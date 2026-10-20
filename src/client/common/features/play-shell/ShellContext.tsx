@@ -26,7 +26,9 @@ import {
 } from "./alerts";
 import { browserAudioContext, createAudioEngine } from "./audio";
 import { contentHeights } from "./content-heights";
+import { requestFit } from "./free-area";
 import type { Rect } from "./geometry";
+import { reportedKeepOuts, subscribeKeepOuts } from "./keep-outs";
 import type { OpenBy, WindowAction } from "./manager";
 import { availableKinds, type WindowRegistry } from "./registry";
 import { createShellController, type ShellController, type ShellState } from "./shell-store";
@@ -72,8 +74,20 @@ export function ShellProvider({
       viewport: browserViewport,
       avoid: () => placementTokens(sync?.getState().store),
       heights: (id) => contentHeights().get(id),
+      // FR-SHELL-80: the map refits once on the client that reset.
+      onReset: requestFit,
     }),
   );
+  // FR-SHELL-81: a reported region (the active tool bar) going returns the windows it pushed.
+  useEffect(() => {
+    let before = new Set(reportedKeepOuts().keys());
+    return subscribeKeepOuts(() => {
+      const now = new Set(reportedKeepOuts().keys());
+      const gone = [...before].some((id) => !now.has(id));
+      before = now;
+      if (gone) controller.dispatch({ type: "return" }, availableNow(controller, sync));
+    });
+  }, [controller, sync]);
   const you = useSync((s) => s.store.you);
   const key = you
     ? layoutKey(
@@ -219,7 +233,7 @@ export function useOpenWindow(): (kind: string, instance?: string, opts?: { by?:
 /**
  * Feature API (FR-SHELL-55): `push(rect)` moves every open window overlapping a map tool bar at
  * `rect` (viewport px) right of it; call it when the bar appears or changes size, never on window
- * changes. `layoutKey` changes when a layout is applied (first snapshot, campaign switch): a bar
+ * changes. The windows go back when the bar's keep-out report goes (FR-SHELL-81, `ShellProvider`). `layoutKey` changes when a layout is applied (first snapshot, campaign switch): a bar
  * shown then pushes again. Outside a ShellProvider: a no-op and null.
  */
 export function usePushWindows(): { push: (rect: Rect) => void; layoutKey: string | null } {

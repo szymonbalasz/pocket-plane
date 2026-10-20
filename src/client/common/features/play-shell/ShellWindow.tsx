@@ -113,6 +113,8 @@ export function ShellWindow({
   const caps = useGrowthCaps(wid);
   // FR-SHELL-57: auto-placed with no PC footprint under it (walkthroughs read `data-pc-clear`).
   const pcClear = useShellState((s) => s.pcClear.has(wid));
+  // FR-SHELL-88: the kind it was auto-minimised for (walkthroughs).
+  const autoFor = useShellState((s) => s.autoMinimisedFor.get(wid));
   // Measured heights are reported as they are taken; a window that stops growing reports none.
   useEffect(() => {
     if (!grows) reportContentHeight(wid, null);
@@ -193,6 +195,7 @@ export function ShellWindow({
       data-placed={placed}
       data-pc-clear={pcClear || undefined}
       data-auto-minimised={(parked && autoMinimised) || undefined}
+      data-auto-minimised-for={(parked && autoMinimised && autoFor) || undefined}
       data-focused={focused}
       aria-label={def.title}
       aria-hidden={parked || undefined}

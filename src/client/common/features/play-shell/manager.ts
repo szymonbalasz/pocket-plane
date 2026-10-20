@@ -1,6 +1,7 @@
-// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29, 40–42, 45–53, 55, 56). Pure: no DOM, no
-// storage. Holds every window's *stored* state; rendering fits and clamps (geometry.ts) without
-// writing back. Every geometry it sets is stamped with the work area it was set in (`area`).
+// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29, 40–42, 45–53, 55, 56, 77–81). Pure: no
+// DOM, no storage. Holds every window's *stored* state; rendering fits and clamps (geometry.ts)
+// without writing back. Every geometry it sets is stamped with the work area it was set in
+// (`area`); a rect the shell chooses drops `userSpot`, a move / resize end sets it.
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import {
   clampRect,
@@ -19,12 +20,20 @@ import {
   fittedDefaultRect,
   type Obstacle,
   type Placeable,
+  type PlaceInput,
   type PlacementToken,
+  pcClear,
   placeWindow,
   RAIL_CLEAR,
   usableArea,
 } from "./placement";
-import { defaultSizeAt, knownDefaultSizes, type WindowRegistry } from "./registry";
+import {
+  defaultSizeAt,
+  knownDefaultSizes,
+  type Size,
+  type WindowDef,
+  type WindowRegistry,
+} from "./registry";
 
 export type Windows = readonly WindowState[];
 
@@ -57,9 +66,14 @@ export type WindowAction =
   | { type: "settle"; kind: string; instance?: string }
   /**
    * A map tool bar appeared at `rect` (viewport px) or changed size (FR-SHELL-55): windows over it
-   * are pushed right of it, written; nothing moves back when it goes.
+   * are pushed right of it, written.
    */
   | { type: "push"; rect: Rect }
+  /**
+   * The tool bar went (FR-SHELL-81): windows still at their pushed rect go back to their pre-push
+   * rect (`ctx.prePush`) where it is clear, written with the `userSpot` they had.
+   */
+  | { type: "return" }
   /**
    * The viewport changed while the page is shown (FR-SHELL-51, -53): never-resized windows at a
    * default size follow this viewport's default and placement, as on applying the entry.
@@ -83,6 +97,22 @@ export interface ManagerContext {
   placed?: (id: string) => Placed | undefined;
   /** Measured content height of a `growToContent` window (FR-SHELL-39), by window id. */
   heights?: (id: string) => number | undefined;
+  /** Pushed windows' pre-push rects (FR-SHELL-81, client memory); read by `return`. */
+  prePush?: () => readonly PrePush[];
+  /** Called for each window auto-minimised for `forKind` (FR-SHELL-77, -88). */
+  onAutoMinimise?: (id: string, forKind: string) => void;
+}
+
+/** A pushed window's spot before the push (FR-SHELL-81): client memory, never stored. */
+export interface PrePush {
+  kind: string;
+  instance: string;
+  /** Its stored rect before the first push of this tool use. */
+  rect: Rect;
+  /** Its `userSpot` then (OQ-SHELL-55 B), restored with the rect. */
+  userSpot?: true;
+  /** The stored rect the push wrote: a window no longer there was moved since (stays). */
+  at: Rect;
 }
 
 /**
@@ -90,9 +120,10 @@ export interface ManagerContext {
  * `default` = auto placement kept its fitted default rect, `auto` = it chose another one,
  * `stored` = read from the layout entry, set by the user (move / resize end) or kept by a user
  * reopen, `pushed` = moved off a map tool bar (FR-SHELL-55), `reopened` = a user reopen found its
- * stored rect covered and auto-placed it (FR-SHELL-56).
+ * stored rect covered and auto-placed it (FR-SHELL-56), `returned` = back at its pre-push rect
+ * after the tool bar went (FR-SHELL-81).
  */
-export type Placed = "auto" | "stored" | "default" | "pushed" | "reopened";
+export type Placed = "auto" | "stored" | "default" | "pushed" | "reopened" | "returned";
 
 /**
  * A user open of a closed or minimised window (FR-SHELL-56): the launcher's `toggle` or `open`
@@ -104,10 +135,13 @@ export const isUserReopen = (action: WindowAction, before: WindowState["state"] 
   (action.type === "toggle" || (action.type === "open" && action.by !== "feature"));
 
 /** Actions naming no window: the whole layout may change. */
-export type LayoutAction = Extract<WindowAction, { type: "push" | "viewport" | "reset" }>;
+export type LayoutAction = Extract<
+  WindowAction,
+  { type: "push" | "return" | "viewport" | "reset" }
+>;
 
 export const isLayoutAction = (a: WindowAction): a is LayoutAction =>
-  a.type === "push" || a.type === "viewport" || a.type === "reset";
+  a.type === "push" || a.type === "return" || a.type === "viewport" || a.type === "reset";
 
 const sameRect = (a: Rect | undefined, b: Rect) =>
   a !== undefined && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
@@ -182,6 +216,55 @@ export function defaultLayout(
   return out;
 }
 
+/** FR-SHELL-79: a window's useful height is at most this unless it declares more. */
+export const USEFUL_H = 360;
+
+const bands = new WeakMap<WindowRegistry, Map<string, number>>();
+
+/**
+ * FR-SHELL-79's **band**: the work area's height above the protected bottom window (the Game
+ * log) in this client's token-free default layout at `vp` (DM 412 / 492 / 512 / 512, player
+ * 412 / 492 / 472 / 472 at the reference sizes); the whole usable height without one.
+ */
+export function bandAt(registry: WindowRegistry, vp: Viewport): number {
+  const key = `${vp.w}x${vp.h}`;
+  let byVp = bands.get(registry);
+  if (!byVp) {
+    byVp = new Map();
+    bands.set(registry, byVp);
+  }
+  const known = byVp.get(key);
+  if (known !== undefined) return known;
+  const a = usableArea(vp);
+  let bottom = a.bottom;
+  for (const w of defaultLayout(registry, vp, [], keepOuts(registry.client, vp, new Map()))) {
+    if (registry.get(w.kind)?.defaultPosition.anchor.startsWith("bottom")) {
+      bottom = Math.min(bottom, w.y - EDGE_GAP);
+    }
+  }
+  const band = Math.max(0, bottom - a.top);
+  byVp.set(key, band);
+  return band;
+}
+
+/**
+ * FR-SHELL-79: `useful(def, vp, client)`: width `usefulSize.w` ?? the fitted default width;
+ * height min(`usefulSize.h` ?? `minOpenH` ?? min(default h, 360), band); never below the min
+ * size, never above the default.
+ */
+export function usefulSize(def: WindowDef, vp: Viewport, band: number): Size {
+  const fitted = fittedDefaultRect(def, vp);
+  const dflt = defaultSizeAt(def, vp);
+  const w = Math.min(fitted.w, Math.max(def.minSize.w, def.usefulSize?.w ?? fitted.w));
+  const want = def.usefulSize?.h ?? def.minOpenH ?? Math.min(dflt.h, USEFUL_H);
+  const h = Math.min(dflt.h, Math.max(def.minSize.h, Math.min(want, band)));
+  return { w, h };
+}
+
+/** `usefulSize` with this registry's band. */
+export const useful = (def: WindowDef, vp: Viewport, registry: WindowRegistry) =>
+  usefulSize(def, vp, bandAt(registry, vp));
+
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
@@ -224,56 +307,121 @@ function onScreen(ws: Windows, ctx: ManagerContext, kind: string, instance: stri
 }
 
 /**
- * Auto placement of (kind, instance) against what is on screen now (FR-SHELL-45), never shorter
- * than the height it renders at: a growing window's measured content height (FR-SHELL-39).
- * Screen full (FR-SHELL-47): the least recently used launcher-opened window (open, type neither
- * `defaultOpen` nor `fixedDefault`; lowest z) is minimised and placement runs again, repeatedly.
- * Returns the windows (incl. any auto-minimised) and the rect.
+ * A rect the shell chose for `w` (auto placement, push, viewport follow), written with `area`;
+ * `userSpot` dropped (FR-SHELL-56 note, OQ-SHELL-55 B).
+ */
+function shellRect(w: WindowState, r: Rect, area: WindowState["area"]): WindowState {
+  const { userSpot: _user, ...rest } = w;
+  return { ...rest, x: r.x, y: r.y, w: r.w, h: r.h, area };
+}
+
+/**
+ * Windows auto placement of (kind, instance) may auto-minimise (FR-SHELL-77): rendered, open,
+ * type neither `defaultOpen` nor `fixedDefault`, not the window placed; in FR-SHELL-78's order:
+ * ascending z (least recently brought to front first), ties → earlier in the entry, a window
+ * placed earlier in this placement's own sequence (`late`) last.
+ */
+export function autoMinimiseOrder(
+  ws: Windows,
+  ctx: ManagerContext,
+  kind: string,
+  instance: string,
+  late?: ReadonlySet<string>,
+): WindowState[] {
+  const at = new Map(ws.map((w, i) => [w, i]));
+  const isLate = (w: WindowState) => (late?.has(windowId(w.kind, w.instance)) ? 1 : 0);
+  return ws
+    .filter((w) => {
+      const d = ctx.registry.get(w.kind);
+      if (!d || d.defaultOpen || d.fixedDefault || !isShown(w, ctx.available)) return false;
+      return !(w.kind === kind && w.instance === instance);
+    })
+    .sort((a, b) => isLate(a) - isLate(b) || a.z - b.z || (at.get(a) ?? 0) - (at.get(b) ?? 0));
+}
+
+const minimised = (ws: Windows, gone: ReadonlySet<WindowState>): Windows =>
+  ws.map((w) => (gone.has(w) ? { ...w, state: "minimised" as const } : w));
+
+/**
+ * Auto placement of (kind, instance) (FR-SHELL-77 (a)–(e) over FR-SHELL-45), never shorter than
+ * the height it renders at (a growing window's measured content height, FR-SHELL-39):
+ * (a) rank at full and useful size (FR-SHELL-79); (b) accept a spot clear of windows and hard
+ * keep-outs and of every PC footprint + 4 px; (c) else, iff ranking with every auto-minimisable
+ * window removed (the look-ahead) gives an accepted spot, auto-minimise the first in FR-SHELL-78's
+ * order and go back to (a); (d) else shrink down to the min size, accepted when clear and PC-free;
+ * (e) else the clear spot over the least PC area; none clear (screen full, FR-SHELL-47): the
+ * first auto-minimisable window is auto-minimised and placement runs again; nothing left: the
+ * protected last resort. Returns the windows (incl. any auto-minimised), the rect and whether it
+ * is clear of the other windows.
  */
 function autoPlace(
   ws: Windows,
   ctx: ManagerContext,
   kind: string,
   instance: string,
-): { windows: Windows; rect: Rect } | null {
+  late?: ReadonlySet<string>,
+): { windows: Windows; rect: Rect; clear: boolean } | null {
   const def = ctx.registry.get(kind);
   if (!def) return null;
   const regions = keepOutsOf(ctx);
   const input = { hard: hardRects(regions), soft: softRects(regions), tokens: ctx.avoid?.() ?? [] };
   const cur = find(ws, kind, instance);
   const need = growsToContent(cur ?? {}, def) ? ctx.heights?.(windowId(kind, instance)) : undefined;
+  const floor = useful(def, ctx.viewport, ctx.registry);
+  const placeIn = (list: Windows, more: Partial<PlaceInput>) =>
+    placeWindow(def, ctx.viewport, {
+      ...input,
+      windows: onScreen(list, ctx, kind, instance),
+      need,
+      ...more,
+    });
+  const park = (list: Windows, w: WindowState) => {
+    ctx.onAutoMinimise?.(windowId(w.kind, w.instance), kind);
+    return minimised(list, new Set([w]));
+  };
   let windows = ws;
+  let ahead: boolean | null = null;
   for (;;) {
-    const others = onScreen(windows, ctx, kind, instance);
-    const p = placeWindow(def, ctx.viewport, { ...input, windows: others, need });
-    if (p.clear) return { windows, rect: p.rect };
-    let lru: WindowState | undefined;
-    for (const w of windows) {
-      const d = ctx.registry.get(w.kind);
-      if (!d || d.defaultOpen || d.fixedDefault || !isShown(w, ctx.available)) continue;
-      if (w.kind === kind && w.instance === instance) continue;
-      if (!lru || w.z < lru.z) lru = w;
+    const p = placeIn(windows, { floor });
+    if (p.clear && p.pcClear) return { windows, rect: p.rect, clear: true };
+    const first = autoMinimiseOrder(windows, ctx, kind, instance, late)[0];
+    if (first) {
+      // (c) The look-ahead, once: after each auto-minimise the rest are the same set, minus it.
+      if (ahead === null) {
+        const all = new Set(autoMinimiseOrder(windows, ctx, kind, instance, late));
+        const q = placeIn(minimised(windows, all), { floor });
+        ahead = q.clear && q.pcClear;
+      }
+      if (ahead) {
+        windows = park(windows, first);
+        continue;
+      }
     }
-    if (!lru) {
-      const last = placeWindow(def, ctx.viewport, {
-        ...input,
-        windows: others,
-        need,
-        lastResort: true,
-      });
-      return { windows, rect: last.rect };
+    const d = placeIn(windows, {});
+    if (d.clear && d.pcClear) return { windows, rect: d.rect, clear: true };
+    const e = placeIn(windows, { leastPc: true });
+    if (e.clear) return { windows, rect: e.rect, clear: true };
+    if (first) {
+      windows = park(windows, first);
+      continue;
     }
-    const parked = lru;
-    windows = windows.map((w) => (w === parked ? { ...w, state: "minimised" as const } : w));
+    const last = placeIn(windows, { leastPc: true, lastResort: true });
+    return { windows, rect: last.rect, clear: last.clear };
   }
 }
 
 /** `ws` with (kind, instance) auto-placed (and any window auto-minimised for it), written. */
-function withAutoPlaced(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Windows {
-  const placed = autoPlace(ws, ctx, kind, instance);
+function withAutoPlaced(
+  ws: Windows,
+  ctx: ManagerContext,
+  kind: string,
+  instance: string,
+  late?: ReadonlySet<string>,
+): Windows {
+  const placed = autoPlace(ws, ctx, kind, instance, late);
   if (!placed) return ws;
   const area = workArea(ctx.viewport);
-  return patch(placed.windows, kind, instance, (w) => ({ ...w, ...placed.rect, area }));
+  return patch(placed.windows, kind, instance, (w) => shellRect(w, placed.rect, area));
 }
 
 /**
@@ -288,10 +436,20 @@ export function isCovered(ws: Windows, cur: WindowState, ctx: ManagerContext): b
 }
 
 /**
+ * A user reopen's "covered" (FR-SHELL-56 (2) with OQ-SHELL-55 B): `isCovered`, or, for a spot the
+ * shell chose (no `userSpot`), its shown rect covers a PC footprint + 4 px.
+ */
+export function isReopenCovered(ws: Windows, cur: WindowState, ctx: ManagerContext): boolean {
+  if (isCovered(ws, cur, ctx)) return true;
+  return !cur.userSpot && !pcClear(shownRect(ws, cur, ctx), ctx.avoid?.() ?? []);
+}
+
+/**
  * FR-SHELL-56 (5): a protected window reopened onto a covered spot keeps it; every other open
- * window overlapping its shown rect is auto-placed as if just opened (the protected one an
- * obstacle), lowest z first, written; one with no clear spot is auto-minimised (FR-SHELL-47).
- * Protected and `fixedDefault` ones are moved only when a clear spot exists.
+ * window overlapping its shown rect is auto-placed as if just opened (FR-SHELL-77; the protected
+ * one an obstacle, the ones moved before it last in FR-SHELL-78's order), lowest z first,
+ * written; one still not clear of the windows is auto-minimised (FR-SHELL-47). Protected and
+ * `fixedDefault` ones are moved only when a clear spot exists.
  */
 function clearAround(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Windows {
   const me = find(ws, kind, instance);
@@ -304,16 +462,25 @@ function clearAround(ws: Windows, ctx: ManagerContext, kind: string, instance: s
   const regions = keepOutsOf(ctx);
   const input = { hard: hardRects(regions), soft: softRects(regions), tokens: ctx.avoid?.() ?? [] };
   const area = workArea(ctx.viewport);
+  const late = new Set([windowId(kind, instance)]);
   let out = ws;
   for (const w of covering) {
     const def = ctx.registry.get(w.kind);
-    if (!def || def.fixedDefault) continue;
+    const now = find(out, w.kind, w.instance);
+    if (!def || def.fixedDefault || !now || !isShown(now, ctx.available)) continue;
+    if (!def.defaultOpen) {
+      const placed = autoPlace(out, ctx, w.kind, w.instance, late);
+      if (!placed) continue;
+      out = placed.clear
+        ? patch(placed.windows, w.kind, w.instance, (x) => shellRect(x, placed.rect, area))
+        : patch(out, w.kind, w.instance, (x) => ({ ...x, state: "minimised" }));
+      late.add(windowId(w.kind, w.instance));
+      continue;
+    }
     const others = onScreen(out, ctx, w.kind, w.instance);
     const need = growsToContent(w, def) ? ctx.heights?.(windowId(w.kind, w.instance)) : undefined;
     const p = placeWindow(def, ctx.viewport, { ...input, windows: others, need });
-    if (p.clear) out = patch(out, w.kind, w.instance, (x) => ({ ...x, ...p.rect, area }));
-    else if (!def.defaultOpen)
-      out = patch(out, w.kind, w.instance, (x) => ({ ...x, state: "minimised" }));
+    if (p.clear) out = patch(out, w.kind, w.instance, (x) => shellRect(x, p.rect, area));
   }
   return out;
 }
@@ -331,6 +498,8 @@ function needsAutoPlace(ws: Windows, cur: WindowState, ctx: ManagerContext): boo
   const hard = hardRects(keepOutsOf(ctx));
   const how = ctx.placed?.(windowId(cur.kind, cur.instance));
   if (how === "auto" || how === "default" || how === "pushed") return true;
+  // OQ-SHELL-55 B: a spot the shell chose (a returned one included) over a PC is re-placed.
+  if (!cur.userSpot && (how === "returned" || isReopenCovered(ws, cur, ctx))) return true;
   const asDefault = defaultLayout(ctx.registry, ctx.viewport).find((w) => w.kind === cur.kind);
   return sameRect(asDefault, cur) || sameRect(fittedDefaultRect(def, ctx.viewport, hard), cur);
 }
@@ -379,11 +548,14 @@ function followDefaults(
       keep.x + keep.w <= vp.w &&
       keep.y + keep.h <= vp.h - LAUNCHER_CLEAR;
     const clear = ![...others, ...hard].some((o) => overlaps(keep, o));
-    const rect =
+    windows[i] =
       inside && clear
-        ? keep
-        : placeWindow(def, vp, { windows: others, hard, soft: softRects(regions) }).rect;
-    windows[i] = { ...w, ...rect, area: workArea(vp) };
+        ? { ...w, ...keep, area: workArea(vp) }
+        : shellRect(
+            w,
+            placeWindow(def, vp, { windows: others, hard, soft: softRects(regions) }).rect,
+            workArea(vp),
+          );
     changed = true;
   }
   return changed;
@@ -411,7 +583,8 @@ export function followViewport(
  * 12), repeatedly; same y and height; its width kept if it fits before vw − 12, else shrunk toward
  * its min. No room to the right even at min width: it moves below the bar (`belowBar`). Neither
  * fits: a launcher window is auto-minimised (FR-SHELL-47), a protected (`defaultOpen`) or
- * `fixedDefault` one goes to the right edge at min width. Written with `area`; never restored.
+ * `fixedDefault` one goes to the right edge at min width. Written with `area`; the shell keeps
+ * the pre-push rect for `return` (FR-SHELL-81).
  */
 function pushWindows(ws: Windows, bar: Rect, ctx: ManagerContext): Windows {
   const vp = ctx.viewport;
@@ -456,7 +629,37 @@ function pushWindows(ws: Windows, bar: Rect, ctx: ManagerContext): Windows {
     const at = landed ?? under ?? { ...r, x: right - min, w: min };
     taken.push(at);
     const stored = under ?? { x: at.x, y: base.y, w: at.w, h: base.h };
-    out = patch(out, win.kind, win.instance, (w) => ({ ...w, ...stored, area }));
+    out = patch(out, win.kind, win.instance, (w) => shellRect(w, stored, area));
+  }
+  return out;
+}
+
+/**
+ * FR-SHELL-81: when the tool bar goes, every window still open at the rect its push wrote goes
+ * back to its pre-push rect, lowest z first, iff that rect (as it renders now) is clear of every
+ * other rendered open window and hard keep-out region; PCs don't count (like a user spot). Written
+ * with `area` and the `userSpot` it had; any other stays where it was pushed.
+ */
+function returnPushed(ws: Windows, ctx: ManagerContext): Windows {
+  const area = workArea(ctx.viewport);
+  const back = (ctx.prePush?.() ?? [])
+    .map((p) => ({ p, w: find(ws, p.kind, p.instance) }))
+    .filter(
+      (e): e is { p: PrePush; w: WindowState } =>
+        e.w !== undefined && isShown(e.w, ctx.available) && sameRect(e.w, e.p.at),
+    )
+    .sort((a, b) => a.w.z - b.w.z);
+  let out = ws;
+  for (const { p } of back) {
+    const moved = patch(out, p.kind, p.instance, (w) => ({
+      ...shellRect(w, p.rect, area),
+      ...(p.userSpot && { userSpot: true as const }),
+    }));
+    const me = find(moved, p.kind, p.instance);
+    if (!me || moved === out) continue;
+    const shown = shownRect(moved, me, ctx);
+    const blocked = [...onScreen(moved, ctx, p.kind, p.instance), ...hardRects(keepOutsOf(ctx))];
+    if (!blocked.some((o) => overlaps(shown, o))) out = moved;
   }
   return out;
 }
@@ -560,7 +763,8 @@ function patch(
     next.z === cur.z &&
     next.area?.w === cur.area?.w &&
     next.area?.h === cur.area?.h &&
-    next.fixedH === cur.fixedH
+    next.fixedH === cur.fixedH &&
+    next.userSpot === cur.userSpot
   ) {
     return ws;
   }
@@ -583,9 +787,11 @@ function toFront(ws: Windows, kind: string, instance: string, state?: WindowStat
  */
 export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): Windows {
   if (action.type === "reset") {
-    return defaultLayout(ctx.registry, ctx.viewport, ctx.avoid?.(), keepOutsOf(ctx));
+    // FR-SHELL-80: exactly the named (token-free) default layout; the map refits instead.
+    return defaultLayout(ctx.registry, ctx.viewport, [], keepOutsOf(ctx));
   }
   if (action.type === "push") return pushWindows(ws, action.rect, ctx);
+  if (action.type === "return") return returnPushed(ws, ctx);
   if (action.type === "viewport") {
     return followViewport(ws, ctx.registry, ctx.viewport, keepOutsOf(ctx));
   }
@@ -605,7 +811,7 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
         if (cur.state !== "open" && ctx.available.has(kind)) {
           if (action.by === "feature") {
             if (needsAutoPlace(ws, cur, ctx)) next = withAutoPlaced(ws, ctx, kind, instance);
-          } else if (!def.fixedDefault && isCovered(ws, cur, ctx)) {
+          } else if (!def.fixedDefault && isReopenCovered(ws, cur, ctx)) {
             if (!def.defaultOpen) next = withAutoPlaced(ws, ctx, kind, instance);
             else {
               const opened = patch(ws, kind, instance, (w) => ({ ...w, state: "open" }));
@@ -659,6 +865,7 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
     }
     case "setRect": {
       const r = action.rect;
+      // OQ-SHELL-55 B: a move / resize end makes the spot the user's (`userSpot`).
       return patch(ws, kind, instance, (w) => ({
         ...w,
         x: bound(r.x, -GEOMETRY_LIMIT),
@@ -668,6 +875,7 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
         area: workArea(ctx.viewport),
         // FR-SHELL-39: after a user resize the stored height wins (cleared by reset).
         ...(action.resized && def.growToContent && { fixedH: true as const }),
+        userSpot: true as const,
       }));
     }
   }

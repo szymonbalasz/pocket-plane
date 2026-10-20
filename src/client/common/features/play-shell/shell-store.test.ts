@@ -64,7 +64,7 @@ describe("FR-SHELL-40, -41 settle after first layout", () => {
       growToContent: true,
     }),
     def("cmp.compendium", { defaultSize: { w: 440, h: 560 } }),
-    def("dice.log", { defaultSize: { w: 460, h: 240 } }),
+    def("dice.log", { defaultSize: { w: 460, h: 240 }, defaultOpen: true }),
   ]);
   const small = { w: 1280, h: 720 };
   const kinds = new Set(["cbt.initiative", "cmp.compendium", "dice.log"]);
@@ -99,17 +99,22 @@ describe("FR-SHELL-40, -41 settle after first layout", () => {
   test("FR-SHELL-41 Initiative closed before Start (no measured height) ends clear of the Game log and the Compendium", () => {
     const { c, heights, init } = m8Controller({ state: "closed", x: 868, y: 60, w: 400, h: 500 });
     c.dispatch({ type: "open", kind: "cbt.initiative", by: "feature" }, kinds);
-    // Sprint 5 (FR-SHELL-45): the tallest clear slot, clear of both before its height is known.
+    // Sprint 7 (FR-SHELL-77, -79): no clear slot at its useful 360 px with the Compendium open, so
+    // the Compendium (the only launcher window) is auto-minimised; clear of the Game log before
+    // its height is known.
     const first = init() as WindowState;
-    for (const o of [log, comp]) expect(overlaps(first, o)).toBe(false);
+    const compendium = () => c.store.getState().windows.find((w) => w.kind === "cmp.compendium");
+    expect(compendium()?.state).toBe("minimised");
+    expect(first.h).toBeGreaterThanOrEqual(360);
+    expect(overlaps(first, log)).toBe(false);
     expect(c.store.getState().settling.has(INIT)).toBe(true);
     // First layout: ShellWindow reports the measured height, then settles.
     heights.set(INIT, 302);
     c.dispatch({ type: "settle", kind: "cbt.initiative" }, kinds);
     const r = init() as WindowState;
     expect(r.h).toBeGreaterThanOrEqual(302);
-    for (const o of [log, comp]) expect(overlaps(r, o)).toBe(false);
-    expect(c.store.getState().placed.get(INIT)).toBe("auto");
+    expect(overlaps(r, log)).toBe(false);
+    expect(compendium()?.state).toBe("minimised");
     expect(c.store.getState().settling.has(INIT)).toBe(false);
     // Once: a later settle (or growth) never moves it again.
     heights.set(INIT, 600);
@@ -213,5 +218,134 @@ describe("sprint 5 (FR-SHELL-47, -53)", () => {
     expect(w).toMatchObject({ x: 68, y: 404, w: 500, h: 160, area: workArea(small) });
     expect(backend.get("k")).not.toBe(raw);
     expect(c.store.getState().placed.get("dice.log:main")).toBe("stored");
+  });
+});
+
+describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
+  const wide = { w: 1440, h: 900 };
+  const reg = createWindowRegistry("dm", [
+    def("c.log", {
+      defaultOpen: true,
+      defaultSize: { w: 600, h: 200 },
+      minSize: { w: 300, h: 160 },
+      defaultPosition: { anchor: "bottom-left", dx: 56 },
+    }),
+    def("c.init", {
+      defaultOpen: true,
+      defaultSize: { w: 400, h: 500 },
+      minSize: { w: 320, h: 240 },
+      defaultPosition: { anchor: "top-left", dx: 56 },
+      growToContent: true,
+    }),
+    def("c.side", { defaultSize: { w: 300, h: 300 }, defaultPosition: { anchor: "top-right" } }),
+  ]);
+  const kinds = new Set(reg.defs.map((d) => d.kind));
+  const bar = { x: 62, y: 56, w: 300, h: 80 };
+  function make(fits: { n: number }) {
+    const backend = new Map<string, string>();
+    const storage = createLayoutStorage(() => ({
+      getItem: (k) => backend.get(k) ?? null,
+      setItem: (k, v) => void backend.set(k, v),
+    }));
+    const c = createShellController({
+      registry: reg,
+      storage,
+      viewport: () => wide,
+      onReset: () => {
+        fits.n += 1;
+      },
+    });
+    c.restore("k");
+    const win = (kind: string) => c.store.getState().windows.find((w) => w.kind === kind);
+    const rect = (kind: string) => {
+      const w = win(kind);
+      return w && { x: w.x, y: w.y, w: w.w, h: w.h };
+    };
+    return { c, win, rect, storage };
+  }
+
+  test("FR-SHELL-80 reset keeps the zones: the default layout written (its fitted default rects: `default`), other windows closed, fixedH cleared, one Fit requested", () => {
+    const fits = { n: 0 };
+    const { c, win } = make(fits);
+    c.dispatch({ type: "open", kind: "c.side" }, kinds);
+    const init = win("c.init") as WindowState;
+    c.dispatch(
+      { type: "setRect", kind: "c.init", rect: { ...init, h: 300 }, resized: true },
+      kinds,
+    );
+    expect(win("c.init")?.fixedH).toBe(true);
+    c.dispatch({ type: "reset" }, kinds);
+    expect(fits.n).toBe(1);
+    expect(win("c.side")).toBeUndefined();
+    expect(win("c.init")?.fixedH).toBeUndefined();
+    expect(Object.fromEntries(c.store.getState().placed)).toEqual({
+      "c.log:main": "default",
+      "c.init:main": "default",
+    });
+    c.dispatch({ type: "open", kind: "c.side" }, kinds); // not a reset: no Fit
+    expect(fits.n).toBe(1);
+  });
+
+  test("FR-SHELL-81 pushed windows return: bar shown → Initiative pushed; bar gone → back at the pre-push rect, `returned`, userSpot restored; Fog → AoE switch → back to the pre-Fog rect; reload → no memory", () => {
+    const { c, rect, win, storage } = make({ n: 0 });
+    const home = rect("c.init");
+    // The user's spot (userSpot), then the Fog bar pushes it.
+    c.dispatch({ type: "setRect", kind: "c.init", rect: home as Rect }, kinds);
+    c.dispatch({ type: "push", rect: bar }, kinds);
+    expect(rect("c.init")?.x).toBe(bar.x + bar.w + 12);
+    expect(c.store.getState().placed.get("c.init:main")).toBe("pushed");
+    expect(win("c.init")?.userSpot).toBeUndefined();
+    // A wider AoE panel replaces the bar before it went: pushed further, memory kept from before Fog.
+    c.dispatch({ type: "push", rect: { ...bar, w: 420 } }, kinds);
+    expect(rect("c.init")?.x).toBe(bar.x + 420 + 12);
+    c.dispatch({ type: "return" }, kinds);
+    expect(rect("c.init")).toEqual(home);
+    expect(c.store.getState().placed.get("c.init:main")).toBe("returned");
+    expect(win("c.init")?.userSpot).toBe(true);
+    expect(c.store.getState().prePush.size).toBe(0);
+    // Pushed, then the page reloads: the pushed rect is the stored one, nothing returns.
+    c.dispatch({ type: "push", rect: bar }, kinds);
+    const pushed = rect("c.init");
+    const reloaded = createShellController({ registry: reg, storage, viewport: () => wide });
+    reloaded.restore("k");
+    expect(reloaded.store.getState().prePush.size).toBe(0);
+    reloaded.dispatch({ type: "return" }, kinds);
+    const after = reloaded.store.getState().windows.find((w) => w.kind === "c.init");
+    expect(after && { x: after.x, y: after.y, w: after.w, h: after.h }).toEqual(pushed);
+  });
+
+  test("FR-SHELL-81 a window moved or minimised while pushed drops out of the memory and stays", () => {
+    const { c, rect } = make({ n: 0 });
+    c.dispatch({ type: "push", rect: bar }, kinds);
+    const at = rect("c.init") as Rect;
+    c.dispatch({ type: "setRect", kind: "c.init", rect: { ...at, x: at.x + 30 } }, kinds);
+    expect(c.store.getState().prePush.has("c.init:main")).toBe(false);
+    c.dispatch({ type: "return" }, kinds);
+    expect(rect("c.init")?.x).toBe(at.x + 30);
+  });
+
+  test("FR-SHELL-88 test hooks: data-auto-minimised-for = the kind it made room for; the last placement's moves; cleared on restore", () => {
+    // Screen full at 1280×720 (FR-SHELL-47): three 500×400 launcher windows.
+    const small = { w: 1280, h: 720 };
+    const big = { defaultSize: { w: 500, h: 400 }, minSize: { w: 500, h: 400 } };
+    const r = createWindowRegistry("dm", [
+      def("d.one", big),
+      def("d.two", big),
+      def("d.three", big),
+    ]);
+    const all = new Set(["d.one", "d.two", "d.three"]);
+    const storage = createLayoutStorage(() => ({ getItem: () => null, setItem: () => {} }));
+    const c = createShellController({ registry: r, storage, viewport: () => small });
+    c.restore("k");
+    for (const kind of ["d.one", "d.two", "d.three"]) c.dispatch({ type: "open", kind }, all);
+    expect(Object.fromEntries(c.store.getState().autoMinimisedFor)).toEqual({
+      "d.one:main": "d.three",
+    });
+    expect(c.store.getState().autoMinimiseLog).toBe("d.one>d.three");
+    c.dispatch({ type: "focus", kind: "d.two" }, all); // not a placement: the log stays
+    expect(c.store.getState().autoMinimiseLog).toBe("d.one>d.three");
+    c.dispatch({ type: "close", kind: "d.three" }, all);
+    c.dispatch({ type: "open", kind: "d.one" }, all);
+    expect(c.store.getState().autoMinimisedFor.has("d.one:main")).toBe(false);
   });
 });

@@ -45,6 +45,12 @@ export const WindowState = z.object({
    * wins, no growth. Absent = grows; entries stored before it still parse.
    */
   fixedH: z.literal(true).optional(),
+  /**
+   * Set at a user move / resize end (FR-SHELL-56, OQ-SHELL-55 B): the spot is the user's, kept on
+   * a reopen even over a PC. Cleared when the shell places the window; entries stored before it
+   * parse as absent (the shell chose the spot).
+   */
+  userSpot: z.literal(true).optional(),
 });
 export type WindowState = z.infer<typeof WindowState>;
 

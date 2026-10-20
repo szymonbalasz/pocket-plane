@@ -23,7 +23,7 @@ import {
   rectIn,
   rectOf,
 } from "@ui/features/play-shell/layout-checks";
-import { defaultLayout, reduce, restoreLayout } from "@ui/features/play-shell/manager";
+import { defaultLayout, reduce, restoreLayout, useful } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect, placeWindow } from "@ui/features/play-shell/placement";
 import {
@@ -784,13 +784,16 @@ test("FR-SHELL-58 token-free spot first (DM, sim-9 a01): 1440×900, Initiative +
     const rect = steps[0]?.rect;
     if (!rect || !def) throw new Error(`${kind} not open`);
     const got = placeFields(rect, def, WIDE, scene);
-    expect({ kind, got }).toEqual({ kind, got: bruteBest(def, WIDE, scene) });
+    // Sprint 7 (FR-SHELL-79): ranked at ≥ its useful size first.
+    const floor = useful(def, WIDE, dmWindows);
+    expect({ kind, got }).toEqual({ kind, got: bruteBest(def, WIDE, scene, floor) });
     fields[kind] = got.join("");
   }
   // The 42-px fit spreads the ambush over the map band: Compendium has no token-free spot (sim-9
-  // had 576,60, under the old fit's left strip), Scenes still does.
+  // had 576,60, under the old fit's left strip); sprint 7 (FR-SHELL-79): neither has Scenes at
+  // its useful 360 high (sprint 6 shrank it to a token-free 240), so it covers a monster, no PC.
   expect(fields["cmp.compendium"]).toBe("00001");
-  expect(fields["map.scenes"]).toBe("00000");
+  expect(fields["map.scenes"]).toBe("00001");
 });
 
 /** FR-SHELL-61 (5): stand-ins for PF's Preferences until PF1 registers the real line (S2, S3). */
@@ -805,11 +808,24 @@ const PREFS_STUB = {
   component: () => null,
 } satisfies WindowDef;
 
+/** FR-SHELL-86: stands in for ST's `stats.board` until ST2 registers it (400 × 412, seams S5). */
+const STATS_STUB = {
+  kind: "stats.test",
+  title: "Stats",
+  clients: ["dm", "player"],
+  defaultSize: { w: 400, h: 412 },
+  minSize: { w: 320, h: 280 },
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  launcher: { icon: () => null, label: "Stats", order: 65 },
+  component: () => null,
+} satisfies WindowDef;
+
 /** The DM registry with this sprint's new windows: the real lines once merged, else the stubs. */
 const withNewWindows = (): WindowRegistry =>
-  dmWindows.get(PREFS_STUB.kind)
-    ? dmWindows
-    : createWindowRegistry("dm", [...dmWindows.defs, PREFS_STUB]);
+  createWindowRegistry("dm", [
+    ...dmWindows.defs,
+    ...[PREFS_STUB, STATS_STUB].filter((d) => !dmWindows.get(d.kind)),
+  ]);
 
 /** FR-SHELL-62 (d): the DM's non-default product kinds on `main` when WF1 started, in registry order. */
 const GOLDEN_KINDS = [
@@ -853,14 +869,17 @@ test("FR-SHELL-61 every user-opened kind (DM): every non-default kind, launcher 
   expect(kinds).toContain("charx.companion"); // no DM launcher (FR-CHARX-59)
   expect(kinds).toContain("party.handout"); // no launcher button
   expect(kinds).toContain("shell.test"); // test mode
+  expect(kinds).toContain("stats.test"); // FR-SHELL-86's stand-in for stats.board
   expect(problemsOf(runs(registry, kinds))).toEqual([]);
   for (const kind of kinds.filter((k) => !GOLDEN_KINDS.includes(k))) {
     const def = registry.get(kind);
     if (!def || def.fixedDefault || kind === "party.handout") continue;
     expect({ kind, problems: contractProblems(def) }).toEqual({ kind, problems: [] });
   }
-  // The stand-ins at the S3 numbers pass; a 480-wide one doesn't.
+  // The stand-ins at the S3 / S5 numbers pass; a 480-wide one doesn't.
   expect(contractProblems(PREFS_STUB)).toEqual([]);
+  expect(contractProblems(STATS_STUB)).toEqual([]);
+  expect(contractProblems({ ...STATS_STUB, minSize: { w: 320, h: 300 } })).toEqual(["min 320×300"]);
   expect(contractProblems({ ...PREFS_STUB, defaultSize: { w: 480, h: 300 } })).toEqual([
     "width 480 at 1280×720",
     "width 480 at 1280×800",
