@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Wolf Pack Leader</title>
+  <circle cx="128" cy="128" r="124" fill="#546e7a" stroke="#222" stroke-width="6"/>
+  <polygon points="128,51 148,100 201,104 161,139 173,190 128,163 83,190 95,139 55,104 108,100" fill="#ef6c00" stroke="#111" stroke-width="3"/>
+  <rect x="38" y="233" width="15" height="15" fill="#fff" stroke="#000"/><rect x="55" y="234" width="15" height="14" fill="#fff" stroke="#000"/><rect x="72" y="242" width="15" height="6" fill="#fff" stroke="#000"/><rect x="89" y="232" width="15" height="16" fill="#fff" stroke="#000"/><rect x="106" y="243" width="15" height="5" fill="#fff" stroke="#000"/><rect x="123" y="241" width="15" height="7" fill="#fff" stroke="#000"/><rect x="140" y="240" width="15" height="8" fill="#fff" stroke="#000"/><rect x="157" y="236" width="15" height="12" fill="#fff" stroke="#000"/><rect x="174" y="232" width="15" height="16" fill="#fff" stroke="#000"/><rect x="191" y="239" width="15" height="9" fill="#fff" stroke="#000"/>
+</svg>

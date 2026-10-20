@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="490" viewBox="0 0 700 490">
+  <title>Forest Road</title>
+  <rect width="700" height="490" fill="#ef6c00"/><path d="M70 0V490M140 0V490M210 0V490M280 0V490M350 0V490M420 0V490M490 0V490M560 0V490M630 0V490M0 70H700M0 140H700M0 210H700M0 280H700M0 350H700M0 420H700" stroke="#000" stroke-opacity=".25"/>
+  <polygon points="350,98 477,172 477,319 350,392 223,319 223,172" fill="#1565c0" stroke="#111" stroke-width="3"/>
+  <rect x="105" y="469" width="46" height="13" fill="#fff" stroke="#000"/><rect x="153" y="468" width="46" height="14" fill="#fff" stroke="#000"/><rect x="201" y="473" width="46" height="9" fill="#fff" stroke="#000"/><rect x="249" y="473" width="46" height="9" fill="#fff" stroke="#000"/><rect x="297" y="466" width="46" height="16" fill="#fff" stroke="#000"/><rect x="345" y="472" width="46" height="10" fill="#fff" stroke="#000"/><rect x="393" y="476" width="46" height="6" fill="#fff" stroke="#000"/><rect x="441" y="468" width="46" height="14" fill="#fff" stroke="#000"/><rect x="489" y="475" width="46" height="7" fill="#fff" stroke="#000"/><rect x="537" y="467" width="46" height="15" fill="#fff" stroke="#000"/>
+</svg>

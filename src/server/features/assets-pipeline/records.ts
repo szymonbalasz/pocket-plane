@@ -3,8 +3,34 @@
 import { AssetRecord } from "@shared/assets-pipeline/schemas";
 import { and, asc, eq } from "drizzle-orm";
 import { asset } from "../../db/schema";
+import type { RecordChange } from "../../events/types";
 import { defineRecordType } from "../../ws/records";
-import { toAssetRecord } from "./commands";
+
+type AssetRow = typeof asset.$inferSelect;
+
+/**
+ * The only mapping from a row to the wire: `hash` and `listed` are dropped here (ASSET §8).
+ * *(S6)* A pre-IM-1 row's null `tags` is sent as `[]` (FR-ASSET-10).
+ */
+export const toAssetRecord = (r: AssetRow): AssetRecord => ({
+  id: r.id,
+  campaignId: r.campaignId,
+  seq: r.seq,
+  name: r.name,
+  mime: r.mime,
+  bytes: r.bytes,
+  width: r.width,
+  height: r.height,
+  displayWidth: r.displayWidth,
+  displayHeight: r.displayHeight,
+  createdAt: r.createdAt,
+  tags: r.tags ?? [],
+});
+
+/** An `asset` upsert (DM) if the row is listed; an attachment has no record (FR-ASSET-24). */
+export function assetUpsert(row: AssetRow): RecordChange[] {
+  return row.listed ? [{ type: "asset", id: row.id, before: null, after: toAssetRecord(row) }] : [];
+}
 
 export const assetRecordType = defineRecordType<AssetRecord>({
   type: "asset",

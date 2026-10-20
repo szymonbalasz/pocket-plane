@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Goblin Elder</title>
+  <circle cx="128" cy="128" r="124" fill="#ef6c00" stroke="#222" stroke-width="6"/>
+  <polygon points="128,51 205,128 128,205 51,128" fill="#1565c0" stroke="#111" stroke-width="3"/>
+  <rect x="38" y="241" width="15" height="7" fill="#fff" stroke="#000"/><rect x="55" y="234" width="15" height="14" fill="#fff" stroke="#000"/><rect x="72" y="234" width="15" height="14" fill="#fff" stroke="#000"/><rect x="89" y="242" width="15" height="6" fill="#fff" stroke="#000"/><rect x="106" y="237" width="15" height="11" fill="#fff" stroke="#000"/><rect x="123" y="241" width="15" height="7" fill="#fff" stroke="#000"/><rect x="140" y="242" width="15" height="6" fill="#fff" stroke="#000"/><rect x="157" y="242" width="15" height="6" fill="#fff" stroke="#000"/><rect x="174" y="233" width="15" height="15" fill="#fff" stroke="#000"/><rect x="191" y="239" width="15" height="9" fill="#fff" stroke="#000"/>
+</svg>

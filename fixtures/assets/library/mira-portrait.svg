@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="320" viewBox="0 0 256 320">
+  <title>Mira Portrait</title>
+  <rect width="256" height="320" fill="#2f7d32"/><rect x="12" y="12" width="232" height="296" fill="none" stroke="#e0c070" stroke-width="8"/>
+  <circle cx="128" cy="160" r="77" fill="#546e7a" stroke="#111" stroke-width="3"/><circle cx="128" cy="160" r="39" fill="#111"/>
+  <rect x="38" y="302" width="15" height="10" fill="#fff" stroke="#000"/><rect x="55" y="301" width="15" height="11" fill="#fff" stroke="#000"/><rect x="72" y="303" width="15" height="9" fill="#fff" stroke="#000"/><rect x="89" y="305" width="15" height="7" fill="#fff" stroke="#000"/><rect x="106" y="307" width="15" height="5" fill="#fff" stroke="#000"/><rect x="123" y="298" width="15" height="14" fill="#fff" stroke="#000"/><rect x="140" y="303" width="15" height="9" fill="#fff" stroke="#000"/><rect x="157" y="302" width="15" height="10" fill="#fff" stroke="#000"/><rect x="174" y="303" width="15" height="9" fill="#fff" stroke="#000"/><rect x="191" y="305" width="15" height="7" fill="#fff" stroke="#000"/>
+</svg>

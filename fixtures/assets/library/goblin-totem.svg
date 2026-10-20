@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140">
+  <title>Goblin Totem</title>
+  <rect width="140" height="140" rx="16" fill="#c62828"/>
+  <polygon points="70,28 81,55 110,57 88,76 95,104 70,89 45,104 52,76 30,57 59,55" fill="#2f7d32" stroke="#111" stroke-width="3"/>
+  <rect x="21" y="125" width="7" height="7" fill="#fff" stroke="#000"/><rect x="30" y="118" width="7" height="14" fill="#fff" stroke="#000"/><rect x="39" y="118" width="7" height="14" fill="#fff" stroke="#000"/><rect x="48" y="126" width="7" height="6" fill="#fff" stroke="#000"/><rect x="57" y="121" width="7" height="11" fill="#fff" stroke="#000"/><rect x="66" y="125" width="7" height="7" fill="#fff" stroke="#000"/><rect x="75" y="125" width="7" height="7" fill="#fff" stroke="#000"/><rect x="84" y="118" width="7" height="14" fill="#fff" stroke="#000"/><rect x="93" y="122" width="7" height="10" fill="#fff" stroke="#000"/><rect x="102" y="123" width="7" height="9" fill="#fff" stroke="#000"/>
+</svg>
