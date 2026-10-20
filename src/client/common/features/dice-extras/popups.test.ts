@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { type DiceThrow, throwDice } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
-import { dmStackAt, pipClip, popupRows } from "./popup-logic";
+import { dmStackAt, pipClip, popupRows, shownPopupStack } from "./popup-logic";
 import { createRollPopups, pipModeOf, pipPlan, type RollPopup } from "./popups";
 import { createDiceExtrasStore } from "./store";
 import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS, POPUP_ROLLING_MAX_MS } from "./timing";
@@ -364,5 +364,35 @@ describe("FR-DICEX-39 placement", () => {
     // The left move lands on another rect → below that one.
     const left = { x: 40, y: 60, w: 400, h: 200 };
     expect(dmStackAt(vp, 100, size, [popup, left])).toEqual({ left: 268, top: 272 });
+  });
+});
+
+describe("FR-DICEX-55 popup clears the tool bar", () => {
+  test("FR-DICEX-55 popup clears the tool bar: 1440×900, Initiative at x 600 + a hard region at the fog bar → the shifted popup drops below the bar; no hard region → the sprint-5 result", () => {
+    const vp = { w: 1440 };
+    const size = { w: 320, h: 190 };
+    const initiative = { x: 600, y: 60, w: 400, h: 500 };
+    // The fog bar at its home spot (FR-MAP-60: right of the rail + 8, y 56; 470 px at 1440×900).
+    const bar = { x: 76, y: 56, w: 470, h: 88 };
+    // Sprint 5: left of Initiative, over the bar.
+    expect(dmStackAt(vp, 100, size, [initiative])).toEqual({ left: 268, top: 100 });
+    // The shift left would overlap the bar (no room left of it at the rail) → below the bar.
+    const at = dmStackAt(vp, 100, size, [initiative, bar]);
+    expect(at).toEqual({ left: 268, top: 156 });
+    const r = { x: at.left, y: at.top, w: size.w, h: size.h };
+    const overlaps = (a: typeof r, b: typeof r) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(overlaps(r, bar)).toBe(false);
+    expect(overlaps(r, initiative)).toBe(false);
+    // A bar clear of the centred popup changes nothing.
+    expect(dmStackAt(vp, 100, size, [bar])).toEqual({ left: 560, top: 100 });
+  });
+
+  test("FR-DICEX-55 popup clears the tool bar: the DM stack reports its rendered rect for the Fit (FR-SHELL-59, OQ-MAP-57 D), null when empty, never for players", () => {
+    const rect = { x: 560, y: 100, w: 320, h: 190 };
+    expect(shownPopupStack(true, rect)).toEqual(rect);
+    expect(shownPopupStack(true, null)).toBeNull();
+    expect(shownPopupStack(true, { ...rect, h: 0 })).toBeNull();
+    expect(shownPopupStack(false, rect)).toBeNull();
   });
 });

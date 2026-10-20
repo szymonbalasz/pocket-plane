@@ -235,8 +235,9 @@ export const MINI_DIE_PX = CELL_PX;
 
 /**
  * FR-DICEX-39 / FR-NOTE-32 rule for the DM's popup stack: centred at `top`; over a rect it keeps
- * clear of (Initiative; the open combat popup, FR-CBT-75, which may sit where its toast was) →
- * left of it with a 12 px gap; no room there → below it. Returns the stack's left / top.
+ * clear of (Initiative; the open combat popup, FR-CBT-75, which may sit where its toast was; the
+ * hard keep-outs, FR-DICEX-55: the map tool bar) → left of it with a 12 px gap; no room there
+ * (a shift onto the tool bar at the rail) → below it. Returns the stack's left / top.
  */
 export function dmStackAt(
   vp: { w: number },
@@ -261,4 +262,12 @@ export function dmStackAt(
         : { left: at.left, top: Math.round(r.y + r.h + EDGE_GAP) };
   }
   return at;
+}
+
+/**
+ * FR-SHELL-59 (OQ-MAP-57 D): what the DM popup stack reports as shown for the Fit: its rendered
+ * rect while it draws something; null for players, an empty stack or a zero-size box.
+ */
+export function shownPopupStack(dm: boolean, rect: Rect | null): Rect | null {
+  return dm && rect && rect.w > 0 && rect.h > 0 ? rect : null;
 }
