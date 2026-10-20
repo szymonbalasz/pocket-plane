@@ -8,6 +8,12 @@ import {
   ROLL_POPUP_H,
   ROLL_POPUP_W,
   ROLL_POPUPS_MAX,
+  reportShownStack,
+  SUMMARY_STRIP_H,
+  SUMMARY_STRIP_W,
+  shownStack,
+  shownStacks,
+  summaryStrip,
   toastKeepOut,
   toastRegion,
 } from "./toast-region";
@@ -95,4 +101,36 @@ describe("toast regions (FR-SHELL-40, -49; seams S2, S7)", () => {
       expect(p.y + p.h).toBeLessThanOrEqual(vp.h - LAUNCHER_CLEAR); // above the launcher
     }
   });
+});
+
+test("FR-SHELL-59 shown stack rect: no reports → null; two reports → their bounding box; a cleared report is gone; players always null; the summary strip at the DM stack home", () => {
+  expect(shownStack("dm")).toBeNull();
+  const toasts = { x: 560, y: 100, w: 320, h: 57 };
+  const popups = { x: 540, y: 165, w: 360, h: 190 };
+  reportShownStack("note.toasts", toasts);
+  try {
+    expect(shownStack("dm")).toEqual(toasts);
+    const before = shownStacks();
+    reportShownStack("note.toasts", { ...toasts }); // same rect: no change
+    expect(shownStacks()).toBe(before);
+    reportShownStack("dicex.popups", popups);
+    expect(shownStack("dm")).toEqual({ x: 540, y: 100, w: 360, h: 255 });
+    expect(shownStack("player")).toBeNull();
+    reportShownStack("note.toasts", null);
+    expect(shownStack("dm")).toEqual(popups);
+  } finally {
+    reportShownStack("note.toasts", null);
+    reportShownStack("dicex.popups", null);
+  }
+  expect(shownStack("dm")).toBeNull();
+  // OQ-MAP-57 D: the 320 × 57 strip at the stack home (FR-NOTE-42's 480 / 560 / 640, y 100).
+  expect([SUMMARY_STRIP_W, SUMMARY_STRIP_H]).toEqual([320, 57]);
+  for (const [vp, x] of [
+    [{ w: 1280, h: 720 }, 480],
+    [{ w: 1280, h: 800 }, 480],
+    [{ w: 1440, h: 900 }, 560],
+    [{ w: 1600, h: 900 }, 640],
+  ] as const) {
+    expect(summaryStrip(vp)).toEqual({ x, y: 100, w: 320, h: 57 });
+  }
 });

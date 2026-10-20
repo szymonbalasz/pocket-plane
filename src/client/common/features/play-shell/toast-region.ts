@@ -97,3 +97,76 @@ export function toastKeepOut(client: ShellClient, vp: { w: number; h: number }):
         h: KEEP_OUT_H,
       };
 }
+
+// ---- the DM's shown stack (FR-SHELL-59; OQ-MAP-57 D, #288) ----
+// The Fit keeps the summary strip and whatever shows clear, not the whole empty box (FR-MAP-80).
+// Reporters (notifications' toast stack, the DM roll-popup stack) call `reportShownStack` with
+// their rendered rect; client memory only.
+
+/** The DM stack's home strip: one summary card (FR-NOTE-42), centred at the region's top. */
+export const SUMMARY_STRIP_W = 320;
+export const SUMMARY_STRIP_H = 57;
+
+/** The summary strip at the DM stack's home, viewport px (an obstacle for the Fit under D). */
+export function summaryStrip(vp: { w: number; h: number }): Rect {
+  return {
+    x: Math.round((vp.w - SUMMARY_STRIP_W) / 2),
+    y: DM_TOAST_TOP,
+    w: SUMMARY_STRIP_W,
+    h: SUMMARY_STRIP_H,
+  };
+}
+
+let shown: ReadonlyMap<string, Rect> = new Map();
+const shownListeners = new Set<() => void>();
+
+const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+
+/**
+ * A DM stack reports its rendered rect (viewport px) while something shows, null when empty.
+ * Same rect again → no change.
+ */
+export function reportShownStack(id: string, rect: Rect | null): void {
+  const cur = shown.get(id);
+  if (rect === null ? cur === undefined : cur && sameRect(cur, rect)) return;
+  const next = new Map(shown);
+  if (rect === null) next.delete(id);
+  else next.set(id, { x: rect.x, y: rect.y, w: rect.w, h: rect.h });
+  shown = next;
+  for (const fn of [...shownListeners]) fn();
+}
+
+/** The reported rects so far (a new Map on every change). */
+export function shownStacks(): ReadonlyMap<string, Rect> {
+  return shown;
+}
+
+/**
+ * The bounding box of the DM's rendered toasts and roll popups now (FR-SHELL-59), null when none
+ * shows. Players: always null (they keep their corner box).
+ */
+export function shownStack(
+  client: ShellClient,
+  reports: ReadonlyMap<string, Rect> = shown,
+): Rect | null {
+  if (client !== "dm" || reports.size === 0) return null;
+  let x0 = Number.POSITIVE_INFINITY;
+  let y0 = Number.POSITIVE_INFINITY;
+  let x1 = Number.NEGATIVE_INFINITY;
+  let y1 = Number.NEGATIVE_INFINITY;
+  for (const r of reports.values()) {
+    x0 = Math.min(x0, r.x);
+    y0 = Math.min(y0, r.y);
+    x1 = Math.max(x1, r.x + r.w);
+    y1 = Math.max(y1, r.y + r.h);
+  }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+/** Subscribe to shown-stack reports (`useSyncExternalStore`). */
+export function subscribeShownStack(fn: () => void): () => void {
+  shownListeners.add(fn);
+  return () => {
+    shownListeners.delete(fn);
+  };
+}
