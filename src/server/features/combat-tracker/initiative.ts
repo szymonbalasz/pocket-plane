@@ -35,6 +35,8 @@ export const rollInitiative = defineCommand({
     if (input.public !== undefined) throw forbidden("Player rolls are always public");
     if (input.combatantIds.length !== 1) throw forbidden("Roll for your own character only");
     const { c } = activeCombatant(env, input.combatantIds[0] as string, { own: true });
+    // FR-CBT-108 (sprint 6): a player never rolls a companion's initiative.
+    if (c.kind !== "pc") throw forbidden("Roll for your own character only");
     if (c.initiative !== null) throw alreadySet([c]);
   },
   execute(input, env): { rollIds: string[] } {

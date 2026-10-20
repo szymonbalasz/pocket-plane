@@ -22,6 +22,7 @@ import type { CommandEnv } from "../../commands/commands";
 import type { Db } from "../../db/client";
 import type { RecordChange } from "../../events/types";
 import type { Viewer } from "../../ws/records";
+import { petPresenceVisibilityHook } from "../entities/pet-presence";
 import { fogVisibilityHook } from "../fog-of-war/hooks";
 
 /** Read-only DB access: a command's `tx` or a signal audience's `read.db`. */
@@ -71,6 +72,7 @@ export interface SceneVisibilityHook {
 /** The registry. Append your feature's line; order = run order. */
 export const sceneVisibilityHooks: readonly SceneVisibilityHook[] = [
   fogVisibilityHook, // fog-of-war (FR-FOG-10 derive, -11 / -12 hides, -15 dragAudience, -35 rederive)
+  petPresenceVisibilityHook, // entities: a pet token's write re-derives `petPresent` (FR-ENT-37)
 ];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */

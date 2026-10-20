@@ -74,7 +74,9 @@ describe("FR-CBT-43 creature form Type", () => {
 
   test("FR-CBT-43 Type: Derive and Edit prefill it from the source; New starts at None", () => {
     expect(initial({ kind: "derive", base: goblin }).type).toBe("humanoid");
-    expect(initial({ kind: "edit", def: { ...goblin, campaignId: "c1" } }).type).toBe("humanoid");
+    expect(
+      initial({ kind: "edit", def: { ...goblin, campaignId: "c1" } as DefinitionRecord }).type,
+    ).toBe("humanoid");
     expect(initial({ kind: "new" }).type).toBe("__none__");
     const untyped = { ...goblin, statBlock: source } as unknown as DefinitionRecord;
     expect(initial({ kind: "derive", base: untyped }).type).toBe("__none__");

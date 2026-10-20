@@ -2,6 +2,8 @@
 // its damage exists. One transaction: the DM-only `hit_ruling` row, one `cbt.attack` line per
 // ruled target without damage (`awaitingDamage`), `HitApplied`. No HP, no `hp_change`, the card
 // stays pending and unchanged; nothing is spent (FR-MOD-63: no apply hooks run). Not undoable.
+
+import { companionSafeToHit, isCompanion } from "@shared/combat-tracker/companion";
 import type { AttackLogDmPayload, AttackLogPayload } from "@shared/combat-tracker/log-kinds";
 import { AcModPart } from "@shared/combat-tracker/log-kinds";
 import { hitHint } from "@shared/combat-tracker/rules";
@@ -69,17 +71,19 @@ export const applyHitCommand = defineCommand({
         target.kind === "pc" ? { characterId: target.entityId } : { combatantId: target.id };
       const ac = effectiveAc(statsOf(env, target).ac, activeEffects(env, who), who);
       const hitComputed = hitHint(toHitRoll.natural, input.toHitTotal, ac.ac);
+      const lineToHit: AttackLogPayload["toHit"] = {
+        dice: toHitSet ? null : toHitRoll.total - (p.toHit?.constant ?? 0),
+        constant: p.toHit?.constant ?? 0,
+        ...(p.toHit?.mods && !toHitSet ? { mods: p.toHit.mods } : {}),
+        total: input.toHitTotal,
+        natural: toHitRoll.natural,
+      };
       const payload: AttackLogPayload = {
         targetName: target.name,
         attackName: p.attackName,
         damageType: p.damageType,
-        toHit: {
-          dice: toHitSet ? null : toHitRoll.total - (p.toHit?.constant ?? 0),
-          constant: p.toHit?.constant ?? 0,
-          ...(p.toHit?.mods && !toHitSet ? { mods: p.toHit.mods } : {}),
-          total: input.toHitTotal,
-          natural: toHitRoll.natural,
-        },
+        // FR-CBT-114 (sprint 6): a companion attacker's line keeps the total only (ADR-0056).
+        toHit: isCompanion(attacker) ? companionSafeToHit(lineToHit) : lineToHit,
         hit,
         damage: 0,
         multiplier,

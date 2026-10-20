@@ -2668,3 +2668,49 @@ From [combat-extras](../specs/combat-extras.md) FR-CBTX-57, -58 and [combat-trac
 | List viewport `cbt-init-list` (DM: the rows' scroll box; player: the `ul`) | The rows' own clipping viewport (`overflow-y: auto`); `cbt-init-more` sits **under** it (not sticky, not over the rows), absent while N = 0. While the window grows (FR-SHELL-39) the body (`cbt-init`) gets `max-height` = the height the window would have for the uncapped content (`windowRect` with the measured natural height, the window's growth caps) − title bar, borders, body padding, so the window body never scrolls and no row paints in its padding. `listClip(natural, avail)` (`below-fold.tsx`): cap iff natural > avail + 1 px. N = rows not wholly above the list's bottom (FR-CBT-77). DM Pending: its own 3-row scroll, unchanged | FR-CBT-125 |
 | Tests | `parts.test.tsx` (`FR-CBTX-57 hidden ally name whole` ×4, `FR-CBTX-58 trigger label never cut` ×3), `below-fold.test.ts` (`FR-CBT-125 nothing below N more` ×2), `chips-fit.test.tsx` (FR-CBTX-54, markup updated); e2e `init-rows-s6.e2e.ts` (session-sim-9, PLAY §13 F10: DM 400 / 320, player-1 280 / 240) | |
 | CON-44 | 0 B: no record, field or frame | |
+
+## 112. Sprint 6: companions core (CP0)
+
+From [combat-tracker](../specs/combat-tracker.md#9-api--events) FR-CBT-105–124, [entities](../specs/entities.md#9-api--events) FR-ENT-31–38, [scenes-map](../specs/scenes-map.md#9-api--events) FR-MAP-74, -78, -79 and [dice-roll-log](../specs/dice-roll-log.md) (`audiencePlayerId`) (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `fix/cp-core`** (server + shared; no UI). Data side: [data model §89](../data-model/README.md#89-sprint-6-companions-core-cp0).
+
+**REST and intents**
+
+| Intent / route | Who | Validation | Result | Source |
+|---|---|---|---|---|
+| `POST /api/pets {baseDefinitionId, companionOf, name?, turnMode?}` *(new; command `entities.createPet`)* | DM (no secret → 401) | base not a monster (`resolveDefinition`) or `companionOf` not a character of the campaign → `invalid`; a 4th pet of a PC / the campaign's 61st → `conflict` "Mira already has 3 pets"; name taken → "Owlbear (Mira)", then " 2", " 3" | `201 {entity}` | FR-ENT-32, -35 |
+| `PUT /api/entities/:id` + `companionOf?`, `turnMode?` | DM | whole replace: omitted = null (release); a character with them → `invalid`; release / owner change while an active combatant → `conflict` "Dismiss it from the fight first"; caps as above | as before | FR-ENT-33 |
+| `cbt.setCompanion {combatantId, owner: {characterId, turnMode?} \| null, side?}` *(new)* | DM | PC target → `invalid`; inactive / unknown / not started → `not_found`; owner PC not active in the encounter → `conflict` "Mira isn't in this fight"; owner without a player → `invalid` "Mira has no player"; a pet's owner change or release → `conflict` "Change a pet's owner in the Party window"; the turn combatant to `in-owner-turn` → `conflict` "Change it after its turn"; a 9th companion of one owner → `conflict`; same values → ack, no event | — | FR-CBT-111, -121 |
+| `cbt.start` + `petIds?` (≤ 60) | DM | each a pet of a joining PC, else `invalid` | — | FR-CBT-109 |
+| `cbt.attack`, `cbt.rollDamage` as a companion | DM; player with `ownerPlayerId = actor` | another's companion → `forbidden`; hidden → `not_found`; a player's `attackId` not a `card` row id, or a spell → `not_found` | as before | FR-CBT-114 |
+| `cbt.rollInitiative` | player | a companion → `forbidden` (players roll only their PC) | as before | FR-CBT-108 |
+| `cbt.undo` | DM | a step with an entry on an inactive (dismissed) target → `conflict` "Dismissed: adjust it in the Party window", whole step | as before | FR-CBT-112 |
+| `char.edit` / `char.putRow` / `char.deleteRow` on a pet | DM; the pet's owner | owner: `set` keys ⊆ `ac`, `hpMax`, `speed`, and `list: "attacks"` only (≤ 8 rows: a 9th → `conflict`), no lock; anything else → `forbidden`; another's pet → `forbidden`; any other monster → `not_found`; `char.moveRow` → `forbidden` | as before | FR-ENT-38 |
+
+**Record types**
+
+| Type | Player visibility | Snapshot | Source |
+|---|---|---|---|
+| `combatant` (fn takes the viewer) | hidden / inactive / **`ownerHidden`** → hidden for every player. Companion: everyone the monster redaction + `ownerCharacterId`, `ownerPlayerId`, `turnMode`; the **owner** also `hpCurrent`, `hpMax`, `tempHp`, `pet`, `card`. `ownerHidden`, `concentrationEffectId` DM only. `position` / `playerPosition` null for an in-owner-turn companion | as before | FR-CBT-116 |
+| `entity` (pets) | owner: full minus `derivedFromId`, `petPresent`; other players: only while `petPresent`, `RedactedPet {id, kind, name, portraitAssetId, ownerPlayerId, companionOf, band}`; else hidden | as before | FR-ENT-37 |
+| `game-log-entry` + `audiencePlayerId` | a non-public entry reaches that player too (redacted: no `dmPayload`) | as before | FR-CBT-114 |
+
+**Domain events** (`src/shared/events/combat-tracker.ts`, `entities.ts`)
+
+| Event | Changes | Player sees | Undoable |
+|---|---|---|---|
+| `CompanionChanged {encounterId, combatantId, ownerCharacterId \| null, turnMode \| null, side?}` *(new)* | `combatant` + reranked rows; the bound `token`'s owner; one `cbt.companion` line | upsert per FR-CBT-116 (the old owner loses `card` / HP, the new one gains them) | no |
+| `CompanionsSummoned`, `CompanionDismissed` *(new; defined here, emitted by CP3)* | per CBT §9 | per CBT §9 | no |
+| `PetHpAdjusted {petId, before, after}` *(new; defined here, emitted by CP1's `pet.adjustHp`)* | `entity` | per FR-ENT-37 | no |
+| `EntityCreated` + `companionOf?` | the pet | its owner: the pet; others: nothing (not present) | no |
+| `EncounterStarted` | + pet combatants; the joining pets' `entity` (`petPresent`) | per FR-CBT-116 / FR-ENT-37 | no |
+| `EncounterEnded` | + pets' `entity` (HP write-back, presence), summons' `token` deletes (`deleteTokenIn`) | the pet per FR-ENT-37; token deletes | no |
+| `EntityUpdated` (a character's owner change) | + its pets, their tokens, its active companion combatants and their bound tokens (one hook line) | per rule | no |
+| `TurnChanged` | + reranked rows (owner states), the in-turn companions' `movedFt` reset | as before | no |
+| Token writes (place, duplicate, hide / reveal, delete), `SceneActivated`, `SceneDeleted` | + the pet's `entity` when `petPresent` flips | upsert / delete for non-owners | as before |
+
+**Helpers and hooks**
+
+- scenes-map server: `deleteTokenIn(env, tokenId)` (`commands.ts`: token-changed hooks, the row, its dependants; rows for the caller's event); `setTokenOwnerIn(env, tokenId, owner)` and `tokenCopies` (`token-owner.ts`); `placeTokenIn` gives a pet's token the pet's owner (FR-MAP-74).
+- combat: `rerank` copies `ownerHidden`, ranks per mode (owner eligibility from removed / dead; the turn combatant keeps its rank until the turn moves on); `turnStartersOf(tx, encounterId, turnId)` = the turn combatant + its in-turn companions: combat-extras' expiry and effect-modifiers' `turnStart` reminders use it (FR-CBT-108). Card refresh in `combatant-copies` (definition hook).
+- Registry lines (append-only): definition-changed `entities.pet-owner-copies`; scene visibility `entities.pet-presence` (`rederive`); scene lifecycle `entities.pet-presence` (`activated`, `deleting`); log-entry kind `cbt.companion`; route mount `petRoutes`.
+- Fog (FR-MAP-78, OQ-MAP-56 C): `sceneSources` orders PC tokens first, then the rest by `seq`, within the 4-source cap.

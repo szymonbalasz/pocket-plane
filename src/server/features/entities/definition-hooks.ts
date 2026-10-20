@@ -14,6 +14,7 @@ import { presetOwnerHook } from "../effect-modifiers/definition-hook";
 import { fogSensesHook } from "../fog-of-war/lifecycle";
 import { refreshTokenCopies } from "../scenes-map/definition-hook";
 import { fillTokenCreatureType } from "./creature-type-fill";
+import { petOwnerCopiesHook } from "./pets";
 
 export type HookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
 
@@ -37,6 +38,7 @@ export const definitionChangedHooks: readonly HookRegistration[] = [
   { name: "effect-modifiers.preset-owner", hook: presetOwnerHook }, // MOD preset owner copy (FR-MOD-07)
   { name: "fog-of-war.senses", hook: fogSensesHook }, // FOG senses edit re-derives (FR-FOG-35)
   { name: "scenes-map.creature-type-fill", hook: fillTokenCreatureType }, // token art fill (FR-ENT-27)
+  { name: "entities.pet-owner-copies", hook: petOwnerCopiesHook }, // pets + companions follow the owner (FR-ENT-34)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */

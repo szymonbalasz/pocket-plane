@@ -18,6 +18,8 @@ export const EntityCreated = defineEvent({
       entityId: z.string(),
       kind: z.enum(["character", "monster"]),
       derivedFromId: z.string().optional(),
+      /** Sprint 6 (FR-ENT-32): a pet's owner PC. */
+      companionOf: z.string().optional(),
     })
     .strict(),
   logged: true,
@@ -40,6 +42,17 @@ export const EntityUpdated = defineEvent({
 export const ImportedEntityUpdated = defineEvent({
   type: "ImportedEntityUpdated",
   payload: z.object({ entityId: z.string() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `pet.adjustHp` (sprint 6, FR-ENT-36): a pet's kept HP out of a fight; `entity` upsert (owner
+ * full, other players the redacted row while present). Logged, not undoable.
+ */
+export const PetHpAdjusted = defineEvent({
+  type: "PetHpAdjusted",
+  payload: z.object({ petId: z.string(), before: z.int(), after: z.int() }).strict(),
   logged: true,
   undoable: false,
 });

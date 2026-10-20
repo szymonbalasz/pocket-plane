@@ -10,12 +10,18 @@ import {
   RollModPart,
 } from "@shared/dice-roll-log/schemas";
 import { PartDamageType } from "@shared/effect-modifiers/schemas";
-import { Ability, EXTRA_DAMAGE_MAX } from "@shared/entities/schemas";
+import {
+  Ability,
+  CompanionCard,
+  EXTRA_DAMAGE_MAX,
+  HealthBand,
+  TurnMode,
+} from "@shared/entities/schemas";
 import { DamageMultiplier } from "@shared/events/combat-tracker";
 import { CellIndex } from "@shared/scenes-map/schemas";
 import { z } from "zod";
 
-export { DamageMultiplier };
+export { DamageMultiplier, HealthBand, TurnMode };
 
 export const ENCOUNTER_TYPE = "encounter";
 export const ENCOUNTER_ENTRY_TYPE = "encounter-entry";
@@ -63,6 +69,8 @@ export const CBT_INTENTS = {
   applyHit: "cbt.applyHit",
   /** FR-CBT-99 (sprint 5, #252): a combatant's side, secret or not. */
   setSide: "cbt.setSide",
+  /** FR-CBT-111 (sprint 6, #252): make / change / release a companion; turn hostile. */
+  setCompanion: "cbt.setCompanion",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -173,6 +181,22 @@ export type EncounterEntryRecord = z.infer<typeof EncounterEntryRecord>;
 export const CombatantKind = z.enum(["pc", "monster"]);
 export type CombatantKind = z.infer<typeof CombatantKind>;
 
+/**
+ * FR-CBT-105–117 (sprint 6, #252): a companion's fields; all null / false on a non-companion.
+ * `ownerCharacterId` and `ownerPlayerId` are both set or both null (`ownerPlayerId` = a copy of
+ * the owner PC's player). `ownerHidden` (copy of the owner combatant's `hidden`) and
+ * `concentrationEffectId` are DM-only. `card` = FR-CHARX-60's copy (FR-CBT-117).
+ */
+const companionFields = {
+  ownerCharacterId: z.string().nullable().default(null),
+  ownerPlayerId: z.string().nullable().default(null),
+  turnMode: TurnMode.nullable().default(null),
+  pet: z.boolean().default(false),
+  ownerHidden: z.boolean().default(false),
+  concentrationEffectId: z.string().nullable().default(null),
+  card: CompanionCard.nullable().default(null),
+};
+
 export const CombatantRecord = z.object({
   id: z.string(),
   campaignId: z.string(),
@@ -188,7 +212,8 @@ export const CombatantRecord = z.object({
   removed: z.boolean(),
   initiative: z.int().nullable(),
   initRollId: z.string().nullable(),
-  position: z.int(),
+  /** FR-CBT-107 (sprint 6): null for an `in-owner-turn` companion while its owner is eligible. */
+  position: z.int().nullable(),
   playerPosition: z.int().nullable(),
   hpCurrent: z.int().nullable(),
   hpMax: z.int().nullable(),
@@ -202,11 +227,9 @@ export const CombatantRecord = z.object({
    */
   side: Side.nullable(),
   publicSide: Side.nullable(),
+  ...companionFields,
 });
 export type CombatantRecord = z.infer<typeof CombatantRecord>;
-
-export const HealthBand = z.enum(["healthy", "bloodied", "down"]);
-export type HealthBand = z.infer<typeof HealthBand>;
 
 const movedFt = z.int().min(0).max(MOVED_FT_MAX);
 
@@ -226,6 +249,16 @@ export const PlayerPcCombatant = z.object({
   /** FR-CBT-100 (#252): `publicSideOf`; the true side never reaches players. */
   side: Side,
 });
+/**
+ * FR-CBT-116 (sprint 6, ADR-0056): a companion's owner ids and mode, for every player who
+ * receives it (absent on a non-companion).
+ */
+const playerCompanionFields = {
+  ownerCharacterId: z.string().optional(),
+  ownerPlayerId: z.string().optional(),
+  turnMode: TurnMode.optional(),
+};
+
 /** Player view of a visible monster combatant: band, never HP numbers (FR-CBT-26). */
 export const PlayerMonsterCombatant = z.object({
   id: z.string(),
@@ -239,7 +272,23 @@ export const PlayerMonsterCombatant = z.object({
   removed: z.literal(false),
   movedFt,
   side: Side,
+  ...playerCompanionFields,
 });
+/**
+ * FR-CBT-116 (ADR-0056): the **owner's** view of its own companion: the monster view plus HP
+ * numbers, temp HP, `pet` and `card`. Other players get `PlayerMonsterCombatant` (band only).
+ */
+export const PlayerOwnedCompanion = PlayerMonsterCombatant.extend({
+  ownerCharacterId: z.string(),
+  ownerPlayerId: z.string(),
+  turnMode: TurnMode,
+  hpCurrent: z.int().nullable(),
+  hpMax: z.int().nullable(),
+  tempHp: TempHp,
+  pet: z.boolean(),
+  card: CompanionCard.nullable(),
+});
+
 /** Player view of an active, removed, non-hidden combatant: no rank, band or initiative (FR-CBT-37). */
 export const PlayerRemovedCombatant = z.object({
   id: z.string(),
@@ -255,6 +304,7 @@ export const PlayerRemovedCombatant = z.object({
 export type PlayerCombatant =
   | z.infer<typeof PlayerPcCombatant>
   | z.infer<typeof PlayerMonsterCombatant>
+  | z.infer<typeof PlayerOwnedCompanion>
   | z.infer<typeof PlayerRemovedCombatant>;
 /** A combatant as either client holds it. */
 export type CombatantView = PlayerCombatant & Partial<CombatantRecord> & { band?: HealthBand };
@@ -511,6 +561,8 @@ export const StartInput = z.strictObject({
   sceneId: Id,
   at: GridCell.optional(),
   excludeCharacterIds: z.array(Id).max(50).optional(),
+  /** FR-CBT-109 (sprint 6): pets of joining PCs (≤ 3 per PC, FR-ENT-35). */
+  petIds: z.array(Id).max(60).optional(),
 });
 export type StartInput = z.input<typeof StartInput>;
 export const EndInput = z.strictObject({ encounterId: Id });
@@ -794,3 +846,18 @@ export const SetSideInput = z.strictObject({
   secret: z.boolean().optional(),
 });
 export type SetSideInput = z.input<typeof SetSideInput>;
+
+/**
+ * `cbt.setCompanion` (sprint 6, FR-CBT-111): make an active monster combatant a companion,
+ * change its owner or mode, or release it (`owner: null`). Turn hostile = `owner: null` +
+ * `side: "enemy"` (an open side change, FR-CBT-99), one transaction.
+ */
+export const SetCompanionInput = z.strictObject({
+  combatantId: Id,
+  owner: z.strictObject({ characterId: Id, turnMode: TurnMode.optional() }).nullable(),
+  side: Side.optional(),
+});
+export type SetCompanionInput = z.input<typeof SetCompanionInput>;
+
+/** FR-CBT-121: companion combatants per owner PC per encounter (pets included). */
+export const COMPANIONS_PER_OWNER_MAX = 8;

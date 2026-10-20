@@ -32,6 +32,10 @@ const base = (r: EntityRow) => ({
   deathSuccesses: r.deathSuccesses,
   deathFailures: r.deathFailures,
   derivedFromId: r.derivedFromId,
+  // Pet fields (sprint 6, FR-ENT-31 / -37); the character / imported schemas strip them.
+  companionOf: r.companionOf,
+  turnMode: r.turnMode,
+  petPresent: r.petPresent,
   createdAt: r.createdAt,
   updatedAt: r.updatedAt,
 });
