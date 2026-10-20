@@ -70,7 +70,7 @@ test("FR-MAP-59 every token visible: player sheet + Game log, then + Initiative 
       const at = `${vp.w}×${vp.h} ${when}`;
       const windows = renderedWindowRects(ws, playerWindows, available, vp);
       expect(windows.length).toBe(when === "sheet + log" ? 2 : 3);
-      const obstacles = fitObstacles(windows, keepOuts("player", vp));
+      const obstacles = fitObstacles("player", windows, keepOuts("player", vp), vp);
       // The players' bottom-right toast box is an obstacle (FR-SHELL-48 (a)).
       expect(obstacles).toContainEqual(toastKeepOut("player", vp));
       const windowsOnly = freeAreas(windows, vp);

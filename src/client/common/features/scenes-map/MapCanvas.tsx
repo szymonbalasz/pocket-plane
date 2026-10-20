@@ -32,11 +32,7 @@ import { Group, Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
-import { useContentHeights } from "../play-shell/content-heights";
-import { fitObstacles, renderedWindowRects, useFreeArea } from "../play-shell/free-area";
-import { useViewport } from "../play-shell/hooks";
-import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
-import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
+import { useFreeArea } from "../play-shell/free-area";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
   type Camera,
@@ -248,24 +244,9 @@ export function MapCanvas(props: MapCanvasProps) {
   /** FR-MAP-59: every token footprint clear of windows and the toast box (`data-fit-visible`). */
   const [fitVisible, setFitVisible] = useState<FitVisible>("all");
   const free = useFreeArea();
-  // FR-MAP-59 obstacles: the rendered open windows + this client's toast box (FR-SHELL-48 (a)).
-  const registry = useRegistry();
-  const shellWindows = useShellState((s) => s.windows);
-  const available = useAvailableKinds();
-  const vp = useViewport();
-  const measured = useContentHeights();
-  const regions = useKeepOuts(registry.client);
-  const obstacles = useMemo(() => {
-    const shown = renderedWindowRects(
-      shellWindows,
-      registry,
-      available,
-      vp,
-      measured,
-      hardRects(regions),
-    );
-    return fitObstacles(shown, regions);
-  }, [shellWindows, registry, available, vp, measured, regions]);
+  // FR-MAP-59 / -80 obstacles: the rendered open windows + the players' toast box, or the DM's
+  // summary strip + shown stack (`fitObstacles`).
+  const obstacles = free.obstacles;
   const fitNow = useRef(() => {});
   fitNow.current = () => {
     if (size.w === 0) return;
