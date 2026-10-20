@@ -12,11 +12,13 @@ import {
   launcherMetrics,
 } from "@ui/features/play-shell/launcher-fit";
 import {
+  bruteBest,
   contractProblems,
   type LayoutStep,
   launcherKinds,
   launcherSequence,
   layoutRun,
+  placeFields,
   REFERENCE_VIEWPORTS,
   rectIn,
 } from "@ui/features/play-shell/layout-checks";
@@ -566,7 +568,7 @@ const pcUnder = (r: Rect, pcs: readonly Rect[]) =>
     return c.x > r.x && c.x < r.x + r.w && c.y > r.y && c.y < r.y + r.h;
   }).length;
 
-test("FR-SHELL-45 (2) sweep (player-1, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC centre", () => {
+test("FR-SHELL-45 (2) sweep (player-1, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC (footprint + 4 px) while a clear spot avoiding them exists; screen full only when nothing is clear (FR-SHELL-47)", () => {
   const cases = [
     [LAPTOP, [pcAt(410, 312), pcAt(458, 312)]],
     [WIDE, [pcAt(463, 363), pcAt(516, 363)]],
@@ -583,9 +585,14 @@ test("FR-SHELL-45 (2) sweep (player-1, Town): every launcher window in registry 
     for (const s of steps) {
       const at = `${s.kind} at ${viewport.w}×${viewport.h}`;
       expect(s.hits.length === 0 ? "ok" : `${at} on ${s.hits.join(", ")}`).toBe("ok");
-      expect(
-        s.rect && pcUnder(s.rect, pcs) ? `${at} over a PC: ${JSON.stringify(s.rect)}` : "ok",
-      ).toBe("ok");
+      // Ruling #262's "park one more window to keep PCs clear" is retired (WF1 walkthrough
+      // finding 2): a PC under the window only when no clear spot avoids it.
+      const def = playerWindows.get(s.kind);
+      if (!s.rect || !def) continue;
+      const scene = { windows: s.others, hard: s.hard, tokens: pcs };
+      const got = placeFields(s.rect, def, viewport, scene);
+      expect(got[0] === 0 ? "ok" : `${at} not clear`).toBe("ok");
+      if (got[1] === 1) expect(bruteBest(def, viewport, scene)[1]).toBe(1);
     }
   }
 });

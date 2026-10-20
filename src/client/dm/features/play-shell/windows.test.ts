@@ -21,10 +21,11 @@ import {
   placeFields,
   REFERENCE_VIEWPORTS,
   rectIn,
+  rectOf,
 } from "@ui/features/play-shell/layout-checks";
 import { defaultLayout, reduce, restoreLayout } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
-import { fittedDefaultRect } from "@ui/features/play-shell/placement";
+import { fittedDefaultRect, placeWindow } from "@ui/features/play-shell/placement";
 import {
   availableKinds,
   createWindowRegistry,
@@ -682,7 +683,7 @@ test("FR-SHELL-45 (2) W1 repro: DM 1440×900 on Town (Thorn 463,363, Mira 516,36
   }
 });
 
-test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC centre", () => {
+test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC (footprint + 4 px) while a clear spot avoiding them exists; screen full only when nothing is clear (FR-SHELL-47)", () => {
   const cases = [
     [LAPTOP, [pcAt(410, 312), pcAt(458, 312)]],
     [WIDE, [pcAt(463, 363), pcAt(516, 363)]],
@@ -697,9 +698,14 @@ test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order 
     for (const s of steps) {
       const at = `${s.kind} at ${viewport.w}×${viewport.h}`;
       expect(s.hits.length === 0 ? "ok" : `${at} on ${s.hits.join(", ")}`).toBe("ok");
-      expect(
-        s.rect && pcUnder(s.rect, pcs) ? `${at} over a PC: ${JSON.stringify(s.rect)}` : "ok",
-      ).toBe("ok");
+      // Ruling #262's "park one more window to keep PCs clear" is retired (WF1 walkthrough
+      // finding 2): a PC under the window only when no clear spot avoids it.
+      const def = dmWindows.get(s.kind);
+      if (!s.rect || !def) continue;
+      const scene = { windows: s.others, hard: s.hard, tokens: pcs };
+      const got = placeFields(s.rect, def, viewport, scene);
+      expect(got[0] === 0 ? "ok" : `${at} not clear`).toBe("ok");
+      if (got[1] === 1) expect(bruteBest(def, viewport, scene)[1]).toBe(1);
     }
   }
 });
@@ -861,4 +867,93 @@ test("FR-SHELL-62 golden layouts (DM): four sizes, open / close / reopen / small
   console.info(
     `FR-SHELL-62 DM: ${steps.length} steps in ${(performance.now() - t0).toFixed(0)} ms`,
   );
+});
+
+// ---- WF1 walkthrough (2026-10-20) repros: the probes' exact inputs ----
+
+/** The DM's Goblin Ambush footprints from the walkthrough probes: [name, x, y, side, pc]. */
+const walkTokens = (dy: number) =>
+  (
+    [
+      ["Adult", 350, 96, 144, 0],
+      ["Ogre", 974, 96, 96, 0],
+      ["Mira", 398, 336, 48, 1],
+      ["Goblin", 638, 336, 48, 0],
+      ["Wolf", 830, 240, 48, 0],
+      ["Elite", 878, 432, 48, 0],
+      ["Goblin2", 734, 432, 48, 0],
+      ["Thorn", 350, 528, 48, 1],
+      ["Lurker", 974, 576, 48, 0],
+      ["Brakka", 302, 432, 48, 1],
+      ["G3", 542, 144, 48, 0],
+      ["G4", 590, 144, 48, 0],
+      ["Elite2", 638, 144, 48, 0],
+      ["Wolf2", 734, 144, 48, 0],
+      ["Brute", 830, 144, 48, 0],
+    ] as const
+  ).map(([, x, y, s, pc]) => ({ x, y: y + dy, w: s, h: s, pc: pc === 1 }));
+
+test("FR-SHELL-47 FR-SHELL-56 walkthrough finding 2 (DM 1280×720): restoring Party with 68–450 × 60–472 clear of windows (over Mira, Brakka, Thorn) is placed there, clear; Compendium is not auto-minimised", () => {
+  const def = dmWindows.get("party.board");
+  if (!def) throw new Error("no party.board");
+  const tokens = walkTokens(-108); // the probe's 1280×720 camera
+  const windows = [
+    { x: 68, y: 484, w: 690, h: 160, protected: true },
+    { x: 868, y: 60, w: 400, h: 544, protected: true },
+    { x: 462, y: 72, w: 340, h: 400 }, // Compendium
+  ];
+  const soft = [toastKeepOut("dm", LAPTOP)];
+  const p = placeWindow(def, LAPTOP, { windows, soft, tokens });
+  expect(p.clear).toBe(true);
+  for (const o of windows) expect(overlaps(p.rect, o)).toBe(false);
+  // The same through the manager: Party restored, Compendium stays open.
+  const ctx = { registry: dmWindows, viewport: LAPTOP, available: allKinds(), avoid: () => tokens };
+  const area = workArea(LAPTOP);
+  const at = (kind: string, state: "open" | "minimised", r: Rect, z: number) => ({
+    kind,
+    instance: "main",
+    state,
+    ...rectOf(r),
+    z,
+    area,
+  });
+  const ws = [
+    at("dice.log", "open", windows[0] as Rect, 1),
+    at("cbt.initiative", "open", windows[1] as Rect, 2),
+    at("cmp.compendium", "open", windows[2] as Rect, 3),
+    at("party.board", "minimised", { x: 462, y: 72, w: 340, h: 400 }, 4), // its spot: Compendium's
+  ];
+  const next = reduce(ws, { type: "open", kind: "party.board" }, ctx);
+  expect(next.find((w) => w.kind === "cmp.compendium")?.state).toBe("open");
+  const party = win(next, "party.board");
+  expect(party.state).toBe("open");
+  expect(overlaps(party, windows[2] as Rect)).toBe(false);
+});
+
+test("FR-SHELL-45 (2) walkthrough edge-on-PC row (DM 1440×900, F3): Encounters, which must cover PCs, holds them whole: no edge through a PC footprint + 4 px", () => {
+  const def = dmWindows.get("cbt.encounters");
+  if (!def) throw new Error("no cbt.encounters");
+  const tokens = walkTokens(0);
+  const windows = [
+    { x: 68, y: 636, w: 1150, h: 188, protected: true },
+    { x: 1028, y: 204, w: 400, h: 420, protected: true },
+    { x: 580, y: 120, w: 340, h: 400 },
+  ];
+  const soft = [toastKeepOut("dm", WIDE)];
+  const scene = { windows, hard: [], tokens };
+  const p = placeWindow(def, WIDE, { windows, soft, tokens });
+  expect(p.clear).toBe(true);
+  expect(bruteBest(def, WIDE, scene)[1]).toBe(1); // no clear spot avoids every PC
+  const cut = tokens
+    .filter((t) => t.pc)
+    .map((t) => ({ x: t.x - 4, y: t.y - 4, w: t.w + 8, h: t.h + 8 }))
+    .filter((b) => overlaps(p.rect, b))
+    .filter(
+      (b) =>
+        b.x < p.rect.x ||
+        b.y < p.rect.y ||
+        b.x + b.w > p.rect.x + p.rect.w ||
+        b.y + b.h > p.rect.y + p.rect.h,
+    );
+  expect(cut).toEqual([]);
 });

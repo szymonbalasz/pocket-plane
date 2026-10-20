@@ -37,6 +37,9 @@ export interface LaunchStep {
   parked: string[];
   /** What the open landed on: other open windows' kinds, `keep-out:<id>` for hard regions. */
   hits: string[];
+  /** What it was placed against: the other shown windows' rendered rects, the hard regions. */
+  others: Rect[];
+  hard: Rect[];
 }
 
 /**
@@ -86,7 +89,8 @@ export function launcherSequence(
       for (const k of regions)
         if (k.kind === "hard" && overlaps(mine, k.rect)) hits.push(`keep-out:${k.id}`);
     }
-    steps.push({ kind, rect: mine ?? null, parked, hits });
+    const others = rects.filter((_, i) => open[i] !== me);
+    steps.push({ kind, rect: mine ?? null, parked, hits, others, hard: hardRects(regions) });
   }
   return { windows: ws, steps };
 }
@@ -174,8 +178,9 @@ const less = (a: readonly number[], b: readonly number[]) => {
  * The brute check's oracle (FR-SHELL-62 (c), rulings-b #19): the best `placeFields` any rect of
  * the window's full width (full, `minOpenH` and min height) reaches on a 16-px grid of the usable
  * area, with a 4-px refine around the winners; then, when none is clear and over no PC and no
- * token, the same at min width, counted only where it is all three (placement narrows a window
- * only to get off every token). Footprints count with the 12-px candidate gap.
+ * token, the same at min width, counted only where it is all three, or anywhere when no
+ * full-width spot is clear (placement narrows a window to get off every token, or to stay clear
+ * of windows before it parks one). Footprints count with the 12-px candidate gap.
  */
 export function bruteBest(def: Placeable, vp: Viewport, scene: PlaceScene): number[] {
   const z = sizesOf(def, vp, scene.hard);
@@ -218,7 +223,9 @@ export function bruteBest(def: Placeable, vp: Viewport, scene: PlaceScene): numb
     }
   };
   search(z.w, false);
-  if (z.minW < z.w && !free(best)) search(z.minW, true);
+  // Min width: where clear and over no PC and no token, or where clear at all when no full-width
+  // spot is (placement narrows to stay clear before it parks a window, FR-SHELL-47).
+  if (z.minW < z.w && !free(best)) search(z.minW, best[0] === 0);
   return best;
 }
 

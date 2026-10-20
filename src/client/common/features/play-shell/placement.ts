@@ -11,7 +11,8 @@
 // Rank, lexicographic (FR-SHELL-45):
 //   (1) clear of every open window and hard keep-out region (else, screen full: no protected
 //       window, no title bar, least protected area, least overlap; FR-SHELL-47's fallback);
-//   (2) covers no PC footprint grown by 4 px (FR-SHELL-57); (1b) `minOpenH` windows: clear at
+//   (2) covers no PC footprint grown by 4 px (FR-SHELL-57), else holds the ones it covers whole
+//   (no edge through one); (1b) `minOpenH` windows: clear at
 //   ≥ `minOpenH` (after (2): a slightly shorter window beats one over a PC, walkthrough W1);
 //   (2c) covers no token footprint (FR-SHELL-58: a spot over no token beats size, edge and the
 //   soft box);
@@ -283,6 +284,18 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   type Column = ReturnType<typeof inColumn>;
 
   /**
+   * 1 when an edge of `r` runs through a PC footprint + 4 px (partly inside): among candidates that
+   * must cover PCs, one that holds them whole ranks first (walkthrough WF1, edge-on-PC row).
+   */
+  const pcCut = (r: Rect, c: Column) => {
+    for (const p of c.pcs) {
+      if (!hits(r, p)) continue;
+      const whole = p.x >= r.x && p.y >= r.y && p.x + p.w <= r.x + r.w && p.y + p.h <= r.y + r.h;
+      if (!whole) return 1;
+    }
+    return 0;
+  };
+  /**
    * The rank of `r` (header), in stages: when its first fields already lose to `bound` (the best
    * so far), only those are returned (most candidates stop there; (2) is always included).
    */
@@ -297,7 +310,16 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     for (const o of c.hard) overlap += overlapArea(r, o);
     const title = anyHit(r, c.titleBars) ? 1 : 0;
     const keepsOpenH = openH === null || (clear && r.h >= openH) ? 0 : 1;
-    const head = [clear ? 0 : 1, prot > 0 ? 1 : 0, title, prot, overlap, pc, keepsOpenH];
+    const head = [
+      clear ? 0 : 1,
+      prot > 0 ? 1 : 0,
+      title,
+      prot,
+      overlap,
+      pc,
+      pcCut(r, c),
+      keepsOpenH,
+    ];
     const loses = () => bound !== undefined && lexLess(bound, head, head.length);
     if (loses()) return head;
     head.push(anyHit(r, c.tokens) ? 1 : 0, inward ? 1 : 0, anyHit(r, c.soft) ? 1 : 0);
@@ -323,8 +345,9 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
 
   let best: { rect: Rect; rank: number[] } | null = null;
   const seen = new Set<number>();
-  const HEAD = 10; // fields of a rank cut short (`rank`)
+  const HEAD = 11; // fields of a rank cut short (`rank`)
   let narrowing = false;
+  let narrowToClear = false;
   let cur: Column = inColumn(base.x, w);
   const minW = Math.min(def.minSize.w, w);
   /**
@@ -367,8 +390,9 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
       seen.add(key + (inward ? 1 : 0));
     }
     const r = rank(rect, inward, cur, best?.rank);
-    // Narrowed only to get off every token: clear, over no PC and no token, or not at all.
-    const fits = !narrowing || (r[0] === 0 && r[5] === 0 && r[7] === 0);
+    // Narrowed only to be clear: of windows when nothing at full width is (FR-SHELL-47 parks only
+    // when no candidate is clear), else of every PC and token too.
+    const fits = !narrowing || (r[0] === 0 && (narrowToClear || (r[5] === 0 && r[8] === 0)));
     if (fits && r.length > HEAD && (!best || lexLess(r, best.rank))) best = { rect, rank: r };
     if (r[5] === 1) for (const s of clearOfPcs(rect)) consider(s, inward, true);
   };
@@ -405,7 +429,7 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const edgeXs = (cw: number) => new Set(edges(cw).map((e) => e.v));
   for (const x of edgeXs(w)) column(x, false);
   // FR-SHELL-46, -58: inward columns only when no edge candidate passes (1), (1b), (2), (2c).
-  const passes = (r: number[]) => r[0] === 0 && r[5] === 0 && r[6] === 0 && r[7] === 0;
+  const passes = (r: number[]) => r[0] === 0 && r[5] === 0 && r[7] === 0 && r[8] === 0;
   const inwardXs = (cw: number) => {
     const xs = new Set<number>();
     for (const e of inwardCols(cw)) if (!e.token || keptX.has(e.k)) xs.add(e.v);
@@ -416,10 +440,13 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     for (const x of inwardXs(w)) column(x, true);
   }
   // No full-width spot clear and over no PC and no token: the same columns at min width, taken
-  // only where that is clear and over no token (FR-SHELL-58; a narrower window ranks (6)).
-  const tokenFree = (r: number[]) => r[0] === 0 && r[5] === 0 && r[7] === 0;
+  // where that is clear and over no token (FR-SHELL-58), or, when no full-width spot is clear at
+  // all, where it is clear (tokens are rank (2) / (2c), never a reason to park; walkthrough
+  // finding 2). A narrower window ranks (6).
+  const tokenFree = (r: number[]) => r[0] === 0 && r[5] === 0 && r[8] === 0;
   if (minW < w && !tokenFree(bestRank())) {
     narrowing = true;
+    narrowToClear = bestRank()[0] !== 0;
     for (const x of edgeXs(minW)) column(x, false, minW);
     for (const x of inwardXs(minW)) column(x, true, minW);
     narrowing = false;
