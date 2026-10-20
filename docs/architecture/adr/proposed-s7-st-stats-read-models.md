@@ -3,7 +3,7 @@
 - Status: proposed (sprint 7, track ST; the integrator numbers it at merge)
 - Date: 2026-10-20
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md). Its "stats computed from the event log retroactively" becomes: computed from the **typed fact tables** written in the same transaction as the logged events, filtered per viewer.
-- Affects: [stats](../../specs/stats.md) (FR-STATS-01–05, -12, -13, -16), [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-138), [dice-roll-log](../../specs/dice-roll-log.md) (FR-DICE-72–73), [live-sync](../../specs/live-sync.md) (leak scan over acks), later stats features (tier B: trophy case, luck tracker)
+- Affects: [stats](../../specs/stats.md) (FR-STATS-01–05, -13, -14, -16), [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-138), [dice-roll-log](../../specs/dice-roll-log.md) (FR-DICE-72–73), [live-sync](../../specs/live-sync.md) (leak scan over acks), later stats features (tier B: trophy case, luck tracker)
 - Raised by: DM [#311](../../decisions-log.md) (stats tier A, "computed from the append-only event log, visibility-safe"), the stats stub's open "computed on read or materialised projections?"
 
 ## Context
@@ -30,9 +30,9 @@
 **A.**
 
 1. **Facts, not projections.** Stats read `hp_change`, `roll` and `game_log_entry`, plus `combatant` / `encounter` / `entity` for names and kinds, through read helpers owned by those specs. No stats table, column, record type or snapshot field.
-2. **Filter, then aggregate.** A fact counts for a viewer only if its game-log entry is visible to them. For players this means `public`: one view for all players, and `audiencePlayerId` lines are excluded. Undone facts and superseded entries never count. The player result schema has no field for hidden numbers.
+2. **Filter, then aggregate.** A fact counts for a viewer only if its game-log entry is visible to them. For players this is the hub filter for a viewer with no `playerId` (public only): one view for all players. Feature-tagged entries are skipped while their feature is off. Undone facts and superseded entries never count. The player result schema has no field for hidden numbers.
 3. **Read-only command.** `stats.query` runs in the command pipeline with an empty event list (no write, event, log row or `seq`), so it is answered in hub frame order. Its acks pass the leak scan.
-4. **Only append-only derivations may be cached** (session boundaries, extended from the last `n`). A cache is in memory and rebuilt on demand, never persisted.
+4. **Only append-only derivations may be cached** (session boundaries, extended from the last `n`). A cache lives in memory, is warmed at server start, and is never persisted. Read commands are rate-limited per connection.
 5. **New facts that stats should count need a log line** (`entryId`) for their visibility. A fact without one is DM-only or not counted.
 
 ## Consequences
