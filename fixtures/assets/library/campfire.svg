@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="140" height="140" viewBox="0 0 140 140">
+  <title>Campfire</title>
+  <rect width="140" height="140" rx="16" fill="#8e24aa"/>
+  <polygon points="70,28 106,49 106,91 70,112 34,91 34,49" fill="#9e9d24" stroke="#111" stroke-width="3"/>
+  <rect x="21" y="127" width="10" height="5" fill="#fff" stroke="#000"/><rect x="33" y="125" width="10" height="7" fill="#fff" stroke="#000"/><rect x="45" y="119" width="10" height="13" fill="#fff" stroke="#000"/><rect x="57" y="124" width="10" height="8" fill="#fff" stroke="#000"/><rect x="69" y="116" width="10" height="16" fill="#fff" stroke="#000"/><rect x="81" y="121" width="10" height="11" fill="#fff" stroke="#000"/><rect x="93" y="123" width="10" height="9" fill="#fff" stroke="#000"/><rect x="105" y="123" width="10" height="9" fill="#fff" stroke="#000"/>
+</svg>

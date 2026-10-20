@@ -1,6 +1,7 @@
 // Fixture unit registry. Append-only (AGENTS §9.9): add your own lines.
 import type { Fixture } from "@server/features/fixtures-adapters/fixture-types";
 import imageLarge from "./assets-pipeline/image-large";
+import imageTags from "./assets-pipeline/image-tags";
 import images from "./assets-pipeline/images";
 import imagesSecond from "./assets-pipeline/images-second";
 import campaign from "./campaign-management/campaign";
@@ -195,4 +196,5 @@ export const units: readonly Fixture[] = [
   petDrake,
   cpPetThorn,
   cpAlly,
+  imageTags,
 ];

@@ -621,6 +621,54 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       expect(snapshotSizes(b.s).map((v) => v.bytes)).toEqual(before.map((v) => v.bytes));
     });
 
+    // Mutates the scenario (500 library assets), then removes them: after the read-only cases.
+    test("FR-ASSET-39 CON-44 tags: + 500 library images with worst tags (8 × 24 chars) → DM < 1.5 MiB; every player frame byte-identical to no tags", () => {
+      const sql = b.s.db.$client;
+      const cid = sql.query<{ id: string }, []>("SELECT id FROM campaign WHERE active = 1").get()
+        ?.id as string;
+      const seq0 = sql.query<{ n: number }, []>("SELECT max(seq) AS n FROM asset").get()?.n ?? 0;
+      const insert = sql.query(
+        `INSERT INTO asset (id, campaign_id, seq, name, hash, mime, bytes, width, height, display_width, display_height, created_at, listed, tags)
+         VALUES (?, ?, ?, ?, ?, 'image/png', 2000000, 1400, 980, 1400, 980, '2026-10-20T00:00:00.000Z', 1, '[]')`,
+      );
+      // Size probe, not commands (ASSET §12): 80-char names, distinct hashes.
+      sql.transaction(() => {
+        for (let i = 0; i < 500; i++) {
+          const id = `con44-tags-${String(i).padStart(11, "0")}`;
+          const name = `${"Library image ".repeat(6)}${i}`.slice(0, 80).padEnd(80, "x");
+          insert.run(
+            id,
+            cid,
+            seq0 + 1 + i,
+            name,
+            `con44-tags-${String(i).padStart(4, "0")}`.padEnd(64, "0"),
+          );
+        }
+      })();
+      const none = snapshotSizes(b.s);
+      const assetBytes = (v: ViewerSize) => v.types.asset?.bytes ?? 0;
+      const typical = JSON.stringify(["Tokens", "Portraits"]);
+      sql.run(`UPDATE asset SET tags = '${typical}' WHERE id LIKE 'con44-tags-%'`);
+      const typ = snapshotSizes(b.s);
+      const worst = JSON.stringify(Array.from({ length: 8 }, (_, k) => `${k}`.repeat(24)));
+      sql.run(`UPDATE asset SET tags = '${worst}' WHERE id LIKE 'con44-tags-%'`);
+      const after = snapshotSizes(b.s);
+      expectUnderCeilings(after);
+      const [dm, ...players] = after as [ViewerSize, ...ViewerSize[]];
+      const [dm0, ...players0] = none as [ViewerSize, ...ViewerSize[]];
+      // Players: `asset` is DM-only, so not one byte changes (FR-ASSET-50).
+      expect(players.map((p) => [p.label, p.bytes])).toEqual(
+        players0.map((p) => [p.label, p.bytes]),
+      );
+      expect(players.every((p) => assetBytes(p) === 0)).toBe(true);
+      // `"tags":[]` → 8 × (24 + 3) - 1 more bytes per record.
+      expect(assetBytes(dm) - assetBytes(dm0)).toBe(500 * (8 * 27 - 1));
+      console.log(
+        `ASSET S6 CON-44 tags: 500 library images, DM ${dm0.bytes} B (no tags) → ${typ[0]?.bytes} B (typical) → ${dm.bytes} B (worst 8 × 24), ${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1.5 MiB; players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B, unchanged`,
+      );
+      sql.run("DELETE FROM asset WHERE id LIKE 'con44-tags-%'");
+    });
+
     // Mutates the scenario (every token's creatureType): after the read-only cases.
     test("FR-ENT-27 CON-44 token creatureType: null on every token, worst case `monstrosity` ≤ +9 B per received token; ceilings hold", () => {
       const typed = b.s.db.$client

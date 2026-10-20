@@ -5,6 +5,7 @@ import {
   MAX_UPLOAD_BYTES,
   type UploadResponse,
 } from "@shared/assets-pipeline/schemas";
+import { ImageTags } from "@shared/assets-pipeline/tags";
 import { and, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
@@ -33,6 +34,23 @@ export const CACHE_CONTROL = "private, max-age=31536000, immutable";
 function parseListed(v: string | File | undefined): boolean | null {
   if (v === undefined || v === "true") return true;
   return v === "false" ? false : null;
+}
+
+/**
+ * FR-ASSET-41: the multipart `tags` field: absent = none; a JSON array of tags under FR-ASSET-39's
+ * rules (normalised, deduplicated); anything else = null (400).
+ */
+function parseTags(v: string | File | undefined): { tags?: string[] } | null {
+  if (v === undefined) return {};
+  if (typeof v !== "string") return null;
+  let json: unknown;
+  try {
+    json = JSON.parse(v);
+  } catch {
+    return null;
+  }
+  const r = ImageTags.safeParse(json);
+  return r.success ? { tags: r.data } : null;
 }
 
 /** Multipart framing on top of the file itself. */
@@ -79,6 +97,15 @@ export function assetRoutes(s: Services) {
               400,
             );
           }
+          const tags = parseTags(form.tags);
+          if (tags === null) {
+            return c.json(
+              errorBody("invalid", "Invalid tags", [
+                { path: ["tags"], message: "Expected a JSON array of tags" },
+              ]),
+              400,
+            );
+          }
           if (!(file instanceof File)) {
             return c.json(
               errorBody("invalid", "Missing file", [{ path: ["file"], message: "Required" }]),
@@ -99,12 +126,15 @@ export function assetRoutes(s: Services) {
             });
             const r = s.commands.run(
               INGEST,
-              { ...input, listed },
+              { ...input, listed, ...tags },
               {
                 actor: dmActor(campaignId),
               },
             ) as IngestResult;
-            const body: UploadResponse = { asset: r.asset };
+            const body: UploadResponse = {
+              asset: r.asset,
+              ...(r.droppedTags ? { droppedTags: r.droppedTags } : {}),
+            };
             return c.json(body, r.outcome === "created" ? 201 : 200);
           } catch (err) {
             // 413 / 415 / 422 keep code `invalid`; the status carries the cause.

@@ -25,5 +25,7 @@ export default defineFixture({
   requires: ["campaign"],
   ownerSpec: "assets-pipeline",
   assets: FILES,
-  steps: FILES.map((f) => ingestStep(f)),
+  // *(S6)* Tags (FR-ASSET-41, ASSET §13.1): maps → Maps, token art → Tokens. IDs unchanged:
+  // tags don't feed the seed.
+  steps: FILES.map((f) => ingestStep(f, { tags: [f.startsWith("maps/") ? "Maps" : "Tokens"] })),
 });

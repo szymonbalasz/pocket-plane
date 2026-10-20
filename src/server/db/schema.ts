@@ -167,6 +167,12 @@ export const asset = sqliteTable(
      * Server-only, not on the wire. Existing rows: true.
      */
     listed: integer("listed", { mode: "boolean" }).notNull().default(true),
+    /**
+     * FR-ASSET-39 (S6): 0–8 tags (JSON leaf), fold-unique. Null only on rows written before
+     * IM-1 (the push adds the column as null); backfilled once at start (FR-ASSET-49). Every
+     * ingest since writes an array (`[]` when none sent, FR-ASSET-41). DM only (FR-ASSET-50).
+     */
+    tags: text("tags", { mode: "json" }).$type<string[]>(),
   },
   (t) => [
     // FR-ASSET-03: dedupe per campaign.

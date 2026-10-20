@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200">
+  <title>Ransom sketch</title>
+  <rect width="300" height="200" fill="#eeeeee"/><path d="M20 180L80 40L140 160L200 60L280 170" fill="none" stroke="#ad1457" stroke-width="4"/>
+  <polygon points="150,40 210,100 150,160 90,100" fill="#00838f" stroke="#111" stroke-width="3"/>
+  <rect x="45" y="186" width="19" height="6" fill="#fff" stroke="#000"/><rect x="66" y="185" width="19" height="7" fill="#fff" stroke="#000"/><rect x="87" y="185" width="19" height="7" fill="#fff" stroke="#000"/><rect x="108" y="176" width="19" height="16" fill="#fff" stroke="#000"/><rect x="129" y="178" width="19" height="14" fill="#fff" stroke="#000"/><rect x="150" y="179" width="19" height="13" fill="#fff" stroke="#000"/><rect x="171" y="176" width="19" height="16" fill="#fff" stroke="#000"/><rect x="192" y="180" width="19" height="12" fill="#fff" stroke="#000"/><rect x="213" y="183" width="19" height="9" fill="#fff" stroke="#000"/><rect x="234" y="182" width="19" height="10" fill="#fff" stroke="#000"/>
+</svg>

@@ -383,7 +383,7 @@ DM always `full`. Generic record changes only ([ADR-0021](../architecture/adr/00
 
 | Type | Owner | Scope | Wire fields (DM) | Player visibility | Snapshot provider | Source |
 |---|---|---|---|---|---|---|
-| `asset` | ASSET | campaign | `{id, campaignId, seq, name, mime, bytes, width, height, displayWidth, displayHeight, createdAt}` (no `hash`) | **hidden** | all of the campaign's assets | [FR-ASSET-10](../specs/assets-pipeline.md#6-functional-requirements), ASSET §9 |
+| `asset` | ASSET | campaign | `{id, campaignId, seq, name, mime, bytes, width, height, displayWidth, displayHeight, createdAt}` (no `hash`) *(S6: + `tags: string[]`, [§108](#108-sprint-6-image-tags-core-im-1))* | **hidden** | all of the campaign's assets | [FR-ASSET-10](../specs/assets-pipeline.md#6-functional-requirements), ASSET §9 |
 | `entity` | ENT | campaign | row minus provenance (+ `tokenShape`, feedback pass) | own character (`ownerPlayerId = ctx.playerId`) **full**; other characters **redacted** `{id, kind, name, portraitAssetId, ownerPlayerId}` (+ derived `down` = `hpCurrent = 0`, feedback pass, #154; *(sprint 1, built, fix/charx-core)* + `level, className, species` and *(built, fix/cbtx-core)* CBTX's derived `deathState` ([FR-CBTX-32](../specs/combat-extras.md#6-functional-requirements)): the **one whitelist** `RedactedCharacter` / `REDACTED_CHARACTER_KEYS`, [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md), [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements)); monsters **hidden** | campaign's characters + customs | [FR-ENT-15](../specs/entities.md#6-functional-requirements), [ADR-0024](../architecture/adr/0024-definition-visibility.md) |
 | `imported-entity` | ENT | global, `audience: dm` (players get no list, not even empty; [ADR-0024](../architecture/adr/0024-definition-visibility.md)); *(sprint 3, C2)* **lazy `"ids"`** ([§58](#58-sprint-3-compendium-read-c2)) | row incl. provenance | **hidden** | ~~all imported definitions~~ none (DM loads by id) | [FR-ENT-16](../specs/entities.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md) |
 | `scene` | MAP | scene, `sceneOf = id` ([CON-22](#11-conflicts-log)) | full row | **redacted** `{id, mapAssetId, mapWidth, mapHeight, grid*, active}` (no name, folder, lock, `seq`) *(proposed, OQ-MAP-17)* | DM: all; player: active | [FR-MAP-26](../specs/scenes-map.md#6-functional-requirements), MAP §9 |
@@ -415,7 +415,7 @@ DM always `full`. Generic record changes only ([ADR-0021](../architecture/adr/00
 
 | Method | Path | Who | Command / purpose | Success | Source |
 |---|---|---|---|---|---|
-| POST | `/api/assets` | DM | `assets.ingest`: multipart `file`, `name?` | `201 {asset}` created / `200 {asset}` existing; 400, 401, 413, 415, 422, 429 | [FR-ASSET-01–03](../specs/assets-pipeline.md#6-functional-requirements), ASSET §9 |
+| POST | `/api/assets` | DM | `assets.ingest`: multipart `file`, `name?` *(S5: `listed?`; S6: `tags?`, [§108](#108-sprint-6-image-tags-core-im-1))* | `201 {asset}` created / `200 {asset}` existing *(S6: + `droppedTags?`)*; 400, 401, 413, 415, 422, 429 | [FR-ASSET-01–03](../specs/assets-pipeline.md#6-functional-requirements), ASSET §9 |
 | GET | `/api/assets/:id/:file` | **anyone holding the ID** (no credential) | Serve `thumb` \| `display` ([§14](#14-scenes-asset-route)) | 200 / 304 / 404 | [FR-ASSET-11](../specs/assets-pipeline.md#6-functional-requirements) |
 | POST | `/api/entities` | DM | `entities.create {kind, name, portraitAssetId?, statBlock, derivedFromId?, ownerPlayerId?}`; *(feedback pass, built)* `tokenShape?`; `statBlock` optional `speed`, `abilities`, `saveProficiencies` | `201 {entity}` | [FR-ENT-08–10](../specs/entities.md#6-functional-requirements) |
 | PUT | `/api/entities/:id` | DM | `entities.update` (whole replace; imported → 403). *(feedback pass, built)*: `tokenShape?` as create; omitted → null. Also how character speed / scores / saves are set in MVP (#154) | `200 {entity}` | [FR-ENT-07](../specs/entities.md#6-functional-requirements), [FR-ENT-11](../specs/entities.md#6-functional-requirements) |
@@ -478,7 +478,7 @@ All non-transient; **none undoable** ([ADR-0016](../architecture/adr/0016-domain
 
 | Domain event | Owner | Emitted by | Payload | Changes | Logged | After commit | Source |
 |---|---|---|---|---|---|---|---|
-| `AssetIngested` | ASSET | `assets.ingest` (`created` only; `existing` emits nothing, *S5: except `AssetListed`*) | `{assetId, hash, bytes, listed}` *(S5: + `listed`)* | `asset` upsert (*S5: listed only; an attachment's event has no change*) | yes | — | [FR-ASSET-06](../specs/assets-pipeline.md#6-functional-requirements), ASSET §9, [§82](#82-sprint-5-party-core-p0) |
+| `AssetIngested` | ASSET | `assets.ingest` (`created` only; `existing` emits nothing, *S5: except `AssetListed`*) | `{assetId, hash, bytes, listed, tags}` *(S5: + `listed`; S6: + `tags`)* | `asset` upsert (*S5: listed only; an attachment's event has no change*) | yes | — | [FR-ASSET-06](../specs/assets-pipeline.md#6-functional-requirements), ASSET §9, [§82](#82-sprint-5-party-core-p0) |
 | `EntityImported` | ENT | `entities.import` (`created` only) | `{entityId, source, sourceKey}` | `imported-entity` upsert | yes, `campaignId` null | — | [FR-ENT-06](../specs/entities.md#6-functional-requirements), [FR-FIX-23](../specs/fixtures-adapters.md#6-functional-requirements) |
 | `EntityCreated` | ENT | `entities.create` (incl. derive) | `{entityId, kind, derivedFromId?}` | `entity` upsert | yes | — | ENT §9 |
 | `EntityUpdated` | ENT | `entities.update` | `{entityId}` | `entity` upsert (owner change flips full/redacted) + every hook-changed instance row ([§17](#17-scenes-definition-changed-hooks)) + `combatant` rows ([FR-CBT-06](../specs/combat-tracker.md#6-functional-requirements), CON-42) | yes | — | [FR-ENT-19](../specs/entities.md#6-functional-requirements), ENT §9 |
@@ -2583,9 +2583,31 @@ From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DIC
 | Tests | `name-color.test.tsx` (`FR-DICE-60 log name colour` ×3 over real entry shapes incl. the DM's `cbt.attack` apply → neutral, hidden line, popup name; `FR-DICE-61 kinds and fallback` ×2), `note-colors.test.tsx` (`FR-NOTE-39 accent stripe` ×2, `FR-NOTE-40 names`, `FR-NOTE-41 old rows`), `log-note-colours.fixtures.test.ts`; e2e `log-note-colours.e2e.ts` (CAMP §13 K6, K7) |
 | CON-44 | 0 B: no record, field or frame |
 
-## 108. Sprint 6: companions core (CP0)
+## 108. Sprint 6: image tags core (IM-1)
 
-From [combat-tracker](../specs/combat-tracker.md#9-api--events) FR-CBT-105–124, [entities](../specs/entities.md#9-api--events) FR-ENT-31–38, [scenes-map](../specs/scenes-map.md#9-api--events) FR-MAP-74, -78, -79 and [dice-roll-log](../specs/dice-roll-log.md) (`audiencePlayerId`) (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `fix/cp-core`** (server + shared; no UI). Data side: [data model §86](../data-model/README.md#86-sprint-6-companions-core-cp0).
+From [assets-pipeline](../specs/assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im) FR-ASSET-39–43, -49, -50 (DM gate #288; seams S1, S12; rulings IM #10, #23, #25, #28). **Built by `fix/im-core`**: server, shared schemas, fixtures; no client UI (picker: IM-2). Data side: [data model §86](../data-model/README.md#86-sprint-6-image-tags-core-im-1).
+
+| Piece | Contract |
+|---|---|
+| Shared (`@shared/assets-pipeline/tags.ts`) | `ImageTag`, `ImageTags` (FR-ASSET-39 rules), `tagKey` (= compendium `fold`), `IMAGE_TAGS`, `ImageContext`, `IMAGE_CONTEXT_TAG`, `ASSET_INTENTS`, intent schemas (strict), `TagChangeResult {changed}`, `DroppedTag {tag, reason: image-full \| campaign-full}`; messages "Too many tags (50)", "Built-in tag", "Tag not found" |
+| Record type `asset` | + `tags: string[]` (row null → `[]`). Visibility unchanged: DM `full`, players `hidden` (audience DM; no player snapshot list). Listed rows only |
+| `POST /api/assets` `tags` field | Optional multipart `tags` = JSON array under `ImageTags`; anything else → 400 `invalid` (path `tags`), nothing written. Response `{asset, droppedTags?}` (omitted when empty); `asset.tags` = the row's tags after the upload. Parsed in the assets feature route; no `app.ts` change |
+| `assets.ingest` `tags?` | `created`: row gets the tags (campaign spelling) or `[]`. `existing`: the sent tags are added (union, existing spelling) → `AssetTagsSet` if anything was added (then `AssetListed` if the request also lists an attachment). A tag past 8 on the image (`image-full`) or a new DM tag past 50 distinct (`campaign-full`) is dropped; checked inside the transaction after the files are written, so the upload never fails for a tag |
+| `assets.setTags {assetId, tags}` (DM) | Whole replace, campaign spelling. Asset not in `ctx.campaignId` → `not_found`. Same tags by fold and order → `ack`, no event, no log row. After-state > 50 distinct → `conflict` "Too many tags (50)", nothing written. Result: none (`ack`). Event `AssetTagsSet` |
+| `assets.renameTag {from, to}` (DM) | `from` built-in → `invalid` "Built-in tag"; held by no asset of the campaign → `not_found` "Tag not found". Every holder (listed + attachments): `from` → `to` in place, or just `from` removed if it holds `to` (merge); `to` takes the campaign spelling unless fold-equal to `from` (respell). Nothing changed → `{changed: 0}`, no event. Result `{changed}` |
+| `assets.deleteTag {tag}` (DM) | Held by none → `not_found`. Removed from every holder, built-ins too. Result `{changed}` |
+| `AssetTagsSet {assetId, tags}` | Logged, not undoable. `asset` upsert if listed; an attachment's has no change |
+| `AssetTagRenamed {from, to, assetIds}` / `AssetTagDeleted {tag, assetIds}` | Logged, not undoable. `assetIds` = every changed asset (listed + attachments, seq order); one `asset` upsert per changed listed asset. One frame per DM connection (≈ 423 B per image, ASSET §12; ≤ 4 MiB send buffer) |
+| `AssetIngested` | Payload + `tags` (the new row's) |
+| Visibility (FR-ASSET-50) | All three tag events change only `asset` records → DM connections only; players at most an empty-change frame. Event payloads never go on the wire. No tag in any player REST body (compendium entry bodies carry IDs only) |
+| Start hook `assets-pipeline.tags-backfill` | FR-ASSET-49, once per DB (`db_meta` `asset-tags-backfill`); see data model §86. No event, no log row |
+| Fixtures | `ingestStep(file, {name?, listed?, tags?})`; units `images` (tagged), `image-tags`; bundles `image-search`, `session-sim-10` |
+| Tests | `src/shared/assets-pipeline/tags.test.ts` (`FR-ASSET-39 tag rules`, `FR-ASSET-40 built-ins`), `tags.test.ts` (`FR-ASSET-39 spelling`, `cap 50`, `FR-ASSET-40 built-ins`, `FR-ASSET-41 auto-tag on upload`, `re-upload adds`, `cap on upload`, `FR-ASSET-42 set tags`, `FR-ASSET-43 rename merges`, `delete`, `crash`), `backfill.test.ts` (`FR-ASSET-49 backfill guesses`, no null row), `tags-leak.test.ts` (`FR-ASSET-50 tags never reach a player`), `image-tags.fixtures.test.ts` (`FR-ASSET-39 session-sim-10 loads`, CON-44 sim-10), `snapshot-size.test.ts` (`FR-ASSET-39 CON-44 tags`), `src/server/db/im-schema.test.ts` (push) |
+| CON-44 | Heavy + 500 images: DM 817,909 → 925,409 B worst tags (59 % of 1.5 MiB); players byte-identical. Upload `tags` ≤ 220 B per POST |
+
+## 109. Sprint 6: companions core (CP0)
+
+From [combat-tracker](../specs/combat-tracker.md#9-api--events) FR-CBT-105–124, [entities](../specs/entities.md#9-api--events) FR-ENT-31–38, [scenes-map](../specs/scenes-map.md#9-api--events) FR-MAP-74, -78, -79 and [dice-roll-log](../specs/dice-roll-log.md) (`audiencePlayerId`) (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `fix/cp-core`** (server + shared; no UI). Data side: [data model §87](../data-model/README.md#87-sprint-6-companions-core-cp0).
 
 **REST and intents**
 
