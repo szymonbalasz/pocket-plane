@@ -2034,9 +2034,64 @@ From [assets-pipeline](../specs/assets-pipeline.md#63-sprint-6-image-search-and-
 - **Fixtures:** `image-tags` (requires `images`): 24 listed SVGs under `fixtures/assets/library/` with tags (Ruined Keep + DM tag `zz-lair-secret`, Misc Sketch `[]`) + 2 attachments tagged Handouts; `upload-ogre.svg` committed, not ingested. The `images` unit's steps carry tags (maps → Maps, token art → Tokens; IDs unchanged). Bundles `image-search` = `session-sim-9` + `image-tags`; **`session-sim-10`** = `session-sim-9` + `image-tags` (seams S12; later sprint-6 slices append). No fixture row is null.
 - **Snapshot size** (CON-44, `snapshot-size.test.ts` `FR-ASSET-39 CON-44 tags`): heavy harness + 500 library images (80-char names) → DM **817,909 B** no tags, **827,909 B** typical (Tokens + Portraits, +20 B per image), **925,409 B** worst (8 × 24 chars, +215 B per image; 647,455 B left of 1.5 MiB); every player frame byte-identical. `session-sim-10`: DM +6,498 B over `session-sim-9` (24 listed assets), players unchanged.
 
-## 87. Sprint 6: Fit without the empty box, pcs keeps the top row, players' reveal refit (WF3)
+## 87. Sprint 6: free player colour core (PF0)
 
-From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-80–82, [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-59, -60 and [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-55. **Built by `fix/fit-s6`**: no table, column, record type or payload change. Protocol side: [protocol §110](../protocol/README.md#110-sprint-6-fit-without-the-empty-box-pcs-keeps-the-top-row-players-reveal-refit-wf3).
+From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-30–34, -36, -37 ([ADR-0057](../architecture/adr/0057-free-player-colour.md) amends [ADR-0055](../architecture/adr/0055-player-colour.md) bullet 1; DM gate #288, OQ-CAMP-29 B + danger (a), OQ-CAMP-30 A). **Built by `fix/colour-free-core`**: **no DDL** (both columns were already `text`); `schema.ts` only drops the `enum: PLAYER_COLOR_KEYS` typing on `player.color` and `campaign.dm_color` (rulings-b 7). Protocol side: [protocol §110](../protocol/README.md#110-sprint-6-free-player-colour-core-pf0).
+
+| Column | Value | Default / backfill | Visibility | Source |
+|---|---|---|---|---|
+| `player.color` | lowercase `#rrggbb` (a palette key only in pre-sprint-6 rows, migrated at boot) | written at `player.add` (the default, below); null / invalid → the default at boot | unchanged (every connection of the campaign) | [FR-CAMP-30](../specs/campaign-management.md#6-functional-requirements), -34 |
+| `campaign.dm_color` | lowercase `#rrggbb` | DB default stays `'amber'` but is **never relied on**: `campaign.create` writes `#e69f00`; a still-invalid value → `#e69f00` at boot | unchanged | FR-CAMP-24, -34 |
+
+- **Rules** (pure, `@shared/campaign-management/colors.ts`; server and picker share them): `colorProblem(hex)` = `too-dark` (WCAG < 4.5 : 1 on `#171717`) / `too-grey` (CIELAB C\* < 25) / `too-red` (ΔE2000 < 15 from `#ef4444` in normal vision, or < 5 from `#ef4444` or `#ff6467` in the worst of normal / deuteranopia / protanopia) / null. `colorDistance(a, b)` = min ΔE2000 over normal, deuteranopia, protanopia (Machado 2009, severity 1.0). A **pick** must be ≥ 9 from the DM colour and every other player's (`colorClash`). Thresholds in the spec only.
+- **Default** (`defaultColor(taken)`, deterministic): the first palette colour (`PLAYER_COLORS`, order unchanged) at distance ≥ 9 from every colour of the campaign; none → the palette colour whose smallest distance is largest, ties in palette order. Only defaults may break the rule (no unique index, as before).
+- **Boot migration** (start hook `campaign-management.color-backfill`, `migratePlayerColors`, one transaction, before the server listens; no event, no log row): **pass 1** palette key → its hex, uppercase hex → lowercase, on both columns; **pass 2** invalid `dm_color` → `#e69f00`, then per campaign the null / invalid `player.color` rows get defaults against the pass-1 colours in `createdAt`, `rowid` order, each seeing the ones before it. Rerun = no-op (`state:digest` equal).
+- **Derived (never stored):** a colour's validity and distances; its palette name (`colorName`: a palette hex → "Rose", else the hex); the client's CSS colour = `colorOf` (a hex as is; an old key → its palette hex via `--player-<key>`; else the role accent; system → null).
+- **Event log:** old `PlayerColorSet` rows keep their key (history); the payload schema reads a key or a lowercase hex.
+- **Fixtures:** `pc-colours` now picks Blue's hex `#5b8ff0`; new `pc-colour-free` (as DM, `player-2` → lavender `#b388ff`; requires `pc-colours`; also loads on top of `session-sim-9`); bundles **`prefs-s6`** = `player-colours` + `pc-colour-free` + `loot-1`, **`prefs-s6-e2e`** = `prefs-s6`. `session-sim-10` gains `pc-colour-free` once IM-1 creates it (seams S12).
+- **Snapshot size** (CON-44, `colours-size.test.ts` on the realistic heavy harness): every colour field a hex → **+128 B** DM over no colour fields (≤ 160 B per viewer); **−21 B** vs all-`vermillion` (the sprint-5 worst case, kept in `snapshot-size.test.ts` as the larger bound), **+14 B** vs all-`amber` (−3 / +2 B per field, 7 fields). Heavy DM 681,934 B (890,930 B left of 1.5 MiB); players max 286,731 B of 512 KiB.
+
+## 88. Sprint 6: Initiative rows (WF4)
+
+From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-57, -58 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-125. **Built by `fix/init-rows-s6`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §111](../protocol/README.md#111-sprint-6-initiative-rows--whole-names-whole-trigger-chips-nothing-below--n-more-wf4).
+
+| Derived (not stored) | Where | Rule | Audience | Source |
+|---|---|---|---|---|
+| Name-line fit | per render, per row | `fitNameLine` → chips' room, side chip + chips on a second line, name wraps | each client its own rows | FR-CBTX-57 |
+| Initiative body cap | per render | `listClip(natural, avail)`, `avail` from `windowRect` for the uncapped content | each client | FR-CBT-125 |
+
+- **Fixtures:** none new (session-sim-9: Goblin Ambush running, "Escort to the Ford" planned, Mira's Searing trigger).
+
+## 89. Sprint 6: companions core (CP0)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 and [entities](../specs/entities.md#8-data-model) FR-ENT-31–38 (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `fix/cp-core`** (schema lane after IM-1, seams S1; drizzle push, push-safe: plain `ADD COLUMN`s only, nullable or defaulted, no FK on an added column (drizzle-kit would rebuild the table at the next push), no backfill). Protocol side: [protocol §112](../protocol/README.md#112-sprint-6-companions-core-cp0).
+
+### Changed
+
+| Table / field | Change | Rule | Source |
+|---|---|---|---|
+| `entity.companion_of` | + ID (character of the campaign) \| null, plain id (no FK) | a pet's owner PC; null = not a pet; set by `POST /api/pets` or `PUT` (`companionOf`), cleared by release | FR-ENT-31, -33 |
+| `entity.turn_mode` | + `after-owner` \| `in-owner-turn` \| `own` \| null | a pet's default mode (default `after-owner`), copied to its combatant at join; a mode change in a fight never writes it back | FR-ENT-31, FR-CBT-106 |
+| `entity.pet_present` | + bool, default false; DM only | the pet has an active combatant or an unhidden token on the active scene; server-written in the causing command's transaction | FR-ENT-37 |
+| `entity.owner_player_id`, `entity.hp_current` | now also set on pets | owner copy of `companion_of`'s player (rewritten with it, FR-ENT-34); kept HP 0…`hpMax` (written back at End) | FR-ENT-31, FR-CBT-113 |
+| `combatant.owner_character_id`, `owner_player_id` | + ID \| null ×2, plain ids | both set or both null; `owner_player_id` = the owner PC's player, rewritten with it | FR-CBT-105, FR-ENT-34 |
+| `combatant.turn_mode` | + mode \| null | null iff not a companion; a release clears it (ranks as `own` with the owner's number) | FR-CBT-106, -111 |
+| `combatant.pet`, `combatant.owner_hidden` | + bool ×2, default false | `pet` = HP written back at End; `owner_hidden` = copy of the owner combatant's `hidden` (DM only), written by every rerank | FR-CBT-105, -116 |
+| `combatant.concentration_effect_id` | + ID \| null, plain id; DM only | the owner's concentration a summon is linked to (CP3 writes it) | FR-CBT-110, -120 |
+| `combatant.card` | + **JSON leaf** `companionCard(statBlock)` \| null | `{size, type?, ac, hpMax, speed?, attacks ≤ 8 [{id, name, toHit, bonus?, damage, damageType?, extraDamage?}], more?}`; stable row ids (the row's own, else `ctx.ids` at copy, kept while the row at that index keeps its name); written at join / `setCompanion`, refreshed by the definition hook, cleared on release; ≤ 2,038 B | FR-CBT-117, FR-CHARX-60 |
+| `combatant.position` | 0 = **no rank** (record: null) | an `in-owner-turn` companion while its owner is eligible acts inside the owner's turn (the column stays NOT NULL: a nullable change makes push rebuild and empty the table) | FR-CBT-107 |
+| `game_log_entry.audience_player_id` | + ID \| null, plain id | a non-public entry also reaches this player: a companion's roll lines (DM + owner) | FR-CBT-114, ADR-0056 |
+| Log-entry kind `cbt.companion` *(new)* | payload `{action: summon \| dismiss \| follows \| release \| hostile, name, ownerName?, count?}`, dmPayload `{turnMode?}` | `public` iff the combatant is visible to players; DM text adds the mode | FR-CBT-122 |
+| `cbt.attack` line payload (companion attacker) | `toHit` = `{dice: null, constant: 0, total, natural}` | the "N + M" split, bonus and effect parts only in `dmPayload` | FR-CBT-114 |
+
+- **Derived (not stored):** `isPet` (`companionOf ≠ null`); `isSummon` (`ownerPlayerId ≠ null ∧ ¬pet`); ranks per mode and owner state (`ranks`, `inTurnCompanionsOf`, `@shared/combat-tracker/rules.ts`); a pet's redacted `band` (FR-CBT-26 on `hpCurrent` / `statBlock.hpMax`).
+- **Persisted runtime state:** companion fields and HP on the combatant; a pet's kept HP and presence on its entity. No new table or record type.
+- **Fixtures:** units `cp-srd` (SRD Owlbear, Fire Elemental), `pet-owlbear`, `pet-drake`, `cp-pet-thorn`, `cp-ally`; bundles `companions-prep`, `companions`, `companions-e2e`, `companions-start`, `companions-ally`.
+- **CON-44** (`src/server/ws/snapshot-size.test.ts`, realistic-heavy harness): 24 owned combatants with 8-attack max cards + 18 present pets (3 per player, max names and blocks): DM 691,105 → 796,753 B (owned combatants +54,816 B, pets +50,832 B; 776,111 B left of 1.5 MiB); players 310,614–313,914 B (+24,779 B each; 210,374 B left of 512 KiB).
+
+## 90. Sprint 6: Fit without the empty box, pcs keeps the top row, players' reveal refit (WF3)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-80–82, [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-59, -60 and [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-55. **Built by `fix/fit-s6`**: no table, column, record type or payload change. Protocol side: [protocol §113](../protocol/README.md#113-sprint-6-fit-without-the-empty-box-pcs-keeps-the-top-row-players-reveal-refit-wf3).
 
 | State | Where | Rule | Source |
 |---|---|---|---|

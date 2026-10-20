@@ -17,6 +17,7 @@
 import type { SceneRecord } from "@shared/scenes-map/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
+import { petPresenceSceneHook } from "../entities/pet-presence";
 import { fogSceneHook } from "../fog-of-war/lifecycle";
 import { scnSceneHook } from "../scene-tools/lifecycle";
 
@@ -36,6 +37,7 @@ export interface SceneHook {
 export const sceneHooks: readonly SceneHook[] = [
   fogSceneHook, // fog-of-war (FR-FOG-02 created / duplicated, -23 deleting, -35 activated, -33 mapChanged)
   scnSceneHook, // scene-tools (FR-SCN-31)
+  petPresenceSceneHook, // entities: scene switch / active-scene delete re-derive `petPresent` (FR-ENT-37)
 ];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */

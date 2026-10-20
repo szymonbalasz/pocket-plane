@@ -43,6 +43,9 @@ const elite: EntityRecord = {
   statBlock: goblinBlock as unknown as Extract<EntityRecord, { kind: "monster" }>["statBlock"],
   ownerPlayerId: null,
   hpCurrent: null,
+  companionOf: null,
+  turnMode: null,
+  petPresent: false,
 };
 
 describe("entities record types", () => {

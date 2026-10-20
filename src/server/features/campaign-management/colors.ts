@@ -1,12 +1,22 @@
-// Player colours, server side (CAMP FR-CAMP-23–26; ADR-0055): defaults at player add, the boot
-// backfill, and the `camp.setColor` intent. Colours live only on `player.color` and
-// `campaign.dm_color`; every other feature derives them from the person it already names.
-import { defaultColor, isPlayerColor, type PlayerColor } from "@shared/campaign-management/colors";
+// Player colours, server side (CAMP FR-CAMP-23–26, -30–34; ADR-0055 amended by ADR-0057):
+// defaults at player add, the boot migration, and the `camp.setColor` intent. Colours live only
+// on `player.color` and `campaign.dm_color` as lowercase `#rrggbb`; every other feature derives
+// them from the person it already names.
+import {
+  COLOR_PROBLEM_MESSAGE,
+  type ColorHolder,
+  colorClash,
+  colorProblem,
+  DM_DEFAULT_COLOR,
+  defaultColor,
+  isHexColor,
+  normalizeColor,
+} from "@shared/campaign-management/colors";
 import { SetColorInput } from "@shared/campaign-management/schemas";
 import { PlayerColorSet } from "@shared/events/campaign-management";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { defineCommand } from "../../commands/commands";
-import { conflict, forbidden, notFound } from "../../commands/errors";
+import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import type { Db, Tx } from "../../db/client";
 import { campaign, player } from "../../db/schema";
 import { toCampaignRecord, toPlayerRecord } from "./records";
@@ -29,47 +39,76 @@ function holders(tx: Reader, campaignId: string) {
   return { dmColor: dm?.dmColor ?? null, players };
 }
 
-/** FR-CAMP-23: the default for a new player of `campaignId` (call before the insert). */
-export function nextDefaultColor(tx: Reader, campaignId: string): PlayerColor {
+/** FR-CAMP-23, -32: the default for a new player of `campaignId` (call before the insert). */
+export function nextDefaultColor(tx: Reader, campaignId: string): string {
   const { dmColor, players } = holders(tx, campaignId);
-  const taken = [dmColor, ...players.map((p) => p.color)].filter(isPlayerColor);
-  return defaultColor(taken);
+  return defaultColor([dmColor, ...players.map((p) => p.color)].filter((c) => c !== null));
+}
+
+export interface ColorMigration {
+  /** Pass 1: palette keys → hex, uppercase hex → lowercase. */
+  normalised: number;
+  /** Pass 2: DM colours → Amber, player colours → their default. */
+  filled: number;
 }
 
 /**
- * FR-CAMP-23 boot backfill (a start hook, before the server listens): per campaign, players with
- * a null colour get defaults in `createdAt, rowid` order, each seeing the ones before it. One
- * transaction; no event, no log row (a migration, like FR-FOG-40); rerun = no-op. Returns how
- * many rows it filled.
+ * FR-CAMP-23 / -34 boot migration (a start hook, before the server listens), one transaction:
+ * **pass 1** turns every palette key in `player.color` / `campaign.dm_color` into its hex and
+ * lowercases hex; **pass 2** sets a still-invalid `dm_color` to Amber and gives every player
+ * whose colour is null or still invalid the default (FR-CAMP-32) against the pass-1 colours, per
+ * campaign in `createdAt, rowid` order, each seeing the ones before it. No event, no log row (a
+ * migration, like FR-FOG-40); rerun = no-op.
  */
-export function backfillPlayerColors(db: Db): number {
+export function migratePlayerColors(db: Db): ColorMigration {
   return db.transaction((tx) => {
-    const campaigns = tx
-      .selectDistinct({ id: player.campaignId })
-      .from(player)
-      .where(isNull(player.color))
-      .all();
-    let n = 0;
-    for (const { id: campaignId } of campaigns) {
-      const { dmColor, players } = holders(tx, campaignId);
-      const taken = [dmColor, ...players.map((p) => p.color)].filter(isPlayerColor);
+    let normalised = 0;
+    let filled = 0;
+    for (const c of tx
+      .select({ id: campaign.id, dmColor: campaign.dmColor })
+      .from(campaign)
+      .all()) {
+      const hex = normalizeColor(c.dmColor);
+      if (hex && hex !== c.dmColor) {
+        tx.update(campaign).set({ dmColor: hex }).where(eq(campaign.id, c.id)).run();
+        normalised++;
+      }
+    }
+    for (const p of tx.select({ id: player.id, color: player.color }).from(player).all()) {
+      const hex = normalizeColor(p.color);
+      if (hex && hex !== p.color) {
+        tx.update(player).set({ color: hex }).where(eq(player.id, p.id)).run();
+        normalised++;
+      }
+    }
+    for (const c of tx
+      .select({ id: campaign.id, dmColor: campaign.dmColor })
+      .from(campaign)
+      .all()) {
+      if (!isHexColor(c.dmColor)) {
+        tx.update(campaign).set({ dmColor: DM_DEFAULT_COLOR }).where(eq(campaign.id, c.id)).run();
+        filled++;
+      }
+      const { dmColor, players } = holders(tx, c.id);
+      const taken = [dmColor, ...players.map((p) => p.color)].filter(isHexColor);
       for (const p of players) {
-        if (p.color !== null) continue;
+        if (isHexColor(p.color)) continue;
         const color = defaultColor(taken);
         tx.update(player).set({ color }).where(eq(player.id, p.id)).run();
         taken.push(color);
-        n++;
+        filled++;
       }
     }
-    return n;
+    return { normalised, filled };
   });
 }
 
 /**
- * FR-CAMP-25 / -26 `camp.setColor {playerId | null, color}`: a player sets their own colour, the
- * DM any player's of the campaign or (`null`) the DM colour. A pick must be free among the DM
- * colour and every other player's (checked in this transaction; SQLite's single writer
- * serialises racing picks) → else `conflict` "Taken by ‹name›". Same colour → ack, no write.
+ * FR-CAMP-25 / -33 `camp.setColor {playerId | null, color}`: a player sets their own colour, the
+ * DM any player's of the campaign or (`null`) the DM colour. In this transaction, in order:
+ * FR-CAMP-31 validity → `invalid` with its message; same colour → ack, no write; FR-CAMP-32
+ * distance from the DM colour and every other player's → `conflict` "Taken by ‹name›" / "Too
+ * close to ‹name›'s colour…" (SQLite's single writer serialises racing picks); else write + event.
  */
 export const setColor = defineCommand({
   name: "camp.setColor",
@@ -94,13 +133,20 @@ export const setColor = defineCommand({
             .where(and(eq(player.id, playerId), eq(player.campaignId, campaignId)))
             .get();
     if (playerId !== null && !row) throw notFound("Player not found");
+    const problem = colorProblem(color);
+    if (problem) throw invalid(COLOR_PROBLEM_MESSAGE[problem]);
     const current = row ? row.color : camp.dmColor;
     if (current === color) return {};
 
     const { dmColor, players } = holders(tx, campaignId);
-    if (playerId !== null && dmColor === color) throw conflict("Taken by DM");
-    const taker = players.find((p) => p.id !== playerId && p.color === color);
-    if (taker) throw conflict(`Taken by ${taker.name}`);
+    const others: ColorHolder[] = [
+      ...(playerId !== null && dmColor ? [{ by: "dm", name: "DM", color: dmColor }] : []),
+      ...players
+        .filter((p) => p.id !== playerId && p.color !== null)
+        .map((p) => ({ by: p.id, name: p.name, color: p.color as string })),
+    ];
+    const clash = colorClash(color, others);
+    if (clash) throw conflict(clash.message);
 
     const now = ctx.clock.iso();
     if (row) {

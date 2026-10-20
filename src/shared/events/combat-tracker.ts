@@ -3,7 +3,7 @@
 // Shared definitions (fix/combat-core); combat-tracker emits them. Payloads the specs leave
 // open (`{encounterId}` CRUD, initiative, remove / restore) are fix/combat-core picks (§22).
 import { DeathCounters } from "@shared/combat-extras/schemas";
-import { Ability } from "@shared/entities/schemas";
+import { Ability, TurnMode } from "@shared/entities/schemas";
 import { z } from "zod";
 import { defineEvent } from "./types";
 
@@ -239,6 +239,56 @@ export const CombatantSideChanged = defineEvent({
       secret: z.boolean(),
     })
     .strict(),
+  logged: true,
+  undoable: false,
+});
+
+// ---------- sprint 6: companions (#252, FR-CBT-105–122, ADR-0056) ----------
+
+/**
+ * `cbt.summon` (FR-CBT-110): `token` creates first, then `combatant` creates (others' ranks),
+ * initiative / HP `roll` entries and one `cbt.companion` line. Not undoable (Dismiss).
+ */
+export const CompanionsSummoned = defineEvent({
+  type: "CompanionsSummoned",
+  payload: z
+    .object({
+      encounterId: Id,
+      combatantIds: z.array(Id).min(1).max(8),
+      ownerCharacterId: Id,
+    })
+    .strict(),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `cbt.setCompanion` (FR-CBT-111): the `combatant` (+ reranked rows), its bound `token` (owner)
+ * and one `cbt.companion` line. `ownerCharacterId` / `turnMode` null = released; `side` set on
+ * turn hostile (an open change, FR-CBT-99).
+ */
+export const CompanionChanged = defineEvent({
+  type: "CompanionChanged",
+  payload: z
+    .object({
+      encounterId: Id,
+      combatantId: Id,
+      ownerCharacterId: Id.nullable(),
+      turnMode: TurnMode.nullable(),
+      side: z.enum(["ally", "enemy"]).optional(),
+    })
+    .strict(),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `cbt.dismiss` (FR-CBT-112): `combatant` inactive; a summon's `token` delete or a pet's `entity`
+ * write-back; ended `effect`s; reranked rows; one line. `by` = the DM or the owner player id.
+ */
+export const CompanionDismissed = defineEvent({
+  type: "CompanionDismissed",
+  payload: z.object({ encounterId: Id, combatantId: Id, by: z.string() }).strict(),
   logged: true,
   undoable: false,
 });

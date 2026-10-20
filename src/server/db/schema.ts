@@ -1,7 +1,6 @@
 // Drizzle schema. Shared file (AGENTS §9.9). Entities and rules: docs/data-model/README.md.
 // Timestamps are ISO-8601 UTC strings from ctx.clock.
 
-import { DM_DEFAULT_COLOR, PLAYER_COLOR_KEYS } from "@shared/campaign-management/colors";
 import { CONDITIONS } from "@shared/combat-extras/conditions";
 import {
   type DeathCounters,
@@ -21,7 +20,12 @@ import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
 import { TRIGGER_CHARGES } from "@shared/effect-modifiers/trigger-state";
 import { TRIGGER_EVENTS, type TriggerRule } from "@shared/effect-modifiers/triggers";
-import { TOKEN_CREATURE_TYPES, TOKEN_SHAPES } from "@shared/entities/schemas";
+import {
+  type CompanionCard,
+  TOKEN_CREATURE_TYPES,
+  TOKEN_SHAPES,
+  TURN_MODES,
+} from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
@@ -53,8 +57,11 @@ export const campaign = sqliteTable(
     id: text("id").primaryKey(),
     name: text("name").notNull(),
     active: integer("active", { mode: "boolean" }).notNull().default(false),
-    /** FR-CAMP-24: the DM colour, a palette key; the default makes the push-time add safe. */
-    dmColor: text("dm_color", { enum: PLAYER_COLOR_KEYS }).notNull().default(DM_DEFAULT_COLOR),
+    /**
+     * FR-CAMP-24, -30: the DM colour, a lowercase `#rrggbb`. The `'amber'` default only made the
+     * push-time add safe; every insert writes a hex and the boot migration converts old keys.
+     */
+    dmColor: text("dm_color").notNull().default("amber"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -77,11 +84,11 @@ export const player = sqliteTable(
     /** Never in a sync record, event or log entry (FR-CAMP-13). */
     linkToken: text("link_token").notNull(),
     /**
-     * FR-CAMP-23: a palette key. Nullable only so drizzle push can add it to a populated table;
-     * the boot backfill fills it before any snapshot (the wire record is non-null). Not unique:
-     * defaults repeat past 8 players (FR-CAMP-26).
+     * FR-CAMP-23, -30: a lowercase `#rrggbb`. Nullable only so drizzle push can add it to a
+     * populated table; the boot migration fills it before any snapshot (the wire record is
+     * non-null). Not unique: defaults may repeat once no palette colour is far enough (FR-CAMP-32).
      */
-    color: text("color", { enum: PLAYER_COLOR_KEYS }),
+    color: text("color"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -204,6 +211,19 @@ export const entity = sqliteTable(
     tokenShape: text("token_shape", { enum: TOKEN_SHAPES }),
     /** Plain id, no FK (informational). */
     derivedFromId: text("derived_from_id"),
+    /**
+     * FR-ENT-31 (sprint 6, #252): a pet's owner PC (a character of the campaign, checked by the
+     * commands); null = not a pet. Plain id, no FK: characters are never deleted (FR-ENT-14), and
+     * a column added to an existing table can't carry one (drizzle-kit's push would rebuild it).
+     */
+    companionOf: text("companion_of"),
+    /** FR-ENT-31: a pet's default turn mode (copied to its combatant at join); null = not a pet. */
+    turnMode: text("turn_mode", { enum: TURN_MODES }),
+    /**
+     * FR-ENT-37 (ADR-0056): server-written, DM-only: the pet has an active companion combatant or
+     * an unhidden token on the active scene; other players receive the pet only while true.
+     */
+    petPresent: integer("pet_present", { mode: "boolean" }).notNull().default(false),
     source: text("source"),
     sourceKey: text("source_key"),
     licence: text("licence"),
@@ -220,6 +240,8 @@ export const entity = sqliteTable(
     // FR-ENT-05, FR-FIX-20: provenance unique globally (nulls for customs).
     uniqueIndex("entity_source_key").on(t.source, t.sourceKey),
     index("entity_campaign").on(t.campaignId),
+    // No `companion_of` index (≤ 60 pets per campaign, read through `entity_campaign`): a new
+    // index on `entity` makes drizzle-kit's push re-create its expression index broken.
   ],
 );
 
@@ -451,6 +473,12 @@ export const gameLogEntry = sqliteTable(
     /** JSON leaf ID[]; no FK (gate I24). */
     rollIds: text("roll_ids", { mode: "json" }).notNull(),
     encounterId: text("encounter_id").references((): AnySQLiteColumn => encounter.id),
+    /**
+     * Sprint 6 (FR-CBT-114, FR-CHARX-69, ADR-0056): a non-public entry also reaches this player
+     * (a companion's owner); null = DM only. Ignored on public entries. Plain id, no FK (an added
+     * column can't carry one; players are never deleted).
+     */
+    audiencePlayerId: text("audience_player_id"),
     /** Reserved for gems (#140); null in MVP. */
     supersededBy: text("superseded_by"),
   },
@@ -601,7 +629,11 @@ export const combatant = sqliteTable(
     removed: integer("removed", { mode: "boolean" }).notNull().default(false),
     initiative: integer("initiative"),
     initRollId: text("init_roll_id"),
-    /** Server-written ranks (FR-CBT-13). */
+    /**
+     * Server-written ranks (FR-CBT-13), 1…n. Sprint 6 (FR-CBT-107): `0` = no rank, an
+     * `in-owner-turn` companion acting inside its owner's turn; the record reads it as null.
+     * (Not a nullable column: drizzle-kit's push rebuilds a table for that and empties it.)
+     */
     position: integer("position").notNull(),
     playerPosition: integer("player_position"),
     /** Monsters only (PC HP lives on the character, #92). */
@@ -617,6 +649,26 @@ export const combatant = sqliteTable(
      */
     side: text("side", { enum: SIDES }),
     publicSide: text("public_side", { enum: SIDES }),
+    /**
+     * FR-CBT-105 (sprint 6, #252): a companion's owner PC and that PC's player (a copy written
+     * with it); both null = not a companion. Plain ids, no FK: columns added to an existing table
+     * can't carry one (drizzle-kit's push would rebuild and empty it); the commands check them.
+     */
+    ownerCharacterId: text("owner_character_id"),
+    ownerPlayerId: text("owner_player_id"),
+    /** FR-CBT-106: null iff not a companion. */
+    turnMode: text("turn_mode", { enum: TURN_MODES }),
+    /** FR-CBT-105: the entity is a pet (HP written back at End / Dismiss). */
+    pet: integer("pet", { mode: "boolean" }).notNull().default(false),
+    /** FR-CBT-116: copy of the owner combatant's `hidden`, written with it. DM only. */
+    ownerHidden: integer("owner_hidden", { mode: "boolean" }).notNull().default(false),
+    /**
+     * FR-CBT-110 / -120: the owner's concentration this summon is linked to. DM only. Plain id,
+     * no FK: effects are never deleted (they end), and an added column can't carry one.
+     */
+    concentrationEffectId: text("concentration_effect_id"),
+    /** FR-CBT-117: JSON leaf `companionCard(statBlock)` with stable row ids; companions only. */
+    card: text("card", { mode: "json" }).$type<CompanionCard>(),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );

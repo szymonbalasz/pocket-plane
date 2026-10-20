@@ -17,6 +17,10 @@ export default defineBundle({
     // WF3: no new unit (Fit, pcs pan and the reveal refit walk on sim-9's Goblin Ambush: door
     // (8, 5), party vision, the hidden Elite and Wolf)
     // PF: Preferences, free colour, Subtract
+    // PF0: Player 2 lavender `#b388ff` (one DM `camp.setColor`; Blue and Sky blocked for Player 1)
+    "pc-colour-free",
     // CP: companions + summons
+    // CP0: the SRD Owlbear and Fire Elemental (imported, DM-only; CP1 / CP3 add the pets and the fight)
+    "cp-srd",
   ],
 });

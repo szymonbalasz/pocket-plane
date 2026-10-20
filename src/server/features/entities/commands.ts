@@ -10,18 +10,21 @@ import {
   type EntityRecord,
   entityNameKey,
   kindRegistry,
+  PETS_PER_CAMPAIGN_MAX,
+  PETS_PER_PC_MAX,
   type StatBlock,
+  type TurnMode,
   UpdateEntityBody,
   withClassTotals,
 } from "@shared/entities/schemas";
 import { EntityCreated, EntityUpdated } from "@shared/events/entities";
 import type { Issue } from "@shared/protocol/codes";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import type { z } from "zod";
 import { type CommandEnv, defineCommand, IdSchema } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound, zodIssues } from "../../commands/errors";
 import type { Tx } from "../../db/client";
-import { entity, player } from "../../db/schema";
+import { combatant, entity, player } from "../../db/schema";
 import type { Actor, RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import type { DefinitionHooks } from "./definition-hooks";
@@ -36,7 +39,7 @@ type Env = { tx: Tx; actor: Actor };
 /** What the internal create / update need: a command env minus `emit` (they never emit). */
 export type EntityEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
 
-function campaignOf(actor: Actor): string {
+export function campaignOf(actor: Actor): string {
   if (!actor.campaignId) throw conflict("No active campaign");
   return actor.campaignId;
 }
@@ -61,17 +64,78 @@ export function resolveDefinition(env: Env, id: string): DefinitionRecord {
   return toDefinitionRecord(row);
 }
 
-/** FR-ENT-08: unique case-insensitive among the campaign's entities of that kind. */
-function assertNameFree(tx: Tx, cid: string, kind: EntityKind, name: string, exceptId?: string) {
+/** FR-ENT-08: the name is taken (case-insensitive) among the campaign's entities of that kind. */
+export function nameTaken(
+  tx: Pick<Tx, "select">,
+  cid: string,
+  kind: EntityKind,
+  name: string,
+  exceptId?: string,
+): boolean {
   const key = entityNameKey(name);
-  const clash = tx
+  return tx
     .select({ id: entity.id, name: entity.name })
     .from(entity)
     .where(and(eq(entity.campaignId, cid), eq(entity.kind, kind)))
     .all()
     .some((e) => e.id !== exceptId && entityNameKey(e.name) === key);
-  if (clash) throw conflict(`A ${kind} named "${name}" already exists in this campaign`);
 }
+
+/** FR-ENT-08: unique case-insensitive among the campaign's entities of that kind. */
+function assertNameFree(tx: Tx, cid: string, kind: EntityKind, name: string, exceptId?: string) {
+  if (nameTaken(tx, cid, kind, name, exceptId)) {
+    throw conflict(`A ${kind} named "${name}" already exists in this campaign`);
+  }
+}
+
+/** FR-ENT-31 / -32: a pet's owner PC: a character of the campaign, else `invalid`. */
+export function ownerCharacter(
+  tx: Pick<Tx, "select">,
+  cid: string,
+  id: string,
+  path: string,
+): { id: string; name: string; ownerPlayerId: string } {
+  const row = tx
+    .select({
+      id: entity.id,
+      name: entity.name,
+      ownerPlayerId: entity.ownerPlayerId,
+      kind: entity.kind,
+    })
+    .from(entity)
+    .where(and(eq(entity.id, id), eq(entity.campaignId, cid)))
+    .get();
+  if (row?.kind !== "character" || row.ownerPlayerId === null) {
+    throw invalid("A pet belongs to a character of this campaign", [
+      { path: [path], message: "Not a character of this campaign" },
+    ]);
+  }
+  return { id: row.id, name: row.name, ownerPlayerId: row.ownerPlayerId };
+}
+
+/** FR-ENT-35: a 4th pet of one PC (or the campaign's 61st) → `conflict`. */
+export function assertPetCaps(
+  tx: Pick<Tx, "select">,
+  cid: string,
+  owner: { id: string; name: string },
+  exceptId?: string,
+): void {
+  const pets = tx
+    .select({ id: entity.id, companionOf: entity.companionOf })
+    .from(entity)
+    .where(and(eq(entity.campaignId, cid), isNotNull(entity.companionOf)))
+    .all()
+    .filter((e) => e.id !== exceptId);
+  if (pets.filter((e) => e.companionOf === owner.id).length >= PETS_PER_PC_MAX) {
+    throw conflict(`${owner.name} already has ${PETS_PER_PC_MAX} pets`);
+  }
+  if (pets.length >= PETS_PER_CAMPAIGN_MAX) {
+    throw conflict(`This campaign already has ${PETS_PER_CAMPAIGN_MAX} pets`);
+  }
+}
+
+/** FR-ENT-33: a pet's release or owner change while it is an active combatant. */
+export const PET_IN_FIGHT = "Dismiss it from the fight first";
 
 /** FR-ENT-10: owner must be a player of the campaign. */
 function assertOwner(tx: Tx, cid: string, ownerPlayerId: string) {
@@ -96,6 +160,16 @@ const stored = (tx: Tx, id: string) =>
   toEntityRecord(getRow(tx, id) as NonNullable<ReturnType<typeof getRow>>);
 
 export type CreateEntityInput = z.output<typeof CreateEntityBody>;
+
+/** FR-ENT-33: a pet with an active companion combatant can't be released or change owner. */
+function assertNotFighting(tx: Tx, entityId: string): void {
+  const active = tx
+    .select({ id: combatant.id })
+    .from(combatant)
+    .where(and(eq(combatant.entityId, entityId), eq(combatant.active, true)))
+    .get();
+  if (active) throw conflict(PET_IN_FIGHT);
+}
 
 /**
  * Internal create (CHARX FR-CHARX-08, OQ-CHARX-19): the `POST` path minus HTTP and the event.
@@ -220,14 +294,40 @@ export function updateIn(
   let statBlock: StatBlock = parsed.data;
   let ownerPlayerId: string | null = null;
   let hpCurrent: number | null = null;
+  let companionOf: string | null = null;
+  let turnMode: TurnMode | null = null;
+  let petPresent = false;
   if (before.kind === "monster") {
     if (next.ownerPlayerId !== undefined) {
       throw invalid("Monsters have no owner", [
         { path: ["ownerPlayerId"], message: "Not allowed for monsters" },
       ]);
     }
-    if (next.hpCurrent !== undefined) throw new Error("Monster definitions have no hpCurrent");
+    // FR-ENT-33 (sprint 6): whole replace: `companionOf` omitted = null (released).
+    companionOf = next.companionOf ?? null;
+    if (companionOf === null) {
+      if (next.hpCurrent !== undefined) throw new Error("Monster definitions have no hpCurrent");
+      if (before.companionOf !== null) assertNotFighting(tx, before.id);
+    } else {
+      const owner = ownerCharacter(tx, cid, companionOf, "companionOf");
+      if (owner.id !== before.companionOf) {
+        if (before.companionOf !== null) assertNotFighting(tx, before.id);
+        assertPetCaps(tx, cid, owner, before.id);
+      }
+      ownerPlayerId = owner.ownerPlayerId;
+      turnMode = next.turnMode ?? "after-owner";
+      // A new pet starts at full HP; a pet keeps its HP, clamped to the new max (FR-ENT-11).
+      const max = (parsed.data as StatBlock).hpMax;
+      const kept = before.companionOf === null ? max : (next.hpCurrent ?? before.hpCurrent ?? max);
+      hpCurrent = Math.max(0, Math.min(kept, max));
+      petPresent = before.petPresent;
+    }
   } else {
+    if (next.companionOf != null || next.turnMode != null) {
+      throw invalid("Characters can't be pets", [
+        { path: ["companionOf"], message: "Not allowed for characters" },
+      ]);
+    }
     if (next.ownerPlayerId === undefined) {
       throw invalid("Characters need an owner", [{ path: ["ownerPlayerId"], message: "Required" }]);
     }
@@ -250,6 +350,9 @@ export function updateIn(
       statBlock,
       ownerPlayerId,
       hpCurrent,
+      companionOf,
+      turnMode,
+      petPresent,
       updatedAt: ctx.clock.iso(),
     })
     .where(eq(entity.id, before.id))

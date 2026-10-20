@@ -156,7 +156,11 @@ function setup() {
 describe("FR-FOG-24 registries (fog's server lines only)", () => {
   test("FR-FOG-24 fog registers derive, hides, dragAudience, rederive and created / duplicated / deleting / activated; without them nothing changes", () => {
     // build/fog-visibility completes fog's lines (FOG §14).
-    expect(sceneVisibilityHooks.map((h) => h.name)).toEqual(["fog-of-war.fogged"]);
+    // Sprint 6 (FR-ENT-37): entities' pet-presence line follows fog's.
+    expect(sceneVisibilityHooks.map((h) => h.name)).toEqual([
+      "fog-of-war.fogged",
+      "entities.pet-presence",
+    ]);
     const [line] = sceneVisibilityHooks;
     expect([!!line?.derive, !!line?.hides, !!line?.dragAudience, !!line?.rederive]).toEqual([
       true,
@@ -165,7 +169,11 @@ describe("FR-FOG-24 registries (fog's server lines only)", () => {
       true,
     ]);
     // scene-tools' line (FR-SCN-31) only lists SCN rows, and these scenes have none.
-    expect(sceneHooks.map((h) => h.name)).toEqual(["fog-of-war.fog-row", "scene-tools.scene-rows"]);
+    expect(sceneHooks.map((h) => h.name)).toEqual([
+      "fog-of-war.fog-row",
+      "scene-tools.scene-rows",
+      "entities.pet-presence",
+    ]);
     const [fogLine] = sceneHooks;
     expect([
       !!fogLine?.created,

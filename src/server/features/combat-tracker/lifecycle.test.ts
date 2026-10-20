@@ -15,7 +15,9 @@ import { endCommand, startCommand } from "./lifecycle";
 import { combatSetup, eliteBlock } from "./testing";
 
 const pos = (rows: CombatantRecord[]) =>
-  [...rows].sort((a, b) => a.position - b.position).map((r) => [r.name, r.playerPosition]);
+  [...rows]
+    .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+    .map((r) => [r.name, r.playerPosition]);
 
 function started() {
   const t = combatSetup();
@@ -45,7 +47,9 @@ describe("FR-CBT-13 order (unit)", () => {
       row("m12b3", { seq: 8, initiative: 12, initBonus: 3 }),
       row("m18", { seq: 7, initiative: 18 }),
     ]);
-    const order = [...r].sort((a, b) => a[1].position - b[1].position).map(([id]) => id);
+    const order = [...r]
+      .sort((a, b) => (a[1].position ?? 0) - (b[1].position ?? 0))
+      .map(([id]) => id);
     expect(order).toEqual(["m18", "m12b3", "pc12b2", "m12b2s2", "m12b2s3", "none"]);
   });
   test("FR-CBT-13 playerPosition skips hidden, removed, inactive", () => {

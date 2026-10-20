@@ -1,11 +1,22 @@
 // Small combat-extras parts for both clients: effect chips on one line ("+N" for the rest: the
 // hidden ones on hover and click, P3 glitch 6; FR-CBTX-33/34; compact labels measured against the room left, FR-CBTX-46; tighter tiers before "+N", BL-08), death pips + state badge (FR-CBTX-33/34), roll / intent helpers.
 // Sprint 4 (FR-CBTX-52): trigger chips after the effect chips on the same line. Sprint 5
-// (FR-CBTX-54, BL-26): a trigger never folds into "+N"; it goes icon-only first.
+// (FR-CBTX-54, BL-26): a trigger never folds into "+N"; it goes icon-only first. Sprint 6
+// (FR-CBTX-57, -58, BL-43): the name line counts its fixed parts, so the name is never cut; a
+// trigger chip is whole or icon-only.
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
 import type { DeathState } from "@shared/entities/schemas";
 import { CheckIcon, EyeOffIcon, ZapIcon } from "lucide-react";
-import { type ComponentProps, type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,10 +42,15 @@ import {
   DEATH_LABEL,
   fitChipRow,
   fitChips,
+  fitNameLine,
+  type NameLineFit,
   splitNumbered,
 } from "./logic";
 
 const GAP = 2;
+
+/** FR-CBTX-57: the chips' room on their row's name line (`NameLine`); null elsewhere. */
+const NameLineRoom = createContext<number | null>(null);
 
 /** `left`: plain rows' "+N" offset, px. */
 type Fit = { n: number; tier: number; icons: boolean; wrap: boolean; left: number };
@@ -44,14 +60,15 @@ type Fit = { n: number; tier: number; icons: boolean; wrap: boolean; left: numbe
  * after the full name). Plain rows (`fitChips`): the rest stay in flow but invisible (clipped by the
  * row) and "+N" sits after the last one that fits. Compact rows (`fitChipRow`, FR-CBTX-54) are
  * measured on an invisible copy of the chips at natural width (`data-chip-measure`): effect chips
- * tighten (BL-08), trigger chips go icon-only, effect chips fold, and only then (or as soon as the
- * name beside them is cut, #182) does the chip row take a line of its own under the name (`wrap`:
- * the name line wraps, the row grows one line; kept
- * until the name line widens or the chips change, so it never flips back and forth). Measured
- * after layout, on resize (ResizeObserver) and when the chips change.
+ * tighten (BL-08), trigger chips go icon-only, effect chips fold, and only then does the chip row
+ * take a line of its own under the name (`wrap`: the name line wraps, the row grows one line; kept
+ * until the name line widens or the chips change, so it never flips back and forth). The room on
+ * the name line is `NameLine`'s (FR-CBTX-57: after the name and its fixed parts), so the name is
+ * never cut (#182). Measured after layout, on resize (ResizeObserver) and when the chips change.
  */
 function useFit(count: number, compact: boolean, deps: unknown) {
   const ref = useRef<HTMLDivElement>(null);
+  const lineRoom = useContext(NameLineRoom);
   const [fit, setFit] = useState<Fit>({ n: count, tier: 0, icons: false, wrap: false, left: 0 });
   const wrapAt = useRef<number | null>(null);
   const lastDeps = useRef(deps);
@@ -97,11 +114,7 @@ function useFit(count: number, compact: boolean, deps: unknown) {
           setFit({ ...(r.wrap ? { n: 0, tier: 0, icons: true } : r), wrap: true, left: 0 });
           return;
         }
-        // #182: the chip line keeps its minimum width, so a squeezed name (a hidden row's eye-off
-        // icon takes room too) is cut while the chips "fit": that also takes the second line.
-        const name = el.parentElement?.querySelector<HTMLElement>("[data-name-base]");
-        const cut = !!name && name.scrollWidth > name.clientWidth;
-        const r = fitChipRow(widths("effect"), widths("trigger"), room, GAP, cut);
+        const r = fitChipRow(widths("effect"), widths("trigger"), lineRoom ?? room, GAP);
         if (r.wrap) wrapAt.current = line;
         setFit({ ...r, left: 0 });
         return;
@@ -117,7 +130,7 @@ function useFit(count: number, compact: boolean, deps: unknown) {
     ro?.observe(el);
     if (el.parentElement) ro?.observe(el.parentElement);
     return () => ro?.disconnect();
-  }, [count, compact, deps, fit.wrap]);
+  }, [count, compact, deps, fit.wrap, lineRoom]);
   return { ref, ...fit, n: Math.min(fit.n, count) };
 }
 
@@ -230,15 +243,14 @@ const TRIGGER_CLASS: Record<TriggerChip["state"], string> = {
 
 /**
  * FR-CBTX-52 trigger chip: lightning + name, uses left after it ("Divine Fury 2"; "−1" in
- * `hp.down`), muted + check once used (or no use left), at most `CHIP_MAX_W`. `icon` (FR-CBTX-54):
- * lightning + uses only ("⚡2"), the used look kept, the name for screen readers. Display only
- * (CBTX §4).
+ * `hp.down`), muted + check once used (or no use left). Whole, never cut (FR-CBTX-58): no width
+ * cap or ellipsis, so the fit measures its natural width. `icon` (FR-CBTX-54): lightning + uses
+ * only ("⚡2"), the used look kept, the name for screen readers. Display only (CBTX §4).
  */
 function TriggerChipBadge({
   t,
   testId,
   icon = false,
-  style,
   ...trigger
 }: Omit<ComponentProps<"span">, "children"> & {
   t: TriggerChip;
@@ -256,17 +268,12 @@ function TriggerChipBadge({
       data-muted={testId ? t.muted : undefined}
       data-compact={testId ? icon : undefined}
       className={cn(
-        "shrink-0 gap-0.5 truncate px-1 py-0 text-[11px] font-normal",
+        "shrink-0 gap-0.5 whitespace-nowrap px-1 py-0 text-[11px] font-normal",
         t.muted ? "text-muted-foreground opacity-70" : TRIGGER_CLASS[t.state],
       )}
-      style={{ ...style, maxWidth: CHIP_MAX_W }}
     >
       <ZapIcon className="size-3 shrink-0" aria-hidden />
-      {icon ? (
-        <span className="sr-only">{t.name}</span>
-      ) : (
-        <span className="min-w-0 truncate">{t.name}</span>
-      )}
+      {icon ? <span className="sr-only">{t.name}</span> : <span>{t.name}</span>}
       {t.uses && (
         <span className={cn(!icon && "ml-0.5", "shrink-0", t.down && "text-hp-down")}>
           {t.uses.text}
@@ -509,30 +516,139 @@ export function DeathPips({ c, className }: { c: DeathCounters; className?: stri
 }
 
 /**
- * A combatant name that truncates in the middle and keeps its number: "Gob… 2" (Initiative row
- * ruling, CBTX walkthrough): Goblin and Goblin 2 stay distinct at any width. The text content
- * is the full name.
+ * A combatant name, never cut (FR-CBTX-57): on one line, or wrapped onto two (`wrap`, a name wider
+ * than its line) without an ellipsis. Base and number in their own spans ("Goblin" + " 2"). The
+ * text content is the full name.
  */
 export function RowName({
   name,
   testId,
   className,
+  wrap = false,
 }: {
   name: string;
   testId: string;
   className?: string;
+  wrap?: boolean;
 }) {
   const { base, suffix } = splitNumbered(name);
   return (
-    <span className="flex min-w-0 truncate" data-testid={testId} data-value={name} title={name}>
-      <span data-name-base className={cn("min-w-[3ch] truncate", className)}>
+    <span
+      className={wrap ? "min-w-0 wrap-anywhere" : "shrink-0 whitespace-nowrap"}
+      data-testid={testId}
+      data-value={name}
+      data-wrap={wrap}
+    >
+      <span data-name-base className={className}>
         {base}
       </span>
       {suffix && (
-        <span data-name-suffix className={cn("shrink-0 whitespace-pre", className)}>
+        <span data-name-suffix className={cn("whitespace-pre", className)}>
           {suffix}
         </span>
       )}
     </span>
+  );
+}
+
+/** `NameLine`'s natural widths, px (FR-CBTX-57). */
+function nameLineWidths(line: HTMLElement) {
+  const width = (sel: string) => line.querySelector<HTMLElement>(sel)?.offsetWidth ?? 0;
+  const marks = width(":scope > [data-name-head] > [data-name-marks]");
+  return {
+    line: line.clientWidth,
+    name: width("[data-name-measure]"),
+    marks: marks > 0 ? [marks] : [],
+    side: width(":scope > [data-name-side]"),
+    end: width(":scope > [data-name-end]"),
+    chips: line.querySelector(":scope > [data-chip-row]") !== null,
+  };
+}
+
+/**
+ * An Initiative row's name line (FR-CBTX-57, BL-43; DM and player rows): the name, its `marks`
+ * (hidden eye-off, skip icon: always beside it), the `side` chip, the chips (`children`, compact
+ * `EffectChips`), and `end` (the DM's Moved, which carries `data-name-end`). The chips get the
+ * room left after the name's natural width and every fixed part (`fitNameLine`); when the name and
+ * its fixed parts don't fit, the side chip and the chips take a second line, and a name wider than
+ * the line wraps onto two. Measured on every render (parts come and go with the row) and on
+ * resize; natural widths only, so it never flips back and forth.
+ */
+export function NameLine({
+  name,
+  testId,
+  className,
+  marks,
+  side,
+  end,
+  children,
+}: {
+  name: string;
+  /** The name's test ID (`cbt-init-row-name`). */
+  testId: string;
+  /** The name's text classes (its measuring copy too). */
+  className?: string;
+  marks?: ReactNode;
+  side?: ReactNode;
+  end?: ReactNode;
+  children?: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState<NameLineFit | null>(null);
+  const measure = useCallback(() => {
+    const line = ref.current;
+    if (!line || line.clientWidth === 0) return;
+    const next = fitNameLine(nameLineWidths(line));
+    setFit((f) =>
+      f?.nameWrap === next.nameWrap && f.split === next.split && f.room === next.room ? f : next,
+    );
+  }, []);
+  // Every render: the marks, the side chip and Moved come and go with the row.
+  useLayoutEffect(() => measure());
+  useLayoutEffect(() => {
+    const line = ref.current;
+    if (!line || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(line);
+    for (const el of line.querySelectorAll(":scope > [data-name-side], [data-name-marks]")) {
+      ro.observe(el);
+    }
+    return () => ro.disconnect();
+  }, [measure]);
+  const nameWrap = fit?.nameWrap ?? false;
+  const split = fit?.split ?? false;
+  const sideSlot = (
+    <span data-name-side className="flex shrink-0 empty:hidden">
+      {side}
+    </span>
+  );
+  return (
+    <div
+      ref={ref}
+      data-name-line
+      data-split={split}
+      className="relative flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
+    >
+      {/* The name's natural width, whatever its line does. Never shown. */}
+      <span aria-hidden className="pointer-events-none invisible absolute size-0 overflow-hidden">
+        <span data-name-measure className={cn("block w-max whitespace-pre", className)}>
+          {name}
+        </span>
+      </span>
+      <span
+        data-name-head
+        className={cn("flex items-center gap-1", nameWrap ? "min-w-0" : "shrink-0")}
+      >
+        <RowName name={name} testId={testId} className={className} wrap={nameWrap} />
+        <span data-name-marks className="flex shrink-0 items-center gap-1 empty:hidden">
+          {marks}
+        </span>
+      </span>
+      {split && !nameWrap && end}
+      {split && <span data-name-break aria-hidden className="h-0 basis-full" />}
+      {sideSlot}
+      <NameLineRoom.Provider value={fit?.room ?? null}>{children}</NameLineRoom.Provider>
+      {(!split || nameWrap) && end}
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-// FR-CAMP-28 `colorOf` over fake stores (no DOM: `read` is injected), the hook over a static
+// FR-CAMP-28 / -36 `colorOf` over fake stores (no DOM: `read` is injected), the hook over a static
 // render, and the `--player-<key>` tokens in styles.css against the palette.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
@@ -10,6 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import {
   type ColorPerson,
+  colorHex,
   colorKeyOf,
   colorOf,
   playerColorVar,
@@ -125,5 +126,40 @@ describe("FR-CAMP-28 colorOf", () => {
       const m = new RegExp(`${playerColorVar(k)}:\\s*(#[0-9a-f]{6});`).exec(css);
       expect({ k, hex: m?.[1] }).toEqual({ k, hex: PLAYER_COLORS[k] });
     }
+  });
+});
+
+describe("FR-CAMP-36 colorOf hex", () => {
+  const H = store(
+    [
+      { id: "p1", color: "#b388ff" }, // a free colour
+      { id: "p2", color: "#5B8FF0" }, // Blue, upper case (an older peer)
+      { id: "p3", color: "rose" }, // a sprint-5 key not yet migrated
+      { id: "p4", color: "red" }, // neither
+    ],
+    "#e69f00",
+  );
+
+  test("FR-CAMP-36 colorOf hex: a stored hex is returned as is (lowercase, no token read); a key → its palette hex via the token; unknown → role accent; system → null", () => {
+    expect(colorOf(H, p("p1"), themed)).toBe("#b388ff");
+    expect(colorOf(H, p("p2"), themed)).toBe("#5b8ff0");
+    expect(colorOf(H, dm, themed)).toBe("#e69f00");
+    expect(colorOf(H, p("p3"), themed)).toBe("var(--player-rose)");
+    expect(colorOf(H, p("p3"), none)).toBe(PLAYER_COLORS.rose);
+    expect(colorOf(H, p("p4"), none)).toBe(ROLE_ACCENT_FALLBACK.player);
+    expect(colorOf(H, p("nobody"), none)).toBe(ROLE_ACCENT_FALLBACK.player);
+    expect(colorOf(store([], "teal"), dm, none)).toBe(ROLE_ACCENT_FALLBACK.dm);
+    expect(colorOf(H, { role: "system" }, themed)).toBeNull();
+  });
+
+  test("FR-CAMP-36 colorOf hex: colorKeyOf names palette colours (data-color), else the hex; colorHex takes a hex or a key", () => {
+    expect(colorKeyOf(H, p("p1"))).toBe("#b388ff");
+    expect(colorKeyOf(H, p("p2"))).toBe("blue");
+    expect(colorKeyOf(H, p("p3"))).toBe("rose");
+    expect(colorKeyOf(H, dm)).toBe("amber");
+    expect(colorKeyOf(H, p("p4"))).toBeNull();
+    expect(colorHex("blue", none)).toBe(PLAYER_COLORS.blue);
+    expect(colorHex("blue", themed)).toBe("var(--player-blue)");
+    expect(colorHex("#B388FF", themed)).toBe("#b388ff");
   });
 });

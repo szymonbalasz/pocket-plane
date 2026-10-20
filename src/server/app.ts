@@ -10,6 +10,7 @@ import { encounterRoutes } from "./features/combat-tracker/routes";
 import { compendiumHomebrewRoutes } from "./features/compendium/homebrew-routes";
 import { compendiumImportRoutes } from "./features/compendium/import-route";
 import { compendiumRoutes } from "./features/compendium/routes";
+import { petRoutes } from "./features/entities/pets";
 import { entityRoutes } from "./features/entities/routes";
 import { sceneRoutes } from "./features/scenes-map/routes";
 import { errorBody, errorResponse } from "./http";
@@ -27,6 +28,7 @@ export function createApi(s: Services) {
       .route("/api", compendiumRoutes(s))
       .route("/api", compendiumImportRoutes(s))
       .route("/api", compendiumHomebrewRoutes(s))
+      .route("/api", petRoutes(s))
   );
 }
 
