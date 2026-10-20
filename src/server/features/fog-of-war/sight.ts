@@ -2,9 +2,10 @@
 // from the DB (a command's `tx` or the server's `Db`) through the vision cache.
 // - Source of P = a token on the scene with `ownerPlayerId = P`, not `hidden`; senses from its
 //   definition's `statBlock.senses` (absent = Normal 999 ft, sprint 4); at most 4 per player,
-//   oldest `seq` first (more are ignored with a `warn` log); while party vision is on, at most 12
-//   for the whole party, taken round robin over players in campaign order (FR-FOG-52). A player
-//   with ≥ 1 source has a `vision` record, even with stored senses 0 / 0 (no polygon).
+//   oldest `seq` first (more are ignored with a `warn` log, once per dropped set: BL-55); while
+//   party vision is on, at most 12 for the whole party, taken round robin over players in
+//   campaign order (FR-FOG-52). A player with ≥ 1 source has a `vision` record, even with stored
+//   senses 0 / 0 (no polygon).
 // - Occluders (walls + doors not open + the map rectangle's edges, darkness edges for sources
 //   without see-through) are read and prepared only on a cache miss.
 // - Cache key: fog `rev`, structure `rev`, the darkness geometry, the map rectangle (size, cell
@@ -44,8 +45,40 @@ let log: Logger = silentLogger;
 /** The fog feature's logger (set at registration; FR-FOG-32's cap warning, FR-FOG-37's). */
 export function setFogLogger(l: Logger) {
   log = l;
+  capWarned.clear();
 }
 export const fogLog = () => log;
+
+/**
+ * BL-55: the cap warnings already logged, `scene|player` (or `scene|party`) → the dropped token
+ * IDs. A derive logs only when that set changes; an entry goes when nothing is dropped any more or
+ * the scene is deleted. Server memory, bounded.
+ */
+const capWarned = new Map<string, string>();
+const CAP_WARNED_MAX = 256;
+
+function capWarn(key: string, dropped: readonly string[], line: (tokenId: string) => string) {
+  if (dropped.length === 0) {
+    capWarned.delete(key);
+    return;
+  }
+  const set = [...dropped].sort().join(",");
+  if (capWarned.get(key) === set) return;
+  capWarned.delete(key);
+  capWarned.set(key, set);
+  while (capWarned.size > CAP_WARNED_MAX) capWarned.delete(capWarned.keys().next().value as string);
+  for (const id of dropped) log.warn(line(id));
+}
+
+const partyKey = (sceneId: string) => `${sceneId}|party`;
+
+/** Test support: how many (scene, player or party) cap warnings are remembered (BL-55). */
+export const capWarnedCount = () => capWarned.size;
+
+/** BL-55: a deleted scene's cap warnings are forgotten (FR-FOG-23). */
+export function forgetCapWarnings(sceneId: string) {
+  for (const k of [...capWarned.keys()]) if (k.startsWith(`${sceneId}|`)) capWarned.delete(k);
+}
 
 let computed = 0;
 
@@ -149,7 +182,22 @@ export function sceneSources(
     .orderBy(sql`${token.characterId} is null`, asc(token.seq))
     .all();
   const out = new Map<string, SourceToken[]>();
-  if (rows.length === 0) return out;
+  const dropped = new Map<string, string[]>(players.map((p) => [p, []]));
+  const warnDropped = () => {
+    for (const [p, ids] of dropped) {
+      capWarn(
+        `${sceneId}|${p}`,
+        ids,
+        (id) =>
+          `fog: player ${p} has more than ${SOURCES_MAX} tokens on scene ${sceneId}; token ${id} gives no vision`,
+      );
+    }
+  };
+  if (rows.length === 0) {
+    warnDropped();
+    capWarned.delete(partyKey(sceneId));
+    return out;
+  }
   const defIds = [...new Set(rows.map((r) => r.definitionId))].sort();
   const defs = new Map(
     read
@@ -166,9 +214,7 @@ export function sceneSources(
     if (!known.has(p)) continue;
     const list = out.get(p) ?? [];
     if (list.length >= SOURCES_MAX) {
-      log.warn(
-        `fog: player ${p} has more than ${SOURCES_MAX} tokens on scene ${sceneId}; token ${r.id} gives no vision`,
-      );
+      dropped.get(p)?.push(r.id);
       continue;
     }
     const n = footprint(r.size);
@@ -186,13 +232,16 @@ export function sceneSources(
     });
     out.set(p, list);
   }
-  return party ? partyCut(out, players, sceneId) : out;
+  warnDropped();
+  if (party) return partyCut(out, players, sceneId);
+  capWarned.delete(partyKey(sceneId));
+  return out;
 }
 
 /**
  * FR-FOG-52: ≤ 12 sources for the party, one per player per round in campaign order; the rest
- * give no sight (`warn`). A player whose sources were all cut keeps an empty list (still a
- * `vision` record, no polygon).
+ * give no sight (`warn`, once per dropped set, BL-55). A player whose sources were all cut keeps
+ * an empty list (still a `vision` record, no polygon).
  */
 function partyCut(
   all: Map<string, SourceToken[]>,
@@ -200,7 +249,10 @@ function partyCut(
   sceneId: string,
 ): Map<string, SourceToken[]> {
   const total = [...all.values()].reduce((n, l) => n + l.length, 0);
-  if (total <= PARTY_SOURCES_MAX) return all;
+  if (total <= PARTY_SOURCES_MAX) {
+    capWarned.delete(partyKey(sceneId));
+    return all;
+  }
   const order = players.filter((p) => all.has(p));
   const kept = new Map<string, SourceToken[]>(order.map((p) => [p, []]));
   let left = PARTY_SOURCES_MAX;
@@ -212,13 +264,12 @@ function partyCut(
       left--;
     }
   }
-  for (const p of order) {
-    for (const s of (all.get(p) ?? []).slice(kept.get(p)?.length ?? 0)) {
-      log.warn(
-        `fog: party vision has more than ${PARTY_SOURCES_MAX} sources on scene ${sceneId}; token ${s.tokenId} gives no vision`,
-      );
-    }
-  }
+  capWarn(
+    partyKey(sceneId),
+    order.flatMap((p) => (all.get(p) ?? []).slice(kept.get(p)?.length ?? 0).map((s) => s.tokenId)),
+    (id) =>
+      `fog: party vision has more than ${PARTY_SOURCES_MAX} sources on scene ${sceneId}; token ${id} gives no vision`,
+  );
   return kept;
 }
 

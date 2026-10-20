@@ -29,7 +29,7 @@ import { loadSceneStatic } from "./derive";
 import { bindFogRederive } from "./hooks";
 import { markScenesStale, mergeChanges, rederiveDarkness, rederiveScene } from "./rederive";
 import { readFogRecord, sceneExploredRecords } from "./rows";
-import { isSource } from "./sight";
+import { forgetCapWarnings, isSource } from "./sight";
 
 const boxColumns = ([col0, row0, cols, rows]: FogBox) => ({ col0, row0, cols, rows });
 
@@ -82,8 +82,12 @@ export const fogSceneHook: SceneHook = {
     if (st) rederiveDarkness({ tx }, st);
     return [{ type: FOG_TYPE, id: copy.id, before: null, after: readFogRecord(tx, copy.id) }];
   },
-  /** FR-FOG-23: the `fog` delete and every `fog-explored` row (the FK cascade removes them). */
+  /**
+   * FR-FOG-23: the `fog` delete and every `fog-explored` row (the FK cascade removes them); the
+   * scene's cap warnings are forgotten (BL-55).
+   */
   deleting({ tx }, scene): RecordChange[] {
+    forgetCapWarnings(scene.id);
     const before = readFogRecord(tx, scene.id);
     const explored: RecordChange[] = sceneExploredRecords(tx, scene.id).map((r) => ({
       type: FOG_EXPLORED_TYPE,
