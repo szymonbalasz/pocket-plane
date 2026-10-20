@@ -3,7 +3,14 @@
 import { attackRollSpecs } from "@shared/character-sheet/logic";
 import { critExpression } from "@shared/combat-tracker/rules";
 import type { Attack } from "@shared/entities/schemas";
+import { attackRowView } from "@ui/features/character-sheet/view-model";
 import { slotLabelsOf } from "@ui/features/dice-roll-log/logic";
+
+/**
+ * Attack ▸'s second line, as the sheet and the companion card show the row (walkthrough fix):
+ * "+6 · 1d6+4 piercing + 1d6 fire" (magic bonus folded in, every extra damage part).
+ */
+export const attackSummary = (a: Attack): string => attackRowView(a).parts.join(" ");
 
 export interface AttackChoice {
   attack: Attack;

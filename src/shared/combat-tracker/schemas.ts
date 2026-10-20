@@ -71,6 +71,10 @@ export const CBT_INTENTS = {
   setSide: "cbt.setSide",
   /** FR-CBT-111 (sprint 6, #252): make / change / release a companion; turn hostile. */
   setCompanion: "cbt.setCompanion",
+  /** FR-CBT-110 (sprint 6, #252): summon companions of one monster for an owner PC. */
+  summon: "cbt.summon",
+  /** FR-CBT-112 (sprint 6): a companion leaves the fight (summon: token deleted; pet: HP kept). */
+  dismiss: "cbt.dismiss",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -195,6 +199,8 @@ const companionFields = {
   ownerHidden: z.boolean().default(false),
   concentrationEffectId: z.string().nullable().default(null),
   card: CompanionCard.nullable().default(null),
+  /** FR-CBT-110 / -113: made by `cbt.summon` (its bound token goes at Dismiss / End). DM only. */
+  summoned: z.boolean().default(false),
 };
 
 export const CombatantRecord = z.object({
@@ -863,3 +869,34 @@ export type SetCompanionInput = z.input<typeof SetCompanionInput>;
 
 /** FR-CBT-121: companion combatants per owner PC per encounter (pets included). */
 export const COMPANIONS_PER_OWNER_MAX = 8;
+
+/**
+ * `cbt.summon` (sprint 6, FR-CBT-110; §9 for the errors): `count` companions of one monster
+ * definition (never a pet) for one owner PC of the started encounter. `turnMode` default
+ * `after-owner`, `hpMode` default `average`, `hidden` default false; `at` = the DM's free-area
+ * cell when the owner has no token on the encounter's scene (FR-MAP-75, FR-CBT-65).
+ */
+export const SummonInput = z.strictObject({
+  encounterId: Id,
+  definitionId: Id,
+  count: z.int().min(1).max(COMPANIONS_PER_OWNER_MAX),
+  ownerCharacterId: Id,
+  turnMode: TurnMode.optional(),
+  hpMode: HpMode.optional(),
+  hidden: z.boolean().optional(),
+  at: GridCell.optional(),
+  linkConcentration: z.boolean().optional(),
+});
+export type SummonInput = z.input<typeof SummonInput>;
+export const SummonResult = z.object({ combatantIds: z.array(z.string()) });
+export type SummonResult = z.infer<typeof SummonResult>;
+
+/**
+ * `cbt.dismiss` (sprint 6, FR-CBT-112): one companion, or (FR-CBT-120, DM) every summon still
+ * linked to a concentration card, which resolves `dismissed` in the same transaction.
+ */
+export const DismissInput = z.union([
+  z.strictObject({ combatantId: Id }),
+  z.strictObject({ notificationId: Id }),
+]);
+export type DismissInput = z.input<typeof DismissInput>;

@@ -6,7 +6,7 @@
 import { hpState, initials, parseHpAmount, speedText } from "@shared/character-sheet/logic";
 import { COMPANION_ROLL_BUTTONS, type PetRollKind } from "@shared/character-sheet/rolls";
 import { defaultSheetData } from "@shared/character-sheet/sheet";
-import type { CombatantView } from "@shared/combat-tracker/schemas";
+import { CBT_INTENTS, type CombatantView } from "@shared/combat-tracker/schemas";
 import {
   CARD_ATTACKS_MAX,
   type CompanionCardAttack,
@@ -19,6 +19,7 @@ import { Trash2Icon } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { Button } from "../../../components/ui/button";
+import { Tooltip } from "../../../components/ui/overlays";
 import { Badge, Input, Skeleton } from "../../../components/ui/primitives";
 import { cn } from "../../../lib/utils";
 import { useRecords, useSync } from "../../../sync/store";
@@ -27,7 +28,7 @@ import { activeEffects, effectsOn } from "../../combat-extras/logic";
 import { EffectChips } from "../../combat-extras/parts";
 import { useCompanionCardRequest } from "../../combat-tracker/companion-card-request";
 import { SIDE_LABEL } from "../../combat-tracker/side";
-import { useCombatants, useStartedEncounter } from "../../combat-tracker/store";
+import { useCbtIntent, useCombatants, useStartedEncounter } from "../../combat-tracker/store";
 import { slotLabelsOf } from "../../dice-roll-log/logic";
 import { RollButton, useRollControl } from "../../dice-roll-log/roll-control";
 import { useOpenWindow, useWindowDispatch } from "../../play-shell/ShellContext";
@@ -67,6 +68,8 @@ export const DM_EMPTY_TEXT = "No companions in this campaign";
 export const GONE_TEXT = "No longer your companion";
 export const IN_FIGHT_HP_HINT = "The DM applies damage in combat";
 export const OFFLINE_TEXT = "Disconnected — reconnecting…";
+/** FR-CBT-112 (server's `PRESS_NEXT_FIRST`): the turn combatant stays until Next. */
+export const DISMISS_TURN_HINT = "Press Next first";
 
 const HP_CLASS = { full: "text-hp-full", bloodied: "text-hp-bloodied", down: "text-hp-down" };
 const HP_BAR = { full: "bg-hp-full", bloodied: "bg-hp-bloodied", down: "bg-hp-down" };
@@ -114,8 +117,9 @@ function Header({ e, picker, edit }: { e: CompanionEntry; picker: ReactNode; edi
     <div className="flex items-start gap-2">
       <Portrait e={e} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-1.5">
-          <span data-testid="charx-companion-name" className="truncate font-semibold">
+        {/* Walkthrough fix: the name is never cut ("Owlb…" at 320 px); it and the chips wrap. */}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span data-testid="charx-companion-name" className="min-w-0 break-words font-semibold">
             {e.name}
           </span>
           {e.combatant && (
@@ -478,6 +482,86 @@ function Conditions({ c, round, dm }: { c: CombatantView; round: number; dm?: Co
   return <EffectChips effects={effects} round={round} testId="charx-companion-effect" />;
 }
 
+/**
+ * FR-CBT-112 (OQ-CBT-78 A): who may dismiss the shown companion from the card: the DM any
+ * companion in the fight, its owner only a summon (a pet leaves through the DM). Null = no button.
+ */
+export function canDismissFromCard(
+  e: Pick<CompanionEntry, "petId" | "combatant">,
+  client: "dm" | "player",
+): boolean {
+  if (!e.combatant) return false;
+  return client === "dm" || e.petId === null;
+}
+
+/** FR-CBT-112: Dismiss → an inline confirm ("Its token goes") → `cbt.dismiss`. */
+function DismissRow({
+  e,
+  live,
+  turnCombatantId,
+}: {
+  e: CompanionEntry;
+  live: boolean;
+  turnCombatantId: string | null;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const { send, disabled } = useCbtIntent();
+  const c = e.combatant as CombatantView;
+  const turn = turnCombatantId === c.id;
+  if (!confirming) {
+    const button = (
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-7"
+        data-testid="cbt-companion-dismiss"
+        data-record-id={c.id}
+        data-reason={turn ? DISMISS_TURN_HINT : undefined}
+        disabled={!live || turn}
+        onClick={() => setConfirming(true)}
+      >
+        Dismiss
+      </Button>
+    );
+    return (
+      <div className="flex justify-end">
+        {turn ? (
+          <Tooltip content={DISMISS_TURN_HINT}>
+            <span>{button}</span>
+          </Tooltip>
+        ) : (
+          button
+        )}
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+      <span data-testid="cbt-companion-dismiss-text">
+        Dismiss {e.name}?{e.petId === null ? " It leaves the fight and its token goes." : ""}
+      </span>
+      <Button size="sm" variant="ghost" className="h-7" onClick={() => setConfirming(false)}>
+        Cancel
+      </Button>
+      <Button
+        size="sm"
+        variant="destructive"
+        className="h-7"
+        data-testid="cbt-companion-dismiss-confirm"
+        data-record-id={c.id}
+        disabled={!live || disabled}
+        onClick={async () => {
+          // A reject toasts (FR-CHARX-68); the card then shows "No longer your companion".
+          await send(CBT_INTENTS.dismiss, { combatantId: c.id });
+          setConfirming(false);
+        }}
+      >
+        Dismiss
+      </Button>
+    </div>
+  );
+}
+
 /** One companion's card. */
 export function CompanionCardView({
   e,
@@ -534,6 +618,15 @@ export function CompanionCardView({
           ) : null
         }
       />
+      {/* FR-CBT-112: right under the header, so its confirm shows without scrolling. */}
+      {canDismissFromCard(e, client) && !isEditing && (
+        <DismissRow
+          e={e}
+          live={live}
+          // DM: the turn; players: the turn they're shown (FR-CBT-31).
+          turnCombatantId={enc?.turnCombatantId ?? enc?.playerTurnCombatantId ?? null}
+        />
+      )}
       {e.combatant && <Conditions c={e.combatant} round={enc?.round ?? 0} dm={dm} />}
       {e.petId && isEditing ? (
         <Stats e={e} editing petId={e.petId} />

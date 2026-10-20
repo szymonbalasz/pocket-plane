@@ -28,5 +28,8 @@ export default defineBundle({
     "pet-owlbear",
     "pet-drake",
     // CP5: no new unit (the companion marker walks on CP1's pet tokens)
+    // CP3: both pets join sim-9's running ambush (combat-extras' Add with their tokens);
+    // Fire Elementals for Mira (after her), Brakka (in her turn), Thorn (own 9, linked concentration)
+    "cp-combat",
   ],
 });

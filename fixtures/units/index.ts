@@ -24,6 +24,7 @@ import combat1 from "./combat-tracker/combat-1";
 import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
 import cpAlly from "./combat-tracker/cp-ally";
+import cpCombat from "./combat-tracker/cp-combat";
 import cpSrd from "./combat-tracker/cp-srd";
 import encFriendly from "./combat-tracker/enc-friendly";
 import encounter1 from "./combat-tracker/encounter-1";
@@ -199,4 +200,6 @@ export const units: readonly Fixture[] = [
   cpPetThorn,
   cpAlly,
   imageTags,
+  // Sprint 6 track CP (build/cp-summon): pets + summons in the running fight
+  cpCombat,
 ];

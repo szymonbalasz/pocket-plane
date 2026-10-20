@@ -434,20 +434,19 @@ describe("FR-CBT-109 / -113 pets at Start and End", () => {
     expect(t.combatantNamed("Drake").position).toBeNull();
   });
 
-  test("FR-CBT-113 summon HP gone after End, pet HP kept", () => {
+  test("FR-CBT-113 End: pet HP written back, a setCompanion companion keeps its token", () => {
     const t = cpSetup();
-    // Goblin 2 made Mira's companion (a summon by the rule `ownerPlayerId ∧ ¬pet`).
+    // Goblin 2 made Mira's companion: not summoned, so End keeps its token (#295; CP3's
+    // `summon.test.ts` covers a summon's token delete).
     t.setCompanion({ combatantId: t.id("Goblin 2"), owner: t.owner(t.miraId) });
     t.run(applyHp.name, { combatantId: t.id("Owlbear"), kind: "damage", amount: 39 });
     expect(t.combatantNamed("Owlbear").hpCurrent).toBe(20);
     const n = t.events.length;
     t.endEncounter();
     expect(t.entityRow(t.owlbear)).toMatchObject({ hpCurrent: 20, petPresent: true });
-    // The summon's token is deleted (FR-MAP-79); the pet keeps its token.
     const ended = t.events.slice(n).find((e) => e.event.type === "EncounterEnded")?.event;
-    expect(
-      ended?.changes.filter((c) => c.type === TOKEN_TYPE && c.after === null).map((c) => c.id),
-    ).toEqual([t.tokens.goblin2]);
+    expect(ended?.changes.filter((c) => c.type === TOKEN_TYPE && c.after === null)).toEqual([]);
+    expect(t.tokenRow(t.tokens.goblin2).ownerPlayerId).toBeNull();
     expect(t.tokenRow(t.petTokens.owlbear).id).toBe(t.petTokens.owlbear);
     // A new encounter with the Owlbear (same DB): its combatant starts at 20.
     const enc2 = t.createAmbush();
@@ -652,6 +651,24 @@ describe("FR-CBT-122 cbt.companion lines", () => {
         { turnMode: "in-owner-turn" },
       ),
     ).toBe("DM — Owlbear now follows Brakka (in Brakka's turn)");
+    // Walkthrough fix: a mode change with the same owner says what changed.
+    expect(
+      line({ action: "mode", name: "Owlbear", ownerName: "Mira", turnMode: "in-owner-turn" }),
+    ).toBe("Owlbear now acts in Mira's turn");
+    expect(line({ action: "mode", name: "Owlbear", ownerName: "Mira", turnMode: "own" })).toBe(
+      "Owlbear now has its own initiative",
+    );
+    expect(
+      line(
+        { action: "mode", name: "Owlbear", ownerName: "Mira", turnMode: "after-owner" },
+        { turnMode: "after-owner" },
+      ),
+    ).toBe("DM — Owlbear now acts after Mira");
+    const m = cpSetup();
+    m.setCompanion({ combatantId: m.id("Owlbear"), owner: m.owner(m.miraId, "in-owner-turn") });
+    expect(m.logRows().at(-1)).toMatchObject({
+      payload: { action: "mode", name: "Owlbear", ownerName: "Mira", turnMode: "in-owner-turn" },
+    });
     // Hidden companion → DM-only line.
     const t = cpSetup();
     t.run(MAP_INTENTS.setTokenHidden, { tokenId: t.tokens.goblin2, hidden: true });
@@ -674,11 +691,38 @@ describe("FR-CBT-116 leak scan per player (CP0)", () => {
     const n = t.events.length;
     const ob = t.combatantNamed("Owlbear");
     t.setCompanion({ combatantId: t.id("Goblin 2"), owner: t.owner(t.miraId) });
-    t.run<AttackResult>(
+    const r = t.run<AttackResult>(
       attackCommand.name,
       { attackerId: ob.id, manual: [{ diceTotal: 12 }, { diceTotal: 9 }] },
       t.p1,
     );
+    // Walkthrough fix: the DM applies it; the public outcome line names no attack (Beak).
+    t.run("cbt.applyCard", {
+      cardId: r.cardId,
+      toHitTotal: 19,
+      damageTotal: 14,
+      targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
+      damageRollId: DamageCardPayload.parse(
+        t.s.db.select().from(notification).where(eq(notification.id, r.cardId)).get()?.payload,
+      ).damage?.rollId as string,
+    });
+    // Thorn's Drake (player-2's) attacks through the DM's Attack ▸: player-1 must not learn "Bite".
+    const dr = t.run<AttackResult>(attackCommand.name, {
+      attackerId: t.id("Drake"),
+      manual: [{ diceTotal: 15 }, { diceTotal: 6 }],
+    });
+    t.run("cbt.applyCard", {
+      cardId: dr.cardId,
+      toHitTotal: 19,
+      damageTotal: 8,
+      targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
+      damageRollId: DamageCardPayload.parse(
+        t.s.db.select().from(notification).where(eq(notification.id, dr.cardId)).get()?.payload,
+      ).damage?.rollId as string,
+    });
+    const outcome = t.logRows().at(-1);
+    expect(outcome?.payload).not.toHaveProperty("attackName");
+    expect(outcome?.dmPayload).toMatchObject({ attackName: "Bite" });
     t.run(applyHp.name, { combatantId: ob.id, kind: "damage", amount: 14 });
     t.run(MAP_INTENTS.setTokenHidden, { tokenId: t.tokens.thorn, hidden: true });
     const leaks = [
@@ -696,7 +740,7 @@ describe("FR-CBT-116 leak scan per player (CP0)", () => {
       expect({ leak, found: p2.includes(leak) }).toEqual({ leak, found: false });
     // The owner never sees DM-only fields or the drake of hidden Thorn.
     const p1 = t.framesSince(n, t.p1V) + JSON.stringify(t.h.snapshot(t.p1V));
-    for (const leak of ["ownerHidden", "concentrationEffectId"]) {
+    for (const leak of ["ownerHidden", "concentrationEffectId", "Bite"]) {
       expect({ leak, found: p1.includes(leak) }).toEqual({ leak, found: false });
     }
     // `derivedFromId` never on the owner's pet rows (characters carry theirs as before).

@@ -20,9 +20,10 @@ import { combatant, entity } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { gameLog } from "../dice-roll-log";
 import { syncPetPresence } from "../entities/pet-presence";
-import { getRow, toEntityRecord } from "../entities/rows";
-import { deleteTokenIn } from "../scenes-map/commands";
+import { getRow } from "../entities/rows";
 import { setTokenOwnerIn } from "../scenes-map/token-owner";
+import { resolveSummonCards } from "./concentration-card";
+import { companionLeaves, petWriteBack } from "./dismiss";
 import { statsOf } from "./guards";
 import { combatantDiff, encounterDiff, rerank, syncPlayerTurn } from "./ranks";
 import { combatantVisibility } from "./records";
@@ -111,7 +112,7 @@ export const setCompanionCommand = defineCommand({
     const rows = combatantsOf(tx, enc.id);
     const encBefore = enc;
     const set: Partial<typeof combatant.$inferInsert> = {};
-    let action: "follows" | "release" | "hostile";
+    let action: "follows" | "mode" | "release" | "hostile";
     let lineOwner: string;
     let mode: TurnMode | null = null;
     if (owner === null) {
@@ -176,7 +177,9 @@ export const setCompanionCommand = defineCommand({
       // FR-CBT-105: companions are on the party's side, shown openly.
       if (before.ownerCharacterId === null)
         Object.assign(set, { side: "ally", publicSide: "ally" });
-      action = "follows";
+      // Same owner, new mode → "Owlbear now acts in Mira's turn" (walkthrough fix).
+      action =
+        before.ownerCharacterId === o.row.entityId && before.turnMode !== mode ? "mode" : "follows";
       lineOwner = o.name;
     }
     // FR-CBT-99 / -111: an explicit side is an open change (turn hostile: `enemy`).
@@ -192,7 +195,12 @@ export const setCompanionCommand = defineCommand({
       kind: LOG_KIND_COMPANION,
       category: "other",
       actorName: "DM",
-      payload: { action, name: after.name, ...(lineOwner ? { ownerName: lineOwner } : {}) },
+      payload: {
+        action,
+        name: after.name,
+        ...(lineOwner ? { ownerName: lineOwner } : {}),
+        ...(action === "mode" && mode ? { turnMode: mode } : {}),
+      },
       dmPayload: mode ? { turnMode: mode } : {},
       rollIds: [],
       encounterId: enc.id,
@@ -216,6 +224,8 @@ export const setCompanionCommand = defineCommand({
         entry,
       ],
     });
+    // FR-CBT-120: a release or turn hostile may leave a concentration card without summons.
+    if (owner === null) resolveSummonCards(env, enc.id, action === "hostile" ? "hostile" : "gone");
   },
 });
 
@@ -225,35 +235,21 @@ export { companionText };
 /**
  * FR-CBT-113 (End, inside `EncounterEnded`'s transaction, after its rows): each active pet
  * combatant's `hpCurrent` goes back to its pet (temp HP dropped); each summon's bound token is
- * deleted (FR-MAP-79, OQ-CBT-83b); the pets' presence follows. Call with the rows **before** End
- * set them inactive; the combatants must already be inactive (the token hook then allows the
- * delete). Returns the rows for `EncounterEnded`'s changes.
+ * deleted (FR-MAP-79, OQ-CBT-83b; only tokens `cbt.summon` made, #295); any other companion's
+ * token loses its owner (`companionLeaves`); the pets' presence follows. Call with the rows
+ * **before** End set them inactive; the combatants must already be inactive (the token hook then
+ * allows the delete). Returns the rows for `EncounterEnded`'s changes.
  */
 export function companionsAtEnd(env: CommandEnv, rows: readonly CombatantRecord[]): RecordChange[] {
-  const { tx, ctx } = env;
   const out: RecordChange[] = [];
   const pets: string[] = [];
   for (const c of rows) {
     if (!c.active || c.ownerCharacterId === null) continue;
     if (c.pet) {
       pets.push(c.entityId);
-      const row = getRow(tx, c.entityId);
-      if (!row || row.companionOf === null) continue;
-      const before = toEntityRecord(row);
-      const hp = Math.max(0, c.hpCurrent ?? 0);
-      if (before.hpCurrent === hp) continue;
-      tx.update(entity)
-        .set({ hpCurrent: hp, updatedAt: ctx.clock.iso() })
-        .where(eq(entity.id, c.entityId))
-        .run();
-      out.push({
-        type: "entity",
-        id: c.entityId,
-        before,
-        after: toEntityRecord(getRow(tx, c.entityId) as NonNullable<ReturnType<typeof getRow>>),
-      });
-    } else if (c.tokenId) {
-      out.push(...deleteTokenIn(env, c.tokenId));
+      out.push(...petWriteBack(env, c));
+    } else {
+      out.push(...companionLeaves(env, c));
     }
   }
   out.push(...syncPetPresence(env, campaignOf(env.actor), { petIds: pets }));

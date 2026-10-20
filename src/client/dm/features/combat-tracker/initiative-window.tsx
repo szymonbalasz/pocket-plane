@@ -113,6 +113,7 @@ import {
   RotateCcwIcon,
   ShieldIcon,
   SkipForwardIcon,
+  SparklesIcon,
   SwordIcon,
   UserMinusIcon,
   UserPlusIcon,
@@ -132,7 +133,7 @@ import {
 import { CbtxRuntime } from "../combat-extras/runtime";
 import { skipText } from "../combat-extras/skip";
 import { useCbtxDialogs } from "../combat-extras/store";
-import { type AttackAction, attackChoices, attackRolls } from "./attack-choices";
+import { type AttackAction, attackChoices, attackRolls, attackSummary } from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { CompanionCardButton, CompanionMenu } from "./companion-menu";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
@@ -145,6 +146,7 @@ import { rollKeys } from "./roll-keys";
 import { SideMenu } from "./side-menu";
 import { idleInitiativeOnLoad } from "./start-end";
 import { startReason } from "./start-reason";
+import { SummonDialog, useSummonDialog } from "./summon-dialog";
 
 /**
  * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
@@ -404,7 +406,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate">{ch.attack.name}</span>
                         <span className="text-xs text-muted-foreground tabular-nums">
-                          {signed(ch.attack.toHit)} · {ch.attack.damage}
+                          {attackSummary(ch.attack)}
                         </span>
                       </span>
                       <span className="text-xs text-muted-foreground">{a.label}</span>
@@ -685,6 +687,7 @@ function RowMain({
 }: Omit<RowProps, "lines" | "indent"> & { line: boolean }) {
   const { send, disabled } = useCbtIntent();
   const openHp = useCombatDialogs((s) => s.openHp);
+  const openSummon = useSummonDialog((s) => s.openFor);
   const hp = hpOf(c, defs);
   const ac = acOf(c, defs);
   const stats = def?.statBlock;
@@ -855,8 +858,18 @@ function RowMain({
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <SideMenu c={c} testId="cbt-init-row-side" />
-          {/* FR-CBT-118 (sprint 6): owner, turn mode, release, turn hostile. */}
+          {/* FR-CBT-118 (sprint 6): owner, turn mode, release, turn hostile, dismiss. */}
           <CompanionMenu c={c} testId="cbt-init-row-companion" />
+          {c.kind === "pc" && c.entityId && (
+            <DropdownMenuItem
+              data-testid="cbt-init-row-summon"
+              data-record-id={c.id}
+              disabled={disabled}
+              onSelect={() => openSummon(c.entityId)}
+            >
+              <SparklesIcon /> Summon for {c.name}…
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             variant="destructive"
             data-testid="cbt-init-row-remove"
@@ -1024,6 +1037,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   const startEnd = useStartEnd();
   const store = useSync((s) => s.store);
   const openAdd = useCbtxDialogs((s) => s.openAdd);
+  const openSummon = useSummonDialog((s) => s.openFor);
   const start = useStartRound(enc.round, rows);
   /**
    * FR-CBT-50: skipped names from the order at send time, toasted once the step is acked. A dead
@@ -1180,6 +1194,16 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
           onClick={openAdd}
         >
           <UserPlusIcon className="size-3.5" /> Add…
+        </Button>
+        {/* FR-CBT-110 / -118 (sprint 6): summon companions for a PC of the fight. */}
+        <Button
+          size="sm"
+          variant="ghost"
+          data-testid="cbt-init-summon"
+          disabled={disabled}
+          onClick={() => openSummon()}
+        >
+          <SparklesIcon className="size-3.5" /> Summon…
         </Button>
       </div>
       {start.reason && (
@@ -1407,6 +1431,7 @@ function CombatDialogs() {
     <>
       <AttackPopup />
       <HpDialog />
+      <SummonDialog />
       <CbtxRuntime />
     </>
   );

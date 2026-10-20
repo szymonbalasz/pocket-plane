@@ -86,7 +86,11 @@ export type AttackLineDamagePart = z.infer<typeof AttackLineDamagePart>;
 
 export const AttackLogPayload = z.strictObject({
   targetName: z.string(),
-  attackName: z.string(),
+  /**
+   * Absent on a companion attacker's line (FR-CBT-114, ADR-0056): the name is in `dmPayload`;
+   * the owner has it on its roll line and card, other players read totals only.
+   */
+  attackName: z.string().optional(),
   damageType: z.string().nullable(),
   /**
    * `dice` = rolled dice sum, null when the DM edited the total. Null = a damage-only card
@@ -181,6 +185,8 @@ export const AttackLogDmPayload = z.strictObject({
    * payload's.
    */
   toHitNatural: z.int().nullable().optional(),
+  /** FR-CBT-114 (walkthrough fix): a companion attacker's attack name (absent from `payload`). */
+  attackName: z.string().optional(),
   hitComputed: z.boolean().nullable(),
   toHitRolled: z.int().nullable(),
   damageRolled: z.int().nullable(),
@@ -321,7 +327,7 @@ function damageSegments(
       const r = dm?.rolls?.extra?.[i];
       if (r?.set) out.push({ text: ` (DM set; rolled ${r.rolled})`, style: "muted" });
       // FR-CBT-84 / FR-MOD-57: the part's dice labelled with its name ("Flame Tongue fire").
-      const label = `${p.attackName} ${x.type}`;
+      const label = `${attackNameOf(p, dm)} ${x.type}`.trim();
       if (r) out.push(...rollBreakdownSegments(r).map((s) => withDieLabel(s, label)));
     });
     out.push({ text: ` damage${suffix}` });
@@ -329,6 +335,10 @@ function damageSegments(
   out.push(...linePartSegments(p.parts, dm?.parts, p.damageType));
   return out;
 }
+
+/** The line's attack name: the payload's, else the DM's (a companion attacker, FR-CBT-114). */
+const attackNameOf = (p: AttackLogPayload, dm: AttackLogDmPayload | null | undefined): string =>
+  p.attackName ?? dm?.attackName ?? "";
 
 /**
  * FR-CBT-85 (BL-10, #245): the players' hit / miss words credit the DM on every line, ruled or
@@ -365,8 +375,10 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
     const damageBadge = p.hit && !!p.manual?.damage;
     if (t === null) {
       out.push({ text: ` → ${p.targetName}: ` });
-      if (!p.hit) return [...out, { text: `miss (${p.attackName})` }];
-      out.push(...damageSegments(p, dm, ` (${p.attackName})`));
+      const name = attackNameOf(p, dm);
+      const suffix = name ? ` (${name})` : "";
+      if (!p.hit) return [...out, { text: `miss${suffix}` }];
+      out.push(...damageSegments(p, dm, suffix));
       if (damageBadge) out.push(...PHYSICAL);
       out.push(...absorbedSegments(dm));
       return out;

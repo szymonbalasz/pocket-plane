@@ -2,7 +2,8 @@
 // menu and token menu, over `cbt.setCompanion`: Owner ▸ (a PC of the fight: makes a monster a
 // companion or moves it), Turn mode (three radio items), Release, Turn hostile. Hints only: the
 // server decides (a pet's owner → "Change a pet's owner in the Party window", the turn
-// combatant → "Change it after its turn"). Dismiss is the summon slice's (FR-CBT-112). Card
+// combatant → "Change it after its turn"). Dismiss (FR-CBT-112, CP3): out of the fight; a
+// summon's token goes, a pet's HP is kept; not the turn combatant ("Press Next first"). Card
 // (FR-CHARX-59, walkthrough 9): the menu item and the row / line icon open the companion card.
 import { isCompanion } from "@shared/combat-tracker/companion";
 import {
@@ -25,9 +26,20 @@ import {
 import { Tooltip } from "@ui/components/ui/overlays";
 import { useOpenCompanionCard } from "@ui/features/combat-tracker/companion-card-request";
 import { MODE_MENU_LABEL } from "@ui/features/combat-tracker/companions";
-import { useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
+import {
+  useCbtIntent,
+  useCombatants,
+  useStartedEncounter,
+} from "@ui/features/combat-tracker/store";
 import { useSync } from "@ui/sync/store";
-import { IdCardIcon, PawPrintIcon, SwordsIcon, UnlinkIcon, UserRoundIcon } from "lucide-react";
+import {
+  IdCardIcon,
+  LogOutIcon,
+  PawPrintIcon,
+  SwordsIcon,
+  UnlinkIcon,
+  UserRoundIcon,
+} from "lucide-react";
 import { useMemo } from "react";
 import { useHoverSafeSub } from "./hover-sub";
 
@@ -76,6 +88,18 @@ export function companionMenuOf(
     })),
     release: companion ? petLock : NOT_COMPANION,
   };
+}
+
+/** FR-CBT-112 (server's `PRESS_NEXT_FIRST`): the turn combatant stays until Next. */
+export const PRESS_NEXT_HINT = "Press Next first";
+
+/** Why Dismiss is disabled for `c` (null = enabled): not a companion, or its turn now. */
+export function dismissReasonOf(
+  c: Pick<CombatantView, "id" | "ownerCharacterId">,
+  turnCombatantId: string | null | undefined,
+): string | null {
+  if (!isCompanion(c)) return NOT_COMPANION;
+  return turnCombatantId === c.id ? PRESS_NEXT_HINT : null;
 }
 
 /** The intent each item sends (FR-CBT-111; turn hostile = release + an open side to enemy). */
@@ -151,8 +175,10 @@ export function CompanionMenu({ c, testId }: { c: CombatantView; testId: string 
   const sub = useHoverSafeSub();
   const ownerSub = useHoverSafeSub();
   const pcs = useOwnerChoices(c.encounterId);
+  const enc = useStartedEncounter();
   if (c.kind !== "monster") return null;
   const menu = companionMenuOf(c, pcs);
+  const dismissReason = dismissReasonOf(c, enc?.turnCombatantId);
   const set = (body: SetCompanionInput) => void send(CBT_INTENTS.setCompanion, body);
   return (
     <DropdownMenuSub open={sub.open} onOpenChange={sub.onOpenChange}>
@@ -251,6 +277,16 @@ export function CompanionMenu({ c, testId }: { c: CombatantView; testId: string 
           onSelect={() => set(companionIntent.hostile(c))}
         >
           <SwordsIcon /> Turn hostile
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          variant="destructive"
+          data-testid="cbt-companion-dismiss"
+          data-record-id={c.id}
+          disabled={disabled || dismissReason !== null}
+          title={dismissReason ?? undefined}
+          onSelect={() => void send(CBT_INTENTS.dismiss, { combatantId: c.id })}
+        >
+          <LogOutIcon /> Dismiss
         </DropdownMenuItem>
         {c.pet && (
           <DropdownMenuLabel className="max-w-52 font-normal text-xs text-muted-foreground">

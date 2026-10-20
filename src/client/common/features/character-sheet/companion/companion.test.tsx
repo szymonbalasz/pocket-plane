@@ -21,6 +21,8 @@ import {
   CompanionCard,
   CompanionCardView,
   type CompanionDmParts,
+  canDismissFromCard,
+  DISMISS_TURN_HINT,
   DM_EMPTY_TEXT,
   EMPTY_TEXT,
   IN_FIGHT_HP_HINT,
@@ -750,5 +752,52 @@ describe("FR-CHARX-68 states", () => {
     expect(leftCompanion(fe, after)).toBe("Fire Elemental");
     expect(leftCompanion(fe, before)).toBeNull();
     expect(shownEntry(after, "c-fe")?.name).toBe("Owlbear");
+  });
+});
+
+describe("FR-CBT-112 Dismiss from the card (CP3)", () => {
+  test("FR-CBT-112 dismiss: the owner dismisses their summon from the card; never a pet; the DM any companion in the fight; the turn combatant → 'Press Next first'", () => {
+    // player-1's Fire Elemental (a summon): Dismiss.
+    const summon = render(storeOf(P1, { entities: [mira], combatants: [feC] }), <CompanionCard />);
+    expect(tagOf(summon, "cbt-companion-dismiss", ' data-record-id="c-fe"')).toBeTruthy();
+    expect(isDisabled(tagOf(summon, "cbt-companion-dismiss"))).toBe(false);
+    // Walkthrough fix: right under the header (its confirm needs no scroll), before the stats.
+    expect(summon.indexOf('data-testid="cbt-companion-dismiss"')).toBeLessThan(
+      summon.indexOf('data-testid="charx-companion-ac"'),
+    );
+    // The name is never cut: no truncation, its line wraps.
+    expect(tagOf(summon, "charx-companion-name")).not.toContain("truncate");
+    // player-1's Owlbear (a pet) in the fight: no Dismiss for the owner.
+    const pet = render(
+      storeOf(P1, { entities: [mira, owlPet], combatants: [owlC] }),
+      <CompanionCard />,
+    );
+    expect(has(pet, "cbt-companion-dismiss")).toBe(false);
+    // Out of a fight: nothing to dismiss.
+    expect(canDismissFromCard({ petId: null, combatant: null }, "player")).toBe(false);
+    // The DM: a pet in the fight too.
+    expect(canDismissFromCard({ petId: "owl", combatant: owlC }, "dm")).toBe(true);
+    expect(canDismissFromCard({ petId: "owl", combatant: owlC }, "player")).toBe(false);
+    // Its turn now (the player's shown turn): disabled with the hint.
+    const turn = render(
+      {
+        ...storeOf(P1, { entities: [mira], combatants: [feC] }),
+        records: {
+          ...storeOf(P1, { entities: [mira], combatants: [feC] }).records,
+          [ENCOUNTER_TYPE]: { e1: { ...enc, playerTurnCombatantId: "c-fe" } },
+        },
+      } as RecordStore,
+      <CompanionCard />,
+    );
+    const tag = tagOf(turn, "cbt-companion-dismiss");
+    expect(isDisabled(tag)).toBe(true);
+    expect(tag).toContain(`data-reason="${DISMISS_TURN_HINT}"`);
+    // Offline: disabled.
+    const off = render(
+      storeOf(P1, { entities: [mira], combatants: [feC] }),
+      <CompanionCard />,
+      false,
+    );
+    expect(isDisabled(tagOf(off, "cbt-companion-dismiss"))).toBe(true);
   });
 });

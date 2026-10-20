@@ -26,13 +26,17 @@ export function useStartedEncounter(): EncounterView | null {
   return useMemo(() => encounters.find((e) => e.status === "started") ?? null, [encounters]);
 }
 
-/** Combatants of an encounter in rank order: DM by `position`, players by `playerPosition`. */
+/**
+ * Combatants of an encounter in rank order: DM by `position`, players by `playerPosition`.
+ * Sprint 6 (FR-CBT-112): a dismissed companion (`active` false in the DM's store; players get a
+ * delete) has left the fight.
+ */
 export function useCombatants(encounterId: string | null | undefined): CombatantView[] {
   const all = useRecords<CombatantView>(COMBATANT_TYPE);
   return useMemo(
     () =>
       all
-        .filter((c) => c.encounterId === encounterId)
+        .filter((c) => c.encounterId === encounterId && c.active !== false)
         .sort(
           (a, b) =>
             (a.position ?? a.playerPosition ?? 0) - (b.position ?? b.playerPosition ?? 0) ||

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { attackChoices, attackRolls } from "./attack-choices";
+import { attackChoices, attackRolls, attackSummary } from "./attack-choices";
 
 const a = (name: string, id?: string) => ({
   name,
@@ -54,5 +54,22 @@ describe("BL-19 DM Attack ▸ physical entries per part", () => {
       extraParts: 0,
       slotLabels: ["To hit", "Damage"],
     });
+  });
+});
+
+describe("Attack ▸ summary (walkthrough fix)", () => {
+  test("FR-CBT-118 the DM's Attack ▸ line shows extra damage parts as the card does: '+6 · 1d6+4 piercing + 1d6 fire'", () => {
+    expect(
+      attackSummary({
+        name: "Bite",
+        toHit: 6,
+        damage: "1d6+4",
+        damageType: "piercing",
+        extraDamage: [{ damage: "1d6", type: "fire" }],
+      }),
+    ).toBe("+6 · 1d6+4 piercing + 1d6 fire");
+    expect(
+      attackSummary({ name: "Claws", toHit: 7, damage: "2d8+5", damageType: "slashing" }),
+    ).toBe("+7 · 2d8+5 slashing");
   });
 });
