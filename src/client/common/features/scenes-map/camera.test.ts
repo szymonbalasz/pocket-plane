@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TokenSize } from "@shared/scenes-map/schemas";
 import { freeArea, freeAreas } from "../play-shell/free-area";
-import { defaultRect, type Rect, workArea } from "../play-shell/geometry";
+import { defaultRect, type Rect, TOP_BAR_H, workArea } from "../play-shell/geometry";
 import {
   APPEARANCE_REFIT_MAX_WAITS,
   allClear,
@@ -20,8 +20,11 @@ import {
   fitScene,
   fitVisible,
   footprintBox,
+  PCS_PAN_MAX_TOKENS,
+  pcsPan,
   RESIZE_REFIT_MS,
   type Timers,
+  visibleArea,
   ZOOM_MAX,
 } from "./camera";
 import { labelMetrics } from "./label";
@@ -877,6 +880,117 @@ describe("FR-MAP-59 every token visible (fitVisible)", () => {
     const today = fitContent(contentBox(tokens, GRID, MAP), rect, MAP, workArea(vp), 70, pcs);
     expect({ x: fit.x, y: fit.y, scale: fit.scale, floor: fit.floor }).toEqual(today);
     expect(fit.visible).toBe("all");
+  });
+});
+
+describe("FR-MAP-81 pcs keeps the top row (pcsPan)", () => {
+  const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+  const at = (col: number, row: number, pc = false) => ({ ...box(col * 70, row * 70, 70, 70), pc });
+  const view = { w: 1280, h: 720 };
+  const area = box(84, 64, 1000, 500);
+  /** Screen rect of a footprint (map px) at `cam`. */
+  const screen = (cam: Camera, b: Box) => ({
+    x: cam.x + b.x * cam.scale,
+    y: cam.y + b.y * cam.scale,
+    w: b.w * cam.scale,
+    h: b.h * cam.scale,
+  });
+  const cutByTop = (cam: Camera, b: Box) => {
+    const s = screen(cam, b);
+    return s.y < area.y - 1e-6 && s.y + s.h > 0 && s.x + s.w > 0 && s.x < view.w;
+  };
+
+  test("FR-MAP-81 pcs keeps the top row: a cut-free pan exists → no footprint above the area's top, the PC inside; the scale is 48 px", () => {
+    // A token on row 0, the PC on row 4: from (y 20) cuts the token; y 64 draws it whole.
+    const tokens = [at(0, 0), at(0, 4, true)];
+    const from = { x: 84, y: 20 };
+    const cam = pcsPan(tokens, [], area, view, from, 70);
+    expect(cam).not.toBeNull();
+    if (!cam) return;
+    expect(cam.scale * 70).toBeCloseTo(FIT_MIN_CELL_PX, 9);
+    expect(tokens.some((t) => cutByTop(cam, t))).toBe(false);
+    expect(allClear(cam, tokens, [], area)).toBe(true);
+    expect({ x: cam.x, y: cam.y }).toEqual({ x: 84, y: 64 });
+  });
+
+  test("FR-MAP-81 pcs keeps the top row: only a top-cutting pan keeps the PC clear → that pan (rule (1) yields)", () => {
+    // The PC on row 10 (screen y = cam.y + 480); a full-width window down to y 480 leaves the PC
+    // clear only for cam.y ≥ 0, and inside the area only for cam.y ≤ 36: the row-0 token is cut.
+    const tokens = [at(0, 0), at(0, 10, true)];
+    const wall = box(84, 64, 1000, 416);
+    const from = { x: 84, y: -100 };
+    const cam = pcsPan(tokens, [wall], area, view, from, 70);
+    expect(cam).not.toBeNull();
+    if (!cam) return;
+    expect(cam.y).toBe(0);
+    expect(cutByTop(cam, tokens[0] as Box)).toBe(true);
+    expect(allClear(cam, [tokens[1] as Box], [wall], area)).toBe(true);
+    // The PCs themselves can't fit → null (FR-MAP-46's centring stays).
+    const low = box(84, 64, 1000, 500);
+    expect(pcsPan(tokens, [low], area, view, from, 70)).toBeNull();
+    expect(pcsPan([at(0, 0)], [], area, view, from, 70)).toBeNull(); // no PC
+  });
+
+  test("FR-MAP-81 pcs keeps the top row: bounded inputs — 40 tokens → only the PCs + the 30 nearest enter the sweep", () => {
+    // PCs at (2, 0), (3, 0); 30 tokens fill cols 2–9 × rows 0–3; 8 far ones on cols 20–27 row 0.
+    // At `from` all 32 near ones show and no far one; a pan 56 px left would show 2 far ones.
+    const pcs = [at(2, 0, true), at(3, 0, true)];
+    const near = [];
+    for (let row = 0; row < 4; row++)
+      for (let col = 2; col < 10; col++) if (row > 0 || col > 3) near.push(at(col, row));
+    expect(near.length).toBe(PCS_PAN_MAX_TOKENS);
+    const far = Array.from({ length: 8 }, (_, i) => at(20 + i, 0));
+    const from = { x: 84, y: 64 };
+    const cam = pcsPan([...far, ...near, ...pcs], [], area, view, from, 70);
+    expect(cam && { x: cam.x, y: cam.y }).toEqual(from);
+    // The far ones would move the pan if they counted: 56 px left (the nearest pan showing 2).
+    const unbounded = pcsPan([...pcs, ...far], [], area, view, from, 70);
+    expect(unbounded?.x).toBe(28);
+  });
+
+  test("FR-MAP-81 pcs keeps the top row: 7 obstacles in the area → null (FR-MAP-46's centring); 6 → a pan", () => {
+    const tokens = [at(0, 0), at(0, 4, true)];
+    const from = { x: 84, y: 20 };
+    const small = (n: number) =>
+      Array.from({ length: n }, (_, i) => box(700 + i * 20, 400, 10, 10));
+    expect(pcsPan(tokens, small(6), area, view, from, 70)).not.toBeNull();
+    expect(pcsPan(tokens, small(7), area, view, from, 70)).toBeNull();
+    // Obstacles outside the area don't count.
+    const outside = Array.from({ length: 7 }, (_, i) => box(2000 + i * 20, 0, 10, 10));
+    expect(pcsPan(tokens, outside, area, view, from, 70)).not.toBeNull();
+  });
+
+  test("FR-MAP-81 pcs keeps the top row: determinism (same input → same camera; obstacle and token order don't matter)", () => {
+    const tokens = [at(0, 0), at(4, 1), at(2, 5, true), at(6, 6, true), at(9, 2), at(12, 8)];
+    const obstacles = [box(68, 484, 690, 160), box(868, 60, 400, 500), box(480, 100, 320, 57)];
+    const a = pcsPan(tokens, obstacles, area, view, { x: 100, y: 30 }, 70);
+    expect(a).not.toBeNull();
+    expect(pcsPan(tokens, obstacles, area, view, { x: 100, y: 30 }, 70)).toEqual(a);
+    expect(
+      pcsPan([...tokens].reverse(), [...obstacles].reverse(), area, view, { x: 100, y: 30 }, 70),
+    ).toEqual(a);
+  });
+
+  test("FR-MAP-81 pcs keeps the top row: fitScene ends pcs (31 tokens, past FR-MAP-59's bound) → the pcsPan camera at 48 px (data-fit-floor), the PC clear, the top row whole below the top bar", () => {
+    const vp = { w: 1280, h: 720 };
+    // The PC in the middle; rows 0 and 13 (cols 0–9) and col 19 (rows 1–10): 14 rows at 48 px
+    // don't fit 720 px, so step 1 (at the floor) leaves tokens off-screen.
+    const tokens = [
+      { ...tok(10, 7), pc: true },
+      ...Array.from({ length: 10 }, (_, c) => ({ ...tok(c, 0), pc: false })),
+      ...Array.from({ length: 10 }, (_, c) => ({ ...tok(c, 13), pc: false })),
+      ...Array.from({ length: 10 }, (_, r) => ({ ...tok(19, r + 1), pc: false })),
+    ];
+    const areas = freeAreas([], vp);
+    const room = { areas, obstacles: [], windowsOnly: areas };
+    const fit = fitScene(tokens, GRID, MAP, vp, room);
+    expect(fit.visible).toBe("pcs");
+    expect(fit.scale * 70).toBeCloseTo(FIT_MIN_CELL_PX, 9);
+    expect(fit.floor).toBe(true);
+    const pc = footprintBox([tok(10, 7)], GRID) as Box;
+    expect(allClear(fit, [pc], [], visibleArea(vp))).toBe(true);
+    const top = footprintBox([tok(0, 0)], GRID) as Box;
+    expect(screen(fit, top).y).toBeGreaterThanOrEqual(TOP_BAR_H + FIT_MARGIN - 1e-6);
   });
 });
 

@@ -4,6 +4,7 @@ import type { Rect } from "@ui/features/play-shell/geometry";
 import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { keepOuts } from "@ui/features/play-shell/keep-outs";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
+import { AMBUSH_GRID, AMBUSH_MAP, SIM9_AMBUSH_DM } from "@ui/features/play-shell/test-cells";
 import { summaryStrip, toastKeepOut } from "@ui/features/play-shell/toast-region";
 import {
   allClear,
@@ -159,4 +160,43 @@ test("FR-MAP-80 fit without the empty box: nothing shown → obstacles = windows
   console.info(
     `FR-MAP-80 with a card at 1440×900: ${(fit.scale * GRID.gridCellSize).toFixed(1)} px`,
   );
+});
+
+test("FR-MAP-81 pcs keeps the top row: sim-9 a03 (1280×720, Game log + Initiative, the box forced as an obstacle) → pcs at 48 px, every PC clear, the top row starts at or below y 64 (was y 36 under the top bar)", () => {
+  const vp = { w: 1280, h: 720 };
+  const all = new Set(dmWindows.defs.map((d) => d.kind));
+  const windows = renderedWindowRects(defaultLayout(dmWindows, vp), dmWindows, all, vp);
+  // The sprint-5 obstacle (the whole 356 × 238 box) passed as the shown stack.
+  const box = toastKeepOut("dm", vp);
+  const obstacles = fitObstacles("dm", windows, keepOuts("dm", vp), vp, box);
+  const room = { areas: freeAreas(obstacles, vp), obstacles, windowsOnly: freeAreas(windows, vp) };
+  const fit = fitScene(SIM9_AMBUSH_DM, AMBUSH_GRID, AMBUSH_MAP, vp, room);
+  expect(fit.visible).toBe("pcs");
+  expect(fit.scale * AMBUSH_GRID.gridCellSize).toBeCloseTo(48, 9);
+  const area = visibleArea(vp);
+  expect(area.y).toBe(64);
+  const drawn = SIM9_AMBUSH_DM.map((t) => {
+    const p = footprintBox([t], AMBUSH_GRID) as Rect;
+    return {
+      t,
+      s: {
+        x: fit.x + p.x * fit.scale,
+        y: fit.y + p.y * fit.scale,
+        w: p.w * fit.scale,
+        h: p.h * fit.scale,
+      },
+    };
+  });
+  for (const { t, s } of drawn.filter((d) => d.t.pc)) {
+    expect(allClear({ x: 0, y: 0, scale: 1 }, [s], obstacles, area)).toBe(true);
+    expect(windows.some((w) => overlaps(s, w)) ? `${t.name} under a window` : "ok").toBe("ok");
+  }
+  // No footprint drawn on screen is cut by the top: each one on screen starts at or below y 64.
+  const cut = drawn
+    .filter(({ s }) => s.y + s.h > 0 && s.x + s.w > 0 && s.x < vp.w && s.y < area.y - 1e-6)
+    .map(({ t }) => t.name);
+  expect(cut).toEqual([]);
+  const top = Math.min(...drawn.filter(({ s }) => s.y + s.h > 0).map(({ s }) => s.y));
+  expect(top).toBeGreaterThanOrEqual(64);
+  console.info(`FR-MAP-81 a03: pan ${fit.x}, ${fit.y}; top row at y ${top}`);
 });
