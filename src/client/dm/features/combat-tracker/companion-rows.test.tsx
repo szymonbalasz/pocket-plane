@@ -204,3 +204,20 @@ describe("FR-CBT-111 pet owner and in-turn guard (client)", () => {
     });
   });
 });
+
+describe("FR-CHARX-59 DM opens the card", () => {
+  test("FR-CHARX-59 DM card icon (walkthrough 9): every companion row and in-owner-turn line has the card icon; other rows none", () => {
+    const html = dm();
+    const cards = [...html.matchAll(/data-testid="cbt-init-row-card" data-record-id="([^"]+)"/g)]
+      .map((m) => m[1])
+      .sort();
+    // Rows (Owlbear after Mira, FE 3 own) and lines (Drake, FE 2 in Brakka's row; Thorn's Wolf).
+    expect(cards).toEqual(["drake", "fe2", "fe3", "owlbear", "wolfpet"]);
+    expect(rowHtml(html, "cbt-init-companion", "drake")).toContain(
+      'data-testid="cbt-init-row-card"',
+    );
+    for (const id of ["goblin", "wolf", "mira", "brakka", "thorn"]) {
+      expect(cards).not.toContain(id);
+    }
+  });
+});

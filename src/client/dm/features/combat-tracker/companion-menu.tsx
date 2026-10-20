@@ -2,7 +2,8 @@
 // menu and token menu, over `cbt.setCompanion`: Owner ▸ (a PC of the fight: makes a monster a
 // companion or moves it), Turn mode (three radio items), Release, Turn hostile. Hints only: the
 // server decides (a pet's owner → "Change a pet's owner in the Party window", the turn
-// combatant → "Change it after its turn"). Dismiss is the summon slice's (FR-CBT-112).
+// combatant → "Change it after its turn"). Dismiss is the summon slice's (FR-CBT-112). Card
+// (FR-CHARX-59, walkthrough 9): the menu item and the row / line icon open the companion card.
 import { isCompanion } from "@shared/combat-tracker/companion";
 import {
   CBT_INTENTS,
@@ -10,6 +11,7 @@ import {
   type SetCompanionInput,
 } from "@shared/combat-tracker/schemas";
 import { TURN_MODES, type TurnMode } from "@shared/entities/schemas";
+import { Button } from "@ui/components/ui/button";
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -20,10 +22,12 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "@ui/components/ui/menus";
+import { Tooltip } from "@ui/components/ui/overlays";
+import { useOpenCompanionCard } from "@ui/features/combat-tracker/companion-card-request";
 import { MODE_MENU_LABEL } from "@ui/features/combat-tracker/companions";
 import { useCbtIntent, useCombatants } from "@ui/features/combat-tracker/store";
 import { useSync } from "@ui/sync/store";
-import { PawPrintIcon, SwordsIcon, UnlinkIcon, UserRoundIcon } from "lucide-react";
+import { IdCardIcon, PawPrintIcon, SwordsIcon, UnlinkIcon, UserRoundIcon } from "lucide-react";
 import { useMemo } from "react";
 import { useHoverSafeSub } from "./hover-sub";
 
@@ -113,8 +117,36 @@ function useOwnerChoices(encounterId: string | undefined): OwnerChoice[] {
   }, [rows, entities]);
 }
 
+/**
+ * FR-CHARX-59 (walkthrough 9): a companion row's / line's card icon (`cbt-init-row-card`, as the
+ * player's) opening `charx.companion` on it; nothing on a non-companion.
+ */
+export function CompanionCardButton({ c }: { c: CombatantView }) {
+  const openCard = useOpenCompanionCard();
+  if (!isCompanion(c)) return null;
+  return (
+    <Tooltip content={`${c.name}'s card`}>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-5 shrink-0"
+        data-testid="cbt-init-row-card"
+        data-record-id={c.id}
+        aria-label={`Open ${c.name}'s card`}
+        onClick={(e) => {
+          e.stopPropagation();
+          openCard(c.id);
+        }}
+      >
+        <IdCardIcon className="size-3.5" />
+      </Button>
+    </Tooltip>
+  );
+}
+
 /** Companion ▸ for a monster combatant; `testId` = the trigger's (`cbt-init-row-companion`). */
 export function CompanionMenu({ c, testId }: { c: CombatantView; testId: string }) {
+  const openCard = useOpenCompanionCard();
   const { send, disabled } = useCbtIntent();
   const sub = useHoverSafeSub();
   const ownerSub = useHoverSafeSub();
@@ -128,6 +160,18 @@ export function CompanionMenu({ c, testId }: { c: CombatantView; testId: string 
         <PawPrintIcon /> Companion
       </DropdownMenuSubTrigger>
       <DropdownMenuSubContent onPointerEnter={sub.keep} className="min-w-52">
+        {isCompanion(c) && (
+          <>
+            <DropdownMenuItem
+              data-testid="cbt-companion-card"
+              data-record-id={c.id}
+              onSelect={() => openCard(c.id)}
+            >
+              <IdCardIcon /> Card
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuSub open={ownerSub.open} onOpenChange={ownerSub.onOpenChange}>
           <DropdownMenuSubTrigger data-testid="cbt-companion-owner-menu" data-record-id={c.id}>
             <UserRoundIcon /> Owner

@@ -1,7 +1,6 @@
-// FR-CAMP-27 picker, player side: "Playing as ● Player 1 in …", the dot reads the player's own
-// colour from the store (CAMP §7).
+// FR-CAMP-35 picker, player side: the header's colour dot (`camp-my-color`) retired; the identity
+// chip shows the colour and Preferences holds the picker (CAMP §7).
 import { describe, expect, test } from "bun:test";
-import { PLAYER_COLORS } from "@shared/campaign-management/colors";
 import { applySnapshot } from "@shared/protocol/store";
 import { TooltipProvider } from "@ui/components/ui/overlays";
 import { SyncContext, type SyncState } from "@ui/sync/store";
@@ -15,7 +14,7 @@ function render(color: string) {
     seq: 0,
     you: { campaignId: "c1", role: "player", playerId: "p1" },
     records: {
-      campaign: [{ id: "c1", name: "Fixture Campaign", dmColor: "amber" }],
+      campaign: [{ id: "c1", name: "Fixture Campaign", dmColor: "#e69f00" }],
       player: [{ id: "p1", campaignId: "c1", name: "Player 1", color }],
     },
   } as never);
@@ -31,15 +30,12 @@ function render(color: string) {
   );
 }
 
-describe("FR-CAMP-27 picker (player header)", () => {
-  test("FR-CAMP-27 picker: the header dot sits before the name and shows the player's colour", () => {
-    const html = render("jade");
-    expect(html).toMatch(/data-testid="camp-my-color"[^>]*data-value="jade"/);
-    expect(html).toContain(`background-color:${PLAYER_COLORS.jade}`);
-    expect(html.indexOf("camp-my-color")).toBeLessThan(html.indexOf("camp-joined-player-name"));
+describe("FR-CAMP-35 picker (player header)", () => {
+  test("FR-CAMP-35 picker: camp-my-color gone from the player header; the line reads 'Playing as Player 1 in …'", () => {
+    const html = render("#19b98a");
+    expect(html).not.toContain("camp-my-color");
     expect(html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toBe(
       "Playing as Player 1 in Fixture Campaign",
     );
-    expect(render("rose")).toMatch(/data-testid="camp-my-color"[^>]*data-value="rose"/);
   });
 });

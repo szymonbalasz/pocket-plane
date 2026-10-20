@@ -44,6 +44,8 @@ DM notes in brackets ([#285](../decisions-log.md)). "sim-9" = the [session-sim-9
 | 2026-10-20 | Merged: **image search in every picker** — type "Gob el" in token Image…, New scene, Props, Portrait, handout or compendium From library; tag chips, tag editor, Manage tags [#296](../decisions-log.md). Try it in bundle `image-search` |
 | 2026-10-20 | Merged: **your pending-actions toast stays top-centre** and never covers the Fog / AoE / Structure bars [#297](../decisions-log.md); **dice tray Roll always visible** at the small default size, and a kept template shows "· by ‹name›" on **hover** [#298](../decisions-log.md) |
 | 2026-10-20 | Merged: **Preferences** — click your name chip at the top right: Sound (moved from the speaker), Reset layout, and for you Log out; **loot Subtract** — a negative amount reads "Subtract" with a hint, empty / 0 disabled [#299](../decisions-log.md). The colour picker and dice settings join Preferences next |
+| 2026-10-20 | Merged: **companion turns** — companions show in Initiative under their owner ("After Mira") or as a line in the owner's row; Companion ▸ menu (owner, turn mode, Turn hostile); pets join at Start; "Your turn — Owlbear (Mira)" alerts [#300](../decisions-log.md); **timing checks moved to the bench** so test runs stop going red on load (BL-51, #301) |
+| 2026-10-20 | Merged: **Fit** — the map uses the space (42 px cells at 1440×900 instead of 28), keeps the top row below the top bar, and players' maps re-frame once when new tokens come into sight under a window; your roll popups stay clear of tool bars and toasts [#302](../decisions-log.md). Last slice started: companion marker on the map. Backlog picking stopped (sprint end) |
 
 ## Check `main` any time (DM)
 

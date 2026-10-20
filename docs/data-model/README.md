@@ -2081,6 +2081,8 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 
 | `combatant.concentration_effect_id` | + ID \| null, plain id; DM only | the owner's concentration a summon is linked to (CP3 writes it) | FR-CBT-110, -120 |
 | `combatant.card` | + **JSON leaf** `companionCard(statBlock)` \| null | `{size, type?, ac, hpMax, speed?, attacks ≤ 8 [{id, name, toHit, bonus?, damage, damageType?, extraDamage?}], more?}`; stable row ids (the row's own, else `ctx.ids` at copy, kept while the row at that index keeps its name); written at join / `setCompanion`, refreshed by the definition hook, cleared on release; ≤ 2,038 B | FR-CBT-117, FR-CHARX-60 |
 | `combatant.position` | 0 = **no rank** (record: null) | an `in-owner-turn` companion while its owner is eligible acts inside the owner's turn (the column stays NOT NULL: a nullable change makes push rebuild and empty the table) | FR-CBT-107 |
+| `combatant` owner view (wire) *(CP4, build/cp-card)* | + `entityId` on a **pet** companion's owner view | the owner's own pet row id (the owner has the row in full), so the companion card lists a pet in a fight once (FR-CHARX-61); a summon's owner view and other players' views never carry it; no column change | FR-CHARX-61, FR-CBT-116 |
+| `cbt.attack` line `dmPayload.toHitNatural` *(CP4 walkthrough 7, build/cp-card)* | + int \| null, optional | a companion attacker's d20 face; its `payload.toHit.natural` is null and its outcome entry's `rollIds` hold none of the card's rolls (players get totals only) | FR-CBT-114, ADR-0056 |
 | `game_log_entry.audience_player_id` | + ID \| null, plain id | a non-public entry also reaches this player: a companion's roll lines (DM + owner) | FR-CBT-114, ADR-0056 |
 | Log-entry kind `cbt.companion` *(new)* | payload `{action: summon \| dismiss \| follows \| release \| hostile, name, ownerName?, count?}`, dmPayload `{turnMode?}` | `public` iff the combatant is visible to players; DM text adds the mode | FR-CBT-122 |
 | `cbt.attack` line payload (companion attacker) | `toHit` = `{dice: null, constant: 0, total, natural}` | the "N + M" split, bonus and effect parts only in `dmPayload` | FR-CBT-114 |
@@ -2092,7 +2094,7 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 
 
 ## 90. Sprint 6: companion turns client (CP2)
 
-From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109, -115, -118, -119. **Built by `build/cp-turns`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent beyond CP0's fields. Protocol side: [protocol §117](../protocol/README.md#117-sprint-6-companion-turns-client-cp2).
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109, -115, -118, -119. **Built by `build/cp-turns`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent beyond CP0's fields. Protocol side: [protocol §118](../protocol/README.md#117-sprint-6-companion-turns-client-cp2).
 
 | Derived (not stored) | Where | Rule | Audience | Source |
 |---|---|---|---|---|
@@ -2102,9 +2104,37 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109,
 | Pet offers | Start dialog | joining PCs' pets; ticked iff a token of the pet is on the scene (DM ticks override, reset on open) | DM | FR-CBT-109 |
 | Card request | client memory | `{id, n}`, lost on reload | player (DM when CP4 opens it there) | FR-CBT-119 |
 
-## 91. Sprint 6: pets (CP1)
+## 91. Sprint 6: Fit without the empty box, pcs keeps the top row, players' reveal refit (WF3)
 
-From [entities](../specs/entities.md#8-data-model) FR-ENT-36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252). **Built by `build/cp-pets`**. **No schema change**: CP0's columns ([§89](#89-sprint-6-companions-core-cp0)). Protocol side: [protocol §118](../protocol/README.md#118-sprint-6-pets--new-pet-pet-hp-companions-tab-cp1).
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-80–82, [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-59, -60 and [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-55. **Built by `fix/fit-s6`**: no table, column, record type or payload change. Protocol side: [protocol §118](../protocol/README.md#118-sprint-6-fit-without-the-empty-box-pcs-keeps-the-top-row-players-reveal-refit-wf3).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Shown stack report `dicex.popups` | client memory (`reportShownStack`) | the DM roll-popup stack's rendered rect while it draws; null when empty or unmounted; starts empty on reload | [FR-SHELL-59](../specs/play-shell.md#6-functional-requirements) |
+| Drawn token ids | client memory (`MapCanvas`, per shown scene) | the ids of the last token list; a scene switch resets them without a reveal | [FR-MAP-82](../specs/scenes-map.md#6-functional-requirements) |
+| Pending reveal refit | client memory (`createRevealRefit`) | armed ≤ 1 s, or deferred to a pointer release; dropped on a gesture, unmount or scene change | FR-MAP-82 |
+| `data-fit-reason` | client memory | the last fit's cause | FR-MAP-82 |
+
+- **Fixtures:** no new unit (Fit, the `pcs` pan and the reveal refit walk on `session-sim-9`'s Goblin Ambush, door (8, 5), party vision, the hidden Elite and Wolf); `session-sim-10` gets a WF3 comment line only.
+- **Snapshot size** (CON-44): 0 B.
+
+## 92. Sprint 6: colour picker and Dice section (PF2)
+
+From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-35 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-57, -58. **Built by `build/colour-picker-2`**: client only. Protocol side: [protocol §119](../protocol/README.md#119-sprint-6-colour-picker-and-dice-section-pf2).
+
+| Item | Where | Rule | Source |
+|---|---|---|---|
+| Picker draft (HSV marker + exact hex, hex-field text, hovered swatch, the refused target while a drag is held) | picker component state only | never stored or sent; Apply sends `camp.setColor` with the draft hex; a reject or a matching store value resets it | FR-CAMP-35 |
+| "No allowed colour at this hue" cache | picker memory, per (hue, the others' colours) | search memo only | FR-CAMP-35 |
+| Preference sections `camp.color` (10), `dicex.dice` (30) | both clients' `pref-sections.ts` (append) | no new storage: `player.color` / `campaign.dmColor` (server), `pp.dicex.v2.*` (browser) and the `dice-look` record, as before | FR-SHELL-72, -76 |
+
+- **Derived (not stored):** a colour's verdict (FR-CAMP-31 / -32), the palette row's blocks, the shading mask.
+- **Fixtures:** none new (the walkthrough and e2e use `prefs-s6` / `prefs-s6-e2e`; `session-sim-10` already holds `pc-colour-free`).
+- **CON-44:** 0 B.
+
+## 93. Sprint 6: pets (CP1)
+
+From [entities](../specs/entities.md#8-data-model) FR-ENT-36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252). **Built by `build/cp-pets`**. **No schema change**: CP0's columns ([§89](#89-sprint-6-companions-core-cp0)). Protocol side: [protocol §121](../protocol/README.md#121-sprint-6-pets--new-pet-pet-hp-companions-tab-cp1).
 
 | Table / field | Change | Rule | Source |
 |---|---|---|---|

@@ -237,7 +237,18 @@ test("FR-FOG-48 / -21 Blinded chip: Blinded → 'Blinded — you can't see'; sec
   // Put everything back: end the effect and the encounter.
   await dm.getByTestId("map-tool-select").click();
   await openWindow(dm, "cbt.initiative");
-  await mira.locator('[data-testid="cbtx-init-row-effect"][data-value="blinded"]').click();
+  // The chip, or (a narrower Initiative: placement stops it 12 px before a PC, FR-SHELL-57) its
+  // "+N" fold (FR-CBTX-33): the folded effect's submenu holds the same End.
+  const blindedChip = mira.locator('[data-testid="cbtx-init-row-effect"][data-value="blinded"]');
+  if (await blindedChip.isVisible()) {
+    await blindedChip.click();
+  } else {
+    const effectId = await blindedChip.getAttribute("data-record-id");
+    await mira.getByTestId("cbtx-init-row-effect-more").click();
+    await dm
+      .locator(`[data-testid="cbtx-init-row-effect-more-item"][data-record-id="${effectId}"]`)
+      .click();
+  }
   await dm.getByTestId("cbtx-init-row-effect-end").click();
   await expect(chip).toHaveCount(0);
   const enc2 = await openWindow(dm, "cbt.encounters");

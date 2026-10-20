@@ -72,7 +72,8 @@ export function combatantVisibility(r: CombatantRecord, _v?: Viewer): Visibility
  * FR-CBT-37: removed → no rank, band or initiative; else the PC / monster redaction. FR-CBT-100
  * (#252): `side` = the side players were last openly shown; the true side never. Sprint 6
  * (FR-CBT-116): a companion adds its owner ids and mode for everyone, and for its **owner** (the
- * viewer is `ownerPlayerId`) also HP, temp HP, `pet` and `card`; `ownerHidden` and
+ * viewer is `ownerPlayerId`) also HP, temp HP, `pet` and `card`, and a pet's `entityId` (the
+ * owner's own pet row; a summon's definition id never, FR-CHARX-61); `ownerHidden` and
  * `concentrationEffectId` never.
  */
 export function redactCombatant(r: CombatantRecord, v?: Viewer): PlayerCombatant {
@@ -112,6 +113,7 @@ export function redactCombatant(r: CombatantRecord, v?: Viewer): PlayerCombatant
     tempHp: r.tempHp,
     pet: r.pet,
     card: r.card,
+    ...(r.pet ? { entityId: r.entityId } : {}),
   };
 }
 

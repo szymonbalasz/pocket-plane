@@ -3,6 +3,7 @@ import type { WindowState } from "@shared/play-shell/layout";
 import {
   contentHeights,
   FREE_AREAS_MAX,
+  fitObstacles,
   freeArea,
   freeAreas,
   isAppearance,
@@ -13,7 +14,9 @@ import {
   reportContentHeight,
 } from "./free-area";
 import type { Rect } from "./geometry";
+import { keepOuts } from "./keep-outs";
 import { createWindowRegistry, defineWindow } from "./registry";
+import { reportShownStack, summaryStrip, toastKeepOut } from "./toast-region";
 
 const VP = { w: 1440, h: 900 };
 /** Work area right of the rail at 1440×900: x 68…1440, y 48…836. */
@@ -290,5 +293,28 @@ describe("FR-SHELL-34 appearances", () => {
     noteAppearance();
     noteAppearance();
     expect(notedAppearances()).toBe(n + 2);
+  });
+});
+
+describe("FR-SHELL-59 fit obstacles", () => {
+  test("FR-SHELL-59 shown stack rect: fitObstacles('dm') takes the summary strip + the shown stack, not the 356 × 238 box; players keep their corner box", () => {
+    const win = { x: 1028, y: 60, w: 400, h: 500 };
+    const regions = keepOuts("dm", VP, new Map());
+    const strip = summaryStrip(VP);
+    expect(fitObstacles("dm", [win], regions, VP, null)).toEqual([win, strip]);
+    const card = { x: 560, y: 165, w: 320, h: 175 };
+    expect(fitObstacles("dm", [win], regions, VP, card)).toEqual([win, strip, card]);
+    expect(fitObstacles("dm", [win], regions, VP, card)).not.toContainEqual(toastKeepOut("dm", VP));
+    // The reported stack is read when none is passed.
+    reportShownStack("test.stack", card);
+    try {
+      expect(fitObstacles("dm", [], regions, VP)).toEqual([strip, card]);
+      // Players: their hard corner box, never the DM's stack.
+      const player = keepOuts("player", VP, new Map());
+      expect(fitObstacles("player", [win], player, VP)).toEqual([win, toastKeepOut("player", VP)]);
+    } finally {
+      reportShownStack("test.stack", null);
+    }
+    expect(fitObstacles("dm", [], regions, VP)).toEqual([strip]);
   });
 });
