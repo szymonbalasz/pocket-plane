@@ -19,6 +19,63 @@ const row = (scope: Locator, id: string) =>
   scope.locator(`[data-testid="cbt-init-row"][data-record-id="${id}"]`);
 
 /** The combatant id of the row named `name`. */
+/** Drags the window's resize corner by (dx, dy); the shell clamps to the min size. */
+async function resizeBy(page: Page, win: Locator, dx: number, dy: number) {
+  const h = await win.getByTestId("ui-window-resize").boundingBox();
+  if (!h) throw new Error("no resize handle");
+  const x = h.x + h.width / 2;
+  const y = h.y + h.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 6; i++) await page.mouse.move(x + (dx * i) / 6, y + (dy * i) / 6);
+  await page.mouse.up();
+}
+
+/** Narrows `win` to its min width (the shell clamps). */
+async function toMinWidth(page: Page, win: Locator, w: number) {
+  await resizeBy(page, win, -400, 0);
+  await expect.poll(async () => Math.round((await win.boundingBox())?.width ?? 0)).toBe(w);
+}
+
+/**
+ * FR-CBTX-57 / FR-CBT-125 with companions (seams S4): every name (rows and companion lines) whole
+ * inside its line, every AC / HP part whole, owner chips inside their row; no row content under
+ * the list's bottom edge or past the footer.
+ */
+function rowsCut(init: Locator): Promise<string[]> {
+  return init.evaluate((w) => {
+    const bad: string[] = [];
+    for (const n of w.querySelectorAll<HTMLElement>('[data-testid="cbt-init-row-name"]')) {
+      const line = n.closest("[data-name-line]") as HTMLElement;
+      const a = n.getBoundingClientRect();
+      const b = line.getBoundingClientRect();
+      if (n.scrollWidth > n.clientWidth + 0.5 || (n.textContent ?? "").includes("…")) {
+        bad.push(`name cut: ${n.dataset.value}`);
+      }
+      if (a.width === 0 || a.right > b.right + 0.5) bad.push(`name out: ${n.dataset.value}`);
+    }
+    for (const l of w.querySelectorAll<HTMLElement>("[data-stats-line]")) {
+      if (l.scrollWidth > l.clientWidth + 0.5) bad.push("stats cut");
+    }
+    for (const c of w.querySelectorAll<HTMLElement>('[data-testid="cbt-init-row-owner"]')) {
+      const a = c.getBoundingClientRect();
+      const b = (c.closest('[data-testid="cbt-init-row"]') as HTMLElement).getBoundingClientRect();
+      if (c.scrollWidth > c.clientWidth + 0.5 || a.right > b.right + 0.5) {
+        bad.push(`owner chip out: ${c.dataset.recordId}`);
+      }
+    }
+    const list = w.querySelector<HTMLElement>('[data-testid="cbt-init-list"]') as HTMLElement;
+    const footer = w.querySelector<HTMLElement>('[data-testid="cbt-init-more"]');
+    const body = w.querySelector('[data-testid="ui-window-content"]')?.parentElement as HTMLElement;
+    const l = list.getBoundingClientRect();
+    if (footer && !footer.hidden && footer.getBoundingClientRect().top < l.bottom - 0.5) {
+      bad.push("footer over the list");
+    }
+    if (body.scrollHeight > body.clientHeight + 1) bad.push("body scrolls");
+    return bad;
+  });
+}
+
 async function idByName(init: Locator, name: string): Promise<string> {
   const r = init.locator('[data-testid="cbt-init-row"]').filter({
     has: init.page().locator(`[data-testid="cbt-init-row-name"][data-value="${name}"]`),
@@ -114,6 +171,11 @@ test("FR-CBT-109 FR-CBT-115 FR-CBT-118 FR-CBT-119 companions-start: Start with p
   await expect(row(i1, thorn).getByTestId("cbt-init-companion")).toHaveCount(1);
   await expect(row(i1, thorn).getByTestId("cbt-init-row-card")).toHaveCount(0);
 
+  // Seams S4: WF's row rules with the owner chip, the indent and the Wolf's line (DM 400 and
+  // its 320 min, player-2 280 and its 240 min); sizes restored only by reload, so check last-ish.
+  await expect.poll(() => rowsCut(init)).toEqual([]);
+  await expect.poll(() => rowsCut(i2)).toEqual([]);
+
   // S2: initiatives (monsters rolled at Start), round 1, Next to Mira, the Owlbear, Thorn.
   for (const [id, v] of [
     [mira, "15"],
@@ -190,6 +252,12 @@ test("FR-CBT-109 FR-CBT-115 FR-CBT-118 FR-CBT-119 companions-start: Start with p
   await expect(row(init, goblin).getByTestId("cbt-init-row-owner")).toHaveCount(0);
   await expect(row(i1, goblin).getByTestId("cbt-init-row-owner")).toHaveCount(0);
   await expect(row(i1, goblin).getByTestId("cbt-init-row-card")).toHaveCount(0);
+
+  // The row rules at the min widths (owner chips and the Wolf's line wrap, never cut).
+  await toMinWidth(dm, init, 320);
+  await expect.poll(() => rowsCut(init)).toEqual([]);
+  await toMinWidth(p2, i2, 240);
+  await expect.poll(() => rowsCut(i2)).toEqual([]);
 
   for (const p of [p1, p2, dm]) await p.context().close();
 });
