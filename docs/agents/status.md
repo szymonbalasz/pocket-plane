@@ -21,7 +21,7 @@ ID ranges per track (sprint 6): CP ENT FR 31–40 / OQ 31–36, CBT FR 105–124
 
 ## Shared-file locks
 
-- Play-shell frame `free-area.ts` + canvas `MapCanvas.tsx`: `fix/fit-s6` (WF3). Next canvas holder CP5.
+- Canvas lock (`MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx`, `canvas-icons.ts`): free (WF3 merged #302); next CP5 `fix/cp-tokens`.
 - Schema lane (`src/server/db/`): `fix/im-core` first, then `fix/cp-core` / PF0 in either order.
 
 ## Pending DM decisions

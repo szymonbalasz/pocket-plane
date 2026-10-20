@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { fitObstacles, freeAreas } from "./free-area";
 import { hardRects, keepOuts, keepOutsAttr, reportedKeepOuts, reportKeepOut } from "./keep-outs";
-import { toastKeepOut } from "./toast-region";
+import { summaryStrip, toastKeepOut } from "./toast-region";
 
 const vp = { w: 1440, h: 900 };
 const overlaps = (a: { x: number; y: number; w: number; h: number }, b: typeof a) =>
@@ -31,15 +31,15 @@ test("FR-SHELL-48 keep-outs: the toast box always (players hard, the DM soft); r
   expect(keepOuts("dm", vp).length).toBe(1);
 });
 
-test("FR-SHELL-48 both toast boxes are excluded from freeArea / freeAreas; a reported tool bar isn't", () => {
+test("FR-SHELL-48 the fit's toast obstacle (players' box, the DM's summary strip, FR-MAP-80) is excluded from freeAreas; a reported tool bar isn't", () => {
   for (const client of ["dm", "player"] as const) {
-    const box = toastKeepOut(client, vp);
+    const box = client === "dm" ? summaryStrip(vp) : toastKeepOut(client, vp);
     const bar = { x: 68, y: 60, w: 520, h: 120 };
     const regions = [
       ...keepOuts(client, vp),
       { id: "map.toolbar", rect: bar, kind: "hard" as const },
     ];
-    const areas = freeAreas(fitObstacles([], regions), vp);
+    const areas = freeAreas(fitObstacles(client, [], regions, vp, null), vp);
     expect(areas.length).toBeGreaterThan(0);
     for (const a of areas) expect(overlaps(a, box)).toBe(false);
     expect(areas.some((a) => overlaps(a, bar))).toBe(true);
