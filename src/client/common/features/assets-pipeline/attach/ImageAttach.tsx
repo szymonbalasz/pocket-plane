@@ -2,7 +2,9 @@
 // paste for every form that holds image asset IDs. It never holds the caller's list: `onAdd` once
 // per finished image; order, removal, slot layout and dedupe are the caller's (seams S5). Uploads
 // are attachments (`listed=false`). No uploader context (player client) → renders nothing.
+// S6: `context` tags its uploads and is passed to From library's picker (FR-ASSET-48).
 import type { AssetRecord } from "@shared/assets-pipeline/schemas";
+import type { ImageContext } from "@shared/assets-pipeline/tags";
 import { Button } from "@ui/components/ui/button";
 import { Tooltip } from "@ui/components/ui/overlays";
 import { Alert } from "@ui/components/ui/primitives";
@@ -12,7 +14,7 @@ import { useRecords, useSync } from "@ui/sync/store";
 import { ImagesIcon, UploadIcon } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 import { AssetPickerDialog } from "../AssetPicker";
-import { type AttachUploader, useAttachUploader } from "../uploader";
+import { type AttachUploader, useAttachUploader, withContextTags } from "../uploader";
 import { type AttachGate, handleDragOver, handleDrop, handlePaste } from "./handlers";
 import { ATTACH_TYPES, AttachQueue, IDLE_STATUS, noMoreImages, progressText } from "./queue";
 
@@ -33,6 +35,8 @@ export interface ImageAttachProps {
   library?: boolean;
   /** Host form busy. */
   disabled?: boolean;
+  /** FR-ASSET-48: the host; sets the tag sent with uploads, drops and pastes (FR-ASSET-41). */
+  context?: ImageContext;
   className?: string;
 }
 
@@ -78,17 +82,18 @@ function AttachControl({
   dropTarget,
   library = true,
   disabled = false,
+  context,
   className,
   uploader,
   ...rest
 }: ImageAttachProps & { uploader: AttachUploader }) {
-  const latest = useRef({ max, count, disabled, onAdd: rest.onAdd });
-  latest.current = { max, count, disabled, onAdd: rest.onAdd };
+  const latest = useRef({ max, count, disabled, context, onAdd: rest.onAdd });
+  latest.current = { max, count, disabled, context, onAdd: rest.onAdd };
   const [status, setStatus] = useState(IDLE_STATUS);
   const [queue] = useState(
     () =>
       new AttachQueue({
-        upload: (file, opts, h) => uploader.upload(file, opts, h),
+        upload: withContextTags(uploader, () => latest.current.context),
         onAdd: (id) => latest.current.onAdd(id),
         onChange: setStatus,
       }),
@@ -157,6 +162,7 @@ function AttachControl({
       ref={self}
       data-testid="asset-attach"
       data-owner={owner}
+      data-context={context}
       data-remaining={remaining}
       className={cn("flex flex-col gap-1.5", className)}
     >
@@ -237,6 +243,7 @@ function AttachControl({
           onOpenChange={setPicking}
           title="Add an image"
           selectLabel="Add"
+          context={context}
           onSelect={(id) => {
             // The slot may have gone while the picker was open.
             if (gate().free - queue.pending > 0) latest.current.onAdd(id);

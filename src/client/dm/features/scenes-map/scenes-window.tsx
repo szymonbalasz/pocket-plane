@@ -223,7 +223,13 @@ function SceneRow({
   );
 }
 
-function NewSceneDialog({ open, onOpenChange }: { open: boolean; onOpenChange(o: boolean): void }) {
+export function NewSceneDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange(o: boolean): void;
+}) {
   const [name, setName] = useState("");
   const [mapAssetId, setMap] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -302,8 +308,10 @@ function NewSceneDialog({ open, onOpenChange }: { open: boolean; onOpenChange(o:
               <span className="text-muted-foreground">none chosen</span>
             )}
           </div>
+          {/* FR-MAP-86: inline, so its search never takes focus from the name. */}
           <AssetPicker
             className="max-h-[45vh]"
+            context="map"
             selectLabel="Use as map"
             initialSelectedId={mapAssetId}
             onSelect={(id) => {

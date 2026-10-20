@@ -80,6 +80,7 @@ export const scenesMapTokenMenu: readonly TokenMenuEntry[] = [
           open
           onOpenChange={(o) => !o && close()}
           title="Token image"
+          context="token"
           initialSelectedId={token.imageAssetId}
           onSelect={(id) =>
             void send(MAP_INTENTS.updateToken, { tokenId: token.id, imageAssetId: id })

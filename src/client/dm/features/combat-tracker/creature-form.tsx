@@ -204,7 +204,7 @@ function Field({ id, label, children }: { id: string; label: string; children: R
   );
 }
 
-function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
+export function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
   const [f, setF] = useState<Fields>(() => initial(mode));
   const [error, setError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
@@ -501,6 +501,7 @@ function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
         open={picking}
         onOpenChange={setPicking}
         title="Portrait"
+        context="portrait"
         initialSelectedId={f.portraitAssetId}
         onSelect={(id) => setF((x) => ({ ...x, portraitAssetId: id }))}
       />
