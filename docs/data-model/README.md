@@ -2101,3 +2101,18 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109,
 | Own companion | per render | `ownerPlayerId = you` (players only receive HP / `card` on these) | player | FR-CBT-119 |
 | Pet offers | Start dialog | joining PCs' pets; ticked iff a token of the pet is on the scene (DM ticks override, reset on open) | DM | FR-CBT-109 |
 | Card request | client memory | `{id, n}`, lost on reload | player (DM when CP4 opens it there) | FR-CBT-119 |
+
+## 91. Sprint 6: summons (CP3)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-110, -112, -113, -120 (#252, #288, #295). **Built by `build/cp-summon`**. Protocol side: [protocol §118](../protocol/README.md#118-sprint-6-summons-cp3).
+
+| Field / record | Change | Rule | Source |
+|---|---|---|---|
+| `combatant.summoned` | + bool, NOT NULL default false (push-safe `ADD COLUMN`, like `pet`); DM only | made by `cbt.summon`; its bound token is deleted at Dismiss / End. A companion made with `cbt.setCompanion` (charmed goblin) keeps its token, owner cleared | FR-CBT-110, -112, -113 |
+| `combatant.concentration_effect_id` | now written | `cbt.summon {linkConcentration}` = the owner's active concentration; cleared (null) by the effect hook when that effect ends | FR-CBT-110, -120 |
+| Notification kind `cbt-summon-concentration` *(new)* | payload `{encounterId, ownerCharacterId, effectId, combatantIds}`, resolution `{outcome}` | one per owner + ended concentration; resolved `dismissed` (its action), `hostile` / `gone` (none of its summons left active with the owner); dismissed at End | FR-CBT-120 |
+
+- **Derived (not stored):** a card's summons left = its `combatantIds` still active with `ownerCharacterId` = the card's owner.
+- **Persisted runtime state:** none new beyond the column and the notification rows.
+- **Fixtures:** unit `cp-combat` (pets join through Add; Thorn's Conjure Elemental; Fire Elemental for Mira after-owner, Brakka in-owner-turn, Thorn own 9 + linked), appended to `companions` and `session-sim-10` (loads on `session-sim-9`'s running fight).
+- **CON-44** (`snapshot-size.test.ts` heavy harness, measured with a throwaway probe): `summoned` on every combatant row → DM 765,752 → 766,523 B (+771 B; 806,341 B left of 1.5 MiB); players unchanged (the flag is never redacted in). `session-sim-10` with `cp-combat`: DM 64,264 B, players 32,243 / 24,394 B (+6,384 / +4,493 B over sim-9).

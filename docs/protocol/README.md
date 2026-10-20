@@ -2791,3 +2791,30 @@ From [combat-tracker](../specs/combat-tracker.md#64-sprint-6-companions) FR-CBT-
 | Turn alert (`turnAlertFor`) | `TurnChanged` to a combatant with `ownerPlayerId = me` → "Your turn" / "Owlbear (Mira)"; to own PC → "Brakka + Drake Companion, Fire Elemental 2" (its lines) | FR-CBT-115 |
 
 - **Fixtures:** none new (bundles `companions-start`, `companions-ally` from CP0). E2E `e2e/cp-turns.e2e.ts` on `companions-start`.
+
+## 118. Sprint 6: summons (CP3)
+
+From [combat-tracker](../specs/combat-tracker.md#64-sprint-6-companions) FR-CBT-110, -112, -113, -120, -121, [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-75 and [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-44 (OQ-CBT-81 B, -82 A, -83b A, -83c A, -84 a / c / d; #252, #288). **Built by `build/cp-summon`** on CP0 ([§112](#112-sprint-6-companions-core-cp0)) and CP2 ([§117](#117-sprint-6-companion-turns-client-cp2)). Data model: [§91](../data-model/README.md#91-sprint-6-summons-cp3).
+
+| Intent | Who | Errors (one code per case) | Result | Source |
+|---|---|---|---|---|
+| `cbt.summon {encounterId, definitionId, count 1–8, ownerCharacterId, turnMode?, hpMode?, hidden?, at?, linkConcentration?}` *(new)* | DM (player → `forbidden`) | not started → `conflict`; not a monster → `invalid`; a pet → `invalid` "Pets join as themselves"; owner not an active PC combatant → `conflict` "Mira isn't in this fight"; owner without a player → `invalid` "Mira has no player"; a 9th companion of the owner (pets count) / 57th combatant / full scene → `conflict`; `rolled` without a formula → `invalid`; `linkConcentration` without an active concentration → `invalid` "Mira isn't concentrating" | `{combatantIds}` | FR-CBT-110, -121 |
+| `cbt.dismiss {combatantId}` \| `{notificationId}` *(new)* | DM; player: `{combatantId}` of their own summon (`ownerPlayerId = actor ∧ ¬pet`) | not a companion of the started encounter → `invalid` "Only companions can be dismissed"; inactive → `invalid`; the turn combatant → `conflict` "Press Next first"; a player on a pet / another's → `forbidden`, on a hidden one → `not_found`; `{notificationId}`: player → `forbidden`, not this kind → `not_found`, not pending → `conflict` | — | FR-CBT-112, -120 |
+| `cbtx.addCombatants` + pets | DM | a pet item (its token or `definitionId`) joins as itself: quantity > 1 → `invalid`; already in combat → `conflict`; owner PC not in the fight → `conflict` "Mira isn't in this fight"; > 8 companions → `conflict` | as before | FR-CBTX-44, OQ-CBT-84 a |
+
+| Event | `changes` | Players receive | Undoable |
+|---|---|---|---|
+| `CompanionsSummoned {encounterId, combatantIds, ownerCharacterId}` | `token` creates (owner = the owner's player; FR-MAP-75 beside the owner's token, else `at` / centre) first, `combatant` creates, HP / `own` initiative `roll` entries (DM-only), others' ranks, encounter, one `cbt.companion` line; then the `added` rule-hook rows | visible tokens + combatants per FR-CBT-116 (owner: `card`, HP); hidden → nothing (owner too); the line iff visible | no |
+| `CompanionDismissed {encounterId, combatantId, by}` (one per companion; the card form emits one each) | `combatant` `active: false` + reranks; ended `effect`s (`removed`); summon: `token` delete (`deleteTokenIn`); pet: `entity` write-back + presence; a `setCompanion` companion: its `token` owner cleared; the effect hooks' rows; one line. Then `NotificationResolved` of a card left without summons | combatant delete; token delete / upsert; pet per FR-ENT-37 | no |
+| Effect events (`EffectsEnded`, `ConcentrationSet`, `ConcentrationRolled`, `EffectsAdded` (Incapacitated), apply events, …) whose concentration a summon was linked to | + the summons' `combatant` (`concentrationEffectId` null) + the card's `notification` create (**no `NotificationCreated` of its own**: `effectHooks` never emit; the DM client infers "new" from the store, FR-NOTE-13) | nothing (identical redacted upsert dropped, FR-SYNC-17 / -19; the card is `audience: dm`) | as the event |
+| `CompanionChanged` (release / turn hostile) | as §112; then `NotificationResolved` (`hostile` / `gone`) of a card left without summons | as §112 | no |
+| `EncounterEnded` | summons' tokens deleted **only if `summoned`** (a `setCompanion` companion keeps its token, owner cleared); then `NotificationDismissed` of pending summon cards (end rule) | token deletes / upserts | no |
+
+| Record / kind | Visibility | Source |
+|---|---|---|
+| `combatant.summoned` | DM only (never in a player redaction) | FR-CBT-110, -113 |
+| Notification kind `cbt-summon-concentration` *(new)* | `audience: dm`; payload `{encounterId, ownerCharacterId, effectId, combatantIds 1–8}`; action "Dismiss summon(s)" (role dm → `cbt.dismiss {notificationId}`); resolution `{outcome: dismissed \| hostile \| gone}`; end rule `onEncounterEnd: dismiss`; text "Thorn lost concentration (Conjure Elemental): Fire Elemental 3" | FR-CBT-120 |
+
+- **Registry lines (append-only):** notification kind `summonCardKind` (`kinds.ts`), DM view `dmSummonCardView` (`notification-views.ts`), effect hook `combat-tracker.summon-concentration` (`effect-hooks.ts`).
+- **DM UI:** header `cbt-init-summon` and a PC row's `cbt-init-row-summon` ("Summon for Mira…") open the Dialog `cbt-summon` (`cbt-summon-lookup` → `cbt-lookup-option`, `cbt-summon-picked`, `-count`, `-owner` (+ `data-value`), `-mode` (+ `data-value`, `data-state`), `-hp`, `-hidden`, `-concentration` (iff the owner concentrates), `-submit`, `-error`); Companion ▸ `cbt-companion-dismiss` (disabled on the turn combatant: "Press Next first"); the card's `cbt-summon-hostile` (`cbt.setCompanion` release + enemy per summon left) and `cbt-summon-outcome`. A dismissed companion (inactive in the DM's store) leaves `useCombatants`.
+- **Fixtures:** unit `cp-combat` (bundles `companions`, `session-sim-10`); e2e `e2e/companions.e2e.ts` on `companions-e2e`.
