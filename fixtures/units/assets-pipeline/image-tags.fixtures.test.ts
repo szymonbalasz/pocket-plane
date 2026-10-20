@@ -5,6 +5,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
 import { asset, campaign, encounter } from "@server/db/schema";
+import { SNAPSHOT_CEILING } from "@server/ws/hub";
+import { servicesFromBundle, snapshotSizes } from "@server/ws/testing/snapshot-size";
 import { asc, eq } from "drizzle-orm";
 import { loadBundle } from "../../index";
 import { IMAGE_TAGS_FIXTURE as F } from "./image-tags";
@@ -111,4 +113,31 @@ describe("image-tags fixtures (ASSET §13.1)", () => {
     expect(holding(r.rows, cid, F.secretTag)).toEqual(["Ruined Keep"]);
     expect(listed.find((a) => a.name === "Misc Sketch")?.tags).toEqual([]);
   }, 60_000);
+});
+
+describe("CON-44 session-sim-10 (#256 ceilings)", () => {
+  test("CON-44 session-sim-10 under the ceilings: DM ≤ 1.5 MiB, players ≤ 512 KiB; players byte-identical to session-sim-9 (image-tags adds DM assets only)", async () => {
+    const sizes = async (bundle: string) => {
+      const b = await servicesFromBundle(await loadBundle(bundle, { testMode: true }));
+      try {
+        return snapshotSizes(b.s);
+      } finally {
+        b.cleanup();
+      }
+    };
+    const sim9 = await sizes("session-sim-9");
+    const sim10 = await sizes("session-sim-10");
+    for (const v of sim10)
+      expect([v.label, v.bytes <= SNAPSHOT_CEILING[v.role]]).toEqual([v.label, true]);
+    expect(sim10.slice(1).map((v) => [v.label, v.bytes])).toEqual(
+      sim9.slice(1).map((v) => [v.label, v.bytes]),
+    );
+    const [dm9, dm10] = [sim9[0]?.bytes ?? 0, sim10[0]?.bytes ?? 0];
+    console.log(
+      `CON-44 session-sim-10: DM ${dm10} B (+${dm10 - dm9} B over session-sim-9, ${sim10[0]?.types.asset?.rows} assets); players ${sim10
+        .slice(1)
+        .map((v) => `${v.label} ${v.bytes} B`)
+        .join(", ")} (unchanged)`,
+    );
+  }, 120_000);
 });
