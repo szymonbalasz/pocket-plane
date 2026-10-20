@@ -34,7 +34,9 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 
 | Date | What |
 |---|---|
-| — | Not started (kickoff prompt from the sprint-6 recap) |
+| 2026-10-20 | Phase A started: spec agents for gems, stats and the sprint-6 follow-ups running in parallel |
+| 2026-10-20 | Specs drafted (gems, stats, follow-ups); seams ruled; reviews running. Backfill: weapon-combat natural-1 e2e flake fixed (BL-50, #313) |
+| 2026-10-20 | Reviews ruled and applied (4 blockers fixed: gem spend lines and stats no longer leak hidden rolls / monster HP / fight names; Space-pan kept). **DM gate 1 open** (`.verify/sprint7/gate.md`). Backfill: DM image library size warning (BL-49, #314) |
 
 ## Check `main` any time (DM)
 

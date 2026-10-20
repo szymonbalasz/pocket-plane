@@ -358,5 +358,5 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - *(Sprint 6)* Moving the DM's toasts out of the top-centre (decided #256, OQ-SHELL-32 C); the players' toast corner (unchanged).
 - Concentration, duration and turn reminders; rule listeners → [combat-extras](combat-extras.md), ADR-0027 C.
 - Roll requests → [dice-extras](post-mvp/dice-extras.md) (future kind, player owner). Kill-feed toasts → [stats](stats.md). `loot-received` → [party-loot](party-loot.md) (#146).
-- [Gems](post-mvp/gems.md) (#140): modifying a pending damage card's dice is combat-tracker's command; if card text must change then, ~~a post-MVP `updateNotification` helper (pending only)~~ *(sprint 2: exists, FR-NOTE-25)*. No MVP change.
+- [Gems](gems.md) (#140): modifying a pending damage card's dice is combat-tracker's command; if card text must change then, ~~a post-MVP `updateNotification` helper (pending only)~~ *(sprint 2: exists, FR-NOTE-25)*. No MVP change.
 - Load older history, server read state, cross-browser seen marker.

@@ -72,11 +72,11 @@ test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, f
   await expect(popup).toHaveCount(0);
 
   // The outcome line: players read "— DM: hit." (BL-10), "— DM: critical hit!" on a natural 20,
-  // "(natural 1) — DM ruled hit" when the DM rules a natural 1 a hit (FR-CBT-58); the DM's line
-  // keeps its own words.
+  // "(natural 1) — DM ruled hit." when the DM rules a natural 1 a hit (FR-CBT-58, full stop per
+  // FR-CBT-95); the DM's line keeps its own words.
   const words =
     natural === "1"
-      ? "\\(natural 1\\) — DM ruled hit"
+      ? "\\(natural 1\\) — DM ruled hit\\."
       : natural === "20"
         ? "— DM: critical hit!"
         : "— DM: hit\\.";

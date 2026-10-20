@@ -2,8 +2,8 @@
 title: Character sheet (full)
 prefix: CHARX
 status: complete
-owner: spec-companions
-phase: post-mvp-6
+owner: spec-gems
+phase: post-mvp-7
 ---
 
 # Character sheet (full)
@@ -17,6 +17,8 @@ phase: post-mvp-6
 > **Sprint 4 at a glance:** FR-CHARX-54 weapon row schema → S4-0 zod + S4-1a `build/weapon-rows` → test `FR-CHARX-54`; FR-CHARX-55 rolls with parts → S4-1a → `FR-CHARX-55`; FR-CHARX-56 sheet UI → S4-1a → `FR-CHARX-56`; FR-CHARX-57 visibility → S4-1a → `FR-CHARX-57` (leak); FR-CHARX-58 negative uses → S4-0 zod + S4-2 `fix/uses-negative` → `FR-CHARX-58`.
 
 > **Sprint 6 (track CP, DM [#252](../decisions-log.md) / BL-30).** The owner of a **companion** (pet or summon, [combat-tracker §6.4](combat-tracker.md#64-sprint-6-companions)) gets a **companion card**: a small read-only window built from the creature's stat block (HP, AC, speed, attacks with Roll, conditions); **not a second character sheet**. New FR-CHARX-59–70, window `charx.companion`, OQ-CHARX-31–36. Card data reaches only the owner and the DM ([proposed companion visibility ADR](../architecture/adr/0056-companion-visibility.md)). **At a glance:** FR-CHARX-59–68 → CP4 `build/cp-card` → tests `FR-CHARX-60 card fields`, `FR-CHARX-64 card rolls`, `FR-CHARX-67 card visibility`; FR-CHARX-69 (owner rolls a pet out of combat) → CP4; FR-CHARX-70 (a pet's NPC sheet stays DM-only) → CP0.
+
+> **Sprint 7 (track GM, [gems](gems.md); DM #140, #312).** Decided (not open): gem counts on the character sheet, built-in icons now (art in the UI sprint, BL-29), nothing while the campaign's gems are off. One sheet section `gem.counts` (FR-CHARX-71–76, slice GM3 `build/gems-sheet`, tests `FR-CHARX-71 gem section off / on`, `FR-CHARX-72 owner / DM controls`, `FR-CHARX-73 summary counts`); placement open (OQ-CHARX-37).
 
 > Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Extends [character-sheet](character-sheet.md) (CHAR, basics); every FR-CHAR stays in force unless amended here.
 
@@ -162,6 +164,13 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-68 | **States**: empty "No companions — your DM can give you one"; loading skeleton until the first snapshot; disconnected: last values, buttons disabled, banner; the selected companion leaves (Dismiss, turn hostile, hidden, released) → "No longer your companion" for 3 s, then the picker moves on; reject → Toast. | |
 | FR-CHARX-69 | **The owner rolls a pet out of a fight** (amends FR-CHARX-18, -22): `char.roll` on a monster `creatureId` is allowed for a **player** iff it is a pet with `ownerPlayerId = actor`; kinds `toHit`, `damage`, `attack` only (others → `invalid`); actor name = the pet's name; the entry is **DM + owner only** (`public: false`, `audiencePlayerId` = the owner, dice-roll-log, as FR-CBT-114; review 1): other players never see a pet's bonuses or dice. Kept or cut by the DM: OQ-CBT-83d. Every other monster stays `not_found` for players. | OQ-CHARX-35 |
 | FR-CHARX-70 | **A pet's NPC sheet** (FR-CHARX-31): pets are custom monsters, so the DM opens their NPC sheet as today; its `creature-sheet` row keeps `ownerPlayerId` **null** (the owner copy rule, FR-CHARX-13, applies to characters only), so its notes stay DM-only. The owner never receives a pet's `creature-sheet`. | OQ-ENT-34 |
+| **Sprint 7** (track GM, [gems](gems.md); #140, #312) | | |
+| FR-CHARX-71 | **Gem block section** `gem.counts` (§7.1 registry, append): slot `header` *(OQ-CHARX-37 pick A)*, order after `cbtx.effects`, kinds `["character"]`, both clients; `available` = gems on (`useFeature(store, "gems")`, [FR-CAMP-45](campaign-management.md#6-functional-requirements)). Component owned by gems (`src/client/common/features/gems/GemBlock.tsx`); the sheet passes identity only. Feature off → not rendered, nothing in the store. | GM3 |
+| FR-CHARX-72 | **What it shows** ([FR-GEM-32](gems.md#6-functional-requirements), -35): five icon + count chips in a fixed order (Inspiration, Fortune, Combat, Divine Knowledge, Action), zeros muted; a static "max 5" label (`gem-max-label`, Tooltip "A table rule, not enforced"); counts above 5 shown plainly, no over-limit styling (FR-GEM-08, OQ-GEM-11 D, #315). **Owner:** a "Spend" menu (Fortune, Divine Knowledge, Action: Bonus action / Reaction / Action (2), Inspiration: "to recall" per OQ-GEM-06) with the 4-s confirm (FR-GEM-17); Inspiration / Combat chip Tooltips say where they're spent. **DM:** a Popover per chip with − / + (`gem.adjust` ±1) and the same Spend menu (on the player's behalf, OQ-GEM-14). View and edit mode alike; the **sheet lock** (FR-CHARX-12) doesn't block it (gems are DM-awarded play state, not sheet data). | GM3 |
+| FR-CHARX-73 | **Summary card** (other players' PCs, FR-CHARX-32): with gems on and [OQ-GEM-01](gems.md#15-open-questions) A, one row of the five icons + counts under "Level N Class" (`gem-summary-count`), read-only; under B or off → absent. | GM3 |
+| FR-CHARX-74 | **Not on** NPC sheets, the companion card, or monsters (kinds `character` only; gems are the character's, OQ-GEM-15). | |
+| FR-CHARX-75 | **No stat-block or whitelist change:** counts are their own record type `character-gems` (ADR-0036's consequence: nothing new on the `entity` row, which is resent on every HP change); FR-CHARX-35's other-player whitelist is unchanged. | ADR-0036 |
+| FR-CHARX-76 | **Disconnect / reload:** the block keeps the last counts with controls disabled while not `live`; reload / reconnect → counts from the snapshot; a confirm in progress resets. Feature switched off while the sheet is open → the resync removes the block. | |
 
 **Roll specs** (FR-CHARX-21). Bonus strings per FR-CHAR-21 (`1d20`, `1d20+3`, `1d20-1`). *(Sprint 4: an attack row's `bonus` adds to to-hit and the base part's constant; `extraDamage` adds one roll per part, FR-CHARX-55.)*
 
@@ -243,6 +252,7 @@ interface SheetSection {
 | `cbtx.temp-hp` | `vitals` | always | Temp HP |
 | `cbtx.death-saves` | `vitals` | `deathState != null` | Death-save successes / failures |
 | `cbtx.effects` | `header` | always | Condition / effect chips; owner "Concentrate…", DM add / edit / end from the chip row's menu |
+| `gem.counts` *(sprint 7, GM)* | `header` (after `cbtx.effects`) | gems on (FR-CHARX-71) | Five gem icons + counts; owner Spend menu; DM ± (FR-CHARX-72) |
 
 - **What CHARX exposes** for sections (pure, `@shared/entities`, overrides honoured): `abilityMod`, `proficiencyBonus`, `saveBonus(stats, ability)`, `checkBonus`, `spellSaveDc`, `spellAttackBonus`; record fields `hpCurrent`, `statBlock.hpMax`; on `creature-sheet` (owner + DM only) `spells[].concentration`.
 - **Concentration save**: CBTX uses `saveBonus(stats, "con")`; a `save.con` override wins. That is exactly what the sheet's CON Save button rolls. The resolver lands in `fix/charx-core`, which merges before the CBTX build.
@@ -382,6 +392,7 @@ interface SheetSection {
 - Sprint 3: `senses` on all 19 heavy-harness DM entity rows = **+1,349 B** (measured, FOG §12 probe; seams re-run: 21 stat-block rows, +1,491 B); a player gets only their own characters'. A senses edit's event adds FOG's re-derive rows (≈ 2–5 KB to the owner, FOG §12). *(#208)* DM ceiling now 1 MiB. *(#210)* `seesInvisible` adds ≈ 22 B to a stat-block row that sets it (absent = false, omitted); not re-measured.
 - Sprint 4 (measured, [MOD §12](effect-modifiers.md#12-performance--bandwidth)): `bonus` + 2 max extra parts = +110 B per attack row (typical +57 B); heavy DM +7,590 B (69 rows), a player +440 … +660 B. Feature `used` below zero: 0 B (same field).
 - Sprint 2: G8 adds ≤ 2 small `notification` rows (< 0.5 KB) per character's lifetime; pending `charx-draft` rows are pinned in the DM snapshot until approved or dismissed (a handful; CON-44 unaffected). `toHit` = one roll, one entry.
+- *(Sprint 7, GM)* The gem block adds **0 B** to `entity` and `creature-sheet` (FR-CHARX-75); `character-gems` rows are measured in [gems §12](gems.md#12-performance--bandwidth) (8 rows ≈ 2.2 KB per viewer, 0 B while off).
 
 ## 13. Test plan
 
@@ -433,6 +444,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 13 | *(items 13, 16)* — | C: picker → Thorn; reload. Then open Notes on Sela in edit mode with a long note; scroll | After reload C still on Thorn (was: jumped to Sela). While scrolling, name, badges and the tab strip stay at the top (`charx-header` `data-pinned="true"`) |
 | 14 | *(Sprint 3; bundle `vision`, run inside FOG §13 steps 8–9)* Thorn's sheet: switch **Sees invisible** on (FOG step 8); then Edit, Darkvision 60 → 30, then back; switch "Sees through magical darkness" off and on | B: Mira's sheet: Senses line "Vision 30 ft"; opens Thorn → summary card only. C: Thorn's sheet in edit mode: `charx-senses-invisible` disabled before and after A's switch; Senses line gains "Sees invisible" | Senses line updates ≤ 1 s for A and C; Thorn at (11, 9): at 30 ft Goblin Lurker (17, 11) leaves C's view (d 6.3 > 6 cells), back at 60 ft it returns; C's screen dark while the switch is off (Thorn in darkness). B frames: no Thorn `senses` |
 
+**Sprint 7 (track GM):** bundles `gems`, `gems-hidden` ([gems §13](gems.md#13-test-plan)). DOM tests (in-code store): `FR-CHARX-71 gem section off / on` (no `campaign.features` → no `gem-block`, sheet DOM byte-identical to sprint 6; on → block in the header after the effect chips; NPC sheet / companion card → absent); `FR-CHARX-72 owner / DM controls` (owner: Spend menu, no ±; DM: ± and Spend; locked sheet → still enabled; not `live` → disabled; `FR-GEM-08 max 5 label shown, no over-limit styling at 6`); `FR-CHARX-73 summary counts` (another player's view of Mira: counts row, no menu; under OQ-GEM-01 B → absent). Walkthrough: [gems §13](gems.md#13-test-plan) steps 2, 3, 9, 10.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -450,8 +463,12 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | effect-modifiers (M, accepted #190) | Registers "Active effects" through `sheetSections`; no CHARX change | decided #190 |
 | [fog-of-war](fog-of-war.md) *(sprint 3)* | Reads `statBlock.senses` server-side (incl. `seesInvisible` for Invisible tokens, FR-FOG-46, #210); its definition-changed hook line re-derives vision on a senses edit (FR-CHARX-52); owns bundle `vision` | decided #207, #210 |
 | [entities](entities.md) *(sprint 3)* | `senses` in the creature core zod (both kinds, optional, additive like FR-CHARX-01) and not on the summary whitelist; compendium (track C) maps SRD darkvision into it in C1, after V0 | change in `fix/vision-core`; seams S6 |
+| *(Sprint 7)* [gems](gems.md) | `GemBlock` component, `gem.adjust` / `gem.spend`, `character-gems` | revised with this spec |
+| *(Sprint 7)* [campaign-management](campaign-management.md) | `useFeature(store, "gems")` (FR-CAMP-45) | revised with this spec |
 
 ### Shared changes
+
+- *(Sprint 7, GM3 `build/gems-sheet`)* ★ `src/client/common/features/character-sheet/sheet-sections.ts` (append `gem.counts`); the summary card's counts row in `src/client/common/features/character-sheet/SummaryCard.tsx` (feature-owned; one import + one line). No schema, record or event change here.
 
 Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes marked ★, all in `fix/charx-core`. **Build order (fixed by the orchestrator):** P fixes → `fix/charx-core` → `fix/cbtx-core` → S build (a, b) ∥ D build → S slice 4 (combat routes) last. `fix/charx-core` and `fix/cbtx-core` both touch db, `src/shared/events/` and `src/shared/entities/`, so they never run at the same time ([sprint-1 boundaries](../agents/sprint-1.md#boundaries-and-hotspots-orchestrator-sequence-these)). Play-shell layout tests and protocol §24 are untouched (window geometry unchanged, FR-CHARX-26).
 
@@ -546,9 +563,15 @@ Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes mark
 
 OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while drafting).
 
+**Sprint 7** (track GM, owner spec-gems).
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CHARX-37 | Where the gem block sits on the sheet | **Decided (#315): A.** **A. Header chip row, after the effect chips (seen at a glance on every tab; the row gets longer)** / B. Vitals, under HP (near play state; pushes the HP row's neighbours down) / C. Its own "Gems" tab (roomy; hidden until clicked) | — · decided | gems |
+
 ## 16. Out of scope
 
-- See §4. Levelling, builder, compendium lookups, rests, encumbrance, rest-time hit-die healing; temp HP / death saves / conditions data (combat-extras); party HP / AC view (tier B, play-shell); several sheet windows at once; DM-only notes on a PC; gems ([gems](post-mvp/gems.md)).
+- See §4. Levelling, builder, compendium lookups, rests, encumbrance, rest-time hit-die healing; temp HP / death saves / conditions data (combat-extras); party HP / AC view (tier B, play-shell); several sheet windows at once; DM-only notes on a PC; gems ([gems](gems.md)).
 - *(Sprint 4)* Extra damage parts on spell rows; weapon properties (finesse, heavy, versatile) and a "magical" flag; mapping compendium weapons into attack rows (OQ-CHARX-28); counters below zero for slots and hit dice.
 - *(Sprint 6)* A sheet for companions: abilities, skills, saves, spells, features, notes or editing on the card (OQ-CHARX-34); companion rolls other than its attacks for the owner (the DM rolls them from the row).
 - A spell row's `concentration` mark does not start CBTX concentration; the player uses CBTX's "Concentrate…" in the effects chip row (§7.1).
