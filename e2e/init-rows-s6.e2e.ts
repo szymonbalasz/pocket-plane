@@ -1,4 +1,4 @@
-// e2e-bundle: session-sim-9
+// e2e-bundle: init-rows-e2e
 // Sprint 6 WF4 (play-shell §13 F10; BL-43, sim-9 c03 / c10), thin: DM and player-1 at 1440×900.
 // Goblin Ambush running (≥ 7 rows): the DM's Initiative at its default size shows "↓ N more" with
 // no row painted below it or in the window body's padding, the list (not the body) scrolls, and
