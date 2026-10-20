@@ -32,6 +32,15 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 
 **Idle slots (#204, #205, #286, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill)):** the goal is the sprint's milestones. When an agent slot is idle and nothing in the sprint queue can start (DM #286: "pull more stories from the backlog when there are idle agents"), pick one small eligible item from [backlog](backlog.md) without asking (max two at once; sprint work always wins the next slot); stop picking once the last sprint slices are in flight. If nothing fits, ask the DM.
 
+Lessons from sprint 6 (2026-10-19/20), on top of the ones below:
+- **Never merge into `main` (or run anything else there) while `main`'s gates run**: a merge mid-run changed spec files under a running e2e (3 false failures), and a manual e2e on `main` during gates collided on Playwright trace files (ENOENT).
+- **Git can append two branches' protocol / data-model sections with the same number and no conflict**: `resolve_docs.py` now warns about duplicate section numbers; run it after every merge, conflicted or not, and fix with `fixlinks.py`.
+- **Golden layout files** (`windows.golden.json`) auto-merge into a wrong state when two branches add window kinds: after such a merge, regenerate with `UPDATE_GOLDEN=1` (invariants + brute check still guard it).
+- State-changing e2e specs on a shared bundle bit again (Initiative rows Ended the session-sim-9 fight): every spec that Starts / Ends / Dismisses gets its own alias bundle.
+- Small slices in the same area went to one builder with one walkthrough (image picker + wiring, tray + template label, Preferences + Subtract): fewer slots, fewer walkthroughs, no loss.
+- Fixed-ms checks belong only in `bun run bench` (BL-51 done); a `bun test` red from a timing bound under load is noise.
+- A builder's "fails on the base too" claim needs checking on `main` itself (once it was the branch).
+
 Lessons from sprint 5 (2026-10-18/19), on top of the ones below:
 - **Protocol / data-model section numbers collide on every merge**: merge main into the branch, run `resolve_docs.py`, then fix the moved section's links (`docs/agents/tools/fixlinks.py <wt> <protocol|data-model> <old> <new> <slug>` does it). Abort and redo a conflicted merge in the branch's worktree, never resolve on `main`.
 - **Gates one at a time**, chained with `waitgates.sh`: parallel suites made timing tests flake; all fixed-ms gates now live in `bun run bench` (#265).
