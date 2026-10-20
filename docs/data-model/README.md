@@ -2101,3 +2101,17 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109,
 | Own companion | per render | `ownerPlayerId = you` (players only receive HP / `card` on these) | player | FR-CBT-119 |
 | Pet offers | Start dialog | joining PCs' pets; ticked iff a token of the pet is on the scene (DM ticks override, reset on open) | DM | FR-CBT-109 |
 | Card request | client memory | `{id, n}`, lost on reload | player (DM when CP4 opens it there) | FR-CBT-119 |
+
+## 91. Sprint 6: Fit without the empty box, pcs keeps the top row, players' reveal refit (WF3)
+
+From [scenes-map](../specs/scenes-map.md#8-data-model) FR-MAP-80–82, [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-59, -60 and [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-55. **Built by `fix/fit-s6`**: no table, column, record type or payload change. Protocol side: [protocol §118](../protocol/README.md#118-sprint-6-fit-without-the-empty-box-pcs-keeps-the-top-row-players-reveal-refit-wf3).
+
+| State | Where | Rule | Source |
+|---|---|---|---|
+| Shown stack report `dicex.popups` | client memory (`reportShownStack`) | the DM roll-popup stack's rendered rect while it draws; null when empty or unmounted; starts empty on reload | [FR-SHELL-59](../specs/play-shell.md#6-functional-requirements) |
+| Drawn token ids | client memory (`MapCanvas`, per shown scene) | the ids of the last token list; a scene switch resets them without a reveal | [FR-MAP-82](../specs/scenes-map.md#6-functional-requirements) |
+| Pending reveal refit | client memory (`createRevealRefit`) | armed ≤ 1 s, or deferred to a pointer release; dropped on a gesture, unmount or scene change | FR-MAP-82 |
+| `data-fit-reason` | client memory | the last fit's cause | FR-MAP-82 |
+
+- **Fixtures:** no new unit (Fit, the `pcs` pan and the reveal refit walk on `session-sim-9`'s Goblin Ambush, door (8, 5), party vision, the hidden Elite and Wolf); `session-sim-10` gets a WF3 comment line only.
+- **Snapshot size** (CON-44): 0 B.
