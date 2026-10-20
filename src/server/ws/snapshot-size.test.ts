@@ -2,7 +2,8 @@
 // heavy" session built through commands. DM ≤ 768 KiB, players ≤ 512 KiB, DM build < 200 ms.
 // Worst-case rows per core (seams S14): PARTY S5 adds an open `handout-present` for every player;
 // CMP S5 (track C) 20 homebrew entries × 4 attachment images (0 B); CAMP S5 (track K) the
-// longest colour key on every player + the DM, every notification stamped by a player.
+// longest colour key on every player + the DM, every notification stamped by a player; CBT S6
+// (track CP) 24 owned combatants with max cards and 18 present pets.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
@@ -486,6 +487,136 @@ describe("CON-44 snapshot ceilings (#163)", () => {
         );
         sql.run("UPDATE token SET trail = NULL");
         sql.run("UPDATE combatant SET side = NULL, public_side = NULL");
+      }
+      expect(snapshotSizes(b.s).map((v) => v.bytes)).toEqual(before.map((v) => v.bytes));
+    });
+
+    // Mutates the scenario, then restores it: after the read-only cases.
+    test("CBT §12 sprint 6 (track CP) worst case: 24 owned combatants with 8-attack max cards, 18 present pets (3 per player); ceilings hold", () => {
+      const sql = b.s.db.$client;
+      const enc = sql
+        .query<{ id: string; cid: string }, []>(
+          "SELECT id, campaign_id AS cid FROM encounter WHERE status = 'started'",
+        )
+        .get();
+      if (!enc) throw new Error("no started encounter");
+      const before = snapshotSizes(b.s);
+      // One owner PC per player (the heavy scenario's six players).
+      const owners = sql
+        .query<{ id: string; p: string }, [string]>(
+          "SELECT id, owner_player_id AS p FROM entity WHERE kind = 'character' AND campaign_id = ? AND owner_player_id IS NOT NULL ORDER BY owner_player_id, id",
+        )
+        .all(enc.cid)
+        .filter((o, i, all) => all.findIndex((x) => x.p === o.p) === i);
+      expect(owners).toHaveLength(HEAVY.players);
+      // FR-CHARX-60 at its max: 8 rows, 40-char names, the longest damage, 2 extra parts.
+      const attack = (i: number) => ({
+        id: `card-row-${i}`.padEnd(36, "0"),
+        name: `Attack ${i}`.padEnd(40, "x"),
+        toHit: -10,
+        bonus: 3,
+        damage: "20d100+30",
+        damageType: "bludgeoning",
+        extraDamage: [
+          { damage: "6d12+10", type: "lightning" },
+          { damage: "6d12+10", type: "radiant" },
+        ],
+      });
+      const card = JSON.stringify({
+        size: "gargantuan",
+        type: "monstrosity",
+        ac: 30,
+        hpMax: 999,
+        speed: 200,
+        attacks: Array.from({ length: 8 }, (_, i) => attack(i)),
+        more: 12,
+      });
+      // (1) 4 owned combatants per player (24 of the started encounter's monsters).
+      const monsters = sql
+        .query<{ id: string }, [string]>(
+          "SELECT id FROM combatant WHERE encounter_id = ? AND kind = 'monster' ORDER BY seq LIMIT 24",
+        )
+        .all(enc.id);
+      expect(monsters).toHaveLength(24);
+      const own = sql.query(
+        "UPDATE combatant SET owner_character_id = ?, owner_player_id = ?, turn_mode = 'in-owner-turn', pet = 1, card = ?, concentration_effect_id = ? WHERE id = ?",
+      );
+      for (const [i, m] of monsters.entries()) {
+        const o = owners[i % owners.length] as { id: string; p: string };
+        own.run(o.id, o.p, card, `effect-${i}`.padEnd(36, "0"), m.id);
+      }
+      sql.run("UPDATE combatant SET owner_hidden = 0");
+      const owned = snapshotSizes(b.s);
+      // (2) 3 present pets per player (FR-ENT-35 cap), max names, a max 8-attack stat block.
+      const block = JSON.stringify({
+        size: "gargantuan",
+        ac: 30,
+        hpMax: 999,
+        hpFormula: "20d20+999",
+        initBonus: 20,
+        speed: 200,
+        abilities: { str: 30, dex: 30, con: 30, int: 30, wis: 30, cha: 30 },
+        attacks: Array.from({ length: 8 }, (_, i) => attack(i)),
+        cr: "30",
+        type: "monstrosity",
+      });
+      const pet = sql.query(
+        "INSERT INTO entity (id, kind, campaign_id, name, stat_block, owner_player_id, hp_current, derived_from_id, companion_of, turn_mode, pet_present, created_at, updated_at) VALUES (?, 'monster', ?, ?, ?, ?, 499, ?, ?, 'in-owner-turn', 1, '2026-10-20T00:00:00.000Z', '2026-10-20T00:00:00.000Z')",
+      );
+      for (const [i, o] of owners.entries()) {
+        for (let k = 0; k < 3; k++) {
+          const id = `pet-${i}-${k}`.padEnd(36, "0");
+          pet.run(
+            id,
+            enc.cid,
+            `Pet ${i} ${k}`.padEnd(60, "x"),
+            block,
+            o.p,
+            "derived".padEnd(36, "0"),
+            o.id,
+          );
+        }
+      }
+      const withPets = snapshotSizes(b.s);
+      try {
+        expectUnderCeilings(withPets);
+        const [dm0] = before as [ViewerSize, ...ViewerSize[]];
+        const [dm1] = owned as [ViewerSize, ...ViewerSize[]];
+        const [dm2, ...p2] = withPets as [ViewerSize, ...ViewerSize[]];
+        // CBT §12: card ≤ 2,038 B; 24 owned combatants ≈ +55 KB, 18 pets ≈ +52 KB (DM).
+        expect(dm1.bytes - dm0.bytes).toBeLessThan(60_000);
+        expect(dm2.bytes - dm1.bytes).toBeLessThan(60_000);
+        const pDelta = p2.map((v, i) => v.bytes - ((before[i + 1] as ViewerSize).bytes ?? 0));
+        for (const d of pDelta) expect(d).toBeLessThan(30_000);
+        // Leak strings (ADR-0056): a player frame carries only its own companions' cards and
+        // pets in full; never `ownerHidden`, `concentrationEffectId`, `petPresent` or a pet's
+        // `derivedFromId`.
+        for (const f of snapshotFrames(b.s).filter((x) => x.viewer.role === "player")) {
+          const raw = JSON.stringify(f.records);
+          for (const leak of ["ownerHidden", "concentrationEffectId", "petPresent", "effect-0"]) {
+            expect({ leak, found: raw.includes(leak) }).toEqual({ leak, found: false });
+          }
+          for (const c of (f.records[COMBATANT_TYPE] ?? []) as Record<string, unknown>[]) {
+            if (c.ownerPlayerId && c.ownerPlayerId !== f.viewer.playerId) {
+              expect(Object.keys(c)).not.toContain("card");
+            }
+          }
+          for (const e of (f.records[ENTITY_TYPE] ?? []) as Record<string, unknown>[]) {
+            if (e.kind !== "monster") continue;
+            expect(Object.keys(e)).not.toContain("derivedFromId");
+            if (e.ownerPlayerId !== f.viewer.playerId)
+              expect(Object.keys(e)).not.toContain("statBlock");
+          }
+        }
+        const players = withPets.slice(1).map((v) => v.bytes);
+        console.log(
+          `CBT S6 CON-44: DM ${dm0.bytes} → ${dm2.bytes} B (owned combatants +${dm1.bytes - dm0.bytes}, pets +${dm2.bytes - dm1.bytes}); ${1.5 * 1_048_576 - dm2.bytes} B left of 1.5 MiB; players ${Math.min(...players)}–${Math.max(...players)} B (+${Math.min(...pDelta)}–${Math.max(...pDelta)}); ${512 * 1024 - Math.max(...players)} B left of 512 KiB`,
+        );
+      } finally {
+        sql.run("DELETE FROM entity WHERE companion_of IS NOT NULL AND id LIKE 'pet-%'");
+        sql.run(
+          "UPDATE combatant SET owner_character_id = NULL, owner_player_id = NULL, turn_mode = NULL, pet = 0, card = NULL, concentration_effect_id = NULL, owner_hidden = 0",
+        );
       }
       expect(snapshotSizes(b.s).map((v) => v.bytes)).toEqual(before.map((v) => v.bytes));
     });

@@ -234,11 +234,26 @@ export function stepTurn(
 export const canRollInitiative = (round: number, initiative: number | null | undefined) =>
   round === 0 || initiative == null;
 
-/** FR-CBT-11 / -46: "Roll monsters" sends every non-removed monster without initiative. */
+/**
+ * FR-CBT-11 / -46: "Roll monsters" sends every non-removed monster without initiative; sprint 6
+ * (FR-CBT-108): companions acting with their owner (`after-owner`, `in-owner-turn`) never roll.
+ */
 export function unrolledMonsters<
-  T extends { kind: CombatantKind; removed?: boolean; initiative?: number | null },
+  T extends {
+    kind: CombatantKind;
+    removed?: boolean;
+    initiative?: number | null;
+    turnMode?: TurnMode | null;
+  },
 >(rows: readonly T[]): T[] {
-  return rows.filter((c) => c.kind === "monster" && !c.removed && c.initiative == null);
+  return rows.filter(
+    (c) =>
+      c.kind === "monster" &&
+      !c.removed &&
+      c.initiative == null &&
+      c.turnMode !== "after-owner" &&
+      c.turnMode !== "in-owner-turn",
+  );
 }
 
 /**

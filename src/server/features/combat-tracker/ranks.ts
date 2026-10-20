@@ -64,7 +64,8 @@ export function rerank(tx: Tx, encounterId: string): void {
     const n = next.get(r.id);
     if (!n || (n.position === r.position && n.playerPosition === r.playerPosition)) continue;
     tx.update(combatant)
-      .set({ position: n.position, playerPosition: n.playerPosition })
+      // FR-CBT-107: no rank is stored as 0 (`toCombatantRecord` reads it as null).
+      .set({ position: n.position ?? 0, playerPosition: n.playerPosition })
       .where(eq(combatant.id, r.id))
       .run();
   }

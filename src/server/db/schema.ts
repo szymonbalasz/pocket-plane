@@ -204,12 +204,11 @@ export const entity = sqliteTable(
     /** Plain id, no FK (informational). */
     derivedFromId: text("derived_from_id"),
     /**
-     * FR-ENT-31 (sprint 6, #252): a pet's owner PC (a character of the campaign); null = not a
-     * pet. Characters are never deleted (FR-ENT-14); the FK sets null all the same.
+     * FR-ENT-31 (sprint 6, #252): a pet's owner PC (a character of the campaign, checked by the
+     * commands); null = not a pet. Plain id, no FK: characters are never deleted (FR-ENT-14), and
+     * a column added to an existing table can't carry one (drizzle-kit's push would rebuild it).
      */
-    companionOf: text("companion_of").references((): AnySQLiteColumn => entity.id, {
-      onDelete: "set null",
-    }),
+    companionOf: text("companion_of"),
     /** FR-ENT-31: a pet's default turn mode (copied to its combatant at join); null = not a pet. */
     turnMode: text("turn_mode", { enum: TURN_MODES }),
     /**
@@ -233,7 +232,8 @@ export const entity = sqliteTable(
     // FR-ENT-05, FR-FIX-20: provenance unique globally (nulls for customs).
     uniqueIndex("entity_source_key").on(t.source, t.sourceKey),
     index("entity_campaign").on(t.campaignId),
-    index("entity_companion_of").on(t.companionOf),
+    // No `companion_of` index (≤ 60 pets per campaign, read through `entity_campaign`): a new
+    // index on `entity` makes drizzle-kit's push re-create its expression index broken.
   ],
 );
 
@@ -467,9 +467,10 @@ export const gameLogEntry = sqliteTable(
     encounterId: text("encounter_id").references((): AnySQLiteColumn => encounter.id),
     /**
      * Sprint 6 (FR-CBT-114, FR-CHARX-69, ADR-0056): a non-public entry also reaches this player
-     * (a companion's owner); null = DM only. Ignored on public entries.
+     * (a companion's owner); null = DM only. Ignored on public entries. Plain id, no FK (an added
+     * column can't carry one; players are never deleted).
      */
-    audiencePlayerId: text("audience_player_id").references((): AnySQLiteColumn => player.id),
+    audiencePlayerId: text("audience_player_id"),
     /** Reserved for gems (#140); null in MVP. */
     supersededBy: text("superseded_by"),
   },
@@ -621,10 +622,11 @@ export const combatant = sqliteTable(
     initiative: integer("initiative"),
     initRollId: text("init_roll_id"),
     /**
-     * Server-written ranks (FR-CBT-13). Null for an `in-owner-turn` companion while its owner is
-     * eligible (FR-CBT-107, sprint 6): it acts inside the owner's turn.
+     * Server-written ranks (FR-CBT-13), 1…n. Sprint 6 (FR-CBT-107): `0` = no rank, an
+     * `in-owner-turn` companion acting inside its owner's turn; the record reads it as null.
+     * (Not a nullable column: drizzle-kit's push rebuilds a table for that and empties it.)
      */
-    position: integer("position"),
+    position: integer("position").notNull(),
     playerPosition: integer("player_position"),
     /** Monsters only (PC HP lives on the character, #92). */
     hpCurrent: integer("hp_current"),
@@ -641,10 +643,11 @@ export const combatant = sqliteTable(
     publicSide: text("public_side", { enum: SIDES }),
     /**
      * FR-CBT-105 (sprint 6, #252): a companion's owner PC and that PC's player (a copy written
-     * with it); both null = not a companion.
+     * with it); both null = not a companion. Plain ids, no FK: columns added to an existing table
+     * can't carry one (drizzle-kit's push would rebuild and empty it); the commands check them.
      */
-    ownerCharacterId: text("owner_character_id").references((): AnySQLiteColumn => entity.id),
-    ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
+    ownerCharacterId: text("owner_character_id"),
+    ownerPlayerId: text("owner_player_id"),
     /** FR-CBT-106: null iff not a companion. */
     turnMode: text("turn_mode", { enum: TURN_MODES }),
     /** FR-CBT-105: the entity is a pet (HP written back at End / Dismiss). */
@@ -653,8 +656,7 @@ export const combatant = sqliteTable(
     ownerHidden: integer("owner_hidden", { mode: "boolean" }).notNull().default(false),
     /**
      * FR-CBT-110 / -120: the owner's concentration this summon is linked to. DM only. Plain id,
-     * no FK: effects are never deleted (they end), and an FK into `effect` would pin the
-     * pre-CBTX push test's old DB shape (SQLite can't drop an FK column).
+     * no FK: effects are never deleted (they end), and an added column can't carry one.
      */
     concentrationEffectId: text("concentration_effect_id"),
     /** FR-CBT-117: JSON leaf `companionCard(statBlock)` with stable row ids; companions only. */

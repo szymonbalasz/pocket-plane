@@ -87,9 +87,8 @@ test("protocol §28: push adds the feedback columns to an old dev DB without dat
 
 test("push still refuses a real lossy add (not-null column without a default, table not empty)", async () => {
   const db = await oldDb();
-  // `position` became nullable in sprint 6 (FR-CBT-107); `name` is still not-null, no default.
-  db.run("ALTER TABLE combatant DROP COLUMN name");
-  await expect(pushSchema(db)).rejects.toThrow(/would lose data[\s\S]*name/);
+  db.run("ALTER TABLE combatant DROP COLUMN position");
+  await expect(pushSchema(db)).rejects.toThrow(/would lose data[\s\S]*position/);
   expect(db.query("SELECT count(*) AS n FROM combatant").get()).toEqual({ n: 1 });
   db.close();
 });
