@@ -2,7 +2,9 @@
 // the hub's "off" rule (tagged type, tagged log kind, traces) for every read path and viewer,
 // FR-DICE-69 tagged kinds and traces, and the crash points of the switch.
 import { afterEach, describe, expect, test } from "bun:test";
-import { GEMS_FEATURE } from "@shared/campaign-management/features";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { FEATURES, GEMS_FEATURE } from "@shared/campaign-management/features";
 import type { CampaignRecord } from "@shared/campaign-management/schemas";
 import { GAME_LOG_WINDOW, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { CampaignFeatureSet } from "@shared/events/campaign-management";
@@ -72,6 +74,15 @@ function setup() {
 }
 
 describe("FR-CAMP-38–44 feature switches (in-process)", () => {
+  test("FR-CAMP-41 registry: every feature's ownerSpec is a spec's front-matter prefix", () => {
+    const dir = join(import.meta.dir, "../../../../docs/specs");
+    const prefixes = readdirSync(dir)
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => /^prefix:\s*([A-Z]+)\s*$/m.exec(readFileSync(join(dir, f), "utf8"))?.[1]);
+    expect(prefixes).toContain("GEM");
+    for (const f of FEATURES) expect(prefixes).toContain(f.ownerSpec);
+  });
+
   test('FR-CAMP-38 features wire: off → no `features` key; on → `["gems"]`, for every viewer', () => {
     const t = setup();
     const camp = (v: Viewer) => (t.seed.snapshot(v).campaign as CampaignRecord[])[0];

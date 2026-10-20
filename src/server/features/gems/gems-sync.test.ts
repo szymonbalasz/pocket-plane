@@ -111,7 +111,7 @@ const gemLines = (c: TestClient) =>
   recordsOf<GameLogEntryRecord>(c.store, "game-log-entry").filter((e) => e.kind.startsWith("gem."));
 
 describe("gems over real sockets (gems-hidden)", () => {
-  test("FR-CAMP-40 switch resyncs: DM, a second DM tab and both players each get one fresh snapshot with the new features; same value → none; player → forbidden", async () => {
+  test("FR-CAMP-40 FR-SYNC-39 switch resyncs: DM, a second DM tab and both players each get one fresh snapshot with the new features; same value → none; player → forbidden", async () => {
     const clients = [await h.live(DM), await h.live(DM), await h.live(P1()), await h.live(P2())];
     const [dm, , p1] = clients as [TestClient, TestClient, TestClient, TestClient];
     const before = clients.map(snapshots);
