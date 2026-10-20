@@ -24,6 +24,19 @@ export const damageRollIdOf = (card: unknown): string | null =>
   DamageCardPayload.parse((card as { payload?: unknown } | undefined)?.payload).damage?.rollId ??
   null;
 
+/** Record IDs (UUIDs, real or seeded) anywhere; tokens / asset IDs as whole JSON strings. */
+const ID_SHAPES =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|"[A-Za-z0-9_-]{22}"/gi;
+
+/**
+ * BL-33: the leak strings found in `text` (raw frames / JSON), IDs masked first so a random ID
+ * that happens to spell a short leak (e.g. "2d6" in a hex UUID) is not a false hit.
+ */
+export const leaksIn = (text: string, leaks: readonly string[]): string[] => {
+  const masked = text.replace(ID_SHAPES, "<id>");
+  return leaks.filter((leak) => masked.includes(leak));
+};
+
 export const eliteBlock = {
   ...goblinBlock,
   ac: 16,

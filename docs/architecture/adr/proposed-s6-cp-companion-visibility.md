@@ -1,6 +1,6 @@
 # NNNN — Companions: the owner sees an owned creature's stats
 
-- Status: proposed
+- Status: accepted (DM gate 1, #288: A; with CP-3 → B, the owner also edits a pet's AC, HP max, speed and attack rows on its card, FR-ENT-38: visibility unchanged). The integrator numbers it
 - Date: 2026-10-19 (review pass 2026-10-20)
 - Amends: [ADR-0024](0024-definition-visibility.md) ("players never receive monster definitions"); refines [ADR-0036](0036-full-sheet-derivation.md) (other-player redaction lists) and [ADR-0009](0009-entity-content-model.md) (a pet is a definition with play state, `hpCurrent`, like a character). The `combatant` redaction uses the viewer, as `entity` and `token` already do (ADR-0021 unchanged)
 - Affects: [entities](../../specs/entities.md), [combat-tracker](../../specs/combat-tracker.md), [character-sheet-full](../../specs/character-sheet-full.md), [party-board](../../specs/party-board.md), [scenes-map](../../specs/scenes-map.md), [dice-roll-log](../../specs/dice-roll-log.md) (one entry field); data model, protocol
@@ -24,7 +24,7 @@
 
 ## Decision
 
-> Undecided. **A** proposed.
+> **A** (DM, #288).
 
 - **Pets** (`entity` kind `monster` with `companionOf` set): DM full; **owner** (`ownerPlayerId = ctx.playerId`) full **minus `derivedFromId`** (it may name a prepared custom) and the DM-only `petPresent`; **other players only while `petPresent`** (the pet has an active companion combatant, or an unhidden token on the active scene; server-written in the transaction of every command that changes either), redacted to `{id, kind, name, portraitAssetId, ownerPlayerId, companionOf, band}` (`band` derived from `hpCurrent` / `statBlock.hpMax`, FR-CBT-26's rule); otherwise hidden. Every other monster stays hidden (ADR-0024 unchanged for them).
 - **Companion combatants** (`ownerPlayerId` set): DM full; **owner** gets the monster redaction plus `hpCurrent`, `hpMax`, `tempHp`, `ownerCharacterId`, `ownerPlayerId`, `turnMode`, `pet` and **`card`** (stat-block subset: size, type, AC, HP max, speed, ≤ 8 attack rows with stable ids; written at join and by the definition-changed hook, never per-instance editable); other players get the monster redaction (band) plus `ownerCharacterId`, `ownerPlayerId`, `turnMode`. `concentrationEffectId` and `ownerHidden` stay DM-only. Hidden, inactive, or **of a hidden owner** (`ownerHidden`, #141) → hidden for every player, the owner included.

@@ -2,8 +2,8 @@
 title: Scene tools
 prefix: SCN
 status: complete
-owner: spec-colours
-phase: post-mvp-5
+owner: spec-windows
+phase: post-mvp-6
 ---
 
 # Scene tools
@@ -13,6 +13,16 @@ phase: post-mvp-5
 > **Sprint 4 (track M, DM decisions [#243](../decisions-log.md) [8], BL-05).** Decided by the DM (not open): **freeform AoE templates** that still highlight affected cells, a cell counting when **> 50 % covered**. Amended here: FR-SCN-20–23, 26; new FR-SCN-41–46; §7–§15. *Sprint-4 gate 1 (DM, 2026-10-17, **#245**):* every §15 sprint-4 question decided as picked: one-side tie rule, exact area, snapped unless Ctrl, Clear confirm + tick, end handle kept, no dependency (OQ-SCN-28–32, -36). One map-tools design with [scenes-map](scenes-map.md) (drag path, labels, Show to players) and [play-shell](play-shell.md) (window placement); seams with track V ([fog-of-war](fog-of-war.md): fog brush, drag-time vision) in §14. *Seams pass (orchestrator ruling):* S1 (the `map.checkMove` probe moves to V8's `drag-probe.ts`, FR-SCN-38), S2 (helper at `@shared/scenes-map/area`, FR-SCN-42, OQ-SCN-33 settled), S4 / S5 (M1 after V7; schema V6 → R0 → Mc) applied.
 
 > **Sprint 5 (track K; DM decisions [#250](../decisions-log.md) [1], BL-17 via [#251](../decisions-log.md)).** Decided by the DM (not open): a **kept AoE template can be deleted from a right-click menu** [1]; templates (the players' only "drawings": freehand is out, #21) show their **placer's player colour** (BL-17; the colour itself is [campaign-management](campaign-management.md)'s, FR-CAMP-23–29). Amended: FR-SCN-23, -26; new FR-SCN-47–51. The canvas side of the right press (menu vs laser) is [scenes-map](scenes-map.md) FR-MAP-71. Walkthrough: [CAMP §13](campaign-management.md#13-test-plan) K1, K2, K4, K8, K9, K12.
+
+> **Sprint 6 (track WF, window + layout fix pack; spec-windows; session-sim-9 FAIL j, glitch 10; BL-47).** Decided, not open (#286): a kept template's "· by ‹name›" shows **on hover**, not only while selected (FR-SCN-47 already said "on hover or while selected"; sim-9 j09: A and C hovered Player 1's template and saw nothing). Root cause (`TemplatesLayer.tsx` `useLabelHover`): hover is tested only against the small label pill, not the template's area, and the pill's own growth on hover moves its edge under the pointer. New **FR-SCN-52**; amends FR-SCN-47's hover. Client only, 0 B; no open question; no new fixture (bundle `session-sim-9`, the template is placed live). Walkthrough F12 in [play-shell §13](play-shell.md#13-test-plan). IM (image search) edits this spec in parallel (props picker); WF touches only the rows marked sprint 6.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-SCN-52 | "· by ‹name›" on hover of the template's **area** or its label, for every drawn template, under any tool | WF6 `fix/template-hover-label` | `FR-SCN-52 template label on hover` |
+
+> **Sprint 6, track IM (image search, DM [#285](../decisions-log.md)).** The Props tool's image picker (place and Change image) gets the search field (shared matcher: "Gob el" finds Elite Goblin), the tag filter and the tag editor of [assets-pipeline FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im); uploads there are tagged **Props**. New FR-SCN-55. No canvas, record, event or visibility change. WF edits this spec in parallel (BL-47 template label).
+
+**Sprint 6 at a glance** (track IM): FR-SCN-55, props picker with search, tag filter and `context="prop"`; slice IM-3 `build/im-wiring` ([ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split)); test `FR-SCN-55 props picker searches and tags`; walkthrough [ASSET IM3](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im).
 
 **Sprint 5 at a glance**
 
@@ -158,6 +168,8 @@ Decided at sprint-4 gate 1 (#245): OQ-SCN-28 (one-side ties), -29 (exact area), 
 | FR-SCN-49 | **Hit test:** pure `templateAt(p, templates, {client, myPlayerId, dmOnlyOff, templatesOff, blind, scale})` in scene-tools' client `templates.ts` → the topmost (draw order) template this client may edit (FR-SCN-26) whose **true outline** contains map point `p` or lies within 6 screen px of it (FR-SCN-42's `templateArea`, uncut, so a template off the map's edge still hits), else null. Hidden ones only for the DM with DM-only items on. `templatesOff` (the DM's Layers switch "Templates" off: not drawn, not hit, FR-SCN-05) → null; `blind` (FR-FOG-36: a blind player draws no others' templates, but still draws their own kept ones) → only the own kept templates hit (review #48). One function for the menu and FR-MAP-71's press decision. | review #48 |
 | FR-SCN-50 | **Delete for everyone:** Delete sends the existing `scn.deleteTemplate {templateId}` (permissions unchanged, FR-SCN-26, §9: another player's → `forbidden`; unknown or already gone → `not_found` → Toast "Template already removed"). Not optimistic: on commit `TemplateDeleted` removes it on every client that had it ≤ 1 s. An open menu whose template leaves the store (deleted by another tab, Clear templates, hidden for this player, scene switch, snapshot) closes. While not `live` the items are disabled (FR-SCN-34). | |
 | FR-SCN-51 | **Layer context menus** (the entry shape `LayerDef` lives in scenes-map's `src/client/common/features/scenes-map/layers.ts`, its type SCN-specified per FR-SCN-03; **K1 is granted** this contract change and the edit of SCN's own `scn-templates` line in the append-only `canvas-layers.ts` registry, review-a #11): optional `contextMenu?: {hit(p, ctx) → boolean, open(p, screen, ctx) → void}` on a layer entry. scenes-map's right-press routing (FR-MAP-71) asks entries top-down by `order` after the node menus, token and tool menu; the first `hit` wins. `scn-templates` is the only one in sprint 5 (FR-SCN-48 via FR-SCN-49). Doors and props keep their own node-level menus (FR-SCN-09, -17: `cancelBubble` on button 2, so they always win). No new registry; protocol §26's layer-entry row gains `contextMenu?` (K1's docs). | Seam with FR-MAP-71; review #11, #43 |
+| FR-SCN-52 | **Label on hover** (sprint 6, BL-47; sim-9 j09; amends FR-SCN-47's "on hover"): a template (kept or ephemeral) is **hovered** while the pointer is over its **true outline area** (FR-SCN-42's `templateArea`, uncut) or within 6 screen px of it, **or** over its label pill; of several, the topmost in draw order. Every template this client draws counts (not only ones it may edit: C hovers B's template), under any tool, while not dragging; the DM's hidden ones while drawn. Hovered or selected → the pill reads "‹label› · N squares · by ‹name›"; else as built. Pure helper `templateUnder(p, drawn, scale)` in `templates.ts` (shares `templateAt`'s geometry, FR-SCN-49, without its edit filter); the layer stays `listening={false}` and reads the stage pointer as built. No flicker: hover ends only when the pointer leaves both the area (+ 6 px) and the pill's **grown** rect. Konva `scn-template-label` attr `hovered` (`true` \| absent). Client only, 0 B. | sim-9 j09 |
+| FR-SCN-55 | *(S6, track IM)* **Props picker searches and tags.** The Props tool's image picker (FR-SCN-16 place; the prop menu's Change image; `src/client/dm/features/scene-tools/props-host.tsx`) is ASSET's `AssetPickerDialog` with `context="prop"`: search field, tag filter, tag editor ([FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)); an upload there is tagged **Props** (FR-ASSET-41). `scn.placeProp` / prop update, `assets.require` and prop visibility (hidden props never reach players, so neither do their image IDs) unchanged; tags never reach players (FR-ASSET-50). The picker remembers nothing between opens (search and filter reset, FR-ASSET-45). | OQ-ASSET-23 |
 
 ## 7. UI/UX notes
 
@@ -414,6 +426,16 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 
 **Sprint 5 walkthrough:** [CAMP §13](campaign-management.md#13-test-plan) K1, K2 (recolour), K4 (template colours, "by"), K8 (DM menu: Delete, Hide, Edit…; right-drag = laser), K9 (player menu own only), K12 (reload, crash).
 
+**Sprint 6** (track WF; bundle **`session-sim-9`**, template placed live as in sim-9 j). Unit (client, `templates.test.ts`, `template-colour.test.ts`): `FR-SCN-52 template label on hover`: `templateUnder` inside a cone's / sphere's / line's true outline, within 6 px, outside → null; topmost wins; another player's template is found (no edit filter); the DM's hidden one only while drawn; the layer's hover state: pointer over the area → label `hovered="true"` with "· by Player 1"; moving onto the grown pill keeps it (no flicker); leaving both → absent; selected and not hovered → still "by" (FR-SCN-47); during a token or template drag → unchanged. The sprint-5 `FR-SCN-47 template colour` hover case is updated (area, not only the pill). Walkthrough F12 in [play-shell §13](play-shell.md#13-test-plan) (A and C hover B's kept cone; j09 repro). Disconnect / reconnect / crash: hover is pointer state, nothing to lose; a template that leaves the store while hovered drops the hover.
+
+**Sprint 6 (track IM)**, bundle **`image-search`** ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im)), isolated per worktree as above:
+
+| Level | Named tests |
+|---|---|
+| Unit (DOM) | **`FR-SCN-55 props picker searches and tags`**: Props tool → choose image opens `asset-picker` with `data-context="prop"` and the search field; "Gob el" → Elite Goblin + Goblin Elder; Props chip → props only; Upload sends `tags=["Props"]`; Select still arms the placement; Change image on a placed prop opens the same picker |
+
+Walkthrough: [ASSET IM3](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im). Disconnect / reconnect / crash: props unchanged; the picker per [ASSET §11](assets-pipeline.md#11-edge-cases--failure-modes).
+
 **Sprint 4 walkthrough:** steps M1–M3, M10 and M12 of the map-tools walkthrough in [scenes-map §13](scenes-map.md#13-test-plan) (freeform cone with its squares, the snapped line tie, Thunderwave's 8 squares, Clear templates confirm + scope, crash with decimals).
 
 ## 14. Dependencies
@@ -486,6 +508,10 @@ Isolated per worktree: `bun test` on `:memory:`, a temp asset dir, port 0; walkt
 | **K1** `fix/tpl-menu` ([1]; no schema, starts at once in Phase B; first canvas holder, seams S1 / S10) | FR-SCN-48–51: `templateAt`, `TemplateMenu.tsx` island, `LayerDef.contextMenu?`, the `scn-templates` entry's `contextMenu`; with MAP's FR-MAP-71 routing in `MapCanvas.tsx` | scene-tools client (`templates.ts`, `aoe-store.ts`, new `TemplateMenu.tsx`); scenes-map's `layers.ts` (`LayerDef.contextMenu?`: contract change **granted to K1**, review-a #11), `canvas-layers.ts` (SCN's own `scn-templates` line, granted), `MapCanvas.tsx` (single holder), `laser.ts` (the deferred laser starts from the press point). Docs: protocol §26 layer-entry row (`contextMenu?`). No server, schema or event change |
 | **K3** `build/map-colours` (after K0; last canvas holder: K1 → W2 → R3 → K3, seams S10; tool bars `ToolRail.tsx` / `FogBar.tsx` are outside the lock) | FR-SCN-47 in `layers/TemplatesLayer.tsx` (colour per placer / sender, label dot and "by") | `TemplatesLayer.tsx` (canvas holder with MAP's K3 files) |
 
+**Sprint 6** (track WF; full split [play-shell §14](play-shell.md#14-dependencies)): **WF6** `fix/template-hover-label` (FR-SCN-52): scene-tools' own `layers/TemplatesLayer.tsx` (`useLabelHover` → area + pill hover) and `templates.ts` (`templateUnder`), tests. *(Settled by seams S5)* outside the canvas lock (`MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx`, `canvas-icons.ts`), so it runs in parallel with WF3 (Fit) and CP5. IM's props-picker changes are in other scene-tools files (`PropsTool.tsx`); a conflict there is not expected. No server, schema, event or wire change.
+
+**Sprint 6** (track IM; full split in [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split)). SCN part: **IM-3 `build/im-wiring`** (after IM-2): one `context` prop in `props-host.tsx` + its DOM test. Not a canvas hotspot file (no canvas lock; runs alongside WF's BL-47 label work). No schema, event, §9.9 shared file or dependency.
+
 ## 15. Open questions
 
 Sprint-2 rows: all decided at DM gate 2 (#196, "go with picks") or settled earlier; OQ-SCN-05 (blocking rule) stands on freeform segments; OQ-SCN-06 (doors under fog) is refined per player by FR-SCN-36. Glossary rows stay for the integrator. Sprint-3 rows follow the table.
@@ -544,6 +570,8 @@ Sprint-2 rows: all decided at DM gate 2 (#196, "go with picks") or settled earli
 | OQ-SCN-39 | Right-click vs laser on a template (seam with FR-MAP-71) | **Decided (#256): a click (< 4 px) opens the menu, a right-drag still lasers.** Pick as proposed: A. Click (< 4 px) opens the menu, a right-drag still lasers (laser inside a big area keeps working). Rejected: ~~B. Door style: any right-press on an editable template opens the menu, never the laser (no `MapCanvas.tsx` change; no laser from inside your own templates)~~ | — · decided | scenes-map |
 | OQ-SCN-40 | **fog-of-war, scene-tools:** the same right-click menu for fog shapes and walls? *(Seams S15: no K ↔ fog seam if A.)* | **Decided (#256): no change in sprint 5.** Pick as proposed: A. No change in sprint 5: darkness shapes already have right-click Remove (FR-FOG-42); fog Reveal / Fog / Explored shapes are mask edits, not objects (Undo / Redo instead); walls: Erase mode; doors: the door menu (FR-SCN-09). Rejected: ~~B. Walls and doors get a right-click Delete under any tool (DM), via FR-SCN-51's hook: later, a small SCN + FOG item~~ | — · decided | fog-of-war |
 | OQ-SCN-41 | Colour of a **hidden** (DM-only) template on the DM's map | **Decided (#256): `visibility.hidden` styling wins.** Pick as proposed: A. `visibility.hidden` styling wins (grey, eye-off) (the DM's "players can't see this" cue stays). Rejected: ~~B. Placer colour at 50 % + eye-off: keeps whose it is, weaker hidden cue~~ | — · decided | — |
+
+**Sprint 6** (track WF): no open question (BL-47's outcome is FR-SCN-47's existing wording, #286).
 
 ## 16. Out of scope
 

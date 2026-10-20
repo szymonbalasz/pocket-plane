@@ -1,8 +1,8 @@
 ---
 title: Party board
 prefix: PARTY
-status: in-review
-owner: spec-companions
+status: complete
+owner: spec-images
 phase: post-mvp-6
 ---
 
@@ -16,11 +16,19 @@ phase: post-mvp-6
 
 ### Sprint 6 at a glance
 
-| FR | What | Slice ([CBT §14.2](combat-tracker.md#142-build-split-sprint-6-track-cp)) | Named test |
+| FR | What | Slice ([CBT §14.3](combat-tracker.md#143-build-split-sprint-6-track-cp)) | Named test |
 |---|---|---|---|
 | FR-PARTY-41, -42, -44 | Companions tab, rows (owner full HP, others band), empty state | CP1 `build/cp-pets` | `FR-PARTY-41 companions tab`, `FR-PARTY-42 band for other players` |
 | FR-PARTY-43 | DM New pet…, rename, mode, owner, release | CP1 | `FR-PARTY-43 release` |
 | FR-PARTY-45, -46 | No new data; layout | CP1 | `FR-PARTY-46 tabs fit at min width` |
+> **Sprint 6, track IM (image search, DM [#285](../decisions-log.md)).** The handout editor's image picking (its attach control's **From library** and its uploads / pastes) gets the search field (shared matcher: "Gob el" finds Elite Goblin), the tag filter and the tag editor of [assets-pipeline FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im); its uploads are tagged **Handouts**. Session-sim-9 found the editor's Images row **below the fold** (BL-48): it moves above the body. New FR-PARTY-47, -48. No record, event or visibility change. CP edits this spec in parallel (pets listed).
+
+### Sprint 6 at a glance (track IM)
+
+| FR | What | Slice ([ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split)) | Named test ([§13.3](#133-sprint-6-track-im-image-search)) |
+|---|---|---|---|
+| FR-PARTY-47 | Editor attach control + From library: `context="handout"` | IM-3 `build/im-wiring` | `FR-PARTY-47 editor picker searches and tags` |
+| FR-PARTY-48 | Images row above the body (BL-48) | IM-3 | `FR-PARTY-48 images above the fold`; walkthrough IM5 |
 
 ### Sprint 5 at a glance
 
@@ -170,6 +178,12 @@ phase: post-mvp-6
 | FR-PARTY-44 | **Empty and other states**: no pets → "No companions yet" (players: "… — your DM can give you one"); a muted footer "Summons show in Initiative" while a fight runs; disconnected: last list, actions disabled; a pet released or reassigned while shown → the row moves group or leaves (live upsert / delete). | |
 | FR-PARTY-45 | **No new data**: the tab reads `entity` (pets) and `combatant` rows already in the snapshot (not lazy, unlike handouts); no record type, intent or event of PARTY's. Visibility is entities' (FR-ENT-37) and combat's (FR-CBT-116). | 0 B |
 | FR-PARTY-46 | **Layout**: window size unchanged (440×560, min 340×360, FR-PARTY-29's seams S4 width); the four tabs keep their full labels; where they don't fit (the min width, 340 px) the strip scrolls horizontally, never cutting a label (seams S7); rows wrap their badges, never cut a name (as W4's rule). | Seams S4, S7 |
+### 6.8 Sprint 6: image search in the editor (track IM)
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-PARTY-47 | **Editor picker searches and tags.** The editor's `ImageAttach` (FR-PARTY-39; `src/client/dm/features/party-board/Editor.tsx`) gets `context="handout"` ([FR-ASSET-48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)): **From library** opens the picker with the search field, tag filter and tag editor (FR-ASSET-44–47); Upload / drop / paste attachments are tagged **Handouts** server-side (FR-ASSET-41; attachments stay out of the library, #256); an upload made inside From library's picker is listed and tagged Handouts. Draft, dedupe ("Already in this handout"), `max` 10, Save and `assets.require` unchanged. | Amends FR-PARTY-39 |
+| FR-PARTY-48 | **Images above the fold** (BL-48, session-sim-9): the editor's order becomes title → **Images** (label with count, strip, attach control, duplicate hint) → body Textarea (+ counter). At `party.handout`'s default size and 1280 × 720 the attach row (Upload, From library) is visible without scrolling, for New and for Edit with 10 images (the strip wraps; the body keeps ≥ 4 visible rows; the editor's ScrollArea scrolls the rest). Paste / drop targets unchanged (the whole editor). The player view's order (images, then text) is unchanged. | OQ-PARTY-28 |
 
 ## 7. UI/UX notes
 
@@ -183,6 +197,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 - *(S5)* **Present, DM:** Share dialog checkbox; "Open on screens…" in the row menu and viewer; "On screen: 2" Badge (muted while 0 is never shown); "Close on all screens". **Player:** the popup is a shadcn Dialog (modal, centred, max 90 vw × 90 vh), title in the header, Close focused, "Open in Party" secondary. No popup on the DM client.
 - *(S5)* **Editor:** the attach control sits at the end of the images strip ("Upload", "From library", hint "or drop / paste an image"); progress and errors under the strip (ASSET §7). States as FR-PARTY-15.
 - *(S6)* **Companions tab:** **DM view:** every pet with HP numbers, New pet…, row menu; **player view:** every pet, own with HP + Card, others with a band. **Test IDs:** `party-tab` `data-value="companions"`, `party-companions`, `party-companions-empty`, `party-companion-group` (+ `data-record-id` = PC id), `party-companion-row` (+ `data-record-id` = pet id, `data-in-combat`), `party-companion-hp` (+ `data-value`), `party-companion-band` (+ `data-value`), `party-companion-card`, `party-companion-new`, `party-companion-menu`, `party-companion-rename`, `party-companion-mode` (+ `data-value`), `party-companion-owner`, `party-companion-release`, `party-companion-release-confirm`, `party-companion-npc-sheet`.
+- *(S6)* **Editor:** Images block directly under the title, body below it (FR-PARTY-48); From library opens ASSET's picker with search + tag chips (ASSET §7). Test IDs unchanged (`party-editor-*`, `asset-attach*` with `data-owner="party-editor"`; the picker's `asset-picker` gains `data-context="handout"`).
 - *(S5)* **Test IDs:** `party-share-present`, `party-share-present-names`, `party-present-open` (row menu / viewer) + `data-record-id`, `party-present-dialog`, `party-present-mode` + `data-value` (`all|players`), `party-present-player` + `data-record-id`, `party-present-submit`, `party-present-error`, `party-present-count` + `data-value` (n), `party-present-close-all`; player popup `party-present-popup` + `data-record-id` (handout id) + `data-present-id`, `party-present-title`, `party-present-image` + `data-record-id` (asset id), `party-present-prev`, `party-present-next`, `party-present-page`, `party-present-body`, `party-present-loading`, `party-present-retry`, `party-present-close`, `party-present-open-board`. Editor: ASSET's `asset-attach*` with `data-owner="party-editor"`, plus `party-editor-duplicate` (seams S5).
 
 ## 8. Data model
@@ -374,7 +389,7 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 
 ### Sprint 6 tests (track CP)
 
-Fixtures (`pet-owlbear`, `pet-drake`), bundles `companions-prep` / `companions` and the walkthrough (C1, C7, C10) are in [CBT §13.2](combat-tracker.md#132-sprint-6-track-cp-cbt-ent-charx-party-map). PARTY's named tests: `FR-PARTY-41 companions tab` (client: tab order Handouts, Inventory, Loot, Companions; stored `companions` restores; groups by PC with the colour dot); `FR-PARTY-42 band for other players` (client + leak: `player-2` sees the Owlbear's band "Bloodied" at 24 / 59, no numbers, no Card; `player-1` sees "24 / 59" and Card; in a fight both read the combatant; **a pet without a token on the active scene and not in a fight isn't in `player-2`'s list or frames**, and appears when its token is placed); `FR-PARTY-43 release` (client: Release confirm sends `PUT` with `companionOf: null`; disabled in a fight; reject inline); `FR-PARTY-44 empty states`; `FR-PARTY-46 tabs fit at min width` (seams S7: at 340 px every tab label is whole, the strip scrolls to Companions; the registry-driven layout tests at 1280×720 / 1440×900 pass with four tabs).
+Fixtures (`pet-owlbear`, `pet-drake`), bundles `companions-prep` / `companions` and the walkthrough (C1, C7, C10) are in [CBT §13.3](combat-tracker.md#133-sprint-6-track-cp-cbt-ent-charx-party-map). PARTY's named tests: `FR-PARTY-41 companions tab` (client: tab order Handouts, Inventory, Loot, Companions; stored `companions` restores; groups by PC with the colour dot); `FR-PARTY-42 band for other players` (client + leak: `player-2` sees the Owlbear's band "Bloodied" at 24 / 59, no numbers, no Card; `player-1` sees "24 / 59" and Card; in a fight both read the combatant; **a pet without a token on the active scene and not in a fight isn't in `player-2`'s list or frames**, and appears when its token is placed); `FR-PARTY-43 release` (client: Release confirm sends `PUT` with `companionOf: null`; disabled in a fight; reject inline); `FR-PARTY-44 empty states`; `FR-PARTY-46 tabs fit at min width` (seams S7: at 340 px every tab label is whole, the strip scrolls to Companions; the registry-driven layout tests at 1280×720 / 1440×900 pass with four tabs).
 
 ### 13.1 Sprint 5 (track P: PARTY, LOOT, ASSET, CMP)
 
@@ -411,6 +426,17 @@ Fixtures (`pet-owlbear`, `pet-drake`), bundles `companions-prep` / `companions` 
 
 Teardown: stop the server, then `fixtures:reset --profile verify`.
 
+### 13.3 Sprint 6 (track IM, image search)
+
+Bundle **`image-search`** ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im)); isolated per worktree as above.
+
+| Level | Named tests |
+|---|---|
+| Unit (DOM) | **`FR-PARTY-47 editor picker searches and tags`** (the editor's `asset-attach` passes `context="handout"`; From library → `asset-picker` with `data-context="handout"` and the search field; "Gob el" → 2 items; a paste sends `tags=["Handouts"]` with `listed=false`; Select still appends to the strip; dedupe hint unchanged); **`FR-PARTY-48 images above the fold`** (DOM order: title, Images block, body; the DOM test can't measure layout, so the visibility check is walkthrough IM5 at 1280 × 720: `asset-attach-library` in view without scrolling, for New and for a handout with 10 images) |
+| Integration | none new (handout records, events and visibility unchanged; the leak property for tags is ASSET's `FR-ASSET-50`, which covers player handout frames) |
+
+Walkthrough: [ASSET IM5, IM7](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im). Disconnect / reconnect / crash: as FR-PARTY-15 / -39; the picker per [ASSET §11](assets-pipeline.md#11-edge-cases--failure-modes).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -441,7 +467,7 @@ Sprint locks (seams S3, gate 1 build plan): ws / protocol / common store V0 → 
 ### Sprint 6 dependencies and build (track CP)
 
 - **Depends on** [entities](entities.md) FR-ENT-31–37 (pets, REST, visibility; CP0 / CP1), [combat-tracker](combat-tracker.md) FR-CBT-116 (combatant HP / band in a fight), [character-sheet-full](character-sheet-full.md) FR-CHARX-59 (Card opens the window: until CP4 merges the button is hidden), [campaign-management](campaign-management.md) colour dot (built; PF may change the colour storage: PARTY reads `colorOf`, unchanged API).
-- **Slice:** the tab ships in **CP1** `build/cp-pets` ([CBT §14.2](combat-tracker.md#142-build-split-sprint-6-track-cp)): `src/client/common/features/party-board/{Board.tsx (tab), Companions.tsx (new), logic.ts (`PARTY_TABS`, tab memory)}`; feature-owned files (#154), no shared file. IM-3 edits only the handout `Editor.tsx` (FR-PARTY-48): no overlap (seams S7).
+- **Slice:** the tab ships in **CP1** `build/cp-pets` ([CBT §14.3](combat-tracker.md#143-build-split-sprint-6-track-cp)): `src/client/common/features/party-board/{Board.tsx (tab), Companions.tsx (new), logic.ts (`PARTY_TABS`, tab memory)}`; feature-owned files (#154), no shared file. IM-3 edits only the handout `Editor.tsx` (FR-PARTY-48): no overlap (seams S7).
 
 ### 14.2 Sprint 5 build split
 
@@ -469,6 +495,10 @@ flowchart LR
 
 - Walkthrough S5 runs once P0–P4 are on `main` (each slice walks its own steps first: P1 S5-2–S5-3, P2 S5-1, S5-4–S5-7, P3 S5-8, P4 S5-9).
 
+### 14.4 Sprint 6 build split (track IM)
+
+Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). PARTY part: **IM-3 `build/im-wiring`** (after IM-2): `Editor.tsx` (one `context` prop; the Images block moves above the body, FR-PARTY-48) + DOM tests. No schema, event, §9.9 shared file or dependency. CP1's **Companions** tab (after Loot, OQ-PARTY-24) touches other Party files: no overlap with IM-3 (settled by seams S7). The FR-PARTY-48 item of BL-48 is done by IM-3 (the integrator updates the backlog row).
+
 ## 15. Open questions
 
 DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G29 and the P bulk-accept). Rejected options kept for the record. Seam / integrator rows stay as settled. *(S5)* OQ-PARTY-18–21 decided at sprint-5 DM gate 1 (#256): every pick accepted.
@@ -477,7 +507,7 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 |---|---|---|---|---|
 | OQ-PARTY-24 *(S6)* | Where pets live in the Party window | **A Companions tab after Loot** (Loot keeps its place right of Inventory, #268) / a section at the end of Inventory (no new tab; a pet isn't an item) / their own window | no · owner: CP1 | play-shell |
 | OQ-PARTY-25 *(S6)* | List summons too? | **No: pets only** (#252; summons live in Initiative and the card; a footer points there) / yes, under "In this fight" | no · owner: CP1 | combat-tracker |
-| OQ-PARTY-26 *(S6; review 1)* | Which pets do other players see? | **Present pets only** (in a running fight, or with an unhidden token on the active scene): name, owner, band; a pet the DM prepares stays secret until it shows up / every pet always (leak: a prepared pet's name and existence reach the table the moment it is created) / own pets only (the party can't see a companion it is fighting beside) | no (follows OQ-CBT-80, DM) | entities |
+| OQ-PARTY-26 *(S6; review 1)* | Which pets do other players see? | **Decided (#288): present pets only.** Options were: **Present pets only** (in a running fight, or with an unhidden token on the active scene): name, owner, band; a pet the DM prepares stays secret until it shows up / every pet always (leak: a prepared pet's name and existence reach the table the moment it is created) / own pets only (the party can't see a companion it is fighting beside) | — | entities |
 | OQ-PARTY-27 *(S6)* | **campaign-management (PF):** the group header's owner colour dot reads `colorOf(player)`; PF's free colour picker may change the stored value but not that helper | **Settled by seams S8:** `colorOf(player)` keeps its signature and returns a CSS colour string after PF0 (`#rrggbb`); the group header and the companion marker call `colorOf` only, never switching on palette keys. Rejected: ~~PARTY waits for PF's colour core~~ | no (settled) | campaign-management |
 | OQ-PARTY-01 | Handout share model vs entity visibility | **Decided (#207, G26):** handout-own `sharedWith` {none / all / chosen players} + its own visibility fn; shape exported from `@shared` for later reuse (world-builder NPCs). Terms Share / Unshare per seams S9. Rejected: reuse entity visibility (fixed per kind; needs a share field on entities and a handout entity kind), `hidden` boolean like tokens (no chosen players) | — | entities, post-mvp/world-builder |
 | OQ-PARTY-02 | Content types; where files live | **Decided (#207, G26):** text + 0–10 images via the assets pipeline (capability IDs, ADR-0023); PDF out (DM exports pages as images). Rejected: PDF served as an original with the browser viewer (breaks "originals never served", script risk), PDF rasterised at ingest (new dependency) | — | assets-pipeline |
@@ -502,6 +532,7 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-21 | *(S5)* Pasting an image into the handout text [12] | **Decided (#256): the image joins the handout's images (end of the strip); the text is unchanged** (FR-PARTY-39, FR-ASSET-22). Rejected: ~~B an inline image at the cursor (`![](asset:…)` in the body)~~, ~~C an attachment chip in the text~~. Same decision for the compendium homebrew text ([OQ-ASSET-13](assets-pipeline.md#15-open-questions)) | — | assets-pipeline, compendium |
 | OQ-PARTY-22 | *(S5)* **play-shell (track W)**: (a) one mount line for the player popup and one provider line for the DM uploader in the client roots; (b) the popup is a modal Dialog in FR-SHELL-01's dialog layer (over windows, chrome, toasts), under the dice layer; (c) removing `loot.log` from both window registries (append-only); (d) Party window default size with the Loot tab (440×560 today; the loot body was 440×472) | **Settled by seams S4:** (a) P1 and P2 each add one line to their client root, granted append-style, no wait on W1; (b) dialog layer, above windows and toasts, under the dice layer (W lists it in FR-SHELL-01); (c) the owning feature deletes its own line: P3 removes `loot.log` from both `windows.ts`; (d) Party stays 440×560 | no · settled | play-shell |
 | OQ-PARTY-23 | Glossary | **Add "Present (handout)": open a shared handout on chosen players' screens until each closes it ("show" stays the scenes' word, "Show to players"); amend "Party board" (+ Loot tab)**. Settled by seams S12 (integrator adds Present, Attachment, Asset library at the gate merge) | no · settled | glossary |
+| OQ-PARTY-28 | *(S6, BL-48)* How does the editor's Images row get above the fold? | **Decided (#288): A: Images block under the title, body below.** Options were: **A Images block under the title, body below** (always visible, any window size; the DM writes text after picking images) / B body Textarea down to 4 rows, Images stay last (keeps text-first order; a long strip still pushes it down) / C `party.handout` opens taller (WF's default sizes: a cross-track change that still fails on small screens) | — · decided (#288) | play-shell (C only) |
 
 ## 16. Out of scope
 
