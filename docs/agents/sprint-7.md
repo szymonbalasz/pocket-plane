@@ -35,6 +35,7 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 | Date | What |
 |---|---|
 | 2026-10-20 | Phase A started: spec agents for gems, stats and the sprint-6 follow-ups running in parallel |
+| 2026-10-20 | Specs drafted (gems, stats, follow-ups); seams ruled; reviews running. Backfill: weapon-combat natural-1 e2e flake fixed (BL-50, #313) |
 
 ## Check `main` any time (DM)
 
