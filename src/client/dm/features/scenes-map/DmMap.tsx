@@ -35,7 +35,7 @@ import {
   useMapSelection,
   useTargeting,
 } from "./selection";
-import { doubleClickFor, menuFor } from "./token-menu";
+import { doubleClickFor, menuFor, tokenDoubleClick } from "./token-menu";
 import { useDmMap, viewedScene } from "./view-state";
 
 /** The DM's viewed scene, resolved against the store (FR-MAP-08). */
@@ -139,9 +139,11 @@ export function DmMapBase() {
   const menuToken = byId(menu?.tokenId);
   const dialogToken = byId(dialog?.tokenId);
   const entries = menuToken ? menuFor(menuToken) : [];
+  // A menu entry's dialog, or a double-click entry's (FR-MAP-29).
   const DialogC =
     dialog && dialogToken
-      ? menuFor(dialogToken).find((e) => e.id === dialog.entryId)?.Dialog
+      ? (menuFor(dialogToken).find((e) => e.id === dialog.entryId)?.Dialog ??
+        tokenDoubleClick.find((e) => e.id === dialog.entryId)?.Dialog)
       : undefined;
 
   return (

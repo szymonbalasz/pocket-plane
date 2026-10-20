@@ -2144,9 +2144,16 @@ From [entities](../specs/entities.md#8-data-model) FR-ENT-36, -39 and [party-boa
 - **Derived (client, not stored):** the Companions tab's groups and rows (`companionGroups`, `src/client/common/features/party-board/logic.ts`): owner PC, HP for the DM / owner (combatant in a fight, else the pet row), band for others, "In combat"; the Creatures row's `pet` (owner PC + player) and "Pet of ‹PC›" badge.
 - **Fixtures:** `pet-owlbear` gains `pet.adjustHp −14` (45 / 59); `session-sim-10` gains `pet-owlbear`, `pet-drake`; bundle `cp-pets-e2e`.
 
-## 94. Sprint 6: summons (CP3)
+## 94. Sprint 6: layout test cells at the new Fit (WF follow-up)
 
-From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-110, -112, -113, -120 (#252, #288, #295). **Built by `build/cp-summon`**. Protocol side: [protocol §122](../protocol/README.md#122-sprint-6-summons-cp3).
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-62. **Built by `fix/placement-s6`**: tests only; no table, column, record type, payload or browser state. Protocol side: [protocol §122](../protocol/README.md#122-sprint-6-layout-test-cells-at-the-new-fit-the-oracle-ranks-the-pc-cut-wf-follow-up).
+
+- **Fixtures:** no new unit (pure tests on `session-sim-9`'s Goblin Ambush cells); `session-sim-10` gets a comment line only.
+- **CON-44:** 0 B.
+
+## 95. Sprint 6: summons (CP3)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-110, -112, -113, -120 (#252, #288, #295). **Built by `build/cp-summon`**. Protocol side: [protocol §124](../protocol/README.md#124-sprint-6-summons-cp3).
 
 | Field / record | Change | Rule | Source |
 |---|---|---|---|

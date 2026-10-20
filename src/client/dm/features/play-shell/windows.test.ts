@@ -36,7 +36,7 @@ import {
 import { createShellController } from "@ui/features/play-shell/shell-store";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
 import { ambushTokens } from "@ui/features/play-shell/test-cells";
-import { toastKeepOut } from "@ui/features/play-shell/toast-region";
+import { summaryStrip, toastKeepOut } from "@ui/features/play-shell/toast-region";
 import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
   contentBox,
@@ -760,17 +760,37 @@ test("FR-SHELL-56 reopen covered vs free spot (DM, protected): Initiative closed
   }
 });
 
-test("FR-SHELL-58 token-free spot first (DM, sim-9 a01): 1440×900, Initiative + Game log, the Goblin Ambush at its fit → Compendium covers no token while a clear spot over none exists, and no PC footprint", () => {
+test("FR-SHELL-62 layout test cells at the sprint-6 Fit (DM): sim-9's Goblin Ambush with Initiative + Game log, nothing shown → every footprint at 32 / 37 / 42 / 42 px, clear of the windows and the summary strip", () => {
+  const cells = [32, 37, 42, 42];
+  for (const [i, vp] of REFERENCE_VIEWPORTS.entries()) {
+    const at = `${vp.w}×${vp.h}`;
+    const rects = renderedWindowRects(defaultLayout(dmWindows, vp), dmWindows, allKinds(), vp);
+    const tokens = ambush(vp, rects);
+    expect({ at, cell: Math.round(tokens[0]?.w ?? 0) }).toEqual({ at, cell: cells[i] as number });
+    const over = tokens.filter((t) => [...rects, summaryStrip(vp)].some((r) => overlaps(t, r)));
+    expect({ at, over: over.length }).toEqual({ at, over: 0 });
+  }
+});
+
+test("FR-SHELL-58 token-free spot first (DM, sim-9 a01): 1440×900, Initiative + Game log, the Goblin Ambush at its fit → each launcher window covers no token where a clear spot over none exists, else no PC footprint and ranks as the brute check's best", () => {
   const layout = defaultLayout(dmWindows, WIDE);
   const rects = renderedWindowRects(layout, dmWindows, allKinds(), WIDE);
   const tokens = ambush(WIDE, rects);
-  const { steps } = launcherSequence(dmWindows, WIDE, ["cmp.compendium"], { avoid: () => tokens });
-  const cmp = steps[0]?.rect;
-  const def = dmWindows.get("cmp.compendium");
-  if (!cmp || !def) throw new Error("Compendium not open");
   const scene = { windows: rects, hard: [], tokens };
-  expect(bruteBest(def, WIDE, scene)).toEqual([0, 0, 0, 0]); // such a spot exists here
-  expect(placeFields(cmp, def, WIDE, scene)).toEqual([0, 0, 0, 0]);
+  const fields: Record<string, string> = {};
+  for (const kind of launcherKinds(dmWindows, product)) {
+    const { steps } = launcherSequence(dmWindows, WIDE, [kind], { avoid: () => tokens });
+    const def = dmWindows.get(kind);
+    const rect = steps[0]?.rect;
+    if (!rect || !def) throw new Error(`${kind} not open`);
+    const got = placeFields(rect, def, WIDE, scene);
+    expect({ kind, got }).toEqual({ kind, got: bruteBest(def, WIDE, scene) });
+    fields[kind] = got.join("");
+  }
+  // The 42-px fit spreads the ambush over the map band: Compendium has no token-free spot (sim-9
+  // had 576,60, under the old fit's left strip), Scenes still does.
+  expect(fields["cmp.compendium"]).toBe("00001");
+  expect(fields["map.scenes"]).toBe("00000");
 });
 
 /** FR-SHELL-61 (5): stand-ins for PF's Preferences until PF1 registers the real line (S2, S3). */

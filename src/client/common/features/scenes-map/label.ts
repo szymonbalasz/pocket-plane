@@ -96,6 +96,8 @@ export interface BadgeIn {
   id: string;
   label: string;
   tone?: BadgeTone;
+  /** Always an icon chip, even where its text would fit (FR-MAP-76's paw). */
+  compact?: boolean;
 }
 
 /** The "+N"'s tone: the most severe hidden one, so a hidden Dying keeps its danger colour. */
@@ -200,7 +202,7 @@ export function labelRow(
   let rowW = 0;
   for (const b of badges) {
     const natural = measure(b.label, m.font, true) + 2 * m.padX;
-    const compact = natural > side;
+    const compact = b.compact === true || natural > side;
     const width = compact ? chip : natural;
     if (row.length > 0 && rowW + m.gap + width > side) {
       rows.push(row);

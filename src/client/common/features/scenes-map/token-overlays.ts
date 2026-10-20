@@ -7,7 +7,7 @@
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import { cbtxTokenOverlay } from "../combat-extras/token-overlay";
-import { cbtTokenOverlay } from "../combat-tracker/token-overlay";
+import { cbtTokenOverlay, companionTokenOverlay } from "../combat-tracker/token-overlay";
 import { modTriggersOverlay } from "../effect-modifiers/trigger-badges";
 import { fogTokenOverlay } from "../fog-of-war/token-overlay";
 import { noteCueOverlay } from "../notifications/token-cue";
@@ -28,6 +28,13 @@ export interface TokenBadge {
   /** Palette tone (visual-direction): `down` = `hp.down`, `bloodied` = `hp.bloodied`. */
   tone: "neutral" | "bloodied" | "down";
   label: string;
+  /**
+   * A person's colour (hex, from `colorOf`), e.g. the companion marker's owner (FR-MAP-76): pill
+   * or chip on the dark casing (FR-MAP-72), text / glyph in this colour; Konva attr `color`.
+   */
+  color?: string;
+  /** Always an icon chip (label on hover), even where its label would fit (FR-MAP-76). */
+  compact?: boolean;
 }
 
 /** A translucent X over the footprint (FR-MAP-43), e.g. combat's Down. */
@@ -126,5 +133,8 @@ export const tokenOverlays: readonly TokenOverlay[] = [
   cbtxTokenOverlay, // combat-extras: HP bar, effect icons, death badge (FR-CBTX-28/29/30)
   noteCueOverlay, // notifications: the DM's 4 s action cue (FR-NOTE-30)
   fogTokenOverlay, // fog-of-war: DM "Fog" / "Invisible" badges, View-as dimming (FR-FOG-20, -47)
+  // combat-tracker: companion marker, a paw badge in the owner's colour (FR-MAP-76); above MOD's
+  // line, which stays last (its icon ends the icon row)
+  companionTokenOverlay,
   modTriggersOverlay, // effect-modifiers: one trigger icon, last in the icon row (FR-CBTX-53, S9)
 ];

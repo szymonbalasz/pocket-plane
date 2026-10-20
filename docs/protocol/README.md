@@ -2865,9 +2865,36 @@ From [entities](../specs/entities.md#6-functional-requirements) FR-ENT-32 (UI), 
 | Tests | `entities/pet-hp.test.ts` (`FR-ENT-36 pet HP`, guards, per viewer), `entities/pet-hp-sync.test.ts` (real sockets on `companions`: owner adjust, `player-2` rejected, nothing then a band, leak scan before / after reconnect), `dm/features/entities/pets-ui.test.tsx` (`FR-ENT-39 pet badge`, `FR-ENT-32` dialog rules, `FR-ENT-33` whole `PUT`), `party-board/companions.test.tsx` (`FR-PARTY-41 companions tab`, `FR-PARTY-42 band for other players`, `FR-PARTY-44 empty states`, `FR-PARTY-46 tabs fit at min width`); e2e `cp-pets.e2e.ts` (bundle `cp-pets-e2e`: New pet "owl" → Owlbear, owner / other player, badge, Release; tabs at 340 px) |
 | CON-44 | `session-sim-10` (two pets, not present: Town active): DM +8,074 B over `session-sim-9` with IM-1's tags; player-1 (owner) +1,462 B; player-2 +0 B. Worst case unchanged (CP0's rows, §112) |
 
-## 122. Sprint 6: summons (CP3)
+## 122. Sprint 6: layout test cells at the new Fit, the oracle ranks the PC cut (WF follow-up)
 
-From [combat-tracker](../specs/combat-tracker.md#64-sprint-6-companions) FR-CBT-110, -112, -113, -120, -121, [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-75 and [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-44 (OQ-CBT-81 B, -82 A, -83b A, -83c A, -84 a / c / d; #252, #288). **Built by `build/cp-summon`** on CP0 ([§112](#112-sprint-6-companions-core-cp0)) and CP2 ([§117](#117-sprint-6-companion-turns-client-cp2)). Data model: [§94](../data-model/README.md#94-sprint-6-summons-cp3).
+From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-45, -57, -58, -62 (#292, #302 item 3). **Built by `fix/placement-s6`**: tests only; `placement.ts` unchanged, so no app behaviour changes (CON-44: 0 B). Amends §109's oracle fields and §118's `test-cells.ts` row. Data side: [data model §94](../data-model/README.md#94-sprint-6-layout-test-cells-at-the-new-fit-wf-follow-up).
+
+| Piece | Contract | Source |
+|---|---|---|
+| Layout test cells (`test-cells.ts` `ambushTokens`) | The DM's Goblin Ambush footprints at the merged Fit with nothing shown: `fitObstacles("dm", windows, …, shown = null)` = the windows + the summary strip (OQ-MAP-57 D), not the 356 × 238 box. Default layout (Initiative + Game log): **32 / 37 / 42 / 42 px** at 1280×720 / 1280×800 / 1440×900 / 1600×900, every footprint clear of the windows and the strip (the live e2e's 34 px at 1280×720 reads the rendered Initiative). Players unchanged | FR-SHELL-62, FR-MAP-80 |
+| Oracle fields (`layout-checks.ts` `placeFields`, `bruteBest`) | In placement's rank order: [not clear, over a PC footprint + 4 px, **an edge through one** (holds the PCs it covers whole, #292; part of rank (2), before (2b)), not clear at `minOpenH`, over a token]. The cut is judged on the PC boxes grown by the oracle's `margin` (12 px), like the PC field. So a spot holding Mira and Brakka whole at 320 × 360 beats one 400 high cutting Mira and Thorn (DM 1280×720 Compendium; WF3's "better spot") | FR-SHELL-45, -57, -62 |
+| Goldens | DM `windows.golden.json` regenerated (`UPDATE_GOLDEN=1`): the token footprints moved with the Fit, so most token-placed rects move (e.g. 1280×720 Compendium 68,60,320×412 → 90,60,320×360; 1440×900 Compendium 194,60,336×400 → 102,172,320×400). Token-free defaults unchanged. Player goldens unchanged | FR-SHELL-62 |
+| Tests | DM `windows.test.ts`: `FR-SHELL-62 layout test cells at the sprint-6 Fit` (cells + clear); `FR-SHELL-58 token-free spot first (sim-9 a01)` rewritten: at 1440×900 every launcher window ranks as the oracle's best; Compendium has no token-free spot at the 42-px fit (`00001`), Scenes does (`00000`) | FR-SHELL-58, -62 |
+| CON-44 | 0 B | — |
+
+## 123. Sprint 6: companion marker and double-click to the card (CP5)
+
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-76, -77 (#252, #288; OQ-MAP-55 picker; seams S5, S8). **Built by `fix/cp-tokens`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B).
+
+| Piece | Contract | Source |
+|---|---|---|
+| Overlay line `companion` (`combat-tracker/token-overlay.ts` `companionTokenOverlay`; registered above MOD's line, which stays last) | Both clients, every token they receive: `ownerPlayerId ≠ null` and `characterId = null` → badge `map-token-companion` (id = token id), `icon` `paw-print`, `label` "‹player name›'s companion" (`personName`: no `player` row → "Player"), `color` = `markColor(owner)` (`colorOf`; unknown → player accent), `compact: true`. No combat data | FR-MAP-76 |
+| `TokenBadge.color?`, `TokenBadge.compact?` (`token-overlays.ts`; `BadgeIn.compact?` in `label.ts`) | `color`: a person's hex: the pill / chip is filled `#000` (the chip's disc is a `map-casing`, id = token id), text / glyph in the colour; Konva attr `color`. `compact`: always an icon chip, even where the label fits; otherwise the label row's rules unchanged (BL-35: below 48 px cells chip + "+N" or "+N", the paw listed in the "+N" hover; never over a name) | FR-MAP-76, -72 |
+| Paw glyph (`canvas-icons.ts`) | lucide `paw-print` path data | FR-MAP-76 |
+| Double-click (`@ui/features/combat-tracker/companion-token-open`) | `companionCardTarget(token, store, viewer)`: a marked token, viewer the DM or `token.ownerPlayerId` → the active companion combatant of the started encounter bound to it (`tokenId`) → `useOpenCompanionCard()(combatantId)`; none → opens `charx.companion` as is (picker as last used). Another player / unmarked token / the card not registered → nothing | FR-MAP-77, OQ-MAP-55 |
+| DM: `tokenDoubleClick` line `charx.companion-card` (order 10, `available` = marked token; `dm/features/character-sheet/companion-double-click.tsx`) | Its `Dialog` opens the card once on mount and closes; `DmMap` resolves a double-click entry's `Dialog` as well as a menu entry's | FR-MAP-29, -77 |
+| Player: `PlayerMap` `onTokenDoubleClick` | `useCompanionTokenOpen("player")` (players have no token registry) | FR-MAP-77 |
+
+- **Fixtures:** none new; bundle `cp-tokens` (= `companions-start`, for the e2e). E2E `e2e/cp-tokens.e2e.ts`.
+
+## 124. Sprint 6: summons (CP3)
+
+From [combat-tracker](../specs/combat-tracker.md#64-sprint-6-companions) FR-CBT-110, -112, -113, -120, -121, [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-75 and [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-44 (OQ-CBT-81 B, -82 A, -83b A, -83c A, -84 a / c / d; #252, #288). **Built by `build/cp-summon`** on CP0 ([§112](#112-sprint-6-companions-core-cp0)) and CP2 ([§117](#117-sprint-6-companion-turns-client-cp2)). Data model: [§95](../data-model/README.md#95-sprint-6-summons-cp3).
 
 | Intent | Who | Errors (one code per case) | Result | Source |
 |---|---|---|---|---|
