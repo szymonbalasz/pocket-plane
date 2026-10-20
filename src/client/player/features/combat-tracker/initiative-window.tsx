@@ -16,7 +16,7 @@ import {
   deathStateFor,
   effectsOn,
 } from "@ui/features/combat-extras/logic";
-import { DeathBadge, DeathPips, EffectChips, RowName } from "@ui/features/combat-extras/parts";
+import { DeathBadge, DeathPips, EffectChips, NameLine } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
@@ -102,12 +102,15 @@ function PlayerInitiativeBody() {
               <TurnMarker active={turn} />
               <Portrait name={c.name} imageAssetId={c.imageAssetId} />
               <div className="flex min-w-0 flex-1 flex-col">
-                {/* FR-CBTX-46 (P3 glitch 6): the name line holds only the name and the chips, so
-                    chips get the width left after the full name, as on the DM's rows. */}
-                <div className="flex min-w-0 items-center gap-1">
-                  <RowName name={c.name} testId="cbt-init-row-name" className="text-sm" />
-                  {/* FR-CBT-104: never folds, before the effect chips (FR-CBTX-54). */}
-                  <SideChip c={c} testId="cbt-init-row-ally" />
+                {/* FR-CBTX-46 (P3 glitch 6), FR-CBTX-57: chips get the width left after the full
+                    name and the side chip, as on the DM's rows; the name is never cut. */}
+                <NameLine
+                  name={c.name}
+                  testId="cbt-init-row-name"
+                  className="text-sm"
+                  // FR-CBT-104: never folds, before the effect chips (FR-CBTX-54).
+                  side={<SideChip c={c} testId="cbt-init-row-ally" />}
+                >
                   <EffectChips
                     compact
                     effects={effectsOn(fx, creatureOf(c))}
@@ -115,7 +118,7 @@ function PlayerInitiativeBody() {
                     round={enc.round}
                     testId="cbtx-init-row-effect"
                   />
-                </div>
+                </NameLine>
                 {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down; on
                     its own line under the name. */}
                 {death && (

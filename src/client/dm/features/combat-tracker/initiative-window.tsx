@@ -54,7 +54,7 @@ import {
 } from "@ui/components/ui/overlays";
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
-import { RowName } from "@ui/features/combat-extras/parts";
+import { NameLine } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
@@ -547,6 +547,7 @@ function Moved({ c, speed }: { c: CombatantView; speed: number | undefined }) {
         data-testid="cbt-init-row-moved"
         data-record-id={c.id}
         data-tone={tone}
+        data-name-end
       >
         <FootprintsIcon className="size-3" aria-hidden />
         <span className="sr-only">Moved </span>
@@ -576,17 +577,18 @@ function useMovedBelow(rowRef: RefObject<HTMLLIElement | null>, deps: unknown): 
     if (!row || !line || !stats) return;
     const measure = () => {
       const moved = row.querySelector<HTMLElement>('[data-testid="cbt-init-row-moved"]');
-      const name = line.querySelector<HTMLElement>('[data-testid="cbt-init-row-name"]');
+      const name = line.querySelector<HTMLElement>("[data-name-measure]");
       if (!moved || !name || line.clientWidth === 0) {
         setBelow(false);
         return;
       }
-      const base = name.querySelector<HTMLElement>("[data-name-base]");
-      const suffix = name.querySelector<HTMLElement>("[data-name-suffix]");
-      const nameW = (base?.scrollWidth ?? 0) + (suffix?.offsetWidth ?? 0);
-      const others = [...line.children].filter(
-        (k) => k !== name && k !== moved && !k.hasAttribute("data-chip-row"),
-      );
+      // The name's natural width, then its marks and the side chip (NameLine, FR-CBTX-57).
+      const nameW = name.offsetWidth;
+      const others = [
+        ...line.querySelectorAll<HTMLElement>(
+          ":scope > [data-name-head] > [data-name-marks], :scope > [data-name-side]",
+        ),
+      ].filter((k) => k.offsetWidth > 0);
       const chips = line.querySelector("[data-chip-row]") ? MORE_W : 0;
       const gap = 4; // gap-1
       const parts = 2 + others.length + (chips ? 1 : 0);
@@ -662,34 +664,45 @@ function Row({
       <TurnMarker active={turn} />
       <Portrait name={c.name} imageAssetId={c.imageAssetId} />
       <div className="min-w-0 flex-1">
-        <div data-name-line className="flex min-w-0 items-center gap-1">
-          {/* Middle-truncated, number kept ("Gob… 2"): names win over chips and Moved. */}
-          <RowName name={c.name} testId="cbt-init-row-name" className="text-sm font-medium" />
-          {c.hidden && (
-            <EyeOffIcon className="size-3.5 shrink-0 text-muted-foreground" aria-label="Hidden" />
-          )}
-          {skipped && (
-            <Tooltip content={dead ? "Skipped while dead" : "Skipped while down"}>
-              <span
-                data-testid="cbt-init-row-skip"
-                data-record-id={c.id}
-                className="flex shrink-0 text-muted-foreground"
-              >
-                <SkipForwardIcon
-                  className="size-3.5"
-                  aria-label={dead ? "Skipped while dead" : "Skipped while down"}
+        {/* The name is never cut (FR-CBTX-57): the side chip and the chips take a second line
+            first, a name wider than the line wraps. */}
+        <NameLine
+          name={c.name}
+          testId="cbt-init-row-name"
+          className="text-sm font-medium"
+          marks={
+            <>
+              {c.hidden && (
+                <EyeOffIcon
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                  aria-label="Hidden"
                 />
-              </span>
-            </Tooltip>
-          )}
-          {/* FR-CBT-104 (#252): the side chip never folds; before the effect chips (FR-CBTX-54). */}
-          <SideChip c={c} testId="cbt-init-row-ally" />
+              )}
+              {skipped && (
+                <Tooltip content={dead ? "Skipped while dead" : "Skipped while down"}>
+                  <span
+                    data-testid="cbt-init-row-skip"
+                    data-record-id={c.id}
+                    className="flex shrink-0 text-muted-foreground"
+                  >
+                    <SkipForwardIcon
+                      className="size-3.5"
+                      aria-label={dead ? "Skipped while dead" : "Skipped while down"}
+                    />
+                  </span>
+                </Tooltip>
+              )}
+            </>
+          }
+          // FR-CBT-104 (#252): the side chip never folds; before the effect chips (FR-CBTX-54).
+          side={<SideChip c={c} testId="cbt-init-row-ally" />}
+          // On the name line, right-aligned; below when the name needs the room. From round 1
+          // only: before the first turn nothing has moved in combat (P3 glitch 10, ruling A).
+          end={round >= 1 && !movedBelow && <Moved c={c} speed={stats?.speed} />}
+        >
           {/* FR-CBTX-33: effect chips, one line ("+N" for the rest). */}
           <RowEffects c={c} round={round} />
-          {/* On the name line, right-aligned; below when the name needs the room. From round 1
-              only: before the first turn nothing has moved in combat (P3 glitch 10, ruling A). */}
-          {round >= 1 && !movedBelow && <Moved c={c} speed={stats?.speed} />}
-        </div>
+        </NameLine>
         <div
           data-stats-line
           className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums"

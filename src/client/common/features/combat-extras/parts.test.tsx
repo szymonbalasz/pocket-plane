@@ -1,0 +1,219 @@
+// Sprint 6 WF4 (BL-43, sim-9 c03 / c10): an Initiative row's name is never cut, its fixed parts
+// counted (FR-CBTX-57), and a trigger chip is whole or icon-only (FR-CBTX-58). The fit rules on
+// stubbed natural widths (the DM's and the player's rows share `NameLine` / `EffectChips`), the
+// markup (static render); the rows in a browser at 400 / 320 (DM) and 280 / 240 (player):
+// e2e/init-rows-s6.e2e.ts.
+import { describe, expect, test } from "bun:test";
+import { renderToStaticMarkup } from "react-dom/server";
+import { TooltipProvider } from "../../components/ui/overlays";
+import type { TriggerChip } from "../effect-modifiers/trigger-badges";
+import { fitChipRow, fitNameLine, MORE_W } from "./logic";
+import { EffectChips, NameLine, RowName, TriggerChipView } from "./parts";
+
+const render = (node: React.ReactNode) =>
+  renderToStaticMarkup(
+    <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+      {node}
+    </TooltipProvider>,
+  );
+
+// Natural widths as measured in the build (text-sm / 11 px text): the name line of a DM row at
+// the 400 default and at the 320 min, a player row at 280 / 240; "Goblin Lurker" (medium), the
+// eye-off icon, the "Ally" chip, Moved "15 / 30 ft".
+const DM_400 = 206;
+const DM_320 = 126;
+const P_280 = 150;
+const lurker = 94;
+const eye = 14;
+const ally = 46;
+const moved = 62;
+
+const searing = (o: Partial<TriggerChip> = {}): TriggerChip => ({
+  id: "searing",
+  triggerId: "t-searing",
+  name: "Searing Strike",
+  uses: { left: 1, text: "1" },
+  state: "uses",
+  muted: false,
+  down: false,
+  tooltip: "1 use left",
+  ...o,
+});
+
+describe("FR-CBTX-57 hidden ally name whole", () => {
+  test("FR-CBTX-57 hidden ally name whole: the room = line − the name's natural width − its fixed parts − the gaps", () => {
+    // Name + eye-off + Ally + Moved + chips on a 300-px line: 300 − 94 − (4 + 14) − (4 + 46) −
+    // (4 + 62) − 4.
+    expect(
+      fitNameLine({ line: 300, name: lurker, marks: [eye], side: ally, end: moved, chips: true }),
+    ).toEqual({ nameWrap: false, split: false, room: 300 - 94 - 18 - 50 - 66 - 4 });
+    // Less than a "+N" chip's room left (the same at the 400 default) → the second line.
+    expect(
+      fitNameLine({
+        line: DM_400,
+        name: lurker,
+        marks: [eye],
+        side: ally,
+        end: moved,
+        chips: true,
+      }),
+    ).toEqual({ nameWrap: false, split: true, room: DM_400 - 46 - 4 });
+    // Without Moved (round 0) the chips get its room too; no side chip: its room as well.
+    expect(
+      fitNameLine({ line: DM_400, name: lurker, marks: [eye], side: ally, end: 0, chips: true })
+        .room,
+    ).toBe(DM_400 - 94 - 18 - 50 - 4);
+    expect(
+      fitNameLine({ line: DM_400, name: lurker, marks: [], side: 0, end: 0, chips: true }).room,
+    ).toBe(DM_400 - 94 - 4);
+    // The room is what FR-CBTX-54's steps run against: a 99-px Searing Strike chip fits 112 px
+    // in full, and goes icon-only in 60.
+    expect(fitChipRow([], [{ full: 99, short: 30 }], 112).icons).toBe(false);
+    expect(fitChipRow([], [{ full: 99, short: 30 }], 60).icons).toBe(true);
+  });
+
+  test("FR-CBTX-57 hidden ally name whole: 'Goblin Lurker' hidden + Ally at 400 on one line; at 320 the Ally chip takes the second line (sim-9 c10)", () => {
+    // c10: "Goblin Lur…" (86 / 83 px) — the row had no chips, so nothing made room for the name.
+    expect(
+      fitNameLine({ line: DM_400, name: lurker, marks: [eye], side: ally, end: 0, chips: false }),
+    ).toEqual({ nameWrap: false, split: false, room: 0 });
+    // 320: 94 + 4 + 14 + 4 + 46 = 162 > 126 → the side chip moves, the eye-off stays.
+    expect(
+      fitNameLine({ line: DM_320, name: lurker, marks: [eye], side: ally, end: 0, chips: false }),
+    ).toEqual({ nameWrap: false, split: true, room: 0 });
+    // Player rows (no eye-off: players never get hidden rows) at 280 / 240.
+    expect(
+      fitNameLine({ line: P_280, name: lurker, marks: [], side: ally, end: 0, chips: false }).split,
+    ).toBe(false);
+    expect(
+      fitNameLine({ line: 110, name: lurker, marks: [], side: ally, end: 0, chips: false }).split,
+    ).toBe(true);
+  });
+
+  test("FR-CBTX-57 hidden ally name whole: 'Elite Goblin Warrior' hidden with 2 effects → the chips wrap, the name whole; a 40-character name at 280 → two lines, never an ellipsis", () => {
+    const elite = 128;
+    // 400: name + eye-off fit with a "+N" chip's room → the chips stay, tightened / folded.
+    const wide = fitNameLine({
+      line: DM_400,
+      name: elite,
+      marks: [eye],
+      side: 0,
+      end: 0,
+      chips: true,
+    });
+    expect(wide).toEqual({ nameWrap: false, split: false, room: DM_400 - 128 - 18 - 4 });
+    expect(wide.room).toBeGreaterThanOrEqual(MORE_W);
+    // Less than a "+N" chip's room left → the chips take the second line, the whole line theirs.
+    const tight = fitNameLine({
+      line: 170,
+      name: elite,
+      marks: [eye],
+      side: 0,
+      end: 0,
+      chips: true,
+    });
+    expect(tight).toEqual({ nameWrap: false, split: true, room: 170 });
+    // With the Ally chip: the second line starts with it; the chips get the rest.
+    expect(
+      fitNameLine({ line: 170, name: elite, marks: [eye], side: ally, end: 0, chips: true }),
+    ).toEqual({ nameWrap: false, split: true, room: 170 - 46 - 4 });
+    // 40 characters (≈ 300 px) at the player's 280 → the name wraps; chips and side chip below.
+    expect(
+      fitNameLine({ line: P_280, name: 300, marks: [], side: ally, end: 0, chips: true }),
+    ).toEqual({ nameWrap: true, split: true, room: P_280 - 46 - 4 });
+    // DM 320 (sim-9 Ambush): "Elite Goblin Warrior" + eye-off (125 + 4 + 14) on a 138-px line
+    // wraps; Moved follows the chips on the second line, so their room leaves it out.
+    expect(
+      fitNameLine({ line: 138, name: 125, marks: [eye], side: 0, end: 60, chips: true }),
+    ).toEqual({ nameWrap: true, split: true, room: 138 - 60 - 4 });
+    // No chips, no side chip: nothing moves, the name still wraps rather than being cut.
+    expect(
+      fitNameLine({ line: P_280, name: 300, marks: [], side: 0, end: 0, chips: false }),
+    ).toEqual({ nameWrap: true, split: false, room: 0 });
+  });
+
+  test("FR-CBTX-57 hidden ally name whole: the name has no truncation; it wraps (no ellipsis) only when wider than its line", () => {
+    const one = render(<RowName name="Goblin Lurker" testId="cbt-init-row-name" />);
+    expect(one).not.toContain("truncate");
+    expect(one).not.toContain("…");
+    expect(one).toContain("whitespace-nowrap");
+    expect(one).toContain('data-value="Goblin Lurker"');
+    const two = render(
+      <RowName name="Bartholomew the Exceedingly Long-Winded 3" testId="cbt-init-row-name" wrap />,
+    );
+    expect(two).toContain("wrap-anywhere");
+    expect(two).not.toContain("truncate");
+    // "Goblin 2": base and number in their own spans.
+    expect(render(<RowName name="Goblin 2" testId="cbt-init-row-name" />)).toContain(
+      '<span data-name-suffix="true" class="whitespace-pre"> 2</span>',
+    );
+    // The line: the name's measuring copy (never shown, no test ID), the marks beside the name,
+    // the side chip slot.
+    const line = render(
+      <NameLine
+        name="Goblin Lurker"
+        testId="cbt-init-row-name"
+        marks={<span data-testid="eye">eye</span>}
+        side={<span data-testid="ally">Ally</span>}
+      />,
+    );
+    expect(line).toContain('data-name-measure="true"');
+    expect(line.match(/data-testid="cbt-init-row-name"/g)).toHaveLength(1);
+    expect(line.indexOf('data-testid="eye"')).toBeLessThan(line.indexOf("data-name-side"));
+    expect(line).toContain('data-split="false"');
+  });
+});
+
+describe("FR-CBTX-58 trigger label never cut", () => {
+  test("FR-CBTX-58 trigger label never cut: no width cap or ellipsis on a trigger chip; the fit measures its natural width", () => {
+    const full = render(<TriggerChipView t={searing()} />);
+    expect(full).toContain("<span>Searing Strike</span>");
+    expect(full).not.toContain("truncate");
+    expect(full).not.toContain("max-width");
+    expect(full).not.toContain("max-w-");
+    // The row's measuring copy is uncapped too (sim-9 c03: capped at 96 px it "fit", then CSS cut it).
+    const row = render(
+      <EffectChips
+        compact
+        effects={[]}
+        triggers={[searing()]}
+        round={1}
+        testId="cbtx-init-row-effect"
+      />,
+    );
+    const measure = row.slice(row.indexOf('data-chip-measure="trigger"'), row.indexOf("</div>"));
+    expect(measure).toContain("<span>Searing Strike</span>");
+    expect(measure).not.toContain("max-width");
+    expect(measure).not.toContain("truncate");
+  });
+
+  test("FR-CBTX-58 trigger label never cut: Mira's Searing trigger + 'uses 1' at 400 → full label; at 320 → icon-only '⚡1' with the Tooltip sentence", () => {
+    // Natural widths: "Searing Strike 1" 99, icon-only "⚡1" 30. Mira's line: name 30, Moved 62
+    // on it at 400; at 320 Moved takes the AC / HP line (P3 glitch 10).
+    const chip = { full: 99, short: 30 };
+    const at = (line: number, end: number) =>
+      fitChipRow(
+        [],
+        [chip],
+        fitNameLine({ line, name: 30, marks: [], side: 0, end, chips: true }).room,
+      );
+    expect(at(DM_400, moved)).toEqual({ n: 0, tier: 0, icons: false, wrap: false });
+    expect(at(DM_320, 0)).toEqual({ n: 0, tier: 0, icons: true, wrap: false });
+    const icon = render(<TriggerChipView t={searing()} icon />);
+    expect(icon).toContain('data-compact="true"');
+    expect(icon).toContain('data-value="1"');
+    expect(icon).toContain('<span class="sr-only">Searing Strike</span>');
+    expect(icon).not.toContain("truncate");
+  });
+
+  test("FR-CBTX-58 trigger label never cut: a used trigger keeps muted + check, full or icon-only", () => {
+    const used = searing({ state: "used", muted: true, uses: { left: 0, text: "0" } });
+    for (const icon of [false, true]) {
+      const html = render(<TriggerChipView t={used} icon={icon} />);
+      expect(html).toContain('data-muted="true"');
+      expect(html).toContain('aria-label="Used"');
+      expect(html).toContain("opacity-70");
+      expect(html).not.toContain("truncate");
+    }
+  });
+});
