@@ -1072,6 +1072,16 @@ describe("FR-MAP-82 reveal refit", () => {
     ).toBe(false);
   });
 
+  test("FR-MAP-82 reveal refit: a sight change that redraws the tokens already drawn (Blinded, party vision on / off, a new vision polygon) → none, whatever the camera", () => {
+    const { clock, state, frame } = rig();
+    // The same ids, every frame: only the fog / vision changed.
+    for (let i = 0; i < 5; i++) frame(before);
+    // Even with one of them now under the sheet (e.g. the sheet grew): already drawn.
+    frame([drawn("mira", 0, 0), drawn("thorn", 900, 100)]);
+    clock.advance(10_000);
+    expect(state.fits).toEqual([]);
+  });
+
   test("FR-MAP-82 reveal refit: two reveals 300 ms apart → one refit (the last frame's content)", () => {
     const { clock, state, frame } = rig();
     frame([...before, drawn("goblin", 900, 100)]);
