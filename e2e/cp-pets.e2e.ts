@@ -121,7 +121,9 @@ test("FR-ENT-32 FR-PARTY-41 FR-PARTY-42 FR-ENT-39 FR-PARTY-43 New pet: owl → O
   await dm.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
 
-  // FR-PARTY-43: Release… → confirm → a plain creature: gone from every list.
+  // FR-PARTY-43: Release… → confirm → a plain creature: gone from every list. Creatures at its
+  // useful size may have auto-minimised Party (FR-SHELL-77): bring it back first.
+  await openWindow(dm, "party.board");
   await row(board).getByTestId("party-companion-menu").click();
   await dm.getByTestId("party-companion-release").click();
   await dm.getByTestId("party-companion-release-confirm").click();
