@@ -34,7 +34,7 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 
 | Date | What |
 |---|---|
-| — | Not started (kickoff prompt from the sprint-6 recap) |
+| 2026-10-20 | Phase A started: spec agents for gems, stats and the sprint-6 follow-ups running in parallel |
 
 ## Check `main` any time (DM)
 

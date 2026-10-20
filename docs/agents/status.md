@@ -2,16 +2,21 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 6 **done** (#290–#309), recap done (#310, #311). **Sprint 7 planned** in [sprint-7](sprint-7.md); Phase A starts with the DM's kickoff prompt.
+**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): GM, ST, FU spec agents running.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Sprint 6 | merged | — | done (#290–#309), recap #310 | — |
-| Sprint 7 | — | — | planned ([sprint-7](sprint-7.md)) | Phase A: specs GM, ST, FU at once |
+| GM gems spec | `spec/s7-gems` (ws w8H) | spec-gems | writing | seams |
+| ST stats spec | `spec/s7-stats` (ws w8J) | spec-stats | writing | seams |
+| FU follow-ups spec | `spec/s7-followups` (ws w8K) | spec-followups | writing | seams |
 
-ID ranges: assigned per track in the sprint-7 spec briefs (sprint 6's are in the decisions log #288 era; compute current maxima first).
+ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
+- GM: GEM FR 01-40 / OQ 04-20; CAMP FR 38-45 / OQ 33-36; DICE FR 62-71 / OQ 41-44; DICEX FR 59-62 / OQ 49-50; CBT FR 126-135 / OQ 85-88; CHARX FR 71-80 / OQ 37-40; MOD FR 64-67 / OQ 47-48; SHELL FR 98-100 / OQ 61-62; NOTE FR 52-54 / OQ 30-31.
+- ST: STATS FR 01-40 / OQ 01-20; DICE FR 72-76 / OQ 45-47; CBT FR 136-140 / OQ 89-91; SHELL FR 93-97 / OQ 58-60; NOTE FR 48-51 / OQ 28-29; MAP FR 98-100 / OQ 65-66; CHARX FR 86-88 / OQ 43.
+- FU: SHELL FR 77-92 / OQ 52-57; MAP FR 88-97 / OQ 61-64; CBT FR 141-160 / OQ 92-99; CBTX FR 59-64 / OQ 30-32; CHARX FR 81-85 / OQ 41-42; NOTE FR 44-47 / OQ 26-27; ENT FR 42-45 / OQ 38-39; PARTY FR 49-53 / OQ 29-30; LOOT FR 29-31 / OQ 21; DICE FR 77-79 / OQ 48-49; DICEX FR 63-65 / OQ 51; MOD FR 68-70 / OQ 49; CMP FR 57-59 / OQ 45.
 
 ## Shared-file locks
 
