@@ -2984,3 +2984,36 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 | Encounter editor | `cbt-enc-editor-back`; `cbt-enc-editor-body` scrolls between the header and `cbt-enc-editor-actions`; `cbt-enc-entry-name` (wraps between words, ≥ 96 px); list `cbt-enc-row-name` wraps | FR-CBT-146, -147, -149 |
 | Concentration chip (`EffectChips`) | fitted like a trigger chip (`data-compact`), never cut; DM / the PC's owner: `cbtx-conc-chip` → `cbtx-conc-menu` (`cbtx-conc-title`, `cbtx-conc-rounds`, `cbtx-conc-ends` from the viewer's store, `cbtx-conc-end` → `cbtx.endEffect`, DM `cbtx-conc-edit`); others: a focusable chip with its Tooltip | FR-CBTX-59–61 |
 | Turn-mode radios / portrait | `aria-label` = label on `cbt-summon-mode`, `cbt-companion-mode`, `ent-pet-mode`; `cbt-form-portrait` | FR-CBT-151, FR-ENT-44 |
+
+## 127. Sprint 7: stats core — `stats.query`, Show awards, From on heals, overkill line callout (ST-core)
+
+From [stats](../specs/stats.md#6-functional-requirements) FR-STATS-01–16, -20, -21, -23, -25, [combat-tracker](../specs/combat-tracker.md#65-sprint-7-stats-facts) FR-CBT-136–138, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-72, -73 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-48 (DM #311, #315; [ADR-0059](../architecture/adr/0059-stats-read-models.md)). **Built by `fix/st-core`** (server + shared + the DM dialog's From; the Stats window and toasts: ST2). Data side: [data model §98](../data-model/README.md#98-sprint-7-stats-core-st-core).
+
+**Intents**
+
+| Intent | Who | Errors (one code per case) | Result | Source |
+|---|---|---|---|---|
+| `stats.query {scope: "fight", encounterId?}` *(new)* | DM, player | unknown, planned or (player) not listed fight → `not_found`; an actor's 5th computed answer in 1 s with no earlier answer for that input → `conflict` "Too many stats queries, try again in a moment" | `{fight: {key, label, round, status, rows} \| null, fights: [{key, label, status}]}` (`fights` = the picker, newest first, ≤ 50) | FR-STATS-15, -16, -18 |
+| `stats.query {scope: "sessions"}` *(new)* | DM, player | rate as above | `{sessions: [{fromN, toN, from, to, fights}]}` (≤ 200, newest first) | FR-STATS-13, -19 |
+| `stats.query {scope: "session", n?}` *(new)* | DM, player | `n` in no session the viewer can list → `not_found`; rate as above | `{session: {fromN, toN, from, to, fights, awards[9]} \| null}` (absent `n` = the newest; null = none yet) | FR-STATS-12, -13 |
+| `stats.showAwards {fromN}` *(new)* | DM (player → `forbidden`) | `fromN` not a session key → `not_found` | `{notificationId}` | FR-STATS-20 |
+| `cbt.applyHp` + `sourceId?` *(changed)* | DM | not an active, non-removed combatant of the started encounter → `not_found` (the target itself allowed) | as before | FR-CBT-136 |
+
+- **Read-only:** `stats.query` runs in the command pipeline with no write, event, log row or `seq` (answered in this connection's frame order). Results parse with the role's strict schema (`@shared/stats/schemas`: `PlayerFightRow` has no `hidden`, `downs`, `effective`, monster or special rows; ADR-0059 §2).
+- **Viewer filter before aggregation:** a fact (`hp_change`, roll) counts only if its log line is visible: DM all; **players the hub filter for a viewer with no `playerId`** (public lines only, so every player gets the same answer); feature-tagged kinds skipped while off (DM too); undone and superseded lines never.
+- **Keys and labels:** a fight's `key` = its encounter id (a player lists only fights with a public fact, whose public lines already carry the id); `label` = the DM's encounter name, a player's "Fight N · Tue 20 Oct" (N by `startedAt` among the fights they list; the date in the server's local time). A session's key = the unclipped `fromN` for every viewer; `from` / `to` are clipped to the viewer's visible entries.
+- **Award** `{key, value, winners: [{characterId, name, playerId, with?}], more?, detail?: {from, to, raw, fight}}`; keys `biggest-hit`, `biggest-overkill`, `most-dealt`, `most-taken`, `most-healing`, `most-kills`, `most-nat20`, `most-nat1`, `most-downed`. Biggest overkill: the DM's `value` = the overkill amount; a player's = the callout line's `raw` (= `detail.raw`).
+- **Rate (FR-STATS-16):** answers are memoised per (campaign, role + enabled features, input) and staled by a commit hook on any change to `game-log-entry`, `hp-change`, `combatant`, `encounter`, `entity` or `campaign`. A fresh memo is free; otherwise ≤ 4 computed answers per actor (role + player: commands see no connection) per second; the excess is answered with the last answer for that input (coalesced), or `conflict` when there is none.
+- **Session boundary cache** (FR-STATS-14): server memory per campaign, extended from the last `n`; the active campaign's warmed by the start hook `stats-sessions`.
+
+**Lines and notification** (no new record type or event)
+
+| Thing | Visibility | Source |
+|---|---|---|
+| `cbt.attack` / `cbt.hp` payload `callout?: "overkill"` *(new)* | as the line: `hpAfter = 0` and `overkill ≥ max(10, hpBefore + absorbed)`, PCs too; the amount is DM-only: `cbt.attack` `dmPayload.overkill` (existing int), `cbt.hp` `dmPayload.overkill?` *(new)* | FR-CBT-137 |
+| `cbt.hp` payload `sourced?: true` *(new)* + `actorName` = the source | the line reads "Sela → Mira, heal 8" / "Goblin → Mira, 8 damage"; a hidden source makes the line DM-only | FR-CBT-136 |
+| Notification kind `stats-awards` *(new; `notifications/kinds.ts`)* | audience `all`, info, no action; payload `{fromN, toN, from, to, label}` (players' clipped times, "Tue 20 Oct"); text "Session awards: ‹label›" | FR-NOTE-48 |
+
+- **Read helpers:** `combat-tracker/stats-read.ts`: `combatFacts(db, {encounterId} | {campaignId, from, to})`, `fightCombatants`, `fightsOf`, `publicFactEncounters`, `factRefs`; `dice-roll-log/stats-read.ts`: `logTimeline(db, campaignId, afterN?) → {n, at, public, feature}[]`, `rollFacts(db, viewer, campaignId, fromN, toN) → {rollId, natural, category, actorKind, actorId, public}[]`, `entryVisible(viewer, entry)`.
+- **Fixtures:** units `st-past-crypt`, `st-ambush-facts`; bundles `stats-past` (base + the ended "Old Crypt", included first: one started fight per campaign), `stats` (= `stats-past` + `session-sim-10` + `st-ambush-facts`), `stats-e2e`; `session-sim-11` includes `stats-past`.
+- **CON-44** (heavy harness): +189 B per viewer (9 callout lines in the window); worst, every combat line in the 100-row window a sourced callout: players ≈ +3.6 KB, DM ≈ +5 KB (DM ≤ 940 KB of 1.5 MiB with the sprint's worst; players ≤ 293 KB of 512 KiB). `stats-awards` rows sit in the closed-notification window (no growth). Stats add no snapshot field.

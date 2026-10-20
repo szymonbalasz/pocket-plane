@@ -2198,3 +2198,19 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-141, -145 
 - **Derived (not stored):** kept HP (one pass over the campaign's monster `combatant` rows joined to ended encounters; no index needed at ≤ a few thousand rows).
 - **Fixtures:** unit `fu-hurt-goblins` (Goblin −7 → 0 / 7, Goblin 2 −3 → 4 / 7 in the running ambush); bundles `fu-s7` (= `session-sim-10` + `cp-ally` + `fu-hurt-goblins`), `fu-s7-e2e`; both units appended to `session-sim-11` (FU group).
 - **CON-44: 0 B** (no field or record; kept HP fills existing columns).
+
+## 98. Sprint 7: stats core (ST-core)
+
+From [stats](../specs/stats.md#8-data-model) and [combat-tracker](../specs/combat-tracker.md#65-sprint-7-stats-facts) FR-CBT-136–138 (#311, #315; [ADR-0059](../architecture/adr/0059-stats-read-models.md)). **Built by `fix/st-core`**. Protocol side: [protocol §127](../protocol/README.md#127-sprint-7-stats-core--statsquery-show-awards-from-on-heals-overkill-line-callout-st-core). **No table, column or record type.**
+
+| Field / table | Change | Rule | Source |
+|---|---|---|---|
+| `hp_change.attacker_id` / `attacker_name` | unchanged columns, now also written by `cbt.applyHp` from `sourceId` | null = the DM, as before | FR-CBT-136 |
+| `game_log_entry.payload` (`cbt.attack`, `cbt.hp`) | + `callout?: "overkill"`; `cbt.hp` + `sourced?: true` | stamped at apply; old rows parse | FR-CBT-136, -137 |
+| `game_log_entry.dm_payload` (`cbt.hp`) | + `overkill?` int (callout lines) | `cbt.attack` keeps its existing `overkill` int (the spec's `{amount, hpBefore}` leaf would clash with it; "over M HP" = damage − overkill) | FR-CBT-137 |
+| `notification` (kind `stats-awards`) | new kind, payload `{fromN, toN, from, to, label}` | made only by `stats.showAwards` | FR-NOTE-48 |
+
+- **Facts contract** (FR-CBT-138, FR-DICE-72): `hp_change` rows, combatants and started / ended encounters are never deleted; rows change only by the undo marker; `raw`, `applied`, `overkill`, `hpBefore`, `hpAfter`, temp fields, `entryId`, and the log's `natural`, `category`, `rollIds`, `encounterId`, `public` keep their meaning (a change needs a stats review).
+- **Derived (not stored):** every stat, sessions (a ≥ 6 h gap between consecutive entries; key = first `n`), fight labels.
+- **Persisted runtime state:** none. Server memory only: the session boundary cache and the query memo / rate gate.
+- **Fixtures:** `st-past-crypt` (ended "Old Crypt": Thorn vs 2 Skeletons, one callout, Mira downed and healed back, a public nat 20), `st-ambush-facts` (4 Goblin Scouts + 13 facts on sim-10's Goblin Ambush; expected numbers in `fixtures/units/stats/stats.fixtures.test.ts`).
