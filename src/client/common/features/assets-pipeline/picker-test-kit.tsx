@@ -11,7 +11,8 @@ import { SyncContext, type SyncState } from "@ui/sync/store";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
-import { AssetPicker, type AssetPickerProps } from "./AssetPicker";
+import { AssetPicker, AssetPickerDialog, type AssetPickerProps } from "./AssetPicker";
+import { ImageAttach, type ImageAttachProps } from "./attach/ImageAttach";
 import type { UploadOutcome } from "./upload";
 import { type AttachUploader, AttachUploaderProvider } from "./uploader";
 
@@ -148,4 +149,18 @@ export function hostPicker(props: AssetPickerProps, assets: readonly AssetRecord
   const shown = new Set(itemIds(html));
   const ordered = [...assets].sort(pickerOrder).filter((a) => shown.has(a.id));
   return { html, gobEl: matchImages(ordered, "Gob el").map((a) => a.name) };
+}
+
+/**
+ * The picker an `ImageAttach` opens from From library (its `AssetPickerDialog` element), found
+ * one component down: `ImageAttach` → its control → the Dialog.
+ */
+export function attachLibraryPicker(
+  props: ImageAttachProps,
+  assets: readonly AssetRecord[],
+): ReactElement<AssetPickerProps> | null {
+  const control = captureTree(ImageAttach, props, assets);
+  if (!isValidElement(control) || typeof control.type !== "function") return null;
+  const tree = captureTree(control.type as (p: unknown) => ReactNode, control.props, assets);
+  return findElement(tree, AssetPickerDialog);
 }

@@ -1,8 +1,11 @@
 // Homebrew form Dialog (FR-CMP-24, -25; CMP §7): kind (New only), name, the kind's facets and
 // short fields, text Textarea with a live markdown-lite preview, **Shared with players** Switch.
 // Images strip (FR-CMP-50): one tile per image (first "Main"), Remove / Move left / right, then
-// the image attach control (upload, drop or paste anywhere in the Dialog, From library).
+// the image attach control (upload, drop or paste anywhere in the Dialog, From library); its
+// `context` follows the kind (FR-CMP-55: items tag uploads Items).
 // Saves with `POST` (New, Clone) or `PUT` (Edit); server errors inline; the window refetches.
+
+import type { ImageContext } from "@shared/assets-pipeline/tags";
 import {
   HOMEBREW_TEXT_MAX,
   IMAGE_SLOTS_MAX,
@@ -274,6 +277,7 @@ export function ImageSlots({
   busy,
   duplicate,
   onAdd,
+  context,
 }: {
   images: readonly string[];
   onChange(ids: string[]): void;
@@ -281,6 +285,8 @@ export function ImageSlots({
   busy: boolean;
   duplicate: boolean;
   onAdd(id: string): void;
+  /** FR-CMP-55: the picker / upload context of the entry's kind. */
+  context?: ImageContext;
 }) {
   return (
     <div className="flex flex-col gap-1.5" data-testid="cmp-form-images" data-value={images.length}>
@@ -337,6 +343,7 @@ export function ImageSlots({
       )}
       <ImageAttach
         owner="cmp-form"
+        context={context}
         max={IMAGE_SLOTS_MAX}
         count={images.length}
         onAdd={onAdd}
@@ -352,6 +359,10 @@ export function ImageSlots({
     </div>
   );
 }
+
+/** FR-CMP-55: item entries tag uploads Items; other kinds send no tag (FR-ASSET-48). */
+export const imageContextOf = (kind: HomebrewKind): ImageContext =>
+  kind === "item" ? "compendium-item" : "compendium";
 
 function HomebrewForm({
   api,
@@ -485,6 +496,7 @@ function HomebrewForm({
             busy={saving}
             duplicate={duplicate}
             onAdd={attach}
+            context={imageContextOf(f.kind)}
           />
         </div>
         <div className="col-span-2 flex items-center gap-2">
