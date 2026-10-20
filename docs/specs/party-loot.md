@@ -1,7 +1,7 @@
 ---
 title: Party loot
 prefix: LOOT
-status: in-review
+status: complete
 owner: spec-prefs
 wave: 3
 phase: post-mvp-6
@@ -262,8 +262,8 @@ A **bold** option is the suggested pick unless the row says Decided.
 | ~~OQ-LOOT-16~~ | ~~Wallet on `char.sheet`?~~ | **Decided (#152):** not in MVP; the loot window shows wallets | — | character-sheet |
 | OQ-LOOT-17 | *(S5)* After the Loot tab [4], does the separate "Party loot" window stay? | **Decided (#256): no, it retires (window and launcher entry); every "open loot" link opens Party on Loot** (FR-LOOT-21–23). Rejected: ~~B keep both~~. *How (settled by seams S4):* P3 deletes LOOT's own `loot.log` line from both `windows.ts` (the owning feature may delete its own line from an append-only registry) | — | play-shell |
 | OQ-LOOT-18 | *(S5)* **character-sheet-full**: the wallet link (FR-LOOT-23) is a CHARX file | **Settled by seams S4:** P3 changes the one call (`openPartyTab("loot")`), granted; no sheet UI change | no · settled | character-sheet-full |
-| OQ-LOOT-19 | *(S6)* "Disabled for empty or zero" (#285 [3]) with **text but no coins** (e.g. "Rope") | **A. Disabled: coins decide, as the DM said; items go to the party Inventory; the server still accepts text-only entries (fixtures, old rows)**: one clear rule / B. Text alone still enables Add (today's FR-LOOT-02 rule): keeps loot notes without coin, but "disabled for empty or zero" then only applies to the coins | no · owner: DM | FR-LOOT-27 |
-| OQ-LOOT-20 | *(S6)* Mixed signs (−2 gp, +15 sp: making change): which label? | **A. "Subtract" whenever any coin is negative**: matches the server's spend rule (no toast), one test / B. "Add / subtract": exact, but a third label for a rare case | no · owner: DM | FR-LOOT-25 |
+| OQ-LOOT-19 | *(S6)* "Disabled for empty or zero" (#285 [3]) with **text but no coins** (e.g. "Rope") | **Decided (#288): A (disabled without a coin).** Options as framed: **A. Disabled: coins decide, as the DM said; items go to the party Inventory; the server still accepts text-only entries (fixtures, old rows)**: one clear rule / B. Text alone still enables Add (today's FR-LOOT-02 rule): keeps loot notes without coin, but "disabled for empty or zero" then only applies to the coins | — · decided | FR-LOOT-27 |
+| OQ-LOOT-20 | *(S6)* Mixed signs (−2 gp, +15 sp: making change): which label? | **Decided (#288): A ("Subtract" when any coin is negative).** Options as framed: **A. "Subtract" whenever any coin is negative**: matches the server's spend rule (no toast), one test / B. "Add / subtract": exact, but a third label for a rare case | — · decided | FR-LOOT-25 |
 
 ## 16. Out of scope
 
