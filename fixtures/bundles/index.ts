@@ -22,6 +22,7 @@ import fogScn from "./fog-scn";
 import furyLogLine from "./fury-log-line";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
+import initRowsE2e from "./init-rows-e2e";
 import lateDamage from "./late-damage";
 import logNoteColours from "./log-note-colours";
 import mapTools from "./map-tools";
@@ -46,6 +47,7 @@ import sessionSim8 from "./session-sim-8";
 import sessionSim9 from "./session-sim-9";
 import sessionSim10 from "./session-sim-10";
 import syncProbe from "./sync-probe";
+import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
 import tplMenu from "./tpl-menu";
 import usesNegative from "./uses-negative";
@@ -106,4 +108,6 @@ export const bundles: readonly Bundle[] = [
   prefsS6E2e,
   imageSearch,
   sessionSim10,
+  toastHomeE2e,
+  initRowsE2e,
 ];

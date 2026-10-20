@@ -1,4 +1,4 @@
-// e2e-bundle: session-sim-9
+// e2e-bundle: toast-home-e2e
 // Thin sprint-6 toast home (SHELL §13 F5, track WF2; FR-NOTE-42, -43, FR-SHELL-59). Read-only on
 // server state: opens windows and map tools, sends no intent. The DM's "1 pending action" summary
 // (sim-9's ruled card) stays at its top-centre home with Scenes and a tool bar open, and every
