@@ -2092,7 +2092,7 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 
 
 ## 90. Sprint 6: pets (CP1)
 
-From [entities](../specs/entities.md#8-data-model) FR-ENT-36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252). **Built by `build/cp-pets`**. **No schema change**: CP0's columns ([§89](#89-sprint-6-companions-core-cp0)). Protocol side: [protocol §115](../protocol/README.md#115-sprint-6-pets--new-pet-pet-hp-companions-tab-cp1).
+From [entities](../specs/entities.md#8-data-model) FR-ENT-36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252). **Built by `build/cp-pets`**. **No schema change**: CP0's columns ([§89](#89-sprint-6-companions-core-cp0)). Protocol side: [protocol §117](../protocol/README.md#117-sprint-6-pets--new-pet-pet-hp-companions-tab-cp1).
 
 | Table / field | Change | Rule | Source |
 |---|---|---|---|

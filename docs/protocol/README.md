@@ -2773,7 +2773,7 @@ From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-52 
 | Tests | `template-hover.test.ts` (`FR-SCN-52 template label on hover`: any drawn template's area incl. one the player can't edit, 6-px tolerance per scale, topmost, the pill and its grown rect), `e2e/tray-label-s6.e2e.ts` (Player 1 hovers Player 2's kept Thunderwave on a square Web doesn't cover → "· by Player 2" + `hovered`; away → gone; the pill, then six steps across its grown part → hovered throughout) | — |
 | CON-44 | 0 B | — |
 
-## 115. Sprint 6: pets — New pet, pet HP, Companions tab (CP1)
+## 117. Sprint 6: pets — New pet, pet HP, Companions tab (CP1)
 
 From [entities](../specs/entities.md#6-functional-requirements) FR-ENT-32 (UI), -33 (form), -36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `build/cp-pets`**: one new intent; everything else uses CP0's routes, events and visibility ([§112](#112-sprint-6-companions-core-cp0)). Data side: [data model §90](../data-model/README.md#90-sprint-6-pets-cp1).
 
