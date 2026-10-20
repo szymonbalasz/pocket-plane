@@ -222,7 +222,7 @@ test("FR-SHELL-45 launcher opens never stack (player, 1280×720 / 1280×800 / 14
   }
 });
 
-test("FR-SHELL-48 keep-outs (player): the toast corner is hard: auto placement stays out; a feature open stored over it is re-placed, a user open isn't", () => {
+test("FR-SHELL-48 FR-SHELL-56 keep-outs (player): the toast corner is hard: auto placement stays out; a feature open and a user reopen stored over it are both re-placed", () => {
   for (const viewport of REFERENCE_VIEWPORTS) {
     expect(keepOuts("player", viewport)).toEqual([
       { id: "toasts", rect: toastKeepOut("player", viewport), kind: "hard" },
@@ -240,8 +240,9 @@ test("FR-SHELL-48 keep-outs (player): the toast corner is hard: auto placement s
   const over = { x: corner.x, y: corner.y - 100, w: 360, h: 300 };
   ws = reduce(ws, { type: "setRect", kind: "note.history", rect: over }, ctx);
   ws = reduce(ws, { type: "minimise", kind: "note.history" }, ctx);
+  // FR-SHELL-56 (2): a hard keep-out covers a stored rect like a window does.
   const user = reduce(ws, { type: "open", kind: "note.history", by: "user" }, ctx);
-  expect(rectIn(user, "note.history")).toEqual(over);
+  expect(overlaps(rectIn(user, "note.history"), corner)).toBe(false);
   const feature = reduce(ws, { type: "open", kind: "note.history", by: "feature" }, ctx);
   expect(overlaps(rectIn(feature, "note.history"), corner)).toBe(false);
 });

@@ -156,15 +156,23 @@ test("FR-SHELL-45 FR-SHELL-46 FR-SHELL-47 sim-8 sequence (DM, Initiative + Game 
   for (const s of laptop.steps) expect(s.rect).toEqual({ x: 68, y: 60, w: 440, h: 412 });
 });
 
-test("FR-SHELL-47 screen full (DM): the auto-minimised window is written minimised; a user restore reopens at its stored rect", () => {
+test("FR-SHELL-47 FR-SHELL-56 screen full (DM): the auto-minimised window is written minimised; a user restore onto its taken spot re-places it, parking the least recently used other window", () => {
   const seq = ["cmp.compendium", "party.board", "cbt.encounters"];
   const { windows } = launcherSequence(dmWindows, WIDE, seq);
   const cmp = windows.find((w) => w.kind === "cmp.compendium");
   expect(cmp?.state).toBe("minimised");
   const ctx = { registry: dmWindows, viewport: WIDE, available: allKinds() };
   const back = reduce(windows, { type: "open", kind: "cmp.compendium" }, ctx);
-  expect(rectIn(back, "cmp.compendium")).toEqual({ x: 68, y: 60, w: 440, h: 512 });
+  // Its stored spot (68, 60) is Encounters' now: re-placed; Party (lowest z) parked for it.
+  expect(back.find((w) => w.kind === "cmp.compendium")?.state).toBe("open");
   expect(back.find((w) => w.kind === "cbt.encounters")?.state).toBe("open");
+  expect(back.find((w) => w.kind === "party.board")?.state).toBe("minimised");
+  const shown = back.filter((w) => w.state === "open");
+  const rects = renderedWindowRects(shown, dmWindows, allKinds(), WIDE);
+  const mine = rects[shown.findIndex((w) => w.kind === "cmp.compendium")] as Rect;
+  rects.forEach((r, i) => {
+    if (shown[i]?.kind !== "cmp.compendium") expect(overlaps(mine, r)).toBe(false);
+  });
   for (const w of back) {
     if (dmWindows.get(w.kind)?.defaultOpen) expect(w.state).toBe("open");
   }
@@ -567,23 +575,37 @@ test("FR-SHELL-41 DM: Compendium dragged onto Initiative's stored rect; Start re
   }
 });
 
-test('FR-SHELL-08 user opens keep the stored rect: the Not-shown badge → Scenes, a notification "Open" over another window', () => {
+test('FR-SHELL-08 FR-SHELL-56 user opens keep a clear stored rect (the DM soft box does not count), and re-place one now over another window: the Not-shown badge → Scenes, a notification "Open"', () => {
   const viewport = DESKTOP;
   const ctx = { registry: dmWindows, viewport, available: allKinds() };
   const layout = defaultLayout(dmWindows, viewport);
   const init = win(layout, "cbt.initiative");
-  for (const kind of ["map.scenes", "note.history", "char.sheet"]) {
-    let ws = reduce(layout, { type: "open", kind }, ctx);
-    const spot = { x: init.x + 10, y: init.y + 10, w: 300, h: 300 };
-    ws = reduce(ws, { type: "setRect", kind, rect: spot }, ctx);
-    const stored = win(reduce(ws, { type: "close", kind }, ctx), kind);
-    // `useOpenWindow()(kind)` dispatches `by: "user"`.
-    const back = win(
-      reduce(reduce(ws, { type: "close", kind }, ctx), { type: "open", kind, by: "user" }, ctx),
-      kind,
+  const reopen = (kind: string, spot: Rect) => {
+    const ws = reduce(
+      reduce(layout, { type: "open", kind }, ctx),
+      {
+        type: "setRect",
+        kind,
+        rect: spot,
+      },
+      ctx,
     );
-    expect(same(back, stored)).toBe(true);
-    expect(overlaps(back, init)).toBe(true);
+    // `useOpenWindow()(kind)` dispatches `by: "user"`.
+    const closed = reduce(ws, { type: "close", kind }, ctx);
+    return {
+      stored: win(closed, kind),
+      back: win(reduce(closed, { type: "open", kind, by: "user" }, ctx), kind),
+    };
+  };
+  for (const kind of ["map.scenes", "note.history", "char.sheet"]) {
+    // Clear (partly under the DM's soft top-centre box): kept.
+    const free = reopen(kind, { x: 600, y: 200, w: 300, h: 300 });
+    expect(overlaps(free.back, toastKeepOut("dm", viewport))).toBe(true);
+    expect(same(free.back, free.stored)).toBe(true);
+    // Over Initiative: re-placed, clear of it.
+    const covered = reopen(kind, { x: init.x + 10, y: init.y + 10, w: 300, h: 300 });
+    expect(same(covered.back, covered.stored)).toBe(false);
+    expect(overlaps(covered.back, init)).toBe(false);
   }
 });
 
