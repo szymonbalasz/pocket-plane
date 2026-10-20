@@ -34,6 +34,7 @@ import {
   clamp,
   type Hsv,
   hexToHsv,
+  hsvToHex,
   MASK_CELLS,
   maskPath,
   NO_COLOUR_MESSAGE,
@@ -42,6 +43,7 @@ import {
   parseHexInput,
   pickerRules,
   type Sv,
+  type Verdict,
 } from "./color-picker";
 import { colorHex } from "./colors";
 
@@ -185,12 +187,15 @@ export interface PickerStatus {
 /**
  * The reason line and Apply (FR-CAMP-35): a hovered / focused swatch names its block (or its
  * name); else the draft's problem: a hex field that doesn't parse, no allowed colour at this hue,
- * FR-CAMP-31 / -32. Apply needs live, nothing in flight, no problem and a changed draft.
+ * FR-CAMP-31 / -32; else, while the clamp holds the marker off its target (`pushed`), why the
+ * target was refused. Apply needs live, nothing in flight, no problem and a changed draft.
  */
 export function pickerView(p: {
   draft: Draft;
   hexText: string | null;
   hint: PaletteSwatch | null;
+  /** The refused target's verdict while a drag / key / hue move was clamped. */
+  pushed?: Verdict | null;
   stored: string | null;
   rules: PickerRules;
   live: boolean;
@@ -203,10 +208,11 @@ export function pickerView(p: {
       ? { reason: "no-colour" as const, message: NO_COLOUR_MESSAGE }
       : p.rules.verdict(p.draft.hex);
   const { hint } = p;
+  const shown = verdict ?? p.pushed ?? null;
   const status = hint
     ? { reason: hint.reason, message: hint.message ?? hint.name, block: hint.reason !== null }
-    : verdict
-      ? { reason: verdict.reason, message: verdict.message, block: true }
+    : shown
+      ? { reason: shown.reason, message: shown.message, block: true }
       : null;
   const canApply = p.live && !p.inFlight && verdict === null && p.draft.hex !== p.stored;
   return { badHex, status, canApply };
@@ -223,6 +229,7 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
   const [pick, setPick] = useState<Draft | null>(null);
   const [hexText, setHexText] = useState<string | null>(null);
   const [hint, setHint] = useState<PaletteSwatch | null>(null);
+  const [pushed, setPushed] = useState<Verdict | null>(null);
   const [inFlight, setInFlight] = useState(false);
   const draft = pick ?? draftOf(stored ?? PLAYER_COLORS.amber);
   // The draft follows the store once it equals it (an Apply landed, or someone set the same).
@@ -236,6 +243,7 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
     draft,
     hexText,
     hint,
+    pushed,
     stored,
     rules,
     live,
@@ -243,11 +251,14 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
   });
 
   const move = (t: Hsv) => {
+    const got = clamp(t, rules, cache);
     setHexText(null);
-    setPick(clamp(t, rules, cache));
+    setPick(got);
+    setPushed(got.s === t.s && got.v === t.v ? null : rules.verdict(hsvToHex(t)));
   };
   const take = (hex: string) => {
     setHexText(null);
+    setPushed(null);
     setPick(draftOf(hex, draft.h));
   };
   const apply = () => {
@@ -332,6 +343,7 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
         onPointerMove={(e) => {
           if (e.currentTarget.hasPointerCapture(e.pointerId)) pointerTo(e);
         }}
+        onPointerUp={() => setPushed(null)}
         onKeyDown={(e) => {
           const t = keyTarget(e.key, e.shiftKey, draft);
           if (!t) return;
@@ -383,6 +395,7 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
             const text = e.target.value;
             const hex = parseHexInput(text, false);
             setHexText(text);
+            setPushed(null);
             if (hex) setPick(draftOf(hex, draft.h));
           }}
           onKeyDown={(e) => {

@@ -237,6 +237,31 @@ describe("FR-CAMP-35 picker", () => {
     });
   });
 
+  test("FR-CAMP-35 clamp: while a drag is held off a refused target, the reason line names the target's reason (§13 P4); the clamped draft stays appliable", () => {
+    const rules = pickerRules(othersOf(H, "p1"));
+    const target = { h: 162, s: 86, v: 5 };
+    const got = clamp(target, rules, new Set());
+    expect(got.v).toBeGreaterThan(5);
+    const pushed = rules.verdict(hsvToHex(target));
+    expect(pushed?.reason).toBe("too-dark");
+    expect(
+      pickerView({
+        draft: got,
+        hexText: null,
+        hint: null,
+        pushed,
+        stored: PLAYER_COLORS.jade,
+        rules,
+        live: true,
+        inFlight: false,
+      }),
+    ).toEqual({
+      badHex: false,
+      status: { reason: "too-dark", message: "Too dark to read on the map", block: true },
+      canApply: true,
+    });
+  });
+
   test("FR-CAMP-35 picker: not live → the picker still renders the draft, Apply disabled", () => {
     const html = renderWith(
       snapshotStore("player"),
