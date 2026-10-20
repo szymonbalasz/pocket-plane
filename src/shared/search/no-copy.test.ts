@@ -76,5 +76,5 @@ describe("FR-CMP-54 no copy", () => {
     }
     expect(scanned).toBeGreaterThan(100); // the glob found the tree
     expect(hits).toEqual([]);
-  });
+  }, 30_000); // reads every file under src/: over the 5 s default while other suites run
 });
