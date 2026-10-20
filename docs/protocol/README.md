@@ -883,6 +883,8 @@ Built by `build/party-loot` from [party-loot](../specs/party-loot.md) (LOOT, #14
 
 **Window** `loot.log` "Party loot" *(S5: **retired**, window type and launcher entry removed from both registries; the same body is the Party window's Loot tab, [FR-LOOT-21](../specs/party-loot.md#6-functional-requirements), [§93](#93-sprint-5-loot-tab-p3))*: both clients, closed by default, `center` 440×560, min 320×320; launcher "Loot" (coins icon, order 60). Body: pot strip, wallets, DM add form, Move form, log newest first ([FR-LOOT-15](../specs/party-loot.md#6-functional-requirements)).
 
+*(Sprint 6, built, build/prefs-window: PF3)* **Add form Subtract** ([FR-LOOT-25–28](../specs/party-loot.md#6-functional-requirements)), client only: any coin < 0 → title "Subtract from the pot" (`loot-add-title` `data-mode` = `add` | `subtract`), button "Subtract" (`loot-add-submit` `data-mode`); hint `loot-add-hint` "Enter a negative amount to subtract." under the coin Inputs (also in an edited row); Add / Subtract disabled unless some coin is a non-zero integer ("", 0, "-", text alone). `loot.add` and the server rule FR-LOOT-02 unchanged; 0 B on the wire. E2E bundle `loot-subtract-e2e` (= `party-loot`).
+
 **Snapshot budget:** ≤ 100 × 471 B (measured, 200-char text, #163) + pot + ≤ 10 wallets ≈ 50 KB worst, same for DM and players (LOOT §12, CON-44).
 
 **Registry lines:** server feature `partyLootFeature`; record types `loot-entry`, `party-pot`, `wallet`; notification kind `loot-received` (server + both client views); window `loot.log` (both) *(S5: both lines removed by its owner, FR-LOOT-21)*; bundle `party-loot`; fixture units `loot-1`, `loot-wallets`, `loot-second` ([data model §19](../data-model/README.md#19-reward-loot-entry-party-pot-wallet)).

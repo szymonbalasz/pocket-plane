@@ -61,6 +61,7 @@ import {
   movePayload,
   NO_MOVE_TEXT,
   newestFirst,
+  parseCoin,
   splitCharacters,
   splitPayload,
   splitPrefill,
@@ -116,8 +117,47 @@ function Purse({
   );
 }
 
-function SectionTitle({ children }: { children: string }) {
-  return <h3 className="text-xs font-medium text-muted-foreground">{children}</h3>;
+function SectionTitle({ children, ...props }: { children: string } & React.ComponentProps<"h3">) {
+  return (
+    <h3 className="text-xs font-medium text-muted-foreground" {...props}>
+      {children}
+    </h3>
+  );
+}
+
+export type AddMode = "add" | "subtract";
+
+/** FR-LOOT-26: under the coin Inputs of the add and edit forms, always shown. */
+export const SUBTRACT_HINT = "Enter a negative amount to subtract.";
+
+const ADD_TEXT: Record<AddMode, { title: string; button: string }> = {
+  add: { title: "Add loot", button: "Add" },
+  subtract: { title: "Subtract from the pot", button: "Subtract" },
+};
+
+/**
+ * The DM add form as drawn (FR-LOOT-25, -27): "Subtract" while any coin Input holds a negative
+ * integer (mixed signs too: the server's spend rule, so no player toast); enabled only with a
+ * non-zero coin ("", 0, "-" or text alone → disabled), on top of FR-LOOT-16's reasons.
+ */
+export function addForm(text: string, draft: CoinDraft, s: { live: boolean; busy: boolean }) {
+  const parsed = lootPayload(text, draft);
+  const coins = COINS_DISPLAY.map((k) => parseCoin(draft[k], true) ?? 0);
+  const mode: AddMode = coins.some((v) => v < 0) ? "subtract" : "add";
+  return {
+    parsed,
+    mode,
+    ...ADD_TEXT[mode],
+    enabled: coins.some((v) => v !== 0) && submitEnabled({ valid: parsed.ok, ...s }),
+  };
+}
+
+function CoinHint() {
+  return (
+    <p data-testid="loot-add-hint" className="text-xs text-muted-foreground">
+      {SUBTRACT_HINT}
+    </p>
+  );
 }
 
 /** Five coin Inputs, pp → cp (FR-LOOT-16, FR-LOOT-18). */
@@ -178,13 +218,12 @@ function useSend(lost: string) {
 const dirty = (text: string, draft: CoinDraft) =>
   text !== "" || Object.values(draft).some((v) => v !== "");
 
-/** DM add form (FR-LOOT-16). */
+/** DM add form (FR-LOOT-16, -25–27). */
 function AddForm({ live }: { live: boolean }) {
   const [text, setText] = useState("");
   const [draft, setDraft] = useState<CoinDraft>(EMPTY_DRAFT);
   const { busy, error, send } = useSend(LOST_ADD);
-  const parsed = lootPayload(text, draft);
-  const enabled = submitEnabled({ valid: parsed.ok, live, busy });
+  const { parsed, mode, title, button, enabled } = addForm(text, draft, { live, busy });
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!enabled || !parsed.ok) return;
@@ -196,7 +235,9 @@ function AddForm({ live }: { live: boolean }) {
   const message = error ?? (!parsed.ok && dirty(text, draft) ? parsed.message : null);
   return (
     <form data-testid="loot-add" onSubmit={submit} className="flex flex-col gap-1">
-      <SectionTitle>Add loot</SectionTitle>
+      <SectionTitle data-testid="loot-add-title" data-mode={mode}>
+        {title}
+      </SectionTitle>
       <fieldset disabled={!live} className="flex flex-col gap-1">
         <div className="flex gap-1">
           <Input
@@ -207,11 +248,18 @@ function AddForm({ live }: { live: boolean }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          <Button type="submit" size="sm" data-testid="loot-add-submit" disabled={!enabled}>
-            Add
+          <Button
+            type="submit"
+            size="sm"
+            data-testid="loot-add-submit"
+            data-mode={mode}
+            disabled={!enabled}
+          >
+            {button}
           </Button>
         </div>
         <CoinInputs draft={draft} onChange={setDraft} signed testId="loot-add-coin" />
+        <CoinHint />
       </fieldset>
       {message && (
         <p data-testid="loot-add-error" role="alert" className="text-xs text-destructive">
@@ -462,8 +510,8 @@ function Time({ iso }: { iso: string }) {
   );
 }
 
-/** A loot row in edit (FR-LOOT-17): same inputs, prefilled; Enter saves, Esc cancels. */
-function EditRow({
+/** A loot row in edit (FR-LOOT-17, -28): same inputs and hint, prefilled; Enter saves, Esc cancels. */
+export function EditRow({
   entry,
   live,
   onDone,
@@ -512,6 +560,8 @@ function EditRow({
         onChange={(e) => setText(e.target.value)}
       />
       <CoinInputs draft={draft} onChange={setDraft} signed testId="loot-add-coin" />
+      {/* FR-LOOT-28: the same hint; Save keeps FR-LOOT-17's rule and its label. */}
+      <CoinHint />
       <div className="flex justify-end gap-1">
         <Button size="sm" variant="ghost" data-testid="loot-edit-cancel" onClick={onDone}>
           Cancel
