@@ -2088,3 +2088,15 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 
 - **Persisted runtime state:** companion fields and HP on the combatant; a pet's kept HP and presence on its entity. No new table or record type.
 - **Fixtures:** units `cp-srd` (SRD Owlbear, Fire Elemental), `pet-owlbear`, `pet-drake`, `cp-pet-thorn`, `cp-ally`; bundles `companions-prep`, `companions`, `companions-e2e`, `companions-start`, `companions-ally`.
 - **CON-44** (`src/server/ws/snapshot-size.test.ts`, realistic-heavy harness): 24 owned combatants with 8-attack max cards + 18 present pets (3 per player, max names and blocks): DM 691,105 → 796,753 B (owned combatants +54,816 B, pets +50,832 B; 776,111 B left of 1.5 MiB); players 310,614–313,914 B (+24,779 B each; 210,374 B left of 512 KiB).
+
+## 90. Sprint 6: companion turns client (CP2)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109, -115, -118, -119. **Built by `build/cp-turns`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent beyond CP0's fields. Protocol side: [protocol §113](../protocol/README.md#113-sprint-6-companion-turns-client-cp2).
+
+| Derived (not stored) | Where | Rule | Audience | Source |
+|---|---|---|---|---|
+| Row layout | per render | `companionLayout`: lines = `in-owner-turn` without a rank, in the owner PC's row; indent = ranked by the owner | each client its own rows | FR-CBT-107 |
+| Owner name | per render | the owner PC's combatant name, else its character's | each client | FR-CBT-118, -119 |
+| Own companion | per render | `ownerPlayerId = you` (players only receive HP / `card` on these) | player | FR-CBT-119 |
+| Pet offers | Start dialog | joining PCs' pets; ticked iff a token of the pet is on the scene (DM ticks override, reset on open) | DM | FR-CBT-109 |
+| Card request | client memory | `{id, n}`, lost on reload | player (DM when CP4 opens it there) | FR-CBT-119 |
