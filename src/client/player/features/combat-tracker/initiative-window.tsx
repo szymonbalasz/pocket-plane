@@ -16,8 +16,8 @@ import {
   deathStateFor,
   effectsOn,
 } from "@ui/features/combat-extras/logic";
-import { DeathBadge, DeathPips, EffectChips, RowName } from "@ui/features/combat-extras/parts";
-import { MoreFooter, useBelowFold } from "@ui/features/combat-tracker/below-fold";
+import { DeathBadge, DeathPips, EffectChips, NameLine } from "@ui/features/combat-extras/parts";
+import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
 import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
@@ -48,13 +48,13 @@ function PlayerInitiativeBody() {
   const store = useSync((s) => s.store);
   useTriggerWords();
   const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const footerRef = useRef<HTMLButtonElement>(null);
+  const ids = rows.map((c) => c.id);
   // FR-CBT-77 (G4): new rows (Start, reveal) scroll into view; "↓ N more" below the fold.
-  const fold = useBelowFold(
-    rootRef,
-    footerRef,
-    rows.map((c) => c.id),
-  );
+  const fold = useBelowFold(rootRef, footerRef, ids);
+  // FR-CBT-125: the row list clips and scrolls; the footer sits under it.
+  const clip = useListViewport(rootRef, listRef, footerRef, ids);
   if (!everLive || !enc) return <Skeleton className="h-24" />;
   const fx = activeEffects(store);
   const mine = new Set(characters.filter((c) => c.ownerPlayerId === me).map((c) => c.id));
@@ -62,12 +62,14 @@ function PlayerInitiativeBody() {
     (c: CombatantView) => c.kind === "pc" && mine.has(c.entityId ?? "") && c.initiative == null,
   );
   return (
-    // Round + hint stay put; the rows scroll inside the window.
+    // Round + hint stay put; the rows scroll inside the window, in their own clipping viewport
+    // above "↓ N more" (FR-CBT-125).
     <div
       ref={rootRef}
       data-testid="cbt-init"
       data-record-id={enc.id}
       className="flex h-full min-h-0 flex-col gap-2"
+      style={clip === null ? undefined : { maxHeight: clip }}
     >
       <span
         data-testid="cbt-init-round"
@@ -81,7 +83,11 @@ function PlayerInitiativeBody() {
           Roll initiative on your sheet
         </p>
       )}
-      <ul className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+      <ul
+        ref={listRef}
+        data-testid="cbt-init-list"
+        className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
+      >
         {rows.map((c) => {
           const turn = enc.playerTurnCombatantId === c.id;
           const ch = c.kind === "pc" ? characterOf(store, c.entityId ?? "") : undefined;
@@ -102,12 +108,15 @@ function PlayerInitiativeBody() {
               <TurnMarker active={turn} />
               <Portrait name={c.name} imageAssetId={c.imageAssetId} />
               <div className="flex min-w-0 flex-1 flex-col">
-                {/* FR-CBTX-46 (P3 glitch 6): the name line holds only the name and the chips, so
-                    chips get the width left after the full name, as on the DM's rows. */}
-                <div className="flex min-w-0 items-center gap-1">
-                  <RowName name={c.name} testId="cbt-init-row-name" className="text-sm" />
-                  {/* FR-CBT-104: never folds, before the effect chips (FR-CBTX-54). */}
-                  <SideChip c={c} testId="cbt-init-row-ally" />
+                {/* FR-CBTX-46 (P3 glitch 6), FR-CBTX-57: chips get the width left after the full
+                    name and the side chip, as on the DM's rows; the name is never cut. */}
+                <NameLine
+                  name={c.name}
+                  testId="cbt-init-row-name"
+                  className="text-sm"
+                  // FR-CBT-104: never folds, before the effect chips (FR-CBTX-54).
+                  side={<SideChip c={c} testId="cbt-init-row-ally" />}
+                >
                   <EffectChips
                     compact
                     effects={effectsOn(fx, creatureOf(c))}
@@ -115,7 +124,7 @@ function PlayerInitiativeBody() {
                     round={enc.round}
                     testId="cbtx-init-row-effect"
                   />
-                </div>
+                </NameLine>
                 {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down; on
                     its own line under the name. */}
                 {death && (

@@ -2051,9 +2051,20 @@ From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP
 - **Fixtures:** `pc-colours` now picks Blue's hex `#5b8ff0`; new `pc-colour-free` (as DM, `player-2` → lavender `#b388ff`; requires `pc-colours`; also loads on top of `session-sim-9`); bundles **`prefs-s6`** = `player-colours` + `pc-colour-free` + `loot-1`, **`prefs-s6-e2e`** = `prefs-s6`. `session-sim-10` gains `pc-colour-free` once IM-1 creates it (seams S12).
 - **Snapshot size** (CON-44, `colours-size.test.ts` on the realistic heavy harness): every colour field a hex → **+128 B** DM over no colour fields (≤ 160 B per viewer); **−21 B** vs all-`vermillion` (the sprint-5 worst case, kept in `snapshot-size.test.ts` as the larger bound), **+14 B** vs all-`amber` (−3 / +2 B per field, 7 fields). Heavy DM 681,934 B (890,930 B left of 1.5 MiB); players max 286,731 B of 512 KiB.
 
-## 88. Sprint 6: companions core (CP0)
+## 88. Sprint 6: Initiative rows (WF4)
 
-From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 and [entities](../specs/entities.md#8-data-model) FR-ENT-31–38 (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `fix/cp-core`** (schema lane after IM-1, seams S1; drizzle push, push-safe: plain `ADD COLUMN`s only, nullable or defaulted, no FK on an added column (drizzle-kit would rebuild the table at the next push), no backfill). Protocol side: [protocol §111](../protocol/README.md#111-sprint-6-companions-core-cp0).
+From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-57, -58 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-125. **Built by `fix/init-rows-s6`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §111](../protocol/README.md#111-sprint-6-initiative-rows--whole-names-whole-trigger-chips-nothing-below--n-more-wf4).
+
+| Derived (not stored) | Where | Rule | Audience | Source |
+|---|---|---|---|---|
+| Name-line fit | per render, per row | `fitNameLine` → chips' room, side chip + chips on a second line, name wraps | each client its own rows | FR-CBTX-57 |
+| Initiative body cap | per render | `listClip(natural, avail)`, `avail` from `windowRect` for the uncapped content | each client | FR-CBT-125 |
+
+- **Fixtures:** none new (session-sim-9: Goblin Ambush running, "Escort to the Ford" planned, Mira's Searing trigger).
+
+## 89. Sprint 6: companions core (CP0)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 and [entities](../specs/entities.md#8-data-model) FR-ENT-31–38 (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `fix/cp-core`** (schema lane after IM-1, seams S1; drizzle push, push-safe: plain `ADD COLUMN`s only, nullable or defaulted, no FK on an added column (drizzle-kit would rebuild the table at the next push), no backfill). Protocol side: [protocol §112](../protocol/README.md#112-sprint-6-companions-core-cp0).
 
 ### Changed
 
