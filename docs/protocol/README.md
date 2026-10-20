@@ -2930,5 +2930,18 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 | `CombatantsAdded` | the same kept HP and pet-token safety net | as above | no |
 | `EncounterEnded` | + `token` deletes of **every** summoned combatant's surviving token (released, turned hostile, removed mid-fight; FR-CBT-145), before the other companions' rows; pets' tokens untouched (owner kept, FR-MAP-88); a `setCompanion` (charmed) companion's token owner cleared (#310 (2)) | token deletes to everyone | no |
 
-- **FR-MAP-88 root cause (FU0 replay on `session-sim-10`):** Dismiss Fire Elemental, Turn hostile Fire Elemental 3, End, Start "Escort to the Ford" with both pets → the drake's token gets **no change at all** (`ownerPlayerId` = Player 1 after every step; the Add-joined drake row has `pet: true`, so `companionLeaves` never runs for it). Suspect (1) refuted on the server; the marker's loss is client-side (FU3).
+- **FR-MAP-88 root cause (FU0 replay on `session-sim-10`):** Dismiss Fire Elemental, Turn hostile Fire Elemental 3, End, Start "Escort to the Ford" with both pets → the drake's token gets **no change at all** (`ownerPlayerId` = Player 1 after every step; the Add-joined drake row has `pet: true`, so `companionLeaves` never runs for it). Suspect (1) refuted on the server. **Client cause (e2e):** Start's refit (DM 1440×900, 34 px cells) leaves the medium drake's label row room for one chip; BL-35's rule folds the combat overlay's "Ally" **and the paw** into "+N" (tip "Ally, Player 1's companion"); the large Owlbear's row fits both. The fix is FU3's (the paw's priority in the label row); `combat-followups.e2e.ts` accepts the paw drawn or inside "+N" until then.
 - **Crash hooks:** `cbt.start:after-commit`, `cbt.end:before-commit` (all or nothing, `fu-combat-crash.test.ts`).
+
+**Client (FU2, both clients; no record, intent or frame):**
+
+| Piece | Contract | Source |
+|---|---|---|
+| DM companion line (`cbt-init-companion`, in-owner-turn) | one row via `NameLine`: name (+ mode icon, eye-off, skip), side slot `cbt-init-row-hp` "22 / 22" (+ `cbtx-init-row-temp`) + `cbt-init-row-ac`, chips, end slot `cbt-init-row-card` + `cbt-init-companion-menu` (⋯: `cbt-init-row-attack` submenu, Check ▸ / Save ▸, `cbt-init-row-hp-adjust`, combat-extras items incl. `cbtx-init-row-effect-new`, Side, `cbt-init-row-companion`, Remove) | FR-CBT-142 |
+| Player companion line | owner: `cbt-init-row-hp` + temp + `cbt-init-row-ac` (from `card.ac`), chips, `cbt-init-row-card`; other players: `cbt-init-row-band`, chips | FR-CBT-142 |
+| `NameLine` / `RowName` | each word measured (`data-word-measure`); a wrapped name's `min-width` = its longest word (capped at the line), `overflow-wrap: break-word` | FR-CBT-143 |
+| End confirm (`EndConfirmDescription {area}`) | `${area}-end-summons` (`data-value` = count; ≤ 5 names + "and N more"), one `${area}-end-charmed` per charmed companion, then `${area}-end-pending`; from the DM store at open time | FR-CBT-144 |
+| Start dialog | `cbt-enc-start-kept-note` while a monster binding takes a placed token | FR-CBT-141 |
+| Encounter editor | `cbt-enc-editor-back`; `cbt-enc-editor-body` scrolls between the header and `cbt-enc-editor-actions`; `cbt-enc-entry-name` (wraps between words, ≥ 96 px); list `cbt-enc-row-name` wraps | FR-CBT-146, -147, -149 |
+| Concentration chip (`EffectChips`) | fitted like a trigger chip (`data-compact`), never cut; DM / the PC's owner: `cbtx-conc-chip` → `cbtx-conc-menu` (`cbtx-conc-title`, `cbtx-conc-rounds`, `cbtx-conc-ends` from the viewer's store, `cbtx-conc-end` → `cbtx.endEffect`, DM `cbtx-conc-edit`); others: a focusable chip with its Tooltip | FR-CBTX-59–61 |
+| Turn-mode radios / portrait | `aria-label` = label on `cbt-summon-mode`, `cbt-companion-mode`, `ent-pet-mode`; `cbt-form-portrait` | FR-CBT-151, FR-ENT-44 |

@@ -91,9 +91,11 @@ test("FR-CBTX-46 FR-CBT-78 FR-NOTE-27 FR-CBT-79 FR-NOTE-30 chips fit; temp HP pr
   // "Bless 10r" show without "+N" (DM), Goblin's chips likewise.
   const chips = (scope: Locator, id: string) =>
     row(scope, id).locator('[data-testid="cbtx-init-row-effect"]:visible');
+  // Sprint 7 (FR-CBTX-59): the concentration chip carries its rounds ("10r"), whole or icon-only
+  // (the label then for screen readers), never cut.
   await expect(
     row(init, mira).locator('[data-testid="cbtx-init-row-effect"][data-value="concentration"]'),
-  ).toHaveText("Bless");
+  ).toHaveText(/^Bless ?10r$/);
   for (const scope of [init, pinit]) {
     await expect(row(scope, mira).getByTestId("cbtx-init-row-effect-more")).toHaveCount(0);
   }
