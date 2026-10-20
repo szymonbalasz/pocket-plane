@@ -233,8 +233,9 @@ export function useOpenWindow(): (kind: string, instance?: string, opts?: { by?:
 /**
  * Feature API (FR-SHELL-55): `push(rect)` moves every open window overlapping a map tool bar at
  * `rect` (viewport px) right of it; call it when the bar appears or changes size, never on window
- * changes. The windows go back when the bar's keep-out report goes (FR-SHELL-81, `ShellProvider`). `layoutKey` changes when a layout is applied (first snapshot, campaign switch): a bar
- * shown then pushes again. Outside a ShellProvider: a no-op and null.
+ * changes; the windows go back when the bar's keep-out report goes (FR-SHELL-81, `ShellProvider`).
+ * `layoutKey` changes when a layout is applied (first snapshot, campaign switch): a bar shown then
+ * pushes again. Outside a ShellProvider: a no-op and null.
  */
 export function usePushWindows(): { push: (rect: Rect) => void; layoutKey: string | null } {
   const controller = useContext(ShellContext);

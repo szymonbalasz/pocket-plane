@@ -2,11 +2,12 @@
 // Thin sprint-7 window frame (SHELL FR-SHELL-77, -80, -83, -84; track FU slice FU1). Read-only on
 // server state (the bundle is shared): window opens, Reset layout, Fit, keys, nothing sent. DM:
 // Compendium, Party, Encounters at 1440×900 land PC-clear (`data-pc-clear`, checked against the
-// PC footprints); auto-minimised ones carry `data-auto-minimised-for`; reopened at 1280×720, a window
-// marked PC-clear covers no PC. Player 2 (player 1 starts behind a presented handout whose Close
-// is a server write): Reset layout keeps the zones (the sheet 948, 60, 320×418); Space presses a Tab-focused launcher button with the mouse over the map, and pans
-// after a click (#199). DM Initiative: each row's chips are one tab stop. The rules in detail:
-// bun test (`manager.test.ts`, both `windows-s7.test.ts`, `keys.test.ts`, `overlays.test.ts`).
+// PC footprints); auto-minimised ones carry `data-auto-minimised-for`; reopened at 1280×720, a
+// window marked PC-clear covers no PC. Player 2 (player 1 starts behind a presented handout
+// whose Close is a server write): Reset layout keeps the zones (the sheet 948, 60, 320×418);
+// Space presses a Tab-focused launcher button with the mouse over the map, and pans after a
+// click (#199). DM Initiative: each row's chips are one tab stop. The rules in detail: bun test
+// (`manager.test.ts`, both `windows-s7.test.ts`, `keys.test.ts`, `overlays.test.ts`).
 import { expect, type Page, test } from "@playwright/test";
 import { footprintsOf, overlaps } from "./support/canvas";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
