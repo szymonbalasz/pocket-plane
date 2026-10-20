@@ -49,9 +49,9 @@ describe.each([
   ["DM", DM],
   ["player", PLAYER],
 ] as const)("%s board", (_, you) => {
-  test("FR-PARTY-29 Loot tab right of Inventory (tabs Handouts, Inventory, Loot; Handouts first by default)", () => {
+  test("FR-PARTY-29 Loot tab right of Inventory (tabs Handouts, Inventory, Loot, then Companions, FR-PARTY-41; Handouts first by default)", () => {
     const html = render(you);
-    expect(tabsOf(html)).toEqual(["handouts", "inventory", "loot"]);
+    expect(tabsOf(html)).toEqual(["handouts", "inventory", "loot", "companions"]);
     expect(html).toContain(">Loot<");
     expect(html).toContain('data-testid="stub-handouts"');
     expect(html).not.toContain('data-testid="loot-log"');
