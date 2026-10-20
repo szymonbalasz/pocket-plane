@@ -13,7 +13,7 @@ phase: post-mvp-7
 ## 1. Summary
 
 - The DM's homebrew reward rule ([#140](../decisions-log.md)): the DM **awards / removes** gems per character; the player **spends** one and the log says so. Gems: **Inspiration**, **Fortune**, **Combat**, **Divine Knowledge**, **Action**.
-- **Optional, off by default** ([#312](../decisions-log.md)): a per-campaign switch; while off nothing of gems reaches anyone. Generic **feature switch**: [proposed ADR](../architecture/adr/proposed-s7-gm-feature-switches.md), [campaign-management](campaign-management.md) FR-CAMP-38–45.
+- **Optional, off by default** ([#312](../decisions-log.md)): a per-campaign switch; while off nothing of gems reaches anyone. Generic **feature switch**: [proposed ADR](../architecture/adr/0058-feature-switches.md), [campaign-management](campaign-management.md) FR-CAMP-38–45.
 - **Inspiration** rerolls a d20 roll from the log, the old line struck through ([dice-roll-log](dice-roll-log.md) FR-DICE-62–71). **Combat** maxes 1 damage die (2 at level 6, 3 at level 12) on a pending card, also after Apply hit; the server recomputes the total ([combat-tracker](combat-tracker.md) FR-CBT-126–135). Fortune, Divine Knowledge, Action: spend + line.
 - Counts on the sheet ([character-sheet-full](character-sheet-full.md) FR-CHARX-71–76); built-in icons now, art later (BL-29).
 

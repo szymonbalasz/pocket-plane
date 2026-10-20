@@ -24,7 +24,7 @@
 | Initiative, HP, damage, rolls; advantage/disadvantage on any roll (toggle or Shift/Ctrl). **BG2-style game log** with **DM per-category public/hidden tickboxes** | Whispers, roll requests, inline rolls, macros, 3D dice → [dice-extras](../../specs/post-mvp/dice-extras.md) |
 | **Damage cards**: Shieldmaiden-style attack (Shift adv / Ctrl dis) → DM applies to a target as normal / half / none / double, with manual override | — (hit/miss vs AC is MVP, #74) |
 | One-click monster initiative; monster HP as health band to players; **start / end encounter**; combatants bind to pre-placed (possibly hidden) tokens | Conditions, concentration, durations, temp HP, death saves; custom NPC actions, multi-target (tier A) |
-| **Stats data capture**: all rolls, damage dealt/taken/healed, weapon, overkill | Stats UI, summaries → [stats](../../specs/post-mvp/stats.md) |
+| **Stats data capture**: all rolls, damage dealt/taken/healed, weapon, overkill | Stats UI, summaries → [stats](../../specs/stats.md) |
 | **Every roll: automated or manual entry** (physical dice), for DM and players | |
 | **One play page** ([play-shell](../../specs/play-shell.md)): canvas as base, floating windows over it. Player lands on the active scene; window layout persisted per player | Props (status rings, AoE markers) → [scene-tools](../../specs/scene-tools.md); notes from tokens, player notes → [world-builder](../../specs/post-mvp/world-builder.md) |
 | Assume immediate asset load | Player-ready indicator / load handling → [scene-tools](../../specs/scene-tools.md) |

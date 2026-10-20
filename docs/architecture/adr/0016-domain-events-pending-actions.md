@@ -47,7 +47,7 @@ graph LR
 - **Undo is basic and combat-only (decided):** the DM can undo combat log entries such as "Player X did 4 damage to creature Y". Not rolls (an Animal Handling roll is just a fact), not token moves, not scene edits.
 - Undoable events carry what's needed to reverse them (e.g. `DamageApplied {target, amount, hpBefore, hpAfter}`).
 - **Undo = append a compensating event** that reverses an earlier one and marks it `undone`. The log stays append-only; state tables stay the truth for play.
-- Stats ([stats](../../specs/post-mvp/stats.md)) ignore undone events.
+- Stats ([stats](../../specs/stats.md)) ignore undone events.
 
 | Undo option | Pros | Cons |
 |---|---|---|

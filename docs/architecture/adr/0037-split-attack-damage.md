@@ -31,4 +31,4 @@
 - combat-tracker: FR-CBT-70–74 and the §6.1 table; card payload `toHit` / `damage` nullable (never both), plus `attackId?` / `spellId?` / `saveDc?`; new `DamageRolled` event; outcome lines for to-hit-only (miss) and damage-only applies.
 - character-sheet-full (settled S1): new kinds `toHit` / `spellToHit` (Attack); `damage` / `spellDamage` (Damage); `attack` / `spellAttack` keep their stored meaning (Attack + damage), so old `CharacterRolled` events and log entries read the same. Combat's route claims all three per row while in combat; P2b's sheet build merges first (unclaimed `toHit` = a plain roll).
 - Undo: unchanged (one apply = one undo step; completing a card is not undoable, like rolling it).
-- Gems ([gems](../../specs/post-mvp/gems.md), FR-CBT-32) can use the same helper later.
+- Gems ([gems](../../specs/gems.md), FR-CBT-32) can use the same helper later.

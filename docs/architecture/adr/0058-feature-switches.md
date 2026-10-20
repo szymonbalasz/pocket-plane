@@ -1,6 +1,6 @@
-# Proposed — Campaign feature switches (optional features, off by default)
+# 0058 — Campaign feature switches (optional features, off by default)
 
-- Status: proposed
+- Status: accepted (DM gate, [#315](../../decisions-log.md))
 - Date: 2026-10-20
 - Refines: [ADR-0021](0021-sync-protocol-conventions.md) B (visibility fns read the record + connection context: the context gains the campaign's switches); [ADR-0016](0016-domain-events-pending-actions.md) unchanged (events and the event log as before)
 - Affects: [campaign-management](../../specs/campaign-management.md) (FR-CAMP-38–45), [gems](../../specs/gems.md) (FR-GEM-01–05), [live-sync](../../specs/live-sync.md), [dice-roll-log](../../specs/dice-roll-log.md) (log kinds), protocol §26 registries

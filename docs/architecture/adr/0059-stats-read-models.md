@@ -1,6 +1,6 @@
-# Proposed: stats are read models computed on read over the fact tables
+# 0059 — Stats are read models computed on read over the fact tables
 
-- Status: proposed (sprint 7, track ST; the integrator numbers it at merge)
+- Status: accepted (DM gate, [#315](../../decisions-log.md))
 - Date: 2026-10-20
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md). Its "stats computed from the event log retroactively" becomes: computed from the **typed fact tables** written in the same transaction as the logged events, filtered per viewer.
 - Affects: [stats](../../specs/stats.md) (FR-STATS-01–05, -13, -14, -16), [combat-tracker](../../specs/combat-tracker.md) (FR-CBT-138), [dice-roll-log](../../specs/dice-roll-log.md) (FR-DICE-72–73), [live-sync](../../specs/live-sync.md) (leak scan over acks), later stats features (tier B: trophy case, luck tracker)

@@ -73,6 +73,17 @@ All revisions, gate 1 #245 (ADRs 0047–0050).
 | [Compendium](compendium.md) (word search, ranking, groups) | CMP | complete | spec-compendium |
 | [Entities](entities.md) (creature type, token art) | ENT | complete | spec-compendium |
 
+## Sprint 7 (post-MVP)
+
+Gate 1 #315 (ADRs 0058, 0059).
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Gems](gems.md) (optional per-campaign feature: award / spend, Inspiration reroll, Combat gem) | GEM | complete | spec-gems |
+| [Stats](stats.md) (damage leaderboard, overkill callouts, session awards) | STATS | complete | spec-stats |
+
+Sprint 7 also revised campaign-management (feature switch), dice-roll-log (reroll supersede, stats reads), combat-tracker (max dice, From on heals, kept HP on rebind, compact companion line, End dialog), character-sheet-full (gem block), play-shell (auto-minimise instead of covering PCs, useful sizes, Space, Stats window), scenes-map, combat-extras, notifications, entities, party-board, party-loot, dice-extras, effect-modifiers, compendium (sprint-6 follow-ups, BL-46, BL-48).
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.
@@ -80,9 +91,7 @@ Stubs only. Not to be claimed during MVP spec phase.
 | Spec | Prefix | Note |
 |---|---|---|
 | [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes |
-| [Stats and summaries](post-mvp/stats.md) | STATS | Data capture starts in MVP |
 | [Dice extras](post-mvp/dice-extras.md) | DICEX | Inline rolls, macros, 3D dice, hidden rolls |
-| [Gems (homebrew)](post-mvp/gems.md) | GEM | DM-awarded gems; reroll, max damage dice; tier A |
 | [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |
 | [Levelling workflows](post-mvp/levelling.md) | LVL | |

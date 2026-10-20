@@ -885,7 +885,7 @@ Sprint-2 OQ-MOD-01–19 are decided (#190) and listed in [Appendix A](#a2-sprint
 - Everything in §6.3; "attacks against it have advantage"; damage-taken and end-of-turn events.
 - Condition automation (OQ-MOD-05), rest buttons, automatic resets other than window keys.
 - Free roll bar, NPC-sheet definition rolls, combatant-creation rolls; hit triggers out of combat.
-- Undo of MOD commands; trigger history UI; ~~a player's live "charge left" indicator~~ (sprint 4: FR-MOD-53); stats over trigger parts beyond `triggerParts` ([stats](post-mvp/stats.md) can read them later).
+- Undo of MOD commands; trigger history UI; ~~a player's live "charge left" indicator~~ (sprint 4: FR-MOD-53); stats over trigger parts beyond `triggerParts` ([stats](stats.md) can read them later).
 - *(Sprint 4, review §6.4)* Rerolls and die-face changes, positional effects, a "nonmagical" damage qualifier, monsters' innate resistances on stat blocks, a `row` selector on modifiers, a player-picked Smite slot. Extra damage parts on spell rows (spells keep one part; CHARX §4).
 
 ## Appendix A. Built tier-1 reference (sprint 2)

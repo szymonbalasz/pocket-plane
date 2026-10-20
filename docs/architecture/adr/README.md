@@ -63,6 +63,8 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0055](0055-player-colour.md) | Player colour stored once per person, derived everywhere | accepted (#256); bullet 1 amended by 0057 |
 | [0056](0056-companion-visibility.md) | Companions: the owner sees an owned creature's stats | accepted (#288; amends 0024, refines 0009, 0036) |
 | [0057](0057-free-player-colour.md) | Free player colour (`#rrggbb`, validity + distance rules) | accepted (#288; amends 0055) |
+| [0058](0058-feature-switches.md) | Campaign feature switches (optional features off by default; one hub rule) | accepted (#315) |
+| [0059](0059-stats-read-models.md) | Stats as read models over the fact tables, filtered per viewer | accepted (#315) |
 
 ## Proposing a new ADR
 

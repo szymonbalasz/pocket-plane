@@ -478,6 +478,6 @@ Sprint-1 rows: all decided (the DM accepted every pick, #178; the D/S seam rows 
 - Advantage / disadvantage from conditions, condition immunities, exhaustion effects, massive damage (OQ-CBTX-06, -11).
 - *(Sprint 4)* Clicking a trigger chip to act on it (chips are display only; the sheet and the DM's trigger editor stay the entry points).
 - Effects on tokens or monsters outside an encounter; end-of-turn durations (OQ-CBTX-03); concentration on non-creatures.
-- Spells, slots, hit dice (→ character-sheet-full / levelling); stats UI (→ [stats](post-mvp/stats.md)).
+- Spells, slots, hit dice (→ character-sheet-full / levelling); stats UI (→ [stats](stats.md)).
 - Sheet spells marked concentration (CHARX `spells[].concentration`) don't start CBTX concentration; the player uses **Concentrate…** with a free-text label.
 - Field / op / value modifiers on instances (ADR-0009 design-for-later); effects carry no numbers.

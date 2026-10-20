@@ -153,5 +153,5 @@ Report (<= 20 lines): PASS/FAIL per step, failures with repro + evidence path, t
 
 - Ask the DM before: a new phase, accepting/superseding an ADR, a dependency outside ADR-0001 / #110 / #119, anything destructive, reading their personal config.
 - Token display name belongs to the token (#126); only the DM picks targets and applies damage (#134, #136); monsters show players a health band, never HP (#138).
-- Gems are tier A (post-MVP, [gems](../specs/post-mvp/gems.md)); MVP data already allows rerolls and maxed damage dice.
+- Gems are tier A (post-MVP, [gems](../specs/gems.md)); MVP data already allows rerolls and maxed damage dice.
 - Keep status.md current; it's how the next session picks up.

@@ -41,7 +41,7 @@ wave: 2
 - Temp HP, death saves, conditions → [combat-extras](combat-extras.md). Crit rule: combat only ([combat-tracker](combat-tracker.md) FR-CBT-16).
 - Character creation, levelling, editing basics in the UI (#139 P20) → [levelling](post-mvp/levelling.md). Speed, scores and saves come from fixtures / `PUT /api/entities` in MVP; full PC / NPC editing and player-filled sheets are design-for-later (#154).
 - Damage cards, targets, hit/miss, initiative order → [combat-tracker](combat-tracker.md). Notation, game log → [dice-roll-log](dice-roll-log.md).
-- Other PCs' HP for players (#139 P7); [gems](post-mvp/gems.md) (#140, tier A).
+- Other PCs' HP for players (#139 P7); [gems](gems.md) (#140, tier A).
 
 ## 5. User stories
 
@@ -102,7 +102,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, de
 - **DM view:** any character (picker shows owner name); DM public override on rolls. **Player view:** own characters only; others never listed.
 - **States:** loading = skeleton until first snapshot; empty per FR-CHAR-04; reconnecting = last values + shell banner, controls disabled; error = Toast (FR-CHAR-12).
 - **Test IDs:** `char-sheet` (+ `data-record-id` = character id), `char-sheet-picker`, `-name`, `-portrait`, `-level`, `-ac`, `-hp`, `-down`, `-speed`, `-combat`, `-init`, `-roll-init`, ~~`-attack`, `-roll-attack`, `-public-attack`~~ (retired by N4; Actions tab IDs per CHARX §7), `-prof`, `-ability` (+ `data-value` = `str` … `cha`), `-ability-score`, `-ability-mod`, `-roll-check`, `-roll-save`, `-save-prof` (each + `data-value`; `-save-prof` also `data-proficient`), `-public-init`, `-public-check`, `-public-save` (DM), `-abilities-empty`, `-hp-input`, `-hp-damage`, `-hp-heal`, `-empty`, `-init-locked` (#171) (all prefixed `char-sheet`). Hints: play-shell's `ui-tooltip`.
-- **Later:** open from a token double-click ([FR-MAP-29](scenes-map.md#6-functional-requirements)); one window per character; a gem counter block in the header ([gems](post-mvp/gems.md), #140; no MVP UI or field).
+- **Later:** open from a token double-click ([FR-MAP-29](scenes-map.md#6-functional-requirements)); one window per character; a gem counter block in the header ([gems](gems.md), #140; no MVP UI or field).
 
 ## 8. Data model
 
@@ -256,4 +256,4 @@ In-combat hiding (FR-CHAR-24) is walked in [combat-tracker §13](combat-tracker.
 
 ## 16. Out of scope
 
-- See §4. Token double-click → sheet, several sheet windows, gem counters (§7 later). Stats UI → [stats](post-mvp/stats.md).
+- See §4. Token double-click → sheet, several sheet windows, gem counters (§7 later). Stats UI → [stats](stats.md).

@@ -47,7 +47,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | **Hidden combatants** (stealthed) | A | [combat-extras](specs/combat-extras.md) | Added by DM |
 | Drag to reorder initiative | B | [combat-extras](specs/combat-extras.md) | |
 | Auto-roll attacks + hit/miss hint vs AC | S | [combat-tracker](specs/combat-tracker.md) | MVP per #74 (DM attack popup) |
-| End-of-combat summary | B | [stats](specs/post-mvp/stats.md) | Plus campaign-wide stats; discuss after MVP |
+| End-of-combat summary | B | [stats](specs/stats.md) | Plus campaign-wide stats; discuss after MVP |
 | Legendary / lair actions | C | [combat-extras](specs/combat-extras.md) | |
 | Reaction-used tracker | C | [combat-extras](specs/combat-extras.md) | |
 
@@ -119,16 +119,16 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 |---|---|---|---|
 | **BG2-style game log** in the play view ("Goblin attacks Mira: 12 + 4 = 16 — hit! 6 damage") | S | [dice-roll-log](specs/dice-roll-log.md) | Combat and out-of-combat rolls (e.g. contested Strength) |
 | **DM per-category public/hidden log settings** (attack, damage, saves, checks…), changeable live | S | [dice-roll-log](specs/dice-roll-log.md) | Shieldmaiden-style tickboxes; broken there today |
-| Live damage leaderboard + overkill callouts | A | [stats](specs/post-mvp/stats.md) | |
-| Session awards (BG2-style: biggest hit, most damage taken…) | A | [stats](specs/post-mvp/stats.md) | |
-| Kill-feed toasts ("Thorn finished the Ogre, overkill 37") | B | [stats](specs/post-mvp/stats.md) | Notification kind |
-| Character trophy case (campaign stats on sheet) | B | [stats](specs/post-mvp/stats.md) | |
-| Dice luck tracker (avg d20, nat 20s/1s) | B | [stats](specs/post-mvp/stats.md) | |
+| Live damage leaderboard + overkill callouts | A | [stats](specs/stats.md) | |
+| Session awards (BG2-style: biggest hit, most damage taken…) | A | [stats](specs/stats.md) | |
+| Kill-feed toasts ("Thorn finished the Ogre, overkill 37") | B | [stats](specs/stats.md) | Notification kind |
+| Character trophy case (campaign stats on sheet) | B | [stats](specs/stats.md) | |
+| Dice luck tracker (avg d20, nat 20s/1s) | B | [stats](specs/stats.md) | |
 | Auto session recap from event log | D | — | Recaps are story, not combat |
 | Live AI follow-along / summariser | F | — | Distinct from [agent-api](specs/post-mvp/agent-api.md) |
 | Combat rewind / timeline replay | F | — | |
 | External stream / overlay of the log | F | — | Log lives in the game client |
-| **Homebrew gems** (Inspiration, Fortune, Combat, Divine Knowledge, Action): DM awards, player spends; reroll a d20, max damage dice | A | [gems](specs/post-mvp/gems.md) | Max 5 per character, not enforced (#140). MVP dice/combat interfaces allow it |
+| **Homebrew gems** (Inspiration, Fortune, Combat, Divine Knowledge, Action): DM awards, player spends; reroll a d20, max damage dice | A | [gems](specs/gems.md) | Max 5 per character, not enforced (#140). MVP dice/combat interfaces allow it |
 
 ## 7. Prep, content and sources
 

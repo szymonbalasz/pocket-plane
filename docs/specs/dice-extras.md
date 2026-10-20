@@ -802,4 +802,4 @@ Rows 01–17 decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-l
 
 ## 16. Out of scope
 
-- As §4. Macros, roll requests (notification with a roll action), whispers → [stub](post-mvp/dice-extras.md). Stats on rolls → [stats](post-mvp/stats.md). Gem rerolls → [gems](gems.md) (their new entries throw like any roll).
+- As §4. Macros, roll requests (notification with a roll action), whispers → [stub](post-mvp/dice-extras.md). Stats on rolls → [stats](stats.md). Gem rerolls → [gems](gems.md) (their new entries throw like any roll).

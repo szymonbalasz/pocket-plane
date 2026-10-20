@@ -21,7 +21,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 |---|---|---|
 | **Campaign** | Top-level scope. Every record belongs to exactly one campaign, except imported definitions, which are global ([ADR-0018](architecture/adr/0018-global-imported-content.md)). | Session |
 | **Active campaign** | The one campaign the server serves to players; the DM switches it. | — |
-| **Session** | One sitting of play (an evening). Informal only: **not tracked** by the app ([ADR-0013](architecture/adr/0013-session-journal-scope.md)). | Campaign; WS connection; encounter |
+| **Session** | One sitting of play (an evening). **Not stored** by the app ([ADR-0013](architecture/adr/0013-session-journal-scope.md)); stats derive it from the log: a gap of ≥ 6 h starts a new one ([stats](specs/stats.md), #315). | Campaign; WS connection; encounter |
 | **Entity** | A world record: NPC, monster, item, location, faction, quest, character. Campaign-owned, except imported definitions (global, [ADR-0018](architecture/adr/0018-global-imported-content.md)). Content model: [ADR-0009](architecture/adr/0009-entity-content-model.md). | Compendium entry |
 | **Entity kind** | The type of an entity (npc, monster, item, location, faction, quest, character). MVP uses only **character** and **monster** ([ADR-0014](architecture/adr/0014-mvp-scope.md)). | — |
 | **Creature definition** | What a creature *is*: stat block, actions. Imported (read-only) or custom (editable). Same shape for all sources ([ADR-0009](architecture/adr/0009-entity-content-model.md)). | Instance |
@@ -46,7 +46,11 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Clone** | A campaign-owned copy of a compendium entry, editable without affecting the original; for monsters the clone is a derived custom definition (Derive). | — |
 | **Bundled source** | A recorded copy of an external source shipped in the repo (e.g. SRD 5.1 from Open5e, `wotc-srd` only) and imported offline. | — |
 | **Homebrew** | DM-authored content not from an external source. | — |
-| **Gem** | Homebrew reward the DM awards to a character (Inspiration, Fortune, Combat, Divine Knowledge, Action); spent for an effect. Post-MVP ([gems](specs/post-mvp/gems.md)). | Homebrew |
+| **Gem** | Homebrew reward the DM awards to a character (Inspiration, Fortune, Combat, Divine Knowledge, Action); the player spends one for an effect (a public log line). An optional feature, **off by default** per campaign ([gems](specs/gems.md), #312). "Max 5" is a label, not enforced (#315). | Homebrew; D&D Inspiration |
+| **Feature switch** | A per-campaign on / off for an optional feature (gems first). While off, nothing tagged with the feature reaches any client or stats read; its rows are kept ([ADR-0058](architecture/adr/0058-feature-switches.md)). | Preference (per person) |
+| **Reroll** | An Inspiration gem spend: a new roll replaces one d20 roll from the log; the old entry stays, struck through, marked superseded ([dice-roll-log](specs/dice-roll-log.md)). | Undo |
+| **Superseded entry** | A game-log entry replaced by a reroll: kept (append-only), marked once with `supersededBy`; stats count only the final roll. | Undone entry |
+| **Maxed die** | A damage die a Combat gem set to its maximum on a pending damage card; the card total is recomputed on the server ([combat-tracker](specs/combat-tracker.md)). | Critical hit |
 | **Cross-reference** | A link from one entity/entry to another. Model is open ([ADR-0011](architecture/adr/0011-cross-references.md)). | — |
 | **Asset** | An uploaded binary (map image, portrait, handout), stored content-hashed. | Entity |
 | **Derivative** | A generated variant of an asset (thumbnail, resized, format-converted). | — |
@@ -161,6 +165,9 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Attack popup** | The DM's non-modal panel to pick a damage card's targets (map selection or list), check hit vs AC per target, override values and apply. | Damage card |
 | **Action owner** | Who may act on a pending notification (the DM or one player); the DM may always act. | Actor (a roll's actor in the game log) |
 | **Combat log entry** | One applied HP change to one target in combat (damage or heal): the stats unit. Undo reverts one apply, which may hold several entries. | Game log entry; event log entry |
+| **Stats window** | The launcher window with the live damage leaderboard (Fight) and session awards (Session), computed on request from saved facts, filtered per viewer ([stats](specs/stats.md), [ADR-0059](architecture/adr/0059-stats-read-models.md)). | Game log |
+| **Session awards** | BG2-style records for one session (biggest hit, biggest overkill, most damage dealt / taken, most healing, kills, nat 20s / 1s, times downed); the DM's Show awards opens them for everyone. | Leaderboard (one fight) |
+| **Overkill callout** | "— Overkill!" on a damage line (plus a toast) when damage beyond what was needed is ≥ max(10, what was needed); players never see the amount ([stats](specs/stats.md)). | — |
 | **Health band** | healthy / bloodied / down: what players see of a monster's HP instead of numbers. | — |
 | **Log entry** | One game-log line; may join several rolls (e.g. an attack's to-hit and damage). | Roll; event log entry |
 | **Roll mode** | normal / advantage / disadvantage, applied to the d20. | — |
@@ -202,7 +209,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Minimised** (window) | Parked on the launcher: keeps its state and shows a dot when something new happens in it. A closed window keeps only its geometry ([play-shell](specs/play-shell.md)). | Closed |
 | **Work area** | The part of the viewport below the top bar and above the launcher; windows and the attack popup fit into it (decisions #172). | Viewport |
 | **Free area** | A part of the work area, right of the tool rail, that no open window covers; the map frames its tokens there (FR-SHELL-34, FR-MAP-44). *(Sprint 4)* Fit picks among the candidate free rectangles: PCs inside first, then the map's top row visible, then other tokens clear of windows, then the largest scale (FR-MAP-58). | Work area |
-| **Auto placement** | Where a window opens when the user didn't choose: the free edge slot covering the fewest tokens ([play-shell](specs/play-shell.md)). | Layout |
+| **Auto placement** | Where a window opens when the user didn't choose: a free edge slot covering the fewest tokens, never on a window, a keep-out region or a PC while another window can be auto-minimised ([play-shell](specs/play-shell.md), #310). | Layout |
+| **Useful size** | The smallest size a window opens at before the shell auto-minimises another window to make room ([play-shell](specs/play-shell.md) §7). | Minimum size |
 | **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |
 | **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
 
