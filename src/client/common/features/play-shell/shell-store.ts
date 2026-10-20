@@ -4,7 +4,10 @@ import { createStore, type StoreApi } from "zustand";
 import type { Rect, Viewport } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import {
+  isCovered,
   isLayoutAction,
+  isUserReopen,
+  type ManagerContext,
   type Placed,
   placedAs,
   reduce,
@@ -14,7 +17,7 @@ import {
   type Windows,
   windowId,
 } from "./manager";
-import type { PlacementToken } from "./placement";
+import { type PlacementToken, pcClear } from "./placement";
 import type { WindowRegistry } from "./registry";
 import type { LayoutStorage } from "./storage";
 
@@ -34,6 +37,11 @@ export interface ShellState {
    * closed; client memory only (a reload loads them plain `minimised`).
    */
   autoMinimised: ReadonlySet<string>;
+  /**
+   * Windows whose rect auto placement chose (`default`, `auto`, `reopened`) with no PC footprint
+   * (+ 4 px) under it then (`data-pc-clear`, FR-SHELL-57); client memory only.
+   */
+  pcClear: ReadonlySet<string>;
 }
 
 export interface ShellController {
@@ -52,8 +60,11 @@ const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w
 
 /**
  * `placed` after a change: a move / resize end → `stored`; a push off a tool bar → `pushed`
- * (FR-SHELL-55); a rect the reducer chose (new window, auto placement, reset, viewport follow) →
- * `default` / `auto`; any other window keeps its value.
+ * (FR-SHELL-55); a user reopen (FR-SHELL-56) → `reopened` when its stored rect was `covered`
+ * (auto-placed, even onto the same rect once the windows over it were parked), else `stored`
+ * (a protected window too), and any other window it moved → `auto`; a rect the reducer
+ * chose (new window, auto placement, reset, viewport follow) → `default` / `auto`; any other
+ * window keeps its value.
  */
 function nextPlaced(
   prev: ShellState,
@@ -62,6 +73,7 @@ function nextPlaced(
   registry: WindowRegistry,
   vp: Viewport,
   hard: readonly Rect[],
+  covered = false,
 ): ReadonlyMap<string, Placed> {
   const out = new Map<string, Placed>();
   for (const w of next) {
@@ -69,7 +81,14 @@ function nextPlaced(
     const before = prev.windows.find((p) => p.kind === w.kind && p.instance === w.instance);
     const def = registry.get(w.kind);
     const moved = action.type === "reset" || !before || !sameRect(before, w);
-    if (action.type === "setRect" && moved) out.set(id, "stored");
+    const named = !isLayoutAction(action) && id === windowId(action.kind, action.instance);
+    const reopen = named && isUserReopen(action, before?.state);
+    if (reopen) {
+      const replaced = covered && def !== undefined && !def.defaultOpen && !def.fixedDefault;
+      out.set(id, replaced ? "reopened" : "stored");
+    } else if (moved && !named && (action.type === "open" || action.type === "toggle")) {
+      out.set(id, "auto");
+    } else if (action.type === "setRect" && moved) out.set(id, "stored");
     else if (action.type === "push" && moved) out.set(id, "pushed");
     else if (moved && def) out.set(id, placedAs(def, w, vp, hard));
     else {
@@ -128,6 +147,36 @@ function nextAutoMinimised(
   return out.size === prev.size && [...out].every((id) => prev.has(id)) ? prev : out;
 }
 
+/**
+ * `pcClear` after a change: windows the change auto-placed (`placed` now `default`, `auto` or
+ * `reopened` and moved) are tested against the PC footprints now; any other window that moved
+ * drops out; the rest keep their mark.
+ */
+function nextPcClear(
+  prev: ShellState,
+  next: Windows,
+  placed: ReadonlyMap<string, Placed>,
+  tokens: () => readonly PlacementToken[],
+): ReadonlySet<string> {
+  const out = new Set<string>();
+  let pcs: readonly PlacementToken[] | null = null;
+  for (const w of next) {
+    const id = windowId(w.kind, w.instance);
+    const before = prev.windows.find((p) => p.kind === w.kind && p.instance === w.instance);
+    const how = placed.get(id);
+    if (before && sameRect(before, w) && prev.placed.get(id) === how) {
+      if (prev.pcClear.has(id)) out.add(id);
+      continue;
+    }
+    if (how !== "default" && how !== "auto" && how !== "reopened") continue;
+    pcs ??= tokens();
+    if (pcClear(w, pcs)) out.add(id);
+  }
+  return out.size === prev.pcClear.size && [...out].every((id) => prev.pcClear.has(id))
+    ? prev.pcClear
+    : out;
+}
+
 export function createShellController(opts: {
   registry: WindowRegistry;
   storage: LayoutStorage;
@@ -148,6 +197,7 @@ export function createShellController(opts: {
     placed: new Map(),
     settling: new Set(),
     autoMinimised: new Set(),
+    pcClear: new Set(),
   }));
   const regionsAt = (vp: Viewport) => opts.keepOuts?.(vp) ?? keepOuts(registry.client, vp);
   return {
@@ -165,12 +215,19 @@ export function createShellController(opts: {
         const how = r.stored || !def ? "stored" : placedAs(def, w, vp, hardRects(regions));
         placed.set(windowId(w.kind, w.instance), how);
       }
+      const pcs = opts.avoid?.() ?? [];
+      const pcClearNow = new Set(
+        r.windows
+          .filter((w) => placed.get(windowId(w.kind, w.instance)) !== "stored" && pcClear(w, pcs))
+          .map((w) => windowId(w.kind, w.instance)),
+      );
       store.setState({
         key,
         windows: r.windows,
         placed,
         settling: new Set(),
         autoMinimised: new Set(),
+        pcClear: pcClearNow,
       });
       // FR-SHELL-53: default-sized windows took this viewport's default; written with `area`.
       if (r.migrated) storage.write(key, serialise(r.windows, registry));
@@ -185,7 +242,7 @@ export function createShellController(opts: {
       }
       const viewport = opts.viewport();
       const regions = regionsAt(viewport);
-      const next = reduce(windows, action, {
+      const ctx: ManagerContext = {
         registry,
         viewport,
         available,
@@ -193,15 +250,30 @@ export function createShellController(opts: {
         keepOuts: () => regions,
         heights: opts.heights,
         placed: (id) => state.placed.get(id),
-      });
+      };
+      // FR-SHELL-56: whether a user reopen finds its stored rect covered (`data-placed`).
+      const named = isLayoutAction(action)
+        ? undefined
+        : windows.find(
+            (w) => windowId(w.kind, w.instance) === windowId(action.kind, action.instance),
+          );
+      const covered =
+        named !== undefined &&
+        isUserReopen(action, named.state) &&
+        available.has(named.kind) &&
+        isCovered(windows, named, ctx);
+      const next = reduce(windows, action, ctx);
       const settling = nextSettling(state.settling, windows, next, action);
       if (next === windows) {
         if (settling !== state.settling) store.setState({ settling });
         return;
       }
+      const hard = hardRects(regions);
+      const placed = nextPlaced(state, next, action, registry, viewport, hard, covered);
       store.setState({
         windows: next,
-        placed: nextPlaced(state, next, action, registry, viewport, hardRects(regions)),
+        placed,
+        pcClear: nextPcClear(state, next, placed, () => opts.avoid?.() ?? []),
         settling,
         autoMinimised: nextAutoMinimised(state.autoMinimised, windows, next, action),
       });

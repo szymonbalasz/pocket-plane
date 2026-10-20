@@ -134,7 +134,7 @@ describe("FR-MAP-73 signal frames", () => {
 
     // A recolour is one record upsert; the next frames are byte-for-byte the same shape.
     expect(
-      (await reply(b, "camp.setColor", { playerId: p["Player 1"].id, color: "rose" })).type,
+      (await reply(b, "camp.setColor", { playerId: p["Player 1"].id, color: "#e08ab8" })).type,
     ).toBe("ack");
     for (const x of [dm, c]) await x.next("event", 1000);
     await round();

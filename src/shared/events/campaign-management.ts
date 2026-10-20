@@ -1,5 +1,5 @@
 // Domain events of campaign-management (CAMP §9). Payloads never hold a link token or the DM secret.
-import { PlayerColor } from "@shared/campaign-management/colors";
+import { PaletteKey } from "@shared/campaign-management/colors";
 import { z } from "zod";
 import { defineEvent } from "./types";
 
@@ -39,10 +39,18 @@ export const PlayerRenamed = defineEvent({
   undoable: false,
 });
 
-/** FR-CAMP-25 (sprint 5): `playerId` null = the DM colour (a `campaign` upsert). */
+/**
+ * FR-CAMP-25, -37: `playerId` null = the DM colour (a `campaign` upsert). `color` is a lowercase
+ * `#rrggbb` (sprint 6); sprint-5 log rows keep their palette key and still parse.
+ */
 export const PlayerColorSet = defineEvent({
   type: "PlayerColorSet",
-  payload: z.object({ playerId: z.string().nullable(), color: PlayerColor }).strict(),
+  payload: z
+    .object({
+      playerId: z.string().nullable(),
+      color: z.union([z.string().regex(/^#[0-9a-f]{6}$/), PaletteKey]),
+    })
+    .strict(),
   logged: true,
   undoable: false,
 });

@@ -50,7 +50,7 @@ Delivered via the [theme system](../specs/post-mvp/theme-system.md). MVP markup 
 | Texture | `texture.panel`, `texture.parchment` |
 | Game state | `hp.full`, `hp.bloodied`, `hp.down`, `visibility.hidden` |
 | Creature type (canvas) | `creature.<type>`, 14 tokens, values below |
-| Player colour | `player.<key>`, 8 tokens, values below |
+| Palette colour | `player.<key>`, 8 tokens, values below (suggested player colours) |
 
 ### Creature type colours (proposed)
 
@@ -66,9 +66,9 @@ Token art backdrops ([entities §7](../specs/entities.md#7-uiux-notes), [OQ-ENT-
 | `creature.elemental` | `#b4530f` | 5.02 | | `creature.undead` | `#4b4f63` | 8.08 |
 | `creature.fey` | `#2f7d5b` | 4.99 | | `creature.fiend` | `#8c1d40` | 8.88 |
 
-### Player colours (proposed)
+### Palette colours
 
-Each player's and the DM's colour ([campaign-management §7](../specs/campaign-management.md#7-uiux-notes), FR-CAMP-28; OQ-CAMP-17 decided #256): it marks their laser, pings, templates, drag paths, log names and notification stripes. Tuned from the Okabe–Ito colour-blind-safe set, dark mode; CSS `--player-<key>`; stored as a key, so the theme system may restyle them. WCAG contrast on the app background `#0a0a0a`, the window surface `#171717` and the `#000` casing drawn under every coloured map mark:
+A player colour marks a person's laser, pings, templates, drag paths, log names and notification stripes. Since sprint 6 it is **any `#rrggbb` that passes the rules** of [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-31 (contrast on the window surface, not grey, away from the danger reds) and FR-CAMP-32 (a minimum distance from everyone else's colour, colour-blind views included); thresholds live in the spec ([ADR-0057](../architecture/adr/0057-free-player-colour.md), #288). The 8 **palette colours** below are the suggested ones (shown first in the picker; a new player's default is the first far enough from the campaign's colours). Tuned from the Okabe–Ito set, dark mode; CSS `--player-<key>`. The stored value is the hex, so a theme can restyle a palette colour only through a one-off migration. WCAG contrast on the app background `#0a0a0a`, the window surface `#171717` and the `#000` casing drawn under every coloured map mark:
 
 | Token | Colour | On `#0a0a0a` | On `#171717` | On casing | | Token | Colour | On `#0a0a0a` | On `#171717` | On casing |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -79,3 +79,4 @@ Each player's and the DM's colour ([campaign-management §7](../specs/campaign-m
 
 - Every key ≥ 4.5 : 1 on the window surface (log names are text) and ≥ 5 : 1 on the casing. No white or grey key (selection outline, `visibility.hidden`); no pure red (`accent.danger`: every key ΔE2000 ≥ 15 from it).
 - Colour-blind check (CIEDE2000 between every pair after the Machado 2009 simulation at full severity): normal min 14.1 (sky–blue), deuteranopia 9.7 (sky–blue), protanopia 9.6 (sky–rose), tritanopia 6.8 (sky–jade). Name chips and "by ‹name›" labels back colour up (OQ-CAMP-25). Checked by `FR-CAMP-28 palette contrast`.
+- Every palette colour passes FR-CAMP-31 (tightest: Bronze 4.52 : 1 and C* 29.9; Vermillion 5.4 and Bronze 5.7 from `#ef4444` in the worst colour-blind view) and the 8 stay ≥ 9.61 apart (Sky–Rose), so all of them fit in one campaign. Checked by `FR-CAMP-31 colour validity` and `FR-CAMP-32 distance rule`.

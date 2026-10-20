@@ -1,4 +1,4 @@
-// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29, 40–42, 45–53, 55). Pure: no DOM, no
+// Window manager reducer (FR-SHELL-08–12, 14, 16–18, 29, 40–42, 45–53, 55, 56). Pure: no DOM, no
 // storage. Holds every window's *stored* state; rendering fits and clamps (geometry.ts) without
 // writing back. Every geometry it sets is stamped with the work area it was set in (`area`).
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
@@ -29,8 +29,9 @@ import { defaultSizeAt, knownDefaultSizes, type WindowRegistry } from "./registr
 export type Windows = readonly WindowState[];
 
 /**
- * Who opens a window (FR-SHELL-08): `user` (a click; the default) reopens at the stored rect;
- * `feature` (a feature on its own, e.g. Initiative at Start) never lands on another window.
+ * Who opens a window (FR-SHELL-08): `user` (a click; the default) reopens at the stored rect
+ * unless something now covers it (FR-SHELL-56); `feature` (a feature on its own, e.g. Initiative
+ * at Start) never lands on another window (FR-SHELL-41).
  */
 export type OpenBy = "user" | "feature";
 
@@ -87,10 +88,20 @@ export interface ManagerContext {
 /**
  * How a window's current rect was chosen (`ui-window` `data-placed`; client memory only):
  * `default` = auto placement kept its fitted default rect, `auto` = it chose another one,
- * `stored` = read from the layout entry or set by the user (move / resize end), `pushed` = moved
- * off a map tool bar (FR-SHELL-55).
+ * `stored` = read from the layout entry, set by the user (move / resize end) or kept by a user
+ * reopen, `pushed` = moved off a map tool bar (FR-SHELL-55), `reopened` = a user reopen found its
+ * stored rect covered and auto-placed it (FR-SHELL-56).
  */
-export type Placed = "auto" | "stored" | "default" | "pushed";
+export type Placed = "auto" | "stored" | "default" | "pushed" | "reopened";
+
+/**
+ * A user open of a closed or minimised window (FR-SHELL-56): the launcher's `toggle` or `open`
+ * without `by: "feature"`. `before`: the window's state before the action.
+ */
+export const isUserReopen = (action: WindowAction, before: WindowState["state"] | undefined) =>
+  before !== undefined &&
+  before !== "open" &&
+  (action.type === "toggle" || (action.type === "open" && action.by !== "feature"));
 
 /** Actions naming no window: the whole layout may change. */
 export type LayoutAction = Extract<WindowAction, { type: "push" | "viewport" | "reset" }>;
@@ -266,6 +277,48 @@ function withAutoPlaced(ws: Windows, ctx: ManagerContext, kind: string, instance
 }
 
 /**
+ * Covered (FR-SHELL-56 (2), OQ-SHELL-41 A): the window's shown rect (stored geometry as it would
+ * render now: fit, clamp, grown height) overlaps, by ≥ 1 px, another rendered open window or a
+ * hard keep-out region. The DM's soft box and tokens don't count.
+ */
+export function isCovered(ws: Windows, cur: WindowState, ctx: ManagerContext): boolean {
+  const shown = shownRect(ws, cur, ctx);
+  if (onScreen(ws, ctx, cur.kind, cur.instance).some((o) => overlaps(shown, o))) return true;
+  return hardRects(keepOutsOf(ctx)).some((k) => overlaps(shown, k));
+}
+
+/**
+ * FR-SHELL-56 (5): a protected window reopened onto a covered spot keeps it; every other open
+ * window overlapping its shown rect is auto-placed as if just opened (the protected one an
+ * obstacle), lowest z first, written; one with no clear spot is auto-minimised (FR-SHELL-47).
+ * Protected and `fixedDefault` ones are moved only when a clear spot exists.
+ */
+function clearAround(ws: Windows, ctx: ManagerContext, kind: string, instance: string): Windows {
+  const me = find(ws, kind, instance);
+  if (!me) return ws;
+  const mine = shownRect(ws, me, ctx);
+  const covering = [...shownRects(ws, ctx)]
+    .filter(([w, r]) => w !== me && overlaps(mine, r))
+    .map(([w]) => w)
+    .sort((a, b) => a.z - b.z);
+  const regions = keepOutsOf(ctx);
+  const input = { hard: hardRects(regions), soft: softRects(regions), tokens: ctx.avoid?.() ?? [] };
+  const area = workArea(ctx.viewport);
+  let out = ws;
+  for (const w of covering) {
+    const def = ctx.registry.get(w.kind);
+    if (!def || def.fixedDefault) continue;
+    const others = onScreen(out, ctx, w.kind, w.instance);
+    const need = growsToContent(w, def) ? ctx.heights?.(windowId(w.kind, w.instance)) : undefined;
+    const p = placeWindow(def, ctx.viewport, { ...input, windows: others, need });
+    if (p.clear) out = patch(out, w.kind, w.instance, (x) => ({ ...x, ...p.rect, area }));
+    else if (!def.defaultOpen)
+      out = patch(out, w.kind, w.instance, (x) => ({ ...x, state: "minimised" }));
+  }
+  return out;
+}
+
+/**
  * A stored window a feature brings up (feature open, appearance) is auto-placed when it would
  * cover a window on screen or a hard keep-out region (FR-SHELL-41, -48) or sits at a rect the
  * user didn't choose: auto-placed on this page, or at its default-layout / fitted default rect
@@ -274,10 +327,8 @@ function withAutoPlaced(ws: Windows, ctx: ManagerContext, kind: string, instance
 function needsAutoPlace(ws: Windows, cur: WindowState, ctx: ManagerContext): boolean {
   const def = ctx.registry.get(cur.kind);
   if (!def) return false;
-  const shown = shownRect(ws, cur, ctx);
-  if (onScreen(ws, ctx, cur.kind, cur.instance).some((o) => overlaps(shown, o))) return true;
+  if (isCovered(ws, cur, ctx)) return true;
   const hard = hardRects(keepOutsOf(ctx));
-  if (hard.some((k) => overlaps(shown, k))) return true;
   const how = ctx.placed?.(windowId(cur.kind, cur.instance));
   if (how === "auto" || how === "default" || how === "pushed") return true;
   const asDefault = defaultLayout(ctx.registry, ctx.viewport).find((w) => w.kind === cur.kind);
@@ -546,13 +597,21 @@ export function reduce(ws: Windows, action: WindowAction, ctx: ManagerContext): 
   switch (action.type) {
     case "open": {
       // FR-SHELL-08: last geometry, else auto placement (FR-SHELL-45); front; minimised →
-      // restored. A feature open never lands on another window (FR-SHELL-41).
+      // restored. A feature open never lands on another window (FR-SHELL-41); a user reopen
+      // keeps the stored rect unless it is covered (FR-SHELL-56). Already open: front only.
       const cur = find(ws, kind, instance);
       if (cur) {
         let next = ws;
-        const feature = action.by === "feature" && cur.state !== "open";
-        if (feature && ctx.available.has(kind) && needsAutoPlace(ws, cur, ctx)) {
-          next = withAutoPlaced(ws, ctx, kind, instance);
+        if (cur.state !== "open" && ctx.available.has(kind)) {
+          if (action.by === "feature") {
+            if (needsAutoPlace(ws, cur, ctx)) next = withAutoPlaced(ws, ctx, kind, instance);
+          } else if (!def.fixedDefault && isCovered(ws, cur, ctx)) {
+            if (!def.defaultOpen) next = withAutoPlaced(ws, ctx, kind, instance);
+            else {
+              const opened = patch(ws, kind, instance, (w) => ({ ...w, state: "open" }));
+              next = clearAround(opened, ctx, kind, instance);
+            }
+          }
         }
         return toFront(next, kind, instance, "open");
       }
