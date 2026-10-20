@@ -1,7 +1,7 @@
 // Image tags (ASSET §6.3, FR-ASSET-39–43, -48): rules, built-in tags, upload contexts and the
 // DM-only tag intents. Tags live only on the DM's `asset` record (FR-ASSET-50).
 
-import { fold } from "@shared/compendium/match";
+import { fold } from "@shared/search/match";
 import { z } from "zod";
 
 /** FR-ASSET-39: tag length (chars), tags per image, distinct tags per campaign (built-ins incl.). */
