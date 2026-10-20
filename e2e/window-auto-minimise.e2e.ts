@@ -2,8 +2,8 @@
 // Thin sprint-7 window frame (SHELL FR-SHELL-77, -80, -83, -84; track FU slice FU1). Read-only on
 // server state (the bundle is shared): window opens, Reset layout, Fit, keys, nothing sent. DM:
 // Compendium, Party, Encounters at 1440×900 land PC-clear (`data-pc-clear`, checked against the
-// PC footprints); auto-minimised ones carry `data-auto-minimised-for`; reopened at 1280×720, a
-// window marked PC-clear covers no PC. Player 2 (player 1 starts behind a presented handout
+// PC footprints); auto-minimised ones carry `data-auto-minimised-for`; reopened at 1280×720, the
+// same (pets and summons aren't PCs). Player 2 (player 1 starts behind a presented handout
 // whose Close is a server write): Reset layout keeps the zones (the sheet 948, 60, 320×418);
 // Space presses a Tab-focused launcher button with the mouse over the map, and pans after a
 // click (#199). DM Initiative: each row's chips are one tab stop. The rules in detail: bun test
@@ -14,8 +14,8 @@ import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
-/** sim-10's owned tokens (PCs for FR-SHELL-57): the PCs, their pets and summons, by label. */
-const PCS = ["Mira", "Thorn", "Brakka", "Owlbear", "Drake", "Fire Elem"];
+/** sim-10's PCs for the PC rule (FR-SHELL-57, -77): player characters only, by label. */
+const PCS = ["Mira", "Thorn", "Brakka"];
 const KINDS = ["cmp.compendium", "party.board", "cbt.encounters"];
 
 async function live(page: Page) {
@@ -63,7 +63,8 @@ async function settled(page: Page) {
 /** After an open: PC-clear marks match the footprints; auto-minimised ones name their newcomer. */
 async function checkMarks(page: Page, strict: boolean) {
   const pcs = await footprintsOf(page, PCS);
-  expect(pcs.length).toBeGreaterThan(0);
+  const labels = (await konvaNodes(page, "map-token-label")).map((l) => l.text);
+  expect(pcs.length, JSON.stringify(labels)).toBe(3);
   for (const w of await windows(page)) {
     if (w.autoMinimised) expect(w.autoFor, w.kind).toBeTruthy();
     if (w.state !== "open" || !["auto", "reopened", "default"].includes(w.placed ?? "")) continue;
@@ -79,7 +80,7 @@ async function checkMarks(page: Page, strict: boolean) {
   }
 }
 
-test("FR-SHELL-77 auto-minimise instead of covering a PC (DM): Compendium, Party, Encounters at 1440×900 → PC-clear, any auto-minimised window names its newcomer; closed, 1280×720, reopened → a PC-clear mark always holds", async ({
+test("FR-SHELL-77 auto-minimise instead of covering a PC (DM): Compendium, Party, Encounters at 1440×900 → PC-clear, any auto-minimised window names its newcomer; closed, 1280×720, reopened → PC-clear too", async ({
   browser,
 }) => {
   const { secret, recordId } = e2eEnv();
@@ -118,7 +119,7 @@ test("FR-SHELL-77 auto-minimise instead of covering a PC (DM): Compendium, Party
   for (const kind of KINDS) {
     await launcherButton(dm, kind).click();
     await expect(shellWindow(dm, kind)).toHaveAttribute("data-state", "open");
-    await checkMarks(dm, false);
+    await checkMarks(dm, true);
   }
 });
 

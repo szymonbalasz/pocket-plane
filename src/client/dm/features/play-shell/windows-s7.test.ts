@@ -10,7 +10,12 @@ import {
   rectIn,
   sizeTableProblems,
 } from "@ui/features/play-shell/layout-checks";
-import { defaultLayout, type ManagerContext, reduce } from "@ui/features/play-shell/manager";
+import {
+  defaultLayout,
+  type ManagerContext,
+  reduce,
+  type Windows,
+} from "@ui/features/play-shell/manager";
 import { pcClear } from "@ui/features/play-shell/placement";
 import { createShellController } from "@ui/features/play-shell/shell-store";
 import { BANDS, SIZE_TABLE, TEST_KINDS } from "@ui/features/play-shell/size-table";
@@ -139,4 +144,25 @@ test("FR-SHELL-87 (e) every sim-10 auto placement at the four sizes: launcher ki
     const tokens = fitted(vp);
     for (const r of rects) expect(pcClear(r, tokens)).toBe(true);
   }
+});
+
+test("FR-SHELL-77 DM 1280×720 PCs are player characters (sim-10 b02, b03): Compendium, Party, Encounters on sim-10's fitted ambush → Party and Encounters clear of every PC footprint (Mira, Thorn, Brakka; the pets and summons rank like other tokens)", () => {
+  const tokens = fitted(LAPTOP);
+  expect(tokens.filter((t) => t.pc).length).toBe(3);
+  const ctx: ManagerContext = {
+    registry: dmWindows,
+    viewport: LAPTOP,
+    available: all(),
+    avoid: () => tokens,
+  };
+  let ws: Windows = defaultLayout(dmWindows, LAPTOP);
+  const out: string[] = [];
+  for (const kind of ["cmp.compendium", "party.board", "cbt.encounters"]) {
+    ws = reduce(ws, { type: "open", kind }, ctx);
+    const r = rectIn(ws, kind);
+    out.push(`${kind} ${r.x},${r.y} ${r.w}×${r.h}`);
+    expect({ kind, pcClear: pcClear(r, tokens) }).toEqual({ kind, pcClear: true });
+  }
+  const parked = ws.filter((w) => w.state === "minimised").map((w) => w.kind);
+  console.info(`FR-SHELL-77 DM 1280×720: ${out.join("; ")}; auto-minimised ${parked.join(",")}`);
 });

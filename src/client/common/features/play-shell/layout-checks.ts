@@ -350,9 +350,12 @@ function autoPlaceProblems(
   const accepted = pcFree && atUseful && placeFields(rect, def, vp, scene)[0] === 0;
   const ahead = bruteBest(def, vp, { ...scene, windows: kept }, floor);
   const aheadOk = accepted || (ahead[0] === 0 && ahead[1] === 0);
-  if (aheadOk && !pcFree) out.push("over a PC while auto-minimising could clear it");
+  // (d'): the same at the min size (a shrunk PC-free spot once auto-minimised windows are gone).
+  const aheadMin = bruteBest(def, vp, { ...scene, windows: kept });
+  const aheadMinOk = pcFree || aheadOk || (aheadMin[0] === 0 && aheadMin[1] === 0);
+  if (aheadMinOk && !pcFree) out.push("over a PC while auto-minimising could clear it");
   if (aheadOk && !atUseful) out.push(`below its useful size ${floor.w}×${floor.h}`);
-  if (parked.length > 0 && !aheadOk) {
+  if (parked.length > 0 && !aheadOk && !aheadMinOk) {
     const full = bruteBest(def, vp, { ...scene, windows: rectsOf(others) })[0] === 1;
     if (!full) out.push("auto-minimised though the look-ahead fails");
   }

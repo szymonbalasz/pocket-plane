@@ -18,20 +18,26 @@ export interface AmbushToken extends FitToken {
   name: string;
   /** Hidden: drawn for the DM only. */
   hidden?: true;
+  /**
+   * Owned but not a character (a pet or summon): a PC for the map's Fit (FR-MAP-46: owned),
+   * not for auto placement's PC rule (FR-SHELL-57, -77: player characters only).
+   */
+  companion?: true;
 }
 
 const tok = (
   name: string,
   col: number,
   row: number,
-  opts: { pc?: true; size?: FitToken["size"]; hidden?: true } = {},
+  opts: { pc?: true; size?: FitToken["size"]; hidden?: true; companion?: true } = {},
 ): AmbushToken => ({
   name,
   col,
   row,
   size: opts.size ?? "medium",
-  pc: opts.pc === true,
+  pc: opts.pc === true || opts.companion === true,
   ...(opts.hidden && { hidden: true as const }),
+  ...(opts.companion && { companion: true as const }),
 });
 
 /**
@@ -64,7 +70,8 @@ export const SIM9_AMBUSH_PLAYER: readonly AmbushToken[] = SIM9_AMBUSH_DM.filter(
 /**
  * `session-sim-10` Goblin Ambush, DM view (read from the loaded bundle): sim-9's cells (no Crypt
  * Ogre) plus CP's tokens: Mira's Owlbear and Brakka's Drake Companion (pets) and the three Fire
- * Elementals (summons). PCs = tokens with an owner (FR-SHELL-57), so the pets and summons count.
+ * Elementals (summons). The pets and summons are owned (the Fit's PCs, FR-MAP-46), not player
+ * characters (auto placement's PCs, FR-SHELL-57).
  */
 export const SIM10_AMBUSH_DM: readonly AmbushToken[] = [
   tok("Mira", 5, 6, { pc: true }),
@@ -82,11 +89,11 @@ export const SIM10_AMBUSH_DM: readonly AmbushToken[] = [
   tok("Wolf 2", 12, 2),
   tok("Plain Brute", 14, 2),
   tok("Ogre", 17, 1, { size: "large", hidden: true }),
-  tok("Owlbear", 0, 7, { pc: true, size: "large" }),
-  tok("Drake Companion", 4, 8, { pc: true }),
-  tok("Fire Elemental", 6, 5, { pc: true, size: "large" }),
-  tok("Fire Elemental 2", 2, 9, { pc: true, size: "large" }),
-  tok("Fire Elemental 3", 5, 9, { pc: true, size: "large" }),
+  tok("Owlbear", 0, 7, { companion: true, size: "large" }),
+  tok("Drake Companion", 4, 8, { companion: true }),
+  tok("Fire Elemental", 6, 5, { companion: true, size: "large" }),
+  tok("Fire Elemental 2", 2, 9, { companion: true, size: "large" }),
+  tok("Fire Elemental 3", 5, 9, { companion: true, size: "large" }),
 ];
 
 /** The same for a player: hidden tokens never arrive. */
@@ -121,7 +128,7 @@ export function ambushTokens(
     y: cam.y + t.row * c,
     w: footprint(t.size) * c,
     h: footprint(t.size) * c,
-    pc: t.pc,
+    pc: t.pc && !t.companion,
   }));
 }
 

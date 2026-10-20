@@ -2180,6 +2180,7 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-56 (OQ-SHELL-55 
 | `WindowDef.usefulSize`, band, size table | code (registry; `size-table.ts` test data) | not sent or stored | [FR-SHELL-79](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-85](../specs/play-shell.md#6-functional-requirements) |
 | Fit requests | client memory (`free-area.ts` counter) | one per Reset layout on this page | [FR-SHELL-80](../specs/play-shell.md#6-functional-requirements) |
 
-- **Fixtures:** no new unit (pure tests on `session-sim-10`'s Goblin Ambush cells in `test-cells.ts`; the e2e reads `session-sim-10`); `session-sim-11` gets a comment line only.
+- **Derived:** a PC for auto placement = a token with `characterId` and `ownerPlayerId` (a player character); pets and summons are not (orchestrator ruling, sprint 7).
+- **Fixtures:** no new unit (pure tests on `session-sim-10`'s Goblin Ambush cells in `test-cells.ts`, pets and summons marked `companion`; the e2e reads `session-sim-10`); `session-sim-11` gets a comment line only.
 - **Persisted runtime state:** only `userSpot` in the layout entry.
 - **CON-44:** 0 B.

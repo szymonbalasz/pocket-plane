@@ -349,7 +349,9 @@ const minimised = (ws: Windows, gone: ReadonlySet<WindowState>): Windows =>
  * keep-outs and of every PC footprint + 4 px; (c) else, iff ranking with every auto-minimisable
  * window removed (the look-ahead) gives an accepted spot, auto-minimise the first in FR-SHELL-78's
  * order and go back to (a); (d) else shrink down to the min size, accepted when clear and PC-free;
- * (e) else the clear spot over the least PC area; none clear (screen full, FR-SHELL-47): the
+ * (d') else the look-ahead at the min size: it helps → auto-minimise as in (c) (sprint 7 ruling: a
+ * PC is covered only when no auto-minimise can prevent it); (e) else the clear spot over the
+ * least PC area; none clear (screen full, FR-SHELL-47): the
  * first auto-minimisable window is auto-minimised and placement runs again; nothing left: the
  * protected last resort. Returns the windows (incl. any auto-minimised), the rect and whether it
  * is clear of the other windows.
@@ -381,24 +383,34 @@ function autoPlace(
   };
   let windows = ws;
   let ahead: boolean | null = null;
+  let aheadMin: boolean | null = null;
+  /** The look-ahead: the same with every auto-minimisable window gone (once per floor). */
+  const lookAhead = (more: Partial<PlaceInput>) => {
+    const q = placeIn(
+      minimised(windows, new Set(autoMinimiseOrder(windows, ctx, kind, instance, late))),
+      more,
+    );
+    return q.clear && q.pcClear;
+  };
   for (;;) {
     const p = placeIn(windows, { floor });
     if (p.clear && p.pcClear) return { windows, rect: p.rect, clear: true };
     const first = autoMinimiseOrder(windows, ctx, kind, instance, late)[0];
-    if (first) {
-      // (c) The look-ahead, once: after each auto-minimise the rest are the same set, minus it.
-      if (ahead === null) {
-        const all = new Set(autoMinimiseOrder(windows, ctx, kind, instance, late));
-        const q = placeIn(minimised(windows, all), { floor });
-        ahead = q.clear && q.pcClear;
-      }
-      if (ahead) {
-        windows = park(windows, first);
-        continue;
-      }
+    // (c) The look-ahead, once: after each auto-minimise the rest are the same set, minus it.
+    if (first && ahead === null) ahead = lookAhead({ floor });
+    if (first && ahead) {
+      windows = park(windows, first);
+      continue;
     }
     const d = placeIn(windows, {});
     if (d.clear && d.pcClear) return { windows, rect: d.rect, clear: true };
+    // (d') No PC-free spot even shrunk: the look-ahead again at the min size, so a window is
+    // auto-minimised rather than a PC covered (#310) whenever that can help.
+    if (first && aheadMin === null) aheadMin = lookAhead({});
+    if (first && aheadMin) {
+      windows = park(windows, first);
+      continue;
+    }
     const e = placeIn(windows, { leastPc: true });
     if (e.clear) return { windows, rect: e.rect, clear: true };
     if (first) {

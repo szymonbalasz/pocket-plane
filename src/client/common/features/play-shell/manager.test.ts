@@ -842,6 +842,11 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
   });
 
   test("FR-SHELL-77 the look-ahead fails (no useful-size PC-free spot even with every launcher window gone): nothing is auto-minimised; shrink to a PC-free spot below the useful size, else the least PC area (not PC-clear)", () => {
+    // (d') at the min size: a shrunk PC-free spot that needs sv.a gone → sv.a is auto-minimised.
+    const minOnly = [pc(200, 200), pc(660, 240), pc(560, 100), pc(760, 400)];
+    const viaMin = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(minOnly));
+    expect(stateOf(viaMin, "sv.a")).toBe("minimised");
+    expect(pcClear(get(viaMin, "sv.b"), minOnly)).toBe(true);
     // PCs under s7.a's spot and in the middle: no 440×360 PC-free spot on an empty map.
     const hole = [pc(200, 200), pc(660, 300)];
     const shrunk = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(hole));
@@ -849,8 +854,10 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
     const b = get(shrunk, "sv.b");
     expect(pcClear(b, hole)).toBe(true);
     expect(b.w < 440 || b.h < 360).toBe(true); // below its useful size: only step (d) goes there
-    // No PC-free spot at all: the clear spot over the least PC area, nothing auto-minimised.
-    const spread = [pc(200, 200), pc(660, 240), pc(560, 100), pc(760, 400)];
+    // No PC-free spot at all, not even at the min size with sv.a gone (PCs every 150 px): the
+    // clear spot over the least PC area, nothing auto-minimised.
+    const spread: PlacementToken[] = [];
+    for (let x = 80; x < 860; x += 150) for (let y = 70; y < 480; y += 150) spread.push(pc(x, y));
     const last = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(spread));
     expect(stateOf(last, "sv.a")).toBe("open");
     const lb = get(last, "sv.b");

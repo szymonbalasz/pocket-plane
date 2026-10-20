@@ -27,13 +27,18 @@ export async function tokenFootprints(page: Page): Promise<Box[]> {
  */
 export async function footprintsOf(page: Page, names: readonly string[]): Promise<Box[]> {
   const labels = await konvaNodes(page, "map-token-label");
+  // A cut label ("Mi…") is the start of its name.
+  const named = (text: string, n: string) => {
+    const cut = text.endsWith("…") ? text.slice(0, -1).trimEnd() : null;
+    return cut === null ? text.startsWith(n) : cut.length > 0 && n.startsWith(cut);
+  };
   const ids = new Set(
-    labels.filter((l) => names.some((n) => (l.text ?? "").startsWith(n))).map((l) => l.id),
+    labels.filter((l) => names.some((n) => named(l.text ?? "", n))).map((l) => l.id),
   );
-  const named = new Map(labels.map((l) => [l.id, l.text]));
+  const text = new Map(labels.map((l) => [l.id, l.text]));
   return (await tokenFootprints(page))
     .filter((t) => ids.has(t.id))
-    .map((t) => ({ ...t, label: named.get(t.id) ?? null }));
+    .map((t) => ({ ...t, label: text.get(t.id) ?? null }));
 }
 
 /** Overlap by more than half a px (rounded screen rects). */

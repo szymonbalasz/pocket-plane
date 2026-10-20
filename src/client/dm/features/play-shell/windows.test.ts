@@ -25,7 +25,7 @@ import {
 } from "@ui/features/play-shell/layout-checks";
 import { defaultLayout, reduce, restoreLayout, useful } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
-import { fittedDefaultRect, placeWindow } from "@ui/features/play-shell/placement";
+import { fittedDefaultRect, pcClear, placeWindow } from "@ui/features/play-shell/placement";
 import {
   availableKinds,
   createWindowRegistry,
@@ -935,7 +935,7 @@ const walkTokens = (dy: number) =>
     ] as const
   ).map(([, x, y, s, pc]) => ({ x, y: y + dy, w: s, h: s, pc: pc === 1 }));
 
-test("FR-SHELL-47 FR-SHELL-56 walkthrough finding 2 (DM 1280×720): restoring Party with 68–450 × 60–472 clear of windows (over Mira, Brakka, Thorn) is placed there, clear; Compendium is not auto-minimised", () => {
+test("FR-SHELL-47 FR-SHELL-56 FR-SHELL-77 walkthrough finding 2 (DM 1280×720): Party's clear-of-windows spot 68–450 × 60–472 covers Mira, Brakka, Thorn; sprint 7 (#310): restoring Party auto-minimises Compendium instead and lands clear and PC-free", () => {
   const def = dmWindows.get("party.board");
   if (!def) throw new Error("no party.board");
   const tokens = walkTokens(-108); // the probe's 1280×720 camera
@@ -948,7 +948,9 @@ test("FR-SHELL-47 FR-SHELL-56 walkthrough finding 2 (DM 1280×720): restoring Pa
   const p = placeWindow(def, LAPTOP, { windows, soft, tokens });
   expect(p.clear).toBe(true);
   for (const o of windows) expect(overlaps(p.rect, o)).toBe(false);
-  // The same through the manager: Party restored, Compendium stays open.
+  // Through the manager (FR-SHELL-77): that spot covers PCs, so Compendium (the only launcher
+  // window) is auto-minimised and Party lands clear of every window and PC (sprint 6: it covered
+  // the three PCs and Compendium stayed open).
   const ctx = { registry: dmWindows, viewport: LAPTOP, available: allKinds(), avoid: () => tokens };
   const area = workArea(LAPTOP);
   const at = (kind: string, state: "open" | "minimised", r: Rect, z: number) => ({
@@ -966,10 +968,11 @@ test("FR-SHELL-47 FR-SHELL-56 walkthrough finding 2 (DM 1280×720): restoring Pa
     at("party.board", "minimised", { x: 462, y: 72, w: 340, h: 400 }, 4), // its spot: Compendium's
   ];
   const next = reduce(ws, { type: "open", kind: "party.board" }, ctx);
-  expect(next.find((w) => w.kind === "cmp.compendium")?.state).toBe("open");
+  expect(next.find((w) => w.kind === "cmp.compendium")?.state).toBe("minimised");
   const party = win(next, "party.board");
   expect(party.state).toBe("open");
-  expect(overlaps(party, windows[2] as Rect)).toBe(false);
+  expect(pcClear(party, tokens)).toBe(true);
+  for (const o of windows.slice(0, 2)) expect(overlaps(party, o)).toBe(false);
 });
 
 test("FR-SHELL-45 (2) walkthrough edge-on-PC row (DM 1440×900, F3): Encounters, which must cover PCs, holds them whole: no edge through a PC footprint + 4 px", () => {

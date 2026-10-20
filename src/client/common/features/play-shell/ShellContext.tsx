@@ -34,7 +34,7 @@ import { availableKinds, type WindowRegistry } from "./registry";
 import { createShellController, type ShellController, type ShellState } from "./shell-store";
 import { browserSoundSettingsStorage, soundKey } from "./sound-settings";
 import { browserLayoutStorage } from "./storage";
-import { tokenScreenBoxes } from "./token-boxes";
+import { isPlacementPc, tokenScreenBoxes } from "./token-boxes";
 
 const ShellContext = createContext<ShellController | null>(null);
 const AlertContext = createContext<AlertController | null>(null);
@@ -42,20 +42,24 @@ const AlertContext = createContext<AlertController | null>(null);
 const browserViewport = () => ({ w: window.innerWidth, h: window.innerHeight });
 
 /**
- * The drawn tokens' footprints for auto placement (FR-SHELL-40, -45, -57): `pc` = the token has
- * an owner in this client's store (a PC).
+ * The drawn tokens' footprints for auto placement (FR-SHELL-40, -45, -57, -77): `pc` = a player
+ * character's token (a character, with an owner, in this client's store). Pets, summons and other
+ * owned companions rank like any other token (sprint 7 ruling: #310 says PCs).
  */
 function placementTokens(store: RecordStore | undefined) {
-  const owned = new Set(
+  const pcs = new Set(
     store
-      ? recordsOf<{ id: string; ownerPlayerId: string | null }>(store, TOKEN_TYPE)
-          .filter((t) => t.ownerPlayerId)
+      ? recordsOf<{ id: string; ownerPlayerId: string | null; characterId: string | null }>(
+          store,
+          TOKEN_TYPE,
+        )
+          .filter((t) => isPlacementPc(t))
           .map((t) => t.id)
       : [],
   );
   return tokenScreenBoxes("all", store).map((b) => ({
     ...b,
-    pc: b.id !== undefined && owned.has(b.id),
+    pc: b.id !== undefined && pcs.has(b.id),
   }));
 }
 

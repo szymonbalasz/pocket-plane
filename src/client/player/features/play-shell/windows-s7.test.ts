@@ -3,7 +3,6 @@
 // returning (FR-SHELL-81) and the sim-10 replays with the (e) invariants (FR-SHELL-87). Pure.
 import { expect, test } from "bun:test";
 import { renderedWindowRects } from "@ui/features/play-shell/free-area";
-import type { Rect } from "@ui/features/play-shell/geometry";
 import {
   type LayoutStep,
   layoutRun,
@@ -11,7 +10,7 @@ import {
   sizeTableProblems,
 } from "@ui/features/play-shell/layout-checks";
 import { defaultLayout, type ManagerContext, reduce } from "@ui/features/play-shell/manager";
-import { pcBoxes, pcClear } from "@ui/features/play-shell/placement";
+import { pcClear } from "@ui/features/play-shell/placement";
 import { createShellController } from "@ui/features/play-shell/shell-store";
 import { BANDS, SIZE_TABLE, TEST_KINDS } from "@ui/features/play-shell/size-table";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
@@ -86,28 +85,30 @@ test("FR-SHELL-80 reset keeps the zones (player 1280×800, c05): with sim-10's t
   expect(fits.n).toBe(1);
 });
 
-test("FR-SHELL-87 sim-10 replay r06 (player 1280×800): Reset layout, then the Fit, then Compendium, then the companion card → neither over Mira or Thorn; the card PC-clear", () => {
+test("FR-SHELL-87 sim-10 replay r06 (player 1280×800): Reset layout, then the Fit, then Compendium, then the companion card → neither over a PC (Mira, Thorn, Brakka; pets and summons aren't PCs); the card at its useful 320×360 or a window auto-minimised for it", () => {
   let tokens = sim10Tokens("player", MID, []);
   const { c, ws } = shell(MID, () => tokens);
   c.dispatch({ type: "reset" }, all());
   tokens = fittedFor(ws(), MID); // FR-SHELL-80: the post-reset camera (FR-MAP-59's Fit)
-  const pcs = (names: string[]) =>
-    pcBoxes(
-      tokens.filter((_, i) => names.includes((SIM10_AMBUSH_PLAYER[i] as { name: string }).name)),
-    );
-  const miraThorn = pcs(["Mira", "Thorn"]);
-  const hits = (a: Rect, b: Rect) =>
-    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const name = (i: number) => (SIM10_AMBUSH_PLAYER[i] as { name: string }).name;
+  // The PC rule counts player characters only: the Owlbear, the drake and the elementals don't.
+  expect(tokens.map((t, i) => (t.pc ? name(i) : null)).filter(Boolean)).toEqual([
+    "Mira",
+    "Thorn",
+    "Brakka",
+  ]);
+  const placed: string[] = [];
   for (const kind of ["cmp.compendium", "charx.companion"]) {
     c.dispatch({ type: "open", kind }, all());
     const r = rectIn(ws(), kind);
-    expect({ kind, over: miraThorn.some((p) => hits(r, p)) }).toEqual({ kind, over: false });
+    expect({ kind, pcClear: pcClear(r, tokens) }).toEqual({ kind, pcClear: true });
+    placed.push(`${kind} ${r.x},${r.y} ${r.w}×${r.h}`);
   }
-  // At this camera the owned tokens (pets and summons count as PCs) leave no PC-free 320×360
-  // spot even with Compendium gone, so the look-ahead fails and the card shrinks PC-free (step
-  // (d)) rather than auto-minimise Compendium and cover a PC.
-  expect(pcClear(rectIn(ws(), "charx.companion"), tokens)).toBe(true);
-  expect(ws().find((w) => w.kind === "cmp.compendium")?.state).toBe("open");
+  const card = rectIn(ws(), "charx.companion");
+  const parked = c.store.getState().autoMinimisedFor;
+  const useful = card.w === 320 && card.h === 360;
+  expect({ useful, parked: parked.size > 0 }).not.toEqual({ useful: false, parked: false });
+  console.info(`FR-SHELL-87 r06: ${placed.join("; ")}; auto-minimised ${[...parked].join(",")}`);
 });
 
 test("FR-SHELL-81 pushed windows return (player, sim-10 c05): the AoE panel pushes Initiative to x 330; the panel closes → back at 68, 60, `returned`; a dragged window stays where dragged", () => {
