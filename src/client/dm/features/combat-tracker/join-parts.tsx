@@ -10,7 +10,9 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Badge } from "@ui/components/ui/primitives";
+import { cn } from "@ui/lib/utils";
 import { EyeOffIcon } from "lucide-react";
+import type { ReactNode } from "react";
 import { hpLabel, type JoinBinding, type JoinRow } from "./join-preview";
 
 export const NO_FORMULA = "No HP formula";
@@ -68,8 +70,21 @@ const BINDING_LABEL: Record<JoinBinding, string> = {
   none: "no token",
 };
 
-/** One preview line: name, binding ("token" / "new token" / "no token"), HP mode, eye-off. */
-export function JoinPreviewRow({ row, testId }: { row: JoinRow; testId: string }) {
+/**
+ * One preview line: name, binding ("token" / "new token" / "no token"), HP mode, eye-off; `lead`
+ * before the name (a pet's tick, FR-CBT-109).
+ */
+export function JoinPreviewRow({
+  row,
+  testId,
+  lead,
+  className,
+}: {
+  row: JoinRow;
+  testId: string;
+  lead?: ReactNode;
+  className?: string;
+}) {
   const hp = hpLabel(row);
   return (
     <li
@@ -78,8 +93,9 @@ export function JoinPreviewRow({ row, testId }: { row: JoinRow; testId: string }
       data-record-id={row.tokenId ?? ""}
       data-bound={row.tokenId !== null}
       data-hidden={row.hidden}
-      className="flex items-center gap-2"
+      className={cn("flex items-center gap-2", className)}
     >
+      {lead}
       <span className="flex-1 truncate">{row.name}</span>
       {row.hidden && <EyeOffIcon className="size-3.5 text-visibility-hidden" aria-label="Hidden" />}
       {hp && <span className="text-xs text-muted-foreground">{hp}</span>}

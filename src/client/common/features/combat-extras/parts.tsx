@@ -534,7 +534,8 @@ export function RowName({
   const { base, suffix } = splitNumbered(name);
   return (
     <span
-      className={wrap ? "min-w-0 wrap-anywhere" : "shrink-0 whitespace-nowrap"}
+      // Between words; inside a word only when it alone is wider than the line (note 3).
+      className={wrap ? "min-w-0 wrap-break-word" : "shrink-0 whitespace-nowrap"}
       data-testid={testId}
       data-value={name}
       data-wrap={wrap}
@@ -554,7 +555,8 @@ export function RowName({
 /** `NameLine`'s natural widths, px (FR-CBTX-57). */
 function nameLineWidths(line: HTMLElement) {
   const width = (sel: string) => line.querySelector<HTMLElement>(sel)?.offsetWidth ?? 0;
-  const marks = width(":scope > [data-name-head] > [data-name-marks]");
+  // Beside the name, or moved down (`marksWrap`): measured wherever they are.
+  const marks = width(":scope > [data-name-head] > [data-name-marks], :scope > [data-name-marks]");
   return {
     line: line.clientWidth,
     name: width("[data-name-measure]"),
@@ -600,7 +602,12 @@ export function NameLine({
     if (!line || line.clientWidth === 0) return;
     const next = fitNameLine(nameLineWidths(line));
     setFit((f) =>
-      f?.nameWrap === next.nameWrap && f.split === next.split && f.room === next.room ? f : next,
+      f?.nameWrap === next.nameWrap &&
+      f.marksWrap === next.marksWrap &&
+      f.split === next.split &&
+      f.room === next.room
+        ? f
+        : next,
     );
   }, []);
   // Every render: the marks, the side chip and Moved come and go with the row.
@@ -616,7 +623,13 @@ export function NameLine({
     return () => ro.disconnect();
   }, [measure]);
   const nameWrap = fit?.nameWrap ?? false;
+  const marksWrap = fit?.marksWrap ?? false;
   const split = fit?.split ?? false;
+  const marksSlot = (
+    <span data-name-marks className="flex shrink-0 items-center gap-1 empty:hidden">
+      {marks}
+    </span>
+  );
   const sideSlot = (
     <span data-name-side className="flex shrink-0 empty:hidden">
       {side}
@@ -640,12 +653,12 @@ export function NameLine({
         className={cn("flex items-center gap-1", nameWrap ? "min-w-0" : "shrink-0")}
       >
         <RowName name={name} testId={testId} className={className} wrap={nameWrap} />
-        <span data-name-marks className="flex shrink-0 items-center gap-1 empty:hidden">
-          {marks}
-        </span>
+        {!marksWrap && marksSlot}
       </span>
       {split && !nameWrap && end}
       {split && <span data-name-break aria-hidden className="h-0 basis-full" />}
+      {/* The name fits but not with its marks: they lead the next line (note 3). */}
+      {marksWrap && marksSlot}
       {sideSlot}
       <NameLineRoom.Provider value={fit?.room ?? null}>{children}</NameLineRoom.Provider>
       {(!split || nameWrap) && end}

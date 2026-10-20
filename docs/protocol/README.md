@@ -2773,9 +2773,28 @@ From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-52 
 | Tests | `template-hover.test.ts` (`FR-SCN-52 template label on hover`: any drawn template's area incl. one the player can't edit, 6-px tolerance per scale, topmost, the pill and its grown rect), `e2e/tray-label-s6.e2e.ts` (Player 1 hovers Player 2's kept Thunderwave on a square Web doesn't cover → "· by Player 2" + `hovered`; away → gone; the pill, then six steps across its grown part → hovered throughout) | — |
 | CON-44 | 0 B | — |
 
-## 117. Sprint 6: pets — New pet, pet HP, Companions tab (CP1)
+## 117. Sprint 6: companion turns client (CP2)
 
-From [entities](../specs/entities.md#6-functional-requirements) FR-ENT-32 (UI), -33 (form), -36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `build/cp-pets`**: one new intent; everything else uses CP0's routes, events and visibility ([§112](#112-sprint-6-companions-core-cp0)). Data side: [data model §90](../data-model/README.md#90-sprint-6-pets-cp1).
+From [combat-tracker](../specs/combat-tracker.md#64-sprint-6-companions) FR-CBT-107–109, -111, -115, -118, -119 (#252, #288; OQ-CBT-79 A, -82 A, -83a A; seams S4). **Built by `build/cp-turns`** on CP0's server core ([§112](#112-sprint-6-companions-core-cp0): `cbt.setCompanion`, `cbt.start` `petIds?`, the redaction, ranks). **No wire change**: no new intent, event, record type, signal or field (CON-44: 0 B beyond §112's measured rows). Data model: [§90](../data-model/README.md#90-sprint-6-companion-turns-client-cp2).
+
+| Piece | Contract | Source |
+|---|---|---|
+| Row layout (`companionLayout(rows, rank)`, `@ui/features/combat-tracker/companions`) | Rows in rank order; an `in-owner-turn` companion with no rank (`position` DM / `playerPosition` players null) is a **line** in its owner PC's row (first PC row of `ownerCharacterId`), by `seq`; a companion ranked by its owner (not `own`) is indented; a line whose owner isn't listed stays a row | FR-CBT-107, -118, -119 |
+| Owner chip `cbt-init-row-owner` (both clients; `data-value` = owner character id) | Owner PC's name + its player's colour dot (`colorOf`, seams S8), `badge` look, in the name line's side slot before the side chip (never folds, FR-CBTX-54); not on lines | FR-CBT-118, -119 |
+| Mode icon `cbt-init-row-mode` (`data-value` = mode) | lucide `corner-down-right` / `link` / `dices`; Tooltip "After Mira" / "In Mira's turn" / "Own initiative" | FR-CBT-118 |
+| Companion line `cbt-init-companion` (+ `data-record-id`) | Inside the owner's `cbt-init-row`: the row's parts with the line's own `cbt-init-row-*` IDs (`data-record-id` = the companion): name, AC / HP, band, chips, Attack ▸, menu; no turn marker, initiative or owner chip | FR-CBT-118, OQ-CBT-79 |
+| DM initiative cell of an owner-ranked companion | `cbt-init-row-init` as text (`data-value` = the owner's number), no input or roll; "Start round 1" and the skip toast ignore `after-owner` / `in-owner-turn` companions | FR-CBT-108 |
+| Companion ▸ `cbt-init-row-companion` (row, line) / `cbt-token-menu-companion` (token menu entry `cbt.companion`, order 70.6, monsters) | Owner ▸ (`cbt-companion-owner-menu`; items `cbt-companion-owner`, `data-record-id` = character id, the fight's active PCs, disabled "Mira has no player"); Turn mode radio items `cbt-companion-mode` (`data-value`); `cbt-companion-release`; `cbt-companion-hostile`. Each sends `cbt.setCompanion` (owner: `{characterId, turnMode?}`; mode: `{characterId: current, turnMode}`; release: `owner: null`; hostile: `owner: null, side: "enemy"`). A pet's owner / release / hostile disabled ("Change a pet's owner in the Party window"); the server decides | FR-CBT-111, -118 |
+| Player row of an own companion | HP `cbt-init-row-hp` "45 / 59" instead of the band; card icon `cbt-init-row-card` (+ `data-record-id`); a click on the row opens the card too | FR-CBT-119 |
+| Card request (`@ui/features/combat-tracker/companion-card-request`) | `useOpenCompanionCard()(id)`: `useCompanionCardRequest` `{id, n}` (n bumps per request) + opens `charx.companion`; the card (CP4) selects the latest request | FR-CBT-119 → FR-CHARX-59 |
+| Start dialog pets `cbt-enc-pet` (Checkbox, `data-record-id` = pet id, `data-checked`) | Joining PCs' pets (`petOffers`): on the map → under the PC with its binding row, ticked by default; else under "Not on this map", unticked; never a new token; ticked → `cbt.start {petIds}` | FR-CBT-109 |
+| Turn alert (`turnAlertFor`) | `TurnChanged` to a combatant with `ownerPlayerId = me` → "Your turn" / "Owlbear (Mira)"; to own PC → "Brakka + Drake Companion, Fire Elemental 2" (its lines) | FR-CBT-115 |
+
+- **Fixtures:** none new (bundles `companions-start`, `companions-ally` from CP0). E2E `e2e/cp-turns.e2e.ts` on `companions-start`.
+
+## 118. Sprint 6: pets — New pet, pet HP, Companions tab (CP1)
+
+From [entities](../specs/entities.md#6-functional-requirements) FR-ENT-32 (UI), -33 (form), -36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252, #288; [ADR-0056](../architecture/adr/0056-companion-visibility.md)). **Built by `build/cp-pets`**: one new intent; everything else uses CP0's routes, events and visibility ([§112](#112-sprint-6-companions-core-cp0)). Data side: [data model §91](../data-model/README.md#91-sprint-6-pets-cp1).
 
 | Piece | Contract |
 |---|---|
