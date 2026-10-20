@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: in-review
+status: complete
 owner: spec-gems
 phase: post-mvp-7
 wave: 3
@@ -1071,9 +1071,9 @@ Full split: [gems §14](gems.md#14-dependencies). Combat's parts, feature-owned 
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CBT-85 | **A reroll flips the crit** (a miss rerolled to a natural 20) while damage is on the card | **A. The damage goes to "not used"; the card waits for a new damage roll, doubled (5e-correct; one more click for the player)** / B. Keep the damage; the DM adjusts by hand (no extra roll; a natural 20 that doesn't double) / C. The server rolls only the extra crit dice and adds them (no click; a server roll the player didn't make, physical dice can't follow) | no (DM) | gems |
-| OQ-CBT-86 | **FU:** the popup / card files' holder order this sprint | **Resolved (integrator, seams S3):** FU's End dialog / concentration files aren't apply-popup / card files (FU's OQ-CBT-95 accepted), so FU takes no turn; apply path GM1 ∥ ST core (GM1 merges first, ST core rebases) → GM2. Rejected: ~~A. GM0 → FU → GM2~~, ~~B. GM2 before FU~~ | — · resolved | ST, FU |
-| OQ-CBT-87 | **The DM typed a damage total, then the player maxes a die** | **A. Typed value kept, "rolled N" shows the new total (FR-CBT-90's never-override rule, one rule)** / B. The maxed total replaces the typed one (the gem always shows; overrides the DM) | no (DM) | gems |
+| OQ-CBT-85 | **A reroll flips the crit** (a miss rerolled to a natural 20) while damage is on the card | **Decided (#315): A.** **A. The damage goes to "not used"; the card waits for a new damage roll, doubled (5e-correct; one more click for the player)** / B. Keep the damage; the DM adjusts by hand (no extra roll; a natural 20 that doesn't double) / C. The server rolls only the extra crit dice and adds them (no click; a server roll the player didn't make, physical dice can't follow) | — · decided | gems |
+| OQ-CBT-86 | **FU:** the popup / card files' holder order this sprint | **Resolved (integrator, sprint-7 seams / rulings)** (S3): FU's End dialog / concentration files aren't apply-popup / card files (FU's OQ-CBT-95 accepted), so FU takes no turn; apply path GM1 ∥ ST core (GM1 merges first, ST core rebases) → GM2. Rejected: ~~A. GM0 → FU → GM2~~, ~~B. GM2 before FU~~ | — · resolved | ST, FU |
+| OQ-CBT-87 | **The DM typed a damage total, then the player maxes a die** | **Decided (#315): A.** **A. Typed value kept, "rolled N" shows the new total (FR-CBT-90's never-override rule, one rule)** / B. The maxed total replaces the typed one (the gem always shows; overrides the DM) | — · decided | gems |
 
 ## 16. Out of scope
 

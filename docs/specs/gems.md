@@ -1,7 +1,7 @@
 ---
 title: Gems (homebrew)
 prefix: GEM
-status: in-review
+status: complete
 owner: spec-gems
 phase: post-mvp-7
 ---
@@ -44,7 +44,7 @@ phase: post-mvp-7
 | FR-GEM-02 | **Off = nothing:** no `character-gems` row or `gem.*` entry in any snapshot, frame, `sync.load` ack or stats read (DM included); no `features` key (FR-CAMP-38); no gem UI. Server-side, by feature tags (ADR). |
 | FR-GEM-03 | Every `gem.*` intent while off → `forbidden` "Gems are off in this campaign"; nothing written. |
 | FR-GEM-04 | **Off keeps counts, hidden** *(OQ-GEM-04)*; on again shows them. All connections resync (FR-CAMP-40); client-only UI state survives. |
-| FR-GEM-05 | **Gem traces while off** *(OQ-GEM-21 B)*: entries superseded by a reroll are hidden; `replaces`, `maxed`, `diceMaxed` are stripped; only final rolls show; on again restores them. Declared as feature traces (ADR). *(Under A: kept as dice history.)* |
+| FR-GEM-05 | **Gem traces while off** *(OQ-GEM-21 B, #315)*: entries superseded by a reroll are hidden; `replaces`, `maxed`, `diceMaxed` are stripped; only final rolls show; on again restores them. Declared as feature traces (ADR). |
 
 ### Counts
 
@@ -52,10 +52,10 @@ phase: post-mvp-7
 |---|---|
 | FR-GEM-06 | Record type **`character-gems`**: one row per character (`id` = entity id), counts `inspiration`, `fortune`, `combat`, `divine`, `action` 0–99; created on first award. Not on `entity` (ADR-0036). |
 | FR-GEM-07 | `gem.adjust {characterId, gem, delta}` (DM): `delta` −5…+5, ≠ 0; result 0–99 else `invalid`; unknown character → `not_found`. Count + line + `GemsAdjusted`, one transaction. |
-| FR-GEM-08 | **Max 5 shown only** *(OQ-GEM-11)*: over 5 in `hp.bloodied` (reused; visual-direction has no warning token) + Tooltip "Table rule: at most 5 gems". |
+| FR-GEM-08 | **Max 5 is a label** *(OQ-GEM-11 D, #315)*: the gem block shows a static "max 5" label (Tooltip "A table rule, not enforced"); counts above 5 are allowed and shown plainly: no over-limit colour, hint or warning anywhere. |
 | FR-GEM-09 | **Award lines** *(OQ-GEM-10)*: public `gem.award` "DM awards Mira an Inspiration gem (2 held)"; removals write none. |
 | FR-GEM-10 | **Visibility** *(OQ-GEM-01)*: DM full; players full (counts only). Off → hidden. |
-| FR-GEM-11 | **Owner check:** under OQ-GEM-01 A no owner copy, `gem.spend` checks the entity's `ownerPlayerId`; under B the row copies `ownerPlayerId`, refreshed by an [entities](entities.md) owner-change hook. |
+| FR-GEM-11 | **Owner check** (OQ-GEM-01 A, #315): no owner copy on the row; `gem.spend` checks the entity's `ownerPlayerId`. |
 
 ### Spend
 
@@ -117,7 +117,7 @@ phase: post-mvp-7
 
 - **DM view:** options dialog; block with ± on PC sheets; Players-window counts; log and popup actions. **Player view:** own block + Spend; others' summary-card counts; Inspiration on own lines; Combat gem on own card.
 - **States:** off → nothing rendered or stored; disconnected → controls disabled; reject → inline / Toast.
-- **Test IDs:** `gem-block`, `gem-count` (+ `data-value`, `data-count`, `data-over`), `gem-award`, `gem-remove`, `gem-spend-menu`, `gem-spend` (+ `data-value`), `gem-spend-confirm`, `gem-reroll`, `gem-combat`, `gem-combat-die` (+ `data-part`, `data-index`, `data-state`), `gem-combat-submit`, `gem-error`, `gem-summary-count`; records via `data-record-id`.
+- **Test IDs:** `gem-block`, `gem-count` (+ `data-value`, `data-count`), `gem-max-label`, `gem-award`, `gem-remove`, `gem-spend-menu`, `gem-spend` (+ `data-value`), `gem-spend-confirm`, `gem-reroll`, `gem-combat`, `gem-combat-die` (+ `data-part`, `data-index`, `data-state`), `gem-combat-submit`, `gem-error`, `gem-summary-count`; records via `data-record-id`.
 
 ## 8. Data model
 
@@ -125,7 +125,6 @@ phase: post-mvp-7
 |---|---|---|---|
 | `character-gems` | id (= characterId), campaignId, characterId | ID | One per character |
 | | inspiration … action | int 0–99 ×5 | |
-| | ownerPlayerId | ID \| null | Only under OQ-GEM-01 B |
 | | updatedAt | timestamp | `ctx.clock` |
 | `gem.spend` payload | `{characterId, gem, count, use?, target? {kind, id, label, from, to}, dice? ≤ 3}` | JSON leaf | `target` / `dice` in `dmPayload` for a DM-only target |
 | `gem.award` payload | `{characterId, gem, count, held}` | JSON leaf | |
@@ -141,7 +140,7 @@ phase: post-mvp-7
 
 | Record / kind | Visibility |
 |---|---|
-| `character-gems` (tag `gems`) | Off: hidden. On: DM full; players full (A) / owner only (B) |
+| `character-gems` (tag `gems`) | Off: hidden. On: DM and every player full (counts only) |
 | `gem.award`, `gem.spend` (tag `gems`) | Off: hidden. On: public; detail in `dmPayload` for a DM-only target |
 | Traces on `roll` entries, damage cards | Off: superseded hidden, `replaces` / `maxed` / `diceMaxed` stripped (OQ-GEM-21 B) |
 
@@ -156,7 +155,7 @@ phase: post-mvp-7
 |---|---|---|---|
 | Switch, award / remove | ✓ | ✗ | role |
 | Spend, reroll, Combat gem | ✓ any PC | ✓ own PC | entity owner |
-| Read counts | ✓ | ✓ (A) | visibility + tag |
+| Read counts | ✓ | ✓ | visibility + tag |
 
 ## 11. Edge cases & failure modes
 
@@ -184,7 +183,7 @@ Per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md) / [ADR-0017](
 
 | Level | Named tests |
 |---|---|
-| Unit | `FR-GEM-18 eligible` (initiative, death / concentration saves ✗), `FR-GEM-26 levels`, `FR-GEM-27 dice`, `FR-GEM-16 action costs 2`, `FR-GEM-08 over five`, `FR-GEM-30 line wording`, `FR-GEM-13 detail by audience`, kind contract |
+| Unit | `FR-GEM-18 eligible` (initiative, death / concentration saves ✗), `FR-GEM-26 levels`, `FR-GEM-27 dice`, `FR-GEM-16 action costs 2`, `FR-GEM-08 max 5 label shown, no over-limit styling at 6`, `FR-GEM-30 line wording`, `FR-GEM-13 detail by audience`, kind contract |
 | Integration | `FR-GEM-01 bundles off`, `-02 off: no gem bytes`, `-03 off refuses`, `-04 kept hidden`, `-05 off hides gem traces`, `-07 adjust`, `-09 award public, removal silent`, `-10 visibility`, `-11 owner check`, `-12 spend each kind`, `-13 public whoever sends`, `-13 hidden target leak scan` (DM-SECRET-GEM), `-19 reroll supersedes`, `-19 adv`, `-19 no hook re-run`, `-20 second gem`, `-21 physical reroll`, `-22 card follows to-hit`, `-23 final value`, `-24 audience`, `-25 combat on pending card`, `-25 late damage`, `-28 physical`, `-29 apply hit order`, `-31 undo keeps maxed`, `-31 crit flip clears diceMaxed`, `-37 races`, `-38 stale apply`, `-39 owner change`, `-40 campaign isolation`; leak scan per player (snapshot, frames, fresh connection, resync; off and on); crash + `state:digest`; reconnect mid-spend |
 | DOM | `FR-GEM-33 log action available`, `FR-GEM-34 card action available`, `FR-GEM-04 resync keeps UI state` |
 | E2E | `gems-e2e`: P1 spends Fortune, rerolls e-perc; DM off → all gem traces gone without reload |
@@ -195,7 +194,7 @@ Per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md) / [ADR-0017](
 |---|---|---|
 | 1 | A, B, C open sheets, log, a card | Gems off: nothing; no `character-gems`, `gem.`, `features` in frames |
 | 2 | A: Campaign options → on | All resync; blocks (0s) |
-| 3 | A: Mira + Inspiration ×2, + Combat; Brakka + Combat, + Action ×3, + Fortune ×6 | Counts ≤ 1 s; award lines; Fortune 6 flagged |
+| 3 | A: Mira + Inspiration ×2, + Combat; Brakka + Combat, + Action ×3, + Fortune ×6 | Counts ≤ 1 s; award lines; Fortune 6 shown plainly beside the "max 5" label |
 | 4 | B: Mira Perception → Inspiration on its line | Spend + new line; old struck, "rerolled" |
 | 5 | B: Brakka Attack + damage (Flame Tongue) → Combat gem, one d6 | Total up; A's popup refreshes; C never gets the card |
 | 6 | A: Apply | HP drops by the maxed total |
@@ -213,7 +212,6 @@ Per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md) / [ADR-0017](
 | CAMP, DICE, CBT, CHARX | FR ranges in §1 | revised with this spec |
 | [live-sync](live-sync.md) / protocol | Viewer `features`, tag + trace rule (OQ-GEM-17) | proposed ADR |
 | [stats](stats.md) | Reads per FR-GEM-23 | settled (S2) |
-| [entities](entities.md) | Owner hook, only under OQ-GEM-01 B | — |
 | Package | **None** | — |
 
 | Slice | Branch | What | Shared files | After |
@@ -227,31 +225,31 @@ Per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md) / [ADR-0017](
 
 ## 15. Open questions
 
-**Bold** = pick. Decided (#140, #311, #312): optional, off by default, off = nothing; five gems; max 5 shown only; reroll replaces, old struck; Combat 1 / 2 / 3 by level; built-in icons now.
+Decided before the spec (#140, #311, #312): optional, off by default, off = nothing; five gems; max 5 not enforced; reroll replaces, old struck; Combat 1 / 2 / 3 by level; built-in icons now. **Every row below decided at DM gate 1 (#315)** as picked, except OQ-GEM-11 (DM's D); options kept for the record.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-GEM-01 | Others see a character's gems? | **A. Counts (party flavour; +2.2 KB per player)** / B. Owner + DM (secret; needs an owner hook) | no (DM) | CHARX |
-| OQ-GEM-02 | Spend lines always public? | **A. Yes (hidden targets show no detail)** / B. Per log category (spends go secret by surprise) | no (DM) | DICE |
-| OQ-GEM-03 | Built-in look | A. One gem in five colours (5 new tokens; colour-only cue) / **B. A lucide icon per gem (shapes carry meaning)** / C. Letters | no (DM) | — |
-| OQ-GEM-04 | Off: awarded gems? | **A. Kept, hidden (misclick-safe)** / B. Cleared after confirm (clean slate) | no (DM) | CAMP |
-| OQ-GEM-05 | Which rolls Inspiration rerolls | **A. Own d20 rolls in the newest 100, no initiative, attacks while pending and unruled; rerolls may chain** / B. Latest roll only (simplest) / C. Any, even after Apply (DM fixes outcomes) | no (DM) | DICE, CBT |
-| OQ-GEM-06 | Inspiration "help me recall" | **A. Plain spend "— to recall"** / B. Table talk + `−1` | no (DM) | — |
-| OQ-GEM-07 | Combat timing | **A. Pending with damage, incl. after Apply hit** / B. Before Apply hit only (no late damage) / C. Also after Apply (Undo + re-apply) | no (DM) | CBT |
-| OQ-GEM-08 | Which dice | **A. Weapon dice of any part, crits too; no effect / trigger dice** / B. Base part only / C. Any incl. Bless (bytes + MOD change) | no (DM) | CBT, MOD |
-| OQ-GEM-09 | Undo spend / award | **A. None; ± corrects (dice stand)** / B. Latest plain spend / C. Full (compensating events, card rewind) | no (DM) | DICE, CBT |
-| OQ-GEM-10 | Award / remove lines | **A. Awards public, removals silent** / B. Both / C. Neither | no (DM) | DICE |
-| OQ-GEM-11 | Max-5 hint | **A. Per kind over 5** / B. Per character total (if #140 means 5 in all) / C. None | no (DM) | CHARX |
-| OQ-GEM-12 | Action 2-for-1 | **A. Menu Bonus (1) / Reaction (1) / Action (2)** / B. One Spend, said at the table | no (DM) | — |
-| OQ-GEM-13 | Physical dice | **A. Reroll follows physical mode; Combat asks each die** / B. App dice only | no (DM) | DICE |
-| OQ-GEM-14 | DM spends for a player? | **A. Yes (speed)** / B. Owner only | no (DM) | — |
-| OQ-GEM-15 | Companions / pets | **A. Not in v1** / B. Owner's companions too | no (DM) | CBT |
-| ~~OQ-GEM-16~~ | ~~Stats~~ | **Resolved (S2):** final roll; max via applied damage; no award | — | stats |
-| OQ-GEM-17 | live-sync: features, tags, traces | **A. Per the ADR; one live-sync FR at integration** / B. Each feature filters itself (breaks ADR-0021 B) | no (integrator) | live-sync |
-| OQ-GEM-18 | Glossary: **feature switch**, **reroll**, **superseded entry**, **maxed die**; amend **gem** | **A. As worded here** | no (integrator) | glossary |
-| ~~OQ-GEM-19~~ | ~~Popup order~~ | **Resolved (S3):** GM1 ∥ ST core → GM2 | — | CBT |
-| OQ-GEM-20 | Rerolling rule-driven rolls (death / concentration saves, roll-request DCs) | **A. Excluded in v1 (table rerolls by hand, DM fixes state)** / B. Death saves follow, concentration excluded / C. Both follow (restoring ended effects: large) | no (DM) | CBTX, DICE |
-| OQ-GEM-21 | Dice history while off | A. Keep struck lines and max badges (simpler; traces stay) / **B. Hide them; only final rolls; on restores (#312 literally; one more hub rule)** | no (DM) | DICE, CBT |
+| OQ-GEM-01 | Others see a character's gems? | **Decided (#315): A.** **A. Counts (party flavour; +2.2 KB per player)** / B. Owner + DM (secret; needs an owner hook) | — · decided | CHARX |
+| OQ-GEM-02 | Spend lines always public? | **Decided (#315): A.** **A. Yes (hidden targets show no detail)** / B. Per log category (spends go secret by surprise) | — · decided | DICE |
+| OQ-GEM-03 | Built-in look | **Decided (#315): B.** A. One gem in five colours (5 new tokens; colour-only cue) / **B. A lucide icon per gem (shapes carry meaning)** / C. Letters | — · decided | — |
+| OQ-GEM-04 | Off: awarded gems? | **Decided (#315): A.** **A. Kept, hidden (misclick-safe)** / B. Cleared after confirm (clean slate) | — · decided | CAMP |
+| OQ-GEM-05 | Which rolls Inspiration rerolls | **Decided (#315): A.** **A. Own d20 rolls in the newest 100, no initiative, attacks while pending and unruled; rerolls may chain** / B. Latest roll only (simplest) / C. Any, even after Apply (DM fixes outcomes) | — · decided | DICE, CBT |
+| OQ-GEM-06 | Inspiration "help me recall" | **Decided (#315): A.** **A. Plain spend "— to recall"** / B. Table talk + `−1` | — · decided | — |
+| OQ-GEM-07 | Combat timing | **Decided (#315): A.** **A. Pending with damage, incl. after Apply hit** / B. Before Apply hit only (no late damage) / C. Also after Apply (Undo + re-apply) | — · decided | CBT |
+| OQ-GEM-08 | Which dice | **Decided (#315): A.** **A. Weapon dice of any part, crits too; no effect / trigger dice** / B. Base part only / C. Any incl. Bless (bytes + MOD change) | — · decided | CBT, MOD |
+| OQ-GEM-09 | Undo spend / award | **Decided (#315): A.** **A. None; ± corrects (dice stand)** / B. Latest plain spend / C. Full (compensating events, card rewind) | — · decided | DICE, CBT |
+| OQ-GEM-10 | Award / remove lines | **Decided (#315): A.** **A. Awards public, removals silent** / B. Both / C. Neither | — · decided | DICE |
+| OQ-GEM-11 | Max-5 hint | **Decided (#315): D (DM): "The max 5 is not enforced, just a label is fine"**: a static "max 5" label, no over-limit styling (FR-GEM-08). Proposed: ~~A. Per kind over 5~~ / ~~B. Per character total~~ / ~~C. None~~ | — · decided | CHARX, CAMP |
+| OQ-GEM-12 | Action 2-for-1 | **Decided (#315): A.** **A. Menu Bonus (1) / Reaction (1) / Action (2)** / B. One Spend, said at the table | — · decided | — |
+| OQ-GEM-13 | Physical dice | **Decided (#315): A.** **A. Reroll follows physical mode; Combat asks each die** / B. App dice only | — · decided | DICE |
+| OQ-GEM-14 | DM spends for a player? | **Decided (#315): A.** **A. Yes (speed)** / B. Owner only | — · decided | — |
+| OQ-GEM-15 | Companions / pets | **Decided (#315): A.** **A. Not in v1** / B. Owner's companions too | — · decided | CBT |
+| ~~OQ-GEM-16~~ | ~~Stats~~ | **Resolved (integrator, sprint-7 seams / rulings)** (S2): final roll; max via applied damage; no award | — · resolved | stats |
+| OQ-GEM-17 | live-sync: features, tags, traces | **Resolved (integrator, sprint-7 seams / rulings): A** (ADR accepted at #315). **A. Per the ADR; one live-sync FR at integration** / B. Each feature filters itself (breaks ADR-0021 B) | — · resolved | live-sync |
+| OQ-GEM-18 | Glossary: **feature switch**, **reroll**, **superseded entry**, **maxed die**; amend **gem** | **Resolved (integrator, sprint-7 seams / rulings): A.** **A. As worded here** | — · resolved | glossary |
+| ~~OQ-GEM-19~~ | ~~Popup order~~ | **Resolved (integrator, sprint-7 seams / rulings)** (S3): GM1 ∥ ST core → GM2 | — · resolved | CBT |
+| OQ-GEM-20 | Rerolling rule-driven rolls (death / concentration saves, roll-request DCs) | **Decided (#315): A.** **A. Excluded in v1 (table rerolls by hand, DM fixes state)** / B. Death saves follow, concentration excluded / C. Both follow (restoring ended effects: large) | — · decided | CBTX, DICE |
+| OQ-GEM-21 | Dice history while off | **Decided (#315): B.** A. Keep struck lines and max badges (simpler; traces stay) / **B. Hide them; only final rolls; on restores (#312 literally; one more hub rule)** | — · decided | DICE, CBT |
 
 ## 16. Out of scope
 

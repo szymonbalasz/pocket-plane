@@ -1,7 +1,7 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: in-review
+status: complete
 owner: spec-gems
 wave: 1
 phase: post-mvp-7
@@ -144,7 +144,7 @@ N/A — the goals in §3 are the stories; listing them again adds nothing.
 | FR-CAMP-40 | **Resync on switch:** after the commit, **every connection of the campaign** (DM tabs and players) gets a fresh snapshot (as FR-SYNC-11 does for players on a scene switch); the hub's viewer context gains `features` (read from the campaign row whenever a connection's snapshot is built), which visibility fns may read. **A resync keeps client-only UI state** (the DM's popup typed values, roll-bar drafts, held dice, open dialogs), as FR-SYNC-11's does; only store rows change. The resync replaces listing per-record visibility changes (the ADR's named exemption from ADR-0021). | ADR-0021 B refined |
 | FR-CAMP-41 | **Registry** `src/shared/campaign-management/features.ts` (append-only, AGENTS §9.9): `{key (kebab-case), label, description (≤ 120), offConfirm?, ownerSpec}`; `gems` first (GEM). Test: unique keys, `ownerSpec` a known spec prefix. | |
 | FR-CAMP-42 | **Campaign options** *(OQ-CAMP-33 pick A)*: the DM's Players window (`camp.players`) header gains an "Options" Button → a Dialog "Campaign options — ‹campaign›": one row per registered feature (label, description, Switch). Turning a feature **off** asks once in the Dialog (`offConfirm`, gems: "Hide gems? Counts are kept and come back when you turn gems on"). Disabled unless `live`. DM only; players never see it. | |
-| FR-CAMP-43 | **Party lines** (FR-CAMP-21): with gems on, each character line gains the gem counts (5 icons + numbers, [FR-GEM-35](gems.md#6-functional-requirements)); a count over 5 in `hp.bloodied` (FR-GEM-08; the HP token reused, since visual-direction has no warning token). Off → nothing. Reads `character-gems` the DM already receives. | |
+| FR-CAMP-43 | **Party lines** (FR-CAMP-21): with gems on, each character line gains the gem counts (5 icons + numbers, [FR-GEM-35](gems.md#6-functional-requirements)); counts above 5 shown plainly, no over-limit colour or hint (FR-GEM-08, OQ-GEM-11 D, #315). Off → nothing. Reads `character-gems` the DM already receives. | |
 | FR-CAMP-44 | **"Off" rule** (one rule, applied by the hub; ADR): record types and log kinds registered with `feature: "<key>"` are hidden for every viewer (DM included: snapshot, frames, `sync.load`) whose `features` lack the key; declared **traces** on other records are hidden / stripped the same way (ADR; gems: OQ-GEM-21); every read path applies it (snapshot, frames, `sync.load`, `stats.query`); commands of a feature call `featureOn(env, key)` (campaign-management server export) first and reject `forbidden` "‹label› is off in this campaign". Rows stay in the DB. | |
 | FR-CAMP-45 | **Client:** `useFeature(store, key)` (`@ui`, campaign-management) reads the `campaign` record; features render nothing while it is false. **CON-44** (measured 2026-10-20, §12): off 0 B; on +20 B per viewer. | |
 
@@ -382,7 +382,7 @@ Fixture `gems-on` (setup: `camp.setFeature {gems, on: true}`), `gems-hidden` (of
 |---|---|---|
 | Unit | `FR-CAMP-41 registry` (unique kebab keys, known `ownerSpec`, `offConfirm` ≤ 120); `FR-CAMP-38 features wire` (empty → key absent; `["gems"]` → present); `useFeature` true / false / no campaign row | in-code |
 | Integration | `FR-CAMP-39 setFeature` (DM ✓, player `forbidden`, unknown `invalid`, same value no event; event-log row); `FR-CAMP-40 resync keeps UI state` (DOM: the DM's popup with a typed damage value, a roll-bar draft and an open dialog survive the switch resync); `FR-CAMP-40 switch resyncs` (DM + 2 players connected: each gets one fresh snapshot after the commit; viewer `features` updated; a second DM tab too); `FR-CAMP-44 off hides tagged` (a test-registered tagged record type and log kind: hidden in snapshot, frames, `sync.load` while off, for the DM too; shown on; rows kept); `FR-CAMP-45 CON-44 switch` (heavy harness: off 0 B, on ≤ 30 B per viewer); crash `PP_TEST_CRASH=camp.setFeature:after-commit` → switch on after restart; `FR-GEM-01 bundles off` (every registered bundle loads with `features` empty) | `base`, `gems`, `gems-hidden` |
-| DOM | `FR-CAMP-42 options dialog` (rows from the registry; off asks once; disabled while not `live`); `FR-CAMP-43 party gem counts` (gems on: icons + counts, over 5 `hp.bloodied`; off: absent) | in-code |
+| DOM | `FR-CAMP-42 options dialog` (rows from the registry; off asks once; disabled while not `live`); `FR-CAMP-43 party gem counts` (gems on: icons + counts, a count of 6 with no over-limit styling; off: absent) | in-code |
 
 Walkthrough: [gems §13](gems.md#13-test-plan) steps 1–3 and 12.
 
@@ -483,8 +483,8 @@ Hotspot rules ([sprint-5](../agents/sprint-5.md#boundaries-and-hotspots-sequence
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CAMP-33 | **Where the DM switches gems on / off** (per campaign, not per person) | **A. "Options" in the Players window (the DM's campaign panel): a Campaign options dialog, one Switch per optional feature (next to the campaign's players; reusable)** / B. A DM Preferences section (one place for settings, but Preferences is per person and FR-SHELL-75 says campaign rules aren't preferences: a play-shell amendment) / C. The campaign switcher's menu (beside rename; the switcher is small and rarely opened) | no (DM) | [play-shell](play-shell.md) (B only) |
-| OQ-CAMP-34 | **A field per feature or a generic map?** ([proposed ADR](../architecture/adr/proposed-s7-gm-feature-switches.md)) | A. A column per feature (`gems_enabled`: simplest; a schema change + wire field + own "off" rule each time) / **B. `features` list + feature tags on record types / log kinds, one hub rule (0 B off, one tested rule; a small `ws/` change)** / C. A `campaign_feature` table (normalised; same wire work plus a table) | no (DM: ADR acceptance) | live-sync, protocol |
+| OQ-CAMP-33 | **Where the DM switches gems on / off** (per campaign, not per person) | **Decided (#315): A.** **A. "Options" in the Players window (the DM's campaign panel): a Campaign options dialog, one Switch per optional feature (next to the campaign's players; reusable)** / B. A DM Preferences section (one place for settings, but Preferences is per person and FR-SHELL-75 says campaign rules aren't preferences: a play-shell amendment) / C. The campaign switcher's menu (beside rename; the switcher is small and rarely opened) | — · decided | [play-shell](play-shell.md) (B only) |
+| OQ-CAMP-34 | **A field per feature or a generic map?** ([proposed ADR](../architecture/adr/proposed-s7-gm-feature-switches.md)) | **Decided (#315): B** (ADR accepted). A. A column per feature (`gems_enabled`: simplest; a schema change + wire field + own "off" rule each time) / **B. `features` list + feature tags on record types / log kinds, one hub rule (0 B off, one tested rule; a small `ws/` change)** / C. A `campaign_feature` table (normalised; same wire work plus a table) | — · decided | live-sync, protocol |
 
 ## 16. Out of scope
 

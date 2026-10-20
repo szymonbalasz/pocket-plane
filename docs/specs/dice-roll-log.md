@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-gems
 wave: 2
 phase: post-mvp-7
@@ -420,8 +420,8 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-DICE-41 | How does a superseded line look? | **A. Struck through + dimmed chips + a "rerolled" Badge that jumps to the new line (both stay readable; one extra line per reroll)** / B. Collapsed under the new line ("▸ was 4"), expandable (shorter log; the old roll is one click away, not "visible") / C. Old line unchanged, the new line says "reroll of #n" (no strike: fails #140) | no (DM) | gems |
-| OQ-DICE-42 | Where does the supersede pointer live? | **Resolved (integrator, seams S2; also answers OQ-DICE-45 / OQ-STATS-14): A. Both:** the old entry's existing `supersededBy` (set once, like `undone`; 0 schema change) + `replaces` on the new roll element; roll rows immutable with `replacesRollId`. Rejected: ~~B. Only `replaces` on the new entry~~ | — · resolved | stats (ST) |
+| OQ-DICE-41 | How does a superseded line look? | **Decided (#315): A.** **A. Struck through + dimmed chips + a "rerolled" Badge that jumps to the new line (both stay readable; one extra line per reroll)** / B. Collapsed under the new line ("▸ was 4"), expandable (shorter log; the old roll is one click away, not "visible") / C. Old line unchanged, the new line says "reroll of #n" (no strike: fails #140) | — · decided | gems |
+| OQ-DICE-42 | Where does the supersede pointer live? | **Resolved (integrator, sprint-7 seams / rulings)** (S2; also answers OQ-DICE-45 / OQ-STATS-14): **A. Both:** the old entry's existing `supersededBy` (set once, like `undone`; 0 schema change) + `replaces` on the new roll element; roll rows immutable with `replacesRollId`. Rejected: ~~B. Only `replaces` on the new entry~~ | — · resolved | stats (ST) |
 
 ## 16. Out of scope
 
