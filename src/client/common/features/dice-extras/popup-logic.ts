@@ -265,6 +265,28 @@ export function dmStackAt(
 }
 
 /**
+ * FR-DICEX-55: what the DM popup stack keeps clear of, in `dmStackAt`'s order: Initiative, the open
+ * non-modal dialogs, the hard keep-outs (the map tool bar), then every other reported shown stack
+ * (FR-SHELL-59: the notification toasts; `own` = the popups' own report, skipped). The toast stack
+ * keeps its spot; the popups stack in its band `STACK_GAP` (8 px) below it, or left of it, never on
+ * it: a stack enters inset by `EDGE_GAP` − `STACK_GAP` per side, so `dmStackAt`'s 12-px clearance
+ * leaves the stacks' own 8 px and a popup already 8 px under the toasts (the region's home) stays.
+ */
+export function dmPopupClear(
+  initiative: Rect | null,
+  dialogs: readonly Rect[],
+  hard: readonly Rect[],
+  shown: ReadonlyMap<string, Rect>,
+  own: string,
+): Rect[] {
+  const d = EDGE_GAP - STACK_GAP;
+  const others = [...shown]
+    .filter(([id]) => id !== own)
+    .map(([, r]) => ({ x: r.x + d, y: r.y + d, w: r.w - 2 * d, h: r.h - 2 * d }));
+  return [...(initiative ? [initiative] : []), ...dialogs, ...hard, ...others];
+}
+
+/**
  * FR-SHELL-59 (OQ-MAP-57 D): what the DM popup stack reports as shown for the Fit: its rendered
  * rect while it draws something; null for players, an empty stack or a zero-size box.
  */

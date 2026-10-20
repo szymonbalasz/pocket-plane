@@ -21,6 +21,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
@@ -35,7 +36,13 @@ import { useViewport } from "../play-shell/hooks";
 import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
 import type { ShellClient } from "../play-shell/registry";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
-import { ROLL_POPUP_H, ROLL_POPUP_W, reportShownStack } from "../play-shell/toast-region";
+import {
+  ROLL_POPUP_H,
+  ROLL_POPUP_W,
+  reportShownStack,
+  shownStacks,
+  subscribeShownStack,
+} from "../play-shell/toast-region";
 import { arenaOf, DIE_WORLD } from "./arena";
 import type { Rect } from "./dice3d/index";
 import { FlatDie } from "./FlatDie";
@@ -46,6 +53,7 @@ import {
   CELL_LINES,
   CELL_PX,
   cellTag,
+  dmPopupClear,
   dmStackAt,
   LINE_W,
   linesH,
@@ -629,6 +637,8 @@ export function RollPopupStack({
   const dialogs = useNonModalRects(dm, popups.length > 0 || pending);
   // FR-DICEX-55: the DM stack never covers a tool bar (play-shell's hard keep-outs).
   const keepOuts = useKeepOuts(client);
+  // FR-DICEX-55: nor the DM's other shown stacks (the notification toasts, FR-SHELL-59).
+  const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
   const stack = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ top: 0, h: 0 });
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the cards change
@@ -638,11 +648,13 @@ export function RollPopupStack({
     const h = Math.round(el?.getBoundingClientRect().height ?? 0);
     setBox((b) => (b.top === top && b.h === h ? b : { top, h }));
   }, [popups, pending, vp]);
-  const clear = [
-    ...(initiative ? [initiative] : []),
-    ...dialogs,
-    ...(dm ? hardRects(keepOuts) : []),
-  ];
+  const clear = dmPopupClear(
+    initiative,
+    dialogs,
+    dm ? hardRects(keepOuts) : [],
+    dm ? reports : new Map(),
+    SHOWN_ID,
+  );
   const at = dmStackAt(vp, box.top, { w: ROLL_POPUP_W, h: box.h }, clear);
   // FR-DICEX-47 short screens: only the popups that fit the region (newest first; the oldest
   // drops), never past the viewport's bottom (DM) or over the top bar (players).
