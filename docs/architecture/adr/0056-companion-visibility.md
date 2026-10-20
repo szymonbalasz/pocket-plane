@@ -1,6 +1,6 @@
-# NNNN — Companions: the owner sees an owned creature's stats
+# 0056 — Companions: the owner sees an owned creature's stats
 
-- Status: accepted (DM gate 1, #288: A; with CP-3 → B, the owner also edits a pet's AC, HP max, speed and attack rows on its card, FR-ENT-38: visibility unchanged). The integrator numbers it
+- Status: accepted (DM gate 1, #288: A; with CP-3 → B, the owner also edits a pet's AC, HP max, speed and attack rows on its card, FR-ENT-38: visibility unchanged)
 - Date: 2026-10-19 (review pass 2026-10-20)
 - Amends: [ADR-0024](0024-definition-visibility.md) ("players never receive monster definitions"); refines [ADR-0036](0036-full-sheet-derivation.md) (other-player redaction lists) and [ADR-0009](0009-entity-content-model.md) (a pet is a definition with play state, `hpCurrent`, like a character). The `combatant` redaction uses the viewer, as `entity` and `token` already do (ADR-0021 unchanged)
 - Affects: [entities](../../specs/entities.md), [combat-tracker](../../specs/combat-tracker.md), [character-sheet-full](../../specs/character-sheet-full.md), [party-board](../../specs/party-board.md), [scenes-map](../../specs/scenes-map.md), [dice-roll-log](../../specs/dice-roll-log.md) (one entry field); data model, protocol

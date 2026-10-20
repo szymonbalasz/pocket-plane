@@ -1,6 +1,6 @@
-# Proposed — Free player colour (amends ADR-0055)
+# 0057 — Free player colour (amends ADR-0055)
 
-- Status: proposed (spec-prefs, sprint 6 track PF; for DM gate 1)
+- Status: accepted (DM gate 1, #288: OQ-CAMP-30 A)
 - Date: 2026-10-19
 - Amends: [ADR-0055](0055-player-colour.md) (decision bullet 1 only)
 - Affects: [campaign-management](../../specs/campaign-management.md) (FR-CAMP-30–37), [play-shell](../../specs/play-shell.md) (FR-SHELL-70), and every surface that draws `colorOf` (no change there: [scenes-map](../../specs/scenes-map.md), [scene-tools](../../specs/scene-tools.md), [dice-roll-log](../../specs/dice-roll-log.md), [notifications](../../specs/notifications.md), [dice-extras](../../specs/dice-extras.md))
