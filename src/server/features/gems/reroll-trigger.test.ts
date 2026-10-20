@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/noThenProperty: `then` is the rule's effect field (MOD §8.4); rules are data, never awaited.
 // GEM GM1 / ADR-0043 (rulings-a #19): a reroll never re-runs the roll hooks, so an ADR-0043 rule
 // trigger on the rerolled roll doesn't fire again: the new line keeps the part as rolled, no new
 // trigger use, no new part roll row.

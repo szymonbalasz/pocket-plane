@@ -53,7 +53,7 @@ describe("FR-DICE-70 rerollableRoll", () => {
 });
 
 describe("FR-DICE-64 reroll line", () => {
-  test("FR-DICE-64 reroll line: `replaces` → \"(reroll, was 4)\"; adv keeps its marker first", () => {
+  test('FR-DICE-64 reroll line: `replaces` → "(reroll, was 4)"; adv keeps its marker first', () => {
     const line = (p: Partial<RollPayloadItem>) =>
       lineText(formatEntry({ kind: "roll", actorName: "Mira", payload: [item(p)] }).segments);
     expect(line({ replaces: { entryId: "e1", total: 4 } })).toBe(
