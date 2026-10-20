@@ -2622,3 +2622,36 @@ From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-56,
 | Contract (`layout-checks.ts` `contractProblems`) | A new window type: not `defaultOpen`; min ≤ 320 × 240 (`CONTRACT_MIN_EXCEPTIONS`: `shell.prefs` 320 × 280, S3); default width ≤ 440 and height ≤ 412 or `minOpenH` ≤ 412 at the four reference sizes. The registry tests open every non-default kind (launcher or not, test-mode included) through `openWindow`; stand-ins for `shell.prefs` (360 × 560, `minOpenH` 400, min 320 × 280, top-right `dx` 12) and `charx.companion` (320 × 360, min 280 × 240, top-left `dx` 56) until PF1 / CP4 register them | FR-SHELL-61 |
 | Layout tests (`layout-checks.ts` `layoutRun`, `bruteBest`, `placeFields`; `test-cells.ts`) | Per client, from each reference size down the chain 1600×900 → 1440×900 → 1280×800 → 1280×720: token-free default layout, the `session-sim-9` Goblin Ambush footprints at the scene fit, open / close / reopen, `viewport` + reopen at each smaller size, then the protected reopen. Checks: no overlap unless no launcher window is left to park; a reopen moves only when covered; the brute oracle (16-px grid, 4-px refine around the winners, sizes full / `minOpenH` / min, footprints with the 12-px candidate gap) never finds a better [clear, PC, `minOpenH`, token] than the chosen rect when a clear spot exists. Goldens per kind for a fixed list (DM 9, player 4) in `windows.golden.json` next to each `windows.test.ts`; `UPDATE_GOLDEN=1` rewrites (PowerShell `$env:UPDATE_GOLDEN=1; bun test <file>`); PF1 / CP4 append their kind and regenerate | FR-SHELL-62 |
 | CON-44 | 0 B | — |
+
+## 110. Sprint 6: free player colour core (PF0)
+
+From [campaign-management](../specs/campaign-management.md#9-api--events) FR-CAMP-30–34, -36, -37 ([ADR-0057](../architecture/adr/0057-free-player-colour.md); DM gate #288). **Built by `fix/colour-free-core`**: the colour on every field and frame is a lowercase `#rrggbb`. No new route, intent, event, record type, signal or registry; the picker is PF2. Data side: [data model §87](../data-model/README.md#87-sprint-6-free-player-colour-core-pf0).
+
+**Intent** (strict zod `SetColorInput`; command `src/server/features/campaign-management/colors.ts`)
+
+| Intent | Who | Validation (in the command's transaction, in order) | Result | Source |
+|---|---|---|---|---|
+| `camp.setColor {playerId: Id \| null, color}` *(changed)* | DM, player | zod: `color` = `^#[0-9a-fA-F]{6}$`, stored lowercase (palette names and `#rgb` → `invalid` "Invalid input"); permissions and `not_found` as [§91](#91-sprint-5-player-colours-core-k0); `colorProblem` → `invalid` "Too dark to read on the map" \| "Too grey" \| "Too close to the danger red"; same as the current colour → `ack`, no write, no event; distance < 9 from the DM colour (player targets only) or another player's → `conflict` "Taken by ‹name›" (distance 0) \| "Too close to ‹name›'s colour" (+ " for colour-blind players" when normal vision alone is ≥ 9); the closest holder is named | `{}` | FR-CAMP-31–33 |
+
+**Record types** (unchanged visibility: every connection of the campaign)
+
+| Type | Change | Source |
+|---|---|---|
+| `campaign` | `dmColor` = `#rrggbb` | FR-CAMP-30, -37 |
+| `player` | `color` = `#rrggbb` (never null, never a key: the boot migration runs before the server listens) | FR-CAMP-30, -34, -37 |
+
+- The wire zod still reads `color` / `dmColor` as a non-empty string: an older peer's key maps to its palette hex, anything else to the role accent (FR-CAMP-36).
+
+**Domain events**
+
+| Event | Changes | Player sees | Logged | Undoable |
+|---|---|---|---|---|
+| `PlayerColorSet {playerId: Id \| null, color}` *(changed)* | as §91; `color` = lowercase `#rrggbb` (old log rows: a palette key; the payload schema reads both) | the upsert (every connection of the campaign) | yes | no |
+
+**Helpers and seams**
+
+- `@shared/campaign-management/colors.ts`: `colorProblem`, `colorDistance`, `colorClash`, `defaultColor`, `normalizeColor`, `paletteKeyOf`, `colorName`, `HexColorInput`, `PaletteKey` (`PlayerColor` kept as a deprecated alias of `PaletteKey` for old tests).
+- Client `colorOf(store, person)` keeps its signature and returns a CSS colour string (seams S8); `colorHex(color)` takes a hex or a key; `colorKeyOf` gives the `data-color` value (palette name for a palette colour, else the hex). `GameLog.tsx`, `name-color.tsx`, notifications `parts.tsx`: type-only `PlayerColor` → `string`.
+- Start hook `campaign-management.color-backfill` now runs `migratePlayerColors` (two passes, one transaction).
+- Until PF2: the sprint-5 `ColorPopover` sends the palette hex and marks a swatch taken by FR-CAMP-32's distance; its `data-value` stays the palette name (the hex for a free colour).
+- **CON-44:** −21 to +14 B per snapshot frame (data model §87); event frames ± 3 B; signals 0 B.
