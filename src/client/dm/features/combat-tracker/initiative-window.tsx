@@ -1029,15 +1029,18 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
    */
   const step = async (direction: "next" | "prev", sender: typeof send = send) => {
     const dead = new Set(rows.filter((c) => deadPc(store, c)).map((c) => c.name));
-    const turnRows = rows.map((c) => ({
-      id: c.id,
-      name: c.name,
-      position: c.position ?? 0,
-      kind: dead.has(c.name) ? ("monster" as const) : c.kind,
-      removed: c.removed === true,
-      hpCurrent: dead.has(c.name) ? 0 : (c.hpCurrent ?? null),
-      initiative: c.initiative ?? null,
-    }));
+    // FR-CBT-107: in-turn companions (no rank) never take a turn of their own.
+    const turnRows = rows
+      .filter((c) => c.position != null)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        position: c.position ?? 0,
+        kind: dead.has(c.name) ? ("monster" as const) : c.kind,
+        removed: c.removed === true,
+        hpCurrent: dead.has(c.name) ? 0 : (c.hpCurrent ?? null),
+        initiative: c.initiative ?? null,
+      }));
     const skipped = skippedOnStep(turnRows, enc.round, enc.turnCombatantId ?? null, direction);
     const r = await sender<TurnResult>(
       direction === "next" ? "cbt.nextTurn" : "cbt.prevTurn",
