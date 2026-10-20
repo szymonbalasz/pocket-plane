@@ -1,4 +1,5 @@
 // Record types `game-log-entry` (FR-DICE-15, FR-DICE-17) and `game-log-settings` (FR-DICE-16).
+import { getLogKind } from "@shared/dice-roll-log/kinds";
 import {
   GameLogEntryRecord as EntrySchema,
   GAME_LOG_ENTRY_TYPE,
@@ -35,6 +36,10 @@ export const gameLogEntryType = defineRecordType<GameLogEntryRecord>({
   schema: EntrySchema,
   idOf: (r) => r.id,
   campaignOf: (r) => r.campaignId,
+  // FR-DICE-69 (ADR-0058): a feature-tagged kind is hidden while its feature is off; a kind's
+  // declared traces (gems' supersede on `roll`) are hidden / stripped the same way.
+  featureOf: (r) => getLogKind(r.kind)?.feature,
+  tracesOf: (r) => getLogKind(r.kind)?.traces ?? [],
   visibility: entryVisibility,
   redact: redactEntry,
   // The newest 100 by `n`, cut in SQL (#163: build time no longer grows with the log), oldest

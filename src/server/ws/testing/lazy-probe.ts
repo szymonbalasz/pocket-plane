@@ -41,6 +41,8 @@ export interface LazyProbeOptions {
   audience?: "dm";
   /** Register a `byIds` provider (else the registry filters `snapshot` rows by id). */
   byIds?: boolean;
+  /** ADR-0058: tag the type with a feature (hidden while the campaign's feature is off). */
+  feature?: string;
 }
 
 export interface LazyProbeFixture {
@@ -67,6 +69,7 @@ export function registerLazyProbe(s: Services, opts: LazyProbeOptions = {}): Laz
       type,
       scope,
       ...(opts.audience ? { audience: opts.audience } : {}),
+      ...(opts.feature ? { feature: opts.feature } : {}),
       lazy: opts.lazy ?? "all",
       schema: LazyProbeRecord,
       idOf: (r) => r.id,

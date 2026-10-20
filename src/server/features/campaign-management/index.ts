@@ -1,4 +1,4 @@
-import { CampaignActivated } from "@shared/events/campaign-management";
+import { CampaignActivated, CampaignFeatureSet } from "@shared/events/campaign-management";
 import { CloseCode } from "@shared/protocol/codes";
 import { eq } from "drizzle-orm";
 import { player } from "../../db/schema";
@@ -12,6 +12,7 @@ import {
   renameCampaign,
   renamePlayer,
 } from "./commands";
+import { campaignFeatures, setFeature } from "./features";
 import { campaignRecordType, playerRecordType } from "./records";
 
 export const campaignManagement: Feature = {
@@ -26,6 +27,8 @@ export const campaignManagement: Feature = {
     r.command(renamePlayer);
     // Sprint 5: the one WS intent (FR-CAMP-25).
     r.command(setColor, { intent: true });
+    // Sprint 7 (ADR-0058, FR-CAMP-39): feature switches.
+    r.command(setFeature, { intent: true });
     r.recordType(campaignRecordType);
     r.recordType(playerRecordType);
     // FR-CAMP-23 / -34: keys → hex, then fill, before the server listens (no snapshot carries a
@@ -48,6 +51,15 @@ export const campaignManagement: Feature = {
           .where(eq(player.id, playerId))
           .get()?.campaignId ?? null,
     );
+    // ADR-0058: the hub reads a campaign's switches whenever it builds a snapshot.
+    s.records.provideCampaignFeatures((campaignId) => campaignFeatures(s.db, campaignId));
+    // FR-CAMP-40: after a switch commits, every connection of the campaign (DM tabs and players)
+    // gets a fresh snapshot with the new viewer `features` (client-only UI state is kept).
+    r.listener("feature-switch", ({ event }) => {
+      if (event.type !== CampaignFeatureSet.type || event.campaignId === null) return;
+      const campaignId = event.campaignId;
+      s.hub?.resync((c) => c.campaignId === campaignId);
+    });
     // FR-CAMP-09 / FR-SYNC-07: after an activation commits, close every connection of another
     // campaign with 4409 campaign-inactive (DM reconnects, players wait).
     r.listener("campaign-switch", ({ event }) => {
