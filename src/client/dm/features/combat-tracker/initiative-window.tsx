@@ -285,9 +285,11 @@ function attackSubjects(
  * card the roll control opens critical). The pick rolls through one control once it has
  * re-rendered with that attack and action (as Check ▸ / Save ▸); the result's card opens.
  * Physical dice (BL-19): one entry per part as the server rolls them (FR-CBT-81), the extra
- * parts sent as `manualExtra`.
+ * parts sent as `manualExtra`. The pick state lives with the row (`useAttackPick`), outside the
+ * menu, so the roll still runs once the menu has closed (sprint 7: the companion line's ⋯ holds
+ * Attack ▸ as a submenu, FR-CBT-142).
  */
-function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | undefined }) {
+function useAttackPick(c: CombatantView, def: DefinitionRecord | undefined) {
   const { send, disabled } = useCbtIntent();
   const openCard = useCombatDialogs((s) => s.openCard);
   const notes = useRecords<NotificationRecord>("notification");
@@ -354,11 +356,58 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
     keys.current = {};
     setPick((p) => ({ index, action: a, keys: k, n: (p?.n ?? 0) + 1 }));
   };
+  return { control, choices, choose, keys, attack, disabled: disabled || choices.length === 0 };
+}
+type AttackPick = ReturnType<typeof useAttackPick>;
+
+/** Attack ▸'s items: per attack, Attack + damage / Attack / Damage. */
+function AttackItems({ c, a }: { c: CombatantView; a: AttackPick }) {
+  return a.choices.map((ch, i) => (
+    <div key={ch.attackId ?? `first-${i}`} className="flex items-center gap-0.5">
+      {ATTACK_ACTIONS.map((x) => (
+        <DropdownMenuItem
+          key={x.value}
+          data-testid="cbt-init-row-attack-option"
+          data-record-id={c.id}
+          data-value={x.value}
+          data-attack-id={ch.attackId ?? ""}
+          className={x.value === "both" ? "min-w-0 flex-1 gap-2" : "px-1.5 text-xs"}
+          onPointerDown={(e) => {
+            a.keys.current = rollKeys(e);
+          }}
+          onSelect={() => a.choose(i, x.value)}
+        >
+          {x.value === "both" ? (
+            <>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate">{ch.attack.name}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {attackSummary(ch.attack)}
+                </span>
+              </span>
+              <span className="text-xs text-muted-foreground">{x.label}</span>
+            </>
+          ) : (
+            x.label
+          )}
+        </DropdownMenuItem>
+      ))}
+    </div>
+  ));
+}
+
+/** Invisible anchor for the physical-dice popover of the picked attack. */
+const AttackAnchor = ({ a }: { a: AttackPick }) => (
+  <RollButton control={a.control} hint={false} tabIndex={-1} aria-hidden className={ANCHOR} />
+);
+
+function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | undefined }) {
+  const a = useAttackPick(c, def);
+  const { attack } = a;
   return (
     <>
-      {/* Invisible anchor for the physical-dice popover of the picked attack; the Alt hint is
-          the trigger's (FR-DICEX-51). */}
-      <RollButton control={control} hint={false} tabIndex={-1} aria-hidden className={ANCHOR} />
+      {/* The Alt hint is the trigger's (FR-DICEX-51). */}
+      <AttackAnchor a={a} />
       <DropdownMenu>
         <Tooltip
           content={
@@ -379,45 +428,14 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
               variant="ghost"
               className="size-7"
               aria-label={`Attack with ${c.name}`}
-              disabled={disabled || choices.length === 0}
+              disabled={a.disabled}
             >
               <SwordIcon className="size-3.5" />
             </Button>
           </DropdownMenuTrigger>
         </Tooltip>
         <DropdownMenuContent align="end" className="min-w-64">
-          {choices.map((ch, i) => (
-            <div key={ch.attackId ?? `first-${i}`} className="flex items-center gap-0.5">
-              {ATTACK_ACTIONS.map((a) => (
-                <DropdownMenuItem
-                  key={a.value}
-                  data-testid="cbt-init-row-attack-option"
-                  data-record-id={c.id}
-                  data-value={a.value}
-                  data-attack-id={ch.attackId ?? ""}
-                  className={a.value === "both" ? "min-w-0 flex-1 gap-2" : "px-1.5 text-xs"}
-                  onPointerDown={(e) => {
-                    keys.current = rollKeys(e);
-                  }}
-                  onSelect={() => choose(i, a.value)}
-                >
-                  {a.value === "both" ? (
-                    <>
-                      <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate">{ch.attack.name}</span>
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          {attackSummary(ch.attack)}
-                        </span>
-                      </span>
-                      <span className="text-xs text-muted-foreground">{a.label}</span>
-                    </>
-                  ) : (
-                    a.label
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </div>
-          ))}
+          <AttackItems c={c} a={a} />
         </DropdownMenuContent>
       </DropdownMenu>
     </>
@@ -671,8 +689,7 @@ interface RowProps {
 
 /**
  * One combatant's row content: portrait, name line, AC / HP line, initiative, Attack ▸, menu.
- * `line`: an in-owner-turn companion's compact line inside its owner's row (FR-CBT-118: no turn
- * marker or initiative of its own; its own Attack ▸ and menu).
+ * (An in-owner-turn companion's line is `CompanionLine`, FR-CBT-142.)
  */
 function RowMain({
   c,
@@ -683,8 +700,7 @@ function RowMain({
   wideInit,
   owner,
   ownerName,
-  line,
-}: Omit<RowProps, "lines" | "indent"> & { line: boolean }) {
+}: Omit<RowProps, "lines" | "indent">) {
   const { send, disabled } = useCbtIntent();
   const openHp = useCombatDialogs((s) => s.openHp);
   const openSummon = useSummonDialog((s) => s.openFor);
@@ -732,7 +748,7 @@ function RowMain({
         <NameLine
           name={c.name}
           testId="cbt-init-row-name"
-          className={cn("text-sm", !line && "font-medium")}
+          className="text-sm font-medium"
           marks={
             <>
               {/* FR-CBT-118 (sprint 6): the mode icon, Tooltip "After Mira". */}
@@ -770,7 +786,7 @@ function RowMain({
           // Sprint 6 (FR-CBT-118): the owner chip with it (a line sits in its owner's row).
           side={
             <>
-              {companion && !line && (
+              {companion && (
                 <OwnerChip c={c} ownerName={ownerName ?? ""} testId="cbt-init-row-owner" />
               )}
               <SideChip c={c} testId="cbt-init-row-ally" />
@@ -804,9 +820,7 @@ function RowMain({
           {round >= 1 && movedBelow && <Moved c={c} speed={stats?.speed} />}
         </div>
       </div>
-      {line ? (
-        <span aria-hidden className={cn("shrink-0", INIT_W[wideInit ? "wide" : "narrow"])} />
-      ) : byOwner ? (
+      {byOwner ? (
         <OwnerInitCell c={c} owner={owner} ownerName={ownerName ?? ""} wide={wideInit} />
       ) : (
         <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
@@ -815,20 +829,7 @@ function RowMain({
       {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸, out of the flow
           (no gaps: the name line keeps the room, FR-CBTX-46). */}
       <span className="pointer-events-none absolute top-1/2 right-16 flex size-0">
-        <RollButton
-          control={check.control}
-          hint={false}
-          tabIndex={-1}
-          aria-hidden
-          className={ANCHOR}
-        />
-        <RollButton
-          control={save.control}
-          hint={false}
-          tabIndex={-1}
-          aria-hidden
-          className={ANCHOR}
-        />
+        <AbilityAnchors check={check.control} save={save.control} />
         {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
       </span>
       <DropdownMenu>
@@ -885,9 +886,166 @@ function RowMain({
 }
 
 /**
+ * FR-CBT-142 (BL-56, OQ-CBT-93 A): an `in-owner-turn` companion's **one-row** line in its owner's
+ * row: name (wrapping between words only, FR-CBT-143), its marks, "22 / 22" (+ temp) and AC, the
+ * chips, the card and ⋯ (Attack ▸, Check ▸ / Save ▸, Damage / heal, Effect…, Companion ▸, …).
+ * `NameLine` fits it (FR-CBTX-57): the stats ride in the side slot, card + ⋯ at the end; too
+ * narrow → the stats and chips take a second line, never the name.
+ */
+function CompanionLine({
+  c,
+  def,
+  round,
+  defs,
+  ownerName,
+}: {
+  c: CombatantView;
+  def: DefinitionRecord | undefined;
+  round: number;
+  defs: Map<string, DefinitionRecord>;
+  ownerName: string;
+}) {
+  const { send, disabled } = useCbtIntent();
+  const openHp = useCombatDialogs((s) => s.openHp);
+  const hp = hpOf(c, defs);
+  const ac = acOf(c, defs);
+  const stats = def?.statBlock;
+  const hasScores = stats?.abilities !== undefined;
+  const checkOf = (a: Ability) => (stats ? checkBonus(stats, a) : null);
+  const saveOf = (a: Ability) => (stats ? saveBonus(stats, a) : null);
+  const check = useAbilityRoll(c, "check", checkOf);
+  const save = useAbilityRoll(c, "save", saveOf);
+  const attack = useAttackPick(c, def);
+  const deathRoll = useDeathSaveRoll(c);
+  const skipped = c.kind === "monster" && !c.removed && c.hpCurrent === 0;
+  const attackSub = useHoverSafeSub();
+  return (
+    <div
+      data-row-main
+      className={cn(
+        "relative flex items-center",
+        c.hidden && "opacity-70",
+        skipped && "opacity-50",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <NameLine
+          name={c.name}
+          testId="cbt-init-row-name"
+          className="text-sm"
+          marks={
+            <>
+              <ModeIcon
+                id={c.id}
+                mode={c.turnMode ?? "in-owner-turn"}
+                ownerName={ownerName}
+                testId="cbt-init-row-mode"
+              />
+              {c.hidden && (
+                <EyeOffIcon
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                  aria-label="Hidden"
+                />
+              )}
+              {skipped && (
+                <SkipForwardIcon
+                  className="size-3.5 shrink-0 text-muted-foreground"
+                  aria-label="Skipped while down"
+                />
+              )}
+            </>
+          }
+          side={
+            <span
+              data-stats-line
+              className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+            >
+              <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
+                {hp ? `${hp.cur} / ${hp.max}` : "—"}
+              </span>
+              <RowTemp c={c} />
+              <span className="shrink-0" data-testid="cbt-init-row-ac" data-record-id={c.id}>
+                AC {ac ?? "—"}
+              </span>
+            </span>
+          }
+          end={
+            <span data-name-end className="ml-auto flex shrink-0 items-center">
+              <CompanionCardButton c={c} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-6"
+                    data-testid="cbt-init-companion-menu"
+                    data-record-id={c.id}
+                    aria-label={`More for ${c.name}`}
+                  >
+                    <EllipsisIcon className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuSub open={attackSub.open} onOpenChange={attackSub.onOpenChange}>
+                    <DropdownMenuSubTrigger
+                      data-testid="cbt-init-row-attack"
+                      data-record-id={c.id}
+                      disabled={attack.disabled}
+                    >
+                      <SwordIcon /> Attack
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="min-w-64" onPointerEnter={attackSub.keep}>
+                      <AttackItems c={c} a={attack} />
+                    </DropdownMenuSubContent>
+                  </DropdownMenuSub>
+                  {hasScores && (
+                    <>
+                      <AbilityMenu c={c} kind="check" bonus={checkOf} {...check} />
+                      <AbilityMenu c={c} kind="save" bonus={saveOf} {...save} />
+                    </>
+                  )}
+                  <DropdownMenuItem
+                    data-testid="cbt-init-row-hp-adjust"
+                    onSelect={() => openHp(c.id)}
+                  >
+                    <HeartPulseIcon /> Damage / heal…
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <RowMenuItems c={c} deathRoll={deathRoll} />
+                  <DropdownMenuSeparator />
+                  <SideMenu c={c} testId="cbt-init-row-side" />
+                  <CompanionMenu c={c} testId="cbt-init-row-companion" />
+                  <DropdownMenuItem
+                    variant="destructive"
+                    data-testid="cbt-init-row-remove"
+                    disabled={disabled}
+                    onSelect={() =>
+                      void send("cbt.setRemoved", { combatantId: c.id, removed: true })
+                    }
+                  >
+                    <UserMinusIcon /> Remove from combat
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </span>
+          }
+        >
+          <RowEffects c={c} round={round} />
+        </NameLine>
+      </div>
+      {/* Invisible anchors for the physical-dice popovers (Attack ▸, Check ▸ / Save ▸). */}
+      <span className="pointer-events-none absolute top-1/2 right-8 flex size-0">
+        <AttackAnchor a={attack} />
+        <AbilityAnchors check={check.control} save={save.control} />
+      </span>
+    </div>
+  );
+}
+
+/**
  * One Initiative row (`cbt-init-row`); sprint 6 (FR-CBT-118): an `after-owner` companion sits
  * indented under its owner, an owner's `in-owner-turn` companions are lines inside its row
- * (`cbt-init-companion`), each with its own HP, AC, band, chips, Attack ▸ and menu.
+ * (`cbt-init-companion`), each one row with its own HP, AC, chips, card and ⋯ (FR-CBT-142).
  */
 export function Row({ lines = [], indent = false, ...p }: RowProps) {
   const { c, turn, defs } = p;
@@ -907,7 +1065,7 @@ export function Row({ lines = [], indent = false, ...p }: RowProps) {
         indent && "ml-3",
       )}
     >
-      <RowMain {...p} line={false} />
+      <RowMain {...p} />
       {lines.map((l) => (
         <div
           key={l.id}
@@ -916,14 +1074,12 @@ export function Row({ lines = [], indent = false, ...p }: RowProps) {
           data-hidden={l.hidden === true}
           className="border-l border-border/60 pl-1"
         >
-          <RowMain
-            {...p}
+          <CompanionLine
             c={l}
             def={l.entityId ? defs.get(l.entityId) : undefined}
-            turn={false}
-            owner={c}
+            round={p.round}
+            defs={defs}
             ownerName={c.name}
-            line
           />
         </div>
       ))}
@@ -932,6 +1088,16 @@ export function Row({ lines = [], indent = false, ...p }: RowProps) {
 }
 
 const ANCHOR = "pointer-events-none size-0 overflow-hidden p-0 opacity-0";
+
+/** Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸ (rows and lines). */
+function AbilityAnchors({ check, save }: { check: RollControl; save: RollControl }) {
+  return (
+    <>
+      <RollButton control={check} hint={false} tabIndex={-1} aria-hidden className={ANCHOR} />
+      <RollButton control={save} hint={false} tabIndex={-1} aria-hidden className={ANCHOR} />
+    </>
+  );
+}
 
 /**
  * FR-CBT-79 (G9): one Pending row per linked notification. A damage card opens the popup; another
@@ -1107,7 +1273,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>End “{enc.name}”?</DialogTitle>
-            <EndConfirmDescription encounterId={enc.id} testId="cbt-init-end-pending" />
+            <EndConfirmDescription encounterId={enc.id} area="cbt-init" />
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEnding(false)}>

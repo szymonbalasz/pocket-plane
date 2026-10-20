@@ -285,3 +285,25 @@ describe("FR-CBTX-57 a word that fits never breaks (sprint 6 CP2, walkthrough no
     expect(line.match(/data-name-marks/g)).toHaveLength(1);
   });
 });
+
+describe("FR-CBT-143 names break only between words", () => {
+  test("FR-CBT-143 no mid-word break: a wrapped name keeps its longest word's width (capped at the line); no break-all / anywhere", () => {
+    // Wrapped: `overflow-wrap: break-word` (doesn't shrink min-content) + a min width = the
+    // longest word, so "Drake / Compa / nion" can't happen; never `min-w-0`, `break-all` or
+    // `anywhere`.
+    const wrapped = render(
+      <RowName name="Drake Companion" testId="cbt-init-row-name" wrap minW={71} />,
+    );
+    expect(wrapped).toContain('class="wrap-break-word"');
+    expect(wrapped).toContain("min-width:71px");
+    for (const bad of ["min-w-0", "break-all", "wrap-anywhere", "anywhere"]) {
+      expect(wrapped).not.toContain(bad);
+    }
+    // The line measures each word (one hidden span per word) for that min width.
+    const line = render(<NameLine name="Fire Elemental 2" testId="cbt-init-row-name" />);
+    expect(line.match(/data-word-measure="true"/g)).toHaveLength(3);
+    expect(line).toContain(">Elemental<");
+    // Unwrapped: one line, no wrapping at all.
+    expect(render(<RowName name="Goblin Lurker" testId="x" />)).toContain("whitespace-nowrap");
+  });
+});

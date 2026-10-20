@@ -249,6 +249,8 @@ export function CompanionMenu({ c, testId }: { c: CombatantView; testId: string 
               data-record-id={c.id}
               data-value={m.mode}
               data-checked={m.checked}
+              // FR-CBT-151: the radio item's accessible name = its label.
+              aria-label={MODE_MENU_LABEL[m.mode]}
               disabled={disabled || m.reason !== null}
               onSelect={() => {
                 if (!m.checked) set(companionIntent.mode(c, m.mode));

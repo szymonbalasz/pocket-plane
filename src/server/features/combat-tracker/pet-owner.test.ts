@@ -123,3 +123,20 @@ describe("FR-CBT-145 End removes every summon's token", () => {
     expect((ended?.changes ?? []).filter((c) => c.id === feToken)).toEqual([]);
   });
 });
+
+describe("FR-CBTX-61 end from the chip", () => {
+  test("FR-CBTX-61 end from the chip: the owner's cbtx.endEffect ends Thorn's concentration, the linked summon loses its link, the DM's card appears; another player → forbidden", () => {
+    const t = summonSetup();
+    const effectId = t.concentrate();
+    const [fe] = t.summon({ ownerCharacterId: t.thornId, linkConcentration: true });
+    expect(t.combatantRow(fe as string).concentrationEffectId).toBe(effectId);
+    // player-1 (not Thorn's) → forbidden; nothing changes.
+    expect(t.err(() => t.run(CBTX_INTENTS.endEffect, { effectId }, t.p1)).code).toBe("forbidden");
+    expect(t.active().map((e) => e.id)).toContain(effectId);
+    // player-2 (Thorn's owner) from the chip: today's intent, same behaviour as Active effects' End.
+    t.run(CBTX_INTENTS.endEffect, { effectId }, t.p2);
+    expect(t.active().map((e) => e.id)).not.toContain(effectId);
+    expect(t.combatantRow(fe as string).concentrationEffectId).toBeNull();
+    expect(t.cards().map((c) => [c.state, c.audience])).toEqual([["pending", "dm"]]);
+  });
+});

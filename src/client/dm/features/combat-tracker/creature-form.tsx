@@ -409,6 +409,8 @@ export function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
         <Field id="portrait" label="Portrait">
           <Button
             id="cbt-form-portrait"
+            // FR-CBT-151 (sim-10 small copy).
+            data-testid="cbt-form-portrait"
             type="button"
             variant="outline"
             size="sm"
