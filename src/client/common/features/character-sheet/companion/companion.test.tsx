@@ -1,8 +1,8 @@
-// Companion card, client (CHARX §13, CBT §13.3; sprint 6 CP4): window contract (FR-CHARX-59),
-// card data (FR-CHARX-60), picker (FR-CHARX-61), header (FR-CHARX-62), HP control and pet edits
-// (FR-CHARX-63), rolls (FR-CHARX-64), conditions (FR-CHARX-65), not a sheet (FR-CHARX-66),
+// Companion card, client (CHARX §13, CBT §13.3; sprint 6 CP4): card data (FR-CHARX-60), picker
+// (FR-CHARX-61), header (FR-CHARX-62), HP control and pet edits (FR-CHARX-63), rolls (FR-CHARX-64), conditions (FR-CHARX-65), not a sheet (FR-CHARX-66),
 // visibility (FR-CHARX-67), states (FR-CHARX-68). Pure models + static server renders over a
-// fake sync store (the repo's client test style: no DOM).
+// fake sync store (the repo's client test style: no DOM). The window defs (FR-CHARX-59): each
+// client's `companion-window.test.ts`.
 import { afterEach, describe, expect, test } from "bun:test";
 import { CHAR_ROLL } from "@shared/character-sheet/schemas";
 import { COMBATANT_TYPE, type CombatantView, ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
@@ -11,8 +11,6 @@ import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
-import { dmCompanionWindow } from "../../../../dm/features/character-sheet/companion-window";
-import { playerCompanionWindow } from "../../../../player/features/character-sheet/companion-window";
 import { TooltipProvider } from "../../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../../sync/store";
 import { createWindowRegistry } from "../../play-shell/registry";
@@ -257,35 +255,6 @@ const dmParts: CompanionDmParts = {
 afterEach(() => resetCompanionMemory());
 
 // ---------- tests ----------
-
-describe("FR-CHARX-59 window", () => {
-  test("FR-CHARX-59 window: one charx.companion per client, top-left dx 56, 320×360 min 280×240, closed by default; player launcher Companions available iff they own one; DM none", () => {
-    // Registered once per client: FR-SHELL-61's registry tests open it (play-shell windows.test).
-    for (const def of [dmCompanionWindow, playerCompanionWindow]) {
-      expect(def).toMatchObject({
-        kind: COMPANION_KIND,
-        title: "Companion",
-        defaultSize: { w: 320, h: 360 },
-        minSize: { w: 280, h: 240 },
-        defaultPosition: { anchor: "top-left", dx: 56 },
-        defaultOpen: false,
-      });
-    }
-    expect(dmCompanionWindow.clients).toEqual(["dm"]);
-    expect(dmCompanionWindow.launcher).toBeUndefined();
-    const player = playerCompanionWindow;
-    expect(player.clients).toEqual(["player"]);
-    expect(player.launcher?.label).toBe("Companions");
-    const available = player.available;
-    if (!available) throw new Error("no available()");
-    // Owns a pet (no fight) → available; owns only a summon → available; nothing → not.
-    expect(available(storeOf(P1, { entities: [mira, owlPet], fight: false }))).toBe(true);
-    expect(available(storeOf(P1, { entities: [mira], combatants: [feC] }))).toBe(true);
-    expect(available(storeOf(P2, { entities: [mira, owlRedacted], combatants: [owlBand] }))).toBe(
-      false,
-    );
-  });
-});
 
 describe("FR-CHARX-60 card fields", () => {
   test("FR-CHARX-60 card fields: a pet out of a fight from its stat block, in a fight from the combatant card; row ids stable; +N more; no speed → —", () => {
