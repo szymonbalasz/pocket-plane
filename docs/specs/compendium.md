@@ -2,8 +2,8 @@
 title: Compendium
 prefix: CMP
 status: complete
-owner: spec-images
-phase: post-mvp-6
+owner: spec-followups
+phase: post-mvp-7
 ---
 
 # Compendium
@@ -52,6 +52,8 @@ phase: post-mvp-6
 | FR-CMP-50 | Homebrew form slots + `ImageAttach` (upload, drop, paste, library) | C5 UI | `FR-CMP-50 form slots`, walkthrough I3–I6 |
 | FR-CMP-51, -52 | Entry view gallery + lightbox, both clients; refresh | C5 UI | `FR-CMP-51 entry gallery`, walkthrough I1, I2, I5 |
 | FR-CMP-53 | CON-44: 0 B | C5 core | `FR-CMP-53 CON-44 entry images 0 B` |
+
+> **Sprint 7 revision (track FU, BL-48; DM [#311](../decisions-log.md)):** decided, not open: the DM gets a confirmation after Add to party, and a fixture Goblin's row no longer reads "CR 1/4 · Small" with no type. New **FR-CMP-57**, **-58**. Tests `FR-CMP-57 add to party confirmed` (DOM: ack → `cmp-add-to-party-done` "Added: Potion of healing ×2", Popover closes after 1.5 s; `e2e/cmp-add-to-party.e2e.ts` expects the new players' text), `FR-CMP-58 type-less creature label` (unit: no trailing space without a type; the new typed fixture Goblin "Small humanoid"; the old type-less entry unchanged); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. 0 B. Edge cases: client-only text; reconnect re-renders from the store; crash: no server change. No open question.
 
 ## 1. Summary
 
@@ -172,6 +174,8 @@ All writes: one transaction (rows + event-log entry), then the domain event ([AD
 | FR-CMP-54 | *(S6)* **One matcher module.** The generic matcher moves to **`src/shared/search/match.ts`** (`@shared/search/match`, pure, no dependency): `fold`, `queryWords`, `wordForms`, `foldName`, `FoldedName`, `nameTier`, `searchTier`, `textWordsOf`, `NameTier`, `SearchTier`, `QUERY_WORDS_MAX`, `TEXT_MATCH_MIN`, `PLURAL_MIN`, unchanged. `@shared/compendium/match.ts` keeps only compendium's own `sourceRank`, `SourceRank`, `BUNDLED_SOURCE_KEYS`, `FIXTURE_SOURCE`. Every user imports `@shared/search/match` directly: compendium's server index and search (`search-index.ts`, `search.ts`), the Creatures filter ([FR-ENT-18](entities.md#6-functional-requirements)), the creature lookups ([FR-CBT-63](combat-tracker.md#6-functional-requirements)), image search ([FR-ASSET-44](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)). No re-export from `@shared/compendium` and no second implementation (a `bun test` check fails on an **exported** declaration of `fold` / `queryWords` / `searchTier` outside `src/shared/search/`; local variables of those names are fine, review #24). Owner: assets-pipeline's track this sprint (DM #285: "one shared matcher"); compendium keeps its rules (FR-CMP-32, -33). | Amends FR-CMP-37 |
 | FR-CMP-55 | *(S6)* **Homebrew image slots search and tag**: `ImageAttach` in `HomebrewForm.tsx` gets `context` = `compendium-item` for item entries, else `compendium` ([FR-ASSET-48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)); From library opens the picker with its search and tag filter; uploads and pastes are tagged Items for items (attachments keep the tag, FR-ASSET-41). Changing the kind while the form is open changes the context for later uploads only. | Amends FR-CMP-50 |
 | FR-CMP-56 | *(S6)* **Search unchanged**: the move changes no result, tier, order, cursor or group of compendium search, the Creatures filter or the lookups; FR-CMP-32–38 hold as written. | |
+| FR-CMP-57 | *(S7, track FU)* **Add to party confirms for the DM** (BL-48: no DM confirmation after Add to party; amends FR-CMP-41's "the `loot-received` toast is the confirmation", which only players saw): on `ack` the Popover shows "Added: ‹name› ×‹qty›" (`cmp-add-to-party-done`) for 1.5 s, then closes; reject and lost-intent handling unchanged. Players' toast text per [FR-PARTY-49](party-board.md#69-sprint-7-bl-48-copy-and-tabs-track-fu) ("Party inventory: …"). | BL-48 |
+| FR-CMP-58 | *(S7)* **A creature row without a type** (BL-48: fixture Goblin "CR 1/4 · Small"): the row's summary (`@shared/compendium/schemas.ts`, "CR ‹cr› · ‹Size› ‹type›") drops the empty type cleanly ("CR 1/4 · Small", no trailing space); and a **separate typed Goblin entry** is added to the fixtures (e.g. in `cmp-srd-mini-s3` as a second Goblin with `type: "humanoid"`, "Small humanoid"), leaving the existing type-less entry and every test that reads it untouched (rulings-b #19). | BL-48 |
 
 ## 7. UI/UX notes
 
