@@ -12,6 +12,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | GM gems spec | `spec/s7-gems` (ws w8H) | spec-gems | writing | seams |
 | ST stats spec | `spec/s7-stats` (ws w8J) | spec-stats | writing | seams |
 | FU follow-ups spec | `spec/s7-followups` (ws w8K) | spec-followups | writing | seams |
+| backfill (BL-50) nat-1 e2e flake | `fix/bl-50-nat1-e2e` (ws w8M, slot 0) | fix-bl-50 | fixing | gates + merge |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
 - GM: GEM FR 01-40 / OQ 04-20; CAMP FR 38-45 / OQ 33-36; DICE FR 62-71 / OQ 41-44; DICEX FR 59-62 / OQ 49-50; CBT FR 126-135 / OQ 85-88; CHARX FR 71-80 / OQ 37-40; MOD FR 64-67 / OQ 47-48; SHELL FR 98-100 / OQ 61-62; NOTE FR 52-54 / OQ 30-31.
