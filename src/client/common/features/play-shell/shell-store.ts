@@ -4,8 +4,10 @@ import { createStore, type StoreApi } from "zustand";
 import type { Rect, Viewport } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import {
+  isCovered,
   isLayoutAction,
   isUserReopen,
+  type ManagerContext,
   type Placed,
   placedAs,
   reduce,
@@ -58,8 +60,9 @@ const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w
 
 /**
  * `placed` after a change: a move / resize end → `stored`; a push off a tool bar → `pushed`
- * (FR-SHELL-55); a user reopen (FR-SHELL-56) → `reopened` when it moved the window, else
- * `stored`, and any other window it moved (off a protected one) → `auto`; a rect the reducer
+ * (FR-SHELL-55); a user reopen (FR-SHELL-56) → `reopened` when its stored rect was `covered`
+ * (auto-placed, even onto the same rect once the windows over it were parked), else `stored`
+ * (a protected window too), and any other window it moved → `auto`; a rect the reducer
  * chose (new window, auto placement, reset, viewport follow) → `default` / `auto`; any other
  * window keeps its value.
  */
@@ -70,6 +73,7 @@ function nextPlaced(
   registry: WindowRegistry,
   vp: Viewport,
   hard: readonly Rect[],
+  covered = false,
 ): ReadonlyMap<string, Placed> {
   const out = new Map<string, Placed>();
   for (const w of next) {
@@ -79,8 +83,10 @@ function nextPlaced(
     const moved = action.type === "reset" || !before || !sameRect(before, w);
     const named = !isLayoutAction(action) && id === windowId(action.kind, action.instance);
     const reopen = named && isUserReopen(action, before?.state);
-    if (reopen) out.set(id, moved ? "reopened" : "stored");
-    else if (moved && !named && (action.type === "open" || action.type === "toggle")) {
+    if (reopen) {
+      const replaced = covered && def !== undefined && !def.defaultOpen && !def.fixedDefault;
+      out.set(id, replaced ? "reopened" : "stored");
+    } else if (moved && !named && (action.type === "open" || action.type === "toggle")) {
       out.set(id, "auto");
     } else if (action.type === "setRect" && moved) out.set(id, "stored");
     else if (action.type === "push" && moved) out.set(id, "pushed");
@@ -158,7 +164,7 @@ function nextPcClear(
     const id = windowId(w.kind, w.instance);
     const before = prev.windows.find((p) => p.kind === w.kind && p.instance === w.instance);
     const how = placed.get(id);
-    if (before && sameRect(before, w)) {
+    if (before && sameRect(before, w) && prev.placed.get(id) === how) {
       if (prev.pcClear.has(id)) out.add(id);
       continue;
     }
@@ -236,7 +242,7 @@ export function createShellController(opts: {
       }
       const viewport = opts.viewport();
       const regions = regionsAt(viewport);
-      const next = reduce(windows, action, {
+      const ctx: ManagerContext = {
         registry,
         viewport,
         available,
@@ -244,13 +250,26 @@ export function createShellController(opts: {
         keepOuts: () => regions,
         heights: opts.heights,
         placed: (id) => state.placed.get(id),
-      });
+      };
+      // FR-SHELL-56: whether a user reopen finds its stored rect covered (`data-placed`).
+      const named = isLayoutAction(action)
+        ? undefined
+        : windows.find(
+            (w) => windowId(w.kind, w.instance) === windowId(action.kind, action.instance),
+          );
+      const covered =
+        named !== undefined &&
+        isUserReopen(action, named.state) &&
+        available.has(named.kind) &&
+        isCovered(windows, named, ctx);
+      const next = reduce(windows, action, ctx);
       const settling = nextSettling(state.settling, windows, next, action);
       if (next === windows) {
         if (settling !== state.settling) store.setState({ settling });
         return;
       }
-      const placed = nextPlaced(state, next, action, registry, viewport, hardRects(regions));
+      const hard = hardRects(regions);
+      const placed = nextPlaced(state, next, action, registry, viewport, hard, covered);
       store.setState({
         windows: next,
         placed,
