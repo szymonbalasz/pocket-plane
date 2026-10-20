@@ -13,6 +13,7 @@ import type { TokenRecord } from "@shared/scenes-map/schemas";
 import { and, asc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { combatant, effect } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
+import { turnStartersOf } from "../combat-tracker/ranks";
 import { combatantsOf, toCombatantRecord } from "../combat-tracker/rows";
 import type { CombatRuleEnv, CombatRuleHookSet } from "../combat-tracker/rule-hooks";
 import type { TokenHookEnv } from "../scenes-map/token-hooks";
@@ -72,8 +73,14 @@ export const cbtxRuleHooks: CombatRuleHookSet = {
     if (d.direction === "next") {
       // Concentrations last, so a timed link that is due ends `expired` itself (the DM toast
       // names it), not by the cascade.
+      // FR-CBT-108 (sprint 6): an in-owner-turn companion's anchor is its owner's turn start.
+      const starters = turnStartersOf(env.tx, enc.id, d.to.turnCombatantId);
       const due = timedEffects(env, enc.id)
-        .filter((e) => expiresAt(e, d.to))
+        .filter((e) =>
+          (starters.length ? starters : [null]).some((id) =>
+            expiresAt(e, { round: d.to.round, turnCombatantId: id }),
+          ),
+        )
         .sort((a, b) => Number(a.kind === "concentration") - Number(b.kind === "concentration"));
       if (due.length === 0) return [];
       // Stamped with the new turn: Prev from it restores exactly these (FR-CBTX-07).

@@ -21,7 +21,12 @@ import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
 import { TRIGGER_CHARGES } from "@shared/effect-modifiers/trigger-state";
 import { TRIGGER_EVENTS, type TriggerRule } from "@shared/effect-modifiers/triggers";
-import { TOKEN_CREATURE_TYPES, TOKEN_SHAPES } from "@shared/entities/schemas";
+import {
+  type CompanionCard,
+  TOKEN_CREATURE_TYPES,
+  TOKEN_SHAPES,
+  TURN_MODES,
+} from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
@@ -198,6 +203,20 @@ export const entity = sqliteTable(
     tokenShape: text("token_shape", { enum: TOKEN_SHAPES }),
     /** Plain id, no FK (informational). */
     derivedFromId: text("derived_from_id"),
+    /**
+     * FR-ENT-31 (sprint 6, #252): a pet's owner PC (a character of the campaign); null = not a
+     * pet. Characters are never deleted (FR-ENT-14); the FK sets null all the same.
+     */
+    companionOf: text("companion_of").references((): AnySQLiteColumn => entity.id, {
+      onDelete: "set null",
+    }),
+    /** FR-ENT-31: a pet's default turn mode (copied to its combatant at join); null = not a pet. */
+    turnMode: text("turn_mode", { enum: TURN_MODES }),
+    /**
+     * FR-ENT-37 (ADR-0056): server-written, DM-only: the pet has an active companion combatant or
+     * an unhidden token on the active scene; other players receive the pet only while true.
+     */
+    petPresent: integer("pet_present", { mode: "boolean" }).notNull().default(false),
     source: text("source"),
     sourceKey: text("source_key"),
     licence: text("licence"),
@@ -214,6 +233,7 @@ export const entity = sqliteTable(
     // FR-ENT-05, FR-FIX-20: provenance unique globally (nulls for customs).
     uniqueIndex("entity_source_key").on(t.source, t.sourceKey),
     index("entity_campaign").on(t.campaignId),
+    index("entity_companion_of").on(t.companionOf),
   ],
 );
 
@@ -445,6 +465,11 @@ export const gameLogEntry = sqliteTable(
     /** JSON leaf ID[]; no FK (gate I24). */
     rollIds: text("roll_ids", { mode: "json" }).notNull(),
     encounterId: text("encounter_id").references((): AnySQLiteColumn => encounter.id),
+    /**
+     * Sprint 6 (FR-CBT-114, FR-CHARX-69, ADR-0056): a non-public entry also reaches this player
+     * (a companion's owner); null = DM only. Ignored on public entries.
+     */
+    audiencePlayerId: text("audience_player_id").references((): AnySQLiteColumn => player.id),
     /** Reserved for gems (#140); null in MVP. */
     supersededBy: text("superseded_by"),
   },
@@ -595,8 +620,11 @@ export const combatant = sqliteTable(
     removed: integer("removed", { mode: "boolean" }).notNull().default(false),
     initiative: integer("initiative"),
     initRollId: text("init_roll_id"),
-    /** Server-written ranks (FR-CBT-13). */
-    position: integer("position").notNull(),
+    /**
+     * Server-written ranks (FR-CBT-13). Null for an `in-owner-turn` companion while its owner is
+     * eligible (FR-CBT-107, sprint 6): it acts inside the owner's turn.
+     */
+    position: integer("position"),
     playerPosition: integer("player_position"),
     /** Monsters only (PC HP lives on the character, #92). */
     hpCurrent: integer("hp_current"),
@@ -611,6 +639,26 @@ export const combatant = sqliteTable(
      */
     side: text("side", { enum: SIDES }),
     publicSide: text("public_side", { enum: SIDES }),
+    /**
+     * FR-CBT-105 (sprint 6, #252): a companion's owner PC and that PC's player (a copy written
+     * with it); both null = not a companion.
+     */
+    ownerCharacterId: text("owner_character_id").references((): AnySQLiteColumn => entity.id),
+    ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
+    /** FR-CBT-106: null iff not a companion. */
+    turnMode: text("turn_mode", { enum: TURN_MODES }),
+    /** FR-CBT-105: the entity is a pet (HP written back at End / Dismiss). */
+    pet: integer("pet", { mode: "boolean" }).notNull().default(false),
+    /** FR-CBT-116: copy of the owner combatant's `hidden`, written with it. DM only. */
+    ownerHidden: integer("owner_hidden", { mode: "boolean" }).notNull().default(false),
+    /**
+     * FR-CBT-110 / -120: the owner's concentration this summon is linked to. DM only. Plain id,
+     * no FK: effects are never deleted (they end), and an FK into `effect` would pin the
+     * pre-CBTX push test's old DB shape (SQLite can't drop an FK column).
+     */
+    concentrationEffectId: text("concentration_effect_id"),
+    /** FR-CBT-117: JSON leaf `companionCard(statBlock)` with stable row ids; companions only. */
+    card: text("card", { mode: "json" }).$type<CompanionCard>(),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );

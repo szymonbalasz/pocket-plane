@@ -310,6 +310,11 @@ export const GameLogEntryRecord = z.strictObject({
   dmPayload: z.unknown().nullable(),
   rollIds: z.array(z.string()),
   encounterId: z.string().nullable(),
+  /**
+   * Sprint 6 (ADR-0056, FR-CBT-114): a non-public entry also reaches this player (a companion's
+   * owner: its roll lines); null = DM only. Old rows: null.
+   */
+  audiencePlayerId: z.string().nullable().default(null),
   supersededBy: z.string().nullable(),
 });
 export type GameLogEntryRecord = z.infer<typeof GameLogEntryRecord>;
@@ -319,7 +324,10 @@ export const RedactedGameLogEntry = GameLogEntryRecord.omit({ dmPayload: true })
 export type RedactedGameLogEntry = z.infer<typeof RedactedGameLogEntry>;
 
 /** An entry as either client holds it. */
-export type GameLogEntryView = RedactedGameLogEntry & { dmPayload?: unknown };
+export type GameLogEntryView = Omit<RedactedGameLogEntry, "audiencePlayerId"> & {
+  audiencePlayerId?: string | null;
+  dmPayload?: unknown;
+};
 
 /** `game-log-settings` (DM only). */
 export const GameLogSettingsRecord = z.strictObject({

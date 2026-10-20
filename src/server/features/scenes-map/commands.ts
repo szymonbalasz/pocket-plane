@@ -19,13 +19,7 @@ import {
   TokenRevealed,
   TokenUpdated,
 } from "@shared/events/scenes-map";
-import {
-  copyName,
-  duplicateCell,
-  footprint,
-  numberedName,
-  overlapsMap,
-} from "@shared/scenes-map/geometry";
+import { copyName, duplicateCell, numberedName, overlapsMap } from "@shared/scenes-map/geometry";
 import {
   ActivateSceneInput,
   CheckMoveInput,
@@ -86,8 +80,9 @@ import {
   sceneTokens,
 } from "./rows";
 import { lifecycleHooks } from "./scene-hooks";
-import type { TokenHooks } from "./token-hooks";
-import { deriveSceneObject, rederiveDependants, tokenHiddenFor } from "./visibility-hooks";
+import { runTokenChangedHooks, type TokenHooks } from "./token-hooks";
+import { tokenCopies } from "./token-owner";
+import { rederiveDependants, tokenHiddenFor } from "./visibility-hooks";
 
 /** REST-only commands (no WS intent, MAP §9 / ADR-0021 D). */
 export const MAP_REST = {
@@ -159,32 +154,6 @@ function assertUnlocked(s: SceneRecord) {
 
 const assetOrNull = (env: CommandEnv, id: string | null | undefined): string | null =>
   id === null || id === undefined ? null : requireAsset(env, id).id;
-
-/** What a token's copies depend on (FR-FOG-10 / -34 / -46). */
-interface TokenPlace {
-  sceneId: string;
-  col: number;
-  row: number;
-  size: TokenSize;
-  ownerPlayerId: string | null;
-  invisible?: boolean;
-}
-
-/**
- * FR-FOG-10 (ADR-0039 / ADR-0042): a token's server copies (`fogged`, `seenBy`) at a scene, cell
- * and size for its owner, derived in the writing command's transaction before its single write.
- * No `derive` hook → not fogged, `seenBy` null.
- */
-function tokenCopies(tx: Tx, t: TokenPlace) {
-  const n = footprint(t.size);
-  return deriveSceneObject(tx, {
-    type: TOKEN_TYPE,
-    sceneId: t.sceneId,
-    cells: { col: t.col, row: t.row, w: n, h: n },
-    ownerPlayerId: t.ownerPlayerId,
-    invisible: t.invisible === true,
-  });
-}
 
 // ---------- scenes (REST) ----------
 
@@ -580,7 +549,7 @@ export type PlaceTokenSpec = z.output<typeof PlaceTokenInput>;
  * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
  * `statBlock.speed`, else null (FR-MAP-36); `creatureType` = the monster's `statBlock.type`, else
- * null (FR-ENT-27); owner = the character's owner, else none; visible; `characterId` copy
+ * null (FR-ENT-27); owner = the character's or (FR-MAP-74) the pet's owner, else none; visible; `characterId` copy
  * (FR-MAP-50); `fogged` / `seenBy` derived (FR-FOG-10). Optional overrides (fixtures) for name,
  * image, owner, hidden, shape; never size, speed, `creatureType`, `characterId` or `fogged`.
  * `dependants` = the visibility hooks' `rederive` rows (FR-FOG-35, ADR-0042); a caller lists them
@@ -597,7 +566,8 @@ export function placeTokenIn(
   const size = def.statBlock.size;
   assertOnMap(s, input.col, input.row, size);
   assertCaps(tx, cid, s.id, 1);
-  let ownerPlayerId: string | null = def.kind === "character" ? def.ownerPlayerId : null;
+  // FR-MAP-74 (sprint 6): a character's or a pet's token takes its owner (imported: none).
+  let ownerPlayerId: string | null = def.ownerPlayerId;
   if (input.ownerPlayerId !== undefined) {
     if (input.ownerPlayerId !== null) assertOwner(tx, cid, input.ownerPlayerId);
     ownerPlayerId = input.ownerPlayerId;
@@ -625,6 +595,21 @@ export function placeTokenIn(
   });
   const dependants = rederiveDependants(env, tokenChange(null, after));
   return { token: after, change: tokenChange(null, after), dependants };
+}
+
+/**
+ * FR-MAP-79 (sprint 6): deletes a token inside the caller's transaction (combat: a summon's token
+ * at Dismiss / End, after its combatant went inactive). Token-changed hooks first (they may
+ * refuse, as `map.deleteToken`), then the row, then its dependants (fog, FR-FOG-35). Returns the
+ * `token` delete + the hook and dependant rows for the caller's event.
+ */
+export function deleteTokenIn(env: CommandEnv, tokenId: string): RecordChange[] {
+  const { tx, ctx, actor } = env;
+  const before = getToken(tx, campaignOf(actor), tokenId);
+  const hookChanges = runTokenChangedHooks({ tx, ctx, actor }, before, null);
+  tx.delete(token).where(eq(token.id, tokenId)).run();
+  const dependants = rederiveDependants({ tx, ctx, actor }, tokenChange(before, null));
+  return [tokenChange(before, null), ...dependants, ...hookChanges];
 }
 
 /** FR-MAP-13: `placeTokenIn` + `TokenPlaced`. */

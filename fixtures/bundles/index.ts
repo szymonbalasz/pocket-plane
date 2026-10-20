@@ -9,6 +9,11 @@ import characterSheetFull from "./character-sheet-full";
 import cmpImages from "./cmp-images";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
+import companions from "./companions";
+import companionsAlly from "./companions-ally";
+import companionsE2e from "./companions-e2e";
+import companionsPrep from "./companions-prep";
+import companionsStart from "./companions-start";
 import compendium from "./compendium";
 import compendiumFull from "./compendium-full";
 import diceDisplay from "./dice-display";
@@ -98,4 +103,10 @@ export const bundles: readonly Bundle[] = [
   partyCmp,
   playerColours,
   logNoteColours,
+  // Sprint 6 track CP (fix/cp-core)
+  companionsPrep,
+  companions,
+  companionsE2e,
+  companionsStart,
+  companionsAlly,
 ];

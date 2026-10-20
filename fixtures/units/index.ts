@@ -21,6 +21,8 @@ import cbtxTemp from "./combat-extras/cbtx-temp";
 import combat1 from "./combat-tracker/combat-1";
 import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
+import cpAlly from "./combat-tracker/cp-ally";
+import cpSrd from "./combat-tracker/cp-srd";
 import encFriendly from "./combat-tracker/enc-friendly";
 import encounter1 from "./combat-tracker/encounter-1";
 import goblin2 from "./combat-tracker/goblin-2";
@@ -56,11 +58,14 @@ import weaponFlameTongue from "./effect-modifiers/weapon-flame-tongue";
 import artUpdateTokens from "./entities/art-update-tokens";
 import charMira from "./entities/char-mira";
 import charThorn from "./entities/char-thorn";
+import cpPetThorn from "./entities/cp-pet-thorn";
 import enemy1 from "./entities/enemy-1";
 import enemy2 from "./entities/enemy-2";
 import enemyCustom from "./entities/enemy-custom";
 import enemyCustomSecond from "./entities/enemy-custom-second";
 import entArtTokens from "./entities/ent-art-tokens";
+import petDrake from "./entities/pet-drake";
+import petOwlbear from "./entities/pet-owlbear";
 import fogAmbush from "./fog-of-war/fog-ambush";
 import fogAmbushPartial from "./fog-of-war/fog-ambush-partial";
 import fogScn from "./fog-of-war/fog-scn";
@@ -184,4 +189,10 @@ export const units: readonly Fixture[] = [
   encFriendly,
   logColours,
   noteColours,
+  // Sprint 6 track CP (fix/cp-core): companions
+  cpSrd,
+  petOwlbear,
+  petDrake,
+  cpPetThorn,
+  cpAlly,
 ];

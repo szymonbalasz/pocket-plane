@@ -74,7 +74,7 @@ describe("FR-CBT-11 FR-CBT-12 initiative", () => {
     expect(by.Goblin?.initRollId).toBe(r.rollIds[0] as string);
     // Monsters with initiative rank above the PCs without.
     const rolled = Object.values(by).filter((c) => c.initiative !== null);
-    expect(Math.max(...rolled.map((c) => c.position))).toBe(4);
+    expect(Math.max(...rolled.map((c) => c.position ?? 0))).toBe(4);
     // Players see only the visible monsters' new ranks.
     const v = t.h.viewer("player", t.h.p1.id);
     const wire = (ev?.changes ?? []).map((c) => t.s.records.filterChange(c, v)).filter(Boolean);
@@ -125,7 +125,7 @@ describe("FR-CBT-11 FR-CBT-12 initiative", () => {
     const by = t.byName(t.enc.id);
     expect(
       Object.values(by)
-        .sort((a, b) => a.position - b.position)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
         .map((c) => [c.name, c.playerPosition]),
     ).toEqual([
       ["Wolf", null],
@@ -223,7 +223,7 @@ describe("FR-CBT-46 FR-CBT-47 playtest: no re-rolls from round 1", () => {
     expect(g2()?.initiative).toBe(9);
     expect(
       Object.values(t.byName(t.enc.id))
-        .sort((a, b) => a.position - b.position)
+        .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
         .map((c) => c.name),
     ).toEqual(["Wolf", "Mira", "Goblin", "Thorn", "Goblin 2", "Elite Goblin Warrior"]);
   });

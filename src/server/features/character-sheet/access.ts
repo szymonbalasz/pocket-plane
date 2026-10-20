@@ -21,13 +21,19 @@ function campaignOf(env: Env): string {
 }
 
 /**
- * The campaign creature a CHARX write targets. Player: own character only. DM: any character or
- * custom monster of the campaign; imported → `forbidden`.
+ * The campaign creature a CHARX write targets. Player: own character only (and, with `pets`, a
+ * pet they own: FR-ENT-38, #288; another's pet → `forbidden`, any other monster → `not_found`).
+ * DM: any character or custom monster of the campaign; imported → `forbidden`.
  */
-function creatureFor(env: Env, id: string): EntityRecord {
+function creatureFor(env: Env, id: string, opts: { pets?: boolean } = {}): EntityRecord {
   const cid = campaignOf(env);
   const row = getRow(env.tx, id);
   if (env.actor.role === "player") {
+    if (opts.pets && row && row.campaignId === cid && row.companionOf !== null) {
+      const pet = toEntityRecord(row);
+      if (pet.ownerPlayerId !== env.actor.playerId) throw forbidden(NOT_YOURS);
+      return pet;
+    }
     if (!row || row.campaignId !== cid || row.kind !== "character") throw notFound(NOT_FOUND);
     const c = toEntityRecord(row);
     if (c.kind !== "character") throw notFound(NOT_FOUND);
@@ -39,16 +45,28 @@ function creatureFor(env: Env, id: string): EntityRecord {
   return toEntityRecord(row);
 }
 
-/** Fields and rows (FR-CHARX-15/16): the owner only while unlocked; the DM always. */
+/**
+ * Fields and rows (FR-CHARX-15/16): the owner only while unlocked; the DM always. Sprint 6
+ * (FR-ENT-38, #288 "B without a lock"): a pet's owner too, never locked; the callers limit the
+ * fields (`PET_OWNER_FIELDS`, attack rows).
+ */
 export function editableCreature(
   env: Env,
   id: string,
 ): { creature: EntityRecord; sheet: CreatureSheetRecord | null } {
-  const creature = creatureFor(env, id);
+  const creature = creatureFor(env, id, { pets: true });
   const sheet = getSheet(env.tx, creature.id);
-  if (env.actor.role === "player" && sheet?.locked) throw forbidden(LOCKED_MESSAGE);
+  const ownPet = creature.kind === "monster";
+  if (env.actor.role === "player" && !ownPet && sheet?.locked) throw forbidden(LOCKED_MESSAGE);
   return { creature, sheet };
 }
+
+/** FR-ENT-38 (#288): what a pet's owner may edit on its card; the rest is the DM's. */
+export const PET_OWNER_FIELDS = ["ac", "hpMax", "speed"] as const;
+
+/** FR-ENT-38: a player editing a pet (only their own reaches here, `editableCreature`). */
+export const petOwnerEdit = (env: Env, c: EntityRecord): boolean =>
+  env.actor.role === "player" && c.kind === "monster";
 
 /** Counters (FR-CHARX-17): characters only, the owner also on a locked sheet. */
 export function counterCharacter(env: Env, id: string): CharacterRecord {

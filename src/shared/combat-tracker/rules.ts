@@ -7,6 +7,7 @@ import type {
   DamageMultiplier,
   HealthBand,
   Side,
+  TurnMode,
 } from "./schemas";
 
 // ---------- side (FR-CBT-98, #252) ----------
@@ -33,6 +34,20 @@ export interface RankInput {
   active: boolean;
   removed: boolean;
   hidden: boolean;
+  /** Sprint 6 (FR-CBT-107): companions rank by their owner PC's combatant (`entityId`). */
+  entityId?: string;
+  ownerCharacterId?: string | null;
+  turnMode?: TurnMode | null;
+  /** FR-CBT-116: a hidden owner hides its companions from players (no player rank). */
+  ownerHidden?: boolean;
+}
+
+/** What `ranks` needs besides the rows (FR-CBT-108's owner states). */
+export interface RankContext {
+  /** Combatants that can't take a turn now (removed, dead: FR-CBT-14, FR-CBTX-25). */
+  ineligible?: ReadonlySet<string>;
+  /** The turn combatant keeps a rank until the turn moves on (a restored owner, FR-CBT-108). */
+  turnCombatantId?: string | null;
 }
 
 /** Initiative desc, init bonus desc, PC before monster, `seq`; no initiative last. */
@@ -47,17 +62,95 @@ export function compareOrder(a: RankInput, b: RankInput): number {
   return a.seq - b.seq;
 }
 
-/** `position` 1…n over all; `playerPosition` 1…k over active, non-removed, non-hidden. */
+/**
+ * FR-CBT-107 (sprint 6): the owner PC's combatant a companion ranks by: the first PC combatant
+ * of its owner character; null = not a companion, or the owner never joined (ranks as `own`).
+ */
+export function ownerRowOf<
+  T extends Pick<RankInput, "id" | "kind" | "seq"> & { entityId?: string },
+>(rows: readonly T[], c: { ownerCharacterId?: string | null }): T | null {
+  if (!c.ownerCharacterId) return null;
+  let best: T | null = null;
+  for (const r of rows) {
+    if (r.kind !== "pc" || r.entityId !== c.ownerCharacterId) continue;
+    if (!best || r.seq < best.seq) best = r;
+  }
+  return best;
+}
+
+/**
+ * `position` 1…n over all; `playerPosition` 1…k over active, non-removed, non-hidden (and, since
+ * sprint 6, not of a hidden owner). FR-CBT-107 / -108: an `after-owner` companion sits right after
+ * its owner's combatant (by `seq` among them); an `in-owner-turn` one has no rank (both null)
+ * while its owner is eligible, else (or while it is the turn combatant) it ranks as `after-owner`;
+ * `own` and owner-less rows by `compareOrder`.
+ */
 export function ranks(
   rows: readonly RankInput[],
-): Map<string, { position: number; playerPosition: number | null }> {
-  const out = new Map<string, { position: number; playerPosition: number | null }>();
+  rc: RankContext = {},
+): Map<string, { position: number | null; playerPosition: number | null }> {
+  const out = new Map<string, { position: number | null; playerPosition: number | null }>();
+  const attached = new Map<string, RankInput[]>();
+  const base: RankInput[] = [];
+  for (const r of rows) {
+    const owner =
+      r.turnMode === "after-owner" || r.turnMode === "in-owner-turn" ? ownerRowOf(rows, r) : null;
+    if (!owner) {
+      base.push(r);
+      continue;
+    }
+    const list = attached.get(owner.id) ?? [];
+    list.push(r);
+    attached.set(owner.id, list);
+  }
+  let i = 0;
   let k = 0;
-  [...rows].sort(compareOrder).forEach((r, i) => {
-    const seen = r.active && !r.removed && !r.hidden;
-    out.set(r.id, { position: i + 1, playerPosition: seen ? ++k : null });
-  });
+  const place = (r: RankInput) => {
+    const seen = r.active && !r.removed && !r.hidden && !r.ownerHidden;
+    out.set(r.id, { position: ++i, playerPosition: seen ? ++k : null });
+  };
+  for (const r of [...base].sort(compareOrder)) {
+    place(r);
+    const companions = (attached.get(r.id) ?? []).sort((a, b) => a.seq - b.seq);
+    const ownerEligible = !rc.ineligible?.has(r.id) && !r.removed && r.active;
+    for (const c of companions) {
+      if (c.turnMode === "in-owner-turn" && ownerEligible && rc.turnCombatantId !== c.id) {
+        out.set(c.id, { position: null, playerPosition: null });
+      } else {
+        place(c);
+      }
+    }
+  }
   return out;
+}
+
+/**
+ * FR-CBT-108: the `in-owner-turn` companions acting inside `ownerCombatantId`'s turn (no rank,
+ * active); their effects and `turnStart` triggers start with that turn, and Next onto the owner
+ * resets their `movedFt`.
+ */
+export function inTurnCompanionsOf<
+  T extends {
+    id: string;
+    kind: CombatantKind;
+    seq: number;
+    entityId?: string;
+    active: boolean;
+    position: number | null;
+    turnMode?: TurnMode | null;
+    ownerCharacterId?: string | null;
+  },
+>(rows: readonly T[], ownerCombatantId: string | null): T[] {
+  if (!ownerCombatantId) return [];
+  return rows
+    .filter(
+      (r) =>
+        r.active &&
+        r.turnMode === "in-owner-turn" &&
+        r.position === null &&
+        ownerRowOf(rows, r)?.id === ownerCombatantId,
+    )
+    .sort((a, b) => a.seq - b.seq);
 }
 
 // ---------- health band (FR-CBT-26) ----------
@@ -72,12 +165,21 @@ export function healthBand(hpCurrent: number, hpMax: number): HealthBand {
 
 export interface TurnRow {
   id: string;
-  position: number;
+  /** Null = no turn of its own (an `in-owner-turn` companion, FR-CBT-107). */
+  position: number | null;
   kind: CombatantKind;
   removed: boolean;
   hpCurrent: number | null;
   initiative: number | null;
+  /** Sprint 6 (FR-CBT-108): companions acting with their owner never count as missing. */
+  turnMode?: TurnMode | null;
 }
+
+/** Rows with a turn of their own, in turn order. */
+const turnOrder = <T extends TurnRow>(rows: readonly T[]) =>
+  rows
+    .filter((r): r is T & { position: number } => r.position !== null)
+    .sort((a, b) => a.position - b.position);
 
 /** Not removed and not a monster at 0 HP (PCs at 0 keep turns, #139 P14). */
 export const eligible = (r: TurnRow) => !r.removed && !(r.kind === "monster" && r.hpCurrent === 0);
@@ -92,11 +194,18 @@ export function stepTurn(
   turnId: string | null,
   direction: "next" | "prev",
 ): TurnStep {
-  const order = [...rows].sort((a, b) => a.position - b.position);
+  const order = turnOrder(rows);
   const ok = order.filter(eligible);
   if (round === 0) {
     if (direction === "prev") return { ok: false, message: "Combat has not started" };
-    const missing = order.filter((r) => !r.removed && r.initiative === null).length;
+    // FR-CBT-108: `after-owner` / `in-owner-turn` companions use their owner's number.
+    const missing = order.filter(
+      (r) =>
+        !r.removed &&
+        r.initiative === null &&
+        r.turnMode !== "after-owner" &&
+        r.turnMode !== "in-owner-turn",
+    ).length;
     if (missing > 0) return { ok: false, message: `${missing} without initiative` };
     const first = ok[0];
     if (!first) return { ok: false, message: "No one can act" };
@@ -154,7 +263,7 @@ export function skippedOnStep<T extends TurnRow & { name: string }>(
 ): { names: string[]; round: number | null } | null {
   const step = stepTurn(rows, round, turnId, direction);
   if (!step.ok) return null;
-  const order = [...rows].sort((a, b) => a.position - b.position);
+  const order = turnOrder(rows);
   const n = order.length;
   const from = round === 0 ? -1 : order.findIndex((r) => r.id === turnId);
   const d = direction === "next" ? 1 : -1;

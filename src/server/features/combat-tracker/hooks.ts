@@ -3,7 +3,7 @@
 // changed for the caller's event and never emit.
 
 import { MOVED_FT_MAX } from "@shared/combat-tracker/schemas";
-import type { EntityRecord } from "@shared/entities/schemas";
+import { companionCard, type EntityRecord } from "@shared/entities/schemas";
 import { distanceFt } from "@shared/scene-tools/geometry";
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import { and, eq } from "drizzle-orm";
@@ -114,7 +114,8 @@ function trailHook(env: TokenHookEnv, before: TokenRecord, after: TokenRecord): 
  * FR-CBT-06 / -67: active monster combatants of the definition whose `hpMax` equals the old
  * definition's (average HP) take the new `hpMax`; rolled ones keep theirs. `hpCurrent` = new max
  * if it equalled the old, else clamped. Active combatants of the definition still
- * showing the old portrait take the new one (gate I23).
+ * showing the old portrait take the new one (gate I23). Sprint 6 (FR-CBT-117): a companion's
+ * `card` is re-copied from the new stat block, keeping its row ids (`companionCard`).
  */
 export function combatantDefinitionHook(
   env: HookEnv,
@@ -139,6 +140,10 @@ export function combatantDefinitionHook(
     if (c.kind === "monster" && newMax !== null && c.hpMax === oldMax && oldMax !== newMax) {
       set.hpMax = newMax;
       set.hpCurrent = c.hpCurrent === c.hpMax ? newMax : Math.min(c.hpCurrent ?? 0, newMax);
+    }
+    if (c.card !== null) {
+      const card = companionCard(after.statBlock, () => env.ctx.ids.next(), c.card);
+      if (JSON.stringify(card) !== JSON.stringify(c.card)) set.card = card;
     }
     if (Object.keys(set).length > 0) {
       env.tx.update(combatant).set(set).where(eq(combatant.id, c.id)).run();

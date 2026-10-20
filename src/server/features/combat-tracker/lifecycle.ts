@@ -9,7 +9,12 @@ import {
   type Side,
   StartInput,
 } from "@shared/combat-tracker/schemas";
-import { type DefinitionRecord, entityNameKey } from "@shared/entities/schemas";
+import {
+  companionCard,
+  type DefinitionRecord,
+  entityNameKey,
+  type MonsterRecord,
+} from "@shared/entities/schemas";
 import { EncounterEnded, EncounterStarted } from "@shared/events/combat-tracker";
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
@@ -17,10 +22,13 @@ import { conflict, invalid } from "../../commands/errors";
 import { combatant, combatantSeqNext, creatureSheet, encounter, entity } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { resolveDefinition } from "../entities/commands";
+import { syncPetPresence } from "../entities/pet-presence";
+import { getRow, toEntityRecord } from "../entities/rows";
 import { dismissForEncounter } from "../notifications";
 import { getScene, sceneTokens } from "../scenes-map/rows";
 import { clearTrails } from "../scenes-map/trail";
 import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
+import { companionsAtEnd } from "./companions";
 import { rollInitiativeFor } from "./initiative";
 import { monsterHp, TokenPlacer } from "./join";
 import { rerank } from "./ranks";
@@ -64,8 +72,43 @@ export function partyOf(env: Pick<CommandEnv, "tx">, cid: string, ids: string[] 
     });
 }
 
-/** `side`: the entry's (FR-CBT-98); null = the kind's default (PCs). */
-type StartSlot = BindSlot & { def: DefinitionRecord | null; hpMode: HpMode; side: Side | null };
+/**
+ * `side`: the entry's (FR-CBT-98); null = the kind's default (PCs). `pet` (sprint 6, FR-CBT-109):
+ * the pet joining with its owner (kept HP, owner copies, mode, card).
+ */
+type StartSlot = BindSlot & {
+  def: DefinitionRecord | null;
+  hpMode: HpMode;
+  side: Side | null;
+  pet?: MonsterRecord;
+};
+
+/**
+ * FR-CBT-109: `petIds` must be pets (campaign monsters with `companionOf`) of joining PCs, else
+ * `invalid`; returned in the given order.
+ */
+function startPets(
+  env: Pick<CommandEnv, "tx">,
+  cid: string,
+  petIds: readonly string[],
+  joining: ReadonlySet<string>,
+): MonsterRecord[] {
+  return petIds.map((id, i) => {
+    const row = getRow(env.tx, id);
+    const pet = row && row.campaignId === cid ? toEntityRecord(row) : null;
+    if (
+      pet?.kind !== "monster" ||
+      pet.companionOf === null ||
+      !joining.has(pet.companionOf) ||
+      petIds.indexOf(id) !== i
+    ) {
+      throw invalid("Only pets of joining characters can join", [
+        { path: ["petIds", i], message: "Not a pet of a joining character" },
+      ]);
+    }
+    return pet;
+  });
+}
 
 /**
  * FR-CBT-07 / -08, sprint 2 FR-CBT-64–66: party PCs (minus `excludeCharacterIds`) by name, then
@@ -77,7 +120,7 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
   defineCommand({
     name: CBT_INTENTS.start,
     input: StartInput,
-    execute({ encounterId, sceneId, at, excludeCharacterIds }, env): void {
+    execute({ encounterId, sceneId, at, excludeCharacterIds, petIds }, env): void {
       const { tx, ctx } = env;
       const cid = campaignOf(env.actor);
       const before = getEncounter(tx, cid, encounterId);
@@ -108,6 +151,8 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
           side: null,
         });
       }
+      const joining = new Set(slots.map((sl) => sl.entityId));
+      const pets = startPets(env, cid, petIds ?? [], joining);
       for (const e of entriesOf(tx, before)) {
         const def = resolveDefinition(env, e.definitionId);
         for (let i = 0; i < e.quantity; i++) {
@@ -122,6 +167,19 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
             side: e.side === "ally" ? "ally" : null,
           });
         }
+      }
+      // FR-CBT-109 (sprint 6): pets after the entries; each binds its token or joins token-less.
+      for (const pet of pets) {
+        slots.push({
+          kind: "monster",
+          entityId: pet.id,
+          name: pet.name,
+          portraitAssetId: pet.portraitAssetId,
+          def: null,
+          hpMode: "average",
+          side: "ally",
+          pet,
+        });
       }
       const placer = new TokenPlacer(env, scene, at);
       // FR-FOG-14: a combatant's hidden copy = the token's `hidden` or fog-hidden.
@@ -145,10 +203,18 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
       bindings.forEach((b, i) => {
         const slot = slots[i] as StartSlot;
         let hp: number | null = null;
+        let hpMax: number | null = null;
         if (slot.def) {
           const r = monsterHp(env, slot.def, slot.hpMode, b.name, encounterId);
           hp = r.hp;
+          hpMax = r.hp;
           if (r.entry) hpEntries.push(r.entry);
+        }
+        const pet = slot.pet;
+        if (pet) {
+          // FR-CBT-109: the pet's kept HP; its stat block's max.
+          hpMax = pet.statBlock.hpMax;
+          hp = Math.min(pet.hpCurrent ?? hpMax, hpMax);
         }
         tx.insert(combatant)
           .values({
@@ -169,14 +235,26 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
             position: i + 1,
             playerPosition: null,
             hpCurrent: hp,
-            hpMax: hp,
+            hpMax,
             side: slot.side,
             publicSide: slot.side,
+            ...(pet
+              ? {
+                  ownerCharacterId: pet.companionOf,
+                  ownerPlayerId: pet.ownerPlayerId,
+                  turnMode: pet.turnMode ?? "after-owner",
+                  pet: true,
+                  card: companionCard(pet.statBlock, () => ctx.ids.next()),
+                }
+              : {}),
           })
           .run();
       });
       // FR-CBT-64: monsters roll initiative in Start's transaction, so Initiative opens ranked.
-      const monsters = combatantsOf(tx, encounterId).filter((c) => c.kind === "monster");
+      // FR-CBT-108: companions acting with their owner use the owner's number (no roll).
+      const monsters = combatantsOf(tx, encounterId).filter(
+        (c) => c.kind === "monster" && (c.turnMode === null || c.turnMode === "own"),
+      );
       const init = rollInitiativeFor(env, monsters, encounterId, { mode: "normal" });
       rerank(tx, encounterId);
       const now = ctx.clock.iso();
@@ -201,6 +279,8 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
         ...rows.map((r) => combatantChange(null, r)),
         ...hpEntries,
         ...init.entries,
+        // FR-ENT-37: a joining pet is present now (other players get its redacted row).
+        ...syncPetPresence(env, cid, { petIds: pets.map((p) => p.id) }),
       ];
       env.emit({
         type: EncounterStarted.type,
@@ -237,6 +317,8 @@ export const endCommandWith = (hooks: CombatRuleHooks) =>
         ...rows.map((r) => combatantChange(r, { ...r, active: false })),
         // FR-CBT-97: End clears the trails.
         ...(before.sceneId ? clearTrails(env, before.sceneId) : []),
+        // FR-CBT-113 (sprint 6): pets' HP written back, summons' tokens deleted (1b).
+        ...companionsAtEnd(env, rows),
       ];
       env.emit({ type: EncounterEnded.type, campaignId: cid, payload: { encounterId }, changes });
       changes.push(...hooks.run("ended", env, after, { combatantIds: rows.map((r) => r.id) }));
