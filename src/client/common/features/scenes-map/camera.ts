@@ -804,13 +804,26 @@ export type CameraMode = "fitted" | "moved";
 
 /**
  * What can happen to the camera; window, token and snapshot changes are not here. `resize` = a
- * browser viewport resize, settled (FR-MAP-47).
+ * browser viewport resize, settled (FR-MAP-47); `reveal` = newly drawn tokens off-screen or under
+ * an obstacle (FR-MAP-82, players).
  */
-export type CameraEvent = "open" | "fit" | "appearance" | "resize" | "pan" | "zoom" | "pull";
+export type CameraEvent =
+  | "open"
+  | "fit"
+  | "appearance"
+  | "resize"
+  | "reveal"
+  | "pan"
+  | "zoom"
+  | "pull";
+
+/** `data-fit-reason`: the last fit's cause (FR-MAP-82). */
+export type FitReason = "open" | "fit" | "appearance" | "resize" | "reveal";
 
 /**
- * FR-MAP-44/45/47 triggers: a scene open and the Fit button always fit; an appearance or a
- * viewport resize refits only while `fitted`; pan, wheel zoom and pull mark the camera `moved`.
+ * FR-MAP-44/45/47/82 triggers: a scene open and the Fit button always fit; an appearance, a
+ * viewport resize or a reveal refits only while `fitted`; pan, wheel zoom and pull mark the
+ * camera `moved`.
  */
 export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; fit: boolean } {
   switch (e) {
@@ -819,6 +832,7 @@ export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; 
       return { mode: "fitted", fit: true };
     case "appearance":
     case "resize":
+    case "reveal":
       return { mode, fit: mode === "fitted" };
     default:
       return { mode: "moved", fit: false };
@@ -866,6 +880,91 @@ export function createResizeRefit(refit: () => void, dragging: () => boolean, ti
       if (handle !== null) timers.clear(handle);
       handle = null;
       afterDrop = false;
+    },
+  };
+}
+
+/** FR-MAP-82: reveals within this long coalesce into one refit (the last frame's content). */
+export const REVEAL_REFIT_MS = 1000;
+
+/** A token this client draws: its id and footprint (map px). */
+export interface DrawnToken {
+  id: string;
+  box: Box;
+}
+
+/** FR-MAP-82 is the players' (rulings-b #18): the DM's camera never refits on reveals. */
+export const refitsOnReveal = (client: "dm" | "player") => client === "player";
+
+/**
+ * FR-MAP-82 trigger (players): a frame made tokens newly drawn (ids not in `prevDrawn`) and at
+ * least one of their footprints lies outside `area` or under an obstacle at `cam`, while the
+ * camera is `fitted`. Tokens already drawn, moving or leaving sight never count.
+ */
+export function revealRefit(
+  prevDrawn: ReadonlySet<string>,
+  nextDrawn: readonly DrawnToken[],
+  cam: Camera,
+  obstacles: readonly Box[],
+  area: Box,
+  mode: CameraMode,
+): boolean {
+  if (mode !== "fitted") return false;
+  return nextDrawn.some((t) => !prevDrawn.has(t.id) && !allClear(cam, [t.box], obstacles, area));
+}
+
+/**
+ * FR-MAP-82 timing: `reveal()` arms one refit `REVEAL_REFIT_MS` later (later reveals ride along,
+ * so a burst refits once with the last frame's content). The user wins: `gesture()` (a pan or zoom
+ * gesture's start; the caller marks the camera `moved`) cancels it; `press()` (a token or a tool
+ * under the pointer) cancels it and `release()` (the drop) re-arms it; reveals while pressed wait
+ * for the release. `refit` applies the `reveal` camera event, so `moved` never refits.
+ */
+export function createRevealRefit(refit: () => void, timers = realTimers) {
+  let handle: unknown = null;
+  let pressing = false;
+  let deferred = false;
+  const clear = () => {
+    if (handle !== null) timers.clear(handle);
+    handle = null;
+  };
+  const arm = () => {
+    if (handle !== null) return;
+    handle = timers.set(() => {
+      handle = null;
+      refit();
+    }, REVEAL_REFIT_MS);
+  };
+  return {
+    reveal() {
+      if (pressing) deferred = true;
+      else arm();
+    },
+    gesture() {
+      clear();
+      deferred = false;
+    },
+    press() {
+      pressing = true;
+      if (handle === null) return;
+      clear();
+      deferred = true;
+    },
+    release() {
+      if (!pressing) return;
+      pressing = false;
+      if (!deferred) return;
+      deferred = false;
+      arm();
+    },
+    /** A refit is armed or waits for a release. */
+    get pending() {
+      return handle !== null || deferred;
+    },
+    dispose() {
+      clear();
+      pressing = false;
+      deferred = false;
     },
   };
 }

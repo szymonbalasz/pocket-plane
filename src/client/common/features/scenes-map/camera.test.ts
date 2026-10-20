@@ -13,6 +13,7 @@ import {
   contentBox,
   createAppearanceRefit,
   createResizeRefit,
+  createRevealRefit,
   FIT_MARGIN,
   FIT_MIN_CELL_PX,
   fitCamera,
@@ -23,6 +24,9 @@ import {
   PCS_PAN_MAX_TOKENS,
   pcsPan,
   RESIZE_REFIT_MS,
+  REVEAL_REFIT_MS,
+  refitsOnReveal,
+  revealRefit,
   type Timers,
   visibleArea,
   ZOOM_MAX,
@@ -991,6 +995,165 @@ describe("FR-MAP-81 pcs keeps the top row (pcsPan)", () => {
     expect(allClear(fit, [pc], [], visibleArea(vp))).toBe(true);
     const top = footprintBox([tok(0, 0)], GRID) as Box;
     expect(screen(fit, top).y).toBeGreaterThanOrEqual(TOP_BAR_H + FIT_MARGIN - 1e-6);
+  });
+});
+
+describe("FR-MAP-82 reveal refit", () => {
+  const box = (x: number, y: number, w: number, h: number) => ({ x, y, w, h });
+  /** Player at 1280×800: the sheet (948, 60, 320 × 418) and the toast corner as obstacles. */
+  const area = box(84, 64, 1180, 656);
+  const sheet = box(948, 60, 320, 418);
+  const obstacles = [sheet];
+  const cam = { x: 84, y: 64, scale: 1 };
+  const drawn = (id: string, x: number, y: number) => ({ id, box: box(x, y, 70, 70) });
+  const before = [drawn("mira", 0, 0), drawn("thorn", 140, 0)];
+  const seen = new Set(before.map((t) => t.id));
+
+  /** A player canvas stand-in: the camera mode, the fits it ran (clock ms), the reveal timing. */
+  function rig(mode: CameraMode = "fitted") {
+    const clock = fakeTimers();
+    const state = { mode, fits: [] as number[] };
+    const r = createRevealRefit(() => {
+      const next = cameraOn(state.mode, "reveal");
+      state.mode = next.mode;
+      if (next.fit) state.fits.push(clock.now());
+    }, clock.timers);
+    /** A frame drew `next`: the trigger, then the timing (as MapCanvas does). */
+    const frame = (next: readonly { id: string; box: Box }[], prev = seen) => {
+      if (revealRefit(prev, next, cam, obstacles, area, state.mode)) r.reveal();
+    };
+    /** A pan or zoom gesture starts: moved now, the pending refit cancelled. */
+    const gesture = (e: "pan" | "zoom") => {
+      r.gesture();
+      state.mode = cameraOn(state.mode, e).mode;
+    };
+    return { clock, state, r, frame, gesture };
+  }
+
+  test("FR-MAP-82 reveal refit: a new token under the sheet while fitted → one refit, the camera stays fitted; a new token on screen and clear → none", () => {
+    // Goblin at map x 900 → screen 984: under the sheet.
+    expect(
+      revealRefit(seen, [...before, drawn("goblin", 900, 100)], cam, obstacles, area, "fitted"),
+    ).toBe(true);
+    // Off-screen (right of the area) counts too.
+    expect(
+      revealRefit(seen, [...before, drawn("ogre", 1400, 500)], cam, obstacles, area, "fitted"),
+    ).toBe(true);
+    // On screen, clear of every obstacle.
+    expect(
+      revealRefit(seen, [...before, drawn("wolf", 300, 300)], cam, obstacles, area, "fitted"),
+    ).toBe(false);
+    const { clock, state, frame } = rig();
+    frame([...before, drawn("goblin", 900, 100)]);
+    expect(state.fits).toEqual([]);
+    clock.advance(REVEAL_REFIT_MS);
+    expect(state.fits).toEqual([REVEAL_REFIT_MS]);
+    expect(state.mode).toBe("fitted");
+    clock.advance(5000);
+    expect(state.fits.length).toBe(1);
+  });
+
+  test("FR-MAP-82 reveal refit: moved → none; a token leaving sight, moving or already drawn → none", () => {
+    expect(
+      revealRefit(seen, [...before, drawn("goblin", 900, 100)], cam, obstacles, area, "moved"),
+    ).toBe(false);
+    // Thorn leaves sight.
+    expect(revealRefit(seen, [drawn("mira", 0, 0)], cam, obstacles, area, "fitted")).toBe(false);
+    // Thorn moves under the sheet: already drawn.
+    expect(
+      revealRefit(
+        seen,
+        [drawn("mira", 0, 0), drawn("thorn", 900, 0)],
+        cam,
+        obstacles,
+        area,
+        "fitted",
+      ),
+    ).toBe(false);
+  });
+
+  test("FR-MAP-82 reveal refit: two reveals 300 ms apart → one refit (the last frame's content)", () => {
+    const { clock, state, frame } = rig();
+    frame([...before, drawn("goblin", 900, 100)]);
+    clock.advance(300);
+    const later = new Set([...seen, "goblin"]);
+    frame([...before, drawn("goblin", 900, 100), drawn("goblin-2", 950, 200)], later);
+    clock.advance(5000);
+    expect(state.fits).toEqual([REVEAL_REFIT_MS]);
+  });
+
+  test("FR-MAP-82 reveal refit: a reconnect snapshot that brings tokens into sight → one refit; a plain reconnect (the same tokens) → none", () => {
+    const { clock, state, frame } = rig();
+    frame(before);
+    clock.advance(5000);
+    expect(state.fits).toEqual([]);
+    // The snapshot after a reconnect holds 3 tokens never drawn: one reveal.
+    frame([...before, drawn("a", 900, 100), drawn("b", 950, 200), drawn("c", 1000, 300)]);
+    clock.advance(10_000);
+    expect(state.fits).toEqual([5000 + REVEAL_REFIT_MS]);
+  });
+
+  test("FR-MAP-82 reveal refit: a token drag in progress → deferred to the drop; a token pointer-down while one is pending → cancelled, re-armed at pointer-up, the camera stays fitted", () => {
+    // A reveal mid-drag waits for the drop.
+    const a = rig();
+    a.r.press();
+    a.frame([...before, drawn("goblin", 900, 100)]);
+    a.clock.advance(5000);
+    expect(a.state.fits).toEqual([]);
+    a.r.release();
+    a.clock.advance(5000 + REVEAL_REFIT_MS);
+    expect(a.state.fits).toEqual([5000 + REVEAL_REFIT_MS]);
+    // A press while a refit is pending cancels it; the release re-arms it.
+    const b = rig();
+    b.frame([...before, drawn("goblin", 900, 100)]);
+    b.clock.advance(500);
+    b.r.press();
+    expect(b.r.pending).toBe(true);
+    b.clock.advance(2000);
+    expect(b.state.fits).toEqual([]);
+    b.r.release();
+    b.clock.advance(2000 + REVEAL_REFIT_MS);
+    expect(b.state.fits).toEqual([2000 + REVEAL_REFIT_MS]);
+    expect(b.state.mode).toBe("fitted");
+    // A release with nothing deferred arms nothing.
+    b.r.press();
+    b.r.release();
+    expect(b.r.pending).toBe(false);
+  });
+
+  test("FR-MAP-82 reveal refit: a pan pointer-down or a wheel inside the 1-s window → the pending refit cancelled and moved from the gesture's start; a reveal mid-pan → none", () => {
+    for (const e of ["pan", "zoom"] as const) {
+      const { clock, state, r, frame, gesture } = rig();
+      frame([...before, drawn("goblin", 900, 100)]);
+      clock.advance(400);
+      expect(r.pending).toBe(true);
+      gesture(e);
+      expect(state.mode).toBe("moved");
+      expect(r.pending).toBe(false);
+      // A reveal arriving mid-pan (the camera already moved) → nothing armed.
+      frame(
+        [...before, drawn("goblin", 900, 100), drawn("wolf", 1000, 300)],
+        new Set([...seen, "goblin"]),
+      );
+      expect(r.pending).toBe(false);
+      clock.advance(5000);
+      expect({ e, fits: state.fits }).toEqual({ e, fits: [] });
+    }
+  });
+
+  test("FR-MAP-82 reveal refit: players only (the DM client never refits on reveals); cameraOn('reveal') refits only while fitted", () => {
+    expect(refitsOnReveal("player")).toBe(true);
+    expect(refitsOnReveal("dm")).toBe(false);
+    expect(cameraOn("fitted", "reveal")).toEqual({ mode: "fitted", fit: true });
+    expect(cameraOn("moved", "reveal")).toEqual({ mode: "moved", fit: false });
+  });
+
+  test("FR-MAP-82 reveal refit: dispose cancels a pending refit", () => {
+    const { clock, state, r, frame } = rig();
+    frame([...before, drawn("goblin", 900, 100)]);
+    r.dispose();
+    clock.advance(5000);
+    expect(state.fits).toEqual([]);
   });
 });
 

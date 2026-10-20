@@ -1,8 +1,15 @@
 import { expect, test } from "bun:test";
 import { fitObstacles, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
+import type { Rect } from "@ui/features/play-shell/geometry";
 import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { keepOuts } from "@ui/features/play-shell/keep-outs";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
+import {
+  AMBUSH_GRID,
+  AMBUSH_MAP,
+  type AmbushToken,
+  SIM9_AMBUSH_PLAYER,
+} from "@ui/features/play-shell/test-cells";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
 import {
   allClear,
@@ -10,6 +17,7 @@ import {
   type FitToken,
   fitScene,
   footprintBox,
+  revealRefit,
   visibleArea,
 } from "@ui/features/scenes-map/camera";
 import { playerWindows } from "../../windows";
@@ -86,4 +94,62 @@ test("FR-MAP-59 every token visible: player sheet + Game log, then + Initiative 
     }
   }
   console.info(`FR-MAP-59 player cells: ${cells.join("; ")}`);
+});
+
+/**
+ * Sim-9 r02 → r05 as player 2 holds it (the running fight: sheet + Game log + Initiative): at the
+ * Show the PCs and Goblin 2; through the door and party vision 7 more come into sight (Goblin,
+ * the art tokens on rows 1–2, Wolf 2, Plain Brute; session-sim-9 notes r05).
+ */
+const R02 = ["Mira", "Thorn", "Brakka", "Goblin 2"];
+const R05 = ["Goblin", "Dragon", "Goblin 3", "Goblin A", "Goblin B", "Wolf 2", "Plain Brute"];
+
+test("FR-SHELL-60 player sheet 1280×800: fit on the 4 r02 tokens, 7 more come into sight → one reveal refit (FR-MAP-82) → no footprint under char.sheet or any window at 1280×800, 1280×720, 1440×900, 1600×900", () => {
+  const byName = (names: readonly string[]) =>
+    names.map((n) => SIM9_AMBUSH_PLAYER.find((t) => t.name === n) as AmbushToken);
+  const shown = byName(R02);
+  const later = [...shown, ...byName(R05)];
+  const refits: string[] = [];
+  for (const vp of SIZES) {
+    const all = new Set(playerWindows.defs.map((d) => d.kind));
+    const ws = defaultLayout(playerWindows, vp);
+    const windows = renderedWindowRects(ws, playerWindows, all, vp);
+    const sheet = renderedWindowRects(
+      ws.filter((w) => w.kind === "char.sheet"),
+      playerWindows,
+      all,
+      vp,
+    )[0];
+    expect(sheet).toBeDefined();
+    if (vp.w === 1280 && vp.h === 800) expect(sheet).toEqual({ x: 948, y: 60, w: 320, h: 418 });
+    const obstacles = fitObstacles("player", windows, keepOuts("player", vp), vp);
+    const room = {
+      areas: freeAreas(obstacles, vp),
+      obstacles,
+      windowsOnly: freeAreas(windows, vp),
+    };
+    const area = visibleArea(vp);
+    const first = fitScene(shown, AMBUSH_GRID, AMBUSH_MAP, vp, room);
+    const drawn = later.map((t) => ({ id: t.name, box: footprintBox([t], AMBUSH_GRID) as Rect }));
+    const prev = new Set(R02);
+    const refit = revealRefit(prev, drawn, first, obstacles, area, "fitted");
+    const cam = refit ? fitScene(later, AMBUSH_GRID, AMBUSH_MAP, vp, room) : first;
+    refits.push(`${vp.w}×${vp.h}: ${refit ? `refit ${Math.round(cam.scale * 70)} px` : "none"}`);
+    const check = "visible" in cam && cam.visible === "pcs" ? later.filter((t) => t.pc) : later;
+    for (const t of check) {
+      const p = footprintBox([t], AMBUSH_GRID) as Rect;
+      expect({
+        at: `${vp.w}×${vp.h}`,
+        t: t.name,
+        clear: allClear(cam, [p], obstacles, area),
+      }).toEqual({
+        at: `${vp.w}×${vp.h}`,
+        t: t.name,
+        clear: true,
+      });
+    }
+  }
+  // BL-42: at 1280×800 the newly seen tokens land under the sheet or off-screen → a refit.
+  expect(refits[1]).toMatch(/^1280×800: refit/);
+  console.info(`FR-SHELL-60 reveal refits: ${refits.join("; ")}`);
 });
