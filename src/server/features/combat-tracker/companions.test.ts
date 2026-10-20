@@ -385,9 +385,12 @@ describe("FR-CBT-106–108 turn modes and owner states", () => {
     );
     // Start rolled no initiative for the after-owner / in-owner-turn pets.
     expect([ob.initiative, t.combatantNamed("Drake").initiative]).toEqual([null, null]);
-    // An `own` companion lacking one is listed by "Roll monsters"; the others never.
-    t.setCompanion({ combatantId: ob.id, owner: t.owner(t.miraId, "own") });
-    expect(unrolledMonsters(t.combatants(t.enc.id)).map((c) => c.name)).toEqual(["Owlbear"]);
+    // An `own` companion lacking one is listed by "Roll monsters"; the others never. (With an
+    // owner number it keeps that one instead, FR-CBT-106: here a fresh start, Mira has none.)
+    const r0 = cpSetup({ start: false });
+    r0.run("cbt.start", { encounterId: r0.enc.id, sceneId: r0.sceneId, petIds: [r0.owlbear] });
+    r0.setCompanion({ combatantId: r0.id("Owlbear"), owner: r0.owner(r0.miraId, "own") });
+    expect(unrolledMonsters(r0.combatants(r0.enc.id)).map((c) => c.name)).toEqual(["Owlbear"]);
   });
 
   test("FR-CBT-106 mode change lasts for that fight", () => {

@@ -46,7 +46,12 @@ describe("FR-CBTX-57 hidden ally name whole", () => {
     // (4 + 62) − 4.
     expect(
       fitNameLine({ line: 300, name: lurker, marks: [eye], side: ally, end: moved, chips: true }),
-    ).toEqual({ nameWrap: false, split: false, room: 300 - 94 - 18 - 50 - 66 - 4 });
+    ).toEqual({
+      nameWrap: false,
+      marksWrap: false,
+      split: false,
+      room: 300 - 94 - 18 - 50 - 66 - 4,
+    });
     // Less than a "+N" chip's room left (the same at the 400 default) → the second line.
     expect(
       fitNameLine({
@@ -57,7 +62,7 @@ describe("FR-CBTX-57 hidden ally name whole", () => {
         end: moved,
         chips: true,
       }),
-    ).toEqual({ nameWrap: false, split: true, room: DM_400 - 46 - 4 });
+    ).toEqual({ nameWrap: false, marksWrap: false, split: true, room: DM_400 - 46 - 4 });
     // Without Moved (round 0) the chips get its room too; no side chip: its room as well.
     expect(
       fitNameLine({ line: DM_400, name: lurker, marks: [eye], side: ally, end: 0, chips: true })
@@ -76,11 +81,11 @@ describe("FR-CBTX-57 hidden ally name whole", () => {
     // c10: "Goblin Lur…" (86 / 83 px) — the row had no chips, so nothing made room for the name.
     expect(
       fitNameLine({ line: DM_400, name: lurker, marks: [eye], side: ally, end: 0, chips: false }),
-    ).toEqual({ nameWrap: false, split: false, room: 0 });
+    ).toEqual({ nameWrap: false, marksWrap: false, split: false, room: 0 });
     // 320: 94 + 4 + 14 + 4 + 46 = 162 > 126 → the side chip moves, the eye-off stays.
     expect(
       fitNameLine({ line: DM_320, name: lurker, marks: [eye], side: ally, end: 0, chips: false }),
-    ).toEqual({ nameWrap: false, split: true, room: 0 });
+    ).toEqual({ nameWrap: false, marksWrap: false, split: true, room: 0 });
     // Player rows (no eye-off: players never get hidden rows) at 280 / 240.
     expect(
       fitNameLine({ line: P_280, name: lurker, marks: [], side: ally, end: 0, chips: false }).split,
@@ -101,7 +106,12 @@ describe("FR-CBTX-57 hidden ally name whole", () => {
       end: 0,
       chips: true,
     });
-    expect(wide).toEqual({ nameWrap: false, split: false, room: DM_400 - 128 - 18 - 4 });
+    expect(wide).toEqual({
+      nameWrap: false,
+      marksWrap: false,
+      split: false,
+      room: DM_400 - 128 - 18 - 4,
+    });
     expect(wide.room).toBeGreaterThanOrEqual(MORE_W);
     // Less than a "+N" chip's room left → the chips take the second line, the whole line theirs.
     const tight = fitNameLine({
@@ -112,24 +122,29 @@ describe("FR-CBTX-57 hidden ally name whole", () => {
       end: 0,
       chips: true,
     });
-    expect(tight).toEqual({ nameWrap: false, split: true, room: 170 });
+    expect(tight).toEqual({ nameWrap: false, marksWrap: false, split: true, room: 170 });
     // With the Ally chip: the second line starts with it; the chips get the rest.
     expect(
       fitNameLine({ line: 170, name: elite, marks: [eye], side: ally, end: 0, chips: true }),
-    ).toEqual({ nameWrap: false, split: true, room: 170 - 46 - 4 });
+    ).toEqual({ nameWrap: false, marksWrap: false, split: true, room: 170 - 46 - 4 });
     // 40 characters (≈ 300 px) at the player's 280 → the name wraps; chips and side chip below.
     expect(
       fitNameLine({ line: P_280, name: 300, marks: [], side: ally, end: 0, chips: true }),
-    ).toEqual({ nameWrap: true, split: true, room: P_280 - 46 - 4 });
-    // DM 320 (sim-9 Ambush): "Elite Goblin Warrior" + eye-off (125 + 4 + 14) on a 138-px line
-    // wraps; Moved follows the chips on the second line, so their room leaves it out.
+    ).toEqual({ nameWrap: true, marksWrap: false, split: true, room: P_280 - 46 - 4 });
+    // DM 320 (sim-9 Ambush): "Elite Goblin Warrior" (125) fits its 138-px line but not with the
+    // eye-off (+ 4 + 14): the name keeps its line whole, the eye-off leads the second line, the
+    // chips get the rest of it (sprint 6 CP2 note 3: never break a word that fits).
     expect(
       fitNameLine({ line: 138, name: 125, marks: [eye], side: 0, end: 60, chips: true }),
-    ).toEqual({ nameWrap: true, split: true, room: 138 - 60 - 4 });
+    ).toEqual({ nameWrap: false, marksWrap: true, split: true, room: 138 - 18 });
+    // Wider than the line alone (150 on 138): it wraps; Moved follows the chips below.
+    expect(
+      fitNameLine({ line: 138, name: 150, marks: [eye], side: 0, end: 60, chips: true }),
+    ).toEqual({ nameWrap: true, marksWrap: false, split: true, room: 138 - 60 - 4 });
     // No chips, no side chip: nothing moves, the name still wraps rather than being cut.
     expect(
       fitNameLine({ line: P_280, name: 300, marks: [], side: 0, end: 0, chips: false }),
-    ).toEqual({ nameWrap: true, split: false, room: 0 });
+    ).toEqual({ nameWrap: true, marksWrap: false, split: false, room: 0 });
   });
 
   test("FR-CBTX-57 hidden ally name whole: the name has no truncation; it wraps (no ellipsis) only when wider than its line", () => {
@@ -141,7 +156,9 @@ describe("FR-CBTX-57 hidden ally name whole", () => {
     const two = render(
       <RowName name="Bartholomew the Exceedingly Long-Winded 3" testId="cbt-init-row-name" wrap />,
     );
-    expect(two).toContain("wrap-anywhere");
+    // Between words; a word broken only when it alone is wider than the line (CP2 note 3).
+    expect(two).toContain("wrap-break-word");
+    expect(two).not.toContain("wrap-anywhere");
     expect(two).not.toContain("truncate");
     // "Goblin 2": base and number in their own spans.
     expect(render(<RowName name="Goblin 2" testId="cbt-init-row-name" />)).toContain(
@@ -215,5 +232,56 @@ describe("FR-CBTX-58 trigger label never cut", () => {
       expect(html).toContain("opacity-70");
       expect(html).not.toContain("truncate");
     }
+  });
+});
+
+describe("FR-CBTX-57 a word that fits never breaks (sprint 6 CP2, walkthrough note 3)", () => {
+  // DM 320, the Owlbear's row indented under Mira: "Owlbear" (58) fits its 96-px line; with its
+  // mode icon (14), hidden eye (14), owner chip and Ally chip it doesn't.
+  const owlbear = 58;
+  const modeIcon = 14;
+  test("FR-CBTX-57 a word that fits never breaks: 'Owlbear' keeps its line; the marks, then the chips, move down", () => {
+    const fit = fitNameLine({
+      line: 66,
+      name: owlbear,
+      marks: [modeIcon],
+      side: 46 + 4 + 40,
+      end: 0,
+      chips: true,
+    });
+    expect(fit.nameWrap).toBe(false);
+    expect(fit.marksWrap).toBe(true);
+    expect(fit.split).toBe(true);
+    // The name still fits beside its marks on a wider line: nothing moves.
+    expect(
+      fitNameLine({ line: 96, name: owlbear, marks: [modeIcon], side: 0, end: 0, chips: false }),
+    ).toEqual({ nameWrap: false, marksWrap: false, split: false, room: 0 });
+    // Only a name wider than the line wraps.
+    expect(
+      fitNameLine({ line: 50, name: owlbear, marks: [], side: 0, end: 0, chips: false }),
+    ).toMatchObject({ nameWrap: true, marksWrap: false });
+  });
+
+  test("FR-CBTX-57 a word that fits never breaks: the markup — the unwrapped name is nowrap, a wrapping one breaks between words (overflow-wrap: break-word), the marks render once", () => {
+    const one = render(
+      <RowName name="Owlbear" testId="cbt-init-row-name" className="text-sm font-medium" />,
+    );
+    expect(one).toContain("whitespace-nowrap");
+    expect(one).not.toContain("wrap-anywhere");
+    const long = render(<RowName name="Owlbear of the Northern Wastes" testId="x" wrap />);
+    expect(long).toContain("wrap-break-word");
+    expect(long).not.toContain("wrap-anywhere");
+    expect(long).not.toContain("break-all");
+    // Static render (no measurement): the marks sit beside the name, once.
+    const line = render(
+      <NameLine
+        name="Owlbear"
+        testId="cbt-init-row-name"
+        marks={<span data-testid="mode">m</span>}
+        side={<span data-testid="owner">Mira</span>}
+      />,
+    );
+    expect(line.match(/data-testid="mode"/g)).toHaveLength(1);
+    expect(line.match(/data-name-marks/g)).toHaveLength(1);
   });
 });
