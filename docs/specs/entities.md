@@ -1,7 +1,7 @@
 ---
 title: Entities (core)
 prefix: ENT
-status: in-review
+status: complete
 owner: spec-images
 wave: 2
 phase: post-mvp-6

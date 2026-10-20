@@ -1,7 +1,7 @@
 ---
 title: Party board
 prefix: PARTY
-status: in-review
+status: complete
 owner: spec-images
 phase: post-mvp-6
 ---
@@ -491,7 +491,7 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-21 | *(S5)* Pasting an image into the handout text [12] | **Decided (#256): the image joins the handout's images (end of the strip); the text is unchanged** (FR-PARTY-39, FR-ASSET-22). Rejected: ~~B an inline image at the cursor (`![](asset:…)` in the body)~~, ~~C an attachment chip in the text~~. Same decision for the compendium homebrew text ([OQ-ASSET-13](assets-pipeline.md#15-open-questions)) | — | assets-pipeline, compendium |
 | OQ-PARTY-22 | *(S5)* **play-shell (track W)**: (a) one mount line for the player popup and one provider line for the DM uploader in the client roots; (b) the popup is a modal Dialog in FR-SHELL-01's dialog layer (over windows, chrome, toasts), under the dice layer; (c) removing `loot.log` from both window registries (append-only); (d) Party window default size with the Loot tab (440×560 today; the loot body was 440×472) | **Settled by seams S4:** (a) P1 and P2 each add one line to their client root, granted append-style, no wait on W1; (b) dialog layer, above windows and toasts, under the dice layer (W lists it in FR-SHELL-01); (c) the owning feature deletes its own line: P3 removes `loot.log` from both `windows.ts`; (d) Party stays 440×560 | no · settled | play-shell |
 | OQ-PARTY-23 | Glossary | **Add "Present (handout)": open a shared handout on chosen players' screens until each closes it ("show" stays the scenes' word, "Show to players"); amend "Party board" (+ Loot tab)**. Settled by seams S12 (integrator adds Present, Attachment, Asset library at the gate merge) | no · settled | glossary |
-| OQ-PARTY-28 | *(S6, BL-48)* How does the editor's Images row get above the fold? | **A Images block under the title, body below** (always visible, any window size; the DM writes text after picking images) / B body Textarea down to 4 rows, Images stay last (keeps text-first order; a long strip still pushes it down) / C `party.handout` opens taller (WF's default sizes: a cross-track change that still fails on small screens) | no · owner: spec-images | play-shell (C only) |
+| OQ-PARTY-28 | *(S6, BL-48)* How does the editor's Images row get above the fold? | **Decided (#288): A: Images block under the title, body below.** Options were: **A Images block under the title, body below** (always visible, any window size; the DM writes text after picking images) / B body Textarea down to 4 rows, Images stay last (keeps text-first order; a long strip still pushes it down) / C `party.handout` opens taller (WF's default sizes: a cross-track change that still fails on small screens) | — · decided (#288) | play-shell (C only) |
 
 ## 16. Out of scope
 
