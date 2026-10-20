@@ -3,7 +3,12 @@
 // in a fight send combat's intents as the companion), FR-CHARX-67 (what reaches whom),
 // FR-CHARX-63 / FR-ENT-38 (the owner edits a pet on the card; other players gain nothing).
 import { describe, expect, test } from "bun:test";
+import { attackLogKind } from "@shared/combat-tracker/log-kinds";
+import { DamageCardPayload } from "@shared/combat-tracker/schemas";
+import { lineText } from "@shared/dice-roll-log/kind-types";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
+import { eq } from "drizzle-orm";
+import { notification } from "../../db/schema";
 import { cpSetup } from "../combat-tracker/cp-testing";
 
 type Row = Record<string, unknown>;
@@ -226,5 +231,72 @@ describe("FR-CHARX-61 owner view names its pet", () => {
     expect(t.framesSince(n, t.p2V)).not.toContain(`"entityId":"${t.owlbear}"`);
     expect(t.framesSince(n, t.p1V)).toContain(`"entityId":"${t.owlbear}"`);
     expect(t.framesSince(n, t.p1V)).not.toContain(`"entityId":"${g2.entityId}"`);
+  });
+});
+
+describe("FR-CBT-114 outcome line totals only", () => {
+  test("FR-CBT-114 outcome line totals only (walkthrough 7): a companion's outcome lines carry no d20 face and none of its roll ids for other players; natural 20 / 1 / other read right for players and the DM", () => {
+    const t = cpSetup();
+    const ob = t.id("Owlbear");
+    const goblin = t.id("Goblin");
+    const cardOf = (id: string) =>
+      DamageCardPayload.parse(
+        t.s.db.select().from(notification).where(eq(notification.id, id)).get()?.payload,
+      );
+    const line = (e: { payload: unknown; dmPayload?: unknown }, dm: boolean) =>
+      lineText(
+        attackLogKind.formatLine({
+          actorName: "Owlbear",
+          payload: e.payload,
+          ...(dm ? { dmPayload: e.dmPayload } : {}),
+        } as never),
+      );
+    const cases = [
+      { face: 20, hit: true, path: "card", players: "— DM: critical hit!", dm: "(natural 20)" },
+      { face: 1, hit: true, path: "card", players: "— DM: hit.", dm: "(natural 1) vs AC" },
+      { face: 3, hit: true, path: "hit", players: "— DM: hit.", dm: "vs AC" },
+    ] as const;
+    for (const c of cases) {
+      const n = t.events.length;
+      const r = t.run<{ cardId: string; rollIds: string[] }>(
+        "cbt.attack",
+        { attackerId: ob, manual: [{ diceTotal: c.face }, { diceTotal: 9 }] },
+        t.p1,
+      );
+      const card = cardOf(r.cardId);
+      const total = card.toHit?.total as number;
+      if (c.path === "card") {
+        t.run("cbt.applyCard", {
+          cardId: r.cardId,
+          toHitTotal: total,
+          damageTotal: 14,
+          targets: [{ targetId: goblin, hit: c.hit, multiplier: "normal" }],
+          damageRollId: card.damage?.rollId as string,
+        });
+      } else {
+        t.run("cbt.applyHit", {
+          cardId: r.cardId,
+          toHitTotal: total,
+          targets: [{ targetId: goblin, hit: c.hit, multiplier: "normal" }],
+        });
+      }
+      const outcome = t.logRows().at(-1);
+      if (!outcome) throw new Error("no outcome line");
+      expect(outcome.public).toBe(true);
+      expect((outcome.payload as { toHit: { natural: unknown } }).toHit.natural).toBeNull();
+      expect((outcome.dmPayload as { toHitNatural?: number }).toHitNatural).toBe(c.face);
+      expect(outcome.rollIds as string[]).toEqual([]);
+      // Player-2's frames: the outcome line, but no face and none of the companion's roll ids.
+      const p2 = t.framesSince(n, t.p2V);
+      expect(p2).toContain(outcome.id);
+      expect(p2).not.toContain(`"natural":${c.face}`);
+      for (const id of r.rollIds) expect(p2).not.toContain(id);
+      // Players read the total and the DM's words; the DM keeps the face.
+      const players = line(outcome, false);
+      expect(players).toContain(`Owlbear attacks Goblin: ${total} ${c.players}`);
+      expect(players).not.toContain("natural");
+      expect(players).not.toContain("ruled");
+      expect(line(outcome, true)).toContain(c.dm);
+    }
   });
 });
