@@ -12,7 +12,7 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "check": "bun scripts/check.ts",
-    "bench": "bun test ./src/shared/fog-of-war/vision.bench.ts ./src/shared/fog-of-war/vision-s4.bench.ts ./src/shared/scene-tools/geometry.bench.ts ./src/shared/scenes-map/area.bench.ts ./src/shared/dice-extras/notation.bench.ts ./src/client/common/features/dice-extras/dice3d/settle.bench.ts ./src/server/features/scene-tools/guard.bench.ts ./src/server/features/compendium/search-s4.bench.ts ./src/client/common/features/scenes-map/camera.bench.ts ./src/client/common/features/play-shell/placement.bench.ts",
+    "bench": "bun test ./src/shared/fog-of-war/vision.bench.ts ./src/shared/fog-of-war/vision-s4.bench.ts ./src/shared/scene-tools/geometry.bench.ts ./src/shared/scenes-map/area.bench.ts ./src/shared/dice-extras/notation.bench.ts ./src/client/common/features/dice-extras/dice3d/settle.bench.ts ./src/server/features/scene-tools/guard.bench.ts ./src/server/features/compendium/search-s4.bench.ts ./src/client/common/features/scenes-map/camera.bench.ts ./src/client/common/features/play-shell/placement.bench.ts ./src/server/ws/snapshot-build.bench.ts",
     "e2e": "bun scripts/e2e.ts",
     "fixtures:reset": "bun scripts/fixtures.ts reset",
     "fixtures:load": "bun scripts/fixtures.ts load",
