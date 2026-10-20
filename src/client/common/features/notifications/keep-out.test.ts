@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dmStackPlacement, STACK_W } from "./keep-out";
+import { dmStackLefts, dmStackPlacement, STACK_W } from "./keep-out";
 
 describe("FR-NOTE-32 toast keep-out", () => {
   const top = 48 + 12 + 32 + 8;
@@ -45,7 +45,8 @@ describe("FR-NOTE-32 toast keep-out", () => {
       at.left < t.x + t.w && t.x < at.left + STACK_W && at.top < t.y + t.h && t.y < at.top + 190;
     expect(covers(wolf) || covers(goblin)).toBe(false);
     expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
-    expect(at.top).toBe(top);
+    // FR-NOTE-42: it moves down (below the goblin) at its home, not sideways.
+    expect(at).toEqual({ left: 560, top: goblin.y + goblin.h + 12 });
     // Nothing to avoid under the default spot → the default spot.
     expect(dmStackPlacement(vp, init, 190, STACK_W, [{ x: 100, y: 600, w: 50, h: 50 }])).toEqual({
       left: 560,
@@ -134,11 +135,12 @@ describe("FR-NOTE-32 sim-6 glitch 3: toasts keep off open windows' bodies", () =
     expect(at.top + h).toBeLessThanOrEqual(900 - 64);
   });
 
-  test("FR-NOTE-32 toast keep-out: a window under the default spot → beside it, not below its title bar", () => {
-    // The Notifications window dragged to the top centre: its bar is under the default spot.
+  test("FR-NOTE-32 toast keep-out: a window under the default spot → below it (FR-NOTE-42: never beside it)", () => {
+    // The Notifications window dragged to the top centre: its body is under the default spot.
     const notes = { x: 540, y: 60, w: 360, h: 480 };
     const at = dmStackPlacement(vp, init, 120, STACK_W, [], [notes]);
     expect(over(stack(at, 120), notes)).toBe(false);
+    expect(at).toEqual({ left: 560, top: 60 + 480 + 8 });
   });
 
   test("FR-NOTE-32 toast keep-out: no spot clear of the bodies → over a body, never a title bar", () => {
@@ -151,5 +153,157 @@ describe("FR-NOTE-32 sim-6 glitch 3: toasts keep off open windows' bodies", () =
     expect(over(r, wolf)).toBe(false);
     expect(at.top).toBeGreaterThanOrEqual(48 + 32);
     expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
+  });
+});
+
+// Sprint 6 (sim-9 a01, b01; OQ-NOTE-25 A, #288).
+type Box = { x: number; y: number; w: number; h: number };
+const hit = (a: Box, b: Box) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const rectOf = (p: { left: number; top: number }, h: number): Box => ({
+  x: p.left,
+  y: p.top,
+  w: STACK_W,
+  h,
+});
+const SIZES = [
+  { w: 1280, h: 720 },
+  { w: 1280, h: 800 },
+  { w: 1440, h: 900 },
+  { w: 1600, h: 900 },
+];
+// sim-9 at 1440×900: Initiative and the Game log by default; Compendium and Party from a01.
+const INIT = { x: 1028, y: 60, w: 400, h: 648 };
+const LOG = { x: 68, y: 584, w: 1150, h: 240 };
+const COMPENDIUM = { x: 164, y: 172, w: 344, h: 400 };
+const PARTY = { x: 576, y: 60, w: 440, h: 512 };
+const DRAGON = { x: 70, y: 100, w: 90, h: 90 };
+const GOBLIN_2 = { x: 300, y: 330, w: 45, h: 45 };
+/** The Fog bar wrapped at its home spot (1440×900, FR-FOG-58). */
+const FOG_BAR = { x: 62, y: 56, w: 472, h: 92 };
+
+describe("FR-NOTE-42 stack stays home", () => {
+  const vp = { w: 1440, h: 900 };
+
+  // a01: with windows open the summary (320 × 57) jumped to x 68, over the Dragon.
+  test("FR-NOTE-42 stack stays home: sim-9 a01 → the home (560), never x 68; moves down past Party instead of sideways", () => {
+    const windows = [LOG, COMPENDIUM, PARTY];
+    const at = dmStackPlacement(vp, INIT, 57, STACK_W, [GOBLIN_2], windows);
+    expect(at.left).toBe(560);
+    expect(hit(rectOf(at, 57), DRAGON)).toBe(false);
+    for (const w of windows) expect(hit(rectOf(at, 57), { ...w, h: 32 })).toBe(false);
+    // Without the Game log below it: below Party's body, still at the home.
+    const down = dmStackPlacement(vp, INIT, 57, STACK_W, [GOBLIN_2], [COMPENDIUM, PARTY]);
+    expect(down).toEqual({ left: 560, top: 60 + 512 + 8 });
+    // Two cards (300 high) no longer fit below Party: home, on Party's body, never beside it.
+    expect(dmStackPlacement(vp, INIT, 300, STACK_W, [GOBLIN_2], windows)).toEqual({
+      left: 560,
+      top: 100,
+    });
+  });
+
+  test("FR-NOTE-42 stack stays home: FR-NOTE-32 unchanged (shift left of Initiative, below it when no room)", () => {
+    const small = { w: 1024, h: 768 };
+    expect(dmStackPlacement(small, { x: 612, y: 60, w: 400, h: 600 }, 200)).toEqual({
+      left: 612 - 12 - STACK_W,
+      top: 100,
+    });
+    expect(dmStackPlacement(small, { x: 300, y: 60, w: 600, h: 500 }, 200)).toEqual({
+      left: 352,
+      top: 572,
+    });
+    // Initiative moved onto the home band, a window open: the shift is the only other left.
+    const moved = { x: 700, y: 60, w: 400, h: 648 };
+    expect(dmStackPlacement(vp, moved, 57, STACK_W, [], [COMPENDIUM])).toEqual({
+      left: 700 - 12 - STACK_W,
+      top: 100,
+    });
+  });
+
+  test("FR-NOTE-42 stack stays home: avoidTokens still ranks target-token cover first", () => {
+    // A target under the home top and a window body below it: off the token, onto the body.
+    const wolf = { x: 600, y: 120, w: 50, h: 50 };
+    const body = { x: 500, y: 150, w: 400, h: 300 };
+    const at = dmStackPlacement(vp, INIT, 57, STACK_W, [wolf], [body]);
+    expect(hit(rectOf(at, 57), wolf)).toBe(false);
+    expect(hit(rectOf(at, 57), { ...body, h: 32 })).toBe(false);
+    expect(at.left).toBe(560);
+  });
+
+  test("FR-NOTE-42 stack stays home: every chosen left ∈ {home, left-of-Initiative shift} at the four sizes", () => {
+    expect(SIZES.map((s) => dmStackLefts(s, null))).toEqual([[480], [480], [560], [640]]);
+    for (const size of SIZES) {
+      const home = (size.w - STACK_W) / 2;
+      for (const ix of [68, 300, 480, 600, 760, size.w - 412]) {
+        for (const iy of [60, 300]) {
+          const initiative = { x: ix, y: iy, w: 400, h: Math.min(648, size.h - 72 - iy) };
+          const lefts = dmStackLefts(size, initiative);
+          expect(lefts[0]).toBe(home);
+          for (const l of lefts) expect(l).toBeGreaterThanOrEqual(68);
+          for (const h of [57, 190, 330]) {
+            for (const windows of [[], [PARTY], [LOG, COMPENDIUM], [LOG, COMPENDIUM, PARTY]]) {
+              for (const avoid of [
+                [],
+                [DRAGON],
+                [GOBLIN_2, { x: home + 40, y: 110, w: 50, h: 50 }],
+              ]) {
+                for (const hard of [[], [FOG_BAR]]) {
+                  const at = dmStackPlacement(size, initiative, h, STACK_W, avoid, windows, hard);
+                  expect(lefts).toContain(at.left);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+});
+
+describe("FR-NOTE-43 never over a tool bar", () => {
+  const vp = { w: 1440, h: 900 };
+
+  test("FR-NOTE-43 never over a tool bar: Initiative moved to x 600 → the shifted stack drops below the bar (bar bottom + 8)", () => {
+    const init = { x: 600, y: 60, w: 400, h: 648 };
+    const at = dmStackPlacement(vp, init, 57, STACK_W, [], [], [FOG_BAR]);
+    expect(at).toEqual({ left: 600 - 12 - STACK_W, top: 56 + 92 + 8 });
+    expect(hit(rectOf(at, 57), FOG_BAR)).toBe(false);
+    // No bar: FR-NOTE-32's shift at the top row.
+    expect(dmStackPlacement(vp, init, 57)).toEqual({ left: 600 - 12 - STACK_W, top: 100 });
+    // With a window and a target token too: still off the bar.
+    const wolf = { x: 300, y: 200, w: 50, h: 50 };
+    const p = dmStackPlacement(vp, init, 57, STACK_W, [wolf], [LOG], [FOG_BAR]);
+    expect(hit(rectOf(p, 57), FOG_BAR)).toBe(false);
+    expect(hit(rectOf(p, 57), wolf)).toBe(false);
+  });
+
+  // b01: 6 of 16 Fog bar controls under the summary at 68..388 × 100..157.
+  test("FR-NOTE-43 never over a tool bar: sim-9 b01 (Scenes pushed to 546, Fog tool) → no overlap, at the home", () => {
+    const scenes = { x: 546, y: 61, w: 260, h: 440 };
+    for (const h of [57, 190]) {
+      const at = dmStackPlacement(vp, INIT, h, STACK_W, [GOBLIN_2], [LOG, scenes], [FOG_BAR]);
+      expect(hit(rectOf(at, h), FOG_BAR)).toBe(false);
+      expect(at.left).toBe(560);
+    }
+    // 1280×720: the bar (≤ 390 wide) ends before the home (480).
+    const small = { w: 1280, h: 720 };
+    const bar = { x: 62, y: 56, w: 390, h: 140 };
+    const init = { x: 868, y: 60, w: 400, h: 578 };
+    expect(dmStackPlacement(small, init, 57, STACK_W, [], [], [bar])).toEqual({
+      left: 480,
+      top: 100,
+    });
+  });
+
+  test("FR-NOTE-43 never over a tool bar: a hard region under the home top → below it, with nothing else to avoid", () => {
+    const wide = { x: 62, y: 56, w: 900, h: 92 };
+    expect(dmStackPlacement(vp, null, 57, STACK_W, [], [], [wide])).toEqual({
+      left: 560,
+      top: 56 + 92 + 8,
+    });
+    // Taller than the room: the top row, off the bar where it can be.
+    const corner = { x: 900, y: 56, w: 100, h: 50 };
+    const tall = dmStackPlacement(vp, null, 800, STACK_W, [], [], [corner]);
+    expect(hit(rectOf(tall, 800), corner)).toBe(false);
   });
 });
