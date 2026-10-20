@@ -9,7 +9,7 @@ import path from "node:path";
 import { gzipSync } from "node:zlib";
 
 const KB = 1024;
-/** The spike measured 3.6 KB; this build (incl. the Players panel Popover and the section) ≈ 4.7 KB. */
+/** The spike measured 3.6 KB; this build (incl. the Players panel Popover and the section) ≈ 4.8 KB. */
 const PICKER_MAX = 5 * KB;
 const OWN = ["ColorPicker.tsx", "color-picker.ts", "ColorSection.tsx"].map((f) =>
   path.join(import.meta.dir, f),
