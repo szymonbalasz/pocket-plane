@@ -1,6 +1,7 @@
 // Players panel: name, online dot, copy link, rename; add player (CAMP §7, FR-CAMP-12–15).
 // Under each player, their characters at a glance; a line opens the sheet (FR-CAMP-21/22, N3).
-// Colour swatches: the DM's own above the table, one per player row (FR-CAMP-27, sprint 5).
+// Colour swatches: the DM's own above the table, one per player row, each opening the colour
+// picker in a Popover (FR-CAMP-35).
 import {
   isLoopbackUrl,
   PlayerName,
@@ -22,7 +23,7 @@ import {
   TableCell,
   TableRow,
 } from "@ui/components/ui/primitives";
-import { ColorPopover } from "@ui/features/campaign-management/ColorPopover";
+import { ColorPickerPopover } from "@ui/features/campaign-management/ColorPicker";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { cn } from "@ui/lib/utils";
 import { onlineDot } from "@ui/sync/presence";
@@ -194,7 +195,7 @@ export function PlayersPanel() {
         {/* One 16 px line: two players' rows still fit the default window unscrolled. */}
         <div className="flex h-4 items-center gap-1.5 px-1 text-xs">
           Your colour (DM)
-          <ColorPopover target={null} testId="camp-color-dm" size={16} tip="Your colour (DM)" />
+          <ColorPickerPopover target={null} testId="camp-color-dm" tip="Your colour (DM)" />
         </div>
         {players.length === 0 ? (
           <p className="text-sm text-muted-foreground" data-testid="camp-players-empty">
@@ -211,11 +212,10 @@ export function PlayersPanel() {
                   <Fragment key={p.id}>
                     <TableRow data-testid="camp-player-row" data-record-id={p.id}>
                       <TableCell className="w-0 py-1 pr-0 pl-1">
-                        <ColorPopover
+                        <ColorPickerPopover
                           target={p.id}
                           testId="camp-player-color"
                           recordId={p.id}
-                          size={16}
                           tip={`${p.name}'s colour`}
                         />
                       </TableCell>
