@@ -761,6 +761,12 @@ describe("FR-CBT-112 Dismiss from the card (CP3)", () => {
     const summon = render(storeOf(P1, { entities: [mira], combatants: [feC] }), <CompanionCard />);
     expect(tagOf(summon, "cbt-companion-dismiss", ' data-record-id="c-fe"')).toBeTruthy();
     expect(isDisabled(tagOf(summon, "cbt-companion-dismiss"))).toBe(false);
+    // Walkthrough fix: right under the header (its confirm needs no scroll), before the stats.
+    expect(summon.indexOf('data-testid="cbt-companion-dismiss"')).toBeLessThan(
+      summon.indexOf('data-testid="charx-companion-ac"'),
+    );
+    // The name is never cut: no truncation, its line wraps.
+    expect(tagOf(summon, "charx-companion-name")).not.toContain("truncate");
     // player-1's Owlbear (a pet) in the fight: no Dismiss for the owner.
     const pet = render(
       storeOf(P1, { entities: [mira, owlPet], combatants: [owlC] }),

@@ -112,7 +112,7 @@ export const setCompanionCommand = defineCommand({
     const rows = combatantsOf(tx, enc.id);
     const encBefore = enc;
     const set: Partial<typeof combatant.$inferInsert> = {};
-    let action: "follows" | "release" | "hostile";
+    let action: "follows" | "mode" | "release" | "hostile";
     let lineOwner: string;
     let mode: TurnMode | null = null;
     if (owner === null) {
@@ -177,7 +177,9 @@ export const setCompanionCommand = defineCommand({
       // FR-CBT-105: companions are on the party's side, shown openly.
       if (before.ownerCharacterId === null)
         Object.assign(set, { side: "ally", publicSide: "ally" });
-      action = "follows";
+      // Same owner, new mode → "Owlbear now acts in Mira's turn" (walkthrough fix).
+      action =
+        before.ownerCharacterId === o.row.entityId && before.turnMode !== mode ? "mode" : "follows";
       lineOwner = o.name;
     }
     // FR-CBT-99 / -111: an explicit side is an open change (turn hostile: `enemy`).
@@ -193,7 +195,12 @@ export const setCompanionCommand = defineCommand({
       kind: LOG_KIND_COMPANION,
       category: "other",
       actorName: "DM",
-      payload: { action, name: after.name, ...(lineOwner ? { ownerName: lineOwner } : {}) },
+      payload: {
+        action,
+        name: after.name,
+        ...(lineOwner ? { ownerName: lineOwner } : {}),
+        ...(action === "mode" && mode ? { turnMode: mode } : {}),
+      },
       dmPayload: mode ? { turnMode: mode } : {},
       rollIds: [],
       encounterId: enc.id,

@@ -131,3 +131,17 @@ describe("FR-CBT-115 owner's turn alert", () => {
     expect(turnAlertFor({ ...turnFrame("owlbear"), changes: [] }, store)).toBeNull();
   });
 });
+
+describe("FR-CBT-107 'After Mira' on player rows (walkthrough fix)", () => {
+  test("FR-CBT-107 order per turn mode: an after-owner row says 'After Mira' for every player; own / in-turn rows don't", () => {
+    for (const viewer of ["p1", "p2"] as const) {
+      const html = as(viewer);
+      const owl = rowHtml(html, "cbt-init-row", "owlbear");
+      expect(owl).toMatch(
+        /data-testid="cbt-init-row-after" data-record-id="owlbear"[^>]*>After Mira</,
+      );
+      expect(rowHtml(html, "cbt-init-row", "fe3")).not.toContain("cbt-init-row-after");
+      expect(rowHtml(html, "cbt-init-row", "goblin")).not.toContain("cbt-init-row-after");
+    }
+  });
+});

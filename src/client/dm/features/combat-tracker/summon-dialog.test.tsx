@@ -75,6 +75,8 @@ describe("FR-CBT-118 Summon… dialog", () => {
     const html = dialog(concentrating(), "ch-thorn");
     expect(html).toContain('data-testid="cbt-summon-concentration"');
     expect(html).toContain("Linked to Thorn&#x27;s concentration (Conjure Elemental)");
+    // Integrator ruling (walkthrough): unticked by default; the DM ticks it.
+    expect(html).toMatch(/data-state="unchecked"[^>]*data-testid="cbt-summon-concentration"/);
     expect(dialog(concentrating(), "ch-mira")).not.toContain("cbt-summon-concentration");
     expect(concentrationOf(concentrating(), "ch-thorn")).toBe("Conjure Elemental");
     expect(concentrationOf(concentrating(), "ch-mira")).toBeNull();

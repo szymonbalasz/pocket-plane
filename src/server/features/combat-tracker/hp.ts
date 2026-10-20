@@ -355,7 +355,8 @@ export const applyCardWith = (hooks: ApplyHooks) =>
             : null;
         const logPayload: AttackLogPayload = {
           targetName: target.name,
-          attackName: p.attackName,
+          // FR-CBT-114 (walkthrough fix): a companion's attack name is DM (+ owner card) only.
+          ...(isCompanion(attacker) ? {} : { attackName: p.attackName }),
           damageType: p.damageType,
           // FR-CBT-114 (sprint 6, ADR-0056): a companion attacker's line keeps the total only.
           toHit: isCompanion(attacker) ? companionSafeToHit(lineToHit) : lineToHit,
@@ -380,6 +381,7 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           targetAc,
           // FR-CBT-114: a companion's d20 face (its payload's is null).
           ...(isCompanion(attacker) && lineToHit ? { toHitNatural: lineToHit.natural } : {}),
+          ...(isCompanion(attacker) ? { attackName: p.attackName } : {}),
           hitComputed,
           toHitRolled,
           damageRolled,

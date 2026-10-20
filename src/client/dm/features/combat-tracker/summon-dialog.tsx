@@ -179,7 +179,8 @@ export function SummonBody({
     turnMode: "after-owner",
     hpMode: "average",
     hidden: false,
-    linkConcentration: true,
+    // Integrator ruling (walkthrough): unticked; the DM ticks it (the PC may concentrate on Bless).
+    linkConcentration: false,
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

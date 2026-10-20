@@ -94,6 +94,9 @@ test("FR-CBT-110 FR-CBT-112 FR-CBT-114 FR-CBT-118 companions-e2e: Summon for Mir
   await expect(card.getByTestId("charx-companion-name")).toHaveText("Fire Elemental");
   await expect(card.getByTestId("charx-companion-owner")).toHaveText("Mira's summon");
   await expect(card.getByTestId("charx-companion-edit")).toHaveCount(0); // a summon
+  // Walkthrough fix: at the card's default 320 px the name is whole (never "Fire Elem…").
+  const name = card.getByTestId("charx-companion-name");
+  expect(await name.evaluate((n) => n.scrollWidth <= n.clientWidth + 0.5)).toBe(true);
   const touch = card.getByTestId("charx-companion-attack").filter({ hasText: "Touch" });
   await touch.locator('[data-testid="charx-companion-roll"][data-value="attack"]').click();
   const pending = init.getByTestId("cbt-init-card").filter({ hasText: "Fire Elemental" });
@@ -116,7 +119,15 @@ test("FR-CBT-110 FR-CBT-112 FR-CBT-114 FR-CBT-118 companions-e2e: Summon for Mir
   await expect(card.getByTestId("cbt-companion-dismiss-text")).toContainText(
     "Dismiss Fire Elemental?",
   );
-  await card.getByTestId("cbt-companion-dismiss-confirm").click();
+  // Walkthrough fix: the confirm shows inside the card without scrolling.
+  const confirm = card.getByTestId("cbt-companion-dismiss-confirm");
+  const inside = async () => {
+    const body = await card.boundingBox();
+    const box = await confirm.boundingBox();
+    return !!body && !!box && box.y >= body.y && box.y + box.height <= body.y + body.height + 0.5;
+  };
+  expect(await inside()).toBe(true);
+  await confirm.click();
   for (const w of [init, i1, i2]) await expect(row(w, fe)).toHaveCount(0);
   await expect(card.getByTestId("charx-companion-gone")).toContainText("No longer your companion");
 

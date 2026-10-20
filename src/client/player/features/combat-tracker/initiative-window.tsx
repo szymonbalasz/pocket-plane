@@ -23,7 +23,12 @@ import {
 import { DeathBadge, DeathPips, EffectChips, NameLine } from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
 import { useOpenCompanionCard } from "@ui/features/combat-tracker/companion-card-request";
-import { companionLayout, ModeIcon, OwnerChip } from "@ui/features/combat-tracker/companions";
+import {
+  companionLayout,
+  ModeIcon,
+  modeLabel,
+  OwnerChip,
+} from "@ui/features/combat-tracker/companions";
 import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
@@ -123,6 +128,16 @@ function PlayerRowMain({
             testId="cbtx-init-row-effect"
           />
         </NameLine>
+        {/* FR-CBT-107 (walkthrough fix): an `after-owner` row says whose turn it follows. */}
+        {companion && !line && c.turnMode === "after-owner" && (
+          <span
+            data-testid="cbt-init-row-after"
+            data-record-id={c.id}
+            className="text-xs text-muted-foreground"
+          >
+            {modeLabel("after-owner", ownerName)}
+          </span>
+        )}
         {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down; on
             its own line under the name. */}
         {death && (

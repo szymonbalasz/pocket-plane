@@ -117,8 +117,9 @@ function Header({ e, picker, edit }: { e: CompanionEntry; picker: ReactNode; edi
     <div className="flex items-start gap-2">
       <Portrait e={e} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-1.5">
-          <span data-testid="charx-companion-name" className="truncate font-semibold">
+        {/* Walkthrough fix: the name is never cut ("Owlb…" at 320 px); it and the chips wrap. */}
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+          <span data-testid="charx-companion-name" className="min-w-0 break-words font-semibold">
             {e.name}
           </span>
           {e.combatant && (
@@ -617,6 +618,15 @@ export function CompanionCardView({
           ) : null
         }
       />
+      {/* FR-CBT-112: right under the header, so its confirm shows without scrolling. */}
+      {canDismissFromCard(e, client) && !isEditing && (
+        <DismissRow
+          e={e}
+          live={live}
+          // DM: the turn; players: the turn they're shown (FR-CBT-31).
+          turnCombatantId={enc?.turnCombatantId ?? enc?.playerTurnCombatantId ?? null}
+        />
+      )}
       {e.combatant && <Conditions c={e.combatant} round={enc?.round ?? 0} dm={dm} />}
       {e.petId && isEditing ? (
         <Stats e={e} editing petId={e.petId} />
@@ -630,14 +640,6 @@ export function CompanionCardView({
         </span>
       )}
       <Attacks e={e} pet={pet} editing={isEditing} live={live} />
-      {canDismissFromCard(e, client) && !isEditing && (
-        <DismissRow
-          e={e}
-          live={live}
-          // DM: the turn; players: the turn they're shown (FR-CBT-31).
-          turnCombatantId={enc?.turnCombatantId ?? enc?.playerTurnCombatantId ?? null}
-        />
-      )}
       {client === "dm" && npcSheet && e.definitionId && (
         <div className="flex justify-end">
           <Button

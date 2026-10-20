@@ -2160,6 +2160,8 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-110, -112,
 | `combatant.summoned` | + bool, NOT NULL default false (push-safe `ADD COLUMN`, like `pet`); DM only | made by `cbt.summon`; its bound token is deleted at Dismiss / End. A companion made with `cbt.setCompanion` (charmed goblin) keeps its token, owner cleared | FR-CBT-110, -112, -113 |
 | `combatant.concentration_effect_id` | now written | `cbt.summon {linkConcentration}` = the owner's active concentration; cleared (null) by the effect hook when that effect ends | FR-CBT-110, -120 |
 | Notification kind `cbt-summon-concentration` *(new)* | payload `{encounterId, ownerCharacterId, effectId, combatantIds}`, resolution `{outcome}` | one per owner + ended concentration; resolved `dismissed` (its action), `hostile` / `gone` (none of its summons left active with the owner); dismissed at End | FR-CBT-120 |
+| `cbt.attack` line payload (companion attacker) | `attackName` absent; `dmPayload.attackName` set | other players get totals only, never the attack's name | FR-CBT-114 |
+| Log-entry kind `cbt.companion` | + action `mode`, payload `turnMode?` | a mode change with the same owner | FR-CBT-122 |
 
 - **Derived (not stored):** a card's summons left = its `combatantIds` still active with `ownerCharacterId` = the card's owner.
 - **Persisted runtime state:** none new beyond the column and the notification rows.

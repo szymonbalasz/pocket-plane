@@ -84,7 +84,8 @@ export const applyHitCommand = defineCommand({
       };
       const payload: AttackLogPayload = {
         targetName: target.name,
-        attackName: p.attackName,
+        // FR-CBT-114 (walkthrough fix): a companion's attack name is DM (+ owner card) only.
+        ...(isCompanion(attacker) ? {} : { attackName: p.attackName }),
         damageType: p.damageType,
         // FR-CBT-114 (sprint 6): a companion attacker's line keeps the total only (ADR-0056).
         toHit: isCompanion(attacker) ? companionSafeToHit(lineToHit) : lineToHit,
@@ -97,7 +98,9 @@ export const applyHitCommand = defineCommand({
       };
       const dmPayload: AttackLogDmPayload = {
         targetAc: ac.ac,
-        ...(isCompanion(attacker) ? { toHitNatural: toHitRoll.natural } : {}),
+        ...(isCompanion(attacker)
+          ? { toHitNatural: toHitRoll.natural, attackName: p.attackName }
+          : {}),
         hitComputed,
         toHitRolled,
         damageRolled: null,

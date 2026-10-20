@@ -1,7 +1,7 @@
 // Log-entry kind `cbt.companion` (sprint 6, FR-CBT-122, #252): one line per summon, dismiss,
 // owner / mode change, release or turn hostile. Players read "Mira summons Fire Elemental ×2" /
-// "Fire Elemental is dismissed" / "Owlbear now follows Brakka" / "Goblin 2 no longer follows
-// Mira" / "Fire Elemental turns hostile" (the entry's `public` = the combatant is not hidden);
+// "Fire Elemental is dismissed" / "Owlbear now follows Brakka" / "Owlbear now acts in Mira's
+// turn" (mode only) / "Goblin 2 no longer follows Mira" / "Fire Elemental turns hostile" (the entry's `public` = the combatant is not hidden);
 // the DM reads "DM — …" plus the turn mode ("(in Brakka's turn)").
 import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-types";
 import { TurnMode } from "@shared/entities/schemas";
@@ -9,7 +9,14 @@ import { z } from "zod";
 
 export const LOG_KIND_COMPANION = "cbt.companion";
 
-export const COMPANION_ACTIONS = ["summon", "dismiss", "follows", "release", "hostile"] as const;
+export const COMPANION_ACTIONS = [
+  "summon",
+  "dismiss",
+  "follows",
+  "mode",
+  "release",
+  "hostile",
+] as const;
 export const CompanionAction = z.enum(COMPANION_ACTIONS);
 export type CompanionAction = z.infer<typeof CompanionAction>;
 
@@ -21,6 +28,8 @@ export const CompanionLogPayload = z.strictObject({
   ownerName: z.string().optional(),
   /** `summon`: how many (1–8). */
   count: z.int().min(1).max(8).optional(),
+  /** `mode`: the new turn mode, same owner (players see the mode on the row anyway). */
+  turnMode: TurnMode.optional(),
 });
 export type CompanionLogPayload = z.infer<typeof CompanionLogPayload>;
 
@@ -44,6 +53,11 @@ export function companionText(p: CompanionLogPayload): string {
       return `${p.name} is dismissed`;
     case "follows":
       return `${p.name} now follows ${owner}`;
+    case "mode":
+      // Walkthrough fix: a mode change with the same owner says what changed.
+      if (p.turnMode === "in-owner-turn") return `${p.name} now acts in ${owner}'s turn`;
+      if (p.turnMode === "own") return `${p.name} now has its own initiative`;
+      return `${p.name} now acts after ${owner}`;
     case "release":
       return `${p.name} no longer follows ${owner}`;
     case "hostile":
@@ -59,7 +73,7 @@ export const companionLogKind = defineLogKind<CompanionLogPayload, CompanionLogD
     const text = companionText(p);
     if (!dm) return [{ text }];
     const out: LineSegment[] = [{ text: actorName, style: "actor" }, { text: ` — ${text}` }];
-    if (dm.turnMode && p.ownerName) {
+    if (dm.turnMode && p.ownerName && p.action !== "mode") {
       out.push({ text: ` (${turnModeWords(dm.turnMode, p.ownerName)})`, style: "muted" });
     }
     return out;

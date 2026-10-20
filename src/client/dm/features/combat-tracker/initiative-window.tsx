@@ -133,7 +133,7 @@ import {
 import { CbtxRuntime } from "../combat-extras/runtime";
 import { skipText } from "../combat-extras/skip";
 import { useCbtxDialogs } from "../combat-extras/store";
-import { type AttackAction, attackChoices, attackRolls } from "./attack-choices";
+import { type AttackAction, attackChoices, attackRolls, attackSummary } from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { CompanionCardButton, CompanionMenu } from "./companion-menu";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
@@ -406,7 +406,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
                       <span className="flex min-w-0 flex-1 flex-col">
                         <span className="truncate">{ch.attack.name}</span>
                         <span className="text-xs text-muted-foreground tabular-nums">
-                          {signed(ch.attack.toHit)} · {ch.attack.damage}
+                          {attackSummary(ch.attack)}
                         </span>
                       </span>
                       <span className="text-xs text-muted-foreground">{a.label}</span>
