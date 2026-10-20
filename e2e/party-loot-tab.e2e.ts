@@ -43,11 +43,13 @@ test("FR-PARTY-29 FR-LOOT-21 Loot tab right of Inventory, no Coin button, no loo
     ).toHaveCount(0);
     const board = await openWindow(page, "party.board");
     const tabs = board.getByTestId("party-tab");
-    await expect(tabs).toHaveCount(3);
+    // Sprint 6: Companions after Loot (FR-PARTY-41).
+    await expect(tabs).toHaveCount(4);
     expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute("data-value")))).toEqual([
       "handouts",
       "inventory",
       "loot",
+      "companions",
     ]);
     await expect(tabs.nth(2)).toHaveText("Loot");
     await expect(page.getByTestId("party-loot-link")).toHaveCount(0);
