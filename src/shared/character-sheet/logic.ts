@@ -398,7 +398,12 @@ export function clampHp(before: number, delta: number, hpMax: number): number {
 
 /** Portrait fallback (FR-CHAR-03): up to two initials. */
 export function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  // Punctuation never counts: "Owlbear (Mira)" → "OM" (sprint 6, pet names).
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .map((p) => p.replace(/[^\p{L}\p{N}]/gu, ""))
+    .filter(Boolean);
   const letters = parts.length > 1 ? [parts[0], parts[parts.length - 1]] : [parts[0] ?? ""];
   return letters
     .map((p) => [...(p ?? "")][0] ?? "")

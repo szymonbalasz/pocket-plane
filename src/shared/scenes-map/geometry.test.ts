@@ -162,5 +162,10 @@ describe("scenes-map geometry", () => {
     expect([...list].sort(tokenDrawOrder).map((t) => t.id)).toEqual(["b", "a", "c"]);
     expect(initials("Elite Goblin Warrior")).toBe("EG");
     expect(initials("mira")).toBe("M");
+    // Punctuation never counts (a pet named by FR-ENT-32's rule).
+    expect(initials("Owlbear (Mira)")).toBe("OM");
+    expect(initials("Owlbear (Mira) 2")).toBe("OM");
+    expect(initials("— (x)")).toBe("X");
+    expect(initials("()")).toBe("");
   });
 });

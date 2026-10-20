@@ -2131,3 +2131,15 @@ From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP
 - **Derived (not stored):** a colour's verdict (FR-CAMP-31 / -32), the palette row's blocks, the shading mask.
 - **Fixtures:** none new (the walkthrough and e2e use `prefs-s6` / `prefs-s6-e2e`; `session-sim-10` already holds `pc-colour-free`).
 - **CON-44:** 0 B.
+
+## 93. Sprint 6: pets (CP1)
+
+From [entities](../specs/entities.md#8-data-model) FR-ENT-36, -39 and [party-board](../specs/party-board.md#67-sprint-6-companions-tab) FR-PARTY-41–46 (#252). **Built by `build/cp-pets`**. **No schema change**: CP0's columns ([§89](#89-sprint-6-companions-core-cp0)). Protocol side: [protocol §121](../protocol/README.md#121-sprint-6-pets--new-pet-pet-hp-companions-tab-cp1).
+
+| Table / field | Change | Rule | Source |
+|---|---|---|---|
+| `entity.hp_current` (pets) | now also written by `pet.adjustHp` | clamped 0…`statBlock.hpMax`; refused while the pet is an active combatant (its HP lives on the combatant) | FR-ENT-36 |
+| `event_log` | + `PetHpAdjusted {petId, before, after}` rows | logged, not undoable | FR-ENT-36 |
+
+- **Derived (client, not stored):** the Companions tab's groups and rows (`companionGroups`, `src/client/common/features/party-board/logic.ts`): owner PC, HP for the DM / owner (combatant in a fight, else the pet row), band for others, "In combat"; the Creatures row's `pet` (owner PC + player) and "Pet of ‹PC›" badge.
+- **Fixtures:** `pet-owlbear` gains `pet.adjustHp −14` (45 / 59); `session-sim-10` gains `pet-owlbear`, `pet-drake`; bundle `cp-pets-e2e`.

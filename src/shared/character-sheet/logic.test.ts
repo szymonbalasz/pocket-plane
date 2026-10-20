@@ -106,6 +106,7 @@ describe("FR-CHAR-03 formatting", () => {
       "down",
     ]);
     expect([initials("Mira"), initials("Pip the Bold"), initials("  ")]).toEqual(["M", "PB", ""]);
+    expect(initials("Owlbear (Mira)")).toBe("OM");
   });
 });
 
