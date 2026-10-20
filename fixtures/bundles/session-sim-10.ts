@@ -13,6 +13,9 @@ export default defineBundle({
     // IM: image search + tags
     // IM-1: 24 tagged library images + 2 attachments (Ruined Keep holds the DM tag `zz-lair-secret`)
     "image-tags",
+    // WF: window + layout fixes
+    // WF3: no new unit (Fit, pcs pan and the reveal refit walk on sim-9's Goblin Ambush: door
+    // (8, 5), party vision, the hidden Elite and Wolf)
     // PF: Preferences, free colour, Subtract
     // CP: companions + summons
   ],
