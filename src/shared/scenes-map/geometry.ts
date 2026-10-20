@@ -281,9 +281,16 @@ export function tokenDrawOrder(
   return footprint(b.size) - footprint(a.size) || a.seq - b.seq;
 }
 
-/** Initials for a token without an image (MAP §7). */
+/**
+ * Initials for a token without an image (MAP §7). Punctuation never counts: "Owlbear (Mira)" →
+ * "OM", not "O(" (sprint 6, pet names).
+ */
 export function initials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
+    .filter(Boolean);
   const letters = words.length > 1 ? [words[0], words[1]] : [words[0]];
   return letters
     .map((w) => [...(w ?? "")][0] ?? "")

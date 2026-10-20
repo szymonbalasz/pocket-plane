@@ -282,9 +282,11 @@ export const PlayerMonsterCombatant = z.object({
 });
 /**
  * FR-CBT-116 (ADR-0056): the **owner's** view of its own companion: the monster view plus HP
- * numbers, temp HP, `pet` and `card`. Other players get `PlayerMonsterCombatant` (band only).
+ * numbers, temp HP, `pet` and `card`; a **pet** also its `entityId` (the owner's own pet row, so
+ * the card shows it once, FR-CHARX-61). Other players get `PlayerMonsterCombatant` (band only).
  */
 export const PlayerOwnedCompanion = PlayerMonsterCombatant.extend({
+  entityId: z.string().optional(),
   ownerCharacterId: z.string(),
   ownerPlayerId: z.string(),
   turnMode: TurnMode,

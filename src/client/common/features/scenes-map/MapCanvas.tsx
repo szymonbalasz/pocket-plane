@@ -32,11 +32,7 @@ import { Group, Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
-import { useContentHeights } from "../play-shell/content-heights";
-import { fitObstacles, renderedWindowRects, useFreeArea } from "../play-shell/free-area";
-import { useViewport } from "../play-shell/hooks";
-import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
-import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
+import { useFreeArea } from "../play-shell/free-area";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
   type Camera,
@@ -46,8 +42,14 @@ import {
   centreOn,
   createAppearanceRefit,
   createResizeRefit,
+  createRevealRefit,
+  type FitReason,
   type FitVisible,
   fitScene,
+  footprintBox,
+  refitsOnReveal,
+  revealRefit,
+  visibleArea,
   zoomAt,
 } from "./camera";
 import { CanvasContext, type CanvasContextValue, type EffectiveGrid } from "./canvas-context";
@@ -95,6 +97,7 @@ import {
   activeTool,
   escapeOrder,
   isDrawing,
+  type PointerIntent,
   pressGoesToTool,
   stagePans,
   type ToolPointer,
@@ -247,27 +250,14 @@ export function MapCanvas(props: MapCanvasProps) {
   const [fitRect, setFitRect] = useState("");
   /** FR-MAP-59: every token footprint clear of windows and the toast box (`data-fit-visible`). */
   const [fitVisible, setFitVisible] = useState<FitVisible>("all");
+  /** FR-MAP-82: the last fit's cause (`data-fit-reason`). */
+  const [fitReason, setFitReason] = useState<FitReason>("open");
   const free = useFreeArea();
-  // FR-MAP-59 obstacles: the rendered open windows + this client's toast box (FR-SHELL-48 (a)).
-  const registry = useRegistry();
-  const shellWindows = useShellState((s) => s.windows);
-  const available = useAvailableKinds();
-  const vp = useViewport();
-  const measured = useContentHeights();
-  const regions = useKeepOuts(registry.client);
-  const obstacles = useMemo(() => {
-    const shown = renderedWindowRects(
-      shellWindows,
-      registry,
-      available,
-      vp,
-      measured,
-      hardRects(regions),
-    );
-    return fitObstacles(shown, regions);
-  }, [shellWindows, registry, available, vp, measured, regions]);
-  const fitNow = useRef(() => {});
-  fitNow.current = () => {
+  // FR-MAP-59 / -80 obstacles: the rendered open windows + the players' toast box, or the DM's
+  // summary strip + shown stack (`fitObstacles`).
+  const obstacles = free.obstacles;
+  const fitNow = useRef((_reason: FitReason) => {});
+  fitNow.current = (reason) => {
     if (size.w === 0) return;
     // FR-MAP-58 in the room the toast box leaves (FR-SHELL-48 (a)), then FR-MAP-59; PC tokens =
     // tokens with an owner, in this client's store (FR-MAP-46).
@@ -282,11 +272,12 @@ export function MapCanvas(props: MapCanvasProps) {
     setFitFloor(fit.floor);
     setFitVisible(fit.visible);
     setFitRect(`${fit.rect.x},${fit.rect.y},${fit.rect.w},${fit.rect.h}`);
+    setFitReason(reason);
   };
   /** FR-MAP-61: the appearance refit, once the frame that caused it reached the canvas. */
   const [appearanceRefit] = useState(() =>
     createAppearanceRefit(() => {
-      if (cameraModeRef.current === "fitted") fitNow.current();
+      if (cameraModeRef.current === "fitted") fitNow.current("appearance");
     }),
   );
   useEffect(() => () => appearanceRefit.dispose(), [appearanceRefit]);
@@ -299,7 +290,8 @@ export function MapCanvas(props: MapCanvasProps) {
       cameraModeRef.current = next.mode;
       setCameraMode(next.mode);
       if (!next.fit) return;
-      if (!deferred) fitNow.current();
+      // Only fit events (open, fit, appearance, resize, reveal) fit.
+      if (!deferred) fitNow.current(e as FitReason);
       else appearanceRefit.appearance();
     },
     [appearanceRefit],
@@ -332,12 +324,14 @@ export function MapCanvas(props: MapCanvasProps) {
     const el = box.current;
     if (!el) return;
     // Capture phase on the canvas box: before Konva's stage listeners (and so every tool).
-    const down = (e: MouseEvent) =>
-      void pan.press(e, {
+    const down = (e: MouseEvent) => {
+      const intent = pan.press(e, {
         tool: toolDefRef.current,
         space: spaceRef.current,
         live: liveRef.current,
       });
+      if (e.type === "pointerdown") revealPress.current(e, intent);
+    };
     const move = (e: MouseEvent) => pan.move(e);
     const aux = (e: MouseEvent) => pan.auxclick(e);
     const blur = () => pan.cancel();
@@ -394,6 +388,71 @@ export function MapCanvas(props: MapCanvasProps) {
       }),
     [onCamera],
   );
+  // FR-MAP-82 (players only): a frame that newly draws tokens off-screen or under a window (or
+  // the toast box) refits once while `fitted`, after the frame is applied; a burst coalesces.
+  const [reveal] = useState(() => createRevealRefit(() => onCamera("reveal")));
+  useEffect(() => () => reveal.dispose(), [reveal]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch drops a pending refit
+  useEffect(() => reveal.dispose(), [reveal, scene.id]);
+  const obstaclesRef = useRef(obstacles);
+  obstaclesRef.current = obstacles;
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  const drawn = useRef<{ scene: string; ids: ReadonlySet<string> } | null>(null);
+  useEffect(() => {
+    const prev = drawn.current;
+    drawn.current = { scene: scene.id, ids: new Set(tokens.map((t) => t.id)) };
+    // A scene switch, or tokens before the scene-open fit: that fit frames them.
+    const same = prev?.scene === scene.id && fittedFor.current === scene.id;
+    if (!refitsOnReveal(client) || !prev || !same) return;
+    const next = tokens.flatMap((t) => {
+      const box = footprintBox([t], gridRef.current);
+      return box ? [{ id: t.id, box }] : [];
+    });
+    const area = visibleArea(sizeRef.current);
+    const mode = cameraModeRef.current;
+    if (revealRefit(prev.ids, next, camRef.current, obstaclesRef.current, area, mode)) {
+      reveal.reveal();
+    }
+  }, [tokens, scene.id, client, reveal]);
+  /**
+   * FR-MAP-82: a press on the canvas (capture phase, before Konva and the tools). The user wins:
+   * a pan gesture (middle button; left on empty canvas where the stage pans) marks the camera
+   * `moved` at its start and cancels a pending reveal refit; a press on a token or for a tool
+   * cancels it and re-arms it at the release (the drop), the camera still `fitted`.
+   */
+  const revealPress = useRef((_e: MouseEvent, _intent: PointerIntent) => {});
+  revealPress.current = (e, intent) => {
+    if (!refitsOnReveal(client) || intent === "ignore") return;
+    if (intent === "pan") {
+      reveal.gesture();
+      onCamera("pan");
+      return;
+    }
+    if (e.button !== 0) return;
+    const stage = stageRef.current;
+    let onToken = false;
+    if (stage) {
+      stage.setPointersPositions(e);
+      const p = stage.getPointerPosition();
+      onToken = p !== null && tokenNodeOf(stage.getIntersection(p)) !== null;
+    }
+    if (intent === "canvas" && !onToken && stagePans(tool, spaceRef.current)) {
+      reveal.gesture();
+      onCamera("pan");
+    } else {
+      reveal.press();
+    }
+  };
+  useEffect(() => {
+    const up = () => reveal.release();
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+    };
+  }, [reveal]);
 
   // ---- optimistic move overlay (FR-MAP-15): any snapshot drops it ----
   const [overlay, setOverlay] = useState<MoveOverlay>(emptyOverlay);
@@ -930,6 +989,8 @@ export function MapCanvas(props: MapCanvasProps) {
     const p = stageRef.current?.getPointerPosition();
     if (!p) return;
     setCam((c) => zoomAt(c, p, e.evt.deltaY));
+    // FR-MAP-82: a zoom gesture cancels a pending reveal refit.
+    reveal.gesture();
     onCamera("zoom");
   };
 
@@ -991,6 +1052,7 @@ export function MapCanvas(props: MapCanvasProps) {
       data-fit-floor={fitFloor}
       data-fit-visible={fitVisible}
       data-fit-rect={fitRect}
+      data-fit-reason={fitReason}
       data-loading={loading}
       className="absolute inset-0"
       style={{

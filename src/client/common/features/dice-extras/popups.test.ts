@@ -3,7 +3,8 @@
 import { describe, expect, test } from "bun:test";
 import { type DiceThrow, throwDice } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
-import { dmStackAt, pipClip, popupRows } from "./popup-logic";
+import type { Rect } from "../play-shell/geometry";
+import { dmPopupClear, dmStackAt, pipClip, popupRows, shownPopupStack } from "./popup-logic";
 import { createRollPopups, pipModeOf, pipPlan, type RollPopup } from "./popups";
 import { createDiceExtrasStore } from "./store";
 import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS, POPUP_ROLLING_MAX_MS } from "./timing";
@@ -364,5 +365,70 @@ describe("FR-DICEX-39 placement", () => {
     // The left move lands on another rect → below that one.
     const left = { x: 40, y: 60, w: 400, h: 200 };
     expect(dmStackAt(vp, 100, size, [popup, left])).toEqual({ left: 268, top: 272 });
+  });
+});
+
+describe("FR-DICEX-55 popup clears the tool bar", () => {
+  test("FR-DICEX-55 popup clears the tool bar: 1440×900, Initiative at x 600 + a hard region at the fog bar → the shifted popup drops below the bar; no hard region → the sprint-5 result", () => {
+    const vp = { w: 1440 };
+    const size = { w: 320, h: 190 };
+    const initiative = { x: 600, y: 60, w: 400, h: 500 };
+    // The fog bar at its home spot (FR-MAP-60: right of the rail + 8, y 56; 470 px at 1440×900).
+    const bar = { x: 76, y: 56, w: 470, h: 88 };
+    // Sprint 5: left of Initiative, over the bar.
+    expect(dmStackAt(vp, 100, size, [initiative])).toEqual({ left: 268, top: 100 });
+    // The shift left would overlap the bar (no room left of it at the rail) → below the bar.
+    const at = dmStackAt(vp, 100, size, [initiative, bar]);
+    expect(at).toEqual({ left: 268, top: 156 });
+    const r = { x: at.left, y: at.top, w: size.w, h: size.h };
+    const overlaps = (a: typeof r, b: typeof r) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(overlaps(r, bar)).toBe(false);
+    expect(overlaps(r, initiative)).toBe(false);
+    // A bar clear of the centred popup changes nothing.
+    expect(dmStackAt(vp, 100, size, [bar])).toEqual({ left: 560, top: 100 });
+  });
+
+  test("FR-DICEX-55 popup clears the tool bar: the DM stack reports its rendered rect for the Fit (FR-SHELL-59, OQ-MAP-57 D), null when empty, never for players", () => {
+    const rect = { x: 560, y: 100, w: 320, h: 190 };
+    expect(shownPopupStack(true, rect)).toEqual(rect);
+    expect(shownPopupStack(true, null)).toBeNull();
+    expect(shownPopupStack(true, { ...rect, h: 0 })).toBeNull();
+    expect(shownPopupStack(false, rect)).toBeNull();
+  });
+});
+
+describe("FR-DICEX-55 popup clears the toast stack", () => {
+  test("FR-DICEX-55 popup clears the tool bar and the toast stack: walkthrough rects (1440×900, Fog bar 62,56 392×154, Initiative at x 600, the pending summary dropped to 268,218 320×58) → the popup goes below the summary, overlapping neither", () => {
+    const vp = { w: 1440 };
+    const size = { w: 320, h: 98 };
+    const initiative = { x: 600, y: 60, w: 400, h: 500 };
+    const bar = { x: 62, y: 56, w: 392, h: 154 };
+    const summary = { x: 268, y: 218, w: 320, h: 58 };
+    const overlaps = (a: Rect, b: Rect) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    // The walkthrough's FAIL: without the stack the popup lands on the summary (268, 222).
+    const before = dmStackAt(vp, 166, size, dmPopupClear(initiative, [], [bar], new Map(), "own"));
+    expect(before).toEqual({ left: 268, top: 222 });
+    expect(overlaps({ x: before.left, y: before.top, ...size }, summary)).toBe(true);
+    // The other shown stacks are obstacles (the popups' own report is not).
+    const shown = new Map([
+      ["note.toasts", summary],
+      ["own", { x: 268, y: 222, w: 320, h: 98 }],
+    ]);
+    const clear = dmPopupClear(initiative, [], [bar], shown, "own");
+    // The summary enters inset by 4 px (12-px clearance − the stacks' 8-px gap).
+    expect(clear).toEqual([initiative, bar, { x: 272, y: 222, w: 312, h: 50 }]);
+    const at = dmStackAt(vp, 166, size, clear);
+    // One band: 8 px under the summary (218 + 58 + 8).
+    expect(at).toEqual({ left: 268, top: 284 });
+    const r = { x: at.left, y: at.top, ...size };
+    for (const o of [summary, bar, initiative]) expect(overlaps(r, o)).toBe(false);
+  });
+
+  test("FR-DICEX-55 popup clears the toast stack: at home (the summary 560,100 320×57, the popup region 8 px under it) → the popup stays centred under it (no shift)", () => {
+    const summary = { x: 560, y: 100, w: 320, h: 57 };
+    const clear = dmPopupClear(null, [], [], new Map([["note.toasts", summary]]), "own");
+    expect(dmStackAt({ w: 1440 }, 165, { w: 320, h: 98 }, clear)).toEqual({ left: 560, top: 165 });
   });
 });

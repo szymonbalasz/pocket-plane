@@ -1,0 +1,89 @@
+// Companion card rolls (FR-CHARX-64, OQ-CHARX-36): the three buttons of a card row and the intent
+// each sends. In a fight: combat's intents as the companion with the card row's id (FR-CBT-114):
+// Attack → `cbt.attack {rolls: "toHit"}`, Damage → `cbt.rollDamage`, Attack + damage →
+// `cbt.attack`; a Damage after a natural 20 on the row's pending to-hit card is critical
+// (FR-CBT-74). Out of a fight (pets only): `char.roll` with the pet as the creature
+// (FR-CHARX-69). Never `public` (players can't; the DM's companion lines are DM-only anyway).
+import { attackRollSpecs, type CharacterRollSpec } from "@shared/character-sheet/logic";
+import type { PetRollKind } from "@shared/character-sheet/rolls";
+import { CHAR_ROLL } from "@shared/character-sheet/schemas";
+import { critExpression } from "@shared/combat-tracker/rules";
+import { CBT_INTENTS } from "@shared/combat-tracker/schemas";
+import type { CompanionCardAttack } from "@shared/entities/schemas";
+import type { NotificationRecord } from "@shared/notifications/schemas";
+import { manualFields, pendingToHitCard } from "../../combat-tracker/roll-route";
+import { charRollPayload, type RollRouteInput } from "../routing";
+
+/** What a roll goes out as: the companion combatant in a fight, else the pet. */
+export type CardRollTarget = { combatantId: string } | { petId: string };
+
+/** FR-CHARX-64: a card row's roll specs as the server builds them (bonus folded in). */
+export function cardRowSpecs(row: CompanionCardAttack, kind: PetRollKind): CharacterRollSpec[] {
+  const specs = attackRollSpecs({
+    name: row.name,
+    toHit: row.toHit,
+    damage: row.damage,
+    damageType: row.damageType ?? null,
+    bonus: row.bonus ?? 0,
+    extraDamage: row.extraDamage ?? [],
+  });
+  if (kind === "toHit") return specs.slice(0, 1);
+  if (kind === "damage") return specs.slice(1);
+  return specs;
+}
+
+/** The intent one button sends (name + payload) from the roll control's input. */
+export function cardRollIntent(
+  target: CardRollTarget,
+  rowId: string,
+  kind: PetRollKind,
+  input: RollRouteInput,
+): { name: string; payload: Record<string, unknown> } {
+  if ("petId" in target) {
+    const { public: _p, ...rest } = input;
+    return {
+      name: CHAR_ROLL,
+      payload: { ...charRollPayload(target.petId, kind, rest, { attackId: rowId }) },
+    };
+  }
+  const attackerId = target.combatantId;
+  if (kind === "damage") {
+    return {
+      name: CBT_INTENTS.rollDamage,
+      payload: { attackerId, attackId: rowId, ...manualFields(input, 1) },
+    };
+  }
+  const toHitOnly = kind === "toHit";
+  return {
+    name: CBT_INTENTS.attack,
+    payload: {
+      attackerId,
+      attackId: rowId,
+      mode: input.mode,
+      ...(toHitOnly
+        ? {
+            rolls: "toHit",
+            ...(input.manual ? { manual: input.manual } : {}),
+            ...(input.manualParts ? { manualParts: input.manualParts } : {}),
+          }
+        : manualFields(input, 2)),
+    },
+  };
+}
+
+/**
+ * FR-CBT-74 / -83 in a fight: the roll control's crit options of a row's Damage (after a natural
+ * 20 on its pending to-hit card: `crit`) and of Attack + damage (crit dice ready).
+ */
+export function cardCritOptions(
+  target: CardRollTarget,
+  row: CompanionCardAttack,
+  kind: PetRollKind,
+  notes: readonly NotificationRecord[],
+): { critExpressions?: readonly string[]; crit?: boolean } {
+  if (!("combatantId" in target) || kind === "toHit") return {};
+  const critExpressions = cardRowSpecs(row, "damage").map((s) => critExpression(s.expression));
+  if (kind === "attack") return { critExpressions };
+  const card = pendingToHitCard(notes, target.combatantId, { attackId: row.id });
+  return card?.toHit?.natural === 20 ? { critExpressions, crit: true } : {};
+}

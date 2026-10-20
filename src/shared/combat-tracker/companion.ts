@@ -36,11 +36,20 @@ export function withCardIds<S extends { attacks: Attack[] }>(
 }
 
 /**
- * FR-CBT-114 (review 1, ADR-0056): a companion's outcome line keeps the to-hit total and the
- * natural flag for everyone; the "N + M" split, the bonus and the effect parts go to `dmPayload`
- * (the DM already has the rolls there; the owner has them on its roll line and card).
+ * FR-CBT-114 (review 1, ADR-0056; walkthrough 7): a companion's outcome line keeps the to-hit
+ * total only; the d20 face (total − face = the bonus), the "N + M" split and the effect parts go
+ * to `dmPayload` (`toHitNatural`, the rolls; the owner has them on its roll line and card), and
+ * the entry carries none of the card's roll ids (`companionLineRollIds`). Players read "— DM:
+ * hit." / "— DM: miss" (no "(natural 20)", no public ruling): totals only.
  */
 export function companionSafeToHit(t: AttackLogPayload["toHit"]): AttackLogPayload["toHit"] {
   if (t === null) return null;
-  return { dice: null, constant: 0, total: t.total, natural: t.natural };
+  return { dice: null, constant: 0, total: t.total, natural: null };
 }
+
+/** FR-CBT-114 (walkthrough 7): an outcome line's public roll ids; a companion's: none of its card's. */
+export const companionLineRollIds = (
+  attacker: { ownerCharacterId?: string | null },
+  cardRollIds: readonly string[],
+  other: readonly string[] = [],
+): string[] => (isCompanion(attacker) ? [...other] : [...cardRollIds, ...other]);

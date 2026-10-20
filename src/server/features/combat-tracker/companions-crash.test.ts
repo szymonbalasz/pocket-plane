@@ -182,7 +182,8 @@ describe("CP0 crash (PP_TEST_CRASH seams)", () => {
       run(applyHp.name, {
         combatantId: combatantNamed(b.db, "Owlbear").id,
         kind: "damage",
-        amount: 39,
+        // The fixture leaves the Owlbear at 45 / 59 (`pet.adjustHp −14`, CP1): 45 − 25 = 20.
+        amount: 25,
       });
       const summonToken = combatantNamed(b.db, "Fire Elemental").tokenId as string;
       const charmedToken = combatantNamed(b.db, "Goblin 2").tokenId as string;

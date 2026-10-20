@@ -50,12 +50,49 @@ function pairwiseDisjoint(boxes: Box[]): string[] {
   return out;
 }
 
+/** FR-SHELL-57: a PC footprint's margin; placement's edge gap and the launcher's clearance. */
+const PC_MARGIN = 4;
+const EDGE_GAP = 12;
+const RAIL_CLEAR = 68;
+const TOP_BAR_H = 48;
+const LAUNCHER_CLEAR = 64;
+
+/**
+ * A spot (8-px grid over the usable area right of the rail) for `win`'s size that is clear of
+ * every other shown window (12 px gap) and of every grown PC footprint; null when none exists.
+ */
+function pcFreeSpot(
+  win: Box,
+  windows: readonly Box[],
+  pcs: readonly Box[],
+  vp: { width: number; height: number },
+): string | null {
+  const grow = (o: Box) => ({
+    ...o,
+    x: o.x - EDGE_GAP,
+    y: o.y - EDGE_GAP,
+    w: o.w + 2 * EDGE_GAP,
+    h: o.h + 2 * EDGE_GAP,
+  });
+  const others = windows.filter((o) => o.kind !== win.kind).map(grow);
+  const right = vp.width - EDGE_GAP - win.w;
+  const bottom = vp.height - EDGE_GAP - LAUNCHER_CLEAR - win.h;
+  for (let y = TOP_BAR_H + EDGE_GAP; y <= bottom; y += 8) {
+    for (let x = RAIL_CLEAR; x <= right; x += 8) {
+      const r = { kind: win.kind, x, y, w: win.w, h: win.h };
+      if (others.some((o) => overlaps(r, o)) || pcs.some((p) => overlaps(r, p))) continue;
+      return `${x},${y}`;
+    }
+  }
+  return null;
+}
+
 async function resetLayout(page: Page) {
   await page.getByTestId("ui-launcher-menu").click();
   await page.getByTestId("ui-launcher-reset").click();
 }
 
-test("FR-SHELL-45 FR-SHELL-47 DM at 1440×900: Compendium, Party, Encounters from the launcher → the shown windows (Game log, Initiative included) are pairwise disjoint and over no PC token", async ({
+test("FR-SHELL-45 FR-SHELL-47 DM at 1440×900: Compendium, Party, Encounters from the launcher → the shown windows (Game log, Initiative included) are pairwise disjoint; one over a PC only when no spot clear of windows and PCs exists (#292)", async ({
   browser,
 }) => {
   const { secret, recordId } = e2eEnv();
@@ -129,10 +166,33 @@ test("FR-SHELL-45 FR-SHELL-47 DM at 1440×900: Compendium, Party, Encounters fro
     tokens.length,
     JSON.stringify({ pcs, drawn: all.map((t) => [t.id, t.text]) }),
   ).toBeGreaterThan(0);
-  for (const t of tokens) {
-    const under = boxes.find((b) => t.x > b.x && t.x < b.x + b.w && t.y > b.y && t.y < b.y + b.h);
-    expect(under ? `PC token under ${under.kind}` : "ok").toBe("ok");
+  // #292 / FR-SHELL-47 (sprint 6 ruling): PCs only rank; a window parks only when no spot is
+  // clear of windows. So a window may cover a PC (footprint + 4 px, FR-SHELL-57) only when no spot
+  // clear of every other window (12 px gap) and of every PC exists for it at its size; under
+  // OQ-MAP-57 D's larger map (FR-MAP-80) that is Party's case at 1440×900.
+  const cell = Number(await dm.getByTestId("map-canvas").getAttribute("data-cell-px"));
+  const pcBoxes = tokens.map((t) => {
+    const side = Math.max(1, Math.round(t.width / cell)) * cell + 2 * PC_MARGIN;
+    return { kind: t.id, x: t.x - side / 2, y: t.y - side / 2, w: side, h: side };
+  });
+  const vp = dm.viewportSize() ?? { width: 0, height: 0 };
+  const covering: string[] = [];
+  for (const b of boxes) {
+    if (!pcBoxes.some((p) => overlaps(b, p))) continue;
+    covering.push(b.kind);
+    const spot = pcFreeSpot(b, boxes, pcBoxes, vp);
+    expect(spot ? `${b.kind} over a PC while ${spot} was clear of windows and PCs` : "ok").toBe(
+      "ok",
+    );
+    // Placement knew: no `data-pc-clear` on it (FR-SHELL-57).
+    await expect(shellWindow(dm, b.kind.split(":")[0] as string)).not.toHaveAttribute(
+      "data-pc-clear",
+      "true",
+    );
   }
+  console.info(
+    `FR-SHELL-45 windows over a PC (no PC-free clear spot): ${covering.join(", ") || "none"}`,
+  );
   await expect(dm.getByTestId("ui-play-page")).toHaveAttribute(
     "data-keep-outs",
     "toasts:542,100,356,238",

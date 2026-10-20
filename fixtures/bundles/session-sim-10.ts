@@ -15,13 +15,18 @@ export default defineBundle({
     "image-tags",
     // WF: window + layout fix pack
     // WF2: no new unit (the toast home walks on sim-9's ruled card summary, Scenes and the Fog tool)
+    // WF3: no new unit (Fit, pcs pan and the reveal refit walk on sim-9's Goblin Ambush: door
+    // (8, 5), party vision, the hidden Elite and Wolf)
     // PF: Preferences, free colour, Subtract
     // PF0: Player 2 lavender `#b388ff` (one DM `camp.setColor`; Blue and Sky blocked for Player 1)
     "pc-colour-free",
     // CP: companions + summons
     // CP0: the SRD Owlbear and Fire Elemental (imported, DM-only; CP1 / CP3 add the pets and the fight)
     "cp-srd",
-    // CP3: the pets join sim-9's running ambush (pulls in `pet-owlbear` / `pet-drake`, CP1's lines);
+    // CP1: Mira's Owlbear (45 / 59) and Brakka's Drake Companion, tokens beside their owners
+    "pet-owlbear",
+    "pet-drake",
+    // CP3: both pets join sim-9's running ambush (combat-extras' Add with their tokens);
     // Fire Elementals for Mira (after her), Brakka (in her turn), Thorn (own 9, linked concentration)
     "cp-combat",
   ],

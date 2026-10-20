@@ -4,7 +4,8 @@ import type { Rect } from "@ui/features/play-shell/geometry";
 import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { keepOuts } from "@ui/features/play-shell/keep-outs";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
-import { toastKeepOut } from "@ui/features/play-shell/toast-region";
+import { AMBUSH_GRID, AMBUSH_MAP, SIM9_AMBUSH_DM } from "@ui/features/play-shell/test-cells";
+import { summaryStrip, toastKeepOut } from "@ui/features/play-shell/toast-region";
 import {
   allClear,
   FIT_HARD_MIN_CELL_PX,
@@ -60,8 +61,11 @@ const SIZES = [
   { w: 1600, h: 900 },
 ];
 
-/** The DM default layout (Game log + Initiative), optionally Scenes opened from the launcher. */
-function dmFit(vp: { w: number; h: number }, scenes: boolean) {
+/**
+ * The DM default layout (Game log + Initiative), optionally Scenes opened from the launcher;
+ * `shown` = the shown stack at fit time (FR-SHELL-59; null = nothing shows).
+ */
+function dmFit(vp: { w: number; h: number }, scenes: boolean, shown: Rect | null = null) {
   const all = new Set(dmWindows.defs.map((d) => d.kind));
   let ws = defaultLayout(dmWindows, vp);
   if (scenes) {
@@ -73,7 +77,7 @@ function dmFit(vp: { w: number; h: number }, scenes: boolean) {
     ["cbt.initiative", "dice.log", ...(scenes ? ["map.scenes"] : [])].sort(),
   );
   const windows = renderedWindowRects(ws, dmWindows, all, vp);
-  const obstacles = fitObstacles(windows, keepOuts("dm", vp));
+  const obstacles = fitObstacles("dm", windows, keepOuts("dm", vp), vp, shown);
   const room = { areas: freeAreas(obstacles, vp), obstacles, windowsOnly: freeAreas(windows, vp) };
   return { windows, obstacles, fit: fitScene(SIM8_AMBUSH_DM, GRID, MAP, vp, room) };
 }
@@ -84,46 +88,115 @@ const footprints = (tokens: readonly FitToken[]) =>
 const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
-test("FR-MAP-59 every token visible: DM Game log + Initiative → all at 1280×800, 1440×900, 1600×900, pcs at 1280×720; + Scenes → all at 1280×800 only (play-shell §12, OQ-SHELL-40)", () => {
-  const want = {
-    plain: ["pcs", "all", "all", "all"],
-    scenes: ["pcs", "all", "pcs", "pcs"],
-  };
+/** Every footprint at `fit` (screen px). */
+const onScreen = (fit: { x: number; y: number; scale: number }, tokens: readonly FitToken[]) =>
+  footprints(tokens).map((p) => ({
+    x: fit.x + p.x * fit.scale,
+    y: fit.y + p.y * fit.scale,
+    w: p.w * fit.scale,
+    h: p.h * fit.scale,
+  }));
+
+/** Sprint-6 named outcomes (scenes-map §12, OQ-MAP-57 D, #288): cell px per size. */
+const D_CELLS = { plain: [36, 37, 42, 42], scenes: [30, 30, 38, 42] };
+
+test("FR-MAP-59 every token visible: DM Game log + Initiative → all at 36 / 37 / 42 / 42 px; + Scenes → all at 30 / 30 / 38 / 42 px (sprint 6: the summary strip, not the box, FR-MAP-80; was pcs at 1280×720 / + Scenes, OQ-SHELL-40)", () => {
   const cells: string[] = [];
   for (const [i, vp] of SIZES.entries()) {
     for (const scenes of [false, true]) {
       const at = `${vp.w}×${vp.h}${scenes ? " + Scenes" : ""}`;
       const { windows, obstacles, fit } = dmFit(vp, scenes);
-      // The DM's top-centre toast box is an obstacle (#256).
-      expect(obstacles).toContainEqual(toastKeepOut("dm", vp));
       const cell = fit.scale * GRID.gridCellSize;
       cells.push(`${at}: ${fit.visible} ${cell.toFixed(1)} px`);
-      expect({ at, visible: fit.visible }).toEqual({
+      expect({ at, visible: fit.visible, cell: Math.round(cell) }).toEqual({
         at,
-        visible: (scenes ? want.scenes : want.plain)[i] as "all" | "pcs",
+        visible: "all",
+        cell: (scenes ? D_CELLS.scenes : D_CELLS.plain)[i] as number,
       });
-      if (fit.visible === "all") {
-        // Every footprint (hidden ones too) inside the inset work area, clear of every window
-        // and the toast box; an integer cell ≥ 24 px.
-        expect(allClear(fit, footprints(SIM8_AMBUSH_DM), obstacles, visibleArea(vp))).toBe(true);
-        expect(cell).toBeGreaterThanOrEqual(FIT_HARD_MIN_CELL_PX);
-        // FR-MAP-44: the map's top row stays at or below the top bar.
-        expect(fit.y).toBeGreaterThanOrEqual(TOP_BAR_H - 1e-6);
-        expect(Math.abs(cell - Math.round(cell))).toBeLessThan(1e-9);
-      } else {
-        // PCs first (FR-MAP-46): every PC clear of every window.
-        for (const p of footprints(SIM8_AMBUSH_DM.filter((t) => t.pc))) {
-          const s = {
-            x: fit.x + p.x * fit.scale,
-            y: fit.y + p.y * fit.scale,
-            w: p.w * fit.scale,
-            h: p.h * fit.scale,
-          };
-          const under = windows.some((w) => overlaps(s, w));
-          expect(under ? `${at}: a PC under a window` : "ok").toBe("ok");
-        }
+      // Every footprint (hidden ones too) inside the inset work area, clear of every window and
+      // the summary strip; an integer cell ≥ 24 px.
+      expect(allClear(fit, footprints(SIM8_AMBUSH_DM), obstacles, visibleArea(vp))).toBe(true);
+      expect(cell).toBeGreaterThanOrEqual(FIT_HARD_MIN_CELL_PX);
+      // FR-MAP-44: the map's top row stays at or below the top bar.
+      expect(fit.y).toBeGreaterThanOrEqual(TOP_BAR_H - 1e-6);
+      expect(Math.abs(cell - Math.round(cell))).toBeLessThan(1e-9);
+      for (const s of onScreen(fit, SIM8_AMBUSH_DM)) {
+        const under = windows.some((w) => overlaps(s, w));
+        expect(under ? `${at}: a token under a window` : "ok").toBe("ok");
       }
     }
   }
   console.info(`FR-MAP-59 DM cells: ${cells.join("; ")}`);
+});
+
+test("FR-MAP-80 fit without the empty box: nothing shown → obstacles = windows + the summary strip (not the 356 × 238 box), all at §12's cells, no footprint under the strip; a shown card below the strip → every footprint clear of it", () => {
+  for (const [i, vp] of SIZES.entries()) {
+    for (const scenes of [false, true]) {
+      const at = `${vp.w}×${vp.h}${scenes ? " + Scenes" : ""}`;
+      const { windows, obstacles, fit } = dmFit(vp, scenes);
+      const strip = summaryStrip(vp);
+      expect(strip).toEqual({ x: Math.round((vp.w - 320) / 2), y: 100, w: 320, h: 57 });
+      expect(obstacles).toEqual([...windows, strip]);
+      expect(obstacles).not.toContainEqual(toastKeepOut("dm", vp));
+      expect({ at, visible: fit.visible }).toEqual({ at, visible: "all" });
+      const want = (scenes ? D_CELLS.scenes : D_CELLS.plain)[i] as number;
+      expect({ at, cell: Math.round(fit.scale * GRID.gridCellSize) }).toEqual({ at, cell: want });
+      const under = onScreen(fit, SIM8_AMBUSH_DM).filter((s) => overlaps(s, strip)).length;
+      expect({ at, under }).toEqual({ at, under: 0 });
+    }
+  }
+  // A sticky card showing below the strip (320 × 175 at 1440×900): the shown stack is an
+  // obstacle too; every footprint clear of it and of the strip.
+  const vp = { w: 1440, h: 900 };
+  const card = { x: 560, y: 165, w: 320, h: 175 };
+  const { obstacles, fit } = dmFit(vp, false, card);
+  expect(obstacles).toContainEqual(card);
+  expect(fit.visible).toBe("all");
+  for (const s of onScreen(fit, SIM8_AMBUSH_DM)) {
+    expect(overlaps(s, card)).toBe(false);
+    expect(overlaps(s, summaryStrip(vp))).toBe(false);
+  }
+  expect(allClear(fit, footprints(SIM8_AMBUSH_DM), obstacles, visibleArea(vp))).toBe(true);
+  console.info(
+    `FR-MAP-80 with a card at 1440×900: ${(fit.scale * GRID.gridCellSize).toFixed(1)} px`,
+  );
+});
+
+test("FR-MAP-81 pcs keeps the top row: sim-9 a03 (1280×720, Game log + Initiative, the box forced as an obstacle) → pcs at 48 px, every PC clear, the top row starts at or below y 64 (was y 36 under the top bar)", () => {
+  const vp = { w: 1280, h: 720 };
+  const all = new Set(dmWindows.defs.map((d) => d.kind));
+  const windows = renderedWindowRects(defaultLayout(dmWindows, vp), dmWindows, all, vp);
+  // The sprint-5 obstacle (the whole 356 × 238 box) passed as the shown stack.
+  const box = toastKeepOut("dm", vp);
+  const obstacles = fitObstacles("dm", windows, keepOuts("dm", vp), vp, box);
+  const room = { areas: freeAreas(obstacles, vp), obstacles, windowsOnly: freeAreas(windows, vp) };
+  const fit = fitScene(SIM9_AMBUSH_DM, AMBUSH_GRID, AMBUSH_MAP, vp, room);
+  expect(fit.visible).toBe("pcs");
+  expect(fit.scale * AMBUSH_GRID.gridCellSize).toBeCloseTo(48, 9);
+  const area = visibleArea(vp);
+  expect(area.y).toBe(64);
+  const drawn = SIM9_AMBUSH_DM.map((t) => {
+    const p = footprintBox([t], AMBUSH_GRID) as Rect;
+    return {
+      t,
+      s: {
+        x: fit.x + p.x * fit.scale,
+        y: fit.y + p.y * fit.scale,
+        w: p.w * fit.scale,
+        h: p.h * fit.scale,
+      },
+    };
+  });
+  for (const { t, s } of drawn.filter((d) => d.t.pc)) {
+    expect(allClear({ x: 0, y: 0, scale: 1 }, [s], obstacles, area)).toBe(true);
+    expect(windows.some((w) => overlaps(s, w)) ? `${t.name} under a window` : "ok").toBe("ok");
+  }
+  // No footprint drawn on screen is cut by the top: each one on screen starts at or below y 64.
+  const cut = drawn
+    .filter(({ s }) => s.y + s.h > 0 && s.x + s.w > 0 && s.x < vp.w && s.y < area.y - 1e-6)
+    .map(({ t }) => t.name);
+  expect(cut).toEqual([]);
+  const top = Math.min(...drawn.filter(({ s }) => s.y + s.h > 0).map(({ s }) => s.y));
+  expect(top).toBeGreaterThanOrEqual(64);
+  console.info(`FR-MAP-81 a03: pan ${fit.x}, ${fit.y}; top row at y ${top}`);
 });

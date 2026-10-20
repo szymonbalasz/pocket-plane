@@ -8,6 +8,7 @@ import type { Rect, Viewport } from "./geometry";
 import { keepOuts } from "./keep-outs";
 import type { PlacementToken } from "./placement";
 import type { ShellClient } from "./registry";
+import { toastKeepOut } from "./toast-region";
 
 /** The `battlemap` fixture (Goblin Ambush): 20 × 14 cells at 70 px. */
 export const AMBUSH_GRID = { gridCellSize: 70, gridOffsetX: 0, gridOffsetY: 0 };
@@ -67,13 +68,16 @@ export const ambushCells = (client: ShellClient) =>
 /**
  * The client's Goblin Ambush footprints on screen (FR-SHELL-57) at the camera the scene fit
  * (FR-MAP-59) gives with `windows` (rendered rects) open: what `tokenScreenBoxes` reads live.
+ * The DM's at sim-9's fit, as measured there: the whole top-centre box as the obstacle (the
+ * sprint-5 rule; FR-MAP-80's strip lies inside it), so these cells stay sim-9's.
  */
 export function ambushTokens(
   client: ShellClient,
   vp: Viewport,
   windows: readonly Rect[],
 ): PlacementToken[] {
-  const obstacles = fitObstacles(windows, keepOuts(client, vp, new Map()));
+  const box = client === "dm" ? toastKeepOut("dm", vp) : null;
+  const obstacles = fitObstacles(client, windows, keepOuts(client, vp, new Map()), vp, box);
   const room = { areas: freeAreas(obstacles, vp), obstacles, windowsOnly: freeAreas(windows, vp) };
   const cells = ambushCells(client);
   const cam = fitScene(cells, AMBUSH_GRID, AMBUSH_MAP, vp, room);

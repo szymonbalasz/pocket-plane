@@ -1,5 +1,6 @@
 // Creatures list model (FR-ENT-18, ENT §7): pure, from synced records. Rows that fail their
 // schema are omitted (FR-ENT-01); the server already drops them, this guards the client too.
+// Sprint 6 (FR-ENT-39): pets list with the customs, badged "Pet of ‹PC›" (the lookups too).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -29,8 +30,20 @@ export interface CreatureRow {
   xp: number | null;
   /** Derived customs: base name, `(unknown)` if it can't be resolved; null if not derived. */
   derivedFrom: string | null;
+  /** FR-ENT-39 (sprint 6): a pet's owner PC and that PC's player; null if not a pet. */
+  pet: PetOwner | null;
   definition: DefinitionRecord;
 }
+
+export interface PetOwner {
+  characterId: string;
+  /** The owner PC's name, `(unknown)` if it isn't in the store. */
+  characterName: string;
+  playerName: string;
+}
+
+/** FR-ENT-39: a pet row's Badge text. */
+export const petBadge = (characterName: string) => `Pet of ${characterName}`;
 
 export function creatureRows(
   entities: readonly unknown[],
@@ -49,12 +62,21 @@ export function creatureRows(
   }
   const names = new Map(defs.map((d) => [d.id, d.name]));
   const playerName = new Map(players.map((p) => [p.id, p.name]));
+  const petOf = (d: DefinitionRecord): PetOwner | null => {
+    if (d.campaignId === null || d.kind !== "monster" || d.companionOf === null) return null;
+    return {
+      characterId: d.companionOf,
+      characterName: names.get(d.companionOf) ?? "(unknown)",
+      playerName: playerName.get(d.ownerPlayerId ?? "") ?? "Unknown player",
+    };
+  };
   return defs
     .filter((d) => tab === "all" || d.kind === tab)
     .sort(definitionOrder)
     .map((d) => {
       const readOnly = d.campaignId === null;
       const cr = d.kind === "monster" ? d.statBlock.cr : null;
+      const pet = petOf(d);
       return {
         id: d.id,
         kind: d.kind,
@@ -65,10 +87,13 @@ export function creatureRows(
           ? badgeLabel(d.source ?? "")
           : d.kind === "character"
             ? (playerName.get(d.ownerPlayerId) ?? "Unknown player")
-            : "Custom",
+            : pet
+              ? petBadge(pet.characterName)
+              : "Custom",
         cr,
         xp: cr === null ? null : xpForCr(cr),
         derivedFrom: d.derivedFromId === null ? null : (names.get(d.derivedFromId) ?? "(unknown)"),
+        pet,
         definition: d,
       };
     });

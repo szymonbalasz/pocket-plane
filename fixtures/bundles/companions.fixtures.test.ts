@@ -36,7 +36,7 @@ function track(r: Loaded): { r: Loaded; db: Db } {
 
 const load = async (bundle: string) => track(await loadBundle(bundle, { testMode: true }));
 
-/** The four session-sim-10 units on top of session-sim-9. */
+/** The four session-sim-10 CP units (CP0, CP1, CP3) on top of session-sim-9. */
 const SIM9_CP = defineBundle({
   name: "test-sim9-cp",
   includes: ["session-sim-9"],
@@ -111,7 +111,7 @@ describe("FR-CBT-124 companions bundles", () => {
     ]);
     // FR-ENT-37: both pets are in the running fight now (cp-combat), so present.
     expect(pets(db)).toEqual([
-      { name: "Owlbear", mode: "after-owner", hp: 59, present: true },
+      { name: "Owlbear", mode: "after-owner", hp: 45, present: true },
       { name: "Drake Companion", mode: "in-owner-turn", hp: 22, present: true },
     ]);
     // FR-MAP-74: the pet tokens are owned by the pet's player (Mira and Brakka: player-1).
@@ -141,7 +141,7 @@ describe("FR-CBT-124 companions bundles", () => {
     const start = await load("companions-start");
     expect(start.r.manifest.status).toBe("complete");
     expect(pets(start.db)).toEqual([
-      { name: "Owlbear", mode: "after-owner", hp: 59, present: false },
+      { name: "Owlbear", mode: "after-owner", hp: 45, present: false },
       { name: "Wolf", mode: "in-owner-turn", hp: 11, present: false },
     ]);
     // No running fight: "Ambush at the Ford" waits for the DM's Start (FR-CBT-109, S1).

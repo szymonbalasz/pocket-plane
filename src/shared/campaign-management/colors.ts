@@ -18,8 +18,6 @@ export const PLAYER_COLOR_KEYS = [
 ] as const;
 export type PaletteKey = (typeof PLAYER_COLOR_KEYS)[number];
 export const PaletteKey = z.enum(PLAYER_COLOR_KEYS);
-/** @deprecated The sprint-5 name of `PaletteKey`; a stored colour is now a hex (FR-CAMP-30). */
-export type PlayerColor = PaletteKey;
 
 /** CAMP §7 palette colours, dark mode (visual-direction `player.<key>`); order and hex fixed. */
 export const PLAYER_COLORS: Readonly<Record<PaletteKey, string>> = {

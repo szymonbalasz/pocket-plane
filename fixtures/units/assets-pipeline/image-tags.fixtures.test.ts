@@ -117,7 +117,7 @@ describe("image-tags fixtures (ASSET §13.1)", () => {
 });
 
 describe("CON-44 session-sim-10 (#256 ceilings)", () => {
-  test("CON-44 session-sim-10 under the ceilings: DM ≤ 1.5 MiB, players ≤ 512 KiB (image-tags adds DM assets only; CP3's cp-combat adds the companions players see)", async () => {
+  test("CON-44 session-sim-10 under the ceilings: DM ≤ 1.5 MiB, players ≤ 512 KiB; players unchanged by image-tags (DM assets only), only the CP units (pets, the fight's companions) add player rows", async () => {
     const sizes = async (bundle: string) => {
       const b = await servicesFromBundle(await loadBundle(bundle, { testMode: true }));
       try {
@@ -130,13 +130,23 @@ describe("CON-44 session-sim-10 (#256 ceilings)", () => {
     const sim10 = await sizes("session-sim-10");
     for (const v of sim10)
       expect([v.label, v.bytes <= SNAPSHOT_CEILING[v.role]]).toEqual([v.label, true]);
-    // Players: no asset rows (tags are DM-only); they grow only by cp-combat's pets + summons.
+    // Players: every type but the CP units' rows (CP1's pets + tokens, CP3's cp-combat: combatants,
+    // summon tokens, Thorn's concentration, the lines) byte-identical to sim-9; no asset rows.
+    const CP = new Set(["entity", "token", "combatant", "effect", "game-log-entry", "encounter"]);
+    const others = (v: (typeof sim10)[number]) =>
+      Object.entries(v.types).filter(([t]) => !CP.has(t));
+    expect(sim10.slice(1).map((v) => [v.label, others(v)])).toEqual(
+      sim9.slice(1).map((v) => [v.label, others(v)]),
+    );
     for (const v of sim10.slice(1)) expect(v.types.asset?.rows ?? 0).toBe(0);
     const [dm9, dm10] = [sim9[0]?.bytes ?? 0, sim10[0]?.bytes ?? 0];
     console.log(
       `CON-44 session-sim-10: DM ${dm10} B (+${dm10 - dm9} B over session-sim-9, ${sim10[0]?.types.asset?.rows} assets); players ${sim10
         .slice(1)
-        .map((v, i) => `${v.label} ${v.bytes} B (+${v.bytes - (sim9[i + 1]?.bytes ?? 0)})`)
+        .map(
+          (v, i) =>
+            `${v.label} ${v.bytes} B (+${v.bytes - (sim9[i + 1]?.bytes ?? 0)} B companions)`,
+        )
         .join(", ")}`,
     );
   }, 120_000);

@@ -16,8 +16,9 @@ import { useViewport } from "./hooks";
 import { hardRects, type KeepOut, keepOuts, TOASTS_KEEP_OUT, useKeepOuts } from "./keep-outs";
 import { type Windows, windowId } from "./manager";
 import { RAIL_CLEAR } from "./placement";
-import type { WindowRegistry } from "./registry";
+import type { ShellClient, WindowRegistry } from "./registry";
 import { useAvailableKinds, useRegistry, useShellState } from "./ShellContext";
+import { shownStack, shownStacks, subscribeShownStack, summaryStrip } from "./toast-region";
 
 /** Below this size (or share of the work area) the free area falls back to the work area. */
 export const FREE_MIN_W = 320;
@@ -131,11 +132,19 @@ export function freeArea(rects: readonly Rect[], vp: Viewport): Rect {
 }
 
 /**
- * What the free area avoids (FR-SHELL-48 (a)): the rendered windows plus the client's toast box,
- * so the fit frames no token under the toasts (FR-MAP-59); reported chrome (tool bars) doesn't
- * count: tool bars come and go, and the camera never refits on a tool change.
+ * What the fit avoids (FR-MAP-59, -80): the rendered windows plus, for players, their toast box
+ * (FR-SHELL-48 (a)); for the DM the summary strip (always) and the shown stack (FR-SHELL-59: what
+ * shows at fit time), not the empty top-centre box (OQ-MAP-57 D, #288). Reported chrome (tool
+ * bars) doesn't count: tool bars come and go, and the camera never refits on a tool change.
  */
-export function fitObstacles(windows: readonly Rect[], regions: readonly KeepOut[]): Rect[] {
+export function fitObstacles(
+  client: ShellClient,
+  windows: readonly Rect[],
+  regions: readonly KeepOut[],
+  vp: Viewport,
+  shown: Rect | null = shownStack(client),
+): Rect[] {
+  if (client === "dm") return [...windows, summaryStrip(vp), ...(shown ? [shown] : [])];
   return [...windows, ...regions.filter((k) => k.id === TOASTS_KEEP_OUT).map((k) => k.rect)];
 }
 
@@ -253,10 +262,13 @@ export interface FreeAreaState {
   /** Every candidate free rectangle, largest first (FR-SHELL-44); may be empty. */
   areas: readonly Rect[];
   /**
-   * The same, also clear of this client's toast box (FR-SHELL-48 (a)): the fit that keeps every
-   * token out from under the toasts (FR-MAP-59, slice W2) switches the camera to these.
+   * The same, also clear of the fit's toast obstacles (`fitObstacles`: players' toast box, the
+   * DM's summary strip + shown stack): the fit that keeps every token out from under the toasts
+   * (FR-MAP-59, -80) picks from these.
    */
   toastFreeAreas: readonly Rect[];
+  /** The fit's obstacles now (`fitObstacles`), screen px. */
+  obstacles: readonly Rect[];
   /** Grows by one per appearance; compare with a previous value, never read as a total. */
   appearances: number;
   /** The layout is applied (FR-SHELL-16): a fit before that would use no windows. */
@@ -272,7 +284,8 @@ export function useFreeArea(): FreeAreaState {
   const vp = useViewport();
   const measured = useContentHeights();
   const regions = useKeepOuts(registry.client);
-  const { area, areas, toastFreeAreas } = useMemo(() => {
+  const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
+  const { area, areas, toastFreeAreas, obstacles } = useMemo(() => {
     const shown = renderedWindowRects(
       windows,
       registry,
@@ -281,12 +294,15 @@ export function useFreeArea(): FreeAreaState {
       measured,
       hardRects(regions),
     );
+    const client = registry.client;
+    const obstacles = fitObstacles(client, shown, regions, vp, shownStack(client, reports));
     return {
       area: freeArea(shown, vp),
       areas: freeAreas(shown, vp),
-      toastFreeAreas: freeAreas(fitObstacles(shown, regions), vp),
+      toastFreeAreas: freeAreas(obstacles, vp),
+      obstacles,
     };
-  }, [windows, registry, available, vp, measured, regions]);
+  }, [windows, registry, available, vp, measured, regions, reports]);
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
   const [flips, setFlips] = useState(0);
   const windowsRef = useRef(windows);
@@ -297,5 +313,12 @@ export function useFreeArea(): FreeAreaState {
     if (isAppearance(seen.current, next, windowsRef.current)) setFlips((n) => n + 1);
     seen.current = next;
   }, [key, available]);
-  return { area, areas, toastFreeAreas, appearances: flips + notedNow, ready: key !== null };
+  return {
+    area,
+    areas,
+    toastFreeAreas,
+    obstacles,
+    appearances: flips + notedNow,
+    ready: key !== null,
+  };
 }

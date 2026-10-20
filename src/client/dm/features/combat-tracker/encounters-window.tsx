@@ -229,20 +229,23 @@ function DifficultyCard({ draft, partyIds }: { draft: Draft; partyIds?: readonly
 
 /**
  * The builder's suggestions (FR-CBT-63): the campaign's custom monsters from the store, imported
- * ones from the server (FR-CMP-17), merged in FR-ENT-18 order. `q` = the lookup's text.
+ * ones from the server (FR-CMP-17), merged in FR-ENT-18 order. `q` = the lookup's text. Pets
+ * aren't entries: they join at Start with their owner (FR-CBT-109, sprint 6).
  */
 function useMonsterLookupRows(q: string): LookupRow[] {
   const entities = useRecords<unknown>("entity");
   const players = useRecords<PlayerRecord>("player");
   const customs = useMemo(
     () =>
-      creatureRows(entities, [], players, "monster").map((r) => ({
-        id: r.id,
-        name: r.name,
-        cr: r.cr,
-        xp: r.xp,
-        badge: r.badge,
-      })),
+      creatureRows(entities, [], players, "monster")
+        .filter((r) => r.pet === null)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          cr: r.cr,
+          xp: r.xp,
+          badge: r.badge,
+        })),
     [entities, players],
   );
   return useCreatureLookup(api, customs, q);

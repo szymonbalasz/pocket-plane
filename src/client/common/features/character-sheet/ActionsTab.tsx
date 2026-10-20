@@ -14,7 +14,7 @@ import {
   spellAttackBonus,
   spellSaveDc,
 } from "@shared/entities/schemas";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Badge, Input } from "../../components/ui/primitives";
 import { useSync } from "../../sync/store";
@@ -334,6 +334,62 @@ function AttackLine({ a }: { a: Attack }) {
   );
 }
 
+/** FR-CHARX-56: a row's whole-row put (`char.putRow` with its id); unset keys dropped. */
+export function useAttackPut(a: Attack): PutAttack {
+  const rows = useRows("attacks");
+  return (patch) => {
+    const next: Record<string, unknown> = { ...a, ...patch };
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+    return rows.put(next);
+  };
+}
+
+/**
+ * FR-CHARX-56: one attack row in edit mode (name, to-hit, damage, type, Magic, extra parts);
+ * `tools` = the row's delete / move controls. Also the companion card's (FR-CHARX-63).
+ */
+export function AttackEditFields({ a, tools }: { a: Attack; tools: ReactNode }) {
+  const put = useAttackPut(a);
+  return (
+    <div className="flex flex-wrap items-start gap-1">
+      <TextField
+        path={`attacks.${a.id}.name`}
+        label="Attack name"
+        value={a.name}
+        max={40}
+        required
+        className="flex-1"
+        commit={(name) => put({ name })}
+      />
+      <IntField
+        path={`attacks.${a.id}.toHit`}
+        label="To hit"
+        value={a.toHit}
+        min={-10}
+        max={30}
+        commit={(toHit) => put({ toHit: toHit ?? 0 })}
+      />
+      <DamageField
+        path={`attacks.${a.id}.damage`}
+        value={a.damage}
+        commit={(damage) => put({ damage })}
+      />
+      <SelectField
+        path={`attacks.${a.id}.damageType`}
+        label="Damage type"
+        value={a.damageType ?? null}
+        options={typeOptions}
+        commit={(t) => put({ damageType: t ?? undefined })}
+      />
+      <MagicSelect a={a} put={put} />
+      {tools}
+      <div className="basis-full">
+        <ExtraParts a={a} put={put} />
+      </div>
+    </div>
+  );
+}
+
 function AttackRow({
   a,
   index,
@@ -346,13 +402,7 @@ function AttackRow({
   overrides: PublicOverrides;
 }) {
   const ctx = useSheet();
-  const rows = useRows("attacks");
   const e = ctx.editing && ctx.canEdit;
-  const put = (patch: Partial<Attack>) => {
-    const next: Record<string, unknown> = { ...a, ...patch };
-    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
-    return rows.put(next);
-  };
   const ref = a.id ? { attackId: a.id } : {};
   return (
     <div
@@ -361,42 +411,10 @@ function AttackRow({
       className="flex flex-col gap-1 border-b py-1.5"
     >
       {e ? (
-        <div className="flex flex-wrap items-start gap-1">
-          <TextField
-            path={`attacks.${a.id}.name`}
-            label="Attack name"
-            value={a.name}
-            max={40}
-            required
-            className="flex-1"
-            commit={(name) => put({ name })}
-          />
-          <IntField
-            path={`attacks.${a.id}.toHit`}
-            label="To hit"
-            value={a.toHit}
-            min={-10}
-            max={30}
-            commit={(toHit) => put({ toHit: toHit ?? 0 })}
-          />
-          <DamageField
-            path={`attacks.${a.id}.damage`}
-            value={a.damage}
-            commit={(damage) => put({ damage })}
-          />
-          <SelectField
-            path={`attacks.${a.id}.damageType`}
-            label="Damage type"
-            value={a.damageType ?? null}
-            options={typeOptions}
-            commit={(t) => put({ damageType: t ?? undefined })}
-          />
-          <MagicSelect a={a} put={put} />
-          <RowTools list="attacks" rowId={a.id} index={index} count={count} />
-          <div className="basis-full">
-            <ExtraParts a={a} put={put} />
-          </div>
-        </div>
+        <AttackEditFields
+          a={a}
+          tools={<RowTools list="attacks" rowId={a.id} index={index} count={count} />}
+        />
       ) : (
         <AttackLine a={a} />
       )}
