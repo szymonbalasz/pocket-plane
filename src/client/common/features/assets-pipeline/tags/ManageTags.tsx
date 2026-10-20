@@ -111,6 +111,8 @@ function TagChange({
   const merge = editing.kind === "rename" ? renamePrompt(chips, chip, to) : null;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    // React events bubble through the portal: never submit a host form (New scene, MAP §7).
+    e.stopPropagation();
     if (editing.kind === "delete") {
       if (await send(ASSET_INTENTS.deleteTag, { tag: chip.label })) close();
       return;

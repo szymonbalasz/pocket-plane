@@ -228,6 +228,8 @@ export function AssetPicker({
             value={query}
             className="h-8 pl-8 pr-8"
             onChange={(e) => setQuery(e.target.value)}
+            // Filtering is live: Enter never submits a host form (New scene).
+            onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
           />
           {query !== "" && (
             <button
@@ -249,7 +251,10 @@ export function AssetPicker({
       {(chips.tags.length > 0 || chips.untagged > 0) && (
         <TagChipRow chips={chips} filter={filter} onFilter={setFilter} />
       )}
-      {selectedAsset && <TagEditor asset={selectedAsset} chips={chips} live={live} />}
+      {selectedAsset && (
+        // Keyed: a typed tag or an error never carries over to another image.
+        <TagEditor key={selectedAsset.id} asset={selectedAsset} chips={chips} live={live} />
+      )}
 
       {upload.phase === "sending" && (
         <div data-testid="asset-upload-progress" className="flex items-center gap-2 text-xs">

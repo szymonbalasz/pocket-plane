@@ -158,6 +158,9 @@ test("FR-MAP-86 FR-ASSET-47 New scene: the name keeps focus; add a tag, Rename m
 
   // IM8: Misc Sketch (Untagged) → Add tag Dungeon (Enter).
   await picker.getByTestId("asset-picker-search").fill("misc");
+  // Enter in the search never submits the New scene form.
+  await picker.getByTestId("asset-picker-search").press("Enter");
+  await expect(dialog.getByTestId("map-scene-new-error")).toHaveCount(0);
   const item = picker.locator(`[data-testid="asset-picker-item"][data-record-id="${misc}"]`);
   await item.click();
   const editor = picker.getByTestId("asset-tags-editor");
@@ -182,4 +185,7 @@ test("FR-MAP-86 FR-ASSET-47 New scene: the name keeps focus; add a tag, Rename m
   await expect(rename).toHaveCount(0);
   await expect(chip(picker, "dungeon")).toHaveCount(0);
   await expect(item).toHaveAttribute("data-tags", "maps");
+  // The Rename form sits in a portal: confirming it didn't submit New scene.
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTestId("map-scene-new-error")).toHaveCount(0);
 });
