@@ -2129,3 +2129,10 @@ From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP
 - **Derived (not stored):** a colour's verdict (FR-CAMP-31 / -32), the palette row's blocks, the shading mask.
 - **Fixtures:** none new (the walkthrough and e2e use `prefs-s6` / `prefs-s6-e2e`; `session-sim-10` already holds `pc-colour-free`).
 - **CON-44:** 0 B.
+
+## 93. Sprint 6: layout test cells at the new Fit (WF follow-up)
+
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-62. **Built by `fix/placement-s6`**: tests only; no table, column, record type, payload or browser state. Protocol side: [protocol §120](../protocol/README.md#120-sprint-6-layout-test-cells-at-the-new-fit-the-oracle-ranks-the-pc-cut-wf-follow-up).
+
+- **Fixtures:** no new unit (pure tests on `session-sim-9`'s Goblin Ambush cells); `session-sim-10` gets a comment line only.
+- **CON-44:** 0 B.
