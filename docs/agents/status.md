@@ -18,7 +18,7 @@ ID ranges per track (sprint 6): CP ENT FR 31–40 / OQ 31–36, CBT FR 105–124
 
 ## Shared-file locks
 
-- Play-shell frame: free (WF1 merged #292); next holder WF3 `fix/fit-s6` (`free-area.ts`).
+- Play-shell frame `free-area.ts` + canvas `MapCanvas.tsx`: `fix/fit-s6` (WF3). Next canvas holder CP5.
 - Schema lane (`src/server/db/`): `fix/im-core` first, then `fix/cp-core` / PF0 in either order.
 
 ## Pending DM decisions
@@ -36,6 +36,7 @@ ID ranges per track (sprint 6): CP ENT FR 31–40 / OQ 31–36, CBT FR 105–124
 - Known flake: `e2e/weapon-rows.e2e.ts` "2d6+5 slashing" text check under a parallel full e2e (sprint 5; 3 / 3 alone).
 - Known flake: `e2e/weapon-combat.e2e.ts` (Flame Tongue line count) under a loaded full run; passes alone.
 - Known flake: `vision-s4.bench.test.ts` party move ≤ 30 ms fails only under parallel load (32 ms with 4 suites running; 11 ms alone). Re-run alone before treating it as real.
+- Known flake: `placement.test.ts` FR-SHELL-46 inward column ≤ 5 ms under parallel load (37 ms on main after WF1; 3 / 3 alone) → BL-51.
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
 
 - Integrator picks #142–#144 (badge, snapshot ceilings, registry-driven shell tests, reconnect probe 204, lazy Konva, window layout).
