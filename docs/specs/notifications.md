@@ -1,10 +1,10 @@
 ---
 title: Notifications
 prefix: NOTE
-status: complete
-owner: spec-windows
+status: claimed
+owner: spec-stats
 wave: 2
-phase: post-mvp-6
+phase: post-mvp-7
 ---
 
 # Notifications

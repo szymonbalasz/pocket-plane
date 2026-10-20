@@ -1,10 +1,10 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: complete
-owner: spec-windows
+status: claimed
+owner: spec-stats
 wave: 2
-phase: post-mvp-5
+phase: post-mvp-7
 ---
 
 # Dice and game log
