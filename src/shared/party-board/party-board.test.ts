@@ -1,5 +1,6 @@
 // PARTY §13 unit: zod rules, visibility fns, gainers, split math, merge rules, texts.
 import { describe, expect, test } from "bun:test";
+import { lootNotificationText } from "@shared/party-loot/format";
 import type { Coins } from "@shared/party-loot/schemas";
 import {
   dmShareLabel,
@@ -451,8 +452,15 @@ describe("PARTY derived texts", () => {
   const names: Record<string, string> = { m: "Mira", p1: "Player 1", p2: "Player 2" };
 
   test("FR-PARTY-19 loot-received text, cut to 280", () => {
-    expect(itemAddedText("Healer's kit", 1)).toBe("Party loot: Healer's kit ×1");
+    expect(itemAddedText("Healer's kit", 1)).toBe("Party inventory: Healer's kit ×1");
     expect(itemAddedText("x".repeat(400), 1).length).toBe(280);
+  });
+
+  test("FR-PARTY-49 inventory toast text: an item says inventory; coin / loot entries keep Party loot", () => {
+    expect(itemAddedText("Potion of healing", 2)).toBe("Party inventory: Potion of healing ×2");
+    expect(lootNotificationText("Silver dagger", { pp: 0, gp: 50, ep: 0, sp: 0, cp: 0 })).toBe(
+      "Party loot: Silver dagger (50 gp)",
+    );
   });
 
   test("FR-PARTY-25 item row text", () => {

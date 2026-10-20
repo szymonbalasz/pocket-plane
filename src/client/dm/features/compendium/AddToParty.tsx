@@ -1,7 +1,9 @@
 // **Add to party** (FR-CMP-40–42, CMP §7), DM only, on item entry views: Popover with a qty Input
-// (default 1) + **Add** → party-board's `party.addItem`. The `loot-received` toast is the
-// confirmation; reject → inline, qty kept; lost intent → Toast. Disabled while not live.
+// (default 1) + **Add** → party-board's `party.addItem`. FR-CMP-57: on ack the Popover reads
+// "Added: ‹name› ×‹qty›" (the row's name after a merge) for 1.5 s, then closes; reject → inline,
+// qty kept; lost intent → Toast. Disabled while not live.
 import type { CompendiumEntry } from "@shared/compendium/schemas";
+import { AddItemResult, PARTY_ITEM_TYPE, type PartyItemRecord } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@ui/components/ui/controls";
 import { Input, Label } from "@ui/components/ui/primitives";
@@ -9,15 +11,16 @@ import { useLive } from "@ui/features/combat-tracker/store";
 import { ITEM_INTENTS, LOST_ITEM_ADD } from "@ui/features/party-board/inventory-logic";
 import { intentFailure } from "@ui/features/party-board/logic";
 import { submitEnabled } from "@ui/features/party-loot/logic";
-import { useSync } from "@ui/sync/store";
+import { SyncContext, useSync } from "@ui/sync/store";
 import { PackagePlusIcon } from "lucide-react";
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   type AddToPartyState,
   addToPartyHint,
   addToPartyPayload,
   CLOSED,
+  DONE_MS,
   type SendOutcome,
   settle,
 } from "./add-to-party";
@@ -29,6 +32,7 @@ export function AddToPartyPanel({
   entry,
   qty,
   error,
+  done,
   live,
   busy,
   onQty,
@@ -37,6 +41,8 @@ export function AddToPartyPanel({
   entry: Entry;
   qty: string;
   error: string | null;
+  /** FR-CMP-57: the confirmation after an ack (the form gives way to it). */
+  done?: string;
   live: boolean;
   busy: boolean;
   onQty(v: string): void;
@@ -51,6 +57,13 @@ export function AddToPartyPanel({
     e.preventDefault();
     if (enabled) onSubmit();
   };
+  if (done) {
+    return (
+      <p data-testid="cmp-add-to-party-done" role="status" className="text-sm">
+        {done}
+      </p>
+    );
+  }
   return (
     <form onSubmit={submit} className="space-y-2">
       <div className="flex items-end gap-2">
@@ -94,6 +107,7 @@ export function AddToPartyPanel({
 export function AddToParty({ entry }: { entry: Entry }) {
   const live = useLive();
   const connection = useSync((s) => s.connection);
+  const sync = useContext(SyncContext);
   const [state, setState] = useState<AddToPartyState>(CLOSED);
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
@@ -105,8 +119,11 @@ export function AddToParty({ entry }: { entry: Entry }) {
     setBusy(true);
     let outcome: SendOutcome;
     try {
-      await connection.sendIntent(ITEM_INTENTS.addItem, parsed.value);
-      outcome = { kind: "ack" };
+      const result = AddItemResult.safeParse(
+        await connection.sendIntent(ITEM_INTENTS.addItem, parsed.value),
+      );
+      const name = result.success ? await rowName(result.data.itemId) : null;
+      outcome = { kind: "ack", name: name ?? parsed.value.name, qty: parsed.value.qty };
     } catch (err) {
       outcome = intentFailure(err, LOST_ITEM_ADD);
       if (outcome.kind === "toast") toast.error(outcome.message);
@@ -116,6 +133,25 @@ export function AddToParty({ entry }: { entry: Entry }) {
     }
     setState((s) => settle(s, outcome));
   };
+
+  // FR-CMP-57: the merged row's name ("Potion of healing"): from the store, else one-id load of the
+  // lazy type (ADR-0045); unavailable → the name sent.
+  const rowName = async (itemId: string): Promise<string | null> => {
+    const read = () =>
+      (sync?.getState().store.records[PARTY_ITEM_TYPE]?.[itemId] as PartyItemRecord | undefined)
+        ?.name ?? null;
+    const now = read();
+    if (now !== null) return now;
+    await connection.load(PARTY_ITEM_TYPE, [itemId])?.catch(() => {});
+    return read();
+  };
+
+  const done = state.done;
+  useEffect(() => {
+    if (!done) return;
+    const h = setTimeout(() => setState((s) => (s.done === done ? CLOSED : s)), DONE_MS);
+    return () => clearTimeout(h);
+  }, [done]);
 
   return (
     <Popover
@@ -138,6 +174,7 @@ export function AddToParty({ entry }: { entry: Entry }) {
           entry={entry}
           qty={state.qty}
           error={state.error}
+          done={state.done}
           live={live}
           busy={busy}
           onQty={(qty) => setState((s) => ({ ...s, qty, error: null }))}

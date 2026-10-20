@@ -308,12 +308,21 @@ export function ordinal(n: number): string {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/**
+ * A creature row's summary: "CR 1/4 · Small humanoid"; FR-CMP-58 (BL-48): no type (a creature core
+ * without one) → "CR 1/4 · Small", no trailing space. Entries and entryless definitions alike.
+ */
+export function monsterLine(m: { cr: string; size: string; type?: string | null }): string {
+  const type = m.type?.trim();
+  return `CR ${m.cr} · ${cap(m.size)}${type ? ` ${type}` : ""}`;
+}
+
 /** Summary line (≤ 80, derived at write): "CR 1/4 · Small humanoid", "Level 3 evocation", … */
 export function entryLine(e: EntryDraft): string {
   let line: string;
   switch (e.kind) {
     case "monster":
-      line = `CR ${e.facets.cr} · ${cap(e.facets.size)} ${e.facets.type}`;
+      line = monsterLine(e.facets);
       break;
     case "spell":
       line =

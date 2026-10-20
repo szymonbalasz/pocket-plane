@@ -26,6 +26,7 @@ import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import fog from "./fog";
 import fogScn from "./fog-scn";
+import fuSmallCopy from "./fu-small-copy";
 import furyLogLine from "./fury-log-line";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
@@ -130,4 +131,6 @@ export const bundles: readonly Bundle[] = [
   // Sprint 6 track CP (build/cp-pets)
   cpPetsE2e,
   cpTokens,
+  // Sprint 7 track FU (fix/fu-small-copy)
+  fuSmallCopy,
 ];
