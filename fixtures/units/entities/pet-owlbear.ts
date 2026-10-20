@@ -1,3 +1,4 @@
+import { petAdjustHp } from "@server/features/entities/pet-hp";
 import { createPet } from "@server/features/entities/pets";
 import { defineFixture, step } from "@server/features/fixtures-adapters/fixture-types";
 import { placeToken } from "@server/features/scenes-map/commands";
@@ -6,7 +7,7 @@ import { ENTITY_TYPE, IMPORTED_ENTITY_TYPE } from "@shared/entities/schemas";
 /**
  * CBT §13.3 `pet-owlbear` (sprint 6, FR-ENT-32): `POST /api/pets` Owlbear (`cp-srd`) for Mira,
  * `after-owner` → pet "Owlbear" (59 / 59); its token on Goblin Ambush beside Mira (0, 7), owned
- * by `player-1` (FR-MAP-74). CP1 appends `pet.adjustHp −14` (→ 45 / 59) with FR-ENT-36.
+ * by `player-1` (FR-MAP-74); then `pet.adjustHp −14` (→ 45 / 59, FR-ENT-36, CP1).
  */
 export default defineFixture({
   key: "pet-owlbear",
@@ -24,5 +25,7 @@ export default defineFixture({
       col: 0,
       row: 7,
     })),
+    // CP1 (FR-ENT-36): the kept HP the walkthrough and the Party tab read.
+    step(petAdjustHp, (r) => ({ petId: r.id("pet-owlbear", ENTITY_TYPE), delta: -14 })),
   ],
 });

@@ -16,6 +16,7 @@ import companionsPrep from "./companions-prep";
 import companionsStart from "./companions-start";
 import compendium from "./compendium";
 import compendiumFull from "./compendium-full";
+import cpPetsE2e from "./cp-pets-e2e";
 import diceDisplay from "./dice-display";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
@@ -123,4 +124,6 @@ export const bundles: readonly Bundle[] = [
   toastHomeE2e,
   initRowsE2e,
   lootSubtractE2e,
+  // Sprint 6 track CP (build/cp-pets)
+  cpPetsE2e,
 ];

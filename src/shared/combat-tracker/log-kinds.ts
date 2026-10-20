@@ -175,6 +175,12 @@ export type AttackLogRolls = z.infer<typeof AttackLogRolls>;
 /** FR-CBT-72: null = the card had no such roll (damage-only: no to-hit; to-hit-only: no damage). */
 export const AttackLogDmPayload = z.strictObject({
   targetAc: z.int(),
+  /**
+   * FR-CBT-114 (sprint 6, ADR-0056): a companion attacker's d20 face (its `payload.toHit.natural`
+   * is null: with the total it gives away the bonus). The DM's line reads it; absent = the
+   * payload's.
+   */
+  toHitNatural: z.int().nullable().optional(),
   hitComputed: z.boolean().nullable(),
   toHitRolled: z.int().nullable(),
   damageRolled: z.int().nullable(),
@@ -377,7 +383,9 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
     out.push({ text: String(t.total), style: "total" });
     // Both manual → the damage's badge (at the end) is the line's only one.
     if (hitBadge && !damageBadge) out.push(...PHYSICAL);
-    const natural = naturalMark(t.natural);
+    // FR-CBT-114: a companion's face is the DM's only (`dm.toHitNatural`).
+    const face = dm?.toHitNatural !== undefined ? dm.toHitNatural : t.natural;
+    const natural = naturalMark(face);
     if (natural !== null) out.push({ text: ` (natural ${natural})` });
     if (dm) {
       if (dm.overrides.toHit) {
@@ -388,7 +396,7 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       if (r && r.mode !== "normal") out.push(...rollBreakdownSegments(r));
       out.push({ text: ` vs AC ${dm.targetAc}` });
     }
-    const ruled = dm?.overrides.hit === true || publicRuling(t.natural, p.hit);
+    const ruled = dm?.overrides.hit === true || publicRuling(face, p.hit);
     const outcome = outcomeText(p.hit, p.crit, ruled, !!dm);
     // FR-CBT-88: an Apply hit line ends at its outcome ("— DM: hit.").
     if (p.awaitingDamage) return [...out, { text: outcome.trimEnd() }];

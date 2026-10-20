@@ -3,7 +3,11 @@
 // + game-log lines + card state. HP, temp HP, death counters and concentration go through
 // combat-extras' `hpRules` (FR-CBTX-01/02): owner event first, then its cards (FR-CBTX-17).
 
-import { companionSafeToHit, isCompanion } from "@shared/combat-tracker/companion";
+import {
+  companionLineRollIds,
+  companionSafeToHit,
+  isCompanion,
+} from "@shared/combat-tracker/companion";
 import type {
   AttackLogDmPayload,
   AttackLogPayload,
@@ -374,6 +378,8 @@ export const applyCardWith = (hooks: ApplyHooks) =>
         };
         const dmPayload: AttackLogDmPayload = {
           targetAc,
+          // FR-CBT-114: a companion's d20 face (its payload's is null).
+          ...(isCompanion(attacker) && lineToHit ? { toHitNatural: lineToHit.natural } : {}),
           hitComputed,
           toHitRolled,
           damageRolled,
@@ -399,8 +405,9 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           actorName: p.attackerName,
           payload: logPayload,
           dmPayload,
-          // FR-MOD-57: + public character-trigger rolls (the others ride in `dmPayload.rollIds`).
-          rollIds: [...rollIds, ...hooked.rollIds],
+          // FR-MOD-57: + public character-trigger rolls (the others ride in `dmPayload.rollIds`);
+          // FR-CBT-114: a companion's card rolls stay on its DM + owner roll line.
+          rollIds: companionLineRollIds(attacker, rollIds, hooked.rollIds),
           encounterId: enc.id,
           // FR-CBT-91: a ruled miss's line is the DM's record of its `raw 0` row (players read
           // its miss on the Apply hit line).

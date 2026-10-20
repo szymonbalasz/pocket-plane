@@ -823,6 +823,7 @@ const GOLDEN_KINDS = [
   "party.board",
   "cmp.compendium",
   "shell.prefs", // PF1 (FR-SHELL-62 (d): appended with its goldens)
+  "charx.companion", // CP4 (S2): appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */
@@ -849,6 +850,7 @@ test("FR-SHELL-61 every user-opened kind (DM): every non-default kind, launcher 
   const registry = withNewWindows();
   const kinds = userOpened(registry);
   expect(kinds).toContain("shell.prefs");
+  expect(kinds).toContain("charx.companion"); // no DM launcher (FR-CHARX-59)
   expect(kinds).toContain("party.handout"); // no launcher button
   expect(kinds).toContain("shell.test"); // test mode
   expect(problemsOf(runs(registry, kinds))).toEqual([]);

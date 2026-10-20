@@ -24,5 +24,8 @@ export default defineBundle({
     // CP: companions + summons
     // CP0: the SRD Owlbear and Fire Elemental (imported, DM-only; CP1 / CP3 add the pets and the fight)
     "cp-srd",
+    // CP1: Mira's Owlbear (45 / 59) and Brakka's Drake Companion, tokens beside their owners
+    "pet-owlbear",
+    "pet-drake",
   ],
 });

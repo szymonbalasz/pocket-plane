@@ -22,8 +22,8 @@ import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import { hpRules } from "../combat-extras/hp-rules";
 import { startedEncounter } from "../combat-tracker/rows";
 import { dice, gameLog } from "../dice-roll-log";
-import { rollTarget } from "./access";
 import { getCharacter } from "./hp";
+import { rollActor } from "./roll";
 import { getSheet } from "./sheet-rows";
 
 /**
@@ -76,8 +76,9 @@ export const charRoll = defineCommand({
     }
   },
   execute(input, env): CharRollResult {
-    // FR-CHARX-22: the DM may roll for any definition (NPC sheet); players for own characters.
-    const c = rollTarget(env, input.characterId);
+    // FR-CHARX-22: the DM may roll for any definition (NPC sheet); players for own characters
+    // and (FR-CHARX-69) the attacks of a pet they own.
+    const { creature: c, audiencePlayerId } = rollActor(env, input.characterId, input.kind);
     const definition = c.kind === "monster";
     if (definition && input.public !== undefined) {
       throw invalid("NPC sheet rolls are DM-only", [
@@ -142,6 +143,8 @@ export const charRoll = defineCommand({
       rollIds,
       // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).
       public: definition ? false : input.public,
+      // FR-CHARX-69 (ADR-0056): a pet owner's roll reaches the DM and that owner only.
+      ...(audiencePlayerId ? { audiencePlayerId } : {}),
     });
     env.emit({
       type: CharacterRolled.type,
