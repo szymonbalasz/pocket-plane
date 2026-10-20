@@ -2,7 +2,7 @@
 title: Play shell
 prefix: SHELL
 status: complete
-owner: spec-followups
+owner: spec-stats
 phase: post-mvp-7
 ---
 
@@ -104,6 +104,13 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 | FR-SHELL-88 | Test hooks: `data-auto-minimised-for`, `data-placed="returned"` | FU1 | in the tests above |
 
 0 B on the wire (all browser-only; §12). No new dependency. Bundle **`session-sim-10`** + one new FU unit (§13).
+
+> **Sprint 7 (track ST, stats tier A, DM [#311](../decisions-log.md); spec-stats).** A new launcher window **Stats** (`stats.board`, both clients) for the [stats](stats.md) leaderboard and session awards. It registers through the window registry (append) under FU's **FR-SHELL-86** contract (seam S5), and opens itself on the awards when the DM shows them. New **FR-SHELL-93–94**. **FU owns the frame this sprint** (#310 parking, default sizes, Reset layout). Slice ST2 registers `stats.board` **after FU1 merges**. 0 B on the wire from SHELL.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-SHELL-93 | Window type `stats.board` "Stats", both clients, launcher, loads closed | ST2 | `FR-SHELL-93 stats window registered` (+ FR-SHELL-45 / -62 registry tests pick it up) |
+| FR-SHELL-94 | Feature open on Show awards: opens / fronts Stats on that session's awards | ST2 | `FR-SHELL-94 awards open the window` |
 
 ## 1. Summary
 
@@ -260,6 +267,10 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 - **(d) Shrink:** nothing accepted after (c) → rank with every shrink down to `W`'s min size allowed (FR-SHELL-45 (6), `clearOfPcs`); accept the winner iff (b) holds without the useful-size clause.
 - **(e) Last resort:** the clear-of-windows candidate (else FR-SHELL-45's protected last resort) with the **least PC footprint area**, then the least token area, then today's order; `data-pc-clear` absent.
 - **Protected `W`** (DM Initiative at Start, the player's Initiative appearance, a protected reopen): (a)–(e) auto-minimise launcher windows for it; a protected window is never auto-minimised; a PC it still covers is the map's to clear (FR-MAP-44 (b), FR-MAP-90).
+
+| **Sprint 7, track ST** (stats) | | |
+| FR-SHELL-93 | **Window type `stats.board`** "Stats" ([stats](stats.md) FR-STATS-18, -19), registered per **FR-SHELL-86** (seam S5): one `defineWindow` line in each client's `windows.ts` (append); `defaultOpen: false` (parkable, never protected); no keep-out; **default 400 × 412**, `top-left`, `dx` 56; **min 320 × 280** (FU's limit); body scrolls. Launcher: lucide `Trophy`, label "Stats", order right after Party; no `activity` (stats aren't in the store). An ordinary launcher window for auto placement, the reopen rule, screen-full auto-minimise and #310 parking. ST2 appends its **golden row** and **size-table row** (FR-SHELL-86's tables) in its own branch. | OQ-STATS-17 resolved (S5) |
+| FR-SHELL-94 | **Feature open on awards** (FR-STATS-20). On a **live** `stats-awards` notification (never from a snapshot), the client calls `openStatsAwards(fromN)` (`@ui/features/stats/open.ts`, the `openPartyTab` pattern, [protocol §93](../protocol/README.md#93-sprint-5-loot-tab-p3)). It stores the view `{tab: "session", fromN}` for the viewer's key, then `openWindow("stats.board", main, {by: "feature"})`. A closed window is auto-placed (FR-SHELL-40 / -45, may park per FU). A minimised one is restored. An open one is fronted and switched. A player offline at the time uses the notification's **Open** (FR-NOTE-48), which does the same as a user open. | |
 
 ## 7. UI/UX notes
 
@@ -669,6 +680,12 @@ Covers SHELL FR-SHELL-77–88, [MAP](scenes-map.md#6-functional-requirements) FR
 
 Teardown: stop the server, `fixtures:reset --profile verify`.
 
+### Sprint 7 (track ST): Stats window
+
+- Unit `FR-SHELL-93 stats window registered`: both registries hold `stats.board` with the launcher entry, 400 × 412, min 320 × 280. FR-SHELL-86's golden and size-table rows pass, and the FR-SHELL-45 / -62 layout cases still pass at 1280×720, 1280×800, 1440×900 and 1600×900 with it opened.
+- Integration (client store) `FR-SHELL-94 awards open the window`: a live `stats-awards` frame opens a closed window (placed `feature`), restores a minimised one, and fronts and switches an open one. A snapshot with the same notification opens nothing.
+- Walkthrough: [stats §13](stats.md#13-test-plan) steps 1 and 6, plus one extra check at 1280×720: Stats opened by Show awards covers no PC token (FU's parking rule).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -791,6 +808,8 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - **FU1 → FU2 on `encounters-window.tsx`** (rulings-b #13): FU1 adds one `usefulSize` line to `cbt.encounters`' def; FU2 (FU-combat) rewrites the editor and End dialog in the same file and **rebases on FU1** for that line. The Start-dialog note (`cbt-enc-start-kept-note`, FR-CBT-141's client part) is FU2's (rulings-b #5).
 - **Docs at consolidation:** protocol §18 (parking rule, park order, useful size, Reset layout, returns, push vs the DM box, Space guard), §24 (the size table incl. `usefulSize`), combat-tracker protocol rows (Start's kept HP, End's summoned tokens); glossary (OQ-SHELL-57). No data-model change (no column). **None:** events, intents, record types, wire bytes.
 - **Dependency:** none. Parking reuses the hand-rolled placement (≤ 20 rects, ≤ 200 boxes); key handling and focus Tooltips use the existing Radix-based `Tooltip` and DOM events.
+
+**Sprint 7, track ST:** slice **ST2** `build/st-window` appends one line to each of `src/client/dm/windows.ts` and `src/client/player/windows.ts` (append-only registries, AGENTS §9.9), its golden row and size-table row (FR-SHELL-86), and adds `@ui/features/stats/*`. It doesn't touch the frame, placement or keep-outs. It goes **after FU1** (and ST-core) merges, then rebases on it (seam S5).
 
 ## 15. Open questions
 

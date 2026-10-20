@@ -2,7 +2,7 @@
 title: Notifications
 prefix: NOTE
 status: complete
-owner: spec-followups
+owner: spec-stats
 wave: 2
 phase: post-mvp-7
 ---
@@ -35,6 +35,13 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 |---|---|---|---|
 | FR-NOTE-44 | The DM stack never covers a pushed window's first row | FU1 | `FR-NOTE-44 toast clear of a pushed window` |
 | FR-NOTE-45 | The DM summary also counts actions waiting for players | FU4 | `FR-NOTE-45 summary counts waiting` |
+
+> **Sprint 7 (track ST, stats tier A, DM [#311](../decisions-log.md); spec-stats).** [Stats](stats.md) adds one info kind and one non-notification toast. **FR-NOTE-48**: kind `stats-awards` (audience all, no action), made when the DM presses **Show awards**. Its history row has **Open**. **FR-NOTE-49**: the overkill callout toast is a plain Toast in the same region, **not** a notification (no row, no bell, no history), like combat-extras' expiry toast (FR-CBTX-06). CON-44 measured: 575 B a `stats-awards` row, inside the 100-closed window, so the snapshot doesn't grow with sessions ([stats §12](stats.md#12-performance--bandwidth)).
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-NOTE-48 | Kind `stats-awards`: info to all, payload `{fromN, toN, from, to, label}`, view with Open | ST0 (kind), ST2 (views) | `FR-NOTE-48 awards notification` |
+| FR-NOTE-49 | Callout toasts are not notifications; a transient info toast in the info stack (S6) | ST2 | `FR-NOTE-49 callout toast is not a notification` |
 
 ## 1. Summary
 
@@ -123,6 +130,9 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR-NOTE-43 | **Never over a tool bar** (BL-40): a spot overlapping (≥ 1 px) a **hard** keep-out region (play-shell [FR-SHELL-48](play-shell.md#6-functional-requirements) (b): the active map tool bar `map.toolbar`, reported by scenes-map / fog-of-war) is not clear, like Initiative. `ToastRuntime.tsx` reads `useKeepOuts("dm")` and re-places the stack when the keep-outs change (a tool opens, closes, its bar wraps) as it does on window changes. Outcome: with any tool bar shown, `elementFromPoint` at the centre of each of its controls hits that control (sim-9: 6 / 16 Fog bar controls under the summary). The bar's max width already ends 8 px before the home band ([FR-MAP-60](scenes-map.md#6-functional-requirements)), so this bites only when the stack is shifted left of a moved Initiative; then it drops below the bar (top = bar bottom + 8). *(Under [OQ-MAP-57](scenes-map.md#15-open-questions) D or C, proposed)* the runtime also reports the stack's rendered rect through play-shell's `reportShownStack("note.toasts", rect \| null)` ([FR-SHELL-59](play-shell.md#6-functional-requirements)). | sim-9 b01 |
 | FR-NOTE-44 | **Never over a pushed window's first row** (sprint 7, sim-10 b05; amends FR-NOTE-42's "least window body"): outcome: with any map tool's bar shown and windows pushed by it (FR-SHELL-55), no DM toast covers the **title bar or the first 40 px of the body** of a rendered window. Means (rulings-b #3: this rule alone carries b05): in `dmStackPlacement` (`keep-out.ts`), a rendered window whose `data-placed` is `pushed` counts like Initiative (FR-NOTE-32: not clear), so the stack shifts within its band or drops below that window's **title bar + 40 px** of body before it takes "the least window body". Players unchanged. Outcome check (b05 repro): `elementFromPoint` at the centre of Scenes' first row hits the row. | sim-10 b05 |
 | FR-NOTE-45 | **The summary counts what waits for players** (sprint 7, BL-48: "1 pending action" toast while Initiative lists Pending (2); amends FR-NOTE-15's text, DM only): the DM's summary toast reads "N pending action(s)" for the DM's own as today and, when the started encounter also has pending notifications whose action owner is a player (the rows Initiative lists as "Waiting for …", FR-CBT-79), appends " · M waiting for players" (M ≥ 1; "1 waiting for a player"). With **N = 0 and M ≥ 1** the summary reads the waiting part alone ("1 waiting for a player", "2 waiting for players"), same "Open" action. So N + M = Initiative's "Pending (n)" for combat cards. Players: unchanged. `note-toast-pending-summary` gains `data-waiting` = M. | BL-48 |
+| **Sprint 7** (track ST, [stats](stats.md)) | | |
+| FR-NOTE-48 | **Kind `stats-awards`** (owner stats; one line in `kinds.ts`, append). Audience `all`, no action, so state `info`: a 6 s toast per FR-NOTE-13 / -14 plus a history row. Payload zod `{fromN, toN, from, to, label}` (`label` ≤ 40 chars, e.g. "Tue 20 Oct"); text "Session awards: ‹label›". Both are player-safe: times and a date only. Made only by `stats.showAwards` through `notify` (FR-NOTE-02). Client views (both `notification-views.ts`, append): icon lucide `Trophy`, and a renderer with an **Open** Button (`note-stats-awards-open`, client-only, not an action) calling `openStatsAwards(fromN)` ([FR-SHELL-94](play-shell.md#6-functional-requirements)). No `endRule` (awards outlive fights). | 575 B a row (measured) |
+| FR-NOTE-49 | **Callout toasts are not notifications** ([FR-STATS-22](stats.md#6-functional-requirements)). The overkill toast (`stats-overkill-toast`) is a shadcn Toast in this client's toast region: players bottom-right, DM top-centre band, under FR-NOTE-42 / -43's placement. It makes no row and doesn't count in the bell or appear in history. It is a transient **info** toast, not a card toast (seam S6): it uses the existing info-toast stack, never pushes windows, and Fit ([OQ-MAP-61](scenes-map.md#15-open-questions)) and the pending-toast rules ignore it. Only one shows at a time (a new callout replaces it). It starts from a live event frame only (`useEventFrame`), like FR-CBTX-06. | OQ-STATS-03 |
 
 ## 7. UI/UX notes
 
@@ -314,6 +324,10 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - *(Sprint 6, track WF; full split [play-shell §14](play-shell.md#14-dependencies))* **WF2** `fix/pending-toast-home` (FR-NOTE-42, -43): notifications-owned `keep-out.ts` (`dmStackPlacement` candidates and hard regions), `ToastRuntime.tsx` (`useKeepOuts("dm")`, re-place on keep-out change; under [OQ-MAP-57](scenes-map.md#15-open-questions) D or C also `reportShownStack`), `keep-out.test.ts`. Reads play-shell's existing `keep-outs.ts` (no frame edit); the reporter export comes from WF1 (stack on it with `--base`, or add that line after WF1 merges). Starts at once otherwise; no schema, event, record or visibility change. *(Settled by seams S10, S8)* WF2 owns `keep-out.ts` and `ToastRuntime.tsx` this sprint; CP3's one appended DM kind (`cbt-summon-concentration`) and PF0's type-only lines in `parts.tsx` / `HistoryWindow.tsx` touch other files; sound settings stay out of this spec. [dice-extras](dice-extras.md) FR-DICEX-55 does the same for the DM roll-popup stack (WF3's assigned line).
 - **K3** (last canvas holder, seams S10; `cue.color?` contract change granted to K3, S15; OQ-CAMP-27 decided in): the cue ring colour through scenes-map's `cue.color?` (FR-MAP-72) and notifications' own `tokenOverlays` line passing the action owner's colour.
 
+**Shared changes — sprint 7** (track ST): `src/server/features/notifications/kinds.ts` gets one `stats-awards` line (append, slice ST0). `src/client/{dm,player}/notification-views.ts` get one line each (append, slice ST2). Nothing else in this spec's code.
+
+**Sprint 7 tests** (track ST, bundle `stats`): integration `FR-NOTE-48 awards notification` (DM-only command; the row goes to every player and the DM; payload schema has no DM data; history row with Open; info toast 6 s), client `FR-NOTE-49 callout toast is not a notification` (a live `cbt.attack` frame with `callout` → toast, no store row, bell count unchanged, goes in the info-toast stack, pushes no window, Fit ignores it; a snapshot holding the same line → no toast). Walkthrough [stats §13](stats.md#13-test-plan) steps 2 and 6.
+
 ## 15. Open questions
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
@@ -344,10 +358,16 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 |---|---|---|---|---|
 | OQ-NOTE-25 | **How the DM's toast stack keeps off the tool bar and the map's top-left** (sim-9 b01, a01) | **Decided (#288): A** (the stack stays in its top-centre band; the tool bar blocks it). Options: **A. Move the toast: it stays in its top-centre band and slides down past windows (never to the left edge); hard keep-outs (the tool bar) block it like Initiative** (FR-NOTE-42, -43): predictable spot; may sit on a window body in the middle (e.g. Party at 576) more often than today. / B. Keep-out for the bar only: today's sideways search plus the bar as a blocker: fewer window-body overlaps, but the stack still wanders to the map's top-left (over the Dragon) when windows fill the middle. / C. Collapse: the summary becomes a one-line pill pinned at the home top (≈ 200 × 32), cards open from it: least footprint, one more click for the DM on every card | — · decided (#288) | FR-NOTE-42, -43, -32; play-shell §7 |
 
+**Sprint 7** (track ST).
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-NOTE-28 | Show awards: info toast **and** the window opening, or only the window? | **Decided (#315): A** · **A. Both** (FR-NOTE-13's rule unchanged; the toast says why the window opened) · B. Window only (a per-kind "no toast" flag, new to the registry) | — | NOTE, STATS |
+
 ## 16. Out of scope
 
 - *(Sprint 6)* Moving the DM's toasts out of the top-centre (decided #256, OQ-SHELL-32 C); the players' toast corner (unchanged).
 - Concentration, duration and turn reminders; rule listeners → [combat-extras](combat-extras.md), ADR-0027 C.
-- Roll requests → [dice-extras](post-mvp/dice-extras.md) (future kind, player owner). Kill-feed toasts → [stats](post-mvp/stats.md). `loot-received` → [party-loot](party-loot.md) (#146).
-- [Gems](post-mvp/gems.md) (#140): modifying a pending damage card's dice is combat-tracker's command; if card text must change then, ~~a post-MVP `updateNotification` helper (pending only)~~ *(sprint 2: exists, FR-NOTE-25)*. No MVP change.
+- Roll requests → [dice-extras](post-mvp/dice-extras.md) (future kind, player owner). Kill-feed toasts → [stats](stats.md). `loot-received` → [party-loot](party-loot.md) (#146).
+- [Gems](gems.md) (#140): modifying a pending damage card's dice is combat-tracker's command; if card text must change then, ~~a post-MVP `updateNotification` helper (pending only)~~ *(sprint 2: exists, FR-NOTE-25)*. No MVP change.
 - Load older history, server read state, cross-browser seen marker.

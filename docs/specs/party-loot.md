@@ -44,7 +44,7 @@ phase: post-mvp-7
 
 ## 4. Non-goals
 
-- Party inventory, item transfer, handouts, gold split (→ [party-board](post-mvp/party-board.md)); gems (→ [gems](post-mvp/gems.md), OQ-LOOT-08); wallet on the character sheet (OQ-LOOT-16).
+- Party inventory, item transfer, handouts, gold split (→ [party-board](post-mvp/party-board.md)); gems (→ [gems](gems.md), OQ-LOOT-08); wallet on the character sheet (OQ-LOOT-16).
 - Below-zero guard (#150), coin conversion / making change, hidden or pre-staged loot, deleting entries, editing moves (OQ-LOOT-15), edit history in the UI, player-added loot (OQ-LOOT-03), load older.
 - Loot lines in the game log (they are separate windows, as notifications I6). Undo is combat-only ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)): an edit or a reverse move is the correction.
 
@@ -270,4 +270,4 @@ A **bold** option is the suggested pick unless the row says Decided.
 
 ## 16. Out of scope
 
-- See §4. Owners: [party-board](post-mvp/party-board.md) (inventory, gold split, handouts, notes), [gems](post-mvp/gems.md), [character-sheet](character-sheet.md) (wallet on the sheet, OQ-LOOT-16). Also out: load older, edit history UI, item refs, player-added loot (OQ-LOOT-03, 04).
+- See §4. Owners: [party-board](post-mvp/party-board.md) (inventory, gold split, handouts, notes), [gems](gems.md), [character-sheet](character-sheet.md) (wallet on the sheet, OQ-LOOT-16). Also out: load older, edit history UI, item refs, player-added loot (OQ-LOOT-03, 04).

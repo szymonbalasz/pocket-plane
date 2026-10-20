@@ -54,6 +54,7 @@ import sessionSim7 from "./session-sim-7";
 import sessionSim8 from "./session-sim-8";
 import sessionSim9 from "./session-sim-9";
 import sessionSim10 from "./session-sim-10";
+import sessionSim11 from "./session-sim-11";
 import syncProbe from "./sync-probe";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
@@ -122,6 +123,7 @@ export const bundles: readonly Bundle[] = [
   companionsAlly,
   imageSearch,
   sessionSim10,
+  sessionSim11,
   toastHomeE2e,
   initRowsE2e,
   lootSubtractE2e,
