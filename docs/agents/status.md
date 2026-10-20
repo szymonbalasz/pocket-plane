@@ -8,11 +8,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| WF1 window reopen + footprints + layout tests | `fix/window-reopen` | build-window-reopen (w7Y) | building — **frame lock** | walkthrough → merge; then WF3, PF1 / CP4 merges |
-| IM-0 shared matcher | `fix/im-matcher` | build-im-matcher (w7Z) | building | merge (no walkthrough: refactor) |
-| IM-1 image tags core | `fix/im-core` | build-im-core (w70) | building — **schema lane 1st** | walkthrough-lite → merge; creates `session-sim-10` |
-| CP0 companions core | `fix/cp-core` | build-cp-core (w81) | building — schema lane after IM-1 | merge after IM-1 |
-| Queue | — | — | WF2, WF4, WF5, WF6, PF0 (lane after IM-1), PF3, PF1 (merges after WF1) as slots free; then IM-2 → IM-3, CP1, CP2 (after WF4), CP4, CP3, PF2, WF3, CP5 | — |
+| Merged | IM-0 #290, IM-1 #291, WF1 #292, PF0 #293 | — | — | — |
+| WF4 Initiative rows | `fix/init-rows-s6` | build-init-rows-s6 | walkthrough 15 / 16 (fixture name) + AC / HP fix; branch gates running | merge → unblocks CP2 |
+| CP0 companions core | `fix/cp-core` | build-cp-core | ready; main merged; gates queued after WF4 | merge → CP1, CP2, CP4 |
+| IM-2 + IM-3 image picker + wiring | `build/im-picker` | build-im-picker, test-im-picker | walkthrough IM1–IM12 running | merge |
+| WF3 Fit | `fix/fit-s6` | build-fit-s6 | building — **canvas + free-area lock** | walkthrough F6–F9 (+ F1–F4 recheck) |
+| WF2 pending toast | `fix/pending-toast-home` | build-pending-toast-home | building | walkthrough F5 |
+| PF1 + PF3 Preferences + loot Subtract | `build/prefs-window` | build-prefs-window | building | walkthrough P-steps |
+| Queue | — | — | WF5 tray Roll, WF6 template label; CP1 pets, CP2 turns (after WF4 + CP0), CP4 card, CP3 summon (after CP2), PF2 colour picker (after PF1 + WF5), CP5 marker (after WF3) | — |
 
 ID ranges per track (sprint 6): CP ENT FR 31–40 / OQ 31–36, CBT FR 105–124 / OQ 77–84, CHARX FR 59–70 / OQ 31–36, PARTY FR 41–46 / OQ 24–27, MAP FR 74–79 / OQ 54–56, NOTE FR 52–54 / OQ 30. WF SHELL FR 56–69 / OQ 41–46, MAP FR 80–85 / OQ 57–59, CBTX FR 57–62 / OQ 30–32, CBT FR 125–129 / OQ 85–86, DICEX FR 53–56 / OQ 46–47, SCN FR 52–54 / OQ 42–43, NOTE FR 42–45 / OQ 25–26. PF SHELL FR 70–79 / OQ 47–51, CAMP FR 30–37 / OQ 28–32, NOTE FR 46–51 / OQ 27–29, DICEX FR 57–60 / OQ 48–49, LOOT FR 25–28 / OQ 19–20. IM ASSET FR 39–52 / OQ 21–26, CMP FR 54–58 / OQ 43–45, ENT FR 41–43 / OQ 37–38, MAP FR 86–89 / OQ 60–61, SCN FR 55–58 / OQ 44–45, PARTY FR 47–49 / OQ 28–29. Proposed ADRs `proposed-s6-<cp|wf|pf|im>-<slug>.md`.
 
