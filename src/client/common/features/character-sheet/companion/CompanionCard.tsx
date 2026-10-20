@@ -280,10 +280,10 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * FR-CHARX-63: AC · HP bar + "45 / 59" (+ temp) · Speed; edit mode: AC, HP max, Speed inputs.
- * FR-CHARX-82: shown in edit mode only (out of it, `StatsLine`).
+ * FR-CHARX-63 edit mode: AC, HP ("45 / 59" + temp, HP bar) with HP max, Speed inputs. FR-CHARX-82:
+ * out of edit mode the card shows `StatsLine`.
  */
-function Stats({ e, editing, petId }: { e: CompanionEntry; editing: boolean; petId: string }) {
+function EditStats({ e, petId }: { e: CompanionEntry; petId: string }) {
   const intents = useSheetIntents();
   const card = e.card;
   const { current, max, temp } = e.hp;
@@ -293,24 +293,14 @@ function Stats({ e, editing, petId }: { e: CompanionEntry; editing: boolean; pet
   return (
     <div className="flex flex-wrap items-start gap-x-4 gap-y-1">
       <Stat label="AC">
-        {editing ? (
-          <IntField
-            path="ac"
-            label="AC"
-            value={card?.ac ?? 0}
-            min={0}
-            max={30}
-            commit={(v) => edit("ac", v)}
-          />
-        ) : (
-          <span
-            data-testid="charx-companion-ac"
-            data-value={card?.ac}
-            className="text-lg font-semibold tabular-nums leading-tight"
-          >
-            {card?.ac ?? "—"}
-          </span>
-        )}
+        <IntField
+          path="ac"
+          label="AC"
+          value={card?.ac ?? 0}
+          min={0}
+          max={30}
+          commit={(v) => edit("ac", v)}
+        />
       </Stat>
       <Stat label="HP">
         <span className="flex items-center gap-1.5">
@@ -327,16 +317,14 @@ function Stats({ e, editing, petId }: { e: CompanionEntry; editing: boolean; pet
               Temp {temp}
             </span>
           )}
-          {editing && (
-            <IntField
-              path="hpMax"
-              label="HP max"
-              value={card?.hpMax ?? max ?? 1}
-              min={1}
-              max={999}
-              commit={(v) => edit("hpMax", v)}
-            />
-          )}
+          <IntField
+            path="hpMax"
+            label="HP max"
+            value={card?.hpMax ?? max ?? 1}
+            min={1}
+            max={999}
+            commit={(v) => edit("hpMax", v)}
+          />
         </span>
         {current !== null && max ? (
           <span className="mt-0.5 h-1 w-24 overflow-hidden rounded-full bg-muted">
@@ -348,26 +336,16 @@ function Stats({ e, editing, petId }: { e: CompanionEntry; editing: boolean; pet
         ) : null}
       </Stat>
       <Stat label="Speed">
-        {editing ? (
-          <IntField
-            path="speed"
-            label="Speed"
-            value={card?.speed ?? null}
-            min={0}
-            max={200}
-            step={5}
-            optional
-            commit={(v) => edit("speed", v)}
-          />
-        ) : (
-          <span
-            data-testid="charx-companion-speed"
-            data-value={card?.speed}
-            className="text-lg font-semibold tabular-nums leading-tight"
-          >
-            {speedText(card?.speed)}
-          </span>
-        )}
+        <IntField
+          path="speed"
+          label="Speed"
+          value={card?.speed ?? null}
+          min={0}
+          max={200}
+          step={5}
+          optional
+          commit={(v) => edit("speed", v)}
+        />
       </Stat>
     </div>
   );
@@ -689,7 +667,7 @@ export function CompanionCardView({
       {e.petId && isEditing ? (
         <>
           <div className="flex items-start gap-2">
-            <Stats e={e} editing petId={e.petId} />
+            <EditStats e={e} petId={e.petId} />
             <div className="ml-auto">{editToggle}</div>
           </div>
           {hpControl}

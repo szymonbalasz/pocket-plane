@@ -630,8 +630,8 @@ export interface FlagStore {
  * FR-DICE-30 / -77: one Options entry. Without an actor pick it stays `"1"` / `"0"` (as before
  * FR-DICE-77); with one, `{"open":…,"actor":…}`.
  */
-const RollBarEntry = z.strictObject({ open: z.boolean(), actor: z.string().max(64) });
-type RollBarState = { open: boolean; actor: string | null };
+const RollBarEntry = z.strictObject({ open: z.boolean(), actor: z.string().max(64).nullable() });
+type RollBarState = z.infer<typeof RollBarEntry>;
 
 function parseEntry(raw: string | null | undefined): RollBarState {
   if (raw === "1") return { open: true, actor: null };
