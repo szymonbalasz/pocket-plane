@@ -2,16 +2,16 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams + review rulings applied; **DM gate 1 open** (`.verify/sprint7/gate.md`).
+**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams + review rulings applied; DM gate 1 **passed** (#315); spec merge in progress (GM → ST → FU), then Phase B wave 1.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Sprint 6 | merged | — | done (#290–#309), recap #310 | — |
-| GM gems spec | `spec/s7-gems` (ws w8H) | spec-gems | rulings applied | DM gate 1, then integrate + merge |
-| ST stats spec | `spec/s7-stats` (ws w8J) | spec-stats | rulings applied | DM gate 1, then integrate + merge |
-| FU follow-ups spec | `spec/s7-followups` (ws w8K) | spec-followups | rulings applied | DM gate 1, then integrate + merge |
+| GM gems spec | `spec/s7-gems` (ws w8H) | spec-gems | gate passed | mark decided, merge (GM → ST → FU) |
+| ST stats spec | `spec/s7-stats` (ws w8J) | spec-stats | gate passed | mark decided, merge (GM → ST → FU) |
+| FU follow-ups spec | `spec/s7-followups` (ws w8K) | spec-followups | gate passed | mark decided, merge (GM → ST → FU) |
 | backfill (BL-55) fog log once | `fix/bl-55-fog-log-once` (ws w8N, slot 0) | fix-bl-55 | fixing | gates + merge |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
@@ -25,7 +25,7 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 
 ## Pending DM decisions
 
-- Sprint 7 gate 1: `.verify/sprint7/gate.md` (51 picks, 2 ADRs, no dependency).
+- None.
 
 ## Resolved locally (report at gate)
 
