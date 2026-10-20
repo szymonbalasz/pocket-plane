@@ -19,6 +19,8 @@ import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
   APPLY_TARGETS_MAX,
   type CombatantView,
+  CRIT_CHANGED_TEXT,
+  critChanged,
   DamageCardPayload,
   type DamageMultiplier,
   HIT_RULING_TYPE,
@@ -696,6 +698,11 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                 className="animate-pulse font-normal text-muted-foreground [animation-duration:2.5s]"
               >
                 Waiting for damage
+              </span>
+            ) : critChanged(p) ? (
+              // FR-CBT-127 (sprint 7): a reroll flipped the crit; the old damage is "not used".
+              <span data-testid="cbt-popup-crit-changed" className="font-normal text-warning">
+                {CRIT_CHANGED_TEXT}
               </span>
             ) : (
               <span

@@ -560,6 +560,9 @@ export const samePartRollIds = (sent: PartRollIds, p: DamageCardPayload): boolea
 export const critChanged = (p: DamageCardPayload): boolean =>
   p.toHit !== null && p.damage === null && (p.unusedRolls?.length ?? 0) > 0;
 
+/** FR-CBT-127: what the DM's popup and the owner's card view say then. */
+export const CRIT_CHANGED_TEXT = "Critical changed by a reroll — roll damage again";
+
 /** One target's outcome, seen by the rolling player (#138): no DM-only ids. */
 export const DamageCardTargetOutcome = z.strictObject({
   targetName: z.string().nullable(),

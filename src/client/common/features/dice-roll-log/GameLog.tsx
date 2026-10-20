@@ -3,7 +3,9 @@
 // render from `you.role` / the `dmTools` slot. Sprint 4: each `die` segment is an inline die-shape
 // chip in the roller's look (FR-DICE-35); `focusLogEntry` highlights an entry (FR-DICE-37).
 // Sprint 5: a line this client's dice haven't landed yet shows blank chips and "…" (FR-DICE-40);
-// a `roll` line's actor name in the roller's player colour (FR-DICE-60, -61).
+// a `roll` line's actor name in the roller's player colour (FR-DICE-60, -61). Sprint 7 (GM1): a
+// superseded line is struck through with a "rerolled" Badge that jumps to the new line
+// (FR-DICE-65); entry actions from the registry at the line end (FR-DICE-68).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -25,22 +27,35 @@ import {
   type DmRollActorRef,
   GAME_LOG_ENTRY_TYPE,
   type GameLogEntryView,
+  type ManualEntry,
   ROLL_CATEGORIES,
   type RollCategory,
   RollEntryPayload,
   type RollMode,
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
+import type { RecordStore } from "@shared/protocol/store";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
 import {
+  CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   DicesIcon,
   EyeIcon,
   EyeOffIcon,
   HandIcon,
+  XIcon,
 } from "lucide-react";
-import { type ReactNode, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
@@ -51,8 +66,9 @@ import { useRecords, useSync } from "../../sync/store";
 import { colorHex } from "../campaign-management/colors";
 import { DieShape } from "../dice-extras/DieShape";
 import { useLanded, useLandingFade } from "../dice-extras/landing";
-import { stageTray, type TrayRequest } from "../dice-extras/store";
-import { scrollToEntry, useLogFocus } from "./focus";
+import { diceExtras, stageTray, type TrayRequest } from "../dice-extras/store";
+import { actionsFor, type EntryAction, entryActions } from "./entry-actions";
+import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
 import {
   type ActorOption,
   actorOptions,
@@ -152,7 +168,11 @@ function tooltipOf(e: GameLogEntryView, landed: boolean): ReactNode {
   const rolls = landed ? RollEntryPayload.safeParse(e.payload) : null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span>{time}</span>
+      <span>
+        {time}
+        {/* FR-DICE-65: the Tooltip keeps the full line + "rerolled". */}
+        {e.supersededBy !== null && !e.undone ? " · rerolled" : ""}
+      </span>
       {rolls?.success &&
         rolls.data.map((r) => (
           <span key={r.rollId}>
@@ -165,18 +185,190 @@ function tooltipOf(e: GameLogEntryView, landed: boolean): ReactNode {
   );
 }
 
+/** FR-DICE-68: how long an action's confirm ("Spend?" ✓ ✗) stays open. */
+export const ACTION_CONFIRM_MS = 4000;
+
+const ACTION_BUTTON = "size-6 shrink-0";
+
+/**
+ * FR-DICE-68: one entry action. A `confirm` action asks first ("Spend?" ✓ ✗, 4 s); a `roll`
+ * action's ✓ (or button) is a `RollButton`, so physical-dice mode asks for the dice (FR-DICE-07)
+ * and the throw waits for the new entry (FR-DICEX-09). A reject → Toast.
+ */
+function EntryActionButton({
+  action,
+  entry,
+  store,
+}: {
+  action: EntryAction;
+  entry: GameLogEntryView;
+  store: RecordStore;
+}) {
+  const connection = useSync((s) => s.connection);
+  const live = useSync((s) => s.state === "live");
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!asking) return;
+    const t = setTimeout(() => setAsking(false), ACTION_CONFIRM_MS);
+    return () => clearTimeout(t);
+  }, [asking]);
+  const roll = action.roll?.(entry) ?? null;
+  const go = (manual?: ManualEntry) => {
+    setAsking(false);
+    setBusy(true);
+    action
+      .run(entry, {
+        store,
+        send: (name, payload) => connection.sendIntent(name, payload),
+        ...(manual ? { manual } : {}),
+      })
+      .catch((err: unknown) => {
+        if (roll) diceExtras.failed();
+        toast.error(errorText(err));
+      })
+      .finally(() => setBusy(false));
+  };
+  const control = useRollControl({
+    expressions: [roll?.expression ?? "1d20"],
+    category: roll?.category ?? entry.category,
+    label: roll?.label ?? action.label,
+    mode: roll?.mode ?? "normal",
+    onRoll: (r) => go(r.manual?.[0]),
+  });
+  const disabled = !live || busy;
+  const ids = { "data-value": action.id, "data-record-id": entry.id };
+  const Icon = action.Icon;
+  // A roll action keeps the line's mode: the control rolls without Shift / Ctrl.
+  const start = () => (roll ? control.roll() : go());
+  if (asking) {
+    const yes = {
+      "data-testid": "dice-log-action-yes",
+      ...ids,
+      "aria-label": `${action.label}: yes`,
+      size: "icon" as const,
+      variant: "ghost" as const,
+      className: ACTION_BUTTON,
+      disabled,
+    };
+    return (
+      <span
+        data-testid="dice-log-action-confirm"
+        {...ids}
+        className="flex shrink-0 items-center gap-0.5 text-xs"
+      >
+        <span>{action.confirm}</span>
+        {roll ? (
+          <RollButton
+            control={control}
+            hint={false}
+            type="button"
+            {...yes}
+            onClick={(e) => {
+              e.preventDefault();
+              control.roll();
+            }}
+          >
+            <CheckIcon className="size-3.5" />
+          </RollButton>
+        ) : (
+          <Button type="button" {...yes} onClick={() => go()}>
+            <CheckIcon className="size-3.5" />
+          </Button>
+        )}
+        <Button
+          type="button"
+          data-testid="dice-log-action-no"
+          {...ids}
+          aria-label={`${action.label}: no`}
+          size="icon"
+          variant="ghost"
+          className={ACTION_BUTTON}
+          onClick={() => setAsking(false)}
+        >
+          <XIcon className="size-3.5" />
+        </Button>
+      </span>
+    );
+  }
+  const button = (
+    <Button
+      type="button"
+      data-testid="dice-log-action"
+      {...ids}
+      aria-label={action.label}
+      size="icon"
+      variant="ghost"
+      className={cn(ACTION_BUTTON, "text-muted-foreground")}
+      disabled={disabled}
+      onClick={() => (action.confirm !== undefined ? setAsking(true) : start())}
+    >
+      <Icon className="size-3.5" />
+    </Button>
+  );
+  // A roll action without a confirm anchors its physical form on the button itself.
+  return (
+    <Tooltip content={action.label}>
+      {roll && action.confirm === undefined ? (
+        <RollButton
+          control={control}
+          hint={false}
+          type="button"
+          data-testid="dice-log-action"
+          {...ids}
+          aria-label={action.label}
+          size="icon"
+          variant="ghost"
+          className={cn(ACTION_BUTTON, "text-muted-foreground")}
+          disabled={disabled}
+          onClick={(e) => {
+            e.preventDefault();
+            control.roll();
+          }}
+        >
+          <Icon className="size-3.5" />
+        </RollButton>
+      ) : (
+        button
+      )}
+    </Tooltip>
+  );
+}
+
+/**
+ * FR-DICE-68: the line's available actions, shown on hover / keyboard focus of the line (always
+ * on touch) and while one asks to confirm; none → nothing rendered (lines unchanged).
+ */
+function EntryActions({ e, actions }: { e: GameLogEntryView; actions: readonly EntryAction[] }) {
+  const store = useSync((s) => s.store);
+  const shown = useMemo(() => actionsFor(actions, store, e), [actions, store, e]);
+  if (shown.length === 0) return null;
+  return (
+    <span
+      data-testid="dice-log-actions"
+      className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover/entry:opacity-100 has-[[data-testid=dice-log-action-confirm]]:opacity-100 [@media(hover:none)]:opacity-100"
+    >
+      {shown.map((a) => (
+        <EntryActionButton key={a.id} action={a} entry={e} store={store} />
+      ))}
+    </span>
+  );
+}
+
 function Entry({
   e,
   isDm,
   look,
   color,
   focused,
+  actions,
 }: {
   e: GameLogEntryView;
   isDm: boolean;
   look: DiceLook;
   color: string | null;
   focused: boolean;
+  actions: readonly EntryAction[];
 }) {
   const { segments } = useMemo(() => formatEntry(e), [e]);
   // FR-DICE-40: only entries this client's live-throw path holds (FR-DICEX-49) wait.
@@ -185,6 +377,8 @@ function Entry({
   const line = useLandingFade<HTMLSpanElement>(landed);
   const hidden = isDm && !e.public;
   const nameColor = color ? colorHex(color) : null;
+  // FR-DICE-65: an undone line that is also superseded reads "undone" (its badge) only.
+  const rerolled = e.supersededBy !== null && !e.undone ? e.supersededBy : null;
   return (
     <li
       data-testid="dice-log-entry"
@@ -193,13 +387,14 @@ function Entry({
       data-roller={rollerAttr(e)}
       data-public={e.public}
       data-undone={e.undone}
+      data-superseded={e.supersededBy !== null}
       data-focused={focused}
       data-landed={landed}
       aria-busy={landed ? undefined : true}
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
       // FR-DICE-37: a focused entry gets the accent ring for 2 s.
       className={cn(
-        "flex items-start gap-1.5 rounded-sm py-px text-sm leading-snug transition-shadow",
+        "group/entry flex items-start gap-1.5 rounded-sm py-px text-sm leading-snug transition-shadow",
         hidden && "text-visibility-hidden",
         focused && "ring-2 ring-ring",
       )}
@@ -212,13 +407,38 @@ function Entry({
         />
       )}
       <Tooltip content={tooltipOf(e, landed)}>
-        <span ref={line} className={cn("min-w-0 flex-1 break-words", e.undone && "line-through")}>
+        <span
+          ref={line}
+          className={cn(
+            "min-w-0 flex-1 break-words",
+            (e.undone || rerolled) && "line-through",
+            // FR-DICE-65: struck through and dimmed, chips included.
+            rerolled && "opacity-60",
+          )}
+        >
           {shown.map((s, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and immutable
             <Segment key={i} s={s} look={look} nameColor={nameColor} />
           ))}
         </span>
       </Tooltip>
+      {rerolled && (
+        <Tooltip content="Rerolled: show the new roll">
+          <button
+            type="button"
+            data-testid="dice-log-rerolled"
+            data-record-id={rerolled}
+            aria-label="Rerolled: show the new roll"
+            className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => focusLogEntry(rerolled)}
+          >
+            <Badge variant="outline" className="px-1 py-0 text-[10px] text-muted-foreground">
+              rerolled
+            </Badge>
+          </button>
+        </Tooltip>
+      )}
+      <EntryActions e={e} actions={actions} />
       <Badge variant="secondary" className="shrink-0 px-1 py-0 text-[10px] text-muted-foreground">
         {CATEGORY_LABEL[e.category]}
       </Badge>
@@ -230,7 +450,15 @@ function Entry({
  * FR-DICE-21: oldest at the top; sticks to the bottom unless scrolled up, then "N new". The
  * roll bar's height changes (Options row, Physical strip; FR-DICE-30) keep a pinned list pinned.
  */
-function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boolean }) {
+function EntryList({
+  entries,
+  isDm,
+  actions,
+}: {
+  entries: GameLogEntryView[];
+  isDm: boolean;
+  actions: readonly EntryAction[];
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const looks = useRollerLooks();
   const keyOf = useColorKeyOf();
@@ -304,6 +532,7 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
               look={looks(e)}
               color={rollerColorKey(keyOf, e)}
               focused={focusedId === e.id}
+              actions={actions}
             />
           ))}
         </ul>
@@ -688,8 +917,17 @@ function useRollerLooks(): (e: GameLogEntryView) => DiceLook {
   }, [rows, players]);
 }
 
-/** The `dice.log` window body. `dmTools`: the DM's settings gear (FR-DICE-22). */
-export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
+/**
+ * The `dice.log` window body. `dmTools`: the DM's settings gear (FR-DICE-22). `actions`: the
+ * entry-action registry (FR-DICE-68; tests pass their own).
+ */
+export function GameLog({
+  dmTools,
+  actions = entryActions,
+}: {
+  dmTools?: ReactNode;
+  actions?: readonly EntryAction[];
+}) {
   const records = useRecords<GameLogEntryView>(GAME_LOG_ENTRY_TYPE);
   const everLive = useSync((s) => s.everLive);
   const isDm = useSync((s) => s.store.you?.role === "dm");
@@ -718,7 +956,7 @@ export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
           No rolls yet
         </p>
       ) : (
-        <EntryList entries={entries} isDm={isDm} />
+        <EntryList entries={entries} isDm={isDm} actions={actions} />
       )}
       <RollBar dmTools={isDm ? dmTools : undefined} />
     </section>
