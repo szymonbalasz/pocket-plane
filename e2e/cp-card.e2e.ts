@@ -5,10 +5,15 @@
 // Scimitar row with Attack / Damage / Attack + damage (FR-CHARX-59, -62, -64). Attack + damage
 // sends `cbt.attack` as the companion: the DM's Initiative gets a "Goblin 2" card; the roll line
 // is in player-1's log, not player-2's (FR-CBT-114, ADR-0056). Player-2 has no Companions entry
-// (FR-CHARX-67). Picker, edits, HP states, leaks: bun test (companion tests).
-import { expect, type Page, test } from "@playwright/test";
+// (FR-CHARX-67). The DM opens the card from Goblin 2's card icon (FR-CHARX-59, walkthrough 9);
+// Turn hostile → player-1's card says "No longer your companion" and then closes (FR-CHARX-68,
+// walkthrough 19). Picker, edits, HP states, leaks: bun test (companion tests).
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
+
+const row = (scope: Locator, id: string) =>
+  scope.locator(`[data-testid="cbt-init-row"][data-record-id="${id}"]`);
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -19,10 +24,11 @@ const entriesBy = (page: Page, name: string) =>
     has: page.getByTestId("dice-log-entry-actor").getByText(name, { exact: true }),
   });
 
-test("FR-CHARX-59 FR-CHARX-64 FR-CHARX-67 companions-ally: the owner's card rolls as Goblin 2; the DM gets the card; player-2 has no card and no roll line", async ({
+test("FR-CHARX-59 FR-CHARX-64 FR-CHARX-67 FR-CHARX-68 companions-ally: the owner's card rolls as Goblin 2; the DM gets the card and opens it from the row; player-2 has no card and no roll line; turned hostile, the card says so and closes", async ({
   browser,
 }) => {
-  const { secret, link } = e2eEnv();
+  const { secret, link, recordId } = e2eEnv();
+  const goblin2 = recordId("combat-1", "combatant", 3);
   const dm = await rolePage(browser);
   await dm.setViewportSize({ width: 1440, height: 900 });
   await loginDm(dm, secret);
@@ -67,4 +73,19 @@ test("FR-CHARX-59 FR-CHARX-64 FR-CHARX-67 companions-ally: the owner's card roll
   await expect(entriesBy(p1, "Goblin 2")).toHaveCount(p1Before + 1);
   // The roll line is DM + owner only: player-2's log is unchanged once player-1 has it.
   await expect(entriesBy(p2, "Goblin 2")).toHaveCount(p2Before);
+
+  // The DM opens Goblin 2's card from its row's card icon (walkthrough 9).
+  await row(init, goblin2).getByTestId("cbt-init-row-card").click();
+  const dmCard = shellWindow(dm, "charx.companion");
+  await expect(dmCard.getByTestId("charx-companion-name")).toHaveText("Goblin 2");
+  await expect(dmCard.getByTestId("charx-companion")).toHaveAttribute("data-record-id", goblin2);
+
+  // Turn hostile: player-1's last companion leaves → the message for 3 s, then the window
+  // closes with its launcher entry (walkthrough 19).
+  await row(init, goblin2).getByTestId("cbt-init-row-menu").first().click();
+  await dm.getByTestId("cbt-init-row-companion").click();
+  await dm.getByTestId("cbt-companion-hostile").click();
+  await expect(card.getByTestId("charx-companion-gone")).toContainText("No longer your companion");
+  await expect(card).toHaveCount(0, { timeout: 6000 });
+  await expect(launcherButton(p1, "charx.companion")).toHaveCount(0);
 });

@@ -4,6 +4,11 @@ import { expect, test } from "bun:test";
 import { COMBATANT_TYPE, ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
+import {
+  createOwnershipHold,
+  GONE_MS,
+  goneOutcome,
+} from "@ui/features/character-sheet/companion/picker";
 import { playerCompanionWindow } from "./companion-window";
 
 const mira = { id: "mira", kind: "character", name: "Mira", ownerPlayerId: "p1" };
@@ -71,10 +76,29 @@ test("FR-CHARX-59 window (player): charx.companion top-left dx 56, 320×360 min 
   expect(def.launcher?.label).toBe("Companions");
   const available = def.available;
   if (!available) throw new Error("no available()");
-  expect(available(store("p1", { entities: [mira, owlPet] }))).toBe(true); // a pet, no fight
-  expect(available(store("p1", { entities: [mira], combatants: [summon] }))).toBe(true); // a summon
+  // (The page's hold keeps a just-lost companion's card for 3 s: check "none" first.)
   expect(available(store("p2", { entities: [mira, owlRedacted] }))).toBe(false);
   expect(
     available(store("p2", { entities: [mira], combatants: [{ ...summon, card: undefined }] })),
   ).toBe(false);
+  expect(available(store("p1", { entities: [mira], combatants: [summon] }))).toBe(true); // a summon
+  expect(available(store("p1", { entities: [mira, owlPet] }))).toBe(true); // a pet, no fight
+});
+
+test("FR-CHARX-68 last companion leaves (walkthrough 19): the window stays available for the 3 s message, then the card closes it", () => {
+  let t = 0;
+  const hold = createOwnershipHold(() => t);
+  expect(hold(false)).toBe(false); // never owned one
+  expect(hold(true)).toBe(true);
+  t = 1000;
+  expect(hold(false)).toBe(true); // just left: the card shows "No longer your companion"
+  t = 1000 + GONE_MS - 1;
+  expect(hold(false)).toBe(true);
+  t = 1000 + GONE_MS;
+  expect(hold(false)).toBe(false); // gone
+  expect(hold(true)).toBe(true); // a new one
+  // After the message the card closes itself when nothing is left (player); else moves on.
+  expect(goneOutcome([], "player")).toBe("close");
+  expect(goneOutcome([], "dm")).toBe("next");
+  expect(goneOutcome([{ key: "owl" } as never], "player")).toBe("next");
 });

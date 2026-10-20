@@ -30,7 +30,7 @@ import { SIDE_LABEL } from "../../combat-tracker/side";
 import { useCombatants, useStartedEncounter } from "../../combat-tracker/store";
 import { slotLabelsOf } from "../../dice-roll-log/logic";
 import { RollButton, useRollControl } from "../../dice-roll-log/roll-control";
-import { useOpenWindow } from "../../play-shell/ShellContext";
+import { useOpenWindow, useWindowDispatch } from "../../play-shell/ShellContext";
 import { AttackEditFields } from "../ActionsTab";
 import { IntField, useBusy } from "../fields";
 import { ROLL_HINT } from "../rolls";
@@ -48,6 +48,7 @@ import {
   companionSelection,
   entryFor,
   GONE_MS,
+  goneOutcome,
   leftCompanion,
   modeText,
   ownerText,
@@ -56,6 +57,7 @@ import {
   sizeTypeText,
 } from "./picker";
 import { type CardRollTarget, cardCritOptions, cardRollIntent, cardRowSpecs } from "./rolls";
+import { COMPANION_KIND } from "./window";
 
 /** FR-ENT-36 (entities, CP1): a pet's kept HP out of a fight; the card's ± sends it. */
 export const PET_ADJUST_HP = "pet.adjustHp";
@@ -632,11 +634,18 @@ export function CompanionCard({ dm }: { dm?: CompanionDmParts }) {
     if (left) setGone(left);
     lastShown.current = left ? null : shown;
   }, [entries, shown, live]);
+  const dispatch = useWindowDispatch();
   useEffect(() => {
     if (!gone) return;
-    const t = setTimeout(() => setGone(null), GONE_MS);
+    const t = setTimeout(() => {
+      setGone(null);
+      // The player's last companion left: close (the launcher entry went with it).
+      if (goneOutcome(entriesRef.current, role) === "close") {
+        dispatch({ type: "close", kind: COMPANION_KIND });
+      }
+    }, GONE_MS);
     return () => clearTimeout(t);
-  }, [gone]);
+  }, [gone, role, dispatch]);
 
   if (!you) {
     return (

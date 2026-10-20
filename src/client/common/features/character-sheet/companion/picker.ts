@@ -212,3 +212,34 @@ export const leftCompanion = (
 
 /** FR-CHARX-68: "No longer your companion" shows this long before the picker moves on. */
 export const GONE_MS = 3000;
+
+/**
+ * FR-CHARX-68 (walkthrough 19): the player's `available` stays true for `GONE_MS` after their
+ * last companion leaves, so the open card can say "No longer your companion" before it closes
+ * itself (`goneOutcome`). Per page; `now` = the clock (tests pass their own).
+ */
+export function createOwnershipHold(now: () => number = () => Date.now()) {
+  let owned = false;
+  let until = 0;
+  return (owns: boolean): boolean => {
+    if (owns) {
+      owned = true;
+      until = 0;
+      return true;
+    }
+    if (owned) {
+      owned = false;
+      until = now() + GONE_MS;
+    }
+    return now() < until;
+  };
+}
+
+/**
+ * FR-CHARX-68: after the "No longer your companion" message, the card moves on to the next
+ * companion; a player with none left closes the window (its launcher entry is gone).
+ */
+export const goneOutcome = (
+  entries: readonly CompanionEntry[],
+  client: "dm" | "player",
+): "next" | "close" => (client === "player" && entries.length === 0 ? "close" : "next");

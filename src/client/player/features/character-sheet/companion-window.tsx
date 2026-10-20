@@ -7,12 +7,16 @@ import { recordsOf } from "@shared/protocol/store";
 import { CompanionCard } from "@ui/features/character-sheet/companion/CompanionCard";
 import {
   type CompanionEntityLike,
+  createOwnershipHold,
   ownsCompanion,
 } from "@ui/features/character-sheet/companion/picker";
 import { companionWindowBase } from "@ui/features/character-sheet/companion/window";
 import { startedIn } from "@ui/features/combat-tracker/store";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { PawPrintIcon } from "lucide-react";
+
+/** FR-CHARX-68: the card outlives the last companion by the "No longer…" message. */
+const hold = createOwnershipHold();
 
 export const playerCompanionWindow = defineWindow({
   ...companionWindowBase,
@@ -23,10 +27,12 @@ export const playerCompanionWindow = defineWindow({
     const combatants = enc
       ? recordsOf<CombatantView>(store, COMBATANT_TYPE).filter((c) => c.encounterId === enc.id)
       : [];
-    return ownsCompanion(
-      store.you?.playerId ?? null,
-      recordsOf<CompanionEntityLike>(store, ENTITY_TYPE),
-      combatants,
+    return hold(
+      ownsCompanion(
+        store.you?.playerId ?? null,
+        recordsOf<CompanionEntityLike>(store, ENTITY_TYPE),
+        combatants,
+      ),
     );
   },
   component: () => <CompanionCard />,
