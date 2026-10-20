@@ -1,6 +1,6 @@
 // Creature lookup (FR-CBT-63): the builder's and the Add dialog's autocomplete. Pure; the part is
 // `CreatureLookup` in `./parts`. Matches with the compendium's shared matcher (FR-CMP-37).
-import { type NameTier, nameTier, queryWords } from "@shared/compendium/match";
+import { type NameTier, nameTier, queryWords } from "@shared/search/match";
 
 /** What a suggestion row shows: name, CR, XP, source Badge (FR-CBT-63). */
 export interface LookupRow {

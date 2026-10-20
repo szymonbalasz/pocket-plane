@@ -2,7 +2,6 @@
 // schema are omitted (FR-ENT-01); the server already drops them, this guards the client too.
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
-import { nameTier, queryWords } from "@shared/compendium/match";
 import {
   type DefinitionRecord,
   definitionOrder,
@@ -11,6 +10,7 @@ import {
   ImportedEntityRecord,
   xpForCr,
 } from "@shared/entities/schemas";
+import { nameTier, queryWords } from "@shared/search/match";
 import { badgeLabel } from "@ui/features/compendium/logic";
 
 export type CreatureTab = "all" | EntityKind;
