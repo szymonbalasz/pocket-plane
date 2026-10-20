@@ -29,7 +29,7 @@
 
 - **Registry** `src/shared/campaign-management/features.ts` (append-only, AGENTS §9.9): `{key, label, description, ownerSpec}`; `gems` first. Unknown key in an intent → `invalid`.
 - **Storage:** `campaign.features` JSON leaf `string[]`, default `[]`. **Wire:** `CampaignRecord.features` present only when non-empty (0 B when off).
-- **Switching:** `camp.setFeature {feature, on}` (DM, WS) → `campaign` upsert + event `CampaignFeatureSet {feature, on}` (logged, not undoable); same value → no-op, no event. After the commit **every connection of the campaign gets a fresh snapshot** (as a scene switch does for players, FR-SYNC-11), so rows appear / disappear in one step and per-connection state can't go stale.
+- **Switching:** `camp.setFeature {feature, on}` (DM, WS) → `campaign` upsert + event `CampaignFeatureSet {feature, on}` (logged, not undoable); same value → no-op, no event. After the commit **every connection of the campaign gets a fresh snapshot** (as a scene switch does for players, FR-SYNC-11), so rows appear / disappear in one step and per-connection state can't go stale. **Named exemption from ADR-0021** ("events carry changes for any record whose visibility changes"): a feature switch resyncs instead of listing those changes. A resync keeps client-only UI state (popup typed values, roll-bar drafts, held dice, open dialogs), as FR-SYNC-11's does.
 - **Viewer context** gains `features: readonly string[]`, read from the campaign row when the connection's snapshot is built (connect, `resync`, the forced resync above). Visibility fns may read it; they still read nothing else.
 - **What "off" means** (one rule, the hub applies it; features declare, never re-implement):
 
@@ -38,15 +38,16 @@
 | Record type | `feature: "<key>"` on registration | Hidden for every viewer (DM too): no snapshot rows, no frame changes, no `sync.load` rows |
 | Log kind | `feature: "<key>"` on the kind def (`kinds.ts`) | Entries of the kind hidden for every viewer; the window still counts them (ADR-0029 cut before the filter: a viewer may get < 100 entries, as with hidden entries today) |
 | Intents | the command checks `featureOn(env, key)` first | `forbidden` "‹Label› is off in this campaign"; nothing written |
-| Fields on other features' records | not allowed: a feature that needs data on a shared record keeps it generic (e.g. `supersededBy`, `maxed`) and never names the feature | stays |
+| Traces on other features' records (fields / rows a feature caused on a shared record) | `traces: {feature, hides?(record), strip: paths[]}` on that record type / log kind, pure (record + context) | `hides` true → row hidden; `strip` paths removed, for every viewer. Gems (OQ-GEM-21 B): `roll` entries with `supersededBy` hidden, `replaces` stripped; damage cards' `maxed` / `diceMaxed` stripped. (Under OQ-GEM-21 A gems declares no traces.) |
+| Entries in other registries (notification kinds, rule / roll hooks, sheet sections, windows, routes) | `feature?` on the entry; server hooks call `featureOn`; client registries check `useFeature` | skipped / not rendered. No build now beyond what gems needs |
 | Rows in the DB | — | **kept** (switching on restores them); a feature that wants a clear does it with its own command |
 | Client UI | `useFeature(store, key)` from the `campaign` record | not rendered |
 
 ## Consequences
 
-- Gems ship as the first feature: `character-gems` tagged `gems`; log kinds `gem.award`, `gem.spend` tagged `gems`. The reroll's `roll` entry, `supersededBy`, `replacesRollId` and the card's `maxed` dice are generic dice facts and stay while off (gems FR-GEM-05).
-- **Leak rule for tests:** with a feature off, no snapshot, frame or `sync.load` ack contains a tagged type, a tagged kind, or the feature key; leak scans add the tag check per feature.
-- **Event log:** unchanged. Events of tagged commands are logged as usual; replays and stats read them regardless of the switch (stats are DM / server-side reads; a stats view honouring the switch is that view's rule).
+- Gems ship as the first feature: `character-gems` tagged `gems`; log kinds `gem.award`, `gem.spend` tagged `gems`; traces per the table (gems FR-GEM-05, OQ-GEM-21).
+- **Leak rule for tests:** with a feature off, no snapshot, frame, `sync.load` ack or `stats.query` answer contains a tagged type, a tagged kind, a declared trace or the feature key; leak scans add the check per feature.
+- **Every read path** (snapshot, frames, `sync.load`, `stats.query`) applies the hub's feature rule. Only the raw `event_log` ignores it (events of tagged commands are logged as usual), and no client read uses it.
 - **CON-44** (measured 2026-10-20, heavy harness, throwaway probe): off **0 B**; switch on +20 B per viewer (`"features":["gems"]`); gems' own rows are in [gems §12](../../specs/gems.md#12-performance--bandwidth).
-- Build: one shared-file slice (gems GM0): `src/server/db/schema.ts` (column), `src/server/ws/` (viewer `features`, tag check in the visibility filter and `sync.load`), the record-type registration type (`feature?`), `LogKindDef.feature?` in `@shared/dice-roll-log/kind-types.ts`, the new registry; docs: protocol (§26 registries, viewer context), data model (campaign), live-sync (one FR at integration).
+- Build: one shared-file slice (gems GM0): `src/server/db/schema.ts` (column), `src/server/ws/` (viewer `features`, tag and trace check in the visibility filter and `sync.load`), the record-type registration type (`feature?`), `LogKindDef.feature?` in `@shared/dice-roll-log/kind-types.ts`, the new registry; docs: protocol (§26 registries, viewer context), data model (campaign), live-sync (one FR at integration).
 - A later feature adds: one registry line, its tags, its own `featureOn` checks. No new column, no ADR.
