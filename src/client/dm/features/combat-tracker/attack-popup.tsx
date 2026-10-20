@@ -535,6 +535,8 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
       await connection.sendIntent("cbt.applyHit", {
         cardId: card.id,
         toHitTotal,
+        // FR-CBT-129: the to-hit this popup shows; a reroll since → conflict, and the popup fills.
+        partRollIds: partRollIdsOf(p),
         targets: rows.map((x) => ({ targetId: x.c.id, hit: x.hit, multiplier: x.mult })),
       });
     } catch (err) {
