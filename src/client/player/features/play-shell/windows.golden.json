@@ -24,6 +24,12 @@
     "parked": "dicex.tray"
   },
   {
+    "at": "open @1600×900 shell.prefs",
+    "rect": "785,132,360×400",
+    "placed": "auto",
+    "parked": "party.board"
+  },
+  {
     "at": "open @1600×900 charx.companion",
     "rect": "930,584,280×240",
     "placed": "auto",
@@ -52,6 +58,12 @@
     "rect": "360,60,320×400",
     "placed": "reopened",
     "parked": "dicex.tray"
+  },
+  {
+    "at": "reopen @1600×900 shell.prefs",
+    "rect": "785,132,360×400",
+    "placed": "reopened",
+    "parked": "party.board"
   },
   {
     "at": "reopen @1600×900 charx.companion",
@@ -84,10 +96,16 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1440×900 @1440×900 shell.prefs",
+    "rect": "636,132,360×400",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1440×900 @1440×900 charx.companion",
     "rect": "688,192,320×240",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×800 @1280×800 note.history",
@@ -114,10 +132,16 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×800 @1280×800 shell.prefs",
+    "rect": "474,132,321×400",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 charx.companion",
     "rect": "590,484,280×240",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×720 @1280×720 note.history",
@@ -144,10 +168,16 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×720 @1280×720 shell.prefs",
+    "rect": "474,146,321×338",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 charx.companion",
     "rect": "505,158,320×326",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -186,10 +216,16 @@
     "parked": "party.board"
   },
   {
+    "at": "open @1440×900 shell.prefs",
+    "rect": "636,132,360×400",
+    "placed": "auto",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "open @1440×900 charx.companion",
     "rect": "688,192,320×240",
     "placed": "auto",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "reopen @1440×900 note.history",
@@ -216,10 +252,16 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen @1440×900 shell.prefs",
+    "rect": "636,132,360×400",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1440×900 charx.companion",
     "rect": "688,192,320×240",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×800 @1280×800 note.history",
@@ -246,10 +288,16 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×800 @1280×800 shell.prefs",
+    "rect": "474,132,321×400",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 charx.companion",
     "rect": "590,484,280×240",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×720 @1280×720 note.history",
@@ -276,10 +324,16 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×720 @1280×720 shell.prefs",
+    "rect": "474,146,321×338",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 charx.companion",
     "rect": "505,158,320×326",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -318,10 +372,16 @@
     "parked": "dicex.tray,party.board"
   },
   {
+    "at": "open @1280×800 shell.prefs",
+    "rect": "474,152,321×400",
+    "placed": "auto",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "open @1280×800 charx.companion",
     "rect": "590,484,280×240",
     "placed": "auto",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "reopen @1280×800 note.history",
@@ -348,10 +408,16 @@
     "parked": "dicex.tray,party.board"
   },
   {
+    "at": "reopen @1280×800 shell.prefs",
+    "rect": "474,152,321×400",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1280×800 charx.companion",
     "rect": "590,484,280×240",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×720 @1280×720 note.history",
@@ -378,10 +444,16 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×720 @1280×720 shell.prefs",
+    "rect": "474,134,321×338",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 charx.companion",
     "rect": "505,158,320×314",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -420,10 +492,16 @@
     "parked": "party.board"
   },
   {
+    "at": "open @1280×720 shell.prefs",
+    "rect": "474,134,321×338",
+    "placed": "auto",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "open @1280×720 charx.companion",
     "rect": "505,158,320×314",
     "placed": "auto",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "reopen @1280×720 note.history",
@@ -450,10 +528,16 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen @1280×720 shell.prefs",
+    "rect": "474,134,321×338",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1280×720 charx.companion",
     "rect": "505,158,320×314",
     "placed": "reopened",
-    "parked": "cmp.compendium"
+    "parked": "shell.prefs"
   },
   {
     "at": "protected @1280×720 note.history",

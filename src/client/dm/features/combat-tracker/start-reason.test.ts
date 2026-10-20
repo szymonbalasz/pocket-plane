@@ -22,3 +22,14 @@ test("BL-02 max 3 names, then +N", () => {
 test("BL-02 no reason when everyone has initiative", () => {
   expect(startReason([c("Mira", 14), c("Thorn", 10), c("Wolf", null, true)])).toBeNull();
 });
+
+test("FR-CBT-108 owner without initiative: companions acting with their owner never count as missing; own ones do", () => {
+  const rows = [
+    { ...c("Mira", 15), turnMode: null },
+    { ...c("Owlbear", null), turnMode: "after-owner" as const },
+    { ...c("Wolf", null), turnMode: "in-owner-turn" as const },
+    { ...c("Fire Elemental 3", null), turnMode: "own" as const },
+  ];
+  expect(startReason(rows)).toBe("1 without initiative: Fire Elemental 3");
+  expect(startReason(rows.slice(0, 3))).toBeNull();
+});

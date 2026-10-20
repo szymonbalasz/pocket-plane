@@ -30,6 +30,7 @@ import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
 import lateDamage from "./late-damage";
 import logNoteColours from "./log-note-colours";
+import lootSubtractE2e from "./loot-subtract-e2e";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
@@ -121,4 +122,5 @@ export const bundles: readonly Bundle[] = [
   sessionSim10,
   toastHomeE2e,
   initRowsE2e,
+  lootSubtractE2e,
 ];

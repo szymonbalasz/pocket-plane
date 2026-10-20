@@ -54,10 +54,16 @@
     "parked": "cbt.encounters"
   },
   {
+    "at": "open @1600×900 shell.prefs",
+    "rect": "816,60,360×512",
+    "placed": "auto",
+    "parked": "dicex.tray,party.board"
+  },
+  {
     "at": "open @1600×900 charx.companion",
     "rect": "1268,572,320×252",
     "placed": "auto",
-    "parked": "dicex.tray"
+    "parked": ""
   },
   {
     "at": "reopen @1600×900 camp.players",
@@ -114,10 +120,16 @@
     "parked": "cbt.encounters"
   },
   {
+    "at": "reopen @1600×900 shell.prefs",
+    "rect": "816,60,360×512",
+    "placed": "reopened",
+    "parked": "dicex.tray,party.board"
+  },
+  {
     "at": "reopen @1600×900 charx.companion",
     "rect": "1268,572,320×252",
-    "placed": "reopened",
-    "parked": "dicex.tray"
+    "placed": "stored",
+    "parked": ""
   },
   {
     "at": "reopen 1440×900 @1440×900 camp.players",
@@ -174,10 +186,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen 1440×900 @1440×900 charx.companion",
-    "rect": "582,60,320×360",
+    "at": "reopen 1440×900 @1440×900 shell.prefs",
+    "rect": "656,60,360×512",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1440×900 @1440×900 charx.companion",
+    "rect": "68,60,320×262",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×800 @1280×800 camp.players",
@@ -234,10 +252,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen 1280×800 @1280×800 charx.companion",
-    "rect": "68,60,280×328",
+    "at": "reopen 1280×800 @1280×800 shell.prefs",
+    "rect": "90,152,360×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×800 @1280×800 charx.companion",
+    "rect": "498,176,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -294,10 +318,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "498,96,320×240",
+    "at": "reopen 1280×720 @1280×720 shell.prefs",
+    "rect": "496,72,360×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "68,60,280×248",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -366,10 +396,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "open @1440×900 charx.companion",
-    "rect": "582,60,320×360",
+    "at": "open @1440×900 shell.prefs",
+    "rect": "656,60,360×512",
     "placed": "auto",
     "parked": "party.board"
+  },
+  {
+    "at": "open @1440×900 charx.companion",
+    "rect": "68,60,320×262",
+    "placed": "auto",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen @1440×900 camp.players",
@@ -426,10 +462,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen @1440×900 charx.companion",
-    "rect": "582,60,320×360",
+    "at": "reopen @1440×900 shell.prefs",
+    "rect": "656,60,360×512",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen @1440×900 charx.companion",
+    "rect": "68,60,320×262",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×800 @1280×800 camp.players",
@@ -486,10 +528,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen 1280×800 @1280×800 charx.companion",
-    "rect": "68,60,280×328",
+    "at": "reopen 1280×800 @1280×800 shell.prefs",
+    "rect": "90,152,360×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×800 @1280×800 charx.companion",
+    "rect": "498,176,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -546,10 +594,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "498,96,320×240",
+    "at": "reopen 1280×720 @1280×720 shell.prefs",
+    "rect": "496,72,360×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "68,60,280×248",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -618,10 +672,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "open @1280×800 charx.companion",
-    "rect": "68,60,280×328",
+    "at": "open @1280×800 shell.prefs",
+    "rect": "90,152,360×400",
     "placed": "auto",
     "parked": "party.board"
+  },
+  {
+    "at": "open @1280×800 charx.companion",
+    "rect": "498,176,320×240",
+    "placed": "auto",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen @1280×800 camp.players",
@@ -678,10 +738,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen @1280×800 charx.companion",
-    "rect": "68,60,280×328",
+    "at": "reopen @1280×800 shell.prefs",
+    "rect": "90,152,360×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen @1280×800 charx.companion",
+    "rect": "498,176,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -738,10 +804,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "498,96,320×240",
+    "at": "reopen 1280×720 @1280×720 shell.prefs",
+    "rect": "496,72,360×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "68,60,280×248",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -810,10 +882,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "open @1280×720 charx.companion",
-    "rect": "68,60,280×248",
+    "at": "open @1280×720 shell.prefs",
+    "rect": "90,72,360×400",
     "placed": "auto",
     "parked": "party.board"
+  },
+  {
+    "at": "open @1280×720 charx.companion",
+    "rect": "498,96,320×240",
+    "placed": "auto",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen @1280×720 camp.players",
@@ -870,10 +948,16 @@
     "parked": "dicex.tray"
   },
   {
-    "at": "reopen @1280×720 charx.companion",
-    "rect": "68,60,280×248",
+    "at": "reopen @1280×720 shell.prefs",
+    "rect": "90,72,360×400",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen @1280×720 charx.companion",
+    "rect": "498,96,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 camp.players",

@@ -2,6 +2,8 @@
 // requests are composed here and sent as `dice.roll`; `control` requests (Alt+click) roll through
 // the caller's own `onRoll`, so the caller sends its own intent. One `RollControl` per host: the
 // tray runs `useRollControl` on the staged options, so physical dice show the same `ManualForm`.
+// FR-DICEX-53: the body is fixed parts (header, palette; expression row, bottom bar) around one
+// flexible dice area; only the dice area shrinks or scrolls, so Roll stays visible at min size.
 
 import {
   COMBATANT_TYPE,
@@ -31,7 +33,15 @@ import {
   SettingsIcon,
   XIcon,
 } from "lucide-react";
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "../../components/ui/button";
 import {
   Popover,
@@ -63,7 +73,7 @@ import { useHolding, useLandingFade } from "./landing";
 import { useOwnLook } from "./own-look";
 import { SettingsPanel } from "./SettingsPanel";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
-import { type TrayGroup, TrayPreview } from "./TrayPreview";
+import { type AreaBox, type TrayGroup, TrayPreview } from "./TrayPreview";
 import {
   addDie,
   chipsOf,
@@ -90,6 +100,43 @@ const MODE_LABEL: Record<RollMode, string> = {
 };
 
 const IDLE_TEXT = "Click dice in any text, Alt+click a roll button, or pick dice below";
+
+/**
+ * FR-DICEX-53 (§12 tray budget): the fixed parts' heights in px, as their classes draw them
+ * (header `h-6`, palette and expression row `h-7`, bottom bar `border-t pt-1` + a 28-px row), the gap
+ * between parts (`gap-1`) and the dice area's padding (`py-1.5`: room for a die's tag and "×N").
+ */
+export const TRAY_PART_PX = { header: 24, palette: 28, expression: 28, bar: 33 } as const;
+export const TRAY_GAP = 4;
+export const DICE_AREA_PAD = 12;
+
+/** FR-DICEX-53: the dice area's content height for a body of `bodyH` px and these fixed parts. */
+export function trayLayout(bodyH: number, parts: readonly number[]): { dice: number } {
+  const fixed = parts.reduce((n, h) => n + h, 0) + parts.length * TRAY_GAP;
+  return { dice: Math.max(0, bodyH - fixed - DICE_AREA_PAD) };
+}
+
+/** The dice area's content box, kept up to date as the tray resizes (FR-DICEX-54). */
+function useAreaBox(ref: RefObject<HTMLElement | null>): AreaBox | null {
+  const [box, setBox] = useState<AreaBox | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof getComputedStyle !== "function") return;
+    const read = () => {
+      const cs = getComputedStyle(el);
+      const px = (v: string) => Number.parseFloat(v) || 0;
+      const w = el.clientWidth - px(cs.paddingLeft) - px(cs.paddingRight);
+      const h = el.clientHeight - px(cs.paddingTop) - px(cs.paddingBottom);
+      setBox((b) => (b && b.w === w && b.h === h ? b : { w, h }));
+    };
+    read();
+    if (typeof ResizeObserver !== "function") return;
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return box;
+}
 
 /** FR-DICEX-03 / DICEX §7: the tray's state from what is staged and in flight. */
 export function trayState(o: {
@@ -185,7 +232,7 @@ function SettingsPopover() {
           data-testid="dicex-settings-open"
           size="icon"
           variant="ghost"
-          className="size-7 shrink-0"
+          className="size-6 shrink-0"
           aria-label="Dice settings"
         >
           <SettingsIcon className="size-4" />
@@ -276,6 +323,8 @@ export function TrayWindow() {
   const free = request?.kind === "free" ? request : null;
   const [draft, setDraft] = useState(free?.expression ?? "");
   const lastValid = useRef(termsOf(draft) ?? []);
+  const diceArea = useRef<HTMLDivElement>(null);
+  const area = useAreaBox(diceArea);
 
   // A new stage resets the draft to the request's (FR-DICEX-02); the store resets the mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per stage (`staged`)
@@ -394,14 +443,14 @@ export function TrayWindow() {
     <section
       data-testid="dicex-tray"
       aria-label="Dice tray"
-      className="flex h-full min-h-fit flex-col gap-2"
+      className="flex h-full min-h-0 flex-col gap-1"
       onKeyDown={onKeyDown}
       onKeyUp={trackKeys}
       onPointerMove={(e) => {
         if (e.shiftKey || e.ctrlKey || held) trackKeys(e);
       }}
     >
-      <div className="flex items-start gap-2">
+      <div data-tray-part="header" className="flex h-6 shrink-0 items-center gap-2">
         <div className="min-w-0 flex-1">
           <p
             data-testid="dicex-tray-state"
@@ -423,31 +472,8 @@ export function TrayWindow() {
         <SettingsPopover />
       </div>
 
-      {/* Dice area */}
-      <div className="flex min-h-10 flex-wrap items-center gap-1">
-        {(state === "compose" || state === "adjust" || state === "rolling") && request && (
-          <TrayPreview
-            request={request}
-            groups={groups}
-            mode={shownMode}
-            onRemove={state === "compose" ? (term) => setTerms(removeDie(terms, term)) : undefined}
-            dimmed={state === "rolling"}
-          />
-        )}
-        {state === "rolling" && !request && (
-          <p className="text-sm text-muted-foreground">Rolling…</p>
-        )}
-        {state === "result" && result && <ResultView entries={result} />}
-      </div>
-
-      {state === "manual" && (
-        <div className="rounded-md border p-2">
-          <ManualForm control={control} />
-        </div>
-      )}
-
       {(state === "idle" || state === "compose" || state === "result") && (
-        <fieldset className="flex flex-wrap gap-1">
+        <fieldset data-tray-part="palette" className="grid shrink-0 grid-cols-7 gap-1">
           <legend className="sr-only">Add a die</legend>
           {PALETTE.map((f) => (
             <Button
@@ -457,7 +483,7 @@ export function TrayWindow() {
               variant="outline"
               data-testid="dicex-tray-palette"
               data-value={f}
-              className="h-7 px-2 font-mono text-xs"
+              className="h-7 min-w-0 px-0 font-mono text-xs"
               onClick={() => {
                 // After a result the palette starts a new roll; else it adds to the request.
                 diceExtras.api.setState({ result: null });
@@ -470,9 +496,36 @@ export function TrayWindow() {
         </fieldset>
       )}
 
+      {/* Dice area: the one flexible part (FR-DICEX-53); scrolls on its own (FR-DICEX-54). */}
+      <div
+        ref={diceArea}
+        data-testid="dicex-tray-area"
+        className="flex min-h-0 flex-1 flex-wrap content-start items-center gap-1 overflow-y-auto overflow-x-hidden py-1.5 pr-1.5"
+      >
+        {(state === "compose" || state === "adjust" || state === "rolling") && request && (
+          <TrayPreview
+            request={request}
+            groups={groups}
+            mode={shownMode}
+            onRemove={state === "compose" ? (term) => setTerms(removeDie(terms, term)) : undefined}
+            dimmed={state === "rolling"}
+            area={area}
+          />
+        )}
+        {state === "rolling" && !request && (
+          <p className="text-sm text-muted-foreground">Rolling…</p>
+        )}
+        {state === "result" && result && <ResultView entries={result} />}
+        {state === "manual" && (
+          <div className="w-full rounded-md border p-2">
+            <ManualForm control={control} />
+          </div>
+        )}
+      </div>
+
       {/* FR-DICEX-50: typing after a result starts a fresh request, as the palette does. */}
       {(state === "compose" || state === "result") && (
-        <div className="flex items-center gap-1.5">
+        <div data-tray-part="expression" className="flex shrink-0 items-center gap-1.5">
           <Input
             data-testid="dicex-tray-expression"
             aria-label="Dice expression"
@@ -508,19 +561,32 @@ export function TrayWindow() {
       )}
 
       {error && (
-        <p data-testid="dicex-tray-error" role="alert" className="text-xs text-destructive">
+        <p
+          data-testid="dicex-tray-error"
+          role="alert"
+          className="shrink-0 truncate text-xs text-destructive"
+          title={error}
+        >
           {error}
         </p>
       )}
       {control.error && (
-        <p className="text-xs text-destructive" role="alert">
+        <p
+          className="shrink-0 truncate text-xs text-destructive"
+          role="alert"
+          title={control.error}
+        >
           {control.error}
         </p>
       )}
 
       {/* Bottom bar, like the roll bar (DICEX §7). */}
       {state !== "manual" && (
-        <div className="mt-auto flex flex-col gap-1.5 border-t pt-1.5">
+        <div
+          data-testid="dicex-tray-bar"
+          data-tray-part="bar"
+          className="flex shrink-0 flex-col gap-1.5 border-t pt-1"
+        >
           <div className="flex items-center gap-1.5">
             <ToggleGroup
               type="single"
@@ -541,7 +607,8 @@ export function TrayWindow() {
                   data-testid="dicex-tray-mode-option"
                   data-value={m}
                   aria-label={m}
-                  className="h-7 px-2"
+                  // 26 px + the group's 1-px border = the bar's 28-px row (FR-DICEX-53 budget).
+                  className="h-[26px] px-2"
                 >
                   {MODE_LABEL[m]}
                 </ToggleGroupItem>

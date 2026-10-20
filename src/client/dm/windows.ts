@@ -1,5 +1,7 @@
 // DM window registry (FR-SHELL-07, ADR-0025). APPEND-ONLY (AGENTS §9.9): a feature adds one
 // import and one line in the list for each of its DM window types; nothing else changes here.
+
+import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
@@ -16,6 +18,7 @@ import { dmPartyBoardWindow } from "./features/party-board/board-window";
 import { dmHandoutWindow } from "./features/party-board/handout-window";
 import { playersWindow } from "./features/play-shell/players-window";
 import { scenesWindow } from "./features/scenes-map/scenes-window";
+import { dmPrefSections } from "./pref-sections";
 
 const windows: WindowDef[] = [
   playersWindow, // camp.players (play-shell, FR-SHELL-21)
@@ -33,6 +36,7 @@ const windows: WindowDef[] = [
   dmPartyBoardWindow, // party.board (party-board, FR-PARTY-11)
   { ...dmHandoutWindow, restoreOpen: false }, // party.handout (party-board, FR-PARTY-14; FR-SHELL-42)
   dmCompendiumWindow, // cmp.compendium (compendium, FR-CMP-18)
+  prefsWindow("dm", dmPrefSections), // shell.prefs, no launcher (play-shell, FR-SHELL-71)
   dmCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
 ];
 
