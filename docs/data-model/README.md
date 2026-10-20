@@ -2014,3 +2014,14 @@ From [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-60, -61 and
 
 - **Fixtures:** units `log-colours` (3 `roll` entries) and `note-colours` (3 notifications, test mode); bundle `log-note-colours`; `session-sim-9` + `log-colours`.
 - **Snapshot size** (CON-44): 0 B on the heavy harness (no field); bundle `log-note-colours` measured DM 15,121 B, P1 7,458 B, P2 6,681 B.
+
+## 86. Sprint 6: Initiative rows (WF4)
+
+From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-57, -58 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-125. **Built by `fix/init-rows-s6`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent. Protocol side: [protocol §108](../protocol/README.md#108-sprint-6-initiative-rows--whole-names-whole-trigger-chips-nothing-below--n-more-wf4).
+
+| Derived (not stored) | Where | Rule | Audience | Source |
+|---|---|---|---|---|
+| Name-line fit | per render, per row | `fitNameLine` → chips' room, side chip + chips on a second line, name wraps | each client its own rows | FR-CBTX-57 |
+| Initiative body cap | per render | `listClip(natural, avail)`, `avail` from `windowRect` for the uncapped content | each client | FR-CBT-125 |
+
+- **Fixtures:** none new (session-sim-9: Goblin Ambush running, "Escort to the Ford" planned, Mira's Searing trigger).
