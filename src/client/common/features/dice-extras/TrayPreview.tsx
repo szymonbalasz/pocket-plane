@@ -4,6 +4,8 @@
 // this area's own 2D canvas (`dicex-tray-preview`), so they keep the window's z-order; no loop.
 // Else `DieShape` chips. Each die has a DOM mirror (`dicex-tray-die`): a button in `compose`
 // (click removes one), a span otherwise. More than 12 dice → one die per term "×N".
+// FR-DICEX-54: the dice area shrinks first: 40-px cells while every die fits the area, else 28,
+// else "×N" (forced by room), else the area scrolls on its own (`stillSize`).
 import type { DiceLook } from "@shared/dice-extras/looks";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -27,6 +29,46 @@ import {
   trayPreviewMode,
   trayWantsChunk,
 } from "./tray-logic";
+
+/** FR-DICEX-54: still cell sizes (px) and the gap between cells (`gap-1`). */
+export type StillCell = 40 | 28;
+export const CELL_GAP = 4;
+
+/** The dice area's content box (CSS px), measured by the tray. */
+export interface AreaBox {
+  w: number;
+  h: number;
+}
+
+const fitsIn = (cells: number, size: StillCell, area: AreaBox) => {
+  const perRow = Math.max(1, Math.floor((area.w + CELL_GAP) / (size + CELL_GAP)));
+  const rows = Math.ceil(cells / perRow);
+  return rows * size + (rows - 1) * CELL_GAP <= area.h;
+};
+
+/**
+ * FR-DICEX-54: the still size for `cells` cells (one per still, d100 = two, plus one per constant
+ * / label) or `groupedCells` once grouped "×N". 40 while all fit; else 28; else grouped (40 or 28,
+ * `grouped` = forced by room, not by > 12 dice); else grouped at 28 and the area scrolls.
+ */
+export function stillSize(
+  o: { cells: number; groupedCells: number; byCount: boolean },
+  area: AreaBox,
+): { cell: StillCell; grouped: boolean; scroll: boolean } {
+  if (!o.byCount) {
+    for (const cell of [40, 28] as const) {
+      if (fitsIn(o.cells, cell, area)) return { cell, grouped: false, scroll: false };
+    }
+  }
+  const grouped = !o.byCount;
+  for (const cell of [40, 28] as const) {
+    if (fitsIn(o.groupedCells, cell, area)) return { cell, grouped, scroll: false };
+  }
+  return { cell: 28, grouped, scroll: true };
+}
+
+const CELL_BOX: Record<StillCell, string> = { 40: "h-10 min-w-10", 28: "h-7 min-w-7" };
+const CELL_SIZE: Record<StillCell, string> = { 40: "size-10", 28: "size-7" };
 
 /** One expression's dice and constant ("+5" after the dice). */
 export interface TrayGroup {
@@ -52,7 +94,7 @@ function useExtraDice(request: TrayRequest, mode: RollMode) {
 }
 
 /** Still cells under `root`, in CSS px from `canvas`'s top-left. */
-function cellsOf(root: HTMLElement, canvas: HTMLCanvasElement): TrayStill[] {
+function stillCells(root: HTMLElement, canvas: HTMLCanvasElement): TrayStill[] {
   const o = canvas.getBoundingClientRect();
   return [...root.querySelectorAll<HTMLElement>("[data-still]")].flatMap((el) => {
     const s = parseStill(el.dataset.still);
@@ -68,11 +110,14 @@ export function TrayDie({
   render,
   look,
   onRemove,
+  cell = 40,
 }: {
   die: PreviewDie;
   render: "3d" | "chips";
   look: DiceLook;
   onRemove?: () => void;
+  /** FR-DICEX-54: 40 or 28 px; chips `md` → `sm`. */
+  cell?: StillCell;
 }) {
   const text = `${die.sign === -1 ? "−" : ""}d${die.faces}`;
   const parts = render === "3d" ? stillParts(die.faces) : null;
@@ -82,7 +127,12 @@ export function TrayDie({
         <>
           {die.sign === -1 && <span className="font-mono text-sm">−</span>}
           {parts.map((p) => (
-            <span key={p} data-still={p} aria-hidden className="block size-10 shrink-0" />
+            <span
+              key={p}
+              data-still={p}
+              aria-hidden
+              className={cn("block shrink-0", CELL_SIZE[cell])}
+            />
           ))}
         </>
       ) : (
@@ -92,6 +142,7 @@ export function TrayDie({
           look={look}
           negative={die.sign === -1}
           label={text}
+          size={cell === 40 ? "md" : "sm"}
         />
       )}
       {die.tag && (
@@ -114,7 +165,7 @@ export function TrayDie({
     ...(die.group && { "data-group": die.group }),
     "data-value": die.faces,
   };
-  const cls = "relative flex h-10 min-w-10 items-center justify-center rounded-md";
+  const cls = cn("relative flex items-center justify-center rounded-md", CELL_BOX[cell]);
   return onRemove ? (
     <button
       type="button"
@@ -141,12 +192,14 @@ function ExtraDice({
   grouped,
   render,
   look,
+  cell,
 }: {
   extraKey: string;
   dice: TrayExtraDice[];
   grouped: boolean;
   render: "3d" | "chips";
   look: DiceLook;
+  cell: StillCell;
 }) {
   if (dice.length === 0) return null;
   return (
@@ -170,7 +223,7 @@ function ExtraDice({
           </span>
           {previewDice(extraChips([d]), grouped).map((c, j) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: one die per position
-            <TrayDie key={j} die={{ ...c, term: i }} render={render} look={look} />
+            <TrayDie key={j} die={{ ...c, term: i }} render={render} look={look} cell={cell} />
           ))}
         </span>
       ))}
@@ -184,6 +237,7 @@ export function TrayPreview({
   mode,
   onRemove,
   dimmed = false,
+  area,
 }: {
   request: TrayRequest;
   groups: TrayGroup[];
@@ -193,6 +247,8 @@ export function TrayPreview({
   onRemove?: (term: number) => void;
   /** `rolling`: the preview stays, dimmed. */
   dimmed?: boolean;
+  /** FR-DICEX-54: the dice area's content box; unknown (not measured yet) → 40 px, as built. */
+  area?: AreaBox | null;
 }) {
   const extras = useExtraDice(request, mode);
   const look = useOwnLook();
@@ -206,13 +262,29 @@ export function TrayPreview({
   const count =
     groups.reduce((n, g) => n + g.chips.length, 0) +
     extras.reduce((n, x) => n + extraChips(x.dice).length, 0);
-  const grouped = count > GROUP_OVER;
+  const byCount = count > GROUP_OVER;
+  const cellsOf = (g: boolean) =>
+    groups.reduce(
+      (n, x) =>
+        n +
+        previewDice(x.chips, g).reduce((k, d) => k + (stillParts(d.faces)?.length ?? 1), 0) +
+        (x.constant !== 0 ? 1 : 0) +
+        (x.label ? 1 : 0),
+      0,
+    ) +
+    // An extra's text ("MOD +1d4") takes about two cells.
+    extras.reduce((n, x) => n + x.dice.length * 2 + previewDice(extraChips(x.dice), g).length, 0);
+  const fit = area
+    ? stillSize({ cells: cellsOf(byCount), groupedCells: cellsOf(true), byCount }, area)
+    : { cell: 40 as const, grouped: false, scroll: false };
+  const grouped = byCount || fit.grouped;
+  const cell = fit.cell;
   const dice = useMemo(() => groups.map((g) => previewDice(g.chips, grouped)), [groups, grouped]);
 
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   // Redraw when the dice, tags, look or the area's size change; one draw each, no loop.
-  const drawKey = JSON.stringify([dice, extras, grouped, look]);
+  const drawKey = JSON.stringify([dice, extras, grouped, cell, look]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: redraws on `drawKey`
   useLayoutEffect(() => {
     const mod = dice3d.module();
@@ -228,7 +300,7 @@ export function TrayPreview({
     }
     const paint = () => {
       try {
-        mod.drawTrayStills(layer, c, cellsOf(el, c), look);
+        mod.drawTrayStills(layer, c, stillCells(el, c), look);
       } catch (err) {
         console.warn("Dice: the tray's 3D dice failed; showing flat dice.", err);
         setFailed(true);
@@ -256,7 +328,8 @@ export function TrayPreview({
     <div
       ref={root}
       className={cn(
-        "relative flex min-h-10 w-full flex-wrap items-center gap-1",
+        "relative flex w-full flex-wrap items-center gap-1",
+        cell === 40 ? "min-h-10" : "min-h-7",
         dimmed && "opacity-50",
       )}
     >
@@ -266,6 +339,9 @@ export function TrayPreview({
         ref={canvas}
         data-testid="dicex-tray-preview"
         data-mode={render}
+        data-cell={cell}
+        {...(fit.grouped && { "data-grouped": "true" })}
+        {...(fit.scroll && { "data-scroll": "true" })}
         aria-hidden
         className="pointer-events-none absolute inset-0 size-full"
       />
@@ -289,6 +365,7 @@ export function TrayPreview({
               die={d}
               render={render}
               look={look}
+              cell={cell}
               onRemove={onRemove && !d.tag ? () => onRemove(d.term) : undefined}
             />
           ))}
@@ -307,6 +384,7 @@ export function TrayPreview({
           grouped={grouped}
           render={render}
           look={look}
+          cell={cell}
         />
       ))}
     </div>
