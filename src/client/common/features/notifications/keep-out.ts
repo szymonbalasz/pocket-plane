@@ -4,7 +4,10 @@
 // left of it → below its bottom edge. P3 glitch 2: then, of the spots clear of Initiative, the one
 // covering the least of the toasts' tokens to avoid (a card's likely targets) wins; ties keep the
 // default. Window title bars are never covered, their bodies only when no spot clear of them is
-// (sim-6 glitch 3). Pure; players keep bottom-right.
+// (sim-6 glitch 3). FR-NOTE-42 (sim-9 a01): the stack stays in its top-centre band (home, or the
+// left-of-Initiative shift) and moves down, never to the rail or beside windows / tokens.
+// FR-NOTE-43 (sim-9 b01): hard keep-outs (the active tool bar) block it like Initiative. Pure;
+// players keep bottom-right.
 
 import {
   EDGE_GAP,
@@ -40,6 +43,17 @@ function initiativeKeepOut(
   return { left, top: Math.round(initiative.y + initiative.h + EDGE_GAP) };
 }
 
+/**
+ * FR-NOTE-42: the stack's only candidate lefts: its home (centred), then FR-NOTE-32's shift left
+ * of Initiative when that is left of home and clear of the rail (never x = 68 by clamping).
+ */
+export function dmStackLefts(vp: Viewport, initiative: Rect | null, width = STACK_W): number[] {
+  const home = Math.round((vp.w - width) / 2);
+  if (!initiative) return [home];
+  const shifted = Math.round(initiative.x - EDGE_GAP - width);
+  return shifted < home && shifted >= RAIL_CLEAR ? [home, shifted] : [home];
+}
+
 const hits = (a: Rect, b: Rect, gap: number) =>
   a.x < b.x + b.w + gap && b.x - gap < a.x + a.w && a.y < b.y + b.h + gap && b.y - gap < a.y + a.h;
 
@@ -48,12 +62,14 @@ const hits = (a: Rect, b: Rect, gap: number) =>
  * the tokens the stack should keep clear of (P3 glitch 2). `windows`: the other open windows'
  * rendered rects; their title bars are never covered (P3 retest: the drag handle stays
  * reachable), their bodies only when no spot clear of them is (sim-6 glitch 3: the stack sat on
- * the Notifications rows). Candidate spots: FR-NOTE-32's first, then the top row, below each
- * title bar, below each window and above / below each token, at the centre, the left edge, left
- * of Initiative, beside each window and beside each token. Of the spots clear of Initiative and
- * the bars, the one covering the least token area, then the least window body, wins (ties keep
- * the earlier spot); a spot must hold the whole stack above the launcher bar (P3 E3). None → the
- * top row (the runtime collapses toasts into "+N more").
+ * the Notifications rows). `hard`: hard keep-out rects (FR-NOTE-43: the active tool bar), never
+ * covered. Candidate spots (FR-NOTE-42): FR-NOTE-32's first, then the top row, below each title
+ * bar, below each window, below each hard keep-out and above / below each token, at the home or
+ * left of Initiative only. Of the spots clear of Initiative, the bars and the hard keep-outs, the
+ * one covering the least token area, then the least window body, wins (ties keep the earlier
+ * spot); a spot must hold the whole stack above the launcher bar (P3 E3). None → the top row
+ * when clear, else FR-NOTE-32's spot, off the hard keep-outs where one is (the runtime collapses
+ * toasts into "+N more").
  */
 export function dmStackPlacement(
   vp: Viewport,
@@ -62,28 +78,28 @@ export function dmStackPlacement(
   width = STACK_W,
   avoid: readonly TokenBox[] = [],
   windows: readonly Rect[] = [],
+  hard: readonly Rect[] = [],
 ): { left: number; top: number } {
   const base = initiativeKeepOut(vp, initiative, stackH, width);
+  const at = (p: { left: number; top: number }) => ({ x: p.left, y: p.top, w: width, h: stackH });
+  // FR-NOTE-43: ≥ 1 px over a hard keep-out is not clear.
+  const offHard = (p: { left: number; top: number }) => !hard.some((k) => hits(at(p), k, 0));
   // P3 E3: a spot must hold the whole stack above the launcher bar.
   const fits = (p: { top: number }) => p.top + stackH <= vp.h - LAUNCHER_CLEAR;
-  if (stackH === 0 || (avoid.length === 0 && windows.length === 0 && fits(base))) return base;
+  if (stackH === 0) return base;
+  if (avoid.length === 0 && windows.length === 0 && fits(base) && offHard(base)) return base;
   const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, TITLE_H) }));
-  const at = (p: { left: number; top: number }) => ({ x: p.left, y: p.top, w: width, h: stackH });
   const clear = (p: { left: number; top: number }) =>
-    !(initiative && hits(at(p), initiative, EDGE_GAP)) && !bars.some((b) => hits(at(p), b, 0));
-  const maxLeft = vp.w - EDGE_GAP - width;
+    !(initiative && hits(at(p), initiative, EDGE_GAP)) &&
+    !bars.some((b) => hits(at(p), b, 0)) &&
+    offHard(p);
   const maxTop = vp.h - LAUNCHER_CLEAR - stackH;
-  const lefts = [
-    Math.round((vp.w - width) / 2),
-    RAIL_CLEAR,
-    initiative ? initiative.x - EDGE_GAP - width : maxLeft,
-    ...windows.flatMap((w) => [w.x + w.w + EDGE_GAP, w.x - EDGE_GAP - width]),
-    ...avoid.flatMap((t) => [t.x + t.w + EDGE_GAP, t.x - EDGE_GAP - width]),
-  ].map((x) => Math.round(Math.min(maxLeft, Math.max(RAIL_CLEAR, x))));
+  const lefts = dmStackLefts(vp, initiative, width);
   const tops = [
     DM_TOAST_TOP,
     ...bars.map((b) => b.y + b.h + STACK_GAP),
     ...windows.map((w) => w.y + w.h + STACK_GAP),
+    ...hard.map((k) => k.y + k.h + STACK_GAP),
     ...avoid.flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH]),
   ].map((y) => Math.round(Math.max(DM_TOAST_TOP, Math.min(maxTop, y))));
   const spots = [base, ...tops.flatMap((top) => lefts.map((left) => ({ left, top })))];
@@ -100,6 +116,8 @@ export function dmStackPlacement(
       bestArea = area;
     }
   }
-  // Nothing holds it (the runtime then shows fewer toasts): the top row, clear if possible.
-  return best ?? spots.find((p) => p.top === DM_TOAST_TOP && clear(p)) ?? base;
+  // Nothing holds it (the runtime then shows fewer toasts): the top row when clear, else
+  // FR-NOTE-32's spot, else the top row, each only off the hard keep-outs (FR-NOTE-43).
+  const row = spots.filter((p) => p.top === DM_TOAST_TOP);
+  return best ?? row.find(clear) ?? [base, ...row].find(offHard) ?? base;
 }
