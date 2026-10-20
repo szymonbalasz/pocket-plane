@@ -85,6 +85,15 @@ const SAMPLES: Record<string, { payload: unknown; dmPayload: unknown | null }> =
     payload: { action: "follows", name: "Owlbear", ownerName: "Brakka" },
     dmPayload: { turnMode: "in-owner-turn" },
   },
+  // Sprint 7 (GEM, feature `gems`): no DM-only part (public lines, OQ-GEM-02 A / -10 A).
+  "gem.award": {
+    payload: { characterId: "c1", gem: "inspiration", count: 1, held: 2 },
+    dmPayload: null,
+  },
+  "gem.spend": {
+    payload: { characterId: "c1", gem: "action", count: 2, use: "action" },
+    dmPayload: null,
+  },
 };
 
 describe("FR-DICE-28 kind contract", () => {

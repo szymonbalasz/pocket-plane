@@ -2920,7 +2920,46 @@ From [combat-tracker](../specs/combat-tracker.md#64-sprint-6-companions) FR-CBT-
 - **DM UI:** header `cbt-init-summon` and a PC row's `cbt-init-row-summon` ("Summon for Mira…") open the Dialog `cbt-summon` (`cbt-summon-lookup` → `cbt-lookup-option`, `cbt-summon-picked`, `-count`, `-owner` (+ `data-value`), `-mode` (+ `data-value`, `data-state`), `-hp`, `-hidden`, `-concentration` (iff the owner concentrates), `-submit`, `-error`); Companion ▸ `cbt-companion-dismiss` (disabled on the turn combatant: "Press Next first"); the card's `cbt-summon-hostile` (`cbt.setCompanion` release + enemy per summon left) and `cbt-summon-outcome`. Companion card (`charx.companion`): `cbt-companion-dismiss` → inline confirm `cbt-companion-dismiss-text` / `cbt-companion-dismiss-confirm` → `cbt.dismiss`; shown to the DM for any companion in the fight and to the owner for a summon only (never a pet), disabled on the turn combatant. A dismissed companion (inactive in the DM's store) leaves `useCombatants`.
 - **Fixtures:** unit `cp-combat` (bundles `companions`, `session-sim-10`); e2e `e2e/companions.e2e.ts` on `companions-e2e`.
 
-## 125. Sprint 7: small copy (FU4)
+## 125. Sprint 7: gems core and campaign feature switches (GM0)
+
+From [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-38–41, -44, -45, [gems](../specs/gems.md#6-functional-requirements) FR-GEM-01–07, -09–16, -37, -39, -40, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-69 and [live-sync](../specs/live-sync.md#6-functional-requirements) FR-SYNC-39 (DM #140, #312, #315; [ADR-0058](../architecture/adr/0058-feature-switches.md)). **Built by `fix/gems-core`** (server + shared + `useFeature`; no gem UI: GM3). Data side: [data model §96](../data-model/README.md#96-sprint-7-gems-core-and-campaign-feature-switches-gm0).
+
+**Intents**
+
+| Intent | Who | Errors (one code per case) | Result | Source |
+|---|---|---|---|---|
+| `camp.setFeature {feature, on}` *(new)* | DM (player → `forbidden`) | key not in the registry → `invalid`; same value → ack, no event | `{}` | FR-CAMP-39 |
+| `gem.adjust {characterId, gem, delta}` *(new)* | DM | gems off → `forbidden` "Gems are off in this campaign"; `delta` 0 or outside −5…+5 → `invalid`; result < 0 → `invalid` "Mira has no Fortune gem to remove", > 99 → `invalid` "At most 99 Fortune gems"; not a character of the campaign (pets, monsters, other campaigns) → `not_found` | `{held}` | FR-GEM-03, -07 |
+| `gem.spend {characterId, gem, use?}` *(new; GM0: plain spends)* | DM any character; player own (entity `ownerPlayerId`) | gems off → `forbidden`; another player's character → `forbidden` "Not your character"; unknown → `not_found`; `use` missing on Action / present on another gem, `gem: "combat"` (GM2: card), extra keys (`entryId`: GM1) → `invalid`; none held → `conflict` "No Fortune gem left"; Action (2) with 1 → `conflict` "2 Action gems needed, 1 left" | `{held, entryId}` | FR-GEM-11–16 |
+
+**Record types, kinds and the "off" rule**
+
+| Thing | Visibility | Source |
+|---|---|---|
+| `campaign.features` | every connection of the campaign; **present only when non-empty** (all off: no key) | FR-CAMP-38 |
+| `character-gems {id (= characterId), campaignId, characterId, inspiration, fortune, combat, divine, action}` *(new; tag `gems`)* | gems on: DM and every player full (OQ-GEM-01 A); off: hidden for everyone | FR-GEM-06, -10 |
+| Log kinds `gem.award {characterId, gem, count, held}`, `gem.spend {characterId, gem, count, use?}` *(new; tag `gems`)* | public (stamped `public: true` whoever sends; roller = sender); off: hidden for everyone | FR-GEM-09, -13, FR-DICE-69 |
+| `roll` kind trace (gems) | gems off: an entry with `supersededBy` set is hidden; `replaces` stripped from every payload item | FR-GEM-05, OQ-GEM-21 B |
+| **Hub rule** (`ws/records.ts`) | before every role rule, DM included: a type registered with `feature` off → no snapshot key, no frame change, `sync.load` → `invalid` "Unknown record type"; a record whose `featureOf` (log entries: the kind's `feature`) is off → hidden; each `tracesOf` trace of an off feature → `hides` → hidden, `strip` → the record as sent. Window cut before the filter (ADR-0029) | FR-CAMP-44, FR-SYNC-39 |
+
+**Registration API** (server + shared)
+
+- `RecordTypeDef` + `feature?`, `featureOf?(r)`, `tracesOf?(r) → FeatureTrace[]` (`{feature, hides?(r), strip?(r)}`); `Viewer.features?` (the hub always sets it at snapshot time; absent = the campaign's current switches, test viewers); `RecordRegistry.provideCampaignFeatures(fn)` (campaign-management), `featuresOf(campaignId)`, `typeOff(def, viewer)`.
+- `LogKindDef` + `feature?`, `traces?: LogKindTrace[]` (`@shared/dice-roll-log/kind-types.ts`); `game-log-entry` registers `featureOf` / `tracesOf` from the kind.
+- Feature registry `@shared/campaign-management/features.ts` (append-only): `{key, label, description, offConfirm?, ownerSpec}`; `gems` first. Server: `featureOn(env, key)`, `assertFeatureOn(env, key, message?)` (campaign-management `features.ts`); client: `useFeature(key)` / `isFeatureOn(store, key)` (`@ui/features/campaign-management/use-feature`).
+
+**Domain events** (`src/shared/events/campaign-management.ts`, `gems.ts`; logged, not undoable)
+
+| Event | Changes | Player sees |
+|---|---|---|
+| `CampaignFeatureSet {feature, on}` *(new)* | `campaign` upsert. After the commit the listener `feature-switch` **resyncs every connection of the campaign** (fresh snapshot, viewer `features` re-read); the named exemption from ADR-0021's per-record changes | a fresh snapshot (client-only UI state kept), then the campaign upsert |
+| `GemsAdjusted {characterId, gem, delta, held, entryId?}` *(new)* | `character-gems` (created on the first award) + the `gem.award` line (awards only) | both, while on |
+| `GemSpent {characterId, gem, cost, held, entryId, rollIds, rerollEntryId?, supersededEntryId?, cardId?}` *(new; the optional fields: GM1 / GM2)* | `character-gems` + the `gem.spend` line | both, while on |
+
+- **Fixtures:** units `gems-on`, `gems-awarded`, `gems-hidden`; bundles `gems` (= `session-sim-10` + on + awarded), `gems-hidden`, `gems-e2e` (e2e `e2e/gems-core.e2e.ts`). Every other bundle loads with gems off; `session-sim-11` adds none.
+- **CON-44** (`snapshot-size.test.ts` heavy harness): gems off with 8 rows at 99 → every frame byte-identical (0 B); on → +20 B (`"features":["gems"]`) + 1,754 B of rows per viewer (DM 693,796 B, 879,068 B left of 1.5 MiB; players ≤ 290,926 B of 512 KiB).
+
+## 126. Sprint 7: small copy (FU4)
 
 From [play-shell §14](../specs/play-shell.md#14-dependencies) slice FU4 (BL-48 + sim-10 extras, DM #311, rulings-b #17–#19). **Built by `fix/fu-small-copy`**. Data-model side: [data-model §96](../data-model/README.md#96-sprint-7-small-copy-fu4). No new intent, event, record type or close code.
 

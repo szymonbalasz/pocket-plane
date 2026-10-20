@@ -4,6 +4,7 @@
 import { companionLogKind } from "../combat-tracker/companion-kind";
 import { attackLogKind, hpLogKind } from "../combat-tracker/log-kinds";
 import { sideLogKind } from "../combat-tracker/side-kind";
+import { gemAwardKind, gemSpendKind } from "../gems/log-kinds";
 import type { AnyLogKind } from "./kind-types";
 import { rollKind } from "./roll-kind";
 
@@ -13,6 +14,8 @@ const kinds: AnyLogKind[] = [
   hpLogKind, // cbt.hp (combat-tracker, FR-CBT-24)
   sideLogKind, // cbt.side (combat-tracker, FR-CBT-99)
   companionLogKind, // cbt.companion (combat-tracker, FR-CBT-122)
+  gemAwardKind, // gem.award (gems, FR-GEM-09; feature `gems`)
+  gemSpendKind, // gem.spend (gems, FR-GEM-12; feature `gems`)
 ];
 
 const byKind = new Map<string, AnyLogKind>();

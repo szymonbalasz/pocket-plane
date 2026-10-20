@@ -4,10 +4,17 @@
 // `rollSegments` / `rollBreakdownSegments` for their roll parts (FR-DICE-28). Roll-hook parts
 // (FR-MOD-19/20) follow the constant ("14 + 4 + 3 Bless = 21"); the DM's line names every part
 // from `dmPayload`, players see "(DM)" for parts of effects they don't receive.
+import { GEMS_FEATURE } from "@shared/campaign-management/features";
 import { rollOfferSegments } from "@shared/effect-modifiers/combat-parts";
 import { AUTO_PART_TEXT, modeLabels, modSegments, modsTotal } from "@shared/effect-modifiers/line";
 import { diceTerms, parseExpression } from "./grammar";
-import { defineLogKind, type LineDie, type LineSegment } from "./kind-types";
+import {
+  defineLogKind,
+  type LineDie,
+  type LineSegment,
+  type LogKindTrace,
+  type TracedEntry,
+} from "./kind-types";
 import {
   type RollCategory,
   RollEntryDmPayload,
@@ -224,8 +231,27 @@ function itemRuns(payload: readonly RollPayloadItem[]): number[][] {
   return runs;
 }
 
+/**
+ * FR-DICE-69, FR-GEM-05 (OQ-GEM-21 B): gems' rerolls on `roll` entries. While gems are off, a
+ * superseded entry is hidden and every payload item loses `replaces`: only final rolls show.
+ */
+export const gemsRollTrace: LogKindTrace = {
+  feature: GEMS_FEATURE,
+  hides: (e) => e.supersededBy !== null,
+  strip<E extends TracedEntry>(e: E): E {
+    if (!Array.isArray(e.payload) || !e.payload.some((i) => i && "replaces" in i)) return e;
+    const payload = e.payload.map((i: Record<string, unknown>) => {
+      if (!i || !("replaces" in i)) return i;
+      const { replaces: _r, ...rest } = i;
+      return rest;
+    });
+    return { ...e, payload };
+  },
+};
+
 export const rollKind = defineLogKind({
   kind: ROLL_KIND,
+  traces: [gemsRollTrace],
   payload: RollEntryPayload,
   dmPayload: RollEntryDmPayload,
   formatLine({ actorName, payload, dmPayload, category }) {

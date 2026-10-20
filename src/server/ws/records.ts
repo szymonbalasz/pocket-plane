@@ -1,4 +1,5 @@
-// Record-type registry with visibility (SYNC §8, FR-SYNC-09/18/19). Default deny.
+// Record-type registry with visibility (SYNC §8, FR-SYNC-09/18/19). Default deny. Feature switches
+// (ADR-0058, FR-CAMP-44): tagged types / records and declared traces are hidden while off.
 
 import { LAZY_MODES, type LazyMode } from "@shared/protocol/lazy";
 import {
@@ -22,6 +23,21 @@ export interface Viewer {
   campaignId: string;
   role: Role;
   playerId: string | null;
+  /**
+   * ADR-0058: the campaign's enabled features, read when the connection's snapshot is built (the
+   * hub always sets it). Absent = the campaign's current switches (test helpers' viewers).
+   */
+  features?: readonly string[];
+}
+
+/**
+ * ADR-0058 trace: what a feature left on another feature's record. While `feature` is off for the
+ * viewer, `hides` true → the record is hidden; `strip` → the record as sent. Pure.
+ */
+export interface FeatureTrace<R> {
+  feature: string;
+  hides?(r: R): boolean;
+  strip?(r: R): R;
 }
 
 export interface PresenceView {
@@ -49,6 +65,15 @@ export interface RecordTypeDef<R> {
    * only while its scene is the campaign's active scene; DM sees every scene of the campaign.
    */
   sceneOf?(r: R): string;
+  /**
+   * ADR-0058: the whole type belongs to this feature (a key of the feature registry): while it is
+   * off the type is hidden for every viewer, DM too: no snapshot key, frame change or load row.
+   */
+  feature?: string;
+  /** ADR-0058: a per-record feature tag (e.g. a log entry's kind); null / undefined = none. */
+  featureOf?(r: R): string | null | undefined;
+  /** ADR-0058: traces other features left on this record (e.g. gems' supersede on a roll entry). */
+  tracesOf?(r: R): readonly FeatureTrace<R>[];
   /** Player visibility; reads record + viewer only. DM always gets `full`. */
   visibility(r: R, v: Viewer): Visibility;
   /** Required when `visibility` can return `redacted`. */
@@ -105,6 +130,9 @@ export type SceneCampaignResolver = (sceneId: string) => string | null;
 /** The campaign a player belongs to, or null when no such player exists (FR-FOG-43). */
 export type PlayerCampaignResolver = (playerId: string) => string | null;
 
+/** A campaign's enabled feature keys (ADR-0058); unknown campaign → `[]`. */
+export type CampaignFeaturesResolver = (campaignId: string) => readonly string[];
+
 /** Type-erased registration (the registry works on unknown records). */
 export type AnyRecordType = RecordTypeDef<unknown>;
 
@@ -137,6 +165,9 @@ export class RecordRegistry {
   /** No provider → no player exists → every `sync.loadScene {viewAs}` is `not_found`. */
   private playerCampaign: PlayerCampaignResolver = () => null;
   private playerCampaignProvided = false;
+  /** No provider → every feature off (ADR-0058: off by default). */
+  private campaignFeatures: CampaignFeaturesResolver = () => [];
+  private campaignFeaturesProvided = false;
 
   register(def: AnyRecordType): void {
     if (this.types.has(def.type)) throw new Error(`Record type "${def.type}" registered twice`);
@@ -220,6 +251,49 @@ export class RecordRegistry {
     return this.playerCampaign(playerId);
   }
 
+  /** One provider per server (campaign-management's campaign row). `replace`: tests only. */
+  provideCampaignFeatures(fn: CampaignFeaturesResolver, opts: { replace?: boolean } = {}): void {
+    if (this.campaignFeaturesProvided && !opts.replace) {
+      throw new Error("Campaign-features resolver provided twice");
+    }
+    this.campaignFeaturesProvided = true;
+    this.campaignFeatures = fn;
+  }
+
+  /** ADR-0058: the campaign's enabled features now (the hub reads it per snapshot). */
+  featuresOf(campaignId: string): readonly string[] {
+    return this.campaignFeatures(campaignId);
+  }
+
+  /** The viewer's enabled features (absent → the campaign's current switches). */
+  private featuresFor(v: Viewer): readonly string[] {
+    return v.features ?? this.featuresOf(v.campaignId);
+  }
+
+  /** ADR-0058: a type tagged with a feature the viewer's campaign has off (DM too). */
+  typeOff(def: AnyRecordType, v: Viewer): boolean {
+    return def.feature !== undefined && !this.featuresFor(v).includes(def.feature);
+  }
+
+  /**
+   * ADR-0058 "off" rule for one record: null = hidden (tagged type / record, or a trace that hides
+   * it); else the record with every off feature's traces stripped. Pure: record + viewer.
+   */
+  private featureGate(def: AnyRecordType, record: unknown, v: Viewer): { r: unknown } | null {
+    if (def.feature === undefined && !def.featureOf && !def.tracesOf) return { r: record };
+    const on = this.featuresFor(v);
+    if (def.feature !== undefined && !on.includes(def.feature)) return null;
+    const tag = def.featureOf?.(record);
+    if (tag && !on.includes(tag)) return null;
+    let r = record;
+    for (const t of def.tracesOf?.(record) ?? []) {
+      if (on.includes(t.feature)) continue;
+      if (t.hides?.(r)) return null;
+      if (t.strip) r = t.strip(r);
+    }
+    return { r };
+  }
+
   /** Types registered with `dmWindow: "active-scene"` (ADR-0041). */
   dmWindowed(): AnyRecordType[] {
     return [...this.types.values()].filter((d) => d.dmWindow === DM_WINDOW_ACTIVE_SCENE);
@@ -256,13 +330,17 @@ export class RecordRegistry {
    * Shared by snapshots and live events (FR-SYNC-20), so the scene gate feeds the transition
    * matrix: a scene-scoped record off the active scene is `hidden` for players (CON-22).
    */
-  view(type: string, record: unknown, v: Viewer): { vis: Visibility; data?: unknown } {
+  view(type: string, raw: unknown, v: Viewer): { vis: Visibility; data?: unknown } {
     const def = this.types.get(type);
     if (!def) return { vis: "hidden" };
     if (def.scope !== "global") {
-      const cid = def.campaignOf?.(record);
+      const cid = def.campaignOf?.(raw);
       if (cid !== v.campaignId) return { vis: "hidden" };
     }
+    // ADR-0058: the feature rule comes before every role rule (the DM is filtered too).
+    const gated = this.featureGate(def, raw, v);
+    if (!gated) return { vis: "hidden" };
+    const record = gated.r;
     if (v.role === "dm") return { vis: "full", data: def.dmRedact ? def.dmRedact(record) : record };
     if (def.audience === "dm") return { vis: "hidden" };
     if (def.scope === "scene") {
@@ -343,6 +421,7 @@ export class RecordRegistry {
     const out: Record<string, unknown[]> = {};
     for (const def of this.dmWindowed()) {
       if (def.audience === "dm" && v.role !== "dm") continue;
+      if (this.typeOff(def, v)) continue;
       const list: unknown[] = [];
       for (const r of def.snapshot(src, v, { sceneId })) {
         if (def.sceneOf?.(r) !== sceneId) continue;
@@ -370,10 +449,13 @@ export class RecordRegistry {
     if (viewAs === VIEW_AS_PARTY) {
       const out: Record<string, unknown[]> = {};
       for (const def of this.viewAsTypes()) {
+        if (this.typeOff(def, v)) continue;
         out[def.type] = def
           .snapshot(src, v, { sceneId })
           .filter((r) => def.sceneOf?.(r) === sceneId && def.campaignOf?.(r) === v.campaignId)
-          .map((r) => this.view(def.type, r, v).data);
+          .map((r) => this.view(def.type, r, v))
+          .filter((seen) => seen.vis !== "hidden")
+          .map((seen) => seen.data);
       }
       return out;
     }
@@ -382,14 +464,17 @@ export class RecordRegistry {
       campaignId: v.campaignId,
       role: "player",
       playerId: viewAs,
+      features: this.featuresFor(v),
     };
     const out: Record<string, unknown[]> = {};
     for (const def of this.viewAsTypes()) {
+      if (this.typeOff(def, v)) continue;
       const list: unknown[] = [];
       for (const r of def.snapshot(src, as, { sceneId })) {
         if (def.sceneOf?.(r) !== sceneId || def.campaignOf?.(r) !== v.campaignId) continue;
         if (def.visibility(r, as) === "hidden") continue;
-        list.push(this.view(def.type, r, v).data);
+        const seen = this.view(def.type, r, v);
+        if (seen.vis !== "hidden") list.push(seen.data);
       }
       out[def.type] = list;
     }
@@ -410,6 +495,8 @@ export class RecordRegistry {
   ): Record<string, unknown[]> {
     const def = this.types.get(type);
     if (!def || def.lazy === undefined) throw new Error(`Record type "${type}" is not lazy`);
+    // ADR-0058: the hub answers a feature-off type as unknown; never a key here.
+    if (this.typeOff(def, v)) return {};
     let rows: unknown[];
     if (ids === undefined) rows = def.snapshot(src, v);
     else {
@@ -437,6 +524,7 @@ export class RecordRegistry {
     for (const def of this.types.values()) {
       if (!def.window) continue;
       if (def.audience === "dm" && v.role !== "dm") continue;
+      if (this.typeOff(def, v)) continue;
       const cut = cutWindow(def.snapshot(src, v), def.window);
       out[def.type] = { ids: cut.rows.map((r) => def.idOf(r)), floor: cut.floor };
     }
@@ -451,11 +539,15 @@ export class RecordRegistry {
   }
 
   /** Snapshot records per type through the same filter (FR-SYNC-20). Lazy types: never. */
-  snapshot(src: SnapshotSource, v: Viewer): Record<string, unknown[]> {
+  snapshot(src: SnapshotSource, viewer: Viewer): Record<string, unknown[]> {
+    // One features read per snapshot (ADR-0058), whoever built the viewer.
+    const v: Viewer = { ...viewer, features: this.featuresFor(viewer) };
     const out: Record<string, unknown[]> = {};
     for (const def of this.types.values()) {
       if (def.lazy !== undefined) continue;
       if (def.audience === "dm" && v.role !== "dm") continue;
+      // ADR-0058: a feature-off type isn't even an empty list (nothing names the feature).
+      if (this.typeOff(def, v)) continue;
       const list: unknown[] = [];
       for (const r of this.snapshotRows(def, src, v)) {
         const seen = this.view(def.type, r, v);

@@ -39,6 +39,23 @@ export interface LineInput<P, D> {
   category?: RollCategory;
 }
 
+/** The entry fields a trace reads (a `game-log-entry` row; ADR-0058). */
+export interface TracedEntry {
+  supersededBy: string | null;
+  payload: unknown;
+}
+
+/**
+ * ADR-0058 trace (FR-DICE-69): what another feature left on this kind's entries. While the
+ * campaign's `feature` is off, `hides` true → the entry is hidden for every viewer; `strip` → the
+ * entry as sent (pure: record in, record out). Applied by the hub.
+ */
+export interface LogKindTrace {
+  feature: string;
+  hides?(entry: TracedEntry): boolean;
+  strip?<E extends TracedEntry>(entry: E): E;
+}
+
 export interface LogKindDef<P = unknown, D = unknown> {
   /** `roll` (dice) or `<prefix>.<name>` (other features, e.g. `cbt.attack`). */
   kind: string;
@@ -47,6 +64,13 @@ export interface LogKindDef<P = unknown, D = unknown> {
   /** DM-only extras, stripped for players. No schema → `dmPayload` must be null. */
   dmPayload?: z.ZodType<D>;
   formatLine(entry: LineInput<P, D>): LineSegment[];
+  /**
+   * FR-DICE-69 (ADR-0058): a key of the feature registry (`@shared/campaign-management/features`).
+   * Entries of the kind are hidden for every viewer (DM too) while the campaign's feature is off.
+   */
+  feature?: string;
+  /** FR-DICE-69: other features' traces on this kind's entries (e.g. gems' supersede on `roll`). */
+  traces?: readonly LogKindTrace[];
 }
 
 export type AnyLogKind = LogKindDef<unknown, unknown>;
