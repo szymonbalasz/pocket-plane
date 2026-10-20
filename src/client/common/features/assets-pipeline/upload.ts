@@ -1,10 +1,23 @@
 // DM upload over REST with progress (FR-ASSET-17, -21). XHR because fetch has no upload progress.
 // Moved to `@ui` (FR-ASSET-27): the DM's uploader context calls it with the DM secret.
 import { type AssetRecord, UploadResponse } from "@shared/assets-pipeline/schemas";
+import {
+  CAMPAIGN_TAGS_MAX,
+  type DroppedTag,
+  IMAGE_CONTEXT_TAG,
+  type ImageContext,
+  TAGS_PER_IMAGE_MAX,
+} from "@shared/assets-pipeline/tags";
 import { RestError } from "@shared/protocol/codes";
 
 export type UploadOutcome =
-  | { kind: "ok"; outcome: "created" | "existing"; asset: AssetRecord }
+  | {
+      kind: "ok";
+      outcome: "created" | "existing";
+      asset: AssetRecord;
+      /** FR-ASSET-41: sent tags the server couldn't add (the upload is kept); absent when none. */
+      droppedTags?: DroppedTag[];
+    }
   | { kind: "unauthorized" }
   | { kind: "error"; message: string };
 
@@ -22,7 +35,13 @@ export function outcomeOf(status: number, body: unknown): UploadOutcome {
   if (status === 200 || status === 201) {
     const r = UploadResponse.safeParse(body);
     if (r.success) {
-      return { kind: "ok", outcome: status === 201 ? "created" : "existing", asset: r.data.asset };
+      const { asset, droppedTags } = r.data;
+      return {
+        kind: "ok",
+        outcome: status === 201 ? "created" : "existing",
+        asset,
+        ...(droppedTags?.length ? { droppedTags } : {}),
+      };
     }
   }
   return { kind: "error", message: uploadErrorMessage(status, body) };
@@ -40,6 +59,33 @@ export interface UploadOptions {
   listed: boolean;
   /** Display name; absent = from the file name (FR-ASSET-01). */
   name?: string;
+  /** FR-ASSET-41: the host's context tag (FR-ASSET-48); absent or empty = no `tags` field. */
+  tags?: readonly string[];
+}
+
+/** FR-ASSET-48: the tags an upload from `context` carries (none → undefined: no field sent). */
+export function contextTags(context: ImageContext | undefined): string[] | undefined {
+  const tag = context ? IMAGE_CONTEXT_TAG[context] : null;
+  return tag ? [tag] : undefined;
+}
+
+/** FR-ASSET-41 Toast for a tag the server dropped. */
+export function droppedTagMessage(d: DroppedTag): string {
+  const why =
+    d.reason === "image-full"
+      ? `${TAGS_PER_IMAGE_MAX} tags on this image`
+      : `${CAMPAIGN_TAGS_MAX} tags in this campaign`;
+  return `Tag ${d.tag} not added: ${why}`;
+}
+
+/** The multipart body of `POST /api/assets` (ASSET §9): file, `listed`, `name?`, `tags?`. */
+export function uploadBody(file: File, opts: UploadOptions): FormData {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("listed", opts.listed ? "true" : "false");
+  if (opts.name !== undefined) body.append("name", opts.name);
+  if (opts.tags?.length) body.append("tags", JSON.stringify(opts.tags));
+  return body;
 }
 
 export function uploadAsset(
@@ -60,10 +106,6 @@ export function uploadAsset(
     xhr.onload = () => resolve(outcomeOf(xhr.status, xhr.response));
     xhr.onerror = () => resolve({ kind: "error", message: "Upload failed, try again" });
     xhr.onabort = xhr.onerror;
-    const body = new FormData();
-    body.append("file", file);
-    body.append("listed", opts.listed ? "true" : "false");
-    if (opts.name !== undefined) body.append("name", opts.name);
-    xhr.send(body);
+    xhr.send(uploadBody(file, opts));
   });
 }

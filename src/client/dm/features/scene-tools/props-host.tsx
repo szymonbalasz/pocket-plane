@@ -21,6 +21,7 @@ export function ScnPropsDmHost() {
       open
       onOpenChange={(o) => !o && close()}
       title={picking.kind === "place" ? "Prop image" : "Change prop image"}
+      context="prop"
       initialSelectedId={picking.kind === "place" ? imageId : (target?.assetId ?? null)}
       onSelect={(id) => {
         if (picking.kind === "place") {
