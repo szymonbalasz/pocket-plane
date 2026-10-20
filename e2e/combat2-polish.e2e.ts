@@ -473,10 +473,13 @@ for (const [width, height] of [
         .getByTestId("note-toast")
         .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id") ?? "")),
     );
-    // Mira's likely targets: the monsters' tokens (every token but the PCs').
+    // Mira's likely targets (FR-CBT-55): the monsters' tokens, every token but the PCs' and the
+    // unbound reinforcement tokens (`cbtx-reinforcement`: Goblin 3, Wolf 2 are no combatants, so
+    // the placement may cover them).
+    const unbound = new Set(["Goblin 3", "Wolf 2"]);
     const monsters = async () =>
       (await tokenBoxes(dm)).filter(
-        (t) => t.name !== "" && t.name !== "Mira" && t.name !== "Thorn",
+        (t) => t.name !== "" && t.name !== "Mira" && t.name !== "Thorn" && !unbound.has(t.name),
       );
     const popup = dm.getByTestId("cbt-popup");
 

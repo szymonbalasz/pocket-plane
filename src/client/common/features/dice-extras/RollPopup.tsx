@@ -21,6 +21,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
@@ -32,9 +33,16 @@ import { RollerName } from "../dice-roll-log/name-color";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
+import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
 import type { ShellClient } from "../play-shell/registry";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
-import { ROLL_POPUP_H, ROLL_POPUP_W } from "../play-shell/toast-region";
+import {
+  ROLL_POPUP_H,
+  ROLL_POPUP_W,
+  reportShownStack,
+  shownStacks,
+  subscribeShownStack,
+} from "../play-shell/toast-region";
 import { arenaOf, DIE_WORLD } from "./arena";
 import type { Rect } from "./dice3d/index";
 import { FlatDie } from "./FlatDie";
@@ -45,6 +53,7 @@ import {
   CELL_LINES,
   CELL_PX,
   cellTag,
+  dmPopupClear,
   dmStackAt,
   LINE_W,
   linesH,
@@ -61,6 +70,7 @@ import {
   popupsThatFit,
   ROW_H,
   ROWS_SHOWN,
+  shownPopupStack,
   TAG_OVERHANG,
 } from "./popup-logic";
 import {
@@ -608,6 +618,9 @@ function useNonModalRects(dm: boolean, active: boolean): readonly Rect[] {
   return rects;
 }
 
+/** The DM popup stack's id in play-shell's shown stack (FR-SHELL-59). */
+const SHOWN_ID = "dicex.popups";
+
 export function RollPopupStack({
   client,
   display,
@@ -622,6 +635,10 @@ export function RollPopupStack({
   const vp = useViewport();
   const initiative = useInitiativeRect(dm);
   const dialogs = useNonModalRects(dm, popups.length > 0 || pending);
+  // FR-DICEX-55: the DM stack never covers a tool bar (play-shell's hard keep-outs).
+  const keepOuts = useKeepOuts(client);
+  // FR-DICEX-55: nor the DM's other shown stacks (the notification toasts, FR-SHELL-59).
+  const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
   const stack = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ top: 0, h: 0 });
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the cards change
@@ -631,7 +648,13 @@ export function RollPopupStack({
     const h = Math.round(el?.getBoundingClientRect().height ?? 0);
     setBox((b) => (b.top === top && b.h === h ? b : { top, h }));
   }, [popups, pending, vp]);
-  const clear = initiative ? [initiative, ...dialogs] : dialogs;
+  const clear = dmPopupClear(
+    initiative,
+    dialogs,
+    dm ? hardRects(keepOuts) : [],
+    dm ? reports : new Map(),
+    SHOWN_ID,
+  );
   const at = dmStackAt(vp, box.top, { w: ROLL_POPUP_W, h: box.h }, clear);
   // FR-DICEX-47 short screens: only the popups that fit the region (newest first; the oldest
   // drops), never past the viewport's bottom (DM) or over the top bar (players).
@@ -646,6 +669,9 @@ export function RollPopupStack({
     const keep = Math.max(1, popupsThatFit(heights, room) - (pending ? 1 : 0));
     if (open.length > keep) rollPopups.drop(open.slice(0, open.length - keep).map((p) => p.id));
   });
+  // FR-SHELL-59: the DM stack's rendered rect for the Fit (FR-MAP-80); null when empty or gone.
+  useLayoutEffect(() => reportShownStack(SHOWN_ID, shownPopupStack(dm, rectOf(stack.current))));
+  useEffect(() => () => reportShownStack(SHOWN_ID, null), []);
   if (popups.length === 0 && !pending) return null;
   // Newest nearest the region's anchor: the DM's top, the players' bottom.
   const cards = popups.map((p) => <Card key={p.id} p={p} display={display} />);

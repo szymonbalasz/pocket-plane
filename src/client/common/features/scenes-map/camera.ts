@@ -558,6 +558,173 @@ export function fitVisible(
   return pcs;
 }
 
+// ---- FR-MAP-81: `pcs` keeps the top row (sprint 6, BL-41) ----
+
+/** FR-MAP-81 bound: the tokens nearest the PCs' box centre that enter the `pcs` pan sweep. */
+export const PCS_PAN_MAX_TOKENS = 30;
+
+/** A footprint (map px) and whether it is a PC's. */
+export interface FitBox extends Box {
+  pc: boolean;
+}
+
+/** Index range of sorted `xs` inside the closed interval [lo, hi]. */
+const closedRange = (xs: readonly number[], lo: number, hi: number): [number, number] => [
+  lowerBound(xs, lo - EPS, false),
+  lowerBound(xs, hi + EPS, true),
+];
+
+/** Index range of sorted `xs` inside the open interval (lo, hi). */
+const openRange = (xs: readonly number[], lo: number, hi: number): [number, number] => [
+  lowerBound(xs, lo + EPS, true),
+  lowerBound(xs, hi - EPS, false),
+];
+
+/** Lexicographic `a < b`, ties within EPS. */
+function before(a: readonly number[], b: readonly number[]): boolean {
+  for (let i = 0; i < a.length; i++) {
+    const d = (a[i] as number) - (b[i] as number);
+    if (Math.abs(d) > EPS) return d < 0;
+  }
+  return false;
+}
+
+/**
+ * FR-MAP-81: the `pcs` pan at 48 px per cell (`FIT_MIN_CELL_PX`, capped by the max zoom), or null
+ * (no PCs, more than 6 obstacles in the area, or no pan keeps every PC footprint inside `area` and
+ * clear of every obstacle: FR-MAP-46's centring stays). Inputs bounded: the PCs + the 30 tokens
+ * nearest the PCs' box centre. Among the pans keeping the PCs inside and clear: (1) none drawn
+ * cut by the top (a footprint on the viewport `view` whose top is above `area`'s), if such a pan
+ * exists ("never cuts a token by the top bar while another PC-clear pan doesn't"; sim-9 a03's
+ * top row at y 64), (2) then the most of those footprints inside `area` and clear of every
+ * obstacle, (3) then the least Manhattan distance to `from`, then higher, then left. Candidates: the cross product of
+ * every edge where one of those counts can change (as FR-MAP-59 (2)); per x a sweep over y counts.
+ */
+export function pcsPan(
+  tokens: readonly FitBox[],
+  obstacles: readonly Box[],
+  area: Box,
+  view: Size,
+  from: { x: number; y: number },
+  cell: number,
+): Camera | null {
+  const inArea = obstacles
+    .filter((o) => cross(o, area))
+    .sort((a, b) => b.w * b.h - a.w * a.h || a.y - b.y || a.x - b.x);
+  const pcs = tokens.filter((t) => t.pc);
+  if (cell <= 0 || pcs.length === 0 || inArea.length > FIT_VISIBLE_MAX_OBSTACLES) return null;
+  const scale = Math.min(ZOOM_MAX, FIT_MIN_CELL_PX / cell);
+  // The PCs' bounding-box centre.
+  const cx = (Math.min(...pcs.map((p) => p.x)) + Math.max(...pcs.map((p) => p.x + p.w))) / 2;
+  const cy = (Math.min(...pcs.map((p) => p.y)) + Math.max(...pcs.map((p) => p.y + p.h))) / 2;
+  const dist = (t: Box) => Math.hypot(t.x + t.w / 2 - cx, t.y + t.h / 2 - cy);
+  const others = tokens
+    .map((t, i) => ({ t, i, d: dist(t) }))
+    .filter(({ t }) => !t.pc)
+    .sort((a, b) => a.d - b.d || a.i - b.i)
+    .slice(0, PCS_PAN_MAX_TOKENS)
+    .map(({ t }) => t);
+  const set = [...pcs, ...others];
+  // The pan range: every PC footprint inside the area.
+  let x0 = Number.NEGATIVE_INFINITY;
+  let x1 = Number.POSITIVE_INFINITY;
+  let y0 = Number.NEGATIVE_INFINITY;
+  let y1 = Number.POSITIVE_INFINITY;
+  for (const t of pcs) {
+    x0 = Math.max(x0, area.x - t.x * scale);
+    x1 = Math.min(x1, area.x + area.w - (t.x + t.w) * scale);
+    y0 = Math.max(y0, area.y - t.y * scale);
+    y1 = Math.min(y1, area.y + area.h - (t.y + t.h) * scale);
+  }
+  if (x0 > x1 + EPS || y0 > y1 + EPS) return null;
+  x1 = Math.max(x0, x1);
+  y1 = Math.max(y0, y1);
+  // Per token: the pans keeping it inside the area, the forbidden (open) pans per obstacle, and
+  // the (open) pans that draw it cut by the top.
+  const per = set.map((t) => ({
+    pc: t.pc,
+    ax: [area.x - t.x * scale, area.x + area.w - (t.x + t.w) * scale] as const,
+    ay: [area.y - t.y * scale, area.y + area.h - (t.y + t.h) * scale] as const,
+    forbid: inArea.map((o) => ({
+      l: o.x - (t.x + t.w) * scale,
+      r: o.x + o.w - t.x * scale,
+      t: o.y - (t.y + t.h) * scale,
+      b: o.y + o.h - t.y * scale,
+    })),
+    cutX: [-(t.x + t.w) * scale, view.w - t.x * scale] as const,
+    cutY: [-(t.y + t.h) * scale, area.y - t.y * scale] as const,
+  }));
+  const inX = (v: number) => v >= x0 - EPS && v <= x1 + EPS;
+  const inY = (v: number) => v >= y0 - EPS && v <= y1 + EPS;
+  const fx = Math.min(Math.max(from.x, x0), x1);
+  const fy = Math.min(Math.max(from.y, y0), y1);
+  const xs = sortedUnique(
+    [
+      x0,
+      x1,
+      fx,
+      ...per.flatMap((p) => [...p.ax, ...p.cutX, ...p.forbid.flatMap((f) => [f.l, f.r])]),
+    ].filter(inX),
+  );
+  const ys = sortedUnique(
+    [
+      y0,
+      y1,
+      fy,
+      ...per.flatMap((p) => [...p.ay, ...p.cutY, ...p.forbid.flatMap((f) => [f.t, f.b])]),
+    ].filter(inY),
+  );
+  const ok = new Int32Array(ys.length + 1);
+  const pcOk = new Int32Array(ys.length + 1);
+  const cut = new Int32Array(ys.length + 1);
+  const mark = (arr: Int32Array, [lo, hi]: [number, number]) => {
+    if (lo >= hi) return;
+    arr[lo] = (arr[lo] as number) + 1;
+    arr[hi] = (arr[hi] as number) - 1;
+  };
+  let best: { x: number; y: number; rank: number[] } | null = null;
+  for (const x of xs) {
+    ok.fill(0);
+    pcOk.fill(0);
+    cut.fill(0);
+    for (const p of per) {
+      if (p.cutX[0] < x - EPS && x < p.cutX[1] - EPS) mark(cut, openRange(ys, ...p.cutY));
+      if (x < p.ax[0] - EPS || x > p.ax[1] + EPS) continue;
+      // The token's allowed y: inside the area minus the open intervals of the obstacles whose
+      // forbidden x-interval holds x.
+      const gaps = p.forbid.filter((f) => f.l < x - EPS && x < f.r - EPS).sort((a, b) => a.t - b.t);
+      let at = p.ay[0];
+      for (const g of gaps) {
+        if (g.t >= at - EPS) {
+          const hi = Math.min(g.t, p.ay[1]);
+          if (hi >= at - EPS) {
+            mark(ok, closedRange(ys, at, hi));
+            if (p.pc) mark(pcOk, closedRange(ys, at, hi));
+          }
+        }
+        at = Math.max(at, g.b);
+      }
+      if (at <= p.ay[1] + EPS) {
+        mark(ok, closedRange(ys, at, p.ay[1]));
+        if (p.pc) mark(pcOk, closedRange(ys, at, p.ay[1]));
+      }
+    }
+    let nOk = 0;
+    let nPc = 0;
+    let nCut = 0;
+    for (let j = 0; j < ys.length; j++) {
+      nOk += ok[j] as number;
+      nPc += pcOk[j] as number;
+      nCut += cut[j] as number;
+      if (nPc < pcs.length) continue;
+      const y = ys[j] as number;
+      const rank = [nCut > 0 ? 1 : 0, -nOk, Math.abs(x - from.x) + Math.abs(y - from.y), y, x];
+      if (best === null || before(rank, best.rank)) best = { x, y, rank };
+    }
+  }
+  return best && { x: best.x, y: best.y, scale };
+}
+
 /** A token as the fit sees it: its cells and whether it is a PC (has an owner, FR-MAP-46). */
 export interface FitToken {
   col: number;
@@ -619,6 +786,15 @@ export function fitScene(
     cell,
     TOP_BAR_H,
   );
+  if (visible === "pcs") {
+    // FR-MAP-81: the PCs first at 48 px, the top row not cut where a pan allows it.
+    const boxes = tokens.flatMap((t) => {
+      const b = footprintBox([t], grid);
+      return b ? [{ ...b, pc: t.pc }] : [];
+    });
+    const pan = pcsPan(boxes, room.obstacles, visibleArea(view), view, step1, cell);
+    if (pan) return { ...pan, floor: true, rect, visible };
+  }
   const same = cam.x === step1.x && cam.y === step1.y && cam.scale === step1.scale;
   return { ...cam, floor: same ? step1.floor : false, rect, visible };
 }
@@ -628,13 +804,26 @@ export type CameraMode = "fitted" | "moved";
 
 /**
  * What can happen to the camera; window, token and snapshot changes are not here. `resize` = a
- * browser viewport resize, settled (FR-MAP-47).
+ * browser viewport resize, settled (FR-MAP-47); `reveal` = newly drawn tokens off-screen or under
+ * an obstacle (FR-MAP-82, players).
  */
-export type CameraEvent = "open" | "fit" | "appearance" | "resize" | "pan" | "zoom" | "pull";
+export type CameraEvent =
+  | "open"
+  | "fit"
+  | "appearance"
+  | "resize"
+  | "reveal"
+  | "pan"
+  | "zoom"
+  | "pull";
+
+/** `data-fit-reason`: the last fit's cause (FR-MAP-82). */
+export type FitReason = "open" | "fit" | "appearance" | "resize" | "reveal";
 
 /**
- * FR-MAP-44/45/47 triggers: a scene open and the Fit button always fit; an appearance or a
- * viewport resize refits only while `fitted`; pan, wheel zoom and pull mark the camera `moved`.
+ * FR-MAP-44/45/47/82 triggers: a scene open and the Fit button always fit; an appearance, a
+ * viewport resize or a reveal refits only while `fitted`; pan, wheel zoom and pull mark the
+ * camera `moved`.
  */
 export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; fit: boolean } {
   switch (e) {
@@ -643,6 +832,7 @@ export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; 
       return { mode: "fitted", fit: true };
     case "appearance":
     case "resize":
+    case "reveal":
       return { mode, fit: mode === "fitted" };
     default:
       return { mode: "moved", fit: false };
@@ -690,6 +880,91 @@ export function createResizeRefit(refit: () => void, dragging: () => boolean, ti
       if (handle !== null) timers.clear(handle);
       handle = null;
       afterDrop = false;
+    },
+  };
+}
+
+/** FR-MAP-82: reveals within this long coalesce into one refit (the last frame's content). */
+export const REVEAL_REFIT_MS = 1000;
+
+/** A token this client draws: its id and footprint (map px). */
+export interface DrawnToken {
+  id: string;
+  box: Box;
+}
+
+/** FR-MAP-82 is the players' (rulings-b #18): the DM's camera never refits on reveals. */
+export const refitsOnReveal = (client: "dm" | "player") => client === "player";
+
+/**
+ * FR-MAP-82 trigger (players): a frame made tokens newly drawn (ids not in `prevDrawn`) and at
+ * least one of their footprints lies outside `area` or under an obstacle at `cam`, while the
+ * camera is `fitted`. Tokens already drawn, moving or leaving sight never count.
+ */
+export function revealRefit(
+  prevDrawn: ReadonlySet<string>,
+  nextDrawn: readonly DrawnToken[],
+  cam: Camera,
+  obstacles: readonly Box[],
+  area: Box,
+  mode: CameraMode,
+): boolean {
+  if (mode !== "fitted") return false;
+  return nextDrawn.some((t) => !prevDrawn.has(t.id) && !allClear(cam, [t.box], obstacles, area));
+}
+
+/**
+ * FR-MAP-82 timing: `reveal()` arms one refit `REVEAL_REFIT_MS` later (later reveals ride along,
+ * so a burst refits once with the last frame's content). The user wins: `gesture()` (a pan or zoom
+ * gesture's start; the caller marks the camera `moved`) cancels it; `press()` (a token or a tool
+ * under the pointer) cancels it and `release()` (the drop) re-arms it; reveals while pressed wait
+ * for the release. `refit` applies the `reveal` camera event, so `moved` never refits.
+ */
+export function createRevealRefit(refit: () => void, timers = realTimers) {
+  let handle: unknown = null;
+  let pressing = false;
+  let deferred = false;
+  const clear = () => {
+    if (handle !== null) timers.clear(handle);
+    handle = null;
+  };
+  const arm = () => {
+    if (handle !== null) return;
+    handle = timers.set(() => {
+      handle = null;
+      refit();
+    }, REVEAL_REFIT_MS);
+  };
+  return {
+    reveal() {
+      if (pressing) deferred = true;
+      else arm();
+    },
+    gesture() {
+      clear();
+      deferred = false;
+    },
+    press() {
+      pressing = true;
+      if (handle === null) return;
+      clear();
+      deferred = true;
+    },
+    release() {
+      if (!pressing) return;
+      pressing = false;
+      if (!deferred) return;
+      deferred = false;
+      arm();
+    },
+    /** A refit is armed or waits for a release. */
+    get pending() {
+      return handle !== null || deferred;
+    },
+    dispose() {
+      clear();
+      pressing = false;
+      deferred = false;
     },
   };
 }

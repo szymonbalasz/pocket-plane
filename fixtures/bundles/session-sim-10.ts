@@ -15,6 +15,8 @@ export default defineBundle({
     "image-tags",
     // WF: window + layout fix pack
     // WF2: no new unit (the toast home walks on sim-9's ruled card summary, Scenes and the Fog tool)
+    // WF3: no new unit (Fit, pcs pan and the reveal refit walk on sim-9's Goblin Ambush: door
+    // (8, 5), party vision, the hidden Elite and Wolf)
     // PF: Preferences, free colour, Subtract
     // PF0: Player 2 lavender `#b388ff` (one DM `camp.setColor`; Blue and Sky blocked for Player 1)
     "pc-colour-free",

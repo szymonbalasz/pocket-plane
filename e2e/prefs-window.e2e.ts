@@ -30,7 +30,7 @@ test("FR-SHELL-70/71/72/74 chip opens Preferences; minimised → restored by the
   const prefs = shellWindow(p, "shell.prefs");
   await expect(prefs.getByTestId("ui-prefs-window")).toBeVisible();
   await expect(chip).toHaveAttribute("data-state", "open");
-  expect(await sectionIds(p)).toEqual(["shell.sound", "shell.layout"]);
+  expect(await sectionIds(p)).toEqual(["camp.color", "shell.sound", "dicex.dice", "shell.layout"]);
 
   // Minimised from its title bar: no launcher button, so the chip restores it (rulings-b 27).
   const before = await prefs.boundingBox();
@@ -59,7 +59,12 @@ test("FR-SHELL-70/72, FR-CAMP-35 DM chip and Account: no Log out in the top bar;
 
   await chip.click();
   await expect(dm.getByTestId("ui-prefs-window")).toBeVisible();
-  expect(await sectionIds(dm)).toEqual(["shell.layout", "camp.account"]);
+  expect(await sectionIds(dm)).toEqual([
+    "camp.color",
+    "dicex.dice",
+    "shell.layout",
+    "camp.account",
+  ]);
   await dm.getByTestId("camp-logout").click();
   await expect(dm.getByTestId("camp-login-secret")).toBeVisible();
 

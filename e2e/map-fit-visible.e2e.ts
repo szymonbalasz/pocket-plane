@@ -2,8 +2,9 @@
 // Fit keeps every token visible (MAP FR-MAP-59, SHELL §13 sprint 5 step W5, slice W2), DM:
 // Fit (rail) with Initiative + Game log, then with Scenes too, at 1440×900 and 1280×720. Every
 // `map-token` footprint (hidden ones too) inside the work area right of the rail and clear of
-// every `ui-window` and the DM's top-centre toast box with `data-fit-visible="all"` (1440×900
-// without Scenes), else `pcs` with every PC clear (OQ-SHELL-40). The method in detail: bun test
+// every `ui-window` and the DM's summary strip with `data-fit-visible="all"` (sprint 6, FR-MAP-80,
+// OQ-MAP-57 D: the strip, not the whole top-centre box, so every case is `all` now; was `pcs` in
+// three, OQ-SHELL-40); a `pcs` case keeps every PC clear. The method in detail: bun test
 // (`camera.test.ts`, the registry-driven `fit-visible.test.ts` per client).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -47,12 +48,13 @@ async function footprints(page: Page) {
   });
 }
 
-/** The DM's top-centre toast box (`ui-toast-corner` `data-rect`). */
-async function toastBox(page: Page): Promise<Box> {
-  const rect = (await page.getByTestId("ui-toast-corner").getAttribute("data-rect")) ?? "";
-  const [x, y, w, h] = rect.split(",").map(Number);
-  return { x: x ?? 0, y: y ?? 0, w: w ?? 0, h: h ?? 0 };
-}
+/** The DM's summary strip (FR-MAP-80): 320 × 57 at ((vw − 320) / 2, 100). */
+const summaryStrip = (vw: number): Box => ({
+  x: Math.round((vw - 320) / 2),
+  y: 100,
+  w: 320,
+  h: 57,
+});
 
 /** Fit from the rail, then wait until the drawn tokens stop moving. */
 async function fit(page: Page) {
@@ -88,7 +90,7 @@ async function expectVisible(page: Page, want: "all" | "pcs", count: number, pcs
     h: (launcher?.y ?? vp.height) - TOP_BAR_H,
   };
   const windows = await shownWindows(page);
-  const toasts = await toastBox(page);
+  const toasts = summaryStrip(vp.width);
   const tokens = await footprints(page);
   expect(tokens.length).toBe(count);
   const cell = Number(await canvas.getAttribute("data-cell-px"));
@@ -103,7 +105,7 @@ async function expectVisible(page: Page, want: "all" | "pcs", count: number, pcs
       t.y + t.h <= area.y + area.h + 0.5;
     if (!inside) out.push(`${t.id} outside the work area`);
     for (const w of windows) if (overlaps(t, w)) out.push(`${t.id} under ${w.kind}`);
-    if (want === "all" && overlaps(t, toasts)) out.push(`${t.id} under the toast box`);
+    if (want === "all" && overlaps(t, toasts)) out.push(`${t.id} under the summary strip`);
     return out;
   });
   expect(
@@ -119,7 +121,7 @@ async function expectVisible(page: Page, want: "all" | "pcs", count: number, pcs
   return cell;
 }
 
-test("FR-MAP-59 every token visible: DM Fit with Initiative + Game log, then + Scenes, at 1440×900 and 1280×720 (W5)", async ({
+test("FR-MAP-59 every token visible: DM Fit with Initiative + Game log, then + Scenes, at 1440×900 and 1280×720 → all (W5; sprint 6 FR-MAP-80)", async ({
   browser,
 }) => {
   const { secret, recordId } = e2eEnv();
@@ -150,8 +152,8 @@ test("FR-MAP-59 every token visible: DM Fit with Initiative + Game log, then + S
 
   const cells: string[] = [];
   for (const [size, plain, withScenes] of [
-    [{ width: 1440, height: 900 }, "all", "pcs"],
-    [{ width: 1280, height: 720 }, "pcs", "pcs"],
+    [{ width: 1440, height: 900 }, "all", "all"],
+    [{ width: 1280, height: 720 }, "all", "all"],
   ] as const) {
     await dm.setViewportSize(size);
     await fit(dm);
