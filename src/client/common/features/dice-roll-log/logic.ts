@@ -18,6 +18,7 @@ import type {
 } from "@shared/dice-roll-log/schemas";
 import type { EntityRecord } from "@shared/entities/schemas";
 import type { SceneView, TokenView } from "@shared/scenes-map/schemas";
+import { z } from "zod";
 
 /** FR-DICE-05: Shift = advantage, Ctrl = disadvantage, both = normal; none → the toggle. */
 export function modeFromKeys(
@@ -130,6 +131,28 @@ export function actorSelection(
   if (current) return { options: [...actors], selected: current };
   const stale = { ...picked, stale: true };
   return { options: [...actors, stale], selected: stale };
+}
+
+/**
+ * FR-DICE-77 (BL-48, amends FR-DICE-30's default; rulings-b #18): a **player's** roll-bar actor
+ * when nothing is picked in this page, in order: the stored manual pick (`""` = "Me"; only while
+ * still one of the player's options) → the character the Character sheet shows (only one of their
+ * own) → their only character → null ("Me", the player's name). The DM's default is unchanged.
+ */
+export function playerActorPick(
+  actors: readonly ActorOption[],
+  stored: string | null,
+  sheetId: string | null,
+): ActorOption | null {
+  const own = actors.filter((a) => a.group === "Characters");
+  if (stored !== null) {
+    const hit =
+      stored === "" ? actors.find((a) => a.value === "") : own.find((a) => a.value === stored);
+    if (hit) return hit;
+  }
+  const sheet = sheetId ? own.find((a) => a.value === sheetId) : undefined;
+  if (sheet) return sheet;
+  return own.length === 1 ? (own[0] as ActorOption) : null;
 }
 
 type ActorToken = Pick<TokenView, "id" | "sceneId" | "name" | "seq" | "definitionId">;
@@ -597,31 +620,62 @@ export interface FlagStore {
   read(key: string): boolean;
   /** Writes `"1"` / `"0"`; storage unavailable → kept in memory for this tab. Never throws. */
   write(key: string, on: boolean): void;
+  /** FR-DICE-77: the player's manual actor pick in the same entry (`""` = "Me"); null = none. */
+  readActor(key: string): string | null;
+  /** FR-DICE-77: stores (or, null, clears) the pick beside the open flag. Never throws. */
+  writeActor(key: string, actor: string | null): void;
 }
+
+/**
+ * FR-DICE-30 / -77: one Options entry. Without an actor pick it stays `"1"` / `"0"` (as before
+ * FR-DICE-77); with one, `{"open":…,"actor":…}`.
+ */
+const RollBarEntry = z.strictObject({ open: z.boolean(), actor: z.string().max(64) });
+type RollBarState = { open: boolean; actor: string | null };
+
+function parseEntry(raw: string | null | undefined): RollBarState {
+  if (raw === "1") return { open: true, actor: null };
+  if (!raw || raw === "0") return { open: false, actor: null };
+  try {
+    const p = RollBarEntry.safeParse(JSON.parse(raw));
+    if (p.success) return p.data;
+  } catch {
+    // Not JSON: a broken entry reads as the default.
+  }
+  return { open: false, actor: null };
+}
+
+const serializeEntry = (s: RollBarState) =>
+  s.actor === null ? (s.open ? "1" : "0") : JSON.stringify(s);
 
 /** FR-DICE-30: per-browser on / off flag (Options open), with an in-memory fallback. */
 export function createFlagStore(getBackend: () => FlagBackend | undefined): FlagStore {
-  const memory = new Map<string, boolean>();
+  const memory = new Map<string, RollBarState>();
+  const state = (key: string): RollBarState => {
+    const kept = memory.get(key);
+    if (kept !== undefined) return kept;
+    try {
+      return parseEntry(getBackend()?.getItem(key));
+    } catch {
+      return { open: false, actor: null };
+    }
+  };
+  const write = (key: string, patch: Partial<RollBarState>) => {
+    const next = { ...state(key), ...patch };
+    try {
+      const backend = getBackend();
+      if (!backend) throw new Error("no storage");
+      backend.setItem(key, serializeEntry(next));
+      memory.delete(key);
+    } catch {
+      memory.set(key, next);
+    }
+  };
   return {
-    read(key) {
-      const kept = memory.get(key);
-      if (kept !== undefined) return kept;
-      try {
-        return getBackend()?.getItem(key) === "1";
-      } catch {
-        return false;
-      }
-    },
-    write(key, on) {
-      try {
-        const backend = getBackend();
-        if (!backend) throw new Error("no storage");
-        backend.setItem(key, on ? "1" : "0");
-        memory.delete(key);
-      } catch {
-        memory.set(key, on);
-      }
-    },
+    read: (key) => state(key).open,
+    write: (key, on) => write(key, { open: on }),
+    readActor: (key) => state(key).actor,
+    writeActor: (key, actor) => write(key, { actor }),
   };
 }
 

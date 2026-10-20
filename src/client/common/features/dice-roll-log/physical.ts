@@ -1,8 +1,16 @@
 // FR-DICE-07: physical-dice mode, per client, in browser storage. Shared by the log window's
 // toggle and every roll control in this tab (same-tab listeners + the `storage` event).
-import { useCallback, useSyncExternalStore } from "react";
+// FR-DICE-30 / -77: the roll bar's Options state and a player's actor pick, one entry per client.
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { useSync } from "../../sync/store";
-import { createFlagStore, optionsKey, physicalKey } from "./logic";
+import { sheetSelection } from "../character-sheet/selection";
+import {
+  type ActorOption,
+  createFlagStore,
+  optionsKey,
+  physicalKey,
+  playerActorPick,
+} from "./logic";
 
 const listeners = new Set<() => void>();
 
@@ -66,11 +74,9 @@ function subscribeOptions(fn: () => void): () => void {
 export function useRollOptionsOpen(): [boolean, (open: boolean) => void] {
   const you = useSync((s) => s.store.you);
   const key = you ? optionsKey(you.campaignId, you.role, you.playerId) : null;
-  const open = useSyncExternalStore(
-    subscribeOptions,
-    () => (key ? optionsStore.read(key) : false),
-    () => false,
-  );
+  // The same read as the server snapshot: static renders (tests) see the stored state too.
+  const read = () => (key ? optionsStore.read(key) : false);
+  const open = useSyncExternalStore(subscribeOptions, read, read);
   const set = useCallback(
     (v: boolean) => {
       if (!key) return;
@@ -80,4 +86,35 @@ export function useRollOptionsOpen(): [boolean, (open: boolean) => void] {
     [key],
   );
   return [open, set];
+}
+
+/**
+ * FR-DICE-77: the roll bar's actor pick, shaped as `useState`. The DM: this page's pick only (as
+ * before). A player: a pick is also stored with the Options state (kept across reloads); with no
+ * pick in this page, `playerActorPick` (stored pick → the sheet's PC → the only PC → "Me").
+ * `set(null)` (FR-DICE-34: a stale pick answered) clears both.
+ */
+export function useRollBarActor(
+  actors: readonly ActorOption[],
+): [ActorOption | null, (a: ActorOption | null) => void] {
+  const you = useSync((s) => s.store.you);
+  const player = you?.role === "player";
+  const key = you && player ? optionsKey(you.campaignId, you.role, you.playerId) : null;
+  const [picked, setPicked] = useState<ActorOption | null>(null);
+  const readActor = () => (key ? optionsStore.readActor(key) : null);
+  const stored = useSyncExternalStore(subscribeOptions, readActor, readActor);
+  // Not zustand's `useStore`: its server snapshot is the initial state (static render tests).
+  const readSheet = () => sheetSelection.getState().selectedId;
+  const sheetId = useSyncExternalStore(sheetSelection.subscribe, readSheet, readSheet);
+  const set = useCallback(
+    (a: ActorOption | null) => {
+      setPicked(a);
+      if (!key) return;
+      optionsStore.writeActor(key, a ? a.value : null);
+      for (const fn of [...optionsListeners]) fn();
+    },
+    [key],
+  );
+  if (!player) return [picked, set];
+  return [picked ?? playerActorPick(actors, stored, sheetId), set];
 }
