@@ -1,9 +1,11 @@
 // FR-DICE-07: physical-dice mode, per client, in browser storage. Shared by the log window's
 // toggle and every roll control in this tab (same-tab listeners + the `storage` event).
 // FR-DICE-30 / -77: the roll bar's Options state and a player's actor pick, one entry per client.
-import { useCallback, useState, useSyncExternalStore } from "react";
-import { useSync } from "../../sync/store";
+import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import { useRecords, useSync } from "../../sync/store";
 import { sheetSelection } from "../character-sheet/selection";
+import { type CreatureLike, pickerModel, shownSheetId } from "../character-sheet/view-model";
 import {
   type ActorOption,
   createFlagStore,
@@ -105,7 +107,15 @@ export function useRollBarActor(
   const stored = useSyncExternalStore(subscribeOptions, readActor, readActor);
   // Not zustand's `useStore`: its server snapshot is the initial state (static render tests).
   const readSheet = () => sheetSelection.getState().selectedId;
-  const sheetId = useSyncExternalStore(sheetSelection.subscribe, readSheet, readSheet);
+  const selectedId = useSyncExternalStore(sheetSelection.subscribe, readSheet, readSheet);
+  // The PC the sheet shows, by its own rule: its selection, else its first own PC (a fresh
+  // browser shows Brakka without a pick; walkthrough U17).
+  const entities = useRecords<CreatureLike>(ENTITY_TYPE);
+  const sheetId = useMemo(() => {
+    if (!player || !you) return null;
+    const viewer = { role: you.role, playerId: you.playerId };
+    return shownSheetId(pickerModel(entities, {}, viewer, [], null).options, selectedId);
+  }, [player, you, entities, selectedId]);
   const set = useCallback(
     (a: ActorOption | null) => {
       setPicked(a);

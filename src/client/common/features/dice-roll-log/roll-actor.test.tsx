@@ -10,6 +10,7 @@ import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { sheetSelection } from "../character-sheet/selection";
+import { pickerModel, shownSheetId } from "../character-sheet/view-model";
 import { GameLog } from "./GameLog";
 import {
   type ActorOption,
@@ -45,6 +46,8 @@ const char = (id: string, name: string, ownerPlayerId: string) => ({
   kind: "character" as const,
   name,
   ownerPlayerId,
+  // The sheet's picker lists only characters with a stat block (`pickerModel`).
+  statBlock: {},
 });
 const MIRA = char("mira", "Mira", "p1");
 const BRAKKA = char("brakka", "Brakka", "p1");
@@ -121,6 +124,21 @@ describe("FR-DICE-77 roll as your PC", () => {
     openOptions(null);
     sheetSelection.setState({ selectedId: "mira" });
     expect(actorSelect(render("dm")).selected).toBe("DM");
+  });
+
+  test("FR-DICE-77 roll as your PC, the sheet's default (walkthrough U17): a fresh browser (no Options / sheet entry, nothing picked), player-1 with Mira and Brakka → the sheet shows Brakka (its first own PC) and the roll bar rolls as Brakka", () => {
+    // Nothing stored but the Options row open, so the Select renders; `sheetSelection` untouched.
+    openOptions("p1");
+    expect(sheetSelection.getState().selectedId).toBeNull();
+    const viewer = { role: "player" as const, playerId: "p1" };
+    expect(shownSheetId(pickerModel(ENTITIES, {}, viewer, [], null).options, null)).toBe("brakka");
+    expect(actorSelect(render("player")).selected).toBe("Brakka");
+    // A pick in the sheet's picker moves the default with it.
+    sheetSelection.setState({ selectedId: "mira" });
+    expect(actorSelect(render("player")).selected).toBe("Mira");
+    // A stored sheet choice that is no longer eligible: the sheet falls back to Brakka, so does the bar.
+    sheetSelection.setState({ selectedId: "gone" });
+    expect(actorSelect(render("player")).selected).toBe("Brakka");
   });
 
   test("FR-DICE-77 fallback order: manual pick (still the player's) → the sheet's own PC → the only PC → Me", () => {
