@@ -29,7 +29,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0021](0021-sync-protocol-conventions.md) | Sync protocol conventions | accepted, C refined by 0041, 0045, D refined by 0036, 0038 |
 | [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted |
 | [0023](0023-asset-access-by-capability-id.md) | Asset access by capability ID | accepted; amended by 0054 |
-| [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009), redaction whitelist refined by 0036; refined by 0050 |
+| [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009), redaction whitelist refined by 0036; refined by 0050; amended by 0056 (pets) |
 | [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted |
 | [0026](0026-signal-routing.md) | Signal routing: sender stamp, DM-only pull, receiver scene filter | accepted, amended by 0033 |
 | [0027](0027-notification-creation.md) | Notifications are created in the causing command's transaction | accepted (refines 0016), refined by 0034, 0035, 0037 |
@@ -60,7 +60,9 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0052](0052-static-serving.md) | Static client served precompressed with cache headers | accepted (#256) |
 | [0053](0053-apply-hit.md) | Apply hit: a damage card applied in two steps | accepted (#256; refines 0037) |
 | [0054](0054-compendium-rest-asset-ids.md) | Asset IDs in compendium REST bodies after the entry visibility check | accepted (#256; amends 0023) |
-| [0055](0055-player-colour.md) | Player colour stored once per person, derived everywhere | accepted (#256) |
+| [0055](0055-player-colour.md) | Player colour stored once per person, derived everywhere | accepted (#256); bullet 1 amended by 0057 |
+| [0056](0056-companion-visibility.md) | Companions: the owner sees an owned creature's stats | accepted (#288; amends 0024, refines 0009, 0036) |
+| [0057](0057-free-player-colour.md) | Free player colour (`#rrggbb`, validity + distance rules) | accepted (#288; amends 0055) |
 
 ## Proposing a new ADR
 

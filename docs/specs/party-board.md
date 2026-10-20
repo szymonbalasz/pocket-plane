@@ -12,6 +12,15 @@ phase: post-mvp-6
 >
 > **Sprint 5 revision (track P, DM [#250](../decisions-log.md) [4] [5] [11] [12], [#251](../decisions-log.md)):** Party Loot moves into a **Loot** tab right of Inventory and the "Coin: open Party loot" button goes [4]; the DM can **present** a shared handout: it opens over everything on chosen players' screens [5]; the handout editor gets **direct upload, drop and clipboard paste** through ASSET's image attach control [11] [12]. New FRs FR-PARTY-29–40; amended FR-PARTY-05, -06, -11, -15, -27. DM questions OQ-PARTY-18–21 decided at sprint-5 gate 1 ([#256](../decisions-log.md)): every pick accepted ([§15](#15-open-questions)). CON-44 measured with a throwaway probe on `session-sim-8` + the realistic-heavy harness (deleted).
 
+> **Sprint 6 revision (track CP, DM [#252](../decisions-log.md) / BL-30):** **pets** are listed in the Party window: a **Companions** tab (after Loot) with each pet, its owner and its health; the DM makes, edits and releases pets there. New FR-PARTY-41–46, OQ-PARTY-24–27. No new record type: pets are `entity` rows ([entities FR-ENT-31–37](entities.md#6-functional-requirements)). Summons are combat's ([combat-tracker §6.4](combat-tracker.md#64-sprint-6-companions)).
+
+### Sprint 6 at a glance
+
+| FR | What | Slice ([CBT §14.3](combat-tracker.md#143-build-split-sprint-6-track-cp)) | Named test |
+|---|---|---|---|
+| FR-PARTY-41, -42, -44 | Companions tab, rows (owner full HP, others band), empty state | CP1 `build/cp-pets` | `FR-PARTY-41 companions tab`, `FR-PARTY-42 band for other players` |
+| FR-PARTY-43 | DM New pet…, rename, mode, owner, release | CP1 | `FR-PARTY-43 release` |
+| FR-PARTY-45, -46 | No new data; layout | CP1 | `FR-PARTY-46 tabs fit at min width` |
 > **Sprint 6, track IM (image search, DM [#285](../decisions-log.md)).** The handout editor's image picking (its attach control's **From library** and its uploads / pastes) gets the search field (shared matcher: "Gob el" finds Elite Goblin), the tag filter and the tag editor of [assets-pipeline FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im); its uploads are tagged **Handouts**. Session-sim-9 found the editor's Images row **below the fold** (BL-48): it moves above the body. New FR-PARTY-47, -48. No record, event or visibility change. CP edits this spec in parallel (pets listed).
 
 ### Sprint 6 at a glance (track IM)
@@ -37,6 +46,7 @@ phase: post-mvp-6
 - A **handout** = title + plain text + 0–10 images (assets pipeline, capability IDs per [ADR-0023](../architecture/adr/0023-asset-access-by-capability-id.md)). The DM prepares it unshared, then **shares** it with everyone or chosen players, and can **unshare** it. A player it isn't shared with never receives its ID, title, text or image IDs.
 - The **gold ledger** is [party-loot](party-loot.md) evolved, not replaced: item moves join the same log, plus a DM **split** of the party pot.
 - Board data **loads when the window opens** ([ADR-0045](../architecture/adr/0045-lazy-record-types.md) lazy record types, the one on-demand path per seams S1): measured +0 B on every snapshot for handouts and items ([§12](#12-performance--bandwidth)).
+- *(S6)* A fourth tab, **Companions**, lists the party's pets (owner, health; HP numbers for the owner and DM only) and is where the DM makes and releases pets (FR-PARTY-41–46).
 - *(S5)* The Party window has three tabs: Handouts, Inventory, **Loot** (party-loot's pot, wallets, forms and log). The DM can **present** a shared handout: it opens over everything on the chosen players' screens until each closes it, also on a later connect. Handout images can be uploaded, dropped or pasted straight into the editor.
 
 ## 2. Scope
@@ -49,6 +59,7 @@ phase: post-mvp-6
 - Fixtures + bundle `party-board`.
 - All four slices are in sprint 3 (#207, G5). If the sprint runs late, cut slice 4 (party inventory + moves) first, then slice 3 (split); handouts always ship (#203's ask).
 - *(S5)* Record type `handout-present` (in the snapshot, own rows only); intents `party.presentHandout`, `party.closePresent`; `party.shareHandout` gains `present`. Loot tab in `party.board`; `loot.log` window retired ([party-loot](party-loot.md) FR-LOOT-21). Editor images via the image attach control ([ASSET FR-ASSET-20–27](assets-pipeline.md#6-functional-requirements)). Fixtures `handout-attachment`, `handout-present-1`, bundle `party-s5`.
+- *(S6)* **Companions** tab: every pet of the campaign by owner PC; HP for the owner and DM, band for others; DM New pet… / rename / mode / owner / release; Card button opens the companion card. *Not in:* summons in the list, player-made pets, pet inventory.
 - *(S5, not in)* Presenting to the DM's own screen, a present timer, presenting unshared handouts, inline images in the body text (OQ-PARTY-21), player uploads ([OQ-ASSET-02](assets-pipeline.md#15-open-questions)).
 
 ## 3. Goals
@@ -157,6 +168,16 @@ phase: post-mvp-6
 | FR-PARTY-39 | **Editor uploads** [11] [12]: the editor's images strip hosts ASSET's **image attach control** ([FR-ASSET-20–27](assets-pipeline.md#6-functional-requirements)) with `max = 10`, `count` = images in the draft, `owner = "party-editor"`, paste target = the whole editor (title Input and body Textarea included), drop target = the editor. Upload, drop and paste add **attachments** (FR-ASSET-24) to the end of the strip, in order; "From library" keeps the picker. Save unchanged (`assets.require` per id, FR-PARTY-02). A pasted image never changes the text (OQ-PARTY-21). Dedupe is the caller's (seams S5): an id already in the strip (same bytes → same id) is not added again (handout ids stay unique, FR-PARTY-02); hint "Already in this handout" (`party-editor-duplicate`). | Amends FR-PARTY-15 |
 | FR-PARTY-40 | Fixtures `handout-attachment` (an attachment-only image in a new unshared handout h6) and `handout-present-1` (h2 presented to player-1), bundle **`party-s5`** (§13). Patches only (seams S10); `fixtures:reset-load party-s5` works from empty and is deterministic. | ADR-0017 |
 
+### 6.7 Sprint 6: Companions tab
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-PARTY-41 | **Companions tab** (#252: pets "listed in the Party window"): `party.board` tabs are **Handouts, Inventory, Loot, Companions** (OQ-PARTY-24; Loot stays right of Inventory, FR-PARTY-29). Tab memory (FR-PARTY-11) accepts `companions`. Lists every pet the viewer receives ([FR-ENT-37](entities.md#6-functional-requirements): the DM and the owner every pet; **other players only present pets** (in a running fight, or with an unhidden token on the active scene), redacted; OQ-PARTY-26), grouped by owner PC (header: PC name + the owner player's colour dot, [FR-CAMP-29](campaign-management.md#6-functional-requirements)), groups by PC name, rows by name. | #252 |
+| FR-PARTY-42 | **Row**: portrait / token art / initials, name, turn mode icon (as [FR-CBT-118](combat-tracker.md#6-functional-requirements)), "In combat" Badge while it's an active combatant. **Health:** owner and DM "45 / 59" with the HP bar (from the combatant while in a fight, else the pet row); other players the band Badge (healthy / bloodied / down; from the redacted pet, or the combatant's band in a fight) (OQ-CBT-80). **Card** button (owner, DM) → opens `charx.companion` on it ([FR-CHARX-59](character-sheet-full.md#6-functional-requirements)). DM also sees the base ("Owlbear", muted, from `derivedFromId`). | |
+| FR-PARTY-43 | **DM**: header **New pet…** → entities' dialog ([FR-ENT-32](entities.md#6-functional-requirements)); row menu **Rename**, **Turn mode ▸** (three radio items), **Owner…** (PC Select), **Open NPC sheet** (FR-CHARX-31), **Release…** (AlertDialog "Owlbear becomes a plain creature. Mira loses its card." → `PUT` with `companionOf: null`, [FR-ENT-33](entities.md#6-functional-requirements)). Rename, mode and owner send entities' `PUT` with the loaded fields (whole replace). While the pet is in a fight: Owner… and Release… disabled with Tooltip "Dismiss it from the fight first". Reject → inline; lost request → Toast "Connection lost — check the pet before trying again". | |
+| FR-PARTY-44 | **Empty and other states**: no pets → "No companions yet" (players: "… — your DM can give you one"); a muted footer "Summons show in Initiative" while a fight runs; disconnected: last list, actions disabled; a pet released or reassigned while shown → the row moves group or leaves (live upsert / delete). | |
+| FR-PARTY-45 | **No new data**: the tab reads `entity` (pets) and `combatant` rows already in the snapshot (not lazy, unlike handouts); no record type, intent or event of PARTY's. Visibility is entities' (FR-ENT-37) and combat's (FR-CBT-116). | 0 B |
+| FR-PARTY-46 | **Layout**: window size unchanged (440×560, min 340×360, FR-PARTY-29's seams S4 width); the four tabs keep their full labels; where they don't fit (the min width, 340 px) the strip scrolls horizontally, never cutting a label (seams S7); rows wrap their badges, never cut a name (as W4's rule). | Seams S4, S7 |
 ### 6.8 Sprint 6: image search in the editor (track IM)
 
 | ID | Requirement | Notes |
@@ -175,6 +196,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 - *(S5)* **Loot tab:** `party-tab` `data-value="loot"`; LOOT's `loot-*` IDs inside it, unchanged; `party-loot-link` gone (a test asserts its absence).
 - *(S5)* **Present, DM:** Share dialog checkbox; "Open on screens…" in the row menu and viewer; "On screen: 2" Badge (muted while 0 is never shown); "Close on all screens". **Player:** the popup is a shadcn Dialog (modal, centred, max 90 vw × 90 vh), title in the header, Close focused, "Open in Party" secondary. No popup on the DM client.
 - *(S5)* **Editor:** the attach control sits at the end of the images strip ("Upload", "From library", hint "or drop / paste an image"); progress and errors under the strip (ASSET §7). States as FR-PARTY-15.
+- *(S6)* **Companions tab:** **DM view:** every pet with HP numbers, New pet…, row menu; **player view:** every pet, own with HP + Card, others with a band. **Test IDs:** `party-tab` `data-value="companions"`, `party-companions`, `party-companions-empty`, `party-companion-group` (+ `data-record-id` = PC id), `party-companion-row` (+ `data-record-id` = pet id, `data-in-combat`), `party-companion-hp` (+ `data-value`), `party-companion-band` (+ `data-value`), `party-companion-card`, `party-companion-new`, `party-companion-menu`, `party-companion-rename`, `party-companion-mode` (+ `data-value`), `party-companion-owner`, `party-companion-release`, `party-companion-release-confirm`, `party-companion-npc-sheet`.
 - *(S6)* **Editor:** Images block directly under the title, body below it (FR-PARTY-48); From library opens ASSET's picker with search + tag chips (ASSET §7). Test IDs unchanged (`party-editor-*`, `asset-attach*` with `data-owner="party-editor"`; the picker's `asset-picker` gains `data-context="handout"`).
 - *(S5)* **Test IDs:** `party-share-present`, `party-share-present-names`, `party-present-open` (row menu / viewer) + `data-record-id`, `party-present-dialog`, `party-present-mode` + `data-value` (`all|players`), `party-present-player` + `data-record-id`, `party-present-submit`, `party-present-error`, `party-present-count` + `data-value` (n), `party-present-close-all`; player popup `party-present-popup` + `data-record-id` (handout id) + `data-present-id`, `party-present-title`, `party-present-image` + `data-record-id` (asset id), `party-present-prev`, `party-present-next`, `party-present-page`, `party-present-body`, `party-present-loading`, `party-present-retry`, `party-present-close`, `party-present-open-board`. Editor: ASSET's `asset-attach*` with `data-owner="party-editor"`, plus `party-editor-duplicate` (seams S5).
 
@@ -207,7 +229,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 
 ## 9. API & events
 
-**REST:** none (images upload through the existing DM asset upload).
+**REST:** none (images upload through the existing DM asset upload). *(S6: the Companions tab calls entities' `POST /api/pets` and `PUT /api/entities/:id`; PARTY adds no route, intent, record type or event, FR-PARTY-45.)*
 
 **Record types** (campaign scope)
 
@@ -273,7 +295,11 @@ Players sending a DM-only intent → `forbidden`, no change.
 | *(S5)* See presents | all rows | own row only | FR-PARTY-31 |
 | *(S5)* Upload / paste handout images | ✓ | ✗ (no editor) | DM upload route ([FR-ASSET-01](assets-pipeline.md#6-functional-requirements)); `assets.require` at save |
 
+*(S6)* Companions tab: see pets — DM all with HP, players all (own with HP, others a band); New pet…, rename, mode, owner, release — DM only (entities' REST, DM secret); Card — DM any, owner own.
+
 ## 11. Edge cases & failure modes
+
+- *(S6)* **Companions tab:** *player disconnect / reconnect:* the list rebuilds from the snapshot's `entity` / `combatant` rows; *DM disconnect:* REST independent, a lost `PUT` → Toast (FR-PARTY-43); *crash:* every pet change is one entities transaction; *concurrency:* two DM tabs renaming → last `PUT` wins (whole replace, FR-ENT-11), a name clash → inline `conflict`; a pet joining a fight while its menu is open → Release disables on the combatant upsert; the server refuses anyway (FR-ENT-33). *Leaks:* none new: the tab shows only what entities and combat already send.
 
 - **Player disconnect / reconnect:** lazy rows aren't in the snapshot, and the snapshot purges any lazy rows still in the store (FR-SYNC-37); an open board / viewer reloads (FR-PARTY-10) and gets only what is visible now: a handout unshared while away is simply absent (no delete needed), and a notification's Open for it shows "No longer shared". Missed shares show on the bell (`handout-shared`), no per-item toasts. Seen marks are local and survive.
 - **DM disconnect / reconnect:** players unaffected, can keep moving items. DM forms disabled; a lost intent → toast (FR-PARTY-15/24); the reconnect load shows whether it committed.
@@ -291,6 +317,8 @@ Players sending a DM-only intent → `forbidden`, no change.
 - **Invalid / malicious input:** over-long fields, control characters, foreign or unknown asset / player / character ids, `rowId` of another sheet, qty 0 / negative / fractional, strict-key violations → `invalid` / `not_found`. Body rendered as text, never HTML (`DiceText` renders text runs only). Inbound frames > 64 KB closed by live-sync: a 10 000-char body is ≤ 30 KB even at 3 B per char.
 
 ## 12. Performance & bandwidth
+
+- *(S6, measured with CP's heavy-harness probe, [CBT §12](combat-tracker.md#12-performance--bandwidth))*: the Companions tab adds **0 B** (no record type; it reads `entity` / `combatant` rows); the pet rows themselves are entities' (2,896 B full, 285 B redacted; worst 18 pets, all present: DM +52 KB, a player +13 KB; a pet that isn't present costs other players 0 B).
 
 **CON-44, measured** (throwaway probe on the realistic-heavy harness, `session-sim` + `buildRealisticHeavy`, max-length ASCII; frame bytes as `snapshotSizes`; probe deleted). Board: 30 handouts (20 text, 10 with 3 images; 20 shared with all, 5 with player-1, 5 unshared), 60–100 party items.
 
@@ -358,6 +386,10 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 13 | Switch to Second Campaign, then back | B, C rejoin | A: only "SECOND-CAMPAIGN-HANDOUT" / "SECOND-CAMPAIGN-ITEM"; then step-12 state |
 
 Teardown: stop the server, then `fixtures:reset --profile verify`.
+
+### Sprint 6 tests (track CP)
+
+Fixtures (`pet-owlbear`, `pet-drake`), bundles `companions-prep` / `companions` and the walkthrough (C1, C7, C10) are in [CBT §13.3](combat-tracker.md#133-sprint-6-track-cp-cbt-ent-charx-party-map). PARTY's named tests: `FR-PARTY-41 companions tab` (client: tab order Handouts, Inventory, Loot, Companions; stored `companions` restores; groups by PC with the colour dot); `FR-PARTY-42 band for other players` (client + leak: `player-2` sees the Owlbear's band "Bloodied" at 24 / 59, no numbers, no Card; `player-1` sees "24 / 59" and Card; in a fight both read the combatant; **a pet without a token on the active scene and not in a fight isn't in `player-2`'s list or frames**, and appears when its token is placed); `FR-PARTY-43 release` (client: Release confirm sends `PUT` with `companionOf: null`; disabled in a fight; reject inline); `FR-PARTY-44 empty states`; `FR-PARTY-46 tabs fit at min width` (seams S7: at 340 px every tab label is whole, the strip scrolls to Companions; the registry-driven layout tests at 1280×720 / 1440×900 pass with four tabs).
 
 ### 13.1 Sprint 5 (track P: PARTY, LOOT, ASSET, CMP)
 
@@ -432,6 +464,11 @@ Sprint locks (seams S3, gate 1 build plan): ws / protocol / common store V0 → 
 | 3 | `build/party-gold` (∥ 2) | `loot.split`, Split… dialog, item-row rendering in `loot.log`, `loot.edit` item `conflict` | party-loot server + client folders (LOOT-owned; by assignment, seams S8) |
 | 4 | `build/party-inventory` (after 3; char-sheet folder lock after D4, arrival order with C4; first to cut if late, G5) | Item commands, CHARX `sheet-items.ts`, Inventory tab | new file in `src/server/features/character-sheet/` (CHARX-owned), party-loot `add` helper for item rows |
 
+### Sprint 6 dependencies and build (track CP)
+
+- **Depends on** [entities](entities.md) FR-ENT-31–37 (pets, REST, visibility; CP0 / CP1), [combat-tracker](combat-tracker.md) FR-CBT-116 (combatant HP / band in a fight), [character-sheet-full](character-sheet-full.md) FR-CHARX-59 (Card opens the window: until CP4 merges the button is hidden), [campaign-management](campaign-management.md) colour dot (built; PF may change the colour storage: PARTY reads `colorOf`, unchanged API).
+- **Slice:** the tab ships in **CP1** `build/cp-pets` ([CBT §14.3](combat-tracker.md#143-build-split-sprint-6-track-cp)): `src/client/common/features/party-board/{Board.tsx (tab), Companions.tsx (new), logic.ts (`PARTY_TABS`, tab memory)}`; feature-owned files (#154), no shared file. IM-3 edits only the handout `Editor.tsx` (FR-PARTY-48): no overlap (seams S7).
+
 ### 14.2 Sprint 5 build split
 
 Schema order (seams S1): two lanes run in parallel, lane 1 **P0** → C5 core (`fix/cmpimg-core`), lane 2 R0 → K0; **merge order P0 → R0 → C5 core → K core** (a later merger rebases schema lines and docs). P0 owns only `handout_present` and `asset.listed`. P3 and P4 touch no schema and start at once in Phase B.
@@ -468,6 +505,10 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
+| OQ-PARTY-24 *(S6)* | Where pets live in the Party window | **A Companions tab after Loot** (Loot keeps its place right of Inventory, #268) / a section at the end of Inventory (no new tab; a pet isn't an item) / their own window | no · owner: CP1 | play-shell |
+| OQ-PARTY-25 *(S6)* | List summons too? | **No: pets only** (#252; summons live in Initiative and the card; a footer points there) / yes, under "In this fight" | no · owner: CP1 | combat-tracker |
+| OQ-PARTY-26 *(S6; review 1)* | Which pets do other players see? | **Decided (#288): present pets only.** Options were: **Present pets only** (in a running fight, or with an unhidden token on the active scene): name, owner, band; a pet the DM prepares stays secret until it shows up / every pet always (leak: a prepared pet's name and existence reach the table the moment it is created) / own pets only (the party can't see a companion it is fighting beside) | — | entities |
+| OQ-PARTY-27 *(S6)* | **campaign-management (PF):** the group header's owner colour dot reads `colorOf(player)`; PF's free colour picker may change the stored value but not that helper | **Settled by seams S8:** `colorOf(player)` keeps its signature and returns a CSS colour string after PF0 (`#rrggbb`); the group header and the companion marker call `colorOf` only, never switching on palette keys. Rejected: ~~PARTY waits for PF's colour core~~ | no (settled) | campaign-management |
 | OQ-PARTY-01 | Handout share model vs entity visibility | **Decided (#207, G26):** handout-own `sharedWith` {none / all / chosen players} + its own visibility fn; shape exported from `@shared` for later reuse (world-builder NPCs). Terms Share / Unshare per seams S9. Rejected: reuse entity visibility (fixed per kind; needs a share field on entities and a handout entity kind), `hidden` boolean like tokens (no chosen players) | — | entities, post-mvp/world-builder |
 | OQ-PARTY-02 | Content types; where files live | **Decided (#207, G26):** text + 0–10 images via the assets pipeline (capability IDs, ADR-0023); PDF out (DM exports pages as images). Rejected: PDF served as an original with the browser viewer (breaks "originals never served", script risk), PDF rasterised at ingest (new dependency) | — | assets-pipeline |
 | OQ-PARTY-03 | Snapshot cost (CON-44, measured §12) | **Decided (#207, G4): lazy types + `sync.load`** ([ADR-0045](../architecture/adr/0045-lazy-record-types.md), the one on-demand path, also for C `imported-entity` and R `rule-trigger`); +1.1 KB DM. Ceilings per #208 (§12). Rejected: headers + items in the snapshot with bodies on demand (+37–80 KB DM), feature `party.load` command (re-implements the filter; ruled out by S1) | — | live-sync, compendium, effect-modifiers |
@@ -494,6 +535,8 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-28 | *(S6, BL-48)* How does the editor's Images row get above the fold? | **Decided (#288): A: Images block under the title, body below.** Options were: **A Images block under the title, body below** (always visible, any window size; the DM writes text after picking images) / B body Textarea down to 4 rows, Images stay last (keeps text-first order; a long strip still pushes it down) / C `party.handout` opens taller (WF's default sizes: a cross-track change that still fails on small screens) | — · decided (#288) | play-shell (C only) |
 
 ## 16. Out of scope
+
+- *(S6)* Summons in the Party window (OQ-PARTY-25); pet inventory or gear; player-made pets; a pet's notes for its owner (FR-CHARX-70 keeps them DM-only).
 
 - See §4. PDF (OQ-PARTY-02), party notes (OQ-PARTY-07), player pins / annotations (OQ-PARTY-09), item references (OQ-PARTY-13), a "Give" button on the sheet's own Inventory tab (later, via CHARX), handout folders and reordering, load-older for the loot log (LOOT).
 - *(S5)* Presenting to the DM's own screen or to players who can't see the handout; a present queue (one per player, the newest wins); inline images in text (OQ-PARTY-21 B / C); player uploads.

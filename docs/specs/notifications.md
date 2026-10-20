@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: in-review
+status: complete
 owner: spec-windows
 wave: 2
 phase: post-mvp-6
@@ -331,7 +331,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-NOTE-25 | **How the DM's toast stack keeps off the tool bar and the map's top-left** (sim-9 b01, a01) | **A. Move the toast: it stays in its top-centre band and slides down past windows (never to the left edge); hard keep-outs (the tool bar) block it like Initiative** (FR-NOTE-42, -43): predictable spot; may sit on a window body in the middle (e.g. Party at 576) more often than today. / B. Keep-out for the bar only: today's sideways search plus the bar as a blocker: fewer window-body overlaps, but the stack still wanders to the map's top-left (over the Dragon) when windows fill the middle. / C. Collapse: the summary becomes a one-line pill pinned at the home top (≈ 200 × 32), cards open from it: least footprint, one more click for the DM on every card | yes · DM gate 1 | FR-NOTE-42, -43, -32; play-shell §7 |
+| OQ-NOTE-25 | **How the DM's toast stack keeps off the tool bar and the map's top-left** (sim-9 b01, a01) | **Decided (#288): A** (the stack stays in its top-centre band; the tool bar blocks it). Options: **A. Move the toast: it stays in its top-centre band and slides down past windows (never to the left edge); hard keep-outs (the tool bar) block it like Initiative** (FR-NOTE-42, -43): predictable spot; may sit on a window body in the middle (e.g. Party at 576) more often than today. / B. Keep-out for the bar only: today's sideways search plus the bar as a blocker: fewer window-body overlaps, but the stack still wanders to the map's top-left (over the Dragon) when windows fill the middle. / C. Collapse: the summary becomes a one-line pill pinned at the home top (≈ 200 × 32), cards open from it: least footprint, one more click for the DM on every card | — · decided (#288) | FR-NOTE-42, -43, -32; play-shell §7 |
 
 ## 16. Out of scope
 

@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: in-review
+status: complete
 owner: spec-windows
 phase: post-mvp-6
 ---
@@ -9,6 +9,8 @@ phase: post-mvp-6
 # Dice extras
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Scope: DM decision [#203](../decisions-log.md) (sprint 3, track D). Builds on [dice-roll-log](dice-roll-log.md) (DICE); stub and tier table: [post-mvp/dice-extras](post-mvp/dice-extras.md).
+
+> **Sprint 6 (track PF; DM [#285](../decisions-log.md) [2]).** Settings move to a **Preferences window** ([play-shell](play-shell.md) FR-SHELL-70–76). *OQ-SHELL-47 decided A (#288)*: this spec registers a **Dice** section there: the existing settings panel (display, others' rolls, roll popups, "Dice look…"), same stores; the tray and popup gears stay as shortcuts (OQ-DICEX-48). New FR-DICEX-57, -58 (PF2). No server, record or storage change; 0 B. Walkthrough: [play-shell §13](play-shell.md#13-test-plan) P9, P10.
 
 ## 1. Summary
 
@@ -179,6 +181,9 @@ phase: post-mvp-6
 | FR-DICEX-53 | **Roll always visible** (BL-44; amends FR-DICEX-01's body and FR-DICEX-48's "40 px, wrapping"): the tray body is a column of **fixed** parts and **one** flexible part: header row (state, gear) and palette row on top, the **dice area** in the middle (flexible), the expression / constant row and the **bottom bar** (mode, DM eye, Roll, Options chevron; `dicex-tray-roll`) pinned at the bottom. Only the dice area shrinks or scrolls; the body itself never scrolls. At every window size ≥ min (300 × 240, incl. FR-SHELL-29 fits and placement's shrunk sizes) and in every state (`compose`, `adjust`, `rolling`, result), `dicex-tray-roll` lies wholly inside the window's rendered rect and is the `elementFromPoint` hit at its centre. **Budget at the min size**: the one budget is §12's table (from d01). Today's fixed parts leave ≈ 2 px for the dice, so the palette stays in **one row** at every width ≥ 300 (seven buttons ≥ 32 px wide, 4 px gaps = 248 px of the 276 inner width) and the header row is ≤ 24 px (with or without PF's tray gear, OQ-DICEX-48), which leaves ≈ 39 px. **Testable outcome** (rulings-b #14): at 300 × 240 the bottom bar is inside the window, the body doesn't scroll, and the dice area holds **≥ one row of 28-px stills**; the build measures the real heights and pins the 40-px row if the gaps allow it. More dice → 28 px or "×N", FR-DICEX-54. Same in both clients. | sim-9 d01; rulings-b #14 |
 | FR-DICEX-54 | **The dice area shrinks first** (BL-44; amends §6.1 table C "Size" and "Grouping"): stills are drawn at **40 px** while every die fits in the dice area's height; else at **28 px**; still too many → **one die per term "×N"** even at ≤ 12 dice (the grouping of table C, earlier); still too many (many terms) → the dice area scrolls **on its own** (vertical, `dicex-tray-preview` `data-scroll="true"`), bottom bar unaffected. Redraw on tray size change as built (table C "Redraw when"). `dicex-tray-preview` attrs `data-cell` (40 \| 28) and `data-grouped` (`true` when "×N" was forced by room). Fallback chips follow the same steps (`DieShape` `md` → `sm`). | sim-9 d01 |
 | FR-DICEX-55 | **The DM popup stack never covers a tool bar** (seam with [FR-NOTE-43](notifications.md#6-functional-requirements); sim-9 b01 found the toast, the popup shifts left the same way): `dmStackAt(vp, top, size, clear)` takes the active **hard** keep-out regions (play-shell `useKeepOuts("dm")`: the map tool bar) in `clear`, like Initiative and the toast stack; a shift left that would overlap one drops below it instead (as built for Initiative). Under [OQ-MAP-57](scenes-map.md#15-open-questions) C, `RollPopup.tsx` also reports the DM stack's rendered rect through play-shell's `reportShownStack("dicex.popups", rect \| null)` ([FR-SHELL-59](play-shell.md#6-functional-requirements)). Players unchanged (bottom-right). Two lines in dice-extras' files, **assigned to WF3** (no D slice this sprint). | sim-9 b01 |
+| **Sprint 6** (track PF; if OQ-SHELL-47 A) | | |
+| FR-DICEX-57 | **Dice section in Preferences:** both clients register `dicex.dice` "Dice" (order 30) in their `pref-sections.ts` ([FR-SHELL-72](play-shell.md#6-functional-requirements)); its body is the existing `SettingsPanel` (Display Full screen / Tray throw / Flat / Off; "Show others' rolls"; "Roll popups"; "Dice look…" opening the look editor pane in place), laid out for the 360-px window. Same disabled states and reasons (no WebGL → 3D modes disabled with the reason; Dice look Save disabled unless `live`, FR-DICEX-27). | #285 [2] |
+| FR-DICEX-58 | **One store, two places:** the section and the tray / roll-popup gears read and write the same `pp.dicex.v2` entry (FR-DICEX-36) and the same `dice-look` record (FR-DICEX-26), so a change in one shows in the other at once (same tab; other tabs on their next read, as today). The gears stay (OQ-DICEX-48 A). No new key, field, intent or event. | FR-SHELL-76 |
 
 ### 6.1 Sprint 5 rule tables
 
@@ -334,7 +339,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - *(Sprint 5)* **Tray dice area** (FR-DICEX-48, §6.1 table C): the staged dice as 3D stills in the owner's look; hover on a die in `compose` → red outline, click removes it.
 - *(Sprint 5)* **Held numbers** (FR-DICEX-49, §6.1 table E): blank die shapes (outline in the look, no number); total "…" in the tray and log, "Rolling…" in the popup.
 - **Die shapes** (FR-DICEX-42): d4 ▲, d6 ■, d8 ◆, d10 kite, d12 pentagon, d20 hexagon with centre triangle, d100 two kites, others ●; number centred; look colours.
-- **Settings popover** (tray gear and popup gear): Display: Full screen / Tray throw / Flat / Off (ToggleGroup); Switches "Show others' rolls", "Roll popups"; "Dice look…". Reduced motion / no WebGL: Full screen and Tray throw disabled with the reason.
+- **Settings popover** (tray gear and popup gear): Display: Full screen / Tray throw / Flat / Off (ToggleGroup); Switches "Show others' rolls", "Roll popups"; "Dice look…". Reduced motion / no WebGL: Full screen and Tray throw disabled with the reason. *(Sprint 6, if OQ-SHELL-47 A)* The same panel is the Preferences **Dice** section (FR-DICEX-57), one column at 360 px; test IDs unchanged (`dicex-settings-*`), the section wrapper is `ui-prefs-section` `data-record-id="dicex.dice"`.
 - **Layers** (amendment to [FR-SHELL-01](play-shell.md#6-functional-requirements), settled by seams S7; integrator adds the row at merge): base < windows < chrome < banner, toasts, roll popups < dialogs, overlays < **dice layer** (topmost, no input).
 - **States:** disconnected → tray Roll disabled (banner from live-sync), staged request kept; throws already running finish. Loading 3D chunk → flat for that throw. No WebGL → flat, settings show "3D unavailable on this device".
 - **DM view:** tray with DM eye; own hidden throws; every player's throw in their look; look editor for the DM look. *(Sprint 4)* Every public roll big + popup (the DM's top-centre region, FR-SHELL-49); own DM-only rolls (hidden, monster attacks and initiative, HP) only in the popup PiP with eye-off.
@@ -621,6 +626,14 @@ Bundle **`session-sim-9`** (no new fixture; the tray and popups need no records)
 | Unit (client, `tray-preview.test.tsx`, new `tray-layout.test.tsx`) | `FR-DICEX-53 tray Roll visible at min`: the tray at 360 × 300, 320 × 260 and 300 × 240 (min) in `compose` with 3 dice + constant, 12 dice, 20 dice (grouped), in `adjust` (a MOD-labelled attack), `rolling`, result: the bottom bar's box inside the window; the body not scrolling (`scrollHeight ≤ clientHeight`); the dice area ≥ one 28-px row (the 40 pinned by the build's measured heights, rulings-b #14); layout computed by a pure `trayLayout(bodyH, parts)` with measured part heights (the DOM test checks its CSS matches). `FR-DICEX-54 tray dice area fits`: pure `stillSize(n dice, terms, area w × h)` → 40 when two rows of 40 fit, 28 when only smaller fits, grouped "×N" when 28 doesn't, `data-scroll` when grouped still doesn't; fallback chips the same steps | In-code |
 | Unit (`popups.test.ts`) | `FR-DICEX-55 popup clears the tool bar`: `dmStackAt` at 1440×900 with Initiative at x 600 and a hard region at the fog bar's rect → the shifted popup drops below the bar; no hard region → unchanged sprint-5 results (regression); under OQ-MAP-57 D / C the popup reports its rect, cleared on close | In-code |
 | E2E | In play-shell's `window-fixes.e2e.ts`: `player-1` tray at 300 × 240 with 2d6 + 1d8 + 1 → `dicex-tray-roll` visible and the `elementFromPoint` hit | `session-sim-9` |
+### Sprint 6 (track PF): Dice section in Preferences
+
+Decided (#288): OQ-SHELL-47 A, so this applies. Bundle `prefs-s6` ([play-shell §13](play-shell.md#13-test-plan); e2e on `prefs-s6-e2e`, seams S12); no dice fixture needed (device settings are browser-only; looks default).
+
+| Level | What | Fixtures |
+|---|---|---|
+| Client / DOM | `FR-DICEX-57 dice section` (both registries hold `dicex.dice` at order 30; the section renders the settings panel; no WebGL stub → 3D modes disabled with the reason; Dice look… opens the look pane in place; Save disabled while not live). `FR-DICEX-58 one store` (set Flat in the section → the tray gear's panel shows Flat in the same render; set "Roll popups" off in the gear → the section shows it off; one `pp.dicex.v2` entry written; no new key) | In-code |
+| Walkthrough | [play-shell §13](play-shell.md#13-test-plan) P9 (Flat in Preferences = Flat in the tray gear), P10 (Dice look from Preferences), P14 (kept after reload) | `prefs-s6` |
 
 ## 14. Dependencies
 
@@ -777,6 +790,12 @@ Rows 01–17 decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-l
 | OQ-DICEX-45 | **Scope flag** (beyond BL-15): Alt+click on the game log roll bar's Roll stages the bar's expression in the tray (FR-DICEX-51) | **Decided (#256): A. Yes: it stages `free`, like the tray Button**. Rejected: ~~B. Hint only; no Alt stage on the roll bar~~ | no (decided) | FR-DICEX-51; [dice-roll-log](dice-roll-log.md) |
 
 **Sprint 6** (track WF): no open question. BL-44's outcome is decided (#286); the layout order (bar pinned, dice shrink first) has no visible trade-off worth a DM call. If PF moves tray-gear settings to Preferences, that is PF's question.
+**Sprint 6** (track PF). **Bold** = suggested pick.
+
+|---|---|---|---|---|
+| OQ-DICEX-48 | *(Only if [OQ-SHELL-47](play-shell.md#15-open-questions) A)* Keep the tray and roll-popup gears once the Dice section exists? | **Decided (#288): A (keep both gears as shortcuts).** Options as framed: **A. Keep both gears as shortcuts to the same panel (FR-DICEX-58)**: settings stay one click from the dice, one home in Preferences / B. Remove the gears; Preferences only: one place, but changing Display mid-roll takes a window | — · decided | FR-DICEX-57, -58; [play-shell](play-shell.md) FR-SHELL-75 |
+
+**Sprint 6 build:** FR-DICEX-57, -58 go in slice **PF2** ([play-shell §14](play-shell.md#14-dependencies)): one line in each client's `pref-sections.ts` (append) + `SettingsPanel.tsx` (a layout prop at most; dice-extras' own file). *(Seams S9)* WF5 `fix/tray-roll-visible` owns `TrayWindow.tsx` / `TrayPreview.tsx`; `SettingsPanel.tsx` is PF's. PF2 does not edit `TrayWindow.tsx` (the gear already opens `SettingsPanel`, so OQ-DICEX-48 A needs no tray change); if it ever must, PF2 merges after WF5. No dependency.
 
 ## 16. Out of scope
 

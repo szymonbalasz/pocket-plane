@@ -51,6 +51,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Asset** | An uploaded binary (map image, portrait, handout), stored content-hashed. | Entity |
 | **Derivative** | A generated variant of an asset (thumbnail, resized, format-converted). | — |
 | **Asset reference** | A record field holding an asset ID, set via `assets.require`; a player learns the ID only if they can see the field ([ADR-0023](architecture/adr/0023-asset-access-by-capability-id.md)). | Asset |
+| **Image tag** | A DM-only label on an image (built-ins Tokens, Portraits, Maps, Handouts, Props, Items, plus the DM's own; ≤ 8 per image) used to filter pickers ([assets-pipeline](specs/assets-pipeline.md)). | Search group |
+| **Shared matcher** | The one search matcher (`@shared/search/match`): whitespace-separated terms, partial, case-insensitive, all must match; used by the compendium and every image picker. | Source rank |
 
 ## Play
 
@@ -62,7 +64,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Scene folder** | DM-only, one-level grouping of scenes in the scene list. Never sent to players. | — |
 | **Grid calibration** | Setting cell size/offset so the grid aligns with the map image. | — |
 | **Token** | A movable piece on a scene: an instance of a creature definition, optionally bound to a combatant. | Combatant |
-| **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). | Character's owner |
+| **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). A companion's token follows its owner ([ADR-0056](architecture/adr/0056-companion-visibility.md)). | Character's owner |
+| **Reveal refit** | A player's map re-frames once when tokens they see for the first time land under a window or off-screen, unless they moved the camera; a pan cancels it, a drag defers it ([scenes-map](specs/scenes-map.md) FR-MAP-82). | Fit |
 | **Hidden token** | Token visible only to the DM (shown translucent to DM) until revealed with the hide/reveal button. MVP. | — |
 | **Token shape** | How a token is drawn: round (circular crop), square, or none (image as is). Owned by the token; new tokens take the definition's default (decisions #148). | — |
 | **Token art** | The glyph on its creature type's colour, drawn for a token without an image; the DM can switch a token to initials ([entities](specs/entities.md), [ADR-0050](architecture/adr/0050-token-creature-type.md)). | Token shape |
@@ -113,6 +116,11 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Encounter** | A planned set of monsters with CR/difficulty math. Lifecycle: planned → started → ended. The unit of combat history. | Combat; session |
 | **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
 | **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP and temp HP (for PCs, both live on the character); effects target the combatant (monsters) or the character (PCs). | Token; Entity |
+| **Companion** | A creature with an owner PC (and that PC's player): a pet or a summon; acts in a turn mode and gives its owner a companion card ([combat-tracker](specs/combat-tracker.md), [ADR-0056](architecture/adr/0056-companion-visibility.md)). | Ally |
+| **Pet** | A companion that is its own copy of a creature definition, HP kept between fights, listed in the Party window; its owner may edit its stats ([entities](specs/entities.md)). | Summon |
+| **Summon** | A companion placed from any monster for one fight; HP for that fight; Dismiss removes it and its token. | Pet |
+| **Turn mode** | When a companion acts: right after its owner (default), in its owner's turn (no own Initiative row), or its own initiative. | Initiative |
+| **Companion card** | The owner's window for a companion: HP, AC, speed, attacks with Roll, conditions. Not a character sheet ([character-sheet-full](specs/character-sheet-full.md)). | Character sheet |
 | **Movement used** | Feet a combatant's token has moved since its turn started (5/10/5 per move, any mover); reset on Next. Indicator only. | Speed |
 | **Turn alert** | The player client's alert (flash, ping, Toast) when one of its own PCs' turn starts. | Notification |
 | **Initiative order** | Ordered list of combatants for the current combat. | — |
@@ -164,6 +172,10 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Roll popup** | The card in the toast region that shows a received roll with its dice ([ADR-0048](architecture/adr/0048-dice-display.md)). | Toast |
 | **Die shape** | A die drawn flat as its outline with the value ([dice-extras](specs/dice-extras.md)). | — |
 | **Dice look** | An owner's dice appearance (style, colours, material); everyone sees the roller's look. | — |
+| **Preferences** | The window for a person's own settings (colour, sound, dice, layout, account), opened from the identity chip; each setting keeps its storage ([play-shell](specs/play-shell.md)). | Campaign settings |
+| **Identity chip** | The top-right "● Name ⚙" button in both clients that opens Preferences and shows muted sound. | — |
+| **Player colour** | A person's colour (`#rrggbb`), stored once and derived everywhere (pointer, templates, path, log names); must pass the validity and distance rules ([ADR-0055](architecture/adr/0055-player-colour.md), [ADR-0057](architecture/adr/0057-free-player-colour.md)). | Dice look |
+| **Palette colour** | One of the 8 suggested player colours shown in the picker. | Player colour |
 | **Dice style** | A named starting look (Ivory, Obsidian, …). | Preset (MOD) |
 | **Notation link** | Dice notation in free text (e.g. "1d12 + 5") rendered clickable; stages a plain roll in the tray, never attack / apply. | — |
 | **Party loot** | Shared, party-visible log of the party's coin and rewards: loot the DM gives, party spending, coin moves between the party pot and wallets, and (sprint 3) party item moves and the DM's split. | Party board |
