@@ -987,10 +987,10 @@ One track over CBT, ENT, CHARX, PARTY, MAP; every slice lists its shared files (
 
 | Slice | FRs | Files | Order |
 |---|---|---|---|
-| **ST0** `fix/st-core` (with stats) | FR-CBT-138 | `src/server/features/combat-tracker/stats-read.ts` (new, read-only) | after GM core; no schema lane |
-| **ST1** `fix/st-lines` | FR-CBT-136, -137 | `combat-tracker/hp.ts` (apply path), `cbt.attack` / `cbt.hp` kind schemas + `formatLine` in `src/shared/combat-tracker/`, the DM Damage / heal dialog | **apply path: one holder at a time** (sprint-7 hotspot: after GM core's card-total change); never touches Initiative rows (FU) or the attack popup (GM / FU) |
+| **ST0** `fix/st-core` (with stats) | FR-CBT-138 | `src/server/features/combat-tracker/stats-read.ts` (new, read-only) | **after GM0** (seam S4); no schema lane |
+| **ST1** `fix/st-lines` | FR-CBT-136, -137 | `combat-tracker/hp.ts` (apply path), `cbt.attack` / `cbt.hp` kind schemas + `formatLine` in `src/shared/combat-tracker/`, the DM Damage / heal dialog | **apply path (seam S3): builds in parallel with GM1, GM1 merges first, ST rebases (after GM1)**; GM2 after both. Never touches Initiative rows (FU) or the attack popup (GM / FU) |
 
-- ST0 ∥ ST1. Docs at consolidation: protocol (`cbt.applyHp` `sourceId`, line fields), data model (§8 sprint 7 rows).
+- ST0 + ST1 = one builder, **ST-core** (build plan wave 2). Docs at consolidation: protocol (`cbt.applyHp` `sourceId`, line fields), data model (§8 sprint 7 rows).
 
 ## 15. Open questions
 

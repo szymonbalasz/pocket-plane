@@ -34,7 +34,7 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR | What | Slice | Named test |
 |---|---|---|---|
 | FR-NOTE-48 | Kind `stats-awards`: info to all, payload `{fromN, toN, from, to, label}`, view with Open | ST0 (kind), ST2 (views) | `FR-NOTE-48 awards notification` |
-| FR-NOTE-49 | Callout toasts are not notifications; same region and stack rules | ST2 | `FR-NOTE-49 callout toast is not a notification` |
+| FR-NOTE-49 | Callout toasts are not notifications; a transient info toast in the info stack (S6) | ST2 | `FR-NOTE-49 callout toast is not a notification` |
 
 ## 1. Summary
 
@@ -123,7 +123,7 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR-NOTE-43 | **Never over a tool bar** (BL-40): a spot overlapping (≥ 1 px) a **hard** keep-out region (play-shell [FR-SHELL-48](play-shell.md#6-functional-requirements) (b): the active map tool bar `map.toolbar`, reported by scenes-map / fog-of-war) is not clear, like Initiative. `ToastRuntime.tsx` reads `useKeepOuts("dm")` and re-places the stack when the keep-outs change (a tool opens, closes, its bar wraps) as it does on window changes. Outcome: with any tool bar shown, `elementFromPoint` at the centre of each of its controls hits that control (sim-9: 6 / 16 Fog bar controls under the summary). The bar's max width already ends 8 px before the home band ([FR-MAP-60](scenes-map.md#6-functional-requirements)), so this bites only when the stack is shifted left of a moved Initiative; then it drops below the bar (top = bar bottom + 8). *(Under [OQ-MAP-57](scenes-map.md#15-open-questions) D or C, proposed)* the runtime also reports the stack's rendered rect through play-shell's `reportShownStack("note.toasts", rect \| null)` ([FR-SHELL-59](play-shell.md#6-functional-requirements)). | sim-9 b01 |
 | **Sprint 7** (track ST, [stats](stats.md)) | | |
 | FR-NOTE-48 | **Kind `stats-awards`** (owner stats; one line in `kinds.ts`, append). Audience `all`, no action, so state `info`: a 6 s toast per FR-NOTE-13 / -14 plus a history row. Payload zod `{fromN, toN, from, to, label}` (`label` ≤ 40 chars, e.g. "Tue 20 Oct"); text "Session awards: ‹label›". Both are player-safe: times and a date only. Made only by `stats.showAwards` through `notify` (FR-NOTE-02). Client views (both `notification-views.ts`, append): icon lucide `Trophy`, and a renderer with an **Open** Button (`note-stats-awards-open`, client-only, not an action) calling `openStatsAwards(fromN)` ([FR-SHELL-94](play-shell.md#6-functional-requirements)). No `endRule` (awards outlive fights). | 575 B a row (measured) |
-| FR-NOTE-49 | **Callout toasts are not notifications** ([FR-STATS-22](stats.md#6-functional-requirements)). The overkill toast (`stats-overkill-toast`) is a shadcn Toast in this client's toast region: players bottom-right, DM top-centre band, under FR-NOTE-42 / -43's placement. It makes no row and doesn't count in the bell or appear in history. It sits **below** any pending toast in the stack, and only one shows at a time (a new callout replaces it). It starts from a live event frame only (`useEventFrame`), like FR-CBTX-06. | OQ-STATS-03 |
+| FR-NOTE-49 | **Callout toasts are not notifications** ([FR-STATS-22](stats.md#6-functional-requirements)). The overkill toast (`stats-overkill-toast`) is a shadcn Toast in this client's toast region: players bottom-right, DM top-centre band, under FR-NOTE-42 / -43's placement. It makes no row and doesn't count in the bell or appear in history. It is a transient **info** toast, not a card toast (seam S6): it uses the existing info-toast stack, never pushes windows, and Fit ([OQ-MAP-61](scenes-map.md#15-open-questions)) and the pending-toast rules ignore it. Only one shows at a time (a new callout replaces it). It starts from a live event frame only (`useEventFrame`), like FR-CBTX-06. | OQ-STATS-03 |
 
 ## 7. UI/UX notes
 
@@ -315,7 +315,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 **Shared changes — sprint 7** (track ST): `src/server/features/notifications/kinds.ts` gets one `stats-awards` line (append, slice ST0). `src/client/{dm,player}/notification-views.ts` get one line each (append, slice ST2). Nothing else in this spec's code.
 
-**Sprint 7 tests** (track ST, bundle `stats`): integration `FR-NOTE-48 awards notification` (DM-only command; the row goes to every player and the DM; payload schema has no DM data; history row with Open; info toast 6 s), client `FR-NOTE-49 callout toast is not a notification` (a live `cbt.attack` frame with `callout` → toast, no store row, bell count unchanged, sits below a pending toast; a snapshot holding the same line → no toast). Walkthrough [stats §13](stats.md#13-test-plan) steps 2 and 6.
+**Sprint 7 tests** (track ST, bundle `stats`): integration `FR-NOTE-48 awards notification` (DM-only command; the row goes to every player and the DM; payload schema has no DM data; history row with Open; info toast 6 s), client `FR-NOTE-49 callout toast is not a notification` (a live `cbt.attack` frame with `callout` → toast, no store row, bell count unchanged, goes in the info-toast stack, pushes no window, Fit ignores it; a snapshot holding the same line → no toast). Walkthrough [stats §13](stats.md#13-test-plan) steps 2 and 6.
 
 ## 15. Open questions
 
