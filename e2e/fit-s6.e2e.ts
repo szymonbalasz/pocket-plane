@@ -8,7 +8,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
-import { shellWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 interface Box {
   x: number;
@@ -81,9 +81,17 @@ test("FR-MAP-80 fit without the empty box: DM Fit at 1440×900 and 1280×720 wit
   await live(dm);
   await expect(shellWindow(dm, "cbt.initiative")).toBeVisible();
   await expect(shellWindow(dm, "dice.log")).toBeVisible();
+  // View Goblin Ambush (the DM's own view, nothing sent), then close Scenes again.
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
+    .first()
+    .click();
   const canvas = dm.getByTestId("map-canvas");
   await expect(canvas).toHaveAttribute("data-scene-id", ambush);
   await expect(canvas).toHaveAttribute("data-loading", "false");
+  await scenes.getByTestId("ui-window-close").click();
+  await expect(scenes).toHaveCount(0);
   await expect.poll(async () => (await konvaNodes(dm, "map-token")).length).toBeGreaterThan(0);
 
   const cells: string[] = [];
@@ -91,7 +99,12 @@ test("FR-MAP-80 fit without the empty box: DM Fit at 1440×900 and 1280×720 wit
     { width: 1440, height: 900 },
     { width: 1280, height: 720 },
   ]) {
+    const before = dm.viewportSize();
     await dm.setViewportSize(size);
+    // A resize refits while fitted (FR-MAP-47, 200 ms later): let it land before the Fit.
+    if (before?.width !== size.width || before?.height !== size.height) {
+      await expect(canvas).toHaveAttribute("data-fit-reason", "resize");
+    }
     await fit(dm);
     await expect(canvas).toHaveAttribute("data-fit-visible", "all");
     const cell = Number(await canvas.getAttribute("data-cell-px"));
@@ -133,27 +146,33 @@ test("FR-MAP-80 fit without the empty box: DM Fit at 1440×900 and 1280×720 wit
 test("FR-MAP-82 reveal refit: a player's pan (empty-canvas press) and wheel zoom mark the camera moved at the gesture's start; Fit makes it fitted again (F9)", async ({
   browser,
 }) => {
-  const { link, recordId } = e2eEnv();
-  const ambush = recordId("battlemap", "scene");
+  const { link } = e2eEnv();
   const p = await rolePage(browser);
   await p.setViewportSize({ width: 1280, height: 800 });
-  await p.goto(link("Player 1"));
+  // Player 2: Player 1 opens with the presented handout (sim-9 `handout-present-1`) over the map.
+  await p.goto(link("Player 2"));
   await live(p);
+  // The shown scene, whichever it is (this spec sends nothing).
   const canvas = p.getByTestId("map-canvas");
-  await expect(canvas).toHaveAttribute("data-scene-id", ambush);
   await expect.poll(async () => (await konvaNodes(p, "map-token")).length).toBeGreaterThan(0);
   await fit(p);
-  // An empty-canvas spot: right of the rail, left of the 16-px inset every fitted token keeps.
-  const spot = { x: RAIL_CLEAR + 8, y: 400 };
-  const hit = await p.evaluate(
-    ({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-testid="map-canvas"]') !== null,
-    spot,
-  );
-  expect(hit).toBe(true);
-  const onToken = (await footprints(p)).some(
-    (t) => spot.x >= t.x && spot.x <= t.x + t.w && spot.y >= t.y && spot.y <= t.y + t.h,
-  );
-  expect(onToken).toBe(false);
+  // An empty-canvas spot: the canvas on top (no window, launcher or toast) and no token there.
+  const tokens = await footprints(p);
+  const spot = await p.evaluate((boxes) => {
+    for (let y = 120; y < window.innerHeight - 120; y += 16) {
+      for (let x = 80; x < window.innerWidth - 80; x += 16) {
+        const el = document.elementFromPoint(x, y);
+        if (el?.tagName !== "CANVAS" || !el.closest('[data-testid="map-canvas"]')) continue;
+        const near = boxes.some(
+          (t) => x >= t.x - 8 && x <= t.x + t.w + 8 && y >= t.y - 24 && y <= t.y + t.h + 24,
+        );
+        if (!near) return { x, y };
+      }
+    }
+    return null;
+  }, tokens);
+  expect(spot).not.toBeNull();
+  if (!spot) return;
   // Pan: `moved` while the button is still down (the gesture's start), before any drag.
   await p.mouse.move(spot.x, spot.y);
   await p.mouse.down();
