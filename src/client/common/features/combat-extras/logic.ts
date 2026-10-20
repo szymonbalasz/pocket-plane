@@ -186,8 +186,16 @@ export interface NameLineWidths {
 
 /** `fitNameLine`'s pick. */
 export interface NameLineFit {
-  /** The name and its marks are wider than the line: the name wraps onto two lines (no "…"). */
+  /**
+   * The name alone is wider than the line: it wraps onto two lines (no "…"), between words, and
+   * inside a word only when that word is wider than the line.
+   */
   nameWrap: boolean;
+  /**
+   * The name fits but not with its marks: the marks leave the name's line (to the next one, before
+   * the side chip), so a word that fits on its own line never breaks (sprint 6 CP2, note 3).
+   */
+  marksWrap: boolean;
   /** The side chip and every chip take a second line under the name. */
   split: boolean;
   /** The chips' room (FR-CBTX-54's steps run against it); 0 without chips. */
@@ -199,19 +207,24 @@ export interface NameLineFit {
  * the fixed parts on it (marks, side chip, Moved) − the gaps. If the name and its fixed parts
  * don't fit with at least a "+N" chip's room, the side chip and the chips move to a second line
  * (the marks stay beside the name), where the chips get the line after the side chip (and after
- * Moved too when the name wraps: Moved then follows the chips).
+ * Moved too when the name wraps: Moved then follows the chips). Only a name wider than the line
+ * wraps; a name that fits but not with its marks keeps its line and the marks move down first.
  */
 export function fitNameLine(w: NameLineWidths, gap = 4): NameLineFit {
   const head = w.name + w.marks.reduce((s, m) => s + gap + m, 0);
   const side = w.side > 0 ? w.side + gap : 0;
   const end = w.end > 0 ? w.end + gap : 0;
-  const nameWrap = head > w.line;
+  const nameWrap = w.name > w.line;
+  const marksWrap = !nameWrap && head > w.line;
   const room = w.line - head - side - end - gap;
   const moves = w.side > 0 || w.chips;
-  const split = moves && (nameWrap || head + side + end > w.line || (w.chips && room < MORE_W));
-  if (!w.chips) return { nameWrap, split, room: 0 };
-  const below = w.line - side - (nameWrap ? end : 0);
-  return { nameWrap, split, room: Math.max(0, split ? below : room) };
+  const split =
+    moves && (nameWrap || marksWrap || head + side + end > w.line || (w.chips && room < MORE_W));
+  if (!w.chips) return { nameWrap, marksWrap, split, room: 0 };
+  // Marks moved down: they lead the second line, before the side chip.
+  const marks = marksWrap ? head - w.name : 0;
+  const below = w.line - side - marks - (nameWrap ? end : 0);
+  return { nameWrap, marksWrap, split, room: Math.max(0, split ? below : room) };
 }
 
 /** "N rounds left" (sheet chips). */

@@ -596,7 +596,7 @@ function useMovedBelow(rowRef: RefObject<HTMLElement | null>, deps: unknown): bo
       const nameW = name.offsetWidth;
       const others = [
         ...line.querySelectorAll<HTMLElement>(
-          ":scope > [data-name-head] > [data-name-marks], :scope > [data-name-side]",
+          ":scope > [data-name-head] > [data-name-marks], :scope > [data-name-marks], :scope > [data-name-side]",
         ),
       ].filter((k) => k.offsetWidth > 0);
       const chips = line.querySelector("[data-chip-row]") ? MORE_W : 0;

@@ -53,6 +53,16 @@ function rowsCut(init: Locator): Promise<string[]> {
         bad.push(`name cut: ${n.dataset.value}`);
       }
       if (a.width === 0 || a.right > b.right + 0.5) bad.push(`name out: ${n.dataset.value}`);
+      // Note 3: a one-word name that fits its line never breaks inside the word.
+      const base = n.querySelector<HTMLElement>("[data-name-base]");
+      if (base && !(base.textContent ?? "").trim().includes(" ")) {
+        const r = document.createRange();
+        r.selectNodeContents(base);
+        const rows = new Set([...r.getClientRects()].map((x) => Math.round(x.top)));
+        if (rows.size > 1 && base.scrollWidth <= b.width) {
+          bad.push(`word broken: ${n.dataset.value}`);
+        }
+      }
     }
     for (const l of w.querySelectorAll<HTMLElement>("[data-stats-line]")) {
       if (l.scrollWidth > l.clientWidth + 0.5) bad.push("stats cut");
