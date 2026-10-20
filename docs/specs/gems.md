@@ -25,7 +25,7 @@ phase: post-mvp-7
 | Counts, award / remove, visibility | FR-GEM-06–11 | GM0 core |
 | Spend: Fortune, Divine Knowledge, Action | FR-GEM-12–17 | GM0 core (server), GM3 (sheet UI) |
 | Inspiration reroll | FR-GEM-18–24, FR-DICE-62–71 | GM1 |
-| Combat gem (max dice) | FR-GEM-25–31, FR-CBT-126–135 | GM2 (after FU's popup slice) |
+| Combat gem (max dice) | FR-GEM-25–31, FR-CBT-126–135 | GM2 (after GM1 + ST core, seams S3) |
 | Sheet block, options dialog, icons | FR-GEM-32–36, FR-CHARX-71–80 | GM3 |
 | Edge rules | FR-GEM-37–40 | per slice |
 
@@ -102,7 +102,7 @@ phase: post-mvp-7
 | FR-GEM-20 | **Must keep the new roll** (#140): the old roll can't come back (no undo, OQ-GEM-09). The new entry may take a **second** Inspiration gem (it is not superseded) *(OQ-GEM-05 pick A)*. | |
 | FR-GEM-21 | **Physical dice** *(OQ-GEM-13 pick A)*: with physical-dice mode on, the Inspiration action opens the manual popover for one d20 (`manual: {diceTotal}`, "Roll for me" too); adv / dis asks for both d20s. The new roll is marked manual. | FR-DICE-07 |
 | FR-GEM-22 | **Attack to-hit:** the pending card follows the new to-hit (`toHit`, `natural`, crit) server-side (FR-CBT-126); a crit that appears or disappears with damage already on the card moves that damage to `unusedRolls` and the card waits for a new damage roll *(OQ-CBT-85 pick A)* (FR-CBT-127). | |
-| FR-GEM-23 | **Final value for stats:** the superseding roll counts; a superseded entry's rolls don't (FR-DICE-67). [stats](post-mvp/stats.md) reads it that way (OQ-GEM-16). | GM ↔ ST |
+| FR-GEM-23 | **Final value for stats:** the superseding roll counts; a superseded entry's rolls don't (FR-DICE-67); natural 20 / 1 count on the final roll; a reroll is not an extra roll in counts; a maxed die counts only through the applied damage (`hp_change`). No "gems spent" stat (stats stay independent of an optional feature). [stats](post-mvp/stats.md) reads it that way (OQ-GEM-16, resolved by seams S2). | GM ↔ ST |
 | FR-GEM-24 | **Audience kept:** the new entry copies `public` and `audiencePlayerId` of the old one (FR-DICE-62), so a DM-hidden roll's reroll stays hidden and a reroll never reveals more. | ADR-0056 |
 
 ### Combat (max dice)
@@ -283,7 +283,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [combat-tracker](combat-tracker.md) | To-hit follow, crit flip, `cards.maxDice`, stale Apply wording, popup + card UI (FR-CBT-126–135) | revised with this spec |
 | [character-sheet-full](character-sheet-full.md) | Gem block section, summary counts (FR-CHARX-71–80) | revised with this spec |
 | [live-sync](live-sync.md) / protocol | Viewer `features`; feature tag on record types and log kinds (hub filter) | **needs** OQ-GEM-17 (proposed ADR) |
-| [stats](post-mvp/stats.md) (track ST) | Reads the final roll and applied damage (FR-GEM-23) | OQ-GEM-16 (seams) |
+| [stats](post-mvp/stats.md) (track ST) | Reads the final roll and applied damage (FR-GEM-23) | settled (seams S2) |
 | [play-shell](play-shell.md) | Nothing: no window, no Preferences section (FR-SHELL-75: campaign rules aren't preferences) | — |
 | [notifications](notifications.md), [dice-extras](dice-extras.md), [effect-modifiers](effect-modifiers.md) | Nothing new: `updateNotification` exists (ADR-0037); a new entry throws, a superseded upsert doesn't (DICEX §11); mods are copied on a reroll, never re-run | — |
 | Dependency (package) | **None.** lucide (already in) for icons | — |
@@ -294,11 +294,11 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 |---|---|---|---|---|
 | **GM0** core | `fix/gems-core` | Feature registry + `features` column + `camp.setFeature` + resync; viewer `features` + hub feature filter; `character_gems` table + record type; `gem.adjust`; plain `gem.spend` (Fortune / Divine / Action); kinds `gem.award`, `gem.spend`; events; fixtures `gems-on`, `gems-awarded`, `gems-hidden`, bundles `gems`, `gems-hidden` (+ `gems-rolls` stub) | **schema lane 1st**: `src/server/db/schema.ts`; `src/shared/events/`; `src/server/ws/` (viewer, filter); record-type registry; `src/server/features/index.ts` (append `gems`); `src/shared/dice-roll-log/kinds.ts` (append); `src/shared/campaign-management/features.ts` (new registry); `fixtures/bundles/index.ts` (append); `docs/data-model/`, `docs/protocol/` | — (first in the schema lane; ST core / FU column after) |
 | **GM1** Inspiration | `build/gems-reroll` | `dice.reroll`, `gameLog.supersede`, `replaces`, struck line, entry-action registry + "Inspiration" action, to-hit follow + crit flip on the card (FR-CBT-126, -127 server) | dice-roll-log server / shared / `GameLog.tsx` (feature-owned; **GameLog holder**); combat-tracker server `cards.ts` (new), `hp.ts`, `hit.ts` + `@shared/combat-tracker/schemas.ts` (`partRollIds`) (one holder with GM2, [CBT §14.4](combat-tracker.md#144-build-split-sprint-7-track-gm)); new registry `src/client/common/features/dice-roll-log/entry-actions.ts` (AGENTS §9.9 list at integration) | GM0. ST's log reads after GM1's `supersede` |
-| **GM2** Combat gem | `build/gems-combat` | `cards.maxDice`, stale wording, DM popup chip + die picker, player card button | combat-tracker server (`cards.ts`, `hp.ts`), `@shared/combat-tracker/{schemas.ts, log-kinds.ts}`, DM popup files + the player damage-card view (feature-owned; **popup holder**); new append-only `src/client/common/features/combat-tracker/card-actions.ts` (AGENTS §9.9 at integration) | GM0; GM1 (card-kind); **FU's End dialog / concentration slice** (popup: GM0 → FU → GM2, as sprint-7 hotspots) |
+| **GM2** Combat gem | `build/gems-combat` | `cards.maxDice`, stale wording, DM popup chip + die picker, player card button | combat-tracker server (`cards.ts`, `hp.ts`), `@shared/combat-tracker/{schemas.ts, log-kinds.ts}`, DM popup files + the player damage-card view (feature-owned; **popup holder**); new append-only `src/client/common/features/combat-tracker/card-actions.ts` (AGENTS §9.9 at integration) | GM1 **and ST core** merged (apply-path holder, seams S3: GM1 ∥ ST core, GM1 merges first, ST core rebases, then GM2). FU needs no turn. GM2 never edits DM `initiative-window.tsx` (if it must: rebase after FU's combat-rows slice) |
 | **GM3** UI | `build/gems-sheet` | Sheet block (`sheet-sections.ts` append), summary counts, Spend menu, DM ± , Players-window counts, Campaign options dialog | `src/client/common/features/character-sheet/sheet-sections.ts` (append); CAMP DM client files (feature-owned) | GM0 |
 
 - **Feature-owned (new) folders:** `src/server/features/gems/`, `src/shared/gems/` (intent zod, kinds `gem.award` / `gem.spend`, eligibility helpers), `src/client/common/features/gems/` (`GemBlock`, icons, the log and card actions), `fixtures/units/gems/`, bundles `gems`, `gems-hidden`, `gems-e2e`.
-- **Parallel:** GM1 ∥ GM3 after GM0; GM2 after GM1 + FU's popup slice (GM3 may run beside GM2). One builder for GM1 + GM2 if slots are short (both touch `card-kind.ts`).
+- **Parallel (seams build plan):** wave 1 GM0; wave 2 GM1 ∥ GM3 (∥ ST core; GM1 merges before ST core); wave 3 GM2 after GM1 + ST core (GM3 may run beside it). One builder for GM1 + GM2 if slots are short (both touch `cards.ts`, `hp.ts`, `schemas.ts`).
 
 ## 15. Open questions
 
@@ -321,12 +321,12 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | OQ-GEM-13 | Physical dice vs gems | **A. Reroll follows physical mode (type the new d20); Combat gem on a total-only physical roll asks each die first** / B. Gems need app-rolled dice (physical rolls not eligible) | no (DM) | DICE |
 | OQ-GEM-14 | May the DM spend on a player's behalf? | **A. Yes (absent player, table speed); the line says "Mira spends…", roller DM** / B. Owner only | no (DM) | — |
 | OQ-GEM-15 | Companions and pets | **A. Not in v1: gems are the character's, its own rolls and attacks only** / B. The owner's companions' rolls / cards too | no (DM) | CBT |
-| OQ-GEM-16 | **stats (ST):** what counts after a reroll / maxed die | **A. Final roll only (superseded entries skipped); damage = the applied amount (maxed included); a "gems spent" award optional** / B. Count both rolls | no (seams; owner: orchestrator) | [stats](post-mvp/stats.md) |
+| OQ-GEM-16 | **stats (ST):** what counts after a reroll / maxed die | **Resolved (integrator, seams S2): A.** Final roll only (superseded and undone entries skipped; nat 20 / 1 on the final roll; a reroll is no extra roll); a maxed die only through the applied damage (`hp_change`); **no "gems spent" award**. Rejected: ~~B. Count both rolls~~ | — · resolved | [stats](post-mvp/stats.md) |
 | OQ-GEM-17 | **live-sync / protocol:** viewer `features` and the feature tag on record types / log kinds | **A. As the [proposed ADR](../architecture/adr/proposed-s7-gm-feature-switches.md): GM0 changes `src/server/ws/` (shared, orchestrator-routed); live-sync gains one FR at integration** / B. Each feature filters in its own visibility fn (needs the campaign row: breaks ADR-0021 B) | no (seams; owner: orchestrator) | [live-sync](live-sync.md) |
 | OQ-GEM-18 | Glossary: add **feature switch**, **reroll**, **superseded entry**, **maxed die**; amend **gem** (optional per campaign) | **A. Add as worded in §1 / §8** | no (owner: integrator) | glossary |
-| OQ-GEM-19 | **FU:** popup holder order with the End dialog / concentration slice | **A. GM0 → FU's popup slice → GM2 (sprint-7 hotspot default)** / B. GM2 before FU | no (seams; owner: orchestrator) | CBT, [combat-extras](combat-extras.md) |
+| OQ-GEM-19 | **FU:** popup holder order with the End dialog / concentration slice | **Resolved (integrator, seams S3):** FU's End dialog / concentration files aren't apply-popup / card files, so FU takes no turn; the apply path goes GM1 ∥ ST core (GM1 merges first) → GM2. Rejected: ~~GM0 → FU → GM2~~, ~~GM2 before FU~~ | — · resolved | CBT, ST |
 
 ## 16. Out of scope
 
 - Gem art and DM-supplied images (BL-29, UI sprint). Fortune's d100 tables; tracking actions per turn; gem trading between characters; gems for monsters / companions (OQ-GEM-15).
-- Stats over gems (track ST may add a "gems spent" award, OQ-GEM-16). Other optional features reusing the switch (the ADR allows them; none this sprint).
+- Stats over gems: no "gems spent" award (seams S2; tier B at best). Other optional features reusing the switch (the ADR allows them; none this sprint).

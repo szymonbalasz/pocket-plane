@@ -11,7 +11,7 @@ wave: 3
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
-> **Sprint 7, track GM (homebrew gems, [gems](gems.md); DM #140, #312; spec-gems).** Decided, not open: the **Combat gem** sets 1 damage die to max (2 at level 6, 3 at level 12) **before the DM applies a damage card**, total updated server-side, also with late damage / Apply hit; an **Inspiration** reroll replaces a d20 roll from the log. This spec gives gems three card helpers (to-hit follows a reroll, crit flip, max dice), a wider stale-Apply check, maxed-die markers and a **card-action slot** on the DM popup and the player's card view (FR-CBT-126–135). Gems owns the rules and the buttons. Popup files: one holder at a time, **GM0 → FU's End dialog / concentration slice → GM2** (OQ-CBT-86).
+> **Sprint 7, track GM (homebrew gems, [gems](gems.md); DM #140, #312; spec-gems).** Decided, not open: the **Combat gem** sets 1 damage die to max (2 at level 6, 3 at level 12) **before the DM applies a damage card**, total updated server-side, also with late damage / Apply hit; an **Inspiration** reroll replaces a d20 roll from the log. This spec gives gems three card helpers (to-hit follows a reroll, crit flip, max dice), a wider stale-Apply check, maxed-die markers and a **card-action slot** on the DM popup and the player's card view (FR-CBT-126–135). Gems owns the rules and the buttons. Apply path (`hp.ts`, `cards.ts`, `hit.ts`, `schemas.ts`, `log-kinds.ts`): **GM1 ∥ ST core, GM1 merges first, then GM2** (seams S3; OQ-CBT-86 resolved).
 
 **Sprint 7 at a glance** (track GM)
 
@@ -1000,7 +1000,7 @@ Full split: [gems §14](gems.md#14-dependencies). Combat's parts, feature-owned 
 | Slice | Combat files | After |
 |---|---|---|
 | GM1 `build/gems-reroll` | `src/server/features/combat-tracker/{cards.ts (new: `replaceToHit`, crit flip), hp.ts + hit.ts (`partRollIds.toHit`)}`, `@shared/combat-tracker/schemas.ts` (`partRollIds`) | GM0 |
-| GM2 `build/gems-combat` | `cards.ts` (`maxDice`), `hp.ts` (extra ids), `@shared/combat-tracker/schemas.ts` (`maxed`, `diceMaxed`), `@shared/combat-tracker/log-kinds.ts` (`max` chip label), DM popup files + player damage-card view (markers, slot), new append-only `src/client/common/features/combat-tracker/card-actions.ts` (AGENTS §9.9 at integration) | GM1 (shares `cards.ts`, `hp.ts`, `schemas.ts`); **FU's End dialog / concentration slice** (popup holder, OQ-CBT-86) |
+| GM2 `build/gems-combat` | `cards.ts` (`maxDice`), `hp.ts` (extra ids), `@shared/combat-tracker/schemas.ts` (`maxed`, `diceMaxed`), `@shared/combat-tracker/log-kinds.ts` (`max` chip label), DM popup files + player damage-card view (markers, slot), new append-only `src/client/common/features/combat-tracker/card-actions.ts` (AGENTS §9.9 at integration) | GM1 **and ST core** merged (seams S3; shares `cards.ts`, `hp.ts`, `schemas.ts`, `log-kinds.ts`). FU takes no turn. Never edits DM `initiative-window.tsx` (if it must: after FU's combat-rows slice) |
 
 - No schema, event or protocol-envelope change; docs at merge: protocol (`partRollIds`, card payload, §26 registry row), data model (card payload note).
 
@@ -1072,7 +1072,7 @@ Full split: [gems §14](gems.md#14-dependencies). Combat's parts, feature-owned 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-CBT-85 | **A reroll flips the crit** (a miss rerolled to a natural 20) while damage is on the card | **A. The damage goes to "not used"; the card waits for a new damage roll, doubled (5e-correct; one more click for the player)** / B. Keep the damage; the DM adjusts by hand (no extra roll; a natural 20 that doesn't double) / C. The server rolls only the extra crit dice and adds them (no click; a server roll the player didn't make, physical dice can't follow) | no (DM) | gems |
-| OQ-CBT-86 | **FU:** the popup / card files' holder order this sprint | **A. GM0 (no popup edit) → FU's End dialog / concentration slice → GM2's slot + markers (sprint-7 hotspot default; GM2 is small and can wait)** / B. GM2 before FU (gems sooner; FU rebases onto the slot) | no (seams; owner: orchestrator) | [combat-extras](combat-extras.md), FU |
+| OQ-CBT-86 | **FU:** the popup / card files' holder order this sprint | **Resolved (integrator, seams S3):** FU's End dialog / concentration files aren't apply-popup / card files (FU's OQ-CBT-95 accepted), so FU takes no turn; apply path GM1 ∥ ST core (GM1 merges first, ST core rebases) → GM2. Rejected: ~~A. GM0 → FU → GM2~~, ~~B. GM2 before FU~~ | — · resolved | ST, FU |
 | OQ-CBT-87 | **The DM typed a damage total, then the player maxes a die** | **A. Typed value kept, "rolled N" shows the new total (FR-CBT-90's never-override rule, one rule)** / B. The maxed total replaces the typed one (the gem always shows; overrides the DM) | no (DM) | gems |
 
 ## 16. Out of scope
