@@ -2198,3 +2198,20 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-141, -145 
 - **Derived (not stored):** kept HP (one pass over the campaign's monster `combatant` rows joined to ended encounters; no index needed at ≤ a few thousand rows).
 - **Fixtures:** unit `fu-hurt-goblins` (Goblin −7 → 0 / 7, Goblin 2 −3 → 4 / 7 in the running ambush); bundles `fu-s7` (= `session-sim-10` + `cp-ally` + `fu-hurt-goblins`), `fu-s7-e2e`; both units appended to `session-sim-11` (FU group).
 - **CON-44: 0 B** (no field or record; kept HP fills existing columns).
+
+## 98. Sprint 7: Inspiration reroll (GM1)
+
+From [gems](../specs/gems.md#8-data-model) FR-GEM-13, -19, [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-62–64, -67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-126, -127 (#140, #315). **Built by `build/gems-reroll`**. Protocol side: [protocol §127](../protocol/README.md#127-sprint-7-inspiration-reroll-gm1). **No table or column change.**
+
+| Field | Change | Rule | Source |
+|---|---|---|---|
+| `roll.replaces_roll_id` | now written | a reroll's new row names the row it replaced (only the d20 term's dice differ); rows stay immutable | FR-DICE-62 |
+| `game_log_entry.superseded_by` | now written | set once (`null` → the reroll's new entry); the old entry is kept | FR-DICE-63 |
+| `roll` payload item `replaces?` | new optional `{entryId, total}` | on the reroll's item: the old entry and its item's total ("(reroll, was 7)") | FR-DICE-64 |
+| `gem.spend` payload `target?`, `dmPayload` | new optional `target {kind: "entry", id, label ≤ 60, from, to?}` (`null` = a DM-only target); new `dmPayload {target}` | the target's detail takes its audience | FR-GEM-13, -19 |
+| `damage-card` payload | no new field | a reroll replaces `toHit`, sets `crit`; a crit flip moves `damage` to `unusedRolls` (`damage: null`) | FR-CBT-126, -127 |
+
+- **Derived (not stored):** `critChanged(card)` (a to-hit card with unused rolls and no damage); `countedRollIds` (stats: entries neither undone nor superseded).
+- **Deleted on a crit flip:** the card's `offered` `trigger_use` rows (server-only; the new damage roll offers again).
+- **Fixtures:** `gems-rolls` in bundle `gems`; alias `gems-reroll-e2e`.
+- **CON-44:** 33 superseded + 33 `replaces` in the 100-entry window → +3,564 B per viewer; 0 B with no reroll.
