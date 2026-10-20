@@ -3,6 +3,9 @@
 // a sheet (FR-CHARX-66): the only edit is a pet's AC, HP max, speed and attack rows (FR-CHARX-63,
 // #288). One window, a picker between the viewer's companions (OQ-CHARX-31). Every change goes
 // out as an existing intent; the DM's combat parts (Damage / heal, chip menu) come in as `dm`.
+// FR-CHARX-82 (sprint 7, sim-10 a03): attacks above the fold at 320 × 360: a one-line header, one
+// stats line ("HP 45 / 59 · AC 15 · 40 ft · Large monstrosity", the HP control / Edit at its
+// right end), then the attack rows; conditions after the attacks, "Open NPC sheet" last.
 import { hpState, initials, parseHpAmount, speedText } from "@shared/character-sheet/logic";
 import { COMPANION_ROLL_BUTTONS, type PetRollKind } from "@shared/character-sheet/rolls";
 import { defaultSheetData } from "@shared/character-sheet/sheet";
@@ -99,7 +102,7 @@ interface CardProps {
 
 function Portrait({ e }: { e: CompanionEntry }) {
   return (
-    <div className="size-10 shrink-0 overflow-hidden rounded-full">
+    <div className="size-8 shrink-0 overflow-hidden rounded-full">
       {e.imageAssetId ? (
         <AssetImg id={e.imageAssetId} file="thumb" alt={e.name} className="size-full" />
       ) : (
@@ -111,16 +114,32 @@ function Portrait({ e }: { e: CompanionEntry }) {
   );
 }
 
-/** FR-CHARX-62: portrait, name, "Mira's pet", the mode in words, "In combat", side chip. */
-function Header({ e, picker, edit }: { e: CompanionEntry; picker: ReactNode; edit: ReactNode }) {
+/**
+ * FR-CHARX-62: portrait, name, "Mira's pet", the mode in words, "In combat", side chip.
+ * FR-CHARX-82: one line where it fits (name · owner · mode), the badges after; it wraps.
+ */
+function Header({ e, picker }: { e: CompanionEntry; picker: ReactNode }) {
   return (
     <div className="flex items-start gap-2">
       <Portrait e={e} />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Walkthrough fix: the name is never cut ("Owlb…" at 320 px); it and the chips wrap. */}
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
           <span data-testid="charx-companion-name" className="min-w-0 break-words font-semibold">
             {e.name}
+          </span>
+          <span data-testid="charx-companion-owner" className="text-xs text-muted-foreground">
+            {ownerText(e)}
+          </span>
+          <span aria-hidden className="text-xs text-muted-foreground">
+            ·
+          </span>
+          <span
+            data-testid="charx-companion-mode"
+            data-value={e.turnMode}
+            className="text-xs text-muted-foreground"
+          >
+            {modeText(e.turnMode, e.ownerName)}
           </span>
           {e.combatant && (
             <Badge data-testid="charx-companion-in-combat" variant="secondary" className="px-1.5">
@@ -138,21 +157,63 @@ function Header({ e, picker, edit }: { e: CompanionEntry; picker: ReactNode; edi
             </Badge>
           )}
         </div>
-        <span data-testid="charx-companion-owner" className="text-xs text-muted-foreground">
-          {ownerText(e)}
-        </span>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">{picker}</div>
+    </div>
+  );
+}
+
+/**
+ * FR-CHARX-82: the read-only stats as one line, "HP 45 / 59 · AC 15 · 40 ft · Large monstrosity"
+ * (+ "Temp 5" after the HP); `end` (the HP control, Edit) at its right end, wrapping when narrow.
+ */
+function StatsLine({ e, end }: { e: CompanionEntry; end: ReactNode }) {
+  const card = e.card;
+  const { current, max, temp } = e.hp;
+  const state = current !== null && max ? hpState(current, max) : "full";
+  const dot = (
+    <span aria-hidden className="text-muted-foreground">
+      {" · "}
+    </span>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span data-testid="charx-companion-stats" className="min-w-0 text-sm tabular-nums">
+        HP{" "}
         <span
-          data-testid="charx-companion-mode"
-          data-value={e.turnMode}
-          className="text-xs text-muted-foreground"
+          data-testid="charx-companion-hp"
+          data-value={current ?? undefined}
+          data-state={state}
+          className={cn("font-semibold", HP_CLASS[state])}
         >
-          {modeText(e.turnMode, e.ownerName)}
+          {current ?? "—"} / {max ?? "—"}
         </span>
-      </div>
-      <div className="flex shrink-0 flex-col items-end gap-1">
-        {picker}
-        {edit}
-      </div>
+        {temp > 0 && (
+          <>
+            {dot}
+            <span data-testid="charx-companion-temp" className="text-muted-foreground">
+              Temp {temp}
+            </span>
+          </>
+        )}
+        {dot}AC{" "}
+        <span data-testid="charx-companion-ac" data-value={card?.ac} className="font-semibold">
+          {card?.ac ?? "—"}
+        </span>
+        {dot}
+        <span data-testid="charx-companion-speed" data-value={card?.speed}>
+          {card?.speed === undefined ? "Speed —" : speedText(card.speed)}
+        </span>
+        {card && (
+          <>
+            {dot}
+            <span data-testid="charx-companion-type" className="text-muted-foreground">
+              {sizeTypeText(card)}
+            </span>
+          </>
+        )}
+      </span>
+      {end && <div className="ml-auto flex flex-wrap items-center justify-end gap-1.5">{end}</div>}
     </div>
   );
 }
@@ -218,7 +279,10 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** FR-CHARX-63: AC · HP bar + "45 / 59" (+ temp) · Speed; edit mode: AC, HP max, Speed inputs. */
+/**
+ * FR-CHARX-63: AC · HP bar + "45 / 59" (+ temp) · Speed; edit mode: AC, HP max, Speed inputs.
+ * FR-CHARX-82: shown in edit mode only (out of it, `StatsLine`).
+ */
 function Stats({ e, editing, petId }: { e: CompanionEntry; editing: boolean; petId: string }) {
   const intents = useSheetIntents();
   const card = e.card;
@@ -591,6 +655,20 @@ export function CompanionCardView({
   ) : e.petId ? (
     <PetHpAdjust petId={e.petId} live={live} />
   ) : null;
+  const editToggle = canEdit ? (
+    <Button
+      size="sm"
+      variant={isEditing ? "secondary" : "outline"}
+      className="h-7"
+      data-testid="charx-companion-edit"
+      data-state={isEditing ? "on" : "off"}
+      aria-pressed={isEditing}
+      disabled={!live}
+      onClick={() => setEditing(!isEditing)}
+    >
+      {isEditing ? "Done" : "Edit"}
+    </Button>
+  ) : null;
   const body = (
     <div
       data-testid="charx-companion"
@@ -598,26 +676,7 @@ export function CompanionCardView({
       data-editing={isEditing ? "true" : "false"}
       className="flex flex-col gap-2 p-1"
     >
-      <Header
-        e={e}
-        picker={picker}
-        edit={
-          canEdit ? (
-            <Button
-              size="sm"
-              variant={isEditing ? "secondary" : "outline"}
-              className="h-7"
-              data-testid="charx-companion-edit"
-              data-state={isEditing ? "on" : "off"}
-              aria-pressed={isEditing}
-              disabled={!live}
-              onClick={() => setEditing(!isEditing)}
-            >
-              {isEditing ? "Done" : "Edit"}
-            </Button>
-          ) : null
-        }
-      />
+      <Header e={e} picker={picker} />
       {/* FR-CBT-112: right under the header, so its confirm shows without scrolling. */}
       {canDismissFromCard(e, client) && !isEditing && (
         <DismissRow
@@ -627,19 +686,30 @@ export function CompanionCardView({
           turnCombatantId={enc?.turnCombatantId ?? enc?.playerTurnCombatantId ?? null}
         />
       )}
-      {e.combatant && <Conditions c={e.combatant} round={enc?.round ?? 0} dm={dm} />}
       {e.petId && isEditing ? (
-        <Stats e={e} editing petId={e.petId} />
+        <>
+          <div className="flex items-start gap-2">
+            <Stats e={e} editing petId={e.petId} />
+            <div className="ml-auto">{editToggle}</div>
+          </div>
+          {hpControl}
+        </>
       ) : (
-        <Stats e={e} editing={false} petId={e.petId ?? ""} />
-      )}
-      {hpControl}
-      {e.card && (
-        <span data-testid="charx-companion-type" className="text-xs text-muted-foreground">
-          {sizeTypeText(e.card)}
-        </span>
+        <StatsLine
+          e={e}
+          end={
+            hpControl || editToggle ? (
+              <>
+                {hpControl}
+                {editToggle}
+              </>
+            ) : null
+          }
+        />
       )}
       <Attacks e={e} pet={pet} editing={isEditing} live={live} />
+      {/* FR-CHARX-82: conditions after the attacks (they were above them). */}
+      {e.combatant && <Conditions c={e.combatant} round={enc?.round ?? 0} dm={dm} />}
       {client === "dm" && npcSheet && e.definitionId && (
         <div className="flex justify-end">
           <Button
