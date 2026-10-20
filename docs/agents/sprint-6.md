@@ -37,6 +37,7 @@ DM notes in brackets ([#285](../decisions-log.md)). "sim-9" = the [session-sim-9
 |---|---|
 | 2026-10-19 | Phase A started: four spec agents at once — companions + summons, window / layout fixes, Preferences + colour picker + Subtract, image search + tags (ID ranges per track in [status](status.md)) |
 | 2026-10-20 | Phase A: four specs, seams ([`.verify/sprint6/seams.md`](../../.verify/sprint6/seams.md)), two reviews + rulings, gate ([`gate.md`](../../.verify/sprint6/gate.md)). Backfill: BL-33 leak-scan flake fixed (#287); BL-45 silent no-ops in progress |
+| 2026-10-20 | **Gate 1 passed** ([#288](../decisions-log.md)): every pick, except a pet's owner may also edit its stats on the companion card. ADR-0056 companion visibility, ADR-0057 free player colour. Specs merged. Backfill merged: **BL-45** — an unticked Sneak Attack you rolled now shows "Not applied" with an Include button instead of vanishing; the physical-dice form marks the empty total (#289). Phase B started: window reopen + footprints, shared search matcher, image tags core, companions core |
 
 ## Check `main` any time (DM)
 
