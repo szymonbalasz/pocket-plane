@@ -1,10 +1,10 @@
 ---
 title: Entities (core)
 prefix: ENT
-status: complete
-owner: spec-images
+status: claimed
+owner: spec-followups
 wave: 2
-phase: post-mvp-6
+phase: post-mvp-7
 ---
 
 # Entities (core)

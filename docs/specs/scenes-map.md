@@ -1,10 +1,10 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: complete
-owner: spec-companions
+status: claimed
+owner: spec-followups
 wave: 3
-phase: post-mvp-6
+phase: post-mvp-7
 ---
 
 # Scenes and map

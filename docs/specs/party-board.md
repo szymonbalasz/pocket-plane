@@ -1,9 +1,9 @@
 ---
 title: Party board
 prefix: PARTY
-status: complete
-owner: spec-images
-phase: post-mvp-6
+status: claimed
+owner: spec-followups
+phase: post-mvp-7
 ---
 
 # Party board
