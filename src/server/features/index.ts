@@ -19,6 +19,7 @@ import { partyBoard } from "./party-board";
 import { partyLootFeature } from "./party-loot";
 import { sceneTools } from "./scene-tools";
 import { scenesMap } from "./scenes-map";
+import { stats } from "./stats";
 
 export const features: readonly Feature[] = [
   campaignManagement,
@@ -40,4 +41,5 @@ export const features: readonly Feature[] = [
   compendium,
   diceExtras,
   gems,
+  stats,
 ];
