@@ -180,7 +180,8 @@ test("FR-DICEX-50 label reset: 'Roll again' keeps the label; a palette die after
   const tray = await openWindow(p1, "dicex.tray");
   const state = tray.getByTestId("dicex-tray-state");
   await expect(state).toHaveAttribute("data-value", "compose");
-  await expect(state).toHaveText("Notation test");
+  // FR-DICE-77: player-1's roll bar rolls as the sheet's PC (Brakka, its first own PC by default).
+  await expect(state).toHaveText("Brakka — Notation test");
 
   const lines = log.getByTestId("dice-log-entry").filter({ hasText: "Notation test" });
   await tray.getByTestId("dicex-tray-roll").click();
