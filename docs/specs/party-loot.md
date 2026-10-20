@@ -1,7 +1,7 @@
 ---
 title: Party loot
 prefix: LOOT
-status: claimed
+status: in-review
 owner: spec-followups
 wave: 3
 phase: post-mvp-7
@@ -14,6 +14,8 @@ phase: post-mvp-7
 > **Sprint 5 revision (track P, DM [#250](../decisions-log.md) [4]; owned by [party-board](party-board.md)):** the loot view moves into a **Loot** tab of the Party window, right of Inventory ([FR-PARTY-29](party-board.md#66-sprint-5-loot-tab-present-uploads)); the "Coin: open Party loot" button goes; the `loot.log` window retires (decided #256, OQ-LOOT-17). New FR-LOOT-21–24; amended FR-LOOT-14, -15, OQ-LOOT-07. Records, intents, events and the snapshot are unchanged (0 B, [PARTY §12](party-board.md#12-performance--bandwidth)).
 
 > **Sprint 6 revision (track PF, DM [#285](../decisions-log.md) [3]):** decided by the DM (not open): a **negative amount stays the way to subtract**; with a negative value the add button reads **Subtract** and the form's label updates; a hint says "Enter a negative amount to subtract."; the button is **disabled for empty or zero**. New FR-LOOT-25–28 (client only, slice PF3); FR-LOOT-16 amended. Records, intents, events, notifications and the snapshot are unchanged (0 B). Walkthrough: [play-shell §13](play-shell.md#13-test-plan) P13.
+
+> **Sprint 7 revision (track FU, BL-48, DM [#311](../decisions-log.md)):** decided, not open: a half-typed Move form is no longer lost on a tab switch. New **FR-LOOT-29** (outcome; the means is party-board's [FR-PARTY-50](party-board.md#69-sprint-7-bl-48-copy-and-tabs-track-fu), tabs stay mounted). Loot's "Party loot: …" notification text stays (FR-LOOT-13); only the **inventory** toast changes ([FR-PARTY-49](party-board.md#69-sprint-7-bl-48-copy-and-tabs-track-fu)). Test `FR-LOOT-29 move draft kept` (DOM: 5 gp Mira → Party typed, tab to Inventory and back → kept; close → gone); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. Client only, 0 B. No open question.
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
@@ -93,6 +95,7 @@ phase: post-mvp-7
 | FR-LOOT-26 | **Hint:** a muted line under the coin Inputs, always shown: "Enter a negative amount to subtract." | #285 [3] |
 | FR-LOOT-27 | **Disabled for empty or zero** (OQ-LOOT-19 A): Add / Subtract is disabled while every coin Input is empty or 0, **even with text filled**, in addition to FR-LOOT-16's reasons (invalid, not `live`, in flight). The server rule (FR-LOOT-02: text or a non-zero coin) is unchanged, so fixtures and existing text-only entries stay valid; items go to the party Inventory ([party-board](party-board.md)). | #285 [3] |
 | FR-LOOT-28 | **Edit form:** a loot row's Edit (FR-LOOT-17) shows the same hint; its button stays "Save" and keeps FR-LOOT-17's rule (a text-only entry stays editable). Move and Split forms unchanged (non-negative coins). | |
+| FR-LOOT-29 | **Drafts survive a tab switch** (sprint 7, track FU; BL-48: a half-typed Move form was lost when switching the Party window's tab): the Loot tab's add form, Move form and Split dialog draft keep their typed values while the Party window stays open and the user switches to another tab and back (the tab stays mounted, [FR-PARTY-50](party-board.md#69-sprint-7-bl-48-copy-and-tabs-track-fu)); closing the window or a reload drops them (as today); a submitted form clears as today. No LOOT code beyond keeping state in the form components (no lifting to a store needed). | BL-48 |
 
 ## 7. UI/UX notes
 

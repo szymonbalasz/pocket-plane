@@ -1,7 +1,7 @@
 ---
 title: Party board
 prefix: PARTY
-status: claimed
+status: in-review
 owner: spec-followups
 phase: post-mvp-7
 ---
@@ -39,6 +39,8 @@ phase: post-mvp-7
 | FR-PARTY-36–38 | Player popup over everything; DM controls | P2 `build/party-present` | `FR-PARTY-36 popup on connect`, `FR-PARTY-37 close`, walkthrough S5-4–S5-7 |
 | FR-PARTY-39 | Editor: upload, drop, paste via the attach control | P1 `build/image-attach` | `FR-PARTY-39 paste adds an image`, walkthrough S5-2–S5-3 |
 | FR-PARTY-40 | Fixtures `handout-attachment`, `handout-present-1`, bundle `party-s5` | P0 core | `party-s5 loads from empty` |
+
+> **Sprint 7, track FU (BL-48 small copy, DM [#311](../decisions-log.md)).** Decided, not open: the inventory toast's wording and a Loot draft lost on a tab switch. New FR-PARTY-49, -50 ([§6.9](#69-sprint-7-bl-48-copy-and-tabs-track-fu)); two BL-48 items dropped with reasons there. Client + one notification text, 0 B new. Tests `FR-PARTY-49 inventory toast text` (unit: `itemAddedText` → "Party inventory: Potion of healing ×2"; the DM's and players' toasts), `FR-PARTY-50 tabs keep state` (DOM: Move draft kept across Loot → Inventory → Loot; gone after close); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4 ([play-shell §14](play-shell.md#14-dependencies)). No open question. Edge cases: a reconnect re-renders the mounted tabs from the store (drafts kept, as minimised windows); reload drops drafts (as today).
 
 ## 1. Summary
 
@@ -184,6 +186,15 @@ phase: post-mvp-7
 |---|---|---|
 | FR-PARTY-47 | **Editor picker searches and tags.** The editor's `ImageAttach` (FR-PARTY-39; `src/client/dm/features/party-board/Editor.tsx`) gets `context="handout"` ([FR-ASSET-48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)): **From library** opens the picker with the search field, tag filter and tag editor (FR-ASSET-44–47); Upload / drop / paste attachments are tagged **Handouts** server-side (FR-ASSET-41; attachments stay out of the library, #256); an upload made inside From library's picker is listed and tagged Handouts. Draft, dedupe ("Already in this handout"), `max` 10, Save and `assets.require` unchanged. | Amends FR-PARTY-39 |
 | FR-PARTY-48 | **Images above the fold** (BL-48, session-sim-9): the editor's order becomes title → **Images** (label with count, strip, attach control, duplicate hint) → body Textarea (+ counter). At `party.handout`'s default size and 1280 × 720 the attach row (Upload, From library) is visible without scrolling, for New and for Edit with 10 images (the strip wraps; the body keeps ≥ 4 visible rows; the editor's ScrollArea scrolls the rest). Paste / drop targets unchanged (the whole editor). The player view's order (images, then text) is unchanged. | OQ-PARTY-28 |
+
+### 6.9 Sprint 7: BL-48 copy and tabs (track FU)
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-PARTY-49 | **The inventory toast says inventory** (BL-48: "Party loot: Potion of healing ×2" for an item; amends FR-PARTY-19's text and [FR-CMP-41](compendium.md#6-functional-requirements)'s quote): `party.addItem`'s `loot-received` notification text becomes **"Party inventory: ‹name› ×‹qty›"** (`itemAddedText`, `@shared/party-board/format.ts`); coin and loot entries keep [FR-LOOT-13](party-loot.md#6-functional-requirements)'s "Party loot: …". Same kind, audience and payload; old notifications keep their stored text. The tests that pin the old string (`party-board.test.ts`, `e2e/cmp-add-to-party.e2e.ts`) change with it. | BL-48 |
+| FR-PARTY-50 | **Tabs keep their state** (BL-48: a half-typed Loot Move form is lost on a tab switch; amends FR-PARTY-11, -29): while `party.board` is open, its tabs (Handouts, Inventory, Loot, Companions) stay **mounted**, the hidden ones `hidden` (as FR-SHELL-36 does for minimised windows), so drafts (Loot add / Move forms, the Inventory Add form, a handout list's scroll) survive switching tabs; closing the window drops them (as today). Hidden tabs take no pointer or key events and aren't focusable. Outcome: type 5 gp and Mira → Party in Loot's Move form, switch to Inventory and back → the draft is still there ([FR-LOOT-29](party-loot.md#6-functional-requirements)). | BL-48 |
+
+- **BL-48 items dropped here, with the reason:** (1) the handout editor's Images picker below the fold: **fixed** in sprint 6 by FR-PARTY-48 (sim-10 d09: "From library" at y 211, visible without scrolling); the walkthrough re-checks it. (12) clipboard paste untested in Firefox / Edge: **dropped as a test change**: the e2e runs Chromium only (adding browsers is a tooling change outside this track), Edge is Chromium (the paste path is the same `ClipboardEvent` code), Firefox gets one manual line in the sprint-7 playtest section instead.
 
 ## 7. UI/UX notes
 

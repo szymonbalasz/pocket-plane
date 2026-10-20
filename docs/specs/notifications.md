@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: claimed
+status: in-review
 owner: spec-followups
 wave: 2
 phase: post-mvp-7
@@ -28,6 +28,13 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 |---|---|---|---|
 | FR-NOTE-42 | The DM stack stays in its top-centre band (moves down, not sideways) (proposed, OQ-NOTE-25 A) | WF2 | `FR-NOTE-42 stack stays home` |
 | FR-NOTE-43 | The DM stack never overlaps a hard keep-out (the active tool bar); recomputed when keep-outs change | WF2 | `FR-NOTE-43 never over a tool bar` |
+
+> **Sprint 7 (track FU, DM [#311](../decisions-log.md); session-sim-10 glitch 6; BL-48).** Decided, not open: the DM's pending toast no longer **covers the Scenes window's first row while windows are pushed** by the Fog bar (b05: Scenes pushed to 546, 60, the stack at its home on top of "Goblin Ambush"); the summary's count no longer disagrees with Initiative's "Pending (2)" (BL-48). Root cause of b05: the push (FR-SHELL-55) may end inside the DM's soft top-centre box, and the stack's last choice is "the least window body". New **FR-NOTE-44** (outcome; the push side is [FR-SHELL-82](play-shell.md#6-functional-requirements)), **FR-NOTE-45**. Client only, 0 B. Walkthrough U4, U17 in [play-shell §13](play-shell.md#13-test-plan); slices FU1 (`keep-out.ts` fallback), FU4 (summary text). No open question.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-NOTE-44 | The DM stack never covers a pushed window's first row | FU1 | `FR-NOTE-44 toast clear of a pushed window` |
+| FR-NOTE-45 | The DM summary also counts actions waiting for players | FU4 | `FR-NOTE-45 summary counts waiting` |
 
 ## 1. Summary
 
@@ -114,6 +121,8 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | **Sprint 6** (track WF; sim-9 b01, a01) | | |
 | FR-NOTE-42 | **The DM stack stays home** (proposed, OQ-NOTE-25 A; amends FR-NOTE-32 and the P3 / sim-6 candidate list in `dmStackPlacement`): the DM stack's candidate **lefts** are only its home, centred (`(vw − 320) / 2`: 480 / 480 / 560 / 640 at 1280×720 / 1280×800 / 1440×900 / 1600×900, [play-shell §7](play-shell.md#7-uiux-notes)), and FR-NOTE-32's left-of-Initiative shift; never x = 68 (the rail), beside other windows or beside tokens. Its **tops** stay as built (100, below title bars, below windows, around the cards' target tokens), so it moves **down** within its band. Choice as built: clear of Initiative, title bars and hard keep-outs (FR-NOTE-43), then the least area of the cards' target tokens (`avoidTokens`), then the least window body, ties → the earlier spot; nothing holds the whole stack above the launcher → the home row, clear of hard keep-outs (the runtime shows "+N more"). Covers every DM toast (summary, cards, info, alerts), not only the summary. Players unchanged. Pure in `keep-out.ts`. | sim-9 a01, b01 |
 | FR-NOTE-43 | **Never over a tool bar** (BL-40): a spot overlapping (≥ 1 px) a **hard** keep-out region (play-shell [FR-SHELL-48](play-shell.md#6-functional-requirements) (b): the active map tool bar `map.toolbar`, reported by scenes-map / fog-of-war) is not clear, like Initiative. `ToastRuntime.tsx` reads `useKeepOuts("dm")` and re-places the stack when the keep-outs change (a tool opens, closes, its bar wraps) as it does on window changes. Outcome: with any tool bar shown, `elementFromPoint` at the centre of each of its controls hits that control (sim-9: 6 / 16 Fog bar controls under the summary). The bar's max width already ends 8 px before the home band ([FR-MAP-60](scenes-map.md#6-functional-requirements)), so this bites only when the stack is shifted left of a moved Initiative; then it drops below the bar (top = bar bottom + 8). *(Under [OQ-MAP-57](scenes-map.md#15-open-questions) D or C, proposed)* the runtime also reports the stack's rendered rect through play-shell's `reportShownStack("note.toasts", rect \| null)` ([FR-SHELL-59](play-shell.md#6-functional-requirements)). | sim-9 b01 |
+| FR-NOTE-44 | **Never over a pushed window's first row** (sprint 7, sim-10 b05; amends FR-NOTE-42's "least window body"): outcome: with any map tool's bar shown and windows pushed by it (FR-SHELL-55), no DM toast covers the **title bar or the first 40 px of the body** of a rendered window. Means: **(1)** the push itself clears the DM's top-centre box when room exists ([FR-SHELL-82](play-shell.md#6-functional-requirements)); **(2)** fallback in `dmStackPlacement` (`keep-out.ts`): a rendered window whose `data-placed` is `pushed` counts like Initiative (FR-NOTE-32: not clear), so the stack shifts within its band or drops below that window's first 40 px of body before it takes "the least window body". Players unchanged. Outcome check (b05 repro): `elementFromPoint` at the centre of Scenes' first row hits the row. | sim-10 b05 |
+| FR-NOTE-45 | **The summary counts what waits for players** (sprint 7, BL-48: "1 pending action" toast while Initiative lists Pending (2); amends FR-NOTE-15's text, DM only): the DM's summary toast reads "N pending action(s)" for the DM's own as today and, when the started encounter also has pending notifications whose action owner is a player (the rows Initiative lists as "Waiting for …", FR-CBT-79), appends " · M waiting for players" (M ≥ 1; "1 waiting for a player"). So N + M = Initiative's "Pending (n)" for combat cards. Players: unchanged. `note-toast-pending-summary` gains `data-waiting` = M. | BL-48 |
 
 ## 7. UI/UX notes
 
@@ -263,6 +272,8 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 **Sprint 5 walkthrough:** [CAMP §13](campaign-management.md#13-test-plan) K7 (a player's test card striped in their colour on the DM's toast and row; "Resolved by DM" name in the DM colour; the DM's info to Player 2 striped amber), K10 (DM colour change restripes), K12 (reload, crash: stripes unchanged).
 
 **Sprint 6 walkthrough:** [play-shell §13](play-shell.md#13-test-plan) F0 (summary toast at its home after Reset layout), F5 (Fog / AoE / Structure bars fully reachable with the summary showing, at 1440×900 and 1280×720; the stack never at x 68), F6 (Initiative moved to x 600: the stack shifts left and clears the tool bar), F13 (reload, crash). Bundle `session-sim-9` (its "late-hit-ruled" card gives the DM's summary toast); no new fixture.
+
+**Sprint 7 (track FU):** bundle `fu-s7` (session-sim-10's "1 pending action" toast + Mira's late-hit card); walkthrough U4, U17 in [play-shell §13](play-shell.md#13-test-plan). Unit (`keep-out.test.ts`): `FR-NOTE-44 toast clear of a pushed window` (1440×900: Scenes `pushed` at 546, 60 in the band, Initiative at 1028 → the stack never overlaps Scenes' title bar or first 40 px; with no room in the band it drops below that strip). Client (`logic.test.ts`): `FR-NOTE-45 summary counts waiting` (DM with 1 own pending card + 1 player-owned concentration save in the started encounter → "1 pending action · 1 waiting for a player", `data-waiting="1"`; none waiting → today's text; players unchanged). Edge cases: the summary is computed at load / reconnect from the store (FR-NOTE-15), so a reconnect recounts; disconnect and crash: unchanged. CON-44: 0 B.
 
 ## 14. Dependencies
 

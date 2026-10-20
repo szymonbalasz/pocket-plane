@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: claimed
+status: in-review
 owner: spec-followups
 phase: post-mvp-7
 ---
@@ -11,6 +11,8 @@ phase: post-mvp-7
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Scope: DM decision [#203](../decisions-log.md) (sprint 3, track D). Builds on [dice-roll-log](dice-roll-log.md) (DICE); stub and tier table: [post-mvp/dice-extras](post-mvp/dice-extras.md).
 
 > **Sprint 6 (track PF; DM [#285](../decisions-log.md) [2]).** Settings move to a **Preferences window** ([play-shell](play-shell.md) FR-SHELL-70–76). *OQ-SHELL-47 decided A (#288)*: this spec registers a **Dice** section there: the existing settings panel (display, others' rolls, roll popups, "Dice look…"), same stores; the tray and popup gears stay as shortcuts (OQ-DICEX-48). New FR-DICEX-57, -58 (PF2). No server, record or storage change; 0 B. Walkthrough: [play-shell §13](play-shell.md#13-test-plan) P9, P10.
+
+> **Sprint 7 (track FU, BL-48; DM [#311](../decisions-log.md)).** Decided, not open: no stray spaces in dice text. New **FR-DICEX-63** (with [FR-DICE-78](dice-roll-log.md#6-functional-requirements)). Test `FR-DICEX-63 notation spacing` (unit over `notation.ts` and the popup line: no `"( "`, `" )"`, `"  "`); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. The sim-10 note "DM tray opens 360 × 248, not 300 × 240" is **dropped here**: 300 × 240 is the tray's min, its default is 360 × 300 (FR-DICEX-01), and the 248 came from auto placement's shrink, which play-shell's useful size now governs (FR-SHELL-79). Client only, 0 B. No open question.
 
 ## 1. Summary
 
@@ -184,6 +186,7 @@ phase: post-mvp-7
 | **Sprint 6** (track PF; if OQ-SHELL-47 A) | | |
 | FR-DICEX-57 | **Dice section in Preferences:** both clients register `dicex.dice` "Dice" (order 30) in their `pref-sections.ts` ([FR-SHELL-72](play-shell.md#6-functional-requirements)); its body is the existing `SettingsPanel` (Display Full screen / Tray throw / Flat / Off; "Show others' rolls"; "Roll popups"; "Dice look…" opening the look editor pane in place), laid out for the 360-px window. Same disabled states and reasons (no WebGL → 3D modes disabled with the reason; Dice look Save disabled unless `live`, FR-DICEX-27). | #285 [2] |
 | FR-DICEX-58 | **One store, two places:** the section and the tray / roll-popup gears read and write the same `pp.dicex.v2` entry (FR-DICEX-36) and the same `dice-look` record (FR-DICEX-26), so a change in one shows in the other at once (same tab; other tabs on their next read, as today). The gears stay (OQ-DICEX-48 A). No new key, field, intent or event. | FR-SHELL-76 |
+| FR-DICEX-63 | **Notation and breakdown spacing** (sprint 7, track FU; BL-48: "(3d6: 5 + 2 + 1 )"): the tray's staged notation text, the roll popup's breakdown and the flat zone's text (`@shared/dice-extras/notation.ts` and the popup line) follow [FR-DICE-78](dice-roll-log.md#6-functional-requirements)'s spacing rule (one space between tokens, none after "(" or before ")", none doubled or trailing); one shared joiner where both build the same text. The tray's and popup's sizes are unchanged (the DM tray opening at 360 × 248 in sim-10 is the shell's fit / shrink, covered by [FR-SHELL-79](play-shell.md#6-functional-requirements): `dicex.tray`'s useful size is its 360 × 300 default). | BL-48 |
 
 ### 6.1 Sprint 5 rule tables
 

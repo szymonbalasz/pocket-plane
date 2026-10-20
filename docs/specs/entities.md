@@ -1,7 +1,7 @@
 ---
 title: Entities (core)
 prefix: ENT
-status: claimed
+status: in-review
 owner: spec-followups
 wave: 2
 phase: post-mvp-7
@@ -36,6 +36,16 @@ phase: post-mvp-7
 | FR-ENT-32, -35, -39 | Make pet (server copy, CP0; dialog, CP1), caps, Creatures badge | CP0 / CP1 | `FR-ENT-32 make pet`, `FR-ENT-39 pet badge` |
 | FR-ENT-36 | Pet HP outside a fight | CP1 | `FR-ENT-36 pet HP` |
 | FR-ENT-37, -38 | Visibility: owner full (no `derivedFromId`), others a band **only while present**; the owner and the DM edit a pet's stats (#288) | CP0 (server), CP4 (card UI) | `FR-ENT-37 pet visibility`, `FR-ENT-37 pet presence` (leak scan), `FR-ENT-38 owner edits own pet` |
+
+### Sprint 7 at a glance (track FU, sprint-6 follow-ups; DM [#311](../decisions-log.md); session-sim-10 small copy)
+
+Decided, not open: the Creatures window cuts names ("Fire Elem…"); "Make pet from Drake Companion" on a pet row; the pet dialog's turn-mode radios lack names. Client only, 0 B; no open question. Walkthrough U15 in [play-shell §13](play-shell.md#13-test-plan) (bundle `fu-s7`); slices in [play-shell §14](play-shell.md#14-dependencies).
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-ENT-42 | Names wrap between words (≤ 2 lines), never "Fire Elem…" | FU4 `fix/fu-small-copy` | `FR-ENT-42 creature names whole` (DOM at 300 / 340 wide) |
+| FR-ENT-43 | A pet row reads "Copy as a new pet…" | FU4 | `FR-ENT-43 no Make pet on a pet` (pet row label; monster row unchanged) |
+| FR-ENT-44 | Pet dialog turn-mode radios have accessible names | FU2 | `FR-ENT-44 turn-mode radio names` (`getByRole("radio", {name})`) |
 
 ## 1. Summary
 
@@ -121,6 +131,9 @@ phase: post-mvp-7
 | FR-ENT-40 | **Fixtures**: `cp-srd`, `pet-owlbear`, `pet-drake`; bundles `companions-prep`, `companions` ([CBT §13.3](combat-tracker.md#133-sprint-6-track-cp-cbt-ent-charx-party-map)). | ADR-0017 |
 | **Sprint 6** (S6, track IM, image search) | | |
 | FR-ENT-41 | **Portrait picker searches and tags.** The creature form's **Portrait…** picker (DM; `src/client/dm/features/combat-tracker/creature-form.tsx`, New / Derive / Edit custom) is ASSET's `AssetPickerDialog` with `context="portrait"`: the search field (shared matcher over name and tags), the tag filter and the tag editor ([FR-ASSET-44–48](assets-pipeline.md#63-sprint-6-image-search-and-tags-track-im)); an upload there is tagged **Portraits** (FR-ASSET-41). `portraitAssetId`, `assets.require` (FR-ENT-08 / -11) and every visibility rule unchanged. **Not image pickers** (no search, no tags): the token **Art** menu (14 creature-type glyphs, FR-ENT-28); character portraits have no picker (fixtures / `PUT /api/entities` only, FR-ENT-10). The Creatures window filter already uses the shared matcher (FR-ENT-18; import path per [FR-CMP-54](compendium.md#6-functional-requirements)). | OQ-ASSET-23 |
+| FR-ENT-42 | **Creature names whole** (sprint 7, track FU; sim-10: "Fire Elem…", "Elite Goblin …" in the Creatures window; amends FR-ENT-18's row and #182 "the name wins"): a Creatures row's name (`ent-list-row-name`) wraps between words onto **up to two lines** at every window width ≥ the min (300), never an ellipsis within those two lines; the row's badge / kind / CR / XP line stays under it (as built). Only a name needing a third line ends that line with "…" plus a Tooltip with the full name. Outcome at the default 340 wide: "Fire Elemental", "Elite Goblin Warrior", "Drake Companion", "Goblin Lurker" whole. | sim-10 |
+| FR-ENT-43 | **Make pet on a pet row** (sprint 7; sim-10 "Make pet from Drake Companion" on a pet row; FR-ENT-32 allows another pet as base, unchanged): on a **pet** row the action reads **"Copy as a new pet…"** (`ent-pet-make`, aria-label "Copy ‹name› as a new pet"), so it no longer looks like making the pet a pet; on other monster rows it stays "Make pet…". Dialog unchanged. | sim-10 |
+| FR-ENT-44 | **Turn-mode radios have names** (sprint 7; sim-10: "After the owner" had no accessible name): the New pet / Make pet dialog's turn-mode radio items (`pet-dialog.tsx`) have accessible names = their labels ("After the owner", "In the owner's turn", "Own initiative"), as [FR-CBT-151](combat-tracker.md#6-functional-requirements) for the Summon… dialog. | sim-10 |
 
 ## 7. UI/UX notes
 

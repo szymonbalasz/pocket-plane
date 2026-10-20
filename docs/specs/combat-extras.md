@@ -1,7 +1,7 @@
 ---
 title: Combat extras
 prefix: CBTX
-status: claimed
+status: in-review
 owner: spec-followups
 phase: post-mvp-7
 ---
@@ -42,6 +42,13 @@ phase: post-mvp-7
 |---|---|---|---|
 | BL-43: the name is never cut, hidden + side chip included | FR-CBTX-57 | WF4 `fix/init-rows-s6` | `FR-CBTX-57 hidden ally name whole` |
 | BL-43: a trigger chip label is whole or icon-only | FR-CBTX-58 | WF4 | `FR-CBTX-58 trigger label never cut` |
+
+> **Sprint 7, track FU (owner spec-followups; DM [#311](../decisions-log.md); session-sim-10 glitch 10).** Decided, not open: the **"Concentrating: Conjure…" chip** is cut text in players' Initiative and on the sheet, and **does nothing on click** (the player had to find Active effects → End, a12). New **FR-CBTX-59–61**: the chip is whole or icon-only (as FR-CBTX-58 for triggers) and a click gives the concentrating PC's owner and the DM an **End concentration** (what else the click shows: [OQ-CBTX-30](#15-open-questions)). Client only, 0 B (the intent is today's `cbtx.endEffect`). Walkthrough U8 in [play-shell §13](play-shell.md#13-test-plan); slice FU2.
+
+| Need | FRs | Slice | Named test |
+|---|---|---|---|
+| Concentration chip whole or icon-only, everywhere it shows | FR-CBTX-59 | FU2 `fix/fu-combat-rows` | `FR-CBTX-59 concentration chip whole or icon-only` |
+| Click → menu with End concentration (proposed, OQ-CBTX-30 A) | FR-CBTX-60, -61 | FU2 | `FR-CBTX-60 chip click`, `FR-CBTX-61 end from the chip` |
 
 ## 2. Scope
 
@@ -159,6 +166,9 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 | FR-CBTX-57 | **The name line counts every fixed part** (BL-43; sim-9 c10 "Goblin Lur…"; amends FR-CBTX-54's fit and #182's "the name is never cut" to say how): on every Initiative row (DM and player, owned rows included), the room for chips on the name line = the line width − the name's natural width − the **fixed parts** that sit on it: the hidden marker (eye-off), the side chip (R4's Ally / Enemy, never folds), the turn / Moved cell where it shares the line, and the gaps. FR-CBTX-54's steps (1)–(4) run against that room. If the name plus its fixed parts alone don't fit on one line, the side chip and every chip move to the second line under the name (the hidden marker stays beside the name); a name longer than the whole line wraps onto two lines (never an ellipsis). Outcome: on `cbt-init-row` the name span (`cbt-init-row-name`) has `scrollWidth ≤ clientWidth` and no "…" at every window width ≥ min (320 DM / 280 player), for "Goblin Lurker" hidden + Ally and "Elite Goblin Warrior" hidden. | sim-9 c10 |
 | FR-CBTX-58 | **A trigger chip is whole or icon-only** (BL-43; sim-9 c03 / c10 "Searing Str… 1"; amends FR-CBTX-52, -54 (2)): a trigger chip (any MOD trigger the row shows: class features like Divine Fury, Sneak Attack, and spell-granted ones like Mira's Searing trigger) renders either its **full label** ("‹name› ‹uses›" plus the used look) or **icon-only** ("⚡‹uses›", `data-compact="true"`, Tooltip = the full state sentence, FR-CBTX-54 (2)); no CSS max-width or truncation on its label. The fit measures its full natural width to decide (not a capped width), so a label that would be cut goes icon-only. Same on player rows. | sim-9 c03, c10 |
 | FR-CBTX-56 | **One "Invisible" item on the token menu** (decided #256, OQ-CBTX-29 A; sim-8 #9: fog's Invisible toggle and Conditions ▸ Invisible sat side by side with different effects): the DM token menu's **Conditions ▸** (FR-CBTX-35) lists the 14 other conditions, **not Invisible**; the token menu's only Invisible item is fog's token state ([FR-FOG-59](fog-of-war.md#6-functional-requirements)). The Invisible **condition** stays where it is a reminder on the creature's row: Initiative row Conditions ▸ (FR-CBTX-33), the Effect… dialog's Condition tab, the sheet's effects section. Not coupled (#210 holds: the token state and the condition stay independent). | sim-8 #9 |
+| FR-CBTX-59 | **Concentration chip whole or icon-only** (sprint 7, sim-10 glitch 10: "Conjure..." in players' Initiative, "Concentrating: Conjur..." on the sheet; amends FR-CBTX-34, -46's "One chip ≤ 96 px (ellipsis)" for concentration): wherever a concentration chip shows (DM and player Initiative rows, companion lines, the sheet's `cbtx.effects` chip row, the companion card's conditions), it renders either its **full label** (brain icon + "Conjure Elemental", + "10r" when timed; on the sheet "Concentrating: Conjure Elemental", wrapping to a second line rather than cutting) or **icon-only** (brain icon + "10r", `data-compact="true"`), decided by measuring its full natural width against the room (FR-CBTX-57); no CSS max-width or ellipsis on its label. Tooltip on hover and on keyboard focus ([FR-SHELL-84](play-shell.md#6-functional-requirements)): "Concentrating: Conjure Elemental · 10 rounds left" (untimed: no rounds). Other chips keep FR-CBTX-46's rules. | sim-10 a12, r00 |
+| FR-CBTX-60 | **Concentration chip click** (sprint 7; proposed, [OQ-CBTX-30](#15-open-questions) **A**): for the **DM** and the **owner** of the concentrating PC, a click (or Enter / Space when focused) on its concentration chip opens a small menu (`cbtx-conc-menu`): heading "Concentrating: Conjure Elemental" + "10 rounds left" if timed; a muted line naming what ends with it, from the viewer's store: linked effects ("Ends with it: Bless on Mira") and, for the DM and the summons' owner, linked summons ("Fire Elemental 3"); **End concentration** (`cbtx-conc-end`); the DM also **Edit…** (today's Concentration dialog). Other players: no menu (their chip is focusable for its Tooltip only). Disabled while not `live` (live-sync). *(If OQ-CBTX-30 B: the click opens the sheet's Active effects tab with the row highlighted. If C: no click; only FR-CBTX-59's whole label + Tooltip.)* | sim-10 a12 |
+| FR-CBTX-61 | **End from the chip** (sprint 7): **End concentration** sends today's `cbtx.endEffect {effectId}` (FR-CBTX-08: DM, or the owning player for their own PC's concentration), with exactly Active effects' End (`mod-active-end`) behaviour: linked effects end (FR-CBTX-10), a linked summon's concentration card for the DM ([FR-CBT-120](combat-tracker.md#6-functional-requirements)), `EffectsEnded`; the menu closes on ack; a reject → Toast. No confirm (as Active effects' End). | sim-10 a12 |
 
 ## 7. UI/UX notes
 
@@ -345,6 +355,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 **Sprint 6, track WF:** bundle **`session-sim-9`** (its planned "Escort to the Ford" starts Goblin Lurker as a hidden Ally; Mira carries the Searing trigger; Goblin Ambush has ≥ 7 rows); no new fixture. Unit / DOM (`parts.test.tsx`, DM `row.test.tsx`, player row test; widths 400 / 320 / 280): `FR-CBTX-57 hidden ally name whole` ("Goblin Lurker" hidden + Ally chip at 400 and 320 → name `scrollWidth ≤ clientWidth`, no "…"; at 320 the Ally chip moves to the second line if the line can't hold name + eye-off + chip; "Elite Goblin Warrior" hidden with 2 effects → chips wrap, name whole; a 40-character name at 280 → two lines, never an ellipsis; player rows the same; the fit's room = width − name − fixed parts, asserted on the pure fit helper with stubbed widths); `FR-CBTX-58 trigger label never cut` (Mira's Searing trigger + "uses 1" at 400 → full label, `scrollWidth ≤ clientWidth`; at 320 → icon-only "⚡1" with the Tooltip sentence; a used trigger keeps muted + check; no element under `cbtx-trigger-chip` has `text-overflow: ellipsis`; the sprint-5 `FR-CBTX-54` cases still pass). Walkthrough F10 in [play-shell §13](play-shell.md#13-test-plan) (c03 / c10 repro at 1440×900, Initiative default and 320 wide).
 
+**Sprint 7, track FU:** bundle **`fu-s7`** (= `session-sim-10` + `cp-ally` + `fu-hurt-goblins`; Thorn concentrates on "Conjure Elemental" linked to Fire Elemental 3, from `cp-combat`); fixtures and walkthrough U8 in [play-shell §13](play-shell.md#13-test-plan). Unit / DOM (`parts.test.tsx`, player row test, `sheet-sections.test.tsx`; widths 400 / 320 / 280 and the sheet at 280 / 320): `FR-CBTX-59 concentration chip whole or icon-only` (Thorn's chip: full label or `data-compact`, never `text-overflow`; Tooltip text with and without rounds; sheet label wraps); `FR-CBTX-60 chip click` (`player-2` owner and DM get `cbtx-conc-menu` with the heading, "Ends with it" for linked effects and, DM / owner only, Fire Elemental 3; `player-1` gets no menu; Enter / Space open it; disabled while not `live`); `FR-CBTX-61 end from the chip` (integration: `cbtx-conc-end` → `cbtx.endEffect` → the effect ends, linked ones too, the DM's `cbt-summon-concentration` card appears; another player's send → `forbidden`). **Edge cases:** disconnect → menu items disabled; reconnect / reload → the chip re-renders from the store; crash mid-end → today's `cbtx.endEffect` transaction (all or nothing). **CON-44: 0 B** (no field; today's intent and event).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -405,6 +417,10 @@ Split and order in [MOD §14.3](effect-modifiers.md#143-build-split-sprint-4-tra
 - **WF4** `fix/init-rows-s6` (FR-CBTX-57, -58 + [FR-CBT-125](combat-tracker.md#6-functional-requirements)): own files only: common `parts.tsx` (fit room with fixed parts; trigger chip full or icon-only, no truncation), DM `row.tsx`, the player Initiative row, combat-tracker's `below-fold.tsx` and the two Initiative list viewports. No shared file (AGENTS §9.9), no server, schema, event or wire change (0 B). Starts at once, parallel with every WF slice. **Order on these files** *(settled by seams S4, S11)*: WF4 merges **before CP2 `build/cp-turns`** (CP2 starts once CP0 and WF4 are on `main`); CP2's in-owner-turn companion line and owner chips pass FR-CBTX-57 / -58's tests. CP3 edits CBTX's Add files and one `effectHooks` line: disjoint from WF4's files. Full split: [play-shell §14](play-shell.md#14-dependencies).
 - **Edge cases:** client-only layout: disconnect, reconnect, reload and crash re-render the rows from the store, no state to lose; a row whose side changes secretly (R4) re-fits on the next render (players never see the chip, so their fit is unchanged).
 
+### Shared changes — sprint 7 (track FU)
+
+- **FU2** `fix/fu-combat-rows` ([play-shell §14](play-shell.md#14-dependencies)): own files: common `parts.tsx` (concentration chip fit + menu), `logic.ts` (`chipText` / compact label), `sheet-sections.tsx` (the chip on the sheet), DM `row.tsx`, the player Initiative row. No server, schema, event or protocol change.
+
 ## 15. Open questions
 
 Sprint-1 rows: all decided (the DM accepted every pick, #178; the D/S seam rows were settled by the orchestrator before the gate and accepted with it). Sprint-2 rows: all decided (#190 for OQ-CBTX-22 and -25; seam rulings for -23 and -24). **Sprint 4:** badge content and audience are MOD's OQ-MOD-40 / -41 (DM, gate); OQ-CBTX-26 below is cross-spec, non-blocking.
@@ -448,6 +464,12 @@ Sprint-1 rows: all decided (the DM accepted every pick, #178; the D/S seam rows 
 | OQ-CBTX-29 | **Which "Invisible" stays on the DM token menu** (sim-8 #9; #210) | **Decided (#256): A, fog's token state; Conditions ▸ drops Invisible; the condition stays on Initiative rows, Effect… and the sheet** (FR-CBTX-56, FR-FOG-59). Rejected: B rename fog's item, C one item setting both | — | FR-CBTX-56, FR-FOG-59 |
 
 **Sprint 6, track WF:** no open question (BL-43's outcome decided, #286; FR-CBTX-54's order unchanged).
+
+**Sprint 7, track FU** (owner spec-followups). Decided before the spec (not open): the chip is never cut and does something on click (#311). **Bold** = suggested pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CBTX-30 | **What the concentration chip does on click** (sim-10 a12: nothing; the player found Active effects → End) | **A. A small menu for the DM and the PC's owner: "Concentrating: Conjure Elemental · 10 rounds left", what ends with it (linked effects, summons), End concentration (+ Edit… for the DM); others: Tooltip only: the chip is where people look, one click to end** / B. Open the sheet's Active effects tab with the row highlighted: one place to end effects, but a window jump from Initiative / C. Nothing; only the whole label + Tooltip: no new control, ending stays in Active effects | no · owner: DM | FR-CBTX-60, -61 |
 
 ## 16. Out of scope
 
