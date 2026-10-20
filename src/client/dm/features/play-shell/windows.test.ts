@@ -1,4 +1,6 @@
 import { expect, mock, test } from "bun:test";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { emptyStore } from "@shared/protocol/store";
 import { freeArea, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
@@ -10,15 +12,29 @@ import {
   launcherMetrics,
 } from "@ui/features/play-shell/launcher-fit";
 import {
+  bruteBest,
+  contractProblems,
+  type LayoutStep,
   launcherKinds,
   launcherSequence,
+  layoutRun,
+  placeFields,
   REFERENCE_VIEWPORTS,
   rectIn,
 } from "@ui/features/play-shell/layout-checks";
 import { defaultLayout, reduce, restoreLayout } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
-import { availableKinds, defaultSizeAt } from "@ui/features/play-shell/registry";
+import {
+  availableKinds,
+  createWindowRegistry,
+  defaultSizeAt,
+  type WindowDef,
+  type WindowRegistry,
+} from "@ui/features/play-shell/registry";
+import { createShellController } from "@ui/features/play-shell/shell-store";
+import { createLayoutStorage } from "@ui/features/play-shell/storage";
+import { ambushTokens } from "@ui/features/play-shell/test-cells";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
 import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
@@ -686,4 +702,163 @@ test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order 
       ).toBe("ok");
     }
   }
+});
+
+// ---- sprint 6: reopen rule, footprints, token-free spots, contract, golden layouts ----
+// (FR-SHELL-56, -58, -61, -62; play-shell §13 sprint 6)
+
+const FULL_CHAIN = [...REFERENCE_VIEWPORTS].reverse(); // 1600×900 → 1440×900 → 1280×800 → 1280×720
+const ambush = (vp: { w: number; h: number }, windows: readonly Rect[]) =>
+  ambushTokens("dm", vp, windows);
+
+/** In-memory shell controller on `registry` (what the page runs), at `vp`. */
+function shellAt(registry: WindowRegistry, vp: { w: number; h: number }) {
+  const backend = new Map<string, string>();
+  const storage = createLayoutStorage(() => ({
+    getItem: (k) => backend.get(k) ?? null,
+    setItem: (k, v) => void backend.set(k, v),
+  }));
+  const c = createShellController({ registry, storage, viewport: () => vp });
+  c.restore("k");
+  return c;
+}
+
+test("FR-SHELL-56 reopen covered vs free spot (DM, protected): Initiative closed, Compendium moved into its spot, Initiative reopened → Initiative at its stored rect (stored), Compendium re-placed clear of it (auto) or auto-minimised", () => {
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    const at = `${viewport.w}×${viewport.h}`;
+    const c = shellAt(dmWindows, viewport);
+    const all = allKinds();
+    const home = rectIn(c.store.getState().windows, "cbt.initiative");
+    c.dispatch({ type: "close", kind: "cbt.initiative" }, all);
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all);
+    c.dispatch({ type: "toggle", kind: "cbt.initiative" }, all); // the launcher button
+    const s = c.store.getState();
+    expect({ at, init: rectIn(s.windows, "cbt.initiative") }).toEqual({ at, init: home });
+    expect(s.placed.get("cbt.initiative:main")).toBe("stored");
+    const cmp = s.windows.find((w) => w.kind === "cmp.compendium");
+    if (cmp?.state === "open") {
+      expect(overlaps(cmp, home) ? `Compendium still over Initiative at ${at}` : "ok").toBe("ok");
+      expect(s.placed.get("cmp.compendium:main")).toBe("auto");
+    } else {
+      expect(cmp?.state).toBe("minimised");
+    }
+    // A launcher window's own reopen: onto Initiative → `reopened`; then clear → `stored`.
+    c.dispatch({ type: "close", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all); // stored only
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    expect(c.store.getState().placed.get("cmp.compendium:main")).toBe("reopened");
+    c.dispatch({ type: "close", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    expect(c.store.getState().placed.get("cmp.compendium:main")).toBe("stored");
+  }
+});
+
+test("FR-SHELL-58 token-free spot first (DM, sim-9 a01): 1440×900, Initiative + Game log, the Goblin Ambush at its fit → Compendium covers no token while a clear spot over none exists, and no PC footprint", () => {
+  const layout = defaultLayout(dmWindows, WIDE);
+  const rects = renderedWindowRects(layout, dmWindows, allKinds(), WIDE);
+  const tokens = ambush(WIDE, rects);
+  const { steps } = launcherSequence(dmWindows, WIDE, ["cmp.compendium"], { avoid: () => tokens });
+  const cmp = steps[0]?.rect;
+  const def = dmWindows.get("cmp.compendium");
+  if (!cmp || !def) throw new Error("Compendium not open");
+  const scene = { windows: rects, hard: [], tokens };
+  expect(bruteBest(def, WIDE, scene)).toEqual([0, 0, 0, 0]); // such a spot exists here
+  expect(placeFields(cmp, def, WIDE, scene)).toEqual([0, 0, 0, 0]);
+});
+
+/** FR-SHELL-61 (5): stand-ins for PF's Preferences until PF1 registers the real line (S2, S3). */
+const PREFS_STUB = {
+  kind: "shell.prefs",
+  title: "Preferences",
+  clients: ["dm", "player"],
+  defaultSize: { w: 360, h: 560 },
+  minSize: { w: 320, h: 280 },
+  minOpenH: 400,
+  defaultPosition: { anchor: "top-right", dx: 12 },
+  component: () => null,
+} satisfies WindowDef;
+
+/** The DM registry with this sprint's new windows: the real lines once merged, else the stubs. */
+const withNewWindows = (): WindowRegistry =>
+  dmWindows.get(PREFS_STUB.kind)
+    ? dmWindows
+    : createWindowRegistry("dm", [...dmWindows.defs, PREFS_STUB]);
+
+/** FR-SHELL-62 (d): the DM's non-default product kinds on `main` when WF1 started, in registry order. */
+const GOLDEN_KINDS = [
+  "camp.players",
+  "ent.creatures",
+  "map.scenes",
+  "note.history",
+  "char.sheet",
+  "cbt.encounters",
+  "dicex.tray",
+  "party.board",
+  "cmp.compendium",
+];
+
+/** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */
+const userOpened = (registry: WindowRegistry) =>
+  registry.defs.filter((d) => !d.defaultOpen).map((d) => d.kind);
+
+const runs = (registry: WindowRegistry, kinds: readonly string[]) =>
+  FULL_CHAIN.flatMap((_, i) =>
+    layoutRun(registry, {
+      viewports: FULL_CHAIN.slice(i),
+      kinds,
+      available: new Set(registry.defs.map((d) => d.kind)),
+      tokensAt: ambush,
+      protectedKind: "cbt.initiative",
+    }),
+  );
+
+const problemsOf = (steps: readonly LayoutStep[]) =>
+  steps
+    .filter((s) => s.problems.length > 0)
+    .map((s) => `${s.step} ${s.vp.w}×${s.vp.h} ${s.kind}: ${s.problems.join("; ")}`);
+
+test("FR-SHELL-61 every user-opened kind (DM): every non-default kind, launcher or not, test-mode included, opens through openWindow and passes FR-SHELL-62's invariants with Preferences registered; a new kind keeps the contract", () => {
+  const registry = withNewWindows();
+  const kinds = userOpened(registry);
+  expect(kinds).toContain("shell.prefs");
+  expect(kinds).toContain("party.handout"); // no launcher button
+  expect(kinds).toContain("shell.test"); // test mode
+  expect(problemsOf(runs(registry, kinds))).toEqual([]);
+  for (const kind of kinds.filter((k) => !GOLDEN_KINDS.includes(k))) {
+    const def = registry.get(kind);
+    if (!def || def.fixedDefault || kind === "party.handout") continue;
+    expect({ kind, problems: contractProblems(def) }).toEqual({ kind, problems: [] });
+  }
+  // The stand-ins at the S3 numbers pass; a 480-wide one doesn't.
+  expect(contractProblems(PREFS_STUB)).toEqual([]);
+  expect(contractProblems({ ...PREFS_STUB, defaultSize: { w: 480, h: 300 } })).toEqual([
+    "width 480 at 1280×720",
+    "width 480 at 1280×800",
+    "width 480 at 1440×900",
+    "width 480 at 1600×900",
+  ]);
+});
+
+const GOLDEN_FILE = fileURLToPath(new URL("./windows.golden.json", import.meta.url));
+
+test("FR-SHELL-62 golden layouts (DM): four sizes, open / close / reopen / smaller viewport / protected reopen; invariants + brute check, golden rects per kind (UPDATE_GOLDEN=1 rewrites), deterministic", () => {
+  const t0 = performance.now();
+  const steps = runs(dmWindows, GOLDEN_KINDS);
+  expect(problemsOf(steps)).toEqual([]);
+  // Same inputs → same rects.
+  expect(runs(dmWindows, GOLDEN_KINDS)).toEqual(steps);
+  const golden = steps.map((s) => ({
+    at: `${s.step} @${s.vp.w}×${s.vp.h} ${s.kind}`,
+    rect: s.rect && `${s.rect.x},${s.rect.y},${s.rect.w}×${s.rect.h}`,
+    placed: s.placed,
+    parked: s.parked.join(","),
+  }));
+  if (process.env.UPDATE_GOLDEN === "1") {
+    writeFileSync(GOLDEN_FILE, `${JSON.stringify(golden, null, 2)}\n`);
+  }
+  expect(golden).toEqual(JSON.parse(readFileSync(GOLDEN_FILE, "utf8")));
+  console.info(
+    `FR-SHELL-62 DM: ${steps.length} steps in ${(performance.now() - t0).toFixed(0)} ms`,
+  );
 });

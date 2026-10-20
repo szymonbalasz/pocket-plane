@@ -505,11 +505,12 @@ describe("sprint 4: feature vs user opens, restoreOpen (FR-SHELL-08, -41, -42)",
     expect(order(next).at(-1)).toBe("a.one");
   });
 
-  test('FR-SHELL-08 user opens keep the stored rect (no `by`, or `by: "user"`), even over a window', () => {
+  test('FR-SHELL-08 FR-SHELL-56 (5) a protected window, user-opened (no `by`, or `by: "user"`) keeps its stored rect, even over a window; the window over it moves', () => {
     const ws = covered();
     const stored = get(ws, "a.one");
     for (const by of [undefined, "user"] as const) {
-      const one = get(run(ws, { type: "open", kind: "a.one", by }), "a.one");
+      const next = run(ws, { type: "open", kind: "a.one", by });
+      const one = get(next, "a.one");
       expect(one).toMatchObject({
         state: "open",
         x: stored.x,
@@ -517,6 +518,8 @@ describe("sprint 4: feature vs user opens, restoreOpen (FR-SHELL-08, -41, -42)",
         w: stored.w,
         h: stored.h,
       });
+      expect(overlap(one, get(next, "a.two"))).toBe(false);
+      expect(get(next, "a.two").state).toBe("open");
     }
     // The launcher toggle is a user open too.
     expect(get(run(ws, { type: "toggle", kind: "a.one" }), "a.one")).toMatchObject({
@@ -571,5 +574,190 @@ describe("sprint 4: feature vs user opens, restoreOpen (FR-SHELL-08, -41, -42)",
       const opened = get(reduce(windows, { type: "open", kind: "a.viewer" }, all), "a.viewer");
       expect(opened).toMatchObject({ state: "open", x: 700, y: 300, w: 320, h: 240 });
     }
+  });
+});
+
+describe("sprint 6: reopen rule (FR-SHELL-56)", () => {
+  const overlap = (a: Rect, b: Rect) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const rectOf = (w: WindowState): Rect => ({ x: w.x, y: w.y, w: w.w, h: w.h });
+  /** `a.two` open, moved to `spot`, then closed (or minimised); `a.three` open at `other`. */
+  const stage = (spot: Rect, other: Rect, how: "close" | "minimise" = "close") =>
+    run(
+      defaultLayout(registry, vp),
+      { type: "open", kind: "a.two" },
+      { type: "setRect", kind: "a.two", rect: spot },
+      { type: how, kind: "a.two" },
+      { type: "open", kind: "a.three" },
+      { type: "setRect", kind: "a.three", rect: other },
+    );
+  const spot = { x: 400, y: 300, w: 300, h: 200 };
+
+  test("FR-SHELL-56 reopen covered vs free spot: a clear stored rect is kept; one overlapping an open window by 1 px is auto-placed, clear, written with its area", () => {
+    const free = stage(spot, { x: 700, y: 300, w: 300, h: 200 }); // touching, not overlapping
+    const kept = get(run(free, { type: "open", kind: "a.two" }), "a.two");
+    expect(rectOf(kept)).toEqual(spot);
+    expect(kept.state).toBe("open");
+    const by1 = stage(spot, { x: 699, y: 300, w: 300, h: 200 });
+    for (const action of [
+      { type: "open", kind: "a.two" },
+      { type: "open", kind: "a.two", by: "user" },
+      { type: "toggle", kind: "a.two" },
+    ] as const) {
+      const next = run(by1, action);
+      const two = get(next, "a.two");
+      expect(two.state).toBe("open");
+      expect(rectOf(two)).not.toEqual(spot);
+      expect(overlap(two, get(next, "a.three"))).toBe(false);
+      expect(overlap(two, get(next, "a.one"))).toBe(false);
+      expect(two.area).toEqual(workArea(vp));
+      expect(serialise(next, registry).windows.find((w) => w.kind === "a.two")).toEqual(two);
+      // The next reopen starts from the new spot: it is clear, so it is kept.
+      const again = run(next, { type: "close", kind: "a.two" }, { type: "open", kind: "a.two" });
+      expect(rectOf(get(again, "a.two"))).toEqual(rectOf(two));
+    }
+  });
+
+  test("FR-SHELL-56 covered (OQ-SHELL-41 A): the DM's soft box or a token under the stored rect doesn't count; a hard region (the players' corner, a reported tool bar) does", () => {
+    const ws = stage(spot, { x: 1000, y: 600, w: 200, h: 100 });
+    const soft = { id: "toasts", rect: { ...spot, x: spot.x + 100 }, kind: "soft" as const };
+    const withSoft = { ...ctx, keepOuts: () => [soft], avoid: () => [{ ...spot, w: 50, h: 50 }] };
+    expect(rectOf(get(reduce(ws, { type: "open", kind: "a.two" }, withSoft), "a.two"))).toEqual(
+      spot,
+    );
+    const bar = {
+      id: "map.toolbar",
+      rect: { x: 380, y: 290, w: 100, h: 40 },
+      kind: "hard" as const,
+    };
+    const withBar = { ...ctx, keepOuts: () => [soft, bar] };
+    const moved = get(reduce(ws, { type: "open", kind: "a.two" }, withBar), "a.two");
+    expect(overlap(moved, bar.rect)).toBe(false);
+    // The players' toast corner (hard by default for a player registry).
+    const players = createWindowRegistry(
+      "player",
+      registry.defs.map((d) => ({ ...d, clients: ["player" as const] })),
+    );
+    const pctx: ManagerContext = { ...ctx, registry: players };
+    const corner = { x: 1228, y: 590, w: 356, h: 238 }; // toastKeepOut("player", 1600×900)
+    const over = { x: 1100, y: 560, w: 300, h: 200 };
+    const pgo = (w0: Windows, ...as: WindowAction[]) =>
+      as.reduce((acc, a) => reduce(acc, a, pctx), w0);
+    const pws = pgo(
+      defaultLayout(players, vp),
+      { type: "open", kind: "a.two" },
+      { type: "setRect", kind: "a.two", rect: over },
+      { type: "close", kind: "a.two" },
+    );
+    const back = get(reduce(pws, { type: "open", kind: "a.two" }, pctx), "a.two");
+    expect(overlap(back, corner)).toBe(false);
+  });
+
+  test("FR-SHELL-56 a minimised (auto-minimised) window restored onto a spot now taken is re-placed; screen full parks the least recently used other window, never itself", () => {
+    const big = { defaultSize: { w: 600, h: 584 }, minSize: { w: 600, h: 584 } };
+    const full = createWindowRegistry("dm", [
+      def("b.one", big),
+      def("b.two", big),
+      def("b.three", big),
+    ]);
+    const small = { w: 1280, h: 720 };
+    const fctx: ManagerContext = {
+      registry: full,
+      viewport: small,
+      available: new Set(["b.one", "b.two", "b.three"]),
+    };
+    const go = (ws: Windows, ...as: WindowAction[]) =>
+      as.reduce((acc, a) => reduce(acc, a, fctx), ws);
+    // Three 600-wide windows; the screen holds two: b.one is auto-minimised for b.three.
+    const ws = go(
+      [],
+      ...["b.one", "b.two", "b.three"].map((kind) => ({ type: "open", kind }) as const),
+    );
+    expect(ws.map((w) => w.state)).toEqual(["minimised", "open", "open"]);
+    const stored = rectOf(get(ws, "b.one"));
+    expect(overlap(stored, get(ws, "b.three"))).toBe(true); // its spot is b.three's now
+    const back = go(ws, { type: "open", kind: "b.one" });
+    expect(back.map((w) => w.state)).toEqual(["open", "minimised", "open"]);
+    expect(overlap(get(back, "b.one"), get(back, "b.three"))).toBe(false);
+  });
+
+  test("FR-SHELL-56 bring to front of an open window never moves it, even when it overlaps another", () => {
+    const ws = run(
+      stage(spot, { x: 450, y: 350, w: 300, h: 200 }),
+      { type: "open", kind: "a.two" }, // re-placed (covered)
+      { type: "setRect", kind: "a.two", rect: spot }, // the user drags it back over a.three
+    );
+    for (const action of [
+      { type: "open", kind: "a.two" },
+      { type: "focus", kind: "a.two" },
+      { type: "toggle", kind: "a.two" },
+    ] as const) {
+      const two = get(run(ws, action), "a.two");
+      expect(rectOf(two)).toEqual(spot);
+    }
+  });
+
+  test("FR-SHELL-56 a stored rect from 1440×900 shown at 1280×720 (fitted, FR-SHELL-29) is tested as shown", () => {
+    const small = { w: 1280, h: 720 };
+    const sctx: ManagerContext = { ...ctx, viewport: small };
+    const stored = {
+      kind: "a.two",
+      instance: "main",
+      state: "closed" as const,
+      x: 1100,
+      y: 300,
+      w: 300,
+      h: 200,
+      z: 2,
+      area: workArea({ w: 1440, h: 900 }),
+    };
+    expect(renderedRect(stored, { w: 200, h: 100 }, small)).toEqual({
+      x: 980,
+      y: 300,
+      w: 300,
+      h: 200,
+    });
+    const other = (x: number) => ({
+      kind: "a.three",
+      instance: "main",
+      state: "open" as const,
+      x,
+      y: 320,
+      w: 60,
+      h: 60,
+      z: 1,
+      area: workArea(small),
+    });
+    // Overlaps the shown rect (980…1280), not the stored one (1100…1400): re-placed.
+    const moved = get(
+      reduce([other(1000), stored], { type: "open", kind: "a.two" }, sctx),
+      "a.two",
+    );
+    expect(moved.x).not.toBe(1100);
+    expect(overlap(renderedRect(moved, { w: 200, h: 100 }, small), other(1000))).toBe(false);
+    // Left of the shown rect: clear, so the stored rect is kept as stored (its fit stays render-only).
+    const kept = get(reduce([other(900), stored], { type: "open", kind: "a.two" }, sctx), "a.two");
+    expect(rectOf(kept)).toEqual({ x: 1100, y: 300, w: 300, h: 200 });
+  });
+
+  test("FR-SHELL-56 (6) applying the layout on load re-places nothing, overlaps included", () => {
+    const entry = {
+      windows: [
+        { kind: "a.one", instance: "main", state: "open", x: 400, y: 300, w: 300, h: 200, z: 1 },
+        { kind: "a.two", instance: "main", state: "open", x: 450, y: 350, w: 300, h: 200, z: 2 },
+        {
+          kind: "a.three",
+          instance: "main",
+          state: "minimised",
+          x: 420,
+          y: 320,
+          w: 300,
+          h: 200,
+          z: 3,
+        },
+      ],
+    };
+    const r = restoreLayout(registry, JSON.stringify(entry), vp);
+    expect(r.windows.map(rectOf)).toEqual(entry.windows.map((w) => rectOf(w as WindowState)));
   });
 });
