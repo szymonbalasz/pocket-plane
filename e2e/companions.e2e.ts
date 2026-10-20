@@ -3,12 +3,13 @@
 // the running ambush. The DM opens Mira's row → Summon for Mira…, types "fire el" (the shared
 // matcher finds the SRD Fire Elemental), Summon: its row sits right after Mira with Mira's owner
 // chip (FR-CBT-110, -118). Player-1 sees its HP and the card icon, player-2 a band and no card
-// (FR-CBT-116, -119). The DM's Companion ▸ Dismiss takes it out of the fight for everyone
-// (FR-CBT-112). The owner's card + attack is CP4's (the companion card); rules, redaction, leaks
-// and crashes: bun test (summon, concentration-card, summon-sync, summon-crash).
+// (FR-CBT-116, -119). Player-1 opens its card and attacks with Touch; the DM applies the card on
+// the Goblin (FR-CBT-114). Player-1 dismisses it from the card: gone for everyone (FR-CBT-112).
+// Rules, redaction, leaks and crashes: bun test (summon, concentration-card, summon-sync,
+// summon-crash).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -29,7 +30,7 @@ const rowOrder = (init: Locator) =>
     .getByTestId("cbt-init-row")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
 
-test("FR-CBT-110 FR-CBT-112 FR-CBT-118 companions-e2e: Summon for Mira…, owner sees HP + card icon, others a band; Dismiss", async ({
+test("FR-CBT-110 FR-CBT-112 FR-CBT-114 FR-CBT-118 companions-e2e: Summon for Mira…, owner sees HP + card icon, others a band; card attack applied; owner Dismiss", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
@@ -86,11 +87,38 @@ test("FR-CBT-110 FR-CBT-112 FR-CBT-118 companions-e2e: Summon for Mira…, owner
   await expect(row(i2, fe).getByTestId("cbt-init-row-card")).toHaveCount(0);
   await expect(row(i2, fe).getByTestId("cbt-init-row-owner")).toHaveText("Mira");
 
-  // C8 (DM path): Companion ▸ Dismiss → gone for A, B, C.
-  await row(init, fe).getByTestId("cbt-init-row-menu").first().click();
-  await dm.getByTestId("cbt-init-row-companion").click();
-  await dm.locator(`[data-testid="cbt-companion-dismiss"][data-record-id="${fe}"]`).click();
+  // C6: player-1 opens its card from the row's icon; Touch "Attack + damage" → a player card in
+  // the DM's Initiative (FR-CBT-114, FR-CHARX-64); the DM targets the Goblin and applies.
+  await row(i1, fe).getByTestId("cbt-init-row-card").click();
+  const card = shellWindow(p1, "charx.companion");
+  await expect(card.getByTestId("charx-companion-name")).toHaveText("Fire Elemental");
+  await expect(card.getByTestId("charx-companion-owner")).toHaveText("Mira's summon");
+  await expect(card.getByTestId("charx-companion-edit")).toHaveCount(0); // a summon
+  const touch = card.getByTestId("charx-companion-attack").filter({ hasText: "Touch" });
+  await touch.locator('[data-testid="charx-companion-roll"][data-value="attack"]').click();
+  const pending = init.getByTestId("cbt-init-card").filter({ hasText: "Fire Elemental" });
+  await expect(pending).toHaveCount(1);
+  await pending.click();
+  const popup = dm.getByTestId("cbt-popup");
+  const goblin = await idByName(init, "Goblin");
+  await popup.getByTestId("cbt-popup-target-add").click();
+  await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${goblin}"]`).click();
+  const trow = popup.locator(`[data-testid="cbt-popup-target-row"][data-record-id="${goblin}"]`);
+  const hit = trow.getByTestId("cbt-popup-target-hit");
+  if ((await hit.getAttribute("data-value")) === "miss") await hit.click();
+  await popup.getByTestId("cbt-popup-damage").fill("5");
+  await popup.getByTestId("cbt-popup-apply").click();
+  await expect(popup).toHaveCount(0);
+  await expect(pending).toHaveCount(0);
+
+  // C8: player-1 dismisses its summon from the card (FR-CBT-112) → gone for A, B, C.
+  await card.getByTestId("cbt-companion-dismiss").click();
+  await expect(card.getByTestId("cbt-companion-dismiss-text")).toContainText(
+    "Dismiss Fire Elemental?",
+  );
+  await card.getByTestId("cbt-companion-dismiss-confirm").click();
   for (const w of [init, i1, i2]) await expect(row(w, fe)).toHaveCount(0);
+  await expect(card.getByTestId("charx-companion-gone")).toContainText("No longer your companion");
 
   for (const p of [p1, p2, dm]) await p.context().close();
 });
