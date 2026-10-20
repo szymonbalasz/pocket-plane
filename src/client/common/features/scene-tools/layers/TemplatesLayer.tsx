@@ -6,16 +6,17 @@
 // FR-SCN-41; cut to the map) tinted in its person's player colour (kept: the placer, null = the
 // DM; ephemeral: the sender; own: the own; FR-SCN-47), the shape's true outline (off-grid allowed)
 // over a dark casing (FR-MAP-72) and a label pill at the origin: a colour dot + "‹label› · N
-// squares", plus " · by ‹name›" while hovered or selected. With the AoE tool: an origin handle on
-// every template this client may edit, and an end handle on the selected one. DM: hidden /
-// DM-only ones in `visibility.hidden` styling (OQ-SCN-41 A); the "DM-only items" switch
-// (`dm-only`) drops hidden ones. No pointer events: the AoE tool works on the stage; the label
-// hover is read from the stage's pointer. Konva: name `scn-template`, id = record ID or
-// `eph-<key>`, attrs `shape`, `cells` ("c,r c,r …"), `origin` ("x,y"), `angle`, `ephemeral`,
-// `color` (the drawn hex), `by` (player id | `dm`); `map-casing` (id = template id) under the
-// outline; label `scn-template-label` (id = template id) with `scn-template-label-dot`; handles
-// `scn-template-handle-origin` / `-end` (id = template id). Mounts the right-click menu island
-// (FR-SCN-48; the press routing is MapCanvas', FR-MAP-71).
+// squares", plus " · by ‹name›" while hovered (its area or its pill, FR-SCN-52) or selected.
+// With the AoE tool: an origin handle on every template this client may edit, and an end handle
+// on the selected one. DM: hidden / DM-only ones in `visibility.hidden` styling (OQ-SCN-41 A);
+// the "DM-only items" switch (`dm-only`) drops hidden ones. No pointer events: the AoE tool works
+// on the stage; the hover is read from the stage's pointer. Konva: name `scn-template`, id =
+// record ID or `eph-<key>`, attrs `shape`, `cells` ("c,r c,r …"), `origin` ("x,y"), `angle`,
+// `ephemeral`, `color` (the drawn hex), `by` (player id | `dm`); `map-casing` (id = template id)
+// under the outline; label `scn-template-label` (id = template id; `hovered` = true while
+// hovered) with `scn-template-label-dot`; handles `scn-template-handle-origin` / `-end` (id =
+// template id). Mounts the right-click menu island (FR-SCN-48; the press routing is MapCanvas',
+// FR-MAP-71).
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
@@ -23,6 +24,7 @@ import {
   type TemplateRecordView,
   TemplateSignalData,
 } from "@shared/scene-tools/schemas";
+import type { Grid } from "@shared/scenes-map/geometry";
 import Konva from "konva";
 import { type RefObject, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Line, Rect, Shape, Text } from "react-konva";
@@ -51,6 +53,7 @@ import {
   type GridPoint,
   keptView,
   mapPx,
+  type PillRect,
   pickableTemplates,
   pruneEphemerals,
   receiveTemplate,
@@ -60,6 +63,7 @@ import {
   templateColor,
   templateHandles,
   templateOutline,
+  templateUnder,
 } from "../templates";
 
 interface Drawn {
@@ -121,6 +125,7 @@ function TemplateLabel({
   squares,
   color,
   named,
+  hovered,
 }: {
   d: Drawn;
   x: number;
@@ -128,6 +133,7 @@ function TemplateLabel({
   squares: number;
   color: string;
   named: boolean;
+  hovered: boolean;
 }) {
   const { cam, colors, store } = useCanvas();
   const s = cam.scale;
@@ -142,7 +148,7 @@ function TemplateLabel({
   const lead = pad + dot;
   const h = font + 2 * pad;
   return (
-    <Group x={x} y={y} name="scn-template-label" id={d.id}>
+    <Group x={x} y={y} name="scn-template-label" id={d.id} {...(hovered && { hovered: true })}>
       <Rect
         width={lead + textWidth(text, font, pad)}
         height={h}
@@ -283,6 +289,7 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
         squares={cells.length}
         color={stroke}
         named={hovered || d.selected === true}
+        hovered={hovered}
       />
     </Group>
   );
@@ -296,38 +303,48 @@ function previewOf(r: TemplateRecordView, g: AoeGesture | null): TemplateView {
 }
 
 /**
- * FR-SCN-47: the template whose label pill is under the pointer, read from the stage's pointer
- * (the layer takes no pointer events, so tools and press routing are unchanged).
+ * FR-SCN-52: the template under the pointer (its area + 6 px or its label pill), read from the
+ * stage's pointer (the layer takes no pointer events, so tools and press routing are unchanged).
+ * No hover while a button is held (dragging). The pills are read as drawn, so the hovered one is
+ * tested grown: no flicker when it widens.
  */
-function useLabelHover(groupRef: RefObject<Konva.Group | null>): string | null {
+function useTemplateHover(
+  groupRef: RefObject<Konva.Group | null>,
+  drawn: readonly Drawn[],
+  scale: number,
+  grid: Grid,
+): string | null {
   const [hovered, setHovered] = useState<string | null>(null);
+  const latest = useRef({ drawn, scale, grid });
+  latest.current = { drawn, scale, grid };
   useEffect(() => {
-    const stage = groupRef.current?.getStage();
-    if (!stage) return;
-    const onMove = () => {
+    const group = groupRef.current;
+    const stage = group?.getStage();
+    if (!group || !stage) return;
+    const onMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
       const p = stage.getPointerPosition();
-      let hit: string | null = null;
-      for (const n of groupRef.current?.find(".scn-template-label") ?? []) {
-        const r = n.getClientRect();
-        if (p && p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height) {
-          hit = n.id();
-        }
+      if (!p || (e.evt?.buttons ?? 0) !== 0) return setHovered(null);
+      const at = group.getAbsoluteTransform().copy().invert().point(p);
+      const pills: Record<string, PillRect> = {};
+      for (const n of group.find(".scn-template-label")) {
+        pills[n.id()] = n.getClientRect({ relativeTo: group });
       }
-      setHovered(hit);
+      const { drawn: d, scale: s, grid: g } = latest.current;
+      setHovered(templateUnder(at, d, s, g, pills));
     };
     const onLeave = () => setHovered(null);
-    stage.on("mousemove.scnTemplateLabel", onMove);
-    stage.on("mouseleave.scnTemplateLabel", onLeave);
+    stage.on("mousemove.scnTemplateHover", onMove);
+    stage.on("mouseleave.scnTemplateHover", onLeave);
     return () => {
-      stage.off("mousemove.scnTemplateLabel", onMove);
-      stage.off("mouseleave.scnTemplateLabel", onLeave);
+      stage.off("mousemove.scnTemplateHover", onMove);
+      stage.off("mouseleave.scnTemplateHover", onLeave);
     };
   }, [groupRef]);
   return hovered;
 }
 
 export function ScnTemplatesLayer() {
-  const { client, scene, store, myPlayerId, live, activeTool } = useCanvas();
+  const { client, scene, store, myPlayerId, live, activeTool, cam, grid } = useCanvas();
   const groupRef = useRef<Konva.Group>(null);
   const dmOnlyOff = useLayerToggles((s) => s.off["dm-only"] === true);
   const own = useAoe((s) => s.own);
@@ -416,7 +433,7 @@ export function ScnTemplatesLayer() {
       handle: toolOn,
     });
   }
-  const hovered = useLabelHover(groupRef);
+  const hovered = useTemplateHover(groupRef, drawn, cam.scale, grid);
   return (
     <Group ref={groupRef} name="scn-templates" listening={false}>
       {drawn.map((d) => (

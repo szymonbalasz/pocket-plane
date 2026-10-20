@@ -4,7 +4,8 @@
 // (≤ 20 sends/s while dragging, repeated every 1 s at rest, `end` on Clear / Esc / Keep;
 // FR-SCN-23), the receivers' store (dropped on `end`, on a snapshot or after 3 s of silence; one
 // per sender connection; drawn only for the shown scene), who may edit a kept template
-// (FR-SCN-26) and the right-click menu's hit test and items (FR-SCN-48, -49).
+// (FR-SCN-26), the right-click menu's hit test and items (FR-SCN-48, -49) and the label hover
+// (FR-SCN-52).
 import type { SignalFrom } from "@shared/protocol/frames";
 import type { RecordStore } from "@shared/protocol/store";
 import {
@@ -380,8 +381,48 @@ export function templateAt<
     if (!canEditTemplate(t, o.client, o.myPlayerId)) continue;
     if (t.hidden && (o.client !== "dm" || o.dmOnlyOff)) continue;
     if (o.blind && (o.myPlayerId === null || t.placedByPlayerId !== o.myPlayerId)) continue;
-    if (contains(templateArea(t), g.x, g.y)) return t;
-    if (outlineDistance(templateOutline(t, o.grid), p.x, p.y) <= tol) return t;
+    if (isUnder(t, p, g, tol, o.grid)) return t;
+  }
+  return null;
+}
+
+/** FR-SCN-49 / -52: map point `p` (grid units `g`) inside `t`'s true outline or within `tol` map px. */
+function isUnder(t: TemplateGeometry, p: GridPoint, g: GridPoint, tol: number, grid: Grid) {
+  return (
+    contains(templateArea(t), g.x, g.y) ||
+    outlineDistance(templateOutline(t, grid), p.x, p.y) <= tol
+  );
+}
+
+/** A label pill's rect in map px (as drawn now: grown while hovered or selected). */
+export interface PillRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * FR-SCN-52: the id of the template the pointer hovers: the topmost (last in draw order) drawn
+ * template whose true outline (uncut, as `templateAt`) contains map point `p` or lies within 6
+ * screen px of it, or whose label pill (`pills`, as drawn: the hovered one grown) contains `p`.
+ * Every drawn template counts, editable or not (no `templateAt` edit filter); else null. Because
+ * the hovered pill is passed grown, hover ends only once `p` leaves both its area and that rect.
+ */
+export function templateUnder(
+  p: GridPoint,
+  drawn: readonly { id: string; template: TemplateGeometry }[],
+  scale: number,
+  grid: Grid,
+  pills: Readonly<Record<string, PillRect>> = {},
+): string | null {
+  const g = gridPoint(grid, p.x, p.y);
+  const tol = TEMPLATE_HIT_PX / scale;
+  for (let i = drawn.length - 1; i >= 0; i--) {
+    const d = drawn[i] as (typeof drawn)[number];
+    const r = pills[d.id];
+    if (r && p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height) return d.id;
+    if (isUnder(d.template, p, g, tol, grid)) return d.id;
   }
   return null;
 }
