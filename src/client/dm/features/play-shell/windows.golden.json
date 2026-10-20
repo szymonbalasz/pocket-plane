@@ -60,6 +60,12 @@
     "parked": "dicex.tray,party.board"
   },
   {
+    "at": "open @1600×900 charx.companion",
+    "rect": "1268,572,320×252",
+    "placed": "auto",
+    "parked": ""
+  },
+  {
     "at": "reopen @1600×900 camp.players",
     "rect": "776,372,400×200",
     "placed": "stored",
@@ -118,6 +124,12 @@
     "rect": "816,60,360×512",
     "placed": "reopened",
     "parked": "dicex.tray,party.board"
+  },
+  {
+    "at": "reopen @1600×900 charx.companion",
+    "rect": "1268,572,320×252",
+    "placed": "stored",
+    "parked": ""
   },
   {
     "at": "reopen 1440×900 @1440×900 camp.players",
@@ -180,6 +192,12 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1440×900 @1440×900 charx.companion",
+    "rect": "68,60,320×262",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 camp.players",
     "rect": "68,100,400×200",
     "placed": "reopened",
@@ -240,6 +258,12 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×800 @1280×800 charx.companion",
+    "rect": "514,176,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "68,100,400×200",
     "placed": "stored",
@@ -298,6 +322,12 @@
     "rect": "400,60,360×324",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "68,60,320×360",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -372,6 +402,12 @@
     "parked": "party.board"
   },
   {
+    "at": "open @1440×900 charx.companion",
+    "rect": "68,60,320×262",
+    "placed": "auto",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1440×900 camp.players",
     "rect": "616,372,400×200",
     "placed": "stored",
@@ -430,6 +466,12 @@
     "rect": "656,60,360×512",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen @1440×900 charx.companion",
+    "rect": "68,60,320×262",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×800 @1280×800 camp.players",
@@ -492,6 +534,12 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen 1280×800 @1280×800 charx.companion",
+    "rect": "514,176,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "68,100,400×200",
     "placed": "stored",
@@ -550,6 +598,12 @@
     "rect": "400,60,360×324",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "68,60,320×360",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -624,6 +678,12 @@
     "parked": "party.board"
   },
   {
+    "at": "open @1280×800 charx.companion",
+    "rect": "514,176,320×240",
+    "placed": "auto",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1280×800 camp.players",
     "rect": "68,100,400×200",
     "placed": "stored",
@@ -684,6 +744,12 @@
     "parked": "party.board"
   },
   {
+    "at": "reopen @1280×800 charx.companion",
+    "rect": "514,176,320×240",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "68,100,400×200",
     "placed": "stored",
@@ -742,6 +808,12 @@
     "rect": "400,60,360×324",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "68,60,320×360",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -816,6 +888,12 @@
     "parked": "party.board"
   },
   {
+    "at": "open @1280×720 charx.companion",
+    "rect": "68,60,320×360",
+    "placed": "default",
+    "parked": "cmp.compendium"
+  },
+  {
     "at": "reopen @1280×720 camp.players",
     "rect": "68,132,400×340",
     "placed": "stored",
@@ -874,6 +952,12 @@
     "rect": "400,60,360×324",
     "placed": "reopened",
     "parked": "party.board"
+  },
+  {
+    "at": "reopen @1280×720 charx.companion",
+    "rect": "68,60,320×360",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
   },
   {
     "at": "protected @1280×720 camp.players",

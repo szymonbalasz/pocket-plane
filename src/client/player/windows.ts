@@ -4,6 +4,7 @@
 import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
+import { playerCompanionWindow } from "./features/character-sheet/companion-window";
 import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { playerInitiativeWindow } from "./features/combat-tracker/initiative-window";
 import { playerCompendiumWindow } from "./features/compendium/compendium-window";
@@ -26,6 +27,7 @@ const windows: WindowDef[] = [
   { ...playerHandoutWindow, restoreOpen: false }, // party.handout (party-board, FR-PARTY-14; FR-SHELL-42)
   playerCompendiumWindow, // cmp.compendium (compendium, FR-CMP-18)
   prefsWindow("player", playerPrefSections), // shell.prefs, no launcher (play-shell, FR-SHELL-71)
+  playerCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);
