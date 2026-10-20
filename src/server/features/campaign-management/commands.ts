@@ -1,5 +1,7 @@
 // campaign-management commands (CAMP §6, §9). All DM-only; REST and fixtures call them. The one
 // WS intent, `camp.setColor` (sprint 5), is in `colors.ts`.
+
+import { DM_DEFAULT_COLOR } from "@shared/campaign-management/colors";
 import {
   AddPlayerBody,
   CreateCampaignBody,
@@ -51,10 +53,17 @@ export const createCampaign = defineCommand({
     const id = ctx.ids.next();
     const now = ctx.clock.iso();
     const becomesActive = activeCampaign(tx) === null;
-    // FR-CAMP-24: a new campaign starts at the column default (amber).
+    // FR-CAMP-24, -34: a new campaign starts at Amber, written as hex (never the DB default).
     const row = tx
       .insert(campaign)
-      .values({ id, name, active: becomesActive, createdAt: now, updatedAt: now })
+      .values({
+        id,
+        name,
+        active: becomesActive,
+        dmColor: DM_DEFAULT_COLOR,
+        createdAt: now,
+        updatedAt: now,
+      })
       .returning()
       .get();
     const rec = toCampaignRecord(row);

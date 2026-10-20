@@ -14,6 +14,8 @@ export default defineBundle({
     // IM-1: 24 tagged library images + 2 attachments (Ruined Keep holds the DM tag `zz-lair-secret`)
     "image-tags",
     // PF: Preferences, free colour, Subtract
+    // PF0: Player 2 lavender `#b388ff` (one DM `camp.setColor`; Blue and Sky blocked for Player 1)
+    "pc-colour-free",
     // CP: companions + summons
     // CP0: the SRD Owlbear and Fire Elemental (imported, DM-only; CP1 / CP3 add the pets and the fight)
     "cp-srd",

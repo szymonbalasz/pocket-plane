@@ -6,6 +6,7 @@ import images from "./assets-pipeline/images";
 import imagesSecond from "./assets-pipeline/images-second";
 import campaign from "./campaign-management/campaign";
 import campaignSecond from "./campaign-management/campaign-second";
+import pcColourFree from "./campaign-management/pc-colour-free";
 import pcColours from "./campaign-management/pc-colours";
 import player1 from "./campaign-management/player-1";
 import player2 from "./campaign-management/player-2";
@@ -190,6 +191,7 @@ export const units: readonly Fixture[] = [
   encFriendly,
   logColours,
   noteColours,
+  pcColourFree,
   // Sprint 6 track CP (fix/cp-core): companions
   cpSrd,
   petOwlbear,

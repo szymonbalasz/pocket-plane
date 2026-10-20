@@ -1,9 +1,16 @@
-// `colorOf` (CAMP FR-CAMP-28, ADR-0055): a person's player colour, looked up from the `player` /
-// `campaign` records the store already holds; the hex comes from the theme token
-// `--player-<key>` (fallback: the palette). Every surface that marks a person (laser, pings,
-// templates, drag paths, log names, notification stripes) calls this with the person it already
-// carries; nothing copies a colour onto its own rows or frames.
-import { isPlayerColor, PLAYER_COLORS, type PlayerColor } from "@shared/campaign-management/colors";
+// `colorOf` (CAMP FR-CAMP-28, -36, ADR-0055): a person's player colour, looked up from the
+// `player` / `campaign` records the store already holds: a stored `#rrggbb` as is; an old palette
+// key via the theme token `--player-<key>` (fallback: the palette). Every surface that marks a
+// person (laser, pings, templates, drag paths, log names, notification stripes) calls this with
+// the person it already carries; nothing copies a colour onto its own rows or frames, and no
+// caller switches on palette keys (seams S8).
+import {
+  isPaletteKey,
+  normalizeColor,
+  type PaletteKey,
+  PLAYER_COLORS,
+  paletteKeyOf,
+} from "@shared/campaign-management/colors";
 import type { CampaignRecord, PlayerRecord } from "@shared/campaign-management/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { useSync } from "@ui/sync/store";
@@ -34,7 +41,7 @@ export const readCssVar: ReadVar = (name) => {
   return v;
 };
 
-export const playerColorVar = (key: PlayerColor) => `--player-${key}`;
+export const playerColorVar = (key: PaletteKey) => `--player-${key}`;
 
 type Records = Pick<RecordStore, "you" | "records">;
 
@@ -46,24 +53,38 @@ function dmColorKey(store: Records): string | undefined {
   return (own ?? Object.values(byId)[0])?.dmColor;
 }
 
-/** The person's palette key, or null (system actor, unknown player, unknown key). */
-export function colorKeyOf(store: Records, person: ColorPerson): PlayerColor | null {
-  if (person.role === "system") return null;
-  const key =
-    person.role === "dm"
-      ? dmColorKey(store)
-      : (store.records.player?.[person.playerId ?? ""] as PlayerRecord | undefined)?.color;
-  return isPlayerColor(key) ? key : null;
-}
-
-/** The hex of a palette key: the theme token, else the palette value. */
-export function colorHex(key: PlayerColor, read: ReadVar = readCssVar): string {
-  return read(playerColorVar(key)) || PLAYER_COLORS[key];
+/** The person's stored colour as the record holds it (hex, or an old key), or undefined. */
+function storedColor(store: Records, person: ColorPerson): unknown {
+  if (person.role === "system") return undefined;
+  return person.role === "dm"
+    ? dmColorKey(store)
+    : (store.records.player?.[person.playerId ?? ""] as PlayerRecord | undefined)?.color;
 }
 
 /**
- * FR-CAMP-28: the person's colour; an unknown player or key (old client, deleted row) → the role
- * accent; the system actor → null (neutral: draw nothing person-coloured).
+ * The person's colour as a `data-color` value: a palette colour (or an old key) → its palette
+ * name ("rose"), any other valid colour → its lowercase hex; null for the system actor, an
+ * unknown player or an unreadable value. Feed it to `colorHex` to paint.
+ */
+export function colorKeyOf(store: Records, person: ColorPerson): string | null {
+  const hex = normalizeColor(storedColor(store, person));
+  return hex ? (paletteKeyOf(hex) ?? hex) : null;
+}
+
+/**
+ * The CSS colour of a hex or a palette key (FR-CAMP-36): a key → its theme token, else the
+ * palette value; a hex → lowercase as is; anything else is returned unchanged (callers pass
+ * `colorKeyOf`'s result, already checked).
+ */
+export function colorHex(color: string, read: ReadVar = readCssVar): string {
+  if (isPaletteKey(color)) return read(playerColorVar(color)) || PLAYER_COLORS[color];
+  return normalizeColor(color) ?? color;
+}
+
+/**
+ * FR-CAMP-36: the person's colour as a CSS colour string: a stored `#rrggbb` as is; an old
+ * palette key → its palette hex (theme token); anything else (old client, deleted row, unknown
+ * value) → the role accent; the system actor → null (neutral: draw nothing person-coloured).
  */
 export function colorOf(
   store: Records,
@@ -71,8 +92,10 @@ export function colorOf(
   read: ReadVar = readCssVar,
 ): string | null {
   if (person.role === "system") return null;
-  const key = colorKeyOf(store, person);
-  if (key) return colorHex(key, read);
+  const stored = storedColor(store, person);
+  if (isPaletteKey(stored)) return colorHex(stored, read);
+  const hex = normalizeColor(stored);
+  if (hex) return hex;
   return read(ROLE_ACCENT_VAR[person.role]) || ROLE_ACCENT_FALLBACK[person.role];
 }
 

@@ -9,10 +9,14 @@ def resolve(path):
     blocks = pat.findall(s)
     if not blocks:
         print(path, "no conflicts"); return
+    # main's highest section number over the whole file (outside our side of every hunk), so a branch
+    # section never lands on a number main already uses in another hunk or in clean text
+    mains = pat.sub(lambda m: m.group(2), s)
+    mtop = max((int(n) for n in re.findall(r"^## (\d+)\.", mains, re.M)), default=None)
     def sub(m):
         ours, theirs = m.group(1), m.group(2)
         nums = [int(n) for n in re.findall(r"^## (\d+)\.", theirs, re.M)]
-        top = max(nums) if nums else None
+        top = mtop if nums else None
         ren = {}
         if top is not None:
             def bump(mm):

@@ -2,13 +2,12 @@
 // player colour, read from the entry's `rollerRole` / `rollerPlayerId` (never its payload);
 // every other kind, the system actor and a roller without a `player` record stay neutral (the
 // default text colour: no role accent in text). The log and the roll popup share the rule.
-import type { PlayerColor } from "@shared/campaign-management/colors";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { useCallback } from "react";
 import { useSync } from "../../sync/store";
 import { type ColorPerson, colorHex, colorKeyOf } from "../campaign-management/colors";
 
-export type ColorKeyOf = (person: ColorPerson) => PlayerColor | null;
+export type ColorKeyOf = (person: ColorPerson) => string | null;
 
 /**
  * `colorKeyOf` bound to the live store: re-renders on a `player` / `campaign` change (a colour
@@ -28,7 +27,7 @@ export function useColorKeyOf(): ColorKeyOf {
 type RollerFields = Pick<GameLogEntryView, "kind" | "rollerRole" | "rollerPlayerId">;
 
 /** FR-DICE-60: the roller's key on a `roll` entry; null (neutral) for every other kind. */
-export const rollerColorKey = (keyOf: ColorKeyOf, e: RollerFields): PlayerColor | null =>
+export const rollerColorKey = (keyOf: ColorKeyOf, e: RollerFields): string | null =>
   e.kind === "roll" ? keyOf({ role: e.rollerRole, playerId: e.rollerPlayerId }) : null;
 
 /** `data-roller`: the roller's player id, or `dm`. */

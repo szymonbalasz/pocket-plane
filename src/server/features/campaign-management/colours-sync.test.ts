@@ -4,6 +4,7 @@
 // `color` key on a signal frame (ADR-0055: 0 B per signal).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
+import { PLAYER_COLORS } from "@shared/campaign-management/colors";
 import type { CampaignRecord, PlayerRecord } from "@shared/campaign-management/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { ServerFrame } from "@shared/protocol/frames";
@@ -51,6 +52,8 @@ afterAll(async () => {
 });
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
+const { amber, jade, sky, rose, yellow, blue } = PLAYER_COLORS;
+const HEX = /^#[0-9a-f]{6}$/;
 const P1 = () => ({ role: "player" as const, token: p["Player 1"].linkToken });
 const P2 = () => ({ role: "player" as const, token: p["Player 2"].linkToken });
 const colors = (c: TestClient) =>
@@ -102,16 +105,17 @@ describe("FR-CAMP-29 colours visibility (player-colours)", () => {
     const dm = await h.live(DM);
     const b = await h.live(P1());
     const c = await h.live(P2());
-    const want = { "Player 1": "jade", "Player 2": "blue" };
+    // Sprint 6 (FR-CAMP-30, -37): every colour on the wire is a lowercase #rrggbb.
+    const want = { "Player 1": jade, "Player 2": blue };
     for (const x of [dm, b, c]) {
       expect(colors(x)).toEqual(want);
-      expect(dmColor(x)).toBe("amber");
+      expect(dmColor(x)).toBe(amber);
     }
 
     // Player 1 picks rose: one `player` upsert to everyone, logged.
     const logN = readEventLog(db).length;
     expect(
-      (await reply(b, "camp.setColor", { playerId: p["Player 1"].id, color: "rose" })).type,
+      (await reply(b, "camp.setColor", { playerId: p["Player 1"].id, color: rose })).type,
     ).toBe("ack");
     for (const x of [dm, b, c]) {
       const f = await eventOf(x, "PlayerColorSet");
@@ -124,11 +128,11 @@ describe("FR-CAMP-29 colours visibility (player-colours)", () => {
             id: p["Player 1"].id,
             campaignId: p["Player 1"].campaignId,
             name: "Player 1",
-            color: "rose",
+            color: rose,
           },
         },
       ]);
-      expect(colors(x)).toEqual({ "Player 1": "rose", "Player 2": "blue" });
+      expect(colors(x)).toEqual({ "Player 1": rose, "Player 2": blue });
     }
     expect(
       readEventLog(db)
@@ -137,23 +141,34 @@ describe("FR-CAMP-29 colours visibility (player-colours)", () => {
     ).toEqual(["PlayerColorSet"]);
 
     // The DM moves to yellow: one `campaign` upsert to everyone.
-    expect((await reply(dm, "camp.setColor", { playerId: null, color: "yellow" })).type).toBe(
-      "ack",
-    );
+    expect((await reply(dm, "camp.setColor", { playerId: null, color: yellow })).type).toBe("ack");
     for (const x of [dm, b, c]) {
       const f = await eventOf(x, "PlayerColorSet");
       expect(f.changes.map((ch) => [ch.type, ch.op])).toEqual([["campaign", "upsert"]]);
-      expect(dmColor(x)).toBe("yellow");
+      expect(dmColor(x)).toBe(yellow);
     }
 
-    // Rejects: taken, someone else's, the DM colour, a bad key — nothing reaches anyone.
+    // Rejects: taken, too close, someone else's, the DM colour, a key, a rule broken (FR-CAMP-33)
+    // — nothing reaches anyone.
     const rejects = [
-      [c, { playerId: p["Player 2"].id, color: "rose" }, "conflict", "Taken by Player 1"],
-      [c, { playerId: p["Player 2"].id, color: "yellow" }, "conflict", "Taken by DM"],
-      [c, { playerId: p["Player 1"].id, color: "sky" }, "forbidden", undefined],
-      [c, { playerId: null, color: "sky" }, "forbidden", undefined],
-      [dm, { playerId: p["Player 2"].id, color: "rose" }, "conflict", "Taken by Player 1"],
-      [dm, { playerId: p["Player 2"].id, color: "teal" }, "invalid", undefined],
+      [c, { playerId: p["Player 2"].id, color: rose }, "conflict", "Taken by Player 1"],
+      [c, { playerId: p["Player 2"].id, color: yellow }, "conflict", "Taken by DM"],
+      [
+        c,
+        { playerId: p["Player 2"].id, color: "#e08ab9" },
+        "conflict",
+        "Too close to Player 1's colour",
+      ],
+      [c, { playerId: p["Player 1"].id, color: sky }, "forbidden", undefined],
+      [c, { playerId: null, color: sky }, "forbidden", undefined],
+      [dm, { playerId: p["Player 2"].id, color: rose }, "conflict", "Taken by Player 1"],
+      [dm, { playerId: p["Player 2"].id, color: "rose" }, "invalid", undefined],
+      [
+        dm,
+        { playerId: p["Player 2"].id, color: "#3d6ec9" },
+        "invalid",
+        "Too dark to read on the map",
+      ],
     ] as const;
     for (const [x, payload, code, message] of rejects) {
       const f = await reply(x, "camp.setColor", payload);
@@ -176,8 +191,14 @@ describe("FR-CAMP-29 colours visibility (player-colours)", () => {
     // Reconnect: the snapshot carries every colour; stores converge; leak scans clean.
     b.close();
     const b2 = await h.live(P1());
-    expect(colors(b2)).toEqual({ "Player 1": "rose", "Player 2": "blue" });
-    expect(dmColor(b2)).toBe("yellow");
+    expect(colors(b2)).toEqual({ "Player 1": rose, "Player 2": blue });
+    expect(dmColor(b2)).toBe(yellow);
+    // Leak strings (CAMP §13 sprint 6): every colour a player frame carries is #rrggbb.
+    for (const x of [b, b2, c]) {
+      for (const m of x.raw().matchAll(/"(?:color|dmColor)":"([^"]*)"/g)) {
+        expect(m[1]).toMatch(HEX);
+      }
+    }
     for (const [live, cred] of [
       [dm, DM],
       [c, P2()],
@@ -195,8 +216,8 @@ describe("FR-CAMP-29 colours visibility (player-colours)", () => {
   test("FR-CAMP-29 colours visibility: after a restart the snapshot keeps every colour", async () => {
     await h.restart();
     const x = await h.live(P2());
-    expect(colors(x)).toEqual({ "Player 1": "rose", "Player 2": "blue" });
-    expect(dmColor(x)).toBe("yellow");
+    expect(colors(x)).toEqual({ "Player 1": rose, "Player 2": blue });
+    expect(dmColor(x)).toBe(yellow);
     noTokens(x);
     x.close();
   }, 30_000);

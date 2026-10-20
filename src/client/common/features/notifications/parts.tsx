@@ -1,6 +1,5 @@
 // Shared pieces of rows and toasts: body (icon + text or the kind's renderer), action runner,
 // the causer's colour stripe (FR-NOTE-39, -41).
-import type { PlayerColor } from "@shared/campaign-management/colors";
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { BellIcon } from "lucide-react";
@@ -39,7 +38,7 @@ export function NoteBody({ n, views }: { n: NotificationRecord; views: Notificat
  * Re-renders on a colour change (restripe, OQ-CAMP-21).
  */
 export function useNoteStripe(n: NotificationRecord): {
-  color: PlayerColor | null;
+  color: string | null;
   attrs: { "data-by"?: string; "data-color"?: string };
 } {
   const keyOf = useColorKeyOf();
@@ -52,7 +51,7 @@ export function useNoteStripe(n: NotificationRecord): {
  * The 3 px left stripe, inside the box's border (the parent is `relative`; a pending row's accent
  * border stays). Decoration only: the text names the person where it matters (OQ-CAMP-25).
  */
-export function NoteStripe({ color }: { color: PlayerColor | null }) {
+export function NoteStripe({ color }: { color: string | null }) {
   if (!color) return null;
   return (
     <span

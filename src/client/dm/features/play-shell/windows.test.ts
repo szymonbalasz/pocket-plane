@@ -1,4 +1,6 @@
 import { expect, mock, test } from "bun:test";
+import { readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { emptyStore } from "@shared/protocol/store";
 import { freeArea, freeAreas, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
@@ -10,15 +12,30 @@ import {
   launcherMetrics,
 } from "@ui/features/play-shell/launcher-fit";
 import {
+  bruteBest,
+  contractProblems,
+  type LayoutStep,
   launcherKinds,
   launcherSequence,
+  layoutRun,
+  placeFields,
   REFERENCE_VIEWPORTS,
   rectIn,
+  rectOf,
 } from "@ui/features/play-shell/layout-checks";
 import { defaultLayout, reduce, restoreLayout } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
-import { fittedDefaultRect } from "@ui/features/play-shell/placement";
-import { availableKinds, defaultSizeAt } from "@ui/features/play-shell/registry";
+import { fittedDefaultRect, placeWindow } from "@ui/features/play-shell/placement";
+import {
+  availableKinds,
+  createWindowRegistry,
+  defaultSizeAt,
+  type WindowDef,
+  type WindowRegistry,
+} from "@ui/features/play-shell/registry";
+import { createShellController } from "@ui/features/play-shell/shell-store";
+import { createLayoutStorage } from "@ui/features/play-shell/storage";
+import { ambushTokens } from "@ui/features/play-shell/test-cells";
 import { toastKeepOut } from "@ui/features/play-shell/toast-region";
 import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
@@ -156,15 +173,23 @@ test("FR-SHELL-45 FR-SHELL-46 FR-SHELL-47 sim-8 sequence (DM, Initiative + Game 
   for (const s of laptop.steps) expect(s.rect).toEqual({ x: 68, y: 60, w: 440, h: 412 });
 });
 
-test("FR-SHELL-47 screen full (DM): the auto-minimised window is written minimised; a user restore reopens at its stored rect", () => {
+test("FR-SHELL-47 FR-SHELL-56 screen full (DM): the auto-minimised window is written minimised; a user restore onto its taken spot re-places it, parking the least recently used other window", () => {
   const seq = ["cmp.compendium", "party.board", "cbt.encounters"];
   const { windows } = launcherSequence(dmWindows, WIDE, seq);
   const cmp = windows.find((w) => w.kind === "cmp.compendium");
   expect(cmp?.state).toBe("minimised");
   const ctx = { registry: dmWindows, viewport: WIDE, available: allKinds() };
   const back = reduce(windows, { type: "open", kind: "cmp.compendium" }, ctx);
-  expect(rectIn(back, "cmp.compendium")).toEqual({ x: 68, y: 60, w: 440, h: 512 });
+  // Its stored spot (68, 60) is Encounters' now: re-placed; Party (lowest z) parked for it.
+  expect(back.find((w) => w.kind === "cmp.compendium")?.state).toBe("open");
   expect(back.find((w) => w.kind === "cbt.encounters")?.state).toBe("open");
+  expect(back.find((w) => w.kind === "party.board")?.state).toBe("minimised");
+  const shown = back.filter((w) => w.state === "open");
+  const rects = renderedWindowRects(shown, dmWindows, allKinds(), WIDE);
+  const mine = rects[shown.findIndex((w) => w.kind === "cmp.compendium")] as Rect;
+  rects.forEach((r, i) => {
+    if (shown[i]?.kind !== "cmp.compendium") expect(overlaps(mine, r)).toBe(false);
+  });
   for (const w of back) {
     if (dmWindows.get(w.kind)?.defaultOpen) expect(w.state).toBe("open");
   }
@@ -567,23 +592,37 @@ test("FR-SHELL-41 DM: Compendium dragged onto Initiative's stored rect; Start re
   }
 });
 
-test('FR-SHELL-08 user opens keep the stored rect: the Not-shown badge → Scenes, a notification "Open" over another window', () => {
+test('FR-SHELL-08 FR-SHELL-56 user opens keep a clear stored rect (the DM soft box does not count), and re-place one now over another window: the Not-shown badge → Scenes, a notification "Open"', () => {
   const viewport = DESKTOP;
   const ctx = { registry: dmWindows, viewport, available: allKinds() };
   const layout = defaultLayout(dmWindows, viewport);
   const init = win(layout, "cbt.initiative");
-  for (const kind of ["map.scenes", "note.history", "char.sheet"]) {
-    let ws = reduce(layout, { type: "open", kind }, ctx);
-    const spot = { x: init.x + 10, y: init.y + 10, w: 300, h: 300 };
-    ws = reduce(ws, { type: "setRect", kind, rect: spot }, ctx);
-    const stored = win(reduce(ws, { type: "close", kind }, ctx), kind);
-    // `useOpenWindow()(kind)` dispatches `by: "user"`.
-    const back = win(
-      reduce(reduce(ws, { type: "close", kind }, ctx), { type: "open", kind, by: "user" }, ctx),
-      kind,
+  const reopen = (kind: string, spot: Rect) => {
+    const ws = reduce(
+      reduce(layout, { type: "open", kind }, ctx),
+      {
+        type: "setRect",
+        kind,
+        rect: spot,
+      },
+      ctx,
     );
-    expect(same(back, stored)).toBe(true);
-    expect(overlaps(back, init)).toBe(true);
+    // `useOpenWindow()(kind)` dispatches `by: "user"`.
+    const closed = reduce(ws, { type: "close", kind }, ctx);
+    return {
+      stored: win(closed, kind),
+      back: win(reduce(closed, { type: "open", kind, by: "user" }, ctx), kind),
+    };
+  };
+  for (const kind of ["map.scenes", "note.history", "char.sheet"]) {
+    // Clear (partly under the DM's soft top-centre box): kept.
+    const free = reopen(kind, { x: 600, y: 200, w: 300, h: 300 });
+    expect(overlaps(free.back, toastKeepOut("dm", viewport))).toBe(true);
+    expect(same(free.back, free.stored)).toBe(true);
+    // Over Initiative: re-placed, clear of it.
+    const covered = reopen(kind, { x: init.x + 10, y: init.y + 10, w: 300, h: 300 });
+    expect(same(covered.back, covered.stored)).toBe(false);
+    expect(overlaps(covered.back, init)).toBe(false);
   }
 });
 
@@ -644,7 +683,7 @@ test("FR-SHELL-45 (2) W1 repro: DM 1440×900 on Town (Thorn 463,363, Mira 516,36
   }
 });
 
-test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC centre", () => {
+test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order at 1280×720 / 1440×900 / 1600×900 holds no PC (footprint + 4 px) while a clear spot avoiding them exists; screen full only when nothing is clear (FR-SHELL-47)", () => {
   const cases = [
     [LAPTOP, [pcAt(410, 312), pcAt(458, 312)]],
     [WIDE, [pcAt(463, 363), pcAt(516, 363)]],
@@ -659,9 +698,262 @@ test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order 
     for (const s of steps) {
       const at = `${s.kind} at ${viewport.w}×${viewport.h}`;
       expect(s.hits.length === 0 ? "ok" : `${at} on ${s.hits.join(", ")}`).toBe("ok");
-      expect(
-        s.rect && pcUnder(s.rect, pcs) ? `${at} over a PC: ${JSON.stringify(s.rect)}` : "ok",
-      ).toBe("ok");
+      // Ruling #262's "park one more window to keep PCs clear" is retired (WF1 walkthrough
+      // finding 2): a PC under the window only when no clear spot avoids it.
+      const def = dmWindows.get(s.kind);
+      if (!s.rect || !def) continue;
+      const scene = { windows: s.others, hard: s.hard, tokens: pcs };
+      const got = placeFields(s.rect, def, viewport, scene);
+      expect(got[0] === 0 ? "ok" : `${at} not clear`).toBe("ok");
+      if (got[1] === 1) expect(bruteBest(def, viewport, scene)[1]).toBe(1);
     }
   }
+});
+
+// ---- sprint 6: reopen rule, footprints, token-free spots, contract, golden layouts ----
+// (FR-SHELL-56, -58, -61, -62; play-shell §13 sprint 6)
+
+const FULL_CHAIN = [...REFERENCE_VIEWPORTS].reverse(); // 1600×900 → 1440×900 → 1280×800 → 1280×720
+const ambush = (vp: { w: number; h: number }, windows: readonly Rect[]) =>
+  ambushTokens("dm", vp, windows);
+
+/** In-memory shell controller on `registry` (what the page runs), at `vp`. */
+function shellAt(registry: WindowRegistry, vp: { w: number; h: number }) {
+  const backend = new Map<string, string>();
+  const storage = createLayoutStorage(() => ({
+    getItem: (k) => backend.get(k) ?? null,
+    setItem: (k, v) => void backend.set(k, v),
+  }));
+  const c = createShellController({ registry, storage, viewport: () => vp });
+  c.restore("k");
+  return c;
+}
+
+test("FR-SHELL-56 reopen covered vs free spot (DM, protected): Initiative closed, Compendium moved into its spot, Initiative reopened → Initiative at its stored rect (stored), Compendium re-placed clear of it (auto) or auto-minimised", () => {
+  for (const viewport of REFERENCE_VIEWPORTS) {
+    const at = `${viewport.w}×${viewport.h}`;
+    const c = shellAt(dmWindows, viewport);
+    const all = allKinds();
+    const home = rectIn(c.store.getState().windows, "cbt.initiative");
+    c.dispatch({ type: "close", kind: "cbt.initiative" }, all);
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all);
+    c.dispatch({ type: "toggle", kind: "cbt.initiative" }, all); // the launcher button
+    const s = c.store.getState();
+    expect({ at, init: rectIn(s.windows, "cbt.initiative") }).toEqual({ at, init: home });
+    expect(s.placed.get("cbt.initiative:main")).toBe("stored");
+    const cmp = s.windows.find((w) => w.kind === "cmp.compendium");
+    if (cmp?.state === "open") {
+      expect(overlaps(cmp, home) ? `Compendium still over Initiative at ${at}` : "ok").toBe("ok");
+      expect(s.placed.get("cmp.compendium:main")).toBe("auto");
+    } else {
+      expect(cmp?.state).toBe("minimised");
+    }
+    // A launcher window's own reopen: onto Initiative → `reopened`; then clear → `stored`.
+    c.dispatch({ type: "close", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all); // stored only
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    expect(c.store.getState().placed.get("cmp.compendium:main")).toBe("reopened");
+    c.dispatch({ type: "close", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    expect(c.store.getState().placed.get("cmp.compendium:main")).toBe("stored");
+  }
+});
+
+test("FR-SHELL-58 token-free spot first (DM, sim-9 a01): 1440×900, Initiative + Game log, the Goblin Ambush at its fit → Compendium covers no token while a clear spot over none exists, and no PC footprint", () => {
+  const layout = defaultLayout(dmWindows, WIDE);
+  const rects = renderedWindowRects(layout, dmWindows, allKinds(), WIDE);
+  const tokens = ambush(WIDE, rects);
+  const { steps } = launcherSequence(dmWindows, WIDE, ["cmp.compendium"], { avoid: () => tokens });
+  const cmp = steps[0]?.rect;
+  const def = dmWindows.get("cmp.compendium");
+  if (!cmp || !def) throw new Error("Compendium not open");
+  const scene = { windows: rects, hard: [], tokens };
+  expect(bruteBest(def, WIDE, scene)).toEqual([0, 0, 0, 0]); // such a spot exists here
+  expect(placeFields(cmp, def, WIDE, scene)).toEqual([0, 0, 0, 0]);
+});
+
+/** FR-SHELL-61 (5): stand-ins for PF's Preferences until PF1 registers the real line (S2, S3). */
+const PREFS_STUB = {
+  kind: "shell.prefs",
+  title: "Preferences",
+  clients: ["dm", "player"],
+  defaultSize: { w: 360, h: 560 },
+  minSize: { w: 320, h: 280 },
+  minOpenH: 400,
+  defaultPosition: { anchor: "top-right", dx: 12 },
+  component: () => null,
+} satisfies WindowDef;
+
+/** The DM registry with this sprint's new windows: the real lines once merged, else the stubs. */
+const withNewWindows = (): WindowRegistry =>
+  dmWindows.get(PREFS_STUB.kind)
+    ? dmWindows
+    : createWindowRegistry("dm", [...dmWindows.defs, PREFS_STUB]);
+
+/** FR-SHELL-62 (d): the DM's non-default product kinds on `main` when WF1 started, in registry order. */
+const GOLDEN_KINDS = [
+  "camp.players",
+  "ent.creatures",
+  "map.scenes",
+  "note.history",
+  "char.sheet",
+  "cbt.encounters",
+  "dicex.tray",
+  "party.board",
+  "cmp.compendium",
+];
+
+/** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */
+const userOpened = (registry: WindowRegistry) =>
+  registry.defs.filter((d) => !d.defaultOpen).map((d) => d.kind);
+
+const runs = (registry: WindowRegistry, kinds: readonly string[]) =>
+  FULL_CHAIN.flatMap((_, i) =>
+    layoutRun(registry, {
+      viewports: FULL_CHAIN.slice(i),
+      kinds,
+      available: new Set(registry.defs.map((d) => d.kind)),
+      tokensAt: ambush,
+      protectedKind: "cbt.initiative",
+    }),
+  );
+
+const problemsOf = (steps: readonly LayoutStep[]) =>
+  steps
+    .filter((s) => s.problems.length > 0)
+    .map((s) => `${s.step} ${s.vp.w}×${s.vp.h} ${s.kind}: ${s.problems.join("; ")}`);
+
+test("FR-SHELL-61 every user-opened kind (DM): every non-default kind, launcher or not, test-mode included, opens through openWindow and passes FR-SHELL-62's invariants with Preferences registered; a new kind keeps the contract", () => {
+  const registry = withNewWindows();
+  const kinds = userOpened(registry);
+  expect(kinds).toContain("shell.prefs");
+  expect(kinds).toContain("party.handout"); // no launcher button
+  expect(kinds).toContain("shell.test"); // test mode
+  expect(problemsOf(runs(registry, kinds))).toEqual([]);
+  for (const kind of kinds.filter((k) => !GOLDEN_KINDS.includes(k))) {
+    const def = registry.get(kind);
+    if (!def || def.fixedDefault || kind === "party.handout") continue;
+    expect({ kind, problems: contractProblems(def) }).toEqual({ kind, problems: [] });
+  }
+  // The stand-ins at the S3 numbers pass; a 480-wide one doesn't.
+  expect(contractProblems(PREFS_STUB)).toEqual([]);
+  expect(contractProblems({ ...PREFS_STUB, defaultSize: { w: 480, h: 300 } })).toEqual([
+    "width 480 at 1280×720",
+    "width 480 at 1280×800",
+    "width 480 at 1440×900",
+    "width 480 at 1600×900",
+  ]);
+});
+
+const GOLDEN_FILE = fileURLToPath(new URL("./windows.golden.json", import.meta.url));
+
+test("FR-SHELL-62 golden layouts (DM): four sizes, open / close / reopen / smaller viewport / protected reopen; invariants + brute check, golden rects per kind (UPDATE_GOLDEN=1 rewrites), deterministic", () => {
+  const t0 = performance.now();
+  const steps = runs(dmWindows, GOLDEN_KINDS);
+  expect(problemsOf(steps)).toEqual([]);
+  // Same inputs → same rects.
+  expect(runs(dmWindows, GOLDEN_KINDS)).toEqual(steps);
+  const golden = steps.map((s) => ({
+    at: `${s.step} @${s.vp.w}×${s.vp.h} ${s.kind}`,
+    rect: s.rect && `${s.rect.x},${s.rect.y},${s.rect.w}×${s.rect.h}`,
+    placed: s.placed,
+    parked: s.parked.join(","),
+  }));
+  if (process.env.UPDATE_GOLDEN === "1") {
+    writeFileSync(GOLDEN_FILE, `${JSON.stringify(golden, null, 2)}\n`);
+  }
+  expect(golden).toEqual(JSON.parse(readFileSync(GOLDEN_FILE, "utf8")));
+  console.info(
+    `FR-SHELL-62 DM: ${steps.length} steps in ${(performance.now() - t0).toFixed(0)} ms`,
+  );
+});
+
+// ---- WF1 walkthrough (2026-10-20) repros: the probes' exact inputs ----
+
+/** The DM's Goblin Ambush footprints from the walkthrough probes: [name, x, y, side, pc]. */
+const walkTokens = (dy: number) =>
+  (
+    [
+      ["Adult", 350, 96, 144, 0],
+      ["Ogre", 974, 96, 96, 0],
+      ["Mira", 398, 336, 48, 1],
+      ["Goblin", 638, 336, 48, 0],
+      ["Wolf", 830, 240, 48, 0],
+      ["Elite", 878, 432, 48, 0],
+      ["Goblin2", 734, 432, 48, 0],
+      ["Thorn", 350, 528, 48, 1],
+      ["Lurker", 974, 576, 48, 0],
+      ["Brakka", 302, 432, 48, 1],
+      ["G3", 542, 144, 48, 0],
+      ["G4", 590, 144, 48, 0],
+      ["Elite2", 638, 144, 48, 0],
+      ["Wolf2", 734, 144, 48, 0],
+      ["Brute", 830, 144, 48, 0],
+    ] as const
+  ).map(([, x, y, s, pc]) => ({ x, y: y + dy, w: s, h: s, pc: pc === 1 }));
+
+test("FR-SHELL-47 FR-SHELL-56 walkthrough finding 2 (DM 1280×720): restoring Party with 68–450 × 60–472 clear of windows (over Mira, Brakka, Thorn) is placed there, clear; Compendium is not auto-minimised", () => {
+  const def = dmWindows.get("party.board");
+  if (!def) throw new Error("no party.board");
+  const tokens = walkTokens(-108); // the probe's 1280×720 camera
+  const windows = [
+    { x: 68, y: 484, w: 690, h: 160, protected: true },
+    { x: 868, y: 60, w: 400, h: 544, protected: true },
+    { x: 462, y: 72, w: 340, h: 400 }, // Compendium
+  ];
+  const soft = [toastKeepOut("dm", LAPTOP)];
+  const p = placeWindow(def, LAPTOP, { windows, soft, tokens });
+  expect(p.clear).toBe(true);
+  for (const o of windows) expect(overlaps(p.rect, o)).toBe(false);
+  // The same through the manager: Party restored, Compendium stays open.
+  const ctx = { registry: dmWindows, viewport: LAPTOP, available: allKinds(), avoid: () => tokens };
+  const area = workArea(LAPTOP);
+  const at = (kind: string, state: "open" | "minimised", r: Rect, z: number) => ({
+    kind,
+    instance: "main",
+    state,
+    ...rectOf(r),
+    z,
+    area,
+  });
+  const ws = [
+    at("dice.log", "open", windows[0] as Rect, 1),
+    at("cbt.initiative", "open", windows[1] as Rect, 2),
+    at("cmp.compendium", "open", windows[2] as Rect, 3),
+    at("party.board", "minimised", { x: 462, y: 72, w: 340, h: 400 }, 4), // its spot: Compendium's
+  ];
+  const next = reduce(ws, { type: "open", kind: "party.board" }, ctx);
+  expect(next.find((w) => w.kind === "cmp.compendium")?.state).toBe("open");
+  const party = win(next, "party.board");
+  expect(party.state).toBe("open");
+  expect(overlaps(party, windows[2] as Rect)).toBe(false);
+});
+
+test("FR-SHELL-45 (2) walkthrough edge-on-PC row (DM 1440×900, F3): Encounters, which must cover PCs, holds them whole: no edge through a PC footprint + 4 px", () => {
+  const def = dmWindows.get("cbt.encounters");
+  if (!def) throw new Error("no cbt.encounters");
+  const tokens = walkTokens(0);
+  const windows = [
+    { x: 68, y: 636, w: 1150, h: 188, protected: true },
+    { x: 1028, y: 204, w: 400, h: 420, protected: true },
+    { x: 580, y: 120, w: 340, h: 400 },
+  ];
+  const soft = [toastKeepOut("dm", WIDE)];
+  const scene = { windows, hard: [], tokens };
+  const p = placeWindow(def, WIDE, { windows, soft, tokens });
+  expect(p.clear).toBe(true);
+  expect(bruteBest(def, WIDE, scene)[1]).toBe(1); // no clear spot avoids every PC
+  const cut = tokens
+    .filter((t) => t.pc)
+    .map((t) => ({ x: t.x - 4, y: t.y - 4, w: t.w + 8, h: t.h + 8 }))
+    .filter((b) => overlaps(p.rect, b))
+    .filter(
+      (b) =>
+        b.x < p.rect.x ||
+        b.y < p.rect.y ||
+        b.x + b.w > p.rect.x + p.rect.w ||
+        b.y + b.h > p.rect.y + p.rect.h,
+    );
+  expect(cut).toEqual([]);
 });

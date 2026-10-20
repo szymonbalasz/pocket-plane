@@ -51,7 +51,7 @@ describe("image-tags fixtures (ASSET §13.1)", () => {
       const a = await loaded(bundle);
       const b = await loaded(bundle);
       expect(a.manifest.status).toBe("complete");
-      // Other tracks append their units after it (seams S12): contains, not last.
+      // Other sprint-6 slices append after it (session-sim-10 header): loaded, not last.
       expect(a.manifest.fixtures).toContain(F.key);
       // Deterministic: manifests (minus the run's own paths), asset IDs and tags.
       expect(b.manifest.records).toEqual(a.manifest.records);
