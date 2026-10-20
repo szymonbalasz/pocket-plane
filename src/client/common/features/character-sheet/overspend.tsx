@@ -27,6 +27,15 @@ export function OverspentBadge({ left, testId }: { left: number; testId: string 
 }
 
 /**
+ * FR-MOD-68 (BL-48 "−1 / 3 −1"): a row that shows the count itself ("−1 / 3") draws no Badge; the
+ * Badge's Tooltip goes on its count instead. At ≥ 0 the children alone.
+ */
+export function OverspentTip({ left, children }: { left: number; children: ReactNode }) {
+  if (left >= 0) return <>{children}</>;
+  return <Tooltip content={overspentTip(left)}>{children}</Tooltip>;
+}
+
+/**
  * The ask anchored on `children`: "No Rage uses left (0 / 3). Rage anyway? → −1 / 3" with
  * `‹verb› anyway` / Cancel; at the floor only the reset hint and Close.
  */

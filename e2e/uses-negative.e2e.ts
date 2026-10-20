@@ -43,7 +43,7 @@ test("FR-CHARX-58 FR-MOD-59 uses below zero: Rage anyway → −1 / 3, a pip pas
   await expect(rageLeft).toHaveAttribute("data-value", "0");
   await expect(rageLeft).toContainText("0 / 3 left");
 
-  // Rage switch at 0 left: asks first, then −1 / 3 in red with the "−1" Badge.
+  // Rage switch at 0 left: asks first, then −1 / 3 in red, the minus once (FR-MOD-68: no Badge).
   await tab(sheet, "section:mod.effects");
   const rage = sheet.getByTestId("mod-toggle").first();
   await rage.getByRole("switch").click();
@@ -53,7 +53,7 @@ test("FR-CHARX-58 FR-MOD-59 uses below zero: Rage anyway → −1 / 3, a pip pas
   await p1.getByTestId("mod-toggle-overspend-confirm").click();
   await expect(rage).toHaveAttribute("data-state", "on");
   await expect(sheet.getByTestId("mod-toggle-uses").first()).toHaveAttribute("data-value", "-1/3");
-  await expect(sheet.getByTestId("mod-toggle-overspent")).toHaveText("−1");
+  await expect(sheet.getByTestId("mod-toggle-overspent")).toHaveCount(0);
 
   // Features: −1 / 3 left, every pip filled, the Badge; a pip past zero asks.
   await tab(sheet, "features");
