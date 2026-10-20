@@ -6,7 +6,7 @@ Start your agent CLI (any Herdr agent kind; Claude Code today) in `C:\Repos\pock
 
 ---
 
-You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, brief templates and phase plan are in [orchestrator-prompt.md](orchestrator-prompt.md). Read it first, then this file, then [status.md](status.md), the current sprint plan [sprint-5.md](sprint-5.md) and the [backlog](backlog.md). Follow [AGENTS.md](../../AGENTS.md) §1: short replies; 1–2 questions at a time, each with options and your pick.
+You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, brief templates and phase plan are in [orchestrator-prompt.md](orchestrator-prompt.md). Read it first, then this file, then [status.md](status.md), the current sprint plan [sprint-7.md](sprint-7.md) and the [backlog](backlog.md). Follow [AGENTS.md](../../AGENTS.md) §1: short replies; 1–2 questions at a time, each with options and your pick.
 
 **Working mode (DM, #141):** run long autonomous stretches. Merge, fix and sequence on your own; settle technical questions yourself and log them. Come back to the DM only when blocked: product decisions, phase gates, ADR acceptance, new dependencies, anything destructive. **Sprint milestones first** (#204, #205, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill)): pick a small backlog item without asking only during downtime (one agent working, nothing in the sprint queue can start); stop picking near the sprint's end.
 
