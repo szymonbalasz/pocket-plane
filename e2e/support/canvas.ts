@@ -21,11 +21,19 @@ export async function tokenFootprints(page: Page): Promise<Box[]> {
   });
 }
 
-/** Footprints of the tokens whose label starts with one of `names` (a cut label keeps its start). */
+/**
+ * Footprints of the tokens whose label (`map-token-label`, id = the token's) starts with one of
+ * `names` (a cut label keeps its start).
+ */
 export async function footprintsOf(page: Page, names: readonly string[]): Promise<Box[]> {
-  return (await tokenFootprints(page)).filter((t) =>
-    names.some((n) => (t.label ?? "").startsWith(n)),
+  const labels = await konvaNodes(page, "map-token-label");
+  const ids = new Set(
+    labels.filter((l) => names.some((n) => (l.text ?? "").startsWith(n))).map((l) => l.id),
   );
+  const named = new Map(labels.map((l) => [l.id, l.text]));
+  return (await tokenFootprints(page))
+    .filter((t) => ids.has(t.id))
+    .map((t) => ({ ...t, label: named.get(t.id) ?? null }));
 }
 
 /** Overlap by more than half a px (rounded screen rects). */

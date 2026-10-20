@@ -3,8 +3,8 @@
 // server state (the bundle is shared): window opens, Reset layout, Fit, keys, nothing sent. DM:
 // Compendium, Party, Encounters at 1440×900 land PC-clear (`data-pc-clear`, checked against the
 // PC footprints); auto-minimised ones carry `data-auto-minimised-for`; reopened at 1280×720, a window
-// marked PC-clear covers no PC. Player 1: Reset layout keeps the zones (the sheet 948, 60,
-// 320×418); Space presses a Tab-focused launcher button with the mouse over the map, and pans
+// marked PC-clear covers no PC. Player 2 (player 1 starts behind a presented handout whose Close
+// is a server write): Reset layout keeps the zones (the sheet 948, 60, 320×418); Space presses a Tab-focused launcher button with the mouse over the map, and pans
 // after a click (#199). DM Initiative: each row's chips are one tab stop. The rules in detail:
 // bun test (`manager.test.ts`, both `windows-s7.test.ts`, `keys.test.ts`, `overlays.test.ts`).
 import { expect, type Page, test } from "@playwright/test";
@@ -121,21 +121,23 @@ test("FR-SHELL-77 auto-minimise instead of covering a PC (DM): Compendium, Party
   }
 });
 
-test("FR-SHELL-80 FR-SHELL-83 player 1280×800: Reset layout → the sheet 948, 60, 320×418; Tab to the Party button with the mouse over the map, Space opens it; a click, then Space over the map pans and leaves it alone (#199)", async ({
+test("FR-SHELL-80 FR-SHELL-83 player 2 1280×800: Reset layout → the sheet 948, 60, 320×418; Tab to the Party button with the mouse over the map, Space opens it; a click, then Space over the map pans and leaves it alone (#199)", async ({
   browser,
 }) => {
   const { link } = e2eEnv();
   const p1 = await rolePage(browser);
   await p1.setViewportSize({ width: 1280, height: 800 });
-  await p1.goto(link("Player 1"));
+  await p1.goto(link("Player 2"));
   await live(p1);
+  const canvas = p1.getByTestId("map-canvas");
+  await expect(canvas).toHaveAttribute("data-loading", "false");
+  await settled(p1); // the scene's own first fit has landed
   await p1.getByTestId("ui-launcher-menu").click();
   await p1.getByTestId("ui-launcher-reset").click();
   const sheet = shellWindow(p1, "char.sheet");
   await expect(sheet).toHaveAttribute("data-placed", "default");
   const box = await sheet.boundingBox();
   expect(box && [box.x, box.y, box.width, box.height].map(Math.round)).toEqual([948, 60, 320, 418]);
-  const canvas = p1.getByTestId("map-canvas");
   await expect(canvas).toHaveAttribute("data-fit-reason", "fit"); // the one Fit after the reset
   const party = shellWindow(p1, "party.board");
   await expect(party).toHaveCount(0);
@@ -162,6 +164,23 @@ test("FR-SHELL-80 FR-SHELL-83 player 1280×800: Reset layout → the sheet 948, 
   // drag → the map pans, Party stays as the click left it.
   await partyButton.click();
   await expect(party).toHaveAttribute("data-state", "open");
+  // A point on the bare map now (Party may cover the first one).
+  const bare = await p1.evaluate(() => {
+    const c = document.querySelector('[data-testid="map-canvas"]')?.getBoundingClientRect();
+    if (!c) return null;
+    for (let fy = 0.2; fy < 0.9; fy += 0.05) {
+      for (let fx = 0.1; fx < 0.95; fx += 0.05) {
+        const x = c.x + c.width * fx;
+        const y = c.y + c.height * fy;
+        const hit = document.elementFromPoint(x, y);
+        if (hit?.closest('[data-testid="map-canvas"]')) return { x, y };
+      }
+    }
+    return null;
+  });
+  if (!bare) throw new Error("no bare map point");
+  over.x = bare.x;
+  over.y = bare.y;
   await p1.mouse.move(over.x, over.y);
   const before = await konvaNodes(p1, "map-token");
   await p1.keyboard.down("Space");
@@ -225,13 +244,18 @@ test("FR-SHELL-84 tooltips on focus (DM): each Initiative row's chips are one ta
   if (marked) {
     const row = init.locator("[data-e2e-row]");
     const firstStop = row.locator('[tabindex="0"]').first();
+    await firstStop.evaluate((el) => el.setAttribute("data-e2e-first", ""));
     await firstStop.focus();
     await dm.keyboard.press("ArrowRight");
     const now = await row.evaluate((r) => {
       const a = document.activeElement as HTMLElement | null;
-      return { inRow: !!a && r.contains(a), stop: a?.tabIndex };
+      return {
+        inRow: !!a && r.contains(a),
+        stop: a?.tabIndex,
+        moved: !a?.hasAttribute("data-e2e-first"),
+        stops: r.querySelectorAll('[tabindex="0"]').length,
+      };
     });
-    expect(now).toEqual({ inRow: true, stop: 0 });
-    expect(await firstStop.evaluate((el) => el === document.activeElement)).toBe(false);
+    expect(now).toEqual({ inRow: true, stop: 0, moved: true, stops: 1 });
   }
 });
