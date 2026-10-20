@@ -137,10 +137,13 @@ export function monsterHp(
 /** FR-CBT-141: a token's last combatant (the latest-ended inactive row with that `tokenId`). */
 export interface KeptHp {
   entityId: string;
-  encounterId: string;
-  name: string;
   hp: number;
   hpMax: number;
+  /**
+   * The fights this max came through, latest first: the token's consecutive rows of the same
+   * creature with this `hpMax` (a kept max carried from fight to fight). `rolledIn` looks there.
+   */
+  fights: { encounterId: string; name: string }[];
 }
 
 /**
@@ -175,7 +178,10 @@ export function keptHpByToken(tx: Tx, cid: string): Map<string, KeptHp> {
     if (r.tokenId === null || r.hp === null || r.hpMax === null) continue;
     const { entityId, encounterId, name, hp, hpMax } = r;
     // Ordered oldest first: the last write per token is its latest-ended row.
-    out.set(r.tokenId, { entityId, encounterId, name, hp, hpMax });
+    const prev = out.get(r.tokenId);
+    const same = prev && prev.entityId === entityId && prev.hpMax === hpMax;
+    const fights = [{ encounterId, name }, ...(same ? prev.fights : [])];
+    out.set(r.tokenId, { entityId, hp, hpMax, fights });
   }
   return out;
 }
@@ -202,8 +208,8 @@ export const downedLast = <T extends { id: string; definitionId: string; seq: nu
 /**
  * FR-CBT-141: the HP a kept row starts with: its `hpMax` / `hpCurrent` (a rolled max kept);
  * when an average row's max no longer matches the definition's (edited since), FR-CBT-06 / -67's
- * rule: the new max, a full row stays full, else clamped. "Rolled" = the old fight logged its
- * DM-only "HP (…)" roll for it (`monsterHp`). Not an `hp_change` (no fact, seams S8).
+ * rule: the new max, a full row stays full, else clamped. "Rolled" = a fight this max came
+ * through logged its DM-only "HP (…)" roll for it (`monsterHp`). Not an `hp_change` (no fact, seams S8).
  */
 export function keptHp(tx: Tx, k: KeptHp, def: DefinitionRecord): { hp: number; hpMax: number } {
   const max = effectiveStats(def as { statBlock: StatBlock }).hpMax;
@@ -212,22 +218,24 @@ export function keptHp(tx: Tx, k: KeptHp, def: DefinitionRecord): { hp: number; 
 }
 
 function rolledIn(tx: Tx, k: KeptHp): boolean {
-  return tx
-    .select({ payload: gameLogEntry.payload })
-    .from(gameLogEntry)
-    .where(
-      and(
-        eq(gameLogEntry.encounterId, k.encounterId),
-        eq(gameLogEntry.kind, ROLL_KIND),
-        eq(gameLogEntry.actorName, k.name),
-        eq(gameLogEntry.public, false),
-      ),
-    )
-    .all()
-    .some((e) => {
-      const first = Array.isArray(e.payload) ? (e.payload[0] as { label?: unknown }) : null;
-      return typeof first?.label === "string" && first.label.startsWith("HP (");
-    });
+  return k.fights.some((f) =>
+    tx
+      .select({ payload: gameLogEntry.payload })
+      .from(gameLogEntry)
+      .where(
+        and(
+          eq(gameLogEntry.encounterId, f.encounterId),
+          eq(gameLogEntry.kind, ROLL_KIND),
+          eq(gameLogEntry.actorName, f.name),
+          eq(gameLogEntry.public, false),
+        ),
+      )
+      .all()
+      .some((e) => {
+        const first = Array.isArray(e.payload) ? (e.payload[0] as { label?: unknown }) : null;
+        return typeof first?.label === "string" && first.label.startsWith("HP (");
+      }),
+  );
 }
 
 /**

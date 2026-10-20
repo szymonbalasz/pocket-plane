@@ -91,6 +91,11 @@ describe("FR-CBT-141 kept HP at Start", () => {
     );
     const f1 = encounterOf(t, "F1", [{ definitionId: t.eliteId, quantity: 1, hpMode: "rolled" }]);
     start(t, f1);
+    // A rolled max well above the average (15), so a carried max must not be taken for an edit.
+    const first = t.combatants(f1.id)[0] as CombatantRecord;
+    t.s.db.$client.run("update combatant set hp_max = 21, hp_current = 21 where id = ?", [
+      first.id,
+    ]);
     const rolled = t.combatants(f1.id)[0] as CombatantRecord;
     t.run(applyHp.name, { combatantId: rolled.id, kind: "damage", amount: 2 });
     t.run(endCommand.name, { encounterId: f1.id });
@@ -107,7 +112,7 @@ describe("FR-CBT-141 kept HP at Start", () => {
     t.run(endCommand.name, { encounterId: f2.id });
     const f3 = encounterOf(t, "F3", [{ definitionId: t.eliteId, quantity: 1 }]);
     start(t, f3);
-    expect(t.combatants(f3.id)[0]?.hpCurrent).toBe((rolled.hpCurrent ?? 0) - 3);
+    expect(t.combatants(f3.id)[0]).toMatchObject({ hpMax: 21, hpCurrent: 18 });
   });
 
   test("FR-CBT-141 kept HP at Start: a definition max edited between fights follows FR-CBT-06 (full → new max, else clamped)", () => {
