@@ -8,11 +8,12 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| GM0 gems core | `fix/gems-core` (ws w8Q) | build-gm0 | building | walkthrough → merge; then GM1, ST-core, GM3 |
-| FU1 window frame | `fix/fu-frame` (ws w8R) | build-fu1 | building | walkthrough → merge; then FU3, ST2 |
-| FU-combat (FU0 + FU2) | `fix/fu-combat` (ws w8S) | build-fu-combat | building | walkthrough → merge |
-| FU4 small copy | `fix/fu-small-copy` (ws w8T) | build-fu4 | building | walkthrough → merge |
-| Wave 2 (after GM0) | GM1 `build/gems-reroll`, ST-core `fix/st-core`, GM3 `build/gems-sheet` | — | waiting | GM1 merges before ST-core |
+| FU1 window frame | `fix/fu-frame` (ws w8R) | build-fu1 | PC rule change (#318) + merge main | walkthrough → merge; then FU3, ST2 |
+| FU-combat (FU0 + FU2) | `fix/fu-combat` (ws w8S) | build-fu-combat, test-fu-combat | walkthrough | gates → merge |
+| FU4 small copy | `fix/fu-small-copy` (ws w8T) | build-fu4, test-fu4 | walkthrough | gates → merge |
+| GM1 Inspiration reroll | `build/gems-reroll` (ws w8V) | build-gm1 | building | merges before ST-core |
+| ST-core | `fix/st-core` (ws w8W) | build-st-core | building | rebase on GM1, merge |
+| GM3 gems UI | `build/gems-sheet` | — | waiting for a slot | — |
 | Wave 3 | FU3 `fix/fu-map` (after FU1), ST2 `build/st-window` (after FU1 + ST-core), GM2 `build/gems-combat` (after GM1 + ST-core) | — | waiting | — |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
@@ -22,7 +23,7 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 
 ## Shared-file locks
 
-- Schema lane + `src/server/ws/` + `src/shared/events/`: `fix/gems-core` (GM0).
+- Schema lane: free (GM0 merged). Apply path: GM1 first, ST-core rebases.
 - Play-shell frame + `overlays.tsx`: `fix/fu-frame` (FU1). Canvas lock: FU1 first (MapCanvas.tsx), then FU3.
 - Combat-tracker lifecycle / DM Initiative + encounters files: `fix/fu-combat`. Apply path (hp.ts, cards.ts, hit.ts, schemas.ts, log-kinds.ts): free until GM1 / ST-core.
 
