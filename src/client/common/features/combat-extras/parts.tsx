@@ -3,10 +3,13 @@
 // Sprint 4 (FR-CBTX-52): trigger chips after the effect chips on the same line. Sprint 5
 // (FR-CBTX-54, BL-26): a trigger never folds into "+N"; it goes icon-only first. Sprint 6
 // (FR-CBTX-57, -58, BL-43): the name line counts its fixed parts, so the name is never cut; a
-// trigger chip is whole or icon-only.
+// trigger chip is whole or icon-only. Sprint 7 (FR-CBTX-59–61): a concentration chip is whole or
+// icon-only too, and a click gives the DM and the PC's owner a menu with End concentration.
+import { CBTX_INTENTS } from "@shared/combat-extras/intents";
+import { effectName, roundsLeft } from "@shared/combat-extras/rules";
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
 import type { DeathState } from "@shared/entities/schemas";
-import { CheckIcon, EyeOffIcon, ZapIcon } from "lucide-react";
+import { CheckIcon, EyeOffIcon, PencilIcon, TrashIcon, ZapIcon } from "lucide-react";
 import {
   type ComponentProps,
   createContext,
@@ -21,6 +24,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -29,6 +34,8 @@ import {
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
+import { SyncContext, useSync } from "../../sync/store";
+import { useCbtIntent } from "../combat-tracker/store";
 import { type TriggerChip, triggerLine } from "../effect-modifiers/trigger-badges";
 import { EffectIcon, effectValue } from "./icons";
 import {
@@ -39,11 +46,15 @@ import {
   chipOrder,
   chipParts,
   chipText,
+  concEndsWith,
+  concMenuFor,
+  concTooltip,
   DEATH_LABEL,
   fitChipRow,
   fitChips,
   fitNameLine,
   type NameLineFit,
+  roundsLeftText,
   splitNumbered,
 } from "./logic";
 
@@ -120,9 +131,14 @@ function useFit(count: number, compact: boolean, deps: unknown) {
         return;
       }
       const ws = [...el.querySelectorAll<HTMLElement>("[data-chip]")].map((k) => k.offsetWidth);
-      const n = fitChips(ws, room, GAP);
+      // FR-CBTX-59: concentration chips come first and never fold; the rest get what's left.
+      const conc = [...el.querySelectorAll<HTMLElement>("[data-chip-conc]")].reduce(
+        (w, k) => w + k.offsetWidth + GAP,
+        0,
+      );
+      const n = fitChips(ws, room - conc, GAP);
       // "+N" right after the last chip shown.
-      const left = n < ws.length ? ws.slice(0, n).reduce((a, w) => a + w + GAP, 0) : 0;
+      const left = n < ws.length ? conc + ws.slice(0, n).reduce((a, w) => a + w + GAP, 0) : 0;
       setFit({ n, tier: 0, icons: false, wrap: false, left });
     };
     measure();
@@ -293,11 +309,177 @@ export function TriggerChipView({ t, icon = false }: { t: TriggerChip; icon?: bo
   );
 }
 
+/** FR-CBTX-59's chip test id for the measuring copy's kind (trigger-like: never folds). */
+const CONC_MEASURE = "trigger";
+
+/**
+ * FR-CBTX-59 (sprint 7): a concentration chip, never cut (no width cap or ellipsis). Compact
+ * (Initiative rows): brain + its label ("Conjure Elemental") + "10r" when timed, or `icon`-only
+ * (brain + "10r", `data-compact`, the label for screen readers). Elsewhere (the sheet, the card):
+ * "Concentrating: Conjure Elemental", wrapping to a second line rather than cutting.
+ */
+function ConcBadge({
+  e,
+  round,
+  testId,
+  compact,
+  icon = false,
+  ...trigger
+}: Omit<ComponentProps<"span">, "children"> & {
+  e: EffectView;
+  round: number | null;
+  testId?: string;
+  compact: boolean;
+  icon?: boolean;
+}) {
+  const Icon = EffectIcon(e);
+  const label = compact ? (e.label ?? "") : effectName(e);
+  const rounds = e.endsRound != null && round !== null ? roundsLeft(e.endsRound, round) : null;
+  return (
+    <Badge
+      {...trigger}
+      variant="outline"
+      data-testid={testId}
+      data-record-id={testId && e.id}
+      data-value={testId && effectValue(e)}
+      data-secret={testId && e.secret === true}
+      data-compact={testId ? icon : undefined}
+      data-conc
+      className={cn(
+        "gap-0.5 px-1 py-0 text-[11px] font-normal",
+        compact ? "shrink-0 whitespace-nowrap" : "h-auto min-w-0 whitespace-normal text-left",
+        e.secret && "border-dashed",
+      )}
+    >
+      <Icon className="size-3 shrink-0" aria-hidden />
+      {icon ? <span className="sr-only">{label}</span> : <span>{label}</span>}
+      {rounds !== null && <span className={cn("shrink-0", !icon && "ml-0.5")}>{rounds}r</span>}
+      {e.secret && <EyeOffIcon className="size-3 shrink-0" aria-label="Hidden from players" />}
+    </Badge>
+  );
+}
+
+interface ConcChipProps {
+  e: EffectView;
+  round: number | null;
+  testId: string;
+  compact: boolean;
+  icon: boolean;
+  /** The DM's Edit… (today's Concentration dialog); absent: no Edit…. */
+  onEdit?: (e: EffectView) => void;
+}
+
+/**
+ * FR-CBTX-59 / -60: the chip with its Tooltip (hover and keyboard focus); with a synced store, the
+ * DM and the PC's owner get its menu (`ConcMenuChip`); everyone else a focusable chip.
+ */
+function ConcChip(p: ConcChipProps) {
+  const sync = useContext(SyncContext);
+  if (sync) return <ConcMenuChip {...p} />;
+  return (
+    <Tooltip content={concTooltip(p.e, p.round)}>
+      <ConcBadge
+        e={p.e}
+        round={p.round}
+        testId={p.testId}
+        compact={p.compact}
+        icon={p.icon}
+        tabIndex={0}
+      />
+    </Tooltip>
+  );
+}
+
+/**
+ * FR-CBTX-60 / -61 (OQ-CBTX-30 A): a click (or Enter / Space) opens `cbtx-conc-menu`: "Concentrating:
+ * Conjure Elemental", "10 rounds left", what ends with it (the viewer's store), **End
+ * concentration** (`cbtx.endEffect`, as Active effects' End; closes on ack, a reject toasts), the
+ * DM's Edit…. Items disabled while not live. Other viewers: the chip is focusable, Tooltip only.
+ */
+function ConcMenuChip({ e, round, testId, compact, icon, onEdit }: ConcChipProps) {
+  const store = useSync((s) => s.store);
+  const who = concMenuFor(store, e);
+  const { send, disabled } = useCbtIntent();
+  const [open, setOpen] = useState(false);
+  const tip = concTooltip(e, round);
+  const badge = <ConcBadge e={e} round={round} testId={testId} compact={compact} icon={icon} />;
+  if (!who) {
+    return (
+      <Tooltip content={tip}>
+        <ConcBadge e={e} round={round} testId={testId} compact={compact} icon={icon} tabIndex={0} />
+      </Tooltip>
+    );
+  }
+  const left = roundsLeftText(e, round);
+  const ends = concEndsWith(store, e);
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className="flex min-w-0 rounded-md text-left"
+          aria-label={tip}
+          data-testid="cbtx-conc-chip"
+          data-record-id={e.id}
+        >
+          <Tooltip content={tip}>{badge}</Tooltip>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="max-w-72"
+        data-testid="cbtx-conc-menu"
+        data-record-id={e.id}
+      >
+        <DropdownMenuLabel data-testid="cbtx-conc-title">{effectName(e)}</DropdownMenuLabel>
+        {left && (
+          <p className="px-2 text-xs text-muted-foreground" data-testid="cbtx-conc-rounds">
+            {left}
+          </p>
+        )}
+        {ends.length > 0 && (
+          <p className="px-2 pb-1 text-xs text-muted-foreground" data-testid="cbtx-conc-ends">
+            Ends with it: {ends.join(", ")}
+          </p>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          data-testid="cbtx-conc-end"
+          data-record-id={e.id}
+          disabled={disabled}
+          onSelect={(ev) => {
+            // FR-CBTX-61: the menu closes on ack; a reject keeps it (the toast says why).
+            ev.preventDefault();
+            void send(CBTX_INTENTS.endEffect, { effectId: e.id }).then((r) => {
+              if (r !== undefined) setOpen(false);
+            });
+          }}
+        >
+          <TrashIcon /> End concentration
+        </DropdownMenuItem>
+        {who === "dm" && onEdit && (
+          <DropdownMenuItem
+            data-testid="cbtx-conc-edit"
+            data-record-id={e.id}
+            disabled={disabled}
+            onSelect={() => onEdit(e)}
+          >
+            <PencilIcon /> Edit…
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /**
  * One line of chips, concentration first, then the trigger chips (FR-CBTX-52, compact rows only).
  * Effect chips that don't fit collapse into "+N" (hover and click list them); trigger chips never
- * do (FR-CBTX-54): they go icon-only first, and wrap under the name as a last resort.
- * `menu(e)` (DM): an effect chip opens a menu with those items.
+ * do (FR-CBTX-54): they go icon-only first, and wrap under the name as a last resort. Sprint 7
+ * (FR-CBTX-59): concentration chips are fitted like trigger chips (whole or icon-only, never
+ * folded or cut) and have their own menu (FR-CBTX-60; `onEditConcentration` = the DM's Edit…).
+ * `menu(e)` (DM): another effect chip opens a menu with those items.
  */
 export function EffectChips({
   effects,
@@ -305,6 +487,7 @@ export function EffectChips({
   round,
   testId,
   menu,
+  onEditConcentration,
   className,
   compact = false,
 }: {
@@ -313,20 +496,24 @@ export function EffectChips({
   round: number | null;
   testId: string;
   menu?: (e: EffectView) => ReactNode;
+  onEditConcentration?: (e: EffectView) => void;
   className?: string;
   compact?: boolean;
 }) {
-  const fx = chipOrder(effects);
+  const ordered = chipOrder(effects);
+  const conc = ordered.filter((e) => e.kind === "concentration");
+  const fx = ordered.filter((e) => e.kind !== "concentration");
   const trig = compact ? triggers : [];
   const { ref, n, tier, icons, wrap, left } = useFit(
     fx.length,
     compact,
     [
+      ...conc.map((e) => `c:${e.id}:${chipText(e, round)}`),
       ...fx.map((e) => `${e.id}:${compact ? chipLabel(e, round) : chipText(e, round)}`),
       ...trig.map((t) => `${t.id}:${t.name}:${t.uses?.text ?? ""}:${t.muted}`),
     ].join(),
   );
-  if (fx.length === 0 && trig.length === 0) return null;
+  if (ordered.length === 0 && trig.length === 0) return null;
   const folded = fx.slice(n);
   return (
     <div
@@ -349,6 +536,12 @@ export function EffectChips({
           aria-hidden
           className="pointer-events-none invisible absolute top-0 left-0 flex w-max gap-0.5"
         >
+          {conc.map((e) => (
+            <span key={e.id} data-chip-measure={CONC_MEASURE} className="flex gap-0.5">
+              <ConcBadge e={e} round={round} compact />
+              <ConcBadge e={e} round={round} compact icon />
+            </span>
+          ))}
           {fx.map((e) => (
             <span key={e.id} data-chip-measure="effect" className="flex gap-0.5">
               <ChipBadge e={e} round={round} compact natural />
@@ -363,6 +556,22 @@ export function EffectChips({
           ))}
         </div>
       )}
+      {conc.map((e) => (
+        <span
+          key={`c:${e.id}`}
+          data-chip-conc
+          className={cn("flex", compact ? "shrink-0" : "min-w-0 shrink")}
+        >
+          <ConcChip
+            e={e}
+            round={round}
+            testId={testId}
+            compact={compact}
+            icon={compact && icons}
+            onEdit={onEditConcentration}
+          />
+        </span>
+      ))}
       {fx.map((e, i) => {
         const hidden = i >= n;
         const chip = (
@@ -518,24 +727,28 @@ export function DeathPips({ c, className }: { c: DeathCounters; className?: stri
 /**
  * A combatant name, never cut (FR-CBTX-57): on one line, or wrapped onto two (`wrap`, a name wider
  * than its line) without an ellipsis. Base and number in their own spans ("Goblin" + " 2"). The
- * text content is the full name.
+ * text content is the full name. FR-CBT-143 (sprint 7): wrapped, it never gets narrower than its
+ * longest word (`minW` = that word's width, capped at the line), so it breaks between words only;
+ * inside a word only when that word alone is wider than the whole line.
  */
 export function RowName({
   name,
   testId,
   className,
   wrap = false,
+  minW,
 }: {
   name: string;
   testId: string;
   className?: string;
   wrap?: boolean;
+  minW?: number;
 }) {
   const { base, suffix } = splitNumbered(name);
   return (
     <span
-      // Between words; inside a word only when it alone is wider than the line (note 3).
-      className={wrap ? "min-w-0 wrap-break-word" : "shrink-0 whitespace-nowrap"}
+      className={wrap ? "wrap-break-word" : "shrink-0 whitespace-nowrap"}
+      style={wrap && minW ? { minWidth: minW } : undefined}
       data-testid={testId}
       data-value={name}
       data-wrap={wrap}
@@ -596,16 +809,20 @@ export function NameLine({
   children?: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState<NameLineFit | null>(null);
+  const [fit, setFit] = useState<(NameLineFit & { wordW: number }) | null>(null);
   const measure = useCallback(() => {
     const line = ref.current;
     if (!line || line.clientWidth === 0) return;
-    const next = fitNameLine(nameLineWidths(line));
+    // FR-CBT-143: the longest word's natural width, capped at the line.
+    const words = [...line.querySelectorAll<HTMLElement>("[data-word-measure]")];
+    const wordW = Math.min(Math.max(0, ...words.map((w) => w.offsetWidth)), line.clientWidth);
+    const next = { ...fitNameLine(nameLineWidths(line)), wordW };
     setFit((f) =>
       f?.nameWrap === next.nameWrap &&
       f.marksWrap === next.marksWrap &&
       f.split === next.split &&
-      f.room === next.room
+      f.room === next.room &&
+      f.wordW === next.wordW
         ? f
         : next,
     );
@@ -642,17 +859,31 @@ export function NameLine({
       data-split={split}
       className="relative flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
     >
-      {/* The name's natural width, whatever its line does. Never shown. */}
+      {/* The name's natural width (and each word's, FR-CBT-143), whatever its line does. Never
+          shown. */}
       <span aria-hidden className="pointer-events-none invisible absolute size-0 overflow-hidden">
         <span data-name-measure className={cn("block w-max whitespace-pre", className)}>
           {name}
         </span>
+        {name.split(/\s+/).map((w, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: one measuring span per word, in order
+          <span key={i} data-word-measure className={cn("block w-max whitespace-pre", className)}>
+            {w}
+          </span>
+        ))}
       </span>
       <span
         data-name-head
         className={cn("flex items-center gap-1", nameWrap ? "min-w-0" : "shrink-0")}
+        style={nameWrap && fit?.wordW ? { minWidth: fit.wordW } : undefined}
       >
-        <RowName name={name} testId={testId} className={className} wrap={nameWrap} />
+        <RowName
+          name={name}
+          testId={testId}
+          className={className}
+          wrap={nameWrap}
+          minW={fit?.wordW}
+        />
         {!marksWrap && marksSlot}
       </span>
       {split && !nameWrap && end}

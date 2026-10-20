@@ -78,6 +78,7 @@ import { useOpenEncounter } from "./open-encounter";
 import { partyMembers, toggleParty } from "./party";
 import { freeAreaCell } from "./place-at";
 import { combatRest } from "./rest";
+import { START_KEPT_NOTE, startKeptNoteShown } from "./start-end";
 
 /** The DM REST client, imported lazily (the session reads localStorage at import). */
 const api = lazyApi(() => import("../campaign-management/session").then((m) => m.api));
@@ -275,7 +276,8 @@ function PetPreviewRow({
   return (
     <li className="flex items-center gap-2 pl-4 text-muted-foreground">
       {tick}
-      <span className="flex-1 truncate">{offer.pet.name}</span>
+      {/* FR-CBT-146: the pet-offer row's name wraps between words, never cut. */}
+      <span className={cn("min-w-0 flex-1", NAME_WRAP)}>{offer.pet.name}</span>
     </li>
   );
 }
@@ -409,6 +411,11 @@ function StartDialog({
             ),
           )}
         </ul>
+        {startKeptNoteShown(rows) && (
+          <p className="text-xs text-muted-foreground" data-testid="cbt-enc-start-kept-note">
+            {START_KEPT_NOTE}
+          </p>
+        )}
         {(offMap.length > 0 || offers.some((o) => !o.onMap)) && (
           <fieldset className="flex flex-col gap-1">
             <legend className="mb-1 text-xs font-medium text-muted-foreground">
@@ -492,7 +499,27 @@ function StartDialog({
 
 // ---------- editor ----------
 
-function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void }) {
+/** FR-CBT-143 / -146: names wrap between words only (never "Drake / Compa / nion"), never cut. */
+const NAME_WRAP = "[overflow-wrap:normal] [word-break:normal]";
+/**
+ * FR-CBT-146: an entry row: the name (≥ 96 px, whole or wrapped between words) and CR, then the
+ * controls on the same line when the name has its natural width there, else on a second line.
+ */
+const ENTRY_ROW = "flex flex-wrap items-center gap-x-2 gap-y-1 text-sm";
+const ENTRY_CONTROLS = "ml-auto flex shrink-0 items-center gap-2";
+
+export function EntryName({ name, cr }: { name: string; cr: string }) {
+  return (
+    <span className="flex max-w-full flex-[1_0_auto] items-baseline gap-2">
+      <span data-testid="cbt-enc-entry-name" className={cn("min-w-24 flex-auto", NAME_WRAP)}>
+        {name}
+      </span>
+      <span className="shrink-0 text-xs text-muted-foreground">CR {cr}</span>
+    </span>
+  );
+}
+
+export function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void }) {
   // One array per store version (`useRecords` builds a fresh one per render), so `server` only
   // changes when the encounter or its entries do.
   const entriesById = useSync((s) => s.store.records[ENCOUNTER_ENTRY_TYPE]);
@@ -554,13 +581,21 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
   const lookupRows = useMonsterLookupRows(lookupQuery);
 
   return (
+    // FR-CBT-147: header and action row pinned; the entries, options and party scroll between.
     <div
-      className="flex min-h-0 flex-col gap-3"
+      className="flex h-full min-h-0 flex-col gap-3"
       data-testid="cbt-enc-editor"
       data-record-id={encounter.id}
     >
-      <div className="flex items-center gap-2">
-        <Button size="icon" variant="ghost" className="size-8" aria-label="Back" onClick={back}>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8 shrink-0"
+          aria-label="Back"
+          data-testid="cbt-enc-editor-back"
+          onClick={back}
+        >
           <ArrowLeftIcon className="size-4" />
         </Button>
         <Input
@@ -575,171 +610,181 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
           {encounter.status}
         </Badge>
       </div>
-      {nameError && <p className="text-xs text-destructive">{nameError}</p>}
-      {planned && (
-        <CreatureLookup
-          rows={lookupRows}
-          disabled={readOnly}
-          onQueryChange={setLookupQuery}
-          onPick={(id) => edit((d) => ({ ...d, entries: addPick(d.entries, id) }))}
-        />
-      )}
-      <ul className="flex flex-col gap-1">
-        {draft.entries.map((e) => {
-          const d = defs.get(e.definitionId);
-          const key = entryKey(e);
-          return (
-            <li
-              key={key}
-              data-testid="cbt-enc-entry"
-              data-record-id={e.definitionId}
-              data-value={e.quantity}
-              data-side={e.side}
-              className="flex items-center gap-2 text-sm"
-            >
-              <span className="flex-1 truncate">{d?.name ?? "(unknown)"}</span>
-              <span className="text-xs text-muted-foreground">
-                CR {d?.kind === "monster" ? d.statBlock.cr : "?"}
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                data-testid="cbt-enc-entry-dec"
+      {nameError && <p className="shrink-0 text-xs text-destructive">{nameError}</p>}
+      <div
+        className="-mx-1 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-1"
+        data-testid="cbt-enc-editor-body"
+      >
+        {planned && (
+          <CreatureLookup
+            rows={lookupRows}
+            disabled={readOnly}
+            onQueryChange={setLookupQuery}
+            onPick={(id) => edit((d) => ({ ...d, entries: addPick(d.entries, id) }))}
+          />
+        )}
+        <ul className="flex flex-col gap-1">
+          {draft.entries.map((e) => {
+            const d = defs.get(e.definitionId);
+            const key = entryKey(e);
+            return (
+              <li
+                key={key}
+                data-testid="cbt-enc-entry"
                 data-record-id={e.definitionId}
-                aria-label="One fewer"
-                disabled={readOnly}
-                onClick={() => setQty(key, e.quantity - 1)}
+                data-value={e.quantity}
+                data-side={e.side}
+                className={ENTRY_ROW}
               >
-                <MinusIcon className="size-3.5" />
-              </Button>
-              <span className="w-5 text-center tabular-nums">{e.quantity}</span>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                data-testid="cbt-enc-entry-inc"
-                data-record-id={e.definitionId}
-                aria-label="One more"
-                disabled={readOnly || e.quantity >= QUANTITY_MAX}
-                onClick={() => setQty(key, e.quantity + 1)}
-              >
-                <PlusIcon className="size-3.5" />
-              </Button>
-              <HpSelect
-                value={e.hpMode}
-                hasFormula={d?.kind === "monster" && Boolean(d.statBlock.hpFormula)}
-                disabled={readOnly}
-                testId="cbt-enc-entry-hp"
-                recordId={e.definitionId}
-                onChange={(hpMode) =>
-                  edit((x) => ({
-                    ...x,
-                    entries: x.entries.map((y) => (entryKey(y) === key ? { ...y, hpMode } : y)),
-                  }))
-                }
-              />
-              {/* FR-CBT-98 (#252): a friendly entry's creatures start as allies. */}
-              <Tooltip content="Friendly: on the party's side, not counted in the difficulty">
-                <span className="flex shrink-0 items-center gap-1">
-                  <HandshakeIcon className="size-3.5 text-muted-foreground" aria-hidden />
-                  <Switch
-                    data-testid="cbt-enc-entry-friendly"
+                <EntryName
+                  name={d?.name ?? "(unknown)"}
+                  cr={d?.kind === "monster" ? d.statBlock.cr : "?"}
+                />
+                <span className={ENTRY_CONTROLS}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    data-testid="cbt-enc-entry-dec"
                     data-record-id={e.definitionId}
-                    data-value={e.side}
-                    aria-label="Friendly"
+                    aria-label="One fewer"
                     disabled={readOnly}
-                    checked={e.side === "ally"}
-                    onCheckedChange={(on) =>
+                    onClick={() => setQty(key, e.quantity - 1)}
+                  >
+                    <MinusIcon className="size-3.5" />
+                  </Button>
+                  <span className="w-5 text-center tabular-nums">{e.quantity}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    data-testid="cbt-enc-entry-inc"
+                    data-record-id={e.definitionId}
+                    aria-label="One more"
+                    disabled={readOnly || e.quantity >= QUANTITY_MAX}
+                    onClick={() => setQty(key, e.quantity + 1)}
+                  >
+                    <PlusIcon className="size-3.5" />
+                  </Button>
+                  <HpSelect
+                    value={e.hpMode}
+                    hasFormula={d?.kind === "monster" && Boolean(d.statBlock.hpFormula)}
+                    disabled={readOnly}
+                    testId="cbt-enc-entry-hp"
+                    recordId={e.definitionId}
+                    onChange={(hpMode) =>
                       edit((x) => ({
                         ...x,
-                        entries: setEntrySide(x.entries, key, on ? "ally" : "enemy"),
+                        entries: x.entries.map((y) => (entryKey(y) === key ? { ...y, hpMode } : y)),
                       }))
                     }
                   />
+                  {/* FR-CBT-98 (#252): a friendly entry's creatures start as allies. */}
+                  <Tooltip content="Friendly: on the party's side, not counted in the difficulty">
+                    <span className="flex shrink-0 items-center gap-1">
+                      <HandshakeIcon className="size-3.5 text-muted-foreground" aria-hidden />
+                      <Switch
+                        data-testid="cbt-enc-entry-friendly"
+                        data-record-id={e.definitionId}
+                        data-value={e.side}
+                        aria-label="Friendly"
+                        disabled={readOnly}
+                        checked={e.side === "ally"}
+                        onCheckedChange={(on) =>
+                          edit((x) => ({
+                            ...x,
+                            entries: setEntrySide(x.entries, key, on ? "ally" : "enemy"),
+                          }))
+                        }
+                      />
+                    </span>
+                  </Tooltip>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    data-testid="cbt-enc-entry-remove"
+                    data-record-id={e.definitionId}
+                    aria-label="Remove"
+                    disabled={readOnly}
+                    onClick={() => setQty(key, 0)}
+                  >
+                    <Trash2Icon className="size-3.5" />
+                  </Button>
                 </span>
-              </Tooltip>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                data-testid="cbt-enc-entry-remove"
-                data-record-id={e.definitionId}
-                aria-label="Remove"
-                disabled={readOnly}
-                onClick={() => setQty(key, 0)}
-              >
-                <Trash2Icon className="size-3.5" />
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="cbt-enc-create-tokens"
-            data-testid="cbt-enc-create-tokens"
-            disabled={readOnly}
-            checked={draft.createTokens}
-            onCheckedChange={(v) => edit((d) => ({ ...d, createTokens: v === true }))}
-          />
-          <Label htmlFor="cbt-enc-create-tokens" className="font-normal">
-            Create tokens
-          </Label>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="cbt-enc-create-tokens"
+              data-testid="cbt-enc-create-tokens"
+              disabled={readOnly}
+              checked={draft.createTokens}
+              onCheckedChange={(v) => edit((d) => ({ ...d, createTokens: v === true }))}
+            />
+            <Label htmlFor="cbt-enc-create-tokens" className="font-normal">
+              Create tokens
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* OQ-CBTX-22: disabled while Create tokens is off. */}
+            <Checkbox
+              id="cbt-enc-add-hidden"
+              data-testid="cbt-enc-add-hidden"
+              disabled={readOnly || !draft.createTokens}
+              checked={draft.addHidden}
+              onCheckedChange={(v) => edit((d) => ({ ...d, addHidden: v === true }))}
+            />
+            <Label htmlFor="cbt-enc-add-hidden" className="font-normal">
+              Add hidden
+            </Label>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* OQ-CBTX-22: disabled while Create tokens is off. */}
-          <Checkbox
-            id="cbt-enc-add-hidden"
-            data-testid="cbt-enc-add-hidden"
-            disabled={readOnly || !draft.createTokens}
-            checked={draft.addHidden}
-            onCheckedChange={(v) => edit((d) => ({ ...d, addHidden: v === true }))}
-          />
-          <Label htmlFor="cbt-enc-add-hidden" className="font-normal">
-            Add hidden
-          </Label>
-        </div>
+        <fieldset className="flex flex-col gap-1">
+          <legend className="mb-1 text-xs font-medium text-muted-foreground">Party</legend>
+          {characters.map((c) => {
+            const id = `cbt-party-${c.id}`;
+            return (
+              <div key={c.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={id}
+                  data-testid="cbt-enc-party"
+                  data-record-id={c.id}
+                  disabled={readOnly}
+                  checked={partyIds.includes(c.id)}
+                  onCheckedChange={(v) =>
+                    edit((d) => ({
+                      ...d,
+                      partyCharacterIds: toggleParty(
+                        characters,
+                        d.partyCharacterIds,
+                        drafts,
+                        c.id,
+                        v === true,
+                      ),
+                    }))
+                  }
+                />
+                <Label htmlFor={id} className="font-normal">
+                  {c.name}{" "}
+                  <span className="text-xs text-muted-foreground">
+                    (level {c.kind === "character" ? c.statBlock.level : "?"})
+                    {drafts.has(c.id) && " · Draft"}
+                  </span>
+                </Label>
+              </div>
+            );
+          })}
+        </fieldset>
+        <DifficultyCard draft={draft} />
       </div>
-      <fieldset className="flex flex-col gap-1">
-        <legend className="mb-1 text-xs font-medium text-muted-foreground">Party</legend>
-        {characters.map((c) => {
-          const id = `cbt-party-${c.id}`;
-          return (
-            <div key={c.id} className="flex items-center gap-2">
-              <Checkbox
-                id={id}
-                data-testid="cbt-enc-party"
-                data-record-id={c.id}
-                disabled={readOnly}
-                checked={partyIds.includes(c.id)}
-                onCheckedChange={(v) =>
-                  edit((d) => ({
-                    ...d,
-                    partyCharacterIds: toggleParty(
-                      characters,
-                      d.partyCharacterIds,
-                      drafts,
-                      c.id,
-                      v === true,
-                    ),
-                  }))
-                }
-              />
-              <Label htmlFor={id} className="font-normal">
-                {c.name}{" "}
-                <span className="text-xs text-muted-foreground">
-                  (level {c.kind === "character" ? c.statBlock.level : "?"})
-                  {drafts.has(c.id) && " · Draft"}
-                </span>
-              </Label>
-            </div>
-          );
-        })}
-      </fieldset>
-      <DifficultyCard draft={draft} />
-      <div className="flex items-center gap-2">
+      <div
+        className="flex shrink-0 flex-wrap items-center gap-2"
+        data-testid="cbt-enc-editor-actions"
+      >
         {planned && (
           <>
             <Button data-testid="cbt-enc-start" disabled={!live} onClick={() => setStarting(true)}>
@@ -778,7 +823,7 @@ function Editor({ encounter, back }: { encounter: EncounterRecord; back(): void 
         <DialogContent>
           <DialogHeader>
             <DialogTitle>End “{encounter.name}”?</DialogTitle>
-            <EndConfirmDescription encounterId={encounter.id} testId="cbt-enc-end-pending" />
+            <EndConfirmDescription encounterId={encounter.id} area="cbt-enc" />
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEnding(false)}>
@@ -853,7 +898,9 @@ function EncountersBody() {
                 )}
                 onClick={() => setSelected(e.id)}
               >
-                <span className="flex-1 truncate">{e.name}</span>
+                <span className={cn("min-w-0 flex-1", NAME_WRAP)} data-testid="cbt-enc-row-name">
+                  {e.name}
+                </span>
                 <Badge variant={e.status === "started" ? "default" : "outline"}>
                   {e.status === "planned"
                     ? "Planned"

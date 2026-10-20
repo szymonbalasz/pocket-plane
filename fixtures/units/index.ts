@@ -28,6 +28,7 @@ import cpCombat from "./combat-tracker/cp-combat";
 import cpSrd from "./combat-tracker/cp-srd";
 import encFriendly from "./combat-tracker/enc-friendly";
 import encounter1 from "./combat-tracker/encounter-1";
+import fuHurtGoblins from "./combat-tracker/fu-hurt-goblins";
 import goblin2 from "./combat-tracker/goblin-2";
 import lateHitRuled from "./combat-tracker/late-hit-ruled";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
@@ -208,6 +209,8 @@ export const units: readonly Fixture[] = [
   cpCombat,
   // Sprint 7 track FU (fix/fu-small-copy): a type-less fixture Goblin (FR-CMP-58)
   cmpGoblinUntyped,
+  // Sprint 7 track FU (fix/fu-combat): kept HP on rebind
+  fuHurtGoblins,
   // Sprint 7 track GM (fix/gems-core): gems switch + counts
   gemsOn,
   gemsAwarded,

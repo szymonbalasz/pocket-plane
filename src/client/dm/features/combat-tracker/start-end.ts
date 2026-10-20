@@ -1,5 +1,7 @@
 // DM Start / End around the intents (pure; bun test): the End confirm's pending-card count
-// (FR-CBT-59) and the windows that follow the DM's own acked Start / End (FR-CBT-60).
+// (FR-CBT-59), its summon-token and charmed lines (FR-CBT-144, sprint 7) and the windows that
+// follow the DM's own acked Start / End (FR-CBT-60).
+import type { CombatantRecord } from "@shared/combat-tracker/schemas";
 import { endsWithEncounter } from "@shared/notifications/end-rule";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { ENCOUNTERS_KIND, INITIATIVE_KIND } from "@ui/features/combat-tracker/window";
@@ -32,6 +34,67 @@ export function endPendingText(n: number): string {
 }
 
 export const END_FIRST_SENTENCE = "Combatants leave the initiative list.";
+
+/** FR-CBT-141's Start-dialog note (OQ-CBT-92 A; no per-row numbers: the DM store can't know). */
+export const START_KEPT_NOTE = "Monsters that were in an earlier fight keep their HP.";
+
+/** FR-CBT-141: the note shows whenever a monster (not a pet) binding takes a placed token. */
+export const startKeptNoteShown = (
+  rows: readonly { kind: string; pet?: boolean; binding: "token" | "new" | "none" }[],
+) => rows.some((r) => r.kind === "monster" && !r.pet && r.binding === "token");
+
+/** FR-CBT-144: names listed before "and N more". */
+export const END_SUMMONS_SHOWN = 5;
+
+type EndRow = Pick<
+  CombatantRecord,
+  | "encounterId"
+  | "seq"
+  | "kind"
+  | "entityId"
+  | "name"
+  | "active"
+  | "tokenId"
+  | "summoned"
+  | "pet"
+  | "ownerCharacterId"
+>;
+
+/**
+ * FR-CBT-144 (OQ-CBT-94 A), from the DM's store at open time: the summons End will take tokens
+ * from (FR-CBT-145's set: every active summoned row with a token, any owner, removed ones too; a
+ * dismissed one is inactive, its token gone) and each charmed companion (an owned non-pet,
+ * non-summoned row) with its owner PC's name. Row (`seq`) order.
+ */
+export function endLeavers(
+  rows: readonly EndRow[],
+  encounterId: string,
+  characterName: (id: string) => string | undefined,
+): { summons: string[]; charmed: { owner: string; name: string }[] } {
+  const mine = rows.filter((r) => r.encounterId === encounterId).sort((a, b) => a.seq - b.seq);
+  const summons = mine.filter((r) => r.active && r.summoned && r.tokenId !== null);
+  const charmed = mine.filter(
+    (r) => r.active && r.ownerCharacterId !== null && !r.pet && !r.summoned,
+  );
+  const ownerName = (id: string) =>
+    mine.find((r) => r.kind === "pc" && r.entityId === id)?.name ?? characterName(id) ?? "";
+  return {
+    summons: summons.map((r) => r.name),
+    charmed: charmed.map((r) => ({ owner: ownerName(r.ownerCharacterId as string), name: r.name })),
+  };
+}
+
+/** FR-CBT-144: "Summoned creatures' tokens are removed: A, B." (≤ 5 names, then "and N more"). */
+export function endSummonsText(names: readonly string[]): string {
+  if (names.length === 0) return "";
+  const shown = names.slice(0, END_SUMMONS_SHOWN).join(", ");
+  const more = names.length - END_SUMMONS_SHOWN;
+  return `Summoned creatures' tokens are removed: ${shown}${more > 0 ? ` and ${more} more` : ""}.`;
+}
+
+/** FR-CBT-144 / #310 (2): "Mira's charmed Goblin 2 stays as a monster." */
+export const endCharmedText = (c: { owner: string; name: string }) =>
+  `${c.owner}'s charmed ${c.name} stays as a monster.`;
 
 export interface ShellEffects {
   dispatch(action: WindowAction): void;

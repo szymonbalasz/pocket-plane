@@ -15,5 +15,7 @@ export default defineBundle({
     // FU: sprint-6 follow-ups (`cp-ally` charmed Goblin 2 + `fu-hurt-goblins`, FU-combat)
     // FU4: a type-less fixture Goblin's Compendium row "CR 1/4 · Small" (FR-CMP-58)
     "cmp-goblin-untyped",
+    "cp-ally",
+    "fu-hurt-goblins",
   ],
 });

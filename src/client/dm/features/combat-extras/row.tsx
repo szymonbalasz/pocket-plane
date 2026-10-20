@@ -87,6 +87,7 @@ export function RowEffects({ c, round }: { c: CombatantView; round: number }) {
   const triggers = useTriggerChips(c);
   const { send, disabled } = useCbtIntent();
   const openEffect = useCbtxDialogs((s) => s.openEffect);
+  const openConcentration = useCbtxDialogs((s) => s.openConcentration);
   return (
     <EffectChips
       compact
@@ -94,6 +95,8 @@ export function RowEffects({ c, round }: { c: CombatantView; round: number }) {
       triggers={triggers}
       round={round}
       testId="cbtx-init-row-effect"
+      // FR-CBTX-60: the concentration chip's menu has the DM's Edit… (today's dialog).
+      onEditConcentration={() => openConcentration(targetOf(c))}
       menu={(e: EffectView) => (
         <>
           <DropdownMenuItem

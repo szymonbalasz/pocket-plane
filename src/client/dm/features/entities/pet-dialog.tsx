@@ -55,7 +55,7 @@ export interface PetBase {
   badge: string;
 }
 
-function PetForm({ base: initialBase, onDone }: { base: PetBase | null; onDone(): void }) {
+export function PetForm({ base: initialBase, onDone }: { base: PetBase | null; onDone(): void }) {
   const raw = useRecords<unknown>(ENTITY_TYPE);
   const players = useRecords<PlayerRecord>("player");
   const entities = useMemo(() => parsedEntities(raw), [raw]);
@@ -193,7 +193,14 @@ function PetForm({ base: initialBase, onDone }: { base: PetBase | null; onDone()
           className="flex-wrap"
         >
           {PET_TURN_MODES.map((m) => (
-            <ToggleGroupItem key={m} value={m} data-testid="ent-pet-mode" data-value={m}>
+            <ToggleGroupItem
+              key={m}
+              value={m}
+              data-testid="ent-pet-mode"
+              data-value={m}
+              // FR-ENT-44: the radio's accessible name = its label.
+              aria-label={TURN_MODE_LABEL[m]}
+            >
               {TURN_MODE_LABEL[m]}
             </ToggleGroupItem>
           ))}

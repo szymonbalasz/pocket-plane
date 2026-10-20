@@ -6,7 +6,9 @@
 // Ranks + player turn rewritten; `added` hook (FR-CBTX-13). All or nothing. Encounter entries
 // stay the plan (OQ-CBTX-17). Sprint 6 (OQ-CBT-84 a, FR-CBT-109's rules): a pet (its token or the
 // pet itself, one each) joins as itself: owner copies, its mode, its kept HP, `card`, side ally;
-// its owner PC must be in the fight.
+// its owner PC must be in the fight. Sprint 7 (FR-CBT-141): a monster binding a token from an
+// earlier fight keeps that fight's HP (a token kept at 0 bound last); a pet's tokens keep its
+// owner (FR-MAP-88's safety net).
 import {
   AddCombatantsInput,
   CBTX_INTENTS,
@@ -25,7 +27,15 @@ import type { RecordChange } from "../../events/types";
 import { getCharacter } from "../character-sheet/hp";
 import { assertCompanionCap, ownerOfCompanion } from "../combat-tracker/companions";
 import { rollInitiativeFor } from "../combat-tracker/initiative";
-import { monsterHp, TokenPlacer } from "../combat-tracker/join";
+import {
+  downedLast,
+  keptFor,
+  keptHp,
+  keptHpByToken,
+  monsterHp,
+  petTokenOwners,
+  TokenPlacer,
+} from "../combat-tracker/join";
 import { combatantDiff, encounterDiff, rerank, syncPlayerTurn } from "../combat-tracker/ranks";
 import {
   campaignOf,
@@ -72,7 +82,8 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
       }
       // FR-CBT-65: no scene (deleted since Start) → no tokens, creatures join token-less.
       const scene = before.sceneId ? getScene(tx, cid, before.sceneId) : null;
-      const tokens = scene ? sceneTokens(tx, scene.id) : [];
+      const kept = keptHpByToken(tx, cid);
+      const tokens = scene ? downedLast(sceneTokens(tx, scene.id), kept) : [];
       const placer = scene && createTokens ? new TokenPlacer(env, scene, at) : null;
       const taken = new Set(rows.filter((r) => r.active && r.tokenId).map((r) => r.tokenId));
       const inCombat = new Set(
@@ -196,10 +207,13 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
         let hp: number | null = null;
         let hpMax: number | null = null;
         const pet = s.pet;
+        const k = s.kind === "monster" ? keptFor(kept, s.tokenId, s.def.id) : null;
         if (pet) {
           // FR-CBT-109: the pet's kept HP; its stat block's max.
           hpMax = pet.statBlock.hpMax;
           hp = Math.min(pet.hpCurrent ?? hpMax, hpMax);
+        } else if (k) {
+          ({ hp, hpMax } = keptHp(tx, k, s.def));
         } else if (s.kind === "monster") {
           const r = monsterHp(env, s.def, s.hpMode, s.name, encounterId);
           hp = r.hp;
@@ -261,6 +275,8 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
         ...syncPetPresence(env, cid, {
           petIds: slots.flatMap((s) => (s.pet ? [s.pet.id] : [])),
         }),
+        // FR-MAP-88: the pet's tokens carry its owner (safety net: rows only where one differs).
+        ...slots.flatMap((s) => (s.pet ? petTokenOwners(env, s.pet) : [])),
       ];
       env.emit({
         type: CombatantsAdded.type,

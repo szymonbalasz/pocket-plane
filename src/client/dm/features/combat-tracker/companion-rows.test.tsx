@@ -88,7 +88,7 @@ describe("FR-CBT-118 DM rows", () => {
     expect(goblin).not.toContain("cbt-init-row-mode");
   });
 
-  test("FR-CBT-118 DM rows: the drake and Fire Elemental 2 are companion lines in Brakka's row with their own HP, AC, band, Attack ▸ and menu", () => {
+  test("FR-CBT-142 compact companion line: DM — the drake and Fire Elemental 2 are one-row lines in Brakka's row: name, '22 / 22', AC, card, ⋯ (Attack ▸ inside)", () => {
     const html = dm();
     const brakka = rowHtml(html, "cbt-init-row", "brakka");
     expect(
@@ -99,11 +99,20 @@ describe("FR-CBT-118 DM rows", () => {
     const drake = brakka.slice(
       brakka.indexOf('data-testid="cbt-init-companion" data-record-id="drake"'),
     );
-    expect(drake).toContain(">Drake Companion<");
-    expect(drake).toMatch(/data-testid="cbt-init-row-hp" data-record-id="drake">HP 22\/22/);
-    expect(drake).toMatch(/data-testid="cbt-init-row-band"[^>]*data-value="healthy"/);
-    expect(drake).toMatch(/data-testid="cbt-init-row-attack" data-record-id="drake"/);
-    expect(drake).toMatch(/data-testid="cbt-init-row-menu" data-record-id="drake"/);
+    const own = drake.slice(0, drake.indexOf('data-record-id="fe2"'));
+    expect(own).toContain(">Drake Companion<");
+    expect(own).toMatch(/data-testid="cbt-init-row-hp" data-record-id="drake">22 \/ 22</);
+    expect(own).toMatch(/data-testid="cbt-init-row-ac" data-record-id="drake">AC [^<]+</);
+    expect(own).toContain('data-testid="cbt-init-row-card"');
+    expect(own).toMatch(/data-testid="cbt-init-companion-menu" data-record-id="drake"/);
+    // One row: no band, no Attack button or row menu of its own (both inside ⋯), no stats line.
+    expect(own).not.toContain("cbt-init-row-band");
+    expect(own).not.toMatch(/data-testid="cbt-init-row-attack"/);
+    expect(own).not.toMatch(/data-testid="cbt-init-row-menu"/);
+    // HP, AC ride in the name line's side slot; card + ⋯ in its end slot (NameLine fits them).
+    const side = own.slice(own.indexOf("data-name-side"));
+    expect(side.indexOf("cbt-init-row-hp")).toBeLessThan(side.indexOf("data-name-end"));
+    expect(own.indexOf("data-name-end")).toBeLessThan(own.indexOf("cbt-init-companion-menu"));
     expect(drake).toMatch(
       /data-testid="cbt-init-row-mode" data-record-id="drake" data-value="in-owner-turn"/,
     );

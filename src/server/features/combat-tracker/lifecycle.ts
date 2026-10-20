@@ -1,5 +1,6 @@
 // Start / End (FR-CBT-07, FR-CBT-08, FR-CBT-10; End dismisses pending cards, FR-CBT-59/61;
-// sprint 2: Start options, created tokens, HP modes, monster initiative, FR-CBT-64–66).
+// sprint 2: Start options, created tokens, HP modes, monster initiative, FR-CBT-64–66; sprint 7:
+// kept HP on rebind FR-CBT-141, every summon's token goes at End FR-CBT-145).
 // `started` / `ended` rule hooks run after the event (FR-CBTX-01, ADR-0035).
 import { type BindSlot, planBindings } from "@shared/combat-tracker/rules";
 import {
@@ -30,7 +31,15 @@ import { clearTrails } from "../scenes-map/trail";
 import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 import { companionsAtEnd } from "./companions";
 import { rollInitiativeFor } from "./initiative";
-import { monsterHp, TokenPlacer } from "./join";
+import {
+  downedLast,
+  keptFor,
+  keptHp,
+  keptHpByToken,
+  monsterHp,
+  petTokenOwners,
+  TokenPlacer,
+} from "./join";
 import { rerank } from "./ranks";
 import {
   campaignOf,
@@ -182,9 +191,13 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
         });
       }
       const placer = new TokenPlacer(env, scene, at);
+      // FR-CBT-141: tokens from an earlier fight keep its HP; one kept at 0 binds after the
+      // living ones (`seq` rewritten to that order for `planBindings`).
+      const kept = keptHpByToken(tx, cid);
       // FR-FOG-14: a combatant's hidden copy = the token's `hidden` or fog-hidden.
-      const placed = sceneTokens(tx, scene.id).map((t) => ({
+      const placed = downedLast(sceneTokens(tx, scene.id), kept).map((t, seq) => ({
         ...t,
+        seq,
         hidden: tokenHiddenForPlayers(t),
       }));
       const bindings = planBindings(slots, placed).map((b, i) => {
@@ -204,7 +217,10 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
         const slot = slots[i] as StartSlot;
         let hp: number | null = null;
         let hpMax: number | null = null;
-        if (slot.def) {
+        const k = slot.def ? keptFor(kept, b.tokenId, slot.entityId) : null;
+        if (slot.def && k) {
+          ({ hp, hpMax } = keptHp(tx, k, slot.def));
+        } else if (slot.def) {
           const r = monsterHp(env, slot.def, slot.hpMode, b.name, encounterId);
           hp = r.hp;
           hpMax = r.hp;
@@ -281,6 +297,8 @@ export const startCommandWith = (hooks: CombatRuleHooks) =>
         ...init.entries,
         // FR-ENT-37: a joining pet is present now (other players get its redacted row).
         ...syncPetPresence(env, cid, { petIds: pets.map((p) => p.id) }),
+        // FR-MAP-88: the pet's tokens carry its owner (safety net: rows only where one differs).
+        ...pets.flatMap((p) => petTokenOwners(env, p)),
       ];
       env.emit({
         type: EncounterStarted.type,

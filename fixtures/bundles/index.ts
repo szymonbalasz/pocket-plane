@@ -27,6 +27,8 @@ import entities from "./entities";
 import fog from "./fog";
 import fogScn from "./fog-scn";
 import fuSmallCopy from "./fu-small-copy";
+import fuS7 from "./fu-s7";
+import fuS7E2e from "./fu-s7-e2e";
 import furyLogLine from "./fury-log-line";
 import gems from "./gems";
 import gemsE2e from "./gems-e2e";
@@ -136,6 +138,9 @@ export const bundles: readonly Bundle[] = [
   cpTokens,
   // Sprint 7 track FU (fix/fu-small-copy)
   fuSmallCopy,
+  // Sprint 7 track FU (fix/fu-combat)
+  fuS7,
+  fuS7E2e,
   // Sprint 7 track GM (fix/gems-core)
   gems,
   gemsHidden,

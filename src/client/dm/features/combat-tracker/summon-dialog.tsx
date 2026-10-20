@@ -305,6 +305,8 @@ export function SummonBody({
               value={m}
               data-testid="cbt-summon-mode"
               data-value={m}
+              // FR-CBT-151: the radio's accessible name = its label.
+              aria-label={MODE_MENU_LABEL[m]}
               className="h-7 px-2 text-xs"
             >
               {MODE_MENU_LABEL[m]}
