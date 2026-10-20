@@ -4,10 +4,11 @@
 // portalled, FR-SHELL-22).
 import { useEffect, useRef, useState } from "react";
 import { ConnectionIndicator, ReconnectBanner } from "../live-sync/ConnectionStatus";
-import { AlertFlash, SoundControl } from "./AlertLayer";
+import { AlertFlash } from "./AlertLayer";
 import { testSoundAttr } from "./alerts";
 import { TOP_BAR_H } from "./geometry";
 import { useBaseKeyDown, useViewport } from "./hooks";
+import { IdentityChip } from "./IdentityChip";
 import { keepOutsAttr, useKeepOuts } from "./keep-outs";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { Launcher } from "./Launcher";
@@ -45,7 +46,7 @@ export interface PlayFrameProps {
   topLeft: React.ReactNode;
   /** Top bar, right, before the connection indicator. */
   topRight?: React.ReactNode;
-  /** Top bar, far right, after the connection indicator. */
+  /** Top bar, after the connection indicator, before the identity chip (FR-SHELL-70). */
   topEnd?: React.ReactNode;
   /** Base layer (scenes-map canvas). Omitted → the empty state. */
   base?: React.ReactNode;
@@ -120,10 +121,10 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
         <div className="flex min-w-0 items-center gap-2">{topLeft}</div>
         <div className="ml-auto flex items-center gap-2">
           {topRight}
-          {/* FR-SHELL-24: players only; no DM sound control in MVP (#154). */}
-          {client === "player" && <SoundControl />}
           <ConnectionIndicator />
           {topEnd}
+          {/* FR-SHELL-70: opens Preferences; the players' sound state moved here (FR-SHELL-73). */}
+          <IdentityChip client={client} />
         </div>
       </header>
 
