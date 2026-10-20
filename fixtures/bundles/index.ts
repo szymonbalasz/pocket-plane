@@ -20,6 +20,7 @@ import entities from "./entities";
 import fog from "./fog";
 import fogScn from "./fog-scn";
 import furyLogLine from "./fury-log-line";
+import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import lateDamage from "./late-damage";
 import logNoteColours from "./log-note-colours";
@@ -43,6 +44,7 @@ import sessionSim from "./session-sim";
 import sessionSim7 from "./session-sim-7";
 import sessionSim8 from "./session-sim-8";
 import sessionSim9 from "./session-sim-9";
+import sessionSim10 from "./session-sim-10";
 import syncProbe from "./sync-probe";
 import tokenArtUpdate from "./token-art-update";
 import tplMenu from "./tpl-menu";
@@ -102,4 +104,6 @@ export const bundles: readonly Bundle[] = [
   logNoteColours,
   prefsS6,
   prefsS6E2e,
+  imageSearch,
+  sessionSim10,
 ];

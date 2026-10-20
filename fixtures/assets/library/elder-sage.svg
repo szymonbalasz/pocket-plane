@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="320" viewBox="0 0 256 320">
+  <title>Elder Sage</title>
+  <rect width="256" height="320" fill="#8e24aa"/><rect x="12" y="12" width="232" height="296" fill="none" stroke="#e0c070" stroke-width="8"/>
+  <polygon points="128,83 205,160 128,237 51,160" fill="#9e9d24" stroke="#111" stroke-width="3"/>
+  <rect x="38" y="306" width="17" height="6" fill="#fff" stroke="#000"/><rect x="57" y="306" width="17" height="6" fill="#fff" stroke="#000"/><rect x="76" y="297" width="17" height="15" fill="#fff" stroke="#000"/><rect x="95" y="303" width="17" height="9" fill="#fff" stroke="#000"/><rect x="114" y="303" width="17" height="9" fill="#fff" stroke="#000"/><rect x="133" y="299" width="17" height="13" fill="#fff" stroke="#000"/><rect x="152" y="305" width="17" height="7" fill="#fff" stroke="#000"/><rect x="171" y="302" width="17" height="10" fill="#fff" stroke="#000"/><rect x="190" y="303" width="17" height="9" fill="#fff" stroke="#000"/>
+</svg>
