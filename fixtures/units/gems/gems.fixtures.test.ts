@@ -1,7 +1,8 @@
-// GEM §13 fixtures: `gems-on`, `gems-awarded`, `gems-hidden`; bundles `gems`, `gems-hidden`,
-// `gems-e2e`. Every other bundle keeps gems off (FR-GEM-01): only these units switch it.
+// GEM §13 fixtures: `gems-on`, `gems-awarded`, `gems-hidden`, `gems-rolls` (GM1); bundles `gems`,
+// `gems-hidden`, `gems-e2e`, `gems-reroll-e2e`. Every other bundle keeps gems off (FR-GEM-01):
+// only these units switch it.
 import { afterAll, describe, expect, test } from "bun:test";
-import { campaign, characterGems, entity, gameLogEntry } from "@server/db/schema";
+import { campaign, characterGems, entity, gameLogEntry, player } from "@server/db/schema";
 import { SET_FEATURE_INTENT } from "@server/features/campaign-management/features";
 import { servicesFromBundle, snapshotFrames } from "@server/ws/testing/snapshot-size";
 import type { CampaignRecord } from "@shared/campaign-management/schemas";
@@ -12,6 +13,7 @@ import { CHARACTER_GEMS_TYPE, type CharacterGemsRecord, GEM_KINDS } from "@share
 import { eq } from "drizzle-orm";
 import { library, loadBundle } from "../../index";
 import { GEMS_AWARDED } from "./gems-awarded";
+import { GEM_SECRET_LABEL, GEMS_ROLLS } from "./gems-rolls";
 
 const cleanups: (() => void)[] = [];
 afterAll(() => {
@@ -41,7 +43,7 @@ function closure(name: string): string[] {
   return [...keys];
 }
 
-const GEM_BUNDLES = ["gems", "gems-hidden", "gems-e2e"];
+const GEM_BUNDLES = ["gems", "gems-hidden", "gems-e2e", "gems-reroll-e2e"];
 
 async function frames(bundle: string) {
   const loaded = await loadBundle(bundle, { testMode: true });
@@ -104,6 +106,37 @@ describe("gems fixtures (GEM §13)", () => {
       expect(lines).toContain("DM awards Brakka a Fortune gem (6 held)");
       expect(lines).toContain("DM awards Thorn an Inspiration gem (1 held)");
     }
+  }, 180_000);
+
+  test("FR-GEM-18 gems-rolls: Mira's lines (P1 public, the DM's hidden one never in a player frame); a P1 reroll of e-perc works from the bundle", async () => {
+    const { s, frames: fs } = await frames("gems-reroll-e2e");
+    const all = s.db.select().from(gameLogEntry).all() as GameLogEntryRecord[];
+    const byLabel = (label: string) =>
+      all.find(
+        (e) =>
+          e.kind === "roll" &&
+          (e.payload as { label: string | null }[])[0]?.label === label &&
+          e.actorName === "Mira",
+      ) as GameLogEntryRecord;
+    const perc = byLabel(GEMS_ROLLS.perception);
+    const secret = byLabel(GEM_SECRET_LABEL);
+    expect(lineText(formatEntry(perc).segments)).toBe("Mira — Perception: 4 + 3 = 7 (physical)");
+    expect(lineText(formatEntry(byLabel(GEMS_ROLLS.stealth)).segments)).toBe(
+      "Mira — Stealth (adv): 6 ~2~ + 5 = 11 (physical)",
+    );
+    expect([perc.public, perc.rollerRole, secret.public]).toEqual([true, "player", false]);
+    expect(byLabel(GEMS_ROLLS.initiative).category).toBe("initiative");
+    for (const f of fs.slice(1)) expect(JSON.stringify(f.records)).not.toContain(GEM_SECRET_LABEL);
+    const p1 = s.db.select().from(player).where(eq(player.name, "Player 1")).get();
+    const mira = s.db.select().from(entity).where(eq(entity.name, "Mira")).get();
+    const r = s.commands.run(
+      "gem.spend",
+      { characterId: mira?.id, gem: "inspiration", entryId: perc.id },
+      { actor: { role: "player", playerId: p1?.id as string, campaignId: perc.campaignId } },
+    ) as { held: number; rerollEntryId: string };
+    expect(r.held).toBe(1);
+    const after = s.db.select().from(gameLogEntry).where(eq(gameLogEntry.id, perc.id)).get();
+    expect(after?.supersededBy).toBe(r.rerollEntryId);
   }, 180_000);
 
   test("FR-GEM-02 FR-GEM-04 gems-hidden and gems-e2e: rows and lines kept in the DB; no gem record, line or `features` key in any viewer's snapshot", async () => {

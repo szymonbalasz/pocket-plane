@@ -3,6 +3,7 @@
 // character; lines are public (OQ-GEM-02 A, OQ-GEM-10 A).
 import { GEMS_FEATURE } from "@shared/campaign-management/features";
 import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-types";
+import { LABEL_MAX } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 import {
   ActionUse,
@@ -22,13 +23,36 @@ export const GemAwardPayload = z.strictObject({
 });
 export type GemAwardPayload = z.infer<typeof GemAwardPayload>;
 
+/**
+ * GEM §8: what a spend went on: `entry` = a rerolled log line (FR-GEM-19: its label and old total
+ * `from`; `to` = the new total when the line states it). The Combat gem adds `card` (GM2).
+ */
+export const GemSpendTarget = z.strictObject({
+  kind: z.enum(["entry"]),
+  id: z.string(),
+  label: z.string().max(LABEL_MAX),
+  from: z.int(),
+  to: z.int().optional(),
+});
+export type GemSpendTarget = z.infer<typeof GemSpendTarget>;
+
+/**
+ * FR-GEM-13 (rulings-a #1): `target` takes the target's audience. A public target → here; a
+ * DM-only target (a hidden roll) → `null` here and the detail in `dmPayload`, so the public line
+ * is just "Mira spends an Inspiration gem".
+ */
 export const GemSpendPayload = z.strictObject({
   characterId: z.string(),
   gem: GemKind,
   count: z.int().min(1).max(3),
   use: ActionUse.optional(),
+  target: GemSpendTarget.nullable().optional(),
 });
 export type GemSpendPayload = z.infer<typeof GemSpendPayload>;
+
+/** FR-GEM-13: a DM-only target's detail (the DM's line reads it). */
+export const GemSpendDmPayload = z.strictObject({ target: GemSpendTarget });
+export type GemSpendDmPayload = z.infer<typeof GemSpendDmPayload>;
 
 /** "an Inspiration gem" / "a Fortune gem" / "2 Action gems". */
 export function gemsPhrase(gem: GemKind, count: number): string {
@@ -73,13 +97,21 @@ export const gemAwardKind = defineLogKind<GemAwardPayload>({
   },
 });
 
-/** FR-GEM-14–16: "Brakka spends 2 Action gems — a full action". */
-export const gemSpendKind = defineLogKind<GemSpendPayload>({
+/** FR-GEM-19: "rerolls Perception (4)". */
+export const targetText = (t: GemSpendTarget): string => `rerolls ${t.label} (${t.from})`;
+
+/**
+ * FR-GEM-14–16: "Brakka spends 2 Action gems — a full action"; FR-GEM-19: "Mira spends an
+ * Inspiration gem — rerolls Perception (4)"; FR-GEM-13: a DM-only target → no detail for players.
+ */
+export const gemSpendKind = defineLogKind<GemSpendPayload, GemSpendDmPayload>({
   kind: LOG_KIND_GEM_SPEND,
   feature: GEMS_FEATURE,
   payload: GemSpendPayload,
-  formatLine({ actorName, payload: p }) {
-    const purpose = spendPurpose(p);
+  dmPayload: GemSpendDmPayload,
+  formatLine({ actorName, payload: p, dmPayload }) {
+    const target = dmPayload?.target ?? p.target;
+    const purpose = target ? targetText(target) : target === null ? null : spendPurpose(p);
     const out: LineSegment[] = [
       { text: actorName, style: "actor" },
       { text: ` spends ${gemsPhrase(p.gem, p.count)}` },
