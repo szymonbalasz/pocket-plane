@@ -31,6 +31,8 @@ export interface IngestStepOptions {
   name?: string;
   /** FR-ASSET-24 (S5): false = an attachment (ruling #26: `ingestStep(file, {listed: false})`). */
   listed?: boolean;
+  /** FR-ASSET-41 (S6): `ingestStep(file, {tags})`; absent = `[]`. Tags don't feed the ID seed. */
+  tags?: string[];
 }
 
 /**
@@ -39,7 +41,8 @@ export interface IngestStepOptions {
  * the asset name.
  */
 export function ingestStep(file: string, opts: string | IngestStepOptions = {}): SetupStep {
-  const { name, listed } = typeof opts === "string" ? { name: opts, listed: undefined } : opts;
+  const { name, listed, tags } =
+    typeof opts === "string" ? ({ name: opts } as IngestStepOptions) : opts;
   return {
     command: INGEST,
     input: async () => ({
@@ -47,6 +50,7 @@ export function ingestStep(file: string, opts: string | IngestStepOptions = {}):
       filename: path.basename(file),
       ...(name !== undefined ? { name } : {}),
       ...(listed !== undefined ? { listed } : {}),
+      ...(tags !== undefined ? { tags } : {}),
     }),
   };
 }
