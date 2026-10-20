@@ -1,9 +1,11 @@
-// Player colours (CAMP FR-CAMP-23, -28; ADR-0055): the fixed palette of 8, the default rule, and
-// the pure checks behind CAMP §7's figures (WCAG 2.x contrast; CIEDE2000 after colour-blind
-// simulation). The wire carries the key; each client maps it to `--player-<key>` (FR-CAMP-28).
+// Player colours (CAMP FR-CAMP-23, -28, -30–32; ADR-0055 amended by ADR-0057): a colour is a
+// lowercase `#rrggbb`; the 8 sprint-5 colours are the suggested palette colours. Pure rules used
+// by server and picker: validity (`colorProblem`), the distance between people (`colorDistance`,
+// `colorClash`) and a new player's default (`defaultColor`), on the WCAG / CIELAB / CIEDE2000
+// helpers below (no dependency).
 import { z } from "zod";
 
-/** Keys in default order (FR-CAMP-23: a new player gets the first free one). */
+/** Palette keys in default order (FR-CAMP-32: a new player gets the first one far enough away). */
 export const PLAYER_COLOR_KEYS = [
   "amber",
   "jade",
@@ -14,11 +16,13 @@ export const PLAYER_COLOR_KEYS = [
   "vermillion",
   "bronze",
 ] as const;
-export type PlayerColor = (typeof PLAYER_COLOR_KEYS)[number];
-export const PlayerColor = z.enum(PLAYER_COLOR_KEYS);
+export type PaletteKey = (typeof PLAYER_COLOR_KEYS)[number];
+export const PaletteKey = z.enum(PLAYER_COLOR_KEYS);
+/** @deprecated The sprint-5 name of `PaletteKey`; a stored colour is now a hex (FR-CAMP-30). */
+export type PlayerColor = PaletteKey;
 
-/** CAMP §7 palette, dark mode (visual-direction `player.<key>`). */
-export const PLAYER_COLORS: Readonly<Record<PlayerColor, string>> = {
+/** CAMP §7 palette colours, dark mode (visual-direction `player.<key>`); order and hex fixed. */
+export const PLAYER_COLORS: Readonly<Record<PaletteKey, string>> = {
   amber: "#e69f00",
   jade: "#19b98a",
   sky: "#56b4e9",
@@ -29,30 +33,153 @@ export const PLAYER_COLORS: Readonly<Record<PlayerColor, string>> = {
   bronze: "#a07850",
 };
 
-/** FR-CAMP-24: every campaign starts here. */
-export const DM_DEFAULT_COLOR: PlayerColor = "amber";
+/** FR-CAMP-24, -30: every campaign starts at Amber (written by the create command). */
+export const DM_DEFAULT_COLOR = PLAYER_COLORS.amber;
 
-export const isPlayerColor = (v: unknown): v is PlayerColor =>
+export const isPaletteKey = (v: unknown): v is PaletteKey =>
   (PLAYER_COLOR_KEYS as readonly unknown[]).includes(v);
 
-/** "vermillion" → "Vermillion" (picker labels, CAMP §7). */
-export const colorLabel = (k: PlayerColor): string => k.charAt(0).toUpperCase() + k.slice(1);
+/** A stored colour (FR-CAMP-30): lowercase `#rrggbb`. */
+export const isHexColor = (v: unknown): v is string =>
+  typeof v === "string" && /^#[0-9a-f]{6}$/.test(v);
+
+/** `camp.setColor`'s colour (FR-CAMP-33): `#rrggbb` in any case, stored lowercase; no names. */
+export const HexColorInput = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "Expected a #rrggbb colour")
+  .transform((s) => s.toLowerCase());
 
 /**
- * FR-CAMP-23 default: the first key in palette order not in `taken` (the DM colour and the other
- * players' colours of the campaign); all 8 taken → the least-used key, ties in palette order.
+ * A colour as old data or an older peer may hold it (FR-CAMP-34, -36): a palette key → its hex,
+ * a hex in any case → lowercase; anything else → null.
  */
-export function defaultColor(taken: readonly PlayerColor[]): PlayerColor {
-  const uses = new Map<PlayerColor, number>(PLAYER_COLOR_KEYS.map((k) => [k, 0]));
-  for (const k of taken) uses.set(k, (uses.get(k) ?? 0) + 1);
-  let best: PlayerColor = PLAYER_COLOR_KEYS[0];
-  for (const k of PLAYER_COLOR_KEYS) {
-    if ((uses.get(k) ?? 0) < (uses.get(best) ?? 0)) best = k;
-  }
-  return best;
+export function normalizeColor(v: unknown): string | null {
+  if (isPaletteKey(v)) return PLAYER_COLORS[v];
+  if (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v)) return v.toLowerCase();
+  return null;
 }
 
-// ---- Colour science (FR-CAMP-28 palette contrast; no dependency) ----
+/** The palette key whose hex this is (any case), or null. */
+export function paletteKeyOf(hex: string): PaletteKey | null {
+  const h = hex.toLowerCase();
+  return PLAYER_COLOR_KEYS.find((k) => PLAYER_COLORS[k] === h) ?? null;
+}
+
+/** "vermillion" → "Vermillion" (picker labels, CAMP §7). */
+export const colorLabel = (k: PaletteKey): string => k.charAt(0).toUpperCase() + k.slice(1);
+
+/** FR-CAMP-30: a palette colour shows its name ("Rose"), any other colour its hex. */
+export function colorName(color: string): string {
+  const hex = normalizeColor(color);
+  const key = hex ? paletteKeyOf(hex) : null;
+  return key ? colorLabel(key) : (hex ?? color);
+}
+
+// ---- FR-CAMP-31 validity ----
+
+/** The window surface: log names are text on it. */
+export const WINDOW_SURFACE = "#171717";
+/** The danger reds the app draws: `accent.danger` / `hp.down`, the canvas `--destructive`. */
+export const DANGER_REDS = ["#ef4444", "#ff6467"] as const;
+export const MIN_CONTRAST = 4.5;
+export const MIN_CHROMA = 25;
+/** ΔE2000 from `accent.danger` in normal vision. */
+export const MIN_DANGER_NORMAL = 15;
+/** ΔE2000 from each danger red in the worst of the three views (OQ-CAMP-29 danger (a)). */
+export const MIN_DANGER_WORST = 5;
+
+export type ColorProblem = "too-dark" | "too-grey" | "too-red";
+
+export const COLOR_PROBLEM_MESSAGE: Readonly<Record<ColorProblem, string>> = {
+  "too-dark": "Too dark to read on the map",
+  "too-grey": "Too grey",
+  "too-red": "Too close to the danger red",
+};
+
+/** CIELAB chroma C* (normal vision). */
+export function chroma(hex: string): number {
+  const [, a, b] = linearToLab(linearRgb(hexToRgb(hex)));
+  return Math.hypot(a, b);
+}
+
+/**
+ * FR-CAMP-31: null when the colour reads on the map and stays a person colour; else the first
+ * rule it breaks: (a) contrast ≥ 4.5 : 1 on `#171717`; (b) C* ≥ 25; (c) ΔE ≥ 15 from `#ef4444`
+ * in normal vision and ≥ 5 from each danger red in the worst of the three views.
+ */
+export function colorProblem(hex: string): ColorProblem | null {
+  if (contrastRatio(hex, WINDOW_SURFACE) < MIN_CONTRAST) return "too-dark";
+  if (chroma(hex) < MIN_CHROMA) return "too-grey";
+  if (deltaE(hex, DANGER_REDS[0]) < MIN_DANGER_NORMAL) return "too-red";
+  if (DANGER_REDS.some((red) => colorDistance(hex, red) < MIN_DANGER_WORST)) return "too-red";
+  return null;
+}
+
+// ---- FR-CAMP-32 distance between people ----
+
+/** A pick must be at least this far from everyone else's colour. */
+export const MIN_PERSON_DISTANCE = 9;
+/** The views the distance is checked in (not tritanopia, CAMP §7). */
+export const DISTANCE_VISIONS = ["normal", "deuteranopia", "protanopia"] as const;
+
+/** FR-CAMP-32: the smallest ΔE2000 of `a` vs `b` in normal, deuteranopia and protanopia views. */
+export function colorDistance(a: string, b: string): number {
+  return Math.min(...DISTANCE_VISIONS.map((v) => deltaE(a, b, v)));
+}
+
+/** Someone else's colour in the campaign: a player (`by` = id) or the DM (`by` = `dm`). */
+export interface ColorHolder {
+  by: string;
+  name: string;
+  color: string;
+}
+
+export interface ColorClash {
+  reason: "taken" | "too-close";
+  by: string;
+  message: string;
+}
+
+/**
+ * FR-CAMP-32: the closest holder under 9 (ties in the given order), or null. Distance 0 →
+ * "Taken by ‹name›"; else "Too close to ‹name›'s colour", plus " for colour-blind players" when
+ * normal vision alone is ≥ 9. A holder whose colour isn't readable (`normalizeColor`) is skipped.
+ */
+export function colorClash(hex: string, others: readonly ColorHolder[]): ColorClash | null {
+  const own = hex.toLowerCase();
+  let best: { h: ColorHolder; hex: string; d: number } | null = null;
+  for (const h of others) {
+    const other = normalizeColor(h.color);
+    if (!other) continue;
+    const d = other === own ? 0 : colorDistance(own, other);
+    if (d < MIN_PERSON_DISTANCE && (!best || d < best.d)) best = { h, hex: other, d };
+  }
+  if (!best) return null;
+  const { h, d } = best;
+  if (d === 0) return { reason: "taken", by: h.by, message: `Taken by ${h.name}` };
+  const cb = deltaE(own, best.hex) >= MIN_PERSON_DISTANCE ? " for colour-blind players" : "";
+  return { reason: "too-close", by: h.by, message: `Too close to ${h.name}'s colour${cb}` };
+}
+
+/**
+ * FR-CAMP-32 default (amends FR-CAMP-23): the first palette colour at distance ≥ 9 from every
+ * colour in `taken` (the DM colour and the campaign's other players'; read with
+ * `normalizeColor`, unreadable ones ignored); none → the palette colour whose smallest distance
+ * is largest, ties in palette order. Deterministic: no `ctx` generator.
+ */
+export function defaultColor(taken: readonly string[]): string {
+  const held = taken.map(normalizeColor).filter((c): c is string => c !== null);
+  let best = { hex: PLAYER_COLORS[PLAYER_COLOR_KEYS[0]], d: -1 };
+  for (const k of PLAYER_COLOR_KEYS) {
+    const hex = PLAYER_COLORS[k];
+    const d = Math.min(Infinity, ...held.map((c) => (c === hex ? 0 : colorDistance(hex, c))));
+    if (d >= MIN_PERSON_DISTANCE) return hex;
+    if (d > best.d) best = { hex, d };
+  }
+  return best.hex;
+}
+
+// ---- Colour science (FR-CAMP-28 palette contrast, FR-CAMP-31 / -32; no dependency) ----
 
 export type Rgb = readonly [number, number, number];
 
@@ -187,13 +314,13 @@ export function deltaE(a: string, b: string, vision: Vision = "normal"): number 
 }
 
 /** The closest pair of palette keys under `vision` (CAMP §7's colour-blind check). */
-export function closestPair(vision: Vision): { pair: [PlayerColor, PlayerColor]; deltaE: number } {
-  let best: { pair: [PlayerColor, PlayerColor]; deltaE: number } | null = null;
+export function closestPair(vision: Vision): { pair: [PaletteKey, PaletteKey]; deltaE: number } {
+  let best: { pair: [PaletteKey, PaletteKey]; deltaE: number } | null = null;
   for (const [i, a] of PLAYER_COLOR_KEYS.entries()) {
     for (const b of PLAYER_COLOR_KEYS.slice(i + 1)) {
       const d = deltaE(PLAYER_COLORS[a], PLAYER_COLORS[b], vision);
       if (!best || d < best.deltaE) best = { pair: [a, b], deltaE: d };
     }
   }
-  return best as { pair: [PlayerColor, PlayerColor]; deltaE: number };
+  return best as { pair: [PaletteKey, PaletteKey]; deltaE: number };
 }
