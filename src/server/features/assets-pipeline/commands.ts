@@ -1,7 +1,8 @@
 // assets.ingest (FR-ASSET-01, -03, -04, -06, -08, -09) and assets.require (FR-ASSET-15).
 import { createHash } from "node:crypto";
 import { AssetName, type AssetRecord, nameFromFilename } from "@shared/assets-pipeline/schemas";
-import { AssetIngested, AssetListed } from "@shared/events/assets-pipeline";
+import { type DroppedTag, ImageTags } from "@shared/assets-pipeline/tags";
+import { AssetIngested, AssetListed, AssetTagsSet } from "@shared/events/assets-pipeline";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { defineCommand } from "../../commands/commands";
@@ -11,26 +12,13 @@ import type { Tx } from "../../db/client";
 import { asset, assetSeqNext } from "../../db/schema";
 import type { Actor } from "../../events/types";
 import type { ProcessedImage } from "./image";
+import { assetUpsert, toAssetRecord } from "./records";
 import type { AssetStore } from "./store";
+import { addTags, campaignTagSpellings } from "./tags";
 
 export const INGEST = "assets.ingest";
 
 type AssetRow = typeof asset.$inferSelect;
-
-/** The only mapping from a row to the wire: `hash` is dropped here (ASSET §8). */
-export const toAssetRecord = (r: AssetRow): AssetRecord => ({
-  id: r.id,
-  campaignId: r.campaignId,
-  seq: r.seq,
-  name: r.name,
-  mime: r.mime,
-  bytes: r.bytes,
-  width: r.width,
-  height: r.height,
-  displayWidth: r.displayWidth,
-  displayHeight: r.displayHeight,
-  createdAt: r.createdAt,
-});
 
 const Bytes = z.custom<Uint8Array>((v) => v instanceof Uint8Array, "Expected bytes");
 const Dim = z.number().int().min(1);
@@ -54,13 +42,20 @@ export const IngestInput = z.object({
   name: z.string().optional(),
   /** FR-ASSET-24 (S5): false = an attachment (outside the library and every snapshot). */
   listed: z.boolean().optional(),
+  /** FR-ASSET-41 (S6): the upload context's tags; a new row without them gets `[]`. */
+  tags: ImageTags.optional(),
 });
 export type IngestInput = z.input<typeof IngestInput>;
 
 export interface IngestResult {
   asset: AssetRecord;
   outcome: "created" | "existing";
+  /** FR-ASSET-41: sent tags not added (image full / campaign cap); absent when none. */
+  droppedTags?: DroppedTag[];
 }
+
+const withDropped = (r: IngestResult, dropped: DroppedTag[]): IngestResult =>
+  dropped.length > 0 ? { ...r, droppedTags: dropped } : r;
 
 /** Name rule (FR-ASSET-08): given `name`, else the filename without extension. */
 export function resolveName(filename: string, name?: string) {
@@ -94,13 +89,19 @@ export function seededAssetId(token: string, sourceHash: string): string {
  * `AssetIngested` dispatches after commit (FR-ASSET-06). Same image in the campaign →
  * `existing`, nothing written (FR-ASSET-03), except that a `listed` request lists an existing
  * attachment (`AssetListed`, FR-ASSET-26); `listed: false` never unlists. *(S5)* An attachment's
- * `AssetIngested` carries no record change (FR-ASSET-24).
+ * `AssetIngested` carries no record change (FR-ASSET-24). *(S6)* Tags (FR-ASSET-41): a new row
+ * gets the sent ones (`[]` if none); `existing` adds them (union, `AssetTagsSet` if that changed
+ * anything). A tag that doesn't fit is dropped (`droppedTags`); checked after the files are
+ * written, so it never fails the upload.
  */
 export function ingestCommand(store: AssetStore) {
   return defineCommand({
     name: INGEST,
     input: IngestInput,
-    execute({ image, filename, name, listed = true }, { tx, ctx, actor, emit }): IngestResult {
+    execute(
+      { image, filename, name, listed = true, tags: sent },
+      { tx, ctx, actor, emit },
+    ): IngestResult {
       const campaignId = actor.campaignId;
       if (!campaignId) throw conflict("No active campaign");
       const parsedName = resolveName(filename, name);
@@ -122,21 +123,40 @@ export function ingestCommand(store: AssetStore) {
       if (existing) {
         // Files lost since (FR-ASSET-07 404s): this upload heals them (#163).
         store.repairFiles(image);
+        let row: AssetRow = existing;
+        let dropped: DroppedTag[] = [];
+        if (sent !== undefined && sent.length > 0) {
+          const current = existing.tags ?? [];
+          const added = addTags(current, sent, campaignTagSpellings(tx, campaignId));
+          dropped = added.dropped;
+          if (added.tags.length > current.length) {
+            row = { ...row, tags: added.tags, listed: row.listed || listed };
+            tx.update(asset).set({ tags: added.tags }).where(eq(asset.id, existing.id)).run();
+            emit({
+              type: AssetTagsSet.type,
+              campaignId,
+              payload: { assetId: existing.id, tags: added.tags },
+              changes: assetUpsert(row),
+            });
+          }
+        }
         if (listed && !existing.listed) {
+          row = { ...row, listed: true };
           tx.update(asset).set({ listed: true }).where(eq(asset.id, existing.id)).run();
-          const rec = toAssetRecord(existing);
           emit({
             type: AssetListed.type,
             campaignId,
             payload: { assetId: existing.id },
             // New to the library: an upsert for the DM (players: `asset` is hidden).
-            changes: [{ type: "asset", id: existing.id, before: null, after: rec }],
+            changes: assetUpsert(row),
           });
         }
-        return { asset: toAssetRecord(existing), outcome: "existing" };
+        return withDropped({ asset: toAssetRecord(row), outcome: "existing" }, dropped);
       }
 
       store.ensureFiles(image);
+      // After the files (FR-ASSET-41): a tag that doesn't fit is dropped, the upload kept.
+      const { tags, dropped } = addTags([], sent ?? [], campaignTagSpellings(tx, campaignId));
 
       let id = nextAssetId(ctx, image.sourceHash);
       while (tx.select({ id: asset.id }).from(asset).where(eq(asset.id, id)).get()) {
@@ -157,17 +177,17 @@ export function ingestCommand(store: AssetStore) {
           displayHeight: image.display.height,
           createdAt: ctx.clock.iso(),
           listed,
+          tags,
         })
         .run();
       const row = tx.select().from(asset).where(eq(asset.id, id)).get() as AssetRow;
-      const rec = toAssetRecord(row);
       emit({
         type: AssetIngested.type,
         campaignId,
-        payload: { assetId: id, hash: image.hash, bytes: row.bytes, listed },
-        changes: listed ? [{ type: "asset", id, before: null, after: rec }] : [],
+        payload: { assetId: id, hash: image.hash, bytes: row.bytes, listed, tags },
+        changes: assetUpsert(row),
       });
-      return { asset: rec, outcome: "created" };
+      return withDropped({ asset: toAssetRecord(row), outcome: "created" }, dropped);
     },
   });
 }

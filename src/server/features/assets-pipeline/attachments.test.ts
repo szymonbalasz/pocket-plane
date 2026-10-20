@@ -57,7 +57,7 @@ describe("attachments (FR-ASSET-24, -25)", () => {
     expect(dm.raw()).not.toContain(id);
     expect(p1.raw()).not.toContain(id);
     expect(logOf(AssetIngested.type).map((e) => e.payload)).toEqual([
-      { assetId: id, hash: row(id)?.hash, bytes: row(id)?.bytes, listed: false },
+      { assetId: id, hash: row(id)?.hash, bytes: row(id)?.bytes, listed: false, tags: [] },
     ]);
     // A later snapshot (DM and player) has no record for it.
     const fresh = await h.live(DM);

@@ -1,5 +1,6 @@
 // assets-pipeline boundary schemas (ASSET §6, §8, §9). Used by server and both clients.
 import { z } from "zod";
+import { DroppedTag } from "./tags";
 
 /** FR-ASSET-02 (OQ-ASSET-06, proposed): request body limit. */
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -31,6 +32,8 @@ export const AssetRecord = z.object({
   displayWidth: z.number().int(),
   displayHeight: z.number().int(),
   createdAt: z.string(),
+  /** *(S6)* FR-ASSET-39: 0–8 tags; a pre-IM-1 row's null is sent as `[]`. DM only (FR-ASSET-50). */
+  tags: z.array(z.string()),
 });
 export type AssetRecord = z.infer<typeof AssetRecord>;
 
@@ -63,6 +66,12 @@ export function pickerOrder(a: AssetRecord, b: AssetRecord): number {
 export const assetPath = (id: string, file: AssetFile) =>
   `/api/assets/${encodeURIComponent(id)}/${file}`;
 
-/** POST /api/assets responses (ASSET §9): 201 created, 200 existing. */
-export const UploadResponse = z.object({ asset: AssetRecord });
+/**
+ * POST /api/assets responses (ASSET §9): 201 created, 200 existing. *(S6)* `droppedTags`: sent
+ * tags not added (image full or campaign cap, FR-ASSET-41); omitted when empty.
+ */
+export const UploadResponse = z.object({
+  asset: AssetRecord,
+  droppedTags: z.array(DroppedTag).optional(),
+});
 export type UploadResponse = z.infer<typeof UploadResponse>;

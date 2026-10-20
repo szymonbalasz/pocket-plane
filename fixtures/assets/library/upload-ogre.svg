@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <title>Ogre</title>
+  <circle cx="128" cy="128" r="124" fill="#9e9d24" stroke="#222" stroke-width="6"/>
+  <polygon points="128,51 201,104 173,190 83,190 55,104" fill="#6d4c41" stroke="#111" stroke-width="3"/>
+  <rect x="38" y="237" width="42" height="11" fill="#fff" stroke="#000"/><rect x="82" y="238" width="42" height="10" fill="#fff" stroke="#000"/><rect x="126" y="239" width="42" height="9" fill="#fff" stroke="#000"/><rect x="170" y="239" width="42" height="9" fill="#fff" stroke="#000"/>
+</svg>

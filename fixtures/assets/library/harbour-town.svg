@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="700" height="490" viewBox="0 0 700 490">
+  <title>Harbour Town</title>
+  <rect width="700" height="490" fill="#6d4c41"/><path d="M70 0V490M140 0V490M210 0V490M280 0V490M350 0V490M420 0V490M490 0V490M560 0V490M630 0V490M0 70H700M0 140H700M0 210H700M0 280H700M0 350H700M0 420H700" stroke="#000" stroke-opacity=".25"/>
+  <polygon points="350,98 384,164 454,141 431,211 497,245 431,279 454,349 384,326 350,392 316,326 246,349 269,279 203,245 269,211 246,141 316,164" fill="#c62828" stroke="#111" stroke-width="3"/>
+  <rect x="105" y="468" width="46" height="14" fill="#fff" stroke="#000"/><rect x="153" y="475" width="46" height="7" fill="#fff" stroke="#000"/><rect x="201" y="473" width="46" height="9" fill="#fff" stroke="#000"/><rect x="249" y="468" width="46" height="14" fill="#fff" stroke="#000"/><rect x="297" y="468" width="46" height="14" fill="#fff" stroke="#000"/><rect x="345" y="478" width="46" height="4" fill="#fff" stroke="#000"/><rect x="393" y="473" width="46" height="9" fill="#fff" stroke="#000"/><rect x="441" y="475" width="46" height="7" fill="#fff" stroke="#000"/><rect x="489" y="468" width="46" height="14" fill="#fff" stroke="#000"/><rect x="537" y="477" width="46" height="5" fill="#fff" stroke="#000"/>
+</svg>

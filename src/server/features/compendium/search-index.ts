@@ -4,13 +4,7 @@
 // definition events and rebuilt at the next search, so a search never answers from rows older
 // than the last commit. Derived, never persisted, never sent. Replaces the `instr` scan and the
 // entry-less `LEFT JOIN` (≈ 50 ms on the DM's every search).
-import {
-  type FoldedName,
-  foldName,
-  type SourceRank,
-  sourceRank,
-  textWordsOf,
-} from "@shared/compendium/match";
+import { type SourceRank, sourceRank } from "@shared/compendium/match";
 import type { CompendiumKind } from "@shared/compendium/schemas";
 import { MonsterStatBlock } from "@shared/entities/schemas";
 import {
@@ -19,6 +13,7 @@ import {
   CompendiumImported,
 } from "@shared/events/compendium";
 import { EntityImported, ImportedEntityUpdated } from "@shared/events/entities";
+import { type FoldedName, foldName, textWordsOf } from "@shared/search/match";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { compendiumEntry, compendiumSource, entity } from "../../db/schema";
