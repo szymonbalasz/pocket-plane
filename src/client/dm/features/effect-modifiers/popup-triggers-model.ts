@@ -41,6 +41,11 @@ export interface ChipView {
   hint: { kind: "ask" | "none" | "used"; text: string } | null;
   /** Damage it adds to its row (0 unless ticked on a Hit row). */
   lands: number;
+  /**
+   * BL-45: unticked while a Hit row exists — its rolled damage would not land. The popup says so
+   * ("Not applied: …" + Include) so Apply never drops it unseen.
+   */
+  skipped: boolean;
 }
 
 /** The line's popup value: the DM's touched chips + every chip resolved (read by `toInput`). */
@@ -114,6 +119,7 @@ export function chipViews(
       force: !!t?.force,
       hint,
       lands: on ? Math.floor(value * MULTIPLIER_FACTOR[multiplier]) : 0,
+      skipped: !on && hits.length > 0,
     };
   });
 }

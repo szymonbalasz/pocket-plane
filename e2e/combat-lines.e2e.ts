@@ -2,8 +2,8 @@
 // Combat log wording (sprint 5 R2; CBT §13.1 L12–L14), thin, physical dice so the d20s are set:
 // L12 Brakka (Rage anyway) Flame Tongue Attack → Apply hit on Goblin → Damage fills → Apply (a
 // damage-only line, FR-CBT-91): the DM's line holds Rage inside the slashing run ("incl. + 2 Rage", FR-CBT-96), players' line plain;
-// L13 Thorn's Dagger on Goblin 2 with Sneak Attack ticked: "+ N piercing (Sneak Attack)" (FR-MOD-62); L14 Mira
-// rolls low, the DM sets Hit: "— DM ruled hit. N piercing damage" (DM), "— DM: hit." (players)
+// L13 Thorn's Dagger on Goblin 2, Sneak Attack "Not applied" until the DM includes it (BL-45): "+ N piercing (Sneak Attack)" (FR-MOD-62); L14 Mira
+// rolls a natural 1, the DM sets Hit: "— DM ruled hit. N piercing damage" for everyone (FR-CBT-58)
 // (FR-CBT-95). Every wording case and old rows: bun test (combat-lines.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -130,7 +130,9 @@ test("FR-CBT-96 FR-MOD-62 FR-CBT-95 combat log wording: Rage once in the DM line
     );
   }
 
-  // L13: Thorn's Dagger Attack + damage; the DM ticks Sneak Attack on Goblin 2 → typed on the line.
+  // L13: Thorn's Dagger Attack + damage without advantage: Sneak Attack offered unticked (soft
+  // mode, FR-MOD-39); the popup says it won't land ("Not applied: …", BL-45); the DM's Include
+  // ticks it on Goblin 2 → typed on the line.
   const dagger = await attackRow(p2, recordId("char-thorn", "entity"), "Dagger");
   await dagger.getByTestId("charx-roll-attack-damage").click();
   await rollPhysical(p2, "15");
@@ -141,10 +143,12 @@ test("FR-CBT-96 FR-MOD-62 FR-CBT-95 combat log wording: Rage once in the DM line
   const chipText = (await sneak.textContent()) ?? "";
   const n = /\+ (\d+) piercing Sneak Attack/.exec(chipText)?.[1];
   expect(n, chipText).toBeDefined();
-  if ((await sneak.getAttribute("data-state")) === "off") {
-    await sneak.getByTestId("mod-popup-part-tick").click();
-  }
+  await expect(sneak).toHaveAttribute("data-state", "off");
+  const skipped = popup.getByTestId("mod-popup-part-skipped");
+  await expect(skipped).toContainText(`Not applied: + ${n} piercing Sneak Attack`);
+  await skipped.getByTestId("mod-popup-part-include").click();
   await expect(sneak).toHaveAttribute("data-state", "on");
+  await expect(skipped).toHaveCount(0);
   await popup.getByTestId("cbt-popup-apply").click();
   await expect(popup).toHaveCount(0);
   for (const [who, page] of [
@@ -158,22 +162,23 @@ test("FR-CBT-96 FR-MOD-62 FR-CBT-95 combat log wording: Rage once in the DM line
     ).toContainText(`+ ${n} piercing (Sneak Attack)`);
   }
 
-  // L14: Mira's crossbow rolls 2 (a computed miss); the DM sets Hit and applies.
+  // L14: Mira's crossbow rolls a natural 1 (a computed miss); the DM sets Hit and applies. A
+  // ruling against a natural roll is public (FR-CBT-58, -95).
   const crossbow = await attackRow(p1, recordId("char-mira", "entity"), "Light crossbow");
   await crossbow.getByTestId("charx-roll-attack-damage").click();
-  await rollPhysical(p1, "2");
-  const miraRow = await openCard(/Mira: \d+ to hit, \d+ piercing/, goblin);
+  await rollPhysical(p1, "1");
+  const miraRow = await openCard(/Mira: \d+ to hit \(natural 1\), \d+ piercing/, goblin);
   const miraHit = miraRow.getByTestId("cbt-popup-target-hit");
   await expect(miraHit).toHaveAttribute("data-value", "miss");
   await miraHit.click();
   await popup.getByTestId("cbt-popup-apply").click();
   await expect(popup).toHaveCount(0);
   await expect(await lastLine(dm)).toContainText(
-    /Mira attacks Goblin: .*vs AC \d+ — DM ruled hit\. \d+ piercing damage/,
+    /Mira attacks Goblin: .*\(natural 1\).*vs AC \d+ — DM ruled hit\. \d+ piercing damage/,
   );
   for (const page of [p1, p2]) {
     await expect(await lastLine(page)).toContainText(
-      /Mira attacks Goblin: .* — DM: hit\. \d+ piercing damage/,
+      /Mira attacks Goblin: .*\(natural 1\).* — DM ruled hit\. \d+ piercing damage/,
     );
   }
 

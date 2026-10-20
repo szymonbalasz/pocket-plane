@@ -1,13 +1,16 @@
 // MOD's `popupParts` line `effect-modifiers.triggers` (FR-MOD-39, -40; MOD §7 "Popup"): the
 // card's offered rule-trigger parts as chips under their target rows. Tick, value edit, own
 // multiplier, target Select (Hit rows); amber hints "Check: …" / "No target passes" / a
-// conflict's message with a Force tick. Reads the card's settle facts and the DM store (effects,
-// campaign presets), never `rule-trigger` rows (seams S1); sends nothing itself: its share joins
-// each row's `cbt.applyCard` entry (`targets[].triggers`).
+// conflict's message with a Force tick. An unticked chip with a Hit row is struck and says
+// "Not applied: …" with an Include button, so Apply never drops rolled damage unseen (BL-45).
+// Reads the card's settle facts and the DM store (effects, campaign presets), never
+// `rule-trigger` rows (seams S1); sends nothing itself: its share joins each row's
+// `cbt.applyCard` entry (`targets[].triggers`).
 import { EFFECT_TYPE, type EffectView } from "@shared/combat-extras/schemas";
 import type { DamageMultiplier } from "@shared/combat-tracker/schemas";
 import { EFFECT_PRESET_TYPE, type EffectPresetRecord } from "@shared/effect-modifiers/schemas";
 import type { SettleStore } from "@shared/effect-modifiers/settle";
+import { Button } from "@ui/components/ui/button";
 import { Checkbox, ToggleGroup, ToggleGroupItem } from "@ui/components/ui/controls";
 import {
   Select,
@@ -17,6 +20,7 @@ import {
   SelectValue,
 } from "@ui/components/ui/overlays";
 import { Input } from "@ui/components/ui/primitives";
+import { cn } from "@ui/lib/utils";
 import { useRecords } from "@ui/sync/store";
 import { useEffect, useMemo, useState } from "react";
 // Types only: `popup-parts.ts` imports this line (no runtime cycle).
@@ -115,6 +119,8 @@ function Chip({
   const id = chip.part.triggerId;
   const hits = rows.filter((r) => r.hit);
   const shownHit = hits.find((r) => r.targetId === chip.shownOn);
+  const tick = (on: boolean) =>
+    set({ on, targetId: chip.targetId ?? shownHit?.targetId ?? hits[0]?.targetId ?? null });
   return (
     <div className="grid gap-0.5">
       <div
@@ -129,14 +135,11 @@ function Chip({
           aria-label={`Apply ${chip.part.label}`}
           checked={chip.on}
           disabled={disabled || hits.length === 0}
-          onCheckedChange={(v) =>
-            set({
-              on: v === true,
-              targetId: chip.targetId ?? shownHit?.targetId ?? hits[0]?.targetId ?? null,
-            })
-          }
+          onCheckedChange={(v) => tick(v === true)}
         />
-        <span className={chip.on ? "" : "text-muted-foreground"}>{chip.text}</span>
+        <span className={cn(!chip.on && "text-muted-foreground", chip.skipped && "line-through")}>
+          {chip.text}
+        </span>
         <ValueInput chip={chip} disabled={disabled} onValue={(value) => set({ value })} />
         <ToggleGroup
           type="single"
@@ -206,6 +209,27 @@ function Chip({
               Force
             </label>
           )}
+        </div>
+      )}
+      {chip.skipped && (
+        <div
+          data-testid="mod-popup-part-skipped"
+          data-record-id={id}
+          className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-warning"
+        >
+          Not applied: {chip.text}
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            data-testid="mod-popup-part-include"
+            data-record-id={id}
+            className="h-6 px-2 text-xs"
+            disabled={disabled}
+            onClick={() => tick(true)}
+          >
+            Include
+          </Button>
         </div>
       )}
     </div>
