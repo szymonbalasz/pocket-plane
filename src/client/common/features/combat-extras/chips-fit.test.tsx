@@ -124,7 +124,8 @@ describe("FR-CBTX-54 trigger chips never fold", () => {
     // Full chip: the name shown, not compact.
     const full = render(<TriggerChipView t={chip({})} />);
     expect(tagOf(full, "cbtx-trigger-chip")).toContain('data-compact="false"');
-    expect(full).toContain('<span class="min-w-0 truncate">Divine Fury</span>');
+    // FR-CBTX-58: whole, never cut.
+    expect(full).toContain("<span>Divine Fury</span>");
   });
 
   test("FR-CBTX-54 trigger chips never fold: the row measures each trigger with its name and icon-only, and renders triggers after the effects, outside '+N'", () => {
@@ -150,7 +151,7 @@ describe("FR-CBTX-54 trigger chips never fold", () => {
     );
     const measure = html.slice(html.indexOf('data-chip-measure="trigger"'), html.indexOf("</div>"));
     expect(measure).toContain('<span class="sr-only">Divine Fury</span>');
-    expect(measure).toContain('<span class="min-w-0 truncate">Divine Fury</span>');
+    expect(measure).toContain("<span>Divine Fury</span>");
     expect(measure).not.toContain("data-testid");
     expect(html.indexOf('data-testid="cbtx-trigger-chip"')).toBeGreaterThan(
       html.indexOf('data-testid="cbtx-init-row-effect"'),

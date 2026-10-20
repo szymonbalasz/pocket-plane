@@ -65,7 +65,10 @@ export function chipParts(
   return { label: effectName(e), rounds };
 }
 
-/** One Initiative-row chip at most this wide, px; longer labels end in an ellipsis. */
+/**
+ * One Initiative-row effect chip at most this wide, px; longer labels end in an ellipsis. Not
+ * trigger chips: whole or icon-only (FR-CBTX-58).
+ */
 export const CHIP_MAX_W = 96;
 /** Width kept for the "+N" chip when some chips don't fit, px. */
 export const MORE_W = 30;
@@ -165,6 +168,50 @@ export function fitChipRow(
   const icon = fitChipTiers(effects, iconRoom, gap);
   const fits = icon.n === effects.length ? iconRoom >= 0 : icon.n > 0 || MORE_W <= iconRoom;
   return fits ? { ...icon, icons: true, wrap: false } : { n: 0, tier: 0, icons: true, wrap: true };
+}
+
+/** An Initiative row's name line at natural widths, px (FR-CBTX-57). */
+export interface NameLineWidths {
+  line: number;
+  name: number;
+  /** Beside the name, never moved: the hidden eye-off, the skip icon. */
+  marks: readonly number[];
+  /** The side chip (Ally / Enemy, never folds); 0 = none. */
+  side: number;
+  /** The Moved cell while it shares the line; 0 = none. */
+  end: number;
+  /** The row has effect or trigger chips. */
+  chips: boolean;
+}
+
+/** `fitNameLine`'s pick. */
+export interface NameLineFit {
+  /** The name and its marks are wider than the line: the name wraps onto two lines (no "…"). */
+  nameWrap: boolean;
+  /** The side chip and every chip take a second line under the name. */
+  split: boolean;
+  /** The chips' room (FR-CBTX-54's steps run against it); 0 without chips. */
+  room: number;
+}
+
+/**
+ * FR-CBTX-57 (BL-43): the room for chips on the name line = the line − the name's natural width −
+ * the fixed parts on it (marks, side chip, Moved) − the gaps. If the name and its fixed parts
+ * don't fit with at least a "+N" chip's room, the side chip and the chips move to a second line
+ * (the marks stay beside the name), where the chips get the line after the side chip (and after
+ * Moved too when the name wraps: Moved then follows the chips).
+ */
+export function fitNameLine(w: NameLineWidths, gap = 4): NameLineFit {
+  const head = w.name + w.marks.reduce((s, m) => s + gap + m, 0);
+  const side = w.side > 0 ? w.side + gap : 0;
+  const end = w.end > 0 ? w.end + gap : 0;
+  const nameWrap = head > w.line;
+  const room = w.line - head - side - end - gap;
+  const moves = w.side > 0 || w.chips;
+  const split = moves && (nameWrap || head + side + end > w.line || (w.chips && room < MORE_W));
+  if (!w.chips) return { nameWrap, split, room: 0 };
+  const below = w.line - side - (nameWrap ? end : 0);
+  return { nameWrap, split, room: Math.max(0, split ? below : room) };
 }
 
 /** "N rounds left" (sheet chips). */
