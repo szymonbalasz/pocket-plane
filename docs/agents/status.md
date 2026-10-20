@@ -8,12 +8,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| FU1 window frame | `fix/fu-frame` (ws w8R) | build-fu1 | PC rule change (#318) + merge main | walkthrough → merge; then FU3, ST2 |
-| FU-combat (FU0 + FU2) | `fix/fu-combat` (ws w8S) | build-fu-combat, test-fu-combat | walkthrough | gates → merge |
-| FU4 small copy | `fix/fu-small-copy` (ws w8T) | build-fu4, test-fu4 | walkthrough | gates → merge |
+| FU1 window frame | `fix/fu-frame` (ws w8R) | build-fu1 | U4 toast fix (walkthrough 5 / 7, U1 accepted #319) | gates → merge; then FU3, ST2 |
+| FU4 small copy | `fix/fu-small-copy` (ws w8T) | build-fu4 | walkthrough PASS (re-test) | branch gates → merge |
 | GM1 Inspiration reroll | `build/gems-reroll` (ws w8V) | build-gm1 | building | merges before ST-core |
 | ST-core | `fix/st-core` (ws w8W) | build-st-core | building | rebase on GM1, merge |
-| GM3 gems UI | `build/gems-sheet` | — | waiting for a slot | — |
+| GM3 gems UI | `build/gems-sheet` (ws w8X) | build-gm3 | building | walkthrough → merge |
 | Wave 3 | FU3 `fix/fu-map` (after FU1), ST2 `build/st-window` (after FU1 + ST-core), GM2 `build/gems-combat` (after GM1 + ST-core) | — | waiting | — |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
@@ -25,7 +24,7 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 
 - Schema lane: free (GM0 merged). Apply path: GM1 first, ST-core rebases.
 - Play-shell frame + `overlays.tsx`: `fix/fu-frame` (FU1). Canvas lock: FU1 first (MapCanvas.tsx), then FU3.
-- Combat-tracker lifecycle / DM Initiative + encounters files: `fix/fu-combat`. Apply path (hp.ts, cards.ts, hit.ts, schemas.ts, log-kinds.ts): free until GM1 / ST-core.
+Apply path (hp.ts, cards.ts, hit.ts, schemas.ts, log-kinds.ts): free until GM1 / ST-core.
 
 ## Pending DM decisions
 

@@ -39,6 +39,7 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 | 2026-10-20 | Reviews ruled and applied (4 blockers fixed: gem spend lines and stats no longer leak hidden rolls / monster HP / fight names; Space-pan kept). **DM gate 1 open** (`.verify/sprint7/gate.md`). Backfill: DM image library size warning (BL-49, #314) |
 | 2026-10-20 | **Gate 1 passed (#315)**: all picks, except the max-5 rule is a plain label. ADR-0058 (feature switches), ADR-0059 (stats read models). Backfill: fog log spam (BL-55, #316). `session-sim-11` bundle created. **Phase B wave 1 building:** gems core, window frame, combat follow-ups, small copy fixes |
 | 2026-10-21 | **Gems core merged** (#317): per-campaign gems switch (off by default), gem counts, award / remove, plain spends; nothing gem-related reaches anyone while off. Inspiration reroll and stats core building |
+| 2026-10-21 | **Combat follow-ups merged** (#320): a downed monster keeps its HP into the next fight, End removes summon tokens (hostile too) and says so, one-row companion line, concentration chip menu, encounter editor names, the drake keeps its paw through End. Window frame in fixes (toast vs pushed Scenes), small copy fixes in gates, gems sheet UI building |
 
 ## Check `main` any time (DM)
 
