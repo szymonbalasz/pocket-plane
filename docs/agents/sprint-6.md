@@ -36,6 +36,7 @@ DM notes in brackets ([#285](../decisions-log.md)). "sim-9" = the [session-sim-9
 | Date | What |
 |---|---|
 | 2026-10-19 | Phase A started: four spec agents at once — companions + summons, window / layout fixes, Preferences + colour picker + Subtract, image search + tags (ID ranges per track in [status](status.md)) |
+| 2026-10-20 | Phase A: four specs, seams ([`.verify/sprint6/seams.md`](../../.verify/sprint6/seams.md)), two reviews + rulings, gate ([`gate.md`](../../.verify/sprint6/gate.md)). Backfill: BL-33 leak-scan flake fixed (#287); BL-45 silent no-ops in progress |
 
 ## Check `main` any time (DM)
 
