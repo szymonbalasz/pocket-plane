@@ -137,10 +137,11 @@ function sizesOf(def: Placeable, vp: Viewport, hard: readonly Rect[]) {
 }
 
 /**
- * The fields of FR-SHELL-45's rank the brute check compares, for `r`: [not clear (12 px gap to
- * windows and hard regions), over a PC footprint + 4 px, not clear at `minOpenH`, over a token].
- * `margin`: footprints grown by that much more (the oracle's spots keep the 12 px candidates
- * keep: rows and columns sit 12 px off a footprint, FR-SHELL-58).
+ * The fields of FR-SHELL-45's rank the brute check compares, for `r`, in placement's order: [not
+ * clear (12 px gap to windows and hard regions), over a PC footprint + 4 px, an edge through one
+ * (#292: holding the PCs it covers whole beats cutting one; still rank (2), before (2b)), not
+ * clear at `minOpenH`, over a token]. `margin`: footprints grown by that much more (the oracle's
+ * spots keep the 12 px candidates keep: rows and columns sit 12 px off a footprint, FR-SHELL-58).
  */
 export function placeFields(
   r: Rect,
@@ -160,9 +161,13 @@ function fieldsOf(def: Placeable, vp: Viewport, scene: PlaceScene, margin: numbe
   const tokens = scene.tokens.map((t) => grow(t, margin));
   return (r: Rect): number[] => {
     const clear = !blocks.some((o) => overlaps(r, o));
+    const over = pcs.filter((p) => overlaps(r, p));
+    const inside = (p: Rect) =>
+      p.x >= r.x && p.y >= r.y && p.x + p.w <= r.x + r.w && p.y + p.h <= r.y + r.h;
     return [
       clear ? 0 : 1,
-      pcs.some((p) => overlaps(r, p)) ? 1 : 0,
+      over.length > 0 ? 1 : 0,
+      over.every(inside) ? 0 : 1,
       openH === null || (clear && r.h >= openH) ? 0 : 1,
       tokens.some((t) => overlaps(r, t)) ? 1 : 0,
     ];
@@ -186,8 +191,8 @@ export function bruteBest(def: Placeable, vp: Viewport, scene: PlaceScene): numb
   const z = sizesOf(def, vp, scene.hard);
   const heights = [...new Set([z.fullH, z.minH, ...(z.openH === null ? [] : [z.openH])])];
   const fields = fieldsOf(def, vp, scene, EDGE_GAP);
-  const free = (f: readonly number[]) => f[0] === 0 && f[1] === 0 && f[3] === 0;
-  let best = [1, 1, 1, 1];
+  const free = (f: readonly number[]) => f[0] === 0 && f[1] === 0 && f[4] === 0;
+  let best = [1, 1, 1, 1, 1];
   const search = (cw: number, onlyFree: boolean) => {
     for (const h of heights) {
       const xMax = z.a.right - cw;
