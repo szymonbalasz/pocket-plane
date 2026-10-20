@@ -166,9 +166,11 @@ describe("FR-SHELL-83 Space presses a keyboard-focused control (keeps #199 / FR-
   test("FR-SHELL-83 keyboard focus is read when focus lands (:focus-visible then), not at the keydown", () => {
     type FocusFn = (e: { target: EventTarget | null }) => void;
     let onFocus: FocusFn = () => {};
+    let onPress: FocusFn = () => {};
     const doc = {
-      addEventListener: (_: "focusin", fn: FocusFn) => {
-        onFocus = fn;
+      addEventListener: (type: "focusin" | "pointerdown", fn: FocusFn) => {
+        if (type === "focusin") onFocus = fn;
+        else onPress = fn;
       },
     };
     trackFocusModality(doc);
@@ -183,5 +185,12 @@ describe("FR-SHELL-83 Space presses a keyboard-focused control (keeps #199 / FR-
     visible = true; // a key pressed later makes it :focus-visible; the click focus stays pointer
     expect(isKeyboardFocus(target)).toBe(false);
     expect(isKeyboardFocus(null)).toBe(false);
+    // Tab onto it, then a click on it (already focused: no focusin) → pointer focus again.
+    visible = true;
+    onFocus({ target });
+    expect(isKeyboardFocus(target)).toBe(true);
+    const icon = { parentElement: button } as unknown as EventTarget;
+    onPress({ target: icon });
+    expect(isKeyboardFocus(target)).toBe(false);
   });
 });

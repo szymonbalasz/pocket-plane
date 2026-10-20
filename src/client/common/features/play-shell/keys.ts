@@ -97,7 +97,7 @@ export function spaceAction(
 
 interface FocusDoc {
   addEventListener(
-    type: "focusin",
+    type: "focusin" | "pointerdown",
     fn: (e: { target: EventTarget | null }) => void,
     capture: true,
   ): void;
@@ -109,8 +109,9 @@ const tracking = new WeakSet<object>();
 /**
  * FR-SHELL-83: remembers, for each element as it gains focus, whether that focus was keyboard-
  * driven (`:focus-visible` at that moment: Tab, arrows, a shortcut). Read at keydown time the
- * pseudo-class itself can't tell: pressing a key turns a clicked button `:focus-visible`. Once per
- * document.
+ * pseudo-class itself can't tell: pressing a key turns a clicked button `:focus-visible`. A
+ * pointer press makes the pressed element and its ancestors pointer-focused again (a click on
+ * the control that already has focus fires no `focusin`). Once per document.
  */
 export function trackFocusModality(doc: FocusDoc): void {
   if (tracking.has(doc)) return;
@@ -128,6 +129,16 @@ export function trackFocusModality(doc: FocusDoc): void {
       }
       if (visible) keyboardFocused.add(el);
       else keyboardFocused.delete(el);
+    },
+    true,
+  );
+  doc.addEventListener(
+    "pointerdown",
+    (e) => {
+      for (let el = e.target as { parentElement?: unknown } | null; el; ) {
+        keyboardFocused.delete(el);
+        el = (el.parentElement ?? null) as { parentElement?: unknown } | null;
+      }
     },
     true,
   );
