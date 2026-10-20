@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: claimed
+status: in-review
 owner: spec-stats
 phase: post-mvp-7
 wave: 3
@@ -10,6 +10,8 @@ wave: 3
 # Combat tracker
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
+
+> **Sprint 7, track ST (stats tier A, DM [#311](../decisions-log.md); spec-stats).** The combat log entries (`hp_change`) are the stats unit, and [stats](stats.md) reads them and never edits them or the Initiative rows (FU owns the rows). This track adds three FRs in [§6.5](#65-sprint-7-stats-facts): a **From** (source) on the DM's direct Damage / heal, so a heal has an author (FR-CBT-136); the **overkill callout** flag and suffix on outcome lines (FR-CBT-137); and a read helper plus a facts contract (FR-CBT-138). No schema change: `hp_change.attackerId` already exists. CON-44 measured +21 B a callout line for players and +49 B for the DM ([stats §12](stats.md#12-performance--bandwidth)). Slice ST1 ([§14.4](#144-build-split-sprint-7-track-st)).
 
 > **Sprint 6, track WF (window + layout fix pack; spec-windows; session-sim-9 FAIL c, BL-43).** Decided, not open (#286): the last Initiative row never bleeds under the "↓ N more" footer (c03: the Elite row's text painted below the footer). Likely cause (WF4 confirms it first): the footer is `sticky` inside the scrolling list (FR-CBT-77), and the grown window's body doesn't clip the list, so a partly hidden row paints past it. New **FR-CBT-125** (WF4, with [FR-CBTX-57 / -58](combat-extras.md#6-functional-requirements) for the names and chips). Client only, 0 B; no open question. Walkthrough F10 in [play-shell §13](play-shell.md#13-test-plan). CP (companions) edits this spec in parallel with its own range; its owned rows follow these rules (WF4 merges first).
 
@@ -106,7 +108,7 @@ MVP = tier S ([feature tiers §2, §5, §7](../feature-tiers.md#2-combat)).
 
 - Conditions, concentration, durations, temp HP, death saves, add combatants mid-fight, token-less hidden combatants, legendary / lair / reactions → [combat-extras](combat-extras.md).
 - Drag-to-reorder initiative, current-turn token highlight, end-of-combat summary (tier B); player target selection, stat block on token click (later, unranked; #134). Rules automation beyond the hit hint.
-- Redo (re-apply the reopened card). Undo of initiative, turns, removals (#70). Undo after End. Custom actions, spells (tier A). Party HP for players (tier B). Stats UI → [stats](post-mvp/stats.md). Gems → [gems](post-mvp/gems.md) (design-for-later only, FR-CBT-32).
+- Redo (re-apply the reopened card). Undo of initiative, turns, removals (#70). Undo after End. Custom actions, spells (tier A). Party HP for players (tier B). Stats UI → [stats](stats.md). Gems → [gems](post-mvp/gems.md) (design-for-later only, FR-CBT-32).
 - Multi-target direct damage / heal (`cbt.applyHp` stays one combatant); blocking or correcting movement (indicators only; the next turn resets); DM-added alert sounds (tier A, [ADR-0030](../architecture/adr/0030-ui-notification-sounds.md)); player targeting (#134, #148).
 
 ## 5. User stories
@@ -386,6 +388,16 @@ flowchart LR
 
 - **Disconnect / reconnect:** owner, mode, `card` and HP are on the combatant (pets: on the entity between fights): the snapshot carries them; the card re-renders. **Crash:** summon ⇔ tokens ⇔ combatants ⇔ line; dismiss ⇔ token delete ⇔ write-back; End ⇔ write-backs ⇔ token deletes: one transaction each; restart → identical snapshots. **Two DM tabs:** last write wins; a second Dismiss of the same summon → `invalid` (inactive). **Hidden summon** (Hidden tick): hidden from everyone incl. the owner until revealed (#141): the owner's card picker doesn't list it, and the reveal brings it in.
 
+### 6.5 Sprint 7: stats facts
+
+Track ST. The formulas live in [stats](stats.md#6-functional-requirements); these FRs only make the facts complete and stable.
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-CBT-136 | **From on direct Damage / heal** (amends FR-CBT-21; OQ-STATS-08 A). `cbt.applyHp` gains `sourceId?`: an active, non-removed combatant of the started encounter, the target included (self-heal); otherwise `not_found`. It writes the existing `hp_change.attackerId` / `attackerName`. The `cbt.hp` line reads "Sela → Mira, heal 8" (else "DM → Mira, …" as today). The line is `public: false` if the source is hidden, as FR-CBT-24's rule for attackers. The DM's Damage / heal dialog gains a **From** Select (`cbt-hp-from`): "DM" plus the fight's active combatants by name. **Heal** presets to the turn combatant (OQ-CBT-89); **damage** presets to "DM". The undo Tooltip uses the source name (FR-CBT-80). Players: only the line's name changes. | stats "Most healing" |
+| FR-CBT-137 | **Overkill callout on the line** ([FR-STATS-21](stats.md#6-functional-requirements)). In the apply transaction (`cbt.applyCard`, and `cbt.applyHp` damage), a damage row with `hpAfter = 0` and `overkill ≥ max(10, hpBefore + absorbed)` stamps its outcome line `payload.callout = "overkill"` (player-safe) and `dmPayload.overkill = {amount, hpBefore}`. `formatLine` appends " — Overkill!" for everyone, and on the DM client " (+23 over 7 HP)". The rule is the same for PC targets (OQ-CBT-90). Undo strikes the line as today, and the client toast ([FR-STATS-22](stats.md#6-functional-requirements)) ignores undone lines. Old rows parse (field optional). A hidden target's line is non-public, so players get neither the line nor the toast. | CON-44 +21 B / +49 B a line (measured) |
+| FR-CBT-138 | **Read helper and facts contract.** `combat-tracker/stats-read.ts` (read-only, new file): `combatFacts(db, {encounterId} \| {campaignId, from, to})` returns the non-undone `hp_change` rows joined with their entry's `public`, the attacker's and target's `kind`, `ownerCharacterId`, `hidden` and the encounter name. **Contract**: `hp_change` rows, combatants and started / ended encounters are never deleted. Rows change only by the undo marker. `raw`, `applied`, `overkill`, `hpBefore`, `hpAfter`, temp fields and `entryId` keep their meaning (FR-CBT-22, FR-CBTX-15). A change to any of them needs a stats review. Stats never write combat rows. | proposed ADR [stats read models](../architecture/adr/proposed-s7-st-stats-read-models.md) |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, dense; `hp.full` / `hp.bloodied` / `hp.down`, `visibility.hidden` tokens.
@@ -478,6 +490,15 @@ All rows per campaign; `seq` by the DB ([CON-20](../data-model/README.md#8-confl
 | Entity *(entities)* | companionOf, turnMode | ID → Entity \| null, mode \| null | Pets: [FR-ENT-31](entities.md#6-functional-requirements); `ownerPlayerId`, `hpCurrent` reused |
 
 - **Derived:** order key per mode (FR-CBT-107; `after-owner` reads the owner's key); "After Mira" / "In Mira's turn" labels; the in-turn companion lines per owner row; the owner's alert detail (FR-CBT-115). `summon = ownerPlayerId ≠ null ∧ ¬pet`. **Persisted runtime state:** companion fields, HP on the combatant; the pet's kept HP on its entity. **No new table or record type.**
+
+**Sprint 7** (track ST; FR-CBT-136–138). **No table, column or record type.**
+
+| Entity | Field | Type | Notes |
+|---|---|---|---|
+| Combat log entry (`hp_change`) | attackerId, attackerName | as built | Now also written by `cbt.applyHp` from `sourceId` (FR-CBT-136); still null for "DM" |
+| Outcome line (`cbt.attack`, `cbt.hp`) | payload `callout?`; dmPayload `overkill?` | `"overkill"` \| absent; **JSON leaf** `{amount, hpBefore}` \| absent | FR-CBT-137; old rows parse |
+
+- **Intent change:** `cbt.applyHp {combatantId, kind, amount, public?, sourceId?}` (DM). Events unchanged (`HpApplied` facts already carry `attackerId` / `attackerName`).
 
 ## 9. API & events
 
@@ -851,6 +872,19 @@ Plus CHARX's `FR-CHARX-60 card fields` / `FR-CHARX-64 card rolls`, ENT's `FR-ENT
 | D6 | Hard-kill the server; restart | All rejoin | `state:digest` equal; order, lines, cards, HP intact |
 | D7 | End encounter; open Party → Companions | — | Pets' HP written back; the Owlbear's stored mode still "After the owner" (the D5 change lasted for that fight, FR-CBT-106); Fire Elemental 2's token deleted; FE 3 (released) keeps its token as an ordinary monster token; no leak string; no console errors; teardown `fixtures:reset --profile verify` |
 
+### 13.4 Sprint 7 (track ST: CBT, STATS)
+
+Bundle **`stats`** (units `st-past-crypt`, `st-ambush-facts`; [stats §13](stats.md#13-test-plan)).
+
+| Named test | Level | Checks |
+|---|---|---|
+| `FR-CBT-136 heal from a source` | integration | `sourceId` → `hp_change.attackerId` / name, the line "Sela → Mira, heal 8", undo copy; unknown or removed source → `not_found`; hidden source → line non-public; no `sourceId` → "DM" as today |
+| `FR-CBT-137 overkill callout on the line` | integration | at the threshold (overkill = max(10, needed)) → `callout` + `dmPayload.overkill`; one below → none; temp HP absorbed counts in "needed"; players' frame carries `callout`, never `overkill`; hidden target → no player line; undo → line undone; old line without the field parses |
+| `FR-CBT-137 formatLine suffix` | unit | " — Overkill!" for both; DM adds " (+23 over 7 HP)" |
+| `FR-CBT-138 facts contract` | integration | `combatFacts` joins `public`, kinds, owner; undone excluded; End keeps rows and combatants |
+
+**Walkthrough:** steps 2–3 of [stats §13](stats.md#13-test-plan) (overkill line and toast, undo), plus the DM heals Mira **From** Sela in the Damage / heal dialog → the line reads "Sela → Mira, heal 8" for the DM and both players.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -949,6 +983,15 @@ One track over CBT, ENT, CHARX, PARTY, MAP; every slice lists its shared files (
 - **Order (seams S14):** CP0 starts at once and merges after IM-1; then CP1 ∥ CP4 (CP4 merges after WF1); CP2 after CP0 + WF4; CP3 after CP2 + IM-0; CP5 after WF3. **Critical path CP0 → CP2 → CP3.** **Cut order** if late (review 15): CP5 marker (cosmetic), then **the owner's pet extras** (owner adjusts pet HP out of combat, FR-ENT-36's player path; owner rolls a pet out of combat, FR-CHARX-69: the DM does both; OQ-CBT-83d), then the concentration card (FR-CBT-120: the DM dismisses by hand), then `in-owner-turn` lines (ship as `after-owner` until then).
 - **Docs at consolidation:** data model (combatant, entity rows), protocol (intents, events, record visibility, §26 registries: one `effectHooks` line, one notification kind, one log kind, token overlay / double-click lines), glossary (OQ-ENT-36), ADR (number the proposed one), FIX §8 rows.
 
+### 14.4 Build split (sprint 7, track ST)
+
+| Slice | FRs | Files | Order |
+|---|---|---|---|
+| **ST0** `fix/st-core` (with stats) | FR-CBT-138 | `src/server/features/combat-tracker/stats-read.ts` (new, read-only) | after GM core; no schema lane |
+| **ST1** `fix/st-lines` | FR-CBT-136, -137 | `combat-tracker/hp.ts` (apply path), `cbt.attack` / `cbt.hp` kind schemas + `formatLine` in `src/shared/combat-tracker/`, the DM Damage / heal dialog | **apply path: one holder at a time** (sprint-7 hotspot: after GM core's card-total change); never touches Initiative rows (FU) or the attack popup (GM / FU) |
+
+- ST0 ∥ ST1. Docs at consolidation: protocol (`cbt.applyHp` `sourceId`, line fields), data model (§8 sprint 7 rows).
+
 ## 15. Open questions
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
@@ -1011,6 +1054,13 @@ One track over CBT, ENT, CHARX, PARTY, MAP; every slice lists its shared files (
 | ~~OQ-CBT-42~~ | ~~Glitch verdicts in this spec (playtest)~~ | **Decided (#172):** verdicts accepted: G4 → FR-CBT-50; G5 → FR-CBT-54; G6 → FR-CBT-51; G9 → FR-CBT-49; G2 popup → FR-CBT-55; G1 fixture (`thorn-battlemap` in `session-sim`); G12 "group roll" not a bug | — | scenes-map, play-shell |
 
 *(Sprint 6, track WF)* No open question: FR-CBT-125's outcome is decided (#286).
+
+*(Sprint 7, track ST)* The stats-wide questions (who sees what, "dealt", healer credit) are in [stats §15](stats.md#15-open-questions). Local ones:
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CBT-89 | **From preset** on a direct heal | **A. The turn combatant** (Sela casts on her turn: zero clicks) · B. The last source picked (good for one dedicated healer) · C. "DM" (no guess, but healing goes uncredited unless the DM picks) | no · DM | CBT, STATS |
+| OQ-CBT-90 | **Overkill callout on PCs** (Mira at 3 HP takes 40) | **A. Same rule as monsters** (the table loves it; players see no HP number) · B. Monsters only (kinder to the downed player) | no · DM | CBT, STATS |
 
 ## 16. Out of scope
 

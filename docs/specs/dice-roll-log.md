@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: claimed
+status: in-review
 owner: spec-stats
 wave: 2
 phase: post-mvp-7
@@ -10,6 +10,8 @@ phase: post-mvp-7
 # Dice and game log
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
+
+> **Sprint 7, track ST (stats tier A, DM [#311](../decisions-log.md); spec-stats).** [Stats](stats.md) count nat 20s / nat 1s and decide visibility from this spec's facts: `roll.natural`, `category` and actor, and the entry's `public` (stamped once), `rollIds` and `supersededBy`. New **FR-DICE-72** writes down that contract, including how a superseded entry counts (only the final roll; the GM track writes the supersede). New **FR-DICE-73** adds a read-only helper. No schema, record type, window or line change: 0 B. ST reads these facts **after GM's reroll core** merges (sprint-7 hotspot).
 
 ## 1. Summary
 
@@ -55,7 +57,7 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 - Manual roll (DM and players), marked manual; physical-dice mode per client.
 - Categories: attack, damage, saving throw, ability check, skill check, contested, initiative, healing, other. Public log settings per campaign, live; DM per-roll override at roll time.
 - Window `dice.log` (both clients); typed entries so text can join later (chat tier C–D, #61).
-- Every roll persisted with roller, actor, every die, automated vs manual ([stats](post-mvp/stats.md), #54).
+- Every roll persisted with roller, actor, every die, automated vs manual ([stats](stats.md), #54).
 - *(Sprint 4)* Dice chips in log lines; a `die` line segment for kinds; `focusLogEntry` for the roll popup (FR-DICE-35–37).
 - *(Sprint 5)* Held numbers until the landing (FR-DICE-40); per-slot labels on the roll control (FR-DICE-41).
 
@@ -129,6 +131,9 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 | FR-DICE-41 | **Slot labels** (BL-20; amends FR-DICE-24, -31): `RollControlOptions` gains optional `slotLabels?: readonly (string \| null)[]`, parallel to `expressions` (client only, never sent). The physical form heads each slot "<label> — <expression>" ("To hit — 1d20+8", "Slashing — 2d6+5", "Fire — 2d6"), its crit sub-row reads "Extra critical dice: 2d6 (slashing)", and the inline error names it ("Enter the total for 2d6 fire (critical)"); the tray's `adjust` groups ([FR-DICEX-05](dice-extras.md#6-functional-requirements)) carry the same labels. Callers: sheet attacks (`CharacterRollSpec`: to-hit → "To hit", each damage part → its type capitalised, no type → "Damage") and the DM's Initiative Attack ▸ (same specs, `attack-choices.ts`) (OQ-DICE-31). Absent / null → the expression alone, as today. No intent or `ManualEntry` change. | BL-20 |
 | FR-DICE-60 | *(OQ-DICE-39 A′, decided #256)* **Name colour** (BL-17): in a **`roll`-kind** entry's line (`dice.roll`, sheet checks / saves / attacks, combat rolls: every `gameLog.append` with `kind: "roll"`) the **actor name** (the bold `actorName` that starts the line, FR-DICE-20) is drawn in `colorOf(store, {role: rollerRole, playerId: rollerPlayerId})` ([FR-CAMP-28](campaign-management.md#6-functional-requirements)): the **roller's** colour, so a player's rolls show their colour (for any of their characters) and the DM's rolls the DM colour (also when the DM rolls for a PC or a monster). **Other kinds stay neutral** (default text colour): combat's DM-applied outcome lines `cbt.attack` / `cbt.hp` are appended by the DM's apply, so their `rollerRole` is `dm` even when a player's card caused them (`hp.ts`, `game-log.ts`); colouring them would paint "**Mira** hits Goblin" amber under Mira's own rose to-hit line (review #5). Still bold; no other part of the line changes (targets, totals, chips, badges). Text contrast: every palette key ≥ 4.5 : 1 on the window surface (measured, CAMP §7). `dice-log-entry` gains `data-color` (the key; absent = neutral) and `data-roller` (player id \| `dm`). | BL-17; review #5 |
 | FR-DICE-61 | **Neutral kinds, system actor, fallback, recolour:** the rule reads only the entry's `kind` (`roll` or not) and `rollerRole` / `rollerPlayerId`, never the payload, so a kind adds nothing. **System actor = neutral everywhere** (review #44; same rule as FR-NOTE-38): `gameLog.append` today stamps a system actor as `dm`; K0 makes it **throw** under a system actor (one line in dice-roll-log's `game-log.ts`; no caller today: only fog's boot backfill and upgrade run as system, and neither logs), so no line is ever DM-coloured by the system. An entry whose roller has no `player` record in the store → the default text colour (no role accent in text). A colour change recolours every coloured line in the store ≤ 1 s (OQ-CAMP-21, #256); entries written before sprint 5 render coloured too (fields exist since MVP). Client only otherwise: no kind, payload, event, record or schema change (0 B). Hidden-entry markers (DM view) unchanged. | review #44 |
+| **Sprint 7, track ST** (stats facts) | | |
+| FR-DICE-72 | **Roll facts contract** (read by [stats](stats.md#6-functional-requirements) FR-STATS-02, -03, -10). A roll row is never updated. It is deleted only while no entry references it (effect-modifiers' dropped offers). `natural` = the single kept d20 or null. An entry's `public` is stamped once, and its `rollIds` and `encounterId` never change. **Supersede** (gems, GM track): the old entry and its rolls **stay**, the old entry's `supersededBy` points at the new one, and nothing else on it changes. Stats count a roll only through a non-superseded entry that references it. A change to any of these meanings needs a stats review. | proposed ADR [stats read models](../architecture/adr/proposed-s7-st-stats-read-models.md) |
+| FR-DICE-73 | **Read helper** `dice-roll-log/stats-read.ts` (read-only, new file). `logTimeline(db, campaignId, afterN?)` → `{n, at, public}[]` ascending on the unique `(campaign_id, n)` index. `rollFacts(db, campaignId, fromN, toN)` → one row per roll referenced by a non-superseded entry in the range: `{rollId, natural, category, actorKind, actorId, public}`, where `public` = some such referencing entry is public. No new index (measured: one session ≤ 7 ms at 94k entries, [stats §12](stats.md#12-performance--bandwidth)). | |
 
 ## 7. UI/UX notes
 
@@ -302,6 +307,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 **Sprint 5 walkthrough:** held numbers and slot labels are walked in [dice-extras §13](dice-extras.md#13-test-plan) steps 30, 32, 33, 37 (FR-DICE-40) and 34 (FR-DICE-41), bundle `dice-polish`. Also here, on `dice-log`: step 1 again → e1–e4 show numbers at once (snapshot, never held); step 3 → A and C see B's adv line with blank chips and "…" until the dice rest.
 **Sprint 5, track W:** unit `FR-DICE-38 Game log width` (both registries: `defaultSize` at 1280×720 / 1280×800 / 1440×900 / 1600×900 = DM 690×160 / 690×160 / 1150×240 / 1150×240, player 510×160 / 510×160 / 850×280 / 850×280; min 300×160; `previousDefaults` listed; DOM: 8 single-line `1d4` entries at each default size with Physical dice off / on → ≥ 6 / ≥ 4 visible at the tall sizes, ≥ 3 / ≥ 2 at 160 high); `FR-DICE-39 wide log` (DOM at 1150 px: the sim-8 Flame Tongue crit line (6 lines at 460 px) renders on ≤ 3, the category Badge right-aligned; roll-bar expression input ≤ 320 px wide). Fixtures: `windows-s5` (play-shell §13); walkthrough W0, W1, W3 in [play-shell §13](play-shell.md#13-test-plan).
 
+**Sprint 7, track ST:** integration `FR-DICE-72 superseded entry not counted` (a hand-set `supersededBy` until GM's core lands, then the real reroll; the old entry and its rolls are unchanged, the new one counts), `FR-DICE-73 rollFacts` (a roll in two entries returns once; `public` is true if any referencing entry is public; an unreferenced roll is absent; initiative rows are returned and stats drop them). Bundle `stats`; walkthrough [stats §13](stats.md#13-test-plan) step 6 (the hidden roll's nat 20 counts for the DM only).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -339,6 +346,8 @@ DM-only detail in combat lines (NPC dice, "DM ruled hit", physical tags on outco
 
 **Shared changes — sprint 5, track W:** none in this spec's own server or shared code. The `dice.log` window lines (`src/client/{dm,player}/features/dice-roll-log/log-window.tsx`, common `dice-roll-log/window.ts`: size function, min 300×160, `previousDefaults`) and `GameLog.tsx` (FR-DICE-39 widths) go in play-shell's slice **W1** `fix/window-layout` (assigned; [play-shell §14](play-shell.md#14-dependencies)), which needs the new `WindowDef` fields. `GameLog.tsx` order, settled by seams S15: **W1 (width) → D8 (held lines) → D9 → K4 (name colour)** (S15 as amended by rulings-a); R2 never edits `GameLog.tsx`.
 
+**Shared changes — sprint 7, track ST:** none in AGENTS §9.9. Slice ST0 `fix/st-core` adds the new read-only file `src/server/features/dice-roll-log/stats-read.ts` after GM core (the supersede writer) merges. It doesn't touch `game-log.ts`, `kinds.ts` or the schema.
+
 ## 15. Open questions
 
 All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-4 gate 1 ([#245](../decisions-log.md)) and the seams ruling (S8, rulings B5 / B9). **Sprint 5: OQ-DICE-30 decided (#256);** OQ-DICE-31 settled by seams S8; OQ-DICE-40 (popup name colour) is K's row, decided A (#256) and built as K4's line (seams S15); "what waits when nothing animates" is [OQ-DICEX-38](dice-extras.md#15-open-questions).
@@ -367,6 +376,12 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 |---|---|---|---|---|
 | OQ-DICE-39 | **Whose colour** colours a line's name? (review #5: combat's outcome lines are appended by the DM's apply, so `rollerRole` is `dm` on them) | **Decided (#256): A′, roll lines only in the roller's colour; DM-applied outcome / rule lines neutral.** Pick as proposed: A′. Roll lines only, in the roller's colour; DM-applied outcome / rule lines (`cbt.attack`, `cbt.hp`, any non-`roll` kind) stay neutral (0 B; "who rolled", like the dice look; Mira's to-hit rose, the applied "Mira hits Goblin" plain). Rejected: ~~B. `actorPlayerId` on log entries: outcome lines in the actor's owner's colour (Mira rose on every line), a nullable column written by each kind caller (combat, sheet, dice); measured **+2,100 B** (all null) to **+5,500 B** (all set) per snapshot frame on 100 entries~~, ~~C. Only player-rolled lines coloured, the DM's plain: quieter, but BL-17 says the DM colour shows too~~ | — · decided | combat-tracker (B: its callers write the field) |
 | OQ-DICE-40 | **dice-extras:** the roll popup (FR-DICEX-39) names the roller too: colour it the same way? | **Decided (#256): yes, K4 adds the popup's `colorOf` line after D11.** Pick as proposed: A. Yes: K4 adds the `colorOf` line in the popup after D11 merges; D11 leaves the name plain (one rule for log and popup). Rejected: ~~B. Log only this sprint~~ | — · decided | dice-extras |
+
+**Sprint 7** (track ST).
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-DICE-45 | **gems (GM track):** how a reroll leaves the old entry | **A. Kept, with `supersededBy` → the new entry; old rolls unchanged; the new roll's `replacesRollId` → the old roll** (stats and the struck-through line both read it; FR-DICE-72) · B. The old entry is edited in place (breaks "public stamped once", loses the old nat for history) | yes · orchestrator seam (GM ↔ ST) | DICE, GEM, STATS |
 
 ## 16. Out of scope
 
