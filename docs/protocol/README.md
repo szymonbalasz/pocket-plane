@@ -2773,7 +2773,7 @@ From [scene-tools](../specs/scene-tools.md#6-functional-requirements) FR-SCN-52 
 | Tests | `template-hover.test.ts` (`FR-SCN-52 template label on hover`: any drawn template's area incl. one the player can't edit, 6-px tolerance per scale, topmost, the pill and its grown rect), `e2e/tray-label-s6.e2e.ts` (Player 1 hovers Player 2's kept Thunderwave on a square Web doesn't cover → "· by Player 2" + `hovered`; away → gone; the pill, then six steps across its grown part → hovered throughout) | — |
 | CON-44 | 0 B | — |
 
-## 115. Sprint 6: companion turns client (CP2)
+## 117. Sprint 6: companion turns client (CP2)
 
 From [combat-tracker](../specs/combat-tracker.md#64-sprint-6-companions) FR-CBT-107–109, -111, -115, -118, -119 (#252, #288; OQ-CBT-79 A, -82 A, -83a A; seams S4). **Built by `build/cp-turns`** on CP0's server core ([§112](#112-sprint-6-companions-core-cp0): `cbt.setCompanion`, `cbt.start` `petIds?`, the redaction, ranks). **No wire change**: no new intent, event, record type, signal or field (CON-44: 0 B beyond §112's measured rows). Data model: [§90](../data-model/README.md#90-sprint-6-companion-turns-client-cp2).
 

@@ -2092,7 +2092,7 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 
 
 ## 90. Sprint 6: companion turns client (CP2)
 
-From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109, -115, -118, -119. **Built by `build/cp-turns`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent beyond CP0's fields. Protocol side: [protocol §115](../protocol/README.md#115-sprint-6-companion-turns-client-cp2).
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-107–109, -115, -118, -119. **Built by `build/cp-turns`**. No table, column, record type or snapshot change (CON-44: 0 B); nothing stored or sent beyond CP0's fields. Protocol side: [protocol §117](../protocol/README.md#117-sprint-6-companion-turns-client-cp2).
 
 | Derived (not stored) | Where | Rule | Audience | Source |
 |---|---|---|---|---|
