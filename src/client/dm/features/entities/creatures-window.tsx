@@ -2,7 +2,8 @@
 // read-only. Characters and customs live from sync; imported monsters from the compendium search
 // (FR-CMP-17: debounced 150 ms, pages of 50 + More), their definitions loaded on demand
 // (`useDefinitions`). Rows are HTML5 drag sources for the canvas (FR-MAP-13), data unchanged.
-// Footer **Credits** opens the About dialog with the token art credits (FR-ENT-29).
+// Footer **Credits** opens the About dialog with the token art credits (FR-ENT-29). Pets carry a
+// "Pet of Mira" Badge (FR-ENT-39); a dropped pet row places a token owned by its player (FR-MAP-74).
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { SearchResponse } from "@shared/compendium/rest";
 import {
@@ -110,9 +111,18 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
         </div>
       </TableCell>
       <TableCell className="w-px whitespace-nowrap p-1.5">
-        <Badge data-testid="ent-list-row-badge" variant={row.readOnly ? "outline" : "secondary"}>
-          {row.badge}
-        </Badge>
+        {row.pet ? (
+          // FR-ENT-39: "Pet of Mira", the owner player in the Tooltip.
+          <Tooltip content={row.pet.playerName}>
+            <Badge data-testid="ent-list-row-pet" data-record-id={row.id} variant="secondary">
+              {row.badge}
+            </Badge>
+          </Tooltip>
+        ) : (
+          <Badge data-testid="ent-list-row-badge" variant={row.readOnly ? "outline" : "secondary"}>
+            {row.badge}
+          </Badge>
+        )}
       </TableCell>
       {actions.length > 0 && (
         <TableCell className="w-px whitespace-nowrap p-1.5">
