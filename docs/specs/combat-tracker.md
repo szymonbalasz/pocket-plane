@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: in-review
+status: complete
 owner: spec-stats
 phase: post-mvp-7
 wave: 3
@@ -1059,8 +1059,8 @@ One track over CBT, ENT, CHARX, PARTY, MAP; every slice lists its shared files (
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CBT-89 | **From preset** on a direct heal | **A. The turn combatant** (Sela casts on her turn: zero clicks) · B. The last source picked (good for one dedicated healer) · C. "DM" (no guess, but healing goes uncredited unless the DM picks) | no · DM | CBT, STATS |
-| OQ-CBT-90 | **Overkill callout on PCs** (Mira at 3 HP takes 40) | **A. Same rule as monsters** (the table loves it; players see no HP number) · B. Monsters only (kinder to the downed player) | no · DM | CBT, STATS |
+| OQ-CBT-89 | **From preset** on a direct heal | **Decided (#315): A** · **A. The turn combatant** (Sela casts on her turn: zero clicks) · B. The last source picked (good for one dedicated healer) · C. "DM" (no guess, but healing goes uncredited unless the DM picks) | — | CBT, STATS |
+| OQ-CBT-90 | **Overkill callout on PCs** (Mira at 3 HP takes 40) | **Decided (#315): A** · **A. Same rule as monsters** (the table loves it; players see no HP number) · B. Monsters only (kinder to the downed player) | — | CBT, STATS |
 
 ## 16. Out of scope
 

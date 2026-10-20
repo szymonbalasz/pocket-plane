@@ -1,7 +1,7 @@
 ---
 title: Stats and summaries
 prefix: STATS
-status: in-review
+status: complete
 owner: spec-stats
 phase: post-mvp-7
 ---
@@ -200,29 +200,29 @@ Named tests (all `FR-STATS-NN …`):
 
 ## 15. Open questions
 
-**Bold** = pick. DM questions unless marked.
+**Bold** = pick. All decided at DM gate 1 (#315): every bold pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-STATS-01 | Who sees which stats? | **A. DM all; players the same numbers from public lines** (zero-leak; thin if attacks are hidden) · B. + own-audience lines (differs per player) · C. DM-only | yes | STATS, DICE |
-| OQ-STATS-02 | Leaderboard where? | **A. Stats window, live** · B. Initiative footer (steals rows) · C. End-of-combat popup (tier B) | yes | SHELL |
-| OQ-STATS-03 | Callout form | **A. Toast + line** · B. Line only (quiet) | no | CBT, NOTE |
-| OQ-STATS-04 | Players and monster overkill | **A. "Overkill!" + public damage, no number** (but a callout bounds HP: needed ≤ min(raw − 10, raw / 2), finer than the band) · B. The amount (exact HP) · C. DM-only (no bound) | yes | CBT |
-| OQ-STATS-05 | Callout threshold | **A. ≥ max(10, needed)** (rare) · B. any ≥ 10 (frequent) | no | STATS |
-| OQ-STATS-06 | "Dealt" = ? | **A. The log number; DM also Effective** · B. Effective (leaks HP) · C. Rolled, before overrides | yes | STATS, CBT |
-| OQ-STATS-07 | Overheal | **A. Counts (log number)** · B. Effective only (fairer) | no | STATS |
-| OQ-STATS-08 | Heal credit (none today) | **A. From on direct heal, preset turn combatant** · B. Healing-category rolls (unapplied heals count) · C. Drop the award | yes | CBT |
-| OQ-STATS-09 | What is a session? | **A. Derived ≥ 6 h log gap** (ADR-0013 holds, retroactive) · B. "End session" marker (supersedes ADR-0013) · C. The DM picks a range | yes | STATS |
-| OQ-STATS-10 | When do awards show? | **A. Show awards opens everyone's Stats** · B. No push (quieter) | no | NOTE |
-| OQ-STATS-11 | Monsters on players' board? | **A. Party only (DM all)** · B. Visible monsters (busier) | no | STATS |
-| OQ-STATS-12 | Companion credit | **A. Rolled into the current owner** (a charmed-away companion's past glory leaves its old owner: accepted) · B. Own winners | no | STATS |
-| OQ-STATS-13 | Retroactive? | **A. All history** (free) · B. From release | no | STATS |
-| OQ-STATS-15 | Which kills count? | **A. Any monster to 0, again after a revive** (simple) · B. Enemies, once per fight | no | STATS |
-| OQ-STATS-16 | Out-of-combat HP | **A. Not counted** (no source) · B. Downs from `CharacterHpAdjusted` | no | STATS |
-| OQ-STATS-18 | Glossary: Stats window, Session awards, Overkill callout; Session "derived" | **A. Add** | no · integrator | glossary |
-| OQ-STATS-19 | Encounter names in players' stats? | **A. Neutral "Fight 3 · Tue 20 Oct"** (names stay DM-only) · B. Real names (reveals names players never saw) | no | STATS |
+| OQ-STATS-01 | Who sees which stats? | **Decided (#315): A** · **A. DM all; players the same numbers from public lines** (zero-leak; thin if attacks are hidden) · B. + own-audience lines (differs per player) · C. DM-only | — | STATS, DICE |
+| OQ-STATS-02 | Leaderboard where? | **Decided (#315): A** · **A. Stats window, live** · B. Initiative footer (steals rows) · C. End-of-combat popup (tier B) | — | SHELL |
+| OQ-STATS-03 | Callout form | **Decided (#315): A** · **A. Toast + line** · B. Line only (quiet) | — | CBT, NOTE |
+| OQ-STATS-04 | Players and monster overkill | **Decided (#315): A** · **A. "Overkill!" + public damage, no number** (but a callout bounds HP: needed ≤ min(raw − 10, raw / 2), finer than the band) · B. The amount (exact HP) · C. DM-only (no bound) | — | CBT |
+| OQ-STATS-05 | Callout threshold | **Decided (#315): A** · **A. ≥ max(10, needed)** (rare) · B. any ≥ 10 (frequent) | — | STATS |
+| OQ-STATS-06 | "Dealt" = ? | **Decided (#315): A** · **A. The log number; DM also Effective** · B. Effective (leaks HP) · C. Rolled, before overrides | — | STATS, CBT |
+| OQ-STATS-07 | Overheal | **Decided (#315): A** · **A. Counts (log number)** · B. Effective only (fairer) | — | STATS |
+| OQ-STATS-08 | Heal credit (none today) | **Decided (#315): A** · **A. From on direct heal, preset turn combatant** · B. Healing-category rolls (unapplied heals count) · C. Drop the award | — | CBT |
+| OQ-STATS-09 | What is a session? | **Decided (#315): A** · **A. Derived ≥ 6 h log gap** (ADR-0013 holds, retroactive) · B. "End session" marker (supersedes ADR-0013) · C. The DM picks a range | — | STATS |
+| OQ-STATS-10 | When do awards show? | **Decided (#315): A** · **A. Show awards opens everyone's Stats** · B. No push (quieter) | — | NOTE |
+| OQ-STATS-11 | Monsters on players' board? | **Decided (#315): A** · **A. Party only (DM all)** · B. Visible monsters (busier) | — | STATS |
+| OQ-STATS-12 | Companion credit | **Decided (#315): A** · **A. Rolled into the current owner** (a charmed-away companion's past glory leaves its old owner: accepted) · B. Own winners | — | STATS |
+| OQ-STATS-13 | Retroactive? | **Decided (#315): A** · **A. All history** (free) · B. From release | — | STATS |
+| OQ-STATS-15 | Which kills count? | **Decided (#315): A** · **A. Any monster to 0, again after a revive** (simple) · B. Enemies, once per fight | — | STATS |
+| OQ-STATS-16 | Out-of-combat HP | **Decided (#315): A** · **A. Not counted** (no source) · B. Downs from `CharacterHpAdjusted` | — | STATS |
+| OQ-STATS-18 | Glossary: Stats window, Session awards, Overkill callout; Session "derived" | **Resolved (integrator, sprint-7 seams / rulings)** · **A. Add** | — | glossary |
+| OQ-STATS-19 | Encounter names in players' stats? | **Decided (#315): A** · **A. Neutral "Fight 3 · Tue 20 Oct"** (names stay DM-only) · B. Real names (reveals names players never saw) | — | STATS |
 
-Resolved by the integrator: ~~OQ-STATS-14~~ (S2: final roll only, maxed die via `raw`), ~~OQ-STATS-17~~ (S5: [FR-SHELL-86](play-shell.md#6-functional-requirements), 400 × 412, min 320 × 280).
+**Resolved (integrator, sprint-7 seams / rulings)**: ~~OQ-STATS-14~~ (S2: final roll only, maxed die via `raw`), ~~OQ-STATS-17~~ (S5: [FR-SHELL-86](play-shell.md#6-functional-requirements), 400 × 412, min 320 × 280).
 
 ## 16. Out of scope
 

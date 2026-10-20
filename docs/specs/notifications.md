@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: in-review
+status: complete
 owner: spec-stats
 wave: 2
 phase: post-mvp-7
@@ -351,7 +351,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-NOTE-28 | Show awards: info toast **and** the window opening, or only the window? | **A. Both** (FR-NOTE-13's rule unchanged; the toast says why the window opened) · B. Window only (a per-kind "no toast" flag, new to the registry) | no · DM | NOTE, STATS |
+| OQ-NOTE-28 | Show awards: info toast **and** the window opening, or only the window? | **Decided (#315): A** · **A. Both** (FR-NOTE-13's rule unchanged; the toast says why the window opened) · B. Window only (a per-kind "no toast" flag, new to the registry) | — | NOTE, STATS |
 
 ## 16. Out of scope
 

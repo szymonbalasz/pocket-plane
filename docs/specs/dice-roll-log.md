@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-stats
 wave: 2
 phase: post-mvp-7
@@ -381,7 +381,7 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| ~~OQ-DICE-45~~ | ~~gems: how a reroll leaves the old entry~~ | **Resolved by the integrator (seam S2), = OQ-DICE-42 A:** kept, with `supersededBy` set once; `replaces` on the new entry; roll rows immutable with `replacesRollId` (GM's FR-DICE-62–67). Stats count the final roll only | — | DICE, GEM, STATS |
+| ~~OQ-DICE-45~~ | ~~gems: how a reroll leaves the old entry~~ | **Resolved (integrator, sprint-7 seams / rulings)** (seam S2, = OQ-DICE-42 A): kept, with `supersededBy` set once; `replaces` on the new entry; roll rows immutable with `replacesRollId` (GM's FR-DICE-62–67). Stats count the final roll only | — | DICE, GEM, STATS |
 
 ## 16. Out of scope
 
