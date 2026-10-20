@@ -1,9 +1,9 @@
 ---
 title: Gems (homebrew)
 prefix: GEM
-status: stub
-owner: -
-phase: post-mvp
+status: claimed
+owner: spec-gems
+phase: post-mvp-7
 ---
 
 # Gems (post-MVP stub)
