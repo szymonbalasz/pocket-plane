@@ -703,9 +703,11 @@ function Row({
           {/* FR-CBTX-33: effect chips, one line ("+N" for the rest). */}
           <RowEffects c={c} round={round} />
         </NameLine>
+        {/* Never cut (FR-CBTX-57, F10): whole parts wrap onto a second line when narrow (320 at
+            round 0, Roll buttons in the Init column). */}
         <div
           data-stats-line
-          className="flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+          className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
         >
           <span className="shrink-0">AC {ac ?? "—"}</span>
           <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>

@@ -36,7 +36,8 @@ async function toWidth(page: Page, win: Locator, w: number) {
 }
 
 /**
- * FR-CBTX-57 / -58 on every row: names neither cut nor ellipsed nor past their line; trigger chips
+ * FR-CBTX-57 / -58 on every row: names neither cut nor ellipsed nor past their line, the DM's AC /
+ * HP line whole; trigger chips
  * whole (inside their chip line) or icon-only, nothing under them with `text-overflow: ellipsis`.
  */
 function rowsCut(init: Locator): Promise<string[]> {
@@ -50,6 +51,21 @@ function rowsCut(init: Locator): Promise<string[]> {
         bad.push(`name cut: ${n.dataset.value} ${n.scrollWidth}/${n.clientWidth}`);
       }
       if (a.width === 0 || a.right > b.right + 0.5) bad.push(`name out: ${n.dataset.value}`);
+    }
+    // The DM's AC / HP line: whole parts, wrapped when narrow, never clipped (F10 09).
+    for (const l of w.querySelectorAll<HTMLElement>("[data-stats-line]")) {
+      const b = l.getBoundingClientRect();
+      const name = l
+        .closest('[data-testid="cbt-init-row"]')
+        ?.querySelector<HTMLElement>('[data-testid="cbt-init-row-name"]')?.dataset.value;
+      if (l.scrollWidth > l.clientWidth + 0.5) bad.push(`stats cut: ${name}`);
+      for (const k of l.querySelectorAll<HTMLElement>(":scope > *")) {
+        const a = k.getBoundingClientRect();
+        const cut = k.scrollWidth > k.clientWidth + 0.5;
+        if (cut || a.right > b.right + 0.5 || a.bottom > b.bottom + 0.5) {
+          bad.push(`stats part out: ${name} ${k.textContent}`);
+        }
+      }
     }
     for (const c of w.querySelectorAll<HTMLElement>('[data-testid="cbtx-trigger-chip"]')) {
       const label = `${c.textContent} (${c.dataset.recordId})`;
@@ -214,6 +230,25 @@ test("FR-CBT-125 FR-CBTX-57 FR-CBTX-58 F10 Initiative rows: nothing below '↓ N
     ).toBeLessThan(6);
   }
   expect(await name.getAttribute("data-value")).toBe("Goblin Lurker");
+
+  await test.step("FR-CBTX-57 AC / HP line whole at 320: round 0, Roll buttons in the Init column", async () => {
+    // Still 320 wide (F10 09: "AC 14 HP 10/" clipped at 74 px, the goblins' "Healthy" hidden).
+    expect(Math.round((await escort.boundingBox())?.width ?? 0)).toBe(320);
+    await expect(escort.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "0");
+    await expect(escort.getByRole("button", { name: /Roll/ }).first()).toBeVisible();
+    expect(await rowsCut(escort)).toEqual([]);
+    const bands = escort.getByTestId("cbt-init-row-band");
+    expect(await bands.count()).toBeGreaterThanOrEqual(3);
+    for (const band of await bands.all()) {
+      await expect(band).toBeVisible();
+      const whole = await band.evaluate((el) => {
+        const a = el.getBoundingClientRect();
+        const b = (el.closest("[data-stats-line]") as HTMLElement).getBoundingClientRect();
+        return a.width > 0 && a.right <= b.right + 0.5 && a.bottom <= b.bottom + 0.5;
+      });
+      expect(whole).toBe(true);
+    }
+  });
 
   for (const page of [p1, dm]) await page.context().close();
 });
