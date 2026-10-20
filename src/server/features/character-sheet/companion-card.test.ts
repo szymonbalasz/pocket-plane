@@ -204,3 +204,27 @@ describe("FR-CHARX-63 / FR-ENT-38 card edits", () => {
     ).toBe("forbidden");
   });
 });
+
+describe("FR-CHARX-61 owner view names its pet", () => {
+  test("FR-CHARX-61 owner view names its pet: a pet combatant's entityId reaches its owner only; a summon's never", () => {
+    const t = cpSetup();
+    const ob = t.id("Owlbear");
+    const drake = t.id("Drake");
+    // The owner's view of its pet names the pet row; the DM's has it as always.
+    expect(t.playerCombatant(t.p1V, ob)).toMatchObject({ entityId: t.owlbear, pet: true });
+    expect(t.playerCombatant(t.p2V, drake)).toMatchObject({ entityId: t.drake, pet: true });
+    // Other players never get it (snapshot and frames).
+    expect(t.playerCombatant(t.p2V, ob)).not.toHaveProperty("entityId");
+    expect(t.playerCombatant(t.p1V, drake)).not.toHaveProperty("entityId");
+    // A summon (Goblin 2 made Mira's): its owner gets no definition id.
+    const g2 = t.combatantNamed("Goblin 2");
+    const n = t.events.length;
+    t.setCompanion({ combatantId: g2.id, owner: t.owner(t.miraId) });
+    expect(t.playerCombatant(t.p1V, g2.id)).toMatchObject({ ownerPlayerId: t.h.p1.id });
+    expect(t.playerCombatant(t.p1V, g2.id)).not.toHaveProperty("entityId");
+    t.run("char.edit", { creatureId: t.owlbear, set: { ac: 15 } }, t.p1);
+    expect(t.framesSince(n, t.p2V)).not.toContain(`"entityId":"${t.owlbear}"`);
+    expect(t.framesSince(n, t.p1V)).toContain(`"entityId":"${t.owlbear}"`);
+    expect(t.framesSince(n, t.p1V)).not.toContain(`"entityId":"${g2.entityId}"`);
+  });
+});

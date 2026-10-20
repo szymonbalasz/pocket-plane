@@ -81,14 +81,11 @@ const petCard = (s: MonsterStatBlock): CompanionCard => {
 };
 
 /**
- * FR-CHARX-61 (a pet in a fight shows once, from its combatant): the DM's combatant names its
- * entity; a player's owner view doesn't, so its pet is the owner's pet of the same name.
+ * FR-CHARX-61 (a pet in a fight shows once, from its combatant): the combatant names its pet
+ * (the DM's row, and the owner's view of a pet, FR-CBT-116).
  */
-function isPetCombatant(c: CombatantView, pet: CompanionEntityLike): boolean {
-  if (c.pet !== true) return false;
-  if (c.entityId !== undefined) return c.entityId === pet.id;
-  return c.ownerCharacterId === pet.companionOf && c.name === pet.name;
-}
+const isPetCombatant = (c: CombatantView, pet: CompanionEntityLike): boolean =>
+  c.pet === true && c.entityId === pet.id;
 
 /**
  * FR-CHARX-61 / -67: player → own pets (full rows) and own active companion combatants; DM →

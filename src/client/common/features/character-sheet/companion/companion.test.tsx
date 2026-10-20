@@ -131,10 +131,11 @@ const base = {
   tokenId: null,
   imageAssetId: null,
 };
-/** The owner's view of its companions (FR-CBT-116). */
+/** The owner's view of its companions (FR-CBT-116; a pet's names its row). */
 const owlC = {
   ...base,
   id: "c-owl",
+  entityId: "owl",
   kind: "monster",
   name: "Owlbear",
   playerPosition: 2,
@@ -157,6 +158,7 @@ const feC = {
   hpCurrent: 102,
   hpMax: 102,
   tempHp: 0,
+  entityId: undefined,
   pet: false,
   card: feCard,
 } as CombatantView;
