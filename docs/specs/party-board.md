@@ -549,7 +549,7 @@ Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). PARTY p
 
 ### 14.5 Sprint 8 build split (track CB)
 
-Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). PARTY part: **CB3** `build/cb-party`: (1) server first, at once: entities' other-player whitelist (`src/server/features/entities/records.ts`, `src/shared/entities/schemas.ts` `RedactedCharacter` / `REDACTED_CHARACTER_KEYS`; ENT-owned, orchestrator assigns; ADR proposed-s8-cb-party-hp accepted at the gate) and the leak tests that pin the list; (2) the window after **WF's frame core**: `src/client/common/features/party-board/Summary.tsx` (new), party-board `window.ts` (a second def), one append line per client in `windows.ts`, WF's size-table / golden rows in this branch. Depends on nothing of CB0 / CB2 (reads the turn field as it is).
+Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). PARTY part: **CB3** `build/cb-party`: (1) server first, once the DM answers the party-HP ADR / OQ-PARTY-30 (its only wait, seams S12): entities' other-player whitelist (`src/server/features/entities/records.ts`, `src/shared/entities/schemas.ts` `RedactedCharacter` / `REDACTED_CHARACTER_KEYS`; ENT-owned, **assigned to CB3's server part**, S12) and the leak tests that pin the list; (2) the window after **WF1** (FR-SHELL-112 (1)): `src/client/common/features/party-board/Summary.tsx` (new), party-board `window.ts` (a second def), one append line per client in `windows.ts`, its size-table row ([FR-SHELL-141](play-shell.md#6-functional-requirements)), golden and WF's harness sets P1 / P3 in this branch. Wave 3. Depends on nothing of CB0 / CB2 (reads the turn field as it is).
 
 ## 15. Open questions
 

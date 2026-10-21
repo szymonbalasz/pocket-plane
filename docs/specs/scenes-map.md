@@ -9,7 +9,7 @@ phase: post-mvp-8
 
 # Scenes and map
 
-> **Sprint 8, track CB (combat polish; owner spec-cb; DM [#334](../decisions-log.md)).** Decided, not open: the **current-turn token is highlighted** (ring / glow) for everyone who can see it. Combat says which token ([FR-CBT-166](combat-tracker.md#6-functional-requirements)); this spec adds the `turn` field to the token-overlay contract and draws it (FR-MAP-108–112). Why not the registry alone: `TokenDecoration` is declarative and its `ring` is only `"target"` (code read), so a new mark needs one small `TokensLayer.tsx` change, made **after WF's refits release the canvas** (sprint-8 hotspot rule). **For the DM:** [OQ-MAP-67, -68](#15-open-questions); seam with WF: OQ-MAP-69. Wire: 0 B (derived). Walkthrough: [combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary) CB1, CB7. WF edits this spec in parallel (refits) with its own range.
+> **Sprint 8, track CB (combat polish; owner spec-cb; DM [#334](../decisions-log.md)).** Decided, not open: the **current-turn token is highlighted** (ring / glow) for everyone who can see it. Combat says which token ([FR-CBT-166](combat-tracker.md#6-functional-requirements)); this spec adds the `turn` field to the token-overlay contract and draws it (FR-MAP-108–112). Why not the registry alone: `TokenDecoration` is declarative and its `ring` is only `"target"` (code read), so a new mark needs one small `TokensLayer.tsx` change, made **after WF3 (refits) merges** (seams S1: WF3 → CB2, canvas lock). **For the DM:** [OQ-MAP-67, -68](#15-open-questions); seam with WF: OQ-MAP-69 (closed by S1). Wire: 0 B (derived). Walkthrough: [combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary) CB1, CB7. WF edits this spec in parallel (refits) with its own range.
 
 | FR | What | Slice | Named test |
 |---|---|---|---|
@@ -698,7 +698,7 @@ Full split: [play-shell §14](play-shell.md#14-dependencies). MAP parts: **FU0**
 
 ### Sprint 8 build split (track CB)
 
-Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). MAP part: **CB2** `build/cb-turn-ring`: `token-overlays.ts` (the `TokenDecoration` type only), `decorations.ts` (merge), `token-decor.ts` (ring geometry), `layers/TokensLayer.tsx` (one mark before `TokenBody`); combat's `token-overlay.ts` line; `e2e/support` helper. **Canvas lock: after WF's refits** (`MapCanvas.tsx`, `TokensLayer.tsx`, `camera.ts`), one holder at a time. No server, schema or wire change.
+Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). MAP part: **CB2** `build/cb-turn-ring`: `token-overlays.ts` (the `TokenDecoration` type only), `decorations.ts` (merge), `token-decor.ts` (ring geometry), `layers/TokensLayer.tsx` (one mark before `TokenBody`); combat's `token-overlay.ts` line; `e2e/support` helper. **Canvas lock: after WF3 merges** (seams S1; `MapCanvas.tsx`, `TokensLayer.tsx`, `camera.ts`), one holder at a time; wave 4. The combat overlay line stays an append. No server, schema or wire change.
 
 ## 15. Open questions
 
@@ -782,7 +782,7 @@ Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track
 |---|---|---|---|---|
 | OQ-MAP-67 | **Turn highlight style** | **A. One colour for everyone, ring + soft glow, static: reads at a glance, no clash with the paw marker, side chips or HP tones** / B. Colour per side (a PC in its owner's colour, ally, enemy by the public side): more information, but repeats the side chip and paw colours and needs a colour-blind check / C. A pulsing ring: draws the eye, but constant redraws and motion noise for a minute-long turn | no · owner: DM (gate) | FR-MAP-109 |
 | OQ-MAP-68 | **Which tokens highlight, for whom** (hidden, fog) | **A. Players: only the tokens they receive whose turn they know (never a hidden or fogged combatant: no data reaches them); DM: also hidden tokens, dashed; `in-owner-turn` companions ring with their owner** / B. The DM never sees a ring on hidden tokens either: simpler, but the DM loses the cue on a hidden monster's turn / C. A plus an "on deck" (next up) marker: more planning help, more noise (later) | no · owner: DM (gate) | FR-MAP-110, FR-CBT-166 |
-| OQ-MAP-69 | **Seam with WF (window-frame pass): canvas lock.** How the ring is drawn | **A. The `turn` overlay field drawn by `TokensLayer.tsx` (one mark, after WF's refits release the canvas): moves with drags and previews** / B. An own canvas layer under the tokens (layer registry, no `TokensLayer.tsx` edit, can start at once): lags a dragged token until the drop | no · owner: orchestrator (seams) | play-shell (WF), FR-MAP-108 |
+| OQ-MAP-69 | **Seam with WF (window-frame pass): canvas lock.** How the ring is drawn | **Closed by seams S1: A.** `TokenDecoration.ring` only takes `"target"`, so CB2 extends the type (`turn` field), `decorations.ts`, `token-decor.ts` and `TokensLayer.tsx` under the canvas lock **after WF3 merges**; the combat overlay line stays an append. (Rejected: B, an own canvas layer that lags a dragged token) | — | play-shell (WF), FR-MAP-108 |
 
 ## 16. Out of scope
 
