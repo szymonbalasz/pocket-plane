@@ -3124,7 +3124,7 @@ From [stats](../specs/stats.md#6-functional-requirements) FR-STATS-01–16, -20,
 
 ## 133. Sprint 7: Stats window — Fight leaderboard, Session awards, live refresh, overkill toast, Show awards (ST2)
 
-From [stats](../specs/stats.md#6-functional-requirements) FR-STATS-17–20, -22, -24, -25, [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-93, -94 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-48 (views), -49 (DM #311, #315; OQ-NOTE-28 A). **Built by `build/st-window`**: browser only. The intents, ack shapes, `callout` line fields and the `stats-awards` kind are [§130](#130-sprint-7-stats-core--statsquery-show-awards-from-on-heals-overkill-line-callout-st-core)'s; no new record type, intent, event, signal or wire field (CON-44: 0 B). Data side: [data model §102](../data-model/README.md#102-sprint-7-stats-window-st2).
+From [stats](../specs/stats.md#6-functional-requirements) FR-STATS-17–20, -22, -24, -25, [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-93, -94 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-48 (views), -49 (DM #311, #315; OQ-NOTE-28 A). **Built by `build/st-window`**: browser only. The intents, ack shapes, `callout` line fields and the `stats-awards` kind are [§130](#130-sprint-7-stats-core--statsquery-show-awards-from-on-heals-overkill-line-callout-st-core)'s; no new record type, intent, event, signal or wire field (CON-44: 0 B). Data side: [data model §104](../data-model/README.md#104-sprint-7-stats-window-st2).
 
 | Kind | Owner | Clients | Default open | Default geometry | Launcher | Gate | Source |
 |---|---|---|---|---|---|---|---|
