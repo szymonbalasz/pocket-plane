@@ -1,8 +1,10 @@
 // Summary card of another player's PC (FR-CHARX-32): portrait, name, owner, "Level N Class",
-// species, Down / death state. Nothing else; no sections (CHARX §7.1).
+// species, Down / death state; with gems on, the gem counts under the level (FR-CHARX-73).
+// Nothing else; no sections (CHARX §7.1).
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { ReactNode } from "react";
 import { Badge, Card } from "../../components/ui/primitives";
+import { GemCountsRow } from "../gems/GemCounts";
 import { Portrait } from "./SheetView";
 import { type SummaryInput, summaryCard } from "./view-model";
 
@@ -33,6 +35,7 @@ export function SummaryCard({
               {v.level}
             </span>
           )}
+          <GemCountsRow characterId={e.id} testId="charx-summary-gems" />
           {v.species && (
             <span data-testid="charx-summary-species" className="text-xs text-muted-foreground">
               {v.species}
