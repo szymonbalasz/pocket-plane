@@ -1,7 +1,13 @@
 // Log-entry kinds `cbt.attack` and `cbt.hp` (FR-CBT-24, FR-DICE-18). Public text = actors, roll
 // + modifier, outcome, damage, "physical" tags; AC, the computed hit, overrides and the dice
 // breakdown stay in `dmPayload` (FR-CBT-53, FR-DICE-28).
-import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-types";
+import { GEMS_FEATURE } from "@shared/campaign-management/features";
+import {
+  defineLogKind,
+  type LineSegment,
+  type LogKindTrace,
+  type TracedEntry,
+} from "@shared/dice-roll-log/kind-types";
 import { rollBreakdownSegments } from "@shared/dice-roll-log/roll-kind";
 import { DmModPart, ROLL_MODS_MAX, RollModPart } from "@shared/dice-roll-log/schemas";
 import { linePartSegments } from "@shared/effect-modifiers/combat-parts";
@@ -13,6 +19,7 @@ import {
   CardDie,
   LOG_KIND_ATTACK,
   LOG_KIND_HP,
+  MaxedDice,
   TRIGGER_EXPRESSION_MAX,
   TRIGGER_LABEL_MAX,
   TRIGGER_PARTS_MAX,
@@ -153,6 +160,8 @@ export const AttackLogRolls = z.strictObject({
       dice: CompactDice,
       constant: z.int(),
       crit: z.boolean(),
+      /** FR-CBT-131 (sprint 7): the card's maxed dice (labelled `max`); a gems trace. */
+      maxed: MaxedDice.optional(),
     })
     .optional(),
   /**
@@ -168,6 +177,7 @@ export const AttackLogRolls = z.strictObject({
         constant: z.int(),
         rolled: z.int(),
         set: z.literal(true).optional(),
+        maxed: MaxedDice.optional(),
       }),
     )
     .min(1)
@@ -274,6 +284,20 @@ export function publicRuling(natural: number | null, hit: boolean): boolean {
 const withDieLabel = (s: LineSegment, label: string): LineSegment =>
   s.die ? { ...s, die: { ...s.die, label } } : s;
 
+/** FR-CBT-131 (sprint 7): the DM's chip label of a die the card maxed. */
+export const MAX_DIE_LABEL = "max";
+
+/** FR-CBT-131: a breakdown's die chips at `maxed` (their order in the roll's dice) read `max`. */
+function withMaxLabels(run: LineSegment[], maxed: readonly number[] | undefined): LineSegment[] {
+  if (!maxed?.length) return run;
+  let i = -1;
+  return run.map((s) => {
+    if (!s.die) return s;
+    i++;
+    return maxed.includes(i) ? withDieLabel(s, MAX_DIE_LABEL) : s;
+  });
+}
+
 const muted = (s: LineSegment): LineSegment =>
   s.style === "dropped" ? s : { ...s, style: "muted" };
 const close: LineSegment = { text: ")", style: "muted" };
@@ -287,7 +311,7 @@ function includedRun(
   roll: AttackLogRolls["damage"],
   mods: readonly RollModPart[] | undefined,
 ): LineSegment[] {
-  const run = roll ? rollBreakdownSegments(roll) : [];
+  const run = roll ? withMaxLabels(rollBreakdownSegments(roll), roll.maxed) : [];
   if (!mods?.length) return run;
   const incl = modSegments(mods).map(muted);
   if (run.length === 0) return [{ text: " (incl.", style: "muted" }, ...incl, close];
@@ -328,13 +352,38 @@ function damageSegments(
       if (r?.set) out.push({ text: ` (DM set; rolled ${r.rolled})`, style: "muted" });
       // FR-CBT-84 / FR-MOD-57: the part's dice labelled with its name ("Flame Tongue fire").
       const label = `${attackNameOf(p, dm)} ${x.type}`.trim();
-      if (r) out.push(...rollBreakdownSegments(r).map((s) => withDieLabel(s, label)));
+      if (r) {
+        const run = rollBreakdownSegments(r).map((s) => withDieLabel(s, label));
+        out.push(...withMaxLabels(run, r.maxed));
+      }
     });
     out.push({ text: ` damage${suffix}` });
   }
   out.push(...linePartSegments(p.parts, dm?.parts, p.damageType));
   return out;
 }
+
+/**
+ * FR-GEM-05 / FR-CBT-131 (OQ-GEM-21 B, ADR-0058): while gems are off the DM's breakdown loses its
+ * `maxed` marks (the dice stay as rolled: the maxed values are the final roll).
+ */
+export const gemsAttackTrace: LogKindTrace = {
+  feature: GEMS_FEATURE,
+  strip<E extends TracedEntry>(e: E): E {
+    const dm = (e as E & { dmPayload?: { rolls?: AttackLogRolls } | null }).dmPayload;
+    const rolls = dm?.rolls;
+    if (!rolls) return e;
+    const marked = rolls.damage?.maxed !== undefined || rolls.extra?.some((x) => x.maxed);
+    if (!marked) return e;
+    const { maxed: _d, ...damage } = rolls.damage ?? {};
+    const out: AttackLogRolls = {
+      ...rolls,
+      ...(rolls.damage ? { damage: damage as NonNullable<AttackLogRolls["damage"]> } : {}),
+      ...(rolls.extra ? { extra: rolls.extra.map(({ maxed: _x, ...x }) => x) } : {}),
+    };
+    return { ...e, dmPayload: { ...dm, rolls: out } };
+  },
+};
 
 /** The line's attack name: the payload's, else the DM's (a companion attacker, FR-CBT-114). */
 const attackNameOf = (p: AttackLogPayload, dm: AttackLogDmPayload | null | undefined): string =>
@@ -365,6 +414,7 @@ function outcomeText(hit: boolean, crit: boolean, ruled: boolean, dmView: boolea
  */
 export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof AttackLogDmPayload>>({
   kind: LOG_KIND_ATTACK,
+  traces: [gemsAttackTrace],
   payload: AttackLogPayload,
   dmPayload: AttackLogDmPayload,
   formatLine({ actorName, payload: p, dmPayload: dm }) {

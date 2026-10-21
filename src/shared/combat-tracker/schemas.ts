@@ -458,6 +458,15 @@ export const CARD_EXTRA_DICE_MAX = 12;
  * the same entry, typed, in attack-row order. Not in the base part's `total` (summed per target
  * at apply with its own multiplier, FR-CBT-82).
  */
+/** FR-CBT-128 (sprint 7): dice one `cards.maxDice` sets to max (gems' Combat gem: 1 / 2 / 3). */
+export const MAX_DICE_PICKS = 3;
+
+/**
+ * FR-CBT-128 (sprint 7): a part's dice set to their max (indices into its `dice`, ascending);
+ * absent = none. A gems trace: stripped while gems are off (OQ-GEM-21 B).
+ */
+export const MaxedDice = z.array(z.int().min(0).max(50)).min(1).max(MAX_DICE_PICKS);
+
 export const CardExtraPart = z.strictObject({
   type: PartDamageType,
   rollId: Id,
@@ -465,6 +474,7 @@ export const CardExtraPart = z.strictObject({
   constant: z.int(),
   total: z.int(),
   manual: z.boolean(),
+  maxed: MaxedDice.optional(),
 });
 export type CardExtraPart = z.infer<typeof CardExtraPart>;
 
@@ -475,6 +485,7 @@ export type CardExtraPart = z.infer<typeof CardExtraPart>;
 export const CardDamage = CardRoll.extend({
   triggers: z.array(CardTriggerPart).min(1).max(TRIGGER_PARTS_MAX).optional(),
   extra: z.array(CardExtraPart).min(1).max(EXTRA_DAMAGE_MAX).optional(),
+  maxed: MaxedDice.optional(),
 });
 export type CardDamage = z.infer<typeof CardDamage>;
 
@@ -514,6 +525,11 @@ export const DamageCardPayload = z
      * targets, no outcome), so a to-hit reroll isn't offered (FR-GEM-18). Absent = not ruled.
      */
     ruled: z.literal(true).optional(),
+    /**
+     * FR-CBT-128 (sprint 7): `cards.maxDice` ran on this damage (one per damage; a crit flip
+     * clears it with the moved damage, FR-CBT-127). A gems trace (OQ-GEM-21 B). Absent = never.
+     */
+    diceMaxed: z.literal(true).optional(),
   })
   .refine((p) => p.toHit !== null || p.damage !== null, {
     path: ["damage"],
@@ -565,6 +581,39 @@ export const samePartRollIds = (sent: PartRollIds, p: DamageCardPayload): boolea
  */
 export const critChanged = (p: DamageCardPayload): boolean =>
   p.toHit !== null && p.damage === null && (p.unusedRolls?.length ?? 0) > 0;
+
+/** FR-CBT-128: a card damage part: `"base"` or an extra part's index (card order). */
+export const CardPartRef = z.union([
+  z.literal("base"),
+  z
+    .int()
+    .min(0)
+    .max(EXTRA_DAMAGE_MAX - 1),
+]);
+export type CardPartRef = z.infer<typeof CardPartRef>;
+
+/** FR-CBT-128: one die to set to max: the part and the die's index in its `dice`. */
+export const CardDiePick = z.strictObject({ part: CardPartRef, index: z.int().min(0).max(50) });
+export type CardDiePick = z.infer<typeof CardDiePick>;
+
+/**
+ * FR-CBT-128 (OQ-GEM-13 A): the per-die values of a part entered as a physical total, in its
+ * `dice` order (count and faces matching, sum = the stored dice total).
+ */
+export const CardKnownDice = z.strictObject({
+  part: CardPartRef,
+  dice: z.array(z.int().min(1).max(1000)).min(1).max(51),
+});
+export type CardKnownDice = z.infer<typeof CardKnownDice>;
+
+/** FR-CBT-128: a card part by reference (null = no such part). */
+export function cardPart(
+  p: DamageCardPayload,
+  part: CardPartRef,
+): (CardRoll & { maxed?: number[] }) | null {
+  if (!p.damage) return null;
+  return part === "base" ? p.damage : (p.damage.extra?.[part] ?? null);
+}
 
 /** FR-CBT-127: what the DM's popup and the owner's card view say then. */
 export const CRIT_CHANGED_TEXT = "Critical changed by a reroll — roll damage again";
@@ -799,8 +848,9 @@ export const ApplyCardTargetsInput = z.strictObject({
   public: z.boolean().optional(),
   /**
    * FR-CBT-94 (sprint 5): the card's damage `rollId` the popup was built from (null = none yet);
-   * another one on the card → `conflict` "Damage just arrived — check and Apply again". Required
-   * (R1): every caller says which damage it applies.
+   * another one on the card → `conflict` "Damage just arrived — check and Apply again" (sprint 7:
+   * a shown damage since changed, e.g. a maxed die → CARD_CHANGED). Required (R1): every caller
+   * says which damage it applies.
    */
   damageRollId: Id.nullable(),
   /** FR-CBT-129 (sprint 7): required; another part on the card → `conflict` (CARD_CHANGED). */

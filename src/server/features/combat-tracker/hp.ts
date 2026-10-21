@@ -173,7 +173,11 @@ export const applyCardWith = (hooks: ApplyHooks) =>
       if (enc.status !== "started") throw conflict("Encounter has ended");
       if (card.state !== "pending") throw conflict("No longer pending");
       // FR-CBT-94 (sprint 5): the DM applies only the damage the popup showed.
-      if (input.damageRollId !== (p.damage?.rollId ?? null)) throw conflict(DAMAGE_JUST_ARRIVED);
+      // FR-CBT-129 (sprint 7): a damage the popup showed that changed since (a maxed die, or a
+      // crit flip's new roll) is "the card changed"; none shown → damage just arrived.
+      if (input.damageRollId !== (p.damage?.rollId ?? null)) {
+        throw conflict(input.damageRollId === null ? DAMAGE_JUST_ARRIVED : CARD_CHANGED);
+      }
       // FR-CBT-129 (sprint 7): and every other part as the popup showed it.
       if (!samePartRollIds(input.partRollIds, p)) throw conflict(CARD_CHANGED);
       // FR-CBT-91 (sprint 5): a ruled card takes its to-hit from the hit ruling and applies only
@@ -271,20 +275,26 @@ export const applyCardWith = (hooks: ApplyHooks) =>
                 dice: damageRoll.dice,
                 constant: damageRoll.constant,
                 crit: p.crit,
+                // FR-CBT-131 (sprint 7): the DM's chips of maxed dice read `max`.
+                ...(p.damage?.maxed ? { maxed: p.damage.maxed } : {}),
               },
             }
           : {}),
         // FR-CBT-84: the extra parts' dice stay DM-only (rulings B4).
         ...(extras.length
           ? {
-              extra: extras.map((x) => ({
-                type: x.type,
-                expression: x.roll.expression,
-                dice: x.roll.dice,
-                constant: x.roll.constant,
-                rolled: x.rolled,
-                ...(x.total !== x.rolled ? { set: true as const } : {}),
-              })),
+              extra: extras.map((x, i) => {
+                const maxed = extraParts[i]?.maxed;
+                return {
+                  type: x.type,
+                  expression: x.roll.expression,
+                  dice: x.roll.dice,
+                  constant: x.roll.constant,
+                  rolled: x.rolled,
+                  ...(x.total !== x.rolled ? { set: true as const } : {}),
+                  ...(maxed ? { maxed } : {}),
+                };
+              }),
             }
           : {}),
       };
