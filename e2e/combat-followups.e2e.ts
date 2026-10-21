@@ -68,7 +68,7 @@ function brokenWords(scope: Locator, name: string): Promise<string[]> {
 const markerIds = async (page: Page) =>
   (await konvaNodes(page, "map-token-companion")).map((n) => n.id);
 
-/** FR-MAP-76 / -88: the token's paw drawn, or folded into its "+N" (whose tip lists it). */
+/** FR-MAP-76 / -88: the token's paw drawn as its own chip (never folded into "+N", FU3). */
 function pawShown(page: Page, tokenId: string): Promise<boolean> {
   return page.evaluate((id) => {
     type KNode = {
@@ -81,11 +81,7 @@ function pawShown(page: Page, tokenId: string): Promise<boolean> {
     const mine = (K?.stages[0]?.find((n: KNode) => n.id() === id) ?? []).filter((n) =>
       n.isVisible(),
     );
-    return mine.some(
-      (n) =>
-        n.name() === "map-token-companion" ||
-        (n.name() === "map-token-badge-more" && /companion/.test(String(n.getAttr("tip")))),
-    );
+    return mine.some((n) => n.name() === "map-token-companion");
   }, tokenId);
 }
 
@@ -242,9 +238,8 @@ test("FR-CBT-141 FR-CBT-142 FR-CBT-143 FR-CBT-144 FR-CBT-145 FR-CBT-146 FR-CBT-1
     await expect(
       escort.locator(`[data-testid="cbt-init-row-hp"][data-record-id="${g2}"]`),
     ).toHaveText("HP 4/7");
-    // FR-MAP-88 (server invariant): both pets' tokens still carry the paw. At Start's refit (34 px
-    // cells) the medium drake's label row folds it into "+N" ("Ally, Player 1's companion"): the
-    // marker is decorated, drawn as its own chip only once FU3's client part lands.
+    // FR-MAP-88: both pets' tokens still carry the paw, drawn as its own chip: at Start's refit
+    // (34 px cells) the medium drake's label row keeps the paw before the "+N" (FU3).
     for (const page of [dm, p2]) {
       await expect.poll(() => pawShown(page, owlToken)).toBe(true);
       await expect.poll(() => pawShown(page, drakeToken)).toBe(true);
