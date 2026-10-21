@@ -6,6 +6,7 @@
 //   Brakka  Dealt 12 | 12  Taken 55 | 55 Healed 8 | 8  Kills 1 | 1
 //   Mira    Dealt 11 | 0   Taken 11 | 11 Kills 1 | 0   (late damage on the hidden Goblin 2)
 //   Owlbear Dealt 7 | 7    Kills 1 | 1   (under Mira)
+//   DM only: Elite Dealt 9 (hidden), "DM (direct)" Dealt 3 (on the hidden Wolf)
 // Fight "Old Crypt" (players: "Fight 1 · ‹day›"): Thorn Dealt 43, Kills 2; Mira Taken 15, down;
 //   DM: Skeleton 2 Dealt 15, "Unattributed" Healed 12.
 // Session awards, DM | players: Biggest hit Thorn 30 | 30; Biggest overkill Thorn 23 | 30;
@@ -97,6 +98,8 @@ describe("STATS §13 fixtures", () => {
     expect(d.Mira).toEqual([11, 11, 0, 1]);
     expect(d.Owlbear).toEqual([7, 0, 0, 1]);
     expect(d["Elite Goblin Warrior"]).toEqual([9, 0, 0, 0]);
+    expect(d["DM (direct)"]).toEqual([3, 0, 0, 0]);
+    expect(d.Wolf).toEqual([0, 3, 0, 0]);
     expect(dm.fights.map((f) => f.label)).toEqual(["Ambush at the Ford", "Old Crypt"]);
     for (const name of ["Player 1", "Player 2"]) {
       const p = t.q<PlayerFightResult>({ scope: "fight" }, t.as(name));
@@ -109,6 +112,7 @@ describe("STATS §13 fixtures", () => {
       expect(r.Owlbear).toEqual([7, 0, 0, 1]);
       expect(Object.keys(r)).not.toContain("Elite Goblin Warrior");
       expect(Object.keys(r)).not.toContain("Goblin 2");
+      expect(Object.keys(r)).not.toContain("DM (direct)");
     }
     const cryptKey = dm.fights[1]?.key as string;
     const crypt = table(

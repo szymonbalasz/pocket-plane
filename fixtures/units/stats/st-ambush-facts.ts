@@ -75,6 +75,7 @@ const UNDONE_ROW = 8;
  * - The Owlbear (Mira's pet) → Goblin Scout 4: 7, kill ("Mira + Owlbear").
  * - One undone apply: Thorn → Goblin Scout 2, 5, undone (it stays at 7 HP: the walkthrough's
  *   "Goblin 4").
+ * - The DM's direct 3 on the hidden Wolf, no From: the DM's "DM (direct)" row (DM-only line).
  * Expected numbers: the header of `stats.fixtures.test.ts` (DM and players).
  */
 export default defineFixture({
@@ -138,5 +139,6 @@ export default defineFixture({
     hp("scout4", "damage", 7, "owlbear"),
     hp("scout2", "damage", 5, "thorn"),
     step(undoCommand, (r) => ({ expectedHpChangeId: r.id(KEY, HP_CHANGE_TYPE, UNDONE_ROW) })),
+    hp("wolf", "damage", 3),
   ],
 });
