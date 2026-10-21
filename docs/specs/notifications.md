@@ -140,7 +140,7 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR-NOTE-60 | *(Sprint 8)* **`restoreToast`** (optional view flag; amends FR-NOTE-13, -15; in WF4's `ToastRuntime.tsx`, after WF4): after the first snapshot of a load or reconnect, each pending row of such a kind owned by this client re-toasts, **silent, no cue**, and is left out of the "N pending" summary. Only `roll-request` sets it. Test `FR-NOTE-60 restore toast`. | OQ-NOTE-34 |
 | FR-NOTE-61 | *(Sprint 8)* **DM view** (append): history row "‹PC› · ‹label›" + "Open requests"; no DM toast, no action cue (`cueTokens: false`); the bell counts open prompts (FR-NOTE-27). Test `FR-NOTE-61 DM view`. | OQ-NOTE-33 |
 | FR-NOTE-62 | *(Sprint 8)* **Closing**: answer / decline → resolved by the closer; DM Close → by rule ("Closed"); never dismissed by End. Test `FR-NOTE-62 prompt closes`. | |
-| FR-NOTE-63 | *(Sprint 8)* **Paused** (seams S10): prompts and other card toasts arrive under the pause card and are restored at resume; callouts are dropped, not replayed. Test `FR-NOTE-63 prompt while paused`. | |
+| FR-NOTE-63 | *(Sprint 8)* **Paused** (seams S10): prompts and other card toasts arrive under the pause card and are restored at resume; info toasts go to history only; callouts are dropped, not replayed. Test `FR-NOTE-63 prompt while paused`. | |
 | FR-NOTE-64 | *(Sprint 8)* **Leak rules**: no DC unless shown, never `success`; `resolution.total` only to the roller. Test `FR-NOTE-64 roll-request leak`. | |
 
 ## 7. UI/UX notes

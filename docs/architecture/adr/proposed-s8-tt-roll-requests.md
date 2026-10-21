@@ -30,7 +30,8 @@
 - **Record:** `roll-request`, campaign scope, **DM only**, snapshot window "open pinned + newest 20 closed". Targets 1–12 PCs; ≤ 5 open per campaign.
 - **Prompts:** one `roll-request` notification per target, audience = the PC's owner, action "Roll" owned by that player (ADR-0016 "action owner + the DM"). Payload carries the DC only when the DM shows it.
 - **Answer:** `dicex.answerRequest` (owner or DM): the server builds the roll from the request (sheet bonuses, overrides and roll hooks as `char.roll`), writes the `roll` entry, marks the target, resolves the prompt, in one transaction. Physical dice and the tray work because the client's Roll is an ordinary roll control whose `onRoll` sends this intent.
-- **Hidden answers:** `public: false` + `audiencePlayerId` = the roller's player: DM + roller, no one else (the companion-line rule). Stamped by the server from the request through an internal `audience` input; no intent field lets a player choose it (#73 stands for every other roll).
+- **Hidden answers:** `public: false` + `audiencePlayerId` = the target's player (whoever rolls, the DM included): DM + that player, no one else (the companion-line rule). Answers are marked `answer: true` and are not rerollable (OQ-GEM-20 A).
+- **Owner changes:** a PC's owner change marks its open targets `missed` and resolves their prompts (no re-target). Targets must be owned, non-hidden PCs at send. Stamped by the server from the request through an internal `audience` input; no intent field lets a player choose it (#73 stands for every other roll).
 - **No timer.** A request closes when no target is open, or by the DM (Close; Roll for missing). Not undoable. Not encounter-scoped.
 - **Stats** (ADR-0059): answers are ordinary `roll` facts; hidden ones count for the DM only (players' view = public).
 
