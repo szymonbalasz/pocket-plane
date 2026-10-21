@@ -113,23 +113,36 @@ describe("FR-STATS-22 callout toast", () => {
     expect(overkillToast(frame([redacted]), "player")?.text).not.toContain("over");
   });
 
-  test("FR-STATS-22 no toast for an undone line, a line without callout, a cbt.hp line or another kind", () => {
+  test("FR-STATS-22 no toast for an undone line, a line without callout, a heal or another kind", () => {
     expect(overkillToast(frame([entry({ undone: true })]), "dm")).toBeNull();
     const plain = entry();
     delete (plain.payload as { callout?: unknown }).callout;
     expect(overkillToast(frame([plain]), "dm")).toBeNull();
-    expect(
-      overkillToast(
-        frame([
-          entry({
-            kind: LOG_KIND_HP,
-            payload: { targetName: "G", kind: "damage", amount: 30, callout: "overkill" },
-          }),
-        ]),
-        "dm",
-      ),
-    ).toBeNull();
+    const heal = { targetName: "Mira", kind: "heal", amount: 30, sourced: true };
+    expect(overkillToast(frame([entry({ kind: LOG_KIND_HP, payload: heal })]), "dm")).toBeNull();
     expect(overkillToast(frame([entry({ kind: "roll", payload: [] })]), "dm")).toBeNull();
+  });
+
+  test("FR-STATS-22 a direct-damage cbt.hp callout line (From Thorn) toasts too: players without the amount, the DM with it", () => {
+    const hp = entry({
+      kind: LOG_KIND_HP,
+      payload: {
+        targetName: "Goblin Scout 2",
+        kind: "damage",
+        amount: 40,
+        sourced: true,
+        callout: "overkill",
+      },
+      dmPayload: { applied: 7, hpBefore: 7, hpAfter: 0, overkill: 33 },
+    });
+    expect(overkillToast(frame([hp]), "dm")?.text).toBe(
+      "Overkill! Thorn → Goblin Scout 2: 40 damage (+33 over 7 HP)",
+    );
+    const { dmPayload: _, ...redacted } = hp;
+    expect(overkillToast(frame([redacted]), "player")?.text).toBe(
+      "Overkill! Thorn → Goblin Scout 2: 40 damage",
+    );
+    expect(overkillToast(frame([{ ...hp, undone: true }]), "dm")).toBeNull();
   });
 
   test("FR-STATS-22 one per frame: a multi-target apply toasts the first callout line only", () => {

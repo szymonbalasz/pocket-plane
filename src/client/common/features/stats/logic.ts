@@ -1,8 +1,13 @@
 // Stats window client logic (STATS §7, FR-STATS-17–25), pure: which live frames re-query, the
 // overkill callout toast (FR-STATS-22), the live awards open (FR-SHELL-94), picker labels. The
 // numbers are always the server's (`stats.query`'s ack): nothing here aggregates a fact.
-import { AttackLogDmPayload, AttackLogPayload } from "@shared/combat-tracker/log-kinds";
-import { LOG_KIND_ATTACK } from "@shared/combat-tracker/schemas";
+import {
+  AttackLogDmPayload,
+  AttackLogPayload,
+  HpLogDmPayload,
+  HpLogPayload,
+} from "@shared/combat-tracker/log-kinds";
+import { LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { NotificationCreated } from "@shared/events/notifications";
 import type { NotificationRecord } from "@shared/notifications/schemas";
@@ -52,23 +57,43 @@ export function refreshes(
   );
 }
 
+/** A callout line's public damage and DM-only overkill (`dmPayload`, absent for players). */
+function calloutOf(
+  e: GameLogEntryView,
+): { target: string; damage: number; overkill?: number } | null {
+  if (e.kind === LOG_KIND_ATTACK) {
+    const p = AttackLogPayload.safeParse(e.payload);
+    if (!p.success || p.data.callout !== "overkill") return null;
+    const dm = AttackLogDmPayload.safeParse(e.dmPayload);
+    return { target: p.data.targetName, damage: p.data.damage, overkill: dm.data?.overkill };
+  }
+  if (e.kind === LOG_KIND_HP) {
+    const p = HpLogPayload.safeParse(e.payload);
+    if (!p.success || p.data.callout !== "overkill" || p.data.kind !== "damage") return null;
+    const dm = HpLogDmPayload.safeParse(e.dmPayload);
+    return { target: p.data.targetName, damage: p.data.amount, overkill: dm.data?.overkill };
+  }
+  return null;
+}
+
 /**
- * FR-STATS-22 (FR-NOTE-49): the callout toast a live frame starts: the first `cbt.attack` upsert
- * with `callout`, not undone. Players: "Overkill! Thorn → Goblin 1: 30 damage"; the DM adds
- * " (+23 over 7 HP)" from `dmPayload` (players never have it). Null = no toast.
+ * FR-STATS-22 (FR-NOTE-49): the callout toast a live frame starts: the first outcome line upsert
+ * with `callout`, not undone: `cbt.attack`, and `cbt.hp` direct damage (FR-CBT-137 stamps both;
+ * the DM's "Thorn applies 40" in the Damage / heal dialog is a `cbt.hp` line). Players:
+ * "Overkill! Thorn → Goblin 1: 30 damage"; the DM adds " (+23 over 7 HP)" from `dmPayload`
+ * (players never have it). Null = no toast.
  */
 export function overkillToast(
   frame: Frame,
   role: "dm" | "player",
 ): { entryId: string; text: string } | null {
   for (const e of logUpserts(frame)) {
-    if (e.kind !== LOG_KIND_ATTACK || e.undone) continue;
-    const p = AttackLogPayload.safeParse(e.payload);
-    if (!p.success || p.data.callout !== "overkill") continue;
-    let text = `Overkill! ${e.actorName} → ${p.data.targetName}: ${p.data.damage} damage`;
-    if (role === "dm") {
-      const dm = AttackLogDmPayload.safeParse(e.dmPayload);
-      if (dm.success) text += ` (+${dm.data.overkill} over ${p.data.damage - dm.data.overkill} HP)`;
+    if (e.undone) continue;
+    const c = calloutOf(e);
+    if (!c) continue;
+    let text = `Overkill! ${e.actorName} → ${c.target}: ${c.damage} damage`;
+    if (role === "dm" && c.overkill !== undefined) {
+      text += ` (+${c.overkill} over ${c.damage - c.overkill} HP)`;
     }
     return { entryId: e.id, text };
   }
