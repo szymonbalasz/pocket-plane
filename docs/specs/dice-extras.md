@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: claimed
+status: in-review
 owner: spec-tt
 phase: post-mvp-8
 ---
@@ -13,6 +13,22 @@ phase: post-mvp-8
 > **Sprint 6 (track PF; DM [#285](../decisions-log.md) [2]).** Settings move to a **Preferences window** ([play-shell](play-shell.md) FR-SHELL-70–76). *OQ-SHELL-47 decided A (#288)*: this spec registers a **Dice** section there: the existing settings panel (display, others' rolls, roll popups, "Dice look…"), same stores; the tray and popup gears stay as shortcuts (OQ-DICEX-48). New FR-DICEX-57, -58 (PF2). No server, record or storage change; 0 B. Walkthrough: [play-shell §13](play-shell.md#13-test-plan) P9, P10.
 
 > **Sprint 7 (track FU, BL-48; DM [#311](../decisions-log.md)).** Decided, not open: no stray spaces in dice text. New **FR-DICEX-63** (with [FR-DICE-78](dice-roll-log.md#6-functional-requirements)). Test `FR-DICEX-63 notation spacing` (unit over `notation.ts` and the popup line: no `"( "`, `" )"`, `"  "`); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. The sim-10 note "DM tray opens 360 × 248, not 300 × 240" is **dropped here**: 300 × 240 is the tray's min, its default is 360 × 300 (FR-DICEX-01), and the 248 came from auto placement's shrink, which play-shell's useful size now governs (FR-SHELL-79). Client only, 0 B. Edge cases: client-only text; reconnect re-renders from the store; crash: no server change. No open question.
+
+> **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md); spec-tt).** Decided by the DM (not open): **saved macros / custom roll buttons** (named roll buttons, e.g. "Sneak Attack 3d6", "Bless 1d4"; one click → the normal roll path incl. physical dice and the tray) and **DM roll requests** (a notification with a roll action, "Everyone: Perception", "Mira: DEX save DC 15"; results back to the DM, hidden or public per the request). Both move here from the [post-MVP stub](post-mvp/dice-extras.md) (its macros and roll-request rows; the stub keeps whispers). New FR-DICEX-64–93 (§6 "Sprint 8"). Two record types (`roll-macro`, `roll-request`), one notification kind ([FR-NOTE-58](notifications.md#6-functional-requirements)), request answers reuse the companion audience on log lines ([FR-DICE-79](dice-roll-log.md#6-functional-requirements)). Roll requests as pending actions: [proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md). Pause screen and alert sounds: [play-shell](play-shell.md) FR-SHELL-125–135, [campaign-management](campaign-management.md) FR-CAMP-46–50, [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61. **For the DM:** OQ-DICEX-49–60. CON-44 **measured** (§12): DM worst +231 KB (≈ 1.17 MB cumulative of 1.5 MiB), players +13 KB.
+
+**Sprint 8 at a glance** (track TT)
+
+| FR | What | Slice | Named test(s) (§13) |
+|---|---|---|---|
+| 64–67 | Macro record, caps, who may edit, visibility | TT0 (record), TT1 | `FR-DICEX-64 macro schema`, `FR-DICEX-66 macro rights`, `FR-DICEX-67 macro visibility` |
+| 68 | A macro rolls through the normal roll control (physical dice, Shift / Ctrl, Alt → tray) | TT1 | `FR-DICEX-68 macro roll path` |
+| 69–72 | Tray Macros popover, Save as macro, editor, offline | TT1 | `FR-DICEX-69 tray macros`, `FR-DICEX-70 save as macro`, `FR-DICEX-71 macro editor` |
+| 73–77 | Roll request record, send, targets, roll spec, DC and results | TT0 (record), TT2 | `FR-DICEX-74 request send`, `FR-DICEX-75 request targets`, `FR-DICEX-77 DC never leaks` |
+| 78–82 | Answer, decline, close, roll for missing, lifecycle | TT2 | `FR-DICEX-78 answer`, `FR-DICEX-79 decline`, `FR-DICEX-80 close`, `FR-DICEX-81 roll for missing`, `FR-DICEX-82 lifecycle` |
+| 83–85 | The player's prompt (roll control), result surfaces | TT2 | `FR-DICEX-83 prompt roll path`, `FR-DICEX-84 hidden result surfaces` |
+| 86–88 | The DM's Roll requests window | TT2 | `FR-DICEX-86 requests window`, `FR-DICEX-87 request card` |
+| 89–91 | Sound, pause, reconnect | TT2 (+ TT3 sound key) | `FR-DICEX-89 request sound`, `FR-DICEX-90 request while paused`, `FR-DICEX-91 prompt after reload` |
+| 92–93 | Leak scan; CON-44 measured | TT0, TT2 | `FR-DICEX-92 request leak scan`, `CON-44 table tools` |
 
 ## 1. Summary
 
@@ -74,6 +90,7 @@ phase: post-mvp-8
 - Decided at sprint-3 gate 1 ([#207](../decisions-log.md)): `three` + `cannon-es` (OQ-DICEX-01), throw zone over the free area (OQ-DICEX-02), server-stored looks (OQ-DICEX-06), Alt+click (OQ-DICEX-08), styles list (FR-DICEX-24).
 - **Sprint 4:** display modes with full-screen as default (FR-DICEX-32–35), device settings v2 (FR-DICEX-36), 3D ready for the first throw (FR-DICEX-37), DM-only throws (FR-DICEX-38), roll popup + picture-in-picture (FR-DICEX-39–41), die-shape chips (FR-DICEX-42), others / slow / reduced motion (FR-DICEX-43–45). Game-log dice: [FR-DICE-35–37](dice-roll-log.md#6-functional-requirements). Library compared again (§14, #244). No server, schema, event or protocol change.
 - **Sprint 5:** popup line layout (FR-DICEX-46, -47), tray preview (FR-DICEX-48), landing hold (FR-DICEX-49), label reset (FR-DICEX-50), Alt hint (FR-DICEX-51), compressed static serving (FR-DICEX-52). No schema, event, protocol, record or WS change; one server-core edit (static serving) and one tooling edit (build).
+- **Sprint 8 (TT):** saved macros: record, rights, tray popover, sheet tab ([FR-CHARX-87–90](character-sheet-full.md#6-functional-requirements)), editor (FR-DICEX-64–72); DM roll requests: record, send / answer / decline / close / roll for missing, the player's prompt, the DM's Roll requests window, sound, pause, reconnect, leak scan (FR-DICEX-73–93). *Out:* whispers (stub), macros that feed attack / apply or reference sheet values (OQ-DICEX-51), request timers (OQ-DICEX-56).
 
 ## 3. Goals
 
@@ -87,7 +104,8 @@ phase: post-mvp-8
 ## 4. Non-goals
 
 - Client-rolled or client-influenced results ([ADR-0001](../architecture/adr/0001-tech-stack.md): dice are server-authoritative).
-- Macros / custom roll buttons, DM roll requests, whispers (stay in the [stub](post-mvp/dice-extras.md); DM didn't take them into sprint 3).
+- ~~Macros / custom roll buttons, DM roll requests, whispers (stay in the [stub](post-mvp/dice-extras.md); DM didn't take them into sprint 3).~~ *(Sprint 8: macros and roll requests are in, #334; whispers stay in the [stub](post-mvp/dice-extras.md).)*
+- *(Sprint 8)* A macro that feeds attack / apply, adds effect riders or reads sheet values (`@dex`); a macro bar; server-side request timers (ADR-0016: no wall-clock scheduler); requests to companions; players requesting rolls from each other.
 - Dice sound (OQ-DICEX-11; [ADR-0007](../architecture/adr/0007-product-scope.md) allows only short UI sounds).
 - Dice in map world space / on the Konva canvas (OQ-DICEX-02 C; would follow V's canvas work).
 - Tapping 3D faces to enter physical results; per-category looks (OQ-DICEX-05 C).
@@ -115,6 +133,12 @@ phase: post-mvp-8
 - As a player, I want my friend's 10d6 to sit in the popup as dice I can read, not as dots, so that I can check the fireball.
 - As a player, I want to see the d6s and d8 I picked in the tray as real dice, and the total only once they land, so that a roll still feels like a roll.
 - As the DM on a phone-tethered tunnel, I want the dice to load fast after a reload, so that the first roll isn't flat.
+
+**Sprint 8**
+- As a player, I want a "Sneak Attack 3d6" button on Mira, so that I don't type it every turn, and still roll it with my real dice when I want.
+- As the DM, I want "Bless 1d4" and my monsters' odd rolls one click away in the tray.
+- As the DM, I want to ask everyone for Perception against a hidden DC and see each total come back to me, so that the table doesn't learn what they missed.
+- As a player, I want the DM's "DEX save DC 15" to pop up with a Roll button that uses my bonus, so that I answer in one click.
 
 ## 6. Functional requirements
 
@@ -187,6 +211,70 @@ phase: post-mvp-8
 | FR-DICEX-57 | **Dice section in Preferences:** both clients register `dicex.dice` "Dice" (order 30) in their `pref-sections.ts` ([FR-SHELL-72](play-shell.md#6-functional-requirements)); its body is the existing `SettingsPanel` (Display Full screen / Tray throw / Flat / Off; "Show others' rolls"; "Roll popups"; "Dice look…" opening the look editor pane in place), laid out for the 360-px window. Same disabled states and reasons (no WebGL → 3D modes disabled with the reason; Dice look Save disabled unless `live`, FR-DICEX-27). | #285 [2] |
 | FR-DICEX-58 | **One store, two places:** the section and the tray / roll-popup gears read and write the same `pp.dicex.v2` entry (FR-DICEX-36) and the same `dice-look` record (FR-DICEX-26), so a change in one shows in the other at once (same tab; other tabs on their next read, as today). The gears stay (OQ-DICEX-48 A). No new key, field, intent or event. | FR-SHELL-76 |
 | FR-DICEX-63 | **Notation and breakdown spacing** (sprint 7, track FU; BL-48: "(3d6: 5 + 2 + 1 )"): the tray's staged notation text, the roll popup's breakdown and the flat zone's text (`@shared/dice-extras/notation.ts` and the popup line) follow [FR-DICE-78](dice-roll-log.md#6-functional-requirements)'s spacing rule (one space between tokens, none after "(" or before ")", none doubled or trailing); one shared joiner where both build the same text. The tray's and popup's sizes are unchanged (the DM tray opening at 360 × 248 in sim-10 is the shell's fit / shrink, covered by [FR-SHELL-79](play-shell.md#6-functional-requirements): `dicex.tray`'s useful size is its 360 × 300 default). | BL-48 |
+| **Sprint 8 (TT): saved macros** (#334; was the stub's tier-A row) | | |
+| FR-DICEX-64 | **Record `roll-macro`** (table `roll_macro`, §8): `name` 1–40 (trimmed, control chars removed, rendered as text), `expression` (FR-DICE-01 grammar, stored canonical `toNotation`), `category` (FR-DICE-11, default `other`), `creatureId` (roll as; null = "Me" / "DM"), `playerId` (the player who sees and uses it; null = DM only), `order`. **Caps:** ≤ 24 per list (`playerId`, `creatureId`), ≤ 400 per campaign; over → `conflict` "At most 24 macros here" / "Macro limit reached (400)". IDs and time from `ctx`. | OQ-DICEX-49 |
+| FR-DICEX-65 | **Whose macro** (OQ-DICEX-49 pick A): a player's macros have `playerId` = self and `creatureId` null or a character they own ([FR-DICE-10](dice-roll-log.md#6-functional-requirements)). The DM's have `playerId` null (general, any monster, NPC sheet or campaign creature), or, on a PC, the PC's owner by default (the player sees and uses it; "DM only" Switch → null). A PC given to another player moves its macros with it: dice-extras registers an entities **definition-changed hook** ([OQ-ENT-14](entities.md#15-open-questions) registry, append) that rewrites `playerId` old owner → new owner for that `creatureId`, in the same transaction. | |
+| FR-DICEX-66 | **Intents** (§9): `dicex.saveMacro {id?, name, expression, category, creatureId, dmOnly?}` (create, or update own), `dicex.deleteMacro {id}`, `dicex.moveMacro {id, index}` (renumbers `order` in its list). Player: only rows with `playerId` = self; `creatureId` must be own (else `forbidden`; unseen → `not_found`); `dmOnly` → `forbidden`. DM: any row. zod; same values → no-op, no event; else upsert(s) + event-log row + `MacroSaved` / `MacroDeleted` in one transaction (logged, not undoable). | ADR-0016 |
+| FR-DICEX-67 | **Visibility** `roll-macro`: DM full; player **full iff `playerId` = the viewer**, else hidden (no placeholder). Never in another player's frame, so a monster's or another PC's macro never leaks. In the snapshot, not lazy (buttons need them at once; §12 measured). | |
+| FR-DICEX-68 | **A macro is a roll button**: a `RollButton` on `useRollControl({expressions: [expression], category, label: name, onRoll})` (FR-DICEX-06); `onRoll` sends `dice.roll {expression, mode, category, label: name, actor: creatureId ? {entityId} : omitted, manual?, public? (DM)}` ([FR-DICE-09](dice-roll-log.md#6-functional-requirements)) **unchanged**. So: click / Shift / Ctrl roll at once (adv / dis on the first `1d20`); physical mode → `ManualForm` ([FR-DICE-07](dice-roll-log.md#6-functional-requirements)); **Alt+click stages it in the tray** (`adjust`); the DM's eye presets from the category ([FR-DICE-30](dice-roll-log.md#6-functional-requirements)); the entry throws and pops up like any roll. A macro never feeds attack / apply and adds no effect riders (a free roll, as FR-DICEX-31; OQ-DICEX-51). No new server roll path, intent field or log field. | OQ-DICEX-51 |
+| FR-DICEX-69 | **Tray Macros popover** (OQ-DICEX-50 pick A): a 24-px icon Button `dicex-tray-macros` (lucide `bookmark`) in the tray's header row beside the gear (header stays ≤ 24 px, FR-DICEX-53: no height change) → Popover: group "‹actor›" (macros whose `creatureId` = the tray's actor: a player's [FR-DICE-77](dice-roll-log.md#6-functional-requirements) pick, the DM's Options actor), then "General" (`creatureId` null); row = name + muted expression, a roll button per FR-DICEX-68, ✎ edit. "+ New macro". Empty: "No macros yet. Save a roll here or on the sheet's Macros tab." Both clients. | |
+| FR-DICEX-70 | **Save as macro**: in `compose` and `result` (free requests), the bottom bar's Options chevron gains "Save as macro…" (`dicex-tray-save-macro`; no extra height): the editor (FR-DICEX-71) prefilled with name = label else expression, the expression, category and actor. | |
+| FR-DICEX-71 | **Editor** (popover and the sheet's Macros tab, [FR-CHARX-88](character-sheet-full.md#6-functional-requirements)): name Input; expression Input checked live by `parseExpression` (invalid → inline message, Save disabled); category Select; DM on a PC: "DM only" Switch; Save / Cancel; Delete asks once inline ("Delete ‹name›?" Delete / Cancel); ↑ / ↓ move Buttons (keyboard reachable). Rejects show inline ([FR-DICE-32](dice-roll-log.md#6-functional-requirements) spirit). | |
+| FR-DICEX-72 | **States**: not `live` → roll and edit Buttons disabled (staging still works, FR-DICEX-29); a macro whose creature the viewer may no longer roll as ([FR-DICE-10](dice-roll-log.md#6-functional-requirements)) shows disabled with "Can't roll as ‹name›"; a deleted / hidden creature's macros list under "General" with the creature's last name muted, editable, disabled to roll. | |
+| **Sprint 8 (TT): DM roll requests** (#334; was the stub's tier-B row; [proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md)) | | |
+| FR-DICEX-73 | **Record `roll-request`** (table `roll_request`, §8), **DM only**: roll spec `{kind: skill \| save \| check \| custom, key, expression}`, `label`, `dc`, `dcShown`, `mode`, `results: public \| hidden`, `state: open \| closed`, `targets` (JSON leaf, 1–12: `{characterId, playerId, name, notificationId, state, entryId, total, natural, success, at}`), `seq`, `createdAt`, `closedAt`. Snapshot window (ADR-0029): every `open` row + the newest 20 `closed` by `seq`. | |
+| FR-DICEX-74 | **Send** `dicex.request {roll, characterIds, dc?, dcShown, mode, results, label?}` (DM): zod; ≤ 12 targets; ≤ 5 open requests per campaign (else `conflict` "Close a request first (5 open)"). One transaction: the row, **one `roll-request` notification per target** ([FR-NOTE-58](notifications.md#6-functional-requirements); audience = the PC's owner, action "Roll" owned by that player), event-log row, `RollRequested {requestId}`; each `notify` emits its own `NotificationCreated` (CON-40). | ADR-0016, -0027 |
+| FR-DICEX-75 | **Targets** (OQ-DICEX-52 pick A): characters with an owner in the campaign (PCs; never companions or monsters), each named once; one notification per PC (a player with two PCs gets two prompts). The composer presets "All PCs" (every PC) and the DM unticks; "Mira: DEX save" = one target. A character without an owner, a monster or another campaign's → `invalid`. | OQ-DICEX-52 |
+| FR-DICEX-76 | **Roll spec** (OQ-DICEX-53 pick A): `skill` + skill key (category `skill-check`), `save` + ability (`saving-throw`), `check` + ability (`ability-check`), `custom` + expression (FR-DICE-01; category `other`). `label` default "Perception", "DEX save", "STR check", the expression; ≤ 60. `mode` normal / advantage / disadvantage is the prompt's preset (OQ-DICEX-59 pick A: the player's Shift / Ctrl still choose). | |
+| FR-DICEX-77 | **DC and results** (OQ-DICEX-54, -55 picks A): `dc` 1–40 optional; `dcShown` (default false) puts "DC 15" in the prompt text and payload, else neither carries it (**the DC never reaches a player** unless shown). `results`: `public` → answer lines `public: true` (everyone); `hidden` → `public: false` + `audiencePlayerId` = the roller's player (**DM + that player only**, the companion-line rule, [FR-DICE-79](dice-roll-log.md#6-functional-requirements)). The composer's eye presets from the category's public log setting ([FR-DICE-12](dice-roll-log.md#6-functional-requirements)); the DM may flip it. | OQ-DICEX-54, -55 |
+| FR-DICEX-78 | **Answer** `dicex.answerRequest {requestId, characterId, mode, manual?, manualParts?}` (the target's player, or the DM): request `open` and target `open` (else `conflict` "Already answered" / "Request closed"); not a target the sender may see → `not_found`. The roll is built **server-side from the request**: skill / save / check → character-sheet's roll helper (the `char.roll` specs, overrides and MOD roll hooks with `subject`, so Bless adds to a save; [FR-CHARX-21](character-sheet-full.md#6-functional-requirements)); custom → `dice.evaluate` as the character. Entry: label = the request's, category per FR-DICEX-76, visibility per FR-DICEX-77 (internal `audience` input, [FR-DICE-83](dice-roll-log.md#6-functional-requirements)). Same transaction: target ← `rolled` {entryId, total, natural, success, at}; `resolveNotification` (`{outcome: "rolled", total}`); `RollRequestAnswered {requestId, characterId, entryId}`. No answer path through `char.roll` / `dice.roll` (OQ-DICEX-60). | OQ-DICEX-60 |
+| FR-DICEX-79 | **Decline** (OQ-DICEX-57 pick A) `dicex.declineRequest {requestId, characterId}` (target's player or DM): target ← `declined`; notification resolved `{outcome: "declined"}`; `RollRequestDeclined`. The DM sees "Declined". | OQ-DICEX-57 |
+| FR-DICEX-80 | **Close** `dicex.closeRequest {requestId}` (DM): open targets ← `missed`; their notifications closed by rule ([FR-NOTE-28](notifications.md#6-functional-requirements): "Closed", `{outcome: "missed"}`); request `closed`; `RollRequestClosed`. Closed rows take no answer. | |
+| FR-DICEX-81 | **Roll for missing** `dicex.rollForMissing {requestId}` (DM): rolls each `open` target as FR-DICEX-78 with the DM as roller (normal mode, no physical), stamped per `results`; resolves their notifications (closer = DM); then closes the request; one `RollRequestClosed {requestId, rolled}` whose changes carry the entries. | |
+| FR-DICEX-82 | **Lifecycle** (§6.2 diagram; OQ-DICEX-56 pick A, **no timer**): a request closes when no target is `open` (last answer / decline), or by Close / Roll for missing. Encounter End, scene and turn changes leave it open (no end rule). Not undoable. Campaign switch: requests are per campaign. | ADR-0016 "no wall-clock scheduler" |
+| FR-DICEX-83 | **The prompt** (the player's `roll-request` view, [FR-NOTE-59](notifications.md#6-functional-requirements)): a pending toast "DM: ‹label›" (+ " · DC 15" iff shown; "for ‹PC›" when the player has several PCs) with **Roll** = a `RollButton` on `useRollControl` (OQ-DICEX-58 pick A): expressions from the same sheet specs the sheet shows (`characterRolls`), mode preset from the request, `onRoll` → `dicex.answerRequest`; so physical dice (`ManualForm`), Shift / Ctrl and **Alt+click → tray `adjust`** all work. **Decline** beside it. The same Buttons on the `note.history` row while pending. | OQ-DICEX-58 |
+| FR-DICEX-84 | **Result surfaces**: `public` answers throw and pop up for everyone (a player roll, FR-DICEX-39). `hidden` answers reach the DM and the roller only: popup with the eye-off marker, PiP only (FR-DICEX-38's non-public rule, as companion lines today), log line on both; other players get nothing (no frame, no placeholder). | FR-DICE-15 |
+| FR-DICEX-85 | **Pass / fail** (OQ-DICEX-54 pick A): `success` = total ≥ dc (null without a DC), on the DM's request card only; players' lines and prompts never show pass / fail. | |
+| FR-DICEX-86 | **Roll requests window** `dicex.requests` (DM only; launcher "Requests" after "Dice"; default closed; 360 × 460, min 300 × 320, useful size 360 × 460 ([FR-SHELL-79](play-shell.md#6-functional-requirements)); placed by the shell's placer like any launcher window). Body: composer on top (collapsible), then request cards, open first, newest first. Opened also from the Game log roll bar's "Request…" Button (`dicex-request-open`, DM). | |
+| FR-DICEX-87 | **Composer and card**: Roll Select (Skills ▸ 18, Saves ▸ 6, Checks ▸ 6, Custom → expression Input); "Who" PC chips + "All PCs"; DC Input + "Show DC" Switch; mode toggle; results eye; label; **Send** (disabled unless `live` and ≥ 1 target). Card: label · DC (eye-off when hidden) · results eye; per target a row: name, state chip (Waiting / total with ✓ ✗ vs DC / Declined / No roll), nat 20 / 1 marks; click a total → `focusLogEntry`; **Roll for missing**, **Close** (asks once inline). Live from the record. | |
+| FR-DICEX-88 | **DM side cues**: no DM toast per answer (OQ-NOTE-33 pick A); the launcher button shows a dot while a request is open; the DM bell counts the players' pending prompts ([FR-NOTE-27](notifications.md#6-functional-requirements)). | |
+| FR-DICEX-89 | **Sound**: a new prompt toast plays the alert sound **`request`** ([FR-SHELL-130](play-shell.md#6-functional-requirements); default ping, the DM's pick, mute wins), no flash. | |
+| FR-DICEX-90 | **Paused** ([FR-SHELL-127](play-shell.md#6-functional-requirements)): a request sent while the table is paused creates its rows as usual; the prompt toast sits under the pause card (input blocked), no sound; on resume one `request` sound plays if this client has an open prompt. | |
+| FR-DICEX-91 | **Reload / reconnect** ([OQ-NOTE-34](notifications.md#15-open-questions) pick A): an `open` prompt comes back from the snapshot (the pending notification is pinned, FR-NOTE-12) as its toast again, **no sound** (the kind view's `restoreToast`, [FR-NOTE-60](notifications.md#6-functional-requirements)); an answer sent before the drop is committed or not, never doubled (the target is no longer `open` → `conflict`). | |
+| FR-DICEX-92 | **Leak rules** (integration leak scan per player): a player's frames never carry `roll-request`, another player's prompt, a hidden DC, `success`, or a hidden answer of another player (entry, popup, notification `resolution`). | |
+| FR-DICEX-93 | **CON-44** (measured, §12): macros + requests + prompts + pause / sounds on the campaign: DM worst **+230,908 B**, players worst **+13,030 B**; per-event frames in §12. | #256 |
+
+### 6.2 Sprint 8 rule tables
+
+**Request lifecycle** (FR-DICEX-73–82)
+
+```mermaid
+stateDiagram-v2
+  [*] --> open: dicex.request (DM)
+  open --> open: an answer / decline, targets still open
+  open --> closed: last target answered or declined
+  open --> closed: Close (open targets → missed)
+  open --> closed: Roll for missing (DM rolls them)
+  closed --> [*]
+```
+
+| Target state | Set by | Notification | DM card shows |
+|---|---|---|---|
+| `open` | send | `pending`, prompt toast | Waiting |
+| `rolled` | answer (player or DM), Roll for missing | resolved `{outcome: rolled, total}` | total, ✓ / ✗ vs DC, nat 20 / 1 |
+| `declined` | decline | resolved `{outcome: declined}` | Declined |
+| `missed` | Close | closed by rule `{outcome: missed}` | No roll |
+
+**Who sees what** (each player = the target's owner unless "other")
+
+| Thing | DM | Target's player | Other players |
+|---|---|---|---|
+| `roll-request` row (spec, DC, targets, success) | full | — | — |
+| Prompt notification | full | full (DC only if shown) | — |
+| Answer line, `results: public` | full | full | full (popup + throw) |
+| Answer line, `results: hidden` | full (popup PiP, eye-off) | full (popup PiP, eye-off) | — |
+| `roll-macro` with `playerId` = P | full | full if P | — |
+| `roll-macro` with `playerId` null | full | — | — |
 
 ### 6.1 Sprint 5 rule tables
 
@@ -313,6 +401,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 | Roll monsters (`cbt-init-roll-monsters`) | plain Button → `cbt.rollInitiative` | no; one coalesced throw (FR-DICEX-11) |
 | Concentration notification "Roll save" with no roll host open | notification action → `cbtx.rollConcentration` | no; throw only |
 | Notation links, tray palette | tray `free` | always staged |
+| *(Sprint 8)* Macro buttons (tray popover, sheet Macros tab) | `RollButton` + `useRollControl` → `dice.roll` | yes (FR-DICEX-68) |
+| *(Sprint 8)* Roll-request prompt "Roll" (toast, history row) | `RollButton` + `useRollControl` → `dicex.answerRequest` | yes (FR-DICEX-83) |
 
 - **Throw zone:** dice tumble in the roller's look, roller name + label above them, total badge at rest; dropped dice dimmed; MOD dice with a small label; "physical" badge on flat manual dice; DM's hidden throws with the eye-off marker (`visibility.hidden` token). *(Sprint 4: the `zone` option; caption only while popups are off, FR-DICEX-17.)*
 
@@ -350,6 +440,31 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - **Keyboard:** tray expression Input: Enter / Shift+Enter / Ctrl+Enter roll ([FR-DICE-05](dice-roll-log.md#6-functional-requirements)); Esc clears a staged request. Notation links are focusable Buttons (Enter = click).
 - **Test IDs:** `dicex-tray`, `dicex-tray-state` (+ `data-value` = state), `dicex-tray-die` (+ `data-faces`, `data-term`), `dicex-tray-palette` (+ `data-value` = faces), `dicex-tray-expression`, `dicex-tray-constant`, `dicex-tray-mode`, `dicex-tray-public`, `dicex-tray-roll`, `dicex-tray-clear`, `dicex-tray-again`, `dicex-tray-error`, `dicex-tray-extra` (+ `data-value` = registry key), `dicex-tray-open` (roll-bar button), `dicex-settings-open`, `dicex-settings-render` (+ `data-value`), `dicex-settings-others`, `dicex-look-open`, `dicex-look-style` (+ `data-value`), `dicex-look-body`, `dicex-look-pips`, `dicex-look-material` (+ `data-value`), `dicex-look-save`, `dicex-look-reset`, `dicex-look-contrast`; `dicex-throw` (+ `data-record-id` = first entry id, `data-count` = entries coalesced, `data-render` = 3d \| flat, `data-state` = pending \| moving \| rest), `dicex-throw-die` (+ `data-entry-id`, `data-faces`, `data-value` = server value, `data-settled` = `upFace` at rest, `data-kept`, `data-flat`, `data-offered`), `dicex-throw-more`; `dicex-notation` (+ `data-value` = canonical expression). Manual step reuses `dice-manual-*`. *(Sprint 4)* `dicex-screen` (the dice layer; + `data-state` = idle \| moving \| rest \| handoff); `dicex-throw` gains `data-arena` = screen \| zone \| pip (its existing `data-render` stays as is); `dicex-popup` (+ `data-record-id` = first entry id, `data-count` = entries, `data-dice` = dice shown incl. chips, `data-hidden`, `data-state` = rolling \| rest \| closing); `dicex-popup-row` (+ `data-record-id` = entry id); `dicex-popup-total`; `dicex-popup-pip` (+ `data-mode` = handoff \| play \| chips); `dicex-popup-close`; `dicex-popup-settings`; `dicex-die` (every `DieShape`, the element's only test ID; + `data-shape` = d4 \| d6 \| d8 \| d10 \| d12 \| d20 \| round, `data-faces`, `data-value`, `data-kept`, `data-offered`; the game log wraps it in `dice-log-die`, review B31); `dicex-settings-display` (+ `data-value`, replaces `dicex-settings-render`), `dicex-settings-popup`. Canvas dice keep their DOM mirror (`dicex-throw-die`, `data-settled`). *(Sprint 5)* `dicex-popup` gains `data-shown` (dice drawn in cells) and `data-landed` (= every row landed); `dicex-popup-row` gains `data-landed`; `dicex-popup-cell` (+ `data-entry-id`, `data-line` = 1 \| 2, `data-index`, `data-faces`, `data-value` only once its entry landed); `dicex-popup-more` (+ `data-value` = N, `data-entry-id` = the first hidden die's entry); `dicex-tray-preview` (the tray's 2D canvas; + `data-mode` = 3d \| chips); `dicex-tray-die` gains `data-group` (= N when grouped "×N"); `dicex-tray-total` (the result's total; + `data-landed`); `dicex-stage-hint` (the Alt hint line, FR-DICEX-51). Roll bar Roll keeps `dice-roll-submit`.
 
+**Sprint 8 (TT): macros and roll requests**
+
+```text
+Tray header            Macros popover               Player prompt (bottom-right toast)
+┌──────────────────┐   ┌─────────────────────────┐  ┌───────────────────────────────┐
+│ Other     [▮] ⚙  │   │ Mira                    │  │ DM: DEX save · DC 15          │
+└──────────────────┘   │  Sneak Attack  3d6    ✎ │  │ for Mira   [ Roll ] [Decline] │
+  [▮] = Macros         │  Hunter's Mark 1d6    ✎ │  └───────────────────────────────┘
+                       │ General                 │
+                       │  Luck          1d100  ✎ │  DM: Roll requests window
+                       │ + New macro             │  ┌───────────────────────────────┐
+                       └─────────────────────────┘  │ Perception · DC 15 ⊘ · Hidden │
+                                                    │  Mira    17 ✓   nat —         │
+                                                    │  Thorn   Waiting              │
+                                                    │ [Roll for missing]  [Close]   │
+                                                    └───────────────────────────────┘
+```
+
+- **Macros** (FR-DICEX-69–72): tray header icon Button (no extra height); popover rows = name + muted expression; ✎ opens the editor in place; Alt hint per FR-DICEX-51 on every macro button. Sheet tab: [CHARX §7](character-sheet-full.md#7-uiux-notes).
+- **Prompt** (FR-DICEX-83): a pending toast in the players' corner (WF's toast policy); Roll is primary, Decline ghost; the DC only when shown; "physical" mode opens `ManualForm` in the popover as any roll button.
+- **Requests window** (FR-DICEX-86, -87): composer as a collapsible card (Select, chips, DC, eye, Send); request cards below; state chips use existing semantic tokens (success / muted / warning); nothing new in visual-direction.
+- **DM view:** tray Macros (general + the actor's), every macro on every sheet, the Requests window and its launcher dot, the bell counting players' prompts. **Player view:** own macros (tray + own sheets), prompts as toasts, own answers; never the request card, a hidden DC, pass / fail or another player's hidden answer.
+- **States:** not `live` → Send, Roll, Decline, Save disabled with "Reconnecting…"; empty Requests window: "No requests yet. Ask the table for a roll."; a prompt whose request closed meanwhile → its toast closes with the notification's state (FR-NOTE-14).
+- **Test IDs:** `dicex-tray-macros`, `dicex-macros` (popover), `dicex-macro` (+ `data-record-id`, `data-creature-id`), `dicex-macro-roll`, `dicex-macro-edit`, `dicex-macro-new`, `dicex-tray-save-macro`, `dicex-macro-form`, `dicex-macro-name`, `dicex-macro-expression`, `dicex-macro-category`, `dicex-macro-dm-only`, `dicex-macro-save`, `dicex-macro-delete`, `dicex-macro-delete-confirm`, `dicex-macro-up`, `dicex-macro-down`, `dicex-macro-error`; `dicex-request-open` (roll bar), `dicex-requests` (window), `dicex-request-roll` (+ `data-value` = `skill:perception` …), `dicex-request-expression`, `dicex-request-target` (+ `data-record-id` = characterId, `data-state` = on \| off), `dicex-request-all`, `dicex-request-dc`, `dicex-request-dc-shown`, `dicex-request-mode`, `dicex-request-results` (+ `data-value`), `dicex-request-label`, `dicex-request-send`, `dicex-request-card` (+ `data-record-id`, `data-state`), `dicex-request-target-row` (+ `data-record-id` = characterId, `data-state`, `data-total`, `data-success`), `dicex-request-missing`, `dicex-request-close`, `dicex-request-close-confirm`; prompt: `dicex-prompt` (+ `data-record-id` = notification id), `dicex-prompt-roll`, `dicex-prompt-decline`.
+
 ## 8. Data model
 
 | Entity | Field | Type | Notes |
@@ -370,6 +485,29 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - **Derived:** default looks by sorted player `id`; throws (`throwDice`) from `roll` entries; up-faces; canonical notation.
 - **Persisted runtime state:** `dice_look` rows only. Rolls and entries unchanged ([DICE §8](dice-roll-log.md#8-data-model)).
 - No change to `roll`, `game-log-entry`, kinds or any intent. DICEX adds no `RollRequest` field; what MOD adds (`subject` incl. `subject.card` on `RollControlOptions`; `previewMode`, `manualParts` on `RollRequest`; R14) passes through the tray verbatim (FR-DICEX-08, seams S4). DICEX reads R's per-die `dice` on MOD and `offered` part items (R1); it doesn't define them.
+
+**Sprint 8 (TT)** — two tables (schema lane TT0, first this sprint)
+
+| Entity | Field | Type | Notes |
+|---|---|---|---|
+| Roll macro (`roll-macro`, table `roll_macro`) | id, campaignId | ID, ID | `ctx.ids` |
+| | playerId | ID → Player \| null | Who sees and uses it besides the DM; null = DM only (FR-DICEX-65) |
+| | creatureId | ID → Entity \| null (no FK, as DICE §8) | Roll as; null = "Me" / "DM" |
+| | name | text 1–40 | |
+| | expression | text ≤ 60 | Canonical FR-DICE-01 notation |
+| | category | enum (FR-DICE-11) | default `other` |
+| | order | int | Within its list (`playerId`, `creatureId`); index `(campaignId, playerId, creatureId, order)` |
+| | createdBy, updatedAt | `dm` \| `player`, timestamp | `env.actor`, `ctx.clock` |
+| Roll request (`roll-request`, table `roll_request`) | id, campaignId, seq | ID, ID, int | `seq` = insertion order (CON-20 pattern); index `(campaignId, state, seq)` |
+| | roll | **JSON leaf** `{kind, key, expression}` | `kind` skill \| save \| check \| custom; `key` skill or ability \| null; `expression` \| null |
+| | label, dc, dcShown, mode, results | text ≤ 60, int 1–40 \| null, bool, enum, `public` \| `hidden` | FR-DICEX-76, -77 |
+| | state | `open` \| `closed` | FR-DICEX-82 |
+| | targets | **JSON leaf** 1–12 `{characterId, playerId, name, notificationId, state, entryId, total, natural, success, at}` | `state` open \| rolled \| declined \| missed; `name` copied at send (≤ 60) |
+| | createdAt, closedAt | timestamp, timestamp \| null | `ctx.clock` |
+
+- **Relations:** Campaign 1—* Roll macro, 1—* Roll request; a target → its `notification` (1:1) and its answer `game-log-entry` (`entryId`) by id; macros → Player / Entity by id.
+- **Derived:** the tray's and the sheet's macro lists (filter by `creatureId`, order); "All PCs"; the composer's eye preset; `success`.
+- **Persisted runtime state:** both tables; prompts are `notification` rows (NOTE); answers are `roll` + `game-log-entry` rows (DICE). Nothing in client memory survives a reload except the browser's existing keys.
 
 ## 9. API & events
 
@@ -411,6 +549,34 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - Per-roll wire **measured, unchanged** (§12): no byte is added to any frame.
 - *(Sprint 5)* No intent, event, record, field or signal. Visibility rules unchanged: the landing, popup line and tray preview only change how entries a client already received are drawn. **Static serving** (FR-DICEX-52): `GET /assets/*` adds `Content-Encoding` (`br` / `gzip`), `Vary: Accept-Encoding` (on every answer) and `Cache-Control: public, max-age=31536000, immutable`; `GET /`, `GET /p/*` add `Cache-Control: no-cache`. Same for DM and players (public build files, no secrets in them).
 
+**Sprint 8 (TT)**
+
+| Intent | Who | Validation / ownership | Result |
+|---|---|---|---|
+| `dicex.saveMacro {id?, name, expression, category, creatureId, dmOnly?}` | DM, player | FR-DICEX-64–66 | `{macroId}` |
+| `dicex.deleteMacro {id}` / `dicex.moveMacro {id, index}` | DM, player (own) | FR-DICEX-66 | `{}` |
+| `dicex.request {roll, characterIds, dc?, dcShown, mode, results, label?}` | DM | FR-DICEX-74–77 | `{requestId}` |
+| `dicex.answerRequest {requestId, characterId, mode, manual?, manualParts?}` | target's player, DM | FR-DICEX-78 | `{rollId, entryId}` |
+| `dicex.declineRequest {requestId, characterId}` | target's player, DM | FR-DICEX-79 | `{}` |
+| `dicex.closeRequest {requestId}` / `dicex.rollForMissing {requestId}` | DM | FR-DICEX-80, -81 | `{}` / `{entryIds}` |
+
+| Record type | Visibility rule | Snapshot provider |
+|---|---|---|
+| `roll-macro` | DM full; player full iff `playerId` = viewer, else hidden | all rows of the campaign (≤ 400), not lazy |
+| `roll-request` | **DM only** (`audience: dm`) | `window {orderBy: seq, size: 20, pin: state = open}` |
+
+| Event | Emitted by | Changes | DM | Player sees | Logged / undoable |
+|---|---|---|---|---|---|
+| `MacroSaved {macroId}` | save, move (one per command) | `roll-macro` upsert(s) | full | iff `playerId` = them | yes / no |
+| `MacroDeleted {macroId}` | delete | `roll-macro` delete | full | iff they had the row | yes / no |
+| `RollRequested {requestId}` | `dicex.request` | `roll-request` upsert; then one `NotificationCreated` per target (helper event) | full | empty `changes` (seq only); their own prompt in its `NotificationCreated` | yes / no |
+| `RollRequestAnswered {requestId, characterId, entryId}` | answer | `roll` entry upsert, `roll-request` upsert; then `NotificationResolved` | full | the entry per FR-DICEX-77 (public: all; hidden: the roller); the resolve: the target's player | yes / no |
+| `RollRequestDeclined {requestId, characterId}` | decline | `roll-request` upsert; then `NotificationResolved` | full | the target's player: the resolve | yes / no |
+| `RollRequestClosed {requestId, rolled}` | close, roll for missing | `roll-request` upsert (+ entries); then `NotificationResolved` per open target | full | entries per FR-DICEX-77; each target's player: their resolve | yes / no |
+
+- No signal; no new log kind (answers are `roll` entries). The `roll-request` notification kind is NOTE's registry line, owner DICEX ([FR-NOTE-58](notifications.md#6-functional-requirements)).
+- Answer visibility uses the existing `game-log-entry` rule (public, or `audiencePlayerId` = viewer; [FR-DICE-79](dice-roll-log.md#6-functional-requirements)); no new visibility code in the hub.
+
 ## 10. Permissions
 
 | Action | DM | Player | Server check |
@@ -424,6 +590,11 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 | *(Sprint 4)* See a roll popup | every entry (DM-only: PiP only) | public entries only | FR-DICE-15 |
 | *(Sprint 4)* Change own display / popup settings | ✓ (this device) | ✓ (this device) | none (browser only) |
 | *(Sprint 5)* Download built client files (compressed) | ✓ | ✓ (before login too, as today) | none: public build output |
+| *(Sprint 8)* Create / edit / delete / move a macro | ✓ any (general, any creature, on a PC for its owner or DM only) | own (`playerId` = self), on own PCs or general | FR-DICEX-66; FR-DICE-10 for `creatureId` |
+| *(Sprint 8)* See / roll a macro | all | own | visibility FR-DICEX-67; the roll = `dice.roll`'s checks |
+| *(Sprint 8)* Send / close a request, roll for missing | ✓ | ✗ | role; caps FR-DICEX-74 |
+| *(Sprint 8)* Answer / decline a request | ✓ (for any target) | own targets only | target `playerId` = sender (or DM), states `open` |
+| *(Sprint 8)* See a request, its DC, pass / fail | ✓ | ✗ (prompt only; DC iff shown) | `roll-request` DM only; payload built per FR-DICEX-77 |
 
 ## 11. Edge cases & failure modes
 
@@ -449,6 +620,13 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 - *(Sprint 5)* **Compressed serving:** a missing `.br` / `.gz` (an old `dist`) → the next encoding or the plain file; an `Accept-Encoding` with q-values (`br;q=1.0`) isn't matched by Hono's simple split → plain file (no browser sends it; accepted). A new build changes hashed names, so `immutable` never serves stale code; the HTML (`no-cache`) points at the new names. Server crash / restart: files on disk, nothing to recover. Not verified: whether Cloudflare's edge already compresses tunnel traffic; origin compression helps LAN play, other tunnels and throttled tests either way.
 
 - *(Sprint 6)* **Tray layout / popup clearance:** client-only, so disconnect, reconnect, reload and a server crash change nothing: the tray re-lays out from its size on mount; a staged request survives a reconnect as built; the DM popup stack re-places when a tool bar appears or goes (FR-DICEX-55). Fits never go below min size (FR-SHELL-29); at exactly min the dice area holds one row and scrolls past it, the bar stays (FR-DICEX-53).
+
+- *(Sprint 8)* **Player disconnect / reconnect:** macros and open prompts come back from the snapshot (prompt toasts re-shown without sound, FR-DICEX-91); an answer in flight is never resent (FR-SYNC-05): committed → the target is `rolled` and the re-sent click gets `conflict` "Already answered"; not committed → still `open`. A request sent while a player is offline waits as a pending notification; FR-NOTE-15's summary toast and the re-shown prompt greet them.
+- *(Sprint 8)* **DM disconnect / reconnect:** the Requests window rebuilds from the snapshot (open rows pinned); answers that arrived meanwhile are on the cards. Nothing is lost: every change is a committed row.
+- *(Sprint 8)* **Server crash:** each command is one transaction (row + notifications + entry + event log); after restart the snapshot equals the last commit; no half-answered target (entry without `rolled`, or the reverse). Open requests stay open; prompts stay pending.
+- *(Sprint 8)* **Concurrent:** the player and the DM answer the same target at once → the first commit wins, the second `conflict`; Close vs a last-second answer → whichever commits first (answer then Close: `rolled` stays; Close then answer: `conflict` "Request closed"). Two tabs edit one macro → last commit wins. A PC handed to another player mid-request: the target keeps its `playerId` (the old owner's prompt); the DM closes and re-asks (edge, accepted).
+- *(Sprint 8)* **Invalid / malicious input:** a player sending `dicex.answerRequest` for another player's target → `not_found`; forging `public`, `dc` or a roll expression is impossible (the server builds the roll from the request); a macro name renders as text; an expression over FR-DICE-01 limits → `invalid`. A player can't read `roll-request` (no frame carries it) or a hidden DC (not in their payload).
+- *(Sprint 8)* **Deleted / renamed things:** a renamed PC keeps its old `name` on an open request's target (copied at send); the prompt names the PC as the store does. A macro's creature that disappears → FR-DICEX-72.
 
 ## 12. Performance & bandwidth
 
@@ -517,6 +695,30 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 | **Left for the dice area** | ≈ 2 (the 40-px stills push the bar out) | **≈ 39** → ≥ one 28-px row (tested); 40 only if the build trims a gap |
 
 Redraws: one still redraw per tray resize (as built).
+
+**Sprint 8 (TT) CON-44 — measured 2026-10-21** on this branch (`main` @ `db8fe53b` + docs). Throwaway probe (deleted): `session-sim` + `buildRealisticHeavy`, then the new rows at max length in their proposed wire shape, sized with the hub's `snapshotTypeBytes`; the prompt row = a real heavy pending notification re-kinded with the prompt's text and payload; the campaign row = the real one plus the new fields (FR-CAMP-46, -48); frames = the protocol §3 envelope. Baseline here: heavy DM **690,771 B**, players max **289,099 B**.
+
+| What (worst = max strings, caps) | DM | Each player |
+|---|---|---|
+| `roll-macro` worst: 6 players × 24 on their PC + DM 24 general + 10 monsters × 24 = 408 rows (396 B / row) | +152,429 B | +9,557 B (own 24) |
+| `roll-macro` realistic: 6 per player + 10 DM, "Sneak Attack" / "3d6" (335 B / row) | +14,841 B | +2,031 B |
+| `roll-request` window: 3 open + 20 closed, 6 targets each (2,447 B / row; 4,495 B at 12 targets) | +60,081 B | 0 (DM only) |
+| `roll-request` prompts pending: 3 requests × 6 PCs (994 B / row; a damage card is 1,183 B) | +17,910 B | +2,985 B (own 3) |
+| `campaign` + `alertSounds` (4 picks) / + pause (200-char message, image) | +150 / +488 B | same |
+| `audio-asset` (lazy, [FR-ASSET-57](assets-pipeline.md#6-functional-requirements)) | 0 B (`sync.load` of 50 rows = 13,833 B, on opening Alert sounds) | 0 B |
+| **Total worst** | **+230,908 B** (921,679 B on this harness) | **+13,030 B** |
+| **Cumulative worst** (GM + ST's ≈ 942 KB / ≈ 299 KB, [stats §12](stats.md#12-performance--bandwidth)) | **≈ 1.17 MB of 1.5 MiB** (≈ 400 KB left) | **≈ 312 KB of 512 KiB** |
+| Realistic session (6 + 10 macros, 1 open request) | +23,409 B | +3,176 B |
+
+| Per-event frame | DM | Players |
+|---|---|---|
+| `MacroSaved` (one worst row) / `MacroDeleted` | 605 / 203 B | the owner only: same |
+| `RollRequested` (6 / 12 targets) + one `NotificationCreated` per target (1,164 B) | 2,661 / 4,709 B + 1,164 B × N (12 targets: ≈ 18.7 KB in 13 frames) | 75 B (empty changes) + their own 1,164 B prompt |
+| Answer: the entry (a sheet roll, 782 B in sprint 4) + `roll-request` upsert (2,537 B) + `NotificationResolved` (1,223 B) | ≈ 3.3 KB + 1,223 B | public: the entry (≈ 0.8 KB) to all; the resolve to the roller only; hidden: roller only |
+| `CampaignPaused` / `CampaignResumed` (FR-CAMP-47) | 834 / 497 B | same, every player |
+
+- **Caps that bound it:** macros 24 per list / 400 per campaign (FR-DICEX-64); requests 5 open, 12 targets, 20 closed in the window (FR-DICEX-73, -74). The big DM figure is the macro cap; a real table sits near the realistic row. **Asserted** by `src/server/features/dice-extras/con44-tt.test.ts` (TT0; replaces the probe): DM < 1.5 MiB, players < 512 KiB, `roll-macro` ≤ 160 KB DM, `roll-request` ≤ 64 KB DM, 0 rows of `roll-request` / `audio-asset` in any player frame.
+- **Client bundle:** the prompt view and macro buttons stay in the initial chunk (≤ 2.5 KB gz more; DICEX's 15 KB cap holds, 12.2 KB today); the Macros popover, editor and Requests window go in a lazy chunk `TableTools` (new cap 12 KB gz, asserted by `bundle-size.test.ts`). Measured by the builder on `bun run build`.
 
 ## 13. Test plan
 
@@ -638,6 +840,57 @@ Decided (#288): OQ-SHELL-47 A, so this applies. Bundle `prefs-s6` ([play-shell �
 | Client / DOM | `FR-DICEX-57 dice section` (both registries hold `dicex.dice` at order 30; the section renders the settings panel; no WebGL stub → 3D modes disabled with the reason; Dice look… opens the look pane in place; Save disabled while not live). `FR-DICEX-58 one store` (set Flat in the section → the tray gear's panel shows Flat in the same render; set "Roll popups" off in the gear → the section shows it off; one `pp.dicex.v2` entry written; no new key) | In-code |
 | Walkthrough | [play-shell §13](play-shell.md#13-test-plan) P9 (Flat in Preferences = Flat in the tray gear), P10 (Dice look from Preferences), P14 (kept after reload) | `prefs-s6` |
 
+### Sprint 8 (track TT): table tools
+
+The one TT walkthrough (macros, requests, pause, sounds) lives here; play-shell, campaign-management, assets-pipeline, notifications, dice-roll-log and character-sheet-full list their named tests and point at it.
+
+**Fixtures** (setups as DM unless noted; patches, composable inside `session-sim-11` and the integrator's `session-sim-12`)
+
+| Key | Kind | Owner | Requires | Contents |
+|---|---|---|---|---|
+| `dicex-macros` | setup | dice-extras | `char-mira`, `char-thorn`, `enemy-custom` | As `player-1`: "Sneak Attack" `3d6` damage on Mira, "Luck" `1d100` general. DM: "Bless" `1d4` general; "Inspiration" `1d8` on Thorn (visible to `player-2`, FR-DICEX-65); "Ambush" `2d6` damage on the Elite Goblin Warrior (DM only) |
+| `dicex-request-open` | setup | dice-extras | `char-mira`, `char-thorn` | `dicex.request` skill Perception to Mira + Thorn, DC 15 **hidden**, results **hidden**, normal mode (one open request, two pending prompts) |
+| `audio-chime` | setup | assets-pipeline | `campaign` | Ingests "Chime": a **generated** WAV (PCM 16-bit mono 22,050 Hz, 0.4 s, 880 Hz → 1,320 Hz with decay; **17,684 B**), built in code by `fixtures/assets/audio/chime.ts` (`wav({seconds, hz, rate})`, deterministic bytes, so the seeded asset ID and hash are stable); no binary committed; `ingestStep` gains a `{bytes, filename}` form (assets-pipeline's `fixtures.ts`) |
+| `camp-alert-sounds` | setup | campaign-management | `audio-chime` | `camp.setAlertSound` `request` → Chime; `turn` stays default (ping); `pause` → Chime |
+| `camp-paused` | setup | campaign-management | `campaign`, `images` | `camp.pause {message: "Pizza break, back soon", imageAssetId: the `town` map asset, backInMin: 10}` |
+
+- **Bundle `table-tools`** = `session-sim-11` + `dicex-macros` + `audio-chime` + `camp-alert-sounds` + `dicex-request-open`. **`table-tools-paused`** = `table-tools` + `camp-paused`. E2E aliases (state-changing specs get their own, sprint-8 hotspot rule): `table-tools-e2e`, `table-tools-paused-e2e`. `session-sim-12` (integrator) adds the five units.
+- **Test files for audio limits** (not fixtures): `e2e/support/audio.ts` writes `big.wav` (600 KB), `long.wav` (6 s, 8 kHz, ≈ 96 KB), `fake.mp3` (text bytes) and a valid `short.mp3`-header stub into the run's evidence dir for the walkthrough and e2e.
+
+| Level | What | Fixtures |
+|---|---|---|
+| Unit | `FR-DICEX-64 macro schema` (name trim / control chars / 1–40; expression stored canonical; FR-DICE-01 limits; caps 24 / 400 → `conflict`); request zod (`FR-DICEX-74`: ≤ 12 targets, roll spec per kind, dc 1–40, label ≤ 60) | in-code |
+| Integration | `FR-DICEX-66 macro rights` (player: own general + on Mira ✓, on Thorn `forbidden`, `dmOnly` `forbidden`, edit another's `not_found`; DM: any; same values → no event; event + row + log in one tx, rollback → none); `FR-DICEX-65 macro follows the PC` (owner change via the entities hook moves `playerId`); `FR-DICEX-67 macro visibility` (`player-2` frame: no "Sneak Attack", has "Inspiration"; "Ambush" in the DM frame only; delete frames per transition) | `table-tools` |
+| Integration | `FR-DICEX-74 request send` (row + 2 prompts + `RollRequested` + 2 `NotificationCreated`; 6th open → `conflict`); `FR-DICEX-75 request targets` (monster / ownerless / other campaign → `invalid`); `FR-DICEX-77 DC never leaks` (hidden: prompt text and payload without DC; shown: both carry it); `FR-DICEX-78 answer` (Mira's Perception = the sheet's bonus incl. an override; a Blessed save carries the MOD part; physical `manual`; hidden → `public: false` + `audiencePlayerId` = `player-1`; second answer `conflict`; `player-2` answering Mira → `not_found`); `FR-DICEX-79 decline`; `FR-DICEX-80 close` (open → missed, prompts "Closed"); `FR-DICEX-81 roll for missing` (DM roller, stamped per `results`, request closed); `FR-DICEX-82 lifecycle` (auto-close on the last answer; encounter End leaves it open) | `table-tools` |
+| Integration | `FR-DICEX-92 request leak scan`: a scripted run (everyone hidden, everyone public, one PC hidden, roll for missing) over real sockets; each player's frames and acks never contain `roll-request`, `success`, a hidden DC, another player's prompt or hidden answer (entry or `resolution`) | `table-tools` |
+| Integration | **Crash** (#163): `PP_TEST_CRASH=dicex.answerRequest:before-commit` → after restart target `open`, no entry, prompt pending; `:after-commit` → `rolled`, entry present, prompt resolved; same for `dicex.request` (no row, no prompts / all of them). `state:digest` equal before and after a clean restart | `table-tools` |
+| Integration | `CON-44 table tools` (`con44-tt.test.ts`, §12 caps): heavy + worst macros, requests, prompts, campaign fields; DM < 1.5 MiB, players < 512 KiB, per-type bounds, 0 `roll-request` / `audio-asset` rows in player frames | `session-sim` + heavy |
+| Client / DOM | `FR-DICEX-68 macro roll path` (click → `dice.roll` with expression, label = name, category, actor; Shift → `advantage`; Alt → tray `adjust` with the macro's dice; physical mode → `ManualForm` → `manual` sent); `FR-DICEX-69 tray macros` (header row ≤ 24 px with the button; groups by actor; empty state); `FR-DICEX-70 save as macro`; `FR-DICEX-71 macro editor` (invalid expression → message, Save disabled; delete asks once; ↑ / ↓ send `dicex.moveMacro`); `FR-DICEX-72` (not live → disabled; a creature you can't roll as → disabled with the reason) | in-code |
+| Client / DOM | `FR-DICEX-83 prompt roll path` (Roll → `dicex.answerRequest` with mode; physical → manual; Alt → tray `adjust` → Roll sends the same intent); `FR-DICEX-84 hidden result surfaces` (hidden answer: PiP only + eye-off on DM and roller); `FR-DICEX-86 requests window` (DM registry only; launcher dot while open); `FR-DICEX-87 request card` (state chips, ✓ ✗, focus log); `FR-DICEX-89 request sound` (test mode: `request:played`; muted → `request:muted`; no flash); `FR-DICEX-90 request while paused` (no sound under the card; one on resume); `FR-DICEX-91 prompt after reload` (pending prompt from the snapshot → toast, no sound) | in-code |
+| E2E (thin) | `table-tools.e2e.ts`: DM sends Perception to everyone, hidden → `player-1` rolls from the prompt → DM card shows Mira's total; `player-2`'s page has no Mira total. Pause → `player-1`'s click on a token does nothing; reload → card still; Resume → token draggable | `table-tools-e2e`, `table-tools-paused-e2e` |
+
+**Browser walkthrough T** — `PP_TEST_MODE=1`; `bun run build`; `fixtures:reset-load table-tools --profile verify`; `start --profile verify` (the test agent's Herdr pane). Contexts **A** DM 1440×900 (`pw-dm`), **B** `player-1` (Mira) 1280×720, **C** `player-2` (Thorn) 1280×800; B and C frames logged for the leak scan. Evidence + teardown per AGENTS §9.6.
+
+| # | DM (A) | Players (B, C) | Expected |
+|---|---|---|---|
+| T1 | Tray → Macros | B, C: tray → Macros | A: Bless, Ambush (under Elite Goblin), Inspiration (Thorn), Sneak Attack, Luck. B: Sneak Attack (Mira), Luck. C: Inspiration (Thorn) only. Header heights unchanged |
+| T2 | — | B: click Sneak Attack | Popup + throw on A, B, C: "Mira · Sneak Attack" 3d6, category damage; no damage card |
+| T3 | — | B: physical on → Sneak Attack → 3, 4, 5 → Roll | Line "physical", total 12 |
+| T4 | — | B: Alt+click Sneak Attack → tray `adjust` (3 d6) → Roll | Same line from the tray |
+| T5 | — | B: tray compose `1d20+2` → Options → Save as macro "Guidance roll" → ↑ | In the popover under Mira, first; C's popover unchanged |
+| T6 | Requests window: the fixture's Perception card: Mira, Thorn Waiting, DC 15 eye-off, Hidden | B, C connected after load | B: prompt "DM: Perception" for Mira (no DC); C: for Thorn; **no sound** (restored, `data-test-last-sound` unchanged) |
+| T7 | — | B: Roll on the prompt | A: Mira's row total + ✓ / ✗; A and B popup PiP with eye-off; **C: no frame with Mira's total** |
+| T8 | — | C: reload mid-request → prompt back → Decline | A: Thorn "Declined"; card closes (no open target) |
+| T9 | Send "DEX save" to All PCs, DC 15 shown, Public | B: Shift+Roll; C: wait | B, C prompts "· DC 15"; sound `request:played` on both (Chime); B's adv roll pops up on A, B, C; A: Roll for missing → Thorn rolled by the DM, public; card closed |
+| T10 | Send custom `1d100` to Mira, Hidden | B: Preferences → Sound → Mute; then Alt+Roll → tray → Roll | B: toast, `request:muted`, no audio; answer hidden (C nothing) |
+| T11 | Pause: "Pizza break", the `town` image, back in 5 min | B, C | Full-screen card with message, image, "Back in 4:5x" counting down; B's click on Mira's token, a drag, Tab, Escape: nothing changes behind it (`inert`); card's mute toggle works; Chime plays on B, C (pause sound) |
+| T12 | While paused: request "STR check" to Mira; roll a public `1d20` | B | No sound, no dice over the card, no popup; after resume both are there (prompt toast, log line) |
+| T13 | — | C: offline 10 s → back; then the operator restarts the server (stop / start in the pane) | C: card shows straight after the snapshot (no map flash); after the restart B and C reconnect still paused; A's top bar still "Paused · Resume" |
+| T14 | Resume | B, C | Cards gone; B hears one `request` sound and sees the STR prompt; map interactive |
+| T15 | Campaign options → Alert sounds: upload `big.wav` → "Too large (max 512 KB)"; `long.wav` → "Too long (max 5 s)"; `fake.mp3` → "Not a sound file"; pick Chime for Turn; Test ▶ | — | Rejects inline, nothing listed; Chime plays on A's Test |
+| T16 | Goblin Ambush: Next until Mira's turn | B; then B muted | B: turn alert with `turn:played` (Chime); muted → `turn:muted`, flash still |
+| T17 | — | — | Leak scan (B, C frames + REST): no `roll-request`, `audio-asset`, `success`, hidden DC, the other player's hidden answers or prompts; `pause` only while paused |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -735,6 +988,33 @@ Walkthrough steps per slice: D8 → 30, 32, 33, 35, 37; D11 → 30, 31, 33; D12 
 
 - No new dependency; no record, event or frame (0 B). Docs at consolidation: protocol §18 / the popup row (hard keep-outs in the DM stack).
 
+**Sprint 8 dependencies** (track TT)
+
+| On | What we need | Status |
+|---|---|---|
+| [dice-roll-log](dice-roll-log.md) | The `roll` path unchanged for macros; an internal `audience` input on `gameLog.append` / the sheet roll helper for request answers ([FR-DICE-79–83](dice-roll-log.md#6-functional-requirements)); the roll bar's "Request…" Button | this track (TT owns the roll paths this sprint) |
+| [notifications](notifications.md) | Kind `roll-request` (one `kinds.ts` line), views with the prompt, `restoreToast` ([FR-NOTE-58–64](notifications.md#6-functional-requirements)) | this track; registries append-only |
+| [character-sheet-full](character-sheet-full.md) | Macros tab (`sheet-sections.ts` line, [FR-CHARX-87–90](character-sheet-full.md#6-functional-requirements)); `char.roll`'s body as an exported helper the answer calls (no behaviour change) | this track; CHAR server file assigned to TT2 |
+| [entities](entities.md) | Definition-changed hook registry ([OQ-ENT-14](entities.md#15-open-questions), append) for "a PC changes owner" (FR-DICEX-65) | built registry; one line |
+| [play-shell](play-shell.md) | Alert sound keys + `alertSound()` ([FR-SHELL-130–134](play-shell.md#6-functional-requirements)); the pause card and its suppression rules (FR-SHELL-125–129) | this track; **seam with WF** (OQ-DICEX-63) |
+| [campaign-management](campaign-management.md), [assets-pipeline](assets-pipeline.md) | `campaign.pause`, `campaign.alertSounds`, Campaign options section; audio assets | this track (FR-CAMP-46–50, FR-ASSET-52–61) |
+| WF (track window frame, [play-shell](play-shell.md)) | The Requests window placed by the one placer with its useful size; prompt toasts under WF's toast-stack policy; an overlay registry + a top-bar slot for the pause card and the DM's Pause control | seam, OQ-DICEX-63 |
+| SB ([stats](stats.md)) | Which macro / request rolls the luck tracker counts | seam, OQ-DICEX-62 |
+| CB ([combat-tracker](combat-tracker.md), [combat-extras](combat-extras.md)) | A request mid-fight vs the turn alert; the turn alert's sound key (`turn`) | seam, OQ-DICEX-64; the turn alert's one line is TT3's (assigned) |
+| New dependency | **none**: macros and requests are records + commands; audio plays through the existing Web Audio context ([FR-SHELL-25](play-shell.md#6-functional-requirements)); the server's duration probe is hand-rolled ([FR-ASSET-53](assets-pipeline.md#6-functional-requirements), OQ-ASSET-29) | — |
+
+**Sprint 8 build split** (track TT; AGENTS §9.9 shared files named per slice)
+
+| # | Branch | Content | Shared files touched | After / parallel |
+|---|---|---|---|---|
+| TT0 | `fix/tt-core` | Tables `roll_macro`, `roll_request`; columns `asset.kind`, `asset.duration_ms`, `campaign.pause`, `campaign.alert_sounds`; record types `roll-macro`, `roll-request` (window), `audio-asset` (lazy, DM); 9 domain events; zod in `@shared/dice-extras/{macros,requests}.ts`, `@shared/campaign-management/table.ts`, `@shared/assets-pipeline/audio.ts`; kind `roll-request` def; `gameLog.append` `audience` input; `con44-tt.test.ts`; docs | `src/server/db/schema.ts`, `src/shared/events/`, `src/shared/protocol/`, `src/server/features/index.ts`, `notifications/kinds.ts` (append), `docs/data-model/`, `docs/protocol/` | **first schema lane of the sprint** (before CB core; SB none); ∥ WF |
+| TT1 | `build/tt-macros` | FR-DICEX-64–72, FR-CHARX-87–90: commands, entities hook line, tray popover + Save as macro (`TrayWindow.tsx`), editor, sheet Macros tab, fixture `dicex-macros` | `sheet-sections.ts`, entities hook registry, `fixtures/bundles/index.ts` (append lines only) | after TT0; ∥ TT2, TT3, TT4 |
+| TT2 | `build/tt-requests` | FR-DICEX-73–92, FR-NOTE-58–64, FR-DICE-79–84: request commands; `char.roll` body → exported helper (`src/server/features/character-sheet/commands.ts`, assigned); prompt view; Requests window; roll bar "Request…" (`GameLog.tsx`); `restoreToast` in `ToastRuntime.tsx`; fixture `dicex-request-open`; e2e | `src/client/dm/windows.ts`, both `notification-views.ts` (append); `ToastRuntime.tsx` (existing shared UI: **lock, after WF's toast-stack slice**); CHAR server file (assigned) | after TT0; ∥ TT1, TT3; its one `alertSound("request")` line after TT3 (stack) |
+| TT3 | `build/tt-sounds` | FR-ASSET-52–61, FR-CAMP-48–49, FR-SHELL-130–134: audio sniff / probe / serve / lazy type; `camp.setAlertSound`; Campaign options section; shell playback (alert keys, decode cache, preload, one at a time, `flash?`); turn alert line; fixtures `audio-chime`, `camp-alert-sounds` | `play-shell/{sounds,audio,alerts}.ts`, `AlertLayer.tsx` (existing shared UI: lock; not WF's frame files); `combat-tracker/turn-alert.ts` (one assigned line) | after TT0; ∥ TT1, TT2 |
+| TT4 | `build/tt-pause` | FR-CAMP-46–47, FR-SHELL-125–129, -135: `camp.pause` / `camp.resume`; pause card; DM Pause control; suppression on players (dice layer, popups, toasts, sounds); fixture `camp-paused`; e2e | WF's overlay registry and top-bar slot (append) — or assigned lines in `PlayFrame.tsx` if WF rules so | **after WF's frame core**; after TT3 for the pause sound (else silent until TT3); ∥ TT1, TT2 |
+
+- Walkthrough steps per slice: TT1 → T1–T5; TT2 → T6–T10, T17; TT3 → T15, T16 (+ T9's sound); TT4 → T11–T14. TT1 + TT2 may be one builder if the orchestrator prefers (both in the dice-extras folders; disjoint files: only TT1 edits `TrayWindow.tsx`, only TT2 `GameLog.tsx`).
+
 ## 15. Open questions
 
 Rows 01–17 decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-log.md), 2026-10-16; gate rows G1, G16–G18 + bulk-accept D); the decided option is in bold, rejected ones are kept for the record. Rows 13–17 were settled by the seams ruling (2026-10-16; 17 = terms the integrator adds after the gate). **Rows 18–32: sprint 4, all decided** (DM, sprint-4 gate 1, [#245](../decisions-log.md), 2026-10-17: gate rows G1, G4, G7, G21–G27 + bulk-accept D); 29 and 30 settled by the seams ruling (S7); 32 is the integrator's glossary row. Full screen as default, popup for every public roll, die-shape chips and log dice were DM decisions already (#243 [10–12, 17]).
@@ -800,6 +1080,28 @@ Rows 01–17 decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-l
 
 **Sprint 6 build:** FR-DICEX-57, -58 go in slice **PF2** ([play-shell §14](play-shell.md#14-dependencies)): one line in each client's `pref-sections.ts` (append) + `SettingsPanel.tsx` (a layout prop at most; dice-extras' own file). *(Seams S9)* WF5 `fix/tray-roll-visible` owns `TrayWindow.tsx` / `TrayPreview.tsx`; `SettingsPanel.tsx` is PF's. PF2 does not edit `TrayWindow.tsx` (the gear already opens `SettingsPanel`, so OQ-DICEX-48 A needs no tray change); if it ever must, PF2 merges after WF5. No dependency.
 
+**Sprint 8** (track TT). **Bold** = suggested pick (not decided). Rows 49–60 are for the DM at gate 1; 61–64 are seams / glossary for the orchestrator.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-DICEX-49 | Who can make macros? | **A. Players for their own PCs (+ general ones); the DM for anyone: general, monsters, NPCs, and on a PC for its owner (or DM only)**: covers "Bless" and monster riders; one more rule (FR-DICEX-65) / B. DM only: simplest, players can't help themselves / C. Players only: the DM keeps typing | yes | FR-DICEX-64–67 |
+| OQ-DICEX-50 | Where do macros live? | **A. A Macros tab on the sheet + a Macros popover in the tray header**: no new screen furniture, 0 px on the tray / B. A macro bar (hotbar strip above the launcher): one-click always, but takes map room and needs WF's placer / keep-outs / C. A Macros window: flexible, one more window to place | yes | FR-DICEX-69, FR-CHARX-87 |
+| OQ-DICEX-51 | Macro syntax: what can a macro hold? | **A. Dice notation + name + category; a free roll (no riders, never attack / apply)**: reuses `dice.roll`, nothing new server-side / B. + damage type and "add to my open damage card": Sneak Attack lands on the card, but touches combat's card and apply rules / C. + sheet references (`1d20+@dex`, `@prof`): fewer edits on level-up, needs a reference grammar | yes | FR-DICEX-68 |
+| OQ-DICEX-52 | Request targets | **A. PCs (characters with an owner), "All PCs" preset, the DM unticks**: one prompt per PC / B. + companions (the owner rolls the pet's check): needs pet sheets in the prompt / C. Online players only: offline PCs skipped silently | yes | FR-DICEX-75 |
+| OQ-DICEX-53 | Which rolls can be requested? | **A. Skill, save, ability check, custom expression**: covers "Perception", "DEX save", "1d100" / B. + initiative and death saves: overlaps combat's own buttons / C. Custom expression only: no sheet bonuses, players add them by hand | yes | FR-DICEX-76 |
+| OQ-DICEX-54 | DC: shown or hidden, and pass / fail? | **A. Optional DC, shown or hidden per request (default hidden); pass / fail on the DM's card only**: no meta-gaming, the DM narrates / B. Shown with pass / fail on every line: table sees outcomes, spoils hidden checks / C. No DC field: the DM compares in their head | yes | FR-DICEX-77, -85 |
+| OQ-DICEX-55 | Results public or DM-only? | **A. Per request: Public, or Hidden = DM + the roller (the companion-line rule), preset from the category's log setting**: the roller still sees their number / B. A + Blind (DM only, the existing DM-only stamp; the roller's prompt closes with "Sent to the DM", no number): classic secret checks, one more choice in the composer / C. Always public: simplest, no secret checks | yes | FR-DICEX-77, -84; FR-DICE-79 |
+| OQ-DICEX-56 | A timeout? | **A. None: open until answered / declined, the DM's Close or Roll for missing**: no wall-clock scheduler (ADR-0016) / B. A countdown (30 / 60 / 120 s) on the prompt, closed lazily by the next command: urgency, but clock skew and a fake "timer" / C. Close at the next turn in combat: ties requests to combat | no | FR-DICEX-82 |
+| OQ-DICEX-57 | Can a player decline? | **A. Yes, Decline on the prompt; the DM sees "Declined"**: an honest "I don't want to" / B. No: only the DM closes; fewer states | no | FR-DICEX-79 |
+| OQ-DICEX-58 | Physical dice on a prompt? | **A. The prompt's Roll is a normal roll button: physical mode, tray (Alt), Shift / Ctrl**: the DM's #334 "normal roll path" / B. One tap, the server always rolls: fastest, no physical dice | no | FR-DICEX-83 |
+| OQ-DICEX-59 | The request's adv / dis | **A. A preset; the player's Shift / Ctrl may change it**: players know their own advantages / B. Forced: the DM decides; the player can't add their Elven advantage | no | FR-DICEX-76 |
+| OQ-DICEX-60 | How an answer reaches the server (technical; integrator may settle) | **A. Own intent `dicex.answerRequest`, the server builds the roll from the request via the sheet's roll helper**: one owner of the rules, no change to `char.roll` / `dice.roll` intents / B. A `requestId` on `char.roll` / `dice.roll` + an answer hook: no new intent, but two other features' intents grow a field | no | FR-DICEX-78; FR-CHARX-21 |
+| OQ-DICEX-61 | Glossary: add **Macro** ("a saved, named roll button: dice notation + category, rolled through the normal roll path"), **Roll request** ("the DM's ask for a roll from chosen PCs; each PC gets a prompt"), **Prompt** ("a roll request's pending notification with Roll / Decline"), **Pause screen**, **Alert sound** (play-shell's rows) | **A. Add as worded** / B. Reword | no (integrator) | glossary |
+| OQ-DICEX-62 | *(Seam SB, [stats](stats.md))* Which macro and request rolls count in the luck tracker? | **A. As any roll: by the entry's visibility (players: public only; hidden answers count for the DM only, FR-DICE-72); macro rolls are `dice.roll` entries with their category** / B. Requests excluded (asked rolls aren't "luck") | no (seams) | stats; FR-DICE-82 |
+| OQ-DICEX-63 | *(Seam WF, [play-shell](play-shell.md))* Pause card, prompt and Requests window vs the placer | **A. The pause card is an overlay (not a window): no placement, no keep-out, registered in a WF overlay registry above dialogs, below the dice layer; the prompt is a pending toast under WF's toast policy; Requests is a normal launcher window (useful size 360 × 460); the DM's Pause control sits in a WF top-bar slot** / B. The pause card as a maximised modal window: reuses windows, but the placer would have to skip it | no (seams) | FR-DICEX-86, FR-SHELL-125, -135 |
+| OQ-DICEX-64 | *(Seam CB, [combat-tracker](combat-tracker.md))* A request mid-fight vs the turn alert | **A. Independent: both may toast; sounds never overlap (FR-SHELL-133: the second within the first's length is skipped, the flash / toast stay); the turn alert's sound becomes key `turn`** / B. Requests wait while it's the player's turn | no (seams) | FR-DICEX-89; FR-CBT-41 |
+
 ## 16. Out of scope
 
-- As §4. Macros, roll requests (notification with a roll action), whispers → [stub](post-mvp/dice-extras.md). Stats on rolls → [stats](stats.md). Gem rerolls → [gems](gems.md) (their new entries throw like any roll).
+- As §4. ~~Macros, roll requests (notification with a roll action), whispers → [stub](post-mvp/dice-extras.md).~~ *(Sprint 8: macros and roll requests are here; whispers → [stub](post-mvp/dice-extras.md).)* Stats on rolls → [stats](stats.md). Gem rerolls → [gems](gems.md) (their new entries throw like any roll).
+- *(Sprint 8)* Pause screen and alert sounds → [play-shell](play-shell.md), [campaign-management](campaign-management.md), [assets-pipeline](assets-pipeline.md). Macro bar, macro sheet references, damage-card macros (OQ-DICEX-50 B, -51 B / C). Blind requests (OQ-DICEX-55 B). Request timers (OQ-DICEX-56 B).

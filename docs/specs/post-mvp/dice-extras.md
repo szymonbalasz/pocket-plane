@@ -1,32 +1,31 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: claimed
+status: in-review
 owner: spec-tt
 phase: post-mvp-8
 ---
 
 # Dice extras (post-MVP stub)
 
-> **In scope for sprint 3 (DM decision [#203](../../decisions-log.md), 2026-10-16):** 3D dice, a dice tray, clickable dice notation in free text, and **dice customisation** (per-player dice look). **Expanded into [dice-extras](../dice-extras.md) (prefix DICEX); that spec is the source of truth.** This stub stays for the tier table and the items not taken into sprint 3 (macros, roll requests, whispers). A 3D / physics library is a new dependency (AGENTS §3: needs the DM's OK at gate 1).
+> **[dice-extras](../dice-extras.md) (prefix DICEX) is the source of truth.** Sprint 3 took 3D dice, the tray, clickable notation and dice looks ([#203](../../decisions-log.md)); **sprint 8 took saved macros and DM roll requests** ([#334](../../decisions-log.md); FR-DICEX-64–72 and FR-DICEX-73–93). This stub keeps only what stays post-MVP: **player whispers** (tier C).
 
-Beyond MVP [dice-roll-log](../dice-roll-log.md). Ranking in [feature tiers](../../feature-tiers.md#3-character-sheet-and-dice).
+Ranking in [feature tiers](../../feature-tiers.md#3-character-sheet-and-dice).
 
-| Tier | Feature |
-|---|---|
-| S | **3D dice roller** in a tray or over the battlemap; every roll in the app eventually goes through it; customisation later (B) (#188) |
-| A | **Dice notation in any free text is clickable** ("1d12+5", whitespace-tolerant): puts the dice in the tray to adjust before rolling; doesn't feed attack / apply. Very important (#188) |
-| A | Saved roll macros / custom roll buttons |
-| B | DM requests a roll from players ("everyone roll Perception") — fits as a [notification](../notifications.md) with a roll action |
-| — | ~~Hidden DM rolls~~ → MVP as per-category public log settings ([dice-roll-log](../dice-roll-log.md)) |
-| C | Player whispers a roll to the DM |
+| Tier | Feature | Where now |
+|---|---|---|
+| S | 3D dice roller | [dice-extras](../dice-extras.md) (sprints 3–5) |
+| A | Clickable dice notation in free text | [dice-extras](../dice-extras.md) FR-DICEX-28–31 |
+| A | Saved roll macros / custom roll buttons | [dice-extras](../dice-extras.md) FR-DICEX-64–72 (sprint 8) |
+| B | DM requests a roll from players | [dice-extras](../dice-extras.md) FR-DICEX-73–93 (sprint 8; a notification with a roll action, [notifications](../notifications.md) FR-NOTE-58) |
+| — | ~~Hidden DM rolls~~ | MVP: per-category public log settings ([dice-roll-log](../dice-roll-log.md)) |
+| **C** | **Player whispers a roll to the DM** | **here (post-MVP)** |
 
-- **Builds on:** [dice-roll-log](../dice-roll-log.md), [notifications](../notifications.md), [live-sync](../live-sync.md) (visibility filter for hidden/whispered rolls).
-- **Carried-over open questions** (suggested pick in bold):
+- **Builds on:** a hidden request answer already reaches only the DM and the roller (`public: false` + `audiencePlayerId`, [FR-DICE-79](../dice-roll-log.md#6-functional-requirements)); a whisper would be the same audience chosen by the player on a free roll, and amends #73 ("player rolls are always public") the way the [roll-request ADR](../../architecture/adr/proposed-s8-tt-roll-requests.md) does for answers.
+- **Carried-over open question** (suggested pick in bold; not for sprint 8):
 
 | Question | Options |
 |---|---|
 | Whisper directions | **Player→DM and DM→player only** / any |
-| 3D dice: cosmetic only, result still server-side? | **Yes, animation plays server result** / client-rolled |
 
-> TODO (spec phase): expand from [_template.md](../_template.md) after MVP.
+- Retired from this stub: "3D dice: cosmetic only, result server-side?" (decided #207: the animation plays the server's result, [ADR-0044](../../architecture/adr/0044-3d-dice.md)).

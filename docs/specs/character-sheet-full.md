@@ -1,7 +1,7 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: claimed
+status: in-review
 owner: spec-tt
 phase: post-mvp-8
 ---
@@ -21,6 +21,15 @@ phase: post-mvp-8
 > **Sprint 7 (track GM, [gems](gems.md); DM #140, #312).** Decided (not open): gem counts on the character sheet, built-in icons now (art in the UI sprint, BL-29), nothing while the campaign's gems are off. One sheet section `gem.counts` (FR-CHARX-71–76, slice GM3 `build/gems-sheet`, tests `FR-CHARX-71 gem section off / on`, `FR-CHARX-72 owner / DM controls`, `FR-CHARX-73 summary counts`); placement open (OQ-CHARX-37).
 
 > **Sprint 7 (track FU, DM [#311](../decisions-log.md); session-sim-10 a03).** Decided, not open: the **companion card** no longer opens at its minimum with the attacks below the fold. New **FR-CHARX-81** (a useful size, so the shell auto-minimises a window rather than shrink the card; [play-shell FR-SHELL-79](play-shell.md#6-functional-requirements), OQ-SHELL-53) and **FR-CHARX-82** (attacks before conditions, two attack rows visible at 320 × 360). Client only, 0 B. Tests `FR-CHARX-81 card useful size` (registry: `usefulSize` 320 × 360; with Compendium open at 1280×800 the card opens 320 × 360 and Compendium is auto-minimised), `FR-CHARX-82 attacks above the fold` (DOM at 320 × 360: both Owlbear attack rows' buttons inside the rect with 3 conditions); walkthrough U2, U15 in [play-shell §13](play-shell.md#13-test-plan); slices FU1 (the window line) and FU4 (the card's order) in [play-shell §14](play-shell.md#14-dependencies). GM (gems) edits this spec in parallel with its own range. Edge cases: client-only layout; reconnect re-renders from the store; crash: no server change. No open question.
+
+> **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md); spec-tt).** Decided by the DM (not open): **saved macros / custom roll buttons** ([dice-extras](dice-extras.md) FR-DICEX-64–72). The sheet gets a **Macros tab** (a `sheet-sections.ts` line; the component is dice-extras'), macros stay editable on a locked sheet, and `char.roll`'s body becomes a helper so **DM roll requests** roll exactly as the sheet does. New FR-CHARX-87–90; no record, field or event here (CON-44: 0 B from CHARX; macros measured in [dice-extras §12](dice-extras.md#12-performance--bandwidth)). For the DM: OQ-CHARX-40, -41. Walkthrough T1–T5 in [dice-extras §13](dice-extras.md#13-test-plan).
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-CHARX-87 | Macros tab registration and availability | TT1 | `FR-CHARX-87 macros tab` |
+| FR-CHARX-88 | Tab contents: roll buttons, editor, DM-only tags | TT1 | `FR-CHARX-88 macros tab contents` |
+| FR-CHARX-89 | Locked sheet doesn't lock macros | TT1 | `FR-CHARX-89 macros on a locked sheet` |
+| FR-CHARX-90 | `char.roll` body → `sheetRoll` helper for request answers | TT2 | `FR-CHARX-90 sheet roll helper` |
 
 > Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Extends [character-sheet](character-sheet.md) (CHAR, basics); every FR-CHAR stays in force unless amended here.
 
@@ -176,6 +185,11 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | **Sprint 7** (track FU; sim-10 a03) | | |
 | FR-CHARX-81 | **The companion card opens readable** (sprint 7, track FU; sim-10 a03: opened at 280 × 308, its minimum-ish, attacks below the fold; with [FR-SHELL-79](play-shell.md#6-functional-requirements)): `charx.companion` declares `usefulSize` **320 × 360** (= its default), so auto placement auto-minimises a launcher window before opening it smaller (under OQ-SHELL-53 B; under A it opens as today); min stays 280 × 240. One line in `companion/window.ts` (assigned to FU1). | sim-10 a03 |
 | FR-CHARX-82 | **Attacks above the fold** (sprint 7; amends FR-CHARX-62–65's order): at 320 × 360 the card shows, without scrolling, the header (one line: name, "Mira's pet", turn mode; the "In combat" Badge and side chip on the same line when they fit, else a second line), one stats line ("HP 45 / 59 · AC 15 · 40 ft · Large monstrosity"; the HP control / Edit toggle at its right end), then **the first two attack rows with their three buttons**; conditions follow the attacks (they were above them), the DM's "Open NPC sheet" link last. Outcome (`session-sim-10`: Owlbear Beak + Claws, Drake Companion Bite): both Owlbear rows' Attack / Damage / Attack + damage buttons inside the window's rect at 320 × 360 with up to 3 conditions; at the min (280 × 240) the body scrolls. | sim-10 a03 |
+| **Sprint 8 (TT): macros on the sheet** | | |
+| FR-CHARX-87 | **Macros tab** ([dice-extras](dice-extras.md) FR-DICEX-64–72; OQ-DICEX-50 pick A): one line in `sheet-sections.ts` (append): `{id: "dicex.macros", slot: "tab", title: "Macros", order: 90 (last), clients: both, kinds: ["character", "monster"]}`; `available`: DM always; a player iff the creature is a character they own. The component is dice-extras' (`src/client/common/features/dice-extras/MacrosSection.tsx`). | OQ-CHARX-41 |
+| FR-CHARX-88 | **Contents**: the viewer's macros on this creature (`creatureId` = it, FR-DICEX-67), in `order`; each a macro roll button (FR-DICEX-68: click / Shift / Ctrl, physical dice, Alt → tray) with ✎; "+ Macro" opens the editor (FR-DICEX-71) with the creature preset; the DM sees every macro on it, a "DM only" tag on hidden ones. Same in view and edit mode. Empty: "No macros yet. Add one, or save a roll from the tray." The tab strip keeps scrolling at 320 px (FR-CHARX-26). | |
+| FR-CHARX-89 | **Locked sheet** (OQ-CHARX-40 pick A): macros stay editable by the owner on a locked sheet (they are rolls, like counters, FR-CHARX-12), not sheet data; the lock never touches `roll-macro`. | OQ-CHARX-40 |
+| FR-CHARX-90 | **Roll helper for requests**: `char.roll`'s body becomes an exported helper `sheetRoll(env, input, {audience?, label?})` in `src/server/features/character-sheet/commands.ts` (behaviour of `char.roll` unchanged: its tests stay green), called by `dicex.answerRequest` ([FR-DICEX-78](dice-extras.md#6-functional-requirements)) so an answer uses the same specs, overrides and MOD roll hooks (FR-CHARX-21) as the sheet's button; `audience` per [FR-DICE-83](dice-roll-log.md#6-functional-requirements). | |
 
 **Roll specs** (FR-CHARX-21). Bonus strings per FR-CHAR-21 (`1d20`, `1d20+3`, `1d20-1`). *(Sprint 4: an attack row's `bonus` adds to to-hit and the base part's constant; `extraDamage` adds one roll per part, FR-CHARX-55.)*
 
@@ -263,6 +277,7 @@ interface SheetSection {
 - **Concentration save**: CBTX uses `saveBonus(stats, "con")`; a `save.con` override wins. That is exactly what the sheet's CON Save button rolls. The resolver lands in `fix/charx-core`, which merges before the CBTX build.
 - **HP control**: the sheet keeps `char.adjustHp`. CBTX wires it through its `hpRules.apply`: temp HP absorbs first, a hit at 0 HP adds a death-save failure, concentration cards. The sheet UI does not change.
 - **Play state vs sheet data**: `tempHp`, `deathSuccesses` and `deathFailures` are CBTX-owned play-state columns on `entity`, like `hpCurrent`. Effects live in CBTX's `effect` table. None of them is in `statBlock` or `creature-sheet`, and CHARX models no such field. The summary card (FR-CHARX-32) shows only Down / `deathState` from CBTX's data.
+- *(Sprint 8, TT)* **Macros tab** (FR-CHARX-87–88): section `dicex.macros` in the table above's terms: slot `tab`, kinds character + monster, both clients, `available` = DM or the owning player. Rows: name, muted expression, a roll Button (Alt hint, FR-DICEX-51), ✎; "+ Macro" at the end. **DM view:** every macro on the creature ("DM only" Badge on hidden ones), also on NPC / monster sheets. **Player view:** own PCs only; never on a Party summary card. Test IDs: `charx-section` `data-record-id="dicex.macros"`, inside it dice-extras' `dicex-macro*` IDs.
 
 ## 8. Data model
 
@@ -369,6 +384,8 @@ interface SheetSection {
 
 *(Sprint 6)* Companion card: open it — DM any companion, player own only (an empty picker otherwise); roll its attacks — DM any, player own companions (combat: FR-CBT-114; a pet out of a fight: FR-CHARX-69); pet HP out of a fight — DM, owner (FR-ENT-36); edit stats — DM any companion's definition (NPC sheet, card for pets), the owner their **pets'** AC, HP max, speed and attack rows on the card (FR-CHARX-63, #288); summons never by players.
 
+*(Sprint 8)* Macros tab: DM on any creature; player on own characters (create / edit / roll per [dice-extras §10](dice-extras.md#10-permissions)); a locked sheet changes nothing for macros (FR-CHARX-89). `sheetRoll` is server-internal: no new permission.
+
 ## 11. Edge cases & failure modes
 
 - **Player disconnect / reconnect:** controls disabled; last values shown; FR-CHARX-38 for lost intents. Snapshot restores sheet, counters and lock state; selection kept if still eligible.
@@ -398,6 +415,7 @@ interface SheetSection {
 - Sprint 4 (measured, [MOD §12](effect-modifiers.md#12-performance--bandwidth)): `bonus` + 2 max extra parts = +110 B per attack row (typical +57 B); heavy DM +7,590 B (69 rows), a player +440 … +660 B. Feature `used` below zero: 0 B (same field).
 - Sprint 2: G8 adds ≤ 2 small `notification` rows (< 0.5 KB) per character's lifetime; pending `charx-draft` rows are pinned in the DM snapshot until approved or dismissed (a handful; CON-44 unaffected). `toHit` = one roll, one entry.
 - *(Sprint 7, GM)* The gem block adds **0 B** to `entity` and `creature-sheet` (FR-CHARX-75); `character-gems` rows are measured in [gems §12](gems.md#12-performance--bandwidth) (8 rows ≈ 2.2 KB per viewer, 0 B while off).
+- *(Sprint 8, TT)* **CON-44: 0 B** from CHARX (the tab reads `roll-macro`, measured by dice-extras; `sheetRoll` is a refactor). Edge cases: disconnect → tab Buttons disabled (FR-DICEX-72); a PC handed to another player → its macros follow (FR-DICEX-65); a deleted macro's row disappears on its delete frame; crash → nothing of CHARX's to recover.
 
 ## 13. Test plan
 
@@ -450,6 +468,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 14 | *(Sprint 3; bundle `vision`, run inside FOG §13 steps 8–9)* Thorn's sheet: switch **Sees invisible** on (FOG step 8); then Edit, Darkvision 60 → 30, then back; switch "Sees through magical darkness" off and on | B: Mira's sheet: Senses line "Vision 30 ft"; opens Thorn → summary card only. C: Thorn's sheet in edit mode: `charx-senses-invisible` disabled before and after A's switch; Senses line gains "Sees invisible" | Senses line updates ≤ 1 s for A and C; Thorn at (11, 9): at 30 ft Goblin Lurker (17, 11) leaves C's view (d 6.3 > 6 cells), back at 60 ft it returns; C's screen dark while the switch is off (Thorn in darkness). B frames: no Thorn `senses` |
 
 **Sprint 7 (track GM):** bundles `gems`, `gems-hidden` ([gems §13](gems.md#13-test-plan)). DOM tests (in-code store): `FR-CHARX-71 gem section off / on` (no `campaign.features` → no `gem-block`, sheet DOM byte-identical to sprint 6; on → block in the header after the effect chips; NPC sheet / companion card → absent); `FR-CHARX-72 owner / DM controls` (owner: Spend menu, no ±; DM: ± and Spend; locked sheet → still enabled; not `live` → disabled; `FR-GEM-08 max 5 label shown, no over-limit styling at 6`); `FR-CHARX-73 summary counts` (another player's view of Mira: counts row, no menu; under OQ-GEM-01 B → absent). Walkthrough: [gems §13](gems.md#13-test-plan) steps 2, 3, 9, 10.
+
+**Sprint 8 (track TT):** bundle `table-tools` (`dicex-macros`: Sneak Attack on Mira, Inspiration on Thorn, Ambush on the Elite Goblin Warrior); walkthrough T1–T5 in [dice-extras §13](dice-extras.md#13-test-plan). DOM tests (in-code store): `FR-CHARX-87 macros tab` (registry line; player-1 sees it on Mira, not on Thorn; the DM on both and on the Elite Goblin's NPC sheet), `FR-CHARX-88 macros tab contents` (rows in order; Roll → `dice.roll` as Mira; "+ Macro" presets the creature; DM-only Badge), `FR-CHARX-89 macros on a locked sheet` (locked → editor still enabled for the owner). Integration `FR-CHARX-90 sheet roll helper` (every existing `char.roll` test unchanged; `sheetRoll` with `audience {public: false, audiencePlayerId}` → the entry stamped so; Bless part kept).
 
 ## 14. Dependencies
 
@@ -524,6 +544,8 @@ Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes mark
 | 3 | same (b) | Tabs, edit mode, picker, summary, creation, NPC sheet, wallet line, empty `sheet-sections.ts` | `creature-actions.ts` line |
 | 4 | same (c), **last** (after the D build) | `char.roll` kinds, route `ref`, combat route + `cbt.attack` + drafts | combat-tracker `roll-route.ts`, `attack.ts`, `schemas.ts`, `lifecycle.ts` (lock) |
 
+**Sprint 8 (track TT):** TT1 appends the `dicex.macros` line to `sheet-sections.ts` (append-only registry); TT2 refactors `src/server/features/character-sheet/commands.ts` (`sheetRoll` export; assigned path, no behaviour change). No schema, event or record from CHARX. Full split: [dice-extras §14](dice-extras.md#14-dependencies).
+
 ## 15. Open questions
 
 **Sprint 6 (track CP):** OQ-CHARX-31–36 below (OQ-CHARX-34 for the DM). All decided (#178, S1, #190, #207); OQ-CHARX-23 (glossary) stays for the integrator. **Sprint 4 (track R):** OQ-CHARX-26, -27 **decided** (DM, sprint-4 gate 1, #245); OQ-CHARX-28 settled at the gate (owner: compendium's importer bump); OQ-CHARX-29 settled by seams S5 / S14. IDs OQ-CHARX-26–29 stay R's (seams S10; V's sprint-4 row is OQ-CHARX-30). Sprint 3's OQ-CHARX-24 / -25 were decided at sprint-3 gate 1 (#207), with placement of senses (Main tab line, FR-CHARX-50) and defaults (0 / 0 / off, FOG OQ-FOG-35); #210 added Sees invisible (DM only, FR-CHARX-53).
@@ -573,6 +595,13 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-CHARX-37 | Where the gem block sits on the sheet | **Decided (#315): A.** **A. Header chip row, after the effect chips (seen at a glance on every tab; the row gets longer)** / B. Vitals, under HP (near play state; pushes the HP row's neighbours down) / C. Its own "Gems" tab (roomy; hidden until clicked) | — · decided | gems |
+
+**Sprint 8** (track TT). **Bold** = suggested pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CHARX-40 | Does the DM's sheet lock also lock macros? | **A. No: macros are rolls (like counters), the owner keeps editing them**: the lock guards character data, not buttons / B. Yes: a locked sheet freezes its macros too; the DM edits them | no | FR-CHARX-89 |
+| OQ-CHARX-41 | Where on the sheet? | **A. A "Macros" tab (last)**: room for 24, no change to Main's fold (FR-CHARX-82) / B. A block at the end of Main: one less click, pushes Main longer at 320 px | no | FR-CHARX-87 |
 
 ## 16. Out of scope
 
