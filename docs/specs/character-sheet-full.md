@@ -1,7 +1,7 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: claimed
+status: in-review
 owner: spec-sb
 phase: post-mvp-8
 ---
@@ -19,6 +19,8 @@ phase: post-mvp-8
 > **Sprint 6 (track CP, DM [#252](../decisions-log.md) / BL-30).** The owner of a **companion** (pet or summon, [combat-tracker §6.4](combat-tracker.md#64-sprint-6-companions)) gets a **companion card**: a small read-only window built from the creature's stat block (HP, AC, speed, attacks with Roll, conditions); **not a second character sheet**. New FR-CHARX-59–70, window `charx.companion`, OQ-CHARX-31–36. Card data reaches only the owner and the DM ([proposed companion visibility ADR](../architecture/adr/0056-companion-visibility.md)). **At a glance:** FR-CHARX-59–68 → CP4 `build/cp-card` → tests `FR-CHARX-60 card fields`, `FR-CHARX-64 card rolls`, `FR-CHARX-67 card visibility`; FR-CHARX-69 (owner rolls a pet out of combat) → CP4; FR-CHARX-70 (a pet's NPC sheet stays DM-only) → CP0.
 
 > **Sprint 7 (track GM, [gems](gems.md); DM #140, #312).** Decided (not open): gem counts on the character sheet, built-in icons now (art in the UI sprint, BL-29), nothing while the campaign's gems are off. One sheet section `gem.counts` (FR-CHARX-71–76, slice GM3 `build/gems-sheet`, tests `FR-CHARX-71 gem section off / on`, `FR-CHARX-72 owner / DM controls`, `FR-CHARX-73 summary counts`); placement open (OQ-CHARX-37).
+
+> **Sprint 8 (track SB, stats tier B, DM [#334](../decisions-log.md); spec-sb).** Decided (not open): a **trophy case** of campaign-wide records on the character. It is one sheet section, `stats.trophies`, a **Trophies** tab owned by [stats](stats.md#61-tier-b-sprint-8) (FR-STATS-42–44), registered through `sheet-sections.ts` (append). New FR-CHARX-97–99. Client only; it reads `stats.query`, not sheet data; 0 B snapshot. Placement and audience are DM picks (OQ-STATS-22, -23, OQ-CHARX-44). Slice SB2 `build/sb-trophies`. Tests `FR-CHARX-97 trophies tab`, `FR-CHARX-98 trophies layout`, `FR-CHARX-99 trophies never on summary cards`.
 
 > **Sprint 7 (track FU, DM [#311](../decisions-log.md); session-sim-10 a03).** Decided, not open: the **companion card** no longer opens at its minimum with the attacks below the fold. New **FR-CHARX-81** (a useful size, so the shell auto-minimises a window rather than shrink the card; [play-shell FR-SHELL-79](play-shell.md#6-functional-requirements), OQ-SHELL-53) and **FR-CHARX-82** (attacks before conditions, two attack rows visible at 320 × 360). Client only, 0 B. Tests `FR-CHARX-81 card useful size` (registry: `usefulSize` 320 × 360; with Compendium open at 1280×800 the card opens 320 × 360 and Compendium is auto-minimised), `FR-CHARX-82 attacks above the fold` (DOM at 320 × 360: both Owlbear attack rows' buttons inside the rect with 3 conditions); walkthrough U2, U15 in [play-shell §13](play-shell.md#13-test-plan); slices FU1 (the window line) and FU4 (the card's order) in [play-shell §14](play-shell.md#14-dependencies). GM (gems) edits this spec in parallel with its own range. Edge cases: client-only layout; reconnect re-renders from the store; crash: no server change. No open question.
 
@@ -189,6 +191,14 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | `toHit` *(N7)* | `attackId?` | 1d20 + toHit only | attack | "Light crossbow attack" | 1 |
 | `spellToHit` *(N7)* | `spellId` | 1d20 + spell attack only (`roll: attack`) | attack | "Guiding Bolt attack" | 1 |
 
+**Sprint 8 (track SB): trophy case**
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-CHARX-97 | **Trophies tab**: sheet section `stats.trophies` (owner stats; one line in `sheet-sections.ts`, append): slot `tab`, title "Trophies", order after every existing tab section, both clients, kinds `["character"]`, `available` = always. Like every section it renders only on full sheets, so on the DM's sheets and the owner's own (FR-CHARX-36); never on summary cards or imported-definition sheets (§7.1). Drafts and locked sheets show it read-only. | picks OQ-STATS-23 A, OQ-CHARX-44 A |
+| FR-CHARX-98 | **Layout** (the component is stats', `@ui/features/stats/trophies/`): **Lifetime**, a label / value grid (2 columns, 1 under 360 px), then **Records**, each value with a muted detail line ("→ Ogre · Fight 3 · Tue 20 Oct"), then a footnote "Whole campaign, counted from the game log". DM adds a muted "Includes hidden rolls and fights". "—" for 0. Test IDs: `stats-trophies` (+ `data-record-id` = character id), `stats-trophy` (+ `data-record-id` = key, `data-value`), `stats-trophy-detail`. States per FR-STATS-50. | FR-STATS-42 |
+| FR-CHARX-99 | **Data and refresh**: the tab sends `stats.query {scope: "trophies", characterId}` when shown and refreshes per FR-STATS-44. It reads no `creature-sheet` or stat-block field, and other players never get it (no section on the summary card, FR-CHARX-32; the server answers players only for their own characters, FR-STATS-43). | FR-STATS-43, -44 |
+
 ### 6.1 N7 sheet buttons
 
 DM-specified (#188): a third button **Attack + damage**, and the three behave the same everywhere. P2b owns where they show, labels, the out-of-combat roll and test IDs; P2a ([combat-tracker](combat-tracker.md)) owns what each does when routed into combat (settled S1, FR-CHARX-43).
@@ -257,6 +267,7 @@ interface SheetSection {
 | `cbtx.temp-hp` | `vitals` | always | Temp HP |
 | `cbtx.death-saves` | `vitals` | `deathState != null` | Death-save successes / failures |
 | `cbtx.effects` | `header` | always | Condition / effect chips; owner "Concentrate…", DM add / edit / end from the chip row's menu |
+| `stats.trophies` *(sprint 8, SB)* | `tab` "Trophies" (last) | always | Campaign trophy case (FR-CHARX-97–99) |
 | `gem.counts` *(sprint 7, GM)* | `header` (after `cbtx.effects`) | gems on (FR-CHARX-71) | Five gem icons + counts; owner Spend menu; DM ± (FR-CHARX-72) |
 
 - **What CHARX exposes** for sections (pure, `@shared/entities`, overrides honoured): `abilityMod`, `proficiencyBonus`, `saveBonus(stats, ability)`, `checkBonus`, `spellSaveDc`, `spellAttackBonus`; record fields `hpCurrent`, `statBlock.hpMax`; on `creature-sheet` (owner + DM only) `spells[].concentration`.
@@ -449,6 +460,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 13 | *(items 13, 16)* — | C: picker → Thorn; reload. Then open Notes on Sela in edit mode with a long note; scroll | After reload C still on Thorn (was: jumped to Sela). While scrolling, name, badges and the tab strip stay at the top (`charx-header` `data-pinned="true"`) |
 | 14 | *(Sprint 3; bundle `vision`, run inside FOG §13 steps 8–9)* Thorn's sheet: switch **Sees invisible** on (FOG step 8); then Edit, Darkvision 60 → 30, then back; switch "Sees through magical darkness" off and on | B: Mira's sheet: Senses line "Vision 30 ft"; opens Thorn → summary card only. C: Thorn's sheet in edit mode: `charx-senses-invisible` disabled before and after A's switch; Senses line gains "Sees invisible" | Senses line updates ≤ 1 s for A and C; Thorn at (11, 9): at 30 ft Goblin Lurker (17, 11) leaves C's view (d 6.3 > 6 cells), back at 60 ft it returns; C's screen dark while the switch is off (Thorn in darkness). B frames: no Thorn `senses` |
 
+**Sprint 8 (track SB):** bundle `stats-b` ([stats §13.1](stats.md#131-sprint-8-tier-b), walkthrough step 8). DOM tests (in-code store, mocked ack): `FR-CHARX-97 trophies tab` (tab listed last on Mira's sheet for the DM and Player 1; absent on Player 2's summary card of Mira and on an imported sheet), `FR-CHARX-98 trophies layout` (grid, records with details, "—" for 0, DM footnote only for the DM, 1 column at 320 px). Integration `FR-CHARX-99 trophies never on summary cards` (Player 2's frames and acks hold no trophy values for Mira; a raw intent → `forbidden`).
+
 **Sprint 7 (track GM):** bundles `gems`, `gems-hidden` ([gems §13](gems.md#13-test-plan)). DOM tests (in-code store): `FR-CHARX-71 gem section off / on` (no `campaign.features` → no `gem-block`, sheet DOM byte-identical to sprint 6; on → block in the header after the effect chips; NPC sheet / companion card → absent); `FR-CHARX-72 owner / DM controls` (owner: Spend menu, no ±; DM: ± and Spend; locked sheet → still enabled; not `live` → disabled; `FR-GEM-08 max 5 label shown, no over-limit styling at 6`); `FR-CHARX-73 summary counts` (another player's view of Mira: counts row, no menu; under OQ-GEM-01 B → absent). Walkthrough: [gems §13](gems.md#13-test-plan) steps 2, 3, 9, 10.
 
 ## 14. Dependencies
@@ -473,6 +486,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 ### Shared changes
 
+- *(Sprint 8, SB2 `build/sb-trophies`)* `src/client/common/features/character-sheet/sheet-sections.ts` (append `stats.trophies`). No other sheet file; the component is in stats' folder. Parallel with TT's sheet work (macro buttons), since both only append to the registry.
 - *(Sprint 7, GM3 `build/gems-sheet`)* ★ `src/client/common/features/character-sheet/sheet-sections.ts` (append `gem.counts`); the summary card's counts row in `src/client/common/features/character-sheet/SummaryCard.tsx` (feature-owned; one import + one line). No schema, record or event change here.
 
 Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes marked ★, all in `fix/charx-core`. **Build order (fixed by the orchestrator):** P fixes → `fix/charx-core` → `fix/cbtx-core` → S build (a, b) ∥ D build → S slice 4 (combat routes) last. `fix/charx-core` and `fix/cbtx-core` both touch db, `src/shared/events/` and `src/shared/entities/`, so they never run at the same time ([sprint-1 boundaries](../agents/sprint-1.md#boundaries-and-hotspots-orchestrator-sequence-these)). Play-shell layout tests and protocol §24 are untouched (window geometry unchanged, FR-CHARX-26).
@@ -574,8 +588,15 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 |---|---|---|---|---|
 | OQ-CHARX-37 | Where the gem block sits on the sheet | **Decided (#315): A.** **A. Header chip row, after the effect chips (seen at a glance on every tab; the row gets longer)** / B. Vitals, under HP (near play state; pushes the HP row's neighbours down) / C. Its own "Gems" tab (roomy; hidden until clicked) | — · decided | gems |
 
+**Sprint 8** (track SB). Bold = pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CHARX-44 | Where the trophy case sits on the sheet | **A. Its own tab "Trophies", last**: room for records, out of the way · B. End of the Main tab (`main` slot): seen without a click, makes Main longer · C. A header chip "12 kills" (trophy icon) opening a popover: compact, tiny | DM gate (with OQ-STATS-23) | CHARX, STATS |
+
 ## 16. Out of scope
 
+- *(Sprint 8)* Trophies on other players' summary cards (OQ-STATS-23 B); editing or resetting trophies.
 - See §4. Levelling, builder, compendium lookups, rests, encumbrance, rest-time hit-die healing; temp HP / death saves / conditions data (combat-extras); party HP / AC view (tier B, play-shell); several sheet windows at once; DM-only notes on a PC; gems ([gems](gems.md)).
 - *(Sprint 4)* Extra damage parts on spell rows; weapon properties (finesse, heavy, versatile) and a "magical" flag; mapping compendium weapons into attack rows (OQ-CHARX-28); counters below zero for slots and hit dice.
 - *(Sprint 6)* A sheet for companions: abilities, skills, saves, spells, features, notes or editing on the card (OQ-CHARX-34); companion rolls other than its attacks for the owner (the DM rolls them from the row).

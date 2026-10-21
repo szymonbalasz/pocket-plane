@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: claimed
+status: in-review
 owner: spec-sb
 phase: post-mvp-8
 wave: 3
@@ -29,6 +29,8 @@ wave: 3
 | FR-CBT-135 | CON-44 measured | GM2 | `FR-CBT-135 CON-44 maxed` |
 
 > **Sprint 7, track ST (stats tier A, DM [#311](../decisions-log.md); spec-stats).** The combat log entries (`hp_change`) are the stats unit, and [stats](stats.md) reads them and never edits them or the Initiative rows (FU owns the rows). This track adds three FRs in [§6.5](#65-sprint-7-stats-facts): a **From** (source) on the DM's direct Damage / heal, so a heal has an author (FR-CBT-136); the **overkill callout** flag and suffix on outcome lines (FR-CBT-137); and a read helper plus a facts contract (FR-CBT-138). No schema change: `hp_change.attackerId` already exists. CON-44 measured +21 B a callout line for players and +49 B for the DM ([stats §12](stats.md#12-performance--bandwidth)). Slice ST1 ([§14.5](#145-build-split-sprint-7-track-st)).
+
+> **Sprint 8, track SB (stats tier B, DM [#334](../decisions-log.md); spec-sb).** [Stats](stats.md#61-tier-b-sprint-8) adds a kill feed and an end-of-combat summary. Combat gains two FRs in [§6.6](#66-sprint-8-kill-flag-and-the-end-summary). **FR-CBT-152**: outcome lines carry a player-safe `fell` flag (`kill` / `down`), stamped at apply like the callout. **FR-CBT-153**: `cbt.end` runs stats' `ended` rule hook, which notifies the summary. **`lifecycle.ts` and the Initiative rows are untouched** (CB owns rows). `rule-hooks.ts` gets one appended line. No schema. CON-44: +14 B a kill line (measured, [stats §12](stats.md#12-performance--bandwidth)).
 
 > **Sprint 6, track WF (window + layout fix pack; spec-windows; session-sim-9 FAIL c, BL-43).** Decided, not open (#286): the last Initiative row never bleeds under the "↓ N more" footer (c03: the Elite row's text painted below the footer). Likely cause (WF4 confirms it first): the footer is `sticky` inside the scrolling list (FR-CBT-77), and the grown window's body doesn't clip the list, so a partly hidden row paints past it. New **FR-CBT-125** (WF4, with [FR-CBTX-57 / -58](combat-extras.md#6-functional-requirements) for the names and chips). Client only, 0 B; no open question. Walkthrough F10 in [play-shell §13](play-shell.md#13-test-plan). CP (companions) edits this spec in parallel with its own range; its owned rows follow these rules (WF4 merges first).
 
@@ -468,6 +470,15 @@ Track ST. The formulas live in [stats](stats.md#6-functional-requirements); thes
 | FR-CBT-137 | **Overkill callout on the line** ([FR-STATS-21](stats.md#6-functional-requirements)). In the apply transaction (`cbt.applyCard`, and `cbt.applyHp` damage), a damage row with `hpAfter = 0` and `overkill ≥ max(10, hpBefore + absorbed)` stamps its outcome line `payload.callout = "overkill"` (player-safe) and `dmPayload.overkill = {amount, hpBefore}`. `formatLine` appends " — Overkill!" for everyone, and on the DM client " (+23 over 7 HP)". The rule is the same for PC targets (OQ-CBT-90). Undo strikes the line as today, and the client toast ([FR-STATS-22](stats.md#6-functional-requirements)) ignores undone lines. Old rows parse (field optional). A hidden target's line is non-public, so players get neither the line nor the toast. | CON-44 +21 B / +49 B a line (measured) |
 | FR-CBT-138 | **Read helper and facts contract.** `combat-tracker/stats-read.ts` (read-only, new file): `combatFacts(db, {encounterId} \| {campaignId, from, to})` returns the non-undone `hp_change` rows joined with their entry's `public`, the attacker's and target's `kind`, `ownerCharacterId`, `hidden` and the encounter name. **Contract**: `hp_change` rows, combatants and started / ended encounters are never deleted. Rows change only by the undo marker. `raw`, `applied`, `overkill`, `hpBefore`, `hpAfter`, temp fields and `entryId` keep their meaning (FR-CBT-22, FR-CBTX-15). A change to any of them needs a stats review. Stats never write combat rows. | proposed ADR [stats read models](../architecture/adr/0059-stats-read-models.md) |
 
+### 6.6 Sprint 8: kill flag and the End summary
+
+Track SB. Formulas and toasts: [stats §6.1](stats.md#61-tier-b-sprint-8).
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-CBT-152 | **`fell` on outcome lines** ([FR-STATS-26](stats.md#6-functional-requirements)). In the apply transaction, where FR-CBT-137 stamps `callout` (`cbt.applyCard`, `cbt.applyHp` damage, late damage), each target's line gets `payload.fell = "kill"` when its damage row goes `hpBefore > 0 → hpAfter = 0` on a monster that is not a companion, `"down"` on a PC or companion. No change to `formatLine`, line text, `hp_change` or events. **Player-safe:** a public line's target is visible and its band already reads "down" (FR-CBT-26); a hidden side keeps the line non-public (FR-CBT-24). Undo strikes the line as today (the flag stays; stats skip undone lines). Old rows parse (optional field). | CON-44 +14 B a line (measured) |
+| FR-CBT-153 | **End → summary through the rule hooks** (amends FR-CBT-61's order): stats registers `stats.fight-summary` in `rule-hooks.ts` (**append, last**; `ended` point only). Inside `cbt.end`'s transaction it reads the encounter's counted facts (indexed `hp_change_encounter`) and may `notify` kind `stats-fight-summary` ([FR-STATS-33](stats.md#6-functional-requirements), [FR-NOTE-68](notifications.md#6-functional-requirements)). Order: (1) `EncounterEnded`, then the `ended` hooks in registry order (CBTX's, then this `NotificationCreated`); (2) CBTX `NotificationResolved`; (3) FR-CBT-59's dismissals. A throw rolls End back. `lifecycle.ts`, the End confirms and rows don't change. | [ADR-0035](../architecture/adr/0035-combat-rule-hooks.md) |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, dense; `hp.full` / `hp.bloodied` / `hp.down`, `visibility.hidden` tokens.
@@ -569,6 +580,7 @@ All rows per campaign; `seq` by the DB ([CON-20](../data-model/README.md#8-confl
 |---|---|---|---|
 | Combat log entry (`hp_change`) | attackerId, attackerName | as built | Now also written by `cbt.applyHp` from `sourceId` (FR-CBT-136); still null for "DM" |
 | Outcome line (`cbt.attack`, `cbt.hp`) | payload `callout?`; dmPayload `overkill?` | `"overkill"` \| absent; **JSON leaf** `{amount, hpBefore}` \| absent | FR-CBT-137; old rows parse |
+| Outcome line (`cbt.attack`, `cbt.hp`) *(sprint 8)* | payload `fell?` | `"kill"` \| `"down"` \| absent | FR-CBT-152; player-safe; old rows parse |
 
 - **Intent change:** `cbt.applyHp {combatantId, kind, amount, public?, sourceId?}` (DM). Events unchanged (`HpApplied` facts already carry `attackerId` / `attackerName`).
 
@@ -661,6 +673,8 @@ All rows per campaign; `seq` by the DB ([CON-20](../data-model/README.md#8-confl
 - *(Sprint 7, GM)* **No new intent or event here:** `cards.replaceToHit` / `cards.maxDice` are internal helpers in gems' `gem.spend` (event `GemSpent`, which lists the `notification` upsert); `cbt.applyCard` / `cbt.applyHit` gain required `partRollIds` (FR-CBT-129). **Visibility unchanged:** the card goes to its audience (the rolling player + DM, or DM only); `maxed` / `diceMaxed` ride on it; the DM-only `dmPayload` breakdown labels maxed chips. Other players get only gems' public spend line.
 
 *(Sprint 7)* **No new intent, event or record type.** `cbt.start` and combat-extras' Add: same inputs (OQ-CBT-92 C adds `resetHp?: true`), kept HP inside `EncounterStarted` / `CombatantsAdded`'s `combatant` creates as today, plus a pet token's safety-net owner re-assert row only when it differs; `cbt.end` no longer clears a pet token's owner ([FR-MAP-88](scenes-map.md#6-functional-requirements)). `cbt.end`: `EncounterEnded`'s changes gain the token deletes of released / hostile summons (FR-CBT-145; the same `token` delete rows Dismiss sends). **Visibility:** unchanged (a combatant's HP to players per FR-CBT-37 / -116; a token delete to everyone who had the token).
+
+*(Sprint 8, SB)* **No new intent, event or record type.** Outcome lines' payload gains `fell?` (FR-CBT-152). Visibility is the line's: DM always; players only for public lines (and a companion owner's audience lines), where the target is visible and its band already says "down". `cbt.end` may add one `NotificationCreated` (`stats-fight-summary`) after the CBTX hooks (FR-CBT-153). Its visibility: audience `all` only when the fight has a counted public fact, else DM.
 
 ## 10. Permissions
 
@@ -979,6 +993,18 @@ Bundle **`stats`** (units `st-past-crypt`, `st-ambush-facts`; [stats §13](stats
 
 **Walkthrough:** steps 2–3 of [stats §13](stats.md#13-test-plan) (overkill line and toast, undo), plus the DM heals Mira **From** Sela in the Damage / heal dialog → the line reads "Sela → Mira, heal 8" for the DM and both players.
 
+### 13.5a Sprint 8 (track SB: CBT, STATS)
+
+Bundle **`stats-b`** (units `sb-fight-facts`, `sb-luck-rolls`; [stats §13.1](stats.md#131-sprint-8-tier-b)).
+
+| Named test | Level | Checks |
+|---|---|---|
+| `FR-CBT-152 fell on the line` | integration | monster `hpBefore > 0 → 0` → `kill`; PC → `down`; companion → `down`; already at 0 → none; multi-target: per line; late damage; DM direct `cbt.applyHp`; player frames: only on public lines; leak scan |
+| `FR-CBT-152 old rows parse` | unit | lines without `fell` parse; `formatLine` text unchanged |
+| `FR-CBT-153 End notifies the summary` | integration | hook runs once at End after CBTX's hooks; event order (1)–(3); a throwing hook rolls End back; `lifecycle.ts` unchanged (no diff in the slice) |
+
+**Walkthrough:** [stats §13.1](stats.md#131-sprint-8-tier-b) steps 2–6.
+
 ### 13.6 Sprint 7 (track FU)
 
 Fixtures (`fu-hurt-goblins` new, `cp-ally` reused), bundles `fu-s7` / `fu-s7-e2e`, the e2e `combat-followups.e2e.ts` and the walkthrough (U7, U9–U11, U13, U14, U18): [play-shell §13](play-shell.md#13-test-plan). Named tests here (`bun test`, seeded; names start with the FR):
@@ -1114,6 +1140,14 @@ Full split: [gems §14](gems.md#14-dependencies). Combat's parts, feature-owned 
 
 - ST0 + ST1 = one builder, **ST-core** (build plan wave 2). Docs at consolidation: protocol (`cbt.applyHp` `sourceId`, line fields), data model (§8 sprint 7 rows).
 
+### 14.5a Build split (sprint 8, track SB)
+
+| Slice | FRs | Files | Order |
+|---|---|---|---|
+| **SB0** `build/sb-core` (with stats) | FR-CBT-152, -153 | `combat-tracker/hp.ts` (apply path, beside the callout), `src/shared/combat-tracker/log-kinds.ts` (optional `fell`); ⚠ append one line to `combat-tracker/rule-hooks.ts` | any time; CB's slices own `lifecycle.ts`, `initiative.ts` and rows, so no overlap (OQ-CBT-96) |
+
+- Docs at consolidation: protocol (line field `fell`, summary kind), data model (§8 sprint 8 row).
+
 ### 14.6 Build split (sprint 7, track FU)
 
 Full split: [play-shell §14](play-shell.md#14-dependencies). CBT parts (seams build plan: **FU0 + FU2 = one builder, FU-combat**, walkthrough U7–U12, U14, U18; rulings-b #5): **FU0** `fix/fu-combat-core` (FR-CBT-141's server part, -145; server `lifecycle.ts`, `join.ts`, `companions.ts`, `dismiss.ts`, combat-extras `add-combatants.ts`; fixture `fu-hurt-goblins`, bundles `fu-s7`, `fu-s7-e2e`; **no schema**), **FU2** `fix/fu-combat-rows` (FR-CBT-142–144, -146, -147, -149, -151; DM `initiative-window.tsx`, common `companions.tsx`, `companion-menu.tsx`, DM `encounters-window.tsx`, `end-confirm.tsx`, `start-end.ts` text, `summon-dialog.tsx`, `creature-form.tsx`), FR-CBT-148's `usefulSize` line in FU1, FR-CBT-150 in FU3 (`start-end.ts`, one line). Combat tracker rows are FU's this sprint (ST reads, never edits). **The apply popup / damage cards:** FU edits none of their files, so it needs no turn there (GM core → GM popup UI hold them alone); FU2 merges first only if GM's popup UI also edits DM `initiative-window.tsx`.
@@ -1205,8 +1239,15 @@ Full split: [play-shell §14](play-shell.md#14-dependencies). CBT parts (seams b
 | OQ-CBT-94 | **The End dialog's summon warning wording** | **Decided (#315): A** (names the removed summon tokens + the charmed line). **A. "Summoned creatures' tokens are removed: Fire Elemental 2, Fire Elemental 3." (names, ≤ 5 then "and N more"), plus "Mira's charmed Goblin 2 stays as a monster." when one exists (#310 (2)): says what goes, which, and what stays** / B. "2 summon tokens will be removed.": short, but which ones, and nothing on charmed companions / C. A + a "Keep its token" tick per summon (→ `cbt.end` `keepTokenIds?`): lets a summon's token stay as a plain monster token, more to read at End | no · owner: DM | FR-CBT-144 |
 | ~~OQ-CBT-95~~ | **Accepted by seams S3:** FU needs no turn on the apply path; GM1 → ST core → GM2 hold it; GM2 must not edit DM `initiative-window.tsx`, else it rebases after FU's combat-rows slice. Original row: **gems (GM) and the apply popup:** the brief orders GM core → FU (End dialog / concentration) → GM popup UI. FU's End dialog (`end-confirm.tsx`, `encounters-window.tsx`, `initiative-window.tsx`'s End confirm) and concentration chip (combat-extras `parts.tsx`) are **not** popup or damage-card files | **Resolved (integrator, sprint-7 seams / rulings)** **No FU turn on the popup: GM core → GM popup UI hold it alone; FU2 runs in parallel and merges first only if GM's popup UI edits DM `initiative-window.tsx` (seams)** / the brief's order (FU waits between GM's two slices for files it doesn't touch) | no · owner: orchestrator (seams) | [gems](gems.md); §14.6 |
 
+**Sprint 8** (track SB). Bold = pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CBT-96 | Seam **CB ↔ SB**: who holds End | **A. SB never edits `lifecycle.ts` or rows; the summary rides on the `ended` rule hook (append); CB keeps `lifecycle.ts` for drag reorder; no merge order needed** · B. SB adds a direct call in `cbt.end` (CB then SB on `lifecycle.ts`) | no (seams; owner orchestrator) | CBT, STATS |
+
 ## 16. Out of scope
 
+- *(Sprint 8)* A kill-feed suffix in the line text (OQ-STATS-21 B); an End-confirm checkbox to skip the summary (the preference covers it).
 - *(Sprint 7)* Carrying a monster's conditions or temp HP into the next fight (ended at End); a per-token "fresh HP" button (the DM heals); BL-50 (weapon-combat nat-1 e2e flake) stays a backlog item.
 - See §4. Full monster editor, compendium import → [compendium](post-mvp/compendium.md); gems → [gems](gems.md).
 - *(Sprint 4)* Server-applied resistances (the popup presets, the DM confirms, #134 / #136); parts on direct HP (`cbt.applyHp`); extra parts on spell attacks; "nonmagical" qualifiers.
