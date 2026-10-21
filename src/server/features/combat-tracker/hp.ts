@@ -27,6 +27,7 @@ import {
   type HpChangesResult,
   LOG_KIND_ATTACK,
   LOG_KIND_HP,
+  samePartRollIds,
   UndoInput,
   type UndoResult,
 } from "@shared/combat-tracker/schemas";
@@ -64,6 +65,8 @@ import {
 
 /** FR-CBT-94 (sprint 5): the card gained (other) damage since the popup was built. */
 export const DAMAGE_JUST_ARRIVED = "Damage just arrived — check and Apply again";
+/** FR-CBT-129 (sprint 7): a part's roll changed (a reroll, a maxed die) since the popup. */
+export const CARD_CHANGED = "The card changed — check and Apply again";
 
 type Env = CommandEnv;
 
@@ -171,6 +174,8 @@ export const applyCardWith = (hooks: ApplyHooks) =>
       if (card.state !== "pending") throw conflict("No longer pending");
       // FR-CBT-94 (sprint 5): the DM applies only the damage the popup showed.
       if (input.damageRollId !== (p.damage?.rollId ?? null)) throw conflict(DAMAGE_JUST_ARRIVED);
+      // FR-CBT-129 (sprint 7): and every other part as the popup showed it.
+      if (!samePartRollIds(input.partRollIds, p)) throw conflict(CARD_CHANGED);
       // FR-CBT-91 (sprint 5): a ruled card takes its to-hit from the hit ruling and applies only
       // ruled hits; the ruling leaves the wire with its card (the row stays).
       const ruling = rulingOfCard(env.tx, card.id);

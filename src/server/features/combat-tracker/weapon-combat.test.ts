@@ -10,6 +10,7 @@ import type {
   HpChangesResult,
   RollDamageResult,
 } from "@shared/combat-tracker/schemas";
+import { partRollIdsOf } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import type { ManualEntry } from "@shared/dice-roll-log/schemas";
@@ -76,6 +77,7 @@ function flameTongue(o: { rage?: boolean; ward?: boolean } = {}) {
       ...(p.toHit ? { toHitTotal: p.toHit.total } : {}),
       damageTotal: p.damage?.total ?? 0,
       damageRollId: p.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(p),
       targets,
       ...more,
     });

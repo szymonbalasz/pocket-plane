@@ -3,7 +3,9 @@
 // render from `you.role` / the `dmTools` slot. Sprint 4: each `die` segment is an inline die-shape
 // chip in the roller's look (FR-DICE-35); `focusLogEntry` highlights an entry (FR-DICE-37).
 // Sprint 5: a line this client's dice haven't landed yet shows blank chips and "…" (FR-DICE-40);
-// a `roll` line's actor name in the roller's player colour (FR-DICE-60, -61).
+// a `roll` line's actor name in the roller's player colour (FR-DICE-60, -61). Sprint 7 (GM1): a
+// superseded line is struck through with a "rerolled" Badge that jumps to the new line
+// (FR-DICE-65); entry actions from the registry at the line end (FR-DICE-68).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -52,7 +54,9 @@ import { colorHex } from "../campaign-management/colors";
 import { DieShape } from "../dice-extras/DieShape";
 import { useLanded, useLandingFade } from "../dice-extras/landing";
 import { stageTray, type TrayRequest } from "../dice-extras/store";
-import { scrollToEntry, useLogFocus } from "./focus";
+import { EntryActions } from "./entry-action-button";
+import { type EntryAction, entryActions } from "./entry-actions";
+import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
 import {
   actorOptions,
   actorSelection,
@@ -151,7 +155,11 @@ function tooltipOf(e: GameLogEntryView, landed: boolean): ReactNode {
   const rolls = landed ? RollEntryPayload.safeParse(e.payload) : null;
   return (
     <div className="flex flex-col gap-0.5">
-      <span>{time}</span>
+      <span>
+        {time}
+        {/* FR-DICE-65: the Tooltip keeps the full line + "rerolled". */}
+        {e.supersededBy !== null && !e.undone ? " · rerolled" : ""}
+      </span>
       {rolls?.success &&
         rolls.data.map((r) => (
           <span key={r.rollId}>
@@ -170,12 +178,14 @@ function Entry({
   look,
   color,
   focused,
+  actions,
 }: {
   e: GameLogEntryView;
   isDm: boolean;
   look: DiceLook;
   color: string | null;
   focused: boolean;
+  actions: readonly EntryAction[];
 }) {
   const { segments } = useMemo(() => formatEntry(e), [e]);
   // FR-DICE-40: only entries this client's live-throw path holds (FR-DICEX-49) wait.
@@ -184,6 +194,8 @@ function Entry({
   const line = useLandingFade<HTMLSpanElement>(landed);
   const hidden = isDm && !e.public;
   const nameColor = color ? colorHex(color) : null;
+  // FR-DICE-65: an undone line that is also superseded reads "undone" (its badge) only.
+  const rerolled = e.supersededBy !== null && !e.undone ? e.supersededBy : null;
   return (
     <li
       data-testid="dice-log-entry"
@@ -192,13 +204,14 @@ function Entry({
       data-roller={rollerAttr(e)}
       data-public={e.public}
       data-undone={e.undone}
+      data-superseded={e.supersededBy !== null}
       data-focused={focused}
       data-landed={landed}
       aria-busy={landed ? undefined : true}
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
       // FR-DICE-37: a focused entry gets the accent ring for 2 s.
       className={cn(
-        "flex items-start gap-1.5 rounded-sm py-px text-sm leading-snug transition-shadow",
+        "group/entry flex items-start gap-1.5 rounded-sm py-px text-sm leading-snug transition-shadow",
         hidden && "text-visibility-hidden",
         focused && "ring-2 ring-ring",
       )}
@@ -211,13 +224,38 @@ function Entry({
         />
       )}
       <Tooltip content={tooltipOf(e, landed)}>
-        <span ref={line} className={cn("min-w-0 flex-1 break-words", e.undone && "line-through")}>
+        <span
+          ref={line}
+          className={cn(
+            "min-w-0 flex-1 break-words",
+            (e.undone || rerolled) && "line-through",
+            // FR-DICE-65: struck through and dimmed, chips included.
+            rerolled && "opacity-60",
+          )}
+        >
           {shown.map((s, i) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and immutable
             <Segment key={i} s={s} look={look} nameColor={nameColor} />
           ))}
         </span>
       </Tooltip>
+      {rerolled && (
+        <Tooltip content="Rerolled: show the new roll">
+          <button
+            type="button"
+            data-testid="dice-log-rerolled"
+            data-record-id={rerolled}
+            aria-label="Rerolled: show the new roll"
+            className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => focusLogEntry(rerolled)}
+          >
+            <Badge variant="outline" className="px-1 py-0 text-[10px] text-muted-foreground">
+              rerolled
+            </Badge>
+          </button>
+        </Tooltip>
+      )}
+      <EntryActions e={e} actions={actions} />
       <Badge variant="secondary" className="shrink-0 px-1 py-0 text-[10px] text-muted-foreground">
         {CATEGORY_LABEL[e.category]}
       </Badge>
@@ -229,7 +267,15 @@ function Entry({
  * FR-DICE-21: oldest at the top; sticks to the bottom unless scrolled up, then "N new". The
  * roll bar's height changes (Options row, Physical strip; FR-DICE-30) keep a pinned list pinned.
  */
-function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boolean }) {
+function EntryList({
+  entries,
+  isDm,
+  actions,
+}: {
+  entries: GameLogEntryView[];
+  isDm: boolean;
+  actions: readonly EntryAction[];
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const looks = useRollerLooks();
   const keyOf = useColorKeyOf();
@@ -303,6 +349,7 @@ function EntryList({ entries, isDm }: { entries: GameLogEntryView[]; isDm: boole
               look={looks(e)}
               color={rollerColorKey(keyOf, e)}
               focused={focusedId === e.id}
+              actions={actions}
             />
           ))}
         </ul>
@@ -688,8 +735,17 @@ function useRollerLooks(): (e: GameLogEntryView) => DiceLook {
   }, [rows, players]);
 }
 
-/** The `dice.log` window body. `dmTools`: the DM's settings gear (FR-DICE-22). */
-export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
+/**
+ * The `dice.log` window body. `dmTools`: the DM's settings gear (FR-DICE-22). `actions`: the
+ * entry-action registry (FR-DICE-68; tests pass their own).
+ */
+export function GameLog({
+  dmTools,
+  actions = entryActions,
+}: {
+  dmTools?: ReactNode;
+  actions?: readonly EntryAction[];
+}) {
   const records = useRecords<GameLogEntryView>(GAME_LOG_ENTRY_TYPE);
   const everLive = useSync((s) => s.everLive);
   const isDm = useSync((s) => s.store.you?.role === "dm");
@@ -718,7 +774,7 @@ export function GameLog({ dmTools }: { dmTools?: ReactNode }) {
           No rolls yet
         </p>
       ) : (
-        <EntryList entries={entries} isDm={isDm} />
+        <EntryList entries={entries} isDm={isDm} actions={actions} />
       )}
       <RollBar dmTools={isDm ? dmTools : undefined} />
     </section>

@@ -12,6 +12,7 @@ import {
   COMBATANT_TYPE,
   type CombatantRecord,
   DamageCardPayload,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
@@ -545,6 +546,11 @@ describe("FR-CBT-114 the owner attacks", () => {
       damageRollId: DamageCardPayload.parse(
         t.s.db.select().from(notification).where(eq(notification.id, r.cardId)).get()?.payload,
       ).damage?.rollId as string,
+      partRollIds: partRollIdsOf(
+        DamageCardPayload.parse(
+          t.s.db.select().from(notification).where(eq(notification.id, r.cardId)).get()?.payload,
+        ),
+      ),
     });
     const outcome = t.logRows().at(-1);
     const payload = outcome?.payload as { toHit: { dice: number | null; constant: number } };
@@ -705,6 +711,11 @@ describe("FR-CBT-116 leak scan per player (CP0)", () => {
       damageRollId: DamageCardPayload.parse(
         t.s.db.select().from(notification).where(eq(notification.id, r.cardId)).get()?.payload,
       ).damage?.rollId as string,
+      partRollIds: partRollIdsOf(
+        DamageCardPayload.parse(
+          t.s.db.select().from(notification).where(eq(notification.id, r.cardId)).get()?.payload,
+        ),
+      ),
     });
     // Thorn's Drake (player-2's) attacks through the DM's Attack ▸: player-1 must not learn "Bite".
     const dr = t.run<AttackResult>(attackCommand.name, {
@@ -719,6 +730,11 @@ describe("FR-CBT-116 leak scan per player (CP0)", () => {
       damageRollId: DamageCardPayload.parse(
         t.s.db.select().from(notification).where(eq(notification.id, dr.cardId)).get()?.payload,
       ).damage?.rollId as string,
+      partRollIds: partRollIdsOf(
+        DamageCardPayload.parse(
+          t.s.db.select().from(notification).where(eq(notification.id, dr.cardId)).get()?.payload,
+        ),
+      ),
     });
     const outcome = t.logRows().at(-1);
     expect(outcome?.payload).not.toHaveProperty("attackName");

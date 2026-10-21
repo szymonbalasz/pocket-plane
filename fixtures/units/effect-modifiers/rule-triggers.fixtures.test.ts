@@ -17,7 +17,7 @@ import {
 import type { Actor } from "@server/events/types";
 import { loadInProcess } from "@server/features/fixtures-adapters/loader";
 import { servicesFromBundle } from "@server/ws/testing/snapshot-size";
-import { CBT_INTENTS, type DamageCardPayload } from "@shared/combat-tracker/schemas";
+import { CBT_INTENTS, type DamageCardPayload, partRollIdsOf } from "@shared/combat-tracker/schemas";
 import { MOD_INTENTS } from "@shared/effect-modifiers/intents";
 import { asc, eq } from "drizzle-orm";
 import { library } from "../../index";
@@ -148,6 +148,7 @@ describe("rule-trigger fixtures (MOD §13, R4 units)", () => {
       toHitTotal: p.toHit?.total,
       damageTotal: p.damage?.total,
       damageRollId: p.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(p),
       targets: [
         {
           targetId: goblin?.id,

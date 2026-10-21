@@ -11,6 +11,7 @@ import {
   COMBATANT_TYPE,
   type CombatantRecord,
   parseFullCard,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
@@ -173,6 +174,7 @@ describe("combat-extras over WS", () => {
       toHitTotal: pay.toHit.total,
       damageTotal: pay.damage.total,
       damageRollId: pay.damage.rollId,
+      partRollIds: partRollIdsOf(pay),
       targets: [{ targetId: mira.id, hit: true, multiplier: "normal" }],
     });
     await nextEvent(p1, "AttackApplied");
