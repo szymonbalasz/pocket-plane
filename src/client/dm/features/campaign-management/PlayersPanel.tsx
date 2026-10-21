@@ -1,7 +1,8 @@
 // Players panel: name, online dot, copy link, rename; add player (CAMP §7, FR-CAMP-12–15).
 // Under each player, their characters at a glance; a line opens the sheet (FR-CAMP-21/22, N3).
 // Colour swatches: the DM's own above the table, one per player row, each opening the colour
-// picker in a Popover (FR-CAMP-35).
+// picker in a Popover (FR-CAMP-35). Sprint 7: "Options" opens Campaign options (FR-CAMP-42);
+// with gems on, each character line gains its gem counts (FR-CAMP-43).
 import {
   isLoopbackUrl,
   PlayerName,
@@ -24,6 +25,7 @@ import {
   TableRow,
 } from "@ui/components/ui/primitives";
 import { ColorPickerPopover } from "@ui/features/campaign-management/ColorPicker";
+import { PartyLineGems } from "@ui/features/gems/GemCounts";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { cn } from "@ui/lib/utils";
 import { onlineDot } from "@ui/sync/presence";
@@ -31,6 +33,7 @@ import { usePresence, useRecords, useSync } from "@ui/sync/store";
 import { CopyIcon } from "lucide-react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { CampaignOptions } from "./CampaignOptions";
 import { NameDialog } from "./NameDialog";
 import {
   hpText,
@@ -141,6 +144,7 @@ function CharacterLine({ line }: { line: PartyLine }) {
           </Tooltip>
         </Fragment>
       ))}
+      <PartyLineGems characterId={line.id} />
     </button>
   );
 }
@@ -196,6 +200,9 @@ export function PlayersPanel() {
         <div className="flex h-4 items-center gap-1.5 px-1 text-xs">
           Your colour (DM)
           <ColorPickerPopover target={null} testId="camp-color-dm" tip="Your colour (DM)" />
+          <span className="ml-auto">
+            <CampaignOptions />
+          </span>
         </div>
         {players.length === 0 ? (
           <p className="text-sm text-muted-foreground" data-testid="camp-players-empty">

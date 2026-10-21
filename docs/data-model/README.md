@@ -2212,3 +2212,17 @@ From [play-shell §14](../specs/play-shell.md#14-dependencies) slice FU4 (BL-48 
 - **Browser storage:** the roll bar's Options entry may hold `{"open", "actor"}` (FR-DICE-77, per browser).
 - **Fixtures:** unit `cmp-goblin-untyped` (an imported `fixture` monster without a creature type), bundles `fu-small-copy`, `session-sim-11`.
 - **CON-44:** no new snapshot record. `offered[].type` null → a type: the heavy harness already writes every max offered part typed ("lightning", `con44.test.ts`); the longest type ("bludgeoning") adds ≤ 2 B per offered part. The fixture definition is a global `entity` row (loaded on demand, not in a campaign snapshot). DM ceiling 1.5 MiB and players' 512 KiB unchanged.
+
+## 99. Sprint 7: gems sheet block, counts and Campaign options (GM3)
+
+From [gems](../specs/gems.md#8-data-model) FR-GEM-17, [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-71–76 and [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP-42, -43. **Built by `build/gems-sheet`**: client only. Protocol side: [protocol §127](../protocol/README.md#127-sprint-7-gems-sheet-block-counts-and-campaign-options-gm3).
+
+| Item | Where | Rule | Source |
+|---|---|---|---|
+| Spend confirm (the picked choice), the DM chip Popover, the inline reject text | `GemBlock` component state | never stored or sent; the confirm resets after 4 s or when not `live` | FR-GEM-17, FR-CHARX-76 |
+| Off-confirm in Campaign options | `FeatureRow` state | never stored; "Turn off" sends `camp.setFeature {on: false}` | FR-CAMP-42 |
+| Sheet section `gem.counts` | `sheet-sections.ts` (append) | reads `character-gems` and `campaign.features` (GM0); no new storage | FR-CHARX-71 |
+
+- **Derived (not stored):** counts of a character without a `character-gems` row = 0; who may spend (DM, or the entity's `ownerPlayerId`).
+- **Fixtures:** bundle `gems-ui-e2e` (= `gems-hidden`, for `e2e/gems-ui.e2e.ts`); no new unit. `session-sim-11` gains none (gems off there; seams S13).
+- **CON-44:** 0 B.
