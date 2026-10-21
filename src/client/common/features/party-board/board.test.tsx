@@ -72,4 +72,18 @@ describe.each([
     // DM-only parts by role, as in the old window (FR-LOOT-19).
     expect(html.includes('data-testid="loot-add"')).toBe(you.role === "dm");
   });
+
+  test("FR-PARTY-50 tabs keep state: every tab panel mounted, the shown one visible, the others hidden (no events, not focusable) and empty until first shown", () => {
+    partyMemory().tabs.choose(tabKeyOf(you), "loot");
+    const html = render(you);
+    const panels = [...html.matchAll(/<div[^>]*role="tabpanel"[^>]*>/g)].map((m) => m[0]);
+    expect(panels).toHaveLength(4);
+    const shown = panels.filter((p) => !/ hidden=""/.test(p));
+    expect(shown).toHaveLength(1);
+    expect(shown[0]).toContain('data-state="active"');
+    // Only the shown tab has mounted so far; the Handouts stub mounts on its first visit and then
+    // stays (switching back and forth keeps its state; closing the window drops it).
+    expect(html).toContain('data-testid="loot-log"');
+    expect(html).not.toContain('data-testid="stub-handouts"');
+  });
 });

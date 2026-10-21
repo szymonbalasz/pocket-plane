@@ -4,7 +4,15 @@ import { describe, expect, test } from "bun:test";
 import { type DiceThrow, throwDice } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import type { Rect } from "../play-shell/geometry";
-import { dmPopupClear, dmStackAt, pipClip, popupRows, shownPopupStack } from "./popup-logic";
+import {
+  dmPopupClear,
+  dmStackAt,
+  pipClip,
+  popupItemLabel,
+  popupOfferText,
+  popupRows,
+  shownPopupStack,
+} from "./popup-logic";
 import { createRollPopups, pipModeOf, pipPlan, type RollPopup } from "./popups";
 import { createDiceExtrasStore } from "./store";
 import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS, POPUP_ROLLING_MAX_MS } from "./timing";
@@ -430,5 +438,27 @@ describe("FR-DICEX-55 popup clears the toast stack", () => {
     const summary = { x: 560, y: 100, w: 320, h: 57 };
     const clear = dmPopupClear(null, [], [], new Map([["note.toasts", summary]]), "own");
     expect(dmStackAt({ w: 1440 }, 165, { w: 320, h: 98 }, clear)).toEqual({ left: 560, top: 165 });
+  });
+});
+
+describe("FR-DICEX-63 popup line spacing", () => {
+  test("FR-DICEX-63 notation spacing: the popup row's labels and offered parts, one space between tokens", () => {
+    const strays = (t: string) =>
+      [/\( /, / \)/, / {2}/, /^\s/, /\s$/].filter((r) => r.test(t)).map(String);
+    const texts = [
+      popupItemLabel({ label: "Dagger damage (piercing)", mode: null }),
+      popupItemLabel({ label: "Attack", mode: "adv" }),
+      popupItemLabel({ label: "1d20+4", mode: "dis" }),
+      popupOfferText({ label: "Sneak Attack", value: 8 }),
+      popupOfferText({ label: "DM", value: 6 }),
+    ];
+    expect(texts).toEqual([
+      "Dagger damage (piercing)",
+      "Attack (adv)",
+      "1d20+4 (dis)",
+      "Sneak Attack 8 on a hit",
+      "DM 6 on a hit",
+    ]);
+    for (const t of texts) expect([t, strays(t)]).toEqual([t, []]);
   });
 });

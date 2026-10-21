@@ -1,29 +1,22 @@
-// Feature uses below zero (FR-CHARX-58; MOD FR-MOD-59): the "−1" Badge with its Tooltip, and the
-// small Popover that asks before spending a use the row doesn't have. Used by the Features tab's
-// pips and MOD's Toggles block (the Rage switch). The server allows the spend; this only asks.
+// Feature uses below zero (FR-CHARX-58; MOD FR-MOD-59): the overspent Tooltip on a row's count
+// ("−1 / 3"; FR-MOD-68: the minus once, no "−1" Badge beside it), and the small Popover that asks
+// before spending a use the row doesn't have. Used by the Features tab's pips and MOD's Toggles
+// block (the Rage switch). The server allows the spend; this only asks.
 
-import { leftText } from "@shared/character-sheet/counters";
 import type { ReactNode } from "react";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
-import { Badge } from "../../components/ui/primitives";
 import { overspendAsk, overspentTip } from "./view-model";
 
-/** "−1" in `hp.down` with "1 use more than the maximum — check with your DM"; none at ≥ 0. */
-export function OverspentBadge({ left, testId }: { left: number; testId: string }) {
-  if (left >= 0) return null;
-  return (
-    <Tooltip content={overspentTip(left)}>
-      <Badge
-        data-testid={testId}
-        data-value={left}
-        className="border-transparent bg-hp-down px-1 py-0 text-[10px] text-white"
-      >
-        {leftText(left)}
-      </Badge>
-    </Tooltip>
-  );
+/**
+ * FR-MOD-68 (BL-48 "−1 / 3 −1"): a row that shows the count itself ("−1 / 3") draws no Badge; the
+ * Tooltip ("1 use more than the maximum — check with your DM") goes on its count. At ≥ 0 the
+ * children alone.
+ */
+export function OverspentTip({ left, children }: { left: number; children: ReactNode }) {
+  if (left >= 0) return <>{children}</>;
+  return <Tooltip content={overspentTip(left)}>{children}</Tooltip>;
 }
 
 /**

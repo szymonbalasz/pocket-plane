@@ -145,7 +145,7 @@ describe("CMP §13 sprint 5 Add to party on `party-cmp`", () => {
       // Merged: still one row, keeping the party's spelling.
       expect(potionRow(c).map((r) => [r.name, r.qty])).toEqual([[PARTY_POTION, 4]]);
       await until(() => lootToasts(c).length === (toastsBefore[i] as number) + 1);
-      expect(lootToasts(c).at(-1)?.text).toBe(`Party loot: ${PARTY_POTION} ×2`);
+      expect(lootToasts(c).at(-1)?.text).toBe(`Party inventory: ${PARTY_POTION} ×2`);
     }
   });
 

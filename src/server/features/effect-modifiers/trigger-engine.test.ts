@@ -5,6 +5,8 @@
 import { describe, expect, test } from "bun:test";
 import { AttackLogDmPayload, AttackLogPayload } from "@shared/combat-tracker/log-kinds";
 import type { DamageCardPayload, HpChangeRecord } from "@shared/combat-tracker/schemas";
+import { lineText } from "@shared/dice-roll-log/kind-types";
+import { formatEntry } from "@shared/dice-roll-log/line";
 import type {
   ManualPart,
   RollEntryDmPayload,
@@ -16,7 +18,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { defineCommand } from "../../commands/commands";
 import { armCrashHook } from "../../commands/crash";
-import { gameLogEntry, hpChange, notification, roll, ruleTrigger } from "../../db/schema";
+import { entity, gameLogEntry, hpChange, notification, roll, ruleTrigger } from "../../db/schema";
 import { getSheet } from "../character-sheet/sheet-rows";
 import { attackCommand } from "../combat-tracker/attack";
 import { applyCard } from "../combat-tracker/hp";
@@ -233,6 +235,55 @@ describe("FR-MOD-37 offers at the damage roll", () => {
     });
     const dis = t.attack("Thorn", { mode: "disadvantage", damage: 3 }).cardId;
     expect(t.offers(dis)).toEqual([]);
+  });
+
+  test("FR-MOD-69 trigger roll line typed: Thorn's Sneak Attack (an untyped part) on the Dagger's damage line reads piercing; a typed part keeps its type; an untyped part on an untyped attack stays untyped", () => {
+    const t = rtSetup();
+    const sa = sneak(t);
+    t.nextTo("Thorn", 1);
+    const { cardId } = t.attack("Thorn", { damage: 3 });
+    expect(t.offers(cardId)).toEqual([sa]);
+    const offer = t.card(cardId).damage?.triggers?.[0];
+    const entry = entryOf(t, offer?.rollId as string);
+    const items = entry?.payload as RollEntryPayload;
+    expect(items[1]?.offered?.[0]).toMatchObject({ label: "Sneak Attack", type: "piercing" });
+    const text = lineText(
+      formatEntry({
+        kind: "roll",
+        actorName: "Thorn",
+        payload: entry?.payload,
+        dmPayload: entry?.dmPayload,
+      }).segments,
+    );
+    expect(text).toContain(`(+ ${offer?.value} piercing Sneak Attack`);
+    // The card keeps the trigger's own (null) type: the attack's at apply, as before (FR-MOD-62).
+    expect(offer?.type).toBeNull();
+    // A typed part keeps its own type (Divine Fury radiant on Brakka's slashing Greataxe).
+    const u = raging();
+    const fc = u.attack("Brakka", { toHit: 15, damage: 8 }).cardId;
+    const furyItems = entryOf(u, fury(u, fc)?.rollId as string)?.payload as RollEntryPayload;
+    expect(furyItems[1]?.offered?.[0]).toMatchObject({ label: "Divine Fury", type: "radiant" });
+    // Untyped part, untyped attack: as today (no type).
+    const v = rtSetup();
+    const sa2 = sneak(v);
+    const thorn = v.s.db.select().from(entity).where(eq(entity.id, v.thornId)).get();
+    const block = thorn?.statBlock as { attacks: { damageType?: string }[] };
+    v.s.db
+      .update(entity)
+      .set({
+        statBlock: {
+          ...block,
+          attacks: block.attacks.map(({ damageType: _t, ...a }) => a),
+        } as typeof block,
+      })
+      .where(eq(entity.id, v.thornId))
+      .run();
+    v.nextTo("Thorn", 1);
+    const plain = v.attack("Thorn", { damage: 3 }).cardId;
+    expect(v.offers(plain)).toEqual([sa2]);
+    const plainOffer = v.card(plain).damage?.triggers?.[0];
+    const plainItems = entryOf(v, plainOffer?.rollId as string)?.payload as RollEntryPayload;
+    expect(plainItems[1]?.offered?.[0]?.type).toBeNull();
   });
 
   test("FR-MOD-37 settle facts: a targetMarked trigger's offer carries the campaign mark (by name, never its id: R7) and `hurt` (target-side filters never gate the roll)", () => {

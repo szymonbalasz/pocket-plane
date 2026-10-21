@@ -142,7 +142,7 @@ describe("compendium REST (C2)", () => {
       kind: "monster",
       name: "Wolf",
       sourceLabel: "fixture",
-      line: "CR 1/4 · Medium",
+      line: "CR 1/4 · Medium beast",
       definitionId: fixtureIds.Wolf as string,
     });
     // Same tiers as entries: both Wolves are name prefixes; the fixture one ranks after the SRD
