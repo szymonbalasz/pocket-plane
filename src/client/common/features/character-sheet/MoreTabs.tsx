@@ -15,7 +15,7 @@ import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
 import { useOpenPartyTab } from "../party-board/open-tab";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
-import { OverspendPopover, OverspentBadge } from "./overspend";
+import { OverspendPopover, OverspentTip } from "./overspend";
 import { AddRow, RowTools, useRows } from "./rows";
 import { notationContext, useSheet, useSheetIntents } from "./sheet-context";
 import { pipDelta, usesLeftText, walletLine } from "./view-model";
@@ -78,16 +78,18 @@ function FeatureUses({ f }: { f: FeatureRow }) {
           ))}
         </span>
       </OverspendPopover>
-      <span
-        data-testid="charx-feature-left"
-        data-record-id={f.id}
-        data-value={left}
-        className={`text-[10px] tabular-nums ${left < 0 ? "text-hp-down" : "text-muted-foreground"}`}
-      >
-        {usesLeftText(left, f.usesMax)}
-        {f.reset ? ` · ${f.reset} rest` : ""}
-      </span>
-      <OverspentBadge left={left} testId="charx-feature-overspent" />
+      {/* FR-MOD-68: the count shows the minus once; no overspent Badge beside it. */}
+      <OverspentTip left={left}>
+        <span
+          data-testid="charx-feature-left"
+          data-record-id={f.id}
+          data-value={left}
+          className={`text-[10px] tabular-nums ${left < 0 ? "text-hp-down" : "text-muted-foreground"}`}
+        >
+          {usesLeftText(left, f.usesMax)}
+          {f.reset ? ` · ${f.reset} rest` : ""}
+        </span>
+      </OverspentTip>
       {counters && f.used > 0 && (
         <button
           type="button"

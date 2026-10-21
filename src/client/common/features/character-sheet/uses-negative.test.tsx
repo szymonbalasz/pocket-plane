@@ -86,7 +86,7 @@ const pips = (html: string) => [
 ];
 
 describe("FR-CHARX-58 negative uses display", () => {
-  test("FR-CHARX-58 Features row: '0 / 3 left' at 0; '−1 / 3 left' in hp.down below zero, every pip filled, data-left, '−1' Badge", () => {
+  test("FR-CHARX-58 Features row: '0 / 3 left' at 0; '−1 / 3 left' in hp.down below zero, every pip filled, data-left", () => {
     const zero = render(3);
     expect(zero).toContain("0 / 3 left");
     expect(zero).not.toContain('data-testid="charx-feature-overspent"');
@@ -102,13 +102,22 @@ describe("FR-CHARX-58 negative uses display", () => {
         expect(p).toContain('data-left="-1"');
         expect(p).toContain("bg-hp-down");
       }
-      expect(html).toMatch(/data-testid="charx-feature-overspent"[^>]*>−1</);
     }
     // Down to −9; Reset still offered.
     const floor = render(12);
     expect(floor).toContain("−9 / 3 left");
     expect(floor).toContain('data-testid="charx-resource-reset"');
     expect(render(1)).toContain("2 / 3 left");
+  });
+
+  test("FR-MOD-68 uses shown once: the Features row at −1 / 3 reads one '−1 / 3 left', no '−1' Badge beside it", () => {
+    for (const client of ["player", "dm"] as const) {
+      const html = render(4, client);
+      expect(html).not.toContain('data-testid="charx-feature-overspent"');
+      const text = html.replace(/<[^>]+>/g, "");
+      expect(text).toContain("−1 / 3 left");
+      expect(text.split("−1").length - 1).toBe(1);
+    }
   });
 
   test("FR-CHARX-58 words: uses left, Tooltip, the ask before spending past zero and at the floor", () => {

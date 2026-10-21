@@ -49,6 +49,7 @@ import {
   type SyncView,
   summaryText,
   viewerOf,
+  waitingForPlayers,
 } from "./logic";
 import type { NoteClient } from "./note-client";
 import { NoteBody, NoteStripe, useNoteActions, useNoteStripe } from "./parts";
@@ -264,7 +265,9 @@ export function ToastRuntime({
       const t = classify(prev, next);
       if (t === null) return;
       if (t === "connect") note.baseline(next.store);
-      memory.setState((m) => syncToasts(m, prev, next, t, Date.now()));
+      memory.setState((m) =>
+        syncToasts(m, prev, next, t, Date.now(), (store) => waitingForPlayers(store, views)),
+      );
       // FR-NOTE-30: the DM's 4 s action cue (live event frames only).
       startCues(cueTriggers(prev, next, t), (kind) => views.get(kind));
       note.markSeen(next.store);
@@ -391,9 +394,10 @@ export function ToastRuntime({
               role="status"
               data-testid="note-toast-pending-summary"
               data-count={t.count}
+              data-waiting={t.waiting ?? 0}
               className="pointer-events-auto flex items-center gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
             >
-              <span className="flex-1">{summaryText(t.count)}</span>
+              <span className="flex-1">{summaryText(t.count, t.waiting)}</span>
               <Button
                 size="sm"
                 data-testid="note-toast-open"

@@ -2,18 +2,17 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams + review rulings applied; DM gate 1 **passed** (#315); specs merged + integrated (ADR-0058, -0059). **Phase B wave 1 building.**
+**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams + review rulings applied; DM gate 1 **passed** (#315); specs merged + integrated (ADR-0058, -0059). Paused by the DM on 2026-10-21, **resumed** the same day ("go"). Phase B wave 2-3 in progress.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| FU1 window frame | `fix/fu-frame` (ws w8R) | build-fu1 | U4 toast fix (walkthrough 5 / 7, U1 accepted #319) | gates → merge; then FU3, ST2 |
-| FU4 small copy | `fix/fu-small-copy` (ws w8T) | build-fu4 | walkthrough PASS (re-test) | branch gates → merge |
-| GM1 Inspiration reroll | `build/gems-reroll` (ws w8V) | build-gm1 | building | merges before ST-core |
-| ST-core | `fix/st-core` (ws w8W) | build-st-core | building | rebase on GM1, merge |
-| GM3 gems UI | `build/gems-sheet` (ws w8X) | build-gm3 | building | walkthrough → merge |
-| Wave 3 | FU3 `fix/fu-map` (after FU1), ST2 `build/st-window` (after FU1 + ST-core), GM2 `build/gems-combat` (after GM1 + ST-core) | — | waiting | — |
+| GM1 Inspiration reroll | `build/gems-reroll` (ws w8V) | build-gm1 | walkthrough PASS (re-test) | branch gates → merge; then ST-core rebases |
+| ST-core | `fix/st-core` (ws w8W) | build-st-core | session fix in; main merged | merge GM1 via main → re-test F1 → gates → merge |
+| ST2 Stats window | `build/st-window` (ws w80, stacked on st-core) | build-st2 | building | walkthrough → merge after ST-core |
+| FU3 map follow-ups | `fix/fu-map` (ws w8Y, was stacked on fu-frame) | build-fu3 | Start-refit follow-up | merge main → gates → merge |
+| GM2 Combat gem | `build/gems-combat` | — | waits GM1 + ST-core | — |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
 - GM: GEM FR 01-40 / OQ 04-20; CAMP FR 38-45 / OQ 33-36; DICE FR 62-71 / OQ 41-44; DICEX FR 59-62 / OQ 49-50; CBT FR 126-135 / OQ 85-88; CHARX FR 71-80 / OQ 37-40; MOD FR 64-67 / OQ 47-48; SHELL FR 98-100 / OQ 61-62; NOTE FR 52-54 / OQ 30-31.
@@ -22,9 +21,8 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 
 ## Shared-file locks
 
-- Schema lane: free (GM0 merged). Apply path: GM1 first, ST-core rebases.
-- Play-shell frame + `overlays.tsx`: `fix/fu-frame` (FU1). Canvas lock: FU1 first (MapCanvas.tsx), then FU3.
-Apply path (hp.ts, cards.ts, hit.ts, schemas.ts, log-kinds.ts): free until GM1 / ST-core.
+- Schema lane: free. Apply path: GM1 first, ST-core rebases, then GM2.
+- Canvas lock: FU3. Play-shell frame: free (FU1 merged).
 
 ## Pending DM decisions
 

@@ -1,5 +1,6 @@
 // Pure client rules of notifications (NOTE §6–§7): which store transitions toast, the pending
 // summary, unread count, button rules, list order and labels. No React, no browser APIs.
+import { ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import {
   addressedTo,
   isActionOwner,
@@ -7,6 +8,7 @@ import {
   type NotificationRecord,
 } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
+import { encounterIdOfView, type NotificationViews } from "./views";
 
 export const NOTIFICATION_TYPE = "notification";
 export const HISTORY_KIND = "note.history";
@@ -107,8 +109,34 @@ export function summaryCount(t: Transition, store: RecordStore): number {
   return t === "connect" ? pendingForMe(store).length : 0;
 }
 
-export function summaryText(n: number): string {
-  return `${n} pending action${n === 1 ? "" : "s"}`;
+/**
+ * FR-NOTE-45 (BL-48, DM only): pending rows of the started encounter whose action owner is a player
+ * (Initiative's "Waiting for …" rows, FR-CBT-79, linked by their kind's view, FR-NOTE-29); 0 for
+ * players or with no started encounter. With the DM's own N, N + M = Initiative's "Pending (n)".
+ */
+export function waitingForPlayers(store: RecordStore, views: NotificationViews): number {
+  if (viewerOf(store)?.role !== "dm") return 0;
+  const started = Object.values(store.records[ENCOUNTER_TYPE] ?? {}).find(
+    (e) => (e as { status?: string }).status === "started",
+  ) as { id: string } | undefined;
+  if (!started) return 0;
+  return notificationsOf(store).filter(
+    (n) =>
+      n.state === "pending" &&
+      n.actionRole === "player" &&
+      encounterIdOfView(views.get(n.kind), n.payload) === started.id,
+  ).length;
+}
+
+/**
+ * FR-NOTE-15: "2 pending actions"; FR-NOTE-45: " · 1 waiting for a player" appended (M >= 1), or
+ * the waiting part alone when the DM has none of their own ("2 waiting for players").
+ */
+export function summaryText(n: number, waiting = 0): string {
+  const own = `${n} pending action${n === 1 ? "" : "s"}`;
+  if (waiting <= 0) return own;
+  const others = waiting === 1 ? "1 waiting for a player" : `${waiting} waiting for players`;
+  return n > 0 ? `${own} · ${others}` : others;
 }
 
 /**

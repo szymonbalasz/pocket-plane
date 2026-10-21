@@ -20,9 +20,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { AddToPartyPanel } from "./AddToParty";
 import {
+  addedText,
   addToPartyHint,
   addToPartyPayload,
   CLOSED,
+  DONE_MS,
   hasAddToParty,
   partyItemName,
   settle,
@@ -89,13 +91,14 @@ function render(data: EntryResponse, state: "live" | "reconnecting" = "live") {
 
 const panel = (
   entry: CompendiumEntry,
-  o: { qty?: string; live?: boolean; busy?: boolean; error?: string | null } = {},
+  o: { qty?: string; live?: boolean; busy?: boolean; error?: string | null; done?: string } = {},
 ) =>
   renderToStaticMarkup(
     <AddToPartyPanel
       entry={entry}
       qty={o.qty ?? "1"}
       error={o.error ?? null}
+      done={o.done}
       live={o.live ?? true}
       busy={o.busy ?? false}
       onQty={() => {}}
@@ -174,9 +177,13 @@ describe("CMP §7 Add to party (FR-CMP-40–42)", () => {
     expect(disabled(panel(POTION, { live: false }), "cmp-add-to-party-submit")).toBe(true);
     expect(disabled(panel(POTION, { busy: true }), "cmp-add-to-party-submit")).toBe(true);
 
-    // ack → closed, qty back to the default; reject → inline, qty kept.
+    // ack → the confirmation (FR-CMP-57), qty back to the default; reject → inline, qty kept.
     const open = { open: true, qty: "3", error: null };
-    expect(settle(open, { kind: "ack" })).toEqual(CLOSED);
+    expect(settle(open, { kind: "ack", name: "Potion", qty: 3 })).toEqual({
+      ...CLOSED,
+      open: true,
+      done: "Added: Potion ×3",
+    });
     const full = intentFailure(new IntentRejected("conflict", PARTY_FULL_MESSAGE), LOST_ITEM_ADD);
     expect(full).toEqual({ kind: "inline", message: "Party inventory is full (60)" });
     const rejected = settle(open, full);
@@ -193,6 +200,27 @@ describe("CMP §7 Add to party (FR-CMP-40–42)", () => {
       });
       expect(settle(open, lost)).toEqual(open);
     }
+  });
+
+  test("FR-CMP-57 add to party confirmed: ack → Added: ‹row name› ×‹qty› in the Popover, closed after 1.5 s", () => {
+    const sent = { open: true, qty: "2", error: null };
+    const done = settle(sent, { kind: "ack", name: "Potion of healing", qty: 2 });
+    expect(done).toEqual({
+      open: true,
+      qty: "1",
+      error: null,
+      done: "Added: Potion of healing ×2",
+    });
+    expect(addedText("Potion of healing", 2)).toBe("Added: Potion of healing ×2");
+    expect(DONE_MS).toBe(1500);
+    const html = panel(POTION, { done: done.done });
+    expect(tag(html, "cmp-add-to-party-done")).toContain('role="status"');
+    expect(html).toContain("Added: Potion of healing ×2");
+    // The form gives way to the confirmation (no second Add).
+    expect(html).not.toContain("cmp-add-to-party-submit");
+    // Reject and lost intent: unchanged (no confirmation).
+    const full = intentFailure(new IntentRejected("conflict", PARTY_FULL_MESSAGE), LOST_ITEM_ADD);
+    expect(settle(sent, full).done).toBeUndefined();
   });
 
   test("FR-CMP-41 unshared homebrew → hint shown; shared homebrew and imported → none", () => {
