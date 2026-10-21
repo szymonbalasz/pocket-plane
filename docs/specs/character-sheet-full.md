@@ -1,9 +1,9 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: complete
-owner: spec-gems
-phase: post-mvp-7
+status: claimed
+owner: spec-sb
+phase: post-mvp-8
 ---
 
 # Character sheet (full)
