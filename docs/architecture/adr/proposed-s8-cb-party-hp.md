@@ -2,7 +2,7 @@
 
 - Status: proposed (sprint 8, track CB; the integrator numbers it at merge; DM gate 1)
 - Date: 2026-10-21
-- Refines: [ADR-0036](0036-full-sheet-derivation.md) (the one other-player character whitelist) and the [ADR-0024](0024-definition-visibility.md) consequence "other PCs' HP for a party view is a Combat-phase question" ([OQ-ENT-15](../../specs/entities.md#15-open-questions)). [ADR-0056](0056-companion-visibility.md) unchanged
+- **Amends DM decision #178 G6 and [ADR-0036](0036-full-sheet-derivation.md)'s "No HP, AC, scores, counters or text"** for the other-player character whitelist: a **decision reversal** for the DM (OQ-PARTY-30). Answers the [ADR-0024](0024-definition-visibility.md) consequence "other PCs' HP for a party view is a Combat-phase question" ([OQ-ENT-15](../../specs/entities.md#15-open-questions)). [ADR-0056](0056-companion-visibility.md) unchanged
 - Affects: [party-board](../../specs/party-board.md) (FR-PARTY-51–58), [entities](../../specs/entities.md) (visibility fn, FR-ENT-15), [character-sheet-full](../../specs/character-sheet-full.md) (ADR-0036's table), [combat-extras](../../specs/combat-extras.md) (FR-CBTX-32: `tempHp` to others), [play-shell](../../specs/play-shell.md) (FR-SHELL-140); data model, protocol, leak tests
 - Raised by: DM [#334](../../decisions-log.md) (party HP / AC summary for players), OQ-PARTY-30, -31, -32
 
@@ -38,4 +38,5 @@ Sub-choices (any of A / B): **hidden PC** — accept (a) or add a server-written
 - **Leak surface, stated:** other players learn each PC's HP, temp HP and stored AC at all times (in and out of a fight), and a hidden PC's figures (as its `down` / `deathState` today). Still never: scores, counters, sheet text, `creature-sheet`, a pet's `statBlock`, any monster number.
 - **Leak tests:** the CBTX / CHARX / CBT scans assert against the new list (FR-CBTX-32's "against that list" rule); `tempHp` on another player's character leaves the leak-string list; `tempHp` / HP on a `combatant`, a monster or another player's companion stays on it.
 - **CON-44 (measured,** heavy harness, worst-width values**):** players +343 B (7 other PCs × 49 B; worst player 289,620 B of 512 KiB); DM 0 B. Per HP change other players get +49 B on an upsert they already receive; a temp HP set sends them one ≈ 286 B upsert.
-- **Build:** one server slice in CB3 (entities' `records.ts` + `schemas.ts`, ENT-owned, orchestrator-assigned), before the window. OQ-ENT-15 is answered by this ADR.
+- ADR-0036's "No HP, AC, scores, counters or text" becomes "No scores, counters or text; HP, temp HP and stored AC per this ADR".
+- **Build:** CB3's server part (entities' `records.ts` + `schemas.ts`, ENT-owned, assigned to CB3, seams S12), before the window. **Docs updated in CB3's merge** (integrator): protocol README's `entity` redaction rows (≈ lines 387, 936, 965), data-model §372 (other-player character fields), [entities](../../specs/entities.md) FR-ENT-15 and OQ-ENT-15 (answered here), [character-sheet-full](../../specs/character-sheet-full.md) FR-CHARX-35, ADR-0036's whitelist table (one row).
