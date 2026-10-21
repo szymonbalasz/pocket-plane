@@ -1,7 +1,8 @@
 // e2e-bundle: party-cmp
 // Thin Add to party flow (CMP §13 sprint 5, P4): the DM opens Potion of Healing in the Compendium,
-// Add to party ×2 (qty 0 keeps Add disabled) → the `loot-received` toast in the DM and player-1
-// clients, and the party Inventory shows "Potion of healing" ×4 (merged). Player-1's Compendium
+// Add to party ×2 (qty 0 keeps Add disabled) → "Added: Potion of healing ×2" in the Popover, which
+// closes after 1.5 s (FR-CMP-57); the `loot-received` toast "Party inventory: …" (FR-PARTY-49) in
+// the DM and player-1 clients, and the party Inventory shows "Potion of healing" ×4 (merged). Player-1's Compendium
 // has no Add to party. Merge, log row, forbidden for players, leak scans: bun test
 // (add-to-party.test.tsx, party-cmp.fixtures.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
@@ -18,7 +19,7 @@ async function openPotion(win: Locator) {
   await expect(win.getByTestId("cmp-entry-header")).toContainText("Potion of Healing");
 }
 
-test("FR-CMP-40 FR-CMP-41 FR-CMP-42 DM adds Potion of Healing ×2 to the party → toast, Inventory ×4; no Add to party for players", async ({
+test("FR-CMP-40 FR-CMP-41 FR-CMP-42 FR-CMP-57 FR-PARTY-49 DM adds Potion of Healing ×2 to the party → toast, Inventory ×4; no Add to party for players", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
@@ -45,10 +46,14 @@ test("FR-CMP-40 FR-CMP-41 FR-CMP-42 DM adds Potion of Healing ×2 to the party �
   await expect(panel.getByTestId("cmp-add-to-party-submit")).toBeDisabled();
   await qty.fill("2");
   await panel.getByTestId("cmp-add-to-party-submit").click();
+  // FR-CMP-57: the DM's confirmation, with the party row's spelling after the merge.
+  await expect(panel.getByTestId("cmp-add-to-party-done")).toHaveText(
+    "Added: Potion of healing ×2",
+  );
   await expect(panel).toHaveCount(0);
 
-  // The loot-received toast is the confirmation (the party row's spelling after the merge).
-  const toast = "Party loot: Potion of healing ×2";
+  // FR-PARTY-49: the loot-received toast says inventory.
+  const toast = "Party inventory: Potion of healing ×2";
   await expect(dm.getByText(toast)).toBeVisible();
   await expect(p1.getByText(toast)).toBeVisible();
 

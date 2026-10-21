@@ -5,7 +5,7 @@
 // than the last commit. Derived, never persisted, never sent. Replaces the `instr` scan and the
 // entry-less `LEFT JOIN` (≈ 50 ms on the DM's every search).
 import { type SourceRank, sourceRank } from "@shared/compendium/match";
-import type { CompendiumKind } from "@shared/compendium/schemas";
+import { type CompendiumKind, monsterLine } from "@shared/compendium/schemas";
 import { MonsterStatBlock } from "@shared/entities/schemas";
 import {
   CompendiumEntryDeleted,
@@ -67,8 +67,6 @@ const groupKeyOf = (
   campaignId: string | null,
 ) => JSON.stringify([kind, folded, source ?? `campaign:${campaignId ?? ""}`]);
 
-const cap = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
-
 export function buildSearchIndex(db: Db): SearchIndex {
   const rows: IndexRow[] = [];
   const linked = new Set<string>();
@@ -128,10 +126,11 @@ export function buildSearchIndex(db: Db): SearchIndex {
       shared: false,
       source,
       rank: sourceRank(source),
-      // Only CR filters apply; a `type` filter never matches (the creature core has no type).
+      // Only CR filters apply; a `type` filter never matches (entryless rows carry CR only).
       facets: { cr: sb.data.cr },
       name: d.name,
-      line: `CR ${sb.data.cr} · ${cap(sb.data.size)}`,
+      // FR-CMP-58 (BL-48): the core's type when it has one (FR-ENT-26), "CR 1/4 · Small" without.
+      line: monsterLine(sb.data),
       definitionId: d.id,
       entryless: true,
       folded,

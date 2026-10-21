@@ -663,6 +663,58 @@ describe("FR-CHARX-65 conditions", () => {
   });
 });
 
+describe("FR-CHARX-82 attacks above the fold", () => {
+  test("FR-CHARX-82 attacks above the fold: one header line, one stats line (HP · AC · speed · type, HP control / Edit at its end), then the attack rows; conditions after them; Open NPC sheet last (rects at 320 × 360: e2e/small-copy-s7.e2e.ts)", () => {
+    const fx = (id: string, condition: string) => ({
+      id,
+      kind: "condition",
+      condition,
+      level: null,
+      label: null,
+      targetCombatantId: "c-owl",
+      targetCharacterId: null,
+      encounterId: "e1",
+      endsRound: null,
+    });
+    const three = [fx("fx1", "poisoned"), fx("fx2", "prone"), fx("fx3", "frightened")];
+    const p1 = render(
+      storeOf(P1, { entities: [mira, owlPet], combatants: [owlC], effects: three }),
+      <CompanionCard />,
+    );
+    const at = (html: string, id: string) => html.indexOf(`data-testid="${id}"`);
+    // Header: name, owner and mode on one wrapping line (one flex row).
+    const header = /<div class="flex flex-wrap items-baseline[^"]*">([\s\S]*?)<\/div>/.exec(
+      p1,
+    )?.[1];
+    for (const id of ["charx-companion-name", "charx-companion-owner", "charx-companion-mode"]) {
+      expect(header).toContain(`data-testid="${id}"`);
+    }
+    // One stats line, in order, with the in-fight HP hint at its end.
+    const stats =
+      /<span data-testid="charx-companion-stats"[\s\S]*?<\/span><\/span>/.exec(p1)?.[0] ?? "";
+    const statsText = stats.replace(/<[^>]+>/g, "");
+    expect(statsText).toBe("HP 30 / 59 · Temp 5 · AC 13 · 40 ft · Large monstrosity");
+    expect(at(p1, "charx-companion-stats")).toBeLessThan(at(p1, "charx-companion-hp-hint"));
+    // Attacks come before the conditions (they were below them), all three conditions after.
+    const firstAttack = at(p1, "charx-companion-attack");
+    expect(at(p1, "charx-companion-stats")).toBeLessThan(firstAttack);
+    expect(count(p1, "charx-companion-effect")).toBe(3);
+    expect(firstAttack).toBeLessThan(at(p1, "charx-companion-effect"));
+    // The DM: the effects part after the attacks, the NPC sheet link last.
+    const dm = render(
+      storeOf(DM, { entities: [mira, owlPet], combatants: [dmC(owlC, "owl")], effects: three }),
+      <CompanionCard dm={dmParts} />,
+    );
+    expect(at(dm, "charx-companion-attack")).toBeLessThan(at(dm, "test-dm-effects"));
+    expect(at(dm, "test-dm-effects")).toBeLessThan(at(dm, "charx-companion-npc-sheet"));
+    // Out of a fight: the HP control and Edit sit at the stats line's end, before the attacks.
+    const out = render(storeOf(P1, { entities: [mira, owlPet], fight: false }), <CompanionCard />);
+    expect(at(out, "charx-companion-stats")).toBeLessThan(at(out, "charx-companion-hp-amount"));
+    expect(at(out, "charx-companion-hp-amount")).toBeLessThan(at(out, "charx-companion-edit"));
+    expect(at(out, "charx-companion-edit")).toBeLessThan(at(out, "charx-companion-attack"));
+  });
+});
+
 describe("FR-CHARX-66 not a sheet", () => {
   test("FR-CHARX-66 not a sheet: no abilities, skills, saves, spells, notes or sections; the DM's Open NPC sheet only for pets and customs", () => {
     const html = render(

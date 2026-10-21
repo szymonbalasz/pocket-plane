@@ -16,7 +16,7 @@ import { keptPetFields } from "../combat-tracker/creature-form";
 import { actionsOf, creatureActions } from "./creature-actions";
 import { CreaturesList, NAME_MIN } from "./creatures-window";
 import { creatureRows } from "./list";
-import { petCreatureAction } from "./pet-action";
+import { petActionLabel, petCreatureAction } from "./pet-action";
 import {
   monsterNameKeys,
   NAME_TAKEN,
@@ -141,6 +141,38 @@ describe("FR-ENT-39 Creatures window", () => {
       expect(badgeAt).toBeGreaterThan(r.indexOf("ent-list-row-name"));
       expect(badgeAt).toBeLessThan(actionsAt);
     }
+  });
+
+  test("FR-ENT-42 creature names whole: the name wraps onto two lines (no single-line ellipsis), its Tooltip keeps the whole name (layout at 300 / 340 wide: e2e/small-copy-s7.e2e.ts)", () => {
+    const html = render(records);
+    const names = [...html.matchAll(/<span class="([^"]*)" data-testid="ent-list-row-name"/g)];
+    expect(names).toHaveLength(records.length);
+    for (const [, cls] of names) {
+      expect((cls ?? "").split(" ")).toEqual(
+        expect.arrayContaining(["line-clamp-2", "break-words"]),
+      );
+      expect(cls).not.toContain("truncate");
+    }
+  });
+
+  test("FR-ENT-43 no Make pet on a pet: a pet row reads Copy as a new pet…; a monster row Make pet…", () => {
+    const html = render(records);
+    expect(html).toMatch(
+      /data-testid="ent-pet-make" data-record-id="owl" aria-label="Copy Owlbear as a new pet"/,
+    );
+    expect(html).toMatch(
+      /data-testid="ent-pet-make" data-record-id="brute" aria-label="Make pet from Goblin Brute"/,
+    );
+    expect(
+      petActionLabel({
+        name: "Drake Companion",
+        pet: { characterId: "b", characterName: "Brakka", playerName: "Player 1" },
+      }),
+    ).toEqual({
+      label: "Copy as a new pet…",
+      aria: "Copy Drake Companion as a new pet",
+    });
+    expect(petActionLabel({ name: "Owlbear", pet: null }).label).toBe("Make pet…");
   });
 
   test("FR-ENT-32 Make pet… on every monster row, never on characters", () => {

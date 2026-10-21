@@ -88,11 +88,16 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
       {/* Name column takes the free width (w-full + max-w-0: truncate inside a table) but never
           less than NAME_MIN (the inner min width raises the cell's min-content width), so row
           actions can't squeeze names away (CP1 walkthrough). The source / owner / pet badge, kind,
-          CR and XP sit on the second line, so a narrow window (default 340 px) still shows names. */}
+          CR and XP sit on the second line, so a narrow window (default 340 px) still shows names.
+          FR-ENT-42 (sim-10 "Fire Elem…"): the name wraps between words onto up to two lines; only
+          a name needing a third ends the second with "…" (its Tooltip has the whole name). */}
       <TableCell className="w-full max-w-0 p-1.5">
         <div className={cn("flex items-center gap-1.5", NAME_MIN)} data-testid="ent-list-row-main">
           <Tooltip content={row.name}>
-            <span className="truncate font-medium" data-testid="ent-list-row-name">
+            <span
+              className="line-clamp-2 min-w-0 break-words font-medium"
+              data-testid="ent-list-row-name"
+            >
               {row.name}
             </span>
           </Tooltip>

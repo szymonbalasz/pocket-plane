@@ -20,7 +20,15 @@ export const SUMMARY_KEY = "summary";
 
 export type Toast =
   | { key: string; kind: "note"; notificationId: string; sticky: boolean; remaining: number }
-  | { key: typeof SUMMARY_KEY; kind: "summary"; count: number; sticky: true; remaining: number };
+  | {
+      key: typeof SUMMARY_KEY;
+      kind: "summary";
+      count: number;
+      /** FR-NOTE-45 (DM): the started encounter's pending rows a player owns; absent = 0. */
+      waiting?: number;
+      sticky: true;
+      remaining: number;
+    };
 
 export interface ToastState {
   /** Insertion order, oldest first. */
@@ -80,16 +88,24 @@ export function addNote(s: ToastState, n: NotificationRecord, now: number): Toas
   };
 }
 
-/** FR-NOTE-15: one summary toast; replaces an older one; count 0 removes it. */
-export function setSummary(s: ToastState, count: number, now: number): ToastState {
+/**
+ * FR-NOTE-15: one summary toast; replaces an older one; count 0 removes it. FR-NOTE-45: `waiting`
+ * (DM) counts too: 0 own + 1 waiting still shows the summary.
+ */
+export function setSummary(s: ToastState, count: number, now: number, waiting = 0): ToastState {
   const ran = advance(s, now);
   const rest = ran.toasts.filter((t) => t.kind !== "summary");
-  if (count <= 0) return { ...ran, toasts: rest };
-  return {
-    ...ran,
-    toasts: [...rest, { key: SUMMARY_KEY, kind: "summary", count, sticky: true, remaining: 0 }],
-  };
+  if (count <= 0 && waiting <= 0) return { ...ran, toasts: rest };
+  const summary: Toast =
+    waiting > 0
+      ? { key: SUMMARY_KEY, kind: "summary", count, waiting, sticky: true, remaining: 0 }
+      : { key: SUMMARY_KEY, kind: "summary", count, sticky: true, remaining: 0 };
+  return { ...ran, toasts: [...rest, summary] };
 }
+
+/** FR-NOTE-45: the DM's waiting-for-players count of a store (players: none). */
+export type WaitingCount = (store: RecordStore) => number;
+const NONE: WaitingCount = () => 0;
 
 export function closeToast(s: ToastState, key: string, now: number): ToastState {
   const ran = advance(s, now);
@@ -130,13 +146,19 @@ export function untoastedPending(s: ToastState, store: RecordStore): number {
  * is gone) disappears; the summary follows the current count of pending-for-me rows without a
  * toast of their own.
  */
-export function pruneToasts(s: ToastState, store: RecordStore, now: number): ToastState {
+export function pruneToasts(
+  s: ToastState,
+  store: RecordStore,
+  now: number,
+  waitingOf: WaitingCount = NONE,
+): ToastState {
   const ran = advance(s, now);
   const rows = (store.records[NOTIFICATION_TYPE] ?? {}) as Record<string, NotificationRecord>;
   const kept = ran.toasts.filter(
     (t) => !(t.kind === "note" && t.sticky && rows[t.notificationId]?.state !== "pending"),
   );
   const mine = untoastedPending({ ...ran, toasts: kept }, store);
+  const waiting = ran.toasts.some((t) => t.kind === "summary") ? waitingOf(store) : 0;
   let changed = false;
   const toasts: Toast[] = [];
   for (const t of ran.toasts) {
@@ -144,9 +166,11 @@ export function pruneToasts(s: ToastState, store: RecordStore, now: number): Toa
       changed = true;
       continue;
     }
-    if (t.kind === "summary" && t.count !== mine) {
+    if (t.kind === "summary" && (t.count !== mine || (t.waiting ?? 0) !== waiting)) {
       changed = true;
-      if (mine > 0) toasts.push({ ...t, count: mine });
+      const { waiting: _old, ...rest } = t;
+      if (mine > 0 || waiting > 0)
+        toasts.push(waiting > 0 ? { ...rest, count: mine, waiting } : { ...rest, count: mine });
       continue;
     }
     toasts.push(t);
@@ -176,7 +200,8 @@ export function createToastMemory(now: number, hidden = false): ToastMemoryStore
 /**
  * One classified sync change applied to the stack (FR-NOTE-13/14/15): a `connect` to another
  * campaign clears it, every `connect` sets the summary (rows already toasted don't count, P3
- * glitch 8); created rows toast; then the stack follows the store.
+ * glitch 8; FR-NOTE-45: plus the DM's waiting-for-players count, `waitingOf`); created rows toast;
+ * then the stack follows the store.
  */
 export function syncToasts(
   m: ToastMemory,
@@ -184,6 +209,7 @@ export function syncToasts(
   next: SyncView,
   t: Transition,
   now: number,
+  waitingOf: WaitingCount = NONE,
 ): ToastMemory {
   if (t === null) return m;
   const store = next.store;
@@ -194,10 +220,15 @@ export function syncToasts(
     if (cid !== campaignId) s = clearToasts(s, now);
     campaignId = cid;
     // Only pending rows without a toast of their own (a sticky card kept over a reconnect).
-    s = setSummary(s, Math.min(summaryCount(t, store), untoastedPending(s, store)), now);
+    s = setSummary(
+      s,
+      Math.min(summaryCount(t, store), untoastedPending(s, store)),
+      now,
+      waitingOf(store),
+    );
   }
   for (const n of toastTriggers(prev, next, t)) s = addNote(s, n, now);
-  s = pruneToasts(s, store, now);
+  s = pruneToasts(s, store, now, waitingOf);
   return s === m.toasts && campaignId === m.campaignId ? m : { toasts: s, campaignId };
 }
 
