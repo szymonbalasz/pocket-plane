@@ -52,7 +52,7 @@ function PlayerCombatRuntime() {
 }
 
 /**
- * One row's content (a row, or a companion line inside its owner's row): portrait, name line with
+ * One row's content (an in-turn companion's line is `PlayerCompanionLine`): portrait, name line with
  * the side chip and (sprint 6) the owner chip and mode icon, effect chips, death state; band (a
  * monster) or, for the companion's owner, HP "45 / 59" and the card icon (FR-CBT-119); PCs'
  * initiative.
@@ -63,14 +63,12 @@ function PlayerRowMain({
   turn,
   round,
   me,
-  line,
 }: {
   c: CombatantView;
   ownerName: string;
   turn: boolean;
   round: number;
   me: string | null;
-  line: boolean;
 }) {
   const store = useSync((s) => s.store);
   const openCard = useOpenCompanionCard();
@@ -113,9 +111,7 @@ function PlayerRowMain({
           // chip with it (FR-CBT-119; a line sits in its owner's row).
           side={
             <>
-              {companion && !line && (
-                <OwnerChip c={c} ownerName={ownerName} testId="cbt-init-row-owner" />
-              )}
+              {companion && <OwnerChip c={c} ownerName={ownerName} testId="cbt-init-row-owner" />}
               <SideChip c={c} testId="cbt-init-row-ally" />
             </>
           }
@@ -129,7 +125,7 @@ function PlayerRowMain({
           />
         </NameLine>
         {/* FR-CBT-107 (walkthrough fix): an `after-owner` row says whose turn it follows. */}
-        {companion && !line && c.turnMode === "after-owner" && (
+        {companion && c.turnMode === "after-owner" && (
           <span
             data-testid="cbt-init-row-after"
             data-record-id={c.id}
@@ -158,24 +154,7 @@ function PlayerRowMain({
       ) : (
         c.kind === "monster" && c.band && <BandBadge band={c.band} testId="cbt-init-row-band" />
       )}
-      {own && (
-        <Tooltip content={`${c.name}'s card`}>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-6 shrink-0"
-            data-testid="cbt-init-row-card"
-            data-record-id={c.id}
-            aria-label={`Open ${c.name}'s card`}
-            onClick={(e) => {
-              e.stopPropagation();
-              openCard(c.id);
-            }}
-          >
-            <IdCardIcon className="size-3.5" />
-          </Button>
-        </Tooltip>
-      )}
+      {own && <OwnCardButton c={c} />}
       {/* FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`). */}
       {!death && pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />}
       {c.kind === "pc" && (
@@ -187,6 +166,120 @@ function PlayerRowMain({
           {c.initiative ?? "—"}
         </span>
       )}
+    </div>
+  );
+}
+
+/** FR-CBT-119: the owner's card icon (opens the companion card, FR-CHARX-59). */
+function OwnCardButton({ c }: { c: CombatantView }) {
+  const openCard = useOpenCompanionCard();
+  return (
+    <Tooltip content={`${c.name}'s card`}>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-6 shrink-0"
+        data-testid="cbt-init-row-card"
+        data-record-id={c.id}
+        aria-label={`Open ${c.name}'s card`}
+        onClick={(e) => {
+          e.stopPropagation();
+          openCard(c.id);
+        }}
+      >
+        <IdCardIcon className="size-3.5" />
+      </Button>
+    </Tooltip>
+  );
+}
+
+/**
+ * FR-CBT-142 per viewer (OQ-CBT-93 A, sprint 7): an `in-owner-turn` companion's one-row line in
+ * its owner's row. The owner: name, "45 / 59" (+ temp), AC from its `card`, chips, card icon
+ * (no ⋯: the card holds the owner's actions). Another player: name, band, chips (no AC, no card).
+ * `NameLine` fits it (FR-CBTX-57); names break between words only (FR-CBT-143).
+ */
+function PlayerCompanionLine({
+  c,
+  ownerName,
+  round,
+  me,
+}: {
+  c: CombatantView;
+  ownerName: string;
+  round: number;
+  me: string | null;
+}) {
+  const store = useSync((s) => s.store);
+  const openCard = useOpenCompanionCard();
+  const fx = activeEffects(store);
+  // FR-CBT-116: only the owner receives a companion's HP numbers and card.
+  const own = me !== null && c.ownerPlayerId === me;
+  const temp = c.tempHp ?? 0;
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: a pointer shortcut; the card icon is the keyboard path
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer shortcut; the card icon is the keyboard path
+    <div
+      data-row-main
+      className={cn("flex min-w-0 items-center", own && "cursor-pointer")}
+      onClick={own ? () => openCard(c.id) : undefined}
+    >
+      <div className="min-w-0 flex-1">
+        <NameLine
+          name={c.name}
+          testId="cbt-init-row-name"
+          className="text-sm"
+          marks={
+            <ModeIcon
+              id={c.id}
+              mode={c.turnMode ?? "in-owner-turn"}
+              ownerName={ownerName}
+              testId="cbt-init-row-mode"
+            />
+          }
+          side={
+            own ? (
+              <span
+                data-stats-line
+                className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+              >
+                <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
+                  {c.hpCurrent ?? "—"} / {c.hpMax ?? "—"}
+                </span>
+                {temp > 0 && (
+                  <span
+                    data-testid="cbtx-init-row-temp"
+                    data-record-id={c.id}
+                    className="shrink-0 text-sky-400"
+                  >
+                    +{temp}
+                  </span>
+                )}
+                <span className="shrink-0" data-testid="cbt-init-row-ac" data-record-id={c.id}>
+                  AC {c.card?.ac ?? "—"}
+                </span>
+              </span>
+            ) : (
+              c.band && <BandBadge band={c.band} testId="cbt-init-row-band" />
+            )
+          }
+          end={
+            own && (
+              <span data-name-end className="ml-auto flex shrink-0">
+                <OwnCardButton c={c} />
+              </span>
+            )
+          }
+        >
+          <EffectChips
+            compact
+            effects={effectsOn(fx, creatureOf(c))}
+            triggers={triggerChipsFor(store, c)}
+            round={round}
+            testId="cbtx-init-row-effect"
+          />
+        </NameLine>
+      </div>
     </div>
   );
 }
@@ -225,7 +318,7 @@ export function PlayerRow({
         indent && "ml-3",
       )}
     >
-      <PlayerRowMain c={c} ownerName={ownerName} turn={turn} round={round} me={me} line={false} />
+      <PlayerRowMain c={c} ownerName={ownerName} turn={turn} round={round} me={me} />
       {lines.map((l) => (
         <div
           key={l.id}
@@ -233,7 +326,7 @@ export function PlayerRow({
           data-record-id={l.id}
           className="border-l border-border/60 pl-1"
         >
-          <PlayerRowMain c={l} ownerName={c.name} turn={false} round={round} me={me} line />
+          <PlayerCompanionLine c={l} ownerName={c.name} round={round} me={me} />
         </div>
       ))}
     </li>

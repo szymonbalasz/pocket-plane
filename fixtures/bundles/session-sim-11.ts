@@ -15,5 +15,7 @@ export default defineBundle({
     // FU: sprint-6 follow-ups (`cp-ally` charmed Goblin 2 + `fu-hurt-goblins`, FU-combat)
     // FU1: no new unit (the window frame walks on session-sim-10's Goblin Ambush; layout tests
     // use its cells in test-cells.ts)
+    "cp-ally",
+    "fu-hurt-goblins",
   ],
 });

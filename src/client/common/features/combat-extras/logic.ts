@@ -2,7 +2,7 @@
 // server decides; clients render what they receive (players: the redaction, FR-CBTX-31/32).
 import { deathStateOf, effectName, roundsLeft } from "@shared/combat-extras/rules";
 import { EFFECT_TYPE, type EffectView } from "@shared/combat-extras/schemas";
-import type { CombatantView } from "@shared/combat-tracker/schemas";
+import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import { matchingMods } from "@shared/effect-modifiers/rules";
 import { type DeathState, ENTITY_TYPE } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
@@ -326,4 +326,51 @@ export function concentrationSaveText(
     else if (m.kind === "flat") parts.push(`${sign(m.value)} ${Math.abs(m.value)}${label}`);
   }
   return `${parts.join(" ")} vs DC ${dc ?? "?"}`;
+}
+
+/**
+ * FR-CBTX-59 (sprint 7): the concentration chip's Tooltip, "Concentrating: Conjure Elemental ·
+ * 10 rounds left" (untimed: no rounds).
+ */
+export function concTooltip(e: EffectView, round: number | null): string {
+  const left = roundsLeftText(e, round);
+  return left ? `${effectName(e)} · ${left}` : effectName(e);
+}
+
+/**
+ * FR-CBTX-60 (OQ-CBTX-30 A): who gets the chip's menu: the DM, or the player who owns the
+ * concentrating PC; anyone else (or a monster's concentration for a player) none.
+ */
+export function concMenuFor(store: RecordStore, e: EffectView): "dm" | "owner" | null {
+  const you = store.you;
+  if (you?.role === "dm") return "dm";
+  if (!you?.playerId || !e.targetCharacterId) return null;
+  return characterOf(store, e.targetCharacterId)?.ownerPlayerId === you.playerId ? "owner" : null;
+}
+
+/**
+ * FR-CBTX-60: what ends with a concentration, from the viewer's store only: its linked effects
+ * ("Bless on Mira", FR-CBTX-10) and linked summons ("Fire Elemental 3", FR-CBT-120). Players
+ * receive neither link (FR-CBTX-31, FR-CBT-116), so for them it is empty.
+ */
+export function concEndsWith(store: RecordStore, e: EffectView): string[] {
+  const combatants = Object.values(store.records[COMBATANT_TYPE] ?? {}) as (CombatantView & {
+    concentrationEffectId?: string | null;
+    active?: boolean;
+  })[];
+  const nameOf = (x: EffectView) =>
+    x.targetCharacterId
+      ? characterOf(store, x.targetCharacterId)?.name
+      : combatants.find((c) => c.id === x.targetCombatantId)?.name;
+  const linked = activeEffects(store)
+    .filter((x) => x.id !== e.id && x.concentrationId === e.id)
+    .map((x) => {
+      const on = nameOf(x);
+      return on ? `${effectName(x)} on ${on}` : effectName(x);
+    });
+  const summons = combatants
+    .filter((c) => c.active !== false && c.concentrationEffectId === e.id)
+    .sort((a, b) => ((a as { seq?: number }).seq ?? 0) - ((b as { seq?: number }).seq ?? 0))
+    .map((c) => c.name);
+  return [...linked, ...summons];
 }

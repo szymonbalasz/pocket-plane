@@ -2184,7 +2184,22 @@ From [campaign-management](../specs/campaign-management.md#8-data-model) FR-CAMP
 - **Fixtures:** `gems-on`, `gems-awarded` (Mira Inspiration 2, Combat 1, Fortune 1; Brakka Combat 2, Action 3, Divine 1, Fortune 6; Thorn Inspiration 1), `gems-hidden`; bundles `gems`, `gems-hidden`, `gems-e2e`.
 - **CON-44:** off 0 B (8 rows at 99 in the DB, frames byte-identical); on +20 B per viewer + 1,754 B for 8 rows at 99 (heavy harness).
 
-## 97. Sprint 7: window frame (FU1)
+## 97. Sprint 7: combat follow-ups (FU-combat)
+
+From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-141, -145 and [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (#315: OQ-CBT-92 A; seams S7, S8). **Built by `fix/fu-combat`**. Protocol side: [protocol §125](../protocol/README.md#125-sprint-7-combat-follow-ups-fu-combat). **No new entity, field or column.**
+
+| Field / record | Change | Rule | Source |
+|---|---|---|---|
+| `combatant.hp_current` / `hp_max` (monster, bound) | written from the token's **last combatant** at `cbt.start` / `cbtx.addCombatants` | the latest-ended inactive monster row of the campaign with that `token_id` and the same `entity_id` (ties → higher `seq`): its `hp_max` / `hp_current` (0 → Down). An average row whose max no longer matches the definition's follows FR-CBT-06 / -67 (full → new max, else clamped); "rolled" = a fight that max came through (consecutive rows of the token with that max) logged the DM-only "HP (…)" roll. No row → today's `hpMode` HP. Not an `hp_change` (no fact, S8) | FR-CBT-141 |
+| Binding order (Start / Add) | tokens kept at 0 bind after the living ones, then `seq` | a fresh goblin is taken before one left at 0 | FR-CBT-141 |
+| `token` of a summoned combatant | deleted at End whatever its owner now (released, turned hostile, removed mid-fight) | only `summoned` rows; combatant rows and facts stay (S7) | FR-CBT-145 |
+| `token.owner_player_id` of a pet | kept through End; Start / Add re-assert it only where it differs (safety net) | every token of a pet = the pet's `ownerPlayerId` | FR-MAP-88 |
+
+- **Derived (not stored):** kept HP (one pass over the campaign's monster `combatant` rows joined to ended encounters; no index needed at ≤ a few thousand rows).
+- **Fixtures:** unit `fu-hurt-goblins` (Goblin −7 → 0 / 7, Goblin 2 −3 → 4 / 7 in the running ambush); bundles `fu-s7` (= `session-sim-10` + `cp-ally` + `fu-hurt-goblins`), `fu-s7-e2e`; both units appended to `session-sim-11` (FU group).
+- **CON-44: 0 B** (no field or record; kept HP fills existing columns).
+
+## 98. Sprint 7: window frame (FU1)
 
 From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-56 (OQ-SHELL-55 B), -77–81, -85–88 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-44. **Built by `fix/fu-frame`**: no table, column, record type or payload change. Protocol side: [protocol §126](../protocol/README.md#126-sprint-7-window-frame--auto-minimise-instead-of-covering-pcs-useful-sizes-pushed-windows-return-space--focus-tooltips-fu1).
 

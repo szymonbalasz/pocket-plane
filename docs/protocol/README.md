@@ -2959,7 +2959,33 @@ From [campaign-management](../specs/campaign-management.md#6-functional-requirem
 - **Fixtures:** units `gems-on`, `gems-awarded`, `gems-hidden`; bundles `gems` (= `session-sim-10` + on + awarded), `gems-hidden`, `gems-e2e` (e2e `e2e/gems-core.e2e.ts`). Every other bundle loads with gems off; `session-sim-11` adds none.
 - **CON-44** (`snapshot-size.test.ts` heavy harness): gems off with 8 rows at 99 → every frame byte-identical (0 B); on → +20 B (`"features":["gems"]`) + 1,754 B of rows per viewer (DM 693,796 B, 879,068 B left of 1.5 MiB; players ≤ 290,926 B of 512 KiB).
 
-## 126. Sprint 7: window frame — auto-minimise instead of covering PCs, useful sizes, pushed windows return, Space + focus Tooltips (FU1)
+## 126. Sprint 7: combat follow-ups (FU-combat)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-141, -145 (OQ-CBT-92 A, #315) and [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88. **Built by `fix/fu-combat`**. Data side: [data model §96](../data-model/README.md#96-sprint-7-combat-follow-ups-fu-combat). **No new intent, event, record type or signal.**
+
+| Event | `changes` (sprint 7) | Players receive | Undoable |
+|---|---|---|---|
+| `EncounterStarted` | combatant creates carry kept HP (FR-CBT-141; no HP roll entry for a kept row); + a pet token's owner upsert (`setTokenOwnerIn`) **only when it differs** (safety net, FR-MAP-88) | per FR-CBT-37 / -116; token upserts as any owner change | no |
+| `CombatantsAdded` | the same kept HP and pet-token safety net | as above | no |
+| `EncounterEnded` | + `token` deletes of **every** summoned combatant's surviving token (released, turned hostile, removed mid-fight; FR-CBT-145), before the other companions' rows; pets' tokens untouched (owner kept, FR-MAP-88); a `setCompanion` (charmed) companion's token owner cleared (#310 (2)) | token deletes to everyone | no |
+
+- **FR-MAP-88 root cause (FU0 replay on `session-sim-10`):** Dismiss Fire Elemental, Turn hostile Fire Elemental 3, End, Start "Escort to the Ford" with both pets → the drake's token gets **no change at all** (`ownerPlayerId` = Player 1 after every step; the Add-joined drake row has `pet: true`, so `companionLeaves` never runs for it). Suspect (1) refuted on the server. **Client cause (e2e):** Start's refit (DM 1440×900, 34 px cells) leaves the medium drake's label row room for one chip; BL-35's rule folds the combat overlay's "Ally" **and the paw** into "+N" (tip "Ally, Player 1's companion"); the large Owlbear's row fits both. The fix is FU3's (the paw's priority in the label row); `combat-followups.e2e.ts` accepts the paw drawn or inside "+N" until then.
+- **Crash hooks:** `cbt.start:after-commit`, `cbt.end:before-commit` (all or nothing, `fu-combat-crash.test.ts`).
+
+**Client (FU2, both clients; no record, intent or frame):**
+
+| Piece | Contract | Source |
+|---|---|---|
+| DM companion line (`cbt-init-companion`, in-owner-turn) | one row via `NameLine`: name (+ mode icon, eye-off, skip), side slot `cbt-init-row-hp` "22 / 22" (+ `cbtx-init-row-temp`) + `cbt-init-row-ac`, chips, end slot `cbt-init-row-card` + `cbt-init-companion-menu` (⋯: `cbt-init-row-attack` submenu, Check ▸ / Save ▸, `cbt-init-row-hp-adjust`, combat-extras items incl. `cbtx-init-row-effect-new`, Side, `cbt-init-row-companion`, Remove) | FR-CBT-142 |
+| Player companion line | owner: `cbt-init-row-hp` + temp + `cbt-init-row-ac` (from `card.ac`), chips, `cbt-init-row-card`; other players: `cbt-init-row-band`, chips | FR-CBT-142 |
+| `NameLine` / `RowName` | each word measured (`data-word-measure`); a wrapped name's `min-width` = its longest word (capped at the line), `overflow-wrap: break-word` | FR-CBT-143 |
+| End confirm (`EndConfirmDescription {area}`) | `${area}-end-summons` (`data-value` = count; ≤ 5 names + "and N more"), one `${area}-end-charmed` per charmed companion, then `${area}-end-pending`; from the DM store at open time | FR-CBT-144 |
+| Start dialog | `cbt-enc-start-kept-note` while a monster binding takes a placed token | FR-CBT-141 |
+| Encounter editor | `cbt-enc-editor-back`; `cbt-enc-editor-body` scrolls between the header and `cbt-enc-editor-actions`; `cbt-enc-entry-name` (wraps between words, ≥ 96 px); list `cbt-enc-row-name` wraps | FR-CBT-146, -147, -149 |
+| Concentration chip (`EffectChips`) | fitted like a trigger chip (`data-compact`), never cut; DM / the PC's owner: `cbtx-conc-chip` → `cbtx-conc-menu` (`cbtx-conc-title`, `cbtx-conc-rounds`, `cbtx-conc-ends` from the viewer's store, `cbtx-conc-end` → `cbtx.endEffect`, DM `cbtx-conc-edit`); others: a focusable chip with its Tooltip | FR-CBTX-59–61 |
+| Turn-mode radios / portrait | `aria-label` = label on `cbt-summon-mode`, `cbt-companion-mode`, `ent-pet-mode`; `cbt-form-portrait` | FR-CBT-151, FR-ENT-44 |
+
+## 127. Sprint 7: window frame — auto-minimise instead of covering PCs, useful sizes, pushed windows return, Space + focus Tooltips (FU1)
 
 From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-77–81, -83–88 (FR-SHELL-82 retired) and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-44 (DM gate #315: OQ-SHELL-52 A, -53 B, -54 A, -55 B; review-b rulings #1–#3, #7–#9, #12, #22). **Built by `fix/fu-frame`**: browser only, no record type, intent, event, signal or wire field (CON-44: 0 B). Supersedes §104's "never restored when the tool closes" and §109's contract min (320 × 240 → 320 × 280) where they differ.
 
