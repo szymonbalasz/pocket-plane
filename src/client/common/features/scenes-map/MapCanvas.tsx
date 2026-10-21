@@ -36,6 +36,7 @@ import { useFreeArea } from "../play-shell/free-area";
 import { isKeyboardFocus, spaceAction, trackFocusModality } from "../play-shell/keys";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
+  appearanceKeeps,
   type Camera,
   type CameraEvent,
   type CameraMode,
@@ -46,6 +47,7 @@ import {
   createRevealRefit,
   type FitReason,
   type FitVisible,
+  fitPastToasts,
   fitScene,
   footprintBox,
   refitsOnReveal,
@@ -67,6 +69,7 @@ import {
 } from "./drag-preview";
 import { DragProbe, probesDrag } from "./drag-probe";
 import { toastReject, useLive, useMapIntent } from "./intents";
+import { labelHitAt, labelRowItems, tokenIdAt } from "./label-hit";
 import { LaserSender } from "./laser";
 import {
   type LayerContextMenu,
@@ -162,6 +165,9 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>) {
 
 const tokenNodeOf = (n: Konva.Node | null) => n?.findAncestor(".map-token", true) ?? null;
 
+/** FR-MAP-89 (2): the first scene open on this page is the load fit (`data-fit-reason="load"`). */
+let loadFitDone = false;
+
 /**
  * FR-MAP-12 / OQ-MAP-45: the mounted canvases' middle pans. Konva ends any drag on a window
  * `mouseup` (capture); this guard is registered when the module loads, before any Stage exists,
@@ -256,50 +262,100 @@ export function MapCanvas(props: MapCanvasProps) {
   // FR-MAP-59 / -80 obstacles: the rendered open windows + the players' toast box, or the DM's
   // summary strip + shown stack (`fitObstacles`).
   const obstacles = free.obstacles;
+  const obstaclesRef = useRef(obstacles);
+  obstaclesRef.current = obstacles;
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  const tokensRef = useRef(tokens);
+  tokensRef.current = tokens;
+  const camRef = useRef(cam);
+  camRef.current = cam;
+  /** FR-MAP-82 / -89 (3): the token ids the last fit framed on its scene (the reveal baseline). */
+  const drawn = useRef<{ scene: string; ids: ReadonlySet<string> } | null>(null);
   const fitNow = useRef((_reason: FitReason) => {});
   fitNow.current = (reason) => {
     if (size.w === 0) return;
     // FR-MAP-58 in the room the toast box leaves (FR-SHELL-48 (a)), then FR-MAP-59; PC tokens =
     // tokens with an owner, in this client's store (FR-MAP-46).
-    const fit = fitScene(
-      tokens.map((t) => ({ col: t.col, row: t.row, size: t.size, pc: t.ownerPlayerId !== null })),
-      grid,
-      { w: scene.mapWidth, h: scene.mapHeight },
-      size,
-      { areas: free.toastFreeAreas, obstacles, windowsOnly: free.areas },
-    );
+    const fitTokens = tokens.map((t) => ({
+      col: t.col,
+      row: t.row,
+      size: t.size,
+      pc: t.ownerPlayerId !== null,
+    }));
+    const map = { w: scene.mapWidth, h: scene.mapHeight };
+    const room = { areas: free.toastFreeAreas, obstacles, windowsOnly: free.areas };
+    // FR-MAP-91: Fit (button, Reset layout) and a resize may fit past the DM's shown card toasts.
+    const fit =
+      reason === "fit" || reason === "resize"
+        ? fitPastToasts(fitTokens, grid, map, size, room, {
+            ...free.stripOnly,
+            windowsOnly: free.areas,
+          })
+        : { ...fitScene(fitTokens, grid, map, size, room), pastToasts: false };
     setCam({ x: fit.x, y: fit.y, scale: fit.scale });
     setFitFloor(fit.floor);
     setFitVisible(fit.visible);
     setFitRect(`${fit.rect.x},${fit.rect.y},${fit.rect.w},${fit.rect.h}`);
-    setFitReason(reason);
+    setFitReason(fit.pastToasts ? "fit-past-toasts" : reason);
+    drawn.current = { scene: scene.id, ids: new Set(tokens.map((t) => t.id)) };
   };
-  /** FR-MAP-61: the appearance refit, once the frame that caused it reached the canvas. */
+  /**
+   * FR-MAP-61: the appearance refit, once the frame that caused it reached the canvas. FR-MAP-90:
+   * every token already inside the area and clear of every obstacle → the camera stays.
+   */
   const [appearanceRefit] = useState(() =>
     createAppearanceRefit(() => {
-      if (cameraModeRef.current === "fitted") fitNow.current("appearance");
+      if (cameraModeRef.current !== "fitted") return;
+      const boxes = tokensRef.current.flatMap((t) => footprintBox([t], gridRef.current) ?? []);
+      if (appearanceKeeps(camRef.current, boxes, obstaclesRef.current, sizeRef.current)) return;
+      fitNow.current("appearance");
     }),
   );
-  useEffect(() => () => appearanceRefit.dispose(), [appearanceRefit]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: each new token list or window rect set re-arms a pending refit
-  useEffect(() => appearanceRefit.applied(), [appearanceRefit, tokens, obstacles]);
+  /**
+   * FR-MAP-89 (2), -92: the scene-open (load) fit and the resize refit wait, as the appearance
+   * refit does, for the windows' rendered rects (restored layout, grown heights, the render fit to
+   * the new viewport) before they frame.
+   */
+  const settledReason = useRef<FitReason>("open");
+  const [settledFit] = useState(() =>
+    createAppearanceRefit(() => {
+      const reason = settledReason.current;
+      if (reason === "resize" && cameraModeRef.current !== "fitted") return;
+      fitNow.current(reason);
+    }),
+  );
+  useEffect(
+    () => () => {
+      appearanceRefit.dispose();
+      settledFit.dispose();
+    },
+    [appearanceRefit, settledFit],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new token list, window rect set or canvas size re-arms a pending refit
+  useEffect(() => {
+    appearanceRefit.applied();
+    settledFit.applied();
+  }, [appearanceRefit, settledFit, tokens, obstacles, size]);
   /** Applies a camera event; fits now (or later, once the window change is laid out). */
   const onCamera = useCallback(
-    (e: CameraEvent, deferred = false) => {
+    (e: CameraEvent, deferred = false, reason: FitReason = e as FitReason) => {
       const next = cameraOn(cameraModeRef.current, e);
       cameraModeRef.current = next.mode;
       setCameraMode(next.mode);
       if (!next.fit) return;
       // Only fit events (open, fit, appearance, resize, reveal) fit.
-      if (!deferred) fitNow.current(e as FitReason);
-      else appearanceRefit.appearance();
+      if (!deferred) fitNow.current(reason);
+      else if (e === "appearance") appearanceRefit.appearance();
+      else {
+        settledReason.current = reason;
+        settledFit.appearance();
+      }
     },
-    [appearanceRefit],
+    [appearanceRefit, settledFit],
   );
   // ---- FR-MAP-12 (sprint 4): the middle mouse pans with any tool, before Konva and the tools ----
   const [panning, setPanning] = useState(false);
-  const camRef = useRef(cam);
-  camRef.current = cam;
   const [pan] = useState(() =>
     createMiddlePan({
       position: () => {
@@ -357,7 +413,8 @@ export function MapCanvas(props: MapCanvasProps) {
   useEffect(() => {
     if (size.w === 0 || !free.ready || loading || fittedFor.current === scene.id) return;
     fittedFor.current = scene.id;
-    onCamera("open");
+    onCamera("open", true, loadFitDone ? "open" : "load");
+    loadFitDone = true;
   }, [scene.id, size, free.ready, loading, onCamera]);
   // (b) an appearance refits while `fitted`; the window lands (FR-SHELL-18 `appear`) first.
   const seenAppearances = useRef(free.appearances);
@@ -370,7 +427,7 @@ export function MapCanvas(props: MapCanvasProps) {
   const resizeRefit = useRef<ReturnType<typeof createResizeRefit> | null>(null);
   useEffect(() => {
     const r = createResizeRefit(
-      () => onCamera("resize"),
+      () => onCamera("resize", true),
       () => dragRef.current !== null,
     );
     resizeRefit.current = r;
@@ -401,17 +458,13 @@ export function MapCanvas(props: MapCanvasProps) {
   useEffect(() => () => reveal.dispose(), [reveal]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch drops a pending refit
   useEffect(() => reveal.dispose(), [reveal, scene.id]);
-  const obstaclesRef = useRef(obstacles);
-  obstaclesRef.current = obstacles;
-  const sizeRef = useRef(size);
-  sizeRef.current = size;
-  const drawn = useRef<{ scene: string; ids: ReadonlySet<string> } | null>(null);
   useEffect(() => {
     const prev = drawn.current;
+    // A scene switch, or tokens before this scene's first fit has framed: that fit takes the
+    // baseline (FR-MAP-89 (3)), so a token arriving after it counts as a reveal.
+    if (!prev || prev.scene !== scene.id) return;
     drawn.current = { scene: scene.id, ids: new Set(tokens.map((t) => t.id)) };
-    // A scene switch, or tokens before the scene-open fit: that fit frames them.
-    const same = prev?.scene === scene.id && fittedFor.current === scene.id;
-    if (!refitsOnReveal(client) || !prev || !same) return;
+    if (!refitsOnReveal(client)) return;
     const next = tokens.flatMap((t) => {
       const box = footprintBox([t], gridRef.current);
       return box ? [{ id: t.id, box }] : [];
@@ -442,7 +495,8 @@ export function MapCanvas(props: MapCanvasProps) {
     if (stage) {
       stage.setPointersPositions(e);
       const p = stage.getPointerPosition();
-      onToken = p !== null && tokenNodeOf(stage.getIntersection(p)) !== null;
+      // FR-MAP-89 (1): the token or its label row (name, marker, badges).
+      onToken = p !== null && tokenIdAt(stage, p) !== null;
     }
     if (intent === "canvas" && !onToken && stagePans(tool, spaceRef.current)) {
       reveal.gesture();
@@ -668,8 +722,6 @@ export function MapCanvas(props: MapCanvasProps) {
       performance.now(),
     );
   });
-  const tokensRef = useRef(tokens);
-  tokensRef.current = tokens;
   useSignal(MAP_SIGNALS.drag, (s) => {
     const d = DragData.safeParse(s.data);
     if (!d.success) return;
@@ -878,10 +930,18 @@ export function MapCanvas(props: MapCanvasProps) {
     toolDefRef.current?.pointer?.cancel?.("live");
   }, [live]);
 
+  /** FR-MAP-89 (1): the token whose label row (not its node) is under the pointer, if any. */
+  const labelTokenAt = (): TokenView | null => {
+    const stage = stageRef.current;
+    const p = stage?.getPointerPosition();
+    const id = stage && p ? labelHitAt(labelRowItems(stage), p) : null;
+    return (id && tokensRef.current.find((t) => t.id === id)) || null;
+  };
+
   const onMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const p = mapPoint();
     if (!p) return;
-    const onToken = tokenNodeOf(e.target) !== null;
+    const onToken = tokenNodeOf(e.target) !== null || labelTokenAt() !== null;
     if (e.evt.button === 2) {
       // FR-MAP-71: doors' and props' menus never get here (`cancelBubble`).
       rightRef.current = null;
@@ -1121,6 +1181,12 @@ export function MapCanvas(props: MapCanvasProps) {
             onCamera("pan");
           }}
           onWheel={onWheel}
+          onDblClick={(e) => {
+            // FR-MAP-89 (1): a double-click on a label row is one on its token (FR-MAP-77).
+            if (tokenNodeOf(e.target) !== null) return;
+            const t = labelTokenAt();
+            if (t) tokenHandlers.dblClick(t);
+          }}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onContextMenu={onContextMenu}

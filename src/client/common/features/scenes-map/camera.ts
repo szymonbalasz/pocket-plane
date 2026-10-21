@@ -415,7 +415,7 @@ const sortedUnique = (vs: readonly number[]) => [...new Set(vs)].sort((a, b) => 
 
 /**
  * FR-MAP-59 (2), one scale: the allowed pan nearest `from` (Manhattan, then higher, then left), or
- * null. Each (token, obstacle) pair forbids an open rectangle of pans (Minkowski difference); the
+ * null (also when more than 6 obstacles reach into the pan range: FR-MAP-90's bound). Each (token, obstacle) pair forbids an open rectangle of pans (Minkowski difference); the
  * area bounds the pan range. Candidates = the cross product of the x-values {range bounds, `from`
  * clamped, every forbidden rectangle's left and right edge} and the y-values likewise; a sweep over
  * the x-values marks, per x, the y-candidates inside an active rectangle's open y-interval. Pans
@@ -448,6 +448,7 @@ function panAtScale(
   const fr: number[] = [];
   const ft: number[] = [];
   const fb: number[] = [];
+  const reach = new Set<Box>();
   for (const t of tokens) {
     for (const o of obstacles) {
       const l = o.x - (t.x + t.w) * scale;
@@ -455,12 +456,15 @@ function panAtScale(
       const tp = o.y - (t.y + t.h) * scale;
       const b = o.y + o.h - t.y * scale;
       if (r <= x0 + EPS || l >= x1 - EPS || b <= y0 + EPS || tp >= y1 - EPS) continue;
+      reach.add(o);
       fl.push(l);
       fr.push(r);
       ft.push(tp);
       fb.push(b);
     }
   }
+  // FR-MAP-90: the bound counts only the obstacles some token can reach at this scale.
+  if (reach.size > FIT_VISIBLE_MAX_OBSTACLES) return null;
   const inX = (v: number) => v >= x0 - EPS && v <= x1 + EPS;
   const inY = (v: number) => v >= y0 - EPS && v <= y1 + EPS;
   const fx = Math.min(Math.max(from.x, x0), x1);
@@ -510,8 +514,9 @@ function panAtScale(
  * `area` and clear of every obstacle (screen px). Scales: from step 1's cell down to
  * `FIT_HARD_MIN_CELL_PX` in steps of 4 px; at the first step with an allowed pan, also + 3, + 2,
  * + 1 (below the previous step); the largest allowed wins (no monotonicity assumed). Step 1
- * already clear → `from`; nothing allowed at 24 px, or more than 30 tokens or 6 obstacles in the
- * area → `from` (FR-MAP-46's PCs first), `pcs`. `minY`: `all` keeps the map's top edge (map
+ * already clear → `from`; nothing allowed at 24 px, or more than 30 tokens → `from` (FR-MAP-46's
+ * PCs first), `pcs`. FR-MAP-90: a scale at which more than 6 obstacles reach the tokens' pan range
+ * isn't searched (the bound counts only those, not every obstacle in the area). `minY`: `all` keeps the map's top edge (map
  * px 0) at or below it (FR-MAP-44's top row under the top bar), step 1 included.
  */
 export function fitVisible(
@@ -527,13 +532,7 @@ export function fitVisible(
     return { ...from, visible: "all" };
   }
   const pcs = { ...from, visible: "pcs" as const };
-  if (
-    cell <= 0 ||
-    tokens.length > FIT_VISIBLE_MAX_TOKENS ||
-    inArea.length > FIT_VISIBLE_MAX_OBSTACLES
-  ) {
-    return pcs;
-  }
+  if (cell <= 0 || tokens.length > FIT_VISIBLE_MAX_TOKENS) return pcs;
   const at = (c: number) => {
     const scale = c / cell;
     if (scale < ZOOM_MIN || scale > ZOOM_MAX) return null;
@@ -591,9 +590,10 @@ function before(a: readonly number[], b: readonly number[]): boolean {
 
 /**
  * FR-MAP-81: the `pcs` pan at 48 px per cell (`FIT_MIN_CELL_PX`, capped by the max zoom), or null
- * (no PCs, more than 6 obstacles in the area, or no pan keeps every PC footprint inside `area` and
- * clear of every obstacle: FR-MAP-46's centring stays). Inputs bounded: the PCs + the 30 tokens
- * nearest the PCs' box centre. Among the pans keeping the PCs inside and clear: (1) none drawn
+ * (no PCs, or no pan keeps every PC footprint inside `area`: FR-MAP-46's centring stays). Inputs
+ * bounded: the PCs + the 30 tokens nearest the PCs' box centre, and (FR-MAP-90) the 6 obstacles in
+ * the area nearest the PCs' box at `from`. No pan keeps every PC clear → the pan with the least PC
+ * footprint area under those obstacles (FR-MAP-90). Among the pans keeping the PCs inside and clear: (1) none drawn
  * cut by the top (a footprint on the viewport `view` whose top is above `area`'s), if such a pan
  * exists ("never cuts a token by the top bar while another PC-clear pan doesn't"; sim-9 a03's
  * top row at y 64), (2) then the most of those footprints inside `area` and clear of every
@@ -608,15 +608,30 @@ export function pcsPan(
   from: { x: number; y: number },
   cell: number,
 ): Camera | null {
+  const pcs = tokens.filter((t) => t.pc);
+  if (cell <= 0 || pcs.length === 0) return null;
+  const scale = Math.min(ZOOM_MAX, FIT_MIN_CELL_PX / cell);
+  // The PCs' bounding box and its centre.
+  const px0 = Math.min(...pcs.map((p) => p.x));
+  const py0 = Math.min(...pcs.map((p) => p.y));
+  const px1 = Math.max(...pcs.map((p) => p.x + p.w));
+  const py1 = Math.max(...pcs.map((p) => p.y + p.h));
+  const cx = (px0 + px1) / 2;
+  const cy = (py0 + py1) / 2;
+  // FR-MAP-90: past the bound, the 6 obstacles nearest the PCs' box (on screen at `from`).
+  const pcScreen = {
+    x: from.x + px0 * scale,
+    y: from.y + py0 * scale,
+    w: (px1 - px0) * scale,
+    h: (py1 - py0) * scale,
+  };
   const inArea = obstacles
     .filter((o) => cross(o, area))
+    .map((o) => ({ o, d: rectGap(o, pcScreen) }))
+    .sort((a, b) => a.d - b.d || b.o.w * b.o.h - a.o.w * a.o.h || a.o.y - b.o.y || a.o.x - b.o.x)
+    .slice(0, FIT_VISIBLE_MAX_OBSTACLES)
+    .map(({ o }) => o)
     .sort((a, b) => b.w * b.h - a.w * a.h || a.y - b.y || a.x - b.x);
-  const pcs = tokens.filter((t) => t.pc);
-  if (cell <= 0 || pcs.length === 0 || inArea.length > FIT_VISIBLE_MAX_OBSTACLES) return null;
-  const scale = Math.min(ZOOM_MAX, FIT_MIN_CELL_PX / cell);
-  // The PCs' bounding-box centre.
-  const cx = (Math.min(...pcs.map((p) => p.x)) + Math.max(...pcs.map((p) => p.x + p.w))) / 2;
-  const cy = (Math.min(...pcs.map((p) => p.y)) + Math.max(...pcs.map((p) => p.y + p.h))) / 2;
   const dist = (t: Box) => Math.hypot(t.x + t.w / 2 - cx, t.y + t.h / 2 - cy);
   const others = tokens
     .map((t, i) => ({ t, i, d: dist(t) }))
@@ -722,7 +737,83 @@ export function pcsPan(
       if (best === null || before(rank, best.rank)) best = { x, y, rank };
     }
   }
-  return best && { x: best.x, y: best.y, scale };
+  if (best) return { x: best.x, y: best.y, scale };
+  // FR-MAP-90: no pan keeps every PC clear → the least PC footprint area under the obstacles.
+  const pan = leastCoveredPan(pcs, inArea, [x0, x1], [y0, y1], scale, from);
+  return { ...pan, scale };
+}
+
+/** Screen gap between two rectangles (0 when they touch or overlap). */
+function rectGap(a: Box, b: Box): number {
+  const dx = Math.max(0, a.x - (b.x + b.w), b.x - (a.x + a.w));
+  const dy = Math.max(0, a.y - (b.y + b.h), b.y - (a.y + a.h));
+  return Math.hypot(dx, dy);
+}
+
+/** Length of the overlap of [at, at + len] with [o, o + olen]. */
+const overlap1 = (at: number, len: number, o: number, olen: number) =>
+  Math.max(0, Math.min(at + len, o + olen) - Math.max(at, o));
+
+/**
+ * FR-MAP-90: in the pan range [x0, x1] × [y0, y1] at `scale`, the pan with the least total area of
+ * `pcs` footprints under `obstacles` (screen px), then the least Manhattan distance to `from`, then
+ * higher, then left. Each footprint's overlap with an obstacle is bilinear between the pans where
+ * an edge of one meets an edge of the other, so the minimum lies on the grid of those pans.
+ */
+function leastCoveredPan(
+  pcs: readonly Box[],
+  obstacles: readonly Box[],
+  [x0, x1]: readonly [number, number],
+  [y0, y1]: readonly [number, number],
+  scale: number,
+  from: { x: number; y: number },
+): { x: number; y: number } {
+  const inX = (v: number) => v >= x0 - EPS && v <= x1 + EPS;
+  const inY = (v: number) => v >= y0 - EPS && v <= y1 + EPS;
+  const edges = (o: number, olen: number, t: number, tlen: number) => [
+    o - (t + tlen) * scale,
+    o - t * scale,
+    o + olen - (t + tlen) * scale,
+    o + olen - t * scale,
+  ];
+  const xs = sortedUnique(
+    [
+      x0,
+      x1,
+      Math.min(Math.max(from.x, x0), x1),
+      ...pcs.flatMap((t) => obstacles.flatMap((o) => edges(o.x, o.w, t.x, t.w))),
+    ].filter(inX),
+  );
+  const ys = sortedUnique(
+    [
+      y0,
+      y1,
+      Math.min(Math.max(from.y, y0), y1),
+      ...pcs.flatMap((t) => obstacles.flatMap((o) => edges(o.y, o.h, t.y, t.h))),
+    ].filter(inY),
+  );
+  const n = pcs.length * obstacles.length;
+  const ox = new Float64Array(n);
+  let best: { x: number; y: number; rank: number[] } | null = null;
+  for (const x of xs) {
+    let k = 0;
+    for (const t of pcs) {
+      for (const o of obstacles) ox[k++] = overlap1(x + t.x * scale, t.w * scale, o.x, o.w);
+    }
+    for (const y of ys) {
+      let cost = 0;
+      k = 0;
+      for (const t of pcs) {
+        for (const o of obstacles) {
+          const w = ox[k++] as number;
+          if (w > 0) cost += w * overlap1(y + t.y * scale, t.h * scale, o.y, o.h);
+        }
+      }
+      const rank = [cost, Math.abs(x - from.x) + Math.abs(y - from.y), y, x];
+      if (best === null || before(rank, best.rank)) best = { x, y, rank };
+    }
+  }
+  return best ?? { x: x0, y: y0 };
 }
 
 /** A token as the fit sees it: its cells and whether it is a PC (has an owner, FR-MAP-46). */
@@ -799,6 +890,42 @@ export function fitScene(
   return { ...cam, floor: same ? step1.floor : false, rect, visible };
 }
 
+/** FR-MAP-91 (OQ-MAP-61 A): shown card toasts stay clear unless the cell drops below this share. */
+export const FIT_PAST_TOASTS_SHARE = 0.75;
+
+/**
+ * FR-MAP-91: the DM's Fit (button, Reset layout, resize) twice: with the shown stack as obstacle
+ * (`room`, FR-MAP-80) and with only the summary strip (`stripRoom`); the first's cell below 75 %
+ * of the second's → the second (`pastToasts`: a card toast may cover tokens until resolved), else
+ * the first. Players (no shown stack): `room` alone.
+ */
+export function fitPastToasts(
+  tokens: readonly FitToken[],
+  grid: Grid,
+  map: Size,
+  view: Size,
+  room: FitRoom,
+  stripRoom: FitRoom,
+): SceneFit & { pastToasts: boolean } {
+  const kept = fitScene(tokens, grid, map, view, room);
+  if (stripRoom.obstacles.length === room.obstacles.length) return { ...kept, pastToasts: false };
+  const past = fitScene(tokens, grid, map, view, stripRoom);
+  return kept.scale < FIT_PAST_TOASTS_SHARE * past.scale - EPS
+    ? { ...past, pastToasts: true }
+    : { ...kept, pastToasts: false };
+}
+
+/**
+ * FR-MAP-90 no jump: an appearance keeps the camera when every footprint (`tokens`, map px) is
+ * inside FR-MAP-59's area and clear of every obstacle at `cam` (FR-MAP-59's test).
+ */
+export const appearanceKeeps = (
+  cam: Camera,
+  tokens: readonly Box[],
+  obstacles: readonly Box[],
+  view: Size,
+) => allClear(cam, tokens, obstacles, visibleArea(view));
+
 /** `data-camera` (FR-MAP-44 (b)): where the last fit put it, or moved by the user since. */
 export type CameraMode = "fitted" | "moved";
 
@@ -817,8 +944,18 @@ export type CameraEvent =
   | "zoom"
   | "pull";
 
-/** `data-fit-reason`: the last fit's cause (FR-MAP-82). */
-export type FitReason = "open" | "fit" | "appearance" | "resize" | "reveal";
+/**
+ * `data-fit-reason`: the last fit's cause (FR-MAP-82); `load` = the first scene open on this page
+ * (FR-MAP-89), `fit-past-toasts` = a Fit that let a card toast cover tokens (FR-MAP-91).
+ */
+export type FitReason =
+  | "open"
+  | "load"
+  | "fit"
+  | "fit-past-toasts"
+  | "appearance"
+  | "resize"
+  | "reveal";
 
 /**
  * FR-MAP-44/45/47/82 triggers: a scene open and the Fit button always fit; an appearance, a
