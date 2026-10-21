@@ -2223,7 +2223,7 @@ From [gems](../specs/gems.md#8-data-model) FR-GEM-13, -19, [dice-roll-log](../sp
 | `game_log_entry.superseded_by` | now written | set once (`null` → the reroll's new entry); the old entry is kept | FR-DICE-63 |
 | `roll` payload item `replaces?` | new optional `{entryId, total}` | on the reroll's item: the old entry and its item's total ("(reroll, was 7)") | FR-DICE-64 |
 | `gem.spend` payload `target?`, `dmPayload` | new optional `target {kind: "entry", id, label ≤ 60, from, to?}` (`null` = a DM-only target); new `dmPayload {target}` | the target's detail takes its audience | FR-GEM-13, -19 |
-| `damage-card` payload | no new field | a reroll replaces `toHit`, sets `crit`; a crit flip moves `damage` to `unusedRolls` (`damage: null`) | FR-CBT-126, -127 |
+| `damage-card` payload | + optional `ruled: true` (set by `cbt.applyHit`, +13 B per ruled card) | a reroll replaces `toHit`, sets `crit`; a crit flip moves `damage` to `unusedRolls` (`damage: null`); `ruled` tells the owner a ruling exists (no targets, no outcome) | FR-CBT-88, -126, -127 |
 
 - **Derived (not stored):** `critChanged(card)` (a to-hit card with unused rolls and no damage); `countedRollIds` (stats: entries neither undone nor superseded).
 - **Deleted on a crit flip:** the card's `offered` `trigger_use` rows (server-only; the new damage roll offers again).

@@ -32,7 +32,7 @@ const written = (t: Setup) => [
 ];
 
 describe("FR-CBT-88 cbt.applyHit", () => {
-  test("FR-CBT-88 applyHit writes the hit lines: ruling, one line per target, no HP, card unchanged", () => {
+  test("FR-CBT-88 applyHit writes the hit lines: ruling, one line per target, no HP, card only `ruled`", () => {
     const t = setup();
     const { cardId } = t.toHit("Mira", 11);
     const before = t.card(cardId);
@@ -42,8 +42,8 @@ describe("FR-CBT-88 cbt.applyHit", () => {
       t.target("Goblin", true, "half"),
       t.target("Goblin 2", false),
     ]);
-    expect(t.typesSince(n)).toEqual(["HitApplied"]);
-    const ev = t.events.at(-1)?.event;
+    expect(t.typesSince(n)).toEqual(["HitApplied", "NotificationUpdated"]);
+    const ev = t.events.at(-2)?.event;
     const lines = t.entries().slice(-2);
     expect(ev?.payload).toEqual({
       cardId,
@@ -81,10 +81,12 @@ describe("FR-CBT-88 cbt.applyHit", () => {
       [true, expect.objectContaining({ awaitingDamage: true, damage: 0, hit: true })],
       [true, expect.objectContaining({ awaitingDamage: true, hit: false })],
     ]);
-    // No HP, no hp_change; the card stays pending and unchanged (no card upsert).
+    // No HP, no hp_change; the card stays pending; its one change is `ruled` (GM1, no toast).
     expect(t.count("hp_change")).toBe(0);
     expect([t.combatant("Goblin").hpCurrent, t.combatant("Goblin 2").hpCurrent]).toEqual(hp);
-    expect(t.card(cardId)).toEqual(before);
+    const after = t.card(cardId);
+    expect(after.p).toEqual({ ...before.p, ruled: true });
+    expect([after.state, after.seq, after.text]).toEqual([before.state, before.seq, before.text]);
     expect(ev?.changes.some((c) => c.type === "notification")).toBe(false);
     // FR-MOD-63: Apply hit spends nothing.
     expect(t.count("trigger_use")).toBe(0);

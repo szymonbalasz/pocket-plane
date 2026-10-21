@@ -508,6 +508,12 @@ export const DamageCardPayload = z
     saveDc: CardSaveDc.optional(),
     /** FR-CBT-92 (sprint 5): the owner's later damage rolls, not used ("Also rolled: 9"). */
     unusedRolls: z.array(CardUnusedRoll).min(1).max(UNUSED_ROLLS_MAX).optional(),
+    /**
+     * Sprint 7 (GM1 walkthrough d2): the DM's Apply hit ruled this card (FR-CBT-88). The owner
+     * never gets the DM-only `hit-ruling`; the flag tells it only that a ruling exists (no
+     * targets, no outcome), so a to-hit reroll isn't offered (FR-GEM-18). Absent = not ruled.
+     */
+    ruled: z.literal(true).optional(),
   })
   .refine((p) => p.toHit !== null || p.damage !== null, {
     path: ["damage"],

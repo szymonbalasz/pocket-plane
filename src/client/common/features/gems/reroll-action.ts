@@ -9,8 +9,9 @@ import {
   HIT_RULING_TYPE,
   type HitRulingRecord,
 } from "@shared/combat-tracker/schemas";
-import { rerollableRoll } from "@shared/dice-roll-log/reroll";
+import { inRerollWindow, rerollableRoll } from "@shared/dice-roll-log/reroll";
 import {
+  GAME_LOG_ENTRY_TYPE,
   type GameLogEntryView,
   RollEntryPayload,
   type RollPayloadItem,
@@ -57,13 +58,36 @@ export function rerollCharacter(
 
 /** FR-GEM-18: a combat to-hit only while its card is pending and unruled (what this viewer holds). */
 function cardOpen(store: RecordStore, rollId: string): boolean {
-  const card = recordsOf<NotificationRecord>(store, "notification").find((n) => {
-    if (n.kind !== DAMAGE_CARD_KIND) return false;
+  let card: NotificationRecord | undefined;
+  let ruled = false;
+  for (const n of recordsOf<NotificationRecord>(store, "notification")) {
+    if (n.kind !== DAMAGE_CARD_KIND) continue;
     const p = DamageCardPayload.safeParse(n.payload);
-    return p.success && p.data.toHit?.rollId === rollId;
-  });
-  if (card?.state !== "pending") return false;
-  return !recordsOf<HitRulingRecord>(store, HIT_RULING_TYPE).some((r) => r.cardId === card.id);
+    if (p.success && p.data.toHit?.rollId === rollId) {
+      card = n;
+      ruled = p.data.ruled === true;
+      break;
+    }
+  }
+  if (card?.state !== "pending" || ruled) return false;
+  // The DM's own record (cards ruled before the `ruled` flag existed).
+  const id = card.id;
+  return !recordsOf<HitRulingRecord>(store, HIT_RULING_TYPE).some((r) => r.cardId === id);
+}
+
+const newestCache = new WeakMap<object, number>();
+
+/** The newest entry `n` this client holds (the store's entry map, cached per map). */
+function newestN(store: RecordStore): number {
+  const map = store.records[GAME_LOG_ENTRY_TYPE];
+  if (!map) return 0;
+  let n = newestCache.get(map);
+  if (n === undefined) {
+    n = 0;
+    for (const e of Object.values(map) as { n: number }[]) if (e.n > n) n = e.n;
+    newestCache.set(map, n);
+  }
+  return n;
 }
 
 /** FR-GEM-33: show "Inspiration: reroll" on this line for this viewer? */
@@ -71,6 +95,8 @@ export function rerollAvailable(store: RecordStore, entry: GameLogEntryView, you
   const item = rerollItem(entry);
   // OQ-GEM-20 A: death / concentration saves state their outcome (`note`) and stay as rolled.
   if (!item || item.note !== undefined) return false;
+  // The server's window rule on this client's newest line (live logs outgrow the snapshot's 100).
+  if (!inRerollWindow(entry.n, Math.max(entry.n, newestN(store)))) return false;
   const ch = rerollCharacter(store, entry, you);
   if (!ch) return false;
   const gems = recordsOf<CharacterGemsRecord>(store, CHARACTER_GEMS_TYPE).find(

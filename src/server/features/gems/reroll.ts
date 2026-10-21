@@ -1,7 +1,7 @@
 // Inspiration reroll (GEM FR-GEM-18–24, GM1): the eligibility rule on top of dice-roll-log's
 // generic reroll (`rerollableRoll`, FR-DICE-70), and the spend's target detail by audience
 // (FR-GEM-13). The command (`gem.spend`) writes count + spend line + reroll in one transaction.
-import { rerollableRoll } from "@shared/dice-roll-log/reroll";
+import { inRerollWindow, rerollableRoll } from "@shared/dice-roll-log/reroll";
 import {
   GAME_LOG_WINDOW,
   type GameLogEntryRecord,
@@ -10,7 +10,7 @@ import {
 } from "@shared/dice-roll-log/schemas";
 import type { GemSpendTarget } from "@shared/gems/log-kinds";
 import type { NotificationRecord } from "@shared/notifications/schemas";
-import { and, count, eq, gt } from "drizzle-orm";
+import { eq, max } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { conflict, notFound } from "../../commands/errors";
 import { gameLogEntry, roll } from "../../db/schema";
@@ -65,12 +65,12 @@ export function rerollTarget(
     if (entry.category === "initiative") throw conflict("Initiative can't be rerolled");
     throw conflict("No d20 roll to reroll");
   }
-  const newer = env.tx
-    .select({ n: count() })
+  const newest = env.tx
+    .select({ n: max(gameLogEntry.n) })
     .from(gameLogEntry)
-    .where(and(eq(gameLogEntry.campaignId, entry.campaignId), gt(gameLogEntry.n, entry.n)))
+    .where(eq(gameLogEntry.campaignId, entry.campaignId))
     .get();
-  if ((newer?.n ?? 0) >= GAME_LOG_WINDOW) {
+  if (!inRerollWindow(entry.n, newest?.n ?? entry.n)) {
     throw conflict(`Only the newest ${GAME_LOG_WINDOW} lines can be rerolled`);
   }
   const row = env.tx.select().from(roll).where(eq(roll.id, rollId)).get();

@@ -7,6 +7,7 @@ import {
   type DamageCardPayload,
   HIT_RULING_TYPE,
 } from "@shared/combat-tracker/schemas";
+import { inRerollWindow } from "@shared/dice-roll-log/reroll";
 import {
   GAME_LOG_ENTRY_TYPE,
   type GameLogEntryView,
@@ -82,6 +83,7 @@ function store(
     features?: string[];
     cards?: NotificationRecord[];
     rulings?: object[];
+    entries?: GameLogEntryView[];
   } = {},
 ): RecordStore {
   const role = o.role ?? "player";
@@ -90,7 +92,7 @@ function store(
     you: { campaignId: "c1", role, playerId: role === "dm" ? null : (o.playerId ?? "p1") },
     records: {
       campaign: byId([{ id: "c1", name: "C", features: o.features ?? [GEMS_FEATURE] }]),
-      [GAME_LOG_ENTRY_TYPE]: {},
+      [GAME_LOG_ENTRY_TYPE]: byId(o.entries ?? []),
       [ENTITY_TYPE]: byId([
         { id: "mira", kind: "character", name: "Mira", ownerPlayerId: "p1" },
         { id: "thorn", kind: "character", name: "Thorn", ownerPlayerId: "p2" },
@@ -142,6 +144,29 @@ describe("FR-GEM-33 log action available", () => {
         attack,
       ),
     ).toBe(false);
+  });
+
+  test("FR-GEM-33 log action available: hidden on a ruled card for its owner, who never gets the hit-ruling (walkthrough d2)", () => {
+    const attack = entry({ category: "attack", encounterId: "enc" });
+    // The player's store: the card (with the DM's `ruled` flag), no `hit-ruling` record.
+    expect(shows(store({ cards: [card({}, { ruled: true })] }), attack)).toBe(false);
+    expect(shows(store({ role: "dm", cards: [card({}, { ruled: true })] }), attack)).toBe(false);
+  });
+
+  test("FR-GEM-18 FR-GEM-33 log action available: only in the newest-100 window of the live log, as the server decides (walkthrough c2)", () => {
+    const perc = entry({ id: "e1", n: 1 });
+    const later = (count: number) =>
+      Array.from({ length: count }, (_, i) =>
+        entry({ id: `x${i}`, n: i + 2, actorName: "Goblin", rollerRole: "dm" }),
+      );
+    // 99 newer lines: still in the window; 100: out (the server's "newest 100").
+    expect(shows(store({ entries: [perc, ...later(99)] }), perc)).toBe(true);
+    expect(shows(store({ entries: [perc, ...later(100)] }), perc)).toBe(false);
+    // Lines the player doesn't receive still count: `n` is numbered for every line.
+    const gap = entry({ id: "y", n: 101, actorName: "Goblin", rollerRole: "dm" });
+    expect(shows(store({ entries: [perc, gap] }), perc)).toBe(false);
+    expect(inRerollWindow(1, 100)).toBe(true);
+    expect(inRerollWindow(1, 101)).toBe(false);
   });
 
   test("FR-GEM-21 physical reroll: the action rolls the line's d20 in its mode and sends `manual` when typed", async () => {

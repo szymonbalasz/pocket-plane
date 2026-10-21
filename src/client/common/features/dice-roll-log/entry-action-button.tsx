@@ -5,24 +5,23 @@
 import type { GameLogEntryView, ManualEntry } from "@shared/dice-roll-log/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { CheckIcon, XIcon } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useSync } from "../../sync/store";
 import { diceExtras } from "../dice-extras/store";
+import { createActionConfirm } from "./entry-action-confirm";
 import { actionsFor, type EntryAction } from "./entry-actions";
-import { RollButton, useRollControl } from "./roll-control";
+import { RollButton, type RollControl, useRollControl } from "./roll-control";
 
 function errorText(err: unknown): string {
   if (err instanceof IntentRejected) return err.message;
   return err instanceof Error ? err.message : "Something went wrong";
 }
-
-/** FR-DICE-68: how long an action's confirm ("Spend?" ✓ ✗) stays open. */
-export const ACTION_CONFIRM_MS = 4000;
 
 const ACTION_BUTTON = "size-6 shrink-0";
 
@@ -42,16 +41,16 @@ function EntryActionButton({
 }) {
   const connection = useSync((s) => s.connection);
   const live = useSync((s) => s.state === "live");
-  const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    if (!asking) return;
-    const t = setTimeout(() => setAsking(false), ACTION_CONFIRM_MS);
-    return () => clearTimeout(t);
-  }, [asking]);
+  // The confirm closes after 4 s unless the physical form is open; a close that sent nothing
+  // resets the roll control, so the next ✓ opens a fresh form (GM1 walkthrough f2).
+  const controlRef = useRef<RollControl | null>(null);
+  const [confirm] = useState(() => createActionConfirm(() => controlRef.current?.cancelManual()));
+  const asking = useStore(confirm.api, (s) => s.asking);
+  useEffect(() => () => confirm.cancel(), [confirm]);
   const roll = action.roll?.(entry) ?? null;
   const go = (manual?: ManualEntry) => {
-    setAsking(false);
+    confirm.done();
     setBusy(true);
     action
       .run(entry, {
@@ -72,6 +71,9 @@ function EntryActionButton({
     mode: roll?.mode ?? "normal",
     onRoll: (r) => go(r.manual?.[0]),
   });
+  controlRef.current = control;
+  const formOpen = control.manual !== null;
+  useEffect(() => confirm.form(formOpen), [confirm, formOpen]);
   const disabled = !live || busy;
   const ids = { "data-value": action.id, "data-record-id": entry.id };
   const Icon = action.Icon;
@@ -119,7 +121,7 @@ function EntryActionButton({
           size="icon"
           variant="ghost"
           className={ACTION_BUTTON}
-          onClick={() => setAsking(false)}
+          onClick={() => confirm.cancel()}
         >
           <XIcon className="size-3.5" />
         </Button>
@@ -158,7 +160,7 @@ function EntryActionButton({
       <Button
         type="button"
         {...props}
-        onClick={() => (action.confirm !== undefined ? setAsking(true) : go())}
+        onClick={() => (action.confirm !== undefined ? confirm.ask() : go())}
       >
         <Icon className="size-3.5" />
       </Button>

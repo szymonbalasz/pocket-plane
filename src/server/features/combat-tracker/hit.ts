@@ -1,7 +1,9 @@
 // Apply hit (sprint 5, FR-CBT-88, ADR-0053): the DM rules the to-hit of a pending card before
 // its damage exists. One transaction: the DM-only `hit_ruling` row, one `cbt.attack` line per
 // ruled target without damage (`awaitingDamage`), `HitApplied`. No HP, no `hp_change`, the card
-// stays pending and unchanged; nothing is spent (FR-MOD-63: no apply hooks run). Not undoable.
+// stays pending; nothing is spent (FR-MOD-63: no apply hooks run). Not undoable. Sprint 7 (GM1):
+// the card gains `ruled` (its only change, `NotificationUpdated`, no toast) so its owner's
+// client knows a reroll of the to-hit is no longer offered.
 
 import {
   companionLineRollIds,
@@ -28,7 +30,8 @@ import { hitRuling } from "../../db/schema";
 import { gameLog } from "../dice-roll-log";
 import { cardRollIds, dmModNames, rolledOf } from "../effect-modifiers/card";
 import { activeEffects } from "../effect-modifiers/roll-hook";
-import { loadNotification } from "../notifications/helpers";
+import { loadNotification, updateNotification } from "../notifications/helpers";
+import { fitCardPayload } from "./card-kind";
 import { activeCombatant, statsOf } from "./guards";
 import { CARD_CHANGED, cardRoll } from "./hp";
 import {
@@ -176,6 +179,8 @@ export const applyHitCommand = defineCommand({
       },
       changes: [hitRulingChange(null, toHitRulingRecord(row)), ...entries],
     });
+    // Sprint 7 (GM1): the owner's no-leak "ruled" flag, after the owner's event (protocol §22).
+    updateNotification(env, card.id, { payload: fitCardPayload({ ...p, ruled: true }) });
     return { rulingId: id };
   },
 });

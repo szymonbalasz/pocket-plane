@@ -519,6 +519,25 @@ describe("FR-GEM-22 combat to-hits (FR-CBT-126, -127, -129)", () => {
     expect(cardOf(t, b.cardId).damage).toEqual(bp.damage);
   });
 
+  test("FR-GEM-18 ruled card (walkthrough d2): Apply hit flags the owner's card `ruled` (no targets, no outcome); player-2 gets nothing", () => {
+    const t = setup();
+    const { cardId } = t.toHit("Mira", 6);
+    const n = t.events.length;
+    t.applyHit(cardId, 15, [t.target("Wolf", true)]);
+    const cards = (v: typeof t.dmV) =>
+      t.events
+        .slice(n)
+        .flatMap((x) => t.wire(x.event.changes, v))
+        .filter((w) => w.type === "notification");
+    const [own] = cards(t.p1V);
+    expect((own?.data as { payload: DamageCardPayload }).payload.ruled).toBe(true);
+    // The flag alone: the hidden Wolf, the ruling and its outcome stay DM-only.
+    expect(JSON.stringify(own)).not.toContain(t.id("Wolf"));
+    expect(JSON.stringify(own)).not.toContain("hit-ruling");
+    expect(cards(t.p2V)).toEqual([]);
+    expect((t.h.snapshot(t.p1V)["hit-ruling"] ?? []).length).toBe(0);
+  });
+
   test("FR-GEM-22 leak: player-2 never gets player-1's card update; P1 does", () => {
     const t = setup();
     const { cardId } = t.toHit("Mira", 6);

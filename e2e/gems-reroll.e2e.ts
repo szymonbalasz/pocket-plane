@@ -47,6 +47,7 @@ function setGems(page: Page, secret: string, on: boolean) {
 test("FR-GEM-19 FR-GEM-33 FR-DICE-65 FR-DICE-68 FR-GEM-05 P1 rerolls Perception from its line: spend + new line for all, old struck → jumps; gems off hides the traces live, on restores", async ({
   browser,
 }) => {
+  test.setTimeout(60_000);
   const { secret, link } = e2eEnv();
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
@@ -99,6 +100,39 @@ test("FR-GEM-19 FR-GEM-33 FR-DICE-65 FR-DICE-68 FR-GEM-05 P1 rerolls Perception 
   await line(dmLog, old).getByTestId("dice-log-rerolled").click();
   await expect(fresh).toHaveAttribute("data-focused", "true");
   expect(p2Frames.join("\n")).not.toContain("DM-SECRET-GEM");
+
+  // Walkthrough d2: the fixture's to-hit the DM already ruled (Apply hit, still pending) offers
+  // no reroll to its owner, who never gets the DM's hit-ruling.
+  const ruled = line(p1Log, "Light crossbow attack");
+  await expect(ruled).toHaveCount(1);
+  await ruled.hover();
+  await expect(ruled.getByTestId("dice-log-action")).toHaveCount(0);
+
+  // Walkthrough f2: physical dice. The form outlives the 4 s "Spend?"; closed unsent, a second
+  // try opens it again; "Roll for me" sends.
+  const p1Options = p1Log.getByTestId("dice-roll-options");
+  if ((await p1Options.getAttribute("data-state")) !== "open") await p1Options.click();
+  await p1Log.getByTestId("dice-roll-physical").click();
+  await expect(p1Log.getByTestId("dice-roll-physical")).toHaveAttribute("data-state", "checked");
+  const stealth = line(p1Log, "Stealth (adv): 6");
+  const form = p1.locator("form").filter({ has: p1.getByTestId("dice-manual-label") });
+  const openForm = async () => {
+    await stealth.hover();
+    await stealth.locator('[data-testid="dice-log-action"][data-value="gem.reroll"]').click();
+    await stealth.getByTestId("dice-log-action-yes").click();
+    await expect(form).toBeVisible();
+    await expect(form.getByTestId("dice-manual-label")).toContainText("Stealth (reroll)");
+  };
+  await openForm();
+  await p1.waitForTimeout(5_000);
+  await expect(form).toBeVisible();
+  await p1.keyboard.press("Escape");
+  await expect(form).toHaveCount(0);
+  await p1.waitForTimeout(4_500);
+  await expect(stealth.getByTestId("dice-log-action-confirm")).toHaveCount(0);
+  await openForm();
+  await form.getByTestId("dice-manual-auto").click();
+  for (const log of logs) await expect(line(log, "Stealth (adv) (reroll, was 11)")).toHaveCount(1);
 
   // Off: the struck line and the spend line go live; the final roll stays, its marker stripped.
   await setGems(dm, secret, false);

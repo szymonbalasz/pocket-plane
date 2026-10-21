@@ -3,7 +3,7 @@
 // share them. Callers add their own rules (gems: actor, window, card state, FR-GEM-18).
 import { type DiceTerm, parseExpression } from "./grammar";
 import { ROLL_KIND } from "./roll-kind";
-import { type RollCategory, RollEntryPayload } from "./schemas";
+import { GAME_LOG_WINDOW, type RollCategory, RollEntryPayload } from "./schemas";
 
 /**
  * FR-DICE-62: the d20 term a reroll re-rolls: `1d20`, `2d20kh1` or `2d20kl1` (adv / dis), added.
@@ -45,6 +45,13 @@ export function rerollableRoll(entry: RerollableEntry): string | null {
   if (!items.success) return null;
   return items.data.find((i) => hasD20Term(i.expression))?.rollId ?? null;
 }
+
+/**
+ * FR-GEM-18 (OQ-GEM-05 A): is entry `n` in the newest-100 window, given the campaign's newest
+ * `n`? Entries are numbered 1, 2, … per campaign and never deleted (FR-DICE-17), so the newer
+ * entries are exactly `newest - n`. The server passes the campaign's newest; a client its store's.
+ */
+export const inRerollWindow = (n: number, newest: number): boolean => newest - n < GAME_LOG_WINDOW;
 
 /** The entry fields the counting contract reads. */
 export interface CountedEntry {
