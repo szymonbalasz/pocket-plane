@@ -530,7 +530,7 @@ describe("FR-GEM-22 combat to-hits (FR-CBT-126, -127, -129)", () => {
         .flatMap((x) => t.wire(x.event.changes, v))
         .filter((w) => w.type === "notification");
     const [own] = cards(t.p1V);
-    expect((own?.data as { payload: DamageCardPayload }).payload.ruled).toBe(true);
+    expect((own?.data as { payload: DamageCardPayload } | undefined)?.payload.ruled).toBe(true);
     // The flag alone: the hidden Wolf, the ruling and its outcome stay DM-only.
     expect(JSON.stringify(own)).not.toContain(t.id("Wolf"));
     expect(JSON.stringify(own)).not.toContain("hit-ruling");
