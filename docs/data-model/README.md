@@ -2244,9 +2244,9 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-56 (OQ-SHELL-55 
 - **Persisted runtime state:** only `userSpot` in the layout entry.
 - **CON-44:** 0 B.
 
-## 99. Sprint 7: map follow-ups (FU3)
+## 101. Sprint 7: map follow-ups (FU3)
 
-From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A). **Built by `fix/fu-map`**: no table, column, record type or payload change. Protocol side: [protocol §128](../protocol/README.md#128-sprint-7-map-follow-ups-fu3).
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A). **Built by `fix/fu-map`**: no table, column, record type or payload change. Protocol side: [protocol §130](../protocol/README.md#130-sprint-7-map-follow-ups-fu3).
 
 | Data | Where | Rule | Source |
 |---|---|---|---|

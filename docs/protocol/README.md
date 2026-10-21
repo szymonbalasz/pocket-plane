@@ -3041,9 +3041,9 @@ From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-77�
 | DM toast stack (`notifications/keep-out.ts` `dmStackPlacement`; `content-heights.ts` `reportFirstRow`, `firstRows`) | While a hard keep-out (the tool bar) is shown, every window's title bar, first `PUSHED_BODY_CLEAR` 40 px of body and first content row block the stack like a title bar (pushed windows included), so it shifts or drops below that strip before it takes "the least window body". `ShellWindow` reports each open window's first record row (`[data-record-id]` below the body top) as `{x, y, bottom}` at its rendered top-left (walkthrough U4: Scenes' "Goblin Ambush" row at 145…179, under title + 40 = 133); a report is matched to a window by that top-left (± 1 px). Players unchanged | FR-NOTE-44 |
 | CON-44 | 0 B | — |
 
-## 128. Sprint 7: map follow-ups (FU3)
+## 130. Sprint 7: map follow-ups (FU3)
 
-From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A; seams S6). **Built by `fix/fu-map`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B). Amends §118's `pcsPan` row ("> 6 obstacles → null"), reveal-refit row ("once the scene-open fit ran": now the baseline that fit took) and `data-fit-reason` row. Data side: [data model §99](../data-model/README.md#99-sprint-7-map-follow-ups-fu3).
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A; seams S6). **Built by `fix/fu-map`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B). Amends §118's `pcsPan` row ("> 6 obstacles → null"), reveal-refit row ("once the scene-open fit ran": now the baseline that fit took) and `data-fit-reason` row. Data side: [data model §101](../data-model/README.md#101-sprint-7-map-follow-ups-fu3).
 
 | Piece | Contract | Source |
 |---|---|---|
