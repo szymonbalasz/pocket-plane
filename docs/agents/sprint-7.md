@@ -46,6 +46,7 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 | 2026-10-21 | **Stats core merged** (#327): live fight / session stats filtered per viewer, From on heals, "— Overkill!" lines, final roll only. **Stats window merged** (#328): Fight leaderboard, Session awards, overkill toasts, Show awards. Combat gem in its final gates; session-sim-11 next |
 | 2026-10-21 | **Combat gem merged** (#329): max 1–3 damage dice before Apply (incl. after Apply hit), server-side totals, gems-off strips badges. All sprint slices merged. A pre-existing leak found (a player's resolved card showed a monster's HP on a kill): small fix branch before session-sim-11 |
 | 2026-10-21 | **Sprint gate:** session-sim-11 **15 / 17 PASS** on final `main` (leak scan clean, hard kill byte-identical); FAILs: windows on Mira at 1280×720, Player 1's sheet over revealed tokens with the companion card open. The card fix waits for the DM (it amends #138). [Playtest: sprint 7 features](#playtest-sprint-7-features) written. Paused for the recap |
+| 2026-10-21 | **Recap (DM):** #331 B merged (players' cards show the line's damage); a reroll test flake fixed (#332); window-frame pass into sprint 8 (#333); sprint 8 scope #334 → [sprint-8](sprint-8.md) |
 
 ## Playtest: sprint 7 features
 
