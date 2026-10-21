@@ -1,9 +1,9 @@
 ---
 title: Play shell
 prefix: SHELL
-status: complete
-owner: spec-stats
-phase: post-mvp-7
+status: claimed
+owner: spec-wf
+phase: post-mvp-8
 ---
 
 # Play shell
