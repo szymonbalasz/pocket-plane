@@ -46,7 +46,12 @@ Each path has its own inputs, its own idea of "PC" and of "written vs render-onl
 4. **Least movement.** A trigger moves only the windows it displaces or that break an invariant. Ties prefer the window's previous rect.
 5. **Displacement memory.** A window moved, shrunk or put away by a transient cause (a tool bar, a smaller viewport) remembers its rect in client memory. When the cause goes, it returns if the user didn't touch it and the spot is clear. Without memory (after a reload), a shell-sized window grows toward its target size.
 6. **Written vs render-only.** Shell placements are written with `area`. A user spot (`userSpot`) and a user size (new optional `userSize`) are never moved or resized by the placer; they only get the render-only fit and clamp. The exceptions are a hard keep-out (a tool bar pushes) and the rail clamp.
-7. **Registration** for other features: windows (registry line + size-table row incl. useful size), overlays (no placement), chrome keep-outs (new append-only registry, hard + fit obstacle), toasts (notification kind + toast class).
+7. **Registration** for other features (seams S1–S5, S12):
+   - windows: registry line + size-table row incl. useful size;
+   - overlays: new append-only `overlays.ts`, not placed; `blocksInput` queues settles;
+   - top-bar items: new `top-bar-items.ts`; the top bar stays 48 px;
+   - chrome keep-outs: new `chrome-keep-outs.ts`, a hard keep-out + fit obstacle;
+   - toasts: a notification kind + toast class, or a callout.
 
 ## Consequences
 
