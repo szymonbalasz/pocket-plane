@@ -10,6 +10,7 @@ export const companionWindowBase = {
   title: "Companion",
   defaultSize: { w: 320, h: 360 },
   minSize: { w: 280, h: 240 },
+  usefulSize: { w: 320, h: 360 }, // FR-CHARX-81: attacks above the fold before others shrink it
   defaultPosition: { anchor: "top-left", dx: 56 },
   defaultOpen: false,
 } satisfies Partial<WindowDef>;

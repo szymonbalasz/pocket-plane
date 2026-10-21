@@ -74,6 +74,53 @@ export function addPick(
 
 export const instancesOf = (rows: readonly AddRow[]) => rows.reduce((n, r) => n + r.qty, 0);
 
+type AddOptions = ReturnType<typeof addOptionsState>;
+
+/**
+ * OQ-CBTX-22 (BL-58): with Create tokens off nothing is created hidden, so "Add hidden" reads
+ * false and the intent carries `hidden: false`; the DM's own choice is kept for when it is back on.
+ */
+export function addFlags(opts: AddOptions, hidden: boolean) {
+  return { createTokens: opts.creating, hidden: opts.creating && hidden };
+}
+
+/** The Create tokens / Add hidden tickboxes; `hidden` is the DM's choice, shown per `addFlags`. */
+export function AddTokenOptions(p: {
+  opts: AddOptions;
+  hidden: boolean;
+  onCreateTokens: (v: boolean) => void;
+  onHidden: (v: boolean) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="cbtx-add-create-tokens"
+          data-testid="cbtx-add-create-tokens"
+          disabled={p.opts.createDisabled}
+          checked={p.opts.creating}
+          onCheckedChange={(v) => p.onCreateTokens(v === true)}
+        />
+        <Label htmlFor="cbtx-add-create-tokens" className="font-normal">
+          Create tokens
+        </Label>
+      </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="cbtx-add-hidden"
+          data-testid="cbtx-add-hidden"
+          disabled={p.opts.hiddenDisabled}
+          checked={addFlags(p.opts, p.hidden).hidden}
+          onCheckedChange={(v) => p.onHidden(v === true)}
+        />
+        <Label htmlFor="cbtx-add-hidden" className="font-normal">
+          Add hidden
+        </Label>
+      </div>
+    </>
+  );
+}
+
 export function AddForm() {
   const close = useCbtxDialogs((s) => s.close);
   const { send, disabled } = useCbtIntent();
@@ -124,8 +171,7 @@ export function AddForm() {
     slots,
     sceneTokens.filter((t) => !bound.has(t.id)),
     {
-      createTokens: opts.creating,
-      hidden,
+      ...addFlags(opts, hidden),
       sceneTokenNames: sceneTokens.map((t) => t.name),
     },
   );
@@ -221,30 +267,12 @@ export function AddForm() {
         </ul>
       )}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="cbtx-add-create-tokens"
-            data-testid="cbtx-add-create-tokens"
-            disabled={opts.createDisabled}
-            checked={opts.creating}
-            onCheckedChange={(v) => setCreateTokens(v === true)}
-          />
-          <Label htmlFor="cbtx-add-create-tokens" className="font-normal">
-            Create tokens
-          </Label>
-        </div>
-        <div className="flex items-center gap-2">
-          <Checkbox
-            id="cbtx-add-hidden"
-            data-testid="cbtx-add-hidden"
-            disabled={opts.hiddenDisabled}
-            checked={hidden}
-            onCheckedChange={(v) => setHidden(v === true)}
-          />
-          <Label htmlFor="cbtx-add-hidden" className="font-normal">
-            Add hidden
-          </Label>
-        </div>
+        <AddTokenOptions
+          opts={opts}
+          hidden={hidden}
+          onCreateTokens={setCreateTokens}
+          onHidden={setHidden}
+        />
         {scene === null && (
           <span className="text-xs text-muted-foreground">This encounter has no scene</span>
         )}
@@ -280,8 +308,7 @@ export function AddForm() {
             const r = await send(CBTX_INTENTS.addCombatants, {
               encounterId: enc.id,
               items: addItems(rows),
-              createTokens: opts.creating,
-              ...(opts.creating ? { hidden } : {}),
+              ...addFlags(opts, hidden),
               ...(at ? { at } : {}),
             });
             if (r !== undefined) close();

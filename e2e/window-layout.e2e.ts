@@ -1,6 +1,6 @@
 // e2e-bundle: windows-s5
 // Thin sprint-5 window layout flows (SHELL §13 sprint 5 E2E, track W slice W1): launcher opens
-// never stack and keep off PC tokens (FR-SHELL-45–47); the players' sheet, Initiative and Game log
+// never stack and keep off PC tokens (FR-SHELL-45–47; sprint 7: auto-minimise first, FR-SHELL-77); the players' sheet, Initiative and Game log
 // stay apart after the DM's Start at 1280×800 (FR-SHELL-50); the wide Game log keeps its roll bar
 // compact (FR-DICE-39). Rank, keep-outs and default layouts in detail: bun test (placement,
 // manager, windows tests). The AoE panel vs Initiative check waits for the tool-bar push (W3).
@@ -141,17 +141,30 @@ test("FR-SHELL-45 FR-SHELL-47 DM at 1440×900: Compendium, Party, Encounters fro
     const boxes = await shownWindows(dm);
     expect(pairwiseDisjoint(boxes)).toEqual([]);
   }
-  // Screen full at the third: Compendium parked (FR-SHELL-47).
+  // The third, Encounters, needs its useful 440 × 412 (FR-SHELL-79): Compendium, the least
+  // recently used, is auto-minimised for it first (FR-SHELL-77, -78); Party too when that's not
+  // enough. Each carries the newcomer it made room for (FR-SHELL-88).
   await expect(shellWindow(dm, "cmp.compendium")).toHaveAttribute("data-state", "minimised");
   await expect(shellWindow(dm, "cmp.compendium")).toHaveAttribute("data-auto-minimised", "true");
+  await expect(shellWindow(dm, "cmp.compendium")).toHaveAttribute(
+    "data-auto-minimised-for",
+    /^(party\.board|cbt\.encounters)$/,
+  );
   await expect(
     dm.locator('[data-testid="ui-launcher-button"][data-record-id="cmp.compendium"]'),
   ).toHaveAttribute("data-state", "minimised");
 
   const boxes = await shownWindows(dm);
-  expect(boxes.map((b) => b.kind).sort()).toEqual(
-    ["cbt.encounters:main", "cbt.initiative:main", "dice.log:main", "party.board:main"].sort(),
-  );
+  const shown = boxes.map((b) => b.kind);
+  for (const k of ["cbt.encounters:main", "cbt.initiative:main", "dice.log:main"]) {
+    expect(shown).toContain(k);
+  }
+  if (!shown.includes("party.board:main")) {
+    await expect(shellWindow(dm, "party.board")).toHaveAttribute(
+      "data-auto-minimised-for",
+      "cbt.encounters",
+    );
+  }
   // #256 (OQ-SHELL-32 C): the DM has no corner keep-out; its toast box (top-centre) is soft, and
   // the wide Game log runs under the bottom-right as §7 lays it out.
   const pcs = [

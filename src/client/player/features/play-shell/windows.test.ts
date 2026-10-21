@@ -22,7 +22,7 @@ import {
   REFERENCE_VIEWPORTS,
   rectIn,
 } from "@ui/features/play-shell/layout-checks";
-import { defaultLayout, reduce, restoreLayout } from "@ui/features/play-shell/manager";
+import { defaultLayout, reduce, restoreLayout, useful } from "@ui/features/play-shell/manager";
 import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
 import {
@@ -298,7 +298,7 @@ test("FR-SHELL-50 default layouts (player, token-free): exactly §7's table at t
   }
 });
 
-test("FR-SHELL-50 at Start with tokens (player): Initiative appears in the left column above the Game log, y by token cover", () => {
+test("FR-SHELL-50 FR-SHELL-79 at Start with tokens (player): Initiative appears above the Game log at ≥ its useful size, over no more token than its default rect", () => {
   for (const viewport of REFERENCE_VIEWPORTS) {
     const all = new Set(product);
     const layout = defaultLayout(playerWindows, viewport);
@@ -308,7 +308,11 @@ test("FR-SHELL-50 at Start with tokens (player): Initiative appears in the left 
     const ctx = { registry: playerWindows, viewport, available: all, avoid: () => boxes };
     const ws = reduce(layout, { type: "appear", kind: "cbt.initiative" }, ctx);
     const init = rectIn(ws, "cbt.initiative");
-    expect(init.x).toBe(68);
+    // Sprint 7 (OQ-SHELL-53 B): never shrunk below its useful height to dodge a monster; it
+    // moves beside it instead (sprint 5: shrunk in the left column).
+    const def = playerWindows.get("cbt.initiative");
+    if (!def) throw new Error("no cbt.initiative");
+    expect(init.h).toBeGreaterThanOrEqual(useful(def, viewport, playerWindows).h);
     expect(init.y + init.h).toBeLessThanOrEqual(log.y - 12);
     expect(coveredArea(init, boxes)).toBeLessThanOrEqual(
       coveredArea(rectIn(layout, "cbt.initiative"), boxes),
@@ -662,11 +666,23 @@ const COMPANION_STUB = {
   component: () => null,
 } satisfies WindowDef;
 
+/** FR-SHELL-86: stands in for ST's `stats.board` until ST2 registers it (400 × 412, seams S5). */
+const STATS_STUB = {
+  kind: "stats.test",
+  title: "Stats",
+  clients: ["dm", "player"],
+  defaultSize: { w: 400, h: 412 },
+  minSize: { w: 320, h: 280 },
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  launcher: { icon: () => null, label: "Stats", order: 65 },
+  component: () => null,
+} satisfies WindowDef;
+
 /** The player registry with this sprint's new windows: the real lines once merged, else stubs. */
 const withNewWindows = (): WindowRegistry =>
   createWindowRegistry("player", [
     ...playerWindows.defs,
-    ...[PREFS_STUB, COMPANION_STUB].filter((d) => !playerWindows.get(d.kind)),
+    ...[PREFS_STUB, COMPANION_STUB, STATS_STUB].filter((d) => !playerWindows.get(d.kind)),
   ]);
 
 /** FR-SHELL-62 (d): the player's non-default product kinds on `main` when WF1 started. */
@@ -703,7 +719,7 @@ const problemsOf = (steps: readonly LayoutStep[]) =>
 test("FR-SHELL-61 every user-opened kind (player): every non-default kind, launcher or not, test-mode included, opens through openWindow and passes FR-SHELL-62's invariants with Preferences and the companion card registered; a new kind keeps the contract", () => {
   const registry = withNewWindows();
   const kinds = userOpened(registry);
-  for (const k of ["shell.prefs", "charx.companion", "party.handout", "shell.test"]) {
+  for (const k of ["shell.prefs", "charx.companion", "party.handout", "shell.test", "stats.test"]) {
     expect(kinds).toContain(k);
   }
   expect(problemsOf(runs(registry, kinds))).toEqual([]);

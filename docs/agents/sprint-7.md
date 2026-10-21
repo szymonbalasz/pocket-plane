@@ -41,6 +41,7 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 | 2026-10-21 | **Gems core merged** (#317): per-campaign gems switch (off by default), gem counts, award / remove, plain spends; nothing gem-related reaches anyone while off. Inspiration reroll and stats core building |
 | 2026-10-21 | **Combat follow-ups merged** (#320): a downed monster keeps its HP into the next fight, End removes summon tokens (hostile too) and says so, one-row companion line, concentration chip menu, encounter editor names, the drake keeps its paw through End. Window frame in fixes (toast vs pushed Scenes), small copy fixes in gates, gems sheet UI building |
 | 2026-10-21 | **Small copy fixes merged** (#321, BL-48): "Added" confirmation, "Party inventory" toasts, roll bar names the sheet's character, clean dice-line spacing, Rage count once, typed Sneak Attack lines, kept Loot drafts. Window frame walkthrough passed after a toast fix; gems sheet UI in walkthrough |
+| 2026-10-21 | **Gems sheet UI merged** (#322): gem block on the sheet, ± and Spend, Players-window counts, Campaign options switch. **Window frame merged** (#323): windows put away instead of covering a PC, readable sizes, pushed windows return, Space / Tab keyboard. Inspiration reroll passed its walkthrough (gates next); stats core fixed; Stats window and map follow-ups building |
 
 ## Check `main` any time (DM)
 

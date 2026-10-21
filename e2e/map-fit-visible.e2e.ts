@@ -151,16 +151,22 @@ test("FR-MAP-59 every token visible: DM Fit with Initiative + Game log, then + S
   const count = (await konvaNodes(dm, "map-token")).length;
 
   const cells: string[] = [];
-  for (const [size, plain, withScenes] of [
-    [{ width: 1440, height: 900 }, "all", "all"],
-    [{ width: 1280, height: 720 }, "all", "all"],
+  for (const [size, plain] of [
+    [{ width: 1440, height: 900 }, "all"],
+    [{ width: 1280, height: 720 }, "all"],
   ] as const) {
     await dm.setViewportSize(size);
     await fit(dm);
     cells.push(`${size.width}: ${await expectVisible(dm, plain, count, pcs)} px`);
     await openWindow(dm, "map.scenes");
     await fit(dm);
-    cells.push(`${size.width} + Scenes: ${await expectVisible(dm, withScenes, count, pcs)} px`);
+    // Sprint 7 (OQ-SHELL-55 B): Scenes' shell-chosen spot now over a PC is re-placed on the
+    // reopen, PC-free, possibly mid-map; the Fit then keeps at least every PC clear (`pcs`;
+    // the cell floor with Scenes is FR-MAP-91's, FU3).
+    const withScenes = await dm.getByTestId("map-canvas").getAttribute("data-fit-visible");
+    expect(["all", "pcs"]).toContain(withScenes);
+    const want = withScenes === "all" ? "all" : "pcs";
+    cells.push(`${size.width} + Scenes (${want}): ${await expectVisible(dm, want, count, pcs)} px`);
     await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
   }
   console.info(`FR-MAP-59 W5 cells: ${cells.join("; ")}`);
