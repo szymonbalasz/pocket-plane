@@ -941,7 +941,7 @@ export function MapCanvas(props: MapCanvasProps) {
   const onMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const p = mapPoint();
     if (!p) return;
-    const onToken = tokenNodeOf(e.target) !== null || labelTokenAt() !== null;
+    const onToken = tokenNodeOf(e.target) !== null;
     if (e.evt.button === 2) {
       // FR-MAP-71: doors' and props' menus never get here (`cancelBubble`).
       rightRef.current = null;
@@ -972,6 +972,8 @@ export function MapCanvas(props: MapCanvasProps) {
     }
     if (e.evt.button !== 0) return;
     const def = toolDefRef.current;
+    // FR-MAP-89 (1): a left press on a token's label row is one on the token (no empty click).
+    const onTokenRow = onToken || labelTokenAt() !== null;
     if (drawingRef.current) {
       // FR-SCN-06: a drawing tool takes the left press (Space held: the stage pans instead).
       if (!pressGoesToTool(def, { button: 0, space: spaceRef.current, live: liveRef.current })) {
@@ -994,8 +996,8 @@ export function MapCanvas(props: MapCanvasProps) {
       sendSignal(pull ? MAP_SIGNALS.pull : MAP_SIGNALS.ping, data);
       addPing(pointers, p.x, p.y, self, performance.now(), true);
     } else {
-      press.current = { x: e.evt.clientX, y: e.evt.clientY, onToken };
-      if (!onToken && onBoxSelect && (e.evt.ctrlKey || e.evt.shiftKey)) {
+      press.current = { x: e.evt.clientX, y: e.evt.clientY, onToken: onTokenRow };
+      if (!onTokenRow && onBoxSelect && (e.evt.ctrlKey || e.evt.shiftKey)) {
         // Box select instead of pan (FR-MAP-12 / -32).
         boxing.current = true;
         stageRef.current?.draggable(false);
