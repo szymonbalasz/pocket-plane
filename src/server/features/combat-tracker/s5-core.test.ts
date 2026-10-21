@@ -3,7 +3,7 @@
 // (FR-CBT-98–100) and stored combat trails (FR-CBT-97, FR-MAP-65, -66). CBTX's ambush, round 1.
 import { describe, expect, test } from "bun:test";
 import { sideOf } from "@shared/combat-tracker/rules";
-import { COMBATANT_TYPE, HIT_RULING_TYPE } from "@shared/combat-tracker/schemas";
+import { COMBATANT_TYPE, HIT_RULING_TYPE, partRollIdsOf } from "@shared/combat-tracker/schemas";
 import type { GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { MAP_INTENTS, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
@@ -32,7 +32,7 @@ const written = (t: Setup) => [
 ];
 
 describe("FR-CBT-88 cbt.applyHit", () => {
-  test("FR-CBT-88 applyHit writes the hit lines: ruling, one line per target, no HP, card unchanged", () => {
+  test("FR-CBT-88 applyHit writes the hit lines: ruling, one line per target, no HP, card only `ruled`", () => {
     const t = setup();
     const { cardId } = t.toHit("Mira", 11);
     const before = t.card(cardId);
@@ -42,8 +42,8 @@ describe("FR-CBT-88 cbt.applyHit", () => {
       t.target("Goblin", true, "half"),
       t.target("Goblin 2", false),
     ]);
-    expect(t.typesSince(n)).toEqual(["HitApplied"]);
-    const ev = t.events.at(-1)?.event;
+    expect(t.typesSince(n)).toEqual(["HitApplied", "NotificationUpdated"]);
+    const ev = t.events.at(-2)?.event;
     const lines = t.entries().slice(-2);
     expect(ev?.payload).toEqual({
       cardId,
@@ -81,10 +81,12 @@ describe("FR-CBT-88 cbt.applyHit", () => {
       [true, expect.objectContaining({ awaitingDamage: true, damage: 0, hit: true })],
       [true, expect.objectContaining({ awaitingDamage: true, hit: false })],
     ]);
-    // No HP, no hp_change; the card stays pending and unchanged (no card upsert).
+    // No HP, no hp_change; the card stays pending; its one change is `ruled` (GM1, no toast).
     expect(t.count("hp_change")).toBe(0);
     expect([t.combatant("Goblin").hpCurrent, t.combatant("Goblin 2").hpCurrent]).toEqual(hp);
-    expect(t.card(cardId)).toEqual(before);
+    const after = t.card(cardId);
+    expect(after.p).toEqual({ ...before.p, ruled: true });
+    expect([after.state, after.seq, after.text]).toEqual([before.state, before.seq, before.text]);
     expect(ev?.changes.some((c) => c.type === "notification")).toBe(false);
     // FR-MOD-63: Apply hit spends nothing.
     expect(t.count("trigger_use")).toBe(0);
@@ -101,6 +103,7 @@ describe("FR-CBT-88 cbt.applyHit", () => {
         t.run(applyHitCommand.name, {
           cardId,
           toHitTotal: 15,
+          partRollIds: partRollIdsOf(t.card(cardId).p),
           targets: [t.target("Goblin", true), t.target("Goblin", true)],
         }),
       ).code,
@@ -176,6 +179,7 @@ describe("FR-CBT-91 ruling lifecycle (R0) and FR-CBT-94 damageRollId", () => {
       cardId,
       damageTotal: c.damage?.total,
       damageRollId: c.damage?.rollId,
+      partRollIds: partRollIdsOf(c),
       targets: [t.target("Goblin", true)],
     });
     expect(fresh()).toEqual([]);
@@ -214,6 +218,7 @@ describe("FR-CBT-91 ruling lifecycle (R0) and FR-CBT-94 damageRollId", () => {
       cardId,
       damageTotal: c.damage?.total,
       damageRollId: c.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(c),
       targets: [t.target("Goblin", true)],
     };
     const w = written(t);

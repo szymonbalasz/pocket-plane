@@ -20,7 +20,7 @@ import { closeDb, type Db, openFileDb } from "../../db/client";
 import { player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
-import { damageRollIdOf } from "./testing";
+import { damageRollIdOf, partRollIdsFor } from "./testing";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 
@@ -94,6 +94,7 @@ describe("polish over WS (mid-combat)", () => {
         toHitTotal: d20 + 4,
         damageTotal: 6,
         damageRollId: damageRollIdOf(dm.store.records.notification?.[cardId as string]),
+        partRollIds: partRollIdsFor(dm.store.records.notification?.[cardId as string]),
         targets: [{ targetId: goblin.id, hit: true, multiplier: "normal" }],
       });
       await dm.next("ack");

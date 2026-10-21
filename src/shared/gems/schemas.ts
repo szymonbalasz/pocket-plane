@@ -1,5 +1,6 @@
 // gems boundary schemas (GEM §8, §9): the `character-gems` record, the `gem.*` intents and the
 // gem names. Everything here is tagged with the `gems` feature (ADR-0058): off = nothing reaches anyone.
+import { ManualEntry } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 
 export const CHARACTER_GEMS_TYPE = "character-gems";
@@ -66,14 +67,18 @@ export const ACTION_COST: Record<ActionUse, number> = { bonus: 1, reaction: 1, a
 
 /**
  * FR-GEM-12: `gem.spend`, the plain spends (GM0): Fortune, Divine Knowledge, Action (`use`
- * required) and Inspiration "to recall" (OQ-GEM-06 A; no `entryId`). The Inspiration reroll
- * (`entryId`, `manual`) and the Combat gem (`cardId`, `dice`, `known`) extend it later.
+ * required) and Inspiration "to recall" (OQ-GEM-06 A; no `entryId`). FR-GEM-18 (GM1): the
+ * Inspiration reroll names the log line (`entryId`); physical mode sends the new d20(s) as
+ * `manual` (FR-GEM-21, OQ-GEM-13 A; adv / dis: both dice). The Combat gem (`cardId`, `dice`,
+ * `known`) extends it later.
  */
 export const GemSpendInput = z
   .strictObject({
     characterId: Id,
     gem: GemKind,
     use: ActionUse.optional(),
+    entryId: Id.optional(),
+    manual: ManualEntry.optional(),
   })
   .superRefine((v, ctx) => {
     if (v.gem === "action" && v.use === undefined) {
@@ -81,6 +86,20 @@ export const GemSpendInput = z
     }
     if (v.gem !== "action" && v.use !== undefined) {
       ctx.addIssue({ code: "custom", path: ["use"], message: "Only Action gems take a use" });
+    }
+    if (v.entryId !== undefined && v.gem !== "inspiration") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["entryId"],
+        message: "Only Inspiration rerolls a line",
+      });
+    }
+    if (v.manual !== undefined && v.entryId === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["manual"],
+        message: "Physical dice need a line to reroll",
+      });
     }
     if (v.gem === "combat") {
       ctx.addIssue({
@@ -91,7 +110,12 @@ export const GemSpendInput = z
     }
   });
 export type GemSpendInput = z.infer<typeof GemSpendInput>;
-export const GemSpendResult = z.object({ held: Count, entryId: z.string() });
+/** FR-GEM-12: `entryId` = the spend line; `rerollEntryId` = a reroll's new roll line (GEM §9). */
+export const GemSpendResult = z.object({
+  held: Count,
+  entryId: z.string(),
+  rerollEntryId: z.string().optional(),
+});
 export type GemSpendResult = z.infer<typeof GemSpendResult>;
 
 /** FR-GEM-12, -16: gems a spend costs. */

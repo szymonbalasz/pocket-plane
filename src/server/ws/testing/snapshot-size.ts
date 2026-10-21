@@ -7,7 +7,7 @@ import {
   effectVisibleToPlayers,
   redactEffect,
 } from "@shared/combat-extras/schemas";
-import { parseFullCard } from "@shared/combat-tracker/schemas";
+import { parseFullCard, partRollIdsOf } from "@shared/combat-tracker/schemas";
 import { EFFECT_PRESET_TYPE, type Modifier } from "@shared/effect-modifiers/schemas";
 import { type Door, TEMPLATE_LABEL_MAX, type Wall } from "@shared/scene-tools/schemas";
 import { and, eq, inArray, isNull } from "drizzle-orm";
@@ -549,6 +549,7 @@ export function buildRealisticHeavy(s: Services): Record<string, number> {
         toHitTotal: p.toHit.total,
         damageTotal: p.damage.total,
         damageRollId: p.damage.rollId,
+        partRollIds: partRollIdsOf(p),
         targets,
       });
     }

@@ -110,6 +110,8 @@ export default defineFixture({
       cardId: r.id(KEY, "notification", 0),
       damageTotal: 12,
       damageRollId: BRAKKA_DAMAGE_ROLL(),
+      // FR-CBT-129 (GM1): a damage-only card names no to-hit part.
+      partRollIds: { toHit: null, extra: [] },
       targets: [{ targetId: who(r, "scout3"), hit: true, multiplier: "normal" as const }],
       public: true,
     })),
@@ -134,6 +136,8 @@ export default defineFixture({
       cardId: r.id("late-hit-ruled", "notification"),
       damageTotal: 11,
       damageRollId: MIRA_LATE_ROLL(),
+      // FR-CBT-129 (GM1): `late-hit-ruled`'s to-hit roll (its first seeded ID).
+      partRollIds: { toHit: fixtureSeededId("late-hit-ruled", 0), extra: [] },
       targets: [{ targetId: who(r, "goblin2"), hit: true, multiplier: "normal" as const }],
     })),
     hp("scout4", "damage", 7, "owlbear"),

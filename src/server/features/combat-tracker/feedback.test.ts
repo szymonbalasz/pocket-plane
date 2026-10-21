@@ -9,6 +9,7 @@ import {
   type HpChangeRecord,
   type HpChangesResult,
   parseFullCard,
+  partRollIdsOf,
   type RollAbilityResult,
 } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
@@ -26,7 +27,7 @@ import { applyCard, applyHp, undoCommand } from "./hp";
 import { setInitiative, setRemoved } from "./initiative";
 import { endCommand, startCommand } from "./lifecycle";
 import { readEncounter } from "./rows";
-import { combatSetup, damageRollIdOf, eliteBlock } from "./testing";
+import { combatSetup, damageRollIdOf, eliteBlock, partRollIdsFor } from "./testing";
 import { nextTurn, prevTurn } from "./turns";
 
 function started() {
@@ -55,6 +56,7 @@ function started() {
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
       damageRollId: p.damage.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: targets.map(([n, hit, multiplier]) => ({ targetId: id(n), hit, multiplier })),
       ...o,
     });
@@ -184,6 +186,7 @@ describe("FR-CBT-34 FR-CBT-36 multi-target apply", () => {
       toHitTotal: 13,
       damageTotal: 5,
       damageRollId: damageRollIdOf(t.card(r.cardId)),
+      partRollIds: partRollIdsFor(t.card(r.cardId)),
     };
     const tgt = (targetId: string) => ({ targetId, hit: true, multiplier: "normal" });
     expect(

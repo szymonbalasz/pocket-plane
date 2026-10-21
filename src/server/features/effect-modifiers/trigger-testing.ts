@@ -11,6 +11,7 @@ import type {
   HpChangesResult,
   RollDamageResult,
 } from "@shared/combat-tracker/schemas";
+import { partRollIdsOf } from "@shared/combat-tracker/schemas";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import { TRIGGER_INTENTS, type TriggerInput } from "@shared/effect-modifiers/trigger-intents";
 import type { TriggerRule } from "@shared/effect-modifiers/triggers";
@@ -125,6 +126,7 @@ export function rtSetup(opts: { round1?: boolean; inCombat?: boolean } = {}) {
       ...(p.toHit ? { toHitTotal: p.toHit.total } : {}),
       damageTotal: p.damage?.total ?? 0,
       damageRollId: p.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(p),
       targets: targets.map((x) => ({
         targetId: t.id(x.name),
         hit: x.hit ?? true,

@@ -7,8 +7,9 @@ import {
   CBT_INTENTS,
   DamageCardPayload,
   type HpChangesResult,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
-import { GEM_ADJUST_INTENT } from "@shared/gems/schemas";
+import { GEM_ADJUST_INTENT, GEM_SPEND_INTENT } from "@shared/gems/schemas";
 import {
   ACK_MAX_BYTES,
   type DmFightRow,
@@ -20,7 +21,7 @@ import {
 } from "@shared/stats/schemas";
 import { eq } from "drizzle-orm";
 import { CommandError } from "../../commands/errors";
-import { eventLog, gameLogEntry, hpChange, notification } from "../../db/schema";
+import { eventLog, gameLogEntry, hpChange, notification, roll } from "../../db/schema";
 import { SET_FEATURE_INTENT } from "../campaign-management/features";
 import { combatFacts, fightsOf, publicFactEncounters } from "../combat-tracker/stats-read";
 import { rollFacts } from "../dice-roll-log/stats-read";
@@ -54,6 +55,54 @@ describe("FR-STATS-02 counted facts", () => {
     const a = t.session(t.p1).session?.awards ?? [];
     expect(awardOf(a, "most-nat1").value).toBeNull();
     expect(awardOf(a, "most-nat20")).toMatchObject({ value: 1, winners: [{ name: "Thorn" }] });
+  });
+});
+
+describe("FR-STATS-02 final roll on GM1's reroll", () => {
+  test("FR-STATS-02 FR-DICE-67 final roll only on a real Inspiration reroll: the replaced roll never counts, the new one once", () => {
+    const t = statsSetup();
+    t.run(SET_FEATURE_INTENT, { feature: GEMS_FEATURE, on: true });
+    t.run(GEM_ADJUST_INTENT, { characterId: t.thornId, gem: "inspiration", delta: 1 });
+    const old = t.roll("Thorn", 1, { actor: t.p2 });
+    t.run(
+      GEM_SPEND_INTENT,
+      {
+        characterId: t.thornId,
+        gem: "inspiration",
+        entryId: old.entryId,
+        manual: { diceTotal: 20 },
+      },
+      t.p2,
+    );
+    const oldLine = t.s.db
+      .select()
+      .from(gameLogEntry)
+      .where(eq(gameLogEntry.id, old.entryId))
+      .get();
+    expect(oldLine?.supersededBy).not.toBeNull();
+    const fresh = t.s.db.select().from(roll).where(eq(roll.replacesRollId, old.rollId)).get();
+    expect(fresh?.natural).toBe(20);
+    for (const actor of [t.h.dm, t.p1]) {
+      const a = t.session(actor).session?.awards ?? [];
+      expect(awardOf(a, "most-nat1").value).toBeNull();
+      expect(awardOf(a, "most-nat20")).toMatchObject({ value: 1, winners: [{ name: "Thorn" }] });
+    }
+    // Follow `replacesRollId`: even a line that is not superseded can't bring the old roll back.
+    const spend = t.s.db.select().from(gameLogEntry).all().at(-1);
+    t.s.db
+      .update(gameLogEntry)
+      .set({ rollIds: [...((spend?.rollIds as string[]) ?? []), old.rollId] })
+      .where(eq(gameLogEntry.id, spend?.id as string))
+      .run();
+    const facts = rollFacts(
+      t.s.db,
+      { role: "dm", features: [GEMS_FEATURE] },
+      t.h.campaignId,
+      1,
+      999,
+    );
+    expect(facts.map((f) => f.rollId)).not.toContain(old.rollId);
+    expect(facts.filter((f) => f.rollId === fresh?.id)).toHaveLength(1);
   });
 });
 
@@ -143,6 +192,7 @@ describe("FR-STATS-06 raw from the facts", () => {
       toHitTotal: p.toHit?.total,
       damageTotal: 12,
       damageRollId: p.damage?.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: [{ targetId: t.id("Wolf"), hit: true, multiplier: "normal" }],
       public: true,
     });
@@ -465,6 +515,7 @@ describe("STATS read helpers", () => {
       toHitTotal: p.toHit?.total,
       damageTotal: p.damage?.total,
       damageRollId: p.damage?.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: [{ targetId: t.id("Elite Goblin Warrior"), hit: true, multiplier: "normal" }],
     });
     const dm = rollFacts(t.s.db, { role: "dm", features: [] }, t.h.campaignId, 1, 999);

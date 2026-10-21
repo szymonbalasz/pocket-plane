@@ -7,6 +7,7 @@ import {
   type AttackResult,
   type HpChangesResult,
   parseFullCard,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import {
@@ -120,6 +121,7 @@ describe("FR-CBT-52 DM attack roll line", () => {
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
       damageRollId: p.damage.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: [{ targetId: t.id("Mira"), hit: true, multiplier: "normal" }],
     });
     t.run(undoCommand.name, { expectedHpChangeId: res.hpChangeIds[0] });
@@ -150,6 +152,7 @@ describe("FR-CBT-53 outcome line detail", () => {
       toHitTotal: opts.toHitTotal ?? p.toHit.total,
       damageTotal: opts.damage ?? p.damage.total,
       damageRollId: p.damage.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: [{ targetId: t.id("Mira"), hit: opts.hit ?? true, multiplier: "normal" }],
     });
     const change = t.events[n]?.event.changes.find((c) => c.type === GAME_LOG_ENTRY_TYPE);

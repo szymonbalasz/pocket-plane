@@ -54,7 +54,8 @@ export interface RollFact extends StatsRoll {
 }
 
 /**
- * FR-DICE-73: one row per counted roll listed by an entry in `fromN…toN`, after the viewer filter:
+ * FR-DICE-73: one row per counted roll listed by an entry in `fromN…toN`, after the viewer filter
+ * (a roll a reroll replaced never: FR-DICE-67):
  * a roll in two entries returns once (`public` if any counted listing entry is public); a roll no
  * counted entry lists is absent.
  */
@@ -104,5 +105,18 @@ export function rollFacts(
       .all();
     for (const r of rows) out.push({ ...r, public: pub.get(r.rollId) ?? false });
   }
-  return out;
+  // FR-DICE-67: final roll only. A roll another roll replaces (`replacesRollId`, GM1's reroll)
+  // never counts, even if a line that is not superseded still lists it.
+  const replaced = new Set<string>();
+  for (let i = 0; i < ids.length; i += 500) {
+    const rows = db
+      .select({ id: roll.replacesRollId })
+      .from(roll)
+      .where(
+        and(eq(roll.campaignId, campaignId), inArray(roll.replacesRollId, ids.slice(i, i + 500))),
+      )
+      .all();
+    for (const r of rows) if (r.id) replaced.add(r.id);
+  }
+  return replaced.size ? out.filter((r) => !replaced.has(r.rollId)) : out;
 }

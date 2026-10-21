@@ -7,6 +7,7 @@ import {
   CBT_INTENTS,
   DamageCardPayload,
   type HpChangesResult,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { getLogKind } from "@shared/dice-roll-log/kinds";
@@ -163,6 +164,7 @@ describe("FR-CBT-137 overkill callout", () => {
       toHitTotal: p.toHit?.total,
       damageTotal: 30,
       damageRollId: p.damage?.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
     });
     const e = entryOf(t, rowOf(t, hpChangeIds[0] as string)?.entryId as string);

@@ -8,6 +8,7 @@ import {
   DamageCardPayload,
   HIT_RULING_TYPE,
   type HitRulingRecord,
+  partRollIdsOf,
   type RollDamageResult,
 } from "@shared/combat-tracker/schemas";
 import { sideLogKind } from "@shared/combat-tracker/side-kind";
@@ -54,7 +55,11 @@ export function s5Setup(opts: { round1?: boolean } = {}) {
     multiplier,
   });
   const applyHit = (cardId: string, toHitTotal: number, targets: object[], actor = t.h.dm) =>
-    t.run<ApplyHitResult>(applyHitCommand.name, { cardId, toHitTotal, targets }, actor);
+    t.run<ApplyHitResult>(
+      applyHitCommand.name,
+      { cardId, toHitTotal, targets, partRollIds: partRollIdsOf(card(cardId).p) },
+      actor,
+    );
   const card = (cardId: string) => {
     const r = t.s.db.select().from(notification).where(eq(notification.id, cardId)).get();
     if (!r) throw new Error(`no card ${cardId}`);

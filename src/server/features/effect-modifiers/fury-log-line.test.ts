@@ -6,6 +6,7 @@
 // snapshot (= reconnect) and live.
 import { describe, expect, test } from "bun:test";
 import type { AttackLogDmPayload, AttackLogPayload } from "@shared/combat-tracker/log-kinds";
+import { partRollIdsOf } from "@shared/combat-tracker/schemas";
 import { type LineSegment, lineText } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import { eq } from "drizzle-orm";
@@ -170,6 +171,7 @@ describe("FR-MOD-57 Divine Fury line in the combat log", () => {
       toHitTotal: p.toHit?.total,
       damageTotal: p.damage?.total,
       damageRollId: p.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(p),
       public: true,
       targets: [
         { targetId: t.id("Thorn"), hit: true, multiplier: "normal", triggers: [{ triggerId: ma }] },

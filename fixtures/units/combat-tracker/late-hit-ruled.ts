@@ -33,6 +33,8 @@ export default defineFixture({
     step(applyHitCommand, (r) => ({
       cardId: r.id("late-hit-ruled", "notification"),
       toHitTotal: 15,
+      // FR-CBT-129: the attack's first seeded ID is its to-hit roll (Bless's d4 row follows).
+      partRollIds: { toHit: fixtureSeededId("late-hit-ruled", 0), extra: [] },
       targets: [
         {
           targetId: r.id("combat-1", COMBATANT_TYPE, COMBAT_1.goblin2),

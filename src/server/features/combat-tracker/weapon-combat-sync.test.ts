@@ -22,7 +22,7 @@ import { closeDb, type Db, openFileDb } from "../../db/client";
 import { player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
-import { damageRollIdOf, leaksIn } from "./testing";
+import { damageRollIdOf, leaksIn, partRollIdsFor } from "./testing";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 
@@ -113,6 +113,7 @@ describe("weapon parts over WS (rules-effects)", () => {
       toHitTotal: 22,
       damageTotal: 13,
       damageRollId: damageRollIdOf(dm.store.records.notification?.[cardId as string]),
+      partRollIds: partRollIdsFor(dm.store.records.notification?.[cardId as string]),
       targets: [
         { targetId: goblin.id, hit: true, multiplier: "normal", extraMultipliers: ["half"] },
       ],

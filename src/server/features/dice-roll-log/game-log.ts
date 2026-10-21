@@ -1,5 +1,6 @@
-// `gameLog.append` / `gameLog.markUndone` (FR-DICE-19): in the caller's transaction, no events;
-// they return the `game-log-entry` change for the caller's event.
+// `gameLog.append` / `gameLog.markUndone` (FR-DICE-19) / `gameLog.supersede` (FR-DICE-63): in
+// the caller's transaction, no events; they return the `game-log-entry` change for the caller's
+// event.
 import { getLogKind } from "@shared/dice-roll-log/kinds";
 import {
   categoryPublic,
@@ -9,7 +10,7 @@ import {
 } from "@shared/dice-roll-log/schemas";
 import { and, eq, max } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
-import { notFound } from "../../commands/errors";
+import { conflict, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { gameLogEntry } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
@@ -35,6 +36,11 @@ export interface AppendInput {
    * only, whoever rolls (`public` false). Null / absent = the usual stamp.
    */
   audiencePlayerId?: string | null;
+  /**
+   * Sprint 7 (FR-DICE-62): a reroll's entry copies the old entry's audience as stamped (never
+   * re-stamped, ADR-0056); wins over every other stamp.
+   */
+  copyAudience?: { public: boolean; audiencePlayerId: string | null };
 }
 
 type EntryRow = typeof gameLogEntry.$inferSelect;
@@ -61,6 +67,7 @@ function getEntry(tx: Pick<Tx, "select">, campaignId: string, id: string): Entry
  * `forcePrivate` → false for anyone.
  */
 function stampPublic(env: CommandEnv, cid: string, input: AppendInput): boolean {
+  if (input.copyAudience) return input.copyAudience.public;
   if (input.forcePrivate || input.audiencePlayerId) return false;
   if (env.actor.role === "player") return true;
   return input.public ?? categoryPublic(readSettings(env.tx, cid), input.category);
@@ -105,12 +112,49 @@ export function append(env: CommandEnv, input: AppendInput): RecordChange {
       dmPayload,
       rollIds: input.rollIds,
       encounterId: input.encounterId ?? null,
-      audiencePlayerId: input.forcePrivate ? null : (input.audiencePlayerId ?? null),
+      audiencePlayerId: input.copyAudience
+        ? input.copyAudience.audiencePlayerId
+        : input.forcePrivate
+          ? null
+          : (input.audiencePlayerId ?? null),
       supersededBy: null,
     })
     .run();
   const after = toEntryRecord(getEntry(env.tx, cid, id) as EntryRow);
   return { type: GAME_LOG_ENTRY_TYPE, id, before: null, after };
+}
+
+/** An entry of the actor's campaign as a record, or undefined. */
+export function readEntry(env: Pick<CommandEnv, "tx" | "actor">, id: string) {
+  const row = getEntry(env.tx, campaignOf(env.actor), id);
+  return row ? toEntryRecord(row) : undefined;
+}
+
+/** FR-DICE-63: the reason an entry can't be superseded (or rerolled), or null. */
+export function supersedeBlock(e: Pick<GameLogEntryRecord, "undone" | "supersededBy">) {
+  if (e.supersededBy !== null) return "Already rerolled";
+  if (e.undone) return "Undone";
+  return null;
+}
+
+/**
+ * FR-DICE-63: sets `supersededBy` once (`null` → the new entry), like `markUndone`; already set
+ * or undone → `conflict`. The entry's rolls stay immutable (FR-DICE-08).
+ */
+export function supersede(env: CommandEnv, entryId: string, newEntryId: string): RecordChange {
+  const cid = campaignOf(env.actor);
+  const row = getEntry(env.tx, cid, entryId);
+  if (!row) throw notFound("Log entry not found");
+  const before = toEntryRecord(row);
+  const block = supersedeBlock(before);
+  if (block) throw conflict(block);
+  env.tx
+    .update(gameLogEntry)
+    .set({ supersededBy: newEntryId })
+    .where(eq(gameLogEntry.id, entryId))
+    .run();
+  const after = toEntryRecord(getEntry(env.tx, cid, entryId) as EntryRow);
+  return { type: GAME_LOG_ENTRY_TYPE, id: entryId, before, after };
 }
 
 /** Sets `undone` (combat undo). Entry of another campaign / unknown → `not_found`. */
