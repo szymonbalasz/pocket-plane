@@ -1144,7 +1144,7 @@ Full split: [gems §14](gems.md#14-dependencies). Combat's parts, feature-owned 
 
 | Slice | FRs | Files | Order |
 |---|---|---|---|
-| **SB0** `build/sb-core` (with stats) | FR-CBT-152, -153 | `combat-tracker/hp.ts` (apply path, beside the callout), `src/shared/combat-tracker/log-kinds.ts` (optional `fell`); ⚠ append one line to `combat-tracker/rule-hooks.ts` | any time; CB's slices own `lifecycle.ts`, `initiative.ts` and rows, so no overlap (OQ-CBT-96) |
+| **SB0** `build/sb-core` (with stats) | FR-CBT-152, -153 | `combat-tracker/hp.ts` (apply path, beside the callout), `src/shared/combat-tracker/log-kinds.ts` (optional `fell`); ⚠ append one line to `combat-tracker/rule-hooks.ts` | wave 1, ∥ CB0; nobody edits `lifecycle.ts` (seam S8) |
 
 - Docs at consolidation: protocol (line field `fell`, summary kind), data model (§8 sprint 8 row).
 
@@ -1243,7 +1243,7 @@ Full split: [play-shell §14](play-shell.md#14-dependencies). CBT parts (seams b
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CBT-96 | Seam **CB ↔ SB**: who holds End | **A. SB never edits `lifecycle.ts` or rows; the summary rides on the `ended` rule hook (append); CB keeps `lifecycle.ts` for drag reorder; no merge order needed** · B. SB adds a direct call in `cbt.end` (CB then SB on `lifecycle.ts`) | no (seams; owner orchestrator) | CBT, STATS |
+| ~~OQ-CBT-96~~ | Seam **CB ↔ SB**: who holds End | **Resolved (seam S8): A.** Nobody edits `lifecycle.ts`; SB appends its `ended` hook to `rule-hooks.ts`; CB edits rows / `initiative.ts` / `ranks.ts` only; Highlights sort by Dealt | — | CBT, STATS |
 
 ## 16. Out of scope
 
