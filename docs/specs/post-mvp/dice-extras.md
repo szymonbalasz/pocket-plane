@@ -1,9 +1,9 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: stub
-owner: —
-phase: post-mvp
+status: claimed
+owner: spec-tt
+phase: post-mvp-8
 ---
 
 # Dice extras (post-MVP stub)
