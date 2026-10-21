@@ -1,7 +1,7 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: claimed
+status: in-review
 owner: spec-wf
 wave: 3
 phase: post-mvp-8
@@ -100,6 +100,17 @@ Decided at sprint-5 DM gate 1 (#256): every pick accepted except OQ-SHELL-32 (�
 | FR-MAP-58, -44 | Fit into the best free rectangle, then V's per-axis pan inside it | M5 | `FR-MAP-58 best rectangle` |
 
 Decided at sprint-4 gate 1 (#245): OQ-MAP-35 (combat trail), -36 (straight path), -37 (monster glide, no path), -38 (labels shrink). Wire: 0 B (path derived). Walkthrough: §13 M1–M13 (also covers SCN and SHELL).
+
+> **Sprint 8 (track WF, window-frame pass; DM [#333](../decisions-log.md), [#334](../decisions-log.md)).** Decided, not open: one placement path for windows, PCs clear first (#333). The map's refits are its last step: they read the [placer](play-shell.md#6-functional-requirements)'s plan and its PC test (player characters only, #318). Fixed: **BL-65** (sim-11 FAIL h: a player's reveal refit with the companion card open zoomed **in**, 0.657 → 0.686). Cause, from the code: the reveal path's `pcs` fallback `pcsPan` re-scales up to the 48-px floor. Also, the fit counts pets and summons as PCs, the placer doesn't. New FR-MAP-93–98; amended FR-MAP-46, -59, -80, -89, -90, -92. Test plan, walkthrough (F9, F10) and slices: [play-shell §13](play-shell.md#13-test-plan) / [§14](play-shell.md#14-dependencies) (slice **WF3** `fix/wf-refits`, first on the canvas lock, then CB). 0 B.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-MAP-93 | Fits read the placer's plan; one PC test (#318); the canvas provides the base port | WF3 | `FR-MAP-93 one obstacle source` |
+| FR-MAP-94 | A reveal / appearance refit never zooms in | WF3 | `FR-MAP-94 reveal never zooms in (BL-65)` |
+| FR-MAP-95 | Reveal, load and open use Fit's function | WF3 | `FR-MAP-95 one fit path` |
+| FR-MAP-96 | Load and Start refits run after the placer's settle | WF3 | `FR-MAP-96 load and Start after the placer` |
+| FR-MAP-97 | Yield refit (iff OQ-SHELL-64 B / C) | WF3 | `FR-MAP-97 yield refit` |
+| FR-MAP-98 | Resize refit after the `viewport` settle | WF3 | `FR-MAP-98 resize refit after settle` |
 
 ## 1. Summary
 
@@ -244,7 +255,13 @@ Decided at sprint-4 gate 1 (#245): OQ-MAP-35 (combat trail), -36 (straight path)
 | FR-MAP-89 | *(S7, track FU)* **Reveal refit with any window open, and after a reload** (sim-10 FAIL b (3), b07; amends FR-MAP-82, -44 (a); players only, as FR-MAP-82): with `charx.companion` (or any player window) open, a reveal that puts a newly seen token under a window or off-screen refits once, exactly as FR-MAP-82 with the sheet alone; and after a reload no token the player sees lies under a window once the page settles. Means (root cause first, FU3): **(1)** a pointer-down on a token **or its label row** (name, marker, badges: everything `TokensLayer` / `LabelsLayer` draw for it) is a token press, never a pan, so a double-click on a companion token or its paw opens the card (FR-MAP-77) without setting `moved`; **(2)** the load fit (scene open after the first snapshot, FR-MAP-44 (a)) waits for the restored layout's rendered rects (incl. grown heights, as the appearance refit's ≤ 10-frame wait) before it frames, so the card and the sheet are obstacles from the first frame; **(3)** the reveal baseline (`drawn` ids) is taken after that first fit, so a token arriving before the fit settles counts as a reveal. `data-fit-reason` = `reveal` / `load`. | sim-10 b07 |
 | FR-MAP-90 | *(S7, track FU)* **No jump at Start** (sim-10 b00; amends FR-MAP-44 (b), -81): an **appearance** refit (DM: Initiative at Start, FR-CBT-60; players: Initiative's appearance) first checks the current camera: every content token footprint inside the area and clear of every obstacle (FR-MAP-59's test) → **keep the camera** (no move; `data-fit-reason` unchanged). Else it refits, after the windows that caused it have settled (Initiative's grown height measured, [FR-CBT-150](combat-tracker.md#6-functional-requirements)), and the result never leaves a **PC footprint under a window**: `fitVisible`'s obstacle cap counts only obstacles that intersect the area at that scale; past the cap, FR-MAP-81's bounded sweep takes the 6 obstacles nearest the PCs' bounding box instead of falling back to centring; if no pan keeps every PC clear, the pan with the least PC footprint area under windows wins. Outcome (b00 repro, 1440×900, `session-sim-10`, Start "Escort to the Ford" with Scenes + Game log + Initiative open): Thorn, Brakka and the Owlbear clear of every window. Pure in `camera.ts`; perf as FR-MAP-81 (≤ 25 ms bench). | sim-10 b00 |
 | FR-MAP-91 | *(S7, track FU)* **Fit with Scenes and a shown toast** (sim-10 b06; amends FR-MAP-80; proposed, [OQ-MAP-61](#15-open-questions) **A**): the DM's Fit (button, FR-MAP-45; resize, FR-MAP-92) computes the fit twice: with the shown stack as obstacle (FR-MAP-80 as built) and with only the **summary strip**; if the first's cell size is below **75 %** of the second's, it takes the second (the shown card toasts may then cover tokens until resolved; `data-fit-reason="fit-past-toasts"`), else the first. Outcome (1440×900, Game log + Initiative + Scenes, one card toast shown, `session-sim-10` Goblin Ambush): cells ≥ the sprint-6 "nothing showing" figure for that layout (FR-MAP-80: 38 px) or every token clear of the shown toast at ≥ 75 % of it; never the 24-px top-left strip of b06. Players: unchanged (their hard corner). | sim-10 b06 |
-| FR-MAP-92 | *(S7, track FU)* **Resize refit** (sim-10 b06: 1280 → 1440 left 26 px; amends FR-MAP-44's resize trigger): a viewport resize while `fitted` refits with exactly the obstacles and rules of Fit (FR-MAP-59 → -80 → -91), after the windows' render fit (FR-SHELL-29) for the new viewport has applied; so resizing 1280×720 → 1440×900 ends at the same cell size as pressing Fit at 1440×900. A `moved` camera: unchanged (no refit). | sim-10 b06 |
+| FR-MAP-92 | *(S7, track FU)* **Resize refit** (sim-10 b06: 1280 → 1440 left 26 px; amends FR-MAP-44's resize trigger): a viewport resize while `fitted` refits with exactly the obstacles and rules of Fit (FR-MAP-59 → -80 → -91), after the windows' render fit (FR-SHELL-29) for the new viewport has applied; so resizing 1280×720 → 1440×900 ends at the same cell size as pressing Fit at 1440×900. A `moved` camera: unchanged (no refit). *(Sprint 8: ordered after the placer's `viewport` settle, FR-MAP-98.)* | sim-10 b06 |
+| FR-MAP-93 | *(S8, track WF)* **One obstacle source, one PC test** (amends FR-MAP-46, -59, -80): every fit and refit reads its window obstacles from the **plan** of the last [placer](play-shell.md#6-functional-requirements) settle (FR-SHELL-95, -110: rendered rects incl. grown heights, zones, displaced windows), plus the toast obstacles as built (players' corner box; the DM's summary strip + shown stack, FR-MAP-80 / -91). `fitTokens`' `pc` = **player characters only** (`isPlacementPc`, #318, [FR-SHELL-96](play-shell.md#6-functional-requirements)); a pet or summon is an ordinary content token (kept visible under `all`, not required under `pcs`). Today `MapCanvas.tsx` marks any owned token as a PC, so the fit and the placer disagree. The canvas implements the placer's **base port** `{pcs(cam), tokens(cam), dryFit(obstacles)}` (pure over `camera.ts`). | #318, #333 |
+| FR-MAP-94 | *(S8)* **A reveal or appearance refit never zooms in** (BL-65, sim-11 FAIL h: 0.657 → 0.686 with the companion card open). For reasons `reveal`, `appearance` and `window`, the result's scale is **≤ the current scale**: `fitVisible` searches from min(step 1's cell, the current cell) down to 24 px. The `pcs` fallback (`pcsPan`) uses min(48 px, the current cell) instead of re-scaling up to the 48-px floor. With no pan keeping every newly drawn token clear at ≥ 24 px: PCs clear first, then the least token footprint area under windows, at the current scale or below. Fit (button), `open`, `load` and `resize` keep FR-MAP-46's floor (they may zoom in). Outcome (sim-11 h repro, `FR-SHELL-115 replay P1 @1280×800 reveal`): cell after ≤ before; Elite and Plain Brute not under the sheet, card, Stats or Initiative. | BL-65 |
+| FR-MAP-95 | *(S8)* **One fit path**: `open`, `load` and `reveal` call the same function as Fit / resize / appearance (`fitPastToasts` with this client's obstacles; players' toast corner unchanged), so a reveal never picks a different rectangle than Fit would. Today reveal and load call plain `fitScene`. `data-fit-reason` values unchanged, plus `window` (FR-MAP-97). | BL-65 |
+| FR-MAP-96 | *(S8)* **Load and Start after the placer** (amends FR-MAP-89 (2), -90): the load fit runs after the `load` settle has applied (zones written, grown heights measured, [FR-SHELL-99](play-shell.md#6-functional-requirements)). This replaces the ≤ 10-frame wait with "after the plan is applied and every grown window reported its height". The Start / appearance refit runs after the `appear` settle (Initiative in its zone, launcher windows displaced, FR-SHELL-107), with FR-MAP-90's keep-the-camera test first. The reveal baseline (`drawn`) is taken after the load fit (FR-MAP-89 (3), unchanged). | BL-70, g |
+| FR-MAP-97 | *(S8, iff [OQ-SHELL-64](play-shell.md#15-open-questions) B or C)* **Yield refit**: `dryFit(obstacles)` = the pure fit (FR-MAP-95's function) at the current mode, without applying it: returns `{camera, cellPx, verdict}`. When the placer accepts a yield ([FR-SHELL-108](play-shell.md#6-functional-requirements)), the canvas applies that camera once (`data-fit-reason="window"`, camera stays `fitted`), with FR-MAP-94's no-zoom-in rule relaxed to "≥ 75 % of the current cell". Players only under B. | BL-66 |
+| FR-MAP-98 | *(S8)* **Resize refit after the settle** (amends FR-MAP-92): the 200-ms resize refit runs after the placer's last `viewport` settle has applied. So zones, grow-back and returns (FR-SHELL-103) are in place, and resizing 1280×720 → 1440×900 frames around the grown Game log (sim-11 g03: the map squeezed into the bottom-right corner at 27 px). | BL-60, g03 |
 
 ## 7. UI/UX notes
 
@@ -391,6 +408,7 @@ Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/s
 - *(Sprint 6, WF: Fit, reveal refit)* **Disconnect / reconnect:** a reconnect snapshot that brings tokens into sight is one reveal (FR-MAP-82: one refit while `fitted`); tokens already drawn don't count, so a plain reconnect never refits. **Server crash:** same as reconnect after restart; nothing server-side. **Reload:** the scene-open fit runs as before (FR-MAP-44 (a)); the shown stack starts empty (FR-MAP-80). **Drag in progress** when tokens come into sight: the refit waits for the drop (no camera jump under the pointer); a pan or zoom started meanwhile cancels it and marks the camera `moved`. **DM client:** no reveal refit (players only). **A sticky card toast appearing after a fit** may cover top-row tokens below the summary strip until it is resolved or the DM presses Fit (OQ-MAP-57 D trade-off; the camera never refits on toasts). **Fog reveal of many tokens at once:** one refit (coalesced ≤ 1 s). No data-model, API, permission or visibility change (client-only camera; §8, §9, §10 unchanged).
 
 - *(Sprint 7, FU: marker, refits)* **Disconnect / reconnect:** the marker reads the token record, so a reconnect snapshot shows it as stored; a reconnect that brings tokens into sight is one reveal (FR-MAP-82 / -89). **Reload:** the load fit waits for the restored windows (FR-MAP-89 (2)). **Server crash mid-End / mid-Start:** the owner handling (FR-MAP-88's fix at End, the safety-net re-assert at Start) is inside `cbt.end` / `cbt.start`'s transaction: all or nothing. **Start with every token already clear:** no camera move (FR-MAP-90). **A `moved` camera:** no appearance, reveal or resize refit (unchanged).
+- *(Sprint 8, WF: refits after the placer)* **Disconnect / reconnect:** a reconnect snapshot that draws new tokens is a reveal (players), refitting at ≤ the current scale (FR-MAP-94); an `appear` in it settles first (FR-MAP-96). **Server crash:** same as reconnect. **Reload:** the load fit waits for the `load` settle; the camera mode starts `fitted`. **A reveal while a settle is pending** (e.g. mid-resize): the reveal refit runs after that settle, once (coalesced as FR-MAP-82). **`moved` camera:** no refit and no yield, ever.
 
 ## 12. Performance & bandwidth
 
@@ -421,6 +439,8 @@ Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/s
 - Snapshot: token ≈ 300 B, scene ≈ 400 B; 30 scenes × 30 tokens ≈ 280 KB. Shared DM budget: scenes ≤ 300 KB of live-sync's 512 KB (1,000-token cap). Players get one scene. **Review check:** Chrome trace of a 10 s pan on Cellar (4096 px map, grid on): median frame ≤ 20 ms.
 
 - *(Sprint 7, FU)* **CON-44: 0 B in the normal case.** FR-MAP-88's safety-net re-assert adds a `token` upsert to `EncounterStarted` / `CombatantsAdded` only for a pet token whose owner differs (never once the End fix holds; a token upsert as sent today, ≈ 0.3 KB); nothing new in the snapshot, so no probe was run. FR-MAP-89–92 are client geometry: the no-jump check is one FR-MAP-59 visibility test (O(tokens × obstacles)); FR-MAP-91 runs the fit twice on a Fit press only; both inside FR-MAP-81's 25 ms bench budget.
+
+- *(Sprint 8, WF)* **CON-44: 0 B.** Refits and the base port are client-only; nothing enters the snapshot or a frame. `dryFit` reuses FR-MAP-59's search (≤ 25 ms bench budget) at most once per settle (FR-SHELL-119).
 
 ## 13. Test plan
 
@@ -547,6 +567,19 @@ Bundle **`image-search`** ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-
 
 Walkthrough: [ASSET IM1, IM2, IM7, IM10](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im) (player-1's frames carry the new token image ID only because the token is visible, never a tag). Disconnect / reconnect / crash: unchanged for the canvas; the picker per [ASSET §11](assets-pipeline.md#11-edge-cases--failure-modes).
 
+### Sprint 8: refits after the placer (track WF)
+
+Bundles `wf-frame` / `wf-frame-e2e`, the harness and the walkthrough (F2, F4, F9, F10): [play-shell §13](play-shell.md#13-test-plan). Named tests here (pure, `camera.test.ts` / both `fit-visible.test.ts`, inputs from `replay-cells.generated.ts`):
+
+| Test | What |
+|---|---|
+| `FR-MAP-93 one obstacle source` | The fit's obstacles = the plan's rects + the toast obstacles; a pet is a content token, not a PC, in `fitTokens` and in the placer (same function) |
+| `FR-MAP-94 reveal never zooms in (BL-65)` | P1 @1280×800, sheet + Initiative + Game log + card + Stats, `ambush` → `ambush-revealed`: cell after ≤ before; `pcsPan` at min(48, current); no newly drawn token under a window where a pan at ≤ the current scale allows it |
+| `FR-MAP-95 one fit path` | `reveal`, `load`, `open` and Fit give the same camera for the same inputs |
+| `FR-MAP-96 load and Start after the placer` | Load: the fit sees the zones and the card's measured height; Start: Initiative in its zone before the appearance refit (BL-70 frame order) |
+| `FR-MAP-97 yield refit` | `dryFit` pure; accepted ≥ 75 % cell, refused below; `moved` never |
+| `FR-MAP-98 resize refit after settle` | 1280×720 → 1440×900: refit after the Game log is back at 1150×240; cell = Fit at 1440×900 |
+
 ### Sprint 7: marker and refits (track FU)
 
 Fixtures, bundle `fu-s7` / `fu-s7-e2e` and the walkthrough (U5, U12, U13, U16): [play-shell §13](play-shell.md#13-test-plan). Named tests here:
@@ -670,6 +703,10 @@ Full split, order and locks: [CAMP §14](campaign-management.md#sprint-5-build-s
 
 Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). MAP part: **IM-3 `build/im-wiring`** (after IM-2 `build/im-picker`): one `context` prop in `scenes-window.tsx` and in `token-menu-entries.tsx`, one DOM test each. Neither is a canvas hotspot file (`MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx`, tools), so IM-3 needs no canvas lock and runs alongside WF / CP canvas work. No schema, record type, event, §9.9 shared file or dependency.
 
+### Sprint 8 build split (track WF)
+
+Full split: [play-shell §14](play-shell.md#14-dependencies). MAP part = **WF3** `fix/wf-refits` (FR-MAP-93–98): ★ canvas lock `MapCanvas.tsx` (base port, plan obstacles, PC test, reason `window`), `camera.ts` (pure: no-zoom-in cap, one fit path, `dryFit`), ★ frame `free-area.ts` (assigned to WF3). After WF1 (`fix/placer-core`). **Canvas lock this sprint: WF3 → CB** (current-turn highlight). If CB's highlight is a `tokenOverlays` entry only (registry append), it needs no lock (OQ-MAP-62). No record type, intent, signal, Konva layer or dependency.
+
 ### Sprint 7 build split (track FU)
 
 Full split: [play-shell §14](play-shell.md#14-dependencies). MAP parts: **FU0** `fix/fu-combat-core` (FR-MAP-88's server cause, in combat's End / Start / Add transactions, root cause first; no canvas file) and **FU3** `fix/fu-map` (FR-MAP-88 client part if any, FR-MAP-89–92): ★ canvas lock `MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx` (label-row hit test), `camera.ts` (pure), ★ frame `free-area.ts` (after FU1). **Canvas lock this sprint: FU1 (Space guard + `requestFit` listener, two small edits) → FU3**; no other track edits the canvas files (sprint-7 hotspots). No record type, intent, signal, Konva layer or dependency; protocol §18 notes at consolidation.
@@ -750,7 +787,16 @@ Full split: [play-shell §14](play-shell.md#14-dependencies). MAP parts: **FU0**
 |---|---|---|---|---|
 | OQ-MAP-61 | **Fit vs a shown card toast** (sim-10 b06: Game log + Initiative + Scenes + one card toast → 24 px in the top-left strip; #288 OQ-MAP-57 D keeps whatever shows clear) | **Decided (#315): A** (drop a shown card toast that costs more than a quarter of the cell size). **A. Keep shown toasts clear unless that costs more than a quarter of the cell size; then fit as if only the summary strip were there (a card toast may cover a token until resolved): readable map, the toast is temporary** / B. Always keep them clear (as built): nothing hidden, the map can drop to 24 px / C. Never count card toasts, only the summary strip: always the larger map, a sticky card often sits on the top row | no · owner: DM | FR-MAP-91; amends OQ-MAP-57 D only for card toasts |
 
+**Sprint 8, track WF** (spec-wf). Decided before the spec (#333): one placement path; the refits read its plan. **Bold** = suggested pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-MAP-62 | **Seam with CB** ([combat-tracker](combat-tracker.md) / CB's current-turn highlight) on the canvas lock | **A. The highlight is one `tokenOverlays` entry (`ring` decoration, registry append, `token-overlays.ts`): no canvas file, no lock wait; it never changes footprints, so placement and fits are unaffected** / B. A canvas edit (`TokensLayer.tsx` glow): CB holds the canvas lock after WF3 merges | no · owner: spec-cb, orchestrator (seams) | FR-MAP-34; §14 sprint 8 |
+| OQ-MAP-63 | The fit's `pcs` fallback keeps only player characters clear (FR-MAP-93, #318). A player's own pet may then sit under a window when the map can't fit everything at 24 px. Keep the viewer's own companions in the `pcs` set? | **A. No: one PC definition everywhere (#318, #333); pets stay "kept visible when possible" (`all`)** / B. Players only: the viewer's own pets count in their `pcs` fallback (a player steering the drake sees it), the placer unchanged | no · owner: DM (gate) | FR-MAP-93 |
+
 ## 16. Out of scope
+
+- *(Sprint 8)* Refitting when a token moves under a window; a camera that follows windows as they move; any change to the DM's Fit button behaviour beyond FR-MAP-95's shared function.
 
 - *(Sprint 7)* BL-55 (fog log spam with > 4 owned tokens) stays a backlog item; refitting when a PC walks under a window; a DM option to turn the appearance refit off.
 - *(Sprint 6)* Seeing through a companion's eyes on demand; per-token vision switches (OQ-MAP-54 C, unless picked); a companion leash / range indicator; summon placement by the player.

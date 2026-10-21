@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: claimed
+status: in-review
 owner: spec-wf
 wave: 2
 phase: post-mvp-8
@@ -42,6 +42,15 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 |---|---|---|---|
 | FR-NOTE-48 | Kind `stats-awards`: info to all, payload `{fromN, toN, from, to, label}`, view with Open | ST0 (kind), ST2 (views) | `FR-NOTE-48 awards notification` |
 | FR-NOTE-49 | Callout toasts are not notifications; a transient info toast in the info stack (S6) | ST2 | `FR-NOTE-49 callout toast is not a notification` |
+
+> **Sprint 8 (track WF, window-frame pass; DM [#333](../decisions-log.md), [#334](../decisions-log.md)).** **One toast policy** for both clients: position, classes, max and overflow (FR-NOTE-50). TT's roll requests and SB's kill-feed register a class instead of new stacks (FR-NOTE-52). Fixed: **BL-59** (the DM stack stays low after a tool closes, FR-NOTE-51). FR-NOTE-44 reads the [placer](play-shell.md#6-functional-requirements)'s plan (FR-NOTE-53). New FR-NOTE-50–53. Slice **WF4** `fix/wf-sizes-toasts` ([play-shell §14](play-shell.md#14-dependencies)); walkthrough F8 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-NOTE-50 | One stack per client; classes card / alert / info / callout; max 3 + "+N more"; one callout | WF4 | `FR-NOTE-50 toast policy` |
+| FR-NOTE-51 | The stack returns home when its inputs change | WF4 | `FR-NOTE-51 stack returns home (BL-59)` |
+| FR-NOTE-52 | `toastClass` on kinds; one `showCallout` | WF4 | `FR-NOTE-52 toast classes` |
+| FR-NOTE-53 | "Pushed" read from the plan | WF4 (after WF1) | `FR-NOTE-53 stack reads the plan` |
 
 ## 1. Summary
 
@@ -133,6 +142,10 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | **Sprint 7** (track ST, [stats](stats.md)) | | |
 | FR-NOTE-48 | **Kind `stats-awards`** (owner stats; one line in `kinds.ts`, append). Audience `all`, no action, so state `info`: a 6 s toast per FR-NOTE-13 / -14 plus a history row. Payload zod `{fromN, toN, from, to, label}` (`label` ≤ 40 chars, e.g. "Tue 20 Oct"); text "Session awards: ‹label›". Both are player-safe: times and a date only. Made only by `stats.showAwards` through `notify` (FR-NOTE-02). Client views (both `notification-views.ts`, append): icon lucide `Trophy`, and a renderer with an **Open** Button (`note-stats-awards-open`, client-only, not an action) calling `openStatsAwards(fromN)` ([FR-SHELL-94](play-shell.md#6-functional-requirements)). No `endRule` (awards outlive fights). | 575 B a row (measured) |
 | FR-NOTE-49 | **Callout toasts are not notifications** ([FR-STATS-22](stats.md#6-functional-requirements)). The overkill toast (`stats-overkill-toast`) is a shadcn Toast in this client's toast region: players bottom-right, DM top-centre band, under FR-NOTE-42 / -43's placement. It makes no row and doesn't count in the bell or appear in history. It is a transient **info** toast, not a card toast (seam S6): it uses the existing info-toast stack, never pushes windows, and Fit ([OQ-MAP-61](scenes-map.md#15-open-questions)) and the pending-toast rules ignore it. Only one shows at a time (a new callout replaces it). It starts from a live event frame only (`useEventFrame`), like FR-CBTX-06. | OQ-STATS-03 |
+| FR-NOTE-50 | **One toast policy** (sprint 8, track WF; both clients; consolidates FR-NOTE-14, -42–44, -49 and [FR-SHELL-49](play-shell.md#6-functional-requirements)). **One stack per client**: players bottom-right (72 px above the bottom, 16 px from the right); the DM at the top-centre home band (FR-NOTE-42: down within the band, never sideways beyond the left-of-Initiative shift). **Toast classes**: **card** (pending, action owner; sticky until no longer pending or closed), **alert** (shell alerts, 6 s), **info** (6 s, FR-NOTE-14), **callout** (4 s, not a notification, FR-NOTE-49; **at most one** shown, a new one replaces it). **Order** from the home edge: the DM's summary, cards, alerts, info, then the callout; players: notifications, alerts, then roll popups (FR-SHELL-49). **Max**: 3 notification toasts (cards + info + alerts) visible; more → "+N more" (opens `note.history`); a card never goes into "+N more" for an info toast (info toasts overflow first). Callouts and roll popups don't count toward the 3. **Never a window**: toasts aren't placed by the shell's placer; they keep clear of windows by FR-NOTE-42–44 / -53. | #333; FR-SHELL-112 (4) |
+| FR-NOTE-51 | **The stack returns home** (BL-59: the DM stack dropped to y 684 by FR-NOTE-44's fallback stayed there after the tool closed, until a reload). `ToastRuntime` recomputes `dmStackPlacement` on **every** change of its inputs: rendered window rects and their `data-placed`, hard keep-outs, the first-row reports (subscribed, not read once as a default parameter), the stack height and the viewport. The hover freeze holds the stack only while the pointer is on it and recomputes on leave. Root cause first (code read: `rows = firstRows()` is not reactive; `tick` frozen while hovered; pushed windows that didn't return keep blocking). Outcome: the tool closes → pushed windows return ([FR-SHELL-102](play-shell.md#6-functional-requirements)) → the stack is at its home (560, 100 at 1440×900) within one frame of that settle, unless a window that is still there blocks it. | BL-59 |
+| FR-NOTE-52 | **Toast class for new kinds** (seams TT / SB): a notification kind's registry entry (`kinds.ts`, append) may declare `toastClass?: "card" \| "info"` (default from its state: pending → card, else info). Callouts that are not notifications call one shared `showCallout({id, content, ms?})` (the overkill toast, FR-NOTE-49, is its first user; SB's kill-feed its second). Proposed per track: TT's roll request = a pending kind → **card** with its Roll action (OQ-SHELL-65); SB's kill-feed = **callout** (OQ-NOTE-29). The TT pause screen is an overlay, not a toast. | FR-SHELL-112 |
+| FR-NOTE-53 | **The stack reads the placer's plan** (amends FR-NOTE-44): "a pushed window" = a rendered window whose `data-placed` is `pushed`, or `displaced` with cause `toolbar:*` ([FR-SHELL-110](play-shell.md#6-functional-requirements)); a squeezed Game log is read at its rendered rect. Nothing else changes in `dmStackPlacement`. | FR-NOTE-44 |
 
 ## 7. UI/UX notes
 
@@ -218,6 +231,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 - *(Sprint 5)* **Colours:** the stamp is part of the insert: it commits with the notification or not at all (crash-safe, nothing new to lose); disconnect → stripes keep their last colours; reconnect / restart → the snapshot brings rows and colours. A player sending `byPlayerId` in `note.testSend` → `invalid` (strict schema). The creator's colour changes → existing rows restripe (derived). A row created by one DM tab shows the DM colour in every tab.
 - *(Sprint 6)* **Stack placement:** client-only; disconnect / reconnect / restart re-place the stack from what is on screen (the reconnect summary toast lands at the home, FR-NOTE-42); a tool bar shown after a reload re-reports and the stack re-places (FR-NOTE-43). A sticky stack taller than the band above the launcher → "+N more" as built. The DM moves Initiative onto the home band → the stack shifts left of it, and drops below a tool bar it would meet.
 - **Invalid / malicious input:** players create only via feature commands and test mode; text per FR-NOTE-21, never HTML; frames > 64 KB closed by live-sync.
+- **Sprint 8 (toast policy, BL-59):** *disconnect / reconnect*: snapshots never toast (FR-NOTE-13), so the policy applies to live frames only; the stack re-places after the reconnect snapshot like any input change (FR-NOTE-51). *Server crash*: same. *Reload*: the stack starts at home; callouts don't survive (transient). *A burst* (a big fight): cards stay, info toasts go to "+N more" first, callouts replace each other.
 
 ## 12. Performance & bandwidth
 
@@ -284,6 +298,8 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 **Sprint 6 walkthrough:** [play-shell §13](play-shell.md#13-test-plan) F0 (summary toast at its home after Reset layout), F5 (Fog / AoE / Structure bars fully reachable with the summary showing, at 1440×900 and 1280×720; the stack never at x 68), F6 (Initiative moved to x 600: the stack shifts left and clears the tool bar), F13 (reload, crash). Bundle `session-sim-9` (its "late-hit-ruled" card gives the DM's summary toast); no new fixture.
 
 **Sprint 7 (track FU):** bundle `fu-s7` (session-sim-10's "1 pending action" toast + Mira's late-hit card); walkthrough U4, U17 in [play-shell §13](play-shell.md#13-test-plan). Unit (`keep-out.test.ts`): `FR-NOTE-44 toast clear of a pushed window` (1440×900: Scenes `pushed` at 546, 60 in the band, Initiative at 1028 → the stack never overlaps Scenes' title bar or first 40 px; with no room in the band it drops below that strip). Client (`logic.test.ts`): `FR-NOTE-45 summary counts waiting` (DM with 1 own pending card + 1 player-owned concentration save in the started encounter → "1 pending action · 1 waiting for a player", `data-waiting="1"`; none waiting → today's text; 0 own + 1 waiting → "1 waiting for a player" alone; players unchanged). Edge cases: the summary is computed at load / reconnect from the store (FR-NOTE-15), so a reconnect recounts; disconnect and crash: unchanged. CON-44: 0 B.
+
+**Sprint 8 (track WF):** unit `FR-NOTE-50 toast policy` (order, max 3, info overflows before cards, one callout replaces another), `FR-NOTE-51 stack returns home (BL-59)` (pure `dmStackPlacement` + a `ToastRuntime` DOM test: tool bar shown → stack below the pushed window's title bar + 40; bar gone and windows returned → home within one frame; hover freeze released on leave; a first-row report change re-places), `FR-NOTE-52 toast classes`, `FR-NOTE-53 stack reads the plan`; walkthrough F8 in [play-shell §13](play-shell.md#13-test-plan) (bundle `wf-frame`); slice WF4.
 
 ## 14. Dependencies
 
@@ -363,6 +379,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-NOTE-28 | Show awards: info toast **and** the window opening, or only the window? | **Decided (#315): A** · **A. Both** (FR-NOTE-13's rule unchanged; the toast says why the window opened) · B. Window only (a per-kind "no toast" flag, new to the registry) | — | NOTE, STATS |
+| OQ-NOTE-29 | **Seam with SB** ([stats](stats.md)): kill-feed toasts ("Thorn finished the Ogre, overkill 37") as which class? | **A. Callout: one at a time, a new one replaces it, 4 s; it never pushes a pending card off the stack in a big fight** / B. Info: stacked up to 3 with the rest, 6 s; every kill stays readable, but cards may go to "+N more" | no · owner: spec-sb, orchestrator (seams) | FR-NOTE-50, -52 |
 
 ## 16. Out of scope
 
