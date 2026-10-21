@@ -123,6 +123,7 @@ export async function startAndFollow(
   await fx.settle?.();
   fx.dispatch({ type: "minimise", kind: ENCOUNTERS_KIND });
   fx.dispatch({ type: "open", kind: INITIATIVE_KIND, by: "feature" }); // FR-SHELL-41
+  await fx.settle?.(); // FR-CBT-150: the map's refit sees Initiative's grown height
   fx.noteAppearance();
   return r;
 }

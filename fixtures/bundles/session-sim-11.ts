@@ -8,11 +8,16 @@ import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
  */
 export default defineBundle({
   name: "session-sim-11",
-  includes: ["session-sim-10"],
+  // ST core: `stats-past` (the ended "Old Crypt") loads before sim-10 starts its Goblin Ambush.
+  includes: ["stats-past", "session-sim-10"],
   fixtures: [
     // GM: gems (no unit: gems off by default, switched on live in the walkthrough)
-    // ST: stats (a past session in the log: `st-past-crypt`, ST core)
+    // ST: stats (a past session in the log: `st-past-crypt`, ST core, via the `stats-past` include:
+    // a campaign has one started fight at a time)
     // FU: sprint-6 follow-ups (`cp-ally` charmed Goblin 2 + `fu-hurt-goblins`, FU-combat)
+    // FU1: no new unit (the window frame walks on session-sim-10's Goblin Ambush; layout tests
+    // use its cells in test-cells.ts)
+    // FU3: no new unit (the map follow-ups walk on session-sim-10's Goblin Ambush)
     // FU4: a type-less fixture Goblin's Compendium row "CR 1/4 · Small" (FR-CMP-58)
     "cmp-goblin-untyped",
     "cp-ally",

@@ -307,3 +307,77 @@ describe("FR-NOTE-43 never over a tool bar", () => {
     expect(hit(rectOf(tall, 800), corner)).toBe(false);
   });
 });
+
+describe("FR-NOTE-44 never over a pushed window's first row", () => {
+  const vp = { w: 1440, h: 900 };
+  // sim-10 b05: Scenes pushed by the Fog bar to 546, 60, inside the stack's band; Initiative at 1028.
+  const scenes = { x: 546, y: 60, w: 260, h: 440 };
+  const strip = { ...scenes, h: 32 + 40 };
+
+  test("FR-NOTE-44 toast clear of a pushed window: the stack never covers Scenes' title bar or its first 40 px of body; it drops below that strip", () => {
+    // The card's targets below Scenes (b05): the spots clear of them are on Scenes' body, and
+    // the stack took the first, on top of Scenes' first row ("Goblin Ambush").
+    const targets = [
+      { x: 600, y: 460, w: 45, h: 45 },
+      { x: 600, y: 520, w: 45, h: 45 },
+    ];
+    const at = dmStackPlacement(vp, INIT, 57, STACK_W, targets, [LOG, scenes], [FOG_BAR]);
+    expect(hit(rectOf(at, 57), strip)).toBe(false);
+    expect(hit(rectOf(at, 57), FOG_BAR)).toBe(false);
+    expect(at).toEqual({ left: 560, top: 60 + 72 + 8 }); // at home (FR-NOTE-42), below the strip
+    // No tool bar shown (nothing pushed): only the title bar blocks, as before (b05's spot).
+    const free = dmStackPlacement(vp, INIT, 57, STACK_W, targets, [LOG, scenes], []);
+    expect(free).toEqual({ left: 560, top: 60 + 32 + 8 });
+  });
+
+  test("FR-NOTE-44 no room in the band below the strip → over a body, never over the strip", () => {
+    const tall = 900 - 64 - (60 + 72 + 8) + 1; // taller than the room below the strip
+    const at = dmStackPlacement(vp, INIT, tall, STACK_W, [], [scenes], [FOG_BAR]);
+    expect(hit(rectOf(at, tall), strip)).toBe(false);
+  });
+});
+
+describe("FR-NOTE-44 walkthrough U4 (20261021-fu1-frame): Scenes' first row stays hit-testable", () => {
+  // The report's rects at 1440×900: Fog bar 62,56 472×154; Scenes pushed to 546,60 260×360, its
+  // first row "Goblin Ambush · Live" 559,145 198×34; Initiative 1028,60 400×512; Game log 68,584
+  // 1150×240; the stack 320×152 ("2 pending actions" + Brakka's card).
+  const vp = { w: 1440, h: 900 };
+  const bar = { x: 62, y: 56, w: 472, h: 154 };
+  const scenes = { x: 546, y: 60, w: 260, h: 360 };
+  const init = { x: 1028, y: 60, w: 400, h: 512 };
+  const log = { x: 68, y: 584, w: 1150, h: 240 };
+  const row = { x: 546, y: 60, bottom: 145 + 34 };
+  const probe = { x: 658, y: 162 }; // the row's centre (elementFromPoint)
+  // The card's target under the lower spots (what made the stack take 140 in the run).
+  const target = [{ x: 560, y: 300, w: 320, h: 280 }];
+  const inside = (p: { x: number; y: number }, r: Box) =>
+    p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
+
+  test("FR-NOTE-44 toast clear of a pushed window's first row: with the row reported, the stack clears title bar + 40 px and the row; the row's centre isn't under it", () => {
+    // The walkthrough's spot without the row report: below title + 40 (133) at 140, on the row.
+    const before = dmStackPlacement(vp, init, 152, STACK_W, target, [log, scenes], [bar], []);
+    expect(before.top).toBe(140);
+    expect(inside(probe, rectOf(before, 152))).toBe(true);
+    const at = dmStackPlacement(vp, init, 152, STACK_W, target, [log, scenes], [bar], [row]);
+    expect(inside(probe, rectOf(at, 152))).toBe(false);
+    expect(hit(rectOf(at, 152), { ...scenes, h: row.bottom - scenes.y })).toBe(false);
+    expect(hit(rectOf(at, 152), bar)).toBe(false);
+    expect(at.left).toBe(560); // still at home (FR-NOTE-42)
+    // A report for another spot (the window before it was pushed) doesn't count.
+    const stale = dmStackPlacement(
+      vp,
+      init,
+      152,
+      STACK_W,
+      target,
+      [log, scenes],
+      [bar],
+      [{ x: 68, y: 60, bottom: 179 }],
+    );
+    expect(stale).toEqual(before);
+    // No tool bar: rows don't count (only title bars, as before).
+    expect(dmStackPlacement(vp, init, 152, STACK_W, target, [log, scenes], [], [row]).top).toBe(
+      100,
+    );
+  });
+});

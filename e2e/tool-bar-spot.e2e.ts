@@ -1,7 +1,8 @@
 // e2e-bundle: windows-s5
 // Tool bars at their home spot push windows right (SHELL §13 W4, W11; FR-SHELL-55, FR-MAP-60,
 // FR-FOG-58), and a live viewport resize lets the never-resized Game log follow (FR-SHELL-51, -53;
-// W2 walkthrough finding). Push rules in detail: bun test (`FR-SHELL-55 push right`).
+// W2 walkthrough finding). Sprint 7 (FR-SHELL-81): closing the tool returns the pushed windows to
+// their spot. Push rules in detail: bun test (`FR-SHELL-55 push right`, `FR-SHELL-81 …`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
@@ -62,7 +63,7 @@ async function reachable(page: Page, control: Locator) {
   expect(inPanel).toBe(true);
 }
 
-test("W11 FR-SHELL-55 FR-MAP-60 player-1 at 1280×800, then 1440×900: Initiative over the AoE panel's spot is pushed right of it (same y and size, clear of the sheet); every panel control reachable; closing the tool leaves it there", async ({
+test("W11 FR-SHELL-55 FR-MAP-60 player-1 at 1280×800, then 1440×900: Initiative over the AoE panel's spot is pushed right of it (same y and size, clear of the sheet); every panel control reachable; closing the tool returns it (FR-SHELL-81)", async ({
   browser,
 }) => {
   const { link } = e2eEnv();
@@ -103,19 +104,20 @@ test("W11 FR-SHELL-55 FR-MAP-60 player-1 at 1280×800, then 1440×900: Initiativ
     await reachable(p1, p1.getByTestId("scn-aoe-shape-cone"));
     await p1.getByTestId("scn-aoe-shape-cone").click();
     await reachable(p1, p1.getByTestId("scn-aoe-size"));
-    // Close the tool: Initiative stays where it was pushed; the keep-out goes.
+    // Close the tool: the keep-out goes, Initiative returns to its spot (FR-SHELL-81).
     await p1.getByTestId("map-tool-select").click();
     await expect(panel).toHaveCount(0);
     await expect(p1.getByTestId("ui-play-page")).not.toHaveAttribute(
       "data-keep-outs",
       /map\.toolbar/,
     );
-    expect(await box(init)).toEqual(after);
+    await expect(init).toHaveAttribute("data-placed", "returned");
+    expect(await box(init)).toEqual(before);
   }
   await p1.context().close();
 });
 
-test("W4 FR-SHELL-55 FR-FOG-58 DM at 1440×900, then 1280×720: the Fog tool's bar wraps by group at its home spot, before the toast box; Scenes pushed right of it; Party vision and View as reachable; closing the tool leaves Scenes there", async ({
+test("W4 FR-SHELL-55 FR-FOG-58 DM at 1440×900, then 1280×720: the Fog tool's bar wraps by group at its home spot, before the toast box; Scenes pushed right of it; Party vision and View as reachable; closing the tool returns Scenes (FR-SHELL-81)", async ({
   browser,
 }) => {
   const { secret } = e2eEnv();
@@ -164,10 +166,11 @@ test("W4 FR-SHELL-55 FR-FOG-58 DM at 1440×900, then 1280×720: the Fog tool's b
     await dm.getByTestId("fog-view-as").click();
     await expect(dm.getByTestId("fog-view-as-option").first()).toBeVisible();
     await dm.keyboard.press("Escape");
-    // Close the tool: Scenes stays where it was pushed.
+    // Close the tool: Scenes returns to its spot (FR-SHELL-81).
     await dm.getByTestId("map-tool-select").click();
     await expect(panel).toHaveCount(0);
-    expect(await box(scenes)).toEqual(after);
+    await expect(scenes).toHaveAttribute("data-placed", "returned");
+    expect(await box(scenes)).toEqual(before);
   }
   await dm.context().close();
 });

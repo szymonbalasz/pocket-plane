@@ -2225,9 +2225,26 @@ From [gems](../specs/gems.md#8-data-model) FR-GEM-17, [character-sheet-full](../
 
 - **Derived (not stored):** counts of a character without a `character-gems` row = 0; who may spend (DM, or the entity's `ownerPlayerId`).
 - **Fixtures:** bundle `gems-ui-e2e` (= `gems-hidden`, for `e2e/gems-ui.e2e.ts`); no new unit. `session-sim-11` gains none (gems off there; seams S13).
+
+## 100. Sprint 7: window frame (FU1)
+
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-56 (OQ-SHELL-55 B), -77–81, -85–88 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-44. **Built by `fix/fu-frame`**: no table, column, record type or payload change. Protocol side: [protocol §126](../protocol/README.md#126-sprint-7-window-frame--auto-minimise-instead-of-covering-pcs-useful-sizes-pushed-windows-return-space--focus-tooltips-fu1).
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| `WindowState.userSpot` | browser layout entry (`localStorage`, #121) | `true`, optional: set at a user move / resize end; dropped when the shell places the window; restored with a returned pre-push rect; older entries parse as absent | [FR-SHELL-56](../specs/play-shell.md#6-functional-requirements) |
+| Pre-push rects | client memory (`ShellState.prePush`) | per pushed window: its rect and `userSpot` before the first push of a tool use, and the rect the push wrote; dropped on move, resize, close, minimise, reset, return, reload | [FR-SHELL-81](../specs/play-shell.md#6-functional-requirements) |
+| Auto-minimised for, auto-minimise log | client memory (`autoMinimisedFor`, `autoMinimiseLog`) | the newcomer each auto-minimised window made room for; the last placement's moves | [FR-SHELL-88](../specs/play-shell.md#6-functional-requirements) |
+| `WindowDef.usefulSize`, band, size table | code (registry; `size-table.ts` test data) | not sent or stored | [FR-SHELL-79](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-85](../specs/play-shell.md#6-functional-requirements) |
+| Fit requests | client memory (`free-area.ts` counter) | one per Reset layout on this page | [FR-SHELL-80](../specs/play-shell.md#6-functional-requirements) |
+| First content rows | client memory (`content-heights.ts` `reportFirstRow`) | per open window: its rendered top-left and its first record row's bottom; dropped when it closes or unmounts | [FR-NOTE-44](../specs/notifications.md#6-functional-requirements) |
+
+- **Derived:** a PC for auto placement = a token with `characterId` and `ownerPlayerId` (a player character); pets and summons are not (orchestrator ruling, sprint 7).
+- **Fixtures:** no new unit (pure tests on `session-sim-10`'s Goblin Ambush cells in `test-cells.ts`, pets and summons marked `companion`; the e2e reads `session-sim-10`); `session-sim-11` gets a comment line only.
+- **Persisted runtime state:** only `userSpot` in the layout entry.
 - **CON-44:** 0 B.
 
-## 100. Sprint 7: Inspiration reroll (GM1)
+## 101. Sprint 7: Inspiration reroll (GM1)
 
 From [gems](../specs/gems.md#8-data-model) FR-GEM-13, -19, [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-62–64, -67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-126, -127 (#140, #315). **Built by `build/gems-reroll`**. Protocol side: [protocol §127](../protocol/README.md#127-sprint-7-inspiration-reroll-gm1). **No table or column change.**
 
@@ -2244,9 +2261,40 @@ From [gems](../specs/gems.md#8-data-model) FR-GEM-13, -19, [dice-roll-log](../sp
 - **Fixtures:** `gems-rolls` in bundle `gems`; alias `gems-reroll-e2e`.
 - **CON-44:** 33 superseded + 33 `replaces` in the 100-entry window → +3,564 B per viewer; 0 B with no reroll.
 
-## 101. Sprint 7: Combat gem (GM2)
+## 102. Sprint 7: map follow-ups (FU3)
 
-From [gems](../specs/gems.md#8-data-model) FR-GEM-25–31 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-128, -131, -133, -135 (#140, #315). **Built by `build/gems-combat`**. Protocol side: [protocol §130](../protocol/README.md#130-sprint-7-combat-gem-gm2). **No table or column change.**
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A). **Built by `fix/fu-map`**: no table, column, record type or payload change. Protocol side: [protocol §131](../protocol/README.md#131-sprint-7-map-follow-ups-fu3).
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| Reveal baseline | client memory (`MapCanvas` `drawn`) | the token ids the last fit framed on its scene; set by every fit, then by each token-list change on that scene; none before the scene's first fit | FR-MAP-89 (3) |
+| Load fit done | client memory (`MapCanvas` module flag) | the first scene-open fit on this page is the load fit (`data-fit-reason="load"`) | FR-MAP-89 (2) |
+| Strip-only room | derived per render (`useFreeArea().stripOnly`) | the DM's fit obstacles without the shown stack (windows + summary strip) and their candidate rectangles; players: the same as `obstacles` | FR-MAP-91 |
+
+- **Derived:** the no-jump check (`appearanceKeeps`) and Fit past toasts (`fitPastToasts`) read the canvas's current camera, tokens and obstacles; nothing kept.
+- **Fixtures:** no new unit; bundle `fu-map-e2e` (= `session-sim-10`, for `e2e/map-followups.e2e.ts`, which shows Goblin Ambush and reveals its fog); `session-sim-11` gets a comment line only.
+- **Persisted runtime state:** none.
+- **CON-44:** 0 B.
+
+## 103. Sprint 7: stats core (ST-core)
+
+From [stats](../specs/stats.md#8-data-model) and [combat-tracker](../specs/combat-tracker.md#65-sprint-7-stats-facts) FR-CBT-136–138 (#311, #315; [ADR-0059](../architecture/adr/0059-stats-read-models.md)). **Built by `fix/st-core`**. Protocol side: [protocol §132](../protocol/README.md#132-sprint-7-stats-core--statsquery-show-awards-from-on-heals-overkill-line-callout-st-core). **No table, column or record type.**
+
+| Field / table | Change | Rule | Source |
+|---|---|---|---|
+| `hp_change.attacker_id` / `attacker_name` | unchanged columns, now also written by `cbt.applyHp` from `sourceId` | null = the DM, as before | FR-CBT-136 |
+| `game_log_entry.payload` (`cbt.attack`, `cbt.hp`) | + `callout?: "overkill"`; `cbt.hp` + `sourced?: true` | stamped at apply; old rows parse | FR-CBT-136, -137 |
+| `game_log_entry.dm_payload` (`cbt.hp`) | + `overkill?` int (callout lines) | `cbt.attack` keeps its existing `overkill` int (the spec's `{amount, hpBefore}` leaf would clash with it; "over M HP" = damage − overkill) | FR-CBT-137 |
+| `notification` (kind `stats-awards`) | new kind, payload `{fromN, toN, from, to, label}` | made only by `stats.showAwards` | FR-NOTE-48 |
+
+- **Facts contract** (FR-CBT-138, FR-DICE-72): `hp_change` rows, combatants and started / ended encounters are never deleted; rows change only by the undo marker; `raw`, `applied`, `overkill`, `hpBefore`, `hpAfter`, temp fields, `entryId`, and the log's `natural`, `category`, `rollIds`, `encounterId`, `public` keep their meaning (a change needs a stats review).
+- **Derived (not stored):** every stat, sessions (a ≥ 6 h gap between consecutive entries; key = first `n`; a fact belongs to its line's session by `n`, never by `at`), fight labels.
+- **Persisted runtime state:** none. Server memory only: the session boundary cache and the query memo / rate gate.
+- **Fixtures:** `st-past-crypt` (ended "Old Crypt": Thorn vs 2 Skeletons, one callout, Mira downed and healed back, a public nat 20), `st-ambush-facts` (4 Goblin Scouts + 13 facts on sim-10's Goblin Ambush; expected numbers in `fixtures/units/stats/stats.fixtures.test.ts`).
+
+## 104. Sprint 7: Combat gem (GM2)
+
+From [gems](../specs/gems.md#8-data-model) FR-GEM-25–31 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-128, -131, -133, -135 (#140, #315). **Built by `build/gems-combat`**. Protocol side: [protocol §133](../protocol/README.md#133-sprint-7-combat-gem-gm2). **No table or column change.**
 
 | Field | Change | Rule | Source |
 |---|---|---|---|

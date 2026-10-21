@@ -294,6 +294,37 @@ describe("FR-MAP-42 label", () => {
     expect(new Set(big.badges.map((b) => b.y + b.height / 2)).size).toBe(2);
   });
 
+  test("FR-MAP-88 companion marker after End → Start (client part): the paw has priority over the '+N' (the drake's paw folded into '+N' on the DM map, FU-combat walkthrough)", () => {
+    // The drake as the DM holds it: Ally, Fog, then the paw (registry order puts the marker last).
+    const ally = { id: "cbt-token-ally", label: "Ally" };
+    const fog = { id: "fog-token-fogged", label: "Fog" };
+    const paw = { id: "map-token-companion", label: "Player 1's companion", compact: true };
+    for (const px of [24, 32, 40, 44, 48, 56]) {
+      const before = labelRow("Drake Companion", [ally, fog, paw], 70, 70, px / 70, measure);
+      const after = labelRow(
+        "Drake Companion",
+        [ally, fog, { ...paw, priority: true }],
+        70,
+        70,
+        px / 70,
+        measure,
+      );
+      const drawn = after.badges.map((b) => b.id);
+      // The paw is drawn at every size (first, an icon chip), never only listed in the "+N".
+      expect({ px, paw: drawn.includes(paw.id) }).toEqual({ px, paw: true });
+      expect(after.badges.find((b) => b.id === paw.id)?.compact).toBe(true);
+      const more = after.badges.find((b) => b.id === MORE_BADGE_ID);
+      expect(more?.full?.includes(paw.label) ?? false).toBe(false);
+      // Every other badge is drawn or listed in the "+N" (or dropped only beside a lone paw
+      // where no "+N" fits).
+      if (more) expect(more.text).toBe(`+${more.full?.split(", ").length}`);
+      if (px === 32) {
+        // Before: one "+3" hid the paw.
+        expect(before.badges.map((b) => b.id)).toEqual([MORE_BADGE_ID]);
+      }
+    }
+  });
+
   test("FR-MAP-43 BL-35 a '+N' hiding a Dying badge takes the danger tone (24–35 px and full rows)", () => {
     const dying = { id: "cbtx-token-death", label: "Dying", tone: "down" as const };
     const invisible = { id: "fog-token-invisible", label: "Invisible", tone: "neutral" as const };

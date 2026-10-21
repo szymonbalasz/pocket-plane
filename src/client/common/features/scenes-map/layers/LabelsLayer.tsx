@@ -18,6 +18,7 @@ import type Konva from "konva";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Circle, Group, Path, Rect, Text } from "react-konva";
 import { useStore } from "zustand";
+import { COMPANION_MARKER_ID } from "../../combat-tracker/token-overlay";
 import { withoutDmOnly } from "../../scene-tools/layer-switches";
 import { useCanvas } from "../canvas-context";
 import { chipGlyph, ICON_GRID, ICON_STROKE } from "../canvas-icons";
@@ -199,9 +200,13 @@ function TokenLabel({ t, cut, full }: { t: TokenView; cut: boolean; full: boolea
     targeting: c.targeting,
   });
   // FR-MAP-56: cut by a collision → its footprint (less the gap); hovered → the whole name.
+  // FR-MAP-88: the companion paw has priority over the "+N".
+  const badges = deco.badges.map((b) =>
+    b.id === COMPANION_MARKER_ID ? { ...b, priority: true } : b,
+  );
   const row = labelRow(
     t.name,
-    deco.badges,
+    badges,
     side,
     grid.gridCellSize,
     cam.scale,

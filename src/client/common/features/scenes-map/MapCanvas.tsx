@@ -33,8 +33,10 @@ import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from ".
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
 import { useFreeArea } from "../play-shell/free-area";
+import { isKeyboardFocus, spaceAction, trackFocusModality } from "../play-shell/keys";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
+  appearanceKeeps,
   type Camera,
   type CameraEvent,
   type CameraMode,
@@ -45,6 +47,7 @@ import {
   createRevealRefit,
   type FitReason,
   type FitVisible,
+  fitPastToasts,
   fitScene,
   footprintBox,
   refitsOnReveal,
@@ -66,6 +69,7 @@ import {
 } from "./drag-preview";
 import { DragProbe, probesDrag } from "./drag-probe";
 import { toastReject, useLive, useMapIntent } from "./intents";
+import { labelHitAt, labelRowItems, tokenIdAt } from "./label-hit";
 import { LaserSender } from "./laser";
 import {
   type LayerContextMenu,
@@ -102,7 +106,6 @@ import {
   stagePans,
   type ToolPointer,
   tokenTakesLeftPress,
-  typingTarget,
 } from "./tools";
 
 export interface MapCanvasProps {
@@ -162,6 +165,9 @@ function useSize(ref: React.RefObject<HTMLDivElement | null>) {
 
 const tokenNodeOf = (n: Konva.Node | null) => n?.findAncestor(".map-token", true) ?? null;
 
+/** FR-MAP-89 (2): the first scene open on this page is the load fit (`data-fit-reason="load"`). */
+let loadFitDone = false;
+
 /**
  * FR-MAP-12 / OQ-MAP-45: the mounted canvases' middle pans. Konva ends any drag on a window
  * `mouseup` (capture); this guard is registered when the module loads, before any Stage exists,
@@ -208,8 +214,8 @@ export function MapCanvas(props: MapCanvasProps) {
   spaceRef.current = space;
   /** The pointer is over the canvas (Space pans then even while a button has focus). */
   const overMap = useRef(false);
-  /** Space taken from a focused button: its keyup must not click it either. */
-  const spaceFromButton = useRef(false);
+  /** Space taken for a pan (from a focused control too): its keyup must not click it either. */
+  const spaceTaken = useRef(false);
   useEffect(() => useMapTool.setState({ client }), [client]);
   const sendIntent = useMapIntent();
   const sendIntentRef = useRef(sendIntent);
@@ -256,50 +262,101 @@ export function MapCanvas(props: MapCanvasProps) {
   // FR-MAP-59 / -80 obstacles: the rendered open windows + the players' toast box, or the DM's
   // summary strip + shown stack (`fitObstacles`).
   const obstacles = free.obstacles;
+  const obstaclesRef = useRef(obstacles);
+  obstaclesRef.current = obstacles;
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  const tokensRef = useRef(tokens);
+  tokensRef.current = tokens;
+  const camRef = useRef(cam);
+  camRef.current = cam;
+  /** FR-MAP-82 / -89 (3): the token ids the last fit framed on its scene (the reveal baseline). */
+  const drawn = useRef<{ scene: string; ids: ReadonlySet<string> } | null>(null);
   const fitNow = useRef((_reason: FitReason) => {});
   fitNow.current = (reason) => {
     if (size.w === 0) return;
     // FR-MAP-58 in the room the toast box leaves (FR-SHELL-48 (a)), then FR-MAP-59; PC tokens =
     // tokens with an owner, in this client's store (FR-MAP-46).
-    const fit = fitScene(
-      tokens.map((t) => ({ col: t.col, row: t.row, size: t.size, pc: t.ownerPlayerId !== null })),
-      grid,
-      { w: scene.mapWidth, h: scene.mapHeight },
-      size,
-      { areas: free.toastFreeAreas, obstacles, windowsOnly: free.areas },
-    );
+    const fitTokens = tokens.map((t) => ({
+      col: t.col,
+      row: t.row,
+      size: t.size,
+      pc: t.ownerPlayerId !== null,
+    }));
+    const map = { w: scene.mapWidth, h: scene.mapHeight };
+    const room = { areas: free.toastFreeAreas, obstacles, windowsOnly: free.areas };
+    // FR-MAP-91: Fit (button, Reset layout), a resize and (FR-MAP-90) an appearance refit may fit
+    // past the DM's shown stack.
+    const fit =
+      reason === "fit" || reason === "resize" || reason === "appearance"
+        ? fitPastToasts(fitTokens, grid, map, size, room, {
+            ...free.stripOnly,
+            windowsOnly: free.areas,
+          })
+        : { ...fitScene(fitTokens, grid, map, size, room), pastToasts: false };
     setCam({ x: fit.x, y: fit.y, scale: fit.scale });
     setFitFloor(fit.floor);
     setFitVisible(fit.visible);
     setFitRect(`${fit.rect.x},${fit.rect.y},${fit.rect.w},${fit.rect.h}`);
-    setFitReason(reason);
+    setFitReason(fit.pastToasts ? "fit-past-toasts" : reason);
+    drawn.current = { scene: scene.id, ids: new Set(tokens.map((t) => t.id)) };
   };
-  /** FR-MAP-61: the appearance refit, once the frame that caused it reached the canvas. */
+  /**
+   * FR-MAP-61: the appearance refit, once the frame that caused it reached the canvas. FR-MAP-90:
+   * every token already inside the area and clear of every obstacle → the camera stays.
+   */
   const [appearanceRefit] = useState(() =>
     createAppearanceRefit(() => {
-      if (cameraModeRef.current === "fitted") fitNow.current("appearance");
+      if (cameraModeRef.current !== "fitted") return;
+      const boxes = tokensRef.current.flatMap((t) => footprintBox([t], gridRef.current) ?? []);
+      if (appearanceKeeps(camRef.current, boxes, obstaclesRef.current, sizeRef.current)) return;
+      fitNow.current("appearance");
     }),
   );
-  useEffect(() => () => appearanceRefit.dispose(), [appearanceRefit]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: each new token list or window rect set re-arms a pending refit
-  useEffect(() => appearanceRefit.applied(), [appearanceRefit, tokens, obstacles]);
+  /**
+   * FR-MAP-89 (2), -92: the scene-open (load) fit and the resize refit wait, as the appearance
+   * refit does, for the windows' rendered rects (restored layout, grown heights, the render fit to
+   * the new viewport) before they frame.
+   */
+  const settledReason = useRef<FitReason>("open");
+  const [settledFit] = useState(() =>
+    createAppearanceRefit(() => {
+      const reason = settledReason.current;
+      if (reason === "resize" && cameraModeRef.current !== "fitted") return;
+      fitNow.current(reason);
+    }),
+  );
+  useEffect(
+    () => () => {
+      appearanceRefit.dispose();
+      settledFit.dispose();
+    },
+    [appearanceRefit, settledFit],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new token list, window rect set or canvas size re-arms a pending refit
+  useEffect(() => {
+    appearanceRefit.applied();
+    settledFit.applied();
+  }, [appearanceRefit, settledFit, tokens, obstacles, size]);
   /** Applies a camera event; fits now (or later, once the window change is laid out). */
   const onCamera = useCallback(
-    (e: CameraEvent, deferred = false) => {
+    (e: CameraEvent, deferred = false, reason: FitReason = e as FitReason) => {
       const next = cameraOn(cameraModeRef.current, e);
       cameraModeRef.current = next.mode;
       setCameraMode(next.mode);
       if (!next.fit) return;
       // Only fit events (open, fit, appearance, resize, reveal) fit.
-      if (!deferred) fitNow.current(e as FitReason);
-      else appearanceRefit.appearance();
+      if (!deferred) fitNow.current(reason);
+      else if (e === "appearance") appearanceRefit.appearance();
+      else {
+        settledReason.current = reason;
+        settledFit.appearance();
+      }
     },
-    [appearanceRefit],
+    [appearanceRefit, settledFit],
   );
   // ---- FR-MAP-12 (sprint 4): the middle mouse pans with any tool, before Konva and the tools ----
   const [panning, setPanning] = useState(false);
-  const camRef = useRef(cam);
-  camRef.current = cam;
   const [pan] = useState(() =>
     createMiddlePan({
       position: () => {
@@ -357,7 +414,8 @@ export function MapCanvas(props: MapCanvasProps) {
   useEffect(() => {
     if (size.w === 0 || !free.ready || loading || fittedFor.current === scene.id) return;
     fittedFor.current = scene.id;
-    onCamera("open");
+    onCamera("open", true, loadFitDone ? "open" : "load");
+    loadFitDone = true;
   }, [scene.id, size, free.ready, loading, onCamera]);
   // (b) an appearance refits while `fitted`; the window lands (FR-SHELL-18 `appear`) first.
   const seenAppearances = useRef(free.appearances);
@@ -370,7 +428,7 @@ export function MapCanvas(props: MapCanvasProps) {
   const resizeRefit = useRef<ReturnType<typeof createResizeRefit> | null>(null);
   useEffect(() => {
     const r = createResizeRefit(
-      () => onCamera("resize"),
+      () => onCamera("resize", true),
       () => dragRef.current !== null,
     );
     resizeRefit.current = r;
@@ -380,6 +438,13 @@ export function MapCanvas(props: MapCanvasProps) {
       r.dispose();
     };
   }, [onCamera]);
+  // FR-SHELL-80: Reset layout on this page runs one Fit, with the windows it wrote.
+  const seenFits = useRef(free.fitRequests);
+  useEffect(() => {
+    if (free.fitRequests === seenFits.current) return;
+    seenFits.current = free.fitRequests;
+    onCamera("fit");
+  }, [free.fitRequests, onCamera]);
   // FR-MAP-45: the rail's Fit button.
   useEffect(
     () =>
@@ -394,17 +459,13 @@ export function MapCanvas(props: MapCanvasProps) {
   useEffect(() => () => reveal.dispose(), [reveal]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: a scene switch drops a pending refit
   useEffect(() => reveal.dispose(), [reveal, scene.id]);
-  const obstaclesRef = useRef(obstacles);
-  obstaclesRef.current = obstacles;
-  const sizeRef = useRef(size);
-  sizeRef.current = size;
-  const drawn = useRef<{ scene: string; ids: ReadonlySet<string> } | null>(null);
   useEffect(() => {
     const prev = drawn.current;
+    // A scene switch, or tokens before this scene's first fit has framed: that fit takes the
+    // baseline (FR-MAP-89 (3)), so a token arriving after it counts as a reveal.
+    if (!prev || prev.scene !== scene.id) return;
     drawn.current = { scene: scene.id, ids: new Set(tokens.map((t) => t.id)) };
-    // A scene switch, or tokens before the scene-open fit: that fit frames them.
-    const same = prev?.scene === scene.id && fittedFor.current === scene.id;
-    if (!refitsOnReveal(client) || !prev || !same) return;
+    if (!refitsOnReveal(client)) return;
     const next = tokens.flatMap((t) => {
       const box = footprintBox([t], gridRef.current);
       return box ? [{ id: t.id, box }] : [];
@@ -435,7 +496,8 @@ export function MapCanvas(props: MapCanvasProps) {
     if (stage) {
       stage.setPointersPositions(e);
       const p = stage.getPointerPosition();
-      onToken = p !== null && tokenNodeOf(stage.getIntersection(p)) !== null;
+      // FR-MAP-89 (1): the token or its label row (name, marker, badges).
+      onToken = p !== null && tokenIdAt(stage, p) !== null;
     }
     if (intent === "canvas" && !onToken && stagePans(tool, spaceRef.current)) {
       reveal.gesture();
@@ -661,8 +723,6 @@ export function MapCanvas(props: MapCanvasProps) {
       performance.now(),
     );
   });
-  const tokensRef = useRef(tokens);
-  tokensRef.current = tokens;
   useSignal(MAP_SIGNALS.drag, (s) => {
     const d = DragData.safeParse(s.data);
     if (!d.success) return;
@@ -815,26 +875,28 @@ export function MapCanvas(props: MapCanvasProps) {
       signal: sendSignal,
     };
   };
-  // Space + drag pans with any tool; typing in a field keeps Space. A focused button (e.g. a fog
-  // bar toggle just clicked) keeps Space only while the pointer is off the map: over the map,
-  // Space pans and never presses the button (FR-FOG-17).
+  // Space + drag pans with any tool; typing in a field keeps Space. A focused control presses on
+  // Space when Tab put focus there or the pointer is off the map; focused by the pointer (e.g. a
+  // fog bar toggle just clicked) with the pointer over the map, Space pans and never presses it
+  // (FR-SHELL-83, #199, FR-FOG-17).
   useEffect(() => {
+    trackFocusModality(document);
     const down = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
-      const button = (e.target as { tagName?: string } | null)?.tagName === "BUTTON";
-      if (typingTarget(e.target) && !(button && overMap.current)) return;
+      const opts = { keyboard: isKeyboardFocus(e.target), overMap: overMap.current };
+      if (spaceAction(e.target, opts) === "browser") return;
       e.preventDefault();
-      if (button) spaceFromButton.current = true;
+      spaceTaken.current = true;
       if (!spaceRef.current) setSpace(true);
     };
     const up = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
-      if (spaceFromButton.current) e.preventDefault();
-      spaceFromButton.current = false;
+      if (spaceTaken.current) e.preventDefault();
+      spaceTaken.current = false;
       setSpace(false);
     };
     const blur = () => {
-      spaceFromButton.current = false;
+      spaceTaken.current = false;
       setSpace(false);
     };
     window.addEventListener("keydown", down);
@@ -868,6 +930,14 @@ export function MapCanvas(props: MapCanvasProps) {
     toolPress.current = false;
     toolDefRef.current?.pointer?.cancel?.("live");
   }, [live]);
+
+  /** FR-MAP-89 (1): the token whose label row (not its node) is under the pointer, if any. */
+  const labelTokenAt = (): TokenView | null => {
+    const stage = stageRef.current;
+    const p = stage?.getPointerPosition();
+    const id = stage && p ? labelHitAt(labelRowItems(stage), p) : null;
+    return (id && tokensRef.current.find((t) => t.id === id)) || null;
+  };
 
   const onMouseDown = (e: Konva.KonvaEventObject<MouseEvent>) => {
     const p = mapPoint();
@@ -903,6 +973,8 @@ export function MapCanvas(props: MapCanvasProps) {
     }
     if (e.evt.button !== 0) return;
     const def = toolDefRef.current;
+    // FR-MAP-89 (1): a left press on a token's label row is one on the token (no empty click).
+    const onTokenRow = onToken || labelTokenAt() !== null;
     if (drawingRef.current) {
       // FR-SCN-06: a drawing tool takes the left press (Space held: the stage pans instead).
       if (!pressGoesToTool(def, { button: 0, space: spaceRef.current, live: liveRef.current })) {
@@ -925,8 +997,8 @@ export function MapCanvas(props: MapCanvasProps) {
       sendSignal(pull ? MAP_SIGNALS.pull : MAP_SIGNALS.ping, data);
       addPing(pointers, p.x, p.y, self, performance.now(), true);
     } else {
-      press.current = { x: e.evt.clientX, y: e.evt.clientY, onToken };
-      if (!onToken && onBoxSelect && (e.evt.ctrlKey || e.evt.shiftKey)) {
+      press.current = { x: e.evt.clientX, y: e.evt.clientY, onToken: onTokenRow };
+      if (!onTokenRow && onBoxSelect && (e.evt.ctrlKey || e.evt.shiftKey)) {
         // Box select instead of pan (FR-MAP-12 / -32).
         boxing.current = true;
         stageRef.current?.draggable(false);
@@ -1035,6 +1107,9 @@ export function MapCanvas(props: MapCanvasProps) {
       data-testid="map-canvas"
       role="application"
       aria-label="Map canvas"
+      // FR-SHELL-83: a press on the map takes focus off the last control clicked.
+      tabIndex={-1}
+      onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
       data-scene-id={scene.id}
       data-tool={tool}
       data-drawing={drawing}
@@ -1054,7 +1129,7 @@ export function MapCanvas(props: MapCanvasProps) {
       data-fit-rect={fitRect}
       data-fit-reason={fitReason}
       data-loading={loading}
-      className="absolute inset-0"
+      className="absolute inset-0 outline-none"
       style={{
         cursor: panning
           ? "grabbing"
@@ -1109,6 +1184,12 @@ export function MapCanvas(props: MapCanvasProps) {
             onCamera("pan");
           }}
           onWheel={onWheel}
+          onDblClick={(e) => {
+            // FR-MAP-89 (1): a double-click on a label row is one on its token (FR-MAP-77).
+            if (tokenNodeOf(e.target) !== null) return;
+            const t = labelTokenAt();
+            if (t) tokenHandlers.dblClick(t);
+          }}
           onMouseDown={onMouseDown}
           onMouseMove={onMouseMove}
           onContextMenu={onContextMenu}

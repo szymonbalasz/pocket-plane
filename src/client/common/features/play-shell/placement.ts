@@ -21,7 +21,9 @@
 //   (7) default column; (8) nearest to the fitted default rect, then taller, higher, more left,
 //   least over soft regions.
 // A window that renders taller than its min size (`need`: a `growToContent` window's measured
-// content height, FR-SHELL-39) never gets a slot shorter than that.
+// content height, FR-SHELL-39) never gets a slot shorter than that. Sprint 7 (FR-SHELL-77, -79):
+// `floor` keeps every candidate at least the useful size (step (a)); `leastPc` ranks (2) by the
+// least PC footprint area instead of holding PCs whole (step (e), the last resort).
 import {
   defaultRect,
   EDGE_GAP,
@@ -31,7 +33,7 @@ import {
   TOP_BAR_H,
   type Viewport,
 } from "./geometry";
-import { defaultSizeAt, type WindowDef } from "./registry";
+import { defaultSizeAt, type Size, type WindowDef } from "./registry";
 
 /** Left edge clear of the tool rail (scenes-map's, ≈ 56 px wide) plus a gap. */
 export const RAIL_CLEAR = 68;
@@ -45,7 +47,7 @@ export const SPOTS_MAX = 4000;
 
 export type Placeable = Pick<
   WindowDef,
-  "defaultPosition" | "defaultSize" | "minSize" | "fixedDefault" | "minOpenH"
+  "defaultPosition" | "defaultSize" | "minSize" | "fixedDefault" | "minOpenH" | "usefulSize"
 >;
 
 interface Area {
@@ -150,12 +152,21 @@ export interface PlaceInput {
    * last resort), in every column.
    */
   lastResort?: boolean;
+  /**
+   * The smallest size a candidate may take (FR-SHELL-79: the useful size, FR-SHELL-77 (a)); absent
+   * = the min size (every shrink allowed, step (d)).
+   */
+  floor?: Size;
+  /** FR-SHELL-77 (e): over PCs, the least PC footprint area wins (not the PCs held whole). */
+  leastPc?: boolean;
 }
 
 export interface Placement {
   rect: Rect;
   /** Clear of every open window and hard keep-out region; false = screen full (FR-SHELL-47). */
   clear: boolean;
+  /** Covers no PC footprint + 4 px (FR-SHELL-57, rank (2)). */
+  pcClear: boolean;
 }
 
 /**
@@ -196,13 +207,15 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const soft = (input.soft ?? []).map(plain);
   const tokens = (input.tokens ?? []).map(plain);
   const base = fittedDefaultRect(def, vp, hard);
-  if (def.fixedDefault) return { rect: base, clear: true };
+  if (def.fixedDefault)
+    return { rect: base, clear: true, pcClear: pcClear(base, input.tokens ?? []) };
   const a = usableArea(vp);
   const g = EDGE_GAP;
   const { w } = base;
   const need = Math.ceil(input.need ?? 0);
   const fullH = Math.min(Math.max(base.h, need), a.bottom - a.top);
-  const minH = Math.min(Math.max(def.minSize.h, need), fullH);
+  const floorH = Math.max(def.minSize.h, input.floor?.h ?? 0);
+  const minH = Math.min(Math.max(floorH, need), fullH);
   const openH = def.minOpenH === undefined ? null : Math.max(minH, Math.min(def.minOpenH, fullH));
   // Moved windows stay right of the tool rail (unless their default is already left of it).
   const minX = Math.max(a.left, Math.min(base.x, RAIL_CLEAR));
@@ -211,24 +224,26 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const padded = blockers.map((o) => ({ x: o.x - g, y: o.y - g, w: o.w + 2 * g, h: o.h + 2 * g }));
   const regions: Rect[] = [...windows, ...hard, ...soft];
   const heights = [fullH, minH, ...(openH === null ? [] : [openH])];
+  // Rows come from the min height too when a floor is set (the spots a shrink would use).
+  const rowHeights = [...new Set([...heights, Math.min(Math.max(def.minSize.h, need), fullH)])];
   const sizes = [...new Set(heights)];
   const titleBars = windows.map((o) => ({ x: o.x, y: o.y, w: o.w, h: TITLE_H }));
   const pcs = pcBoxes(input.tokens ?? []);
   // FR-SHELL-58: the footprints nearest the default rect give rows and columns too.
   const near = (t: Rect) => Math.abs(t.x - base.x) + Math.abs(t.y - base.y);
   const edgeTokens = [...tokens].sort((p, q) => near(p) - near(q)).slice(0, TOKEN_EDGES_MAX);
-  const rowList = [base.y, a.top, ...heights.map((h) => a.bottom - h)].map((v) => ({
+  const rowList = [base.y, a.top, ...rowHeights.map((h) => a.bottom - h)].map((v) => ({
     v,
     token: false,
   }));
   for (const o of regions) {
     rowList.push({ v: o.y, token: false }, { v: o.y + o.h + g, token: false });
-    for (const h of heights) rowList.push({ v: o.y - g - h, token: false });
+    for (const h of rowHeights) rowList.push({ v: o.y - g - h, token: false });
   }
   // Footprints sit at fractional screen px; stored geometry is whole px, 12 px clear of them.
   for (const t of edgeTokens) {
     rowList.push({ v: Math.ceil(t.y + t.h + g), token: true });
-    for (const h of heights) rowList.push({ v: Math.floor(t.y - g - h), token: true });
+    for (const h of rowHeights) rowList.push({ v: Math.floor(t.y - g - h), token: true });
   }
   /**
    * Inward columns for width `cw`: beside every region and token footprint (FR-SHELL-46, -58);
@@ -295,6 +310,12 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     }
     return 0;
   };
+  /** PC footprint (+ 4 px) area under `r` (FR-SHELL-77 (e)). */
+  const pcArea = (r: Rect, c: Column) => {
+    let n = 0;
+    for (const p of c.pcs) n += overlapArea(r, p);
+    return n;
+  };
   /**
    * The rank of `r` (header), in stages: when its first fields already lose to `bound` (the best
    * so far), only those are returned (most candidates stop there; (2) is always included).
@@ -317,7 +338,7 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
       prot,
       overlap,
       pc,
-      pcCut(r, c),
+      input.leastPc ? pcArea(r, c) : pcCut(r, c),
       keepsOpenH,
     ];
     const loses = () => bound !== undefined && lexLess(bound, head, head.length);
@@ -348,8 +369,10 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const HEAD = 11; // fields of a rank cut short (`rank`)
   let narrowing = false;
   let narrowToClear = false;
+  /** Some full-width candidate is clear (a PC cut narrower than that doesn't count). */
+  let fullClear = false;
   let cur: Column = inColumn(base.x, w);
-  const minW = Math.min(def.minSize.w, w);
+  const minW = Math.min(Math.max(def.minSize.w, input.floor?.w ?? 0), w);
   /**
    * A candidate over PC footprints (+ 4 px), cut (≥ min size) to end 12 px before the nearest
    * one on a side, never at a centre (FR-SHELL-57): narrower keeping its left or right edge,
@@ -380,8 +403,11 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     if (r.y + r.h - by >= minH) out.push({ ...r, y: by, h: r.y + r.h - by });
     return out;
   };
-  /** Ranks `rect`; `cut`: made by `clearOfPcs` (several candidates can give the same one). */
-  const consider = (rect: Rect, inward: boolean, cut = false): void => {
+  /**
+   * Ranks `rect`; `cut`: made by `clearOfPcs` (several candidates can give the same one); `sweep`:
+   * a grid spot of the least-PC-area sweep (no cuts of its own).
+   */
+  const consider = (rect: Rect, inward: boolean, cut = false, sweep = false): void => {
     if (cut) {
       // Whole px in ±4,096 (GEOMETRY_LIMIT): one exact number per (rect, inward).
       const k = (n: number) => n + 4096;
@@ -393,8 +419,9 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     // Narrowed only to be clear: of windows when nothing at full width is (FR-SHELL-47 parks only
     // when no candidate is clear), else of every PC and token too.
     const fits = !narrowing || (r[0] === 0 && (narrowToClear || (r[5] === 0 && r[8] === 0)));
+    if (!narrowing && rect.w === w && r[0] === 0) fullClear = true;
     if (fits && r.length > HEAD && (!best || lexLess(r, best.rank))) best = { rect, rank: r };
-    if (r[5] === 1) for (const s of clearOfPcs(rect)) consider(s, inward, true);
+    if (r[5] === 1 && !sweep) for (const s of clearOfPcs(rect)) consider(s, inward, true);
   };
   const done = new Set<string>();
   /** Candidates in column x0 at width `cw`; `only`: that height only (the last resort). */
@@ -446,10 +473,25 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const tokenFree = (r: number[]) => r[0] === 0 && r[5] === 0 && r[8] === 0;
   if (minW < w && !tokenFree(bestRank())) {
     narrowing = true;
-    narrowToClear = bestRank()[0] !== 0;
+    narrowToClear = !fullClear;
     for (const x of edgeXs(minW)) column(x, false, minW);
     for (const x of inwardXs(minW)) column(x, true, minW);
     narrowing = false;
+  }
+  // FR-SHELL-77 (e): clear spots all over PCs → a 16-px sweep of the usable area at every size
+  // finds the least PC area (the edge and token rows above only ever clear a footprint).
+  if (input.leastPc && bestRank()[0] === 0 && bestRank()[5] === 1) {
+    for (const cw of new Set([w, minW])) {
+      for (let x = minX; x <= a.right - cw; x += 16) {
+        cur = inColumn(x, cw);
+        for (const h of sizes) {
+          for (let y = a.top; y <= a.bottom - h; y += 16) {
+            const r = { x, y, w: cw, h };
+            if (!anyHit(r, cur.padded)) consider(r, true, false, true);
+          }
+        }
+      }
+    }
   }
   // FR-SHELL-45's last resort: min size (FR-SHELL-47 calls it once nothing is left to park).
   if (input.lastResort && minW < w && bestRank()[0] !== 0) {
@@ -457,7 +499,8 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     for (const x of inwardXs(minW)) column(x, true, minW, minH);
   }
   const chosen = best as { rect: Rect; rank: number[] } | null;
-  return chosen ? { rect: chosen.rect, clear: chosen.rank[0] === 0 } : { rect: base, clear: true };
+  if (!chosen) return { rect: base, clear: true, pcClear: pcClear(base, input.tokens ?? []) };
+  return { rect: chosen.rect, clear: chosen.rank[0] === 0, pcClear: chosen.rank[5] === 0 };
 }
 
 /** `a` < `b` lexicographically over the first `n` fields (default: all of `a`). */
