@@ -2278,7 +2278,7 @@ From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (c
 
 ## 103. Sprint 7: stats core (ST-core)
 
-From [stats](../specs/stats.md#8-data-model) and [combat-tracker](../specs/combat-tracker.md#65-sprint-7-stats-facts) FR-CBT-136–138 (#311, #315; [ADR-0059](../architecture/adr/0059-stats-read-models.md)). **Built by `fix/st-core`**. Protocol side: [protocol §131](../protocol/README.md#131-sprint-7-stats-core--statsquery-show-awards-from-on-heals-overkill-line-callout-st-core). **No table, column or record type.**
+From [stats](../specs/stats.md#8-data-model) and [combat-tracker](../specs/combat-tracker.md#65-sprint-7-stats-facts) FR-CBT-136–138 (#311, #315; [ADR-0059](../architecture/adr/0059-stats-read-models.md)). **Built by `fix/st-core`**. Protocol side: [protocol §132](../protocol/README.md#132-sprint-7-stats-core--statsquery-show-awards-from-on-heals-overkill-line-callout-st-core). **No table, column or record type.**
 
 | Field / table | Change | Rule | Source |
 |---|---|---|---|
