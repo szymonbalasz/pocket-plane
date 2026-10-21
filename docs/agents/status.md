@@ -2,14 +2,14 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 7 **Phase A (specs)** started 2026-10-20 ([sprint-7](sprint-7.md)): specs written, seams + review rulings applied; DM gate 1 **passed** (#315); specs merged + integrated (ADR-0058, -0059). Paused by the DM on 2026-10-21, **resumed** the same day ("go"). Phase B wave 2-3 in progress.
+**Phase:** Sprint 7 **done** (#313–#330): all slices merged, session-sim-11 15 / 17, playtest section written. **Paused for the recap with the DM.**
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| GM2 Combat gem | `build/gems-combat` (ws w91) | build-gm2 | merging main + gates | walkthrough → merge |
-| Sprint gate | — | — | after GM2 | session-sim-11 (brief `briefs/tpl-test-session-11.md`), playtest section, recap |
+| Card HP leak fix | `fix/card-applied-leak` (ws w92, slot 0) | fix-card-leak (idle) | ready, check 4461 green; amends #138 | DM decides at the recap: merge (B) or drop (A) |
+| Sprint 7 | merged | — | done, recap pending | recap; then sprint 8 planning |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
 - GM: GEM FR 01-40 / OQ 04-20; CAMP FR 38-45 / OQ 33-36; DICE FR 62-71 / OQ 41-44; DICEX FR 59-62 / OQ 49-50; CBT FR 126-135 / OQ 85-88; CHARX FR 71-80 / OQ 37-40; MOD FR 64-67 / OQ 47-48; SHELL FR 98-100 / OQ 61-62; NOTE FR 52-54 / OQ 30-31.
@@ -18,12 +18,12 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 
 ## Shared-file locks
 
-- Schema lane: free. Apply path: GM1 first, ST-core rebases, then GM2.
-- Canvas lock: FU3. Play-shell frame: free (FU1 merged).
+- None (all sprint-7 branches merged; `fix/card-applied-leak` touches combat-tracker hp.ts only).
 
 ## Pending DM decisions
 
-- None.
+- #138 amendment: a player's resolved damage card shows the HP actually lost (reveals a monster's last HP on a kill). A keep #138 / **B show the outcome line's damage** (fix ready on `fix/card-applied-leak`).
+- Sprint-7 recap: session-sim-11 FAILs g (BL-64) and h (BL-65), glitch list BL-66, BL-68–BL-72.
 
 ## Resolved locally (report at gate)
 
@@ -41,6 +41,7 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 - Known flake: `dice-extras` e2e bundle (dice-extras / dice-screen) 1 / 4 runs under load: login never live, or the 3D chunk (Fit build, sprint 6).
 - Known flake: `init-chips-effect.e2e.ts` Divine Fury hover tooltip under a loaded full run (3 / 3 alone; CP3 build).
 - Known flake: `fog-of-war/leak.test.ts` walkthrough 8 "No frame within 1500 ms" under a parallel suite (main after BL-49, sprint 7; 3 / 3 alone).
+- Known flake: `e2e/popup-line.e2e.ts` FR-DICEX-47 short screens (roll popups count) and `e2e/image-search.e2e.ts` token Image… menu under a loaded full run (sprint 7; pass alone).
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
 
 - Integrator picks #142–#144 (badge, snapshot ceilings, registry-driven shell tests, reconnect probe 204, lazy Konva, window layout).
