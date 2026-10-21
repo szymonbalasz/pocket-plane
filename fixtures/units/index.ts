@@ -81,6 +81,7 @@ import visionLegacy from "./fog-of-war/vision-legacy";
 import gemsAwarded from "./gems/gems-awarded";
 import gemsHidden from "./gems/gems-hidden";
 import gemsOn from "./gems/gems-on";
+import gemsRolls from "./gems/gems-rolls";
 import syncProbes from "./live-sync/sync-probes";
 import noteColours from "./notifications/note-colours";
 import notificationsTest from "./notifications/notifications-test";
@@ -215,4 +216,6 @@ export const units: readonly Fixture[] = [
   gemsOn,
   gemsAwarded,
   gemsHidden,
+  // Sprint 7 track GM (build/gems-reroll): Mira's lines for the Inspiration reroll
+  gemsRolls,
 ];

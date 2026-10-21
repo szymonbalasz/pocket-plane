@@ -241,6 +241,13 @@ export function checkManualParts(
 export const RollPart = z.strictObject({ type: PartDamageType.nullable(), extra: z.boolean() });
 export type RollPart = z.infer<typeof RollPart>;
 
+/**
+ * FR-DICE-64 (sprint 7): the roll this item rerolled, on the new entry's item: the superseded
+ * entry and its item's total ("(reroll, was 4)"). Public by construction (same audience).
+ */
+export const RollReplaces = z.strictObject({ entryId: Id, total: z.int() });
+export type RollReplaces = z.infer<typeof RollReplaces>;
+
 /** `roll` kind payload item (data model §15). */
 export const RollPayloadItem = z.strictObject({
   rollId: Id,
@@ -269,6 +276,8 @@ export const RollPayloadItem = z.strictObject({
    * line merges a base item and the extra items after it into one run. Absent = a plain roll.
    */
   part: RollPart.optional(),
+  /** FR-DICE-64: set on a reroll's item (`dice.reroll`); stripped while gems are off (FR-DICE-69). */
+  replaces: RollReplaces.optional(),
 });
 export type RollPayloadItem = z.infer<typeof RollPayloadItem>;
 

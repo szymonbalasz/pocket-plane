@@ -18,7 +18,7 @@ import { player, token } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { convergence, leakScan } from "../../ws/testing/convergence";
-import { damageRollIdOf } from "./testing";
+import { damageRollIdOf, partRollIdsFor } from "./testing";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 const LEAKS = [
@@ -134,6 +134,7 @@ describe("mid-combat over WS", () => {
       toHitTotal: 25,
       damageTotal: 6,
       damageRollId: damageRollIdOf(dm.store.records.notification?.[cardId as string]),
+      partRollIds: partRollIdsFor(dm.store.records.notification?.[cardId as string]),
       targets: [{ targetId: goblin.id, hit: true, multiplier: "normal" }],
     });
     await nextEvent(dm, "AttackApplied");
@@ -277,6 +278,7 @@ describe("mid-combat over WS", () => {
       toHitTotal: 24,
       damageTotal: 9,
       damageRollId: damageRollIdOf(dm.store.records.notification?.[pending?.id as string]),
+      partRollIds: partRollIdsFor(dm.store.records.notification?.[pending?.id as string]),
       targets: [{ targetId: mira.id, hit: true, multiplier: "normal" }],
     });
     const applied = await nextEvent(dm, "AttackApplied");

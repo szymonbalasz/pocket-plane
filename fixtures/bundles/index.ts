@@ -33,6 +33,7 @@ import furyLogLine from "./fury-log-line";
 import gems from "./gems";
 import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
+import gemsRerollE2e from "./gems-reroll-e2e";
 import gemsUiE2e from "./gems-ui-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
@@ -146,6 +147,8 @@ export const bundles: readonly Bundle[] = [
   gems,
   gemsHidden,
   gemsE2e,
+  // Sprint 7 track GM (build/gems-reroll)
+  gemsRerollE2e,
   // Sprint 7 track GM (build/gems-sheet)
   gemsUiE2e,
 ];

@@ -21,6 +21,7 @@ import { closeDb, type Db, openFileDb } from "../../db/client";
 import { encounter, player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
+import { partRollIdsFor } from "./testing";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 
@@ -106,6 +107,7 @@ describe("sprint 5 core over WS (late-damage)", () => {
     dm.intent("cbt.applyHit", {
       cardId,
       toHitTotal: 15,
+      partRollIds: partRollIdsFor(dm.store.records.notification?.[cardId]),
       targets: [{ targetId: goblin2.id, hit: true, multiplier: "normal" }],
     });
     await dm.next("ack");

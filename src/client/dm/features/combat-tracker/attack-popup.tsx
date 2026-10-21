@@ -19,10 +19,13 @@ import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
   APPLY_TARGETS_MAX,
   type CombatantView,
+  CRIT_CHANGED_TEXT,
+  critChanged,
   DamageCardPayload,
   type DamageMultiplier,
   HIT_RULING_TYPE,
   type HitRulingRecord,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { modSegments } from "@shared/effect-modifiers/line";
@@ -532,6 +535,8 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
       await connection.sendIntent("cbt.applyHit", {
         cardId: card.id,
         toHitTotal,
+        // FR-CBT-129: the to-hit this popup shows; a reroll since → conflict, and the popup fills.
+        partRollIds: partRollIdsOf(p),
         targets: rows.map((x) => ({ targetId: x.c.id, hit: x.hit, multiplier: x.mult })),
       });
     } catch (err) {
@@ -552,6 +557,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
         ...(damageTotal !== null ? { damageTotal } : {}),
         // FR-CBT-94: the damage this popup shows; a newer one → conflict, and the popup fills.
         damageRollId: p.damage?.rollId ?? null,
+        partRollIds: partRollIdsOf(p),
         // FR-CBT-82: the extra parts' values and each row's part multipliers, card order.
         ...(extraTotals.length ? { extraTotals } : {}),
         targets: rows.map((x) => ({
@@ -694,6 +700,11 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                 className="animate-pulse font-normal text-muted-foreground [animation-duration:2.5s]"
               >
                 Waiting for damage
+              </span>
+            ) : critChanged(p) ? (
+              // FR-CBT-127 (sprint 7): a reroll flipped the crit; the old damage is "not used".
+              <span data-testid="cbt-popup-crit-changed" className="font-normal text-warning">
+                {CRIT_CHANGED_TEXT}
               </span>
             ) : (
               <span

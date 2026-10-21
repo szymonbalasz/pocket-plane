@@ -115,6 +115,8 @@ export function rollSegments(
     const why = item.modes ? `: ${modeLabels(item.modes, opts.dm?.modes)}` : "";
     out.push({ text: ` (${mode}${why})` });
   }
+  // FR-DICE-64: "Perception (reroll, was 4): …".
+  if (item.replaces) out.push({ text: ` (reroll, was ${item.replaces.total})` });
   out.push({ text: ": " });
   out.push(...termSegments(item));
   out.push(...modSegments(item.mods, opts.dm?.mods));
