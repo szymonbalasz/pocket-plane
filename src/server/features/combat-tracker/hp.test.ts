@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { attackLogKind } from "@shared/combat-tracker/log-kinds";
-import { critExpression, rawDamage } from "@shared/combat-tracker/rules";
+import { critExpression, rawDamage, resolutionText } from "@shared/combat-tracker/rules";
 import {
   type AttackResult,
   COMBATANT_TYPE,
+  DamageCardResolutionRead,
   type HpChangeRecord,
   type HpChangesResult,
   parseFullCard,
@@ -278,6 +279,42 @@ describe("FR-CBT-34 FR-CBT-22 FR-CBT-23 FR-CBT-24 apply", () => {
     expect([0, 1, 7, 9].map((d) => rawDamage(true, d, "half"))).toEqual([0, 0, 3, 4]);
     expect(rawDamage(false, 9, "double")).toBe(0);
     expect(rawDamage(true, 9, "none")).toBe(0);
+  });
+
+  test("FR-CBT-42 #138 resolution carries the line's damage, never HP lost: 40 to a 7-HP Goblin reads 40; hidden Wolf too", () => {
+    const t = started();
+    const n = t.events.length;
+    const a = t.attack("Mira", 15, 4, t.p1);
+    t.apply(a.cardId, "Goblin", { damageTotal: 40 });
+    const b = t.attack("Mira", 15, 4, t.p1);
+    t.apply(b.cardId, "Wolf", { damageTotal: 40 });
+    const c = t.attack("Mira", 15, 4, t.p1);
+    t.apply(c.cardId, "Goblin 2", { damageTotal: 41, multiplier: "half" });
+    const text = (cardId: string) =>
+      resolutionText(DamageCardResolutionRead.parse(t.card(cardId)?.resolution).targets);
+    expect([a, b, c].map((r) => text(r.cardId))).toEqual([
+      "Hit Goblin: 40",
+      "Hit: 40",
+      "Hit Goblin 2: 20 (half)",
+    ]);
+    // The stats overkill path still reads hp_change: HP actually lost and the rest.
+    expect(t.hpRows().map((r) => [r.raw, r.applied, r.overkill, r.hpBefore])).toEqual([
+      [40, 7, 33, 7],
+      [40, 11, 29, 11],
+      [20, 7, 13, 7],
+    ]);
+    // FR-CBT-34 leak scan per player: no resolved card, frame or snapshot carries an HP-before.
+    const p1 = t.h.viewer("player", t.h.p1.id);
+    for (const v of [p1, t.h.viewer("player", t.h.p2.id)]) {
+      const frames = t.events
+        .slice(n)
+        .flatMap((e) => e.event.changes.map((ch) => t.s.records.filterChange(ch, v)));
+      const seen = JSON.stringify(frames) + JSON.stringify(t.h.snapshot(v));
+      const applied = [...seen.matchAll(/"applied":(\d+)/g)].map((m) => Number(m[1]));
+      // The owner's frames and snapshot carry the three cards' resolutions; player-2's none.
+      expect(applied.sort()).toEqual(v === p1 ? [20, 20, 40, 40, 40, 40] : []);
+      expect(seen).not.toContain("hpBefore");
+    }
   });
 
   test("FR-CBT-24 public rule: hidden attacker or target → false; DM card → category / override", () => {

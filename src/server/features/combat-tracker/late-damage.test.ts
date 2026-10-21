@@ -4,6 +4,7 @@
 // offers on a late roll (FR-MOD-63). CBTX's ambush, round 1; `player-1` plays Mira.
 import { describe, expect, test } from "bun:test";
 import { AttackLogPayload } from "@shared/combat-tracker/log-kinds";
+import { resolutionText } from "@shared/combat-tracker/rules";
 import {
   DAMAGE_CARD_KIND,
   DamageCardTargetsResolution,
@@ -129,6 +130,26 @@ describe("FR-CBT-91 apply after Apply hit", () => {
       // The Wolf is hidden: its name never reaches the card's owner.
       { targetName: null, hit: true, multiplier: "normal", applied: 0, dropped: true },
     ]);
+  });
+
+  test("FR-CBT-91 #138 the damage step's resolution carries the line's damage, never HP lost (40 → a killing blow reads 40)", () => {
+    const { t, cardId } = ruled();
+    t.damage("Mira", 4);
+    const goblin = t.combatant("Goblin").hpCurrent as number;
+    const wolf = t.combatant("Wolf").hpCurrent as number;
+    const { hpChangeIds } = applyDamage(
+      t,
+      cardId,
+      [t.target("Goblin", true), t.target("Wolf", true)],
+      { damageTotal: 40 },
+    );
+    const rows = hpRows(t, hpChangeIds).filter((r) => r.hit);
+    expect(rows.map((r) => [r.raw, r.applied, r.hpBefore])).toEqual([
+      [40, goblin, goblin],
+      [40, wolf, wolf],
+    ]);
+    const res = DamageCardTargetsResolution.parse(t.card(cardId).resolution);
+    expect(resolutionText(res.targets)).toBe("Hit Goblin: 40 · Miss Goblin 2 · Hit: 40");
   });
 
   test("FR-CBT-91 a target outside the ruling, hit: false, or a toHitTotal → invalid; nothing written", () => {
