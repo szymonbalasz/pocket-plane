@@ -208,6 +208,34 @@ describe("FR-STATS-13 sessions", () => {
     expect(today?.fights).toBe(1);
   });
 
+  test("FR-STATS-13 facts stamped after their line (1 ms later, the real clock) stay in its session", () => {
+    const t = statsSetup();
+    // Every stamp moves the clock 1 ms on, as the system clock does between a line and its row.
+    const iso = t.clock.iso.bind(t.clock);
+    t.clock.iso = () => {
+      t.clock.advance(1);
+      return iso();
+    };
+    t.clock.advance(7 * HOUR);
+    const id = t.hp("Goblin 2", "damage", 40, { from: "Thorn" });
+    const row = t.s.db.select().from(hpChange).where(eq(hpChange.id, id)).get();
+    const line = t.s.db
+      .select()
+      .from(gameLogEntry)
+      .where(eq(gameLogEntry.id, row?.entryId as string))
+      .get();
+    expect((row?.at as string) > (line?.at as string)).toBe(true);
+    for (const actor of [t.h.dm, t.p1]) {
+      const s = t.session(actor, line?.n).session;
+      expect(s?.fromN).toBe(line?.n);
+      expect(awardOf(s?.awards ?? [], "biggest-hit")).toMatchObject({ value: 40 });
+      expect(awardOf(s?.awards ?? [], "most-kills")).toMatchObject({ value: 1 });
+      expect(s?.fights).toBe(1);
+      // The list and the session ack count the same fights for the same viewer.
+      expect(t.sessions(actor).sessions[0]).toMatchObject({ fromN: line?.n, fights: 1 });
+    }
+  });
+
   test("FR-STATS-13 any n resolves: an n inside a session answers its key; players get the DM's key", () => {
     const t = statsSetup();
     t.hp("Goblin", "damage", 3, { from: "Thorn" });
@@ -391,11 +419,7 @@ describe("STATS read helpers", () => {
     expect(facts[1]?.attacker?.hidden).toBe(true);
     expect(fightsOf(t.s.db, t.h.campaignId).map((f) => f.status)).toEqual(["ended"]);
     expect([...publicFactEncounters(t.s.db, t.h.campaignId)]).toEqual([t.enc.id]);
-    const bySpan = combatFacts(t.s.db, {
-      campaignId: t.h.campaignId,
-      from: "2000-01-01T00:00:00.000Z",
-      to: "2100-01-01T00:00:00.000Z",
-    });
+    const bySpan = combatFacts(t.s.db, { campaignId: t.h.campaignId, fromN: 1, toN: 999 });
     expect(bySpan).toHaveLength(2);
   });
 

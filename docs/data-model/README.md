@@ -2211,6 +2211,6 @@ From [stats](../specs/stats.md#8-data-model) and [combat-tracker](../specs/comba
 | `notification` (kind `stats-awards`) | new kind, payload `{fromN, toN, from, to, label}` | made only by `stats.showAwards` | FR-NOTE-48 |
 
 - **Facts contract** (FR-CBT-138, FR-DICE-72): `hp_change` rows, combatants and started / ended encounters are never deleted; rows change only by the undo marker; `raw`, `applied`, `overkill`, `hpBefore`, `hpAfter`, temp fields, `entryId`, and the log's `natural`, `category`, `rollIds`, `encounterId`, `public` keep their meaning (a change needs a stats review).
-- **Derived (not stored):** every stat, sessions (a ≥ 6 h gap between consecutive entries; key = first `n`), fight labels.
+- **Derived (not stored):** every stat, sessions (a ≥ 6 h gap between consecutive entries; key = first `n`; a fact belongs to its line's session by `n`, never by `at`), fight labels.
 - **Persisted runtime state:** none. Server memory only: the session boundary cache and the query memo / rate gate.
 - **Fixtures:** `st-past-crypt` (ended "Old Crypt": Thorn vs 2 Skeletons, one callout, Mira downed and healed back, a public nat 20), `st-ambush-facts` (4 Goblin Scouts + 13 facts on sim-10's Goblin Ambush; expected numbers in `fixtures/units/stats/stats.fixtures.test.ts`).

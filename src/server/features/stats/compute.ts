@@ -171,7 +171,7 @@ export function sessionStats(
   const { s, span } = hit;
   const facts = visibleFacts(
     r.viewer,
-    combatFacts(r.db, { campaignId: r.campaignId, from: s.from, to: s.to }),
+    combatFacts(r.db, { campaignId: r.campaignId, fromN: s.fromN, toN: s.toN }),
   );
   const labels = fightsFor(r).label;
   const awards = sessionAwards({

@@ -21,7 +21,13 @@ export interface CombatFact extends StatsFact {
   encounterName: string;
 }
 
-export type FactsScope = { encounterId: string } | { campaignId: string; from: string; to: string };
+/**
+ * One encounter, or a campaign's log range `fromN…toN` (inclusive) by the fact's line: a row's `at`
+ * may be a millisecond after its line's, so sessions bound facts by `n`, never by time.
+ */
+export type FactsScope =
+  | { encounterId: string }
+  | { campaignId: string; fromN: number; toN: number };
 
 const SIDE = {
   id: combatant.id,
@@ -66,8 +72,8 @@ function encounterNames(db: Read, ids: readonly string[]): Map<string, string> {
 }
 
 /**
- * FR-CBT-138: the non-undone `hp_change` rows of one encounter, or of a campaign between two
- * instants (`at`, inclusive), in log order, joined with their line's `public` / `n` / kind, the
+ * FR-CBT-138: the non-undone `hp_change` rows of one encounter, or of a campaign whose lines are
+ * in an `n` range, in log order, joined with their line's `public` / `n` / kind, the
  * attacker's and target's current kind, owner and hidden flags, and the encounter name.
  */
 export function combatFacts(db: Read, scope: FactsScope): CombatFact[] {
@@ -76,8 +82,8 @@ export function combatFacts(db: Read, scope: FactsScope): CombatFact[] {
       ? eq(hpChange.encounterId, scope.encounterId)
       : and(
           eq(hpChange.campaignId, scope.campaignId),
-          gte(hpChange.at, scope.from),
-          lte(hpChange.at, scope.to),
+          gte(gameLogEntry.n, scope.fromN),
+          lte(gameLogEntry.n, scope.toN),
         );
   const rows = db
     .select({
