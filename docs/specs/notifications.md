@@ -43,17 +43,7 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR-NOTE-48 | Kind `stats-awards`: info to all, payload `{fromN, toN, from, to, label}`, view with Open | ST0 (kind), ST2 (views) | `FR-NOTE-48 awards notification` |
 | FR-NOTE-49 | Callout toasts are not notifications; a transient info toast in the info stack (S6) | ST2 | `FR-NOTE-49 callout toast is not a notification` |
 
-> **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md); spec-tt).** Decided by the DM (not open): a **DM roll request** is a notification with a roll action. [Dice-extras](dice-extras.md) adds kind **`roll-request`** (one `kinds.ts` line, append): one pending row per target PC, action "Roll" owned by the PC's player, resolved only by dice-extras' commands ([proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md)). New FR-NOTE-58–64: the kind, the player's prompt view (Roll + Decline), a view flag **`restoreToast`** (a prompt comes back as its toast after a reload, no sound), the DM view, closing, pause, leak rules. Toast stack placement stays WF's (sprint 8). CON-44 measured: a prompt row 994 B (a damage card is 1,183 B), pinned while pending ([dice-extras §12](dice-extras.md#12-performance--bandwidth)). For the DM: OQ-NOTE-32–34.
-
-| FR | What | Slice | Named test |
-|---|---|---|---|
-| FR-NOTE-58 | Kind `roll-request`: audience and action = the PC's player; payload / resolution zod | TT0 (def), TT2 | `FR-NOTE-58 roll-request kind` |
-| FR-NOTE-59 | Player view: the prompt (Roll roll-control + Decline) in toast and history | TT2 | `FR-NOTE-59 prompt view` |
-| FR-NOTE-60 | `restoreToast` views: pending rows re-toast after the first snapshot, no sound | TT2 | `FR-NOTE-60 restore toast` |
-| FR-NOTE-61 | DM view: row + "Open requests"; no DM toast, no action cue | TT2 | `FR-NOTE-61 DM view` |
-| FR-NOTE-62 | Closing: answered / declined by the closer, Close by rule | TT2 | `FR-NOTE-62 prompt closes` |
-| FR-NOTE-63 | Paused: prompts sit under the pause card | TT4 | `FR-NOTE-63 prompt while paused` |
-| FR-NOTE-64 | Leak rules for the kind | TT2 | `FR-NOTE-64 roll-request leak` |
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** A DM roll request is a notification with a roll action: [dice-extras](dice-extras.md) adds kind **`roll-request`** (toast class **card**, FR-NOTE-50; seams S3, S13), one pending prompt per target PC, resolved only by dice-extras' commands. FR-NOTE-58–64, incl. a view flag `restoreToast`. CON-44: a prompt row 994 B ([dice-extras §12](dice-extras.md#12-performance--bandwidth)). Tests and walkthrough (T4–T8, T10, T12): [dice-extras §13](dice-extras.md#13-test-plan). For the DM: OQ-NOTE-32–34.
 
 ## 1. Summary
 
@@ -145,14 +135,13 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | **Sprint 7** (track ST, [stats](stats.md)) | | |
 | FR-NOTE-48 | **Kind `stats-awards`** (owner stats; one line in `kinds.ts`, append). Audience `all`, no action, so state `info`: a 6 s toast per FR-NOTE-13 / -14 plus a history row. Payload zod `{fromN, toN, from, to, label}` (`label` ≤ 40 chars, e.g. "Tue 20 Oct"); text "Session awards: ‹label›". Both are player-safe: times and a date only. Made only by `stats.showAwards` through `notify` (FR-NOTE-02). Client views (both `notification-views.ts`, append): icon lucide `Trophy`, and a renderer with an **Open** Button (`note-stats-awards-open`, client-only, not an action) calling `openStatsAwards(fromN)` ([FR-SHELL-94](play-shell.md#6-functional-requirements)). No `endRule` (awards outlive fights). | 575 B a row (measured) |
 | FR-NOTE-49 | **Callout toasts are not notifications** ([FR-STATS-22](stats.md#6-functional-requirements)). The overkill toast (`stats-overkill-toast`) is a shadcn Toast in this client's toast region: players bottom-right, DM top-centre band, under FR-NOTE-42 / -43's placement. It makes no row and doesn't count in the bell or appear in history. It is a transient **info** toast, not a card toast (seam S6): it uses the existing info-toast stack, never pushes windows, and Fit ([OQ-MAP-61](scenes-map.md#15-open-questions)) and the pending-toast rules ignore it. Only one shows at a time (a new callout replaces it). It starts from a live event frame only (`useEventFrame`), like FR-CBTX-06. | OQ-STATS-03 |
-| **Sprint 8 (TT): roll requests** | | |
-| FR-NOTE-58 | **Kind `roll-request`** (owner dice-extras, [FR-DICEX-74](dice-extras.md#6-functional-requirements); one line in `kinds.ts`, append): audience `player` = the target PC's owner; action label "Roll", owner `player` = that player (FR-NOTE-05); state starts `pending`. Payload zod `{requestId, characterId, characterName, roll: {kind, key, expression}, label, dc: int \| null, mode}` (≤ 1 KB; `dc` null unless the DM shows it); text "DM: ‹label›" (+ " · DC ‹n›" iff shown). Resolution zod `{outcome: "rolled" \| "declined" \| "missed", total?: int}` (≤ 256 B; `total` only for `rolled`). `genericResolve: false` (only dice-extras' commands resolve it; `note.resolve` → `forbidden`); no encounter end rule. | ADR-0016 |
-| FR-NOTE-59 | **Player view** (`notification-views.ts`, player, append): icon `dices`; renderer = the **prompt** ([FR-DICEX-83](dice-extras.md#6-functional-requirements)): text, a Roll `RollButton` (roll control → `dicex.answerRequest`) and a Decline Button, in the toast and in the `note.history` row while pending; no `onAction` (the renderer owns its buttons, as FR-NOTE-16 allows). Resolved rows read "Rolled 17" / "Declined" / "Closed". | |
-| FR-NOTE-60 | **`restoreToast`** (new optional flag on a client view; amends FR-NOTE-13, -15): after the first snapshot of a page load or (re)connection, each `pending` row of a kind whose view sets `restoreToast` and whose action owner is this client shows its toast again (**no sound, no flash, no cue**); those rows are left out of FR-NOTE-15's "N pending action(s)" count. Only `roll-request` sets it. Resyncs while `live` don't re-toast. | OQ-NOTE-34 |
-| FR-NOTE-61 | **DM view** (DM `notification-views.ts`, append): history row "‹PC› · ‹label›" with the state, and an "Open requests" Button → `openWindow("dicex.requests")`. **No DM toast** (FR-NOTE-13 unchanged: a pending row owned by a player never toasts the DM) and **no action cue** (FR-NOTE-30: the view declares `cueTokens: false`; the DM sent it). The DM bell counts open prompts (FR-NOTE-27). | OQ-NOTE-33 |
-| FR-NOTE-62 | **Closing**: answer → resolved by the roller (or the DM, Roll for missing); Decline → resolved `{outcome: declined}` by the player; DM Close → resolved by rule (`byRule`, FR-NOTE-28: "Closed", `{outcome: missed}`). Never `dismissed` by End (not encounter-scoped). The toast closes when the row leaves `pending` (FR-NOTE-14). | |
-| FR-NOTE-63 | **Paused** ([FR-SHELL-127](play-shell.md#6-functional-requirements)): toasts arrive and stay as usual but sit under the pause card (input blocked); info toasts' 6-s timers run; prompt toasts stay until resolved. | |
-| FR-NOTE-64 | **Leak rules** (the kind's leak test, FR-NOTE-06): payload and text carry no DC unless shown and never `success`; `resolution.total` reaches only the audience (the roller), so a hidden answer's number never reaches another player through a notification. | |
+| FR-NOTE-58 | *(Sprint 8)* **Kind `roll-request`** (owner DICEX; `kinds.ts` append; toast class card): audience `player` = the PC's owner, action "Roll" owned by that player. Payload `{requestId, characterId, characterName, roll, label, dc \| null, mode}` (≤ 1 KB; `dc` null unless shown); text "DM: ‹label›" (+ "· DC n" iff shown). Resolution `{outcome: rolled \| declined \| missed, total?}`. `genericResolve: false` (`note.resolve` → `forbidden`); no end rule. Test `FR-NOTE-58 roll-request kind`. | ADR-0016 |
+| FR-NOTE-59 | *(Sprint 8)* **Player view** (append): the prompt renderer ([FR-DICEX-83](dice-extras.md#6-functional-requirements): Roll roll-control + Decline) in the toast and the history row while pending; resolved rows read "Rolled 17" / "Declined" / "Closed". Test `FR-NOTE-59 prompt view`. | |
+| FR-NOTE-60 | *(Sprint 8)* **`restoreToast`** (optional view flag; amends FR-NOTE-13, -15; in WF4's `ToastRuntime.tsx`, after WF4): after the first snapshot of a load or reconnect, each pending row of such a kind owned by this client re-toasts, **silent, no cue**, and is left out of the "N pending" summary. Only `roll-request` sets it. Test `FR-NOTE-60 restore toast`. | OQ-NOTE-34 |
+| FR-NOTE-61 | *(Sprint 8)* **DM view** (append): history row "‹PC› · ‹label›" + "Open requests"; no DM toast, no action cue (`cueTokens: false`); the bell counts open prompts (FR-NOTE-27). Test `FR-NOTE-61 DM view`. | OQ-NOTE-33 |
+| FR-NOTE-62 | *(Sprint 8)* **Closing**: answer / decline → resolved by the closer; DM Close → by rule ("Closed"); never dismissed by End. Test `FR-NOTE-62 prompt closes`. | |
+| FR-NOTE-63 | *(Sprint 8)* **Paused** (seams S10): prompts and other card toasts arrive under the pause card and are restored at resume; callouts are dropped, not replayed. Test `FR-NOTE-63 prompt while paused`. | |
+| FR-NOTE-64 | *(Sprint 8)* **Leak rules**: no DC unless shown, never `success`; `resolution.total` only to the roller. Test `FR-NOTE-64 roll-request leak`. | |
 
 ## 7. UI/UX notes
 
@@ -166,8 +155,6 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 - **Test IDs** (AGENTS §9.5): `note-toast` + `data-record-id`, `note-toast-action`, `note-toast-close`, `note-toast-more`, `note-toast-pending-summary`, `note-history`, `note-history-row` + `data-record-id` + `data-state`, `note-history-action`, `note-history-dismiss`, `note-history-empty`, `note-launcher-badge`, *(sprint 2)* `note-history-closed` (the "Closed" badge); Konva `note-token-cue` (id = token id, attr `label`); test mode: `note-test-text`, `note-test-audience`, `note-test-owner`, `note-test-label`, `note-test-send`. *(Sprint 5)* `note-toast` and `note-history-row` gain `data-by` (player id \| `dm` \| absent) and `data-color` (the stripe's key, absent = none); the "Resolved by" name span `note-history-closed-by` (`data-color`); Konva `note-token-cue` gains attr `color`.
 - *(Sprint 5, K)* *(OQ-NOTE-22, -24, decided #256)* A thin colour stripe on the left edge of each toast and history row: whose action raised it (a player's damage card in their colour, the DM's loot / handout in the DM colour). *(OQ-CAMP-27, cut list, decided #256)* "Resolved by **Player 1**" with the name in their colour; the DM's token cue ring in the action owner's colour. **DM view:** stripes on every row. **Player view:** stripes on the rows they receive.
 - *(Sprint 6, WF)* **DM view:** the toast stack sits top-centre (its home, below the top bar) and only slides **down** to clear windows or a card's targets, or left of Initiative when they'd overlap; it never covers the active tool bar (Fog bar, AoE panel, structure / props panels). No new styling or test ID; walkthroughs read `note-toast` / `note-toast-pending-summary` rects. **Player view:** unchanged (bottom-right corner).
-
-- *(Sprint 8, TT)* **Prompt** (player toast + history row): "DM: DEX save · DC 15", "for Mira" when the player has two PCs, Roll (primary) + Decline (ghost); the toast is a pending toast in the players' corner under WF's stack policy. **DM view:** history rows per target with "Open requests"; no toast. Test IDs: dice-extras' `dicex-prompt*` inside `note-toast` / the history row (`data-record-id` = notification id).
 
 ## 8. Data model
 
@@ -225,7 +212,6 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 | Dismiss | any pending | no (close toast locally) | FR-NOTE-11 |
 | Reopen | via kind owner (undo) | no | FR-NOTE-10 |
 | *(Sprint 5)* Set `byRole` / `byPlayerId` | never (server stamps it) | never | Not in any helper argument or intent schema (FR-NOTE-38) |
-| *(Sprint 8)* Resolve a `roll-request` | through dice-extras (answer, roll for missing, close) | own prompt (answer, decline) | dice-extras' commands; `note.resolve` → `forbidden` (FR-NOTE-58) |
 
 ## 11. Edge cases & failure modes
 
@@ -242,11 +228,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 - *(Sprint 6)* **Stack placement:** client-only; disconnect / reconnect / restart re-place the stack from what is on screen (the reconnect summary toast lands at the home, FR-NOTE-42); a tool bar shown after a reload re-reports and the stack re-places (FR-NOTE-43). A sticky stack taller than the band above the launcher → "+N more" as built. The DM moves Initiative onto the home band → the stack shifts left of it, and drops below a tool bar it would meet.
 - **Invalid / malicious input:** players create only via feature commands and test mode; text per FR-NOTE-21, never HTML; frames > 64 KB closed by live-sync.
 
-- *(Sprint 8)* **Prompts:** offline player → the prompt waits (no timeout, OQ-DICEX-56); on reconnect / reload it re-toasts without sound (FR-NOTE-60). A request closed while a player was offline → their snapshot shows it "Closed", no toast. Crash: prompts commit with the request / answer or not at all. Two tabs of one player: both show the prompt; the first answer wins, the other tab's Roll gets `conflict` "Already answered" (FR-NOTE-20 toast) and its toast closes on the resolve.
-
 ## 12. Performance & bandwidth
 
-- *(Sprint 8, measured 2026-10-21, [dice-extras §12](dice-extras.md#12-performance--bandwidth))* `roll-request` row 994 B at max strings; worst 18 pending (3 requests × 6 PCs) = +17,910 B DM, +2,985 B per player (pinned while pending); `NotificationCreated` 1,164 B per target, `NotificationResolved` 1,223 B.
 - ~50–150 notifications per evening (one per player attack). Record ~300 B typical, ≤ ~1.9 KB max (text + 1 KB payload + 256 B resolution).
 - Snapshot: pending + 100 → typical ≤ 40 KB, worst ~190 KB plus pending. Pending > 100 → server warning. Budget line for the protocol table (I17).
 - One `event` frame per create, resolve, dismiss, reopen. Nothing on the token-move hot path.
@@ -311,11 +294,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 **Sprint 7 (track FU):** bundle `fu-s7` (session-sim-10's "1 pending action" toast + Mira's late-hit card); walkthrough U4, U17 in [play-shell §13](play-shell.md#13-test-plan). Unit (`keep-out.test.ts`): `FR-NOTE-44 toast clear of a pushed window` (1440×900: Scenes `pushed` at 546, 60 in the band, Initiative at 1028 → the stack never overlaps Scenes' title bar or first 40 px; with no room in the band it drops below that strip). Client (`logic.test.ts`): `FR-NOTE-45 summary counts waiting` (DM with 1 own pending card + 1 player-owned concentration save in the started encounter → "1 pending action · 1 waiting for a player", `data-waiting="1"`; none waiting → today's text; 0 own + 1 waiting → "1 waiting for a player" alone; players unchanged). Edge cases: the summary is computed at load / reconnect from the store (FR-NOTE-15), so a reconnect recounts; disconnect and crash: unchanged. CON-44: 0 B.
 
-**Sprint 8 (track TT):** bundle `table-tools` (open request `dicex-request-open`: Mira's and Thorn's prompts pending); walkthrough T6–T10, T12, T14 in [dice-extras §13](dice-extras.md#13-test-plan). Named tests: integration `FR-NOTE-58 roll-request kind` (payload / resolution zod; `note.resolve` on it → `forbidden`; no end rule: End leaves it pending), `FR-NOTE-64 roll-request leak` (hidden DC absent from text and payload; another player's prompt never in a frame; `total` only in the roller's resolution); DOM `FR-NOTE-59 prompt view` (Roll + Decline in toast and history; resolved labels), `FR-NOTE-60 restore toast` (snapshot with 2 pending prompts → 2 toasts, no sound recorded, summary toast doesn't count them; a resync while live → none), `FR-NOTE-61 DM view` (no DM toast, no cue, "Open requests" opens the window, bell counts), `FR-NOTE-62 prompt closes` (answer / decline / Close → toast gone, history label), `FR-NOTE-63 prompt while paused`.
-
 ## 14. Dependencies
-
-**Sprint 8 (track TT):** kind line in `kinds.ts` (TT0, append); views in both `notification-views.ts` (TT2, append); `restoreToast` read by `ToastRuntime.tsx` (TT2; existing shared UI, **after WF's toast-stack slice** or under a lock, since WF changes the stack this sprint). No schema change here.
 
 | On | What we need | Status |
 |---|---|---|
@@ -398,13 +377,14 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-NOTE-32 | What shape is a player's roll prompt? | **A. A pending toast with Roll + Decline in the players' corner (plus the history row)**: the existing action-notification pattern, no new surface / B. A centred prompt dialog: unmissable, but blocks the map and needs placement rules | yes | FR-NOTE-59, FR-DICEX-83 |
-| OQ-NOTE-33 | Does the DM get a toast per answer? | **A. No: the Requests window updates live, the bell counts open prompts**: no toast storm at "Everyone: Perception" / B. One info toast per answer: noticeable without the window, 6 toasts for 6 PCs | no | FR-NOTE-61, FR-DICEX-88 |
-| OQ-NOTE-34 | After a reload, does a prompt come back as a toast? | **A. Yes, re-toasted from the snapshot, no sound (`restoreToast`)**: the player can't lose the prompt / B. Only the existing "N pending actions" summary toast: no new flag, one more click | no | FR-NOTE-60, FR-DICEX-91 |
+| OQ-NOTE-32 | Prompt shape | **A. Pending card toast with Roll + Decline (+ history row)**: the existing pattern / B. A centred dialog: unmissable, blocks the map | yes | FR-NOTE-59 |
+| OQ-NOTE-33 | A DM toast per answer? | **A. No: the Requests window updates, the bell counts** / B. Yes: six toasts for six PCs | no | FR-NOTE-61 |
+| OQ-NOTE-34 | Re-show a prompt after reload? | **A. Yes, silent (`restoreToast`)** / B. Only the "N pending" summary | no | FR-NOTE-60 |
+
+- *(Sprint 8)* Edges: [dice-extras §11](dice-extras.md#11-edge-cases--failure-modes). Slices: kind TT0; views, `restoreToast` TT1+TT2 (after WF4).
 
 ## 16. Out of scope
 
-- *(Sprint 8)* Request timers / auto-expiry (OQ-DICEX-56); the toast stack's placement (WF, sprint 8).
 - *(Sprint 6)* Moving the DM's toasts out of the top-centre (decided #256, OQ-SHELL-32 C); the players' toast corner (unchanged).
 - Concentration, duration and turn reminders; rule listeners → [combat-extras](combat-extras.md), ADR-0027 C.
 - Roll requests → [dice-extras](post-mvp/dice-extras.md) (future kind, player owner). Kill-feed toasts → [stats](stats.md). `loot-received` → [party-loot](party-loot.md) (#146).

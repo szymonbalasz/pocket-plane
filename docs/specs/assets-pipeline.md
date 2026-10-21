@@ -38,22 +38,7 @@ phase: post-mvp-8
 | FR-ASSET-35, -37 | *(C)* Entry images as asset references; stale IDs dropped at the compendium read | C5 core ([CMP §14](compendium.md#14-dependencies)) | CMP `FR-CMP-46 assets.require refusal`, `FR-CMP-47 asset deleted` |
 | FR-ASSET-36, -38 | *(C)* REST-body exception (ADR, #256); leak property over REST incl. ETag | C5 core | `FR-ASSET-36 leak property over REST` |
 
-> **Sprint 8 revision, track TT (table tools; DM [#334](../decisions-log.md); spec-tt).** Decided by the DM (not open): **DM-added alert sounds**: the DM uploads short audio files ([ADR-0030](../architecture/adr/0030-ui-notification-sounds.md): "DM-added sounds as audio assets"). The same upload route and capability IDs ([ADR-0023](../architecture/adr/0023-asset-access-by-capability-id.md)) take **MP3, OGG and WAV** up to 512 KB and 5 s, sniffed and timed by a **hand-rolled header probe** (no dependency); stored as the original only, served at `/api/assets/:id/audio`; listed through a new **lazy, DM-only** record type `audio-asset`, so no snapshot grows and players learn only the IDs the DM picks (campaign `alertSounds`, [FR-CAMP-48](campaign-management.md#6-functional-requirements)). New FR-ASSET-52–61 (§6.4). For the DM: OQ-ASSET-27–30.
-
-### Sprint 8 at a glance
-
-| FR | What | Slice | Named test |
-|---|---|---|---|
-| FR-ASSET-52 | Audio upload: MP3 / OGG / WAV, ≤ 512 KB, ≤ 5 s | TT3 | `FR-ASSET-52 audio upload` |
-| FR-ASSET-53 | Hand-rolled sniff + duration probe | TT3 | `FR-ASSET-53 audio probe` |
-| FR-ASSET-54 | `asset.kind`, `asset.durationMs`; original only | TT0 (columns), TT3 | `FR-ASSET-54 audio row` |
-| FR-ASSET-55 | Dedupe by hash, as images | TT3 | `FR-ASSET-55 audio dedupe` |
-| FR-ASSET-56 | `GET /api/assets/:id/audio` | TT3 | `FR-ASSET-56 audio serve` |
-| FR-ASSET-57 | Lazy DM-only `audio-asset` type; never in `asset` | TT0 (type), TT3 | `FR-ASSET-57 audio visibility` |
-| FR-ASSET-58 | ≤ 50 sounds per campaign | TT3 | `FR-ASSET-58 library cap` |
-| FR-ASSET-59 | `assets.require` checks the kind | TT0 | `FR-ASSET-59 require kind` |
-| FR-ASSET-60 | Upload fields for audio (`listed`, `tags` ignored) | TT3 | `FR-ASSET-60 audio fields` |
-| FR-ASSET-61 | CON-44 measured | TT0 | `CON-44 table tools` |
+> **Sprint 8, track TT (DM [#334](../decisions-log.md)).** DM-added alert sounds are audio assets (ADR-0030, ADR-0023 capability IDs): MP3 / OGG / WAV ≤ 512 KB, ≤ 5 s, hand-rolled probe (**no dependency**), lazy DM-only `audio-asset` (0 B in snapshots). FR-ASSET-52–61 (§6.4); `audio-chime` joins session-sim-12; tests, walkthrough T13–T14: [dice-extras §13](dice-extras.md#13-test-plan). For the DM: OQ-ASSET-27–30.
 
 ## 1. Summary
 
@@ -81,7 +66,7 @@ phase: post-mvp-8
 ## 4. Non-goals
 
 - Preload, load progress, player-ready (ADR-0003's "preloaded" is deferred by [ADR-0014](../architecture/adr/0014-mvp-scope.md): assume immediate load). Preloading an inactive scene would reveal its IDs early; it needs a player-visible preload grant (post-MVP, [scene-tools](scene-tools.md)).
-- Token art library / standalone image browser (tier A). Player uploads (OQ-ASSET-02). Rename, delete, replace, revoke an asset (OQ-ASSET-05). Image editing. *(S8: short alert sounds are in, §6.4; music, long audio and video stay out.)* Audio/video ([ADR-0007](../architecture/adr/0007-product-scope.md)). Cloud storage, CDN.
+- Token art library / standalone image browser (tier A). Player uploads (OQ-ASSET-02). Rename, delete, replace, revoke an asset (OQ-ASSET-05). Image editing. Audio beyond short alert sounds (§6.4) / video ([ADR-0007](../architecture/adr/0007-product-scope.md)). Cloud storage, CDN.
 
 ## 5. User stories
 
@@ -162,16 +147,16 @@ The picks below are OQ-ASSET-21–26 as decided at sprint-6 gate 1 (#288: every 
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-ASSET-52 | **Audio upload** (`POST /api/assets`, DM `Bearer`, unchanged route): a file sniffed as audio (FR-ASSET-53) is accepted as an **audio asset** iff ≤ **512 KB** (`MAX_AUDIO_BYTES`) and ≤ **5,000 ms** (`MAX_AUDIO_MS`). Rejects: > 512 KB → `413` "Too large (max 512 KB)"; > 5 s → `422` `too_long` "Too long (max 5 s)"; not an image and not a sound → `415` "Not an image or sound file"; library full → FR-ASSET-58. Same `201 {asset}` / `200 {asset}` outcomes (created / existing). | OQ-ASSET-27, -28 |
-| FR-ASSET-53 | **Sniff + duration, hand-rolled** (`src/server/features/assets-pipeline/audio-probe.ts`, pure, no dependency; OQ-ASSET-29 pick A): **WAV** = `RIFF…WAVE`, `fmt ` PCM (1) or float (3), duration = `data` bytes ÷ byte rate; **MP3** = optional ID3v2 (skipped by its size) then MPEG-1 / 2 / 2.5 Layer III frame headers: the Xing / Info / VBRI frame count × samples per frame ÷ rate, else a walk over every frame (≤ 512 KB, a few thousand frames, < 5 ms); **OGG** = `OggS` pages, first packet `\x01vorbis` (rate from the id header) or `OpusHead` (48 kHz, minus pre-skip), duration = the last page's granule position ÷ rate. Anything else, or headers that don't parse → `unsupported`. The server never decodes audio: a file with valid headers but broken audio fails only in the browser's decode, which falls back to the ping ([FR-SHELL-131](play-shell.md#6-functional-requirements)). | OQ-ASSET-29 |
-| FR-ASSET-54 | **Row** (`asset` table, TT0 columns): `kind` `image` \| `audio` (default `image`; existing rows image), `durationMs` int \| null (audio only); `mime` `audio/mpeg` \| `audio/ogg` \| `audio/wav`; `width`, `height`, `displayWidth`, `displayHeight` = 0 for audio (no image); `listed` true; `tags` `[]`. Files: `PP_ASSET_DIR/<hash>/original` only (no derivatives); the FR-ASSET-06 write order, fsync and the start sweep (FR-ASSET-07) unchanged. `AssetIngested` as today (+ `kind`). | |
-| FR-ASSET-55 | **Dedupe** as images (FR-ASSET-03): same bytes in the campaign → `200 {asset}` existing; the second upload's name ignored; one file set across campaigns. | |
-| FR-ASSET-56 | **Serve** `GET /api/assets/:id/audio` (no credential; the ID is the capability, FR-ASSET-11): the stored original with `Content-Type` = its `mime`, `Cache-Control: private, max-age=31536000, immutable`, ETag, iff the asset exists in the active campaign **and** is audio. `thumb` / `display` on an audio asset and `audio` on an image → the same `404` as every denial (FR-ASSET-13). `file` zod enum gains `audio`. | ADR-0023 |
-| FR-ASSET-57 | **Visibility / sync**: audio rows are **not** in the `asset` record type (snapshot and changes), so image pickers never list them and no snapshot grows. New record type **`audio-asset`** `{id, campaignId, seq, name, mime, bytes, durationMs, createdAt}`, scope `campaign`, **`lazy: "all"`** ([ADR-0045](../architecture/adr/0045-lazy-record-types.md)), `audience: dm` (player `hidden`; a player's `sync.load` → empty). Loaded by Campaign options' Alert sounds section ([FR-CAMP-49](campaign-management.md#6-functional-requirements)); `AssetIngested` of an audio asset carries an `audio-asset` upsert (DM connections only). Players learn an audio asset ID **only** as a pick in `campaign.alertSounds` (ADR-0023's secrecy rule). | |
-| FR-ASSET-58 | **Library cap**: ≤ 50 audio assets per campaign; the 51st new upload → `409` "Sound library full (50)" (an `existing` re-upload still answers `200`). No delete (OQ-ASSET-30 pick A, as images, OQ-ASSET-05). | OQ-ASSET-30 |
-| FR-ASSET-59 | **`assets.require(ctx, id, {kind?})`** (FR-ASSET-15) gains an optional kind, default `image`: an asset of another kind → `invalid` "Not an image" / "Not a sound". Every existing caller (maps, token art, portraits, handouts, compendium images, the pause image) keeps image; `camp.setAlertSound` passes `audio`. | |
-| FR-ASSET-60 | **Upload fields for audio**: `name` as images (filename minus extension, 1–80); `listed` and `tags` are ignored (audio is always listed in its own type, never tagged); the attach control (FR-ASSET-20) accepts images only, unchanged. | |
-| FR-ASSET-61 | **CON-44** (measured 2026-10-21, [dice-extras §12](dice-extras.md#12-performance--bandwidth)): **0 B** in every snapshot (lazy); an `audio-asset` row 273 B; `sync.load` of 50 rows 13,833 B (DM, on demand). HTTP: one `GET …/audio` per picked sound per player page, then cached. | #256 |
+| FR-ASSET-52 | **Audio upload** (`POST /api/assets`, DM): a sniffed sound is accepted iff ≤ 512 KB and ≤ 5,000 ms; else `413` "Too large (max 512 KB)", `422` `too_long` "Too long (max 5 s)"; neither image nor sound → `415`. Created / existing as images. Test `FR-ASSET-52 audio upload`. | OQ-ASSET-27, -28 |
+| FR-ASSET-53 | **Probe** (`audio-probe.ts`, pure): WAV (`RIFF…WAVE`, PCM / float; `data` bytes ÷ byte rate); MP3 (ID3v2 skipped; Layer III frames: Xing / Info / VBRI count, else a frame walk); OGG (`OggS`, Vorbis or Opus id header; last granule ÷ rate, Opus pre-skip). Else `unsupported`. Never decodes: broken audio falls back to the ping in the browser. Test `FR-ASSET-53 audio probe` (byte-built WAV / MP3 / OGG, truncated, 5,001 ms). | OQ-ASSET-29 |
+| FR-ASSET-54 | **Row**: `kind` `image` \| `audio` (default image), `durationMs` (audio); mime `audio/mpeg` \| `audio/ogg` \| `audio/wav`; image sizes 0; `listed` true, tags `[]`. Files `<hash>/original` only; write order, fsync, sweep unchanged. Test `FR-ASSET-54 audio row`. | |
+| FR-ASSET-55 | **Dedupe** by hash as images. Test `FR-ASSET-55 audio dedupe`. | |
+| FR-ASSET-56 | **Serve** `GET /api/assets/:id/audio`: the original, `Content-Type` = mime, `private, max-age=31536000, immutable`, ETag, iff in the active campaign and audio; any mismatch → the common 404. Test `FR-ASSET-56 audio serve`. | ADR-0023 |
+| FR-ASSET-57 | **Sync**: audio rows never in `asset` (pickers and snapshots unchanged); type **`audio-asset`** `{id, campaignId, seq, name, mime, bytes, durationMs, createdAt}`, `lazy: "all"` (ADR-0045), DM only. Players learn an audio ID only as a pick in `campaign.alertSounds`. Test `FR-ASSET-57 audio visibility`. | |
+| FR-ASSET-58 | **Cap** 50 sounds per campaign → `409` "Sound library full (50)"; no delete. Test `FR-ASSET-58 library cap`. | OQ-ASSET-30 |
+| FR-ASSET-59 | **`assets.require(ctx, id, {kind?})`**, default `image`; a wrong kind → `invalid`. Test `FR-ASSET-59 require kind`. | |
+| FR-ASSET-60 | **Fields**: `name` as images; `listed` / `tags` ignored for audio; the attach control stays images only. Test `FR-ASSET-60 audio fields`. | |
+| FR-ASSET-61 | **CON-44** (measured): 0 B in snapshots; `sync.load` of 50 = 13,833 B; one `GET` per pick per page. Edges as images; MIME headers ignored (sniff only). | #256 |
 
 ## 7. UI/UX notes
 
@@ -240,7 +225,6 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - `existing` outcome emits nothing *(S5: except FR-ASSET-26's listing)*. **Server API for other specs:** `assets.require(ctx, id)` (FR-ASSET-15).
 - *(S5)* Visibility per event: `asset` changes reach DM connections only (player `hidden`); players get at most an empty-change frame. **Client API for other specs:** `ImageAttach` + `AttachUploaderProvider` (FR-ASSET-20, -27).
 - *(S6)* Visibility per event: all three tag events change only `asset` records → **DM connections only**; players get at most an empty-change frame (no tag, no ID). The backfill (FR-ASSET-49) emits nothing. **Client API for other specs:** the `context` prop (FR-ASSET-48); **shared API:** `matchImages` (`@shared/assets-pipeline/search.ts`), the matcher itself is `@shared/search/match.ts` ([FR-CMP-54](compendium.md#6-functional-requirements)).
-- *(S8, TT)* `GET /api/assets/:id/audio` (anyone holding the ID, FR-ASSET-56). Record type `audio-asset` (`campaign`, **lazy** all, DM `full`, player `hidden`, never in a snapshot; `sync.load` only). `AssetIngested` for audio: an `audio-asset` upsert to DM connections, players an empty-change frame at most. **Server API:** `assets.require(ctx, id, {kind})` (FR-ASSET-59).
 
 ## 10. Permissions
 
@@ -255,8 +239,6 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | *(S5)* Receive entry image IDs over REST | ✓ own campaign's entries | entries `entryVisibleTo` allows | FR-ASSET-36 |
 | *(S6)* See / search / filter tags | ✓ | ✗ (OQ-ASSET-25) | `asset` visibility = DM only |
 | *(S6)* Set an image's tags; rename / merge / delete a tag | ✓ | ✗ | default-DM commands (FR-ASSET-42, -43) |
-| *(S8)* Upload a sound; list the sound library | ✓ | ✗ | DM credential on POST; `audio-asset` DM only |
-| *(S8)* Fetch `audio` | any ID it holds | a picked ID (learned via `campaign.alertSounds`) | asset exists in the active campaign and is audio |
 
 ## 11. Edge cases & failure modes
 
@@ -270,7 +252,6 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - *(S5, track C)* **Compendium entry images:** share = the player's next fetch returns the IDs; unshare / image removed = the next fetch omits them, IDs already learned keep working (as any hide). A forged `PUT` naming another campaign's asset → `not_found` (FR-ASSET-35). REST has no reconnect step; a player's reconnect snapshot never holds entry image IDs. Crash: `cmp.putEntry` is one transaction; an upload that finished before it stays an unreferenced attachment.
 - *(S6)* **Tags, DM disconnect / reconnect:** search and filter keep working on the store; tag edits are disabled until `live` (a lost `setTags` intent → Toast "Connection lost — check the tags"); the reconnect snapshot carries current tags. **Players:** unaffected (no tag ever reaches them). **Server crash:** each tag command is one transaction (all assets renamed or none); the backfill is one transaction with its marker and re-runs on the next start only if it never committed; since ingest writes `[]`, a restart after any upload changes nothing (review #10). **Concurrent edits:** two DM tabs set tags on one image → last write wins, both see the upsert; a rename while the other tab's editor is open → the editor shows the new tags. **Cap:** an upload whose tag would make 9 on the image or a 45th DM tag in the campaign → that tag dropped, the upload kept, `droppedTags` + Toast (FR-ASSET-41); a rename can't push a campaign past 50 (rename never adds a tag); a new tag beyond 50 through `setTags` → `conflict`. **Hostile input:** tag names are plain text (rendered as text, never HTML), zod-validated, never used as paths.
 - **Invalid / malicious input:** guessing a 128-bit ID is infeasible; leaked IDs work until revoke exists (post-MVP, OQ-ASSET-05); `id` and `file` zod-validated, never used as paths; decompression bombs stopped by the pixel limit; SVG never served; renamed `.png` text file → 415. Seeded fixture IDs are predictable: fixture data is never tunnelled ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)).
-- *(S8)* **Audio:** crash mid-upload → as images (no row; temp / orphan files swept). Disconnect mid-upload → REST is independent; the section shows the result when it comes. A player holding an old pick's ID after the DM picks another keeps it working (bytes seen; no revoke, as images). A MIME header lying about the type is ignored: only the sniff counts. A huge ID3 tag that pushes the first frame past the file → `unsupported`. A 5.0 s file passes, 5.001 s fails (ms from the probe, rounded down).
 
 ## 12. Performance & bandwidth
 
@@ -308,7 +289,6 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - **Ceilings** (#256: DM 1.5 MiB = 1,572,864 B, players 512 KiB): 500 images with worst tags = 953,634 B (61 %); at typical tags (≈ 346 B per image incl. its 80-char name) the DM ceiling is reached at ≈ 2,580 images from this base. The library's size, not tags, is what grows the snapshot; tags add ≈ 6 % per image typical. Players unchanged.
 - **Search: client-side**, measured with the real matcher (`searchTier` + `foldName` + `textWordsOf`) for "Gob el": 500 images 0.97 ms per keystroke folding every record, 0.18 ms with folded names memoised; 1,000: 1.5 / 0.31 ms; 3,000: 4.4 / 0.96 ms. The snapshot ceiling (≈ 2,600 images) binds long before search does, so no server search route (it would need a REST body with names / tags for the DM only, for no gain). Revisit only if the library becomes lazy (tier-A library, OQ-ASSET-05).
 - Upload: the `tags` field adds ≤ 220 B to a POST; the upload response gains `tags` (≤ 220 B, uploader only).
-- *(S8, measured 2026-10-21)* Audio adds **0 B** to snapshots (FR-ASSET-61); a sound is ≤ 512 KB once per player page (a 0.4-s WAV chime 17,684 B; a 5-s 128 kbit/s MP3 ≈ 80 KB). The probe reads headers only (WAV, OGG: O(1) pages; MP3: one pass over ≤ 512 KB).
 
 ## 13. Test plan
 
@@ -398,16 +378,6 @@ Isolated per worktree as above (`bun test`: `:memory:` + temp asset dir; walkthr
 | IM11 | A: reload; then hard-kill and restart the server | Same tags and counts; search reset on open; thumbnails render |
 | IM12 | Stop the server with A's picker open; type `wolf`; restart | Search still filters; tag editor and Manage disabled ("Reconnecting…"); enabled again when `live` |
 
-### 13.2 Sprint 8: audio assets (track TT)
-
-Fixture `audio-chime` (generated 0.4-s PCM WAV, 17,684 B; [dice-extras §13](dice-extras.md#13-test-plan)); bundle `table-tools`; walkthrough T15–T16.
-
-| Level | What | Fixtures |
-|---|---|---|
-| Unit | `FR-ASSET-53 audio probe`: WAV 8-bit / 16-bit, mono / stereo, 0.4 s and 5.0 s exact; float WAV; MP3 CBR (Xing-less walk) and VBR (Xing count) built in code from frame headers (zero payload), with and without ID3v2; OGG Vorbis and Opus (granule ÷ rate, Opus pre-skip); truncated / zero-length / text / PNG → `unsupported`; 5,001 ms → too long | in-code byte builders |
-| Integration | `FR-ASSET-52 audio upload` (created; 600 KB → 413; 6 s → 422; text → 415); `FR-ASSET-54 audio row` (kind, duration, zero sizes, `original` only on disk); `FR-ASSET-55 audio dedupe`; `FR-ASSET-56 audio serve` (bytes + mime + cache headers; `thumb` on audio and `audio` on an image → the same 404; inactive campaign → 404); `FR-ASSET-57 audio visibility` (no audio row in any `asset` snapshot or change; DM `sync.load audio-asset` → rows; player → empty; `AssetIngested` gives players at most an empty frame); `FR-ASSET-58 library cap`; `FR-ASSET-59 require kind` (pause image = a sound → `invalid`; alert pick = an image → `invalid`); `FR-ASSET-60 audio fields` | `table-tools`, in-code |
-| Walkthrough | T15 (rejects and an upload from Campaign options), T16 (the picked sound plays as the turn alert) | `table-tools` |
-
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -444,11 +414,6 @@ Fixture `audio-chime` (generated 0.4-s PCM WAV, 17,684 B; [dice-extras §13](dic
 - **Schema lane (settled by seams S1):** IM-1 `fix/im-core` and CP0 `fix/cp-core` run in parallel; **merge order IM-1 → CP0** (CP0 merges `main` and rebases its schema first). No shared table; event files are per feature (no lock). PF0 has no schema change, so no lane. Data-model / protocol section numbers that collide at merge: the integrator resolves.
 - **CP (seams S6):** CP3 `build/cp-summon` after IM-0 only. `creature-form.tsx`: CP1 (Make pet) and IM-3 (one `context` prop) both edit it, whichever merges second rebases. **Party window (seams S7):** CP1's Companions tab and IM-3's `Editor.tsx` change don't overlap.
 - **WF:** no file in common (pickers are Dialogs, seams S3; IM-3 holds no canvas lock, S5). **PF:** none.
-
-### 14.2 Sprint 8 build (track TT)
-
-- **TT0** `fix/tt-core`: `asset.kind`, `asset.duration_ms` (`src/server/db/schema.ts`), the `audio-asset` record type (lazy, empty provider), `assets.require` kind, zod `@shared/assets-pipeline/audio.ts`; docs/data-model §10. **TT3** `build/tt-sounds`: `audio-probe.ts` (new), sniff branch in `image.ts` / the ingest command, `routes.ts` (`file` enum + audio serve), fixture `audio-chime` + `ingestStep` bytes form. Full split: [dice-extras §14](dice-extras.md#14-dependencies).
-- **Dependency: none** (OQ-ASSET-29 A). Alternatives (not installed or measured; named for the DM's choice only): `music-metadata` (MIT; a pure-JS parser for many formats, pulling in several helper packages) and `ffprobe` (an external binary, not portable to the single-package / tunnel setup). The hand-rolled probe covers the three accepted formats in ≈ 200 lines with byte-built tests.
 
 ## 15. Open questions
 
@@ -487,10 +452,12 @@ Fixture `audio-chime` (generated 0.4-s PCM WAV, 17,684 B; [dice-extras §13](dic
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-ASSET-27 | Which audio formats? | **A. MP3, OGG (Vorbis / Opus), WAV**: what DMs have; MP3 / WAV play in every browser, OGG not on older Safari (falls back to the ping) / B. MP3 only: one parser, plays everywhere / C. A + M4A / AAC and WebM: more files accepted, two more container parsers | yes | FR-ASSET-52, -53 |
-| OQ-ASSET-28 | Size and length limits | **A. ≤ 512 KB and ≤ 5 s**: a short UI sound (ADR-0030), cheap over a tunnel / B. ≤ 1 MB and ≤ 10 s: room for a jingle at the pause; 4 picks = 4 MB per player / C. ≤ 256 KB and ≤ 3 s: tightest | yes | FR-ASSET-52 |
-| OQ-ASSET-29 | How is the length checked? | **A. Server, hand-rolled header probe (WAV, MP3, OGG), no dependency**: authoritative, testable / B. Only the DM's browser decodes and checks; the server checks magic bytes and size: least code, a bypassable limit (the DM is trusted) / C. A package (`music-metadata`, MIT): broad format support, a new dependency for three formats | no | FR-ASSET-53 |
-| OQ-ASSET-30 | Can the DM delete a sound? | **A. No, as images (OQ-ASSET-05); a cap of 50**: no dangling picks / B. Delete an unpicked sound: a tidy library, the first asset delete path (file sweep, picks check) | no | FR-ASSET-58 |
+| OQ-ASSET-27 | Formats | **A. MP3, OGG, WAV** (OGG falls back to the ping on older Safari) / B. MP3 only / C. + M4A, WebM | yes | FR-ASSET-52 |
+| OQ-ASSET-28 | Limits | **A. ≤ 512 KB, ≤ 5 s**: a short UI sound, cheap on a tunnel / B. 1 MB, 10 s / C. 256 KB, 3 s | yes | FR-ASSET-52 |
+| OQ-ASSET-29 | Length check | **A. Server, hand-rolled probe, no dependency** / B. Only the DM's browser (bypassable) / C. `music-metadata` (MIT, a new dependency; not installed or measured) | no | FR-ASSET-53 |
+| OQ-ASSET-30 | Delete a sound? | **A. No, as images; cap 50** / B. Delete an unpicked one | no | FR-ASSET-58 |
+
+- *(Sprint 8)* Slices: columns, lazy type, `require` kind TT0; probe, serve, `audio-chime` TT3 ([dice-extras §14](dice-extras.md#14-dependencies)). `ffprobe` rejected (external binary).
 
 ## 16. Out of scope
 

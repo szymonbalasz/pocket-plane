@@ -15,16 +15,7 @@ phase: post-mvp-8
 
 > **Sprint 7 (track FU, BL-48 small copy; DM [#311](../decisions-log.md)).** Decided, not open: a player's roll-bar line names the player ("Player 1 — 1d20+2") instead of the character; a stray space in a breakdown ("(3d6: 5 + 2 + 1 )"). New **FR-DICE-77**, **-78**. Client only (line text and an actor default), 0 B. Tests `FR-DICE-77 roll as your PC` (DOM: `player-1` with the sheet on Mira → the bar's actor is Mira, the entry's actor Mira; "Me" still selectable; a manual pick of Brakka survives a reload; a sheet on another player's character falls back to the player's name; DM unchanged), `FR-DICE-78 no stray spaces` (unit over `groupSegments` and every kind's line builder: no `"( "`, `" )"`, `"  "`, leading / trailing spaces for adv, dis, dropped, offered, manual, modifier-only); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. GM (gems: reroll / supersede) edits this spec in parallel with its own range; FU4 touches only the actor default and the joiner. Edge cases: client-only text and a per-browser default; reconnect re-renders from the store; crash: no server change. No open question.
 
-> **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md); spec-tt).** [Dice-extras](dice-extras.md) adds **saved macros** (free rolls through `dice.roll`, unchanged) and **DM roll requests**, whose answers are ordinary `roll` entries: `public` per the request, or hidden = **DM + the roller** through the existing `audiencePlayerId` rule (companion lines, FR-CBT-114). This amends FR-DICE-13 ("player rolls are always public") **for request answers only** ([proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md)). New FR-DICE-79–84. No new field, kind or visibility code: an internal `audience` input on `gameLog.append` and the sheet roll helper, a roll-bar "Request…" Button (DM). CON-44: an answer entry is a sheet roll's size (measured in [dice-extras §12](dice-extras.md#12-performance--bandwidth)). For the DM: OQ-DICE-46.
-
-| FR | What | Slice | Named test |
-|---|---|---|---|
-| FR-DICE-79 | Request answers: public, or DM + roller (`audiencePlayerId`) | TT2 | `FR-DICE-79 answer audience` |
-| FR-DICE-80 | Answer line: actor = the PC, label = the request's, category per roll kind | TT2 | `FR-DICE-80 answer line` |
-| FR-DICE-81 | Macro rolls are plain `dice.roll` entries | TT1 | `FR-DICE-81 macro line` |
-| FR-DICE-82 | Stats read: hidden answers count for the DM only; nothing new | TT2 | `FR-DICE-82 hidden answers in stats` |
-| FR-DICE-83 | Internal `audience` input (server only, never an intent field) | TT0 | `FR-DICE-83 audience input` |
-| FR-DICE-84 | Roll bar "Request…" Button (DM) | TT2 | `FR-DICE-84 request button` |
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** [Dice-extras](dice-extras.md) macros roll as plain `dice.roll`; DM roll-request answers are ordinary `roll` entries, public or **DM + roller** via the built `audiencePlayerId` rule. This amends FR-DICE-13 for answers only ([proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md)). FR-DICE-79–84; no new field, kind or visibility code. Tests, walkthrough (T2–T8, T15) and CON-44: [dice-extras §12–13](dice-extras.md#13-test-plan). For the DM: OQ-DICE-46.
 
 ## 1. Summary
 
@@ -178,13 +169,12 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 | **Sprint 7, track FU** (BL-48 small copy) | | |
 | FR-DICE-77 | **Roll as your PC by default** (sprint 7, track FU; BL-48 / sim-10: roll-bar lines "Player 1 — 1d20+2"; amends FR-DICE-30's actor Select default): a **player's** Game log roll bar preselects, as actor, the character their Character sheet window shows (its pick, FR-CHARX-47; else their only character; else "Me"), so a roll-bar line reads "Mira — 1d20+2"; the player may still pick "Me" (the line then names the player, as today) or another own character. **Storage and fallback** (rulings-b #18): a manual pick in the bar is stored with the roll bar's Options state (FR-DICE-30's per-browser key, same entry) and kept across reloads; the actor is, in order: **the manual pick** (if that character is still the player's) → **the sheet's PC** (only if it is one of the player's own characters; a sheet showing someone else's character is skipped) → **the player's name** ("Me"). DM: unchanged ("DM"). Server: unchanged (the actor is already validated per FR-DICE-10). | BL-48 |
 | FR-DICE-78 | **No stray spaces in a line** (sprint 7; BL-48: "(3d6: 5 + 2 + 1 )"): every `roll` line and every kind's breakdown built by the shared segment helpers (`@shared/dice-roll-log/roll-kind.ts` `groupSegments`, FR-DICE-35 / -36) joins tokens with exactly one space, with **no space after "(" or before ")"**, none doubled, none leading or trailing, for kept, dropped (adv / dis), offered, manual and modifier-only cases. **Root cause first**: the builder reproduces sim-9's line (a dropped or zero-value die, or a closing segment joined with a space) in a unit test, then fixes the joiner. Rendering of old entries follows (lines are built at render). | BL-48 |
-| **Sprint 8 (TT)** | | |
-| FR-DICE-79 | **Request answers' audience** (amends FR-DICE-13 for answers only; [proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md)): an entry written by `dicex.answerRequest` / `dicex.rollForMissing` ([FR-DICEX-78](dice-extras.md#6-functional-requirements), -81) is stamped from the request, not the roller: `results: public` → `public: true`; `hidden` → `public: false` + `audiencePlayerId` = the target's player. **Visibility rule (as built for companions, FR-CBT-114; stated here):** DM full; player redacted iff `public` **or** `audiencePlayerId` = the viewer, else hidden. A DM answer (Roll for missing) is stamped the same way. Every other player roll stays public (#73). | #334 |
-| FR-DICE-80 | **Answer line**: `kind: roll`, actor = the PC (`entity`, its name), `label` = the request's label ("Perception", "DEX save"), category per the roll kind (skill-check, saving-throw, ability-check, other), MOD parts as on the sheet; `rollerRole` = who sent it. No DC, no pass / fail and no "requested" field on the entry (DC and success live on the DM-only request, FR-DICEX-85). | OQ-DICE-46 |
-| FR-DICE-81 | **Macro rolls** ([FR-DICEX-68](dice-extras.md#6-functional-requirements)) are `dice.roll` entries: label = the macro's name, the macro's category and actor; FR-DICE-13 as any roll (player public; DM eye / category). No macro field on the roll or entry. | |
-| FR-DICE-82 | **Stats read** (FR-DICE-72 unchanged): a hidden answer has `audiencePlayerId`, so it counts for the DM only; public answers and macro rolls count as any roll of their category. No stats rule is added here ([OQ-DICEX-62](dice-extras.md#15-open-questions) is SB's seam). | ADR-0059 |
-| FR-DICE-83 | **Internal `audience` input** on `gameLog.append` (exists as `audiencePlayerId` / `forcePrivate`) and on the sheet roll helper character-sheet exports for the answer ([FR-CHARX-21](character-sheet-full.md#6-functional-requirements)): `{public: true}` or `{public: false, audiencePlayerId}`. Server-only: no intent schema gains a field; a player-sent `public` on `dice.roll` / `char.roll` is still `forbidden`. | |
-| FR-DICE-84 | **Roll bar "Request…"** (DM client): a ghost Button `dicex-request-open` at the roll bar's right opens `dicex.requests` ([FR-DICEX-86](dice-extras.md#6-functional-requirements)); players never see it. No other roll-bar change. | |
+| FR-DICE-79 | *(Sprint 8)* **Request answers' audience** (amends FR-DICE-13 for `dicex.answerRequest` / `rollForMissing` entries only): stamped from the request: public → `public: true`; hidden → `public: false` + `audiencePlayerId` = the target's player. Visibility as built for companions (FR-CBT-114): DM full; player iff `public` or `audiencePlayerId` = viewer. Every other player roll stays public (#73). Test `FR-DICE-79 answer audience`. | #334 |
+| FR-DICE-80 | *(Sprint 8)* **Answer line**: kind `roll`, actor = the PC, label = the request's, category per roll kind, MOD parts as on the sheet; no DC, pass / fail or "requested" field. Test `FR-DICE-80 answer line`. | OQ-DICE-46 |
+| FR-DICE-81 | *(Sprint 8)* **Macro rolls** are `dice.roll` entries (label = name, the macro's category and actor); no macro field. Test `FR-DICE-81 macro line`. | |
+| FR-DICE-82 | *(Sprint 8)* **Stats**: answer lines and macro rolls follow FR-DICE-90's luck rule (SB's row, [stats](stats.md)) (seams S6): counted iff the entry is public; a hidden answer (`audiencePlayerId`) counts for the DM only, **not in the roller's own view**. Test `FR-DICE-82 hidden answers in stats`. | S6 |
+| FR-DICE-83 | *(Sprint 8)* **Internal `audience` input** on `gameLog.append` and the exported `sheetRoll` ([FR-CHARX-90](character-sheet-full.md#6-functional-requirements)): `{public: true}` or `{public: false, audiencePlayerId}`. Server-only; a player-sent `public` stays `forbidden`. Test `FR-DICE-83 audience input`. | |
+| FR-DICE-84 | *(Sprint 8)* **Roll bar "Request…"** (DM only, `dicex-request-open`) opens `dicex.requests`. Test `FR-DICE-84 request button`. | |
 
 ## 7. UI/UX notes
 
@@ -262,8 +252,6 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - *(Sprint 5, track W)* No REST route, intent, record type, event or signal; nothing new on the wire, so no visibility rule to add (CON-44: 0 B).
 - *(Sprint 7, GM)* No new intent or event here: `dice.reroll` / `gameLog.supersede` are internal helpers; the caller (`gem.spend`, event `GemSpent`) lists both entry upserts. **Visibility:** `supersededBy` and `replaces` follow the entry's rule (DM full; a player iff `public` or `audiencePlayerId` names them; else hidden); a superseded entry's upsert reaches exactly the viewers of that entry. Tagged kinds (`gem.*`): the entry rule **and** feature on (FR-DICE-69).
 
-- *(Sprint 8, TT)* No new intent, record type, field or kind here. Answers arrive in DICEX's events (`RollRequestAnswered`, `RollRequestClosed`) as `game-log-entry` upserts listed by the caller; clients key on the entry, not the cause (throws and popups already do, FR-DICEX-11). **Visibility** per FR-DICE-79 (the built rule, now written down): DM full; player iff `public` or `audiencePlayerId` = viewer.
-
 ## 10. Permissions
 
 | Action | DM | Player | Server check |
@@ -293,11 +281,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, se
 - *(Sprint 7)* **Reroll:** new roll + new entry + supersede + the caller's line commit together or not at all (crash before commit → the old line unstruck; after → both). Disconnect mid-reroll → `disconnected`, never resent; the reconnect snapshot shows the struck line if it committed. Old entry below the window → not rerollable (caller rule); its supersede upsert still reaches clients live. Two rerolls of one entry → the second `conflict`. Reload → struck lines from the snapshot (never held, never thrown again). The new entry's audience equals the old one's, so a leak scan of the old entry covers the new.
 - *(Sprint 5, W)* The wider default is browser layout only: disconnect, reconnect and a server crash change nothing; a log still at its old default size takes the new one once on load ([FR-SHELL-53](play-shell.md#6-functional-requirements)); a user-resized log keeps its size.
 
-- *(Sprint 8)* **Request answers:** disconnect mid-answer → never resent; committed or not, never doubled (the target leaves `open`, FR-DICEX-78). Crash → entry, target and prompt commit together. A hidden answer never reaches another player, live or in a snapshot (FR-DICE-79, the leak scan FR-DICEX-92). A player forging `public` → `forbidden` as today; the answer's audience comes from the request only.
-
 ## 12. Performance & bandwidth
 
-- *(Sprint 8, measured 2026-10-21, [dice-extras §12](dice-extras.md#12-performance--bandwidth))* An answer entry = a sheet roll's entry (≈ 0.8 KB); hidden answers go to 2 connections instead of all. Macro rolls = `dice.roll` frames as today. Snapshot: entries stay inside the 100-entry window (0 B growth).
 - Entry 300–600 B typical on the wire; schema max (20 rolls × 50 dice) ≈ 8 KB. `DiceRolled` ≈ 0.6 KB × 7 connections per roll; human-paced.
 - Snapshot budget `game-log-entry`: 100 entries ≈ 60 KB typical, ≤ 100 KB (protocol per-type budget table, I17).
 - *(Sprint 5, measured by spec-colours 2026-10-18, heavy harness, [CAMP §12](campaign-management.md#12-performance--bandwidth))* FR-DICE-60–61 (A′) add **0 B** (`rollerRole` / `rollerPlayerId` already on every entry). The rejected colour copy (on each entry and kept template): +2,163 B on the heavy DM snapshot (100 entries + 3 templates), +2,142 B per player. *(Review pass, re-measured 2026-10-18, same harness, throwaway probe deleted)* OQ-DICE-39 **B** (`actorPlayerId` on every entry, 100 entries): **+2,100 B** per viewer when all null, **+5,500 B** when every entry names a player (36-char ids), DM and each player alike.
@@ -380,11 +365,7 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 
 **Sprint 7, track ST:** integration `FR-DICE-72 stats count the final roll` (on GM's real reroll: old entry and rolls unchanged, only the new roll counts, nat counted once), `FR-DICE-72 feature-tagged kinds skipped while off` (S1), `FR-DICE-73 rollFacts` (a roll in two entries returns once; `public` if any counted listing entry is public; an unreferenced roll is absent). Bundle `stats`; walkthrough [stats §13](stats.md#13-test-plan) step 5 (the hidden roll's nat 20 counts for the DM only).
 
-**Sprint 8, track TT** (bundle `table-tools`, walkthrough T in [dice-extras §13](dice-extras.md#13-test-plan) T2–T10, T17): integration `FR-DICE-79 answer audience` (hidden: `public: false`, `audiencePlayerId` = `player-1`; `player-1`'s frame has the entry, `player-2`'s doesn't; public: all frames; DM Roll for missing stamped the same); `FR-DICE-80 answer line` (actor Mira, label "Perception", category skill-check, Bless part on a save); `FR-DICE-81 macro line` (label = macro name, category damage); `FR-DICE-82 hidden answers in stats` (`rollFacts` for a player viewer skips the hidden answer, the DM's has it); `FR-DICE-83 audience input` (a player `dice.roll {public}` still `forbidden`; the intent schemas have no audience field); DOM `FR-DICE-84 request button` (DM roll bar has `dicex-request-open`, the player's doesn't).
-
 ## 14. Dependencies
-
-**Sprint 8, track TT:** no AGENTS §9.9 change beyond TT0's ([dice-extras §14](dice-extras.md#14-dependencies)). `gameLog.append`'s `audience` input is TT0 (this spec's server file; TT owns the roll paths this sprint); the roll bar Button is TT2 (`GameLog.tsx`); SB's luck tracker reads facts only (FR-DICE-82).
 
 | On | What we need | Status |
 |---|---|---|
@@ -474,9 +455,10 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-DICE-46 | Does a request answer's log line say it was requested? | **A. No: the line is a normal roll line with the request's label ("Mira · Perception")**: no new field, old clients render it / B. A small "requested" tag (and "vs DC 15" when the DC is shown): clearer history, one optional payload field and a line change | no | FR-DICE-80 |
+| OQ-DICE-46 | Does an answer's line say it was requested? | **A. No: a normal line with the request's label**: no new field / B. A "requested" tag and "vs DC" when shown: one payload field | no | FR-DICE-80 |
+
+- *(Sprint 8)* Edge cases (disconnect, crash, leaks) for answers: [dice-extras §11](dice-extras.md#11-edge-cases--failure-modes). Slices: `audience` input TT0, the roll-bar Button TT1+TT2 ([dice-extras §14](dice-extras.md#14-dependencies)); SB reads facts only.
 
 ## 16. Out of scope
 
-- *(Sprint 8)* Player whispers (the [stub](post-mvp/dice-extras.md)); blind answers (OQ-DICEX-55 B).
 - As §4; plus text entries (a later kind) and combat undo semantics (→ [combat-tracker](combat-tracker.md)).
