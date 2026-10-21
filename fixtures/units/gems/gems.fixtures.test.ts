@@ -1,6 +1,6 @@
 // GEM §13 fixtures: `gems-on`, `gems-awarded`, `gems-hidden`, `gems-rolls` (GM1); bundles `gems`,
-// `gems-hidden`, `gems-e2e`, `gems-reroll-e2e`. Every other bundle keeps gems off (FR-GEM-01):
-// only these units switch it.
+// `gems-hidden`, `gems-e2e`, `gems-reroll-e2e` (GM1), `gems-ui-e2e` (GM3). Every other bundle keeps
+// gems off (FR-GEM-01): only these units switch it.
 import { afterAll, describe, expect, test } from "bun:test";
 import { campaign, characterGems, entity, gameLogEntry, player } from "@server/db/schema";
 import { SET_FEATURE_INTENT } from "@server/features/campaign-management/features";
@@ -43,7 +43,7 @@ function closure(name: string): string[] {
   return [...keys];
 }
 
-const GEM_BUNDLES = ["gems", "gems-hidden", "gems-e2e", "gems-reroll-e2e"];
+const GEM_BUNDLES = ["gems", "gems-hidden", "gems-e2e", "gems-reroll-e2e", "gems-ui-e2e"];
 
 async function frames(bundle: string) {
   const loaded = await loadBundle(bundle, { testMode: true });
@@ -66,7 +66,9 @@ describe("gems fixtures (GEM §13)", () => {
       .sort();
     expect(withGems).toEqual([...GEM_BUNDLES].sort());
     // Of those, only `gems` ends with gems on.
-    for (const n of ["gems-hidden", "gems-e2e"]) expect(closure(n).at(-1)).toBe("gems-hidden");
+    for (const n of ["gems-hidden", "gems-e2e", "gems-ui-e2e"]) {
+      expect(closure(n).at(-1)).toBe("gems-hidden");
+    }
     expect(closure("session-sim-11")).not.toContain("gems-on");
   });
 

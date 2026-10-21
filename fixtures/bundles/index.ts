@@ -34,6 +34,7 @@ import gems from "./gems";
 import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
+import gemsUiE2e from "./gems-ui-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
@@ -148,4 +149,6 @@ export const bundles: readonly Bundle[] = [
   gemsE2e,
   // Sprint 7 track GM (build/gems-reroll)
   gemsRerollE2e,
+  // Sprint 7 track GM (build/gems-sheet)
+  gemsUiE2e,
 ];

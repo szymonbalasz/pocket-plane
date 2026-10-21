@@ -117,7 +117,7 @@ phase: post-mvp-7
 
 - **DM view:** options dialog; block with ± on PC sheets; Players-window counts; log and popup actions. **Player view:** own block + Spend; others' summary-card counts; Inspiration on own lines; Combat gem on own card.
 - **States:** off → nothing rendered or stored; disconnected → controls disabled; reject → inline / Toast.
-- **Test IDs:** `gem-block`, `gem-count` (+ `data-value`, `data-count`), `gem-max-label`, `gem-award`, `gem-remove`, `gem-spend-menu`, `gem-spend` (+ `data-value`), `gem-spend-confirm`, `gem-reroll`, `gem-combat`, `gem-combat-die` (+ `data-part`, `data-index`, `data-state`), `gem-combat-submit`, `gem-error`, `gem-summary-count`; records via `data-record-id`.
+- **Test IDs:** `gem-block`, `gem-count` (+ `data-value`, `data-count`), `gem-max-label`, `gem-award`, `gem-remove`, `gem-spend-menu`, `gem-spend` (+ `data-value`), `gem-spend-confirm`, `gem-reroll` *(GM3 build, #322: also `gem-spend-ask`, `gem-spend-cancel`, `gem-adjust`, `charx-summary-gems`)*, `gem-combat`, `gem-combat-die` (+ `data-part`, `data-index`, `data-state`), `gem-combat-submit`, `gem-error`, `gem-summary-count`; records via `data-record-id`.
 
 ## 8. Data model
 
