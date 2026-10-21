@@ -8,10 +8,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| ST-core | `fix/st-core` (ws w8W) | build-st-core | merging main (GM1) | gates → merge |
-| ST2 Stats window | `build/st-window` (ws w80, stacked on st-core) | build-st2 | walkthrough 7 / 7 PASS | merge main after ST-core → gates → merge |
-| GM2 Combat gem | `build/gems-combat` (ws w91, stacked on GM1) | build-gm2 | building | merge main (ST-core) → walkthrough → merge |
-| Sprint gate | — | — | after GM2 | session-sim-11, playtest section, recap |
+| GM2 Combat gem | `build/gems-combat` (ws w91) | build-gm2 | merging main + gates | walkthrough → merge |
+| Sprint gate | — | — | after GM2 | session-sim-11 (brief `briefs/tpl-test-session-11.md`), playtest section, recap |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
 - GM: GEM FR 01-40 / OQ 04-20; CAMP FR 38-45 / OQ 33-36; DICE FR 62-71 / OQ 41-44; DICEX FR 59-62 / OQ 49-50; CBT FR 126-135 / OQ 85-88; CHARX FR 71-80 / OQ 37-40; MOD FR 64-67 / OQ 47-48; SHELL FR 98-100 / OQ 61-62; NOTE FR 52-54 / OQ 30-31.

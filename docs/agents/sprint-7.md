@@ -43,6 +43,7 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 | 2026-10-21 | **Small copy fixes merged** (#321, BL-48): "Added" confirmation, "Party inventory" toasts, roll bar names the sheet's character, clean dice-line spacing, Rage count once, typed Sneak Attack lines, kept Loot drafts. Window frame walkthrough passed after a toast fix; gems sheet UI in walkthrough |
 | 2026-10-21 | **Gems sheet UI merged** (#322): gem block on the sheet, ± and Spend, Players-window counts, Campaign options switch. **Window frame merged** (#323): windows put away instead of covering a PC, readable sizes, pushed windows return, Space / Tab keyboard. Inspiration reroll passed its walkthrough (gates next); stats core fixed; Stats window and map follow-ups building |
 | 2026-10-21 | Paused and resumed by the DM. **Inspiration reroll merged** (#325): reroll your own d20, old roll struck, attack cards follow, hidden rolls stay hidden. **Map follow-ups merged** (#326): no jump at Start, players' map refits with the card open, readable Fit with toasts, the paw always drawn. Backfill: Add hidden unticked without tokens (BL-58, #324). Stats window walkthrough 7 / 7; stats core merging the reroll; Combat gem building |
+| 2026-10-21 | **Stats core merged** (#327): live fight / session stats filtered per viewer, From on heals, "— Overkill!" lines, final roll only. **Stats window merged** (#328): Fight leaderboard, Session awards, overkill toasts, Show awards. Combat gem in its final gates; session-sim-11 next |
 
 ## Check `main` any time (DM)
 
