@@ -45,15 +45,92 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 | 2026-10-21 | Paused and resumed by the DM. **Inspiration reroll merged** (#325): reroll your own d20, old roll struck, attack cards follow, hidden rolls stay hidden. **Map follow-ups merged** (#326): no jump at Start, players' map refits with the card open, readable Fit with toasts, the paw always drawn. Backfill: Add hidden unticked without tokens (BL-58, #324). Stats window walkthrough 7 / 7; stats core merging the reroll; Combat gem building |
 | 2026-10-21 | **Stats core merged** (#327): live fight / session stats filtered per viewer, From on heals, "— Overkill!" lines, final roll only. **Stats window merged** (#328): Fight leaderboard, Session awards, overkill toasts, Show awards. Combat gem in its final gates; session-sim-11 next |
 | 2026-10-21 | **Combat gem merged** (#329): max 1–3 damage dice before Apply (incl. after Apply hit), server-side totals, gems-off strips badges. All sprint slices merged. A pre-existing leak found (a player's resolved card showed a monster's HP on a kill): small fix branch before session-sim-11 |
+| 2026-10-21 | **Sprint gate:** session-sim-11 **15 / 17 PASS** on final `main` (leak scan clean, hard kill byte-identical); FAILs: windows on Mira at 1280×720, Player 1's sheet over revealed tokens with the companion card open. The card fix waits for the DM (it amends #138). [Playtest: sprint 7 features](#playtest-sprint-7-features) written. Paused for the recap |
 
-## Check `main` any time (DM)
+## Playtest: sprint 7 features
 
-Bundle **`session-sim-10`** until the sprint adds `session-sim-11`.
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-11 report](../../.verify/20261021-190115-session-sim-11/report.md) (local, gitignored): **15 / 17 PASS** on final `main` (check 4,459, e2e 184 + 1 known flake), leak scan clean (WS + REST + stats answers, both players) with gems on and off, rerolls, maxed dice and stats in play; a hard kill with gems on, a maxed card pending and Stats open restarted byte-identical (digest equal). The two FAILs are the first known gaps below.
+
+### Setup
 
 ```powershell
 git pull; bun install
 bun run build
-bun run fixtures:reset-load session-sim-10 --profile verify
+bun run fixtures:reset-load session-sim-11 --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL (paste the secret) and each player link in its own browser. Town may be live at load: show Goblin Ambush from the Scenes window. Close Player 1's presented-handout popup if it appears. **Gems start off** in `session-sim-11`; you switch them on in part 1. Other bundles: `gems` (gems on, Mira / Brakka / Thorn already hold gems), `stats` (a fight with known numbers and a past session), `fu-s7` (the follow-ups set). To switch: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; player links change on every load.
+
+### Part 1: gems (`session-sim-11`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Look around (sheets, log, cards) | No gems anywhere for anyone |
+| 2 | Players window → **Options** → turn on "Gems (homebrew)" | Everyone's sheet gets a gem block (an icon per gem, 0s) without a reload |
+| 3 | Mira's sheet → **+** Inspiration ×2, Combat ×1; Brakka Combat ×1, Action ×3, Fortune ×6 | Counts update for everyone; each award is a public log line; Fortune 6 shows plainly next to a quiet "max 5" label (a table rule, not enforced). A **−** is silent |
+| 4 | Player 1: roll Mira's Perception, then on that log line **Inspiration: reroll** → ✓ | A spend line and a new roll; the old line is struck through with a "rerolled" badge that jumps to the new one |
+| 5 | Player 1: Mira **Attack** (pending card) → reroll the to-hit with Inspiration | Your popup follows the new to-hit; if it flips a crit, the damage shows "not used" and asks for a new (doubled) roll |
+| 6 | You: roll a **hidden** Mira check, spend her Inspiration on it | Player 2 sees only "Mira spends an Inspiration gem", nothing about the roll |
+| 7 | Player 1: Brakka **Attack + damage** → on the damage card **Combat gem** → pick a die | That die shows max with a "max" badge, the total rises, your popup refreshes; Player 2 never sees the card. Then **Apply** |
+| 8 | Player 1: Mira Attack; you: **Apply hit**; Player 1: Damage → Combat gem in the damage step | Works there too; a total you typed stays ("rolled N" shown) |
+| 9 | Player 1: Brakka **Spend** → Fortune; Spend → Action (2) | Two public lines; Action 3 → 1. Player 2 sees Mira's counts on her summary card, no buttons |
+| 10 | Options → gems **off** (confirm), then on again | Every gem trace goes (blocks, gem lines, struck lines, "rerolled" and "max" badges); final rolls stay; on brings everything back with the same counts |
+
+### Part 2: stats (`session-sim-11`, or `stats`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Everyone: launcher → **Stats** (Fight tab) | A live leaderboard (Dealt / Taken / Healed / Kills). You see everyone incl. monsters and a "DM (direct)" row; players see the party only, with "Fight N · date" labels, never fight names or monster HP |
+| 2 | Apply a big hit on a nearly dead monster (e.g. Thorn 40 on a 7-HP goblin) | "— Overkill!" on the line + a toast; yours says "+N over M HP", players' has no number; tables update within ~2 s |
+| 3 | Damage / heal dialog → heal Mira with **From** (preset to whoever's turn it is) | The heal counts for that healer ("Most healing") |
+| 4 | Undo the big hit, then redo it | The line is struck and drops out of the tables; no toast on undo |
+| 5 | End the fight → Stats → **Session** tab → **Show awards** | Everyone's Stats opens on today's nine awards (biggest hit, biggest overkill, most dealt / taken, most healing, kills, nat 20s / 1s, times downed); "Old Crypt" is an earlier session in the picker. Biggest overkill: you see the amount, players see the hit's damage |
+| 6 | A hidden roll / hidden monster during the fight | Never counted in players' numbers |
+
+### Part 3: sprint-6 follow-ups (`session-sim-11`, or `fu-s7`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | 1440×900, Game log + Initiative open: open Compendium, Party, Encounters, Stats | No window lands on Mira, Brakka or Thorn; when there's no room, the least recently used launcher window is put away (minimised) instead |
+| 2 | Player 1: Preferences → **Reset layout** | Sheet top-right, Initiative left, Game log as before; the map refits; nothing over a PC |
+| 3 | Pick the AoE tool (windows get pushed), then close it | Pushed windows go back to where they were (unless you moved them) |
+| 4 | Tab to a launcher button, press **Space**; click the Fog tool's Explored toggle, then hold Space over the map and drag | Space presses the focused button; over the map Space still pans and the toggle doesn't flip. Tooltips appear when you Tab onto a chip |
+| 5 | Initiative | Companions are one row each (you: name, HP, AC, chips, card, ⋯; Player 1: their own companions' HP; Player 2: a band) |
+| 6 | Player 2: click Thorn's **Concentrating** chip | A menu: what ends with it, **End concentration** |
+| 7 | **End** the fight | The dialog names the summon tokens that will go ("Summoned creatures' tokens are removed: …") and says a charmed creature stays as a monster; after End the summon tokens are gone, hostile ones too |
+| 8 | Start "Escort to the Ford" | No map jump if everything was visible; a goblin downed earlier stays Down (0 / 7) when it joins (bind it with Add if Start picked fresh tokens); the drake and the Owlbear keep their paw (its own chip, never folded into "+N") |
+| 9 | Encounters → edit "Escort to the Ford" at its smallest size | Creature names show, Save / Start stay visible |
+| 10 | Small copy (BL-48): Compendium → Add to party a Potion ×2; Player 1's roll bar; Brakka's Rage at −1 / 3 | "Added: Potion of healing ×2" for you, "Party inventory: …" for players; "Mira — 1d20+2"; "−1 / 3" shown once |
+
+### Known gaps / later
+
+- **Windows can still land on Mira at 1280×720 (FAIL g):** with the Game log + Initiative open during the Escort fight, Compendium, Party, Encounters and Stats all covered Mira (76–100 %) although a clear 320-px strip existed (x 248–568). 1440×900 is clean (BL-64).
+- **Player 1's sheet over revealed tokens with the companion card open (FAIL h):** Reveal all made the map zoom *in* instead of out; the Elite and Plain Brute stayed under the sheet, also after a reload (BL-65).
+- **A player's own resolved damage card shows the HP a monster actually lost** ("Hit: 7" for 40 damage on a 7-HP goblin), so a kill reveals its last HP. Accepted at #138; a fix that shows the attack line's damage instead is ready on `fix/card-applied-leak`: **your call at the recap.**
+- After resizing 1280 → 1440 the layout doesn't recover (Game log stays 300×160, Initiative mid-screen) (BL-60); the Fog tool can push Scenes over Mira (BL-61).
+- Players' Stats opens at its 320×280 minimum (names cut, rows below the fold); your award cards overflow their text (BL-66). The companion card opens at 280×240 when crowded (attacks below the fold).
+- Each **+** award is its own public log line (six Fortune lines in a row) (BL-68). Players' Fight tab shows the previous fight until something public happens in the new one; fixture dates read "Thu 1 Jan" (BL-69).
+- Player 1's Initiative jumps to mid-map after Start (BL-70); you get duplicate Overkill / Session-awards toasts stacked on the Stats window (BL-71).
+- Small: the "4d6kh3" line reads "5 3̶ 6 + 6"; the inline "Spend?" confirm doesn't name the gem; the image picker needs two Escapes (BL-72). After a reroll whose maxed damage went unused, the new line repeats the old damage (BL-62).
+- Firefox: paste an image into the handout editor (manual check; e2e runs Chromium only).
+
+### Teardown
+
+`Ctrl+C` the server, then:
+
+```powershell
+bun run fixtures:reset --profile verify
+```
+
+## Check `main` any time (DM)
+
+Bundle **`session-sim-11`** (sprint 7).
+
+```powershell
+git pull; bun install
+bun run build
+bun run fixtures:reset-load session-sim-11 --profile verify
 bun run start --profile verify
 ```
 
