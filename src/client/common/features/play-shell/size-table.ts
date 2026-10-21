@@ -26,6 +26,7 @@ const shared: Record<string, SizeRow> = {
   "shell.prefs": { default: all(360, 560), useful: all(360, 400), min: s(320, 280) },
   "dicex.tray": { default: all(360, 300), useful: all(360, 300), min: s(300, 240) },
   "charx.companion": { default: all(320, 360), useful: all(320, 360), min: s(280, 240) },
+  "stats.board": { default: all(400, 412), useful: all(400, 360), min: s(320, 280) },
 };
 
 export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {

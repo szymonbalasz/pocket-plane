@@ -66,6 +66,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "open @1600×900 stats.board",
+    "rect": "548,201,400×371",
+    "placed": "auto",
+    "parked": "charx.companion"
+  },
+  {
     "at": "reopen @1600×900 camp.players",
     "rect": "510,232,400×340",
     "placed": "stored",
@@ -130,6 +136,12 @@
     "rect": "510,212,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen @1600×900 stats.board",
+    "rect": "548,201,400×371",
+    "placed": "reopened",
+    "parked": "charx.companion"
   },
   {
     "at": "reopen 1440×900 @1440×900 camp.players",
@@ -198,6 +210,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "reopen 1440×900 @1440×900 stats.board",
+    "rect": "468,201,400×371",
+    "placed": "reopened",
+    "parked": "charx.companion"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 camp.players",
     "rect": "382,212,400×340",
     "placed": "reopened",
@@ -264,6 +282,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "reopen 1280×800 @1280×800 stats.board",
+    "rect": "382,60,400×360",
+    "placed": "reopened",
+    "parked": "charx.companion"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "418,60,400×340",
     "placed": "reopened",
@@ -328,6 +352,12 @@
     "rect": "450,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 stats.board",
+    "rect": "418,60,400×412",
+    "placed": "reopened",
+    "parked": "charx.companion"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -408,6 +438,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "open @1440×900 stats.board",
+    "rect": "468,201,400×371",
+    "placed": "auto",
+    "parked": "charx.companion"
+  },
+  {
     "at": "reopen @1440×900 camp.players",
     "rect": "430,232,400×340",
     "placed": "stored",
@@ -472,6 +508,12 @@
     "rect": "430,212,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen @1440×900 stats.board",
+    "rect": "468,201,400×371",
+    "placed": "reopened",
+    "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×800 @1280×800 camp.players",
@@ -540,6 +582,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "reopen 1280×800 @1280×800 stats.board",
+    "rect": "382,60,400×360",
+    "placed": "reopened",
+    "parked": "charx.companion"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "418,60,400×340",
     "placed": "reopened",
@@ -604,6 +652,12 @@
     "rect": "450,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 stats.board",
+    "rect": "418,60,400×412",
+    "placed": "reopened",
+    "parked": "charx.companion"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -684,6 +738,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "open @1280×800 stats.board",
+    "rect": "382,60,400×360",
+    "placed": "auto",
+    "parked": "charx.companion"
+  },
+  {
     "at": "reopen @1280×800 camp.players",
     "rect": "382,212,400×340",
     "placed": "stored",
@@ -750,6 +810,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "reopen @1280×800 stats.board",
+    "rect": "382,60,400×360",
+    "placed": "reopened",
+    "parked": "charx.companion"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "418,60,400×340",
     "placed": "reopened",
@@ -814,6 +880,12 @@
     "rect": "450,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 stats.board",
+    "rect": "418,60,400×412",
+    "placed": "reopened",
+    "parked": "charx.companion"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -894,6 +966,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "open @1280×720 stats.board",
+    "rect": "418,60,400×412",
+    "placed": "auto",
+    "parked": "charx.companion"
+  },
+  {
     "at": "reopen @1280×720 camp.players",
     "rect": "418,60,400×340",
     "placed": "stored",
@@ -958,6 +1036,12 @@
     "rect": "450,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen @1280×720 stats.board",
+    "rect": "418,60,400×412",
+    "placed": "reopened",
+    "parked": "charx.companion"
   },
   {
     "at": "protected @1280×720 camp.players",

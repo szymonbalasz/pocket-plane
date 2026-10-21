@@ -7,6 +7,7 @@ import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type NotificationView } from "@ui/features/notifications/views";
 import { handoutSharedView } from "@ui/features/party-board/note-view";
 import { lootReceivedView } from "@ui/features/party-loot/note-view";
+import { statsAwardsView } from "@ui/features/stats/note-view";
 import { dmDamageCardView } from "./features/combat-tracker/card-view";
 import { dmSummonCardView } from "./features/combat-tracker/summon-card-view";
 
@@ -20,6 +21,7 @@ const views: NotificationView[] = [
   handoutSharedView, // handout-shared (party-board, FR-PARTY-06)
   modTriggerView, // mod-trigger (effect-modifiers, FR-MOD-44)
   dmSummonCardView, // cbt-summon-concentration (combat-tracker, FR-CBT-120)
+  statsAwardsView, // stats-awards (stats, FR-NOTE-48)
 ];
 
 export const dmNotificationViews = createNotificationViews(views);
