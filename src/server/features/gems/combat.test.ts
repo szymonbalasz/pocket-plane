@@ -557,6 +557,51 @@ describe("FR-GEM-31 / FR-CBT-129–134 the maxed card at apply", () => {
   });
 });
 
+describe("FR-GEM-23 stats (seams S2) and the overkill callout", () => {
+  test("FR-GEM-23 a maxed die reaches stats only through the applied damage; FR-CBT-137 the overkill callout uses the maxed total", () => {
+    const t = setup({ rage: false });
+    t.setLevel(t.brakkaId, 12);
+    // slashing 1, 1 (+ 5) = 7, fire 1, 2 = 3: raw 10 on Goblin (7 HP) → overkill 3, no callout.
+    const { cardId } = t.flame(
+      [{ diceTotal: 14 }, { diceTotal: 2, dice: [1, 1] }],
+      [{ diceTotal: 3, dice: [1, 2] }],
+    );
+    const n = t.events.length;
+    t.spend(cardId, [
+      { part: "base", index: 0 },
+      { part: "base", index: 1 },
+      { part: 0, index: 0 },
+    ]);
+    // The spend itself writes no fact (no hp_change, no stats-side record).
+    expect(t.events.slice(n).flatMap((e) => e.event.changes.map((c) => c.type))).not.toContain(
+      "hp-change",
+    );
+    const p = t.card(cardId);
+    expect(full(p)).toBe(17 + 8);
+    const hpBefore = t.goblinHp();
+    const [hpId] = t.apply(cardId).hpChangeIds;
+    const row = t.s.db
+      .select()
+      .from(hpChange)
+      .where(eq(hpChange.id, hpId as string))
+      .get();
+    expect([row?.raw, row?.overkill]).toEqual([25, 25 - hpBefore]);
+    const line = t.entry(row?.entryId as string);
+    expect((line.payload as { callout?: string }).callout).toBe("overkill");
+    // stats.query (DM): only the applied facts count; the replaced rows count nowhere.
+    // Dealt = the line's number (OQ-STATS-06 A: the maxed raw), Effective = HP lost.
+    type Row = { name: string; dealt: number; kills: number; effective: { dealt: number } };
+    const fight = t.run<{ fight: { rows: Row[] } }>("stats.query", { scope: "fight" });
+    const brakka = fight.fight.rows.find((r) => r.name === "Brakka");
+    expect([brakka?.dealt, brakka?.effective.dealt, brakka?.kills]).toEqual([25, hpBefore, 1]);
+    const replaced = [p.damage?.rollId, p.damage?.extra?.[0]?.rollId].map(
+      (id) => t.rollRow(id as string)?.replacesRollId as string,
+    );
+    expect(row?.rollIds).not.toEqual(expect.arrayContaining([replaced[0]]));
+    expect(row?.rollIds).not.toEqual(expect.arrayContaining([replaced[1]]));
+  });
+});
+
 describe("FR-GEM-13 detail by audience; leak scan", () => {
   test("FR-GEM-13 detail by audience: a DM-made card's spend line shows no detail to players; the DM's line has it", () => {
     const t = setup();
