@@ -392,6 +392,51 @@ describe("FR-GEM-25 eligibility and races", () => {
     t.run(setFeature.name, { feature: GEMS_FEATURE, on: true });
     expect(JSON.stringify(line().dmPayload)).toContain('"maxed":[0]');
   });
+
+  test("FR-GEM-05 off hides gem traces on cards / FR-CBT-131 gems off: `maxed` / `diceMaxed` stripped from the card for the DM and its owner (snapshot, frames); totals stay; on restores", () => {
+    const t = setup();
+    const { cardId } = t.step3();
+    t.spend(cardId, [{ part: "base", index: 0 }]);
+    const b = t.step3();
+    t.spend(b.cardId, [{ part: 0, index: 0 }]);
+    const snapCard = (v: typeof t.dmV, id: string) =>
+      ((t.h.snapshot(v).notification ?? []) as NotificationRecord[]).find((n) => n.id === id)
+        ?.payload as DamageCardPayload | undefined;
+    for (const v of [t.dmV, t.p1V]) {
+      expect(snapCard(v, cardId)?.diceMaxed).toBe(true);
+      expect(snapCard(v, b.cardId)?.damage?.extra?.[0]?.maxed).toEqual([0]);
+    }
+    t.run(setFeature.name, { feature: GEMS_FEATURE, on: false });
+    for (const v of [t.dmV, t.p1V]) {
+      const p = snapCard(v, cardId);
+      const q = snapCard(v, b.cardId);
+      expect(JSON.stringify([p, q])).not.toContain("maxed");
+      expect([p?.damage?.total, p?.damage?.dice]).toEqual([
+        18,
+        [
+          [6, true],
+          [5, true],
+        ],
+      ]);
+      expect(q?.damage?.extra?.[0]?.total).toBe(12);
+    }
+    expect(snapCard(t.p2V, cardId)).toBeUndefined();
+    // A live change while off (Undo of an apply reopens the card) carries no marks either.
+    const n = t.events.length;
+    const [hpId] = t.apply(cardId).hpChangeIds;
+    t.run(undoCommand.name, { expectedHpChangeId: hpId });
+    const frames = JSON.stringify(
+      [t.dmV, t.p1V].flatMap((v) => t.wire(n, v)).filter((w) => w.type === "notification"),
+    );
+    expect(frames).toContain(cardId);
+    expect(frames).not.toContain("maxed");
+    // The stored rows keep them: on again restores.
+    t.run(setFeature.name, { feature: GEMS_FEATURE, on: true });
+    for (const v of [t.dmV, t.p1V]) {
+      expect(snapCard(v, cardId)?.damage?.maxed).toEqual([0]);
+      expect(snapCard(v, b.cardId)?.diceMaxed).toBe(true);
+    }
+  });
 });
 
 describe("FR-GEM-31 / FR-CBT-129–134 the maxed card at apply", () => {

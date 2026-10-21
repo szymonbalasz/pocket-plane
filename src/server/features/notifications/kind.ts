@@ -10,6 +10,7 @@ import {
 import type { z } from "zod";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
+import type { FeatureTrace } from "../../ws/records";
 
 export interface NotificationKindDef {
   /** `^[a-z][a-z0-9-]{0,31}$` */
@@ -39,6 +40,11 @@ export interface NotificationKindDef {
    * kind owner's own command, so it runs no hook. Absent = nothing.
    */
   onClose?: (env: CommandEnv, row: NotificationRecord) => RecordChange[];
+  /**
+   * Sprint 7 (ADR-0058, FR-GEM-05): other features' traces on this kind's rows (e.g. gems' maxed
+   * dice on a damage card), hidden / stripped by the hub while that feature is off. Absent = none.
+   */
+  traces?: readonly FeatureTrace<NotificationRecord>[];
 }
 
 /** The kind's resolution cap (FR-NOTE-03): its own, else 256 B. */
