@@ -13,7 +13,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | ST2 Stats window | `build/st-window` (ws w80, stacked on st-core) | build-st2 | building | walkthrough → merge after ST-core |
 | FU3 map follow-ups | `fix/fu-map` (ws w8Y, was stacked on fu-frame) | build-fu3 | Start-refit follow-up | merge main → gates → merge |
 | GM2 Combat gem | `build/gems-combat` | — | waits GM1 + ST-core | — |
-| backfill (BL-58) Add hidden | `fix/bl-58-add-hidden` (ws w8Z, slot 3) | fix-bl-58 | fixing | gates → merge |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
 - GM: GEM FR 01-40 / OQ 04-20; CAMP FR 38-45 / OQ 33-36; DICE FR 62-71 / OQ 41-44; DICEX FR 59-62 / OQ 49-50; CBT FR 126-135 / OQ 85-88; CHARX FR 71-80 / OQ 37-40; MOD FR 64-67 / OQ 47-48; SHELL FR 98-100 / OQ 61-62; NOTE FR 52-54 / OQ 30-31.
