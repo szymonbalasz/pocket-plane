@@ -13,11 +13,14 @@
 // defenses against the card's damage type. Weapon damage parts (FR-CBT-82, FR-MOD-58; sprint 4):
 // each extra part's total is editable beside the base part's, and every target row gets one chip
 // per extra part with its own multiplier, preset from the target's defenses for that part's type.
+// Sprint 7 (FR-CBT-130, -131): the card-action slot above the targets (gems' Combat gem) and a
+// "max" Badge on maxed dice; a maxed card refreshes like a late roll (FR-CBT-132: typed kept).
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
   APPLY_TARGETS_MAX,
+  type CardPartRef,
   type CombatantView,
   CRIT_CHANGED_TEXT,
   critChanged,
@@ -41,6 +44,7 @@ import {
   ToggleGroupItem,
 } from "@ui/components/ui/controls";
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
+import { CardActions, PartDice } from "@ui/features/combat-tracker/card-actions-row";
 import {
   toastIntentError,
   useCbtIntent,
@@ -161,6 +165,19 @@ function Dice({ dice }: { dice: readonly (readonly [number | null, boolean])[] }
       ]
     </span>
   );
+}
+
+/** FR-CBT-131 (sprint 7): a damage part's dice; maxed ones carry a "max" Badge. */
+function DamageDice({
+  part,
+  dice,
+  maxed,
+}: {
+  part: CardPartRef;
+  dice: readonly (readonly [number | null, boolean])[];
+  maxed: readonly number[] | undefined;
+}) {
+  return maxed ? <PartDice part={part} dice={dice} maxed={maxed} /> : <Dice dice={dice} />;
 }
 
 /** "Add target" Combobox over every eligible combatant not yet in the list (incl. hidden). */
@@ -689,7 +706,8 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
             Damage{" "}
             {p.damage ? (
               <>
-                <Dice dice={p.damage.dice} /> {p.damage.constant >= 0 ? "+" : "−"}
+                <DamageDice part="base" dice={p.damage.dice} maxed={p.damage.maxed} />{" "}
+                {p.damage.constant >= 0 ? "+" : "−"}
                 {Math.abs(p.damage.constant)}
                 {p.damage.mods && lineText(modSegments(p.damage.mods))}
               </>
@@ -744,6 +762,8 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
               <Label htmlFor={`cbt-popup-damage-part-${i + 1}`} className="w-14 text-xs">
                 + {x.type}
               </Label>
+              {/* FR-CBT-131: a maxed extra part shows its dice with the "max" Badge. */}
+              {x.maxed && <DamageDice part={i} dice={x.dice} maxed={x.maxed} />}
               <DamageField
                 id={`cbt-popup-damage-part-${i + 1}`}
                 testId="cbt-popup-damage-part"
@@ -775,6 +795,8 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
           )}
         </div>
       </div>
+      {/* FR-CBT-130 (sprint 7): the card-action slot (gems' Combat gem); none → nothing. */}
+      <CardActions card={card} client="dm" />
       <section aria-label="Targets" className="flex min-h-0 flex-col gap-1.5">
         <div className="flex items-baseline justify-between">
           <h3 className="text-xs font-medium text-muted-foreground">Targets ({rows.length})</h3>
