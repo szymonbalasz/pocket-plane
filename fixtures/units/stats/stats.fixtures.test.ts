@@ -174,9 +174,12 @@ describe("STATS §13 fixtures", () => {
       .map((c) => c.name);
     expect(names).toContain("Brakka");
     expect(names).not.toContain("Goblin Scout");
-    // The crypt's facts are the session's; the ambush has none yet.
+    // The crypt's facts are in the session (FU's units may add the ambush's own); the crypt is
+    // the first fight players list.
     const s = t.q<SessionResult>({ scope: "session" }, t.as("Player 1")).session;
-    expect(s?.fights).toBe(1);
-    expect(s?.awards.find((a) => a.key === "biggest-overkill")?.value).toBe(30);
+    expect(s?.fights).toBeGreaterThanOrEqual(1);
+    const overkill = s?.awards.find((a) => a.key === "biggest-overkill");
+    expect(overkill).toMatchObject({ value: 30, detail: { to: "Skeleton" } });
+    expect(overkill?.detail?.fight).toMatch(/^Fight 1 · /);
   }, 60_000);
 });
