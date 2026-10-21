@@ -14,6 +14,7 @@ import {
   type RollEntryDmPayload,
   type RollPayloadItem,
 } from "@shared/dice-roll-log/schemas";
+import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import { windowKey } from "@shared/effect-modifiers/trigger-fire";
 import { jsonBytes } from "@shared/notifications/schemas";
 import { eq } from "drizzle-orm";
@@ -75,16 +76,28 @@ export function withCardOffers(
 /**
  * The `roll` line of these rolls: payload items + `dmPayload` with the offers (damage item
  * `offered`, label iff the trigger is public; DM names) and every hook note (DM only, ≤ 4).
+ * FR-MOD-69 (BL-48: "Sneak Attack" on Thorn's damage line had no type): an offer's `type` is
+ * FR-MOD-62's (the part's, else the attack's `damageType`), as on the card and the outcome line.
  */
-export function rollLine(rolls: readonly EvaluatedRoll[]): {
+export function rollLine(
+  rolls: readonly EvaluatedRoll[],
+  damageType: string | null = null,
+): {
   payload: RollPayloadItem[];
   dmPayload: RollEntryDmPayload | undefined;
 } {
+  // A free-text attack type that isn't a part type (homebrew) leaves the part untyped, as today.
+  const attackType = PartDamageType.safeParse(damageType);
+  const fallback = attackType.success ? attackType.data : null;
+  const typed = (item: RollPayloadItem): RollPayloadItem =>
+    item.offered && fallback
+      ? { ...item, offered: item.offered.map((o) => ({ ...o, type: o.type ?? fallback })) }
+      : item;
   const payload = rolls.map((r) => {
     const item = dice.rollPayloadItem(r);
     const offered = r.mods?.offered;
-    if (item.offered || !offered?.length) return item;
-    return {
+    if (item.offered || !offered?.length) return typed(item);
+    return typed({
       ...item,
       offered: offered.map((o) => ({
         label: o.public ? o.label : null,
@@ -95,7 +108,7 @@ export function rollLine(rolls: readonly EvaluatedRoll[]): {
         ...(o.auto ? { auto: true as const } : {}),
         ...(o.dice ? { dice: o.dice } : {}),
       })),
-    };
+    });
   });
   const notes = [...new Set(rolls.flatMap((r) => r.mods?.notes ?? []))].slice(0, ROLL_NOTES_MAX);
   const anyOffer = rolls.some((r) => r.mods?.offered?.length);

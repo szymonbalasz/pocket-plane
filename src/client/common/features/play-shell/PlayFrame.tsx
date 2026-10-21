@@ -60,6 +60,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const placed = useShellState((s) => s.placed);
   const settling = useShellState((s) => s.settling);
   const autoMinimised = useShellState((s) => s.autoMinimised);
+  const autoMinimiseLog = useShellState((s) => s.autoMinimiseLog);
   const regions = useKeepOuts(client);
   const available = useAvailableKinds();
   const dispatch = useWindowDispatch();
@@ -79,6 +80,8 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
       className="fixed inset-0 overflow-clip bg-background"
       data-testid="ui-play-page"
       data-keep-outs={keepOutsAttr(regions)}
+      // FR-SHELL-88: the last placement's auto-minimise moves (test mode only).
+      data-auto-minimise-log={testMode ? autoMinimiseLog : undefined}
       onScroll={(e) => {
         e.currentTarget.scrollTop = 0;
         e.currentTarget.scrollLeft = 0;

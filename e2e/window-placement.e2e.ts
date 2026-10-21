@@ -28,11 +28,16 @@ test("FR-SHELL-42 player-1 opens a handout, reloads → no viewer window, Party 
   await expect(viewer.getByTestId("party-handout-view")).toHaveAttribute("data-record-id", mayor);
   const before = await viewer.boundingBox();
   // The 640-wide viewer finds no clear spot beside Party at 1280×800: Party is auto-minimised to
-  // make room (FR-SHELL-47) and comes back from the launcher at its spot.
+  // make room (FR-SHELL-47) and comes back from the launcher; at its useful size it then
+  // auto-minimises the viewer, the least recently used (sprint 7, FR-SHELL-77, -78).
   const boardState = await board.getAttribute("data-state");
   if (boardState === "minimised") await openWindow(p1, "party.board");
   const boardBox = await board.boundingBox();
-  await expect(viewer).toBeVisible();
+  if ((await viewer.getAttribute("data-state")) === "minimised") {
+    await expect(viewer).toHaveAttribute("data-auto-minimised-for", "party.board");
+  } else {
+    await expect(viewer).toBeVisible();
+  }
 
   await p1.reload();
   await live(p1);

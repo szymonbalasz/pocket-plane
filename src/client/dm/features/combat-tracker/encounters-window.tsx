@@ -925,6 +925,7 @@ export const encountersWindow = defineWindow({
   // spot with `map.scenes` / `ent.creatures`, the second one opened goes to the next free slot.
   defaultSize: { w: 440, h: 512 },
   minSize: { w: 360, h: 320 },
+  usefulSize: { w: 440, h: 412 }, // FR-CBT-148: the editor's rows readable (FR-SHELL-79)
   defaultPosition: { anchor: "top-left", dx: 56 },
   launcher: { icon: SwordsIcon, label: "Encounters", order: 55 },
   component: EncountersBody,

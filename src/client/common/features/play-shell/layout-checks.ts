@@ -1,11 +1,19 @@
-// Registry-driven layout checks (FR-SHELL-45, -47, -50, -56–58, -62): pure geometry the clients'
-// layout tests run on their own registry at the reference viewports, and the brute-force oracle
-// for auto placement. Nothing here runs in the app.
+// Registry-driven layout checks (FR-SHELL-45, -47, -50, -56–58, -62, -77–79, -87): pure geometry
+// the clients' layout tests run on their own registry at the reference viewports, and the
+// brute-force oracle for auto placement. Nothing here runs in the app.
 import { MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import { renderedWindowRects } from "./free-area";
 import { EDGE_GAP, type Rect, type Viewport } from "./geometry";
 import { hardRects, keepOuts } from "./keep-outs";
-import { defaultLayout, isCovered, type ManagerContext, reduce, type Windows } from "./manager";
+import {
+  bandAt,
+  defaultLayout,
+  isReopenCovered,
+  type ManagerContext,
+  reduce,
+  useful,
+  type Windows,
+} from "./manager";
 import {
   fittedDefaultRect,
   type Placeable,
@@ -14,7 +22,8 @@ import {
   RAIL_CLEAR,
   usableArea,
 } from "./placement";
-import { defaultSizeAt, type WindowDef, type WindowRegistry } from "./registry";
+import { defaultSizeAt, type Size, type WindowDef, type WindowRegistry } from "./registry";
+import type { SizeRow } from "./size-table";
 
 /** The reference viewports of the named default layouts (FR-SHELL-50). */
 export const REFERENCE_VIEWPORTS: readonly Viewport[] = [
@@ -125,15 +134,19 @@ const grow = (r: Rect, m: number): Rect => ({
   h: r.h + 2 * m,
 });
 
-/** The window's heights and widths auto placement works with (placement.ts). */
-function sizesOf(def: Placeable, vp: Viewport, hard: readonly Rect[]) {
+/**
+ * The window's heights and widths auto placement works with (placement.ts); `floor`: its useful
+ * size (FR-SHELL-77 (a)), else every shrink down to the min size.
+ */
+function sizesOf(def: Placeable, vp: Viewport, hard: readonly Rect[], floor?: Size) {
   const base = fittedDefaultRect(def, vp, hard);
   const a = usableArea(vp);
   const fullH = Math.min(base.h, a.bottom - a.top);
-  const minH = Math.min(def.minSize.h, fullH);
+  const minH = Math.min(Math.max(def.minSize.h, floor?.h ?? 0), fullH);
   const openH = def.minOpenH === undefined ? null : Math.max(minH, Math.min(def.minOpenH, fullH));
   const minX = Math.max(a.left, Math.min(base.x, RAIL_CLEAR));
-  return { base, a, fullH, minH, openH, minX, w: base.w, minW: Math.min(def.minSize.w, base.w) };
+  const minW = Math.min(Math.max(def.minSize.w, floor?.w ?? 0), base.w);
+  return { base, a, fullH, minH, openH, minX, w: base.w, minW };
 }
 
 /**
@@ -187,8 +200,8 @@ const less = (a: readonly number[], b: readonly number[]) => {
  * full-width spot is clear (placement narrows a window to get off every token, or to stay clear
  * of windows before it parks one). Footprints count with the 12-px candidate gap.
  */
-export function bruteBest(def: Placeable, vp: Viewport, scene: PlaceScene): number[] {
-  const z = sizesOf(def, vp, scene.hard);
+export function bruteBest(def: Placeable, vp: Viewport, scene: PlaceScene, floor?: Size): number[] {
+  const z = sizesOf(def, vp, scene.hard, floor);
   const heights = [...new Set([z.fullH, z.minH, ...(z.openH === null ? [] : [z.openH])])];
   const fields = fieldsOf(def, vp, scene, EDGE_GAP);
   const free = (f: readonly number[]) => f[0] === 0 && f[1] === 0 && f[4] === 0;
@@ -234,6 +247,41 @@ export function bruteBest(def: Placeable, vp: Viewport, scene: PlaceScene): numb
   return best;
 }
 
+/** PC footprint (+ 4 px) area under `r` (FR-SHELL-77 (e)). */
+export function pcAreaOf(r: Rect, tokens: readonly PlacementToken[]): number {
+  let n = 0;
+  for (const p of pcBoxes(tokens)) {
+    n +=
+      Math.max(0, Math.min(r.x + r.w, p.x + p.w) - Math.max(r.x, p.x)) *
+      Math.max(0, Math.min(r.y + r.h, p.y + p.h) - Math.max(r.y, p.y));
+  }
+  return n;
+}
+
+/**
+ * FR-SHELL-87 (e)'s brute check of the last resort: the least PC footprint area any rect clear
+ * of the windows and hard regions reaches, at any size from the min to the full one, on a 16-px
+ * grid of the usable area (∞ when none is clear).
+ */
+export function brutePcArea(def: Placeable, vp: Viewport, scene: PlaceScene): number {
+  const z = sizesOf(def, vp, scene.hard);
+  const blocks = [...scene.windows, ...scene.hard].map((o) => grow(o, EDGE_GAP));
+  let best = Number.POSITIVE_INFINITY;
+  const hs = [...new Set([z.fullH, z.minH, ...(z.openH === null ? [] : [z.openH])])];
+  for (const cw of [...new Set([z.w, z.minW])]) {
+    for (const h of hs) {
+      for (let x = z.minX; x <= z.a.right - cw; x += 16) {
+        for (let y = z.a.top; y <= z.a.bottom - h; y += 16) {
+          const r = { x, y, w: cw, h };
+          if (blocks.some((o) => overlaps(r, o))) continue;
+          best = Math.min(best, pcAreaOf(r, scene.tokens));
+        }
+      }
+    }
+  }
+  return best;
+}
+
 /** One step of a layout sequence (FR-SHELL-62 (b)). */
 export interface LayoutStep {
   /** The pass: `open`, `reopen`, `reopen <w>×<h>`, `protected`. */
@@ -263,6 +311,73 @@ export interface LayoutRunOptions {
   tokensAt: (vp: Viewport, windows: readonly Rect[]) => PlacementToken[];
   /** The protected (default-open) kind closed and reopened at the end (FR-SHELL-56 (5)). */
   protectedKind: string;
+}
+
+/**
+ * FR-SHELL-87 (e) for one auto placement of `def` landing at `rect` in `scene` (the other shown
+ * windows after it, hard regions, tokens), `before` = the windows before the open, `parked` = the
+ * kinds it auto-minimised: the look-ahead brute-checked (every auto-minimisable window gone, the
+ * useful size); no PC under it and at least the useful size while that look-ahead succeeds;
+ * auto-minimising only then (or with the screen full) and always FR-SHELL-78's first; the brute
+ * check at the size it took; over PCs, the least PC area a clear spot can have.
+ */
+function autoPlaceProblems(
+  registry: WindowRegistry,
+  def: WindowDef,
+  vp: Viewport,
+  scene: PlaceScene,
+  before: Windows,
+  rect: Rect,
+  parked: readonly string[],
+  o: Pick<LayoutRunOptions, "available">,
+): string[] {
+  const out: string[] = [];
+  const floor = useful(def, vp, registry);
+  const z = sizesOf(def, vp, scene.hard);
+  const isOpen = (w: WindowState) => w.state === "open" && o.available.has(w.kind);
+  const others = before.filter((w) => isOpen(w) && w.kind !== def.kind);
+  const parkable = others.filter((w) => {
+    const d = registry.get(w.kind);
+    return d !== undefined && !d.defaultOpen && !d.fixedDefault;
+  });
+  const rectsOf = (list: Windows) =>
+    renderedWindowRects(list, registry, o.available, vp, new Map(), scene.hard);
+  const kept = rectsOf(others.filter((w) => !parkable.includes(w)));
+  const pcFree = pcAreaOf(rect, scene.tokens) === 0;
+  const atUseful = rect.h >= Math.min(floor.h, z.fullH) && rect.w >= floor.w;
+  // Accepted where it landed → accepted with every auto-minimisable window gone too (fewer
+  // windows only free room); else the brute look-ahead on the 16-px grid.
+  const accepted = pcFree && atUseful && placeFields(rect, def, vp, scene)[0] === 0;
+  const ahead = bruteBest(def, vp, { ...scene, windows: kept }, floor);
+  const aheadOk = accepted || (ahead[0] === 0 && ahead[1] === 0);
+  // (d'): the same at the min size (a shrunk PC-free spot once auto-minimised windows are gone).
+  const aheadMin = bruteBest(def, vp, { ...scene, windows: kept });
+  const aheadMinOk = pcFree || aheadOk || (aheadMin[0] === 0 && aheadMin[1] === 0);
+  if (aheadMinOk && !pcFree) out.push("over a PC while auto-minimising could clear it");
+  if (aheadOk && !atUseful) out.push(`below its useful size ${floor.w}×${floor.h}`);
+  if (parked.length > 0 && !aheadOk && !aheadMinOk) {
+    const full = bruteBest(def, vp, { ...scene, windows: rectsOf(others) })[0] === 1;
+    if (!full) out.push("auto-minimised though the look-ahead fails");
+  }
+  const at = new Map(before.map((w, i) => [w, i]));
+  const order = [...parkable]
+    .sort((a, b) => a.z - b.z || (at.get(a) ?? 0) - (at.get(b) ?? 0))
+    .map((w) => w.kind);
+  if (parked.join() !== order.slice(0, parked.length).join()) {
+    out.push(`auto-minimised ${parked.join()}, FR-SHELL-78 order ${order.join()}`);
+  }
+  if (pcFree) {
+    const got = placeFields(rect, def, vp, scene);
+    const best = bruteBest(def, vp, scene, atUseful ? floor : undefined);
+    if (best[0] === 0 && less(best, got)) {
+      out.push(`brute check: got ${got.join("")}, a spot gives ${best.join("")}`);
+    }
+  } else {
+    const least = brutePcArea(def, vp, scene);
+    const area = pcAreaOf(rect, scene.tokens);
+    if (area > least) out.push(`PC area ${area}, a clear spot covers ${least}`);
+  }
+  return out;
 }
 
 const sameRect = (a: Rect | null, b: Rect | null) =>
@@ -306,7 +421,7 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
     const cur = find(before, kind);
     const reopen = cur !== undefined && cur.state !== "open";
     const was = cur && reopen ? rectOf(cur) : null;
-    const covered = cur && reopen ? isCovered(before, cur, ctx()) : false;
+    const covered = cur && reopen ? isReopenCovered(before, cur, ctx()) : false;
     ws = reduce(ws, { type: "open", kind }, ctx());
     const after = find(ws, kind) as WindowState;
     const moved = !sameRect(was, rectOf(after));
@@ -337,10 +452,7 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
         });
         if (on && parkable) problems.push("on a window while a launcher window could be parked");
         const scene = { windows: rects, hard, tokens };
-        const got = placeFields(rect, def, vp, scene);
-        const best = bruteBest(def, vp, scene);
-        if (best[0] === 0 && less(best, got))
-          problems.push(`brute check: got ${got.join("")}, a spot gives ${best.join("")}`);
+        problems.push(...autoPlaceProblems(registry, def, vp, scene, before, rect, parked, o));
       }
     }
     steps.push({ step, vp, kind, rect, placed, parked, problems });
@@ -380,24 +492,76 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
 }
 
 /**
- * FR-SHELL-61 (1): what a new window type registers. Kinds allowed a taller min size (seams S3:
- * Preferences, it still fits the 412-px band above the Game log at 1280×720).
+ * FR-SHELL-61 (1), FR-SHELL-86 (2): a new window type's largest min size (320 × 280: Preferences
+ * set it, sprint 7 made it everyone's, seams S5).
  */
-export const CONTRACT_MIN_EXCEPTIONS: Readonly<Record<string, { w: number; h: number }>> = {
-  "shell.prefs": { w: 320, h: 280 },
-};
+export const CONTRACT_MIN = { w: 320, h: 280 } as const;
 
 /** FR-SHELL-61 (1): a new window type's breaches of the contract (empty = fine). */
 export function contractProblems(def: WindowDef): string[] {
   const out: string[] = [];
   if (def.defaultOpen) out.push("defaultOpen");
-  const min = CONTRACT_MIN_EXCEPTIONS[def.kind] ?? { w: 320, h: 240 };
-  if (def.minSize.w > min.w || def.minSize.h > min.h)
+  if (def.minSize.w > CONTRACT_MIN.w || def.minSize.h > CONTRACT_MIN.h)
     out.push(`min ${def.minSize.w}×${def.minSize.h}`);
   for (const vp of REFERENCE_VIEWPORTS) {
     const s = defaultSizeAt(def, vp);
     if (s.w > 440) out.push(`width ${s.w} at ${vp.w}×${vp.h}`);
-    if (s.h > 412 && (def.minOpenH ?? s.h) > 412) out.push(`height ${s.h} at ${vp.w}×${vp.h}`);
+    // FR-SHELL-86 (2): its default height, else its `usefulSize` / `minOpenH`, within the band.
+    const opens = def.usefulSize?.h ?? def.minOpenH ?? s.h;
+    if (s.h > 412 && opens > 412) out.push(`height ${s.h} at ${vp.w}×${vp.h}`);
+  }
+  return out;
+}
+
+// ---- sprint 7: the size table (FR-SHELL-85) ----
+
+const sz = (v: Size) => `${v.w}×${v.h}`;
+
+/**
+ * FR-SHELL-85: every registered kind (but `skip`) against its row of `rows` at the four reference
+ * sizes: the default size (fitted for a protected row), `useful(def, vp, client)` (null row = protected) and the min
+ * size; the client's band against `bands`; a row with no registered kind. Empty = matches.
+ */
+export function sizeTableProblems(
+  registry: WindowRegistry,
+  rows: Readonly<Record<string, SizeRow>>,
+  bands: readonly number[],
+  skip: ReadonlySet<string>,
+): string[] {
+  const out: string[] = [];
+  REFERENCE_VIEWPORTS.forEach((vp, i) => {
+    const band = bandAt(registry, vp);
+    if (band !== bands[i]) out.push(`band at ${vp.w}×${vp.h}: ${band}, table ${bands[i]}`);
+  });
+  for (const def of registry.defs) {
+    if (skip.has(def.kind)) continue;
+    const row = rows[def.kind];
+    if (!row) {
+      out.push(`${def.kind}: no row`);
+      continue;
+    }
+    REFERENCE_VIEWPORTS.forEach((vp, i) => {
+      const at = `${def.kind} at ${vp.w}×${vp.h}`;
+      // Protected rows hold what the default layout places (fitted, e.g. the player's sheet above
+      // the toast corner); the others the registered default size.
+      const hard = hardRects(keepOuts(registry.client, vp, new Map()));
+      const f = row.useful === null ? fittedDefaultRect(def, vp, hard) : defaultSizeAt(def, vp);
+      const want = row.default[i] as Size;
+      if (sz(f) !== sz(want)) out.push(`${at}: default ${sz(f)}, table ${sz(want)}`);
+      if (row.useful === null) {
+        if (!def.defaultOpen) out.push(`${at}: not protected, table has no useful size`);
+      } else {
+        const u = useful(def, vp, registry);
+        const w = row.useful[i] as Size;
+        if (sz(u) !== sz(w)) out.push(`${at}: useful ${sz(u)}, table ${sz(w)}`);
+      }
+    });
+    if (sz(def.minSize) !== sz(row.min)) {
+      out.push(`${def.kind}: min ${sz(def.minSize)}, table ${sz(row.min)}`);
+    }
+  }
+  for (const kind of Object.keys(rows)) {
+    if (!registry.get(kind)) out.push(`${kind}: a row with no registered kind`);
   }
   return out;
 }

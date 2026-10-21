@@ -8,11 +8,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| FU1 window frame | `fix/fu-frame` (ws w8R) | build-fu1 | U4 toast fix (walkthrough 5 / 7, U1 accepted #319) | gates → merge; then FU3, ST2 |
-| FU4 small copy | `fix/fu-small-copy` (ws w8T) | build-fu4 | walkthrough PASS (re-test) | branch gates → merge |
+| FU1 window frame | `fix/fu-frame` (ws w8R) | build-fu1 | walkthrough PASS (re-test U1, U4) | branch gates → main gates (FU4) → merge; then FU3, ST2 |
 | GM1 Inspiration reroll | `build/gems-reroll` (ws w8V) | build-gm1 | building | merges before ST-core |
 | ST-core | `fix/st-core` (ws w8W) | build-st-core | building | rebase on GM1, merge |
-| GM3 gems UI | `build/gems-sheet` (ws w8X) | build-gm3 | building | walkthrough → merge |
+| GM3 gems UI | `build/gems-sheet` (ws w8X) | build-gm3, test-gm3 | walkthrough | gates → merge |
 | Wave 3 | FU3 `fix/fu-map` (after FU1), ST2 `build/st-window` (after FU1 + ST-core), GM2 `build/gems-combat` (after GM1 + ST-core) | — | waiting | — |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):

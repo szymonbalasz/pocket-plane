@@ -28,10 +28,12 @@ import fog from "./fog";
 import fogScn from "./fog-scn";
 import fuS7 from "./fu-s7";
 import fuS7E2e from "./fu-s7-e2e";
+import fuSmallCopy from "./fu-small-copy";
 import furyLogLine from "./fury-log-line";
 import gems from "./gems";
 import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
+import gemsUiE2e from "./gems-ui-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
@@ -138,6 +140,8 @@ export const bundles: readonly Bundle[] = [
   // Sprint 6 track CP (build/cp-pets)
   cpPetsE2e,
   cpTokens,
+  // Sprint 7 track FU (fix/fu-small-copy)
+  fuSmallCopy,
   // Sprint 7 track FU (fix/fu-combat)
   fuS7,
   fuS7E2e,
@@ -149,4 +153,6 @@ export const bundles: readonly Bundle[] = [
   statsPast,
   stats,
   statsE2e,
+  // Sprint 7 track GM (build/gems-sheet)
+  gemsUiE2e,
 ];

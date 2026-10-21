@@ -177,9 +177,9 @@ describe("party-board fixtures (PARTY §13, FR-PARTY-28)", () => {
       ["New handout: Old Bounty", "all", null, { handoutId: mine[3]?.id }, "info"],
     ]);
     expect(notes(fixture).slice(-3)).toEqual([
-      "Party loot: Potion of healing ×2",
-      "Party loot: Torch ×10",
-      "Party loot: Rope (50 ft) ×1",
+      "Party inventory: Potion of healing ×2",
+      "Party inventory: Torch ×10",
+      "Party inventory: Rope (50 ft) ×1",
     ]);
 
     expect(r.handouts.filter((x) => x.campaignId === second).map((x) => x.title)).toEqual([
@@ -188,7 +188,7 @@ describe("party-board fixtures (PARTY §13, FR-PARTY-28)", () => {
     expect(r.items.filter((i) => i.campaignId === second).map((i) => i.name)).toEqual([
       SECOND_ITEM_NAME,
     ]);
-    expect(notes(second)).toContain(`Party loot: ${SECOND_ITEM_NAME} ×1`);
+    expect(notes(second)).toContain(`Party inventory: ${SECOND_ITEM_NAME} ×1`);
     expect(notes(second)).toContain(`New handout: ${SECOND_HANDOUT_TITLE}`);
   });
 

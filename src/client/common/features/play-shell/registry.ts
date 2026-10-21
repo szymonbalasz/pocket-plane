@@ -81,6 +81,12 @@ export interface WindowDef {
    * least, instead of shrinking to a free slot. Absent → it shrinks as usual (≥ min size).
    */
   minOpenH?: number;
+  /**
+   * Useful size, px (FR-SHELL-79): the smallest size auto placement opens the window at while
+   * auto-minimising another window can make room (FR-SHELL-77). Absent → the fitted default
+   * width and `minOpenH`, else the default height up to 360; capped by the client's band.
+   */
+  usefulSize?: Size;
   /** No entry = no launcher button (open via `openWindow` only). */
   launcher?: LauncherEntry;
   /** Read from the synced store; false → not rendered, not in the launcher, saved state kept. */

@@ -11,8 +11,11 @@ const cut = (s: string) => (s.length > TEXT_MAX ? `${s.slice(0, TEXT_MAX - 1)}�
 /** FR-PARTY-06: "New handout: ‹title›", cut to 280. */
 export const handoutSharedText = (title: string) => cut(`New handout: ${title}`);
 
-/** FR-PARTY-19: "Party loot: ‹name› ×‹qty›", cut to 280. */
-export const itemAddedText = (name: string, qty: number) => cut(`Party loot: ${name} ×${qty}`);
+/**
+ * FR-PARTY-19, FR-PARTY-49 (BL-48: an item said "Party loot:"): "Party inventory: ‹name› ×‹qty›",
+ * cut to 280. Coin and loot entries keep FR-LOOT-13's "Party loot: …".
+ */
+export const itemAddedText = (name: string, qty: number) => cut(`Party inventory: ${name} ×${qty}`);
 
 /** FR-PARTY-25 end label: "Party", "Outside the party", or the character's name. */
 export function endLabel(end: Endpoint, characterName: (id: string) => string): string {

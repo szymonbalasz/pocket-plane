@@ -103,7 +103,8 @@ test("FR-LOOT-22 FR-PARTY-30 Open goes to the Loot tab (Party closed, minimised,
 
   // Open on Handouts → switches to Loot.
   await tab(board, "handouts").click();
-  await expect(board.getByTestId("loot-log")).toHaveCount(0);
+  // FR-PARTY-50: a visited tab stays mounted, hidden.
+  await expect(board.getByTestId("loot-log")).toBeHidden();
   await open();
   await expectOnLoot(p2);
 

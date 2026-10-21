@@ -86,3 +86,32 @@ describe("FR-DICEX-28 notation parser", () => {
 
   // "a 4,000-char note parses in < 1 ms": ./notation.bench.ts (`bun run bench`).
 });
+
+/** FR-DICE-78's rule: no space after "(", before ")", doubled, leading or trailing. */
+const strays = (t: string) =>
+  [/\( /, / \)/, / {2}/, /^\s/, /\s$/].filter((r) => r.test(t)).map(String);
+
+describe("FR-DICEX-63 notation spacing", () => {
+  test("FR-DICEX-63 notation spacing: staged expressions have no spaces; split text keeps the text as written", () => {
+    const texts = [
+      "Sneak Attack (3d6) on a hit",
+      "Hit: 7 (2d6 + 3) slashing",
+      "( 1d8 + 2 ) fire",
+      "Deals 1d20 − 2 or 2d4+1d6",
+    ];
+    for (const text of texts) {
+      for (const m of findNotation(text)) {
+        expect([m.expression, /\s/.test(m.expression)]).toEqual([m.expression, false]);
+        expect(strays(m.expression)).toEqual([]);
+      }
+      // The text around a match is the author's, untouched (no joiner adds or drops a space).
+      expect(
+        splitNotation(text)
+          .map((p) => p.text)
+          .join(""),
+      ).toBe(text);
+    }
+    expect(findNotation("Sneak Attack (3d6) on a hit").map((m) => m.expression)).toEqual(["3d6"]);
+    expect(findNotation("Hit: 7 (2d6 + 3) slashing").map((m) => m.expression)).toEqual(["2d6+3"]);
+  });
+});

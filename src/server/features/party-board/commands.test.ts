@@ -486,7 +486,7 @@ describe("party inventory core (FR-PARTY-17–19, 25)", () => {
       expect.objectContaining({
         kind: "loot-received",
         audience: "all",
-        text: "Party loot: Potion of healing ×2",
+        text: "Party inventory: Potion of healing ×2",
         payload: { entryId: entry.id },
       }),
     ]);
