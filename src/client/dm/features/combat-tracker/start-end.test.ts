@@ -136,16 +136,38 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
 
   test("FR-CBT-60 own Start ack → settle (one layout frame) before any window changes", async () => {
     const f = fx();
-    let settled = false;
+    let settled = 0;
     await startAndFollow(async () => null, {
       ...f,
       settle: async () => {
-        expect(f.actions).toEqual([]);
-        settled = true;
+        if (settled === 0) expect(f.actions).toEqual([]);
+        settled += 1;
       },
     });
-    expect(settled).toBe(true);
+    expect(settled).toBe(2);
     expect(f.actions.length).toBe(2);
+  });
+
+  test("FR-CBT-150 Initiative settles before the refit: noteAppearance() after Initiative opened and its grown height was reported (the second settle), once", async () => {
+    const f = fx();
+    const log: string[] = [];
+    await startAndFollow(async () => null, {
+      dispatch: (a) => {
+        f.dispatch(a);
+        log.push(a.type);
+      },
+      noteAppearance: () => {
+        f.noteAppearance();
+        log.push("appearance");
+      },
+      // A fake layout frame: after the open, the frame lays out Initiative's rows and reports
+      // its grown height.
+      settle: async () => {
+        log.push(f.actions.length === 0 ? "settle" : "grown height reported");
+      },
+    });
+    expect(log).toEqual(["settle", "minimise", "open", "grown height reported", "appearance"]);
+    expect(f.appearances()).toBe(1);
   });
 
   test("FR-SHELL-40 / FR-SHELL-41 M8 at 1280×720: Initiative's rows need 302 px; placed at Start, its rendered (grown) rect overlaps no open window", async () => {

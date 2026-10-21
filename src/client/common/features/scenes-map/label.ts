@@ -98,6 +98,11 @@ export interface BadgeIn {
   tone?: BadgeTone;
   /** Always an icon chip, even where its text would fit (FR-MAP-76's paw). */
   compact?: boolean;
+  /**
+   * FR-MAP-88: drawn first and kept before the "+N" (the companion paw): it never folds into
+   * "+N" while it fits the row on its own.
+   */
+  priority?: boolean;
 }
 
 /** The "+N"'s tone: the most severe hidden one, so a hidden Dying keeps its danger colour. */
@@ -164,7 +169,9 @@ function squeeze(
   const lead = { id: first.id, text: "", x: 0, y: (h - chip) / 2, width: chip, height: chip };
   if (rest.length === 0) return [{ ...lead, compact: true }];
   const plus = more(rest);
-  if (chip + gap + plus.width > side) return [more(badges)];
+  // FR-MAP-88: a priority badge (the companion paw) beats the "+N" when both don't fit.
+  if (chip + gap + plus.width > side)
+    return first.priority ? [{ ...lead, compact: true }] : [more(badges)];
   return [
     { ...lead, compact: true },
     { ...plus, x: chip + gap },
@@ -181,17 +188,21 @@ function squeeze(
  * footprint's top edge); what doesn't fit collapses into a last "+N" badge, in the most severe
  * tone it hides (a hidden Dying keeps the danger colour). BL-35: with room for
  * one row and only "+N" left in it, the first badge stays as an icon chip if both fit; with room
- * for none, the badges squeeze into one smaller row centred between the two names.
+ * for none, the badges squeeze into one smaller row centred between the two names. FR-MAP-88: a
+ * `priority` badge (the companion paw) goes first and, where only one of it and the "+N" fits,
+ * stays alone.
  */
 export function labelRow(
   name: string,
-  badges: readonly BadgeIn[],
+  given: readonly BadgeIn[],
   side: number,
   cell: number,
   scale: number,
   measure: Measure,
   nameMax = 2 * side,
 ): LabelRow {
+  // FR-MAP-88: priority badges (the companion paw) first, so the "+N" takes the others.
+  const badges = [...given.filter((b) => b.priority), ...given.filter((b) => !b.priority)];
   const m = labelMetrics(cell, scale);
   const { text, width: nameW } = namePill(name, nameMax, m, measure);
   const y = side - m.pillH / 2;
@@ -272,7 +283,8 @@ export function labelRow(
   // row) beside a "+N" for the rest, if both fit the footprint.
   if (fit === 1 && out.length === 1 && out[0]?.id === MORE_BADGE_ID && badges.length > 1) {
     const sq = squeeze(badges, side, m.pillH, Math.min(chip, m.pillH), measure);
-    if (sq.length === 2) {
+    // FR-MAP-88: or the priority badge alone, where it and the "+N" don't both fit.
+    if (sq.length === 2 || sq[0]?.id !== MORE_BADGE_ID) {
       const w = sq.reduce((n, b) => Math.max(n, b.x + b.width), 0);
       const by = y - (m.pillH + m.gap);
       return result(sq.map((b) => ({ ...b, x: b.x + (side - w) / 2, y: b.y + by })));

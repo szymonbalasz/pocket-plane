@@ -296,6 +296,12 @@ export interface FreeAreaState {
   toastFreeAreas: readonly Rect[];
   /** The fit's obstacles now (`fitObstacles`), screen px. */
   obstacles: readonly Rect[];
+  /**
+   * FR-MAP-91: the same room with the DM's shown stack left out (only the summary strip); the Fit
+   * takes it when keeping the shown card toasts clear costs more than a quarter of the cell size.
+   * Players: `toastFreeAreas` and `obstacles` as they are.
+   */
+  stripOnly: { areas: readonly Rect[]; obstacles: readonly Rect[] };
   /** Grows by one per appearance; compare with a previous value, never read as a total. */
   appearances: number;
   /** Grows by one per `requestFit` (FR-SHELL-80); compare with a previous value. */
@@ -314,7 +320,7 @@ export function useFreeArea(): FreeAreaState {
   const measured = useContentHeights();
   const regions = useKeepOuts(registry.client);
   const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
-  const { area, areas, toastFreeAreas, obstacles } = useMemo(() => {
+  const { area, areas, toastFreeAreas, obstacles, stripOnly } = useMemo(() => {
     const shown = renderedWindowRects(
       windows,
       registry,
@@ -325,11 +331,17 @@ export function useFreeArea(): FreeAreaState {
     );
     const client = registry.client;
     const obstacles = fitObstacles(client, shown, regions, vp, shownStack(client, reports));
+    const toastFreeAreas = freeAreas(obstacles, vp);
+    const strip = fitObstacles(client, shown, regions, vp, null);
     return {
       area: freeArea(shown, vp),
       areas: freeAreas(shown, vp),
-      toastFreeAreas: freeAreas(obstacles, vp),
+      toastFreeAreas,
       obstacles,
+      stripOnly:
+        strip.length === obstacles.length
+          ? { areas: toastFreeAreas, obstacles }
+          : { areas: freeAreas(strip, vp), obstacles: strip },
     };
   }, [windows, registry, available, vp, measured, regions, reports]);
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
@@ -348,6 +360,7 @@ export function useFreeArea(): FreeAreaState {
     areas,
     toastFreeAreas,
     obstacles,
+    stripOnly,
     appearances: flips + notedNow,
     fitRequests: fitsNow,
     ready: key !== null,

@@ -1,5 +1,6 @@
 // FR-MAP-59 perf gate: `fitVisible` on the named worst case (scenes-map §12) best of 5 ≤ 25 ms;
-// FR-MAP-81: `pcsPan` on its worst bounded case (36 tokens × 6 obstacles at 1280×720), same budget.
+// FR-MAP-81: `pcsPan` on its worst bounded case (36 tokens × 6 obstacles at 1280×720), same budget;
+// FR-MAP-90: `pcsPan` past the obstacle bound with no PC-clear pan (the least-covered sweep).
 // Run alone via `bun run bench`; the fit asserts stay in ./camera.test.ts.
 import { describe, expect, test } from "bun:test";
 import { best, GATE_TIMEOUT } from "@shared/bench-kit";
@@ -90,6 +91,42 @@ describe("FR-MAP-81 helper", () => {
       expect(r).not.toBeNull();
       const ms = await best(() => pcsPan(tokens, obstacles, area, view, from, cell), 25, 5, 1);
       console.log(`FR-MAP-81 pcsPan worst bounded case: best of 5 ${ms.toFixed(2)} ms`);
+      expect(ms).toBeLessThanOrEqual(25);
+    },
+    GATE_TIMEOUT,
+  );
+});
+
+/**
+ * FR-MAP-90's worst `pcsPan` case at 1280×720: FR-MAP-81's 36 tokens, 8 obstacles in the area: 3
+ * full-width bars leaving 90-px rows (the PCs' 3 × 2 block is 96 px tall at 48 px), 3 full-height
+ * bars, 2 small boxes in a far corner; the bound takes the 6 bars and no pan keeps every PC clear,
+ * so the least-covered sweep runs.
+ */
+function worstLeastCoveredCase() {
+  const { tokens, view, area, cell } = worstPcsCase();
+  const bar = (area.h - 4 * 90) / 3;
+  const obstacles = [
+    ...[0, 1, 2].map((k) => ({ x: area.x, y: area.y + 90 + k * (90 + bar), w: area.w, h: bar })),
+    ...[1, 2, 3].map((k) => ({ x: area.x + (k * area.w) / 4, y: area.y, w: 20, h: area.h })),
+    { x: area.x + area.w - 30, y: area.y + area.h - 30, w: 10, h: 10 },
+    { x: area.x + area.w - 15, y: area.y + area.h - 15, w: 10, h: 10 },
+  ];
+  return { tokens, obstacles, view, area, cell };
+}
+
+describe("FR-MAP-90 helper", () => {
+  test(
+    "FR-MAP-90 perf: pcsPan past the bound with no PC-clear pan (36 tokens, 8 obstacles, 1280×720) best of 5 ≤ 25 ms",
+    async () => {
+      const { tokens, obstacles, view, area, cell } = worstLeastCoveredCase();
+      const from = { x: 100, y: 0 };
+      const r = pcsPan(tokens, obstacles, area, view, from, cell);
+      expect(r).not.toBeNull();
+      const pcs = tokens.filter((t) => t.pc);
+      expect(r && allClear(r, pcs, obstacles, area)).toBe(false);
+      const ms = await best(() => pcsPan(tokens, obstacles, area, view, from, cell), 25, 5, 1);
+      console.log(`FR-MAP-90 pcsPan least-covered case: best of 5 ${ms.toFixed(2)} ms`);
       expect(ms).toBeLessThanOrEqual(25);
     },
     GATE_TIMEOUT,
