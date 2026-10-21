@@ -2299,3 +2299,20 @@ From [stats](../specs/stats.md#8-data-model) FR-STATS-17–20, -22, -24 and [pla
 - **Derived (client, not stored):** nothing aggregated; the window shows the `stats.query` ack as is. Picker labels ("Tue 20 Oct · 19:02–23:41 · 3 fights", "Today") from the ack's `from` / `to` / `fights` in browser local time.
 - **Client view state (page memory, never sent or stored):** per viewer (`<campaignId>.<dm | playerId>`) `{tab: "fight" | "session", fightKey: string | null, sessionFromN: number | null}` (null = the server's default fight / the newest session); the overkill toast's toasted line ids (≤ 200).
 - **Persisted runtime state:** none; the layout entry of `stats.board` follows play-shell's per-browser layout (FR-SHELL-17).
+
+## 105. Sprint 7: Combat gem (GM2)
+
+From [gems](../specs/gems.md#8-data-model) FR-GEM-25–31 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-128, -131, -133, -135 (#140, #315). **Built by `build/gems-combat`**. Protocol side: [protocol §134](../protocol/README.md#134-sprint-7-combat-gem-gm2). **No table or column change.**
+
+| Field | Change | Rule | Source |
+|---|---|---|---|
+| `roll.replaces_roll_id` | also written by a Combat gem | the maxed part's new row names the row it replaced (picked dice at their faces, every other die and the constant copied) | FR-CBT-128 |
+| `damage-card` payload `damage.maxed?`, `damage.extra[i].maxed?` | new optional int[] 1–3 | indices into that part's `dice`, ascending; a gems trace | FR-CBT-128, -131 |
+| `damage-card` payload `diceMaxed?` | new optional `true` | the damage was maxed once; a crit flip clears it with the moved damage (FR-CBT-127) | FR-CBT-128 |
+| `cbt.attack` `dmPayload.rolls.damage.maxed?`, `rolls.extra[i].maxed?` | new optional int[] 1–3 | copied from the card at apply; the DM's chips read `max`; a gems trace | FR-CBT-131 |
+| `gem.spend` payload `target?`, `dice?`, `dmPayload` | `target.kind` + `"card"` (`label` = attack name, `from` / `to` = the card's damage before / after); new `dice? [{part?, faces, from, to}]` ≤ 3; `dmPayload {target, dice?}` | the card's audience (owner's card → payload; DM-made card or hidden attacker → `dmPayload`) | FR-GEM-13, -30 |
+| `hp_change.roll_ids` | lists the maxed parts' new rows | apply reads the card's current rows | FR-CBT-133 |
+
+- **Derived (not stored):** the picker's dice faces (from the roll's log line); the level limit (`statBlock.level`: 1 / 2 / 3 dice at 1–5 / 6–11 / 12+).
+- **Fixtures:** no new unit; e2e alias `gems-combat-e2e` on `gems`.
+- **CON-44:** 29 B a maxed card (33 B with 3 dice); 20 pending maxed → DM +580 B, players +87…+116 B (own cards only); 0 B without a Combat gem.

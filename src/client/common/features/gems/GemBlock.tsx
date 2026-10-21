@@ -43,7 +43,7 @@ import {
 } from "./model";
 
 /** One gem intent in flight; a reject shows inline (`gem-error`). */
-function useGemIntent() {
+export function useGemIntent() {
   const connection = useSync((s) => s.connection);
   const live = useSync((s) => s.state === "live");
   const [busy, setBusy] = useState(false);

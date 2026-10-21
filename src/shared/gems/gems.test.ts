@@ -6,6 +6,8 @@ import { getLogKind } from "@shared/dice-roll-log/kinds";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import { gemsPhrase } from "./log-kinds";
 import {
+  combatDiceLevel,
+  combatDiceLimit,
   GemAdjustInput,
   GemSpendInput,
   LOG_KIND_GEM_AWARD,
@@ -38,7 +40,7 @@ describe("gems schemas and lines (GEM §6)", () => {
     expect(spend({ gem: "fortune", use: "bonus" })).toBe(false);
     expect(spend({ gem: "inspiration" })).toBe(true);
     expect(spend({ gem: "divine" })).toBe(true);
-    // The Combat gem needs a card (GM2). GM1: `entryId` on Inspiration only; `manual` with it.
+    // The Combat gem needs a card and dice (GM2). GM1: `entryId` on Inspiration only; `manual` with it.
     expect(spend({ gem: "combat" })).toBe(false);
     expect(spend({ gem: "inspiration", entryId: "e1" })).toBe(true);
     expect(spend({ gem: "inspiration", entryId: "e1", manual: { diceTotal: 17 } })).toBe(true);
@@ -65,6 +67,60 @@ describe("gems schemas and lines (GEM §6)", () => {
     );
     // No target at all: the plain spend (OQ-GEM-06 A).
     expect(full({})).toBe("Mira spends an Inspiration gem — to recall");
+  });
+
+  test("FR-GEM-26 levels: 1 die at 1–5, 2 at 6–11, 3 at 12+", () => {
+    expect([1, 5, 6, 11, 12, 20].map(combatDiceLimit)).toEqual([1, 1, 2, 2, 3, 3]);
+    expect([1, 2, 3].map(combatDiceLevel)).toEqual([1, 6, 12]);
+  });
+
+  test("FR-GEM-25 FR-GEM-27 FR-GEM-28 combat input: a card + 1–3 dice (base or an extra part); `known` per part; only Combat", () => {
+    const spend = (v: object) =>
+      GemSpendInput.safeParse({ characterId: "c", gem: "combat", cardId: "k", ...v }).success;
+    const die = { part: "base", index: 0 };
+    expect(spend({ dice: [die] })).toBe(true);
+    expect(spend({ dice: [die, { part: 0, index: 1 }, { part: 1, index: 0 }] })).toBe(true);
+    expect(spend({ dice: [] })).toBe(false);
+    expect(spend({ dice: [die, die, die, die] })).toBe(false);
+    expect(spend({ dice: [{ part: "mods", index: 0 }] })).toBe(false);
+    expect(spend({ dice: [{ part: "triggers", index: 0 }] })).toBe(false);
+    expect(spend({ dice: [die], known: [{ part: "base", dice: [3, 5] }] })).toBe(true);
+    expect(spend({ dice: [die], known: [{ part: "base", dice: [0] }] })).toBe(false);
+    expect(spend({})).toBe(false);
+    const other = (v: object) => GemSpendInput.safeParse({ characterId: "c", ...v }).success;
+    expect(other({ gem: "fortune", cardId: "k", dice: [die] })).toBe(false);
+    expect(other({ gem: "inspiration", entryId: "e", known: [{ part: "base", dice: [3] }] })).toBe(
+      false,
+    );
+  });
+
+  test("FR-GEM-30 line wording: 'Mira spends a Combat gem — Light crossbow: d8 3 → 8 (rolled 7 → 12)'; parts named by type when > 1; DM-only card → no detail for players", () => {
+    const target = { kind: "card", id: "k", label: "Light crossbow", from: 7, to: 12 };
+    const full = (payload: object, dmPayload?: object) =>
+      lineText(
+        formatEntry({
+          kind: LOG_KIND_GEM_SPEND,
+          actorName: "Mira",
+          payload: { characterId: "c", gem: "combat", count: 1, ...payload },
+          ...(dmPayload ? { dmPayload } : {}),
+        }).segments,
+      );
+    const d8 = { faces: 8, from: 3, to: 8 };
+    expect(full({ target, dice: [d8] })).toBe(
+      "Mira spends a Combat gem — Light crossbow: d8 3 → 8 (rolled 7 → 12)",
+    );
+    const flame = { ...target, label: "Flame Tongue greatsword", from: 14, to: 22 };
+    const two = [
+      { part: "slashing", faces: 6, from: 2, to: 6 },
+      { part: "fire", faces: 6, from: 2, to: 6 },
+    ];
+    expect(full({ target: flame, dice: two })).toBe(
+      "Mira spends a Combat gem — Flame Tongue greatsword: slashing d6 2 → 6, fire d6 2 → 6 (rolled 14 → 22)",
+    );
+    expect(full({ target: null })).toBe("Mira spends a Combat gem");
+    expect(full({ target: null }, { target, dice: [d8] })).toBe(
+      "Mira spends a Combat gem — Light crossbow: d8 3 → 8 (rolled 7 → 12)",
+    );
   });
 
   test("FR-GEM-09 award line wording", () => {

@@ -4,6 +4,7 @@
 // Payload: a crit card with non-ASCII names passes the 1 KB default: 4 KB (#163). End rule:
 // dismissed when its encounter ends (FR-CBT-59). Closing (sprint 5): a dismissal sends the
 // card's hit-ruling delete (`onClose`, FR-CBT-91).
+import { GEMS_FEATURE } from "@shared/campaign-management/features";
 import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import {
@@ -15,7 +16,8 @@ import {
   DamageCardTargetsResolution,
 } from "@shared/combat-tracker/schemas";
 import { withOffersText } from "@shared/effect-modifiers/combat-parts";
-import { jsonBytes, TEXT_MAX } from "@shared/notifications/schemas";
+import { jsonBytes, type NotificationRecord, TEXT_MAX } from "@shared/notifications/schemas";
+import type { FeatureTrace } from "../../ws/records";
 import type { Roll } from "../dice-roll-log";
 import { defineNotificationKind } from "../notifications/kind";
 import { hitRulingChange, rulingOfCard } from "./rows";
@@ -39,7 +41,33 @@ export const damageCardKind = defineNotificationKind({
     const ruling = rulingOfCard(env.tx, row.id);
     return ruling ? [hitRulingChange(ruling, null)] : [];
   },
+  // FR-GEM-05 / FR-CBT-131 (sprint 7, OQ-GEM-21 B): gems off → no `maxed` / `diceMaxed`.
+  traces: [gemsCardTrace()],
 });
+
+/**
+ * FR-GEM-05 / FR-CBT-131 (ADR-0058): while gems are off a damage card loses its maxed marks (the
+ * dice and totals stay: the maxed values are the final roll). Pure; the same row when unmarked.
+ */
+export function gemsCardTrace(): FeatureTrace<NotificationRecord> {
+  return {
+    feature: GEMS_FEATURE,
+    strip(r) {
+      const p = r.payload as {
+        diceMaxed?: true;
+        damage?: { maxed?: number[]; extra?: { maxed?: number[] }[] } | null;
+      } | null;
+      if (!p?.diceMaxed) return r;
+      const { diceMaxed: _x, ...rest } = p;
+      const { maxed: _m, ...damage } = p.damage ?? {};
+      const extra = p.damage?.extra?.map(({ maxed: _e, ...x }) => x);
+      return {
+        ...r,
+        payload: { ...rest, damage: p.damage ? { ...damage, ...(extra ? { extra } : {}) } : null },
+      };
+    },
+  };
+}
 
 /**
  * The card's text from its payload (FR-CBT-18, -57, -70, -71): full "Mira: 15 to hit, 6

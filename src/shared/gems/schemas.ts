@@ -1,5 +1,6 @@
 // gems boundary schemas (GEM §8, §9): the `character-gems` record, the `gem.*` intents and the
 // gem names. Everything here is tagged with the `gems` feature (ADR-0058): off = nothing reaches anyone.
+import { CardDiePick, CardKnownDice, MAX_DICE_PICKS } from "@shared/combat-tracker/schemas";
 import { ManualEntry } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 
@@ -69,8 +70,9 @@ export const ACTION_COST: Record<ActionUse, number> = { bonus: 1, reaction: 1, a
  * FR-GEM-12: `gem.spend`, the plain spends (GM0): Fortune, Divine Knowledge, Action (`use`
  * required) and Inspiration "to recall" (OQ-GEM-06 A; no `entryId`). FR-GEM-18 (GM1): the
  * Inspiration reroll names the log line (`entryId`); physical mode sends the new d20(s) as
- * `manual` (FR-GEM-21, OQ-GEM-13 A; adv / dis: both dice). The Combat gem (`cardId`, `dice`,
- * `known`) extends it later.
+ * `manual` (FR-GEM-21, OQ-GEM-13 A; adv / dis: both dice). FR-GEM-25 (GM2): the Combat gem
+ * names a pending damage card (`cardId`) and 1–3 of its weapon dice (`dice`); a part entered as a
+ * physical total sends its per-die values first (`known`, FR-GEM-28).
  */
 export const GemSpendInput = z
   .strictObject({
@@ -79,6 +81,9 @@ export const GemSpendInput = z
     use: ActionUse.optional(),
     entryId: Id.optional(),
     manual: ManualEntry.optional(),
+    cardId: Id.optional(),
+    dice: z.array(CardDiePick).min(1).max(MAX_DICE_PICKS).optional(),
+    known: z.array(CardKnownDice).min(1).max(MAX_DICE_PICKS).optional(),
   })
   .superRefine((v, ctx) => {
     if (v.gem === "action" && v.use === undefined) {
@@ -101,11 +106,18 @@ export const GemSpendInput = z
         message: "Physical dice need a line to reroll",
       });
     }
-    if (v.gem === "combat") {
+    if (v.gem === "combat" && (v.cardId === undefined || v.dice === undefined)) {
       ctx.addIssue({
         code: "custom",
-        path: ["gem"],
+        path: ["cardId"],
         message: "A Combat gem goes on a damage card",
+      });
+    }
+    if (v.gem !== "combat" && (v.cardId ?? v.dice ?? v.known) !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cardId"],
+        message: "Only Combat gems max dice",
       });
     }
   });
@@ -121,3 +133,9 @@ export type GemSpendResult = z.infer<typeof GemSpendResult>;
 /** FR-GEM-12, -16: gems a spend costs. */
 export const spendCost = (gem: GemKind, use?: ActionUse): number =>
   gem === "action" && use ? ACTION_COST[use] : 1;
+
+/** FR-GEM-26: dice a Combat gem maxes at this level: 1 at 1–5, 2 at 6–11, 3 at 12+. */
+export const combatDiceLimit = (level: number): number => (level >= 12 ? 3 : level >= 6 ? 2 : 1);
+
+/** FR-GEM-26: the level a count of dice needs ("Level 6 needed for 2 dice"). */
+export const combatDiceLevel = (count: number): number => (count >= 3 ? 12 : count === 2 ? 6 : 1);

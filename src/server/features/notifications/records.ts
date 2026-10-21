@@ -1,4 +1,5 @@
 // Record type `notification` (FR-NOTE-01/06/12, protocol §20): campaign scope, full or hidden,
+// kinds' feature traces stripped while the feature is off (ADR-0058, sprint 7),
 // windowed snapshot = every pending row + the newest 100 closed rows
 // (ADR-0029), both cut in SQL so build time doesn't grow with history.
 import {
@@ -10,7 +11,7 @@ import { and, desc, eq, ne } from "drizzle-orm";
 import { notification } from "../../db/schema";
 import type { Logger } from "../../log";
 import { defineRecordType } from "../../ws/records";
-import { NOTIFICATION_TYPE, toNotificationRecord } from "./helpers";
+import { NOTIFICATION_TYPE, notificationKindOf, toNotificationRecord } from "./helpers";
 
 /** NOTE §12: more pending rows than this in a snapshot → server warning. */
 export const PENDING_WARN = 100;
@@ -21,6 +22,8 @@ export function notificationRecordType(log: Logger) {
     schema: NotificationRecord,
     idOf: (r) => r.id,
     campaignOf: (r) => r.campaignId,
+    // ADR-0058 (sprint 7): a kind's declared traces (gems' maxed dice on damage cards).
+    tracesOf: (r) => notificationKindOf(r.kind)?.traces ?? [],
     visibility: (r, v) =>
       notificationVisibleTo(r, { role: v.role, playerId: v.playerId }) ? "full" : "hidden",
     // Every pending row + the newest 100 closed, oldest first. Viewer-independent

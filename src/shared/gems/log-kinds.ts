@@ -2,6 +2,7 @@
 // `gems` feature (FR-DICE-69): while gems are off no viewer receives them. The entry's actor is the
 // character; lines are public (OQ-GEM-02 A, OQ-GEM-10 A).
 import { GEMS_FEATURE } from "@shared/campaign-management/features";
+import { MAX_DICE_PICKS } from "@shared/combat-tracker/schemas";
 import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-types";
 import { LABEL_MAX } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
@@ -25,10 +26,11 @@ export type GemAwardPayload = z.infer<typeof GemAwardPayload>;
 
 /**
  * GEM §8: what a spend went on: `entry` = a rerolled log line (FR-GEM-19: its label and old total
- * `from`; `to` = the new total when the line states it). The Combat gem adds `card` (GM2).
+ * `from`; `to` = the new total when the line states it); `card` = a damage card a Combat gem
+ * maxed (FR-GEM-30: the attack's name, the damage rolled before and after).
  */
 export const GemSpendTarget = z.strictObject({
-  kind: z.enum(["entry"]),
+  kind: z.enum(["entry", "card"]),
   id: z.string(),
   label: z.string().max(LABEL_MAX),
   from: z.int(),
@@ -37,7 +39,20 @@ export const GemSpendTarget = z.strictObject({
 export type GemSpendTarget = z.infer<typeof GemSpendTarget>;
 
 /**
- * FR-GEM-13 (rulings-a #1): `target` takes the target's audience. A public target → here; a
+ * FR-GEM-30: one die a Combat gem maxed: "d8 3 → 8"; `part` names its damage type when the card
+ * has more than one part ("fire d6 2 → 6").
+ */
+export const GemSpendDie = z.strictObject({
+  part: z.string().min(1).max(20).optional(),
+  faces: z.int().min(2).max(1000),
+  from: z.int(),
+  to: z.int(),
+});
+export type GemSpendDie = z.infer<typeof GemSpendDie>;
+const SpendDice = z.array(GemSpendDie).min(1).max(MAX_DICE_PICKS);
+
+/**
+ * FR-GEM-13 (rulings-a #1): `target` (and a Combat gem's `dice`) take the target's audience. A public target → here; a
  * DM-only target (a hidden roll) → `null` here and the detail in `dmPayload`, so the public line
  * is just "Mira spends an Inspiration gem".
  */
@@ -47,11 +62,15 @@ export const GemSpendPayload = z.strictObject({
   count: z.int().min(1).max(3),
   use: ActionUse.optional(),
   target: GemSpendTarget.nullable().optional(),
+  dice: SpendDice.optional(),
 });
 export type GemSpendPayload = z.infer<typeof GemSpendPayload>;
 
 /** FR-GEM-13: a DM-only target's detail (the DM's line reads it). */
-export const GemSpendDmPayload = z.strictObject({ target: GemSpendTarget });
+export const GemSpendDmPayload = z.strictObject({
+  target: GemSpendTarget,
+  dice: SpendDice.optional(),
+});
 export type GemSpendDmPayload = z.infer<typeof GemSpendDmPayload>;
 
 /** "an Inspiration gem" / "a Fortune gem" / "2 Action gems". */
@@ -97,8 +116,17 @@ export const gemAwardKind = defineLogKind<GemAwardPayload>({
   },
 });
 
-/** FR-GEM-19: "rerolls Perception (4)". */
-export const targetText = (t: GemSpendTarget): string => `rerolls ${t.label} (${t.from})`;
+/**
+ * FR-GEM-19: "rerolls Perception (4)". FR-GEM-30: "Light crossbow: d8 3 → 8 (rolled 7 → 12)":
+ * "rolled" because the DM may still apply a typed value (OQ-CBT-87 A).
+ */
+export function targetText(t: GemSpendTarget, dice?: readonly GemSpendDie[]): string {
+  if (t.kind === "entry") return `rerolls ${t.label} (${t.from})`;
+  const each = (dice ?? [])
+    .map((d) => `${d.part ? `${d.part} ` : ""}d${d.faces} ${d.from} → ${d.to}`)
+    .join(", ");
+  return `${t.label}: ${each} (rolled ${t.from} → ${t.to ?? t.from})`;
+}
 
 /**
  * FR-GEM-14–16: "Brakka spends 2 Action gems — a full action"; FR-GEM-19: "Mira spends an
@@ -110,8 +138,13 @@ export const gemSpendKind = defineLogKind<GemSpendPayload, GemSpendDmPayload>({
   payload: GemSpendPayload,
   dmPayload: GemSpendDmPayload,
   formatLine({ actorName, payload: p, dmPayload }) {
-    const target = dmPayload?.target ?? p.target;
-    const purpose = target ? targetText(target) : target === null ? null : spendPurpose(p);
+    const detail = dmPayload?.target ? dmPayload : p;
+    const target = detail.target;
+    const purpose = target
+      ? targetText(target, detail.dice)
+      : target === null
+        ? null
+        : spendPurpose(p);
     const out: LineSegment[] = [
       { text: actorName, style: "actor" },
       { text: ` spends ${gemsPhrase(p.gem, p.count)}` },

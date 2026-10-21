@@ -21,7 +21,8 @@ import { defineCommand } from "../../commands/commands";
 import { conflict, invalid } from "../../commands/errors";
 import { assertFeatureOn } from "../campaign-management/features";
 import { cards } from "../combat-tracker/cards";
-import { dice, gameLog } from "../dice-roll-log";
+import { dice as diceLog, gameLog } from "../dice-roll-log";
+import { cardDetailByAudience, combatTarget } from "./combat";
 import { entryTarget, rerollTarget, targetByAudience, visibleEntry } from "./reroll";
 import { characterFor, heldOf, writeCount } from "./rows";
 
@@ -71,17 +72,23 @@ export const adjustGems = defineCommand({
  * `entryId`, an Inspiration gem rerolls that line's d20 (`dice.reroll`: new roll + new line, the
  * old one superseded; roll hooks not re-run); the spend line comes first, its target detail by
  * the target's audience (FR-GEM-13); a pending combat to-hit's card follows (FR-GEM-22).
+ * FR-GEM-25–31 (GM2): with `cardId` + `dice`, a Combat gem sets 1–3 weapon dice of the pending
+ * card to their max (`cards.maxDice`: new roll rows, the totals recomputed, `maxed` marks).
  */
 export const spendGem = defineCommand({
   name: GEM_SPEND_INTENT,
   input: GemSpendInput,
   roles: ["dm", "player"],
-  execute({ characterId, gem, use, entryId, manual }, env): GemSpendResult {
+  execute({ characterId, gem, use, entryId, manual, cardId, dice, known }, env): GemSpendResult {
     assertFeatureOn(env, GEMS_FEATURE, GEMS_OFF);
     const ch = characterFor(env, characterId, { owner: true });
-    // FR-GEM-18: checked before anything is written (a reject writes nothing); a line the
-    // sender doesn't receive is `not_found` whatever they hold (GEM §11).
+    // FR-GEM-18, -25: checked before anything is written (a reject writes nothing); a line or
+    // card the sender doesn't receive is `not_found` whatever they hold (GEM §11).
     const target = entryId === undefined ? null : rerollTarget(env, ch, visibleEntry(env, entryId));
+    const combat =
+      cardId !== undefined && dice !== undefined
+        ? combatTarget(env, ch, { cardId, dice, ...(known ? { known } : {}) })
+        : null;
     const cost = spendCost(gem, use);
     const before = heldOf(env.tx, ch.id, gem);
     if (before === 0) throw conflict(`No ${GEM_NAME[gem]} gem left`);
@@ -90,7 +97,9 @@ export const spendGem = defineCommand({
     const count = writeCount(env, ch, gem, held);
     const detail = target
       ? targetByAudience(target.entry, entryTarget(target.entry, target.rollId))
-      : null;
+      : combat
+        ? cardDetailByAudience(combat.plan, combat.hidden)
+        : null;
     const line = gameLog.append(env, {
       kind: LOG_KIND_GEM_SPEND,
       category: "other",
@@ -106,6 +115,27 @@ export const spendGem = defineCommand({
       rollIds: [],
       public: true,
     });
+    if (combat) {
+      // FR-GEM-29 (FR-CBT-128): the new roll rows' ids are allocated by the card write, after the
+      // owner's event (protocol §22); the event names them.
+      const rollIds = combat.plan.parts.map(() => env.ctx.ids.next());
+      env.emit({
+        type: GemSpent.type,
+        campaignId: ch.campaignId,
+        payload: {
+          characterId: ch.id,
+          gem,
+          cost,
+          held,
+          entryId: line.id,
+          cardId: combat.plan.card.id,
+          rollIds,
+        },
+        changes: [count, line],
+      });
+      cards.applyMaxDice(env, combat.plan, rollIds);
+      return { held, entryId: line.id };
+    }
     if (!target) {
       env.emit({
         type: GemSpent.type,
@@ -116,7 +146,7 @@ export const spendGem = defineCommand({
       return { held, entryId: line.id };
     }
     // FR-GEM-19, -21, -24: the new roll + line (audience copied), the old line superseded.
-    const rr = dice.reroll(env, { entryId: target.entry.id, rollId: target.rollId, manual });
+    const rr = diceLog.reroll(env, { entryId: target.entry.id, rollId: target.rollId, manual });
     env.emit({
       type: GemSpent.type,
       campaignId: ch.campaignId,
