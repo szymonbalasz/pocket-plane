@@ -1,5 +1,6 @@
 // Measured content heights (FR-SHELL-39): what each `growToContent` window's content asks for,
 // reported by `ShellWindow`. Read by the free area, toasts, and auto placement (FR-SHELL-40).
+// Also each open window's first content row (FR-NOTE-44), read by the DM toast stack.
 import { useSyncExternalStore } from "react";
 
 /** Window id (`kind:instance`) → window height its content asks for, reported by `ShellWindow`. */
@@ -14,6 +15,42 @@ export function reportContentHeight(id: string, h: number | null): void {
   else next.set(id, h);
   heights = next;
   for (const fn of [...heightListeners]) fn();
+}
+
+/**
+ * FR-NOTE-44: a window's first content row, viewport px: the window's rendered top-left and the
+ * row's bottom. Reported by `ShellWindow` while open; read by the DM toast stack.
+ */
+export interface FirstRow {
+  x: number;
+  y: number;
+  bottom: number;
+}
+
+let rows: ReadonlyMap<string, FirstRow> = new Map();
+
+/**
+ * `ShellWindow` reports where its first content row ends (null = closed / none). Notifies the
+ * height listeners too (a new heights Map), so whatever reads the measured heights re-renders.
+ */
+export function reportFirstRow(id: string, row: FirstRow | null): void {
+  const cur = rows.get(id);
+  if (
+    row === null ? !cur : cur && cur.x === row.x && cur.y === row.y && cur.bottom === row.bottom
+  ) {
+    return;
+  }
+  const next = new Map(rows);
+  if (row === null) next.delete(id);
+  else next.set(id, row);
+  rows = next;
+  heights = new Map(heights);
+  for (const fn of [...heightListeners]) fn();
+}
+
+/** The first rows reported so far (a new Map on every change). */
+export function firstRows(): ReadonlyMap<string, FirstRow> {
+  return rows;
 }
 
 /** The heights reported so far on this page (a new Map on every change). */

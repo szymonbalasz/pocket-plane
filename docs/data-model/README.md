@@ -2225,4 +2225,21 @@ From [gems](../specs/gems.md#8-data-model) FR-GEM-17, [character-sheet-full](../
 
 - **Derived (not stored):** counts of a character without a `character-gems` row = 0; who may spend (DM, or the entity's `ownerPlayerId`).
 - **Fixtures:** bundle `gems-ui-e2e` (= `gems-hidden`, for `e2e/gems-ui.e2e.ts`); no new unit. `session-sim-11` gains none (gems off there; seams S13).
+
+## 100. Sprint 7: window frame (FU1)
+
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-56 (OQ-SHELL-55 B), -77–81, -85–88 and [notifications](../specs/notifications.md#8-data-model) FR-NOTE-44. **Built by `fix/fu-frame`**: no table, column, record type or payload change. Protocol side: [protocol §126](../protocol/README.md#126-sprint-7-window-frame--auto-minimise-instead-of-covering-pcs-useful-sizes-pushed-windows-return-space--focus-tooltips-fu1).
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| `WindowState.userSpot` | browser layout entry (`localStorage`, #121) | `true`, optional: set at a user move / resize end; dropped when the shell places the window; restored with a returned pre-push rect; older entries parse as absent | [FR-SHELL-56](../specs/play-shell.md#6-functional-requirements) |
+| Pre-push rects | client memory (`ShellState.prePush`) | per pushed window: its rect and `userSpot` before the first push of a tool use, and the rect the push wrote; dropped on move, resize, close, minimise, reset, return, reload | [FR-SHELL-81](../specs/play-shell.md#6-functional-requirements) |
+| Auto-minimised for, auto-minimise log | client memory (`autoMinimisedFor`, `autoMinimiseLog`) | the newcomer each auto-minimised window made room for; the last placement's moves | [FR-SHELL-88](../specs/play-shell.md#6-functional-requirements) |
+| `WindowDef.usefulSize`, band, size table | code (registry; `size-table.ts` test data) | not sent or stored | [FR-SHELL-79](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-85](../specs/play-shell.md#6-functional-requirements) |
+| Fit requests | client memory (`free-area.ts` counter) | one per Reset layout on this page | [FR-SHELL-80](../specs/play-shell.md#6-functional-requirements) |
+| First content rows | client memory (`content-heights.ts` `reportFirstRow`) | per open window: its rendered top-left and its first record row's bottom; dropped when it closes or unmounts | [FR-NOTE-44](../specs/notifications.md#6-functional-requirements) |
+
+- **Derived:** a PC for auto placement = a token with `characterId` and `ownerPlayerId` (a player character); pets and summons are not (orchestrator ruling, sprint 7).
+- **Fixtures:** no new unit (pure tests on `session-sim-10`'s Goblin Ambush cells in `test-cells.ts`, pets and summons marked `companion`; the e2e reads `session-sim-10`); `session-sim-11` gets a comment line only.
+- **Persisted runtime state:** only `userSpot` in the layout entry.
 - **CON-44:** 0 B.

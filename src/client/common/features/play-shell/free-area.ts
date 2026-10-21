@@ -1,7 +1,8 @@
 // Free area (FR-SHELL-34, R1): the largest part of the work area, right of the tool rail, that no
 // rendered open window covers, plus a counter of window *appearances* (a window rendered because
-// its kind became available while open, or a feature-driven open noted by `noteAppearance()`).
-// The map frames its tokens there (FR-MAP-44). Read-only: nothing stored or sent.
+// its kind became available while open, or a feature-driven open noted by `noteAppearance()`)
+// and of Fit requests (`requestFit()`, FR-SHELL-80). The map frames its tokens there (FR-MAP-44).
+// Read-only: nothing stored or sent.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { contentHeights, useContentHeights } from "./content-heights";
 import {
@@ -256,6 +257,32 @@ const subscribeNoted = (fn: () => void) => {
   };
 };
 
+// ---- fit requests ----
+
+let fits = 0;
+const fitListeners = new Set<() => void>();
+
+/**
+ * Reset layout was applied on this page (FR-SHELL-80): the map runs one Fit (FR-MAP-45) with the
+ * windows as they now are, so tokens move out from under the windows. Counts one request.
+ */
+export function requestFit(): void {
+  fits += 1;
+  for (const fn of [...fitListeners]) fn();
+}
+
+/** Fit requests so far on this page (tests, `useFreeArea`). */
+export function fitRequests(): number {
+  return fits;
+}
+
+const subscribeFits = (fn: () => void) => {
+  fitListeners.add(fn);
+  return () => {
+    fitListeners.delete(fn);
+  };
+};
+
 export interface FreeAreaState {
   /** Free area in viewport px (the canvas fills the viewport). */
   area: Rect;
@@ -271,6 +298,8 @@ export interface FreeAreaState {
   obstacles: readonly Rect[];
   /** Grows by one per appearance; compare with a previous value, never read as a total. */
   appearances: number;
+  /** Grows by one per `requestFit` (FR-SHELL-80); compare with a previous value. */
+  fitRequests: number;
   /** The layout is applied (FR-SHELL-16): a fit before that would use no windows. */
   ready: boolean;
 }
@@ -304,6 +333,7 @@ export function useFreeArea(): FreeAreaState {
     };
   }, [windows, registry, available, vp, measured, regions, reports]);
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
+  const fitsNow = useSyncExternalStore(subscribeFits, fitRequests);
   const [flips, setFlips] = useState(0);
   const windowsRef = useRef(windows);
   windowsRef.current = windows;
@@ -319,6 +349,7 @@ export function useFreeArea(): FreeAreaState {
     toastFreeAreas,
     obstacles,
     appearances: flips + notedNow,
+    fitRequests: fitsNow,
     ready: key !== null,
   };
 }

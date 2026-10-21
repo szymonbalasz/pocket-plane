@@ -3,6 +3,7 @@ import { CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
 import { Dialog as D, Select as S, Tooltip as T } from "radix-ui";
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { enrollTrigger, TIP_ATTR } from "./roving";
 
 // ---- Dialog ----
 export const Dialog = D.Root;
@@ -118,6 +119,8 @@ export function SelectItem({ className, children, ...props }: React.ComponentPro
 // FR-SHELL-30/31: one open delay for every hover hint, a skip delay between triggers, and no
 // tooltip while (or right after) its trigger's overlay is open. Timing and suppression live in
 // `TooltipController` (unit-tested with fake timers); Radix only positions and renders.
+// FR-SHELL-84: keyboard focus opens it too; a trigger that can't take focus is made reachable
+// (`./roving`: one tab stop per chip row).
 
 /** FR-SHELL-30: the one open delay (decided #172). */
 export const TOOLTIP_DELAY_MS = 400;
@@ -314,12 +317,42 @@ export function Tooltip({
   const [trigger, setTrigger] = React.useState<HTMLElement | null>(null);
   const triggerRef = React.useRef<HTMLElement | null>(null);
   triggerRef.current = trigger;
+  /** What keyboard focus reaches the trigger through (itself, or the chip's menu button). */
+  const hostRef = React.useRef<Element | null>(null);
   const [open, setOpen] = React.useState(false);
   const ctl = React.useMemo(
-    () => new TooltipController(group, () => overlayOpenOn(triggerRef.current), setOpen),
+    () =>
+      new TooltipController(
+        group,
+        () => overlayOpenOn(triggerRef.current) || overlayOpenOn(hostRef.current),
+        setOpen,
+      ),
     [group],
   );
   React.useEffect(() => () => ctl.dismiss(), [ctl]);
+  // FR-SHELL-84: reachable by keyboard; focus on a host around the trigger opens it as well.
+  React.useEffect(() => {
+    if (!trigger) return;
+    const { host, dispose } = enrollTrigger(trigger);
+    hostRef.current = host;
+    if (host === trigger) return dispose;
+    const focus = () => ctl.focus(isFocusVisible(host));
+    const blur = () => ctl.blur();
+    const key = (e: Event) => {
+      const k = (e as KeyboardEvent).key;
+      if (k === "Enter" || k === " ") ctl.press();
+    };
+    host.addEventListener("focus", focus);
+    host.addEventListener("blur", blur);
+    host.addEventListener("keydown", key);
+    return () => {
+      host.removeEventListener("focus", focus);
+      host.removeEventListener("blur", blur);
+      host.removeEventListener("keydown", key);
+      hostRef.current = null;
+      dispose();
+    };
+  }, [trigger, ctl]);
   React.useEffect(() => {
     if (!trigger) return;
     const observer = new MutationObserver(() => ctl.overlayChanged());
@@ -340,6 +373,7 @@ export function Tooltip({
       <T.Trigger
         asChild
         ref={setTrigger}
+        {...{ [TIP_ATTR]: "" }}
         onPointerMove={(e) => {
           if (e.pointerType !== "touch") ctl.pointerMove();
         }}
