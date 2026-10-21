@@ -3,7 +3,10 @@
 // Each client passes its Handouts tab (and the DM its Companions parts); Inventory, Loot
 // (party-loot's body, FR-LOOT-21) and Companions are shared. FR-PARTY-46: the strip scrolls
 // sideways where the four labels don't fit (the 340-px min width), never cutting one.
-import { type ReactNode, useEffect, useSyncExternalStore } from "react";
+// FR-PARTY-50 (BL-48): a tab, once shown, stays mounted while the window is open (the others
+// `hidden`, as minimised windows, FR-SHELL-36), so its drafts survive a tab switch; closing the
+// window unmounts them all.
+import { type ReactNode, useEffect, useState, useSyncExternalStore } from "react";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { useSync } from "../../sync/store";
@@ -35,6 +38,17 @@ function useTabMemory(): [PartyTab, (t: PartyTab) => void] {
   return [tab, (t: PartyTab) => tabs.choose(key, t)];
 }
 
+/** FR-PARTY-50: tabs shown so far in this mount (each mounts on its first visit, then stays). */
+function useVisited(tab: PartyTab): ReadonlySet<PartyTab> {
+  const [visited, setVisited] = useState<ReadonlySet<PartyTab>>(() => new Set([tab]));
+  if (!visited.has(tab)) {
+    const next = new Set(visited).add(tab);
+    setVisited(next);
+    return next;
+  }
+  return visited;
+}
+
 export function PartyBoard({
   handouts,
   companions,
@@ -44,6 +58,13 @@ export function PartyBoard({
   companions?: CompanionsDmParts;
 }) {
   const [tab, setTab] = useTabMemory();
+  const visited = useVisited(tab);
+  // Hidden panels take no pointer or key events and aren't focusable (`hidden`).
+  const panel = (t: PartyTab, className: string, body: ReactNode) => (
+    <TabsContent value={t} forceMount hidden={tab !== t} className={className}>
+      {visited.has(t) ? body : null}
+    </TabsContent>
+  );
   return (
     <div data-testid="party-board" className="flex h-full flex-col gap-2 p-2">
       <Tabs
@@ -67,20 +88,16 @@ export function PartyBoard({
             </TabsTrigger>
           ))}
         </TabsList>
-        <TabsContent value="handouts" className="flex min-h-0 flex-1 flex-col">
-          {handouts}
-        </TabsContent>
-        <TabsContent value="inventory" className="min-h-0 flex-1">
+        {panel("handouts", "flex min-h-0 flex-1 flex-col", handouts)}
+        {panel(
+          "inventory",
+          "min-h-0 flex-1",
           <ScrollArea className="h-full">
             <InventoryTab />
-          </ScrollArea>
-        </TabsContent>
-        <TabsContent value="loot" className="min-h-0 flex-1">
-          <LootLog />
-        </TabsContent>
-        <TabsContent value="companions" className="min-h-0 flex-1">
-          <CompanionsTab dm={companions} />
-        </TabsContent>
+          </ScrollArea>,
+        )}
+        {panel("loot", "min-h-0 flex-1", <LootLog />)}
+        {panel("companions", "min-h-0 flex-1", <CompanionsTab dm={companions} />)}
       </Tabs>
     </div>
   );

@@ -32,7 +32,7 @@ import {
   sheetSelection,
 } from "./selection";
 import { useSheet } from "./sheet-context";
-import { type CreatureLike, pickerModel, type SummaryInput } from "./view-model";
+import { type CreatureLike, pickerModel, type SummaryInput, shownSheetId } from "./view-model";
 
 const NEW = "__new";
 
@@ -150,10 +150,8 @@ export function CharacterSheet() {
       ? ([...entities, ...imported].find((e) => e.id === sel.npcId && e.kind === "monster") ?? null)
       : null;
   const picker = pickerModel(entities, sheets, viewer, players, npc);
-  const selected =
-    picker.options.find((o) => o.id === sel.selectedId) ??
-    picker.options.find((o) => o.group === "own") ??
-    null;
+  const shownId = shownSheetId(picker.options, sel.selectedId);
+  const selected = picker.options.find((o) => o.id === shownId) ?? null;
   // FR-CHARX-47: after the first snapshot (and per campaign), restore the remembered choice if
   // still eligible (incl. the DM's last NPC); else FR-CHAR-04's default.
   const memoryKey = you && live ? sheetMemoryKey(you.campaignId, you.role, you.playerId) : null;

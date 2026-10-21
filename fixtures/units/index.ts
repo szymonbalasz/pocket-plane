@@ -33,6 +33,7 @@ import goblin2 from "./combat-tracker/goblin-2";
 import lateHitRuled from "./combat-tracker/late-hit-ruled";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import trailMoves from "./combat-tracker/trail-moves";
+import cmpGoblinUntyped from "./compendium/cmp-goblin-untyped";
 import cmpHomebrew from "./compendium/cmp-homebrew";
 import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
 import cmpImages from "./compendium/cmp-images";
@@ -207,6 +208,8 @@ export const units: readonly Fixture[] = [
   imageTags,
   // Sprint 6 track CP (build/cp-summon): pets + summons in the running fight
   cpCombat,
+  // Sprint 7 track FU (fix/fu-small-copy): a type-less fixture Goblin (FR-CMP-58)
+  cmpGoblinUntyped,
   // Sprint 7 track FU (fix/fu-combat): kept HP on rebind
   fuHurtGoblins,
   // Sprint 7 track GM (fix/gems-core): gems switch + counts

@@ -123,12 +123,28 @@ describe("FR-MOD-59 Toggles below zero", () => {
         /data-testid="mod-toggle-uses" data-record-id="rage" data-state="ok" data-value="-1\/3" class="text-hp-down"/,
       );
       expect(html).toContain("−1 / 3");
-      expect(html).toMatch(/data-testid="mod-toggle-overspent"[^>]*>−1</);
     }
     expect(render({ role: "dm", used: 4 })).toContain('data-testid="mod-toggle-force"');
     // At 0 and above: no Badge, muted count.
     const zero = render({ role: "player", used: 3 });
     expect(zero).not.toContain('data-testid="mod-toggle-overspent"');
     expect(zero).toContain('data-value="0/3" class="text-muted-foreground"');
+  });
+
+  test("FR-MOD-68 uses shown once: Rage at −1 / 3 reads one '−1 / 3', no extra Badge in that row", () => {
+    for (const role of ["player", "dm"] as const) {
+      const html = render({ role, used: 4 });
+      const row =
+        /<[^>]*data-testid="mod-toggle"[\s\S]*?data-testid="mod-toggle-uses"[\s\S]*?<\/span>/.exec(
+          html,
+        )?.[0];
+      expect(row).toBeTruthy();
+      expect(html).not.toContain('data-testid="mod-toggle-overspent"');
+      // The minus sign once in the uses text: "−1 / 3", never "−1 / 3 −1".
+      const text = html.replace(/<[^>]+>/g, "");
+      expect(text).toContain("Rage −1 / 3");
+      expect(text).not.toContain("−1 / 3 −1");
+      expect(text.split("−1").length - 1).toBe(1);
+    }
   });
 });

@@ -65,7 +65,9 @@ import {
   type PopupRow,
   pipClip,
   popupHeight,
+  popupItemLabel,
   popupLine,
+  popupOfferText,
   popupRows,
   popupsThatFit,
   ROW_H,
@@ -401,14 +403,12 @@ function Total({ item }: { item: PopupItem }) {
       )}
       {item.offered.map((o) => (
         <span key={o.key} className="text-[10px] text-muted-foreground">
-          {o.label} {o.value} on a hit
+          {popupOfferText(o)}
         </span>
       ))}
     </span>
   );
 }
-
-const itemLabel = (i: PopupItem) => (i.mode ? `${i.label} (${i.mode})` : i.label);
 
 const ROLLING_TEXT = "Rolling…";
 
@@ -428,7 +428,7 @@ function Row({ row }: { row: PopupRow }) {
       {row.hidden && <EyeOffIcon aria-label="Hidden from players" className="size-3.5 shrink-0" />}
       <RollerName entryId={row.entryId} name={row.actor} />
       <span className="min-w-0 flex-1 truncate text-muted-foreground">
-        {row.items.map(itemLabel).join(" · ")}
+        {row.items.map(popupItemLabel).join(" · ")}
       </span>
       {landed ? (
         row.items.map((i) => <Total key={i.key} item={i} />)

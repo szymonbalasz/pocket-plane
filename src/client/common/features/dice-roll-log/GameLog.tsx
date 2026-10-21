@@ -58,7 +58,6 @@ import { EntryActions } from "./entry-action-button";
 import { type EntryAction, entryActions } from "./entry-actions";
 import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
 import {
-  type ActorOption,
   actorOptions,
   actorSelection,
   createStickToBottom,
@@ -69,7 +68,7 @@ import {
   sortEntries,
 } from "./logic";
 import { rollerAttr, rollerColorKey, useColorKeyOf } from "./name-color";
-import { usePhysicalDice, useRollOptionsOpen } from "./physical";
+import { usePhysicalDice, useRollBarActor, useRollOptionsOpen } from "./physical";
 import { RollButton, type RollKeys, useRollControl } from "./roll-control";
 
 const SELECT =
@@ -419,7 +418,6 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   const [expression, setExpression] = useState("");
   const [label, setLabel] = useState("");
   const [category, setCategory] = useState<RollCategory>("other");
-  const [actor, setActor] = useState<ActorOption | null>(null);
   const [mode, setMode] = useState<RollMode>("normal");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -432,6 +430,8 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
     () => actorOptions(you, entities, scenes, tokens, encounters, combatants),
     [you, entities, scenes, tokens, encounters, combatants],
   );
+  // FR-DICE-77: a player's default is the sheet's PC; their pick is kept per browser.
+  const [actor, setActor] = useRollBarActor(actors);
   // A token that left the active scene, a removed character or an ended / removed combatant
   // (FR-DICE-34) falls back to the roller.
   const { options: actorList, selected } = actorSelection(actors, actor);
