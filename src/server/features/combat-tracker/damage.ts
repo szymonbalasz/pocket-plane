@@ -204,7 +204,8 @@ export const rollDamageCommand = defineCommand({
     );
     // FR-MOD-14: offered-die rows (after any dropped by the card cap) follow the base roll.
     const rollIds = [damage, ...extra].flatMap((r) => dice.rollIdsOf(r));
-    const line = rollLine([damage, ...extra]);
+    // FR-MOD-69: offered parts read the attack's type when untyped.
+    const line = rollLine([damage, ...extra], row.damageType ?? null);
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: row.spec.category,

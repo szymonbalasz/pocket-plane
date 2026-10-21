@@ -152,7 +152,8 @@ export const attackCommand = defineCommand({
     // (monster or PC) → the same line, always DM-only whatever the Attack tickbox; the outcome
     // line at apply carries the public rule (FR-CBT-24). Rolls are facts: Undo never strikes it.
     // FR-CBT-70: a to-hit-only attack's line holds the to-hit roll alone.
-    const line = rollLine(rolls);
+    // FR-MOD-69: offered parts read the attack's type when untyped.
+    const line = rollLine(rolls, attack.damageType ?? null);
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: "attack",

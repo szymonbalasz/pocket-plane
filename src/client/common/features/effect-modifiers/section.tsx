@@ -49,7 +49,7 @@ import {
   Switch,
 } from "../../components/ui/menus";
 import { useSync } from "../../sync/store";
-import { OverspendPopover, OverspentBadge } from "../character-sheet/overspend";
+import { OverspendPopover, OverspentTip } from "../character-sheet/overspend";
 import type { SheetSection } from "../character-sheet/sections";
 import { EffectIcon, effectValue } from "../combat-extras/icons";
 import {
@@ -237,22 +237,19 @@ function ToggleRow({
         <div className="truncate">
           {p.name}
           {uses?.state === "ok" && (
-            <span
-              data-testid="mod-toggle-uses"
-              data-record-id={p.id}
-              data-state="ok"
-              data-value={`${uses.left}/${uses.max}`}
-              className={uses.left < 0 ? "text-hp-down" : "text-muted-foreground"}
-            >
-              {" "}
-              {leftText(uses.left)} / {uses.max}
-            </span>
-          )}
-          {uses?.state === "ok" && (
-            <>
-              {" "}
-              <OverspentBadge left={uses.left} testId="mod-toggle-overspent" />
-            </>
+            // FR-MOD-68: the count shows the minus once; no overspent Badge beside it.
+            <OverspentTip left={uses.left}>
+              <span
+                data-testid="mod-toggle-uses"
+                data-record-id={p.id}
+                data-state="ok"
+                data-value={`${uses.left}/${uses.max}`}
+                className={uses.left < 0 ? "text-hp-down" : "text-muted-foreground"}
+              >
+                {" "}
+                {leftText(uses.left)} / {uses.max}
+              </span>
+            </OverspentTip>
           )}
         </div>
         {uses?.state === "broken" && (

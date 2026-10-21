@@ -158,6 +158,14 @@ const Item = z.looseObject({
 
 const MODE = { advantage: "adv", disadvantage: "dis" } as const;
 
+/** FR-DICEX-40: an item's label as the row reads it: "Attack (adv)", else the label alone. */
+export const popupItemLabel = (i: Pick<PopupItem, "label" | "mode">) =>
+  i.mode ? `${i.label} (${i.mode})` : i.label;
+
+/** FR-DICEX-13 / -63: an offered part after the total: "Sneak Attack 8 on a hit" (one space each). */
+export const popupOfferText = (o: Pick<PopupItem["offered"][number], "label" | "value">) =>
+  `${o.label} ${o.value} on a hit`;
+
 /** FR-DICEX-40: one row per `roll` entry, in `n` order. */
 export function popupRows(entries: readonly GameLogEntryView[]): PopupRow[] {
   return entries

@@ -16,6 +16,7 @@ import {
   summaryText,
   toastTriggers,
   unreadCount,
+  waitingForPlayers,
 } from "./logic";
 import { createSeenStore } from "./seen";
 import {
@@ -36,6 +37,7 @@ import {
   type ToastMemory,
   visibleToasts,
 } from "./toasts";
+import { createNotificationViews } from "./views";
 
 let seq = 0;
 function note(p: Partial<NotificationRecord> = {}): NotificationRecord {
@@ -161,6 +163,84 @@ describe("summary (FR-NOTE-15)", () => {
     expect(summaryCount("connect", store(P2, rows, 0))).toBe(0);
     expect(summaryText(1)).toBe("1 pending action");
     expect(summaryText(3)).toBe("3 pending actions");
+  });
+});
+
+describe("summary counts waiting (FR-NOTE-45)", () => {
+  // Combat kinds link a row to its encounter by payload (FR-NOTE-29).
+  const views = createNotificationViews([
+    {
+      kind: "card",
+      icon: () => null,
+      encounterIdOf: (p) => (p as { encounterId?: string }).encounterId ?? null,
+    },
+    {
+      kind: "save",
+      icon: () => null,
+      encounterIdOf: (p) => (p as { encounterId?: string }).encounterId ?? null,
+    },
+  ]);
+  const fight = { e1: { id: "e1", status: "started" }, e0: { id: "e0", status: "ended" } };
+  const withFight = (you: RecordStore["you"], rows: NotificationRecord[]): RecordStore => {
+    const st = store(you, rows, 0);
+    return { ...st, records: { ...st.records, encounter: fight } };
+  };
+  const own = pendingFor("dm", null, { kind: "card", payload: { encounterId: "e1" } });
+  const save = pendingFor("player", "p1", { kind: "save", payload: { encounterId: "e1" } });
+  const save2 = pendingFor("player", "p2", { kind: "save", payload: { encounterId: "e1" } });
+  // Not counted: another encounter's, an unlinked kind's, a resolved one.
+  const old = pendingFor("player", "p1", { kind: "save", payload: { encounterId: "e0" } });
+  const loose = pendingFor("player", "p1", { kind: "test" });
+  const done = { ...save2, id: "n-done", state: "resolved" as const };
+  const fresh = (): ToastMemory => ({ toasts: initialToasts(0), campaignId: null });
+  const connect = (st: RecordStore) =>
+    syncToasts(fresh(), null, view(st), "connect", 0, (s) => waitingForPlayers(s, views));
+  const summary = (m: ToastMemory) => m.toasts.toasts.find((t) => t.kind === "summary");
+
+  test("FR-NOTE-45 summary counts waiting: DM 1 own + 1 player-owned save → '1 pending action · 1 waiting for a player'; none waiting → today's text; 0 own + 1 waiting → the waiting part alone; players unchanged", () => {
+    const dm = withFight(DM, [own, save, old, loose, done]);
+    expect(waitingForPlayers(dm, views)).toBe(1);
+    const m = connect(dm);
+    expect(summary(m)).toMatchObject({ count: 1, waiting: 1 });
+    expect(summaryText(1, 1)).toBe("1 pending action · 1 waiting for a player");
+    expect(summaryText(2, 2)).toBe("2 pending actions · 2 waiting for players");
+    // None waiting: today's text, no `waiting`.
+    const alone = connect(withFight(DM, [own]));
+    expect(summary(alone)).toEqual({
+      key: "summary",
+      kind: "summary",
+      count: 1,
+      sticky: true,
+      remaining: 0,
+    });
+    expect(summaryText(1)).toBe("1 pending action");
+    expect(summaryText(1, 0)).toBe("1 pending action");
+    // rulings-b #17: 0 own + M waiting → the waiting part alone.
+    const waiting = connect(withFight(DM, [save, save2]));
+    expect(summary(waiting)).toMatchObject({ count: 0, waiting: 2 });
+    expect(summaryText(0, 1)).toBe("1 waiting for a player");
+    expect(summaryText(0, 2)).toBe("2 waiting for players");
+    // No started encounter: nothing waits.
+    expect(waitingForPlayers(store(DM, [save]), views)).toBe(0);
+    expect(summary(connect(store(DM, [save])))).toBeUndefined();
+    // Players: unchanged (their own pending rows only, never `waiting`).
+    const p1 = withFight(P1, [save]);
+    expect(waitingForPlayers(p1, views)).toBe(0);
+    expect(summary(connect(p1))).toMatchObject({ count: 1 });
+    expect(summary(connect(p1))?.waiting).toBeUndefined();
+  });
+
+  test("FR-NOTE-45 the summary follows the waiting count (a reconnect recounts; the save resolved → gone)", () => {
+    const waitingOf = (s: RecordStore) => waitingForPlayers(s, views);
+    let s = setSummary(initialToasts(0), 1, 0, 1);
+    expect(s.toasts[0]).toMatchObject({ count: 1, waiting: 1 });
+    s = pruneToasts(s, withFight(DM, [own, save, save2]), 1, waitingOf);
+    expect(s.toasts[0]).toMatchObject({ count: 1, waiting: 2 });
+    s = pruneToasts(s, withFight(DM, [{ ...own, state: "resolved" }, save]), 2, waitingOf);
+    expect(s.toasts[0]).toMatchObject({ count: 0, waiting: 1 });
+    s = pruneToasts(s, withFight(DM, [{ ...save, state: "resolved" }]), 3, waitingOf);
+    expect(s.toasts).toHaveLength(0);
+    expect(setSummary(initialToasts(0), 0, 0, 0).toasts).toHaveLength(0);
   });
 });
 

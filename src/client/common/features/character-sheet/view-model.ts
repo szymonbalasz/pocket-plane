@@ -132,6 +132,18 @@ export function pickerModel(
   return { options, canCreate: v.role === "dm" || !openDraft };
 }
 
+/**
+ * FR-CHAR-04 / FR-CHARX-47: the character the sheet shows: the selection while it is a picker
+ * option, else the first own one (null = none). FR-DICE-77's roll bar follows the same rule.
+ */
+export function shownSheetId(
+  options: readonly PickerOption[],
+  selectedId: string | null,
+): string | null {
+  const hit = options.find((o) => o.id === selectedId) ?? options.find((o) => o.group === "own");
+  return hit?.id ?? null;
+}
+
 /** The redacted PC other players get (FR-CHARX-35); fields optional for older servers. */
 export interface SummaryInput {
   id: string;

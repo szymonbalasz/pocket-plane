@@ -178,3 +178,91 @@ describe("FR-DICE-29 no natural marker on initiative", () => {
     expect(line(1)).toContain("— natural 1");
   });
 });
+
+/** FR-DICE-78: one space between tokens; none after "(", before ")", doubled, leading or trailing. */
+const strays = (t: string) =>
+  [/\( /, / \)/, / {2}/, /^\s/, /\s$/].filter((r) => r.test(t)).map(String);
+
+describe("FR-DICE-78 no stray spaces", () => {
+  test("FR-DICE-78 no stray spaces: every registered kind's line, DM's and players'", () => {
+    for (const [kind, s] of Object.entries(SAMPLES)) {
+      const player = formatEntry({ kind, actorName: "Goblin", payload: s.payload }).segments;
+      const dm = formatEntry({ kind, actorName: "Goblin", ...s }).segments;
+      expect([kind, strays(lineText(player))]).toEqual([kind, []]);
+      expect([kind, strays(lineText(dm))]).toEqual([kind, []]);
+    }
+  });
+
+  test("FR-DICE-78 no stray spaces: sim-9's line (offered 3d6 5 + 2 + 1 last, BL-48) and adv, dis, dropped, offered, manual, modifier-only", () => {
+    const line = (items: RollPayloadItem[], dmPayload?: unknown) =>
+      lineText(
+        formatEntry({ kind: "roll", actorName: "Thorn", payload: items, dmPayload }).segments,
+      );
+    // Root cause check: the built text was never "1 )": the offered run closes on the last die.
+    const sim9 = line([
+      rollItem({
+        expression: "1d4+3",
+        dice: [{ faces: 4, value: 1, kept: true }],
+        constant: 3,
+        total: 4,
+        natural: null,
+        label: "Dagger damage (piercing)",
+        offered: [
+          {
+            label: "Sneak Attack",
+            value: 8,
+            expression: "3d6",
+            rollId: "r9",
+            type: "piercing",
+            dice: [5, 2, 1],
+          },
+        ],
+      }),
+    ]);
+    expect(sim9).toBe(
+      "Thorn — Dagger damage (piercing): 1 + 3 = 4 (+ 8 piercing Sneak Attack (3d6: 5 + 2 + 1) on a hit)",
+    );
+    const d20 = (value: number, kept: boolean) => ({ faces: 20, value, kept });
+    const cases = [
+      // adv / dis: the dropped die after the kept one.
+      rollItem({
+        expression: "2d20kh1+4",
+        mode: "advantage",
+        dice: [d20(15, true), d20(7, false)],
+      }),
+      rollItem({
+        expression: "2d20kl1+4",
+        mode: "disadvantage",
+        modes: ["Bane"],
+        dice: [d20(3, true), d20(18, false)],
+      }),
+      // a subtracted group, its last die before ")"; a zero constant.
+      rollItem({
+        expression: "1d20-3d4",
+        dice: [
+          d20(12, true),
+          { faces: 4, value: 2, kept: true },
+          { faces: 4, value: 2, kept: true },
+          { faces: 4, value: 1, kept: true },
+        ],
+        constant: 0,
+        total: 7,
+      }),
+      // manual (physical badge) with an auto part.
+      rollItem({
+        manual: true,
+        mods: [{ label: "Bless", value: 3, expression: "1d4", rollId: "r2", auto: true }],
+      }),
+      // modifier-only: no dice, the constant alone, then a part.
+      rollItem({
+        expression: "+5",
+        dice: [],
+        constant: 5,
+        total: 7,
+        natural: null,
+        mods: [{ label: "Guidance", value: 2, expression: "1d4", rollId: "r3", dice: [2] }],
+      }),
+    ];
+    for (const c of cases) expect([c.expression, strays(line([c]))]).toEqual([c.expression, []]);
+  });
+});
