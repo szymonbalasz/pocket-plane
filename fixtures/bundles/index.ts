@@ -31,6 +31,7 @@ import fuS7E2e from "./fu-s7-e2e";
 import fuSmallCopy from "./fu-small-copy";
 import furyLogLine from "./fury-log-line";
 import gems from "./gems";
+import gemsCombatE2e from "./gems-combat-e2e";
 import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
@@ -151,4 +152,6 @@ export const bundles: readonly Bundle[] = [
   gemsRerollE2e,
   // Sprint 7 track GM (build/gems-sheet)
   gemsUiE2e,
+  // Sprint 7 track GM (build/gems-combat)
+  gemsCombatE2e,
 ];
