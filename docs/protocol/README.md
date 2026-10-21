@@ -3077,7 +3077,7 @@ From [gems](../specs/gems.md#6-functional-requirements) FR-GEM-05, -13, -18–24
 
 ## 131. Sprint 7: map follow-ups (FU3)
 
-From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A; seams S6). **Built by `fix/fu-map`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B). Amends §118's `pcsPan` row ("> 6 obstacles → null"), reveal-refit row ("once the scene-open fit ran": now the baseline that fit took) and `data-fit-reason` row. Data side: [data model §101](../data-model/README.md#101-sprint-7-map-follow-ups-fu3).
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A; seams S6). **Built by `fix/fu-map`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B). Amends §118's `pcsPan` row ("> 6 obstacles → null"), reveal-refit row ("once the scene-open fit ran": now the baseline that fit took) and `data-fit-reason` row. Data side: [data model §102](../data-model/README.md#102-sprint-7-map-follow-ups-fu3).
 
 | Piece | Contract | Source |
 |---|---|---|

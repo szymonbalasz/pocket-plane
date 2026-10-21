@@ -2263,7 +2263,7 @@ From [gems](../specs/gems.md#8-data-model) FR-GEM-13, -19, [dice-roll-log](../sp
 
 ## 102. Sprint 7: map follow-ups (FU3)
 
-From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A). **Built by `fix/fu-map`**: no table, column, record type or payload change. Protocol side: [protocol §130](../protocol/README.md#130-sprint-7-map-follow-ups-fu3).
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A). **Built by `fix/fu-map`**: no table, column, record type or payload change. Protocol side: [protocol §131](../protocol/README.md#131-sprint-7-map-follow-ups-fu3).
 
 | Data | Where | Rule | Source |
 |---|---|---|---|
