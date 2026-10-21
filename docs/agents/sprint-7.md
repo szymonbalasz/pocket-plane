@@ -107,7 +107,7 @@ Open the printed DM URL (paste the secret) and each player link in its own brows
 
 - **Windows can still land on Mira at 1280×720 (FAIL g):** with the Game log + Initiative open during the Escort fight, Compendium, Party, Encounters and Stats all covered Mira (76–100 %) although a clear 320-px strip existed (x 248–568). 1440×900 is clean (BL-64).
 - **Player 1's sheet over revealed tokens with the companion card open (FAIL h):** Reveal all made the map zoom *in* instead of out; the Elite and Plain Brute stayed under the sheet, also after a reload (BL-65).
-- **A player's own resolved damage card shows the HP a monster actually lost** ("Hit: 7" for 40 damage on a 7-HP goblin), so a kill reveals its last HP. Accepted at #138; a fix that shows the attack line's damage instead is ready on `fix/card-applied-leak`: **your call at the recap.**
+- ~~A player's own resolved damage card shows the HP a monster actually lost~~ **fixed at the recap (#331):** the card now shows the attack line's damage ("Hit: 40").
 - After resizing 1280 → 1440 the layout doesn't recover (Game log stays 300×160, Initiative mid-screen) (BL-60); the Fog tool can push Scenes over Mira (BL-61).
 - Players' Stats opens at its 320×280 minimum (names cut, rows below the fold); your award cards overflow their text (BL-66). The companion card opens at 280×240 when crowded (attacks below the fold).
 - Each **+** award is its own public log line (six Fortune lines in a row) (BL-68). Players' Fight tab shows the previous fight until something public happens in the new one; fixture dates read "Thu 1 Jan" (BL-69).

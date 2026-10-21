@@ -8,7 +8,6 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Card HP leak fix | `fix/card-applied-leak` (ws w92, slot 0) | fix-card-leak (idle) | ready, check 4461 green; amends #138 | DM decides at the recap: merge (B) or drop (A) |
 | Sprint 7 | merged | — | done, recap pending | recap; then sprint 8 planning |
 
 ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/briefs/spec-s7-*.md`):
@@ -22,8 +21,7 @@ ID ranges (maxima on 2026-10-20 + per-track blocks; briefs `%TEMP%/pocket-plane/
 
 ## Pending DM decisions
 
-- #138 amendment: a player's resolved damage card shows the HP actually lost (reveals a monster's last HP on a kill). A keep #138 / **B show the outcome line's damage** (fix ready on `fix/card-applied-leak`).
-- Sprint-7 recap: session-sim-11 FAILs g (BL-64) and h (BL-65), glitch list BL-66, BL-68–BL-72.
+- Sprint-7 recap (in progress; #331 decided): window-frame pass as a sprint-8 track?; session-sim-11 FAILs g (BL-64) and h (BL-65), glitch list BL-66, BL-68–BL-72.
 
 ## Resolved locally (report at gate)
 
