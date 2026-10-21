@@ -26,6 +26,7 @@ import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import fog from "./fog";
 import fogScn from "./fog-scn";
+import fuMapE2e from "./fu-map-e2e";
 import fuS7 from "./fu-s7";
 import fuS7E2e from "./fu-s7-e2e";
 import furyLogLine from "./fury-log-line";
@@ -138,6 +139,8 @@ export const bundles: readonly Bundle[] = [
   // Sprint 7 track FU (fix/fu-combat)
   fuS7,
   fuS7E2e,
+  // Sprint 7 track FU (fix/fu-map)
+  fuMapE2e,
   // Sprint 7 track GM (fix/gems-core)
   gems,
   gemsHidden,

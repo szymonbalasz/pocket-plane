@@ -2216,3 +2216,18 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-56 (OQ-SHELL-55 
 - **Fixtures:** no new unit (pure tests on `session-sim-10`'s Goblin Ambush cells in `test-cells.ts`, pets and summons marked `companion`; the e2e reads `session-sim-10`); `session-sim-11` gets a comment line only.
 - **Persisted runtime state:** only `userSpot` in the layout entry.
 - **CON-44:** 0 B.
+
+## 99. Sprint 7: map follow-ups (FU3)
+
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (client part), -89–92 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-150 (#315: OQ-MAP-61 A). **Built by `fix/fu-map`**: no table, column, record type or payload change. Protocol side: [protocol §128](../protocol/README.md#128-sprint-7-map-follow-ups-fu3).
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| Reveal baseline | client memory (`MapCanvas` `drawn`) | the token ids the last fit framed on its scene; set by every fit, then by each token-list change on that scene; none before the scene's first fit | FR-MAP-89 (3) |
+| Load fit done | client memory (`MapCanvas` module flag) | the first scene-open fit on this page is the load fit (`data-fit-reason="load"`) | FR-MAP-89 (2) |
+| Strip-only room | derived per render (`useFreeArea().stripOnly`) | the DM's fit obstacles without the shown stack (windows + summary strip) and their candidate rectangles; players: the same as `obstacles` | FR-MAP-91 |
+
+- **Derived:** the no-jump check (`appearanceKeeps`) and Fit past toasts (`fitPastToasts`) read the canvas's current camera, tokens and obstacles; nothing kept.
+- **Fixtures:** no new unit; bundle `fu-map-e2e` (= `session-sim-10`, for `e2e/map-followups.e2e.ts`, which shows Goblin Ambush and reveals its fog); `session-sim-11` gets a comment line only.
+- **Persisted runtime state:** none.
+- **CON-44:** 0 B.
