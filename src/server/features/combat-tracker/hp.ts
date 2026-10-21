@@ -493,13 +493,14 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           ...rulingGone,
         ]);
         hpChangeIds.push(row.id);
-        // #138: the rolling player sees each outcome; a hidden target's name never. FR-CBTX-15:
-        // `applied` = damage dealt (HP lost + absorbed), so a target's temp HP never shows.
+        // #138: the rolling player sees each outcome; a hidden target's name never. #315:
+        // `applied` = the line's damage (`raw`), never HP lost, so a killing blow shows no HP and
+        // temp HP never shows (FR-CBTX-15).
         outcomes.push({
           targetName: target.hidden ? null : target.name,
           hit,
           multiplier,
-          applied: applied + hp.absorbed,
+          applied: raw,
         });
       }
       const resolution: DamageCardTargetsResolution = { targets: outcomes };

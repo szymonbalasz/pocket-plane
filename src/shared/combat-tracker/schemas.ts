@@ -623,6 +623,7 @@ export const DamageCardTargetOutcome = z.strictObject({
   targetName: z.string().nullable(),
   hit: z.boolean(),
   multiplier: DamageMultiplier,
+  /** The line's damage (`raw`, #315), never HP lost (that would show a monster's HP, #138). */
   applied: z.int(),
   /** FR-CBT-91 (sprint 5): a ruled hit the DM dropped from the damage step (`applied: 0`). */
   dropped: z.literal(true).optional(),
