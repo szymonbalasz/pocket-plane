@@ -195,7 +195,7 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-CHARX-97 | **Trophies tab**: sheet section `stats.trophies` (owner stats; one line in `sheet-sections.ts`, append): slot `tab`, title "Trophies", **last**: the tabs end "… Macros, Trophies" (seam S11; by the `order` field, not merge order), both clients, kinds `["character"]`, `available` = always. Like every section it renders only on full sheets, so on the DM's sheets and the owner's own (FR-CHARX-36); never on summary cards or imported-definition sheets (§7.1). Drafts and locked sheets show it read-only. | picks OQ-STATS-23 A, OQ-CHARX-44 A |
+| FR-CHARX-97 | **Trophies tab**: sheet section `stats.trophies` (owner stats; one line in `sheet-sections.ts`, append): slot `tab`, title "Trophies", **`order: 100`**, last: the tabs end "… Macros (90), Trophies" (seam S11; by the `order` field, not merge order), both clients, kinds `["character"]`, `available` = always. Like every section it renders only on full sheets, so on the DM's sheets and the owner's own (FR-CHARX-36); never on summary cards or imported-definition sheets (§7.1). Drafts and locked sheets show it read-only. | picks OQ-STATS-23 A, OQ-CHARX-44 A |
 | FR-CHARX-98 | **Layout** (the component is stats', `@ui/features/stats/trophies/`): **Lifetime**, a label / value grid (2 columns, 1 under 360 px), then **Records**, each value with a muted detail line ("→ Ogre · Fight 3 · Tue 20 Oct"), then a footnote "Whole campaign, counted from the game log". DM adds a muted "Includes hidden rolls and fights". "—" for 0. Test IDs: `stats-trophies` (+ `data-record-id` = character id), `stats-trophy` (+ `data-record-id` = key, `data-value`), `stats-trophy-detail`. States per FR-STATS-50. | FR-STATS-42 |
 | FR-CHARX-99 | **Data and refresh**: the tab sends `stats.query {scope: "trophies", characterId}` when shown and refreshes per FR-STATS-44. It reads no `creature-sheet` or stat-block field, and other players never get it (no section on the summary card, FR-CHARX-32; the server answers players only for their own characters, FR-STATS-43). | FR-STATS-43, -44 |
 
@@ -267,7 +267,7 @@ interface SheetSection {
 | `cbtx.temp-hp` | `vitals` | always | Temp HP |
 | `cbtx.death-saves` | `vitals` | `deathState != null` | Death-save successes / failures |
 | `cbtx.effects` | `header` | always | Condition / effect chips; owner "Concentrate…", DM add / edit / end from the chip row's menu |
-| `stats.trophies` *(sprint 8, SB)* | `tab` "Trophies" (last) | always | Campaign trophy case (FR-CHARX-97–99) |
+| `stats.trophies` *(sprint 8, SB)* | `tab` "Trophies" (`order: 100`, last) | always | Campaign trophy case (FR-CHARX-97–99) |
 | `gem.counts` *(sprint 7, GM)* | `header` (after `cbtx.effects`) | gems on (FR-CHARX-71) | Five gem icons + counts; owner Spend menu; DM ± (FR-CHARX-72) |
 
 - **What CHARX exposes** for sections (pure, `@shared/entities`, overrides honoured): `abilityMod`, `proficiencyBonus`, `saveBonus(stats, ability)`, `checkBonus`, `spellSaveDc`, `spellAttackBonus`; record fields `hpCurrent`, `statBlock.hpMax`; on `creature-sheet` (owner + DM only) `spells[].concentration`.
@@ -592,7 +592,7 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CHARX-44 | Where the trophy case sits on the sheet | **A. Its own tab "Trophies", last**: room for records, out of the way · B. End of the Main tab (`main` slot): seen without a click, makes Main longer · C. A header chip "12 kills" (trophy icon) opening a popover: compact, tiny | DM gate (with OQ-STATS-23) | CHARX, STATS |
+| OQ-CHARX-44 | Where the trophy case sits on the sheet | **A. Its own tab "Trophies", last**: room for records, out of the way · B. End of the Main tab (`main` slot): seen without a click, makes Main longer · C. A header chip "12 kills" (trophy icon) opening a popover: compact, tiny | no (DM pick, with OQ-STATS-23) | CHARX, STATS |
 
 ## 16. Out of scope
 

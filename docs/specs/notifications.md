@@ -380,7 +380,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | ~~OQ-NOTE-36~~ | Seam **WF**: the feed and summary toasts in WF's toast policy | **Resolved (seams S4, S5):** the feed is the **callout** class (FR-NOTE-50), the summary's toast is **info** class; no new region or keep-out | — | NOTE, SHELL, STATS |
-| OQ-NOTE-37 | Summary: toast **and** the window opening? | **A. Both** (as OQ-NOTE-28: the toast says why Stats opened; with the "open at End" preference off it is the only signal) · B. Window only (a per-kind "no toast" flag, new to the registry) | DM gate | NOTE, STATS |
+| OQ-NOTE-37 | Summary: toast **and** the window opening? | **A. Both** (as OQ-NOTE-28: the toast says why Stats opened; with the "open at End" preference off it is the only signal) · B. Window only (a per-kind "no toast" flag, new to the registry) | no (DM pick) | NOTE, STATS |
 
 **Sprint 7** (track ST).
 
@@ -392,6 +392,6 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 - *(Sprint 6)* Moving the DM's toasts out of the top-centre (decided #256, OQ-SHELL-32 C); the players' toast corner (unchanged).
 - Concentration, duration and turn reminders; rule listeners → [combat-extras](combat-extras.md), ADR-0027 C.
-- Roll requests → [dice-extras](post-mvp/dice-extras.md) (future kind, player owner). Kill-feed toasts → [stats](stats.md) *(sprint 8: FR-NOTE-69, a toast, not a kind)*. `loot-received` → [party-loot](party-loot.md) (#146).
+- Roll requests → [dice-extras](dice-extras.md). Kill-feed toasts → [stats](stats.md) *(sprint 8: FR-NOTE-69, a toast, not a kind)*. `loot-received` → [party-loot](party-loot.md) (#146).
 - [Gems](gems.md) (#140): modifying a pending damage card's dice is combat-tracker's command; if card text must change then, ~~a post-MVP `updateNotification` helper (pending only)~~ *(sprint 2: exists, FR-NOTE-25)*. No MVP change.
 - Load older history, server read state, cross-browser seen marker.

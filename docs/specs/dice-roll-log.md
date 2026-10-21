@@ -362,7 +362,7 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 
 **Sprint 7, track ST:** integration `FR-DICE-72 stats count the final roll` (on GM's real reroll: old entry and rolls unchanged, only the new roll counts, nat counted once), `FR-DICE-72 feature-tagged kinds skipped while off` (S1), `FR-DICE-73 rollFacts` (a roll in two entries returns once; `public` if any counted listing entry is public; an unreferenced roll is absent). Bundle `stats`; walkthrough [stats §13](stats.md#13-test-plan) step 5 (the hidden roll's nat 20 counts for the DM only).
 
-**Sprint 8, track SB** (bundle `stats-b`, unit `sb-luck-rolls`; [stats §13.1](stats.md#131-sprint-8-tier-b)):
+**Sprint 8, track SB** (bundle `stats-b`, units `sb-luck-rolls`, `sb-luck-reroll`; [stats §13.1](stats.md#131-sprint-8-tier-b)):
 - Integration `FR-DICE-89 luck fields`: an advantage roll gives both faces; a physical several-dice roll with null values gives none; a reroll gives only the new roll's faces; whole-campaign = the union of the session reads.
 - Integration `FR-DICE-90 new roll paths count`: a roll written through `dice.evaluate` + `gameLog.append` with a hidden entry counts for the DM only. Re-run on dice-extras' macro / request paths once they merge.
 - Integration `FR-DICE-90 hidden request answer is DM-only` (seam S6): an answer entry with `audiencePlayerId` = Player 1 (not public): the DM's luck counts it; Player 1's and Player 2's luck, awards and trophies don't, though Player 1 sees the line.

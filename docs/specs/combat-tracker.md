@@ -477,7 +477,7 @@ Track SB. Formulas and toasts: [stats §6.1](stats.md#61-tier-b-sprint-8).
 | ID | Requirement | Notes |
 |---|---|---|
 | FR-CBT-152 | **`fell` on outcome lines** ([FR-STATS-26](stats.md#6-functional-requirements)). In the apply transaction, where FR-CBT-137 stamps `callout` (`cbt.applyCard`, `cbt.applyHp` damage, late damage), each target's line gets `payload.fell = "kill"` when its damage row goes `hpBefore > 0 → hpAfter = 0` on a monster that is not a companion, `"down"` on a PC or companion. No change to `formatLine`, line text, `hp_change` or events. **Player-safe:** a public line's target is visible and its band already reads "down" (FR-CBT-26); a hidden side keeps the line non-public (FR-CBT-24). Undo strikes the line as today (the flag stays; stats skip undone lines). Old rows parse (optional field). | CON-44 +14 B a line (measured) |
-| FR-CBT-153 | **End → summary through the rule hooks** (amends FR-CBT-61's order): stats registers `stats.fight-summary` in `rule-hooks.ts` (**append, last**; `ended` point only). Inside `cbt.end`'s transaction it reads the encounter's counted facts (indexed `hp_change_encounter`) and may `notify` kind `stats-fight-summary` ([FR-STATS-33](stats.md#6-functional-requirements), [FR-NOTE-68](notifications.md#6-functional-requirements)). Order: (1) `EncounterEnded`, then the `ended` hooks in registry order (CBTX's, then this `NotificationCreated`); (2) CBTX `NotificationResolved`; (3) FR-CBT-59's dismissals. A throw rolls End back. `lifecycle.ts`, the End confirms and rows don't change. | [ADR-0035](../architecture/adr/0035-combat-rule-hooks.md) |
+| FR-CBT-153 | **End → summary through the rule hooks** (amends FR-CBT-61's order): stats registers `stats.fight-summary` in `rule-hooks.ts` (**append, last**; `ended` point only). Inside `cbt.end`'s transaction it runs **one indexed existence query** (a counted fact of the encounter, and one with a public line, on `hp_change_encounter`; no Highlights build, so a stats bug can't block End beyond that query) and may `notify` kind `stats-fight-summary` ([FR-STATS-33](stats.md#6-functional-requirements), [FR-NOTE-68](notifications.md#6-functional-requirements)). Order: (1) `EncounterEnded`, then the `ended` hooks in registry order (CBTX's, then this `NotificationCreated`); (2) CBTX `NotificationResolved`; (3) FR-CBT-59's dismissals. A throw rolls End back. `lifecycle.ts`, the End confirms and rows don't change. | [ADR-0035](../architecture/adr/0035-combat-rule-hooks.md) |
 
 ## 7. UI/UX notes
 
@@ -995,7 +995,7 @@ Bundle **`stats`** (units `st-past-crypt`, `st-ambush-facts`; [stats §13](stats
 
 ### 13.5a Sprint 8 (track SB: CBT, STATS)
 
-Bundle **`stats-b`** (units `sb-fight-facts`, `sb-luck-rolls`; [stats §13.1](stats.md#131-sprint-8-tier-b)).
+Bundle **`stats-b`** (units `sb-fight-facts`, `sb-luck-rolls`, `sb-luck-reroll`; the first two join session-sim-12; [stats §13.1](stats.md#131-sprint-8-tier-b)).
 
 | Named test | Level | Checks |
 |---|---|---|
