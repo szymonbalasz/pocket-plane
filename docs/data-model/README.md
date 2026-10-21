@@ -2244,7 +2244,7 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-56 (OQ-SHELL-55 
 - **Persisted runtime state:** only `userSpot` in the layout entry.
 - **CON-44:** 0 B.
 
-## 100. Sprint 7: Inspiration reroll (GM1)
+## 101. Sprint 7: Inspiration reroll (GM1)
 
 From [gems](../specs/gems.md#8-data-model) FR-GEM-13, -19, [dice-roll-log](../specs/dice-roll-log.md#8-data-model) FR-DICE-62–64, -67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-126, -127 (#140, #315). **Built by `build/gems-reroll`**. Protocol side: [protocol §127](../protocol/README.md#127-sprint-7-inspiration-reroll-gm1). **No table or column change.**
 
