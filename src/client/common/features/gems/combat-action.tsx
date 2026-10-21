@@ -4,12 +4,12 @@
 // weapon die (base and extra parts, never mods / triggers), up to the level limit (1 / 2 / 3,
 // FR-GEM-26); a part entered as a physical total asks for each die first (FR-GEM-28, OQ-GEM-13 A).
 // "Spend" is the one confirm (FR-GEM-17); a reject shows inline (`gem-error`). Picker state is
-// client memory: a reconnect closes it (nothing sent).
+// client memory: a disconnect closes it (nothing sent, CBT §11).
 import { GEMS_FEATURE } from "@shared/campaign-management/features";
 import type { CardPartRef } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { XIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
@@ -220,6 +220,10 @@ function CombatGemPicker({ card, close }: { card: NotificationRecord; close(): v
 function CombatGem({ card }: { card: NotificationRecord; client: CardClient }) {
   const live = useSync((s) => s.state === "live");
   const [open, setOpen] = useState(false);
+  // CBT §11: a disconnect mid-pick sends nothing and closes the picker (the card is unchanged).
+  useEffect(() => {
+    if (!live) setOpen(false);
+  }, [live]);
   if (open) return <CombatGemPicker card={card} close={() => setOpen(false)} />;
   return (
     <Button

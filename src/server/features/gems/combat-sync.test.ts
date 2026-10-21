@@ -47,7 +47,8 @@ beforeAll(async () => {
     .all()
     .find((e) => e.name === "Brakka" && e.kind === "character");
   brakka = b?.id as string;
-  const attacks = (b?.statBlock as { attacks: { id: string; name: string }[] }).attacks;
+  const attacks =
+    (b?.statBlock as { attacks: { id: string; name: string }[] } | undefined)?.attacks ?? [];
   attackId = attacks.find((a) => a.name.startsWith("Flame Tongue"))?.id as string;
   attackerId = db
     .select()

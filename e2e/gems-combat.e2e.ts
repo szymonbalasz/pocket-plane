@@ -34,8 +34,10 @@ function attack(page: Page, manual: object[], manualExtra: object[]) {
           if (f.type === "snapshot" && !sent) {
             sent = true;
             const brakka = f.records?.entity?.find((e) => e.name === "Brakka");
-            const attacks = (brakka?.statBlock as { attacks: { id: string; name: string }[] })
-              .attacks;
+            const block = brakka?.statBlock as
+              | { attacks: { id: string; name: string }[] }
+              | undefined;
+            const attacks = block?.attacks ?? [];
             const attackId = attacks.find((a) => a.name.startsWith("Flame Tongue"))?.id;
             const attackerId = f.records?.combatant?.find((c) => c.name === "Brakka")?.id;
             const payload = { attackerId, attackId, manual, manualExtra };

@@ -43,7 +43,14 @@ function closure(name: string): string[] {
   return [...keys];
 }
 
-const GEM_BUNDLES = ["gems", "gems-hidden", "gems-e2e", "gems-reroll-e2e", "gems-ui-e2e"];
+const GEM_BUNDLES = [
+  "gems",
+  "gems-hidden",
+  "gems-e2e",
+  "gems-reroll-e2e",
+  "gems-ui-e2e",
+  "gems-combat-e2e",
+];
 
 async function frames(bundle: string) {
   const loaded = await loadBundle(bundle, { testMode: true });
