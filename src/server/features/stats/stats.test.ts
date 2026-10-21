@@ -12,6 +12,7 @@ import { GEM_ADJUST_INTENT } from "@shared/gems/schemas";
 import {
   ACK_MAX_BYTES,
   type DmFightRow,
+  SESSIONS_MAX,
   STATS_AWARDS_KIND,
   STATS_QUERY_INTENT,
   STATS_SHOW_AWARDS_INTENT,
@@ -304,14 +305,16 @@ describe("FR-STATS-16 read path", () => {
     expect(err.code).toBe("conflict");
   });
 
-  test("FR-STATS-25 limits: the worst ack stays ≤ 64 KB", () => {
+  test("FR-STATS-25 limits: sessions ≤ 200 newest; the worst ack stays ≤ 64 KB", () => {
     const t = statsSetup();
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < SESSIONS_MAX + 5; i++) {
       t.hp("Goblin", "damage", 1, { from: i % 2 ? "Thorn" : "Mira" });
       t.clock.advance(7 * HOUR);
     }
     const list = t.sessions().sessions;
-    expect(list.length).toBeGreaterThan(50);
+    expect(list).toHaveLength(SESSIONS_MAX);
+    // Newest first: the oldest five (the start's session included) are cut.
+    expect((list[0]?.fromN as number) > (list[1]?.fromN as number)).toBe(true);
     expect(JSON.stringify(list).length).toBeLessThan(ACK_MAX_BYTES);
     expect(JSON.stringify(t.fight()).length).toBeLessThan(ACK_MAX_BYTES);
     expect(JSON.stringify(t.session()).length).toBeLessThan(ACK_MAX_BYTES);

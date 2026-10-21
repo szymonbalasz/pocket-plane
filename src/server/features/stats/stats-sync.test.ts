@@ -27,6 +27,7 @@ import {
 } from "../../testing/harness";
 import { leaksIn } from "../combat-tracker/testing";
 import { NOTIFICATION_TYPE } from "../notifications/helpers";
+import { statsMemory } from "./index";
 
 let h: TestServer;
 let db: Db;
@@ -139,6 +140,14 @@ const ackText = (frames: readonly ServerFrame[]) =>
   JSON.stringify(frames.filter((f) => f.type === "ack"));
 
 describe("stats over real sockets (stats)", () => {
+  test("FR-STATS-14 cache warmed at start: the active campaign's sessions are read before any query", async () => {
+    await h.restart();
+    const campaignId = db.select().from(player).all()[0]?.campaignId as string;
+    const warmed = statsMemory(h.s).cache.lastN(campaignId);
+    expect(warmed).not.toBeNull();
+    expect(warmed).toBeGreaterThan(40);
+  });
+
   test("FR-STATS-05 leak scan per player: acks, after reconnect and after a hard restart carry no hidden fact", async () => {
     const dm = await h.live(DM);
     const dmFight = await result(dm, STATS_QUERY_INTENT, { scope: "fight" });
