@@ -1,17 +1,28 @@
 // Player view of `damage-card` (FR-CBT-30, FR-CBT-42): pending "Waiting for DM"; resolved one
 // part per target, "Hit Goblin: 6 · Hit Goblin 2: 3 (half) · Miss" (applied incl. rule-trigger
-// parts, FR-MOD-48). The card's offered parts muted after the damage (R7). No action.
+// parts, FR-MOD-48). The card's offered parts muted after the damage (R7). No action. Sprint 7:
+// "Critical changed by a reroll — roll damage again" while a crit flip waits (FR-CBT-127).
 
 import { DAMAGE_CARD_END_RULE } from "@shared/combat-tracker/end-rule";
 import { resolutionText } from "@shared/combat-tracker/rules";
-import { DAMAGE_CARD_KIND, DamageCardResolutionRead } from "@shared/combat-tracker/schemas";
+import {
+  CRIT_CHANGED_TEXT,
+  critChanged,
+  DAMAGE_CARD_KIND,
+  DamageCardPayload,
+  DamageCardResolutionRead,
+} from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { CardOffersText } from "@ui/features/effect-modifiers/card-offers";
 import { defineNotificationView } from "@ui/features/notifications/views";
 import { SwordIcon } from "lucide-react";
 
 export function outcomeText(n: NotificationRecord): string {
-  if (n.state === "pending") return "Waiting for DM";
+  if (n.state === "pending") {
+    // FR-CBT-127 (sprint 7): a reroll flipped the crit; the card waits for a new damage roll.
+    const p = DamageCardPayload.safeParse(n.payload);
+    return p.success && critChanged(p.data) ? CRIT_CHANGED_TEXT : "Waiting for DM";
+  }
   if (n.state === "dismissed") return "Dismissed";
   // Legacy single-target rows (from before the feedback pass) read as one part.
   const r = DamageCardResolutionRead.safeParse(n.resolution);

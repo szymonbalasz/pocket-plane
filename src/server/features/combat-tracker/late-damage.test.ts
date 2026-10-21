@@ -10,6 +10,7 @@ import {
   HIT_RULING_TYPE,
   type HpChangeRecord,
   type HpChangesResult,
+  partRollIdsOf,
 } from "@shared/combat-tracker/schemas";
 import type { GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { asc, eq, inArray } from "drizzle-orm";
@@ -29,6 +30,7 @@ const applyDamage = (t: S5Setup, cardId: string, targets: Target[], more: object
     cardId,
     damageTotal: c.damage?.total,
     damageRollId: c.damage?.rollId ?? null,
+    partRollIds: partRollIdsOf(c),
     targets,
     ...more,
   });
@@ -273,6 +275,7 @@ describe("FR-CBT-94 ordering", () => {
         cardId,
         damageTotal: 6,
         damageRollId: null,
+        partRollIds: partRollIdsOf(t.card(cardId).p),
         targets: [t.target("Goblin", true)],
       }),
     );
@@ -317,6 +320,7 @@ describe("FR-MOD-63 offers on a late roll", () => {
     t.run(applyHitCommand.name, {
       cardId,
       toHitTotal: 22,
+      partRollIds: partRollIdsOf(t.card(cardId)),
       targets: [{ targetId: t.id("Goblin"), hit: true, multiplier: "normal" }],
     });
     // Apply hit spends nothing and writes no `used` row.
@@ -330,6 +334,7 @@ describe("FR-MOD-63 offers on a late roll", () => {
       cardId,
       damageTotal: p.damage?.total,
       damageRollId: p.damage?.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: [
         {
           targetId: t.id("Goblin"),

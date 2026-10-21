@@ -7,6 +7,7 @@ import {
   type AttackResult,
   type HpChangeRecord,
   parseFullCard,
+  partRollIdsOf,
   type UndoResult,
 } from "@shared/combat-tracker/schemas";
 import type { CharacterRecord } from "@shared/entities/schemas";
@@ -123,6 +124,7 @@ export function cbtxSetup(opts: { round1?: boolean } = {}) {
       toHitTotal: p.toHit.total,
       damageTotal: p.damage.total,
       damageRollId: p.damage.rollId,
+      partRollIds: partRollIdsOf(p),
       targets: targets.map((n) => ({ targetId: id(n), hit: true, multiplier: "normal" })),
     });
     return { cardId: r.cardId, damage: p.damage.total };

@@ -1,6 +1,6 @@
-// gems commands (GEM §9): `gem.adjust` (DM award / remove, FR-GEM-07, -09) and the plain
-// `gem.spend` (FR-GEM-12–16). Both check the `gems` switch first (FR-GEM-03) and write count +
-// line + event in one transaction.
+// gems commands (GEM §9): `gem.adjust` (DM award / remove, FR-GEM-07, -09) and `gem.spend`: the
+// plain spends (FR-GEM-12–16) and the Inspiration reroll (FR-GEM-18–24, GM1). Both check the
+// `gems` switch first (FR-GEM-03) and write count + line(s) + event in one transaction.
 import { GEMS_FEATURE } from "@shared/campaign-management/features";
 import { GemSpent, GemsAdjusted } from "@shared/events/gems";
 import { gemsPhrase } from "@shared/gems/log-kinds";
@@ -20,7 +20,9 @@ import {
 import { defineCommand } from "../../commands/commands";
 import { conflict, invalid } from "../../commands/errors";
 import { assertFeatureOn } from "../campaign-management/features";
-import { gameLog } from "../dice-roll-log";
+import { cards } from "../combat-tracker/cards";
+import { dice, gameLog } from "../dice-roll-log";
+import { entryTarget, rerollTarget, targetByAudience, visibleEntry } from "./reroll";
 import { characterFor, heldOf, writeCount } from "./rows";
 
 /** FR-GEM-03: the reject of every `gem.*` intent while gems are off. */
@@ -65,35 +67,74 @@ export const adjustGems = defineCommand({
 
 /**
  * FR-GEM-12–16: the owner (or the DM, OQ-GEM-14 A) spends; too few → `conflict`. Count − cost +
- * a public `gem.spend` line (roller = sender, OQ-GEM-02 A) + `GemSpent`.
+ * a public `gem.spend` line (roller = sender, OQ-GEM-02 A) + `GemSpent`. FR-GEM-18–24: with
+ * `entryId`, an Inspiration gem rerolls that line's d20 (`dice.reroll`: new roll + new line, the
+ * old one superseded; roll hooks not re-run); the spend line comes first, its target detail by
+ * the target's audience (FR-GEM-13); a pending combat to-hit's card follows (FR-GEM-22).
  */
 export const spendGem = defineCommand({
   name: GEM_SPEND_INTENT,
   input: GemSpendInput,
   roles: ["dm", "player"],
-  execute({ characterId, gem, use }, env): GemSpendResult {
+  execute({ characterId, gem, use, entryId, manual }, env): GemSpendResult {
     assertFeatureOn(env, GEMS_FEATURE, GEMS_OFF);
     const ch = characterFor(env, characterId, { owner: true });
+    // FR-GEM-18: checked before anything is written (a reject writes nothing); a line the
+    // sender doesn't receive is `not_found` whatever they hold (GEM §11).
+    const target = entryId === undefined ? null : rerollTarget(env, ch, visibleEntry(env, entryId));
     const cost = spendCost(gem, use);
     const before = heldOf(env.tx, ch.id, gem);
     if (before === 0) throw conflict(`No ${GEM_NAME[gem]} gem left`);
     if (before < cost) throw conflict(`${gemsPhrase(gem, cost)} needed, ${before} left`);
     const held = before - cost;
     const count = writeCount(env, ch, gem, held);
+    const detail = target
+      ? targetByAudience(target.entry, entryTarget(target.entry, target.rollId))
+      : null;
     const line = gameLog.append(env, {
       kind: LOG_KIND_GEM_SPEND,
       category: "other",
       actorName: ch.name,
-      payload: { characterId: ch.id, gem, count: cost, ...(use ? { use } : {}) },
+      payload: {
+        characterId: ch.id,
+        gem,
+        count: cost,
+        ...(use ? { use } : {}),
+        ...(detail?.payload ?? {}),
+      },
+      ...(detail?.dmPayload ? { dmPayload: detail.dmPayload } : {}),
       rollIds: [],
       public: true,
     });
+    if (!target) {
+      env.emit({
+        type: GemSpent.type,
+        campaignId: ch.campaignId,
+        payload: { characterId: ch.id, gem, cost, held, entryId: line.id, rollIds: [] },
+        changes: [count, line],
+      });
+      return { held, entryId: line.id };
+    }
+    // FR-GEM-19, -21, -24: the new roll + line (audience copied), the old line superseded.
+    const rr = dice.reroll(env, { entryId: target.entry.id, rollId: target.rollId, manual });
     env.emit({
       type: GemSpent.type,
       campaignId: ch.campaignId,
-      payload: { characterId: ch.id, gem, cost, held, entryId: line.id, rollIds: [] },
-      changes: [count, line],
+      payload: {
+        characterId: ch.id,
+        gem,
+        cost,
+        held,
+        entryId: line.id,
+        rerollEntryId: rr.entry.id,
+        supersededEntryId: target.entry.id,
+        ...(target.card ? { cardId: target.card.id } : {}),
+        rollIds: [rr.roll.id],
+      },
+      changes: [count, line, rr.entry, rr.superseded],
     });
-    return { held, entryId: line.id };
+    // FR-GEM-22 (FR-CBT-126, -127): the card follows after the owner's event (protocol §22).
+    if (target.card) cards.replaceToHit(env, target.card.id, rr.item);
+    return { held, entryId: line.id, rerollEntryId: rr.entry.id };
   },
 });

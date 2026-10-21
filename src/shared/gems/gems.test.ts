@@ -38,9 +38,33 @@ describe("gems schemas and lines (GEM §6)", () => {
     expect(spend({ gem: "fortune", use: "bonus" })).toBe(false);
     expect(spend({ gem: "inspiration" })).toBe(true);
     expect(spend({ gem: "divine" })).toBe(true);
-    // GM0: the Combat gem needs a card (GM2); a reroll's `entryId` comes with GM1.
+    // The Combat gem needs a card (GM2). GM1: `entryId` on Inspiration only; `manual` with it.
     expect(spend({ gem: "combat" })).toBe(false);
-    expect(spend({ gem: "inspiration", entryId: "e1" })).toBe(false);
+    expect(spend({ gem: "inspiration", entryId: "e1" })).toBe(true);
+    expect(spend({ gem: "inspiration", entryId: "e1", manual: { diceTotal: 17 } })).toBe(true);
+    expect(spend({ gem: "fortune", entryId: "e1" })).toBe(false);
+    expect(spend({ gem: "inspiration", manual: { diceTotal: 17 } })).toBe(false);
+  });
+
+  test("FR-GEM-13 detail by audience / FR-GEM-19 line wording: a public target names the roll; a DM-only one only for the DM", () => {
+    const target = { kind: "entry", id: "e1", label: "Perception", from: 4 };
+    const full = (payload: object, dmPayload?: object) =>
+      lineText(
+        formatEntry({
+          kind: LOG_KIND_GEM_SPEND,
+          actorName: "Mira",
+          payload: { characterId: "c", gem: "inspiration", count: 1, ...payload },
+          ...(dmPayload ? { dmPayload } : {}),
+        }).segments,
+      );
+    expect(full({ target })).toBe("Mira spends an Inspiration gem — rerolls Perception (4)");
+    const secret = { ...target, label: "DM-SECRET-GEM" };
+    expect(full({ target: null })).toBe("Mira spends an Inspiration gem");
+    expect(full({ target: null }, { target: secret })).toBe(
+      "Mira spends an Inspiration gem — rerolls DM-SECRET-GEM (4)",
+    );
+    // No target at all: the plain spend (OQ-GEM-06 A).
+    expect(full({})).toBe("Mira spends an Inspiration gem — to recall");
   });
 
   test("FR-GEM-09 award line wording", () => {

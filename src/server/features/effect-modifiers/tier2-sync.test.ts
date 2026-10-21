@@ -8,7 +8,11 @@ import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
 import { loadInProcess } from "@server/features/fixtures-adapters/loader";
 import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
 import { AttackLogDmPayload } from "@shared/combat-tracker/log-kinds";
-import { COMBATANT_TYPE, type DamageCardPayload } from "@shared/combat-tracker/schemas";
+import {
+  COMBATANT_TYPE,
+  type DamageCardPayload,
+  partRollIdsOf,
+} from "@shared/combat-tracker/schemas";
 import { EFFECT_PRESET_TYPE, type EffectPresetRecord } from "@shared/effect-modifiers/schemas";
 import { eq } from "drizzle-orm";
 import { gameLogEntry, hpChange, notification } from "../../db/schema";
@@ -100,6 +104,7 @@ describe("FR-MOD-31 mod-tier2 fixture", () => {
       toHitTotal: 20,
       damageTotal: p.damage?.total,
       damageRollId: p.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(p),
       targets: [{ targetId: elite.id, hit: true, multiplier: "normal" }],
       public: true,
     });

@@ -9,6 +9,7 @@ import type {
   DamageCardPayload,
   HpChangeRecord,
 } from "@shared/combat-tracker/schemas";
+import { partRollIdsOf } from "@shared/combat-tracker/schemas";
 import {
   type DieResult,
   GAME_LOG_ENTRY_TYPE,
@@ -276,6 +277,7 @@ describe("FR-MOD-24/25 target side at apply (tier 2)", () => {
       toHitTotal,
       damageTotal: p.damage?.total,
       damageRollId: p.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(p),
       targets: [{ targetId: t.id(target), hit, multiplier: "normal" }],
     });
     const row = t.hpRows().at(-1) as HpChangeRecord;

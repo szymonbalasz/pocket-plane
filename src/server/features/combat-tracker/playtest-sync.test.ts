@@ -10,7 +10,7 @@ import { player } from "../../db/schema";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { leakScan } from "../../ws/testing/convergence";
-import { damageRollIdOf } from "./testing";
+import { damageRollIdOf, partRollIdsFor } from "./testing";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
 const LEAKS = ['"rolls"', "DM ruled", "DM set", "dmPayload"];
@@ -116,6 +116,7 @@ describe("playtest leaks over WS (mid-combat)", () => {
       toHitTotal: 13,
       damageTotal: 7,
       damageRollId: damageRollIdOf(dm.store.records.notification?.[cardId as string]),
+      partRollIds: partRollIdsFor(dm.store.records.notification?.[cardId as string]),
       targets: [{ targetId: mira.id, hit: true, multiplier: "normal" }],
       public: true,
     });

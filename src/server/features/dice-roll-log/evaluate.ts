@@ -106,7 +106,7 @@ const manualIssue = (message: string, path: (string | number)[] = []) =>
   invalid(message, [{ path: ["manual", ...path], message }]);
 
 /** Signed sum of kept dice with known values. */
-function keptSum(terms: DiceTerm[], dice: DieResult[]): number {
+export function keptSum(terms: DiceTerm[], dice: DieResult[]): number {
   let at = 0;
   let sum = 0;
   for (const t of terms) {
@@ -180,7 +180,7 @@ function rolledDice(env: CommandEnv, terms: Term[]): { dice: DieResult[]; librar
 }
 
 /** `natural` = the value of the single kept d20 (positive term), else null. */
-function naturalOf(terms: Term[], dice: DieResult[]): number | null {
+export function naturalOf(terms: Term[], dice: DieResult[]): number | null {
   const kept: DieResult[] = [];
   let at = 0;
   for (const t of diceTerms(terms)) {

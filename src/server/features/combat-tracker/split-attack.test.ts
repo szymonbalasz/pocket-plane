@@ -9,6 +9,7 @@ import {
   DamageCardPayload,
   type HpChangeRecord,
   type HpChangesResult,
+  partRollIdsOf,
   type RollDamageResult,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
@@ -94,6 +95,7 @@ function setup() {
     t.run<HpChangesResult>(applyCard.name, {
       cardId,
       damageRollId: card(cardId).p.damage?.rollId ?? null,
+      partRollIds: partRollIdsOf(card(cardId).p),
       ...input,
     });
   const target = (name: string, hit: boolean, multiplier = "normal") => ({
