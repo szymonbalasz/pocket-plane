@@ -8,10 +8,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| WF spec | `spec/s8-wf` (w94) | spec-wf | working | seams |
-| TT spec | `spec/s8-tt` (w95) | spec-tt | working | seams |
-| SB spec | `spec/s8-sb` (w96) | spec-sb | working | seams |
-| CB spec | `spec/s8-cb` (w97) | spec-cb | working | seams |
+| WF spec | `spec/s8-wf` (w94) | spec-wf | in-review, seams + reviews applied | DM gate 1 |
+| TT spec | `spec/s8-tt` (w95) | spec-tt | in-review, seams + reviews applied | DM gate 1 |
+| SB spec | `spec/s8-sb` (w96) | spec-sb | in-review, seams + reviews applied | DM gate 1 |
+| CB spec | `spec/s8-cb` (w97) | spec-cb | in-review, seams + reviews applied | DM gate 1 |
 
 ID ranges: `%TEMP%/pocket-plane/briefs/s8-ranges.md` (computed on `db8fe53b`); briefs `spec-s8-*.md`.
 
@@ -21,7 +21,7 @@ ID ranges: `%TEMP%/pocket-plane/briefs/s8-ranges.md` (computed on `db8fe53b`); b
 
 ## Pending DM decisions
 
-- None (sprint 8 starts with the kickoff prompt).
+- **Sprint 8 gate 1** (specs): `.verify/sprint8/gate.md` (picks, 4 proposed ADRs, build order; no new dependencies).
 
 ## Resolved locally (report at gate)
 
