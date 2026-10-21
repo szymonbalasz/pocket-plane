@@ -218,3 +218,55 @@ test("FR-MAP-92 resize refit: 1280×720 → 1440×900 while fitted (Game log + I
   expect(covered(resized, ESCORT, windows, V1440)).toEqual([]);
   console.info(`FR-MAP-92: ${cellPx(resized).toFixed(1)} px after 1280×720 → 1440×900`);
 });
+
+test("FR-MAP-90 no jump at Start: U13 (1440×900, Scenes 260×360 + Game log + Initiative 400×512, the card plus Start's initiative roll popup shown) → the appearance refit takes Fit's rule: every token clear of the windows at 36 px (was pcs at 48 px, Ogre, Wolf, Elite and Plain Brute under Initiative)", () => {
+  // fu-s7 after End (every Fire Elemental token removed) and Start "Escort to the Ford".
+  const tokens = SIM10_AMBUSH_DM.filter((t) => !t.name.startsWith("Fire Elemental"));
+  const windows = [{ x: 68, y: 60, w: 260, h: 360 }, GAME_LOG, { x: 1028, y: 60, w: 400, h: 512 }];
+  // The shown stack: the card (560, 100, 320 × 86) and one roll popup (320 × 190) below it.
+  const stack = { x: 560, y: 100, w: 320, h: 86 + 8 + 190 };
+  const kept = fitScene(tokens, AMBUSH_GRID, AMBUSH_MAP, V1440, room(V1440, windows, stack));
+  // The walkthrough's refit: the stack as an obstacle → pcs at 48 px, monsters under Initiative.
+  expect({ visible: kept.visible, cell: cellPx(kept) }).toEqual({ visible: "pcs", cell: 48 });
+  expect(covered(kept, named("Ogre", "Plain Brute"), windows, V1440)).toEqual([
+    "Plain Brute",
+    "Ogre",
+  ]);
+  // Fit's rule (FR-MAP-91): the strip-only fit keeps every token clear, so it wins over pcs.
+  const strip = room(V1440, windows);
+  const fit = fitPastToasts(
+    tokens,
+    AMBUSH_GRID,
+    AMBUSH_MAP,
+    V1440,
+    room(V1440, windows, stack),
+    strip,
+  );
+  expect({ visible: fit.visible, cell: cellPx(fit), past: fit.pastToasts }).toEqual({
+    visible: "all",
+    cell: 36,
+    past: true,
+  });
+  expect(covered(fit, tokens, windows, V1440)).toEqual([]);
+  // = pressing Fit once the popup has gone (the card alone: kept, all at 36 px).
+  const pressed = fitPastToasts(
+    tokens,
+    AMBUSH_GRID,
+    AMBUSH_MAP,
+    V1440,
+    room(V1440, windows, { ...stack, h: 86 }),
+    strip,
+  );
+  expect({ visible: pressed.visible, cell: cellPx(pressed) }).toEqual({ visible: "all", cell: 36 });
+  // Both pcs (nothing keeps every token clear) → the toasts stay clear (the first fit).
+  const crowded = [...windows, { x: 340, y: 60, w: 680, h: 520 }];
+  const both = fitPastToasts(
+    tokens,
+    AMBUSH_GRID,
+    AMBUSH_MAP,
+    V1440,
+    room(V1440, crowded, stack),
+    room(V1440, crowded),
+  );
+  expect({ visible: both.visible, past: both.pastToasts }).toEqual({ visible: "pcs", past: false });
+});

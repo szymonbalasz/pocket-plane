@@ -285,9 +285,10 @@ export function MapCanvas(props: MapCanvasProps) {
     }));
     const map = { w: scene.mapWidth, h: scene.mapHeight };
     const room = { areas: free.toastFreeAreas, obstacles, windowsOnly: free.areas };
-    // FR-MAP-91: Fit (button, Reset layout) and a resize may fit past the DM's shown card toasts.
+    // FR-MAP-91: Fit (button, Reset layout), a resize and (FR-MAP-90) an appearance refit may fit
+    // past the DM's shown stack.
     const fit =
-      reason === "fit" || reason === "resize"
+      reason === "fit" || reason === "resize" || reason === "appearance"
         ? fitPastToasts(fitTokens, grid, map, size, room, {
             ...free.stripOnly,
             windowsOnly: free.areas,

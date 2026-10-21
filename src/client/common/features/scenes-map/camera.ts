@@ -894,10 +894,13 @@ export function fitScene(
 export const FIT_PAST_TOASTS_SHARE = 0.75;
 
 /**
- * FR-MAP-91: the DM's Fit (button, Reset layout, resize) twice: with the shown stack as obstacle
- * (`room`, FR-MAP-80) and with only the summary strip (`stripRoom`); the first's cell below 75 %
- * of the second's → the second (`pastToasts`: a card toast may cover tokens until resolved), else
- * the first. Players (no shown stack): `room` alone.
+ * FR-MAP-91: the DM's Fit (button, Reset layout, resize; FR-MAP-90: the appearance refit too)
+ * twice: with the shown stack as obstacle (`room`, FR-MAP-80) and with only the summary strip
+ * (`stripRoom`). The first keeps every token clear (`all`) at ≥ 75 % of the second's cell → the
+ * first; else the second (`pastToasts`: the shown toasts and roll popups may cover tokens until
+ * they go) when it keeps every token clear or the first doesn't either; else the first. So a tall
+ * shown stack never turns an `all` Fit into FR-MAP-46's `pcs` (U13: Start's roll popup). Players
+ * (no shown stack): `room` alone.
  */
 export function fitPastToasts(
   tokens: readonly FitToken[],
@@ -910,9 +913,11 @@ export function fitPastToasts(
   const kept = fitScene(tokens, grid, map, view, room);
   if (stripRoom.obstacles.length === room.obstacles.length) return { ...kept, pastToasts: false };
   const past = fitScene(tokens, grid, map, view, stripRoom);
-  return kept.scale < FIT_PAST_TOASTS_SHARE * past.scale - EPS
-    ? { ...past, pastToasts: true }
-    : { ...kept, pastToasts: false };
+  const useKept =
+    kept.visible === "all"
+      ? kept.scale >= FIT_PAST_TOASTS_SHARE * past.scale - EPS
+      : past.visible !== "all";
+  return useKept ? { ...kept, pastToasts: false } : { ...past, pastToasts: true };
 }
 
 /**
