@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { WindowState } from "@shared/play-shell/layout";
 import { clampRect, type Rect, renderedRect, TOP_BAR_H, workArea } from "./geometry";
+import { brutePcArea, pcAreaOf } from "./layout-checks";
 import {
+  autoMinimiseOrder,
+  bandAt,
   defaultLayout,
   launcherState,
   launcherTooltip,
@@ -11,9 +14,12 @@ import {
   restoreLayout,
   serialise,
   topWindow,
+  useful,
+  usefulSize,
   type WindowAction,
   type Windows,
 } from "./manager";
+import { type PlacementToken, pcClear } from "./placement";
 import { createWindowRegistry, type WindowDef } from "./registry";
 
 const Body = () => null;
@@ -759,5 +765,239 @@ describe("sprint 6: reopen rule (FR-SHELL-56)", () => {
     };
     const r = restoreLayout(registry, JSON.stringify(entry), vp);
     expect(r.windows.map(rectOf)).toEqual(entry.windows.map((w) => rectOf(w as WindowState)));
+  });
+});
+
+describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", () => {
+  // 1280×720: the Game log bottom-left (band 412 above it), Initiative top-right, launcher
+  // windows top-left; `s7.card` declares a useful size (FR-SHELL-79).
+  const box = { w: 440, h: 400 };
+  const TL = { anchor: "top-left", dx: 56 } as const;
+  const s7 = createWindowRegistry("dm", [
+    def("sv.log", {
+      defaultOpen: true,
+      defaultSize: { w: 690, h: 160 },
+      minSize: { w: 300, h: 160 },
+      defaultPosition: { anchor: "bottom-left", dx: 56 },
+    }),
+    def("sv.init", {
+      defaultOpen: true,
+      defaultSize: { w: 400, h: 400 },
+      minSize: { w: 320, h: 240 },
+      defaultPosition: { anchor: "top-right" },
+    }),
+    def("sv.a", { defaultSize: box, minSize: { w: 300, h: 200 }, defaultPosition: TL }),
+    def("sv.b", { defaultSize: box, minSize: { w: 300, h: 200 }, defaultPosition: TL }),
+    def("sv.c", { defaultSize: box, minSize: { w: 300, h: 200 }, defaultPosition: TL }),
+    def("sv.card", {
+      defaultSize: { w: 320, h: 360 },
+      minSize: { w: 280, h: 240 },
+      usefulSize: { w: 320, h: 360 },
+      defaultPosition: TL,
+    }),
+  ]);
+  const small = { w: 1280, h: 720 };
+  const kinds = new Set(s7.defs.map((d) => d.kind));
+  const pc = (x: number, y: number) => ({ x, y, w: 42, h: 42, pc: true });
+  const rectOf = (r: Rect): Rect => ({ x: r.x, y: r.y, w: r.w, h: r.h });
+  const hits = (a: Rect, b: Rect) =>
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  const ctxWith = (tokens: PlacementToken[], log?: string[]): ManagerContext => ({
+    registry: s7,
+    viewport: small,
+    available: kinds,
+    avoid: () => tokens,
+    ...(log && { onAutoMinimise: (id: string, forKind: string) => log.push(`${id}>${forKind}`) }),
+  });
+  /** The default layout plus `s7.a` opened on an empty map: 68, 60, 440×400. */
+  const withA = () => reduce(defaultLayout(s7, small), { type: "open", kind: "sv.a" }, ctxWith([]));
+  const stateOf = (ws: Windows, kind: string) => get(ws, kind).state;
+  const defOf = (kind: string) => s7.get(kind) as WindowDef;
+
+  test("FR-SHELL-79 band and useful size: the Game log's top − 12 − the usable top; useful = usefulSize, else minOpenH, else min(default h, 360), capped by the band", () => {
+    const log = get(defaultLayout(s7, small), "sv.log");
+    expect(bandAt(s7, small)).toBe(log.y - 12 - 60);
+    expect(bandAt(s7, small)).toBe(412);
+    const a = defOf("sv.a");
+    expect(useful(a, small, s7)).toEqual({ w: 440, h: 360 });
+    expect(useful(defOf("sv.card"), small, s7)).toEqual({ w: 320, h: 360 });
+    expect(usefulSize({ ...a, minOpenH: 480 }, small, 412)).toEqual({ w: 440, h: 400 });
+    const tall = { ...a, defaultSize: { w: 440, h: 560 }, minOpenH: 480 };
+    expect(usefulSize(tall, small, 412).h).toBe(412);
+    expect(usefulSize({ ...a, defaultSize: { w: 440, h: 300 } }, small, 412).h).toBe(300);
+  });
+
+  test("FR-SHELL-77 auto-minimise instead of covering a PC: a clear spot over a PC + 4 px is not accepted; the look-ahead finds one → the first auto-minimisable window goes and the window lands clear and PC-free", () => {
+    // A PC in the only clear column (x 520–856): no PC-free spot there even at min size.
+    const tokens = [pc(660, 240)];
+    const log: string[] = [];
+    const ws = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(tokens, log));
+    expect(stateOf(ws, "sv.a")).toBe("minimised");
+    const b = get(ws, "sv.b");
+    expect(rectOf(b)).toEqual({ x: 68, y: 60, ...box });
+    expect(pcClear(b, tokens)).toBe(true);
+    expect(log).toEqual(["sv.a:main>sv.b"]);
+    // Same input twice → same windows auto-minimised and rect.
+    expect(reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(tokens))).toEqual(ws);
+  });
+
+  test("FR-SHELL-77 the look-ahead fails (no useful-size PC-free spot even with every launcher window gone): nothing is auto-minimised; shrink to a PC-free spot below the useful size, else the least PC area (not PC-clear)", () => {
+    // (d') at the min size: a shrunk PC-free spot that needs sv.a gone → sv.a is auto-minimised.
+    const minOnly = [pc(200, 200), pc(660, 240), pc(560, 100), pc(760, 400)];
+    const viaMin = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(minOnly));
+    expect(stateOf(viaMin, "sv.a")).toBe("minimised");
+    expect(pcClear(get(viaMin, "sv.b"), minOnly)).toBe(true);
+    // PCs under s7.a's spot and in the middle: no 440×360 PC-free spot on an empty map.
+    const hole = [pc(200, 200), pc(660, 300)];
+    const shrunk = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(hole));
+    expect(stateOf(shrunk, "sv.a")).toBe("open");
+    const b = get(shrunk, "sv.b");
+    expect(pcClear(b, hole)).toBe(true);
+    expect(b.w < 440 || b.h < 360).toBe(true); // below its useful size: only step (d) goes there
+    // No PC-free spot at all, not even at the min size with sv.a gone (PCs every 150 px): the
+    // clear spot over the least PC area, nothing auto-minimised.
+    const spread: PlacementToken[] = [];
+    for (let x = 80; x < 860; x += 150) for (let y = 70; y < 480; y += 150) spread.push(pc(x, y));
+    const last = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(spread));
+    expect(stateOf(last, "sv.a")).toBe("open");
+    const lb = get(last, "sv.b");
+    expect(pcClear(lb, spread)).toBe(false);
+    expect(hits(lb, get(last, "sv.a"))).toBe(false);
+    const scene = {
+      windows: [get(last, "sv.a"), get(last, "sv.init"), get(last, "sv.log")].map(rectOf),
+      hard: [],
+      tokens: spread,
+    };
+    expect(pcAreaOf(lb, spread)).toBeLessThanOrEqual(brutePcArea(defOf("sv.b"), small, scene));
+  });
+
+  test("FR-SHELL-77 a protected window (Initiative at Start) auto-minimises launcher windows for its spot, never a protected one", () => {
+    const home = rectOf(get(defaultLayout(s7, small), "sv.init"));
+    let ws = reduce(withA(), { type: "close", kind: "sv.init" }, ctxWith([]));
+    ws = reduce(ws, { type: "setRect", kind: "sv.a", rect: home }, ctxWith([]));
+    // PCs over the rest of the band.
+    const tokens: PlacementToken[] = [];
+    for (let x = 80; x < 800; x += 110) for (let y = 70; y < 470; y += 110) tokens.push(pc(x, y));
+    const log: string[] = [];
+    ws = reduce(ws, { type: "open", kind: "sv.init", by: "feature" }, ctxWith(tokens, log));
+    expect(stateOf(ws, "sv.a")).toBe("minimised");
+    expect(stateOf(ws, "sv.log")).toBe("open");
+    expect(rectOf(get(ws, "sv.init"))).toEqual(home);
+    expect(log).toEqual(["sv.a:main>sv.init"]);
+  });
+
+  test("FR-SHELL-78 auto-minimise order: lowest z first, ties → earlier in the entry, a window placed earlier in the sequence last; never protected, fixedDefault, unshown or the window placed", () => {
+    const at = (kind: string, z: number): WindowState => ({
+      kind,
+      instance: "main",
+      state: "open",
+      x: 68,
+      y: 60,
+      w: 300,
+      h: 200,
+      z,
+    });
+    const ws = [
+      at("sv.log", 1),
+      at("sv.init", 2),
+      at("sv.a", 5),
+      at("sv.b", 3),
+      at("sv.c", 3),
+      at("sv.card", 6),
+    ];
+    const c = ctxWith([]);
+    const order = (list: Windows, late?: Set<string>) =>
+      autoMinimiseOrder(list, c, "sv.card", "main", late).map((w) => w.kind);
+    expect(order(ws)).toEqual(["sv.b", "sv.c", "sv.a"]);
+    expect(order(ws, new Set(["sv.b:main"]))).toEqual(["sv.c", "sv.a", "sv.b"]);
+    const hidden = ws.map((w) => (w.kind === "sv.c" ? { ...w, state: "minimised" as const } : w));
+    expect(order(hidden)).toEqual(["sv.b", "sv.a"]);
+    // Through placement: two windows in the way; the least recently fronted goes first.
+    const tokens = [pc(660, 240)];
+    const both = reduce(
+      reduce(withA(), { type: "open", kind: "sv.c" }, ctxWith([])),
+      { type: "focus", kind: "sv.a" },
+      ctxWith([]),
+    );
+    const log: string[] = [];
+    const next = reduce(both, { type: "open", kind: "sv.b" }, ctxWith(tokens, log));
+    expect(log[0]).toBe("sv.c:main>sv.b");
+    expect(new Set(log).size).toBe(log.length); // each window at most once
+    expect(pcClear(get(next, "sv.b"), tokens)).toBe(true);
+  });
+
+  test("FR-SHELL-79 useful size before shrinking: a card with room only 300 px high PC-free auto-minimises the launcher window and opens at its useful 320×360 (sim-10 a03: 280×308)", () => {
+    const tokens = [pc(600, 380)];
+    const ws = reduce(withA(), { type: "open", kind: "sv.card" }, ctxWith(tokens));
+    expect(stateOf(ws, "sv.a")).toBe("minimised");
+    const card = get(ws, "sv.card");
+    expect({ w: card.w, h: card.h }).toEqual({ w: 320, h: 360 });
+    expect(pcClear(card, tokens)).toBe(true);
+  });
+
+  test("FR-SHELL-56 OQ-SHELL-55 B reopen keeps only spots the user set: a move sets userSpot, a shell placement clears it; a shell-chosen spot now over a PC is re-placed, a user's is kept", () => {
+    const tokens = [pc(100, 100)];
+    // Shell-chosen: s7.a auto-placed at 68,60 on an empty map, closed, a PC walks under it.
+    const shell = reduce(withA(), { type: "close", kind: "sv.a" }, ctxWith([]));
+    expect(get(shell, "sv.a").userSpot).toBeUndefined();
+    const reopened = reduce(shell, { type: "open", kind: "sv.a" }, ctxWith(tokens));
+    expect(pcClear(get(reopened, "sv.a"), tokens)).toBe(true);
+    // The user's: moved there (userSpot), closed, the PC under it → kept.
+    const spot = { x: 68, y: 60, ...box };
+    let user = reduce(withA(), { type: "setRect", kind: "sv.a", rect: spot }, ctxWith([]));
+    expect(get(user, "sv.a").userSpot).toBe(true);
+    user = reduce(user, { type: "close", kind: "sv.a" }, ctxWith([]));
+    user = reduce(user, { type: "open", kind: "sv.a" }, ctxWith(tokens));
+    expect(rectOf(get(user, "sv.a"))).toEqual(spot);
+    expect(get(user, "sv.a").userSpot).toBe(true);
+    // A covered reopen is auto-placed: userSpot dropped.
+    let covered = reduce(user, { type: "close", kind: "sv.a" }, ctxWith([]));
+    covered = reduce(covered, { type: "open", kind: "sv.b" }, ctxWith([]));
+    covered = reduce(covered, { type: "setRect", kind: "sv.b", rect: spot }, ctxWith([]));
+    covered = reduce(covered, { type: "open", kind: "sv.a" }, ctxWith([]));
+    expect(get(covered, "sv.a").userSpot).toBeUndefined();
+    // Round-trips through the entry; older entries without it parse (absent).
+    const raw = JSON.stringify(serialise(user, s7));
+    const back = restoreLayout(s7, raw, small).windows.find((w) => w.kind === "sv.a");
+    expect(back?.userSpot).toBe(true);
+  });
+
+  test("FR-SHELL-80 reset keeps the zones: the token-free default layout whatever tokens are drawn; other windows closed; fixedH cleared", () => {
+    const tokens = [pc(900, 100), pc(100, 520)];
+    const ws = reduce(withA(), { type: "reset" }, ctxWith(tokens));
+    expect(ws).toEqual(defaultLayout(s7, small));
+    expect(ws.some((w) => w.kind === "sv.a" || w.fixedH || w.userSpot)).toBe(false);
+  });
+
+  test("FR-SHELL-81 pushed windows return: back to the pre-push rect (userSpot with it) when clear, ignoring PCs; moved, taken or minimised ones stay", () => {
+    const tokens = [pc(100, 100)];
+    const bar = { x: 68, y: 60, w: 300, h: 44 };
+    const spot = { x: 68, y: 60, ...box };
+    const base = reduce(withA(), { type: "setRect", kind: "sv.a", rect: spot }, ctxWith([]));
+    const pushed = reduce(base, { type: "push", rect: bar }, ctxWith([]));
+    const at = rectOf(get(pushed, "sv.a"));
+    expect(at.x).toBe(bar.x + bar.w + 12);
+    expect(get(pushed, "sv.a").userSpot).toBeUndefined();
+    const memory = [{ kind: "sv.a", instance: "main", rect: spot, userSpot: true as const, at }];
+    const ret = (ws: Windows, t: PlacementToken[] = []) =>
+      reduce(ws, { type: "return" }, { ...ctxWith(t), prePush: () => memory });
+    const back = ret(pushed, tokens);
+    expect(rectOf(get(back, "sv.a"))).toEqual(spot); // a PC under it: back all the same
+    expect(get(back, "sv.a").userSpot).toBe(true);
+    // Moved since the push: stays.
+    const moved = { ...at, x: at.x + 20 };
+    const dragged = reduce(pushed, { type: "setRect", kind: "sv.a", rect: moved }, ctxWith([]));
+    expect(ret(dragged)).toBe(dragged);
+    // Its old spot now taken by another window: stays.
+    let taken = reduce(pushed, { type: "open", kind: "sv.b" }, ctxWith([]));
+    taken = reduce(
+      taken,
+      { type: "setRect", kind: "sv.b", rect: { x: 68, y: 60, w: 300, h: 200 } },
+      ctxWith([]),
+    );
+    expect(rectOf(get(ret(taken), "sv.a"))).toEqual(at);
+    // Minimised meanwhile: stays minimised.
+    const parked = reduce(pushed, { type: "minimise", kind: "sv.a" }, ctxWith([]));
+    expect(get(ret(parked), "sv.a").state).toBe("minimised");
   });
 });

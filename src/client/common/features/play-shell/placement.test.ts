@@ -60,7 +60,7 @@ describe("open placement (FR-SHELL-08, -45)", () => {
 
   test("default rect clear → default rect", () => {
     const home = { x: EDGE_GAP, y: TOP_BAR_H + EDGE_GAP, w: 300, h: 200 };
-    expect(placeWindow(def(), vp)).toEqual({ rect: home, clear: true });
+    expect(placeWindow(def(), vp)).toEqual({ rect: home, clear: true, pcClear: true });
     const elsewhere = { x: 800, y: 300, w: 300, h: 300 };
     expect(place(def(), vp, { windows: [elsewhere] })).toEqual(home);
   });
@@ -217,7 +217,7 @@ describe("sprint 5 placement (FR-SHELL-46–48, -51)", () => {
 
   test("FR-SHELL-46 inward column for 10 windows × 200 token boxes: same inputs, same rect (timed in ./placement.bench.ts)", () => {
     const placed = placeWindow(tall, vp, { windows: benchWindows, tokens: benchTokens });
-    expect(placed).toEqual({ rect: { x: 1288, y: 424, w: 300, h: 400 }, clear: false });
+    expect(placed).toMatchObject({ rect: { x: 1288, y: 424, w: 300, h: 400 }, clear: false });
     expect(placeWindow(tall, vp, { windows: benchWindows, tokens: benchTokens })).toEqual(placed);
   });
 
@@ -428,7 +428,7 @@ describe("sprint 6 placement (FR-SHELL-57, -58)", () => {
     });
     expect(placeWindow(tall, vp, input).rect).toEqual({ x: 1288, y: 424, w: 300, h: 400 });
     // A window that may also narrow (min width < width) searches the columns twice.
-    expect(placeWindow(cmp, vp, input)).toEqual({
+    expect(placeWindow(cmp, vp, input)).toMatchObject({
       rect: { x: 68, y: 524, w: 440, h: 300 },
       clear: false,
     });

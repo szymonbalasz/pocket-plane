@@ -96,3 +96,10 @@ export function tokenScreenBoxes(
       return { x: box.left + r.x, y: box.top + r.y, w: r.width, h: r.height, id: n.id() };
     });
 }
+
+/**
+ * A PC for auto placement's PC rule (FR-SHELL-57, -77): a player character's token, i.e. a
+ * character (`characterId`) with an owner. An owned pet or summon (no `characterId`) is not one.
+ */
+export const isPlacementPc = (t: { ownerPlayerId?: string | null; characterId?: string | null }) =>
+  (t.characterId ?? null) !== null && (t.ownerPlayerId ?? null) !== null;

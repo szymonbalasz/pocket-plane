@@ -33,6 +33,7 @@ import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from ".
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
 import { useFreeArea } from "../play-shell/free-area";
+import { isKeyboardFocus, spaceAction, trackFocusModality } from "../play-shell/keys";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
   type Camera,
@@ -102,7 +103,6 @@ import {
   stagePans,
   type ToolPointer,
   tokenTakesLeftPress,
-  typingTarget,
 } from "./tools";
 
 export interface MapCanvasProps {
@@ -208,8 +208,8 @@ export function MapCanvas(props: MapCanvasProps) {
   spaceRef.current = space;
   /** The pointer is over the canvas (Space pans then even while a button has focus). */
   const overMap = useRef(false);
-  /** Space taken from a focused button: its keyup must not click it either. */
-  const spaceFromButton = useRef(false);
+  /** Space taken for a pan (from a focused control too): its keyup must not click it either. */
+  const spaceTaken = useRef(false);
   useEffect(() => useMapTool.setState({ client }), [client]);
   const sendIntent = useMapIntent();
   const sendIntentRef = useRef(sendIntent);
@@ -380,6 +380,13 @@ export function MapCanvas(props: MapCanvasProps) {
       r.dispose();
     };
   }, [onCamera]);
+  // FR-SHELL-80: Reset layout on this page runs one Fit, with the windows it wrote.
+  const seenFits = useRef(free.fitRequests);
+  useEffect(() => {
+    if (free.fitRequests === seenFits.current) return;
+    seenFits.current = free.fitRequests;
+    onCamera("fit");
+  }, [free.fitRequests, onCamera]);
   // FR-MAP-45: the rail's Fit button.
   useEffect(
     () =>
@@ -815,26 +822,28 @@ export function MapCanvas(props: MapCanvasProps) {
       signal: sendSignal,
     };
   };
-  // Space + drag pans with any tool; typing in a field keeps Space. A focused button (e.g. a fog
-  // bar toggle just clicked) keeps Space only while the pointer is off the map: over the map,
-  // Space pans and never presses the button (FR-FOG-17).
+  // Space + drag pans with any tool; typing in a field keeps Space. A focused control presses on
+  // Space when Tab put focus there or the pointer is off the map; focused by the pointer (e.g. a
+  // fog bar toggle just clicked) with the pointer over the map, Space pans and never presses it
+  // (FR-SHELL-83, #199, FR-FOG-17).
   useEffect(() => {
+    trackFocusModality(document);
     const down = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
-      const button = (e.target as { tagName?: string } | null)?.tagName === "BUTTON";
-      if (typingTarget(e.target) && !(button && overMap.current)) return;
+      const opts = { keyboard: isKeyboardFocus(e.target), overMap: overMap.current };
+      if (spaceAction(e.target, opts) === "browser") return;
       e.preventDefault();
-      if (button) spaceFromButton.current = true;
+      spaceTaken.current = true;
       if (!spaceRef.current) setSpace(true);
     };
     const up = (e: KeyboardEvent) => {
       if (e.code !== "Space") return;
-      if (spaceFromButton.current) e.preventDefault();
-      spaceFromButton.current = false;
+      if (spaceTaken.current) e.preventDefault();
+      spaceTaken.current = false;
       setSpace(false);
     };
     const blur = () => {
-      spaceFromButton.current = false;
+      spaceTaken.current = false;
       setSpace(false);
     };
     window.addEventListener("keydown", down);
@@ -1035,6 +1044,9 @@ export function MapCanvas(props: MapCanvasProps) {
       data-testid="map-canvas"
       role="application"
       aria-label="Map canvas"
+      // FR-SHELL-83: a press on the map takes focus off the last control clicked.
+      tabIndex={-1}
+      onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
       data-scene-id={scene.id}
       data-tool={tool}
       data-drawing={drawing}
@@ -1054,7 +1066,7 @@ export function MapCanvas(props: MapCanvasProps) {
       data-fit-rect={fitRect}
       data-fit-reason={fitReason}
       data-loading={loading}
-      className="absolute inset-0"
+      className="absolute inset-0 outline-none"
       style={{
         cursor: panning
           ? "grabbing"

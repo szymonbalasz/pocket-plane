@@ -9,6 +9,7 @@ import {
   TooltipController,
   TooltipGroup,
 } from "./overlays";
+import { currentStop, rovingMove, rowStops } from "./roving";
 
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
@@ -211,5 +212,63 @@ describe("FR-SHELL-31 suppression", () => {
     expect(overlayOpenOn(el({ "aria-expanded": "false" }))).toBe(false);
     expect(overlayOpenOn(el({ "aria-expanded": "true" }))).toBe(true);
     expect(overlayOpenOn(el({ [OVERLAY_OPEN_ATTR]: "true" }))).toBe(true);
+  });
+});
+
+describe("FR-SHELL-84 tooltips on keyboard focus", () => {
+  test("FR-SHELL-84 tooltips on focus: Tab onto a trigger → open after 400 ms; blur or Escape → gone; a click focus → none; the next Tab focus opens again", () => {
+    const t = tip();
+    t.ctl.focus(true); // Tab
+    jest.advanceTimersByTime(400);
+    expect(t.ctl.open).toBe(true);
+    t.ctl.blur();
+    expect(t.ctl.open).toBe(false);
+    t.ctl.focus(true);
+    jest.advanceTimersByTime(400);
+    expect(t.ctl.open).toBe(true);
+    t.ctl.dismiss(); // Escape (Radix's dismissable layer → onOpenChange(false))
+    expect(t.ctl.open).toBe(false);
+    t.ctl.blur();
+    // A click: pointer down latches, the pointer focus doesn't open.
+    t.ctl.pointerMove();
+    t.ctl.press();
+    t.ctl.focus(false);
+    jest.advanceTimersByTime(2000);
+    expect(t.ctl.open).toBe(false);
+    // Tabbing away and back (the latch clears on blur): opens again.
+    t.ctl.blur();
+    t.ctl.pointerLeave();
+    t.ctl.focus(true);
+    jest.advanceTimersByTime(400);
+    expect(t.ctl.open).toBe(true);
+  });
+
+  test("FR-SHELL-84 roving tabIndex: one tab stop per chip row; ←/→ (Home / End) move between its chips and stop at the ends; the last focused chip keeps the stop", () => {
+    expect(rovingMove("ArrowRight", 0, 3)).toBe(1);
+    expect(rovingMove("ArrowRight", 2, 3)).toBe(2);
+    expect(rovingMove("ArrowLeft", 0, 3)).toBe(0);
+    expect(rovingMove("ArrowLeft", 2, 3)).toBe(1);
+    expect(rovingMove("Home", 2, 3)).toBe(0);
+    expect(rovingMove("End", 0, 3)).toBe(2);
+    expect(rovingMove("Tab", 0, 3)).toBeNull();
+    expect(rovingMove("ArrowRight", 0, 0)).toBeNull();
+    // A chip inside its menu button (the DM's chips) is reached through the button, once.
+    const host = new Map([
+      ["chip-a", "menu-a"],
+      ["chip-b", "chip-b"],
+      ["more", "more"],
+    ]);
+    const stops = rowStops(["chip-a", "chip-b", "more"], (t) => host.get(t) ?? t);
+    expect(stops).toEqual(["menu-a", "chip-b", "more"]);
+    expect(rowStops(["x", "x2"], () => "btn")).toEqual(["btn"]);
+    expect(currentStop(stops, undefined)).toBe(0);
+    expect(currentStop(stops, "more")).toBe(2);
+    expect(currentStop(stops, "gone")).toBe(0);
+  });
+
+  test("FR-SHELL-84 every shared Tooltip trigger is enrolled (marked, made reachable) in overlays.tsx", () => {
+    const src = readFileSync(join(import.meta.dir, "overlays.tsx"), "utf8");
+    expect(src).toContain("[TIP_ATTR]");
+    expect(src).toContain("enrollTrigger(trigger)");
   });
 });

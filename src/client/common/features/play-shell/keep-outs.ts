@@ -77,7 +77,8 @@ export function keepOutsAttr(list: readonly KeepOut[]): string {
     .join(";");
 }
 
-const subscribe = (fn: () => void) => {
+/** Calls `fn` after every reported change (FR-SHELL-81: a tool bar going returns windows). */
+export const subscribeKeepOuts = (fn: () => void) => {
   listeners.add(fn);
   return () => {
     listeners.delete(fn);
@@ -87,6 +88,6 @@ const subscribe = (fn: () => void) => {
 /** This client's keep-out regions now; re-renders on viewport resize and on reports. */
 export function useKeepOuts(client: ShellClient): KeepOut[] {
   const vp = useViewport();
-  const reports = useSyncExternalStore(subscribe, reportedKeepOuts, reportedKeepOuts);
+  const reports = useSyncExternalStore(subscribeKeepOuts, reportedKeepOuts, reportedKeepOuts);
   return useMemo(() => keepOuts(client, vp, reports), [client, vp, reports]);
 }

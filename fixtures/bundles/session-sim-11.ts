@@ -13,6 +13,8 @@ export default defineBundle({
     // GM: gems (no unit: gems off by default, switched on live in the walkthrough)
     // ST: stats (a past session in the log: `st-past-crypt`, ST core)
     // FU: sprint-6 follow-ups (`cp-ally` charmed Goblin 2 + `fu-hurt-goblins`, FU-combat)
+    // FU1: no new unit (the window frame walks on session-sim-10's Goblin Ambush; layout tests
+    // use its cells in test-cells.ts)
     // FU4: a type-less fixture Goblin's Compendium row "CR 1/4 · Small" (FR-CMP-58)
     "cmp-goblin-untyped",
     "cp-ally",
