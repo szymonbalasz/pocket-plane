@@ -212,14 +212,17 @@ describe("FR-GEM-19 / FR-DICE-62–64 Inspiration reroll", () => {
 
   test("FR-GEM-23 final value / FR-DICE-67 final roll: only the final roll counts, nat 20 once", () => {
     const t = setup();
+    const all = () => t.s.db.select().from(gameLogEntry).all() as GameLogEntryRecord[];
+    // The setup's real-dice rolls (initiative) may land on 20 too; count only this test's.
+    const before = countedRollIds(all());
     const a = t.rollAs({ dice: [20] });
     const r = t.spend(a.entryId, { manual: { diceTotal: 20 } });
-    const entries = t.s.db.select().from(gameLogEntry).all() as GameLogEntryRecord[];
-    const counted = countedRollIds(entries);
+    const counted = countedRollIds(all());
     const newRoll = (t.items(r.rerollEntryId as string)[0] as RollPayloadItem).rollId;
+    expect([t.rollRow(a.rollId)?.natural, t.rollRow(newRoll)?.natural]).toEqual([20, 20]);
     expect(counted.has(a.rollId)).toBe(false);
     expect(counted.has(newRoll)).toBe(true);
-    const nat20 = [...counted].filter((id) => t.rollRow(id)?.natural === 20);
+    const nat20 = [...counted].filter((id) => !before.has(id) && t.rollRow(id)?.natural === 20);
     expect(nat20).toEqual([newRoll]);
   });
 
