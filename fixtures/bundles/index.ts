@@ -67,6 +67,7 @@ import sessionSim11 from "./session-sim-11";
 import stats from "./stats";
 import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
+import statsWindowE2e from "./stats-window-e2e";
 import syncProbe from "./sync-probe";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
@@ -161,4 +162,6 @@ export const bundles: readonly Bundle[] = [
   statsE2e,
   // Sprint 7 track GM (build/gems-sheet)
   gemsUiE2e,
+  // Sprint 7 track ST (build/st-window)
+  statsWindowE2e,
 ];

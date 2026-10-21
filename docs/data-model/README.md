@@ -2291,3 +2291,11 @@ From [stats](../specs/stats.md#8-data-model) and [combat-tracker](../specs/comba
 - **Derived (not stored):** every stat, sessions (a ≥ 6 h gap between consecutive entries; key = first `n`; a fact belongs to its line's session by `n`, never by `at`), fight labels.
 - **Persisted runtime state:** none. Server memory only: the session boundary cache and the query memo / rate gate.
 - **Fixtures:** `st-past-crypt` (ended "Old Crypt": Thorn vs 2 Skeletons, one callout, Mira downed and healed back, a public nat 20), `st-ambush-facts` (4 Goblin Scouts + 13 facts on sim-10's Goblin Ambush; expected numbers in `fixtures/units/stats/stats.fixtures.test.ts`).
+
+## 104. Sprint 7: Stats window (ST2)
+
+From [stats](../specs/stats.md#8-data-model) FR-STATS-17–20, -22, -24 and [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-93, -94. **Built by `build/st-window`**. Protocol side: [protocol §133](../protocol/README.md#133-sprint-7-stats-window--fight-leaderboard-session-awards-live-refresh-overkill-toast-show-awards-st2). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** nothing aggregated; the window shows the `stats.query` ack as is. Picker labels ("Tue 20 Oct · 19:02–23:41 · 3 fights", "Today") from the ack's `from` / `to` / `fights` in browser local time.
+- **Client view state (page memory, never sent or stored):** per viewer (`<campaignId>.<dm | playerId>`) `{tab: "fight" | "session", fightKey: string | null, sessionFromN: number | null}` (null = the server's default fight / the newest session); the overkill toast's toasted line ids (≤ 200).
+- **Persisted runtime state:** none; the layout entry of `stats.board` follows play-shell's per-browser layout (FR-SHELL-17).
