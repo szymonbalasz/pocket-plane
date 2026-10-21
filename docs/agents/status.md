@@ -2,16 +2,18 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 7 **done** (#313–#332), recap done (#333, #334). **Sprint 8 planned** in [sprint-8](sprint-8.md); Phase A starts with the DM's kickoff prompt.
+**Phase:** Sprint 8 **Phase A** (specs), started 2026-10-21 ([sprint-8](sprint-8.md)).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| Sprint 7 | merged | — | done (#313–#332), recap #333 | — |
-| Sprint 8 | — | — | planned ([sprint-8](sprint-8.md)) | Phase A: specs WF, TT, SB, CB at once |
+| WF spec | `spec/s8-wf` (w94) | spec-wf | working | seams |
+| TT spec | `spec/s8-tt` (w95) | spec-tt | working | seams |
+| SB spec | `spec/s8-sb` (w96) | spec-sb | working | seams |
+| CB spec | `spec/s8-cb` (w97) | spec-cb | working | seams |
 
-ID ranges: assigned per track in the sprint-8 spec briefs (sprint 7's are in the sprint-7 status history / briefs `spec-s7-*.md`; compute current maxima first).
+ID ranges: `%TEMP%/pocket-plane/briefs/s8-ranges.md` (computed on `db8fe53b`); briefs `spec-s8-*.md`.
 
 ## Shared-file locks
 

@@ -35,7 +35,7 @@ DM decisions #333 (sprint-7 recap: a window-frame pass with a stated 1280×720 p
 
 | Date | What |
 |---|---|
-| — | Not started (kickoff prompt from the sprint-7 recap) |
+| 2026-10-21 | Phase A started: WF, TT, SB, CB spec agents at once, new FR / OQ ID ranges per track |
 
 ## Check `main` any time (DM)
 
