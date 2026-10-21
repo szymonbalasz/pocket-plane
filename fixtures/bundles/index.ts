@@ -64,6 +64,9 @@ import sessionSim8 from "./session-sim-8";
 import sessionSim9 from "./session-sim-9";
 import sessionSim10 from "./session-sim-10";
 import sessionSim11 from "./session-sim-11";
+import stats from "./stats";
+import statsE2e from "./stats-e2e";
+import statsPast from "./stats-past";
 import syncProbe from "./sync-probe";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
@@ -152,6 +155,10 @@ export const bundles: readonly Bundle[] = [
   gemsE2e,
   // Sprint 7 track GM (build/gems-reroll)
   gemsRerollE2e,
+  // Sprint 7 track ST (fix/st-core)
+  statsPast,
+  stats,
+  statsE2e,
   // Sprint 7 track GM (build/gems-sheet)
   gemsUiE2e,
 ];

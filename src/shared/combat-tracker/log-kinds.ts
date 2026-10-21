@@ -19,6 +19,8 @@ import {
 } from "./schemas";
 
 const Multiplier = z.enum(["normal", "half", "none", "double"]);
+/** FR-CBT-137: an outcome line's callout flag (`"overkill"`; absent = none). */
+const Callout = z.literal("overkill");
 
 /**
  * effect-modifiers (FR-MOD-20, -38, -47): one rule-trigger part an apply landed on this target,
@@ -128,6 +130,11 @@ export const AttackLogPayload = z.strictObject({
    * damage segments (`damage` 0). Absent = an outcome line; old rows parse.
    */
   awaitingDamage: z.literal(true).optional(),
+  /**
+   * FR-CBT-137 (sprint 7, FR-STATS-21): the overkill callout, player-safe (the amount is
+   * `dmPayload.overkill`). Absent = none; old rows parse.
+   */
+  callout: Callout.optional(),
 });
 export type AttackLogPayload = z.infer<typeof AttackLogPayload>;
 
@@ -238,6 +245,13 @@ export const HpLogPayload = z.strictObject({
   targetName: z.string(),
   kind: z.enum(["damage", "heal"]),
   amount: z.int(),
+  /**
+   * FR-CBT-136 (sprint 7): the line's actor is a combatant source, not the DM: "Sela → Mira, heal
+   * 8". Absent = the DM's line as before; old rows parse.
+   */
+  sourced: z.literal(true).optional(),
+  /** FR-CBT-137 (sprint 7): as on `cbt.attack`. */
+  callout: Callout.optional(),
 });
 export type HpLogPayload = z.infer<typeof HpLogPayload>;
 
@@ -247,11 +261,30 @@ export const HpLogDmPayload = z.strictObject({
   hpAfter: z.int(),
   /** combat-extras (FR-CBTX-39): damage taken by temp HP; absent / 0 = none. */
   absorbed: z.int().min(0).optional(),
+  /** FR-CBT-137 (sprint 7): the overkill amount of a callout line (DM only). Absent = none. */
+  overkill: z.int().min(0).optional(),
 });
 
 /** FR-CBTX-39: the DM line's "(3 absorbed by temp HP)"; players' line unchanged. */
 const absorbedSegments = (dm: { absorbed?: number } | null | undefined): LineSegment[] =>
   dm?.absorbed ? [{ text: ` (${dm.absorbed} absorbed by temp HP)`, style: "muted" }] : [];
+
+/**
+ * FR-CBT-137: " — Overkill!" for everyone; the DM's line adds " (+23 over 7 HP)" (the HP needed
+ * = the line's damage − the overkill, temp HP included).
+ */
+function calloutSegments(
+  callout: "overkill" | undefined,
+  damage: number,
+  overkill: number | undefined,
+): LineSegment[] {
+  if (!callout) return [];
+  const out: LineSegment[] = [{ text: " — Overkill!" }];
+  if (overkill !== undefined) {
+    out.push({ text: ` (+${overkill} over ${damage - overkill} HP)`, style: "muted" });
+  }
+  return out;
+}
 
 const MULT_TEXT = { normal: "", half: " (half)", none: " (none)", double: " (double)" } as const;
 
@@ -381,6 +414,7 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       out.push(...damageSegments(p, dm, suffix));
       if (damageBadge) out.push(...PHYSICAL);
       out.push(...absorbedSegments(dm));
+      out.push(...calloutSegments(p.callout, p.damage, dm?.overkill));
       return out;
     }
     out.push({ text: ` attacks ${p.targetName}: ` });
@@ -417,17 +451,33 @@ export const attackLogKind = defineLogKind<AttackLogPayload, z.infer<typeof Atta
       out.push(...damageSegments(p, dm, ""));
       if (damageBadge) out.push(...PHYSICAL);
       out.push(...absorbedSegments(dm));
+      out.push(...calloutSegments(p.callout, p.damage, dm?.overkill));
     }
     return out;
   },
 });
 
-/** "DM — Mira takes 5 damage" / "DM — Mira heals 5". */
+/**
+ * "DM — Mira takes 5 damage" / "DM — Mira heals 5"; a sourced line (FR-CBT-136) reads "Sela →
+ * Mira, heal 8" / "Goblin → Mira, 8 damage", as the undo Tooltip does (FR-CBT-80).
+ */
 export const hpLogKind = defineLogKind<HpLogPayload, z.infer<typeof HpLogDmPayload>>({
   kind: LOG_KIND_HP,
   payload: HpLogPayload,
   dmPayload: HpLogDmPayload,
   formatLine({ actorName, payload: p, dmPayload: dm }) {
+    const callout = calloutSegments(p.callout, p.amount, dm?.overkill);
+    if (p.sourced) {
+      return [
+        { text: actorName, style: "actor" },
+        { text: ` → ${p.targetName}, ` },
+        ...(p.kind === "damage"
+          ? [{ text: String(p.amount), style: "total" as const }, { text: " damage" }]
+          : [{ text: "heal " }, { text: String(p.amount), style: "total" as const }]),
+        ...absorbedSegments(dm),
+        ...callout,
+      ];
+    }
     return [
       { text: actorName, style: "actor" },
       { text: " — " },
@@ -437,6 +487,7 @@ export const hpLogKind = defineLogKind<HpLogPayload, z.infer<typeof HpLogDmPaylo
       { text: String(p.amount), style: "total" },
       { text: p.kind === "damage" ? " damage" : " HP" },
       ...absorbedSegments(dm),
+      ...callout,
     ];
   },
 });

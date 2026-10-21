@@ -105,6 +105,8 @@ import mtCrowd from "./scenes-map/mt-crowd";
 import scenesExtras from "./scenes-map/scenes-extras";
 import thornTown from "./scenes-map/thorn-town";
 import town from "./scenes-map/town";
+import stAmbushFacts from "./stats/st-ambush-facts";
+import stPastCrypt from "./stats/st-past-crypt";
 
 export const units: readonly Fixture[] = [
   campaign,
@@ -218,4 +220,7 @@ export const units: readonly Fixture[] = [
   gemsHidden,
   // Sprint 7 track GM (build/gems-reroll): Mira's lines for the Inspiration reroll
   gemsRolls,
+  // Sprint 7 track ST (fix/st-core): stats facts
+  stPastCrypt,
+  stAmbushFacts,
 ];

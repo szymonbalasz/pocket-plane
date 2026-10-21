@@ -7,6 +7,7 @@ import { summonCardKind } from "../combat-tracker/summon-card-kind";
 import { modTriggerKind } from "../effect-modifiers/reminders";
 import { handoutSharedKind } from "../party-board/kind";
 import { lootReceivedKind } from "../party-loot/kind";
+import { statsAwardsKind } from "../stats/kind";
 import type { NotificationKindDef } from "./kind";
 import { testKind } from "./test-kind";
 
@@ -20,4 +21,5 @@ export const notificationKinds: readonly NotificationKindDef[] = [
   modTriggerKind, // mod-trigger (effect-modifiers, FR-MOD-44)
   handoutSharedKind, // handout-shared (party-board, FR-PARTY-06)
   summonCardKind, // cbt-summon-concentration (combat-tracker, FR-CBT-120)
+  statsAwardsKind, // stats-awards (stats, FR-NOTE-48)
 ];

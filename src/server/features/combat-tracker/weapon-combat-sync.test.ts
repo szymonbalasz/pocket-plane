@@ -123,7 +123,8 @@ describe("weapon parts over WS (rules-effects)", () => {
     expect(lastLine(dm)).toContain("+ 4 fire (half) (2d6: 2 + 6) damage");
     for (const c of [p1, p2]) {
       expect(lastLine(c)).toBe(
-        "Brakka attacks Goblin: 14 + 8 = 22 — DM: hit. 13 slashing + 4 fire (half) damage (physical)",
+        // FR-CBT-137 (sprint 7): 17 on the 7 HP Goblin is an overkill callout.
+        "Brakka attacks Goblin: 14 + 8 = 22 — DM: hit. 13 slashing + 4 fire (half) damage (physical) — Overkill!",
       );
       expect(
         (attackEntries(c).at(-1)?.payload as AttackLogPayload | undefined)?.damageParts,
