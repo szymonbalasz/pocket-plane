@@ -2377,3 +2377,17 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0
 - **Fixtures:** no new unit; bundles `wf-frame`, `wf-frame-e2e` (= `session-sim-11`). Harness cells `replay-cells.generated.ts` (from `session-sim-11`, `UPDATE_CELLS=1`).
 - **Persisted runtime state:** `userSize` in the layout entry (0 B on the wire).
 - **CON-44:** 0 B.
+
+## 110. Sprint 8: pause screen (TT4)
+
+From [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-46, -47 and [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-125–129, -136 (#334, #335). **Built by `build/tt-pause`**; no schema change (TT0's `campaign.pause`). Protocol side: [protocol §140](../protocol/README.md#140-sprint-8-pause-screen--camppause--campresume-the-card-the-dm-control-tt4).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| `campaign.pause` | written only by `camp.pause` (new: `startedAt` = now; update: kept; fields left out kept) and `camp.resume` (→ null), with the event in the same transaction | FR-CAMP-47 |
+| DM draft `pp.pause.v1.<campaignId>` | `localStorage`: `{message, imageAssetId \| null, backInMin \| null}`; junk → empty; never sent | FR-SHELL-129 |
+| Pause gate, deferred opens, suppression | client memory per page (players); rebuilt from the snapshot | FR-SHELL-127 |
+
+- **Derived:** countdown from `backAt` on the client clock; paused = a player whose campaign row has `pause`.
+- **Fixtures:** `camp-paused`; bundles `table-tools-paused`, `table-tools-paused-e2e`.
+- **CON-44:** 0 B beyond TT0's measured +488 B (paused).
