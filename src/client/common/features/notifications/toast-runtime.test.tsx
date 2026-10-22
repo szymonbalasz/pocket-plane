@@ -13,6 +13,7 @@ import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { PRESENT_POPUP_Z } from "../party-board/present-logic";
 import { reportKeepOut } from "../play-shell/keep-outs";
+import { OVERLAY_LAYER_Z } from "../play-shell/OverlayLayer";
 import { createWindowRegistry, type ShellClient } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { NOTIFICATION_TYPE } from "./logic";
@@ -269,7 +270,7 @@ describe("FR-NOTE-50 toast policy (runtime)", () => {
 describe("FR-NOTE-50 toast policy (layer)", () => {
   test("FR-NOTE-50 toast policy (layer): the stack sits above dialogs (z-50) and the alert flash (z-100), below the overlay layer (1000) and the present popup", () => {
     expect(TOAST_STACK_Z).toBeGreaterThan(100);
-    expect(TOAST_STACK_Z).toBeLessThan(1000);
+    expect(TOAST_STACK_Z).toBeLessThan(OVERLAY_LAYER_Z); // a blocksInput overlay sits above
     expect(TOAST_STACK_Z).toBeLessThan(PRESENT_POPUP_Z);
     const tag = stackTag("dm");
     expect(tag).toContain(`z-index:${TOAST_STACK_Z}`);

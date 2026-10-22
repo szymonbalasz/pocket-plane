@@ -1,6 +1,6 @@
 // `note.history` body (FR-NOTE-17): Pending, then History, newest first; DM audience tags and
 // Dismiss; test-mode send form (FR-NOTE-22). Marks notifications seen while open (FR-NOTE-18).
-// *(Sprint 8, WF4)* Compact rows (FR-SHELL-100: pending + 5 rows whole at the useful 360 × 412):
+// *(Sprint 8, WF4)* Compact rows (FR-SHELL-100: pending + 3 rows whole at the useful 360 × 412):
 // the row's time, badges and buttons share one line with small buttons; the test form comes last.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { useContext, useEffect, useLayoutEffect } from "react";
