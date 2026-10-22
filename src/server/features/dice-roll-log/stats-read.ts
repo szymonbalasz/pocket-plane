@@ -53,6 +53,8 @@ export interface RollFact extends StatsRoll {
   public: boolean;
   /** FR-DICE-89: the first counted listing entry's `n` (sessions are `n` ranges). */
   n: number;
+  /** The roll's actor name (a combat roll names its combatant). */
+  actorName: string;
   /** That entry's encounter (FR-STATS-32), or null. */
   encounterId: string | null;
   /** FR-DICE-89: physical dice. */
@@ -61,6 +63,8 @@ export interface RollFact extends StatsRoll {
   d20: number[];
   /** The roll has a d20 die at all (a physical several-dice total has no values). */
   hasD20: boolean;
+  /** Set by stats (an owned creature's roll, ADR-0056); absent from this helper. */
+  owned?: boolean;
 }
 
 interface StoredDie {
@@ -95,12 +99,13 @@ export function rollFacts(
     category: string;
     actorKind: string;
     actorId: string | null;
+    actorName: string;
     manual: number;
     dice: string;
     replaces: string | null;
   }>(sql`SELECT e.n AS n, e.kind AS kind, e.public AS public, e.encounter_id AS encounterId,
       r.id AS rollId, r.natural AS natural, r.category AS category, r.actor_kind AS actorKind,
-      r.actor_id AS actorId, r.manual AS manual, r.dice AS dice, r.replaces_roll_id AS replaces
+      r.actor_id AS actorId, r.actor_name AS actorName, r.manual AS manual, r.dice AS dice, r.replaces_roll_id AS replaces
     FROM game_log_entry e, json_each(e.roll_ids) j JOIN roll r ON r.id = j.value
     WHERE e.campaign_id = ${campaignId} AND e.undone = 0 AND e.superseded_by IS NULL${range}
     ORDER BY e.n`);
@@ -120,6 +125,7 @@ export function rollFacts(
       category: x.category,
       actorKind: x.actorKind,
       actorId: x.actorId,
+      actorName: x.actorName,
       public: pub,
       n: x.n,
       encounterId: x.encounterId,

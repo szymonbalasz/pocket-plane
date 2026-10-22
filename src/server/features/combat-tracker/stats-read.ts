@@ -3,9 +3,9 @@
 // change only by the undo marker; `raw`, `applied`, `overkill`, `hpBefore`, `hpAfter`, the temp
 // fields and `entryId` keep their meaning (FR-CBT-22, FR-CBTX-15). Stats never write combat rows.
 import type { StatsFact, StatsSide } from "@shared/stats/rules";
-import { and, asc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
 import type { Tx } from "../../db/client";
-import { combatant, encounter, gameLogEntry, hpChange } from "../../db/schema";
+import { combatant, encounter, entity, gameLogEntry, hpChange, token } from "../../db/schema";
 
 type Read = Pick<Tx, "select">;
 
@@ -302,4 +302,56 @@ export function standingOf(db: Read, encounterId: string): StandingRow[] {
     .all()
     .filter((c) => c.ownerCharacterId === null && !c.removed && (c.hpCurrent ?? 1) > 0)
     .map((c) => ({ id: c.id, name: c.name, hidden: c.hidden }));
+}
+
+/** The campaign's owned creatures as roll actors (ADR-0056: a pet, summon or companion). */
+export interface OwnedActors {
+  /** Pet entities (`companionOf` set). */
+  entities: Set<string>;
+  /** Tokens with an owning player. */
+  tokens: Set<string>;
+  /** `${encounterId}|${entityId}|${name}` of combatants with an owner (combat rolls name them). */
+  combatants: Set<string>;
+  /**
+   * `${entityId}|${name}` of owned combatants that no unowned combatant shares: a roll whose line
+   * names no encounter (the DM's `dice.roll` as a combatant).
+   */
+  named: Set<string>;
+}
+
+export const ownedCombatantKey = (encounterId: string, entityId: string, name: string) =>
+  `${encounterId}|${entityId}|${name}`;
+
+/** Every owned creature of a campaign now (current owner, FR-STATS-09): three small reads. */
+export function ownedActors(db: Read, campaignId: string): OwnedActors {
+  const entities = db
+    .select({ id: entity.id })
+    .from(entity)
+    .where(and(eq(entity.campaignId, campaignId), isNotNull(entity.companionOf)))
+    .all();
+  const tokens = db
+    .select({ id: token.id })
+    .from(token)
+    .where(and(eq(token.campaignId, campaignId), isNotNull(token.ownerPlayerId)))
+    .all();
+  const all = db
+    .select({
+      e: combatant.encounterId,
+      entityId: combatant.entityId,
+      name: combatant.name,
+      owner: combatant.ownerCharacterId,
+    })
+    .from(combatant)
+    .where(eq(combatant.campaignId, campaignId))
+    .all();
+  const owned = all.filter((c) => c.owner !== null);
+  const unowned = new Set(
+    all.filter((c) => c.owner === null).map((c) => `${c.entityId}|${c.name}`),
+  );
+  return {
+    entities: new Set(entities.map((r) => r.id)),
+    tokens: new Set(tokens.map((r) => r.id)),
+    combatants: new Set(owned.map((c) => ownedCombatantKey(c.e, c.entityId, c.name))),
+    named: new Set(owned.map((c) => `${c.entityId}|${c.name}`).filter((k) => !unowned.has(k))),
+  };
 }

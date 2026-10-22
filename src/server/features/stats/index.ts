@@ -6,6 +6,8 @@
 import { COMBATANT_TYPE, ENCOUNTER_TYPE, HP_CHANGE_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import type { RecordChange } from "../../events/types";
 import type { Feature, Services } from "../../services";
 import { activeCampaign } from "../campaign-management/commands";
 import { campaignFeatures } from "../campaign-management/features";
@@ -23,6 +25,13 @@ const FACT_TYPES: ReadonlySet<string> = new Set([
   ENTITY_TYPE,
   "campaign",
 ]);
+
+/** A token's owner changed (luck skips owned tokens' rolls); token moves never stale stats. */
+const tokenOwnerChanged = (c: RecordChange): boolean => {
+  if (c.type !== TOKEN_TYPE || !c.before || !c.after) return false;
+  const owner = (x: unknown) => (x as { ownerPlayerId?: string | null }).ownerPlayerId ?? null;
+  return owner(c.before) !== owner(c.after);
+};
 
 interface StatsMemory {
   cache: SessionCache;
@@ -74,7 +83,7 @@ export const stats: Feature = {
     // FR-STATS-46: the same listener drops the touched sessions' partials (ADR-0062 §2).
     r.afterCommit("stats-version", ({ event }) => {
       if (event.campaignId === null) return;
-      if (!event.changes.some((c) => FACT_TYPES.has(c.type))) return;
+      if (!event.changes.some((c) => FACT_TYPES.has(c.type) || tokenOwnerChanged(c))) return;
       gate.bump(event.campaignId);
       partials.invalidate(event.campaignId, event.changes);
     });

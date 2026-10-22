@@ -218,6 +218,37 @@ describe("FR-STATS-37 which rolls count", () => {
   });
 });
 
+describe("FR-STATS-39 owned creatures (gate pick 6)", () => {
+  test("FR-STATS-39 owned creatures' rolls count nowhere: not the owner's row, not DM dice; an unowned monster's are DM dice", async () => {
+    const t = statsSetup();
+    t.run(CBT_INTENTS.setCompanion, {
+      combatantId: t.id("Goblin 2"),
+      owner: { characterId: t.miraId },
+    });
+    const { combatantIds } = t.run<{ combatantIds: string[] }>(CBT_INTENTS.summon, {
+      encounterId: t.enc.id,
+      definitionId: t.h.wolfId,
+      count: 1,
+      ownerCharacterId: t.thornId,
+    });
+    const asCombatant = (combatantId: string) =>
+      t.run(ROLL, {
+        expression: "1d20",
+        category: "attack",
+        actor: { combatantId },
+        manual: { diceTotal: 20 },
+      });
+    asCombatant(t.id("Goblin 2")); // Mira's companion
+    asCombatant(combatantIds[0] as string); // Thorn's summon
+    asCombatant(t.id("Goblin")); // unowned: DM dice
+    expect(t.luck().rows.map((r) => [r.key, r.rolls, r.nat20])).toEqual([[DM_DICE_KEY, 1, 1]]);
+    expect((await campaignLuck(t)).rows).toEqual(cold(t, "dm").luck);
+    // Current owner: released, Goblin 2's past roll is an unowned monster's (DM dice).
+    t.run(CBT_INTENTS.setCompanion, { combatantId: t.id("Goblin 2"), owner: null });
+    expect(t.luck().rows.map((r) => [r.key, r.rolls])).toEqual([[DM_DICE_KEY, 2]]);
+  });
+});
+
 describe("FR-DICE-89 luck fields", () => {
   test("FR-DICE-89 luck fields: advantage gives both faces; a physical several-dice total none; campaign = union of sessions", () => {
     const t = statsSetup();

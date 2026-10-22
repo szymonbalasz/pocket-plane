@@ -38,6 +38,8 @@ import {
   fightActorIds,
   fightCombatants,
   fightsOf,
+  ownedActors,
+  ownedCombatantKey,
   publicFactEncounters,
   standingOf,
 } from "../combat-tracker/stats-read";
@@ -262,6 +264,28 @@ export function awardsPayload(s: SessionBounds, features: readonly string[]) {
 // ---------- luck and trophies (sprint 8, FR-STATS-37–46) ----------
 
 /**
+ * Luck's counted rolls of `fromN…toN` (absent: the campaign), each marked `owned` when its actor is
+ * an owned creature now (a pet entity, an owned token, an owned combatant by its line's encounter
+ * and name): integrator ruling (SB0 gate pick 6), such rolls count nowhere.
+ */
+export function luckRolls(r: StatsRead, fromN?: number, toN?: number): RollFact[] {
+  const rolls = rollFacts(r.db, r.viewer, r.campaignId, fromN, toN);
+  const o = ownedActors(r.db, r.campaignId);
+  for (const x of rolls) {
+    if (x.actorId === null) continue;
+    if (x.actorKind === "token") x.owned = o.tokens.has(x.actorId);
+    else if (x.actorKind === "entity") {
+      x.owned =
+        o.entities.has(x.actorId) ||
+        (x.encounterId !== null &&
+          o.combatants.has(ownedCombatantKey(x.encounterId, x.actorId, x.actorName))) ||
+        o.named.has(`${x.actorId}|${x.actorName}`);
+    }
+  }
+  return rolls;
+}
+
+/**
  * `stats.query {scope: "luck"}` (FR-STATS-40): one session the viewer can list (`n` inside it;
  * absent = the newest) read now, or the campaign from the session partials (FR-STATS-46).
  */
@@ -281,12 +305,7 @@ export function luckStats(
   const hit = pickSession(r, sessions, input.n);
   if (!hit) return { luck: { scope: "session" as const, rows: [] } };
   const tallies = new Map<string, LuckTally>();
-  addLuck(
-    tallies,
-    rollFacts(r.db, r.viewer, r.campaignId, hit.s.fromN, hit.s.toN),
-    chars,
-    r.viewer.role,
-  );
+  addLuck(tallies, luckRolls(r, hit.s.fromN, hit.s.toN), chars, r.viewer.role);
   return {
     luck: {
       scope: "session" as const,

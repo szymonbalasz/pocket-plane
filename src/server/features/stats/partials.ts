@@ -5,6 +5,8 @@
 // partials; a combatant's owner / kind change or a feature switch drops all. Unsure → drop all.
 import { COMBATANT_TYPE, HP_CHANGE_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
+import { ENTITY_TYPE } from "@shared/entities/schemas";
+import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { type SessionBounds, type StatsCharacter, sessionOf } from "@shared/stats/rules";
 import {
   addLuck,
@@ -19,8 +21,8 @@ import type { Tx } from "../../db/client";
 import { gameLogEntry } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { combatFacts } from "../combat-tracker/stats-read";
-import { entryVisible, rollFacts } from "../dice-roll-log/stats-read";
-import type { StatsRead } from "./compute";
+import { entryVisible } from "../dice-roll-log/stats-read";
+import { luckRolls, type StatsRead } from "./compute";
 
 type Read = Pick<Tx, "select" | "all">;
 
@@ -65,7 +67,7 @@ export function computePartials(
     xs.push(f);
     factsBy.set(s.fromN, xs);
   }
-  const rolls = rollFacts(r.db, r.viewer, r.campaignId, first.fromN, last.toN);
+  const rolls = luckRolls(r, first.fromN, last.toN);
   const rollsBy = new Map<number, typeof rolls>();
   for (const x of rolls) {
     const s = sessionOf(sessions, x.n);
@@ -292,6 +294,13 @@ export class Partials {
           (before.kind !== after.kind ||
             (before.ownerCharacterId ?? null) !== (after.ownerCharacterId ?? null))
         ) {
+          this.dropAll(campaignId);
+          return;
+        }
+      } else if (c.type === ENTITY_TYPE || c.type === TOKEN_TYPE) {
+        // An owned creature's rolls count nowhere (gate pick 6): a pet's or token's owner change.
+        const field = c.type === ENTITY_TYPE ? "companionOf" : "ownerPlayerId";
+        if (before && after && (before[field] ?? null) !== (after[field] ?? null)) {
           this.dropAll(campaignId);
           return;
         }

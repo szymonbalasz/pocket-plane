@@ -38,6 +38,8 @@ export interface LuckRoll extends StatsRoll {
   /** Every d20 face with a value, kept and dropped. */
   d20: readonly number[];
   hasD20: boolean;
+  /** An owned creature's roll (a pet, summon or companion, ADR-0056); set by the server. */
+  owned?: boolean;
 }
 
 // ---------- credit ----------
@@ -262,7 +264,8 @@ const luckTally = (): LuckTally => ({ rolls: 0, d20s: 0, d20Sum: 0, nat20: 0, na
 
 /**
  * FR-STATS-37, -39: the row a counted roll lands on: a party character (a character actor), else
- * the DM's `dm-dice` (DM, monster and token actors); a player's "Me" roll counts nowhere. Null =
+ * the DM's `dm-dice` (the DM, unowned monsters, unowned tokens); a player's "Me" roll and an owned
+ * creature's (pet, summon, companion) count nowhere. Null =
  * not counted (initiative, no d20).
  */
 export function luckKeyOf(
@@ -271,6 +274,8 @@ export function luckKeyOf(
 ): string | null {
   if (r.category === "initiative" || !r.hasD20) return null;
   if (r.actorKind === "player") return null;
+  // Integrator ruling (SB0 gate pick 6): an owned creature's roll counts nowhere, not its owner's row nor DM dice.
+  if (r.owned) return null;
   if (r.actorKind === "entity" && r.actorId !== null && characters.has(r.actorId)) {
     return r.actorId;
   }
