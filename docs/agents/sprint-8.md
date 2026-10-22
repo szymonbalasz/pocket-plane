@@ -51,6 +51,73 @@ DM decisions #333 (sprint-7 recap: a window-frame pass with a stated 1280×720 p
 | 2026-10-22 | **SB1+SB2 merged** (kill-feed callouts batched per hit, Highlights + End summary opening Stats on the fight, Luck tab, Trophies sheet tab, Kill feed preference; BL-69 default fight, BL-71). **CB2 merged** (current-turn ring for everyone who may know the turn; dashed for hidden on the DM; 16 / 16). TT4 pause screen (last slice) adding its stats hooks. Main after SB1+SB2 + CB2: check 5141 / e2e 205 |
 | 2026-10-22 | **TT4 merged** (pause / intermission screen: full-screen card with message, image, back-in countdown; every input blocked incl. popups; requests, dice, toasts, kill feed, summary and refits held until resume; one sound at resume; survives reconnect and restart; walkthroughs 13 / 14 → fixed, final 9 / 9). **All sprint-8 slices merged** |
 | 2026-10-22 | Main with every slice: check 5164 / e2e 206. Quiet-machine bench: 38 / 39 gates (placer settle 24–27 ms vs 25 ms → BL-82). **Sprint gate:** session-sim-12 started on final `main` |
+| 2026-10-22 | **Sprint gate:** session-sim-12 **14 / 16 PASS** on final `main` (leak scan clean incl. macros, requests, hidden answers, sounds, initiative numbers, Party status, kills, trophies, luck; hard kill while paused with a request open restarted byte-identical). sim-11 FAILs g and h **fixed**; BL-66, BL-69 (default fight), BL-70, BL-71 fixed. FAILs → BL-83 (DM toast stack leaves its home band over PCs), BL-84 (no DM kill-feed toast for hidden kills); glitches → BL-85–BL-90. [Playtest: sprint 8 features](#playtest-sprint-8-features) written. Paused for the recap |
+
+
+## Playtest: sprint 8 features
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-12 report](../../.verify/20261022-194052-session-sim-12/report.md) (local, gitignored): **14 / 16 PASS** on final `main` (check 5,164, e2e 206), leak scan clean for both players, a hard kill while paused with a request open restarted byte-identical. Both sim-11 FAILs (windows on Mira at 1280×720, the players' reveal refit with the companion card) are fixed. The two new FAILs are the first known gaps below.
+
+### Setup
+
+```powershell
+git pull; bun install
+bun run build
+bun run fixtures:reset-load session-sim-12 --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL (paste the secret) and each player link in its own browser. Town may be live at load: show Goblin Ambush from the Scenes window; close Player 1's presented-handout popup if it appears. Other bundles: `table-tools` (macros, an open roll request, the Chime sound picked), `table-tools-paused` (the table starts paused), `stats-b` (a fight with known kill / luck numbers), `combat-polish` (ties, a fogged Goblin, Party status values), `wf-frame` (the window walkthrough set). To switch: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; player links change on every load.
+
+### Part 1: windows (`session-sim-12`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Browser at 1280×720, Game log + Initiative open; open Compendium, Party, Encounters, Stats | None lands on Mira, Brakka or Thorn (a 4-px gap); each opens at a readable size, or the least recently used launcher window is put away first |
+| 2 | Resize to 1440×900, then back to 1280×720, then 1440×900 | Windows come back to the same places and sizes (Game log 1150×240 at 1440) |
+| 3 | Pick the Fog tool, drag a window under its bar, then close the tool | Windows are pushed off the bar (never onto a PC) and go back when the tool closes; every Fog control is clickable |
+| 4 | Drag a window onto Mira yourself, close it, reopen it | It stays where you put it |
+| 5 | Player 1 at 1280×720: open the Owlbear's card, then you **Reveal all** | Player 1's map zooms *out* (never in) so no newly revealed token sits under the sheet; same after a reload |
+| 6 | Several pending damage cards at once; an error while a dialog is open | At most 3 toasts + "+N more"; errors stay readable above dialogs; the stack goes back home after a tool closes |
+
+### Part 2: table tools (`session-sim-12`, or `table-tools`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1: Mira's sheet → **Macros** tab → Sneak Attack (enter physical dice 3, 4, 5) | "Mira — Sneak Attack: 3 + 4 + 5 = 12 physical" for everyone; no damage card. Player 2 can't edit your DM macro on Thorn |
+| 2 | Player 1: dice tray `1d20+2` → **Save as macro** | It appears under Mira; Player 2 sees nothing |
+| 3 | Game log roll bar → Options → **Request…**: All PCs, Perception, hidden | Each player gets a prompt naming the PC ("DM: Perception · Mira"); answers show only to you and that player; one sound per player |
+| 4 | Request "Mira: DEX save", DC 15 shown, public; Player 2 **Declines** another; your **Requests** window → **Roll for missing** | Your window shows ✓ / ✗ / Declined per PC; Player 1 reloads with a prompt open → it comes back quietly |
+| 5 | Top bar **Pause** → message, image, back in 5 min | Players get the full-screen card + countdown + sound; nothing behind it reacts (keys, wheel, drags, popups); you keep working; Preview shows you their card |
+| 6 | While paused: send a request, kill a monster, End a fight; then **Resume** | Players see none of it until Resume; then exactly one sound, the prompt, the fight summary |
+| 7 | Players window → Options → **Alert sounds**: pick the Chime for "turn"; try a too-big or too-long file | The Chime plays for Player 1 on Mira's turn (not if muted); too-big / too-long files are refused inline |
+
+### Part 3: stats (`session-sim-12`, or `stats-b`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Kill a monster; hit two monsters with one card | One toast per hit ("Thorn finished Goblin 4", yours adds the overkill); players never see amounts or hidden names |
+| 2 | **End** the fight | A "Fight summary" toast and Stats opens on that fight with Highlights for everyone (players: public facts only; you also see Still standing) |
+| 3 | Stats → **Luck** (session and Campaign) | Rolls, d20s, average, nat 20s / 1s per character; "DM dice" only for you |
+| 4 | Player 1: Mira's sheet → **Trophies** | Lifetime totals + records; Player 2 has no Trophies tab on Mira |
+| 5 | Player 2: Preferences → Stats → Kill feed off | No kill toasts for Player 2 |
+
+### Part 4: combat polish (`session-sim-12`, or `combat-polish`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Initiative: drag a row by its grip inside a tie, then across numbers; row menu → Move up / down | The order sticks through rounds; players never see a monster's or a hidden creature's number; a hint if a move skips or repeats a turn |
+| 2 | **Next** through a round | A ring on the current turn's token for everyone who may know the turn; hidden / fogged combatants: a dashed ring only for you |
+| 3 | Players: launcher → **Party status** | Each PC's HP, temp HP and AC live (companions under their owners); no monsters; a hidden companion isn't listed for others |
+
+### Known gaps / later
+
+- **The DM toast stack can leave its home band (FAIL c):** at 1280×720 with Scenes moved it sat at the left edge over Mira; at 1440×900 with Fog open it slid over the party (BL-83).
+- **No DM kill-feed toast for hidden kills (FAIL h):** public kills toast, hidden ones only show in Highlights (BL-84).
+- A window put away to make room doesn't come back when the other one closes (BL-85); after 1280 → 1440 → 1280 the DM map stays zoomed in (BL-86); opening Party status or a sheet at 1440 shrinks the Game log for good (BL-87); a card toast can cover the Notifications window's Apply (BL-88); a monster added mid-combat leaves its initiative popup over the map (BL-89); small ones in BL-90.
+- Today's fight still reads "Thu 1 Jan" with a huge duration (fixture clock, BL-69's other half).
+- The placer's speed check sits right at its 25 ms limit (BL-82).
+- Other players can see a draft PC in Party status (BL-79); the DM launcher shows full labels only from 1920 px wide (BL-80).
 
 ## Check `main` any time (DM)
 
