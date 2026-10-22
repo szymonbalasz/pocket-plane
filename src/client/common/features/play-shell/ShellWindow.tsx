@@ -260,7 +260,7 @@ export function ShellWindow({
           </button>
         </Tooltip>
       </div>
-      <div ref={bodyRef} className="min-h-0 flex-1 overflow-auto p-3">
+      <div ref={bodyRef} data-testid="ui-window-body" className="min-h-0 flex-1 overflow-auto p-3">
         <WindowErrorBoundary>
           <WindowShown.Provider value={!parked}>
             {def.growToContent ? (
