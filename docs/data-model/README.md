@@ -2324,7 +2324,7 @@ From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-65–67 and
 | Field | Change | Rule | Source |
 |---|---|---|---|
 | `combatant.tie_order` / `tieOrder` | + int ≥ 1, **nullable, no default** (push-safe `ADD COLUMN`); DM only (every player redaction omits it, as `position`) | the DM's order inside a group of equal initiative, 1…k (gaps allowed); written only by `cbtx.moveCombatant`; null on a row whose number changes otherwise (`cbt.setInitiative`, `cbt.rollInitiative`) and on rows riding their owner; kept by remove / restore, hide / reveal, death; End leaves it on the inactive rows; a new fight starts null | FR-CBTX-66, FR-CBT-163 |
-| `combatant.initiative` | also written by `cbtx.moveCombatant` (`initRollId` → null on a change) | the A′ rule: a private row takes the anchor's number; a visible PC only another visible PC's | FR-CBTX-65 |
+| `combatant.initiative` | also written by `cbtx.moveCombatant` (`initRollId` → null on a change) | the A′ rule: a private row takes the anchor's number; a PC (hidden too) only another PC's | FR-CBTX-65 |
 
 - **Derived (not stored):** the order (`compareOrder`: initiative desc → `tieOrder` asc, null after numbers → init bonus → PC → `seq`); the DM's number hint (`planMove`, CB1).
 - **Persisted runtime state:** `tieOrder` and the adopted numbers; positions as before. The drag is client memory (CB1).

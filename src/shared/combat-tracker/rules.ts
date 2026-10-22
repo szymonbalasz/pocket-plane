@@ -203,16 +203,19 @@ export type MoveResult =
   | { ok: true; plan: MovePlan | null }
   | { ok: false; code: "invalid" | "conflict"; message: string };
 
-/** FR-CBTX-65: a public number is a visible PC's; players see no other row's number. */
-export const publicNumber = (r: Pick<MoveRow, "kind" | "hidden">) => r.kind === "pc" && !r.hidden;
+/**
+ * FR-CBTX-65: a public number is a PC's (hidden ones too, so a reveal never shows a monster's
+ * number on a PC); players see no other row's number.
+ */
+export const publicNumber = (r: Pick<MoveRow, "kind">) => r.kind === "pc";
 
 /**
  * FR-CBTX-64–66 (decided #335, OQ-CBTX-31 A′): drop `movedId` right after `afterId` (null = top)
  * in `rows` (movable rows, current order). Plan null = the order stays as it is (ack, no write).
- * (a) A private moved row takes the anchor's number (top: the first other numbered row's).
- * (b) A visible PC keeps its own number, lowered to the nearest public row above the drop spot and
+ * (a) A private moved row (not a PC) takes the anchor's number (top: the first other numbered row's).
+ * (b) A PC keeps its own number, lowered to the nearest public row above the drop spot and
  * raised to the nearest public row below; private rows on the wrong side take that number. So a
- * PC's number only ever becomes another visible PC's, and the rule reveals no private number.
+ * PC's number only ever becomes another PC's, and the rule reveals no private number.
  * The server's command and the DM client's number hint both run this.
  */
 export function planMove(

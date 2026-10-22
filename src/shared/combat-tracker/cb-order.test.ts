@@ -130,6 +130,13 @@ describe("FR-CBTX-65 pure rule", () => {
     });
   });
 
+  test("FR-CBTX-65 hidden PC dropped under a monster keeps a PC number (pure)", () => {
+    const rows = sim().map((r) => (r.id === "thorn" ? { ...r, hidden: true } : r));
+    const p = plan(rows, "thorn", "wolf");
+    expect(p.numbers.get("thorn")).toBe(17);
+    expect(p.numbers.has("wolf")).toBe(false);
+  });
+
   test("FR-CBTX-65 numbers never leak: PC dropped under the hidden Elite (pure)", () => {
     const rows = [m("elite", 18, "monster", true), ...sim().filter((r) => r.id !== "elite")];
     const p = plan(rows, "thorn", "elite");

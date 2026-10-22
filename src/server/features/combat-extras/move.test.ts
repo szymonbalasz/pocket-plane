@@ -245,7 +245,7 @@ describe("CB0 cbtx.moveCombatant on combat-polish over WS", () => {
     }
     leaks();
 
-    // 500 seeded drops: every PC number in a player frame is its old number or another visible PC's.
+    // 500 seeded drops: every PC number in a player frame is its old number or another PC's.
     let seed = 0x5eed;
     const rand = (n: number) => {
       seed = (seed * 1103515245 + 12345) & 0x7fffffff;
@@ -269,7 +269,7 @@ describe("CB0 cbtx.moveCombatant on combat-polish over WS", () => {
       const afterId = pick === anchors.length ? null : (anchors[pick] as CombatantRecord).id;
       const publicNumbers = new Set(
         rows(dm)
-          .filter((r) => r.kind === "pc" && !r.hidden)
+          .filter((r) => r.kind === "pc")
           .map((r) => r.initiative),
       );
       const marks = [p1.frames.length, p2.frames.length];
@@ -294,6 +294,19 @@ describe("CB0 cbtx.moveCombatant on combat-polish over WS", () => {
     expect(applied).toBeGreaterThan(250);
     leaks();
   }, 120_000);
+
+  test("FR-CBTX-65 hidden PC dropped under a monster keeps a PC number", async () => {
+    await ok(dm, "map.setTokenHidden", { tokenId: named(dm, "Thorn").tokenId, hidden: true });
+    expect(named(dm, "Thorn").hidden).toBe(true);
+    // Under the hidden Wolf 18: the nearest PC below is Brakka 17, never the Wolf's 18.
+    await move("Thorn", "Wolf");
+    expect(named(dm, "Thorn").initiative).toBe(17);
+    expect(named(dm, "Wolf").initiative).toBe(18);
+    await ok(dm, "map.setTokenHidden", { tokenId: named(dm, "Thorn").tokenId, hidden: false });
+    await settle();
+    for (const c of [p1, p2]) expect(named(c, "Thorn").initiative).toBe(17);
+    leaks();
+  });
 
   test("FR-CBTX-66 ties kept per fight", async () => {
     // Default order of the 12-tie: Thorn, Fire Elemental 3, Goblin (init bonus). Thorn dropped
@@ -388,6 +401,12 @@ describe("CB0 cbtx.moveCombatant on combat-polish over WS", () => {
     });
     expect(named(dm, "Fire Elemental 3").tieOrder).toBeNull();
     expect(named(dm, "Goblin").tieOrder).toBe(2);
+    // (c) release / Turn hostile of an `own` companion holding a tie slot clears it
+    await move("Fire Elemental 3", "Goblin");
+    expect(named(dm, "Fire Elemental 3").tieOrder).not.toBeNull();
+    await ok(dm, CBT_INTENTS.setCompanion, { combatantId: fe3, owner: null, side: "enemy" });
+    expect(named(dm, "Fire Elemental 3").tieOrder).toBeNull();
+    expect(named(dm, "Goblin").tieOrder).not.toBeNull();
     await settle();
     leaks();
   });
