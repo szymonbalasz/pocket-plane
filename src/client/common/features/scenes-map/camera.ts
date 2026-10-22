@@ -5,7 +5,8 @@
 import { footprint, type Grid } from "@shared/scenes-map/geometry";
 import type { TokenSize } from "@shared/scenes-map/schemas";
 import { TOP_BAR_H, workArea } from "../play-shell/geometry";
-import { RAIL_CLEAR } from "../play-shell/placement";
+import { PC_MARGIN, RAIL_CLEAR } from "../play-shell/placement";
+import { isPlacementPc } from "../play-shell/token-boxes";
 import { labelMetrics } from "./label";
 
 export interface Camera {
@@ -108,6 +109,8 @@ export interface FitPriority {
   pcs: Box | null;
   /** Every token's footprint this client has on the scene. */
   tokens: readonly Box[];
+  /** FR-MAP-94: the largest scale the fit may take (the last full fit's, for a refit). */
+  maxScale?: number;
 }
 
 const within = (p: { x: number; y: number }, r: Box) =>
@@ -132,12 +135,12 @@ export function bestFreeRect(
 ): Box {
   const same = (a: Box) => a.x === area.x && a.y === area.y && a.w === area.w && a.h === area.h;
   if (box.w <= 0 || box.h <= 0 || !areas.some(same)) return area;
-  const cap = fitCamera(map, work).scale;
+  const cap = Math.min(fitCamera(map, work).scale, priority?.maxScale ?? Number.POSITIVE_INFINITY);
   const rank = (a: Box): number[] => {
     const s = fitScale(box, a, cap);
     if (!priority) return [s];
-    const { cell, pcs, tokens } = priority;
-    const cam = fitContent(box, a, map, work, cell, pcs);
+    const { cell, pcs, tokens, maxScale } = priority;
+    const cam = fitContent(box, a, map, work, cell, pcs, maxScale);
     const pcsIn =
       !pcs ||
       (cam.x + pcs.x * cam.scale >= a.x - 1e-6 &&
@@ -264,9 +267,11 @@ export function fitContent(
   work: Size,
   cell: number,
   pcs: Box | null,
+  maxScale = Number.POSITIVE_INFINITY,
 ): Fit {
-  const cap = fitCamera(map, work).scale;
-  const min = cell > 0 ? Math.min(ZOOM_MAX, FIT_MIN_CELL_PX / cell) : 0;
+  // FR-MAP-94: a refit bounded by the last full fit never draws a larger cell, floor included.
+  const cap = Math.min(fitCamera(map, work).scale, maxScale);
+  const min = cell > 0 ? Math.min(ZOOM_MAX, FIT_MIN_CELL_PX / cell, maxScale) : 0;
   if (box.w <= 0 || box.h <= 0 || free.w <= 0 || free.h <= 0) {
     return { x: free.x, y: free.y, scale: Math.max(cap, min), floor: min > cap };
   }
@@ -375,26 +380,55 @@ export function visibleArea(view: Size): Box {
   };
 }
 
-/** Every footprint (map px) at `cam` inside `area` and clear of every obstacle (screen px). */
+/**
+ * FR-MAP-93: a fit keeps PC footprints + this margin (screen px) clear of windows wherever a pan
+ * at the same cell allows it, as the placer keeps windows off PC footprints + 4 px (FR-SHELL-57),
+ * so a refit doesn't leave a PC flush with a window. A soft rule: it never costs a smaller cell,
+ * an all-clear fit or the top row (FR-MAP-81).
+ */
+export const FIT_PC_MARGIN = PC_MARGIN;
+
+/** A footprint (map px) that may be a PC's (FR-MAP-93: `isPlacementPc`). */
+type MaybePc = Box & { pc?: boolean };
+
+/**
+ * The footprint (map px) the obstacle test uses at `scale`: a PC's grown by `margin` screen px,
+ * any other as it is. The area test always uses the footprint itself.
+ */
+function guarded(t: MaybePc, scale: number, margin: number): Box {
+  if (!t.pc || margin <= 0 || scale <= 0) return t;
+  // A hair over the margin, so float noise in the pan never leaves a PC + 4 px touching a window.
+  const m = (margin + 1e-3) / scale;
+  return { x: t.x - m, y: t.y - m, w: t.w + 2 * m, h: t.h + 2 * m };
+}
+
+/**
+ * Every footprint (map px) at `cam` inside `area` and clear of every obstacle (screen px); a PC's
+ * (`pc`) with `margin` px to spare (FR-MAP-93).
+ */
 export function allClear(
   cam: Camera,
-  tokens: readonly Box[],
+  tokens: readonly MaybePc[],
   obstacles: readonly Box[],
   area: Box,
+  margin = 0,
 ): boolean {
+  const onScreen = (t: Box) => ({
+    x: cam.x + t.x * cam.scale,
+    y: cam.y + t.y * cam.scale,
+    w: t.w * cam.scale,
+    h: t.h * cam.scale,
+  });
   return tokens.every((t) => {
-    const s = {
-      x: cam.x + t.x * cam.scale,
-      y: cam.y + t.y * cam.scale,
-      w: t.w * cam.scale,
-      h: t.h * cam.scale,
-    };
+    const s = onScreen(t);
     const inArea =
       s.x >= area.x - EPS &&
       s.y >= area.y - EPS &&
       s.x + s.w <= area.x + area.w + EPS &&
       s.y + s.h <= area.y + area.h + EPS;
-    return inArea && !obstacles.some((o) => cross(s, o));
+    if (!inArea) return false;
+    const g = t.pc && margin > 0 ? onScreen(guarded(t, cam.scale, margin)) : s;
+    return !obstacles.some((o) => cross(g, o));
   });
 }
 
@@ -422,12 +456,13 @@ const sortedUnique = (vs: readonly number[]) => [...new Set(vs)].sort((a, b) => 
  * above `minY` (the map's top edge, FR-MAP-44's top row) are out of range.
  */
 function panAtScale(
-  tokens: readonly Box[],
+  tokens: readonly MaybePc[],
   obstacles: readonly Box[],
   area: Box,
   scale: number,
   from: { x: number; y: number },
   minY: number,
+  margin = 0,
 ): { x: number; y: number } | null {
   let x0 = Number.NEGATIVE_INFINITY;
   let x1 = Number.POSITIVE_INFINITY;
@@ -449,7 +484,8 @@ function panAtScale(
   const ft: number[] = [];
   const fb: number[] = [];
   const reach = new Set<Box>();
-  for (const t of tokens) {
+  for (const tok of tokens) {
+    const t = guarded(tok, scale, margin);
     for (const o of obstacles) {
       const l = o.x - (t.x + t.w) * scale;
       const r = o.x + o.w - t.x * scale;
@@ -517,44 +553,64 @@ function panAtScale(
  * already clear → `from`; nothing allowed at 24 px, or more than 30 tokens → `from` (FR-MAP-46's
  * PCs first), `pcs`. FR-MAP-90: a scale at which more than 6 obstacles reach the tokens' pan range
  * isn't searched (the bound counts only those, not every obstacle in the area). `minY`: `all` keeps the map's top edge (map
- * px 0) at or below it (FR-MAP-44's top row under the top bar), step 1 included.
+ * px 0) at or below it (FR-MAP-44's top row under the top bar), step 1 included. `minCell`
+ * (FR-MAP-94): the search's lowest cell. FR-MAP-93: the ladder is searched first with every PC
+ * (`pc`) + 4 px clear (a clear step 1 with a PC flush first tries its own scale), then, if no
+ * cell allows that, flush.
  */
 export function fitVisible(
-  tokens: readonly Box[],
+  tokens: readonly MaybePc[],
   obstacles: readonly Box[],
   area: Box,
   from: Camera,
   cell: number,
   minY = Number.NEGATIVE_INFINITY,
+  minCell = FIT_HARD_MIN_CELL_PX,
 ): Camera & { visible: FitVisible } {
   const inArea = obstacles.filter((o) => cross(o, area));
-  if (from.y >= minY - EPS && allClear(from, tokens, inArea, area)) {
+  const fromOk = from.y >= minY - EPS;
+  if (fromOk && allClear(from, tokens, inArea, area, FIT_PC_MARGIN)) {
     return { ...from, visible: "all" };
   }
+  const plainFrom = fromOk && allClear(from, tokens, inArea, area);
   const pcs = { ...from, visible: "pcs" as const };
-  if (cell <= 0 || tokens.length > FIT_VISIBLE_MAX_TOKENS) return pcs;
-  const at = (c: number) => {
-    const scale = c / cell;
-    if (scale < ZOOM_MIN || scale > ZOOM_MAX) return null;
-    const pan = panAtScale(tokens, inArea, area, scale, from, minY);
-    return pan && { ...pan, scale };
-  };
-  const top = Math.floor(from.scale * cell + EPS);
-  let prev: number | null = null;
-  for (let c = top; c >= FIT_HARD_MIN_CELL_PX; ) {
-    const found = at(c);
-    if (found) {
-      for (let k = 3; k >= 1; k--) {
-        if (prev === null || c + k >= prev) continue;
-        const up = at(c + k);
-        if (up) return { ...up, visible: "all" };
-      }
-      return { ...found, visible: "all" };
-    }
-    prev = c;
-    c = c - 4 >= FIT_HARD_MIN_CELL_PX || c === FIT_HARD_MIN_CELL_PX ? c - 4 : FIT_HARD_MIN_CELL_PX;
+  if (cell <= 0 || tokens.length > FIT_VISIBLE_MAX_TOKENS) {
+    return plainFrom ? { ...from, visible: "all" } : pcs;
   }
-  return pcs;
+  /** The ladder below `from` with each PC `margin` px clear (FR-MAP-93); null: none. */
+  const search = (margin: number) => {
+    const at = (c: number) => {
+      const scale = c / cell;
+      if (scale < ZOOM_MIN || scale > ZOOM_MAX) return null;
+      const pan = panAtScale(tokens, inArea, area, scale, from, minY, margin);
+      return pan && { ...pan, scale };
+    };
+    // A clear step 1 with a PC flush: its own scale first (FR-MAP-93: shift, don't zoom).
+    if (plainFrom) {
+      const pan = panAtScale(tokens, inArea, area, from.scale, from, minY, margin);
+      if (pan) return { ...pan, scale: from.scale };
+    }
+    const top = Math.floor(from.scale * cell + EPS);
+    const low = Math.max(FIT_HARD_MIN_CELL_PX, Math.ceil(minCell - EPS));
+    let prev: number | null = null;
+    for (let c = top; c >= low; ) {
+      const found = at(c);
+      if (found) {
+        for (let k = 3; k >= 1; k--) {
+          if (prev === null || c + k >= prev) continue;
+          const up = at(c + k);
+          if (up) return up;
+        }
+        return found;
+      }
+      prev = c;
+      c = c - 4 >= low || c === low ? c - 4 : low;
+    }
+    return null;
+  };
+  // FR-MAP-93: PCs + 4 px clear where some cell allows it; else flush rather than lose `all`.
+  const found = search(FIT_PC_MARGIN);
+  return found ? { ...found, visible: "all" } : pcs;
 }
 
 // ---- FR-MAP-81: `pcs` keeps the top row (sprint 6, BL-41) ----
@@ -596,8 +652,9 @@ function before(a: readonly number[], b: readonly number[]): boolean {
  * footprint area under those obstacles (FR-MAP-90). Among the pans keeping the PCs inside and clear: (1) none drawn
  * cut by the top (a footprint on the viewport `view` whose top is above `area`'s), if such a pan
  * exists ("never cuts a token by the top bar while another PC-clear pan doesn't"; sim-9 a03's
- * top row at y 64), (2) then the most of those footprints inside `area` and clear of every
- * obstacle, (3) then the least Manhattan distance to `from`, then higher, then left. Candidates: the cross product of
+ * top row at y 64), (1b) then every PC + 4 px clear (FR-MAP-93), (2) then the most of those
+ * footprints inside `area` and clear of every obstacle, (3) then the least Manhattan distance to
+ * `from`, then higher, then left. `scale` (FR-MAP-94): default 48 px per cell. Candidates: the cross product of
  * every edge where one of those counts can change (as FR-MAP-59 (2)); per x a sweep over y counts.
  */
 export function pcsPan(
@@ -607,10 +664,10 @@ export function pcsPan(
   view: Size,
   from: { x: number; y: number },
   cell: number,
+  scale = cell > 0 ? Math.min(ZOOM_MAX, FIT_MIN_CELL_PX / cell) : 0,
 ): Camera | null {
   const pcs = tokens.filter((t) => t.pc);
   if (cell <= 0 || pcs.length === 0) return null;
-  const scale = Math.min(ZOOM_MAX, FIT_MIN_CELL_PX / cell);
   // The PCs' bounding box and its centre.
   const px0 = Math.min(...pcs.map((p) => p.x));
   const py0 = Math.min(...pcs.map((p) => p.y));
@@ -660,12 +717,9 @@ export function pcsPan(
     pc: t.pc,
     ax: [area.x - t.x * scale, area.x + area.w - (t.x + t.w) * scale] as const,
     ay: [area.y - t.y * scale, area.y + area.h - (t.y + t.h) * scale] as const,
-    forbid: inArea.map((o) => ({
-      l: o.x - (t.x + t.w) * scale,
-      r: o.x + o.w - t.x * scale,
-      t: o.y - (t.y + t.h) * scale,
-      b: o.y + o.h - t.y * scale,
-    })),
+    forbid: forbids(t, inArea, scale, 0),
+    // FR-MAP-93: a PC's with the 4-px margin (rank (1b)).
+    forbidM: t.pc ? forbids(t, inArea, scale, FIT_PC_MARGIN) : [],
     cutX: [-(t.x + t.w) * scale, view.w - t.x * scale] as const,
     cutY: [-(t.y + t.h) * scale, area.y - t.y * scale] as const,
   }));
@@ -678,7 +732,11 @@ export function pcsPan(
       x0,
       x1,
       fx,
-      ...per.flatMap((p) => [...p.ax, ...p.cutX, ...p.forbid.flatMap((f) => [f.l, f.r])]),
+      ...per.flatMap((p) => [
+        ...p.ax,
+        ...p.cutX,
+        ...[...p.forbid, ...p.forbidM].flatMap((f) => [f.l, f.r]),
+      ]),
     ].filter(inX),
   );
   const ys = sortedUnique(
@@ -686,54 +744,67 @@ export function pcsPan(
       y0,
       y1,
       fy,
-      ...per.flatMap((p) => [...p.ay, ...p.cutY, ...p.forbid.flatMap((f) => [f.t, f.b])]),
+      ...per.flatMap((p) => [
+        ...p.ay,
+        ...p.cutY,
+        ...[...p.forbid, ...p.forbidM].flatMap((f) => [f.t, f.b]),
+      ]),
     ].filter(inY),
   );
   const ok = new Int32Array(ys.length + 1);
   const pcOk = new Int32Array(ys.length + 1);
+  const pcOkM = new Int32Array(ys.length + 1);
   const cut = new Int32Array(ys.length + 1);
   const mark = (arr: Int32Array, [lo, hi]: [number, number]) => {
     if (lo >= hi) return;
     arr[lo] = (arr[lo] as number) + 1;
     arr[hi] = (arr[hi] as number) - 1;
   };
+  /** Marks the y the token may take at `x`: inside the area, outside every forbidden interval. */
+  const allowed = (
+    x: number,
+    ay: readonly [number, number],
+    forbid: readonly Forbid[],
+    arrs: readonly Int32Array[],
+  ) => {
+    const gaps = forbid.filter((f) => f.l < x - EPS && x < f.r - EPS).sort((a, b) => a.t - b.t);
+    let at = ay[0];
+    for (const g of gaps) {
+      if (g.t >= at - EPS) {
+        const hi = Math.min(g.t, ay[1]);
+        if (hi >= at - EPS) for (const arr of arrs) mark(arr, closedRange(ys, at, hi));
+      }
+      at = Math.max(at, g.b);
+    }
+    if (at <= ay[1] + EPS) for (const arr of arrs) mark(arr, closedRange(ys, at, ay[1]));
+  };
   let best: { x: number; y: number; rank: number[] } | null = null;
   for (const x of xs) {
     ok.fill(0);
     pcOk.fill(0);
+    pcOkM.fill(0);
     cut.fill(0);
     for (const p of per) {
       if (p.cutX[0] < x - EPS && x < p.cutX[1] - EPS) mark(cut, openRange(ys, ...p.cutY));
       if (x < p.ax[0] - EPS || x > p.ax[1] + EPS) continue;
       // The token's allowed y: inside the area minus the open intervals of the obstacles whose
       // forbidden x-interval holds x.
-      const gaps = p.forbid.filter((f) => f.l < x - EPS && x < f.r - EPS).sort((a, b) => a.t - b.t);
-      let at = p.ay[0];
-      for (const g of gaps) {
-        if (g.t >= at - EPS) {
-          const hi = Math.min(g.t, p.ay[1]);
-          if (hi >= at - EPS) {
-            mark(ok, closedRange(ys, at, hi));
-            if (p.pc) mark(pcOk, closedRange(ys, at, hi));
-          }
-        }
-        at = Math.max(at, g.b);
-      }
-      if (at <= p.ay[1] + EPS) {
-        mark(ok, closedRange(ys, at, p.ay[1]));
-        if (p.pc) mark(pcOk, closedRange(ys, at, p.ay[1]));
-      }
+      allowed(x, p.ay, p.forbid, p.pc ? [ok, pcOk] : [ok]);
+      if (p.pc) allowed(x, p.ay, p.forbidM, [pcOkM]);
     }
     let nOk = 0;
     let nPc = 0;
+    let nPcM = 0;
     let nCut = 0;
     for (let j = 0; j < ys.length; j++) {
       nOk += ok[j] as number;
       nPc += pcOk[j] as number;
+      nPcM += pcOkM[j] as number;
       nCut += cut[j] as number;
       if (nPc < pcs.length) continue;
       const y = ys[j] as number;
-      const rank = [nCut > 0 ? 1 : 0, -nOk, Math.abs(x - from.x) + Math.abs(y - from.y), y, x];
+      const d = Math.abs(x - from.x) + Math.abs(y - from.y);
+      const rank = [nCut > 0 ? 1 : 0, nPcM < pcs.length ? 1 : 0, -nOk, d, y, x];
       if (best === null || before(rank, best.rank)) best = { x, y, rank };
     }
   }
@@ -741,6 +812,24 @@ export function pcsPan(
   // FR-MAP-90: no pan keeps every PC clear → the least PC footprint area under the obstacles.
   const pan = leastCoveredPan(pcs, inArea, [x0, x1], [y0, y1], scale, from);
   return { ...pan, scale };
+}
+
+/** The open pan rectangle at which footprint `t` (map px, + `margin` px for a PC) meets an obstacle. */
+interface Forbid {
+  l: number;
+  r: number;
+  t: number;
+  b: number;
+}
+
+function forbids(t: MaybePc, obstacles: readonly Box[], scale: number, margin: number): Forbid[] {
+  const g = guarded(t, scale, margin);
+  return obstacles.map((o) => ({
+    l: o.x - (g.x + g.w) * scale,
+    r: o.x + o.w - g.x * scale,
+    t: o.y - (g.y + g.h) * scale,
+    b: o.y + o.h - g.y * scale,
+  }));
 }
 
 /** Screen gap between two rectangles (0 when they touch or overlap). */
@@ -816,13 +905,28 @@ function leastCoveredPan(
   return best ?? { x: x0, y: y0 };
 }
 
-/** A token as the fit sees it: its cells and whether it is a PC (has an owner, FR-MAP-46). */
+/** A token as the fit sees it: its cells and whether it is a PC (FR-MAP-46, -93). */
 export interface FitToken {
   col: number;
   row: number;
   size: TokenSize;
   pc: boolean;
 }
+
+/**
+ * FR-MAP-93: this client's tokens as the fit sees them; `pc` = the placer's PC test
+ * (`isPlacementPc`, #318): a player character's token. Pets and summons are content tokens.
+ */
+export const fitTokensOf = (
+  tokens: readonly {
+    col: number;
+    row: number;
+    size: TokenSize;
+    ownerPlayerId: string | null;
+    characterId: string | null;
+  }[],
+): FitToken[] =>
+  tokens.map((t) => ({ col: t.col, row: t.row, size: t.size, pc: isPlacementPc(t) }));
 
 /** What the fit avoids, screen px. */
 export interface FitRoom {
@@ -841,6 +945,87 @@ export interface SceneFit extends Fit {
 }
 
 /**
+ * FR-MAP-94: the cell range (screen px per grid cell) a fit may take: at most `maxCell`, and its
+ * searches go no lower than `minCell` (default: FR-MAP-59's 24-px hard floor).
+ */
+export interface FitBounds {
+  maxCell?: number;
+  minCell?: number;
+  /**
+   * With no all-clear pan, the PCs-first ladder (FR-MAP-94) ranks by the least token area hidden;
+   * off (the DM's full fits, BL-41: Fit doesn't squeeze the map): the largest cell keeping the PCs
+   * clear.
+   */
+  leastHidden?: boolean;
+}
+
+/** FR-MAP-97, FR-SHELL-108: a yield (`window`) keeps ≥ this share of the last full fit's cell. */
+export const REFIT_MIN_SHARE = 0.75;
+
+/**
+ * Hidden footprint area (map px², so comparable across scales) of `tokens` at `cam`: outside
+ * `area` or under an obstacle (FR-MAP-94's "least token area under windows").
+ */
+function hiddenArea(cam: Camera, tokens: readonly Box[], obstacles: readonly Box[], area: Box) {
+  let total = 0;
+  for (const t of tokens) {
+    const s = {
+      x: cam.x + t.x * cam.scale,
+      y: cam.y + t.y * cam.scale,
+      w: t.w * cam.scale,
+      h: t.h * cam.scale,
+    };
+    const inside = overlap1(s.x, s.w, area.x, area.w) * overlap1(s.y, s.h, area.y, area.h);
+    let under = 0;
+    for (const o of obstacles) under += overlap1(s.x, s.w, o.x, o.w) * overlap1(s.y, s.h, o.y, o.h);
+    total += Math.min(s.w * s.h, s.w * s.h - inside + under);
+  }
+  return total / (cam.scale * cam.scale);
+}
+
+/**
+ * FR-MAP-94 (BL-65): no pan clears every token at any searched cell → the PCs first (#333), then
+ * (`leastHidden`) the least token area under windows or off the area. Cells from the lower of the
+ * fit's step 1 and FR-MAP-46's 48 px (so it never zooms in past what `fitVisible` searched) down
+ * to `low`, in 4-px steps; each takes FR-MAP-81's `pcs` pan. Rank: every PC clear, then + 4 px
+ * (FR-MAP-93), then the least hidden area, then the larger cell. Null when no PCs or no pan keeps
+ * them inside the area.
+ */
+function pcsFirst(
+  boxes: readonly FitBox[],
+  obstacles: readonly Box[],
+  area: Box,
+  view: Size,
+  from: Camera,
+  cell: number,
+  low: number,
+  leastHidden: boolean,
+): Camera | null {
+  const pcs = boxes.filter((b) => b.pc);
+  const others = boxes.filter((b) => !b.pc);
+  const top = Math.min(FIT_MIN_CELL_PX, from.scale * cell);
+  const bottom = Math.min(top, Math.max(FIT_HARD_MIN_CELL_PX, low));
+  const cells = [top];
+  for (let c = Math.floor(top + EPS) - 4; c > bottom + EPS; c -= 4) cells.push(c);
+  if (bottom < top - EPS) cells.push(bottom);
+  let best: { cam: Camera; rank: number[] } | null = null;
+  for (const c of cells) {
+    const cam = pcsPan(boxes, obstacles, area, view, from, cell, Math.min(ZOOM_MAX, c / cell));
+    if (!cam) continue;
+    const rank = [
+      allClear(cam, pcs, obstacles, area) ? 0 : 1,
+      allClear(cam, pcs, obstacles, area, FIT_PC_MARGIN) ? 0 : 1,
+      leastHidden ? Math.round(hiddenArea(cam, others, obstacles, area)) : 0,
+      -c,
+    ];
+    if (best === null || before(rank, best.rank)) best = { cam, rank };
+    // Cells only shrink from here: nothing beats every PC + 4 px clear with nothing hidden.
+    if (rank[0] === 0 && rank[1] === 0 && rank[2] === 0) break;
+  }
+  return best?.cam ?? null;
+}
+
+/**
  * The whole fit (FR-MAP-44 → -58 → -46, then FR-MAP-59): the candidate free rectangle that best
  * keeps the V7 fit priority, the content box fitted into it; then, if a token footprint is still
  * under a window or the toast box, `fitVisible`. `view` = the canvas (the viewport). Candidates:
@@ -855,6 +1040,7 @@ export function fitScene(
   map: Size,
   view: Size,
   room: FitRoom,
+  bounds: FitBounds = {},
 ): SceneFit {
   const box = contentBox(tokens, grid, map);
   const pcs = footprintBox(
@@ -862,13 +1048,24 @@ export function fitScene(
     grid,
   );
   const work = workArea(view);
-  const footprints = tokens.flatMap((t) => footprintBox([t], grid) ?? []);
+  const footprints = tokens.flatMap((t) => {
+    const b = footprintBox([t], grid);
+    return b ? [{ ...b, pc: t.pc }] : [];
+  });
   const cell = grid.gridCellSize;
   const areas = room.areas.length > 0 ? room.areas : room.windowsOnly;
   const rail = { x: RAIL_CLEAR, y: TOP_BAR_H, w: Math.max(1, work.w - RAIL_CLEAR), h: work.h };
   const area = areas[0] ?? rail;
-  const rect = bestFreeRect(box, areas, area, map, work, { cell, pcs, tokens: footprints });
-  const step1 = fitContent(box, rect, map, work, cell, pcs);
+  const maxScale =
+    bounds.maxCell !== undefined && cell > 0 ? bounds.maxCell / cell : Number.POSITIVE_INFINITY;
+  const rect = bestFreeRect(box, areas, area, map, work, {
+    cell,
+    pcs,
+    tokens: footprints,
+    maxScale,
+  });
+  const step1 = fitContent(box, rect, map, work, cell, pcs, maxScale);
+  const low = bounds.minCell ?? FIT_HARD_MIN_CELL_PX;
   const { visible, ...cam } = fitVisible(
     footprints,
     room.obstacles,
@@ -876,15 +1073,15 @@ export function fitScene(
     step1,
     cell,
     TOP_BAR_H,
+    low,
   );
   if (visible === "pcs") {
-    // FR-MAP-81: the PCs first at 48 px, the top row not cut where a pan allows it.
-    const boxes = tokens.flatMap((t) => {
-      const b = footprintBox([t], grid);
-      return b ? [{ ...b, pc: t.pc }] : [];
-    });
-    const pan = pcsPan(boxes, room.obstacles, visibleArea(view), view, step1, cell);
-    if (pan) return { ...pan, floor: true, rect, visible };
+    // FR-MAP-81, -94: the PCs first (top row not cut where a pan allows it), then the least
+    // token area under windows, never above step 1's cell.
+    const area = visibleArea(view);
+    const hide = bounds.leastHidden === true;
+    const pan = pcsFirst(footprints, room.obstacles, area, view, step1, cell, low, hide);
+    if (pan) return { ...pan, floor: pan.scale * cell >= FIT_MIN_CELL_PX - EPS, rect, visible };
   }
   const same = cam.x === step1.x && cam.y === step1.y && cam.scale === step1.scale;
   return { ...cam, floor: same ? step1.floor : false, rect, visible };
@@ -909,10 +1106,11 @@ export function fitPastToasts(
   view: Size,
   room: FitRoom,
   stripRoom: FitRoom,
+  bounds: FitBounds = {},
 ): SceneFit & { pastToasts: boolean } {
-  const kept = fitScene(tokens, grid, map, view, room);
+  const kept = fitScene(tokens, grid, map, view, room, bounds);
   if (stripRoom.obstacles.length === room.obstacles.length) return { ...kept, pastToasts: false };
-  const past = fitScene(tokens, grid, map, view, stripRoom);
+  const past = fitScene(tokens, grid, map, view, stripRoom, bounds);
   const useKept =
     kept.visible === "all"
       ? kept.scale >= FIT_PAST_TOASTS_SHARE * past.scale - EPS
@@ -922,14 +1120,15 @@ export function fitPastToasts(
 
 /**
  * FR-MAP-90 no jump: an appearance keeps the camera when every footprint (`tokens`, map px) is
- * inside FR-MAP-59's area and clear of every obstacle at `cam` (FR-MAP-59's test).
+ * inside FR-MAP-59's area and clear of every obstacle at `cam` (FR-MAP-59's test), PCs by
+ * `FIT_PC_MARGIN` (FR-MAP-93).
  */
 export const appearanceKeeps = (
   cam: Camera,
-  tokens: readonly Box[],
+  tokens: readonly MaybePc[],
   obstacles: readonly Box[],
   view: Size,
-) => allClear(cam, tokens, obstacles, visibleArea(view));
+) => allClear(cam, tokens, obstacles, visibleArea(view), FIT_PC_MARGIN);
 
 /** `data-camera` (FR-MAP-44 (b)): where the last fit put it, or moved by the user since. */
 export type CameraMode = "fitted" | "moved";
@@ -945,13 +1144,15 @@ export type CameraEvent =
   | "appearance"
   | "resize"
   | "reveal"
+  | "window"
   | "pan"
   | "zoom"
   | "pull";
 
 /**
  * `data-fit-reason`: the last fit's cause (FR-MAP-82); `load` = the first scene open on this page
- * (FR-MAP-89), `fit-past-toasts` = a Fit that let a card toast cover tokens (FR-MAP-91).
+ * (FR-MAP-89), `fit-past-toasts` = a Fit that let a card toast cover tokens (FR-MAP-91), `window`
+ * = the players' map yielded to a window (FR-MAP-97).
  */
 export type FitReason =
   | "open"
@@ -960,12 +1161,111 @@ export type FitReason =
   | "fit-past-toasts"
   | "appearance"
   | "resize"
-  | "reveal";
+  | "reveal"
+  | "window";
+
+/** FR-MAP-94: a full fit (Fit, open, load, resize) sets the cell later refits are bounded by. */
+export const isFullFit = (reason: FitReason) =>
+  reason === "open" ||
+  reason === "load" ||
+  reason === "fit" ||
+  reason === "fit-past-toasts" ||
+  reason === "resize";
+
+/**
+ * FR-MAP-94: a refit (reveal, appearance, window) draws a cell ≤ the last full fit's; it may zoom
+ * out to the floor to clear tokens. A yield (`window`) also keeps ≥ 75 % of it (FR-SHELL-108: the
+ * placer accepts nothing below). A full fit, or no full fit yet, is unbounded. With no all-clear
+ * pan, the players' fits rank the PCs-first ladder by the least hidden token area (BL-65, r03: a
+ * player's load never re-scales up to 48 px with tokens under the sheet); the DM's take the
+ * largest PC-clear cell (BL-41: Fit doesn't squeeze the map).
+ */
+export function fitBounds(
+  reason: FitReason,
+  lastFullCell: number | null,
+  client: "dm" | "player",
+): FitBounds {
+  const leastHidden = client === "player";
+  if (isFullFit(reason) || lastFullCell === null || lastFullCell <= 0) return { leastHidden };
+  if (reason !== "window") return { maxCell: lastFullCell, leastHidden };
+  return { maxCell: lastFullCell, minCell: REFIT_MIN_SHARE * lastFullCell, leastHidden };
+}
+
+/** A fit's inputs: this client's tokens, grid, map, canvas and rooms (FR-MAP-93: one obstacle source). */
+export interface FitInputs {
+  client: "dm" | "player";
+  tokens: readonly FitToken[];
+  grid: Grid;
+  map: Size;
+  view: Size;
+  /** The windows of the placer's plan + this client's toast obstacles (`fitObstacles`). */
+  room: FitRoom;
+  /** The same with only the DM's summary strip (FR-MAP-91); players: `room`. */
+  stripRoom: FitRoom;
+}
+
+/**
+ * FR-MAP-95: the one fit path. Every reason (`open`, `load`, Fit, `resize`, `reveal`,
+ * `appearance`, `window`) runs Fit's function (`fitPastToasts`) with this client's obstacles,
+ * bounded per FR-MAP-94 by the last full fit's cell. `reason` = what `data-fit-reason` shows.
+ */
+export function fitFor(
+  reason: FitReason,
+  inputs: FitInputs,
+  lastFullCell: number | null,
+): SceneFit & { reason: FitReason } {
+  const { tokens, grid, map, view, room, stripRoom } = inputs;
+  const bounds = fitBounds(reason, lastFullCell, inputs.client);
+  const run = (b: FitBounds) => fitPastToasts(tokens, grid, map, view, room, stripRoom, b);
+  // FR-MAP-95: a refit first takes the full fit for these inputs (the camera a load would take);
+  // only when that zooms in past the last full fit (or, for a yield, below 75 % of it) the bounded
+  // fit (FR-MAP-94).
+  let fit = run({ leastHidden: bounds.leastHidden });
+  const cell = fit.scale * grid.gridCellSize;
+  const within =
+    (bounds.maxCell === undefined || cell <= bounds.maxCell + EPS) &&
+    (bounds.minCell === undefined || cell >= bounds.minCell - EPS);
+  if (!within) fit = run(bounds);
+  const { pastToasts, ...rest } = fit;
+  return { ...rest, reason: pastToasts ? "fit-past-toasts" : reason };
+}
+
+/** A dry fit (FR-MAP-97, the base port's `dryFit`): the camera a yield would take, not applied. */
+export interface DryFitResult {
+  camera: Camera;
+  cellPx: number;
+  verdict: FitVisible;
+  /**
+   * Every PC footprint + 4 px clear at `camera` (FR-SHELL-108: every PC, and every token the dry
+   * fit kept, clear; the fit itself keeps the others as far as it can, `verdict`).
+   */
+  clear: boolean;
+}
+
+/**
+ * FR-MAP-97: the `window` fit with `inputs` (the placer's candidate as one more obstacle), not
+ * applied.
+ */
+export function dryFitScene(inputs: FitInputs, lastFullCell: number | null): DryFitResult {
+  const { grid, view, tokens } = inputs;
+  const fit = fitFor("window", inputs, lastFullCell);
+  const pcs = tokens.flatMap((t) => {
+    const b = t.pc ? footprintBox([t], grid) : null;
+    return b ? [{ ...b, pc: true }] : [];
+  });
+  const camera = { x: fit.x, y: fit.y, scale: fit.scale };
+  return {
+    camera,
+    cellPx: fit.scale * grid.gridCellSize,
+    verdict: fit.visible,
+    clear: allClear(camera, pcs, inputs.room.obstacles, visibleArea(view), FIT_PC_MARGIN),
+  };
+}
 
 /**
  * FR-MAP-44/45/47/82 triggers: a scene open and the Fit button always fit; an appearance, a
- * viewport resize or a reveal refits only while `fitted`; pan, wheel zoom and pull mark the
- * camera `moved`.
+ * viewport resize, a reveal or the map yielding to a window (FR-MAP-97) refits only while
+ * `fitted`; pan, wheel zoom and pull mark the camera `moved`.
  */
 export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; fit: boolean } {
   switch (e) {
@@ -975,6 +1275,7 @@ export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; 
     case "appearance":
     case "resize":
     case "reveal":
+    case "window":
       return { mode, fit: mode === "fitted" };
     default:
       return { mode: "moved", fit: false };
@@ -1149,6 +1450,80 @@ export function createAppearanceRefit(refit: () => void, frames = realFrames) {
       waits += 1;
       frames.cancel(handle);
       handle = frames.request(fire);
+    },
+    dispose() {
+      if (handle !== null) frames.cancel(handle);
+      handle = null;
+    },
+  };
+}
+
+/** What the canvas knows of the placer (`useFreeArea`). */
+export interface PlacerState {
+  /** The layout is applied (the `load` settle ran). */
+  ready: boolean;
+  /** Every open growing window reported its content height. */
+  grown: boolean;
+  /** A window the placer just placed (open, `appear`) still waits for its `settle`. */
+  settling: boolean;
+  /** The viewport of the last `viewport` (or `load`, reset) settle. */
+  settledAt: Size | null;
+}
+
+/**
+ * FR-MAP-96, -98: a fit for `reason` may frame now: the layout applied, no placed window waiting
+ * for its `settle`, grown windows measured; a resize refit also waits for the last `viewport`
+ * settle (`settledAt` = the viewport `view`), so zones, returns and grow-back are in place.
+ */
+export function placerSettled(s: PlacerState, reason: FitReason, view: Size): boolean {
+  if (!s.ready || !s.grown || s.settling) return false;
+  if (reason !== "resize") return true;
+  return s.settledAt !== null && s.settledAt.w === view.w && s.settledAt.h === view.h;
+}
+
+/** FR-MAP-96, -98: the most frames a settled fit waits for the placer before it fits anyway. */
+export const SETTLED_FIT_MAX_WAITS = 60;
+
+/**
+ * FR-MAP-96, -98 (replaces FR-MAP-89 (2)'s frame wait): `request()` fits once the placer has
+ * settled: on the first animation frame at which `ready()` holds (the `load`, `appear` or last
+ * `viewport` settle applied, grown windows measured), or after `SETTLED_FIT_MAX_WAITS` frames.
+ * `applied()` (new tokens, window rects or size reached the canvas) moves a pending fit to the
+ * frame after, at most `APPEARANCE_REFIT_MAX_WAITS` times (FR-MAP-61), so it reads them.
+ */
+export function createSettledRefit(
+  refit: () => void,
+  ready: () => boolean,
+  frames: Frames = realFrames,
+) {
+  let handle: unknown = null;
+  let waits = 0;
+  let nudges = 0;
+  const fire = () => {
+    handle = null;
+    if (!ready() && waits < SETTLED_FIT_MAX_WAITS) {
+      waits += 1;
+      handle = frames.request(fire);
+      return;
+    }
+    refit();
+  };
+  return {
+    request() {
+      if (handle !== null) frames.cancel(handle);
+      waits = 0;
+      nudges = 0;
+      handle = frames.request(fire);
+    },
+    applied() {
+      if (handle === null || nudges >= APPEARANCE_REFIT_MAX_WAITS) return;
+      nudges += 1;
+      frames.cancel(handle);
+      handle = frames.request(fire);
+    },
+    /** A fit is waiting. */
+    get pending() {
+      return handle !== null;
     },
     dispose() {
       if (handle !== null) frames.cancel(handle);

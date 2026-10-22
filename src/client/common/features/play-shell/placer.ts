@@ -628,7 +628,11 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const order = () => autoMinimiseOrder(out, ctx, w0.kind, w0.instance, late);
     let aheadUseful: boolean | null = null;
     let aheadMin: boolean | null = null;
-    /** The look-ahead (FR-SHELL-97 L3): the same with every launcher window put away. */
+    /**
+     * The look-ahead (FR-SHELL-97 L3): the same with every launcher window put away; at the useful
+     * size the map's yield counts too (F9: put Stats away, then the map yields to the card, before
+     * either goes below useful).
+     */
     const lookAhead = (more: Partial<PlaceInput>) => {
       const gone = new Set(order().map(idOf));
       const keep: Obstacle[] = [];
@@ -637,7 +641,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         keep.push({ ...r, protected: isProt(w) });
       }
       const p = placeWindow(def, vp, { ...input(), windows: keep, ...more, gap: 4 });
-      return accepted(p);
+      if (accepted(p)) return true;
+      return !o.push && more.floor !== undefined
+        ? yieldFor(def, { ...input(), windows: keep }, more.floor, true) !== null
+        : false;
     };
     /**
      * Whether some spot ≥ `floor` is accepted at all: one search at the 4-px gap (the most
@@ -762,16 +769,23 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
    * over PCs, is accepted iff the dry fit with it as an obstacle keeps every PC (and every token
    * the fit kept) clear at ≥ 75 % of the last full fit's cell and ≥ 24 px; the map then refits.
    */
-  const yieldFor = (def: WindowDef, input: PlaceInput, floor: Size): Spot | null => {
+  const yieldFor = (def: WindowDef, input: PlaceInput, floor: Size, dry = false): Spot | null => {
     if (registry.client !== "player" || !ctx.dryFit || ctx.camera?.() !== "fitted") return null;
     const last = ctx.lastFullCell?.();
     if (!last) return null;
-    const p = placeWindow(def, vp, { ...input, floor });
-    if (!p.clear || p.pcClear) return null;
-    const fit = ctx.dryFit([...(input.windows ?? []).map(plainRect), p.rect]);
-    if (!fit?.clear || fit.cellPx < Math.max(YIELD_SHARE * last, YIELD_MIN_CELL)) return null;
-    yields = true;
-    return { rect: p.rect, rung: "L2b", pcClear: true };
+    // The target size first (a yielded window isn't left shell-shrunk to grow back later), then
+    // down to useful.
+    const sizes =
+      input.size && (input.size.w > floor.w || input.size.h > floor.h) ? [input.size] : [];
+    for (const f of [...sizes, floor]) {
+      const p = placeWindow(def, vp, { ...input, floor: f });
+      if (!p.clear || p.pcClear) continue;
+      const fit = ctx.dryFit([...(input.windows ?? []).map(plainRect), p.rect]);
+      if (!fit?.clear || fit.cellPx < Math.max(YIELD_SHARE * last, YIELD_MIN_CELL)) continue;
+      if (!dry) yields = true;
+      return { rect: p.rect, rung: "L2b", pcClear: true };
+    }
+    return null;
   };
 
   /** Places a launcher window through the ladder and writes it. */
@@ -888,8 +902,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     if (!w.userSpot) {
       const full = zoneOf(w);
       const def = defOf(w);
-      // A squeeze whose cause goes on stays squeezed in the zone (a viewport change).
-      const z = full && def && squeezedNow(w) ? squeezeRect(full, def) : full;
+      // A squeeze whose cause goes on stays squeezed in the zone (a viewport change); after a
+      // reload (memory dropped) a window stored squeezed in its zone stays so: its cause still
+      // shows, else it would have returned before (WF2 notes: the DM's reload kept the layout).
+      const storedSqueezed =
+        trigger.type === "load" &&
+        full &&
+        def &&
+        sameRect(w, squeezeRect(full, def)) &&
+        !sameRect(w, full);
+      const z = full && def && (squeezedNow(w) || storedSqueezed) ? squeezeRect(full, def) : full;
       if (z) {
         const atZone = { ...w, ...z };
         const r = shownRect(
@@ -901,6 +923,17 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         // FR-MAP-96, -98): the camera the PCs are drawn at now is the one before that refit.
         if ((fitted || pcFree(r)) && clearAt(r, id, true)) {
           write(id, z, how, { rung: "zone", keepSize: true });
+          if (storedSqueezed && full) {
+            // Its cause again: the launcher window in its full zone; that one closing (or
+            // ending) returns it to the full zone (FR-SHELL-102).
+            const cause = [...shownMap()].find(
+              ([o, or]) => !isProt(o) && overlaps(or, full) && idOf(o) !== id,
+            );
+            if (cause) {
+              remember({ ...w, ...full }, `window:${cause[0].kind}`, plainRect(z));
+              placed.set(id, "squeezed");
+            }
+          }
         } else {
           // Least movement (ADR-0060 §4): a spot the ladder gave it earlier that still holds (inside,
           // clear of the protected windows, PC-clear, ≥ useful) is kept; else the ladder.
@@ -1080,6 +1113,9 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         write(id, spot.rect, "grown", { rung: spot.rung });
       } else if (was.state !== "open") {
         setWin(id, was);
+        // Still put away: a later settle tries again (a window displaced by the same cause may
+        // still hold its spot, e.g. one whose own viewport cause ends one size later).
+        memory.set(id, d);
       }
     }
   };

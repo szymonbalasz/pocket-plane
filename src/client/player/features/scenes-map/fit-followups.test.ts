@@ -15,6 +15,7 @@ import {
   type Box,
   cameraOn,
   createRevealRefit,
+  fitFor,
   fitScene,
   footprintBox,
   REVEAL_REFIT_MS,
@@ -119,11 +120,34 @@ test("FR-MAP-89 reveal refit with the card open: b07 (1280×800, sheet + compani
     obstacles,
     windowsOnly: freeAreas(WINDOWS, VP),
   };
-  const fit = fitScene(ESCORT, AMBUSH_GRID, AMBUSH_MAP, VP, roomNow);
+  // Sprint 8 (FR-MAP-95): the players' one fit path; PCs keep 4 px from windows (FR-MAP-93).
+  const inputs = {
+    client: "player" as const,
+    tokens: ESCORT,
+    grid: AMBUSH_GRID,
+    map: AMBUSH_MAP,
+    view: VP,
+    room: roomNow,
+    stripRoom: roomNow,
+  };
+  const fit = fitFor("reveal", inputs, 48);
+  expect(fitFor("load", inputs, null)).toMatchObject({ x: fit.x, y: fit.y, scale: fit.scale });
   const under = ESCORT.filter((t) => !allClear(fit, [boxOf(t)], obstacles, area)).map(
     (t) => t.name,
   );
-  expect(under).toEqual([]);
+  // Every token clear only with a PC flush against a window (24 px): the PCs keep 4 px
+  // (FR-MAP-93, a hard rule since walkthrough WF3 F9), the least token area stays hidden.
+  const pcs = ESCORT.filter((t) => t.pc).map(boxOf);
+  expect(
+    allClear(
+      fit,
+      pcs.map((b) => ({ ...b, pc: true })),
+      obstacles,
+      area,
+      4,
+    ),
+  ).toBe(true);
+  expect(under).toEqual(["Goblin Lurker"]);
   expect(mode).toBe("fitted");
   // A fit run before the restored windows rendered (the old load fit): tokens under the sheet.
   const early = fitScene(ESCORT, AMBUSH_GRID, AMBUSH_MAP, VP, {

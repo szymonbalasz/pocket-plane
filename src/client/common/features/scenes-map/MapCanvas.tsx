@@ -32,7 +32,8 @@ import { Group, Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
-import { useFreeArea } from "../play-shell/free-area";
+import { setFitPort, useFreeArea } from "../play-shell/free-area";
+import type { Rect } from "../play-shell/geometry";
 import { isKeyboardFocus, spaceAction, trackFocusModality } from "../play-shell/keys";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import {
@@ -42,14 +43,18 @@ import {
   type CameraMode,
   cameraOn,
   centreOn,
-  createAppearanceRefit,
   createResizeRefit,
   createRevealRefit,
+  createSettledRefit,
+  dryFitScene,
+  type FitInputs,
   type FitReason,
   type FitVisible,
-  fitPastToasts,
-  fitScene,
+  fitFor,
+  fitTokensOf,
   footprintBox,
+  isFullFit,
+  placerSettled,
   refitsOnReveal,
   revealRefit,
   visibleArea,
@@ -259,8 +264,10 @@ export function MapCanvas(props: MapCanvasProps) {
   /** FR-MAP-82: the last fit's cause (`data-fit-reason`). */
   const [fitReason, setFitReason] = useState<FitReason>("open");
   const free = useFreeArea();
-  // FR-MAP-59 / -80 obstacles: the rendered open windows + the players' toast box, or the DM's
-  // summary strip + shown stack (`fitObstacles`).
+  const freeRef = useRef(free);
+  freeRef.current = free;
+  // FR-MAP-59 / -80 / -93 obstacles: the rendered windows of the placer's plan + the players' toast
+  // box, or the DM's summary strip + shown stack (`fitObstacles`).
   const obstacles = free.obstacles;
   const obstaclesRef = useRef(obstacles);
   obstaclesRef.current = obstacles;
@@ -272,59 +279,79 @@ export function MapCanvas(props: MapCanvasProps) {
   camRef.current = cam;
   /** FR-MAP-82 / -89 (3): the token ids the last fit framed on its scene (the reveal baseline). */
   const drawn = useRef<{ scene: string; ids: ReadonlySet<string> } | null>(null);
+  /** FR-MAP-94: the last full fit's cell (Fit, open, load, resize), screen px; the refits' bound. */
+  const lastFullCell = useRef<number | null>(null);
+  /** FR-MAP-93, -95: this client's fit inputs now; `windows` = the placer's candidate rects. */
+  const fitInputs = useRef((_windows?: readonly Rect[]): FitInputs | null => null);
+  fitInputs.current = (windows) => {
+    if (size.w === 0) return null;
+    const rooms = windows ? free.roomsWith(windows) : free;
+    return {
+      client,
+      tokens: fitTokensOf(tokens),
+      grid,
+      map: { w: scene.mapWidth, h: scene.mapHeight },
+      view: size,
+      room: rooms.room,
+      stripRoom: rooms.stripRoom,
+    };
+  };
   const fitNow = useRef((_reason: FitReason) => {});
   fitNow.current = (reason) => {
-    if (size.w === 0) return;
-    // FR-MAP-58 in the room the toast box leaves (FR-SHELL-48 (a)), then FR-MAP-59; PC tokens =
-    // tokens with an owner, in this client's store (FR-MAP-46).
-    const fitTokens = tokens.map((t) => ({
-      col: t.col,
-      row: t.row,
-      size: t.size,
-      pc: t.ownerPlayerId !== null,
-    }));
-    const map = { w: scene.mapWidth, h: scene.mapHeight };
-    const room = { areas: free.toastFreeAreas, obstacles, windowsOnly: free.areas };
-    // FR-MAP-91: Fit (button, Reset layout), a resize and (FR-MAP-90) an appearance refit may fit
-    // past the DM's shown stack.
-    const fit =
-      reason === "fit" || reason === "resize" || reason === "appearance"
-        ? fitPastToasts(fitTokens, grid, map, size, room, {
-            ...free.stripOnly,
-            windowsOnly: free.areas,
-          })
-        : { ...fitScene(fitTokens, grid, map, size, room), pastToasts: false };
+    const inputs = fitInputs.current();
+    if (!inputs) return;
+    // FR-MAP-95: every reason runs Fit's function with this client's obstacles, bounded by the
+    // last full fit (FR-MAP-94).
+    const fit = fitFor(reason, inputs, lastFullCell.current);
     setCam({ x: fit.x, y: fit.y, scale: fit.scale });
     setFitFloor(fit.floor);
     setFitVisible(fit.visible);
     setFitRect(`${fit.rect.x},${fit.rect.y},${fit.rect.w},${fit.rect.h}`);
-    setFitReason(fit.pastToasts ? "fit-past-toasts" : reason);
+    setFitReason(fit.reason);
+    if (isFullFit(fit.reason)) lastFullCell.current = fit.scale * grid.gridCellSize;
     drawn.current = { scene: scene.id, ids: new Set(tokens.map((t) => t.id)) };
   };
   /**
-   * FR-MAP-61: the appearance refit, once the frame that caused it reached the canvas. FR-MAP-90:
-   * every token already inside the area and clear of every obstacle → the camera stays.
-   */
-  const [appearanceRefit] = useState(() =>
-    createAppearanceRefit(() => {
-      if (cameraModeRef.current !== "fitted") return;
-      const boxes = tokensRef.current.flatMap((t) => footprintBox([t], gridRef.current) ?? []);
-      if (appearanceKeeps(camRef.current, boxes, obstaclesRef.current, sizeRef.current)) return;
-      fitNow.current("appearance");
-    }),
-  );
-  /**
-   * FR-MAP-89 (2), -92: the scene-open (load) fit and the resize refit wait, as the appearance
-   * refit does, for the windows' rendered rects (restored layout, grown heights, the render fit to
-   * the new viewport) before they frame.
+   * FR-MAP-96, -98: the placer has settled: the layout applied, no placed window waiting for its
+   * `settle`, grown windows measured; a resize refit also waits for the last `viewport` settle.
    */
   const settledReason = useRef<FitReason>("open");
+  const settledFor = (reason: FitReason) =>
+    placerSettled(freeRef.current, reason, { w: window.innerWidth, h: window.innerHeight });
+  /**
+   * FR-MAP-61, -96: the appearance refit, after the `appear` settle. FR-MAP-90: every token already
+   * inside the area and clear of every obstacle (PCs + 4 px) → the camera stays.
+   */
+  const [appearanceRefit] = useState(() =>
+    createSettledRefit(
+      () => {
+        if (cameraModeRef.current !== "fitted") return;
+        const boxes = fitTokensOf(tokensRef.current).flatMap((t) => {
+          const b = footprintBox([t], gridRef.current);
+          return b ? [{ ...b, pc: t.pc }] : [];
+        });
+        if (appearanceKeeps(camRef.current, boxes, obstaclesRef.current, sizeRef.current)) return;
+        fitNow.current("appearance");
+      },
+      () => settledFor("appearance"),
+    ),
+  );
+  /**
+   * FR-MAP-96, -97, -98: the scene-open (load) fit, the yield refit and the resize refit run once
+   * the placer's settle has applied (restored layout and zones, grown heights, the windows back
+   * after a resize) before they frame.
+   */
   const [settledFit] = useState(() =>
-    createAppearanceRefit(() => {
-      const reason = settledReason.current;
-      if (reason === "resize" && cameraModeRef.current !== "fitted") return;
-      fitNow.current(reason);
-    }),
+    createSettledRefit(
+      () => {
+        const reason = settledReason.current;
+        if ((reason === "resize" || reason === "window") && cameraModeRef.current !== "fitted") {
+          return;
+        }
+        fitNow.current(reason);
+      },
+      () => settledFor(settledReason.current),
+    ),
   );
   useEffect(
     () => () => {
@@ -338,23 +365,37 @@ export function MapCanvas(props: MapCanvasProps) {
     appearanceRefit.applied();
     settledFit.applied();
   }, [appearanceRefit, settledFit, tokens, obstacles, size]);
-  /** Applies a camera event; fits now (or later, once the window change is laid out). */
+  /** Applies a camera event; fits now (or later, once the placer has settled). */
   const onCamera = useCallback(
     (e: CameraEvent, deferred = false, reason: FitReason = e as FitReason) => {
       const next = cameraOn(cameraModeRef.current, e);
       cameraModeRef.current = next.mode;
       setCameraMode(next.mode);
       if (!next.fit) return;
-      // Only fit events (open, fit, appearance, resize, reveal) fit.
+      // Only fit events (open, fit, appearance, resize, reveal, window) fit.
       if (!deferred) fitNow.current(reason);
-      else if (e === "appearance") appearanceRefit.appearance();
+      else if (e === "appearance") appearanceRefit.request();
       else {
         settledReason.current = reason;
-        settledFit.appearance();
+        settledFit.request();
       }
     },
     [appearanceRefit, settledFit],
   );
+  // FR-SHELL-96, -108; FR-MAP-97: the base port the placer's L2b reads (the players' map yields).
+  useEffect(() => {
+    setFitPort({
+      dryFit: (windows) => {
+        const inputs = fitInputs.current(windows);
+        if (!inputs) return null;
+        return dryFitScene(inputs, lastFullCell.current);
+      },
+      lastFullCell: () => lastFullCell.current,
+      // The placer wrote the windows; the refit frames them once they render.
+      yieldRefit: () => onCamera("window", true),
+    });
+    return () => setFitPort(null);
+  }, [onCamera]);
   // ---- FR-MAP-12 (sprint 4): the middle mouse pans with any tool, before Konva and the tools ----
   const [panning, setPanning] = useState(false);
   const [pan] = useState(() =>

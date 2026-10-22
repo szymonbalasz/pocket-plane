@@ -9,7 +9,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | WF1 placer core + replay harness | merged | — | done | main gates running |
-| WF3 map refits | `fix/wf-refits` (w9G) | build-wf3 | walkthrough 6/8; F10 fixed; F9 (placer) after WF2 merges | re-test F9, F10 |
+| WF3 map refits | merged (re-test 7/8; DM reload cell by design) | — | done | main gates running |
+| CB2 turn ring | `build/cb-turn-ring` (w9N) | build-cb2 | building (last sprint slice) | walkthrough CB1, CB7, CB13 |
 | TT4 pause screen | `build/tt-pause` (w9H) | build-tt4 | part 1 13/14 → popup + body-portal fixes, gates | finish after WF4 (toasts), WF3 (reveal), TT1+2 (T10, T12) |
 | WF2 pushes + rail inset | merged (walkthrough 13/14) | — | done | main check 5014 / e2e 199 (1 known flake re-run green) |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
@@ -27,7 +28,8 @@ Queue (seams build plan, `.verify/sprint8/seams.md`): wave 2 WF4, TT1+2, TT3, CB
 ## Shared-file locks
 
 - Canvas (MapCanvas, camera, TokensLayer, LabelsLayer) + `free-area.ts`: `fix/wf-refits` (then CB2).
-- Frame files (placer.ts, manager.ts, geometry.ts, placement.ts, shell-store.ts, ShellContext.tsx) + canvas: `fix/wf-refits`. `PlayFrame.tsx` overlay layer: `build/tt-pause`.
+- Canvas (token-overlays type, decorations, token-decor, TokensLayer): `build/cb-turn-ring`. `PlayFrame.tsx` overlay layer: `build/tt-pause`. Frame files free.
+- Backlog: no new picks (the last sprint slice is in flight).
 - Schema lane: free (TT0, CB0 merged).
 - `TrayWindow.tsx`, `GameLog.tsx`, `char.roll` server file: `build/tt-dice`.
 - `ToastRuntime.tsx`: `build/tt-dice` (`restoreToast`).

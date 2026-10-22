@@ -226,8 +226,9 @@ test("FR-MAP-90 no jump at Start: U13 (1440×900, Scenes 260×360 + Game log + I
   // The shown stack: the card (560, 100, 320 × 86) and one roll popup (320 × 190) below it.
   const stack = { x: 560, y: 100, w: 320, h: 86 + 8 + 190 };
   const kept = fitScene(tokens, AMBUSH_GRID, AMBUSH_MAP, V1440, room(V1440, windows, stack));
-  // The walkthrough's refit: the stack as an obstacle → pcs at 48 px, monsters under Initiative.
-  expect({ visible: kept.visible, cell: cellPx(kept) }).toEqual({ visible: "pcs", cell: 48 });
+  // The walkthrough's refit: the stack as an obstacle → pcs (at 44 px since FR-MAP-93's 4-px PC
+  // margin, 48 before), monsters under Initiative.
+  expect({ visible: kept.visible, cell: cellPx(kept) }).toEqual({ visible: "pcs", cell: 44 });
   expect(covered(kept, named("Ogre", "Plain Brute"), windows, V1440)).toEqual([
     "Plain Brute",
     "Ogre",
