@@ -14,6 +14,7 @@ import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
 import { cbtxEffectHookLine, cbtxRuleHooks } from "../combat-extras/rule-hooks";
 import { modReminderHooks } from "../effect-modifiers/reminders";
+import { statsSummaryHooks } from "../stats/summary";
 
 export type CombatRuleEnv = CommandEnv;
 
@@ -71,6 +72,7 @@ export const combatRuleHooks: readonly CombatRuleHookRegistration[] = [
   { name: "combat-extras.rules", hooks: cbtxRuleHooks }, // combat-extras (FR-CBTX-06/07/12/13)
   { name: "effect-modifiers.reminders", hooks: modReminderHooks }, // effect-modifiers (FR-MOD-44)
   { name: "combat-extras.effect-hooks", hooks: cbtxEffectHookLine }, // combat-extras: effect hooks last (FR-CBTX-51)
+  { name: "stats.fight-summary", hooks: statsSummaryHooks }, // stats: End → fight summary (FR-CBT-153)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */
