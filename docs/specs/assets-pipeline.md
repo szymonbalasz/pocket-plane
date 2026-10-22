@@ -1,7 +1,7 @@
 ---
 title: Assets pipeline
 prefix: ASSET
-status: in-review
+status: complete
 owner: spec-tt
 wave: 1
 phase: post-mvp-8
@@ -38,7 +38,7 @@ phase: post-mvp-8
 | FR-ASSET-35, -37 | *(C)* Entry images as asset references; stale IDs dropped at the compendium read | C5 core ([CMP §14](compendium.md#14-dependencies)) | CMP `FR-CMP-46 assets.require refusal`, `FR-CMP-47 asset deleted` |
 | FR-ASSET-36, -38 | *(C)* REST-body exception (ADR, #256); leak property over REST incl. ETag | C5 core | `FR-ASSET-36 leak property over REST` |
 
-> **Sprint 8, track TT (DM [#334](../decisions-log.md)).** DM-added alert sounds are audio assets (ADR-0030, ADR-0023 capability IDs): MP3 / OGG / WAV ≤ 512 KB, ≤ 5 s, hand-rolled probe (**no dependency**), lazy DM-only `audio-asset` (0 B in snapshots). FR-ASSET-52–61 (§6.4); `audio-chime` joins session-sim-12; tests, walkthrough T13–T14: [dice-extras §13](dice-extras.md#13-test-plan). For the DM: OQ-ASSET-27–30.
+> **Sprint 8, track TT (DM [#334](../decisions-log.md)).** DM-added alert sounds are audio assets (ADR-0030, ADR-0023 capability IDs): MP3 / OGG / WAV ≤ 512 KB, ≤ 5 s, hand-rolled probe (**no dependency**), lazy DM-only `audio-asset` (0 B in snapshots). FR-ASSET-52–61 (§6.4); `audio-chime` joins session-sim-12; tests, walkthrough T13–T14: [dice-extras §13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-ASSET-27–30.
 
 ## 1. Summary
 
@@ -448,14 +448,14 @@ Isolated per worktree as above (`bun test`: `:memory:` + temp asset dir; walkthr
 | OQ-ASSET-25 | *(S6, DM)* **Players and tags** | **Decided (#288): A: no; tags stay on the DM-only asset record, no player picker.** Options were: **A no: tags stay on the DM-only `asset` record; the player client has no image picker today** (no leak surface; ADR-0023 unchanged) / B players see the tags of images they already hold (a player-visible field on each referencing record; no player screen uses it) / C a player picker for their own portrait (needs player uploads, OQ-ASSET-02 / -14: out) | — · decided (#288) | character-sheet-full |
 | OQ-ASSET-26 | *(S6, DM)* **Existing untagged images** (FR-ASSET-49) | **Decided (#288): A: guess once from current use (marker, once per DB); unused → Untagged.** Options were: **A guess once at the first start from current use (scene map → Maps, token → Tokens, portrait → Portraits, prop → Props, handout → Handouts, compendium item → Items); unused → Untagged** (filters useful on day one; a reused image may get two tags) / B all Untagged (no surprises; the DM tags by hand) / C all tagged "Other" (needs OQ-ASSET-21 B) | — · decided (#288) | — |
 
-**Sprint 8** (track TT). **Bold** = suggested pick.
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-ASSET-27 | Formats | **A. MP3, OGG, WAV** (OGG falls back to the ping on older Safari) / B. MP3 only / C. + M4A, WebM | yes | FR-ASSET-52 |
-| OQ-ASSET-28 | Limits | **A. ≤ 512 KB, ≤ 5 s**: a short UI sound, cheap on a tunnel / B. 1 MB, 10 s / C. 256 KB, 3 s | yes | FR-ASSET-52 |
-| OQ-ASSET-29 | Length check | **A. Server, hand-rolled probe, no dependency** / B. Only the DM's browser (bypassable) / C. `music-metadata` (MIT, a new dependency; not installed or measured) | no | FR-ASSET-53 |
-| OQ-ASSET-30 | Delete a sound? | **A. No, as images; cap 50** / B. Delete an unpicked one | no | FR-ASSET-58 |
+| OQ-ASSET-27 | Formats | **Decided (#335): A.** Options: **A. MP3, OGG, WAV** (OGG falls back to the ping on older Safari) / B. MP3 only / C. + M4A, WebM | no (decided) | FR-ASSET-52 |
+| OQ-ASSET-28 | Limits | **Decided (#335): A.** Options: **A. ≤ 512 KB, ≤ 5 s**: a short UI sound, cheap on a tunnel / B. 1 MB, 10 s / C. 256 KB, 3 s | no (decided) | FR-ASSET-52 |
+| OQ-ASSET-29 | Length check | **Decided (#335): A.** Options: **A. Server, hand-rolled probe, no dependency** / B. Only the DM's browser (bypassable) / C. `music-metadata` (MIT, a new dependency; not installed or measured) | no (decided) | FR-ASSET-53 |
+| OQ-ASSET-30 | Delete a sound? | **Decided (#335): A.** Options: **A. No, as images; cap 50** / B. Delete an unpicked one | no (decided) | FR-ASSET-58 |
 
 - *(Sprint 8)* Slices: columns, lazy type, `require` kind TT0; probe, serve, `audio-chime` TT3 ([dice-extras §14](dice-extras.md#14-dependencies)). `ffprobe` rejected (external binary).
 

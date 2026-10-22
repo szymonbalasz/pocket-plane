@@ -1,7 +1,7 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: in-review
+status: complete
 owner: spec-tt
 phase: post-mvp-8
 ---
@@ -578,12 +578,12 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 |---|---|---|---|---|
 | OQ-CHARX-37 | Where the gem block sits on the sheet | **Decided (#315): A.** **A. Header chip row, after the effect chips (seen at a glance on every tab; the row gets longer)** / B. Vitals, under HP (near play state; pushes the HP row's neighbours down) / C. Its own "Gems" tab (roomy; hidden until clicked) | — · decided | gems |
 
-**Sprint 8** (track TT; DM [#334](../decisions-log.md): saved macros, FR-CHARX-87–90; no record, field or event here, CON-44 0 B; walkthrough T1–T3 in [dice-extras §13](dice-extras.md#13-test-plan)). **Bold** = suggested pick.
+**Sprint 8** (track TT; DM [#334](../decisions-log.md): saved macros, FR-CHARX-87–90; no record, field or event here, CON-44 0 B; walkthrough T1–T3 in [dice-extras §13](dice-extras.md#13-test-plan)). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CHARX-40 | Does the sheet lock also lock macros? | **A. No: they are rolls** / B. Yes | no | FR-CHARX-89 |
-| OQ-CHARX-41 | Where on the sheet? | **A. A "Macros" tab**: Main's fold unchanged (FR-CHARX-82) / B. A block at the end of Main | no | FR-CHARX-87 |
+| OQ-CHARX-40 | Does the sheet lock also lock macros? | **Decided (#335): A.** Options: **A. No: they are rolls** / B. Yes | no (decided) | FR-CHARX-89 |
+| OQ-CHARX-41 | Where on the sheet? | **Decided (#335): A.** Options: **A. A "Macros" tab**: Main's fold unchanged (FR-CHARX-82) / B. A block at the end of Main | no (decided) | FR-CHARX-87 |
 
 ## 16. Out of scope
 

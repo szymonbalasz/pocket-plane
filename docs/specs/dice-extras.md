@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: in-review
+status: complete
 owner: spec-tt
 phase: post-mvp-8
 ---
@@ -14,7 +14,7 @@ phase: post-mvp-8
 
 > **Sprint 7 (track FU, BL-48; DM [#311](../decisions-log.md)).** Decided, not open: no stray spaces in dice text. New **FR-DICEX-63** (with [FR-DICE-78](dice-roll-log.md#6-functional-requirements)). Test `FR-DICEX-63 notation spacing` (unit over `notation.ts` and the popup line: no `"( "`, `" )"`, `"  "`); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. The sim-10 note "DM tray opens 360 × 248, not 300 × 240" is **dropped here**: 300 × 240 is the tray's min, its default is 360 × 300 (FR-DICEX-01), and the 248 came from auto placement's shrink, which play-shell's useful size now governs (FR-SHELL-79). Client only, 0 B. Edge cases: client-only text; reconnect re-renders from the store; crash: no server change. No open question.
 
-> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** Decided: **saved macros** (one click → the normal roll path incl. physical dice and the tray) and **DM roll requests** (a notification with a roll action, results hidden or public per request), moved here from the [stub](post-mvp/dice-extras.md). FR-DICEX-64–93; [proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md). §12–14 also hold TT's CON-44, tests, walkthrough and build split for the pause screen ([play-shell](play-shell.md) FR-SHELL-125–136, [campaign-management](campaign-management.md) FR-CAMP-46–50) and sounds ([assets-pipeline](assets-pipeline.md) FR-ASSET-52–61). For the DM: OQ-DICEX-49–60.
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** Decided: **saved macros** (one click → the normal roll path incl. physical dice and the tray) and **DM roll requests** (a notification with a roll action, results hidden or public per request), moved here from the [stub](post-mvp/dice-extras.md). FR-DICEX-64–93; [proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md). §12–14 also hold TT's CON-44, tests, walkthrough and build split for the pause screen ([play-shell](play-shell.md) FR-SHELL-125–136, [campaign-management](campaign-management.md) FR-CAMP-46–50) and sounds ([assets-pipeline](assets-pipeline.md) FR-ASSET-52–61). Decided at gate 1 (#335): OQ-DICEX-49–60.
 
 ## 1. Summary
 
@@ -928,26 +928,26 @@ Rows 01–17 decided. Rows 01–12: DM at sprint-3 gate 1 ([#207](../decisions-l
 
 **Sprint 6 build:** FR-DICEX-57, -58 go in slice **PF2** ([play-shell §14](play-shell.md#14-dependencies)): one line in each client's `pref-sections.ts` (append) + `SettingsPanel.tsx` (a layout prop at most; dice-extras' own file). *(Seams S9)* WF5 `fix/tray-roll-visible` owns `TrayWindow.tsx` / `TrayPreview.tsx`; `SettingsPanel.tsx` is PF's. PF2 does not edit `TrayWindow.tsx` (the gear already opens `SettingsPanel`, so OQ-DICEX-48 A needs no tray change); if it ever must, PF2 merges after WF5. No dependency.
 
-**Sprint 8** (track TT). **Bold** = suggested pick: tradeoff.
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-DICEX-49 | Who makes macros? | **A. Players on own PCs; the DM on anything (a PC's for its owner or DM only)**: covers Bless and monsters / B. DM only / C. Players only | yes | FR-DICEX-64–67 |
-| OQ-DICEX-50 | Where? | **A. Sheet tab + tray popover**: 0 px / B. A macro bar: map room / C. A window | yes | FR-DICEX-69 |
-| OQ-DICEX-51 | Contents | **A. Notation + name + category, a free roll**: no server change / B. + damage type feeding the card / C. + sheet references | yes | FR-DICEX-68 |
-| OQ-DICEX-52 | Targets | **A. PCs, "All PCs" preset** / B. + companions / C. Online players only | yes | FR-DICEX-75 |
-| OQ-DICEX-53 | Rolls | **A. Skill, save, check, custom** / B. + initiative, death saves / C. Custom only | yes | FR-DICEX-76 |
-| OQ-DICEX-54 | DC | **A. Optional, shown or hidden (default hidden); pass / fail DM only**: no meta-gaming / B. Shown with pass / fail / C. None | yes | FR-DICEX-77, -85 |
-| OQ-DICEX-55 | Results | **A. Public, or Hidden = DM + the target's player (preset from the category)** / B. A + Blind (DM only; existing stamp) / C. Always public | yes | FR-DICEX-77 |
-| OQ-DICEX-56 | Timeout | **A. None; Close / Roll for missing**: no wall-clock scheduler (ADR-0016) / B. A countdown / C. Close at the next turn | no | FR-DICEX-82 |
-| OQ-DICEX-57 | Decline? | **A. Yes** / B. No | no | FR-DICEX-79 |
-| OQ-DICEX-58 | Physical dice on a prompt? | **A. Yes, a normal roll button** / B. One tap, server rolls | no | FR-DICEX-83 |
-| OQ-DICEX-59 | Request adv / dis | **A. A preset the player may change** / B. Forced | no | FR-DICEX-76 |
-| OQ-DICEX-60 | Answer path (technical) | **A. Own `dicex.answerRequest` + `sheetRoll`** / B. `requestId` on `char.roll` / `dice.roll` | no | FR-DICEX-78 |
-| OQ-DICEX-61 | Glossary: Macro, Roll request, Prompt, Pause screen, Alert sound | **A. Add** (integrator, S16) | no | glossary |
-| ~~OQ-DICEX-62~~ | Luck counting | **Settled (S6):** iff the entry is public; hidden answers DM only, not in the roller's view (FR-DICE-82) | — | stats |
-| ~~OQ-DICEX-63~~ | Placer seams | **Settled (S2, S3):** card = `overlays.ts` entry (`blocksInput`), control = `top-bar-items.ts`, prompt = card toast, Requests = launcher window (useful 360 × 400) | — | FR-DICEX-86 |
-| ~~OQ-DICEX-64~~ | Request vs turn alert | **Settled (S9):** independent, sounds never overlap; TT3 owns the `turn` key line | — | FR-DICEX-89 |
+| OQ-DICEX-49 | Who makes macros? | **Decided (#335): A.** Options: **A. Players on own PCs; the DM on anything (a PC's for its owner or DM only)**: covers Bless and monsters / B. DM only / C. Players only | no (decided) | FR-DICEX-64–67 |
+| OQ-DICEX-50 | Where? | **Decided (#335): A.** Options: **A. Sheet tab + tray popover**: 0 px / B. A macro bar: map room / C. A window | no (decided) | FR-DICEX-69 |
+| OQ-DICEX-51 | Contents | **Decided (#335): A.** Options: **A. Notation + name + category, a free roll**: no server change / B. + damage type feeding the card / C. + sheet references | no (decided) | FR-DICEX-68 |
+| OQ-DICEX-52 | Targets | **Decided (#335): A.** Options: **A. PCs, "All PCs" preset** / B. + companions / C. Online players only | no (decided) | FR-DICEX-75 |
+| OQ-DICEX-53 | Rolls | **Decided (#335): A.** Options: **A. Skill, save, check, custom** / B. + initiative, death saves / C. Custom only | no (decided) | FR-DICEX-76 |
+| OQ-DICEX-54 | DC | **Decided (#335): A.** Options: **A. Optional, shown or hidden (default hidden); pass / fail DM only**: no meta-gaming / B. Shown with pass / fail / C. None | no (decided) | FR-DICEX-77, -85 |
+| OQ-DICEX-55 | Results | **Decided (#335): A.** Options: **A. Public, or Hidden = DM + the target's player (preset from the category)** / B. A + Blind (DM only; existing stamp) / C. Always public | no (decided) | FR-DICEX-77 |
+| OQ-DICEX-56 | Timeout | **Decided (#335): A.** Options: **A. None; Close / Roll for missing**: no wall-clock scheduler (ADR-0016) / B. A countdown / C. Close at the next turn | no (decided) | FR-DICEX-82 |
+| OQ-DICEX-57 | Decline? | **Decided (#335): A.** Options: **A. Yes** / B. No | no (decided) | FR-DICEX-79 |
+| OQ-DICEX-58 | Physical dice on a prompt? | **Decided (#335): A.** Options: **A. Yes, a normal roll button** / B. One tap, server rolls | no (decided) | FR-DICEX-83 |
+| OQ-DICEX-59 | Request adv / dis | **Decided (#335): A.** Options: **A. A preset the player may change** / B. Forced | no (decided) | FR-DICEX-76 |
+| OQ-DICEX-60 | Answer path (technical) | **Decided (#335): A.** Options: **A. Own `dicex.answerRequest` + `sheetRoll`** / B. `requestId` on `char.roll` / `dice.roll` | no (decided) | FR-DICEX-78 |
+| OQ-DICEX-61 | Glossary: Macro, Roll request, Prompt, Pause screen, Alert sound | **Resolved (integrator, sprint-8 seams / rulings)**: **A. Add** (integrator, S16) | no (decided) | glossary |
+| ~~OQ-DICEX-62~~ | Luck counting | **Resolved (integrator, sprint-8 seams / rulings)**: (S6) iff the entry is public; hidden answers DM only, not in the roller's view (FR-DICE-82) | no (decided) | stats |
+| ~~OQ-DICEX-63~~ | Placer seams | **Resolved (integrator, sprint-8 seams / rulings)**: (S2, S3) card = `overlays.ts` entry (`blocksInput`), control = `top-bar-items.ts`, prompt = card toast, Requests = launcher window (useful 360 × 400) | no (decided) | FR-DICEX-86 |
+| ~~OQ-DICEX-64~~ | Request vs turn alert | **Resolved (integrator, sprint-8 seams / rulings)**: (S9) independent, sounds never overlap; TT3 owns the `turn` key line | no (decided) | FR-DICEX-89 |
 
 ## 16. Out of scope
 

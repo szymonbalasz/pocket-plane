@@ -1,7 +1,7 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: in-review
+status: complete
 owner: spec-tt
 wave: 1
 phase: post-mvp-8
@@ -57,7 +57,7 @@ Decided by the DM (#288, every bold pick): OQ-CAMP-28 A, -29 B + danger (a), -30
 | FR-CAMP-44 | "Off" rule: tagged record types / log kinds hidden, `featureOn` for commands | GM0 | `FR-CAMP-44 off hides tagged` |
 | FR-CAMP-45 | `useFeature(store, key)`; CON-44 measured | GM0 | `FR-CAMP-45 CON-44 switch` |
 
-> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** The pause screen and the DM's alert-sound picks are per-campaign table state on the **campaign row**: `pause` and `alertSounds`, JSON leaves omitted from the wire when empty. FR-CAMP-46–50. Card and playback: [play-shell](play-shell.md) FR-SHELL-125–136; audio files: [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61; CON-44, tests, walkthrough T9–T13: [dice-extras §12–13](dice-extras.md#13-test-plan). Units `camp-alert-sounds` (joins session-sim-12) and `camp-paused`. For the DM: OQ-CAMP-35, -36.
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** The pause screen and the DM's alert-sound picks are per-campaign table state on the **campaign row**: `pause` and `alertSounds`, JSON leaves omitted from the wire when empty. FR-CAMP-46–50. Card and playback: [play-shell](play-shell.md) FR-SHELL-125–136; audio files: [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61; CON-44, tests, walkthrough T9–T13: [dice-extras §12–13](dice-extras.md#13-test-plan). Units `camp-alert-sounds` (joins session-sim-12) and `camp-paused`. Decided at gate 1 (#335): OQ-CAMP-35, -36.
 
 ## 1. Summary
 
@@ -496,12 +496,12 @@ Hotspot rules ([sprint-5](../agents/sprint-5.md#boundaries-and-hotspots-sequence
 | OQ-CAMP-33 | **Where the DM switches gems on / off** (per campaign, not per person) | **Decided (#315): A.** **A. "Options" in the Players window (the DM's campaign panel): a Campaign options dialog, one Switch per optional feature (next to the campaign's players; reusable)** / B. A DM Preferences section (one place for settings, but Preferences is per person and FR-SHELL-75 says campaign rules aren't preferences: a play-shell amendment) / C. The campaign switcher's menu (beside rename; the switcher is small and rarely opened) | — · decided | [play-shell](play-shell.md) (B only) |
 | OQ-CAMP-34 | **A field per feature or a generic map?** ([proposed ADR](../architecture/adr/0058-feature-switches.md)) | **Decided (#315): B** (ADR accepted). A. A column per feature (`gems_enabled`: simplest; a schema change + wire field + own "off" rule each time) / **B. `features` list + feature tags on record types / log kinds, one hub rule (0 B off, one tested rule; a small `ws/` change)** / C. A `campaign_feature` table (normalised; same wire work plus a table) | — · decided | live-sync, protocol |
 
-**Sprint 8** (track TT). **Bold** = suggested pick.
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CAMP-35 | Where does the DM pick and upload sounds? | **A. Campaign options, "Alert sounds" section**: campaign settings, not personal / B. DM Preferences / C. An Audio tab in Images | yes | FR-CAMP-49 |
-| OQ-CAMP-36 | Defaults | **A. Turn + request = ping; pause / resume silent until picked** / B. Ping everywhere / C. New built-in sounds | no | FR-CAMP-48 |
+| OQ-CAMP-35 | Where does the DM pick and upload sounds? | **Decided (#335): A.** Options: **A. Campaign options, "Alert sounds" section**: campaign settings, not personal / B. DM Preferences / C. An Audio tab in Images | no (decided) | FR-CAMP-49 |
+| OQ-CAMP-36 | Defaults | **Decided (#335): A.** Options: **A. Turn + request = ping; pause / resume silent until picked** / B. Ping everywhere / C. New built-in sounds | no (decided) | FR-CAMP-48 |
 
 - *(Sprint 8)* Slices: columns TT0; `camp.setAlertSound` + the section TT3; `camp.pause` / `camp.resume` TT4 ([dice-extras §14](dice-extras.md#14-dependencies)).
 

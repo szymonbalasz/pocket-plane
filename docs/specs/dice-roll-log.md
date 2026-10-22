@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-tt
 wave: 2
 phase: post-mvp-8
@@ -15,7 +15,7 @@ phase: post-mvp-8
 
 > **Sprint 7 (track FU, BL-48 small copy; DM [#311](../decisions-log.md)).** Decided, not open: a player's roll-bar line names the player ("Player 1 — 1d20+2") instead of the character; a stray space in a breakdown ("(3d6: 5 + 2 + 1 )"). New **FR-DICE-77**, **-78**. Client only (line text and an actor default), 0 B. Tests `FR-DICE-77 roll as your PC` (DOM: `player-1` with the sheet on Mira → the bar's actor is Mira, the entry's actor Mira; "Me" still selectable; a manual pick of Brakka survives a reload; a sheet on another player's character falls back to the player's name; DM unchanged), `FR-DICE-78 no stray spaces` (unit over `groupSegments` and every kind's line builder: no `"( "`, `" )"`, `"  "`, leading / trailing spaces for adv, dis, dropped, offered, manual, modifier-only); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. GM (gems: reroll / supersede) edits this spec in parallel with its own range; FU4 touches only the actor default and the joiner. Edge cases: client-only text and a per-browser default; reconnect re-renders from the store; crash: no server change. No open question.
 
-> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** [Dice-extras](dice-extras.md) macros roll as plain `dice.roll`; DM roll-request answers are ordinary `roll` entries, public or **DM + the target's player** via the built `audiencePlayerId` rule. This amends FR-DICE-13 for answers only ([proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md)). FR-DICE-79–84; no new field, kind or visibility code. Tests, walkthrough (T2–T8, T15) and CON-44: [dice-extras §12–13](dice-extras.md#13-test-plan). For the DM: OQ-DICE-46.
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** [Dice-extras](dice-extras.md) macros roll as plain `dice.roll`; DM roll-request answers are ordinary `roll` entries, public or **DM + the target's player** via the built `audiencePlayerId` rule. This amends FR-DICE-13 for answers only ([proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md)). FR-DICE-79–84; no new field, kind or visibility code. Tests, walkthrough (T2–T8, T15) and CON-44: [dice-extras §12–13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-DICE-46.
 
 ## 1. Summary
 
@@ -451,11 +451,11 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 |---|---|---|---|---|
 | ~~OQ-DICE-45~~ | ~~gems: how a reroll leaves the old entry~~ | **Resolved (integrator, sprint-7 seams / rulings)** (seam S2, = OQ-DICE-42 A): kept, with `supersededBy` set once; `replaces` on the new entry; roll rows immutable with `replacesRollId` (GM's FR-DICE-62–67). Stats count the final roll only | — | DICE, GEM, STATS |
 
-**Sprint 8** (track TT). **Bold** = suggested pick.
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-DICE-46 | Does an answer's line say it was requested? | **A. No: a normal line with the request's label** (the `answer` marker stays data only) / B. A "requested" tag and "vs DC" when shown: a line change, plus the DC on the entry | no | FR-DICE-80 |
+| OQ-DICE-46 | Does an answer's line say it was requested? | **Decided (#335): A.** Options: **A. No: a normal line with the request's label** (the `answer` marker stays data only) / B. A "requested" tag and "vs DC" when shown: a line change, plus the DC on the entry | no (decided) | FR-DICE-80 |
 
 - *(Sprint 8)* Edge cases (disconnect, crash, leaks) for answers: [dice-extras §11](dice-extras.md#11-edge-cases--failure-modes). Slices: `audience` input TT0, the roll-bar Button TT1+TT2 ([dice-extras §14](dice-extras.md#14-dependencies)); SB reads facts only.
 

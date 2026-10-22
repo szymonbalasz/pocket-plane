@@ -1,6 +1,6 @@
-# Proposed — DM roll requests as pending actions (and hidden answers)
+# DM roll requests as pending actions (and hidden answers)
 
-- Status: proposed (sprint 8, track TT; integrator numbers it at merge)
+- Status: accepted (DM gate, #335; integrator numbers it after the merge)
 - Date: 2026-10-21
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md) (a pending action whose resolution is a roll), [ADR-0027](0027-notification-creation.md) (created in the causing command's transaction)
 - Amends: decisions [#73](../../decisions-log.md) / FR-DICE-13 "player rolls are always public", **for request answers only**
@@ -18,16 +18,16 @@
 
 | Option | Pros | Cons |
 |---|---|---|
-| **A. A DM-only `roll-request` record (spec, DC, targets, results) + one pending notification per target (kind `roll-request`); a DICEX command answers by building the roll on the server from the request; the answer line is `public`, or `public: false` + `audiencePlayerId` = the roller** | Fits ADR-0016 as is (each prompt is an ordinary pending action); DC and pass / fail live only in a DM-only row; hidden answers reuse a visibility rule already built and tested; the server owns the roll spec, so a player can't change what was asked | A new record type and table; `char.roll`'s body becomes a helper the answer calls |
+| **A. A DM-only `roll-request` record (spec, DC, targets, results) + one pending notification per target (kind `roll-request`); a DICEX command answers by building the roll on the server from the request; the answer line is `public`, or `public: false` + `audiencePlayerId` = the target's player** | Fits ADR-0016 as is (each prompt is an ordinary pending action); DC and pass / fail live only in a DM-only row; hidden answers reuse a visibility rule already built and tested; the server owns the roll spec, so a player can't change what was asked | A new record type and table; `char.roll`'s body becomes a helper the answer calls |
 | B. Notifications only: one per target, the request's data copied in each payload; the DM's view groups them | No new table | The DM's pass / fail and hidden DC must stay out of player payloads, so they'd live nowhere; grouping by payload is fragile; "Close" must find siblings by payload |
 | C. A `requestId` on `char.roll` / `dice.roll`; an answer hook closes the request | No new intent | Two features' intents grow a field; the client chooses kind / skill / mode and the server must re-check them against the request anyway |
 | D. A new "pending action" table separate from notifications | Clean model for multi-target actions | Contradicts ADR-0016's "one concept"; a second inbox |
 
-## Decision (proposed)
+## Decision
 
-**A.**
+**A** (accepted, DM gate 1, [#335](../../decisions-log.md)).
 
-- **Record:** `roll-request`, campaign scope, **DM only**, snapshot window "open pinned + newest 20 closed". Targets 1–12 PCs; ≤ 5 open per campaign.
+- **Record:** `roll-request`, campaign scope, **DM only**, snapshot window "open pinned + newest 10 closed". Targets 1–12 PCs; ≤ 5 open per campaign.
 - **Prompts:** one `roll-request` notification per target, audience = the PC's owner, action "Roll" owned by that player (ADR-0016 "action owner + the DM"). Payload carries the DC only when the DM shows it.
 - **Answer:** `dicex.answerRequest` (owner or DM): the server builds the roll from the request (sheet bonuses, overrides and roll hooks as `char.roll`), writes the `roll` entry, marks the target, resolves the prompt, in one transaction. Physical dice and the tray work because the client's Roll is an ordinary roll control whose `onRoll` sends this intent.
 - **Hidden answers:** `public: false` + `audiencePlayerId` = the target's player (whoever rolls, the DM included): DM + that player, no one else (the companion-line rule). Answers are marked `answer: true` and are not rerollable (OQ-GEM-20 A).

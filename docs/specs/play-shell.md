@@ -1,7 +1,7 @@
 ---
 title: Play shell
 prefix: SHELL
-status: in-review
+status: complete
 owner: spec-tt
 phase: post-mvp-8
 ---
@@ -112,7 +112,7 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 | FR-SHELL-93 | Window type `stats.board` "Stats", both clients, launcher, loads closed | ST2 | `FR-SHELL-93 stats window registered` (+ FR-SHELL-45 / -62 registry tests pick it up) |
 | FR-SHELL-94 | Feature open on Show awards: opens / fronts Stats on that session's awards | ST2 | `FR-SHELL-94 awards open the window` |
 
-> **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md)).** Decided (not open): a **pause / intermission screen** (players see a full-screen card, input blocked; the DM keeps working) and **DM-added alert sounds**. State lives on the campaign row ([FR-CAMP-46–50](campaign-management.md#6-functional-requirements)), files in [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61; this spec owns the card, suppression, the DM's Pause control and playback by alert key: FR-SHELL-125–136. The card is an **overlay** in WF1's `overlays.ts` (`blocksInput`) and the control a `top-bar-items.ts` entry (seams S2). CON-44, tests, walkthrough T9–T14: [dice-extras §12–13](dice-extras.md#13-test-plan). For the DM: OQ-SHELL-68–72.
+> **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md)).** Decided (not open): a **pause / intermission screen** (players see a full-screen card, input blocked; the DM keeps working) and **DM-added alert sounds**. State lives on the campaign row ([FR-CAMP-46–50](campaign-management.md#6-functional-requirements)), files in [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61; this spec owns the card, suppression, the DM's Pause control and playback by alert key: FR-SHELL-125–136. The card is an **overlay** in WF1's `overlays.ts` (`blocksInput`) and the control a `top-bar-items.ts` entry (seams S2). CON-44, tests, walkthrough T9–T14: [dice-extras §12–13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-SHELL-68–72.
 
 ## 1. Summary
 
@@ -920,15 +920,15 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ~~OQ-SHELL-56~~ | **Settled by seams S5 / S10:** ST2 registers `stats.board` (both clients) per FR-SHELL-86 after FU1 merges: default 400 × 412, min 320 × 280, `defaultOpen: false`, auto-minimisable, no keep-out; its golden row and size-table row in ST's branch. GM adds no window (S10); FR-SHELL-86 applies only if one appears later. Original row: **stats (ST) and gems (GM):** a Stats window (and any gems window) follows FR-SHELL-86: one `windows.ts` line per client, ≤ 440 × 412 (or `usefulSize` ≤ 412), min ≤ 320 × 280, `defaultOpen: false`, no keep-out; appended to FR-SHELL-62's golden list, its row added to FR-SHELL-85's table, goldens regenerated in its own branch **after FU1 merges** | **Resolved (integrator, sprint-7 seams / rulings)** **Agree (ST / GM confirm in their specs; seams)** / the window needs to be protected or default-open (then a DM call: it would never auto-minimise) | no · owner: spec-stats, spec-gems | [stats](stats.md), [gems](gems.md) |
 | OQ-SHELL-57 | Glossary (rulings-b #11: no new term for auto-minimised; the existing **Minimised** already says "parked on the launcher") | **Resolved (integrator, sprint-7 seams / rulings)** **Add "Useful size: the smallest size a window opens at before the shell auto-minimises another window to make room"; reword Auto placement: "… never on a window, a keep-out region or a PC while another window can be auto-minimised"** / none | no · owner: integrator | glossary |
 
-**Sprint 8** (track TT). **Bold** = suggested pick.
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-SHELL-68 | Pause card content | **A. "Paused" + optional message, image, "back in N min"** / B. Message only / C. A + a players' "Ready" check-in | yes | FR-SHELL-125 |
-| OQ-SHELL-69 | What can players do while paused? | **A. Only mute**: a real break / B. Read-only peek at own sheet and log / C. Minimise the card to see the map | yes | FR-SHELL-128 |
-| OQ-SHELL-70 | Where is input blocked? | **A. Client only (`inert`)**: no core change / B. Also the server (`conflict "Paused"`; a live-sync core edit) | no | FR-SHELL-128 |
-| OQ-SHELL-71 | Rolls, toasts, alerts while paused | **A. Suppressed, caught up at resume** / B. Shown over the card | no | FR-SHELL-127 |
-| OQ-SHELL-72 | Which alerts get a DM sound? | **A. Turn, request, pause, resume** / B. + every pending-action toast / C. Turn only | yes | FR-SHELL-130 |
+| OQ-SHELL-68 | Pause card content | **Decided (#335): A.** Options: **A. "Paused" + optional message, image, "back in N min"** / B. Message only / C. A + a players' "Ready" check-in | no (decided) | FR-SHELL-125 |
+| OQ-SHELL-69 | What can players do while paused? | **Decided (#335): A.** Options: **A. Only mute**: a real break / B. Read-only peek at own sheet and log / C. Minimise the card to see the map | no (decided) | FR-SHELL-128 |
+| OQ-SHELL-70 | Where is input blocked? | **Decided (#335): A.** Options: **A. Client only (`inert`)**: no core change / B. Also the server (`conflict "Paused"`; a live-sync core edit) | no (decided) | FR-SHELL-128 |
+| OQ-SHELL-71 | Rolls, toasts, alerts while paused | **Decided (#335): A.** Options: **A. Suppressed, caught up at resume** / B. Shown over the card | no (decided) | FR-SHELL-127 |
+| OQ-SHELL-72 | Which alerts get a DM sound? | **Decided (#335): A.** Options: **A. Turn, request, pause, resume** / B. + every pending-action toast / C. Turn only | no (decided) | FR-SHELL-130 |
 
 - *(Sprint 8)* Players see only the card (centred column, shadcn); the DM the top-bar control. Test IDs `ui-pause` (+ `data-state`), `ui-pause-{message,image,countdown,mute}`, DM `ui-pause-{open,form,submit,update,resume,preview}`, `ui-sound-test-key`. No SHELL record (draft and buffers client-only). Edges: disconnect → "Reconnecting…"; DM offline → still paused; devtools can clear `inert` (accepted). Slices TT3, TT4 ([dice-extras §14](dice-extras.md#14-dependencies)).
 

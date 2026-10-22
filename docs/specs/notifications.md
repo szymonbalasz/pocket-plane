@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: in-review
+status: complete
 owner: spec-tt
 wave: 2
 phase: post-mvp-8
@@ -43,7 +43,7 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR-NOTE-48 | Kind `stats-awards`: info to all, payload `{fromN, toN, from, to, label}`, view with Open | ST0 (kind), ST2 (views) | `FR-NOTE-48 awards notification` |
 | FR-NOTE-49 | Callout toasts are not notifications; a transient info toast in the info stack (S6) | ST2 | `FR-NOTE-49 callout toast is not a notification` |
 
-> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** A DM roll request is a notification with a roll action: [dice-extras](dice-extras.md) adds kind **`roll-request`** (toast class **card**, FR-NOTE-50; seams S3, S13), one pending prompt per target PC, resolved only by dice-extras' commands. FR-NOTE-58–64, incl. a view flag `restoreToast`. CON-44: a prompt row 994 B ([dice-extras §12](dice-extras.md#12-performance--bandwidth)). Tests and walkthrough (T4–T8, T10, T12): [dice-extras §13](dice-extras.md#13-test-plan). For the DM: OQ-NOTE-32–34.
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** A DM roll request is a notification with a roll action: [dice-extras](dice-extras.md) adds kind **`roll-request`** (toast class **card**, FR-NOTE-50; seams S3, S13), one pending prompt per target PC, resolved only by dice-extras' commands. FR-NOTE-58–64, incl. a view flag `restoreToast`. CON-44: a prompt row 994 B ([dice-extras §12](dice-extras.md#12-performance--bandwidth)). Tests and walkthrough (T4–T8, T10, T12): [dice-extras §13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-NOTE-32–34.
 
 ## 1. Summary
 
@@ -373,13 +373,13 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 |---|---|---|---|---|
 | OQ-NOTE-28 | Show awards: info toast **and** the window opening, or only the window? | **Decided (#315): A** · **A. Both** (FR-NOTE-13's rule unchanged; the toast says why the window opened) · B. Window only (a per-kind "no toast" flag, new to the registry) | — | NOTE, STATS |
 
-**Sprint 8** (track TT). **Bold** = suggested pick.
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-NOTE-32 | Prompt shape | **A. Pending card toast with Roll + Decline (+ history row)**: the existing pattern / B. A centred dialog: unmissable, blocks the map | yes | FR-NOTE-59 |
-| OQ-NOTE-33 | A DM toast per answer? | **A. No: the Requests window updates, the bell counts** / B. Yes: six toasts for six PCs | no | FR-NOTE-61 |
-| OQ-NOTE-34 | Re-show a prompt after reload? | **A. Yes, silent (`restoreToast`)** / B. Only the "N pending" summary | no | FR-NOTE-60 |
+| OQ-NOTE-32 | Prompt shape | **Decided (#335): A.** Options: **A. Pending card toast with Roll + Decline (+ history row)**: the existing pattern / B. A centred dialog: unmissable, blocks the map | no (decided) | FR-NOTE-59 |
+| OQ-NOTE-33 | A DM toast per answer? | **Decided (#335): A.** Options: **A. No: the Requests window updates, the bell counts** / B. Yes: six toasts for six PCs | no (decided) | FR-NOTE-61 |
+| OQ-NOTE-34 | Re-show a prompt after reload? | **Decided (#335): A.** Options: **A. Yes, silent (`restoreToast`)** / B. Only the "N pending" summary | no (decided) | FR-NOTE-60 |
 
 - *(Sprint 8)* Edges: [dice-extras §11](dice-extras.md#11-edge-cases--failure-modes). Slices: kind TT0; views, `restoreToast` TT1+TT2 (after WF4).
 
