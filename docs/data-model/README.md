@@ -2401,9 +2401,21 @@ From [notifications](../specs/notifications.md#8-data-model) FR-NOTE-50–53 (#3
 - **Client memory (per page, never sent or stored):** each notification toast's class (`cls`); the one callout `{id, content, remaining}` (cleared on a campaign switch).
 - **Derived:** a row's toast class (pending → card, else the kind's alert, else info); what the stack shows (order and the "+N more" count).
 
-## 112. Sprint 8: saved macros and roll requests (TT1+TT2)
+## 112. Sprint 8: tool-bar pushes through the ladder, rail inset (WF2)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`**; no schema change (TT0's tables, [§106](#106-sprint-8-table-tools-core-tt0)). Protocol side: [protocol §142](../protocol/README.md#142-sprint-8-saved-macros-and-dm-roll-requests--intents-prompt-views-requests-window-tt1tt2).
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-104–106, -109. **Built by `fix/wf-push-rail`.** Browser-only; nothing on the wire.
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| Displacement memory, cause `toolbar:<id>` | client memory (`ShellState.memory`) | `<id>` = the hard keep-out that pushed (a tool bar, a chrome keep-out); a push keeps the first pre-push rect across re-selects and tool swaps; a drag-end push keeps the dropped rect with `userSpot` (it returns there) | [FR-SHELL-104](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-105](../specs/play-shell.md#6-functional-requirements) |
+| Rendered x | derived (render clamp) | ≥ 68 unless parked (stored x < 0); never written back | [FR-SHELL-109](../specs/play-shell.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit; e2e on `wf-frame-e2e`.
+- **CON-44:** 0 B.
+
+## 113. Sprint 8: saved macros and roll requests (TT1+TT2)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`**; no schema change (TT0's tables, [§106](#106-sprint-8-table-tools-core-tt0)). Protocol side: [protocol §143](../protocol/README.md#143-sprint-8-saved-macros-and-dm-roll-requests--intents-prompt-views-requests-window-tt1tt2).
 
 | Table / field | Written by | Rule | Source |
 |---|---|---|---|

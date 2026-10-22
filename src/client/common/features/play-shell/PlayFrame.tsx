@@ -146,8 +146,15 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
         className="outline-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 border-b bg-background/85 px-3 backdrop-blur"
         style={{ height: TOP_BAR_H }}
       >
-        <div className="flex min-w-0 items-center gap-2">{topLeft}</div>
-        <div className="ml-auto flex items-center gap-2">
+        {/* FR-SHELL-109 (BL-53): the left slot shrinks and its text ellipsises; the right cluster
+            never shrinks, so nothing runs under it (its items have fixed widths). */}
+        <div
+          data-testid="ui-topbar-left"
+          className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap *:min-w-0 *:truncate"
+        >
+          {topLeft}
+        </div>
+        <div data-testid="ui-topbar-right" className="flex shrink-0 items-center gap-2">
           {topRight}
           <ConnectionIndicator />
           {topEnd}
