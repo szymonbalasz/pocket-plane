@@ -609,7 +609,7 @@ export function fitVisible(
     return null;
   };
   // FR-MAP-93: PCs + 4 px clear where some cell allows it; else flush rather than lose `all`.
-  const found = search(FIT_PC_MARGIN) ?? (plainFrom ? from : search(0));
+  const found = search(FIT_PC_MARGIN);
   return found ? { ...found, visible: "all" } : pcs;
 }
 
@@ -1235,33 +1235,30 @@ export interface DryFitResult {
   camera: Camera;
   cellPx: number;
   verdict: FitVisible;
-  /** Every PC, and every token clear at the current camera, clear at `camera` (FR-MAP-59's test). */
+  /**
+   * Every PC footprint + 4 px clear at `camera` (FR-SHELL-108: every PC, and every token the dry
+   * fit kept, clear; the fit itself keeps the others as far as it can, `verdict`).
+   */
   clear: boolean;
 }
 
 /**
  * FR-MAP-97: the `window` fit with `inputs` (the placer's candidate as one more obstacle), not
- * applied; `cam` = the camera now, `now` = its obstacles (what counts as "kept clear").
+ * applied.
  */
-export function dryFitScene(
-  inputs: FitInputs,
-  lastFullCell: number | null,
-  cam: Camera,
-  now: readonly Box[],
-): DryFitResult {
+export function dryFitScene(inputs: FitInputs, lastFullCell: number | null): DryFitResult {
   const { grid, view, tokens } = inputs;
   const fit = fitFor("window", inputs, lastFullCell);
-  const area = visibleArea(view);
-  const keep = tokens.flatMap((t) => {
-    const b = footprintBox([t], grid);
-    return b && (t.pc || allClear(cam, [b], now, area)) ? [{ ...b, pc: t.pc }] : [];
+  const pcs = tokens.flatMap((t) => {
+    const b = t.pc ? footprintBox([t], grid) : null;
+    return b ? [{ ...b, pc: true }] : [];
   });
   const camera = { x: fit.x, y: fit.y, scale: fit.scale };
   return {
     camera,
     cellPx: fit.scale * grid.gridCellSize,
     verdict: fit.visible,
-    clear: allClear(camera, keep, inputs.room.obstacles, area),
+    clear: allClear(camera, pcs, inputs.room.obstacles, visibleArea(view), FIT_PC_MARGIN),
   };
 }
 

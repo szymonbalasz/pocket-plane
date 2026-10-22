@@ -231,8 +231,7 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
  */
 function dryFit(sim: Sim, obstacles: readonly Rect[]) {
   if (!sim.cam) return null;
-  const now = fitInputs(sim).room.obstacles;
-  return dryFitScene(fitInputs(sim, obstacles), sim.lastFull || null, sim.cam, now);
+  return dryFitScene(fitInputs(sim, obstacles), sim.lastFull || null);
 }
 
 const windowsOf = (sim: Sim): Windows => sim.ctl.store.getState().windows;
@@ -694,6 +693,94 @@ export function runReplay(
       fullFit(sim);
       record("reset", check(sim, before));
       break;
+    }
+  }
+  return { steps, problems: steps.flatMap((s) => s.problems.map((p) => `${s.step}: ${p}`)) };
+}
+
+/** One step of a scripted run (walkthrough repros): a user open, a fight's End / Start, a reload, Fit. */
+export type ScriptStep =
+  | { open: string }
+  | { close: string }
+  | "end"
+  | "start"
+  | "reload"
+  | "fit";
+
+/**
+ * A walkthrough repro in the harness's world (`fitted` camera): load in `state` at `vp` with
+ * nothing open but the protected windows, then `script`, with I1–I6 after every step. Same
+ * controller, camera and base port as `runReplay`.
+ */
+export function runScript(
+  registry: WindowRegistry,
+  viewer: ReplayViewer,
+  vp: Viewport,
+  state: ReplayState,
+  script: readonly ScriptStep[],
+): ReplayRun {
+  const client = registry.client;
+  const sim = {
+    client,
+    registry,
+    set: { name: "script", viewer, kinds: [] },
+    vp,
+    state,
+    combat: true,
+    reports: new Map(),
+    backend: new Map(),
+    cam: null,
+    mode: "fitted",
+    lastFull: 0,
+    key: KEY,
+  } as unknown as Sim;
+  sim.ctl = newController(sim);
+  const steps: ReplayStep[] = [];
+  const record = (step: string, problems: string[]) =>
+    steps.push({
+      step,
+      vp: sim.vp,
+      windows: snapshotOf(sim),
+      cell: cellPx(sim),
+      log: sim.ctl.store.getState().settleLog,
+      problems,
+    });
+  const load = (label: string) => {
+    sim.cam = null;
+    sim.ctl = newController(sim);
+    sim.ctl.restore(sim.key);
+    fullFit(sim, "load");
+    dispatch(sim, { type: "load", drawn: true });
+    record(label, check(sim, windowsOf(sim)));
+  };
+  load("load");
+  for (const step of script) {
+    const before = windowsOf(sim);
+    if (step === "reload") {
+      load("reload");
+    } else if (step === "fit") {
+      fullFit(sim);
+      record("fit", check(sim, before));
+    } else if (step === "end") {
+      sim.combat = false;
+      dispatch(sim, { type: "return" });
+      record("End", check(sim, before));
+    } else if (step === "start") {
+      sim.state = "escort";
+      sim.combat = true;
+      if (client === "dm") dispatch(sim, { type: "open", kind: "cbt.initiative", by: "feature" });
+      else dispatch(sim, { type: "appear", kind: "cbt.initiative" });
+      const refit = appearanceRefit(sim);
+      record("Start", check(sim, before, { refit }));
+    } else if ("open" in step) {
+      const beforeTokens = tokensNow(sim);
+      userOpen(sim, step.open);
+      const problems = check(sim, before, { opened: step.open });
+      problems.push(...checkPutAway(sim, before, step.open, beforeTokens));
+      record(`open ${step.open}`, problems);
+    } else {
+      dispatch(sim, { type: "close", kind: step.close });
+      record(`close ${step.close}`, check(sim, before));
     }
   }
   return { steps, problems: steps.flatMap((s) => s.problems.map((p) => `${s.step}: ${p}`)) };

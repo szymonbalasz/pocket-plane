@@ -388,7 +388,7 @@ export function MapCanvas(props: MapCanvasProps) {
       dryFit: (windows) => {
         const inputs = fitInputs.current(windows);
         if (!inputs) return null;
-        return dryFitScene(inputs, lastFullCell.current, camRef.current, obstaclesRef.current);
+        return dryFitScene(inputs, lastFullCell.current);
       },
       lastFullCell: () => lastFullCell.current,
       // The placer wrote the windows; the refit frames them once they render.
