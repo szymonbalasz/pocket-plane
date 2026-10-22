@@ -401,32 +401,50 @@ export function useFreeArea(): FreeAreaState {
   const regions = useKeepOuts(registry.client);
   const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
   const settledAt = useShellState((s) => s.settledAt);
-  const settling = useShellState((s) => s.settling.size > 0);
-  const { area, areas, toastFreeAreas, obstacles, stripOnly, room, stripRoom, grown, roomsWith } =
-    useMemo(() => {
-      const shown = renderedWindowRects(
-        windows,
-        registry,
-        available,
-        vp,
-        measured,
-        hardRects(regions),
-      );
-      const client = registry.client;
-      const rooms = fitRooms(client, shown, regions, vp, shownStack(client, reports));
-      const grown = grownAll(windows, registry, available, measured);
-      return {
-        area: freeArea(shown, vp),
-        areas: rooms.room.windowsOnly,
-        toastFreeAreas: rooms.room.areas,
-        obstacles: rooms.room.obstacles,
-        stripOnly: { areas: rooms.stripRoom.areas, obstacles: rooms.stripRoom.obstacles },
-        ...rooms,
-        grown,
-        roomsWith: (rects: readonly Rect[]) =>
-          fitRooms(client, rects, regions, vp, shownStack(client, reports)),
-      };
-    }, [windows, registry, available, vp, measured, regions, reports]);
+  const settlingIds = useShellState((s) => s.settling);
+  const {
+    area,
+    areas,
+    toastFreeAreas,
+    obstacles,
+    stripOnly,
+    room,
+    stripRoom,
+    grown,
+    settling,
+    roomsWith,
+  } = useMemo(() => {
+    const shown = renderedWindowRects(
+      windows,
+      registry,
+      available,
+      vp,
+      measured,
+      hardRects(regions),
+    );
+    const client = registry.client;
+    const rooms = fitRooms(client, shown, regions, vp, shownStack(client, reports));
+    const grown = grownAll(windows, registry, available, measured);
+    // Only a rendered window settles (ShellWindow): an unavailable one never holds a fit back.
+    const settling = windows.some(
+      (w) =>
+        settlingIds.has(windowId(w.kind, w.instance)) &&
+        w.state === "open" &&
+        available.has(w.kind),
+    );
+    return {
+      area: freeArea(shown, vp),
+      areas: rooms.room.windowsOnly,
+      toastFreeAreas: rooms.room.areas,
+      obstacles: rooms.room.obstacles,
+      stripOnly: { areas: rooms.stripRoom.areas, obstacles: rooms.stripRoom.obstacles },
+      ...rooms,
+      grown,
+      settling,
+      roomsWith: (rects: readonly Rect[]) =>
+        fitRooms(client, rects, regions, vp, shownStack(client, reports)),
+    };
+  }, [windows, registry, available, vp, measured, regions, reports, settlingIds]);
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
   const fitsNow = useSyncExternalStore(subscribeFits, fitRequests);
   const [flips, setFlips] = useState(0);
