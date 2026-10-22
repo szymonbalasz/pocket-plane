@@ -15,6 +15,9 @@ export default defineBundle({
     // WF: window frame (no unit: aliases only, seams S15)
     // TT: table tools (`dicex-macros` TT1, `audio-chime` + `camp-alert-sounds` TT3)
     // SB: stats tier B (`sb-fight-facts`, `sb-luck-rolls`)
+    // SB0: 4 Bandits + the hidden Bandit Captain with 6 facts; 8 physical luck rolls
+    "sb-fight-facts",
+    "sb-luck-rolls",
     // CB: combat polish (`cb-ties`, `cb-fog-goblin`, `cb-party`)
   ],
 });

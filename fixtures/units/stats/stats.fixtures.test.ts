@@ -29,8 +29,6 @@
 //   nat 20s 5; Biggest hit 30 → Skeleton (Old Crypt), overkill 23 → Goblin Scout.
 import { afterAll, describe, expect, test } from "bun:test";
 import { combatant, encounter, entity, hpChange, notification, player } from "@server/db/schema";
-import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
-import { loadInProcess } from "@server/features/fixtures-adapters/loader";
 import { servicesFromBundle } from "@server/ws/testing/snapshot-size";
 import { DamageCardPayload } from "@shared/combat-tracker/schemas";
 import {
@@ -277,25 +275,16 @@ describe("STATS §13 fixtures", () => {
     expect(library.bundles.find((b) => b.name === "stats-b-e2e")?.includes).toEqual(["stats-b"]);
   }, 60_000);
 
-  test("sb-fight-facts and sb-luck-rolls are session-sim-11-safe: they load on session-sim-11 without gems", async () => {
+  test("session-sim-12 loads from empty; sb-fight-facts and sb-luck-rolls are session-sim-11-safe (no gems, Goblins untouched)", async () => {
     for (const key of ["sb-fight-facts", "sb-luck-rolls"]) {
       const unit = library.fixtures.find((f) => f.key === key);
       expect(unit?.requires).not.toContain("gems-on");
       expect(unit?.requires).not.toContain("st-ambush-facts");
     }
-    // session-sim-12 (TT0) isn't on main yet: its SB part on top of session-sim-11 stands in.
-    const probe = defineBundle({
-      name: "sb-sim-12-part",
-      includes: ["session-sim-11"],
-      fixtures: ["sb-fight-facts", "sb-luck-rolls"],
-    });
-    const l = await loadInProcess(
-      { ...library, bundles: [...library.bundles, probe] },
-      probe.name,
-      {
-        testMode: true,
-      },
+    expect(library.bundles.find((x) => x.name === "session-sim-12")?.fixtures).toEqual(
+      expect.arrayContaining(["sb-fight-facts", "sb-luck-rolls"]),
     );
+    const l = await loadBundle("session-sim-12", { testMode: true });
     const { s, cleanup } = await servicesFromBundle(l);
     cleanups.push(cleanup);
     // cp-ally's charmed Goblin 2 and fu-hurt-goblins' Goblins are untouched.

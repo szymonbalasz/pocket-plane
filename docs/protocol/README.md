@@ -3220,7 +3220,7 @@ From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-6
 
 ## 136. Sprint 8: stats tier B core — `fell` lines, fight summary, Highlights, luck, trophies, session partials (SB0)
 
-From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26, -29, -31–33, -35, -37–40, -42, -43, -45–49, -51–53, [combat-tracker](../specs/combat-tracker.md#67-sprint-8-kill-flag-and-the-end-summary) FR-CBT-152, -153, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-89, -90 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (DM #334, #335; [ADR-0062](../architecture/adr/0062-stats-session-partials.md)). **Built by `build/sb-core`** (server + shared; the feed toast, Highlights / Luck UI and End open: SB1; Trophies tab: SB2). No new intent, event, record type or signal. Data side: [data model §106](../data-model/README.md#107-sprint-8-stats-tier-b-core-sb0).
+From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26, -29, -31–33, -35, -37–40, -42, -43, -45–49, -51–53, [combat-tracker](../specs/combat-tracker.md#67-sprint-8-kill-flag-and-the-end-summary) FR-CBT-152, -153, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-89, -90 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (DM #334, #335; [ADR-0062](../architecture/adr/0062-stats-session-partials.md)). **Built by `build/sb-core`** (server + shared; the feed toast, Highlights / Luck UI and End open: SB1; Trophies tab: SB2). No new intent, event, record type or signal. Data side: [data model §107](../data-model/README.md#107-sprint-8-stats-tier-b-core-sb0).
 
 **Wire changes**
 
