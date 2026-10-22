@@ -71,17 +71,39 @@ function encounterNames(db: Read, ids: readonly string[]): Map<string, string> {
   return out;
 }
 
+/** The encounters named by a campaign's log lines in `fromN…toN` (every outcome line names its). */
+function rangeEncounters(
+  db: Read,
+  scope: { campaignId: string; fromN: number; toN: number },
+): string[] {
+  const rows = db
+    .select({ id: gameLogEntry.encounterId })
+    .from(gameLogEntry)
+    .where(
+      and(
+        eq(gameLogEntry.campaignId, scope.campaignId),
+        gte(gameLogEntry.n, scope.fromN),
+        lte(gameLogEntry.n, scope.toN),
+      ),
+    )
+    .all();
+  return [...new Set(rows.flatMap((r) => (r.id ? [r.id] : [])))];
+}
+
 /**
  * FR-CBT-138: the non-undone `hp_change` rows of one encounter, or of a campaign whose lines are
  * in an `n` range, in log order, joined with their line's `public` / `n` / kind, the
  * attacker's and target's current kind, owner and hidden flags, and the encounter name.
  */
 export function combatFacts(db: Read, scope: FactsScope): CombatFact[] {
+  // A range reads the encounters its lines name (on the `(campaign_id, n)` index), then their
+  // facts on `hp_change_encounter`: `hp_change` has no campaign / entry index, so a campaign-wide
+  // filter would scan every fact (FR-STATS-46's chunks, FR-STATS-51).
   const where =
     "encounterId" in scope
       ? eq(hpChange.encounterId, scope.encounterId)
       : and(
-          eq(hpChange.campaignId, scope.campaignId),
+          inArray(hpChange.encounterId, rangeEncounters(db, scope)),
           gte(gameLogEntry.n, scope.fromN),
           lte(gameLogEntry.n, scope.toN),
         );

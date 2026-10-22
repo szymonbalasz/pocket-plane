@@ -8,7 +8,7 @@ import { conflict } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { logTimeline } from "../dice-roll-log/stats-read";
 
-type Read = Pick<Tx, "select">;
+type Read = Pick<Tx, "select" | "all">;
 
 /** FR-STATS-14: per campaign, the derived sessions and the last `n` they cover. */
 export class SessionCache {

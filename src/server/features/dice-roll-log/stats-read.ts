@@ -6,11 +6,11 @@
 // `public` keep their meaning (a change needs a stats review).
 import { getLogKind } from "@shared/dice-roll-log/kinds";
 import type { StatsRole, StatsRoll, TimelineEntry } from "@shared/stats/rules";
-import { and, asc, desc, eq, gt, gte, inArray, lte, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, isNotNull, sql } from "drizzle-orm";
 import type { Tx } from "../../db/client";
 import { gameLogEntry, roll } from "../../db/schema";
 
-type Read = Pick<Tx, "select">;
+type Read = Pick<Tx, "select" | "all">;
 
 /** Who stats count for: the role and the campaign's enabled features (ADR-0058). */
 export interface StatsViewer {
@@ -81,75 +81,64 @@ export function rollFacts(
   fromN?: number,
   toN?: number,
 ): RollFact[] {
-  const range: SQL[] =
-    fromN !== undefined && toN !== undefined
-      ? [gte(gameLogEntry.n, fromN), lte(gameLogEntry.n, toN)]
-      : [];
-  const entries = db
-    .select({
-      n: gameLogEntry.n,
-      kind: gameLogEntry.kind,
-      public: gameLogEntry.public,
-      undone: gameLogEntry.undone,
-      supersededBy: gameLogEntry.supersededBy,
-      rollIds: gameLogEntry.rollIds,
-      encounterId: gameLogEntry.encounterId,
-    })
-    .from(gameLogEntry)
-    .where(and(eq(gameLogEntry.campaignId, campaignId), ...range))
-    .orderBy(asc(gameLogEntry.n))
-    .all();
-  const listed = new Map<string, { public: boolean; n: number; encounterId: string | null }>();
-  for (const e of entries) {
-    if (e.undone || e.supersededBy !== null || !entryVisible(viewer, e)) continue;
-    for (const id of e.rollIds as string[]) {
-      const l = listed.get(id);
-      if (l) l.public ||= e.public;
-      else listed.set(id, { public: e.public, n: e.n, encounterId: e.encounterId });
+  const range =
+    fromN !== undefined && toN !== undefined ? sql` AND e.n BETWEEN ${fromN} AND ${toN}` : sql``;
+  // One pass on the `(campaign_id, n)` index: counted entries × their `rollIds` × the roll rows
+  // (by primary key), in log order (FR-STATS-46's chunks, FR-STATS-51).
+  const rows = db.all<{
+    n: number;
+    kind: string;
+    public: number;
+    encounterId: string | null;
+    rollId: string;
+    natural: number | null;
+    category: string;
+    actorKind: string;
+    actorId: string | null;
+    manual: number;
+    dice: string;
+    replaces: string | null;
+  }>(sql`SELECT e.n AS n, e.kind AS kind, e.public AS public, e.encounter_id AS encounterId,
+      r.id AS rollId, r.natural AS natural, r.category AS category, r.actor_kind AS actorKind,
+      r.actor_id AS actorId, r.manual AS manual, r.dice AS dice, r.replaces_roll_id AS replaces
+    FROM game_log_entry e, json_each(e.roll_ids) j JOIN roll r ON r.id = j.value
+    WHERE e.campaign_id = ${campaignId} AND e.undone = 0 AND e.superseded_by IS NULL${range}
+    ORDER BY e.n`);
+  const byId = new Map<string, RollFact>();
+  for (const x of rows) {
+    const pub = x.public === 1;
+    if (!entryVisible(viewer, { public: pub, kind: x.kind })) continue;
+    const had = byId.get(x.rollId);
+    if (had) {
+      had.public ||= pub;
+      continue;
     }
+    const d20s = (JSON.parse(x.dice) as StoredDie[]).filter((d) => d.faces === 20);
+    byId.set(x.rollId, {
+      rollId: x.rollId,
+      natural: x.natural,
+      category: x.category,
+      actorKind: x.actorKind,
+      actorId: x.actorId,
+      public: pub,
+      n: x.n,
+      encounterId: x.encounterId,
+      manual: x.manual === 1,
+      d20: d20s.flatMap((d) => (d.value === null ? [] : [d.value])),
+      hasD20: d20s.length > 0,
+    });
   }
-  const ids = [...listed.keys()];
-  const out: RollFact[] = [];
-  for (let i = 0; i < ids.length; i += 500) {
-    const rows = db
-      .select({
-        rollId: roll.id,
-        natural: roll.natural,
-        category: roll.category,
-        actorKind: roll.actorKind,
-        actorId: roll.actorId,
-        manual: roll.manual,
-        dice: roll.dice,
-      })
-      .from(roll)
-      .where(and(eq(roll.campaignId, campaignId), inArray(roll.id, ids.slice(i, i + 500))))
-      .all();
-    for (const { dice, ...r } of rows) {
-      const l = listed.get(r.rollId) as { public: boolean; n: number; encounterId: string | null };
-      const d20s = (dice as StoredDie[]).filter((d) => d.faces === 20);
-      out.push({
-        ...r,
-        ...l,
-        d20: d20s.flatMap((d) => (d.value === null ? [] : [d.value])),
-        hasD20: d20s.length > 0,
-      });
-    }
-  }
+  if (byId.size === 0) return [];
   // FR-DICE-67: final roll only. A roll another roll replaces (`replacesRollId`, GM1's reroll)
-  // never counts, even if a line that is not superseded still lists it.
-  const replaced = new Set<string>();
-  for (let i = 0; i < ids.length; i += 500) {
-    const rows = db
-      .select({ id: roll.replacesRollId })
-      .from(roll)
-      .where(
-        and(eq(roll.campaignId, campaignId), inArray(roll.replacesRollId, ids.slice(i, i + 500))),
-      )
-      .all();
-    for (const r of rows) if (r.id) replaced.add(r.id);
-  }
-  const kept = replaced.size ? out.filter((r) => !replaced.has(r.rollId)) : out;
-  return kept.sort((a, b) => a.n - b.n);
+  // never counts, even if a line that is not superseded still lists it (the new roll may sit
+  // past the range: one pass over the campaign's rerolls, on `roll_campaign`).
+  const replaced = db
+    .select({ id: roll.replacesRollId })
+    .from(roll)
+    .where(and(eq(roll.campaignId, campaignId), isNotNull(roll.replacesRollId)))
+    .all();
+  for (const r of replaced) if (r.id) byId.delete(r.id);
+  return [...byId.values()];
 }
 
 /** The newest entry's time (a started fight's duration runs to it: facts, never the clock). */

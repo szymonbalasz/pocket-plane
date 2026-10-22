@@ -22,7 +22,7 @@ import { combatFacts } from "../combat-tracker/stats-read";
 import { entryVisible, rollFacts } from "../dice-roll-log/stats-read";
 import type { StatsRead } from "./compute";
 
-type Read = Pick<Tx, "select">;
+type Read = Pick<Tx, "select" | "all">;
 
 /** One closed session's tallies for one viewer class. */
 export interface SessionPartial {

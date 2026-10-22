@@ -51,7 +51,7 @@ import {
 } from "../dice-roll-log/stats-read";
 import type { Partials } from "./partials";
 
-type Read = Pick<Tx, "select">;
+type Read = Pick<Tx, "select" | "all">;
 
 export interface StatsRead {
   db: Read;
