@@ -69,6 +69,35 @@ bun run start --profile verify
 
 Open the printed DM URL (paste the secret) and each player link in its own browser. Town may be live at load: show Goblin Ambush from the Scenes window; close Player 1's presented-handout popup if it appears. Other bundles: `table-tools` (macros, an open roll request, the Chime sound picked), `table-tools-paused` (the table starts paused), `stats-b` (a fight with known kill / luck numbers), `combat-polish` (ties, a fogged Goblin, Party status values), `wf-frame` (the window walkthrough set). To switch: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; player links change on every load.
 
+### Before you start: tips
+
+- **Three browsers side by side.** Most sprint-8 features are about who sees what. Keep the DM, Player 1 and Player 2 windows visible together so you can watch one action land (or not land) in each.
+- **Exact screen sizes.** The window work targets 1280×720 and 1440×900. In Chrome / Edge: F12 → the device-toolbar icon (Ctrl+Shift+M) → Responsive → type the width × height. Resizing the real browser window works too.
+- **Sounds need one click first.** Browsers block audio until you click a page. After every reload, each player clicks somewhere once, or turn / request / pause sounds stay silent.
+- **Peek at what the placer decided (optional).** F12 → Elements → pick a window (`data-testid="ui-window"`). `data-placed` says why it sits there: `auto`, `zone` (Game log / Initiative / sheet home spot), `pushed`, `returned`, `displaced`, `squeezed`, `grown`, `reopened`. `data-pc-clear` is present when no PC is under it. `data-auto-minimised-for` names the window it made room for.
+- **Fastest bundle per feature.** Windows: `wf-frame`. Macros + requests + sounds: `table-tools`. Pause: `table-tools-paused` (players load straight onto the pause card). Kill feed / luck / trophies: `stats-b`. Reorder / turn ring / Party status: `combat-polish`. Everything at once: `session-sim-12`.
+
+### Where to find each new thing
+
+| Feature | Who | Where to click | What to look for |
+|---|---|---|---|
+| **Window placement** | both | Nothing to switch on: open windows from the launcher at 1280×720 with the Game log + Initiative up | No window lands on a PC (player characters only; pets and monsters may be covered). When there's no room, a window opens a bit smaller, or the oldest launcher window is minimised (its launcher button shows a hollow ring). The Game log, Initiative and a player's sheet keep their home spots. **Preferences → Layout → Reset layout** puts everything back |
+| **Tool-bar pushes** | DM | Scenes window open at the top-left, then a map tool (Fog, AoE, Structure) | Windows under the tool's bar slide away (never onto a PC) and come back when you pick another tool or close it. Drag a window under the bar: it's pushed off when you let go |
+| **Map refits** | players | Player 1 at 1280×720 with the companion card open; you **Reveal all** (or reveal a token) | Player 1's map zooms *out* just enough that nothing revealed hides under the sheet. It never zooms in on a reveal any more |
+| **Toast stack** | both | Make several pending damage cards at once | At most 3 toasts plus a "+N more" button (opens Notifications). A kill-feed / overkill toast is one at a time and replaces itself. Errors stay readable even over an open dialog |
+| **Macros** | both | Launcher **Sheets** (DM) or **Sheet** (player) → tab **Macros**; or launcher **Dice** → the bookmark button in the tray header | Each macro is a roll button with a pencil. **Macro** / **New macro** opens the editor (Name, Dice, Category; the DM also has "DM only"). In the tray, type an expression and click **Save as macro**. Players edit only their own; your macros on their PCs are read-only for them |
+| **Roll requests** | DM | Launcher **Requests**, or launcher **Log** → the chevron **Roll options** → **Request…** | The **Roll requests** window: pick a **Roll** (Skills / Saves / Checks / Custom…), **All PCs** or chips per PC, optional **DC** + **Show DC**, Dis / Normal / Adv, the eye button for **Results public / hidden**, then **Send**. Each request becomes a card: Waiting / total ✓ ✗ / Declined per PC, plus **Roll for missing** and **Close** |
+| **Request prompts** | players | Appears on its own | A card toast "Mira — Perception" with **Roll** (Shift = advantage, Ctrl = disadvantage) and **Decline**. A hidden request's answer shows only to you and that PC's player |
+| **Pause screen** | DM | Top bar, next to your name chip: the cup button **Pause** | Message, image (**Choose image…**), **Back in** 5–30 min, then **Pause the table**. While paused the button reads "Paused · m:ss" with **Preview**, **Update**, **Resume**. Players get a full-screen card; the only thing they can press is **Mute alert sounds** |
+| **Alert sounds** | DM | Launcher **Players** → **Options** (gear) → **Alert sounds** | Rows **Your turn**, **Roll request**, **Pause**, **Resume**, each with a sound picker and a ▶ test button. **Upload sound…** takes MP3 / OGG / WAV up to 512 KB and 5 s. Players' own mute and volume always win |
+| **Kill feed** | both | Apply killing damage | A short toast: "Thorn finished Goblin 1", "Goblin 2 dropped Brakka", "Overkill! …". Yours adds the overkill amount. Turn it off in **Preferences** (click your name chip) → **Stats** → **Kill feed** |
+| **Fight summary** | both | **End** a fight | Stats opens on that fight with a **Highlights** box (MVP, biggest hit, kills, downs, nat 20s…). Players see public facts only; you also see who's still standing. Off switch: **Preferences → Stats → Open the fight summary at End** |
+| **Luck** | both | Launcher **Stats** → tab **Luck** | Rolls, d20s, average d20, nat 20s / nat 1s per character, for one session or the whole campaign. Only you get the "DM dice" row |
+| **Trophies** | owner + DM | A character sheet → last tab **Trophies** | Lifetime numbers (avg d20, nat 20s, kills, damage dealt / taken, times downed…) and Records (biggest hit…). Other players don't get the tab |
+| **Drag to reorder** | DM | Launcher **Initiative** → the grip at the left of a row; or the row's **⋯** menu → **Move up / Move down** | A drop line while dragging, with "→ 15" when the drop changes that row's number. Players just see the new order; they never learn a monster's or hidden creature's number |
+| **Turn ring** | both | Start a fight and press **Next** | A coloured ring around the current turn's token (a soft glow when zoomed in). A hidden or fogged combatant's turn gets a dashed ring on your screen only |
+| **Party status** | both | Launcher **Party status** (right after Party) | One line per PC: HP bar "38 / 52", "+5" temp HP, AC, conditions, Down / death state; companions under their owner. Updates live as damage lands. Click your own PC's row to open its sheet (you: any row) |
+
 ### Part 1: windows (`session-sim-12`)
 
 | # | You do | Expect |
@@ -86,11 +115,11 @@ Open the printed DM URL (paste the secret) and each player link in its own brows
 |---|---|---|
 | 1 | Player 1: Mira's sheet → **Macros** tab → Sneak Attack (enter physical dice 3, 4, 5) | "Mira — Sneak Attack: 3 + 4 + 5 = 12 physical" for everyone; no damage card. Player 2 can't edit your DM macro on Thorn |
 | 2 | Player 1: dice tray `1d20+2` → **Save as macro** | It appears under Mira; Player 2 sees nothing |
-| 3 | Game log roll bar → Options → **Request…**: All PCs, Perception, hidden | Each player gets a prompt naming the PC ("DM: Perception · Mira"); answers show only to you and that player; one sound per player |
-| 4 | Request "Mira: DEX save", DC 15 shown, public; Player 2 **Declines** another; your **Requests** window → **Roll for missing** | Your window shows ✓ / ✗ / Declined per PC; Player 1 reloads with a prompt open → it comes back quietly |
+| 3 | Launcher **Requests**: Roll = Perception, **All PCs**, eye button = Results hidden → **Send** | Each player gets a prompt per PC ("Mira — Perception", "Brakka — Perception"); answers show only to you and that player; one sound per player |
+| 4 | New request: DEX save, Mira only, DC 15 + **Show DC**, Results public; Player 2 **Declines** another; on a card → **Roll for missing** | Your cards show ✓ / ✗ / Declined per PC; Player 1 reloads with a prompt open → it comes back quietly |
 | 5 | Top bar **Pause** → message, image, back in 5 min | Players get the full-screen card + countdown + sound; nothing behind it reacts (keys, wheel, drags, popups); you keep working; Preview shows you their card |
 | 6 | While paused: send a request, kill a monster, End a fight; then **Resume** | Players see none of it until Resume; then exactly one sound, the prompt, the fight summary |
-| 7 | Players window → Options → **Alert sounds**: pick the Chime for "turn"; try a too-big or too-long file | The Chime plays for Player 1 on Mira's turn (not if muted); too-big / too-long files are refused inline |
+| 7 | Launcher **Players** → **Options** → **Alert sounds**: pick the Chime for **Your turn** (▶ to test); try a too-big or too-long file with **Upload sound…** | The Chime plays for Player 1 on Mira's turn (after they've clicked the page once; not if muted); too-big / too-long files are refused inline |
 
 ### Part 3: stats (`session-sim-12`, or `stats-b`)
 
@@ -100,7 +129,7 @@ Open the printed DM URL (paste the secret) and each player link in its own brows
 | 2 | **End** the fight | A "Fight summary" toast and Stats opens on that fight with Highlights for everyone (players: public facts only; you also see Still standing) |
 | 3 | Stats → **Luck** (session and Campaign) | Rolls, d20s, average, nat 20s / 1s per character; "DM dice" only for you |
 | 4 | Player 1: Mira's sheet → **Trophies** | Lifetime totals + records; Player 2 has no Trophies tab on Mira |
-| 5 | Player 2: Preferences → Stats → Kill feed off | No kill toasts for Player 2 |
+| 5 | Player 2: click the name chip → **Preferences** → **Stats** → **Kill feed** off | No kill toasts for Player 2; Player 1 still gets them |
 
 ### Part 4: combat polish (`session-sim-12`, or `combat-polish`)
 
