@@ -871,6 +871,11 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const def = w && defOf(w);
     if (!w || !def || !isShown(w, ctx.available) || def.fixedDefault) return;
     if (w.userSpot) return;
+    // The settle after the first token draw reconsiders the restored layout only: a window
+    // placed on this page since (an open, a displacement) keeps its spot (no re-placing when a PC
+    // comes under a window, play-shell §16).
+    const how = ctx.placed?.(id);
+    if (load && pcs && how !== undefined && how !== "stored" && how !== "zone") return;
     const size = targetSize(w, def, vp);
     const atDefault = knownDefaultSizes(def).some((s) => s.w === w.w && s.h === w.h);
     const migrate = !w.userSize && !w.fixedH && atDefault && (w.w !== size.w || w.h !== size.h);

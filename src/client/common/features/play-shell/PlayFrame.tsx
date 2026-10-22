@@ -26,8 +26,11 @@ import { ShellWindow } from "./ShellWindow";
 import { SHELL_TEST_DRAG_MIME, SHELL_TEST_KIND } from "./test-windows";
 import { topBarItemsFor } from "./top-bar-items";
 
-/** FR-SHELL-95: the `viewport` settle runs this long after the last resize event. */
-export const VIEWPORT_SETTLE_MS = 200;
+/**
+ * FR-SHELL-95: the `viewport` settle runs this long after the last resize event: before the map's
+ * resize refit (200 ms, FR-MAP-47), so the refit frames the settled windows (FR-MAP-98).
+ */
+export const VIEWPORT_SETTLE_MS = 150;
 
 const EMPTY_TEXT: Record<ShellClient, string> = {
   dm: "No scenes yet",
