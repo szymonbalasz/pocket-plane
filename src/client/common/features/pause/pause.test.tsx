@@ -14,6 +14,7 @@ import { SyncContext, type SyncState } from "../../sync/store";
 import { DICE_LAYER_Z } from "../dice-extras/DiceLayer";
 import { createAlertController, createTitleMarker } from "../play-shell/alerts";
 import type { AudioEngine } from "../play-shell/audio";
+import { blockInput } from "../play-shell/input-block";
 import { OVERLAY_LAYER_Z } from "../play-shell/OverlayLayer";
 import { blockingOverlay, OVERLAYS, overlaysFor } from "../play-shell/overlays";
 import { createWindowRegistry } from "../play-shell/registry";
@@ -415,5 +416,38 @@ describe("the shell's alerts under the card (FR-SHELL-127, -134)", () => {
     );
     expect([last(), c.store.getState().soundCount]).toEqual(["turn:played:2", 2]);
     expect(c.store.getState().flash?.id).toBe("cbt.turn");
+  });
+});
+
+describe("the block reaches body portals (FR-SHELL-128, -135)", () => {
+  test("FR-SHELL-128 input blocked: every other child of the body inert, incl. a portal opened while blocked; release restores each", () => {
+    const listeners = { addEventListener() {}, removeEventListener() {} };
+    const dialog = { inert: false }; // a Radix portal opened before the pause
+    const dice = { inert: true }; // the dice layer: inert already, stays so
+    let added: ((s: { inert: boolean }) => void) | null = null;
+    let watching = true;
+    const release = blockInput({
+      overlay: { contains: () => false, focusables: () => [], focus() {} },
+      siblings: [dialog, dice],
+      watch: (add) => {
+        added = add;
+        return () => {
+          watching = false;
+        };
+      },
+      win: listeners,
+      doc: { activeElement: null, ...listeners },
+    });
+    expect([dialog.inert, dice.inert]).toEqual([true, true]);
+    const tooltip = { inert: false }; // a portal opened while blocked
+    (added as ((s: { inert: boolean }) => void) | null)?.(tooltip);
+    expect(tooltip.inert).toBe(true);
+    release();
+    expect([dialog.inert, dice.inert, tooltip.inert, watching]).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ]);
   });
 });

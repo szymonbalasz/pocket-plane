@@ -112,6 +112,17 @@ test("FR-SHELL-125 FR-SHELL-128 FR-SHELL-129 FR-SHELL-136 pause card blocks inpu
   await expect(player.getByTestId("party-present-popup")).toHaveCount(0);
   await player.getByTestId("ui-topbar").click(); // the first interaction unlocks audio
 
+  // A Radix Popover opened before the pause (the tray's dice settings, portalled to the body):
+  // the card covers it and it can't be clicked while paused.
+  const tray = await openWindow(player, "dicex.tray");
+  await tray.getByTestId("dicex-settings-open").click();
+  const display = (v: string) =>
+    player.locator(`[data-testid="dicex-settings-display"][data-value="${v}"]`).first();
+  const before = await display("flat").getAttribute("data-state");
+  const flat = await display("flat").boundingBox();
+  if (!flat) throw new Error("no dice settings popover");
+  const flatAt = { x: flat.x + flat.width / 2, y: flat.y + flat.height / 2 };
+
   // T9: Pause from the Popover (message, back in 5 min) → the card and the `pause` sound (Chime).
   await control.click();
   await dm.getByTestId("ui-pause-message-input").fill("Snacks");
@@ -124,12 +135,30 @@ test("FR-SHELL-125 FR-SHELL-128 FR-SHELL-129 FR-SHELL-136 pause card blocks inpu
     "data-test-last-sound",
     /^pause:(played|fallback):\d+$/,
   );
+  // The popover is gone or inert, under the card: a click at its option reaches the card only.
+  expect(
+    await player.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-testid="ui-pause"]') !== null,
+      flatAt,
+    ),
+  ).toBe(true);
+  expect(
+    await player.evaluate(() =>
+      [...document.querySelectorAll('[data-testid="dicex-settings-display"]')].every(
+        (el) => el.closest("[inert]") !== null,
+      ),
+    ),
+  ).toBe(true);
+  await player.mouse.click(flatAt.x, flatAt.y);
   // The draft is kept for the next pause (DM browser only).
   await dm.keyboard.press("Escape");
   await control.click();
   await expect(dm.getByTestId("ui-pause-message-input")).toHaveValue("Snacks");
   await dm.getByTestId("ui-pause-resume").click();
   await expect(player.getByTestId("ui-pause")).toHaveCount(0);
+  // Nothing behind the card changed: the dice display is as before the pause.
+  if (!(await display("flat").isVisible())) await tray.getByTestId("dicex-settings-open").click();
+  await expect(display("flat")).toHaveAttribute("data-state", before ?? "off");
 
   await player.context().close();
   await dm.context().close();

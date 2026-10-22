@@ -1,8 +1,13 @@
 // The overlay layer (FR-SHELL-112 (2), -135): the registered overlays of this client, in `layer`
-// order, above the alert flash and below the dice layer. While an entry blocks input, everything
-// else on the page is `inert` and unreachable (`input-block.ts`) and the placer's settles queue.
+// order, above the alert flash and below the dice layer. Portalled to `document.body` (TT4), so
+// its z-index competes with every other body portal (Radix dialogs / popovers / tooltips z-50, the
+// flash z-100, the toast stack): the play page is `position: fixed`, its own stacking context.
+// While an entry blocks input, every other child of the body is `inert` and unreachable (incl.
+// portals opened later; the dice layer is inert already and stays above) and the placer's settles
+// queue (`input-block.ts`).
 import type { RecordStore } from "@shared/protocol/store";
 import { useContext, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { createStore, type StoreApi, useStore } from "zustand";
 import { SyncContext } from "../../sync/store";
 import { blockInput, FOCUSABLE } from "./input-block";
@@ -37,6 +42,7 @@ export function OverlayLayer({
       ? el?.querySelector<HTMLElement>(`[data-overlay-id="${blocking}"]`)
       : null;
     if (!el || !host || !overlay) return;
+    const sibling = (n: Node): n is HTMLElement => n !== el && n instanceof HTMLElement;
     setBlocked(true);
     const release = blockInput({
       overlay: {
@@ -44,7 +50,15 @@ export function OverlayLayer({
         focusables: () => [...overlay.querySelectorAll<HTMLElement>(FOCUSABLE)],
         focus: (o) => overlay.focus(o),
       },
-      siblings: [...host.children].filter((c): c is HTMLElement => c !== el && "inert" in c),
+      siblings: [...host.children].filter(sibling),
+      // A portal opened while blocked (a tooltip, a dialog) is a new child of the body.
+      watch: (add) => {
+        const mo = new MutationObserver((records) => {
+          for (const r of records) for (const n of r.addedNodes) if (sibling(n)) add(n);
+        });
+        mo.observe(host, { childList: true });
+        return () => mo.disconnect();
+      },
       win: window,
       doc: document,
     });
@@ -54,12 +68,13 @@ export function OverlayLayer({
     };
   }, [blocking, setBlocked]);
   if (mine.length === 0) return null;
-  return (
+  const body = typeof document === "undefined" ? undefined : document.body;
+  const view = (
     <div
       ref={layer}
       data-testid="ui-overlay-layer"
       data-blocking={blocking ?? undefined}
-      className="pointer-events-none absolute inset-0"
+      className="pointer-events-none fixed inset-0"
       style={{ zIndex: OVERLAY_LAYER_Z }}
     >
       {mine.map((o) => (
@@ -76,4 +91,5 @@ export function OverlayLayer({
       ))}
     </div>
   );
+  return body ? createPortal(view, body) : view;
 }
