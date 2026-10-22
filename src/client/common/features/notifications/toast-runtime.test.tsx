@@ -16,8 +16,8 @@ import { createWindowRegistry, type ShellClient } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { NOTIFICATION_TYPE } from "./logic";
 import type { NoteClient } from "./note-client";
-import * as realInputs from "./stack-inputs";
 import type { StackInputs } from "./stack-inputs";
+import * as realInputs from "./stack-inputs";
 import {
   addNote,
   initialToasts,
@@ -34,7 +34,10 @@ mock.module("./stack-height", () => ({ useStackHeight: () => stubH }));
 let stubInputs: StackInputs | null = null;
 const useRealInputs = realInputs.useStackInputs;
 mock.module("./stack-inputs", () => ({
-  useStackInputs: (isDm: boolean) => stubInputs ?? useRealInputs(isDm),
+  useStackInputs: (isDm: boolean) => {
+    const real = useRealInputs(isDm);
+    return stubInputs ?? real;
+  },
 }));
 const { ToastRuntime } = await import("./ToastRuntime");
 
