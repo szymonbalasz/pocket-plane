@@ -53,7 +53,10 @@ const names = (c: TestClient) =>
   effects(c)
     .map((e) => e.label ?? e.condition)
     .sort();
-/** A player frame's `tempHp` on a combatant, or another player's counters. */
+/**
+ * A player frame's `tempHp` on a combatant, or another player's counters. Another player's
+ * character carries `hpCurrent` / `tempHp` since ADR-0063 (FR-PARTY-52): the whitelist, not a leak.
+ */
 function playLeaks(c: TestClient, me: string): string[] {
   const out: string[] = [];
   for (const x of recs<Record<string, unknown>>(c, COMBATANT_TYPE)) {
@@ -61,7 +64,7 @@ function playLeaks(c: TestClient, me: string): string[] {
   }
   for (const e of recs<Record<string, unknown>>(c, ENTITY_TYPE)) {
     if (e.ownerPlayerId === me) continue;
-    for (const k of ["tempHp", "deathSuccesses", "deathFailures", "hpCurrent"]) {
+    for (const k of ["deathSuccesses", "deathFailures", "statBlock"]) {
       if (k in e) out.push(`entity ${e.name}.${k}`);
     }
   }
@@ -133,11 +136,13 @@ describe("combat-extras over WS", () => {
         );
       }
     }
-    // FR-CBTX-32: own PC full (temp HP, counters); the other PC whitelisted with deathState.
+    // FR-CBTX-32: own PC full (temp HP, counters); the other PC whitelisted with deathState and,
+    // since ADR-0063, its temp HP; never the counters.
     const thornFor = (c: TestClient) =>
       recs<Record<string, unknown>>(c, ENTITY_TYPE).find((e) => e.name === "Thorn");
     expect(thornFor(p2)).toMatchObject({ tempHp: 5, deathSuccesses: 0, deathFailures: 0 });
-    expect(thornFor(p1)).toMatchObject({ deathState: null });
+    expect(thornFor(p1)).toMatchObject({ deathState: null, tempHp: 5 });
+    expect(thornFor(p1)).not.toHaveProperty("deathSuccesses");
     expect(byName(dm, "Goblin")?.tempHp).toBe(3);
     await scan(p1, players["Player 1"]?.id as string);
     await scan(p2, players["Player 2"]?.id as string);

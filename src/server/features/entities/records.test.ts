@@ -64,18 +64,24 @@ describe("entities record types", () => {
       className: "Fighter",
       species: null,
       deathState: null,
+      // ADR-0063 (FR-PARTY-52): HP, temp HP and the stored AC.
+      hpCurrent: 12,
+      hpMax: 12,
+      tempHp: 0,
+      ac: 16,
     });
   });
 
-  test("FR-ENT-15 redacted character: derived down true at 0 HP, false above; no HP field (#154)", () => {
+  test("FR-ENT-15 redacted character: derived down true at 0 HP, false above; HP per ADR-0063, no stat block", () => {
     const at = (hpCurrent: number) => redactCharacter({ ...mira, hpCurrent } as EntityRecord);
     expect(at(0).down).toBe(true);
     expect(at(1).down).toBe(false);
     expect(at(12).down).toBe(false);
     for (const r of [at(0), at(5)]) {
-      expect(Object.keys(r)).not.toContain("hpCurrent");
       expect(Object.keys(r)).not.toContain("statBlock");
+      expect(Object.keys(r)).not.toContain("deathSuccesses");
     }
+    expect(at(5).hpCurrent).toBe(5);
     const s = entityServices();
     const down = { ...mira, tokenShape: "square", hpCurrent: 0 } as EntityRecord;
     expect(s.records.view("entity", down, v("player", "p2"))).toEqual({
@@ -106,12 +112,19 @@ describe("entities record types", () => {
     const red = redactCharacter(full);
     expect(red).toMatchObject({ level: 1, className: "Fighter", species: "Human" });
     const json = JSON.stringify(red);
-    for (const leak of ["MIRA-NOTE-7", "athletics", "hpMax", "abilities", "Shortsword", "d10"]) {
+    for (const leak of [
+      "MIRA-NOTE-7",
+      "athletics",
+      "initBonus",
+      "abilities",
+      "Shortsword",
+      "d10",
+    ]) {
       expect(json).not.toContain(leak);
     }
   });
 
-  test("FR-CBTX-32 other players get deathState only; owner and DM the counters and temp HP", () => {
+  test("FR-CBTX-32 other players get deathState and temp HP (ADR-0063), never counters; owner and DM full", () => {
     const s = entityServices();
     const at = (hpCurrent: number, deathSuccesses: number, deathFailures: number) =>
       ({ ...mira, hpCurrent, tempHp: 7, deathSuccesses, deathFailures }) as EntityRecord;
@@ -119,9 +132,10 @@ describe("entities record types", () => {
       const view = s.records.view("entity", r, v("player", "p2"));
       expect(view.vis).toBe("redacted");
       const json = JSON.stringify(view.data);
-      for (const leak of ["tempHp", "deathSuccesses", "deathFailures", "hpCurrent"]) {
+      for (const leak of ["deathSuccesses", "deathFailures"]) {
         expect(json).not.toContain(leak);
       }
+      expect(view.data).toMatchObject({ tempHp: 7, hpCurrent: r.hpCurrent });
       expect(Object.keys(view.data as object).sort()).toEqual([...REDACTED_CHARACTER_KEYS].sort());
       // DM and owner: the full record, counters and temp HP included.
       for (const viewer of [v("dm", null), v("player", "p1")]) {
@@ -132,7 +146,7 @@ describe("entities record types", () => {
     expect(states).toEqual([null, "dying", "stable", "dead"]);
   });
 
-  test("FR-CBTX-32 the whitelist is exactly ADR-0036's eight keys + id / kind", () => {
+  test("FR-CBTX-32 FR-PARTY-52 the whitelist is exactly ADR-0036's eight keys + id / kind + ADR-0063's four", () => {
     expect([...REDACTED_CHARACTER_KEYS].sort() as string[]).toEqual(
       [
         "id",
@@ -145,6 +159,11 @@ describe("entities record types", () => {
         "className",
         "species",
         "deathState",
+        // ADR-0063 (#335): party status.
+        "hpCurrent",
+        "hpMax",
+        "tempHp",
+        "ac",
       ].sort(),
     );
   });
