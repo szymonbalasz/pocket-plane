@@ -69,7 +69,8 @@ describe("open placement (FR-SHELL-08, -45)", () => {
     const open = place(def(), vp);
     const r = place(def(), vp, { windows: [open] });
     expect(overlaps(r, open)).toBe(false);
-    expect(r).toEqual({ x: open.x, y: open.y + open.h + EDGE_GAP, w: 300, h: 200 });
+    // The default column (x 12) is left of the rail: moved windows go right of it (FR-SHELL-109).
+    expect(r).toEqual({ x: RAIL_CLEAR, y: open.y + open.h + EDGE_GAP, w: 300, h: 200 });
     const third = place(def(), vp, { windows: [open, r] });
     expect(overlaps(third, open) || overlaps(third, r)).toBe(false);
   });

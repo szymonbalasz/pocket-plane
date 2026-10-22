@@ -109,7 +109,7 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
       default: all(360, 480),
       useful: four(s(360, 412), s(360, 480), s(360, 480), s(360, 480)),
       min: s(280, 240),
-      criterion: "pending + 5 rows",
+      criterion: "pending + 3 rows",
     },
     "cbt.encounters": {
       default: all(440, 512),
@@ -163,7 +163,7 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
       default: all(360, 480),
       useful: four(s(360, 412), s(360, 480), s(360, 472), s(360, 472)),
       min: s(280, 240),
-      criterion: "pending + 5 rows",
+      criterion: "pending + 3 rows",
     },
   },
 };

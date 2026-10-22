@@ -29,6 +29,7 @@ import {
   defaultRect,
   EDGE_GAP,
   LAUNCHER_CLEAR,
+  RAIL_CLEAR,
   type Rect,
   TITLE_H,
   TOP_BAR_H,
@@ -36,8 +37,7 @@ import {
 } from "./geometry";
 import { defaultSizeAt, type Size, type WindowDef } from "./registry";
 
-/** Left edge clear of the tool rail (scenes-map's, ≈ 56 px wide) plus a gap. */
-export const RAIL_CLEAR = 68;
+export { RAIL_CLEAR };
 
 /** A PC's footprint grows by this much per side for the PC rule (FR-SHELL-57, OQ-SHELL-42 A). */
 export const PC_MARGIN = 4;
@@ -237,8 +237,8 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const floorH = Math.max(def.minSize.h, input.floor?.h ?? 0);
   const minH = Math.min(Math.max(floorH, need), fullH);
   const openH = def.minOpenH === undefined ? null : Math.max(minH, Math.min(def.minOpenH, fullH));
-  // Moved windows stay right of the tool rail (unless their default is already left of it).
-  const minX = Math.max(a.left, Math.min(base.x, RAIL_CLEAR));
+  // Moved windows stay right of the tool rail (FR-SHELL-109: always 68).
+  const minX = Math.max(a.left, RAIL_CLEAR);
   const blockers: Rect[] = [...windows, ...hard];
   // "Clear" keeps the 12 px gap to every window and hard region.
   const padded = blockers.map((o) => ({ x: o.x - g, y: o.y - g, w: o.w + 2 * g, h: o.h + 2 * g }));

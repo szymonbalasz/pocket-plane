@@ -151,10 +151,14 @@ describe("geometry", () => {
     expect(resizeRect(r, "s", 0, -1000, min, vp).h).toBe(150);
     expect(resizeRect(r, "e", 5000, 0, min, vp).w).toBe(1600 - 100);
     expect(resizeRect(r, "s", 0, 5000, min, vp).h).toBe(900 - 100);
-    // West edge keeps the right edge put.
-    expect(resizeRect(r, "w", -50, 0, min, vp)).toEqual({ x: 50, y: 100, w: 450, h: 300 });
+    // West edge keeps the right edge put; never under the tool rail (FR-SHELL-109).
+    expect(resizeRect(r, "w", -20, 0, min, vp)).toEqual({ x: 80, y: 100, w: 420, h: 300 });
+    expect(resizeRect(r, "w", -50, 0, min, vp)).toEqual({ x: 68, y: 100, w: 432, h: 300 });
     expect(resizeRect(r, "w", 1000, 0, min, vp)).toEqual({ x: 300, y: 100, w: 200, h: 300 });
-    expect(resizeRect(r, "w", -1000, 0, min, vp)).toEqual({ x: 0, y: 100, w: 500, h: 300 });
+    expect(resizeRect(r, "w", -1000, 0, min, vp)).toEqual({ x: 68, y: 100, w: 432, h: 300 });
+    // Already left of it (parked): the edge may go to its own x.
+    const parked = { ...r, x: 30 };
+    expect(resizeRect(parked, "w", -100, 0, min, vp)).toEqual({ x: 30, y: 100, w: 400, h: 300 });
     expect(resizeRect(r, "sw", -10, 10, min, vp)).toEqual({ x: 90, y: 100, w: 410, h: 310 });
   });
 });

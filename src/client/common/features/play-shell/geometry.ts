@@ -13,6 +13,11 @@ export const MIN_VISIBLE_W = 120;
 export const EDGE_GAP = 12;
 /** Strip above the bottom edge kept clear of default-placed windows (the launcher). */
 export const LAUNCHER_CLEAR = 64;
+/**
+ * Left edge clear of the tool rail (scenes-map's, ≈ 56 px wide) plus a gap: auto placement's
+ * `minX`, and where the render clamp keeps windows (FR-SHELL-109, BL-53).
+ */
+export const RAIL_CLEAR = 68;
 
 export interface Viewport {
   w: number;
@@ -52,13 +57,16 @@ export function defaultRect(pos: DefaultPosition, size: Size, vp: Viewport): Rec
 
 /**
  * Render-only clamp (FR-SHELL-12): window ≤ viewport; title bar fully inside, below the top
- * bar; ≥ 120 px of its width (or all of it, if narrower) inside. Never written back.
+ * bar; ≥ 120 px of its width (or all of it, if narrower) inside. Right of the tool rail
+ * (FR-SHELL-109, BL-53): x ≥ 68, unless parked off-screen (x < 0) or too wide to fit there (then
+ * flush right). Never written back.
  */
 export function clampRect(r: Rect, vp: Viewport): Rect {
   const w = Math.max(1, Math.min(r.w, vp.w));
   const h = Math.max(1, Math.min(r.h, vp.h - TOP_BAR_H));
   const visible = Math.min(MIN_VISIBLE_W, w);
-  const x = clampNum(r.x, visible - w, vp.w - visible);
+  const inView = clampNum(r.x, visible - w, vp.w - visible);
+  const x = r.x >= 0 ? Math.max(inView, Math.min(RAIL_CLEAR, vp.w - w)) : inView;
   const y = clampNum(r.y, TOP_BAR_H, Math.max(TOP_BAR_H, vp.h - TITLE_H));
   return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
 }
@@ -200,7 +208,7 @@ export type ResizeEdge = "e" | "w" | "s" | "se" | "sw";
 
 /**
  * Edge / corner resize (FR-SHELL-10): never below min size, never beyond the viewport
- * (left 0, right vp.w, bottom vp.h). The opposite edge stays put.
+ * (left: the rail's 68, right vp.w, bottom vp.h). The opposite edge stays put.
  */
 export function resizeRect(
   start: Rect,
@@ -216,7 +224,8 @@ export function resizeRect(
     w = clampNum(start.w + dx, min.w, Math.max(min.w, vp.w - start.x));
   }
   if (edge === "w" || edge === "sw") {
-    const newX = clampNum(start.x + dx, Math.min(0, start.x), right - min.w);
+    // Never under the tool rail (FR-SHELL-109), unless it already was.
+    const newX = clampNum(start.x + dx, Math.min(RAIL_CLEAR, start.x), right - min.w);
     x = newX;
     w = right - newX;
   }
