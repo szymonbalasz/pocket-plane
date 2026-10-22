@@ -14,6 +14,7 @@ import { Button } from "../../components/ui/button";
 import { useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
+import { useOpenWindow } from "../play-shell/ShellContext";
 import {
   answerIntent,
   promptExpression,
@@ -21,6 +22,7 @@ import {
   promptPayload,
   promptSubject,
 } from "./prompt-logic";
+import { DICEX_REQUESTS_KIND } from "./window-kind";
 
 type Payload = NonNullable<ReturnType<typeof promptPayload>>;
 
@@ -125,15 +127,28 @@ export function PlayerPrompt({ notification: n }: { notification: NotificationRe
 
 export function DmPrompt({ notification: n }: { notification: NotificationRecord }) {
   const p = promptPayload(n);
+  const open = useOpenWindow();
   return (
     <span
       data-testid="dicex-prompt"
       data-record-id={n.id}
       data-state={n.state}
-      className="flex flex-col"
+      className="flex flex-col items-start gap-1"
     >
       <span>{p ? `${p.characterName} · ${p.label}` : n.text}</span>
       <Outcome n={n} />
+      {n.state === "pending" && (
+        <Button
+          type="button"
+          data-testid="dicex-prompt-open-requests"
+          size="sm"
+          variant="ghost"
+          className="h-6 px-1.5 text-xs"
+          onClick={() => open(DICEX_REQUESTS_KIND)}
+        >
+          Open requests
+        </Button>
+      )}
     </span>
   );
 }

@@ -145,7 +145,7 @@ describe("TT2 roll requests (in process)", () => {
     expect(t.h.snapshot(t.h.viewer("dm"))[ROLL_REQUEST_TYPE]).toHaveLength(2);
   });
 
-  test("FR-DICEX-78 answer: sheet bonus, physical, hidden audience = the target's player, answer marker, repeat conflict", () => {
+  test("FR-DICEX-78 FR-DICEX-76 FR-NOTE-62 answer: sheet bonus, physical, mode changed by the roller, hidden audience = the target's player, answer marker, resolved by the roller, repeat conflict", () => {
     const t = setup();
     const id = t.send();
     // Another player's target → not_found (never forbidden); unknown request → not_found.
@@ -245,7 +245,7 @@ describe("TT2 roll requests (in process)", () => {
     expect(t.err(() => t.answer(id, t.miraId, t.p1)).code).toBe("conflict");
   });
 
-  test("FR-DICEX-80 close: open targets missed, prompts closed by rule; players can't close", () => {
+  test("FR-DICEX-80 FR-NOTE-62 close: open targets missed, prompts closed by rule; players can't close", () => {
     const t = setup();
     const id = t.send();
     t.answer(id, t.miraId, t.p1);

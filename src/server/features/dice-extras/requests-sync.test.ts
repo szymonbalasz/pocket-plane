@@ -176,7 +176,7 @@ describe("TT1+TT2 table tools over sockets (table-tools)", () => {
     expectClean(p2, "p2 prompt");
   });
 
-  test("FR-DICEX-78 FR-DICEX-84 hidden answer as an intent: DM + Player 1 only; the DM's card has the total", async () => {
+  test("FR-DICEX-78 FR-DICEX-84 FR-NOTE-64 hidden answer as an intent: DM + Player 1 only (the total in Player 1's resolve only); the DM's card has the total", async () => {
     const req = openReq();
     // Player 2 can't answer Mira's target.
     const no = await reply(

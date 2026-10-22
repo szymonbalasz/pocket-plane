@@ -14,7 +14,7 @@ import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { GameLog } from "../dice-roll-log/GameLog";
-import { actionButton } from "../notifications/logic";
+import { actionButton, toastsFor } from "../notifications/logic";
 import { createWindowRegistry } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { DmPrompt, PlayerPrompt } from "./PromptBody";
@@ -232,9 +232,11 @@ describe("TT2 roll requests (client)", () => {
     expect(render(<R notification={prompt({}, 15)} />, P1)).toContain("DM: Perception · DC 15");
   });
 
-  test("FR-NOTE-61 DM view: ‹PC› · ‹label›, no cue, no action, no toast (player-owned)", () => {
+  test("FR-NOTE-61 FR-DICEX-88 DM view: ‹PC› · ‹label› + Open requests, no cue, no action, no toast per answer (player-owned)", () => {
     const html = render(Body(rollRequestDmView, prompt()), DM);
     expect(html).toContain("Mira · Perception");
+    expect(html).toContain('data-testid="dicex-prompt-open-requests"');
+    expect(toastsFor(prompt(), { role: "dm", playerId: null })).toBe(false);
     expect(html).not.toContain("dicex-prompt-roll");
     expect(rollRequestDmView.cueTokens?.(prompt(), emptyStore(), null)).toEqual([]);
     expect(actionButton(prompt(), { role: "dm", playerId: null }, true, rollRequestDmView)).toBe(
@@ -347,7 +349,7 @@ describe("TT2 roll requests (client)", () => {
     expect(DICEX_REQUESTS_KIND).toBe("dicex.requests");
   });
 
-  test("FR-DICEX-87 request card: per target Waiting / total ✓ ✗ / Declined / No roll, nat 20; Roll for missing, Close", () => {
+  test("FR-DICEX-87 FR-DICEX-85 request card (pass / fail on the DM's card only): per target Waiting / total ✓ ✗ / Declined / No roll, nat 20; Roll for missing, Close", () => {
     expect(targetText(target("m", "M"))).toBe("Waiting");
     expect(targetText(target("m", "M", { state: "rolled", total: 18, success: true }))).toBe(
       "18 ✓",
