@@ -39,6 +39,7 @@ DM decisions #333 (sprint-7 recap: a window-frame pass with a stated 1280×720 p
 | 2026-10-21 | Seams S1–S16 settled; review-a (TT + SB) and review-b (WF + CB) done, rulings applied; **DM gate 1** sent (4 proposed ADRs, no new dependencies) |
 | 2026-10-22 | **Gate 1 passed (#335)**: all picks; ADRs 0060–0063 accepted; specs merged. Wave 1 builders started: WF1 placer core + replay harness, TT0 table-tools core, SB0 stats core, CB0 combat core |
 | 2026-10-22 | **TT0 merged** (table-tools core: macro / roll-request / audio tables, pause + sound fields, session-sim-12 bundle; walkthrough 6 / 6). TT3 alert sounds started |
+| 2026-10-22 | **CB0 merged** (combat core: tie order, `cbtx.moveCombatant`, numbers never leak; walkthrough all PASS incl. leak scan + hard kill). CB1 drag reorder started |
 
 ## Check `main` any time (DM)
 

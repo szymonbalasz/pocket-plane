@@ -12,14 +12,16 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
 | TT3 alert sounds | `build/tt-sounds` (w9C) | build-tt3 | building | walkthrough (sound steps) |
 | SB0 stats tier-B core | `build/sb-core` (w9A, slot 3) | build-sb0 | building | thin walkthrough (raw intents) |
-| CB0 combat core (schema lane 2nd) | `fix/cb-core` (w9B, slot 4) | build-cb0 | building | merges after TT0 |
+| CB0 combat core | merged (walkthrough all PASS) | — | done | main gates running |
+| CB1 drag reorder | `build/cb-reorder` (w9D) | build-cb1 | building | walkthrough CB2–CB9 |
 
 Queue (seams build plan, `.verify/sprint8/seams.md`): wave 2 WF4, TT1+2, TT3, CB1 · wave 3 WF2, WF3, TT4, SB1+2, CB3 · wave 4 CB2. Slice defs: `%TEMP%/pocket-plane/slices.json` (`wf1`, `tt0`, `sb0`, `cb0`).
 
 ## Shared-file locks
 
 - Frame (play-shell frame files, see slice WF1): `fix/placer-core`.
-- Schema lane: `fix/cb-core` (TT0 merged).
+- Schema lane: free (TT0, CB0 merged).
+- DM Initiative rows: `build/cb-reorder`.
 - Play-shell `sounds.ts`, `audio.ts`, `alerts.ts`, `AlertLayer.tsx`: `build/tt-sounds`.
 - `combat-tracker/hp.ts` + `log-kinds.ts` (`fell`): `build/sb-core`.
 
