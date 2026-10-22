@@ -42,6 +42,7 @@ DM decisions #333 (sprint-7 recap: a window-frame pass with a stated 1280×720 p
 | 2026-10-22 | **CB0 merged** (combat core: tie order, `cbtx.moveCombatant`, numbers never leak; walkthrough all PASS incl. leak scan + hard kill). CB1 drag reorder started |
 | 2026-10-22 | **TT3 merged** (DM-added alert sounds: upload limits + probe, picks in Campaign options, Chime / ping playback, mute wins; walkthrough 15 / 15). TT1+TT2 macros + roll requests started; main after TT3: check 4536 / e2e 187 green. WF4 toast policy + sizes started; SB0 walkthrough 10 / 10; CB1 drag reorder in walkthrough |
 | 2026-10-22 | **CB1 merged** (drag to reorder initiative: grip, drop line "→ n", keyboard Move up / down, crossing hint; walkthrough 14 / 14 + autoscroll / tooltip fixes). WF1 walkthrough passed after a reload fix (L5 never worse than the current rect); SB0 fixing its session-sim-12 unit (past Bandit fight) |
+| 2026-10-22 | **WF1 merged** (one window placer for open / reopen / resize / load / Start, zones, put away, grow-back, session-replay harness: failing layout cells 307 → 166, the rest are pushes and camera; walkthrough 10 / 10 after a reload fix). TT1+TT2 part-1 walkthrough 13 / 13. WF3 map refits and TT4 pause screen started |
 
 ## Check `main` any time (DM)
 

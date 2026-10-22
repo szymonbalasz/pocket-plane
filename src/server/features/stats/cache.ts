@@ -8,7 +8,7 @@ import { conflict } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { logTimeline } from "../dice-roll-log/stats-read";
 
-type Read = Pick<Tx, "select">;
+type Read = Pick<Tx, "select" | "all">;
 
 /** FR-STATS-14: per campaign, the derived sessions and the last `n` they cover. */
 export class SessionCache {
@@ -64,6 +64,8 @@ export class QueryGate {
     memoKey: string;
     now: number;
     compute(): T;
+    /** False = answer only, never memoise (FR-STATS-46's `pending`). Default true. */
+    keep?(result: T): boolean;
   }): T {
     const version = this.versions.get(o.campaignId) ?? 0;
     const key = `${o.campaignId}|${o.memoKey}`;
@@ -78,6 +80,7 @@ export class QueryGate {
     recent.push(o.now);
     const result = o.compute();
     this.computed += 1;
+    if (o.keep && !o.keep(result)) return result;
     this.memo.delete(key);
     this.memo.set(key, { version, result });
     if (this.memo.size > MEMO_MAX) {

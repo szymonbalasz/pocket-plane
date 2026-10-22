@@ -50,6 +50,9 @@ const GEM_BUNDLES = [
   "gems-reroll-e2e",
   "gems-ui-e2e",
   "gems-combat-e2e",
+  // stats tier B (SB0): `stats-b` switches gems on for `sb-luck-reroll` (STATS §13.1)
+  "stats-b",
+  "stats-b-e2e",
 ];
 
 async function frames(bundle: string) {

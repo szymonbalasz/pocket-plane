@@ -317,8 +317,11 @@ describe("FR-STATS-15 fights", () => {
   test("FR-STATS-15 default fight, player label, no planned / fact-less fight", () => {
     const t = statsSetup();
     const planned = t.createAmbush();
-    // Players: the started fight lists only once it has a public fact.
-    expect(t.fight(t.p1)).toEqual({ fight: null, fights: [] });
+    // Players: the started fight lists only once it has a public fact; FR-STATS-52 (sprint 8):
+    // it is the default before that, as "This fight" with party rows at 0.
+    const early = t.fight(t.p1);
+    expect(early.fights).toEqual([]);
+    expect(early.fight).toMatchObject({ key: t.enc.id, label: "This fight", status: "started" });
     expect(t.fight().fight).toMatchObject({ key: t.enc.id, label: "Ambush at the Ford" });
     t.hp("Goblin", "damage", 3, { from: "Thorn" });
     const p = t.fight(t.p1);

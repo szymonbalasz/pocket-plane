@@ -8,7 +8,7 @@ import { rollRequestKind } from "../dice-extras/request-kind";
 import { modTriggerKind } from "../effect-modifiers/reminders";
 import { handoutSharedKind } from "../party-board/kind";
 import { lootReceivedKind } from "../party-loot/kind";
-import { statsAwardsKind } from "../stats/kind";
+import { statsAwardsKind, statsFightSummaryKind } from "../stats/kind";
 import type { NotificationKindDef } from "./kind";
 import { testKind } from "./test-kind";
 
@@ -24,4 +24,5 @@ export const notificationKinds: readonly NotificationKindDef[] = [
   summonCardKind, // cbt-summon-concentration (combat-tracker, FR-CBT-120)
   statsAwardsKind, // stats-awards (stats, FR-NOTE-48)
   rollRequestKind, // roll-request (dice-extras, FR-NOTE-58), toast class card
+  statsFightSummaryKind, // stats-fight-summary (stats, FR-NOTE-68): toast class info
 ];
