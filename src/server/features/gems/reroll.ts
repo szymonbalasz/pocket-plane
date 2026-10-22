@@ -1,7 +1,7 @@
 // Inspiration reroll (GEM FR-GEM-18–24, GM1): the eligibility rule on top of dice-roll-log's
 // generic reroll (`rerollableRoll`, FR-DICE-70), and the spend's target detail by audience
 // (FR-GEM-13). The command (`gem.spend`) writes count + spend line + reroll in one transaction.
-import { inRerollWindow, rerollableRoll } from "@shared/dice-roll-log/reroll";
+import { inRerollWindow, isAnswerEntry, rerollableRoll } from "@shared/dice-roll-log/reroll";
 import {
   GAME_LOG_WINDOW,
   type GameLogEntryRecord,
@@ -63,6 +63,7 @@ export function rerollTarget(
     if (entry.supersededBy !== null) throw conflict("Already rerolled");
     if (entry.undone) throw conflict("Undone");
     if (entry.category === "initiative") throw conflict("Initiative can't be rerolled");
+    if (isAnswerEntry(entry)) throw conflict("A requested roll can't be rerolled"); // FR-DICEX-78
     throw conflict("No d20 roll to reroll");
   }
   const newest = env.tx
