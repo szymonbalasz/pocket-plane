@@ -3354,7 +3354,7 @@ From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-104
 
 ## 143. Sprint 8: stats tier-B UI — kill feed, Highlights, End summary open, Luck tab, Trophies tab (SB1 + SB2)
 
-From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26–30, -34, -36, -41, -44, -48, -50, -52, -53, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (views), -69 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-97–99 (#334, #335; seams S4, S5, S11). **Built by `build/sb-stats-ui`**: browser only. No intent, event, record type, signal or wire field (CON-44: 0 B). Reads §140's acks and lines. Data side: [data model §112](../data-model/README.md#112-sprint-8-stats-tier-b-ui-sb1--sb2).
+From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26–30, -34, -36, -41, -44, -48, -50, -52, -53, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (views), -69 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-97–99 (#334, #335; seams S4, S5, S11). **Built by `build/sb-stats-ui`**: browser only. No intent, event, record type, signal or wire field (CON-44: 0 B). Reads §140's acks and lines. Data side: [data model §113](../data-model/README.md#113-sprint-8-stats-tier-b-ui-sb1--sb2).
 
 | Piece | Contract | Source |
 |---|---|---|
