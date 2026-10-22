@@ -394,7 +394,7 @@ describe("FR-CBT-22 PC targets via characters.adjustHp", () => {
       .query<{ hp: number }, [string]>("select hp_current as hp from entity where id = ?")
       .get(t.miraId)?.hp;
 
-  test("FR-CBT-22 apply to Mira: character HP, entity change in the event; owner full, others no HP", () => {
+  test("FR-CBT-22 apply to Mira: character HP, entity change in the event; owner full, others the ADR-0063 figures", () => {
     const t = started();
     const r = t.attack("Goblin", 15, 4); // 19 to hit vs AC 16, 6 damage
     t.apply(r.cardId, "Mira");
@@ -412,7 +412,9 @@ describe("FR-CBT-22 PC targets via characters.adjustHp", () => {
     const owner = t.s.records.filterChange(ent as never, t.h.viewer("player", t.h.p1.id));
     expect(owner?.data).toMatchObject({ hpCurrent: 6 });
     const other = t.s.records.filterChange(ent as never, t.h.viewer("player", t.h.p2.id));
-    expect(JSON.stringify(other)).not.toContain("hpCurrent");
+    // ADR-0063: other players get the HP figures, never the stat block or counters.
+    expect(other?.data).toMatchObject({ hpCurrent: 6, hpMax: 12, ac: 16 });
+    expect(JSON.stringify(other)).not.toContain("statBlock");
   });
 
   test("FR-CBT-25 undo after a sheet heal restores only its own delta, clamped (I2)", () => {

@@ -215,11 +215,15 @@ describe("entities over REST + WS (entities bundle)", () => {
       className: "Fighter",
       species: null,
       deathState: null,
+      hpCurrent: 12,
+      hpMax: 12,
+      tempHp: 0,
+      ac: 16,
     });
     for (const c of [p1, p2]) c.close();
   });
 
-  test("FR-ENT-15 Mira at 0 HP: P2's redacted upsert has down true, no hpCurrent (#154)", async () => {
+  test("FR-ENT-15 Mira at 0 HP: P2's redacted upsert has down true and hpCurrent 0 (ADR-0063)", async () => {
     const p1 = await h.live({ role: "player", token: tokens["Player 1"] as string });
     const p2 = await h.live({ role: "player", token: tokens["Player 2"] as string });
     const dm = await h.live({ role: "dm", secret: TEST_SECRET });
@@ -228,8 +232,8 @@ describe("entities over REST + WS (entities bundle)", () => {
     const e2 = await p2.next("event", 1000);
     expect(e1.changes.find((c) => c.type === "entity")?.data).toMatchObject({ hpCurrent: 0 });
     const redacted = e2.changes.find((c) => c.type === "entity")?.data as Record<string, unknown>;
-    expect(redacted).toMatchObject({ id: id("Mira"), down: true });
-    expect(Object.keys(redacted)).not.toContain("hpCurrent");
+    expect(redacted).toMatchObject({ id: id("Mira"), down: true, hpCurrent: 0, hpMax: 12 });
+    expect(Object.keys(redacted)).not.toContain("statBlock");
     // Back above 0 → down false again.
     dm.intent("char.adjustHp", { characterId: id("Mira"), delta: 12 }, "up");
     const up = await p2.next("event", 1000);

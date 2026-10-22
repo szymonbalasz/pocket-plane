@@ -385,7 +385,7 @@ DM always `full`. Generic record changes only ([ADR-0021](../architecture/adr/00
 | Type | Owner | Scope | Wire fields (DM) | Player visibility | Snapshot provider | Source |
 |---|---|---|---|---|---|---|
 | `asset` | ASSET | campaign | `{id, campaignId, seq, name, mime, bytes, width, height, displayWidth, displayHeight, createdAt}` (no `hash`) *(S6: + `tags: string[]`, [§108](#108-sprint-6-image-tags-core-im-1))* | **hidden** | all of the campaign's assets | [FR-ASSET-10](../specs/assets-pipeline.md#6-functional-requirements), ASSET §9 |
-| `entity` | ENT | campaign | row minus provenance (+ `tokenShape`, feedback pass) | own character (`ownerPlayerId = ctx.playerId`) **full**; other characters **redacted** `{id, kind, name, portraitAssetId, ownerPlayerId}` (+ derived `down` = `hpCurrent = 0`, feedback pass, #154; *(sprint 1, built, fix/charx-core)* + `level, className, species` and *(built, fix/cbtx-core)* CBTX's derived `deathState` ([FR-CBTX-32](../specs/combat-extras.md#6-functional-requirements)): the **one whitelist** `RedactedCharacter` / `REDACTED_CHARACTER_KEYS`, [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md), [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements)); monsters **hidden** | campaign's characters + customs | [FR-ENT-15](../specs/entities.md#6-functional-requirements), [ADR-0024](../architecture/adr/0024-definition-visibility.md) |
+| `entity` | ENT | campaign | row minus provenance (+ `tokenShape`, feedback pass) | own character (`ownerPlayerId = ctx.playerId`) **full**; other characters **redacted** `{id, kind, name, portraitAssetId, ownerPlayerId}` (+ derived `down` = `hpCurrent = 0`, feedback pass, #154; *(sprint 1, built, fix/charx-core)* + `level, className, species` and *(built, fix/cbtx-core)* CBTX's derived `deathState` ([FR-CBTX-32](../specs/combat-extras.md#6-functional-requirements)) and *(sprint 8, built, build/cb-party)* `hpCurrent, hpMax, tempHp, ac` (`statBlock.hpMax` / `statBlock.ac`; [ADR-0063](../architecture/adr/0063-party-hp-visibility.md), [FR-PARTY-52](../specs/party-board.md#6-functional-requirements)): the **one whitelist** `RedactedCharacter` / `REDACTED_CHARACTER_KEYS`, [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md), [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements)); monsters **hidden** | campaign's characters + customs | [FR-ENT-15](../specs/entities.md#6-functional-requirements), [ADR-0024](../architecture/adr/0024-definition-visibility.md) |
 | `imported-entity` | ENT | global, `audience: dm` (players get no list, not even empty; [ADR-0024](../architecture/adr/0024-definition-visibility.md)); *(sprint 3, C2)* **lazy `"ids"`** ([§58](#58-sprint-3-compendium-read-c2)) | row incl. provenance | **hidden** | ~~all imported definitions~~ none (DM loads by id) | [FR-ENT-16](../specs/entities.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md) |
 | `scene` | MAP | scene, `sceneOf = id` ([CON-22](#11-conflicts-log)) | full row | **redacted** `{id, mapAssetId, mapWidth, mapHeight, grid*, active}` (no name, folder, lock, `seq`) *(proposed, OQ-MAP-17)* | DM: all; player: active | [FR-MAP-26](../specs/scenes-map.md#6-functional-requirements), MAP §9 |
 | `scene-folder` | MAP | campaign | full row | **hidden** | campaign's folders | FR-MAP-26 |
@@ -934,7 +934,7 @@ From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`
 | Type | Status | Visibility | Source |
 |---|---|---|---|
 | `creature-sheet` | **built**: table; record type + zod record `CreatureSheetRecord` (`@shared/character-sheet/sheet`), the row + `id` (= `entityId`) | DM full; owner (row's `ownerPlayerId` copy) full; others hidden | [FR-CHARX-36](../specs/character-sheet-full.md#6-functional-requirements) |
-| `entity` | redaction **built**: other players get the one whitelist `id, kind, name, portraitAssetId, ownerPlayerId, down, level, className, species` + `deathState` (*built, fix/cbtx-core*, [§32](#32-sprint-1-combat-extras)); a key whose value is `undefined` is left out | FR-ENT-15 + whitelist | [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements) |
+| `entity` | redaction **built**: other players get the one whitelist `id, kind, name, portraitAssetId, ownerPlayerId, down, level, className, species` + `deathState` (*built, fix/cbtx-core*, [§32](#32-sprint-1-combat-extras)) + `hpCurrent, hpMax, tempHp, ac` (*sprint 8, built, build/cb-party*, [ADR-0063](../architecture/adr/0063-party-hp-visibility.md)); a key whose value is `undefined` is left out | FR-ENT-15 + whitelist | [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements) |
 
 **WS intents** (default deny; none optimistic) **built** (strict zod in `@shared/character-sheet/sheet` and `schemas`; names `CHARX_INTENTS`): `char.create`, `char.approve`, `char.setLock`, `char.edit`, `char.putRow` / `char.deleteRow` / `char.moveRow`, `char.useResource`, `char.roll` gains `skill?`, `attackId?`, `spellId?` and the new kinds. Payloads, roles and results: [CHARX §9](../specs/character-sheet-full.md#9-api--events). `char.edit` `set` keys = `SHEET_EDIT_FIELDS`; row lists = `SHEET_ROW_LISTS`; counters = `SheetResource` (all **built**, `src/shared/events/character-sheet.ts`).
 
@@ -963,7 +963,7 @@ From [combat-extras](../specs/combat-extras.md) (CBTX, `complete`, #178; [ADR-00
 | Type | Status | Visibility | Source |
 |---|---|---|---|
 | `effect` | table, zod record (`EffectRecord`), player shape + redaction (`PlayerEffectRecord`, `redactEffect`, `effectVisibleToPlayers`) **built** (`@shared/combat-extras/schemas`); registration **built** in CBTX's `index.ts` | DM full; players hidden if `secret`, `hidden` or ended, else redacted (no source, anchor or concentration link) | [FR-CBTX-31](../specs/combat-extras.md#6-functional-requirements) |
-| `entity` | **built**: character record + `tempHp`, `deathSuccesses`, `deathFailures` (default 0; DM + owner); other players get the one whitelist with derived `deathState` (`deathStateOf`), never the counters or temp HP | FR-ENT-15 + whitelist | [FR-CBTX-19/32](../specs/combat-extras.md#6-functional-requirements), [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) |
+| `entity` | **built**: character record + `tempHp`, `deathSuccesses`, `deathFailures` (default 0; DM + owner); other players get the one whitelist with derived `deathState` (`deathStateOf`), never the counters; *(sprint 8, build/cb-party)* `tempHp` (+ `hpCurrent`, `hpMax`, `ac`) on the whitelist ([ADR-0063](../architecture/adr/0063-party-hp-visibility.md)) | FR-ENT-15 + whitelist | [FR-CBTX-19/32](../specs/combat-extras.md#6-functional-requirements), [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) |
 | `combatant` | **built**: DM record + `tempHp` (0–999); player shapes unchanged (no `tempHp`) | §20 | FR-CBTX-14/32 |
 | `hp-change` | **built**: + `tempBefore`, `tempAfter`, `deathBefore`, `deathAfter`, `noteIds`; DM only | §20 | [FR-CBTX-21](../specs/combat-extras.md#6-functional-requirements) |
 
@@ -3410,9 +3410,34 @@ From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-6
 - **Fixtures:** units `dicex-macros` (joins `session-sim-12`) and `dicex-request-open` (not in it); bundles `table-tools` (= `session-sim-11` + `dicex-macros`, `audio-chime`, `camp-alert-sounds`, `dicex-request-open`) and `table-tools-e2e` (`e2e/tt-macros.e2e.ts`, `e2e/tt-requests.e2e.ts`).
 - **CON-44:** no new record type; TT0's `con44-tt.test.ts` holds the caps (§135).
 
-## 145. Sprint 8: stats tier-B UI — kill feed, Highlights, End summary open, Luck tab, Trophies tab (SB1 + SB2)
+## 145. Sprint 8: Party status — other PCs' HP, temp HP, AC; `party.summary` window (CB3)
 
-From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26–30, -34, -36, -41, -44, -48, -50, -52, -53, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (views), -69 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-97–99 (#334, #335; seams S4, S5, S11). **Built by `build/sb-stats-ui`**: browser only. No intent, event, record type, signal or wire field (CON-44: 0 B). Reads §140's acks and lines. Data side: [data model §115](../data-model/README.md#115-sprint-8-stats-tier-b-ui-sb1--sb2).
+From [party-board](../specs/party-board.md#610-sprint-8-party-summary-track-cb) FR-PARTY-51–58, [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-140–143 (DM #334, #335; [ADR-0063](../architecture/adr/0063-party-hp-visibility.md)). **Built by `build/cb-party`.** No intent, event, record type or signal. Data side: [data model §115](../data-model/README.md#115-sprint-8-party-status-cb3).
+
+**Wire change**
+
+| Item | Who | Change | Source |
+|---|---|---|---|
+| `entity` (character) redaction | other players | the one whitelist + `hpCurrent`, `hpMax` (`statBlock.hpMax`), `tempHp`, `ac` (stored `statBlock.ac`); a PC hidden from players still sends them (OQ-PARTY-31 A). Own PC, DM: full, unchanged. Pets, monsters, companion combatants: unchanged (ADR-0024, ADR-0056) | FR-PARTY-52 |
+| Events | other players | `AttackApplied`, `HpApplied`, `CharacterHpAdjusted`, `CombatEntryUndone`, `TempHpSet`, `DeathSaveRolled`, sheet / entity edits now carry the new keys on the `entity` upsert they already got; a temp HP set sends them one upsert (it changed nothing they held before); the hub's identical-change drop still sends nothing when none changed | FR-PARTY-55 |
+
+| Kind | Owner | Clients | Default open | Default geometry | Launcher | Gate | Source |
+|---|---|---|---|---|---|---|---|
+| `party.summary` *(new; `@ui/features/party-board/window` `partySummaryWindow`, one line per client registry)* | PARTY | both | no (parkable, never protected, no keep-out) | top-left `dx` 56, 280×260 `growToContent`, `usefulSize` 280×236, min 240×120; size-table row, goldens, harness sets D3 / P1 / P3 | "Party status" (lucide `HeartPulse`, order 58.5: right after Party, before Stats); no `activity` | — | FR-SHELL-140–143 |
+
+| Piece | Contract | Source |
+|---|---|---|
+| Rows (`summary-logic.ts` `partySummary`, pure) | PCs the viewer holds (drafts out where the viewer holds the `creature-sheet`), own first then by name (DM by name); companions after the PC rows, grouped under the owner PC (`party-summary-group`): present pets (DM: `petPresent`; owner: always) and owned monster combatants of the started encounter (not hidden / `ownerHidden`, not released or hostile); owner and DM numbers + AC (pet row / `card`), others the band | FR-PARTY-51, -53 |
+| Row (`Summary.tsx`) | `party-summary-row` + `data-record-id` (`data-own`, `data-turn`, `data-can-open`): portrait, owner dot, `party-summary-name`, `party-summary-hp` (`data-value` "cur/max" or band) + band-tone bar, `party-summary-temp` ("+n" when > 0), `party-summary-ac` (shield + number), `party-summary-death`, ≤ 4 `party-summary-effect` + "+N" (secret never), `party-summary-turn`, DM `party-summary-hidden` (eye-off); `party-summary-companion` + `data-record-id`; `party-summary-empty` | FR-PARTY-51, -58 |
+| Click / keyboard | own row (player) or any row (DM) → `openSheetFor(id, "character")` + `char.sheet`; others a Tooltip only ("Thorn · HP 10 / 10 + 5 temp · AC 15 · Poisoned"); the PC list is one tab stop (`data-chip-row` roving, ↑/↓ too), Enter opens | FR-PARTY-54 |
+| States | not live → `data-live="false"`, figures muted; reconnect from the snapshot; no PCs → "No player characters yet" | FR-PARTY-56 |
+
+- **Fixtures:** unit `cb-party-six` (Pip / player-1, Rowan and "Vex Thistledown-Ashgrove of Brindlemarsh" / player-2: HP 999 / 999, temp 999, AC 30; no tokens), included in `wf-frame-e2e` (with `cb-party`). E2E `e2e/cb-party.e2e.ts` on `cb-party-e2e`; `party.summary`'s case in `e2e/useful-size.e2e.ts`.
+- **CON-44** (heavy harness, worst-width figures, `snapshot-size.test.ts` `FR-PARTY-57`): players +343 B (7 other PCs × 49 B; worst player 289,969 B of 512 KiB); DM 0 B.
+
+## 146. Sprint 8: stats tier-B UI — kill feed, Highlights, End summary open, Luck tab, Trophies tab (SB1 + SB2)
+
+From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26–30, -34, -36, -41, -44, -48, -50, -52, -53, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (views), -69 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-97–99 (#334, #335; seams S4, S5, S11). **Built by `build/sb-stats-ui`**: browser only. No intent, event, record type, signal or wire field (CON-44: 0 B). Reads §140's acks and lines. Data side: [data model §116](../data-model/README.md#116-sprint-8-stats-tier-b-ui-sb1--sb2).
 
 | Piece | Contract | Source |
 |---|---|---|

@@ -12,17 +12,8 @@ import { TEST_SECRET } from "../../testing/services";
 import { convergence, leakScan } from "../../ws/testing/convergence";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
-const SHEET_KEYS = [
-  "hpCurrent",
-  "statBlock",
-  "hpMax",
-  "ac",
-  "initBonus",
-  "attacks",
-  "speed",
-  "abilities",
-  "saveProficiencies",
-];
+// `hpCurrent`, `hpMax`, `ac` reach other players since ADR-0063 (party status); the rest never.
+const SHEET_KEYS = ["statBlock", "initBonus", "attacks", "speed", "abilities", "saveProficiencies"];
 
 async function nextEvent(c: TestClient, cause: string) {
   for (;;) {
@@ -105,7 +96,7 @@ describe("character-sheet bundle over WS", () => {
     }
   });
 
-  test("FR-CHAR-10 FR-CHAR-03 player-1 damages Mira: DM and owner ≤ 1 s; player-2 redacted, no HP", async () => {
+  test("FR-CHAR-10 FR-CHAR-03 player-1 damages Mira: DM and owner ≤ 1 s; player-2 redacted with HP (ADR-0063)", async () => {
     const dm = await h.live(DM);
     const p1 = await h.live(p("Player 1"));
     const p2 = await h.live(p("Player 2"));
@@ -120,9 +111,10 @@ describe("character-sheet bundle over WS", () => {
     expect(performance.now() - started).toBeLessThan(1000);
     expect(ent(dm, ids.Mira as string)).toMatchObject({ hpCurrent: 9 });
     expect(ent(p1, ids.Mira as string)).toMatchObject({ hpCurrent: 9 });
-    // Accepted timing tell: player-2 gets the redacted upsert, never the HP.
+    // ADR-0063: player-2 gets the redacted upsert with the HP figures, never the stat block.
     await nextEvent(p2, "CharacterHpAdjusted");
-    expect(ent(p2, ids.Mira as string)).not.toHaveProperty("hpCurrent");
+    expect(ent(p2, ids.Mira as string)).toMatchObject({ hpCurrent: 9 });
+    expect(ent(p2, ids.Mira as string)).not.toHaveProperty("statBlock");
 
     // Another player's character → forbidden; no frame for anyone.
     p2.intent("char.adjustHp", { characterId: ids.Mira, delta: -1 }, "x");

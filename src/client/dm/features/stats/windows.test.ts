@@ -53,6 +53,8 @@ test("FR-SHELL-93 stats window registered (DM): stats.board 'Stats', 400 × 412,
     partyOrder: 58,
   });
   const next = dmWindows.defs
+    // CB3's Party status sits between Party and Stats (FR-SHELL-140).
+    .filter((d) => d.kind !== "party.summary")
     .flatMap((d) => (d.launcher && d.launcher.order > 58 ? [d.launcher.order] : []))
     .sort((a, b) => a - b)[0];
   expect(next).toBe(59);
