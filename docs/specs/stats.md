@@ -1,7 +1,7 @@
 ---
 title: Stats and summaries
 prefix: STATS
-status: in-review
+status: complete
 owner: spec-wf
 phase: post-mvp-8
 ---
@@ -225,7 +225,7 @@ Named tests (all `FR-STATS-NN …`):
 | OQ-STATS-16 | Out-of-combat HP | **Decided (#315): A** · **A. Not counted** (no source) · B. Downs from `CharacterHpAdjusted` | — | STATS |
 | OQ-STATS-18 | Glossary: Stats window, Session awards, Overkill callout; Session "derived" | **Resolved (integrator, sprint-7 seams / rulings)** · **A. Add** | — | glossary |
 | OQ-STATS-19 | Encounter names in players' stats? | **Decided (#315): A** · **A. Neutral "Fight 3 · Tue 20 Oct"** (names stay DM-only) · B. Real names (reveals names players never saw) | — | STATS |
-| ~~OQ-STATS-35~~ | SB seam: end-of-combat summary | **Settled by seams S5:** a `stats.board` view opened `by: "feature"` at End, placed by the ladder; its toast is info class | — | FR-SHELL-112 |
+| ~~OQ-STATS-35~~ | SB seam: end-of-combat summary | **Resolved (integrator, sprint-8 seams / rulings)**: seams S5: a `stats.board` view opened `by: "feature"` at End, placed by the ladder; its toast is info class | — | FR-SHELL-112 |
 
 **Resolved (integrator, sprint-7 seams / rulings)**: ~~OQ-STATS-14~~ (S2: final roll only, maxed die via `raw`), ~~OQ-STATS-17~~ (S5: [FR-SHELL-86](play-shell.md#6-functional-requirements), 400 × 412, min 320 × 280).
 

@@ -1,7 +1,7 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: in-review
+status: complete
 owner: spec-wf
 wave: 3
 phase: post-mvp-8
@@ -251,7 +251,7 @@ Decided at sprint-4 gate 1 (#245): OQ-MAP-35 (combat trail), -36 (straight path)
 | FR-MAP-94 | *(S8)* **Never zoom in past the last full fit** (BL-65). **Every reason, incl. `load`:** `pcsPan` never raises the cell above the one `fitVisible` chose (today it re-scales up to 48 px). **`reveal`, `appearance`, `window`:** the new cell is ≤ the **last full fit's** cell (Fit, `open`, `load`, `resize`), so a later reveal may zoom back up to it but never beyond, and repeated reveals don't ratchet the map down. With no pan clearing every new token at ≥ 24 px: PCs clear, then the least token area under windows. Repros first as `test.failing`: sim-11 h (reveal) and **r03 (load at 0.686, Elite + Plain Brute under the sheet)**. | BL-65; rulings-b 6, 12 |
 | FR-MAP-95 | *(S8)* **One fit path**: `open`, `load` and `reveal` call Fit's function (`fitPastToasts` with this client's obstacles), not plain `fitScene`. | BL-65 |
 | FR-MAP-96 | *(S8)* **After the placer**: the load fit runs once the `load` settle has applied and grown windows have reported their height (replaces FR-MAP-89 (2)'s frame wait). The Start / appearance refit runs after the `appear` settle, FR-MAP-90's keep-the-camera test first. | BL-70, g |
-| FR-MAP-97 | *(S8, iff [OQ-SHELL-64](play-shell.md#15-open-questions) B / C)* **Yield refit**: `dryFit` returns `{camera, cellPx, verdict}` without applying it. When the placer accepts a yield (≥ 75 % of the last full fit's cell), the canvas applies it once (`data-fit-reason="window"`, still `fitted`). | BL-66; rulings-b 12 |
+| FR-MAP-97 | *(S8, [OQ-SHELL-64](play-shell.md#15-open-questions) B, players, #335)* **Yield refit**: `dryFit` returns `{camera, cellPx, verdict}` without applying it. When the placer accepts a yield (≥ 75 % of the last full fit's cell), the canvas applies it once (`data-fit-reason="window"`, still `fitted`). | BL-66; rulings-b 12 |
 | FR-MAP-98 | *(S8)* **Resize refit after the settle** (amends FR-MAP-92): it runs after the last `viewport` settle, so zones, returns and grow-back are in place (g03: the map squeezed bottom-right at 27 px). | BL-60 |
 
 ## 7. UI/UX notes
@@ -778,12 +778,12 @@ Full split: [play-shell §14](play-shell.md#14-dependencies). MAP parts: **FU0**
 |---|---|---|---|---|
 | OQ-MAP-61 | **Fit vs a shown card toast** (sim-10 b06: Game log + Initiative + Scenes + one card toast → 24 px in the top-left strip; #288 OQ-MAP-57 D keeps whatever shows clear) | **Decided (#315): A** (drop a shown card toast that costs more than a quarter of the cell size). **A. Keep shown toasts clear unless that costs more than a quarter of the cell size; then fit as if only the summary strip were there (a card toast may cover a token until resolved): readable map, the toast is temporary** / B. Always keep them clear (as built): nothing hidden, the map can drop to 24 px / C. Never count card toasts, only the summary strip: always the larger map, a sticky card often sits on the top row | no · owner: DM | FR-MAP-91; amends OQ-MAP-57 D only for card toasts |
 
-**Sprint 8, track WF.** **Bold** = suggested pick.
+**Sprint 8, track WF.** Decided at DM gate 1 (#335).
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| ~~OQ-MAP-62~~ | CB seam: turn highlight vs the canvas lock | **Settled by seams S1:** a canvas edit (`TokenDecoration` turn ring, `TokensLayer.tsx`) by CB2 under the canvas lock, after WF3 | — | §14 sprint 8 |
-| OQ-MAP-63 | The `pcs` fallback keeps only player characters clear (FR-MAP-93). Should a player's own pet count in their fallback? | **A. No: one PC definition everywhere (#318, #333); pets stay "visible when possible"** / B. Players' own pets count in their `pcs` set (the placer unchanged) | no · DM | FR-MAP-93 |
+| ~~OQ-MAP-62~~ | CB seam: turn highlight vs the canvas lock | **Resolved (integrator, sprint-8 seams / rulings)**: seams S1: a canvas edit (`TokenDecoration` turn ring, `TokensLayer.tsx`) by CB2 under the canvas lock, after WF3 | — | §14 sprint 8 |
+| OQ-MAP-63 | The `pcs` fallback keeps only player characters clear (FR-MAP-93). Should a player's own pet count in their fallback? | **Decided (#335): A.** **A. No: one PC definition everywhere (#318, #333); pets stay "visible when possible"** / B. Players' own pets count in their `pcs` set (the placer unchanged) | no · DM | FR-MAP-93 |
 
 ## 16. Out of scope
 

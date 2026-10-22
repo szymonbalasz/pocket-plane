@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: in-review
+status: complete
 owner: spec-wf
 wave: 2
 phase: post-mvp-8
@@ -372,7 +372,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-NOTE-28 | Show awards: info toast **and** the window opening, or only the window? | **Decided (#315): A** · **A. Both** (FR-NOTE-13's rule unchanged; the toast says why the window opened) · B. Window only (a per-kind "no toast" flag, new to the registry) | — | NOTE, STATS |
-| ~~OQ-NOTE-29~~ | SB seam: kill-feed toast class | **Settled by seams S4:** callout (FR-NOTE-50), not a notification kind | — | FR-NOTE-50, -52 |
+| ~~OQ-NOTE-29~~ | SB seam: kill-feed toast class | **Resolved (integrator, sprint-8 seams / rulings)**: seams S4: callout (FR-NOTE-50), not a notification kind | — | FR-NOTE-50, -52 |
 
 ## 16. Out of scope
 

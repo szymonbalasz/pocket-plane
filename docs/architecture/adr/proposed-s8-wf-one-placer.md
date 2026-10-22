@@ -1,9 +1,9 @@
-# Proposed — One placer for every window path: PCs first, then shrink, then put away
+# One placer for every window path: PCs first, then shrink, then put away
 
-- Status: proposed (spec-wf, sprint 8 track WF; for DM gate 1)
+- Status: accepted (DM gate, #335)
 - Date: 2026-10-21
 - Extends: [ADR-0025](0025-play-shell-windows.md) (registry + browser layout stay; this fixes **how** the shell places windows). Layouts stay browser-only (#121).
-- Supersedes (placement means only; the outcomes they fixed stay): the separate placers behind [FR-SHELL-29](../../specs/play-shell.md#6-functional-requirements) (written shrinks), -47, -53 (live follow), -55 (push right), -56 (5) (protected reopen moves), -77 / -78 / -79 (folded in as the ladder), -81 (generalised to displacement memory). Amends #245's token-aware Initiative at Start **iff OQ-SHELL-63 A**.
+- Supersedes (placement means only; the outcomes they fixed stay): the separate placers behind [FR-SHELL-29](../../specs/play-shell.md#6-functional-requirements) (written shrinks), -47, -53 (live follow), -55 (push right), -56 (5) (protected reopen moves), -77 / -78 / -79 (folded in as the ladder), -81 (generalised to displacement memory). Amends #245's token-aware Initiative at Start (OQ-SHELL-63 A, #335).
 - Raised by: DM [#333](../../decisions-log.md) (one placement path, proven by a session-replay harness; "at small screens PCs stay clear first, then windows shrink, then the least recently used launcher window is put away"), [#334](../../decisions-log.md) (BL-52, -53, -59, -60, -61, -64, -65, -66, -70), #318 (only player characters count as PCs).
 - Affects: [play-shell](../../specs/play-shell.md) FR-SHELL-95–119, [scenes-map](../../specs/scenes-map.md) FR-MAP-93–98, [notifications](../../specs/notifications.md) FR-NOTE-50–53, [stats](../../specs/stats.md) FR-STATS-66–67, [character-sheet-full](../../specs/character-sheet-full.md) FR-CHARX-83; tracks TT, SB, CB register through FR-SHELL-112.
 
@@ -29,20 +29,20 @@ Each path has its own inputs, its own idea of "PC" and of "written vs render-onl
 | B. Keep five paths, add the PC rule and grow-back to each | Smaller diffs | The sprint-4–7 pattern: each fix breaks another path; no single harness target |
 | C. Constraint solver over the whole layout on every change | Globally best layouts | Windows jump on any change; opaque; a dependency or a big hand-rolled solver |
 
-## Decision (proposed)
+## Decision
 
-**A.**
+**A** (accepted, DM gate #335, with OQ-SHELL-58 A, -59 A, -60 B, -61 A, -62 A, -63 A, -64 B, OQ-MAP-63 A).
 
 1. **One entry point.** `settle(world, trigger)` in `play-shell/placer.ts`, pure and deterministic. Triggers: `load`, `open`, `reopen`, `appear` (incl. Start), `settle` (measured height), `viewport`, `push`, `return`, `drag-end`, `reset`. The manager applies the plan, and the canvas refits from it. No other code writes window geometry, except a user's own move or resize.
 2. **One ladder** = [FR-SHELL-97](../../specs/play-shell.md#6-functional-requirements) exactly. For any window the trigger must place, in order:
    1. **L1** target size, accepted (clear of windows and hard keep-outs, PC footprint + 4 px clear).
-   2. **L2** shrink it down to its **useful size**, then, iff OQ-SHELL-59 A, squeeze protected windows down to theirs.
-   3. **L2b**, iff OQ-SHELL-64 B (players, camera `fitted`): the map yields if every PC stays clear at ≥ 75 % of the last full fit's cell.
+   2. **L2** shrink it down to its **useful size**, then squeeze protected windows down to theirs (OQ-SHELL-59 A).
+   3. **L2b** (OQ-SHELL-64 B: players, camera `fitted`): the map yields if every PC stays clear at ≥ 75 % of the last full fit's cell.
    4. **L3** put away the least recently used launcher window when a look-ahead says that helps, then restart.
    5. **L4** below useful, down to min.
    6. **L5** least PC area, flagged.
 
-   #333 says "PCs clear, then shrink, then put away". "Not below their useful size unless nothing else works" is [sprint-8](../../agents/sprint-8.md)'s wording; the DM confirms it as a reading of #333. PC = a player character's token footprint + 4 px (#318), the same definition for the camera.
+   #333 says "PCs clear, then shrink, then put away". "Not below their useful size unless nothing else works" is [sprint-8](../../agents/sprint-8.md)'s wording; the DM confirmed it as the reading of #333 (#335). PC = a player character's token footprint + 4 px (#318), the same definition for the camera.
 3. **Zones.** Protected (default-open) windows sit at their named default rect for the current viewport, unless the user moved them or the rect covers a PC at the current camera (then the ladder, zone first). Launcher windows are placed around them. The map refits so tokens come out from under them (as Reset layout, FR-SHELL-80).
 4. **Least movement.** A trigger moves only the windows it displaces or that break an invariant. Ties prefer the window's previous rect.
 5. **Displacement memory.** A window moved, shrunk or put away by a transient cause (a tool bar, a smaller viewport) remembers its rect in client memory. When the cause goes, it returns if the user didn't touch it and the spot is clear. Without memory (after a reload), a shell-sized window grows toward its target size.
