@@ -1,8 +1,11 @@
 // `party.board` and `party.handout` window geometry (FR-PARTY-11, FR-PARTY-14; protocol §18 /
-// §24 rows); each client registers its own defs with its own bodies.
-import { ScrollIcon } from "lucide-react";
-import type { WindowDef } from "../play-shell/registry";
+// §24 rows); each client registers its own defs with its own bodies. Sprint 8: `party.summary`
+// (FR-SHELL-140, CB3), one def for both clients.
+import { HeartPulseIcon, ScrollIcon } from "lucide-react";
+import { defineWindow, type WindowDef } from "../play-shell/registry";
 import { handoutActivity, PARTY_BOARD_KIND, PARTY_HANDOUT_KIND } from "./logic";
+import { PartySummaryWindow } from "./Summary";
+import { PARTY_SUMMARY_KIND } from "./summary-logic";
 
 type Base = Omit<WindowDef, "component" | "clients">;
 
@@ -31,3 +34,22 @@ export const partyHandoutWindowBase = {
   minOpenH: 400,
   defaultOpen: false,
 } satisfies Base;
+
+/**
+ * FR-SHELL-140–142 "Party status": a launcher window right after Party, loads closed, never
+ * protected, no keep-out, no activity dot; grows to its rows (FR-SHELL-141: default 280 × 260,
+ * useful 280 × 236, min 240 × 120). WF's one placer picks its spot.
+ */
+export const partySummaryWindow = defineWindow({
+  kind: PARTY_SUMMARY_KIND,
+  title: "Party status",
+  clients: ["dm", "player"],
+  defaultSize: { w: 280, h: 260 },
+  minSize: { w: 240, h: 120 },
+  usefulSize: { w: 280, h: 236 },
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  defaultOpen: false,
+  growToContent: true,
+  launcher: { icon: HeartPulseIcon, label: "Party status", order: 58.5 },
+  component: PartySummaryWindow,
+});

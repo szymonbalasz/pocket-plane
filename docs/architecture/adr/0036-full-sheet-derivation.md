@@ -49,8 +49,9 @@
 | `down` | #154, FR-ENT-15 |
 | `level`, `className`, `species` | FR-CHARX-35 (OQ-CHARX-05) |
 | `deathState` | combat-extras (OQ-CBTX-09) |
+| `hpCurrent`, `hpMax`, `tempHp`, `ac` | party status ([ADR-0063](0063-party-hp-visibility.md), #335) |
 
-  No HP, AC, scores, counters or text. Decided with OQ-CHARX-05 and OQ-CBTX-09 (#178, G6).
+  No scores, counters or text; HP, temp HP and stored AC per [ADR-0063](0063-party-hp-visibility.md). Decided with OQ-CHARX-05 and OQ-CBTX-09 (#178, G6); amended by #335.
 
 ## Consequences
 

@@ -369,7 +369,7 @@ One table for imported, custom and character definitions ([ADR-0009](../architec
 - References into `entity` (token, combatant, encounter entry) resolve via `resolveDefinition(env, id)` (campaign = `env.actor.campaignId`, CON-35): global or same campaign, else `not_found` ([FR-ENT-12](../specs/entities.md#6-functional-requirements), [ADR-0018](../architecture/adr/0018-global-imported-content.md)).
 - Reads re-validate the JSON leaf: invalid stored row omitted from the snapshot + error log; a command on it → `internal` ([FR-ENT-01](../specs/entities.md#6-functional-requirements)).
 - *(feedback pass, built)* Character speed, scores and saves come from fixtures / `PUT /api/entities/:id` in MVP; no character edit UI (#154). Redacted characters carry a derived `down` (= `hpCurrent = 0`), computed in the visibility fn, not stored ([FR-ENT-15](../specs/entities.md#6-functional-requirements), #154).
-- *(sprint 1, built, fix/charx-core)* Other players get a character redacted to **one whitelist** (`RedactedCharacter` / `REDACTED_CHARACTER_KEYS` in `@shared/entities`, built by `redactCharacter`): `id, kind, name, portraitAssetId, ownerPlayerId, down, level, className, species` (null when unset) + `deathState` (*built, fix/cbtx-core*: `deathStateOf(hpCurrent, deathSuccesses, deathFailures)` in `@shared/combat-extras/rules`: `dead` at 3 failures, else `stable` at 0 HP with 3 successes, else `dying` at 0 HP, else null; never the counters or temp HP, [FR-CBTX-19/32](../specs/combat-extras.md#6-functional-requirements)) ([ADR-0036](../architecture/adr/0036-full-sheet-derivation.md), [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements)).
+- *(sprint 1, built, fix/charx-core)* Other players get a character redacted to **one whitelist** (`RedactedCharacter` / `REDACTED_CHARACTER_KEYS` in `@shared/entities`, built by `redactCharacter`): `id, kind, name, portraitAssetId, ownerPlayerId, down, level, className, species` (null when unset) + `deathState` (*built, fix/cbtx-core*: `deathStateOf(hpCurrent, deathSuccesses, deathFailures)` in `@shared/combat-extras/rules`: `dead` at 3 failures, else `stable` at 0 HP with 3 successes, else `dying` at 0 HP, else null; never the counters, [FR-CBTX-19/32](../specs/combat-extras.md#6-functional-requirements)) + *(sprint 8, built, build/cb-party)* `hpCurrent`, `hpMax` (`statBlock.hpMax`), `tempHp`, `ac` (the stored `statBlock.ac`) for party status ([ADR-0063](../architecture/adr/0063-party-hp-visibility.md), [FR-PARTY-52](../specs/party-board.md#6-functional-requirements); a PC hidden from players still shows them, OQ-PARTY-31 A) ([ADR-0036](../architecture/adr/0036-full-sheet-derivation.md), [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements)).
 - *(sprint 1, built)* Internal `createIn` / `updateIn` (entities' `POST` / `PUT` path minus HTTP and event) let CHARX write the row; `updateIn` takes an optional `hpCurrent` (FR-CHARX-15, `followHpMax`), still clamped. `PUT` keeps FR-ENT-11's clamp ([protocol §31](../protocol/README.md#31-sprint-1-character-sheet-full)).
 
 ## 12. Scenes: scene, scene folder, token
@@ -963,7 +963,7 @@ From [combat-extras](../specs/combat-extras.md) (CBTX, `complete`, #178; [ADR-00
 
 - **Constraints the DB enforces:** partial unique indexes on rows with `ended_at is null`: one `concentration` per target (`effect_one_concentration_combatant`, `…_character`), one `condition` per (target, key) (`effect_one_condition_combatant`, `…_character`); one index per target side because SQLite treats nulls as distinct. Indexes on campaign, encounter, each target, concentration; `seq` unique.
 - **Visibility** ([FR-CBTX-31](../specs/combat-extras.md#6-functional-requirements)): DM full; players **hidden** if `secret`, `hidden` or ended, else **redacted** `{id, kind, condition, level, label, targetCombatantId, targetCharacterId, encounterId, endsRound}` (`PlayerEffectRecord`, `redactEffect`, `effectVisibleToPlayers`). Snapshot: active effects only, not windowed (capped by FR-CBTX-04: ≤ 20 per target, ≤ 300 per campaign).
-- **Play state** ([§11](#11-scenes-entity), [§17](#17-combat-encounter-combatant-combat-log-entry)): `combatant.tempHp` (monsters; never to players), `entity.tempHp`, `deathSuccesses`, `deathFailures` (characters; DM + owner; others get the derived `deathState` only), `hp_change.tempBefore` / `tempAfter` / `deathBefore` / `deathAfter` / `noteIds`.
+- **Play state** ([§11](#11-scenes-entity), [§17](#17-combat-encounter-combatant-combat-log-entry)): `combatant.tempHp` (monsters; never to players), `entity.tempHp`, `deathSuccesses`, `deathFailures` (characters; DM + owner; others get the derived `deathState`, and since [ADR-0063](../architecture/adr/0063-party-hp-visibility.md) `tempHp`, never the counters), `hp_change.tempBefore` / `tempAfter` / `deathBefore` / `deathAfter` / `noteIds`.
 - **Derived** (never stored): `deathState` (FR-CBTX-19), rounds left (`endsRound − round`), bar fraction / tone, concentration DC, whether a PC is skipped (dead).
 - **Snapshot size** (CON-44): the heavy scenario carries 40 active effects (6 concentrations + 6 linked on PCs, 20 monster conditions, 4 secret, 4 hidden) + 20 soft-ended, max-length labels and UUID ids: ≈ 700 B per effect DM, ≈ 280 B player (CBTX §12 estimated 300 / 200 B with short strings). DM 746 KB (ceiling 768 KiB; effects 28 KB), each player ≈ 270 KB (512 KiB). At ≈ 700 B the 300-effect cap alone would add ≈ 210 KB to the DM frame. With the record type registered (build/combat-extras): DM 745,846 B (728.4 KiB; effects 40 rows, 28 KB), each player ≈ 263 KiB (effects 32 rows, 9 KB); only active effects are state (ended ones are history).
 
@@ -2442,7 +2442,19 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334,
 - **Persisted runtime state:** the rows above. Client memory only: the tray's Macros popover and editor drafts, the composer form.
 - **Fixtures:** `dicex-macros` (player-1: Sneak Attack 3d6 damage on Mira, Luck 1d100; DM: Bless 1d4, Inspiration 1d8 on Thorn → player-2's, Ambush 2d6 on the Elite Goblin Warrior, DM only), `dicex-request-open` (Perception to Mira + Thorn, DC 15 hidden, results hidden).
 
-## 115. Sprint 8: current-turn token highlight (CB2)
+## 115. Sprint 8: Party status (CB3)
+
+From [party-board](../specs/party-board.md#8-data-model) (sprint 8) and [ADR-0063](../architecture/adr/0063-party-hp-visibility.md) (#335). **Built by `build/cb-party`**. Protocol side: [protocol §145](../protocol/README.md#145-sprint-8-party-status--other-pcs-hp-temp-hp-ac-partysummary-window-cb3). **No table, column or record type.**
+
+| Field | Change | Rule | Source |
+|---|---|---|---|
+| Other-player character redaction (`RedactedCharacter`, [§372 row](#11-scenes-entity)) | + `hpCurrent`, `hpMax`, `tempHp`, `ac` | copies of `entity.hp_current`, `statBlock.hpMax`, `entity.temp_hp`, `statBlock.ac` in the visibility fn; never the death counters | FR-PARTY-52 |
+
+- **Derived (client, not stored):** row order, band tone and bar fraction, the turn marker, which companions list (present pets, owned combatants of the started encounter).
+- **Fixtures:** `cb-party-six` (3 PCs, worst-width figures; `wf-frame-e2e` only).
+- **CON-44** (heavy harness, measured): players +343 B, DM 0 B.
+
+## 116. Sprint 8: current-turn token highlight (CB2)
 
 From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-108–112 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-166. **Built by `build/cb-turn-ring`**: no table, column, record type or payload change. Protocol side: [protocol §145](../protocol/README.md#145-sprint-8-current-turn-token-highlight--turn-ring-cb2).
 
