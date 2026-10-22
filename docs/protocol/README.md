@@ -3243,3 +3243,18 @@ From [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBT
 - **Server registration:** `combatPolish` feature line (`src/server/features/combat-extras/move.ts`) in the server feature list.
 - **Fixtures:** units `cb-ties`, `cb-fog-goblin`, `cb-party` (join `session-sim-12`, sim-11-safe); bundle `combat-polish` (= `session-sim-11` + the three); e2e aliases `cb-reorder-e2e` (`e2e/cb-core.e2e.ts`), `cb-turn-ring-e2e`, `cb-party-e2e`.
 - **CON-44** (heavy harness, `con44-cb.test.ts`): `tieOrder` on 46 DM combatant rows → DM +736 B (null) / +635 B (all set), 691,492 B of 1.5 MiB; players 0 B (byte-identical, worst 289,088 B of 512 KiB).
+
+## 137. Sprint 8: drag to reorder initiative — DM client (CB1)
+
+No wire change: the drag and Move up / down send `cbtx.moveCombatant` ([§136](#136-sprint-8-combat-polish-core--cbtxmovecombatant-tie-order-cb0)); records, events and visibility as there. CON-44: 0 B (nothing stored).
+
+| Part | Behaviour | Test IDs | FR |
+|---|---|---|---|
+| Grip | lucide `GripVertical` at the left of every movable row (active, not removed, not riding its owner; hidden rows too); none on an attached companion (a fixed slot keeps names aligned). `tabIndex -1` (no new tab stop). Disabled while a move is in flight or not live; no movable row with a number → disabled, Tooltip "Roll initiative first" | `cbtx-init-row-grip` + `data-record-id` | FR-CBTX-62 |
+| Drag | primary press + 4 px → the row's block (row + rows riding it) lifts and follows the pointer inside the list; autoscroll within 24 px of the list's edges; pointer capture, no library. Esc, pointer cancel, lost capture, the start spot, a disconnect → nothing sent. Drop → one intent, not optimistic | — | FR-CBTX-62, -69 |
+| Drop line | between blocks only, never below the last numbered row, not at the start spot; `data-after` = anchor id or `top`. "→ n" when the drop changes the row's number, the rewritten rows ("Wolf → 17") in a tooltip under the line; both from `planMove` (pure, shared with the server) | `cbtx-init-drop`, `cbtx-init-drop-number`, `cbtx-init-drop-tip` | FR-CBTX-62, -65 |
+| Move up / down | first entries of the DM row menu; one block per step (up: anchor = the block two above, top when one above; down: the block below); disabled at the ends, on attached companions, below the last numbered row, in flight / not live | `cbtx-init-row-move-up`, `cbtx-init-row-move-down` + `data-record-id` | FR-CBTX-63 |
+| Crossing hint | after the move's ack, round ≥ 1, from the order before and after (client only): crossed the turn row upwards "Goblin now acts before Mira: no turn for it this round", downwards "… acts after Mira: it acts again this round", the moved block holds the turn "Mira's turn goes on; next: Goblin 2" (Next's row, skipping as Next does). Silent info toast | `cbt-init-move-hint` | FR-CBT-165 |
+| Players | unchanged: no grip, no items; rows re-sort by `playerPosition` | — | FR-CBTX-68 |
+
+- **Code:** `src/client/dm/features/combat-tracker/{reorder.ts (pure), reorder-drag.tsx, initiative-window.tsx}`, `src/client/dm/features/combat-extras/row.tsx` (`RowMoveItems`). E2E `e2e/cb-reorder.e2e.ts` on `cb-reorder-e2e` (after `cb-core.e2e.ts`, same server).
