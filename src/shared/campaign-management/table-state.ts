@@ -1,0 +1,41 @@
+// Per-campaign table state on the campaign row (CAMP sprint 8, FR-CAMP-46–48): the pause card and
+// the DM's alert-sound picks. JSON leaves, on the wire only when set (null / `{}` → no key).
+// Commands: `camp.setAlertSound` TT3, `camp.pause` / `camp.resume` TT4.
+import { z } from "zod";
+import { AssetId } from "../assets-pipeline/schemas";
+
+/** FR-CAMP-46: the pause message length. */
+export const PAUSE_MESSAGE_MAX = 200;
+/** FR-CAMP-47: "back in" choices, minutes. */
+export const BACK_IN_MINUTES = [5, 10, 15, 30] as const;
+
+/** FR-CAMP-46: `campaign.pause` (null = running); `backAt` / `startedAt` from `ctx.clock`. */
+export const CampaignPause = z.strictObject({
+  message: z.string().min(1).max(PAUSE_MESSAGE_MAX).nullable(),
+  imageAssetId: AssetId.nullable(),
+  backAt: z.string().nullable(),
+  startedAt: z.string(),
+});
+export type CampaignPause = z.infer<typeof CampaignPause>;
+
+/** FR-CAMP-48 (OQ-SHELL-72 A): the alerts that play a sound. */
+export const ALERT_KEYS = ["turn", "request", "pause", "resume"] as const;
+export const AlertKey = z.enum(ALERT_KEYS);
+export type AlertKey = z.infer<typeof AlertKey>;
+
+/** FR-CAMP-48: a picked sound, an audio asset ID or `none` (silent). */
+export const AlertSoundPick = z.union([AssetId, z.literal("none")]);
+export type AlertSoundPick = z.infer<typeof AlertSoundPick>;
+
+/** FR-CAMP-48: `campaign.alertSounds`; an absent key = the default (FR-SHELL-130, OQ-CAMP-36). */
+export const AlertSounds = z.strictObject({
+  turn: AlertSoundPick.optional(),
+  request: AlertSoundPick.optional(),
+  pause: AlertSoundPick.optional(),
+  resume: AlertSoundPick.optional(),
+});
+export type AlertSounds = z.infer<typeof AlertSounds>;
+
+/** True when no alert has a pick (the stored `{}`; no wire key). */
+export const noAlertSounds = (s: AlertSounds): boolean =>
+  ALERT_KEYS.every((k) => s[k] === undefined);

@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { HexColorInput } from "./colors";
 import { FeatureKey } from "./features";
+import { AlertSounds, CampaignPause } from "./table-state";
 
 // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the point (CAMP §11).
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
@@ -44,6 +45,10 @@ export const CampaignRecord = z.object({
   name: z.string(),
   dmColor: WireColor,
   features: z.array(z.string()).min(1).optional(),
+  /** FR-CAMP-46 (sprint 8): present only while paused. */
+  pause: CampaignPause.optional(),
+  /** FR-CAMP-48 (sprint 8): present only when some alert has a pick. */
+  alertSounds: AlertSounds.optional(),
 });
 export type CampaignRecord = z.infer<typeof CampaignRecord>;
 

@@ -69,6 +69,7 @@ import sessionSim8 from "./session-sim-8";
 import sessionSim9 from "./session-sim-9";
 import sessionSim10 from "./session-sim-10";
 import sessionSim11 from "./session-sim-11";
+import sessionSim12 from "./session-sim-12";
 import stats from "./stats";
 import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
@@ -171,6 +172,8 @@ export const bundles: readonly Bundle[] = [
   gemsCombatE2e,
   // Sprint 7 track ST (build/st-window)
   statsWindowE2e,
+  // Sprint 8 track TT (fix/tt-core): the sprint-8 gate bundle, each track appends its units
+  sessionSim12,
   // Sprint 8 track CB (fix/cb-core)
   combatPolish,
   cbReorderE2e,

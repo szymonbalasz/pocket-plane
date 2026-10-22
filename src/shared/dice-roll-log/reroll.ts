@@ -35,14 +35,25 @@ export interface RerollableEntry {
 }
 
 /**
+ * FR-DICE-80 (sprint 8, review A #3): a roll-request answer (`answer: true` on its items). Its
+ * entry is never rerollable (OQ-GEM-20 A); `gem.spend` answers `conflict`.
+ */
+export function isAnswerEntry(entry: Pick<RerollableEntry, "kind" | "payload">): boolean {
+  if (entry.kind !== ROLL_KIND) return false;
+  const items = RollEntryPayload.safeParse(entry.payload);
+  return items.success && items.data.some((i) => i.answer === true);
+}
+
+/**
  * FR-DICE-70: the first roll of a `roll` entry whose expression has a d20 term; null when the
- * entry is not a `roll`, is `initiative`, undone or superseded, or has no such roll.
+ * entry is not a `roll`, is `initiative`, undone or superseded, a request answer (FR-DICE-80), or
+ * has no such roll.
  */
 export function rerollableRoll(entry: RerollableEntry): string | null {
   if (entry.kind !== ROLL_KIND || entry.category === "initiative") return null;
   if (entry.undone || entry.supersededBy !== null) return null;
   const items = RollEntryPayload.safeParse(entry.payload);
-  if (!items.success) return null;
+  if (!items.success || items.data.some((i) => i.answer === true)) return null;
   return items.data.find((i) => hasD20Term(i.expression))?.rollId ?? null;
 }
 

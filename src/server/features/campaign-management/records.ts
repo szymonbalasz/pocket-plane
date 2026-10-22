@@ -1,20 +1,35 @@
 // Record types `campaign` and `player` (CAMP §9). Scope campaign; full for own campaign (sprint 5:
 // with `dmColor` / `color`, FR-CAMP-29).
 import { CampaignRecord, PlayerRecord } from "@shared/campaign-management/schemas";
+import {
+  type AlertSounds,
+  type CampaignPause,
+  noAlertSounds,
+} from "@shared/campaign-management/table-state";
 import { asc, eq, sql } from "drizzle-orm";
 import { campaign, player } from "../../db/schema";
 import { defineRecordType } from "../../ws/records";
 
-/** FR-CAMP-38: `features` only when some feature is on (all off = no key, 0 B). */
+/**
+ * The only mapping from a campaign row to the wire. FR-CAMP-38: `features` only when some feature
+ * is on (all off = no key, 0 B). *(Sprint 8)* FR-CAMP-46, -48: `pause` only while paused,
+ * `alertSounds` only when some alert has a pick. Callers pass the whole row, so an upsert from any
+ * command (rename, colour, switch) keeps both.
+ */
 export const toCampaignRecord = (row: {
   id: string;
   name: string;
   dmColor: string;
   features: readonly string[];
-}): CampaignRecord =>
-  row.features.length === 0
-    ? { id: row.id, name: row.name, dmColor: row.dmColor }
-    : { id: row.id, name: row.name, dmColor: row.dmColor, features: [...row.features] };
+  pause: CampaignPause | null;
+  alertSounds: AlertSounds;
+}): CampaignRecord => {
+  const rec: CampaignRecord = { id: row.id, name: row.name, dmColor: row.dmColor };
+  if (row.features.length > 0) rec.features = [...row.features];
+  if (row.pause !== null) rec.pause = { ...row.pause };
+  if (!noAlertSounds(row.alertSounds)) rec.alertSounds = { ...row.alertSounds };
+  return rec;
+};
 
 /**
  * The only mapping from a player row to anything synced: the token is dropped here. A null
@@ -44,6 +59,8 @@ export const campaignRecordType = defineRecordType<CampaignRecord>({
         name: campaign.name,
         dmColor: campaign.dmColor,
         features: campaign.features,
+        pause: campaign.pause,
+        alertSounds: campaign.alertSounds,
       })
       .from(campaign)
       .where(eq(campaign.id, v.campaignId))

@@ -1,5 +1,6 @@
 // Domain events of campaign-management (CAMP §9). Payloads never hold a link token or the DM secret.
 import { PaletteKey } from "@shared/campaign-management/colors";
+import { AlertKey } from "@shared/campaign-management/table-state";
 import { z } from "zod";
 import { defineEvent } from "./types";
 
@@ -62,6 +63,35 @@ export const PlayerColorSet = defineEvent({
 export const CampaignFeatureSet = defineEvent({
   type: "CampaignFeatureSet",
   payload: z.object({ feature: z.string(), on: z.boolean() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * FR-CAMP-47 (sprint 8, TT4): `camp.pause` (a new pause or an update of the card) /
+ * `camp.resume`: a `campaign` upsert to every connection, no forced resync. Logged, not undoable.
+ */
+export const CampaignPaused = defineEvent({
+  type: "CampaignPaused",
+  payload: z.object({ campaignId: z.string() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
+export const CampaignResumed = defineEvent({
+  type: "CampaignResumed",
+  payload: z.object({ campaignId: z.string() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * FR-CAMP-48 (sprint 8, TT3): `camp.setAlertSound`: a `campaign` upsert to every connection
+ * (players need the picked IDs; the library stays DM only). Logged, not undoable.
+ */
+export const AlertSoundSet = defineEvent({
+  type: "AlertSoundSet",
+  payload: z.object({ alert: AlertKey }).strict(),
   logged: true,
   undoable: false,
 });

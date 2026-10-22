@@ -2,26 +2,28 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 8 **Phase A** (specs), started 2026-10-21 ([sprint-8](sprint-8.md)).
+**Phase:** Sprint 8 **Phase B** (builds), gate 1 passed (#335) ([sprint-8](sprint-8.md)).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| WF spec | `spec/s8-wf` (w94) | spec-wf | in-review, seams + reviews applied | DM gate 1 |
-| TT spec | `spec/s8-tt` (w95) | spec-tt | in-review, seams + reviews applied | DM gate 1 |
-| SB spec | `spec/s8-sb` (w96) | spec-sb | in-review, seams + reviews applied | DM gate 1 |
-| CB spec | `spec/s8-cb` (w97) | spec-cb | in-review, seams + reviews applied | DM gate 1 |
+| WF1 placer core + replay harness | `fix/placer-core` (w98, slot 0) | build-wf1 | building | walkthrough F0–F5, F14 |
+| TT0 table-tools core (schema lane 1st) | `fix/tt-core` (w99, slot 2) | build-tt0 | building | thin walkthrough (raw intents) |
+| SB0 stats tier-B core | `build/sb-core` (w9A, slot 3) | build-sb0 | building | thin walkthrough (raw intents) |
+| CB0 combat core (schema lane 2nd) | `fix/cb-core` (w9B, slot 4) | build-cb0 | building | merges after TT0 |
 
-ID ranges: `%TEMP%/pocket-plane/briefs/s8-ranges.md` (computed on `db8fe53b`); briefs `spec-s8-*.md`.
+Queue (seams build plan, `.verify/sprint8/seams.md`): wave 2 WF4, TT1+2, TT3, CB1 · wave 3 WF2, WF3, TT4, SB1+2, CB3 · wave 4 CB2. Slice defs: `%TEMP%/pocket-plane/slices.json` (`wf1`, `tt0`, `sb0`, `cb0`).
 
 ## Shared-file locks
 
-- None (all sprint-7 branches merged; `fix/card-applied-leak` touches combat-tracker hp.ts only).
+- Frame (play-shell frame files, see slice WF1): `fix/placer-core`.
+- Schema lane: `fix/tt-core` first, then `fix/cb-core`.
+- `combat-tracker/hp.ts` + `log-kinds.ts` (`fell`): `build/sb-core`.
 
 ## Pending DM decisions
 
-- **Sprint 8 gate 1** (specs): `.verify/sprint8/gate.md` (picks, 4 proposed ADRs, build order; no new dependencies).
+- None (gate 1 passed, #335).
 
 ## Resolved locally (report at gate)
 

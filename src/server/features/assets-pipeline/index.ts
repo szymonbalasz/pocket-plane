@@ -2,7 +2,7 @@ import { realContext } from "../../commands/context";
 import type { Feature } from "../../services";
 import { backfillAssetTags } from "./backfill";
 import { ingestCommand } from "./commands";
-import { assetRecordType } from "./records";
+import { assetRecordType, audioAssetRecordType } from "./records";
 import { AssetStore, bindAssetStore } from "./store";
 import { deleteTag, renameTag, setTags } from "./tags";
 
@@ -18,6 +18,8 @@ export const assetsPipeline: Feature = {
     r.command(renameTag, { intent: true });
     r.command(deleteTag, { intent: true });
     r.recordType(assetRecordType);
+    // *(Sprint 8, TT0)* sounds: lazy DM-only type (FR-ASSET-57); probe, upload and serve are TT3.
+    r.recordType(audioAssetRecordType);
     // FR-ASSET-07: crash recovery on server start (never in the loader's preflight).
     r.onStart("asset-store-sweep", () => {
       store.sweep(s.db);

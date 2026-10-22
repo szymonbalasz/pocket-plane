@@ -1,5 +1,6 @@
 // assets.ingest (FR-ASSET-01, -03, -04, -06, -08, -09) and assets.require (FR-ASSET-15).
 import { createHash } from "node:crypto";
+import type { AssetKind } from "@shared/assets-pipeline/audio";
 import { AssetName, type AssetRecord, nameFromFilename } from "@shared/assets-pipeline/schemas";
 import { type DroppedTag, ImageTags } from "@shared/assets-pipeline/tags";
 import { AssetIngested, AssetListed, AssetTagsSet } from "@shared/events/assets-pipeline";
@@ -193,10 +194,16 @@ export function ingestCommand(store: AssetStore) {
 }
 
 /**
- * `assets.require(ctx, id)` (FR-ASSET-15): the asset of `actor.campaignId`, else `not_found`.
- * Every command that sets an asset-ID field calls it, incl. propagated copies in its transaction.
+ * `assets.require(ctx, id, {kind?})` (FR-ASSET-15, -59): the asset of `actor.campaignId`, else
+ * `not_found`; of `kind` (default `image`), else `invalid` (a sound as a map, an image as an alert
+ * sound). Every command that sets an asset-ID field calls it, incl. propagated copies in its
+ * transaction. A sound comes back in the `asset` shape too (image sizes 0); only its id is used.
  */
-export function requireAsset(env: { tx: Tx; actor: Actor }, id: string): AssetRecord {
+export function requireAsset(
+  env: { tx: Tx; actor: Actor },
+  id: string,
+  opts: { kind?: AssetKind } = {},
+): AssetRecord {
   const campaignId = env.actor.campaignId;
   const row = campaignId
     ? env.tx
@@ -206,6 +213,8 @@ export function requireAsset(env: { tx: Tx; actor: Actor }, id: string): AssetRe
         .get()
     : undefined;
   if (!row) throw notFound("Asset not found");
+  const kind = opts.kind ?? "image";
+  if (row.kind !== kind) throw invalid(kind === "audio" ? "Not a sound" : "Not an image");
   return toAssetRecord(row);
 }
 

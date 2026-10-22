@@ -155,7 +155,8 @@ export function assetRoutes(s: Services) {
           .select({ hash: asset.hash })
           .from(asset)
           .innerJoin(campaign, eq(asset.campaignId, campaign.id))
-          .where(and(eq(asset.id, id.data), eq(campaign.active, true)))
+          // Sprint 8 (FR-ASSET-56): a sound has no image files; its own route is TT3's.
+          .where(and(eq(asset.id, id.data), eq(campaign.active, true), eq(asset.kind, "image")))
           .get();
         if (!row) return c.json(NOT_FOUND_BODY, 404);
         // FR-ASSET-07: missing any file of the set → every file of the asset answers 404.
