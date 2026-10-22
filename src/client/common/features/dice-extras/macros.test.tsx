@@ -295,7 +295,8 @@ describe("TT1 macros (client)", () => {
     const dm = { role: "dm", playerId: null, campaignId: "c1" };
     const p1 = { role: "player", playerId: "p1", campaignId: "c1" };
     expect(tabs(dm, "elite", "monster")).toContain("dicex.macros");
-    expect(tabs(p1, "mira").at(-1)).toBe("dicex.macros");
+    // Seams S11: the tabs end "… Macros, Trophies" (stats' `order: 100`).
+    expect(tabs(p1, "mira").slice(-2)).toEqual(["dicex.macros", "stats.trophies"]);
     expect(tabs(p1, "thorn")).not.toContain("dicex.macros");
   });
 

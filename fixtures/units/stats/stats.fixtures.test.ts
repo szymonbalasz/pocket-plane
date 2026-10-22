@@ -273,6 +273,8 @@ describe("STATS §13 fixtures", () => {
     const b4 = t.s.db.select().from(combatant).where(eq(combatant.name, "Bandit 4")).get();
     expect(b4?.hpCurrent).toBe(11);
     expect(library.bundles.find((b) => b.name === "stats-b-e2e")?.includes).toEqual(["stats-b"]);
+    // SB1 + SB2's e2e alias (`e2e/stats-ui-b.e2e.ts` changes state on its own server).
+    expect(library.bundles.find((b) => b.name === "stats-b-ui-e2e")?.includes).toEqual(["stats-b"]);
   }, 60_000);
 
   test("session-sim-12 loads from empty; sb-past-bandits and sb-luck-rolls are session-sim-11-safe (no gems, Goblins untouched)", async () => {

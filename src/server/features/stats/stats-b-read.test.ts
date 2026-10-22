@@ -138,11 +138,13 @@ describe("FR-STATS-31 highlights in the fight ack", () => {
     expect(h.duration).toBe(2000);
   });
 
-  test("FR-STATS-52 default fight: a player's default is the started fight before a public fact", () => {
+  test("FR-STATS-52 default fight: a player's default is the started fight before a public fact, and it heads the picker as 'This fight'", () => {
     const t = statsSetup();
     t.hp("Goblin", "damage", 3, { from: "Elite Goblin Warrior" }); // DM-only so far
     const p = t.fight(t.p1);
-    expect(p.fights).toEqual([]);
+    // SB1 walkthrough: the picker lists it, so "This fight" can be picked again.
+    expect(p.fights).toEqual([{ key: t.enc.id, label: "This fight", status: "started" }]);
+    expect(t.fight(t.p1, t.enc.id).fights).toEqual(p.fights);
     expect(p.fight).toMatchObject({ key: t.enc.id, label: "This fight", status: "started" });
     expect(p.fight?.rows.map((r) => [r.name, r.dealt, r.taken])).toEqual([
       ["Mira", 0, 0],
@@ -151,6 +153,12 @@ describe("FR-STATS-31 highlights in the fight ack", () => {
     // By id too (the client's refresh names it).
     expect(t.fight(t.p1, t.enc.id).fight?.label).toBe("This fight");
     expect(JSON.stringify(p)).not.toContain("Ambush");
+    // A public fact lists it under its neutral label, once.
+    t.hp("Goblin", "damage", 2, { from: "Thorn" });
+    const after = t.fight(t.p1).fights.filter((x) => x.key === t.enc.id);
+    expect(after).toHaveLength(1);
+    expect(after[0]?.label).not.toBe("This fight");
+    expect(after[0]?.label).toStartWith("Fight ");
   });
 });
 

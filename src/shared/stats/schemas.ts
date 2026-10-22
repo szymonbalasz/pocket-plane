@@ -235,8 +235,8 @@ const fightOf = <R extends z.ZodType, H extends z.ZodType>(row: R, highlights: H
     round: Count,
     status: FightStatus,
     rows: z.array(row).max(FIGHT_ROWS_MAX),
-    /** Sprint 8 (FR-STATS-31): always sent by the server; optional so tier-A acks still parse. */
-    highlights: highlights.optional(),
+    /** Sprint 8 (FR-STATS-31): always sent; required (SB1: acks aren't stored, none predate it). */
+    highlights,
   });
 
 /** `fight` null = no fight yet (FR-STATS-24); `fights` = the picker, newest first. */

@@ -1,6 +1,7 @@
 // The Stats window's view state per viewer (campaign + DM / player): tab, picked fight, picked
-// session. Page memory only, never sent or stored (STATS §8: client view state); `openStatsAwards`
-// (FR-SHELL-94) writes it as a click would, so an open window switches at once.
+// session, Highlights open, Luck scope. Page memory only, never sent or stored (STATS §8: client
+// view state); `openStatsAwards` (FR-SHELL-94) and `openStatsFight` (FR-STATS-34) write it as a
+// click would, so an open window switches at once.
 import { createStore } from "zustand";
 import type { StatsTab } from "./logic";
 
@@ -10,9 +11,19 @@ export interface StatsView {
   fightKey: string | null;
   /** Null = the newest session. */
   sessionFromN: number | null;
+  /** FR-STATS-36: Highlights open; null = the default (open on an ended fight, closed on a started one). */
+  highlightsOpen: boolean | null;
+  /** FR-STATS-40: Luck scope; null = the newest session. */
+  luckScope: number | "campaign" | null;
 }
 
-export const DEFAULT_VIEW: StatsView = { tab: "fight", fightKey: null, sessionFromN: null };
+export const DEFAULT_VIEW: StatsView = {
+  tab: "fight",
+  fightKey: null,
+  sessionFromN: null,
+  highlightsOpen: null,
+  luckScope: null,
+};
 
 export const viewKey = (you: { campaignId: string; role: string; playerId: string | null }) =>
   `${you.campaignId}.${you.role === "dm" ? "dm" : (you.playerId ?? "unknown")}`;

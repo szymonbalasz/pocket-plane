@@ -1,10 +1,10 @@
-// Registry-driven facts for the Stats window (FR-SHELL-93, -94), asserted by each client's
+// Registry-driven facts for the Stats window (FR-SHELL-93, -94, FR-STATS-34), asserted by each client's
 // `features/stats/windows.test.ts` on its own registry. Test support, no React.
 import type { You } from "@shared/protocol/frames";
 import { defaultLayout, reduce } from "../play-shell/manager";
 import type { WindowRegistry } from "../play-shell/registry";
 import { STATS_WINDOW_KIND } from "./logic";
-import { openStatsAwards } from "./open";
+import { type OpenWindowFn, openStatsAwards, openStatsFight } from "./open";
 import { createViewState, viewKey } from "./view";
 
 const VP = { w: 1440, h: 900 };
@@ -27,8 +27,14 @@ export function statsDefFacts(registry: WindowRegistry) {
     : null;
 }
 
-/** FR-SHELL-94: `openStatsAwards(7)` on a closed, a minimised and an open window. */
-export function openStatsAwardsRuns(registry: WindowRegistry, you: You) {
+type Opener = (deps: {
+  you: You;
+  views: ReturnType<typeof createViewState>;
+  open: OpenWindowFn;
+}) => void;
+
+/** One feature open on a closed, a minimised and an open (covered) window. */
+function openRuns(registry: WindowRegistry, you: You, run: Opener) {
   const ctx = { registry, viewport: VP, available: new Set(registry.defs.map((d) => d.kind)) };
   const base = defaultLayout(registry, VP);
   const opened = reduce(base, { type: "open", kind: STATS_WINDOW_KIND }, ctx);
@@ -44,7 +50,7 @@ export function openStatsAwardsRuns(registry: WindowRegistry, you: You) {
     views.set(viewKey(you), { tab: "fight", fightKey: "enc-1" });
     let next = ws;
     const calls: { kind: string; by: string | undefined }[] = [];
-    openStatsAwards(7, {
+    run({
       you,
       views,
       open: (kind, instance, opts) => {
@@ -62,3 +68,11 @@ export function openStatsAwardsRuns(registry: WindowRegistry, you: You) {
     };
   });
 }
+
+/** FR-SHELL-94: `openStatsAwards(7)` on a closed, a minimised and an open window. */
+export const openStatsAwardsRuns = (registry: WindowRegistry, you: You) =>
+  openRuns(registry, you, (deps) => openStatsAwards(7, deps));
+
+/** FR-STATS-34: `openStatsFight("enc-9")` (the End summary) on a closed, a minimised and an open window. */
+export const openStatsFightRuns = (registry: WindowRegistry, you: You) =>
+  openRuns(registry, you, (deps) => openStatsFight("enc-9", deps));
