@@ -185,6 +185,8 @@ export const setCompanionCommand = defineCommand({
     }
     // FR-CBT-99 / -111: an explicit side is an open change (turn hostile: `enemy`).
     if (side !== undefined) Object.assign(set, { side, publicSide: side });
+    // FR-CBT-163 (c) (sprint 8): an owner change, release or Turn hostile drops the tie slot.
+    Object.assign(set, { tieOrder: null });
     tx.update(combatant).set(set).where(eq(combatant.id, before.id)).run();
     rerank(tx, enc.id);
     const encAfter = syncPlayerTurn(env, enc.id);

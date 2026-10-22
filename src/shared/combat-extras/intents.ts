@@ -29,6 +29,8 @@ export const CBTX_INTENTS = {
   addCombatants: "cbtx.addCombatants",
   /** FR-CBTX-45 (sprint 2): schema here; the command lands in fix/combat2-add. */
   bindToken: "cbtx.bindToken",
+  /** FR-CBTX-64 (sprint 8): drag / Move up / down in Initiative. */
+  moveCombatant: "cbtx.moveCombatant",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -197,6 +199,16 @@ export type AddCombatantsInput = z.input<typeof AddCombatantsInput>;
  */
 export const BindTokenInput = z.strictObject({ combatantId: Id, tokenId: Id.nullable() });
 export type BindTokenInput = z.input<typeof BindTokenInput>;
+/**
+ * FR-CBTX-64 (sprint 8): drop `combatantId` right after `afterId` (null = top) in the started
+ * encounter's Initiative (DM). Emits `CombatantMoved`; the same order → ack, no event.
+ */
+export const MoveCombatantInput = z.strictObject({
+  encounterId: Id,
+  combatantId: Id,
+  afterId: Id.nullable(),
+});
+export type MoveCombatantInput = z.input<typeof MoveCombatantInput>;
 export const CombatantIdsResult = z.object({ combatantIds: z.array(z.string()) });
 export type CombatantIdsResult = z.infer<typeof CombatantIdsResult>;
 

@@ -233,6 +233,11 @@ export const CombatantRecord = z.object({
    */
   side: Side.nullable(),
   publicSide: Side.nullable(),
+  /**
+   * FR-CBTX-66 (sprint 8): the DM's order inside a tie, 1…k; null = default rules (FR-CBT-162).
+   * DM only: no player view carries it (FR-CBTX-67).
+   */
+  tieOrder: z.int().min(1).nullable().default(null),
   ...companionFields,
 });
 export type CombatantRecord = z.infer<typeof CombatantRecord>;
