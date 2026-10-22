@@ -3,9 +3,9 @@
 // change only by the undo marker; `raw`, `applied`, `overkill`, `hpBefore`, `hpAfter`, the temp
 // fields and `entryId` keep their meaning (FR-CBT-22, FR-CBTX-15). Stats never write combat rows.
 import type { StatsFact, StatsSide } from "@shared/stats/rules";
-import { and, asc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
 import type { Tx } from "../../db/client";
-import { combatant, encounter, gameLogEntry, hpChange } from "../../db/schema";
+import { combatant, encounter, entity, gameLogEntry, hpChange, token } from "../../db/schema";
 
 type Read = Pick<Tx, "select">;
 
@@ -71,17 +71,39 @@ function encounterNames(db: Read, ids: readonly string[]): Map<string, string> {
   return out;
 }
 
+/** The encounters named by a campaign's log lines in `fromN…toN` (every outcome line names its). */
+function rangeEncounters(
+  db: Read,
+  scope: { campaignId: string; fromN: number; toN: number },
+): string[] {
+  const rows = db
+    .select({ id: gameLogEntry.encounterId })
+    .from(gameLogEntry)
+    .where(
+      and(
+        eq(gameLogEntry.campaignId, scope.campaignId),
+        gte(gameLogEntry.n, scope.fromN),
+        lte(gameLogEntry.n, scope.toN),
+      ),
+    )
+    .all();
+  return [...new Set(rows.flatMap((r) => (r.id ? [r.id] : [])))];
+}
+
 /**
  * FR-CBT-138: the non-undone `hp_change` rows of one encounter, or of a campaign whose lines are
  * in an `n` range, in log order, joined with their line's `public` / `n` / kind, the
  * attacker's and target's current kind, owner and hidden flags, and the encounter name.
  */
 export function combatFacts(db: Read, scope: FactsScope): CombatFact[] {
+  // A range reads the encounters its lines name (on the `(campaign_id, n)` index), then their
+  // facts on `hp_change_encounter`: `hp_change` has no campaign / entry index, so a campaign-wide
+  // filter would scan every fact (FR-STATS-46's chunks, FR-STATS-51).
   const where =
     "encounterId" in scope
       ? eq(hpChange.encounterId, scope.encounterId)
       : and(
-          eq(hpChange.campaignId, scope.campaignId),
+          inArray(hpChange.encounterId, rangeEncounters(db, scope)),
           gte(gameLogEntry.n, scope.fromN),
           lte(gameLogEntry.n, scope.toN),
         );
@@ -152,6 +174,8 @@ export interface FightRow {
   status: "started" | "ended";
   round: number;
   startedAt: string;
+  /** Null while started. */
+  endedAt: string | null;
 }
 
 /** The campaign's started and ended encounters, oldest `startedAt` first (planned never count). */
@@ -163,6 +187,7 @@ export function fightsOf(db: Read, campaignId: string): FightRow[] {
       status: encounter.status,
       round: encounter.round,
       startedAt: encounter.startedAt,
+      endedAt: encounter.endedAt,
     })
     .from(encounter)
     .where(and(eq(encounter.campaignId, campaignId), ne(encounter.status, "planned")))
@@ -216,4 +241,117 @@ export function factRefs(db: Read, campaignId: string): FactRef[] {
     .innerJoin(gameLogEntry, eq(gameLogEntry.id, hpChange.entryId))
     .where(and(eq(hpChange.campaignId, campaignId), eq(hpChange.undone, false)))
     .all();
+}
+
+/**
+ * FR-CBT-153 / FR-STATS-33: one indexed existence query on `hp_change_encounter` at End: does the
+ * encounter have a counted (non-undone) fact, and one whose line is public?
+ */
+export function fightFactPresence(
+  db: Read,
+  encounterId: string,
+): { counted: boolean; public: boolean } {
+  const row = db
+    .select({
+      // Raw names: inside select fields drizzle drops the table prefix (ambiguous columns).
+      counted: sql<number>`exists (select 1 from hp_change h where h.encounter_id = ${encounterId} and h.undone = 0)`,
+      public: sql<number>`exists (select 1 from hp_change h join game_log_entry e on e.id = h.entry_id where h.encounter_id = ${encounterId} and h.undone = 0 and e.public = 1)`,
+    })
+    .from(encounter)
+    .where(eq(encounter.id, encounterId))
+    .get();
+  return { counted: Boolean(row?.counted), public: Boolean(row?.public) };
+}
+
+/**
+ * FR-STATS-32: the actors a fight's rolls are attributed by: its combatants' entities (a PC's
+ * character, a monster's definition) and tokens.
+ */
+export function fightActorIds(db: Read, encounterId: string): Set<string> {
+  const rows = db
+    .select({ entityId: combatant.entityId, tokenId: combatant.tokenId })
+    .from(combatant)
+    .where(eq(combatant.encounterId, encounterId))
+    .all();
+  return new Set(rows.flatMap((r) => (r.tokenId ? [r.entityId, r.tokenId] : [r.entityId])));
+}
+
+export interface StandingRow {
+  id: string;
+  name: string;
+  hidden: boolean;
+}
+
+/**
+ * FR-STATS-31 (DM only): the fight's monsters still standing: not companions, not removed, HP
+ * above 0 (unknown HP counts as standing), in initiative-list order.
+ */
+export function standingOf(db: Read, encounterId: string): StandingRow[] {
+  return db
+    .select({
+      id: combatant.id,
+      name: combatant.name,
+      hidden: combatant.hidden,
+      ownerCharacterId: combatant.ownerCharacterId,
+      removed: combatant.removed,
+      hpCurrent: combatant.hpCurrent,
+    })
+    .from(combatant)
+    .where(and(eq(combatant.encounterId, encounterId), eq(combatant.kind, "monster")))
+    .orderBy(asc(combatant.seq))
+    .all()
+    .filter((c) => c.ownerCharacterId === null && !c.removed && (c.hpCurrent ?? 1) > 0)
+    .map((c) => ({ id: c.id, name: c.name, hidden: c.hidden }));
+}
+
+/** The campaign's owned creatures as roll actors (ADR-0056: a pet, summon or companion). */
+export interface OwnedActors {
+  /** Pet entities (`companionOf` set). */
+  entities: Set<string>;
+  /** Tokens with an owning player. */
+  tokens: Set<string>;
+  /** `${encounterId}|${entityId}|${name}` of combatants with an owner (combat rolls name them). */
+  combatants: Set<string>;
+  /**
+   * `${entityId}|${name}` of owned combatants that no unowned combatant shares: a roll whose line
+   * names no encounter (the DM's `dice.roll` as a combatant).
+   */
+  named: Set<string>;
+}
+
+export const ownedCombatantKey = (encounterId: string, entityId: string, name: string) =>
+  `${encounterId}|${entityId}|${name}`;
+
+/** Every owned creature of a campaign now (current owner, FR-STATS-09): three small reads. */
+export function ownedActors(db: Read, campaignId: string): OwnedActors {
+  const entities = db
+    .select({ id: entity.id })
+    .from(entity)
+    .where(and(eq(entity.campaignId, campaignId), isNotNull(entity.companionOf)))
+    .all();
+  const tokens = db
+    .select({ id: token.id })
+    .from(token)
+    .where(and(eq(token.campaignId, campaignId), isNotNull(token.ownerPlayerId)))
+    .all();
+  const all = db
+    .select({
+      e: combatant.encounterId,
+      entityId: combatant.entityId,
+      name: combatant.name,
+      owner: combatant.ownerCharacterId,
+    })
+    .from(combatant)
+    .where(eq(combatant.campaignId, campaignId))
+    .all();
+  const owned = all.filter((c) => c.owner !== null);
+  const unowned = new Set(
+    all.filter((c) => c.owner === null).map((c) => `${c.entityId}|${c.name}`),
+  );
+  return {
+    entities: new Set(entities.map((r) => r.id)),
+    tokens: new Set(tokens.map((r) => r.id)),
+    combatants: new Set(owned.map((c) => ownedCombatantKey(c.e, c.entityId, c.name))),
+    named: new Set(owned.map((c) => `${c.entityId}|${c.name}`).filter((k) => !unowned.has(k))),
+  };
 }
