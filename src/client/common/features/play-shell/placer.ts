@@ -1102,7 +1102,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       break;
     }
     case "return": {
+      // A cause ended (a keep-out went, a kind closed or ended): its windows come back; then
+      // shell-shrunk windows grow toward their target where room returned (FR-SHELL-102).
       returns();
+      growBack();
       break;
     }
     case "drag-end": {

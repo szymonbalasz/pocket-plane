@@ -6,7 +6,7 @@
 import { expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { replayCells, runReplay } from "@ui/features/play-shell/replay";
+import { REPROS, replayCells, runReplay } from "@ui/features/play-shell/replay";
 
 const { playerWindows } = await import("../../windows");
 
@@ -31,6 +31,19 @@ for (const c of cells) {
       expect(run.problems).toEqual([]);
       // I8: the same inputs give the same steps.
       expect(runReplay(playerWindows, c.set, c.camera, c.vp, c.path).steps).toEqual(run.steps);
+    },
+    15_000,
+  );
+}
+
+// FR-SHELL-116's named repro cases (the same cells, under their sim / backlog names).
+for (const r of REPROS.player) {
+  const c = cells.find((x) => x.name === r.cell);
+  if (!c) throw new Error(`no cell ${r.cell}`);
+  (FAILING.has(c.name) ? test.failing : test)(
+    `FR-SHELL-116 repro ${r.name}`,
+    () => {
+      expect(runReplay(playerWindows, c.set, c.camera, c.vp, c.path).problems).toEqual([]);
     },
     15_000,
   );

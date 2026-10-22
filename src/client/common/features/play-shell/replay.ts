@@ -674,6 +674,8 @@ export function runReplay(
       // End: the fight goes (the player's Initiative with it), then Start "Escort to the Ford".
       let before = windowsOf(sim);
       sim.combat = false;
+      // The page dispatches `return` when a kind goes (FR-SHELL-102).
+      dispatch(sim, { type: "return" });
       record("End", check(sim, before));
       before = windowsOf(sim);
       sim.state = "escort";
@@ -715,3 +717,40 @@ export function replayCells(registry: WindowRegistry) {
   }
   return out;
 }
+
+/**
+ * FR-SHELL-116's repro cases: the cells that replay them (sim-11 g is BL-64; the push repro is
+ * WF2's, the reveal and load ones WF3's camera).
+ */
+export const REPROS: Record<ShellClient, readonly { name: string; cell: string }[]> = {
+  dm: [
+    {
+      name: "sim-11 g, BL-64 (D1 escort @1280×720)",
+      cell: replayName("D1", "fitted", { w: 1280, h: 720 }, "open"),
+    },
+    {
+      name: "sim-10 b00 (D2 @1440×900 Start)",
+      cell: replayName("D2", "fitted", { w: 1440, h: 900 }, "Start"),
+    },
+    {
+      name: "BL-60 (D1 1440×900 → 1280×720 → 1440×900)",
+      cell: replayName("D1", "fitted", { w: 1440, h: 900 }, "resize"),
+    },
+    { name: "BL-61 (D2 push)", cell: replayName("D2", "fitted", { w: 1440, h: 900 }, "push") },
+  ],
+  player: [
+    {
+      name: "sim-11 h (P1 reveal @1280×800)",
+      cell: replayName("P1", "fitted", { w: 1280, h: 800 }, "reveal"),
+    },
+    { name: "sim-11 r03 (P1 load)", cell: replayName("P1", "fitted", { w: 1280, h: 800 }, "load") },
+    {
+      name: "BL-66 (P1 open @1280×800)",
+      cell: replayName("P1", "fitted", { w: 1280, h: 800 }, "open"),
+    },
+    {
+      name: "BL-70 (P1 Start @1280×800)",
+      cell: replayName("P1", "fitted", { w: 1280, h: 800 }, "Start"),
+    },
+  ],
+};
