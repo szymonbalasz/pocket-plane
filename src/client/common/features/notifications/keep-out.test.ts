@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dmStackLefts, dmStackPlacement, pushedByPlan, STACK_W } from "./keep-out";
+import { dmStackLefts, dmStackPlacement, dmStackSpot, pushedByPlan, STACK_W } from "./keep-out";
 
 describe("FR-NOTE-32 toast keep-out", () => {
   const top = 48 + 12 + 32 + 8;
@@ -179,6 +179,11 @@ const COMPENDIUM = { x: 164, y: 172, w: 344, h: 400 };
 const PARTY = { x: 576, y: 60, w: 440, h: 512 };
 const DRAGON = { x: 70, y: 100, w: 90, h: 90 };
 const GOBLIN_2 = { x: 300, y: 330, w: 45, h: 45 };
+/**
+ * A window filling the left of the band (walkthrough WF4): with it, no spot beside a window in
+ * the band is clear, so FR-NOTE-44's strip rule decides on Scenes' body.
+ */
+const LEFT_COL = { x: 68, y: 60, w: 466, h: 500 };
 /** The Fog bar wrapped at its home spot (1440×900, FR-FOG-58). */
 const FOG_BAR = { x: 62, y: 56, w: 472, h: 92 };
 
@@ -186,20 +191,20 @@ describe("FR-NOTE-42 stack stays home", () => {
   const vp = { w: 1440, h: 900 };
 
   // a01: with windows open the summary (320 × 57) jumped to x 68, over the Dragon.
-  test("FR-NOTE-42 stack stays home: sim-9 a01 → the home (560), never x 68; moves down past Party instead of sideways", () => {
+  test("FR-NOTE-42 stack stays home: sim-9 a01 → never x 68; down past Party first, beside it only to clear its body (walkthrough WF4)", () => {
     const windows = [LOG, COMPENDIUM, PARTY];
-    const at = dmStackPlacement(vp, INIT, 57, STACK_W, [GOBLIN_2], windows);
-    expect(at.left).toBe(560);
+    // Party's body under the home and the Game log below it: beside Party (left), no body.
+    const at = dmStackSpot(vp, INIT, 57, STACK_W, [GOBLIN_2], windows);
+    expect(at).toMatchObject({ left: 576 - 12 - STACK_W, top: 100, covers: 0 });
     expect(hit(rectOf(at, 57), DRAGON)).toBe(false);
-    for (const w of windows) expect(hit(rectOf(at, 57), { ...w, h: 32 })).toBe(false);
-    // Without the Game log below it: below Party's body, still at the home.
+    for (const w of windows) expect(hit(rectOf(at, 57), w)).toBe(false);
+    // Without the Game log below it: below Party's body, still at the home (down before aside).
     const down = dmStackPlacement(vp, INIT, 57, STACK_W, [GOBLIN_2], [COMPENDIUM, PARTY]);
     expect(down).toEqual({ left: 560, top: 60 + 512 + 8 });
-    // Two cards (300 high) no longer fit below Party: home, on Party's body, never beside it.
-    expect(dmStackPlacement(vp, INIT, 300, STACK_W, [GOBLIN_2], windows)).toEqual({
-      left: 560,
-      top: 100,
-    });
+    // Two cards (300 high) fit nowhere clear: home, on Party's body (`covers` > 0: the runtime
+    // folds a toast into "+N more" first).
+    const tall = dmStackSpot(vp, INIT, 300, STACK_W, [GOBLIN_2], windows);
+    expect(tall.covers).toBeGreaterThan(0);
   });
 
   test("FR-NOTE-42 stack stays home: FR-NOTE-32 unchanged (shift left of Initiative, below it when no room)", () => {
@@ -230,7 +235,7 @@ describe("FR-NOTE-42 stack stays home", () => {
     expect(at.left).toBe(560);
   });
 
-  test("FR-NOTE-42 stack stays home: every chosen left ∈ {home, left-of-Initiative shift} at the four sizes", () => {
+  test("FR-NOTE-42 stack stays home: every chosen left ∈ {home, left-of-Initiative shift, beside a window over the home column} at the four sizes", () => {
     expect(SIZES.map((s) => dmStackLefts(s, null))).toEqual([[480], [480], [560], [640]]);
     for (const size of SIZES) {
       const home = (size.w - STACK_W) / 2;
@@ -249,7 +254,7 @@ describe("FR-NOTE-42 stack stays home", () => {
               ]) {
                 for (const hard of [[], [FOG_BAR]]) {
                   const at = dmStackPlacement(size, initiative, h, STACK_W, avoid, windows, hard);
-                  expect(lefts).toContain(at.left);
+                  expect(dmStackLefts(size, initiative, STACK_W, windows)).toContain(at.left);
                 }
               }
             }
@@ -278,12 +283,12 @@ describe("FR-NOTE-43 never over a tool bar", () => {
   });
 
   // b01: 6 of 16 Fog bar controls under the summary at 68..388 × 100..157.
-  test("FR-NOTE-43 never over a tool bar: sim-9 b01 (Scenes pushed to 546, Fog tool) → no overlap, at the home", () => {
+  test("FR-NOTE-43 never over a tool bar: sim-9 b01 (Scenes pushed to 546, Fog tool) → no overlap, never x 68", () => {
     const scenes = { x: 546, y: 61, w: 260, h: 440 };
     for (const h of [57, 190]) {
       const at = dmStackPlacement(vp, INIT, h, STACK_W, [GOBLIN_2], [LOG, scenes], [FOG_BAR]);
       expect(hit(rectOf(at, h), FOG_BAR)).toBe(false);
-      expect(at.left).toBe(560);
+      expect(at.left).toBeGreaterThan(68);
     }
     // 1280×720: the bar (≤ 390 wide) ends before the home (480).
     const small = { w: 1280, h: 720 };
@@ -321,12 +326,24 @@ describe("FR-NOTE-44 never over a pushed window's first row", () => {
       { x: 600, y: 460, w: 45, h: 45 },
       { x: 600, y: 520, w: 45, h: 45 },
     ];
-    const at = dmStackPlacement(vp, INIT, 57, STACK_W, targets, [LOG, scenes], [FOG_BAR]);
+    const at = dmStackSpot(vp, INIT, 57, STACK_W, targets, [LOG, scenes], [FOG_BAR]);
     expect(hit(rectOf(at, 57), strip)).toBe(false);
     expect(hit(rectOf(at, 57), FOG_BAR)).toBe(false);
-    expect(at).toEqual({ left: 560, top: 60 + 72 + 8 }); // at home (FR-NOTE-42), below the strip
+    // Walkthrough WF4: beside Scenes, below the bar, off every body (b05: on Scenes' first row).
+    expect(at).toMatchObject({ left: 546 - 12 - STACK_W, top: 56 + 92 + 8, covers: 0 });
+    // Nothing clear beside Scenes (the left column taken): home, below the strip.
+    const blocked = dmStackPlacement(
+      vp,
+      INIT,
+      57,
+      STACK_W,
+      targets,
+      [LOG, LEFT_COL, scenes],
+      [FOG_BAR],
+    );
+    expect(blocked).toEqual({ left: 560, top: 60 + 72 + 8 });
     // No tool bar shown (nothing pushed): only the title bar blocks, as before (b05's spot).
-    const free = dmStackPlacement(vp, INIT, 57, STACK_W, targets, [LOG, scenes], []);
+    const free = dmStackPlacement(vp, INIT, 57, STACK_W, targets, [LOG, LEFT_COL, scenes], []);
     expect(free).toEqual({ left: 560, top: 60 + 32 + 8 });
   });
 
@@ -350,15 +367,17 @@ describe("FR-NOTE-44 walkthrough U4 (20261021-fu1-frame): Scenes' first row stay
   const probe = { x: 658, y: 162 }; // the row's centre (elementFromPoint)
   // The card's target under the lower spots (what made the stack take 140 in the run).
   const target = [{ x: 560, y: 300, w: 320, h: 280 }];
+  // Walkthrough WF4: a window left of Scenes below the bar, so nothing beside Scenes is clear.
+  const left = { x: 68, y: 214, w: 466, h: 360 };
   const inside = (p: { x: number; y: number }, r: Box) =>
     p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
 
   test("FR-NOTE-44 toast clear of a pushed window's first row: with the row reported, the stack clears title bar + 40 px and the row; the row's centre isn't under it", () => {
-    // The walkthrough's spot without the row report: below title + 40 (133) at 140, on the row.
-    const before = dmStackPlacement(vp, init, 152, STACK_W, target, [log, scenes], [bar], []);
-    expect(before.top).toBe(140);
+    // The walkthrough's spot without the row report: below title + 40 (132), on the row.
+    const before = dmStackPlacement(vp, init, 152, STACK_W, target, [log, left, scenes], [bar], []);
+    expect(before.top).toBeGreaterThanOrEqual(60 + 72);
     expect(inside(probe, rectOf(before, 152))).toBe(true);
-    const at = dmStackPlacement(vp, init, 152, STACK_W, target, [log, scenes], [bar], [row]);
+    const at = dmStackPlacement(vp, init, 152, STACK_W, target, [log, left, scenes], [bar], [row]);
     expect(inside(probe, rectOf(at, 152))).toBe(false);
     expect(hit(rectOf(at, 152), { ...scenes, h: row.bottom - scenes.y })).toBe(false);
     expect(hit(rectOf(at, 152), bar)).toBe(false);
@@ -370,15 +389,15 @@ describe("FR-NOTE-44 walkthrough U4 (20261021-fu1-frame): Scenes' first row stay
       152,
       STACK_W,
       target,
-      [log, scenes],
+      [log, left, scenes],
       [bar],
       [{ x: 68, y: 60, bottom: 179 }],
     );
     expect(stale).toEqual(before);
     // No tool bar: rows don't count (only title bars, as before).
-    expect(dmStackPlacement(vp, init, 152, STACK_W, target, [log, scenes], [], [row]).top).toBe(
-      100,
-    );
+    expect(
+      dmStackPlacement(vp, init, 152, STACK_W, target, [log, left, scenes], [], [row]).top,
+    ).toBe(100);
   });
 });
 
@@ -404,13 +423,72 @@ describe("FR-NOTE-53 stack reads the plan", () => {
     ];
     // Pushed per the plan, no bar in the list: below its title bar + 40 px.
     const log = { ...LOG, pushed: false };
-    const plan = [log, { ...scenes, pushed: true }];
+    const col = { ...LEFT_COL, pushed: false };
+    const plan = [log, col, { ...scenes, pushed: true }];
     const pushed = dmStackPlacement(vp, INIT, 57, STACK_W, targets, plan, []);
     expect(pushed).toEqual({ left: 560, top: 60 + 72 + 8 });
     // Not pushed (a window the user dropped there) while the Fog bar shows: its title bar only.
-    const dropped = [log, { ...scenes, pushed: false }];
+    const dropped = [log, col, { ...scenes, pushed: false }];
     const user = dmStackPlacement(vp, INIT, 57, STACK_W, targets, dropped, [FOG_BAR]);
     expect(user).toEqual({ left: 560, top: 60 + 32 + 8 });
     expect(hit(rectOf(user, 57), FOG_BAR)).toBe(false);
+  });
+});
+
+describe("FR-NOTE-42 windows in the home band (walkthrough WF4)", () => {
+  const vp = { w: 1440, h: 900 };
+  const init = { x: 1028, y: 60, w: 400, h: 500 };
+  // DM 1440×900: Stats auto-placed at 555,60 under the home spot; the Game log below.
+  const stats = { x: 555, y: 60, w: 400, h: 412 };
+  const log = { x: 68, y: 584, w: 1150, h: 240 };
+
+  test("FR-NOTE-42 home band: a window under the home spot is treated like Initiative: the stack never covers its controls while a clear spot exists (below it, else beside it)", () => {
+    const at = dmStackSpot(vp, init, 57, STACK_W, [], [stats, log]);
+    expect(at.covers).toBe(0);
+    expect(hit(rectOf(at, 57), stats)).toBe(false);
+    expect(at).toMatchObject({ left: 560, top: 60 + 412 + 8 }); // down first (FR-NOTE-42)
+    // Taller (2 cards): nothing below fits above the Game log → beside Stats, off every body.
+    const two = dmStackSpot(vp, init, 190, STACK_W, [], [stats, log]);
+    expect(two).toMatchObject({ left: 555 - 12 - STACK_W, top: 100, covers: 0 });
+  });
+
+  test("FR-NOTE-42 home band: no clear spot (Notifications on the left, Initiative right, Game log below) → `covers` > 0, so the runtime folds toasts into '+N more'", () => {
+    const notes = { x: 68, y: 92, w: 360, h: 478 };
+    const at = dmStackSpot(vp, init, 375, STACK_W, [], [notes, stats, log]);
+    expect(at.covers).toBeGreaterThan(0);
+    // Folded to the summary + one card (≈ 150 px): still on a body (a full screen); folded to
+    // the summary alone it fits below Stats.
+    expect(dmStackSpot(vp, init, 57, STACK_W, [], [notes, stats, log]).covers).toBe(0);
+  });
+});
+
+describe("FR-NOTE-50 toast policy: dialogs (walkthrough T4)", () => {
+  const vp = { w: 1440, h: 900 };
+  // The HP dialog at 496,293 448×314; the DM stack keeps off it like a hard keep-out.
+  const dialog = { x: 496, y: 293, w: 448, h: 314 };
+
+  test("FR-NOTE-50 toast policy: an open dialog keeps the DM stack off it (above it while it fits, else below), never under or over it", () => {
+    const small = dmStackPlacement(vp, INIT, 111, STACK_W, [], [], [dialog]);
+    expect(hit(rectOf(small, 111), dialog)).toBe(false);
+    expect(small).toEqual({ left: 560, top: 100 });
+    const big = dmStackPlacement(vp, INIT, 200, STACK_W, [], [], [dialog]);
+    expect(hit(rectOf(big, 200), dialog)).toBe(false);
+    expect(big.top).toBe(293 + 314 + 8);
+  });
+
+  test("FR-NOTE-50 toast policy: with a dialog open the stack's room is the larger band above or below it", async () => {
+    const { dialogRoom } = await import("./ToastRuntime");
+    const full = 900 - 64 - 100;
+    expect(dialogRoom(vp, [], full)).toBe(full);
+    // Above: 293 − 12 − 100 = 181; below: 900 − 64 − (607 + 12) = 217.
+    expect(dialogRoom(vp, [dialog], full)).toBe(217);
+    expect(dialogRoom(vp, [{ y: 100, h: 740 }], full)).toBe(0);
+  });
+
+  test("FR-NOTE-50 toast policy: only modal dialogs count (the attack popup opens over its toast, FR-CBT-75)", async () => {
+    const { OPEN_DIALOG_SELECTOR } = await import("./dialog-rects");
+    expect(OPEN_DIALOG_SELECTOR).toContain('[role="dialog"][data-state="open"]');
+    expect(OPEN_DIALOG_SELECTOR).toContain(':not([aria-modal="false"])');
+    expect(OPEN_DIALOG_SELECTOR).toContain('[role="alertdialog"][data-state="open"]');
   });
 });

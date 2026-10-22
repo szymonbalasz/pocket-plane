@@ -76,7 +76,7 @@ describe("FR-NOTE-50 toast policy", () => {
     expect(v.more).toBe(1);
   });
 
-  test("FR-NOTE-50 toast policy: at most 3 cards / alerts / info; info overflows before alerts before cards; the summary doesn't count", () => {
+  test("FR-NOTE-50 toast policy: at most 3 cards / alerts / info; alerts always show, info overflows before cards; the summary doesn't count", () => {
     let s = setSummary(initialToasts(0), 1, 0);
     const infos = [note(), note(), note()] as const;
     for (const n of infos) s = addNote(s, n, 0, alertKind);
@@ -93,15 +93,15 @@ describe("FR-NOTE-50 toast policy", () => {
     v = visibleToasts(s);
     expect(classes(s)).toEqual(["summary", "card", "card", "alert"]);
     expect(v.more).toBe(3);
-    // Four cards: the newest three show, every alert and info held back.
+    // Four cards: the alert still shows (walkthrough T4), the newest two cards beside it.
     const more = [card(), card()] as const;
     for (const n of more) s = addNote(s, n, 3, alertKind);
     v = visibleToasts(s);
-    expect(v.shown.map((t) => t.key)).toEqual(["summary", cards[1].id, more[0].id, more[1].id]);
+    expect(v.shown.map((t) => t.key)).toEqual(["summary", more[0].id, more[1].id, a.id]);
     expect(v.more).toBe(5);
-    // P3 E3: the runtime's lowered cap keeps the order rule (at least one counted toast).
-    expect(classes(s, 1)).toEqual(["summary", "card"]);
-    expect(classes(s, 0)).toEqual(["summary", "card"]);
+    // P3 E3: the runtime's lowered cap: the alert takes the room first; it never overflows.
+    expect(classes(s, 1)).toEqual(["summary", "alert"]);
+    expect(classes(s, 0)).toEqual(["summary", "alert"]);
   });
 
   test("FR-NOTE-50 toast policy: card sticky, alert and info 6 s, callout 4 s; every timer pauses while hovered", () => {
@@ -184,8 +184,10 @@ describe("FR-NOTE-50 toast policy: alerts from toast()", () => {
     let s = addNote(initialToasts(0), note(), 0);
     s = addNote(s, card(), 0);
     s = syncAlerts(s, [{ id: "alert:turn" }, { id: 7, ms: 60_000 }, { id: "x", ms: Infinity }], 0);
-    expect(classes(s)).toEqual(["card", "alert", "alert"]);
-    expect(visibleToasts(s).more).toBe(2); // 5 counted, 3 shown: the info held back first, then an alert
+    // Alerts always show (3 of them fill the room): the card and the info go to "+N more".
+    expect(classes(s)).toEqual(["alert", "alert", "alert"]);
+    expect(visibleToasts(s).more).toBe(2);
+    expect(classes(s, 5)).toEqual(["card", "alert", "alert", "alert", "info"]);
     const alerts = s.toasts.filter((t) => t.kind === "alert");
     expect(alerts.map((t) => [t.key, t.sticky, t.remaining])).toEqual([
       [alertKey("alert:turn"), false, 6000],

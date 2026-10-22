@@ -21,6 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
@@ -36,7 +37,8 @@ import {
 } from "../play-shell/toast-region";
 import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, useAlertToasts } from "./alert-toasts";
-import { dmStackPlacement } from "./keep-out";
+import { useDialogRects } from "./dialog-rects";
+import { dmStackSpot } from "./keep-out";
 import {
   actionButton,
   classify,
@@ -315,7 +317,10 @@ export function ToastRuntime({
   // input is subscribed (windows, Initiative, hard keep-outs, first rows, height, viewport).
   const stackRef = useRef<HTMLElement>(null);
   const showing = state.toasts.length > 0 || !!state.callout;
-  const { initiative, windows: windowRects, hard, rows: firstRows } = useStackInputs(isDm);
+  const { initiative, windows: windowRects, hard: bars, rows: firstRows } = useStackInputs(isDm);
+  // Walkthrough T4: an open modal dialog keeps the DM stack off it like a hard keep-out.
+  const dialogs = useDialogRects(isDm && showing);
+  const hard = useMemo(() => (dialogs.length > 0 ? [...bars, ...dialogs] : bars), [bars, dialogs]);
   const vp = useViewport();
   const stackH = useStackHeight(stackRef, isDm, showing);
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
@@ -330,7 +335,7 @@ export function ToastRuntime({
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the live token boxes
   const at = useMemo(
     () =>
-      dmStackPlacement(
+      dmStackSpot(
         vp,
         initiative,
         stackH,
@@ -359,21 +364,24 @@ export function ToastRuntime({
   // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
   // top row, above the launcher; player: above its corner, below the top bar), one more toast
   // folds into "+N more". The cap starts over when the toasts or the room change.
+  // Walkthrough T4: with a dialog open, the DM's room is the larger band above or below it.
   const room = isDm
-    ? vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP
+    ? dialogRoom(vp, dialogs, vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP)
     : vp.h - PLAYER_TOAST_BOTTOM - TOP_BAR_H - EDGE_GAP;
   const [cap, setCap] = useState(MAX_VISIBLE);
   const count = state.toasts.length;
   // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
   useLayoutEffect(() => setCap(MAX_VISIBLE), [count, room]);
+  // Walkthrough WF4: likewise while the DM stack can only sit on a window's body (its controls).
+  const covers = isDm && at.covers > 0;
   useLayoutEffect(() => {
-    if (stackH > room && cap > 1) setCap((c) => Math.max(1, c - 1));
-  }, [stackH, room, cap]);
+    if ((stackH > room || covers) && cap > 1) setCap((c) => Math.max(1, c - 1));
+  }, [stackH, room, cap, covers]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
   const { shown, more, callout } = visibleToasts(state, cap);
   if (!showing) return null;
-  return (
+  const stack = (
     <section
       ref={stackRef}
       aria-label="Notifications"
@@ -472,4 +480,26 @@ export function ToastRuntime({
       )}
     </section>
   );
+  // At the body (walkthrough T4): `TOAST_STACK_Z` holds against dialogs, not inside the shell's
+  // stacking context. A static render (tests) has no body.
+  return typeof document !== "undefined" && document.body
+    ? createPortal(stack, document.body)
+    : stack;
+}
+
+/**
+ * Walkthrough T4: the DM stack's room with modal dialogs open: the larger band above their top
+ * (below the home row) or below their bottom (above the launcher), never more than `full`.
+ */
+export function dialogRoom(
+  vp: { w: number; h: number },
+  dialogs: readonly { y: number; h: number }[],
+  full: number,
+): number {
+  if (dialogs.length === 0) return full;
+  const top = Math.min(...dialogs.map((d) => d.y));
+  const bottom = Math.max(...dialogs.map((d) => d.y + d.h));
+  const above = top - EDGE_GAP - DM_TOAST_TOP;
+  const below = vp.h - LAUNCHER_CLEAR - (bottom + EDGE_GAP);
+  return Math.min(full, Math.max(above, below, 0));
 }

@@ -343,10 +343,11 @@ const RANK: Record<NotificationToastClass | "summary", number> = {
 
 /**
  * FR-NOTE-50: what the stack shows, in order from home: the summary (DM), cards, alerts, info
- * (each oldest first). At most `max` (default `MAX_VISIBLE`) cards / alerts / info: the newest of
- * each class are kept, info held back before alerts before cards; `more` counts the held-back
- * ones ("+N more"). The summary and the callout don't count. The runtime lowers `max` while the
- * stack doesn't fit the viewport (P3 E3).
+ * (each oldest first). At most `max` (default `MAX_VISIBLE`) cards / alerts / info. Alerts always
+ * show (an error is never held back, walkthrough T4): they take the room first, then the newest
+ * cards, then the newest info (info held back before cards); `more` counts the held-back ones
+ * ("+N more"). The summary and the callout don't count. The runtime lowers `max` while the stack
+ * doesn't fit the viewport (P3 E3).
  */
 export function visibleToasts(
   s: ToastState,
@@ -354,8 +355,8 @@ export function visibleToasts(
 ): { shown: Toast[]; more: number; callout: Callout | null } {
   const room = Math.max(1, max);
   const counted = s.toasts.filter((t) => t.kind !== "summary");
-  const kept = new Set<Toast>();
-  for (const cls of ["card", "alert", "info"] as const) {
+  const kept = new Set<Toast>(counted.filter((t) => classOfToast(t) === "alert"));
+  for (const cls of ["card", "info"] as const) {
     const of = counted.filter((t) => classOfToast(t) === cls);
     for (let i = of.length - 1; i >= 0 && kept.size < room; i--) kept.add(of[i] as Toast);
   }

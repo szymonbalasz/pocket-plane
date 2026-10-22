@@ -37,6 +37,11 @@ import { type NotificationViews, originOf } from "./views";
 const ROW_SELECTOR = '[data-testid="note-history-row"]';
 /** Compact row buttons (sprint 8, FR-SHELL-100): on the badges' line. */
 const ROW_BUTTON = "h-6 px-2 text-xs";
+/**
+ * Row badges as tall as the time text (16 px; walkthrough N1: the DM's audience / state badges
+ * made its rows 88 px, players' 82), so the DM's closed rows match the players'.
+ */
+const ROW_BADGE = "py-0 leading-[14px]";
 
 /**
  * FR-NOTE-17 state badge; FR-NOTE-40 (OQ-CAMP-27 A): "Resolved by ‹name›" draws the name in the
@@ -51,6 +56,7 @@ function StateBadge({ n, label }: { n: NotificationRecord; label: string }) {
     return (
       <Badge
         variant={n.state === "pending" ? "default" : "secondary"}
+        className={ROW_BADGE}
         data-testid="note-history-state"
       >
         {label}
@@ -59,7 +65,7 @@ function StateBadge({ n, label }: { n: NotificationRecord; label: string }) {
   }
   const color = keyOf(closer);
   return (
-    <Badge variant="outline" data-testid="note-history-state">
+    <Badge variant="outline" className={ROW_BADGE} data-testid="note-history-state">
       Resolved by{" "}
       <span
         data-testid="note-history-closed-by"
@@ -113,7 +119,7 @@ function Row({
           </time>
         </Tooltip>
         {you.role === "dm" && (
-          <Badge variant="outline" data-testid="note-history-audience">
+          <Badge variant="outline" className={ROW_BADGE} data-testid="note-history-audience">
             {audienceLabel(n, nameOf)}
           </Badge>
         )}

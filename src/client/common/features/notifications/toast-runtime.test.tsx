@@ -164,9 +164,12 @@ describe("FR-NOTE-51 stack returns home (BL-59)", () => {
   const pushedScenes = { x: 546, y: 156, w: 260, h: 440 };
   const scenesHome = { x: 68, y: 60, w: 260, h: 440 };
   const log = { x: 68, y: 652, w: 1150, h: 240 };
+  // A window left of Scenes (walkthrough WF4: nothing beside Scenes is clear, so the stack takes
+  // FR-NOTE-44's spot on Scenes' body).
+  const left = { x: 68, y: 156, w: 466, h: 480 };
   const pushed: StackInputs = {
     initiative: { x: 1028, y: 60, w: 400, h: 500 },
-    windows: [pushedScenes, log],
+    windows: [left, { ...pushedScenes, pushed: true }, log],
     hard: [bar],
     rows: [{ x: 546, y: 156, bottom: 156 + 32 + 36 }],
   };

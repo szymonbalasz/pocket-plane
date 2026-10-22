@@ -9,7 +9,11 @@
 // FR-NOTE-43 (sim-9 b01): hard keep-outs (the active tool bar) block it like Initiative.
 // FR-NOTE-44 (sim-10 b05): while a tool bar is shown (the windows it pushed among them), every
 // window's title bar and first 40 px of body block it too. FR-NOTE-53 (sprint 8): "pushed" comes
-// from the placer's plan (`StackWindow.pushed`). Pure; players keep bottom-right.
+// from the placer's plan (`StackWindow.pushed`). Walkthrough WF4 (DM ruling): the stack never
+// covers a window's controls when it can help it: a spot clear of every window body in the band
+// (down, FR-NOTE-42) first, else beside a window over the home column (left, then right, like
+// Initiative's shift), else the runtime folds toasts into "+N more" (`dmStackSpot().covers`);
+// only then the least window body. Pure; players keep bottom-right.
 
 import { type FirstRow, firstRows } from "../play-shell/content-heights";
 import {
@@ -66,11 +70,28 @@ function initiativeKeepOut(
  * FR-NOTE-42: the stack's only candidate lefts: its home (centred), then FR-NOTE-32's shift left
  * of Initiative when that is left of home and clear of the rail (never x = 68 by clamping).
  */
-export function dmStackLefts(vp: Viewport, initiative: Rect | null, width = STACK_W): number[] {
+export function dmStackLefts(
+  vp: Viewport,
+  initiative: Rect | null,
+  width = STACK_W,
+  /** Walkthrough WF4: also beside these windows when they are over the home column. */
+  windows: readonly Rect[] = [],
+): number[] {
   const home = Math.round((vp.w - width) / 2);
-  if (!initiative) return [home];
-  const shifted = Math.round(initiative.x - EDGE_GAP - width);
-  return shifted < home && shifted >= RAIL_CLEAR ? [home, shifted] : [home];
+  const out = [home];
+  if (initiative) {
+    const shifted = Math.round(initiative.x - EDGE_GAP - width);
+    if (shifted < home && shifted >= RAIL_CLEAR) out.push(shifted);
+  }
+  // Walkthrough WF4: a window over the home column → beside it, left then right.
+  for (const w of windows) {
+    if (!(w.x < home + width + EDGE_GAP && home - EDGE_GAP < w.x + w.w)) continue;
+    const left = Math.round(w.x - EDGE_GAP - width);
+    const right = Math.round(w.x + w.w + EDGE_GAP);
+    if (left >= RAIL_CLEAR) out.push(left);
+    if (right + width <= vp.w - EDGE_GAP) out.push(right);
+  }
+  return [...new Set(out)];
 }
 
 const hits = (a: Rect, b: Rect, gap: number) =>
@@ -101,6 +122,49 @@ export function dmStackPlacement(
   hard: readonly Rect[] = [],
   rows: readonly FirstRow[] = [...firstRows().values()],
 ): { left: number; top: number } {
+  const { left, top } = dmStackSpot(vp, initiative, stackH, width, avoid, windows, hard, rows);
+  return { left, top };
+}
+
+/**
+ * `dmStackPlacement` and what its spot covers of the windows' bodies, px² (`covers` > 0: no spot
+ * clear of every window held this stack; walkthrough WF4: the runtime then shows fewer toasts).
+ */
+export function dmStackSpot(
+  vp: Viewport,
+  initiative: Rect | null,
+  stackH: number,
+  width = STACK_W,
+  avoid: readonly TokenBox[] = [],
+  windows: readonly StackWindow[] = [],
+  hard: readonly Rect[] = [],
+  rows: readonly FirstRow[] = [...firstRows().values()],
+): { left: number; top: number; covers: number } {
+  const covers = (p: { left: number; top: number }) =>
+    stackH === 0 ? 0 : coveredArea({ x: p.left, y: p.top, w: width, h: stackH }, windows);
+  const run = (lefts: number[]) => {
+    const p = dmStackSpotOnly(vp, initiative, stackH, width, avoid, windows, hard, rows, lefts);
+    return { ...p, covers: covers(p) };
+  };
+  // FR-NOTE-42: down within the band first; walkthrough WF4: aside only when that clears every
+  // window body (else the home rules, and the runtime folds toasts while it covers one).
+  const home = run(dmStackLefts(vp, initiative, width));
+  if (home.covers === 0) return home;
+  const aside = run(dmStackLefts(vp, initiative, width, windows));
+  return aside.covers === 0 ? aside : home;
+}
+
+function dmStackSpotOnly(
+  vp: Viewport,
+  initiative: Rect | null,
+  stackH: number,
+  width: number,
+  avoid: readonly TokenBox[],
+  windows: readonly StackWindow[],
+  hard: readonly Rect[],
+  rows: readonly FirstRow[],
+  lefts: readonly number[],
+): { left: number; top: number } {
   const base = initiativeKeepOut(vp, initiative, stackH, width);
   const at = (p: { left: number; top: number }) => ({ x: p.left, y: p.top, w: width, h: stackH });
   // FR-NOTE-43: ≥ 1 px over a hard keep-out is not clear.
@@ -122,7 +186,6 @@ export function dmStackPlacement(
     !bars.some((b) => hits(at(p), b, 0)) &&
     offHard(p);
   const maxTop = vp.h - LAUNCHER_CLEAR - stackH;
-  const lefts = dmStackLefts(vp, initiative, width);
   const tops = [
     DM_TOAST_TOP,
     ...bars.map((b) => b.y + b.h + STACK_GAP),
@@ -130,7 +193,9 @@ export function dmStackPlacement(
     ...hard.map((k) => k.y + k.h + STACK_GAP),
     ...avoid.flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH]),
   ].map((y) => Math.round(Math.max(DM_TOAST_TOP, Math.min(maxTop, y))));
-  const spots = [base, ...tops.flatMap((top) => lefts.map((left) => ({ left, top })))];
+  // Nearest the home row first (ties keep the earlier spot).
+  const byTop = [...new Set(tops)].sort((a, b) => a - b);
+  const spots = [base, ...byTop.flatMap((top) => lefts.map((left) => ({ left, top })))];
   let best: { left: number; top: number } | null = null;
   let bestArea = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
   for (const p of spots) {
