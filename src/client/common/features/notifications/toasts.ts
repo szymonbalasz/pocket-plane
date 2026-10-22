@@ -32,6 +32,9 @@ export const SUMMARY_KEY = "summary";
 /** A row's toast class; the runtime passes its views' (FR-NOTE-52). */
 export type ClassOf = (n: NotificationRecord) => NotificationToastClass;
 const BY_STATE: ClassOf = (n) => toastClassOf(undefined, n.state);
+/** FR-NOTE-60: kinds whose pending rows re-toast on a connect (the view's `restoreToast`). */
+export type Restores = (n: NotificationRecord) => boolean;
+const NO_RESTORE: Restores = () => false;
 
 export type Toast =
   | {
@@ -306,6 +309,7 @@ export function syncToasts(
   now: number,
   waitingOf: WaitingCount = NONE,
   classOf: ClassOf = BY_STATE,
+  restores: Restores = NO_RESTORE,
 ): ToastMemory {
   if (t === null) return m;
   const store = next.store;
@@ -315,6 +319,9 @@ export function syncToasts(
     const cid = store.you?.campaignId ?? null;
     if (cid !== campaignId) s = clearToasts(s, now);
     campaignId = cid;
+    // FR-NOTE-60: restorable pending rows of mine re-toast (silently: a connect starts no cue),
+    // so they have a toast of their own and stay out of the summary.
+    for (const n of pendingForMe(store)) if (restores(n)) s = addNote(s, n, now, classOf);
     // Only pending rows without a toast of their own (a sticky card kept over a reconnect).
     s = setSummary(
       s,

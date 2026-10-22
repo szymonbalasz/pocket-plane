@@ -80,6 +80,8 @@ import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
 import statsWindowE2e from "./stats-window-e2e";
 import syncProbe from "./sync-probe";
+import tableTools from "./table-tools";
+import tableToolsE2e from "./table-tools-e2e";
 import tableToolsPaused from "./table-tools-paused";
 import tableToolsPausedE2e from "./table-tools-paused-e2e";
 import toastHomeE2e from "./toast-home-e2e";
@@ -198,6 +200,9 @@ export const bundles: readonly Bundle[] = [
   cbReorderE2e,
   cbTurnRingE2e,
   cbPartyE2e,
+  // Sprint 8 track TT (build/tt-dice): macros + roll requests
+  tableTools,
+  tableToolsE2e,
   // Sprint 8 track TT (build/tt-pause): the pause screen
   tableToolsPaused,
   tableToolsPausedE2e,

@@ -82,7 +82,8 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-75 | DM toast stack can sit over the Game log's roll bar when the home band and both sides are taken by windows (WF4 re-test, sprint 8, `%TEMP%/pocket-plane/verify-wf4/`) | S | notifications ToastRuntime | none | toast / frame work | open |
 | BL-76 | `layout-checks.ts` (the independent layout checker) starts candidates left of x 68 when a window's default x is below 68; no registered window does today (WF2, sprint 8) | S | play-shell layout-checks | none | frame work | open |
 | BL-77 | The DM campaign switcher keeps a 192-px minimum, so at narrow widths it is cut instead of ellipsised (players' text ellipsises) (WF2, sprint 8) | S | campaign-management CampaignBar | none | — | open |
-| BL-78 | Overkill line on a target already at 0 HP ("+20 over 0 HP"), while 150 damage on Fire Elemental 3 gave no overkill line (WF4 walkthrough note, sprint 8; check against FR-STATS-22 / -28) | S | stats overkill callout | none | stats work | open |
+| BL-78 | Overkill line on a target already at 0 HP ("+20 over 0 HP"), while 150 damage on Fire Elemental 3 gave no overkill line (WF4 walkthrough note, sprint 8; check against FR-STATS-22 / -28) | S | stats overkill callout | none | stats work | closed: by design (FR-STATS-21 / -22, OQ-STATS-05 A; SB1 check) |
+| BL-79 | Other players see a draft PC (and its HP / AC) in Party status: only the DM and the owner hold the draft flag, so FR-PARTY-51's "drafts out" can't apply for others (CB3, sprint 8) | S | entities whitelist / party-board Summary | maybe (is a draft PC's existence private?) | — | open |
 
 ## How to add items
 

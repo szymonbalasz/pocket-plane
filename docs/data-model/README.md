@@ -2411,11 +2411,40 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-104–106, -109.
 | Rendered x | derived (render clamp) | ≥ 68 unless parked (stored x < 0); never written back | [FR-SHELL-109](../specs/play-shell.md#6-functional-requirements) |
 
 - **Fixtures:** no new unit; e2e on `wf-frame-e2e`.
+
+## 113. Sprint 8: map refits after the placer (WF3)
+
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–98. **Built by `fix/wf-refits`**: no table, column, record type or payload change. Protocol side: [protocol §143](../protocol/README.md#143-sprint-8-map-refits-after-the-placer-wf3).
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| Last full fit's cell | client memory (`MapCanvas` `lastFullCell`) | screen px per grid cell of the last Fit, open, load or resize fit on this page; reveal, appearance and yield refits never exceed it (a yield also keeps ≥ 0.75 × it); none before the first fit | FR-MAP-94 |
+| Base port | client memory (`free-area.ts` module slot) | the mounted canvas's `{dryFit, lastFullCell, yieldRefit}`; null when no map is mounted | FR-MAP-97 |
+| Pending settled fit | client memory (`createSettledRefit`) | the reason of the load / open / resize / yield fit waiting for the placer's settle (≤ 60 frames) | FR-MAP-96, -98 |
+
+- **Derived:** a fit's PCs = `isPlacementPc` tokens (#318); its obstacles = the placer's rendered windows + this client's toast obstacles; `grown` / `settling` from the shell state and measured heights.
+- **Fixtures:** no new unit; e2e on `wf-frame-e2e`; `session-sim-12` unchanged (WF: aliases only, seams S15).
+- **Persisted runtime state:** none.
 - **CON-44:** 0 B.
 
-## 113. Sprint 8: pause screen (TT4)
+## 114. Sprint 8: saved macros and roll requests (TT1+TT2)
 
-From [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-46, -47 and [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-125–129, -136 (#334, #335). **Built by `build/tt-pause`**; no schema change (TT0's `campaign.pause`). Protocol side: [protocol §143](../protocol/README.md#143-sprint-8-pause-screen--camppause--campresume-the-card-the-dm-control-tt4).
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`**; no schema change (TT0's tables, [§106](#106-sprint-8-table-tools-core-tt0)). Protocol side: [protocol §144](../protocol/README.md#144-sprint-8-saved-macros-and-dm-roll-requests--intents-prompt-views-requests-window-tt1tt2).
+
+| Table / field | Written by | Rule | Source |
+|---|---|---|---|
+| `roll_macro` | `dicex.saveMacro` / `deleteMacro` / `moveMacro`; entities' owner-change hook | `sort_order` 0…n-1 per (`player_id`, `creature_id`); `created_by` = the making player (null = the DM); an owner change moves the PC's rows from the old owner's list to the new owner's (the old owner's `created_by` follows) | FR-DICEX-64–66 |
+| `roll_request` | `dicex.request` / `answerRequest` / `declineRequest` / `closeRequest` / `rollForMissing`; the owner-change hook | `state` `closed` + `closed_at` when no target is `open` (or Close / Roll for missing); a target leaves `open` once (`rolled` with `entryId`, `total` incl. MOD parts, `natural`, `success`; `declined`; `missed`) with `at` | FR-DICEX-73–82 |
+| `notification` (kind `roll-request`) | `dicex.request` (create); answer / decline (resolved by the closer); Close / Roll for missing / owner change (resolved by rule, no closer) | resolution `{outcome: rolled \| declined \| missed, total?}`; never dismissed by End | FR-NOTE-58, -62 |
+| `game_log_entry` / `roll` (answers) | `dicex.answerRequest`, `dicex.rollForMissing` | kind `roll`, actor = the PC, label = the request's, items `answer: true`; `public` / `audience_player_id` from the request (hidden = the target's player; roll for missing: the current owner, else DM only) | FR-DICE-79, -80 |
+
+- **Derived:** macro groups per viewer, a macro's roll block (not live, gone creature, not the viewer's), the prompt's expression (`characterRolls`), "All PCs" (owned, not hidden), card rows (Waiting / total ✓ ✗ / Declined / No roll).
+- **Persisted runtime state:** the rows above. Client memory only: the tray's Macros popover and editor drafts, the composer form.
+- **Fixtures:** `dicex-macros` (player-1: Sneak Attack 3d6 damage on Mira, Luck 1d100; DM: Bless 1d4, Inspiration 1d8 on Thorn → player-2's, Ambush 2d6 on the Elite Goblin Warrior, DM only), `dicex-request-open` (Perception to Mira + Thorn, DC 15 hidden, results hidden).
+
+## 115. Sprint 8: pause screen (TT4)
+
+From [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-46, -47 and [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-125–129, -136 (#334, #335). **Built by `build/tt-pause`**; no schema change (TT0's `campaign.pause`). Protocol side: [protocol §145](../protocol/README.md#145-sprint-8-pause-screen--camppause--campresume-the-card-the-dm-control-tt4).
 
 | Field / store | Rule | Source |
 |---|---|---|

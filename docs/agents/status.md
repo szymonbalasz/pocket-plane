@@ -9,15 +9,16 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | WF1 placer core + replay harness | merged | — | done | main gates running |
-| WF3 map refits | `fix/wf-refits` (w9G) | build-wf3 | walkthrough 6/8; F10 fixed; F9 (placer) after WF2 merges | re-test F9, F10 |
+| WF3 map refits | merged (re-test 7/8; DM reload cell by design) | — | done | main gates running |
+| CB2 turn ring | `build/cb-turn-ring` (w9N) | build-cb2 | building (last sprint slice) | walkthrough CB1, CB7, CB13 |
 | TT4 pause screen | `build/tt-pause` (w9H) | build-tt4 | part 1 13/14 → popup + body-portal fixes, gates | finish after WF4 (toasts), WF3 (reveal), TT1+2 (T10, T12) |
-| WF2 pushes + rail inset | `fix/wf-push-rail` (w9J) | build-wf2 | walkthrough 13/14 (320-px viewport out of scope); gates after WF4's | merge |
+| WF2 pushes + rail inset | merged (walkthrough 13/14) | — | done | main check 5014 / e2e 199 (1 known flake re-run green) |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
 | TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |
 | TT1+TT2 macros + roll requests | `build/tt-dice` (w9E) | build-tt12 | part-1 13/13; Requests window registered; `restoreToast` waits for WF4 | part 2: T6 reload, T7, T16 |
 | SB0 stats tier-B core | merged (walkthrough 10/10) | — | done | — |
 | CB3 Party status | `build/cb-party` (w9K) | build-cb3 | building | walkthrough CB10, CB11, CB13 |
-| WF4 toast policy + Stats / card sizes | merged | — | done | main gates after WF2 |
+| WF4 toast policy + Stats / card sizes | merged | — | done | — |
 | SB1+SB2 stats UI + trophies | `build/sb-stats-ui` (w9M) | build-sb12 | building | walkthrough §13.1 1–10 |
 | CB0 combat core | merged (walkthrough all PASS) | — | done | main gates running |
 | CB1 drag reorder | merged (walkthrough 14/14) | — | done | main gates after WF1 merge |
@@ -27,7 +28,8 @@ Queue (seams build plan, `.verify/sprint8/seams.md`): wave 2 WF4, TT1+2, TT3, CB
 ## Shared-file locks
 
 - Canvas (MapCanvas, camera, TokensLayer, LabelsLayer) + `free-area.ts`: `fix/wf-refits` (then CB2).
-- Frame files (placer.ts, manager.ts, geometry.ts, PlayFrame.tsx, placement.ts, shell-store.ts): `fix/wf-push-rail` (TT4's one-line PlayFrame change merges first). `ShellContext.tsx`: `fix/wf-refits`.
+- Canvas (token-overlays type, decorations, token-decor, TokensLayer): `build/cb-turn-ring`. `PlayFrame.tsx` overlay layer: `build/tt-pause`. Frame files free.
+- Backlog: no new picks (the last sprint slice is in flight).
 - Schema lane: free (TT0, CB0 merged).
 - `TrayWindow.tsx`, `GameLog.tsx`, `char.roll` server file: `build/tt-dice`.
 - `ToastRuntime.tsx`: `build/tt-dice` (`restoreToast`).

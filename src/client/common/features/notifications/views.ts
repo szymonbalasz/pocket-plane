@@ -56,6 +56,12 @@ export interface NotificationView {
    * a card. Absent → by the row's state.
    */
   toastClass?: NotificationToastClass;
+  /**
+   * FR-NOTE-60 (sprint 8): after the first snapshot of a load or reconnect, each pending row of
+   * this kind the client owns re-toasts, silently (no cue, no sound) and outside the "N pending"
+   * summary. Only `roll-request` sets it.
+   */
+  restoreToast?: true;
 }
 
 /** A client list's line: the view with its toast class named (FR-NOTE-52). */

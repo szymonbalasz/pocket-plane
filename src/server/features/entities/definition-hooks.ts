@@ -10,6 +10,7 @@ import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
 import { creatureSheetDefinitionHook } from "../character-sheet/definition-hook";
 import { combatantDefinitionHook } from "../combat-tracker/hooks";
+import { macroOwnerHook } from "../dice-extras/owner-hook";
 import { presetOwnerHook } from "../effect-modifiers/definition-hook";
 import { fogSensesHook } from "../fog-of-war/lifecycle";
 import { refreshTokenCopies } from "../scenes-map/definition-hook";
@@ -39,6 +40,7 @@ export const definitionChangedHooks: readonly HookRegistration[] = [
   { name: "fog-of-war.senses", hook: fogSensesHook }, // FOG senses edit re-derives (FR-FOG-35)
   { name: "scenes-map.creature-type-fill", hook: fillTokenCreatureType }, // token art fill (FR-ENT-27)
   { name: "entities.pet-owner-copies", hook: petOwnerCopiesHook }, // pets + companions follow the owner (FR-ENT-34)
+  { name: "dice-extras.owner-change", hook: macroOwnerHook }, // DICEX macros move, open targets missed (FR-DICEX-65)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */
