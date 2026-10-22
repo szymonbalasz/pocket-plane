@@ -2377,3 +2377,18 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0
 - **Fixtures:** no new unit; bundles `wf-frame`, `wf-frame-e2e` (= `session-sim-11`). Harness cells `replay-cells.generated.ts` (from `session-sim-11`, `UPDATE_CELLS=1`).
 - **Persisted runtime state:** `userSize` in the layout entry (0 B on the wire).
 - **CON-44:** 0 B.
+
+## 110. Sprint 8: map refits after the placer (WF3)
+
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–98. **Built by `fix/wf-refits`**: no table, column, record type or payload change. Protocol side: [protocol §140](../protocol/README.md#140-sprint-8-map-refits-after-the-placer-wf3).
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| Last full fit's cell | client memory (`MapCanvas` `lastFullCell`) | screen px per grid cell of the last Fit, open, load or resize fit on this page; bounds reveal, appearance and yield refits to [0.75 ×, 1 ×] it; none before the first fit | FR-MAP-94 |
+| Base port | client memory (`free-area.ts` module slot) | the mounted canvas's `{dryFit, lastFullCell, yieldRefit}`; null when no map is mounted | FR-MAP-97 |
+| Pending settled fit | client memory (`createSettledRefit`) | the reason of the load / open / resize / yield fit waiting for the placer's settle (≤ 60 frames) | FR-MAP-96, -98 |
+
+- **Derived:** a fit's PCs = `isPlacementPc` tokens (#318); its obstacles = the placer's rendered windows + this client's toast obstacles; `grown` / `settling` from the shell state and measured heights.
+- **Fixtures:** no new unit; e2e on `wf-frame-e2e`; `session-sim-12` unchanged (WF: aliases only, seams S15).
+- **Persisted runtime state:** none.
+- **CON-44:** 0 B.
