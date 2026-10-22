@@ -2,7 +2,7 @@
 title: Stats and summaries
 prefix: STATS
 status: complete
-owner: spec-sb
+owner: spec-wf, spec-sb
 phase: post-mvp-8
 ---
 
@@ -13,6 +13,8 @@ phase: post-mvp-8
 > **Sprint 7, track ST** (DM [#311](../decisions-log.md), decided): tier A of [feature tiers](../feature-tiers.md#6-table-specific), meaning a live damage leaderboard, overkill callouts and BG2-style session awards. They come from the append-only log ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)) and never leak; sessions follow [ADR-0013](../architecture/adr/0013-session-journal-scope.md). Proposed ADR: [stats as read models](../architecture/adr/0059-stats-read-models.md). Also revised: FR-CBT-136–138, FR-DICE-72–73, FR-SHELL-93–94, FR-NOTE-48–49. Seams S1–S8, S11, S13 and review rulings 2–4, 10, 13, 20–25 applied.
 
 > **Sprint 8, track SB** (DM [#334](../decisions-log.md), decided): tier B, with tier A's visibility rules. FR-STATS-26–53 ([§6.1](#61-tier-b-sprint-8)); also FR-CBT-152–153, FR-NOTE-68–69, FR-CHARX-97–99, FR-DICE-89–90. No schema. [ADR: session partials](../architecture/adr/proposed-s8-sb-session-partials.md). Seams applied. OQ-STATS-20–30 decided at DM gate 1 (#335).
+
+> **Sprint 8, track WF** (DM [#333](../decisions-log.md); size rows only): FR-STATS-66 gives `stats.board` a useful size checked by content; FR-STATS-67 sizes the award grid to the window (BL-66). Slice WF4; walkthrough F9, F13 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
 
 ## 1. Summary
 
@@ -89,6 +91,8 @@ phase: post-mvp-8
 | FR-STATS-23 | **Retroactive, stateless**: no backfill. A crash loses only an answer; reconnect → re-query (last result muted). Undo → re-query drops the row. Old facts keep old names. |
 | FR-STATS-24 | **States**: skeleton rows; "No fight yet" / "No damage yet this fight" / "No sessions yet"; "Couldn't load stats" + Retry; offline = last result muted, pickers off. |
 | FR-STATS-25 | **Limits**: fight ≤ 70 rows; ≤ 8 tied names; `sessions` ≤ 200 newest; ack ≤ 64 KB. |
+| FR-STATS-66 | **Stats useful size** (S8, WF; BL-66: players' Stats opened at 320 × 280, names cut). Default 400 × 412 and min 320 × 280 stay. `usefulSize` **400 × 360**; criterion (seams S5): **5 rows with names whole, or 2 award cards, or the first 4 Highlights lines** visible without scrolling. The placer opens it at least that big while a put-away or a player's map yield helps ([FR-SHELL-97](play-shell.md#6-functional-requirements)). Test `FR-STATS-66 Stats useful size` in `e2e/useful-size.e2e.ts` (browser; [FR-SHELL-100](play-shell.md#6-functional-requirements)). |
+| FR-STATS-67 | **Award cards fit** (BL-66, DM: text clipped at 400 wide; amends FR-STATS-19's columns). Columns follow the window's body width: 3 ≥ 600 px, 2 ≥ 380 px, else 1. Names and values wrap, never run into the next card. Test `FR-STATS-67 award grid fits` in `e2e/useful-size.e2e.ts` (400 × 412 and 320 wide; no card's `scrollWidth` > `clientWidth`). |
 
 ### 6.1 Tier B (sprint 8)
 
@@ -360,6 +364,7 @@ Named tests (all `FR-STATS-NN …`):
 | OQ-STATS-16 | Out-of-combat HP | **Decided (#315): A** · **A. Not counted** (no source) · B. Downs from `CharacterHpAdjusted` | — | STATS |
 | OQ-STATS-18 | Glossary: Stats window, Session awards, Overkill callout; Session "derived" | **Resolved (integrator, sprint-7 seams / rulings)** · **A. Add** | — | glossary |
 | OQ-STATS-19 | Encounter names in players' stats? | **Decided (#315): A** · **A. Neutral "Fight 3 · Tue 20 Oct"** (names stay DM-only) · B. Real names (reveals names players never saw) | — | STATS |
+| ~~OQ-STATS-35~~ | SB seam: end-of-combat summary | **Resolved (integrator, sprint-8 seams / rulings)**: seams S5: a `stats.board` view opened `by: "feature"` at End, placed by the ladder; its toast is info class | — | FR-SHELL-112 |
 
 **Resolved (integrator, sprint-7 seams / rulings)**: ~~OQ-STATS-14~~ (S2: final roll only, maxed die via `raw`), ~~OQ-STATS-17~~ (S5: [FR-SHELL-86](play-shell.md#6-functional-requirements), 400 × 412, min 320 × 280).
 

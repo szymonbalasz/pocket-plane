@@ -2,7 +2,7 @@
 title: Character sheet (full)
 prefix: CHARX
 status: complete
-owner: spec-sb
+owner: spec-wf, spec-sb
 phase: post-mvp-8
 ---
 
@@ -25,6 +25,8 @@ phase: post-mvp-8
 > **Sprint 7 (track FU, DM [#311](../decisions-log.md); session-sim-10 a03).** Decided, not open: the **companion card** no longer opens at its minimum with the attacks below the fold. New **FR-CHARX-81** (a useful size, so the shell auto-minimises a window rather than shrink the card; [play-shell FR-SHELL-79](play-shell.md#6-functional-requirements), OQ-SHELL-53) and **FR-CHARX-82** (attacks before conditions, two attack rows visible at 320 × 360). Client only, 0 B. Tests `FR-CHARX-81 card useful size` (registry: `usefulSize` 320 × 360; with Compendium open at 1280×800 the card opens 320 × 360 and Compendium is auto-minimised), `FR-CHARX-82 attacks above the fold` (DOM at 320 × 360: both Owlbear attack rows' buttons inside the rect with 3 conditions); walkthrough U2, U15 in [play-shell §13](play-shell.md#13-test-plan); slices FU1 (the window line) and FU4 (the card's order) in [play-shell §14](play-shell.md#14-dependencies). GM (gems) edits this spec in parallel with its own range. Edge cases: client-only layout; reconnect re-renders from the store; crash: no server change. No open question.
 
 > Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Extends [character-sheet](character-sheet.md) (CHAR, basics); every FR-CHAR stays in force unless amended here.
+
+> **Sprint 8, track WF** (DM [#333](../decisions-log.md); companion card size only): FR-CHARX-83 (BL-66, sim-11 h01: the card at 280 × 240). Slice WF4 (test) + WF1 (placer); walkthrough F9 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
 
 ## 1. Summary
 
@@ -178,6 +180,7 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | **Sprint 7** (track FU; sim-10 a03) | | |
 | FR-CHARX-81 | **The companion card opens readable** (sprint 7, track FU; sim-10 a03: opened at 280 × 308, its minimum-ish, attacks below the fold; with [FR-SHELL-79](play-shell.md#6-functional-requirements)): `charx.companion` declares `usefulSize` **320 × 360** (= its default), so auto placement auto-minimises a launcher window before opening it smaller (under OQ-SHELL-53 B; under A it opens as today); min stays 280 × 240. One line in `companion/window.ts` (assigned to FU1). | sim-10 a03 |
 | FR-CHARX-82 | **Attacks above the fold** (sprint 7; amends FR-CHARX-62–65's order): at 320 × 360 the card shows, without scrolling, the header (one line: name, "Mira's pet", turn mode; the "In combat" Badge and side chip on the same line when they fit, else a second line), one stats line ("HP 45 / 59 · AC 15 · 40 ft · Large monstrosity"; the HP control / Edit toggle at its right end), then **the first two attack rows with their three buttons**; conditions follow the attacks (they were above them), the DM's "Open NPC sheet" link last. Outcome (`session-sim-10`: Owlbear Beak + Claws, Drake Companion Bite): both Owlbear rows' Attack / Damage / Attack + damage buttons inside the window's rect at 320 × 360 with up to 3 conditions; at the min (280 × 240) the body scrolls. | sim-10 a03 |
+| FR-CHARX-83 | **The card's useful size is checked by content** (S8, WF). `usefulSize` stays 320 × 360 (FR-CHARX-81). Criterion, checked in a browser (`e2e/useful-size.e2e.ts`, [FR-SHELL-100](play-shell.md#6-functional-requirements)) at exactly 320 × 360 with the `session-sim-11` Owlbear (Beak, Claws) and Drake (Bite) shows the header, the stats line and both first attack rows with all three buttons, no scrolling. The placer opens the card at least that big while a put-away or a player's map yield helps ([FR-SHELL-97](play-shell.md#6-functional-requirements)). If the test fails, the fix is the card's layout. Test `FR-CHARX-83 card useful criterion`. | BL-66 |
 
 **Roll specs** (FR-CHARX-21). Bonus strings per FR-CHAR-21 (`1d20`, `1d20+3`, `1d20-1`). *(Sprint 4: an attack row's `bonus` adds to to-hit and the base part's constant; `extraDamage` adds one roll per part, FR-CHARX-55.)*
 
