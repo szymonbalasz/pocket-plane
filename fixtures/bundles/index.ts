@@ -76,6 +76,7 @@ import stats from "./stats";
 import statsB from "./stats-b";
 import statsBE2e from "./stats-b-e2e";
 import statsBPast from "./stats-b-past";
+import statsBUiE2e from "./stats-b-ui-e2e";
 import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
 import statsWindowE2e from "./stats-window-e2e";
@@ -196,4 +197,6 @@ export const bundles: readonly Bundle[] = [
   cbReorderE2e,
   cbTurnRingE2e,
   cbPartyE2e,
+  // Sprint 8 track SB (build/sb-stats-ui)
+  statsBUiE2e,
 ];
