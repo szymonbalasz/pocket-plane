@@ -6,6 +6,7 @@
 import { MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import { footprint } from "@shared/scenes-map/geometry";
 import {
+  allClear,
   appearanceKeeps,
   type Camera,
   type FitToken,
@@ -113,6 +114,8 @@ export interface ReplayStep {
   vp: Viewport;
   windows: string;
   cell: number;
+  /** The last settle's `data-settle-log` (FR-SHELL-110). */
+  log: string;
   problems: string[];
 }
 
@@ -208,8 +211,36 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
     viewport: () => sim.vp,
     avoid: () => tokensNow(sim as Sim),
     keepOuts: (vp) => regionsOf(sim as Sim, vp),
+    available: () => availableOf(sim as Sim),
+    camera: () => sim.mode,
+    dryFit: (obstacles) => dryFit(sim as Sim, obstacles),
+    lastFullCell: () => sim.lastFull || null,
+    // FR-MAP-97: an accepted yield refits once, still `fitted`.
+    onYield: () => {
+      (sim as Sim).cam = fitNow(sim as Sim).cam;
+    },
     warn: () => {},
   });
+}
+
+/**
+ * The base port's dry fit (FR-SHELL-108, FR-MAP-97): the fit with `obstacles` as the windows,
+ * not applied; `clear` = every PC, and every token clear now, stays clear (FR-MAP-59's test).
+ */
+function dryFit(sim: Sim, obstacles: readonly Rect[]) {
+  if (!sim.cam) return null;
+  const grid = gridOf(sim.state, sim.set.viewer);
+  const tokens = cellsNow(sim).tokens;
+  const now = fitNow(sim).obstacles;
+  const area = visibleArea(sim.vp);
+  const boxOf = (t: CellToken) => footprintBox([t], grid);
+  const keep = tokens.filter((t) => {
+    const b = boxOf(t);
+    return t.pc || (b !== null && allClear(sim.cam as Camera, [b], now, area));
+  });
+  const { cam, obstacles: next } = fitNow(sim, obstacles);
+  const boxes = keep.flatMap((t) => boxOf(t) ?? []);
+  return { cellPx: cam.scale * grid.gridCellSize, clear: allClear(cam, boxes, next, area) };
 }
 
 const windowsOf = (sim: Sim): Windows => sim.ctl.store.getState().windows;
@@ -230,8 +261,8 @@ function shownOf(sim: Sim): Map<string, { w: WindowState; r: Rect }> {
 }
 
 /** The fit (FR-MAP-44 → -59) with the rendered windows and toast box as obstacles. */
-function fitNow(sim: Sim): { cam: Camera; obstacles: Rect[] } {
-  const windows = [...shownOf(sim).values()].map((s) => s.r);
+function fitNow(sim: Sim, with_?: readonly Rect[]): { cam: Camera; obstacles: Rect[] } {
+  const windows = with_ ? [...with_] : [...shownOf(sim).values()].map((s) => s.r);
   const obstacles = fitObstacles(sim.client, windows, regionsOf(sim), sim.vp, null);
   const room = {
     areas: freeAreas(obstacles, sim.vp),
@@ -352,7 +383,9 @@ function check(
   for (const [kind, { w, r }] of list) {
     // I1: no PC footprint + 4 px under a window; user spots are exempt (OQ-SHELL-62 A).
     if (!w.userSpot && !opts.exemptI1 && pcs.some((p) => overlaps(r, p))) {
-      out.push(`I1 ${kind} over a PC`);
+      // Within the 4-px margin only: a fit that keeps footprints flush (the camera's, FR-MAP-93).
+      const bare = tokens.some((t) => t.pc && overlaps(r, t));
+      out.push(`I1 ${kind} over a PC${bare ? "" : " (4-px margin)"}`);
     }
     // I2: no overlap, nothing on a hard keep-out or the rail.
     for (const [other, o] of list) {
@@ -378,13 +411,17 @@ function check(
       if (best[0] === 0 && best[1] === 0) out.push(`I3 ${kind} ${r.w}×${r.h} below useful`);
     }
   }
-  // I5: a user open moves no other window (it may put the least recently used one away).
+  // I5: a user open moves no other window (it may put the least recently used one away, and
+  // squeeze a protected one inside its rect, FR-SHELL-101).
   if (opts.opened) {
+    const within = (a: Rect, b: Rect) =>
+      a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
     for (const w of windowsOf(sim)) {
       if (w.kind === opts.opened) continue;
       const b = before.find((x) => x.kind === w.kind && x.instance === w.instance);
-      if (b?.state !== "open" || w.state !== "open") continue;
-      if (rectKey(b) !== rectKey(w)) out.push(`I5 ${w.kind} moved by opening ${opts.opened}`);
+      if (b?.state !== "open" || w.state !== "open" || rectKey(b) === rectKey(w)) continue;
+      if (isProtected(sim.registry, w.kind) && within(w, b)) continue;
+      out.push(`I5 ${w.kind} moved by opening ${opts.opened}`);
     }
   }
   // I6: a reveal / appearance refit never zooms in past the last full fit.
@@ -492,15 +529,25 @@ export function runReplay(
   sim.ctl = newController(sim);
   const steps: ReplayStep[] = [];
   const record = (step: string, problems: string[]) =>
-    steps.push({ step, vp: sim.vp, windows: snapshotOf(sim), cell: cellPx(sim), problems });
+    steps.push({
+      step,
+      vp: sim.vp,
+      windows: snapshotOf(sim),
+      cell: cellPx(sim),
+      log: sim.ctl.store.getState().settleLog,
+      problems,
+    });
 
   /** A page load: the stored layout applied with no token drawn, then the load fit draws them. */
-  const load = (label: string) => {
+  /** `moved`: the camera is panned after the load fit (a reload always fits: `fitted`). */
+  const load = (label: string, moved = camera === "moved") => {
     sim.cam = null;
     sim.ctl = newController(sim);
     sim.ctl.restore(sim.key);
     fullFit(sim);
-    if (camera === "moved") moveCamera(sim);
+    if (moved) moveCamera(sim);
+    // FR-SHELL-95: `load` settles once more after the first token draw, at that camera.
+    dispatch(sim, { type: "load", drawn: true });
     record(label, check(sim, windowsOf(sim)));
   };
   const kinds = setKinds(registry, set);
@@ -536,12 +583,20 @@ export function runReplay(
       before = windowsOf(sim);
       dispatch(sim, { type: "push", rect: bar });
       record("push re-select", check(sim, before));
-      // A user drags the first open launcher window under the bar (FR-SHELL-105).
-      const drag = launcherKinds.find((k) => shownOf(sim).has(k));
+      // A user drags a pushed launcher window back under the bar, onto its spot before the push
+      // (FR-SHELL-105, walkthrough F7).
+      const preOf = (k: string) => pre.split(" ").find((e) => e.startsWith(`${k}@`));
+      const drag = launcherKinds.find((k) => {
+        const now = windowsOf(sim).find((w) => w.kind === k);
+        return (
+          now?.state === "open" && preOf(k) !== undefined && preOf(k) !== `${k}@${rectKey(now)}`
+        );
+      });
       let dropped: string | null = null;
       if (drag) {
-        const cur = shownOf(sim).get(drag)?.r as Rect;
-        const rect = { x: 68, y: 60, w: cur.w, h: cur.h };
+        const [x, y, wh] = (preOf(drag) as string).slice(drag.length + 1).split(",");
+        const [w, h] = (wh as string).split("×");
+        const rect = { x: Number(x), y: Number(y), w: Number(w), h: Number(h) };
         dispatch(sim, { type: "setRect", kind: drag, rect });
         dropped = `${drag}@${rectKey(rect)}`;
         before = windowsOf(sim);
@@ -573,9 +628,9 @@ export function runReplay(
         if (sim.mode === "fitted") fullFit(sim);
         record(`viewport ${next.w}×${next.h}`, check(sim, before));
       }
-      // I7: down and back up restores the start.
+      // I7: down and back up restores the start (1280×720 has nothing below: up and back, no I7).
       const end = snapshotOf(sim);
-      if (end !== start)
+      if (end !== start && down.length > 0)
         steps.push({
           ...(steps.at(-1) as ReplayStep),
           step: "I7",
@@ -604,12 +659,15 @@ export function runReplay(
       break;
     }
     case "load": {
+      // r03: a reload (the load fit, `fitted`), then the settle after the first draw again: a
+      // settled layout stays (FR-SHELL-95 `load`, F5).
       openAll("open");
-      const pre = openRects(sim);
-      load("reload");
-      const problems: string[] = [];
-      if (openRects(sim) !== pre) problems.push(`reload: ${openRects(sim)} ≠ ${pre}`);
-      steps.push({ ...(steps.at(-1) as ReplayStep), step: "reload same rects", problems });
+      load("reload", false);
+      const settled = snapshotOf(sim);
+      dispatch(sim, { type: "load", drawn: true });
+      const problems = check(sim, windowsOf(sim));
+      if (snapshotOf(sim) !== settled) problems.push(`load twice: ${snapshotOf(sim)} ≠ ${settled}`);
+      record("load again", problems);
       break;
     }
     case "Start": {

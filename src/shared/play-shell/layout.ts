@@ -51,6 +51,13 @@ export const WindowState = z.object({
    * parse as absent (the shell chose the spot).
    */
   userSpot: z.literal(true).optional(),
+  /**
+   * Set at a user resize end (FR-SHELL-100, ADR-0060 §6): the size is the user's, the placer's
+   * target; it never shrinks or grows it (render-only fit only). Cleared by Reset layout. Absent
+   * on entries stored before it: inferred at load iff `userSpot` is set and the size is neither a
+   * known default nor the min size.
+   */
+  userSize: z.literal(true).optional(),
 });
 export type WindowState = z.infer<typeof WindowState>;
 

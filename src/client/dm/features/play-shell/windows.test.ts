@@ -24,7 +24,7 @@ import {
   rectOf,
 } from "@ui/features/play-shell/layout-checks";
 import { defaultLayout, reduce, restoreLayout, useful } from "@ui/features/play-shell/manager";
-import { fittedMapRect, touchedEdge, uncoveredShare } from "@ui/features/play-shell/map-coverage";
+import { fittedMapRect, uncoveredShare } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect, pcClear, placeWindow } from "@ui/features/play-shell/placement";
 import {
   availableKinds,
@@ -37,7 +37,6 @@ import { createShellController } from "@ui/features/play-shell/shell-store";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
 import { ambushTokens } from "@ui/features/play-shell/test-cells";
 import { summaryStrip, toastKeepOut } from "@ui/features/play-shell/toast-region";
-import { coveredArea } from "@ui/features/play-shell/token-boxes";
 import {
   contentBox,
   FIT_MIN_CELL_PX,
@@ -288,10 +287,11 @@ test("FR-SHELL-52 growth cap (DM): Initiative with 900 px of content renders dow
   }
 });
 
-test("FR-SHELL-53 previous defaults (DM): a stored 460×240 log → the viewport's default, written with area; a 1280×720 layout at 1440×900 and back; 470×240 kept; second apply = stored", () => {
+test("FR-SHELL-53 FR-SHELL-100 previous defaults (DM): a stored 460×240 log → the viewport's default, written with area; a 1280×720 layout at 1440×900 and back; 470×240 kept only as the user's size; second apply = stored", () => {
   const entry = (
     log: { x: number; y: number; w: number; h: number },
     area: { w: number; h: number },
+    user = false,
   ) =>
     JSON.stringify({
       windows: [
@@ -303,7 +303,15 @@ test("FR-SHELL-53 previous defaults (DM): a stored 460×240 log → the viewport
           z: 1,
           area,
         },
-        { kind: "dice.log", instance: "main", state: "open", ...log, z: 2, area },
+        {
+          kind: "dice.log",
+          instance: "main",
+          state: "open",
+          ...log,
+          z: 2,
+          area,
+          ...(user && { userSpot: true }),
+        },
       ],
     });
   const sprint4 = restoreLayout(
@@ -326,14 +334,22 @@ test("FR-SHELL-53 previous defaults (DM): a stored 460×240 log → the viewport
   expect(rectIn(small.windows, "dice.log")).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
   const back = restoreLayout(dmWindows, JSON.stringify({ windows: small.windows }), LAPTOP);
   expect(rectIn(back.windows, "dice.log")).toEqual({ x: 68, y: 484, w: 690, h: 160 });
-  // Resized by the user (470×240): kept.
+  // Resized by the user (470×240, a user spot: `userSize` inferred, FR-SHELL-100): kept.
   const kept = restoreLayout(
     dmWindows,
-    entry({ x: 68, y: 584, w: 470, h: 240 }, workArea(WIDE)),
+    entry({ x: 68, y: 584, w: 470, h: 240 }, workArea(WIDE), true),
     WIDE,
   );
   expect(kept.migrated).toBeUndefined();
   expect(rectIn(kept.windows, "dice.log")).toEqual({ x: 68, y: 584, w: 470, h: 240 });
+  expect(kept.windows.find((w) => w.kind === "dice.log")?.userSize).toBe(true);
+  // The same size with no user spot is a shell size: the zone (FR-SHELL-99).
+  const shell = restoreLayout(
+    dmWindows,
+    entry({ x: 68, y: 584, w: 470, h: 240 }, workArea(WIDE)),
+    WIDE,
+  );
+  expect(rectIn(shell.windows, "dice.log")).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
 });
 
 test("FR-SHELL-54 DM map-first: battlemap uncovered by the default layout ≥ 55% at 1440×900, ≥ 60% at 1280×720", () => {
@@ -505,7 +521,7 @@ function ambushBoxes(at: { x: number; y: number }, cell: number, tokens = GOBLIN
   return tokens.map((t) => ({ x: ox + t.col * cell, y: oy + t.row * cell, w: cell, h: cell }));
 }
 
-test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: DM Initiative opened at Start clears the monsters under its default top-right rect; no tokens → default rect; first load unchanged", () => {
+test("FR-SHELL-40 FR-SHELL-99 FR-SHELL-118 placement at 1280×720 / 1280×800 / 1600×900: DM Initiative opened at Start takes its zone, monsters under it or not (the map refits, OQ-SHELL-63 A); first load unchanged", () => {
   const def = dmWindows.get("cbt.initiative");
   if (!def) throw new Error("no cbt.initiative");
   for (const viewport of SPRINT4) {
@@ -520,22 +536,12 @@ test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: DM Initiative 
     const start = { type: "open", kind: "cbt.initiative", by: "feature" } as const;
     expect(same(win(reduce(idle, start, plain), "cbt.initiative"), home)).toBe(true);
     // The camera zoomed in (120 px cells) on the monsters, under the whole right column; the
-    // PCs are off-screen left.
+    // PCs are off-screen left: Initiative keeps its zone (no longer placed by token cover).
     const boxes = ambushBoxes({ x: home.x - 40, y: home.y + 2 * 120 }, 120);
     const monsters = boxes.filter((_, i) => !GOBLIN_AMBUSH[i]?.pc);
     expect(monsters.every((b) => overlaps(b, home))).toBe(true);
     const ws = reduce(idle, start, { ...plain, avoid: () => boxes });
-    const init = win(ws, "cbt.initiative");
-    expect(coveredArea(init, boxes)).toBeLessThan(coveredArea(home, boxes));
-    expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? "mid-map");
-    const others = ws.filter((w) => w.kind !== "cbt.initiative");
-    for (const o of renderedWindowRects(others, dmWindows, allKinds(), viewport)) {
-      expect(overlaps(init, o) ? `Initiative over a window at ${at}` : "ok").toBe("ok");
-    }
-    // Ties (tokens under no candidate) → the default column.
-    const midMap = [{ x: viewport.w / 2, y: viewport.h / 2, w: 10, h: 10 }];
-    const tie = reduce(idle, start, { ...plain, avoid: () => midMap });
-    expect(same(win(tie, "cbt.initiative"), home)).toBe(true);
+    expect(same(win(ws, "cbt.initiative"), home) ? "zone" : `moved at ${at}`).toBe("zone");
   }
 });
 
@@ -559,7 +565,7 @@ test("FR-SHELL-40 toast keep-out: DM default layout clear of the top-centre box;
   }
 });
 
-test("FR-SHELL-41 DM: Compendium dragged onto Initiative's stored rect; Start restores Initiative into a free slot, written with its area; a user open keeps the stored rect", () => {
+test("FR-SHELL-41 FR-SHELL-99 DM: Compendium dragged onto Initiative's stored rect; Start restores Initiative into its zone, written with its area, the Compendium displaced; a user open the same", () => {
   for (const viewport of SPRINT4) {
     const ctx = { registry: dmWindows, viewport, available: allKinds() };
     let ws = reduce(
@@ -574,12 +580,16 @@ test("FR-SHELL-41 DM: Compendium dragged onto Initiative's stored rect; Start re
       { type: "setRect", kind: "cmp.compendium", rect: { ...home, w: 440, h: 400 } },
       ctx,
     );
-    const cmp = win(ws, "cmp.compendium");
     const started = reduce(ws, { type: "open", kind: "cbt.initiative", by: "feature" }, ctx);
     const init = started.find((w) => w.kind === "cbt.initiative");
     expect(init?.state).toBe("open");
+    // FR-SHELL-99 (ruling 8): Initiative takes its zone; the user's Compendium in it moves.
+    expect(init && same(init, home)).toBe(true);
+    const cmp = win(started, "cmp.compendium");
     expect(
-      init && overlaps(init, cmp) ? `over the Compendium at ${viewport.w}×${viewport.h}` : "ok",
+      init && cmp.state === "open" && overlaps(init, cmp)
+        ? `over the Compendium at ${viewport.w}×${viewport.h}`
+        : "ok",
     ).toBe("ok");
     expect(init?.area).toEqual(workArea(viewport));
     for (const by of [undefined, "user"] as const) {
@@ -729,7 +739,7 @@ function shellAt(registry: WindowRegistry, vp: { w: number; h: number }) {
   return c;
 }
 
-test("FR-SHELL-56 reopen covered vs free spot (DM, protected): Initiative closed, Compendium moved into its spot, Initiative reopened → Initiative at its stored rect (stored), Compendium re-placed clear of it (auto) or auto-minimised", () => {
+test("FR-SHELL-56 FR-SHELL-99 reopen covered vs free spot (DM, protected): Initiative closed, Compendium moved into its spot, Initiative reopened → Initiative at its zone (`zone`), Compendium displaced clear of it (`displaced`) or put away", () => {
   for (const viewport of REFERENCE_VIEWPORTS) {
     const at = `${viewport.w}×${viewport.h}`;
     const c = shellAt(dmWindows, viewport);
@@ -741,11 +751,11 @@ test("FR-SHELL-56 reopen covered vs free spot (DM, protected): Initiative closed
     c.dispatch({ type: "toggle", kind: "cbt.initiative" }, all); // the launcher button
     const s = c.store.getState();
     expect({ at, init: rectIn(s.windows, "cbt.initiative") }).toEqual({ at, init: home });
-    expect(s.placed.get("cbt.initiative:main")).toBe("stored");
+    expect(s.placed.get("cbt.initiative:main")).toBe("zone");
     const cmp = s.windows.find((w) => w.kind === "cmp.compendium");
     if (cmp?.state === "open") {
       expect(overlaps(cmp, home) ? `Compendium still over Initiative at ${at}` : "ok").toBe("ok");
-      expect(s.placed.get("cmp.compendium:main")).toBe("auto");
+      expect(s.placed.get("cmp.compendium:main")).toBe("displaced");
     } else {
       expect(cmp?.state).toBe("minimised");
     }
@@ -841,6 +851,8 @@ const GOLDEN_KINDS = [
   "shell.prefs", // PF1 (FR-SHELL-62 (d): appended with its goldens)
   "charx.companion", // CP4 (S2): appended, goldens regenerated
   "stats.board", // ST2 (FR-SHELL-86 (5)): appended, goldens regenerated
+  // FR-SHELL-112 (1), -143: pending until registered (TT2 `dicex.requests`, CB3 `party.summary`).
+  ...["dicex.requests", "party.summary"].filter((k) => dmWindows.get(k) !== undefined),
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

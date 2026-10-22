@@ -12,7 +12,7 @@ import {
 import { defaultLayout, type ManagerContext, reduce } from "@ui/features/play-shell/manager";
 import { pcClear } from "@ui/features/play-shell/placement";
 import { createShellController } from "@ui/features/play-shell/shell-store";
-import { BANDS, SIZE_TABLE, TEST_KINDS } from "@ui/features/play-shell/size-table";
+import { BANDS, PENDING_ROWS, SIZE_TABLE, TEST_KINDS } from "@ui/features/play-shell/size-table";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
 import { SIM10_AMBUSH_PLAYER, sim10Tokens } from "@ui/features/play-shell/test-cells";
 import { playerWindows } from "../../windows";
@@ -47,11 +47,19 @@ function shell(vp: { w: number; h: number }, tokens: () => ReturnType<typeof sim
   return { c, fits, ws: () => c.store.getState().windows };
 }
 
-test("FR-SHELL-85 size table (player): every registered kind's default, useful (player band 412 / 492 / 472 / 472) and min size at the four sizes = §7's sprint-7 table", () => {
-  expect(sizeTableProblems(playerWindows, SIZE_TABLE.player, BANDS.player, TEST_KINDS)).toEqual([]);
+test("FR-SHELL-85 FR-SHELL-100 size table (player, shape only): every registered kind's default, useful (player band 412 / 492 / 472 / 472; the ★ kinds' sprint-8 useful sizes), min size and criterion at the four sizes = §7's table; pending rows skipped until registered", () => {
+  expect(
+    sizeTableProblems(
+      playerWindows,
+      SIZE_TABLE.player,
+      BANDS.player,
+      TEST_KINDS,
+      PENDING_ROWS.player,
+    ),
+  ).toEqual([]);
 });
 
-test("FR-SHELL-79 useful size before shrinking (player): note.history at 1440×900 opens 472 high (the player band); the companion card at 1280×800 with Compendium open auto-minimises it and opens 320×360 (sim-10 a03: 280×308)", () => {
+test("FR-SHELL-79 FR-SHELL-97 useful size before shrinking (player): note.history at 1440×900 opens at its full 480 (L1: a spot at its target size comes first); the companion card at 1280×800 with Compendium open auto-minimises it and opens 320×360 (sim-10 a03: 280×308)", () => {
   const ctx = (vp: { w: number; h: number }): ManagerContext => ({
     registry: playerWindows,
     viewport: vp,
@@ -62,7 +70,7 @@ test("FR-SHELL-79 useful size before shrinking (player): note.history at 1440×9
     { type: "open", kind: "note.history" },
     ctx(WIDE),
   );
-  expect(rectIn(notes, "note.history").h).toBe(472);
+  expect(rectIn(notes, "note.history").h).toBe(480);
   let ws = reduce(
     defaultLayout(playerWindows, MID),
     { type: "open", kind: "cmp.compendium" },

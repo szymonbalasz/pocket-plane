@@ -7,11 +7,14 @@ import { EDGE_GAP, type Rect, type Viewport } from "./geometry";
 import { hardRects, keepOuts } from "./keep-outs";
 import {
   bandAt,
+  type Displacement,
   defaultLayout,
   isReopenCovered,
   type ManagerContext,
+  plan,
   reduce,
   useful,
+  type WindowAction,
   type Windows,
 } from "./manager";
 import {
@@ -23,7 +26,7 @@ import {
   usableArea,
 } from "./placement";
 import { defaultSizeAt, type Size, type WindowDef, type WindowRegistry } from "./registry";
-import type { SizeRow } from "./size-table";
+import type { PendingRow, SizeRow } from "./size-table";
 
 /** The reference viewports of the named default layouts (FR-SHELL-50). */
 export const REFERENCE_VIEWPORTS: readonly Viewport[] = [
@@ -162,14 +165,18 @@ export function placeFields(
   vp: Viewport,
   scene: PlaceScene,
   margin = 0,
+  gap: number = EDGE_GAP,
 ): number[] {
-  return fieldsOf(def, vp, scene, margin)(r);
+  return fieldsOf(def, vp, scene, margin, gap)(r);
 }
 
-/** `placeFields` for one window and scene, its lists grown once (the oracle calls it a lot). */
-function fieldsOf(def: Placeable, vp: Viewport, scene: PlaceScene, margin: number) {
+/**
+ * `placeFields` for one window and scene, its lists grown once (the oracle calls it a lot);
+ * `gap`: the clearance to windows and hard regions (FR-SHELL-98: 12 px, a rung's retry at 4).
+ */
+function fieldsOf(def: Placeable, vp: Viewport, scene: PlaceScene, margin: number, gap = EDGE_GAP) {
   const { openH } = sizesOf(def, vp, scene.hard);
-  const blocks = [...scene.windows, ...scene.hard].map((o) => grow(o, EDGE_GAP));
+  const blocks = [...scene.windows, ...scene.hard].map((o) => grow(o, gap));
   const pcs = pcBoxes(scene.tokens).map((p) => grow(p, margin));
   const tokens = scene.tokens.map((t) => grow(t, margin));
   return (r: Rect): number[] => {
@@ -200,10 +207,16 @@ const less = (a: readonly number[], b: readonly number[]) => {
  * full-width spot is clear (placement narrows a window to get off every token, or to stay clear
  * of windows before it parks one). Footprints count with the 12-px candidate gap.
  */
-export function bruteBest(def: Placeable, vp: Viewport, scene: PlaceScene, floor?: Size): number[] {
+export function bruteBest(
+  def: Placeable,
+  vp: Viewport,
+  scene: PlaceScene,
+  floor?: Size,
+  gap: number = EDGE_GAP,
+): number[] {
   const z = sizesOf(def, vp, scene.hard, floor);
   const heights = [...new Set([z.fullH, z.minH, ...(z.openH === null ? [] : [z.openH])])];
-  const fields = fieldsOf(def, vp, scene, EDGE_GAP);
+  const fields = fieldsOf(def, vp, scene, Math.max(gap, EDGE_GAP), gap);
   const free = (f: readonly number[]) => f[0] === 0 && f[1] === 0 && f[4] === 0;
   let best = [1, 1, 1, 1, 1];
   const search = (cw: number, onlyFree: boolean) => {
@@ -367,8 +380,14 @@ function autoPlaceProblems(
     out.push(`auto-minimised ${parked.join()}, FR-SHELL-78 order ${order.join()}`);
   }
   if (pcFree) {
-    const got = placeFields(rect, def, vp, scene);
-    const best = bruteBest(def, vp, scene, atUseful ? floor : undefined);
+    // FR-SHELL-97, -117: within the rung it took. A spot at its full size (L1) is checked against
+    // full-size spots only, a useful-size one (L2) down to the useful size; a rect clear only at
+    // the 4-px retry (FR-SHELL-98) at 4 px.
+    const full = rect.w >= z.w && rect.h >= (z.openH ?? z.fullH);
+    const gap = placeFields(rect, def, vp, scene)[0] === 0 ? EDGE_GAP : 4;
+    const got = placeFields(rect, def, vp, scene, 0, gap);
+    const fullSize = { w: z.w, h: z.openH ?? z.fullH };
+    const best = bruteBest(def, vp, scene, full ? fullSize : atUseful ? floor : undefined, gap);
     if (best[0] === 0 && less(best, got)) {
       out.push(`brute check: got ${got.join("")}, a spot gives ${best.join("")}`);
     }
@@ -399,13 +418,24 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
     renderedWindowRects(shown(ws), registry, o.available, v, new Map(), hardRects(regionsAt(v)));
   let ws: Windows = defaultLayout(registry, vp, [], regionsAt(vp));
   let tokens = o.tokensAt(vp, rendered(ws, vp));
+  // The shell's client memory between actions (FR-SHELL-102), as the controller keeps it.
+  let memory: readonly Displacement[] = [];
+  let settledAt = vp;
   const ctx = (): ManagerContext => ({
     registry,
     viewport: vp,
     available: o.available,
     avoid: () => tokens,
     keepOuts: () => regionsAt(vp),
+    memory: () => memory,
+    settledViewport: settledAt,
   });
+  const act = (a: WindowAction) => {
+    const p = plan(ws, a, ctx());
+    ws = p.windows;
+    memory = p.memory;
+    if (a.type === "viewport") settledAt = vp;
+  };
   const find = (list: Windows, kind: string) =>
     list.find((w) => w.kind === kind && w.instance === MAIN_INSTANCE);
   const rectNow = (list: Windows, kind: string): Rect | null => {
@@ -422,7 +452,7 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
     const reopen = cur !== undefined && cur.state !== "open";
     const was = cur && reopen ? rectOf(cur) : null;
     const covered = cur && reopen ? isReopenCovered(before, cur, ctx()) : false;
-    ws = reduce(ws, { type: "open", kind }, ctx());
+    act({ type: "open", kind });
     const after = find(ws, kind) as WindowState;
     const moved = !sameRect(was, rectOf(after));
     const parked = ws
@@ -458,7 +488,7 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
     steps.push({ step, vp, kind, rect, placed, parked, problems });
   };
   const closeAll = () => {
-    for (const kind of o.kinds) ws = reduce(ws, { type: "close", kind }, ctx());
+    for (const kind of o.kinds) act({ type: "close", kind });
   };
 
   for (const kind of o.kinds) open("open", kind);
@@ -467,19 +497,21 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
   for (const next of o.viewports.slice(1)) {
     closeAll();
     vp = next;
-    ws = reduce(ws, { type: "viewport" }, ctx());
+    act({ type: "viewport" });
     tokens = o.tokensAt(vp, rendered(defaultLayout(registry, vp, [], regionsAt(vp)), vp));
     for (const kind of o.kinds) open(`reopen ${vp.w}×${vp.h}`, kind);
   }
   // FR-SHELL-56 (5): a launcher window moved onto the closed protected window's spot (test-mode
   // `fixedDefault` windows keep theirs, (5)).
   const first = o.kinds.find((k) => !registry.get(k)?.fixedDefault);
+  // Closing the launcher windows ends any squeeze they caused (FR-SHELL-101, -102): the protected
+  // window's spot is the one it has then.
+  closeAll();
   const prot = rectNow(ws, o.protectedKind);
   if (first && prot) {
-    closeAll();
-    ws = reduce(ws, { type: "close", kind: o.protectedKind }, ctx());
+    act({ type: "close", kind: o.protectedKind });
     open("protected", first);
-    ws = reduce(ws, { type: "setRect", kind: first, rect: prot }, ctx());
+    act({ type: "setRect", kind: first, rect: prot });
     open("protected", o.protectedKind);
     const step = steps.at(-1) as LayoutStep;
     if (!sameRect(step.rect, prot)) step.problems.push("protected window moved");
@@ -513,20 +545,23 @@ export function contractProblems(def: WindowDef): string[] {
   return out;
 }
 
-// ---- sprint 7: the size table (FR-SHELL-85) ----
+// ---- sprint 7–8: the size table (FR-SHELL-85, -100) ----
 
 const sz = (v: Size) => `${v.w}×${v.h}`;
 
 /**
- * FR-SHELL-85: every registered kind (but `skip`) against its row of `rows` at the four reference
- * sizes: the default size (fitted for a protected row), `useful(def, vp, client)` (null row = protected) and the min
- * size; the client's band against `bands`; a row with no registered kind. Empty = matches.
+ * FR-SHELL-85, -100: every registered kind (but `skip`) against its row of `rows` at the four
+ * reference sizes: the default size (fitted for a protected row), `useful(def, vp, client)` and
+ * the min size; a criterion named; protected rows exactly the `defaultOpen` kinds; the client's
+ * band against `bands`; a row with no registered kind. `pending` rows (FR-SHELL-112 (1)) are
+ * skipped until their kind registers, then fail until filled. Empty = matches.
  */
 export function sizeTableProblems(
   registry: WindowRegistry,
   rows: Readonly<Record<string, SizeRow>>,
   bands: readonly number[],
   skip: ReadonlySet<string>,
+  pending: Readonly<Record<string, PendingRow>> = {},
 ): string[] {
   const out: string[] = [];
   REFERENCE_VIEWPORTS.forEach((vp, i) => {
@@ -537,23 +572,29 @@ export function sizeTableProblems(
     if (skip.has(def.kind)) continue;
     const row = rows[def.kind];
     if (!row) {
-      out.push(`${def.kind}: no row`);
+      const owner = pending[def.kind]?.pending;
+      out.push(owner ? `${def.kind}: pending row (${owner}) not filled` : `${def.kind}: no row`);
       continue;
+    }
+    if (row.criterion.trim() === "") out.push(`${def.kind}: no useful-size criterion`);
+    if ((row.protected === true) !== (def.defaultOpen === true)) {
+      out.push(
+        `${def.kind}: protected ${def.defaultOpen === true}, table ${row.protected === true}`,
+      );
     }
     REFERENCE_VIEWPORTS.forEach((vp, i) => {
       const at = `${def.kind} at ${vp.w}×${vp.h}`;
       // Protected rows hold what the default layout places (fitted, e.g. the player's sheet above
       // the toast corner); the others the registered default size.
       const hard = hardRects(keepOuts(registry.client, vp, new Map()));
-      const f = row.useful === null ? fittedDefaultRect(def, vp, hard) : defaultSizeAt(def, vp);
+      const f = row.protected ? fittedDefaultRect(def, vp, hard) : defaultSizeAt(def, vp);
       const want = row.default[i] as Size;
       if (sz(f) !== sz(want)) out.push(`${at}: default ${sz(f)}, table ${sz(want)}`);
-      if (row.useful === null) {
-        if (!def.defaultOpen) out.push(`${at}: not protected, table has no useful size`);
-      } else {
-        const u = useful(def, vp, registry);
-        const w = row.useful[i] as Size;
-        if (sz(u) !== sz(w)) out.push(`${at}: useful ${sz(u)}, table ${sz(w)}`);
+      const u = useful(def, vp, registry);
+      const w = row.useful[i] as Size;
+      if (sz(u) !== sz(w)) out.push(`${at}: useful ${sz(u)}, table ${sz(w)}`);
+      if (w.w > want.w || w.h > Math.max(want.h, f.h) || w.w < row.min.w || w.h < row.min.h) {
+        out.push(`${at}: useful ${sz(w)} outside min ${sz(row.min)} … default ${sz(want)}`);
       }
     });
     if (sz(def.minSize) !== sz(row.min)) {
