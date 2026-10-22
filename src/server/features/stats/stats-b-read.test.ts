@@ -197,6 +197,13 @@ describe("FR-STATS-37 which rolls count", () => {
     expect(t.trophies(t.miraId).lifetime?.nat20).toBe(1);
   });
 
+  test("FR-DICE-90 new roll paths count: a roll written through dice.evaluate with a hidden entry counts for the DM only", () => {
+    const t = statsSetup();
+    t.roll("Thorn", 20, { public: false });
+    expect(t.luck().rows).toEqual([expect.objectContaining({ name: "Thorn", rolls: 1, nat20: 1 })]);
+    expect(t.luck(t.p2).rows).toEqual([]);
+  });
+
   test("FR-STATS-39 rows: DM dice for the DM only; a player's Me roll counts nowhere", () => {
     const t = statsSetup();
     // The DM, no actor; then Player 1's "Me" roll.
@@ -255,7 +262,7 @@ describe("FR-DICE-89 luck fields", () => {
 });
 
 describe("FR-STATS-40 scopes", () => {
-  test("FR-STATS-40 scopes: one session (default the newest; any n resolves) or the campaign", async () => {
+  test("FR-STATS-40 FR-STATS-45 scopes: one session (default the newest; any n resolves) or the campaign", async () => {
     const t = statsSetup();
     t.roll("Thorn", 20, { actor: t.p2 });
     const first = t.luck().fromN as number;
