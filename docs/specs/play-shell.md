@@ -1,7 +1,7 @@
 ---
 title: Play shell
 prefix: SHELL
-status: claimed
+status: in-review
 owner: spec-rs
 phase: post-mvp-9
 ---
@@ -113,6 +113,14 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 | FR-SHELL-141 | Sizes: grows to its rows; default / useful / min per WF's table | CB3 | `FR-SHELL-140 party status registered` |
 | FR-SHELL-142 | No feature open; user opens only | CB3 | `FR-SHELL-140 party status registered` |
 | FR-SHELL-143 | Registry rows (sets P1 / P3 / D3, both goldens) filled in CB3's branch; launcher fits at 1280×720 | CB3 | WF's layout harness, `FR-SHELL-140 launcher fits` |
+
+> **Sprint 9 (track RS, reminders + strongholds, BL-73; owner spec-rs).** One new window, **Stronghold** (`hold.stronghold`, both clients, no launcher: opened from the Party Manager's Strongholds tab), for [strongholds](strongholds.md) FR-HOLD-23–34. It registers through the window registries (append) **after PM's frame core** (PM owns the frame, window memory and the Party Manager this sprint). New **FR-SHELL-170–172**. No frame, placer or keep-out file here. 0 B on the wire from SHELL. Seam [OQ-SHELL-85](#15-open-questions) (PM).
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-SHELL-170 | Window type `hold.stronghold` "Stronghold", both clients, no launcher, loads closed, opened by the user from the tab | RS2 `build/hold-ui` | `FR-SHELL-170 stronghold window registered` |
+| FR-SHELL-171 | Size-table row and contract rows (goldens, harness sets) | RS2 | `FR-SHELL-170 stronghold window registered` + PM's layout harness |
+| FR-SHELL-172 | Only under OQ-HOLD-07 B: a launcher window `hold.list` "Strongholds" | RS2 (if B) | `FR-SHELL-172 strongholds launcher` |
 
 > **Sprint 7 (track ST, stats tier A, DM [#311](../decisions-log.md); spec-stats).** A new launcher window **Stats** (`stats.board`, both clients) for the [stats](stats.md) leaderboard and session awards. It registers through the window registry (append) under FU's **FR-SHELL-86** contract (seam S5), and opens itself on the awards when the DM shows them. New **FR-SHELL-93–94**. **FU owns the frame this sprint** (#310 parking, default sizes, Reset layout). Slice ST2 registers `stats.board` **after FU1 merges**. 0 B on the wire from SHELL.
 
@@ -356,6 +364,9 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 | FR-SHELL-141 | **Size-table row** (seams S12; same at 1280×720, 1280×800, 1440×900, 1600×900, both clients): **default** 280 × 260, `growToContent` (FR-SHELL-39: height follows its rows, capped by the client's band, 412 at 1280×720, until the user resizes); **useful** 280 × 236, **criterion**: every PC row of a 6-PC party whole (name, HP, temp, AC uncut; FR-PARTY-58), companions may scroll; **min** 240 × 120. Rows, not the frame, decide wrapping. The criterion is checked in a browser (review-b #3): `party.summary`'s case in `e2e/useful-size.e2e.ts` on `wf-frame-e2e` + fixture `cb-party-six` (6 PCs, worst-width figures): `scrollHeight ≤ clientHeight`, every PC row visible and whole; `bun test` checks the table row's shape only. WF1 adds the pending row in the append-only `size-table.ts`; CB3 fills its values (review-b #14). | S12; review-b #3, #14, #21 |
 | FR-SHELL-142 | **No feature open**: only the launcher opens it (a reload restores it if it was open); a fight's Start opens nothing new (Initiative stays the only feature open at Start, FR-CBT-60). Layout remembered per browser as every window. | FR-SHELL-41 |
 | FR-SHELL-143 | **Contract rows** (FR-SHELL-112 (1)): the golden list, the harness sets and `size-table.ts` are **append-only registries** (review-b #14); WF1 adds `party.summary`'s pending entries to the player sets **P1 / P3**, the DM set **D3** and both goldens (player and DM); CB3 fills them and regenerates the goldens **after WF1 merges**. **Launcher fit** (review-b #20): with "Party status" added (and TT's top-bar items), the launcher still fits at 1280×720 in both clients (`launcher-fit.ts`, FR-SHELL-43: icons only, then "⋯"). Opened by the launcher only (`by: "user"`). | Seams S12; review-b #14, #20 |
+| FR-SHELL-170 | *(Sprint 9, RS)* **Window type `hold.stronghold`** "Stronghold" ([FR-HOLD-23](strongholds.md#6-functional-requirements)): one `defineWindow` line in each client's `windows.ts` (append, after PM's frame core); `defaultOpen: false` (never protected); **no launcher entry** (opened from the Party Manager's Strongholds tab, a reminder's link or a loot-log Stores name, always `by: "user"`); one instance, its content = the selected stronghold (client state kept per browser with the layout, as `party.handout`); anchor `top-right`; no keep-out; no activity dot. First placement by PM's placer; afterwards window memory (PM, #338). A stored layout naming a stronghold that is gone or hidden opens on FR-HOLD-23's "isn't available" message. | BL-73 |
+| FR-SHELL-171 | *(Sprint 9, RS)* **Size-table row** (same at 1280×720, 1280×800, 1440×900, 1600×900, both clients): **default 480 × 560**, **useful 400 × 400** (criterion: header, tab strip and three facility rows visible without scrolling at the default text size), **min 340 × 360**, `minOpenH` 400. **Contract rows** (as FR-SHELL-143, PM's contract this sprint): the golden list and the harness sets gain `hold.stronghold` (opened over the Party Manager in one player set and one DM set PM names); RS2 fills them and regenerates the goldens after PM's frame core merges; never hand-merged. | OQ-SHELL-85 |
+| FR-SHELL-172 | *(Sprint 9, RS; only if [OQ-HOLD-07](strongholds.md#15-open-questions) **B**)* **Launcher window `hold.list`** "Strongholds" (both clients; players: launcher entry only while they see ≥ 1 stronghold): the FR-HOLD-22 list, default 320 × 360, min 260 × 200, anchor `top-left` `dx` 56; launcher icon lucide `Castle` right after Party Manager; the launcher still fits at 1280×720 (FR-SHELL-43). Under A (pick) or C this FR is void. | OQ-HOLD-07 |
 
 ## 7. UI/UX notes
 
@@ -1121,6 +1132,15 @@ Teardown: stop, `fixtures:reset --profile verify`.
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-SHELL-73 | **Seam with WF (window-frame pass): registering Party status.** CB3 needs WF's contract for new windows (the FR-SHELL-86 successor: size-table row, useful size, golden list, put-away order) and its frame core merged first | **Resolved (integrator, sprint-8 seams / rulings).** **Closed by seams S12:** `party.summary` (both clients) registers per FR-SHELL-112 (1) after WF1, with its size-table row (FR-SHELL-141: default, useful + criterion, min), goldens and harness sets P1 / P3 / D3 (append-only registries, review-b #14); WF's placer decides its spot; no keep-out; WF adds it as a pending row. (If the DM picks a strip, OQ-PARTY-29 B, WF owns the strip region and CB3 fills it) | — | WF, FR-SHELL-140–143 |
+
+**Sprint 9, track RS** (owner spec-rs). **Bold** = suggested pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SHELL-85 | **Seam with PM (frame + window memory): registering the Stronghold window.** RS2 needs PM's contract for new windows this sprint (size-table row, useful size, goldens, harness sets) and PM's frame core merged first; under window memory a moved / resized Stronghold window reopens where the user left it | **A. As FR-SHELL-170–171: append lines after PM's frame core; PM's placer places it the first time, window memory after that; PM names the harness sets it joins** / B. RS2 registers before PM and rebases onto window memory (two placers' worth of golden churn). *Owner:* PM / seams | no · owner: orchestrator | PM, FR-SHELL-170–172 |
+| OQ-SHELL-86 | **PM ↔ RS:** if the DM picks a Strongholds launcher window (OQ-HOLD-07 B), the DM and player launchers gain one entry ("Strongholds", after Party Manager) | **Only under OQ-HOLD-07 B; PM's launcher-fit test covers it** (A, the pick, adds no launcher entry) | no · owner: orchestrator | PM, FR-SHELL-172 |
+
+- *(Sprint 9)* Test IDs: the window frame's usual `ui-window` `data-kind="hold.stronghold"`; content IDs are HOLD's (`hold-*`). Edges (FR-HOLD-23, -34): a stored layout with the window open on a stronghold that is gone / hidden opens on the "isn't available" message; reconnect reloads its content; 0 B.
 
 ## 16. Out of scope
 

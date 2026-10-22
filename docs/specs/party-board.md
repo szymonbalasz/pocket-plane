@@ -1,7 +1,7 @@
 ---
 title: Party board
 prefix: PARTY
-status: claimed
+status: in-review
 owner: spec-rs
 phase: post-mvp-9
 ---
@@ -51,6 +51,17 @@ phase: post-mvp-9
 | FR-PARTY-57 | CON-44 measured | CB3 | `FR-PARTY-57 CON-44 combat polish` |
 
 > **Sprint 7, track FU (BL-48 small copy, DM [#311](../decisions-log.md)).** Decided, not open: the inventory toast's wording and a Loot draft lost on a tab switch. New FR-PARTY-49, -50 ([§6.9](#69-sprint-7-bl-48-copy-and-tabs-track-fu)); two BL-48 items dropped with reasons there. Client + one notification text, 0 B new. Tests `FR-PARTY-49 inventory toast text` (unit: `itemAddedText` → "Party inventory: Potion of healing ×2"; the DM's and players' toasts), `FR-PARTY-50 tabs keep state` (DOM: Move draft kept across Loot → Inventory → Loot; gone after close); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4 ([play-shell §14](play-shell.md#14-dependencies)). No open question. Edge cases: a reconnect re-renders the mounted tabs from the store (drafts kept, as minimised windows); reload drops drafts (as today).
+
+> **Sprint 9, track RS (BL-73, DM [#338](../decisions-log.md); owner spec-rs).** Decided, not open: the **Party Manager** (track PM renames the Party window, makes Party status its first tab, moves Companions into it and widens it to 550 px) gains a **Reminders** tab ([reminders](reminders.md): players the party + own characters, the DM all, grouped by character, party first) and a **Strongholds** tab ([strongholds](strongholds.md): the list; each opens a Stronghold window). New **FR-PARTY-71–78** ([§6.11](#611-sprint-9-reminders-and-strongholds-tabs-track-rs)); PARTY only hosts the tabs (content is REM's and HOLD's). Stores items share `party-item` ([LOOT FR-LOOT-36, -37](party-loot.md#6-functional-requirements), amends FR-PARTY-17–23). Questions for PM / the DM: [OQ-PARTY-41, -42](#15-open-questions) and [OQ-HOLD-07](strongholds.md#15-open-questions) (6 tabs at 550 px vs a Strongholds launcher). 0 B snapshot from the tabs (lazy types, measured in REM / HOLD §12). Slices RS1 (Reminders tab) ∥ RS2 (Strongholds tab), both **after PM's restructure** (PM holds the tab list first; RS appends).
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-PARTY-71, -78 | Two tabs appended after PM's list; tab memory; test IDs | RS1, RS2 | `FR-PARTY-71 tabs after PM's list` |
+| FR-PARTY-72 | Strongholds tab only while a player sees one | RS2 | `FR-PARTY-72 strongholds tab per viewer` |
+| FR-PARTY-73, -74 | Hosted content; lazy loads | RS1, RS2 | `FR-PARTY-74 tabs load once per snapshot` |
+| FR-PARTY-75 | `openPartyTab` targets | RS1, RS2 | `FR-PARTY-75 open on a tab` |
+| FR-PARTY-76 | Six tabs at 550 px, never cut | RS2 (e2e) | `FR-PARTY-76 six tabs fit` |
+| FR-PARTY-77 | Inventory shows party rows only | RS3 | `FR-PARTY-77 inventory without Stores rows` |
 
 ## 1. Summary
 
@@ -221,6 +232,21 @@ DM #334 (not open): each PC's HP / AC for players, companions per ADR-0056, mons
 | FR-PARTY-57 | **CON-44** (measured, §12): other players' character redactions + 49 B each → **players +343 B** on the heavy harness (7 other PCs), DM 0 B; per HP change other players get the same `entity` upsert as today + 49 B. | measured |
 | FR-PARTY-58 | **Layout**: one line per row at the default width (name, HP, temp, AC; conditions on the line if they fit, else a second line); names wrap, never cut (W4 rule); numbers never cut; at the min width (240 px) the bar goes under the name. Checked in a browser, not `bun test` (no layout engine there; review-b #3): `e2e/useful-size.e2e.ts` on `wf-frame-e2e` opens `party.summary` at its useful size (FR-SHELL-141) with fixture **`cb-party-six`** (6 PCs, worst-width figures) and asserts `scrollHeight ≤ clientHeight` and every PC row visible, names and figures whole. | |
 
+### 6.11 Sprint 9: Reminders and Strongholds tabs (track RS)
+
+BL-73 (decided): the Party Manager has a **Reminders** tab and a **Strongholds** tab. PM owns the window, its name, size and the tabs before these (Party status first, then Handouts, Inventory, Loot; Companions inside Party status); RS **appends** two entries after PM's restructure merges.
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-PARTY-71 | **Two tabs appended** to the Party Manager's tab list after PM's tabs, in this order: **Reminders**, **Strongholds** (full list per [OQ-PARTY-41](#15-open-questions): Party status, Handouts, Inventory, Loot, Reminders, Strongholds). Tab memory (FR-PARTY-11) accepts `reminders` and `strongholds`; an unknown or unavailable stored value → the first tab (PM's rule). Tabs stay mounted while the window is open (FR-PARTY-50), so a half-typed reminder editor survives a tab switch. | BL-73 |
+| FR-PARTY-72 | **Strongholds tab per viewer** (OQ-HOLD-07 **A**): the DM always; a player **only while they receive ≥ 1 stronghold** (from the `stronghold` load the window makes when it opens, FR-PARTY-74, and live upserts / deletes after it). A stored `strongholds` tab with none visible → the first tab. Under OQ-HOLD-07 B there is no tab: the list lives in its own launcher window ([FR-SHELL-172](play-shell.md#6-functional-requirements)); under C the tab exists only while the campaign's Strongholds switch is on. | OQ-HOLD-07 |
+| FR-PARTY-73 | **Hosted content**: Reminders = REM's `RemindersTab` ([FR-REM-17–26](reminders.md#6-functional-requirements)); Strongholds = HOLD's list ([FR-HOLD-22](strongholds.md#6-functional-requirements)). PARTY adds no record type, intent or event for them. | |
+| FR-PARTY-74 | **Loading** (ADR-0045): opening the Party Manager loads `stronghold` (lazy `"all"`, realistic ≈ 9 KB) for FR-PARTY-72; mounting Reminders loads `reminder`. Once per snapshot generation; after a reconnect / resync the open window reloads both (FR-SYNC-37). Skeleton while loading; reject → inline Retry. | 0 B snapshot |
+| FR-PARTY-75 | `openPartyTab(tab)` ([FR-PARTY-30](#66-sprint-5-loot-tab-present-uploads)) accepts `reminders` and `strongholds`. Callers: the sheet's Reminders section "Open in Party Manager" ([FR-CHARX-103](character-sheet-full.md#6-functional-requirements)) and the Stronghold window's "All strongholds" link ([FR-HOLD-24](strongholds.md#6-functional-requirements)). | |
+| FR-PARTY-76 | **Layout at 550 px** (PM's default width): the six tab labels at their full text fit by estimate (≈ 540 px at 14 px with 12 px padding each); where they don't (min width, a user-narrowed window), the strip **scrolls** horizontally and never cuts or abbreviates a label (FR-PARTY-46's rule). Checked in a browser (no layout engine in `bun test`): an e2e on `rs-e2e` opens the Party Manager at its default size (DM, player with a visible stronghold) and asserts every label whole and the strip's `scrollWidth ≤ clientWidth` at 550 px. | OQ-PARTY-42 |
+| FR-PARTY-77 | **Inventory = the party's rows only**: the Inventory tab lists `party-item` rows without `strongholdId`; Stores rows show only in their Stronghold window ([FR-LOOT-36](party-loot.md#6-functional-requirements)). Take / Give… and caps unchanged for the party. | |
+| FR-PARTY-78 | **Test IDs**: `party-tab` `data-value="reminders"` / `"strongholds"`; tab content uses REM's `rem-*` and HOLD's `hold-*` IDs. | AGENTS §9.5 |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Textarea, Button, Badge, Dialog, RadioGroup, Checkbox, ScrollArea, Toast, Skeleton. Dark only. No custom styling.
@@ -235,6 +261,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 - *(S6)* **Companions tab:** **DM view:** every pet with HP numbers, New pet…, row menu; **player view:** every pet, own with HP + Card, others with a band. **Test IDs:** `party-tab` `data-value="companions"`, `party-companions`, `party-companions-empty`, `party-companion-group` (+ `data-record-id` = PC id), `party-companion-row` (+ `data-record-id` = pet id, `data-in-combat`), `party-companion-hp` (+ `data-value`), `party-companion-band` (+ `data-value`), `party-companion-card`, `party-companion-new`, `party-companion-menu`, `party-companion-rename`, `party-companion-mode` (+ `data-value`), `party-companion-owner`, `party-companion-release`, `party-companion-release-confirm`, `party-companion-npc-sheet`.
 - *(S6)* **Editor:** Images block directly under the title, body below it (FR-PARTY-48); From library opens ASSET's picker with search + tag chips (ASSET §7). Test IDs unchanged (`party-editor-*`, `asset-attach*` with `data-owner="party-editor"`; the picker's `asset-picker` gains `data-context="handout"`).
 - *(S5)* **Test IDs:** `party-share-present`, `party-share-present-names`, `party-present-open` (row menu / viewer) + `data-record-id`, `party-present-dialog`, `party-present-mode` + `data-value` (`all|players`), `party-present-player` + `data-record-id`, `party-present-submit`, `party-present-error`, `party-present-count` + `data-value` (n), `party-present-close-all`; player popup `party-present-popup` + `data-record-id` (handout id) + `data-present-id`, `party-present-title`, `party-present-image` + `data-record-id` (asset id), `party-present-prev`, `party-present-next`, `party-present-page`, `party-present-body`, `party-present-loading`, `party-present-retry`, `party-present-close`, `party-present-open-board`. Editor: ASSET's `asset-attach*` with `data-owner="party-editor"`, plus `party-editor-duplicate` (seams S5).
+- *(S9)* **Reminders tab:** **DM view:** Party group, then every character (empty ones collapsed), DM-only rows with eye-off, Add everywhere; **player view:** Party + own characters, each with its read-only effects line ([REM §7](reminders.md#7-uiux-notes)). **Strongholds tab:** DM: every stronghold, "DM only" Badges, New stronghold; players: shown strongholds only, the tab absent while there are none ([HOLD §7](strongholds.md#7-uiux-notes)).
 - *(S8)* **Party status** (`party.summary`): a dense list, one line per PC (portrait, name + colour dot, HP "38 / 52" with a thin band-tone bar, "+5" temp, shield "15", death / Down Badge, condition icons), companions indented under their owner in muted type. **Player view:** own PCs on top in full; other PCs with the figures OQ-PARTY-30 picks; companions per ADR-0056 (own numbers, others a band). **DM view:** every PC, hidden ones with eye-off. A small turn marker on the PC whose turn it is. No editing in the window (HP stays on the sheet / Initiative / token). Test IDs: `party-summary` (list), `party-summary-row` (+ `data-record-id`), `party-summary-hp` (`data-value` = "cur/max" or band), `party-summary-temp`, `party-summary-ac`, `party-summary-companion` (+ `data-record-id`), `party-summary-empty`.
 
 ## 8. Data model
@@ -317,6 +344,7 @@ Players sending a DM-only intent → `forbidden`, no change.
 | *(S5)* `HandoutShared` / `HandoutDeleted` | unchanged | + handout-present deletes for losers (FR-PARTY-35) | as above, per row |
 
 - Each event is its own `event` frame, before the sender's `ack` ([FR-SYNC-14](live-sync.md#6-functional-requirements)). Notifications follow their command's event in the same transaction.
+- *(S9)* **Reminders / Strongholds tabs: no PARTY record type, intent or event.** They read REM's `reminder` and HOLD's `stronghold` (both lazy; visibility FR-REM-13, FR-HOLD-08). `party-item` gains `strongholdId?` and `party.addItem` an optional `holder` ([LOOT FR-LOOT-36, -37](party-loot.md#6-functional-requirements)); player redaction hides Stores rows of a DM-only stronghold (FR-LOOT-32).
 - *(S8)* **Party summary: no REST route, intent, event or signal.** Visibility rule per field it reads: `entity` character, DM full, owner full, **other players the whitelist + `hpCurrent`, `hpMax`, `tempHp`, `ac`** (option A; [ADR-0063](../architecture/adr/0063-party-hp-visibility.md)); pet entity and companion `combatant` per ADR-0056 (owner numbers, others band, hidden / `ownerHidden` → nothing); monster `combatant` per FR-CBT-37 (band, never shown in this window); `effect` per FR-CBTX-31. Existing events that now carry the new keys to other players: `AttackApplied`, `HpApplied`, `CharacterHpAdjusted`, `CombatEntryUndone`, `TempHpSet`, `DeathSaveRolled` (heal at 20), `EntityUpdated` / sheet edits of `hpMax` / `ac`.
 
 ## 10. Permissions
@@ -336,10 +364,13 @@ Players sending a DM-only intent → `forbidden`, no change.
 
 *(S6)* Companions tab: see pets — DM all with HP, players all (own with HP, others a band); New pet…, rename, mode, owner, release — DM only (entities' REST, DM secret); Card — DM any, owner own.
 
+*(S9)* Reminders / Strongholds tabs: see — per [REM §10](reminders.md#10-permissions) and [HOLD §10](strongholds.md#10-permissions); the Strongholds tab itself — DM always, a player while they see ≥ 1 stronghold (FR-PARTY-72).
+
 *(S8)* Party status: see every PC's figures — DM full; players own full, others per OQ-PARTY-30 (A: HP, temp HP, AC); open a sheet from a row — DM any, player own; no edits in the window.
 
 ## 11. Edge cases & failure modes
 
+- *(S9)* **Reminders / Strongholds tabs.** *Reconnect:* the snapshot purges `reminder` / `stronghold` rows; the open window reloads both (FR-PARTY-74), drafts in mounted editors kept. *A stronghold hidden while a player is on the Strongholds tab:* its row leaves; the last one → the tab disappears and the window falls back to the first tab. *DM disconnect / crash:* as REM §11 / HOLD §11 (every change is one command). *Leaks:* none new in PARTY (it hosts REM / HOLD content only).
 - *(S8)* **Party summary.** *Player disconnect / reconnect:* last figures, muted; the snapshot rebuilds every row. *DM disconnect:* nothing changes (no DM action). *Server crash:* nothing of its own; every figure comes from a command's committed rows. *Concurrent:* two HP changes in a row arrive as two upserts; the row shows the latest. *Hidden PC (#141):* under OQ-PARTY-31 A its figures still reach other players (as `down` and `deathState` do today); B hides them with a server-written copy flag. *Leak:* a monster's or another player's companion's numbers never reach a player (fns unchanged; leak scan per player). *Owner change:* the row moves to the new owner's "own" group on the next upsert. *A PC in no fight:* row without a turn marker; companions only while present (pets) or in the fight (summons).
 
 - *(S6)* **Companions tab:** *player disconnect / reconnect:* the list rebuilds from the snapshot's `entity` / `combatant` rows; *DM disconnect:* REST independent, a lost `PUT` → Toast (FR-PARTY-43); *crash:* every pet change is one entities transaction; *concurrency:* two DM tabs renaming → last `PUT` wins (whole replace, FR-ENT-11), a name clash → inline `conflict`; a pet joining a fight while its menu is open → Release disables on the combatant upsert; the server refuses anyway (FR-ENT-33). *Leaks:* none new: the tab shows only what entities and combat already send.
@@ -361,6 +392,7 @@ Players sending a DM-only intent → `forbidden`, no change.
 
 ## 12. Performance & bandwidth
 
+- *(S9)* The two tabs add **0 B** to every snapshot (lazy types). Their loads and events are measured in [REM §12](reminders.md#12-performance--bandwidth) (realistic DM load 17,873 B) and [HOLD §12](strongholds.md#12-performance--bandwidth) (realistic 9,474 B); Stores rows in the `party-item` load: [LOOT §12](party-loot.md#12-performance--bandwidth).
 - *(S6, measured with CP's heavy-harness probe, [CBT §12](combat-tracker.md#12-performance--bandwidth))*: the Companions tab adds **0 B** (no record type; it reads `entity` / `combatant` rows); the pet rows themselves are entities' (2,896 B full, 285 B redacted; worst 18 pets, all present: DM +52 KB, a player +13 KB; a pet that isn't present costs other players 0 B).
 
 **CON-44, measured** (throwaway probe on the realistic-heavy harness, `session-sim` + `buildRealisticHeavy`, max-length ASCII; frame bytes as `snapshotSizes`; probe deleted). Board: 30 handouts (20 text, 10 with 3 images; 20 shared with all, 5 with player-1, 5 unshared), 60–100 party items.
@@ -481,6 +513,10 @@ Bundle **`image-search`** ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-
 
 Walkthrough: [ASSET IM5, IM7](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im). Disconnect / reconnect / crash: as FR-PARTY-15 / -39; the picker per [ASSET §11](assets-pipeline.md#11-edge-cases--failure-modes).
 
+### 13.5 Sprint 9 (track RS, Reminders and Strongholds tabs)
+
+Bundle `reminders-strongholds` / `rs-e2e` ([REM §13](reminders.md#13-test-plan)). Named tests: `FR-PARTY-71 tabs after PM's list` (client: PM's tabs, then Reminders, Strongholds; stored `reminders` restores; unknown → first), `FR-PARTY-72 strongholds tab per viewer` (DM always; player-1 with Greystone shown → tab; after the DM hides it (live delete) → tab gone, stored value falls back), `FR-PARTY-74 tabs load once per snapshot` (one `sync.load` per type per generation; reload after a resync), `FR-PARTY-75 open on a tab`, `FR-PARTY-76 six tabs fit` (e2e, 550 px), `FR-PARTY-77 inventory without Stores rows`. Walkthroughs: [REM §13](reminders.md#13-test-plan) RS-R, [HOLD §13](strongholds.md#13-test-plan) RS-H.
+
 ### 13.4 Sprint 8 (track CB, party summary)
 
 Bundle `combat-polish` (Thorn temp HP 5, Mira poisoned, Brakka hurt; companions in every mode), e2e `cb-party.e2e.ts` on `cb-party-e2e`, walkthrough CB10–CB13: [combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary). Named tests here: `FR-PARTY-51 rows` (DOM per viewer: own first, by name, companions under owners, drafts out, no monster / NPC ally row; DM case with a hidden PC's eye-off; a hostile or released companion leaves; markup only, layout in the e2e below), `FR-PARTY-52 party summary per player` and `FR-PARTY-52 monsters never` (integration + leak scan P1, P2: each other's PC with the new keys; never a monster's or another player's companion's numbers; a pet's `statBlock` never), `FR-PARTY-57 CON-44 combat polish` (committed into the heavy suite: players +343 B, DM 0 B, ceilings hold). Layout (FR-PARTY-58, FR-SHELL-141's criterion): `e2e/useful-size.e2e.ts` on `wf-frame-e2e` with `cb-party-six`.
@@ -551,6 +587,10 @@ Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). PARTY p
 
 Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). PARTY part: **CB3** `build/cb-party`: (1) server first, once the DM answers the party-HP ADR / OQ-PARTY-30 (its only wait, seams S12): entities' other-player whitelist (`src/server/features/entities/records.ts`, `src/shared/entities/schemas.ts` `RedactedCharacter` / `REDACTED_CHARACTER_KEYS`; ENT-owned, **assigned to CB3's server part**, S12) and the leak tests that pin the list; (2) the window after **WF1** (FR-SHELL-112 (1)): `src/client/common/features/party-board/Summary.tsx` (new), party-board `window.ts` (a second def), one append line per client in `windows.ts`, the values of the pending rows WF1 adds to the append-only size table ([FR-SHELL-141](play-shell.md#6-functional-requirements)), goldens and harness sets P1 / P3 / D3 (review-b #14); fixture `cb-party-six` and the `party.summary` case in `e2e/useful-size.e2e.ts`; the ADR's doc rows at merge. Wave 3. Depends on nothing of CB0 / CB2 (reads the turn field as it is).
 
+### 14.6 Sprint 9 build split (track RS)
+
+Full split: [HOLD §14](strongholds.md#14-dependencies). PARTY part, all **after PM's restructure** (PM holds `Board.tsx`, `logic.ts` `PARTY_TABS` and the window first): **RS1** `build/rem-ui` appends the Reminders tab entry; **RS2** `build/hold-ui` appends the Strongholds entry and FR-PARTY-72's rule (second of RS1 / RS2 rebases one line); **RS3** `build/hold-stores` changes `Inventory.tsx` (FR-PARTY-77) and the item commands (server part in RS0, by assignment). Feature-owned files (#154); no shared file of AGENTS §9.9 beyond those listed in HOLD §14. No dependency.
+
 ## 15. Open questions
 
 DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G29 and the P bulk-accept). Rejected options kept for the record. Seam / integrator rows stay as settled. *(S5)* OQ-PARTY-18–21 decided at sprint-5 DM gate 1 (#256): every pick accepted.
@@ -593,6 +633,8 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-29 | **Strip or window; where by default; the DM's view** (also confirm: "monsters never" = no unowned or hostile creature; companions listed under owners per ADR-0056, FR-PARTY-51) | **Decided (#335): A (and the reading: no unowned or hostile creature; companions per ADR-0056).** **A. A small launcher window "Party status" in both clients (the DM sees the same rows), loads closed, placed by WF's one placer like Stats; the player opens it once and the shell remembers it: no new frame region, PCs stay clear by WF's rule** / B. A fixed strip (under the top bar, right of the tool rail; players only): always in view, but a new frame region and keep-out for WF's placer and the Fit, and it can't step off a PC / C. A tab in the Party window: no frame work, but hidden behind tabs during a fight | no (decided #335) | play-shell (WF), FR-PARTY-51, -53, FR-SHELL-140 |
 | OQ-PARTY-30 | **What players see of other PCs** (A and B **amend #178 G6 / ADR-0036's "No HP, AC"**: a decision reversal) | **Decided (#335): A.** **A. HP numbers (cur / max), temp HP and AC, plus the conditions and death state they already get: what a table says aloud anyway; +343 B a player** / B. A band (healthy / bloodied / down) and AC: HP stays private, still a glance / C. A band only, no AC: closest to today (ADR-0036) | no (decided #335) | entities, ADR-0036 (proposed ADR), FR-PARTY-52 |
 | OQ-PARTY-31 | **A PC hidden from players (#141)** in the summary | **Decided (#335): A.** **A. Accepted: its row and figures still show to other players (as Down and death state already do); hidden PCs are rare and DM-run** / B. Hide its figures while its combatant is hidden: a server-written copy flag on the character (one column, ADR-0039 pattern) | no (decided #335) | entities, FR-PARTY-52 |
+| OQ-PARTY-41 | *(S9, RS ↔ PM seam)* Party Manager tab order with Reminders and Strongholds | **Party status, Handouts, Inventory, Loot, Reminders, Strongholds** (RS appends after PM's list) / Reminders right after Party status (it's play-time info). *Tradeoff:* appending needs no change to PM's order; the alternative puts reminders one click from the landing tab. *Owner:* PM / seams | no · owner: orchestrator | PM (party-board, play-shell) |
+| OQ-PARTY-42 | *(S9, RS ↔ PM seam)* Six tabs at 550 px | **A. Full labels; below the fit the strip scrolls (FR-PARTY-46)** / B. Shorter labels ("Status", "Holds") / C. Two rows of tabs. *Tradeoff:* A keeps the established rule; B hurts clarity; C costs height. Depends on [OQ-HOLD-07](strongholds.md#15-open-questions) (B removes the sixth tab) | no · owner: orchestrator | PM |
 | OQ-PARTY-32 | **Which AC** | **Decided (#335): A.** **A. The sheet's stored AC (`statBlock.ac`): one plain field, same for every viewer** / B. Effective AC with active modifiers (Shield of Faith +2, FR-MOD-24): truer in a fight, but others never get modifiers, so it needs a server-written copy column refreshed by every effect change | no (decided #335) | effect-modifiers, FR-PARTY-52 |
 
 ## 16. Out of scope
