@@ -29,11 +29,14 @@ describe("session-sim-12 (sprint-8 gate bundle)", () => {
     expect(r.manifest.fixtures).toEqual(
       expect.arrayContaining(["st-past-crypt", "cmp-goblin-untyped", "cp-ally", "fu-hurt-goblins"]),
     );
-    // TT0 adds no unit: no table-tools rows yet; the campaign runs with no sound picks.
+    // TT0 adds no unit: no table-tools rows yet.
     expect(db.select().from(rollMacro).all()).toEqual([]);
     expect(db.select().from(rollRequest).all()).toEqual([]);
-    expect(db.select().from(asset).where(eq(asset.kind, "audio")).all()).toEqual([]);
+    // TT3: `audio-chime` + `camp-alert-sounds` (request, pause → Chime); not paused.
+    const sounds = db.select().from(asset).where(eq(asset.kind, "audio")).all();
+    expect(sounds.map((s) => [s.name, s.durationMs])).toEqual([["Chime", 400]]);
+    const chime = sounds[0]?.id;
     const active = db.select().from(campaign).where(eq(campaign.active, true)).get();
-    expect([active?.pause, active?.alertSounds]).toEqual([null, {}]);
+    expect([active?.pause, active?.alertSounds]).toEqual([null, { request: chime, pause: chime }]);
   }, 120_000);
 });

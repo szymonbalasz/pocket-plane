@@ -14,6 +14,8 @@ export default defineBundle({
   fixtures: [
     // WF: window frame (no unit: aliases only, seams S15)
     // TT: table tools (`dicex-macros` TT1, `audio-chime` + `camp-alert-sounds` TT3)
+    "audio-chime",
+    "camp-alert-sounds",
     // SB: stats tier B (`sb-fight-facts`, `sb-luck-rolls`)
     // CB: combat polish (`cb-ties`, `cb-fog-goblin`, `cb-party`)
   ],
