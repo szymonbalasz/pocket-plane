@@ -257,8 +257,8 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 |---|---|---|
 | [party-loot](party-loot.md) FR-LOOT-30–39 | `stores` holder in coin + item ledgers, redaction, Move form options | this track (RS0 server, RS3 UI) |
 | [reminders](reminders.md) | Linked reminders, `linkHidden`, removal with the source | this track |
-| [party-board](party-board.md) (PM restructure first) | Strongholds tab slot | PM, then RS2 |
-| [play-shell](play-shell.md) (PM frame core first) | `hold.stronghold` registration, size-table row, window memory | PM, then RS2 |
+| [party-board](party-board.md) (PM2 first, seams S1) | `party-tabs.ts` registry entry, `order: 60`, `visible?` | PM1 + PM2, then RS2 |
+| [play-shell](play-shell.md) (PM1 first, seams S2, S4) | `hold.stronghold` registration, size-table row, goldens, replay sets D3 / P1, window memory | PM1, then RS2 |
 | [dice-extras](dice-extras.md) | `RollButton` (income dice) | built |
 | [ADR-0045](../architecture/adr/0045-lazy-record-types.md) | lazy `"all"` | built |
 | New npm dependency | **none** | — |
@@ -270,18 +270,23 @@ flowchart LR
   RS0[RS0 fix/rs-core<br/>schema lane first] --> RS1[RS1 build/rem-ui]
   RS0 --> RS2[RS2 build/hold-ui]
   RS2 --> RS3[RS3 build/hold-stores]
-  PM[PM restructure + frame core] --> RS1
-  PM --> RS2
+  PM1[PM1 fix/window-memory] --> RS1
+  PM1 --> RS2
+  PM2[PM2 build/party-manager] --> RS1
+  PM2 --> RS2
+  FX2[FX2 fix/fx-dice-lines] -.-> RS1
+  RS0 --> SP3[SP3 recap: index / protocol lines, loot helper]
+  RS0 --> FX3[FX3 merges after RS0]
 ```
 
 | # | Branch | Contents | Shared files touched |
 |---|---|---|---|
-| RS0 | `fix/rs-core` (**schema lane first** this sprint) | Tables `reminder`, `stronghold`; `party_item.stronghold_id` + `stores_hidden`; `loot_entry` stores ends + `stores_hidden`; zod `@shared/reminders`, `@shared/strongholds`, LOOT / PARTY schema changes; record types `reminder`, `stronghold` (lazy), `stores-coin` (derived); all REM / HOLD commands; LOOT / PARTY command changes for `stores`; entities hook line; fixtures units + bundle `reminders-strongholds`, `rs-e2e`, `session-sim-13` lines; leak, reconnect, crash, CON-44 tests. Server only (tests stand in for a walkthrough) | `src/server/db/` (schema), `src/shared/events/` (`reminders.ts`, `strongholds.ts`, `party-loot.ts` `Endpoint`), record-type registry lines, `src/server/features/index.ts` line, `src/server/features/entities/definition-hooks.ts` line, `fixtures/bundles/index.ts` lines; party-loot / party-board server + shared folders (by assignment); docs: data model, protocol (§26 unchanged: no new registry) |
-| RS1 | `build/rem-ui` (after RS0 + PM's Party Manager restructure; ∥ RS2) | REM tab content, editor, roll path; CHARX section; CBTX read-only line; walkthrough RS-R | `src/client/common/features/reminders/` (new); party-board tab list (one entry); `sheet-sections.ts` (one line, append); `src/client/common/features/combat-extras/sheet-sections.tsx` (CBTX-owned, by assignment) |
-| RS2 | `build/hold-ui` (after RS0 + PM's frame core and restructure; ∥ RS1) | Strongholds tab, `hold.stronghold` window: header, Facilities, Staff, Reminders, Notes tabs; walkthrough RS-H steps H1–H6, H8–H12 | `src/client/common/features/strongholds/` (new); party-board tab list (one entry; second of RS1 / RS2 rebases); both `windows.ts` (one line each, append); play-shell size-table row, goldens, harness sets (append rows, PM's contract) |
-| RS3 | `build/hold-stores` (after RS2) | Stores tab; LOOT Move form / log `stores` options; Inventory filter; walkthrough H7, H10, H13 | party-loot + party-board client folders (by assignment; FX's party-loot items, if any, after RS3) |
+| RS0 | `fix/rs-core` (**schema / core lane first, alone**, seams S10; wave 1) | Tables `reminder`, `stronghold`; `party_item.stronghold_id` + `stores_hidden`; `loot_entry` stores ends + `stores_hidden`; zod `@shared/reminders`, `@shared/strongholds`, LOOT / PARTY schema changes; record types `reminder`, `stronghold` (lazy), `stores-coin` (derived); all REM / HOLD commands; LOOT / PARTY command changes for `stores`; entities hook line; fixtures units + bundle `reminders-strongholds`, `rs-e2e`, `session-sim-13` lines; leak, reconnect, crash, CON-44 tests. Server only (tests stand in for a walkthrough) | `src/server/db/` (schema), `src/shared/events/` (`reminders.ts`, `strongholds.ts`, `party-loot.ts` `Endpoint`), record-type registry lines, `src/server/features/index.ts` line, `src/server/features/entities/definition-hooks.ts` line, `fixtures/bundles/index.ts` lines; party-loot / party-board server + shared folders (by assignment); docs: data model, protocol (§26 unchanged: no new registry) |
+| RS1 | `build/rem-ui` (wave 4: after RS0 + PM1 + PM2; ∥ RS2) | REM tab content, editor, roll path; CHARX section; CBTX read-only line; walkthrough RS-R. **Roll buttons import** `RollButton` + `useRollControl` (the macros' roll path) from `@ui/features/dice-extras/` with **no edit to dice-extras files**; if an export is missing, a one-line grant (S11). FX2 (`MacrosPanel.tsx`, `macro-logic.ts`) merges first, else RS1 merges main and re-tests (S11) | `src/client/common/features/reminders/` (new); `party-tabs.ts` (one entry, `order: 50`, S1); `sheet-sections.ts` (one line, append, S12); `src/client/common/features/combat-extras/sheet-sections.tsx` (CBTX-owned, by assignment, S12) |
+| RS2 | `build/hold-ui` (wave 4: after RS0 + PM1 + PM2; ∥ RS1) | Strongholds tab, `hold.stronghold` window: header, Facilities, Staff, Reminders, Notes tabs; walkthrough RS-H steps H1–H6, H8–H12 | `src/client/common/features/strongholds/` (new); `party-tabs.ts` (one entry, `order: 60`, `visible?`, S1; second of RS1 / RS2 to merge rebases one line); both `windows.ts` (one line each, append, S2); `size-table.ts` row (480 × 560 / useful 400 × 400 / min 340 × 360); both goldens regenerated (`UPDATE_GOLDEN=1`); replay harness: `hold.stronghold` as an **untouched window in DM set D3 and player set P1**, `replay.failing.json` regenerated (S4; FR-SHELL-171) |
+| RS3 | `build/hold-stores` (wave 5: after RS2; may stack on RS2 once its walkthrough passes) | Stores tab; LOOT Move form / log `stores` options; Inventory filter; walkthrough H7, H10, H13 | party-loot + party-board client folders (by assignment). No FX item touches party-loot (S8) |
 
-- Parallel: RS1 ∥ RS2; RS3 after RS2. RS0 first in the sprint's schema lane (SP's recap record, if any, after it).
+- **Order** (seams S10, build plan): RS0 alone holds `src/server/db/`, `src/shared/events/`, the `src/shared/protocol/` record-type lines and the `features/index.ts` line first; **SP3** appends its `features/index.ts` + protocol lines and its party-loot read helper (Stores ends counted as moves, S8) **after RS0 merges**; **FX3** (`connection.ts`, `frames.ts`) builds in parallel and merges after RS0. Parallel: RS1 ∥ RS2; RS3 after RS2. Priority when slots compete: RS0 second only to PM1; RS1 / RS2 / RS3 last.
 
 ## 15. Open questions
 
@@ -297,7 +302,7 @@ flowchart LR
 | OQ-HOLD-06 | **DM:** deleting a stronghold whose Stores aren't empty | A. Refuse until emptied / **B. Move everything to the party in the same step (the confirm says what)** / C. Write it off (gone). *Tradeoff:* B is one step and conserves coin and items; A is safest but tedious | no · owner: DM gate | FR-HOLD-19 |
 | OQ-HOLD-07 | **DM (with PM):** Strongholds as a Party Manager tab or its own launcher window? Party Manager tabs: Party status, Handouts, Inventory, Loot, Reminders, Strongholds = **6 tabs at 550 px** (≈ 540 px of labels by estimate; PM's layout test measures) | **A. 6th tab; players see it only while they can see a stronghold; below the fit the strip scrolls (FR-PARTY-46)** / B. Own launcher window "Strongholds" (the list), Party Manager keeps 5 tabs / C. The tab only when a campaign "Strongholds" switch is on ([ADR-0058](../architecture/adr/0058-feature-switches.md), off by default). *Tradeoff:* A keeps party things in one window as BL-73 says; B costs a launcher slot; C hides it for campaigns that don't use it but needs feature traces on reminders and the ledger | yes | party-board, play-shell |
 | OQ-HOLD-08 | **DM:** who edits a stronghold? | **A. DM only; players read, roll income dice and move with the Stores** / B. Players may also edit orders and staff notes. *Tradeoff:* A keeps one writer; B needs per-field rights | no · owner: DM gate | FR-HOLD-18 |
-| OQ-HOLD-09 | **PM (seams):** the Stronghold window under window memory: registered after PM's frame core with a size-table row (default 480 × 560, useful 400 × 400, min 340 × 360) | **A. As [FR-SHELL-170–172](play-shell.md#6-functional-requirements); PM's placer places it the first time, then window memory** | no · owner: orchestrator | play-shell |
+| OQ-HOLD-09 | **PM (seams):** the Stronghold window under window memory: registered after PM's frame core with a size-table row (default 480 × 560, useful 400 × 400, min 340 × 360) | **Closed per seams S2 + S4:** one `main` instance with a selection, no launcher (unless OQ-HOLD-07 B), registered after PM1 with that size-table row, goldens regenerated, untouched member of replay sets D3 / P1; selection switches aren't "touched" ([FR-SHELL-170, -171](play-shell.md#6-functional-requirements)) | — · closed (S2, S4) | play-shell |
 | OQ-HOLD-10 | **Glossary:** add **Stronghold**, **Facility**, **Staff**, **Defenders**, **Stores** (definitions as §1) | **Add** | no · owner: integrator | glossary |
 | OQ-HOLD-11 | Single record vs one record per row (measured §12) | **Single record with JSON leaves, redacted inside** / per-row records with copy flags. In the proposed ADR | no · owner: DM gate (ADR) | live-sync |
 
@@ -306,3 +311,4 @@ flowchart LR
 - Income reports or automation, upkeep / wage payment, build countdowns, bastion turns, facility levels, events tables (BL-73).
 - Any published facility / order / event catalogue (ADR-0018); hirelings as creatures or tokens; stronghold maps.
 - Player editing (OQ-HOLD-08 B); per-item DM-only Stores rows (Stores follow the stronghold).
+- Stronghold events in the session recap and a strongholds search provider in the command palette (seams S9: a later append).

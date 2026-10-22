@@ -244,12 +244,12 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 | [entities](entities.md) | `definitionChangedHooks` (append one line) for the owner copy | built |
 | [dice-extras](dice-extras.md) | `RollButton` + `useRollControl` (macros' path, FR-DICEX-68) | built |
 | [combat-extras](combat-extras.md) | Read-only effects line export (FR-CBTX-70) | this track (RS1) |
-| [party-board](party-board.md) (PM restructure first) | Reminders tab slot in the Party Manager tab list | PM, then RS1 |
+| [party-board](party-board.md) (PM2 first, seams S1) | `party-tabs.ts` registry entry, `order: 50` | PM1 + PM2, then RS1 |
 | [character-sheet-full](character-sheet-full.md) | `sheet-sections.ts` append (FR-CHARX-100) | RS1 |
 | [strongholds](strongholds.md) | Links, removal with the source, `linkHidden` writes | RS0 |
 | New npm dependency | **none** (text, dice and lists use what exists) | — |
 
-**Build split** (AGENTS §9.9; the full RS split is in [strongholds §14](strongholds.md#14-dependencies)): **RS0 `fix/rs-core`** owns the schema lane first (tables `reminder`, `stronghold`, the Stores columns), REM's server, fixtures and tests; **RS1 `build/rem-ui`** (after RS0 and PM's Party Manager restructure): `src/client/common/features/reminders/` (new, feature-owned), one tab entry in party-board's tab list, one `sheet-sections.ts` line (append), CBTX's read-only export (`src/client/common/features/combat-extras/sheet-sections.tsx`, CBTX-owned, by assignment). RS1 ∥ RS2 (strongholds UI).
+**Build split** (AGENTS §9.9; the full RS split is in [strongholds §14](strongholds.md#14-dependencies)): **RS0 `fix/rs-core`** holds the schema / core lane first and alone (seams S10: tables `reminder`, `stronghold`, the Stores columns, `src/shared/events/`, record-type lines, `features/index.ts`), REM's server, fixtures and tests; **RS1 `build/rem-ui`** (after RS0, PM1 and PM2): `src/client/common/features/reminders/` (new, feature-owned), one `party-tabs.ts` entry (`order: 50`, S1), one `sheet-sections.ts` line (append, S12), CBTX's read-only export (`src/client/common/features/combat-extras/sheet-sections.tsx`, CBTX-owned, by assignment, S12). Roll buttons **import** `RollButton` + `useRollControl` from `@ui/features/dice-extras/` without editing dice-extras files (a missing export = a one-line grant); FX2 merges before RS1, else RS1 merges main and re-tests (S11). RS1 ∥ RS2 (strongholds UI).
 
 ## 15. Open questions
 
@@ -262,7 +262,7 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 | OQ-REM-03 | **DM:** does a reminder's roll use the macros' roll path? | **A. Yes: roll buttons exactly like macros (`dice.roll`, Shift / Ctrl, physical dice, Alt → tray)** / B. Clickable notation inside the text only (as handouts) / C. A reminder points at a saved macro. *Tradeoff:* A reuses a built path with no parser; B has no labels; C couples two lists | yes | FR-REM-21 |
 | OQ-REM-04 | **DM:** ordering inside a group | **A. Creation order, oldest first** / B. Manual ↑ / ↓ (one more intent, a shared order) / C. Newest first. *Tradeoff:* A costs nothing; reorder is additive later | no · owner: DM gate | FR-REM-17 |
 | OQ-REM-05 | **DM:** "done" / dismiss vs permanent | **A. Permanent until deleted** / B. A "Done" tick that strikes it out (kept; "Hide done") / C. One-shot: Done deletes it. *Tradeoff:* A is simplest and matches "no mechanics"; B adds state per row | no · owner: DM gate | FR-REM-07 |
-| OQ-REM-06 | **SP (session recap):** should the recap list reminders added this session? | **A. No: reminders aren't play events; the recap stays combat / loot / stats** / B. List reminders added or removed this session (from `ReminderSaved` / `ReminderDeleted` in the event log). *Owner:* seams (SP ↔ RS) | no · owner: orchestrator | session-recap (SP) |
+| OQ-REM-06 | **SP (session recap):** should the recap list reminders added this session? | **Closed per seams S9 + OQ-RECAP-03 (both picks A):** the recap lists no reminders and no stronghold events this sprint; no strongholds palette provider either (later append). Rejected: ~~list reminders added / removed this session~~ | — · closed (S9) | session-recap (SP) |
 | OQ-REM-07 | **Glossary:** add **Reminder** ("a text note with optional rolls for the party or one character; no mechanics"); amend **Condition** ("Reminder only" → "no mechanics", to avoid two meanings) | **Add + amend** | no · owner: integrator | glossary |
 | OQ-REM-08 | Snapshot or lazy (measured §12) | **Lazy `"all"`** (0 B; ADR-0045's one path) / in the snapshot (+17.8 KB DM realistic, +369 KB at the cap). In the proposed ADR | no · owner: DM gate (ADR) | live-sync |
 
@@ -270,4 +270,4 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 
 - Mechanics, timers, game-time expiry, toasts or bell entries for reminders (later: an info toast when the DM adds one to your character).
 - Reminders on monsters, pets, NPC creatures; manual ordering (OQ-REM-04 B); "Done" state (OQ-REM-05 B); clickable notation in the text (OQ-REM-03 B).
-- The session recap's use of reminders (track SP's recap spec, per OQ-REM-06).
+- Reminders in the session recap (seams S9, OQ-REM-06 closed).
