@@ -155,7 +155,7 @@ describe("CB0 cbtx.moveCombatant on combat-polish over WS", () => {
       message: "Goblin 2 moves with Mira",
     });
     // anchor: attached, itself, removed
-    const drop = { code: "invalid", message: "Drop below a row with initiative" };
+    const drop = { code: "invalid" as const, message: "Drop below a row with initiative" };
     expect(await rejected(dm, MOVE, body(id("Thorn"), id("Owlbear")))).toEqual(drop);
     expect(await rejected(dm, MOVE, body(id("Thorn"), id("Thorn")))).toEqual(drop);
     await ok(dm, CBT_INTENTS.setRemoved, { combatantId: id("Mira"), removed: true });
@@ -432,14 +432,14 @@ describe("CB0 cbtx.moveCombatant on combat-polish over WS", () => {
 
   test("FR-CBTX-67 hidden move sends players nothing", async () => {
     await settle();
-    const marks = [p1.frames.length, p2.frames.length];
+    const marks = { p1: p1.frames.length, p2: p2.frames.length };
     await move("Elite Goblin Warrior", null);
     await move("Goblin", "Wolf"); // fog-hidden
     expect(named(dm, "Elite Goblin Warrior").position).toBe(1);
     await p1.expectNoFrame(150);
     await p2.expectNoFrame(150);
-    expect(p1.frames.length).toBe(marks[0]);
-    expect(p2.frames.length).toBe(marks[1]);
+    expect(p1.frames.length).toBe(marks.p1);
+    expect(p2.frames.length).toBe(marks.p2);
     leaks();
   });
 
@@ -456,12 +456,12 @@ describe("CB0 cbtx.moveCombatant on combat-polish over WS", () => {
       DM,
       { role: "player" as const, token: links["Player 1"] as string },
       { role: "player" as const, token: links["Player 2"] as string },
-    ];
+    ] as const;
     // reconnect, then a server restart: the same records and order for everyone
     for (const restart of [false, true]) {
       for (const c of [dm, p1, p2]) c.close();
       if (restart) await h.restart();
-      [dm, p1, p2] = await Promise.all(creds.map((c) => h.live(c)));
+      [dm, p1, p2] = await Promise.all([h.live(creds[0]), h.live(creds[1]), h.live(creds[2])]);
       expect([dm, p1, p2].map(view)).toEqual(views);
     }
     expect(order(dm).slice(0, 4)).toEqual(["Elite Goblin Warrior", "Thorn", "Goblin", "Wolf"]);
