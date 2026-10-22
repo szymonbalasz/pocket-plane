@@ -679,6 +679,12 @@ export const combatant = sqliteTable(
      * and goes at Dismiss / End; a companion made with `cbt.setCompanion` keeps its token. DM only.
      */
     summoned: integer("summoned", { mode: "boolean" }).notNull().default(false),
+    /**
+     * FR-CBTX-66 (sprint 8): the DM's order inside a group of equal initiative, 1…k; null = none
+     * (default rules). Written by `cbtx.moveCombatant`, cleared per row by FR-CBT-163 (c). DM only.
+     * Nullable, no default: push-safe on old dev DBs.
+     */
+    tieOrder: integer("tie_order"),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );
