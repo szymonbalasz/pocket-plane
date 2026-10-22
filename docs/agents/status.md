@@ -8,12 +8,12 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| RS spec (reminders, strongholds) | `spec/s9-rs` (ws w9P, slot 0) | spec-rs | working | seams |
-| PM spec (Party Manager, window memory) | `spec/s9-pm` (ws w9Q, slot 2) | spec-pm | working | seams |
-| FX spec (fix pack) | `spec/s9-fx` (ws w9R, slot 3) | spec-fx | working | seams |
-| SP spec (palette, rules reference, recap) | `spec/s9-sp` (ws w9S, slot 4) | spec-sp | working | seams |
+| RS spec (reminders, strongholds) | `spec/s9-rs` (ws w9P, slot 0) | spec-rs | in-review (seams + rulings applied) | DM gate 1 |
+| PM spec (Party Manager, window memory) | `spec/s9-pm` (ws w9Q, slot 2) | spec-pm | in-review (seams + rulings applied) | DM gate 1 |
+| FX spec (fix pack) | `spec/s9-fx` (ws w9R, slot 3) | spec-fx | in-review (seams + rulings applied) | DM gate 1 |
+| SP spec (palette, rules reference, recap) | `spec/s9-sp` (ws w9S, slot 4) | spec-sp | in-review (seams + rulings applied) | DM gate 1 |
 
-Queue: seams (`.verify/sprint9/seams.md`) → review-a (RS + SP), review-b (PM + FX) → rulings → DM gate 1.
+Queue: DM gate 1 (`.verify/sprint9/gate.md`) → apply picks → integrate + merge specs → Phase B wave 1 (PM1, PM2, RS0, FX2).
 
 ## Shared-file locks
 

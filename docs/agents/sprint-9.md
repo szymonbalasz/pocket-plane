@@ -36,6 +36,7 @@ DM decision #338 (sprint-8 recap + sprint 9 scope). Process: [orchestrator promp
 | Date | What |
 |---|---|
 | 2026-10-22 | Phase A started: spec agents RS, PM, FX, SP working in `spec/s9-{rs,pm,fx,sp}` (ID ranges from `ab10c460`, specs unchanged since; no Axeholm notes in `.verify/sprint9/`) |
+| 2026-10-22 | Specs drafted; seams S1–S14 (`.verify/sprint9/seams.md`); reviews (RS + SP 1 blocker / 5 majors; PM + FX 0 / 5) ruled and applied. **DM gate 1** ready (`.verify/sprint9/gate.md`) |
 
 ## Check `main` any time (DM)
 
