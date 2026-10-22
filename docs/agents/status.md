@@ -11,8 +11,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | WF1 placer core + replay harness | merged | — | done | main gates running |
 | WF3 map refits | merged (re-test 7/8; DM reload cell by design) | — | done | — |
 | CB2 turn ring | merged (16/16) | — | done | — |
-| TT4 pause screen | merged (13/14 → fixed; final 9/9) | — | done | main gates running |
-| Sprint gate | main | — | next | quiet-machine bench, session-sim-12, playtest section, recap |
+| TT4 pause screen | merged (13/14 → fixed; final 9/9) | — | done | main check 5164 / e2e 206 |
+| Sprint gate | main (tab `test-sim12` in wR) | test-sim12 | session-sim-12 running (`.verify/20261022-194052-session-sim-12/`) | playtest section, recap |
 | WF2 pushes + rail inset | merged (walkthrough 13/14) | — | done | main check 5014 / e2e 199 (1 known flake re-run green) |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
 | TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |

@@ -50,15 +50,16 @@ DM decisions #333 (sprint-7 recap: a window-frame pass with a stated 1280×720 p
 | 2026-10-22 | **CB3 merged** (Party status window for both clients: PCs' HP, temp HP, AC live per ADR-0063, companions under owners, hidden companions never listed for other players; 6-PC layout at 1280×720). Main after CB3: check 5093 / e2e 203. CB2 turn ring walkthrough 16 / 16 |
 | 2026-10-22 | **SB1+SB2 merged** (kill-feed callouts batched per hit, Highlights + End summary opening Stats on the fight, Luck tab, Trophies sheet tab, Kill feed preference; BL-69 default fight, BL-71). **CB2 merged** (current-turn ring for everyone who may know the turn; dashed for hidden on the DM; 16 / 16). TT4 pause screen (last slice) adding its stats hooks. Main after SB1+SB2 + CB2: check 5141 / e2e 205 |
 | 2026-10-22 | **TT4 merged** (pause / intermission screen: full-screen card with message, image, back-in countdown; every input blocked incl. popups; requests, dice, toasts, kill feed, summary and refits held until resume; one sound at resume; survives reconnect and restart; walkthroughs 13 / 14 → fixed, final 9 / 9). **All sprint-8 slices merged** |
+| 2026-10-22 | Main with every slice: check 5164 / e2e 206. Quiet-machine bench: 38 / 39 gates (placer settle 24–27 ms vs 25 ms → BL-82). **Sprint gate:** session-sim-12 started on final `main` |
 
 ## Check `main` any time (DM)
 
-Bundle **`session-sim-11`** until the sprint adds `session-sim-12`.
+Bundle **`session-sim-12`** (sprint 8).
 
 ```powershell
 git pull; bun install
 bun run build
-bun run fixtures:reset-load session-sim-11 --profile verify
+bun run fixtures:reset-load session-sim-12 --profile verify
 bun run start --profile verify
 ```
 
