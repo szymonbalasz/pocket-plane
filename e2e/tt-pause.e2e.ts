@@ -39,6 +39,9 @@ test("FR-SHELL-125 FR-SHELL-128 FR-SHELL-129 FR-SHELL-136 pause card blocks inpu
   await expect(player.getByTestId("ui-pause-image")).toBeVisible();
   await expect(player.getByTestId("ui-pause-countdown")).toHaveText(/^Back (in \d+:\d\d|soon)$/);
   await expect(player.getByTestId("ui-overlay-layer")).toHaveAttribute("data-blocking", "pause");
+  // FR-SHELL-127: the handout present popup (handout-present-1) waits for resume, not over the card.
+  await player.waitForTimeout(1000);
+  await expect(player.getByTestId("party-present-popup")).toHaveCount(0);
 
   // T9: nothing behind the card takes input. Focus is in the card; Tab cycles inside it.
   const canvas = player.getByTestId("map-canvas");
@@ -103,6 +106,10 @@ test("FR-SHELL-125 FR-SHELL-128 FR-SHELL-129 FR-SHELL-136 pause card blocks inpu
   await expect(player.getByTestId("ui-pause")).toHaveCount(0);
   await expect(player.getByTestId("ui-overlay-layer")).not.toHaveAttribute("data-blocking", /.*/);
   expect(await inert(player, "ui-topbar")).toBe(false);
+  // The deferred present popup shows at resume; closing it hands the page back.
+  await expect(player.getByTestId("party-present-popup")).toBeVisible();
+  await player.getByTestId("party-present-close").click();
+  await expect(player.getByTestId("party-present-popup")).toHaveCount(0);
   await player.getByTestId("ui-topbar").click(); // the first interaction unlocks audio
 
   // T9: Pause from the Popover (message, back in 5 min) → the card and the `pause` sound (Chime).
