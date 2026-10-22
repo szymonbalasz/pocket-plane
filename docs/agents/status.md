@@ -9,14 +9,15 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | WF1 placer core + replay harness | merged | — | done | main gates running |
-| WF3 map refits | `fix/wf-refits` (w9G) | build-wf3 | building | walkthrough F9, F10 |
-| TT4 pause screen | `build/tt-pause` (w9H) | build-tt4 | part-1 walkthrough running | finish after WF4 (toasts), WF3 (reveal), TT1+2 (T10, T12) |
-| WF2 pushes + rail inset | `fix/wf-push-rail` (w9J) | build-wf2 | building | walkthrough F6, F7, F11 |
+| WF3 map refits | `fix/wf-refits` (w9G) | build-wf3 | walkthrough 6/8; F10 fixed; F9 (placer) after WF2 merges | re-test F9, F10 |
+| TT4 pause screen | `build/tt-pause` (w9H) | build-tt4 | part 1 13/14 → popup + body-portal fixes, gates | finish after WF4 (toasts), WF3 (reveal), TT1+2 (T10, T12) |
+| WF2 pushes + rail inset | `fix/wf-push-rail` (w9J) | build-wf2 | walkthrough 13/14 (320-px viewport out of scope); gates after WF4's | merge |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
 | TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |
 | TT1+TT2 macros + roll requests | `build/tt-dice` (w9E) | build-tt12 | part-1 13/13; Requests window registered; `restoreToast` waits for WF4 | part 2: T6 reload, T7, T16 |
-| SB0 stats tier-B core | merged (walkthrough 10/10) | — | done | main gates running |
-| WF4 toast policy + Stats / card sizes | `fix/wf-sizes-toasts` (w9F) | build-wf4 | walkthrough running | merge → TT2 restoreToast, SB1+2 |
+| SB0 stats tier-B core | merged (walkthrough 10/10) | — | done | — |
+| CB3 Party status | `build/cb-party` (w9K) | build-cb3 | building | walkthrough CB10, CB11, CB13 |
+| WF4 toast policy + Stats / card sizes | `fix/wf-sizes-toasts` (w9F) | build-wf4 | walkthrough 8/10 → re-test 5/5; gates running | merge → TT2 restoreToast, SB1+2 |
 | CB0 combat core | merged (walkthrough all PASS) | — | done | main gates running |
 | CB1 drag reorder | merged (walkthrough 14/14) | — | done | main gates after WF1 merge |
 
