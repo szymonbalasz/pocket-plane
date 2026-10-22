@@ -451,11 +451,12 @@ function AwardCard({ award: a }: { award: Award }) {
   const colorOf = useColorOf();
   const detail = awardDetailText(a);
   return (
-    // FR-STATS-67: names and values wrap inside the card, never into the next one.
+    // FR-STATS-67: one line per part (title, value, winners, detail); names and values wrap
+    // inside the card, never into the next one.
     <Card
       data-testid="stats-award"
       data-record-id={a.key}
-      className="min-w-0 gap-0.5 wrap-anywhere p-2 text-xs"
+      className="flex min-w-0 flex-col gap-0.5 wrap-anywhere p-2 text-xs"
     >
       <span className="font-medium text-muted-foreground">{AWARD_TITLE[a.key]}</span>
       <span data-testid="stats-award-value" className="text-sm font-semibold tabular-nums">
