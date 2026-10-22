@@ -20,6 +20,7 @@ const EXPECTED: Record<string, string> = {
   "cbt-summon-concentration": "card",
   "stats-awards": "info",
   "roll-request": "card",
+  "stats-fight-summary": "info",
 };
 
 describe("FR-NOTE-52 toast classes", () => {
