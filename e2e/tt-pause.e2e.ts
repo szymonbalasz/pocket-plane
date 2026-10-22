@@ -1,5 +1,5 @@
 // e2e-bundle: table-tools-paused-e2e
-// Pause screen (dice-extras §13 T9, T11, T12, T17; FR-SHELL-125–129, -136; FR-CAMP-47): the
+// Pause screen (dice-extras §13 T9, T10, T11, T12, T17; FR-SHELL-125–129, -136; FR-CAMP-47): the
 // bundle loads paused. Player 1 sees the card from the snapshot, input blocked behind it (Space,
 // arrows, Escape, Tab, wheel); a reload keeps it. The DM previews the card in a non-blocking
 // Dialog (Escape, ✕; windows stay usable), resumes (the card goes, input works) and pauses again
@@ -15,10 +15,12 @@ const inert = (page: Page, testId: string) =>
     .first()
     .evaluate((el) => el.closest("[inert]") !== null);
 
-test("FR-SHELL-125 FR-SHELL-128 FR-SHELL-129 FR-SHELL-136 pause card blocks input, survives reload; DM preview, resume, pause again", async ({
+test("FR-SHELL-125 FR-SHELL-128 FR-SHELL-129 FR-SHELL-136 FR-DICEX-90 pause card blocks input, survives reload; DM preview, resume, pause again", async ({
   browser,
 }) => {
-  const { secret, link } = e2eEnv();
+  test.setTimeout(90_000);
+  const { secret, link, recordId } = e2eEnv();
+  const mira = recordId("char-mira", "entity");
   const dm = await rolePage(browser);
   await dm.setViewportSize({ width: 1440, height: 900 });
   await loginDm(dm, secret);
@@ -150,12 +152,45 @@ test("FR-SHELL-125 FR-SHELL-128 FR-SHELL-129 FR-SHELL-136 pause card blocks inpu
     ),
   ).toBe(true);
   await player.mouse.click(flatAt.x, flatAt.y);
+
+  // T10 (FR-DICEX-90): a public 1d20 request to Mira while paused → B: no sound; the prompt
+  // waits under the card (inert), nothing over it.
+  const topbar = player.getByTestId("ui-topbar");
+  const soundBefore = (await topbar.getAttribute("data-test-last-sound")) ?? "";
+  const requests = await openWindow(dm, "dicex.requests");
+  const fold = requests.getByTestId("dicex-request-fold");
+  if ((await fold.getAttribute("data-state")) !== "open") await fold.click();
+  await requests.getByTestId("dicex-request-roll").selectOption("custom");
+  await requests.getByTestId("dicex-request-expression").fill("1d20");
+  await requests.getByTestId("dicex-request-label").fill("Paused check");
+  await requests.locator(`[data-testid="dicex-request-target"][data-record-id="${mira}"]`).click();
+  const results = requests.getByTestId("dicex-request-results");
+  if ((await results.getAttribute("data-state")) !== "public") await results.click();
+  await requests.getByTestId("dicex-request-send").click();
+  const pausedPrompt = player
+    .locator('[data-testid="note-toast"][data-class="card"]')
+    .filter({ hasText: "Paused check" });
+  await expect(pausedPrompt).toHaveCount(1);
+  expect(await pausedPrompt.evaluate((el) => el.closest("[inert]") !== null)).toBe(true);
+  await player.waitForTimeout(500);
+  await expect(topbar).toHaveAttribute("data-test-last-sound", soundBefore);
+  await expect(card).toBeVisible();
+
   // The draft is kept for the next pause (DM browser only).
   await dm.keyboard.press("Escape");
   await control.click();
   await expect(dm.getByTestId("ui-pause-message-input")).toHaveValue("Snacks");
   await dm.getByTestId("ui-pause-resume").click();
   await expect(player.getByTestId("ui-pause")).toHaveCount(0);
+  // T12: at resume the prompt is there and exactly one sound plays: `request` (no turn).
+  const n = Number(soundBefore.split(":")[2] ?? "0") + 1;
+  await expect(topbar).toHaveAttribute(
+    "data-test-last-sound",
+    new RegExp(`^request:(played|fallback):${n}$`),
+  );
+  await expect(pausedPrompt).toBeVisible();
+  await player.waitForTimeout(500);
+  await expect(topbar).toHaveAttribute("data-test-last-sound", new RegExp(`:${n}$`));
   // Nothing behind the card changed: the dice display is as before the pause.
   if (!(await display("flat").isVisible())) await tray.getByTestId("dicex-settings-open").click();
   await expect(display("flat")).toHaveAttribute("data-state", before ?? "off");

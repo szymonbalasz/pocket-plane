@@ -7,12 +7,11 @@ import {
   PAUSE_MESSAGE_MAX,
 } from "@shared/campaign-management/table-state";
 import { ENCOUNTER_TYPE, type EncounterView } from "@shared/combat-tracker/schemas";
-import { ROLL_REQUEST_KIND } from "@shared/dice-extras/requests";
 import { TurnChanged } from "@shared/events/combat-tracker";
-import type { NotificationRecord } from "@shared/notifications/schemas";
 import { type RecordStore, recordsOf } from "@shared/protocol/store";
 import { z } from "zod";
 import { type TurnAlert, turnAlertFor } from "../combat-tracker/turn-alert";
+import { pendingPrompts } from "../dice-extras/request-sound";
 
 /** FR-CAMP-46: the client's campaign's pause card, or null while running. */
 export function pauseOf(store: RecordStore): CampaignPause | null {
@@ -93,17 +92,9 @@ function myTurnAlert(store: RecordStore): TurnAlert | null {
   );
 }
 
-function promptArrivedSince(store: RecordStore, since: string | null): boolean {
-  const me = store.you?.role === "player" ? store.you.playerId : null;
-  if (!me) return false;
-  return recordsOf<NotificationRecord>(store, "notification").some(
-    (n) =>
-      n.kind === ROLL_REQUEST_KIND &&
-      n.state === "pending" &&
-      n.actionPlayerId === me &&
-      (since === null || n.createdAt >= since),
-  );
-}
+/** TT2's seam (FR-DICEX-90): this player's open prompts; those that came during the pause. */
+const promptArrivedSince = (store: RecordStore, since: string | null): boolean =>
+  pendingPrompts(store).some((n) => since === null || n.createdAt >= since);
 
 /** FR-SHELL-129: the DM's draft, browser only (`pp.pause.v1.<campaignId>`). */
 export const PauseDraft = z.object({
