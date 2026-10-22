@@ -3175,3 +3175,28 @@ From [gems](../specs/gems.md#6-functional-requirements) FR-GEM-05, -13, -25–31
 - **Client:** `cbt-card-actions` (+ `data-record-id` = card). Gems' `gem.combat`: `gem-combat` (+ `data-record-id`) → `gem-combat-picker`; chips `gem-combat-die` (+ `data-part`, `data-index`, `data-state` = `open` | `picked` | `max` | `dropped`); physical totals `gem-combat-known` (+ `data-part`, `data-index`) and `gem-combat-known-error`; `gem-combat-submit` ("Spend (n/limit)", the one confirm), `gem-combat-cancel`, `gem-error`. Faces come from the roll's log line (the card keeps `[value, kept]`). Maxed dice: `cbt-card-die-max` (+ `data-part`, `data-index`; "max" Badge, Tooltip "Set to max") in the popup's damage cell (extra parts too) and the player's card view (`cbt-card-maxed`).
 - **Fixtures:** no new unit (`gems`: Brakka level 5, Combat 2, the Flame Tongue greatsword); e2e alias `gems-combat-e2e` (`e2e/gems-combat.e2e.ts`). `session-sim-11` adds none (gems off).
 - **CON-44** (heavy harness, `con44-maxed.test.ts`): 29 B a maxed card (1 die; 33 B with 3), 20 pending maxed cards → DM +580 B (691,159 B of 1.5 MiB); players +87…+116 B for their own 3–4 cards (≤ 289,034 B of 512 KiB). A spend's frame: count + spend line + the card for its audience.
+
+## 135. Sprint 8: combat polish core — `cbtx.moveCombatant`, tie order (CB0)
+
+From [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-64–69 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-162–164, -168 (#334, #335; OQ-CBTX-31 A′, -32 A, -33 A, OQ-CBT-99 A, -100 A; review-b #16, #23). **Built by `fix/cb-core`**. Data side: [data model §106](../data-model/README.md#106-sprint-8-combat-polish-core-cb0). Section numbers fixed at merge (schema lane: after TT0).
+
+**Intents**
+
+| Intent | Who | Errors (one code per case) | Result | Source |
+|---|---|---|---|---|
+| `cbtx.moveCombatant {encounterId, combatantId, afterId: ID \| null}` (`CBTX_INTENTS.moveCombatant`, strict; `afterId` null = top) | DM; player → `forbidden` | ids of no / another campaign or encounter → `not_found`; encounter not `started` → `conflict` "Combat is not running"; combatant inactive → `conflict` "Goblin is not in combat", removed → `conflict` "Restore Goblin first", riding its owner (`after-owner` / `in-owner-turn` with the owner in the fight) → `conflict` "Goblin 2 moves with Mira"; `afterId` itself, inactive, removed, riding its owner or without initiative → `invalid` "Drop below a row with initiative"; no other row has initiative → `conflict` "Roll initiative first"; a visible PC without a number and no visible PC number around → `conflict` "Set a number first". Same order as today → `ack`, no write, no event | none | FR-CBTX-64 |
+
+**Rule** (`planMove(rows, movedId, afterId)` in `@shared/combat-tracker/rules`, pure; the server and CB1's DM number hint run it). `rows` = movable rows (active, not removed, not riding the owner) by `position`. **(a)** a private moved row (anything but a visible PC) takes the anchor's number (top: the first other numbered row's). **(b)** a visible PC keeps its number, lowered to the nearest visible PC above the drop spot and raised to the nearest visible PC below; private rows above it with a lower number, or below it with a higher one, take that number. Changed numbers null `initRollId`; no roll, no log line. Then `tieOrder` 1…k on every movable row with the arranged number, in the dropped order (others keep theirs; removed rows keep theirs), then `rerank`. Order everywhere: `compareOrder` = initiative desc → `tieOrder` asc (null after any number) → init bonus → PC → `seq`; riding companions follow their owner (FR-CBT-162).
+
+**Tie order cleared** (FR-CBT-163 (c)): `cbt.setInitiative` and `cbt.rollInitiative` (and Start / add rolls) write `tieOrder: null` on the row; `rerank` clears it on any row riding its owner (turn mode or owner change onto attached). Remove / restore, hide / reveal, death keep it; Next / Prev never re-sort; new combatants start null.
+
+**Events and visibility**
+
+| Event | Changes | DM | Players | Undoable |
+|---|---|---|---|---|
+| `CombatantMoved {encounterId, combatantId, afterId \| null, initiativeBefore \| null, initiativeAfter}` (new, `src/shared/events/combat-extras.ts`; logged) | `combatant` upserts: the moved row (`initiative`, `initRollId`, `tieOrder`), rewritten tie rows, reranked rows (`position`, `playerPosition`). No `encounter` change (the turn never moves, FR-CBT-164) | full | each changed visible row's redaction (no `tieOrder`, never a monster's number); unchanged redactions dropped; **`quietWhenUnchanged`**: a move players can't see (hidden, fog-hidden, `ownerHidden` row) sends them **no frame** (FR-CBTX-67) | no (drag back) |
+
+- No `TurnChanged`, turn alert, `turnChanged` rule hook, `movedFt` reset or expiry on a move (FR-CBT-164).
+- **Server registration:** `combatPolish` feature line (`src/server/features/combat-extras/move.ts`) in the server feature list.
+- **Fixtures:** units `cb-ties`, `cb-fog-goblin`, `cb-party` (join `session-sim-12`, sim-11-safe); bundle `combat-polish` (= `session-sim-11` + the three); e2e aliases `cb-reorder-e2e` (`e2e/cb-core.e2e.ts`), `cb-turn-ring-e2e`, `cb-party-e2e`.
+- **CON-44** (heavy harness, `con44-cb.test.ts`): `tieOrder` on 46 DM combatant rows → DM +736 B (null) / +635 B (all set), 691,492 B of 1.5 MiB; players 0 B (byte-identical, worst 289,088 B of 512 KiB).
