@@ -2,7 +2,7 @@
 title: Character sheet (full)
 prefix: CHARX
 status: in-review
-owner: spec-rs
+owner: spec-wf, spec-sb, spec-tt, spec-rs
 phase: post-mvp-9
 ---
 
@@ -212,7 +212,7 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-CHARX-100 | **Reminders tab** (BL-73): sheet section `rem.reminders` (REM-owned component, `@ui/features/reminders/`; one line in `sheet-sections.ts`, append): slot `tab`, title "Reminders", **`order: 80`** (tabs end "… Reminders, Macros, Trophies", by `order`, OQ-CHARX-45 **A**), both clients, kinds `["character"]`, `available` = always. Renders only on full sheets (DM's sheets and the owner's own, FR-CHARX-36); never on summary cards or imported-definition sheets (§7.1), so another player never sees it. The tab label carries a count Badge of the reminders shown when > 0. | BL-73 |
+| FR-CHARX-100 | **Reminders tab** (BL-73): sheet section `rem.reminders` (REM-owned component, `@ui/features/reminders/`; one line in `sheet-sections.ts`, append): slot `tab`, title "Reminders", **`order: 80`** (tabs end "… Reminders, Macros, Trophies", by `order`, OQ-CHARX-45 **A**), both clients, kinds `["character"]`, `available` = always. Renders only on full sheets (DM's sheets and the owner's own, FR-CHARX-36); never on summary cards or imported-definition sheets (§7.1), so another player never sees it. The tab label carries a count Badge when > 0: **count = this character's visible reminders** (the viewer's rows aimed at this character; party reminders not counted; review ruling 22). | BL-73 |
 | FR-CHARX-101 | **Contents**: this character's reminders ([FR-REM-18](reminders.md#6-functional-requirements)'s rows, creation order), then a **Party** subheading with the party reminders; DM-only rows only for the DM (eye-off). Rolls **roll as this character** ([FR-REM-21](reminders.md#6-functional-requirements)); not `live` → disabled. No effects line here (the header's `cbtx.effects` chips already show them). A link "Open in Party Manager" → `openPartyTab("reminders")` ([FR-PARTY-75](party-board.md#611-sprint-9-reminders-and-strongholds-tabs-track-rs)). | |
 | FR-CHARX-102 | **Rights**: Add (prefilled target = this character; "Party" selectable), Edit, Delete per [FR-REM-08](reminders.md#6-functional-requirements) (owner: own-created rows; DM any). The **sheet lock doesn't block reminders** (OQ-CHARX-46 **A**: they aren't sheet data, as item moves, OQ-PARTY-11); view and edit mode alike. | OQ-CHARX-46 |
 | FR-CHARX-103 | **Loading**: the tab loads `reminder` lazily when first shown ([FR-REM-14](reminders.md#6-functional-requirements)); skeleton, Retry; reloads after a snapshot. The count Badge shows once loaded (no load just for the count). | 0 B |

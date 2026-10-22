@@ -27,6 +27,7 @@
 - Pairing: `world` pairs with `character` or `stores`. Rights: DM any; players with visible Stores as with the party pot (OQ-LOOT-21 A).
 - Hidden Stores (OQ-LOOT-22 A): ends redacted to `world` for players; both ends `world` → row hidden; Stores items and `stores-coin` hidden.
 - Deleting a stronghold moves its Stores to the party in the same transaction (OQ-HOLD-06 B); old entries keep their `stores` end, shown as "Stores (removed)".
+- *(Review-a rulings 1, 3, 7, 8, 9)* A redacted hidden end is a wire-only `{kind: outside}` (never the forbidden `world ↔ party` move shape); players' entries carry no `seq` (ordered by a strictly increasing `createdAt`); a show / hide flip rewrites every DB row but sends only the loot window's rows (measured 55,927 B for 100 worst-width rows vs 279,127 B for 500); the delete's auto-moves split above 999,999 per coin and carry no text for a hidden Stores. Stores items may be DM-only one by one (`party_item.dm_only`, OQ-HOLD-12 A), with `item_hidden` on the entries that add or remove them.
 
 ## Consequences
 

@@ -2,7 +2,7 @@
 title: Play shell
 prefix: SHELL
 status: in-review
-owner: spec-rs
+owner: spec-wf, spec-cb, spec-tt, spec-rs
 phase: post-mvp-9
 ---
 

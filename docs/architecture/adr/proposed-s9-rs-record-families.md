@@ -27,6 +27,7 @@
 - `reminder`: campaign scope, `lazy: "all"`; DM full; player hidden if `dmOnly`, `linkHidden`, or another player's character (`ownerPlayerId` ≠ viewer); else redacted (the three DM keys dropped). `ownerPlayerId` is refreshed through one `definitionChangedHooks` line on an owner change; `linkHidden` by every HOLD command that flips a stronghold's or facility's `dmOnly`, in that transaction (changes ride on its event).
 - `stronghold`: campaign scope, `lazy: "all"`; DM full; player hidden if `dmOnly`; else redacted inside the record. Events `quietWhenUnchanged` (#276) so an edit invisible to players sends them no frame.
 - Removing a facility / stronghold deletes its linked reminders in the same transaction (BL-73).
+- *(Review-a rulings 2, 6, 7, 23)* Player redactions of both types drop `seq` and `updatedAt` (no count of hidden rows; a DM-only edit leaves the player record identical, so the quiet rule fires). Players order by `createdAt`, written strictly increasing per campaign. A derived snapshot type **`stronghold-index` `{id, name}`** (≤ 8 rows, players only while shown; measured ≤ +1,477 B DM / +1,365 B a player) names strongholds for the Party Manager tab's visibility, ledger rows and Move options, so the full type loads only when the Strongholds tab or window opens. One record kept, bounded by the test `StrongholdUpdated ≤ 48 KB at caps`.
 
 ## Consequences
 
