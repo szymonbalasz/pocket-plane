@@ -99,7 +99,10 @@ export function ShellProvider({
         available: () => availableIn(registry, sync),
         camera: cameraMode,
         // FR-SHELL-80: the map refits once on the client that reset.
-        onReset: requestFit,
+        onReset: () => {
+          requestFit();
+          refreshAfterFit(() => controller);
+        },
       }),
   );
   // FR-SHELL-81: a reported region (the active tool bar) going returns the windows it pushed.
@@ -350,4 +353,24 @@ function availableIn(
 ): ReadonlySet<string> {
   const store = sync?.getState().store;
   return store ? availableKinds(registry, store) : new Set(registry.defs.map((d) => d.kind));
+}
+
+/**
+ * After Reset layout's Fit lands (`data-fit-reason="fit"`, within 2 s), the zone windows'
+ * `data-pc-clear` is re-tested against the refitted PCs (it was taken before the refit).
+ */
+function refreshAfterFit(controller: () => ShellController) {
+  if (typeof requestAnimationFrame === "undefined") return;
+  const t0 = performance.now();
+  let frames = 0;
+  const tick = () => {
+    frames += 1;
+    // Two frames at least: the Fit runs after the reset's windows are laid out.
+    if (frames > 2 && mapCanvas()?.getAttribute("data-fit-reason") === "fit") {
+      controller().refreshPcClear();
+      return;
+    }
+    if (performance.now() - t0 < 2000) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }

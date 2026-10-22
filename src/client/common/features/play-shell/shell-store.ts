@@ -89,6 +89,11 @@ export interface ShellController {
    * action, the last kept) and run, in order, when it goes.
    */
   setBlocked(blocked: boolean): void;
+  /**
+   * Re-tests `data-pc-clear` of the windows the shell placed against the PCs as drawn now, rects
+   * unchanged (after the map's Fit that follows Reset layout, FR-SHELL-80).
+   */
+  refreshPcClear(): void;
 }
 
 const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
@@ -336,6 +341,24 @@ export function createShellController(opts: {
       });
       // The load settle changed the entry (zones, FR-SHELL-53's default sizes): written.
       if (r.migrated) storage.write(key, serialise(r.windows, registry));
+    },
+    refreshPcClear() {
+      const state = store.getState();
+      const tokens = opts.avoid?.() ?? [];
+      const mine = (how: Placed | undefined) => how !== undefined && how !== "stored";
+      const next = new Set(
+        state.windows
+          .filter((w) => w.state === "open")
+          .map((w) => windowId(w.kind, w.instance))
+          .filter((id) => mine(state.placed.get(id))),
+      );
+      for (const w of state.windows) {
+        const id = windowId(w.kind, w.instance);
+        if (next.has(id) && !pcClear(w, tokens)) next.delete(id);
+      }
+      const same =
+        next.size === state.pcClear.size && [...next].every((id) => state.pcClear.has(id));
+      if (!same) store.setState({ pcClear: next });
     },
     setBlocked(next) {
       if (blocked === next) return;

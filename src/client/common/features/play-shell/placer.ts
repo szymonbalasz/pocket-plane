@@ -175,6 +175,10 @@ export const sameRect = (a: Rect | null | undefined, b: Rect | null | undefined)
 
 const plainRect = (r: Rect): Rect => ({ x: r.x, y: r.y, w: r.w, h: r.h });
 
+const overlapArea = (a: Rect, b: Rect) =>
+  Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) *
+  Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+
 export const overlaps = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
@@ -499,6 +503,20 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   /** Clear of every other rendered window (no overlap) and hard keep-out. */
   const clearAt = (r: Rect, id: string, protectedOnly = false) =>
     !obstacles(id, protectedOnly).some((o) => overlaps(r, o)) && !hard.some((k) => overlaps(r, k));
+  /** PC footprint area under `r`, bare and grown by 4 px (L5's measure). */
+  const pcAreas = (r: Rect) => {
+    let bare = 0;
+    for (const t of tokens) if (t.pc) bare += overlapArea(r, t);
+    return [bare, pcAreaUnder(r, tokens)] as const;
+  };
+  /** `prev` (the window's current rect, clear) covers no more PC footprint than `next`. */
+  const staysAt = (id: string, prev: Rect, next: Rect) => {
+    const w = get(id);
+    if (!w || !inside(prev) || !clearAt(prev, id)) return false;
+    const [pb, pg] = pcAreas(prev);
+    const [nb, ng] = pcAreas(next);
+    return pb < nb || (pb === nb && pg <= ng);
+  };
   /** Inside the work area (FR-SHELL-29's: below the top bar, above the launcher). */
   const inside = (r: Rect) =>
     r.x >= 0 && r.y >= TOP_BAR_H && r.x + r.w <= vp.w && r.y + r.h <= vp.h - LAUNCHER_CLEAR;
@@ -659,6 +677,11 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         }
       }
       const e = placeWindow(def, vp, { ...input(), leastPc: true });
+      if (e.clear && !e.pcClear && o.prev && staysAt(id, o.prev, e.rect)) {
+        // Least movement (ADR-0060 §4): L5 never trades the window's own clear rect for one over
+        // more PC footprint (walkthrough F14: a margin touched after a reload's fit).
+        return { rect: o.prev, rung: "L5", pcClear: pcFree(o.prev) };
+      }
       if (e.clear) return { rect: e.rect, rung: e.pcClear ? "L4" : "L5", pcClear: e.pcClear };
       if (first) {
         putAwayWin(first, o.cause ?? null, w0.kind);

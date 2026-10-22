@@ -729,3 +729,64 @@ describe("one placer (FR-SHELL-95–113)", () => {
     expect(writes).toBe(2); // one viewport settle, one open
   });
 });
+
+test("FR-SHELL-97 L5 never covers more PC footprint than the window's own rect (walkthrough F14: B 1280×800 reload, Stats touching Thorn's +4 margin stays at 584, 382)", () => {
+  const vp = { w: 1280, h: 800 };
+  const players = createWindowRegistry("player", [
+    def("p.log", {
+      clients: ["player"],
+      defaultOpen: true,
+      defaultSize: { w: 510, h: 160 },
+      minSize: { w: 300, h: 160 },
+      minOpenH: undefined,
+      usefulSize: { w: 460, h: 160 },
+      defaultPosition: { anchor: "bottom-left", dx: 56 },
+    }),
+    def("p.sheet", {
+      clients: ["player"],
+      defaultOpen: true,
+      defaultSize: { w: 320, h: 440 },
+      minSize: { w: 280, h: 320 },
+      minOpenH: undefined,
+      usefulSize: { w: 320, h: 338 },
+      defaultPosition: { anchor: "top-right" },
+    }),
+    def("p.init", {
+      clients: ["player"],
+      defaultOpen: true,
+      defaultSize: { w: 280, h: 400 },
+      minSize: { w: 240, h: 200 },
+      minOpenH: undefined,
+      usefulSize: { w: 280, h: 320 },
+    }),
+    def("p.stats", {
+      clients: ["player"],
+      defaultSize: { w: 400, h: 412 },
+      minSize: { w: 320, h: 280 },
+      minOpenH: undefined,
+      usefulSize: { w: 400, h: 360 },
+    }),
+  ]);
+  const stats = { x: 584, y: 382, w: 320, h: 342 };
+  const ws: Windows = [
+    ...defaultLayout(players, vp),
+    { kind: "p.stats", instance: "main", state: "open", ...stats, z: 9, area: { w: 1280, h: 688 } },
+  ];
+  // The reload's fit put the PCs 4 px right, 8 px up: Thorn's +4 margin now reaches x 588.
+  const pcs = [pc(584, 324), pc(538, 508), pc(492, 416)].map((t) => ({ ...t, w: 46, h: 46 }));
+  const p = plan(
+    ws,
+    { type: "load", drawn: true },
+    {
+      registry: players,
+      viewport: vp,
+      available: new Set(players.defs.map((d) => d.kind)),
+      keepOuts: () => keepOuts("player", vp, new Map()),
+      avoid: () => pcs,
+    },
+  );
+  const after = get(p.windows, "p.stats");
+  expect(p.log).toContain("load:p.stats>L5"); // the ladder ran, and kept its own rect
+  expect(rectOf(after)).toEqual(stats);
+  expect(pcs.some((t) => hits(after, t))).toBe(false);
+});
