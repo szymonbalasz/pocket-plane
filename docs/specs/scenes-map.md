@@ -2,7 +2,7 @@
 title: Scenes and map
 prefix: MAP
 status: in-review
-owner: spec-pm
+owner: spec-wf, spec-cb, spec-pm
 wave: 3
 phase: post-mvp-9
 ---
