@@ -8,7 +8,7 @@ phase: post-mvp-9
 
 # Session recap
 
-> Five-minute read. See [AGENTS.md](../../AGENTS.md). **Sprint 9, track SP** (DM [#338](../decisions-log.md), decided: a session recap, tier B, from the event log and stats). Promoted from the [campaign-manager](post-mvp/campaign-manager.md) stub's recap row. Everything below the decision is **proposed**: picks in §15 (OQ-RECAP-01–15). Integrator seams S4, S6–S10, S14 applied (OQ-RECAP-08, -10, -14, -15 resolved). Sessions stay derived ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)'s decision unchanged; a note on its consequences, OQ-RECAP-13); numbers follow [stats](stats.md) ([ADR-0059](../architecture/adr/0059-stats-read-models.md), [ADR-0062](../architecture/adr/0062-stats-session-partials.md)).
+> Five-minute read. See [AGENTS.md](../../AGENTS.md). **Sprint 9, track SP** (DM [#338](../decisions-log.md), decided: a session recap, tier B, from the event log and stats). Promoted from the [campaign-manager](post-mvp/campaign-manager.md) stub's recap row. Everything below the decision is **proposed**: picks in §15 (OQ-RECAP-01–15). Integrator seams S4, S6–S10, S14 applied (OQ-RECAP-08, -10, -14, -15 resolved); review-a rulings 4, 5, 16, 20 applied. Sessions stay derived ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)'s decision unchanged; a note on its consequences, OQ-RECAP-13); numbers follow [stats](stats.md) ([ADR-0059](../architecture/adr/0059-stats-read-models.md), [ADR-0062](../architecture/adr/0062-stats-session-partials.md)).
 
 ## 1. Summary
 
@@ -53,10 +53,10 @@ phase: post-mvp-9
 | FR-RECAP-02 | **Session** = stats' session (FR-STATS-13: key `fromN`, any `n` inside resolves to it), picked with stats' rule (the viewer's listable sessions; `n` absent = the newest). Unknown or unlisted `n` → `not_found`. |
 | FR-RECAP-03 | **Filter, then aggregate** (FR-STATS-03): DM all facts; players the hub filter for a viewer with no `playerId` (public entries only), so every player gets the same recap. Feature-tagged kinds are skipped while their feature is off. Undone facts and superseded rolls never count (FR-STATS-02). |
 | FR-RECAP-04 | **Reads through stats** ([FR-STATS-78](stats.md#62-sprint-9-recap-reads-track-sp)): `pickSession`, `sessionStats` (awards), `luckStats` (session scope), `fightsFor` / `fightStats` (highlights), `luckRolls`; plus the loot ledger in the session's time range (FR-RECAP-14). No second copy of a formula. |
-| FR-RECAP-05 | **Rate limit** per actor: ≤ 2 queries / s; the excess is coalesced into the next (as FR-STATS-16). Separate from stats' limit. |
-| FR-RECAP-06 | **Live refresh** while the window shows the **newest** session and is not minimised: re-query (trailing 2 s) on a live `game-log-entry` or `loot-entry` upsert, and after each snapshot. Older sessions re-query only after a snapshot or a picker change. |
+| FR-RECAP-05 | **Rate limit per actor** (kept per actor: #327 and track FX's FR-STATS-69, per viewer with a quiet client retry once after 1 s; review-a ruling 16): ≤ 2 queries / s; the excess is coalesced into the next, and a client whose query was coalesced retries once after 1 s. Separate from stats' limit. Repeats are cheap because of the memo (FR-RECAP-29). |
+| FR-RECAP-06 | **Live refresh** while the window shows the **newest** session and is not minimised: re-query (trailing 2 s) on a live `game-log-entry` or `loot-entry` upsert, and after each snapshot; the server answers from the memo (FR-RECAP-29) when nothing counted changed. Older sessions re-query only after a snapshot or a picker change. |
 | FR-RECAP-07 | **Retroactive and stateless**: every past session, no backfill; a crash loses only an answer; reconnect → re-query (last result muted meanwhile). |
-| FR-RECAP-08 | **Player schema** (strict zod per role): no applied HP, HP, AC, temp HP, overkill amount, encounter name, hidden mark, Still standing, `dm-dice` or hidden roll. Players' fight labels are stats' neutral "Fight N · Thu 1 Jan"; players' kill lists never name a hidden monster (FR-STATS-35). Acks pass the leak scan. |
+| FR-RECAP-08 | **Player schema** (strict zod per role): no applied HP, HP, AC, temp HP, overkill amount, encounter name, hidden mark, Still standing, `dm-dice` or hidden roll. Players' fight labels are stats' neutral "Fight N · ‹date›"; players' kill lists never name a hidden monster (FR-STATS-35). Acks pass the leak scan. |
 | FR-RECAP-09 | **DM extras**: encounter names, hidden marks (eye-off), overkill amounts, Still standing per fight, hidden rolls in Notable rolls (marked), DM dice nat 20s / 1s. |
 
 **Contents** (OQ-RECAP-03 A; section keys in brackets)
@@ -92,6 +92,7 @@ phase: post-mvp-9
 | FR-RECAP-26 | **CON-44**: no record type; a share row ≤ 2 KB inside the notification window (measured, §12). |
 | FR-RECAP-27 | **Test IDs**: `recap-window`, `recap-session-picker`, `recap-section` (+ `data-record-id` = section key, `data-state` shown \| hidden-from-players), `recap-fight` (+ `data-record-id` = fight key), `recap-party-row` (+ character id), `recap-loot-row` (+ loot entry id), `recap-roll` (+ entry id), `recap-note`, `recap-copy`, `recap-share`, `recap-share-note`, `recap-share-omit` (+ `data-value` section), `recap-share-send`, `recap-empty`, `note-session-recap-open`. |
 | FR-RECAP-28 | **Palette**: a "Session recap" command (`commands.ts`, append; [FR-SHELL-186](play-shell.md#6-functional-requirements)); keywords "recap summary session". |
+| FR-RECAP-29 | **Recap memo** (review-a ruling 4): server memory, keyed `(session fromN, role dm | player, fact high-water n, loot high-water seq)`; **all players share one entry** (FR-RECAP-03), so a Share's fan-out to 7 clients costs ≤ 2 computes (DM + players). The fact high-water = the campaign's highest `game_log_entry.n` inside the session plus stats' fact version (FR-STATS-16: bumped by undo / supersede / owner changes); the loot high-water = the highest `loot_entry.seq` in the session's range (+ edits via `editedAt`). The `shared` part (FR-RECAP-22) is read per query outside the memo (one indexed read). In memory only, never persisted, dropped freely (≤ 2 entries per open session, LRU 32). Tests `FR-RECAP-29 seven concurrent recap.query → ≤ 2 computes`, `FR-RECAP-29 an undo / a new loot row recomputes, an unrelated line does not`. |
 
 ## 7. UI/UX notes
 
@@ -168,22 +169,22 @@ Throwaway probes (deleted before commit): stats' bench history (100 sessions, 92
 | CON-44 worst: every row of the closed-notification window a max share (120 rows) | 793,531 B (+102 KB; ceiling 1.5 MiB) | 388,144 B (+102 KB; ceiling 512 KiB) |
 
 - A 500-char note would cost +1.9 KB a row and 476 KB worst for players: hence the 280 cap.
-- Per share: one `NotificationCreated` (≈ 1 KB) to each connection, then one recap ack per client (≤ 11 KB).
-- `recap.query` runs synchronously in hub order: ≤ 38 ms of other frames' wait per query at 100 sessions; the rate limit bounds it.
+- Per share: one `NotificationCreated` (≈ 1 KB) to each connection, then one recap ack per client (≤ 11 KB). With the memo (FR-RECAP-29) a fan-out to the DM + 6 players costs **2 computes ≈ 70 ms**, not 7 ≈ 260 ms; live re-queries cost a memo hit (< 1 ms) unless a counted fact or loot row changed.
+- `recap.query` runs synchronously in hub order: ≤ 38 ms of other frames' wait per **computed** query at 100 sessions; the memo and the rate limit bound how often.
 
 ## 13. Test plan
 
 Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md), [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md)).
 
 **Fixtures** (`fixtures/units/session-recap/`; headers list expected DM and player numbers per section):
-- **`recap-loot-haul`** (setup; requires `loot-1`, `char-mira`, `char-thorn`; **joins session-sim-13**): in the fixture session (fixed clock): "Bandit Camp strongbox" +40 gp 25 sp (world → party), "Healer's fee" −5 gp, `party.addItem` "Bandit captain's map" ×1, and Thorn's own "Silver ring" 15 gp (world → Thorn). sim-12-safe: adds rows, edits none; if a sim-12 test reads the pot, the unit stays in `sp-s9` only (integrator checks).
+- **`recap-loot-haul`** (setup; requires `loot-1`, `char-mira`, `char-thorn`; **`sp-s9` only, not session-sim-13**: it changes the party pot, same rule as RS's `hold-tower-move`; review-a ruling 20): in the fixture session (the load-time clock anchor, FR-FIX-29): "Bandit Camp strongbox" +40 gp 25 sp (world → party), "Healer's fee" −5 gp, `party.addItem` "Bandit captain's map" ×1, and Thorn's own "Silver ring" 15 gp (world → Thorn). session-sim-13's recap uses sim-12's existing loot rows.
 - **`recap-share-note`** (setup; requires `recap-loot-haul`; `sp-s9-shared` only): `recap.share` of the fixture session with note "Cleared the Bandit Camp; the map points north." and `omit: ["rolls"]`.
 - The rest comes from `session-sim-12`: the ended Bandit Camp with its Captain (`sb-past-bandits` via `stats-b-past`), the Old Crypt (`st-past-crypt`), nat 20s / 1s incl. hidden ones (`sb-luck-rolls`), the running ambush. The recap units' headers restate those units' expected kills, downs and rolls per role.
 - **Bundles:** `sp-s9` ([play-shell §13](play-shell.md#13-test-plan)); **`sp-s9-shared`** = `sp-s9` + `recap-share-note`; e2e aliases `sp-s9-e2e`, `sp-s9-shared-e2e`.
 
 **Named tests** (all `FR-RECAP-NN …`):
 - **Unit:** 12 fight lines per role; 13 party rows (companion roll-up); 14 loot range (between sessions → earlier; moves out; totals complete past 60); 15 nat lines (initiative out, ≤ 12 + more); 19 Markdown per role (no hidden name in the player's); 20 note cleaning and 280 clip; 22 omit per role.
-- **Integration:** 01 read-only (no row, event or `seq`); 14 stores rows never in a recap (S8: a hidden Stores with coins and an item, absent for DM and players); 02 any `n` resolves, unlisted `n` → `not_found`; 03 same recap for player-1 and player-2; 03 undone and superseded excluded; 03 gems-tagged lines skipped while off; **08 leak scan per player** (acks: no HP, AC, overkill amount, encounter name, hidden name or roll); 09 DM extras; 05 rate limit coalesces; 07 three sittings (injected clock) → three recaps; 20 share: one row + log, player `forbidden`; 21 notification to all, payload player-safe; 22 newest share wins; 23 kind registered; hard kill → same recap (`state:digest` equal); crash seam before / after commit.
+- **Integration:** 01 read-only (no row, event or `seq`); 14 stores rows never in a recap (S8: a hidden Stores with coins and an item, absent for DM and players); 29 seven concurrent queries → ≤ 2 computes; 29 undo / new loot recomputes, an unrelated line hits; 02 any `n` resolves, unlisted `n` → `not_found`; 03 same recap for player-1 and player-2; 03 undone and superseded excluded; 03 gems-tagged lines skipped while off; **08 leak scan per player** (acks: no HP, AC, overkill amount, encounter name, hidden name or roll); 09 DM extras; 05 rate limit coalesces; 07 three sittings (injected clock) → three recaps; 20 share: one row + log, player `forbidden`; 21 notification to all, payload player-safe; 22 newest share wins; 23 kind registered; hard kill → same recap (`state:digest` equal); crash seam before / after commit.
 - **Client:** 06 live refresh (newest only, trailing 2 s, minimised off); 10 registered + opens from Stats / palette / history; 17 states; 21 opens `by: "feature"`, deferred while paused; 24 share dialog.
 - **E2E (thin, `recap.e2e.ts`, `// e2e-bundle: sp-s9-e2e`):** DM opens Recap from the palette, Share with a note → player-1's Recap opens with the note ≤ 2 s.
 - **Bench:** FR-RECAP-25.
@@ -193,12 +194,12 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | Step | DM (A) | Players (B, C) | Expect |
 |---|---|---|---|
 | RC1 | Palette "recap" → Enter | — | Recap on the fixture session: fights by name (incl. the ended Bandit Camp), hidden kills marked as the units' headers list, Still standing; loot incl. the strongbox; Notable rolls incl. the hidden DM nat 20 as Thorn (marked) |
-| RC2 | — | B: Stats → Session → Recap | "Fight N · Thu 1 Jan" labels, no hidden monster named, Thorn's nat 20s lower than A's by the hidden ones; loot identical to A's |
-| RC3 | Share: note "Cleared the Bandit Camp", untick Notable rolls | B, C | Toast "Session recap: Thu 1 Jan"; Recap opens with the note, no Notable rolls, no PC covered; A sees Notable rolls marked "Hidden from players" |
+| RC2 | — | B: Stats → Session → Recap | "Fight N · ‹load date›" labels (the anchored load clock, FR-FIX-29; review-a ruling 5), no hidden monster named, Thorn's nat 20s lower than A's by the hidden ones; loot identical to A's |
+| RC3 | Share: note "Cleared the Bandit Camp", untick Notable rolls | B, C | Toast "Session recap: ‹load date›"; Recap opens with the note, no Notable rolls, no PC covered; A sees Notable rolls marked "Hidden from players" |
 | RC4 | — | C: Copy as Markdown | Clipboard text has the heading, sections and note; no hidden name |
-| RC5 | Apply a kill in the running ambush; add 10 gp loot | B on the newest session | A new session "Today" in the picker; its recap gains the kill and the 10 gp ≤ 2 s |
+| RC5 | Apply a kill in the running ambush; add 10 gp loot | B on the current session | Same session (the load anchor is < 6 h ago, no new session); its recap gains the kill and the 10 gp ≤ 2 s; the note stays |
 | RC6 | — | C: leak scan over frames and recap acks | No HP, AC, overkill amount, hidden name, encounter name |
-| RC7 | Pause; share Today's recap; Resume | B, C | Nothing while paused; the Recap opens at resume |
+| RC7 | Pause; share the session again with the note "Back after the break"; Resume | B, C | Nothing while paused; the Recap opens at resume with the new note (newest share wins) |
 | RC8 | Reload all; history Open on the first share; hard kill + restart | same | Same recap and note; `state:digest` equal |
 
 ## 14. Dependencies

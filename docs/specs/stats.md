@@ -157,7 +157,7 @@ The [session recap](session-recap.md) reads stats; it changes no stats number, f
 |---|---|
 | FR-STATS-78 | **Read seam**: `src/server/features/stats/compute.ts` keeps `pickSession`, `sessionStats`, `luckStats`, `fightsFor`, `fightStats`, `luckRolls` and `characters` exported with today's signatures (the recap imports them, read-only), and gains **one** export `sessionFights(r, s)`: the fights with a counted fact the viewer sees inside session `s` (the rule `sessionsStats` already counts by). A change to these signatures needs a RECAP review. Test `FR-STATS-78 recap seam` (the recap's compose over `stats-b` equals the Stats acks it is built from). |
 | FR-STATS-79 | **Recap button** on the Session tab (both clients): `stats-session-recap` "Recap" beside the picker (DM: beside Show awards) opens `recap.session` (`by: "user"`) on the picked session ([FR-RECAP-10](session-recap.md#6-functional-requirements)). Hidden until RECAP's window registers. Test `FR-STATS-79 recap button`. |
-| FR-STATS-80 | **Separate budgets**: `recap.query` has its own per-actor rate limit and memo; it never counts against `stats.query`'s (FR-STATS-16). The leak scan's stats cases cover `recap.query` acks too ([FR-RECAP-08](session-recap.md#6-functional-requirements)). |
+| FR-STATS-80 | **Separate budgets**: `recap.query` has its own per-actor rate limit ([FR-RECAP-05](session-recap.md#6-functional-requirements)) and memo ([FR-RECAP-29](session-recap.md#6-functional-requirements): keyed by session, role and fact / loot high-water; all players share one entry); it never counts against `stats.query`'s (FR-STATS-16). The leak scan's stats cases cover `recap.query` acks too ([FR-RECAP-08](session-recap.md#6-functional-requirements)). |
 
 ## 7. UI/UX notes
 
