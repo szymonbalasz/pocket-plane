@@ -4,6 +4,8 @@
 // layer (FR-SHELL-135); `layer` orders the entries inside it.
 import type { RecordStore } from "@shared/protocol/store";
 import type { ComponentType } from "react";
+import { isPausedFor } from "../pause/logic";
+import { PauseOverlay } from "../pause/PauseOverlay";
 import type { ShellClient } from "./registry";
 
 export interface OverlayEntry {
@@ -23,7 +25,16 @@ export interface OverlayEntry {
 }
 
 /** The overlay entries (append yours: TT4's pause card, after WF1). */
-export const OVERLAYS: readonly OverlayEntry[] = [];
+export const OVERLAYS: readonly OverlayEntry[] = [
+  // TT4 (FR-SHELL-125–128, -135): the players' pause card, below the dice layer.
+  {
+    id: "pause",
+    clients: ["player"],
+    layer: 10,
+    blocksInput: isPausedFor,
+    Component: PauseOverlay,
+  },
+];
 
 /** This client's entries, back to front. */
 export function overlaysFor(

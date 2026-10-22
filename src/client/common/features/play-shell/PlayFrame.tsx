@@ -24,7 +24,7 @@ import {
 } from "./ShellContext";
 import { ShellWindow } from "./ShellWindow";
 import { SHELL_TEST_DRAG_MIME, SHELL_TEST_KIND } from "./test-windows";
-import { topBarItemsFor } from "./top-bar-items";
+import { topBarItemsFor, topBarItemWidth } from "./top-bar-items";
 
 /**
  * FR-SHELL-95: the `viewport` settle runs this long after the last resize event: before the map's
@@ -158,7 +158,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
               data-testid="ui-topbar-item"
               data-record-id={t.id}
               className="flex shrink-0 items-center"
-              style={{ width: t.width }}
+              style={{ width: topBarItemWidth(t, viewport) }}
             >
               <t.Component />
             </div>

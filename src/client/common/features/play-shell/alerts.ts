@@ -50,6 +50,11 @@ export interface AlertController {
   alert(a: ShellAlert): void;
   /** FR-SHELL-134: the sound alone (no flash, Toast or title mark), e.g. a prompt at resume. */
   alertSound(key: AlertKey | (string & {})): void;
+  /**
+   * FR-SHELL-127 (TT4): a player under the pause card: on → `alert` does nothing (no flash, Toast,
+   * sound or title mark; the pause runtime catches up at resume) and only `pause` sounds play.
+   */
+  setSuppressed(on: boolean): void;
   /** FR-SHELL-130, -131: the campaign's picks (`campaign.alertSounds`); preloads new ones. */
   setPicks(picks: AlertSounds): void;
   /** The flash with `key` finished; a newer one is left alone. */
@@ -122,6 +127,7 @@ export function createAlertController(deps: {
   let flashKey = 0;
   /** The sound that won this task (FR-SHELL-133 "due at once"); cleared in a microtask. */
   let winner: string | null = null;
+  let suppressed = false;
   const unlock = () => {
     audio.unlock();
     if (!store.getState().unlocked) store.setState({ unlocked: true });
@@ -132,6 +138,7 @@ export function createAlertController(deps: {
    * `lastSound` shows the winner). Silent keys record nothing.
    */
   const sound = (key: string) => {
+    if (suppressed && key !== "pause") return;
     const s = store.getState();
     const sameTask = winner !== null;
     if (sameTask && soundPriority(key) <= soundPriority(winner as string)) return;
@@ -147,6 +154,7 @@ export function createAlertController(deps: {
   return {
     store,
     alert(a) {
+      if (suppressed) return;
       if (a.flash !== false) {
         flashKey += 1;
         store.setState({ flash: { id: a.id, key: flashKey } });
@@ -156,6 +164,9 @@ export function createAlertController(deps: {
       deps.title.mark(a.title);
     },
     alertSound: sound,
+    setSuppressed: (on) => {
+      suppressed = on;
+    },
     setPicks: (picks) => audio.setPicks(picks),
     flashEnded(key) {
       if (store.getState().flash?.key === key) store.setState({ flash: null });
