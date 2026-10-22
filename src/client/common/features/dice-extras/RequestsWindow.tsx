@@ -350,7 +350,8 @@ function RequestCard({ r }: { r: RollRequestRecord }) {
 export function RequestsWindow() {
   const rows = useRecords<RollRequestRecord>(ROLL_REQUEST_TYPE);
   const list = useMemo(() => requestOrder(rows), [rows]);
-  const [composing, setComposing] = useState(true);
+  // Opens on the cards while a request is open (the useful size: composer folded + a card).
+  const [composing, setComposing] = useState(() => !rows.some((r) => r.state === "open"));
   return (
     <section
       data-testid="dicex-requests"

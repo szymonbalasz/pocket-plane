@@ -2,8 +2,8 @@
 // FR-SHELL-100 (sprint 8, WF1; review-b #3): every registered kind at its useful size (play-shell
 // §7's sprint-8 table, at 1280×720) shows its criterion without scrolling: the body's
 // `scrollHeight ≤ clientHeight`, and the named rows whole inside it. One page per client; each
-// window resized by its handle as a user would. Kinds another track registers later (TT
-// `dicex.requests`, CB `party.summary` on `cb-party-six`) are skipped until registered; the
+// window resized by its handle as a user would. Kinds another track registers later (CB
+// `party.summary` on `cb-party-six`) are skipped until registered; the
 // Stats award text (FR-STATS-67) and the companion card (FR-CHARX-83) add their cases in WF4.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -84,6 +84,13 @@ const DM: Case[] = [
     check: 5,
     skip: "WF4 (FR-STATS-66, -67)",
   },
+  {
+    kind: "dicex.requests",
+    useful: { w: 360, h: 400 },
+    // wf-frame-e2e has no request: the composer and the empty list, body unscrolled.
+    criterion: "composer folded + a 6-row card",
+    check: "body",
+  },
 ];
 const PLAYER: Case[] = [
   { kind: "cbt.initiative", useful: { w: 280, h: 320 }, criterion: "header + 4 rows", check: 4 },
@@ -133,8 +140,8 @@ const PLAYER: Case[] = [
     skip: "WF4 (FR-STATS-66, -67)",
   },
 ];
-/** FR-SHELL-112 (1): pending until their owners register them (TT2, CB3). */
-const PENDING = ["dicex.requests", "party.summary"];
+/** FR-SHELL-112 (1): pending until their owners register them (CB3). */
+const PENDING = ["party.summary"];
 
 async function live(page: Page) {
   await expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");

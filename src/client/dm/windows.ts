@@ -11,6 +11,7 @@ import { dmCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { encountersWindow } from "./features/combat-tracker/encounters-window";
 import { dmInitiativeWindow } from "./features/combat-tracker/initiative-window";
 import { dmCompendiumWindow } from "./features/compendium/compendium-window";
+import { requestsWindow } from "./features/dice-extras/requests-window";
 import { dmTrayWindow } from "./features/dice-extras/tray-window";
 import { dmDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { creaturesWindow } from "./features/entities/creatures-window";
@@ -40,6 +41,7 @@ const windows: WindowDef[] = [
   prefsWindow("dm", dmPrefSections), // shell.prefs, no launcher (play-shell, FR-SHELL-71)
   dmCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
   statsWindow, // stats.board (stats, FR-SHELL-93)
+  requestsWindow, // dicex.requests (dice-extras, FR-DICEX-86)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

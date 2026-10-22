@@ -1,11 +1,11 @@
 // e2e-bundle: table-tools-e2e
 // Roll requests (dice-extras §13 T4–T6; FR-DICEX-78, -79, -83, FR-NOTE-59): the open hidden
 // Perception (DC 15) reaches player-1 and player-2 as pending prompts without the DC. Player-1
-// rolls from the prompt → "Rolled N" and a hidden line only DM + player-1 see; player-2 declines.
-// *(After WF1)* the DM's Requests window card (total ✓ / ✗) joins this flow.
+// rolls from the prompt → "Rolled N" and a hidden line only DM + player-1 see, and the total with
+// ✓ / ✗ on the DM's Requests card only (FR-DICEX-85, -87); player-2 declines → the card closes.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { openWindow } from "./support/shell";
+import { launcherButton, openWindow } from "./support/shell";
 
 const live = (p: Page) =>
   expect(p.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -25,10 +25,12 @@ async function closePresented(page: Page) {
   await expect(popup).toHaveCount(0);
 }
 
-test("FR-DICEX-78 FR-DICEX-79 FR-DICEX-83 FR-NOTE-59 hidden Perception: prompts without DC, Roll → hidden line (DM + roller), Decline", async ({
+test("FR-DICEX-78 FR-DICEX-79 FR-DICEX-83 FR-DICEX-87 FR-DICEX-88 FR-NOTE-59 hidden Perception: prompts without DC, Roll → hidden line (DM + roller), total ✓ / ✗ on the DM card, Decline closes it", async ({
   browser,
 }) => {
-  const { secret, link } = e2eEnv();
+  const { secret, link, recordId } = e2eEnv();
+  const mira = recordId("char-mira", "entity");
+  const thorn = recordId("char-thorn", "entity");
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
   await live(dm);
@@ -61,6 +63,17 @@ test("FR-DICEX-78 FR-DICEX-79 FR-DICEX-83 FR-NOTE-59 hidden Perception: prompts 
   await expect(prompt(p1)).toHaveAttribute("data-state", "resolved");
   await expect(h1.getByTestId("dicex-prompt-outcome").first()).toHaveText(/^Rolled \d+$/);
   await expect(asked(dmLog)).toHaveCount(dmBefore + 1);
+  // A: the Requests card: Mira's total with pass / fail, Thorn waiting; the launcher badge = 1.
+  await expect(dm.getByTestId("dicex-launcher-badge")).toHaveAttribute("data-count", "1");
+  const requests = await openWindow(dm, "dicex.requests");
+  const card = requests.locator('[data-testid="dicex-request-card"][data-state="open"]');
+  const row = (id: string) =>
+    card.locator(`[data-testid="dicex-request-target-row"][data-record-id="${id}"]`);
+  await expect(row(mira)).toHaveAttribute("data-state", "rolled");
+  await expect(row(mira)).toHaveAttribute("data-total", /^\d+$/);
+  await expect(row(mira)).toHaveAttribute("data-success", /^(true|false)$/);
+  await expect(row(mira)).toContainText(/\d+ [✓✗]/);
+  await expect(row(thorn)).toContainText("Waiting");
   await expect(asked(dmLog).last().getByTestId("dice-log-entry-hidden")).toHaveCount(1);
   await p2.waitForTimeout(300);
   await expect(asked(p2Log)).toHaveCount(p2Before);
@@ -69,6 +82,13 @@ test("FR-DICEX-78 FR-DICEX-79 FR-DICEX-83 FR-NOTE-59 hidden Perception: prompts 
   await h2.getByTestId("dicex-prompt-decline").click();
   await expect(prompt(p2)).toHaveAttribute("data-state", "resolved");
   await expect(h2.getByTestId("dicex-prompt-outcome").first()).toHaveText("Declined");
+  const closed = requests.locator('[data-testid="dicex-request-card"][data-state="closed"]');
+  await expect(
+    closed.locator(`[data-testid="dicex-request-target-row"][data-record-id="${thorn}"]`),
+  ).toHaveAttribute("data-state", "declined");
+  await expect(
+    launcherButton(dm, "dicex.requests").getByTestId("dicex-launcher-badge"),
+  ).toHaveCount(0);
 
   // FR-DICEX-92: no request row, DC or pass / fail ever reaches C.
   for (const leak of ['"type":"roll-request"', '"success"', '"dc":15']) {

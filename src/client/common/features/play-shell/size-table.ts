@@ -133,6 +133,13 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
       min: s(280, 320),
       criterion: "header, HP / AC, tabs, 3 attack rows + buttons",
     },
+    // TT2 (seams S3, FR-DICEX-86): DM roll requests.
+    "dicex.requests": {
+      default: all(360, 460),
+      useful: all(360, 400),
+      min: s(300, 320),
+      criterion: "composer folded + a 6-row card",
+    },
   },
   player: {
     "cbt.initiative": {
@@ -166,8 +173,6 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
  */
 export const PENDING_ROWS: Record<"dm" | "player", Record<string, PendingRow>> = {
   dm: {
-    // TT2 (seams S3): DM roll requests, 360 × 460 → ≤ 412 at 1280×720 or band-capped.
-    "dicex.requests": { pending: "TT2" },
     // CB3 (seams S12): Party status (FR-SHELL-141).
     "party.summary": { pending: "CB3" },
   },

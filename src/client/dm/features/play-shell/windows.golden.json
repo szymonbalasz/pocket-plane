@@ -72,6 +72,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "open @1600×900 dicex.requests",
+    "rect": "588,60,360×460",
+    "placed": "auto",
+    "parked": "charx.companion,stats.board"
+  },
+  {
     "at": "reopen @1600×900 camp.players",
     "rect": "510,232,400×340",
     "placed": "stored",
@@ -142,6 +148,12 @@
     "rect": "548,160,400×412",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen @1600×900 dicex.requests",
+    "rect": "588,60,360×460",
+    "placed": "reopened",
+    "parked": "charx.companion,stats.board"
   },
   {
     "at": "reopen 1440×900 @1440×900 camp.players",
@@ -216,6 +228,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "reopen 1440×900 @1440×900 dicex.requests",
+    "rect": "540,364,360×460",
+    "placed": "reopened",
+    "parked": "charx.companion,stats.board"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 camp.players",
     "rect": "382,212,400×340",
     "placed": "reopened",
@@ -288,6 +306,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "reopen 1280×800 @1280×800 dicex.requests",
+    "rect": "399,60,360×460",
+    "placed": "reopened",
+    "parked": "stats.board"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "418,60,400×340",
     "placed": "reopened",
@@ -358,6 +382,12 @@
     "rect": "418,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -444,6 +474,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "open @1440×900 dicex.requests",
+    "rect": "540,364,360×460",
+    "placed": "auto",
+    "parked": "charx.companion,stats.board"
+  },
+  {
     "at": "reopen @1440×900 camp.players",
     "rect": "430,232,400×340",
     "placed": "stored",
@@ -514,6 +550,12 @@
     "rect": "540,412,400×412",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen @1440×900 dicex.requests",
+    "rect": "540,364,360×460",
+    "placed": "reopened",
+    "parked": "charx.companion,stats.board"
   },
   {
     "at": "reopen 1280×800 @1280×800 camp.players",
@@ -588,6 +630,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "reopen 1280×800 @1280×800 dicex.requests",
+    "rect": "399,60,360×460",
+    "placed": "reopened",
+    "parked": "stats.board"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "418,60,400×340",
     "placed": "reopened",
@@ -658,6 +706,12 @@
     "rect": "418,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -744,6 +798,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "open @1280×800 dicex.requests",
+    "rect": "399,60,360×460",
+    "placed": "auto",
+    "parked": "stats.board"
+  },
+  {
     "at": "reopen @1280×800 camp.players",
     "rect": "382,212,400×340",
     "placed": "stored",
@@ -816,6 +876,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "reopen @1280×800 dicex.requests",
+    "rect": "399,60,360×460",
+    "placed": "reopened",
+    "parked": "stats.board"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 camp.players",
     "rect": "418,60,400×340",
     "placed": "reopened",
@@ -886,6 +952,12 @@
     "rect": "418,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -972,6 +1044,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "open @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "auto",
+    "parked": "stats.board"
+  },
+  {
     "at": "reopen @1280×720 camp.players",
     "rect": "418,60,400×340",
     "placed": "stored",
@@ -1042,6 +1120,12 @@
     "rect": "418,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "protected @1280×720 camp.players",

@@ -317,14 +317,22 @@ describe("TT2 roll requests (client)", () => {
     expect(resultsPreset("save:dex", (c) => c === "skill-check")).toBe("hidden");
   });
 
-  test("FR-DICEX-86 requests window: composer folded open, cards open first", () => {
+  test("FR-DICEX-86 requests window: the composer opens folded while a request is open; cards open first", () => {
     const open = request("r-open", 2);
     const closed = request("r-closed", 1, { state: "closed" });
     expect(requestOrder([closed, open]).map((r) => r.id)).toEqual(["r-open", "r-closed"]);
     expect([anyOpen([open]), anyOpen([closed])]).toEqual([true, false]);
-    const html = render(<RequestsWindow />, DM, {
+    const both = render(<RequestsWindow />, DM, {
       "roll-request": { "r-open": open, "r-closed": closed },
     });
+    expect(both).toMatch(/data-testid="dicex-request-fold" data-state="closed"/);
+    expect(both).not.toContain('data-testid="dicex-request-roll"');
+    expect(
+      [...both.matchAll(/data-testid="dicex-request-card" data-record-id="([^"]+)"/g)].map(
+        (m) => m[1],
+      ),
+    ).toEqual(["r-open", "r-closed"]);
+    const html = render(<RequestsWindow />, DM, { "roll-request": { "r-closed": closed } });
     for (const id of [
       "dicex-requests",
       "dicex-request-roll",
@@ -338,11 +346,6 @@ describe("TT2 roll requests (client)", () => {
     ]) {
       expect([id, html.includes(`data-testid="${id}"`)]).toEqual([id, true]);
     }
-    expect(
-      [...html.matchAll(/data-testid="dicex-request-card" data-record-id="([^"]+)"/g)].map(
-        (m) => m[1],
-      ),
-    ).toEqual(["r-open", "r-closed"]);
     expect(html).toMatch(
       /data-testid="dicex-request-target" data-record-id="ghost" data-state="blocked"/,
     );
