@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: in-review
+status: complete
 owner: spec-sb
 wave: 2
 phase: post-mvp-8
@@ -454,11 +454,11 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 |---|---|---|---|---|
 | ~~OQ-DICE-45~~ | ~~gems: how a reroll leaves the old entry~~ | **Resolved (integrator, sprint-7 seams / rulings)** (seam S2, = OQ-DICE-42 A): kept, with `supersededBy` set once; `replaces` on the new entry; roll rows immutable with `replacesRollId` (GM's FR-DICE-62–67). Stats count the final roll only | — | DICE, GEM, STATS |
 
-**Sprint 8** (track SB). Bold = pick.
+**Sprint 8** (track SB). Decided at DM gate 1 (#335): every bold pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| ~~OQ-DICE-51~~ | Seam **TT ↔ SB**: do macro and roll-request rolls count in Luck? | **Resolved (seam S6): A.** Count like any roll per FR-DICE-90; players count public entries only (a hidden answer is DM-only, also for its roller); no origin flag | — | DICE, DICEX, STATS |
+| ~~OQ-DICE-51~~ | Seam **TT ↔ SB**: do macro and roll-request rolls count in Luck? | **Resolved (integrator, sprint-8 seams / rulings)** (S6): **A.** Count like any roll per FR-DICE-90; players count public entries only (a hidden answer is DM-only, also for its roller); no origin flag | — | DICE, DICEX, STATS |
 
 ## 16. Out of scope
 

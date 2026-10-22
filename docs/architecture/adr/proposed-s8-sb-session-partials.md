@@ -1,6 +1,6 @@
-# Proposed — Campaign-wide stats from per-session partials kept in memory
+# Campaign-wide stats from per-session partials kept in memory
 
-- Status: proposed (sprint 8, track SB; for DM gate 1, [OQ-STATS-30](../../specs/stats.md#15-open-questions))
+- Status: accepted (DM gate, #335) ([OQ-STATS-30](../../specs/stats.md#15-open-questions) A; sprint 8, track SB)
 - Date: 2026-10-21
 - Refines: [ADR-0059](0059-stats-read-models.md) §4 ("only append-only derivations may be cached"). Everything else in ADR-0059 stands: facts, not projections; filter, then aggregate; read-only command; nothing persisted.
 - Affects: [stats](../../specs/stats.md) FR-STATS-46, -51 (trophy case, luck tracker)
@@ -23,9 +23,9 @@
 | C. Materialised tables (ADR-0059 option B) | O(1) reads | Schema lane, backfill, drift, every undo / reroll / visibility path must update them |
 | D. Cap campaign scope to the newest N sessions | Cheap | Wrong numbers ("lifetime" isn't) |
 
-## Decision (proposed)
+## Decision
 
-**A.**
+**A. Per-session partials in server memory**, built at start in yielding 5-session chunks; `pending` until ready when more than 5 sessions are unbuilt (accepted with the SB pushback, #335).
 
 1. A partial is a **memo**, not a projection. It is derived only from facts, keyed by viewer class and enabled features, held in memory, never persisted, and rebuilt freely.
 2. **Invalidation** goes through the existing fact-version listener (FR-STATS-16). It also reports the touched entries' `n`, and the partials of those sessions are dropped. Owner / kind changes of combatants and feature switches drop all partials of the campaign. Unsure → drop all: correctness over speed.

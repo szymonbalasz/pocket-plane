@@ -1,7 +1,7 @@
 ---
 title: Notifications
 prefix: NOTE
-status: in-review
+status: complete
 owner: spec-sb
 wave: 2
 phase: post-mvp-8
@@ -375,12 +375,12 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 |---|---|---|---|---|
 | OQ-NOTE-25 | **How the DM's toast stack keeps off the tool bar and the map's top-left** (sim-9 b01, a01) | **Decided (#288): A** (the stack stays in its top-centre band; the tool bar blocks it). Options: **A. Move the toast: it stays in its top-centre band and slides down past windows (never to the left edge); hard keep-outs (the tool bar) block it like Initiative** (FR-NOTE-42, -43): predictable spot; may sit on a window body in the middle (e.g. Party at 576) more often than today. / B. Keep-out for the bar only: today's sideways search plus the bar as a blocker: fewer window-body overlaps, but the stack still wanders to the map's top-left (over the Dragon) when windows fill the middle. / C. Collapse: the summary becomes a one-line pill pinned at the home top (≈ 200 × 32), cards open from it: least footprint, one more click for the DM on every card | — · decided (#288) | FR-NOTE-42, -43, -32; play-shell §7 |
 
-**Sprint 8** (track SB). Bold = pick.
+**Sprint 8** (track SB). Decided at DM gate 1 (#335): every bold pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| ~~OQ-NOTE-36~~ | Seam **WF**: the feed and summary toasts in WF's toast policy | **Resolved (seams S4, S5):** the feed is the **callout** class (FR-NOTE-50), the summary's toast is **info** class; no new region or keep-out | — | NOTE, SHELL, STATS |
-| OQ-NOTE-37 | Summary: toast **and** the window opening? | **A. Both** (as OQ-NOTE-28: the toast says why Stats opened; with the "open at End" preference off it is the only signal) · B. Window only (a per-kind "no toast" flag, new to the registry) | no (DM pick) | NOTE, STATS |
+| ~~OQ-NOTE-36~~ | Seam **WF**: the feed and summary toasts in WF's toast policy | **Resolved (integrator, sprint-8 seams / rulings)** (S4, S5): the feed is the **callout** class (FR-NOTE-50), the summary's toast is **info** class; no new region or keep-out | — | NOTE, SHELL, STATS |
+| OQ-NOTE-37 | Summary: toast **and** the window opening? | **Decided (#335): A** · **A. Both** (as OQ-NOTE-28: the toast says why Stats opened; with the "open at End" preference off it is the only signal) · B. Window only (a per-kind "no toast" flag, new to the registry) | no (DM pick) | NOTE, STATS |
 
 **Sprint 7** (track ST).
 

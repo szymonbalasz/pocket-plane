@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: in-review
+status: complete
 owner: spec-sb
 phase: post-mvp-8
 wave: 3
@@ -1239,11 +1239,11 @@ Full split: [play-shell §14](play-shell.md#14-dependencies). CBT parts (seams b
 | OQ-CBT-94 | **The End dialog's summon warning wording** | **Decided (#315): A** (names the removed summon tokens + the charmed line). **A. "Summoned creatures' tokens are removed: Fire Elemental 2, Fire Elemental 3." (names, ≤ 5 then "and N more"), plus "Mira's charmed Goblin 2 stays as a monster." when one exists (#310 (2)): says what goes, which, and what stays** / B. "2 summon tokens will be removed.": short, but which ones, and nothing on charmed companions / C. A + a "Keep its token" tick per summon (→ `cbt.end` `keepTokenIds?`): lets a summon's token stay as a plain monster token, more to read at End | no · owner: DM | FR-CBT-144 |
 | ~~OQ-CBT-95~~ | **Accepted by seams S3:** FU needs no turn on the apply path; GM1 → ST core → GM2 hold it; GM2 must not edit DM `initiative-window.tsx`, else it rebases after FU's combat-rows slice. Original row: **gems (GM) and the apply popup:** the brief orders GM core → FU (End dialog / concentration) → GM popup UI. FU's End dialog (`end-confirm.tsx`, `encounters-window.tsx`, `initiative-window.tsx`'s End confirm) and concentration chip (combat-extras `parts.tsx`) are **not** popup or damage-card files | **Resolved (integrator, sprint-7 seams / rulings)** **No FU turn on the popup: GM core → GM popup UI hold it alone; FU2 runs in parallel and merges first only if GM's popup UI edits DM `initiative-window.tsx` (seams)** / the brief's order (FU waits between GM's two slices for files it doesn't touch) | no · owner: orchestrator (seams) | [gems](gems.md); §14.6 |
 
-**Sprint 8** (track SB). Bold = pick.
+**Sprint 8** (track SB). Decided at DM gate 1 (#335): every bold pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| ~~OQ-CBT-96~~ | Seam **CB ↔ SB**: who holds End | **Resolved (seam S8): A.** Nobody edits `lifecycle.ts`; SB appends its `ended` hook to `rule-hooks.ts`; CB edits rows / `initiative.ts` / `ranks.ts` only; Highlights sort by Dealt | — | CBT, STATS |
+| ~~OQ-CBT-96~~ | Seam **CB ↔ SB**: who holds End | **Resolved (integrator, sprint-8 seams / rulings)** (S8): **A.** Nobody edits `lifecycle.ts`; SB appends its `ended` hook to `rule-hooks.ts`; CB edits rows / `initiative.ts` / `ranks.ts` only; Highlights sort by Dealt | — | CBT, STATS |
 
 ## 16. Out of scope
 

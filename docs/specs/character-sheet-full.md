@@ -1,7 +1,7 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: in-review
+status: complete
 owner: spec-sb
 phase: post-mvp-8
 ---
@@ -20,7 +20,7 @@ phase: post-mvp-8
 
 > **Sprint 7 (track GM, [gems](gems.md); DM #140, #312).** Decided (not open): gem counts on the character sheet, built-in icons now (art in the UI sprint, BL-29), nothing while the campaign's gems are off. One sheet section `gem.counts` (FR-CHARX-71–76, slice GM3 `build/gems-sheet`, tests `FR-CHARX-71 gem section off / on`, `FR-CHARX-72 owner / DM controls`, `FR-CHARX-73 summary counts`); placement open (OQ-CHARX-37).
 
-> **Sprint 8 (track SB, stats tier B, DM [#334](../decisions-log.md); spec-sb).** Decided (not open): a **trophy case** of campaign-wide records on the character. It is one sheet section, `stats.trophies`, a **Trophies** tab owned by [stats](stats.md#61-tier-b-sprint-8) (FR-STATS-42–44), registered through `sheet-sections.ts` (append). New FR-CHARX-97–99. Client only; it reads `stats.query`, not sheet data; 0 B snapshot. Placement and audience are DM picks (OQ-STATS-22, -23, OQ-CHARX-44). Slice SB2 `build/sb-trophies`. Tests `FR-CHARX-97 trophies tab`, `FR-CHARX-98 trophies layout`, `FR-CHARX-99 trophies never on summary cards`.
+> **Sprint 8 (track SB, stats tier B, DM [#334](../decisions-log.md); spec-sb).** Decided (not open): a **trophy case** of campaign-wide records on the character. It is one sheet section, `stats.trophies`, a **Trophies** tab owned by [stats](stats.md#61-tier-b-sprint-8) (FR-STATS-42–44), registered through `sheet-sections.ts` (append). New FR-CHARX-97–99. Client only; it reads `stats.query`, not sheet data; 0 B snapshot. Placement and audience decided at DM gate 1 (#335: OQ-STATS-22, -23, OQ-CHARX-44 A). Slice SB2 `build/sb-trophies`. Tests `FR-CHARX-97 trophies tab`, `FR-CHARX-98 trophies layout`, `FR-CHARX-99 trophies never on summary cards`.
 
 > **Sprint 7 (track FU, DM [#311](../decisions-log.md); session-sim-10 a03).** Decided, not open: the **companion card** no longer opens at its minimum with the attacks below the fold. New **FR-CHARX-81** (a useful size, so the shell auto-minimises a window rather than shrink the card; [play-shell FR-SHELL-79](play-shell.md#6-functional-requirements), OQ-SHELL-53) and **FR-CHARX-82** (attacks before conditions, two attack rows visible at 320 × 360). Client only, 0 B. Tests `FR-CHARX-81 card useful size` (registry: `usefulSize` 320 × 360; with Compendium open at 1280×800 the card opens 320 × 360 and Compendium is auto-minimised), `FR-CHARX-82 attacks above the fold` (DOM at 320 × 360: both Owlbear attack rows' buttons inside the rect with 3 conditions); walkthrough U2, U15 in [play-shell §13](play-shell.md#13-test-plan); slices FU1 (the window line) and FU4 (the card's order) in [play-shell §14](play-shell.md#14-dependencies). GM (gems) edits this spec in parallel with its own range. Edge cases: client-only layout; reconnect re-renders from the store; crash: no server change. No open question.
 
@@ -195,7 +195,7 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-CHARX-97 | **Trophies tab**: sheet section `stats.trophies` (owner stats; one line in `sheet-sections.ts`, append): slot `tab`, title "Trophies", **`order: 100`**, last: the tabs end "… Macros (90), Trophies" (seam S11; by the `order` field, not merge order), both clients, kinds `["character"]`, `available` = always. Like every section it renders only on full sheets, so on the DM's sheets and the owner's own (FR-CHARX-36); never on summary cards or imported-definition sheets (§7.1). Drafts and locked sheets show it read-only. | picks OQ-STATS-23 A, OQ-CHARX-44 A |
+| FR-CHARX-97 | **Trophies tab**: sheet section `stats.trophies` (owner stats; one line in `sheet-sections.ts`, append): slot `tab`, title "Trophies", **`order: 100`**, last: the tabs end "… Macros (90), Trophies" (seam S11; by the `order` field, not merge order), both clients, kinds `["character"]`, `available` = always. Like every section it renders only on full sheets, so on the DM's sheets and the owner's own (FR-CHARX-36); never on summary cards or imported-definition sheets (§7.1). Drafts and locked sheets show it read-only. | OQ-STATS-23 A, OQ-CHARX-44 A (decided #335) |
 | FR-CHARX-98 | **Layout** (the component is stats', `@ui/features/stats/trophies/`): **Lifetime**, a label / value grid (2 columns, 1 under 360 px), then **Records**, each value with a muted detail line ("→ Ogre · Fight 3 · Tue 20 Oct"), then a footnote "Whole campaign, counted from the game log". DM adds a muted "Includes hidden rolls and fights". "—" for 0. Test IDs: `stats-trophies` (+ `data-record-id` = character id), `stats-trophy` (+ `data-record-id` = key, `data-value`), `stats-trophy-detail`. States per FR-STATS-50. | FR-STATS-42 |
 | FR-CHARX-99 | **Data and refresh**: the tab sends `stats.query {scope: "trophies", characterId}` when shown and refreshes per FR-STATS-44. It reads no `creature-sheet` or stat-block field, and other players never get it (no section on the summary card, FR-CHARX-32; the server answers players only for their own characters, FR-STATS-43). | FR-STATS-43, -44 |
 
@@ -588,11 +588,11 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 |---|---|---|---|---|
 | OQ-CHARX-37 | Where the gem block sits on the sheet | **Decided (#315): A.** **A. Header chip row, after the effect chips (seen at a glance on every tab; the row gets longer)** / B. Vitals, under HP (near play state; pushes the HP row's neighbours down) / C. Its own "Gems" tab (roomy; hidden until clicked) | — · decided | gems |
 
-**Sprint 8** (track SB). Bold = pick.
+**Sprint 8** (track SB). Decided at DM gate 1 (#335): every bold pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CHARX-44 | Where the trophy case sits on the sheet | **A. Its own tab "Trophies", last**: room for records, out of the way · B. End of the Main tab (`main` slot): seen without a click, makes Main longer · C. A header chip "12 kills" (trophy icon) opening a popover: compact, tiny | no (DM pick, with OQ-STATS-23) | CHARX, STATS |
+| OQ-CHARX-44 | Where the trophy case sits on the sheet | **Decided (#335): A** · **A. Its own tab "Trophies", last**: room for records, out of the way · B. End of the Main tab (`main` slot): seen without a click, makes Main longer · C. A header chip "12 kills" (trophy icon) opening a popover: compact, tiny | no (DM pick, with OQ-STATS-23) | CHARX, STATS |
 
 ## 16. Out of scope
 
