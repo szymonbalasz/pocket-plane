@@ -67,6 +67,8 @@ import sessionSim10 from "./session-sim-10";
 import sessionSim11 from "./session-sim-11";
 import sessionSim12 from "./session-sim-12";
 import stats from "./stats";
+import statsB from "./stats-b";
+import statsBE2e from "./stats-b-e2e";
 import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
 import statsWindowE2e from "./stats-window-e2e";
@@ -170,4 +172,7 @@ export const bundles: readonly Bundle[] = [
   statsWindowE2e,
   // Sprint 8 track TT (fix/tt-core): the sprint-8 gate bundle, each track appends its units
   sessionSim12,
+  // Sprint 8 track SB (build/sb-core)
+  statsB,
+  statsBE2e,
 ];
