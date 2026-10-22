@@ -456,8 +456,13 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   };
   const defOf = (w: WindowState) => registry.get(w.kind);
   const isProt = (w: WindowState) => defOf(w)?.defaultOpen === true;
-  const shownMap = () => shownRects(out, ctx);
-  const rendered = (w: WindowState) => shownRect(out, w, ctx);
+  // Rendered rects of the windows as they are now, computed once per change of `out`.
+  let shownCache: { at: WindowState[]; map: Map<WindowState, Rect> } | null = null;
+  const shownMap = () => {
+    if (shownCache?.at !== out) shownCache = { at: out, map: shownRects(out, ctx) };
+    return shownCache.map;
+  };
+  const rendered = (w: WindowState) => shownMap().get(w) ?? shownRect(out, w, ctx);
   const need = (w: WindowState, def: WindowDef) =>
     growsToContent(w, def) ? ctx.heights?.(idOf(w)) : undefined;
 
@@ -611,13 +616,23 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const p = placeWindow(def, vp, { ...input(), windows: keep, ...more, gap: 4 });
       return accepted(p);
     };
+    /**
+     * Whether some spot ≥ `floor` is accepted at all: one search at the 4-px gap (the most
+     * permissive; every L1 candidate is an L2 one), before the rung-by-rung searches.
+     */
+    const anyAt = (more: Partial<PlaceInput>) =>
+      accepted(placeWindow(def, vp, { ...input(), ...more, gap: 4 }));
+    let squeezed = false;
     for (;;) {
-      const l1 = tryAt({ floor: size });
-      if (l1) return { rect: l1.rect, rung: "L1", pcClear: true };
-      const l2 = tryAt({ floor });
-      if (l2) return { rect: l2.rect, rung: "L2", pcClear: true };
-      if (o.squeeze) {
-        const s = squeezeFor(w0, () => tryAt({ floor }));
+      if (anyAt({ floor })) {
+        const l1 = tryAt({ floor: size });
+        if (l1) return { rect: l1.rect, rung: "L1", pcClear: true };
+        const l2 = tryAt({ floor });
+        if (l2) return { rect: l2.rect, rung: "L2", pcClear: true };
+      } else if (o.squeeze && !squeezed) {
+        // Once: after a put-away the restart only needs L1–L2 (the look-ahead found room).
+        squeezed = true;
+        const s = squeezeFor(w0, () => (anyAt({ floor }) ? tryAt({ floor }) : null));
         if (s) return s;
       }
       const yielded = yieldFor(def, input(), floor);
@@ -631,7 +646,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
           continue;
         }
       }
-      const l4 = tryAt({});
+      const l4 = anyAt({}) ? tryAt({}) : null;
       if (l4) return { rect: l4.rect, rung: "L4", pcClear: true };
       if (first) {
         aheadMin ??= lookAhead({});
