@@ -99,9 +99,9 @@ export interface ShellController {
 const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
 /**
- * `placed` after a change: what the placer placed (its plan); a move / resize end → `stored`; a
- * user reopen (FR-SHELL-56) → `reopened` when its stored rect was `covered` (re-placed), else
- * `stored`; any other window keeps its value.
+ * `placed` after a change: what the placer placed (its plan); a move / resize end → `stored` (or
+ * `pushed` off a tool bar, FR-SHELL-105); a user reopen (FR-SHELL-56) → `reopened` when its
+ * stored rect was `covered` (re-placed), else `stored`; any other window keeps its value.
  */
 function nextPlaced(
   prev: ShellState,
@@ -116,7 +116,8 @@ function nextPlaced(
     const before = prev.windows.find((p) => p.kind === w.kind && p.instance === w.instance);
     const named = !isLayoutAction(action) && id === windowId(action.kind, action.instance);
     const how = planned.get(id);
-    if (named && action.type === "setRect") out.set(id, "stored");
+    // A move / resize end dropped over a shown tool bar is pushed off it (FR-SHELL-105).
+    if (named && action.type === "setRect") out.set(id, how ?? "stored");
     else if (named && isUserReopen(action, before?.state) && !how) {
       out.set(id, covered ? "reopened" : "stored");
     } else if (how) out.set(id, how);

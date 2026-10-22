@@ -3336,7 +3336,23 @@ From [notifications](../specs/notifications.md#6-functional-requirements) FR-NOT
 | `stats.board` | `usefulSize` 400 × 360 (criterion: 5 rows names whole, or 2 award cards, or the first 4 Highlights lines). Award grid: `@min-[356px]` 2 columns, `@min-[576px]` 3 (= window body 380 / 600 px), else 1; each card stacks title, value, winners, detail; names, values and details wrap (no truncation); Fight names wrap | FR-STATS-66, -67 |
 | Fixtures / e2e | No unit; `wf-toasts.e2e.ts` on `toast-home-e2e`; `useful-size.e2e.ts` (`wf-frame-e2e`): `stats.board`, `charx.companion`, `note.history` cases on, plus `FR-CHARX-83 card useful criterion` (Owlbear, Drake at 320 × 360) and `FR-STATS-66 … FR-STATS-67 award grid fits` (both clients) | NOTE §13 |
 
-## 142. Sprint 8: stats tier-B UI — kill feed, Highlights, End summary open, Luck tab, Trophies tab (SB1 + SB2)
+## 142. Sprint 8: tool-bar pushes through the ladder, more push triggers, rail inset (WF2)
+
+From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-104–106, -109 ([ADR-0060](../architecture/adr/0060-one-window-placer.md)). **Built by `fix/wf-push-rail`.** No intent, event or record change (0 B).
+
+| Seam | Contract | Source |
+|---|---|---|
+| `push` trigger (`placer.ts`) | Every shown window over the bar + 12 is displaced, protected ones first (registry order), then launcher windows by descending z; the ones still waiting are no obstacle. Each goes through the ladder (no L2b yield, no squeeze, puts no other window away) ranked nearest its pre-push rect (the memory's first one), cause `toolbar:<id>` (the hard region at that rect; `map.toolbar` if none, and the rect counts as hard). A launcher window with no spot ≥ useful is put away itself until `return`; a protected one never: L4, else L5 (flagged). `data-placed="pushed"`. FR-SHELL-55's push right and `belowBar` are gone | FR-SHELL-104 |
+| `drag-end` | A move / resize end whose rendered rect overlaps a shown hard keep-out other than the toast box (a tool bar, a chrome keep-out) pushes that window; the memory keeps the dropped rect + `userSpot`, so `return` puts it back there. Over a PC: kept (user spot) | FR-SHELL-105, -106 |
+| Re-select (`ToolRail.tsx`) | Pressing the active tool (the toggle group reports "") bumps `ToolPanel`'s `reselect`, which pushes with the current bar rect; a tool swap pushes as before (new `id`) | FR-SHELL-105 |
+| Rail inset (`geometry.ts`, `placement.ts`) | `RAIL_CLEAR` = 68 (now in `geometry.ts`, re-exported by `placement.ts`). `clampRect`: stored x ≥ 0 renders at x ≥ 68 (flush right if wider than the room); x < 0 (parked) unchanged. `resizeRect`'s west edge stops at 68. Auto placement's `minX` = 68 always | FR-SHELL-109 |
+| Top bar (`PlayFrame.tsx`) | `ui-topbar-left` (flex-1, `min-w-0`, children `truncate`) and `ui-topbar-right` (`shrink-0`): the left text ellipsises before the right cluster | FR-SHELL-109 |
+
+- **Test hooks:** `data-settle-log` gains `push:<kind>>put-away` and `drag-end:<kind>>L…`; `data-auto-minimised-cause` = `toolbar:<id>` for a pushed window put away.
+- **Harness:** push-path cells flipped (DM 14, players 6); push steps' I3 oracle keeps the launcher windows (a push puts none away, OQ-SHELL-61 A).
+- **CON-44:** 0 B.
+
+## 143. Sprint 8: stats tier-B UI — kill feed, Highlights, End summary open, Luck tab, Trophies tab (SB1 + SB2)
 
 From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26–30, -34, -36, -41, -44, -48, -50, -52, -53, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (views), -69 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-97–99 (#334, #335; seams S4, S5, S11). **Built by `build/sb-stats-ui`**: browser only. No intent, event, record type, signal or wire field (CON-44: 0 B). Reads §140's acks and lines. Data side: [data model §112](../data-model/README.md#112-sprint-8-stats-tier-b-ui-sb1--sb2).
 
