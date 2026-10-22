@@ -10,8 +10,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | WF1 placer core + replay harness | `fix/placer-core` (w98, slot 0) | build-wf1 | building | walkthrough F0–F5, F14 |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
-| TT3 alert sounds | `build/tt-sounds` (w9C) | build-tt3 | building | walkthrough (sound steps) |
-| SB0 stats tier-B core | `build/sb-core` (w9A, slot 3) | build-sb0 | building | thin walkthrough (raw intents) |
+| TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |
+| TT1+TT2 macros + roll requests | `build/tt-dice` (w9E) | build-tt12 | building (window + toast parts wait for WF1 / WF4) | walkthrough T1–T8, T15, T16 |
+| SB0 stats tier-B core | `build/sb-core` (w9A, slot 3) | build-sb0 | walkthrough 10/10 PASS; branch gates queued after main's | merge |
+| WF4 toast policy + Stats / card sizes | `fix/wf-sizes-toasts` (w9F) | build-wf4 | building (FR-NOTE-53 waits for WF1) | walkthrough F8, F9, F13 |
 | CB0 combat core | merged (walkthrough all PASS) | — | done | main gates running |
 | CB1 drag reorder | `build/cb-reorder` (w9D) | build-cb1 | building | walkthrough CB2–CB9 |
 
@@ -22,7 +24,8 @@ Queue (seams build plan, `.verify/sprint8/seams.md`): wave 2 WF4, TT1+2, TT3, CB
 - Frame (play-shell frame files, see slice WF1): `fix/placer-core`.
 - Schema lane: free (TT0, CB0 merged).
 - DM Initiative rows: `build/cb-reorder`.
-- Play-shell `sounds.ts`, `audio.ts`, `alerts.ts`, `AlertLayer.tsx`: `build/tt-sounds`.
+- `TrayWindow.tsx`, `GameLog.tsx`, `char.roll` server file: `build/tt-dice`.
+- Notifications `keep-out.ts`, `ToastRuntime.tsx`: `fix/wf-sizes-toasts` (then TT2's `restoreToast`).
 - `combat-tracker/hp.ts` + `log-kinds.ts` (`fell`): `build/sb-core`.
 
 ## Pending DM decisions
