@@ -61,7 +61,7 @@ const prompt = (
     kind: ROLL_REQUEST_KIND,
     audience: "player",
     audiencePlayerId: "p1",
-    text: dc === null ? "DM: Perception" : `DM: Perception · DC ${dc}`,
+    text: dc === null ? "DM: Perception · Mira" : `DM: Perception · Mira · DC ${dc}`,
     payload: {
       requestId: "r1",
       characterId: "mira",
@@ -202,7 +202,7 @@ describe("TT2 roll requests (client)", () => {
     const html = render(Body(rollRequestPlayerView, prompt()), P1);
     expect(html).toContain('data-testid="dicex-prompt-roll"');
     expect(html).toContain('data-testid="dicex-prompt-decline"');
-    expect(html).toContain("DM: Perception");
+    expect(html).toContain("DM: Perception · Mira");
   });
 
   test("FR-NOTE-59 prompt view: Roll + Decline only for its owner while pending; resolved rows read the outcome", () => {
@@ -229,7 +229,9 @@ describe("TT2 roll requests (client)", () => {
 
   test("FR-NOTE-59 prompt views: the body chunk loads lazily; until then the row shows its text", () => {
     const R = rollRequestPlayerView.render as NonNullable<typeof rollRequestPlayerView.render>;
-    expect(render(<R notification={prompt({}, 15)} />, P1)).toContain("DM: Perception · DC 15");
+    expect(render(<R notification={prompt({}, 15)} />, P1)).toContain(
+      "DM: Perception · Mira · DC 15",
+    );
   });
 
   test("FR-NOTE-61 FR-DICEX-88 DM view: ‹PC› · ‹label› + Open requests, no cue, no action, no toast per answer (player-owned)", () => {

@@ -111,8 +111,8 @@ describe("dice-extras fixtures (DICEX §13)", () => {
     expect(reqs).toHaveLength(1);
     expect(reqs[0]).toMatchObject({ label: "Perception", dc: 15, dcShown: false, state: "open" });
     expect(prompts.map((n) => [n.audiencePlayerId, n.state, n.text])).toEqual([
-      [p1, "pending", "DM: Perception"],
-      [p2, "pending", "DM: Perception"],
+      [p1, "pending", "DM: Perception · Mira"],
+      [p2, "pending", "DM: Perception · Thorn"],
     ]);
     expect(prompts.every((n) => (n.payload as { dc: number | null }).dc === null)).toBe(true);
   }, 120_000);

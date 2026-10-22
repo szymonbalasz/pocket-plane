@@ -1,5 +1,5 @@
 // The roll-request prompt views (FR-NOTE-59, -61; FR-DICEX-83), kind `roll-request`. Player:
-// "DM: ‹label›" (+ "· DC n" iff shown); while pending and theirs, **Roll** is a roll button over
+// "DM: ‹label› · ‹PC›" (+ "· DC n" iff shown); while pending and theirs, **Roll** is a roll button over
 // the expression the server will build (`characterRolls`), so Shift / Ctrl, physical dice and
 // Alt → tray (expression locked: a `control` request) work, sending `dicex.answerRequest`; and
 // **Decline**. Resolved rows read "Rolled 17" / "Declined" / "Closed". DM: "‹PC› · ‹label›", no

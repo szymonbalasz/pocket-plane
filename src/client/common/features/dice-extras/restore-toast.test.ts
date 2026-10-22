@@ -22,7 +22,7 @@ const row = (kind: string, p: Partial<NotificationRecord> = {}): NotificationRec
     kind,
     audience: "player",
     audiencePlayerId: "p1",
-    text: "DM: Perception",
+    text: "DM: Perception · Mira",
     payload: {},
     actionLabel: "Roll",
     actionRole: "player",

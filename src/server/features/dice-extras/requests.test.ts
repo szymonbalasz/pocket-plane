@@ -134,8 +134,8 @@ describe("TT2 roll requests (in process)", () => {
     const payload = (nid: string) => t.prompt(nid).payload as RollRequestPromptPayload;
     const h = t.req(hidden).targets[0]?.notificationId as string;
     const s = t.req(shown).targets[0]?.notificationId as string;
-    expect([payload(h).dc, t.prompt(h).text]).toEqual([null, "DM: Perception"]);
-    expect([payload(s).dc, t.prompt(s).text]).toEqual([15, "DM: DEX save · DC 15"]);
+    expect([payload(h).dc, t.prompt(h).text]).toEqual([null, "DM: Perception · Mira"]);
+    expect([payload(s).dc, t.prompt(s).text]).toEqual([15, "DM: DEX save · Mira · DC 15"]);
     for (const n of t.prompts()) {
       expect(JSON.stringify(n.payload)).not.toMatch(/success|results/);
     }

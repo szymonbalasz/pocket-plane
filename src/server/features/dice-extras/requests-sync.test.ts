@@ -167,7 +167,7 @@ describe("TT1+TT2 table tools over sockets (table-tools)", () => {
     ] as const) {
       const ps = prompts(c);
       expect(ps.map((n) => [n.audiencePlayerId, n.text, n.state])).toEqual([
-        [me, "DM: Perception", "pending"],
+        [me, `DM: Perception · ${mine === miraId ? "Mira" : "Thorn"}`, "pending"],
       ]);
       expect(ps[0]?.payload).toMatchObject({ characterId: mine, dc: null });
     }
@@ -241,7 +241,7 @@ describe("TT1+TT2 table tools over sockets (table-tools)", () => {
     expect(eventsOf(p1, "RollRequested", a0)).toHaveLength(0);
     const shown = prompts(p1).find((n) => n.state === "pending");
     expect([shown?.text, (shown?.payload as { dc: number } | undefined)?.dc]).toEqual([
-      "DM: DEX save · DC 12",
+      "DM: DEX save · Mira · DC 12",
       12,
     ]);
     const out = await ok<{ entryIds: string[] }>(dm, DICEX_REQUEST_INTENTS.rollForMissing, {

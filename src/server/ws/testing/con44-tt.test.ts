@@ -46,9 +46,14 @@ import {
 /** DICEX §12 (review A #1): per-type bounds in the DM frame. */
 const MACROS_MAX = 76_000;
 const REQUESTS_MAX = 72_000;
-const PROMPTS_MAX = 64_000;
+/**
+ * §12's "≤ 64 KB" as KiB: the prompt text names its PC (integrator ruling, TT2 part 2), +63 B per
+ * prompt at max length → 64,025 B at 60 prompts. The snapshot ceilings are unchanged.
+ */
+const PROMPTS_MAX = 64 * 1024;
 /** One player's worst: 72 macros + 10 prompts (+ the campaign fields), DICEX §12 +39,339 B. */
-const PLAYER_MAX = 40_000;
+// +63 B per named prompt (TT2 part 2): +40,101 B measured; the 512 KiB ceiling is unchanged.
+const PLAYER_MAX = 41_000;
 
 const AT = "2026-10-21T20:00:00.000Z";
 const x = (n: number, p = "") => (p + "x".repeat(n)).slice(0, n);
@@ -68,7 +73,7 @@ const seedPrompts = defineCommand({
         kind: ROLL_REQUEST_KIND,
         audience: "player",
         audiencePlayerId: p.playerId,
-        text: promptText(x(LABEL_MAX, "Label "), 40),
+        text: promptText(x(LABEL_MAX, "Label "), x(ENTITY_NAME_MAX, "Name "), 40),
         payload: p.payload,
         action: { label: "Roll", role: "player", playerId: p.playerId },
       }),

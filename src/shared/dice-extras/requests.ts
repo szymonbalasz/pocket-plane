@@ -199,6 +199,9 @@ export const RollRequestPromptResolution = z.strictObject({
 });
 export type RollRequestPromptResolution = z.infer<typeof RollRequestPromptResolution>;
 
-/** FR-NOTE-58: "DM: ‹label›" (+ " · DC n" iff shown). */
-export const promptText = (label: string, dc: number | null): string =>
-  dc === null ? `DM: ${label}` : `DM: ${label} · DC ${dc}`;
+/**
+ * FR-NOTE-58: "DM: ‹label› · ‹character›" (+ " · DC n" iff shown). The character names which PC
+ * is asked (a player with two PCs gets two prompts; integrator ruling, part-2 walkthrough).
+ */
+export const promptText = (label: string, character: string, dc: number | null): string =>
+  dc === null ? `DM: ${label} · ${character}` : `DM: ${label} · ${character} · DC ${dc}`;

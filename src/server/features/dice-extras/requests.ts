@@ -228,7 +228,7 @@ export const request = defineCommand({
         kind: ROLL_REQUEST_KIND,
         audience: "player",
         audiencePlayerId: w.playerId,
-        text: promptText(label, shownDc),
+        text: promptText(label, w.name, shownDc),
         payload,
         action: { label: "Roll", role: "player", playerId: w.playerId },
       });

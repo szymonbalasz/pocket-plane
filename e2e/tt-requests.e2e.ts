@@ -60,9 +60,10 @@ test("FR-DICEX-78 FR-DICEX-79 FR-DICEX-83 FR-DICEX-91 FR-DICEX-87 FR-DICEX-88 FR
       .first();
   const h1 = await openWindow(p1, "note.history");
   await expect(prompt(p1)).toHaveAttribute("data-state", "pending");
-  await expect(prompt(p1)).toContainText("DM: Perception");
+  await expect(prompt(p1)).toContainText("DM: Perception · Mira");
   await expect(prompt(p1)).not.toContainText("DC");
   const h2 = await openWindow(p2, "note.history");
+  await expect(prompt(p2)).toContainText("DM: Perception · Thorn");
   await expect(prompt(p2)).toHaveAttribute("data-state", "pending");
 
   // T5: B rolls from the prompt → "Rolled N"; the hidden line reaches A (eye-off), never C.
