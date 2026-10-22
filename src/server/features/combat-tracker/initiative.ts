@@ -80,7 +80,7 @@ export const rollInitiative = defineCommand({
 
 /**
  * FR-CBT-11: one d20 + init bonus roll and one `roll` entry per combatant; writes `initiative`
- * and `initRollId` (the caller reranks). `public`: a hidden combatant → false (FR-CBT-24); a
+ * and `initRollId` and clears `tieOrder` (FR-CBT-163 (c): a new number; the caller reranks). `public`: a hidden combatant → false (FR-CBT-24); a
  * monster → false unless `public: true` (FR-CBT-69); a PC → the sent value, else the category
  * setting. Also Start's and add's monster rolls (FR-CBT-64, FR-CBTX-44: mode normal, no public).
  * `effects`: `cbt.rollInitiative` only (FR-MOD-15): the roll hooks add the creature's parts to
@@ -124,7 +124,7 @@ export function rollInitiativeFor(
     // FR-MOD-16: the initiative value includes the parts.
     env.tx
       .update(combatant)
-      .set({ initiative: r.total + (r.mods?.modTotal ?? 0), initRollId: r.id })
+      .set({ initiative: r.total + (r.mods?.modTotal ?? 0), initRollId: r.id, tieOrder: null })
       .where(eq(combatant.id, c.id))
       .run();
     rollIds.push(...dice.rollIdsOf(r));
@@ -153,9 +153,10 @@ export const setInitiative = defineCommand({
   execute({ combatantId, value }, env): void {
     const { c, enc } = activeCombatant(env, combatantId, { allowRemoved: true });
     const before = combatantsOf(env.tx, enc.id);
+    // FR-CBT-163 (c): a number not set by a move drops this row's tie slot (others keep theirs).
     env.tx
       .update(combatant)
-      .set({ initiative: value, initRollId: null })
+      .set({ initiative: value, initRollId: null, tieOrder: null })
       .where(eq(combatant.id, c.id))
       .run();
     rerank(env.tx, enc.id);

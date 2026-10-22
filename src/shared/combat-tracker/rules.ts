@@ -40,6 +40,8 @@ export interface RankInput {
   turnMode?: TurnMode | null;
   /** FR-CBT-116: a hidden owner hides its companions from players (no player rank). */
   ownerHidden?: boolean;
+  /** Sprint 8 (FR-CBT-162): the DM's order inside a tie; null = default rules. */
+  tieOrder?: number | null;
 }
 
 /** What `ranks` needs besides the rows (FR-CBT-108's owner states). */
@@ -50,12 +52,22 @@ export interface RankContext {
   turnCombatantId?: string | null;
 }
 
-/** Initiative desc, init bonus desc, PC before monster, `seq`; no initiative last. */
+/**
+ * Initiative desc, then (sprint 8, FR-CBT-162) `tieOrder` asc with null after any number, init
+ * bonus desc, PC before monster, `seq`; no initiative last.
+ */
 export function compareOrder(a: RankInput, b: RankInput): number {
   if (a.initiative === null && b.initiative !== null) return 1;
   if (b.initiative === null && a.initiative !== null) return -1;
   if (a.initiative !== null && b.initiative !== null && a.initiative !== b.initiative) {
     return b.initiative - a.initiative;
+  }
+  const ta = a.tieOrder ?? null;
+  const tb = b.tieOrder ?? null;
+  if (ta !== tb) {
+    if (ta === null) return 1;
+    if (tb === null) return -1;
+    return ta - tb;
   }
   if (a.initBonus !== b.initBonus) return b.initBonus - a.initBonus;
   if (a.kind !== b.kind) return a.kind === "pc" ? -1 : 1;
@@ -76,6 +88,20 @@ export function ownerRowOf<
     if (!best || r.seq < best.seq) best = r;
   }
   return best;
+}
+
+/**
+ * FR-CBT-107 / -162: an `after-owner` / `in-owner-turn` companion whose owner joined rides its
+ * owner (no sort key, no `tieOrder`, no grip); without an owner row it ranks as `own`.
+ */
+export function ridesOwner<
+  T extends Pick<RankInput, "id" | "kind" | "seq" | "turnMode" | "ownerCharacterId"> & {
+    entityId?: string;
+  },
+>(rows: readonly T[], c: T): boolean {
+  return (
+    (c.turnMode === "after-owner" || c.turnMode === "in-owner-turn") && ownerRowOf(rows, c) !== null
+  );
 }
 
 /**
@@ -151,6 +177,96 @@ export function inTurnCompanionsOf<
         ownerRowOf(rows, r)?.id === ownerCombatantId,
     )
     .sort((a, b) => a.seq - b.seq);
+}
+
+// ---------- reorder (sprint 8, FR-CBTX-64–66) ----------
+
+/** A movable row (active, not removed, not riding its owner), in the DM's current order. */
+export interface MoveRow {
+  id: string;
+  kind: CombatantKind;
+  hidden: boolean;
+  initiative: number | null;
+}
+
+/** What a drop does: the order after, the numbers it changes, the tie it writes. */
+export interface MovePlan {
+  /** Movable rows' ids in the order after the drop. */
+  order: string[];
+  /** Changed numbers only (the moved row's and rewritten private rows'). */
+  numbers: Map<string, number>;
+  /** FR-CBTX-66: the number whose tie the drop arranges (every movable row with it, in `order`). */
+  tieValue: number;
+}
+
+export type MoveResult =
+  | { ok: true; plan: MovePlan | null }
+  | { ok: false; code: "invalid" | "conflict"; message: string };
+
+/**
+ * FR-CBTX-65: a public number is a PC's (hidden ones too, so a reveal never shows a monster's
+ * number on a PC); players see no other row's number.
+ */
+export const publicNumber = (r: Pick<MoveRow, "kind">) => r.kind === "pc";
+
+/**
+ * FR-CBTX-64–66 (decided #335, OQ-CBTX-31 A′): drop `movedId` right after `afterId` (null = top)
+ * in `rows` (movable rows, current order). Plan null = the order stays as it is (ack, no write).
+ * (a) A private moved row (not a PC) takes the anchor's number (top: the first other numbered row's).
+ * (b) A PC keeps its own number, lowered to the nearest public row above the drop spot and
+ * raised to the nearest public row below; private rows on the wrong side take that number. So a
+ * PC's number only ever becomes another PC's, and the rule reveals no private number.
+ * The server's command and the DM client's number hint both run this.
+ */
+export function planMove(
+  rows: readonly MoveRow[],
+  movedId: string,
+  afterId: string | null,
+): MoveResult {
+  const moved = rows.find((r) => r.id === movedId);
+  if (!moved) return { ok: false, code: "conflict", message: "Can't move this row" };
+  const rest = rows.filter((r) => r.id !== movedId);
+  const firstNumbered = rest.find((r) => r.initiative !== null);
+  if (!firstNumbered) return { ok: false, code: "conflict", message: "Roll initiative first" };
+  let at = 0;
+  if (afterId !== null) {
+    const i = rest.findIndex((r) => r.id === afterId);
+    if (i < 0 || rest[i]?.initiative === null) {
+      return { ok: false, code: "invalid", message: "Drop below a row with initiative" };
+    }
+    at = i + 1;
+  }
+  const after = [...rest.slice(0, at), moved, ...rest.slice(at)];
+  if (after.every((r, i) => r.id === rows[i]?.id)) return { ok: true, plan: null };
+  const above = after.slice(0, at);
+  const below = after.slice(at + 1);
+  const numbers = new Map<string, number>();
+  let n: number;
+  if (!publicNumber(moved)) {
+    n =
+      afterId === null
+        ? (firstNumbered.initiative as number)
+        : (above.at(-1)?.initiative as number);
+  } else {
+    // Lists are in order, so the nearest public row above has the lowest public number above.
+    const up = above.filter(publicNumber).at(-1)?.initiative ?? null;
+    const down = below.find((r) => publicNumber(r) && r.initiative !== null)?.initiative ?? null;
+    let own = moved.initiative ?? down ?? up;
+    if (own === null) {
+      return { ok: false, code: "conflict", message: "Set a number first" };
+    }
+    if (up !== null && own > up) own = up;
+    if (down !== null && own < down) own = down;
+    n = own;
+    for (const r of above) {
+      if (!publicNumber(r) && r.initiative !== null && r.initiative < n) numbers.set(r.id, n);
+    }
+    for (const r of below) {
+      if (!publicNumber(r) && r.initiative !== null && r.initiative > n) numbers.set(r.id, n);
+    }
+  }
+  if (moved.initiative !== n) numbers.set(moved.id, n);
+  return { ok: true, plan: { order: after.map((r) => r.id), numbers, tieValue: n } };
 }
 
 // ---------- health band (FR-CBT-26) ----------

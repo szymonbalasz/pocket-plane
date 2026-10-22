@@ -2333,3 +2333,16 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) §8 sprint 8, [assets-p
 - **Persisted runtime state:** the two tables and four columns.
 - **Fixtures:** bundle `session-sim-12` (empty sprint-8 section); TT units `dicex-macros` (TT1), `audio-chime`, `camp-alert-sounds` (TT3) join it later.
 - **CON-44:** see [protocol §135](../protocol/README.md#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0) (DM +203,534 B at the caps; players ≤ +39,461 B).
+
+## 107. Sprint 8: combat polish core (CB0)
+
+From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-65–67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-162–163, -168 (#334, #335). **Built by `fix/cb-core`** (schema lane: after TT0). Protocol side: [protocol §136](../protocol/README.md#136-sprint-8-combat-polish-core--cbtxmovecombatant-tie-order-cb0).
+
+| Field | Change | Rule | Source |
+|---|---|---|---|
+| `combatant.tie_order` / `tieOrder` | + int ≥ 1, **nullable, no default** (push-safe `ADD COLUMN`); DM only (every player redaction omits it, as `position`) | the DM's order inside a group of equal initiative, 1…k (gaps allowed); written only by `cbtx.moveCombatant`; null on a row whose number changes otherwise (`cbt.setInitiative`, `cbt.rollInitiative`) and on rows riding their owner; kept by remove / restore, hide / reveal, death; End leaves it on the inactive rows; a new fight starts null | FR-CBTX-66, FR-CBT-163 |
+| `combatant.initiative` | also written by `cbtx.moveCombatant` (`initRollId` → null on a change) | the A′ rule: a private row takes the anchor's number; a PC (hidden too) only another PC's | FR-CBTX-65 |
+
+- **Derived (not stored):** the order (`compareOrder`: initiative desc → `tieOrder` asc, null after numbers → init bonus → PC → `seq`); the DM's number hint (`planMove`, CB1).
+- **Persisted runtime state:** `tieOrder` and the adopted numbers; positions as before. The drag is client memory (CB1).
+- **CON-44:** DM +736 B worst (46 rows, `tieOrder` null), players 0 B.

@@ -110,3 +110,21 @@ export const CombatantsAdded = defineEvent({
   logged: true,
   undoable: false,
 });
+
+/**
+ * Sprint 8 `cbtx.moveCombatant` (FR-CBTX-66): `combatant` upserts (the moved row, rewritten tie
+ * rows, reranked rows). Never in a player frame: payloads stay server-side, and players get only
+ * changed redactions (FR-CBTX-67), so a monster's number never reaches them.
+ */
+export const CombatantMoved = defineEvent({
+  type: "CombatantMoved",
+  payload: z.strictObject({
+    encounterId: Id,
+    combatantId: Id,
+    afterId: Id.nullable(),
+    initiativeBefore: z.int().nullable(),
+    initiativeAfter: z.int(),
+  }),
+  logged: true,
+  undoable: false,
+});
