@@ -12,7 +12,7 @@ phase: post-mvp-8
 
 > **Sprint 7, track ST** (DM [#311](../decisions-log.md), decided): tier A of [feature tiers](../feature-tiers.md#6-table-specific), meaning a live damage leaderboard, overkill callouts and BG2-style session awards. They come from the append-only log ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)) and never leak; sessions follow [ADR-0013](../architecture/adr/0013-session-journal-scope.md). Proposed ADR: [stats as read models](../architecture/adr/0059-stats-read-models.md). Also revised: FR-CBT-136–138, FR-DICE-72–73, FR-SHELL-93–94, FR-NOTE-48–49. Seams S1–S8, S11, S13 and review rulings 2–4, 10, 13, 20–25 applied.
 
-> **Sprint 8, track SB** (DM [#334](../decisions-log.md), decided): tier B, with tier A's visibility rules. FR-STATS-26–53 ([§6.1](#61-tier-b-sprint-8)); also FR-CBT-152–153, FR-NOTE-68–69, FR-CHARX-97–99, FR-DICE-89–90. No schema. [ADR: session partials](../architecture/adr/proposed-s8-sb-session-partials.md). Seams applied. OQ-STATS-20–30 decided at DM gate 1 (#335).
+> **Sprint 8, track SB** (DM [#334](../decisions-log.md), decided): tier B, with tier A's visibility rules. FR-STATS-26–53 ([§6.1](#61-tier-b-sprint-8)); also FR-CBT-152–153, FR-NOTE-68–69, FR-CHARX-97–99, FR-DICE-89–90. No schema. [ADR: session partials](../architecture/adr/0062-stats-session-partials.md). Seams applied. OQ-STATS-20–30 decided at DM gate 1 (#335).
 
 > **Sprint 8, track WF** (DM [#333](../decisions-log.md); size rows only): FR-STATS-66 gives `stats.board` a useful size checked by content; FR-STATS-67 sizes the award grid to the window (BL-66). Slice WF4; walkthrough F9, F13 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
 
@@ -125,7 +125,7 @@ Tier A rules hold: filter, then aggregate; final roll only; names from facts; pa
 | FR-STATS-44 | **Refresh**: on tab show, then as FR-STATS-17 on a live line of the character or their companions. |
 | | **Read path and cost** |
 | FR-STATS-45 | `stats.query` gains `luck {n? \| campaign: true}` and `trophies {characterId}`; fight acks gain `highlights`. Same pipeline, rate limit and memo (FR-STATS-16); unknown → `not_found`. |
-| FR-STATS-46 | **Campaign = session partials** ([ADR](../architecture/adr/proposed-s8-sb-session-partials.md), accepted #335) *(OQ-STATS-30)*: in-memory tallies per (session, viewer class, features), **built at start** (and after a drop-all) in yielding 5-session chunks. Newest session recomputed; dropped per touched session, all on owner / kind / feature changes. **Until ready**: the rest read uncached if ≤ 5 sessions, else `{pending: true}` (re-query in 1 s). |
+| FR-STATS-46 | **Campaign = session partials** ([ADR](../architecture/adr/0062-stats-session-partials.md), accepted #335) *(OQ-STATS-30)*: in-memory tallies per (session, viewer class, features), **built at start** (and after a drop-all) in yielding 5-session chunks. Newest session recomputed; dropped per touched session, all on owner / kind / feature changes. **Until ready**: the rest read uncached if ≤ 5 sessions, else `{pending: true}` (re-query in 1 s). |
 | FR-STATS-47 | **Player schemas** (strict): no applied, HP, overkill amount, AC, encounter name, hidden mark, Still standing or `dm-dice`. Acks are leak-scanned. |
 | FR-STATS-48 | **Limits**: luck ≤ 70 rows; highlights ≤ 20 kills / downs, then "+N"; ack ≤ 64 KB. |
 | FR-STATS-49 | **Retroactive** for every past fight and session; the feed is live only. Crash / reconnect / undo as FR-STATS-23. |
@@ -382,7 +382,7 @@ Named tests (all `FR-STATS-NN …`):
 | OQ-STATS-27 | Summary: when, for whom? | **Decided (#335): A** · **A. Automatic at End for everyone**: no clicks · B. DM auto + Share: DM's moment · C. On demand | no | STATS, CBT, NOTE |
 | OQ-STATS-28 | Summary surface | **Decided (#335): A** · **A. Stats window with Highlights** · B. A centred dialog: blocks play · C. A card toast: too small | no | STATS, SHELL |
 | OQ-STATS-29 | End with hidden monsters | **Decided (#335): A** · **A. Public facts only; no survivors / "victory"; DM sees Still standing** · B. No players' summary while a hidden monster has HP: missed summaries | no | STATS |
-| OQ-STATS-30 | Campaign numbers (≈ 1 s at 100 sessions) | **Decided (#335): A** · **A. Session partials ([ADR](../architecture/adr/proposed-s8-sb-session-partials.md))**: ≈ 25 ms warm · B. Compute each time · C. Tables: schema, drift | no | STATS |
+| OQ-STATS-30 | Campaign numbers (≈ 1 s at 100 sessions) | **Decided (#335): A** · **A. Session partials ([ADR](../architecture/adr/0062-stats-session-partials.md))**: ≈ 25 ms warm · B. Compute each time · C. Tables: schema, drift | no | STATS |
 | OQ-STATS-31 | Glossary: Kill feed, Fight summary (Highlights), Luck tracker, Trophy case | **Resolved (integrator, sprint-8 seams / rulings)** · **A. Add** | no (integrator, S16) | glossary |
 
 **Resolved (integrator, sprint-8 seams / rulings)**: ~~OQ-STATS-32~~ (S4 / S5: feed = callout class; summary = `stats.board` via the ladder), ~~OQ-STATS-33~~ (S6: counted iff the entry is public), ~~OQ-STATS-34~~ (S8: no `lifecycle.ts`).

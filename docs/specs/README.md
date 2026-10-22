@@ -84,6 +84,25 @@ Gate 1 #315 (ADRs 0058, 0059).
 
 Sprint 7 also revised campaign-management (feature switch), dice-roll-log (reroll supersede, stats reads), combat-tracker (max dice, From on heals, kept HP on rebind, compact companion line, End dialog), character-sheet-full (gem block), play-shell (auto-minimise instead of covering PCs, useful sizes, Space, Stats window), scenes-map, combat-extras, notifications, entities, party-board, party-loot, dice-extras, effect-modifiers, compendium (sprint-6 follow-ups, BL-46, BL-48).
 
+## Sprint 8 (post-MVP)
+
+All revisions, gate 1 #335 (ADRs 0060–0063).
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Play shell](play-shell.md) (one placer, useful sizes, replay harness, pause screen, alert sounds, Party status window) | SHELL | complete | spec-wf, spec-tt, spec-cb |
+| [Scenes and map](scenes-map.md) (refits never zoom in, turn highlight) | MAP | complete | spec-wf, spec-cb |
+| [Notifications](notifications.md) (one toast policy, roll-request prompt, fight summary) | NOTE | complete | spec-wf, spec-tt, spec-sb |
+| [Dice extras](dice-extras.md) (macros, roll requests) | DICEX | complete | spec-tt |
+| [Dice and game log](dice-roll-log.md) (request answers, luck reads) | DICE | complete | spec-tt, spec-sb |
+| [Assets pipeline](assets-pipeline.md) (audio assets) | ASSET | complete | spec-tt |
+| [Campaign management](campaign-management.md) (pause, alert sound picks) | CAMP | complete | spec-tt |
+| [Stats](stats.md) (kill feed, luck tracker, trophies, fight summary) | STATS | complete | spec-sb, spec-wf |
+| [Character sheet full](character-sheet-full.md) (Macros + Trophies tabs, companion card size) | CHARX | complete | spec-tt, spec-sb, spec-wf |
+| [Combat tracker](combat-tracker.md) (tie order, End summary hook, `fell`) | CBT | complete | spec-cb, spec-sb |
+| [Combat extras](combat-extras.md) (drag to reorder initiative) | CBTX | complete | spec-cb |
+| [Party board](party-board.md) (Party status) | PARTY | complete | spec-cb |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.
@@ -91,7 +110,7 @@ Stubs only. Not to be claimed during MVP spec phase.
 | Spec | Prefix | Note |
 |---|---|---|
 | [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes |
-| [Dice extras](post-mvp/dice-extras.md) | DICEX | Inline rolls, macros, 3D dice, hidden rolls |
+| [Dice extras](post-mvp/dice-extras.md) | DICEX | Whispers only (the rest is in [dice-extras](dice-extras.md)) |
 | [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |
 | [Levelling workflows](post-mvp/levelling.md) | LVL | |

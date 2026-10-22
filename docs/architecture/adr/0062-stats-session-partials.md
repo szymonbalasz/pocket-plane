@@ -1,6 +1,6 @@
-# Campaign-wide stats from per-session partials kept in memory
+# 0062 — Campaign-wide stats from per-session partials kept in memory
 
-- Status: accepted (DM gate, #335) ([OQ-STATS-30](../../specs/stats.md#15-open-questions) A; sprint 8, track SB)
+- Status: accepted (DM gate, [#335](../../decisions-log.md)) ([OQ-STATS-30](../../specs/stats.md#15-open-questions) A; sprint 8, track SB)
 - Date: 2026-10-21
 - Refines: [ADR-0059](0059-stats-read-models.md) §4 ("only append-only derivations may be cached"). Everything else in ADR-0059 stands: facts, not projections; filter, then aggregate; read-only command; nothing persisted.
 - Affects: [stats](../../specs/stats.md) FR-STATS-46, -51 (trophy case, luck tracker)

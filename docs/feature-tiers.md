@@ -62,10 +62,10 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Advantage/disadvantage on any roll (toggle or Shift/Ctrl) | S | [dice-roll-log](specs/dice-roll-log.md) | Replaces inspiration toggle |
 | Roll from any number on the sheet | A | [character-sheet-full](specs/character-sheet-full.md) | |
 | **Dice notation in any free text is clickable** ("1d12+5", whitespace-tolerant; no `[[ ]]` needed): puts the dice in the 3D dice tray to adjust (dice, modifiers) before rolling; doesn't feed attack / apply | A | [dice-extras](specs/post-mvp/dice-extras.md) | **Very important** (DM, #188) |
-| Saved macros / custom roll buttons | A | [dice-extras](specs/post-mvp/dice-extras.md) | |
+| Saved macros / custom roll buttons | A | [dice-extras](specs/dice-extras.md) | Sprint 8 (#334) |
 | **3D dice roller** in a tray or over the battlemap; every roll in the app eventually goes through it | S | [dice-extras](specs/post-mvp/dice-extras.md) | Next dice work (DM, #188); result stays server-side; customisation (dice skins) later, tier B |
 | Party portrait strip (BG2-style) | A | [theme-system](specs/post-mvp/theme-system.md) | Also a [play-shell](specs/play-shell.md) element |
-| DM requests a roll from players | B | [dice-extras](specs/post-mvp/dice-extras.md) | Notification with roll action |
+| DM requests a roll from players | B | [dice-extras](specs/dice-extras.md) | Sprint 8 (#334); notification with roll action ([ADR-0061](architecture/adr/0061-roll-requests.md)) |
 | Hidden DM rolls | S | [dice-roll-log](specs/dice-roll-log.md) | Via per-category public log settings (section 6) |
 | Spell slots tracker | B | [character-sheet-full](specs/character-sheet-full.md) | |
 | Party HP/AC summary for players | B | [play-shell](specs/play-shell.md) | Pairs with portrait strip |

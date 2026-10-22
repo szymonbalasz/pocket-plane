@@ -17,7 +17,7 @@ phase: post-mvp-8
 
 > **Sprint 7 (track FU, BL-48 small copy; DM [#311](../decisions-log.md)).** Decided, not open: a player's roll-bar line names the player ("Player 1 — 1d20+2") instead of the character; a stray space in a breakdown ("(3d6: 5 + 2 + 1 )"). New **FR-DICE-77**, **-78**. Client only (line text and an actor default), 0 B. Tests `FR-DICE-77 roll as your PC` (DOM: `player-1` with the sheet on Mira → the bar's actor is Mira, the entry's actor Mira; "Me" still selectable; a manual pick of Brakka survives a reload; a sheet on another player's character falls back to the player's name; DM unchanged), `FR-DICE-78 no stray spaces` (unit over `groupSegments` and every kind's line builder: no `"( "`, `" )"`, `"  "`, leading / trailing spaces for adv, dis, dropped, offered, manual, modifier-only); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. GM (gems: reroll / supersede) edits this spec in parallel with its own range; FU4 touches only the actor default and the joiner. Edge cases: client-only text and a per-browser default; reconnect re-renders from the store; crash: no server change. No open question.
 
-> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** [Dice-extras](dice-extras.md) macros roll as plain `dice.roll`; DM roll-request answers are ordinary `roll` entries, public or **DM + the target's player** via the built `audiencePlayerId` rule. This amends FR-DICE-13 for answers only ([proposed ADR](../architecture/adr/proposed-s8-tt-roll-requests.md)). FR-DICE-79–84; no new field, kind or visibility code. Tests, walkthrough (T2–T8, T15) and CON-44: [dice-extras §12–13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-DICE-46.
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** [Dice-extras](dice-extras.md) macros roll as plain `dice.roll`; DM roll-request answers are ordinary `roll` entries, public or **DM + the target's player** via the built `audiencePlayerId` rule. This amends FR-DICE-13 for answers only ([proposed ADR](../architecture/adr/0061-roll-requests.md)). FR-DICE-79–84; no new field, kind or visibility code. Tests, walkthrough (T2–T8, T15) and CON-44: [dice-extras §12–13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-DICE-46.
 
 ## 1. Summary
 
@@ -92,7 +92,7 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 
 ## 4. Non-goals
 
-- 3D dice, inline rolls, macros, roll requests, whispers (→ [dice-extras](post-mvp/dice-extras.md)). Text chat (tier C–D).
+- 3D dice, inline rolls, macros, roll requests (→ [dice-extras](dice-extras.md), sprint 8), whispers (→ [stub](post-mvp/dice-extras.md)). Text chat (tier C–D).
 - Client-side authoritative rolling. Editing or deleting rolls or entries. Undo of plain rolls (#67). Retroactive category changes; single-entry reveal / hide (tier B, #139 P8).
 - Hit/miss and damage outcomes (→ [combat-tracker](combat-tracker.md) kinds). Contest winners (two entries, #139 P24).
 - History beyond the snapshot window ([ADR-0029](../architecture/adr/0029-windowed-record-types.md)). Stats UI. Gem UI (→ [gems](gems.md); this spec only supersedes entries for its caller, FR-DICE-62–70).

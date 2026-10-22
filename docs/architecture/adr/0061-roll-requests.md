@@ -1,6 +1,6 @@
-# DM roll requests as pending actions (and hidden answers)
+# 0061 — DM roll requests as pending actions (and hidden answers)
 
-- Status: accepted (DM gate, #335; integrator numbers it after the merge)
+- Status: accepted (DM gate, [#335](../../decisions-log.md))
 - Date: 2026-10-21
 - Refines: [ADR-0016](0016-domain-events-pending-actions.md) (a pending action whose resolution is a roll), [ADR-0027](0027-notification-creation.md) (created in the causing command's transaction)
 - Amends: decisions [#73](../../decisions-log.md) / FR-DICE-13 "player rolls are always public", **for request answers only**

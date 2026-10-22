@@ -1,6 +1,6 @@
-# Party status: other players see a PC's HP, temp HP and AC
+# 0063 — Party status: other players see a PC's HP, temp HP and AC
 
-- Status: accepted (DM gate, #335)
+- Status: accepted (DM gate, [#335](../../decisions-log.md))
 - Date: 2026-10-21
 - **Amends DM decision #178 G6 and [ADR-0036](0036-full-sheet-derivation.md)'s "No HP, AC, scores, counters or text"** for the other-player character whitelist: a **decision reversal** for the DM (OQ-PARTY-30). Answers the [ADR-0024](0024-definition-visibility.md) consequence "other PCs' HP for a party view is a Combat-phase question" ([OQ-ENT-15](../../specs/entities.md#15-open-questions)). [ADR-0056](0056-companion-visibility.md) unchanged
 - Affects: [party-board](../../specs/party-board.md) (FR-PARTY-51–58), [entities](../../specs/entities.md) (visibility fn, FR-ENT-15), [character-sheet-full](../../specs/character-sheet-full.md) (ADR-0036's table), [combat-extras](../../specs/combat-extras.md) (FR-CBTX-32: `tempHp` to others), [play-shell](../../specs/play-shell.md) (FR-SHELL-140); data model, protocol, leak tests

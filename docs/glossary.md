@@ -127,7 +127,15 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Companion card** | The owner's window for a companion: HP, AC, speed, attacks with Roll, conditions. Not a character sheet ([character-sheet-full](specs/character-sheet-full.md)). | Character sheet |
 | **Movement used** | Feet a combatant's token has moved since its turn started (5/10/5 per move, any mover); reset on Next. Indicator only. | Speed |
 | **Turn alert** | The player client's alert (flash, ping, Toast) when one of its own PCs' turn starts. | Notification |
-| **Initiative order** | Ordered list of combatants for the current combat. | — |
+| **Initiative order** | Ordered list of combatants for the current combat: sorted by initiative, then the DM's tie order ([combat-tracker](specs/combat-tracker.md) FR-CBT-162). | — |
+| **Tie order** | The DM's order inside a group of equal initiative, set by dragging a row; kept for the fight ([combat-extras](specs/combat-extras.md)). | Initiative |
+| **Turn highlight** | The ring on the current turn's token, for everyone who may know whose turn it is ([scenes-map](specs/scenes-map.md)). | Target ring |
+| **Party status** | The small window showing each PC's HP, temp HP and AC, companions under their owners; never monsters ([party-board](specs/party-board.md), [ADR-0063](architecture/adr/0063-party-hp-visibility.md)). | Party window |
+| **Macro** | A saved, named roll button ("Sneak Attack 3d6") that rolls through the normal roll path; on the sheet's Macros tab and the tray ([dice-extras](specs/dice-extras.md)). | Roll request |
+| **Roll request** | The DM's request for a roll from chosen PCs (skill / save / check / custom; optional DC; results public or hidden) ([ADR-0061](architecture/adr/0061-roll-requests.md)). | Macro |
+| **Prompt** | The pending card toast a roll request puts on each target's screen, with Roll and Decline. | Roll popup |
+| **Pause screen** | The full-screen card players see while the DM pauses the table; input blocked, the DM keeps working ([play-shell](specs/play-shell.md)). | — |
+| **Alert sound** | A DM-uploaded short audio file picked for an alert (turn, roll request, pause, resume); players' mute still wins ([assets-pipeline](specs/assets-pipeline.md)). | Alert |
 | **Condition** | A 5e condition (e.g. prone, poisoned; exhaustion with a level), stored as an Effect on a combatant or character. Reminder only, except incapacitating ones end concentration. | Effect |
 | **Effect** | A row on a creature in play: a condition, a custom label, or a concentration; optional duration in rounds ([combat-extras](specs/combat-extras.md)); custom effects may carry modifiers ([effect-modifiers](specs/effect-modifiers.md)). | Modifier |
 | **Preset** | A named effect template with modifiers (built-in, customised per campaign, or a character's own), e.g. Bless, Rage; trigger presets (Sneak Attack …) create rule triggers ([effect-modifiers](specs/effect-modifiers.md)). | Effect; Dice style |
@@ -168,6 +176,10 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Stats window** | The launcher window with the live damage leaderboard (Fight) and session awards (Session), computed on request from saved facts, filtered per viewer ([stats](specs/stats.md), [ADR-0059](architecture/adr/0059-stats-read-models.md)). | Game log |
 | **Session awards** | BG2-style records for one session (biggest hit, biggest overkill, most damage dealt / taken, most healing, kills, nat 20s / 1s, times downed); the DM's Show awards opens them for everyone. | Leaderboard (one fight) |
 | **Overkill callout** | "— Overkill!" on a damage line (plus a toast) when damage beyond what was needed is ≥ max(10, what was needed); players never see the amount ([stats](specs/stats.md)). | — |
+| **Kill feed** | A callout toast per kill or party down the viewer may see ("Thorn finished the Ogre"); live only ([stats](specs/stats.md)). | Game log |
+| **Fight summary** | The Stats window opened on a fight at End, with its leaderboard and **Highlights** (MVP, biggest hit, kills, downs…). | Session awards |
+| **Luck tracker** | The Stats Luck tab: rolls, d20s, average d20, nat 20s / 1s per character, per session or campaign, from public rolls. | — |
+| **Trophy case** | A character's campaign-wide totals and records, on the sheet's Trophies tab (owner + DM). | Session awards |
 | **Health band** | healthy / bloodied / down: what players see of a monster's HP instead of numbers. | — |
 | **Log entry** | One game-log line; may join several rolls (e.g. an attack's to-hit and damage). | Roll; event log entry |
 | **Roll mode** | normal / advantage / disadvantage, applied to the d20. | — |
@@ -210,7 +222,9 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Work area** | The part of the viewport below the top bar and above the launcher; windows and the attack popup fit into it (decisions #172). | Viewport |
 | **Free area** | A part of the work area, right of the tool rail, that no open window covers; the map frames its tokens there (FR-SHELL-34, FR-MAP-44). *(Sprint 4)* Fit picks among the candidate free rectangles: PCs inside first, then the map's top row visible, then other tokens clear of windows, then the largest scale (FR-MAP-58). | Work area |
 | **Auto placement** | Where a window opens when the user didn't choose: a free edge slot covering the fewest tokens, never on a window, a keep-out region or a PC while another window can be auto-minimised ([play-shell](specs/play-shell.md), #310). | Layout |
-| **Useful size** | The smallest size a window opens at before the shell auto-minimises another window to make room ([play-shell](specs/play-shell.md) §7). | Minimum size |
+| **Useful size** | The smallest size a window opens at before the shell puts another window away to make room, checked by a content criterion per window ([play-shell](specs/play-shell.md) §7). | Minimum size |
+| **Placer** | The one shell function that places every window on every path (open, reopen, push, resize, refits): PCs clear first, then shrink to useful size, then put away the least recently used launcher window ([ADR-0060](architecture/adr/0060-one-window-placer.md)). | Auto placement |
+| **Zone** | The default spot of a protected window (Game log, Initiative, sheet); used while it is clear of PCs, else the placer decides. | Keep-out region |
 | **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |
 | **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
 

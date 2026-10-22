@@ -21,7 +21,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0013](0013-session-journal-scope.md) | Session outcomes / journal: MVP or post-MVP | accepted — no session tracking |
 | [0014](0014-mvp-scope.md) | MVP is a playable session simulation | accepted |
 | [0015](0015-source-adapters-fixtures.md) | Import pipeline and source adapters | accepted |
-| [0016](0016-domain-events-pending-actions.md) | Domain events and pending actions | accepted (core), refined by 0034, 0035, 0037; undo scope amended by 0039 |
+| [0016](0016-domain-events-pending-actions.md) | Domain events and pending actions | accepted (core), refined by 0034, 0035, 0037, 0061; undo scope amended by 0039 |
 | [0017](0017-agent-verification-fixture-library.md) | Agent-driven verification and fixture library | accepted |
 | [0018](0018-global-imported-content.md) | Imported reference content is global; custom content per campaign | accepted; amended by 0046 (compendium entries) |
 | [0019](0019-auth-credentials.md) | DM secret and player link credentials | accepted; amended by 0046 (player REST header on compendium routes) |
@@ -30,7 +30,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted |
 | [0023](0023-asset-access-by-capability-id.md) | Asset access by capability ID | accepted; amended by 0054 |
 | [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009), redaction whitelist refined by 0036; refined by 0050; amended by 0056 (pets) |
-| [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted |
+| [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted; placement extended by 0060 |
 | [0026](0026-signal-routing.md) | Signal routing: sender stamp, DM-only pull, receiver scene filter | accepted, amended by 0033 |
 | [0027](0027-notification-creation.md) | Notifications are created in the causing command's transaction | accepted (refines 0016), refined by 0034, 0035, 0037 |
 | [0028](0028-token-changed-hooks.md) | Token-changed hooks keep bound instances in step | accepted (extends 0024), amended by 0031; refined by 0039 |
@@ -41,7 +41,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0033](0033-signal-audience.md) | Signal audience hook: a signal type routes to everyone or DM only, or refuses the sender | accepted (amends 0026), refined by 0042 (player-list audience) |
 | [0034](0034-encounter-scoped-notifications.md) | Pending combat notifications end with their encounter, per kind | accepted (refines 0016, 0027) |
 | [0035](0035-combat-rule-hooks.md) | Combat rules run in the causing command's transaction | accepted (refines 0009, 0016, 0027), refined by 0038, 0043; refined by 0049 |
-| [0036](0036-full-sheet-derivation.md) | Full character sheet: derived with overrides; rules data vs sheet record | accepted (decides 0012 full sheet; refines 0021 D, 0024) |
+| [0036](0036-full-sheet-derivation.md) | Full character sheet: derived with overrides; rules data vs sheet record | accepted (decides 0012 full sheet; refines 0021 D, 0024); other-player whitelist amended by 0063 |
 | [0037](0037-split-attack-damage.md) | Attack and damage as separate rolls on one damage card | accepted (#190; refines 0016, 0027); refined by 0053 |
 | [0038](0038-effect-modifiers.md) | Effect modifiers: typed riders on effect rows, applied by a roll hook | accepted (#190; refines 0009, 0021 D, 0035), refined by 0043 |
 | [0039](0039-fog-visibility.md) | Fog visibility: server-written `fogged` copies, scene visibility and lifecycle hook registries | accepted (#196; amends 0016 undo scope; refines 0024, 0028), refined by 0042 (per-player copies) |
@@ -64,7 +64,11 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0056](0056-companion-visibility.md) | Companions: the owner sees an owned creature's stats | accepted (#288; amends 0024, refines 0009, 0036) |
 | [0057](0057-free-player-colour.md) | Free player colour (`#rrggbb`, validity + distance rules) | accepted (#288; amends 0055) |
 | [0058](0058-feature-switches.md) | Campaign feature switches (optional features off by default; one hub rule) | accepted (#315) |
-| [0059](0059-stats-read-models.md) | Stats as read models over the fact tables, filtered per viewer | accepted (#315) |
+| [0059](0059-stats-read-models.md) | Stats as read models over the fact tables, filtered per viewer | accepted (#315); §4 caching refined by 0062 |
+| [0060](0060-one-window-placer.md) | One placer for every window path: PCs first, then shrink, then put away | accepted (#335; extends 0025; amends #245) |
+| [0061](0061-roll-requests.md) | DM roll requests as pending actions; hidden answers to DM + the target's player | accepted (#335; refines 0016, 0027; amends #73 for answers) |
+| [0062](0062-stats-session-partials.md) | Campaign-wide stats from per-session partials kept in memory | accepted (#335; refines 0059) |
+| [0063](0063-party-hp-visibility.md) | Party status: other players see a PC's HP, temp HP and AC | accepted (#335; amends 0036 / #178 G6) |
 
 ## Proposing a new ADR
 
