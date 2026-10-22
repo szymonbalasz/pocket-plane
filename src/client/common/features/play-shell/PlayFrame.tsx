@@ -80,12 +80,20 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const lastSound = useAlertState((s) => s.lastSound);
   useAppearPlacement(available, dispatch);
   // FR-SHELL-95, -103: while the viewport changes windows only render-fit; one `viewport` settle
-  // runs, and writes, 200 ms after the last resize event.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the viewport size is the trigger
+  // runs, and writes, after the last resize event. Timed from the event itself (not a render), so
+  // it always lands before the map's resize refit (FR-MAP-98).
   useEffect(() => {
-    const t = setTimeout(() => dispatch({ type: "viewport" }), VIEWPORT_SETTLE_MS);
-    return () => clearTimeout(t);
-  }, [viewport.w, viewport.h, dispatch]);
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const on = () => {
+      clearTimeout(t);
+      t = setTimeout(() => dispatch({ type: "viewport" }), VIEWPORT_SETTLE_MS);
+    };
+    window.addEventListener("resize", on);
+    return () => {
+      window.removeEventListener("resize", on);
+      clearTimeout(t);
+    };
+  }, [dispatch]);
 
   return (
     // overflow-clip (not hidden): a clipped box can't be scrolled at all, so focusing something
