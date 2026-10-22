@@ -699,13 +699,7 @@ export function runReplay(
 }
 
 /** One step of a scripted run (walkthrough repros): a user open, a fight's End / Start, a reload, Fit. */
-export type ScriptStep =
-  | { open: string }
-  | { close: string }
-  | "end"
-  | "start"
-  | "reload"
-  | "fit";
+export type ScriptStep = { open: string } | { close: string } | "end" | "start" | "reload" | "fit";
 
 /**
  * A walkthrough repro in the harness's world (`fitted` camera): load in `state` at `vp` with
