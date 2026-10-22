@@ -2,12 +2,21 @@
 title: Scenes and map
 prefix: MAP
 status: complete
-owner: spec-followups
+owner: spec-wf, spec-cb
 wave: 3
-phase: post-mvp-7
+phase: post-mvp-8
 ---
 
 # Scenes and map
+
+> **Sprint 8, track CB (combat polish; owner spec-cb; DM [#334](../decisions-log.md)).** Decided, not open: the **current-turn token is highlighted** (ring / glow) for everyone who can see it. Combat says which token ([FR-CBT-166](combat-tracker.md#6-functional-requirements)); this spec adds the `turn` field to the token-overlay contract and draws it (FR-MAP-108–112). Why not the registry alone: `TokenDecoration` is declarative and its `ring` is only `"target"` (code read), so a new mark needs one small `TokensLayer.tsx` change, made **after WF3 (refits) merges** (seams S1: WF3 → CB2, canvas lock). **For the DM:** [OQ-MAP-67, -68](#15-open-questions); seam with WF: OQ-MAP-69 (closed by S1). Wire: 0 B (derived). Walkthrough: [combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary) CB1, CB7. WF edits this spec in parallel (refits) with its own range.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-MAP-108 | `turn` decoration field: merged, drawn under the token body inside its group | CB2 `build/cb-turn-ring` | `FR-MAP-108 turn mark` |
+| FR-MAP-109 | Look: one turn colour, ring + soft glow, static; dashed for hidden (DM) (decided #335, OQ-MAP-67 A) | CB2 | `FR-MAP-108 turn mark`, `FR-MAP-109 small cells` |
+| FR-MAP-110 | Only on tokens the client has and the decoration marks (decided #335, OQ-MAP-68 A) | CB2 | `FR-CBT-166 turn ring per viewer` |
+| FR-MAP-111, -112 | Node budget; canvas query helper | CB2 | `FR-MAP-108 turn mark` |
 
 > **Sprint 4 (track M, DM decisions [#243](../decisions-log.md) [9], [13]; session-sim-7 glitches).** Decided by the DM (not open): a **drag path** while dragging (the cells the distance uses): everyone sees players' tokens' paths, only the DM sees non-player tokens' paths [9]; **Show to players** moves to the Scenes window [13]. Fixed here: label collisions, the player's fit at 1280×800. Amended: FR-MAP-08, 42, 43, 44; new FR-MAP-51–58. *Sprint-4 gate 1 (DM, 2026-10-17, **#245**):* OQ-MAP-35–38 decided as picked (combat trail, straight-line path, monster glide without a path, labels shrink on collision); if the sprint runs late, combat trails, then label collisions, are on the cut order (G7). One map-tools design with [scene-tools](scene-tools.md) (freeform templates) and [play-shell](play-shell.md) (window placement); the shared **map-tools walkthrough** is §13. Track V (fog-of-war) edits this canvas first: middle-mouse pan, Fit (BL-01), drag-time vision on the same drag pipeline (§14). *Seams pass (orchestrator ruling, sprint 4):* S1 (V8 builds the drag pipeline + probe; M2 derives the path), S2 (helper at `@shared/scenes-map/area`), S3 (middle mouse pans before tool dispatch: M's tools never see middle-button events), S4 / S14 (canvas order V7 → V8 → M2 → M5 → C-art), S7, S9, S11–S13 applied; OQ-MAP-39–42, -44 settled.
 
@@ -100,6 +109,8 @@ Decided at sprint-5 DM gate 1 (#256): every pick accepted except OQ-SHELL-32 (�
 | FR-MAP-58, -44 | Fit into the best free rectangle, then V's per-axis pan inside it | M5 | `FR-MAP-58 best rectangle` |
 
 Decided at sprint-4 gate 1 (#245): OQ-MAP-35 (combat trail), -36 (straight path), -37 (monster glide, no path), -38 (labels shrink). Wire: 0 B (path derived). Walkthrough: §13 M1–M13 (also covers SCN and SHELL).
+
+> **Sprint 8 (track WF; DM [#333](../decisions-log.md)).** The refits become the last step of the [placer](play-shell.md#6-functional-requirements): they read its plan and its PC test (player characters only, #318). Fixed: **BL-65** (sim-11 FAIL h: a player's reveal with the companion card open zoomed **in**, 0.657 → 0.686; cause: `pcsPan` re-scales up to the 48-px floor). New FR-MAP-93–98; amends FR-MAP-46, -59, -80, -89, -90, -92. Tests, walkthrough (F9, F10), slice **WF3**: [play-shell §13–14](play-shell.md#13-test-plan). 0 B.
 
 ## 1. Summary
 
@@ -245,6 +256,18 @@ Decided at sprint-4 gate 1 (#245): OQ-MAP-35 (combat trail), -36 (straight path)
 | FR-MAP-90 | *(S7, track FU)* **No jump at Start** (sim-10 b00; amends FR-MAP-44 (b), -81): an **appearance** refit (DM: Initiative at Start, FR-CBT-60; players: Initiative's appearance) first checks the current camera: every content token footprint inside the area and clear of every obstacle (FR-MAP-59's test) → **keep the camera** (no move; `data-fit-reason` unchanged). Else it refits, after the windows that caused it have settled (Initiative's grown height measured, [FR-CBT-150](combat-tracker.md#6-functional-requirements)), and the result never leaves a **PC footprint under a window**: `fitVisible`'s obstacle cap counts only obstacles that intersect the area at that scale; past the cap, FR-MAP-81's bounded sweep takes the 6 obstacles nearest the PCs' bounding box instead of falling back to centring; if no pan keeps every PC clear, the pan with the least PC footprint area under windows wins. Outcome (b00 repro, 1440×900, `session-sim-10`, Start "Escort to the Ford" with Scenes + Game log + Initiative open): Thorn, Brakka and the Owlbear clear of every window. Pure in `camera.ts`; perf as FR-MAP-81 (≤ 25 ms bench). | sim-10 b00 |
 | FR-MAP-91 | *(S7, track FU)* **Fit with Scenes and a shown toast** (sim-10 b06; amends FR-MAP-80; proposed, [OQ-MAP-61](#15-open-questions) **A**): the DM's Fit (button, FR-MAP-45; resize, FR-MAP-92) computes the fit twice: with the shown stack as obstacle (FR-MAP-80 as built) and with only the **summary strip**; if the first's cell size is below **75 %** of the second's, it takes the second (the shown card toasts may then cover tokens until resolved; `data-fit-reason="fit-past-toasts"`), else the first. Outcome (1440×900, Game log + Initiative + Scenes, one card toast shown, `session-sim-10` Goblin Ambush): cells ≥ the sprint-6 "nothing showing" figure for that layout (FR-MAP-80: 38 px) or every token clear of the shown toast at ≥ 75 % of it; never the 24-px top-left strip of b06. Players: unchanged (their hard corner). | sim-10 b06 |
 | FR-MAP-92 | *(S7, track FU)* **Resize refit** (sim-10 b06: 1280 → 1440 left 26 px; amends FR-MAP-44's resize trigger): a viewport resize while `fitted` refits with exactly the obstacles and rules of Fit (FR-MAP-59 → -80 → -91), after the windows' render fit (FR-SHELL-29) for the new viewport has applied; so resizing 1280×720 → 1440×900 ends at the same cell size as pressing Fit at 1440×900. A `moved` camera: unchanged (no refit). | sim-10 b06 |
+| FR-MAP-93 | *(S8, WF)* **One obstacle source, one PC test**: every fit reads window obstacles from the placer's last plan (rendered rects, zones, displaced windows), plus the toast obstacles as built. `fitTokens`' `pc` = `isPlacementPc` (#318): pets and summons are content tokens, kept under `all`, not required under `pcs`. The canvas provides the placer's **base port** `{pcs(cam), tokens(cam), dryFit(obstacles)}`, pure over `camera.ts`. | #318 |
+| FR-MAP-94 | *(S8)* **Never zoom in past the last full fit** (BL-65). **Every reason, incl. `load`:** `pcsPan` never raises the cell above the one `fitVisible` chose (today it re-scales up to 48 px). **`reveal`, `appearance`, `window`:** the new cell is ≤ the **last full fit's** cell (Fit, `open`, `load`, `resize`), so a later reveal may zoom back up to it but never beyond, and repeated reveals don't ratchet the map down. With no pan clearing every new token at ≥ 24 px: PCs clear, then the least token area under windows. Repros first as `test.failing`: sim-11 h (reveal) and **r03 (load at 0.686, Elite + Plain Brute under the sheet)**. | BL-65; rulings-b 6, 12 |
+| FR-MAP-95 | *(S8)* **One fit path**: `open`, `load` and `reveal` call Fit's function (`fitPastToasts` with this client's obstacles), not plain `fitScene`. | BL-65 |
+| FR-MAP-96 | *(S8)* **After the placer**: the load fit runs once the `load` settle has applied and grown windows have reported their height (replaces FR-MAP-89 (2)'s frame wait). The Start / appearance refit runs after the `appear` settle, FR-MAP-90's keep-the-camera test first. | BL-70, g |
+| FR-MAP-97 | *(S8, [OQ-SHELL-64](play-shell.md#15-open-questions) B, players, #335)* **Yield refit**: `dryFit` returns `{camera, cellPx, verdict}` without applying it. When the placer accepts a yield (≥ 75 % of the last full fit's cell), the canvas applies it once (`data-fit-reason="window"`, still `fitted`). | BL-66; rulings-b 12 |
+| FR-MAP-98 | *(S8)* **Resize refit after the settle** (amends FR-MAP-92): it runs after the last `viewport` settle, so zones, returns and grow-back are in place (g03: the map squeezed bottom-right at 27 px). | BL-60 |
+| **Sprint 8: current-turn highlight** (track CB, DM #334; combat's side [FR-CBT-166, -167](combat-tracker.md#66-sprint-8-order-turn-and-highlight)) | | |
+| FR-MAP-108 | **`turn` decoration** (amends FR-MAP-34's contract; `token-overlays.ts` type only, registry order unchanged): `TokenDecoration` gains `turn?: {id: string, hidden?: boolean}`. Merge (`decorations.ts`): first non-null wins (as `cross`). Drawn **inside the token's group, before the body** (under the image, the selection / target outline, bar, icons and cue), so it moves with a drag and with drag previews, and dims with the group's opacity (`dim`, hidden). Konva `name` = `id`, `id` attr = token id, attr `hidden` = `"true"` \| `"false"`, `listening: false` (never steals a press). | #334 |
+| FR-MAP-109 | **Look** (decided #335, [OQ-MAP-67](#15-open-questions) **A**): a ring hugging the footprint's shape (circle or square, FR-MAP-26 shape), just outside the selection / target outline so both read at once, plus a soft outer glow; **one colour for everyone**: visual-direction's `accent.success` over FR-MAP-72's dark casing (distinct from selection `accent.primary` and target `accent.danger`; the UI / art sprint may rename it); **static** (no pulse, nothing for reduced motion to stop). `hidden: true` (DM only) → dashed ring, no glow. Cells < 48 px (BL-35's compact rule) → a 2 px ring, no glow. | |
+| FR-MAP-110 | **Who sees it** (decided #335, [OQ-MAP-68](#15-open-questions) **A**): drawn only where the decoration says (combat's line, FR-CBT-166) on tokens the client has. Players never receive a hidden or fog-hidden token (ADR-0039) nor a hidden turn id (FR-CBT-31), so a hidden or fogged combatant's turn never shows; the DM's fog "view as" dims client-side only and keeps the DM ring. | ADR-0039 |
+| FR-MAP-111 | **Budget**: one Konva node per ringed token (the turn token + its in-owner-turn companions); no animation frame; Next redraws only the old and new tokens' groups (memoised decorations). | |
+| FR-MAP-112 | **Test hook**: `e2e/support`'s canvas query helper finds `cbt-token-turn` nodes (name, id, `hidden`), as FR-MAP-34's other marks (AGENTS §9.5). | |
 
 ## 7. UI/UX notes
 
@@ -391,8 +414,12 @@ Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/s
 - *(Sprint 6, WF: Fit, reveal refit)* **Disconnect / reconnect:** a reconnect snapshot that brings tokens into sight is one reveal (FR-MAP-82: one refit while `fitted`); tokens already drawn don't count, so a plain reconnect never refits. **Server crash:** same as reconnect after restart; nothing server-side. **Reload:** the scene-open fit runs as before (FR-MAP-44 (a)); the shown stack starts empty (FR-MAP-80). **Drag in progress** when tokens come into sight: the refit waits for the drop (no camera jump under the pointer); a pan or zoom started meanwhile cancels it and marks the camera `moved`. **DM client:** no reveal refit (players only). **A sticky card toast appearing after a fit** may cover top-row tokens below the summary strip until it is resolved or the DM presses Fit (OQ-MAP-57 D trade-off; the camera never refits on toasts). **Fog reveal of many tokens at once:** one refit (coalesced ≤ 1 s). No data-model, API, permission or visibility change (client-only camera; §8, §9, §10 unchanged).
 
 - *(Sprint 7, FU: marker, refits)* **Disconnect / reconnect:** the marker reads the token record, so a reconnect snapshot shows it as stored; a reconnect that brings tokens into sight is one reveal (FR-MAP-82 / -89). **Reload:** the load fit waits for the restored windows (FR-MAP-89 (2)). **Server crash mid-End / mid-Start:** the owner handling (FR-MAP-88's fix at End, the safety-net re-assert at Start) is inside `cbt.end` / `cbt.start`'s transaction: all or nothing. **Start with every token already clear:** no camera move (FR-MAP-90). **A `moved` camera:** no appearance, reveal or resize refit (unchanged).
+- *(Sprint 8, WF)* Disconnect / reconnect / crash: tokens newly drawn by a reconnect snapshot are a reveal (≤ the current scale); an `appear` in it settles first. Reload: the load fit waits for the `load` settle. A `moved` camera never refits or yields.
+- **Sprint 8 (CB):** the turn token wears a green ring with a soft glow under its image, for the DM and every player who sees that token; a hidden monster's turn shows a dashed ring on the DM's map only. **Player view:** nothing on a hidden or fogged creature. Disconnected: the last ring stays (it is the last turn); reconnect / reload re-derive it from the snapshot; a crash changes nothing (no state).
 
 ## 12. Performance & bandwidth
+
+- *(Sprint 8, track CB)* **0 B**: the ring is derived from `turnCombatantId` / `playerTurnCombatantId` and `combatant.tokenId`, already in every snapshot; one Konva node per ringed token (FR-MAP-111).
 
 - *(Sprint 6, track CP)* **0 B** of scenes-map's own: the marker is derived; owned summon tokens are ordinary tokens (≤ 400 B each, ≤ 8 per summon); their creates / deletes ride combat's events (measured totals in [CBT §12](combat-tracker.md#12-performance--bandwidth)).
 
@@ -421,6 +448,8 @@ Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/s
 - Snapshot: token ≈ 300 B, scene ≈ 400 B; 30 scenes × 30 tokens ≈ 280 KB. Shared DM budget: scenes ≤ 300 KB of live-sync's 512 KB (1,000-token cap). Players get one scene. **Review check:** Chrome trace of a 10 s pan on Cellar (4096 px map, grid on): median frame ≤ 20 ms.
 
 - *(Sprint 7, FU)* **CON-44: 0 B in the normal case.** FR-MAP-88's safety-net re-assert adds a `token` upsert to `EncounterStarted` / `CombatantsAdded` only for a pet token whose owner differs (never once the End fix holds; a token upsert as sent today, ≈ 0.3 KB); nothing new in the snapshot, so no probe was run. FR-MAP-89–92 are client geometry: the no-jump check is one FR-MAP-59 visibility test (O(tokens × obstacles)); FR-MAP-91 runs the fit twice on a Fit press only; both inside FR-MAP-81's 25 ms bench budget.
+
+- *(Sprint 8, WF)* **CON-44: 0 B** (client only). `dryFit` reuses FR-MAP-59's search, ≤ once per settle.
 
 ## 13. Test plan
 
@@ -547,6 +576,19 @@ Bundle **`image-search`** ([ASSET §13.1](assets-pipeline.md#131-sprint-6-image-
 
 Walkthrough: [ASSET IM1, IM2, IM7, IM10](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im) (player-1's frames carry the new token image ID only because the token is visible, never a tag). Disconnect / reconnect / crash: unchanged for the canvas; the picker per [ASSET §11](assets-pipeline.md#11-edge-cases--failure-modes).
 
+### Sprint 8: refits after the placer (track WF)
+
+Pure tests in `camera.test.ts` / both `fit-visible.test.ts`, inputs from `replay-cells.generated.ts`; bundles, harness, walkthrough: [play-shell §13](play-shell.md#13-test-plan).
+
+| Test | What |
+|---|---|
+| `FR-MAP-93 one obstacle source` | Obstacles = plan rects + toasts; a pet is not a PC in `fitTokens` or the placer |
+| `FR-MAP-94 reveal never zooms in (BL-65)` | P1 @1280×800 with the card + Stats, `ambush` → `ambush-revealed`: cell after ≤ before; no new token under a window where a pan allows; **r03**: the load fit with the card open ≤ `fitVisible`'s cell, nothing under the sheet; repeated reveals return up to, never above, the last full fit |
+| `FR-MAP-95 one fit path` | `reveal`, `load`, `open`, Fit → the same camera for the same inputs |
+| `FR-MAP-96 load and Start after the placer` | The load fit sees zones and the card's height; Initiative in its zone before the Start refit |
+| `FR-MAP-97 yield refit` | ≥ 75 % of the last full fit accepted, below refused, `moved` never |
+| `FR-MAP-98 resize refit after settle` | 1280×720 → 1440×900: refit after the Game log is back; cell = Fit at 1440×900 |
+
 ### Sprint 7: marker and refits (track FU)
 
 Fixtures, bundle `fu-s7` / `fu-s7-e2e` and the walkthrough (U5, U12, U13, U16): [play-shell §13](play-shell.md#13-test-plan). Named tests here:
@@ -558,6 +600,10 @@ Fixtures, bundle `fu-s7` / `fu-s7-e2e` and the walkthrough (U5, U12, U13, U16): 
 | `FR-MAP-90 no jump at Start` | client (pure) | `fitScene` / appearance inputs from sim-10 b00 (1440×900, Scenes + Game log + Initiative, Initiative grown after Start): every token already clear → camera unchanged; otherwise one refit and no PC footprint under any window, with 7 obstacles (past the old cap of 6); bench ≤ 25 ms |
 | `FR-MAP-91 Fit with Scenes and a toast` | client (pure) | 1440×900, Game log + Initiative + Scenes, one 320×86 card toast shown at the home band: cells ≥ 75 % of the strip-only fit (≥ 38 px expected), never 24 px; with no toast shown → as FR-MAP-80 |
 | `FR-MAP-92 resize refit` | client (pure) | resize 1280×720 → 1440×900 while `fitted` → the same cell size as Fit at 1440×900 (b06: 26 px); `moved` → no refit |
+
+### Sprint 8: current-turn highlight (track CB)
+
+Bundle `combat-polish` (companions in every turn mode, the hidden Elite, a fog-hidden Goblin), e2e `cb-turn-ring.e2e.ts` on `cb-turn-ring-e2e`, walkthrough CB1 / CB7: [combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary). Named tests here: `FR-MAP-108 turn mark` (merge; drawn before the body in the token group; follows a drag preview; `hidden` → dashed; `listening` false) and `FR-MAP-109 small cells` (< 48 px → 2 px ring, no glow). Konva layer count stays ≤ 4 (FR-MAP-29 test).
 
 ## 14. Dependencies
 
@@ -670,9 +716,17 @@ Full split, order and locks: [CAMP §14](campaign-management.md#sprint-5-build-s
 
 Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). MAP part: **IM-3 `build/im-wiring`** (after IM-2 `build/im-picker`): one `context` prop in `scenes-window.tsx` and in `token-menu-entries.tsx`, one DOM test each. Neither is a canvas hotspot file (`MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx`, tools), so IM-3 needs no canvas lock and runs alongside WF / CP canvas work. No schema, record type, event, §9.9 shared file or dependency.
 
+### Sprint 8 build split (track WF)
+
+**WF3** `fix/wf-refits` (FR-MAP-93–98): ★ canvas lock `MapCanvas.tsx`, `camera.ts`; ★ `free-area.ts`. After WF1. **Canvas lock: WF3 → CB2** (the turn ring edits `TokensLayer.tsx` and the decoration type, seams S1). Full split: [play-shell §14](play-shell.md#14-dependencies).
+
 ### Sprint 7 build split (track FU)
 
 Full split: [play-shell §14](play-shell.md#14-dependencies). MAP parts: **FU0** `fix/fu-combat-core` (FR-MAP-88's server cause, in combat's End / Start / Add transactions, root cause first; no canvas file) and **FU3** `fix/fu-map` (FR-MAP-88 client part if any, FR-MAP-89–92): ★ canvas lock `MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx` (label-row hit test), `camera.ts` (pure), ★ frame `free-area.ts` (after FU1). **Canvas lock this sprint: FU1 (Space guard + `requestFit` listener, two small edits) → FU3**; no other track edits the canvas files (sprint-7 hotspots). No record type, intent, signal, Konva layer or dependency; protocol §18 notes at consolidation.
+
+### Sprint 8 build split (track CB)
+
+Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). MAP part: **CB2** `build/cb-turn-ring`: `token-overlays.ts` (the `TokenDecoration` type only), `decorations.ts` (merge), `token-decor.ts` (ring geometry), `layers/TokensLayer.tsx` (one mark before `TokenBody`); combat's `token-overlay.ts` line; `e2e/support` helper. **Canvas lock: after WF3 merges** (seams S1; `MapCanvas.tsx`, `TokensLayer.tsx`, `camera.ts`), one holder at a time; wave 4. The combat overlay line stays an append. No server, schema or wire change.
 
 ## 15. Open questions
 
@@ -750,7 +804,24 @@ Full split: [play-shell §14](play-shell.md#14-dependencies). MAP parts: **FU0**
 |---|---|---|---|---|
 | OQ-MAP-61 | **Fit vs a shown card toast** (sim-10 b06: Game log + Initiative + Scenes + one card toast → 24 px in the top-left strip; #288 OQ-MAP-57 D keeps whatever shows clear) | **Decided (#315): A** (drop a shown card toast that costs more than a quarter of the cell size). **A. Keep shown toasts clear unless that costs more than a quarter of the cell size; then fit as if only the summary strip were there (a card toast may cover a token until resolved): readable map, the toast is temporary** / B. Always keep them clear (as built): nothing hidden, the map can drop to 24 px / C. Never count card toasts, only the summary strip: always the larger map, a sticky card often sits on the top row | no · owner: DM | FR-MAP-91; amends OQ-MAP-57 D only for card toasts |
 
+**Sprint 8, track WF.** Decided at DM gate 1 (#335).
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| ~~OQ-MAP-62~~ | CB seam: turn highlight vs the canvas lock | **Resolved (integrator, sprint-8 seams / rulings)**: seams S1: a canvas edit (`TokenDecoration` turn ring, `TokensLayer.tsx`) by CB2 under the canvas lock, after WF3 | — | §14 sprint 8 |
+| OQ-MAP-63 | The `pcs` fallback keeps only player characters clear (FR-MAP-93). Should a player's own pet count in their fallback? | **Decided (#335): A.** **A. No: one PC definition everywhere (#318, #333); pets stay "visible when possible"** / B. Players' own pets count in their `pcs` set (the placer unchanged) | no · DM | FR-MAP-93 |
+
+**Sprint 8, track CB** (owner spec-cb). **Bold** = suggested pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-MAP-67 | **Turn highlight style** | **Decided (#335): A.** **A. One colour for everyone, ring + soft glow, static: reads at a glance, no clash with the paw marker, side chips or HP tones** / B. Colour per side (a PC in its owner's colour, ally, enemy by the public side): more information, but repeats the side chip and paw colours and needs a colour-blind check / C. A pulsing ring: draws the eye, but constant redraws and motion noise for a minute-long turn | no (decided #335) | FR-MAP-109 |
+| OQ-MAP-68 | **Which tokens highlight, for whom** (hidden, fog) | **Decided (#335): A.** **A. Players: only the tokens they receive whose turn they know (never a hidden or fogged combatant: no data reaches them); DM: also hidden tokens, dashed; `in-owner-turn` companions ring with their owner** / B. The DM never sees a ring on hidden tokens either: simpler, but the DM loses the cue on a hidden monster's turn / C. A plus an "on deck" (next up) marker: more planning help, more noise (later) | no (decided #335) | FR-MAP-110, FR-CBT-166 |
+| OQ-MAP-69 | **Seam with WF (window-frame pass): canvas lock.** How the ring is drawn | **Resolved (integrator, sprint-8 seams / rulings).** **Closed by seams S1: A.** `TokenDecoration.ring` only takes `"target"`, so CB2 extends the type (`turn` field), `decorations.ts`, `token-decor.ts` and `TokensLayer.tsx` under the canvas lock **after WF3 merges**; the combat overlay line stays an append. (Rejected: B, an own canvas layer that lags a dragged token) | — | play-shell (WF), FR-MAP-108 |
+
 ## 16. Out of scope
+
+- *(Sprint 8)* Refitting when a token moves under a window; a camera that follows moving windows.
 
 - *(Sprint 7)* BL-55 (fog log spam with > 4 owned tokens) stays a backlog item; refitting when a PC walks under a window; a DM option to turn the appearance refit off.
 - *(Sprint 6)* Seeing through a companion's eyes on demand; per-token vision switches (OQ-MAP-54 C, unless picked); a companion leash / range indicator; summon placement by the player.

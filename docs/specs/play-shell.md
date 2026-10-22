@@ -2,7 +2,7 @@
 title: Play shell
 prefix: SHELL
 status: complete
-owner: spec-tt
+owner: spec-wf, spec-cb, spec-tt
 phase: post-mvp-8
 ---
 
@@ -105,12 +105,35 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 
 0 B on the wire (all browser-only; §12). No new dependency. Bundle **`session-sim-10`** + one new FU unit (§13).
 
+> **Sprint 8 (track CB, combat polish; owner spec-cb; DM [#334](../decisions-log.md)).** The players' **party HP / AC summary** ([party-board FR-PARTY-51–58](party-board.md#610-sprint-8-party-summary-track-cb)) is a small launcher window **Party status** (decided #335) (`party.summary`, both clients; [OQ-PARTY-29](party-board.md#15-open-questions) A), registered through the window registry (append) **after WF1**, per WF's FR-SHELL-112 (1) (seams S12). New **FR-SHELL-140–143**. **WF owns the frame this sprint**: no placement, keep-out or frame file here; seam [OQ-SHELL-73](#15-open-questions) closed by S12. 0 B on the wire from SHELL. WF and TT edit this spec in parallel with their own ranges.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-SHELL-140 | Window type `party.summary` "Party status", both clients, launcher, loads closed | CB3 `build/cb-party` | `FR-SHELL-140 party status registered` (+ WF's registry-driven layout tests pick it up) |
+| FR-SHELL-141 | Sizes: grows to its rows; default / useful / min per WF's table | CB3 | `FR-SHELL-140 party status registered` |
+| FR-SHELL-142 | No feature open; user opens only | CB3 | `FR-SHELL-140 party status registered` |
+| FR-SHELL-143 | Registry rows (sets P1 / P3 / D3, both goldens) filled in CB3's branch; launcher fits at 1280×720 | CB3 | WF's layout harness, `FR-SHELL-140 launcher fits` |
+
 > **Sprint 7 (track ST, stats tier A, DM [#311](../decisions-log.md); spec-stats).** A new launcher window **Stats** (`stats.board`, both clients) for the [stats](stats.md) leaderboard and session awards. It registers through the window registry (append) under FU's **FR-SHELL-86** contract (seam S5), and opens itself on the awards when the DM shows them. New **FR-SHELL-93–94**. **FU owns the frame this sprint** (#310 parking, default sizes, Reset layout). Slice ST2 registers `stats.board` **after FU1 merges**. 0 B on the wire from SHELL.
 
 | FR | What | Slice | Named test |
 |---|---|---|---|
 | FR-SHELL-93 | Window type `stats.board` "Stats", both clients, launcher, loads closed | ST2 | `FR-SHELL-93 stats window registered` (+ FR-SHELL-45 / -62 registry tests pick it up) |
 | FR-SHELL-94 | Feature open on Show awards: opens / fronts Stats on that session's awards | ST2 | `FR-SHELL-94 awards open the window` |
+
+> **Sprint 8 (track WF; DM [#333](../decisions-log.md), [#334](../decisions-log.md)).** Decided (#333): **one placement path**. At small screens PCs stay clear first, then windows shrink, then the least recently used launcher window is put away. "Not below their useful size unless nothing else works" is [sprint-8](../agents/sprint-8.md)'s reading of #333; the DM confirmed it at gate 1 (#335). PCs are player characters only (#318). It is proven by a session-replay harness. Fixes BL-52, -53, -59, -60, -61, -64, -65, -66, -70. New FR-SHELL-95–119; FR-SHELL-118 lists what it retires. Proposed ADR: [one placer](../architecture/adr/proposed-s8-wf-one-placer.md). Decided at DM gate 1 (#335): OQ-SHELL-58–64 and OQ-MAP-63 as picked; the ADR accepted. Seams S1–S5, S12, S14 and review-b rulings 1–15, 26 applied. 0 B.
+
+**Five paths today → one placer** (code read at spec time)
+
+| Path | Today | Breaks | Now |
+|---|---|---|---|
+| Open / appear | `autoPlace` → `placeWindow` | accepts a mid-map inward spot before putting a window away (BL-70); the 12-px gap loses a 321-px PC-clear strip (BL-64) | ladder, zones, 4-px gap fallback |
+| Reopen | `clearAround`: bare `placeWindow`, no floor | neighbours written at min | ladder |
+| Push / return | `pushWindows`: no PCs; pushes only on a new bar rect | BL-61, BL-52 | ladder; push on drag-end / re-select |
+| Resize | `followDefaults`: no PCs, no floor, **written** | Game log stuck at its 300×160 min (BL-60) | displace down, return / grow back up |
+| Refits | `pcsPan` re-scales **up** to 48 px; the fit's PC = any owned token | reveal zooms in (BL-65) | after the placer, never zooms in ([FR-MAP-93–98](scenes-map.md#6-functional-requirements)) |
+
+BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR-SHELL-109; BL-66 → useful sizes (FR-SHELL-100, [FR-STATS-66](stats.md#6-functional-requirements), [FR-CHARX-83](character-sheet-full.md#6-functional-requirements)).
 
 > **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md)).** Decided (not open): a **pause / intermission screen** (players see a full-screen card, input blocked; the DM keeps working) and **DM-added alert sounds**. State lives on the campaign row ([FR-CAMP-46–50](campaign-management.md#6-functional-requirements)), files in [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61; this spec owns the card, suppression, the DM's Pause control and playback by alert key: FR-SHELL-125–136. The card is an **overlay** in WF1's `overlays.ts` (`blocksInput`) and the control a `top-bar-items.ts` entry (seams S2). CON-44, tests, walkthrough T9–T14: [dice-extras §12–13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-SHELL-68–72.
 
@@ -129,6 +152,7 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 - **Sprint 5** (FR-SHELL-45–54): the screen has **zones**: right column = Initiative (DM) / sheet (player), bottom strip = a **wide Game log**, toasts and roll popups where they are today (players: bottom-right **toast corner**; DM: **top-centre**, #256), top strip right of the tool rail = the active **tool bar**, which pushes windows off it (FR-SHELL-55), the rest = map. Windows the user opens go to a clear spot (edges first, then beside an edge window, #256 amending #162), never on a window or a keep-out region while one exists; when the screen is full the least recently used launcher window is auto-minimised. The fit keeps every token visible ([FR-MAP-59](scenes-map.md#6-functional-requirements)). Browser-only, 0 bytes.
 - **Sprint 6** (track PF, FR-SHELL-70–76): a **Preferences window** opened from a top-right **identity chip** (colour dot + your name). Features register **preference sections** in it (colour, sound, dice, layout, …); each setting keeps its storage (browser or server). The player's top-bar speaker retires; its controls live in the Sound section.
 - **Sprint 7** (track FU, FR-SHELL-77–88): a window never lands on a PC while another launcher window could be **auto-minimised** instead (#310 A); a window is auto-minimised before it would shrink below a readable size (proposed); Reset layout puts the default windows back in their zones and refits the map; a window a tool bar pushed goes back when the tool closes (proposed); pushes stay out of the DM's toast band; Space and keyboard focus work as on any web page. Browser-only, 0 bytes.
+- **Sprint 8** (track WF, FR-SHELL-95–119): one placer for opens, reopens, pushes, resizes and the map's refits, with one rule (#333): PCs clear, then shrink to the useful size, then put away the least recently used launcher window. Default windows keep their zones (#335). What the shell moved for a tool or a small screen comes back. Proven by a session-replay harness. 0 B.
 
 ## 2. Scope
 
@@ -143,6 +167,7 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 - **Sprint 6** (FR-SHELL-56–62): reopen rule, footprint PC rule, token-free rank, the DM's shown-stack rect for the Fit, the player 1280×800 outcome, the placement contract for CP's / PF's new windows, deterministic layout tests. `ui-window` `data-placed` gains `reopened`; nothing stored or sent changes. Out: window contents (each owner), the Preferences window itself and the top-right area (PF, after WF1), the companion card (CP); pushed windows staying pushed after the tool closes (accepted, sprint-5 playtest).
 - **Sprint 6** (track PF, FR-SHELL-70–76): identity chip in the top bar; window type `shell.prefs`; preference-section registries (one per client); Sound and Layout sections. Out: the colour picker itself ([campaign-management](campaign-management.md) FR-CAMP-35), dice settings' content ([dice-extras](dice-extras.md) FR-DICEX-57), new settings (none added), syncing device settings across browsers (OQ-SHELL-50), placement / keep-outs (track WF).
 - **Sprint 7** (track FU, FR-SHELL-77–88): auto-minimising rule, auto-minimise order, useful size, Reset layout zones, pushed windows returning, pushes clear of the DM toast band, Space and keyboard-focus Tooltips, the size table, the placement contract for ST's Stats window, auto-minimising invariants + sim-10 replays in the layout tests. `WindowDef` gains optional `usefulSize`; client memory gains a pushed window's pre-push rect; the stored `WindowState` gains optional `userSpot` only if OQ-SHELL-55 B (old entries parse); nothing sent changes. Out: window contents (each owner: the companion card's size CHARX, the encounter editor CBT, Creatures ENT, the concentration chip CBTX), the toast stack itself (NOTE), the map camera (MAP).
+- **Sprint 8** (track WF, FR-SHELL-95–119): placer, zones, ladder, useful sizes, displacement memory, push triggers, rail inset, registries for TT / SB / CB, the harness. `WindowState` gains optional `userSize`. Out: window contents, the toast code (NOTE), camera maths (MAP), the TT / SB / CB surfaces themselves.
 - **Later, not built** (nothing here may block them): command palette, shortcuts, portrait strip, pause overlay, DM "view as player". They plug in via the registry, a reserved strip slot above the launcher and an overlay layer.
 
 ## 3. Goals
@@ -164,6 +189,7 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 - *(Sprint 4)* **DM:** When combat starts I want Initiative to open where it doesn't hide the goblins I'm about to target, and never on top of the window I'm reading. **Both:** on a 1280-wide laptop I want every launcher button reachable and the tokens I can see out from under my windows.
 - *(Sprint 6)* **DM:** When I close Compendium and open it again after resizing or opening other windows, I want it back where I put it, unless that spot is now taken, and never on top of another window or my PCs. When a combat card waits, I still want every Fog bar control. **Player:** On my laptop, when the door opens and goblins come into sight, I want them on screen, not under my sheet.
 - *(Sprint 7)* **DM:** When I reopen Encounters at 1440×900 I want it never on top of Mira, Thorn and Brakka; if there's no room, put away a window I'm not using instead. **Player:** After Reset layout I want my sheet and Initiative where they start, full size; when the AoE panel closes I want my sheet back where it was. **Both:** Tab to a button and press Space, like any web page.
+- *(Sprint 8)* **DM:** at 1280×720, windows I open are readable and never on Mira; a resize and back restores my layout. **Player:** Reveal all with the card open zooms out, not in.
 - *(Sprint 5)* **DM:** When I open Compendium, Party and Encounters during a fight, I want each one where I can read it, not stacked on the last one or on my Game log; and a Game log wide enough that a damage line fits on one line. My roll popups and combat cards should not sit on the monsters at the top of the map. **Player:** On my laptop I want my sheet, Initiative and the AoE panel side by side with the map, not on top of each other or of the monsters.
 
 ## 6. Functional requirements
@@ -273,6 +299,46 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 | **Sprint 7, track ST** (stats) | | |
 | FR-SHELL-93 | **Window type `stats.board`** "Stats" ([stats](stats.md) FR-STATS-18, -19), registered per **FR-SHELL-86** (seam S5): one `defineWindow` line in each client's `windows.ts` (append); `defaultOpen: false` (parkable, never protected); no keep-out; **default 400 × 412**, `top-left`, `dx` 56; **min 320 × 280** (FU's limit); body scrolls. Launcher: lucide `Trophy`, label "Stats", order right after Party; no `activity` (stats aren't in the store). An ordinary launcher window for auto placement, the reopen rule, screen-full auto-minimise and #310 parking. ST2 appends its **golden row** and **size-table row** (FR-SHELL-86's tables) in its own branch. | OQ-STATS-17 resolved (S5) |
 | FR-SHELL-94 | **Feature open on awards** (FR-STATS-20). On a **live** `stats-awards` notification (never from a snapshot), the client calls `openStatsAwards(fromN)` (`@ui/features/stats/open.ts`, the `openPartyTab` pattern, [protocol §93](../protocol/README.md#93-sprint-5-loot-tab-p3)). It stores the view `{tab: "session", fromN}` for the viewer's key, then `openWindow("stats.board", main, {by: "feature"})`. A closed window is auto-placed (FR-SHELL-40 / -45, may park per FU). A minimised one is restored. An open one is fronted and switched. A player offline at the time uses the notification's **Open** (FR-NOTE-48), which does the same as a user open. | |
+
+**Sprint 8, track WF** (#333; picks decided at DM gate 1, #335)
+
+**The rule in plain words** (FR-SHELL-97). When a window must be placed, the shell tries, in order:
+
+1. its full size, somewhere that covers no window, tool bar or player character;
+2. smaller, down to its useful size (and the Game log / Initiative / sheet squeezed down to theirs, OQ-SHELL-59);
+3. for players: let the map zoom out a little so the PCs come clear (OQ-SHELL-64);
+4. put away the window you used longest ago, then try again from 1;
+5. below its useful size, down to its minimum;
+6. last resort: cover as little of a PC as possible (flagged, tested never to happen on the reference sessions).
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-SHELL-95 | **One placer.** A pure, deterministic `settle(world, trigger) → Plan` (`play-shell/placer.ts`) is the only writer of window geometry and auto-minimising, besides a user's own move / resize. **Triggers:** `load` (layout applied; it includes FR-SHELL-53's default-size migration, and runs **once more after the first token draw** so PCs count), `open`, `reopen`, `appear` (incl. Initiative at Start), `settle` (grown height), `viewport`, `push`, `return`, `drag-end`, `reset`. **`viewport`:** while the viewport changes, windows only render-fit (FR-SHELL-29); one settle runs, and writes, 200 ms after the last resize event; the map's resize refit follows it. Close / minimise move nothing. `placeWindow` stays as the spot search. `autoPlace`, `pushWindows`, `belowBar`, `followDefaults` and `clearAround` stop being entry points. | #333; rulings-b 7, 13 |
+| FR-SHELL-96 | **World.** Viewport, client, windows (state, rect, `area`, `z`, `userSpot`, `userSize`, def), keep-outs (incl. FR-SHELL-113), token footprints, **PC footprints + 4 px = player characters only** (`isPlacementPc`, #318; the map uses the same test, [FR-MAP-93](scenes-map.md#6-functional-requirements)), camera mode. The canvas provides a **base port** `{pcs, tokens, dryFit}`; the shell never imports it. | #318 |
+| FR-SHELL-97 | **The ladder** (#333). The first rung with an accepted spot wins. Accepted = clear of windows and hard keep-outs (FR-SHELL-98) and of PC footprints. **L1** target size. **L2** down to the useful size, then the protected squeeze (FR-SHELL-101). **L2b** the map yields (FR-SHELL-108). **L3** look-ahead with every launcher window removed: if that helps, put away the LRU launcher window (FR-SHELL-78) and restart. **L4** below useful to min, same look-ahead (#319). **L5** least PC area, flagged (`data-pc-clear` absent). Rank within a rung as built (FR-SHELL-45, -57, -58). A protected window is never put away. | BL-64 |
+| FR-SHELL-98 | **Gaps**: 12 px between windows; a rung that finds nothing retries at 4 px before the next rung. BL-64 is fixed by Initiative's zone (868, 60), not by the gap (g01: Mira's box + 4 ends at 251, Initiative starts at 572: a 320-wide window fits only at ≤ 1 px). | BL-64; rulings-b 2 |
+| FR-SHELL-99 | **Zones** (decided #335, OQ-SHELL-63 A). A protected window without `userSpot` takes its rect in this viewport's named default layout (§7 sprint-5 table, grown height), **iff that rect is PC-clear at the current camera**. Else (a `moved` camera, or a PC under the zone) it goes through the ladder, with the zone as its first candidate. This applies on `load`, `appear`, `viewport`, its own `reopen` and `reset`; `data-placed="zone"`. Launcher windows in a zone, **user spots included**, are displaced (cause `window:<kind>`) and return when the cause ends (End, or the protected window closes). With a `fitted` camera the map clears tokens by refitting. | amends #245 (#335); rulings-b 1, 8 |
+| FR-SHELL-100 | **Useful and target size** (decided #335, OQ-SHELL-58 A). Each kind's useful size has a content criterion (§7), checked in a browser by `e2e/useful-size.e2e.ts` (on `wf-frame-e2e`): every kind opened at its useful size, `scrollHeight ≤ clientHeight` on its body, and the named rows visible. `bun test` checks only the table's shape (FR-SHELL-85). The five protected kinds gain `usefulSize`. Target = the stored size if `userSize`, else the fitted default. New optional `WindowState.userSize`: set at a user resize end, cleared by Reset. Old entries infer it iff `userSpot` is set and the size is neither a known default nor the min. Below target and not user-sized = **shell-shrunk**. | BL-66; rulings-b 3 |
+| FR-SHELL-101 | **Protected squeeze** (decided #335, OQ-SHELL-59 A). In L2, protected windows that block every candidate shrink inside their zone to their useful size, one at a time: Game log, then DM Initiative / player sheet, then player Initiative. Never below useful before L3. A squeeze is a displacement. | — |
+| FR-SHELL-102 | **Displacement memory** (generalises FR-SHELL-81). A window the placer moves, shrinks or puts away for a transient cause (`toolbar:<id>`, `viewport:<w×h>`, `window:<kind>`) keeps its first prior `{rect, userSpot, userSize}` in client memory. The memory is dropped on a user move / resize / close / minimise, reload, reset. **The cause ends** when the keep-out goes, when the viewport is **≥ the recorded size on both axes**, or when the kind closes / ends. Then the window returns, ascending z, iff untouched and the old rect is clear (a shell spot also PC-clear; user spots ignore PCs). Else it grows toward its target by L1–L2, putting nothing away. `data-placed="returned"`. | FR-SHELL-81; rulings-b 9 |
+| FR-SHELL-103 | **Viewport** (BL-60). **Down**: zones; user spots get the render-only fit (FR-SHELL-29). A shell-spot launcher window keeps its rect if it is inside, accepted and ≥ useful, else the ladder (cause `viewport`). **Up**: returns first, then shell-shrunk windows grow back (L1–L2, no put-away). Then (decided #335, OQ-SHELL-60 B) windows that cause put away are restored if they fit without putting anything away. Outcome: 1440×900 → 1280×720 → 1440×900 = the start. | BL-60, g03 |
+| FR-SHELL-104 | **Pushes through the ladder** (BL-61; replaces FR-SHELL-55's push right). Windows overlapping the bar + 12 are displaced (cause `toolbar`), with an extra tie-rank (FR-SHELL-111): nearest to the pre-push rect. L3 (decided #335, OQ-SHELL-61 A): the pushed launcher window **itself** is put away until `return`. **A protected window is never put away.** If L4 finds no PC-clear spot, it takes the L4 rect with the least PC area, flagged `L5` (`data-pc-clear` absent). The harness lists such cells by name as I1 exemptions (FR-SHELL-116). `pushed`. | BL-61; rulings-b 4 |
+| FR-SHELL-105 | **More push triggers** (BL-52). A user move / resize end over a shown hard keep-out pushes, and the window returns to its dropped rect at `return`. Re-selecting the active tool, or a tool swap, pushes with the current bar rect. | BL-52 |
+| FR-SHELL-106 | **A drag onto a PC** (decided #335, OQ-SHELL-62 A): kept as a `userSpot`; the placer never moves it for PCs; the harness exempts it. | — |
+| FR-SHELL-107 | **Appear / Start** (BL-70). A protected kind that appears or is feature-opened takes its zone if PC-clear, else the ladder (FR-SHELL-99). Launcher windows in it are displaced and return at End. Then the appearance refit ([FR-MAP-96](scenes-map.md#6-functional-requirements)). | BL-70 |
+| FR-SHELL-108 | **The map yields** (decided #335, OQ-SHELL-64 B, players). L2b, camera `fitted` only. A candidate ≥ useful, clear of windows but over PCs, is accepted iff `dryFit` with the window as an obstacle keeps every PC, and every token the fit kept, clear at ≥ **75 % of the last full fit's cell** (Fit, open, load or resize; [FR-MAP-94](scenes-map.md#6-functional-requirements)) and ≥ 24 px. Then the map refits (`window`). | BL-66; rulings-b 12 |
+| FR-SHELL-109 | **Rail inset** (BL-53). The render clamp keeps windows at x ≥ 68, except a window parked off-screen (FR-SHELL-12). Auto placement's `minX` is always 68. The top-bar text ellipsises before the right cluster (root cause first). | BL-53 |
+| FR-SHELL-110 | **Plan and hooks.** Shell placements are written with `area`; user spots / sizes only render-fit. `data-placed` adds `zone`, `displaced`, `grown`, `squeezed`. New `data-auto-minimised-cause`. Test mode: `ui-play-page` `data-settle-log` ("trigger:kind>rung;…"). | — |
+| FR-SHELL-111 | **Determinism: one rank list.** Within a rung, candidates rank by, in order: FR-SHELL-45's fields (1) clear, (2) no PC footprint (FR-SHELL-57), (2b) `minOpenH`, (2c) no token (FR-SHELL-58), (3) edge before inward, (4) soft regions, (5) least token area, (6) full size, (7) default column. Then: (8) pushes only, nearest the pre-push rect; (9) nearest the window's previous rect; (10) nearest the fitted default rect; (11) taller; (12) higher; (13) left. Window order: zones (registry order), then displaced windows by descending z, then put-away victims per FR-SHELL-78. A window not displaced and still valid keeps its rect. | rulings-b 10 |
+| FR-SHELL-112 | **Registration** (seams S1–S5, S12, S13). **(1) Window**: a `windows.ts` line + rows in three **append-only registries** (AGENTS §9.9 via the integrator; ruling 14): the size table (`size-table.ts`: useful size + criterion), the golden list, and the harness sets. WF1 adds **pending** rows / sets for TT `dicex.requests` (D3) and CB `party.summary` (D3, P1, P3), skipped until the kind registers; TT2 / CB3 fill the values. SB's End summary is a `stats.board` view opened `by: "feature"`. **(2) Overlay**: append to the new `play-shell/overlays.ts` (`{id, clients, layer, blocksInput?, Component}`; `layer` = its z-slot in the overlay layer, e.g. the pause card below the dice layer). Not placed, no obstacle. **`blocksInput`** (WF1 owns it; review-a rulings 4, 5): while such an overlay is up, every sibling of the overlay layer is `inert`, focus is trapped in the overlay, drags in progress are cancelled, settles queue until it goes, and one capture-phase `keydown` / `wheel` / `pointerdown` guard on `window` stops every event whose target is outside the overlay (no Space-pan, Escape, tray / log shortcuts). TT pause screen; TT's FR-SHELL-128 / -135 point here. **(3) Top-bar item**: append to the new `play-shell/top-bar-items.ts`, fixed width, before the identity chip; the top bar stays 48 px (TT). **(4) Chrome keep-out**: FR-SHELL-113. **(5) Toast**: a kind naming its class, or a callout ([FR-NOTE-50](notifications.md#6-functional-requirements)): TT roll request = card, SB kill feed = callout, SB fight summary = info. CB's turn ring is a canvas edit, not a registration (S1). | Seams; rulings-b 14 |
+| FR-SHELL-113 | **Chrome keep-outs**: new `play-shell/chrome-keep-outs.ts`, `{id, clients, rect(vp, store) \| null, fitObstacle}`. A shown entry is a hard keep-out (a fit obstacle iff set); show / go fire `push` / `return`; ≤ 64-px strip or ≤ 360×240; the harness must pass at 1280×720 with it shown. WF1 creates all three new registries empty (S2, S16). | — |
+| FR-SHELL-114 | **Harness cells.** Server-side `fixtures/units/play-shell/replay-cells.test.ts` loads `session-sim-11` in-process. It builds states by DM commands: `ambush` (as loaded), `ambush-revealed` (Reveal all), `escort` (End → Start "Escort to the Ford"). Per state × viewer (DM, `player-1`, `player-2`) it extracts the scene and the drawn tokens `{id, cell, size, pc, owned, hidden}`. It compares them with the committed `src/client/common/features/play-shell/replay-cells.generated.ts` (`UPDATE_CELLS=1` rewrites). Client tests import that data file only. The sim-10 repros are covered by these states: **b00** = D2 @1440×900 `Start` (Scenes + Game log + Initiative); b02 / b03 = D1 reopen / resize; r06 / c05 = P1 reset. | rulings-b 11 |
+| FR-SHELL-115 | **Runner** (pure `bun test`): `src/client/{dm,player}/features/play-shell/replay.test.ts` runs `settle` plus the real pure camera through the base port. **Sets**: DM **D1** Game log + Initiative + Compendium, Party, Encounters, Stats; **D2** D1 + Scenes + Fog; **D3** D1 + Players, Creatures, Notifications, tray (+ pending `dicex.requests`, `party.summary`). **P1** sheet + Initiative + Game log + Owlbear card + Stats; **P2** P1 + Compendium, Notifications, Party; **P3** (player 2) sheet + Initiative + Game log + Stats (P1, P3 + pending `party.summary`). **Cameras**: each set runs `fitted` and **`moved`** (the fitted camera panned so the PCs sit under the protected windows' zones: the worst case for zones). **Sizes**: the four. **Paths**: open; reopen; push (show, re-select, drag-end under it, return); resize (down the chain and back); reveal (players); load (reload); Start; reset. Named `FR-SHELL-115 replay <set> <camera> @<size> <path>`. | #333; rulings-b 1 |
+| FR-SHELL-116 | **Invariants after every step.** **I1** no PC footprint + 4 under a window. Exempt: user spots, and the named protected-window `L5` cells of FR-SHELL-104 (listed in the test with a reason; the list may only shrink). **I2** no overlap; nothing on a hard keep-out or the rail. **I3** each window ≥ useful or put away; below useful only at L4, confirmed by the brute oracle. **I4** put away only when the look-ahead needed it, LRU first. **I5** untouched windows keep their rects. **I6** reveal / appearance refits never raise the cell above the last full fit's; verdict `all` or PCs clear. **I7** round trips: push + return restores; resize down + up restores shell-shrunk and moved windows, and, (OQ-SHELL-60 B) the windows that cause put away. **I8** run twice → equal. **Repro cases**: sim-11 g (D1 `escort` @1280×720), sim-11 h (P1 reveal @1280×800), sim-11 r03 (P1 load), sim-10 b00, BL-60, -61, -66, -70. **WF1's first commit** runs the harness against today's placer and records every failing / L5 cell as the `test.failing` list in the branch; each later slice flips its own. Each file has a **15 s test timeout** (not an assertion; times only in bench). | #333; rulings-b 4, 6, 9, 13 |
+| FR-SHELL-117 | **Goldens**: regenerated once in WF1 through `settle` (`UPDATE_GOLDEN=1`, diff reviewed). `layout-checks.ts` stays an independent brute oracle, gaining the useful floor and the 4-px gap. | FR-SHELL-62 |
+| FR-SHELL-118 | **Retired / amended** (IDs kept): FR-SHELL-29 render fit → user spots and the in-progress resize only; -47, -77–79 → the ladder; -53 → folded into `settle(load)` (live follow retired); -55 push right → FR-SHELL-104; -56 (5) → the ladder; -81 → FR-SHELL-102; -40 / -50 Initiative at Start by token cover → zones (OQ-SHELL-63 A, #335); sprint 7 §16's "BL-52 / BL-53 stay backlog" → FR-SHELL-105, -109. | rulings-b 7 |
+| FR-SHELL-119 | **Bench** (`placement.bench.ts`): `settle` ≤ 25 ms best-of-5 (12 windows × 200 boxes, full ladder + one `dryFit`); ≤ 100 ms at 40 windows. | — |
+| **Sprint 8: pause screen and alert sounds** (track TT, #334; picks decided at DM gate 1, #335) | | |
 | FR-SHELL-125 | *(Sprint 8)* **Pause card** (players, while `campaign.pause` is set): an opaque full-viewport modal card: "Paused", the DM's message (text), the image (`display`, contain, ≤ 60 vh), the countdown, a mute toggle, "Reconnecting…" while not `live`; focus moves in. Opaque is not secrecy (records sync as usual). Test `FR-SHELL-125 pause card`. | OQ-SHELL-68 |
 | FR-SHELL-126 | *(Sprint 8)* **Countdown** from `backAt` on the client clock: "Back in m:ss", ≤ 0 → "Back soon", none if null (skew accepted; no server timer). Test `FR-SHELL-126 countdown`. | |
 | FR-SHELL-127 | *(Sprint 8)* **Suppressed on players while paused** (seams S10): throws, roll popups (entries skip `holding`), flashes, **callouts** (dropped, not replayed), sounds but `pause`; **info toasts go to history only**; feature opens (the End summary, `stats.showAwards`) and reveal refits are **deferred to resume**; cards (prompts, damage cards) wait. **At resume:** cards restored, deferred opens run, the turn alert's flash if it is their PC's turn, and **one** sound by priority turn > request > resume. Test `FR-SHELL-127 suppressed while paused` (incl. resume with turn, request and resume all picked: only `turn` plays). | OQ-SHELL-71 |
@@ -285,6 +351,11 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 | FR-SHELL-134 | *(Sprint 8)* **API**: `alert({…, sound?: key, flash?: true})`, new `alertSound(key)`; `usePaused(store)`. Test mode: `data-test-last-sound` = `<key>:<played \| muted \| locked \| failed \| skipped \| fallback>:<n>`. Test `FR-SHELL-134 alert API`. | |
 | FR-SHELL-135 | *(Sprint 8)* **Layers** (amends FR-SHELL-01): … dialogs, alert flash < **pause card** < dice layer (idle on players while paused), via the `layer` slot of WF1's overlay entry. Not a window: never placed, no keep-out. Test `FR-SHELL-135 layers`. | S2 |
 | FR-SHELL-136 | *(Sprint 8)* **Pause survives** reload, reconnect and restart (persisted row): the card shows from the snapshot before the page takes input; a campaign switch shows the new campaign's state. Test `FR-SHELL-136 pause survives`. | |
+| **Sprint 8: party summary window** (track CB, DM #334; content [party-board §6.10](party-board.md#610-sprint-8-party-summary-track-cb)) | | |
+| FR-SHELL-140 | **Window type `party.summary`** "Party status" (decided #335, [OQ-PARTY-29](party-board.md#15-open-questions) **A**): one `defineWindow` line in each client's `windows.ts` (append, after WF1, per FR-SHELL-112 (1)); `defaultOpen: false` (never protected: auto-minimised and auto-minimising like any launcher window); launcher lucide `HeartPulse`, label "Party status", order right after Party; `activity` none (figures change all the time); no keep-out; anchor `top-left`, `dx` 56 (as Stats), the spot is WF's one placer's (PCs clear first, then shrink, then put away, #333). | #334 |
+| FR-SHELL-141 | **Size-table row** (seams S12; same at 1280×720, 1280×800, 1440×900, 1600×900, both clients): **default** 280 × 260, `growToContent` (FR-SHELL-39: height follows its rows, capped by the client's band, 412 at 1280×720, until the user resizes); **useful** 280 × 236, **criterion**: every PC row of a 6-PC party whole (name, HP, temp, AC uncut; FR-PARTY-58), companions may scroll; **min** 240 × 120. Rows, not the frame, decide wrapping. The criterion is checked in a browser (review-b #3): `party.summary`'s case in `e2e/useful-size.e2e.ts` on `wf-frame-e2e` + fixture `cb-party-six` (6 PCs, worst-width figures): `scrollHeight ≤ clientHeight`, every PC row visible and whole; `bun test` checks the table row's shape only. WF1 adds the pending row in the append-only `size-table.ts`; CB3 fills its values (review-b #14). | S12; review-b #3, #14, #21 |
+| FR-SHELL-142 | **No feature open**: only the launcher opens it (a reload restores it if it was open); a fight's Start opens nothing new (Initiative stays the only feature open at Start, FR-CBT-60). Layout remembered per browser as every window. | FR-SHELL-41 |
+| FR-SHELL-143 | **Contract rows** (FR-SHELL-112 (1)): the golden list, the harness sets and `size-table.ts` are **append-only registries** (review-b #14); WF1 adds `party.summary`'s pending entries to the player sets **P1 / P3**, the DM set **D3** and both goldens (player and DM); CB3 fills them and regenerates the goldens **after WF1 merges**. **Launcher fit** (review-b #20): with "Party status" added (and TT's top-bar items), the launcher still fits at 1280×720 in both clients (`launcher-fit.ts`, FR-SHELL-43: icons only, then "⋯"). Opened by the launcher only (`by: "user"`). | Seams S12; review-b #14, #20 |
 
 ## 7. UI/UX notes
 
@@ -362,6 +433,34 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 - The default layouts (token-free) are §7's sprint-5 table, unchanged; Reset layout writes them (FR-SHELL-80). ST's `stats.board` (400 × 412, min 320 × 280, seams S5) adds its own row in ST's branch (FR-SHELL-86); FU's tests take any registered kind.
 - **Auto-minimising at 1440×900, DM, Initiative + Game log open, PCs as in sim-10 b03** (expected, FR-SHELL-87 (f) pins the rects): Compendium → the left edge at 440×512 if PC-clear, else beside Initiative; Party → the other side; Encounters → no PC-clear spot at ≥ 440×412 with both open → the look-ahead finds a spot with Compendium gone, so Compendium (lowest z) is auto-minimised and Encounters takes its spot; at 1280×720 one launcher window fits beside Initiative over the 412 band, so each new one auto-minimises the previous one (as sprint 6's sequence, now also when the only clear spot sat on a PC).
 
+- **Sprint 8 (track WF)** (no new styling): moves are plain, as today; a put-away window looks like any minimised one. DM and player: same rules, each with its own PCs, tokens and zones.
+
+**Sprint 8 useful sizes** (FR-SHELL-100; decided #335, OQ-SHELL-58 A; at **1280×720**, band 412; ★ protected; criterion = no scrolling with fixture content)
+
+| Kind | Client | Default | **Useful** | Criterion | Min |
+|---|---|---|---|---|---|
+| `cbt.initiative` ★ | DM | 400×500 | **400×380** | header, controls, 4 rows | 320×240 |
+| `dice.log` ★ | DM / player | 690×160 / 510×160 | **460×160** | 3 one-line entries + roll bar | 300×160 |
+| `cbt.initiative` ★ | player | 280×400 | **280×320** | header + 4 rows | 240×200 |
+| `char.sheet` ★ | player | 320×338 | **320×338** | header, HP / AC, tabs, 3 attack rows + buttons | 280×320 |
+| `cmp.compendium` | both | 440×412 | 440×400 | search, filters, 5 rows | 320×360 |
+| `party.board` | both | 440×412 | 440×400 | tab labels whole + 4 rows | 340×360 |
+| `party.handout` | both | 640×412 | 640×400 | title + 300 px body | 360×320 |
+| `note.history` | both | 360×412 | 360×412 | pending + 5 rows | 280×240 |
+| `shell.prefs` | both | 360×412 | 360×400 | first 2 sections | 320×280 |
+| `dicex.tray` | both | 360×300 | 360×300 | dice, notation, Roll | 300×240 |
+| `charx.companion` | both | 320×360 | 320×360 | header, stats, 2 attacks + 3 buttons | 280×240 |
+| `stats.board` | both | 400×412 | 400×360 | 5 rows names whole, **or** 2 award cards, **or** the first 4 Highlights lines (S5) | 320×280 |
+| `cbt.encounters` | DM | 440×412 | 440×412 | 4 entries + Save / Start | 360×320 |
+| `ent.creatures` | DM | 340×412 | 340×360 | search + 6 rows | 300×240 |
+| `map.scenes` | DM | 260×412 | 260×360 | Show + 6 rows | 240×240 |
+| `camp.players` | DM | 400×340 | 400×340 | 2 players × 2 lines + add | 360×200 |
+| `char.sheet` | DM | 320×412 | 320×360 | as the player's | 280×320 |
+| `dicex.requests` *(pending, TT, S3)* | DM | 360×460 → 412 | TT's row; **must be ≤ 412 at 1280×720** or band-capped like `note.history` | TT's | TT's |
+| `party.summary` *(pending, CB, S12)* | both | CB's row | CB's row | CB's | CB's |
+
+- Only the ★ rows change; the others keep today's values, now with a criterion. Other sizes: the sprint-7 table (DM `dice.log` 1150×240, player 850×280 at 1440 / 1600; player sheet 320×418 / 440 / 440). Zones = the sprint-5 table.
+
 ## 8. Data model
 
 No server entity, record type or migration (#121). Client-side only:
@@ -376,6 +475,9 @@ No server entity, record type or migration (#121). Client-side only:
 | | userSpot *(sprint 7, iff OQ-SHELL-55 B)* | `true`, optional | Set at a user move / resize end; cleared when the shell places the window (auto, pushed, returned, default); absent = the shell chose the spot (FR-SHELL-56 note); older entries parse as absent |
 | Window type *(client code)* | FR-SHELL-07 fields; *(N1)* `activity?(store)`; *(sprint 4)* `restoreOpen?: false`; *(sprint 5)* `defaultSize: Size \| (vp) => Size`, `previousDefaults?: Size[]`; *(sprint 7)* `usefulSize?: Size` | — | Per-client registry; not sent or stored (FR-SHELL-38, -42, -48, -51, -53, -79) |
 | Pre-push rect *(client memory, sprint 7)* | windowKey → Rect | — | FR-SHELL-81; dropped on reload, move, resize, close, minimise |
+| WindowState *(sprint 8)* | userSize | `true`, optional | FR-SHELL-100 |
+| Displacement memory *(client memory, sprint 8)* | windowKey → `{rect, userSpot?, userSize?, cause}` | — | FR-SHELL-102; replaces the pre-push rect |
+| Overlay, top-bar item, chrome keep-out *(client code, sprint 8)* | registry entries | — | FR-SHELL-112, -113; append-only |
 | Keep-out region *(client memory, sprint 5)* | id, rect, kind | string (`toasts`, `map.toolbar`), Rect, `hard` \| `soft` | FR-SHELL-48; recomputed, never stored |
 | Sound settings *(browser `localStorage`)* | key; muted, volume | `pp.sound.v1.<campaignId>.<playerId>`; bool, int 0–100 | FR-SHELL-24; defaults unmuted, 70 |
 | Sound *(client code)* | id, label, play | — | FR-SHELL-26; MVP `ping` only |
@@ -411,6 +513,8 @@ No server entity, record type or migration (#121). Client-side only:
 *(Sprint 5)* No permission change: placement, auto-minimising and keep-outs are per browser; nothing reaches the server. *(Sprint 6)* None either: reopen rule, footprints, stack rect and refits are per browser.
 
 *(Sprint 7)* No permission change: parking, returns and key handling are per browser.
+
+*(Sprint 8)* No permission change: the placer, zones, returns and the harness are per browser / test-only.
 
 *(Sprint 6)* Open own Preferences: DM ✓, player ✓ (browser only). Each section keeps its owner's permissions (colour: own or DM any, FR-CAMP-33; dice look: own; device settings: own browser).
 
@@ -455,6 +559,7 @@ No server entity, record type or migration (#121). Client-side only:
   - Only protected windows open (1280×720, a grown Initiative): nothing to auto-minimise → FR-SHELL-77 steps (d)–(e); the map's refit clears what it can.
   - Two tabs, same owner: parks and returns are per page; writes last-write-wins (FR-SHELL-19).
   - Space held while a control is focused: the control gets it (no pan); Space-pan resumes when focus returns to the body or the canvas (click on the map).
+- **Sprint 8 (one placer):** *disconnect / reconnect / crash*: snapshots never move windows; a kind first available in a reconnect snapshot is an `appear`. *Reload*: the written layout is the settled one; memory is gone, so displaced windows grow toward their target at the next `viewport` / `return`; zones re-apply on `load`. *Tokens not drawn yet*: no PCs; `load` settles again after the first token draw (FR-SHELL-95). *A `moved` camera*: zones fall back to the ladder (FR-SHELL-99). *An overlay blocking input*: settles queue until it goes. *Two tabs*: per page, last write wins.
 - **Alerts:** audio still locked (no interaction yet) → flash + Toast only; the speaker shows `locked`. Two tabs of one player → both alert and play (accepted). Tab hidden → title mark (FR-SHELL-23); the sound plays if unlocked. Disconnect / reconnect: alerts come only from live events, so nothing replays on a snapshot (callers' rule, e.g. FR-CBT-41). Server crash: no effect on settings. Corrupt or missing sound settings → defaults.
 - **Sprint 6 (Preferences):**
   - *Disconnect:* the chip and window stay usable; Sound, Layout and the dice device settings keep working (browser-only); colour Apply and Dice look Save are disabled (their FRs) and the window shows live-sync's banner. *Reconnect:* the snapshot refreshes the colour and the chip's dot; nothing replays. *Server crash:* browser settings unaffected; a colour pick in flight is the CAMP crash rule (FR-CAMP-33).
@@ -482,6 +587,8 @@ No server entity, record type or migration (#121). Client-side only:
 - *(Sprint 6, PF)* **SHELL adds 0 B:** the chip, window, sections and the moved sound settings are browser-only; no probe needed for them. The one PF change that reaches the wire (colour as `#rrggbb`) was **measured** in [CAMP §12](campaign-management.md#12-performance--bandwidth): −21 B to +14 B per snapshot frame. The window renders ≤ 6 sections; the colour picker's shading mask is recomputed per hue on a 32 × 32 grid (FR-CAMP-35): measured with the shared `colors.ts` in Bun on the dev laptop, 1.8 ms per hue for validity alone, 4.7 ms with the distance to 7 other colours (throwaway script, not committed), inside a 60 fps frame.
 
 - *(Sprint 7)* **CON-44: 0 B.** Nothing enters the snapshot or any frame from SHELL (auto-minimising, useful sizes, returns, key handling are browser-only, #121), so no probe was run for SHELL (the track's only server-side change, BL-46, adds no field either: [CBT §12](combat-tracker.md#12-performance--bandwidth)). Cost: FR-SHELL-77 re-runs the existing placement at most once per auto-minimisable window plus one look-ahead per round (≤ 40 windows, FR-SHELL-17; typically ≤ 12 DM kinds), each ≤ 4,000 spots (FR-SHELL-58's cap): asserted ≤ 25 ms best-of-5 for 12 auto-minimisable windows × 200 token boxes and ≤ 100 ms for the 40-window worst case in `placement.bench.ts` (`bun run bench`, not `bun test`); FR-SHELL-87's brute checks stay test-only and inside the file's 10 s.
+
+- *(Sprint 8)* **CON-44: 0 B.** Nothing reaches the server; `userSize` is browser-only (≤ 15 B per window). No probe needed. Cost: the built ranker per placed window × ≤ 2 rungs × 2 gaps × look-ahead, ≤ 4,000 spots each, + ≤ 1 `dryFit`; gate FR-SHELL-119.
 
 ## 13. Test plan
 
@@ -700,6 +807,50 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - Integration (client store) `FR-SHELL-94 awards open the window`: a live `stats-awards` frame opens a closed window (placed `feature`), restores a minimised one, and fronts and switches an open one. A snapshot with the same notification opens nothing.
 - Walkthrough: [stats §13](stats.md#13-test-plan) steps 1 and 6, plus one extra check at 1280×720: Stats opened by Show awards covers no PC token (FU's parking rule).
 
+### Sprint 8 (track WF): one placer, session-replay harness
+
+Covers SHELL, MAP, NOTE, STATS and CHARX sprint-8 rows; one walkthrough; isolated per worktree (ADR-0008, ADR-0017).
+
+- **Fixtures:** no new unit. **Bundles (aliases of `session-sim-11`):** `wf-frame` (walkthrough), `wf-frame-e2e` (state-changing e2e). session-sim-12 adds nothing from WF (S15).
+
+| Level | Named tests |
+|---|---|
+| Unit (`placer.test.ts`) | `FR-SHELL-95 one writer`, `-96 PC is a player character`, `-97 ladder order`, `-98 tight gap`, `-99 zones`, `-101 Game log stays readable`, `-102 return`, `-103 resize round trip (BL-60)`, `-103 grow back after reload`, `-104 push keeps PCs clear (BL-61)`, `-105 drag under a bar (BL-52)`, `-105 re-select pushes`, `-106 drag onto a PC`, `-107 player Initiative at Start (BL-70)`, `-108 map yields`, `-109 rail inset (BL-53)`, `-111 run twice`, `-113 chrome keep-out`, `-112 blocksInput overlay` (DOM, with a test overlay: siblings `inert`, focus trapped (Tab stays inside), a window drag cancelled, `layer` order respected, Space / Escape / arrow / wheel / pointerdown outside the overlay don't reach their handlers, settles queued then run once) |
+| Unit, registry (`windows.test.ts`) | `FR-SHELL-100 size table` (shape only); `FR-SHELL-62 golden layouts` (regenerated) |
+| Integration | `FR-SHELL-114 cells are current` (`session-sim-11`) |
+| Harness | `FR-SHELL-115 replay <set> <camera> @<size> <path>` with I1–I8; repro cases sim-11 g, h, r03, sim-10 b00, BL-60, -61, -66, -70 |
+| Bench | `settle` (FR-SHELL-119) |
+| E2E (`wf-frame-e2e`) | `window-frame.e2e.ts`: DM 1280×720, End → Start Escort, open the four → no window on a PC footprint, Initiative `zone`; 1440 → 1280 → 1440 → `dice.log` 1150×240. Player 1 with the card open, DM Reveal all → `data-cell-px` ≤ before, no token under a window. `useful-size.e2e.ts`: `FR-SHELL-100 useful size shows its content` (every kind at its useful size: body `scrollHeight ≤ clientHeight`, the criterion's rows visible; `party.summary` on CB's 6-PC bundle) |
+
+**Walkthrough** (`wf-frame`; `PP_TEST_MODE=1`, built client, `verify` profile). **A** DM 1440×900, **B** `player-1` 1280×800, **C** `player-2` 1280×800. Evidence: window rects + `data-placed` / `-cause` / `data-pc-clear`, PC footprints, `data-settle-log`, `data-cell-px` (sim-11's `helpers.src.js`).
+
+| # | Do | Expect (sim-11 evidence) |
+|---|---|---|
+| F0 | A: show Goblin Ambush; all reload | Zones: A Initiative 1028, 60, Game log 1150×240; B sheet 948, 60, Initiative 68, 60 |
+| F1 | A: End; B: open Stats | Stats at the free corner 68, 60 |
+| F2 | A: 1280×720, Start "Escort to the Ford" | A: Initiative 868, 60, Game log 690×160; one refit, no PC under a window. B: Initiative back at 68, 60; Stats displaced or put away (BL-70) |
+| F3 | A: open Compendium, Party, Encounters, Stats | Each PC-clear, ≥ useful or the previous put away; no `L5` (FAIL g) |
+| F4 | A: 1440 → 1280×720 → 1440 | Game log 1150×240, Initiative in its zone; the second 1440 = the first (BL-60) |
+| F5 | A: reload | Same rects |
+| F6 | A: open Scenes, Fog tool | Scenes PC-clear or put away (`-cause toolbar`), never over Mira (BL-61) |
+| F7 | A: press Fog again; drag Scenes under the bar | Pushed off; every Fog control hit-testable (BL-52) |
+| F8 | A: with a pending + card toast, close Fog | Scenes `returned` to its drop spot; the stack home (560, 100) within 1 s (BL-59) |
+| F9 | B: open the Owlbear card (Stats open) | Card ≥ 320×360, Stats ≥ 400×360, or the other put away / the map yielded (BL-66) |
+| F10 | A: Reveal all; B reloads after | B: one refit, `data-cell-px` ≤ before, no new token under a window; same after reload (FAIL h) |
+| F11 | B: Party at min width dragged to x 0 | Renders at x ≥ 68, tabs whole (BL-53) |
+| F12 | A: drag Compendium onto Mira, close, reopen | Stays there (OQ-SHELL-62 A) |
+| F13 | A: Stats Session tab at 400 wide | Award text whole (FR-STATS-67) |
+| F14 | All reload; hard kill + restart | As settled; digest equal; no console errors |
+
+Teardown: stop, `fixtures:reset --profile verify`.
+
+### Sprint 8 (track CB): Party status window
+
+- Unit `FR-SHELL-140 launcher fits` (review-b #20): both clients' launchers with `party.summary` added (and TT's top-bar items) fit at 1280×720 per FR-SHELL-43 (`launcher-fit.ts`: icons only, then "⋯"); DM set **D3** and the DM golden include it.
+- E2E (review-b #3): `party.summary`'s useful-size case in `e2e/useful-size.e2e.ts` on `wf-frame-e2e` + `cb-party-six` (FR-SHELL-141's criterion).
+- Unit `FR-SHELL-140 party status registered`: both registries hold `party.summary` (launcher entry after Party, `defaultOpen: false`, 280 wide, `growToContent`, min 240 × 120); WF's golden / size-table rows pass; WF's session-replay layouts (1280×720 … 1600×900, DM and player) still pass with it opened (no PC under it, nothing below its useful size or it is put away).
+- Walkthrough CB10 at 1280×720 ([combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary)): opened from the launcher, it covers no PC token; a reload restores it where the user left it.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -736,6 +887,8 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | *(Sprint 6)* [campaign-management](campaign-management.md) | Colour section + picker, DM Account section with Log out (FR-CAMP-35); `colorOf(you)` for the chip's dot (FR-CAMP-36) | revised with this spec (track PF) |
 | *(Sprint 6)* [dice-extras](dice-extras.md) | Dice section = its existing settings panel, same store (FR-DICEX-57, -58); gears stay (OQ-DICEX-48) | revised with this spec (track PF) |
 | *(Sprint 6)* [notifications](notifications.md) | Nothing: notifications play no sound (NOTE §4) and own no setting; ADR-0030 is unchanged (per-client mute and volume in browser storage, now shown in Preferences) | no change (confirmed by seams S10) |
+| *(Sprint 8)* [scenes-map](scenes-map.md), [notifications](notifications.md), [stats](stats.md), [character-sheet-full](character-sheet-full.md) | Base port + plan-driven refits (FR-MAP-93–98); toast policy (FR-NOTE-50–53); useful-size rows (FR-STATS-66, -67, FR-CHARX-83) | revised with this spec |
+| *(Sprint 8)* TT, SB, CB | Registrations per FR-SHELL-112 (seams S1–S5, S12, S13) | settled by seams |
 
 **Shared changes** (feedback pass):
 - **Existing common files this build edits:** play-shell's frame files stay shared (AGENTS §9.9, #154), so route via the orchestrator: `src/client/common/features/play-shell/{PlayFrame.tsx (flash overlay layer, player top-bar speaker Button), ShellContext.tsx (alert API), test-windows.tsx (`shell-test-alert`)}`. FR-SHELL-28: `src/client/common/features/dice-roll-log/{GameLog.tsx, window.ts}` (dice-roll-log-owned; fold into this build or a `fix/*`). New files (free): alert store, sound engine + `ping`, sound settings storage.
@@ -824,6 +977,22 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - **Dependency:** none. Parking reuses the hand-rolled placement (≤ 20 rects, ≤ 200 boxes); key handling and focus Tooltips use the existing Radix-based `Tooltip` and DOM events.
 
 **Sprint 7, track ST:** slice **ST2** `build/st-window` appends one line to each of `src/client/dm/windows.ts` and `src/client/player/windows.ts` (append-only registries, AGENTS §9.9), its golden row and size-table row (FR-SHELL-86), and adds `@ui/features/stats/*`. It doesn't touch the frame, placement or keep-outs. It goes **after FU1** (and ST-core) merges, then rebases on it (seam S5).
+
+**Shared changes and build split** (sprint 8, track WF; WF owns the frame all sprint and is first on the canvas lock)
+
+| Slice | Contents | Touches (★ shared) | Order |
+|---|---|---|---|
+| **WF1** `fix/placer-core` | First commit: the harness against today's placer, failing / L5 cells recorded as `test.failing`. Then FR-SHELL-95–103, -107, -110–119 (BL-60, -64, -70 flipped); pending size-table rows / harness sets for `dicex.requests`, `party.summary`; the overlay layer's `blocksInput` (FR-SHELL-112 (2)); goldens; bundles `wf-frame`, `wf-frame-e2e`; `useful-size.e2e.ts` | ★ frame lock: new `placer.ts`, `manager.ts`, `placement.ts`, `geometry.ts`, `shell-store.ts`, `ShellContext.tsx`, `PlayFrame.tsx`, `ShellWindow.tsx`, `registry.ts`, `storage.ts`, `size-table.ts`, `layout-checks.ts`, `token-boxes.ts`, `keep-outs.ts`; **new empty registries** `overlays.ts`, `top-bar-items.ts`, `chrome-keep-outs.ts` (S2, S16); `@shared/play-shell/layout.ts`; `usefulSize` lines in the ★ kinds' defs (assigned); ★ `fixtures/bundles/index.ts` | First; ∥ WF4 |
+| **WF2** `fix/wf-push-rail` | FR-SHELL-104–106, -109 | ★ frame (`placer.ts`, `manager.ts`, `geometry.ts`, `PlayFrame.tsx`); `ToolRail.tsx` (outside the canvas lock) | After WF1; ∥ WF3, WF4 |
+| **WF3** `fix/wf-refits` | FR-MAP-93–98, FR-SHELL-108's port | ★ canvas lock `MapCanvas.tsx`, `camera.ts`; ★ `free-area.ts` (WF3 only) | After WF1; canvas WF3 → CB2 |
+| **WF4** `fix/wf-sizes-toasts` | FR-NOTE-50–53, FR-STATS-66, -67, FR-CHARX-83 (their cases in `useful-size.e2e.ts`) | notifications `keep-out.ts`, `ToastRuntime.tsx`; stats UI; e2e | At once; FR-NOTE-53 after WF1 |
+
+- **Walkthrough per slice:** WF1 F0–F5, F14; WF2 F6–F8, F11, F12; WF3 F9, F10; WF4 F8, F9, F13; the last slice runs F0–F14.
+- **Other tracks** (seams): TT4 (overlay + top-bar items) after WF1; TT2's toast part after WF1 + WF4; `dicex.requests` after WF1; SB1 after WF1 + WF4; CB3 `party.summary` after WF1; **CB2 turn ring (canvas edit) after WF3** (S1).
+- **Docs at consolidation:** protocol §18, §24. No DB, event, intent or wire change.
+- **Dependency:** none. `kiwi.js` (Cassowary, MIT, ≈ 10 KB gz) would move windows on every change and can't express "put away the LRU" or the PC rule; `rbush` (MIT, ≈ 6 KB gz) gains nothing at ≤ 40 rects. **Pick: hand-rolled.**
+
+**Sprint 8, track CB:** slice **CB3** `build/cb-party` appends one line to each of `src/client/dm/windows.ts` and `src/client/player/windows.ts` (append-only registries, AGENTS §9.9) **after WF1** (wave 3, also after the DM's answer to the party-HP ADR), and fills the pending entries WF1 adds to the append-only size table, goldens and harness sets P1 / P3 / D3 (seams S12, review-b #14); no frame file (`placement.ts`, `manager.ts`, `free-area.ts`, `ShellWindow.tsx`, keep-outs stay WF's). Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). Dependency: none.
 
 ## 15. Open questions
 
@@ -920,6 +1089,21 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | ~~OQ-SHELL-56~~ | **Settled by seams S5 / S10:** ST2 registers `stats.board` (both clients) per FR-SHELL-86 after FU1 merges: default 400 × 412, min 320 × 280, `defaultOpen: false`, auto-minimisable, no keep-out; its golden row and size-table row in ST's branch. GM adds no window (S10); FR-SHELL-86 applies only if one appears later. Original row: **stats (ST) and gems (GM):** a Stats window (and any gems window) follows FR-SHELL-86: one `windows.ts` line per client, ≤ 440 × 412 (or `usefulSize` ≤ 412), min ≤ 320 × 280, `defaultOpen: false`, no keep-out; appended to FR-SHELL-62's golden list, its row added to FR-SHELL-85's table, goldens regenerated in its own branch **after FU1 merges** | **Resolved (integrator, sprint-7 seams / rulings)** **Agree (ST / GM confirm in their specs; seams)** / the window needs to be protected or default-open (then a DM call: it would never auto-minimise) | no · owner: spec-stats, spec-gems | [stats](stats.md), [gems](gems.md) |
 | OQ-SHELL-57 | Glossary (rulings-b #11: no new term for auto-minimised; the existing **Minimised** already says "parked on the launcher") | **Resolved (integrator, sprint-7 seams / rulings)** **Add "Useful size: the smallest size a window opens at before the shell auto-minimises another window to make room"; reword Auto placement: "… never on a window, a keep-out region or a PC while another window can be auto-minimised"** / none | no · owner: integrator | glossary |
 
+**Sprint 8** (track WF). Decided before the spec (#333): one placement path, PCs clear, then shrink, then put away; PCs = player characters (#318). "Not below the useful size unless nothing else works" = shrink to useful → put away → only then below useful (confirmed, #335). "Put away" = auto-minimised. Decided at DM gate 1 (#335): every bold pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SHELL-58 | **What "useful size" means per window** (sim-11: Stats at 320×280, names cut; the card at 280×240, attacks below the fold) | **Decided (#335): A.** **A. A per-window table with a content criterion (§7), checked by a DOM test: readable by definition** / B. The built generic rule: no work, nothing checks content / C. Useful = default: always full size, a put-away at almost every open at 1280×720 | no · DM | FR-SHELL-100 |
+| OQ-SHELL-59 | **May the DM's Game log shrink below its useful size before a launcher window is put away?** | **Decided (#335): A.** **A. No: squeeze to 460×160 (3 one-line entries), then put away: the log stays readable** / B. Yes, to 300×160 first: more windows stay open, the log is hard to read / C. Never squeeze protected windows: more put-aways | no · DM | FR-SHELL-101 |
+| OQ-SHELL-60 | **What grows back after a resize up** (BL-60) | **Decided (#335): B.** A. Only windows the shell shrank or moved: nothing pops open, the layout isn't fully back / **B. Those, plus windows the smaller screen put away, if they fit: a resize down and up is a round trip** / C. Every put-away window: the fullest screen, dismissed windows pop back | no · DM | FR-SHELL-103 |
+| OQ-SHELL-61 | **May a tool-bar push put a window away instead of covering a PC?** (BL-61) | **Decided (#335): A.** **A. Yes, the pushed window itself, until the tool closes: short-lived, predictable** / B. Yes, by the full rule (the LRU window): a tool can hide a window you weren't using / C. No: PCs hidden while the tool is up (as built) | no · DM | FR-SHELL-104 |
+| OQ-SHELL-62 | **You drag a window onto a PC: respected?** | **Decided (#335): A.** **A. Yes, your spot (kept on reopen; only tool bars push it)** / B. Snap to the nearest PC-clear spot ≤ 160 px: it won't stay put / C. Keep it, outline the PC | no · DM | FR-SHELL-106 |
+| OQ-SHELL-63 | **Default windows at Start / after a resize: own spot or token-aware?** (BL-70, g03; #245 made Initiative at Start avoid tokens) | **Decided (#335): A.** **A. Zones: Game log, Initiative, sheet in their spot unless you moved them or a PC is under it (then the next PC-clear spot); the map refits around them. Amends #245. Stable layout; the map moves at Start** / B. Token-aware as built, default column first: the map moves less, windows wander | no · DM | FR-SHELL-99, -107 |
+| OQ-SHELL-64 | **May opening a window move the map** (camera not moved by you) to keep PCs clear, before shrinking below useful or putting away? (sim-11 h01) | **Decided (#335): B.** A. No (as built) / **B. Players only, if every PC stays clear at ≥ 75 % of the last full fit's zoom: players' screens are the tight ones** / C. Both clients: the DM's map moves while they work | no · DM | FR-SHELL-108, FR-MAP-97 |
+| ~~OQ-SHELL-65~~ | TT seam (pause screen, roll-request prompt) | **Resolved (integrator, sprint-8 seams / rulings)**: seams S2, S3: overlay + top-bar item registries; the prompt is a card toast | — | FR-SHELL-112 |
+| ~~OQ-SHELL-66~~ | CB seam (party summary) | **Resolved (integrator, sprint-8 seams / rulings)**: seams S12: window `party.summary`, size-table row from CB | — | FR-SHELL-112 |
+| OQ-SHELL-67 | Glossary | **Resolved (integrator, sprint-8 seams / rulings)**: **Add "Placer", "Zone"; Useful size "… checked by a content criterion"** / none | no · integrator | glossary |
+
 **Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
@@ -932,8 +1116,15 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 - *(Sprint 8)* Players see only the card (centred column, shadcn); the DM the top-bar control. Test IDs `ui-pause` (+ `data-state`), `ui-pause-{message,image,countdown,mute}`, DM `ui-pause-{open,form,submit,update,resume,preview}`, `ui-sound-test-key`. No SHELL record (draft and buffers client-only). Edges: disconnect → "Reconnecting…"; DM offline → still paused; devtools can clear `inert` (accepted). Slices TT3, TT4 ([dice-extras §14](dice-extras.md#14-dependencies)).
 
+**Sprint 8, track CB** (owner spec-cb). **Bold** = suggested pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SHELL-73 | **Seam with WF (window-frame pass): registering Party status.** CB3 needs WF's contract for new windows (the FR-SHELL-86 successor: size-table row, useful size, golden list, put-away order) and its frame core merged first | **Resolved (integrator, sprint-8 seams / rulings).** **Closed by seams S12:** `party.summary` (both clients) registers per FR-SHELL-112 (1) after WF1, with its size-table row (FR-SHELL-141: default, useful + criterion, min), goldens and harness sets P1 / P3 / D3 (append-only registries, review-b #14); WF's placer decides its spot; no keep-out; WF adds it as a pending row. (If the DM picks a strip, OQ-PARTY-29 B, WF owns the strip region and CB3 fills it) | — | WF, FR-SHELL-140–143 |
+
 ## 16. Out of scope
 
+- *(Sprint 8)* Re-placing windows when a PC walks under one; server-side or cross-browser layouts (#121); announcing a put-away window; the TT / SB / CB surfaces (they register).
 - §2's later list; docked panels, pop-outs, cross-browser layout (§4); window contents (owning specs).
 - *(Sprint 7)* Re-placing windows when a PC walks under them (placement runs on opens only); announcing a auto-minimised window; auto-minimising protected windows; syncing layouts across browsers (#121). BL-52 (a window dragged under a shown tool bar) and BL-53 (tool rail over window content at 320 px) stay backlog items for idle slots.
 - *(Sprint 6, retired by sprint 7 FR-SHELL-81 if OQ-SHELL-54 A)* Pushed windows returning after the tool closes (accepted for later, sprint-5 playtest).
