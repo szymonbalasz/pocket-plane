@@ -812,10 +812,23 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         if ((fitted || pcFree(r)) && clearAt(r, id, true)) {
           write(id, z, how, { rung: "zone", keepSize: true });
         } else {
-          setWin(id, { ...w, ...z });
-          const spot = ladder(id, { prev: z, putAway: false, protectedOnly: true });
-          if (spot) write(id, spot.rect, "auto", { rung: spot.rung });
-          if (spot) pcFlags.set(id, spot.pcClear);
+          // Least movement (ADR-0060 §4): a spot the ladder gave it earlier that still holds (inside,
+          // clear of the protected windows, PC-clear, ≥ useful) is kept; else the ladder.
+          // A shrunk one goes through the ladder again (it may grow back, L1 first).
+          const cur = rendered(w);
+          const holds =
+            !sameRect(w, z) &&
+            w.w === z.w &&
+            w.h === z.h &&
+            inside(w) &&
+            clearAt(cur, id, true) &&
+            pcFree(cur);
+          if (!holds) {
+            setWin(id, { ...w, ...z });
+            const spot = ladder(id, { prev: plainRect(w), putAway: false, protectedOnly: true });
+            if (spot) write(id, spot.rect, "auto", { rung: spot.rung });
+            if (spot) pcFlags.set(id, spot.pcClear);
+          }
         }
       }
     }
@@ -940,7 +953,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       if (!w || !ctx.available.has(w.kind)) continue;
       const untouched = d.at === null ? w.state === "minimised" : sameRect(w, d.at);
       if (!untouched || (d.at !== null && w.state !== "open")) continue;
-      if (isProt(w) && !d.userSpot && !d.userSize) {
+      if (isProt(w) && d.cause.startsWith("window:") && !d.userSpot && !d.userSize) {
         // A squeezed protected window takes its zone back; launcher windows in it move.
         placeProtected(id, "returned");
         continue;

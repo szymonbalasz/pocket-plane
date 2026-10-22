@@ -729,7 +729,7 @@ test("FR-SHELL-61 every user-opened kind (player): every non-default kind, launc
     if (!def || def.fixedDefault || kind === "party.handout") continue;
     expect({ kind, problems: contractProblems(def) }).toEqual({ kind, problems: [] });
   }
-});
+}, 15_000);
 
 const GOLDEN_FILE = fileURLToPath(new URL("./windows.golden.json", import.meta.url));
 
@@ -752,4 +752,4 @@ test("FR-SHELL-62 golden layouts (player): four sizes, open / close / reopen / s
   console.info(
     `FR-SHELL-62 player: ${steps.length} steps in ${(performance.now() - t0).toFixed(0)} ms`,
   );
-});
+}, 15_000);

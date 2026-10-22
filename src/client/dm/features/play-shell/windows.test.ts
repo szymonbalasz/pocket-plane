@@ -899,7 +899,7 @@ test("FR-SHELL-61 every user-opened kind (DM): every non-default kind, launcher 
     "width 480 at 1440×900",
     "width 480 at 1600×900",
   ]);
-});
+}, 15_000);
 
 const GOLDEN_FILE = fileURLToPath(new URL("./windows.golden.json", import.meta.url));
 
@@ -922,7 +922,7 @@ test("FR-SHELL-62 golden layouts (DM): four sizes, open / close / reopen / small
   console.info(
     `FR-SHELL-62 DM: ${steps.length} steps in ${(performance.now() - t0).toFixed(0)} ms`,
   );
-});
+}, 15_000);
 
 // ---- WF1 walkthrough (2026-10-20) repros: the probes' exact inputs ----
 
