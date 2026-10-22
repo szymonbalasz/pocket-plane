@@ -1,7 +1,7 @@
 ---
 title: Party board
 prefix: PARTY
-status: claimed
+status: in-review
 owner: spec-pm
 phase: post-mvp-9
 ---
@@ -52,6 +52,18 @@ phase: post-mvp-9
 
 > **Sprint 7, track FU (BL-48 small copy, DM [#311](../decisions-log.md)).** Decided, not open: the inventory toast's wording and a Loot draft lost on a tab switch. New FR-PARTY-49, -50 ([§6.9](#69-sprint-7-bl-48-copy-and-tabs-track-fu)); two BL-48 items dropped with reasons there. Client + one notification text, 0 B new. Tests `FR-PARTY-49 inventory toast text` (unit: `itemAddedText` → "Party inventory: Potion of healing ×2"; the DM's and players' toasts), `FR-PARTY-50 tabs keep state` (DOM: Move draft kept across Loot → Inventory → Loot; gone after close); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4 ([play-shell §14](play-shell.md#14-dependencies)). No open question. Edge cases: a reconnect re-renders the mounted tabs from the store (drafts kept, as minimised windows); reload drops drafts (as today).
 
+> **Sprint 9, track PM (Party Manager; owner spec-pm; DM [#338](../decisions-log.md)).** Decided, not open: the Party window (`party.board`) and its launcher are renamed **Party Manager**; **Party status** becomes its **first** tab (ahead of Handouts); the separate `party.summary` window and its launcher button go (stored layouts and tab memory migrate); **Companions** leaves the tab bar and becomes a **section inside the Party status tab**, each owner's companions under their PC, with today's visibility ([ADR-0056](../architecture/adr/0056-companion-visibility.md), [ADR-0063](../architecture/adr/0063-party-hp-visibility.md)); default width **1.25×** (440 → 550 px). New FR-PARTY-59–67 ([§6.11](#611-sprint-9-party-manager-track-pm)); retires FR-PARTY-41's tab and the `party.summary` window of FR-PARTY-51–58 (their rows and rules move into the tab). Window rules (550 px, migration, window memory): [play-shell FR-SHELL-155–157](play-shell.md#6-functional-requirements). **For the DM:** OQ-PARTY-33–36. Seams: RS appends Reminders / Strongholds tabs after this restructure (OQ-PARTY-37); FX's BL-79 (OQ-PARTY-39). 0 B on the wire.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-PARTY-59 | Renamed "Party Manager"; copy that names the window | PM2 `build/party-manager` | `FR-PARTY-59 renamed` |
+| FR-PARTY-60 | Tabs Party status · Handouts · Inventory · Loot (proposed, OQ-PARTY-33 A); tab memory migrates | PM2 | `FR-PARTY-60 tabs order and memory` |
+| FR-PARTY-61, -62 | Party status tab: PC rows with companions under each owner (proposed, OQ-PARTY-35 A); the Companions tab's actions there | PM2 | `FR-PARTY-61 companions under owners`, `FR-PARTY-62 DM companion actions` |
+| FR-PARTY-63 | 550 × 560, useful 440 × 400 (proposed, OQ-SHELL-78 A) | PM2 | `FR-SHELL-156 Party Manager registered`, useful-size e2e |
+| FR-PARTY-64 | `party.summary` gone; old layouts open Party Manager on Party status | PM2 (+ PM1 hook) | `FR-SHELL-155 party.summary layout migrated`, `FR-PARTY-64 no party status window` |
+| FR-PARTY-65 | No data, intent or visibility change (proposed, OQ-PARTY-36 A) | PM2 | `FR-PARTY-65 leak` |
+| FR-PARTY-66, -67 | Tabs stay mounted; append-only tab registry for RS | PM2 | `FR-PARTY-50 tabs keep state` (updated), `FR-PARTY-67 tab registry` |
+
 ## 1. Summary
 
 - A **Party** window, both clients, replacing Miro for the table: **handouts** the DM shares with everyone or chosen players, and a **party inventory** that items move in and out of (DM [#203](../decisions-log.md): "party board + handouts"; tier A in [feature tiers §4](../feature-tiers.md#4-notes-handouts-world-and-party)).
@@ -60,8 +72,11 @@ phase: post-mvp-9
 - Board data **loads when the window opens** ([ADR-0045](../architecture/adr/0045-lazy-record-types.md) lazy record types, the one on-demand path per seams S1): measured +0 B on every snapshot for handouts and items ([§12](#12-performance--bandwidth)).
 - *(S6)* A fourth tab, **Companions**, lists the party's pets (owner, health; HP numbers for the owner and DM only) and is where the DM makes and releases pets (FR-PARTY-41–46).
 - *(S5)* The Party window has three tabs: Handouts, Inventory, **Loot** (party-loot's pot, wallets, forms and log). The DM can **present** a shared handout: it opens over everything on the chosen players' screens until each closes it, also on a later connect. Handout images can be uploaded, dropped or pasted straight into the editor.
+- *(S9)* The window is **Party Manager** (550 px): tabs **Party status** (first: each PC's HP / temp HP / AC, its companions under it), Handouts, Inventory, Loot. The Companions tab and the separate Party status window are gone (FR-PARTY-59–67).
 
 ## 2. Scope
+
+- *(S9)* In: rename, tab order, the Party status tab with the companions section, width, migration of `party.summary` layouts and the `companions` tab memory, an append-only tab registry for RS. Not in: new data, visibility changes, the Reminders / Strongholds tabs (RS), editing HP from the tab.
 
 - Record types `handout` (header) and `handout-body`, one table; `party-item`. All campaign scope, **lazy** (OQ-PARTY-03).
 - Intents `party.createHandout`, `party.updateHandout`, `party.shareHandout`, `party.deleteHandout` (DM); `party.addItem`, `party.editItem`, `party.removeItem` (DM); `party.moveItem` (DM, player); `loot.split` (DM).
@@ -103,6 +118,8 @@ phase: post-mvp-9
 - As a player, I want a toast and a list of every handout I've been given, marked New until I read it, and still there after a reload.
 - As a player, I want to take a potion from the party inventory onto my sheet, or give my spare bolts back, without asking the DM.
 - *(S5)* As a player, I want the party's coin under the same Party window as its items.
+- *(S9)* As a player, I want one Party Manager that opens on everyone's HP and AC with our pets under their owners, so I don't juggle two party windows.
+- *(S9)* As the DM, I want to make and release pets right next to the PC they belong to.
 
 ## 6. Functional requirements
 
@@ -221,6 +238,22 @@ DM #334 (not open): each PC's HP / AC for players, companions per ADR-0056, mons
 | FR-PARTY-57 | **CON-44** (measured, §12): other players' character redactions + 49 B each → **players +343 B** on the heavy harness (7 other PCs), DM 0 B; per HP change other players get the same `entity` upsert as today + 49 B. | measured |
 | FR-PARTY-58 | **Layout**: one line per row at the default width (name, HP, temp, AC; conditions on the line if they fit, else a second line); names wrap, never cut (W4 rule); numbers never cut; at the min width (240 px) the bar goes under the name. Checked in a browser, not `bun test` (no layout engine there; review-b #3): `e2e/useful-size.e2e.ts` on `wf-frame-e2e` opens `party.summary` at its useful size (FR-SHELL-141) with fixture **`cb-party-six`** (6 PCs, worst-width figures) and asserts `scrollHeight ≤ clientHeight` and every PC row visible, names and figures whole. | |
 
+### 6.11 Sprint 9: Party Manager (track PM)
+
+DM #338 (not open). The window's registration, size row and the layout migration are play-shell's ([FR-SHELL-155–157](play-shell.md#6-functional-requirements)); window memory applies to it like any window. Retired here (IDs kept): FR-PARTY-41's **Companions tab** (its rows, actions and visibility move into the Party status tab, FR-PARTY-61, -62); the **`party.summary` window** of FR-PARTY-51–58 (its rows and rules move into the tab unchanged; FR-PARTY-58's check moves with them, FR-PARTY-63).
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-PARTY-59 | **Renamed "Party Manager"** (both clients): window title and launcher label (FR-SHELL-156). Kind `party.board`, test IDs (`party-board`, `party-tab`, …), `openPartyTab` and the tab-memory key stay. Copy that names the window changes with it: the present popup's "Open in Party" → **"Open in Party Manager"** (FR-PARTY-36, `party-present-open-board`); the viewer's empty text → "Open a handout from Party Manager."; combat's DM pet-owner hint "Change a pet's owner in the Party window" → "… in Party Manager" (`companion-menu.tsx`, one string, assigned to PM2); any other user-visible "Party window" / "Party board" string the build finds (grep, listed in the PR). | #338 |
+| FR-PARTY-60 | **Tabs** (proposed, OQ-PARTY-33 **A**): **Party status · Handouts · Inventory · Loot**, then RS's tabs (OQ-PARTY-37). Labels exactly so. **Tab memory** (FR-PARTY-11, key `pp.party.tab.v1.<campaignId>.<dm \| playerId>` unchanged): no entry → `status` (the landing tab); stored `companions` → `status`; unknown / invalid → `status` (amends FR-PARTY-29's "unknown → Handouts"); the stored value is checked against the tabs registered for this client (FR-PARTY-67). A launcher open shows the remembered tab (proposed, OQ-PARTY-34 **A**); `openPartyTab(tab)` (FR-PARTY-30) switches as today and accepts `status`. | #338; amends FR-PARTY-11, -29, -41 |
+| FR-PARTY-61 | **Party status tab** (`party-summary` list and test IDs kept). PC rows exactly as FR-PARTY-51–56 (order: own PCs first, then by name; DM by name; drafts per FR-PARTY-51; figures per FR-PARTY-52 / ADR-0063; DM eye-off on a hidden PC; click opens the sheet; live from existing upserts). **Companions section** (proposed, OQ-PARTY-35 **A**): each PC row is followed, indented, by its companions (by name), in the Companions tab's row form (FR-PARTY-42: portrait, name, turn-mode icon, "In combat" Badge, health: owner and DM "45 / 59" + bar, others the band; DM: the base name; **Card** for owner and DM). Which companions: pets per [FR-ENT-37](entities.md#6-functional-requirements) (DM and owner every pet, a hidden one with eye-off on the DM; other players present pets only, redacted) and summons while they are combatants (FR-CBT-116), as Party status lists them today. A companion whose owner PC has no row for this viewer (a draft left out, owner deleted) is listed last under a muted "Other companions". This fixes sim-12's "the DM's own Party status drops a hidden companion" (the DM now reads every pet, as the Companions tab did). | #338; ADR-0056, ADR-0063 |
+| FR-PARTY-62 | **Companion actions in the tab** (moved from FR-PARTY-43, -44): DM: a **New pet…** Button in the tab's header row (`party-companion-new`) → FR-ENT-32's dialog; the pet row menu (Rename, Turn mode ▸, Owner…, Open NPC sheet, Release…) unchanged, also its in-fight disabling and rejects; summons get no menu (Initiative owns them). Owner and DM: Card → `charx.companion`. Disconnected: last list, actions disabled. No companions → nothing under the PCs (no empty line); no PCs → "No player characters yet" (FR-PARTY-56). The "Summons show in Initiative" footer goes (summons are listed). | #338 |
+| FR-PARTY-63 | **Size and layout** (FR-SHELL-156; proposed, OQ-SHELL-78 **A**): default **550 × 560** (band-capped), useful **440 × 400**, min **340 × 360**. At ≥ 440 px a PC row is one line (FR-PARTY-58) and a companion row one line (name, mode icon, health, Card); at the min width rows wrap per FR-PARTY-58 and the tab strip scrolls sideways per FR-PARTY-46. FR-PARTY-58's browser check moves to the tab: `useful-size.e2e.ts`'s `party.board` case at 440 × 400 on `cb-party-six` (Party status tab: every PC row visible and whole; labels Party status, Handouts, Inventory, Loot whole). | #338 |
+| FR-PARTY-64 | **`party.summary` goes** (FR-SHELL-157): its `defineWindow` (`window.ts`), its line in each `windows.ts`, its launcher button. `Summary.tsx` becomes the tab body (`StatusTab.tsx`, no window wrapper). `party.board` declares `absorbs: ["party.summary"]` with `onAbsorb` choosing `status` (FR-SHELL-155): a browser that had Party status open or minimised finds Party Manager in that state on the Party status tab after its next load. `openPartyTab("status")` is the entry point for others (SP's palette). | #338 |
+| FR-PARTY-65 | **No new data, intent, event or visibility** (proposed, OQ-PARTY-36 **A**): each tab shows exactly what it shows today (table in §7). The tab reads `entity`, `effect`, `combatant`, `encounter` rows already sent; the leak scans of CB3 (`FR-PARTY-52 party summary per player`, `… monsters never`) and the Companions tab (FR-PARTY-42's band for others) run against the tab. 0 B. | 0 B |
+| FR-PARTY-66 | **Tabs stay mounted** (FR-PARTY-50) for the new list; Party status mounts first. Outcome: a Loot Move draft survives Loot → Party status → Loot. | FR-PARTY-50 |
+| FR-PARTY-67 | **Tab registry** (seam for RS, OQ-PARTY-37): new `src/client/common/features/party-board/party-tabs.ts`, **append-only** (AGENTS §9.9 once integrated), created by PM2: `{id, label, order, clients, Component}`, rendered in `order`; each client's board window passes its own parts (DM handout list, DM companion menu; RS adds its own keys). PM2 registers `status` (10), `handouts` (20), `inventory` (30), `loot` (40); RS appends `reminders`, `strongholds` (50, 60). Tab memory accepts any registered id for the client (FR-PARTY-60). | seams |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Textarea, Button, Badge, Dialog, RadioGroup, Checkbox, ScrollArea, Toast, Skeleton. Dark only. No custom styling.
@@ -236,6 +269,16 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 - *(S6)* **Editor:** Images block directly under the title, body below it (FR-PARTY-48); From library opens ASSET's picker with search + tag chips (ASSET §7). Test IDs unchanged (`party-editor-*`, `asset-attach*` with `data-owner="party-editor"`; the picker's `asset-picker` gains `data-context="handout"`).
 - *(S5)* **Test IDs:** `party-share-present`, `party-share-present-names`, `party-present-open` (row menu / viewer) + `data-record-id`, `party-present-dialog`, `party-present-mode` + `data-value` (`all|players`), `party-present-player` + `data-record-id`, `party-present-submit`, `party-present-error`, `party-present-count` + `data-value` (n), `party-present-close-all`; player popup `party-present-popup` + `data-record-id` (handout id) + `data-present-id`, `party-present-title`, `party-present-image` + `data-record-id` (asset id), `party-present-prev`, `party-present-next`, `party-present-page`, `party-present-body`, `party-present-loading`, `party-present-retry`, `party-present-close`, `party-present-open-board`. Editor: ASSET's `asset-attach*` with `data-owner="party-editor"`, plus `party-editor-duplicate` (seams S5).
 - *(S8)* **Party status** (`party.summary`): a dense list, one line per PC (portrait, name + colour dot, HP "38 / 52" with a thin band-tone bar, "+5" temp, shield "15", death / Down Badge, condition icons), companions indented under their owner in muted type. **Player view:** own PCs on top in full; other PCs with the figures OQ-PARTY-30 picks; companions per ADR-0056 (own numbers, others a band). **DM view:** every PC, hidden ones with eye-off. A small turn marker on the PC whose turn it is. No editing in the window (HP stays on the sheet / Initiative / token). Test IDs: `party-summary` (list), `party-summary-row` (+ `data-record-id`), `party-summary-hp` (`data-value` = "cur/max" or band), `party-summary-temp`, `party-summary-ac`, `party-summary-companion` (+ `data-record-id`), `party-summary-empty`.
+- *(S9)* **Party Manager** (no new styling; shadcn Tabs, as today): title "Party Manager"; tab strip **Party status · Handouts · Inventory · Loot**. Party status tab: a header row (DM: "New pet…" at the right), then the PC list; under each PC row its companions, indented one step, in muted type (the Companions tab's row form); "Other companions" last if any. At 550 px everything is one line per row. **Per-tab views** (unchanged, FR-PARTY-65):
+
+| Tab | DM | Player |
+|---|---|---|
+| Party status | every PC (hidden ones eye-off, drafts out), full figures; every pet incl. hidden (eye-off), summons in a fight; New pet…, row menus, Card | own PCs first, then other PCs with HP / temp HP / AC (ADR-0063); own pets + summons with numbers and Card; other players' present pets and summons with a band; never a monster |
+| Handouts | every handout, editor, Share…, present (FR-PARTY-12) | handouts shared with them, New / Updated (FR-PARTY-13) |
+| Inventory | Add / Edit / Remove / Move | Take / Give… |
+| Loot | party-loot's DM body (add, Split…, log) | party-loot's player body |
+
+- *(S9)* **Test IDs:** `party-tab` `data-value="status"` (new), `"companions"` retired; inside the tab the `party-summary-*` IDs (FR-PARTY-51) and, per companion row, the Companions tab's `party-companion-row` (+ `data-record-id`, `data-in-combat`), `party-companion-hp`, `party-companion-band`, `party-companion-card`, `party-companion-menu` … (FR-PARTY-41's list), grouped by `party-companion-group` (+ `data-record-id` = PC id; the group wraps the PC row and its companions); `party-companion-other` (the "Other companions" group); `party-companion-new` in the header. `party-summary-companion` retires (the companion rows carry `party-companion-row`).
 
 ## 8. Data model
 
@@ -264,6 +307,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 - **Later (additive):** `party_item.itemRef` (OQ-PARTY-13), `handout.folder`, player pins.
 - *(S5)* **Relations:** handout 1–n present (≤ 1 per player); player 1–0..1 present. **Derived:** "On screen: n" and names (DM client, from the rows); the player popup's content (lazy handout loads). **Persisted runtime state:** present rows until closed (by the player, the DM, or access loss). Index: unique `handout_present (campaignId, playerId)`, plus `(handoutId)`. Attachments are `asset` rows with `listed = false` ([ASSET §8](assets-pipeline.md#8-data-model)); handouts reference them like any asset.
 - *(S8)* **No new table, column or record type.** The party summary reads `entity` (characters, pets), `effect`, `combatant`, `encounter`. Changed: entities' **other-player character redaction** gains `hpCurrent`, `hpMax`, `tempHp`, `ac` (FR-PARTY-52, option A; B: `band`, `ac`; C: `band`). Derived (client): row order, band tone and bar fraction, the turn marker. Browser-only: the window's geometry (shell).
+
+- *(S9)* **No new table, column or record type.** Tab memory values change (`status` new, `companions` retired; FR-PARTY-60); the `party.summary` layout entry is absorbed by `party.board` (browser only, FR-SHELL-155). Tab registry entries are client code (FR-PARTY-67), never sent or stored.
 
 ## 9. API & events
 
@@ -338,6 +383,8 @@ Players sending a DM-only intent → `forbidden`, no change.
 
 *(S8)* Party status: see every PC's figures — DM full; players own full, others per OQ-PARTY-30 (A: HP, temp HP, AC); open a sheet from a row — DM any, player own; no edits in the window.
 
+*(S9)* Party Manager: no permission change; each tab keeps its rules (Party status as FR-PARTY-52–54, companions as FR-PARTY-42, -43: only the DM makes, edits and releases pets; Card for owner and DM).
+
 ## 11. Edge cases & failure modes
 
 - *(S8)* **Party summary.** *Player disconnect / reconnect:* last figures, muted; the snapshot rebuilds every row. *DM disconnect:* nothing changes (no DM action). *Server crash:* nothing of its own; every figure comes from a command's committed rows. *Concurrent:* two HP changes in a row arrive as two upserts; the row shows the latest. *Hidden PC (#141):* under OQ-PARTY-31 A its figures still reach other players (as `down` and `deathState` do today); B hides them with a server-written copy flag. *Leak:* a monster's or another player's companion's numbers never reach a player (fns unchanged; leak scan per player). *Owner change:* the row moves to the new owner's "own" group on the next upsert. *A PC in no fight:* row without a turn marker; companions only while present (pets) or in the fight (summons).
@@ -358,6 +405,8 @@ Players sending a DM-only intent → `forbidden`, no change.
 - *(S5)* **Present, crash:** the row commits with its event-log row or not at all; after a restart the snapshot carries the open rows and the popups reopen.
 - *(S5)* **Upload, crash or disconnect mid-upload:** ASSET FR-ASSET-07 / -26 (no row without files; the editor keeps its draft; a finished upload adds its image even if the WS dropped meanwhile; Save waits for `live`). An uploaded image that is never saved stays as an unreferenced attachment (no delete, [OQ-ASSET-05](assets-pipeline.md#15-open-questions)).
 - **Invalid / malicious input:** over-long fields, control characters, foreign or unknown asset / player / character ids, `rowId` of another sheet, qty 0 / negative / fractional, strict-key violations → `invalid` / `not_found`. Body rendered as text, never HTML (`DiceText` renders text runs only). Inbound frames > 64 KB closed by live-sync: a 10 000-char body is ≤ 30 KB even at 3 B per char.
+
+- *(S9)* **Party Manager.** *Player / DM disconnect:* every tab shows its last view (figures muted, actions disabled, live-sync banner); *reconnect / reload:* rows rebuild from the snapshot, the remembered tab shows (`status` by default); mounted tabs keep drafts across a reconnect (FR-PARTY-66). *Server crash:* nothing of its own; pet actions keep FR-PARTY-43's crash rule. *Old browser state:* stored tab `companions` → Party status; an old layout with `party.summary` open → Party Manager open on Party status, once (FR-PARTY-64). *A pet whose owner PC isn't listed* (draft left out, owner deleted): under "Other companions". *A PC hidden from players:* as FR-PARTY-53 (eye-off on the DM; still listed for others, ADR-0063 (a)). *At 1280×720* Party Manager may open at ≥ 440 px (the ladder) unless the user resized it (window memory).
 
 ## 12. Performance & bandwidth
 
@@ -389,6 +438,7 @@ Players sending a DM-only intent → `forbidden`, no change.
 
 - Worst case with every S5 PARTY row: 863 KB + 5 KB ≈ 868 KB DM; all sprint-5 tracks together ≈ 940 KB of the DM ceiling (1.5 MiB since #256, ≈ 630 KB left), players ≈ 357 KB of 512 KiB (seams S14; P's share unchanged); players + 267 B. Images never in a snapshot; the popup fetches the `display` derivative as the viewer does (§12 above). CON-44 tests assert `handout-present` ≤ 1 row per player frame and the DM growth ≤ 5,100 B at the cap.
 - *(S8)* **Party summary (measured** with a throwaway probe on `session-sim` + `buildRealisticHeavy` + `writeWorstPresents`, deleted before commit): worst-width keys (`"hpCurrent":999,"hpMax":999,"ac":30,"tempHp":999` = +49 B) on every other player's character → **players +343 B** (7 other PCs; 286,026 → 286,369 B; worst player 289,326 → 289,620 B of 512 KiB), DM 0 B. A redacted character row is ≈ 237 B today, ≈ 286 B after. Per event: an HP change sends other players the same `entity` upsert + 49 B; a temp HP set now sends them one ≈ 286 B upsert (none before).
+- *(S9)* **CON-44: 0 B.** Party Manager adds no record type, field, intent or event; the Party status tab and its companion rows read records every client already receives (sprint 8's +343 B per player stays the only cost); the tab memory and layout migration are browser-only. No probe needed. Render: ≤ 8 PC rows + ≤ ~24 companion rows, as the two lists it merges.
 
 ## 13. Test plan
 
@@ -485,6 +535,17 @@ Walkthrough: [ASSET IM5, IM7](assets-pipeline.md#131-sprint-6-image-search-and-t
 
 Bundle `combat-polish` (Thorn temp HP 5, Mira poisoned, Brakka hurt; companions in every mode), e2e `cb-party.e2e.ts` on `cb-party-e2e`, walkthrough CB10–CB13: [combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary). Named tests here: `FR-PARTY-51 rows` (DOM per viewer: own first, by name, companions under owners, drafts out, no monster / NPC ally row; DM case with a hidden PC's eye-off; a hostile or released companion leaves; markup only, layout in the e2e below), `FR-PARTY-52 party summary per player` and `FR-PARTY-52 monsters never` (integration + leak scan P1, P2: each other's PC with the new keys; never a monster's or another player's companion's numbers; a pet's `statBlock` never), `FR-PARTY-57 CON-44 combat polish` (committed into the heavy suite: players +343 B, DM 0 B, ceilings hold). Layout (FR-PARTY-58, FR-SHELL-141's criterion): `e2e/useful-size.e2e.ts` on `wf-frame-e2e` with `cb-party-six`.
 
+### 13.5 Sprint 9 (track PM, Party Manager)
+
+Isolated per worktree (ADR-0008, ADR-0017). No new fixture unit. Bundles: **`pm-memory`** (walkthrough, alias of `session-sim-12`: Mira + Brakka with Owlbear / Drake / Fire Elementals, Thorn, a hidden companion), **`pm-memory-e2e`** (e2e alias), `wf-frame-e2e` + `cb-party-six` (useful size), `cb-party-e2e` (CB3's spec, moved to the tab). Walkthrough: [play-shell §13 sprint 9](play-shell.md#13-test-plan) M0–M2, M11, M13 (one PM walkthrough).
+
+| Level | Named tests |
+|---|---|
+| Unit (DOM, per viewer) | `FR-PARTY-59 renamed` (title, launcher label, "Open in Party Manager", the pet-owner hint); `FR-PARTY-60 tabs order and memory` (order Party status, Handouts, Inventory, Loot; no entry → `status`; `companions` → `status`; unknown → `status`; `openPartyTab("status")`); `FR-PARTY-61 companions under owners` (DM: every pet incl. hidden with eye-off, summons in a fight; player 1: own pets with numbers + Card under Mira / Brakka; player 2: player 1's present pets with a band only, a prepared pet absent; "Other companions" for an orphan); `FR-PARTY-62 DM companion actions` (New pet…, row menu, in-fight disabling; none on players; none on summons); `FR-PARTY-64 no party status window` (no `party.summary` def or launcher button, both clients); `FR-PARTY-50 tabs keep state` (updated list); `FR-PARTY-67 tab registry` (order, per-client filter, ids unique, tab memory accepts registered ids only) |
+| Integration + leak | `FR-PARTY-65 leak`: CB3's `FR-PARTY-52 party summary per player` / `… monsters never` and the Companions tab's band checks run against the tab (P1, P2 frames unchanged: 0 new keys) |
+| Unit (shell) | `FR-SHELL-155 party.summary layout migrated`, `FR-SHELL-156 Party Manager registered` ([play-shell §13](play-shell.md#13-test-plan)) |
+| E2E | `party-manager.e2e.ts` (`pm-memory-e2e`): launcher "Party Manager", opens on Party status, 550 wide where it fits, companions under owners, an old `party.summary` layout migrates; `cb-party.e2e.ts` (moved to the tab); `useful-size.e2e.ts` `party.board` at 440 × 400 on `cb-party-six` |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -499,6 +560,10 @@ Bundle `combat-polish` (Thorn temp HP 5, Mira poisoned, Brakka hurt; companions 
 | *(S5)* [play-shell](play-shell.md) (track W) | Popup mount line in the player client root; popup in the dialog layer (FR-SHELL-01, W lists it), under the dice layer; `loot.log` removed from both registries by P3; Party window stays 440×560 | settled by seams S4 |
 | *(S5)* [notifications](notifications.md) | `hideToast` (FR-NOTE-26, built) | complete; no NOTE change |
 | New npm dependency | none (*S5*: Clipboard, File, DataTransfer and drag-and-drop are browser APIs; `sharp` already rasterises) | — |
+| *(S9)* [play-shell](play-shell.md) (PM1) | `absorbs` / `onAbsorb` (FR-SHELL-155), window memory, the size row (FR-SHELL-156) | this track (PM1 → PM2) |
+| *(S9)* [entities](entities.md), [combat-tracker](combat-tracker.md) | FR-ENT-37 pet visibility, FR-CBT-116 combatant visibility, `companion-menu.tsx` (one hint string) | complete; no change but the string (assigned to PM2) |
+| *(S9)* RS (new `reminders` / `strongholds` specs) | Their Party Manager tabs append to `party-tabs.ts` after PM2 (OQ-PARTY-37) | open (seams) |
+| *(S9)* New npm dependency | none | — |
 
 ### 14.1 Build split (AGENTS §9.9 shared files per slice)
 
@@ -551,6 +616,10 @@ Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). PARTY p
 
 Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). PARTY part: **CB3** `build/cb-party`: (1) server first, once the DM answers the party-HP ADR / OQ-PARTY-30 (its only wait, seams S12): entities' other-player whitelist (`src/server/features/entities/records.ts`, `src/shared/entities/schemas.ts` `RedactedCharacter` / `REDACTED_CHARACTER_KEYS`; ENT-owned, **assigned to CB3's server part**, S12) and the leak tests that pin the list; (2) the window after **WF1** (FR-SHELL-112 (1)): `src/client/common/features/party-board/Summary.tsx` (new), party-board `window.ts` (a second def), one append line per client in `windows.ts`, the values of the pending rows WF1 adds to the append-only size table ([FR-SHELL-141](play-shell.md#6-functional-requirements)), goldens and harness sets P1 / P3 / D3 (review-b #14); fixture `cb-party-six` and the `party.summary` case in `e2e/useful-size.e2e.ts`; the ADR's doc rows at merge. Wave 3. Depends on nothing of CB0 / CB2 (reads the turn field as it is).
 
+### 14.6 Sprint 9 build split (track PM)
+
+Full split: [play-shell §14 sprint 9](play-shell.md#14-dependencies). PARTY part: **PM2** `build/party-manager` (one builder, starts with PM1): `src/client/common/features/party-board/` `window.ts` (rename, 550, `absorbs`, `partySummaryWindow` removed), `Board.tsx`, `logic.ts`, `seen.ts` (tab memory), `Summary.tsx` → `StatusTab.tsx`, `summary-logic.ts`, `Companions.tsx` (row form reused, tab removed), `open-tab.ts`, new `party-tabs.ts` (★ append-only registry once integrated); DM / player `features/party-board/board-window.tsx`, player `present-popup.tsx` (button copy), `Viewer.tsx` (copy); DM `combat-tracker/companion-menu.tsx` (one string, assigned); ★ both `windows.ts` (delete the own `party.summary` line); ★ `size-table.ts`, replay sets, goldens (after PM1 merges, regenerated); e2e `party-manager.e2e.ts`, `cb-party.e2e.ts`, `useful-size.e2e.ts`. **RS waits on PM2** for its tabs (append to `party-tabs.ts`); **FX's BL-79** (draft PC rows) goes after PM2 (OQ-PARTY-39). Dependency: none.
+
 ## 15. Open questions
 
 DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G29 and the P bulk-accept). Rejected options kept for the record. Seam / integrator rows stay as settled. *(S5)* OQ-PARTY-18–21 decided at sprint-5 DM gate 1 (#256): every pick accepted.
@@ -595,7 +664,21 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-31 | **A PC hidden from players (#141)** in the summary | **Decided (#335): A.** **A. Accepted: its row and figures still show to other players (as Down and death state already do); hidden PCs are rare and DM-run** / B. Hide its figures while its combatant is hidden: a server-written copy flag on the character (one column, ADR-0039 pattern) | no (decided #335) | entities, FR-PARTY-52 |
 | OQ-PARTY-32 | **Which AC** | **Decided (#335): A.** **A. The sheet's stored AC (`statBlock.ac`): one plain field, same for every viewer** / B. Effective AC with active modifiers (Shield of Faith +2, FR-MOD-24): truer in a fight, but others never get modifiers, so it needs a server-written copy column refreshed by every effect change | no (decided #335) | effect-modifiers, FR-PARTY-52 |
 
+**Sprint 9, track PM** (owner spec-pm). Decided before the spec (#338): the rename, Party status first, `party.summary` gone, Companions as a section of the Party status tab (owners' companions under their PC), 550 px. **Bold** = suggested pick, not decided.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-PARTY-33 | **Tab order after Party status** | **A. Party status · Handouts · Inventory · Loot, then RS's Reminders · Strongholds: today's order kept, new tabs at the end** / B. Party status · Reminders · Handouts · Inventory · Loot · Strongholds: what's glanced at in play first; moves Handouts, which #338 placed second / C. Party status · Loot · Inventory · Handouts · …: money and items first, handouts are mostly read once | no · DM | FR-PARTY-60 |
+| OQ-PARTY-34 | **Which tab a launcher open shows** | **A. The tab you used last (Party status the first time and after the migration): as today, no surprise switch** / B. Always Party status: the landing tab every time, one more click to get back to Loot | no · DM | FR-PARTY-60 |
+| OQ-PARTY-35 | **Where companions sit in the Party status tab** (#338: "a section … each owner's companions under their PC") | **A. Directly under each PC's row, indented: one list, owner and pets read together, no PC named twice** / B. A "Companions" block after all PCs, grouped under PC-name headers (the old tab moved in; what Party status built in sprint 8): PC rows stay compact, each PC named twice | no · DM | FR-PARTY-61 |
+| OQ-PARTY-36 | **What players see per tab** | **A. Exactly today's views (§7 table): Party status per ADR-0063 (other PCs' HP / temp HP / AC), other players' pets only while present, with a band; Handouts only those shared with them; Inventory Take / Give; Loot their body: no visibility change** / B. As A, but other players' pets listed always (with a band), not only while present: the party sees every companion, but a pet the DM prepares leaks (FR-ENT-37's reason) / C. As A, but other PCs' companions hidden from players: a shorter list, less than the old Companions tab showed | no · DM | FR-PARTY-61, -65 |
+| OQ-PARTY-37 | **Seam with RS** (new `reminders` / `strongholds` specs): Reminders and Strongholds as Party Manager tabs register through `party-tabs.ts` (FR-PARTY-67) after PM2. At 550 px the six labels (≈ 600 px) don't all fit: the strip scrolls sideways (FR-PARTY-46), or the last tabs go into a "⋯" menu, or Strongholds is a launcher window of its own | **Strip scrolls (FR-PARTY-46, no new rule); Strongholds stays a tab that opens RS's Stronghold window (OQ-SHELL-81); RS's tabs order 50, 60** / a "⋯" overflow menu: all visible at once, a new control / Strongholds as its own launcher window: one tab fewer, one more launcher button (BL-80's labels) | no · seams | RS, FR-PARTY-67 |
+| OQ-PARTY-38 | Glossary | **Add "Party Manager: the party window (Party status, Handouts, Inventory, Loot …), opened from the launcher"; "Party board" and "Party window" retire as synonyms of it; "Party status" → "the Party Manager tab with each PC's HP, temp HP and AC and their companions"; "Pet: … listed in Party Manager"** | no · integrator | glossary |
+| OQ-PARTY-39 | **Seam with FX** (BL-79: other players see a draft PC in Party status; FX's fix pack): the fix lands in the Party status row list, which PM2 moves into `StatusTab.tsx` | **FX's BL-79 change goes after PM2 and edits `summary-logic.ts` only (row filter); PM2 keeps the filter in that file** / FX first, PM2 rebases: two slices in the same list at once | no · seams | FX, FR-PARTY-51 |
+
 ## 16. Out of scope
+
+- *(S9)* Editing HP / AC or pets' stats from Party status beyond the existing pet menu; a party portrait strip; per-tab windows (a tab torn off into its own window); RS's Reminders / Strongholds content; player-made pets.
 
 - *(S8)* Editing HP / AC from Party status; NPC allies or monsters in it (never, #334); a portrait strip (BG2 style, [theme-system](post-mvp/theme-system.md)); effective AC (OQ-PARTY-32 B); spell slots, hit dice or other sheet figures.
 

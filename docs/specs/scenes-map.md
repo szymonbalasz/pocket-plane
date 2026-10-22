@@ -1,13 +1,21 @@
 ---
 title: Scenes and map
 prefix: MAP
-status: claimed
+status: in-review
 owner: spec-pm
 wave: 3
 phase: post-mvp-9
 ---
 
 # Scenes and map
+
+> **Sprint 9, track PM (frame follow-ups; owner spec-pm; DM [#338](../decisions-log.md)).** Fixes **BL-86** (sim-12 glitch 4: after DM 1280 → 1440 → 1280 the map sits at the 48-px floor showing only the PCs in a 388-px strip, `data-fit-visible="pcs"`, and stays zoomed at 1440) and gives BL-87's grow-back its refit; states how **window memory** ([play-shell FR-SHELL-144–151](play-shell.md#6-functional-requirements)) meets the fits. New FR-MAP-113–115; amends FR-MAP-92, -98. Slice **PM1** (canvas lock, after nothing: WF3 and CB2 are merged). Tests and walkthrough (M7, M9): [play-shell §13 sprint 9](play-shell.md#13-test-plan). No open question. 0 B.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-MAP-113 | A resize round trip ends where Fit would (BL-86) | PM1 | `FR-MAP-113 resize round trip (BL-86)` |
+| FR-MAP-114 | A protected window's return over a PC refits (BL-87) | PM1 | `FR-MAP-114 refit on return` |
+| FR-MAP-115 | Remembered windows are plain obstacles; their reopen moves no camera | PM1 | `FR-MAP-115 remembered windows` |
 
 > **Sprint 8, track CB (combat polish; owner spec-cb; DM [#334](../decisions-log.md)).** Decided, not open: the **current-turn token is highlighted** (ring / glow) for everyone who can see it. Combat says which token ([FR-CBT-166](combat-tracker.md#6-functional-requirements)); this spec adds the `turn` field to the token-overlay contract and draws it (FR-MAP-108–112). Why not the registry alone: `TokenDecoration` is declarative and its `ring` is only `"target"` (code read), so a new mark needs one small `TokensLayer.tsx` change, made **after WF3 (refits) merges** (seams S1: WF3 → CB2, canvas lock). **For the DM:** [OQ-MAP-67, -68](#15-open-questions); seam with WF: OQ-MAP-69 (closed by S1). Wire: 0 B (derived). Walkthrough: [combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary) CB1, CB7. WF edits this spec in parallel (refits) with its own range.
 
@@ -268,6 +276,10 @@ Decided at sprint-4 gate 1 (#245): OQ-MAP-35 (combat trail), -36 (straight path)
 | FR-MAP-110 | **Who sees it** (decided #335, [OQ-MAP-68](#15-open-questions) **A**): drawn only where the decoration says (combat's line, FR-CBT-166) on tokens the client has. Players never receive a hidden or fog-hidden token (ADR-0039) nor a hidden turn id (FR-CBT-31), so a hidden or fogged combatant's turn never shows; the DM's fog "view as" dims client-side only and keeps the DM ring. | ADR-0039 |
 | FR-MAP-111 | **Budget**: one Konva node per ringed token (the turn token + its in-owner-turn companions); no animation frame; Next redraws only the old and new tokens' groups (memoised decorations). | |
 | FR-MAP-112 | **Test hook**: `e2e/support`'s canvas query helper finds `cbt-token-turn` nodes (name, id, `hidden`), as FR-MAP-34's other marks (AGENTS §9.5). | |
+| **Sprint 9, track PM** (frame follow-ups) | | |
+| FR-MAP-113 | *(S9)* **A resize round trip ends where Fit would** (BL-86; amends FR-MAP-92, -98). Root cause first, as a `test.failing` repro on the harness cells (DM `ambush`, `fitted`, Game log + Initiative, 1280×720 → 1440×900 → 1280×720 → 1440×900). Suspects: **(a)** the resize refit frames against rects rendered before the last `viewport` settle's writes (the 1150-wide Game log render-fit at 1280 leaves a 388-px strip → `pcs` at the 48-px floor); **(b)** a `pcs` result then bounds or skips the next resize refit (FR-MAP-94's bound is for `reveal` / `appearance` / `window` only; `resize` is a full fit). Outcome: while `fitted`, after **any** chain of viewport changes the camera equals what Fit gives at the final size with the final windows (same cell px, same `data-fit-visible`); `pcs` after a resize only where Fit at that size is `pcs` too; sim-12: 34 px `all` at each 1280×720, Fit's cell at each 1440×900. The resize refit reads the plan of the **last** `viewport` settle (`placerSettled` for the current viewport) and is a full fit (it resets the FR-MAP-94 bound). `moved` camera: unchanged (no refit). | BL-86 |
+| FR-MAP-114 | *(S9)* **Refit when a protected window returns over a PC** (BL-87, [FR-SHELL-159](play-shell.md#6-functional-requirements)): a plan that returns a squeezed protected window to its zone over a PC footprint + 4 with a `fitted` camera carries `refit: "window"`; the canvas runs the `window` refit once after that settle (Fit's rules and obstacles, FR-MAP-94's bound: never zooms in past the last full fit; may zoom out until the PCs clear; `data-fit-reason="window"`). DM and players. `moved` camera: no refit (the zone ladder handled it). | BL-87 |
+| FR-MAP-115 | *(S9)* **Remembered windows** ([FR-SHELL-144](play-shell.md#6-functional-requirements)): every fit reads them from the plan as rendered (nudged) rects, like any window (FR-MAP-93 unchanged). Opening, reopening or restoring a remembered window requests **no** refit and no yield (FR-SHELL-149): a window the user put over PCs stays over them and the camera stays. A resize refit, Fit, `open`, `load`, `reveal` and Start treat them as obstacles as before. | #338 |
 
 ## 7. UI/UX notes
 
@@ -416,8 +428,11 @@ Command → event (CON-31): `POST /api/scenes` → `SceneCreated`; `PATCH /api/s
 - *(Sprint 7, FU: marker, refits)* **Disconnect / reconnect:** the marker reads the token record, so a reconnect snapshot shows it as stored; a reconnect that brings tokens into sight is one reveal (FR-MAP-82 / -89). **Reload:** the load fit waits for the restored windows (FR-MAP-89 (2)). **Server crash mid-End / mid-Start:** the owner handling (FR-MAP-88's fix at End, the safety-net re-assert at Start) is inside `cbt.end` / `cbt.start`'s transaction: all or nothing. **Start with every token already clear:** no camera move (FR-MAP-90). **A `moved` camera:** no appearance, reveal or resize refit (unchanged).
 - *(Sprint 8, WF)* Disconnect / reconnect / crash: tokens newly drawn by a reconnect snapshot are a reveal (≤ the current scale); an `appear` in it settles first. Reload: the load fit waits for the `load` settle. A `moved` camera never refits or yields.
 - **Sprint 8 (CB):** the turn token wears a green ring with a soft glow under its image, for the DM and every player who sees that token; a hidden monster's turn shows a dashed ring on the DM's map only. **Player view:** nothing on a hidden or fogged creature. Disconnected: the last ring stays (it is the last turn); reconnect / reload re-derive it from the snapshot; a crash changes nothing (no state).
+- **Sprint 9 (PM):** *disconnect / reconnect / crash:* no camera state on the server; a reconnect snapshot's reveal refit is as built (FR-MAP-94), remembered windows count as obstacles. *Reload:* the load fit after the `load` settle, remembered windows at their stored rects (FR-MAP-96). *Resize mid-drag:* the refit waits for the drop (FR-MAP-47) and then for the last `viewport` settle (FR-MAP-113). *A remembered window reopened over PCs:* the camera stays (FR-MAP-115). **DM view / player view:** the same rules; players' map may yield (FR-MAP-97) only for untouched windows.
 
 ## 12. Performance & bandwidth
+
+- *(Sprint 9, PM)* **0 B**: camera and refits are client-only. FR-MAP-113's refit is the existing Fit (≤ 25 ms bench, FR-MAP-81); FR-MAP-114 adds at most one refit per return.
 
 - *(Sprint 8, track CB)* **0 B**: the ring is derived from `turnCombatantId` / `playerTurnCombatantId` and `combatant.tokenId`, already in every snapshot; one Konva node per ringed token (FR-MAP-111).
 
@@ -589,6 +604,16 @@ Pure tests in `camera.test.ts` / both `fit-visible.test.ts`, inputs from `replay
 | `FR-MAP-97 yield refit` | ≥ 75 % of the last full fit accepted, below refused, `moved` never |
 | `FR-MAP-98 resize refit after settle` | 1280×720 → 1440×900: refit after the Game log is back; cell = Fit at 1440×900 |
 
+### Sprint 9: refits under window memory (track PM)
+
+Pure tests in `camera.test.ts` / `refits.test.ts`, inputs from `replay-cells.generated.ts` (FR-SHELL-114); bundles `pm-memory` / `pm-memory-e2e`, harness, walkthrough M7, M9: [play-shell §13 sprint 9](play-shell.md#13-test-plan).
+
+| Test | What |
+|---|---|
+| `FR-MAP-113 resize round trip (BL-86)` | First a `test.failing` repro: DM `ambush`, `fitted`, Game log + Initiative, 1280×720 → 1440×900 → 1280×720 → 1440×900: each step's cell px and `fit-visible` = Fit's at that size (34 px `all` at 1280); a `moved` camera never refits; the harness `resize` path asserts the same per set (I6 + this) |
+| `FR-MAP-114 refit on return` | DM 1440×900, a PC under the Game log's zone: squeeze (sheet opens) → close → Game log in its zone, one `window` refit, no PC under it, cell ≤ the last full fit's; `moved` → no refit |
+| `FR-MAP-115 remembered windows` | A remembered window reopened over PCs: no refit, no yield, camera equal; Fit afterwards counts it as an obstacle |
+
 ### Sprint 7: marker and refits (track FU)
 
 Fixtures, bundle `fu-s7` / `fu-s7-e2e` and the walkthrough (U5, U12, U13, U16): [play-shell §13](play-shell.md#13-test-plan). Named tests here:
@@ -716,6 +741,10 @@ Full split, order and locks: [CAMP §14](campaign-management.md#sprint-5-build-s
 
 Full split: [ASSET §14.1](assets-pipeline.md#141-sprint-6-build-split). MAP part: **IM-3 `build/im-wiring`** (after IM-2 `build/im-picker`): one `context` prop in `scenes-window.tsx` and in `token-menu-entries.tsx`, one DOM test each. Neither is a canvas hotspot file (`MapCanvas.tsx`, `TokensLayer.tsx`, `LabelsLayer.tsx`, tools), so IM-3 needs no canvas lock and runs alongside WF / CP canvas work. No schema, record type, event, §9.9 shared file or dependency.
 
+### Sprint 9 build split (track PM)
+
+**PM1** `fix/window-memory` (FR-MAP-113–115 with the frame): ★ canvas lock `MapCanvas.tsx` (resize refit after the last `viewport` settle, the plan's `refit` flag), `camera.ts` (if the root cause sits in `fitFor`); `refits.test.ts`. PM holds the canvas lock only for these lines; no other sprint-9 track is on the canvas (sprint-9 hotspots). Full split: [play-shell §14 sprint 9](play-shell.md#14-dependencies). Dependency: none.
+
 ### Sprint 8 build split (track WF)
 
 **WF3** `fix/wf-refits` (FR-MAP-93–98): ★ canvas lock `MapCanvas.tsx`, `camera.ts`; ★ `free-area.ts`. After WF1. **Canvas lock: WF3 → CB2** (the turn ring edits `TokensLayer.tsx` and the decoration type, seams S1). Full split: [play-shell §14](play-shell.md#14-dependencies).
@@ -821,6 +850,7 @@ Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track
 
 ## 16. Out of scope
 
+- *(Sprint 9)* Refitting when a remembered window is reopened or moved by the user; a per-window "keep the map clear of this" option.
 - *(Sprint 8)* Refitting when a token moves under a window; a camera that follows moving windows.
 
 - *(Sprint 7)* BL-55 (fog log spam with > 4 owned tokens) stays a backlog item; refitting when a PC walks under a window; a DM option to turn the appearance refit off.
