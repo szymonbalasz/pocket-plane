@@ -8,11 +8,13 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| WF1 placer core + replay harness | `fix/placer-core` (w98, slot 0) | build-wf1 | walkthrough 10/10 after F14 fix; branch gates running | merge, then WF2, WF3, TT4, SB1+2, CB3 |
+| WF1 placer core + replay harness | merged | — | done | main gates running |
+| WF3 map refits | `fix/wf-refits` (w9G) | build-wf3 | building | walkthrough F9, F10 |
+| TT4 pause screen | `build/tt-pause` (w9H) | build-tt4 | building | walkthrough T9–T12, T17 |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
 | TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |
 | TT1+TT2 macros + roll requests | `build/tt-dice` (w9E) | build-tt12 | part-1 walkthrough running; window + toast parts wait for WF1 / WF4 | part 2: T7, T16 |
-| SB0 stats tier-B core | `build/sb-core` (w9A, slot 3) | build-sb0 | walkthrough 10/10 PASS; branch gates queued after main's | merge |
+| SB0 stats tier-B core | `build/sb-core` (w9A, slot 3) | build-sb0 | walkthrough 10/10; main merged in; gates after main's | merge |
 | WF4 toast policy + Stats / card sizes | `fix/wf-sizes-toasts` (w9F) | build-wf4 | building (FR-NOTE-53 waits for WF1) | walkthrough F8, F9, F13 |
 | CB0 combat core | merged (walkthrough all PASS) | — | done | main gates running |
 | CB1 drag reorder | merged (walkthrough 14/14) | — | done | main gates after WF1 merge |
@@ -21,7 +23,8 @@ Queue (seams build plan, `.verify/sprint8/seams.md`): wave 2 WF4, TT1+2, TT3, CB
 
 ## Shared-file locks
 
-- Frame (play-shell frame files, see slice WF1): `fix/placer-core`.
+- Canvas (MapCanvas, camera, TokensLayer, LabelsLayer) + `free-area.ts`: `fix/wf-refits` (then CB2).
+- `PlayFrame.tsx` (top-bar item width): `build/tt-pause`; frame files otherwise free (next: WF2, after TT4).
 - Schema lane: free (TT0, CB0 merged).
 - `TrayWindow.tsx`, `GameLog.tsx`, `char.roll` server file: `build/tt-dice`.
 - Notifications `keep-out.ts`, `ToastRuntime.tsx`: `fix/wf-sizes-toasts` (then TT2's `restoreToast`).
