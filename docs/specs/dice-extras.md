@@ -469,7 +469,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 | Event | Changes | Player sees |
 |---|---|---|
 | `MacroSaved` / `MacroDeleted {macroId}` | `roll-macro` upsert(s) / delete | iff `playerId` = them |
-| `RollRequested {requestId}` | `roll-request` upsert, then `NotificationCreated` per target | no frame (FR-SYNC-17); a target gets its prompt via `NotificationCreated` |
+| `RollRequested {requestId}` | `NotificationCreated` per target first, then the `roll-request` upsert (the row lists the prompts' ids; integrator, TT2) | no frame (FR-SYNC-17); a target gets its prompt via `NotificationCreated` |
 | `RollRequestAnswered {requestId, characterId, entryId}` | entry + request upsert, then `NotificationResolved` | entry per FR-DICEX-77; the roller their resolve |
 | `RollRequestDeclined` / `RollRequestClosed {requestId, rolled?}` | request upsert (+ entries), then `NotificationResolved` per target | entries per FR-DICEX-77; each target's player their resolve |
 
@@ -596,7 +596,7 @@ Redraws: one still redraw per tray resize (as built).
 | Cumulative on GM + ST's worst (≈ 942 / 299 KB) | ≈ 1.15 MB of 1.5 MiB (≈ 420 KB left) | ≈ 338 KB of 512 KiB (≤ 391 KB theoretical) |
 
 - Frames: `MacroSaved` 605 B; `RollRequested` 4,709 B at 12 targets + `NotificationCreated` ≈ 1.2 KB per target (DM ≈ 19 KB for 12); **players: no frame** for `RollRequested` (FR-SYNC-17), a target gets only its `NotificationCreated`; answer = entry (≈ 0.8 KB, +14 B for `answer: true`) + request upsert ≈ 4.5 KB (DM) + `NotificationResolved` ≈ 1.2 KB; `CampaignPaused` / `Resumed` 834 / 497 B to all.
-- Asserted by `con44-tt.test.ts` (TT0) at these caps: ceilings; in the DM frame `roll-macro` ≤ 76 KB, `roll-request` ≤ 72 KB, `roll-request` prompts ≤ 64 KB; none of `roll-request` / `audio-asset` in player frames. Bundle: prompt + macro buttons initial (≤ 2.5 KB gz, DICEX cap 15 KB holds); popover, editor, Requests window in a lazy `TableTools` chunk (cap 12 KB gz).
+- Asserted by `con44-tt.test.ts` (TT0) at these caps: ceilings; in the DM frame `roll-macro` ≤ 76 KB, `roll-request` ≤ 72 KB, `roll-request` prompts ≤ 64 KB; none of `roll-request` / `audio-asset` in player frames. Bundle: prompt + macro buttons initial (≤ 2.5 KB gz, DICEX cap 15 KB holds); popover, editor, Requests window in a lazy `TableTools` chunk (cap 12 KB gz). *(Integrator, TT2: the prompt body loads in a small idle chunk; the dice-extras initial chunk stays under its 15 KB cap.)*
 
 ## 13. Test plan
 
