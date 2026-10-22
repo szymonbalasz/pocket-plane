@@ -56,3 +56,39 @@ export const ALERT_DEFAULTS: Record<AlertKey, "ping" | "none"> = {
   pause: "none",
   resume: "none",
 };
+
+// biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the rule (FR-CAMP-47).
+const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
+
+/** FR-CAMP-47: the card's message: no control chars, trimmed, ≤ 200; empty → none. */
+export const PauseMessage = z
+  .string()
+  .refine((s) => !CONTROL.test(s), { message: "Message must not contain control characters" })
+  .transform((s) => s.trim())
+  .refine((s) => [...s].length <= PAUSE_MESSAGE_MAX, {
+    message: `Message must be at most ${PAUSE_MESSAGE_MAX} characters`,
+  })
+  .transform((s) => (s === "" ? null : s));
+
+export const BackInMin = z.union(BACK_IN_MINUTES.map((m) => z.literal(m)));
+export type BackInMin = z.infer<typeof BackInMin>;
+
+/**
+ * FR-CAMP-47: `camp.pause` (DM). A field left out keeps its value while paused (none on a new
+ * pause); null clears it. `backInMin` → `backAt` = now + N min (`ctx.clock`).
+ */
+export const PauseInput = z.strictObject({
+  message: PauseMessage.nullable().optional(),
+  imageAssetId: AssetId.nullable().optional(),
+  backInMin: BackInMin.nullable().optional(),
+});
+export type PauseInput = z.input<typeof PauseInput>;
+
+export const ResumeInput = z.strictObject({});
+
+export const PAUSE_INTENT = "camp.pause";
+export const RESUME_INTENT = "camp.resume";
+
+/** FR-CAMP-47: `backAt` for "back in `min`" from `nowMs` (the server's `ctx.clock.now()`). */
+export const backAtFrom = (nowMs: number, min: BackInMin): string =>
+  new Date(nowMs + min * 60_000).toISOString();

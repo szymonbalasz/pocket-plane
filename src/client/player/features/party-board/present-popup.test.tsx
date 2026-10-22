@@ -16,7 +16,7 @@ import { SyncContext, type SyncState } from "@ui/sync/store";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
-import { PresentContent } from "./present-popup";
+import { PresentContent, presentToShow } from "./present-popup";
 
 const header = (imageAssetIds: string[]): PlayerHandoutRecord => ({
   id: "h7",
@@ -132,5 +132,21 @@ describe("FR-PARTY-36 popup content", () => {
     // A fresh page: generation 1, no local hides.
     expect(shownPresent([row], "p1", {}, 1)).toEqual(row);
     expect(shownPresent([], "p1", {}, 1)).toBeNull();
+  });
+});
+
+describe("present popup while paused (FR-SHELL-127, TT4)", () => {
+  test("FR-SHELL-127 present popup deferred: none while paused (incl. a page loaded paused), the same row at resume", () => {
+    const row = {
+      id: "pr1",
+      campaignId: "c1",
+      handoutId: "h7",
+      playerId: "p1",
+      createdAt: "t",
+    } as unknown as HandoutPresentRecord;
+    const you = { role: "player", playerId: "p1" };
+    expect(presentToShow([row], you, {}, 1, true)).toBeNull();
+    expect(presentToShow([row], you, {}, 1, false)).toEqual(row);
+    expect(presentToShow([row], { role: "dm", playerId: null }, {}, 1, false)).toBeNull();
   });
 });

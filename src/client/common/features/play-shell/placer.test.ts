@@ -586,11 +586,15 @@ describe("one placer (FR-SHELL-95–113)", () => {
     expect(rectOf(get(back.windows, "t.small"))).toEqual(rectOf(get(before, "t.small")));
   });
 
-  test("FR-SHELL-112 registries: overlays in `layer` order per client, top-bar items per client, all three created empty", async () => {
+  test("FR-SHELL-112 registries: overlays in `layer` order per client, top-bar items per client, created empty (TT4 appended the pause entries)", async () => {
     const { OVERLAYS } = await import("./overlays");
     const { TOP_BAR_ITEMS } = await import("./top-bar-items");
     const { CHROME_KEEP_OUTS } = await import("./chrome-keep-outs");
-    expect([OVERLAYS.length, TOP_BAR_ITEMS.length, CHROME_KEEP_OUTS.length]).toEqual([0, 0, 0]);
+    expect([
+      OVERLAYS.map((o) => o.id),
+      TOP_BAR_ITEMS.map((t) => t.id),
+      CHROME_KEEP_OUTS.length,
+    ]).toEqual([["pause"], ["pause"], 0]);
     const entries: OverlayEntry[] = [
       { id: "b", clients: ["player"], layer: 20, Component: Body },
       { id: "a", clients: ["player", "dm"], layer: 10, Component: Body, blocksInput: () => true },

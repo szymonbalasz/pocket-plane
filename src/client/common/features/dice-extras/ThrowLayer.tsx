@@ -20,6 +20,7 @@ import { lazy, Suspense, useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { useSync } from "../../sync/store";
+import { isPausedFor } from "../pause/logic";
 import { useOpenWindow, useRegistry, useShellState } from "../play-shell/ShellContext";
 import { useRollPopupMount } from "../play-shell/ShellToaster";
 import { popupHost, type ThrowPlan } from "./display";
@@ -125,6 +126,8 @@ export function DiceExtrasRuntime() {
   useEffect(() => () => waiting.current?.(), []);
 
   useRollFrames((entries, store) => {
+    // FR-SHELL-127, FR-DICEX-90: a player under the pause card gets no throw, popup or hold.
+    if (isPausedFor(store)) return;
     const tabHidden = globalThis.document?.hidden === true;
     const playerIds = recordsOf<PlayerRecord>(store, "player").map((p) => p.id);
     const looks = (t: DiceThrow) =>

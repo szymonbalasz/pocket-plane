@@ -3,7 +3,8 @@
 // (under the dice layer) shows that handout: title, images one at a time (Prev / Next), the body
 // through `DiceText`. Close, Esc, a click outside or "Open in Party" hide it at once and send
 // `party.closePresent`; a close that never reached the server shows again after the next snapshot.
-// Mounted by one line in the player play page (seams S4); not a window.
+// Mounted by one line in the player play page (seams S4); not a window. *(Sprint 8, TT4)* Under the
+// pause card it waits: shown at resume (FR-SHELL-127, a deferred feature open).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { HANDOUT_PRESENT_TYPE, type HandoutPresentRecord } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
@@ -26,6 +27,7 @@ import {
   stepPage,
 } from "@ui/features/party-board/present-logic";
 import { type LoadedHandout, useHandout } from "@ui/features/party-board/Viewer";
+import { usePaused } from "@ui/features/pause/hooks";
 import { useRecords, useSync } from "@ui/sync/store";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Dialog as D } from "radix-ui";
@@ -50,9 +52,22 @@ export function PlayerPresentPopup() {
   const rows = useRecords<HandoutPresentRecord>(HANDOUT_PRESENT_TYPE);
   const generation = useSync((s) => s.lazy.generation);
   const hides = useStore(presentHides, (s) => s.hides);
-  const present =
-    you?.role === "player" ? shownPresent(rows, you.playerId, hides, generation) : null;
+  // From the store, not the gate: a page loaded paused never paints it (the gate closes later).
+  const paused = usePaused();
+  const present = presentToShow(rows, you, hides, generation, paused);
   return present ? <Shown present={present} /> : null;
+}
+
+/** The viewer's present to show now: none for the DM, and none while paused (shown at resume). */
+export function presentToShow(
+  rows: readonly HandoutPresentRecord[],
+  you: { role: string; playerId: string | null } | null,
+  hides: Parameters<typeof shownPresent>[2],
+  generation: number,
+  paused: boolean,
+): HandoutPresentRecord | null {
+  if (you?.role !== "player" || paused) return null;
+  return shownPresent(rows, you.playerId, hides, generation);
 }
 
 function Shown({ present }: { present: HandoutPresentRecord }) {

@@ -8,10 +8,13 @@
 // - FR-STATS-34: a new `stats-fight-summary` notification opens Stats on that fight with
 //   Highlights (preference "Open the fight summary at End"); the DM's own End first minimises
 //   Initiative (FR-CBT-60, on the ack after this frame), so its open waits for that (≤ 2 s).
+// *(Sprint 8, TT4)* Under the pause card (players, seams S10, FR-SHELL-127): no kill feed (dropped,
+// not replayed); the awards and fight-summary opens wait for resume (`pauseGate`).
 import type { EventFrame } from "@shared/protocol/frames";
 import { useEffect, useRef, useState } from "react";
 import { useEventFrame, useSync } from "../../sync/store";
 import { showCallout } from "../notifications/toasts";
+import { type PauseGate, pauseGate } from "../pause/gate";
 import { useShellState } from "../play-shell/ShellContext";
 import {
   createFeed,
@@ -24,7 +27,7 @@ import {
 } from "./feed";
 import { awardsOpenOf, summaryOpenOf } from "./logic";
 import { useOpenStatsAwards, useOpenStatsFight } from "./open";
-import { statsPrefs } from "./prefs";
+import { type StatsPrefs, statsPrefs } from "./prefs";
 
 const INITIATIVE_KIND = "cbt.initiative";
 /** FR-STATS-34: the longest the DM's open waits for its own End's Initiative minimise. */
@@ -76,6 +79,35 @@ export function summaryWaits(
   return role === "dm" && frame.cause.intentId !== undefined && initiative === "open";
 }
 
+export interface StatsFrameDeps {
+  role: "dm" | "player";
+  prefs: Pick<StatsPrefs, "feed" | "openSummary">;
+  feed: Pick<Feed, "push">;
+  openAwards(fromN: number): void;
+  openFight(encounterId: string): void;
+  /** The DM's own End: the open waits for Initiative to minimise. */
+  wait(encounterId: string): void;
+  initiative: string | undefined;
+  gate?: Pick<PauseGate, "paused" | "deferUntilResume">;
+  seen?: Set<string>;
+}
+
+/** One live frame: the kill feed, the awards open, the fight-summary open. */
+export function onStatsFrame(frame: EventFrame, d: StatsFrameDeps): void {
+  const gate = d.gate ?? pauseGate;
+  // FR-SHELL-127: the kill feed is dropped under the pause card, not replayed.
+  if (d.prefs.feed && !gate.paused()) d.feed.push(feedLinesOf(frame, d.role));
+  const awards = awardsOpenOf(frame);
+  if (awards && firstOpen(awards.notificationId, d.seen)) {
+    gate.deferUntilResume("stats.awards", () => d.openAwards(awards.fromN));
+  }
+  const summary = summaryOpenOf(frame);
+  if (summary && firstOpen(summary.notificationId, d.seen) && d.prefs.openSummary) {
+    if (summaryWaits(d.role, frame, d.initiative)) d.wait(summary.encounterId);
+    else gate.deferUntilResume("stats.summary", () => d.openFight(summary.encounterId));
+  }
+}
+
 export function StatsRuntime() {
   const role = useSync((s) => (s.store.you?.role === "dm" ? "dm" : "player"));
   const openAwards = useOpenStatsAwards();
@@ -85,20 +117,17 @@ export function StatsRuntime() {
   const openFightRef = useRef(openFight);
   openFightRef.current = openFight;
 
-  useEventFrame((frame) => {
-    const prefs = statsPrefs().read();
-    if (prefs.feed) pageFeed().push(feedLinesOf(frame, role));
-    const awards = awardsOpenOf(frame);
-    if (awards && firstOpen(awards.notificationId)) openAwards(awards.fromN);
-    const summary = summaryOpenOf(frame);
-    if (summary && firstOpen(summary.notificationId) && prefs.openSummary) {
-      if (summaryWaits(role, frame, initiative)) {
-        setWaiting({ encounterId: summary.encounterId, since: Date.now() });
-      } else {
-        openFight(summary.encounterId);
-      }
-    }
-  });
+  useEventFrame((frame) =>
+    onStatsFrame(frame, {
+      role,
+      prefs: statsPrefs().read(),
+      feed: pageFeed(),
+      openAwards,
+      openFight,
+      wait: (encounterId) => setWaiting({ encounterId, since: Date.now() }),
+      initiative,
+    }),
+  );
 
   useEffect(() => {
     if (!waiting) return;

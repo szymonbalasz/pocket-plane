@@ -22,6 +22,11 @@ export interface BlockEnv {
   overlay: BlockOverlay;
   /** The overlay layer's siblings: made `inert` while blocked. */
   siblings: readonly { inert: boolean }[];
+  /**
+   * Siblings added while blocked (a portal opening later: a tooltip, a dialog): `watch(add)` calls
+   * `add` for each; they are made `inert` too. Returns the stop.
+   */
+  watch?: (add: (sibling: { inert: boolean }) => void) => () => void;
   win: Pick<Window, "addEventListener" | "removeEventListener">;
   doc: { activeElement: unknown } & Pick<Document, "addEventListener" | "removeEventListener">;
 }
@@ -48,8 +53,14 @@ export const FOCUSABLE =
 /** Blocks input outside `env.overlay` until the returned release is called. */
 export function blockInput(env: BlockEnv): () => void {
   const { overlay, siblings, win, doc } = env;
-  const was = siblings.map((s) => s.inert);
-  for (const s of siblings) s.inert = true;
+  const was = new Map<{ inert: boolean }, boolean>();
+  const add = (s: { inert: boolean }) => {
+    if (was.has(s)) return;
+    was.set(s, s.inert);
+    s.inert = true;
+  };
+  for (const s of siblings) add(s);
+  const unwatch = env.watch?.(add);
   cancelGestures();
   const first = () => overlay.focusables()[0] ?? overlay;
   const stop = (e: Event) => {
@@ -98,8 +109,7 @@ export function blockInput(env: BlockEnv): () => void {
     win.removeEventListener("wheel", onOther, wheel);
     win.removeEventListener("pointerdown", onOther, capture);
     doc.removeEventListener("focusin", onFocus, capture);
-    siblings.forEach((s, i) => {
-      s.inert = was[i] ?? false;
-    });
+    unwatch?.();
+    for (const [s, inert] of was) s.inert = inert;
   };
 }

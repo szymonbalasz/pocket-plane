@@ -32,6 +32,7 @@ import { Group, Layer, Stage } from "react-konva";
 import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { FogBlindChip } from "../fog-of-war/BlindChip";
 import { blindStore, isBlind } from "../fog-of-war/blind";
+import { pauseGate } from "../pause/gate";
 import { setFitPort, useFreeArea } from "../play-shell/free-area";
 import type { Rect } from "../play-shell/geometry";
 import { isKeyboardFocus, spaceAction, trackFocusModality } from "../play-shell/keys";
@@ -514,7 +515,8 @@ export function MapCanvas(props: MapCanvasProps) {
     const area = visibleArea(sizeRef.current);
     const mode = cameraModeRef.current;
     if (revealRefit(prev.ids, next, camRef.current, obstaclesRef.current, area, mode)) {
-      reveal.reveal();
+      // FR-SHELL-127: under the pause card the refit waits for resume.
+      pauseGate.deferUntilResume("map.reveal", () => reveal.reveal());
     }
   }, [tokens, scene.id, client, reveal]);
   /**
