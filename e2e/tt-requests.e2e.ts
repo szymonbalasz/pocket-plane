@@ -1,5 +1,5 @@
 // e2e-bundle: table-tools-e2e
-// Roll requests (dice-extras §13 T4–T6; FR-DICEX-78, -79, -83, FR-NOTE-59): the open hidden
+// Roll requests (dice-extras §13 T4–T6; FR-DICEX-78, -79, -83, -91, FR-NOTE-59, -60): the open hidden
 // Perception (DC 15) reaches player-1 and player-2 as pending prompts without the DC. Player-1
 // rolls from the prompt → "Rolled N" and a hidden line only DM + player-1 see, and the total with
 // ✓ / ✗ on the DM's Requests card only (FR-DICEX-85, -87); player-2 declines → the card closes.
@@ -25,7 +25,7 @@ async function closePresented(page: Page) {
   await expect(popup).toHaveCount(0);
 }
 
-test("FR-DICEX-78 FR-DICEX-79 FR-DICEX-83 FR-DICEX-87 FR-DICEX-88 FR-NOTE-59 hidden Perception: prompts without DC, Roll → hidden line (DM + roller), total ✓ / ✗ on the DM card, Decline closes it", async ({
+test("FR-DICEX-78 FR-DICEX-79 FR-DICEX-83 FR-DICEX-91 FR-DICEX-87 FR-DICEX-88 FR-NOTE-59 hidden Perception: prompts without DC, Roll → hidden line (DM + roller), total ✓ / ✗ on the DM card, Decline closes it", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
@@ -44,8 +44,20 @@ test("FR-DICEX-78 FR-DICEX-79 FR-DICEX-83 FR-DICEX-87 FR-DICEX-88 FR-NOTE-59 hid
   await p2.goto(link("Player 2"));
   await live(p2);
 
-  // T4: each player's pending prompt, no DC.
-  const prompt = (p: Page) => p.getByTestId("dicex-prompt").first();
+  // T4 + FR-DICEX-91: the open prompt is back as a card toast after the load (no summary for it).
+  for (const p of [p1, p2]) {
+    const card = p.locator('[data-testid="note-toast"][data-class="card"]');
+    await expect(card.getByTestId("dicex-prompt")).toHaveCount(1);
+    await expect(card.getByTestId("dicex-prompt")).not.toContainText("DC");
+    await expect(p.getByTestId("note-toast-pending-summary")).toHaveCount(0);
+  }
+  // Each player's pending prompt in the history, no DC.
+  const prompt = (p: Page) =>
+    p
+      .locator(
+        '[data-testid="ui-window"][data-record-id="note.history:main"] [data-testid="dicex-prompt"]',
+      )
+      .first();
   const h1 = await openWindow(p1, "note.history");
   await expect(prompt(p1)).toHaveAttribute("data-state", "pending");
   await expect(prompt(p1)).toContainText("DM: Perception");

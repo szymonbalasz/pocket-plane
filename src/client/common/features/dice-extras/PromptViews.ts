@@ -30,6 +30,8 @@ export const rollRequestPlayerView: NotificationView = defineNotificationView({
   kind: ROLL_REQUEST_KIND,
   icon: DicesIcon,
   render: withText(Player),
+  // FR-DICEX-91, FR-NOTE-60: open prompts re-toast silently after a reload / reconnect.
+  restoreToast: true,
 });
 
 /** FR-NOTE-61: the DM's row "‹PC› · ‹label›"; no toast, no cue, no action. */

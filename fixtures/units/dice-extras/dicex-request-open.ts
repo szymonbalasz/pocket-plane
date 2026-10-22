@@ -3,6 +3,13 @@ import { defineFixture, step } from "@server/features/fixtures-adapters/fixture-
 import type { RequestInput } from "@shared/dice-extras/requests";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 
+/** DICEX §13 `dicex-request-open` (tests and walkthrough T4–T6 hard-code them). */
+export const DICEX_REQUEST_OPEN = {
+  label: "Perception",
+  dc: 15,
+  targets: ["Mira", "Thorn"],
+} as const;
+
 /**
  * Sprint 8 (FR-DICEX-73–77): the DM asked Mira and Thorn for Perception, DC 15 hidden, results
  * hidden: one open request, two pending prompts (no DC in them). Not in session-sim-12 (the sim
