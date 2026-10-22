@@ -13,6 +13,8 @@ import {
 import type { RecordStore } from "@shared/protocol/store";
 import type { ReactNode } from "react";
 import { createStore, type StoreApi } from "zustand";
+import { pauseGate } from "../pause/gate";
+import { isPausedFor } from "../pause/logic";
 import {
   NOTIFICATION_TYPE,
   pendingForMe,
@@ -321,7 +323,11 @@ export function syncToasts(
       waitingOf(store),
     );
   }
-  for (const n of toastTriggers(prev, next, t)) s = addNote(s, n, now, classOf);
+  for (const n of toastTriggers(prev, next, t)) {
+    // FR-SHELL-127, FR-NOTE-63: under the pause card info goes to history only; cards wait.
+    if (isPausedFor(store) && classOf(n) === "info") continue;
+    s = addNote(s, n, now, classOf);
+  }
   s = pruneToasts(s, store, now, waitingOf);
   return s === m.toasts && campaignId === m.campaignId ? m : { toasts: s, campaignId };
 }
@@ -419,6 +425,7 @@ export interface CalloutInput {
  * count of 3; the caller keeps to live frames. Client memory only; no runtime mounted → dropped.
  */
 export function showCallout(c: CalloutInput): void {
+  if (pauseGate.paused()) return; // FR-SHELL-127: dropped under the pause card, not replayed
   const now = Date.now();
   for (const m of memories) m.setState((x) => ({ toasts: setCallout(x.toasts, c, now) }));
 }

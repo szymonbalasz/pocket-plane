@@ -12,6 +12,15 @@ import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { DICE_LAYER_Z } from "../dice-extras/DiceLayer";
+import { classify, NOTIFICATION_TYPE } from "../notifications/logic";
+import {
+  createToastMemory,
+  initialToasts,
+  registerToastMemory,
+  showCallout,
+  syncToasts,
+  type ToastMemory,
+} from "../notifications/toasts";
 import { createAlertController, createTitleMarker } from "../play-shell/alerts";
 import type { AudioEngine } from "../play-shell/audio";
 import { blockInput } from "../play-shell/input-block";
@@ -21,7 +30,7 @@ import { createWindowRegistry } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { createSoundSettingsStorage } from "../play-shell/sound-settings";
 import { TOP_BAR_ITEMS, topBarItemsFor, topBarItemWidth } from "../play-shell/top-bar-items";
-import { createPauseGate } from "./gate";
+import { createPauseGate, pauseGate } from "./gate";
 import {
   controlLabel,
   controlWidth,
@@ -449,5 +458,49 @@ describe("the block reaches body portals (FR-SHELL-128, -135)", () => {
       false,
       false,
     ]);
+  });
+});
+
+describe("the toast stack under the card (FR-NOTE-63, FR-SHELL-127)", () => {
+  const withNotes = (pause: CampaignPause | null, notes: NotificationRecord[], seq: number) => ({
+    state: "live" as const,
+    store: {
+      ...storeOf({
+        pause,
+        extra: { [NOTIFICATION_TYPE]: Object.fromEntries(notes.map((n) => [n.id, n])) },
+      }),
+      seq,
+    },
+  });
+  const shownAfter = (pause: CampaignPause | null) => {
+    const info = prompt({ id: "n-info", kind: "test", state: "info", actionLabel: null });
+    const card = prompt({ id: "n-card" });
+    const m: ToastMemory = { toasts: initialToasts(0), campaignId: "c1" };
+    const prev = withNotes(pause, [], 4);
+    const next = withNotes(pause, [info, card], 5);
+    const after = syncToasts(m, prev, next, classify(prev, next), 0);
+    return after.toasts.toasts.map((t) => (t.kind === "summary" ? "summary" : t.key));
+  };
+
+  test("FR-NOTE-63 prompt while paused: the card toast waits under the card; an info toast goes to history only", () => {
+    expect(shownAfter(null).sort()).toEqual(["n-card", "n-info"]);
+    expect(shownAfter(PAUSE)).toEqual(["n-card"]);
+  });
+
+  test("FR-SHELL-127 callouts dropped while paused, not replayed at resume", () => {
+    const m = createToastMemory(Date.now());
+    const off = registerToastMemory(m);
+    try {
+      pauseGate.set(true);
+      showCallout({ id: "kill", content: "Goblin 2 falls" });
+      expect(m.getState().toasts.callout ?? null).toBeNull();
+      pauseGate.set(false);
+      expect(m.getState().toasts.callout ?? null).toBeNull();
+      showCallout({ id: "kill-2", content: "Wolf falls" });
+      expect(m.getState().toasts.callout).toMatchObject({ id: "kill-2" });
+    } finally {
+      pauseGate.set(false);
+      off();
+    }
   });
 });
