@@ -69,12 +69,16 @@ test("FR-MAP-94 reveal never zooms in (BL-65): P1 @1280×800 with the card + Sta
   const revealed = inputsOf("ambush-revealed", WINDOWS);
   const before = fitScene(revealed.tokens, GRID, revealed.map, VP, revealed.room);
   expect(cellOf(before)).toBeGreaterThan(last);
-  // Now: ≤ the last full fit's cell, ≥ 75 % of it (no ratchet down).
+  // Now: ≤ the last full fit's cell; zooming out to clear tokens is allowed (the load's camera).
   const reveal = fitFor("reveal", revealed, last);
   expect(cellOf(reveal)).toBeLessThanOrEqual(last + 1e-9);
-  expect(cellOf(reveal)).toBeGreaterThanOrEqual(REFIT_MIN_SHARE * last - 1e-9);
-  // No pan in that range clears every token here (`pcs`): every PC stays clear.
-  expect(reveal.visible).toBe("pcs");
+  const load2 = fitFor("load", revealed, null);
+  expect({ x: reveal.x, y: reveal.y, scale: reveal.scale }).toEqual({
+    x: load2.x,
+    y: load2.y,
+    scale: load2.scale,
+  });
+  // Every PC stays clear.
   const pcs = REPLAY_CELLS["ambush-revealed"]["player-1"].tokens.filter((t) => t.pc);
   expect(
     hidden("ambush-revealed", reveal, WINDOWS).filter((n) => pcs.some((p) => p.name === n)),
@@ -89,11 +93,11 @@ test("FR-MAP-94 reveal never zooms in (BL-65): P1 @1280×800 with the card + Sta
   expect(cellOf(r03)).toBeLessThan(48);
   expect(cellOf(r03)).toBeLessThanOrEqual(cellOf(before));
   expect(hidden("ambush-revealed", r03, [SHEET])).toEqual([]);
-  // Repeated reveals: the same inputs → the same camera; with room again, back up to the last
-  // full fit at most.
+  // Repeated reveals: the same inputs → the same camera (no ratchet); with room again, back up to
+  // the last full fit at most.
   expect(fitFor("reveal", revealed, last)).toEqual(reveal);
   const again = fitFor("reveal", inputsOf("ambush-revealed", THREE), last);
-  expect(cellOf(again)).toBeGreaterThan(cellOf(reveal));
+  expect(cellOf(again)).toBeGreaterThanOrEqual(cellOf(reveal));
   expect(cellOf(again)).toBeLessThanOrEqual(last + 1e-9);
   // The harness's sim-11 h cell: its reveal step never raises the cell (I6).
   const h = REPROS.player.find((r) => r.name.startsWith("sim-11 h"));
@@ -105,6 +109,56 @@ test("FR-MAP-94 reveal never zooms in (BL-65): P1 @1280×800 with the card + Sta
   expect(run.steps[i]?.cell).toBeLessThanOrEqual((run.steps[i - 1]?.cell ?? 0) + 1e-9);
   expect(run.steps[i]?.problems.filter((p) => p.startsWith("I6"))).toEqual([]);
 }, 15_000);
+
+/** Walkthrough F10 (test-wf3): B 1280×800, Escort, the card open, Stats put away; Initiative, card, sheet, Game log. */
+const F10_WINDOWS: readonly Rect[] = [
+  { x: 68, y: 60, w: 280, h: 400 },
+  { x: 360, y: 60, w: 320, h: 360 },
+  SHEET,
+  { x: 68, y: 564, w: 510, h: 160 },
+];
+/** What B sees after Reveal all (13 tokens: no Fire Elementals in Escort, the charmed Goblin 2 gone). */
+const F10_TOKENS = REPLAY_CELLS["ambush-revealed"]["player-1"].tokens.filter(
+  (t) => !["Fire Elemental", "Fire Elemental 2", "Fire Elemental 3", "Goblin 2"].includes(t.name),
+);
+
+test("FR-MAP-94 FR-MAP-95 reveal = load (walkthrough F10): last full fit 48 px, the card open, Reveal all → the load's camera (24 px, nothing under a window), not 48 px with Goblin, Elite 2, Wolf 2 and Plain Brute under the sheet", () => {
+  const rooms = fitRooms("player", F10_WINDOWS, keepOuts("player", VP, new Map()), VP, null);
+  const tokens = F10_TOKENS.map((t) => ({ col: t.col, row: t.row, size: t.size, pc: t.pc }));
+  const inputs: FitInputs = {
+    client: "player",
+    tokens,
+    grid: GRID,
+    map: { w: 1400, h: 980 },
+    view: VP,
+    ...rooms,
+  };
+  const under = (cam: { x: number; y: number; scale: number }) =>
+    F10_TOKENS.filter(
+      (t) => !allClear(cam, [footprintBox([t], GRID) as Rect], F10_WINDOWS, visibleArea(VP)),
+    ).map((t) => t.name);
+  // The walkthrough's refit: bounded to [36, 48] px, it stayed at 48 (camera 450, 132).
+  const was = fitScene(tokens, GRID, inputs.map, VP, rooms.room, {
+    maxCell: 48,
+    minCell: 36,
+    leastHidden: true,
+  });
+  expect({ cell: cellOf(was), x: was.x, y: was.y }).toEqual({ cell: 48, x: 450, y: 132 });
+  expect(under(was)).toEqual(
+    expect.arrayContaining(["Goblin", "Elite Goblin Warrior 2", "Wolf 2", "Plain Brute"]),
+  );
+  // Now the reveal reaches the load's answer: zoomed out, nothing under a window.
+  const reveal = fitFor("reveal", inputs, 48);
+  const load = fitFor("load", inputs, null);
+  expect({ x: reveal.x, y: reveal.y, scale: reveal.scale }).toEqual({
+    x: load.x,
+    y: load.y,
+    scale: load.scale,
+  });
+  expect(reveal.reason).toBe("reveal");
+  expect(cellOf(reveal)).toBeLessThanOrEqual(48);
+  expect(under(reveal)).toEqual([]);
+});
 
 test("FR-MAP-97 yield refit: dryFit returns {camera, cellPx, verdict} unapplied; a yield the placer accepts (≥ 75 % of the last full fit) refits once with `window`, still fitted; `moved` never", () => {
   // The dry fit: the candidate window as one more obstacle, the camera not applied.

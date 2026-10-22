@@ -2399,7 +2399,7 @@ From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–
 
 | Data | Where | Rule | Source |
 |---|---|---|---|
-| Last full fit's cell | client memory (`MapCanvas` `lastFullCell`) | screen px per grid cell of the last Fit, open, load or resize fit on this page; bounds reveal, appearance and yield refits to [0.75 ×, 1 ×] it; none before the first fit | FR-MAP-94 |
+| Last full fit's cell | client memory (`MapCanvas` `lastFullCell`) | screen px per grid cell of the last Fit, open, load or resize fit on this page; reveal, appearance and yield refits never exceed it (a yield also keeps ≥ 0.75 × it); none before the first fit | FR-MAP-94 |
 | Base port | client memory (`free-area.ts` module slot) | the mounted canvas's `{dryFit, lastFullCell, yieldRefit}`; null when no map is mounted | FR-MAP-97 |
 | Pending settled fit | client memory (`createSettledRefit`) | the reason of the load / open / resize / yield fit waiting for the placer's settle (≤ 60 frames) | FR-MAP-96, -98 |
 

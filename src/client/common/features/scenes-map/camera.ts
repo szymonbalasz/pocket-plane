@@ -959,7 +959,7 @@ export interface FitBounds {
   leastHidden?: boolean;
 }
 
-/** FR-MAP-94, -97: a refit (reveal, appearance, window) keeps ≥ this share of the last full fit's cell. */
+/** FR-MAP-97, FR-SHELL-108: a yield (`window`) keeps ≥ this share of the last full fit's cell. */
 export const REFIT_MIN_SHARE = 0.75;
 
 /**
@@ -1173,19 +1173,21 @@ export const isFullFit = (reason: FitReason) =>
   reason === "resize";
 
 /**
- * FR-MAP-94: a refit (reveal, appearance, window) draws a cell ≤ the last full fit's and searches
- * no lower than 75 % of it (so repeated reveals don't ratchet the map down); a full fit, or no
- * full fit yet, is unbounded. With no all-clear pan, every fit but the DM's full fits ranks the
- * PCs-first ladder by the least hidden token area (BL-65, r03: a player's load never re-scales up
- * to 48 px with tokens under the sheet); the DM's Fit takes the largest PC-clear cell (BL-41).
+ * FR-MAP-94: a refit (reveal, appearance, window) draws a cell ≤ the last full fit's; it may zoom
+ * out to the floor to clear tokens. A yield (`window`) also keeps ≥ 75 % of it (FR-SHELL-108: the
+ * placer accepts nothing below). A full fit, or no full fit yet, is unbounded. With no all-clear
+ * pan, the players' fits rank the PCs-first ladder by the least hidden token area (BL-65, r03: a
+ * player's load never re-scales up to 48 px with tokens under the sheet); the DM's take the
+ * largest PC-clear cell (BL-41: Fit doesn't squeeze the map).
  */
 export function fitBounds(
   reason: FitReason,
   lastFullCell: number | null,
   client: "dm" | "player",
 ): FitBounds {
-  const leastHidden = client === "player" || !isFullFit(reason);
+  const leastHidden = client === "player";
   if (isFullFit(reason) || lastFullCell === null || lastFullCell <= 0) return { leastHidden };
+  if (reason !== "window") return { maxCell: lastFullCell, leastHidden };
   return { maxCell: lastFullCell, minCell: REFIT_MIN_SHARE * lastFullCell, leastHidden };
 }
 
@@ -1214,7 +1216,16 @@ export function fitFor(
 ): SceneFit & { reason: FitReason } {
   const { tokens, grid, map, view, room, stripRoom } = inputs;
   const bounds = fitBounds(reason, lastFullCell, inputs.client);
-  const fit = fitPastToasts(tokens, grid, map, view, room, stripRoom, bounds);
+  const run = (b: FitBounds) => fitPastToasts(tokens, grid, map, view, room, stripRoom, b);
+  // FR-MAP-95: a refit first takes the full fit for these inputs (the camera a load would take);
+  // only when that zooms in past the last full fit (or, for a yield, below 75 % of it) the bounded
+  // fit (FR-MAP-94).
+  let fit = run({ leastHidden: bounds.leastHidden });
+  const cell = fit.scale * grid.gridCellSize;
+  const within =
+    (bounds.maxCell === undefined || cell <= bounds.maxCell + EPS) &&
+    (bounds.minCell === undefined || cell >= bounds.minCell - EPS);
+  if (!within) fit = run(bounds);
   const { pastToasts, ...rest } = fit;
   return { ...rest, reason: pastToasts ? "fit-past-toasts" : reason };
 }
