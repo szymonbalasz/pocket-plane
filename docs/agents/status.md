@@ -13,7 +13,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | CB2 turn ring | merged (16/16) | — | done | — |
 | TT4 pause screen | merged (13/14 → fixed; final 9/9) | — | done | main check 5164 / e2e 206 |
 | Sprint gate | main | — | session-sim-12 14/16 (FAILs → BL-83, BL-84); playtest section written; recap done (#338) | — |
-| Sprint 9 | — | — | planned ([sprint-9](sprint-9.md)) | Phase A: specs RS, PM, FX, SP at once |
+| Sprint 9 | — | — | planned ([sprint-9](sprint-9.md)); spec briefs ready: `%TEMP%/pocket-plane/briefs/spec-s9-{rs,pm,fx,sp}.md`, ID ranges `s9-ranges.md` (computed on `ab10c460`; recompute if specs changed since) | Phase A: start the four spec agents (`mkwt.sh spec/s9-<t> s9-<t> build` + `startagent.sh`) |
 | WF2 pushes + rail inset | merged (walkthrough 13/14) | — | done | main check 5014 / e2e 199 (1 known flake re-run green) |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
 | TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |
