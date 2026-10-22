@@ -31,6 +31,7 @@ import {
   type Viewport,
   windowRect,
 } from "./geometry";
+import { onGestureCancel } from "./input-block";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { type Placed, type WindowAction, windowId } from "./manager";
 import type { WindowDef } from "./registry";
@@ -88,6 +89,7 @@ export function ShellWindow({
   placed,
   settling,
   autoMinimised,
+  autoMinimisedCause,
   viewport,
   focused,
   dispatch,
@@ -100,6 +102,8 @@ export function ShellWindow({
   settling?: boolean;
   /** Minimised to make room for another window (FR-SHELL-47; `data-auto-minimised`). */
   autoMinimised?: boolean;
+  /** Why it was put away (FR-SHELL-110 `data-auto-minimised-cause`). */
+  autoMinimisedCause?: string | undefined;
   viewport: Viewport;
   focused: boolean;
   dispatch: (a: WindowAction) => void;
@@ -167,7 +171,13 @@ export function ShellWindow({
       last = compute(ev.clientX - sx, ev.clientY - sy);
       applyRect(el, last);
     };
+    // FR-SHELL-112 (2): a blocking overlay coming up cancels the gesture, nothing written.
+    const offCancel = onGestureCancel(() => {
+      last = null;
+      end();
+    });
     const end = () => {
+      offCancel();
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", end);
       handle.removeEventListener("pointercancel", end);
@@ -197,6 +207,7 @@ export function ShellWindow({
       data-pc-clear={pcClear || undefined}
       data-auto-minimised={(parked && autoMinimised) || undefined}
       data-auto-minimised-for={(parked && autoMinimised && autoFor) || undefined}
+      data-auto-minimised-cause={(parked && autoMinimised && autoMinimisedCause) || undefined}
       data-focused={focused}
       aria-label={def.title}
       aria-hidden={parked || undefined}
@@ -249,7 +260,7 @@ export function ShellWindow({
           </button>
         </Tooltip>
       </div>
-      <div ref={bodyRef} className="min-h-0 flex-1 overflow-auto p-3">
+      <div ref={bodyRef} data-testid="ui-window-body" className="min-h-0 flex-1 overflow-auto p-3">
         <WindowErrorBoundary>
           <WindowShown.Provider value={!parked}>
             {def.growToContent ? (

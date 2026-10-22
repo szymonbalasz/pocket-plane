@@ -1,7 +1,7 @@
 [
   {
     "at": "open @1600×900 note.history",
-    "rect": "785,60,360×472",
+    "rect": "777,60,360×480",
     "placed": "auto",
     "parked": ""
   },
@@ -37,13 +37,13 @@
   },
   {
     "at": "open @1600×900 stats.board",
-    "rect": "766,172,400×360",
+    "rect": "695,60,400×412",
     "placed": "auto",
     "parked": "charx.companion"
   },
   {
     "at": "reopen @1600×900 note.history",
-    "rect": "785,60,360×472",
+    "rect": "777,60,360×480",
     "placed": "stored",
     "parked": ""
   },
@@ -79,13 +79,13 @@
   },
   {
     "at": "reopen @1600×900 stats.board",
-    "rect": "766,172,400×360",
+    "rect": "695,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1440×900 @1440×900 note.history",
-    "rect": "604,60,360×472",
+    "rect": "612,60,360×480",
     "placed": "reopened",
     "parked": ""
   },
@@ -121,27 +121,27 @@
   },
   {
     "at": "reopen 1440×900 @1440×900 stats.board",
-    "rect": "548,172,400×360",
+    "rect": "548,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×800 @1280×800 note.history",
-    "rect": "616,484,280×240",
+    "rect": "505,72,360×480",
     "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1280×800 @1280×800 dicex.tray",
-    "rect": "471,172,360×300",
+    "rect": "470,208,360×300",
     "placed": "reopened",
-    "parked": ""
+    "parked": "note.history"
   },
   {
     "at": "reopen 1280×800 @1280×800 party.board",
     "rect": "496,60,440×400",
     "placed": "reopened",
-    "parked": "note.history,dicex.tray"
+    "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×800 @1280×800 cmp.compendium",
@@ -151,79 +151,79 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 shell.prefs",
-    "rect": "505,132,360×400",
+    "rect": "505,134,360×418",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×800 @1280×800 charx.companion",
-    "rect": "505,172,320×360",
+    "rect": "505,173,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×800 @1280×800 stats.board",
-    "rect": "466,172,400×360",
+    "rect": "466,140,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×720 @1280×720 note.history",
-    "rect": "616,404,280×240",
-    "placed": "stored",
+    "rect": "505,60,360×412",
+    "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1280×720 @1280×720 dicex.tray",
-    "rect": "505,92,360×300",
+    "rect": "471,172,360×300",
     "placed": "reopened",
-    "parked": ""
+    "parked": "note.history"
   },
   {
     "at": "reopen 1280×720 @1280×720 party.board",
-    "rect": "474,84,366×400",
+    "rect": "462,60,440×400",
     "placed": "reopened",
-    "parked": "note.history,dicex.tray"
+    "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×720 @1280×720 cmp.compendium",
-    "rect": "474,84,326×400",
+    "rect": "462,60,440×400",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "505,146,360×338",
+    "rect": "505,134,360×338",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "505,124,320×360",
+    "rect": "505,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×720 @1280×720 stats.board",
-    "rect": "466,124,400×360",
+    "rect": "466,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "protected @1280×720 note.history",
-    "rect": "616,404,280×240",
+    "rect": "505,60,360×412",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "protected @1280×720 char.sheet",
-    "rect": "948,60,320×440",
+    "rect": "948,60,320×338",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "open @1440×900 note.history",
-    "rect": "604,60,360×472",
+    "rect": "612,60,360×480",
     "placed": "auto",
     "parked": ""
   },
@@ -259,13 +259,13 @@
   },
   {
     "at": "open @1440×900 stats.board",
-    "rect": "548,172,400×360",
+    "rect": "548,60,400×412",
     "placed": "auto",
     "parked": "charx.companion"
   },
   {
     "at": "reopen @1440×900 note.history",
-    "rect": "604,60,360×472",
+    "rect": "612,60,360×480",
     "placed": "stored",
     "parked": ""
   },
@@ -301,27 +301,27 @@
   },
   {
     "at": "reopen @1440×900 stats.board",
-    "rect": "548,172,400×360",
+    "rect": "548,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×800 @1280×800 note.history",
-    "rect": "616,484,280×240",
+    "rect": "505,72,360×480",
     "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1280×800 @1280×800 dicex.tray",
-    "rect": "471,172,360×300",
+    "rect": "470,208,360×300",
     "placed": "reopened",
-    "parked": ""
+    "parked": "note.history"
   },
   {
     "at": "reopen 1280×800 @1280×800 party.board",
     "rect": "496,60,440×400",
     "placed": "reopened",
-    "parked": "note.history,dicex.tray"
+    "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×800 @1280×800 cmp.compendium",
@@ -331,73 +331,73 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 shell.prefs",
-    "rect": "505,132,360×400",
+    "rect": "505,134,360×418",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×800 @1280×800 charx.companion",
-    "rect": "505,172,320×360",
+    "rect": "505,173,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×800 @1280×800 stats.board",
-    "rect": "466,172,400×360",
+    "rect": "466,140,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×720 @1280×720 note.history",
-    "rect": "616,404,280×240",
-    "placed": "stored",
+    "rect": "505,60,360×412",
+    "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1280×720 @1280×720 dicex.tray",
-    "rect": "505,92,360×300",
+    "rect": "471,172,360×300",
     "placed": "reopened",
-    "parked": ""
+    "parked": "note.history"
   },
   {
     "at": "reopen 1280×720 @1280×720 party.board",
-    "rect": "474,84,366×400",
+    "rect": "462,60,440×400",
     "placed": "reopened",
-    "parked": "note.history,dicex.tray"
+    "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×720 @1280×720 cmp.compendium",
-    "rect": "474,84,326×400",
+    "rect": "462,60,440×400",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "505,146,360×338",
+    "rect": "505,134,360×338",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "505,124,320×360",
+    "rect": "505,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×720 @1280×720 stats.board",
-    "rect": "466,124,400×360",
+    "rect": "466,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "protected @1280×720 note.history",
-    "rect": "616,404,280×240",
+    "rect": "505,60,360×412",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "protected @1280×720 char.sheet",
-    "rect": "948,60,320×440",
+    "rect": "948,60,320×338",
     "placed": "stored",
     "parked": ""
   },
@@ -427,7 +427,7 @@
   },
   {
     "at": "open @1280×800 shell.prefs",
-    "rect": "505,152,360×400",
+    "rect": "505,134,360×418",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
@@ -439,7 +439,7 @@
   },
   {
     "at": "open @1280×800 stats.board",
-    "rect": "466,192,400×360",
+    "rect": "466,140,400×412",
     "placed": "auto",
     "parked": "charx.companion"
   },
@@ -469,7 +469,7 @@
   },
   {
     "at": "reopen @1280×800 shell.prefs",
-    "rect": "505,152,360×400",
+    "rect": "505,134,360×418",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -481,7 +481,7 @@
   },
   {
     "at": "reopen @1280×800 stats.board",
-    "rect": "466,192,400×360",
+    "rect": "466,140,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
@@ -499,13 +499,13 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 party.board",
-    "rect": "474,60,366×412",
+    "rect": "462,60,440×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×720 @1280×720 cmp.compendium",
-    "rect": "474,60,326×412",
+    "rect": "462,60,440×400",
     "placed": "reopened",
     "parked": "party.board"
   },
@@ -523,7 +523,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 stats.board",
-    "rect": "466,112,400×360",
+    "rect": "466,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
@@ -535,7 +535,7 @@
   },
   {
     "at": "protected @1280×720 char.sheet",
-    "rect": "948,60,320×418",
+    "rect": "948,60,320×338",
     "placed": "stored",
     "parked": ""
   },
@@ -553,13 +553,13 @@
   },
   {
     "at": "open @1280×720 party.board",
-    "rect": "474,60,366×412",
+    "rect": "462,60,440×400",
     "placed": "auto",
     "parked": "dicex.tray"
   },
   {
     "at": "open @1280×720 cmp.compendium",
-    "rect": "474,60,326×412",
+    "rect": "462,60,440×400",
     "placed": "auto",
     "parked": "party.board"
   },
@@ -577,7 +577,7 @@
   },
   {
     "at": "open @1280×720 stats.board",
-    "rect": "466,112,400×360",
+    "rect": "466,60,400×412",
     "placed": "auto",
     "parked": "charx.companion"
   },
@@ -595,13 +595,13 @@
   },
   {
     "at": "reopen @1280×720 party.board",
-    "rect": "474,60,366×412",
+    "rect": "462,60,440×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen @1280×720 cmp.compendium",
-    "rect": "474,60,326×412",
+    "rect": "462,60,440×400",
     "placed": "reopened",
     "parked": "party.board"
   },
@@ -619,7 +619,7 @@
   },
   {
     "at": "reopen @1280×720 stats.board",
-    "rect": "466,112,400×360",
+    "rect": "466,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },

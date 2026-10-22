@@ -1,9 +1,14 @@
 // Keep-out regions (FR-SHELL-48): parts of the work area auto placement avoids. Registry-driven:
 // (a) the client's toast box (`toastKeepOut`, FR-SHELL-49), always: players' bottom-right corner
 // = hard, the DM's top-centre region = soft; (b) rects reported by chrome floating over the map
-// (`reportKeepOut`; sprint 5: scenes-map's active tool bar `map.toolbar`), hard. Client memory,
-// recomputed; never stored or sent.
-import { useMemo, useSyncExternalStore } from "react";
+// (`reportKeepOut`; sprint 5: scenes-map's active tool bar `map.toolbar`), hard; (c) the shown
+// chrome keep-outs (`chrome-keep-outs.ts`, FR-SHELL-113), hard. Client memory, recomputed; never
+// stored or sent.
+import type { RecordStore } from "@shared/protocol/store";
+import { useContext, useMemo, useSyncExternalStore } from "react";
+import { createStore, type StoreApi, useStore } from "zustand";
+import { SyncContext } from "../../sync/store";
+import { chromeKeepOuts } from "./chrome-keep-outs";
 import type { Rect, Viewport } from "./geometry";
 import { useViewport } from "./hooks";
 import type { ShellClient } from "./registry";
@@ -49,11 +54,15 @@ export function reportedKeepOuts(): ReadonlyMap<string, Rect> {
   return reported;
 }
 
-/** This client's keep-out regions in viewport `vp`: the toast box, then the reported rects. */
+/**
+ * This client's keep-out regions in viewport `vp`: the toast box, then the reported rects, then
+ * the shown chrome keep-outs (`chrome`, FR-SHELL-113).
+ */
 export function keepOuts(
   client: ShellClient,
   vp: Viewport,
   reports: ReadonlyMap<string, Rect> = reported,
+  chrome: readonly KeepOut[] = [],
 ): KeepOut[] {
   const out: KeepOut[] = [
     {
@@ -63,6 +72,7 @@ export function keepOuts(
     },
   ];
   for (const [id, rect] of reports) out.push({ id, rect, kind: "hard" });
+  out.push(...chrome);
   return out;
 }
 
@@ -85,9 +95,14 @@ export const subscribeKeepOuts = (fn: () => void) => {
   };
 };
 
-/** This client's keep-out regions now; re-renders on viewport resize and on reports. */
+const NO_SYNC = createStore<{ store: RecordStore | undefined }>()(() => ({ store: undefined }));
+
+/** This client's keep-out regions now; re-renders on viewport resize, reports and the store. */
 export function useKeepOuts(client: ShellClient): KeepOut[] {
   const vp = useViewport();
   const reports = useSyncExternalStore(subscribeKeepOuts, reportedKeepOuts, reportedKeepOuts);
-  return useMemo(() => keepOuts(client, vp, reports), [client, vp, reports]);
+  const sync = useContext(SyncContext) as StoreApi<{ store: RecordStore | undefined }> | null;
+  const store = useStore(sync ?? NO_SYNC, (s) => s.store);
+  const chrome = useMemo(() => chromeKeepOuts(client, vp, store), [client, vp, store]);
+  return useMemo(() => keepOuts(client, vp, reports, chrome), [client, vp, reports, chrome]);
 }

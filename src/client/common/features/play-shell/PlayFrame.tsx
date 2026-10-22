@@ -1,7 +1,7 @@
 // The play page frame (FR-SHELL-01/02/05). Stacking, bottom → top:
 // base layer (z-0) < windows (z-10) < chrome: top bar, tool rail, launcher (z-20)
 // < reconnect banner (z-30) < dialogs, menus, tooltips (z-50, portalled) < alert flash (z-100,
-// portalled, FR-SHELL-22).
+// portalled, FR-SHELL-22) < overlay layer (FR-SHELL-112 (2), -135) < dice layer.
 import { useEffect, useRef, useState } from "react";
 import { ConnectionIndicator, ReconnectBanner } from "../live-sync/ConnectionStatus";
 import { AlertFlash } from "./AlertLayer";
@@ -13,6 +13,7 @@ import { keepOutsAttr, useKeepOuts } from "./keep-outs";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { Launcher } from "./Launcher";
 import { mountedWindows, topWindow, type WindowAction } from "./manager";
+import { OverlayLayer } from "./OverlayLayer";
 import type { ShellClient } from "./registry";
 import {
   useAlertState,
@@ -23,6 +24,13 @@ import {
 } from "./ShellContext";
 import { ShellWindow } from "./ShellWindow";
 import { SHELL_TEST_DRAG_MIME, SHELL_TEST_KIND } from "./test-windows";
+import { topBarItemsFor } from "./top-bar-items";
+
+/**
+ * FR-SHELL-95: the `viewport` settle runs this long after the last resize event: before the map's
+ * resize refit (200 ms, FR-MAP-47), so the refit frames the settled windows (FR-MAP-98).
+ */
+export const VIEWPORT_SETTLE_MS = 150;
 
 const EMPTY_TEXT: Record<ShellClient, string> = {
   dm: "No scenes yet",
@@ -60,7 +68,9 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const placed = useShellState((s) => s.placed);
   const settling = useShellState((s) => s.settling);
   const autoMinimised = useShellState((s) => s.autoMinimised);
+  const autoCause = useShellState((s) => s.autoMinimisedCause);
   const autoMinimiseLog = useShellState((s) => s.autoMinimiseLog);
+  const settleLog = useShellState((s) => s.settleLog);
   const regions = useKeepOuts(client);
   const available = useAvailableKinds();
   const dispatch = useWindowDispatch();
@@ -69,9 +79,21 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const testMode = available.has(SHELL_TEST_KIND);
   const lastSound = useAlertState((s) => s.lastSound);
   useAppearPlacement(available, dispatch);
-  // FR-SHELL-51, -53: a live resize lets never-resized default-sized windows follow (W2 finding).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the viewport size is the trigger
-  useEffect(() => dispatch({ type: "viewport" }), [viewport.w, viewport.h, dispatch]);
+  // FR-SHELL-95, -103: while the viewport changes windows only render-fit; one `viewport` settle
+  // runs, and writes, after the last resize event. Timed from the event itself (not a render), so
+  // it always lands before the map's resize refit (FR-MAP-98).
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const on = () => {
+      clearTimeout(t);
+      t = setTimeout(() => dispatch({ type: "viewport" }), VIEWPORT_SETTLE_MS);
+    };
+    window.addEventListener("resize", on);
+    return () => {
+      window.removeEventListener("resize", on);
+      clearTimeout(t);
+    };
+  }, [dispatch]);
 
   return (
     // overflow-clip (not hidden): a clipped box can't be scrolled at all, so focusing something
@@ -82,6 +104,8 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
       data-keep-outs={keepOutsAttr(regions)}
       // FR-SHELL-88: the last placement's auto-minimise moves (test mode only).
       data-auto-minimise-log={testMode ? autoMinimiseLog : undefined}
+      // FR-SHELL-110: the last settle's steps, "trigger:kind>rung;…" (test mode only).
+      data-settle-log={testMode ? settleLog : undefined}
       onScroll={(e) => {
         e.currentTarget.scrollTop = 0;
         e.currentTarget.scrollLeft = 0;
@@ -105,6 +129,7 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
               placed={placed.get(`${w.kind}:${w.instance}`)}
               settling={settling.has(`${w.kind}:${w.instance}`)}
               autoMinimised={autoMinimised.has(`${w.kind}:${w.instance}`)}
+              autoMinimisedCause={autoCause.get(`${w.kind}:${w.instance}`)}
               viewport={viewport}
               focused={top === w}
               dispatch={dispatch}
@@ -126,6 +151,18 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
           {topRight}
           <ConnectionIndicator />
           {topEnd}
+          {/* FR-SHELL-112 (3): registered top-bar items, fixed width each, before the chip. */}
+          {topBarItemsFor(client).map((t) => (
+            <div
+              key={t.id}
+              data-testid="ui-topbar-item"
+              data-record-id={t.id}
+              className="flex shrink-0 items-center"
+              style={{ width: t.width }}
+            >
+              <t.Component />
+            </div>
+          ))}
           {/* FR-SHELL-70: opens Preferences; the players' sound state moved here (FR-SHELL-73). */}
           <IdentityChip client={client} />
         </div>
@@ -159,13 +196,16 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
       </div>
 
       <AlertFlash />
+
+      <OverlayLayer client={client} />
     </div>
   );
 }
 
 /**
  * A kind that becomes available while the page shows a layout (not on restore) gets an
- * `appear`: a never-moved default window then avoids the windows already on screen.
+ * `appear` (FR-SHELL-107: a protected one takes its zone); one that goes ends what it displaced
+ * (FR-SHELL-102: a `return`).
  */
 function useAppearPlacement(available: ReadonlySet<string>, dispatch: (a: WindowAction) => void) {
   const key = useShellState((s) => s.key);
@@ -174,6 +214,7 @@ function useAppearPlacement(available: ReadonlySet<string>, dispatch: (a: Window
     const p = prev.current;
     prev.current = { key, kinds: available };
     if (!p || key === null || p.key !== key) return;
+    if ([...p.kinds].some((kind) => !available.has(kind))) dispatch({ type: "return" });
     for (const kind of available) if (!p.kinds.has(kind)) dispatch({ type: "appear", kind });
   }, [available, key, dispatch]);
 }

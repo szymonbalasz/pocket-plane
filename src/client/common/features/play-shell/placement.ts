@@ -18,8 +18,9 @@
 //   soft box);
 //   (3) edge column before inward; (4) clear of soft keep-out regions; (5) least token area;
 //   (6) full size (≥ `minOpenH` counts as full; else, `minOpenH` windows: the tallest, FR-NOTE-31);
-//   (7) default column; (8) nearest to the fitted default rect, then taller, higher, more left,
-//   least over soft regions.
+//   (7) default column; (8)–(9) nearest to the previous rect (`prev`: a displaced window's, the
+//   pre-push one); (10) nearest to the fitted default rect, then taller, higher, more left, least
+//   over soft regions (FR-SHELL-111). `gap`: 12 px, or 4 px on a rung's retry (FR-SHELL-98).
 // A window that renders taller than its min size (`need`: a `growToContent` window's measured
 // content height, FR-SHELL-39) never gets a slot shorter than that. Sprint 7 (FR-SHELL-77, -79):
 // `floor` keeps every candidate at least the useful size (step (a)); `leastPc` ranks (2) by the
@@ -95,8 +96,13 @@ const overlapArea = (a: Rect, b: Rect) =>
  * a `hard` keep-out region below its top (the players' toast corner) ends 12 px above it, never
  * below min size; any other overlapping rect is left as is (placement puts it elsewhere).
  */
-export function fittedDefaultRect(def: Placeable, vp: Viewport, hard: readonly Rect[] = []): Rect {
-  const r = defaultRect(def.defaultPosition, defaultSizeAt(def, vp), vp);
+export function fittedDefaultRect(
+  def: Placeable,
+  vp: Viewport,
+  hard: readonly Rect[] = [],
+  size: Size = defaultSizeAt(def, vp),
+): Rect {
+  const r = defaultRect(def.defaultPosition, size, vp);
   const a = usableArea(vp);
   const [x, w] = fitAxis(r.x, r.w, def.minSize.w, a.left, a.right);
   const [y, h] = fitAxis(r.y, r.h, def.minSize.h, a.top, a.bottom);
@@ -159,6 +165,18 @@ export interface PlaceInput {
   floor?: Size;
   /** FR-SHELL-77 (e): over PCs, the least PC footprint area wins (not the PCs held whole). */
   leastPc?: boolean;
+  /**
+   * The window's full size (FR-SHELL-100's target: a user size, else the fitted default); absent
+   * = the default size. Placed at the type's default anchor.
+   */
+  size?: Size;
+  /** Gap kept to windows, regions and footprints (FR-SHELL-98: 12 px, a retry at 4 px). */
+  gap?: number;
+  /**
+   * The window's previous rect (FR-SHELL-111 (8)–(9): nearest the pre-push / previous rect ranks
+   * before nearest the fitted default).
+   */
+  prev?: Rect;
 }
 
 export interface Placement {
@@ -167,6 +185,8 @@ export interface Placement {
   clear: boolean;
   /** Covers no PC footprint + 4 px (FR-SHELL-57, rank (2)). */
   pcClear: boolean;
+  /** An inward column (beside a window, region or token), not the edge one (rank (3), #162). */
+  inward?: true;
 }
 
 /**
@@ -206,11 +226,11 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const hard = (input.hard ?? []).map(plain);
   const soft = (input.soft ?? []).map(plain);
   const tokens = (input.tokens ?? []).map(plain);
-  const base = fittedDefaultRect(def, vp, hard);
+  const base = fittedDefaultRect(def, vp, hard, input.size);
   if (def.fixedDefault)
     return { rect: base, clear: true, pcClear: pcClear(base, input.tokens ?? []) };
   const a = usableArea(vp);
-  const g = EDGE_GAP;
+  const g = input.gap ?? EDGE_GAP;
   const { w } = base;
   const need = Math.ceil(input.need ?? 0);
   const fullH = Math.min(Math.max(base.h, need), a.bottom - a.top);
@@ -350,12 +370,14 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     const full = r.h >= (openH ?? fullH) && r.w === w ? 0 : 1;
     const column = r.x === base.x ? 0 : 1;
     const dist = Math.abs(r.x - base.x) + Math.abs(r.y - base.y);
+    const prev = input.prev ? Math.abs(r.x - input.prev.x) + Math.abs(r.y - input.prev.y) : 0;
     return [
       ...head,
       tokenArea,
       full,
       openH === null ? 0 : -r.h,
       column,
+      prev,
       dist,
       -r.h,
       r.y,
@@ -500,7 +522,12 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   }
   const chosen = best as { rect: Rect; rank: number[] } | null;
   if (!chosen) return { rect: base, clear: true, pcClear: pcClear(base, input.tokens ?? []) };
-  return { rect: chosen.rect, clear: chosen.rank[0] === 0, pcClear: chosen.rank[5] === 0 };
+  return {
+    rect: chosen.rect,
+    clear: chosen.rank[0] === 0,
+    pcClear: chosen.rank[5] === 0,
+    ...(chosen.rank[9] === 1 && { inward: true as const }),
+  };
 }
 
 /** `a` < `b` lexicographically over the first `n` fields (default: all of `a`). */

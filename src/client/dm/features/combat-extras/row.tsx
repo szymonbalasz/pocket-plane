@@ -1,7 +1,8 @@
 // DM Initiative row additions (FR-CBTX-33): temp HP "+5" after HP, effect chips on the name line
 // (click → Edit / End), PC death pips + state; row menu Conditions ▸, Effect…, Concentration…,
 // Temp HP…, Death save / Stabilise for a dying PC, Set death saves…. Rendered by combat's
-// `cbt.initiative` row; every control sends an intent, the server decides.
+// `cbt.initiative` row; every control sends an intent, the server decides. Sprint 8 (FR-CBTX-63):
+// Move up / Move down.
 import { CONDITION_INFO, CONDITIONS, type Condition } from "@shared/combat-extras/conditions";
 import { CBTX_INTENTS, type TargetRef } from "@shared/combat-extras/intents";
 import type { EffectView } from "@shared/combat-extras/schemas";
@@ -36,6 +37,8 @@ import {
 import { useTriggerChips } from "@ui/features/effect-modifiers/trigger-badges";
 import { useSync } from "@ui/sync/store";
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   BrainIcon,
   CheckIcon,
   DicesIcon,
@@ -46,7 +49,8 @@ import {
   TrashIcon,
   TrophyIcon,
 } from "lucide-react";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { ReorderContext } from "../combat-tracker/reorder-drag";
 import { rollKeys } from "../combat-tracker/roll-keys";
 import { type Target, useCbtxDialogs } from "./store";
 
@@ -309,6 +313,38 @@ export function ConditionsMenu({
         );
       })}
     </SafeSub>
+  );
+}
+
+/**
+ * FR-CBTX-63: Move up / Move down, one block per step (`cbtx.moveCombatant`, as a drag); disabled
+ * at the ends, on a row riding its owner, while a move is in flight or not live.
+ */
+export function RowMoveItems({ c }: { c: CombatantView }) {
+  const r = useContext(ReorderContext);
+  if (!r) return null;
+  const up = r.step(c.id, "up");
+  const down = r.step(c.id, "down");
+  return (
+    <>
+      <DropdownMenuItem
+        data-testid="cbtx-init-row-move-up"
+        data-record-id={c.id}
+        disabled={!up}
+        onSelect={() => up?.()}
+      >
+        <ArrowUpIcon /> Move up
+      </DropdownMenuItem>
+      <DropdownMenuItem
+        data-testid="cbtx-init-row-move-down"
+        data-record-id={c.id}
+        disabled={!down}
+        onSelect={() => down?.()}
+      >
+        <ArrowDownIcon /> Move down
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+    </>
   );
 }
 

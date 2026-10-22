@@ -11,7 +11,7 @@ import {
   rectIn,
   rectOf,
 } from "@ui/features/play-shell/layout-checks";
-import { defaultLayout, followViewport, reduce } from "@ui/features/play-shell/manager";
+import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { TOOL_BAR_MAX_W, toolBarMaxWidth } from "@ui/features/scenes-map/tool-bar-spot";
 import { playerWindows } from "../../windows";
 
@@ -71,7 +71,7 @@ test("FR-SHELL-55 push right (player): a window not overlapping the bar grown by
   expect(rectIn(ws, "cbt.initiative")).toEqual({ ...init, x: near.x + near.w + 12 });
 });
 
-test("FR-SHELL-53 live viewport change (player): the never-resized Game log follows 1440×900 → 1280×720 (850×280 → 510×160)", () => {
+test("FR-SHELL-53 FR-SHELL-99 live viewport change (player): the Game log takes its 1280×720 zone after 1440×900 (850×280 → 510×160)", () => {
   const wide = { w: 1440, h: 900 };
   const small = { w: 1280, h: 720 };
   const start = defaultLayout(playerWindows, wide);
@@ -79,10 +79,10 @@ test("FR-SHELL-53 live viewport change (player): the never-resized Game log foll
     w: 850,
     h: 280,
   });
-  const ws = followViewport(start, playerWindows, small);
+  const ws = reduce(start, { type: "viewport" }, { ...ctxAt(small), settledViewport: wide });
   const log = rectIn(ws, "dice.log");
   expect({ w: log.w, h: log.h }).toEqual({ w: 510, h: 160 });
   expect(log.y + log.h).toBeLessThanOrEqual(small.h - 64 - 12);
   // Unchanged viewport: same array.
-  expect(followViewport(ws, playerWindows, small)).toBe(ws);
+  expect(reduce(ws, { type: "viewport" }, { ...ctxAt(small), settledViewport: small })).toBe(ws);
 });
