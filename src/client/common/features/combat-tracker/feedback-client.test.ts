@@ -176,7 +176,7 @@ describe("FR-CBT-41 turn alert predicate", () => {
       id: "cbt.turn",
       title: "Your turn",
       detail: "Mira",
-      sound: "ping",
+      sound: "turn",
     });
     const s2 = store(p2You, { combatants: [goblin, mira], entities: [owned] });
     expect(turnAlertFor(frame("TurnChanged", "k-mira"), s2)).toBeNull();
