@@ -16,5 +16,9 @@ export default defineBundle({
     // TT: table tools (`dicex-macros` TT1, `audio-chime` + `camp-alert-sounds` TT3)
     // SB: stats tier B (`sb-fight-facts`, `sb-luck-rolls`)
     // CB: combat polish (`cb-ties`, `cb-fog-goblin`, `cb-party`)
+    // CB0: a three-way 12-tie (Thorn, Fire Elemental 3, Goblin), Goblin fog-hidden, party values
+    "cb-ties",
+    "cb-fog-goblin",
+    "cb-party",
   ],
 });
