@@ -16,7 +16,7 @@ phase: post-mvp-9
 
 > **Sprint 8, track WF** (DM [#333](../decisions-log.md); size rows only): FR-STATS-66 gives `stats.board` a useful size checked by content; FR-STATS-67 sizes the award grid to the window (BL-66). Slice WF4; walkthrough F9, F13 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
 
-> **Sprint 9, track SP** (DM [#338](../decisions-log.md): session recap): the [session recap](session-recap.md) reads stats' compute helpers. FR-STATS-78–80 ([§6.2](#62-sprint-9-recap-reads-track-sp)): a read seam, a Recap button on the Session tab, separate budgets. No stats number, schema or ack changes; 0 B. The stats files (`compute.ts`, the Session tab) are edited in slice SP3 **after track FX's stats fixes merge** (one holder of stats files at a time, sprint-9 hotspots).
+> **Sprint 9, track SP** (DM [#338](../decisions-log.md): session recap): the [session recap](session-recap.md) reads stats' compute helpers. FR-STATS-78–80 ([§6.2](#62-sprint-9-recap-reads-track-sp)): a read seam, a Recap button on the Session tab, separate budgets. No stats number, schema or ack changes; 0 B. The stats files (`compute.ts`, the Session tab) are edited in slice SP3 **after FX1 merges** (seams S7: one holder of stats files at a time).
 
 ## 1. Summary
 
@@ -353,7 +353,7 @@ Named tests (all `FR-STATS-NN …`):
 | **SB1** `build/sb-stats-ui` | `@ui/features/stats/*` (feed, Highlights, Luck, End open) | appends: `notification-views.ts` ×2, `pref-sections.ts` ×2 | after SB0 + WF1 + WF4 |
 | **SB2** `build/sb-trophies` | `@ui/features/stats/trophies/*` | append: `sheet-sections.ts` (`order: 100`) | after SB0 + WF1 + WF4; ∥ SB1 (or one builder, one walkthrough) |
 
-**Sprint 9 (track SP).** FR-STATS-78–80 are built in RECAP's slice **SP3** ([session-recap §14](session-recap.md#14-dependencies)): `features/stats/compute.ts` (one export) and the Session tab's button (`@ui/features/stats/*`), **after track FX's stats slice (BL-84, BL-74) merges**. Tests: `FR-STATS-78 recap seam`, `FR-STATS-79 recap button`, `FR-STATS-80` in the leak scan; walkthrough RC2 ([session-recap §13](session-recap.md#13-test-plan)). No fixture here (RECAP's units).
+**Sprint 9 (track SP).** FR-STATS-78–80 are built in RECAP's slice **SP3** ([session-recap §14](session-recap.md#14-dependencies)): `features/stats/compute.ts` (one export) and the Session tab's button (`@ui/features/stats/*`), **after FX1 (BL-84, BL-74) merges** (seams S7). Tests: `FR-STATS-78 recap seam`, `FR-STATS-79 recap button`, `FR-STATS-80` in the leak scan; walkthrough RC2 ([session-recap §13](session-recap.md#13-test-plan)). No fixture here (RECAP's units).
 
 ## 15. Open questions
 
