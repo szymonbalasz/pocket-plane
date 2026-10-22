@@ -10,16 +10,16 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | WF1 placer core + replay harness | merged | — | done | main gates running |
 | WF3 map refits | merged (re-test 7/8; DM reload cell by design) | — | done | — |
-| CB2 turn ring | `build/cb-turn-ring` (w9N) | build-cb2 | building (last sprint slice) | walkthrough CB1, CB7, CB13 |
+| CB2 turn ring | `build/cb-turn-ring` (w9N) | build-cb2 | walkthrough 16/16; gates queued | merge |
 | TT4 pause screen | `build/tt-pause` (w9H) | build-tt4 | part 1 13/14 → popup + body-portal fixes, gates | finish after WF4 (toasts), WF3 (reveal), TT1+2 (T10, T12) |
 | WF2 pushes + rail inset | merged (walkthrough 13/14) | — | done | main check 5014 / e2e 199 (1 known flake re-run green) |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
 | TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |
 | TT1+TT2 macros + roll requests | merged (13/13 + 6/6) | — | done | — |
 | SB0 stats tier-B core | merged (walkthrough 10/10) | — | done | — |
-| CB3 Party status | `build/cb-party` (w9K) | build-cb3 | building | walkthrough CB10, CB11, CB13 |
+| CB3 Party status | merged (walkthrough all PASS after the hidden-companion fix) | — | done | — |
 | WF4 toast policy + Stats / card sizes | merged | — | done | — |
-| SB1+SB2 stats UI + trophies | `build/sb-stats-ui` (w9M) | build-sb12 | building | walkthrough §13.1 1–10 |
+| SB1+SB2 stats UI + trophies | `build/sb-stats-ui` (w9M) | build-sb12 | walkthrough 12/13 → BL-69 fixed; gates running | merge, then TT4's stats hooks |
 | CB0 combat core | merged (walkthrough all PASS) | — | done | main gates running |
 | CB1 drag reorder | merged (walkthrough 14/14) | — | done | main gates after WF1 merge |
 
