@@ -2426,3 +2426,18 @@ From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–
 - **Fixtures:** no new unit; e2e on `wf-frame-e2e`; `session-sim-12` unchanged (WF: aliases only, seams S15).
 - **Persisted runtime state:** none.
 - **CON-44:** 0 B.
+
+## 114. Sprint 8: saved macros and roll requests (TT1+TT2)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`**; no schema change (TT0's tables, [§106](#106-sprint-8-table-tools-core-tt0)). Protocol side: [protocol §144](../protocol/README.md#144-sprint-8-saved-macros-and-dm-roll-requests--intents-prompt-views-requests-window-tt1tt2).
+
+| Table / field | Written by | Rule | Source |
+|---|---|---|---|
+| `roll_macro` | `dicex.saveMacro` / `deleteMacro` / `moveMacro`; entities' owner-change hook | `sort_order` 0…n-1 per (`player_id`, `creature_id`); `created_by` = the making player (null = the DM); an owner change moves the PC's rows from the old owner's list to the new owner's (the old owner's `created_by` follows) | FR-DICEX-64–66 |
+| `roll_request` | `dicex.request` / `answerRequest` / `declineRequest` / `closeRequest` / `rollForMissing`; the owner-change hook | `state` `closed` + `closed_at` when no target is `open` (or Close / Roll for missing); a target leaves `open` once (`rolled` with `entryId`, `total` incl. MOD parts, `natural`, `success`; `declined`; `missed`) with `at` | FR-DICEX-73–82 |
+| `notification` (kind `roll-request`) | `dicex.request` (create); answer / decline (resolved by the closer); Close / Roll for missing / owner change (resolved by rule, no closer) | resolution `{outcome: rolled \| declined \| missed, total?}`; never dismissed by End | FR-NOTE-58, -62 |
+| `game_log_entry` / `roll` (answers) | `dicex.answerRequest`, `dicex.rollForMissing` | kind `roll`, actor = the PC, label = the request's, items `answer: true`; `public` / `audience_player_id` from the request (hidden = the target's player; roll for missing: the current owner, else DM only) | FR-DICE-79, -80 |
+
+- **Derived:** macro groups per viewer, a macro's roll block (not live, gone creature, not the viewer's), the prompt's expression (`characterRolls`), "All PCs" (owned, not hidden), card rows (Waiting / total ✓ ✗ / Declined / No roll).
+- **Persisted runtime state:** the rows above. Client memory only: the tray's Macros popover and editor drafts, the composer form.
+- **Fixtures:** `dicex-macros` (player-1: Sneak Attack 3d6 damage on Mira, Luck 1d100; DM: Bless 1d4, Inspiration 1d8 on Thorn → player-2's, Ambush 2d6 on the Elite Goblin Warrior, DM only), `dicex-request-open` (Perception to Mira + Thorn, DC 15 hidden, results hidden).

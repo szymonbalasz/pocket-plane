@@ -70,9 +70,17 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
     {
       name: "D3",
       viewer: "dm",
-      kinds: [...D1, "stats.board", "camp.players", "ent.creatures", "note.history", "dicex.tray"],
-      // TT's `dicex.requests` (S3) and CB's `party.summary` (S12): pending until registered.
-      pending: ["dicex.requests", "party.summary"],
+      kinds: [
+        ...D1,
+        "stats.board",
+        "camp.players",
+        "ent.creatures",
+        "note.history",
+        "dicex.tray",
+        "dicex.requests", // TT2 (S3)
+      ],
+      // CB's `party.summary` (S12): pending until registered.
+      pending: ["party.summary"],
     },
   ],
   player: [

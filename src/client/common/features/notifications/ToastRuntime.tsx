@@ -278,6 +278,8 @@ export function ToastRuntime({
           Date.now(),
           (store) => waitingForPlayers(store, views),
           classOf,
+          // FR-NOTE-60: kinds that re-toast their pending rows after a load / reconnect.
+          (n) => views.get(n.kind)?.restoreToast === true,
         ),
       );
       // FR-NOTE-30: the DM's 4 s action cue (live event frames only).

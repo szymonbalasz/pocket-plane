@@ -47,7 +47,9 @@ import cmpSrdFull from "./compendium/cmp-srd-full";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
 import cmpSrdMiniS3 from "./compendium/cmp-srd-mini-s3";
 import dicexLooks from "./dice-extras/dicex-looks";
+import dicexMacros from "./dice-extras/dicex-macros";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
+import dicexRequestOpen from "./dice-extras/dicex-request-open";
 import diceSettings from "./dice-roll-log/dice-settings";
 import logColours from "./dice-roll-log/log-colours";
 import rolls1 from "./dice-roll-log/rolls-1";
@@ -244,4 +246,7 @@ export const units: readonly Fixture[] = [
   cbTies,
   cbFogGoblin,
   cbParty,
+  // Sprint 8 track TT (build/tt-dice): macros + the open Perception request
+  dicexMacros,
+  dicexRequestOpen,
 ];
