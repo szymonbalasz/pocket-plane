@@ -250,10 +250,13 @@ export function characterOf(store: RecordStore, id: string): CharacterView | und
   return store.records[ENTITY_TYPE]?.[id] as CharacterView | undefined;
 }
 
-/** FR-CBTX-19: from the counters when held (DM, owner), else the redacted `deathState`. */
+/**
+ * FR-CBTX-19: from the counters when held (DM, owner), else the redacted `deathState` (other
+ * players hold `hpCurrent` too since ADR-0063, but never the counters).
+ */
 export function deathStateFor(c: CharacterView | undefined): DeathState | null {
   if (!c) return null;
-  if (typeof c.hpCurrent === "number") {
+  if (typeof c.hpCurrent === "number" && typeof c.deathSuccesses === "number") {
     return deathStateOf(c.hpCurrent, c.deathSuccesses ?? 0, c.deathFailures ?? 0);
   }
   return c.deathState ?? null;

@@ -7,7 +7,7 @@
 // (track CP) 24 owned combatants with max cards and 18 present pets.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
-import { EFFECT_TYPE } from "@shared/combat-extras/schemas";
+import { EFFECT_TYPE, TEMP_HP_MAX } from "@shared/combat-extras/schemas";
 import {
   COMBATANT_TYPE,
   ENCOUNTER_ENTRY_TYPE,
@@ -260,9 +260,12 @@ describe("CON-44 snapshot ceilings (#163)", () => {
         }
         for (const e of (f.records[ENTITY_TYPE] ?? []) as Record<string, unknown>[]) {
           if (e.ownerPlayerId === f.viewer.playerId) continue;
-          for (const k of ["tempHp", "deathSuccesses", "deathFailures", "hpCurrent"]) {
-            expect(Object.keys(e)).not.toContain(k);
-          }
+          // ADR-0063 (FR-PARTY-52): another player's PC carries HP / temp HP / AC; never counters.
+          const banned =
+            e.kind === "character"
+              ? ["deathSuccesses", "deathFailures"]
+              : ["tempHp", "deathSuccesses", "deathFailures", "hpCurrent"];
+          for (const k of banned) expect(Object.keys(e)).not.toContain(k);
           expect(Object.keys(e)).toContain("deathState");
         }
         const fx = JSON.stringify(f.records[EFFECT_TYPE] ?? []);
@@ -270,6 +273,42 @@ describe("CON-44 snapshot ceilings (#163)", () => {
           expect(fx).not.toContain(leak);
         }
       }
+    });
+
+    // ADR-0063 measured players +343 B (7 other PCs × 49 B at worst-width figures), DM 0 B.
+    test("FR-PARTY-57 CON-44 combat polish: other PCs' HP / temp HP / AC at worst width → players ≤ +343 B, DM 0 B; ceilings hold", () => {
+      const PARTY_KEYS = ["hpCurrent", "hpMax", "tempHp", "ac"];
+      const worst = { hpCurrent: 999, hpMax: 999, tempHp: TEMP_HP_MAX, ac: 30 };
+      const len = (o: unknown) => Buffer.byteLength(JSON.stringify(o), "utf8");
+      const sizes = snapshotSizes(b.s);
+      const growth = new Map<string, number>();
+      for (const f of snapshotFrames(b.s)) {
+        let added = 0;
+        for (const e of (f.records[ENTITY_TYPE] ?? []) as Record<string, unknown>[]) {
+          if (e.kind !== "character") continue;
+          if (f.viewer.role === "dm" || e.ownerPlayerId === f.viewer.playerId) {
+            // Full rows held these fields before ADR-0063: nothing new.
+            expect(Object.keys(e)).toContain("statBlock");
+            continue;
+          }
+          for (const k of PARTY_KEYS) expect(Object.keys(e)).toContain(k);
+          const without = Object.fromEntries(
+            Object.entries(e).filter(([k]) => !PARTY_KEYS.includes(k)),
+          );
+          added += len({ ...without, ...worst }) - len(without);
+        }
+        growth.set(f.label, added);
+      }
+      expect(growth.get("DM")).toBe(0);
+      const players = sizes.filter((v) => v.role === "player");
+      for (const p of players) expect(growth.get(p.label) ?? Infinity).toBeLessThanOrEqual(343);
+      // The worst player with the worst-width figures stays under 512 KiB.
+      const worstPlayer = Math.max(...players.map((p) => p.bytes + (growth.get(p.label) ?? 0)));
+      expect(worstPlayer).toBeLessThan(SNAPSHOT_CEILING.player);
+      expectUnderCeilings(sizes);
+      console.log(
+        `PARTY S8 party status: players +${Math.max(...players.map((p) => growth.get(p.label) ?? 0))} B at worst width; worst player ${worstPlayer} B of ${SNAPSHOT_CEILING.player}; DM +0 B`,
+      );
     });
 
     test("SQL windows: providers return the window, not the history (build time: snapshot-build.bench.ts)", () => {

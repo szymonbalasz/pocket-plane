@@ -100,8 +100,9 @@ test("FR-SHELL-43 DM at 1280×720: no launcher button outside the viewport; narr
   ).toHaveAttribute("data-state", "open");
   await dm.keyboard.press("Escape");
 
-  // Wide again: labels back, menu empty.
-  await dm.setViewportSize({ width: 1600, height: 900 });
+  // Wide again: labels back, menu empty. 1920: with Requests (TT2) and Party status (CB3) the DM's
+  // labelled bar no longer fits 1600 (FR-SHELL-143 only needs it to fit at 1280, icons allowed).
+  await dm.setViewportSize({ width: 1920, height: 1080 });
   await expect(launcher).toHaveAttribute("data-compact", "false");
   await expect(overflow).toHaveAttribute("data-count", "0");
 });

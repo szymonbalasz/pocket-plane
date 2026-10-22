@@ -363,6 +363,10 @@ describe("FR-CBTX-33 FR-CBTX-34 chips, death state", () => {
   test("FR-CBTX-25 dead PC (client copy) and death state from either shape", () => {
     expect(deathStateFor({ ...miraFull, hpCurrent: 0, deathFailures: 3 })).toBe("dead");
     expect(deathStateFor({ ...miraRedacted, deathState: "dying" })).toBe("dying");
+    // ADR-0063: the redacted row holds HP but no counters → its `deathState`, not a recompute.
+    const redHp = { ...miraRedacted, hpCurrent: 0, hpMax: 12, tempHp: 0, ac: 16 };
+    expect(deathStateFor({ ...redHp, deathState: "stable" })).toBe("stable");
+    expect(deathStateFor({ ...redHp, deathState: "dead" })).toBe("dead");
     const s = store(dmYou, { combatants: [miraC], entities: [{ ...miraFull, deathFailures: 3 }] });
     expect(deadPc(s, { kind: "pc", entityId: "mira" })).toBe(true);
   });

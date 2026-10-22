@@ -71,6 +71,25 @@ describe("combat-polish fixtures (CBTX §13.1)", () => {
     expect(enc).toMatchObject({ round: 1, turnCombatantId: by("Wolf").id });
   }, 120_000);
 
+  test("CBTX §13.1 wf-frame-e2e loads from empty with cb-party-six: 6 PCs, worst-width figures (FR-SHELL-141)", async () => {
+    const r = await loadBundle("wf-frame-e2e");
+    dirs.push(r.dir);
+    expect(r.manifest.fixtures.slice(-2)).toEqual(["cb-party", "cb-party-six"]);
+    const pcs = r
+      .openDb()
+      .select()
+      .from(entity)
+      .all()
+      .filter((e) => e.kind === "character");
+    expect(pcs).toHaveLength(6);
+    const six = pcs.filter((e) => (e.statBlock as { ac: number }).ac === 30);
+    expect(six.map((e) => [e.name.length, e.hpCurrent, e.tempHp])).toEqual([
+      [3, 999, 999],
+      [5, 999, 999],
+      [40, 999, 999],
+    ]);
+  }, 120_000);
+
   test("CBTX §13.1 e2e aliases are combat-polish", () => {
     for (const name of ["cb-reorder-e2e", "cb-turn-ring-e2e", "cb-party-e2e"]) {
       const b = library.bundles.find((x) => x.name === name);

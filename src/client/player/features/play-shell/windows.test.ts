@@ -693,8 +693,7 @@ const GOLDEN_KINDS = [
   "shell.prefs",
   "charx.companion",
   "stats.board", // ST2 (FR-SHELL-86 (5)): appended, goldens regenerated
-  // FR-SHELL-112 (1), -143: pending until registered (CB3 `party.summary`).
-  ...["party.summary"].filter((k) => playerWindows.get(k) !== undefined),
+  "party.summary", // CB3 (FR-SHELL-143): appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

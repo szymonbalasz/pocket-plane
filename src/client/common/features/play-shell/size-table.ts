@@ -75,6 +75,14 @@ const shared: Record<string, SizeRow> = {
     min: s(320, 280),
     criterion: "5 rows names whole, or 2 award cards, or the first 4 Highlights lines (S5)",
   },
+  // CB3 (seams S12, FR-SHELL-141): grows to its rows (`growToContent`).
+  "party.summary": {
+    default: all(280, 260),
+    useful: all(280, 236),
+    min: s(240, 120),
+    criterion:
+      "every PC row of a 6-PC party whole (name, HP, temp, AC uncut); companions may scroll",
+  },
 };
 
 /** The Game log's row (both clients): FR-SHELL-100's useful 460 × 160. */
@@ -172,13 +180,8 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
  * replaces its pending row with the real one in `SIZE_TABLE` in its branch).
  */
 export const PENDING_ROWS: Record<"dm" | "player", Record<string, PendingRow>> = {
-  dm: {
-    // CB3 (seams S12): Party status (FR-SHELL-141).
-    "party.summary": { pending: "CB3" },
-  },
-  player: {
-    "party.summary": { pending: "CB3" },
-  },
+  dm: {},
+  player: {},
 };
 
 /** The client's band at the four sizes (FR-SHELL-79). */
