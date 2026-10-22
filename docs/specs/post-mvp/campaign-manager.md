@@ -1,7 +1,7 @@
 ---
 title: Campaign manager
 prefix: CMGR
-status: draft
+status: in-review
 owner: spec-sp
 phase: post-mvp-9
 ---

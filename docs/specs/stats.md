@@ -1,7 +1,7 @@
 ---
 title: Stats and summaries
 prefix: STATS
-status: draft
+status: in-review
 owner: spec-wf, spec-sb, spec-sp
 phase: post-mvp-9
 ---

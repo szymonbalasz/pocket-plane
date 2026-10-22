@@ -1,14 +1,14 @@
 ---
 title: Session recap
 prefix: RECAP
-status: draft
+status: in-review
 owner: spec-sp
 phase: post-mvp-9
 ---
 
 # Session recap
 
-> Five-minute read. See [AGENTS.md](../../AGENTS.md). **Sprint 9, track SP** (DM [#338](../decisions-log.md), decided: a session recap, tier B, from the event log and stats). Promoted from the [campaign-manager](post-mvp/campaign-manager.md) stub's recap row. Everything below the decision is **proposed**: picks in §15 (OQ-RECAP-01–12). Sessions stay derived ([ADR-0013](../architecture/adr/0013-session-journal-scope.md) unchanged); numbers follow [stats](stats.md) ([ADR-0059](../architecture/adr/0059-stats-read-models.md), [ADR-0062](../architecture/adr/0062-stats-session-partials.md)).
+> Five-minute read. See [AGENTS.md](../../AGENTS.md). **Sprint 9, track SP** (DM [#338](../decisions-log.md), decided: a session recap, tier B, from the event log and stats). Promoted from the [campaign-manager](post-mvp/campaign-manager.md) stub's recap row. Everything below the decision is **proposed**: picks in §15 (OQ-RECAP-01–15). Sessions stay derived ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)'s decision unchanged; a note on its consequences, OQ-RECAP-13); numbers follow [stats](stats.md) ([ADR-0059](../architecture/adr/0059-stats-read-models.md), [ADR-0062](../architecture/adr/0062-stats-session-partials.md)).
 
 ## 1. Summary
 
@@ -36,6 +36,7 @@ phase: post-mvp-9
 - A story journal or session notes beyond the share note: story belongs to [world-builder](post-mvp/world-builder.md) (ADR-0013). Editing the computed numbers.
 - A stored session entity, "End session" marker or session record (ADR-0013, OQ-STATS-09 A).
 - XP (OQ-RECAP-07), reminders and strongholds (OQ-RECAP-08), handouts, gems, charts, PDF export.
+- A generated story recap ([feature tiers](../feature-tiers.md#6-table-specific) "Auto session recap from event log", tier D: "recaps are story"): this recap is a mechanical summary plus the DM's own note.
 
 ## 5. User stories
 
@@ -236,6 +237,9 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | OQ-RECAP-10 | **party-loot / track RS:** how the recap reads the ledger, now that RS adds a Stores holder | **A. A read helper in party-loot's folder (`lootRows(db, campaignId, fromAt, toAt)`, new file) added by SP3 after RS's ledger core; Stores rows count as moves (left out)** · B. SP3 reads `loot_entry` in its own folder: no sequencing, but a second reader of LOOT's table | no (seams) | FR-RECAP-14 |
 | OQ-RECAP-11 | Which loot rows? | **A. `world` ↔ party / character (gains, spends, items found / removed); no moves** · B. Every row incl. moves: noisy | no | FR-RECAP-14 |
 | OQ-RECAP-12 | Glossary: **Session recap** ("the Recap window's summary of one derived session; computed, shareable with a note"), **Command palette**, **Shortcuts sheet** (play-shell) | **A. Add** | no (integrator) | glossary |
+| OQ-RECAP-13 | **ADR-0013**'s consequence says the session recap stays a story tool, "not combat history"; DM #338 asks for a summary "from the event log and stats" | **A. The integrator adds an amendment note to ADR-0013 at merge (decision unchanged: no session entity, sessions derived; the recap may summarise combat and loot facts)** · B. A superseding ADR | no (integrator; DM ack at gate) | ADR-0013 |
+| OQ-RECAP-14 | **notifications (track FX holds the toast runtime):** the `session-recap` kind needs a row in notifications' kind list (as FR-NOTE-48 for `stats-awards`) | **A. SP3 appends the kind line and both views; the integrator adds the NOTE row from FR-RECAP-23 at merge; info class, no runtime change** · B. FX writes the NOTE row in its branch | no (seams) | FR-RECAP-21, -23 |
+| OQ-RECAP-15 | **stats / track FX (BL-84 hidden-kill feed, BL-74):** SP3 edits `features/stats/compute.ts` (one export) and the Session tab (a button) | **A. Sequence: SP3's stats edits after FX's stats slice merges; SP3's own server code (it only imports stats) starts at once; if FX changes a FR-STATS-78 signature, it updates the recap's import in the same branch** · B. FX adds the export and the button for SP | no (seams) | FR-STATS-78, -79 |
 
 ## 16. Out of scope
 

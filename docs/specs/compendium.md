@@ -1,7 +1,7 @@
 ---
 title: Compendium
 prefix: CMP
-status: draft
+status: in-review
 owner: spec-followups, spec-sp
 phase: post-mvp-9
 ---
