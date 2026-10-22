@@ -1,13 +1,8 @@
-// Stats window client logic (STATS §7, FR-STATS-17–25), pure: which live frames re-query, the
-// overkill callout toast (FR-STATS-22), the live awards open (FR-SHELL-94), picker labels. The
-// numbers are always the server's (`stats.query`'s ack): nothing here aggregates a fact.
-import {
-  AttackLogDmPayload,
-  AttackLogPayload,
-  HpLogDmPayload,
-  HpLogPayload,
-} from "@shared/combat-tracker/log-kinds";
-import { LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
+// Stats window client logic (STATS §7, FR-STATS-17–25, -34, -41, -52), pure: which live frames
+// re-query, the live awards and fight-summary opens (FR-SHELL-94, FR-STATS-34), picker labels. The
+// kill feed (FR-STATS-28) is `./feed`. The numbers are always the server's (`stats.query`'s ack):
+// nothing here aggregates a fact.
+import { ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { NotificationCreated } from "@shared/events/notifications";
 import type { NotificationRecord } from "@shared/notifications/schemas";
@@ -16,35 +11,44 @@ import { dayLabel } from "@shared/stats/rules";
 import {
   type Award,
   type AwardKey,
+  type DmFellEvent,
   type DmFightRow,
+  type DmHighlightStat,
+  type DmHighlights,
+  type HighlightKey,
+  type PlayerFellEvent,
   type PlayerFightRow,
+  type PlayerHighlightStat,
+  type PlayerHighlights,
   type SessionSummary,
   STATS_AWARDS_KIND,
+  STATS_FIGHT_SUMMARY_KIND,
   StatsAwardsPayload,
+  StatsFightSummaryPayload,
 } from "@shared/stats/schemas";
 import { NOTIFICATION_TYPE } from "../notifications/logic";
 
 export const STATS_WINDOW_KIND = "stats.board";
-export const STATS_TABS = ["fight", "session"] as const;
+export const STATS_TABS = ["fight", "session", "luck"] as const;
 export type StatsTab = (typeof STATS_TABS)[number];
 
 /** FR-STATS-17: trailing re-query delay after a live log upsert. */
 export const REFRESH_MS = 1000;
-/** FR-STATS-22: the callout toast's life. */
-export const OVERKILL_TOAST_MS = 4000;
-/** FR-NOTE-49: one callout toast at a time (a new one replaces it). */
-export const OVERKILL_TOAST_ID = "stats-overkill";
+/** FR-STATS-46: a `pending` campaign answer is asked again this much later. */
+export const PENDING_RETRY_MS = 1000;
 
 type Frame = Pick<EventFrame, "cause" | "changes">;
 
-const logUpserts = (frame: Frame) =>
+export const logUpserts = (frame: Frame) =>
   frame.changes
     .filter((c) => c.type === GAME_LOG_ENTRY_TYPE && c.op === "upsert" && c.data)
     .map((c) => c.data as GameLogEntryView);
 
 /**
  * FR-STATS-17: does this live frame re-query? Fight tab: a log upsert in the shown fight; with no
- * fight picked, any fight's (the default may move to a fight just started). Session tab: any.
+ * fight picked, any fight's (the default may move to a fight just started); FR-STATS-52 (BL-69):
+ * also an `encounter` change (a Start reaches players before any public fact; rounds tick).
+ * Session tab: any log upsert. Luck tab (FR-STATS-41): a log upsert holding a roll.
  */
 export function refreshes(
   frame: Frame,
@@ -52,63 +56,46 @@ export function refreshes(
 ): boolean {
   const entries = logUpserts(frame);
   if (view.tab === "session") return entries.length > 0;
+  if (view.tab === "luck") return entries.some((e) => e.rollIds.length > 0);
+  if (
+    frame.changes.some(
+      (c) => c.type === ENCOUNTER_TYPE && (view.pickedFight === null || c.id === view.pickedFight),
+    )
+  ) {
+    return true;
+  }
   return entries.some((e) =>
     view.pickedFight === null ? e.encounterId !== null : e.encounterId === view.pickedFight,
   );
 }
 
-/** A callout line's public damage and DM-only overkill (`dmPayload`, absent for players). */
-function calloutOf(
-  e: GameLogEntryView,
-): { target: string; damage: number; overkill?: number } | null {
-  if (e.kind === LOG_KIND_ATTACK) {
-    const p = AttackLogPayload.safeParse(e.payload);
-    if (!p.success || p.data.callout !== "overkill") return null;
-    const dm = AttackLogDmPayload.safeParse(e.dmPayload);
-    return { target: p.data.targetName, damage: p.data.damage, overkill: dm.data?.overkill };
-  }
-  if (e.kind === LOG_KIND_HP) {
-    const p = HpLogPayload.safeParse(e.payload);
-    if (!p.success || p.data.callout !== "overkill" || p.data.kind !== "damage") return null;
-    const dm = HpLogDmPayload.safeParse(e.dmPayload);
-    return { target: p.data.targetName, damage: p.data.amount, overkill: dm.data?.overkill };
-  }
-  return null;
-}
-
-/**
- * FR-STATS-22 (FR-NOTE-49): the callout toast a live frame starts: the first outcome line upsert
- * with `callout`, not undone: `cbt.attack`, and `cbt.hp` direct damage (FR-CBT-137 stamps both;
- * the DM's "Thorn applies 40" in the Damage / heal dialog is a `cbt.hp` line). Players:
- * "Overkill! Thorn → Goblin 1: 30 damage"; the DM adds " (+23 over 7 HP)" from `dmPayload`
- * (players never have it). Null = no toast.
- */
-export function overkillToast(
-  frame: Frame,
-  role: "dm" | "player",
-): { entryId: string; text: string } | null {
-  for (const e of logUpserts(frame)) {
-    if (e.undone) continue;
-    const c = calloutOf(e);
-    if (!c) continue;
-    let text = `Overkill! ${e.actorName} → ${c.target}: ${c.damage} damage`;
-    if (role === "dm" && c.overkill !== undefined) {
-      text += ` (+${c.overkill} over ${c.damage - c.overkill} HP)`;
-    }
-    return { entryId: e.id, text };
-  }
-  return null;
+/** The new notification rows of `kind` a live `NotificationCreated` frame holds. */
+function created(frame: Frame, kind: string): NotificationRecord[] {
+  if (frame.cause.name !== NotificationCreated.type) return [];
+  return frame.changes
+    .filter((c) => c.type === NOTIFICATION_TYPE && c.op === "upsert")
+    .map((c) => c.data as NotificationRecord | undefined)
+    .filter((n): n is NotificationRecord => n?.kind === kind);
 }
 
 /** FR-SHELL-94: the session a live frame's new `stats-awards` notification shows; else null. */
-export function awardsOpenOf(frame: Frame): StatsAwardsPayload | null {
-  if (frame.cause.name !== NotificationCreated.type) return null;
-  for (const c of frame.changes) {
-    if (c.type !== NOTIFICATION_TYPE || c.op !== "upsert") continue;
-    const n = c.data as NotificationRecord | undefined;
-    if (n?.kind !== STATS_AWARDS_KIND) continue;
+export function awardsOpenOf(
+  frame: Frame,
+): (StatsAwardsPayload & { notificationId: string }) | null {
+  for (const n of created(frame, STATS_AWARDS_KIND)) {
     const p = StatsAwardsPayload.safeParse(n.payload);
-    if (p.success) return p.data;
+    if (p.success) return { ...p.data, notificationId: n.id };
+  }
+  return null;
+}
+
+/** FR-STATS-34: the fight a live frame's new `stats-fight-summary` notification opens; else null. */
+export function summaryOpenOf(
+  frame: Frame,
+): (StatsFightSummaryPayload & { notificationId: string }) | null {
+  for (const n of created(frame, STATS_FIGHT_SUMMARY_KIND)) {
+    const p = StatsFightSummaryPayload.safeParse(n.payload);
+    if (p.success) return { ...p.data, notificationId: n.id };
   }
   return null;
 }
@@ -156,3 +143,88 @@ const UNIT: Record<AwardKey, string> = {
 };
 export const awardValueText = (a: Award) =>
   a.value === null ? "—" : UNIT[a.key] ? `${a.value} ${UNIT[a.key]}` : String(a.value);
+
+// ---------- Highlights (FR-STATS-31, -36) ----------
+
+export const HIGHLIGHT_TITLE: Record<HighlightKey, string> = {
+  mvp: "MVP",
+  "biggest-hit": "Biggest hit",
+  "biggest-overkill": "Biggest overkill",
+  "most-healing": "Most healing",
+  kills: "Kills",
+  downed: "Downs",
+  nat20: "Nat 20s",
+  nat1: "Nat 1s",
+  rounds: "Rounds",
+  duration: "Duration",
+  standing: "Still standing",
+};
+
+type Stat = PlayerHighlightStat | DmHighlightStat;
+type FellList = { events: readonly (PlayerFellEvent | DmFellEvent)[]; more?: number | undefined };
+
+export type HighlightItem =
+  | { key: HighlightKey; kind: "stat"; stat: Stat; value: string }
+  | { key: HighlightKey; kind: "fell"; list: FellList }
+  | { key: HighlightKey; kind: "text"; text: string }
+  | { key: "standing"; kind: "standing"; sides: DmHighlights["standing"] };
+
+const STAT_UNIT: Partial<Record<HighlightKey, string>> = {
+  mvp: "damage",
+  "biggest-hit": "damage",
+  "most-healing": "HP",
+};
+
+/** FR-STATS-31: "Duration": "<1 min", "12 min", "1 h 5 min". */
+export function durationText(ms: number): string {
+  const min = Math.floor(ms / 60_000);
+  if (min < 1) return "<1 min";
+  const h = Math.floor(min / 60);
+  return h > 0 ? `${h} h ${min % 60} min` : `${min} min`;
+}
+
+/**
+ * FR-STATS-36: the Highlights items in FR-STATS-31's order, from the ack as sent; an empty one
+ * (nobody scored, no kill, 0 rounds, nobody standing) is left out. The DM's ack alone holds
+ * Still standing (FR-STATS-47).
+ */
+export function highlightItems(h: PlayerHighlights | DmHighlights): HighlightItem[] {
+  const out: HighlightItem[] = [];
+  const stat = (
+    key: "mvp" | "biggest-hit" | "biggest-overkill" | "most-healing" | "nat20" | "nat1",
+  ) => {
+    const s = h[key];
+    if (s.value === null || s.winners.length === 0) return;
+    const unit = STAT_UNIT[key];
+    out.push({ key, kind: "stat", stat: s, value: unit ? `${s.value} ${unit}` : String(s.value) });
+  };
+  const fell = (key: "kills" | "downed") => {
+    if (h[key].events.length > 0) out.push({ key, kind: "fell", list: h[key] });
+  };
+  stat("mvp");
+  stat("biggest-hit");
+  stat("biggest-overkill");
+  stat("most-healing");
+  fell("kills");
+  fell("downed");
+  stat("nat20");
+  stat("nat1");
+  if (h.rounds > 0) out.push({ key: "rounds", kind: "text", text: String(h.rounds) });
+  if (h.duration > 0) out.push({ key: "duration", kind: "text", text: durationText(h.duration) });
+  if ("standing" in h && h.standing.length > 0) {
+    out.push({ key: "standing", kind: "standing", sides: h.standing });
+  }
+  return out;
+}
+
+/** A biggest-* item's line: "Thorn → Goblin 1, 30". */
+export const highlightDetailText = (s: Stat) =>
+  s.detail ? `${s.detail.from} → ${s.detail.to}, ${s.detail.raw}` : null;
+
+/** FR-STATS-36: Highlights start open on an ended fight, closed on a started one. */
+export const highlightsOpenByDefault = (status: "started" | "ended") => status === "ended";
+
+// ---------- Luck (FR-STATS-38, -41) ----------
+
+/** "Avg": 1 decimal, "—" with no d20. */
+export const avgText = (avg: number | null) => (avg === null ? "—" : avg.toFixed(1));

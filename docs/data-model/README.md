@@ -2454,7 +2454,16 @@ From [party-board](../specs/party-board.md#8-data-model) (sprint 8) and [ADR-006
 - **Fixtures:** `cb-party-six` (3 PCs, worst-width figures; `wf-frame-e2e` only).
 - **CON-44** (heavy harness, measured): players +343 B, DM 0 B.
 
-## 116. Sprint 8: current-turn token highlight (CB2)
+## 116. Sprint 8: stats tier-B UI (SB1 + SB2)
+
+From [stats](../specs/stats.md#8-data-model) (sprint 8: "Client: two preferences") and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-97 (#334, #335). **Built by `build/sb-stats-ui`**. Protocol side: [protocol §146](../protocol/README.md#146-sprint-8-stats-tier-b-ui--kill-feed-highlights-end-summary-open-luck-tab-trophies-tab-sb1--sb2). **No table, column, record type or wire field.**
+
+- **Browser storage (per browser, never sent):** `pp.stats.v1` = `{feed: boolean, openSummary: boolean}` (zod; missing / invalid → both on; storage blocked → page memory).
+- **Client memory (per page, never sent or stored):** the Stats view per viewer gains `highlightsOpen` (null = by fight status) and `luckScope` (null = newest session, a session key, or `campaign`); the feed's toasted line ids (≤ 200) and its 150-ms batch; the notification ids already opened (awards, fight summary).
+- **Registries (code):** sheet section `stats.trophies` (`order: 100`); Preferences section `stats.prefs` (order 40); notification view `stats-fight-summary` (info) in both clients.
+- **Derived:** feed words (`feedText`), Highlights items, Luck rows, trophy values ("—" for 0): all from acks and lines as sent, no client aggregation.
+
+## 117. Sprint 8: current-turn token highlight (CB2)
 
 From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-108–112 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-166. **Built by `build/cb-turn-ring`**: no table, column, record type or payload change. Protocol side: [protocol §146](../protocol/README.md#146-sprint-8-current-turn-token-highlight--turn-ring-cb2).
 

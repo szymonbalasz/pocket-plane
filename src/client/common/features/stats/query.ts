@@ -1,12 +1,14 @@
 // `useStatsQuery`: one `stats.query` bound to the window (FR-STATS-17, -23): asks on mount and on
 // input change, pokes on the live frames `wants` picks, asks after each snapshot, pauses while
-// the window is minimised. The ack is parsed with the viewer's role schema (FR-STATS-05).
+// the window is minimised. The ack is parsed with the viewer's role schema (FR-STATS-05). A
+// `pending` answer (FR-STATS-46: campaign partials still building) is asked again 1 s later.
 
 import type { EventFrame } from "@shared/protocol/frames";
 import { STATS_QUERY_INTENT, type StatsQueryInput } from "@shared/stats/schemas";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEventFrame, useSync } from "../../sync/store";
 import { useWindowShown } from "../play-shell/ShellWindow";
+import { PENDING_RETRY_MS } from "./logic";
 import { createStatsQuery, type QueryState, type StatsQuery } from "./refresh";
 
 const INITIAL = {
@@ -21,6 +23,7 @@ export function useStatsQuery<R>(
   input: StatsQueryInput,
   parse: (ack: unknown) => R,
   wants: (frame: EventFrame) => boolean,
+  pending?: (result: R) => boolean,
 ): { state: QueryState<StatsQueryInput, R>; retry(): void } {
   const connection = useSync((s) => s.connection);
   const generation = useSync((s) => s.lazy?.generation);
@@ -64,6 +67,15 @@ export function useStatsQuery<R>(
   useEventFrame((frame) => {
     if (wants(frame)) q.current?.poke();
   });
+
+  // FR-STATS-46: `{pending: true}` → re-query in 1 s (until a full answer).
+  const isPending =
+    state.status === "ok" && state.result !== null && (pending?.(state.result) ?? false);
+  useEffect(() => {
+    if (!isPending) return;
+    const t = setTimeout(() => q.current?.retry(), PENDING_RETRY_MS);
+    return () => clearTimeout(t);
+  }, [isPending]);
 
   const retry = useCallback(() => q.current?.retry(), []);
   return { state, retry };

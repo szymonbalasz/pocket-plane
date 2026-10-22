@@ -1,7 +1,8 @@
 // `stats.board` "Stats" body, both clients (FR-STATS-18, -19, -24; FR-SHELL-93): Fight = a live
-// leaderboard over the fight picker, Session = 9 award cards over the session picker (DM: Show
-// awards). Renders only what the ack holds (rows in server order, no client aggregation); the
-// DM's extra fields are in the DM schema only. Only the shown tab queries.
+// leaderboard over the fight picker, with Highlights above it (FR-STATS-36), Session = 9 award
+// cards over the session picker (DM: Show awards), Luck = the luck table (FR-STATS-41). Renders
+// only what the ack holds (rows in server order, no client aggregation); the DM's extra fields are
+// in the DM schema only. Only the shown tab queries.
 import type { You } from "@shared/protocol/frames";
 import {
   AWARD_TITLE,
@@ -32,7 +33,6 @@ import {
 } from "../../components/ui/overlays";
 import {
   Card,
-  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -44,9 +44,12 @@ import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { type ColorPerson, useColorOf } from "../campaign-management/colors";
+import { Highlights } from "./Highlights";
+import { LuckPanel } from "./Luck";
 import {
   awardDetailText,
   awardValueText,
+  highlightsOpenByDefault,
   noDamageYet,
   refreshes,
   STATS_TABS,
@@ -56,13 +59,14 @@ import {
 } from "./logic";
 import { useStatsQuery } from "./query";
 import type { QueryState } from "./refresh";
+import { Empty, LoadError, SkeletonRows } from "./states";
 import { type StatsView, statsViews, viewKey } from "./view";
 
 type Role = "dm" | "player";
 type FightResult = DmFightResult | PlayerFightResult;
 type AnyRow = DmFightRow | PlayerFightRow;
 
-const TAB_LABEL: Record<StatsTab, string> = { fight: "Fight", session: "Session" };
+const TAB_LABEL: Record<StatsTab, string> = { fight: "Fight", session: "Session", luck: "Luck" };
 
 function useView(you: You | null): [StatsView, (patch: Partial<StatsView>) => void] {
   const key = you ? viewKey(you) : null;
@@ -91,47 +95,14 @@ export function StatsWindow() {
       </Tabs>
       {view.tab === "fight" ? (
         <FightPanel role={role} view={view} setView={setView} />
-      ) : (
+      ) : view.tab === "session" ? (
         <SessionPanel role={role} view={view} setView={setView} />
+      ) : (
+        <LuckPanel role={role} view={view} setView={setView} />
       )}
     </div>
   );
 }
-
-// ---------- states (FR-STATS-24) ----------
-
-function SkeletonRows() {
-  return (
-    <div data-testid="stats-loading" className="flex flex-col gap-1.5">
-      {[0, 1, 2, 3].map((i) => (
-        <Skeleton key={i} className="h-6 w-full" />
-      ))}
-    </div>
-  );
-}
-
-function LoadError({ retry }: { retry(): void }) {
-  return (
-    <div data-testid="stats-error" className="flex items-center gap-2 text-sm text-destructive">
-      Couldn't load stats
-      <Button
-        size="sm"
-        variant="outline"
-        className="h-6 px-2"
-        data-testid="stats-retry"
-        onClick={retry}
-      >
-        Retry
-      </Button>
-    </div>
-  );
-}
-
-const Empty = ({ text }: { text: string }) => (
-  <p data-testid="stats-empty" className="text-sm text-muted-foreground">
-    {text}
-  </p>
-);
 
 interface PanelProps {
   role: Role;
@@ -164,7 +135,9 @@ function FightPanel({ role, view, setView }: PanelProps) {
       role={role}
       state={state}
       live={live}
-      onPick={(fightKey) => setView({ fightKey })}
+      highlightsOpen={view.highlightsOpen}
+      onHighlights={(highlightsOpen) => setView({ highlightsOpen })}
+      onPick={(fightKey) => setView({ fightKey, highlightsOpen: null })}
       retry={retry}
     />
   );
@@ -174,12 +147,17 @@ export function FightView({
   role,
   state,
   live,
+  highlightsOpen = null,
+  onHighlights = () => {},
   onPick,
   retry,
 }: {
   role: Role;
   state: Pick<QueryState<unknown, FightResult>, "status" | "result">;
   live: boolean;
+  /** FR-STATS-36: null = open on an ended fight, closed on a started one. */
+  highlightsOpen?: boolean | null;
+  onHighlights?(open: boolean): void;
   onPick(key: string): void;
   retry(): void;
 }) {
@@ -229,6 +207,11 @@ export function FightView({
           <p data-testid="stats-fight-status" className="text-xs text-muted-foreground">
             {fight.status === "started" ? `Round ${fight.round}` : "Ended"}
           </p>
+          <Highlights
+            highlights={fight.highlights}
+            open={highlightsOpen ?? highlightsOpenByDefault(fight.status)}
+            onOpenChange={onHighlights}
+          />
           {fight.rows.length === 0 || noDamageYet(fight.rows) ? (
             <Empty text="No damage yet this fight" />
           ) : null}
