@@ -157,11 +157,12 @@ test("FR-SCN-16–19 props: reveal, lock, locked drag, move, Ctrl+Z (DM + player
   await expect.poll(() => propIds(player)).toEqual([barrel, table, chest, placed].sort());
 
   // Walkthrough F1: with the Props panel open, a window opened from the launcher is above the
-  // panel and gets its clicks (Scenes: switch the view to Town).
+  // panel and gets its clicks (Scenes: switch the view to Town). Sprint 8 (FR-SHELL-105, BL-52): a
+  // window dropped over the shown panel is pushed off it, so the panel stays hit-testable.
   const town = recordId("town", "scene");
   await expect(dm.getByTestId("map-tool-panel")).toBeVisible();
   const scenes2 = await openWindow(dm, "map.scenes");
-  // Drag the window by its title so it covers the panel, then hit-test the panel's centre.
+  // Drag the window by its title onto the panel, then hit-test the panel's centre.
   const panelBox = (await dm.getByTestId("map-tool-panel").boundingBox())!;
   const title = (await scenes2.getByTestId("ui-window-title").boundingBox())!;
   await dm.mouse.move(title.x + 40, title.y + title.height / 2);
@@ -178,7 +179,8 @@ test("FR-SCN-16–19 props: reveal, lock, locked drag, move, Ctrl+Z (DM + player
     },
     [panelBox.x + panelBox.width / 2, panelBox.y + panelBox.height / 2] as const,
   );
-  expect(hit).toEqual({ window: true, panel: false });
+  expect(hit).toEqual({ window: false, panel: true });
+  await expect(scenes2).toHaveAttribute("data-placed", "pushed");
   await scenes2
     .locator(`[data-testid="map-scene-row"][data-record-id="${town}"] button`)
     .first()
