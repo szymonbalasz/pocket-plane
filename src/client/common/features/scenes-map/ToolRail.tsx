@@ -59,17 +59,20 @@ const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w
  * `toolBarMaxWidth` (wider content wraps by control group, FR-FOG-58). The rail lives in the
  * chrome (z-20), so a panel inside it would cover shell windows; it is portalled into the play
  * page at `TOOL_PANEL_Z`. While shown it reports its rect as keep-out `map.toolbar` (FR-SHELL-48)
- * and, when it appears or changes size (tool change, viewport resize, its own content), pushes
- * windows off it (FR-SHELL-55); never on window changes. Outside a play page (no host) it renders
- * inline.
+ * and, when it appears or changes size (tool change, viewport resize, its own content) or its tool
+ * is pressed again (`reselect`, FR-SHELL-105), pushes windows off it through the placer
+ * (FR-SHELL-104); never on window changes. Outside a play page (no host) it renders inline.
  */
 function ToolPanel({
   rail,
   id,
+  reselect,
   children,
 }: {
   rail: React.RefObject<HTMLDivElement | null>;
   id: string;
+  /** Bumped when the active tool is pressed again: push with the current rect (FR-SHELL-105). */
+  reselect: number;
   children: React.ReactNode;
 }) {
   const [host, setHost] = useState<HTMLElement | null>(null);
@@ -101,12 +104,13 @@ function ToolPanel({
       window.removeEventListener("resize", place);
     };
   }, [rail, client]);
-  // Measure after layout: rows, keep-out, push when the rect changed. A new tool (`id`) or a
-  // layout applied after a reload with the tool active (`layoutKey`) pushes again.
+  // Measure after layout: rows, keep-out, push when the rect changed. A new tool (`id`), a layout
+  // applied after a reload with the tool active (`layoutKey`) or the tool pressed again
+  // (`reselect`, FR-SHELL-105) pushes again.
   useLayoutEffect(() => {
     const el = panelRef.current;
     if (!el || !host || !spot) return;
-    const trigger = `${id}|${layoutKey}`;
+    const trigger = `${id}|${layoutKey}|${reselect}`;
     const measure = () => {
       const groups = [...el.querySelectorAll<HTMLElement>(`[${BAR_GROUP_ATTR}]`)];
       let prevTop: number | null = null;
@@ -129,7 +133,7 @@ function ToolPanel({
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [host, spot, id, layoutKey, push]);
+  }, [host, spot, id, layoutKey, reselect, push]);
   useEffect(() => () => reportKeepOut(TOOL_BAR_KEEP_OUT, null), []);
   const panel = (inline: boolean) => (
     <div
@@ -184,6 +188,8 @@ export function ToolRail({
     (selectOnly ? undefined : basePanels?.[tool as BaseTool]);
   const panelId = current?.id ?? tool;
   const railRef = useRef<HTMLDivElement>(null);
+  // FR-SHELL-105 (BL-52): pressing the active tool again (the group reports "") re-pushes.
+  const [reselect, setReselect] = useState(0);
   return (
     <div
       ref={railRef}
@@ -195,7 +201,7 @@ export function ToolRail({
         orientation="vertical"
         className="flex-col"
         value={tool}
-        onValueChange={(v) => v && setTool(v as MapTool)}
+        onValueChange={(v) => (v ? setTool(v as MapTool) : setReselect((n) => n + 1))}
         aria-label="Map tools"
       >
         {TOOLS.map((t) => {
@@ -270,7 +276,7 @@ export function ToolRail({
       </Tooltip>
       {children}
       {Panel && (
-        <ToolPanel rail={railRef} id={panelId}>
+        <ToolPanel rail={railRef} id={panelId} reselect={reselect}>
           <Panel />
         </ToolPanel>
       )}
