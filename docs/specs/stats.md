@@ -2,7 +2,7 @@
 title: Stats and summaries
 prefix: STATS
 status: complete
-owner: spec-wf
+owner: spec-wf, spec-sb
 phase: post-mvp-8
 ---
 
@@ -12,6 +12,8 @@ phase: post-mvp-8
 
 > **Sprint 7, track ST** (DM [#311](../decisions-log.md), decided): tier A of [feature tiers](../feature-tiers.md#6-table-specific), meaning a live damage leaderboard, overkill callouts and BG2-style session awards. They come from the append-only log ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md)) and never leak; sessions follow [ADR-0013](../architecture/adr/0013-session-journal-scope.md). Proposed ADR: [stats as read models](../architecture/adr/0059-stats-read-models.md). Also revised: FR-CBT-136–138, FR-DICE-72–73, FR-SHELL-93–94, FR-NOTE-48–49. Seams S1–S8, S11, S13 and review rulings 2–4, 10, 13, 20–25 applied.
 
+> **Sprint 8, track SB** (DM [#334](../decisions-log.md), decided): tier B, with tier A's visibility rules. FR-STATS-26–53 ([§6.1](#61-tier-b-sprint-8)); also FR-CBT-152–153, FR-NOTE-68–69, FR-CHARX-97–99, FR-DICE-89–90. No schema. [ADR: session partials](../architecture/adr/proposed-s8-sb-session-partials.md). Seams applied. OQ-STATS-20–30 decided at DM gate 1 (#335).
+
 > **Sprint 8, track WF** (DM [#333](../decisions-log.md); size rows only): FR-STATS-66 gives `stats.board` a useful size checked by content; FR-STATS-67 sizes the award grid to the window (BL-66). Slice WF4; walkthrough F9, F13 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
 
 ## 1. Summary
@@ -20,27 +22,28 @@ phase: post-mvp-8
 - **Overkill callouts**: "— Overkill!" on the line, and a toast.
 - **Computed on read** from facts already written, filtered per viewer **before** aggregation; nothing in the snapshot.
 - Combat-tracker gains a **From** on direct heals (FR-CBT-136).
+- *(Sprint 8)* **Kill feed** toasts ("Thorn finished Goblin 1"); at End, Stats opens on the fight with **Highlights**; a **Luck** tab; a **Trophies** tab on the sheet.
 
 ## 2. Scope
 
-- Live and past fights and sessions, callouts, awards.
+- Live and past fights and sessions, callouts, awards. *(Sprint 8)* Kill feed, highlights, luck (session, campaign), trophies (campaign).
 
 ## 3. Goals
 
 - An overkill reaches every screen in ≤ 1 s. Awards take one click.
 - Zero leaks to players (FR-STATS-05).
 - All history works, with no backfill.
-- Cheap (§12).
+- Cheap (§12). *(Sprint 8)* A kill toasts once, ≤ 1 s; campaign numbers ≤ 50 ms warm.
 
 ## 4. Non-goals
 
-- Tier B (§16), and out-of-combat HP (`char.adjustHp`, `pet.adjustHp`): there's no combat log entry for it.
-- A "gems spent" award (seam S2), charts, editing stats.
+- Out-of-combat HP (`char.adjustHp`, `pet.adjustHp`): there's no combat log entry for it.
+- A "gems spent" award (seam S2), charts, editing stats. *(Sprint 8)* XP, party-wide records, a feed for old lines.
 
 ## 5. User stories
 
 - **DM:** a live damage table to pace fights; one **Show awards** at the end of the night; my hidden rolls and monsters count only for me.
-- **Player:** watch my damage and kills climb, see "Overkill!", look back at last session's awards.
+- **Player:** watch my damage and kills climb, see "Overkill!", look back at last session's awards. *(Sprint 8)* See who finished the Ogre, my character's lifetime records, proof my d20 is cursed.
 
 ## 6. Functional requirements
 
@@ -84,18 +87,72 @@ phase: post-mvp-8
 | FR-STATS-19 | **Session tab**: `stats-session-picker` ("Tue 20 Oct · 19:02–23:41 · 3 fights"), 9 cards `stats-award` (`data-record-id` = key) holding `stats-award-value`, winners in the player colour. DM: `stats-show-awards`. Grid of 3 columns, 1 under 400 px. |
 | FR-STATS-20 | **`stats.showAwards {fromN}`** (DM) → a `stats-awards` info notification to all (FR-NOTE-48). Each client opens Stats on those awards (FR-SHELL-94) under its own filter; an offline player has **Open** in history. |
 | FR-STATS-21 | **Callout rule**: `hpAfter = 0` and `overkill ≥ max(10, hpBefore + absorbed)`; stamped at apply (FR-CBT-137). |
-| FR-STATS-22 | **Callout toast** `stats-overkill-toast` (4 s), from **live** frames only: a `cbt.attack` upsert with `callout`, not undone. Players: "Overkill! Thorn → Goblin 1: 30 damage"; the DM adds "(+23 over 7 HP)". One per frame. An info toast, not a notification (FR-NOTE-49). *(ST2 build, #328: fires on any outcome line with the callout: `cbt.attack` and the DM's direct `cbt.hp` damage)* |
+| FR-STATS-22 | **Callout toast** `stats-overkill-toast` (4 s), from **live** frames only: a `cbt.attack` upsert with `callout`, not undone. Players: "Overkill! Thorn → Goblin 1: 30 damage"; the DM adds "(+23 over 7 HP)". One per frame. An info toast, not a notification (FR-NOTE-49). *(ST2 build, #328: fires on any outcome line with the callout: `cbt.attack` and the DM's direct `cbt.hp` damage)* *(Sprint 8: folded into FR-STATS-28; a callout on an already-downed target keeps this text.)* |
 | FR-STATS-23 | **Retroactive, stateless**: no backfill. A crash loses only an answer; reconnect → re-query (last result muted). Undo → re-query drops the row. Old facts keep old names. |
 | FR-STATS-24 | **States**: skeleton rows; "No fight yet" / "No damage yet this fight" / "No sessions yet"; "Couldn't load stats" + Retry; offline = last result muted, pickers off. |
 | FR-STATS-25 | **Limits**: fight ≤ 70 rows; ≤ 8 tied names; `sessions` ≤ 200 newest; ack ≤ 64 KB. |
 | FR-STATS-66 | **Stats useful size** (S8, WF; BL-66: players' Stats opened at 320 × 280, names cut). Default 400 × 412 and min 320 × 280 stay. `usefulSize` **400 × 360**; criterion (seams S5): **5 rows with names whole, or 2 award cards, or the first 4 Highlights lines** visible without scrolling. The placer opens it at least that big while a put-away or a player's map yield helps ([FR-SHELL-97](play-shell.md#6-functional-requirements)). Test `FR-STATS-66 Stats useful size` in `e2e/useful-size.e2e.ts` (browser; [FR-SHELL-100](play-shell.md#6-functional-requirements)). |
 | FR-STATS-67 | **Award cards fit** (BL-66, DM: text clipped at 400 wide; amends FR-STATS-19's columns). Columns follow the window's body width: 3 ≥ 600 px, 2 ≥ 380 px, else 1. Names and values wrap, never run into the next card. Test `FR-STATS-67 award grid fits` in `e2e/useful-size.e2e.ts` (400 × 412 and 320 wide; no card's `scrollWidth` > `clientWidth`). |
 
+### 6.1 Tier B (sprint 8)
+
+Tier A rules hold: filter, then aggregate; final roll only; names from facts; party = PCs + companions, credited to the current owner. *(OQ-STATS-NN)* = decided at DM gate 1 (#335).
+
+| ID | Requirement |
+|---|---|
+| | **Kill feed** |
+| FR-STATS-26 | **Events**: a damage fact `hpBefore > 0 → 0` on a non-companion monster = **kill**, on a PC or companion = **down**, whoever the attacker *(OQ-STATS-20)*. Read from the line's `fell` ([FR-CBT-152](combat-tracker.md#6-functional-requirements)). |
+| FR-STATS-27 | **Text** (the line's names): "Thorn finished Goblin 1" / "Goblin 1 falls"; "Goblin 2 dropped Brakka" / "Brakka is down"; a callout starts "Overkill! ". DM adds ", overkill 23" and "(hidden)"; players never get an amount. |
+| FR-STATS-28 | **Toast** `stats-feed-toast`, **callout** class ([FR-NOTE-50](notifications.md#6-functional-requirements)), 4 s *(OQ-STATS-21)*. Live frames only: a new line with `fell` or `callout`, not undone. One per frame (≤ 3 lines, then "and N more"), one listener per client (BL-71). Dropped while paused (S10). |
+| FR-STATS-29 | **Visibility**: only lines the hub sent (a hidden side → DM only, FR-CBT-24). Snapshots, resyncs, undo / supersede upserts never toast. |
+| FR-STATS-30 | **Preference** "Kill feed" (per browser, both clients, default on; Preferences sections, append). |
+| | **Fight summary** |
+| FR-STATS-31 | **Highlights** (fight ack `highlights`; players party only): MVP (most Dealt), Biggest hit, Biggest overkill (per role, FR-STATS-12), Most healing, Kills / Downs in order (by `fell`, as the feed; Times downed stays PCs only), Nat 20s / 1s (FR-STATS-32), Rounds, Duration. DM adds monsters, hidden marks, **Still standing**. Ties ≤ 8. |
+| FR-STATS-32 | **A fight's rolls** = in the `n` span `startedAt…endedAt` (now while started): entries with its `encounterId`, plus `attack` / `saving-throw` rolls by its combatants' actors (no checks, skills or other). |
+| FR-STATS-33 | **At End**: combat's `ended` rule hook ([FR-CBT-153](combat-tracker.md#6-functional-requirements)) runs one indexed existence query (no Highlights build) and notifies `stats-fight-summary` ([FR-NOTE-68](notifications.md#6-functional-requirements)) in `cbt.end`'s transaction. Audience `all` if the fight has a counted public fact, else `dm`; nothing counted → none *(OQ-STATS-27)*. |
+| FR-STATS-34 | **Summary opens**: a live notification opens `stats.board` `by: "feature"` on that fight, Highlights open, via the ladder *(OQ-STATS-28)*. Preference "Open the fight summary at End" (default on). History **Open** does the same. DM: after FR-CBT-60. Paused players: deferred to resume (S10). |
+| FR-STATS-35 | **Hidden at End**: players' Highlights never name a hidden monster, count survivors or say "victory" *(OQ-STATS-29)*. |
+| FR-STATS-36 | **UI**: `stats-highlights` (`data-state`) above the Fight table; items `stats-highlight` + `data-record-id` = the FR-STATS-31 key (`mvp`, `biggest-hit`, …, `standing`); empty → hidden. Closed on a started fight. The first 4 lines fit the useful 400 × 360 (S5). |
+| | **Luck tracker** |
+| FR-STATS-37 | **Counted rolls**: counted (FR-STATS-02), character actor, not `initiative`, ≥ 1 d20; physical, macro, request and DM-on-behalf rolls too *(OQ-STATS-25)*. Players: public entries only; a hidden request answer is DM-only, even for its roller (S6; awards, trophies too). |
+| FR-STATS-38 | **Formulas**: the table below *(OQ-STATS-26)*. |
+| FR-STATS-39 | **Rows**: party characters with ≥ 1 counted roll, by name. DM also `dm-dice`: d20 rolls by DM, monster and token actors, hidden included *(OQ-STATS-24)*. A player's roll with no character ("Me") counts nowhere. |
+| FR-STATS-40 | **Scopes**: one session (FR-STATS-13's picker, default the newest) or Campaign. |
+| FR-STATS-41 | **UI**: tab **Luck** (`stats-luck`): `stats-luck-scope`, `stats-luck-table` of `stats-luck-row` (`data-record-id` = character id / `dm-dice`): Name, Rolls, d20s, Avg, Nat 20, Nat 1. Refresh as FR-STATS-17 on a live `roll` entry. |
+| | **Trophy case** |
+| FR-STATS-42 | **Contents**: the Lifetime and Records rows below, campaign-wide, "—" for 0 *(OQ-STATS-22)*. |
+| FR-STATS-43 | **Who**: DM any character. A player only their own (else `forbidden`), from public facts. Shown as the sheet's Trophies tab ([FR-CHARX-97](character-sheet-full.md#6-functional-requirements)) *(OQ-STATS-23)*. |
+| FR-STATS-44 | **Refresh**: on tab show, then as FR-STATS-17 on a live line of the character or their companions. |
+| | **Read path and cost** |
+| FR-STATS-45 | `stats.query` gains `luck {n? \| campaign: true}` and `trophies {characterId}`; fight acks gain `highlights`. Same pipeline, rate limit and memo (FR-STATS-16); unknown → `not_found`. |
+| FR-STATS-46 | **Campaign = session partials** ([ADR](../architecture/adr/proposed-s8-sb-session-partials.md), accepted #335) *(OQ-STATS-30)*: in-memory tallies per (session, viewer class, features), **built at start** (and after a drop-all) in yielding 5-session chunks. Newest session recomputed; dropped per touched session, all on owner / kind / feature changes. **Until ready**: the rest read uncached if ≤ 5 sessions, else `{pending: true}` (re-query in 1 s). |
+| FR-STATS-47 | **Player schemas** (strict): no applied, HP, overkill amount, AC, encounter name, hidden mark, Still standing or `dm-dice`. Acks are leak-scanned. |
+| FR-STATS-48 | **Limits**: luck ≤ 70 rows; highlights ≤ 20 kills / downs, then "+N"; ack ≤ 64 KB. |
+| FR-STATS-49 | **Retroactive** for every past fight and session; the feed is live only. Crash / reconnect / undo as FR-STATS-23. |
+| FR-STATS-50 | **States**: FR-STATS-24, plus "No rolls yet" and "No fights yet". |
+| FR-STATS-51 | **Bench** (100 sessions): fight + highlights ≤ 20 ms; luck, one session ≤ 50 ms; campaign warm ≤ 50 ms; the chunked build's **longest single block ≤ 50 ms**. |
+| FR-STATS-52 | **BL-69** (default-fight half only; flagged at the gate): a player's default fight is the started one even before a public fact ("This fight", party rows at 0; amends FR-STATS-15). |
+| FR-STATS-53 | **BL-71**: Show awards toasts and opens Stats once per client. |
+
+**Formulas** (per character; companions rolled up, FR-STATS-09)
+
+| Stat | Rule | Luck | Trophies |
+|---|---|---|---|
+| Rolls | counted rolls (FR-STATS-37) | ✓ | |
+| d20s | every d20 face with a value, kept **and dropped** ([FR-DICE-89](dice-roll-log.md#6-functional-requirements)) | ✓ | |
+| Avg d20 | mean of d20s, 1 decimal, "—" with none (expected 10.5) | ✓ | Lifetime |
+| Nat 20s / 1s | `natural` (FR-STATS-10): set only for one kept d20 (FR-DICE-20), so a `1d20+1d20` roll adds faces, never nats | ✓ | Lifetime |
+| Fights | encounters with a counted fact of theirs | | Lifetime |
+| Dealt, Taken, Healing, Kills, Times downed | FR-STATS-06–08 | | Lifetime |
+| Biggest hit, Biggest overkill | FR-STATS-12 per role, "→ target · fight label" | | Records |
+| Best fight (damage / kills) | max over fights of Dealt / Kills, with the fight label | | Records |
+
 ## 7. UI/UX notes
 
 - [visual-direction](../design/visual-direction.md); shadcn Table, Tabs, Select, Card, Tooltip, Toast. Window `stats.board` (FR-SHELL-93). Layout and test IDs: FR-STATS-18, -19.
 - **Player view:** party rows, neutral fight labels, no Show awards; awards open by themselves.
 - **DM view:** everything (FR-STATS-18).
+- *(Sprint 8)* Tabs Fight · Session · Luck (fit 320 px); Highlights a Collapsible, two columns from 400 px; Luck a Table. **Player:** party only, own Trophies. **DM:** + monsters, hidden marks, Still standing, DM dice, any Trophies.
 
 ## 8. Data model
 
@@ -111,6 +168,7 @@ phase: post-mvp-8
 - **Relations:** `hp_change` → combatants, entry; entry → rolls. Roll → character.
 - **Added (CBT):** line `callout` / `dmPayload.overkill`; `cbt.applyHp sourceId` → `attackerId`.
 - **Derived:** all stats, sessions, labels. **Persisted runtime state:** none (server cache; client view state).
+- *(Sprint 8)* Nothing new stored for stats. Added: line `payload.fell?: "kill" | "down"` (FR-CBT-152), `stats-fight-summary` rows (FR-NOTE-68). Also read: `roll.dice` d20 faces, `manual` (FR-DICE-89), `encounter.startedAt` / `endedAt`. Server memory: partials (FR-STATS-46). Client: two preferences.
 
 ## 9. API & events
 
@@ -123,6 +181,16 @@ phase: post-mvp-8
 
 - `Row` / `Award` per role (FR-STATS-05). **Events:** none new; `stats-awards` notification to all; outcome lines carry `callout` (public) and amounts in `dmPayload` (DM).
 
+*(Sprint 8)*
+
+| Intent / event | Who | Validation | Ack / visibility |
+|---|---|---|---|
+| `stats.query {scope: "fight", …}` | DM, player | as above | + `highlights` per role |
+| `stats.query {scope: "luck", n? \| campaign: true}` | DM, player | `n` in a listed session | `{luck: {scope, fromN?, rows}}`; DM + `dm-dice` |
+| `stats.query {scope: "trophies", characterId}` | DM; player, own | else `forbidden` | `{trophies: {characterId, lifetime, records}}` per role |
+| Line `fell` (existing upsert) | — | at apply | DM all; players public lines (the band already reads "down") + a companion owner's audience lines |
+| `NotificationCreated` `stats-fight-summary` (in `cbt.end`) | hook | FR-STATS-33 | DM always; players only for audience `all`; payload `{encounterId}` (already public, #327) |
+
 ## 10. Permissions
 
 | Action | DM | Player | Server check |
@@ -130,10 +198,12 @@ phase: post-mvp-8
 | Query | ✓ all facts | ✓ public facts | role from the connection; zod; rate limit |
 | Show awards | ✓ | ✗ | `forbidden` |
 | Change stats | ✗ | ✗ | no such command |
+| *(S8)* Trophies | ✓ any character | ✓ own | owner check → `forbidden` |
 
 ## 11. Edge cases & failure modes
 
 - Disconnect / reconnect (DM, player), server crash, concurrent undo, renames: FR-STATS-23. Invalid input / spam: FR-STATS-16. DM-hidden attack lines leave players' numbers empty, by design (OQ-STATS-01). Multi-target: one row per target. A fight across two sessions splits rows by `at`.
+- *(Sprint 8)* A missed frame never toasts; after End, a reconnect shows the summary in history (no auto-open). A crash loses no `fell` or summary row (same transaction); partials rebuild. A revive + kill toasts again; a charm-away moves trophies (OQ-STATS-12).
 
 ## 12. Performance & bandwidth
 
@@ -151,6 +221,22 @@ Compute (a synthetic session = 4 fights × 80 applies + 300 rolls; medians of 7)
 | 100 sessions (94k entries) | 0.37 / 0.69 ms | 5.4–6.0 ms | 103 ms, warmed at start |
 
 - **Bench gates** (`stats.bench.ts`, 100 sessions): fight ≤ 20 ms, session ≤ 50 ms, list cold ≤ 300 / warm ≤ 5 ms.
+
+**Sprint 8** (throwaway probe, deleted): heavy harness + gems on, then the bench's history (a session ≈ a 4-hour sitting: 4 fights × 80 applies, 300 rolls, 300 lines). Medians of 7.
+
+- **CON-44:** `fell` +14 B a line (+420 B per viewer for 30 lines; worst ≈ +1.4 KB). A summary row: 536 B, inside the 100-closed window (no growth). **DM ≈ 944 KB of 1.5 MiB; players ≈ 301 KB of 512 KiB.**
+- **Per event:** +14 B a kill. End: one `NotificationCreated` (≈ 0.6 KB) + a fight ack per client (DM 1.8 / player 0.55 KB).
+
+| Compute (DM / player) | 1 session | 10 sessions | 100 sessions |
+|---|---|---|---|
+| Fight + its rolls | 1.1 ms | 1.0 ms | 1.5 ms |
+| Luck, one session | 2 ms | 2 ms | 7–10 ms |
+| Luck, campaign (one pass) | 1.7 / 1.5 ms | 18 / 14 ms | 404–449 / 289–299 ms |
+| Trophies, campaign (one pass) | 3.6 / 3.0 ms | 30 / 25 ms | 538 / 417–430 ms |
+| Partials, warm (newest session) | 3.3 ms | 4.8 ms | 18.5 ms |
+
+- **Why partials:** ≈ 1 s per campaign answer, after every fact.
+- **Chunked build** (re-measured; 100 sessions, DM / player): 1-session chunks peak 32 / 24 ms (1.9 s total); **5-session: 42 / 38 ms peak, 0.74 / 0.66 s total**; 10-session: 104 / 58 ms peak.
 
 ## 13. Test plan
 
@@ -186,6 +272,51 @@ Named tests (all `FR-STATS-NN …`):
 6. End, then Show awards (Today): both players get a toast and Stats opens. Biggest hit is Thorn's 40. **Biggest overkill: the DM sees Thorn's overkill amount, the players see "40" (Thorn's callout line raw).**
 7. Reloads, then a hard kill + restart: same numbers (`state:digest` equal).
 
+### 13.1 Sprint 8 (tier B)
+
+**Fixtures** (`fixtures/units/stats/`; headers list expected numbers per bundle). `sb-fight-facts` and `sb-luck-rolls` **join session-sim-12** (S15), so they are sim-11-safe: no `gems-on` or `st-ambush-facts`, Goblin / Goblin 2 untouched.
+- **`sb-fight-facts`** (requires `combat-1`, `cp-combat`, `char-mira`, `char-thorn`, `char-brakka`): adds 4 token-less Bandits (11 HP) and a hidden Bandit Captain.
+  - Mira kills Bandit 1 (25: callout, overkill 14).
+  - Thorn kills the hidden Captain.
+  - The Owlbear kills Bandit 3 (companion).
+  - Bandit 2 drops Thorn (200), then the DM heals him 10.
+  - Thorn → Bandit 4, 11, undone: Bandit 4 stays at 11 HP, a live target.
+- **`sb-luck-rolls`** (requires `char-mira`, `char-thorn`; manual dice, so all physical):
+  - Mira: advantage 18 / 3; a nat 20; an initiative nat 20 (not counted).
+  - Thorn: a save nat 1; a death-save nat 20.
+  - DM: a hidden roll as Thorn, nat 20; a Bandit nat 20 (DM dice).
+  - Player 1: a "Me" nat 20 (counts nowhere).
+- **`sb-luck-reroll`** (requires `gems-on`, `sb-luck-rolls`; **`stats-b` only**, not session-sim-12): Mira's Perception 4 rerolled to 17.
+- **Bundle `stats-b`** = `stats` + `gems-on` + the three units (the fixed-clock past session + live "Today"); e2e alias `stats-b-e2e`.
+
+**Named tests** (`FR-STATS-NN …`):
+- **Unit:** 26, 27 per role, 28, 31 per role, 32, 38 every formula row, 39, 42 companion roll-up, 48.
+- **Integration:**
+  - Fixtures: `stats-b` and **session-sim-12 load from empty** (`stats.fixtures.test.ts`; TT / CB units are noted by the integrator).
+  - 29 hidden-side kill: no `fell` reaches players.
+  - 33 audience `all` / `dm` / none; a throwing hook rolls End back.
+  - 35 players' highlights never name the Wolf.
+  - 37 initiative out; reroll final only; a hidden request answer counts for the DM only, not for its roller (S6).
+  - 40 scopes; 43 another's trophies → `forbidden`.
+  - 46 partials: chunked start build; queries before ready; an old undo, a charm-away and a feature switch match a cold recompute.
+  - 47 **leak scan per player**.
+  - 49 three sittings (injected clock); 52 default fight.
+  - Hard kill → same numbers.
+- **Client:** 28 live only, once with Stats open, dropped while paused; 30 / 34 preferences; 34 opens `by: "feature"`, after Initiative minimises (DM), deferred while paused, history Open after reload; 36; 41; 50; 53.
+- **E2E (`stats-b-e2e`):** one kill toast on DM + Player 2; End opens Highlights on both; Player 1's Trophies. **Bench:** FR-STATS-51.
+
+**Browser walkthrough** (bundle `stats-b`, verify profile, contexts `dm`, `player-1`, `player-2`, 1440×900; step 6 also at DM **and** player-1 1280×720):
+1. All open Stats → Luck · Campaign. The DM's Thorn nat 20s are **2 higher** (two hidden rolls). Only the DM has "DM dice". Mira's d20s include the dropped 3; the reroll counts 17; the "Me" nat 20 counts nowhere.
+2. Thorn applies 25 to **Bandit 4** (11 HP): **one** toast per client ("Overkill! Thorn finished Bandit 4"; the DM's adds ", overkill 14").
+3. DM kills the hidden Elite: the DM's toast reads "(hidden)"; players get nothing (frames).
+4. Heal Brakka 20 (he is down), then Bandit 2 → Brakka 200: "Bandit 2 dropped Brakka" on all three. Mira's card on Goblin Scout 2 + Bandit 2, 30 each: one toast, both names.
+5. Undo that apply: no toast. Re-apply: a toast.
+6. **End**: "Fight summary" on all three. Stats opens with Highlights, clear of PCs at 1280×720 (DM and player-1, companion card open). Players' Kills omit the Elite and the Captain; the DM sees Still standing.
+7. Player 2 leak scan over frames and acks.
+8. Mira's Trophies for Player 1, per the units' headers (incl. the Old Crypt). Thorn's for the DM (both hidden nat 20s count). Nothing on Player 2's summary card; a raw intent → `forbidden`.
+9. Player 2 turns Kill feed off: no toast for them.
+10. Reload, then history Open: same numbers. Hard kill + restart: `state:digest` equal.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -201,6 +332,14 @@ Named tests (all `FR-STATS-NN …`):
 
 - **ST-core** (ST0 server + ST1 CBT lines): `features/stats/*`, `shared/stats/*`, `stats-read.ts` ×2 (new), `combat-tracker/hp.ts`, CBT line kinds; ⚠ appends to `features/index.ts`, `notifications/kinds.ts`, `bundles/index.ts`, the `package.json` bench list. **After GM0**, no schema; parallel with GM1, **GM1 merges first**; GM2 after both.
 - **ST2** `build/st-window`: `@ui/features/stats/*`; ⚠ appends to `windows.ts` ×2, `notification-views.ts` ×2; golden + size rows. **After FU1 + ST-core.**
+
+**Sprint 8.** Needs FR-CBT-152–153, FR-DICE-89–90, FR-NOTE-68–69, FR-CHARX-97–99 (this track) and WF1 + WF4 (placer, toast classes). TT and CB: nothing beyond seams S6, S8. **Libraries: none** (Luck is a table; no chart).
+
+| Slice | Files | ⚠ Shared (AGENTS §9.9) | Order |
+|---|---|---|---|
+| **SB0** `build/sb-core` | `features/stats/*`, `shared/stats/*`, both `stats-read.ts`, `combat-tracker/hp.ts` + `@shared/combat-tracker/log-kinds.ts` (`fell`), `stats.bench.ts`, `fixtures/units/stats/sb-*` | appends: `rule-hooks.ts`, `notifications/kinds.ts`, `bundles/index.ts` | wave 1, ∥ WF1 / TT0 / CB0; no schema, no `lifecycle.ts` |
+| **SB1** `build/sb-stats-ui` | `@ui/features/stats/*` (feed, Highlights, Luck, End open) | appends: `notification-views.ts` ×2, `pref-sections.ts` ×2 | after SB0 + WF1 + WF4 |
+| **SB2** `build/sb-trophies` | `@ui/features/stats/trophies/*` | append: `sheet-sections.ts` (`order: 100`) | after SB0 + WF1 + WF4; ∥ SB1 (or one builder, one walkthrough) |
 
 ## 15. Open questions
 
@@ -229,6 +368,25 @@ Named tests (all `FR-STATS-NN …`):
 
 **Resolved (integrator, sprint-7 seams / rulings)**: ~~OQ-STATS-14~~ (S2: final roll only, maxed die via `raw`), ~~OQ-STATS-17~~ (S5: [FR-SHELL-86](play-shell.md#6-functional-requirements), 400 × 412, min 320 × 280).
 
+**Sprint 8 (track SB).** All decided at DM gate 1 (#335): every bold pick accepted.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-STATS-20 | Kill feed: which kills? | **Decided (#335): A** · **A. Every kill and party down the viewer sees**: one rule, busier · B. Party kills + downs: DM kills silent · C. Party kills only | no | STATS, CBT |
+| OQ-STATS-21 | Toast or log line? | **Decided (#335): A** · **A. Toast; the line gains a hidden `fell`**: no log noise · B. + "— falls" in the line · C. A notification kind: fills history · D. Line only: easy to miss | no | STATS, NOTE, CBT |
+| OQ-STATS-22 | Trophy contents | **Decided (#335): A** · **A. Lifetime + records (§6.1 table)** · B. A + session awards won: more compute · C. Three lines: little to browse | no | STATS, CHARX |
+| OQ-STATS-23 | Trophies: where, who? | **Decided (#335): A** · **A. Sheet tab; owner + DM**: private · B. A + a line on others' summary cards · C. Stats tab for everyone | no | STATS, CHARX |
+| OQ-STATS-24 | Luck: who sees? | **Decided (#335): A** · **A. Everyone, from public rolls (DM all + DM dice)**: fun, zero leak · B. Own characters only: differs per player · C. DM only | no | STATS |
+| OQ-STATS-25 | Luck: which rolls? | **Decided (#335): A** · **A. FR-STATS-37 (the awards' rule)** · B. Attack / save / check only · C. A minus physical | no | STATS, DICE |
+| OQ-STATS-26 | Average of which faces? | **Decided (#335): A** · **A. Every d20 face, dropped too**: true luck, advantage-neutral · B. Kept die only: matches log markers, advantage inflates it | no | STATS |
+| OQ-STATS-27 | Summary: when, for whom? | **Decided (#335): A** · **A. Automatic at End for everyone**: no clicks · B. DM auto + Share: DM's moment · C. On demand | no | STATS, CBT, NOTE |
+| OQ-STATS-28 | Summary surface | **Decided (#335): A** · **A. Stats window with Highlights** · B. A centred dialog: blocks play · C. A card toast: too small | no | STATS, SHELL |
+| OQ-STATS-29 | End with hidden monsters | **Decided (#335): A** · **A. Public facts only; no survivors / "victory"; DM sees Still standing** · B. No players' summary while a hidden monster has HP: missed summaries | no | STATS |
+| OQ-STATS-30 | Campaign numbers (≈ 1 s at 100 sessions) | **Decided (#335): A** · **A. Session partials ([ADR](../architecture/adr/proposed-s8-sb-session-partials.md))**: ≈ 25 ms warm · B. Compute each time · C. Tables: schema, drift | no | STATS |
+| OQ-STATS-31 | Glossary: Kill feed, Fight summary (Highlights), Luck tracker, Trophy case | **Resolved (integrator, sprint-8 seams / rulings)** · **A. Add** | no (integrator, S16) | glossary |
+
+**Resolved (integrator, sprint-8 seams / rulings)**: ~~OQ-STATS-32~~ (S4 / S5: feed = callout class; summary = `stats.board` via the ladder), ~~OQ-STATS-33~~ (S6: counted iff the entry is public), ~~OQ-STATS-34~~ (S8: no `lifecycle.ts`).
+
 ## 16. Out of scope
 
-- Tier B: end-of-combat popup, kill-feed toasts, trophy case, dice luck tracker, XP. Campaign records, charts, export. Session records ([campaign-manager](post-mvp/campaign-manager.md)).
+- XP, charts, export, party-wide records, session records ([campaign-manager](post-mvp/campaign-manager.md)).

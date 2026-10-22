@@ -2,9 +2,9 @@
 title: Dice and game log
 prefix: DICE
 status: complete
-owner: spec-gems
+owner: spec-sb
 wave: 2
-phase: post-mvp-7
+phase: post-mvp-8
 ---
 
 # Dice and game log
@@ -12,6 +12,8 @@ phase: post-mvp-7
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
 > **Sprint 7, track ST (stats tier A, DM [#311](../decisions-log.md); spec-stats).** [Stats](stats.md) count nat 20s / nat 1s and decide visibility from this spec's facts. **Supersede is GM's** (FR-DICE-62–67; seam S2): the old entry is kept with `supersededBy` and the final roll counts (FR-DICE-67). New **FR-DICE-72** lists only the stats read rules on top of that. New **FR-DICE-73** adds a read-only helper. No schema, record type, window or line change: 0 B. ST0 reads these facts **after GM0** (seam S4).
+
+> **Sprint 8, track SB (stats tier B, DM [#334](../decisions-log.md); spec-sb).** The [luck tracker](stats.md#61-tier-b-sprint-8) reads roll facts only. **FR-DICE-89** adds d20 faces (dropped included), `manual` and `n` to the read helper, plus a whole-campaign read. **FR-DICE-90** states the contract any new roll path must keep so luck counts it (dice-extras' macros and roll requests; seam S6: players count public entries only). No schema, record, line or window change: 0 B.
 
 > **Sprint 7 (track FU, BL-48 small copy; DM [#311](../decisions-log.md)).** Decided, not open: a player's roll-bar line names the player ("Player 1 — 1d20+2") instead of the character; a stray space in a breakdown ("(3d6: 5 + 2 + 1 )"). New **FR-DICE-77**, **-78**. Client only (line text and an actor default), 0 B. Tests `FR-DICE-77 roll as your PC` (DOM: `player-1` with the sheet on Mira → the bar's actor is Mira, the entry's actor Mira; "Me" still selectable; a manual pick of Brakka survives a reload; a sheet on another player's character falls back to the player's name; DM unchanged), `FR-DICE-78 no stray spaces` (unit over `groupSegments` and every kind's line builder: no `"( "`, `" )"`, `"  "`, leading / trailing spaces for adv, dis, dropped, offered, manual, modifier-only); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. GM (gems: reroll / supersede) edits this spec in parallel with its own range; FU4 touches only the actor default and the joiner. Edge cases: client-only text and a per-browser default; reconnect re-renders from the store; crash: no server change. No open question.
 
@@ -164,6 +166,9 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 | **Sprint 7, track ST** (stats facts) | | |
 | FR-DICE-72 | **Stats read rules** (read by [stats](stats.md#6-functional-requirements) FR-STATS-02, -03, -10). Supersede and the counting contract are GM's FR-DICE-63 / -67 (seam S2): only a roll listed by an entry that is neither undone nor superseded counts, and a reroll is never an extra roll. Stats add three rules. (a) **Players: the hub filter for a viewer with no `playerId`** (public only): a roll counts only if a counted listing entry is `public` (stamped once, FR-DICE-13); `audiencePlayerId` lines count for the DM only. (b) Feature-tagged kinds (gems while off, seam S1) are skipped as in a snapshot. (c) `natural`, `category`, `rollIds`, `encounterId` and `public` keep their meaning; a change needs a stats review. | proposed ADR [stats read models](../architecture/adr/0059-stats-read-models.md) |
 | FR-DICE-73 | **Read helper** `dice-roll-log/stats-read.ts` (read-only, new file). `logTimeline(db, campaignId, afterN?)` → `{n, at, public}[]` ascending on the unique `(campaign_id, n)` index. `rollFacts(db, viewer, campaignId, fromN, toN)` → one row per counted roll (FR-DICE-67) listed in the range, after the viewer filter: `{rollId, natural, category, actorKind, actorId, public}`. No new index (measured: one session ≤ 7 ms at 94k entries, [stats §12](stats.md#12-performance--bandwidth)). | |
+| **Sprint 8, track SB** (stats tier B; [stats §6.1](stats.md#61-tier-b-sprint-8)) | | |
+| FR-DICE-89 | **Read helper, luck fields** (amends FR-DICE-73; read-only, no schema, no index): `rollFacts` rows gain `n` (the first counted listing entry's), `manual`, and `d20` = the values of every `faces: 20` die in the roll's `dice` leaf with a non-null value, **kept and dropped** (FR-DICE-04 stores both). Its range becomes `fromN…toN` **or** the whole campaign in one pass (for stats' session partials, FR-STATS-46). Same counting and viewer rules (FR-DICE-67, -72). Measured: campaign at 100 sessions (30k rolls) 290–450 ms one pass; one session 7–10 ms ([stats §12](stats.md#12-performance--bandwidth)). | FR-STATS-37, -38 |
+| FR-DICE-90 | **Contract additions** (a change needs a stats review, as FR-DICE-72 (c)): `roll.dice` (`{faces, value, kept}`, every die incl. dropped) and `manual` keep their meaning. **Any new roll path** (dice-extras' macros and roll requests included) writes `roll` rows through `dice.evaluate` and lists them in a log entry's `rollIds`, with `public` per FR-DICE-13 and `audiencePlayerId` per FR-DICE-72 (a). Luck then counts it with no stats change: for players **iff the entry is public**, for the DM always. A hidden request answer (`audiencePlayerId` set, not public) counts for the DM only, **also not in its roller's own view** (every player gets the same party numbers); same for awards and trophies (seam S6). | seam S6 |
 | **Sprint 7, track FU** (BL-48 small copy) | | |
 | FR-DICE-77 | **Roll as your PC by default** (sprint 7, track FU; BL-48 / sim-10: roll-bar lines "Player 1 — 1d20+2"; amends FR-DICE-30's actor Select default): a **player's** Game log roll bar preselects, as actor, the character their Character sheet window shows (its pick, FR-CHARX-47; else their only character; else "Me"), so a roll-bar line reads "Mira — 1d20+2"; the player may still pick "Me" (the line then names the player, as today) or another own character. **Storage and fallback** (rulings-b #18): a manual pick in the bar is stored with the roll bar's Options state (FR-DICE-30's per-browser key, same entry) and kept across reloads; the actor is, in order: **the manual pick** (if that character is still the player's) → **the sheet's PC** (only if it is one of the player's own characters; a sheet showing someone else's character is skipped) → **the player's name** ("Me"). DM: unchanged ("DM"). Server: unchanged (the actor is already validated per FR-DICE-10). | BL-48 |
 | FR-DICE-78 | **No stray spaces in a line** (sprint 7; BL-48: "(3d6: 5 + 2 + 1 )"): every `roll` line and every kind's breakdown built by the shared segment helpers (`@shared/dice-roll-log/roll-kind.ts` `groupSegments`, FR-DICE-35 / -36) joins tokens with exactly one space, with **no space after "(" or before ")"**, none doubled, none leading or trailing, for kept, dropped (adv / dis), offered, manual and modifier-only cases. **Root cause first**: the builder reproduces sim-9's line (a dropped or zero-value die, or a closing segment joined with a space) in a unit test, then fixes the joiner. Rendering of old entries follows (lines are built at render). | BL-48 |
@@ -357,6 +362,12 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 
 **Sprint 7, track ST:** integration `FR-DICE-72 stats count the final roll` (on GM's real reroll: old entry and rolls unchanged, only the new roll counts, nat counted once), `FR-DICE-72 feature-tagged kinds skipped while off` (S1), `FR-DICE-73 rollFacts` (a roll in two entries returns once; `public` if any counted listing entry is public; an unreferenced roll is absent). Bundle `stats`; walkthrough [stats §13](stats.md#13-test-plan) step 5 (the hidden roll's nat 20 counts for the DM only).
 
+**Sprint 8, track SB** (bundle `stats-b`, units `sb-luck-rolls`, `sb-luck-reroll`; [stats §13.1](stats.md#131-sprint-8-tier-b)):
+- Integration `FR-DICE-89 luck fields`: an advantage roll gives both faces; a physical several-dice roll with null values gives none; a reroll gives only the new roll's faces; whole-campaign = the union of the session reads.
+- Integration `FR-DICE-90 new roll paths count`: a roll written through `dice.evaluate` + `gameLog.append` with a hidden entry counts for the DM only. Re-run on dice-extras' macro / request paths once they merge.
+- Integration `FR-DICE-90 hidden request answer is DM-only` (seam S6): an answer entry with `audiencePlayerId` = Player 1 (not public): the DM's luck counts it; Player 1's and Player 2's luck, awards and trophies don't, though Player 1 sees the line.
+- **Build:** SB0 `build/sb-core` edits `dice-roll-log/stats-read.ts` only (no commands, kinds or UI).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -442,6 +453,12 @@ All rows up to OQ-DICE-28 decided or settled; sprint-4 rows by the DM at sprint-
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | ~~OQ-DICE-45~~ | ~~gems: how a reroll leaves the old entry~~ | **Resolved (integrator, sprint-7 seams / rulings)** (seam S2, = OQ-DICE-42 A): kept, with `supersededBy` set once; `replaces` on the new entry; roll rows immutable with `replacesRollId` (GM's FR-DICE-62–67). Stats count the final roll only | — | DICE, GEM, STATS |
+
+**Sprint 8** (track SB). Decided at DM gate 1 (#335): every bold pick accepted.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| ~~OQ-DICE-51~~ | Seam **TT ↔ SB**: do macro and roll-request rolls count in Luck? | **Resolved (integrator, sprint-8 seams / rulings)** (S6): **A.** Count like any roll per FR-DICE-90; players count public entries only (a hidden answer is DM-only, also for its roller); no origin flag | — | DICE, DICEX, STATS |
 
 ## 16. Out of scope
 
