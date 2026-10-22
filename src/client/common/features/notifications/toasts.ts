@@ -1,9 +1,17 @@
-// Toast stack model (FR-NOTE-14/15): pure state + an injected clock. Info toasts hide after 6 s,
-// timers pause while the stack is hovered or the tab is hidden; pending toasts stay until their
-// notification leaves `pending` or the user closes them (closing ≠ dismissing). At most 3 show;
-// the rest count as "+N more". Client memory only.
+// Toast stack model (FR-NOTE-14/15, -50): pure state + an injected clock. One stack per client;
+// each toast has a class (FR-NOTE-50): cards (pending) stay until their notification leaves
+// `pending` or the user closes them (closing ≠ dismissing); alert and info toasts hide after 6 s;
+// one callout (not a notification, `showCallout`) hides after 4 s and a new one replaces it.
+// Timers pause while the stack is hovered or the tab is hidden. At most 3 cards / alerts / info
+// show (info held back first, then alerts); the rest count as "+N more". Client memory only.
 import type { NotificationRecord } from "@shared/notifications/schemas";
+import {
+  type NotificationToastClass,
+  TOAST_CLASS_MS,
+  toastClassOf,
+} from "@shared/notifications/toast-class";
 import type { RecordStore } from "@shared/protocol/store";
+import type { ReactNode } from "react";
 import { createStore, type StoreApi } from "zustand";
 import {
   NOTIFICATION_TYPE,
@@ -14,12 +22,25 @@ import {
   toastTriggers,
 } from "./logic";
 
-export const INFO_TOAST_MS = 6000;
+export const INFO_TOAST_MS = TOAST_CLASS_MS.info ?? 6000;
+export const CALLOUT_MS = TOAST_CLASS_MS.callout ?? 4000;
 export const MAX_VISIBLE = 3;
 export const SUMMARY_KEY = "summary";
 
+/** A row's toast class; the runtime passes its views' (FR-NOTE-52). */
+export type ClassOf = (n: NotificationRecord) => NotificationToastClass;
+const BY_STATE: ClassOf = (n) => toastClassOf(undefined, n.state);
+
 export type Toast =
-  | { key: string; kind: "note"; notificationId: string; sticky: boolean; remaining: number }
+  | {
+      key: string;
+      kind: "note";
+      notificationId: string;
+      /** FR-NOTE-50: card (sticky), alert or info; absent (older memory) = by `sticky`. */
+      cls?: NotificationToastClass;
+      sticky: boolean;
+      remaining: number;
+    }
   | {
       key: typeof SUMMARY_KEY;
       kind: "summary";
@@ -30,9 +51,18 @@ export type Toast =
       remaining: number;
     };
 
+/** FR-NOTE-50: the one callout (not a notification): a newer one replaces it. */
+export interface Callout {
+  id: string;
+  content: ReactNode;
+  remaining: number;
+}
+
 export interface ToastState {
   /** Insertion order, oldest first. */
   toasts: Toast[];
+  /** FR-NOTE-50: the callout showing, outside the count of 3. Optional: absent = none. */
+  callout?: Callout | null;
   /**
    * FR-NOTE-26: notifications whose toast was hidden (`closeToast()` of an action, `hideToast`);
    * their toast doesn't come back in this page load. Optional: absent = none.
@@ -57,7 +87,10 @@ export function advance(s: ToastState, now: number): ToastState {
   const toasts = s.toasts
     .map((t) => (t.sticky ? t : { ...t, remaining: t.remaining - dt }))
     .filter((t) => t.sticky || t.remaining > 0);
-  return { ...s, toasts, runningSince: now };
+  if (!s.callout) return { ...s, toasts, runningSince: now };
+  const left = s.callout.remaining - dt;
+  const callout = left > 0 ? { ...s.callout, remaining: left } : null;
+  return { ...s, toasts, callout, runningSince: now };
 }
 
 function withPause(s: ToastState, patch: Partial<ToastState>, now: number): ToastState {
@@ -74,18 +107,36 @@ export function setHidden(s: ToastState, hidden: boolean, now: number): ToastSta
   return withPause(s, { hidden }, now);
 }
 
-/** FR-NOTE-13/14: a toast per created notification; pending → sticky. */
-export function addNote(s: ToastState, n: NotificationRecord, now: number): ToastState {
+/**
+ * FR-NOTE-13/14, -50: a toast per created notification, in its class (`classOf`: the kind's
+ * views); a pending row is a card (sticky), alert / info hide after 6 s.
+ */
+export function addNote(
+  s: ToastState,
+  n: NotificationRecord,
+  now: number,
+  classOf: ClassOf = BY_STATE,
+): ToastState {
   const ran = advance(s, now);
   if (ran.toasts.some((t) => t.key === n.id) || ran.hiddenIds?.includes(n.id)) return ran;
-  const sticky = n.state === "pending";
-  return {
-    ...ran,
-    toasts: [
-      ...ran.toasts,
-      { key: n.id, kind: "note", notificationId: n.id, sticky, remaining: INFO_TOAST_MS },
-    ],
-  };
+  const cls = n.state === "pending" ? "card" : classOf(n);
+  const sticky = cls === "card";
+  const remaining = TOAST_CLASS_MS[cls] ?? INFO_TOAST_MS;
+  const t: Toast = { key: n.id, kind: "note", notificationId: n.id, cls, sticky, remaining };
+  return { ...ran, toasts: [...ran.toasts, t] };
+}
+
+/** FR-NOTE-50: shows a callout; one showing is replaced (one at a time). */
+export function setCallout(s: ToastState, c: CalloutInput, now: number): ToastState {
+  const ran = advance(s, now);
+  return { ...ran, callout: { id: c.id, content: c.content, remaining: c.ms ?? CALLOUT_MS } };
+}
+
+/** Closes the callout (any; or only the one with `id`). */
+export function clearCallout(s: ToastState, now: number, id?: string): ToastState {
+  const ran = advance(s, now);
+  if (!ran.callout || (id !== undefined && ran.callout.id !== id)) return ran;
+  return { ...ran, callout: null };
 }
 
 /**
@@ -122,9 +173,10 @@ export function hideNote(s: ToastState, notificationId: string, now: number): To
   return { ...ran, hiddenIds: [...(ran.hiddenIds ?? []), notificationId] };
 }
 
-/** Clears every toast (campaign switch). */
+/** Clears every toast and the callout (campaign switch). */
 export function clearToasts(s: ToastState, now: number): ToastState {
-  return { ...advance(s, now), toasts: [] };
+  const ran = advance(s, now);
+  return ran.callout ? { ...ran, toasts: [], callout: null } : { ...ran, toasts: [] };
 }
 
 /**
@@ -210,6 +262,7 @@ export function syncToasts(
   t: Transition,
   now: number,
   waitingOf: WaitingCount = NONE,
+  classOf: ClassOf = BY_STATE,
 ): ToastMemory {
   if (t === null) return m;
   const store = next.store;
@@ -227,27 +280,55 @@ export function syncToasts(
       waitingOf(store),
     );
   }
-  for (const n of toastTriggers(prev, next, t)) s = addNote(s, n, now);
+  for (const n of toastTriggers(prev, next, t)) s = addNote(s, n, now, classOf);
   s = pruneToasts(s, store, now, waitingOf);
   return s === m.toasts && campaignId === m.campaignId ? m : { toasts: s, campaignId };
 }
 
+/** A toast's class (FR-NOTE-50); the summary comes before every class. */
+export function classOfToast(t: Toast): NotificationToastClass | "summary" {
+  if (t.kind === "summary") return "summary";
+  return t.cls ?? (t.sticky ? "card" : "info");
+}
+
+/** FR-NOTE-50: order from home. */
+const RANK: Record<NotificationToastClass | "summary", number> = {
+  summary: 0,
+  card: 1,
+  alert: 2,
+  info: 3,
+};
+
 /**
- * The newest `max` (default `MAX_VISIBLE`) toasts (oldest first) and how many more are held back;
- * the runtime lowers `max` while the stack doesn't fit the viewport (P3 E3).
+ * FR-NOTE-50: what the stack shows, in order from home: the summary (DM), cards, alerts, info
+ * (each oldest first). At most `max` (default `MAX_VISIBLE`) cards / alerts / info: the newest of
+ * each class are kept, info held back before alerts before cards; `more` counts the held-back
+ * ones ("+N more"). The summary and the callout don't count. The runtime lowers `max` while the
+ * stack doesn't fit the viewport (P3 E3).
  */
 export function visibleToasts(
   s: ToastState,
   max: number = MAX_VISIBLE,
-): { shown: Toast[]; more: number } {
-  const more = Math.max(0, s.toasts.length - Math.max(1, max));
-  return { shown: s.toasts.slice(more), more };
+): { shown: Toast[]; more: number; callout: Callout | null } {
+  const room = Math.max(1, max);
+  const counted = s.toasts.filter((t) => t.kind !== "summary");
+  const kept = new Set<Toast>();
+  for (const cls of ["card", "alert", "info"] as const) {
+    const of = counted.filter((t) => classOfToast(t) === cls);
+    for (let i = of.length - 1; i >= 0 && kept.size < room; i--) kept.add(of[i] as Toast);
+  }
+  const shown = s.toasts
+    .map((t, i) => ({ t, i }))
+    .filter(({ t }) => t.kind === "summary" || kept.has(t))
+    .sort((a, b) => RANK[classOfToast(a.t)] - RANK[classOfToast(b.t)] || a.i - b.i)
+    .map(({ t }) => t);
+  return { shown, more: counted.length - kept.size, callout: s.callout ?? null };
 }
 
-/** Milliseconds until the next info toast expires; null if none or paused. */
+/** Milliseconds until the next timed toast (alert, info, callout) ends; null if none or paused. */
 export function nextExpiry(s: ToastState): number | null {
   if (s.runningSince === null) return null;
-  let min: number | null = null;
+  let min: number | null = s.callout ? s.callout.remaining : null;
   for (const t of s.toasts) if (!t.sticky && (min === null || t.remaining < min)) min = t.remaining;
   return min;
 }
@@ -272,4 +353,25 @@ export function hideToast(notificationId: string): void {
   const now = Date.now();
   for (const m of memories)
     m.setState((x) => ({ toasts: hideNote(x.toasts, notificationId, now) }));
+}
+
+// ---- FR-NOTE-50, -52: `showCallout` for every callout (the overkill toast, SB's kill feed) ----
+
+export interface CalloutInput {
+  /** The callout's id (`data-callout-id`); a newer callout replaces whichever shows. */
+  id: string;
+  /** What it shows (the caller's text and test id). */
+  content: ReactNode;
+  /** How long it shows, ms (default 4 s); the timer pauses while the stack is hovered. */
+  ms?: number | undefined;
+}
+
+/**
+ * FR-NOTE-50, -52: shows a callout in this page's one stack, after the info toasts. Not a
+ * notification (no row, bell or history), one at a time (a new one replaces it), outside the
+ * count of 3; the caller keeps to live frames. Client memory only; no runtime mounted → dropped.
+ */
+export function showCallout(c: CalloutInput): void {
+  const now = Date.now();
+  for (const m of memories) m.setState((x) => ({ toasts: setCallout(x.toasts, c, now) }));
 }
