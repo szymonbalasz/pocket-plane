@@ -8,6 +8,7 @@ import {
 } from "../combat-extras/sheet-sections";
 import { modEffectsSection } from "../effect-modifiers/section";
 import { gemCountsSection } from "../gems/GemBlock";
+import { statsTrophiesSection } from "../stats/trophies/TrophiesTab";
 import type { SheetSection } from "./sections";
 
 export const sheetSections: readonly SheetSection[] = [
@@ -16,4 +17,5 @@ export const sheetSections: readonly SheetSection[] = [
   cbtxEffectsSection, // cbtx.effects, header (combat-extras, FR-CBTX-41)
   modEffectsSection, // mod.effects, tab "Active effects" (effect-modifiers, FR-MOD-26)
   gemCountsSection, // gem.counts, header after cbtx.effects (gems, FR-CHARX-71)
+  statsTrophiesSection, // stats.trophies, tab "Trophies", order 100, last (stats, FR-CHARX-97)
 ];
