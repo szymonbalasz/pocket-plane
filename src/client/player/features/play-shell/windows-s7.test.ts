@@ -119,13 +119,14 @@ test("FR-SHELL-87 sim-10 replay r06 (player 1280×800): Reset layout, then the F
   console.info(`FR-SHELL-87 r06: ${placed.join("; ")}; auto-minimised ${[...parked].join(",")}`);
 });
 
-test("FR-SHELL-81 pushed windows return (player, sim-10 c05): the AoE panel pushes Initiative to x 330; the panel closes → back at 68, 60, `returned`; a dragged window stays where dragged", () => {
+test("FR-SHELL-102 pushed windows return (player, sim-10 c05): the AoE panel pushes Initiative off it (FR-SHELL-104); the panel closes → back at 68, 60, `returned`; a dragged window stays where dragged", () => {
   const { c, ws } = shell(MID, () => []);
   c.dispatch({ type: "reset" }, all());
   const home = rectIn(ws(), "cbt.initiative");
   const aoe = { x: 62, y: 56, w: 256, h: 300 };
   c.dispatch({ type: "push", rect: aoe }, all());
-  expect(rectIn(ws(), "cbt.initiative").x).toBe(330);
+  expect(rectIn(ws(), "cbt.initiative")).not.toEqual(home);
+  expect(c.store.getState().placed.get("cbt.initiative:main")).toBe("pushed");
   c.dispatch({ type: "return" }, all());
   expect(rectIn(ws(), "cbt.initiative")).toEqual(home);
   expect(c.store.getState().placed.get("cbt.initiative:main")).toBe("returned");

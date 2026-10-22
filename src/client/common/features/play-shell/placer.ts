@@ -23,13 +23,12 @@ import {
   growsToContent,
   LAUNCHER_CLEAR,
   type Rect,
-  renderedRect,
   TOP_BAR_H,
   type Viewport,
   windowRects,
   workArea,
 } from "./geometry";
-import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
+import { hardRects, type KeepOut, keepOuts, TOASTS_KEEP_OUT } from "./keep-outs";
 import {
   fittedDefaultRect,
   type Obstacle,
@@ -40,7 +39,6 @@ import {
   pcBoxes,
   pcClear,
   placeWindow,
-  RAIL_CLEAR,
   usableArea,
 } from "./placement";
 import {
@@ -436,7 +434,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const area = workArea(vp);
   const registry = ctx.registry;
   const regions = keepOutsOf(ctx);
-  const hard = hardRects(regions);
+  // A pushing bar is a hard keep-out, reported or not yet (FR-SHELL-104).
+  const unreported =
+    trigger.type === "push" && !regions.some((k) => sameRect(k.rect, trigger.rect));
+  const hard = [...hardRects(regions), ...(unreported ? [plainRect(trigger.rect)] : [])];
   const soft = softRects(regions);
   // A `viewport` settle with a `fitted` camera: the map's resize refit follows it (FR-MAP-98), so
   // the tokens drawn now sit where the old viewport's fit put them; PCs count after the refit.
@@ -474,13 +475,15 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const obstacles = (id: string, protectedOnly = false): Obstacle[] => {
     const res: Obstacle[] = [];
     for (const [w, r] of shownMap()) {
-      if (idOf(w) === id) continue;
+      if (idOf(w) === id || moving.has(idOf(w))) continue;
       const prot = isProt(w);
       if (protectedOnly && (!prot || (zoned !== null && !zoned.has(idOf(w))))) continue;
       res.push({ ...r, protected: prot });
     }
     return res;
   };
+  /** Windows a push displaces and hasn't placed yet: off the bar, never an obstacle. */
+  let moving = new Set<string>();
   /**
    * During a zone pass, the protected windows already placed in it (FR-SHELL-111: zones in
    * registry order): a later one fits around them, not around where the others were.
@@ -594,6 +597,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       protectedOnly?: boolean;
       squeeze?: boolean;
       maxL2?: boolean;
+      /** A tool-bar push (FR-SHELL-104): the map never yields for it (FR-SHELL-48). */
+      push?: boolean;
     },
   ): Spot | null => {
     const w0 = get(id);
@@ -656,7 +661,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         const s = squeezeFor(w0, () => (anyAt({ floor }) ? tryAt({ floor }) : null));
         if (s) return s;
       }
-      const yielded = yieldFor(def, input(), floor);
+      const yielded = o.push ? null : yieldFor(def, input(), floor);
       if (yielded) return yielded;
       if (o.maxL2) return null;
       const first = o.putAway ? order()[0] : undefined;
@@ -791,6 +796,65 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const kind = typeof how === "function" ? how(spot.rect) : how;
     write(id, spot.rect, kind, { ...(o.cause && { cause: o.cause }), rung: spot.rung });
     pcFlags.set(id, spot.pcClear);
+  };
+
+  /**
+   * FR-SHELL-104: one window off a hard keep-out, through the ladder (cause `toolbar:<id>`),
+   * ranked nearest its pre-push rect (FR-SHELL-111 (8): the first one a push remembered). Never
+   * the map's yield, nor a squeeze or a put-away of another window (OQ-SHELL-61 A): a launcher
+   * window with no spot ≥ useful is put away itself until `return`; a protected one goes below
+   * useful (L4), else the least PC area (L5, flagged).
+   */
+  const pushOne = (id: string, cause: string) => {
+    const w = get(id);
+    if (!w) return;
+    const m = memory.get(id);
+    const prev = m?.cause === cause ? m.rect : plainRect(w);
+    if (isProt(w)) {
+      const spot = ladder(id, { cause, prev, putAway: false, push: true });
+      if (!spot) return;
+      write(id, spot.rect, "pushed", { cause, rung: spot.rung });
+      pcFlags.set(id, spot.pcClear);
+      return;
+    }
+    const spot = ladder(id, { cause, prev, putAway: false, maxL2: true, push: true });
+    if (spot) {
+      write(id, spot.rect, "pushed", { cause, rung: spot.rung });
+      pcFlags.set(id, spot.pcClear);
+      return;
+    }
+    putAwayWin(w, cause, cause.slice(cause.indexOf(":") + 1));
+    log.push(`${label}:${w.kind}>put-away`);
+  };
+
+  /**
+   * FR-SHELL-104: every shown window over `bar` grown by 12 px is displaced: protected ones first
+   * (registry order), then the launcher windows by descending z (FR-SHELL-111). The ones still
+   * waiting are no obstacle (they leave the bar). `only`: just that window (FR-SHELL-105's drag-end).
+   */
+  const pushFrom = (bar: Rect, cause: string, only?: string) => {
+    const grown = {
+      x: bar.x - EDGE_GAP,
+      y: bar.y - EDGE_GAP,
+      w: bar.w + 2 * EDGE_GAP,
+      h: bar.h + 2 * EDGE_GAP,
+    };
+    const hit = new Set(
+      [...shownMap()]
+        .filter(([w, r]) => (!only || idOf(w) === only) && overlaps(r, grown))
+        .filter(([w]) => !defOf(w)?.fixedDefault)
+        .map(([w]) => idOf(w)),
+    );
+    const order = [
+      ...protectedIds().filter((id) => hit.has(id)),
+      ...launchersByZ().filter((id) => hit.has(id)),
+    ];
+    moving = new Set(order);
+    for (const id of order) {
+      moving.delete(id);
+      pushOne(id, cause);
+    }
+    moving = new Set();
   };
 
   const autoKind = (w: WindowState) => (r: Rect) => {
@@ -1121,15 +1185,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       break;
     }
     case "push": {
-      out = [...pushWindows(out, trigger.rect, ctx, (w, at) => remember(w, TOOLBAR_CAUSE, at))];
-      for (const w of out) {
-        const b = ws.find((x) => x.kind === w.kind && x.instance === w.instance);
-        if (b && !sameRect(b, w)) {
-          placed.set(idOf(w), "pushed");
-          log.push(`push:${w.kind}>pushed`);
-        }
-        if (b && b.state === "open" && w.state === "minimised") putAway.set(idOf(w), TOOLBAR_CAUSE);
-      }
+      // FR-SHELL-104, -105: shown, a tool bar re-selected or swapped; the cause is the region at
+      // that rect (the tool bar, a chrome keep-out).
+      const at = regions.find((k) => k.kind === "hard" && sameRect(k.rect, trigger.rect));
+      pushFrom(trigger.rect, at ? `toolbar:${at.id}` : TOOLBAR_CAUSE);
       break;
     }
     case "return": {
@@ -1140,9 +1199,19 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       break;
     }
     case "drag-end": {
-      // The user's own move / resize (FR-SHELL-95): its memory goes; nothing else moves (the push
-      // on a drag-end over a shown bar is FR-SHELL-105, WF2).
-      memory.delete(windowId(trigger.kind, trigger.instance));
+      // The user's own move / resize (FR-SHELL-95): its memory goes; nothing else moves. Dropped
+      // over a shown hard keep-out (a tool bar, a chrome keep-out; not the toast box), it is pushed
+      // and returns to the dropped rect at `return` (FR-SHELL-105, BL-52). Over a PC it stays
+      // (FR-SHELL-106).
+      const id = windowId(trigger.kind, trigger.instance);
+      memory.delete(id);
+      const w = get(id);
+      if (!w || !isShown(w, ctx.available)) break;
+      const r = rendered(w);
+      const bar = regions.find(
+        (k) => k.kind === "hard" && k.id !== TOASTS_KEEP_OUT && overlaps(r, k.rect),
+      );
+      if (bar) pushFrom(bar.rect, `toolbar:${bar.id}`, id);
       break;
     }
   }
@@ -1177,110 +1246,6 @@ function needsPlacing(ws: Windows, cur: WindowState, ctx: ManagerContext): boole
   if (how === "auto" || how === "default" || how === "pushed") return true;
   if (!cur.userSpot && (how === "returned" || isReopenCovered(ws, cur, ctx))) return true;
   return sameRect(fittedDefaultRect(def, ctx.viewport, hard), cur);
-}
-
-// ---- tool-bar push (FR-SHELL-55; through the placer, FR-SHELL-104 is WF2's) ----
-
-/**
- * FR-SHELL-55: every rendered open window overlapping `bar` grown by 12 px is pushed right, in x
- * order: x = the bar's right edge + 12, then past each open window it lands on, repeatedly; same y
- * and height; its width kept if it fits before vw − 12, else shrunk toward its min. No room to the
- * right even at min width: below the bar (`belowBar`). Neither: a launcher window is put away, a
- * protected or `fixedDefault` one goes to the right edge at min width. Written with `area`;
- * `remember` keeps each pushed window's prior state (FR-SHELL-102, cause `toolbar`).
- */
-function pushWindows(
-  ws: Windows,
-  bar: Rect,
-  ctx: ManagerContext,
-  remember: (w: WindowState, at: Rect | null) => void,
-): Windows {
-  const vp = ctx.viewport;
-  const grown = {
-    x: bar.x - EDGE_GAP,
-    y: bar.y - EDGE_GAP,
-    w: bar.w + 2 * EDGE_GAP,
-    h: bar.h + 2 * EDGE_GAP,
-  };
-  const shown = [...shownRects(ws, ctx)];
-  const hit = shown
-    .filter(([, r]) => overlaps(r, grown))
-    .sort(([a, ra], [b, rb]) => ra.x - rb.x || ra.y - rb.y || a.z - b.z);
-  if (hit.length === 0) return ws;
-  const moving = new Set(hit.map(([w]) => w));
-  const taken = shown.filter(([w]) => !moving.has(w)).map(([, r]) => r);
-  const right = vp.w - EDGE_GAP;
-  const area = workArea(vp);
-  let out = ws;
-  const patchWin = (w: WindowState, next: WindowState) => {
-    out = out.map((x) => (x.kind === w.kind && x.instance === w.instance ? next : x));
-  };
-  for (const [win, r] of hit) {
-    const def = ctx.registry.get(win.kind);
-    if (!def) continue;
-    const min = Math.min(def.minSize.w, r.w);
-    let x = bar.x + bar.w + EDGE_GAP;
-    let landed: Rect | null = null;
-    while (x + min <= right) {
-      const cand = { ...r, x, w: Math.min(r.w, right - x) };
-      const on = taken.filter((o) => overlaps(cand, o));
-      if (on.length === 0) {
-        landed = cand;
-        break;
-      }
-      x = Math.max(...on.map((o) => o.x + o.w)) + EDGE_GAP;
-    }
-    const base = renderedRect(win, def.minSize, vp); // stored height: growth is never written
-    const under = landed ? null : belowBar({ ...r, h: base.h }, def.minSize.h, bar, taken, vp);
-    if (!landed && !under && !def.defaultOpen && !def.fixedDefault) {
-      remember(win, null);
-      patchWin(win, { ...win, state: "minimised" });
-      continue;
-    }
-    const at = landed ?? under ?? { ...r, x: right - min, w: min };
-    taken.push(at);
-    const stored = under ?? { x: at.x, y: base.y, w: at.w, h: base.h };
-    remember(win, plainRect(stored));
-    patchWin(win, shellRect(win, stored, area));
-  }
-  return out;
-}
-
-/**
- * FR-SHELL-55 (orchestrator ruling, W3): a pushed window with no room right of the bar goes below
- * it: top = the bar's bottom + 12, same width, at the x nearest its own column (its x, else
- * beside a window it would land on; never under the rail) where it lands on no other window;
- * its height kept, else shrunk to the clear space above the next window / the usable bottom,
- * never below `minH`. Null when nothing fits.
- */
-function belowBar(
-  r: Rect,
-  minH: number,
-  bar: Rect,
-  taken: readonly Rect[],
-  vp: Viewport,
-): Rect | null {
-  const usable = usableArea(vp);
-  const top = bar.y + bar.h + EDGE_GAP;
-  const xs = [r.x, ...taken.flatMap((o) => [o.x - EDGE_GAP - r.w, o.x + o.w + EDGE_GAP])]
-    .filter((x) => x >= RAIL_CLEAR && x + r.w <= usable.right)
-    .sort((a, b) => Math.abs(a - r.x) - Math.abs(b - r.x) || a - b);
-  for (const x of xs) {
-    let bottom = usable.bottom;
-    let blocked = false;
-    for (const o of taken) {
-      if (o.x >= x + r.w || x >= o.x + o.w) continue;
-      if (o.y + o.h <= top) continue; // above the slot
-      if (o.y < top + minH) {
-        blocked = true; // spans the slot's top
-        break;
-      }
-      bottom = Math.min(bottom, o.y - EDGE_GAP);
-    }
-    const h = Math.min(r.h, bottom - top);
-    if (!blocked && h >= minH) return { x, y: top, w: r.w, h };
-  }
-  return null;
 }
 
 /** PC footprints (+ 4 px) under `r`, as area (L5's measure, FR-SHELL-77 (e)). */

@@ -136,6 +136,14 @@ export function ShellWindow({
   // and its end stores the result with the current work area.
   const rect = windowRect(win, def, viewport, needed, caps);
   useFirstRow(wid, open, rect, ref, bodyRef);
+  // A gesture's end re-applies the rendered rect once: a drop the placer pushed back to the rect it
+  // had before the gesture (FR-SHELL-105) changes no style prop, so React wouldn't undo the drag's.
+  const [gestures, setGestures] = useState(0);
+  const rectNow = useRef(rect);
+  rectNow.current = rect;
+  useLayoutEffect(() => {
+    if (gestures > 0 && ref.current) applyRect(ref.current, rectNow.current);
+  }, [gestures]);
   const id = { kind: win.kind, instance: win.instance };
   const parked = win.state === "minimised";
   const Body = def.component;
@@ -187,6 +195,7 @@ export function ShellWindow({
       ) {
         if (kind === "resize") dispatch({ type: "setRect", ...id, rect: last, resized: true });
         else dispatch({ type: "setRect", ...id, rect: movedRect(last) });
+        setGestures((n) => n + 1);
       } else {
         applyRect(el, rect);
       }

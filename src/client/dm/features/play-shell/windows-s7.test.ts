@@ -109,7 +109,7 @@ test("FR-SHELL-87 sim-10 replays (DM b02, b03): 1440×900 Compendium, Party, Enc
   }
 });
 
-test("FR-SHELL-87 sim-10 replay (DM Scenes + Fog): Scenes at the top-left, the Fog bar pushes it right of the bar (FR-SHELL-55); the bar gone, it returns (FR-SHELL-81)", () => {
+test("FR-SHELL-87 sim-10 replay (DM Scenes + Fog): Scenes at the top-left, the Fog bar pushes it through the ladder: the edge column below the bar, ≥ useful (FR-SHELL-104); the bar gone, it returns (FR-SHELL-102)", () => {
   const storage = createLayoutStorage(() => ({ getItem: () => null, setItem: () => {} }));
   const c = createShellController({ registry: dmWindows, storage, viewport: () => WIDE });
   c.restore("k");
@@ -119,7 +119,7 @@ test("FR-SHELL-87 sim-10 replay (DM Scenes + Fog): Scenes at the top-left, the F
   const fogBar = { x: 62, y: 56, w: 472, h: 92 };
   c.dispatch({ type: "push", rect: fogBar }, all());
   const ws = c.store.getState().windows;
-  expect(rectIn(ws, "map.scenes")).toMatchObject({ x: 546, y: 60 });
+  expect(rectIn(ws, "map.scenes")).toMatchObject({ x: 68, y: fogBar.y + fogBar.h + 12 });
   expect(c.store.getState().placed.get("map.scenes:main")).toBe("pushed");
   c.dispatch({ type: "return" }, all());
   expect(rectIn(c.store.getState().windows, "map.scenes")).toEqual(home);
