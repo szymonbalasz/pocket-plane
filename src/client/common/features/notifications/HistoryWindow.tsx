@@ -1,5 +1,7 @@
 // `note.history` body (FR-NOTE-17): Pending, then History, newest first; DM audience tags and
 // Dismiss; test-mode send form (FR-NOTE-22). Marks notifications seen while open (FR-NOTE-18).
+// *(Sprint 8, WF4)* Compact rows (FR-SHELL-100: pending + 3 rows whole at the useful 360 × 412):
+// the row's time, badges and buttons share one line with small buttons; the test form comes last.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { useContext, useEffect, useLayoutEffect } from "react";
 import { Button } from "../../components/ui/button";
@@ -33,6 +35,13 @@ import { TestSendForm } from "./TestSendForm";
 import { type NotificationViews, originOf } from "./views";
 
 const ROW_SELECTOR = '[data-testid="note-history-row"]';
+/** Compact row buttons (sprint 8, FR-SHELL-100): on the badges' line. */
+const ROW_BUTTON = "h-6 px-2 text-xs";
+/**
+ * Row badges as tall as the time text (16 px; walkthrough N1: the DM's audience / state badges
+ * made its rows 88 px, players' 82), so the DM's closed rows match the players'.
+ */
+const ROW_BADGE = "py-0 leading-[14px]";
 
 /**
  * FR-NOTE-17 state badge; FR-NOTE-40 (OQ-CAMP-27 A): "Resolved by ‹name›" draws the name in the
@@ -47,6 +56,7 @@ function StateBadge({ n, label }: { n: NotificationRecord; label: string }) {
     return (
       <Badge
         variant={n.state === "pending" ? "default" : "secondary"}
+        className={ROW_BADGE}
         data-testid="note-history-state"
       >
         {label}
@@ -55,7 +65,7 @@ function StateBadge({ n, label }: { n: NotificationRecord; label: string }) {
   }
   const color = keyOf(closer);
   return (
-    <Badge variant="outline" data-testid="note-history-state">
+    <Badge variant="outline" className={ROW_BADGE} data-testid="note-history-state">
       Resolved by{" "}
       <span
         data-testid="note-history-closed-by"
@@ -96,7 +106,7 @@ function Row({
       data-state={n.state}
       {...stripe.attrs}
       className={cn(
-        "relative flex flex-col gap-1.5 rounded-md border p-2",
+        "relative flex flex-col gap-1 rounded-md border px-2 py-1.5",
         n.state === "pending" ? "border-primary" : "text-muted-foreground",
       )}
     >
@@ -109,7 +119,7 @@ function Row({
           </time>
         </Tooltip>
         {you.role === "dm" && (
-          <Badge variant="outline" data-testid="note-history-audience">
+          <Badge variant="outline" className={ROW_BADGE} data-testid="note-history-audience">
             {audienceLabel(n, nameOf)}
           </Badge>
         )}
@@ -118,6 +128,7 @@ function Row({
           {action !== "none" && (
             <Button
               size="sm"
+              className={ROW_BUTTON}
               data-testid="note-history-action"
               disabled={action === "disabled" || busy}
               onClick={(e) =>
@@ -131,6 +142,7 @@ function Row({
             <Button
               size="sm"
               variant="outline"
+              className={ROW_BUTTON}
               data-testid="note-history-dismiss"
               disabled={dismiss === "disabled" || busy}
               onClick={() => void actions.dismiss(n)}
@@ -159,9 +171,9 @@ function Section({
 }) {
   if (rows.length === 0) return null;
   return (
-    <section aria-label={title} data-testid={testId} className="flex flex-col gap-1.5">
+    <section aria-label={title} data-testid={testId} className="flex flex-col gap-1">
       <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex flex-col gap-1">
         {rows.map((n) => (
           <Row key={n.id} n={n} views={views} actions={actions} />
         ))}
@@ -212,8 +224,7 @@ export function HistoryBody({ views, note }: { views: NotificationViews; note: N
     );
   }
   return (
-    <div className="flex min-h-0 flex-col gap-3" data-testid="note-history">
-      {testMode && <TestSendForm />}
+    <div className="flex min-h-0 flex-col gap-2" data-testid="note-history">
       {pending.length === 0 && history.length === 0 ? (
         <p
           data-testid="note-history-empty"
@@ -239,6 +250,7 @@ export function HistoryBody({ views, note }: { views: NotificationViews; note: N
           />
         </>
       )}
+      {testMode && <TestSendForm />}
     </div>
   );
 }

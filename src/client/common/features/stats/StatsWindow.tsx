@@ -267,7 +267,8 @@ function FightTable({ role, rows }: { role: Role; rows: readonly AnyRow[] }) {
             >
               <TableCell
                 data-testid="stats-fight-name"
-                className={cn("max-w-0 truncate px-1.5 py-1", row.ownerKey && "pl-4")}
+                // FR-STATS-66: names whole (they wrap), never cut.
+                className={cn("wrap-anywhere px-1.5 py-1", row.ownerKey && "pl-4")}
               >
                 {row.ownerKey ? "↳ " : ""}
                 {row.name}
@@ -430,8 +431,12 @@ export function SessionView({
         <div
           data-testid="stats-awards"
           data-record-id={String(s.fromN)}
-          // FR-STATS-19: 3 columns, 1 under 400 px of window (the body's padding: 26 px).
-          className={cn("grid grid-cols-1 gap-1.5 @min-[372px]:grid-cols-3", !live && "opacity-60")}
+          // FR-STATS-67 (amends FR-STATS-19): columns follow the window body's width (the board is
+          // the body less its 2 × 12 px padding): 3 ≥ 600 px, 2 ≥ 380 px, else 1.
+          className={cn(
+            "grid grid-cols-1 gap-1.5 @min-[356px]:grid-cols-2 @min-[576px]:grid-cols-3",
+            !live && "opacity-60",
+          )}
         >
           {s.awards.map((a) => (
             <AwardCard key={a.key} award={a} />
@@ -446,7 +451,13 @@ function AwardCard({ award: a }: { award: Award }) {
   const colorOf = useColorOf();
   const detail = awardDetailText(a);
   return (
-    <Card data-testid="stats-award" data-record-id={a.key} className="gap-0.5 p-2 text-xs">
+    // FR-STATS-67: one line per part (title, value, winners, detail); names and values wrap
+    // inside the card, never into the next one.
+    <Card
+      data-testid="stats-award"
+      data-record-id={a.key}
+      className="flex min-w-0 flex-col gap-0.5 wrap-anywhere p-2 text-xs"
+    >
       <span className="font-medium text-muted-foreground">{AWARD_TITLE[a.key]}</span>
       <span data-testid="stats-award-value" className="text-sm font-semibold tabular-nums">
         {awardValueText(a)}
@@ -461,7 +472,6 @@ function AwardCard({ award: a }: { award: Award }) {
               key={w.characterId}
               data-testid="stats-award-winner"
               data-record-id={w.characterId}
-              className="truncate"
               style={{ color: colorOf(person) ?? undefined }}
             >
               {winnerText(w)}
@@ -471,7 +481,7 @@ function AwardCard({ award: a }: { award: Award }) {
         {a.more ? <span className="text-muted-foreground">+{a.more} more</span> : null}
       </span>
       {detail ? (
-        <span data-testid="stats-award-detail" className="truncate text-muted-foreground">
+        <span data-testid="stats-award-detail" className="text-muted-foreground">
           {detail}
         </span>
       ) : null}

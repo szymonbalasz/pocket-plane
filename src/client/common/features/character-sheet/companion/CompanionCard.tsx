@@ -478,7 +478,8 @@ function Attacks({
                 key={row.id}
                 data-testid="charx-companion-attack"
                 data-record-id={row.id}
-                className="flex flex-col gap-1 border-b py-1.5"
+                // FR-CHARX-83: compact rows; the Owlbear's two fit 320 × 360 without scrolling.
+                className="flex flex-col gap-1 border-b py-1 last:border-b-0 last:pb-0"
               >
                 <span className="text-sm">
                   {v.name}
@@ -652,7 +653,8 @@ export function CompanionCardView({
       data-testid="charx-companion"
       data-record-id={e.key}
       data-editing={isEditing ? "true" : "false"}
-      className="flex flex-col gap-2 p-1"
+      // FR-CHARX-83: no bottom padding (the useful 320 × 360 shows every first-row button).
+      className="flex flex-col gap-2 px-1 pt-1"
     >
       <Header e={e} picker={picker} />
       {/* FR-CBT-112: right under the header, so its confirm shows without scrolling. */}

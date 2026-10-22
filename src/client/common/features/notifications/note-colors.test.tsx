@@ -259,3 +259,17 @@ describe("FR-NOTE-41 old rows", () => {
     }
   });
 });
+
+describe("FR-SHELL-100 note.history compact rows (walkthrough N1)", () => {
+  test("FR-SHELL-100 note.history useful size: the DM's audience and state badges are as tall as the time text (rows match the players', pending + 3 at 360 × 412)", () => {
+    const html = render(storeOf(ALL), "history");
+    const badges = [
+      ...html.matchAll(/<span [^>]*data-testid="note-history-(audience|state)"[^>]*>/g),
+    ];
+    expect(badges.length).toBeGreaterThan(0);
+    for (const [tag] of badges) {
+      expect(tag).toContain("py-0");
+      expect(tag).toContain("leading-[14px]");
+    }
+  });
+});
