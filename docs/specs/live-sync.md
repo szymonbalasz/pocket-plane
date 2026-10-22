@@ -1,9 +1,10 @@
 ---
 title: Live sync, reconnect, visibility
 prefix: SYNC
-status: complete
-owner: spec-live-sync
+status: claimed
+owner: spec-live-sync, spec-fx
 wave: 1
+phase: post-mvp-9
 ---
 
 # Live sync, reconnect, visibility

@@ -1,10 +1,10 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: complete
-owner: spec-tt
+status: claimed
+owner: spec-tt, spec-fx
 wave: 1
-phase: post-mvp-8
+phase: post-mvp-9
 ---
 
 # Campaign management

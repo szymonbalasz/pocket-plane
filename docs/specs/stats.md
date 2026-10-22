@@ -1,9 +1,9 @@
 ---
 title: Stats and summaries
 prefix: STATS
-status: complete
-owner: spec-wf, spec-sb
-phase: post-mvp-8
+status: claimed
+owner: spec-wf, spec-sb, spec-fx
+phase: post-mvp-9
 ---
 
 # Stats and summaries
