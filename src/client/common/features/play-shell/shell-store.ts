@@ -84,6 +84,11 @@ export interface ShellController {
   restore(key: string): void;
   /** Apply a user change; writes synchronously to the key it was made under. */
   dispatch(action: WindowAction, available: ReadonlySet<string>): void;
+  /**
+   * A `blocksInput` overlay is up (FR-SHELL-112 (2)): actions queue (one per window and kind of
+   * action, the last kept) and run, in order, when it goes.
+   */
+  setBlocked(blocked: boolean): void;
 }
 
 const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
@@ -256,6 +261,10 @@ export function createShellController(opts: {
   }));
   const regionsAt = (vp: Viewport) => opts.keepOuts?.(vp) ?? keepOuts(registry.client, vp);
   const allKinds = () => new Set(registry.defs.map((d) => d.kind));
+  let blocked = false;
+  const queued = new Map<string, { action: WindowAction; available: ReadonlySet<string> }>();
+  const queueKey = (a: WindowAction) =>
+    isLayoutAction(a) ? a.type : `${a.type}:${windowId(a.kind, a.instance)}`;
   const contextFor = (
     state: ShellState,
     available: ReadonlySet<string>,
@@ -280,7 +289,7 @@ export function createShellController(opts: {
       autoMinimised: () => state.autoMinimised,
     };
   };
-  return {
+  const ctl: ShellController = {
     store,
     registry,
     restore(key) {
@@ -328,7 +337,21 @@ export function createShellController(opts: {
       // The load settle changed the entry (zones, FR-SHELL-53's default sizes): written.
       if (r.migrated) storage.write(key, serialise(r.windows, registry));
     },
+    setBlocked(next) {
+      if (blocked === next) return;
+      blocked = next;
+      if (blocked) return;
+      const run = [...queued.values()];
+      queued.clear();
+      for (const q of run) ctl.dispatch(q.action, q.available);
+    },
     dispatch(action, available) {
+      if (blocked) {
+        const k = queueKey(action);
+        queued.delete(k);
+        queued.set(k, { action, available });
+        return;
+      }
       const state = store.getState();
       const { key, windows } = state;
       if (key === null) return; // nothing shown before the first snapshot
@@ -392,4 +415,5 @@ export function createShellController(opts: {
       if (action.type === "reset") opts.onReset?.();
     },
   };
+  return ctl;
 }

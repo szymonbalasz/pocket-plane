@@ -536,7 +536,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const m = memory.get(id);
       if (m && m.at !== null) memory.set(id, { ...m, at: plainRect(r) });
     }
-    const keep = opts.keepSize === true && w.userSize === true;
+    // A user size the shell keeps (a zone at it, a displacement at it) stays the user's.
+    const keep = w.userSize === true && (opts.keepSize === true || (r.w === w.w && r.h === w.h));
     const same = sameRect(w, r) && w.area?.w === area.w && w.area?.h === area.h;
     const next =
       same && !w.userSpot && (keep || !w.userSize)
