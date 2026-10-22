@@ -214,20 +214,18 @@ export function useReorder(
   return { blocks, drag, disabled, unranked, movable, start, step };
 }
 
-/** The grip slot's width: rows without a grip keep the column, so names stay aligned. */
-const GRIP_W = "w-3";
-
 /**
  * FR-CBTX-62: lucide `GripVertical` at a movable row's left (hidden rows too); none on a row riding
- * its owner. `tabIndex -1`: keyboard users have Move up / down (FR-CBTX-63), no new tab stop.
+ * its owner. It sits in the 8 px gutter left of the turn marker (the list's and the row's padding),
+ * so it costs the name line no width. `tabIndex -1`: keyboard users have Move up / down
+ * (FR-CBTX-63), no new tab stop.
  */
 export function Grip({ c }: { c: CombatantView }) {
   const r = useContext(ReorderContext);
-  if (!r) return null;
-  if (!r.movable(c.id)) return <span aria-hidden className={`${GRIP_W} shrink-0`} />;
+  if (!r?.movable(c.id)) return null;
   return (
     <Tooltip content={r.unranked ? "Roll initiative first" : "Drag to reorder"}>
-      <span className={`flex ${GRIP_W} shrink-0`}>
+      <span className="absolute inset-y-0 -left-2 flex w-2">
         <button
           type="button"
           tabIndex={-1}
@@ -235,10 +233,10 @@ export function Grip({ c }: { c: CombatantView }) {
           data-record-id={c.id}
           aria-label={`Drag ${c.name} to reorder`}
           disabled={r.disabled || r.unranked}
-          className="flex h-7 w-full cursor-grab touch-none items-center justify-center text-muted-foreground/70 hover:text-foreground active:cursor-grabbing disabled:cursor-default disabled:opacity-40"
+          className="flex w-full cursor-grab touch-none items-center justify-center text-muted-foreground/70 hover:text-foreground active:cursor-grabbing disabled:cursor-default disabled:opacity-40"
           onPointerDown={(e) => r.start(e, c.id)}
         >
-          <GripVerticalIcon className="size-3.5" aria-hidden />
+          <GripVerticalIcon className="size-3.5 shrink-0" aria-hidden />
         </button>
       </span>
     </Tooltip>

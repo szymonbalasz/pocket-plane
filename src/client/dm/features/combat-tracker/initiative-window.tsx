@@ -1527,7 +1527,7 @@ function DmInitiativeBody() {
           aria-hidden
           className="sticky top-0 z-10 flex items-center gap-0.5 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
         >
-          <span className="flex-1 pl-[62px]">Combatant</span>
+          <span className="flex-1 pl-[48px]">Combatant</span>
           <span className={cn("text-center", INIT_W[wideInit ? "wide" : "narrow"])}>Init</span>
           <span className="w-[58px]" />
         </div>
