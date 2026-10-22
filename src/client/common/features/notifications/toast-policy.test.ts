@@ -99,9 +99,9 @@ describe("FR-NOTE-50 toast policy", () => {
     v = visibleToasts(s);
     expect(v.shown.map((t) => t.key)).toEqual(["summary", more[0].id, more[1].id, a.id]);
     expect(v.more).toBe(5);
-    // P3 E3: the runtime's lowered cap: the alert takes the room first; it never overflows.
-    expect(classes(s, 1)).toEqual(["summary", "alert"]);
-    expect(classes(s, 0)).toEqual(["summary", "alert"]);
+    // P3 E3: the runtime's lowered cap: the alert never overflows, and the newest card stays.
+    expect(classes(s, 1)).toEqual(["summary", "card", "alert"]);
+    expect(classes(s, 0)).toEqual(["summary", "card", "alert"]);
   });
 
   test("FR-NOTE-50 toast policy: card sticky, alert and info 6 s, callout 4 s; every timer pauses while hovered", () => {
@@ -184,9 +184,10 @@ describe("FR-NOTE-50 toast policy: alerts from toast()", () => {
     let s = addNote(initialToasts(0), note(), 0);
     s = addNote(s, card(), 0);
     s = syncAlerts(s, [{ id: "alert:turn" }, { id: 7, ms: 60_000 }, { id: "x", ms: Infinity }], 0);
-    // Alerts always show (3 of them fill the room): the card and the info go to "+N more".
-    expect(classes(s)).toEqual(["alert", "alert", "alert"]);
-    expect(visibleToasts(s).more).toBe(2);
+    // Alerts always show (3 of them fill the room), the newest card beside them; the info goes
+    // to "+N more".
+    expect(classes(s)).toEqual(["card", "alert", "alert", "alert"]);
+    expect(visibleToasts(s).more).toBe(1);
     expect(classes(s, 5)).toEqual(["card", "alert", "alert", "alert", "info"]);
     const alerts = s.toasts.filter((t) => t.kind === "alert");
     expect(alerts.map((t) => [t.key, t.sticky, t.remaining])).toEqual([

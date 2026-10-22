@@ -83,7 +83,6 @@ test("FR-NOTE-42 FR-NOTE-43 F5 DM at 1440×900, then 1280×720: with the pending
   ]) {
     await dm.setViewportSize(size);
     await resetLayout(dm);
-    const home = (size.width - 320) / 2;
     const scenes = await openWindow(dm, "map.scenes");
     await dragTo(dm, scenes, 68, 60);
     await dm.getByTestId("map-tool-fog").click();
@@ -91,9 +90,10 @@ test("FR-NOTE-42 FR-NOTE-43 F5 DM at 1440×900, then 1280×720: with the pending
     await expect(dm.getByTestId("fog-bar")).toBeVisible();
     await expect(scenes).toHaveAttribute("data-placed", "pushed");
     await expect(summary).toBeVisible();
-    // FR-NOTE-42: at its home, never x 68 (b01: 68..388 × 100..157).
-    await expect(stack).toHaveAttribute("data-left", String(home));
-    expect((await box(stack)).x).toBe(home);
+    // FR-NOTE-42: never x 68 (b01: 68..388 × 100..157); walkthrough WF4: at its home unless the
+    // pushed Scenes is under it, then beside it, off Scenes.
+    await expect.poll(async () => overlaps(await box(stack), await box(scenes))).toBe(false);
+    expect((await box(stack)).x).toBeGreaterThan(68);
     // FR-NOTE-43: off the bar; all 16 Fog bar controls hit at their centre.
     expect(overlaps(await box(stack), await box(panel))).toBe(false);
     const fog = await blocked(dm, 'button[data-testid^="fog-"]');
@@ -109,7 +109,7 @@ test("FR-NOTE-42 FR-NOTE-43 F5 DM at 1440×900, then 1280×720: with the pending
     for (const tool of ["map-tool-aoe", "map-tool-structure"]) {
       await dm.getByTestId(tool).click();
       await expect(panel).toBeVisible();
-      await expect(stack).toHaveAttribute("data-left", String(home));
+      await expect.poll(async () => overlaps(await box(stack), await box(scenes))).toBe(false);
       expect(overlaps(await box(stack), await box(panel))).toBe(false);
       const controls = await blocked(dm, "button, input, select, [role='combobox']");
       expect(controls.out).toEqual([]);
