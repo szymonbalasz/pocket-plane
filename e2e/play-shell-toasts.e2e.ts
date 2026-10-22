@@ -28,9 +28,8 @@ async function alertBesideNotification(page: Page) {
   const alert = page.getByTestId("ui-alert-toast");
   await expect(alert).toHaveText("Test alert");
   await expect(note).toBeVisible();
-  // Let sonner's enter transition settle before measuring.
-  await expect(alert).toHaveAttribute("data-mounted", "true");
-  await page.waitForTimeout(500);
+  // FR-NOTE-50 (sprint 8): one stack; the alert is its alert class.
+  await expect(alert).toHaveAttribute("data-class", "alert");
   const a = await rect(alert);
   const n = await rect(note);
   const apart = a.y >= n.y + n.height || n.y >= a.y + a.height;

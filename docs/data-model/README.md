@@ -2392,3 +2392,11 @@ From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../spe
 - **Persisted runtime state:** none. Server memory only (ADR-0062): per-session partials per (campaign, role + features), built at server start after the session warm in yielding 5-session chunks, dropped per touched session (entries / facts by `n`) or all (a combatant's owner / kind, the campaign's features), rebuilt in the background.
 - **Fixtures:** `sb-fight-facts` (4 Bandits + the hidden Bandit Captain on the Goblin Ambush; 6 facts, one undone; `stats-b`), `sb-past-bandits` (session-sim-12: an ended "Bandit Camp" before the Ambush, 4 facts, the Captain's token deleted), `sb-luck-rolls` (8 physical rolls), `sb-luck-reroll` (Mira's Perception 4 → 17); expected numbers in `fixtures/units/stats/stats.fixtures.test.ts` and `fixtures/bundles/session-sim-12.fixtures.test.ts`.
 - **CON-44** (heavy harness, measured): 15 B a flagged line; +45 B per viewer (3 in the window), worst +1.5 KB (all 100); summary rows inside the closed window: no growth. DM 690,797 B of 1.5 MiB; players ≤ 289,129 B of 512 KiB.
+
+## 111. Sprint 8: toast policy (WF4)
+
+From [notifications](../specs/notifications.md#8-data-model) FR-NOTE-50–53 (#333, #335). **Built by `fix/wf-sizes-toasts`**. Protocol side: [protocol §141](../protocol/README.md#141-sprint-8-one-toast-policy-stats-and-companion-card-useful-sizes-wf4). **No table, column, record type or wire field.**
+
+- **Registries (code, not stored):** server kind def and client view gain `toastClass` (`card` | `alert` | `info`), named on every registry line.
+- **Client memory (per page, never sent or stored):** each notification toast's class (`cls`); the one callout `{id, content, remaining}` (cleared on a campaign switch).
+- **Derived:** a row's toast class (pending → card, else the kind's alert, else info); what the stack shows (order and the "+N more" count).

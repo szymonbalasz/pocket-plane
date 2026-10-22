@@ -456,6 +456,36 @@ async function closeRollPopups(page: Page) {
   await expect(page.getByTestId("dicex-popup")).toHaveCount(0);
 }
 
+/** Closes the page's alert-class toasts (FR-NOTE-50) with their ✕; true if any was shown. */
+async function closeAlertToasts(page: Page): Promise<boolean> {
+  const close = page.locator('[data-class="alert"] [data-testid="ui-toast-close"]');
+  let any = false;
+  while ((await close.count()) > 0) {
+    await close.first().click();
+    any = true;
+  }
+  return any;
+}
+
+/** `toast`'s box once it holds still for 500 ms. */
+async function stableBox(page: Page, toast: Locator): Promise<Box> {
+  let box: Box | null = null;
+  await expect
+    .poll(
+      async () => {
+        const a = await toast.boundingBox();
+        await page.waitForTimeout(500);
+        const b = await toast.boundingBox();
+        box = b && { x: b.x, y: b.y, w: b.width, h: b.height };
+        return a !== null && b !== null && a.x === b.x && a.y === b.y;
+      },
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  if (!box) throw new Error("no toast box");
+  return box;
+}
+
 for (const [width, height] of [
   [1440, 900],
   [1280, 720],
@@ -520,6 +550,9 @@ for (const [width, height] of [
       // The roll popups (FR-DICEX-39) sit over the map's top rows below the toasts: closed, so
       // the cells under the toast's popup span stay grabbable.
       await closeRollPopups(dm);
+      // FR-NOTE-50 (sprint 8): alert toasts ("Dice set to flat …") sit in the one stack under the
+      // card: closed too, and the card's box read again once the shorter stack holds still.
+      if (await closeAlertToasts(dm)) card = { ...card, box: await stableBox(dm, card.toast) };
       // A monster the DM can grab (not under a window), the lowest one.
       const grabbable: Awaited<ReturnType<typeof monsters>> = [];
       for (const t of await monsters()) {

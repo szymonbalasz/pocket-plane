@@ -1,11 +1,12 @@
 // `stats.board`'s companion (always mounted while the kind is available), both clients, live
 // event frames only (never a snapshot, reload or resync):
-// - FR-STATS-22 / FR-NOTE-49: the overkill callout toast `stats-overkill-toast`, 4 s, an info
-//   toast in the shared stack (no notification row; one at a time; once per line);
+// - FR-STATS-22 / FR-NOTE-49: the overkill callout toast `stats-overkill-toast`, 4 s, in the
+//   callout class of the one stack (FR-NOTE-50, -52: `showCallout`; no notification row; one at
+//   a time; once per line);
 // - FR-SHELL-94: a new `stats-awards` notification opens everyone's Stats on that session.
 import { useRef } from "react";
-import { toast } from "sonner";
 import { useEventFrame, useSync } from "../../sync/store";
+import { showCallout } from "../notifications/toasts";
 import { awardsOpenOf, OVERKILL_TOAST_ID, OVERKILL_TOAST_MS, overkillToast } from "./logic";
 import { useOpenStatsAwards } from "./open";
 
@@ -24,9 +25,10 @@ export function StatsRuntime() {
         const [oldest] = toasted.current;
         if (oldest) toasted.current.delete(oldest);
       }
-      toast(<span data-testid="stats-overkill-toast">{t.text}</span>, {
+      showCallout({
         id: OVERKILL_TOAST_ID,
-        duration: OVERKILL_TOAST_MS,
+        content: <span data-testid="stats-overkill-toast">{t.text}</span>,
+        ms: OVERKILL_TOAST_MS,
       });
     }
     const awards = awardsOpenOf(frame);
