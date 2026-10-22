@@ -17,6 +17,9 @@ import charMiraFull from "./character-sheet-full/char-mira-full";
 import charMiraLocked from "./character-sheet-full/char-mira-locked";
 import charSela from "./character-sheet-full/char-sela";
 import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
+import cbFogGoblin from "./combat-extras/cb-fog-goblin";
+import cbParty from "./combat-extras/cb-party";
+import cbTies from "./combat-extras/cb-ties";
 import cbtxEffects from "./combat-extras/cbtx-effects";
 import cbtxReinforcement from "./combat-extras/cbtx-reinforcement";
 import cbtxTemp from "./combat-extras/cbtx-temp";
@@ -223,4 +226,8 @@ export const units: readonly Fixture[] = [
   // Sprint 7 track ST (fix/st-core): stats facts
   stPastCrypt,
   stAmbushFacts,
+  // Sprint 8 track CB (fix/cb-core): ties, a fog-hidden Goblin, party values
+  cbTies,
+  cbFogGoblin,
+  cbParty,
 ];
