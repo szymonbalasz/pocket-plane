@@ -146,7 +146,8 @@ describe("FR-SHELL-40, -41 settle after first layout", () => {
 });
 
 describe("sprint 5 (FR-SHELL-47, -53)", () => {
-  const big = { defaultSize: { w: 600, h: 584 }, minSize: { w: 600, h: 584 } };
+  // 580 wide: two fit right of the tool rail at 1280 (FR-SHELL-109), not three.
+  const big = { defaultSize: { w: 580, h: 584 }, minSize: { w: 580, h: 584 } };
   const reg = createWindowRegistry("dm", [
     def("b.one", big),
     def("b.two", big),
@@ -292,12 +293,19 @@ describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
     // The user's spot (userSpot), then the Fog bar pushes it.
     c.dispatch({ type: "setRect", kind: "c.init", rect: home as Rect }, kinds);
     c.dispatch({ type: "push", rect: bar }, kinds);
-    expect(rect("c.init")?.x).toBe(bar.x + bar.w + 12);
+    // FR-SHELL-104: off the bar + 12 through the ladder, nearest the pre-push rect.
+    const off = (b: Rect) => ({ x: b.x - 12, y: b.y - 12, w: b.w + 24, h: b.h + 24 });
+    const hits = (a: Rect, b: Rect) =>
+      a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(hits(rect("c.init") as Rect, off(bar))).toBe(false);
+    expect(rect("c.init")).not.toEqual(home);
     expect(c.store.getState().placed.get("c.init:main")).toBe("pushed");
     expect(win("c.init")?.userSpot).toBeUndefined();
-    // A wider AoE panel replaces the bar before it went: pushed further, memory kept from before Fog.
-    c.dispatch({ type: "push", rect: { ...bar, w: 420 } }, kinds);
-    expect(rect("c.init")?.x).toBe(bar.x + 420 + 12);
+    // A taller AoE panel replaces the bar before it went: pushed again, memory kept from before Fog.
+    const aoe = { ...bar, h: bar.h + 200 };
+    c.dispatch({ type: "push", rect: aoe }, kinds);
+    expect(hits(rect("c.init") as Rect, off(aoe))).toBe(false);
+    expect(c.store.getState().memory.find((d) => d.kind === "c.init")?.rect).toEqual(home);
     c.dispatch({ type: "return" }, kinds);
     expect(rect("c.init")).toEqual(home);
     expect(c.store.getState().placed.get("c.init:main")).toBe("returned");
