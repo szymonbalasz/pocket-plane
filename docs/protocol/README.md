@@ -3316,3 +3316,28 @@ From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26, -29, -31–33, -
 - **Shared:** `@shared/stats/rules-b` (Highlights, luck and trophy tallies, mergeable), `@shared/stats/feed` (`feedText`: FR-STATS-27's wording for SB1).
 - **Fixtures:** units `sb-fight-facts` (Bandits in the running Ambush; `stats-b` only), `sb-past-bandits` (gate ruling: the same facts as an **ended** "Bandit Camp" before the Ambush starts, via bundle `stats-b-past`, included first by session-sim-12, so the sim's fights are untouched), `sb-luck-rolls` (rolls only; joins session-sim-12), `sb-luck-reroll` (gems on; `stats-b` only); bundles `stats-b` (= `stats` + `gems-on` + `sb-fight-facts`, `sb-luck-rolls`, `sb-luck-reroll`), `stats-b-e2e` (`e2e/stats-core-b.e2e.ts`), `stats-b-past`.
 - **CON-44** (heavy harness, measured): `,"fell":"kill"` 15 B a line; 3 kill / down lines in the 100-line window → +45 B per viewer (DM 690,797 B of 1.5 MiB; players ≤ 289,129 B of 512 KiB); worst, every line in the window flagged, +1.5 KB per viewer. A summary row sits in the closed-notification window (no growth). Acks: none in the snapshot.
+
+## 141. Sprint 8: Party status — other PCs' HP, temp HP, AC; `party.summary` window (CB3)
+
+From [party-board](../specs/party-board.md#610-sprint-8-party-summary-track-cb) FR-PARTY-51–58, [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-140–143 (DM #334, #335; [ADR-0063](../architecture/adr/0063-party-hp-visibility.md)). **Built by `build/cb-party`.** No intent, event, record type or signal. Data side: [data model §111](../data-model/README.md#111-sprint-8-party-status-cb3).
+
+**Wire change**
+
+| Item | Who | Change | Source |
+|---|---|---|---|
+| `entity` (character) redaction | other players | the one whitelist + `hpCurrent`, `hpMax` (`statBlock.hpMax`), `tempHp`, `ac` (stored `statBlock.ac`); a PC hidden from players still sends them (OQ-PARTY-31 A). Own PC, DM: full, unchanged. Pets, monsters, companion combatants: unchanged (ADR-0024, ADR-0056) | FR-PARTY-52 |
+| Events | other players | `AttackApplied`, `HpApplied`, `CharacterHpAdjusted`, `CombatEntryUndone`, `TempHpSet`, `DeathSaveRolled`, sheet / entity edits now carry the new keys on the `entity` upsert they already got; a temp HP set sends them one upsert (it changed nothing they held before); the hub's identical-change drop still sends nothing when none changed | FR-PARTY-55 |
+
+| Kind | Owner | Clients | Default open | Default geometry | Launcher | Gate | Source |
+|---|---|---|---|---|---|---|---|
+| `party.summary` *(new; `@ui/features/party-board/window` `partySummaryWindow`, one line per client registry)* | PARTY | both | no (parkable, never protected, no keep-out) | top-left `dx` 56, 280×260 `growToContent`, `usefulSize` 280×236, min 240×120; size-table row, goldens, harness sets D3 / P1 / P3 | "Party status" (lucide `HeartPulse`, order 58.5: right after Party, before Stats); no `activity` | — | FR-SHELL-140–143 |
+
+| Piece | Contract | Source |
+|---|---|---|
+| Rows (`summary-logic.ts` `partySummary`, pure) | PCs the viewer holds (drafts out where the viewer holds the `creature-sheet`), own first then by name (DM by name); companions after the PC rows, grouped under the owner PC (`party-summary-group`): present pets (DM: `petPresent`; owner: always) and owned monster combatants of the started encounter (not hidden / `ownerHidden`, not released or hostile); owner and DM numbers + AC (pet row / `card`), others the band | FR-PARTY-51, -53 |
+| Row (`Summary.tsx`) | `party-summary-row` + `data-record-id` (`data-own`, `data-turn`, `data-can-open`): portrait, owner dot, `party-summary-name`, `party-summary-hp` (`data-value` "cur/max" or band) + band-tone bar, `party-summary-temp` ("+n" when > 0), `party-summary-ac` (shield + number), `party-summary-death`, ≤ 4 `party-summary-effect` + "+N" (secret never), `party-summary-turn`, DM `party-summary-hidden` (eye-off); `party-summary-companion` + `data-record-id`; `party-summary-empty` | FR-PARTY-51, -58 |
+| Click / keyboard | own row (player) or any row (DM) → `openSheetFor(id, "character")` + `char.sheet`; others a Tooltip only ("Thorn · HP 10 / 10 + 5 temp · AC 15 · Poisoned"); the PC list is one tab stop (`data-chip-row` roving, ↑/↓ too), Enter opens | FR-PARTY-54 |
+| States | not live → `data-live="false"`, figures muted; reconnect from the snapshot; no PCs → "No player characters yet" | FR-PARTY-56 |
+
+- **Fixtures:** unit `cb-party-six` (Pip / player-1, Rowan and "Vex Thistledown-Ashgrove of Brindlemarsh" / player-2: HP 999 / 999, temp 999, AC 30; no tokens), included in `wf-frame-e2e` (with `cb-party`). E2E `e2e/cb-party.e2e.ts` on `cb-party-e2e`; `party.summary`'s case in `e2e/useful-size.e2e.ts`.
+- **CON-44** (heavy harness, worst-width figures, `snapshot-size.test.ts` `FR-PARTY-57`): players +343 B (7 other PCs × 49 B; worst player 289,969 B of 512 KiB); DM 0 B.

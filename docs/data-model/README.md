@@ -2392,3 +2392,15 @@ From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../spe
 - **Persisted runtime state:** none. Server memory only (ADR-0062): per-session partials per (campaign, role + features), built at server start after the session warm in yielding 5-session chunks, dropped per touched session (entries / facts by `n`) or all (a combatant's owner / kind, the campaign's features), rebuilt in the background.
 - **Fixtures:** `sb-fight-facts` (4 Bandits + the hidden Bandit Captain on the Goblin Ambush; 6 facts, one undone; `stats-b`), `sb-past-bandits` (session-sim-12: an ended "Bandit Camp" before the Ambush, 4 facts, the Captain's token deleted), `sb-luck-rolls` (8 physical rolls), `sb-luck-reroll` (Mira's Perception 4 → 17); expected numbers in `fixtures/units/stats/stats.fixtures.test.ts` and `fixtures/bundles/session-sim-12.fixtures.test.ts`.
 - **CON-44** (heavy harness, measured): 15 B a flagged line; +45 B per viewer (3 in the window), worst +1.5 KB (all 100); summary rows inside the closed window: no growth. DM 690,797 B of 1.5 MiB; players ≤ 289,129 B of 512 KiB.
+
+## 111. Sprint 8: Party status (CB3)
+
+From [party-board](../specs/party-board.md#8-data-model) (sprint 8) and [ADR-0063](../architecture/adr/0063-party-hp-visibility.md) (#335). **Built by `build/cb-party`**. Protocol side: [protocol §141](../protocol/README.md#141-sprint-8-party-status--other-pcs-hp-temp-hp-ac-partysummary-window-cb3). **No table, column or record type.**
+
+| Field | Change | Rule | Source |
+|---|---|---|---|
+| Other-player character redaction (`RedactedCharacter`, [§372 row](#11-scenes-entity)) | + `hpCurrent`, `hpMax`, `tempHp`, `ac` | copies of `entity.hp_current`, `statBlock.hpMax`, `entity.temp_hp`, `statBlock.ac` in the visibility fn; never the death counters | FR-PARTY-52 |
+
+- **Derived (client, not stored):** row order, band tone and bar fraction, the turn marker, which companions list (present pets, owned combatants of the started encounter).
+- **Fixtures:** `cb-party-six` (3 PCs, worst-width figures; `wf-frame-e2e` only).
+- **CON-44** (heavy harness, measured): players +343 B, DM 0 B.

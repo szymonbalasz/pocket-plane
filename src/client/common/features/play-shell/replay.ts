@@ -68,13 +68,21 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
     {
       name: "D3",
       viewer: "dm",
-      kinds: [...D1, "stats.board", "camp.players", "ent.creatures", "note.history", "dicex.tray"],
-      // TT's `dicex.requests` (S3) and CB's `party.summary` (S12): pending until registered.
-      pending: ["dicex.requests", "party.summary"],
+      kinds: [
+        ...D1,
+        "stats.board",
+        "camp.players",
+        "ent.creatures",
+        "note.history",
+        "dicex.tray",
+        "party.summary", // CB3 (S12)
+      ],
+      // TT's `dicex.requests` (S3): pending until registered.
+      pending: ["dicex.requests"],
     },
   ],
   player: [
-    { name: "P1", viewer: "player-1", kinds: P1, pending: ["party.summary"] },
+    { name: "P1", viewer: "player-1", kinds: [...P1, "party.summary"] }, // CB3 (S12)
     {
       name: "P2",
       viewer: "player-1",
@@ -83,8 +91,7 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
     {
       name: "P3",
       viewer: "player-2",
-      kinds: ["char.sheet", "cbt.initiative", "dice.log", "stats.board"],
-      pending: ["party.summary"],
+      kinds: ["char.sheet", "cbt.initiative", "dice.log", "stats.board", "party.summary"], // CB3
     },
   ],
 };

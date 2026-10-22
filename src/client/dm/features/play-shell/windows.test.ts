@@ -851,8 +851,9 @@ const GOLDEN_KINDS = [
   "shell.prefs", // PF1 (FR-SHELL-62 (d): appended with its goldens)
   "charx.companion", // CP4 (S2): appended, goldens regenerated
   "stats.board", // ST2 (FR-SHELL-86 (5)): appended, goldens regenerated
-  // FR-SHELL-112 (1), -143: pending until registered (TT2 `dicex.requests`, CB3 `party.summary`).
-  ...["dicex.requests", "party.summary"].filter((k) => dmWindows.get(k) !== undefined),
+  "party.summary", // CB3 (FR-SHELL-143): appended, goldens regenerated
+  // FR-SHELL-112 (1), -143: pending until registered (TT2 `dicex.requests`).
+  ...["dicex.requests"].filter((k) => dmWindows.get(k) !== undefined),
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

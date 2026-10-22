@@ -21,6 +21,7 @@ import charSela from "./character-sheet-full/char-sela";
 import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
 import cbFogGoblin from "./combat-extras/cb-fog-goblin";
 import cbParty from "./combat-extras/cb-party";
+import cbPartySix from "./combat-extras/cb-party-six";
 import cbTies from "./combat-extras/cb-ties";
 import cbtxEffects from "./combat-extras/cbtx-effects";
 import cbtxReinforcement from "./combat-extras/cbtx-reinforcement";
@@ -244,4 +245,6 @@ export const units: readonly Fixture[] = [
   cbTies,
   cbFogGoblin,
   cbParty,
+  // Sprint 8 track CB (build/cb-party): a 6-PC party with worst-width figures
+  cbPartySix,
 ];
