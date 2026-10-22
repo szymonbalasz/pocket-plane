@@ -2,7 +2,7 @@
 title: Play shell
 prefix: SHELL
 status: complete
-owner: spec-wf
+owner: spec-wf, spec-cb
 phase: post-mvp-8
 ---
 
@@ -104,6 +104,15 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 | FR-SHELL-88 | Test hooks: `data-auto-minimised-for`, `data-placed="returned"` | FU1 | in the tests above |
 
 0 B on the wire (all browser-only; §12). No new dependency. Bundle **`session-sim-10`** + one new FU unit (§13).
+
+> **Sprint 8 (track CB, combat polish; owner spec-cb; DM [#334](../decisions-log.md)).** The players' **party HP / AC summary** ([party-board FR-PARTY-51–58](party-board.md#610-sprint-8-party-summary-track-cb)) is a small launcher window **Party status** (decided #335) (`party.summary`, both clients; [OQ-PARTY-29](party-board.md#15-open-questions) A), registered through the window registry (append) **after WF1**, per WF's FR-SHELL-112 (1) (seams S12). New **FR-SHELL-140–143**. **WF owns the frame this sprint**: no placement, keep-out or frame file here; seam [OQ-SHELL-73](#15-open-questions) closed by S12. 0 B on the wire from SHELL. WF and TT edit this spec in parallel with their own ranges.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-SHELL-140 | Window type `party.summary` "Party status", both clients, launcher, loads closed | CB3 `build/cb-party` | `FR-SHELL-140 party status registered` (+ WF's registry-driven layout tests pick it up) |
+| FR-SHELL-141 | Sizes: grows to its rows; default / useful / min per WF's table | CB3 | `FR-SHELL-140 party status registered` |
+| FR-SHELL-142 | No feature open; user opens only | CB3 | `FR-SHELL-140 party status registered` |
+| FR-SHELL-143 | Registry rows (sets P1 / P3 / D3, both goldens) filled in CB3's branch; launcher fits at 1280×720 | CB3 | WF's layout harness, `FR-SHELL-140 launcher fits` |
 
 > **Sprint 7 (track ST, stats tier A, DM [#311](../decisions-log.md); spec-stats).** A new launcher window **Stats** (`stats.board`, both clients) for the [stats](stats.md) leaderboard and session awards. It registers through the window registry (append) under FU's **FR-SHELL-86** contract (seam S5), and opens itself on the awards when the DM shows them. New **FR-SHELL-93–94**. **FU owns the frame this sprint** (#310 parking, default sizes, Reset layout). Slice ST2 registers `stats.board` **after FU1 merges**. 0 B on the wire from SHELL.
 
@@ -327,6 +336,11 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 | FR-SHELL-117 | **Goldens**: regenerated once in WF1 through `settle` (`UPDATE_GOLDEN=1`, diff reviewed). `layout-checks.ts` stays an independent brute oracle, gaining the useful floor and the 4-px gap. | FR-SHELL-62 |
 | FR-SHELL-118 | **Retired / amended** (IDs kept): FR-SHELL-29 render fit → user spots and the in-progress resize only; -47, -77–79 → the ladder; -53 → folded into `settle(load)` (live follow retired); -55 push right → FR-SHELL-104; -56 (5) → the ladder; -81 → FR-SHELL-102; -40 / -50 Initiative at Start by token cover → zones (OQ-SHELL-63 A, #335); sprint 7 §16's "BL-52 / BL-53 stay backlog" → FR-SHELL-105, -109. | rulings-b 7 |
 | FR-SHELL-119 | **Bench** (`placement.bench.ts`): `settle` ≤ 25 ms best-of-5 (12 windows × 200 boxes, full ladder + one `dryFit`); ≤ 100 ms at 40 windows. | — |
+| **Sprint 8: party summary window** (track CB, DM #334; content [party-board §6.10](party-board.md#610-sprint-8-party-summary-track-cb)) | | |
+| FR-SHELL-140 | **Window type `party.summary`** "Party status" (decided #335, [OQ-PARTY-29](party-board.md#15-open-questions) **A**): one `defineWindow` line in each client's `windows.ts` (append, after WF1, per FR-SHELL-112 (1)); `defaultOpen: false` (never protected: auto-minimised and auto-minimising like any launcher window); launcher lucide `HeartPulse`, label "Party status", order right after Party; `activity` none (figures change all the time); no keep-out; anchor `top-left`, `dx` 56 (as Stats), the spot is WF's one placer's (PCs clear first, then shrink, then put away, #333). | #334 |
+| FR-SHELL-141 | **Size-table row** (seams S12; same at 1280×720, 1280×800, 1440×900, 1600×900, both clients): **default** 280 × 260, `growToContent` (FR-SHELL-39: height follows its rows, capped by the client's band, 412 at 1280×720, until the user resizes); **useful** 280 × 236, **criterion**: every PC row of a 6-PC party whole (name, HP, temp, AC uncut; FR-PARTY-58), companions may scroll; **min** 240 × 120. Rows, not the frame, decide wrapping. The criterion is checked in a browser (review-b #3): `party.summary`'s case in `e2e/useful-size.e2e.ts` on `wf-frame-e2e` + fixture `cb-party-six` (6 PCs, worst-width figures): `scrollHeight ≤ clientHeight`, every PC row visible and whole; `bun test` checks the table row's shape only. WF1 adds the pending row in the append-only `size-table.ts`; CB3 fills its values (review-b #14). | S12; review-b #3, #14, #21 |
+| FR-SHELL-142 | **No feature open**: only the launcher opens it (a reload restores it if it was open); a fight's Start opens nothing new (Initiative stays the only feature open at Start, FR-CBT-60). Layout remembered per browser as every window. | FR-SHELL-41 |
+| FR-SHELL-143 | **Contract rows** (FR-SHELL-112 (1)): the golden list, the harness sets and `size-table.ts` are **append-only registries** (review-b #14); WF1 adds `party.summary`'s pending entries to the player sets **P1 / P3**, the DM set **D3** and both goldens (player and DM); CB3 fills them and regenerates the goldens **after WF1 merges**. **Launcher fit** (review-b #20): with "Party status" added (and TT's top-bar items), the launcher still fits at 1280×720 in both clients (`launcher-fit.ts`, FR-SHELL-43: icons only, then "⋯"). Opened by the launcher only (`by: "user"`). | Seams S12; review-b #14, #20 |
 
 ## 7. UI/UX notes
 
@@ -815,6 +829,13 @@ Covers SHELL, MAP, NOTE, STATS and CHARX sprint-8 rows; one walkthrough; isolate
 
 Teardown: stop, `fixtures:reset --profile verify`.
 
+### Sprint 8 (track CB): Party status window
+
+- Unit `FR-SHELL-140 launcher fits` (review-b #20): both clients' launchers with `party.summary` added (and TT's top-bar items) fit at 1280×720 per FR-SHELL-43 (`launcher-fit.ts`: icons only, then "⋯"); DM set **D3** and the DM golden include it.
+- E2E (review-b #3): `party.summary`'s useful-size case in `e2e/useful-size.e2e.ts` on `wf-frame-e2e` + `cb-party-six` (FR-SHELL-141's criterion).
+- Unit `FR-SHELL-140 party status registered`: both registries hold `party.summary` (launcher entry after Party, `defaultOpen: false`, 280 wide, `growToContent`, min 240 × 120); WF's golden / size-table rows pass; WF's session-replay layouts (1280×720 … 1600×900, DM and player) still pass with it opened (no PC under it, nothing below its useful size or it is put away).
+- Walkthrough CB10 at 1280×720 ([combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary)): opened from the launcher, it covers no PC token; a reload restores it where the user left it.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -956,6 +977,8 @@ Teardown: stop, `fixtures:reset --profile verify`.
 - **Docs at consolidation:** protocol §18, §24. No DB, event, intent or wire change.
 - **Dependency:** none. `kiwi.js` (Cassowary, MIT, ≈ 10 KB gz) would move windows on every change and can't express "put away the LRU" or the PC rule; `rbush` (MIT, ≈ 6 KB gz) gains nothing at ≤ 40 rects. **Pick: hand-rolled.**
 
+**Sprint 8, track CB:** slice **CB3** `build/cb-party` appends one line to each of `src/client/dm/windows.ts` and `src/client/player/windows.ts` (append-only registries, AGENTS §9.9) **after WF1** (wave 3, also after the DM's answer to the party-HP ADR), and fills the pending entries WF1 adds to the append-only size table, goldens and harness sets P1 / P3 / D3 (seams S12, review-b #14); no frame file (`placement.ts`, `manager.ts`, `free-area.ts`, `ShellWindow.tsx`, keep-outs stay WF's). Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). Dependency: none.
+
 ## 15. Open questions
 
 **Bold** option = suggested pick (not decided).
@@ -1065,6 +1088,12 @@ Teardown: stop, `fixtures:reset --profile verify`.
 | ~~OQ-SHELL-65~~ | TT seam (pause screen, roll-request prompt) | **Resolved (integrator, sprint-8 seams / rulings)**: seams S2, S3: overlay + top-bar item registries; the prompt is a card toast | — | FR-SHELL-112 |
 | ~~OQ-SHELL-66~~ | CB seam (party summary) | **Resolved (integrator, sprint-8 seams / rulings)**: seams S12: window `party.summary`, size-table row from CB | — | FR-SHELL-112 |
 | OQ-SHELL-67 | Glossary | **Resolved (integrator, sprint-8 seams / rulings)**: **Add "Placer", "Zone"; Useful size "… checked by a content criterion"** / none | no · integrator | glossary |
+
+**Sprint 8, track CB** (owner spec-cb). **Bold** = suggested pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SHELL-73 | **Seam with WF (window-frame pass): registering Party status.** CB3 needs WF's contract for new windows (the FR-SHELL-86 successor: size-table row, useful size, golden list, put-away order) and its frame core merged first | **Resolved (integrator, sprint-8 seams / rulings).** **Closed by seams S12:** `party.summary` (both clients) registers per FR-SHELL-112 (1) after WF1, with its size-table row (FR-SHELL-141: default, useful + criterion, min), goldens and harness sets P1 / P3 / D3 (append-only registries, review-b #14); WF's placer decides its spot; no keep-out; WF adds it as a pending row. (If the DM picks a strip, OQ-PARTY-29 B, WF owns the strip region and CB3 fills it) | — | WF, FR-SHELL-140–143 |
 
 ## 16. Out of scope
 
