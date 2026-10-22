@@ -3175,3 +3175,45 @@ From [gems](../specs/gems.md#6-functional-requirements) FR-GEM-05, -13, -25–31
 - **Client:** `cbt-card-actions` (+ `data-record-id` = card). Gems' `gem.combat`: `gem-combat` (+ `data-record-id`) → `gem-combat-picker`; chips `gem-combat-die` (+ `data-part`, `data-index`, `data-state` = `open` | `picked` | `max` | `dropped`); physical totals `gem-combat-known` (+ `data-part`, `data-index`) and `gem-combat-known-error`; `gem-combat-submit` ("Spend (n/limit)", the one confirm), `gem-combat-cancel`, `gem-error`. Faces come from the roll's log line (the card keeps `[value, kept]`). Maxed dice: `cbt-card-die-max` (+ `data-part`, `data-index`; "max" Badge, Tooltip "Set to max") in the popup's damage cell (extra parts too) and the player's card view (`cbt-card-maxed`).
 - **Fixtures:** no new unit (`gems`: Brakka level 5, Combat 2, the Flame Tongue greatsword); e2e alias `gems-combat-e2e` (`e2e/gems-combat.e2e.ts`). `session-sim-11` adds none (gems off).
 - **CON-44** (heavy harness, `con44-maxed.test.ts`): 29 B a maxed card (1 die; 33 B with 3), 20 pending maxed cards → DM +580 B (691,159 B of 1.5 MiB); players +87…+116 B for their own 3–4 cards (≤ 289,034 B of 512 KiB). A spend's frame: count + spend line + the card for its audience.
+
+## 135. Sprint 8: table-tools core — macros, roll requests, audio assets, pause and sound fields (TT0)
+
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-64, -67, -73, -77, -92, -93, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-79, -80, -83, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-58, -64, [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-54, -57, -59 and [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-46, -48 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `fix/tt-core`** (records, zod, events, kind def, helpers; no intent: macros / requests TT1+2, sounds TT3, pause TT4). Data side: [data model §106](../data-model/README.md#106-sprint-8-table-tools-core-tt0).
+
+**Record types** (scope `campaign`)
+
+| Type | Visibility | Snapshot | Source |
+|---|---|---|---|
+| `roll-macro {id, campaignId, playerId \| null, creatureId \| null, name, expression, category, order, createdBy \| null}` *(new)* | DM full; a player iff `playerId` = them (DM-only rows, `playerId` null, never). `createdBy` null = the DM's row (read-only for players) | every row (≤ 200) | FR-DICEX-64, -67 |
+| `roll-request {id, campaignId, seq, roll {kind, key, expression}, label, dc, dcShown, mode, results, state, targets [{characterId, playerId, name, notificationId, state, entryId, total, natural, success, at}] 1–12, createdAt, closedAt}` *(new)* | **`audience: dm`**: no player key, change or load | window: open pinned + newest 10 closed by `seq` (the provider reads only that, SQL) | FR-DICEX-73 |
+| `audio-asset {id, campaignId, seq, name, mime, bytes, durationMs, createdAt}` *(new)* | **`audience: dm`**, **lazy `all`** (ADR-0045): in no snapshot; `sync.load` DM only (player → `forbidden`) | — | FR-ASSET-57 |
+| `asset` | unchanged, but **images only** (`kind = image`): a sound never appears in it | as before | FR-ASSET-57 |
+| `campaign` | + `pause {message \| null, imageAssetId \| null, backAt \| null, startedAt}` only while paused; + `alertSounds {turn?, request?, pause?, resume?: assetId \| "none"}` only when some alert has a pick. Every connection of the campaign. `toCampaignRecord` takes the whole row, so every campaign upsert (rename, colour, switch) keeps both | as before | FR-CAMP-46, -48 |
+
+**Notification kind** `roll-request` *(new; `kinds.ts` append; toast class **card**, FR-NOTE-52)*: audience `player` = the PC's owner, action "Roll" owned by that player; payload `{requestId, characterId, characterName, roll, label, dc | null, mode}` (strict: no `success` / `results`; `dc` null unless shown; ≤ 1 KB); resolution `{outcome: rolled | declined | missed, total?}`; `genericResolve: false` (`note.resolve` → `forbidden`), no end rule.
+
+**Domain events** (`src/shared/events/dice-extras.ts`, `campaign-management.ts`; all logged, none undoable; emitted by TT1–TT4)
+
+| Event | Changes | Player sees |
+|---|---|---|
+| `MacroSaved {macroId}` / `MacroDeleted {macroId}` | `roll-macro` upsert(s) / delete | iff `playerId` = them; else no frame |
+| `RollRequested {requestId}` | `roll-request` upsert (with `NotificationCreated` per target) | **no frame** (FR-SYNC-17); a target gets only its own prompt |
+| `RollRequestAnswered {requestId, characterId, entryId}` | answer entry + `roll-request` upsert (then `NotificationResolved`) | the entry per its audience (public, or `audiencePlayerId` = them); the roller their resolve |
+| `RollRequestDeclined {requestId, characterId}` | `roll-request` upsert (then `NotificationResolved`) | the target's player their resolve |
+| `RollRequestClosed {requestId, rolled?: entryId[]}` | `roll-request` upsert + the entries rolled for missing targets (then `NotificationResolved` per open target, by rule) | the entries per audience; each target's player their resolve |
+| `CampaignPaused {campaignId}` / `CampaignResumed {campaignId}` | `campaign` upsert | every connection (no resync) |
+| `AlertSoundSet {alert}` | `campaign` upsert | every connection |
+
+**Internal helpers** (server only; no intent field reaches them)
+
+| Helper | Contract | Source |
+|---|---|---|
+| `gameLog.append(env, {…, audience?})` | `audience` `{public: true}` or `{public: false, audiencePlayerId}` stamps the entry (hidden = DM + that player), whoever rolls; wins over the role / category stamp and `forcePrivate`. A player-sent `public` stays `forbidden` on every intent | FR-DICE-79, -83 |
+| `roll` payload item `answer?: true` | a request answer (data only, no line tag); `rerollableRoll` → null and `isAnswerEntry(entry)` (`@shared/dice-roll-log/reroll`): never rerollable | FR-DICE-80 |
+| `assets.require(env, id, {kind?})` | default `image`; a row of the other kind → `invalid` "Not an image" / "Not a sound"; unknown → `not_found` | FR-ASSET-59 |
+| `dice-extras/table-rows.ts` | `assertMacroRoom` (≤ 24 per list, ≤ 200 per campaign → `conflict`), `assertRequestRoom` (≤ 5 open → `conflict`), row ↔ record mappers | FR-DICEX-64, -74 |
+
+- **Zod** (`@shared/dice-extras/macros`, `requests`; `@shared/assets-pipeline/audio`; `@shared/campaign-management/table-state`): records, the TT1 / TT2 intents (`dicex.saveMacro`, `deleteMacro`, `moveMacro`, `request`, `answerRequest`, `declineRequest`, `closeRequest`, `rollForMissing`; none takes `public` or an audience), the prompt payload / resolution, the pause card, the picks.
+- **Image route** `GET /api/assets/:id/{thumb,display}`: a sound → the common 404 (its own route is TT3's).
+- **Fixtures:** bundle `session-sim-12` (= `session-sim-11` + an empty sprint-8 section, one comment per track WF / TT / SB / CB); no unit yet.
+- **CON-44** (`src/server/ws/testing/con44-tt.test.ts`, heavy harness at the caps): DM 690,790 → 894,324 B (+203,534 B; 678,540 B left of 1.5 MiB): `roll-macro` 72,390 B (200 rows), `roll-request` 70,526 B (5 open + 10 closed × 12 targets), prompts 60,185 B (60); players +10,500…+39,461 B (worst 325,266 B of 512 KiB); `audio-asset` 0 B in every snapshot (`sync.load` of 50 = 13,967 B).
