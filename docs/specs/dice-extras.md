@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: claimed
+status: in-review
 owner: spec-tt, spec-fx
 phase: post-mvp-9
 ---
@@ -15,6 +15,11 @@ phase: post-mvp-9
 > **Sprint 7 (track FU, BL-48; DM [#311](../decisions-log.md)).** Decided, not open: no stray spaces in dice text. New **FR-DICEX-63** (with [FR-DICE-78](dice-roll-log.md#6-functional-requirements)). Test `FR-DICEX-63 notation spacing` (unit over `notation.ts` and the popup line: no `"( "`, `" )"`, `"  "`); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. The sim-10 note "DM tray opens 360 × 248, not 300 × 240" is **dropped here**: 300 × 240 is the tray's min, its default is 360 × 300 (FR-DICEX-01), and the 248 came from auto placement's shrink, which play-shell's useful size now governs (FR-SHELL-79). Client only, 0 B. Edge cases: client-only text; reconnect re-renders from the store; crash: no server change. No open question.
 
 > **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** Decided: **saved macros** (one click → the normal roll path incl. physical dice and the tray) and **DM roll requests** (a notification with a roll action, results hidden or public per request), moved here from the [stub](post-mvp/dice-extras.md). FR-DICEX-64–93; [proposed ADR](../architecture/adr/0061-roll-requests.md). §12–14 also hold TT's CON-44, tests, walkthrough and build split for the pause screen ([play-shell](play-shell.md) FR-SHELL-125–136, [campaign-management](campaign-management.md) FR-CAMP-46–50) and sounds ([assets-pipeline](assets-pipeline.md) FR-ASSET-52–61). Decided at gate 1 (#335): OQ-DICEX-49–60.
+
+> **Sprint 9 (track FX, fix pack; DM [#338](../decisions-log.md)).** FR-DICEX-94–95, slice **FX2**, walkthrough [dice-roll-log §13 FX2](dice-roll-log.md#13-test-plan). No schema, 0 B.
+> - **BL-89**: a roll popup stuck over the map after a mid-combat Add.
+> - **BL-90**: "Name is required" before typing a macro name.
+> - Die chips draw their numbers as HTML text for [FR-DICE-93](dice-roll-log.md#6-functional-requirements) (BL-57; `DieShape.tsx`).
 
 ## 1. Summary
 
@@ -223,6 +228,9 @@ phase: post-mvp-9
 | FR-DICEX-91 | **Reload**: open prompts re-toast silently (`restoreToast`, FR-NOTE-60); answers never double (`conflict`). | OQ-NOTE-34 |
 | FR-DICEX-92 | **Leaks**: no `roll-request`, hidden DC, `success`, other players' prompts or hidden answers, other players' or DM-only `roll-macro` rows in any player frame or ack. | |
 | FR-DICEX-93 | **CON-44** measured at the caps (§12): DM worst +208,556 B, players +39,339 B. | #256 |
+| **Sprint 9** (track FX, fix pack) | | |
+| FR-DICEX-94 | **A popup never sticks** (BL-89, sim-12 glitch 8 / h00: "Goblin 3 Initiative 19" stayed over the map after an Add… mid-combat; amends FR-DICEX-39's hover pause).<br>• A roll popup closes 6 s after rest unless, **at that moment**, the pointer is over it (`matches(":hover")`) or focus is inside it. Otherwise it closes then.<br>• A held popup re-checks on pointer leave and on blur, and every 1 s while held.<br>• The hover flag clears when the card unmounts or remounts, so a stale flag never holds it.<br>• ✕ always closes.<br>• Root cause **not confirmed**. Hypothesis (code read, `popups.ts` / `RollPopup.tsx`): the card got `mouseenter` / `focus` and lost its card before `mouseleave` / `blur` (remount, or the Add dialog's focus return), so `hovered` stayed true and `settle` never re-armed.<br>• The builder reproduces it first (`data-state`, the hover flag) and records the cause. | sim-12 h00 |
+| FR-DICEX-95 | **No error before typing** (BL-90: "Name is required" showed as Save as macro opened; amends FR-DICEX-71).<br>• The editor shows a field's error only after that field was touched (changed or blurred) or Save was pressed.<br>• Save stays disabled while invalid.<br>• A preset (Save as macro: the expression filled in) opens with focus in Name and no error text. | sim-12 glitch 12 |
 
 **Sprint 8: who sees what** — `roll-request`: DM only. Prompt: DM + the target's player (DC iff shown). Public answer: all; hidden answer: DM + the target's player. `roll-macro`: DM + its `playerId` (read-only to the player if the DM made it).
 
@@ -755,6 +763,18 @@ The one TT plan (macros, requests, pause, sounds); the other TT specs name their
 | T16 | A at 1280×720: open Requests → at ≥ 360 × 400, no PC covered |
 | T17 | A: Pause → Preview → the card in a non-blocking Dialog; Escape, then ✕ close it; A's windows stay usable |
 
+### Sprint 9 (track FX): popups, macro editor
+
+- **Unit `popups.test.ts`.** `FR-DICEX-94 popup never sticks`:
+  - The hover flag is set, then the card unmounts without leave → the popup closes 6 s after rest.
+  - Hovered at expiry (`:hover` stub true) → held; on leave → closes within 1 s.
+  - Focus inside → held until blur.
+- **DOM `roll-popup.test.tsx`.** The same, on a mounted card.
+- **DOM `macros.test.tsx`.** `FR-DICEX-95 no error before typing`:
+  - Save as macro with an expression preset → no "Name is required", Save disabled, focus in Name.
+  - Type then clear the name → the error shows.
+- Walkthrough: [dice-roll-log §13 FX2](dice-roll-log.md#13-test-plan) steps 7, 8.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -861,6 +881,7 @@ Walkthrough steps per slice: D8 → 30, 32, 33, 35, 37; D11 → 30, 31, 33; D12 
 | TT3 | `build/tt-sounds` | Audio probe / serve / lazy type; `camp.setAlertSound`; Campaign options section; shell playback; the `turn-alert.ts` line (S9); fixtures `audio-chime`, `camp-alert-sounds` | `play-shell/{sounds,audio,alerts}.ts`, `AlertLayer.tsx` (lock); `combat-tracker/turn-alert.ts` (assigned line) | wave 2, after TT0 |
 | TT4 | `build/tt-pause` | `camp.pause` / `camp.resume`; the card; the DM control; suppression; fixture `camp-paused`; e2e | `play-shell/overlays.ts`, `play-shell/top-bar-items.ts` (append, S2); no `PlayFrame.tsx` line | wave 3, **after WF1 + TT3** |
 
+- *(Sprint 9)* **FX2** `fix/fx-dice-lines` (FR-DICEX-94–95, FR-DICE-93's chip): `DieShape.tsx`, `popups.ts`, `RollPopup.tsx`, `MacrosPanel.tsx`, `macro-logic.ts` and their tests. Shared: none. Split: [dice-roll-log §14](dice-roll-log.md#14-dependencies).
 - Walkthrough per slice: TT1+TT2 → T1–T8, T15, T16; TT3 → T13, T14 (+ T7's sound); TT4 → T9–T12, T17. TT1+TT2 also adds the `answer` refusal to `gem.spend` (gems' server file, assigned line) and the entities hook's target closing.
 
 ## 15. Open questions

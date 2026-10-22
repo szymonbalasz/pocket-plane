@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: claimed
+status: in-review
 owner: spec-sb, spec-tt, spec-fx
 wave: 2
 phase: post-mvp-9
@@ -18,6 +18,11 @@ phase: post-mvp-9
 > **Sprint 7 (track FU, BL-48 small copy; DM [#311](../decisions-log.md)).** Decided, not open: a player's roll-bar line names the player ("Player 1 — 1d20+2") instead of the character; a stray space in a breakdown ("(3d6: 5 + 2 + 1 )"). New **FR-DICE-77**, **-78**. Client only (line text and an actor default), 0 B. Tests `FR-DICE-77 roll as your PC` (DOM: `player-1` with the sheet on Mira → the bar's actor is Mira, the entry's actor Mira; "Me" still selectable; a manual pick of Brakka survives a reload; a sheet on another player's character falls back to the player's name; DM unchanged), `FR-DICE-78 no stray spaces` (unit over `groupSegments` and every kind's line builder: no `"( "`, `" )"`, `"  "`, leading / trailing spaces for adv, dis, dropped, offered, manual, modifier-only); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. GM (gems: reroll / supersede) edits this spec in parallel with its own range; FU4 touches only the actor default and the joiner. Edge cases: client-only text and a per-browser default; reconnect re-renders from the store; crash: no server change. No open question.
 
 > **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** [Dice-extras](dice-extras.md) macros roll as plain `dice.roll`; DM roll-request answers are ordinary `roll` entries, public or **DM + the target's player** via the built `audiencePlayerId` rule. This amends FR-DICE-13 for answers only ([proposed ADR](../architecture/adr/0061-roll-requests.md)). FR-DICE-79–84; no new field, kind or visibility code. Tests, walkthrough (T2–T8, T15) and CON-44: [dice-extras §12–13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-DICE-46.
+
+> **Sprint 9 (track FX, fix pack; DM [#338](../decisions-log.md)).** FR-DICE-91–93, slice **FX2** (dice + gems lines), walkthrough [§13 FX2](#13-test-plan). No schema, 0 B.
+> - **BL-57**: copying a log line breaks it around each die. The die number is only SVG `<text>` inside `inline-flex` chips (confirmed for the SVG; the flex breaks are a hypothesis).
+> - **BL-72**: "4d6kh3" reads "5 3̶ 6 + 6". `groupSegments` puts " + " only between two adjacent kept dice.
+> - **BL-62**: the reroll helper takes the caller's items (FR-DICE-91, used by [FR-GEM-41](gems.md#6-functional-requirements)).
 
 ## 1. Summary
 
@@ -180,6 +185,9 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): D's OQ-DICE-30 (OQ-DI
 | FR-DICE-82 | *(Sprint 8)* **Stats**: answer lines and macro rolls follow FR-DICE-90's luck rule (SB's row, [stats](stats.md)) (seams S6): counted iff the entry is public; a hidden answer (`audiencePlayerId`) counts for the DM only, **not in the roller's own view**. Test `FR-DICE-82 hidden answers in stats`. | S6 |
 | FR-DICE-83 | *(Sprint 8)* **Internal `audience` input** on `gameLog.append` and the exported `sheetRoll` ([FR-CHARX-90](character-sheet-full.md#6-functional-requirements)): `{public: true}` or `{public: false, audiencePlayerId}`. Server-only; a player-sent `public` stays `forbidden`. Test `FR-DICE-83 audience input`. | |
 | FR-DICE-84 | *(Sprint 8)* **Roll bar "Request…"** (DM only, `dicex-request-open`) opens `dicex.requests`. Test `FR-DICE-84 request button`. | |
+| FR-DICE-91 | *(Sprint 9, BL-62)* **Reroll takes the caller's items** (amends FR-DICE-62).<br>• `dice.reroll` takes optional `items` (the new entry's other payload items) and `rollIds` (its other roll ids). Absent → copied as today.<br>• Combat's card reroll passes the card's current view ([FR-GEM-41](gems.md#6-functional-requirements)).<br>• `dmPayload`, audience and supersede are unchanged.<br>• Test `FR-DICE-91 reroll items override`. | BL-62 |
+| FR-DICE-92 | *(Sprint 9, BL-72)* **Kept dice joined across dropped ones** (amends FR-DICE-20, -78).<br>• In a roll's breakdown, " + " goes between consecutive **kept** dice even with dropped dice between them.<br>• A dropped die stays in rolled order, struck, with one space on each side and no "+" of its own: "4d6kh3: 5 3̶ + 6 + 6 = 17".<br>• Adv / dis lines stay as built ("13 7̶ + 5 = 18").<br>• `lineText` follows the same rule. Test `FR-DICE-92 keep-highest joins kept dice`. | BL-72 |
+| FR-DICE-93 | *(Sprint 9, BL-57)* **A log line copies as one line** (amends FR-DICE-35's "copy reads 'd20: 13'").<br>• A die chip draws its number as **HTML text** over the shape: a positioned `<span>`, the `<svg>` stays `aria-hidden`.<br>• The chip and its log wrapper are `inline-block`, not `inline-flex`.<br>• So Chromium's `innerText`, a selection copy and a paste give the line on one line, matching `lineText` digit for digit, e.g. "Mira — Athletics: 13 + 5 = 18".<br>• The chip looks as before in the log, popup and tray (FR-DICEX-42). The `DieShape` file is dice-extras'; built in FX2.<br>• Test `FR-DICE-93 line copies as one line`. | BL-57 |
 
 ## 7. UI/UX notes
 
@@ -376,6 +384,30 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 - Integration `FR-DICE-90 hidden request answer is DM-only` (seam S6): an answer entry with `audiencePlayerId` = Player 1 (not public): the DM's luck counts it; Player 1's and Player 2's luck, awards and trophies don't, though Player 1 sees the line.
 - **Build:** SB0 `build/sb-core` edits `dice-roll-log/stats-read.ts` only (no commands, kinds or UI).
 
+**Sprint 9, track FX: slice FX2** (dice + gems lines; FR-DICE-91–93, [FR-GEM-41–44](gems.md#6-functional-requirements), [FR-NOTE-74](notifications.md#6-functional-requirements), [FR-DICEX-94–95](dice-extras.md#6-functional-requirements)).
+- **Tests:**
+  - Unit `roll-kind.test.ts`: `FR-DICE-92 keep-highest joins kept dice` ([5, 3✗, 6, 6] → "5 3̶ + 6 + 6"; adv unchanged; FR-DICE-78's spacing rules hold).
+  - Integration `reroll.test.ts` (dice-roll-log): `FR-DICE-91 reroll items override`.
+  - DOM `game-log.test.tsx` + `die-shape.test.tsx`: `FR-DICE-93 line copies as one line` (the value is a text node outside `<svg>`; wrappers are not `inline-flex`; a line's `textContent` = `lineText`).
+- **E2E (thin)** `e2e/fx-dice.e2e.ts`, bundle **`fx-dice-e2e`** (alias of `gems-reroll-e2e`):
+  - In Chromium, a roll line's `innerText` has no "\n" and equals `lineText`.
+  - A "4d6kh3" line reads "a b̶ + c + d".
+
+**Walkthrough FX2** (test agent; bundle `session-sim-12`, profile `verify`; **A** DM 1440×900 then 1280×720, **B** `player-1`, **C** `player-2`; frames recorded on all three):
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | B: tray "4d6kh3" | Line "… 5 3̶ + 6 + 6 = 17" form: "+" between kept dice, the dropped one struck (BL-72) |
+| 2 | A: select a die-chip roll line in the Game log, copy, paste into a text field | One line, digits as shown (BL-57); chips look unchanged in the log, popup and tray (screenshots) |
+| 3 | B: Brakka attack + damage → Combat gem maxes a die; then Inspiration on the attack line, once without a crit flip and once with one | New line: to-hit + the maxed damage, or the to-hit only after a flip; never the old pre-max part (GM2 repro, BL-62) |
+| 4 | Frames of step 3's Combat spend | A, B: one `GemSpent` frame each with the card; C: one frame without it; no `NotificationUpdated` after (BL-63) |
+| 5 | B at 1280×720: Inspiration on a line | Inline "Spend Inspiration? ✓ ✗" fits the line (BL-72) |
+| 6 | A: *(if [OQ-GEM-22](gems.md#15-open-questions) A)* Brakka + Fortune ×6 fast; then + and − | One line "DM awards Brakka 6 Fortune gems (… held)"; + − → no line (BL-68) |
+| 7 | A: Initiative → Add… a monster mid-combat (initiative rolled), pointer resting where the popup opens; repeat at 1440×900 (h00) | The popup closes ≤ 6 s after rest once the pointer has left; a token under it is clickable after (BL-89) |
+| 8 | B: tray d20 + 2 → Options → Save as macro | No "Name is required" until the name was touched; Save disabled meanwhile (BL-90) |
+| 9 | B reloads with step 3's card pending; then hard kill + restart | Line and card consistent after the reload; `state:digest` equal after the restart |
+| 10 | Leak scan C | No Brakka card, no `dmPayload`; award lines public only |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -419,6 +451,10 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 **Shared changes — sprint 5, track W:** none in this spec's own server or shared code. The `dice.log` window lines (`src/client/{dm,player}/features/dice-roll-log/log-window.tsx`, common `dice-roll-log/window.ts`: size function, min 300×160, `previousDefaults`) and `GameLog.tsx` (FR-DICE-39 widths) go in play-shell's slice **W1** `fix/window-layout` (assigned; [play-shell §14](play-shell.md#14-dependencies)), which needs the new `WindowDef` fields. `GameLog.tsx` order, settled by seams S15: **W1 (width) → D8 (held lines) → D9 → K4 (name colour)** (S15 as amended by rulings-a); R2 never edits `GameLog.tsx`.
 
 **Shared changes — sprint 7, track ST:** none in AGENTS §9.9. Slice ST0 `fix/st-core` adds the new read-only file `src/server/features/dice-roll-log/stats-read.ts` after GM0 (the supersede columns, seam S4) merges. It doesn't touch `game-log.ts`, `kinds.ts` or the schema.
+
+**Shared changes — sprint 9, track FX (FX2 `fix/fx-dice-lines`):** none in AGENTS §9.9.
+- Files: `@shared/dice-roll-log/roll-kind.ts`, `server/features/dice-roll-log/reroll.ts`, `client/common/features/dice-roll-log/GameLog.tsx`, dice-extras' `DieShape.tsx`, `popups.ts` / `RollPopup.tsx`, `MacrosPanel.tsx` / `macro-logic.ts`, plus the gems and notifications files in [gems §14](gems.md#14-dependencies).
+- Docs: protocol §22 `GemSpent`. Waits on nothing (PM / RS cores not involved); TT-era dice-extras files have no other sprint-9 holder.
 
 ## 15. Open questions
 
