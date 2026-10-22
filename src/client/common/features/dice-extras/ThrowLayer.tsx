@@ -4,7 +4,8 @@
 // (FR-DICEX-11, -32, -38, -43) in the stores, which run their timelines (FR-DICEX-18, -35), and
 // holds their numbers until their dice land (FR-DICEX-49). The views that draw them (dice layer,
 // zone) and the popup stack (`RollPopup.tsx`, portalled into the shell's toast region) are lazy
-// chunks loaded at idle too.
+// chunks loaded at idle too. *(Sprint 8)* It also plays the `request` sound for a new prompt
+// (FR-DICEX-89).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -25,7 +26,9 @@ import { popupHost, type ThrowPlan } from "./display";
 import { onRollFrame } from "./frame-handler";
 import { heldOnArrival, landing } from "./landing";
 import { createChunkLoader, dice3d, loadAtIdle, preloadAtIdle, whenChunk } from "./lazy3d";
+import { promptChunk } from "./PromptViews";
 import { rollPopups, setThreeDReady, useRollPopups } from "./popups";
+import { useRequestSound } from "./request-sound";
 import { is3dDisplay, useDiceSettings } from "./settings";
 import { diceExtras, useDiceExtras } from "./store";
 import { useRollFrames } from "./throw-source";
@@ -88,6 +91,7 @@ function useTrayWindowSync() {
 
 export function DiceExtrasRuntime() {
   useTrayWindowSync();
+  useRequestSound();
   const { settings, display, set } = useDiceSettings();
   const you = useSync((s) => s.store.you);
   const current = useDiceExtras((s) => s.current);
@@ -111,6 +115,11 @@ export function DiceExtrasRuntime() {
   useEffect(() => {
     if (!snapshot) return;
     return loadAtIdle(popupUi);
+  }, [snapshot]);
+  // FR-DICEX-83: the roll-request prompt bodies, so a prompt shows its Roll at once.
+  useEffect(() => {
+    if (!snapshot) return;
+    return loadAtIdle(promptChunk);
   }, [snapshot]);
   const viewsState = useSyncExternalStore(views.subscribe, views.state, views.state);
   useEffect(() => () => waiting.current?.(), []);

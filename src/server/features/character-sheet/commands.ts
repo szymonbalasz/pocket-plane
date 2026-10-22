@@ -1,4 +1,5 @@
-// `char.roll` (FR-CHAR-05–09, FR-CHAR-17, FR-CHAR-21, FR-CHARX-20–22) and `char.adjustHp`
+// `char.roll` (FR-CHAR-05–09, FR-CHAR-17, FR-CHAR-21, FR-CHARX-20–22; body exported as
+// `sheetRoll` for request answers, FR-CHARX-90) and `char.adjustHp`
 // (FR-CHAR-09, FR-CHAR-10). One transaction each: rolls + one log entry + `CharacterRolled`; HP
 // row + `CharacterHpAdjusted`.
 import { characterRolls, sheetAttack } from "@shared/character-sheet/logic";
@@ -15,13 +16,20 @@ import {
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import type { RollCategory } from "@shared/dice-roll-log/schemas";
 import { ROLL_ROW_MAX, type RollSubject } from "@shared/effect-modifiers/schemas";
-import { type CharacterRecord, SKILL_ABILITY } from "@shared/entities/schemas";
+import {
+  type CharacterRecord,
+  type DefinitionRecord,
+  SKILL_ABILITY,
+} from "@shared/entities/schemas";
 import { CharacterHpAdjusted, CharacterRolled } from "@shared/events/character-sheet";
+import type { z } from "zod";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
+import type { RecordChange } from "../../events/types";
 import { hpRules } from "../combat-extras/hp-rules";
 import { startedEncounter } from "../combat-tracker/rows";
-import { dice, gameLog } from "../dice-roll-log";
+import { dice, type EvaluatedRoll, gameLog } from "../dice-roll-log";
+import type { EntryAudience } from "../dice-roll-log/game-log";
 import { getCharacter } from "./hp";
 import { rollActor } from "./roll";
 import { getSheet } from "./sheet-rows";
@@ -65,6 +73,114 @@ function subjectOf(
   return undefined;
 }
 
+/** FR-CHARX-90: what `sheetRoll` adds to a sheet roll for its caller (a request answer). */
+export interface SheetRollOptions {
+  /** FR-DICE-83: the answer's audience, stamped by the server (wins over `public`). */
+  audience?: EntryAudience;
+  /** The line's label (the request's) instead of the spec's. */
+  label?: string;
+  /** FR-DICE-80: every item marked `answer: true` (never rerollable). */
+  answer?: true;
+}
+
+export interface SheetRolled {
+  creature: DefinitionRecord;
+  rolls: EvaluatedRoll[];
+  rollIds: string[];
+  change: RecordChange;
+  ability: SheetRollInput["ability"];
+  attack: { name: string; damageType?: string | null } | null;
+}
+
+type SheetRollInput = z.output<typeof SheetRollIntent>;
+
+/**
+ * FR-CHARX-90: `char.roll`'s body: the sheet's specs, overrides and MOD hooks (FR-CHARX-21), the
+ * rolls and one log entry, no event (the caller emits). `char.roll` passes no options.
+ */
+export function sheetRoll(
+  env: CommandEnv,
+  input: SheetRollInput,
+  opts: SheetRollOptions = {},
+): SheetRolled {
+  // FR-CHARX-22: the DM may roll for any definition (NPC sheet); players for own characters
+  // and (FR-CHARX-69) the attacks of a pet they own.
+  const { creature: c, audiencePlayerId } = rollActor(env, input.characterId, input.kind);
+  const definition = c.kind === "monster";
+  if (definition && input.public !== undefined) {
+    throw invalid("NPC sheet rolls are DM-only", [
+      { path: ["public"], message: "Not allowed for definitions" },
+    ]);
+  }
+  // FR-CHARX-21: specs from committed data (stat block + sheet rows), overrides honoured.
+  const sheet = c.campaignId === null ? null : getSheet(env.tx, c.id);
+  const ref = {
+    ability: isAbilityRollKind(input.kind) ? input.ability : undefined,
+    skill: input.skill,
+    attackId: input.attackId,
+    spellId: input.spellId,
+  };
+  const res = characterRolls(c.statBlock, sheet, input.kind, ref);
+  if (!res.ok) throw res.code === "not_found" ? notFound(res.message) : conflict(res.message);
+  const specs = res.specs;
+  if (input.manual && input.manual.length !== specs.length) {
+    throw invalid("Invalid input", [
+      { path: ["manual"], message: `Enter ${specs.length} physical rolls for ${input.kind}` },
+    ]);
+  }
+  const ability = ref.ability;
+  const actor = { kind: "entity" as const, id: c.id, name: c.name };
+  const attack = !isAttackRowKind(input.kind)
+    ? null
+    : input.attackId === undefined
+      ? sheetAttack(c.statBlock)
+      : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
+  const row = attack?.name ?? sheet?.spells.find((x) => x.id === input.spellId)?.name;
+  const rolls = specs.map((s, i) => {
+    // FR-CHARX-55: mods (Rage +2) attach to the base part; an extra part has no subject.
+    const subject = s.part?.extra
+      ? undefined
+      : subjectOf(c, s.category, { ...input, ability }, row);
+    return dice.evaluate(env, {
+      expression: s.expression,
+      mode: s.d20 ? input.mode : "normal",
+      category: s.category,
+      label: opts.label ?? s.label,
+      actor,
+      manual: input.manual?.[i],
+      // FR-MOD-18: the physical part groups of this roll (one list per `manual` entry).
+      ...(input.manualParts?.[i] ? { manualParts: input.manualParts[i] } : {}),
+      source: "char",
+      ...(subject ? { subject } : {}),
+    });
+  });
+  // FR-MOD-14: bonus-die rows follow their base roll (FR-DICE-26).
+  const rollIds = rolls.flatMap((r) => dice.rollIdsOf(r));
+  const change = gameLog.append(env, {
+    kind: ROLL_KIND,
+    // attack: the to-hit's category (FR-DICE-26); check / save: ability-check / saving-throw.
+    category: (specs[0] as (typeof specs)[number]).category,
+    actorName: c.name,
+    // FR-CHARX-55: each damage part of a magic weapon row is its own item, typed (`part`).
+    payload: rolls.map((r, i) => {
+      const part = specs[i]?.part;
+      return {
+        ...dice.rollPayloadItem(r),
+        ...(part ? { part } : {}),
+        ...(opts.answer ? { answer: true } : {}),
+      };
+    }),
+    dmPayload: dice.rollDmPayload(rolls),
+    rollIds,
+    // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).
+    public: definition ? false : input.public,
+    // FR-CHARX-69 (ADR-0056): a pet owner's roll reaches the DM and that owner only.
+    ...(audiencePlayerId ? { audiencePlayerId } : {}),
+    ...(opts.audience ? { audience: opts.audience } : {}),
+  });
+  return { creature: c, rolls, rollIds, change, ability, attack };
+}
+
 export const charRoll = defineCommand({
   name: CHAR_ROLL,
   input: SheetRollIntent,
@@ -76,76 +192,7 @@ export const charRoll = defineCommand({
     }
   },
   execute(input, env): CharRollResult {
-    // FR-CHARX-22: the DM may roll for any definition (NPC sheet); players for own characters
-    // and (FR-CHARX-69) the attacks of a pet they own.
-    const { creature: c, audiencePlayerId } = rollActor(env, input.characterId, input.kind);
-    const definition = c.kind === "monster";
-    if (definition && input.public !== undefined) {
-      throw invalid("NPC sheet rolls are DM-only", [
-        { path: ["public"], message: "Not allowed for definitions" },
-      ]);
-    }
-    // FR-CHARX-21: specs from committed data (stat block + sheet rows), overrides honoured.
-    const sheet = c.campaignId === null ? null : getSheet(env.tx, c.id);
-    const ref = {
-      ability: isAbilityRollKind(input.kind) ? input.ability : undefined,
-      skill: input.skill,
-      attackId: input.attackId,
-      spellId: input.spellId,
-    };
-    const res = characterRolls(c.statBlock, sheet, input.kind, ref);
-    if (!res.ok) throw res.code === "not_found" ? notFound(res.message) : conflict(res.message);
-    const specs = res.specs;
-    if (input.manual && input.manual.length !== specs.length) {
-      throw invalid("Invalid input", [
-        { path: ["manual"], message: `Enter ${specs.length} physical rolls for ${input.kind}` },
-      ]);
-    }
-    const ability = ref.ability;
-    const actor = { kind: "entity" as const, id: c.id, name: c.name };
-    const attack = !isAttackRowKind(input.kind)
-      ? null
-      : input.attackId === undefined
-        ? sheetAttack(c.statBlock)
-        : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
-    const row = attack?.name ?? sheet?.spells.find((x) => x.id === input.spellId)?.name;
-    const rolls = specs.map((s, i) => {
-      // FR-CHARX-55: mods (Rage +2) attach to the base part; an extra part has no subject.
-      const subject = s.part?.extra
-        ? undefined
-        : subjectOf(c, s.category, { ...input, ability }, row);
-      return dice.evaluate(env, {
-        expression: s.expression,
-        mode: s.d20 ? input.mode : "normal",
-        category: s.category,
-        label: s.label,
-        actor,
-        manual: input.manual?.[i],
-        // FR-MOD-18: the physical part groups of this roll (one list per `manual` entry).
-        ...(input.manualParts?.[i] ? { manualParts: input.manualParts[i] } : {}),
-        source: "char",
-        ...(subject ? { subject } : {}),
-      });
-    });
-    // FR-MOD-14: bonus-die rows follow their base roll (FR-DICE-26).
-    const rollIds = rolls.flatMap((r) => dice.rollIdsOf(r));
-    const change = gameLog.append(env, {
-      kind: ROLL_KIND,
-      // attack: the to-hit's category (FR-DICE-26); check / save: ability-check / saving-throw.
-      category: (specs[0] as (typeof specs)[number]).category,
-      actorName: c.name,
-      // FR-CHARX-55: each damage part of a magic weapon row is its own item, typed (`part`).
-      payload: rolls.map((r, i) => {
-        const part = specs[i]?.part;
-        return { ...dice.rollPayloadItem(r), ...(part ? { part } : {}) };
-      }),
-      dmPayload: dice.rollDmPayload(rolls),
-      rollIds,
-      // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).
-      public: definition ? false : input.public,
-      // FR-CHARX-69 (ADR-0056): a pet owner's roll reaches the DM and that owner only.
-      ...(audiencePlayerId ? { audiencePlayerId } : {}),
-    });
+    const { creature: c, rollIds, change, ability, attack } = sheetRoll(env, input);
     env.emit({
       type: CharacterRolled.type,
       campaignId: env.actor.campaignId,

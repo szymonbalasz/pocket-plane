@@ -40,8 +40,15 @@ describe("session-sim-12 (sprint-8 gate bundle)", () => {
     expect(r.manifest.fixtures).toEqual(
       expect.arrayContaining(["st-past-crypt", "cmp-goblin-untyped", "cp-ally", "fu-hurt-goblins"]),
     );
-    // TT0 adds no unit: no table-tools rows yet.
-    expect(db.select().from(rollMacro).all()).toEqual([]);
+    // TT1: `dicex-macros` (five macros); no request (the sim sends them live).
+    const macros = db.select().from(rollMacro).all();
+    expect(macros.map((m) => m.name).sort()).toEqual([
+      "Ambush",
+      "Bless",
+      "Inspiration",
+      "Luck",
+      "Sneak Attack",
+    ]);
     expect(db.select().from(rollRequest).all()).toEqual([]);
     // TT3: `audio-chime` + `camp-alert-sounds` (request, pause → Chime); not paused.
     const sounds = db.select().from(asset).where(eq(asset.kind, "audio")).all();

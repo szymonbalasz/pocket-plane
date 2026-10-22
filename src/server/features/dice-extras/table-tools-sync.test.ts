@@ -119,7 +119,7 @@ const sendRequest = defineCommand({
         kind: ROLL_REQUEST_KIND,
         audience: "player",
         audiencePlayerId: t.playerId,
-        text: promptText(label, null),
+        text: promptText(label, t.name, null),
         payload: {
           requestId: id,
           characterId: t.characterId,
@@ -501,7 +501,7 @@ describe("TT0 table-tools events over sockets (dice-log)", () => {
       expect(mine).toHaveLength(1);
       expect(mine[0]?.audiencePlayerId).toBe(who.playerId);
       expect(mine[0]?.payload).toMatchObject({ characterId: who.characterId, dc: null });
-      expect(mine[0]?.text).toBe(`DM: ${SECRET_LABEL}`);
+      expect(mine[0]?.text).toBe(`DM: ${SECRET_LABEL} · ${who.name}`);
     }
     const req = dm.store.records[ROLL_REQUEST_TYPE]?.["req-hidden"] as RollRequestRecord;
     expect([req.dc, req.targets.map((t) => t.state)]).toEqual([15, ["open", "open"]]);

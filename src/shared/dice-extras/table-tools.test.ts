@@ -180,9 +180,9 @@ describe("TT0 table-tools zod", () => {
       true,
     );
     expect(RollRequestPromptResolution.safeParse({ outcome: "lost" }).success).toBe(false);
-    expect([promptText("Perception", null), promptText("DEX save", 15)]).toEqual([
-      "DM: Perception",
-      "DM: DEX save · DC 15",
+    expect([promptText("Perception", "Mira", null), promptText("DEX save", "Mira", 15)]).toEqual([
+      "DM: Perception · Mira",
+      "DM: DEX save · Mira · DC 15",
     ]);
   });
 

@@ -2,8 +2,7 @@
 // FR-SHELL-100 (sprint 8, WF1; review-b #3): every registered kind at its useful size (play-shell
 // §7's sprint-8 table, at 1280×720) shows its criterion without scrolling: the body's
 // `scrollHeight ≤ clientHeight`, and the named rows whole inside it. One page per client; each
-// window resized by its handle as a user would. Kinds another track registers later (TT
-// `dicex.requests`) are skipped until registered; CB `party.summary` checks `cb-party-six`. WF4:
+// window resized by its handle as a user would. CB `party.summary` checks `cb-party-six`. WF4:
 // Stats (FR-STATS-66, -67: the award grid fits at 400 and 320 wide) and the companion card
 // (FR-CHARX-83: Owlbear and Drake at exactly 320 × 360) have their own tests below.
 import { expect, type Locator, type Page, test } from "@playwright/test";
@@ -102,6 +101,13 @@ const DM: Case[] = [
     criterion: "5 rows names whole",
     check: 5,
   },
+  {
+    kind: "dicex.requests",
+    useful: { w: 360, h: 400 },
+    // wf-frame-e2e has no request: the composer and the empty list, body unscrolled.
+    criterion: "composer folded + a 6-row card",
+    check: "body",
+  },
   PARTY_SUMMARY,
 ];
 const PLAYER: Case[] = [
@@ -153,8 +159,8 @@ const PLAYER: Case[] = [
   },
   PARTY_SUMMARY,
 ];
-/** FR-SHELL-112 (1): pending until their owners register them (TT2). */
-const PENDING = ["dicex.requests"];
+/** FR-SHELL-112 (1): pending until their owners register them (none left this sprint). */
+const PENDING: string[] = [];
 
 async function live(page: Page) {
   await expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");

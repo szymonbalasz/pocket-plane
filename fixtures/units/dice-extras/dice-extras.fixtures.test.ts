@@ -1,12 +1,22 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { closeDb } from "@server/db/client";
-import { creatureSheet, diceLook, entity, player } from "@server/db/schema";
+import {
+  creatureSheet,
+  diceLook,
+  entity,
+  notification,
+  player,
+  rollMacro,
+  rollRequest,
+} from "@server/db/schema";
 import { CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { defaultLook, lookOf } from "@shared/dice-extras/looks";
 import { findNotation } from "@shared/dice-extras/notation";
+import { ROLL_REQUEST_KIND } from "@shared/dice-extras/requests";
 import { eq } from "drizzle-orm";
 import { loadBundle } from "../../index";
 import { DICEX_LOOKS } from "./dicex-looks";
+import { DICEX_MACROS } from "./dicex-macros";
 import { NOTATION_TEXT } from "./dicex-notation-text";
 
 const cleanups: (() => void)[] = [];
@@ -64,4 +74,46 @@ describe("dice-extras fixtures (DICEX §13)", () => {
     expect(lookOf(p2, rows, ids).style).toBe("sapphire");
     expect(rows.find((x) => x.ownerKey === p1)?.ownerPlayerId).toBe(p1);
   });
+
+  test("FR-DICEX-64 FR-DICEX-74 bundle table-tools loads from empty: five macros, one open hidden Perception to Mira + Thorn", async () => {
+    const r = await loadBundle("table-tools", { testMode: true });
+    cleanups.push(r.cleanup);
+    expect(r.manifest.status).toBe("complete");
+    expect(r.manifest.fixtures.slice(-4)).toEqual([
+      "dicex-macros",
+      "audio-chime",
+      "camp-alert-sounds",
+      "dicex-request-open",
+    ]);
+    const db = r.openDb();
+    const players = db.select().from(player).all();
+    const macros = db.select().from(rollMacro).all();
+    const reqs = db.select().from(rollRequest).all();
+    const prompts = db
+      .select()
+      .from(notification)
+      .where(eq(notification.kind, ROLL_REQUEST_KIND))
+      .all();
+    closeDb(db);
+    const p1 = players.find((p) => p.name === "Player 1")?.id as string;
+    const p2 = players.find((p) => p.name === "Player 2")?.id as string;
+    const who = (name: string) => macros.find((m) => m.name === name);
+    expect(macros).toHaveLength(5);
+    expect(who(DICEX_MACROS.sneak)).toMatchObject({
+      playerId: p1,
+      createdBy: p1,
+      expression: "3d6",
+    });
+    expect(who(DICEX_MACROS.luck)).toMatchObject({ playerId: p1, creatureId: null });
+    expect(who(DICEX_MACROS.bless)).toMatchObject({ playerId: null, createdBy: null });
+    expect(who(DICEX_MACROS.inspiration)).toMatchObject({ playerId: p2, createdBy: null });
+    expect(who(DICEX_MACROS.ambush)).toMatchObject({ playerId: null, expression: "2d6" });
+    expect(reqs).toHaveLength(1);
+    expect(reqs[0]).toMatchObject({ label: "Perception", dc: 15, dcShown: false, state: "open" });
+    expect(prompts.map((n) => [n.audiencePlayerId, n.state, n.text])).toEqual([
+      [p1, "pending", "DM: Perception · Mira"],
+      [p2, "pending", "DM: Perception · Thorn"],
+    ]);
+    expect(prompts.every((n) => (n.payload as { dc: number | null }).dc === null)).toBe(true);
+  }, 120_000);
 });

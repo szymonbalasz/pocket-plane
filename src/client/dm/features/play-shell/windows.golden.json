@@ -72,6 +72,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "open @1600×900 dicex.requests",
+    "rect": "588,60,360×460",
+    "placed": "auto",
+    "parked": "charx.companion,stats.board"
+  },
+  {
     "at": "open @1600×900 party.summary",
     "rect": "68,60,280×260",
     "placed": "default",
@@ -148,6 +154,12 @@
     "rect": "548,160,400×412",
     "placed": "reopened",
     "parked": "shell.prefs"
+  },
+  {
+    "at": "reopen @1600×900 dicex.requests",
+    "rect": "588,60,360×460",
+    "placed": "reopened",
+    "parked": "charx.companion,stats.board"
   },
   {
     "at": "reopen @1600×900 party.summary",
@@ -228,6 +240,12 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "reopen 1440×900 @1440×900 dicex.requests",
+    "rect": "540,364,360×460",
+    "placed": "reopened",
+    "parked": "charx.companion,stats.board"
+  },
+  {
     "at": "reopen 1440×900 @1440×900 party.summary",
     "rect": "68,60,280×260",
     "placed": "stored",
@@ -306,6 +324,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "reopen 1280×800 @1280×800 dicex.requests",
+    "rect": "399,60,360×460",
+    "placed": "reopened",
+    "parked": "stats.board"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 party.summary",
     "rect": "68,60,280×260",
     "placed": "stored",
@@ -382,6 +406,12 @@
     "rect": "418,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 party.summary",
@@ -474,8 +504,14 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "open @1440×900 dicex.requests",
+    "rect": "540,364,360×460",
+    "placed": "auto",
+    "parked": "charx.companion,stats.board"
+  },
+  {
     "at": "open @1440×900 party.summary",
-    "rect": "68,140,280×260",
+    "rect": "1148,452,280×260",
     "placed": "auto",
     "parked": ""
   },
@@ -552,8 +588,14 @@
     "parked": "shell.prefs"
   },
   {
+    "at": "reopen @1440×900 dicex.requests",
+    "rect": "540,364,360×460",
+    "placed": "reopened",
+    "parked": "charx.companion,stats.board"
+  },
+  {
     "at": "reopen @1440×900 party.summary",
-    "rect": "68,140,280×260",
+    "rect": "68,137,280×260",
     "placed": "stored",
     "parked": ""
   },
@@ -628,6 +670,12 @@
     "rect": "382,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen 1280×800 @1280×800 dicex.requests",
+    "rect": "399,60,360×460",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "reopen 1280×800 @1280×800 party.summary",
@@ -706,6 +754,12 @@
     "rect": "418,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 party.summary",
@@ -798,6 +852,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "open @1280×800 dicex.requests",
+    "rect": "399,60,360×460",
+    "placed": "auto",
+    "parked": "stats.board"
+  },
+  {
     "at": "open @1280×800 party.summary",
     "rect": "68,60,280×260",
     "placed": "default",
@@ -876,6 +936,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "reopen @1280×800 dicex.requests",
+    "rect": "399,60,360×460",
+    "placed": "reopened",
+    "parked": "stats.board"
+  },
+  {
     "at": "reopen @1280×800 party.summary",
     "rect": "68,60,280×260",
     "placed": "stored",
@@ -952,6 +1018,12 @@
     "rect": "418,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 party.summary",
@@ -1044,6 +1116,12 @@
     "parked": "charx.companion"
   },
   {
+    "at": "open @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "auto",
+    "parked": "stats.board"
+  },
+  {
     "at": "open @1280×720 party.summary",
     "rect": "68,60,280×260",
     "placed": "default",
@@ -1120,6 +1198,12 @@
     "rect": "418,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
+  },
+  {
+    "at": "reopen @1280×720 dicex.requests",
+    "rect": "418,60,360×412",
+    "placed": "reopened",
+    "parked": "stats.board"
   },
   {
     "at": "reopen @1280×720 party.summary",
