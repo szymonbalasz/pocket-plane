@@ -6,8 +6,11 @@
 // toasts covered its lower rows; the map gap between the columns is free in the default layout.
 // Wherever Initiative is, the DM stack keeps clear of it (FR-NOTE-32, `keep-out.ts`), stays in
 // its top-centre band (FR-NOTE-42) and off the active tool bar (FR-NOTE-43); it reports its
-// rendered rect for the Fit (FR-SHELL-59).
+// rendered rect for the Fit (FR-SHELL-59). *(Sprint 8)* One stack per client (FR-NOTE-50): the
+// summary, cards, alerts, info, then the callout, in that order from home (players: home is the
+// bottom, so the column runs upwards); it re-places on every input change (FR-NOTE-51).
 import type { NotificationRecord } from "@shared/notifications/schemas";
+import { toastClassOf } from "@shared/notifications/toast-class";
 import { XIcon } from "lucide-react";
 import {
   useCallback,
@@ -18,21 +21,14 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
-import { INITIATIVE_KIND } from "../combat-tracker/window";
-import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
-import { EDGE_GAP, LAUNCHER_CLEAR, type Rect, TOP_BAR_H } from "../play-shell/geometry";
+import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
-import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
-import {
-  useAvailableKinds,
-  useOpenWindow,
-  useRegistry,
-  useShellState,
-} from "../play-shell/ShellContext";
+import { useOpenWindow } from "../play-shell/ShellContext";
 import {
   DM_TOAST_TOP,
   NOTE_EDGE,
@@ -40,7 +36,9 @@ import {
   reportShownStack,
 } from "../play-shell/toast-region";
 import { tokenScreenBoxes } from "../play-shell/token-boxes";
-import { dmStackPlacement } from "./keep-out";
+import { AlertToast, useAlertToasts } from "./alert-toasts";
+import { useDialogRects } from "./dialog-rects";
+import { dmStackSpot } from "./keep-out";
 import {
   actionButton,
   classify,
@@ -54,8 +52,13 @@ import {
 import type { NoteClient } from "./note-client";
 import { NoteBody, NoteStripe, useNoteActions, useNoteStripe } from "./parts";
 import { useStackHeight } from "./stack-height";
+import { useStackInputs } from "./stack-inputs";
 import {
   advance,
+  type Callout,
+  type ClassOf,
+  classOfToast,
+  clearCallout,
   closeToast,
   MAX_VISIBLE,
   nextExpiry,
@@ -102,6 +105,7 @@ function NoteToast({
       data-record-id={n.id}
       data-state={n.state}
       data-sticky={t.sticky}
+      data-class={classOfToast(t)}
       {...stripe.attrs}
       className="pointer-events-auto relative flex flex-col gap-2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg"
     >
@@ -135,37 +139,6 @@ function NoteToast({
       )}
     </div>
   );
-}
-
-/** FR-NOTE-32: the open, non-minimised `cbt.initiative` window's rendered rect (DM), else null. */
-function useInitiativeRect(isDm: boolean): Rect | null {
-  const registry = useRegistry();
-  const windows = useShellState((s) => s.windows);
-  const available = useAvailableKinds();
-  const vp = useViewport();
-  const measured = useContentHeights();
-  return useMemo(() => {
-    if (!isDm) return null;
-    const win = windows.filter((w) => w.kind === INITIATIVE_KIND && w.state === "open");
-    return renderedWindowRects(win, registry, available, vp, measured)[0] ?? null;
-  }, [isDm, windows, registry, available, vp, measured]);
-}
-
-/**
- * The DM's open windows but Initiative, as rendered: the stack never covers their title bars (P3
- * retest) and keeps off their bodies when it can (sim-6 glitch 3).
- */
-function useWindowRects(isDm: boolean): Rect[] {
-  const registry = useRegistry();
-  const windows = useShellState((s) => s.windows);
-  const available = useAvailableKinds();
-  const vp = useViewport();
-  const measured = useContentHeights();
-  return useMemo(() => {
-    if (!isDm) return [];
-    const win = windows.filter((w) => w.kind !== INITIATIVE_KIND && w.state === "open");
-    return renderedWindowRects(win, registry, available, vp, measured);
-  }, [isDm, windows, registry, available, vp, measured]);
 }
 
 interface KonvaLayerLike {
@@ -227,11 +200,37 @@ function useAvoidTokens(
   }, [isDm, toasts, rows, views, store]);
 }
 
-/** FR-NOTE-43: the DM's hard keep-out rects (the active tool bar), re-read when they change. */
-function useHardKeepOuts(isDm: boolean): Rect[] {
-  const list = useKeepOuts("dm");
-  return useMemo(() => (isDm ? hardRects(list) : []), [isDm, list]);
+/** FR-NOTE-50: the one callout (`showCallout`), last in the stack; not a notification. */
+function CalloutToast({ c, onClose }: { c: Callout; onClose: () => void }) {
+  return (
+    <div
+      role="status"
+      data-testid="note-callout"
+      data-callout-id={c.id}
+      data-class="callout"
+      className="pointer-events-auto flex items-start gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
+    >
+      <div className="min-w-0 flex-1">{c.content}</div>
+      <button
+        type="button"
+        data-testid="note-callout-close"
+        aria-label="Close"
+        className="rounded-sm text-muted-foreground hover:text-foreground"
+        onClick={onClose}
+      >
+        <XIcon className="size-4" />
+      </button>
+    </div>
+  );
 }
+
+/**
+ * FR-NOTE-50 (sprint 8, DM ruling): the one stack's layer: above windows, dialogs (z-50) and
+ * the alert flash (z-100), so an error stays readable while a dialog is open (as sonner's was);
+ * below the overlay layer (play-shell `OVERLAY_LAYER_Z` 1000: a `blocksInput` overlay such as the
+ * pause card sits above it) and the popups above every toast (`PRESENT_POPUP_Z`, the dice layer).
+ */
+export const TOAST_STACK_Z = 900;
 
 /** Id of this stack's FR-SHELL-59 report. */
 export const SHOWN_STACK_ID = "note.toasts";
@@ -257,6 +256,11 @@ export function ToastRuntime({
     | undefined;
   const actions = useNoteActions(views);
   const isDm = useSync((s) => s.store.you?.role === "dm");
+  // FR-NOTE-52: a row's class from its kind's view (pending → card).
+  const classOf = useCallback<ClassOf>(
+    (n) => toastClassOf(views.get(n.kind)?.toastClass, n.state),
+    [views],
+  );
 
   // Sync changes, in order (zustand calls this synchronously for every applied frame).
   useEffect(() => {
@@ -266,7 +270,15 @@ export function ToastRuntime({
       if (t === null) return;
       if (t === "connect") note.baseline(next.store);
       memory.setState((m) =>
-        syncToasts(m, prev, next, t, Date.now(), (store) => waitingForPlayers(store, views)),
+        syncToasts(
+          m,
+          prev,
+          next,
+          t,
+          Date.now(),
+          (store) => waitingForPlayers(store, views),
+          classOf,
+        ),
       );
       // FR-NOTE-30: the DM's 4 s action cue (live event frames only).
       startCues(cueTriggers(prev, next, t), (kind) => views.get(kind));
@@ -278,7 +290,10 @@ export function ToastRuntime({
     // Mounted after the first snapshot (loading screen first): treat it as the connect.
     if (first.state === "live" && viewerOf(first.store)) onChange(first, null);
     return sync.subscribe((next, prev) => onChange(next, prev));
-  }, [sync, note, memory, dispatch, views]);
+  }, [sync, note, memory, dispatch, views, classOf]);
+
+  // FR-NOTE-50: the client's `toast()` calls as the alert class (this stack claims the region).
+  const alerts = useAlertToasts(state.toasts, dispatch);
 
   // FR-NOTE-26: `hideToast(id)` reaches this page's stack.
   useEffect(() => registerToastMemory(memory), [memory]);
@@ -298,27 +313,29 @@ export function ToastRuntime({
     return () => document.removeEventListener("visibilitychange", on);
   }, [dispatch]);
 
-  // FR-NOTE-32: the DM's stack keeps clear of the rendered Initiative window.
+  // FR-NOTE-32: the DM's stack keeps clear of the rendered Initiative window. FR-NOTE-51: every
+  // input is subscribed (windows, Initiative, hard keep-outs, first rows, height, viewport).
   const stackRef = useRef<HTMLElement>(null);
-  const initiative = useInitiativeRect(isDm);
+  const showing = state.toasts.length > 0 || !!state.callout;
+  const { initiative, windows: windowRects, hard: bars, rows: firstRows } = useStackInputs(isDm);
+  // Walkthrough T4: an open modal dialog keeps the DM stack off it like a hard keep-out.
+  const dialogs = useDialogRects(isDm && showing);
+  const hard = useMemo(() => (dialogs.length > 0 ? [...bars, ...dialogs] : bars), [bars, dialogs]);
   const vp = useViewport();
-  const stackH = useStackHeight(stackRef, isDm, state.toasts.length > 0);
+  const stackH = useStackHeight(stackRef, isDm, showing);
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
   // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
   const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
-  const windowRects = useWindowRects(isDm);
-  // FR-NOTE-43: a tool opening, closing or its bar wrapping re-places the stack.
-  const hard = useHardKeepOuts(isDm);
   // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
-  // pointer is on the stack.
-  const settled = useMapSettled(isDm && state.toasts.length > 0);
+  // pointer is on the stack (FR-NOTE-51: only while; every other input re-places at once).
+  const settled = useMapSettled(isDm && showing);
   const frozen = useRef(settled);
   if (!state.hovered) frozen.current = settled;
   const tick = frozen.current;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the live token boxes
   const at = useMemo(
     () =>
-      dmStackPlacement(
+      dmStackSpot(
         vp,
         initiative,
         stackH,
@@ -326,8 +343,9 @@ export function ToastRuntime({
         tokenScreenBoxes(avoidKey ? avoidKey.split(",") : []),
         windowRects,
         hard,
+        firstRows,
       ),
-    [vp, initiative, stackH, avoidKey, windowRects, hard, tick],
+    [vp, initiative, stackH, avoidKey, windowRects, hard, firstRows, tick],
   );
 
   // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
@@ -346,21 +364,24 @@ export function ToastRuntime({
   // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
   // top row, above the launcher; player: above its corner, below the top bar), one more toast
   // folds into "+N more". The cap starts over when the toasts or the room change.
+  // Walkthrough T4: with a dialog open, the DM's room is the larger band above or below it.
   const room = isDm
-    ? vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP
+    ? dialogRoom(vp, dialogs, vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP)
     : vp.h - PLAYER_TOAST_BOTTOM - TOP_BAR_H - EDGE_GAP;
   const [cap, setCap] = useState(MAX_VISIBLE);
   const count = state.toasts.length;
   // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
   useLayoutEffect(() => setCap(MAX_VISIBLE), [count, room]);
+  // Walkthrough WF4: likewise while the DM stack can only sit on a window's body (its controls).
+  const covers = isDm && at.covers > 0;
   useLayoutEffect(() => {
-    if (stackH > room && cap > 1) setCap((c) => Math.max(1, c - 1));
-  }, [stackH, room, cap]);
+    if ((stackH > room || covers) && cap > 1) setCap((c) => Math.max(1, c - 1));
+  }, [stackH, room, cap, covers]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
-  const { shown, more } = visibleToasts(state, cap);
-  if (state.toasts.length === 0) return null;
-  return (
+  const { shown, more, callout } = visibleToasts(state, cap);
+  if (!showing) return null;
+  const stack = (
     <section
       ref={stackRef}
       aria-label="Notifications"
@@ -368,24 +389,21 @@ export function ToastRuntime({
       data-placement={isDm ? "top-center" : "bottom-right"}
       data-left={isDm ? at.left : undefined}
       data-top={isDm ? at.top : undefined}
-      className={cn("pointer-events-none fixed z-40 flex w-80 flex-col gap-2")}
+      // FR-NOTE-50: DOM order = order from home; the players' home is the bottom.
+      className={cn(
+        "pointer-events-none fixed flex w-80 gap-2",
+        isDm ? "flex-col" : "flex-col-reverse",
+      )}
       // Player: bottom-right, above the launcher bar (never over its buttons).
-      style={
-        isDm ? { left: at.left, top: at.top } : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }
-      }
+      style={{
+        zIndex: TOAST_STACK_Z,
+        ...(isDm
+          ? { left: at.left, top: at.top }
+          : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }),
+      }}
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >
-      {more > 0 && (
-        <button
-          type="button"
-          data-testid="note-toast-more"
-          className="pointer-events-auto self-end rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow"
-          onClick={openHistory}
-        >
-          +{more} more
-        </button>
-      )}
       {shown.map((t) => {
         if (t.kind === "summary") {
           return (
@@ -420,6 +438,17 @@ export function ToastRuntime({
             </div>
           );
         }
+        if (t.kind === "alert") {
+          const a = alerts.get(t.alertId);
+          if (!a) return null;
+          return (
+            <AlertToast
+              key={t.key}
+              t={a}
+              onClose={() => dispatch((s, now) => closeToast(s, t.key, now))}
+            />
+          );
+        }
         const n = rows?.[t.notificationId];
         if (!n) return null;
         return (
@@ -433,6 +462,44 @@ export function ToastRuntime({
           />
         );
       })}
+      {more > 0 && (
+        <button
+          type="button"
+          data-testid="note-toast-more"
+          className="pointer-events-auto self-end rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow"
+          onClick={openHistory}
+        >
+          +{more} more
+        </button>
+      )}
+      {callout && (
+        <CalloutToast
+          c={callout}
+          onClose={() => dispatch((s, now) => clearCallout(s, now, callout.id))}
+        />
+      )}
     </section>
   );
+  // At the body (walkthrough T4): `TOAST_STACK_Z` holds against dialogs, not inside the shell's
+  // stacking context. A static render (tests) has no body.
+  return typeof document !== "undefined" && document.body
+    ? createPortal(stack, document.body)
+    : stack;
+}
+
+/**
+ * Walkthrough T4: the DM stack's room with modal dialogs open: the larger band above their top
+ * (below the home row) or below their bottom (above the launcher), never more than `full`.
+ */
+export function dialogRoom(
+  vp: { w: number; h: number },
+  dialogs: readonly { y: number; h: number }[],
+  full: number,
+): number {
+  if (dialogs.length === 0) return full;
+  const top = Math.min(...dialogs.map((d) => d.y));
+  const bottom = Math.max(...dialogs.map((d) => d.y + d.h));
+  const above = top - EDGE_GAP - DM_TOAST_TOP;
+  const below = vp.h - LAUNCHER_CLEAR - (bottom + EDGE_GAP);
+  return Math.min(full, Math.max(above, below, 0));
 }

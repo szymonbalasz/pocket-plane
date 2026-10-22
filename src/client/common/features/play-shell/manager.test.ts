@@ -670,7 +670,7 @@ describe("sprint 6: reopen rule (FR-SHELL-56)", () => {
   });
 
   test("FR-SHELL-56 a minimised (auto-minimised) window restored onto a spot now taken is re-placed; screen full parks the least recently used other window, never itself", () => {
-    const big = { defaultSize: { w: 600, h: 584 }, minSize: { w: 600, h: 584 } };
+    const big = { defaultSize: { w: 580, h: 584 }, minSize: { w: 580, h: 584 } };
     const full = createWindowRegistry("dm", [
       def("b.one", big),
       def("b.two", big),
@@ -684,7 +684,8 @@ describe("sprint 6: reopen rule (FR-SHELL-56)", () => {
     };
     const go = (ws: Windows, ...as: WindowAction[]) =>
       as.reduce((acc, a) => reduce(acc, a, fctx), ws);
-    // Three 600-wide windows; the screen holds two: b.one is auto-minimised for b.three.
+    // Three 580-wide windows; the screen holds two right of the rail (FR-SHELL-109): b.one is
+    // auto-minimised for b.three.
     const ws = go(
       [],
       ...["b.one", "b.two", "b.three"].map((kind) => ({ type: "open", kind }) as const),
@@ -991,7 +992,8 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
     const base = reduce(withA(), { type: "setRect", kind: "sv.a", rect: spot }, ctxWith([]));
     const pushed = reduce(base, { type: "push", rect: bar }, ctxWith([]));
     const at = rectOf(get(pushed, "sv.a"));
-    expect(at.x).toBe(bar.x + bar.w + 12);
+    // FR-SHELL-104: through the ladder; full size (rank 6) before nearest the pre-push rect (8).
+    expect(at).toEqual({ ...spot, x: bar.x + bar.w + 12 });
     expect(get(pushed, "sv.a").userSpot).toBeUndefined();
     const memory = [
       {

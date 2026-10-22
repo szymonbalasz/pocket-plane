@@ -368,12 +368,13 @@ export const I1_EXEMPT: ReadonlyMap<string, string> = new Map();
 /**
  * The invariants after one step (FR-SHELL-116 I1–I3, I5, I6); `before` = stored windows before
  * the step; `opened` = the launcher kind a user open placed; `refit` = the step refitted the map
- * for a reveal / appearance (I6).
+ * for a reveal / appearance (I6); `push` = a tool-bar push (FR-SHELL-104: it puts no other window
+ * away, OQ-SHELL-61 A, so I3's oracle keeps the launcher windows).
  */
 function check(
   sim: Sim,
   before: Windows,
-  opts: { opened?: string; refit?: boolean; exemptI1?: boolean } = {},
+  opts: { opened?: string; refit?: boolean; exemptI1?: boolean; push?: boolean } = {},
 ): string[] {
   const out: string[] = [];
   const shown = shownOf(sim);
@@ -401,8 +402,8 @@ function check(
     const u = useful(def, sim.vp, sim.registry);
     if (r.w < u.w || r.h < u.h) {
       const kept = list
-        .filter(([k]) => k !== kind && isProtected(sim.registry, k))
-        .map(([k, s]) => squeezed(sim, k, s.r));
+        .filter(([k]) => k !== kind && (opts.push || isProtected(sim.registry, k)))
+        .map(([k, s]) => (isProtected(sim.registry, k) ? squeezed(sim, k, s.r) : s.r));
       const best = bruteBest(
         def,
         sim.vp,
@@ -580,10 +581,10 @@ export function runReplay(
       let before = windowsOf(sim);
       sim.reports.set("map.toolbar", bar);
       dispatch(sim, { type: "push", rect: bar });
-      record("push show", check(sim, before));
+      record("push show", check(sim, before, { push: true }));
       before = windowsOf(sim);
       dispatch(sim, { type: "push", rect: bar });
-      record("push re-select", check(sim, before));
+      record("push re-select", check(sim, before, { push: true }));
       // A user drags a pushed launcher window back under the bar, onto its spot before the push
       // (FR-SHELL-105, walkthrough F7).
       const preOf = (k: string) => pre.split(" ").find((e) => e.startsWith(`${k}@`));
@@ -601,7 +602,7 @@ export function runReplay(
         dispatch(sim, { type: "setRect", kind: drag, rect });
         dropped = `${drag}@${rectKey(rect)}`;
         before = windowsOf(sim);
-        record("push drag-end", check(sim, before, { exemptI1: false }));
+        record("push drag-end", check(sim, before, { push: true }));
       }
       before = windowsOf(sim);
       sim.reports.delete("map.toolbar");
