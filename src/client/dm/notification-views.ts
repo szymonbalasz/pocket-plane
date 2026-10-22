@@ -3,6 +3,7 @@
 // toast class (FR-NOTE-52: the server kind's; pending → card, else info).
 import { charxApprovedView, charxDraftView } from "@ui/features/character-sheet/note-views";
 import { concentrationView } from "@ui/features/combat-extras/concentration";
+import { rollRequestDmView } from "@ui/features/dice-extras/PromptViews";
 import { modTriggerView } from "@ui/features/effect-modifiers/note-view";
 import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type RegisteredView } from "@ui/features/notifications/views";
@@ -23,6 +24,7 @@ const views: RegisteredView[] = [
   { ...modTriggerView, toastClass: "info" }, // mod-trigger (effect-modifiers, FR-MOD-44)
   { ...dmSummonCardView, toastClass: "card" }, // cbt-summon-concentration (combat-tracker, FR-CBT-120)
   { ...statsAwardsView, toastClass: "info" }, // stats-awards (stats, FR-NOTE-48)
+  { ...rollRequestDmView, toastClass: "card" }, // roll-request (dice-extras, FR-NOTE-61)
   { ...statsFightSummaryView, toastClass: "info" }, // stats-fight-summary (stats, FR-NOTE-68)
 ];
 

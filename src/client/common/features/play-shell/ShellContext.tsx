@@ -27,7 +27,7 @@ import {
 import { browserAudioContext, createAudioEngine } from "./audio";
 import { chromeKeepOuts } from "./chrome-keep-outs";
 import { contentHeights } from "./content-heights";
-import { requestFit } from "./free-area";
+import { fitPort, requestFit } from "./free-area";
 import type { Rect, Viewport } from "./geometry";
 import { keepOuts, reportedKeepOuts, subscribeKeepOuts } from "./keep-outs";
 import type { OpenBy, WindowAction } from "./manager";
@@ -98,6 +98,10 @@ export function ShellProvider({
         heights: (id) => contentHeights().get(id),
         available: () => availableIn(registry, sync),
         camera: cameraMode,
+        // FR-SHELL-108, FR-MAP-97: the map canvas's base port (players' L2b, the map yields).
+        dryFit: (windows) => fitPort()?.dryFit(windows) ?? null,
+        lastFullCell: () => fitPort()?.lastFullCell() ?? null,
+        onYield: () => fitPort()?.yieldRefit(),
         // FR-SHELL-80: the map refits once on the client that reset.
         onReset: () => {
           requestFit();

@@ -54,6 +54,8 @@ import { colorHex } from "../campaign-management/colors";
 import { DieShape } from "../dice-extras/DieShape";
 import { useLanded, useLandingFade } from "../dice-extras/landing";
 import { stageTray, type TrayRequest } from "../dice-extras/store";
+import { DICEX_REQUESTS_KIND } from "../dice-extras/window-kind";
+import { useOpenWindow } from "../play-shell/ShellContext";
 import { EntryActions } from "./entry-action-button";
 import { type EntryAction, entryActions } from "./entry-actions";
 import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
@@ -665,6 +667,7 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             onChange={(e) => setLabel(e.target.value)}
           />
           {dmTools && <div className="shrink-0">{dmTools}</div>}
+          {dmTools && <RequestButton />}
           <Tooltip content="Physical dice: type in my own rolls">
             <span className="flex shrink-0 items-center gap-1 text-muted-foreground">
               <Switch
@@ -687,6 +690,23 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
         </p>
       )}
     </div>
+  );
+}
+
+/** FR-DICE-84 (sprint 8): the DM's "Request…" opens the Requests window (`dicex.requests`). */
+function RequestButton() {
+  const open = useOpenWindow();
+  return (
+    <Button
+      type="button"
+      data-testid="dicex-request-open"
+      size="sm"
+      variant="outline"
+      className="h-7 shrink-0 px-2 text-xs"
+      onClick={() => open(DICEX_REQUESTS_KIND)}
+    >
+      Request…
+    </Button>
   );
 }
 

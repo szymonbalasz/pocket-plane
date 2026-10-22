@@ -4,6 +4,8 @@
 // tray runs `useRollControl` on the staged options, so physical dice show the same `ManualForm`.
 // FR-DICEX-53: the body is fixed parts (header, palette; expression row, bottom bar) around one
 // flexible dice area; only the dice area shrinks or scrolls, so Roll stays visible at min size.
+// *(Sprint 8)* FR-DICEX-69, -70: the header's Macros popover (by the gear) and "Save as macro" in
+// the Options row; the list and editor load lazily (`TableTools` chunk).
 
 import {
   COMBATANT_TYPE,
@@ -26,6 +28,7 @@ import {
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
 import {
+  BookmarkIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   EyeIcon,
@@ -35,7 +38,9 @@ import {
 } from "lucide-react";
 import {
   type KeyboardEvent,
+  lazy,
   type RefObject,
+  Suspense,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -70,6 +75,7 @@ import {
 } from "../dice-roll-log/roll-control";
 import { FlatDie } from "./FlatDie";
 import { useHolding, useLandingFade } from "./landing";
+import { draftOf, type MacroDraft } from "./macro-logic";
 import { useOwnLook } from "./own-look";
 import { SettingsPanel } from "./SettingsPanel";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
@@ -249,6 +255,51 @@ function SettingsPopover() {
   );
 }
 
+const MacrosPanel = lazy(() => import("./MacrosPanel").then((m) => ({ default: m.MacrosPanel })));
+
+/**
+ * FR-DICEX-69: the header's Macros button (24 px, by the gear, FR-DICEX-53) → the macro list,
+ * the tray's actor first. `preset` (Save as macro, FR-DICEX-70) opens it on the editor.
+ */
+function MacrosPopover({
+  actorId,
+  preset,
+  open,
+  onOpenChange,
+}: {
+  actorId: string | null;
+  preset: MacroDraft | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          data-testid="dicex-tray-macros"
+          size="icon"
+          variant="ghost"
+          className="size-6 shrink-0"
+          aria-label="Macros"
+        >
+          <BookmarkIcon className="size-4" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" side="bottom" className="max-h-96 w-80 overflow-y-auto">
+        <Suspense fallback={null}>
+          {open && (
+            <MacrosPanel
+              key={preset ? JSON.stringify(preset) : "list"}
+              actorId={actorId}
+              preset={preset}
+            />
+          )}
+        </Suspense>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 /**
  * `result`: the last own roll as flat dice, its total and the log line (FR-DICEX-10). FR-DICEX-49
  * (table E): while its entries are held, blank die shapes and "…"; at the landing the numbers
@@ -320,6 +371,10 @@ export function TrayWindow() {
   const [held, trackKeys] = useHeldMode();
   const [error, setError] = useState<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [macros, setMacros] = useState<{ open: boolean; preset: MacroDraft | null }>({
+    open: false,
+    preset: null,
+  });
   const free = request?.kind === "free" ? request : null;
   const [draft, setDraft] = useState(free?.expression ?? "");
   const lastValid = useRef(termsOf(draft) ?? []);
@@ -469,6 +524,12 @@ export function TrayWindow() {
             {state === "result" && "Last roll"}
           </p>
         </div>
+        <MacrosPopover
+          actorId={free?.actor && "entityId" in free.actor ? free.actor.entityId : null}
+          preset={macros.preset}
+          open={macros.open}
+          onOpenChange={(open) => setMacros({ open, preset: null })}
+        />
         <SettingsPopover />
       </div>
 
@@ -736,6 +797,28 @@ export function TrayWindow() {
                 value={free.label ?? ""}
                 onChange={(e) => update({ label: e.target.value || undefined })}
               />
+              <Button
+                type="button"
+                data-testid="dicex-tray-save-macro"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
+                disabled={!draft.trim()}
+                onClick={() =>
+                  setMacros({
+                    open: true,
+                    preset: draftOf({
+                      name: free.label ?? "",
+                      expression: draft.trim(),
+                      category: free.category,
+                      creatureId:
+                        free.actor && "entityId" in free.actor ? free.actor.entityId : null,
+                    }),
+                  })
+                }
+              >
+                Save as macro
+              </Button>
             </div>
           )}
         </div>
