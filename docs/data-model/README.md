@@ -2441,3 +2441,12 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334,
 - **Derived:** macro groups per viewer, a macro's roll block (not live, gone creature, not the viewer's), the prompt's expression (`characterRolls`), "All PCs" (owned, not hidden), card rows (Waiting / total ✓ ✗ / Declined / No roll).
 - **Persisted runtime state:** the rows above. Client memory only: the tray's Macros popover and editor drafts, the composer form.
 - **Fixtures:** `dicex-macros` (player-1: Sneak Attack 3d6 damage on Mira, Luck 1d100; DM: Bless 1d4, Inspiration 1d8 on Thorn → player-2's, Ambush 2d6 on the Elite Goblin Warrior, DM only), `dicex-request-open` (Perception to Mira + Thorn, DC 15 hidden, results hidden).
+
+## 115. Sprint 8: current-turn token highlight (CB2)
+
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-108–112 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-166. **Built by `build/cb-turn-ring`**: no table, column, record type or payload change. Protocol side: [protocol §145](../protocol/README.md#145-sprint-8-current-turn-token-highlight--turn-ring-cb2).
+
+- **Derived (not stored):** the ringed tokens per client = the token bound to its turn combatant (DM `turnCombatantId`, players `playerTurnCombatantId`) + those of its `in-owner-turn` companions; dashed (DM) = that combatant's `hidden` / `ownerHidden`.
+- **Fixtures:** no new unit; bundle `combat-polish`, e2e alias `cb-turn-ring-e2e` (CB0); `session-sim-12` unchanged.
+- **Persisted runtime state:** none.
+- **CON-44:** 0 B.
