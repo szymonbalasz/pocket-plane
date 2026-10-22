@@ -46,13 +46,18 @@ const REDACT: { [K in keyof RedactedCharacter]-?: (r: CharacterRecord) => Redact
   name: (r) => r.name,
   portraitAssetId: (r) => r.portraitAssetId,
   ownerPlayerId: (r) => r.ownerPlayerId,
-  // #154: the PC Down indicator for everyone; the HP number stays private.
+  // #154: the PC Down indicator for everyone.
   down: (r) => r.hpCurrent === 0,
   level: (r) => r.statBlock.level,
   className: (r) => r.statBlock.className,
   species: (r) => r.statBlock.species ?? null,
-  // FR-CBTX-32: the derived state only; never the counters or temp HP.
+  // FR-CBTX-32: the derived state only; never the counters.
   deathState: (r) => deathStateOf(r.hpCurrent, r.deathSuccesses, r.deathFailures),
+  // ADR-0063 (FR-PARTY-52): party status; a PC hidden from players still shows them (OQ-PARTY-31 A).
+  hpCurrent: (r) => r.hpCurrent,
+  hpMax: (r) => r.statBlock.hpMax,
+  tempHp: (r) => r.tempHp,
+  ac: (r) => r.statBlock.ac,
 };
 
 /** FR-ENT-37: another player's present pet, by the pet whitelist (`RedactedPet`). */

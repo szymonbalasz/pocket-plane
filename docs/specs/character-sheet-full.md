@@ -129,7 +129,7 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-33 | Inventory tab shows the character's wallet read-only from party-loot's `wallet` record (missing = all zero), with "Move coin in Party loot". | OQ-LOOT-16 follow-up |
 | FR-CHARX-34 | Sheet sections registry and rendering: [§7.1](#71-sheet-sections-seam-combat-extras). | Seam |
 | **Visibility** | | |
-| FR-CHARX-35 | Other players get a character redacted to **one whitelist** in entities' visibility fn (ENT-owned), defined in the [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) ("Refines ADR-0024"): base `id, kind, name, portraitAssetId, ownerPlayerId` + `down` (#154) + `level, className, species` (CHARX) + `deathState` (CBTX). No other field. Tests assert against that shared list. | Entities' visibility line; #178 G6 |
+| FR-CHARX-35 | Other players get a character redacted to **one whitelist** in entities' visibility fn (ENT-owned), defined in the [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) ("Refines ADR-0024"): base `id, kind, name, portraitAssetId, ownerPlayerId` + `down` (#154) + `level, className, species` (CHARX) + `deathState` (CBTX) + *(sprint 8)* `hpCurrent, hpMax, tempHp, ac` (party status, [ADR-0063](../architecture/adr/0063-party-hp-visibility.md)). No other field. Tests assert against that shared list. | Entities' visibility line; #178 G6; #335 |
 | FR-CHARX-36 | `creature-sheet`: DM full; player full iff `ownerPlayerId = ctx.playerId` (the row's copy); otherwise hidden (other players' sheets, every NPC sheet). | ADR-0021 |
 | FR-CHARX-37 | Every CHARX command lists every record whose visibility changes (owner change: `entity` + `creature-sheet`). | FR-CBT-27 rule |
 | **Robustness** | | |

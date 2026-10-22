@@ -483,7 +483,7 @@ describe("FR-CHAR-10 char.adjustHp", () => {
     }
   });
 
-  test("FR-CHAR-14 after adjust: DM + owner see HP; another player's entity record has none", () => {
+  test("FR-CHAR-14 after adjust: DM + owner see HP; another player the ADR-0063 figures, no stat block", () => {
     const t = setup();
     t.s.commands.run(charAdjustHp, { characterId: t.miraId, delta: -3 }, { actor: t.dm });
     const find = (v: ReturnType<typeof t.viewer>) =>
@@ -492,7 +492,7 @@ describe("FR-CHAR-10 char.adjustHp", () => {
     expect(find(t.viewer("player", t.p1.id))).toMatchObject({ hpCurrent: 9 });
     const other = find(t.viewer("player", t.p2.id));
     expect(other).toBeDefined();
-    expect(other).not.toHaveProperty("hpCurrent");
+    expect(other).toMatchObject({ hpCurrent: 9 });
     expect(other).not.toHaveProperty("statBlock");
   });
 });

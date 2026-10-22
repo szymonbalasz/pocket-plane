@@ -121,7 +121,7 @@ export function fightRolls(r: StatsRead, fight: FightRow): RollFact[] {
  * `stats.query {scope: "fight"}`: the given fight (unknown or not listed → `not_found`), else the
  * started one, else the newest ended; none → `fight: null`. FR-STATS-52 (BL-69): a player's
  * default (and the started fight by id) is the started one even before a public fact, labelled
- * "This fight". Sprint 8: + `highlights` per role (FR-STATS-31).
+ * "This fight", and it heads the picker's list then (SB1 walkthrough). Sprint 8: + `highlights` per role (FR-STATS-31).
  */
 export function fightStats(r: StatsRead, encounterId: string | undefined) {
   const f = fightsFor(r);
@@ -136,7 +136,15 @@ export function fightStats(r: StatsRead, encounterId: string | undefined) {
       started ??
       [...f.listed].reverse().find((x) => x.status === "ended"));
   if (encounterId && !pick) throw notFound("Fight not found");
-  if (!pick) return { fight: null, fights: summaries(f) };
+  // FR-STATS-52: a player's started fight before a public fact heads the picker as "This fight".
+  const unlisted = started && !f.listed.some((x) => x.id === started.id) ? started : undefined;
+  const fights = unlisted
+    ? [
+        { key: unlisted.id, label: THIS_FIGHT_LABEL, status: unlisted.status },
+        ...summaries(f),
+      ].slice(0, FIGHTS_MAX)
+    : summaries(f);
+  if (!pick) return { fight: null, fights };
   const facts = visibleFacts(r.viewer, combatFacts(r.db, { encounterId: pick.id }));
   const combatants = fightCombatants(r.db, pick.id);
   // A started fight's duration runs to the newest entry (the same answer after a restart).
@@ -158,7 +166,7 @@ export function fightStats(r: StatsRead, encounterId: string | undefined) {
         standing: r.viewer.role === "dm" ? standingOf(r.db, pick.id) : [],
       }),
     },
-    fights: summaries(f),
+    fights,
   };
 }
 

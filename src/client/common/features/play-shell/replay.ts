@@ -78,13 +78,12 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
         "note.history",
         "dicex.tray",
         "dicex.requests", // TT2 (S3)
+        "party.summary", // CB3 (S12)
       ],
-      // CB's `party.summary` (S12): pending until registered.
-      pending: ["party.summary"],
     },
   ],
   player: [
-    { name: "P1", viewer: "player-1", kinds: P1, pending: ["party.summary"] },
+    { name: "P1", viewer: "player-1", kinds: [...P1, "party.summary"] }, // CB3 (S12)
     {
       name: "P2",
       viewer: "player-1",
@@ -93,8 +92,7 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
     {
       name: "P3",
       viewer: "player-2",
-      kinds: ["char.sheet", "cbt.initiative", "dice.log", "stats.board"],
-      pending: ["party.summary"],
+      kinds: ["char.sheet", "cbt.initiative", "dice.log", "stats.board", "party.summary"], // CB3
     },
   ],
 };

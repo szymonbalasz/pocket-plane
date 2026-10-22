@@ -86,8 +86,10 @@ test("FR-CHAR-10 FR-CHAR-08 player-1 damages Mira and attacks; DM and player-2 s
   await expect(sheet1.getByTestId("char-sheet-abilities-empty")).toHaveText("No ability scores");
   await expect(sheet1.getByTestId("char-sheet-roll-save")).toHaveCount(0);
 
-  // player-2 never received Mira's HP (sheet data, FR-CHAR-14).
-  expect(p2Frames.join("\n")).not.toMatch(new RegExp(`"id":"${miraId}"[^}]*"hpCurrent"`));
+  // player-2 gets Mira's HP figures since ADR-0063 (party status), never her sheet data.
+  const p2Text = p2Frames.join("\n");
+  expect(p2Text).toMatch(new RegExp(`"id":"${miraId}"[^}]*"hpCurrent":9`));
+  expect(p2Text).not.toMatch(new RegExp(`"id":"${miraId}"[^}]*"statBlock"`));
 
   for (const page of [p2, p1, dm]) await page.context().close();
 });

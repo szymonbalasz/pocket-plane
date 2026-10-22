@@ -604,8 +604,9 @@ export type DeathState = z.infer<typeof DeathState>;
 /**
  * What a player receives of another player's character: the **one whitelist** (ADR-0036
  * "Refines ADR-0024", FR-CHARX-35, FR-CBTX-32). Every spec adding a key amends this schema; its
- * keys are `REDACTED_CHARACTER_KEYS`. `down` = `hpCurrent = 0`, derived in the visibility fn;
- * never the HP number (#154). No `tokenShape` (FR-ENT-22), stat-block numbers or text.
+ * keys are `REDACTED_CHARACTER_KEYS`. `down` = `hpCurrent = 0`, derived in the visibility fn.
+ * ADR-0063 (#335) adds HP, temp HP and the stored AC for party status; no `tokenShape`
+ * (FR-ENT-22), other stat-block numbers, counters or text.
  */
 export const RedactedCharacter = z.strictObject({
   // ADR-0024 (#120)
@@ -621,8 +622,13 @@ export const RedactedCharacter = z.strictObject({
   className: z.string(),
   species: z.string().nullable(),
   // combat-extras (OQ-CBTX-09, FR-CBTX-32): derived from the counters + HP; null = not at 0 HP.
-  // Never the counters or temp HP.
+  // Never the counters.
   deathState: DeathState.nullable(),
+  // ADR-0063, FR-PARTY-52 (OQ-PARTY-30 A, -32 A): party status figures; `ac` is the stored AC.
+  hpCurrent: z.number().int(),
+  hpMax: z.number().int(),
+  tempHp: TempHp,
+  ac: z.number().int(),
 });
 export type RedactedCharacter = z.infer<typeof RedactedCharacter>;
 export const REDACTED_CHARACTER_KEYS = Object.keys(

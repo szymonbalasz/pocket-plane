@@ -1,8 +1,8 @@
 // Token overlay registry (FR-MAP-34, protocol §26). APPEND-ONLY (AGENTS §9.9): a feature adds
 // one import and one line; nothing else changes here. scenes-map merges the results in registry
-// order and draws dim, ring, cross, bar, icons and cue inside the token's group, badges in the
-// label row (FR-MAP-43; bar + icons: OQ-CBTX-21; cue + subscribe: FR-MAP-49). combat-tracker adds
-// `cbt` (Out, Down, target ring, `movedFt`; FR-CBT-38/39).
+// order and draws dim, turn, ring, cross, bar, icons and cue inside the token's group, badges in
+// the label row (FR-MAP-43; bar + icons: OQ-CBTX-21; cue + subscribe: FR-MAP-49; turn: FR-MAP-108).
+// combat-tracker adds `cbt` (Out, Down, target ring, turn ring, `movedFt`; FR-CBT-38/39, -166).
 
 import type { RecordStore } from "@shared/protocol/store";
 import type { TokenView } from "@shared/scenes-map/schemas";
@@ -94,6 +94,18 @@ export interface TokenCue {
   color?: string;
 }
 
+/**
+ * FR-MAP-108 / -109: the current-turn mark, a static ring + soft glow hugging the footprint just
+ * outside the selection / target outline, inside the token group under the body. Konva `name` =
+ * `id`, `id` attr = token id, attr `hidden` (`"true"` | `"false"`), `listening` false.
+ */
+export interface TokenTurn {
+  /** Test id; Konva `name` of the ring. */
+  id: string;
+  /** DM only: players don't see this turn → dashed, no glow. */
+  hidden?: boolean;
+}
+
 export interface TokenDecoration {
   /** Token group opacity × 0.5 (the label row stays at full opacity). */
   dim?: boolean;
@@ -112,6 +124,8 @@ export interface TokenDecoration {
   icons?: readonly TokenIcon[];
   /** Transient cue above everything in the group; first non-null wins (FR-MAP-49). */
   cue?: TokenCue;
+  /** Current-turn ring under the body; first non-null wins (FR-MAP-108). */
+  turn?: TokenTurn;
 }
 
 /** Pure functions; a throw is logged once and ignored (token drawn plain). */

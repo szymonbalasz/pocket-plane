@@ -1,22 +1,33 @@
-// Stats window logic (pure): which live frames re-query (FR-STATS-17), the overkill callout toast
-// (FR-STATS-22, FR-NOTE-49), the live awards open (FR-SHELL-94), labels (FR-STATS-19).
+// Stats window logic (pure): which live frames re-query (FR-STATS-17, -41, -52), the live awards
+// and fight-summary opens (FR-SHELL-94, FR-STATS-34), labels (FR-STATS-19), Highlights items
+// (FR-STATS-31, -36). The kill feed (FR-STATS-26–29) is `feed.test.ts`.
 import { describe, expect, test } from "bun:test";
-import { LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
+import { ENCOUNTER_TYPE, LOG_KIND_ATTACK } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { NotificationCreated, NotificationUpdated } from "@shared/events/notifications";
 import type { EventFrame } from "@shared/protocol/frames";
 import type { Award } from "@shared/stats/schemas";
 import {
+  avgText,
   awardDetailText,
   awardsOpenOf,
   awardValueText,
+  durationText,
+  highlightDetailText,
+  highlightItems,
+  highlightsOpenByDefault,
   noDamageYet,
-  OVERKILL_TOAST_ID,
-  overkillToast,
   refreshes,
   sessionLabel,
+  summaryOpenOf,
   winnerText,
 } from "./logic";
+import {
+  DM_HIGHLIGHTS,
+  EMPTY_DM_HIGHLIGHTS,
+  EMPTY_PLAYER_HIGHLIGHTS,
+  PLAYER_HIGHLIGHTS,
+} from "./test-acks";
 
 type Frame = Pick<EventFrame, "cause" | "changes">;
 
@@ -98,71 +109,6 @@ describe("FR-STATS-17 refresh", () => {
   });
 });
 
-describe("FR-STATS-22 callout toast", () => {
-  test("FR-STATS-22 toast live-only, not undone: players 'Overkill! Thorn → Goblin 1: 30 damage', the DM adds '(+23 over 7 HP)'", () => {
-    expect(overkillToast(frame([entry()]), "player")).toEqual({
-      entryId: "e1",
-      text: "Overkill! Thorn → Goblin 1: 30 damage",
-    });
-    expect(overkillToast(frame([entry()]), "dm")?.text).toBe(
-      "Overkill! Thorn → Goblin 1: 30 damage (+23 over 7 HP)",
-    );
-    // A player's line has no dmPayload: never the amount.
-    const redacted = entry();
-    delete (redacted as { dmPayload?: unknown }).dmPayload;
-    expect(overkillToast(frame([redacted]), "player")?.text).not.toContain("over");
-  });
-
-  test("FR-STATS-22 no toast for an undone line, a line without callout, a heal or another kind", () => {
-    expect(overkillToast(frame([entry({ undone: true })]), "dm")).toBeNull();
-    const plain = entry();
-    delete (plain.payload as { callout?: unknown }).callout;
-    expect(overkillToast(frame([plain]), "dm")).toBeNull();
-    const heal = { targetName: "Mira", kind: "heal", amount: 30, sourced: true };
-    expect(overkillToast(frame([entry({ kind: LOG_KIND_HP, payload: heal })]), "dm")).toBeNull();
-    expect(overkillToast(frame([entry({ kind: "roll", payload: [] })]), "dm")).toBeNull();
-  });
-
-  test("FR-STATS-22 a direct-damage cbt.hp callout line (From Thorn) toasts too: players without the amount, the DM with it", () => {
-    const hp = entry({
-      kind: LOG_KIND_HP,
-      payload: {
-        targetName: "Goblin Scout 2",
-        kind: "damage",
-        amount: 40,
-        sourced: true,
-        callout: "overkill",
-      },
-      dmPayload: { applied: 7, hpBefore: 7, hpAfter: 0, overkill: 33 },
-    });
-    expect(overkillToast(frame([hp]), "dm")?.text).toBe(
-      "Overkill! Thorn → Goblin Scout 2: 40 damage (+33 over 7 HP)",
-    );
-    const { dmPayload: _, ...redacted } = hp;
-    expect(overkillToast(frame([redacted]), "player")?.text).toBe(
-      "Overkill! Thorn → Goblin Scout 2: 40 damage",
-    );
-    expect(overkillToast(frame([{ ...hp, undone: true }]), "dm")).toBeNull();
-  });
-
-  test("FR-STATS-22 one per frame: a multi-target apply toasts the first callout line only", () => {
-    const two = frame([
-      entry({ id: "a", payload: { ...entry().payload, targetName: "Goblin 1" } }),
-      entry({ id: "b", payload: { ...entry().payload, targetName: "Goblin 2" } }),
-    ]);
-    expect(overkillToast(two, "player")).toEqual({
-      entryId: "a",
-      text: "Overkill! Thorn → Goblin 1: 30 damage",
-    });
-  });
-
-  test("FR-NOTE-49 callout toast is not a notification: one fixed toast id (a new callout replaces it), built from the frame alone (no notification row)", () => {
-    expect(OVERKILL_TOAST_ID).toBe("stats-overkill");
-    // The same frame never yields a notification change to apply.
-    expect(awardsOpenOf(frame([entry()]))).toBeNull();
-  });
-});
-
 describe("FR-SHELL-94 awards open", () => {
   const note = (kind: string, payload: unknown) => ({
     type: "notification",
@@ -183,7 +129,7 @@ describe("FR-SHELL-94 awards open", () => {
       cause: { name: NotificationCreated.type },
       changes: [note("stats-awards", payload)],
     };
-    expect(awardsOpenOf(created)).toEqual(payload);
+    expect(awardsOpenOf(created)).toEqual({ ...payload, notificationId: "n1" });
     // A later update of the same row (dismiss, read) opens nothing.
     expect(awardsOpenOf({ ...created, cause: { name: NotificationUpdated.type } })).toBeNull();
     expect(
@@ -241,5 +187,121 @@ describe("FR-STATS-19 labels", () => {
     };
     expect(noDamageYet([row])).toBe(true);
     expect(noDamageYet([row, { ...row, key: "b", taken: 1 }])).toBe(false);
+  });
+});
+
+describe("FR-STATS-41 FR-STATS-52 refresh (tier B)", () => {
+  const enc = (id: string, op: "upsert" | "delete" = "upsert"): Frame => ({
+    cause: { name: "EncounterStarted" },
+    changes: [
+      {
+        type: ENCOUNTER_TYPE,
+        id,
+        op,
+        ...(op === "upsert" ? { data: { id, status: "started", round: 1 } } : {}),
+      },
+    ],
+  });
+
+  test("FR-STATS-52 default fight: a Start (the encounter upsert players get before any public fact) re-queries the default Fight tab; a picked fight only on its own encounter", () => {
+    expect(refreshes(enc("enc-9"), { tab: "fight", pickedFight: null })).toBe(true);
+    expect(refreshes(enc("enc-9", "delete"), { tab: "fight", pickedFight: null })).toBe(true);
+    expect(refreshes(enc("enc-9"), { tab: "fight", pickedFight: "enc-1" })).toBe(false);
+    expect(refreshes(enc("enc-1"), { tab: "fight", pickedFight: "enc-1" })).toBe(true);
+    expect(refreshes(enc("enc-9"), { tab: "session", pickedFight: null })).toBe(false);
+  });
+
+  test("FR-STATS-41 Luck refreshes on a live entry holding a roll only", () => {
+    expect(refreshes(frame([entry({ rollIds: ["r1"] })]), { tab: "luck", pickedFight: null })).toBe(
+      true,
+    );
+    expect(refreshes(frame([entry()]), { tab: "luck", pickedFight: null })).toBe(false);
+    expect(refreshes(enc("enc-9"), { tab: "luck", pickedFight: null })).toBe(false);
+  });
+
+  test("FR-STATS-38 Avg shows 1 decimal, '—' with no d20", () => {
+    expect(avgText(10.5)).toBe("10.5");
+    expect(avgText(7)).toBe("7.0");
+    expect(avgText(null)).toBe("—");
+  });
+});
+
+describe("FR-STATS-34 fight summary open", () => {
+  const note = (
+    kind: string,
+    payload: unknown,
+    cause: string = NotificationCreated.type,
+  ): Frame => ({
+    cause: { name: cause },
+    changes: [{ type: "notification", id: "n7", op: "upsert", data: { id: "n7", kind, payload } }],
+  });
+
+  test("FR-STATS-34 a live NotificationCreated frame with a stats-fight-summary row → its fight; an update, another kind or a bad payload → null", () => {
+    expect(summaryOpenOf(note("stats-fight-summary", { encounterId: "enc-1" }))).toEqual({
+      encounterId: "enc-1",
+      notificationId: "n7",
+    });
+    expect(
+      summaryOpenOf(
+        note("stats-fight-summary", { encounterId: "enc-1" }, NotificationUpdated.type),
+      ),
+    ).toBeNull();
+    expect(summaryOpenOf(note("stats-awards", { encounterId: "enc-1" }))).toBeNull();
+    expect(summaryOpenOf(note("stats-fight-summary", {}))).toBeNull();
+    expect(awardsOpenOf(note("stats-fight-summary", { encounterId: "enc-1" }))).toBeNull();
+  });
+});
+
+describe("FR-STATS-31 FR-STATS-36 Highlights items", () => {
+  test("FR-STATS-31 per role: the player's items in order, no Still standing; the DM's add Still standing; the ack's values as sent", () => {
+    expect(highlightItems(PLAYER_HIGHLIGHTS).map((i) => i.key)).toEqual([
+      "mvp",
+      "biggest-hit",
+      "biggest-overkill",
+      "most-healing",
+      "kills",
+      "downed",
+      "nat20",
+      "rounds",
+      "duration",
+    ]);
+    expect(highlightItems(DM_HIGHLIGHTS).map((i) => i.key)).toEqual([
+      "mvp",
+      "biggest-hit",
+      "biggest-overkill",
+      "kills",
+      "downed",
+      "rounds",
+      "duration",
+      "standing",
+    ]);
+    const values = Object.fromEntries(
+      highlightItems(PLAYER_HIGHLIGHTS).map((i) => [i.key, i.kind === "stat" ? i.value : null]),
+    );
+    expect(values).toMatchObject({
+      mvp: "45 damage",
+      "biggest-hit": "30 damage",
+      "biggest-overkill": "30",
+      "most-healing": "8 HP",
+      nat20: "1",
+    });
+    const overkill = highlightItems(DM_HIGHLIGHTS).find((i) => i.key === "biggest-overkill");
+    expect(overkill?.kind === "stat" && overkill.value).toBe("23");
+    expect(overkill?.kind === "stat" && highlightDetailText(overkill.stat)).toBe(
+      "Thorn → Goblin 1, 30",
+    );
+  });
+
+  test("FR-STATS-36 empty → hidden: an ack with nothing scored yields no item (the block is not drawn)", () => {
+    expect(highlightItems(EMPTY_PLAYER_HIGHLIGHTS)).toEqual([]);
+    expect(highlightItems(EMPTY_DM_HIGHLIGHTS)).toEqual([]);
+  });
+
+  test("FR-STATS-36 open on an ended fight, closed on a started one; Duration text", () => {
+    expect(highlightsOpenByDefault("ended")).toBe(true);
+    expect(highlightsOpenByDefault("started")).toBe(false);
+    expect(durationText(20_000)).toBe("<1 min");
+    expect(durationText(12 * 60_000)).toBe("12 min");
+    expect(durationText(65 * 60_000)).toBe("1 h 5 min");
   });
 });

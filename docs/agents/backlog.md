@@ -84,6 +84,8 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-77 | The DM campaign switcher keeps a 192-px minimum, so at narrow widths it is cut instead of ellipsised (players' text ellipsises) (WF2, sprint 8) | S | campaign-management CampaignBar | none | — | open |
 | BL-78 | Overkill line on a target already at 0 HP ("+20 over 0 HP"), while 150 damage on Fire Elemental 3 gave no overkill line (WF4 walkthrough note, sprint 8; check against FR-STATS-22 / -28) | S | stats overkill callout | none | stats work | closed: by design (FR-STATS-21 / -22, OQ-STATS-05 A; SB1 check) |
 | BL-79 | Other players see a draft PC (and its HP / AC) in Party status: only the DM and the owner hold the draft flag, so FR-PARTY-51's "drafts out" can't apply for others (CB3, sprint 8) | S | entities whitelist / party-board Summary | maybe (is a draft PC's existence private?) | — | open |
+| BL-80 | Session-replay harness: 10 more player cells fail (P1 ×6, P3 ×4) once `party.summary` joins the sets: placer limits with one more window open (no window over a PC); and the DM launcher shows full labels only from 1920 px wide with Requests + Party status registered (CB3, sprint 8) | M | play-shell placer / launcher | none | frame work | open |
+| BL-81 | e2e support `tokenNode` helper centres a token on its first Circle node, which can be an icon disc rather than the token (CB2, sprint 8) | S | e2e/support canvas helper | none | — | open |
 
 ## How to add items
 

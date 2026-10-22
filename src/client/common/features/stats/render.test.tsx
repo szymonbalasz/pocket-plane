@@ -1,6 +1,7 @@
 // The Stats window's tabs as static renders over a fake sync store, per role: fight rows
 // (FR-STATS-18), award cards and Show awards (FR-STATS-19), states (FR-STATS-24), tie limits
-// (FR-STATS-25). The data is an ack as the server sends it; the view renders it as is.
+// (FR-STATS-25); sprint 8: Highlights (FR-STATS-36, -48), Luck (FR-STATS-39, -41, -50). The data
+// is an ack as the server sends it; the view renders it as is.
 import { describe, expect, test } from "bun:test";
 import type { You } from "@shared/protocol/frames";
 import { emptyStore } from "@shared/protocol/store";
@@ -8,7 +9,9 @@ import {
   AWARD_KEYS,
   type Award,
   type DmFightResult,
+  type DmLuckResult,
   type PlayerFightResult,
+  type PlayerLuckResult,
   type SessionResult,
   type SessionsResult,
 } from "@shared/stats/schemas";
@@ -17,8 +20,15 @@ import { SyncContext, type SyncState } from "@ui/sync/store";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
+import { LuckView } from "./Luck";
 import type { QueryStatus } from "./refresh";
 import { FightView, SessionView, StatsWindow } from "./StatsWindow";
+import {
+  DM_HIGHLIGHTS,
+  EMPTY_DM_HIGHLIGHTS,
+  EMPTY_PLAYER_HIGHLIGHTS,
+  PLAYER_HIGHLIGHTS,
+} from "./test-acks";
 import { statsViews, viewKey } from "./view";
 
 const DM: You = { campaignId: "c1", role: "dm", playerId: null };
@@ -66,6 +76,7 @@ const PLAYER_FIGHT: PlayerFightResult = {
     label: "Fight 2 · Tue 20 Oct",
     round: 3,
     status: "started",
+    highlights: EMPTY_PLAYER_HIGHLIGHTS,
     rows: [
       { key: "thorn", name: "Thorn", kind: "pc", ...counts, dealt: 30, taken: 0, kills: 1 },
       { key: "mira", name: "Mira", kind: "pc", ...counts, taken: 11 },
@@ -84,6 +95,7 @@ const DM_FIGHT: DmFightResult = {
     label: "Goblin Ambush",
     round: 3,
     status: "started",
+    highlights: EMPTY_DM_HIGHLIGHTS,
     rows: [
       {
         key: "thorn",
@@ -115,6 +127,7 @@ const fightHtml = (
   you: You,
   state: { status: QueryStatus; result: DmFightResult | PlayerFightResult | null },
   live = true,
+  highlightsOpen: boolean | null = null,
 ) =>
   wrap(
     you,
@@ -122,6 +135,7 @@ const fightHtml = (
       role={you.role === "dm" ? "dm" : "player"}
       state={state}
       live={live}
+      highlightsOpen={highlightsOpen}
       onPick={() => {}}
       retry={() => {}}
     />,
@@ -328,12 +342,173 @@ describe("Stats window", () => {
     const html = wrap(PLAYER, <StatsWindow />);
     expect(
       [...html.matchAll(/data-testid="stats-tab" data-value="(\w+)"/g)].map((m) => m[1]),
-    ).toEqual(["fight", "session"]);
+    ).toEqual(["fight", "session", "luck"]);
     expect(html).toContain('data-testid="stats-fight"');
     statsViews().set(viewKey(PLAYER), { tab: "session", sessionFromN: 1 });
     const after = wrap(PLAYER, <StatsWindow />);
     expect(after).toContain('data-testid="stats-session"');
     expect(after).not.toContain('data-testid="stats-fight"');
     statsViews().set(viewKey(PLAYER), { tab: "fight", sessionFromN: null });
+  });
+});
+
+// ---------- sprint 8 (tier B) ----------
+
+const ended = <F extends DmFightResult | PlayerFightResult>(f: F, highlights: unknown): F =>
+  ({ ...f, fight: f.fight && { ...f.fight, status: "ended", highlights } }) as F;
+const items = (html: string) =>
+  [...html.matchAll(/data-testid="stats-highlight" data-record-id="([^"]+)"/g)].map((m) => m[1]);
+const stateOf = (html: string, id: string) =>
+  new RegExp(`<[^>]*data-testid="${id}"[^>]*>`).exec(html)?.[0].match(/data-state="(\w+)"/)?.[1];
+
+describe("FR-STATS-36 Highlights", () => {
+  test("FR-STATS-36 player: stats-highlights above the Fight table, open on an ended fight; items by key in order; Kills / Downs worded as the feed; no Still standing, no hidden mark", () => {
+    const html = fightHtml(PLAYER, ok(ended(PLAYER_FIGHT, PLAYER_HIGHLIGHTS)));
+    expect(stateOf(html, "stats-highlights")).toBe("open");
+    expect(html.indexOf('data-testid="stats-highlights"')).toBeLessThan(
+      html.indexOf('data-testid="stats-fight-table"'),
+    );
+    expect(items(html)).toEqual([
+      "mvp",
+      "biggest-hit",
+      "biggest-overkill",
+      "most-healing",
+      "kills",
+      "downed",
+      "nat20",
+      "rounds",
+      "duration",
+    ]);
+    expect(html).toContain("Overkill! Thorn finished Goblin 1");
+    expect(html).toContain("Goblin 2 dropped Brakka");
+    expect(html).toContain("Mira + Owlbear");
+    expect(html).toContain("12 min");
+    expect(count(html, "stats-highlight-hidden")).toBe(0);
+    expect(count(html, "stats-highlight-side")).toBe(0);
+    expect(html).not.toContain("Still standing");
+  });
+
+  test("FR-STATS-36 DM: + Still standing with the hidden mark, the hidden kill marked, the overkill amount in the feed words", () => {
+    const html = fightHtml(DM, ok(ended(DM_FIGHT, DM_HIGHLIGHTS)));
+    expect(items(html)).toContain("standing");
+    expect(count(html, "stats-highlight-side")).toBe(2);
+    expect(html).toContain("Overkill! Thorn finished Goblin 1, overkill 23");
+    expect(html).toContain("Thorn finished Elite (hidden)");
+    expect(count(html, "stats-highlight-hidden")).toBe(1); // the Wolf still standing
+  });
+
+  test("FR-STATS-36 closed on a started fight (the summary opens it); the stored choice wins; nothing scored → no block", () => {
+    const fight = PLAYER_FIGHT.fight;
+    if (!fight) throw new Error("fixture");
+    const started = { ...PLAYER_FIGHT, fight: { ...fight, highlights: PLAYER_HIGHLIGHTS } };
+    expect(stateOf(fightHtml(PLAYER, ok(started)), "stats-highlights")).toBe("closed");
+    expect(stateOf(fightHtml(PLAYER, ok(started), true, true), "stats-highlights")).toBe("open");
+    expect(fightHtml(PLAYER, ok(PLAYER_FIGHT))).not.toContain('data-testid="stats-highlights"');
+  });
+
+  test("FR-STATS-48 limits: kills listed as sent (≤ 20), then '+N'; tied winners then '+N more'", () => {
+    const events = Array.from({ length: 20 }, (_, i) => ({
+      fell: "kill" as const,
+      from: "Thorn",
+      to: `Goblin ${i + 1}`,
+      callout: false,
+    }));
+    const winners = Array.from({ length: 8 }, (_, i) => ({
+      key: `c${i}`,
+      name: `C${i}`,
+      playerId: null,
+    }));
+    const many = {
+      ...PLAYER_HIGHLIGHTS,
+      kills: { events, more: 4 },
+      mvp: { value: 10, winners, more: 2 },
+    };
+    const html = fightHtml(PLAYER, ok(ended(PLAYER_FIGHT, many)));
+    expect(count(html, "stats-highlight-event")).toBe(21); // 20 kills + Brakka's down
+    expect(html).toContain(">+4<");
+    expect(html).toContain("+2 more");
+  });
+});
+
+const luckRow = (key: string, name: string, over: Record<string, unknown> = {}) => ({
+  key,
+  name,
+  playerId: null,
+  rolls: 3,
+  d20s: 4,
+  avg: 10.5,
+  nat20: 1,
+  nat1: 0,
+  ...over,
+});
+const PLAYER_LUCK: PlayerLuckResult = {
+  luck: {
+    scope: "campaign",
+    rows: [luckRow("mira", "Mira", { playerId: "p1" }), luckRow("thorn", "Thorn", { avg: null })],
+  },
+};
+const DM_LUCK: DmLuckResult = {
+  luck: {
+    scope: "session",
+    fromN: 1,
+    rows: [...PLAYER_LUCK.luck.rows, luckRow("dm-dice", "DM dice")],
+  },
+};
+const luckHtml = (
+  you: You,
+  luck: { status: QueryStatus; result: DmLuckResult | PlayerLuckResult | null },
+  live = true,
+) =>
+  wrap(
+    you,
+    <LuckView
+      list={ok(SESSIONS)}
+      luck={luck}
+      live={live}
+      onPick={() => {}}
+      retry={() => {}}
+      now={new Date("2026-10-22T12:00:00")}
+    />,
+  );
+const luckRows = (html: string) =>
+  [...html.matchAll(/data-testid="stats-luck-row" data-record-id="([^"]+)"/g)].map((m) => m[1]);
+
+describe("FR-STATS-41 Luck tab", () => {
+  test("FR-STATS-41 stats-luck: the scope picker, a stats-luck-table of stats-luck-row (data-record-id = character id) in ack order: Name, Rolls, d20s, Avg ('—' with none), Nat 20, Nat 1", () => {
+    const html = luckHtml(PLAYER, ok(PLAYER_LUCK));
+    expect(html).toContain('data-testid="stats-luck-scope"');
+    expect(luckRows(html)).toEqual(["mira", "thorn"]);
+    for (const h of ["Name", "Rolls", "d20s", "Avg", "Nat 20", "Nat 1"]) {
+      expect(html).toContain(`>${h}<`);
+    }
+    expect(html).toContain(">10.5<");
+    expect(html).toContain(">—<");
+  });
+
+  test("FR-STATS-39 DM dice: the DM's ack holds the dm-dice row, shown as sent; a player's never does", () => {
+    expect(luckRows(luckHtml(DM, ok(DM_LUCK)))).toEqual(["mira", "thorn", "dm-dice"]);
+    expect(luckHtml(PLAYER, ok(PLAYER_LUCK))).not.toContain("dm-dice");
+  });
+
+  test("FR-STATS-50 Luck states: skeleton while loading and while pending (FR-STATS-46), 'No rolls yet', error + Retry, offline muted with the picker off", () => {
+    expect(luckHtml(PLAYER, { status: "loading", result: null })).toContain(
+      'data-testid="stats-loading"',
+    );
+    const pending = luckHtml(
+      PLAYER,
+      ok<PlayerLuckResult>({ luck: { scope: "campaign", pending: true, rows: [] } }),
+    );
+    expect(pending).toContain('data-testid="stats-loading"');
+    expect(stateOf(pending, "stats-luck")).toBe("pending");
+    expect(
+      luckHtml(PLAYER, ok<PlayerLuckResult>({ luck: { scope: "session", rows: [] } })),
+    ).toContain("No rolls yet");
+    expect(luckHtml(PLAYER, { status: "error", result: null })).toContain(
+      'data-testid="stats-retry"',
+    );
+    const offline = luckHtml(PLAYER, ok(PLAYER_LUCK), false);
+    expect(stateOf(offline, "stats-luck")).toBe("offline");
+    expect(disabled(offline, "stats-luck-scope")).toBe(true);
+    expect(offline).toContain("opacity-60");
   });
 });

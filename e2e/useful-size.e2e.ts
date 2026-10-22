@@ -2,8 +2,7 @@
 // FR-SHELL-100 (sprint 8, WF1; review-b #3): every registered kind at its useful size (play-shell
 // §7's sprint-8 table, at 1280×720) shows its criterion without scrolling: the body's
 // `scrollHeight ≤ clientHeight`, and the named rows whole inside it. One page per client; each
-// window resized by its handle as a user would. Kinds another track registers later (CB
-// `party.summary` on `cb-party-six`) are skipped until registered. WF4:
+// window resized by its handle as a user would. CB `party.summary` checks `cb-party-six`. WF4:
 // Stats (FR-STATS-66, -67: the award grid fits at 400 and 320 wide) and the companion card
 // (FR-CHARX-83: Owlbear and Drake at exactly 320 × 360) have their own tests below.
 import { expect, type Locator, type Page, test } from "@playwright/test";
@@ -21,9 +20,26 @@ interface Case {
    * fewer), the rest of the body (search, controls) unscrolled above them.
    */
   check: "body" | number;
+  /** Rows counted by `check` (default: every `[data-record-id]`). */
+  rows?: string;
+  /** Test IDs inside each counted row that must show whole (not clipped, not cut). */
+  uncut?: readonly string[];
   /** Not checked here yet, and why. */
   skip?: string;
 }
+
+/**
+ * CB3 (FR-SHELL-141, FR-PARTY-58): every PC row of `cb-party-six`'s 6-PC party whole, names and
+ * figures uncut; companions (listed after the PCs) may scroll.
+ */
+const PARTY_SUMMARY: Case = {
+  kind: "party.summary",
+  useful: { w: 280, h: 236 },
+  criterion: "every PC row of a 6-PC party whole (name, HP, temp, AC uncut); companions may scroll",
+  check: 6,
+  rows: '[data-testid="party-summary-row"]',
+  uncut: ["party-summary-name", "party-summary-hp", "party-summary-temp", "party-summary-ac"],
+};
 
 /** §7 sprint-8 useful sizes at 1280×720 (band 412). */
 const DM: Case[] = [
@@ -92,6 +108,7 @@ const DM: Case[] = [
     criterion: "composer folded + a 6-row card",
     check: "body",
   },
+  PARTY_SUMMARY,
 ];
 const PLAYER: Case[] = [
   { kind: "cbt.initiative", useful: { w: 280, h: 320 }, criterion: "header + 4 rows", check: 4 },
@@ -140,9 +157,10 @@ const PLAYER: Case[] = [
     criterion: "5 rows names whole",
     check: 5,
   },
+  PARTY_SUMMARY,
 ];
-/** FR-SHELL-112 (1): pending until their owners register them (CB3). */
-const PENDING = ["party.summary"];
+/** FR-SHELL-112 (1): pending until their owners register them (none left this sprint). */
+const PENDING: string[] = [];
 
 async function live(page: Page) {
   await expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -168,24 +186,48 @@ async function resizeTo(page: Page, win: Locator, w: number, h: number) {
     .toEqual([w, h]);
 }
 
-/** The body's scroll state and the record rows whole inside its visible box. */
-const measure = (win: Locator) =>
-  win.getByTestId("ui-window-body").evaluate((body) => {
-    const b = body.getBoundingClientRect();
-    const rows = [...body.querySelectorAll("[data-record-id]")].filter(
-      (r) => (r as HTMLElement).offsetParent !== null,
-    );
-    const whole = rows.filter((r) => {
-      const x = r.getBoundingClientRect();
-      return x.height > 0 && x.top >= b.top - 0.5 && x.bottom <= b.bottom + 0.5;
-    });
-    return {
-      scroll: body.scrollHeight,
-      client: body.clientHeight,
-      rows: rows.length,
-      whole: whole.length,
-    };
-  });
+/**
+ * The body's scroll state and the record rows whole inside its visible box; `cut` = the `uncut`
+ * parts that are clipped (wider than shown, or outside their row / the body).
+ */
+const measure = (win: Locator, c?: Pick<Case, "rows" | "uncut">) =>
+  win.getByTestId("ui-window-body").evaluate(
+    (body, { selector, uncut }) => {
+      const b = body.getBoundingClientRect();
+      const rows = [...body.querySelectorAll(selector)].filter(
+        (r) => (r as HTMLElement).offsetParent !== null,
+      );
+      const whole = rows.filter((r) => {
+        const x = r.getBoundingClientRect();
+        return x.height > 0 && x.top >= b.top - 0.5 && x.bottom <= b.bottom + 0.5;
+      });
+      const cut: string[] = [];
+      for (const r of rows) {
+        const rr = r.getBoundingClientRect();
+        for (const id of uncut) {
+          for (const el of r.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)) {
+            const x = el.getBoundingClientRect();
+            const inside =
+              x.left >= Math.max(rr.left, b.left) - 0.5 &&
+              x.right <= Math.min(rr.right, b.right) + 0.5 &&
+              x.top >= rr.top - 0.5 &&
+              x.bottom <= rr.bottom + 0.5;
+            if (el.scrollWidth > el.clientWidth + 1 || !inside) {
+              cut.push(`${r.getAttribute("data-record-id")} ${id}`);
+            }
+          }
+        }
+      }
+      return {
+        scroll: body.scrollHeight,
+        client: body.clientHeight,
+        rows: rows.length,
+        whole: whole.length,
+        cut,
+      };
+    },
+    { selector: c?.rows ?? "[data-record-id]", uncut: c?.uncut ?? [] },
+  );
 
 async function checkClient(page: Page, cases: readonly Case[]) {
   for (const c of cases) {
@@ -195,13 +237,16 @@ async function checkClient(page: Page, cases: readonly Case[]) {
       if (!(await win.isVisible())) await launcherButton(page, c.kind).click();
       await expect(win).toHaveAttribute("data-state", "open");
       await resizeTo(page, win, c.useful.w, c.useful.h);
-      const m = await measure(win);
+      const m = await measure(win, c);
       console.log(`useful-size ${c.kind}: ${JSON.stringify(m)}`);
       if (c.check === "body") {
         expect(m.scroll, `${c.kind}: body scrolls`).toBeLessThanOrEqual(m.client + 1);
       } else {
         expect(m.whole, `${c.kind}: whole rows`).toBeGreaterThanOrEqual(Math.min(c.check, m.rows));
       }
+      expect(m.cut, `${c.kind}: cut parts`).toEqual([]);
+      // A named row set (CB3's 6 PCs) must all be there: the fixture loaded.
+      if (c.rows && typeof c.check === "number") expect(m.rows).toBeGreaterThanOrEqual(c.check);
       // Put it back out of the way for the next one.
       await win.getByTestId("ui-window-minimise").click();
     });

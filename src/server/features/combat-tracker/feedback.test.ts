@@ -413,14 +413,13 @@ describe("FR-CBT-39 FR-CBT-40 movement used", () => {
 });
 
 describe("FR-CBT-38 PC Down for other players (FR-ENT-15)", () => {
-  test("FR-CBT-38 Mira at 0 HP → player-2 gets the redacted entity with down: true, no HP", () => {
+  test("FR-CBT-38 Mira at 0 HP → player-2 gets the redacted entity with down: true and HP 0 (ADR-0063)", () => {
     const t = started();
     t.run(applyHp.name, { combatantId: t.id("Mira"), kind: "damage", amount: 99 });
     const ent = t.events.at(-1)?.event.changes.find((c) => c.type === "entity");
     const other = t.s.records.filterChange(ent as never, t.h.viewer("player", t.h.p2.id));
-    expect(other?.data).toMatchObject({ id: t.miraId, down: true });
-    expect(JSON.stringify(other)).not.toContain("hpCurrent");
-    expect(JSON.stringify(other)).not.toContain("hpMax");
+    expect(other?.data).toMatchObject({ id: t.miraId, down: true, hpCurrent: 0, hpMax: 12 });
+    expect(JSON.stringify(other)).not.toContain("statBlock");
     t.undo();
     const back = t.events.at(-1)?.event.changes.find((c) => c.type === "entity");
     expect(

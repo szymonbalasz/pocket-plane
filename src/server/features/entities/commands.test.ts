@@ -303,6 +303,10 @@ describe("entities commands", () => {
         className: "Fighter",
         species: null,
         deathState: null,
+        hpCurrent: 12,
+        hpMax: 12,
+        tempHp: 0,
+        ac: 16,
       },
     });
     expect(p2?.data).toMatchObject({ statBlock: miraBlock, hpCurrent: 12 });
