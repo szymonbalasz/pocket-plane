@@ -35,7 +35,7 @@ DM decision #338 (sprint-8 recap + sprint 9 scope). Process: [orchestrator promp
 
 | Date | What |
 |---|---|
-| — | Not started (kickoff prompt from the sprint-8 recap) |
+| 2026-10-22 | Phase A started: spec agents RS, PM, FX, SP working in `spec/s9-{rs,pm,fx,sp}` (ID ranges from `ab10c460`, specs unchanged since; no Axeholm notes in `.verify/sprint9/`) |
 
 ## Check `main` any time (DM)
 

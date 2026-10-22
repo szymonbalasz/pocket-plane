@@ -2,34 +2,22 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 8 **done**; recap + sprint 9 scope decided (#338). **Sprint 9 planned** in [sprint-9](sprint-9.md); Phase A starts with the DM's kickoff prompt ([sprint-8](sprint-8.md)).
+**Phase:** Sprint 9 Phase A (specs), DM decision #338, plan [sprint-9](sprint-9.md).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| WF1 placer core + replay harness | merged | — | done | main gates running |
-| WF3 map refits | merged (re-test 7/8; DM reload cell by design) | — | done | — |
-| CB2 turn ring | merged (16/16) | — | done | — |
-| TT4 pause screen | merged (13/14 → fixed; final 9/9) | — | done | main check 5164 / e2e 206 |
-| Sprint gate | main | — | session-sim-12 14/16 (FAILs → BL-83, BL-84); playtest section written; recap done (#338) | — |
-| Sprint 9 | — | — | planned ([sprint-9](sprint-9.md)); spec briefs ready: `%TEMP%/pocket-plane/briefs/spec-s9-{rs,pm,fx,sp}.md`, ID ranges `s9-ranges.md` (computed on `ab10c460`; recompute if specs changed since) | Phase A: start the four spec agents (`mkwt.sh spec/s9-<t> s9-<t> build` + `startagent.sh`) |
-| WF2 pushes + rail inset | merged (walkthrough 13/14) | — | done | main check 5014 / e2e 199 (1 known flake re-run green) |
-| TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
-| TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |
-| TT1+TT2 macros + roll requests | merged (13/13 + 6/6) | — | done | — |
-| SB0 stats tier-B core | merged (walkthrough 10/10) | — | done | — |
-| CB3 Party status | merged (walkthrough all PASS after the hidden-companion fix) | — | done | — |
-| WF4 toast policy + Stats / card sizes | merged | — | done | — |
-| SB1+SB2 stats UI + trophies | merged (12/13 → BL-69 fixed) | — | done | — |
-| CB0 combat core | merged (walkthrough all PASS) | — | done | main gates running |
-| CB1 drag reorder | merged (walkthrough 14/14) | — | done | main gates after WF1 merge |
+| RS spec (reminders, strongholds) | `spec/s9-rs` (ws w9P, slot 0) | spec-rs | working | seams |
+| PM spec (Party Manager, window memory) | `spec/s9-pm` (ws w9Q, slot 2) | spec-pm | working | seams |
+| FX spec (fix pack) | `spec/s9-fx` (ws w9R, slot 3) | spec-fx | working | seams |
+| SP spec (palette, rules reference, recap) | `spec/s9-sp` (ws w9S, slot 4) | spec-sp | working | seams |
 
-Queue (seams build plan, `.verify/sprint8/seams.md`): wave 2 WF4, TT1+2, TT3, CB1 · wave 3 WF2, WF3, TT4, SB1+2, CB3 · wave 4 CB2. Slice defs: `%TEMP%/pocket-plane/slices.json` (`wf1`, `tt0`, `sb0`, `cb0`).
+Queue: seams (`.verify/sprint9/seams.md`) → review-a (RS + SP), review-b (PM + FX) → rulings → DM gate 1.
 
 ## Shared-file locks
 
-- Canvas (MapCanvas, camera, TokensLayer, LabelsLayer) + `free-area.ts`: `fix/wf-refits` (then CB2).
+
 - None (every sprint-8 slice merged).
 - Backlog: no new picks (the last sprint slice is in flight).
 - Schema lane: free (TT0, CB0 merged).
