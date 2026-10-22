@@ -2347,9 +2347,23 @@ From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-65–67 and
 - **Persisted runtime state:** `tieOrder` and the adopted numbers; positions as before. The drag is client memory (CB1).
 - **CON-44:** DM +736 B worst (46 rows, `tieOrder` null), players 0 B.
 
-## 108. Sprint 8: stats tier B core (SB0)
+## 108. Sprint 8: alert sounds (TT3)
 
-From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../specs/combat-tracker.md#67-sprint-8-kill-flag-and-the-end-summary) FR-CBT-152, -153 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (#334, #335; [ADR-0062](../architecture/adr/0062-stats-session-partials.md)). **Built by `build/sb-core`**. Protocol side: [protocol §137](../protocol/README.md#137-sprint-8-stats-tier-b-core--fell-lines-fight-summary-highlights-luck-trophies-session-partials-sb0). **No table, column or record type.**
+From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-52–60 and [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-48 (#334, #335). **Built by `build/tt-sounds`**; no schema change (TT0's columns). Protocol side: [protocol §137](../protocol/README.md#137-sprint-8-alert-sounds--audio-upload--probe-sound-picks-shell-playback-tt3).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| `asset` row, `kind = audio` | written by `assets.ingest` with a probed sound: `mime` sniffed, `bytes` ≤ 512 KB, `duration_ms` 1–5,000 (the probe's length, cross-checked against bytes ÷ bitrate / the pages, the larger counts beyond 20 %), `width` / `height` / `display_*` 0, `listed` true, `tags` `[]`; dedupe by (`campaign_id`, `hash`) as images; ≤ 50 per campaign, no delete | FR-ASSET-52–55, -58, -60 |
+| Asset dir `<hash>/original` | a sound's only file (no derivatives); same temp-dir write, fsync, rename and start-up sweep as images (the sweep checks the files of each row's kind) | FR-ASSET-54 |
+| `campaign.alert_sounds` | written only by `camp.setAlertSound`: `default` removes the key; values are audio asset IDs of the campaign or `none` | FR-CAMP-48 |
+| Client decode cache | per page, per asset ID (`AudioBuffer`), filled at idle from the picks; never persisted | FR-SHELL-131 |
+
+- **Derived:** what a key plays (pick, else turn / request ping, pause / resume silent).
+- **Fixtures:** `audio-chime` (asset "Chime", 17,684 B, 400 ms), `camp-alert-sounds` (`request`, `pause` → Chime); both in `session-sim-12`.
+
+## 109. Sprint 8: stats tier B core (SB0)
+
+From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../specs/combat-tracker.md#67-sprint-8-kill-flag-and-the-end-summary) FR-CBT-152, -153 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (#334, #335; [ADR-0062](../architecture/adr/0062-stats-session-partials.md)). **Built by `build/sb-core`**. Protocol side: [protocol §138](../protocol/README.md#138-sprint-8-stats-tier-b-core--fell-lines-fight-summary-highlights-luck-trophies-session-partials-sb0). **No table, column or record type.**
 
 | Field / table | Change | Rule | Source |
 |---|---|---|---|
@@ -2359,5 +2373,5 @@ From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../spe
 - **Read (contract):** `roll.dice` (every die, kept and dropped) and `roll.manual` keep their meaning (FR-DICE-90); `encounter.startedAt` / `endedAt` bound a fight's rolls by `n` (FR-STATS-32).
 - **Derived (not stored):** Highlights, luck rows, trophy cases, the fight's `n` span; a line's kill / down for stats from the same `fellOf` rule over current sides (current owner, FR-STATS-09).
 - **Persisted runtime state:** none. Server memory only (ADR-0062): per-session partials per (campaign, role + features), built at server start after the session warm in yielding 5-session chunks, dropped per touched session (entries / facts by `n`) or all (a combatant's owner / kind, the campaign's features), rebuilt in the background.
-- **Fixtures:** `sb-fight-facts` (4 Bandits + the hidden Bandit Captain on the Goblin Ambush; 6 facts, one undone), `sb-luck-rolls` (8 physical rolls), `sb-luck-reroll` (Mira's Perception 4 → 17); expected numbers in `fixtures/units/stats/stats.fixtures.test.ts`.
+- **Fixtures:** `sb-fight-facts` (4 Bandits + the hidden Bandit Captain on the Goblin Ambush; 6 facts, one undone; `stats-b`), `sb-past-bandits` (session-sim-12: an ended "Bandit Camp" before the Ambush, 4 facts, the Captain's token deleted), `sb-luck-rolls` (8 physical rolls), `sb-luck-reroll` (Mira's Perception 4 → 17); expected numbers in `fixtures/units/stats/stats.fixtures.test.ts` and `fixtures/bundles/session-sim-12.fixtures.test.ts`.
 - **CON-44** (heavy harness, measured): 15 B a flagged line; +45 B per viewer (3 in the window), worst +1.5 KB (all 100); summary rows inside the closed window: no growth. DM 690,797 B of 1.5 MiB; players ≤ 289,129 B of 512 KiB.

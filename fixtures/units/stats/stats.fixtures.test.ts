@@ -275,15 +275,16 @@ describe("STATS §13 fixtures", () => {
     expect(library.bundles.find((b) => b.name === "stats-b-e2e")?.includes).toEqual(["stats-b"]);
   }, 60_000);
 
-  test("session-sim-12 loads from empty; sb-fight-facts and sb-luck-rolls are session-sim-11-safe (no gems, Goblins untouched)", async () => {
-    for (const key of ["sb-fight-facts", "sb-luck-rolls"]) {
+  test("session-sim-12 loads from empty; sb-past-bandits and sb-luck-rolls are session-sim-11-safe (no gems, Goblins untouched)", async () => {
+    for (const key of ["sb-past-bandits", "sb-luck-rolls"]) {
       const unit = library.fixtures.find((f) => f.key === key);
       expect(unit?.requires).not.toContain("gems-on");
       expect(unit?.requires).not.toContain("st-ambush-facts");
     }
-    expect(library.bundles.find((x) => x.name === "session-sim-12")?.fixtures).toEqual(
-      expect.arrayContaining(["sb-fight-facts", "sb-luck-rolls"]),
-    );
+    const sim12 = library.bundles.find((x) => x.name === "session-sim-12");
+    expect(sim12?.includes[0]).toBe("stats-b-past");
+    expect(sim12?.fixtures).toContain("sb-luck-rolls");
+    expect(sim12?.fixtures).not.toContain("sb-fight-facts");
     const l = await loadBundle("session-sim-12", { testMode: true });
     const { s, cleanup } = await servicesFromBundle(l);
     cleanups.push(cleanup);

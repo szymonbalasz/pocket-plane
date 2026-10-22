@@ -33,3 +33,6 @@ export const AudioAssetRecord = z.strictObject({
   createdAt: z.string(),
 });
 export type AudioAssetRecord = z.infer<typeof AudioAssetRecord>;
+
+/** FR-ASSET-56: `GET /api/assets/:id/audio`; a sound's capability URL (ADR-0023). */
+export const audioPath = (id: string) => `/api/assets/${encodeURIComponent(id)}/audio`;

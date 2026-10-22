@@ -1,9 +1,11 @@
 // Fixture unit registry. Append-only (AGENTS §9.9): add your own lines.
 import type { Fixture } from "@server/features/fixtures-adapters/fixture-types";
+import audioChime from "./assets-pipeline/audio-chime";
 import imageLarge from "./assets-pipeline/image-large";
 import imageTags from "./assets-pipeline/image-tags";
 import images from "./assets-pipeline/images";
 import imagesSecond from "./assets-pipeline/images-second";
+import campAlertSounds from "./campaign-management/camp-alert-sounds";
 import campaign from "./campaign-management/campaign";
 import campaignSecond from "./campaign-management/campaign-second";
 import pcColourFree from "./campaign-management/pc-colour-free";
@@ -111,6 +113,7 @@ import town from "./scenes-map/town";
 import sbFightFacts from "./stats/sb-fight-facts";
 import sbLuckReroll from "./stats/sb-luck-reroll";
 import sbLuckRolls from "./stats/sb-luck-rolls";
+import sbPastBandits from "./stats/sb-past-bandits";
 import stAmbushFacts from "./stats/st-ambush-facts";
 import stPastCrypt from "./stats/st-past-crypt";
 
@@ -233,6 +236,10 @@ export const units: readonly Fixture[] = [
   sbFightFacts,
   sbLuckRolls,
   sbLuckReroll,
+  sbPastBandits,
+  // Sprint 8 track TT (build/tt-sounds): the Chime sound + the DM's picks
+  audioChime,
+  campAlertSounds,
   // Sprint 8 track CB (fix/cb-core): ties, a fog-hidden Goblin, party values
   cbTies,
   cbFogGoblin,
