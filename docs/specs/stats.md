@@ -1,7 +1,7 @@
 ---
 title: Stats and summaries
 prefix: STATS
-status: claimed
+status: draft
 owner: spec-wf, spec-sb, spec-sp
 phase: post-mvp-9
 ---
@@ -15,6 +15,8 @@ phase: post-mvp-9
 > **Sprint 8, track SB** (DM [#334](../decisions-log.md), decided): tier B, with tier A's visibility rules. FR-STATS-26–53 ([§6.1](#61-tier-b-sprint-8)); also FR-CBT-152–153, FR-NOTE-68–69, FR-CHARX-97–99, FR-DICE-89–90. No schema. [ADR: session partials](../architecture/adr/0062-stats-session-partials.md). Seams applied. OQ-STATS-20–30 decided at DM gate 1 (#335).
 
 > **Sprint 8, track WF** (DM [#333](../decisions-log.md); size rows only): FR-STATS-66 gives `stats.board` a useful size checked by content; FR-STATS-67 sizes the award grid to the window (BL-66). Slice WF4; walkthrough F9, F13 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
+
+> **Sprint 9, track SP** (DM [#338](../decisions-log.md): session recap): the [session recap](session-recap.md) reads stats' compute helpers. FR-STATS-78–80 ([§6.2](#62-sprint-9-recap-reads-track-sp)): a read seam, a Recap button on the Session tab, separate budgets. No stats number, schema or ack changes; 0 B. The stats files (`compute.ts`, the Session tab) are edited in slice SP3 **after track FX's stats fixes merge** (one holder of stats files at a time, sprint-9 hotspots).
 
 ## 1. Summary
 
@@ -146,6 +148,16 @@ Tier A rules hold: filter, then aggregate; final roll only; names from facts; pa
 | Dealt, Taken, Healing, Kills, Times downed | FR-STATS-06–08 | | Lifetime |
 | Biggest hit, Biggest overkill | FR-STATS-12 per role, "→ target · fight label" | | Records |
 | Best fight (damage / kills) | max over fights of Dealt / Kills, with the fight label | | Records |
+
+### 6.2 Sprint 9: recap reads (track SP)
+
+The [session recap](session-recap.md) reads stats; it changes no stats number, formula, schema or ack. Proposed with RECAP's picks.
+
+| ID | Requirement |
+|---|---|
+| FR-STATS-78 | **Read seam**: `src/server/features/stats/compute.ts` keeps `pickSession`, `sessionStats`, `luckStats`, `fightsFor`, `fightStats`, `luckRolls` and `characters` exported with today's signatures (the recap imports them, read-only), and gains **one** export `sessionFights(r, s)`: the fights with a counted fact the viewer sees inside session `s` (the rule `sessionsStats` already counts by). A change to these signatures needs a RECAP review. Test `FR-STATS-78 recap seam` (the recap's compose over `stats-b` equals the Stats acks it is built from). |
+| FR-STATS-79 | **Recap button** on the Session tab (both clients): `stats-session-recap` "Recap" beside the picker (DM: beside Show awards) opens `recap.session` (`by: "user"`) on the picked session ([FR-RECAP-10](session-recap.md#6-functional-requirements)). Hidden until RECAP's window registers. Test `FR-STATS-79 recap button`. |
+| FR-STATS-80 | **Separate budgets**: `recap.query` has its own per-actor rate limit and memo; it never counts against `stats.query`'s (FR-STATS-16). The leak scan's stats cases cover `recap.query` acks too ([FR-RECAP-08](session-recap.md#6-functional-requirements)). |
 
 ## 7. UI/UX notes
 
@@ -340,6 +352,8 @@ Named tests (all `FR-STATS-NN …`):
 | **SB0** `build/sb-core` | `features/stats/*`, `shared/stats/*`, both `stats-read.ts`, `combat-tracker/hp.ts` + `@shared/combat-tracker/log-kinds.ts` (`fell`), `stats.bench.ts`, `fixtures/units/stats/sb-*` | appends: `rule-hooks.ts`, `notifications/kinds.ts`, `bundles/index.ts` | wave 1, ∥ WF1 / TT0 / CB0; no schema, no `lifecycle.ts` |
 | **SB1** `build/sb-stats-ui` | `@ui/features/stats/*` (feed, Highlights, Luck, End open) | appends: `notification-views.ts` ×2, `pref-sections.ts` ×2 | after SB0 + WF1 + WF4 |
 | **SB2** `build/sb-trophies` | `@ui/features/stats/trophies/*` | append: `sheet-sections.ts` (`order: 100`) | after SB0 + WF1 + WF4; ∥ SB1 (or one builder, one walkthrough) |
+
+**Sprint 9 (track SP).** FR-STATS-78–80 are built in RECAP's slice **SP3** ([session-recap §14](session-recap.md#14-dependencies)): `features/stats/compute.ts` (one export) and the Session tab's button (`@ui/features/stats/*`), **after track FX's stats slice (BL-84, BL-74) merges**. Tests: `FR-STATS-78 recap seam`, `FR-STATS-79 recap button`, `FR-STATS-80` in the leak scan; walkthrough RC2 ([session-recap §13](session-recap.md#13-test-plan)). No fixture here (RECAP's units).
 
 ## 15. Open questions
 

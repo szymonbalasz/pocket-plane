@@ -1,7 +1,7 @@
 ---
 title: Play shell
 prefix: SHELL
-status: claimed
+status: draft
 owner: spec-wf, spec-cb, spec-tt, spec-sp
 phase: post-mvp-9
 ---
@@ -137,6 +137,18 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 
 > **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md)).** Decided (not open): a **pause / intermission screen** (players see a full-screen card, input blocked; the DM keeps working) and **DM-added alert sounds**. State lives on the campaign row ([FR-CAMP-46–50](campaign-management.md#6-functional-requirements)), files in [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61; this spec owns the card, suppression, the DM's Pause control and playback by alert key: FR-SHELL-125–136. The card is an **overlay** in WF1's `overlays.ts` (`blocksInput`) and the control a `top-bar-items.ts` entry (seams S2). CON-44, tests, walkthrough T9–T14: [dice-extras §12–13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-SHELL-68–72.
 
+> **Sprint 9 (track SP, smaller picks; DM [#338](../decisions-log.md)).** Decided (not open): a **command palette** (search + commands in one place, Obsidian / VS Code style) and **keyboard shortcuts** (a documented set, a shortcuts sheet, never while typing, never behind the pause card, existing keys untouched). Shape proposed here: FR-SHELL-180–199, OQ-SHELL-89–95. Client-only: no intent, event, record or snapshot byte (§12). The palette is an **overlay** (`overlays.ts`, append) with a top-bar button (`top-bar-items.ts`, append), both after track PM's frame core; commands come from one append-only **command registry** ([proposed ADR](../architecture/adr/proposed-s9-sp-command-registry.md)). Rules and recap rows: [compendium §6.1](compendium.md#61-sprint-9-rules-quick-reference-track-sp), [session-recap](session-recap.md).
+
+**Sprint 9 at a glance** (track SP; slice SP1, §14)
+
+| FR | What | Named test |
+|---|---|---|
+| FR-SHELL-180, -181 | Ctrl+K opens a centred palette overlay (both clients) | `FR-SHELL-180 opens from anywhere`, `FR-SHELL-181 overlay not window` |
+| FR-SHELL-182, -183, -188 | Groups: Commands, Windows, Characters, Creatures, Rules, Compendium; shared matcher; server search for compendium + rules | `FR-SHELL-183 tiers and group order` |
+| FR-SHELL-184–187, -199 | Append-only command registry; windows generated from `windows.ts`; launch commands (Reset layout, Next turn, …) | `FR-SHELL-184 registry`, `FR-SHELL-186 when reasons` |
+| FR-SHELL-189–193 | Shortcut set; never while typing or paused; existing keys untouched; shortcuts sheet; single-key off switch | `FR-SHELL-190 never in inputs`, `FR-SHELL-190 never while paused` |
+| FR-SHELL-194–198 | Recent picks, top-bar button, states, test IDs, bench | `FR-SHELL-198 bench` |
+
 ## 1. Summary
 
 - The one play page per client (Roll20-style): scene canvas as the base, **floating windows** over it ([ADR-0014](../architecture/adr/0014-mvp-scope.md), [decisions-log](../decisions-log.md) #44, #48). Replaces the DM's six-window setup ([vision](../vision.md#the-table-today)).
@@ -153,6 +165,7 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 - **Sprint 6** (track PF, FR-SHELL-70–76): a **Preferences window** opened from a top-right **identity chip** (colour dot + your name). Features register **preference sections** in it (colour, sound, dice, layout, …); each setting keeps its storage (browser or server). The player's top-bar speaker retires; its controls live in the Sound section.
 - **Sprint 7** (track FU, FR-SHELL-77–88): a window never lands on a PC while another launcher window could be **auto-minimised** instead (#310 A); a window is auto-minimised before it would shrink below a readable size (proposed); Reset layout puts the default windows back in their zones and refits the map; a window a tool bar pushed goes back when the tool closes (proposed); pushes stay out of the DM's toast band; Space and keyboard focus work as on any web page. Browser-only, 0 bytes.
 - **Sprint 8** (track WF, FR-SHELL-95–119): one placer for opens, reopens, pushes, resizes and the map's refits, with one rule (#333): PCs clear, then shrink to the useful size, then put away the least recently used launcher window. Default windows keep their zones (#335). What the shell moved for a tool or a small screen comes back. Proven by a session-replay harness. 0 B.
+- **Sprint 9** (track SP, FR-SHELL-180–199): **Ctrl+K** opens a **command palette**: type to find a window, a command (Reset layout, Next turn, …), a character, a creature, a rule or a compendium entry; Enter runs it. A small **shortcut** set (letters for windows, `/` for the roll bar, DM N / Shift+N for turns) never fires while typing or behind the pause card; `?` lists them. Client-only, 0 B.
 
 ## 2. Scope
 
@@ -168,7 +181,8 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 - **Sprint 6** (track PF, FR-SHELL-70–76): identity chip in the top bar; window type `shell.prefs`; preference-section registries (one per client); Sound and Layout sections. Out: the colour picker itself ([campaign-management](campaign-management.md) FR-CAMP-35), dice settings' content ([dice-extras](dice-extras.md) FR-DICEX-57), new settings (none added), syncing device settings across browsers (OQ-SHELL-50), placement / keep-outs (track WF).
 - **Sprint 7** (track FU, FR-SHELL-77–88): auto-minimising rule, auto-minimise order, useful size, Reset layout zones, pushed windows returning, pushes clear of the DM toast band, Space and keyboard-focus Tooltips, the size table, the placement contract for ST's Stats window, auto-minimising invariants + sim-10 replays in the layout tests. `WindowDef` gains optional `usefulSize`; client memory gains a pushed window's pre-push rect; the stored `WindowState` gains optional `userSpot` only if OQ-SHELL-55 B (old entries parse); nothing sent changes. Out: window contents (each owner: the companion card's size CHARX, the encounter editor CBT, Creatures ENT, the concentration chip CBTX), the toast stack itself (NOTE), the map camera (MAP).
 - **Sprint 8** (track WF, FR-SHELL-95–119): placer, zones, ladder, useful sizes, displacement memory, push triggers, rail inset, registries for TT / SB / CB, the harness. `WindowState` gains optional `userSize`. Out: window contents, the toast code (NOTE), camera maths (MAP), the TT / SB / CB surfaces themselves.
-- **Later, not built** (nothing here may block them): command palette, shortcuts, portrait strip, pause overlay, DM "view as player". They plug in via the registry, a reserved strip slot above the launcher and an overlay layer.
+- **Sprint 9** (track SP, FR-SHELL-180–199): command palette overlay, command registry, shortcut dispatcher, shortcuts sheet, Keyboard preference section, top-bar search button. Out: the Rules and Recap windows (CMP, RECAP register them), rebinding keys (OQ-SHELL-91), the frame and window memory (PM).
+- **Later, not built** (nothing here may block them): ~~command palette, shortcuts~~ *(sprint 9)*, portrait strip, DM "view as player". They plug in via the registry, a reserved strip slot above the launcher and an overlay layer.
 
 ## 3. Goals
 
@@ -191,6 +205,8 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 - *(Sprint 7)* **DM:** When I reopen Encounters at 1440×900 I want it never on top of Mira, Thorn and Brakka; if there's no room, put away a window I'm not using instead. **Player:** After Reset layout I want my sheet and Initiative where they start, full size; when the AoE panel closes I want my sheet back where it was. **Both:** Tab to a button and press Space, like any web page.
 - *(Sprint 8)* **DM:** at 1280×720, windows I open are readable and never on Mira; a resize and back restores my layout. **Player:** Reveal all with the card open zooms out, not in.
 - *(Sprint 5)* **DM:** When I open Compendium, Party and Encounters during a fight, I want each one where I can read it, not stacked on the last one or on my Game log; and a Game log wide enough that a damage line fits on one line. My roll popups and combat cards should not sit on the monsters at the top of the map. **Player:** On my laptop I want my sheet, Initiative and the AoE panel side by side with the map, not on top of each other or of the monsters.
+
+- *(Sprint 9)* **DM:** Mid-fight I press Ctrl+K, type "owl" and land on the Owlbear's entry, or "cover" and read the cover rule, without hunting through the launcher; N ends the turn. **Player:** I press C for my sheet and `/` to roll; typing "n" in a field never does anything else; while the DM has paused, my keys do nothing.
 
 ## 6. Functional requirements
 
@@ -356,6 +372,27 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 | FR-SHELL-141 | **Size-table row** (seams S12; same at 1280×720, 1280×800, 1440×900, 1600×900, both clients): **default** 280 × 260, `growToContent` (FR-SHELL-39: height follows its rows, capped by the client's band, 412 at 1280×720, until the user resizes); **useful** 280 × 236, **criterion**: every PC row of a 6-PC party whole (name, HP, temp, AC uncut; FR-PARTY-58), companions may scroll; **min** 240 × 120. Rows, not the frame, decide wrapping. The criterion is checked in a browser (review-b #3): `party.summary`'s case in `e2e/useful-size.e2e.ts` on `wf-frame-e2e` + fixture `cb-party-six` (6 PCs, worst-width figures): `scrollHeight ≤ clientHeight`, every PC row visible and whole; `bun test` checks the table row's shape only. WF1 adds the pending row in the append-only `size-table.ts`; CB3 fills its values (review-b #14). | S12; review-b #3, #14, #21 |
 | FR-SHELL-142 | **No feature open**: only the launcher opens it (a reload restores it if it was open); a fight's Start opens nothing new (Initiative stays the only feature open at Start, FR-CBT-60). Layout remembered per browser as every window. | FR-SHELL-41 |
 | FR-SHELL-143 | **Contract rows** (FR-SHELL-112 (1)): the golden list, the harness sets and `size-table.ts` are **append-only registries** (review-b #14); WF1 adds `party.summary`'s pending entries to the player sets **P1 / P3**, the DM set **D3** and both goldens (player and DM); CB3 fills them and regenerates the goldens **after WF1 merges**. **Launcher fit** (review-b #20): with "Party status" added (and TT's top-bar items), the launcher still fits at 1280×720 in both clients (`launcher-fit.ts`, FR-SHELL-43: icons only, then "⋯"). Opened by the launcher only (`by: "user"`). | Seams S12; review-b #14, #20 |
+| **Sprint 9: command palette and shortcuts** (track SP, DM #338; picks proposed, OQ-SHELL-89–95) | | |
+| FR-SHELL-180 | **Open / close**: **Ctrl+K** (⌘K on macOS) toggles the palette in both clients from anywhere on the page, text fields included (OQ-SHELL-89); also the top-bar button (FR-SHELL-195). Not while a `blocksInput` overlay is up (players' pause: FR-SHELL-128's guard eats the key) or a modal dialog / alert dialog is open. Escape, a click outside or a pick closes it; focus returns to the element that had it. Test `FR-SHELL-180 opens from anywhere`. | OQ-SHELL-89 |
+| FR-SHELL-181 | **Overlay, not a window** (OQ-SHELL-92 A): entry `palette` appended to `overlays.ts` (both clients, `layer` 5: below the pause card at 10), no `blocksInput`. Renders a modal shadcn Dialog (`role="dialog"`: FR-SHELL-13 keeps map keys out), 560 px wide (≤ 90 vw), top at 12 vh: input, then the grouped list (≤ 60 vh, scrolls). Never placed, no keep-out, no layout entry, no Fit obstacle. Test `FR-SHELL-181 overlay not window`. | ADR-0060 §7 |
+| FR-SHELL-182 | **Groups**, in this order: Commands, Windows, Characters, Creatures (DM only), Rules, Compendium. Empty query → **Recent** (FR-SHELL-194), then Commands. Prefix `>` = commands only; `@` = characters and creatures only. Test `FR-SHELL-182 prefixes`. | OQ-SHELL-94 |
+| FR-SHELL-183 | **Matching**: local rows (commands, windows, characters, creatures) use the shared matcher (`@shared/search/match` `searchTier` over title + keywords), ranked by tier, then group order, then shorter title; ≤ 8 rows a group, ≤ 40 in all. Rules and Compendium rows come from compendium search ([FR-CMP-10](compendium.md#6-functional-requirements), debounced 150 ms, ≤ 8 each, the server's visibility FR-CMP-14) and appear under their headings when they arrive; local rows never wait. ↑ / ↓ move, Enter or a click runs, the list keeps the highlighted row in view. Test `FR-SHELL-183 tiers and group order`. | No dependency |
+| FR-SHELL-184 | **Command registry** ([proposed ADR](../architecture/adr/proposed-s9-sp-command-registry.md)): append-only `src/client/common/features/play-shell/commands.ts`, entries `{id, title, keywords?, group, clients, keys?, when?(ctx), run(ctx)}`; `when` returns `true`, a disabled reason string, or `false` (hidden). `ctx` = `{client, store, shell: {openWindow, focusWindow, resetLayout}, send, openPalette(prefix)}`. **A command does only what a click in the UI does**: existing intents through the client's sender, checked by the server as today; no new intent, event or record. Test `FR-SHELL-184 registry` (unique ids, unique keys per client, every `keys` in FR-SHELL-189's table). | ADR-0025 |
+| FR-SHELL-185 | **Windows group, generated**: "Open ‹title›" for each window type of the client with a launcher entry, plus Preferences (from `windows.ts`, no line per window); an open one reads "Go to ‹title›" (front + focus; minimised → restored). Opens go through `openWindow(kind, …, {by: "user"})`, so track PM's window memory places them. Test-mode windows only in test mode. Test `FR-SHELL-185 windows from the registry`. | Seam PM |
+| FR-SHELL-186 | **Launch commands** (OQ-SHELL-90): both: Reset layout (the same action as Preferences → Layout and "⋯", FR-SHELL-74, as track PM leaves it), Preferences, Keyboard shortcuts (FR-SHELL-192), Roll dice (focus the Game log's roll bar), Session recap ([FR-RECAP-10](session-recap.md#6-functional-requirements)), Rules ([FR-CMP-63](compendium.md#61-sprint-9-rules-quick-reference-track-sp)). DM: Next turn / Previous turn (`cbt.nextTurn` / `cbt.prevTurn`, as the Initiative buttons; disabled "No fight started"), Pause… (opens the Pause Popover, FR-SHELL-129) / Resume, Show awards (opens Stats' Session tab; the button there sends). Any command that sends: disabled "Not connected" unless `live`. Test `FR-SHELL-186 when reasons`. | |
+| FR-SHELL-187 | **Characters and creatures** (from the synced store only): DM: every campaign character → its `char.sheet`; custom creature definitions → the NPC sheet; companions → `charx.companion`. Player: own characters → sheet, own companions → card; other PCs are not listed. Test `FR-SHELL-187 player sees own only`. | Store already filtered |
+| FR-SHELL-188 | **Compendium and rule rows**: a compendium row opens `cmp.compendium` on that entry (FR-CMP-22's path); a `rule` row opens the Rules window on that card ([FR-CMP-69](compendium.md#61-sprint-9-rules-quick-reference-track-sp)). A player's rows never include monsters or unshared homebrew (server-side). Test `FR-SHELL-188 player compendium rows`. | FR-CMP-14 |
+| FR-SHELL-189 | **Shortcut set** (OQ-SHELL-90, -91): the §7 table. A window key opens the window or brings it to front; pressed while that window is already the focused front window, it minimises it. N / Shift+N only while a fight is started. Test `FR-SHELL-189 window keys toggle`. | |
+| FR-SHELL-190 | **Never while typing or paused**: one `keydown` listener (mounted by the palette overlay's component: no frame edit) acts on FR-SHELL-189's keys only when (i) no `blocksInput` overlay is up (FR-SHELL-128), (ii) the target is not a typing target (`keys.ts`' typing selector: text inputs, textarea, select, contenteditable) and not inside a dialog, menu or listbox, **except** the Ctrl+K chord, which works from text fields, (iii) not `e.repeat`, not `isComposing`, (iv) modifiers match exactly (L ≠ Ctrl+L ≠ Shift+L). It calls `preventDefault` only on a key it acts on. Tests `FR-SHELL-190 never in inputs`, `FR-SHELL-190 never while paused`, `FR-SHELL-190 Ctrl+K from a text field`. | BL-37 |
+| FR-SHELL-191 | **Existing keys unchanged**: Space (press vs pan, FR-SHELL-83), Escape (dialogs, tools, tray requests), Ctrl+D ([FR-MAP-17](scenes-map.md#6-functional-requirements)), Ctrl+Z / Ctrl+Shift+Z (fog, structure, props), Enter / Shift / Ctrl in roll fields and buttons, arrows in lists and chip rows, Backspace / Delete in the fog tool. No shortcut uses them. Test `FR-SHELL-191 no existing key reused` (and FR-SHELL-83's tests stay green). | #199 |
+| FR-SHELL-192 | **Shortcuts sheet**: `?` (Shift+/) or the "Keyboard shortcuts" command opens a Dialog listing this client's shortcuts, generated from the registry (keys, title, a disabled reason), plus a fixed "Map and rolls" list of FR-SHELL-191's keys. Escape closes. Test `FR-SHELL-192 sheet lists the registry`. | |
+| FR-SHELL-193 | **Single-key shortcuts can be switched off** (WCAG 2.1.4; OQ-SHELL-91 A): Preferences → **Keyboard** section (append to both `pref-sections.ts`): Switch "Single-key shortcuts" (default on), per browser `pp.keys.v1` (device, not per campaign). Off → only Ctrl / ⌘ chords work; the sheet marks the others "Off". Test `FR-SHELL-193 single-key off`. | FR-SHELL-75 |
+| FR-SHELL-194 | **Recent picks**: `pp.palette.v1.<campaignId>.<dm \| playerId>` (≤ 8 ids, zod-parsed, unknown ids dropped); browser only, never sent (#121). Test `FR-SHELL-194 recent picks parse`. | |
+| FR-SHELL-195 | **Top-bar button**: a `top-bar-items.ts` entry (append), 40 px icon Button (lucide `Search`), Tooltip "Search and commands (Ctrl+K)", both clients, before the identity chip. The launcher still fits at 1280×720 in both clients (`launcher-fit.ts`, FR-SHELL-43; track PM's harness re-run). Test `FR-SHELL-195 top-bar button fits`. | Seam PM |
+| FR-SHELL-196 | **States**: compendium groups show "Searching…", "Couldn't search the compendium" (Retry), or, offline, one line "Offline: compendium search unavailable"; local groups keep working offline; commands that send are disabled with "Not connected"; nothing found → "No matches". Test `FR-SHELL-196 states`. | |
+| FR-SHELL-197 | **Test IDs**: `ui-palette` (+ `data-state`), `ui-palette-input`, `ui-palette-group` (+ `data-value` group), `ui-palette-item` (+ `data-record-id` = command id / window kind / record id, `data-value` = group), `ui-palette-empty`, `ui-palette-open` (top bar), `ui-shortcuts`, `ui-shortcuts-row` (+ `data-record-id` = command id), `ui-prefs-keys-single`. Test mode: `data-test-last-shortcut` on `body` = `<command id>:<ran \| typing \| paused \| off \| disabled>`. | §9.5 |
+| FR-SHELL-198 | **Bench** `palette.bench.ts` (added to `bun run bench`): local search ≤ 5 ms p95 per keystroke over 5,000 local rows (spec probe: 3.9 ms worst; 1.9 ms at 1,100 rows, §12). | |
+| FR-SHELL-199 | **Other features register** by appending to `commands.ts`: a command (with optional `keys` from the §7 table's free letters, via the integrator), or a search provider `{id, group, clients, search(q, ctx)}` for a new group (e.g. track RS's strongholds later). A new window type appears in Windows by registering as today. | |
 
 ## 7. UI/UX notes
 
@@ -461,6 +498,27 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 
 - Only the ★ rows change; the others keep today's values, now with a criterion. Other sizes: the sprint-7 table (DM `dice.log` 1150×240, player 850×280 at 1440 / 1600; player sheet 320×418 / 440 / 440). Zones = the sprint-5 table.
 
+- **Sprint 9 (track SP): palette and shortcuts.** shadcn Dialog + Input + a listbox (`role="listbox"` / `option`, `aria-activedescendant`), group headings muted, each row: lucide icon, title, muted hint (window, "Command", the compendium line), the shortcut as a `kbd` chip on the right. Highlight = the shadcn accent. No new tokens or colours.
+- **Shortcut set** (FR-SHELL-189; proposed, OQ-SHELL-90). Letters fire only outside text fields (FR-SHELL-190) and only while Single-key shortcuts is on (FR-SHELL-193).
+
+| Keys | Does | Client |
+|---|---|---|
+| Ctrl+K / ⌘K | Command palette (open / close) | both |
+| `?` | Shortcuts sheet | both |
+| `/` | Roll: open the Game log if needed, focus its roll bar | both |
+| L | Game log | both |
+| I | Initiative | both |
+| D | Dice tray | both |
+| C | Character sheet: your one character's sheet; several (or the DM) → the palette on `@` | both |
+| B | Compendium ("book") | both |
+| R | Rules (CMP) | both |
+| P | Party Manager (track PM's name for `party.board`) | both |
+| S | Stats | both |
+| N / Shift+N | Next turn / Previous turn (fight started) | DM |
+
+- **DM view:** every row above; Creatures group; turn and pause commands. **Player view:** no Creatures group, no N / Shift+N, no DM commands; own characters only; compendium rows as players see them (no monsters).
+- **States:** FR-SHELL-196. The shortcuts sheet: two columns from 480 px wide, one below.
+
 ## 8. Data model
 
 No server entity, record type or migration (#121). Client-side only:
@@ -482,6 +540,9 @@ No server entity, record type or migration (#121). Client-side only:
 | Sound settings *(browser `localStorage`)* | key; muted, volume | `pp.sound.v1.<campaignId>.<playerId>`; bool, int 0–100 | FR-SHELL-24; defaults unmuted, 70 |
 | Sound *(client code)* | id, label, play | — | FR-SHELL-26; MVP `ping` only |
 | Preference section *(client code, sprint 6)* | id, title, order, available?, Component | `<prefix>.<name>`, string, int, `(store) => boolean`, React component | FR-SHELL-72; per-client registry; not sent or stored |
+| Palette command *(client code, sprint 9)* | id, title, keywords?, group, clients, keys?, when?, run | registry entry (`commands.ts`, append-only) | FR-SHELL-184; never sent or stored |
+| Recent picks *(browser `localStorage`, sprint 9)* | key; ids | `pp.palette.v1.<campaignId>.<dm \| playerId>`; ≤ 8 strings | FR-SHELL-194; ≤ 400 B |
+| Keyboard setting *(browser `localStorage`, sprint 9)* | key; singleKey | `pp.keys.v1`; bool (default true) | FR-SHELL-193; device-wide |
 
 - *(Sprint 6)* **Where each setting lives** (FR-SHELL-76; no new key, record or field from SHELL):
 
@@ -501,6 +562,7 @@ No server entity, record type or migration (#121). Client-side only:
 - **Visibility:** N/A; layouts never leave the browser. Window contents read the synced store, already filtered server-side.
 - **Client API for features:** `registerWindow(def)` (one line in the client's registry list), `openWindow(kind, instance?)` (*sprint 4:* `openWindow(kind, instance?, {by?})`, default `"user"`: click-driven callers need no change; self-driven opens pass `"feature"`, FR-SHELL-08), `useShellAlert()` (FR-SHELL-22), *(sprint 4)* `freeAreas` / `useFreeArea().areas` (FR-SHELL-44), *(sprint 5)* `keepOuts(client, vp)`, `reportKeepOut(id, rect | null)`, `useKeepOuts()` (`keep-outs.ts`, FR-SHELL-48); *(sprint 6)* `reportShownStack(id, rect | null)`, `shownStack(client)` (`toast-region.ts`, FR-SHELL-59, only under OQ-MAP-57 D / C); `openWindow` unchanged (the reopen rule lives in the manager, FR-SHELL-56). The shell passes no data. Alerts are client-side reactions to events the client already received; the shell adds no event, intent or record.
 - *(Sprint 6)* **No new intent, event, record type or signal from SHELL.** Sections that write the server use their owners' intents (`camp.setColor`, FR-CAMP-33; `dicex.setLook`, FR-DICEX-26) with those events' visibility (every connection of the campaign). Client API: `PreferencesWindow` + `PrefSection` (FR-SHELL-72); `openWindow("shell.prefs")` from anywhere (e.g. a later "More in Preferences" link).
+- *(Sprint 9)* **No new intent, event, record type or signal.** The palette reads the synced store and compendium search (`GET /api/compendium/search`, FR-CMP-10, the viewer's visibility); its commands send only intents the UI already sends (`cbt.nextTurn`, `cbt.prevTurn`, `camp.resume`, …) with their owners' validation and visibility. **Client API:** `commands.ts` (FR-SHELL-184, -199), `openPalette(prefix?)`.
 
 ## 10. Permissions
 
@@ -517,6 +579,8 @@ No server entity, record type or migration (#121). Client-side only:
 *(Sprint 8)* No permission change: the placer, zones, returns and the harness are per browser / test-only.
 
 *(Sprint 6)* Open own Preferences: DM ✓, player ✓ (browser only). Each section keeps its owner's permissions (colour: own or DM any, FR-CAMP-33; dice look: own; device settings: own browser).
+
+*(Sprint 9)* No permission change: a palette row or shortcut can do only what its UI does for that client; the server checks every intent as before (a player's forged `cbt.nextTurn` → `forbidden`, unchanged). Players' compendium rows: FR-CMP-14.
 
 ## 11. Edge cases & failure modes
 
@@ -568,6 +632,13 @@ No server entity, record type or migration (#121). Client-side only:
   - *Campaign switch:* the window shows the new campaign's settings (keys are per campaign); an unapplied colour draft is dropped.
   - *Chip name:* a rename shows ≤ 1 s (player record); unknown player row (deleted, old client) → "Player" and the role accent dot (FR-CAMP-36 fallback).
   - *Small viewport* (1280×720): the window fits the work area (FR-SHELL-29), never below 320 × 280; the body scrolls; WF's placement decides where it opens (`minOpenH` 400, seams S2, S3).
+- **Sprint 9 (palette, shortcuts):**
+  - *Disconnect / reconnect:* local groups keep working; sending commands are disabled until `live`; compendium groups show the offline line. A reconnect snapshot refreshes rows; an open palette re-runs its query.
+  - *Server crash mid-command:* as the clicked button (the intent's own lost-intent handling); the palette closed at the pick.
+  - *Paused (players):* the card's guard stops Ctrl+K and every shortcut; an open palette is closed when the pause lands (the overlay's siblings go `inert`).
+  - *Held key / IME:* `repeat` and `isComposing` ignored, so holding N never skips turns.
+  - *Two tabs:* each has its own palette; recent picks last write wins.
+  - *Invalid input:* a query is local text (no limit beyond the 100-char compendium `q`, clipped); a stale recent id is dropped.
 
 ## 12. Performance & bandwidth
 
@@ -589,6 +660,8 @@ No server entity, record type or migration (#121). Client-side only:
 - *(Sprint 7)* **CON-44: 0 B.** Nothing enters the snapshot or any frame from SHELL (auto-minimising, useful sizes, returns, key handling are browser-only, #121), so no probe was run for SHELL (the track's only server-side change, BL-46, adds no field either: [CBT §12](combat-tracker.md#12-performance--bandwidth)). Cost: FR-SHELL-77 re-runs the existing placement at most once per auto-minimisable window plus one look-ahead per round (≤ 40 windows, FR-SHELL-17; typically ≤ 12 DM kinds), each ≤ 4,000 spots (FR-SHELL-58's cap): asserted ≤ 25 ms best-of-5 for 12 auto-minimisable windows × 200 token boxes and ≤ 100 ms for the 40-window worst case in `placement.bench.ts` (`bun run bench`, not `bun test`); FR-SHELL-87's brute checks stay test-only and inside the file's 10 s.
 
 - *(Sprint 8)* **CON-44: 0 B.** Nothing reaches the server; `userSize` is browser-only (≤ 15 B per window). No probe needed. Cost: the built ranker per placed window × ≤ 2 rungs × 2 gaps × look-ahead, ≤ 4,000 spots each, + ≤ 1 `dryFit`; gate FR-SHELL-119.
+
+- *(Sprint 9)* **CON-44: 0 B.** Palette, registry and shortcuts are client-only; no snapshot or frame change, so no snapshot probe. **Measured** (throwaway `bun test` probe, deleted): the shared matcher over synthetic local rows (SRD names + keywords), p95 of 40 runs per query: **1,100 rows ≤ 1.9 ms**, **5,000 rows ≤ 3.9 ms** (prep 18 ms once per store change). Compendium search over the full SRD import (FR-CMP-34 bench, re-run at spec time): **≤ 0.96 ms p95** (DM), index build 53 ms; rules add ≈ 300 rows (+12 %, CMP §12). Per keystroke: one debounced search request (≤ 8 summaries, < 2 KB). Gate: FR-SHELL-198.
 
 ## 13. Test plan
 
@@ -851,6 +924,36 @@ Teardown: stop, `fixtures:reset --profile verify`.
 - Unit `FR-SHELL-140 party status registered`: both registries hold `party.summary` (launcher entry after Party, `defaultOpen: false`, 280 wide, `growToContent`, min 240 × 120); WF's golden / size-table rows pass; WF's session-replay layouts (1280×720 … 1600×900, DM and player) still pass with it opened (no PC under it, nothing below its useful size or it is put away).
 - Walkthrough CB10 at 1280×720 ([combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary)): opened from the launcher, it covers no PC token; a reload restores it where the user left it.
 
+### Sprint 9 (track SP): command palette and shortcuts
+
+- **Fixtures:** no new record type. **Bundle `sp-s9`** = `session-sim-12` + `cmp-rules-mini` + `cmp-rule-house` + `recap-loot-haul` ([compendium §13.3](compendium.md#133-sprint-9-rules-quick-reference-track-sp), [session-recap §13](session-recap.md#13-test-plan)); e2e alias `sp-s9-e2e`. The sim-12 ambush is started, so turn commands are live.
+
+| Level | Named tests (all `FR-SHELL-NN …`) |
+|---|---|
+| Unit (`palette.test.ts`, `commands.test.ts`) | `182 prefixes`; `183 tiers and group order` (local rows before late compendium rows; ≤ 8 a group); `184 registry` (unique ids / keys, keys in the table); `185 windows from the registry` (both clients, test-mode windows hidden, "Go to" when open); `186 when reasons` (no fight, not `live`, paused DM still allowed); `187 player sees own only`; `191 no existing key reused`; `194 recent picks parse` |
+| DOM (`shortcuts.test.tsx`, `PaletteOverlay.test.tsx`) | `180 opens from anywhere` (map, window body, roll-bar input; not over a modal dialog); `181 overlay not window` (no layout entry, not a placer obstacle); `189 window keys toggle`; `190 never in inputs` (L / N / C / `/` / `?` typed into an input, textarea, contenteditable, select and a Radix menu type or do nothing else); `190 Ctrl+K from a text field`; `190 never while paused` (a `blocksInput` overlay up: Ctrl+K, L, N, `?` do nothing, `data-test-last-shortcut` = `…:paused`); `190 repeat and IME ignored`; `192 sheet lists the registry`; `193 single-key off`; `195 top-bar button fits` (launcher-fit at 1280×720, both clients); `196 states`; FR-SHELL-83's Space tests unchanged |
+| Integration | `188 player compendium rows` (REST search as player-1: no monster, no unshared homebrew); `186 Next turn sends cbt.nextTurn` (client sender stub → the DM's intent; a player's forged one → `forbidden`) |
+| E2E (thin, `palette.e2e.ts`, `// e2e-bundle: sp-s9-e2e`) | DM: Ctrl+K, "comp", Enter → `cmp-window` visible; L toggles `dice.log`; typing "l" in the roll bar toggles nothing. Player 1: Ctrl+K "goblin" → no Compendium row with `data-value` monster |
+| Bench | FR-SHELL-198 |
+
+**Browser walkthrough** (bundle `sp-s9`, verify profile, contexts `dm`, `player-1`, `player-2`; 1440×900, P10 also 1280×720):
+
+| Step | DM (A) | Players (B, C) | Expect |
+|---|---|---|---|
+| P1 | Click the map, Ctrl+K, type "init", Enter | — | Palette centred, input focused; Windows "Initiative" first; Initiative comes to front, palette gone, focus back |
+| P2 | Ctrl+K, "> reset", Enter | — | Only commands listed; Reset layout runs as from Preferences |
+| P3 | Ctrl+K "@mira" → Enter; then "owlbear" → Enter | — | Mira's sheet opens; the SRD Owlbear (Compendium group, ≤ 300 ms) opens in Compendium |
+| P4 | Ctrl+K "cover" → Enter | — | Rules group "Cover" → the Rules window on the Cover card |
+| P5 | Map focused: L, I, B, R, P, S, D; each again | — | Each window opens / comes to front, the second press minimises it |
+| P6 | N, then Shift+N | B, C watch Initiative | Turn advances ≤ 1 s on all three, then goes back |
+| P7 | Click the Game log roll bar, type "lid"; Initiative HP field, type "n"; Ctrl+K from the roll bar | — | "lid" typed, no window toggled; no turn change; the palette opens from the field |
+| P8 | — | B: Ctrl+K "goblin"; "@"; `?`; C | No monster row; only Mira; the sheet has no N / Shift+N; C opens Mira's sheet |
+| P9 | Pause (no message) | B: Ctrl+K, L, `?`, Space | Nothing happens (`data-test-last-shortcut` `…:paused`); after Resume, Ctrl+K works |
+| P10 | 1280×720 | B 1280×720 | Search button in the top bar, launcher fits (no clipped button); palette ≤ 90 vw |
+| P11 | — | C: Preferences → Keyboard → Single-key shortcuts off; L; Ctrl+K; reload; L | L does nothing, Ctrl+K opens; still off after reload |
+
+Evidence per §9.6 of AGENTS; teardown: stop, `fixtures:reset --profile verify`.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -994,6 +1097,14 @@ Teardown: stop, `fixtures:reset --profile verify`.
 
 **Sprint 8, track CB:** slice **CB3** `build/cb-party` appends one line to each of `src/client/dm/windows.ts` and `src/client/player/windows.ts` (append-only registries, AGENTS §9.9) **after WF1** (wave 3, also after the DM's answer to the party-HP ADR), and fills the pending entries WF1 adds to the append-only size table, goldens and harness sets P1 / P3 / D3 (seams S12, review-b #14); no frame file (`placement.ts`, `manager.ts`, `free-area.ts`, `ShellWindow.tsx`, keep-outs stay WF's). Full split: [combat-extras §14](combat-extras.md#shared-changes--sprint-8-track-cb). Dependency: none.
 
+**Sprint 9, track SP** (palette and shortcuts). **No new dependency:** the shared matcher (`@shared/search/match`) and shadcn Dialog / Input / listbox markup cover it. Considered: `cmdk` (MIT, a few KB gz; shadcn's `Command`): its own fuzzy scorer would rank differently from every other search in the app, and it adds a package for a list we already render; `fuse.js` (Apache-2.0, < 10 KB gz): same ranking problem. Sizes not measured (not picked). **Pick: hand-rolled on the shared matcher.**
+
+| Slice | Files | ⚠ Shared (AGENTS §9.9) | Order |
+|---|---|---|---|
+| **SP1** `build/sp-palette` | new `src/client/common/features/play-shell/palette/*` (overlay, list, dispatcher, sheet), new `commands.ts` (registry + launch commands), `palette.bench.ts` | appends: `overlays.ts`, `top-bar-items.ts`, both `pref-sections.ts`; a one-line **export** of the typing selector in `keys.ts` (frame file, granted, after PM); `package.json` bench list (integrator) | **After track PM's frame core** (overlay layer, top-bar width, Reset layout); ∥ SP2, SP3. Rules / Recap commands land with SP2 / SP3 (each appends its line), or SP1 adds them disabled until the window kind registers |
+
+- Walkthrough P1–P11 (§13). Docs at consolidation: protocol §26 registries list gains `commands.ts` (AGENTS §9.9 append-only list, integrator).
+
 ## 15. Open questions
 
 **Bold** option = suggested pick (not decided).
@@ -1122,7 +1233,21 @@ Teardown: stop, `fixtures:reset --profile verify`.
 |---|---|---|---|---|
 | OQ-SHELL-73 | **Seam with WF (window-frame pass): registering Party status.** CB3 needs WF's contract for new windows (the FR-SHELL-86 successor: size-table row, useful size, golden list, put-away order) and its frame core merged first | **Resolved (integrator, sprint-8 seams / rulings).** **Closed by seams S12:** `party.summary` (both clients) registers per FR-SHELL-112 (1) after WF1, with its size-table row (FR-SHELL-141: default, useful + criterion, min), goldens and harness sets P1 / P3 / D3 (append-only registries, review-b #14); WF's placer decides its spot; no keep-out; WF adds it as a pending row. (If the DM picks a strip, OQ-PARTY-29 B, WF owns the strip region and CB3 fills it) | — | WF, FR-SHELL-140–143 |
 
+**Sprint 9, track SP** (owner spec-sp). **Bold** = suggested pick, not decided.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SHELL-89 | Palette key | **A. Ctrl+K / ⌘K**: the web-app convention, no browser action we lose · B. Ctrl+P: VS Code habit, but it replaces Print · C. Ctrl+Shift+P: safe, two-hand chord · D. A and B both | yes (DM) | FR-SHELL-180 |
+| OQ-SHELL-90 | Which shortcuts ship | **A. §7 table: palette, sheet, `/` roll bar, 8 window letters, DM N / Shift+N**: fast, a stray N is undone by Shift+N · B. A without N / Shift+N: turns only by click or palette · C. Palette and `?` only: least to learn, least speed | yes (DM) | FR-SHELL-186, -189 |
+| OQ-SHELL-91 | Can keys be rebound? | **A. Fixed set + a "Single-key shortcuts" off switch**: meets WCAG 2.1.4, one Switch · B. Rebind any key in Preferences (per browser): flexible; a conflict UI and more tests · C. Fixed, no switch: fails WCAG 2.1.4 | yes (DM) | FR-SHELL-193 |
+| OQ-SHELL-92 | Palette surface | **A. Overlay (modal, centred, never placed)**: like VS Code; no layout cost · B. A window `shell.palette`: movable and remembered, but a search box that wanders and must be closed by hand | no | FR-SHELL-181 |
+| OQ-SHELL-93 | Players' palette | **A. Same palette, scoped to the player** (own characters, player windows and commands, compendium as players see it) · B. DM only: simpler; players keep the launcher | yes (DM) | FR-SHELL-187, -188 |
+| OQ-SHELL-94 | What it searches | **A. Windows, commands, characters, creatures (DM), rules + compendium (server)** · B. A + scenes (DM: show in Scenes) and handouts: more groups, more noise · C. Windows + commands only: no data search | yes (DM) | FR-SHELL-182 |
+| OQ-SHELL-95 | **Seam with track PM** (play-shell frame, window memory): the palette registers through PM's frame | **A. After PM's frame core: `overlays.ts` entry (layer 5), a `top-bar-items.ts` button (40 px, PM re-checks launcher fit), a `keys.ts` export, Reset layout = PM's reset, window keys open `by: "user"` (window memory applies)** · B. A window in PM's size table instead of an overlay | no (seams) | FR-SHELL-181, -185, -186, -195 |
+
 ## 16. Out of scope
+
+- *(Sprint 9)* Rebinding keys (OQ-SHELL-91 B), key sequences ("g l"), a map-tool key layer, scene / handout search (OQ-SHELL-94 B), "pan to token" from a creature row (needs a scenes-map camera API; later), palette history across browsers.
 
 - *(Sprint 8)* Re-placing windows when a PC walks under one; server-side or cross-browser layouts (#121); announcing a put-away window; the TT / SB / CB surfaces (they register).
 - §2's later list; docked panels, pop-outs, cross-browser layout (§4); window contents (owning specs).
