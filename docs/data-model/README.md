@@ -2395,7 +2395,7 @@ From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../spe
 
 ## 111. Sprint 8: toast policy (WF4)
 
-From [notifications](../specs/notifications.md#8-data-model) FR-NOTE-50–53 (#333, #335). **Built by `fix/wf-sizes-toasts`**. Protocol side: [protocol §140](../protocol/README.md#140-sprint-8-one-toast-policy-stats-and-companion-card-useful-sizes-wf4). **No table, column, record type or wire field.**
+From [notifications](../specs/notifications.md#8-data-model) FR-NOTE-50–53 (#333, #335). **Built by `fix/wf-sizes-toasts`**. Protocol side: [protocol §141](../protocol/README.md#141-sprint-8-one-toast-policy-stats-and-companion-card-useful-sizes-wf4). **No table, column, record type or wire field.**
 
 - **Registries (code, not stored):** server kind def and client view gain `toastClass` (`card` | `alert` | `info`), named on every registry line.
 - **Client memory (per page, never sent or stored):** each notification toast's class (`cls`); the one callout `{id, content, remaining}` (cleared on a campaign switch).

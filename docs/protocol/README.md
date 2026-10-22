@@ -3319,7 +3319,7 @@ From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26, -29, -31–33, -
 
 ## 141. Sprint 8: one toast policy, Stats and companion card useful sizes (WF4)
 
-From [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-50–53, [stats](../specs/stats.md#6-functional-requirements) FR-STATS-66, -67 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-83 (#333, #335; seams S3–S5, S13). **Built by `fix/wf-sizes-toasts`**: browser only. No record type, intent, event, signal or wire field (CON-44: 0 B). Data side: [data model §110](../data-model/README.md#110-sprint-8-toast-policy-wf4).
+From [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-50–53, [stats](../specs/stats.md#6-functional-requirements) FR-STATS-66, -67 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-83 (#333, #335; seams S3–S5, S13). **Built by `fix/wf-sizes-toasts`**: browser only. No record type, intent, event, signal or wire field (CON-44: 0 B). Data side: [data model §111](../data-model/README.md#111-sprint-8-toast-policy-wf4).
 
 | Piece | Contract | Source |
 |---|---|---|
