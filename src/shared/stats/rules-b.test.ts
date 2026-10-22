@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { fellOf } from "./callout";
 import { feedText } from "./feed";
-import type { StatsCharacter, StatsFact, StatsSide } from "./rules";
+import type { StatsCharacter, StatsSide } from "./rules";
 import {
   addLuck,
   addTrophies,
