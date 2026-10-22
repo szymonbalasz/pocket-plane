@@ -1,5 +1,5 @@
 // Applying the token overlay registry (FR-MAP-34, -43, -49): results merged in registry order
-// (first non-null `cross`, `bar` and `cue` win; badges and icons concatenate); a throw is logged
+// (first non-null `cross`, `bar`, `cue` and `turn` win; badges and icons concatenate); a throw is logged
 // once per overlay and ignored (token drawn plain). Overlay subscriptions (FR-MAP-49) likewise.
 // DOM-free so it runs under `bun test`.
 import type { RecordStore } from "@shared/protocol/store";
@@ -12,6 +12,7 @@ import type {
   TokenIcon,
   TokenOverlay,
   TokenOverlayView,
+  TokenTurn,
 } from "./token-overlays";
 
 export interface MergedDecoration {
@@ -22,6 +23,7 @@ export interface MergedDecoration {
   bar: TokenBar | null;
   icons: TokenIcon[];
   cue: TokenCue | null;
+  turn: TokenTurn | null;
 }
 
 export const plainDecoration: MergedDecoration = {
@@ -32,6 +34,7 @@ export const plainDecoration: MergedDecoration = {
   bar: null,
   icons: [],
   cue: null,
+  turn: null,
 };
 
 export type OverlayErrorReporter = (overlayId: string, err: unknown) => void;
@@ -63,7 +66,7 @@ export function decorateToken(
       continue;
     }
     if (!d) continue;
-    out ??= { dim: false, badges: [], ring: null, cross: null, bar: null, icons: [], cue: null };
+    out ??= { ...plainDecoration, badges: [], icons: [] };
     if (d.dim) out.dim = true;
     if (d.badges) out.badges.push(...d.badges);
     if (d.ring === "target") out.ring = "target";
@@ -71,6 +74,7 @@ export function decorateToken(
     if (d.bar && !out.bar) out.bar = d.bar;
     if (d.icons) out.icons.push(...d.icons);
     if (d.cue && !out.cue) out.cue = d.cue;
+    if (d.turn && !out.turn) out.turn = d.turn;
   }
   return out ?? plainDecoration;
 }

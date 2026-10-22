@@ -1,19 +1,20 @@
 // Tokens layer (FR-MAP-14–19, -31, -34, -35, -43): image or initials per shape, DM hidden styling,
-// selection / target ring, overlay cross, bar, icons and dim (inside the token's group, so they
-// move with a drag and show in drag previews). Names and badges are on the labels layer
+// selection / target ring, overlay turn ring, cross, bar, icons and dim (inside the token's group,
+// so they move with a drag and show in drag previews). Names and badges are on the labels layer
 // (FR-MAP-42). No image: the creature-type glyph on its type colour, else initials (FR-ENT-28).
 // Konva node `name` = `map-token`, `id` = token id, attrs `shape`, `preview` (FR-MAP-40), `art`
 // (`image` | `<type>` | `initials`, FR-ENT-28); glyph `map-token-art` (attr `creature`); ring
 // `map-token-ring` (attr `state`); crosses, bars and icons named by their overlay id (bar attrs
 // `tone`, `fraction`; icon attrs `value`, `icon`, `tone`, `label`, `muted`, and
 // `tip` = the hover tooltip the labels layer shows, FR-MAP-57 / S9); "+N" `map-token-icons-more`
-// (attrs `count`, `tip`); a cue (FR-MAP-49) named by its id, attr `label`. Drag
+// (attrs `count`, `tip`); a cue (FR-MAP-49) named by its id, attr `label`; the turn ring
+// (FR-MAP-108) named by its id, attr `hidden`, the group's first mark under the body. Drag
 // paths and combat trails (FR-MAP-52–55) are drawn first, below every token (`DragPaths`).
 import type { CreatureType } from "@shared/entities/schemas";
 import { cellToPx, footprint, initials } from "@shared/scenes-map/geometry";
 import type { TokenView } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { Circle, Group, Image, Line, Path, Rect, Shape, Text } from "react-konva";
 import { useStore } from "zustand";
 import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
@@ -25,14 +26,22 @@ import { decorateToken, type MergedDecoration } from "../decorations";
 import { CROSS_OPACITY, crossGeometry } from "../label";
 import { CASING_COLOR, CASING_EXTRA_PX, CASING_NAME } from "../mark-colors";
 import { artBackdropOf, containRect, coverCrop, initialsBackdropOf, outlineOf } from "../shape";
-import { barGeometry, cueGeometry, cuePulse, iconRow } from "../token-decor";
-import type { TokenBar, TokenCross, TokenCue, TokenIcon } from "../token-overlays";
+import {
+  barGeometry,
+  cueGeometry,
+  cuePulse,
+  iconRow,
+  OUTLINE_PX,
+  TOKEN_INSET,
+  turnRingGeometry,
+} from "../token-decor";
+import type { TokenBar, TokenCross, TokenCue, TokenIcon, TokenTurn } from "../token-overlays";
 import { tokenOverlays } from "../token-overlays";
 import { useLayerToggles } from "../tool-store";
 import { DragPaths } from "./DragPaths";
 import { toneColor } from "./tone";
 
-const INSET = 0.92;
+const INSET = TOKEN_INSET;
 
 /** Backdrop per shape: a disc (round) or a rounded square inset like the outline. */
 function Backdrop({
@@ -148,10 +157,10 @@ function TokenOutline({
   let dash: number[] | undefined;
   if (state === "target") {
     stroke = colors.destructive;
-    width = 3 / cam.scale;
+    width = OUTLINE_PX / cam.scale;
   } else if (state === "selected") {
     stroke = colors.primary;
-    width = 3 / cam.scale;
+    width = OUTLINE_PX / cam.scale;
   } else if (t.hidden) {
     stroke = colors.hidden;
     dash = [6 / cam.scale, 4 / cam.scale];
@@ -176,6 +185,77 @@ function TokenOutline({
     <Rect x={inset} y={inset} width={side - 2 * inset} height={side - 2 * inset} {...common} />
   );
 }
+
+/**
+ * FR-MAP-108 / -109: the turn ring, one static node (casing, then the ring with its glow) under
+ * the body. Memoised on its inputs, so Next re-draws only the old and new turn tokens' marks.
+ */
+export const TurnRingMark = memo(function TurnRingMark(p: {
+  tokenId: string;
+  turn: TokenTurn;
+  side: number;
+  shape: TokenView["shape"];
+  scale: number;
+  cellPx: number;
+  /** `accent.success` (the canvas reads `--success` as the player accent). */
+  color: string;
+}) {
+  const hidden = p.turn.hidden === true;
+  const g = turnRingGeometry({
+    side: p.side,
+    shape: p.shape,
+    hidden,
+    scale: p.scale,
+    cellPx: p.cellPx,
+  });
+  const path = (ctx: Konva.Context) => {
+    const { width: w, height: h, radius: k } = g;
+    ctx.beginPath();
+    if (g.kind === "circle") {
+      ctx.arc(w / 2, h / 2, g.radius, 0, Math.PI * 2, false);
+    } else {
+      ctx.moveTo(k, 0);
+      ctx.arcTo(w, 0, w, h, k);
+      ctx.arcTo(w, h, 0, h, k);
+      ctx.arcTo(0, h, 0, 0, k);
+      ctx.arcTo(0, 0, w, 0, k);
+      ctx.closePath();
+    }
+  };
+  return (
+    <Shape
+      name={p.turn.id}
+      id={p.tokenId}
+      hidden={hidden ? "true" : "false"}
+      x={g.x}
+      y={g.y}
+      width={g.width}
+      height={g.height}
+      stroke={p.color}
+      strokeWidth={g.strokeWidth}
+      dash={g.dash ?? undefined}
+      shadowEnabled={g.glow !== null}
+      shadowColor={p.color}
+      shadowBlur={g.glow ?? 0}
+      shadowOpacity={0.9}
+      listening={false}
+      perfectDrawEnabled={false}
+      sceneFunc={(ctx, shape) => {
+        // FR-MAP-72: the dark casing first, without the glow.
+        ctx.save();
+        ctx.setAttr("shadowColor", "rgba(0,0,0,0)");
+        ctx.setAttr("strokeStyle", CASING_COLOR);
+        ctx.setAttr("lineWidth", g.casingWidth);
+        ctx.setLineDash(g.dash ?? []);
+        path(ctx);
+        ctx.stroke();
+        ctx.restore();
+        path(ctx);
+        ctx.strokeShape(shape);
+      }}
+    />
+  );
+});
 
 /** FR-MAP-43: a translucent X over the footprint, one path so the crossing isn't darker. */
 function TokenCrossMark({ t, side, cross }: { t: TokenView; side: number; cross: TokenCross }) {
@@ -418,7 +498,7 @@ function TokenCueMark({ t, side, cue }: { t: TokenView; side: number; cue: Token
   );
 }
 
-function TokenNode({ t }: { t: TokenView }) {
+export function TokenNode({ t }: { t: TokenView }) {
   const c = useCanvas();
   const { grid, colors, cam } = c;
   const img = useAssetImage(t.imageAssetId, "thumb");
@@ -481,6 +561,17 @@ function TokenNode({ t }: { t: TokenView }) {
     >
       {/* Hit area: the whole footprint, whatever the art's alpha. */}
       <Rect width={side} height={side} fill="transparent" />
+      {deco.turn && (
+        <TurnRingMark
+          tokenId={t.id}
+          turn={deco.turn}
+          side={side}
+          shape={t.shape}
+          scale={cam.scale}
+          cellPx={grid.gridCellSize * cam.scale}
+          color={colors.playerAccent}
+        />
+      )}
       <TokenBody t={t} side={side} image={img.image} />
       {deco.cross && <TokenCrossMark t={t} side={side} cross={deco.cross} />}
       <TokenOutline t={t} side={side} state={ring} />
