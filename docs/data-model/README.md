@@ -2427,9 +2427,9 @@ From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–
 - **Persisted runtime state:** none.
 - **CON-44:** 0 B.
 
-## 113. Sprint 8: saved macros and roll requests (TT1+TT2)
+## 114. Sprint 8: saved macros and roll requests (TT1+TT2)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`**; no schema change (TT0's tables, [§106](#106-sprint-8-table-tools-core-tt0)). Protocol side: [protocol §143](../protocol/README.md#143-sprint-8-saved-macros-and-dm-roll-requests--intents-prompt-views-requests-window-tt1tt2).
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`**; no schema change (TT0's tables, [§106](#106-sprint-8-table-tools-core-tt0)). Protocol side: [protocol §144](../protocol/README.md#144-sprint-8-saved-macros-and-dm-roll-requests--intents-prompt-views-requests-window-tt1tt2).
 
 | Table / field | Written by | Rule | Source |
 |---|---|---|---|

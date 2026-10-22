@@ -3373,9 +3373,9 @@ From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–
 - **Tests:** `refits.test.ts` (FR-MAP-93, -95, -96, -98), `src/client/player/features/scenes-map/wf-refits.test.ts` (FR-MAP-94, -97; the F10 repro), `src/client/player/features/play-shell/wf3-placer.test.ts` (F9, Party alone), `src/client/dm/features/play-shell/wf3-reload.test.ts` (the DM reload); E2E `e2e/wf-refits.e2e.ts` on `wf-frame-e2e`.
 - **CON-44:** 0 B.
 
-## 143. Sprint 8: saved macros and DM roll requests — intents, prompt views, Requests window (TT1+TT2)
+## 144. Sprint 8: saved macros and DM roll requests — intents, prompt views, Requests window (TT1+TT2)
 
-From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-64–92, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-79–84, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-58–62, -64 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-87–90 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`** on TT0's records and events ([§135](#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0)). Data side: [data model §113](../data-model/README.md#113-sprint-8-saved-macros-and-roll-requests-tt1tt2).
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-64–92, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-79–84, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-58–62, -64 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-87–90 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`** on TT0's records and events ([§135](#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0)). Data side: [data model §114](../data-model/README.md#114-sprint-8-saved-macros-and-roll-requests-tt1tt2).
 
 **Intents** (WS; zod in `@shared/dice-extras/macros`, `requests`; none takes `public` or an audience)
 
