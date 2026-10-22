@@ -4,7 +4,8 @@
 // Attack; menu Check ▸ / Save ▸ (FR-CBT-44), Damage / heal, Set as ally / enemy (FR-CBT-104),
 // Remove; the side chip), Removed. Sprint 6 (FR-CBT-118): companions' owner chip and mode icon,
 // `after-owner` rows indented under the owner, `in-owner-turn` ones as lines in its row,
-// Companion ▸ in the menus.
+// Companion ▸ in the menus. Sprint 8 (FR-CBTX-62, -63): the grip, drop line and Move up / down
+// (`reorder-drag.tsx`).
 import { signed } from "@shared/character-sheet/logic";
 import { notRestoredText } from "@shared/combat-extras/rules";
 import { isCompanion } from "@shared/combat-tracker/companion";
@@ -118,7 +119,7 @@ import {
   UserMinusIcon,
   UserPlusIcon,
 } from "lucide-react";
-import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { dmNotificationViews } from "../../notification-views";
 import {
@@ -126,6 +127,7 @@ import {
   RowDeath,
   RowEffects,
   RowMenuItems,
+  RowMoveItems,
   RowTemp,
   useDeadPc,
   useDeathSaveRoll,
@@ -142,6 +144,7 @@ import { useHoverSafeSub } from "./hover-sub";
 import { HpDialog } from "./hp-dialog";
 import { damageCardRow, isDamageCard, pendingRowText } from "./pending";
 import { useCombatDialogs } from "./popup-store";
+import { DropLine, Grip, ReorderContext, useReorder } from "./reorder-drag";
 import { rollKeys } from "./roll-keys";
 import { SideMenu } from "./side-menu";
 import { idleInitiativeOnLoad } from "./start-end";
@@ -740,6 +743,7 @@ function RowMain({
         skipped && "opacity-50",
       )}
     >
+      <Grip c={c} />
       <TurnMarker active={turn} />
       <Portrait name={c.name} imageAssetId={c.imageAssetId} />
       <div className="min-w-0 flex-1">
@@ -846,6 +850,7 @@ function RowMain({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <RowMoveItems c={c} />
           {hasScores && (
             <>
               <AbilityMenu c={c} kind="check" bonus={checkOf} {...check} />
@@ -1060,7 +1065,8 @@ export function Row({ lines = [], indent = false, ...p }: RowProps) {
       data-skipped={skipped}
       data-indent={indent || undefined}
       className={cn(
-        "flex flex-col gap-0.5 rounded-md px-1 py-0.5",
+        // FR-CBTX-62: the dragged block lifts (`data-lifted`, set by the drag).
+        "flex flex-col gap-0.5 rounded-md px-1 py-0.5 data-[lifted]:relative data-[lifted]:z-20 data-[lifted]:bg-card data-[lifted]:shadow-md data-[lifted]:ring-1 data-[lifted]:ring-border",
         turn && "bg-accent",
         indent && "ml-3",
       )}
@@ -1472,8 +1478,15 @@ function DmInitiativeBody() {
   const { send, disabled } = useCbtIntent();
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLButtonElement>(null);
-  const activeIds = rows.filter((c) => !c.removed).map((c) => c.id);
+  const active = useMemo(() => rows.filter((c) => !c.removed), [rows]);
+  const activeIds = active.map((c) => c.id);
+  // FR-CBT-107 / -118 (sprint 6): in-turn companions as lines in their owner's row.
+  const layout = useMemo(() => companionLayout(active, "position"), [active]);
+  const listed = useMemo(() => layout.map((l) => l.c), [layout]);
+  // FR-CBTX-62, -63 (sprint 8): drag / Move up / down over the listed blocks.
+  const reorder = useReorder(enc, rows, listed, listRef, wrapRef);
   // FR-CBT-77 (G4): new rows / the Pending section scroll into view; "↓ N more" below the fold.
   const fold = useBelowFold(rootRef, footerRef, activeIds, cards.length > 0);
   // FR-CBT-125: the row list clips and scrolls; the footer sits under it.
@@ -1491,10 +1504,7 @@ function DmInitiativeBody() {
       </div>
     );
   }
-  const active = rows.filter((c) => !c.removed);
   const removed = rows.filter((c) => c.removed);
-  // FR-CBT-107 / -118 (sprint 6): in-turn companions as lines in their owner's row.
-  const layout = companionLayout(active, "position");
   const wideInit = active.some((c) => canRollInitiative(enc.round, c.initiative));
   return (
     // Header + pending cards stay put; the rows scroll inside the window (glitch 3), in their
@@ -1521,23 +1531,29 @@ function DmInitiativeBody() {
           <span className={cn("text-center", INIT_W[wideInit ? "wide" : "narrow"])}>Init</span>
           <span className="w-[58px]" />
         </div>
-        <ul className="flex flex-col gap-0.5">
-          {layout.map(({ c, lines, owner, indent }) => (
-            <Row
-              key={c.id}
-              c={c}
-              def={c.entityId ? defs.get(c.entityId) : undefined}
-              turn={enc.turnCombatantId === c.id}
-              round={enc.round}
-              defs={defs}
-              wideInit={wideInit}
-              owner={owner}
-              ownerName={owner?.name ?? ownerNameOf(c)}
-              lines={lines}
-              indent={indent}
-            />
-          ))}
-        </ul>
+        <ReorderContext.Provider value={reorder}>
+          {/* The drop line's frame (FR-CBTX-62); rows measure their spots from it. */}
+          <div ref={wrapRef} className="relative" data-dragging={reorder.drag?.id}>
+            <ul className="flex flex-col gap-0.5">
+              {layout.map(({ c, lines, owner, indent }) => (
+                <Row
+                  key={c.id}
+                  c={c}
+                  def={c.entityId ? defs.get(c.entityId) : undefined}
+                  turn={enc.turnCombatantId === c.id}
+                  round={enc.round}
+                  defs={defs}
+                  wideInit={wideInit}
+                  owner={owner}
+                  ownerName={owner?.name ?? ownerNameOf(c)}
+                  lines={lines}
+                  indent={indent}
+                />
+              ))}
+            </ul>
+            <DropLine />
+          </div>
+        </ReorderContext.Provider>
         {removed.length > 0 && (
           <section aria-label="Removed" className="flex flex-col gap-1">
             <h3 className="text-xs font-medium text-muted-foreground">Removed</h3>
@@ -1611,6 +1627,8 @@ export const dmInitiativeWindow = defineWindow({
   // `session-sim` rows with no pending card, no scroll, at 1440×900 (FR-SHELL-32, G2).
   defaultSize: { w: 400, h: 500 },
   minSize: { w: 320, h: 240 },
+  // FR-SHELL-100: header, controls, 4 rows (play-shell §7 sprint-8 useful sizes).
+  usefulSize: { w: 400, h: 380 },
   defaultPosition: { anchor: "top-right" },
   // FR-CBT-77 (G4): height follows the rows until the DM resizes it (FR-SHELL-39); "new" dot
   // while minimised when the round or the turn changes (FR-SHELL-38, N1 = A, #190).

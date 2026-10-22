@@ -113,3 +113,18 @@ describe("win-layout fixture (SHELL §13 sprint 5)", () => {
     expect(turn).toMatchObject({ name: "Wolf", hidden: true });
   }, 30_000);
 });
+
+describe("wf-frame bundles (SHELL §13 sprint 8)", () => {
+  test("FIX wf-frame wf-frame-e2e load from empty: session-sim-11 under their own names (no new unit)", async () => {
+    for (const name of ["wf-frame", "wf-frame-e2e"]) {
+      const r = await loadBundle(name);
+      cleanups.push(r.cleanup);
+      expect(r.manifest.status).toBe("complete");
+      expect(r.manifest.fixtures).toContain("cp-ally");
+      const db = r.openDb();
+      cleanups.unshift(() => closeDb(db));
+      const started = db.select().from(encounter).where(eq(encounter.status, "started")).all();
+      expect(started.map((e) => e.name)).toEqual(["Ambush at the Ford"]);
+    }
+  }, 60_000);
+});

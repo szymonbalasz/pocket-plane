@@ -78,6 +78,8 @@ export const dmDiceLogWindow = defineWindow({
   // tall, 690 / 160 below (FR-DICE-38); the sprint-4 460×240 migrates (FR-SHELL-53).
   defaultSize: logSize({ w: 1150, h: 240 }),
   previousDefaults: [{ w: 460, h: 240 }],
+  // FR-SHELL-100: 3 one-line entries + the roll bar (play-shell §7 sprint-8 useful sizes).
+  usefulSize: { w: 460, h: 160 },
   defaultPosition: { anchor: "bottom-left", dx: 56 },
   component: DmLogBody,
 });

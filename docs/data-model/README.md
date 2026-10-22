@@ -2361,7 +2361,24 @@ From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-trac
 - **Derived:** what a key plays (pick, else turn / request ping, pause / resume silent).
 - **Fixtures:** `audio-chime` (asset "Chime", 17,684 B, 400 ms), `camp-alert-sounds` (`request`, `pause` → Chime); both in `session-sim-12`.
 
-## 109. Sprint 8: stats tier B core (SB0)
+## 109. Sprint 8: one window placer (WF1)
+
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0060](../architecture/adr/0060-one-window-placer.md)). **Built by `fix/placer-core`.** Browser-only; nothing on the wire.
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| `WindowState.userSize` | browser layout entry (`localStorage`, #121) | `true`, optional: set at a user resize end; the placer's target size, never shrunk or grown by it (render-only fit); kept when a displacement or zone keeps that size; cleared by Reset layout. Older entries infer it at load iff `userSpot` and the size is neither a known default nor the min | [FR-SHELL-100](../specs/play-shell.md#6-functional-requirements) |
+| Displacement memory | client memory (`ShellState.memory`) | per window the placer moved, shrank or put away for a transient cause (`toolbar:<id>`, `viewport:<w>×<h>`, `window:<kind>`): its first prior rect, `userSpot`, `userSize` and the rect it wrote (null = put away); replaces sprint 7's pre-push rects; dropped when the cause ends, on a user move / resize / close / minimise, reload, reset | [FR-SHELL-102](../specs/play-shell.md#6-functional-requirements) |
+| Settled viewport, put-away causes, settle log | client memory (`settledAt`, `autoMinimisedCause`, `settleLog`) | the viewport of the last `viewport` / reset settle; why each auto-minimised window went; the last settle's `trigger:kind>rung` steps | [FR-SHELL-103](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-110](../specs/play-shell.md#6-functional-requirements) |
+| `WindowDef.usefulSize` (★ kinds), size table criteria, pending rows | code (registry; `size-table.ts` test data, append-only) | DM Initiative 400×380, Game logs 460×160, player Initiative 280×320, player sheet 320×338; `dicex.requests`, `party.summary` pending | [FR-SHELL-100](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-112](../specs/play-shell.md#6-functional-requirements) |
+| Overlays, top-bar items, chrome keep-outs | code (append-only registries `overlays.ts`, `top-bar-items.ts`, `chrome-keep-outs.ts`, created empty) | not stored or sent | [FR-SHELL-112](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-113](../specs/play-shell.md#6-functional-requirements) |
+
+- **Derived:** zones = this viewport's named default layout (§7 sprint-5 table); target size = `userSize` ? stored : fitted default; a PC = a player character's token (#318).
+- **Fixtures:** no new unit; bundles `wf-frame`, `wf-frame-e2e` (= `session-sim-11`). Harness cells `replay-cells.generated.ts` (from `session-sim-11`, `UPDATE_CELLS=1`).
+- **Persisted runtime state:** `userSize` in the layout entry (0 B on the wire).
+- **CON-44:** 0 B.
+
+## 110. Sprint 8: stats tier B core (SB0)
 
 From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../specs/combat-tracker.md#67-sprint-8-kill-flag-and-the-end-summary) FR-CBT-152, -153 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (#334, #335; [ADR-0062](../architecture/adr/0062-stats-session-partials.md)). **Built by `build/sb-core`**. Protocol side: [protocol §138](../protocol/README.md#138-sprint-8-stats-tier-b-core--fell-lines-fight-summary-highlights-luck-trophies-session-partials-sb0). **No table, column or record type.**
 
