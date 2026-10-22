@@ -86,6 +86,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-79 | Other players see a draft PC (and its HP / AC) in Party status: only the DM and the owner hold the draft flag, so FR-PARTY-51's "drafts out" can't apply for others (CB3, sprint 8) | S | entities whitelist / party-board Summary | maybe (is a draft PC's existence private?) | — | open |
 | BL-80 | Session-replay harness: 10 more player cells fail (P1 ×6, P3 ×4) once `party.summary` joins the sets: placer limits with one more window open (no window over a PC); and the DM launcher shows full labels only from 1920 px wide with Requests + Party status registered (CB3, sprint 8) | M | play-shell placer / launcher | none | frame work | open |
 | BL-81 | e2e support `tokenNode` helper centres a token on its first Circle node, which can be an icon disc rather than the token (CB2, sprint 8) | S | e2e/support canvas helper | none | — | open |
+| BL-82 | Placer bench FR-SHELL-119 settle (12 windows × 200 boxes) runs 24.1–24.7 ms alone and 27 ms inside the full `bun run bench` against its 25 ms gate (the L3 look-ahead + yield added in WF3): speed it up or re-budget with a measured reason (sprint 8 final bench, `%TEMP%/pocket-plane/bench-s8-final.log`) | S | play-shell placer.ts | none | frame work | open |
 
 ## How to add items
 
