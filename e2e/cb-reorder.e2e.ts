@@ -52,7 +52,7 @@ async function idOf(init: Locator, name: string): Promise<string> {
  * (dropping there puts the block right above it); still pressed. The dragged row is scrolled to
  * the list's middle first, so a target a row or two away sits clear of the autoscroll edges.
  */
-async function dragAbove(page: Page, init: Locator, id: string, beforeId: string) {
+async function dragAbove(page: Page, init: Locator, id: string, beforeId: string, tip = false) {
   await row(init, id).evaluate((e) => e.scrollIntoView({ block: "center" }));
   const target = await row(init, beforeId).boundingBox();
   const box = await grip(init, id).boundingBox();
@@ -60,8 +60,15 @@ async function dragAbove(page: Page, init: Locator, id: string, beforeId: string
   const x = box.x + box.width / 2;
   const y = target.y - 1;
   await page.mouse.move(x, box.y + box.height / 2);
+  // `tip`: rest on the grip until its "Drag to reorder" tooltip shows, then press (checked below).
+  if (tip) await expect(page.getByTestId("ui-tooltip")).toHaveText("Drag to reorder");
   await page.mouse.down();
   await page.mouse.move(x, box.y + box.height / 2 + (y > box.y ? 6 : -6));
+  // The tip shown before the press shuts once the grip is pressed and dragged (walkthrough).
+  if (tip) {
+    await page.waitForTimeout(300);
+    await expect(page.getByTestId("ui-tooltip")).toBeHidden();
+  }
   await page.mouse.move(x, y, { steps: 8 });
 }
 
@@ -90,7 +97,7 @@ test("FR-CBTX-62 drag and drop: DM drags Thorn to the top of the 12-tie → play
   const first = rows.slice(at + 1).find((r) => !r.indent);
   if (!first) throw new Error("no tie row");
   expect(first.id).not.toBe(thorn); // cb-core left Fire Elemental 3 above Thorn
-  await dragAbove(dm, init, thorn, first.id);
+  await dragAbove(dm, init, thorn, first.id, true);
   const line = init.getByTestId("cbtx-init-drop");
   await expect(line).toHaveAttribute("data-after", mira);
   // Inside the tie: Thorn keeps 12, no "→".

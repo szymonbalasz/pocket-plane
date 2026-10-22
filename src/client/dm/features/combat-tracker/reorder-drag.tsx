@@ -7,7 +7,7 @@
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import type { MovePlan } from "@shared/combat-tracker/rules";
 import type { CombatantView, EncounterView } from "@shared/combat-tracker/schemas";
-import { Tooltip } from "@ui/components/ui/overlays";
+import { OVERLAY_OPEN_ATTR, Tooltip } from "@ui/components/ui/overlays";
 import { deadPc } from "@ui/features/combat-extras/logic";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import { useSync } from "@ui/sync/store";
@@ -48,6 +48,8 @@ export interface DragView {
 export interface Reorder {
   blocks: Block[];
   drag: DragView | null;
+  /** The row whose grip is pressed (before and during a drag): its tooltip stays shut. */
+  held: string | null;
   /** In flight or not live (FR-CBTX-62, -69): grips and Move items disabled. */
   disabled: boolean;
   /** No movable row has a number: grips disabled, "Roll initiative first". */
@@ -75,6 +77,7 @@ export function useReorder(
   const store = useSync((s) => s.store);
   const blocks = useMemo(() => blocksOf(listed, rows), [listed, rows]);
   const [drag, setDrag] = useState<DragView | null>(null);
+  const [held, setHeld] = useState<string | null>(null);
   const cancel = useRef<(() => void) | null>(null);
   const unranked = noInitiative(blocks);
   const off = disabled || unranked;
@@ -108,6 +111,7 @@ export function useReorder(
     const grip = e.currentTarget;
     const pid = e.pointerId;
     grip.setPointerCapture(pid);
+    setHeld(id);
     const ul = wrap.querySelector("ul");
     const elsOf = (b: Block) =>
       b.rows
@@ -156,9 +160,11 @@ export function useReorder(
         setDrag({ id, slot, y: next ? boundary(next.index) : 0 });
       }
     };
+    // The zone starts below the sticky column header (the list's first child), as at the bottom.
+    const header = list.firstElementChild instanceof HTMLElement ? list.firstElementChild : null;
     const tick = () => {
       const r = list.getBoundingClientRect();
-      const d = autoscrollStep(y, r.top, r.bottom);
+      const d = autoscrollStep(y, r.top + (header?.offsetHeight ?? 0), r.bottom);
       if (d !== 0) {
         const was = list.scrollTop;
         list.scrollTop = was + d;
@@ -182,6 +188,7 @@ export function useReorder(
       }
       if (grip.hasPointerCapture(pid)) grip.releasePointerCapture(pid);
       setDrag(null);
+      setHeld(null);
       if (send && dragging && slot) void commit(id, slot.afterId, slot.plan);
     };
     const onMove = (ev: PointerEvent) => {
@@ -211,7 +218,7 @@ export function useReorder(
   };
 
   const movable = (id: string) => blocks.some((b) => b.movable && b.head.id === id);
-  return { blocks, drag, disabled, unranked, movable, start, step };
+  return { blocks, drag, held, disabled, unranked, movable, start, step };
 }
 
 /**
@@ -225,7 +232,11 @@ export function Grip({ c }: { c: CombatantView }) {
   if (!r?.movable(c.id)) return null;
   return (
     <Tooltip content={r.unranked ? "Roll initiative first" : "Drag to reorder"}>
-      <span className="absolute inset-y-0 -left-2 flex w-2">
+      {/* Pressed: the captured pointer's moves bubble here, so "overlay open" keeps the tip shut. */}
+      <span
+        className="absolute inset-y-0 -left-2 flex w-2"
+        {...{ [OVERLAY_OPEN_ATTR]: r.held === c.id ? "true" : undefined }}
+      >
         <button
           type="button"
           tabIndex={-1}

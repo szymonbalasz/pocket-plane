@@ -17,8 +17,8 @@ import type { CombatantView } from "@shared/combat-tracker/schemas";
 export const DRAG_THRESHOLD = 4;
 /** The list scrolls while the pointer is this close to its top or bottom edge, px. */
 export const AUTOSCROLL_EDGE = 24;
-/** Scroll per animation frame at the edge, px. */
-export const AUTOSCROLL_STEP = 8;
+/** Scroll per animation frame at (or past) the edge, px; 1 px where the zone starts. */
+export const AUTOSCROLL_MAX = 4;
 
 /** One draggable unit: a row and the rows riding it (FR-CBT-107), top to bottom. */
 export interface Block {
@@ -136,10 +136,20 @@ export function dropHint(blocks: readonly Block[], slot: Slot, movedId: string):
   return { number: slot.plan.numbers.get(movedId) ?? null, others };
 }
 
-/** Autoscroll per frame: up near the top edge, down near the bottom, else 0. */
+/**
+ * Autoscroll per frame (walkthrough CB4 / CB8: a flat 8 px a frame ran the list to the end):
+ * inside the 24 px zone at either edge, 1 px a frame where the zone starts up to
+ * `AUTOSCROLL_MAX` at the edge and past it; the same for both edges; else 0. `top` = the first
+ * visible row line (below the sticky column header).
+ */
 export function autoscrollStep(y: number, top: number, bottom: number): number {
-  if (y < top + AUTOSCROLL_EDGE) return -AUTOSCROLL_STEP;
-  if (y > bottom - AUTOSCROLL_EDGE) return AUTOSCROLL_STEP;
+  const speed = (inside: number) =>
+    1 +
+    Math.floor(((AUTOSCROLL_MAX - 1) * (AUTOSCROLL_EDGE - Math.max(0, inside))) / AUTOSCROLL_EDGE);
+  const up = y - top;
+  const down = bottom - y;
+  if (up < AUTOSCROLL_EDGE && up <= down) return -speed(up);
+  if (down < AUTOSCROLL_EDGE) return speed(down);
   return 0;
 }
 

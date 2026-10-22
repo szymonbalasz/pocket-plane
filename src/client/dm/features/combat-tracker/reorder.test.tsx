@@ -14,7 +14,7 @@ import {
 import { dmInitiativeWindow } from "./initiative-window";
 import {
   AUTOSCROLL_EDGE,
-  AUTOSCROLL_STEP,
+  AUTOSCROLL_MAX,
   autoscrollStep,
   blocksOf,
   crossingHint,
@@ -97,9 +97,35 @@ describe("FR-CBTX-62 drag and drop", () => {
 
   test("FR-CBTX-62 drag and drop: autoscroll within 24 px of the list's top or bottom edge", () => {
     expect(AUTOSCROLL_EDGE).toBe(24);
-    expect(autoscrollStep(110, 100, 400)).toBe(-AUTOSCROLL_STEP);
+    expect(autoscrollStep(110, 100, 400)).toBeLessThan(0);
     expect(autoscrollStep(250, 100, 400)).toBe(0);
-    expect(autoscrollStep(390, 100, 400)).toBe(AUTOSCROLL_STEP);
+    expect(autoscrollStep(124, 100, 400)).toBe(0);
+    expect(autoscrollStep(376, 100, 400)).toBe(0);
+    expect(autoscrollStep(390, 100, 400)).toBeGreaterThan(0);
+  });
+
+  test("FR-CBTX-62 drag and drop: autoscroll is gradual and the same at both edges (walkthrough CB4 / CB8)", () => {
+    const up = (d: number) => -autoscrollStep(100 + d, 100, 400);
+    const down = (d: number) => autoscrollStep(400 - d, 100, 400);
+    let last = Number.POSITIVE_INFINITY;
+    for (let d = 0; d < AUTOSCROLL_EDGE; d++) {
+      // Symmetric, a few px a frame, faster closer to the edge.
+      expect(down(d)).toBe(up(d));
+      expect(down(d)).toBeGreaterThanOrEqual(1);
+      expect(down(d)).toBeLessThanOrEqual(AUTOSCROLL_MAX);
+      expect(down(d)).toBeLessThanOrEqual(last);
+      last = down(d);
+    }
+    expect(AUTOSCROLL_MAX).toBeLessThanOrEqual(4);
+    expect(down(23)).toBe(1);
+    expect(down(0)).toBe(AUTOSCROLL_MAX);
+    // Past the edge (over the footer or the header): the edge's speed, never a jump.
+    expect(down(-80)).toBe(AUTOSCROLL_MAX);
+    expect(up(-80)).toBe(AUTOSCROLL_MAX);
+    // 120 px of rows past the bottom take dozens of frames, not one.
+    let frames = 0;
+    for (let scrolled = 0; scrolled < 120; frames++) scrolled += down(12);
+    expect(frames).toBeGreaterThanOrEqual(30);
   });
 
   test("FR-CBTX-62 drag and drop: a grip on every movable row (hidden too), none on attached companions, never a tab stop", () => {
@@ -120,6 +146,7 @@ describe("FR-CBTX-62 drag and drop", () => {
     const ctx = (o: Partial<Reorder>): Reorder => ({
       blocks: b,
       drag: null,
+      held: null,
       disabled: false,
       unranked: false,
       movable: () => true,
@@ -137,6 +164,10 @@ describe("FR-CBTX-62 drag and drop", () => {
     expect(grip({})).not.toContain('disabled=""');
     expect(grip({ disabled: true })).toContain('disabled=""');
     expect(grip({ unranked: true })).toContain('disabled=""');
+    // Walkthrough fix: the pressed grip's tooltip stays shut ("overlay open" on its trigger).
+    expect(grip({})).not.toContain('data-overlay-open="true"');
+    expect(grip({ held: "goblin" })).toContain('data-overlay-open="true"');
+    expect(grip({ held: "thorn" })).not.toContain('data-overlay-open="true"');
     expect(
       noInitiative(blocks(ROWS.map((r) => ({ ...r, initiative: null }) as CombatantView))),
     ).toBe(true);
