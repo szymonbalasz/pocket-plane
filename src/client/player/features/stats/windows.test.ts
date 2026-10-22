@@ -1,14 +1,20 @@
 // Stats window on the player registry: registered per FR-SHELL-86 (FR-SHELL-93), fits at 1280×720
 // and overlaps no open product window at 1600×900; the awards open (FR-SHELL-94); the
-// `stats-awards` notification view (FR-NOTE-48).
+// `stats-awards` notification view (FR-NOTE-48). Sprint 8: the End summary open (FR-STATS-34), the
+// `stats-fight-summary` view (FR-NOTE-68), the Stats preferences section (FR-STATS-30).
 import { expect, test } from "bun:test";
 import type { You } from "@shared/protocol/frames";
-import { STATS_AWARDS_KIND } from "@shared/stats/schemas";
+import { STATS_AWARDS_KIND, STATS_FIGHT_SUMMARY_KIND } from "@shared/stats/schemas";
 import { clampRect, type Rect, TOP_BAR_H, workArea } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { STATS_WINDOW_KIND } from "@ui/features/stats/logic";
-import { openStatsAwardsRuns, statsDefFacts } from "@ui/features/stats/window-checks";
+import {
+  openStatsAwardsRuns,
+  openStatsFightRuns,
+  statsDefFacts,
+} from "@ui/features/stats/window-checks";
 import { playerNotificationViews } from "../../notification-views";
+import { playerPrefSections } from "../../pref-sections";
 
 import { playerWindows } from "../../windows";
 
@@ -70,7 +76,13 @@ test("FR-SHELL-93 stats window fits at 1280×720 and covers no open product wind
 });
 
 test("FR-SHELL-94 awards open the window (player): a closed window opens (by feature), a minimised one is restored, an open one is fronted; each switched to the Session tab on that session", () => {
-  const view = { tab: "session" as const, fightKey: "enc-1", sessionFromN: 7 };
+  const view = {
+    tab: "session" as const,
+    fightKey: "enc-1",
+    sessionFromN: 7,
+    highlightsOpen: null,
+    luckScope: null,
+  };
   const feature = [{ kind: STATS_WINDOW_KIND, by: "feature" }];
   expect(openStatsAwardsRuns(playerWindows, YOU)).toEqual([
     { before: "closed", calls: feature, state: "open", onTop: true, view },
@@ -84,4 +96,34 @@ test("FR-NOTE-48 awards notification view (player): stats-awards registered with
   expect(v?.icon).toBeDefined();
   expect(v?.render).toBeDefined();
   expect(v?.onAction).toBeUndefined();
+});
+
+test("FR-STATS-34 summary opens Stats (player): a closed window opens (by feature), a minimised one is restored, an open one is fronted; each on the Fight tab, that fight, Highlights open", () => {
+  const view = {
+    tab: "fight" as const,
+    fightKey: "enc-9",
+    sessionFromN: null,
+    highlightsOpen: true,
+    luckScope: null,
+  };
+  const feature = [{ kind: STATS_WINDOW_KIND, by: "feature" }];
+  expect(openStatsFightRuns(playerWindows, YOU)).toEqual([
+    { before: "closed", calls: feature, state: "open", onTop: true, view },
+    { before: "minimised", calls: feature, state: "open", onTop: true, view },
+    { before: "open", calls: feature, state: "open", onTop: true, view },
+  ]);
+});
+
+test("FR-NOTE-68 fight summary notification view (player): stats-fight-summary registered, info class, with an icon and a renderer (its Open), no action", () => {
+  const v = playerNotificationViews.get(STATS_FIGHT_SUMMARY_KIND);
+  expect(v?.icon).toBeDefined();
+  expect(v?.render).toBeDefined();
+  expect(v?.onAction).toBeUndefined();
+  expect((v as { toastClass?: string } | undefined)?.toastClass).toBe("info");
+});
+
+test("FR-STATS-30 FR-STATS-34 preferences (player): the Stats section stats.prefs registered once", () => {
+  expect(playerPrefSections.filter((s) => s.id === "stats.prefs").map((s) => s.title)).toEqual([
+    "Stats",
+  ]);
 });

@@ -8,7 +8,7 @@ import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type RegisteredView } from "@ui/features/notifications/views";
 import { handoutSharedView } from "@ui/features/party-board/note-view";
 import { lootReceivedView } from "@ui/features/party-loot/note-view";
-import { statsAwardsView } from "@ui/features/stats/note-view";
+import { statsAwardsView, statsFightSummaryView } from "@ui/features/stats/note-view";
 import { dmDamageCardView } from "./features/combat-tracker/card-view";
 import { dmSummonCardView } from "./features/combat-tracker/summon-card-view";
 
@@ -23,6 +23,7 @@ const views: RegisteredView[] = [
   { ...modTriggerView, toastClass: "info" }, // mod-trigger (effect-modifiers, FR-MOD-44)
   { ...dmSummonCardView, toastClass: "card" }, // cbt-summon-concentration (combat-tracker, FR-CBT-120)
   { ...statsAwardsView, toastClass: "info" }, // stats-awards (stats, FR-NOTE-48)
+  { ...statsFightSummaryView, toastClass: "info" }, // stats-fight-summary (stats, FR-NOTE-68)
 ];
 
 export const dmNotificationViews = createNotificationViews(views);

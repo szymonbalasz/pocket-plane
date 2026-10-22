@@ -75,13 +75,14 @@ test("FR-STATS-18 FR-STATS-17 FR-STATS-22 FR-STATS-20 FR-SHELL-94 an overkill up
     String(p2Before + 40),
     { timeout: 2000 },
   );
-  const p2Toast = p2.getByTestId("stats-overkill-toast");
-  await expect(p2Toast).toHaveText("Overkill! Thorn → Goblin Scout 2: 40 damage");
-  await expect(dm.getByTestId("stats-overkill-toast")).toHaveText(
-    "Overkill! Thorn → Goblin Scout 2: 40 damage (+33 over 7 HP)",
+  // Sprint 8 (FR-STATS-28): the kill feed took the overkill toast's place (FR-NOTE-69).
+  const p2Toast = p2.getByTestId("stats-feed-toast");
+  await expect(p2Toast).toHaveText("Overkill! Thorn finished Goblin Scout 2");
+  await expect(dm.getByTestId("stats-feed-toast")).toHaveText(
+    "Overkill! Thorn finished Goblin Scout 2, overkill 33",
   );
   // Player-1 hasn't opened Stats: the toast still comes (the window's companion).
-  await expect(p1.getByTestId("stats-overkill-toast")).toHaveCount(1);
+  await expect(p1.getByTestId("stats-feed-toast")).toHaveCount(1);
   await expect(shellWindow(p1, "stats.board")).toBeHidden();
 
   // FR-STATS-19 / -20: the DM's Session tab defaults to today's session; Show awards.
