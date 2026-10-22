@@ -2360,3 +2360,11 @@ From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-trac
 
 - **Derived:** what a key plays (pick, else turn / request ping, pause / resume silent).
 - **Fixtures:** `audio-chime` (asset "Chime", 17,684 B, 400 ms), `camp-alert-sounds` (`request`, `pause` → Chime); both in `session-sim-12`.
+
+## 109. Sprint 8: toast policy (WF4)
+
+From [notifications](../specs/notifications.md#8-data-model) FR-NOTE-50–53 (#333, #335). **Built by `fix/wf-sizes-toasts`**. Protocol side: [protocol §138](../protocol/README.md#138-sprint-8-one-toast-policy-stats-and-companion-card-useful-sizes-wf4). **No table, column, record type or wire field.**
+
+- **Registries (code, not stored):** server kind def and client view gain `toastClass` (`card` | `alert` | `info`), named on every registry line.
+- **Client memory (per page, never sent or stored):** each notification toast's class (`cls`); the one callout `{id, content, remaining}` (cleared on a campaign switch).
+- **Derived:** a row's toast class (pending → card, else the kind's alert, else info); what the stack shows (order and the "+N more" count).
