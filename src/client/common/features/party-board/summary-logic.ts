@@ -1,8 +1,9 @@
 // Pure rows of the `party.summary` "Party status" window (FR-PARTY-51–56, sprint 8, CB3): one row
 // per player character the viewer receives (drafts out where the viewer holds the sheet), the
 // viewer's own first, then by name (DM: by name); companions per ADR-0056 grouped under their
-// owner PC after the PC rows (present pets + owned combatants of the started encounter; never an
-// unowned or hostile creature, never a hidden / `ownerHidden` one). Reads only records the client
+// owner PC after the PC rows (present pets: another player's only while the viewer holds a visible
+// combatant or token for it; owned combatants of the started encounter; never an unowned or
+// hostile creature, never a hidden / `ownerHidden` one). Reads only records the client
 // already holds (FR-PARTY-55): `entity`, `combatant`, `encounter`, `effect`, `creature-sheet`.
 // No React.
 
@@ -141,7 +142,22 @@ export interface SummaryInput {
   encounters: readonly unknown[];
   effects: readonly EffectView[];
   sheets: readonly unknown[];
+  /** Tokens the viewer holds (players: visible ones of the active scene only). */
+  tokens: readonly unknown[];
 }
+
+/**
+ * A pet's token as a player holds it: no `definitionId` (FR-MAP-26), so matched as a monster
+ * token (no `characterId`) with the pet's owner and name; hidden tokens never reach a player.
+ */
+const holdsPetToken = (tokens: readonly unknown[], pet: { name: string; ownerPlayerId: string }) =>
+  (
+    tokens as readonly {
+      characterId?: string | null;
+      ownerPlayerId?: string | null;
+      name?: string;
+    }[]
+  ).some((t) => !t.characterId && t.ownerPlayerId === pet.ownerPlayerId && t.name === pet.name);
 
 /** FR-PARTY-51–53: the window's rows for this viewer. */
 export function partySummary(input: SummaryInput, viewer: CompanionViewer): PartySummary {
@@ -225,6 +241,10 @@ export function partySummary(input: SummaryInput, viewer: CompanionViewer): Part
       // `petPresent` (FR-ENT-37), so the owner sees its pets always.
       if (dm && row.record?.petPresent !== true) continue;
       if (dm && (c?.hidden === true || c?.ownerHidden === true)) continue;
+      // Another player's pet: only while that player holds a visible combatant or token for it
+      // (a hidden one is never sent; the pet row alone would tell them it is around).
+      const others = !dm && row.ownerPlayerId !== viewer.playerId;
+      if (others && !c && !holdsPetToken(input.tokens, row)) continue;
       add(row.ownerCharacterId, row.ownerPlayerId, {
         id: row.id,
         name: row.name,

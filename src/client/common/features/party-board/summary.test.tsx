@@ -224,6 +224,7 @@ const inputs: Record<"dm" | "p1" | "p2", SummaryInput> = {
     encounters: [enc],
     effects: [poisoned, secretHex] as never,
     sheets,
+    tokens: [],
   },
   p1: {
     entities: [mira, brakka, redacted(thorn), draft, owlbearOwner],
@@ -238,6 +239,7 @@ const inputs: Record<"dm" | "p1" | "p2", SummaryInput> = {
     encounters: [{ id: "e1", status: "started", playerTurnCombatantId: null }],
     effects: [poisoned] as never,
     sheets,
+    tokens: [],
   },
   p2: {
     // Ivo is a draft; Player 2 can't know (no sheet), so it lists like any PC.
@@ -253,6 +255,7 @@ const inputs: Record<"dm" | "p1" | "p2", SummaryInput> = {
     encounters: [{ id: "e1", status: "started", playerTurnCombatantId: "c-thorn" }],
     effects: [poisoned] as never,
     sheets: [],
+    tokens: [],
   },
 };
 
@@ -274,6 +277,7 @@ function render(you: You, input: SummaryInput, live = true) {
             encounter: byId(input.encounters),
             effect: byId(input.effects),
             "creature-sheet": byId(input.sheets),
+            token: byId(input.tokens),
             player: {
               p1: { id: "p1", campaignId: "c", name: "Player 1", color: "#19b98a" },
               p2: { id: "p2", campaignId: "c", name: "Player 2", color: "#56b4e9" },
@@ -385,6 +389,37 @@ describe("Party status (FR-PARTY-51–56)", () => {
     expect(html).toContain('data-testid="party-summary-effect" data-value="poisoned"');
     expect(html.match(/data-testid="party-summary-turn"/g)).toHaveLength(1);
     expect(html).toContain('data-testid="party-summary-hp" data-value="healthy"');
+  });
+
+  test("FR-PARTY-51 hidden companion: another player sees a pet row only while it holds a visible combatant or token for it", () => {
+    const owl = (s: ReturnType<typeof partySummary>) =>
+      s.companions.flatMap((g) => g.rows.map((r) => r.id)).includes("owl");
+    // The DM hides the Owlbear: player 2 gets the combatant delete, keeps the pet row.
+    const hidden = {
+      ...inputs.p2,
+      combatants: inputs.p2.combatants.filter((c) => (c as { id: string }).id !== "c-owl"),
+    };
+    expect(owl(partySummary(inputs.p2, viewerOf(P2)))).toBe(true);
+    expect(owl(partySummary(hidden, viewerOf(P2)))).toBe(false);
+    expect(render(P2, hidden)).not.toContain(">Owlbear<");
+    // Out of the fight with a visible token on the active scene: listed again (band only).
+    const token = {
+      id: "t-owl",
+      name: "Owlbear",
+      ownerPlayerId: "p1",
+      characterId: null,
+      hidden: false,
+    };
+    expect(owl(partySummary({ ...hidden, tokens: [token] }, viewerOf(P2)))).toBe(true);
+    // A character token of the same owner never stands in for the pet.
+    const pcToken = { ...token, characterId: "mira" };
+    expect(owl(partySummary({ ...hidden, tokens: [pcToken] }, viewerOf(P2)))).toBe(false);
+    // The owner keeps its own pet without a combatant or token (accepted: not present, CB13).
+    const ownerHidden = {
+      ...inputs.p1,
+      combatants: inputs.p1.combatants.filter((c) => (c as { id: string }).id !== "c-owl"),
+    };
+    expect(owl(partySummary(ownerHidden, viewerOf(P1)))).toBe(true);
   });
 
   test("FR-PARTY-56 states: no PCs → empty text; disconnected → figures muted; Dying badge at 0 HP", () => {

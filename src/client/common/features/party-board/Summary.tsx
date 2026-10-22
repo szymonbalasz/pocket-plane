@@ -11,6 +11,7 @@ import { COMBATANT_TYPE, ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import type { HealthBand } from "@shared/entities/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { initials } from "@shared/scenes-map/geometry";
+import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { ChevronRightIcon, EyeOffIcon, ShieldIcon } from "lucide-react";
 import { type KeyboardEvent, useMemo } from "react";
 import { Tooltip } from "../../components/ui/overlays";
@@ -247,6 +248,7 @@ export function PartySummaryWindow() {
   const encounters = useRecords<unknown>(ENCOUNTER_TYPE);
   const effects = useRecords<EffectView>(EFFECT_TYPE);
   const sheets = useRecords<unknown>(CREATURE_SHEET_TYPE);
+  const tokens = useRecords<unknown>(TOKEN_TYPE);
   const you = useSync((s) => s.store.you);
   const live = useSync((s) => s.state === "live");
   const viewer = useMemo(
@@ -254,8 +256,8 @@ export function PartySummaryWindow() {
     [you],
   );
   const summary = useMemo(
-    () => partySummary({ entities, combatants, encounters, effects, sheets }, viewer),
-    [entities, combatants, encounters, effects, sheets, viewer],
+    () => partySummary({ entities, combatants, encounters, effects, sheets, tokens }, viewer),
+    [entities, combatants, encounters, effects, sheets, tokens, viewer],
   );
   const openWindow = useOpenWindow();
   const open = (id: string) => {
