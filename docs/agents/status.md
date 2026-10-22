@@ -10,8 +10,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | WF1 placer core + replay harness | merged | — | done | main gates running |
 | WF3 map refits | merged (re-test 7/8; DM reload cell by design) | — | done | — |
-| CB2 turn ring | `build/cb-turn-ring` (w9N) | build-cb2 | walkthrough 16/16; gates queued | merge |
-| TT4 pause screen | `build/tt-pause` (w9H) | build-tt4 | part 1 13/14 → popup + body-portal fixes, gates | finish after WF4 (toasts), WF3 (reveal), TT1+2 (T10, T12) |
+| CB2 turn ring | merged (16/16) | — | done | — |
+| TT4 pause screen (last slice) | `build/tt-pause` (w9H) | build-tt4 | final: stats hooks after merging main | final walkthrough T9–T12, T17 |
 | WF2 pushes + rail inset | merged (walkthrough 13/14) | — | done | main check 5014 / e2e 199 (1 known flake re-run green) |
 | TT0 table-tools core | merged (walkthrough 6/6) | — | done | main gates running |
 | TT3 alert sounds | merged (walkthrough 15/15) | — | done | main gates running |
@@ -19,7 +19,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SB0 stats tier-B core | merged (walkthrough 10/10) | — | done | — |
 | CB3 Party status | merged (walkthrough all PASS after the hidden-companion fix) | — | done | — |
 | WF4 toast policy + Stats / card sizes | merged | — | done | — |
-| SB1+SB2 stats UI + trophies | `build/sb-stats-ui` (w9M) | build-sb12 | walkthrough 12/13 → BL-69 fixed; gates running | merge, then TT4's stats hooks |
+| SB1+SB2 stats UI + trophies | merged (12/13 → BL-69 fixed) | — | done | — |
 | CB0 combat core | merged (walkthrough all PASS) | — | done | main gates running |
 | CB1 drag reorder | merged (walkthrough 14/14) | — | done | main gates after WF1 merge |
 
@@ -28,7 +28,7 @@ Queue (seams build plan, `.verify/sprint8/seams.md`): wave 2 WF4, TT1+2, TT3, CB
 ## Shared-file locks
 
 - Canvas (MapCanvas, camera, TokensLayer, LabelsLayer) + `free-area.ts`: `fix/wf-refits` (then CB2).
-- Canvas (token-overlays type, decorations, token-decor, TokensLayer): `build/cb-turn-ring`. `PlayFrame.tsx` overlay layer: `build/tt-pause`. Frame files free.
+- `PlayFrame.tsx` overlay layer, stats runtime pause hooks: `build/tt-pause`. Everything else free.
 - Backlog: no new picks (the last sprint slice is in flight).
 - Schema lane: free (TT0, CB0 merged).
 
