@@ -3262,3 +3262,18 @@ From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-trac
 - **Test IDs:** DM `camp-sounds`, `camp-sound` (+ `data-value` = key), `camp-sound-select` (`data-value` = pick or `default`), `camp-sound-test` (`data-outcome` after a click), `camp-sound-upload`, `camp-sound-file`, `camp-sound-error`; players' Sound section `ui-sound-test-key` (`data-value`), `ui-sound-test` (`data-outcome`).
 - **Fixtures:** units `audio-chime` (generated 0.4 s PCM WAV, 17,684 B; `ingestStep` gains a bytes form `{bytes, filename}`; manifest type `audio-asset`) and `camp-alert-sounds` (request, pause → Chime) join `session-sim-12`; bundles `alert-sounds` (`mid-combat` + both), `alert-sounds-e2e`. Upload-limit files `e2e/support/audio.ts` (`bun e2e/support/audio.ts <dir>` writes `big.wav`, `long.wav`, `fake.mp3`).
 - **CON-44:** no new snapshot record; `audio-asset` 0 B (lazy); the picks' +150 B and the 50-sound load are measured by `con44-tt.test.ts` (§135).
+
+## 138. Sprint 8: drag to reorder initiative — DM client (CB1)
+
+No wire change: the drag and Move up / down send `cbtx.moveCombatant` ([§136](#136-sprint-8-combat-polish-core--cbtxmovecombatant-tie-order-cb0)); records, events and visibility as there. CON-44: 0 B (nothing stored).
+
+| Part | Behaviour | Test IDs | FR |
+|---|---|---|---|
+| Grip | lucide `GripVertical` at the left of every movable row (active, not removed, not riding its owner; hidden rows too); none on an attached companion. It sits in the 8 px gutter left of the turn marker, so the name line keeps its width. `tabIndex -1` (no new tab stop). Disabled while a move is in flight or not live; no movable row with a number → disabled, Tooltip "Roll initiative first" | `cbtx-init-row-grip` + `data-record-id` | FR-CBTX-62 |
+| Drag | primary press + 4 px → the row's block (row + rows riding it) lifts and follows the pointer inside the list; autoscroll within 24 px of the list's edges; pointer capture, no library. Esc, pointer cancel, lost capture, the start spot, a disconnect → nothing sent. Drop → one intent, not optimistic | — | FR-CBTX-62, -69 |
+| Drop line | between blocks only, never below the last numbered row, not at the start spot; `data-after` = anchor id or `top`. "→ n" when the drop changes the row's number, the rewritten rows ("Wolf → 17") in a tooltip under the line; both from `planMove` (pure, shared with the server) | `cbtx-init-drop`, `cbtx-init-drop-number`, `cbtx-init-drop-tip` | FR-CBTX-62, -65 |
+| Move up / down | first entries of the DM row menu; one block per step (up: anchor = the block two above, top when one above; down: the block below); disabled at the ends, on attached companions, below the last numbered row, in flight / not live | `cbtx-init-row-move-up`, `cbtx-init-row-move-down` + `data-record-id` | FR-CBTX-63 |
+| Crossing hint | after the move's ack, round ≥ 1, from the order before and after (client only): crossed the turn row upwards "Goblin now acts before Mira: no turn for it this round", downwards "… acts after Mira: it acts again this round", the moved block holds the turn "Mira's turn goes on; next: Goblin 2" (Next's row, skipping as Next does). Silent info toast | `cbt-init-move-hint` | FR-CBT-165 |
+| Players | unchanged: no grip, no items; rows re-sort by `playerPosition` | — | FR-CBTX-68 |
+
+- **Code:** `src/client/dm/features/combat-tracker/{reorder.ts (pure), reorder-drag.tsx, initiative-window.tsx}`, `src/client/dm/features/combat-extras/row.tsx` (`RowMoveItems`). E2E `e2e/cb-reorder.e2e.ts` on `cb-reorder-e2e` (after `cb-core.e2e.ts`, same server).
