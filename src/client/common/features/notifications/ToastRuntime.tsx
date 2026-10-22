@@ -35,6 +35,7 @@ import {
   reportShownStack,
 } from "../play-shell/toast-region";
 import { tokenScreenBoxes } from "../play-shell/token-boxes";
+import { AlertToast, useAlertToasts } from "./alert-toasts";
 import { dmStackPlacement } from "./keep-out";
 import {
   actionButton,
@@ -281,6 +282,9 @@ export function ToastRuntime({
     return sync.subscribe((next, prev) => onChange(next, prev));
   }, [sync, note, memory, dispatch, views, classOf]);
 
+  // FR-NOTE-50: the client's `toast()` calls as the alert class (this stack claims the region).
+  const alerts = useAlertToasts(state.toasts, dispatch);
+
   // FR-NOTE-26: `hideToast(id)` reaches this page's stack.
   useEffect(() => registerToastMemory(memory), [memory]);
 
@@ -413,6 +417,17 @@ export function ToastRuntime({
                 <XIcon className="size-4" />
               </button>
             </div>
+          );
+        }
+        if (t.kind === "alert") {
+          const a = alerts.get(t.alertId);
+          if (!a) return null;
+          return (
+            <AlertToast
+              key={t.key}
+              t={a}
+              onClose={() => dispatch((s, now) => closeToast(s, t.key, now))}
+            />
           );
         }
         const n = rows?.[t.notificationId];

@@ -42,6 +42,15 @@ export type Toast =
       remaining: number;
     }
   | {
+      /** FR-NOTE-50: an alert-class toast from the client's `toast()` calls (sonner's store). */
+      key: string;
+      kind: "alert";
+      alertId: string | number;
+      /** An infinite duration: stays until closed or dismissed. */
+      sticky: boolean;
+      remaining: number;
+    }
+  | {
       key: typeof SUMMARY_KEY;
       kind: "summary";
       count: number;
@@ -124,6 +133,38 @@ export function addNote(
   const remaining = TOAST_CLASS_MS[cls] ?? INFO_TOAST_MS;
   const t: Toast = { key: n.id, kind: "note", notificationId: n.id, cls, sticky, remaining };
   return { ...ran, toasts: [...ran.toasts, t] };
+}
+
+/** One `toast()` call showing (sonner's store), for `syncAlerts`. */
+export interface AlertInput {
+  id: string | number;
+  /** Its own duration, ms; absent → the alert class's 6 s; infinite → until closed. */
+  ms?: number | undefined;
+}
+
+/** The stack key of the `toast()` with this id. */
+export const alertKey = (id: string | number) => `toast:${typeof id}:${id}`;
+
+/**
+ * FR-NOTE-50: the alert toasts follow the client's `toast()` calls: a new one joins (its own
+ * duration, else 6 s), one gone from the list leaves; one already showing keeps its timer.
+ * Unchanged → the same state.
+ */
+export function syncAlerts(s: ToastState, list: readonly AlertInput[], now: number): ToastState {
+  const want = new Map(list.map((a) => [alertKey(a.id), a]));
+  const have = new Set(s.toasts.flatMap((t) => (t.kind === "alert" ? [t.key] : [])));
+  const gone = [...have].some((k) => !want.has(k));
+  const added = [...want.keys()].filter((k) => !have.has(k));
+  if (!gone && added.length === 0) return s;
+  const ran = advance(s, now);
+  const toasts: Toast[] = ran.toasts.filter((t) => t.kind !== "alert" || want.has(t.key));
+  for (const key of added) {
+    const a = want.get(key) as AlertInput;
+    const ms = a.ms !== undefined && a.ms > 0 ? a.ms : (TOAST_CLASS_MS.alert ?? INFO_TOAST_MS);
+    const sticky = !Number.isFinite(ms);
+    toasts.push({ key, kind: "alert", alertId: a.id, sticky, remaining: sticky ? 0 : ms });
+  }
+  return { ...ran, toasts };
 }
 
 /** FR-NOTE-50: shows a callout; one showing is replaced (one at a time). */
@@ -288,6 +329,7 @@ export function syncToasts(
 /** A toast's class (FR-NOTE-50); the summary comes before every class. */
 export function classOfToast(t: Toast): NotificationToastClass | "summary" {
   if (t.kind === "summary") return "summary";
+  if (t.kind === "alert") return "alert";
   return t.cls ?? (t.sticky ? "card" : "info");
 }
 

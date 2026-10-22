@@ -6,6 +6,7 @@ import type { NotificationRecord } from "@shared/notifications/schemas";
 import { TOAST_CLASS_MS, toastClassOf } from "@shared/notifications/toast-class";
 import {
   addNote,
+  alertKey,
   CALLOUT_MS,
   type ClassOf,
   classOfToast,
@@ -20,6 +21,7 @@ import {
   setHovered,
   setSummary,
   showCallout,
+  syncAlerts,
   type ToastState,
   visibleToasts,
 } from "./toasts";
@@ -174,5 +176,36 @@ describe("FR-NOTE-52 toast classes", () => {
     expect(createNotificationViews([ok]).get("a")?.toastClass).toBe("alert");
     const bad = { kind: "b", icon: Icon, toastClass: "toast" } as unknown as typeof ok;
     expect(() => createNotificationViews([bad])).toThrow(/unknown toast class/);
+  });
+});
+
+describe("FR-NOTE-50 toast policy: alerts from toast()", () => {
+  test("FR-NOTE-50 toast policy: a toast() joins as an alert (its duration, else 6 s; infinite = until closed), keeps its timer while shown, leaves when gone; between cards and info", () => {
+    let s = addNote(initialToasts(0), note(), 0);
+    s = addNote(s, card(), 0);
+    s = syncAlerts(s, [{ id: "alert:turn" }, { id: 7, ms: 60_000 }, { id: "x", ms: Infinity }], 0);
+    expect(classes(s)).toEqual(["card", "alert", "alert"]);
+    expect(visibleToasts(s).more).toBe(2); // 5 counted, 3 shown: the info held back first, then an alert
+    const alerts = s.toasts.filter((t) => t.kind === "alert");
+    expect(alerts.map((t) => [t.key, t.sticky, t.remaining])).toEqual([
+      [alertKey("alert:turn"), false, 6000],
+      [alertKey(7), false, 60_000],
+      [alertKey("x"), true, 0],
+    ]);
+    // Same list again: the same state (no timer reset).
+    s = setHovered(s, false, 5000);
+    expect(
+      syncAlerts(s, [{ id: "alert:turn" }, { id: 7, ms: 60_000 }, { id: "x", ms: Infinity }], 5000),
+    ).toBe(s);
+    // 6 s: the default alert ends; the 60 s one and the sticky one stay.
+    s = setHovered(s, false, 6000);
+    expect(s.toasts.filter((t) => t.kind === "alert").map((t) => t.key)).toEqual([
+      alertKey(7),
+      alertKey("x"),
+    ]);
+    // Dismissed elsewhere (gone from the list) → leaves.
+    s = syncAlerts(s, [{ id: 7, ms: 60_000 }], 6000);
+    expect(s.toasts.filter((t) => t.kind === "alert").map((t) => t.key)).toEqual([alertKey(7)]);
+    expect(alertKey("7")).not.toBe(alertKey(7));
   });
 });
