@@ -64,6 +64,8 @@ export class QueryGate {
     memoKey: string;
     now: number;
     compute(): T;
+    /** False = answer only, never memoise (FR-STATS-46's `pending`). Default true. */
+    keep?(result: T): boolean;
   }): T {
     const version = this.versions.get(o.campaignId) ?? 0;
     const key = `${o.campaignId}|${o.memoKey}`;
@@ -78,6 +80,7 @@ export class QueryGate {
     recent.push(o.now);
     const result = o.compute();
     this.computed += 1;
+    if (o.keep && !o.keep(result)) return result;
     this.memo.delete(key);
     this.memo.set(key, { version, result });
     if (this.memo.size > MEMO_MAX) {

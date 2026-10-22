@@ -67,6 +67,13 @@ export const StatsQueryInput = z.discriminatedUnion("scope", [
   z.strictObject({ scope: z.literal("fight"), encounterId: Id.optional() }),
   z.strictObject({ scope: z.literal("session"), n: z.int().min(1).optional() }),
   z.strictObject({ scope: z.literal("sessions") }),
+  // Sprint 8 (FR-STATS-45): one session's luck (`n` inside it; absent = the newest) or the campaign's.
+  z.strictObject({
+    scope: z.literal("luck"),
+    n: z.int().min(1).optional(),
+    campaign: z.literal(true).optional(),
+  }),
+  z.strictObject({ scope: z.literal("trophies"), characterId: Id }),
 ]);
 export type StatsQueryInput = z.infer<typeof StatsQueryInput>;
 
@@ -116,23 +123,130 @@ export const DmFightRow = z.strictObject({
 });
 export type DmFightRow = z.infer<typeof DmFightRow>;
 
-const fightOf = <R extends z.ZodType>(row: R) =>
+// ---------- highlights (sprint 8, FR-STATS-31–36) ----------
+
+/** FR-STATS-36: the Highlights items' `data-record-id`s, in display order. */
+export const HIGHLIGHT_KEYS = [
+  "mvp",
+  "biggest-hit",
+  "biggest-overkill",
+  "most-healing",
+  "kills",
+  // Not "downs": that key is the DM fight row's (the leak scans look for it).
+  "downed",
+  "nat20",
+  "nat1",
+  "rounds",
+  "duration",
+  "standing",
+] as const;
+export type HighlightKey = (typeof HIGHLIGHT_KEYS)[number];
+/** FR-STATS-48: kills / downs listed, then "+N". */
+export const FELL_LIST_MAX = 20;
+
+const winnerFields = {
+  /** A party character's id (companions roll into the current owner); a DM's monster: its combatant id. */
+  key: Id,
+  name: Name,
+  /** The owning player (colour); null = the DM's (a monster, a DM character). */
+  playerId: Id.nullable(),
+  /** Companion names whose facts counted ("Mira + Owlbear"). */
+  with: z.array(Name).min(1).max(8).optional(),
+};
+export const PlayerHighlightWinner = z.strictObject(winnerFields);
+/** The DM's winners may be monsters; `hidden` = a hidden side (the eye-off mark). */
+export const DmHighlightWinner = z.strictObject({ ...winnerFields, hidden: z.boolean() });
+
+/** The line behind a biggest-* item ("Thorn → Goblin 1, 30"). */
+export const HighlightDetail = z.strictObject({ from: Name, to: Name, raw: Count });
+
+const statOf = <W extends z.ZodType>(winner: W) =>
+  z.strictObject({
+    /** Sum / count / max; null + no winners = nobody scored (the item is hidden). */
+    value: Count.nullable(),
+    winners: z.array(winner).max(TIED_MAX),
+    more: z.int().min(1).optional(),
+    detail: HighlightDetail.optional(),
+  });
+export const PlayerHighlightStat = statOf(PlayerHighlightWinner);
+export const DmHighlightStat = statOf(DmHighlightWinner);
+export type PlayerHighlightStat = z.infer<typeof PlayerHighlightStat>;
+export type DmHighlightStat = z.infer<typeof DmHighlightStat>;
+
+const fellFields = {
+  fell: z.enum(["kill", "down"]),
+  /** The attacker's fact name; null = the DM's direct damage ("Goblin 1 falls"). */
+  from: Name.nullable(),
+  to: Name,
+  /** The line has the overkill callout ("Overkill! …"). */
+  callout: z.boolean(),
+};
+/** FR-STATS-31: one kill / down in log order, as the feed words it (FR-STATS-27). */
+export const PlayerFellEvent = z.strictObject(fellFields);
+export type PlayerFellEvent = z.infer<typeof PlayerFellEvent>;
+/** The DM's: + `hidden` (players never saw the line) and a callout's overkill amount. */
+export const DmFellEvent = z.strictObject({
+  ...fellFields,
+  hidden: z.boolean(),
+  overkill: Count.optional(),
+});
+export type DmFellEvent = z.infer<typeof DmFellEvent>;
+const fellListOf = <E extends z.ZodType>(event: E) =>
+  z.strictObject({
+    events: z.array(event).max(FELL_LIST_MAX),
+    more: z.int().min(1).optional(),
+  });
+
+const highlightFields = <S extends z.ZodType, E extends z.ZodType>(stat: S, event: E) => ({
+  mvp: stat,
+  "biggest-hit": stat,
+  "biggest-overkill": stat,
+  "most-healing": stat,
+  kills: fellListOf(event),
+  downed: fellListOf(event),
+  nat20: stat,
+  nat1: stat,
+  rounds: Count,
+  /** ms from Start to End (to now while started). */
+  duration: Count,
+});
+
+/**
+ * FR-STATS-31, -35, -47: a player's Highlights: party only, public facts, no hidden mark, no
+ * Still standing, no overkill amount (Biggest overkill = the callout line's `raw`).
+ */
+export const PlayerHighlights = z.strictObject(
+  highlightFields(PlayerHighlightStat, PlayerFellEvent),
+);
+export type PlayerHighlights = z.infer<typeof PlayerHighlights>;
+
+/** FR-STATS-31: the DM's monsters still standing at End (or now). */
+export const StandingSide = z.strictObject({ key: Id, name: Name, hidden: z.boolean() });
+export const DmHighlights = z.strictObject({
+  ...highlightFields(DmHighlightStat, DmFellEvent),
+  standing: z.array(StandingSide).max(FIGHT_ROWS_MAX),
+});
+export type DmHighlights = z.infer<typeof DmHighlights>;
+
+const fightOf = <R extends z.ZodType, H extends z.ZodType>(row: R, highlights: H) =>
   z.strictObject({
     key: Id,
     label: Label,
     round: Count,
     status: FightStatus,
     rows: z.array(row).max(FIGHT_ROWS_MAX),
+    /** Sprint 8 (FR-STATS-31): always sent by the server; optional so tier-A acks still parse. */
+    highlights: highlights.optional(),
   });
 
 /** `fight` null = no fight yet (FR-STATS-24); `fights` = the picker, newest first. */
-const fightResultOf = <R extends z.ZodType>(row: R) =>
+const fightResultOf = <R extends z.ZodType, H extends z.ZodType>(row: R, highlights: H) =>
   z.strictObject({
-    fight: fightOf(row).nullable(),
+    fight: fightOf(row, highlights).nullable(),
     fights: z.array(FightSummary).max(FIGHTS_MAX),
   });
-export const PlayerFightResult = fightResultOf(PlayerFightRow);
-export const DmFightResult = fightResultOf(DmFightRow);
+export const PlayerFightResult = fightResultOf(PlayerFightRow, PlayerHighlights);
+export const DmFightResult = fightResultOf(DmFightRow, DmHighlights);
 export type PlayerFightResult = z.infer<typeof PlayerFightResult>;
 export type DmFightResult = z.infer<typeof DmFightResult>;
 
@@ -192,8 +306,107 @@ export const SessionsResult = z.strictObject({
 });
 export type SessionsResult = z.infer<typeof SessionsResult>;
 
-export const PlayerStatsResult = z.union([PlayerFightResult, SessionResult, SessionsResult]);
-export const DmStatsResult = z.union([DmFightResult, SessionResult, SessionsResult]);
+// ---------- luck (sprint 8, FR-STATS-37–41) ----------
+
+export const LUCK_ROWS_MAX = 70;
+/** FR-STATS-39: the DM's row of DM, monster and token d20s (hidden included). */
+export const DM_DICE_KEY = "dm-dice";
+export const DM_DICE_NAME = "DM dice";
+
+const luckRowFields = {
+  /** A party character's id; the DM's extra row `dm-dice`. */
+  key: Id,
+  name: Name,
+  playerId: Id.nullable(),
+  rolls: Count,
+  /** Every d20 face with a value, kept and dropped (OQ-STATS-26 A). */
+  d20s: Count,
+  /** Mean of the faces, 1 decimal; null = none ("—"). */
+  avg: z.number().min(1).max(20).nullable(),
+  nat20: Count,
+  nat1: Count,
+};
+export const DmLuckRow = z.strictObject(luckRowFields);
+export type DmLuckRow = z.infer<typeof DmLuckRow>;
+/** FR-STATS-47: no `dm-dice` for players. */
+export const PlayerLuckRow = DmLuckRow.refine((r) => r.key !== DM_DICE_KEY, "DM-only row");
+
+/**
+ * `pending` (FR-STATS-46): campaign partials are still building; the client shows a skeleton and
+ * re-queries in 1 s (`rows` empty). `fromN` = the session key (scope `session`); absent with no
+ * session yet.
+ */
+const luckResultOf = <R extends z.ZodType>(row: R) =>
+  z.strictObject({
+    luck: z.strictObject({
+      scope: z.enum(["session", "campaign"]),
+      fromN: z.int().min(1).optional(),
+      pending: z.literal(true).optional(),
+      rows: z.array(row).max(LUCK_ROWS_MAX),
+    }),
+  });
+export const DmLuckResult = luckResultOf(DmLuckRow);
+export const PlayerLuckResult = luckResultOf(PlayerLuckRow);
+export type DmLuckResult = z.infer<typeof DmLuckResult>;
+export type PlayerLuckResult = z.infer<typeof PlayerLuckResult>;
+
+// ---------- trophies (sprint 8, FR-STATS-42–44) ----------
+
+/** FR-STATS-42 Lifetime (campaign-wide; 0 = "—" in the UI). */
+export const TrophyLifetime = z.strictObject({
+  avgD20: z.number().min(1).max(20).nullable(),
+  nat20: Count,
+  nat1: Count,
+  fights: Count,
+  dealt: Count,
+  taken: Count,
+  healing: Count,
+  kills: Count,
+  downed: Count,
+});
+export type TrophyLifetime = z.infer<typeof TrophyLifetime>;
+
+/**
+ * One record: `value` (Biggest overkill per role, FR-STATS-12: a player's is the callout line's
+ * `raw`), the target of a hit, the viewer's fight label. Null = none yet.
+ */
+export const TrophyRecord = z
+  .strictObject({ value: Count, to: Name.optional(), fight: Label })
+  .nullable();
+export type TrophyRecord = z.infer<typeof TrophyRecord>;
+export const TrophyRecords = z.strictObject({
+  "biggest-hit": TrophyRecord,
+  "biggest-overkill": TrophyRecord,
+  "best-fight-damage": TrophyRecord,
+  "best-fight-kills": TrophyRecord,
+});
+export type TrophyRecords = z.infer<typeof TrophyRecords>;
+
+/** `pending`: as luck's (no `lifetime` / `records` then). */
+export const TrophiesResult = z.strictObject({
+  trophies: z.strictObject({
+    characterId: Id,
+    pending: z.literal(true).optional(),
+    lifetime: TrophyLifetime.optional(),
+    records: TrophyRecords.optional(),
+  }),
+});
+export type TrophiesResult = z.infer<typeof TrophiesResult>;
+
+export const PlayerStatsResult = z.union([
+  PlayerFightResult,
+  SessionResult,
+  SessionsResult,
+  PlayerLuckResult,
+  TrophiesResult,
+]);
+export const DmStatsResult = z.union([
+  DmFightResult,
+  SessionResult,
+  SessionsResult,
+  DmLuckResult,
+  TrophiesResult,
+]);
 export type PlayerStatsResult = z.infer<typeof PlayerStatsResult>;
 export type DmStatsResult = z.infer<typeof DmStatsResult>;
 

@@ -152,6 +152,8 @@ export interface FightRow {
   status: "started" | "ended";
   round: number;
   startedAt: string;
+  /** Null while started. */
+  endedAt: string | null;
 }
 
 /** The campaign's started and ended encounters, oldest `startedAt` first (planned never count). */
@@ -163,6 +165,7 @@ export function fightsOf(db: Read, campaignId: string): FightRow[] {
       status: encounter.status,
       round: encounter.round,
       startedAt: encounter.startedAt,
+      endedAt: encounter.endedAt,
     })
     .from(encounter)
     .where(and(eq(encounter.campaignId, campaignId), ne(encounter.status, "planned")))
@@ -236,4 +239,45 @@ export function fightFactPresence(
     .where(eq(encounter.id, encounterId))
     .get();
   return { counted: Boolean(row?.counted), public: Boolean(row?.public) };
+}
+
+/**
+ * FR-STATS-32: the actors a fight's rolls are attributed by: its combatants' entities (a PC's
+ * character, a monster's definition) and tokens.
+ */
+export function fightActorIds(db: Read, encounterId: string): Set<string> {
+  const rows = db
+    .select({ entityId: combatant.entityId, tokenId: combatant.tokenId })
+    .from(combatant)
+    .where(eq(combatant.encounterId, encounterId))
+    .all();
+  return new Set(rows.flatMap((r) => (r.tokenId ? [r.entityId, r.tokenId] : [r.entityId])));
+}
+
+export interface StandingRow {
+  id: string;
+  name: string;
+  hidden: boolean;
+}
+
+/**
+ * FR-STATS-31 (DM only): the fight's monsters still standing: not companions, not removed, HP
+ * above 0 (unknown HP counts as standing), in initiative-list order.
+ */
+export function standingOf(db: Read, encounterId: string): StandingRow[] {
+  return db
+    .select({
+      id: combatant.id,
+      name: combatant.name,
+      hidden: combatant.hidden,
+      ownerCharacterId: combatant.ownerCharacterId,
+      removed: combatant.removed,
+      hpCurrent: combatant.hpCurrent,
+    })
+    .from(combatant)
+    .where(and(eq(combatant.encounterId, encounterId), eq(combatant.kind, "monster")))
+    .orderBy(asc(combatant.seq))
+    .all()
+    .filter((c) => c.ownerCharacterId === null && !c.removed && (c.hpCurrent ?? 1) > 0)
+    .map((c) => ({ id: c.id, name: c.name, hidden: c.hidden }));
 }

@@ -13,6 +13,13 @@ import {
   visibleSpan,
 } from "@shared/stats/rules";
 import {
+  addLuck,
+  fightHighlights,
+  type LuckTally,
+  luckRows,
+  trophyCase,
+} from "@shared/stats/rules-b";
+import {
   FIGHTS_MAX,
   type FightSummary,
   SESSIONS_MAX,
@@ -20,7 +27,7 @@ import {
   type SessionSummary,
 } from "@shared/stats/schemas";
 import { and, eq } from "drizzle-orm";
-import { notFound } from "../../commands/errors";
+import { forbidden, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { entity } from "../../db/schema";
 import {
@@ -28,11 +35,21 @@ import {
   combatFacts,
   type FightRow,
   factRefs,
+  fightActorIds,
   fightCombatants,
   fightsOf,
   publicFactEncounters,
+  standingOf,
 } from "../combat-tracker/stats-read";
-import { entryVisible, rollFacts, type StatsViewer } from "../dice-roll-log/stats-read";
+import {
+  entryVisible,
+  lastEntryAt,
+  nSpanOf,
+  type RollFact,
+  rollFacts,
+  type StatsViewer,
+} from "../dice-roll-log/stats-read";
+import type { Partials } from "./partials";
 
 type Read = Pick<Tx, "select">;
 
@@ -46,7 +63,7 @@ export interface StatsRead {
 const visibleFacts = (v: StatsViewer, facts: readonly CombatFact[]) =>
   facts.filter((f) => entryVisible(v, { public: f.public, kind: f.entryKind }));
 
-interface Fights {
+export interface Fights {
   /** The viewer's fights, oldest `startedAt` first. */
   listed: FightRow[];
   label: Map<string, string>;
@@ -56,7 +73,7 @@ interface Fights {
  * FR-STATS-15: the DM lists every started / ended encounter under its name; a player only those
  * with a counted public fact, as "Fight N · Tue 20 Oct" (N by `startedAt` among them, OQ-STATS-19).
  */
-function fightsFor(r: StatsRead): Fights {
+export function fightsFor(r: StatsRead): Fights {
   const all = fightsOf(r.db, r.campaignId);
   if (r.viewer.role === "dm") {
     return { listed: all, label: new Map(all.map((f) => [f.id, f.name])) };
@@ -75,26 +92,69 @@ const summaries = (f: Fights): FightSummary[] =>
     .slice(0, FIGHTS_MAX)
     .map((x) => ({ key: x.id, label: f.label.get(x.id) ?? "", status: x.status }));
 
+/** FR-STATS-52: a player's label for the started fight before it has a public fact. */
+export const THIS_FIGHT_LABEL = "This fight";
+
+/** FR-STATS-32: the categories a combatant's roll counts in its fight by. */
+const FIGHT_ROLL_CATEGORIES: ReadonlySet<string> = new Set(["attack", "saving-throw"]);
+
+/**
+ * FR-STATS-32: a fight's rolls: counted rolls in its `n` span `startedAt…endedAt` (now while
+ * started) listed by an entry with its `encounterId`, plus attack / saving-throw rolls by its
+ * combatants' actors.
+ */
+export function fightRolls(r: StatsRead, fight: FightRow): RollFact[] {
+  if (!fight.startedAt) return [];
+  const span = nSpanOf(r.db, r.campaignId, fight.startedAt, fight.endedAt);
+  if (!span) return [];
+  const actors = fightActorIds(r.db, fight.id);
+  return rollFacts(r.db, r.viewer, r.campaignId, span.fromN, span.toN).filter(
+    (x) =>
+      x.encounterId === fight.id ||
+      (FIGHT_ROLL_CATEGORIES.has(x.category) && x.actorId !== null && actors.has(x.actorId)),
+  );
+}
+
 /**
  * `stats.query {scope: "fight"}`: the given fight (unknown or not listed → `not_found`), else the
- * started one, else the newest ended; none → `fight: null`.
+ * started one, else the newest ended; none → `fight: null`. FR-STATS-52 (BL-69): a player's
+ * default (and the started fight by id) is the started one even before a public fact, labelled
+ * "This fight". Sprint 8: + `highlights` per role (FR-STATS-31).
  */
 export function fightStats(r: StatsRead, encounterId: string | undefined) {
   const f = fightsFor(r);
+  const started =
+    r.viewer.role === "dm"
+      ? undefined
+      : fightsOf(r.db, r.campaignId).find((x) => x.status === "started");
   const pick = encounterId
-    ? f.listed.find((x) => x.id === encounterId)
+    ? (f.listed.find((x) => x.id === encounterId) ??
+      (started?.id === encounterId ? started : undefined))
     : (f.listed.find((x) => x.status === "started") ??
+      started ??
       [...f.listed].reverse().find((x) => x.status === "ended"));
   if (encounterId && !pick) throw notFound("Fight not found");
   if (!pick) return { fight: null, fights: summaries(f) };
   const facts = visibleFacts(r.viewer, combatFacts(r.db, { encounterId: pick.id }));
+  const combatants = fightCombatants(r.db, pick.id);
+  // A started fight's duration runs to the newest entry (the same answer after a restart).
+  const until = pick.endedAt ?? lastEntryAt(r.db, r.campaignId) ?? pick.startedAt;
   return {
     fight: {
       key: pick.id,
-      label: f.label.get(pick.id) ?? "",
+      label: f.label.get(pick.id) ?? THIS_FIGHT_LABEL,
       round: pick.round,
       status: pick.status,
-      rows: fightRows(r.viewer.role, facts, fightCombatants(r.db, pick.id)),
+      rows: fightRows(r.viewer.role, facts, combatants),
+      highlights: fightHighlights({
+        role: r.viewer.role,
+        facts,
+        rolls: fightRolls(r, pick),
+        characters: characters(r.db, r.campaignId),
+        round: pick.round,
+        span: pick.startedAt ? { from: pick.startedAt, to: until } : null,
+        standing: r.viewer.role === "dm" ? standingOf(r.db, pick.id) : [],
+      }),
     },
     fights: summaries(f),
   };
@@ -137,7 +197,7 @@ export function sessionsStats(r: StatsRead, sessions: readonly SessionBounds[]) 
   return { sessions: out };
 }
 
-function characters(db: Read, campaignId: string): Map<string, StatsCharacter> {
+export function characters(db: Read, campaignId: string): Map<string, StatsCharacter> {
   const rows = db
     .select({ id: entity.id, name: entity.name, playerId: entity.ownerPlayerId })
     .from(entity)
@@ -197,4 +257,72 @@ export function sessionStats(
 export function awardsPayload(s: SessionBounds, features: readonly string[]) {
   const span = visibleSpan(s, "player", features) ?? s;
   return { fromN: s.fromN, toN: s.toN, from: span.from, to: span.to, label: dayLabel(span.from) };
+}
+
+// ---------- luck and trophies (sprint 8, FR-STATS-37–46) ----------
+
+/**
+ * `stats.query {scope: "luck"}` (FR-STATS-40): one session the viewer can list (`n` inside it;
+ * absent = the newest) read now, or the campaign from the session partials (FR-STATS-46).
+ */
+export function luckStats(
+  r: StatsRead,
+  sessions: readonly SessionBounds[],
+  partials: Partials,
+  input: { n?: number; campaign?: true },
+) {
+  const chars = characters(r.db, r.campaignId);
+  if (input.campaign) {
+    const all = partials.campaign(r, chars);
+    if (all.pending)
+      return { luck: { scope: "campaign" as const, pending: true as const, rows: [] } };
+    return { luck: { scope: "campaign" as const, rows: luckRows(all.luck, chars, r.viewer.role) } };
+  }
+  const hit = pickSession(r, sessions, input.n);
+  if (!hit) return { luck: { scope: "session" as const, rows: [] } };
+  const tallies = new Map<string, LuckTally>();
+  addLuck(
+    tallies,
+    rollFacts(r.db, r.viewer, r.campaignId, hit.s.fromN, hit.s.toN),
+    chars,
+    r.viewer.role,
+  );
+  return {
+    luck: {
+      scope: "session" as const,
+      fromN: hit.s.fromN,
+      rows: luckRows(tallies, chars, r.viewer.role),
+    },
+  };
+}
+
+/**
+ * `stats.query {scope: "trophies", characterId}` (FR-STATS-42, -43): the DM any character, a player
+ * only their own (else `forbidden`), campaign-wide from the session partials.
+ */
+export function trophiesStats(
+  r: StatsRead,
+  partials: Partials,
+  characterId: string,
+  playerId: string | null,
+) {
+  const chars = characters(r.db, r.campaignId);
+  const c = chars.get(characterId);
+  if (!c) throw notFound("Character not found");
+  if (r.viewer.role !== "dm" && (playerId === null || c.playerId !== playerId)) {
+    throw forbidden("Only your own character's trophies");
+  }
+  const all = partials.campaign(r, chars);
+  if (all.pending) return { trophies: { characterId, pending: true as const } };
+  const labels = fightsFor(r).label;
+  return {
+    trophies: {
+      characterId,
+      ...trophyCase(
+        all.trophies.get(characterId),
+        all.luck.get(characterId),
+        (id) => labels.get(id) ?? "",
+      ),
+    },
+  };
 }
