@@ -6,6 +6,7 @@ import imageTags from "./assets-pipeline/image-tags";
 import images from "./assets-pipeline/images";
 import imagesSecond from "./assets-pipeline/images-second";
 import campAlertSounds from "./campaign-management/camp-alert-sounds";
+import campPaused from "./campaign-management/camp-paused";
 import campaign from "./campaign-management/campaign";
 import campaignSecond from "./campaign-management/campaign-second";
 import pcColourFree from "./campaign-management/pc-colour-free";
@@ -235,4 +236,6 @@ export const units: readonly Fixture[] = [
   cbTies,
   cbFogGoblin,
   cbParty,
+  // Sprint 8 track TT (build/tt-pause): the table paused
+  campPaused,
 ];

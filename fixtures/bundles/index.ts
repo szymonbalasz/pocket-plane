@@ -77,6 +77,8 @@ import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
 import statsWindowE2e from "./stats-window-e2e";
 import syncProbe from "./sync-probe";
+import tableToolsPaused from "./table-tools-paused";
+import tableToolsPausedE2e from "./table-tools-paused-e2e";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
 import tplMenu from "./tpl-menu";
@@ -189,4 +191,7 @@ export const bundles: readonly Bundle[] = [
   cbReorderE2e,
   cbTurnRingE2e,
   cbPartyE2e,
+  // Sprint 8 track TT (build/tt-pause): the pause screen
+  tableToolsPaused,
+  tableToolsPausedE2e,
 ];

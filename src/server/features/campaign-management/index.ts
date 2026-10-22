@@ -14,6 +14,7 @@ import {
   renamePlayer,
 } from "./commands";
 import { campaignFeatures, setFeature } from "./features";
+import { pauseCampaign, resumeCampaign } from "./pause";
 import { campaignRecordType, playerRecordType } from "./records";
 
 export const campaignManagement: Feature = {
@@ -32,6 +33,9 @@ export const campaignManagement: Feature = {
     r.command(setFeature, { intent: true });
     // Sprint 8 (FR-CAMP-48, TT3): the DM's alert-sound picks.
     r.command(setAlertSound, { intent: true });
+    // Sprint 8 (FR-CAMP-47, TT4): the pause card.
+    r.command(pauseCampaign, { intent: true });
+    r.command(resumeCampaign, { intent: true });
     r.recordType(campaignRecordType);
     r.recordType(playerRecordType);
     // FR-CAMP-23 / -34: keys → hex, then fill, before the server listens (no snapshot carries a
