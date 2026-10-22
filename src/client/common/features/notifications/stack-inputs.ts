@@ -13,13 +13,18 @@ import { renderedWindowRects, useContentHeights } from "../play-shell/free-area"
 import type { Rect } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
 import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
+import { windowId } from "../play-shell/manager";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
+import { pushedByPlan, type StackWindow } from "./keep-out";
 
 export interface StackInputs {
   /** FR-NOTE-32: the open, non-minimised `cbt.initiative` window's rendered rect, else null. */
   initiative: Rect | null;
-  /** The other open windows as rendered (title bars never covered, bodies when nothing else). */
-  windows: Rect[];
+  /**
+   * The other open windows as rendered (title bars never covered, bodies when nothing else), each
+   * with FR-NOTE-53's `pushed` from the placer's plan.
+   */
+  windows: StackWindow[];
   /** FR-NOTE-43: hard keep-out rects (the active tool bar). */
   hard: Rect[];
   /** FR-NOTE-44: the windows' first content rows (`ShellWindow`'s reports). */
@@ -37,17 +42,30 @@ export function useStackInputs(isDm: boolean): StackInputs {
   // A first-row report also renews this Map (`reportFirstRow`), so it re-reads `firstRows()`.
   const measured = useContentHeights();
   const keepOuts = useKeepOuts("dm");
+  // FR-NOTE-53: the plan (`data-placed`) and the displacement causes.
+  const placed = useShellState((s) => s.placed);
+  const memory = useShellState((s) => s.memory);
   return useMemo(() => {
     if (!isDm) return NONE;
     const hard = hardRects(keepOuts);
-    const open = windows.filter((w) => w.state === "open");
+    // As `renderedWindowRects` keeps them, so the rects line up with the windows.
+    const open = windows.filter(
+      (w) => w.state === "open" && registry.get(w.kind) && available.has(w.kind),
+    );
     const rects = (list: typeof open) =>
       renderedWindowRects(list, registry, available, vp, measured, hard);
+    const others = open.filter((w) => w.kind !== INITIATIVE_KIND);
+    const causes = (kind: string, instance: string) =>
+      memory.filter((d) => d.kind === kind && d.instance === instance).map((d) => d.cause);
     return {
       initiative: rects(open.filter((w) => w.kind === INITIATIVE_KIND))[0] ?? null,
-      windows: rects(open.filter((w) => w.kind !== INITIATIVE_KIND)),
+      windows: rects(others).map((r, i) => {
+        const w = others[i] as (typeof others)[number];
+        const how = placed.get(windowId(w.kind, w.instance));
+        return { ...r, pushed: pushedByPlan(how, causes(w.kind, w.instance)) };
+      }),
       hard,
       rows: [...firstRows().values()],
     };
-  }, [isDm, windows, registry, available, vp, measured, keepOuts]);
+  }, [isDm, windows, registry, available, vp, measured, keepOuts, placed, memory]);
 }

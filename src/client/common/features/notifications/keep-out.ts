@@ -8,7 +8,8 @@
 // left-of-Initiative shift) and moves down, never to the rail or beside windows / tokens.
 // FR-NOTE-43 (sim-9 b01): hard keep-outs (the active tool bar) block it like Initiative.
 // FR-NOTE-44 (sim-10 b05): while a tool bar is shown (the windows it pushed among them), every
-// window's title bar and first 40 px of body block it too. Pure; players keep bottom-right.
+// window's title bar and first 40 px of body block it too. FR-NOTE-53 (sprint 8): "pushed" comes
+// from the placer's plan (`StackWindow.pushed`). Pure; players keep bottom-right.
 
 import { type FirstRow, firstRows } from "../play-shell/content-heights";
 import {
@@ -25,8 +26,21 @@ import { coveredArea, type TokenBox } from "../play-shell/token-boxes";
 /** The stack's width, px (`w-80`). */
 export const STACK_W = 320;
 
-/** FR-NOTE-44: body px under a title bar kept clear while a tool bar is shown. */
+/** FR-NOTE-44: body px under a pushed window's title bar kept clear. */
 export const PUSHED_BODY_CLEAR = 40;
+
+/**
+ * A window as the stack sees it: its rendered rect and (FR-NOTE-53) whether the placer's plan
+ * has it pushed by a tool bar (`data-placed` `pushed`, or `displaced` with a `toolbar` cause).
+ * `pushed` absent (a caller without the plan): pushed while a hard keep-out shows (FR-NOTE-44).
+ */
+export type StackWindow = Rect & { pushed?: boolean };
+
+/** FR-NOTE-53: the plan's "pushed": `pushed`, or `displaced` by a tool bar. */
+export function pushedByPlan(placed: string | undefined, causes: readonly string[]): boolean {
+  if (placed === "pushed") return true;
+  return placed === "displaced" && causes.some((c) => c.startsWith("toolbar:"));
+}
 
 /** FR-NOTE-32 alone: centred, else left of Initiative, else below it. */
 function initiativeKeepOut(
@@ -83,7 +97,7 @@ export function dmStackPlacement(
   stackH: number,
   width = STACK_W,
   avoid: readonly TokenBox[] = [],
-  windows: readonly Rect[] = [],
+  windows: readonly StackWindow[] = [],
   hard: readonly Rect[] = [],
   rows: readonly FirstRow[] = [...firstRows().values()],
 ): { left: number; top: number } {
@@ -95,10 +109,10 @@ export function dmStackPlacement(
   const fits = (p: { top: number }) => p.top + stackH <= vp.h - LAUNCHER_CLEAR;
   if (stackH === 0) return base;
   if (avoid.length === 0 && windows.length === 0 && fits(base) && offHard(base)) return base;
-  // FR-NOTE-44: with a tool bar shown, a window's title bar, first 40 px of body and first
-  // content row (its reported bottom, walkthrough U4) count as its bar.
-  const strip = (w: Rect) => {
-    if (hard.length === 0) return TITLE_H;
+  // FR-NOTE-44: a pushed window's title bar, first 40 px of body and first content row (its
+  // reported bottom, walkthrough U4) count as its bar; FR-NOTE-53: pushed per the plan.
+  const strip = (w: StackWindow) => {
+    if (!(w.pushed ?? hard.length > 0)) return TITLE_H;
     const row = rows.find((r) => Math.abs(r.x - w.x) <= 1 && Math.abs(r.y - w.y) <= 1);
     return Math.max(TITLE_H + PUSHED_BODY_CLEAR, row ? row.bottom - w.y : 0);
   };

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { dmStackLefts, dmStackPlacement, STACK_W } from "./keep-out";
+import { dmStackLefts, dmStackPlacement, pushedByPlan, STACK_W } from "./keep-out";
 
 describe("FR-NOTE-32 toast keep-out", () => {
   const top = 48 + 12 + 32 + 8;
@@ -379,5 +379,38 @@ describe("FR-NOTE-44 walkthrough U4 (20261021-fu1-frame): Scenes' first row stay
     expect(dmStackPlacement(vp, init, 152, STACK_W, target, [log, scenes], [], [row]).top).toBe(
       100,
     );
+  });
+});
+
+describe("FR-NOTE-53 stack reads the plan", () => {
+  const vp = { w: 1440, h: 900 };
+  const scenes = { x: 546, y: 60, w: 260, h: 440 };
+
+  test("FR-NOTE-53 stack reads the plan: pushed = `data-placed` pushed, or displaced with a toolbar cause", () => {
+    expect(pushedByPlan("pushed", [])).toBe(true);
+    expect(pushedByPlan("displaced", ["toolbar:map.toolbar"])).toBe(true);
+    expect(pushedByPlan("displaced", ["viewport:1280×720"])).toBe(false);
+    expect(pushedByPlan("displaced", ["window:cbt.initiative"])).toBe(false);
+    for (const how of ["auto", "stored", "returned", "zone", "grown", undefined]) {
+      expect(pushedByPlan(how, ["toolbar:map.toolbar"])).toBe(false);
+    }
+  });
+
+  test("FR-NOTE-53 stack reads the plan: only a pushed window's title bar + 40 px block the stack, whether or not a bar shows", () => {
+    // The card's targets below Scenes (sim-10 b05): the stack stays on Scenes' body.
+    const targets = [
+      { x: 600, y: 460, w: 45, h: 45 },
+      { x: 600, y: 520, w: 45, h: 45 },
+    ];
+    // Pushed per the plan, no bar in the list: below its title bar + 40 px.
+    const log = { ...LOG, pushed: false };
+    const plan = [log, { ...scenes, pushed: true }];
+    const pushed = dmStackPlacement(vp, INIT, 57, STACK_W, targets, plan, []);
+    expect(pushed).toEqual({ left: 560, top: 60 + 72 + 8 });
+    // Not pushed (a window the user dropped there) while the Fog bar shows: its title bar only.
+    const dropped = [log, { ...scenes, pushed: false }];
+    const user = dmStackPlacement(vp, INIT, 57, STACK_W, targets, dropped, [FOG_BAR]);
+    expect(user).toEqual({ left: 560, top: 60 + 32 + 8 });
+    expect(hit(rectOf(user, 57), FOG_BAR)).toBe(false);
   });
 });
