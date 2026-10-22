@@ -85,6 +85,8 @@ import tplMenu from "./tpl-menu";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
+import wfFrame from "./wf-frame";
+import wfFrameE2e from "./wf-frame-e2e";
 import windowsS5 from "./windows-s5";
 
 export const bundles: readonly Bundle[] = [
@@ -176,6 +178,9 @@ export const bundles: readonly Bundle[] = [
   gemsCombatE2e,
   // Sprint 7 track ST (build/st-window)
   statsWindowE2e,
+  // Sprint 8 track WF (fix/placer-core)
+  wfFrame,
+  wfFrameE2e,
   // Sprint 8 track TT (fix/tt-core): the sprint-8 gate bundle, each track appends its units
   sessionSim12,
   // Sprint 8 track TT (build/tt-sounds): alert sounds

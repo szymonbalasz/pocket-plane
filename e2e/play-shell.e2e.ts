@@ -335,7 +335,10 @@ test("FR-SHELL-04/16 campaign switch: DM layout per campaign; player waits, then
   const pBox = await box(p, "sync.probes");
 
   await openWindow(dm, "camp.players");
-  await moveWindow(dm, "camp.players", -500, 150);
+  // A spot clear of Initiative's and the Game log's zones (FR-SHELL-99: a user spot in a zone
+  // moves out when the layout is applied).
+  const at = await box(dm, "camp.players");
+  await moveWindow(dm, "camp.players", 300 - at.x, 70 - at.y);
   const dmBox = await box(dm, "camp.players");
 
   await switchCampaign(dm, "Second Campaign", true);

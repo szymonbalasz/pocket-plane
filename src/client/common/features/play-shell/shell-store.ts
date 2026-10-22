@@ -1,17 +1,19 @@
 // Shell state: the stored windows of the current layout key, plus restore and write rules
-// (FR-SHELL-15/16). One per play page; survives waiting / reconnect screens.
+// (FR-SHELL-15/16), and the placer's client memory (FR-SHELL-102, -110). One per play page;
+// survives waiting / reconnect screens.
 import { createStore, type StoreApi } from "zustand";
 import type { Rect, Viewport } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import {
+  type Displacement,
+  type DryFit,
   isLayoutAction,
   isReopenCovered,
   isUserReopen,
   type ManagerContext,
   type Placed,
-  type PrePush,
   placedAs,
-  reduce,
+  plan,
   restoreLayout,
   serialise,
   type WindowAction,
@@ -34,8 +36,8 @@ export interface ShellState {
    */
   settling: ReadonlySet<string>;
   /**
-   * Windows auto-minimised to make room (FR-SHELL-47, `data-auto-minimised`) until restored or
-   * closed; client memory only (a reload loads them plain `minimised`).
+   * Windows put away to make room (FR-SHELL-47, `data-auto-minimised`) until restored or closed;
+   * client memory only (a reload loads them plain `minimised`).
    */
   autoMinimised: ReadonlySet<string>;
   /**
@@ -44,20 +46,31 @@ export interface ShellState {
    */
   autoMinimisedFor: ReadonlyMap<string, string>;
   /**
+   * Why each auto-minimised window was put away (FR-SHELL-110 `data-auto-minimised-cause`):
+   * `toolbar:<id>`, `viewport:<w>×<h>`, `window:<kind>` (it returns when that ends) or
+   * `open:<kind>`.
+   */
+  autoMinimisedCause: ReadonlyMap<string, string>;
+  /**
    * The last placement's auto-minimise moves, "parked>for;…" (FR-SHELL-88, `ui-play-page`
    * `data-auto-minimise-log`); client memory only.
    */
   autoMinimiseLog: string;
+  /** The last settle's steps, "trigger:kind>rung;…" (FR-SHELL-110 `data-settle-log`). */
+  settleLog: string;
   /**
-   * Pushed windows' pre-push rects (FR-SHELL-81), by window id, until the tool bar goes, the
-   * window is moved, resized, closed or minimised, or a layout is applied; client memory only.
+   * Displacement memory (FR-SHELL-102): what a transient cause moved, shrank or put away, until
+   * the cause ends or the user moves, resizes, closes or minimises it; dropped on reload and
+   * reset. Client memory only.
    */
-  prePush: ReadonlyMap<string, PrePush>;
+  memory: readonly Displacement[];
   /**
-   * Windows whose rect auto placement chose (`default`, `auto`, `reopened`) with no PC footprint
-   * (+ 4 px) under it then (`data-pc-clear`, FR-SHELL-57); client memory only.
+   * Windows the placer placed with no PC footprint (+ 4 px) under them (`data-pc-clear`,
+   * FR-SHELL-57); one placed at `L5` is absent. Client memory only.
    */
   pcClear: ReadonlySet<string>;
+  /** The viewport the layout was last settled at (FR-SHELL-95 `viewport`, -103). */
+  settledAt: Viewport | null;
 }
 
 export interface ShellController {
@@ -65,49 +78,48 @@ export interface ShellController {
   registry: WindowRegistry;
   /**
    * Apply the stored entry for `key` (first snapshot after load, or after `you.campaignId`
-   * changes). Same key → no-op: other snapshots never open, close or move windows.
+   * changes): the placer's `load` settle. Same key → no-op: other snapshots never open, close or
+   * move windows.
    */
   restore(key: string): void;
   /** Apply a user change; writes synchronously to the key it was made under. */
   dispatch(action: WindowAction, available: ReadonlySet<string>): void;
+  /**
+   * A `blocksInput` overlay is up (FR-SHELL-112 (2)): actions queue (one per window and kind of
+   * action, the last kept) and run, in order, when it goes.
+   */
+  setBlocked(blocked: boolean): void;
+  /**
+   * Re-tests `data-pc-clear` of the windows the shell placed against the PCs as drawn now, rects
+   * unchanged (after the map's Fit that follows Reset layout, FR-SHELL-80).
+   */
+  refreshPcClear(): void;
 }
 
 const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
 /**
- * `placed` after a change: a move / resize end → `stored`; a push off a tool bar → `pushed`
- * (FR-SHELL-55); back at the pre-push rect → `returned` (FR-SHELL-81); a user reopen (FR-SHELL-56) → `reopened` when its stored rect was `covered`
- * (auto-placed, even onto the same rect once the windows over it were parked), else `stored`
- * (a protected window too), and any other window it moved → `auto`; a rect the reducer
- * chose (new window, auto placement, reset, viewport follow) → `default` / `auto`; any other
- * window keeps its value.
+ * `placed` after a change: what the placer placed (its plan); a move / resize end → `stored`; a
+ * user reopen (FR-SHELL-56) → `reopened` when its stored rect was `covered` (re-placed), else
+ * `stored`; any other window keeps its value.
  */
 function nextPlaced(
   prev: ShellState,
   next: Windows,
   action: WindowAction,
-  registry: WindowRegistry,
-  vp: Viewport,
-  hard: readonly Rect[],
-  covered = false,
+  planned: ReadonlyMap<string, Placed>,
+  covered: boolean,
 ): ReadonlyMap<string, Placed> {
   const out = new Map<string, Placed>();
   for (const w of next) {
     const id = windowId(w.kind, w.instance);
     const before = prev.windows.find((p) => p.kind === w.kind && p.instance === w.instance);
-    const def = registry.get(w.kind);
-    const moved = action.type === "reset" || !before || !sameRect(before, w);
     const named = !isLayoutAction(action) && id === windowId(action.kind, action.instance);
-    const reopen = named && isUserReopen(action, before?.state);
-    if (reopen) {
-      const replaced = covered && def !== undefined && !def.defaultOpen && !def.fixedDefault;
-      out.set(id, replaced ? "reopened" : "stored");
-    } else if (moved && !named && (action.type === "open" || action.type === "toggle")) {
-      out.set(id, "auto");
-    } else if (action.type === "setRect" && moved) out.set(id, "stored");
-    else if (action.type === "push" && moved) out.set(id, "pushed");
-    else if (action.type === "return" && moved) out.set(id, "returned");
-    else if (moved && def) out.set(id, placedAs(def, w, vp, hard));
+    const how = planned.get(id);
+    if (named && action.type === "setRect") out.set(id, "stored");
+    else if (named && isUserReopen(action, before?.state) && !how) {
+      out.set(id, covered ? "reopened" : "stored");
+    } else if (how) out.set(id, how);
     else {
       const kept = prev.placed.get(id);
       if (kept) out.set(id, kept);
@@ -139,8 +151,8 @@ function nextSettling(
   const at = (ws: Windows) => ws.find((w) => windowId(w.kind, w.instance) === id);
   const w = at(next);
   const b = at(before);
-  // A feature open placed it even when the rect it chose is the one it had (FR-SHELL-77 may
-  // auto-minimise others instead of moving it).
+  // A feature open placed it even when the rect it chose is the one it had (the placer may put
+  // others away instead of moving it).
   const featureOpen =
     action.type === "open" && action.by === "feature" && b !== undefined && b.state !== "open";
   if (!w || (b && sameRect(b, w) && !featureOpen) || prev.has(id)) return prev;
@@ -168,82 +180,40 @@ function nextAutoMinimised(
   return out.size === prev.size && [...out].every((id) => prev.has(id)) ? prev : out;
 }
 
-/**
- * `autoMinimisedFor` after a change: the reducer's auto-minimise moves (`moves`: id → the kind
- * it made room for), else the action's window for one it minimised without naming it; an entry
- * whose window is no longer minimised is dropped.
- */
-function nextAutoMinimisedFor(
+/** Keeps `map`'s entries whose window is still auto-minimised; adds `moves`. */
+function nextFor(
   prev: ReadonlyMap<string, string>,
   auto: ReadonlySet<string>,
   moves: ReadonlyMap<string, string>,
-  action: WindowAction,
+  fallback: string | null,
 ): ReadonlyMap<string, string> {
   const out = new Map<string, string>();
   for (const id of auto) {
-    const forKind = moves.get(id) ?? prev.get(id) ?? (isLayoutAction(action) ? null : action.kind);
-    if (forKind) out.set(id, forKind);
+    const v = moves.get(id) ?? prev.get(id) ?? fallback;
+    if (v) out.set(id, v);
   }
   return out.size === prev.size && [...out].every(([k, v]) => prev.get(k) === v) ? prev : out;
 }
 
 /**
- * `prePush` after a change (FR-SHELL-81): a push keeps each moved window's rect and `userSpot`
- * from before it (the first push of a tool use wins: Fog → AoE returns to before Fog) and the
- * rect it wrote; a return, a reset or a layout applied clears it; a window moved, resized, closed
- * or minimised drops out.
- */
-function nextPrePush(
-  prev: ReadonlyMap<string, PrePush>,
-  before: Windows,
-  next: Windows,
-  action: WindowAction,
-): ReadonlyMap<string, PrePush> {
-  if (action.type === "return" || action.type === "reset") return prev.size ? new Map() : prev;
-  const out = new Map(prev);
-  for (const w of next) {
-    const id = windowId(w.kind, w.instance);
-    const b = before.find((p) => p.kind === w.kind && p.instance === w.instance);
-    const moved = !b || !sameRect(b, w);
-    if (w.state !== "open") out.delete(id);
-    else if (action.type === "push" && b && moved) {
-      const kept = out.get(id);
-      out.set(id, {
-        kind: w.kind,
-        instance: w.instance,
-        rect: kept?.rect ?? { x: b.x, y: b.y, w: b.w, h: b.h },
-        ...((kept ? kept.userSpot : b.userSpot) && { userSpot: true as const }),
-        at: { x: w.x, y: w.y, w: w.w, h: w.h },
-      });
-    } else if (action.type !== "push" && moved) out.delete(id);
-  }
-  return out.size === prev.size && [...out].every(([k, v]) => prev.get(k) === v) ? prev : out;
-}
-
-/**
- * `pcClear` after a change: windows the change auto-placed (`placed` now `default`, `auto` or
- * `reopened` and moved) are tested against the PC footprints now; any other window that moved
- * drops out; the rest keep their mark.
+ * `pcClear` after a change: the windows the placer placed take its flag; any other window that
+ * moved drops out; the rest keep their mark.
  */
 function nextPcClear(
   prev: ShellState,
   next: Windows,
-  placed: ReadonlyMap<string, Placed>,
-  tokens: () => readonly PlacementToken[],
+  flags: ReadonlyMap<string, boolean>,
 ): ReadonlySet<string> {
   const out = new Set<string>();
-  let pcs: readonly PlacementToken[] | null = null;
   for (const w of next) {
     const id = windowId(w.kind, w.instance);
-    const before = prev.windows.find((p) => p.kind === w.kind && p.instance === w.instance);
-    const how = placed.get(id);
-    if (before && sameRect(before, w) && prev.placed.get(id) === how) {
-      if (prev.pcClear.has(id)) out.add(id);
+    const flag = flags.get(id);
+    if (flag !== undefined) {
+      if (flag) out.add(id);
       continue;
     }
-    if (how !== "default" && how !== "auto" && how !== "reopened") continue;
-    pcs ??= tokens();
-    if (pcClear(w, pcs)) out.add(id);
+    const before = prev.windows.find((p) => p.kind === w.kind && p.instance === w.instance);
+    if (before && sameRect(before, w) && prev.pcClear.has(id)) out.add(id);
   }
   return out.size === prev.pcClear.size && [...out].every((id) => prev.pcClear.has(id))
     ? prev.pcClear
@@ -258,12 +228,22 @@ export function createShellController(opts: {
   registry: WindowRegistry;
   storage: LayoutStorage;
   viewport: () => Viewport;
-  /** On-screen map token boxes auto placement covers the least of (FR-SHELL-40, -45). */
+  /** On-screen map token footprints (FR-SHELL-57, -96): `pc` = a player character. */
   avoid?: () => readonly PlacementToken[];
-  /** This client's keep-out regions (FR-SHELL-48); default `keepOuts(client, viewport)`. */
+  /** This client's keep-out regions (FR-SHELL-48, -113); default `keepOuts(client, viewport)`. */
   keepOuts?: (vp: Viewport) => readonly KeepOut[];
   /** Measured content heights of growing windows (FR-SHELL-39): placement never goes below them. */
   heights?: (id: string) => number | undefined;
+  /** Kinds available when a layout is applied (default: every registered kind). */
+  available?: () => ReadonlySet<string>;
+  /** The camera mode now (FR-SHELL-99); default `fitted`. */
+  camera?: () => "fitted" | "moved";
+  /** The canvas's base port for L2b (FR-SHELL-108); absent → the map never yields. */
+  dryFit?: (obstacles: readonly Rect[]) => DryFit | null;
+  /** The last full fit's cell px (FR-SHELL-108). */
+  lastFullCell?: () => number | null;
+  /** The placer accepted a yield (L2b): the map refits once (FR-MAP-97). */
+  onYield?: () => void;
   /** Reset layout was applied (FR-SHELL-80): the page requests one Fit of the map. */
   onReset?: () => void;
   warn?: (msg: string) => void;
@@ -277,30 +257,72 @@ export function createShellController(opts: {
     settling: new Set(),
     autoMinimised: new Set(),
     autoMinimisedFor: new Map(),
+    autoMinimisedCause: new Map(),
     autoMinimiseLog: "",
-    prePush: new Map(),
+    settleLog: "",
+    memory: [],
     pcClear: new Set(),
+    settledAt: null,
   }));
   const regionsAt = (vp: Viewport) => opts.keepOuts?.(vp) ?? keepOuts(registry.client, vp);
-  return {
+  const allKinds = () => new Set(registry.defs.map((d) => d.kind));
+  let blocked = false;
+  const queued = new Map<string, { action: WindowAction; available: ReadonlySet<string> }>();
+  const queueKey = (a: WindowAction) =>
+    isLayoutAction(a) ? a.type : `${a.type}:${windowId(a.kind, a.instance)}`;
+  const contextFor = (
+    state: ShellState,
+    available: ReadonlySet<string>,
+    moves: Map<string, string>,
+  ): ManagerContext => {
+    const viewport = opts.viewport();
+    const regions = regionsAt(viewport);
+    return {
+      registry,
+      viewport,
+      available,
+      avoid: opts.avoid,
+      keepOuts: () => regions,
+      heights: opts.heights,
+      placed: (id) => state.placed.get(id),
+      memory: () => state.memory,
+      camera: opts.camera,
+      dryFit: opts.dryFit,
+      lastFullCell: opts.lastFullCell,
+      settledViewport: state.settledAt ?? viewport,
+      onAutoMinimise: (id, forKind) => moves.set(id, forKind),
+      autoMinimised: () => state.autoMinimised,
+    };
+  };
+  const ctl: ShellController = {
     store,
     registry,
     restore(key) {
       if (store.getState().key === key) return;
       const vp = opts.viewport();
       const regions = regionsAt(vp);
-      const r = restoreLayout(registry, storage.read(key), vp, opts.avoid?.() ?? [], regions);
+      const tokens = opts.avoid?.() ?? [];
+      const moves = new Map<string, string>();
+      const base = store.getState();
+      const ctx = contextFor(
+        { ...base, memory: [], placed: new Map(), settledAt: vp },
+        opts.available?.() ?? allKinds(),
+        moves,
+      );
+      const r = restoreLayout(registry, storage.read(key), vp, tokens, regions, ctx);
       if (r.warning) warn(`play-shell: ${r.warning}; using the default layout`);
       const placed = new Map<string, Placed>();
+      const hard = hardRects(regions);
       for (const w of r.windows) {
         const def = registry.get(w.kind);
-        const how = r.stored || !def ? "stored" : placedAs(def, w, vp, hardRects(regions));
-        placed.set(windowId(w.kind, w.instance), how);
+        const how = r.stored || !def ? "stored" : placedAs(def, w, vp, hard);
+        placed.set(windowId(w.kind, w.instance), def?.defaultOpen && !w.userSpot ? "zone" : how);
       }
-      const pcs = opts.avoid?.() ?? [];
       const pcClearNow = new Set(
         r.windows
-          .filter((w) => placed.get(windowId(w.kind, w.instance)) !== "stored" && pcClear(w, pcs))
+          .filter(
+            (w) => placed.get(windowId(w.kind, w.instance)) !== "stored" && pcClear(w, tokens),
+          )
           .map((w) => windowId(w.kind, w.instance)),
       );
       store.setState({
@@ -310,14 +332,49 @@ export function createShellController(opts: {
         settling: new Set(),
         autoMinimised: new Set(),
         autoMinimisedFor: new Map(),
+        autoMinimisedCause: new Map(),
         autoMinimiseLog: "",
-        prePush: new Map(),
+        settleLog: "",
+        memory: [],
         pcClear: pcClearNow,
+        settledAt: vp,
       });
-      // FR-SHELL-53: default-sized windows took this viewport's default; written with `area`.
+      // The load settle changed the entry (zones, FR-SHELL-53's default sizes): written.
       if (r.migrated) storage.write(key, serialise(r.windows, registry));
     },
+    refreshPcClear() {
+      const state = store.getState();
+      const tokens = opts.avoid?.() ?? [];
+      const mine = (how: Placed | undefined) => how !== undefined && how !== "stored";
+      const next = new Set(
+        state.windows
+          .filter((w) => w.state === "open")
+          .map((w) => windowId(w.kind, w.instance))
+          .filter((id) => mine(state.placed.get(id))),
+      );
+      for (const w of state.windows) {
+        const id = windowId(w.kind, w.instance);
+        if (next.has(id) && !pcClear(w, tokens)) next.delete(id);
+      }
+      const same =
+        next.size === state.pcClear.size && [...next].every((id) => state.pcClear.has(id));
+      if (!same) store.setState({ pcClear: next });
+    },
+    setBlocked(next) {
+      if (blocked === next) return;
+      blocked = next;
+      if (blocked) return;
+      const run = [...queued.values()];
+      queued.clear();
+      for (const q of run) ctl.dispatch(q.action, q.available);
+    },
     dispatch(action, available) {
+      if (blocked) {
+        const k = queueKey(action);
+        queued.delete(k);
+        queued.set(k, { action, available });
+        return;
+      }
       const state = store.getState();
       const { key, windows } = state;
       if (key === null) return; // nothing shown before the first snapshot
@@ -325,20 +382,8 @@ export function createShellController(opts: {
       if (action.type === "settle" && !state.settling.has(windowId(action.kind, action.instance))) {
         return;
       }
-      const viewport = opts.viewport();
-      const regions = regionsAt(viewport);
       const moves = new Map<string, string>();
-      const ctx: ManagerContext = {
-        registry,
-        viewport,
-        available,
-        avoid: opts.avoid,
-        keepOuts: () => regions,
-        heights: opts.heights,
-        placed: (id) => state.placed.get(id),
-        prePush: () => [...state.prePush.values()],
-        onAutoMinimise: (id, forKind) => moves.set(id, forKind),
-      };
+      const ctx = contextFor(state, available, moves);
       // FR-SHELL-56: whether a user reopen finds its stored rect covered (`data-placed`).
       const named = isLayoutAction(action)
         ? undefined
@@ -350,36 +395,48 @@ export function createShellController(opts: {
         isUserReopen(action, named.state) &&
         available.has(named.kind) &&
         isReopenCovered(windows, named, ctx);
-      const next = reduce(windows, action, ctx);
+      const p = plan(windows, action, ctx);
+      const next = p.windows;
       const settling = nextSettling(state.settling, windows, next, action);
-      const prePush = nextPrePush(state.prePush, windows, next, action);
+      const settledAt =
+        action.type === "viewport" || action.type === "reset" ? ctx.viewport : state.settledAt;
+      const log = p.log.length > 0 ? p.log.join(";") : state.settleLog;
       if (next === windows) {
-        if (settling !== state.settling || prePush !== state.prePush) {
-          store.setState({ settling, prePush });
-        }
+        const patch: Partial<ShellState> = {};
+        if (settling !== state.settling) patch.settling = settling;
+        if (p.memory !== state.memory) patch.memory = p.memory;
+        if (settledAt !== state.settledAt) patch.settledAt = settledAt;
+        if (log !== state.settleLog) patch.settleLog = log;
+        if (Object.keys(patch).length > 0) store.setState(patch);
+        if (action.type === "reset") opts.onReset?.();
         return;
       }
-      const hard = hardRects(regions);
-      const placed = nextPlaced(state, next, action, registry, viewport, hard, covered);
+      const placed = nextPlaced(state, next, action, p.placed, covered);
       const autoMinimised = nextAutoMinimised(state.autoMinimised, windows, next, action);
-      const log = [...moves].map(([id, forKind]) => `${id.split(":")[0]}>${forKind}`).join(";");
+      const forKind = isLayoutAction(action) ? null : action.kind;
+      const moveLog = [...moves].map(([id, k]) => `${id.split(":")[0]}>${k}`).join(";");
       store.setState({
         windows: next,
         placed,
-        pcClear: nextPcClear(state, next, placed, () => opts.avoid?.() ?? []),
+        pcClear: nextPcClear(state, next, p.pcClear),
         settling,
         autoMinimised,
-        autoMinimisedFor: nextAutoMinimisedFor(
-          state.autoMinimisedFor,
+        autoMinimisedFor: nextFor(state.autoMinimisedFor, autoMinimised, moves, forKind),
+        autoMinimisedCause: nextFor(
+          state.autoMinimisedCause,
           autoMinimised,
-          moves,
-          action,
+          p.putAway,
+          forKind && `open:${forKind}`,
         ),
-        autoMinimiseLog: moves.size > 0 || placing(action) ? log : state.autoMinimiseLog,
-        prePush,
+        autoMinimiseLog: moves.size > 0 || placing(action) ? moveLog : state.autoMinimiseLog,
+        settleLog: log,
+        memory: action.type === "reset" ? [] : p.memory,
+        settledAt,
       });
       storage.write(key, serialise(next, registry));
+      if (p.yields) opts.onYield?.();
       if (action.type === "reset") opts.onReset?.();
     },
   };
+  return ctl;
 }

@@ -411,6 +411,8 @@ export const playerInitiativeWindow = defineWindow({
   // read-only rows.
   defaultSize: { w: 280, h: 400 },
   minSize: { w: 240, h: 200 },
+  // FR-SHELL-100: header + 4 rows (play-shell §7 sprint-8 useful sizes).
+  usefulSize: { w: 280, h: 320 },
   defaultPosition: { anchor: "top-left", dx: 56 },
   // FR-CBT-77 (G4): grows to its rows until resized (FR-SHELL-39, -52); "new" dot while minimised
   // on a round / turn change (players never get `turnCombatantId`).

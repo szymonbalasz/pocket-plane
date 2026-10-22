@@ -10,5 +10,7 @@ function PlayerLogBody() {
 export const playerDiceLogWindow = defineWindow({
   ...diceLogWindowBase,
   clients: ["player"],
+  // FR-SHELL-100: 3 one-line entries + the roll bar (play-shell §7 sprint-8 useful sizes).
+  usefulSize: { w: 460, h: 160 },
   component: PlayerLogBody,
 });

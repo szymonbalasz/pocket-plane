@@ -2361,9 +2361,26 @@ From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-trac
 - **Derived:** what a key plays (pick, else turn / request ping, pause / resume silent).
 - **Fixtures:** `audio-chime` (asset "Chime", 17,684 B, 400 ms), `camp-alert-sounds` (`request`, `pause` → Chime); both in `session-sim-12`.
 
-## 109. Sprint 8: saved macros and roll requests (TT1+TT2)
+## 109. Sprint 8: one window placer (WF1)
 
-From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`**; no schema change (TT0's tables, [§106](#106-sprint-8-table-tools-core-tt0)). Protocol side: [protocol §138](../protocol/README.md#138-sprint-8-saved-macros-and-dm-roll-requests--intents-prompt-views-requests-window-tt1tt2).
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0060](../architecture/adr/0060-one-window-placer.md)). **Built by `fix/placer-core`.** Browser-only; nothing on the wire.
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| `WindowState.userSize` | browser layout entry (`localStorage`, #121) | `true`, optional: set at a user resize end; the placer's target size, never shrunk or grown by it (render-only fit); kept when a displacement or zone keeps that size; cleared by Reset layout. Older entries infer it at load iff `userSpot` and the size is neither a known default nor the min | [FR-SHELL-100](../specs/play-shell.md#6-functional-requirements) |
+| Displacement memory | client memory (`ShellState.memory`) | per window the placer moved, shrank or put away for a transient cause (`toolbar:<id>`, `viewport:<w>×<h>`, `window:<kind>`): its first prior rect, `userSpot`, `userSize` and the rect it wrote (null = put away); replaces sprint 7's pre-push rects; dropped when the cause ends, on a user move / resize / close / minimise, reload, reset | [FR-SHELL-102](../specs/play-shell.md#6-functional-requirements) |
+| Settled viewport, put-away causes, settle log | client memory (`settledAt`, `autoMinimisedCause`, `settleLog`) | the viewport of the last `viewport` / reset settle; why each auto-minimised window went; the last settle's `trigger:kind>rung` steps | [FR-SHELL-103](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-110](../specs/play-shell.md#6-functional-requirements) |
+| `WindowDef.usefulSize` (★ kinds), size table criteria, pending rows | code (registry; `size-table.ts` test data, append-only) | DM Initiative 400×380, Game logs 460×160, player Initiative 280×320, player sheet 320×338; `dicex.requests`, `party.summary` pending | [FR-SHELL-100](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-112](../specs/play-shell.md#6-functional-requirements) |
+| Overlays, top-bar items, chrome keep-outs | code (append-only registries `overlays.ts`, `top-bar-items.ts`, `chrome-keep-outs.ts`, created empty) | not stored or sent | [FR-SHELL-112](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-113](../specs/play-shell.md#6-functional-requirements) |
+
+- **Derived:** zones = this viewport's named default layout (§7 sprint-5 table); target size = `userSize` ? stored : fitted default; a PC = a player character's token (#318).
+- **Fixtures:** no new unit; bundles `wf-frame`, `wf-frame-e2e` (= `session-sim-11`). Harness cells `replay-cells.generated.ts` (from `session-sim-11`, `UPDATE_CELLS=1`).
+- **Persisted runtime state:** `userSize` in the layout entry (0 B on the wire).
+- **CON-44:** 0 B.
+
+## 110. Sprint 8: saved macros and roll requests (TT1+TT2)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) FR-DICEX-64–82 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`**; no schema change (TT0's tables, [§106](#106-sprint-8-table-tools-core-tt0)). Protocol side: [protocol §140](../protocol/README.md#140-sprint-8-saved-macros-and-dm-roll-requests--intents-prompt-views-requests-window-tt1tt2).
 
 | Table / field | Written by | Rule | Source |
 |---|---|---|---|

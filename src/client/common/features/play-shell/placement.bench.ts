@@ -1,10 +1,13 @@
 // FR-SHELL-46 / FR-SHELL-58 perf gates: `placeWindow` for 10 windows × 200 token boxes, best of 5
-// ≤ 5 ms (narrowing window ≤ 10 ms); FR-SHELL-77: a whole auto placement ≤ 25 ms, worst ≤ 100 ms. Run alone via `bun run bench`; the placement asserts on the
-// same inputs stay in ./placement.test.ts.
+// ≤ 5 ms (narrowing window ≤ 10 ms); FR-SHELL-77: a whole auto placement ≤ 25 ms, worst ≤ 100 ms;
+// FR-SHELL-119: one `settle` with a dry fit ≤ 25 ms, 40 windows ≤ 100 ms. Run alone via `bun run
+// bench`; the placement asserts on the same inputs stay in ./placement.test.ts.
 import { describe, expect, test } from "bun:test";
 import { best, GATE_TIMEOUT } from "@shared/bench-kit";
 import type { WindowState } from "@shared/play-shell/layout";
-import { defaultLayout, type ManagerContext, reduce } from "./manager";
+import { fitScene } from "../scenes-map/camera";
+import { freeAreas } from "./free-area";
+import { defaultLayout, type ManagerContext, plan, reduce } from "./manager";
 import { type Placeable, type PlacementToken, placeWindow } from "./placement";
 import { createWindowRegistry, type WindowDef } from "./registry";
 
@@ -145,4 +148,60 @@ describe("FR-SHELL-77 auto placement", () => {
     },
     GATE_TIMEOUT,
   );
+});
+
+// FR-SHELL-119 perf gates (WF1): one settle (`plan` → `settle`) through the whole ladder (L1–L5, the look-ahead,
+// put-aways, the protected squeeze) and one dry fit of the base port (L2b, the real `fitScene` on
+// 20 tokens), 12 windows × 200 token boxes best of 5 ≤ 25 ms; 40 windows ≤ 100 ms.
+const fitTokens = Array.from({ length: 20 }, (_, i) => ({
+  col: (i * 3) % 20,
+  row: (i * 7) % 14,
+  size: "medium" as const,
+  pc: i % 5 === 0,
+}));
+const dryFit = (obstacles: readonly { x: number; y: number; w: number; h: number }[]) => {
+  const room = {
+    areas: freeAreas(obstacles, vp),
+    obstacles,
+    windowsOnly: freeAreas(obstacles, vp),
+  };
+  const grid = { gridCellSize: 70, gridOffsetX: 0, gridOffsetY: 0 };
+  const f = fitScene(fitTokens, grid, { w: 1400, h: 980 }, vp, room);
+  return { cellPx: f.scale * 70, clear: f.visible === "all" };
+};
+const playerRegistryOf = (n: number) =>
+  createWindowRegistry(
+    "player",
+    registryOf(n).defs.map((d) => ({ ...d, clients: ["player" as const] })),
+  );
+
+describe("FR-SHELL-119 settle", () => {
+  for (const [n, budget] of [
+    [13, 25],
+    [40, 100],
+  ] as const) {
+    test(
+      `FR-SHELL-119 settle: ${n - 1} launcher windows × 200 token boxes, the full ladder + one dry fit, best of 5 ≤ ${budget} ms`,
+      async () => {
+        const reg = playerRegistryOf(n);
+        const ws = layout(n, (i) => ({ x: 68 + (i % 4) * 380, y: 60 + Math.floor(i / 4) * 160 }));
+        const ctx: ManagerContext = {
+          registry: reg,
+          viewport: vp,
+          available: new Set(reg.defs.map((d) => d.kind)),
+          avoid: () => tokens,
+          camera: () => "fitted",
+          lastFullCell: () => 40,
+          dryFit,
+        };
+        const kind = `b.w${n - 1}`;
+        const ms = await best(() => plan(ws, { type: "open", kind }, ctx), budget, 5, 3);
+        console.log(
+          `FR-SHELL-119 settle, ${n - 1} windows × 200 boxes: best of 5 ${ms.toFixed(2)} ms`,
+        );
+        expect(ms).toBeLessThanOrEqual(budget);
+      },
+      GATE_TIMEOUT,
+    );
+  }
 });

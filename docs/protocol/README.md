@@ -3263,9 +3263,42 @@ From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-trac
 - **Fixtures:** units `audio-chime` (generated 0.4 s PCM WAV, 17,684 B; `ingestStep` gains a bytes form `{bytes, filename}`; manifest type `audio-asset`) and `camp-alert-sounds` (request, pause → Chime) join `session-sim-12`; bundles `alert-sounds` (`mid-combat` + both), `alert-sounds-e2e`. Upload-limit files `e2e/support/audio.ts` (`bun e2e/support/audio.ts <dir>` writes `big.wav`, `long.wav`, `fake.mp3`).
 - **CON-44:** no new snapshot record; `audio-asset` 0 B (lazy); the picks' +150 B and the 50-sound load are measured by `con44-tt.test.ts` (§135).
 
-## 138. Sprint 8: saved macros and DM roll requests — intents, prompt views, Requests window (TT1+TT2)
+## 138. Sprint 8: drag to reorder initiative — DM client (CB1)
 
-From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-64–92, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-79–84, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-58–62, -64 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-87–90 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`** on TT0's records and events ([§135](#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0)). Data side: [data model §109](../data-model/README.md#109-sprint-8-saved-macros-and-roll-requests-tt1tt2).
+No wire change: the drag and Move up / down send `cbtx.moveCombatant` ([§136](#136-sprint-8-combat-polish-core--cbtxmovecombatant-tie-order-cb0)); records, events and visibility as there. CON-44: 0 B (nothing stored).
+
+| Part | Behaviour | Test IDs | FR |
+|---|---|---|---|
+| Grip | lucide `GripVertical` at the left of every movable row (active, not removed, not riding its owner; hidden rows too); none on an attached companion. It sits in the 8 px gutter left of the turn marker, so the name line keeps its width. `tabIndex -1` (no new tab stop). Disabled while a move is in flight or not live; no movable row with a number → disabled, Tooltip "Roll initiative first" | `cbtx-init-row-grip` + `data-record-id` | FR-CBTX-62 |
+| Drag | primary press + 4 px → the row's block (row + rows riding it) lifts and follows the pointer inside the list; autoscroll within 24 px of the list's edges; pointer capture, no library. Esc, pointer cancel, lost capture, the start spot, a disconnect → nothing sent. Drop → one intent, not optimistic | — | FR-CBTX-62, -69 |
+| Drop line | between blocks only, never below the last numbered row, not at the start spot; `data-after` = anchor id or `top`. "→ n" when the drop changes the row's number, the rewritten rows ("Wolf → 17") in a tooltip under the line; both from `planMove` (pure, shared with the server) | `cbtx-init-drop`, `cbtx-init-drop-number`, `cbtx-init-drop-tip` | FR-CBTX-62, -65 |
+| Move up / down | first entries of the DM row menu; one block per step (up: anchor = the block two above, top when one above; down: the block below); disabled at the ends, on attached companions, below the last numbered row, in flight / not live | `cbtx-init-row-move-up`, `cbtx-init-row-move-down` + `data-record-id` | FR-CBTX-63 |
+| Crossing hint | after the move's ack, round ≥ 1, from the order before and after (client only): crossed the turn row upwards "Goblin now acts before Mira: no turn for it this round", downwards "… acts after Mira: it acts again this round", the moved block holds the turn "Mira's turn goes on; next: Goblin 2" (Next's row, skipping as Next does). Silent info toast | `cbt-init-move-hint` | FR-CBT-165 |
+| Players | unchanged: no grip, no items; rows re-sort by `playerPosition` | — | FR-CBTX-68 |
+
+- **Code:** `src/client/dm/features/combat-tracker/{reorder.ts (pure), reorder-drag.tsx, initiative-window.tsx}`, `src/client/dm/features/combat-extras/row.tsx` (`RowMoveItems`). E2E `e2e/cb-reorder.e2e.ts` on `cb-reorder-e2e` (after `cb-core.e2e.ts`, same server).
+
+## 139. Sprint 8: one window placer (WF1)
+
+From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-95–119, [ADR-0060](../architecture/adr/0060-one-window-placer.md). **Built by `fix/placer-core`.** No intent, event or record change: the shell is client-side (0 B).
+
+| Seam | Contract | Source |
+|---|---|---|
+| Placer (`play-shell/placer.ts`) | `settle(windows, trigger, ctx) → Plan {windows, memory, placed, pcClear, putAway, log, yields}`, pure. Triggers `load` (`drawn`: after the first token draw), `open` (`fresh`, `by`), `reopen`, `appear`, `settle`, `viewport`, `push`, `return`, `drag-end`, `reset`. The manager's `plan(ws, action, ctx)` / `reduce` call it for every action; close / minimise / focus move nothing (a close of a zone's or squeeze's cause returns what it displaced). `autoPlace`, `pushWindows`, `followDefaults`, `clearAround`, `followViewport` are gone | FR-SHELL-95 |
+| Ladder | L1 target size → L2 useful + the protected squeeze (Game log, then DM Initiative / player sheet, then player Initiative) → L2b map yields (players, `fitted`, `ctx.dryFit` ≥ 75 % of `ctx.lastFullCell`, ≥ 24 px) → L3 put away the LRU launcher window when the look-ahead helps → L4 below useful → L5 least PC area (`data-pc-clear` absent); each rung at 12 px, retried at 4 px; a window displaced for a transient cause that would land at L5 is put away instead | FR-SHELL-97, -98, -101, -108 |
+| Zones | protected windows without `userSpot` take their named default rect (`fitted` camera: always, the map refits; `moved`: iff PC-clear, else the ladder among the protected windows, a still-valid earlier spot kept); launcher windows over them, user spots included, are displaced (`window:<kind>`) and return when it closes or ends | FR-SHELL-99, -107 |
+| `ManagerContext` additions | `memory`, `camera` (`[data-testid=map-canvas]` `data-camera`), `dryFit` + `lastFullCell` (the canvas's base port: WF3 wires it), `settledViewport`, `autoMinimised` | FR-SHELL-96 |
+| Controller (`shell-store.ts`) | `setBlocked(b)`: while a `blocksInput` overlay is up, actions queue (one per window and action kind, last kept) and run in order when it goes; options `available`, `camera`, `dryFit`, `lastFullCell`, `onYield` | FR-SHELL-112 |
+| Page hooks (`ShellContext`, `PlayFrame`) | `viewport` settles 200 ms after the last resize; `load` again once the map's load fit drew tokens; a kind going unavailable dispatches `return`; chrome keep-outs showing / changing push, going return | FR-SHELL-95, -102, -113 |
+| Registries | `overlays.ts` `{id, clients, layer, blocksInput?(store), Component}` (layer above the alert flash, below the dice layer); `top-bar-items.ts` `{id, clients, width, order, Component}` (before the identity chip); `chrome-keep-outs.ts` `{id, clients, rect(vp, store) \| null, fitObstacle}` (hard keep-out; `chromeFitObstacles` for the fit); all append-only, empty | FR-SHELL-112, -113 |
+
+- **Test IDs / hooks:** `ui-window` `data-placed` + `zone`, `displaced`, `grown`, `squeezed`; `data-auto-minimised-cause` (`toolbar:…`, `viewport:…`, `window:…`, `open:…`); `ui-window-body`; `ui-play-page` `data-settle-log` = "trigger:kind>rung;…" (test mode); `ui-overlay-layer` (`data-blocking`), `[data-overlay-id]`; `ui-topbar-item` + `data-record-id`.
+- **Harness:** `fixtures/units/play-shell/replay-cells.test.ts` (FR-SHELL-114) → `replay-cells.generated.ts`; `src/client/{dm,player}/features/play-shell/replay.test.ts` (FR-SHELL-115, -116; known failures in `replay.failing.json`, run as `test.failing`).
+- **CON-44:** 0 B.
+
+## 140. Sprint 8: saved macros and DM roll requests — intents, prompt views, Requests window (TT1+TT2)
+
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-64–92, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-79–84, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-58–62, -64 and [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-87–90 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `build/tt-dice`** on TT0's records and events ([§135](#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0)). Data side: [data model §110](../data-model/README.md#110-sprint-8-saved-macros-and-roll-requests-tt1tt2).
 
 **Intents** (WS; zod in `@shared/dice-extras/macros`, `requests`; none takes `public` or an audience)
 

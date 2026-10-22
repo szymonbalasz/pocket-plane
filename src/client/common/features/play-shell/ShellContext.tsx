@@ -25,10 +25,11 @@ import {
   type ShellAlert,
 } from "./alerts";
 import { browserAudioContext, createAudioEngine } from "./audio";
+import { chromeKeepOuts } from "./chrome-keep-outs";
 import { contentHeights } from "./content-heights";
 import { requestFit } from "./free-area";
-import type { Rect } from "./geometry";
-import { reportedKeepOuts, subscribeKeepOuts } from "./keep-outs";
+import type { Rect, Viewport } from "./geometry";
+import { keepOuts, reportedKeepOuts, subscribeKeepOuts } from "./keep-outs";
 import type { OpenBy, WindowAction } from "./manager";
 import { availableKinds, type WindowRegistry } from "./registry";
 import { createShellController, type ShellController, type ShellState } from "./shell-store";
@@ -40,6 +41,14 @@ const ShellContext = createContext<ShellController | null>(null);
 const AlertContext = createContext<AlertController | null>(null);
 
 const browserViewport = () => ({ w: window.innerWidth, h: window.innerHeight });
+
+/** The map canvas's element (`data-camera`, `data-fit-reason`, FR-MAP-44 (b), -82). */
+const mapCanvas = () =>
+  typeof document === "undefined" ? null : document.querySelector('[data-testid="map-canvas"]');
+
+/** FR-SHELL-96: the camera mode the placer sees (`moved`: zones yield to PCs, FR-SHELL-99). */
+const cameraMode = () =>
+  mapCanvas()?.getAttribute("data-camera") === "moved" ? ("moved" as const) : ("fitted" as const);
 
 /**
  * The drawn tokens' footprints for auto placement (FR-SHELL-40, -45, -57, -77): `pc` = a player
@@ -71,16 +80,30 @@ export function ShellProvider({
   children: React.ReactNode;
 }) {
   const sync = useContext(SyncContext);
-  const [controller] = useState(() =>
-    createShellController({
-      registry,
-      storage: browserLayoutStorage(),
-      viewport: browserViewport,
-      avoid: () => placementTokens(sync?.getState().store),
-      heights: (id) => contentHeights().get(id),
-      // FR-SHELL-80: the map refits once on the client that reset.
-      onReset: requestFit,
-    }),
+  const [controller] = useState(
+    (): ShellController =>
+      createShellController({
+        registry,
+        storage: browserLayoutStorage(),
+        viewport: browserViewport,
+        avoid: () => placementTokens(sync?.getState().store),
+        // FR-SHELL-48, -113: the toast box, reported tool bars, the shown chrome keep-outs.
+        keepOuts: (vp: Viewport) =>
+          keepOuts(
+            registry.client,
+            vp,
+            reportedKeepOuts(),
+            chromeKeepOuts(registry.client, vp, sync?.getState().store),
+          ),
+        heights: (id) => contentHeights().get(id),
+        available: () => availableIn(registry, sync),
+        camera: cameraMode,
+        // FR-SHELL-80: the map refits once on the client that reset.
+        onReset: () => {
+          requestFit();
+          refreshAfterFit(() => controller);
+        },
+      }),
   );
   // FR-SHELL-81: a reported region (the active tool bar) going returns the windows it pushed.
   useEffect(() => {
@@ -92,6 +115,7 @@ export function ShellProvider({
       if (gone) controller.dispatch({ type: "return" }, availableNow(controller, sync));
     });
   }, [controller, sync]);
+  useChromePushes(controller, sync);
   const you = useSync((s) => s.store.you);
   const key = you
     ? layoutKey(
@@ -103,6 +127,7 @@ export function ShellProvider({
   useLayoutEffect(() => {
     if (key) controller.restore(key);
   }, [controller, key]);
+  useLoadAfterDraw(controller, sync, key);
   const alerts = useAlertRuntime(
     you?.role === "player" && you.playerId ? soundKey(you.campaignId, you.playerId) : null,
   );
@@ -111,6 +136,65 @@ export function ShellProvider({
       <AlertContext.Provider value={alerts}>{children}</AlertContext.Provider>
     </ShellContext.Provider>
   );
+}
+
+/** How long the second `load` settle waits for the map's first draw before it gives up. */
+const DRAW_WAIT_MS = 10_000;
+
+/**
+ * FR-SHELL-95: `load` settles once more after the first token draw, so PCs count. After a layout
+ * is applied (`key`), each animation frame looks at the map canvas: once its load fit ran
+ * (`data-fit-reason` past `open`) and tokens are drawn, one `load` settle runs. No map within
+ * 10 s: nothing more (no PCs to count).
+ */
+function useLoadAfterDraw(
+  controller: ShellController,
+  sync: React.ContextType<typeof SyncContext>,
+  key: string | null,
+) {
+  useEffect(() => {
+    if (!key || typeof requestAnimationFrame === "undefined") return;
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = () => {
+      const fitted = (mapCanvas()?.getAttribute("data-fit-reason") ?? "open") !== "open";
+      if (fitted && placementTokens(sync?.getState().store).length > 0) {
+        controller.dispatch({ type: "load" }, availableNow(controller, sync));
+        return;
+      }
+      if (performance.now() - t0 < DRAW_WAIT_MS) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [controller, sync, key]);
+}
+
+/**
+ * FR-SHELL-113: a chrome keep-out showing (or changing its rect) pushes the windows under it; one
+ * going returns what it pushed.
+ */
+function useChromePushes(controller: ShellController, sync: React.ContextType<typeof SyncContext>) {
+  useEffect(() => {
+    if (!sync) return;
+    const client = controller.registry.client;
+    let before = new Map<string, string>();
+    const check = () => {
+      const now = new Map(
+        chromeKeepOuts(client, browserViewport(), sync.getState().store).map((k) => [k.id, k.rect]),
+      );
+      const keyOf = (r: Rect) => `${r.x},${r.y},${r.w},${r.h}`;
+      const available = availableNow(controller, sync);
+      for (const [id, r] of now) {
+        if (before.get(id) !== keyOf(r)) controller.dispatch({ type: "push", rect: r }, available);
+      }
+      if ([...before.keys()].some((id) => !now.has(id))) {
+        controller.dispatch({ type: "return" }, available);
+      }
+      before = new Map([...now].map(([id, r]) => [id, keyOf(r)]));
+    };
+    check();
+    return sync.subscribe(check);
+  }, [controller, sync]);
 }
 
 /**
@@ -189,6 +273,12 @@ export function useRegistry(): WindowRegistry {
   return useController().registry;
 }
 
+/** FR-SHELL-112 (2): a `blocksInput` overlay is up → the placer's settles queue until it goes. */
+export function useSetShellBlocked(): (blocked: boolean) => void {
+  const c = useController();
+  return useCallback((blocked: boolean) => c.setBlocked(blocked), [c]);
+}
+
 /** Kinds this client renders right now (registered + available), as a stable Set. */
 export function useAvailableKinds(): ReadonlySet<string> {
   const registry = useRegistry();
@@ -255,3 +345,32 @@ export function usePushWindows(): { push: (rect: Rect) => void; layoutKey: strin
 }
 
 const NO_SHELL = createStore<Pick<ShellState, "key">>()(() => ({ key: null }));
+
+/** Kinds available in the synced store now (every registered kind before a store exists). */
+function availableIn(
+  registry: WindowRegistry,
+  sync: React.ContextType<typeof SyncContext>,
+): ReadonlySet<string> {
+  const store = sync?.getState().store;
+  return store ? availableKinds(registry, store) : new Set(registry.defs.map((d) => d.kind));
+}
+
+/**
+ * After Reset layout's Fit lands (`data-fit-reason="fit"`, within 2 s), the zone windows'
+ * `data-pc-clear` is re-tested against the refitted PCs (it was taken before the refit).
+ */
+function refreshAfterFit(controller: () => ShellController) {
+  if (typeof requestAnimationFrame === "undefined") return;
+  const t0 = performance.now();
+  let frames = 0;
+  const tick = () => {
+    frames += 1;
+    // Two frames at least: the Fit runs after the reset's windows are laid out.
+    if (frames > 2 && mapCanvas()?.getAttribute("data-fit-reason") === "fit") {
+      controller().refreshPcClear();
+      return;
+    }
+    if (performance.now() - t0 < 2000) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}

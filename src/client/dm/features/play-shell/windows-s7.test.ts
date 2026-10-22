@@ -18,7 +18,7 @@ import {
 } from "@ui/features/play-shell/manager";
 import { pcClear } from "@ui/features/play-shell/placement";
 import { createShellController } from "@ui/features/play-shell/shell-store";
-import { BANDS, SIZE_TABLE, TEST_KINDS } from "@ui/features/play-shell/size-table";
+import { BANDS, PENDING_ROWS, SIZE_TABLE, TEST_KINDS } from "@ui/features/play-shell/size-table";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
 import { sim10Tokens } from "@ui/features/play-shell/test-cells";
 
@@ -40,8 +40,10 @@ const rendered = (ws: Parameters<typeof renderedWindowRects>[0], vp: { w: number
 const fitted = (vp: { w: number; h: number }) =>
   sim10Tokens("dm", vp, rendered(defaultLayout(dmWindows, vp), vp));
 
-test("FR-SHELL-85 size table (DM): every registered kind's default, useful (DM band 412 / 492 / 512 / 512) and min size at the four sizes = §7's sprint-7 table", () => {
-  expect(sizeTableProblems(dmWindows, SIZE_TABLE.dm, BANDS.dm, TEST_KINDS)).toEqual([]);
+test("FR-SHELL-85 FR-SHELL-100 size table (DM, shape only): every registered kind's default, useful (DM band 412 / 492 / 512 / 512; the ★ kinds' sprint-8 useful sizes), min size and criterion at the four sizes = §7's table; pending rows skipped until registered", () => {
+  expect(
+    sizeTableProblems(dmWindows, SIZE_TABLE.dm, BANDS.dm, TEST_KINDS, PENDING_ROWS.dm),
+  ).toEqual([]);
 });
 
 test("FR-SHELL-79 useful size before shrinking (DM): note.history at 1280×720 opens 412 high (its minOpenH 480, band-capped), not below", () => {

@@ -1,0 +1,792 @@
+// The one placer (FR-SHELL-95–113, ADR-0060) on a DM-shaped registry: Initiative (top-right) and
+// the Game log (bottom-left) protected, launcher windows like Compendium; pure, through the
+// manager and the shell controller (play-shell §13 sprint 8, `placer.test.ts`).
+import { describe, expect, test } from "bun:test";
+import type { WindowState } from "@shared/play-shell/layout";
+import { emptyStore } from "@shared/protocol/store";
+import { type ChromeKeepOut, chromeFits, chromeKeepOuts } from "./chrome-keep-outs";
+import type { Rect, Viewport } from "./geometry";
+import { blockInput, cancelGestures, onGestureCancel } from "./input-block";
+import { keepOuts } from "./keep-outs";
+import * as managerModule from "./manager";
+import {
+  type Displacement,
+  defaultLayout,
+  type ManagerContext,
+  plan,
+  reduce,
+  restoreLayout,
+  serialise,
+  type WindowAction,
+  type Windows,
+} from "./manager";
+import { blockingOverlay, type OverlayEntry, overlaysFor } from "./overlays";
+import { type PlacementToken, pcClear } from "./placement";
+import { settle } from "./placer";
+import { createWindowRegistry, type WindowDef } from "./registry";
+import { createShellController } from "./shell-store";
+import { createLayoutStorage } from "./storage";
+import { isPlacementPc } from "./token-boxes";
+import { topBarItemsFor } from "./top-bar-items";
+
+const Body = () => null;
+const def = (kind: string, over: Partial<WindowDef> = {}): WindowDef => ({
+  kind,
+  title: kind,
+  clients: ["dm"],
+  defaultSize: { w: 440, h: 560 },
+  minSize: { w: 320, h: 360 },
+  minOpenH: 400,
+  defaultPosition: { anchor: "top-left", dx: 56 },
+  launcher: { icon: Body, label: kind, order: 1 },
+  component: Body,
+  ...over,
+});
+const LAPTOP = { w: 1280, h: 720 };
+const WIDE = { w: 1440, h: 900 };
+const dm = createWindowRegistry("dm", [
+  def("t.log", {
+    defaultOpen: true,
+    defaultSize: (vp) => (vp.w >= 1440 ? { w: 1150, h: 240 } : { w: 690, h: 160 }),
+    minSize: { w: 300, h: 160 },
+    minOpenH: undefined,
+    usefulSize: { w: 460, h: 160 },
+    defaultPosition: { anchor: "bottom-left", dx: 56 },
+  }),
+  def("t.init", {
+    defaultOpen: true,
+    defaultSize: { w: 400, h: 500 },
+    minSize: { w: 320, h: 240 },
+    minOpenH: undefined,
+    usefulSize: { w: 400, h: 380 },
+    defaultPosition: { anchor: "top-right" },
+  }),
+  def("t.a"),
+  def("t.b"),
+  def("t.c"),
+  def("t.small", { defaultSize: { w: 320, h: 300 }, minSize: { w: 280, h: 240 } }),
+]);
+const all = new Set(dm.defs.map((d) => d.kind));
+const ctxAt = (viewport: Viewport, over: Partial<ManagerContext> = {}): ManagerContext => ({
+  registry: dm,
+  viewport,
+  available: all,
+  keepOuts: () => keepOuts("dm", viewport, new Map()),
+  ...over,
+});
+const get = (ws: Windows, kind: string) => ws.find((w) => w.kind === kind) as WindowState;
+const rectOf = (w: Rect): Rect => ({ x: w.x, y: w.y, w: w.w, h: w.h });
+const hits = (a: Rect, b: Rect) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+const pc = (x: number, y: number): PlacementToken => ({ x, y, w: 40, h: 40, pc: true });
+const zone = (vp: Viewport, kind: string) => rectOf(get(defaultLayout(dm, vp), kind));
+
+/** A small in-memory shell (the page's controller). */
+function shell(
+  vp: { current: Viewport },
+  over: Partial<Parameters<typeof createShellController>[0]> = {},
+) {
+  const backend = new Map<string, string>();
+  const storage = createLayoutStorage(() => ({
+    getItem: (k) => backend.get(k) ?? null,
+    setItem: (k, v) => void backend.set(k, v),
+  }));
+  const c = createShellController({
+    registry: dm,
+    storage,
+    viewport: () => vp.current,
+    keepOuts: (v) => keepOuts("dm", v, new Map()),
+    ...over,
+  });
+  c.restore("k");
+  const win = (kind: string) => get(c.store.getState().windows, kind);
+  return { c, backend, storage, win };
+}
+
+describe("one placer (FR-SHELL-95–113)", () => {
+  test("FR-SHELL-95 one writer: open / reopen / appear / settle / viewport / load / push / return / reset go through settle; close, minimise and focus move nothing; the old entry points are gone", () => {
+    for (const gone of ["followViewport", "autoPlace", "pushWindows", "belowBar", "clearAround"]) {
+      expect(Object.keys(managerModule)).not.toContain(gone);
+    }
+    const ctx = ctxAt(LAPTOP);
+    let ws: Windows = defaultLayout(dm, LAPTOP);
+    const p = plan(ws, { type: "open", kind: "t.a" }, ctx);
+    expect(p.log.length).toBeGreaterThan(0);
+    expect(p.log[0]).toStartWith("open:t.a>");
+    ws = p.windows;
+    for (const a of [
+      { type: "focus", kind: "t.init" },
+      { type: "minimise", kind: "t.a" },
+      { type: "close", kind: "t.a" },
+    ] as const) {
+      const next = reduce(ws, a, ctx);
+      for (const w of next) expect(rectOf(w)).toEqual(rectOf(get(ws, w.kind)));
+    }
+    // A settle is pure: the input windows are never changed, the same inputs give the same plan.
+    const frozen = JSON.stringify(ws);
+    settle(ws, { type: "viewport" }, { ...ctx, settledViewport: WIDE });
+    expect(JSON.stringify(ws)).toBe(frozen);
+  });
+
+  test("FR-SHELL-96 PC is a player character: an owned pet or summon is not one (#318), for the placer and the map alike", () => {
+    expect(isPlacementPc({ ownerPlayerId: "p1", characterId: "c1" })).toBe(true);
+    expect(isPlacementPc({ ownerPlayerId: "p1", characterId: null })).toBe(false);
+    expect(isPlacementPc({ ownerPlayerId: null, characterId: "c1" })).toBe(false);
+    // Tokens everywhere: pets don't stop the target size (L1); player characters do (L5).
+    const grid = (pcFlag: boolean) => {
+      const out: PlacementToken[] = [];
+      for (let x = 60; x < 1280; x += 70)
+        for (let y = 60; y < 650; y += 70) {
+          out.push({ x, y, w: 40, h: 40, pc: pcFlag });
+        }
+      return out;
+    };
+    const open = (tokens: PlacementToken[]) =>
+      plan(
+        defaultLayout(dm, LAPTOP),
+        { type: "open", kind: "t.small" },
+        ctxAt(LAPTOP, { avoid: () => tokens }),
+      );
+    expect(open(grid(false)).log).toEqual(["open:t.small>L1"]);
+    expect(open(grid(true)).log).toEqual(["open:t.small>L5"]);
+  });
+
+  test("FR-SHELL-97 ladder order: L1 the target size; L2 down to useful; L3 the least recently used launcher window put away; L4 below useful; L5 least PC area, flagged", () => {
+    const base = (vp: Viewport) => defaultLayout(dm, vp);
+    // L1: the target size fits.
+    expect(plan(base(WIDE), { type: "open", kind: "t.small" }, ctxAt(WIDE)).log).toEqual([
+      "open:t.small>L1",
+    ]);
+    // L2: 440 × 560 doesn't fit above the Game log; useful (440 × 400) up to the band does.
+    const l2 = plan(base(WIDE), { type: "open", kind: "t.a" }, ctxAt(WIDE));
+    expect(l2.log).toEqual(["open:t.a>L2"]);
+    expect(get(l2.windows, "t.a")).toMatchObject({ w: 440, h: 512 });
+    // L3: at 1280×720 one 440-wide window fits left of Initiative: the next puts it away (LRU).
+    let ws = reduce(base(LAPTOP), { type: "open", kind: "t.a" }, ctxAt(LAPTOP));
+    const l3 = plan(ws, { type: "open", kind: "t.b" }, ctxAt(LAPTOP));
+    expect(get(l3.windows, "t.a").state).toBe("minimised");
+    expect(l3.putAway.get("t.a:main")).toBe("open:t.b");
+    const b = get(l3.windows, "t.b");
+    expect(b.w >= 440 && b.h >= 400).toBe(true);
+    // L4: wider than any free spot at its useful size even with every launcher window gone.
+    const huge = createWindowRegistry("dm", [
+      ...dm.defs.filter((d) => d.defaultOpen),
+      def("t.huge", { defaultSize: { w: 820, h: 412 }, usefulSize: { w: 820, h: 412 } }),
+    ]);
+    const hctx = {
+      ...ctxAt(LAPTOP),
+      registry: huge,
+      available: new Set(huge.defs.map((d) => d.kind)),
+    };
+    const l4 = plan(defaultLayout(huge, LAPTOP), { type: "open", kind: "t.huge" }, hctx);
+    expect(l4.log).toEqual(["open:t.huge>L4"]);
+    expect(get(l4.windows, "t.huge").w).toBeLessThan(820);
+    // L5: PCs everywhere: the clear spot over the least PC area, `data-pc-clear` absent.
+    const everywhere: PlacementToken[] = [];
+    for (let x = 60; x < 1440; x += 70)
+      for (let y = 60; y < 830; y += 70) everywhere.push(pc(x, y));
+    const l5 = plan(
+      base(WIDE),
+      { type: "open", kind: "t.small" },
+      ctxAt(WIDE, { avoid: () => everywhere }),
+    );
+    expect(l5.log).toEqual(["open:t.small>L5"]);
+    expect(l5.pcClear.get("t.small:main")).toBe(false);
+    ws = l5.windows;
+    expect(hits(get(ws, "t.small"), get(ws, "t.init"))).toBe(false);
+  });
+
+  test("FR-SHELL-98 tight gap: a slot clear only at 4 px is taken at its rung before shrinking", () => {
+    // A window 4 px right of t.a's slot: the full size fits only at the 4-px gap.
+    const ws = reduce(defaultLayout(dm, WIDE), { type: "open", kind: "t.a" }, ctxAt(WIDE));
+    const a = get(ws, "t.a");
+    const blocker = {
+      ...a,
+      kind: "t.c",
+      x: a.x + a.w + 4,
+      y: a.y,
+      w: 300,
+      h: 200,
+      z: 9,
+      userSpot: true as const,
+    };
+    const moved = reduce(
+      [...ws.filter((w) => w.kind !== "t.a"), blocker],
+      { type: "open", kind: "t.b" },
+      ctxAt(WIDE),
+    );
+    const b = get(moved, "t.b");
+    expect(b.w).toBe(440);
+    const gapTo = (r: Rect, o: Rect) =>
+      Math.max(o.x - (r.x + r.w), r.x - (o.x + o.w), o.y - (r.y + r.h), r.y - (o.y + o.h));
+    expect(gapTo(b, blocker)).toBeGreaterThanOrEqual(4);
+  });
+
+  test("FR-SHELL-99 zones: protected windows take their named default rect; with a `moved` camera and a PC under it, the ladder (zone first); a launcher window in it, user spot included, is displaced and returns when the zone's window closes", () => {
+    for (const vp of [LAPTOP, WIDE]) {
+      const init = zone(vp, "t.init");
+      // A user's Compendium dropped in Initiative's zone while it was closed.
+      let ws = reduce(defaultLayout(dm, vp), { type: "close", kind: "t.init" }, ctxAt(vp));
+      ws = reduce(ws, { type: "open", kind: "t.a" }, ctxAt(vp));
+      const drop = { x: init.x, y: init.y, w: 440, h: 400 };
+      ws = reduce(ws, { type: "setRect", kind: "t.a", rect: drop }, ctxAt(vp));
+      const p = plan(ws, { type: "open", kind: "t.init", by: "feature" }, ctxAt(vp));
+      expect(rectOf(get(p.windows, "t.init"))).toEqual(init);
+      expect(p.placed.get("t.init:main")).toBe("zone");
+      const a = get(p.windows, "t.a");
+      expect(a.state === "minimised" || !hits(a, init)).toBe(true);
+      expect(p.memory.find((d) => d.kind === "t.a")?.cause).toBe("window:t.init");
+      // Initiative closes: the user's Compendium goes back to its drop spot, a user spot again.
+      const back = plan(
+        p.windows,
+        { type: "close", kind: "t.init" },
+        ctxAt(vp, { memory: () => p.memory }),
+      );
+      expect(rectOf(get(back.windows, "t.a"))).toEqual(drop);
+      expect(get(back.windows, "t.a").userSpot).toBe(true);
+      expect(back.placed.get("t.a:main")).toBe("returned");
+    }
+    // A moved camera with PCs under the zone: Initiative goes through the ladder, PC-clear.
+    const pcs = [pc(zone(WIDE, "t.init").x + 100, 200)];
+    const moved = ctxAt(WIDE, { avoid: () => pcs, camera: () => "moved" });
+    const p = plan(defaultLayout(dm, WIDE), { type: "load", drawn: true }, moved);
+    expect(pcClear(get(p.windows, "t.init"), pcs)).toBe(true);
+    // The same PCs with a `fitted` camera: the zone (the map refits around it).
+    const fitted = ctxAt(WIDE, { avoid: () => pcs, camera: () => "fitted" });
+    expect(
+      rectOf(get(reduce(defaultLayout(dm, WIDE), { type: "load", drawn: true }, fitted), "t.init")),
+    ).toEqual(zone(WIDE, "t.init"));
+  });
+
+  test("FR-SHELL-101 Game log stays readable: the protected squeeze shrinks the Game log, then Initiative, in their zones to their useful sizes, never below, never put away", () => {
+    // PCs fill the band left of Initiative: t.small fits only under a squeezed Initiative.
+    const pcs: PlacementToken[] = [];
+    for (let x = 80; x < 1000; x += 90) for (let y = 70; y < 820; y += 90) pcs.push(pc(x, y));
+    const ctx = ctxAt(WIDE, { avoid: () => pcs });
+    const p = plan(defaultLayout(dm, WIDE), { type: "open", kind: "t.small" }, ctx);
+    const log = get(p.windows, "t.log");
+    const init = get(p.windows, "t.init");
+    expect(log.state).toBe("open");
+    expect(init.state).toBe("open");
+    expect(log.w).toBeGreaterThanOrEqual(460);
+    expect(log.h).toBeGreaterThanOrEqual(160);
+    expect(init.h).toBeGreaterThanOrEqual(380);
+    if (p.placed.get("t.init:main") === "squeezed") {
+      expect(rectOf(init)).toEqual({ ...zone(WIDE, "t.init"), h: 380 });
+      expect(p.memory.find((d) => d.kind === "t.init")?.cause).toBe("window:t.small");
+    }
+    expect(hits(get(p.windows, "t.small"), init)).toBe(false);
+  });
+
+  test("FR-SHELL-102 return: a displaced window comes back when its cause ends iff untouched and clear; a user move drops the memory", () => {
+    const vp = { current: WIDE };
+    const { c, win } = shell(vp);
+    c.dispatch({ type: "open", kind: "t.a" }, all);
+    const at1440 = rectOf(win("t.a"));
+    vp.current = LAPTOP;
+    c.dispatch({ type: "viewport" }, all);
+    const mem = c.store.getState().memory.find((d: Displacement) => d.kind === "t.a");
+    if (!mem) throw new Error("t.a not displaced");
+    expect(mem.cause).toBe("viewport:1440×900");
+    vp.current = WIDE;
+    c.dispatch({ type: "viewport" }, all);
+    expect(rectOf(win("t.a"))).toEqual(at1440);
+    expect(c.store.getState().placed.get("t.a:main")).toBe("returned");
+    // Touched while displaced: it stays where the user put it.
+    vp.current = LAPTOP;
+    c.dispatch({ type: "viewport" }, all);
+    c.dispatch({ type: "setRect", kind: "t.a", rect: { x: 500, y: 70, w: 440, h: 400 } }, all);
+    expect(c.store.getState().memory).toEqual([]);
+    vp.current = WIDE;
+    c.dispatch({ type: "viewport" }, all);
+    expect(rectOf(win("t.a"))).toEqual({ x: 500, y: 70, w: 440, h: 400 });
+  });
+
+  test("FR-SHELL-103 resize round trip (BL-60): 1440×900 → 1280×720 → 1440×900 = the start; the Game log 1150×240 again, not stuck at its min", () => {
+    const vp = { current: WIDE };
+    const { c, win } = shell(vp);
+    c.dispatch({ type: "open", kind: "t.a" }, all);
+    c.dispatch({ type: "open", kind: "t.b" }, all);
+    const start = JSON.stringify(
+      c.store.getState().windows.map((w) => [w.kind, w.state, rectOf(w)]),
+    );
+    vp.current = LAPTOP;
+    c.dispatch({ type: "viewport" }, all);
+    expect(rectOf(win("t.log"))).toEqual(zone(LAPTOP, "t.log"));
+    vp.current = WIDE;
+    c.dispatch({ type: "viewport" }, all);
+    expect(rectOf(win("t.log"))).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+    expect(
+      JSON.stringify(c.store.getState().windows.map((w) => [w.kind, w.state, rectOf(w)])),
+    ).toBe(start);
+  });
+
+  test("FR-SHELL-103 grow back after reload: no memory, a shell-shrunk window grows toward its target at the next viewport up; a user size never changes", () => {
+    const vp = { current: LAPTOP };
+    const { c, storage, win } = shell(vp);
+    c.dispatch({ type: "open", kind: "t.a" }, all);
+    const small = rectOf(win("t.a"));
+    expect(small.h).toBeLessThan(512);
+    c.dispatch({ type: "open", kind: "t.small" }, all);
+    c.dispatch(
+      { type: "setRect", kind: "t.small", rect: { x: 540, y: 80, w: 300, h: 250 }, resized: true },
+      all,
+    );
+    expect(win("t.small").userSize).toBe(true);
+    const reloaded = createShellController({
+      registry: dm,
+      storage,
+      viewport: () => vp.current,
+      keepOuts: (v) => keepOuts("dm", v, new Map()),
+    });
+    reloaded.restore("k");
+    expect(reloaded.store.getState().memory).toEqual([]);
+    expect(rectOf(get(reloaded.store.getState().windows, "t.a"))).toEqual(small);
+    vp.current = WIDE;
+    reloaded.dispatch({ type: "viewport" }, all);
+    const grown = get(reloaded.store.getState().windows, "t.a");
+    expect(grown.h).toBeGreaterThan(small.h);
+    expect(reloaded.store.getState().placed.get("t.a:main")).toBe("grown");
+    expect(rectOf(get(reloaded.store.getState().windows, "t.small"))).toEqual({
+      x: 540,
+      y: 80,
+      w: 300,
+      h: 250,
+    });
+  });
+
+  test("FR-SHELL-107 player Initiative at Start (BL-70): it appears in its zone (68, 60); the window there is displaced and returns at End", () => {
+    const players = createWindowRegistry("player", [
+      def("p.log", {
+        clients: ["player"],
+        defaultOpen: true,
+        defaultSize: { w: 510, h: 160 },
+        minSize: { w: 300, h: 160 },
+        minOpenH: undefined,
+        usefulSize: { w: 460, h: 160 },
+        defaultPosition: { anchor: "bottom-left", dx: 56 },
+      }),
+      def("p.sheet", {
+        clients: ["player"],
+        defaultOpen: true,
+        defaultSize: { w: 320, h: 440 },
+        minSize: { w: 280, h: 320 },
+        minOpenH: undefined,
+        usefulSize: { w: 320, h: 338 },
+        defaultPosition: { anchor: "top-right" },
+      }),
+      def("p.init", {
+        clients: ["player"],
+        defaultOpen: true,
+        defaultSize: { w: 280, h: 400 },
+        minSize: { w: 240, h: 200 },
+        minOpenH: undefined,
+        usefulSize: { w: 280, h: 320 },
+      }),
+      def("p.stats", {
+        clients: ["player"],
+        defaultSize: { w: 400, h: 412 },
+        minSize: { w: 320, h: 280 },
+        minOpenH: undefined,
+        usefulSize: { w: 400, h: 360 },
+      }),
+    ]);
+    const vp = { w: 1280, h: 800 };
+    const fight = new Set(players.defs.map((d) => d.kind));
+    const ended = new Set([...fight].filter((k) => k !== "p.init"));
+    const ctx = (
+      available: ReadonlySet<string>,
+      memory: readonly Displacement[] = [],
+    ): ManagerContext => ({
+      registry: players,
+      viewport: vp,
+      available,
+      keepOuts: () => keepOuts("player", vp, new Map()),
+      memory: () => memory,
+    });
+    const home = rectOf(get(defaultLayout(players, vp), "p.init"));
+    expect(home).toMatchObject({ x: 68, y: 60 });
+    // End: Initiative goes; Stats opens at the free corner.
+    let ws = reduce(defaultLayout(players, vp), { type: "open", kind: "p.stats" }, ctx(ended));
+    expect(rectOf(get(ws, "p.stats"))).toMatchObject({ x: 68, y: 60 });
+    // Start: Initiative appears in its zone, Stats displaced (never over it, never mid-map over it).
+    const start = plan(ws, { type: "appear", kind: "p.init" }, ctx(fight));
+    ws = start.windows;
+    expect(rectOf(get(ws, "p.init"))).toEqual(home);
+    const stats = get(ws, "p.stats");
+    expect(stats.state === "minimised" || !hits(stats, home)).toBe(true);
+    // End again: the cause ends, Stats returns to its corner.
+    const end = plan(ws, { type: "return" }, ctx(ended, start.memory));
+    expect(rectOf(get(end.windows, "p.stats"))).toMatchObject({ x: 68, y: 60 });
+    expect(get(end.windows, "p.stats").state).toBe("open");
+  });
+
+  test("FR-SHELL-108 map yields (players, `fitted`): a spot ≥ useful over PCs is accepted iff the dry fit keeps the PCs clear at ≥ 75 % of the last full fit's cell; the map then refits once", () => {
+    const players = createWindowRegistry("player", [
+      def("p.stats", {
+        clients: ["player"],
+        defaultSize: { w: 400, h: 412 },
+        minSize: { w: 320, h: 280 },
+        minOpenH: undefined,
+      }),
+    ]);
+    const vp = LAPTOP;
+    const pcs: PlacementToken[] = [];
+    for (let x = 60; x < 1280; x += 80) for (let y = 60; y < 650; y += 80) pcs.push(pc(x, y));
+    const base: ManagerContext = {
+      registry: players,
+      viewport: vp,
+      available: new Set(["p.stats"]),
+      keepOuts: () => keepOuts("player", vp, new Map()),
+      avoid: () => pcs,
+      camera: () => "fitted",
+      lastFullCell: () => 40,
+    };
+    const ok = plan(
+      [],
+      { type: "open", kind: "p.stats" },
+      { ...base, dryFit: () => ({ cellPx: 31, clear: true }) },
+    );
+    expect(ok.log).toEqual(["open:p.stats>L2b"]);
+    expect(ok.yields).toBe(true);
+    const tooSmall = plan(
+      [],
+      { type: "open", kind: "p.stats" },
+      { ...base, dryFit: () => ({ cellPx: 29, clear: true }) },
+    );
+    expect(tooSmall.yields).toBe(false);
+    const notClear = plan(
+      [],
+      { type: "open", kind: "p.stats" },
+      { ...base, dryFit: () => ({ cellPx: 40, clear: false }) },
+    );
+    expect(notClear.yields).toBe(false);
+    const moved = plan(
+      [],
+      { type: "open", kind: "p.stats" },
+      { ...base, camera: () => "moved", dryFit: () => ({ cellPx: 40, clear: true }) },
+    );
+    expect(moved.yields).toBe(false);
+  });
+
+  test("FR-SHELL-110 plan and hooks: `data-placed` zone / displaced / grown / squeezed / returned, the settle log, the put-away cause", () => {
+    const vp = { current: WIDE };
+    const yields = { n: 0 };
+    const { c } = shell(vp, { onYield: () => yields.n++ });
+    expect(c.store.getState().placed.get("t.init:main")).toBe("zone");
+    c.dispatch({ type: "open", kind: "t.a" }, all);
+    expect(c.store.getState().settleLog).toMatch(/^open:t\.a>L\d/);
+    vp.current = LAPTOP;
+    c.dispatch({ type: "viewport" }, all);
+    expect(c.store.getState().settleLog).toContain("viewport:t.log>zone");
+    expect(["displaced", "auto", "default", undefined]).toContain(
+      c.store.getState().placed.get("t.a:main"),
+    );
+    vp.current = WIDE;
+    c.dispatch({ type: "viewport" }, all);
+    expect(["returned", "grown", undefined]).toContain(c.store.getState().placed.get("t.a:main"));
+    expect(yields.n).toBe(0);
+  });
+
+  test("FR-SHELL-100 userSize: set at a user resize end, cleared by Reset; an old entry infers it iff a user spot at a size that is neither a default nor the min", () => {
+    const vp = { current: WIDE };
+    const { c, win } = shell(vp);
+    c.dispatch({ type: "open", kind: "t.a" }, all);
+    c.dispatch({ type: "setRect", kind: "t.a", rect: { x: 100, y: 100, w: 450, h: 450 } }, all);
+    expect(win("t.a").userSize).toBeUndefined();
+    c.dispatch(
+      { type: "setRect", kind: "t.a", rect: { x: 100, y: 100, w: 450, h: 450 }, resized: true },
+      all,
+    );
+    expect(win("t.a").userSize).toBe(true);
+    c.dispatch({ type: "reset" }, all);
+    expect(c.store.getState().windows.some((w) => w.userSize || w.userSpot)).toBe(false);
+    const entry = (w: Partial<WindowState>) =>
+      JSON.stringify({
+        windows: [
+          {
+            kind: "t.a",
+            instance: "main",
+            state: "open",
+            x: 100,
+            y: 100,
+            w: 450,
+            h: 450,
+            z: 1,
+            ...w,
+          },
+        ],
+      });
+    expect(get(restoreLayout(dm, entry({ userSpot: true }), WIDE).windows, "t.a").userSize).toBe(
+      true,
+    );
+    expect(get(restoreLayout(dm, entry({}), WIDE).windows, "t.a").userSize).toBeUndefined();
+    const atDefault = entry({ userSpot: true, w: 440, h: 560 });
+    expect(get(restoreLayout(dm, atDefault, WIDE).windows, "t.a").userSize).toBeUndefined();
+    // Stored (0 B on the wire): it round-trips through the entry.
+    const ws = restoreLayout(dm, entry({ userSpot: true }), WIDE).windows;
+    expect(serialise(ws, dm).windows[0]?.userSize).toBe(true);
+  });
+
+  test("FR-SHELL-111 run twice: the same inputs give the same plan (windows, memory, log)", () => {
+    const pcs = [pc(300, 200), pc(700, 300), pc(1000, 400)];
+    const ctx = ctxAt(LAPTOP, { avoid: () => pcs });
+    const actions: WindowAction[] = [
+      { type: "open", kind: "t.a" },
+      { type: "open", kind: "t.b" },
+      { type: "open", kind: "t.small" },
+      { type: "close", kind: "t.init" },
+      { type: "open", kind: "t.init", by: "feature" },
+    ];
+    const once = () => {
+      let ws: Windows = defaultLayout(dm, LAPTOP);
+      let memory: readonly Displacement[] = [];
+      const out: unknown[] = [];
+      for (const a of actions) {
+        const p = plan(ws, a, { ...ctx, memory: () => memory });
+        ws = p.windows;
+        memory = p.memory;
+        out.push([ws, memory, p.log]);
+      }
+      return out;
+    };
+    expect(once()).toEqual(once());
+  });
+
+  test("FR-SHELL-113 chrome keep-out: a shown entry is a hard keep-out the placer avoids; its showing pushes, its going returns; ≤ 64-px strip or ≤ 360×240", () => {
+    const strip: ChromeKeepOut = {
+      id: "test.strip",
+      clients: ["dm"],
+      rect: (vp) => ({ x: 68, y: 60, w: vp.w - 80, h: 48 }),
+      fitObstacle: true,
+    };
+    expect(chromeFits(strip.rect(LAPTOP, emptyStore()) as Rect)).toBe(true);
+    expect(chromeFits({ x: 0, y: 0, w: 400, h: 300 })).toBe(false);
+    const regions = chromeKeepOuts("dm", LAPTOP, emptyStore(), [strip]);
+    expect(regions).toEqual([
+      { id: "test.strip", rect: { x: 68, y: 60, w: 1200, h: 48 }, kind: "hard" },
+    ]);
+    expect(chromeKeepOuts("player", LAPTOP, emptyStore(), [strip])).toEqual([]);
+    const ctx = ctxAt(LAPTOP, { keepOuts: () => keepOuts("dm", LAPTOP, new Map(), regions) });
+    const a = get(reduce(defaultLayout(dm, LAPTOP), { type: "open", kind: "t.a" }, ctx), "t.a");
+    expect(hits(a, regions[0]?.rect as Rect)).toBe(false);
+    // Shown over an open window: the push moves it; gone: it returns.
+    const before = reduce(
+      defaultLayout(dm, LAPTOP),
+      { type: "open", kind: "t.small" },
+      ctxAt(LAPTOP),
+    );
+    const pushed = plan(before, { type: "push", rect: regions[0]?.rect as Rect }, ctx);
+    expect(hits(get(pushed.windows, "t.small"), regions[0]?.rect as Rect)).toBe(false);
+    const back = plan(
+      pushed.windows,
+      { type: "return" },
+      ctxAt(LAPTOP, { memory: () => pushed.memory }),
+    );
+    expect(rectOf(get(back.windows, "t.small"))).toEqual(rectOf(get(before, "t.small")));
+  });
+
+  test("FR-SHELL-112 registries: overlays in `layer` order per client, top-bar items per client, all three created empty", async () => {
+    const { OVERLAYS } = await import("./overlays");
+    const { TOP_BAR_ITEMS } = await import("./top-bar-items");
+    const { CHROME_KEEP_OUTS } = await import("./chrome-keep-outs");
+    expect([OVERLAYS.length, TOP_BAR_ITEMS.length, CHROME_KEEP_OUTS.length]).toEqual([0, 0, 0]);
+    const entries: OverlayEntry[] = [
+      { id: "b", clients: ["player"], layer: 20, Component: Body },
+      { id: "a", clients: ["player", "dm"], layer: 10, Component: Body, blocksInput: () => true },
+    ];
+    expect(overlaysFor("player", entries).map((o) => o.id)).toEqual(["a", "b"]);
+    expect(overlaysFor("dm", entries).map((o) => o.id)).toEqual(["a"]);
+    expect(blockingOverlay(entries, emptyStore())?.id).toBe("a");
+    const broken: OverlayEntry = {
+      id: "x",
+      clients: ["dm"],
+      layer: 1,
+      Component: Body,
+      blocksInput: () => {
+        throw new Error("boom");
+      },
+    };
+    expect(blockingOverlay([broken], emptyStore())).toBeNull();
+    expect(
+      topBarItemsFor("dm", [
+        { id: "p", clients: ["dm"], width: 96, order: 2, Component: Body },
+        { id: "q", clients: ["dm"], width: 40, order: 1, Component: Body },
+      ]).map((t) => t.id),
+    ).toEqual(["q", "p"]);
+  });
+
+  test("FR-SHELL-112 blocksInput overlay: siblings inert, focus trapped (Tab stays inside), a window drag cancelled, Space / Escape / arrow / wheel / pointerdown outside don't reach their handlers, settles queued then run once", () => {
+    // DOM-shaped stand-ins (bun test has no DOM): the window's capture listeners, the overlay.
+    type L = { type: string; fn: (e: Event) => void };
+    const winListeners: L[] = [];
+    const docListeners: L[] = [];
+    const add = (list: L[]) => (type: string, fn: EventListenerOrEventListenerObject) =>
+      list.push({ type, fn: fn as (e: Event) => void });
+    const remove = (list: L[]) => (type: string, fn: EventListenerOrEventListenerObject) => {
+      const i = list.findIndex((l) => l.type === type && l.fn === fn);
+      if (i >= 0) list.splice(i, 1);
+    };
+    const doc = {
+      activeElement: null as unknown,
+      addEventListener: add(docListeners),
+      removeEventListener: remove(docListeners),
+    };
+    const button = (name: string) => ({
+      name,
+      focus: () => {
+        doc.activeElement = button.at[name];
+      },
+    });
+    button.at = {} as Record<string, unknown>;
+    const inside = ["ok", "cancel"].map((n) => {
+      const b = button(n);
+      button.at[n] = b;
+      return b;
+    });
+    const outside = { name: "map" };
+    const overlay = {
+      contains: (n: unknown) => inside.includes(n as never) || n === overlay,
+      focusables: () => inside,
+      focus: () => {
+        doc.activeElement = overlay;
+      },
+    };
+    const siblings = [{ inert: false }, { inert: true }];
+    let dragCancelled = 0;
+    const off = onGestureCancel(() => dragCancelled++);
+    const release = blockInput({
+      overlay,
+      siblings,
+      win: {
+        addEventListener: add(winListeners),
+        removeEventListener: remove(winListeners),
+      } as unknown as Window,
+      doc: doc as unknown as Parameters<typeof blockInput>[0]["doc"],
+    });
+    off();
+    expect(siblings.map((s) => s.inert)).toEqual([true, true]);
+    expect(dragCancelled).toBe(1);
+    expect(doc.activeElement).toBe(inside[0]);
+    const fire = (type: string, target: unknown, extra: Record<string, unknown> = {}) => {
+      const e = {
+        type,
+        target,
+        cancelable: true,
+        stopped: false,
+        prevented: false,
+        stopImmediatePropagation() {
+          this.stopped = true;
+        },
+        preventDefault() {
+          this.prevented = true;
+        },
+        ...extra,
+      };
+      for (const l of winListeners.filter((x) => x.type === type)) l.fn(e as unknown as Event);
+      return e;
+    };
+    for (const key of [" ", "Escape", "ArrowLeft"])
+      expect(fire("keydown", outside, { key }).stopped).toBe(true);
+    expect(fire("wheel", outside).stopped).toBe(true);
+    expect(fire("pointerdown", outside).stopped).toBe(true);
+    expect(fire("pointerdown", inside[1]).stopped).toBe(false);
+    expect(fire("keydown", inside[0], { key: "Enter" }).stopped).toBe(false);
+    // Tab cycles inside: ok → cancel → ok; Shift+Tab back.
+    fire("keydown", doc.activeElement, { key: "Tab" });
+    expect(doc.activeElement).toBe(inside[1]);
+    fire("keydown", doc.activeElement, { key: "Tab" });
+    expect(doc.activeElement).toBe(inside[0]);
+    fire("keydown", doc.activeElement, { key: "Tab", shiftKey: true });
+    expect(doc.activeElement).toBe(inside[1]);
+    // Focus moving outside comes back.
+    for (const l of docListeners.filter((x) => x.type === "focusin"))
+      l.fn({ target: outside } as unknown as Event);
+    expect(doc.activeElement).toBe(inside[0]);
+    release();
+    expect(siblings.map((s) => s.inert)).toEqual([false, true]);
+    expect(winListeners).toEqual([]);
+    expect(docListeners).toEqual([]);
+    cancelGestures(); // nothing subscribed any more
+    expect(dragCancelled).toBe(1);
+
+    // Settles queue while blocked and run once, in order, when it goes.
+    const vp = { current: WIDE };
+    const { c, win } = shell(vp);
+    c.setBlocked(true);
+    vp.current = LAPTOP;
+    c.dispatch({ type: "viewport" }, all);
+    c.dispatch({ type: "viewport" }, all);
+    c.dispatch({ type: "open", kind: "t.a", by: "feature" }, all);
+    expect(win("t.log").w).toBe(1150);
+    expect(win("t.a")).toBeUndefined();
+    let writes = 0;
+    const unsub = c.store.subscribe(() => writes++);
+    c.setBlocked(false);
+    unsub();
+    expect(win("t.log").w).toBe(690);
+    expect(win("t.a").state).toBe("open");
+    expect(writes).toBe(2); // one viewport settle, one open
+  });
+});
+
+test("FR-SHELL-97 L5 never covers more PC footprint than the window's own rect (walkthrough F14: B 1280×800 reload, Stats touching Thorn's +4 margin stays at 584, 382)", () => {
+  const vp = { w: 1280, h: 800 };
+  const players = createWindowRegistry("player", [
+    def("p.log", {
+      clients: ["player"],
+      defaultOpen: true,
+      defaultSize: { w: 510, h: 160 },
+      minSize: { w: 300, h: 160 },
+      minOpenH: undefined,
+      usefulSize: { w: 460, h: 160 },
+      defaultPosition: { anchor: "bottom-left", dx: 56 },
+    }),
+    def("p.sheet", {
+      clients: ["player"],
+      defaultOpen: true,
+      defaultSize: { w: 320, h: 440 },
+      minSize: { w: 280, h: 320 },
+      minOpenH: undefined,
+      usefulSize: { w: 320, h: 338 },
+      defaultPosition: { anchor: "top-right" },
+    }),
+    def("p.init", {
+      clients: ["player"],
+      defaultOpen: true,
+      defaultSize: { w: 280, h: 400 },
+      minSize: { w: 240, h: 200 },
+      minOpenH: undefined,
+      usefulSize: { w: 280, h: 320 },
+    }),
+    def("p.stats", {
+      clients: ["player"],
+      defaultSize: { w: 400, h: 412 },
+      minSize: { w: 320, h: 280 },
+      minOpenH: undefined,
+      usefulSize: { w: 400, h: 360 },
+    }),
+  ]);
+  const stats = { x: 584, y: 382, w: 320, h: 342 };
+  const ws: Windows = [
+    ...defaultLayout(players, vp),
+    { kind: "p.stats", instance: "main", state: "open", ...stats, z: 9, area: { w: 1280, h: 688 } },
+  ];
+  // The reload's fit put the PCs 4 px right, 8 px up: Thorn's +4 margin now reaches x 588.
+  const pcs = [pc(584, 324), pc(538, 508), pc(492, 416)].map((t) => ({ ...t, w: 46, h: 46 }));
+  const p = plan(
+    ws,
+    { type: "load", drawn: true },
+    {
+      registry: players,
+      viewport: vp,
+      available: new Set(players.defs.map((d) => d.kind)),
+      keepOuts: () => keepOuts("player", vp, new Map()),
+      avoid: () => pcs,
+    },
+  );
+  const after = get(p.windows, "p.stats");
+  expect(p.log).toContain("load:p.stats>L5"); // the ladder ran, and kept its own rect
+  expect(rectOf(after)).toEqual(stats);
+  expect(pcs.some((t) => hits(after, t))).toBe(false);
+});
