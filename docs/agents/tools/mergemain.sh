@@ -8,7 +8,7 @@ import sys,re,pathlib,subprocess
 w=pathlib.Path(sys.argv[1])
 u=subprocess.run(["git","-C",str(w),"diff","--name-only","--diff-filter=U"],capture_output=True,text=True).stdout.split()
 for f in u:
-    if f.endswith("index.ts") or f.endswith("session-sim-11.ts") or f.endswith("kinds.ts") or f.endswith("windows.ts"):
+    if f.endswith("index.ts") or re.search(r"session-sim-\d+\.ts$", f) or f.endswith("kinds.ts") or f.endswith("windows.ts"):
         p=w/f; s=p.read_text(encoding='utf-8')
         s=re.sub(r'<<<<<<< [^\n]*\n(.*?)=======\n(.*?)>>>>>>> [^\n]*\n', lambda m: m.group(1)+m.group(2), s, flags=re.S)
         p.write_text(s,encoding='utf-8',newline='\n'); print("both sides:",f)
