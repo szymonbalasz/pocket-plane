@@ -402,8 +402,8 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 | 3 | B: Brakka attack + damage → Combat gem maxes a die; then Inspiration on the attack line, once without a crit flip and once with one | New line: to-hit + the maxed damage, or the to-hit only after a flip; never the old pre-max part (GM2 repro, BL-62) |
 | 4 | Frames of step 3's Combat spend | A, B: one `GemSpent` frame each with the card; C: one frame without it; no `NotificationUpdated` after (BL-63) |
 | 5 | B at 1280×720: Inspiration on a line | Inline "Spend Inspiration? ✓ ✗" fits the line (BL-72) |
-| 6 | A: *(if [OQ-GEM-22](gems.md#15-open-questions) A)* Brakka + Fortune ×6 fast; then + and − | One line "DM awards Brakka 6 Fortune gems (… held)"; + − → no line (BL-68) |
-| 7 | A: Initiative → Add… a monster mid-combat (initiative rolled), pointer resting where the popup opens; repeat at 1440×900 (h00) | The popup closes ≤ 6 s after rest once the pointer has left; a token under it is clickable after (BL-89) |
+| 6 | A: *(if [OQ-GEM-22](gems.md#15-open-questions) A)* Brakka + Fortune ×6 fast; then + and − | One `gem.adjust {delta: 6}` frame and one line "DM awards Brakka 6 Fortune gems (… held)"; + − → no line (BL-68) |
+| 7 | A: Initiative → Add… a monster mid-combat (initiative rolled), the pointer **left resting** where the popup opens (don't move it); repeat at 1440×900 (h00); then once more, moving the pointer onto the popup and off | Resting: the popup closes 6 s after rest with the pointer still on it. Moved onto it: held, then closes ≤ 1 s after leaving. A token under it is clickable after (BL-89) |
 | 8 | B: tray d20 + 2 → Options → Save as macro | No "Name is required" until the name was touched; Save disabled meanwhile (BL-90) |
 | 9 | B reloads with step 3's card pending; then hard kill + restart | Line and card consistent after the reload; `state:digest` equal after the restart |
 | 10 | Leak scan C | No Brakka card, no `dmPayload`; award lines public only |

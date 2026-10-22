@@ -25,7 +25,7 @@ phase: post-mvp-9
 >
 > Data model §8 *Registrations* gains `lazy?`; §9 *Client → server* gains `intent sync.load {type, ids?}` (DM, player; FR-SYNC-31). Protocol docs change with the code in `fix/lazy-records` (AGENTS §9.9).
 
-> **Sprint 9 (track FX, fix pack; DM [#338](../decisions-log.md)).** **BL-54**: a player who went offline kept "Connected" for about 24 s. New FR-SYNC-40: the client marks the socket dropped at once on `offline` or 5 s without a frame after a ping, without waiting for the close handshake. Slice **FX3**, walkthrough [§13 FX3](#13-test-plan). Server unchanged, 0 B.
+> **Sprint 9 (track FX, fix pack; DM [#338](../decisions-log.md)).** **BL-54**: a player who went offline kept "Connected" for about 24 s. New FR-SYNC-40: the client marks the socket dropped at once on `offline`, or after two missed pongs and ≥ 10 s of silence (timestamps; a late timer is a wake-up, not a drop), without waiting for the close handshake. Slice **FX3**, walkthrough [§13 FX3](#13-test-plan). Server unchanged, 0 B.
 
 ## 1. Summary
 
@@ -97,7 +97,7 @@ phase: post-mvp-9
 | **Sprint 7** (#315) | | |
 | FR-SYNC-39 | **Feature switches** ([ADR-0058](../architecture/adr/0058-feature-switches.md), OQ-GEM-17): the connection context gains the campaign's `features`. A record type, log kind or intent registered with `feature: <key>` is hidden from every viewer (DM included) in the snapshot, live frames and `sync.load` while that feature is off, and its intents reject `forbidden`. Switching a feature resyncs every connection of the campaign (client-only UI state kept, FR-SYNC-11). | Built by `fix/gems-core`; tests: off = no tagged data in any frame / ack; on / off resync |
 | **Sprint 9** (track FX, fix pack, #338) | | |
-| FR-SYNC-40 | **Drop detection** (BL-54: a player offline kept "Connected" for about 24 s; amends FR-SYNC-04's client side).<br>• **Root cause** (code read, `sync/connection.ts`): the state leaves `live` only in `onclose`. The pong check runs on the 10 s ping tick with a 20 s threshold, then calls `ws.close()` and waits for a close handshake that a dead link delays (that delay is a hypothesis). There is no `offline` listener.<br>• **Rule:** the browser's `offline` event, or a `ping` with no frame of any kind back within **5 s**, marks the socket dropped **at once**: the client detaches it (its late `onclose` and frames are ignored), enters `reconnecting` (FR-SYNC-24), closes it best-effort and starts FR-SYNC-05's backoff. `online` still retries at once.<br>• The heartbeat check runs every 1 s, so a silent drop shows "Reconnecting…" within 15 s (10 s ping + 5 s) and an `offline` event within 1 s.<br>• Server unchanged: it closes after 30 s of silence, and presence follows within 30 s (FR-SYNC-23).<br>• No intent is resent (FR-SYNC-05). | `FR-SYNC-40 drop detection` (FX3) |
+| FR-SYNC-40 | **Drop detection** (BL-54: a player offline kept "Connected" for about 24 s; amends FR-SYNC-04's client side; review-b ruling 3).<br>• **Root cause** (code read, `sync/connection.ts`): the state leaves `live` only in `onclose`. The pong check runs on the 10 s ping tick with a 20 s threshold, then calls `ws.close()` and waits for a close handshake that a dead link delays (that delay is a hypothesis). There is no `offline` listener.<br>• **`offline`** (the browser event) → dropped **at once**.<br>• **Silent link**, measured with timestamps (`performance.now()`: `lastFrameAt`, `pingSentAt`), checked every 1 s:<br>&nbsp;&nbsp;– A ping with no frame of any kind back within 5 s → one extra probe `ping` at once.<br>&nbsp;&nbsp;– **Dropped** only after **two missed pongs** (the ping and the probe) **and** ≥ **10 s** since the last frame. So a silent drop shows "Reconnecting…" within 20 s.<br>• **Not a drop:**<br>&nbsp;&nbsp;– A check that runs > 2 s later than scheduled (a main-thread stall, a background-tab throttle, a laptop wake) counts as a **wake-up**: the deadlines restart from now and a ping goes at once.<br>&nbsp;&nbsp;– A frame in progress (the main thread busy with a received frame, seen as that drift) counts as alive.<br>&nbsp;&nbsp;– Any frame (snapshot, event, pong) resets both counters.<br>• **Dropped means:** the client detaches the socket (its late `onclose` and frames are ignored), enters `reconnecting` (FR-SYNC-24), closes it best-effort and starts FR-SYNC-05's backoff. `online` still retries at once.<br>• Server unchanged: it closes after 30 s of silence, and presence follows within 30 s (FR-SYNC-23). No intent is resent (FR-SYNC-05). | `FR-SYNC-40 drop detection` (FX3) |
 
 ## 7. UI/UX notes
 
@@ -196,11 +196,12 @@ phase: post-mvp-9
 The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map §13](scenes-map.md#13-test-plan) step 10: the hidden Wolf's drag never reaches B, C).
 
 **Sprint 9, track FX: slice FX3** (sync, shell, misc; FR-SYNC-40, [FR-SHELL-175–176](play-shell.md#6-functional-requirements), [FR-CAMP-51](campaign-management.md#6-functional-requirements), BL-81's e2e helper; [FR-CBTX-75](combat-extras.md#6-functional-requirements) / [FR-PARTY-86](party-board.md#6-functional-requirements) only if the DM picks them).
-- **Unit `connection.test.ts`** (fake socket + clock, FR-SYNC-26). `FR-SYNC-40 drop detection`:
-  - The fake socket never fires `onclose`; the clock advances 15 s past the last frame → `reconnecting`, and a new socket opens on the backoff.
+- **Unit `connection.test.ts`** (fake socket, fake `performance.now` + timers, FR-SYNC-26). `FR-SYNC-40 drop detection`:
+  - The fake socket never fires `onclose` and answers nothing → a probe at ping + 5 s, then `reconnecting` once both are missed and ≥ 10 s passed (≤ 20 s after the last frame); a new socket opens on the backoff.
   - `offline` → `reconnecting` within one tick.
-  - A late `onclose` or frame of the detached socket changes nothing.
-  - Any frame resets the 5 s deadline.
+  - **Clock jump:** the clock jumps 60 s (a sleep) and the pong arrives right after → no drop; the drift counts as a wake-up and a ping goes at once.
+  - **Large frame:** a frame that takes 6 s to arrive, with nothing else in between → no drop (one missed pong only, then the frame).
+  - A late `onclose` or frame of the detached socket changes nothing. Any frame resets both counters.
 - **E2E (thin) `e2e/fx-stale-chunk.e2e.ts`** (bundle `base`; reads only):
   - DM page loaded; `page.route` answers the Dice tray chunk with 404 → open the Dice tray → `ui-window-reload` shows.
   - The map, Game log roll and other windows still work.
@@ -215,8 +216,8 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 | # | Do | Expect |
 |---|---|---|
 | 1 | C: context offline; after 5 s back online | Chip "Reconnecting…" within 1 s; "Connected" within 2 s of online; no intent resent |
-| 2 | C: stop pongs silently (`routeWebSocket`, server → client dropped) | Chip leaves "Connected" within 15 s |
-| 3 | A: page open; `bun run build` in the worktree (new chunk hashes); open the Dice tray | "New version available" + Reload in the tray's body; map, socket and other windows live; Reload → the tray opens (BL-91, the DM's real repro) |
+| 2 | C: stop pongs silently (`routeWebSocket`, server → client dropped) | Chip leaves "Connected" within 20 s; with pongs restored before then, no drop |
+| 3 | A: page open; `bun run build` **in the worktree only, never on `main`'s `dist/`** (new chunk hashes); open the Dice tray; then B (player) the same with the prompt or roll popup | DM: "Rebuild finished — reload" + Reload in the tray's body; B: "New version available — reload" (the stale notice for the popup); map, socket and other windows live; Reload → the tray opens (BL-91, the DM's real repro) |
 | 4 | A at 1280×720 and 1024×768: rename the campaign to a 40-character name | Switcher name ends in "…", full name in the Tooltip; nothing cut; switching still works (BL-77) |
 | 5 | *(If [OQ-CBTX-37](combat-extras.md#15-open-questions) A)* Thorn concentrating on Conjure Elemental with his elementals; Mira on Bless; A: End | Elementals gone, Thorn's concentration ended on A, B, C; Mira's Bless kept |
 | 6 | *(If [OQ-PARTY-47](party-board.md#15-open-questions) B)* B creates a draft PC | C's Party status doesn't list it; A and B do |
@@ -240,7 +241,7 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 - Docs consolidated (#172, protocol §30): protocol §7 routing (hook, `"dm"` audience), §15 (`map.drag`); [ADR-0033](../architecture/adr/0033-signal-audience.md). No schema, event or record-type change.
 
 **Shared changes: sprint 9, FX3** `fix/fx-sync-shell` (orchestrator routes per AGENTS §9.9):
-- **Shared:** `src/client/common/sync/connection.ts` (heartbeat, `offline`, detach) and `src/shared/protocol/frames.ts` (`CLIENT_PONG_TIMEOUT_MS` 20 000 → 5 000; the check interval), so `shared change needed`. FX3 is their only holder (seams S10).
+- **Shared:** `src/client/common/sync/connection.ts` (heartbeat, `offline`, detach) and `src/shared/protocol/frames.ts` (`CLIENT_PONG_TIMEOUT_MS` 20 000 → 5 000 per pong, plus the probe, the 10-s floor, the 2-s wake-up drift and the 1-s check interval), so `shared change needed`. FX3 is their only holder (seams S10).
 - **Order** (seams S5, S10): FX3 builds in wave 2, in parallel with RS0, and **merges after RS0**. Its BL-91 `ShellWindow.tsx` branch lands after PM1.
 - **Docs:** protocol heartbeat paragraph (FR-SYNC-04 / -40). Server unchanged.
 - The rest of FX3's split: [play-shell §14](play-shell.md#14-dependencies) (BL-91), [campaign-management §14](campaign-management.md#14-dependencies) (BL-77).
