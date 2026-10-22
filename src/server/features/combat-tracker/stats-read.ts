@@ -217,3 +217,23 @@ export function factRefs(db: Read, campaignId: string): FactRef[] {
     .where(and(eq(hpChange.campaignId, campaignId), eq(hpChange.undone, false)))
     .all();
 }
+
+/**
+ * FR-CBT-153 / FR-STATS-33: one indexed existence query on `hp_change_encounter` at End: does the
+ * encounter have a counted (non-undone) fact, and one whose line is public?
+ */
+export function fightFactPresence(
+  db: Read,
+  encounterId: string,
+): { counted: boolean; public: boolean } {
+  const row = db
+    .select({
+      // Raw names: inside select fields drizzle drops the table prefix (ambiguous columns).
+      counted: sql<number>`exists (select 1 from hp_change h where h.encounter_id = ${encounterId} and h.undone = 0)`,
+      public: sql<number>`exists (select 1 from hp_change h join game_log_entry e on e.id = h.entry_id where h.encounter_id = ${encounterId} and h.undone = 0 and e.public = 1)`,
+    })
+    .from(encounter)
+    .where(eq(encounter.id, encounterId))
+    .get();
+  return { counted: Boolean(row?.counted), public: Boolean(row?.public) };
+}

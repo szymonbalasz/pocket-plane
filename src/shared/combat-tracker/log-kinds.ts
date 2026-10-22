@@ -28,6 +28,8 @@ import {
 const Multiplier = z.enum(["normal", "half", "none", "double"]);
 /** FR-CBT-137: an outcome line's callout flag (`"overkill"`; absent = none). */
 const Callout = z.literal("overkill");
+/** FR-CBT-152 (sprint 8, FR-STATS-26): the target fell (`kill` / `down`; absent = none). */
+const Fell = z.enum(["kill", "down"]);
 
 /**
  * effect-modifiers (FR-MOD-20, -38, -47): one rule-trigger part an apply landed on this target,
@@ -142,6 +144,11 @@ export const AttackLogPayload = z.strictObject({
    * `dmPayload.overkill`). Absent = none; old rows parse.
    */
   callout: Callout.optional(),
+  /**
+   * FR-CBT-152 (sprint 8): the kill-feed flag, player-safe (a public line's target band already
+   * reads "down"). Absent = none; old rows parse.
+   */
+  fell: Fell.optional(),
 });
 export type AttackLogPayload = z.infer<typeof AttackLogPayload>;
 
@@ -262,6 +269,8 @@ export const HpLogPayload = z.strictObject({
   sourced: z.literal(true).optional(),
   /** FR-CBT-137 (sprint 7): as on `cbt.attack`. */
   callout: Callout.optional(),
+  /** FR-CBT-152 (sprint 8): as on `cbt.attack`. */
+  fell: Fell.optional(),
 });
 export type HpLogPayload = z.infer<typeof HpLogPayload>;
 

@@ -29,6 +29,7 @@ describe("combat rule hooks (ADR-0035)", () => {
       "combat-extras.rules",
       "effect-modifiers.reminders",
       "combat-extras.effect-hooks",
+      "stats.fight-summary", // stats: End → fight summary (FR-CBT-153), appended last
     ]);
     expect(COMBAT_RULE_POINTS).toEqual(["started", "added", "turnChanged", "ended"]);
     expect(new CombatRuleHooks([]).run("turnChanged", env, enc, turn)).toEqual([]);

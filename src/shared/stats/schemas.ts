@@ -208,3 +208,14 @@ export const StatsAwardsPayload = z.strictObject({
   label: z.string().min(1).max(40),
 });
 export type StatsAwardsPayload = z.infer<typeof StatsAwardsPayload>;
+
+// ---------- fight summary notification (sprint 8, FR-NOTE-68) ----------
+
+/** FR-NOTE-68: the kind stats' `ended` rule hook makes at End (FR-STATS-33). Toast class info. */
+export const STATS_FIGHT_SUMMARY_KIND = "stats-fight-summary";
+/** FR-NOTE-68: the row's text (no encounter name, no numbers). */
+export const FIGHT_SUMMARY_TEXT = "Fight summary";
+
+/** Player-safe: the encounter id is already on public lines (#327). */
+export const StatsFightSummaryPayload = z.strictObject({ encounterId: Id });
+export type StatsFightSummaryPayload = z.infer<typeof StatsFightSummaryPayload>;
