@@ -278,6 +278,11 @@ export const RollPayloadItem = z.strictObject({
   part: RollPart.optional(),
   /** FR-DICE-64: set on a reroll's item (`dice.reroll`); stripped while gems are off (FR-DICE-69). */
   replaces: RollReplaces.optional(),
+  /**
+   * FR-DICE-80 (sprint 8): a roll-request answer (`dicex.answerRequest` / `rollForMissing`). Data
+   * only (the line shows no tag, OQ-DICE-46); the entry is never rerollable (OQ-GEM-20 A).
+   */
+  answer: z.literal(true).optional(),
 });
 export type RollPayloadItem = z.infer<typeof RollPayloadItem>;
 

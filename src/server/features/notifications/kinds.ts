@@ -4,6 +4,7 @@ import { charxApprovedKind, charxDraftKind } from "../character-sheet/draft-kind
 import { concentrationCardKind } from "../combat-extras/card-kind";
 import { damageCardKind } from "../combat-tracker/card-kind";
 import { summonCardKind } from "../combat-tracker/summon-card-kind";
+import { rollRequestKind } from "../dice-extras/request-kind";
 import { modTriggerKind } from "../effect-modifiers/reminders";
 import { handoutSharedKind } from "../party-board/kind";
 import { lootReceivedKind } from "../party-loot/kind";
@@ -22,4 +23,5 @@ export const notificationKinds: readonly NotificationKindDef[] = [
   handoutSharedKind, // handout-shared (party-board, FR-PARTY-06)
   summonCardKind, // cbt-summon-concentration (combat-tracker, FR-CBT-120)
   statsAwardsKind, // stats-awards (stats, FR-NOTE-48)
+  rollRequestKind, // roll-request (dice-extras, FR-NOTE-58), toast class card
 ];

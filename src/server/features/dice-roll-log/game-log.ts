@@ -41,7 +41,18 @@ export interface AppendInput {
    * re-stamped, ADR-0056); wins over every other stamp.
    */
   copyAudience?: { public: boolean; audiencePlayerId: string | null };
+  /**
+   * Sprint 8 (FR-DICE-79, -83; ADR-0061): a roll-request answer's audience, stamped by the server
+   * from the request, never from an intent field (a player-sent `public` stays `forbidden`):
+   * public → `{public: true}`; hidden → `{public: false, audiencePlayerId}` = the target's player
+   * (DM + that player, whoever rolls). Wins over the role / category stamp and `forcePrivate`;
+   * never combined with `copyAudience`.
+   */
+  audience?: EntryAudience;
 }
+
+/** FR-DICE-83: the internal audience input of `gameLog.append` and the sheet roll helper. */
+export type EntryAudience = { public: true } | { public: false; audiencePlayerId: string };
 
 type EntryRow = typeof gameLogEntry.$inferSelect;
 
@@ -64,13 +75,21 @@ function getEntry(tx: Pick<Tx, "select">, campaignId: string, id: string): Entry
 /**
  * FR-DICE-13: `public` stamped once, by who rolls. Player → always true. DM (and the fixture
  * loader, which runs as DM) → the override if given, else the category's setting at commit.
- * `forcePrivate` → false for anyone.
+ * `forcePrivate` → false for anyone. A copied (reroll) or request (`audience`) stamp wins.
  */
 function stampPublic(env: CommandEnv, cid: string, input: AppendInput): boolean {
   if (input.copyAudience) return input.copyAudience.public;
+  if (input.audience) return input.audience.public;
   if (input.forcePrivate || input.audiencePlayerId) return false;
   if (env.actor.role === "player") return true;
   return input.public ?? categoryPublic(readSettings(env.tx, cid), input.category);
+}
+
+/** The entry's `audiencePlayerId`: the copied / request audience, else the companion owner. */
+function audiencePlayerOf(input: AppendInput): string | null {
+  if (input.copyAudience) return input.copyAudience.audiencePlayerId;
+  if (input.audience) return input.audience.public ? null : input.audience.audiencePlayerId;
+  return input.forcePrivate ? null : (input.audiencePlayerId ?? null);
 }
 
 export function append(env: CommandEnv, input: AppendInput): RecordChange {
@@ -112,11 +131,7 @@ export function append(env: CommandEnv, input: AppendInput): RecordChange {
       dmPayload,
       rollIds: input.rollIds,
       encounterId: input.encounterId ?? null,
-      audiencePlayerId: input.copyAudience
-        ? input.copyAudience.audiencePlayerId
-        : input.forcePrivate
-          ? null
-          : (input.audiencePlayerId ?? null),
+      audiencePlayerId: audiencePlayerOf(input),
       supersededBy: null,
     })
     .run();
