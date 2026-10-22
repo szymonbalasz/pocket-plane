@@ -222,6 +222,14 @@ function CalloutToast({ c, onClose }: { c: Callout; onClose: () => void }) {
   );
 }
 
+/**
+ * FR-NOTE-50 (sprint 8, DM ruling): the one stack's layer: above windows, dialogs (z-50) and
+ * the alert flash (z-100), so an error stays readable while a dialog is open (as sonner's was);
+ * below the overlay layer (play-shell `OVERLAY_LAYER_Z` 1000: a `blocksInput` overlay such as the
+ * pause card sits above it) and the popups above every toast (`PRESENT_POPUP_Z`, the dice layer).
+ */
+export const TOAST_STACK_Z = 900;
+
 /** Id of this stack's FR-SHELL-59 report. */
 export const SHOWN_STACK_ID = "note.toasts";
 
@@ -375,13 +383,16 @@ export function ToastRuntime({
       data-top={isDm ? at.top : undefined}
       // FR-NOTE-50: DOM order = order from home; the players' home is the bottom.
       className={cn(
-        "pointer-events-none fixed z-40 flex w-80 gap-2",
+        "pointer-events-none fixed flex w-80 gap-2",
         isDm ? "flex-col" : "flex-col-reverse",
       )}
       // Player: bottom-right, above the launcher bar (never over its buttons).
-      style={
-        isDm ? { left: at.left, top: at.top } : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }
-      }
+      style={{
+        zIndex: TOAST_STACK_Z,
+        ...(isDm
+          ? { left: at.left, top: at.top }
+          : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }),
+      }}
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >

@@ -11,6 +11,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
+import { PRESENT_POPUP_Z } from "../party-board/present-logic";
 import { reportKeepOut } from "../play-shell/keep-outs";
 import { createWindowRegistry, type ShellClient } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
@@ -39,7 +40,7 @@ mock.module("./stack-inputs", () => ({
     return stubInputs ?? real;
   },
 }));
-const { ToastRuntime } = await import("./ToastRuntime");
+const { ToastRuntime, TOAST_STACK_Z } = await import("./ToastRuntime");
 
 const views = createNotificationViews([]);
 const TOOLBAR = "map.toolbar";
@@ -262,5 +263,16 @@ describe("FR-NOTE-50 toast policy (runtime)", () => {
     );
     const alone = setCallout(initialToasts(0), { id: "x", content: "Goblin 1 falls" }, 0);
     expect(order(stackHtml("player", alone, {}))).toEqual(["note-callout:x"]);
+  });
+});
+
+describe("FR-NOTE-50 toast policy (layer)", () => {
+  test("FR-NOTE-50 toast policy (layer): the stack sits above dialogs (z-50) and the alert flash (z-100), below the overlay layer (1000) and the present popup", () => {
+    expect(TOAST_STACK_Z).toBeGreaterThan(100);
+    expect(TOAST_STACK_Z).toBeLessThan(1000);
+    expect(TOAST_STACK_Z).toBeLessThan(PRESENT_POPUP_Z);
+    const tag = stackTag("dm");
+    expect(tag).toContain(`z-index:${TOAST_STACK_Z}`);
+    expect(tag).not.toContain("z-40");
   });
 });
