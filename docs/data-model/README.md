@@ -2377,3 +2377,15 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0
 - **Fixtures:** no new unit; bundles `wf-frame`, `wf-frame-e2e` (= `session-sim-11`). Harness cells `replay-cells.generated.ts` (from `session-sim-11`, `UPDATE_CELLS=1`).
 - **Persisted runtime state:** `userSize` in the layout entry (0 B on the wire).
 - **CON-44:** 0 B.
+
+## 110. Sprint 8: tool-bar pushes through the ladder, rail inset (WF2)
+
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-104–106, -109. **Built by `fix/wf-push-rail`.** Browser-only; nothing on the wire.
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| Displacement memory, cause `toolbar:<id>` | client memory (`ShellState.memory`) | `<id>` = the hard keep-out that pushed (a tool bar, a chrome keep-out); a push keeps the first pre-push rect across re-selects and tool swaps; a drag-end push keeps the dropped rect with `userSpot` (it returns there) | [FR-SHELL-104](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-105](../specs/play-shell.md#6-functional-requirements) |
+| Rendered x | derived (render clamp) | ≥ 68 unless parked (stored x < 0); never written back | [FR-SHELL-109](../specs/play-shell.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit; e2e on `wf-frame-e2e`.
+- **CON-44:** 0 B.

@@ -3295,3 +3295,19 @@ From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-95�
 - **Test IDs / hooks:** `ui-window` `data-placed` + `zone`, `displaced`, `grown`, `squeezed`; `data-auto-minimised-cause` (`toolbar:…`, `viewport:…`, `window:…`, `open:…`); `ui-window-body`; `ui-play-page` `data-settle-log` = "trigger:kind>rung;…" (test mode); `ui-overlay-layer` (`data-blocking`), `[data-overlay-id]`; `ui-topbar-item` + `data-record-id`.
 - **Harness:** `fixtures/units/play-shell/replay-cells.test.ts` (FR-SHELL-114) → `replay-cells.generated.ts`; `src/client/{dm,player}/features/play-shell/replay.test.ts` (FR-SHELL-115, -116; known failures in `replay.failing.json`, run as `test.failing`).
 - **CON-44:** 0 B.
+
+## 140. Sprint 8: tool-bar pushes through the ladder, more push triggers, rail inset (WF2)
+
+From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-104–106, -109 ([ADR-0060](../architecture/adr/0060-one-window-placer.md)). **Built by `fix/wf-push-rail`.** No intent, event or record change (0 B).
+
+| Seam | Contract | Source |
+|---|---|---|
+| `push` trigger (`placer.ts`) | Every shown window over the bar + 12 is displaced, protected ones first (registry order), then launcher windows by descending z; the ones still waiting are no obstacle. Each goes through the ladder (no L2b yield, no squeeze, puts no other window away) ranked nearest its pre-push rect (the memory's first one), cause `toolbar:<id>` (the hard region at that rect; `map.toolbar` if none, and the rect counts as hard). A launcher window with no spot ≥ useful is put away itself until `return`; a protected one never: L4, else L5 (flagged). `data-placed="pushed"`. FR-SHELL-55's push right and `belowBar` are gone | FR-SHELL-104 |
+| `drag-end` | A move / resize end whose rendered rect overlaps a shown hard keep-out other than the toast box (a tool bar, a chrome keep-out) pushes that window; the memory keeps the dropped rect + `userSpot`, so `return` puts it back there. Over a PC: kept (user spot) | FR-SHELL-105, -106 |
+| Re-select (`ToolRail.tsx`) | Pressing the active tool (the toggle group reports "") bumps `ToolPanel`'s `reselect`, which pushes with the current bar rect; a tool swap pushes as before (new `id`) | FR-SHELL-105 |
+| Rail inset (`geometry.ts`, `placement.ts`) | `RAIL_CLEAR` = 68 (now in `geometry.ts`, re-exported by `placement.ts`). `clampRect`: stored x ≥ 0 renders at x ≥ 68 (flush right if wider than the room); x < 0 (parked) unchanged. `resizeRect`'s west edge stops at 68. Auto placement's `minX` = 68 always | FR-SHELL-109 |
+| Top bar (`PlayFrame.tsx`) | `ui-topbar-left` (flex-1, `min-w-0`, children `truncate`) and `ui-topbar-right` (`shrink-0`): the left text ellipsises before the right cluster | FR-SHELL-109 |
+
+- **Test hooks:** `data-settle-log` gains `push:<kind>>put-away` and `drag-end:<kind>>L…`; `data-auto-minimised-cause` = `toolbar:<id>` for a pushed window put away.
+- **Harness:** push-path cells flipped (DM 14, players 6); push steps' I3 oracle keeps the launcher windows (a push puts none away, OQ-SHELL-61 A).
+- **CON-44:** 0 B.
