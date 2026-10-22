@@ -10,7 +10,8 @@ import { defineBundle } from "@server/features/fixtures-adapters/fixture-types";
  */
 export default defineBundle({
   name: "session-sim-12",
-  includes: ["session-sim-11"],
+  // SB0 (gate ruling): `stats-b-past` (the ended "Bandit Camp") loads before sim-10's Ambush.
+  includes: ["stats-b-past", "session-sim-11"],
   fixtures: [
     // WF: window frame (no unit: aliases only, seams S15)
     // TT: table tools (`dicex-macros` TT1, `audio-chime` + `camp-alert-sounds` TT3)
@@ -18,6 +19,8 @@ export default defineBundle({
     "audio-chime",
     "camp-alert-sounds",
     // SB: stats tier B (`sb-fight-facts`, `sb-luck-rolls`)
+    // SB0: `sb-past-bandits` via the `stats-b-past` include (an ended fight); 8 physical luck rolls
+    "sb-luck-rolls",
     // CB: combat polish (`cb-ties`, `cb-fog-goblin`, `cb-party`)
     // CB0: a three-way 12-tie (Thorn, Fire Elemental 3, Goblin), Goblin fog-hidden, party values
     "cb-ties",

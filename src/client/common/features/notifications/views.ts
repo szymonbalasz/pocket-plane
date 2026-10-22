@@ -2,6 +2,7 @@
 // `src/client/{dm,player}/notification-views.ts` (append-only, AGENTS §9.9).
 import { checkEndRule, type EncounterEndRule } from "@shared/notifications/end-rule";
 import type { NotificationRecord } from "@shared/notifications/schemas";
+import { checkToastClass, type NotificationToastClass } from "@shared/notifications/toast-class";
 import type { RecordStore } from "@shared/protocol/store";
 import type { ComponentType } from "react";
 
@@ -49,7 +50,16 @@ export interface NotificationView {
    * likely targets); only the drawn ones count. Absent → none.
    */
   avoidTokens?: (n: NotificationRecord, store: RecordStore) => string[];
+  /**
+   * Sprint 8 (FR-NOTE-50, -52): the kind's toast class, the same as its server kind's: pending →
+   * card, else info (or alert). Named on every line of the client lists; a pending row is always
+   * a card. Absent → by the row's state.
+   */
+  toastClass?: NotificationToastClass;
 }
+
+/** A client list's line: the view with its toast class named (FR-NOTE-52). */
+export type RegisteredView = NotificationView & { toastClass: NotificationToastClass };
 
 export function defineNotificationView(v: NotificationView): NotificationView {
   return v;
@@ -74,6 +84,7 @@ export function createNotificationViews(list: readonly NotificationView[]): Noti
   for (const v of list) {
     if (map.has(v.kind)) throw new Error(`notification view "${v.kind}" registered twice`);
     checkEndRule(v.kind, v.endRule);
+    checkToastClass(v.kind, v.toastClass);
     map.set(v.kind, v);
   }
   return { get: (kind) => map.get(kind) };

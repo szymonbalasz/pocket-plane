@@ -3,8 +3,19 @@
 // appends a unit extends the expectations here.
 import { afterAll, describe, expect, test } from "bun:test";
 import { closeDb } from "@server/db/client";
-import { asset, campaign, combatant, rollMacro, rollRequest } from "@server/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  asset,
+  campaign,
+  combatant,
+  encounter,
+  entity,
+  gameLogEntry,
+  notification,
+  rollMacro,
+  rollRequest,
+  token,
+} from "@server/db/schema";
+import { asc, eq } from "drizzle-orm";
 import { loadBundle } from "../index";
 
 const cleanups: (() => void)[] = [];
@@ -47,7 +58,14 @@ describe("session-sim-12 (sprint-8 gate bundle)", () => {
     expect([active?.pause, active?.alertSounds]).toEqual([null, { request: chime, pause: chime }]);
     // CB0: the 12-tie (Thorn, Fire Elemental 3, Goblin), no tie order yet; Goblin fog-hidden.
     expect(r.manifest.fixtures.slice(-3)).toEqual(["cb-ties", "cb-fog-goblin", "cb-party"]);
-    const ambush = db.select().from(combatant).where(eq(combatant.active, true)).all();
+    const fights = db.select().from(encounter).orderBy(asc(encounter.seq)).all();
+    const ambushId = fights.find((e) => e.name === "Ambush at the Ford")?.id as string;
+    const ambush = db
+      .select()
+      .from(combatant)
+      .where(eq(combatant.encounterId, ambushId))
+      .all()
+      .filter((c) => c.active);
     const tie = ambush
       .filter((c) => c.initiative === 12 && c.turnMode !== "after-owner")
       .sort((a, b) => a.position - b.position)
@@ -55,5 +73,53 @@ describe("session-sim-12 (sprint-8 gate bundle)", () => {
     expect(tie).toEqual(["Thorn", "Fire Elemental 3", "Goblin"]);
     expect(ambush.every((c) => c.tieOrder === null)).toBe(true);
     expect(ambush.find((c) => c.name === "Goblin")?.hidden).toBe(true);
+    // SB0 (gate ruling): the Bandit Camp is a past, ended fight before the Ambush; nothing of it
+    // joins the running Ambush or the planned Escort; its hidden Captain's token is gone.
+    expect(fights.map((e) => [e.name, e.status])).toEqual([
+      ["Old Crypt", "ended"],
+      ["Bandit Camp", "ended"],
+      ["Ambush at the Ford", "started"],
+      ["Escort to the Ford", "planned"],
+    ]);
+    expect(ambush.some((c) => c.name.startsWith("Bandit"))).toBe(false);
+    expect(
+      db
+        .select()
+        .from(token)
+        .all()
+        .some((t) => t.name.startsWith("Bandit")),
+    ).toBe(false);
+    const camp = fights[1]?.id as string;
+    const fell = db
+      .select()
+      .from(gameLogEntry)
+      .where(eq(gameLogEntry.encounterId, camp))
+      .all()
+      .flatMap((e) => {
+        const p = e.payload as { fell?: string; targetName?: string };
+        return p.fell ? [[p.targetName, p.fell, e.public]] : [];
+      });
+    expect(fell).toEqual([
+      ["Bandit", "kill", true],
+      ["Bandit Captain", "kill", false],
+      ["Thorn", "down", true],
+    ]);
+    // Thorn healed back to full: sim-10's Ambush starts as before.
+    expect(db.select().from(entity).where(eq(entity.name, "Thorn")).get()?.hpCurrent).toBe(10);
+    // One fight summary per ended fight, for everyone.
+    const summaries = db
+      .select()
+      .from(notification)
+      .where(eq(notification.kind, "stats-fight-summary"))
+      .all();
+    expect(
+      summaries.map((n) => [(n.payload as { encounterId: string }).encounterId, n.audience]),
+    ).toEqual([
+      [fights[0]?.id as string, "all"],
+      [camp, "all"],
+    ]);
+    expect(r.manifest.fixtures).toEqual(
+      expect.arrayContaining(["sb-past-bandits", "sb-luck-rolls"]),
+    );
   }, 120_000);
 });

@@ -18,7 +18,16 @@ import { campaignFeatures } from "../campaign-management/features";
 import type { StatsViewer } from "../dice-roll-log/stats-read";
 import { notify } from "../notifications";
 import type { QueryGate, SessionCache } from "./cache";
-import { awardsPayload, fightStats, type StatsRead, sessionStats, sessionsStats } from "./compute";
+import {
+  awardsPayload,
+  fightStats,
+  luckStats,
+  type StatsRead,
+  sessionStats,
+  sessionsStats,
+  trophiesStats,
+} from "./compute";
+import type { Partials } from "./partials";
 
 /** The actor's campaign (WS: the connection's; REST / system: the active one). */
 function campaignOf(env: CommandEnv): string {
@@ -36,7 +45,13 @@ function readOf(env: CommandEnv): StatsRead {
   return { db: env.tx, viewer, campaignId };
 }
 
-export function statsCommands(cache: SessionCache, gate: QueryGate) {
+/** FR-STATS-46: a campaign answer still waiting for its partials (never memoised). */
+const isPending = (x: unknown): boolean => {
+  const v = x as { luck?: { pending?: true }; trophies?: { pending?: true } };
+  return v.luck?.pending === true || v.trophies?.pending === true;
+};
+
+export function statsCommands(cache: SessionCache, gate: QueryGate, partials: Partials) {
   const query = defineCommand({
     name: STATS_QUERY_INTENT,
     input: StatsQueryInput,
@@ -48,8 +63,12 @@ export function statsCommands(cache: SessionCache, gate: QueryGate) {
         campaignId: r.campaignId,
         actorKey: `${r.campaignId}|${env.actor.role}|${env.actor.playerId ?? ""}`,
         // Every player gets the same numbers (FR-STATS-03): one memo per viewer class.
-        memoKey: `${role}|${r.viewer.features.join(",")}|${JSON.stringify(input)}`,
+        // Trophies: a player's answer depends on who asks (own character only, FR-STATS-43).
+        memoKey: `${role}|${r.viewer.features.join(",")}|${JSON.stringify(input)}${
+          input.scope === "trophies" && role !== "dm" ? `|${env.actor.playerId ?? ""}` : ""
+        }`,
         now: env.ctx.clock.now(),
+        keep: (x) => !isPending(x),
         compute: () => {
           const sessions = () => cache.sessions(r.db, r.campaignId);
           const result =
@@ -57,7 +76,11 @@ export function statsCommands(cache: SessionCache, gate: QueryGate) {
               ? fightStats(r, input.encounterId)
               : input.scope === "session"
                 ? sessionStats(r, sessions(), input.n)
-                : sessionsStats(r, sessions());
+                : input.scope === "luck"
+                  ? luckStats(r, sessions(), partials, input)
+                  : input.scope === "trophies"
+                    ? trophiesStats(r, partials, input.characterId, env.actor.playerId)
+                    : sessionsStats(r, sessions());
           // FR-STATS-05: the role's strict schema; a field it lacks is a bug, never sent.
           return role === "dm" ? DmStatsResult.parse(result) : PlayerStatsResult.parse(result);
         },

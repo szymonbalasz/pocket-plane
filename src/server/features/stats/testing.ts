@@ -2,11 +2,13 @@
 // Elite hidden) started, with helpers to apply, roll and query as the DM or a player.
 import {
   type DmFightResult,
+  type DmLuckResult,
   type PlayerFightResult,
   type SessionResult,
   type SessionsResult,
   STATS_QUERY_INTENT,
   type StatsQueryInput,
+  type TrophiesResult,
 } from "@shared/stats/schemas";
 import type { Actor } from "../../events/types";
 import { applyHp, undoCommand } from "../combat-tracker/hp";
@@ -67,8 +69,28 @@ export function statsSetup() {
   const session = (actor: Actor = t.h.dm, n?: number) =>
     fresh<SessionResult>({ scope: "session", ...(n !== undefined ? { n } : {}) }, actor);
   const sessions = (actor: Actor = t.h.dm) => fresh<SessionsResult>({ scope: "sessions" }, actor);
+  /** Sprint 8: luck of a session (`n` inside it; absent = the newest) or the campaign. */
+  const luck = (actor: Actor = t.h.dm, o: { n?: number; campaign?: true } = {}) =>
+    fresh<DmLuckResult>({ scope: "luck", ...o }, actor).luck;
+  const trophies = (characterId: string, actor: Actor = t.h.dm) =>
+    fresh<TrophiesResult>({ scope: "trophies", characterId }, actor).trophies;
   const memory = () => statsMemory(t.s);
-  return { ...t, enc, id, clock, hp, undo, roll, query, fight, session, sessions, memory };
+  return {
+    ...t,
+    enc,
+    id,
+    clock,
+    hp,
+    undo,
+    roll,
+    query,
+    fight,
+    session,
+    sessions,
+    luck,
+    trophies,
+    memory,
+  };
 }
 
 export type StatsSetup = ReturnType<typeof statsSetup>;

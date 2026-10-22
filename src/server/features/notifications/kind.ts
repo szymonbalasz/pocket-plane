@@ -7,6 +7,7 @@ import {
   PAYLOAD_MAX_BYTES,
   RESOLUTION_MAX_BYTES,
 } from "@shared/notifications/schemas";
+import { checkToastClass, type NotificationToastClass } from "@shared/notifications/toast-class";
 import type { z } from "zod";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
@@ -45,7 +46,16 @@ export interface NotificationKindDef {
    * dice on a damage card), hidden / stripped by the hub while that feature is off. Absent = none.
    */
   traces?: readonly FeatureTrace<NotificationRecord>[];
+  /**
+   * Sprint 8 (FR-NOTE-50, -52): the kind's toast class in the client's one stack: pending → card,
+   * else info (or alert). The registry (`kinds.ts`) names it on every entry; the client views
+   * name the same class. A pending row always toasts as a card (`toastClassOf`).
+   */
+  toastClass?: NotificationToastClass;
 }
+
+/** A `kinds.ts` entry: the kind def with its toast class named (FR-NOTE-52). */
+export type RegisteredKindDef = NotificationKindDef & { toastClass: NotificationToastClass };
 
 /** The kind's resolution cap (FR-NOTE-03): its own, else 256 B. */
 export const resolutionCapOf = (d: NotificationKindDef): number =>
@@ -76,6 +86,7 @@ export function buildKindMap(
       }
     }
     checkEndRule(d.kind, d.endRule);
+    checkToastClass(d.kind, d.toastClass);
     map.set(d.kind, d);
   }
   return map;
