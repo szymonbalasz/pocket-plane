@@ -2,7 +2,7 @@
 title: Notifications
 prefix: NOTE
 status: complete
-owner: spec-wf, spec-sb
+owner: spec-wf, spec-sb, spec-tt
 wave: 2
 phase: post-mvp-8
 ---
@@ -51,6 +51,8 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 |---|---|---|---|
 | FR-NOTE-68 | Kind `stats-fight-summary`: info to `all` (public fact) or `dm`, payload `{encounterId}`, view with Open | SB0 (kind), SB1 (views) | `FR-NOTE-68 fight summary notification` |
 | FR-NOTE-69 | The kill-feed toast is a callout (FR-NOTE-50), not a notification; it replaces the overkill toast (FR-NOTE-49 amended) | SB1 (after WF4) | `FR-NOTE-69 feed toast is not a notification` |
+
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** A DM roll request is a notification with a roll action: [dice-extras](dice-extras.md) adds kind **`roll-request`** (toast class **card**, FR-NOTE-50; seams S3, S13), one pending prompt per target PC, resolved only by dice-extras' commands. FR-NOTE-58–64, incl. a view flag `restoreToast`. CON-44: a prompt row 994 B ([dice-extras §12](dice-extras.md#12-performance--bandwidth)). Tests and walkthrough (T4–T8, T10, T12): [dice-extras §13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-NOTE-32–34.
 
 ## 1. Summary
 
@@ -146,6 +148,13 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR-NOTE-51 | **The stack returns home** (BL-59). `ToastRuntime` re-places on every input change: window rects and `data-placed`, hard keep-outs, first-row reports (subscribed, not read once), stack height, viewport. The hover freeze lasts only while hovered. Root cause first (code read: `firstRows()` not reactive; `tick` frozen on hover; unreturned pushes). Outcome: the tool closes → windows return → the stack is home (560, 100 at 1440×900) within one frame. | BL-59 |
 | FR-NOTE-52 | **Toast class for kinds** (S3–S5, S13): a `kinds.ts` entry names its class (pending → card, else info). Callouts use one shared `showCallout({id, content, ms?})`: the overkill toast (FR-NOTE-49) and SB's kill feed. TT `roll-request` = card; SB `stats-fight-summary` = info. | Seams |
 | FR-NOTE-53 | **"Pushed" from the plan** (amends FR-NOTE-44): a window whose `data-placed` is `pushed`, or `displaced` with a `toolbar` cause. | FR-NOTE-44 |
+| FR-NOTE-58 | *(Sprint 8)* **Kind `roll-request`** (owner DICEX; `kinds.ts` append; toast class card): audience `player` = the PC's owner, action "Roll" owned by that player. Payload `{requestId, characterId, characterName, roll, label, dc \| null, mode}` (≤ 1 KB; `dc` null unless shown); text "DM: ‹label›" (+ "· DC n" iff shown). Resolution `{outcome: rolled \| declined \| missed, total?}`. `genericResolve: false` (`note.resolve` → `forbidden`); no end rule. Test `FR-NOTE-58 roll-request kind`. | ADR-0016 |
+| FR-NOTE-59 | *(Sprint 8)* **Player view** (append): the prompt renderer ([FR-DICEX-83](dice-extras.md#6-functional-requirements): Roll roll-control + Decline) in the toast and the history row while pending; resolved rows read "Rolled 17" / "Declined" / "Closed". Test `FR-NOTE-59 prompt view`. | |
+| FR-NOTE-60 | *(Sprint 8)* **`restoreToast`** (optional view flag; amends FR-NOTE-13, -15; in WF4's `ToastRuntime.tsx`, after WF4): after the first snapshot of a load or reconnect, each pending row of such a kind owned by this client re-toasts, **silent, no cue**, and is left out of the "N pending" summary. Only `roll-request` sets it. Test `FR-NOTE-60 restore toast`. | OQ-NOTE-34 |
+| FR-NOTE-61 | *(Sprint 8)* **DM view** (append): history row "‹PC› · ‹label›" + "Open requests"; no DM toast, no action cue (`cueTokens: false`); the bell counts open prompts (FR-NOTE-27). Test `FR-NOTE-61 DM view`. | OQ-NOTE-33 |
+| FR-NOTE-62 | *(Sprint 8)* **Closing**: answer / decline → resolved by the closer; DM Close → by rule ("Closed"); never dismissed by End. Test `FR-NOTE-62 prompt closes`. | |
+| FR-NOTE-63 | *(Sprint 8)* **Paused** (seams S10): prompts and other card toasts arrive under the pause card and are restored at resume; info toasts go to history only; callouts are dropped, not replayed. Test `FR-NOTE-63 prompt while paused`. | |
+| FR-NOTE-64 | *(Sprint 8)* **Leak rules**: no DC unless shown, never `success`; `resolution.total` only to the roller. Test `FR-NOTE-64 roll-request leak`. | |
 | FR-NOTE-68 | **Kind `stats-fight-summary`** (owner stats; one line in `kinds.ts`, append). No action, so state `info`; its kind def names toast class **info** (FR-NOTE-50, seam S13): a 6 s toast per FR-NOTE-13 / -14 plus a history row. Audience **`all`** when the ended fight has a counted public fact, else **`dm`** ([FR-STATS-33](stats.md#6-functional-requirements)). Payload zod `{encounterId}` (player-safe: the id is already on public lines, #327); text **"Fight summary"** (no encounter name, no numbers). Made only by stats' `ended` rule hook through `notify` inside `cbt.end` (system actor: no stripe, FR-NOTE-38). Client views (both `notification-views.ts`, append): icon lucide `Swords`; renderer "Fight summary" + **Open** (`stats-summary-open`), which opens Stats on that fight with Highlights ([FR-STATS-34](stats.md#6-functional-requirements)); the DM's row adds the encounter name from its store. No end rule (an info row). | OQ-STATS-27 |
 | FR-NOTE-69 | **Kill-feed toasts are not notifications** ([FR-STATS-28](stats.md#6-functional-requirements); amends FR-NOTE-49). `stats-feed-toast` takes the overkill toast's place in the **callout** toast class (FR-NOTE-50, seam S4): no row, bell or history, at most one (a newer one replaces it), live frames only, never pushes windows, ignored by Fit and the pending-toast rules. 4 s; the timer pauses on hover. Off with the viewer's "Kill feed" preference; dropped for players while paused (seam S10). | OQ-STATS-21 |
 
@@ -397,6 +406,16 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 |---|---|---|---|---|
 | OQ-NOTE-28 | Show awards: info toast **and** the window opening, or only the window? | **Decided (#315): A** · **A. Both** (FR-NOTE-13's rule unchanged; the toast says why the window opened) · B. Window only (a per-kind "no toast" flag, new to the registry) | — | NOTE, STATS |
 | ~~OQ-NOTE-29~~ | SB seam: kill-feed toast class | **Resolved (integrator, sprint-8 seams / rulings)**: seams S4: callout (FR-NOTE-50), not a notification kind | — | FR-NOTE-50, -52 |
+
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-NOTE-32 | Prompt shape | **Decided (#335): A.** Options: **A. Pending card toast with Roll + Decline (+ history row)**: the existing pattern / B. A centred dialog: unmissable, blocks the map | no (decided) | FR-NOTE-59 |
+| OQ-NOTE-33 | A DM toast per answer? | **Decided (#335): A.** Options: **A. No: the Requests window updates, the bell counts** / B. Yes: six toasts for six PCs | no (decided) | FR-NOTE-61 |
+| OQ-NOTE-34 | Re-show a prompt after reload? | **Decided (#335): A.** Options: **A. Yes, silent (`restoreToast`)** / B. Only the "N pending" summary | no (decided) | FR-NOTE-60 |
+
+- *(Sprint 8)* Edges: [dice-extras §11](dice-extras.md#11-edge-cases--failure-modes). Slices: kind TT0; views, `restoreToast` TT1+TT2 (after WF4).
 
 ## 16. Out of scope
 

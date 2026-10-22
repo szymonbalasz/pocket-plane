@@ -2,9 +2,9 @@
 title: Campaign management
 prefix: CAMP
 status: complete
-owner: spec-gems
+owner: spec-tt
 wave: 1
-phase: post-mvp-7
+phase: post-mvp-8
 ---
 
 # Campaign management
@@ -56,6 +56,8 @@ Decided by the DM (#288, every bold pick): OQ-CAMP-28 A, -29 B + danger (a), -30
 | FR-CAMP-43 | Players window: gem counts under each character line (gems on) | GM3 | `FR-CAMP-43 party gem counts` |
 | FR-CAMP-44 | "Off" rule: tagged record types / log kinds hidden, `featureOn` for commands | GM0 | `FR-CAMP-44 off hides tagged` |
 | FR-CAMP-45 | `useFeature(store, key)`; CON-44 measured | GM0 | `FR-CAMP-45 CON-44 switch` |
+
+> **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** The pause screen and the DM's alert-sound picks are per-campaign table state on the **campaign row**: `pause` and `alertSounds`, JSON leaves omitted from the wire when empty. FR-CAMP-46–50. Card and playback: [play-shell](play-shell.md) FR-SHELL-125–136; audio files: [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61; CON-44, tests, walkthrough T9–T13: [dice-extras §12–13](dice-extras.md#13-test-plan). Units `camp-alert-sounds` (joins session-sim-12) and `camp-paused`. Decided at gate 1 (#335): OQ-CAMP-35, -36.
 
 ## 1. Summary
 
@@ -147,6 +149,11 @@ N/A — the goals in §3 are the stories; listing them again adds nothing.
 | FR-CAMP-43 | **Party lines** (FR-CAMP-21): with gems on, each character line gains the gem counts (5 icons + numbers, [FR-GEM-35](gems.md#6-functional-requirements)); counts above 5 shown plainly, no over-limit colour or hint (FR-GEM-08, OQ-GEM-11 D, #315). Off → nothing. Reads `character-gems` the DM already receives. | |
 | FR-CAMP-44 | **"Off" rule** (one rule, applied by the hub; ADR): record types and log kinds registered with `feature: "<key>"` are hidden for every viewer (DM included: snapshot, frames, `sync.load`) whose `features` lack the key; declared **traces** on other records are hidden / stripped the same way (ADR; gems: OQ-GEM-21); every read path applies it (snapshot, frames, `sync.load`, `stats.query`); commands of a feature call `featureOn(env, key)` (campaign-management server export) first and reject `forbidden` "‹label› is off in this campaign". Rows stay in the DB. | |
 | FR-CAMP-45 | **Client:** `useFeature(store, key)` (`@ui`, campaign-management) reads the `campaign` record; features render nothing while it is false. **CON-44** (measured 2026-10-20, §12): off 0 B; on +20 B per viewer. | |
+| FR-CAMP-46 | *(Sprint 8)* **`campaign.pause`** (JSON leaf, null = running): `{message ≤ 200 \| null, imageAssetId \| null, backAt \| null, startedAt}`; on the wire only while paused; every connection of the campaign sees it, so the image ID reaches players only while it is on the card. Test `FR-CAMP-46 pause field`. | |
+| FR-CAMP-47 | *(Sprint 8)* **`camp.pause {message?, imageAssetId?, backInMin?}`** (DM): message trimmed, no control chars; image via `assets.require(…, {kind: "image"})`; `backInMin` ∈ {5, 10, 15, 30} → `backAt` from `ctx.clock`; paused already → update (`startedAt` kept). **`camp.resume {}`** (DM). Same values → no-op. Events `CampaignPaused` / `CampaignResumed {campaignId}`: `campaign` upsert to every connection, logged, not undoable, no forced resync. Test `FR-CAMP-47 pause commands` (+ crash `camp.pause:after-commit` → still paused after restart). | |
+| FR-CAMP-48 | *(Sprint 8)* **`campaign.alertSounds`** (JSON leaf, default `{}`): `{turn?, request?, pause?, resume?: audio asset ID \| "none"}`; absent = default (FR-SHELL-130); wire only when non-empty. **`camp.setAlertSound {alert, sound: "default" \| "none" \| assetId}`** (DM; `assets.require(…, {kind: "audio"})`; `default` removes the key) → `AlertSoundSet {alert}`, `campaign` upsert to every connection (players need the picked IDs; the library stays DM only). Test `FR-CAMP-48 alert sound picks`. | OQ-CAMP-36 |
+| FR-CAMP-49 | *(Sprint 8)* **Alert sounds in Campaign options** (FR-CAMP-42's Dialog, under the features): a row per key (Select Default / None / library sounds, Test ▶), one "Upload sound…" (rejects inline). Library via `sync.load {type: "audio-asset"}` on open. DM only, `live` only. Test IDs `camp-sound` (+ `data-value` = key), `camp-sound-{select,test,upload,error}`. Test `FR-CAMP-49 alert sounds section`. | OQ-CAMP-35 |
+| FR-CAMP-50 | *(Sprint 8)* **CON-44** (measured): +150 B (picks), +488 B (paused); `CampaignPaused` 834 B, `CampaignResumed` / `AlertSoundSet` 497 B. Edges: row + event commit together; two DM tabs → last wins; nothing dangles (no asset delete). | #256 |
 
 ## 7. UI/UX notes
 
@@ -204,6 +211,7 @@ No JSON leaf fields ([ADR-0006](../architecture/adr/0006-persistence.md)) *(spri
 | | color *(sprint 5)* | text \| null in the DB, a palette key; non-null on the wire after the boot backfill | FR-CAMP-23; not unique in the DB (defaults may repeat past 8, FR-CAMP-26) |
 | Campaign | dmColor *(sprint 5)* | text, a palette key, default `amber` | FR-CAMP-24 |
 | Campaign | features *(sprint 7)* | **JSON leaf** `string[]` (registered keys), default `[]` | FR-CAMP-38; the spec's first JSON leaf (ADR-0006); omitted on the wire when empty |
+| Campaign | pause, alertSounds *(sprint 8)* | **JSON leaves**, null / `{}` | FR-CAMP-46, -48; omitted on the wire when empty |
 | Player, Campaign | color, dmColor *(sprint 6)* | same columns; value a lowercase `#rrggbb` (a key only in old rows, migrated at boot) | FR-CAMP-30, -34; no DDL: `schema.ts` drops the `enum: PLAYER_COLOR_KEYS` typing on `color` / `dm_color`, keeps the `'amber'` default (rulings-b 7) |
 
 - **Relations:** Campaign 1—* Player 1—* owned records ([entities](entities.md), [scenes-map](scenes-map.md)); no removal → no dangling owners. **Derived:** link URL = public base URL + path + `linkToken`; online state from presence; *(N3)* party lines (FR-CAMP-21: passives derived by entities' helpers; level, AC, HP stored; temp HP read from combat-extras' column), client only; *(sprint 5)* a person's hex = `colorOf(store, {role, playerId})` (FR-CAMP-28), never stored elsewhere. **Persisted runtime state:** `Campaign.active` (throttle counter: memory only); *(sprint 5)* `player.color`, `campaign.dmColor`. *(Sprint 6)* Derived, never stored: a colour's validity (FR-CAMP-31), distances (FR-CAMP-32), its palette name (FR-CAMP-30), the picker's shading; the draft lives in the picker only.
@@ -250,6 +258,7 @@ Envelopes, errors and close codes: [live-sync](live-sync.md). CRUD over REST (OQ
 | *(Sprint 5)* Set the DM colour | ✓ | ✗ | `playerId = null` → DM only |
 | *(Sprint 7)* Switch an optional feature | ✓ | ✗ | `camp.setFeature`: role (FR-CAMP-39) |
 | *(Sprint 7)* Read which features are on | ✓ | ✓ | `campaign` record (FR-CAMP-38) |
+| *(Sprint 8)* Pause / resume; pick or upload sounds / read both | ✓ / ✓ | ✗ / ✓ | role (FR-CAMP-47, -48); upload DM `Bearer` |
 
 ~~No player-writable actions in this spec.~~ *(Sprint 5)* One player-writable action: their own colour. *(Sprint 6)* Unchanged: any valid colour (FR-CAMP-31) far enough from the others (FR-CAMP-32), same who-sets rules; Log out stays DM-only (browser).
 
@@ -486,6 +495,15 @@ Hotspot rules ([sprint-5](../agents/sprint-5.md#boundaries-and-hotspots-sequence
 |---|---|---|---|---|
 | OQ-CAMP-33 | **Where the DM switches gems on / off** (per campaign, not per person) | **Decided (#315): A.** **A. "Options" in the Players window (the DM's campaign panel): a Campaign options dialog, one Switch per optional feature (next to the campaign's players; reusable)** / B. A DM Preferences section (one place for settings, but Preferences is per person and FR-SHELL-75 says campaign rules aren't preferences: a play-shell amendment) / C. The campaign switcher's menu (beside rename; the switcher is small and rarely opened) | — · decided | [play-shell](play-shell.md) (B only) |
 | OQ-CAMP-34 | **A field per feature or a generic map?** ([proposed ADR](../architecture/adr/0058-feature-switches.md)) | **Decided (#315): B** (ADR accepted). A. A column per feature (`gems_enabled`: simplest; a schema change + wire field + own "off" rule each time) / **B. `features` list + feature tags on record types / log kinds, one hub rule (0 B off, one tested rule; a small `ws/` change)** / C. A `campaign_feature` table (normalised; same wire work plus a table) | — · decided | live-sync, protocol |
+
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CAMP-35 | Where does the DM pick and upload sounds? | **Decided (#335): A.** Options: **A. Campaign options, "Alert sounds" section**: campaign settings, not personal / B. DM Preferences / C. An Audio tab in Images | no (decided) | FR-CAMP-49 |
+| OQ-CAMP-36 | Defaults | **Decided (#335): A.** Options: **A. Turn + request = ping; pause / resume silent until picked** / B. Ping everywhere / C. New built-in sounds | no (decided) | FR-CAMP-48 |
+
+- *(Sprint 8)* Slices: columns TT0; `camp.setAlertSound` + the section TT3; `camp.pause` / `camp.resume` TT4 ([dice-extras §14](dice-extras.md#14-dependencies)).
 
 ## 16. Out of scope
 

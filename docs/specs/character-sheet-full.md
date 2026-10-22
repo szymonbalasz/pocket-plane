@@ -2,7 +2,7 @@
 title: Character sheet (full)
 prefix: CHARX
 status: complete
-owner: spec-wf, spec-sb
+owner: spec-wf, spec-sb, spec-tt
 phase: post-mvp-8
 ---
 
@@ -181,6 +181,10 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-81 | **The companion card opens readable** (sprint 7, track FU; sim-10 a03: opened at 280 × 308, its minimum-ish, attacks below the fold; with [FR-SHELL-79](play-shell.md#6-functional-requirements)): `charx.companion` declares `usefulSize` **320 × 360** (= its default), so auto placement auto-minimises a launcher window before opening it smaller (under OQ-SHELL-53 B; under A it opens as today); min stays 280 × 240. One line in `companion/window.ts` (assigned to FU1). | sim-10 a03 |
 | FR-CHARX-82 | **Attacks above the fold** (sprint 7; amends FR-CHARX-62–65's order): at 320 × 360 the card shows, without scrolling, the header (one line: name, "Mira's pet", turn mode; the "In combat" Badge and side chip on the same line when they fit, else a second line), one stats line ("HP 45 / 59 · AC 15 · 40 ft · Large monstrosity"; the HP control / Edit toggle at its right end), then **the first two attack rows with their three buttons**; conditions follow the attacks (they were above them), the DM's "Open NPC sheet" link last. Outcome (`session-sim-10`: Owlbear Beak + Claws, Drake Companion Bite): both Owlbear rows' Attack / Damage / Attack + damage buttons inside the window's rect at 320 × 360 with up to 3 conditions; at the min (280 × 240) the body scrolls. | sim-10 a03 |
 | FR-CHARX-83 | **The card's useful size is checked by content** (S8, WF). `usefulSize` stays 320 × 360 (FR-CHARX-81). Criterion, checked in a browser (`e2e/useful-size.e2e.ts`, [FR-SHELL-100](play-shell.md#6-functional-requirements)) at exactly 320 × 360 with the `session-sim-11` Owlbear (Beak, Claws) and Drake (Bite) shows the header, the stats line and both first attack rows with all three buttons, no scrolling. The placer opens the card at least that big while a put-away or a player's map yield helps ([FR-SHELL-97](play-shell.md#6-functional-requirements)). If the test fails, the fix is the card's layout. Test `FR-CHARX-83 card useful criterion`. | BL-66 |
+| FR-CHARX-87 | *(Sprint 8, TT)* **Macros tab** ([dice-extras](dice-extras.md) FR-DICEX-64–72): `sheet-sections.ts` line `{id: "dicex.macros", slot: "tab", title: "Macros", order: 90, kinds: ["character", "monster"]}`; tabs end "… Macros, Trophies" (SB's tab has a higher `order`, seams S11). `available`: DM always; a player on own characters. Component: dice-extras' `MacrosSection.tsx`. Test `FR-CHARX-87 macros tab`. | OQ-CHARX-41 |
+| FR-CHARX-88 | *(Sprint 8)* **Contents**: the viewer's macros on this creature in order, each a macro roll button with ✎; "+ Macro" presets the creature; the DM sees all, "DM only" Badge on hidden ones; view and edit mode alike. Test IDs: `charx-section` `data-record-id="dicex.macros"` + dice-extras' `dicex-macro*`. Test `FR-CHARX-88 macros tab contents`. | |
+| FR-CHARX-89 | *(Sprint 8)* **Locked sheet**: macros stay editable by the owner (rolls, like counters, FR-CHARX-12). Test `FR-CHARX-89 macros on a locked sheet`. | OQ-CHARX-40 |
+| FR-CHARX-90 | *(Sprint 8)* **`sheetRoll` helper**: `char.roll`'s body is exported as `sheetRoll(env, input, {audience?, label?})` (`character-sheet/commands.ts`, assigned to TT1+TT2; `char.roll` unchanged, its tests stay green), so request answers use the sheet's specs, overrides and MOD hooks (FR-CHARX-21). Test `FR-CHARX-90 sheet roll helper`. | |
 
 **Roll specs** (FR-CHARX-21). Bonus strings per FR-CHAR-21 (`1d20`, `1d20+3`, `1d20-1`). *(Sprint 4: an attack row's `bonus` adds to to-hit and the base part's constant; `extraDamage` adds one roll per part, FR-CHARX-55.)*
 
@@ -590,6 +594,13 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-CHARX-37 | Where the gem block sits on the sheet | **Decided (#315): A.** **A. Header chip row, after the effect chips (seen at a glance on every tab; the row gets longer)** / B. Vitals, under HP (near play state; pushes the HP row's neighbours down) / C. Its own "Gems" tab (roomy; hidden until clicked) | — · decided | gems |
+
+**Sprint 8** (track TT; DM [#334](../decisions-log.md): saved macros, FR-CHARX-87–90; no record, field or event here, CON-44 0 B; walkthrough T1–T3 in [dice-extras §13](dice-extras.md#13-test-plan)). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CHARX-40 | Does the sheet lock also lock macros? | **Decided (#335): A.** Options: **A. No: they are rolls** / B. Yes | no (decided) | FR-CHARX-89 |
+| OQ-CHARX-41 | Where on the sheet? | **Decided (#335): A.** Options: **A. A "Macros" tab**: Main's fold unchanged (FR-CHARX-82) / B. A block at the end of Main | no (decided) | FR-CHARX-87 |
 
 **Sprint 8** (track SB). Decided at DM gate 1 (#335): every bold pick accepted.
 

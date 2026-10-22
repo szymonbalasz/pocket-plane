@@ -2,7 +2,7 @@
 title: Play shell
 prefix: SHELL
 status: complete
-owner: spec-wf, spec-cb
+owner: spec-wf, spec-cb, spec-tt
 phase: post-mvp-8
 ---
 
@@ -134,6 +134,8 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 | Refits | `pcsPan` re-scales **up** to 48 px; the fit's PC = any owned token | reveal zooms in (BL-65) | after the placer, never zooms in ([FR-MAP-93–98](scenes-map.md#6-functional-requirements)) |
 
 BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR-SHELL-109; BL-66 → useful sizes (FR-SHELL-100, [FR-STATS-66](stats.md#6-functional-requirements), [FR-CHARX-83](character-sheet-full.md#6-functional-requirements)).
+
+> **Sprint 8 (track TT, table tools; DM [#334](../decisions-log.md)).** Decided (not open): a **pause / intermission screen** (players see a full-screen card, input blocked; the DM keeps working) and **DM-added alert sounds**. State lives on the campaign row ([FR-CAMP-46–50](campaign-management.md#6-functional-requirements)), files in [assets-pipeline](assets-pipeline.md) FR-ASSET-52–61; this spec owns the card, suppression, the DM's Pause control and playback by alert key: FR-SHELL-125–136. The card is an **overlay** in WF1's `overlays.ts` (`blocksInput`) and the control a `top-bar-items.ts` entry (seams S2). CON-44, tests, walkthrough T9–T14: [dice-extras §12–13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-SHELL-68–72.
 
 ## 1. Summary
 
@@ -336,6 +338,19 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 | FR-SHELL-117 | **Goldens**: regenerated once in WF1 through `settle` (`UPDATE_GOLDEN=1`, diff reviewed). `layout-checks.ts` stays an independent brute oracle, gaining the useful floor and the 4-px gap. | FR-SHELL-62 |
 | FR-SHELL-118 | **Retired / amended** (IDs kept): FR-SHELL-29 render fit → user spots and the in-progress resize only; -47, -77–79 → the ladder; -53 → folded into `settle(load)` (live follow retired); -55 push right → FR-SHELL-104; -56 (5) → the ladder; -81 → FR-SHELL-102; -40 / -50 Initiative at Start by token cover → zones (OQ-SHELL-63 A, #335); sprint 7 §16's "BL-52 / BL-53 stay backlog" → FR-SHELL-105, -109. | rulings-b 7 |
 | FR-SHELL-119 | **Bench** (`placement.bench.ts`): `settle` ≤ 25 ms best-of-5 (12 windows × 200 boxes, full ladder + one `dryFit`); ≤ 100 ms at 40 windows. | — |
+| **Sprint 8: pause screen and alert sounds** (track TT, #334; picks decided at DM gate 1, #335) | | |
+| FR-SHELL-125 | *(Sprint 8)* **Pause card** (players, while `campaign.pause` is set): an opaque full-viewport modal card: "Paused", the DM's message (text), the image (`display`, contain, ≤ 60 vh), the countdown, a mute toggle, "Reconnecting…" while not `live`; focus moves in. Opaque is not secrecy (records sync as usual). Test `FR-SHELL-125 pause card`. | OQ-SHELL-68 |
+| FR-SHELL-126 | *(Sprint 8)* **Countdown** from `backAt` on the client clock: "Back in m:ss", ≤ 0 → "Back soon", none if null (skew accepted; no server timer). Test `FR-SHELL-126 countdown`. | |
+| FR-SHELL-127 | *(Sprint 8)* **Suppressed on players while paused** (seams S10): throws, roll popups (entries skip `holding`), flashes, **callouts** (dropped, not replayed), sounds but `pause`; **info toasts go to history only**; feature opens (the End summary, `stats.showAwards`) and reveal refits are **deferred to resume**; cards (prompts, damage cards) wait. **At resume:** cards restored, deferred opens run, the turn alert's flash if it is their PC's turn, and **one** sound by priority turn > request > resume. Test `FR-SHELL-127 suppressed while paused` (incl. resume with turn, request and resume all picked: only `turn` plays). | OQ-SHELL-71 |
+| FR-SHELL-128 | *(Sprint 8)* **Input blocked, client only**: the card's overlay entry sets `blocksInput`, which **WF1 implements** (FR-SHELL-112 (2), review A #4–5): siblings of the overlay layer `inert`, focus trapped in the card, drags cancelled, placer settles queued, and one capture-phase `keydown` / `wheel` / `pointerdown` guard on `window` stops events from outside the overlay. Outcome: no click, drag, wheel, Space-pan, arrow key, Escape or shortcut acts behind the card. The server accepts player intents as before. Test `FR-SHELL-128 input blocked` (Space and arrow keys do nothing while paused). | OQ-SHELL-69, -70 |
+| FR-SHELL-129 | *(Sprint 8)* **DM Pause control** (`top-bar-items.ts` entry, fixed width; disabled unless `live`): "Pause" → Popover (message, image, back in none / 5 / 10 / 15 / 30 min) → `camp.pause`; paused: "Paused · m:ss" whose Popover holds Update, Resume, Preview. **Width** 96 px running, 128 px paused (one button; the actions live in the Popover); below 1280 px viewport width an icon-only 40 px button (countdown in its tooltip). **Preview** = the card in a non-blocking Dialog on the DM client, closed by Escape or ✕. Draft in `pp.pause.v1.<campaignId>` (DM browser only). The DM is never blocked. Test `FR-SHELL-129 DM pause control`. | |
+| FR-SHELL-130 | *(Sprint 8)* **Alert keys** `turn` (FR-CBT-41's `"ping"` becomes `"turn"`, seams S9), `request`, `pause`, `resume`, resolved via `campaign.alertSounds`: asset → that sound; `"none"` → silent; absent → `ping` for turn / request, silent for pause / resume. Played on the shared Web Audio context and gain. Test `FR-SHELL-130 alert keys`. | OQ-SHELL-72 |
+| FR-SHELL-131 | *(Sprint 8)* **Preload**: at idle after the snapshot, fetch `…/audio` and `decodeAudioData` each pick once (cached per asset ID); a new pick preloads; not ready or undecodable → `ping` (+ one warning). Test `FR-SHELL-131 preload`. | |
+| FR-SHELL-132 | *(Sprint 8)* **Mute wins**: muted, volume 0 or locked → nothing plays for any key. The Sound section's Test gains a key Select. Test `FR-SHELL-132 mute wins`. | |
+| FR-SHELL-133 | *(Sprint 8)* **One sound at a time**: a sound due while another plays is skipped; several due at once → one, by priority turn > request > resume > pause; flash and toast unaffected. The client stops any source after **5 s** (a lying header can't play longer). Test `FR-SHELL-133 one at a time`. | |
+| FR-SHELL-134 | *(Sprint 8)* **API**: `alert({…, sound?: key, flash?: true})`, new `alertSound(key)`; `usePaused(store)`. Test mode: `data-test-last-sound` = `<key>:<played \| muted \| locked \| failed \| skipped \| fallback>:<n>`. Test `FR-SHELL-134 alert API`. | |
+| FR-SHELL-135 | *(Sprint 8)* **Layers** (amends FR-SHELL-01): … dialogs, alert flash < **pause card** < dice layer (idle on players while paused), via the `layer` slot of WF1's overlay entry. Not a window: never placed, no keep-out. Test `FR-SHELL-135 layers`. | S2 |
+| FR-SHELL-136 | *(Sprint 8)* **Pause survives** reload, reconnect and restart (persisted row): the card shows from the snapshot before the page takes input; a campaign switch shows the new campaign's state. Test `FR-SHELL-136 pause survives`. | |
 | **Sprint 8: party summary window** (track CB, DM #334; content [party-board §6.10](party-board.md#610-sprint-8-party-summary-track-cb)) | | |
 | FR-SHELL-140 | **Window type `party.summary`** "Party status" (decided #335, [OQ-PARTY-29](party-board.md#15-open-questions) **A**): one `defineWindow` line in each client's `windows.ts` (append, after WF1, per FR-SHELL-112 (1)); `defaultOpen: false` (never protected: auto-minimised and auto-minimising like any launcher window); launcher lucide `HeartPulse`, label "Party status", order right after Party; `activity` none (figures change all the time); no keep-out; anchor `top-left`, `dx` 56 (as Stats), the spot is WF's one placer's (PCs clear first, then shrink, then put away, #333). | #334 |
 | FR-SHELL-141 | **Size-table row** (seams S12; same at 1280×720, 1280×800, 1440×900, 1600×900, both clients): **default** 280 × 260, `growToContent` (FR-SHELL-39: height follows its rows, capped by the client's band, 412 at 1280×720, until the user resizes); **useful** 280 × 236, **criterion**: every PC row of a 6-PC party whole (name, HP, temp, AC uncut; FR-PARTY-58), companions may scroll; **min** 240 × 120. Rows, not the frame, decide wrapping. The criterion is checked in a browser (review-b #3): `party.summary`'s case in `e2e/useful-size.e2e.ts` on `wf-frame-e2e` + fixture `cb-party-six` (6 PCs, worst-width figures): `scrollHeight ≤ clientHeight`, every PC row visible and whole; `bun test` checks the table row's shape only. WF1 adds the pending row in the append-only `size-table.ts`; CB3 fills its values (review-b #14). | S12; review-b #3, #14, #21 |
@@ -1088,6 +1103,18 @@ Teardown: stop, `fixtures:reset --profile verify`.
 | ~~OQ-SHELL-65~~ | TT seam (pause screen, roll-request prompt) | **Resolved (integrator, sprint-8 seams / rulings)**: seams S2, S3: overlay + top-bar item registries; the prompt is a card toast | — | FR-SHELL-112 |
 | ~~OQ-SHELL-66~~ | CB seam (party summary) | **Resolved (integrator, sprint-8 seams / rulings)**: seams S12: window `party.summary`, size-table row from CB | — | FR-SHELL-112 |
 | OQ-SHELL-67 | Glossary | **Resolved (integrator, sprint-8 seams / rulings)**: **Add "Placer", "Zone"; Useful size "… checked by a content criterion"** / none | no · integrator | glossary |
+
+**Sprint 8** (track TT). Decided at DM gate 1 ([#335](../decisions-log.md)): every pick accepted.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SHELL-68 | Pause card content | **Decided (#335): A.** Options: **A. "Paused" + optional message, image, "back in N min"** / B. Message only / C. A + a players' "Ready" check-in | no (decided) | FR-SHELL-125 |
+| OQ-SHELL-69 | What can players do while paused? | **Decided (#335): A.** Options: **A. Only mute**: a real break / B. Read-only peek at own sheet and log / C. Minimise the card to see the map | no (decided) | FR-SHELL-128 |
+| OQ-SHELL-70 | Where is input blocked? | **Decided (#335): A.** Options: **A. Client only (`inert`)**: no core change / B. Also the server (`conflict "Paused"`; a live-sync core edit) | no (decided) | FR-SHELL-128 |
+| OQ-SHELL-71 | Rolls, toasts, alerts while paused | **Decided (#335): A.** Options: **A. Suppressed, caught up at resume** / B. Shown over the card | no (decided) | FR-SHELL-127 |
+| OQ-SHELL-72 | Which alerts get a DM sound? | **Decided (#335): A.** Options: **A. Turn, request, pause, resume** / B. + every pending-action toast / C. Turn only | no (decided) | FR-SHELL-130 |
+
+- *(Sprint 8)* Players see only the card (centred column, shadcn); the DM the top-bar control. Test IDs `ui-pause` (+ `data-state`), `ui-pause-{message,image,countdown,mute}`, DM `ui-pause-{open,form,submit,update,resume,preview}`, `ui-sound-test-key`. No SHELL record (draft and buffers client-only). Edges: disconnect → "Reconnecting…"; DM offline → still paused; devtools can clear `inert` (accepted). Slices TT3, TT4 ([dice-extras §14](dice-extras.md#14-dependencies)).
 
 **Sprint 8, track CB** (owner spec-cb). **Bold** = suggested pick.
 
