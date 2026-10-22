@@ -1,4 +1,5 @@
 // REST for assets-pipeline (ASSET §9, protocol §13–14). Mounted at /api.
+import { AssetKind } from "@shared/assets-pipeline/audio";
 import {
   AssetFile,
   AssetId,
@@ -97,6 +98,15 @@ export function assetRoutes(s: Services) {
               400,
             );
           }
+          const kind = form.kind === undefined ? undefined : AssetKind.safeParse(form.kind);
+          if (kind && !kind.success) {
+            return c.json(
+              errorBody("invalid", "Invalid kind", [
+                { path: ["kind"], message: 'Expected "image" or "audio"' },
+              ]),
+              400,
+            );
+          }
           const tags = parseTags(form.tags);
           if (tags === null) {
             return c.json(
@@ -123,6 +133,7 @@ export function assetRoutes(s: Services) {
               bytes: new Uint8Array(await file.arrayBuffer()),
               filename: file.name,
               ...(name !== undefined ? { name } : {}),
+              ...(kind ? { kind: kind.data } : {}),
             });
             const r = s.commands.run(
               INGEST,
@@ -145,6 +156,33 @@ export function assetRoutes(s: Services) {
           }
         },
       )
+      // FR-ASSET-56 (sprint 8): a sound's original, no credential (the ID is the capability), iff
+      // in the active campaign and of kind audio; any mismatch → the common 404. Players learn
+      // a sound's ID only as a pick in `campaign.alertSounds` (FR-ASSET-57).
+      .get("/assets/:id/audio", (c) => {
+        const id = AssetId.safeParse(c.req.param("id"));
+        if (!id.success) return c.json(NOT_FOUND_BODY, 404);
+        const row = s.db
+          .select({ hash: asset.hash, mime: asset.mime })
+          .from(asset)
+          .innerJoin(campaign, eq(asset.campaignId, campaign.id))
+          .where(and(eq(asset.id, id.data), eq(campaign.active, true), eq(asset.kind, "audio")))
+          .get();
+        if (!row || !store.isComplete(row.hash, "audio")) return c.json(NOT_FOUND_BODY, 404);
+        const etag = `"${id.data}-audio"`;
+        const headers = {
+          "Cache-Control": CACHE_CONTROL,
+          ETag: etag,
+          "X-Content-Type-Options": "nosniff",
+        };
+        if (etagMatches(c.req.header("if-none-match"), etag)) {
+          return c.body(null, 304, headers);
+        }
+        return new Response(Bun.file(store.originalPath(row.hash)), {
+          status: 200,
+          headers: { ...headers, "Content-Type": row.mime },
+        });
+      })
       // FR-ASSET-11/-13/-14: no credential; the ID is the capability. Served iff the asset
       // exists and belongs to the active campaign. `id` / `file` never reach a path.
       .get("/assets/:id/:file", (c) => {

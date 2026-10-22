@@ -15,7 +15,7 @@ import { toCampaignRecord } from "./records";
 export const SET_FEATURE_INTENT = "camp.setFeature";
 
 /** The actor's campaign row (WS: the connection's; REST / system: the active one). */
-function actorCampaign(env: Pick<CommandEnv, "tx" | "actor">) {
+export function actorCampaign(env: Pick<CommandEnv, "tx" | "actor">) {
   const id = env.actor.campaignId;
   return id === null
     ? activeCampaign(env.tx)

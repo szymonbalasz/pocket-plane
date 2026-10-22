@@ -39,3 +39,20 @@ export type AlertSounds = z.infer<typeof AlertSounds>;
 /** True when no alert has a pick (the stored `{}`; no wire key). */
 export const noAlertSounds = (s: AlertSounds): boolean =>
   ALERT_KEYS.every((k) => s[k] === undefined);
+
+/** FR-CAMP-48: `camp.setAlertSound`; `default` removes the key, `none` silences the alert. */
+export const SetAlertSoundInput = z.strictObject({
+  alert: AlertKey,
+  sound: z.union([z.literal("default"), AlertSoundPick]),
+});
+export type SetAlertSoundInput = z.infer<typeof SetAlertSoundInput>;
+
+export const SET_ALERT_SOUND_INTENT = "camp.setAlertSound";
+
+/** FR-SHELL-130 / OQ-CAMP-36 A: what an absent key plays (turn, request ping; pause, resume none). */
+export const ALERT_DEFAULTS: Record<AlertKey, "ping" | "none"> = {
+  turn: "ping",
+  request: "ping",
+  pause: "none",
+  resume: "none",
+};

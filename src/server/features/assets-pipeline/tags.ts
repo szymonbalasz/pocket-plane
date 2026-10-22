@@ -117,10 +117,11 @@ export const setTags = defineCommand({
   input: SetTagsIntent,
   execute({ assetId, tags }, { tx, actor, emit }): void {
     const campaignId = campaignOf(actor);
+    // FR-ASSET-60 (sprint 8): a sound has no tags; it answers as an unknown asset.
     const row = tx
       .select()
       .from(asset)
-      .where(and(eq(asset.id, assetId), eq(asset.campaignId, campaignId)))
+      .where(and(eq(asset.id, assetId), eq(asset.campaignId, campaignId), eq(asset.kind, "image")))
       .get();
     if (!row) throw notFound("Asset not found");
     const all = campaignTagSpellings(tx, campaignId);

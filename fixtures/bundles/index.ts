@@ -1,5 +1,7 @@
 // Bundle registry. Append-only (AGENTS §9.9): add your own lines.
 import type { Bundle } from "@server/features/fixtures-adapters/fixture-types";
+import alertSounds from "./alert-sounds";
+import alertSoundsE2e from "./alert-sounds-e2e";
 import assetAccess from "./asset-access";
 import assetLibrary from "./asset-library";
 import base from "./base";
@@ -174,6 +176,9 @@ export const bundles: readonly Bundle[] = [
   statsWindowE2e,
   // Sprint 8 track TT (fix/tt-core): the sprint-8 gate bundle, each track appends its units
   sessionSim12,
+  // Sprint 8 track TT (build/tt-sounds): alert sounds
+  alertSounds,
+  alertSoundsE2e,
   // Sprint 8 track CB (fix/cb-core)
   combatPolish,
   cbReorderE2e,
