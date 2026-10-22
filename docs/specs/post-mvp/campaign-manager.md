@@ -1,9 +1,9 @@
 ---
 title: Campaign manager
 prefix: CMGR
-status: stub
-owner: —
-phase: post-mvp
+status: claimed
+owner: spec-sp
+phase: post-mvp-9
 ---
 
 # Campaign manager (post-MVP stub)
