@@ -2333,3 +2333,17 @@ From [dice-extras](../specs/dice-extras.md#8-data-model) §8 sprint 8, [assets-p
 - **Persisted runtime state:** the two tables and four columns.
 - **Fixtures:** bundle `session-sim-12` (empty sprint-8 section); TT units `dicex-macros` (TT1), `audio-chime`, `camp-alert-sounds` (TT3) join it later.
 - **CON-44:** see [protocol §135](../protocol/README.md#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0) (DM +203,534 B at the caps; players ≤ +39,461 B).
+
+## 107. Sprint 8: alert sounds (TT3)
+
+From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-52–60 and [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-48 (#334, #335). **Built by `build/tt-sounds`**; no schema change (TT0's columns). Protocol side: [protocol §136](../protocol/README.md#136-sprint-8-alert-sounds--audio-upload--probe-sound-picks-shell-playback-tt3).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| `asset` row, `kind = audio` | written by `assets.ingest` with a probed sound: `mime` sniffed, `bytes` ≤ 512 KB, `duration_ms` 1–5,000 (the probe's length, cross-checked against bytes ÷ bitrate / the pages, the larger counts beyond 20 %), `width` / `height` / `display_*` 0, `listed` true, `tags` `[]`; dedupe by (`campaign_id`, `hash`) as images; ≤ 50 per campaign, no delete | FR-ASSET-52–55, -58, -60 |
+| Asset dir `<hash>/original` | a sound's only file (no derivatives); same temp-dir write, fsync, rename and start-up sweep as images (the sweep checks the files of each row's kind) | FR-ASSET-54 |
+| `campaign.alert_sounds` | written only by `camp.setAlertSound`: `default` removes the key; values are audio asset IDs of the campaign or `none` | FR-CAMP-48 |
+| Client decode cache | per page, per asset ID (`AudioBuffer`), filled at idle from the picks; never persisted | FR-SHELL-131 |
+
+- **Derived:** what a key plays (pick, else turn / request ping, pause / resume silent).
+- **Fixtures:** `audio-chime` (asset "Chime", 17,684 B, 400 ms), `camp-alert-sounds` (`request`, `pause` → Chime); both in `session-sim-12`.
