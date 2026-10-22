@@ -2395,7 +2395,7 @@ From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../spe
 
 ## 111. Sprint 8: map refits after the placer (WF3)
 
-From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–98. **Built by `fix/wf-refits`**: no table, column, record type or payload change. Protocol side: [protocol §140](../protocol/README.md#140-sprint-8-map-refits-after-the-placer-wf3).
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–98. **Built by `fix/wf-refits`**: no table, column, record type or payload change. Protocol side: [protocol §141](../protocol/README.md#141-sprint-8-map-refits-after-the-placer-wf3).
 
 | Data | Where | Rule | Source |
 |---|---|---|---|

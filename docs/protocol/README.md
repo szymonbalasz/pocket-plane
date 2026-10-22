@@ -3319,7 +3319,7 @@ From [stats](../specs/stats.md#61-tier-b-sprint-8) FR-STATS-26, -29, -31–33, -
 
 ## 141. Sprint 8: map refits after the placer (WF3)
 
-From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–98 and [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-108's port (BL-65, sim-11 h / r03; #333, #335: OQ-SHELL-64 B, OQ-MAP-63 A). **Built by `fix/wf-refits`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B). Amends §131's load / open fit, resize refit and fit-past-toasts rows and §139's `ManagerContext` row ("WF3 wires it": wired). Data side: [data model §110](../data-model/README.md#110-sprint-8-map-refits-after-the-placer-wf3).
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-93–98 and [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-108's port (BL-65, sim-11 h / r03; #333, #335: OQ-SHELL-64 B, OQ-MAP-63 A). **Built by `fix/wf-refits`**: client only, no record type, intent, event, signal, frame or Konva layer (CON-44: 0 B). Amends §131's load / open fit, resize refit and fit-past-toasts rows and §139's `ManagerContext` row ("WF3 wires it": wired). Data side: [data model §111](../data-model/README.md#111-sprint-8-map-refits-after-the-placer-wf3).
 
 | Seam | Contract | FR |
 |---|---|---|
