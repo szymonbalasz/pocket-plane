@@ -626,8 +626,11 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     for (;;) {
       if (anyAt({ floor })) {
         const l1 = tryAt({ floor: size });
-        if (l1) return { rect: l1.rect, rung: "L1", pcClear: true };
-        const l2 = tryAt({ floor });
+        // Within L1–L2 the edge column ranks before the inward ones (FR-SHELL-45 (3), map-first
+        // #162): a full-size spot mid-map loses to the edge at a size down to useful.
+        const l2 = !l1 || l1.inward ? tryAt({ floor }) : null;
+        if (l1 && (!l1.inward || !l2 || l2.inward))
+          return { rect: l1.rect, rung: "L1", pcClear: true };
         if (l2) return { rect: l2.rect, rung: "L2", pcClear: true };
       } else if (o.squeeze && !squeezed) {
         // Once: after a put-away the restart only needs L1–L2 (the look-ahead found room).

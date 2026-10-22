@@ -137,7 +137,7 @@ test("FR-SHELL-80 FR-SHELL-83 player 2 1280×800: Reset layout → the sheet 948
   await p1.getByTestId("ui-launcher-menu").click();
   await p1.getByTestId("ui-launcher-reset").click();
   const sheet = shellWindow(p1, "char.sheet");
-  await expect(sheet).toHaveAttribute("data-placed", "default");
+  await expect(sheet).toHaveAttribute("data-placed", "zone"); // FR-SHELL-110 (sprint 8)
   const box = await sheet.boundingBox();
   expect(box && [box.x, box.y, box.width, box.height].map(Math.round)).toEqual([948, 60, 320, 418]);
   await expect(canvas).toHaveAttribute("data-fit-reason", "fit"); // the one Fit after the reset

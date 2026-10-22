@@ -185,6 +185,8 @@ export interface Placement {
   clear: boolean;
   /** Covers no PC footprint + 4 px (FR-SHELL-57, rank (2)). */
   pcClear: boolean;
+  /** An inward column (beside a window, region or token), not the edge one (rank (3), #162). */
+  inward?: true;
 }
 
 /**
@@ -520,7 +522,12 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   }
   const chosen = best as { rect: Rect; rank: number[] } | null;
   if (!chosen) return { rect: base, clear: true, pcClear: pcClear(base, input.tokens ?? []) };
-  return { rect: chosen.rect, clear: chosen.rank[0] === 0, pcClear: chosen.rank[5] === 0 };
+  return {
+    rect: chosen.rect,
+    clear: chosen.rank[0] === 0,
+    pcClear: chosen.rank[5] === 0,
+    ...(chosen.rank[9] === 1 && { inward: true as const }),
+  };
 }
 
 /** `a` < `b` lexicographically over the first `n` fields (default: all of `a`). */

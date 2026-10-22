@@ -59,7 +59,7 @@ test("FR-SHELL-85 FR-SHELL-100 size table (player, shape only): every registered
   ).toEqual([]);
 });
 
-test("FR-SHELL-79 FR-SHELL-97 useful size before shrinking (player): note.history at 1440×900 opens at its full 480 (L1: a spot at its target size comes first); the companion card at 1280×800 with Compendium open auto-minimises it and opens 320×360 (sim-10 a03: 280×308)", () => {
+test("FR-SHELL-79 FR-SHELL-97 useful size before shrinking (player): note.history at 1440×900 opens at its full 480 (L1 at the 4-px retry, FR-SHELL-98, before shrinking); the companion card at 1280×800 with Compendium open auto-minimises it and opens 320×360 (sim-10 a03: 280×308)", () => {
   const ctx = (vp: { w: number; h: number }): ManagerContext => ({
     registry: playerWindows,
     viewport: vp,

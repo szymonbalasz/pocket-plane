@@ -24,8 +24,8 @@ test("FR-NOTE-31 history geometry: player def is 360×480, min 280×240, unshrun
 
 // Sprint 5 (FR-NOTE-31 as amended, FR-SHELL-45): 480 high where a clear slot allows, else the
 // tallest clear slot, never over the Game log: 412 at 1280×720; with Initiative open (combat)
-// beside it. Sprint 8 (FR-SHELL-97 L1): at 1440×900 a 480-high slot beside the column comes
-// before the 472-high band above the 280-high log.
+// beside it. Sprint 8 (FR-SHELL-97 L1, -98): at 1440×900 the full 480 fits 4 px above the
+// 280-high log, before shrinking to the 472-high band.
 test("FR-NOTE-31 history geometry: opened on the default layout (player) it is 360 wide, 480 where a clear slot allows, else the tallest clear slot (412 at 1280×720), inside the work area", () => {
   for (const [viewport, h, combat] of [
     [{ w: 1440, h: 900 }, 480, true],
