@@ -63,6 +63,7 @@ export const stats: Feature = {
       onDropAll: (campaignId) => {
         setTimeout(() => void partials.build(campaignId), 0);
       },
+      onError: (err) => s.log.debug(`stats partials build stopped: ${(err as Error).message}`),
     });
     memory.set(s, { cache, gate, partials });
     const { query, showAwards } = statsCommands(cache, gate, partials);

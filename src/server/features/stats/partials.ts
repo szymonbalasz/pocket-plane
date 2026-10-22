@@ -118,6 +118,11 @@ export interface BuildEnv {
   characters(campaignId: string): ReadonlyMap<string, StatsCharacter>;
   /** Called after a drop-all (the owner schedules a rebuild). */
   onDropAll?(campaignId: string): void;
+  /**
+   * A background build failed (e.g. the server stopped and closed its DB mid-build): the build
+   * stops; built partials stay, the rest is read on demand or rebuilt after the next drop-all.
+   */
+  onError?(err: unknown): void;
 }
 
 export class Partials {
@@ -168,7 +173,9 @@ export class Partials {
   build(campaignId: string): Promise<void> {
     const running = this.running.get(campaignId);
     if (running) return running;
-    const p = this.run(campaignId).finally(() => this.running.delete(campaignId));
+    const p = this.run(campaignId)
+      .catch((err) => this.env.onError?.(err))
+      .finally(() => this.running.delete(campaignId));
     this.running.set(campaignId, p);
     return p;
   }

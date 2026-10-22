@@ -26,7 +26,7 @@ import { campaignFeatures, SET_FEATURE_INTENT } from "../campaign-management/fea
 import { ROLL } from "../dice-roll-log/commands";
 import { rollFacts } from "../dice-roll-log/stats-read";
 import { characters, fightsFor, type StatsRead } from "./compute";
-import { computePartials } from "./partials";
+import { computePartials, Partials } from "./partials";
 import { statsSetup } from "./testing";
 
 type T = ReturnType<typeof statsSetup>;
@@ -372,6 +372,27 @@ describe("FR-STATS-46 session partials", () => {
     const l = await campaignLuck(t);
     expect(t.memory().partials.computed).toBe(before);
     expect(l.rows).toEqual(cold(t, "dm").luck);
+  });
+});
+
+describe("FR-STATS-46 background build failures", () => {
+  test("FR-STATS-46 a build whose DB closed mid-way stops quietly (no unhandled rejection)", async () => {
+    const t = statsSetup();
+    const errors: unknown[] = [];
+    const p = new Partials({
+      db: t.s.db,
+      sessions: () => {
+        throw new RangeError("Cannot use a closed database");
+      },
+      reads: () => [
+        { db: t.s.db, viewer: { role: "dm", features: [] }, campaignId: t.h.campaignId },
+      ],
+      characters: () => new Map(),
+      onError: (err) => errors.push(err),
+    });
+    await p.build(t.h.campaignId);
+    expect(errors).toHaveLength(1);
+    expect(p.isBuilding(t.h.campaignId)).toBe(false);
   });
 });
 
