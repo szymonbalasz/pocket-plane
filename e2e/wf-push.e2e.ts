@@ -7,7 +7,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { footprintsOf } from "./support/canvas";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { showToPlayers } from "./support/scenes";
-import { openWindow, shellWindow } from "./support/shell";
+import { openWindow } from "./support/shell";
 
 interface Box {
   x: number;
