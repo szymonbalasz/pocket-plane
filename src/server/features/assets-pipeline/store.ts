@@ -1,5 +1,6 @@
 // Asset file store (FR-ASSET-04, -07): one file set per hash under PP_ASSET_DIR,
-// `<hash>/{original, display.webp, thumb.webp}`; temp dir + rename; start-up sweep.
+// `<hash>/{original, display.webp, thumb.webp}`; temp dir + rename; start-up sweep. *(Sprint 8)*
+// A sound's set is `<hash>/original` only (FR-ASSET-54); same write order, fsync and sweep.
 import {
   closeSync,
   existsSync,
@@ -12,6 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import path from "node:path";
+import type { AssetKind } from "@shared/assets-pipeline/audio";
 import type { AssetFile } from "@shared/assets-pipeline/schemas";
 import { crashPoint } from "../../commands/crash";
 import type { Db } from "../../db/client";
@@ -25,7 +27,10 @@ const HASH = /^[0-9a-f]{64}$/;
 const TMP = ".tmp";
 /** Marker file: the id of the DB this asset dir belongs to (#163). */
 export const DB_MARKER = ".pocket-plane-db";
-const FILES = ["original", "display.webp", "thumb.webp"] as const;
+const FILES: Record<AssetKind, readonly string[]> = {
+  image: ["original", "display.webp", "thumb.webp"],
+  audio: ["original"],
+};
 const SERVED: Record<AssetFile, string> = { display: "display.webp", thumb: "thumb.webp" };
 
 /** Write + fsync (#163): the files are on disk before the row that points at them commits. */
@@ -97,10 +102,15 @@ export class AssetStore {
     return path.join(this.hashDir(hash), SERVED[file]);
   }
 
+  /** A sound's stored file (FR-ASSET-56); `hash` is from the DB. */
+  originalPath(hash: string): string {
+    return path.join(this.hashDir(hash), "original");
+  }
+
   /** FR-ASSET-07: an asset missing any file serves none of them. */
-  isComplete(hash: string): boolean {
+  isComplete(hash: string, kind: AssetKind = "image"): boolean {
     const dir = this.hashDir(hash);
-    return FILES.every((f) => existsSync(path.join(dir, f)));
+    return FILES[kind].every((f) => existsSync(path.join(dir, f)));
   }
 
   /**
@@ -108,14 +118,25 @@ export class AssetStore {
    * reused untouched. Synchronous: runs inside the ingest transaction, before the row insert.
    */
   ensureFiles(img: ProcessedImage): void {
-    const target = this.hashDir(img.hash);
+    this.writeSet(img.hash, {
+      original: img.original,
+      "display.webp": img.display.data,
+      "thumb.webp": img.thumb.data,
+    });
+  }
+
+  /** FR-ASSET-54: a sound's set, `<hash>/original` only; otherwise as `ensureFiles`. */
+  ensureAudioFiles(hash: string, original: Uint8Array): void {
+    this.writeSet(hash, { original });
+  }
+
+  private writeSet(hash: string, files: Record<string, Uint8Array>): void {
+    const target = this.hashDir(hash);
     if (!existsSync(target)) {
-      const tmp = path.join(this.dir, TMP, img.hash);
+      const tmp = path.join(this.dir, TMP, hash);
       rmSync(tmp, { recursive: true, force: true });
       mkdirSync(tmp, { recursive: true });
-      writeDurable(path.join(tmp, "original"), img.original);
-      writeDurable(path.join(tmp, "display.webp"), img.display.data);
-      writeDurable(path.join(tmp, "thumb.webp"), img.thumb.data);
+      for (const [name, data] of Object.entries(files)) writeDurable(path.join(tmp, name), data);
       fsyncDir(tmp);
       renameRetrying(tmp, target);
       // The rename itself: the hash dir and its entry in the asset dir (#163).
@@ -135,6 +156,14 @@ export class AssetStore {
     rmSync(this.hashDir(img.hash), { recursive: true, force: true });
     this.ensureFiles(img);
     this.log.warn(`asset store: rewrote the missing files for hash ${img.hash}`);
+  }
+
+  /** `repairFiles` for a sound (FR-ASSET-54). */
+  repairAudioFiles(hash: string, original: Uint8Array): void {
+    if (this.isComplete(hash, "audio")) return;
+    rmSync(this.hashDir(hash), { recursive: true, force: true });
+    this.ensureAudioFiles(hash, original);
+    this.log.warn(`asset store: rewrote the missing files for hash ${hash}`);
   }
 
   /**
@@ -163,7 +192,7 @@ export class AssetStore {
       return { removed: [], missing: [], skipped: true };
     }
     rmSync(path.join(this.dir, TMP), { recursive: true, force: true });
-    const rows = db.select({ id: asset.id, hash: asset.hash }).from(asset).all();
+    const rows = db.select({ id: asset.id, hash: asset.hash, kind: asset.kind }).from(asset).all();
     const referenced = new Set(rows.map((r) => r.hash));
     const removed: string[] = [];
     for (const e of readdirSync(this.dir, { withFileTypes: true })) {
@@ -173,7 +202,7 @@ export class AssetStore {
     }
     const missing: string[] = [];
     for (const r of rows) {
-      const lost = FILES.filter((f) => !existsSync(path.join(this.dir, r.hash, f)));
+      const lost = FILES[r.kind].filter((f) => !existsSync(path.join(this.dir, r.hash, f)));
       if (lost.length > 0) {
         missing.push(r.id);
         // The asset ID is a capability: log the hash, never the ID (FR-ASSET-12).
