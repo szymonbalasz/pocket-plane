@@ -2380,7 +2380,7 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0
 
 ## 110. Sprint 8: stats tier B core (SB0)
 
-From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../specs/combat-tracker.md#67-sprint-8-kill-flag-and-the-end-summary) FR-CBT-152, -153 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (#334, #335; [ADR-0062](../architecture/adr/0062-stats-session-partials.md)). **Built by `build/sb-core`**. Protocol side: [protocol §138](../protocol/README.md#138-sprint-8-stats-tier-b-core--fell-lines-fight-summary-highlights-luck-trophies-session-partials-sb0). **No table, column or record type.**
+From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../specs/combat-tracker.md#67-sprint-8-kill-flag-and-the-end-summary) FR-CBT-152, -153 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (#334, #335; [ADR-0062](../architecture/adr/0062-stats-session-partials.md)). **Built by `build/sb-core`**. Protocol side: [protocol §140](../protocol/README.md#140-sprint-8-stats-tier-b-core--fell-lines-fight-summary-highlights-luck-trophies-session-partials-sb0). **No table, column or record type.**
 
 | Field / table | Change | Rule | Source |
 |---|---|---|---|
