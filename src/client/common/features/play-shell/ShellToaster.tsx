@@ -1,7 +1,9 @@
-// The client's one sonner Toaster (FR-SHELL-01): alert Toasts and every other `toast()` share it.
-// It follows the notifications stack's height so the two stack in one region. The region's third
-// stack, the roll popups (FR-DICEX-39, seams S7), mounts here beyond both: the dice-extras runtime
-// portals its stack into `useRollPopupMount()`'s element.
+// The client's toast region (FR-SHELL-01). *(Sprint 8, FR-NOTE-50)* One stack per client: while
+// the notifications runtime is mounted (the play shell) it claims the region (`claimToastStack`)
+// and shows every `toast()` (alert Toasts, errors) as its alert class; sonner's own Toaster
+// renders only while nothing claims it (before the shell: campaign load, DM login), following the
+// notifications stack's height. The region's roll popups (FR-DICEX-39, seams S7) mount here
+// beyond the stack: the dice-extras runtime portals them into `useRollPopupMount()`'s element.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Toaster } from "sonner";
 import { useViewport } from "./hooks";
@@ -90,6 +92,34 @@ function useSonnerHeight(): number {
   return h;
 }
 
+// ---- FR-NOTE-50: the one stack claims the region ----
+
+let claims = 0;
+const claimListeners = new Set<() => void>();
+const subscribeClaims = (fn: () => void) => {
+  claimListeners.add(fn);
+  return () => {
+    claimListeners.delete(fn);
+  };
+};
+const claimed = () => claims > 0;
+
+/**
+ * The notifications runtime claims the toast region while mounted: sonner's Toaster steps aside
+ * and every `toast()` shows in the one stack. Returns the release.
+ */
+export function claimToastStack(): () => void {
+  claims += 1;
+  for (const fn of [...claimListeners]) fn();
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    claims -= 1;
+    for (const fn of [...claimListeners]) fn();
+  };
+}
+
 // The mount element, for the roll-popup stack's portal.
 let mount: HTMLElement | null = null;
 const listeners = new Set<() => void>();
@@ -117,7 +147,10 @@ export function useRollPopupMount(): HTMLElement | null {
 export function ShellToaster({ client }: { client: ShellClient }) {
   const noteH = useElementHeight(NOTE_STACK_SELECTOR);
   const region = toastRegion(client, noteH);
-  const popups = popupRegion(client, noteH, useSonnerHeight());
+  const stackOwned = useSyncExternalStore(subscribeClaims, claimed, claimed);
+  const sonnerH = useSonnerHeight();
+  // FR-NOTE-50: with the one stack mounted, alerts are inside it (`noteH`).
+  const popups = popupRegion(client, noteH, stackOwned ? 0 : sonnerH);
   const box = toastKeepOut(client, useViewport());
   const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
   const stack = shownStack(client, reports);
@@ -138,12 +171,14 @@ export function ShellToaster({ client }: { client: ShellClient }) {
         className="pointer-events-none fixed"
         style={{ left: box.x, top: box.y, width: box.w, height: box.h }}
       />
-      <Toaster
-        theme="dark"
-        position={region.position}
-        offset={region.offset}
-        mobileOffset={region.offset}
-      />
+      {!stackOwned && (
+        <Toaster
+          theme="dark"
+          position={region.position}
+          offset={region.offset}
+          mobileOffset={region.offset}
+        />
+      )}
       {/* DM: a full-width row at the stack's top (the stack centres and keeps clear of
           Initiative itself); player: the bottom-right column. */}
       <div

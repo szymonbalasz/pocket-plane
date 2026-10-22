@@ -2378,9 +2378,44 @@ From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0
 - **Persisted runtime state:** `userSize` in the layout entry (0 B on the wire).
 - **CON-44:** 0 B.
 
-## 110. Sprint 8: pause screen (TT4)
+## 110. Sprint 8: stats tier B core (SB0)
 
-From [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-46, -47 and [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-125–129, -136 (#334, #335). **Built by `build/tt-pause`**; no schema change (TT0's `campaign.pause`). Protocol side: [protocol §140](../protocol/README.md#140-sprint-8-pause-screen--camppause--campresume-the-card-the-dm-control-tt4).
+From [stats](../specs/stats.md#8-data-model) (sprint 8), [combat-tracker](../specs/combat-tracker.md#67-sprint-8-kill-flag-and-the-end-summary) FR-CBT-152, -153 and [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-68 (#334, #335; [ADR-0062](../architecture/adr/0062-stats-session-partials.md)). **Built by `build/sb-core`**. Protocol side: [protocol §140](../protocol/README.md#140-sprint-8-stats-tier-b-core--fell-lines-fight-summary-highlights-luck-trophies-session-partials-sb0). **No table, column or record type.**
+
+| Field / table | Change | Rule | Source |
+|---|---|---|---|
+| `game_log_entry.payload` (`cbt.attack`, `cbt.hp`) | + `fell?: "kill" \| "down"` | stamped at apply beside `callout`; undo strikes the line, the flag stays; old rows parse | FR-CBT-152 |
+| `notification` (kind `stats-fight-summary`) | new kind, payload `{encounterId}` | made only by the `ended` rule hook in `cbt.end`; audience `all` / `dm` per FR-STATS-33 | FR-NOTE-68 |
+
+- **Read (contract):** `roll.dice` (every die, kept and dropped) and `roll.manual` keep their meaning (FR-DICE-90); `encounter.startedAt` / `endedAt` bound a fight's rolls by `n` (FR-STATS-32).
+- **Derived (not stored):** Highlights, luck rows, trophy cases, the fight's `n` span; a line's kill / down for stats from the same `fellOf` rule over current sides (current owner, FR-STATS-09).
+- **Persisted runtime state:** none. Server memory only (ADR-0062): per-session partials per (campaign, role + features), built at server start after the session warm in yielding 5-session chunks, dropped per touched session (entries / facts by `n`) or all (a combatant's owner / kind, the campaign's features), rebuilt in the background.
+- **Fixtures:** `sb-fight-facts` (4 Bandits + the hidden Bandit Captain on the Goblin Ambush; 6 facts, one undone; `stats-b`), `sb-past-bandits` (session-sim-12: an ended "Bandit Camp" before the Ambush, 4 facts, the Captain's token deleted), `sb-luck-rolls` (8 physical rolls), `sb-luck-reroll` (Mira's Perception 4 → 17); expected numbers in `fixtures/units/stats/stats.fixtures.test.ts` and `fixtures/bundles/session-sim-12.fixtures.test.ts`.
+- **CON-44** (heavy harness, measured): 15 B a flagged line; +45 B per viewer (3 in the window), worst +1.5 KB (all 100); summary rows inside the closed window: no growth. DM 690,797 B of 1.5 MiB; players ≤ 289,129 B of 512 KiB.
+
+## 111. Sprint 8: toast policy (WF4)
+
+From [notifications](../specs/notifications.md#8-data-model) FR-NOTE-50–53 (#333, #335). **Built by `fix/wf-sizes-toasts`**. Protocol side: [protocol §141](../protocol/README.md#141-sprint-8-one-toast-policy-stats-and-companion-card-useful-sizes-wf4). **No table, column, record type or wire field.**
+
+- **Registries (code, not stored):** server kind def and client view gain `toastClass` (`card` | `alert` | `info`), named on every registry line.
+- **Client memory (per page, never sent or stored):** each notification toast's class (`cls`); the one callout `{id, content, remaining}` (cleared on a campaign switch).
+- **Derived:** a row's toast class (pending → card, else the kind's alert, else info); what the stack shows (order and the "+N more" count).
+
+## 112. Sprint 8: tool-bar pushes through the ladder, rail inset (WF2)
+
+From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-104–106, -109. **Built by `fix/wf-push-rail`.** Browser-only; nothing on the wire.
+
+| Data | Where | Rule | Source |
+|---|---|---|---|
+| Displacement memory, cause `toolbar:<id>` | client memory (`ShellState.memory`) | `<id>` = the hard keep-out that pushed (a tool bar, a chrome keep-out); a push keeps the first pre-push rect across re-selects and tool swaps; a drag-end push keeps the dropped rect with `userSpot` (it returns there) | [FR-SHELL-104](../specs/play-shell.md#6-functional-requirements), [FR-SHELL-105](../specs/play-shell.md#6-functional-requirements) |
+| Rendered x | derived (render clamp) | ≥ 68 unless parked (stored x < 0); never written back | [FR-SHELL-109](../specs/play-shell.md#6-functional-requirements) |
+
+- **Fixtures:** no new unit; e2e on `wf-frame-e2e`.
+- **CON-44:** 0 B.
+
+## 113. Sprint 8: pause screen (TT4)
+
+From [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-46, -47 and [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-125–129, -136 (#334, #335). **Built by `build/tt-pause`**; no schema change (TT0's `campaign.pause`). Protocol side: [protocol §143](../protocol/README.md#143-sprint-8-pause-screen--camppause--campresume-the-card-the-dm-control-tt4).
 
 | Field / store | Rule | Source |
 |---|---|---|

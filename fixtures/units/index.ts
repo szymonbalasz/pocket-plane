@@ -111,6 +111,10 @@ import mtCrowd from "./scenes-map/mt-crowd";
 import scenesExtras from "./scenes-map/scenes-extras";
 import thornTown from "./scenes-map/thorn-town";
 import town from "./scenes-map/town";
+import sbFightFacts from "./stats/sb-fight-facts";
+import sbLuckReroll from "./stats/sb-luck-reroll";
+import sbLuckRolls from "./stats/sb-luck-rolls";
+import sbPastBandits from "./stats/sb-past-bandits";
 import stAmbushFacts from "./stats/st-ambush-facts";
 import stPastCrypt from "./stats/st-past-crypt";
 
@@ -229,6 +233,11 @@ export const units: readonly Fixture[] = [
   // Sprint 7 track ST (fix/st-core): stats facts
   stPastCrypt,
   stAmbushFacts,
+  // Sprint 8 track SB (build/sb-core): tier-B stats facts
+  sbFightFacts,
+  sbLuckRolls,
+  sbLuckReroll,
+  sbPastBandits,
   // Sprint 8 track TT (build/tt-sounds): the Chime sound + the DM's picks
   audioChime,
   campAlertSounds,

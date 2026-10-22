@@ -273,9 +273,12 @@ describe("FR-STATS-19 session cards", () => {
     expect(count(html, "stats-award-winner")).toBe(2);
     expect(html.split(">—<").length - 1).toBe(7);
     expect(html).toContain('data-testid="stats-session-picker"');
-    // FR-STATS-19: 3 columns, 1 when narrow (a container query on the window body).
+    // FR-STATS-67 (amends FR-STATS-19's columns): a container query on the board (the window
+    // body less its 24 px padding): 3 ≥ 600 px of body, 2 ≥ 380, else 1; text wraps, never cut.
     expect(html).toContain("grid-cols-1");
-    expect(html).toContain("@min-[372px]:grid-cols-3");
+    expect(html).toContain("@min-[356px]:grid-cols-2");
+    expect(html).toContain("@min-[576px]:grid-cols-3");
+    expect(html).not.toMatch(/data-testid="stats-award[a-z-]*"[^>]*class="[^"]*truncate/);
   });
 
   test("FR-STATS-19 DM-only button: Show awards for the DM (on when a session shows), never for a player", () => {

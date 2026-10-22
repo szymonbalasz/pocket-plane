@@ -38,7 +38,7 @@ import {
   HpApplied,
   type HpChangeFacts,
 } from "@shared/events/combat-tracker";
-import { isOverkillCallout } from "@shared/stats/callout";
+import { fellOf, isOverkillCallout } from "@shared/stats/callout";
 import { and, desc, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
@@ -360,6 +360,8 @@ export const applyCardWith = (hooks: ApplyHooks) =>
         const overkill = Math.max(0, raw - hp.absorbed - hp.hpBefore);
         // FR-CBT-137 (FR-STATS-21): the callout flag, for everyone; the amount stays `dmPayload`'s.
         const callout = isOverkillCallout({ ...hp, overkill });
+        // FR-CBT-152 (FR-STATS-26): the kill-feed flag, beside the callout.
+        const fell = fellOf(target, hp);
         // FR-CBT-91: a ruled card's lines are damage-only (Apply hit wrote the to-hit lines).
         const lineToHit =
           !ruling && toHitRoll && p.toHit && toHitTotal !== undefined
@@ -385,6 +387,7 @@ export const applyCardWith = (hooks: ApplyHooks) =>
           manual,
           ...(hooked.parts.length ? { parts: hooked.parts } : {}),
           ...(callout ? { callout: "overkill" as const } : {}),
+          ...(fell ? { fell } : {}),
           // FR-CBT-84: the extra parts after their multiplier (public, like the damage).
           ...(hit && parts.length
             ? {
@@ -532,6 +535,8 @@ export const applyHp = defineCommand({
       input.kind === "damage" ? Math.max(0, input.amount - hp.absorbed - hp.hpBefore) : 0;
     // FR-CBT-137: direct damage stamps the callout too (amount DM-only).
     const callout = input.kind === "damage" && isOverkillCallout({ ...hp, overkill });
+    // FR-CBT-152: direct damage stamps `fell` too.
+    const fell = input.kind === "damage" ? fellOf(target, hp) : null;
     const entry = gameLog.append(env, {
       kind: LOG_KIND_HP,
       category: input.kind === "damage" ? "damage" : "healing",
@@ -542,6 +547,7 @@ export const applyHp = defineCommand({
         amount: input.amount,
         ...(source ? { sourced: true as const } : {}),
         ...(callout ? { callout: "overkill" as const } : {}),
+        ...(fell ? { fell } : {}),
       },
       dmPayload: {
         applied,
