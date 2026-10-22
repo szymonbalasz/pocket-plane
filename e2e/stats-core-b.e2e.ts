@@ -95,7 +95,8 @@ test("FR-CBT-152 FR-CBT-153 FR-STATS-31 FR-STATS-33 FR-STATS-43 one kill toast e
   for (const log of [dmLog, p2Log]) {
     await expect(line(log, "Thorn → Bandit 4, 25 damage — Overkill!")).toHaveCount(1);
   }
-  for (const page of [dm, p2]) await expect(page.getByTestId("stats-overkill-toast")).toHaveCount(1);
+  for (const page of [dm, p2])
+    await expect(page.getByTestId("stats-overkill-toast")).toHaveCount(1);
   const fell = p2Frames.slice(from).join("\n");
   expect(fell).toContain('"fell":"kill"');
   expect(fell).not.toContain('"overkill":14');
