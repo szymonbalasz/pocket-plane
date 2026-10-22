@@ -119,9 +119,9 @@ describe("CB2 turn ring per viewer on combat-polish over WS", () => {
       { dm: Record<string, boolean>; p1: Record<string, boolean>; p2: Record<string, boolean> }
     >();
     // The fog-hidden Goblin loads Down (skipped); healed, it takes its turn (CB7).
-    const goblin = (Object.values(dm.store.records[COMBATANT_TYPE] ?? {}) as CombatantRecord[]).find(
-      (c) => c.name === "Goblin",
-    ) as CombatantRecord;
+    const goblin = (
+      Object.values(dm.store.records[COMBATANT_TYPE] ?? {}) as CombatantRecord[]
+    ).find((c) => c.name === "Goblin") as CombatantRecord;
     expect(goblin.hidden).toBe(true);
     await ok(dm, CBT_INTENTS.applyHp, { combatantId: goblin.id, kind: "heal", amount: 5 });
     await settle();
