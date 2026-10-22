@@ -2,7 +2,8 @@
 // Dialog "Campaign options — ‹campaign›" with one row per registered feature (label, description,
 // Switch). Turning a feature on sends `camp.setFeature` at once; turning it off asks once in the
 // row (`offConfirm` replaces the description, "Turn off" / "Cancel"). DM only; disabled unless
-// `live`. The server's resync after a switch keeps this Dialog open (FR-CAMP-40).
+// `live`. The server's resync after a switch keeps this Dialog open (FR-CAMP-40). *(Sprint 8)* The
+// "Alert sounds" section sits under the features (FR-CAMP-49, `AlertSoundsSection`).
 import { FEATURES, type FeatureDef, hasFeature } from "@shared/campaign-management/features";
 import type { CampaignRecord } from "@shared/campaign-management/schemas";
 import { Button } from "@ui/components/ui/button";
@@ -19,6 +20,7 @@ import { intentErrorText } from "@ui/features/character-sheet/routing";
 import { useSync } from "@ui/sync/store";
 import { Settings2Icon } from "lucide-react";
 import { useState } from "react";
+import { AlertSoundsSection } from "./AlertSoundsSection";
 
 export const SET_FEATURE_INTENT = "camp.setFeature";
 
@@ -137,7 +139,8 @@ export function FeatureRows() {
 
 /** FR-CAMP-42: the "Options" Button and its Dialog. */
 export function CampaignOptions() {
-  const name = useCampaign()?.name ?? "";
+  const campaign = useCampaign();
+  const name = campaign?.name ?? "";
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -151,12 +154,16 @@ export function CampaignOptions() {
           <Settings2Icon className="size-3" /> Options
         </Button>
       </DialogTrigger>
-      <DialogContent data-testid="camp-options" className="sm:max-w-md">
+      <DialogContent
+        data-testid="camp-options"
+        className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-md"
+      >
         <DialogHeader>
           <DialogTitle>Campaign options — {name}</DialogTitle>
           <DialogDescription>Optional features for this campaign only</DialogDescription>
         </DialogHeader>
         <FeatureRows />
+        <AlertSoundsSection picks={campaign?.alertSounds} />
       </DialogContent>
     </Dialog>
   );
