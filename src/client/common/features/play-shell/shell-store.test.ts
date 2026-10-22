@@ -32,24 +32,24 @@ function controller(entries: Record<string, string> = {}) {
   return createShellController({ registry, storage, viewport: () => vp });
 }
 
-test("FR-SHELL-40 data-placed: default layout default / auto, stored entry stored, move end stored, reset auto-placed again", () => {
+test("FR-SHELL-40 FR-SHELL-110 data-placed: the default layout's windows `zone`, move end stored, reset `zone` again, a reloaded protected window `zone`", () => {
   const c = controller();
   c.restore("k");
   const placed = () => Object.fromEntries(c.store.getState().placed);
-  // a.two's default rect is taken by a.one: auto placement chose another one.
-  expect(placed()).toEqual({ "a.one:main": "default", "a.two:main": "auto" });
+  // Both protected: the named default layout is their zone (FR-SHELL-99).
+  expect(placed()).toEqual({ "a.one:main": "zone", "a.two:main": "zone" });
   c.dispatch({ type: "setRect", kind: "a.one", rect: { x: 500, y: 300, w: 300, h: 200 } }, all);
   expect(placed()["a.one:main"]).toBe("stored");
-  expect(placed()["a.two:main"]).toBe("auto"); // untouched
+  expect(placed()["a.two:main"]).toBe("zone"); // untouched
   c.dispatch({ type: "reset" }, all);
-  expect(placed()).toEqual({ "a.one:main": "default", "a.two:main": "auto" });
+  expect(placed()).toEqual({ "a.one:main": "zone", "a.two:main": "zone" });
 
   const raw = JSON.stringify({ windows: c.store.getState().windows });
   const reloaded = controller({ k: raw });
   reloaded.restore("k");
   expect(Object.fromEntries(reloaded.store.getState().placed)).toEqual({
-    "a.one:main": "stored",
-    "a.two:main": "stored",
+    "a.one:main": "zone",
+    "a.two:main": "zone",
   });
 });
 
@@ -264,7 +264,7 @@ describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
     return { c, win, rect, storage };
   }
 
-  test("FR-SHELL-80 reset keeps the zones: the default layout written (its fitted default rects: `default`), other windows closed, fixedH cleared, one Fit requested", () => {
+  test("FR-SHELL-80 reset keeps the zones: the default layout written (`zone`, FR-SHELL-110), other windows closed, fixedH cleared, one Fit requested", () => {
     const fits = { n: 0 };
     const { c, win } = make(fits);
     c.dispatch({ type: "open", kind: "c.side" }, kinds);
@@ -279,14 +279,14 @@ describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
     expect(win("c.side")).toBeUndefined();
     expect(win("c.init")?.fixedH).toBeUndefined();
     expect(Object.fromEntries(c.store.getState().placed)).toEqual({
-      "c.log:main": "default",
-      "c.init:main": "default",
+      "c.log:main": "zone",
+      "c.init:main": "zone",
     });
     c.dispatch({ type: "open", kind: "c.side" }, kinds); // not a reset: no Fit
     expect(fits.n).toBe(1);
   });
 
-  test("FR-SHELL-81 pushed windows return: bar shown → Initiative pushed; bar gone → back at the pre-push rect, `returned`, userSpot restored; Fog → AoE switch → back to the pre-Fog rect; reload → no memory", () => {
+  test("FR-SHELL-81 FR-SHELL-102 pushed windows return: bar shown → Initiative pushed; bar gone → back at the pre-push rect, `returned`, userSpot restored; Fog → AoE switch → back to the pre-Fog rect; reload → no memory, the protected window at its zone (FR-SHELL-99)", () => {
     const { c, rect, win, storage } = make({ n: 0 });
     const home = rect("c.init");
     // The user's spot (userSpot), then the Fog bar pushes it.
@@ -302,16 +302,17 @@ describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
     expect(rect("c.init")).toEqual(home);
     expect(c.store.getState().placed.get("c.init:main")).toBe("returned");
     expect(win("c.init")?.userSpot).toBe(true);
-    expect(c.store.getState().prePush.size).toBe(0);
-    // Pushed, then the page reloads: the pushed rect is the stored one, nothing returns.
+    expect(c.store.getState().memory.length).toBe(0);
+    // Pushed, then the page reloads (no bar shown yet): no memory; the pushed shell spot is
+    // stored, and the load settle puts the protected window back in its zone.
     c.dispatch({ type: "push", rect: bar }, kinds);
-    const pushed = rect("c.init");
+    expect(rect("c.init")).not.toEqual(home);
     const reloaded = createShellController({ registry: reg, storage, viewport: () => wide });
     reloaded.restore("k");
-    expect(reloaded.store.getState().prePush.size).toBe(0);
+    expect(reloaded.store.getState().memory.length).toBe(0);
     reloaded.dispatch({ type: "return" }, kinds);
     const after = reloaded.store.getState().windows.find((w) => w.kind === "c.init");
-    expect(after && { x: after.x, y: after.y, w: after.w, h: after.h }).toEqual(pushed);
+    expect(after && { x: after.x, y: after.y, w: after.w, h: after.h }).toEqual(home);
   });
 
   test("FR-SHELL-81 a window moved or minimised while pushed drops out of the memory and stays", () => {
@@ -319,7 +320,7 @@ describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
     c.dispatch({ type: "push", rect: bar }, kinds);
     const at = rect("c.init") as Rect;
     c.dispatch({ type: "setRect", kind: "c.init", rect: { ...at, x: at.x + 30 } }, kinds);
-    expect(c.store.getState().prePush.has("c.init:main")).toBe(false);
+    expect(c.store.getState().memory.some((d) => d.kind === "c.init")).toBe(false);
     c.dispatch({ type: "return" }, kinds);
     expect(rect("c.init")?.x).toBe(at.x + 30);
   });

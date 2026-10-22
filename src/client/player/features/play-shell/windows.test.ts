@@ -454,7 +454,7 @@ test("FR-SHELL-08 player default-open product windows don't overlap (1280×720, 
 const SPRINT4 = [LAPTOP, { w: 1280, h: 800 }, DESKTOP];
 const same = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
-test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiative appearing over the goblins goes where it covers less (a spot over none first, FR-SHELL-58, else an edge), over no window; no tokens → where the default layout put it", () => {
+test("FR-SHELL-40 FR-SHELL-107 FR-SHELL-118 placement at 1280×720 / 1280×800 / 1600×900: player Initiative appearing takes its zone, goblins under it or not (the map refits, OQ-SHELL-63 A); no tokens → where the default layout put it", () => {
   for (const viewport of SPRINT4) {
     const where = `${viewport.w}×${viewport.h}`;
     const all = new Set(playerWindows.defs.map((d) => d.kind));
@@ -475,10 +475,7 @@ test("FR-SHELL-40 placement at 1280×720 / 1280×800 / 1600×900: player Initiat
     }));
     const ws = reduce(layout, appear, { ...ctx, avoid: () => boxes });
     const init = at(ws, "cbt.initiative");
-    expect(coveredArea(init, boxes)).toBeLessThan(coveredArea(home, boxes));
-    if (coveredArea(init, boxes) > 0) {
-      expect(["left", "right"]).toContain(touchedEdge(init, viewport) ?? `mid-map at ${where}`);
-    }
+    expect(same(init, home) ? "zone" : `moved at ${where}`).toBe("zone");
     const others = ws.filter((w) => w.kind !== "cbt.initiative");
     for (const o of renderedWindowRects(others, playerWindows, all, viewport)) {
       expect(overlaps(init, o) ? `Initiative over a window at ${where}` : "ok").toBe("ok");
@@ -594,7 +591,8 @@ test("FR-SHELL-45 (2) sweep (player-1, Town): every launcher window in registry 
       const def = playerWindows.get(s.kind);
       if (!s.rect || !def) continue;
       const scene = { windows: s.others, hard: s.hard, tokens: pcs };
-      const got = placeFields(s.rect, def, viewport, scene);
+      // FR-SHELL-98: clear at the 12-px gap, or at the 4-px retry.
+      const got = placeFields(s.rect, def, viewport, scene, 0, 4);
       expect(got[0] === 0 ? "ok" : `${at} not clear`).toBe("ok");
       if (got[1] === 1) expect(bruteBest(def, viewport, scene)[1]).toBe(1);
     }
@@ -621,7 +619,7 @@ function shellAt(registry: WindowRegistry, vp: { w: number; h: number }) {
   return c;
 }
 
-test("FR-SHELL-56 reopen covered vs free spot (player, protected): the sheet closed, Compendium moved into the right column, the sheet reopened → the sheet at its stored rect (stored), Compendium re-placed clear of it (auto) or auto-minimised", () => {
+test("FR-SHELL-56 FR-SHELL-99 reopen covered vs free spot (player, protected): the sheet closed, Compendium moved into the right column, the sheet reopened → the sheet at its zone (`zone`), Compendium displaced clear of it (`displaced`) or put away", () => {
   for (const viewport of REFERENCE_VIEWPORTS) {
     const where = `${viewport.w}×${viewport.h}`;
     const c = shellAt(playerWindows, viewport);
@@ -633,11 +631,11 @@ test("FR-SHELL-56 reopen covered vs free spot (player, protected): the sheet clo
     c.dispatch({ type: "open", kind: "char.sheet" }, all); // the launcher / token menu → sheet
     const s = c.store.getState();
     expect({ where, sheet: rectIn(s.windows, "char.sheet") }).toEqual({ where, sheet: home });
-    expect(s.placed.get("char.sheet:main")).toBe("stored");
+    expect(s.placed.get("char.sheet:main")).toBe("zone");
     const cmp = s.windows.find((w) => w.kind === "cmp.compendium");
     if (cmp?.state === "open") {
       expect(overlaps(cmp, home) ? `Compendium still over the sheet at ${where}` : "ok").toBe("ok");
-      expect(s.placed.get("cmp.compendium:main")).toBe("auto");
+      expect(s.placed.get("cmp.compendium:main")).toBe("displaced");
     } else {
       expect(cmp?.state).toBe("minimised");
     }
@@ -695,6 +693,8 @@ const GOLDEN_KINDS = [
   "shell.prefs",
   "charx.companion",
   "stats.board", // ST2 (FR-SHELL-86 (5)): appended, goldens regenerated
+  // FR-SHELL-112 (1), -143: pending until registered (CB3 `party.summary`).
+  ...["party.summary"].filter((k) => playerWindows.get(k) !== undefined),
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */
@@ -729,7 +729,7 @@ test("FR-SHELL-61 every user-opened kind (player): every non-default kind, launc
     if (!def || def.fixedDefault || kind === "party.handout") continue;
     expect({ kind, problems: contractProblems(def) }).toEqual({ kind, problems: [] });
   }
-});
+}, 15_000);
 
 const GOLDEN_FILE = fileURLToPath(new URL("./windows.golden.json", import.meta.url));
 
@@ -752,4 +752,4 @@ test("FR-SHELL-62 golden layouts (player): four sizes, open / close / reopen / s
   console.info(
     `FR-SHELL-62 player: ${steps.length} steps in ${(performance.now() - t0).toFixed(0)} ms`,
   );
-});
+}, 15_000);

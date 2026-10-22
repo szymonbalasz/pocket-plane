@@ -1627,6 +1627,8 @@ export const dmInitiativeWindow = defineWindow({
   // `session-sim` rows with no pending card, no scroll, at 1440×900 (FR-SHELL-32, G2).
   defaultSize: { w: 400, h: 500 },
   minSize: { w: 320, h: 240 },
+  // FR-SHELL-100: header, controls, 4 rows (play-shell §7 sprint-8 useful sizes).
+  usefulSize: { w: 400, h: 380 },
   defaultPosition: { anchor: "top-right" },
   // FR-CBT-77 (G4): height follows the rows until the DM resizes it (FR-SHELL-39); "new" dot
   // while minimised when the round or the turn changes (FR-SHELL-38, N1 = A, #190).

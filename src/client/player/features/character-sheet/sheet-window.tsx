@@ -8,6 +8,8 @@ export const playerCharSheetWindow = defineWindow({
   ...charSheetWindowBase,
   clients: ["player"],
   defaultPosition: { anchor: "top-right" },
+  // FR-SHELL-100: header, HP / AC, tabs, 3 attack rows + buttons (play-shell §7 sprint-8).
+  usefulSize: { w: 320, h: 338 },
   defaultOpen: true,
   launcher: { icon: UserRoundIcon, label: "Sheet", order: 50 },
   component: CharacterSheet,

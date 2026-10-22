@@ -3277,3 +3277,21 @@ No wire change: the drag and Move up / down send `cbtx.moveCombatant` ([§136](#
 | Players | unchanged: no grip, no items; rows re-sort by `playerPosition` | — | FR-CBTX-68 |
 
 - **Code:** `src/client/dm/features/combat-tracker/{reorder.ts (pure), reorder-drag.tsx, initiative-window.tsx}`, `src/client/dm/features/combat-extras/row.tsx` (`RowMoveItems`). E2E `e2e/cb-reorder.e2e.ts` on `cb-reorder-e2e` (after `cb-core.e2e.ts`, same server).
+
+## 139. Sprint 8: one window placer (WF1)
+
+From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-95–119, [ADR-0060](../architecture/adr/0060-one-window-placer.md). **Built by `fix/placer-core`.** No intent, event or record change: the shell is client-side (0 B).
+
+| Seam | Contract | Source |
+|---|---|---|
+| Placer (`play-shell/placer.ts`) | `settle(windows, trigger, ctx) → Plan {windows, memory, placed, pcClear, putAway, log, yields}`, pure. Triggers `load` (`drawn`: after the first token draw), `open` (`fresh`, `by`), `reopen`, `appear`, `settle`, `viewport`, `push`, `return`, `drag-end`, `reset`. The manager's `plan(ws, action, ctx)` / `reduce` call it for every action; close / minimise / focus move nothing (a close of a zone's or squeeze's cause returns what it displaced). `autoPlace`, `pushWindows`, `followDefaults`, `clearAround`, `followViewport` are gone | FR-SHELL-95 |
+| Ladder | L1 target size → L2 useful + the protected squeeze (Game log, then DM Initiative / player sheet, then player Initiative) → L2b map yields (players, `fitted`, `ctx.dryFit` ≥ 75 % of `ctx.lastFullCell`, ≥ 24 px) → L3 put away the LRU launcher window when the look-ahead helps → L4 below useful → L5 least PC area (`data-pc-clear` absent); each rung at 12 px, retried at 4 px; a window displaced for a transient cause that would land at L5 is put away instead | FR-SHELL-97, -98, -101, -108 |
+| Zones | protected windows without `userSpot` take their named default rect (`fitted` camera: always, the map refits; `moved`: iff PC-clear, else the ladder among the protected windows, a still-valid earlier spot kept); launcher windows over them, user spots included, are displaced (`window:<kind>`) and return when it closes or ends | FR-SHELL-99, -107 |
+| `ManagerContext` additions | `memory`, `camera` (`[data-testid=map-canvas]` `data-camera`), `dryFit` + `lastFullCell` (the canvas's base port: WF3 wires it), `settledViewport`, `autoMinimised` | FR-SHELL-96 |
+| Controller (`shell-store.ts`) | `setBlocked(b)`: while a `blocksInput` overlay is up, actions queue (one per window and action kind, last kept) and run in order when it goes; options `available`, `camera`, `dryFit`, `lastFullCell`, `onYield` | FR-SHELL-112 |
+| Page hooks (`ShellContext`, `PlayFrame`) | `viewport` settles 200 ms after the last resize; `load` again once the map's load fit drew tokens; a kind going unavailable dispatches `return`; chrome keep-outs showing / changing push, going return | FR-SHELL-95, -102, -113 |
+| Registries | `overlays.ts` `{id, clients, layer, blocksInput?(store), Component}` (layer above the alert flash, below the dice layer); `top-bar-items.ts` `{id, clients, width, order, Component}` (before the identity chip); `chrome-keep-outs.ts` `{id, clients, rect(vp, store) \| null, fitObstacle}` (hard keep-out; `chromeFitObstacles` for the fit); all append-only, empty | FR-SHELL-112, -113 |
+
+- **Test IDs / hooks:** `ui-window` `data-placed` + `zone`, `displaced`, `grown`, `squeezed`; `data-auto-minimised-cause` (`toolbar:…`, `viewport:…`, `window:…`, `open:…`); `ui-window-body`; `ui-play-page` `data-settle-log` = "trigger:kind>rung;…" (test mode); `ui-overlay-layer` (`data-blocking`), `[data-overlay-id]`; `ui-topbar-item` + `data-record-id`.
+- **Harness:** `fixtures/units/play-shell/replay-cells.test.ts` (FR-SHELL-114) → `replay-cells.generated.ts`; `src/client/{dm,player}/features/play-shell/replay.test.ts` (FR-SHELL-115, -116; known failures in `replay.failing.json`, run as `test.failing`).
+- **CON-44:** 0 B.
