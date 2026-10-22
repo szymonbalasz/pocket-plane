@@ -1,6 +1,6 @@
-# Proposed — Party status: other players see a PC's HP, temp HP and AC
+# Party status: other players see a PC's HP, temp HP and AC
 
-- Status: proposed (sprint 8, track CB; the integrator numbers it at merge; DM gate 1)
+- Status: accepted (DM gate, #335)
 - Date: 2026-10-21
 - **Amends DM decision #178 G6 and [ADR-0036](0036-full-sheet-derivation.md)'s "No HP, AC, scores, counters or text"** for the other-player character whitelist: a **decision reversal** for the DM (OQ-PARTY-30). Answers the [ADR-0024](0024-definition-visibility.md) consequence "other PCs' HP for a party view is a Combat-phase question" ([OQ-ENT-15](../../specs/entities.md#15-open-questions)). [ADR-0056](0056-companion-visibility.md) unchanged
 - Affects: [party-board](../../specs/party-board.md) (FR-PARTY-51–58), [entities](../../specs/entities.md) (visibility fn, FR-ENT-15), [character-sheet-full](../../specs/character-sheet-full.md) (ADR-0036's table), [combat-extras](../../specs/combat-extras.md) (FR-CBTX-32: `tempHp` to others), [play-shell](../../specs/play-shell.md) (FR-SHELL-140); data model, protocol, leak tests
@@ -27,7 +27,7 @@ Sub-choices (any of A / B): **hidden PC** — accept (a) or add a server-written
 
 ## Decision
 
-> Proposed: **A**, hidden PC **(a)**, AC **(a)**. Pending the DM (OQ-PARTY-30, -31, -32).
+> **A**, hidden PC **(a)**, AC **(a)** (DM gate, #335: OQ-PARTY-30 A, -31 A, -32 A).
 
 - Entities' other-player character redaction gains `hpCurrent`, `hpMax` (`statBlock.hpMax`), `tempHp`, `ac` (`statBlock.ac`). ADR-0036's table gains one row: "`hpCurrent`, `hpMax`, `tempHp`, `ac` — party status (this ADR)". Own PC and the DM: unchanged (full).
 - Monsters, NPC allies, pets and companion combatants: unchanged (ADR-0024, ADR-0056): others see a band, never numbers.
