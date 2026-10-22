@@ -367,7 +367,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 | 5 | DM 1440×900: DM damage kills the hidden Wolf; then Thorn's card kills the hidden Elite (overkill 15) (h) | DM: "Wolf falls (hidden)", then "Overkill! Elite Goblin Warrior 2 falls, overkill 15 (hidden)", each within 1 s (screenshot), each a new `data-callout-seq`; players: none (leak scan clean) |
 | 6 | DM in two tabs: switch the Stats fight picker fast in both (≥ 6 queries in 1 s) ([FR-STATS-69](stats.md#6-functional-requirements)) | No "Too many stats queries"; both tabs show the answer within 1.5 s |
 | 7 | Players: End a fight in which only DM damage killed a monster (f09) ([FR-STATS-70](stats.md#6-functional-requirements)) | Players' summary shows the kill in Highlights and no "No damage yet this fight" |
-| 8 | *(If [OQ-STATS-36](stats.md#15-open-questions) A is built)* Stats on the fixture-started fight | Label "Fight 3 · Thu 22 Oct" (the load day), duration under a day |
+| 8 | Stats on the fixture-started fight, after `fixtures:reset-load` ([FR-FIX-29](fixtures-adapters.md#6-functional-requirements), BL-69) | Label "Fight 3 · ‹load day›" (e.g. "Thu 22 Oct"); duration = minutes since the load, never thousands of hours |
 | 9 | DM reload with Notifications open; then Probes → Drop | Cards still folded after the reload; the stack re-places at its home after the reconnect |
 
 ## 14. Dependencies
@@ -424,7 +424,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - **FX1** `fix/fx-toasts-feed` (FR-NOTE-70–73, with [stats](stats.md#14-dependencies) FR-STATS-68–70). FX holds the toast runtime this sprint (sprint-9 hotspots); PM doesn't touch it.
   - Notifications-owned files: `keep-out.ts`, `ToastRuntime.tsx`, `toasts.ts` (callout seq), `stack-inputs.ts` (the `note.history` rect), their tests.
   - Shared files: none. It reads play-shell's `useShellState` (`windows`, `placed`, `memory`) and `useKeepOuts`, with no frame edit.
-  - Order: builds at once and merges **after PM's frame core**: window memory may change `placed` / `memory`, which `stack-inputs.ts` reads, so FX1 rebases on it.
+  - Order (seams S5, S6, S10): wave 3; FX1 builds and merges **after PM1** (`fix/window-memory`). Window memory may change `placed` / `memory`, which `stack-inputs.ts` reads. FX1 holds the toast runtime all sprint; SP3's `session-recap` kind only appends to `kinds.ts` and the views.
 - **FX2** owns FR-NOTE-74: notifications-owned `src/server/features/notifications/helpers.ts` (the `emit` option) with [gems](gems.md#14-dependencies) FR-GEM-42.
 
 ## 15. Open questions

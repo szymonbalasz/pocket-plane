@@ -240,7 +240,8 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 - Docs consolidated (#172, protocol §30): protocol §7 routing (hook, `"dm"` audience), §15 (`map.drag`); [ADR-0033](../architecture/adr/0033-signal-audience.md). No schema, event or record-type change.
 
 **Shared changes: sprint 9, FX3** `fix/fx-sync-shell` (orchestrator routes per AGENTS §9.9):
-- **Shared:** `src/client/common/sync/connection.ts` (heartbeat, `offline`, detach) and `src/shared/protocol/frames.ts` (`CLIENT_PONG_TIMEOUT_MS` 20 000 → 5 000; the check interval), so `shared change needed`. No other active sprint-9 branch touches them.
+- **Shared:** `src/client/common/sync/connection.ts` (heartbeat, `offline`, detach) and `src/shared/protocol/frames.ts` (`CLIENT_PONG_TIMEOUT_MS` 20 000 → 5 000; the check interval), so `shared change needed`. FX3 is their only holder (seams S10).
+- **Order** (seams S5, S10): FX3 builds in wave 2, in parallel with RS0, and **merges after RS0**. Its BL-91 `ShellWindow.tsx` branch lands after PM1.
 - **Docs:** protocol heartbeat paragraph (FR-SYNC-04 / -40). Server unchanged.
 - The rest of FX3's split: [play-shell §14](play-shell.md#14-dependencies) (BL-91), [campaign-management §14](campaign-management.md#14-dependencies) (BL-77).
 

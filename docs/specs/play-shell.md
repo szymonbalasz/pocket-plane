@@ -1007,7 +1007,8 @@ Teardown: stop, `fixtures:reset --profile verify`.
 
 **Sprint 9, track FX (BL-91), in FX3** `fix/fx-sync-shell`:
 - Files: new `src/client/common/lib/lazy-chunk.ts` and a reload panel. The 7 `React.lazy` sites change to `lazyChunk`: dice-extras `window.ts`, `TrayWindow.tsx`, `MacrosSection.tsx`, `PromptViews.ts`; `pause/top-bar.tsx`; `scenes-map/LazyMapCanvas.tsx`.
-- ⚠ **Frame file:** `ShellWindow.tsx` `WindowErrorBoundary` (its render branch picks the panel). PM holds the frame all sprint, so this lands **after PM's frame core** with a one-function grant, or PM's builder adds the branch (seams).
+- ⚠ **Frame file:** `ShellWindow.tsx` `WindowErrorBoundary` (its render branch picks the panel). PM1 holds every frame file (seams S5), so this lands **after PM1 merges** as a one-function grant in FX3. `lazyChunk` and the 7 sites are FX3's and build at once (wave 2).
+- *(Seams S5)* BL-76 (`layout-checks.ts`) and BL-90's "Scenes returns to its pre-drag spot" moved to **PM1**. Root-cause hand-offs: BL-76 is `layout-checks.ts:150` `Math.min(base.x, RAIL_CLEAR)` → `Math.max(a.left, RAIL_CLEAR)`. Scenes: at 1280×720 the drop spot wasn't free at return (hypothesis), so FR-SHELL-102's grow branch ran; window memory decides it now.
 - No server change, no dependency.
 
 ## 15. Open questions
@@ -1137,7 +1138,7 @@ Teardown: stop, `fixtures:reset --profile verify`.
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-SHELL-73 | **Seam with WF (window-frame pass): registering Party status.** CB3 needs WF's contract for new windows (the FR-SHELL-86 successor: size-table row, useful size, golden list, put-away order) and its frame core merged first | **Resolved (integrator, sprint-8 seams / rulings).** **Closed by seams S12:** `party.summary` (both clients) registers per FR-SHELL-112 (1) after WF1, with its size-table row (FR-SHELL-141: default, useful + criterion, min), goldens and harness sets P1 / P3 / D3 (append-only registries, review-b #14); WF's placer decides its spot; no keep-out; WF adds it as a pending row. (If the DM picks a strip, OQ-PARTY-29 B, WF owns the strip region and CB3 fills it) | — | WF, FR-SHELL-140–143 |
-| OQ-SHELL-87 | *(Sprint 9, BL-91)* Should the server send a build id so a client can tell it is stale before a chunk fails? | **Settled (technical, spec-fx; integrator to confirm): A. No build id.** The failed chunk is the signal (FR-SHELL-175 / -176), and `index.html` is `no-cache`, so a reload always gets the new build. · B. A build id in the snapshot: a stale page could offer "New version" before anything fails. But the server keeps running while `dist/` is rebuilt (the BL-91 case), so a start-time id would be wrong; it would need a `dist` watch plus a protocol field, for a case only gates and DM updates hit. | no | SHELL, SYNC |
+| OQ-SHELL-87 | *(Sprint 9, BL-91)* Should the server send a build id so a client can tell it is stale before a chunk fails? | **Resolved (integrator, seams S5, per T5): A. No build id.** The failed chunk is the signal (FR-SHELL-175 / -176), and `index.html` is `no-cache`, so a reload always gets the new build. · B. A build id in the snapshot: a stale page could offer "New version" before anything fails. But the server keeps running while `dist/` is rebuilt (the BL-91 case), so a start-time id would be wrong; it would need a `dist` watch plus a protocol field, for a case only gates and DM updates hit. | no | SHELL, SYNC |
 
 ## 16. Out of scope
 

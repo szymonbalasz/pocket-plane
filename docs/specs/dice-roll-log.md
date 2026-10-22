@@ -454,7 +454,8 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 
 **Shared changes — sprint 9, track FX (FX2 `fix/fx-dice-lines`):** none in AGENTS §9.9.
 - Files: `@shared/dice-roll-log/roll-kind.ts`, `server/features/dice-roll-log/reroll.ts`, `client/common/features/dice-roll-log/GameLog.tsx`, dice-extras' `DieShape.tsx`, `popups.ts` / `RollPopup.tsx`, `MacrosPanel.tsx` / `macro-logic.ts`, plus the gems and notifications files in [gems §14](gems.md#14-dependencies).
-- Docs: protocol §22 `GemSpent`. Waits on nothing (PM / RS cores not involved); TT-era dice-extras files have no other sprint-9 holder.
+- Docs: protocol §22 `GemSpent` (docs only, seams S10).
+- Order: wave 1, waits on nothing (PM / RS cores not involved). **FX2 merges before RS1** (seams S11: RS1 imports the macros' roll path), or RS1 merges main and re-tests.
 
 ## 15. Open questions
 
