@@ -1,85 +1,85 @@
 [
   {
     "at": "open @1600×900 note.history",
-    "rect": "777,60,360×480",
+    "rect": "772,60,360×480",
     "placed": "auto",
     "parked": ""
   },
   {
     "at": "open @1600×900 dicex.tray",
-    "rect": "650,232,360×300",
+    "rect": "664,232,360×300",
     "placed": "auto",
     "parked": "note.history"
   },
   {
     "at": "open @1600×900 party.board",
-    "rect": "695,132,440×400",
+    "rect": "708,132,440×400",
     "placed": "auto",
     "parked": "dicex.tray"
   },
   {
     "at": "open @1600×900 cmp.compendium",
-    "rect": "695,132,440×400",
+    "rect": "708,132,440×400",
     "placed": "auto",
     "parked": "party.board"
   },
   {
     "at": "open @1600×900 shell.prefs",
-    "rect": "785,132,360×400",
+    "rect": "796,132,360×400",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
   {
     "at": "open @1600×900 charx.companion",
-    "rect": "846,172,320×360",
+    "rect": "848,172,320×360",
     "placed": "auto",
     "parked": "shell.prefs"
   },
   {
     "at": "open @1600×900 stats.board",
-    "rect": "695,60,400×412",
+    "rect": "708,60,400×412",
     "placed": "auto",
     "parked": "charx.companion"
   },
   {
     "at": "reopen @1600×900 note.history",
-    "rect": "777,60,360×480",
+    "rect": "772,60,360×480",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "reopen @1600×900 dicex.tray",
-    "rect": "650,232,360×300",
+    "rect": "664,232,360×300",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
     "at": "reopen @1600×900 party.board",
-    "rect": "695,132,440×400",
+    "rect": "708,132,440×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen @1600×900 cmp.compendium",
-    "rect": "695,132,440×400",
+    "rect": "708,132,440×400",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen @1600×900 shell.prefs",
-    "rect": "785,132,360×400",
+    "rect": "796,132,360×400",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen @1600×900 charx.companion",
-    "rect": "846,172,320×360",
+    "rect": "848,172,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen @1600×900 stats.board",
-    "rect": "695,60,400×412",
+    "rect": "708,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
