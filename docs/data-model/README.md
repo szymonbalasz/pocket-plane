@@ -2462,3 +2462,12 @@ From [stats](../specs/stats.md#8-data-model) (sprint 8: "Client: two preferences
 - **Client memory (per page, never sent or stored):** the Stats view per viewer gains `highlightsOpen` (null = by fight status) and `luckScope` (null = newest session, a session key, or `campaign`); the feed's toasted line ids (≤ 200) and its 150-ms batch; the notification ids already opened (awards, fight summary).
 - **Registries (code):** sheet section `stats.trophies` (`order: 100`); Preferences section `stats.prefs` (order 40); notification view `stats-fight-summary` (info) in both clients.
 - **Derived:** feed words (`feedText`), Highlights items, Luck rows, trophy values ("—" for 0): all from acks and lines as sent, no client aggregation.
+
+## 117. Sprint 8: current-turn token highlight (CB2)
+
+From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-108–112 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-166. **Built by `build/cb-turn-ring`**: no table, column, record type or payload change. Protocol side: [protocol §147](../protocol/README.md#147-sprint-8-current-turn-token-highlight--turn-ring-cb2).
+
+- **Derived (not stored):** the ringed tokens per client = the token bound to its turn combatant (DM `turnCombatantId`, players `playerTurnCombatantId`) + those of its `in-owner-turn` companions; dashed (DM) = that combatant's `hidden` / `ownerHidden`.
+- **Fixtures:** no new unit; bundle `combat-polish`, e2e alias `cb-turn-ring-e2e` (CB0); `session-sim-12` unchanged.
+- **Persisted runtime state:** none.
+- **CON-44:** 0 B.

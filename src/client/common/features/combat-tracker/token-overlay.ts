@@ -1,9 +1,10 @@
 // Combat's token overlay `cbt` (FR-CBT-38, FR-CBT-39, FR-CBT-48; registry FR-MAP-34): on a token
 // bound to an active combatant of the started encounter, Out (removed: dim + badge), Down (a cross;
 // 0 HP: a monster's HP or band, a PC's character HP or redacted `down`), the target ring while the
-// DM targets, movement used this turn, and the side badge (FR-CBT-104: the row's "Ally" / "Enemy"
-// chip). Pure over the record store each client already holds, so players see badges only on what
-// they receive, and nothing after End. Plus `companion` (FR-MAP-76): a paw on an owned non-PC
+// DM targets, movement used this turn, the side badge (FR-CBT-104: the row's "Ally" / "Enemy"
+// chip) and the turn ring (FR-CBT-166: the viewer's turn combatant + its `in-owner-turn`
+// companions). Pure over the record store each client already holds, so players see badges and
+// rings only on what they receive, and nothing after End. Plus `companion` (FR-MAP-76): a paw on an owned non-PC
 // token in its owner's colour, on every client; a pure token rule (no combat data).
 import { COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
@@ -16,7 +17,10 @@ import type {
   TokenCross,
   TokenDecoration,
   TokenOverlay,
+  TokenOverlayView,
+  TokenTurn,
 } from "../scenes-map/token-overlays";
+import { ownerRowIn } from "./companions";
 import { SIDE_LABEL, sideChip } from "./side";
 import { startedIn } from "./store";
 
@@ -33,6 +37,10 @@ export const OUT_BADGE: TokenBadge = {
 };
 /** FR-CBT-48 (#171): Down is a translucent X in `hp.down`, no longer a badge. */
 export const DOWN_CROSS: TokenCross = { id: "cbt-token-down", tone: "down" };
+
+/** FR-CBT-166: the turn ring (scenes-map FR-MAP-108); `hidden` = players don't see this turn. */
+export const TURN_MARK: TokenTurn = { id: "cbt-token-turn" };
+export const TURN_MARK_HIDDEN: TokenTurn = { id: "cbt-token-turn", hidden: true };
 
 /** FR-CBT-104 (#252): the row's side chip as a badge (the same rule: `sideChip`). */
 export function sideBadge(c: CombatantView): TokenBadge | null {
@@ -73,6 +81,30 @@ export function isDown(store: RecordStore, c: CombatantView): boolean {
 /** FR-CBT-49 (G9): the Initiative row's "Down" Badge for a PC (DM, owner: HP; others: `down`). */
 export const pcDown = (store: RecordStore, c: CombatantView) => c.kind === "pc" && isDown(store, c);
 
+/**
+ * FR-CBT-166: `c` acts in the viewer's current turn: it is the turn combatant (DM
+ * `turnCombatantId`; players `playerTurnCombatantId`, null for a hidden, removed or `ownerHidden`
+ * one, FR-CBT-31) or one of its `in-owner-turn` companions without a rank of its own (FR-CBT-108,
+ * `companionLayout`'s rule). Nothing in round 0, without a started encounter or after End.
+ */
+export function actsThisTurn(
+  store: RecordStore,
+  c: CombatantView,
+  client: TokenOverlayView["client"],
+): boolean {
+  const enc = startedIn(store);
+  if (!enc || enc.round < 1) return false;
+  const turnId = client === "dm" ? (enc.turnCombatantId ?? null) : enc.playerTurnCombatantId;
+  if (!turnId || c.removed) return false;
+  if (c.id === turnId) return true;
+  const rank = client === "dm" ? c.position : c.playerPosition;
+  if (c.turnMode !== "in-owner-turn" || rank != null) return false;
+  const rows = (Object.values(store.records[COMBATANT_TYPE] ?? {}) as CombatantView[]).filter(
+    (r) => r.encounterId === enc.id && r.active !== false,
+  );
+  return ownerRowIn(rows, c)?.id === turnId;
+}
+
 export const cbtTokenOverlay: TokenOverlay = {
   id: "cbt",
   decorate(token: TokenView, store, view): TokenDecoration | null {
@@ -87,7 +119,11 @@ export const cbtTokenOverlay: TokenOverlay = {
     }
     const side = sideBadge(c);
     if (side) out.badges = [side];
-    return out.cross || out.ring || out.badges ? out : null;
+    // FR-CBT-166: only the DM's records carry `hidden` / `ownerHidden` (dashed ring).
+    if (actsThisTurn(store, c, view.client)) {
+      out.turn = c.hidden || c.ownerHidden ? TURN_MARK_HIDDEN : TURN_MARK;
+    }
+    return out.cross || out.ring || out.badges || out.turn ? out : null;
   },
   movedFt(token, store) {
     return boundCombatant(store, token.id)?.movedFt ?? null;
