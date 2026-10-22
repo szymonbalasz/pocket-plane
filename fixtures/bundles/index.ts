@@ -6,11 +6,15 @@ import assetAccess from "./asset-access";
 import assetLibrary from "./asset-library";
 import base from "./base";
 import campaignSwitch from "./campaign-switch";
+import cbPartyE2e from "./cb-party-e2e";
+import cbReorderE2e from "./cb-reorder-e2e";
+import cbTurnRingE2e from "./cb-turn-ring-e2e";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import cmpImages from "./cmp-images";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
+import combatPolish from "./combat-polish";
 import companions from "./companions";
 import companionsAlly from "./companions-ally";
 import companionsE2e from "./companions-e2e";
@@ -175,4 +179,9 @@ export const bundles: readonly Bundle[] = [
   // Sprint 8 track TT (build/tt-sounds): alert sounds
   alertSounds,
   alertSoundsE2e,
+  // Sprint 8 track CB (fix/cb-core)
+  combatPolish,
+  cbReorderE2e,
+  cbTurnRingE2e,
+  cbPartyE2e,
 ];

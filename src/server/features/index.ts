@@ -4,6 +4,7 @@ import { assetsPipeline } from "./assets-pipeline";
 import { campaignManagement } from "./campaign-management";
 import { characterSheet } from "./character-sheet";
 import { combatExtras } from "./combat-extras";
+import { combatPolish } from "./combat-extras/move";
 import { combatTracker } from "./combat-tracker";
 import { compendium } from "./compendium";
 import { diceExtras } from "./dice-extras";
@@ -42,4 +43,6 @@ export const features: readonly Feature[] = [
   diceExtras,
   gems,
   stats,
+  // Sprint 8 track CB (fix/cb-core)
+  combatPolish,
 ];

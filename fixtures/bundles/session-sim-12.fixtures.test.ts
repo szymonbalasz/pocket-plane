@@ -3,7 +3,7 @@
 // appends a unit extends the expectations here.
 import { afterAll, describe, expect, test } from "bun:test";
 import { closeDb } from "@server/db/client";
-import { asset, campaign, rollMacro, rollRequest } from "@server/db/schema";
+import { asset, campaign, combatant, rollMacro, rollRequest } from "@server/db/schema";
 import { eq } from "drizzle-orm";
 import { loadBundle } from "../index";
 
@@ -38,5 +38,15 @@ describe("session-sim-12 (sprint-8 gate bundle)", () => {
     const chime = sounds[0]?.id;
     const active = db.select().from(campaign).where(eq(campaign.active, true)).get();
     expect([active?.pause, active?.alertSounds]).toEqual([null, { request: chime, pause: chime }]);
+    // CB0: the 12-tie (Thorn, Fire Elemental 3, Goblin), no tie order yet; Goblin fog-hidden.
+    expect(r.manifest.fixtures.slice(-3)).toEqual(["cb-ties", "cb-fog-goblin", "cb-party"]);
+    const ambush = db.select().from(combatant).where(eq(combatant.active, true)).all();
+    const tie = ambush
+      .filter((c) => c.initiative === 12 && c.turnMode !== "after-owner")
+      .sort((a, b) => a.position - b.position)
+      .map((c) => c.name);
+    expect(tie).toEqual(["Thorn", "Fire Elemental 3", "Goblin"]);
+    expect(ambush.every((c) => c.tieOrder === null)).toBe(true);
+    expect(ambush.find((c) => c.name === "Goblin")?.hidden).toBe(true);
   }, 120_000);
 });

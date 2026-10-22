@@ -2,7 +2,7 @@
 // whose value changed" diff each command lists in its event (FR-CBT-27).
 
 import { DEATH_SAVES_MAX } from "@shared/combat-extras/schemas";
-import { inTurnCompanionsOf, ownerRowOf, ranks } from "@shared/combat-tracker/rules";
+import { inTurnCompanionsOf, ownerRowOf, ranks, ridesOwner } from "@shared/combat-tracker/rules";
 import type { CombatantRecord, EncounterRecord } from "@shared/combat-tracker/schemas";
 import { effectiveStats } from "@shared/entities/schemas";
 import { and, eq, gte, inArray } from "drizzle-orm";
@@ -34,11 +34,16 @@ export function deadPcs(env: { tx: Read }, rows: readonly CombatantRecord[]) {
  * Rewrites `position` / `playerPosition` of every row whose value changed (FR-CBT-13). Sprint 6
  * (FR-CBT-107 / -108 / -116): first copies each owner combatant's `hidden` onto its companions'
  * `ownerHidden`; ranks per turn mode with the owners' eligibility (removed, dead) and the turn
- * combatant (it keeps its rank until the turn moves on). Callers list `combatantDiff`.
+ * combatant (it keeps its rank until the turn moves on). Sprint 8 (FR-CBT-162 / -163 (c)): a row
+ * riding its owner has no tie slot (a turn-mode or owner change onto attached clears it, so it
+ * comes back from attached with none). Callers list `combatantDiff`.
  */
 export function rerank(tx: Tx, encounterId: string): void {
   let rows = combatantsOf(tx, encounterId);
   for (const r of rows) {
+    if (r.tieOrder !== null && ridesOwner(rows, r)) {
+      tx.update(combatant).set({ tieOrder: null }).where(eq(combatant.id, r.id)).run();
+    }
     if (!r.ownerCharacterId) continue;
     const ownerHidden = ownerRowOf(rows, r)?.hidden ?? false;
     if (ownerHidden === r.ownerHidden) continue;

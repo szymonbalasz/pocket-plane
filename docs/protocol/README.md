@@ -286,6 +286,7 @@ Each lists `changes` (before/after per record; create: before null, delete: afte
 | `DeathSavesSet` | CBTX | `{characterId, successes, failures}` | `entity` | yes | no | no | — |
 | `CombatantsAdded` | CBTX | `{encounterId, combatantIds}` (1–20) | `combatant` creates + ranks; `encounter`; `effect` hidden copies; *(sprint 2, FR-CBTX-44, built, fix/combat2-add)* created `token`s first, then combatants, HP and initiative roll entries (DM-only), ranks, effect copies | yes | no | no | — |
 | `CombatantBound` *(sprint 2, emitted by `cbtx.bindToken`, built, fix/combat2-add)* | CBTX | `{combatantId, tokenId \| null}` (null = unlink) | `combatant`; on a `hidden` change also ranks, `encounter`, `effect` hidden copies | yes | no | no | — |
+| `CombatantMoved` *(sprint 8, emitted by `cbtx.moveCombatant`, built, fix/cb-core, [§136](#136-sprint-8-combat-polish-core--cbtxmovecombatant-tie-order-cb0))* | CBTX | `{encounterId, combatantId, afterId \| null, initiativeBefore \| null, initiativeAfter}` | `combatant` upserts (moved row, rewritten tie rows, reranks); players: changed visible redactions only, no frame when none (`quietWhenUnchanged`) | yes | no | no | — |
 | `DamageRolled` *(sprint 2)* | CBT | `{cardId, rollIds (≥ 1), attached}` | `game-log-entry`; then `NotificationUpdated` (`attached`) or `NotificationCreated` | yes | no | no | — |
 | `NotificationUpdated` *(sprint 2)* | NOTE | `{notificationId, kind}` | `notification` upsert (pending row, new payload / text; same `seq`) | yes | no | no | — (no toast) |
 | `EffectPresetSaved` / `EffectPresetDeleted` *(sprint 2, MOD)* | MOD | `{presetId}` | `effect-preset` upsert / delete | yes | no | no | — |
@@ -3218,9 +3219,34 @@ From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-6
 - **Fixtures:** bundle `session-sim-12` (= `session-sim-11` + an empty sprint-8 section, one comment per track WF / TT / SB / CB); no unit yet.
 - **CON-44** (`src/server/ws/testing/con44-tt.test.ts`, heavy harness at the caps): DM 690,790 → 894,324 B (+203,534 B; 678,540 B left of 1.5 MiB): `roll-macro` 72,390 B (200 rows), `roll-request` 70,526 B (5 open + 10 closed × 12 targets), prompts 60,185 B (60); players +10,500…+39,461 B (worst 325,266 B of 512 KiB); `audio-asset` 0 B in every snapshot (`sync.load` of 50 = 13,967 B).
 
-## 136. Sprint 8: alert sounds — audio upload + probe, sound picks, shell playback (TT3)
+## 136. Sprint 8: combat polish core — `cbtx.moveCombatant`, tie order (CB0)
 
-From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-52–61, [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-48–50, [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-130–134 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-41 (#334, #335). **Built by `build/tt-sounds`** on TT0's records and events ([§135](#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0)). Data side: [data model §107](../data-model/README.md#107-sprint-8-alert-sounds-tt3).
+From [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-64–69 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-162–164, -168 (#334, #335; OQ-CBTX-31 A′, -32 A, -33 A, OQ-CBT-99 A, -100 A; review-b #16, #23). **Built by `fix/cb-core`**. Data side: [data model §107](../data-model/README.md#107-sprint-8-combat-polish-core-cb0). Schema lane: merged after TT0.
+
+**Intents**
+
+| Intent | Who | Errors (one code per case) | Result | Source |
+|---|---|---|---|---|
+| `cbtx.moveCombatant {encounterId, combatantId, afterId: ID \| null}` (`CBTX_INTENTS.moveCombatant`, strict; `afterId` null = top) | DM; player → `forbidden` | ids of no / another campaign or encounter → `not_found`; encounter not `started` → `conflict` "Combat is not running"; combatant inactive → `conflict` "Goblin is not in combat", removed → `conflict` "Restore Goblin first", riding its owner (`after-owner` / `in-owner-turn` with the owner in the fight) → `conflict` "Goblin 2 moves with Mira"; `afterId` itself, inactive, removed, riding its owner or without initiative → `invalid` "Drop below a row with initiative"; no other row has initiative → `conflict` "Roll initiative first"; a PC without a number and no PC number around → `conflict` "Set a number first". Same order as today → `ack`, no write, no event | none | FR-CBTX-64 |
+
+**Rule** (`planMove(rows, movedId, afterId)` in `@shared/combat-tracker/rules`, pure; the server and CB1's DM number hint run it). `rows` = movable rows (active, not removed, not riding the owner) by `position`. **(a)** a private moved row (not a PC) takes the anchor's number (top: the first other numbered row's). **(b)** a PC (hidden ones too: a reveal never shows a monster's number on a PC) keeps its number, lowered to the nearest PC above the drop spot and raised to the nearest PC below; private rows above it with a lower number, or below it with a higher one, take that number. Changed numbers null `initRollId`; no roll, no log line. Then `tieOrder` 1…k on every movable row with the arranged number, in the dropped order (others keep theirs; removed rows keep theirs), then `rerank`. Order everywhere: `compareOrder` = initiative desc → `tieOrder` asc (null after any number) → init bonus → PC → `seq`; riding companions follow their owner (FR-CBT-162).
+
+**Tie order cleared** (FR-CBT-163 (c)): `cbt.setInitiative` and `cbt.rollInitiative` (and Start / add rolls) write `tieOrder: null` on the row; `rerank` clears it on any row riding its owner (turn mode or owner change onto attached). Remove / restore, hide / reveal, death keep it; Next / Prev never re-sort; new combatants start null.
+
+**Events and visibility**
+
+| Event | Changes | DM | Players | Undoable |
+|---|---|---|---|---|
+| `CombatantMoved {encounterId, combatantId, afterId \| null, initiativeBefore \| null, initiativeAfter}` (new, `src/shared/events/combat-extras.ts`; logged) | `combatant` upserts: the moved row (`initiative`, `initRollId`, `tieOrder`), rewritten tie rows, reranked rows (`position`, `playerPosition`). No `encounter` change (the turn never moves, FR-CBT-164) | full | each changed visible row's redaction (no `tieOrder`, never a monster's number); unchanged redactions dropped; **`quietWhenUnchanged`**: a move players can't see (hidden, fog-hidden, `ownerHidden` row) sends them **no frame** (FR-CBTX-67) | no (drag back) |
+
+- No `TurnChanged`, turn alert, `turnChanged` rule hook, `movedFt` reset or expiry on a move (FR-CBT-164).
+- **Server registration:** `combatPolish` feature line (`src/server/features/combat-extras/move.ts`) in the server feature list.
+- **Fixtures:** units `cb-ties`, `cb-fog-goblin`, `cb-party` (join `session-sim-12`, sim-11-safe); bundle `combat-polish` (= `session-sim-11` + the three); e2e aliases `cb-reorder-e2e` (`e2e/cb-core.e2e.ts`), `cb-turn-ring-e2e`, `cb-party-e2e`.
+- **CON-44** (heavy harness, `con44-cb.test.ts`): `tieOrder` on 46 DM combatant rows → DM +736 B (null) / +635 B (all set), 691,492 B of 1.5 MiB; players 0 B (byte-identical, worst 289,088 B of 512 KiB).
+
+## 137. Sprint 8: alert sounds — audio upload + probe, sound picks, shell playback (TT3)
+
+From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-52–61, [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-48–50, [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-130–134 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-41 (#334, #335). **Built by `build/tt-sounds`** on TT0's records and events ([§135](#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0)). Data side: [data model §108](../data-model/README.md#108-sprint-8-alert-sounds-tt3).
 
 **REST**
 
