@@ -57,7 +57,6 @@ export function MacroRow({
         className="h-7 min-w-0 max-w-40 justify-start truncate px-2"
         disabled={block !== null}
         data-reason={block ?? undefined}
-        title={block ?? undefined}
       >
         {m.name}
       </RollButton>

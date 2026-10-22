@@ -2,6 +2,7 @@
 // one import and one line in the list; nothing else changes here.
 import { charxApprovedView, charxDraftView } from "@ui/features/character-sheet/note-views";
 import { concentrationView } from "@ui/features/combat-extras/concentration";
+import { rollRequestDmView } from "@ui/features/dice-extras/PromptViews";
 import { modTriggerView } from "@ui/features/effect-modifiers/note-view";
 import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type NotificationView } from "@ui/features/notifications/views";
@@ -22,6 +23,7 @@ const views: NotificationView[] = [
   modTriggerView, // mod-trigger (effect-modifiers, FR-MOD-44)
   dmSummonCardView, // cbt-summon-concentration (combat-tracker, FR-CBT-120)
   statsAwardsView, // stats-awards (stats, FR-NOTE-48)
+  rollRequestDmView, // roll-request (dice-extras, FR-NOTE-61)
 ];
 
 export const dmNotificationViews = createNotificationViews(views);

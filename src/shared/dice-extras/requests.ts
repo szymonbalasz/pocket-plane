@@ -13,11 +13,24 @@ import {
   RollLabel,
 } from "../dice-roll-log/schemas";
 import { Ability, ENTITY_NAME_MAX, SKILL_NAMES, SkillName } from "../entities/schemas";
-import { type RollCategory, RollMode } from "../events/dice-roll-log";
+import { RollMode } from "../events/dice-roll-log";
+import {
+  DICEX_REQUEST_INTENTS,
+  REQUEST_CATEGORY,
+  REQUEST_ROLL_KINDS,
+  type RequestRollKind,
+  ROLL_REQUEST_KIND,
+  ROLL_REQUEST_TYPE,
+} from "./request-names";
 
-export const ROLL_REQUEST_TYPE = "roll-request";
-/** FR-NOTE-58: the prompt's notification kind (toast class card, FR-NOTE-52). */
-export const ROLL_REQUEST_KIND = "roll-request";
+export {
+  DICEX_REQUEST_INTENTS,
+  REQUEST_CATEGORY,
+  REQUEST_ROLL_KINDS,
+  type RequestRollKind,
+  ROLL_REQUEST_KIND,
+  ROLL_REQUEST_TYPE,
+};
 
 /** FR-DICEX-73, -74: targets per request. */
 export const REQUEST_TARGETS_MAX = 12;
@@ -29,18 +42,7 @@ export const CLOSED_REQUESTS_WINDOW = 10;
 export const DC_MIN = 1;
 export const DC_MAX = 40;
 
-export const DICEX_REQUEST_INTENTS = {
-  request: "dicex.request",
-  answerRequest: "dicex.answerRequest",
-  declineRequest: "dicex.declineRequest",
-  closeRequest: "dicex.closeRequest",
-  rollForMissing: "dicex.rollForMissing",
-} as const;
-
 const Id = z.string().min(1).max(64);
-
-export const REQUEST_ROLL_KINDS = ["skill", "save", "check", "custom"] as const;
-export type RequestRollKind = (typeof REQUEST_ROLL_KINDS)[number];
 
 /**
  * FR-DICEX-73, -76: what is asked. Skill → a skill key; save / check → an ability; custom → an
@@ -57,14 +59,6 @@ export const RequestRoll = z.discriminatedUnion("kind", [
   }),
 ]);
 export type RequestRoll = z.infer<typeof RequestRoll>;
-
-/** FR-DICEX-76: the roll's log category per kind. */
-export const REQUEST_CATEGORY: Readonly<Record<RequestRollKind, RollCategory>> = {
-  skill: "skill-check",
-  save: "saving-throw",
-  check: "ability-check",
-  custom: "other",
-};
 
 /** FR-DICEX-76: the default label ("Perception", "DEX save", "STR check", the expression). */
 export function defaultRequestLabel(roll: RequestRoll): string {

@@ -2,6 +2,7 @@
 // adds one import and one line in the list; nothing else changes here.
 import { charxApprovedView } from "@ui/features/character-sheet/note-views";
 import { concentrationView } from "@ui/features/combat-extras/concentration";
+import { rollRequestPlayerView } from "@ui/features/dice-extras/PromptViews";
 import { modTriggerView } from "@ui/features/effect-modifiers/note-view";
 import { testNotificationView } from "@ui/features/notifications/test-view";
 import { createNotificationViews, type NotificationView } from "@ui/features/notifications/views";
@@ -19,6 +20,7 @@ const views: NotificationView[] = [
   handoutSharedView, // handout-shared (party-board, FR-PARTY-06)
   modTriggerView, // mod-trigger (effect-modifiers, FR-MOD-44)
   statsAwardsView, // stats-awards (stats, FR-NOTE-48)
+  rollRequestPlayerView, // roll-request (dice-extras, FR-NOTE-59)
 ];
 
 export const playerNotificationViews = createNotificationViews(views);
