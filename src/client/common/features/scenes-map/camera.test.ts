@@ -1066,7 +1066,8 @@ describe("FR-MAP-81 pcs keeps the top row (pcsPan)", () => {
     const cam = pcsPan(tokens, [wall], area, view, from, 70);
     expect(cam).not.toBeNull();
     if (!cam) return;
-    expect(cam.y).toBe(0);
+    // FR-MAP-93: both cut the top row, so the PC keeps its 4-px margin below the window.
+    expect(cam.y).toBeCloseTo(4, 2);
     expect(cutByTop(cam, tokens[0] as Box)).toBe(true);
     expect(allClear(cam, [tokens[1] as Box], [wall], area)).toBe(true);
     // FR-MAP-90: no pan keeps the PC clear (the wall leaves 30 px below it) → the least PC area

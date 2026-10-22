@@ -4,8 +4,10 @@
 // and of Fit requests (`requestFit()`, FR-SHELL-80). The map frames its tokens there (FR-MAP-44).
 // Read-only: nothing stored or sent.
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { DryFitResult, FitRoom } from "../scenes-map/camera";
 import { contentHeights, useContentHeights } from "./content-heights";
 import {
+  growsToContent,
   type Rect,
   renderedRect,
   TOP_BAR_H,
@@ -133,10 +135,11 @@ export function freeArea(rects: readonly Rect[], vp: Viewport): Rect {
 }
 
 /**
- * What the fit avoids (FR-MAP-59, -80): the rendered windows plus, for players, their toast box
- * (FR-SHELL-48 (a)); for the DM the summary strip (always) and the shown stack (FR-SHELL-59: what
- * shows at fit time), not the empty top-centre box (OQ-MAP-57 D, #288). Reported chrome (tool
- * bars) doesn't count: tool bars come and go, and the camera never refits on a tool change.
+ * What the fit avoids (FR-MAP-59, -80, -93): the rendered windows of the placer's plan plus, for
+ * players, their toast box (FR-SHELL-48 (a)); for the DM the summary strip (always) and the shown
+ * stack (FR-SHELL-59: what shows at fit time), not the empty top-centre box (OQ-MAP-57 D, #288).
+ * Reported chrome (tool bars) doesn't count: tool bars come and go, and the camera never refits
+ * on a tool change. The camera keeps PC footprints + 4 px clear of them (`FIT_PC_MARGIN`).
  */
 export function fitObstacles(
   client: ShellClient,
@@ -147,6 +150,43 @@ export function fitObstacles(
 ): Rect[] {
   if (client === "dm") return [...windows, summaryStrip(vp), ...(shown ? [shown] : [])];
   return [...windows, ...regions.filter((k) => k.id === TOASTS_KEEP_OUT).map((k) => k.rect)];
+}
+
+/**
+ * FR-MAP-93, -95: the rooms every fit reads, from one obstacle source: `room` = the windows +
+ * this client's toast obstacles (the DM's shown stack included), `stripRoom` = the same with only
+ * the DM's summary strip (FR-MAP-91; players: `room`). `windows` = rendered window rects.
+ */
+export function fitRooms(
+  client: ShellClient,
+  windows: readonly Rect[],
+  regions: readonly KeepOut[],
+  vp: Viewport,
+  shown: Rect | null,
+): { room: FitRoom; stripRoom: FitRoom } {
+  const windowsOnly = freeAreas(windows, vp);
+  const obstacles = fitObstacles(client, windows, regions, vp, shown);
+  const room = { areas: freeAreas(obstacles, vp), obstacles, windowsOnly };
+  if (!shown || client !== "dm") return { room, stripRoom: room };
+  const strip = fitObstacles(client, windows, regions, vp, null);
+  return { room, stripRoom: { areas: freeAreas(strip, vp), obstacles: strip, windowsOnly } };
+}
+
+/**
+ * FR-MAP-96: every open, available window that grows to its content (FR-SHELL-39) has reported
+ * its measured height, so the rendered rects are the grown ones.
+ */
+export function grownAll(
+  windows: Windows,
+  registry: WindowRegistry,
+  available: ReadonlySet<string>,
+  measured: ReadonlyMap<string, number>,
+): boolean {
+  return windows.every((w) => {
+    const def = registry.get(w.kind);
+    if (!def || w.state !== "open" || !available.has(w.kind)) return true;
+    return !growsToContent(w, def) || measured.has(windowId(w.kind, w.instance));
+  });
 }
 
 /** At most this many candidate rectangles (FR-SHELL-44). */
@@ -203,6 +243,32 @@ export function freeAreas(rects: readonly Rect[], vp: Viewport): Rect[] {
   }
   out.sort((a, b) => b.w * b.h - a.w * a.h || a.y - b.y || a.x - b.x);
   return out.slice(0, FREE_AREAS_MAX);
+}
+
+// ---- the canvas's base port (FR-SHELL-96, -108; FR-MAP-97) ----
+
+/**
+ * What the map canvas offers the placer (players' L2b, the map yields): a dry fit with `windows`
+ * (rendered rects) as the window obstacles, not applied; the last full fit's cell; and the yield
+ * refit once the placer accepted one. The shell reads it through `fitPort()` and never imports
+ * the canvas.
+ */
+export interface FitPort {
+  dryFit(windows: readonly Rect[]): DryFitResult | null;
+  lastFullCell(): number | null;
+  yieldRefit(): void;
+}
+
+let port: FitPort | null = null;
+
+/** The mounted map canvas registers its port (null on unmount). */
+export function setFitPort(next: FitPort | null): void {
+  port = next;
+}
+
+/** The port of the mounted map canvas, if any. */
+export function fitPort(): FitPort | null {
+  return port;
 }
 
 // ---- appearances ----
@@ -302,6 +368,20 @@ export interface FreeAreaState {
    * Players: `toastFreeAreas` and `obstacles` as they are.
    */
   stripOnly: { areas: readonly Rect[]; obstacles: readonly Rect[] };
+  /** FR-MAP-93, -95: the fit's rooms (`fitRooms`), what every fit reads. */
+  room: FitRoom;
+  stripRoom: FitRoom;
+  /**
+   * FR-MAP-96: every open `growToContent` window has reported its content height, so the rects
+   * above are the grown ones the load fit should frame around.
+   */
+  grown: boolean;
+  /** FR-MAP-98: the viewport the placer last settled at (`viewport`, `load`, reset); null before. */
+  settledAt: Viewport | null;
+  /** FR-MAP-96: a window the placer just placed (open, `appear`) still waits for its `settle`. */
+  settling: boolean;
+  /** FR-MAP-97: the fit's rooms with `windows` (rendered rects) as the window obstacles. */
+  roomsWith(windows: readonly Rect[]): { room: FitRoom; stripRoom: FitRoom };
   /** Grows by one per appearance; compare with a previous value, never read as a total. */
   appearances: number;
   /** Grows by one per `requestFit` (FR-SHELL-80); compare with a previous value. */
@@ -320,30 +400,33 @@ export function useFreeArea(): FreeAreaState {
   const measured = useContentHeights();
   const regions = useKeepOuts(registry.client);
   const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
-  const { area, areas, toastFreeAreas, obstacles, stripOnly } = useMemo(() => {
-    const shown = renderedWindowRects(
-      windows,
-      registry,
-      available,
-      vp,
-      measured,
-      hardRects(regions),
-    );
-    const client = registry.client;
-    const obstacles = fitObstacles(client, shown, regions, vp, shownStack(client, reports));
-    const toastFreeAreas = freeAreas(obstacles, vp);
-    const strip = fitObstacles(client, shown, regions, vp, null);
-    return {
-      area: freeArea(shown, vp),
-      areas: freeAreas(shown, vp),
-      toastFreeAreas,
-      obstacles,
-      stripOnly:
-        strip.length === obstacles.length
-          ? { areas: toastFreeAreas, obstacles }
-          : { areas: freeAreas(strip, vp), obstacles: strip },
-    };
-  }, [windows, registry, available, vp, measured, regions, reports]);
+  const settledAt = useShellState((s) => s.settledAt);
+  const settling = useShellState((s) => s.settling.size > 0);
+  const { area, areas, toastFreeAreas, obstacles, stripOnly, room, stripRoom, grown, roomsWith } =
+    useMemo(() => {
+      const shown = renderedWindowRects(
+        windows,
+        registry,
+        available,
+        vp,
+        measured,
+        hardRects(regions),
+      );
+      const client = registry.client;
+      const rooms = fitRooms(client, shown, regions, vp, shownStack(client, reports));
+      const grown = grownAll(windows, registry, available, measured);
+      return {
+        area: freeArea(shown, vp),
+        areas: rooms.room.windowsOnly,
+        toastFreeAreas: rooms.room.areas,
+        obstacles: rooms.room.obstacles,
+        stripOnly: { areas: rooms.stripRoom.areas, obstacles: rooms.stripRoom.obstacles },
+        ...rooms,
+        grown,
+        roomsWith: (rects: readonly Rect[]) =>
+          fitRooms(client, rects, regions, vp, shownStack(client, reports)),
+      };
+    }, [windows, registry, available, vp, measured, regions, reports]);
   const notedNow = useSyncExternalStore(subscribeNoted, notedAppearances);
   const fitsNow = useSyncExternalStore(subscribeFits, fitRequests);
   const [flips, setFlips] = useState(0);
@@ -361,6 +444,12 @@ export function useFreeArea(): FreeAreaState {
     toastFreeAreas,
     obstacles,
     stripOnly,
+    room,
+    stripRoom,
+    grown,
+    settledAt,
+    settling,
+    roomsWith,
     appearances: flips + notedNow,
     fitRequests: fitsNow,
     ready: key !== null,

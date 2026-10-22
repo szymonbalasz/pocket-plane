@@ -6,16 +6,18 @@
 import { MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import { footprint } from "@shared/scenes-map/geometry";
 import {
-  allClear,
   appearanceKeeps,
   type Camera,
+  dryFitScene,
+  type FitInputs,
+  type FitReason,
   type FitToken,
-  fitScene,
+  fitFor,
   footprintBox,
   revealRefit,
   visibleArea,
 } from "../scenes-map/camera";
-import { fitObstacles, freeAreas, renderedWindowRects } from "./free-area";
+import { fitRooms, renderedWindowRects } from "./free-area";
 import type { Rect, Viewport } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import { bruteBest, overlaps, REFERENCE_VIEWPORTS } from "./layout-checks";
@@ -217,30 +219,20 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
     lastFullCell: () => sim.lastFull || null,
     // FR-MAP-97: an accepted yield refits once, still `fitted`.
     onYield: () => {
-      (sim as Sim).cam = fitNow(sim as Sim).cam;
+      (sim as Sim).cam = fitNow(sim as Sim, undefined, "window").cam;
     },
     warn: () => {},
   });
 }
 
 /**
- * The base port's dry fit (FR-SHELL-108, FR-MAP-97): the fit with `obstacles` as the windows,
- * not applied; `clear` = every PC, and every token clear now, stays clear (FR-MAP-59's test).
+ * The base port's dry fit (FR-SHELL-108, FR-MAP-97): the `window` fit with `obstacles` as the
+ * windows, not applied (the canvas's own `dryFitScene`).
  */
 function dryFit(sim: Sim, obstacles: readonly Rect[]) {
   if (!sim.cam) return null;
-  const grid = gridOf(sim.state, sim.set.viewer);
-  const tokens = cellsNow(sim).tokens;
-  const now = fitNow(sim).obstacles;
-  const area = visibleArea(sim.vp);
-  const boxOf = (t: CellToken) => footprintBox([t], grid);
-  const keep = tokens.filter((t) => {
-    const b = boxOf(t);
-    return t.pc || (b !== null && allClear(sim.cam as Camera, [b], now, area));
-  });
-  const { cam, obstacles: next } = fitNow(sim, obstacles);
-  const boxes = keep.flatMap((t) => boxOf(t) ?? []);
-  return { cellPx: cam.scale * grid.gridCellSize, clear: allClear(cam, boxes, next, area) };
+  const now = fitInputs(sim).room.obstacles;
+  return dryFitScene(fitInputs(sim, obstacles), sim.lastFull || null, sim.cam, now);
 }
 
 const windowsOf = (sim: Sim): Windows => sim.ctl.store.getState().windows;
@@ -260,32 +252,38 @@ function shownOf(sim: Sim): Map<string, { w: WindowState; r: Rect }> {
   return new Map(open.map((w, i) => [w.kind, { w, r: rects[i] as Rect }]));
 }
 
-/** The fit (FR-MAP-44 → -59) with the rendered windows and toast box as obstacles. */
-function fitNow(sim: Sim, with_?: readonly Rect[]): { cam: Camera; obstacles: Rect[] } {
+/** The fit's inputs (FR-MAP-93): the rendered windows (or `with_`) and toast box as obstacles. */
+function fitInputs(sim: Sim, with_?: readonly Rect[]): FitInputs {
   const windows = with_ ? [...with_] : [...shownOf(sim).values()].map((s) => s.r);
-  const obstacles = fitObstacles(sim.client, windows, regionsOf(sim), sim.vp, null);
-  const room = {
-    areas: freeAreas(obstacles, sim.vp),
-    obstacles,
-    windowsOnly: freeAreas(windows, sim.vp),
-  };
+  const rooms = fitRooms(sim.client, windows, regionsOf(sim), sim.vp, null);
   const cells = cellsNow(sim);
-  const fitTokens: FitToken[] = cells.tokens.map((t) => ({
+  const tokens: FitToken[] = cells.tokens.map((t) => ({
     col: t.col,
     row: t.row,
     size: t.size,
     pc: t.pc,
   }));
   const map = { w: cells.scene.mapWidth, h: cells.scene.mapHeight };
-  const f = fitScene(fitTokens, gridOf(sim.state, sim.set.viewer), map, sim.vp, room);
-  return { cam: { x: f.x, y: f.y, scale: f.scale }, obstacles };
+  const grid = gridOf(sim.state, sim.set.viewer);
+  return { client: sim.client, tokens, grid, map, view: sim.vp, ...rooms };
+}
+
+/** The fit (FR-MAP-95: the canvas's one fit path) for `reason`, bounded by the last full fit. */
+function fitNow(
+  sim: Sim,
+  with_?: readonly Rect[],
+  reason: FitReason = "fit",
+): { cam: Camera; obstacles: readonly Rect[] } {
+  const inputs = fitInputs(sim, with_);
+  const f = fitFor(reason, inputs, sim.lastFull || null);
+  return { cam: { x: f.x, y: f.y, scale: f.scale }, obstacles: inputs.room.obstacles };
 }
 
 const cellPx = (sim: Sim) => (sim.cam ? sim.cam.scale * cellsNow(sim).scene.gridCellSize : 0);
 
 /** A full fit (Fit, open, load, reset, resize): the camera `fitted`, its cell the new baseline. */
-function fullFit(sim: Sim) {
-  sim.cam = fitNow(sim).cam;
+function fullFit(sim: Sim, reason: FitReason = "fit") {
+  sim.cam = fitNow(sim, undefined, reason).cam;
   sim.mode = "fitted";
   sim.lastFull = cellPx(sim);
 }
@@ -319,8 +317,11 @@ function moveCamera(sim: Sim) {
 function appearanceRefit(sim: Sim): boolean {
   if (sim.mode !== "fitted" || !sim.cam) return false;
   const grid = gridOf(sim.state, sim.set.viewer);
-  const boxes = cellsNow(sim).tokens.flatMap((t) => footprintBox([t], grid) ?? []);
-  const { obstacles, cam } = fitNow(sim);
+  const boxes = cellsNow(sim).tokens.flatMap((t) => {
+    const b = footprintBox([t], grid);
+    return b ? [{ ...b, pc: t.pc }] : [];
+  });
+  const { obstacles, cam } = fitNow(sim, undefined, "appearance");
   if (appearanceKeeps(sim.cam, boxes, obstacles, sim.vp)) return false;
   sim.cam = cam;
   return true;
@@ -544,7 +545,7 @@ export function runReplay(
     sim.cam = null;
     sim.ctl = newController(sim);
     sim.ctl.restore(sim.key);
-    fullFit(sim);
+    fullFit(sim, "load");
     if (moved) moveCamera(sim);
     // FR-SHELL-95: `load` settles once more after the first token draw, at that camera.
     dispatch(sim, { type: "load", drawn: true });
@@ -625,7 +626,7 @@ export function runReplay(
         const before = windowsOf(sim);
         sim.vp = next;
         dispatch(sim, { type: "viewport" });
-        if (sim.mode === "fitted") fullFit(sim);
+        if (sim.mode === "fitted") fullFit(sim, "resize");
         record(`viewport ${next.w}×${next.h}`, check(sim, before));
       }
       // I7: down and back up restores the start (1280×720 has nothing below: up and back, no I7).
@@ -649,7 +650,7 @@ export function runReplay(
       });
       let refit = false;
       if (sim.cam) {
-        const { obstacles, cam } = fitNow(sim);
+        const { obstacles, cam } = fitNow(sim, undefined, "reveal");
         if (revealRefit(prev, drawn, sim.cam, obstacles, visibleArea(sim.vp), sim.mode)) {
           sim.cam = cam;
           refit = true;
