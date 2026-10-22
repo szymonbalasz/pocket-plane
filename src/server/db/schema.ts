@@ -1,6 +1,8 @@
 // Drizzle schema. Shared file (AGENTS §9.9). Entities and rules: docs/data-model/README.md.
 // Timestamps are ISO-8601 UTC strings from ctx.clock.
 
+import { ASSET_KINDS } from "@shared/assets-pipeline/audio";
+import type { AlertSounds, CampaignPause } from "@shared/campaign-management/table-state";
 import { CONDITIONS } from "@shared/combat-extras/conditions";
 import {
   type DeathCounters,
@@ -16,6 +18,12 @@ import {
 } from "@shared/combat-tracker/schemas";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
 import { DICE_MATERIALS, DICE_STYLES } from "@shared/dice-extras/looks";
+import {
+  REQUEST_RESULTS,
+  REQUEST_STATES,
+  type RequestRoll,
+  type RequestTarget,
+} from "@shared/dice-extras/requests";
 import type { Modifier } from "@shared/effect-modifiers/schemas";
 import { TRIGGER_USE_STATES } from "@shared/effect-modifiers/trigger-records";
 import { TRIGGER_CHARGES } from "@shared/effect-modifiers/trigger-state";
@@ -67,6 +75,10 @@ export const campaign = sqliteTable(
      * `[]` = every optional feature off (the default for old and new campaigns).
      */
     features: text("features", { mode: "json" }).$type<string[]>().notNull().default([]),
+    /** FR-CAMP-46 (sprint 8): the pause card, JSON leaf; null = running. */
+    pause: text("pause", { mode: "json" }).$type<CampaignPause>(),
+    /** FR-CAMP-48 (sprint 8): alert-sound picks, JSON leaf; `{}` = every alert at its default. */
+    alertSounds: text("alert_sounds", { mode: "json" }).$type<AlertSounds>().notNull().default({}),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
@@ -180,6 +192,13 @@ export const asset = sqliteTable(
      * ingest since writes an array (`[]` when none sent, FR-ASSET-41). DM only (FR-ASSET-50).
      */
     tags: text("tags", { mode: "json" }).$type<string[]>(),
+    /**
+     * FR-ASSET-54 (sprint 8): `audio` rows are alert sounds: never in `asset` (lazy DM-only type
+     * `audio-asset`), image sizes 0, `listed` true, tags `[]`. Existing rows: `image`.
+     */
+    kind: text("kind", { enum: ASSET_KINDS }).notNull().default("image"),
+    /** FR-ASSET-54: audio length (probe, ≤ 5,000 ms); null for images. */
+    durationMs: integer("duration_ms"),
   },
   (t) => [
     // FR-ASSET-03: dedupe per campaign.
@@ -679,6 +698,12 @@ export const combatant = sqliteTable(
      * and goes at Dismiss / End; a companion made with `cbt.setCompanion` keeps its token. DM only.
      */
     summoned: integer("summoned", { mode: "boolean" }).notNull().default(false),
+    /**
+     * FR-CBTX-66 (sprint 8): the DM's order inside a group of equal initiative, 1…k; null = none
+     * (default rules). Written by `cbtx.moveCombatant`, cleared per row by FR-CBT-163 (c). DM only.
+     * Nullable, no default: push-safe on old dev DBs.
+     */
+    tieOrder: integer("tie_order"),
   },
   (t) => [uniqueIndex("combatant_seq").on(t.seq), index("combatant_encounter").on(t.encounterId)],
 );
@@ -1523,9 +1548,68 @@ export const characterGems = sqliteTable(
   (t) => [index("character_gems_campaign").on(t.campaignId)],
 );
 
+/**
+ * Roll macros (dice-extras sprint 8, record type `roll-macro`, FR-DICEX-64): a saved `dice.roll`.
+ * `playerId` = who uses it (null = the DM only); `creatureId` = roll as (null = "Me" / "DM"; no
+ * FK: a gone creature's macros stay, under "General"); `createdBy` = the player who made it, null
+ * = the DM (read-only for players). `order` 0-based per (`playerId`, `creatureId`) list. Caps
+ * (24 per list, 200 per campaign) are the commands'.
+ */
+export const rollMacro = sqliteTable(
+  "roll_macro",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    playerId: text("player_id").references((): AnySQLiteColumn => player.id),
+    creatureId: text("creature_id"),
+    name: text("name").notNull(),
+    expression: text("expression").notNull(),
+    category: text("category", { enum: ROLL_CATEGORIES }).notNull(),
+    order: integer("sort_order").notNull(),
+    createdBy: text("created_by").references((): AnySQLiteColumn => player.id),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [index("roll_macro_list").on(t.campaignId, t.playerId, t.creatureId, t.order)],
+);
+
+/**
+ * DM roll requests (dice-extras sprint 8, record type `roll-request`, DM only, FR-DICEX-73,
+ * ADR-0061). `roll` and `targets` (1–12) are JSON leaves validated by `@shared/dice-extras/
+ * requests`; target `name` is copied at send. Window: open pinned + newest 10 closed by `seq`.
+ * Prompts are `notification` rows; answers `roll` + `game-log-entry` rows (ids in `targets`).
+ */
+export const rollRequest = sqliteTable(
+  "roll_request",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    roll: text("roll", { mode: "json" }).$type<RequestRoll>().notNull(),
+    label: text("label").notNull(),
+    dc: integer("dc"),
+    dcShown: integer("dc_shown", { mode: "boolean" }).notNull(),
+    mode: text("mode", { enum: ROLL_MODES }).notNull(),
+    results: text("results", { enum: REQUEST_RESULTS }).notNull(),
+    state: text("state", { enum: REQUEST_STATES }).notNull(),
+    targets: text("targets", { mode: "json" }).$type<RequestTarget[]>().notNull(),
+    createdAt: text("created_at").notNull(),
+    closedAt: text("closed_at"),
+  },
+  (t) => [
+    uniqueIndex("roll_request_seq").on(t.seq),
+    index("roll_request_campaign_state").on(t.campaignId, t.state, t.seq),
+  ],
+);
+
 /** CON-20: `seq` for props and templates, computed by the DB inside the insert's transaction. */
 export const propSeqNext = sql<number>`(select coalesce(max(${prop.seq}), 0) + 1 from ${prop})`;
 export const aoeTemplateSeqNext = sql<number>`(select coalesce(max(${aoeTemplate.seq}), 0) + 1 from ${aoeTemplate})`;
+/** CON-20: `seq` for roll requests (FR-DICEX-73 window order). */
+export const rollRequestSeqNext = sql<number>`(select coalesce(max(${rollRequest.seq}), 0) + 1 from ${rollRequest})`;
 
 export const schema = {
   dbMeta,
@@ -1569,4 +1653,6 @@ export const schema = {
   compendiumEntry,
   diceLook,
   characterGems,
+  rollMacro,
+  rollRequest,
 };

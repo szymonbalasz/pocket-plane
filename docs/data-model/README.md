@@ -2317,7 +2317,51 @@ From [gems](../specs/gems.md#8-data-model) FR-GEM-25–31 and [combat-tracker](.
 - **Fixtures:** no new unit; e2e alias `gems-combat-e2e` on `gems`.
 - **CON-44:** 29 B a maxed card (33 B with 3 dice); 20 pending maxed → DM +580 B, players +87…+116 B (own cards only); 0 B without a Combat gem.
 
-## 106. Sprint 8: one window placer (WF1)
+## 106. Sprint 8: table-tools core (TT0)
+
+From [dice-extras](../specs/dice-extras.md#8-data-model) §8 sprint 8, [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-54 and [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-46, -48 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `fix/tt-core`** (schema lane first, seams S7). Protocol side: [protocol §135](../protocol/README.md#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0).
+
+| Field / table | Change | Rule | Source |
+|---|---|---|---|
+| `roll_macro` *(new table, record type `roll-macro`)* | `id` PK, `campaign_id` FK, `player_id` FK null (= DM only), `creature_id` (no FK; null = "Me" / "DM"), `name`, `expression`, `category`, `sort_order` (TS `order`), `created_by` FK player null (= the DM), `updated_at`; index `roll_macro_list (campaign_id, player_id, creature_id, sort_order)` | name 1–40, expression canonical FR-DICE-01; ≤ 24 per (`player_id`, `creature_id`), ≤ 200 per campaign (commands); a gone creature's rows stay (shown under "General"); `updated_at` server-only | FR-DICEX-64 |
+| `roll_request` *(new table, record type `roll-request`)* | `id` PK, `campaign_id` FK, `seq` (unique, CON-20), `roll` (JSON leaf `{kind, key, expression}`), `label`, `dc` null, `dc_shown`, `mode`, `results` (`public` \| `hidden`), `state` (`open` \| `closed`), `targets` (JSON leaf, 1–12), `created_at`, `closed_at` null; index `roll_request_campaign_state (campaign_id, state, seq)` | target `{characterId, playerId, name (copied at send), notificationId, state (open \| rolled \| declined \| missed), entryId, total, natural, success, at}`; ≤ 5 open per campaign; no timer; never undone | FR-DICEX-73 |
+| `asset.kind`, `asset.duration_ms` | + `kind` text NOT NULL default `image` (`image` \| `audio`), + `duration_ms` int null (push-safe) | old rows are images; a sound: image sizes 0, `listed` true, tags `[]`, mime `audio/mpeg` \| `audio/ogg` \| `audio/wav`, ≤ 512 KB, ≤ 5,000 ms (TT3's probe) | FR-ASSET-54 |
+| `campaign.pause`, `campaign.alert_sounds` | + JSON leaves: `pause` null (= running), `alert_sounds` NOT NULL default `{}` | on the wire only when set; picks are audio asset IDs or `none`; an absent key = the default sound | FR-CAMP-46, -48 |
+| `game_log_entry` (kind `roll`) | no column; payload items may carry `answer: true` | a request answer, never rerollable | FR-DICE-80 |
+
+- **Relations:** a target → its `notification` (kind `roll-request`) and answer `game_log_entry` by id; a macro → player / creature by id. **Derived:** macro lists, "All PCs", `success` (= total ≥ dc).
+- **Persisted runtime state:** the two tables and four columns.
+- **Fixtures:** bundle `session-sim-12` (empty sprint-8 section); TT units `dicex-macros` (TT1), `audio-chime`, `camp-alert-sounds` (TT3) join it later.
+- **CON-44:** see [protocol §135](../protocol/README.md#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0) (DM +203,534 B at the caps; players ≤ +39,461 B).
+
+## 107. Sprint 8: combat polish core (CB0)
+
+From [combat-extras](../specs/combat-extras.md#8-data-model) FR-CBTX-65–67 and [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-162–163, -168 (#334, #335). **Built by `fix/cb-core`** (schema lane: after TT0). Protocol side: [protocol §136](../protocol/README.md#136-sprint-8-combat-polish-core--cbtxmovecombatant-tie-order-cb0).
+
+| Field | Change | Rule | Source |
+|---|---|---|---|
+| `combatant.tie_order` / `tieOrder` | + int ≥ 1, **nullable, no default** (push-safe `ADD COLUMN`); DM only (every player redaction omits it, as `position`) | the DM's order inside a group of equal initiative, 1…k (gaps allowed); written only by `cbtx.moveCombatant`; null on a row whose number changes otherwise (`cbt.setInitiative`, `cbt.rollInitiative`) and on rows riding their owner; kept by remove / restore, hide / reveal, death; End leaves it on the inactive rows; a new fight starts null | FR-CBTX-66, FR-CBT-163 |
+| `combatant.initiative` | also written by `cbtx.moveCombatant` (`initRollId` → null on a change) | the A′ rule: a private row takes the anchor's number; a PC (hidden too) only another PC's | FR-CBTX-65 |
+
+- **Derived (not stored):** the order (`compareOrder`: initiative desc → `tieOrder` asc, null after numbers → init bonus → PC → `seq`); the DM's number hint (`planMove`, CB1).
+- **Persisted runtime state:** `tieOrder` and the adopted numbers; positions as before. The drag is client memory (CB1).
+- **CON-44:** DM +736 B worst (46 rows, `tieOrder` null), players 0 B.
+
+## 108. Sprint 8: alert sounds (TT3)
+
+From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-52–60 and [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-48 (#334, #335). **Built by `build/tt-sounds`**; no schema change (TT0's columns). Protocol side: [protocol §137](../protocol/README.md#137-sprint-8-alert-sounds--audio-upload--probe-sound-picks-shell-playback-tt3).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| `asset` row, `kind = audio` | written by `assets.ingest` with a probed sound: `mime` sniffed, `bytes` ≤ 512 KB, `duration_ms` 1–5,000 (the probe's length, cross-checked against bytes ÷ bitrate / the pages, the larger counts beyond 20 %), `width` / `height` / `display_*` 0, `listed` true, `tags` `[]`; dedupe by (`campaign_id`, `hash`) as images; ≤ 50 per campaign, no delete | FR-ASSET-52–55, -58, -60 |
+| Asset dir `<hash>/original` | a sound's only file (no derivatives); same temp-dir write, fsync, rename and start-up sweep as images (the sweep checks the files of each row's kind) | FR-ASSET-54 |
+| `campaign.alert_sounds` | written only by `camp.setAlertSound`: `default` removes the key; values are audio asset IDs of the campaign or `none` | FR-CAMP-48 |
+| Client decode cache | per page, per asset ID (`AudioBuffer`), filled at idle from the picks; never persisted | FR-SHELL-131 |
+
+- **Derived:** what a key plays (pick, else turn / request ping, pause / resume silent).
+- **Fixtures:** `audio-chime` (asset "Chime", 17,684 B, 400 ms), `camp-alert-sounds` (`request`, `pause` → Chime); both in `session-sim-12`.
+
+## 109. Sprint 8: one window placer (WF1)
 
 From [play-shell](../specs/play-shell.md#8-data-model) FR-SHELL-95–119 ([ADR-0060](../architecture/adr/0060-one-window-placer.md)). **Built by `fix/placer-core`.** Browser-only; nothing on the wire.
 

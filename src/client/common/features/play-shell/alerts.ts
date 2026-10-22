@@ -1,6 +1,13 @@
 // Alert surface (FR-SHELL-22–27): flash + Toast + sound + title mark, client-side only. Features
 // call `useShellAlert()` (ShellContext) in reaction to events the client already received; the
 // shell adds no event, intent or record. Pure controller with injected browser parts.
+// *(Sprint 8, FR-SHELL-130–134)* Sounds play by alert key through the campaign's picks; one at a
+// time, several due at once → the highest priority (turn > request > resume > pause).
+import type {
+  AlertKey,
+  AlertSoundPick,
+  AlertSounds,
+} from "@shared/campaign-management/table-state";
 import { createStore, type StoreApi } from "zustand";
 import type { AudioEngine, SoundOutcome } from "./audio";
 import {
@@ -9,15 +16,20 @@ import {
   type SoundSettings,
   type SoundSettingsStorage,
 } from "./sound-settings";
-import { DEFAULT_SOUND_ID } from "./sounds";
+import { soundPriority } from "./sounds";
 
 export interface ShellAlert {
   /** Same id while its flash runs → the flash restarts; no stacking. */
   id: string;
   title: string;
   detail?: string;
-  /** Sound id (FR-SHELL-26); omitted → no sound. Unknown → `ping`. */
-  sound?: string;
+  /**
+   * Alert key (FR-SHELL-130: `turn`, `request`, `pause`, `resume`) or a plain sound id
+   * (FR-SHELL-26, unknown → `ping`); omitted → no sound.
+   */
+  sound?: AlertKey | (string & {});
+  /** FR-SHELL-134: false = no flash (Toast and sound only). Default true. */
+  flash?: boolean;
 }
 
 export type SpeakerState = "on" | "muted" | "locked";
@@ -36,6 +48,10 @@ export interface AlertState {
 export interface AlertController {
   store: StoreApi<AlertState>;
   alert(a: ShellAlert): void;
+  /** FR-SHELL-134: the sound alone (no flash, Toast or title mark), e.g. a prompt at resume. */
+  alertSound(key: AlertKey | (string & {})): void;
+  /** FR-SHELL-130, -131: the campaign's picks (`campaign.alertSounds`); preloads new ones. */
+  setPicks(picks: AlertSounds): void;
   /** The flash with `key` finished; a newer one is left alone. */
   flashEnded(key: number): void;
   /** First `pointerdown` / `keydown` anywhere on the page (FR-SHELL-25). */
@@ -43,8 +59,13 @@ export interface AlertController {
   /** Sound settings owner: the player's key, or null (DM: defaults, in memory). */
   setOwner(key: string | null): void;
   setSettings(patch: Partial<SoundSettings>): void;
-  /** The speaker's Test button: counts as an interaction, plays `ping`. */
-  test(): SoundOutcome;
+  /**
+   * The Sound section's Test (FR-SHELL-132): counts as an interaction, plays `key`'s sound (default
+   * `turn`) as an alert would, but not counted. null = the key is silent.
+   */
+  test(key?: AlertKey): SoundOutcome | null;
+  /** The DM's Test ▶ (FR-CAMP-49): `pick` for `key`, loaded first if needed. null = silent. */
+  preview(key: AlertKey, pick: AlertSoundPick | "default"): Promise<SoundOutcome | null>;
 }
 
 /** Speaker state (FR-SHELL-24/25): muted or volume 0 first, then locked until an interaction. */
@@ -99,26 +120,43 @@ export function createAlertController(deps: {
   }));
   let owner: string | null = null;
   let flashKey = 0;
+  /** The sound that won this task (FR-SHELL-133 "due at once"); cleared in a microtask. */
+  let winner: string | null = null;
   const unlock = () => {
     audio.unlock();
     if (!store.getState().unlocked) store.setState({ unlocked: true });
   };
+  /**
+   * FR-SHELL-133: a sound due while another plays → `skipped`; several in one task → the highest
+   * priority (a later, higher one cuts the earlier; a lower one is dropped and not recorded, so
+   * `lastSound` shows the winner). Silent keys record nothing.
+   */
+  const sound = (key: string) => {
+    const s = store.getState();
+    const sameTask = winner !== null;
+    if (sameTask && soundPriority(key) <= soundPriority(winner as string)) return;
+    const r = audio.play(key, s.settings, { replace: sameTask });
+    if (!r) return;
+    const n = s.soundCount + 1;
+    store.setState({ soundCount: n, lastSound: `${r.sound}:${r.outcome}:${n}` });
+    if (r.outcome === "played" || r.outcome === "fallback") {
+      if (winner === null) queueMicrotask(() => (winner = null));
+      winner = key;
+    }
+  };
   return {
     store,
     alert(a) {
-      flashKey += 1;
-      const patch: Partial<AlertState> = { flash: { id: a.id, key: flashKey } };
-      if (a.sound !== undefined) {
-        const s = store.getState();
-        const r = audio.play(a.sound, s.settings);
-        const n = s.soundCount + 1;
-        patch.soundCount = n;
-        patch.lastSound = `${r.sound}:${r.outcome}:${n}`;
+      if (a.flash !== false) {
+        flashKey += 1;
+        store.setState({ flash: { id: a.id, key: flashKey } });
       }
-      store.setState(patch);
+      if (a.sound !== undefined) sound(a.sound);
       deps.toast(a);
       deps.title.mark(a.title);
     },
+    alertSound: sound,
+    setPicks: (picks) => audio.setPicks(picks),
     flashEnded(key) {
       if (store.getState().flash?.key === key) store.setState({ flash: null });
     },
@@ -133,9 +171,13 @@ export function createAlertController(deps: {
       store.setState({ settings });
       if (owner) storage.write(owner, settings);
     },
-    test() {
+    test(key = "turn") {
       unlock();
-      return audio.play(DEFAULT_SOUND_ID, store.getState().settings).outcome;
+      return audio.play(key, store.getState().settings, { force: true })?.outcome ?? null;
+    },
+    preview(key, pick) {
+      unlock();
+      return audio.preview(key, pick, store.getState().settings);
     },
   };
 }

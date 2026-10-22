@@ -116,7 +116,7 @@ Tier A rules hold: filter, then aggregate; final roll only; names from facts; pa
 | | **Luck tracker** |
 | FR-STATS-37 | **Counted rolls**: counted (FR-STATS-02), character actor, not `initiative`, ≥ 1 d20; physical, macro, request and DM-on-behalf rolls too *(OQ-STATS-25)*. Players: public entries only; a hidden request answer is DM-only, even for its roller (S6; awards, trophies too). |
 | FR-STATS-38 | **Formulas**: the table below *(OQ-STATS-26)*. |
-| FR-STATS-39 | **Rows**: party characters with ≥ 1 counted roll, by name. DM also `dm-dice`: d20 rolls by DM, monster and token actors, hidden included *(OQ-STATS-24)*. A player's roll with no character ("Me") counts nowhere. |
+| FR-STATS-39 | **Rows**: party characters with ≥ 1 counted roll, by name. DM also `dm-dice`: d20 rolls by the DM, **unowned** monsters and token actors, hidden included *(OQ-STATS-24)*. A player's roll with no character ("Me") counts nowhere; nor does a roll by an **owned** creature (pet / summon / companion, ADR-0056) (integrator ruling, SB0). |
 | FR-STATS-40 | **Scopes**: one session (FR-STATS-13's picker, default the newest) or Campaign. |
 | FR-STATS-41 | **UI**: tab **Luck** (`stats-luck`): `stats-luck-scope`, `stats-luck-table` of `stats-luck-row` (`data-record-id` = character id / `dm-dice`): Name, Rolls, d20s, Avg, Nat 20, Nat 1. Refresh as FR-STATS-17 on a live `roll` entry. |
 | | **Trophy case** |

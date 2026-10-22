@@ -286,6 +286,7 @@ Each lists `changes` (before/after per record; create: before null, delete: afte
 | `DeathSavesSet` | CBTX | `{characterId, successes, failures}` | `entity` | yes | no | no | — |
 | `CombatantsAdded` | CBTX | `{encounterId, combatantIds}` (1–20) | `combatant` creates + ranks; `encounter`; `effect` hidden copies; *(sprint 2, FR-CBTX-44, built, fix/combat2-add)* created `token`s first, then combatants, HP and initiative roll entries (DM-only), ranks, effect copies | yes | no | no | — |
 | `CombatantBound` *(sprint 2, emitted by `cbtx.bindToken`, built, fix/combat2-add)* | CBTX | `{combatantId, tokenId \| null}` (null = unlink) | `combatant`; on a `hidden` change also ranks, `encounter`, `effect` hidden copies | yes | no | no | — |
+| `CombatantMoved` *(sprint 8, emitted by `cbtx.moveCombatant`, built, fix/cb-core, [§136](#136-sprint-8-combat-polish-core--cbtxmovecombatant-tie-order-cb0))* | CBTX | `{encounterId, combatantId, afterId \| null, initiativeBefore \| null, initiativeAfter}` | `combatant` upserts (moved row, rewritten tie rows, reranks); players: changed visible redactions only, no frame when none (`quietWhenUnchanged`) | yes | no | no | — |
 | `DamageRolled` *(sprint 2)* | CBT | `{cardId, rollIds (≥ 1), attached}` | `game-log-entry`; then `NotificationUpdated` (`attached`) or `NotificationCreated` | yes | no | no | — |
 | `NotificationUpdated` *(sprint 2)* | NOTE | `{notificationId, kind}` | `notification` upsert (pending row, new payload / text; same `seq`) | yes | no | no | — (no toast) |
 | `EffectPresetSaved` / `EffectPresetDeleted` *(sprint 2, MOD)* | MOD | `{presetId}` | `effect-preset` upsert / delete | yes | no | no | — |
@@ -3176,7 +3177,93 @@ From [gems](../specs/gems.md#6-functional-requirements) FR-GEM-05, -13, -25–31
 - **Fixtures:** no new unit (`gems`: Brakka level 5, Combat 2, the Flame Tongue greatsword); e2e alias `gems-combat-e2e` (`e2e/gems-combat.e2e.ts`). `session-sim-11` adds none (gems off).
 - **CON-44** (heavy harness, `con44-maxed.test.ts`): 29 B a maxed card (1 die; 33 B with 3), 20 pending maxed cards → DM +580 B (691,159 B of 1.5 MiB); players +87…+116 B for their own 3–4 cards (≤ 289,034 B of 512 KiB). A spend's frame: count + spend line + the card for its audience.
 
-## 135. Sprint 8: one window placer (WF1)
+## 135. Sprint 8: table-tools core — macros, roll requests, audio assets, pause and sound fields (TT0)
+
+From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-64, -67, -73, -77, -92, -93, [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-79, -80, -83, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-58, -64, [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-54, -57, -59 and [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-46, -48 (#334, #335; [ADR-0061](../architecture/adr/0061-roll-requests.md)). **Built by `fix/tt-core`** (records, zod, events, kind def, helpers; no intent: macros / requests TT1+2, sounds TT3, pause TT4). Data side: [data model §106](../data-model/README.md#106-sprint-8-table-tools-core-tt0).
+
+**Record types** (scope `campaign`)
+
+| Type | Visibility | Snapshot | Source |
+|---|---|---|---|
+| `roll-macro {id, campaignId, playerId \| null, creatureId \| null, name, expression, category, order, createdBy \| null}` *(new)* | DM full; a player iff `playerId` = them (DM-only rows, `playerId` null, never). `createdBy` null = the DM's row (read-only for players) | every row (≤ 200) | FR-DICEX-64, -67 |
+| `roll-request {id, campaignId, seq, roll {kind, key, expression}, label, dc, dcShown, mode, results, state, targets [{characterId, playerId, name, notificationId, state, entryId, total, natural, success, at}] 1–12, createdAt, closedAt}` *(new)* | **`audience: dm`**: no player key, change or load | window: open pinned + newest 10 closed by `seq` (the provider reads only that, SQL) | FR-DICEX-73 |
+| `audio-asset {id, campaignId, seq, name, mime, bytes, durationMs, createdAt}` *(new)* | **`audience: dm`**, **lazy `all`** (ADR-0045): in no snapshot; `sync.load` DM only (player → `forbidden`) | — | FR-ASSET-57 |
+| `asset` | unchanged, but **images only** (`kind = image`): a sound never appears in it | as before | FR-ASSET-57 |
+| `campaign` | + `pause {message \| null, imageAssetId \| null, backAt \| null, startedAt}` only while paused; + `alertSounds {turn?, request?, pause?, resume?: assetId \| "none"}` only when some alert has a pick. Every connection of the campaign. `toCampaignRecord` takes the whole row, so every campaign upsert (rename, colour, switch) keeps both | as before | FR-CAMP-46, -48 |
+
+**Notification kind** `roll-request` *(new; `kinds.ts` append; toast class **card**, FR-NOTE-52)*: audience `player` = the PC's owner, action "Roll" owned by that player; payload `{requestId, characterId, characterName, roll, label, dc | null, mode}` (strict: no `success` / `results`; `dc` null unless shown; ≤ 1 KB); resolution `{outcome: rolled | declined | missed, total?}`; `genericResolve: false` (`note.resolve` → `forbidden`), no end rule.
+
+**Domain events** (`src/shared/events/dice-extras.ts`, `campaign-management.ts`; all logged, none undoable; emitted by TT1–TT4)
+
+| Event | Changes | Player sees |
+|---|---|---|
+| `MacroSaved {macroId}` / `MacroDeleted {macroId}` | `roll-macro` upsert(s) / delete | iff `playerId` = them; else no frame |
+| `RollRequested {requestId}` | `roll-request` upsert (with `NotificationCreated` per target) | **no frame** (FR-SYNC-17); a target gets only its own prompt |
+| `RollRequestAnswered {requestId, characterId, entryId}` | answer entry + `roll-request` upsert (then `NotificationResolved`) | the entry per its audience (public, or `audiencePlayerId` = them); the roller their resolve |
+| `RollRequestDeclined {requestId, characterId}` | `roll-request` upsert (then `NotificationResolved`) | the target's player their resolve |
+| `RollRequestClosed {requestId, rolled?: entryId[]}` | `roll-request` upsert + the entries rolled for missing targets (then `NotificationResolved` per open target, by rule) | the entries per audience; each target's player their resolve |
+| `CampaignPaused {campaignId}` / `CampaignResumed {campaignId}` | `campaign` upsert | every connection (no resync) |
+| `AlertSoundSet {alert}` | `campaign` upsert | every connection |
+
+**Internal helpers** (server only; no intent field reaches them)
+
+| Helper | Contract | Source |
+|---|---|---|
+| `gameLog.append(env, {…, audience?})` | `audience` `{public: true}` or `{public: false, audiencePlayerId}` stamps the entry (hidden = DM + that player), whoever rolls; wins over the role / category stamp and `forcePrivate`. A player-sent `public` stays `forbidden` on every intent | FR-DICE-79, -83 |
+| `roll` payload item `answer?: true` | a request answer (data only, no line tag); `rerollableRoll` → null and `isAnswerEntry(entry)` (`@shared/dice-roll-log/reroll`): never rerollable | FR-DICE-80 |
+| `assets.require(env, id, {kind?})` | default `image`; a row of the other kind → `invalid` "Not an image" / "Not a sound"; unknown → `not_found` | FR-ASSET-59 |
+| `dice-extras/table-rows.ts` | `assertMacroRoom` (≤ 24 per list, ≤ 200 per campaign → `conflict`), `assertRequestRoom` (≤ 5 open → `conflict`), row ↔ record mappers | FR-DICEX-64, -74 |
+
+- **Zod** (`@shared/dice-extras/macros`, `requests`; `@shared/assets-pipeline/audio`; `@shared/campaign-management/table-state`): records, the TT1 / TT2 intents (`dicex.saveMacro`, `deleteMacro`, `moveMacro`, `request`, `answerRequest`, `declineRequest`, `closeRequest`, `rollForMissing`; none takes `public` or an audience), the prompt payload / resolution, the pause card, the picks.
+- **Image route** `GET /api/assets/:id/{thumb,display}`: a sound → the common 404 (its own route is TT3's).
+- **Fixtures:** bundle `session-sim-12` (= `session-sim-11` + an empty sprint-8 section, one comment per track WF / TT / SB / CB); no unit yet.
+- **CON-44** (`src/server/ws/testing/con44-tt.test.ts`, heavy harness at the caps): DM 690,790 → 894,324 B (+203,534 B; 678,540 B left of 1.5 MiB): `roll-macro` 72,390 B (200 rows), `roll-request` 70,526 B (5 open + 10 closed × 12 targets), prompts 60,185 B (60); players +10,500…+39,461 B (worst 325,266 B of 512 KiB); `audio-asset` 0 B in every snapshot (`sync.load` of 50 = 13,967 B).
+
+## 136. Sprint 8: combat polish core — `cbtx.moveCombatant`, tie order (CB0)
+
+From [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-64–69 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-162–164, -168 (#334, #335; OQ-CBTX-31 A′, -32 A, -33 A, OQ-CBT-99 A, -100 A; review-b #16, #23). **Built by `fix/cb-core`**. Data side: [data model §107](../data-model/README.md#107-sprint-8-combat-polish-core-cb0). Schema lane: merged after TT0.
+
+**Intents**
+
+| Intent | Who | Errors (one code per case) | Result | Source |
+|---|---|---|---|---|
+| `cbtx.moveCombatant {encounterId, combatantId, afterId: ID \| null}` (`CBTX_INTENTS.moveCombatant`, strict; `afterId` null = top) | DM; player → `forbidden` | ids of no / another campaign or encounter → `not_found`; encounter not `started` → `conflict` "Combat is not running"; combatant inactive → `conflict` "Goblin is not in combat", removed → `conflict` "Restore Goblin first", riding its owner (`after-owner` / `in-owner-turn` with the owner in the fight) → `conflict` "Goblin 2 moves with Mira"; `afterId` itself, inactive, removed, riding its owner or without initiative → `invalid` "Drop below a row with initiative"; no other row has initiative → `conflict` "Roll initiative first"; a PC without a number and no PC number around → `conflict` "Set a number first". Same order as today → `ack`, no write, no event | none | FR-CBTX-64 |
+
+**Rule** (`planMove(rows, movedId, afterId)` in `@shared/combat-tracker/rules`, pure; the server and CB1's DM number hint run it). `rows` = movable rows (active, not removed, not riding the owner) by `position`. **(a)** a private moved row (not a PC) takes the anchor's number (top: the first other numbered row's). **(b)** a PC (hidden ones too: a reveal never shows a monster's number on a PC) keeps its number, lowered to the nearest PC above the drop spot and raised to the nearest PC below; private rows above it with a lower number, or below it with a higher one, take that number. Changed numbers null `initRollId`; no roll, no log line. Then `tieOrder` 1…k on every movable row with the arranged number, in the dropped order (others keep theirs; removed rows keep theirs), then `rerank`. Order everywhere: `compareOrder` = initiative desc → `tieOrder` asc (null after any number) → init bonus → PC → `seq`; riding companions follow their owner (FR-CBT-162).
+
+**Tie order cleared** (FR-CBT-163 (c)): `cbt.setInitiative` and `cbt.rollInitiative` (and Start / add rolls) write `tieOrder: null` on the row; `rerank` clears it on any row riding its owner (turn mode or owner change onto attached). Remove / restore, hide / reveal, death keep it; Next / Prev never re-sort; new combatants start null.
+
+**Events and visibility**
+
+| Event | Changes | DM | Players | Undoable |
+|---|---|---|---|---|
+| `CombatantMoved {encounterId, combatantId, afterId \| null, initiativeBefore \| null, initiativeAfter}` (new, `src/shared/events/combat-extras.ts`; logged) | `combatant` upserts: the moved row (`initiative`, `initRollId`, `tieOrder`), rewritten tie rows, reranked rows (`position`, `playerPosition`). No `encounter` change (the turn never moves, FR-CBT-164) | full | each changed visible row's redaction (no `tieOrder`, never a monster's number); unchanged redactions dropped; **`quietWhenUnchanged`**: a move players can't see (hidden, fog-hidden, `ownerHidden` row) sends them **no frame** (FR-CBTX-67) | no (drag back) |
+
+- No `TurnChanged`, turn alert, `turnChanged` rule hook, `movedFt` reset or expiry on a move (FR-CBT-164).
+- **Server registration:** `combatPolish` feature line (`src/server/features/combat-extras/move.ts`) in the server feature list.
+- **Fixtures:** units `cb-ties`, `cb-fog-goblin`, `cb-party` (join `session-sim-12`, sim-11-safe); bundle `combat-polish` (= `session-sim-11` + the three); e2e aliases `cb-reorder-e2e` (`e2e/cb-core.e2e.ts`), `cb-turn-ring-e2e`, `cb-party-e2e`.
+- **CON-44** (heavy harness, `con44-cb.test.ts`): `tieOrder` on 46 DM combatant rows → DM +736 B (null) / +635 B (all set), 691,492 B of 1.5 MiB; players 0 B (byte-identical, worst 289,088 B of 512 KiB).
+
+## 137. Sprint 8: alert sounds — audio upload + probe, sound picks, shell playback (TT3)
+
+From [assets-pipeline](../specs/assets-pipeline.md#64-sprint-8-audio-assets-track-tt) FR-ASSET-52–61, [campaign-management](../specs/campaign-management.md#6-functional-requirements) FR-CAMP-48–50, [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-130–134 and [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-41 (#334, #335). **Built by `build/tt-sounds`** on TT0's records and events ([§135](#135-sprint-8-table-tools-core--macros-roll-requests-audio-assets-pause-and-sound-fields-tt0)). Data side: [data model §108](../data-model/README.md#108-sprint-8-alert-sounds-tt3).
+
+**REST**
+
+| Route | Contract | Source |
+|---|---|---|
+| `POST /api/assets` (DM `Bearer`) | Content sniffed (never the name or `Content-Type`): `RIFF…WAVE`, `OggS`, `ID3` or an MPEG Layer III frame → a **sound**, probed (`audio-probe.ts`, hand-rolled, no dependency): > 512 KB → `413` "Too large (max 512 KB)"; header unreadable / not PCM-float WAV, Vorbis / Opus OGG or Layer III → `415`; > 5,000 ms → `422` "Too long (max 5 s)". Code stays `invalid` (the status carries the cause; `RestErrorCode` has no `too_long`). New optional multipart field **`kind`** `image` \| `audio`: what the uploader expects; other content → `415` ("Not a sound (MP3, OGG or WAV)" for `audio`); anything else in the field → `400`. A sound ignores `listed` / `tags`. `201` created / `200` existing (same hash in the campaign), body `{asset}` in the image shape (sizes 0). 51st sound in a campaign → `409` "Sound library full (50)" (a duplicate still answers `200`) | FR-ASSET-52, -55, -58, -60 |
+| `GET /api/assets/:id/audio` (no credential; the ID is the capability, ADR-0023) | The stored original, `Content-Type` = the row's mime, `Cache-Control: private, max-age=31536000, immutable`, `ETag "<id>-audio"` (`304` on match), `nosniff`; iff the asset is in the active campaign, of kind `audio`, its file present; any mismatch (image ID, bad ID, other campaign, file lost) → the common 404 body | FR-ASSET-56 |
+
+**Intent** `camp.setAlertSound {alert: turn | request | pause | resume, sound: "default" | "none" | assetId}` (DM; WS): `default` removes the key, `none` silences, an asset via `assets.require(…, {kind: "audio"})` (image → `invalid`, unknown → `not_found`); bad key / value → `invalid`; player → `forbidden`; same value → ack, no event. Else `AlertSoundSet {alert}` with the `campaign` upsert to every connection (logged, not undoable; two DM tabs: last wins). FR-CAMP-48.
+
+- **Record flow** (TT0's types): an upload's `AssetIngested` carries an **`audio-asset`** upsert (DM only; never `asset`); players get no frame. The library reaches the DM only by `sync.load {type: "audio-asset"}` (the Campaign options section, on open); a player's load → `forbidden`. Players learn a sound's ID only as a pick in `campaign.alertSounds`, and fetch only the picked sounds' capability URLs. `assets.setTags` on a sound → `not_found` (FR-ASSET-60).
+- **Client playback** (`play-shell/{sounds,audio,alerts}.ts`, `AlertLayer.tsx`): `alert({…, sound?: key | id, flash?})`; new `useAlertSound()(key)` (sound alone; TT2 / TT4 call it for `request`, `pause`, `resume`). A key resolves via `campaign.alertSounds`: asset → that sound; `none` → silent (nothing recorded); absent → `ping` for turn / request, silent for pause / resume. Picks preload at idle after the snapshot and on change (`fetch` + `decodeAudioData` on an offline context, once per asset ID); not ready or undecodable → `ping`, outcome `fallback`, one console warning (no ID). Shared context, a gain per sound, every source stopped at 5 s. One at a time: due while another plays → `skipped`; due in one task → turn > request > resume > pause (a higher one cuts a lower; a lower one is dropped). Muted / volume 0 / locked → nothing for any key. Test mode `data-test-last-sound` = `<key>:<played | muted | locked | failed | skipped | fallback>:<n>` (plain ids keep `<sound>`). The turn alert (FR-CBT-41) passes key `turn`. FR-SHELL-130–134.
+- **Test IDs:** DM `camp-sounds`, `camp-sound` (+ `data-value` = key), `camp-sound-select` (`data-value` = pick or `default`), `camp-sound-test` (`data-outcome` after a click), `camp-sound-upload`, `camp-sound-file`, `camp-sound-error`; players' Sound section `ui-sound-test-key` (`data-value`), `ui-sound-test` (`data-outcome`).
+- **Fixtures:** units `audio-chime` (generated 0.4 s PCM WAV, 17,684 B; `ingestStep` gains a bytes form `{bytes, filename}`; manifest type `audio-asset`) and `camp-alert-sounds` (request, pause → Chime) join `session-sim-12`; bundles `alert-sounds` (`mid-combat` + both), `alert-sounds-e2e`. Upload-limit files `e2e/support/audio.ts` (`bun e2e/support/audio.ts <dir>` writes `big.wav`, `long.wav`, `fake.mp3`).
+- **CON-44:** no new snapshot record; `audio-asset` 0 B (lazy); the picks' +150 B and the 50-sound load are measured by `con44-tt.test.ts` (§135).
+
+## 138. Sprint 8: one window placer (WF1)
 
 From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-95–119, [ADR-0060](../architecture/adr/0060-one-window-placer.md). **Built by `fix/placer-core`.** No intent, event or record change: the shell is client-side (0 B).
 

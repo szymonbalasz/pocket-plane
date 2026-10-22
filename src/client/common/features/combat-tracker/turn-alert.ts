@@ -17,7 +17,7 @@ export interface TurnAlert {
   id: "cbt.turn";
   title: string;
   detail: string;
-  sound: "ping";
+  sound: "turn";
 }
 
 /** `store` = the store after the frame was applied. */
@@ -53,7 +53,7 @@ export function turnAlertFor(
   return { ...ALERT, detail: `${name}${extra}` };
 }
 
-const ALERT = { id: "cbt.turn", title: "Your turn", sound: "ping" } as const;
+const ALERT = { id: "cbt.turn", title: "Your turn", sound: "turn" } as const;
 
 /** The owner PC's name: its combatant's, else its character's (FR-CBT-115 "Owlbear (Mira)"). */
 function ownerName(store: RecordStore, characterId: string): string {

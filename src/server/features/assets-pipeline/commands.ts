@@ -1,11 +1,19 @@
 // assets.ingest (FR-ASSET-01, -03, -04, -06, -08, -09) and assets.require (FR-ASSET-15).
+// *(Sprint 8)* Sounds (FR-ASSET-52–60) share the command: `audio` in place of `image`.
 import { createHash } from "node:crypto";
+import {
+  type AssetKind,
+  AUDIO_LIBRARY_CAP,
+  AUDIO_MAX_BYTES,
+  AUDIO_MAX_MS,
+  AudioMime,
+} from "@shared/assets-pipeline/audio";
 import { AssetName, type AssetRecord, nameFromFilename } from "@shared/assets-pipeline/schemas";
 import { type DroppedTag, ImageTags } from "@shared/assets-pipeline/tags";
 import { AssetIngested, AssetListed, AssetTagsSet } from "@shared/events/assets-pipeline";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
-import { defineCommand } from "../../commands/commands";
+import { type CommandEnv, defineCommand } from "../../commands/commands";
 import type { CommandContext } from "../../commands/context";
 import { conflict, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
@@ -36,15 +44,30 @@ export const ProcessedImageSchema = z.object({
   thumb: Derivative,
 }) satisfies z.ZodType<ProcessedImage>;
 
-export const IngestInput = z.object({
-  image: ProcessedImageSchema,
-  filename: z.string().max(1024),
-  name: z.string().optional(),
-  /** FR-ASSET-24 (S5): false = an attachment (outside the library and every snapshot). */
-  listed: z.boolean().optional(),
-  /** FR-ASSET-41 (S6): the upload context's tags; a new row without them gets `[]`. */
-  tags: ImageTags.optional(),
+/** A probed sound (FR-ASSET-53): the stored file as uploaded; the route has checked the limits. */
+export const ProbedAudioSchema = z.object({
+  hash: z.string().regex(/^[0-9a-f]{64}$/),
+  mime: AudioMime,
+  durationMs: z.int().min(1).max(AUDIO_MAX_MS),
+  original: Bytes.refine((b) => b.byteLength <= AUDIO_MAX_BYTES, "Too large (max 512 KB)"),
 });
+export type ProbedAudio = z.infer<typeof ProbedAudioSchema>;
+
+/** Exactly one of `image` / `audio` (sprint 8). */
+export const IngestInput = z
+  .object({
+    image: ProcessedImageSchema.optional(),
+    audio: ProbedAudioSchema.optional(),
+    filename: z.string().max(1024),
+    name: z.string().optional(),
+    /** FR-ASSET-24 (S5): false = an attachment (outside the library and every snapshot). */
+    listed: z.boolean().optional(),
+    /** FR-ASSET-41 (S6): the upload context's tags; a new row without them gets `[]`. */
+    tags: ImageTags.optional(),
+  })
+  .refine((v) => (v.image === undefined) !== (v.audio === undefined), {
+    message: "Expected an image or a sound",
+  });
 export type IngestInput = z.input<typeof IngestInput>;
 
 export interface IngestResult {
@@ -99,7 +122,7 @@ export function ingestCommand(store: AssetStore) {
     name: INGEST,
     input: IngestInput,
     execute(
-      { image, filename, name, listed = true, tags: sent },
+      { image, audio, filename, name, listed = true, tags: sent },
       { tx, ctx, actor, emit },
     ): IngestResult {
       const campaignId = actor.campaignId;
@@ -111,6 +134,10 @@ export function ingestCommand(store: AssetStore) {
           parsedName.error.issues.map((i) => ({ path: ["name"], message: i.message })),
         );
       }
+      if (audio) {
+        return ingestAudio(store, audio, parsedName.data, { tx, ctx, emit, campaignId });
+      }
+      if (!image) throw invalid("Expected an image or a sound");
       if (createHash("sha256").update(image.original).digest("hex") !== image.hash) {
         throw invalid("Hash does not match the original");
       }
@@ -193,10 +220,84 @@ export function ingestCommand(store: AssetStore) {
 }
 
 /**
- * `assets.require(ctx, id)` (FR-ASSET-15): the asset of `actor.campaignId`, else `not_found`.
- * Every command that sets an asset-ID field calls it, incl. propagated copies in its transaction.
+ * FR-ASSET-52–58: a sound. Dedupe by hash as images (`existing`, files healed); else the cap
+ * (50 per campaign, no delete) → `conflict` "Sound library full (50)"; files (`original` only)
+ * before the row; the row: kind `audio`, image sizes 0, `listed` true, tags `[]` (FR-ASSET-60:
+ * the upload's `listed` / `tags` are ignored). Its upsert is an `audio-asset` (DM only, lazy).
  */
-export function requireAsset(env: { tx: Tx; actor: Actor }, id: string): AssetRecord {
+function ingestAudio(
+  store: AssetStore,
+  audio: ProbedAudio,
+  name: string,
+  env: Pick<CommandEnv, "tx" | "ctx" | "emit"> & { campaignId: string },
+): IngestResult {
+  const { tx, ctx, emit, campaignId } = env;
+  if (createHash("sha256").update(audio.original).digest("hex") !== audio.hash) {
+    throw invalid("Hash does not match the original");
+  }
+  const existing = tx
+    .select()
+    .from(asset)
+    .where(and(eq(asset.campaignId, campaignId), eq(asset.hash, audio.hash)))
+    .get();
+  if (existing) {
+    store.repairAudioFiles(audio.hash, audio.original);
+    return { asset: toAssetRecord(existing), outcome: "existing" };
+  }
+  const count = tx
+    .select({ n: sql<number>`count(*)` })
+    .from(asset)
+    .where(and(eq(asset.campaignId, campaignId), eq(asset.kind, "audio")))
+    .get();
+  if ((count?.n ?? 0) >= AUDIO_LIBRARY_CAP) {
+    throw conflict(`Sound library full (${AUDIO_LIBRARY_CAP})`);
+  }
+  store.ensureAudioFiles(audio.hash, audio.original);
+  let id = nextAssetId(ctx, audio.hash);
+  while (tx.select({ id: asset.id }).from(asset).where(eq(asset.id, id)).get()) {
+    id = nextAssetId(ctx, audio.hash);
+  }
+  tx.insert(asset)
+    .values({
+      id,
+      campaignId,
+      seq: assetSeqNext,
+      name,
+      hash: audio.hash,
+      mime: audio.mime,
+      bytes: audio.original.byteLength,
+      width: 0,
+      height: 0,
+      displayWidth: 0,
+      displayHeight: 0,
+      createdAt: ctx.clock.iso(),
+      listed: true,
+      tags: [],
+      kind: "audio",
+      durationMs: audio.durationMs,
+    })
+    .run();
+  const row = tx.select().from(asset).where(eq(asset.id, id)).get() as AssetRow;
+  emit({
+    type: AssetIngested.type,
+    campaignId,
+    payload: { assetId: id, hash: audio.hash, bytes: row.bytes, listed: true, tags: [] },
+    changes: assetUpsert(row),
+  });
+  return { asset: toAssetRecord(row), outcome: "created" };
+}
+
+/**
+ * `assets.require(ctx, id, {kind?})` (FR-ASSET-15, -59): the asset of `actor.campaignId`, else
+ * `not_found`; of `kind` (default `image`), else `invalid` (a sound as a map, an image as an alert
+ * sound). Every command that sets an asset-ID field calls it, incl. propagated copies in its
+ * transaction. A sound comes back in the `asset` shape too (image sizes 0); only its id is used.
+ */
+export function requireAsset(
+  env: { tx: Tx; actor: Actor },
+  id: string,
+  opts: { kind?: AssetKind } = {},
+): AssetRecord {
   const campaignId = env.actor.campaignId;
   const row = campaignId
     ? env.tx
@@ -206,6 +307,8 @@ export function requireAsset(env: { tx: Tx; actor: Actor }, id: string): AssetRe
         .get()
     : undefined;
   if (!row) throw notFound("Asset not found");
+  const kind = opts.kind ?? "image";
+  if (row.kind !== kind) throw invalid(kind === "audio" ? "Not a sound" : "Not an image");
   return toAssetRecord(row);
 }
 

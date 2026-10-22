@@ -1,9 +1,11 @@
 // Fixture unit registry. Append-only (AGENTS §9.9): add your own lines.
 import type { Fixture } from "@server/features/fixtures-adapters/fixture-types";
+import audioChime from "./assets-pipeline/audio-chime";
 import imageLarge from "./assets-pipeline/image-large";
 import imageTags from "./assets-pipeline/image-tags";
 import images from "./assets-pipeline/images";
 import imagesSecond from "./assets-pipeline/images-second";
+import campAlertSounds from "./campaign-management/camp-alert-sounds";
 import campaign from "./campaign-management/campaign";
 import campaignSecond from "./campaign-management/campaign-second";
 import pcColourFree from "./campaign-management/pc-colour-free";
@@ -17,6 +19,9 @@ import charMiraFull from "./character-sheet-full/char-mira-full";
 import charMiraLocked from "./character-sheet-full/char-mira-locked";
 import charSela from "./character-sheet-full/char-sela";
 import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
+import cbFogGoblin from "./combat-extras/cb-fog-goblin";
+import cbParty from "./combat-extras/cb-party";
+import cbTies from "./combat-extras/cb-ties";
 import cbtxEffects from "./combat-extras/cbtx-effects";
 import cbtxReinforcement from "./combat-extras/cbtx-reinforcement";
 import cbtxTemp from "./combat-extras/cbtx-temp";
@@ -223,4 +228,11 @@ export const units: readonly Fixture[] = [
   // Sprint 7 track ST (fix/st-core): stats facts
   stPastCrypt,
   stAmbushFacts,
+  // Sprint 8 track TT (build/tt-sounds): the Chime sound + the DM's picks
+  audioChime,
+  campAlertSounds,
+  // Sprint 8 track CB (fix/cb-core): ties, a fog-hidden Goblin, party values
+  cbTies,
+  cbFogGoblin,
+  cbParty,
 ];

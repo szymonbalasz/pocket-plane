@@ -47,7 +47,7 @@ test("FR-CBT-41 FR-SHELL-25 turn alert Toast after a player reload with audio lo
   await expect(toast).toContainText("Your turn — Mira", { timeout: 1000 });
   await expect(player.getByTestId("ui-topbar")).toHaveAttribute(
     "data-test-last-sound",
-    /^ping:locked:/,
+    /^turn:locked:/,
   );
   // Still there a second later (sonner's 4 s default), not a flicker.
   await player.waitForTimeout(1000);

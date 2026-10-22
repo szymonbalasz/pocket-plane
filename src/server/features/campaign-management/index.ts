@@ -3,6 +3,7 @@ import { CloseCode } from "@shared/protocol/codes";
 import { eq } from "drizzle-orm";
 import { player } from "../../db/schema";
 import type { Feature } from "../../services";
+import { setAlertSound } from "./alert-sounds";
 import { createResolvers, DmSecretChecker } from "./auth";
 import { migratePlayerColors, setColor } from "./colors";
 import {
@@ -29,6 +30,8 @@ export const campaignManagement: Feature = {
     r.command(setColor, { intent: true });
     // Sprint 7 (ADR-0058, FR-CAMP-39): feature switches.
     r.command(setFeature, { intent: true });
+    // Sprint 8 (FR-CAMP-48, TT3): the DM's alert-sound picks.
+    r.command(setAlertSound, { intent: true });
     r.recordType(campaignRecordType);
     r.recordType(playerRecordType);
     // FR-CAMP-23 / -34: keys → hex, then fill, before the server listens (no snapshot carries a
