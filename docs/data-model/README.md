@@ -2544,3 +2544,15 @@ From [strongholds](../specs/strongholds.md#8-data-model) (sprint 9, DM #339). **
 - **Derived (client, not stored):** state summary, figures line, "Replaced by", staff per facility, totals ("incl. DM only" for the DM), order suggestions, reminder groups, confirm texts.
 - **Fixtures:** none new; bundle `hold-ui-e2e` (alias of `reminders-strongholds`, for `e2e/hold-ui.e2e.ts`).
 - **CON-44:** 0 B.
+
+## 123. Sprint 9: Stronghold Stores tab (RS3)
+
+From [strongholds](../specs/strongholds.md#8-data-model) and [party-loot](../specs/party-loot.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-stores`**. Protocol side: [protocol §154](../protocol/README.md#154-sprint-9-stronghold-stores-tab-move-form-stores-options-inventory-filter-rs3). **No table, column, record type or wire field.**
+
+| Browser state | Value | Rule | Source |
+|---|---|---|---|
+| Stronghold window selection `pp.hold.v1.<campaignId>.<dm \| playerId>` | `tab` gains `stores` (`facilities \| staff \| stores \| reminders \| notes`) | as [§122](#122-sprint-9-strongholds-tab-and-stronghold-window-rs2) | FR-HOLD-24, -28 |
+
+- **Derived (client, not stored):** Move form Stores options per viewer (from `stronghold-index`), Stores names in the loot log ("Stores (removed)" without an index row), a Stores' item rows (`party-item` with its `strongholdId`), the party inventory's rows (no `strongholdId`, FR-PARTY-77).
+- **Fixtures:** none new; bundle `hold-stores-e2e` (alias of `reminders-strongholds`, for `e2e/hold-stores.e2e.ts`).
+- **CON-44:** 0 B.
