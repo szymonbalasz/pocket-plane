@@ -21,7 +21,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14 + re-tests 16/16 | merge after RS1 + RS2 |
 
 | RS1 Reminders tab + sheet | merged `d52a5587` | — | done (branch gates 5408 / 216) | main gates 5408 / 216 green |
-| RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | walkthrough 11/11; stacking on RS1 to wire reminder buttons + icon | short re-test → merge after RS1 |
+| RS2 Strongholds tab + window | merged | — | done (11/11 + re-test 5/5) | main gates |
 | RS3 Stores UI | `build/hold-stores` (ws wA5; base RS2) | build-rs3 | walkthrough 18/18 | merge after RS2 |
 
 Queue: SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
