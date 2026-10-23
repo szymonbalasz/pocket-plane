@@ -12,8 +12,9 @@ import { HOUSE_RULES_CHAPTER } from "@shared/compendium/schemas";
 import { and, eq } from "drizzle-orm";
 import { closeDb, type Db, openFileDb } from "../../db/client";
 import { campaign, compendiumEntry, player } from "../../db/schema";
-import { startTestServer, type TestServer } from "../../testing/harness";
+import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
+import { leakScan } from "../../ws/testing/convergence";
 import { CMP_CACHE_CONTROL } from "./auth";
 import { DELETE_ENTRY, PUT_ENTRY } from "./homebrew";
 
@@ -262,6 +263,62 @@ describe("FR-CMP-62 search", () => {
       expect(chapter.map((r) => r.name)).toEqual(["Dodge"]);
     }
   });
+
+  test("FR-CMP-71 CMP §11 WS leak scan per player: a hidden house-rule save and edit send players no rule text and no unshared house rule; snapshots before and after reconnect", async () => {
+    const MARK = "SP2-WS-SECRET-RULE";
+    // The active campaign's players (another campaign's link is closed: inactive).
+    const names = db
+      .select({ name: player.name })
+      .from(player)
+      .where(eq(player.campaignId, campaignId))
+      .all()
+      .map((r) => r.name);
+    expect(names.length).toBeGreaterThanOrEqual(2);
+    const connect = async () => {
+      const out: TestClient[] = [];
+      for (const n of names) out.push(await h.live({ role: "player", token: tokens[n] as string }));
+      return out;
+    };
+    const barrier = async (c: TestClient) => {
+      c.send({ type: "ping" });
+      await c.next("pong");
+    };
+    const scanned = async (cs: TestClient[]) => {
+      for (const c of cs) {
+        await barrier(c);
+        const raw = c.raw();
+        for (const leak of [MARK, SECRET_HOUSE_RULE, "half cover", "Critical fumbles"]) {
+          expect({ leak, found: raw.includes(leak) }).toEqual({ leak, found: false });
+        }
+        expect(leakScan(h.s, c)).toEqual([]);
+        c.close();
+      }
+    };
+    const run = (name: string, input: unknown) => h.s.commands.run(name, input, DM_ACTOR());
+    const before = await connect();
+    const { entryId } = run(PUT_ENTRY, {
+      entry: {
+        kind: "rule",
+        name: MARK,
+        facets: { chapter: HOUSE_RULES_CHAPTER, section: "Combat", order: 0 },
+        body: { text: `${MARK} text` },
+      },
+    }) as { entryId: string };
+    run(PUT_ENTRY, {
+      id: entryId,
+      shared: false,
+      entry: {
+        kind: "rule",
+        name: MARK,
+        facets: { chapter: HOUSE_RULES_CHAPTER, section: "Combat", order: 0 },
+        body: { text: `${MARK} text, edited` },
+      },
+    });
+    await scanned(before);
+    await h.restart();
+    await scanned(await connect());
+    run(DELETE_ENTRY, { id: entryId });
+  }, 60_000);
 
   test("CMP §11 leak scan: no player body above holds an unshared house rule, a monster or unshared homebrew", () => {
     expect(playerBodies.length).toBeGreaterThan(10);
