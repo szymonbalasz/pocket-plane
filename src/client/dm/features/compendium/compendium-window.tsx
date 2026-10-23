@@ -7,6 +7,7 @@ import { Skeleton } from "@ui/components/ui/primitives";
 import { CompendiumBody } from "@ui/features/compendium/CompendiumWindow";
 import { compendiumWindowBase } from "@ui/features/compendium/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
+import { loadChunk } from "@ui/lib/lazy-chunk";
 import { useEffect, useState } from "react";
 import { EntryActions, NewHomebrew } from "./EntryActions";
 import { ImportPanel } from "./ImportPanel";
@@ -15,7 +16,11 @@ function DmCompendium() {
   const [api, setApi] = useState<Api | null>(null);
   useEffect(() => {
     let live = true;
-    void import("../campaign-management/session").then((m) => live && setApi(() => m.api)); // hc clients are callable proxies: never a setState updater
+    // hc clients are callable proxies: never a setState updater. Stale chunk: skeleton + notice.
+    loadChunk(() => import("../campaign-management/session"), { notice: true }).then(
+      (m) => live && setApi(() => m.api),
+      (err) => console.error("compendium: session failed to load", err),
+    );
     return () => {
       live = false;
     };

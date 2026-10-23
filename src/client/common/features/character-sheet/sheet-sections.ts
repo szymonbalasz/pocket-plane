@@ -9,6 +9,7 @@ import {
 import { dicexMacrosSection } from "../dice-extras/MacrosSection";
 import { modEffectsSection } from "../effect-modifiers/section";
 import { gemCountsSection } from "../gems/GemBlock";
+import { remRemindersSection } from "../reminders/section";
 import { statsTrophiesSection } from "../stats/trophies/TrophiesTab";
 import type { SheetSection } from "./sections";
 
@@ -20,4 +21,5 @@ export const sheetSections: readonly SheetSection[] = [
   gemCountsSection, // gem.counts, header after cbtx.effects (gems, FR-CHARX-71)
   dicexMacrosSection, // dicex.macros, tab "Macros" (dice-extras, FR-CHARX-87)
   statsTrophiesSection, // stats.trophies, tab "Trophies", order 100, last (stats, FR-CHARX-97)
+  remRemindersSection, // rem.reminders, tab "Reminders", order 80, before Macros (reminders, FR-CHARX-100)
 ];

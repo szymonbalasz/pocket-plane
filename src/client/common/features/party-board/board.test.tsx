@@ -68,11 +68,12 @@ describe.each([
   ["DM", DM],
   ["player", PLAYER],
 ] as const)("%s board", (_, you) => {
-  test("FR-PARTY-60 tabs order and memory: Party status, Handouts, Inventory, Loot; Party status the landing tab; stored `companions` / unknown → Party status", () => {
+  test("FR-PARTY-60 FR-PARTY-71 tabs order and memory: Party status, Handouts, Inventory, Loot, Reminders; Party status the landing tab; stored `companions` / unknown → Party status", () => {
     const html = render(you);
-    // RS2 (FR-PARTY-72): Strongholds for the DM always; this player sees no stronghold.
+    // RS1 Reminders for everyone; RS2 (FR-PARTY-72): Strongholds for the DM always (this player
+    // sees no stronghold).
     const rs = you.role === "dm" ? ["strongholds"] : [];
-    expect(tabsOf(html)).toEqual(["status", "handouts", "inventory", "loot", ...rs]);
+    expect(tabsOf(html)).toEqual(["status", "handouts", "inventory", "loot", "reminders", ...rs]);
     expect(html).toContain(">Party status<");
     expect(html).not.toContain(">Companions<");
     // No entry: Party status shows (its body mounted), Handouts not yet.
@@ -109,7 +110,7 @@ describe.each([
     partyMemory().tabs.choose(tabKeyOf(you), "loot");
     const html = render(you);
     const panels = [...html.matchAll(/<div[^>]*role="tabpanel"[^>]*>/g)].map((m) => m[0]);
-    expect(panels).toHaveLength(you.role === "dm" ? 5 : 4); // RS2: the DM's Strongholds
+    expect(panels).toHaveLength(you.role === "dm" ? 6 : 5); // RS1 Reminders; RS2 the DM's Strongholds
     const shown = panels.filter((p) => !/ hidden=""/.test(p));
     expect(shown).toHaveLength(1);
     expect(shown[0]).toContain('data-state="active"');

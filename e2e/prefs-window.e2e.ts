@@ -35,6 +35,7 @@ test("FR-SHELL-70/71/72/74 chip opens Preferences; minimised → restored by the
     "shell.sound",
     "dicex.dice",
     "stats.prefs",
+    "shell.keys",
     "shell.layout",
   ]);
 
@@ -69,6 +70,7 @@ test("FR-SHELL-70/72, FR-CAMP-35 DM chip and Account: no Log out in the top bar;
     "camp.color",
     "dicex.dice",
     "stats.prefs",
+    "shell.keys",
     "shell.layout",
     "camp.account",
   ]);

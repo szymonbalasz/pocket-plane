@@ -38,7 +38,6 @@ import {
 } from "lucide-react";
 import {
   type KeyboardEvent,
-  lazy,
   type RefObject,
   Suspense,
   useEffect,
@@ -57,6 +56,7 @@ import {
 } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
 import { Input } from "../../components/ui/primitives";
+import { lazyChunk } from "../../lib/lazy-chunk";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
@@ -255,7 +255,10 @@ function SettingsPopover() {
   );
 }
 
-const MacrosPanel = lazy(() => import("./MacrosPanel").then((m) => ({ default: m.MacrosPanel })));
+const MacrosPanel = lazyChunk(
+  () => import("./MacrosPanel").then((m) => ({ default: m.MacrosPanel })),
+  "inline",
+);
 
 /**
  * FR-DICEX-69: the header's Macros button (24 px, by the gear, FR-DICEX-53) → the macro list,

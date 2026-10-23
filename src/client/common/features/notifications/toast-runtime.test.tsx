@@ -4,6 +4,8 @@
 // no layout effect, so the real hook stays at 0: the stub's 0 between tests matches it).
 // FR-NOTE-51 (sprint 8, WF4; BL-59): the stack returns home when its inputs change back (the
 // stack inputs stubbed: windows as rendered, keep-outs, first rows), also while hovered.
+// Sprint 9 (FX1): FR-NOTE-70 drawn = computed, FR-NOTE-72 the Notifications window (keep clear,
+// fold; `useHistoryOpen` stubbed), FR-NOTE-73 a callout node per show.
 import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
@@ -22,11 +24,16 @@ import type { StackInputs } from "./stack-inputs";
 import * as realInputs from "./stack-inputs";
 import {
   addNote,
+  closeToast,
+  createToastMemory,
   initialToasts,
+  registerToastMemory,
   SUMMARY_KEY,
   setCallout,
+  showCallout,
   type ToastMemory,
   type ToastState,
+  unfold,
 } from "./toasts";
 import { createNotificationViews } from "./views";
 
@@ -34,12 +41,14 @@ let stubH = 0;
 mock.module("./stack-height", () => ({ useStackHeight: () => stubH }));
 // null = the real inputs (the FR-NOTE-43 cases read the real keep-out store).
 let stubInputs: StackInputs | null = null;
+let stubHistoryOpen = false;
 const useRealInputs = realInputs.useStackInputs;
 mock.module("./stack-inputs", () => ({
   useStackInputs: (isDm: boolean) => {
     const real = useRealInputs(isDm);
     return stubInputs ?? real;
   },
+  useHistoryOpen: () => stubHistoryOpen,
 }));
 const { ToastRuntime, TOAST_STACK_Z } = await import("./ToastRuntime");
 
@@ -128,6 +137,7 @@ const spot = (tag: string) => ({ left: attr(tag, "data-left"), top: attr(tag, "d
 afterEach(() => {
   reportKeepOut(TOOLBAR, null);
   stubInputs = null;
+  stubHistoryOpen = false;
 });
 afterAll(() => {
   stubH = 0;
@@ -278,5 +288,137 @@ describe("FR-NOTE-50 toast policy (layer)", () => {
     const tag = stackTag("dm");
     expect(tag).toContain(`z-index:${TOAST_STACK_Z}`);
     expect(tag).not.toContain("z-40");
+  });
+});
+
+describe("FR-NOTE-70 stack never leaves its column (runtime)", () => {
+  test("FR-NOTE-70 stack never leaves its column: `data-left` / `data-top` are the drawn style (the FR-SHELL-59 report's x, y)", () => {
+    stubH = 57;
+    // A window over the home column (sim-12 c01's spirit at 1440×900): the drawn left stays home.
+    stubInputs = {
+      initiative: { x: 1028, y: 60, w: 400, h: 500 },
+      windows: [{ x: 520, y: 112, w: 260, h: 360 }],
+      hard: [],
+      rows: [],
+    };
+    const tag = stackTag("dm");
+    const { left, top } = spot(tag);
+    expect(left).toBe("560");
+    expect(tag).toContain(`left:${left}px`);
+    expect(tag).toContain(`top:${top}px`);
+  });
+});
+
+describe("FR-NOTE-72 an open Notifications window", () => {
+  // r03 at 1440×900: Notifications at 592, 60 (the home column), Brakka's card pending.
+  const notes = { x: 592, y: 60, w: 360, h: 480 };
+  const info: NotificationRecord = {
+    ...pending,
+    id: "i1",
+    seq: 2,
+    text: "Thorn joined",
+    actionLabel: null,
+    actionRole: null,
+    state: "info",
+  };
+  const rows = { n1: pending, i1: info };
+  const ITEMS = ["note-toast", "note-toast-pending-summary", "note-toast-more", "note-callout"];
+  const items = (html: string) =>
+    [...html.matchAll(/<[a-z]+ [^>]*data-testid="([a-z-]+)"[^>]*>/g)]
+      .filter((m) => ITEMS.includes(m[1] ?? ""))
+      .map((m) => `${m[1]}:${/ data-(?:record|callout)-id="([^"]*)"/.exec(m[0])?.[1] ?? ""}`);
+  let st: ToastState = {
+    ...initialToasts(0),
+    toasts: [{ kind: "summary", key: SUMMARY_KEY, count: 2, sticky: true, remaining: 0 }],
+  };
+  st = addNote(addNote(st, pending, 0), info, 0);
+  st = setCallout(st, { id: "stats-feed", content: "Wolf falls (hidden)" }, 0, 7);
+
+  test("FR-NOTE-72 keep clear of an open Notifications window: the DM stack's rect is clear of it (shift left, else below)", () => {
+    stubH = 150;
+    type R = { x: number; y: number; w: number; h: number };
+    const box = (tag: string): R => ({
+      x: Number(attr(tag, "data-left")),
+      y: Number(attr(tag, "data-top")),
+      w: 320,
+      h: 150,
+    });
+    const clear = (a: R, b: R) =>
+      a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+    const initiative = { x: 1028, y: 60, w: 400, h: 500 };
+    stubInputs = { initiative, windows: [{ ...notes, blocks: true }], hard: [], rows: [] };
+    const shifted = box(stackTag("dm"));
+    expect(clear(shifted, notes)).toBe(true);
+    expect(shifted.x).toBe(592 - 12 - 320);
+    // No room left of it: below it.
+    const wide = { ...notes, x: 300 };
+    stubInputs = { initiative, windows: [{ ...wide, blocks: true }], hard: [], rows: [] };
+    const below = box(stackTag("dm"));
+    expect(clear(below, wide)).toBe(true);
+    expect(below).toMatchObject({ x: 560, y: 60 + 480 + 12 });
+  });
+
+  test("FR-NOTE-72 cards fold into an open Notifications window: card and summary toasts gone while it is open; info and the callout stay; both clients", () => {
+    stubH = 57;
+    for (const client of ["dm", "player"] as const) {
+      expect(items(stackHtml(client, st, rows))).toContain("note-toast:n1");
+      stubHistoryOpen = true;
+      expect(items(stackHtml(client, st, rows))).toEqual([
+        "note-toast:i1",
+        "note-callout:stats-feed",
+      ]);
+      stubHistoryOpen = false;
+    }
+  });
+
+  test("FR-NOTE-72 cards fold into an open Notifications window: closed or minimised → the card is back with no new toast and the summary returns; a card the user closed stays closed", () => {
+    stubH = 57;
+    const store = {
+      ...emptyStore(),
+      you: { campaignId: "c1", role: "dm", playerId: null },
+      records: { [NOTIFICATION_TYPE]: { n1: pending } },
+    } as unknown as RecordStore;
+    // The summary was closed by its Open button (which opened the window).
+    const opened = closeToast(st, SUMMARY_KEY, 0);
+    const back = unfold(opened, store, 0);
+    // Only the summary changes: the card is the same toast (silent: no new toast, no cue).
+    const notes = (s: ToastState) => s.toasts.filter((t) => t.kind !== "summary");
+    expect(notes(back)).toEqual(notes(opened));
+    expect(items(stackHtml("dm", back, rows))).toContain("note-toast:n1");
+    // n1 has its own toast: no summary for it.
+    expect(back.toasts.some((t) => t.kind === "summary")).toBe(false);
+    // The user closed the card before: it stays closed; the summary counts it.
+    const closed = unfold(closeToast(opened, "n1", 0), store, 0);
+    expect(closed.toasts.some((t) => t.key === "n1")).toBe(false);
+    expect(closed.toasts.find((t) => t.kind === "summary")).toMatchObject({ count: 1 });
+  });
+});
+
+describe("FR-NOTE-73 callout node per show", () => {
+  test("FR-NOTE-73 callout node per show: two `showCallout` 1 s apart → two nodes, `data-callout-seq` n and n + 1; the second shows the newer line", () => {
+    stubH = 57;
+    const m = createToastMemory(Date.now());
+    const off = registerToastMemory(m);
+    try {
+      showCallout({ id: "stats-feed", content: "Wolf falls (hidden)" });
+      const first = m.getState().toasts;
+      showCallout({ id: "stats-feed", content: "Overkill! Elite Goblin Warrior 2 falls (hidden)" });
+      const second = m.getState().toasts;
+      const n = first.callout?.seq ?? 0;
+      expect(n).toBeGreaterThan(0);
+      expect(second.callout?.seq).toBe(n + 1);
+      const node = (html: string) =>
+        /<div [^>]*data-testid="note-callout"[^>]*>/.exec(html)?.[0] ?? "";
+      const a = stackHtml("dm", first, {});
+      const b = stackHtml("dm", second, {});
+      expect(attr(node(a), "data-callout-seq")).toBe(String(n));
+      expect(attr(node(b), "data-callout-seq")).toBe(String(n + 1));
+      expect(b).toContain("Overkill! Elite Goblin Warrior 2 falls (hidden)");
+      expect(b).not.toContain("Wolf falls");
+      // Each show restarts the 4 s.
+      expect(second.callout?.remaining).toBe(4000);
+    } finally {
+      off();
+    }
   });
 });

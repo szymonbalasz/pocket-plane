@@ -212,7 +212,7 @@ export function FightView({
             open={highlightsOpen ?? highlightsOpenByDefault(fight.status)}
             onOpenChange={onHighlights}
           />
-          {fight.rows.length === 0 || noDamageYet(fight.rows) ? (
+          {noDamageYet(fight.rows, fight.highlights) ? (
             <Empty text="No damage yet this fight" />
           ) : null}
           {fight.rows.length > 0 ? <FightTable role={role} rows={fight.rows} /> : null}

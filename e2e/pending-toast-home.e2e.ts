@@ -1,5 +1,6 @@
 // e2e-bundle: toast-home-e2e
-// Thin sprint-6 toast home (SHELL §13 F5, track WF2; FR-NOTE-42, -43, FR-SHELL-59). Read-only on
+// Thin sprint-6 toast home (SHELL §13 F5, track WF2; FR-NOTE-42, -43, FR-SHELL-59; sprint 9
+// FR-NOTE-70: the home column only, never beside a window). Read-only on
 // server state: opens windows and map tools, sends no intent. The DM's "1 pending action" summary
 // (sim-9's ruled card) stays at its top-centre home with Scenes and a tool bar open, and every
 // tool bar control is hit at its centre (sim-9 b01: 6 / 16 Fog bar controls under the summary).
@@ -31,6 +32,12 @@ const overlaps = (a: Box, b: Box) =>
 async function resetLayout(page: Page) {
   await page.getByTestId("ui-launcher-menu").click();
   await page.getByTestId("ui-launcher-reset").click();
+}
+
+/** FR-NOTE-44: a pushed window's title bar and first 40 px of body. */
+async function strip(win: Locator): Promise<Box> {
+  const w = await box(win);
+  return { ...w, h: Math.min(w.h, (await box(win.getByTestId("ui-window-title"))).h + 40) };
 }
 
 /** Drags a window by its title bar so its top-left lands at (x, y). */
@@ -90,10 +97,12 @@ test("FR-NOTE-42 FR-NOTE-43 F5 DM at 1440×900, then 1280×720: with the pending
     await expect(dm.getByTestId("fog-bar")).toBeVisible();
     await expect(scenes).toHaveAttribute("data-placed", "pushed");
     await expect(summary).toBeVisible();
-    // FR-NOTE-42: never x 68 (b01: 68..388 × 100..157); walkthrough WF4: at its home unless the
-    // pushed Scenes is under it, then beside it, off Scenes.
-    await expect.poll(async () => overlaps(await box(stack), await box(scenes))).toBe(false);
-    expect((await box(stack)).x).toBeGreaterThan(68);
+    // FR-NOTE-42: never x 68 (b01: 68..388 × 100..157); FR-NOTE-70 (sprint 9, retires WF4's
+    // "beside it"): at its home column, never on the pushed Scenes' title bar + first 40 px
+    // (FR-NOTE-44); on its body only when no spot in the column clears it (then folded).
+    const home = Math.round((size.width - 320) / 2);
+    await expect.poll(async () => overlaps(await box(stack), await strip(scenes))).toBe(false);
+    expect(Math.round((await box(stack)).x)).toBe(home);
     // FR-NOTE-43: off the bar; all 16 Fog bar controls hit at their centre.
     expect(overlaps(await box(stack), await box(panel))).toBe(false);
     const fog = await blocked(dm, 'button[data-testid^="fog-"]');
@@ -109,7 +118,7 @@ test("FR-NOTE-42 FR-NOTE-43 F5 DM at 1440×900, then 1280×720: with the pending
     for (const tool of ["map-tool-aoe", "map-tool-structure"]) {
       await dm.getByTestId(tool).click();
       await expect(panel).toBeVisible();
-      await expect.poll(async () => overlaps(await box(stack), await box(scenes))).toBe(false);
+      await expect.poll(async () => overlaps(await box(stack), await strip(scenes))).toBe(false);
       expect(overlaps(await box(stack), await box(panel))).toBe(false);
       const controls = await blocked(dm, "button, input, select, [role='combobox']");
       expect(controls.out).toEqual([]);

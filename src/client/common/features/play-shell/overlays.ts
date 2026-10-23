@@ -6,6 +6,7 @@ import type { RecordStore } from "@shared/protocol/store";
 import type { ComponentType } from "react";
 import { isPausedFor } from "../pause/logic";
 import { PauseOverlay } from "../pause/PauseOverlay";
+import { PaletteOverlay } from "./palette/PaletteOverlay";
 import type { ShellClient } from "./registry";
 
 export interface OverlayEntry {
@@ -34,6 +35,9 @@ export const OVERLAYS: readonly OverlayEntry[] = [
     blocksInput: isPausedFor,
     Component: PauseOverlay,
   },
+  // SP1 (FR-SHELL-180, -181, -190): the command palette, the shortcuts sheet and the one shortcut
+  // dispatcher; below the pause card, never blocks input.
+  { id: "palette", clients: ["dm", "player"], layer: 5, Component: PaletteOverlay },
 ];
 
 /** This client's entries, back to front. */
