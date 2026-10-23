@@ -4,6 +4,7 @@
 import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
+import { recapWindow } from "@ui/features/session-recap/window";
 import { statsWindow } from "@ui/features/stats/window";
 import { strongholdWindow } from "@ui/features/strongholds/window";
 import { playerCompanionWindow } from "./features/character-sheet/companion-window";
@@ -34,6 +35,7 @@ const windows: WindowDef[] = [
   statsWindow, // stats.board (stats, FR-SHELL-93)
   strongholdWindow, // hold.stronghold, no launcher (strongholds, FR-SHELL-170)
   playerRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
+  recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);

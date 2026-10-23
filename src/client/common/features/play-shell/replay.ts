@@ -81,15 +81,16 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
         "dicex.requests", // TT2 (S3)
         "hold.stronghold", // RS2 (S4, FR-SHELL-171)
         "cmp.rules", // SP2 (S4): untouched
+        "recap.session", // SP3 (S4, FR-RECAP-10)
       ],
     },
   ],
   player: [
-    // PM2 (FR-SHELL-160); RS2 (S4, FR-SHELL-171); SP2 (S4): cmp.rules untouched
+    // PM2 (FR-SHELL-160); RS2 (S4, FR-SHELL-171); SP2 (S4): cmp.rules untouched; SP3 (S4, FR-RECAP-10)
     {
       name: "P1",
       viewer: "player-1",
-      kinds: [...P1, "party.board", "hold.stronghold", "cmp.rules"],
+      kinds: [...P1, "party.board", "hold.stronghold", "cmp.rules", "recap.session"],
     },
     {
       name: "P2",

@@ -88,6 +88,10 @@ import spPalette from "./sp-palette";
 import spPaletteE2e from "./sp-palette-e2e";
 import spRules from "./sp-rules";
 import spRulesE2e from "./sp-rules-e2e";
+import spS9 from "./sp-s9";
+import spS9E2e from "./sp-s9-e2e";
+import spS9Shared from "./sp-s9-shared";
+import spS9SharedE2e from "./sp-s9-shared-e2e";
 import stats from "./stats";
 import statsB from "./stats-b";
 import statsBE2e from "./stats-b-e2e";
@@ -251,4 +255,9 @@ export const bundles: readonly Bundle[] = [
   spRulesE2e,
   // Sprint 9 track RS (build/hold-stores): Stores tab E2E
   holdStoresE2e,
+  // Sprint 9 track SP (build/sp-recap): the SP walkthrough bundle + the shared recap
+  spS9,
+  spS9Shared,
+  spS9E2e,
+  spS9SharedE2e,
 ];

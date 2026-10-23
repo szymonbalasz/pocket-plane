@@ -21,6 +21,7 @@ const EXPECTED: Record<string, string> = {
   "stats-awards": "info",
   "roll-request": "card",
   "stats-fight-summary": "info",
+  "session-recap": "info",
 };
 
 describe("FR-NOTE-52 toast classes", () => {

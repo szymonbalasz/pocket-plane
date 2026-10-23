@@ -2597,3 +2597,15 @@ From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#33
 - **Persisted runtime state:** rule rows (imported: global; house rules: per campaign) in `compendium_entry`.
 - **CON-44:** 0 B.
 
+## 127. Sprint 9: session recap (SP3)
+
+From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). **Built by `build/sp-recap`**. Protocol side: [protocol §159](../protocol/README.md#159-sprint-9-session-recap--recapquery-recapshare-session-recap-kind-sp3). **No table, column or record type** (ADR-0013: sessions stay derived).
+
+| Field / table | Change | Rule | Source |
+|---|---|---|---|
+| `notification` (kind `session-recap`) | new kind, payload `{fromN, toN, from, to, label, note?, omit}` ≤ 2 KB | made only by `recap.share`; no FK to a session (derived); the newest row with that `fromN` is the session's share | FR-RECAP-20, -23 |
+| `loot_entry` | read only, through `party-loot/recap-read.ts` (`lootRows`, `lootHighWater`) | rows with one end `world` and the other `party` / `character`, by `createdAt` in the session's range; any `stores` end = left out | FR-RECAP-14 |
+
+- **Derived:** the whole recap (stats' compute helpers + the ledger), per viewer; Markdown text (client).
+- **Persisted runtime state:** share rows only. **Server memory:** the recap memo + per-actor rate limit (`session-recap/memo.ts`, LRU 32, dropped freely) on stats' session cache.
+- **Fixtures:** `recap-loot-haul`, `recap-share-note`; bundles `sp-s9`, `sp-s9-shared` (+ e2e aliases).

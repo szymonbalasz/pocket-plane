@@ -1,6 +1,6 @@
 [
   {
-    "kind": "hold.stronghold",
+    "kind": "cmp.rules",
     "stored": "1043,597,400×380",
     "drawn": {
       "1600×900": "1043,597,400×380",
@@ -10,7 +10,7 @@
     }
   },
   {
-    "kind": "cmp.rules",
+    "kind": "recap.session",
     "stored": "98,476,360×360",
     "drawn": {
       "1600×900": "98,476,360×360",

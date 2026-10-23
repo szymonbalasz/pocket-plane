@@ -54,6 +54,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "open @1600×900 recap.session",
+    "rect": "708,172,440×360",
+    "placed": "auto",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen @1600×900 note.history",
     "rect": "772,60,360×480",
     "placed": "stored",
@@ -106,6 +112,12 @@
     "rect": "708,172,440×360",
     "placed": "reopened",
     "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen @1600×900 recap.session",
+    "rect": "708,172,440×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
   },
   {
     "at": "reopen 1440×900 @1440×900 note.history",
@@ -162,6 +174,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "reopen 1440×900 @1440×900 recap.session",
+    "rect": "548,172,440×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 note.history",
     "rect": "505,72,360×480",
     "placed": "reopened",
@@ -216,6 +234,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "reopen 1280×800 @1280×800 recap.session",
+    "rect": "474,192,401×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×412",
     "placed": "reopened",
@@ -268,6 +292,12 @@
     "rect": "462,60,440×412",
     "placed": "reopened",
     "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 recap.session",
+    "rect": "462,60,440×412",
+    "placed": "reopened",
+    "parked": "cmp.rules"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -336,6 +366,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "open @1440×900 recap.session",
+    "rect": "548,172,440×360",
+    "placed": "auto",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen @1440×900 note.history",
     "rect": "612,60,360×480",
     "placed": "stored",
@@ -388,6 +424,12 @@
     "rect": "548,172,440×360",
     "placed": "reopened",
     "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen @1440×900 recap.session",
+    "rect": "548,172,440×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
   },
   {
     "at": "reopen 1280×800 @1280×800 note.history",
@@ -444,6 +486,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "reopen 1280×800 @1280×800 recap.session",
+    "rect": "474,192,401×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×412",
     "placed": "reopened",
@@ -496,6 +544,12 @@
     "rect": "462,60,440×412",
     "placed": "reopened",
     "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 recap.session",
+    "rect": "462,60,440×412",
+    "placed": "reopened",
+    "parked": "cmp.rules"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -564,6 +618,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "open @1280×800 recap.session",
+    "rect": "474,192,401×360",
+    "placed": "auto",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen @1280×800 note.history",
     "rect": "505,72,360×480",
     "placed": "stored",
@@ -618,6 +678,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "reopen @1280×800 recap.session",
+    "rect": "474,192,401×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×412",
     "placed": "reopened",
@@ -670,6 +736,12 @@
     "rect": "462,60,440×412",
     "placed": "reopened",
     "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 recap.session",
+    "rect": "462,60,440×412",
+    "placed": "reopened",
+    "parked": "cmp.rules"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -738,6 +810,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "open @1280×720 recap.session",
+    "rect": "462,60,440×412",
+    "placed": "auto",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen @1280×720 note.history",
     "rect": "505,60,360×412",
     "placed": "stored",
@@ -790,6 +868,12 @@
     "rect": "462,60,440×412",
     "placed": "reopened",
     "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen @1280×720 recap.session",
+    "rect": "462,60,440×412",
+    "placed": "reopened",
+    "parked": "cmp.rules"
   },
   {
     "at": "protected @1280×720 note.history",
