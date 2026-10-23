@@ -1,12 +1,14 @@
 // Fixture loader: reset / load / reset-and-load with guards, lock and manifest
 // (FR-FIX-01–11, 27, 28; AGENTS §9.3). Loads via server commands, in-process, DM authority.
+// FR-FIX-29 (ADR-0068): a CLI load passes its start (`now`) and every fixture's seeded clock is
+// that instant truncated to the minute; without `now` (bun test, e2e) it is `FIXTURE_INSTANT`.
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { playerLinkUrl } from "@shared/campaign-management/schemas";
 import { AssetIngested } from "@shared/events/assets-pipeline";
 import { asc, eq, sql } from "drizzle-orm";
-import { seededContext, systemClock } from "../../commands/context";
+import { type Clock, fixedClock, seededContext, systemClock } from "../../commands/context";
 import { CommandError } from "../../commands/errors";
 import { type Config, disposableRoots, localUrl, parseConfig } from "../../config";
 import { closeDb, openFileDb, openMemoryDb } from "../../db/client";
@@ -195,7 +197,16 @@ function urls(config: Config) {
   return { dmUrl, base };
 }
 
-async function runFixtures(services: Services, config: Config, bundle: string, order: Fixture[]) {
+/** FR-FIX-29: the load's anchor: its start truncated to the minute (UTC). */
+export const loadAnchor = (now: number) => Math.floor(now / 60_000) * 60_000;
+
+async function runFixtures(
+  services: Services,
+  config: Config,
+  bundle: string,
+  order: Fixture[],
+  clock?: Clock,
+) {
   const records: Record<string, Record<string, string[]>> = {};
   let current: string | null = null;
   services.bus.subscribe("fixture-records", ({ event }) => {
@@ -234,7 +245,11 @@ async function runFixtures(services: Services, config: Config, bundle: string, o
   for (const f of order) {
     current = f.key;
     records[f.key] = {};
-    const ctx = seededContext({ disposable: config.disposable, key: f.key });
+    const ctx = seededContext({
+      disposable: config.disposable,
+      key: f.key,
+      ...(clock && { clock }),
+    });
     const steps =
       f.kind === "setup" ? f.steps : [{ command: "import.batch", input: f.batch as unknown }];
     for (const [i, s] of steps.entries()) {
@@ -278,6 +293,7 @@ async function doLoad(
   lib: FixtureLibrary,
   bundle: string,
   durable = true,
+  opts: Pick<LoaderOptions, "now" | "notice"> = {},
 ): Promise<Manifest> {
   const m = readManifest(config.dataDir);
   if (m?.status !== "empty") {
@@ -301,7 +317,10 @@ async function doLoad(
   let playerRows: { name: string; token: string; campaign: string }[];
   try {
     const services = createServices({ config, db, log: silentLogger });
-    records = await runFixtures(services, config, bundle, order);
+    // FR-FIX-29: one instant for the whole load (the offsets between fixture facts kept).
+    const clock = opts.now === undefined ? undefined : fixedClock(loadAnchor(opts.now));
+    if (clock) opts.notice?.(`Fixture clock: ${clock.iso()} (load time, FR-FIX-29)`);
+    records = await runFixtures(services, config, bundle, order, clock);
     playerRows = db
       .select({ name: player.name, token: player.linkToken, campaign: campaign.name })
       .from(player)
@@ -340,6 +359,11 @@ export interface LoaderOptions {
   notice?: (msg: string) => void;
   /** `false`: step commits skip fsync (`synchronous = OFF`); for throwaway dirs only. */
   durable?: boolean;
+  /**
+   * FR-FIX-29: the load's start, ms (the CLI's). The seeded clock is this truncated to the
+   * minute; absent (bun test, e2e) → `FIXTURE_INSTANT`.
+   */
+  now?: number;
 }
 
 export async function reset(config: Config, opts: LoaderOptions = {}): Promise<void> {
@@ -361,7 +385,7 @@ export async function load(
   checkGuards(config);
   const lock = acquireLock(config.dataDir, "loader", systemClock.iso(), opts.notice);
   try {
-    return await doLoad(config, lib, bundle);
+    return await doLoad(config, lib, bundle, true, opts);
   } finally {
     lock.release();
   }
@@ -378,7 +402,7 @@ export async function resetAndLoad(
   const lock = acquireLock(config.dataDir, "loader", systemClock.iso(), opts.notice);
   try {
     await doReset(config);
-    return await doLoad(config, lib, bundle, opts.durable);
+    return await doLoad(config, lib, bundle, opts.durable, opts);
   } finally {
     lock.release();
   }
@@ -388,7 +412,7 @@ export async function resetAndLoad(
 export async function loadInProcess(
   lib: FixtureLibrary,
   bundle: string,
-  opts: { testMode?: boolean; dmSecret?: string } = {},
+  opts: { testMode?: boolean; dmSecret?: string; now?: number } = {},
 ) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "pp-fixtures-"));
   const config = parseConfig({
@@ -399,7 +423,10 @@ export async function loadInProcess(
     PP_DM_SECRET: opts.dmSecret ?? "in-process-dm-secret",
   });
   // The temp dir dies with the test: power-loss durability buys nothing here (fix/test-speed).
-  const manifest = await resetAndLoad(config, lib, bundle, { durable: false });
+  const manifest = await resetAndLoad(config, lib, bundle, {
+    durable: false,
+    ...(opts.now !== undefined && { now: opts.now }),
+  });
   return {
     config,
     manifest,

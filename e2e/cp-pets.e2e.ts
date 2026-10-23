@@ -7,6 +7,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
+import { closeToasts } from "./support/toasts";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -16,6 +17,7 @@ const tab = (win: Locator, value: string) =>
 /** Party Manager on its Party status tab, where companions sit under their PCs (FR-PARTY-61). */
 async function companions(page: Page): Promise<Locator> {
   const board = await openWindow(page, "party.board");
+  await closeToasts(page); // FR-NOTE-70, -71: the stack may sit on this window's body, below its first row
   await tab(board, "status").click();
   await expect(tab(board, "status")).toHaveAttribute("aria-selected", "true");
   await expect(board.getByTestId("party-status")).toBeVisible();

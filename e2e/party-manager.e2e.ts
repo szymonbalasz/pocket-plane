@@ -48,7 +48,7 @@ test("FR-PARTY-59 FR-PARTY-60 FR-PARTY-61 Party Manager: launcher label, no Part
   const tabs = await win
     .getByTestId("party-tab")
     .evaluateAll((els) => els.map((e) => e.textContent ?? ""));
-  expect(tabs).toEqual(["Party status", "Handouts", "Inventory", "Loot"]);
+  expect(tabs).toEqual(["Party status", "Handouts", "Inventory", "Loot", "Reminders"]);
   const w = Math.round((await win.boundingBox())?.width ?? 0);
   expect(w).toBeGreaterThanOrEqual(440);
   expect(w).toBeLessThanOrEqual(550);

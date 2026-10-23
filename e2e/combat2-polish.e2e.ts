@@ -11,6 +11,7 @@ import { konvaNodes } from "./support/konva";
 import { panMap } from "./support/map";
 import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
+import { closeToasts } from "./support/toasts";
 
 async function idByName(scope: Locator, name: string): Promise<string> {
   const r = scope.locator('[data-testid="cbt-init-row"]').filter({
@@ -42,6 +43,7 @@ async function setup(browser: Parameters<typeof rolePage>[0], width = 1440, heig
 /** DM views Goblin Ambush (the encounter's scene) and shows it to players. */
 async function viewAmbush(dm: Page, player: Page, ambush: string) {
   const scenes = await openWindow(dm, "map.scenes");
+  await closeToasts(dm); // FR-NOTE-70, -71: the stack may sit on this window's body, below its first row
   await scenes
     .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
     .first()

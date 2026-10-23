@@ -157,6 +157,8 @@ test("FR-NOTE-39 FR-NOTE-40 toasts and history rows striped in the causer's colo
   await expect(closer).toHaveCSS("color", HEX[k]);
 
   // B: a test card (owner: the DM, like a damage card) → A's toast and row striped in B's colour.
+  // FR-NOTE-72: A's open Notifications window folds the card's toast; minimised, it toasts.
+  await win.getByTestId("ui-window-minimise").click();
   const pwin = await openWindow(p1, "note.history");
   await pwin.getByTestId("note-test-text").fill("Apply 3 damage?");
   await pwin.getByTestId("note-test-label").fill("Apply");
@@ -166,6 +168,7 @@ test("FR-NOTE-39 FR-NOTE-40 toasts and history rows striped in the causer's colo
   await expect(toast).toHaveAttribute("data-color", k);
   await expect(toast.getByTestId("note-stripe")).toHaveCSS("background-color", HEX[k]);
   await expect(toast.getByTestId("note-stripe")).toHaveCSS("width", "3px");
+  await openWindow(dm, "note.history");
   const row = win.getByTestId("note-history-row").filter({ hasText: "Apply 3 damage?" });
   await expect(row).toHaveAttribute("data-state", "pending");
   await expect(row).toHaveAttribute("data-color", k);
@@ -175,7 +178,9 @@ test("FR-NOTE-39 FR-NOTE-40 toasts and history rows striped in the causer's colo
   await expect(prow).toHaveAttribute("data-color", k);
 
   // A acts → "Resolved by DM", the name in amber; the stripe stays B's.
+  await win.getByTestId("ui-window-minimise").click();
   await toast.getByTestId("note-toast-action").click();
+  await openWindow(dm, "note.history");
   await expect(row.getByTestId("note-history-state")).toHaveText("Resolved by DM");
   await expect(row.getByTestId("note-history-closed-by")).toHaveCSS("color", HEX.amber);
   await expect(row).toHaveAttribute("data-color", k);
