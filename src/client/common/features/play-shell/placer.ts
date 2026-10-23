@@ -1176,8 +1176,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   };
 
   /**
-   * The untouched window (other than `id`) in the way of `id`'s zone rect `z`, as rendered; a
-   * hard keep-out over it is `null` too (blocked, no window to wait for). Remembered windows are
+   * Whether `id`'s zone rect `z`, as rendered, is free, and else the untouched window in its way
+   * (`by`; none when a hard keep-out blocks it: no window to wait for). Remembered windows are
    * ignored, as for zones (FR-SHELL-151).
    */
   const zoneBlocker = (id: string, z: Rect): { free: boolean; by?: WindowState } => {
