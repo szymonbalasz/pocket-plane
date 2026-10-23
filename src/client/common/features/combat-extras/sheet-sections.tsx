@@ -1,7 +1,8 @@
 // combat-extras' character sheet sections (FR-CBTX-41, CBTX §7.1): `cbtx.temp-hp` (vitals),
 // `cbtx.death-saves` (vitals, while `deathState != null`), `cbtx.effects` (header). Both clients,
 // characters only. They read only the store and send only CBTX intents; registered in
-// character-sheet-full's `sheetSections` registry (D/S seam).
+// character-sheet-full's `sheetSections` registry (D/S seam). Also `EffectsLine`, the read-only
+// chips for reminders' character groups (FR-CBTX-70).
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { DEATH_SAVES_MAX } from "@shared/combat-extras/schemas";
 import type { RecordStore } from "@shared/protocol/store";
@@ -30,12 +31,13 @@ import { manualPartsOf, RollButton, useRollControl } from "../dice-roll-log/roll
 import {
   activeEffects,
   characterOf,
+  chipOrder,
   countersFor,
   deathStateFor,
   effectsOn,
   roundsLeftText,
 } from "./logic";
-import { DeathBadge, EffectChips } from "./parts";
+import { DeathBadge, EffectChip, EffectChips } from "./parts";
 
 export interface SectionProps {
   creatureId: string;
@@ -340,6 +342,42 @@ export function EffectsSection({ creatureId }: SectionProps) {
           </Dialog>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * FR-CBTX-70: the character's active effects as `cbtx.effects`' chips (icons, labels, exhaustion
+ * level, "3r" when timed, concentration's label), read-only: no menus, Concentrate… or clicks.
+ * Only what the viewer already receives (FR-CBTX-31); chips wrap, none fold. None → nothing.
+ */
+export function EffectsLine({
+  characterId,
+  testId = "cbtx-effects-line",
+}: {
+  characterId: string;
+  /** The line's test ID (`data-record-id` = the character); reminders pass `rem-effects`. */
+  testId?: string;
+}) {
+  const store = useSync((s) => s.store);
+  const enc = useStartedEncounter();
+  const effects = chipOrder(effectsOn(activeEffects(store), { characterId }));
+  if (effects.length === 0) return null;
+  return (
+    <div
+      data-testid={testId}
+      data-record-id={characterId}
+      className="flex min-w-0 flex-wrap items-center gap-0.5"
+    >
+      {effects.map((e) => (
+        <EffectChip
+          key={e.id}
+          e={e}
+          round={enc?.round ?? null}
+          testId="cbtx-effect-chip"
+          className="max-w-full"
+        />
+      ))}
     </div>
   );
 }

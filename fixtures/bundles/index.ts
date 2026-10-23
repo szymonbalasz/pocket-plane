@@ -66,6 +66,7 @@ import pmMemory from "./pm-memory";
 import pmMemoryE2e from "./pm-memory-e2e";
 import prefsS6 from "./prefs-s6";
 import prefsS6E2e from "./prefs-s6-e2e";
+import remUiE2e from "./rem-ui-e2e";
 import remindersStrongholds from "./reminders-strongholds";
 import rsE2e from "./rs-e2e";
 import ruleTriggers from "./rule-triggers";
@@ -227,6 +228,8 @@ export const bundles: readonly Bundle[] = [
   sessionSim13,
   remindersStrongholds,
   rsE2e,
+  // Sprint 9 track RS (build/rem-ui): the reminders UI e2e
+  remUiE2e,
   // Sprint 9 track FX (fix/fx-dice-lines): dice + gems lines
   fxDiceE2e,
   // Sprint 9 track FX (fix/fx-toasts-feed): toast stack + kill feed

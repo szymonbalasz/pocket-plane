@@ -6,6 +6,7 @@
 import { initials, levelLine } from "@shared/character-sheet/logic";
 import { CHARX_INTENTS, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import type { DefinitionRecord } from "@shared/entities/schemas";
+import { isLoaded, type LoadedSet } from "@shared/protocol/lazy";
 import { LockIcon } from "lucide-react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
@@ -22,7 +23,7 @@ import { FeaturesTab, InventoryTab, NotesTab } from "./MoreTabs";
 import { rollRoutes } from "./roll-routes";
 import { sheetBadge } from "./routing";
 import { SectionView, SheetSlotView } from "./SheetSections";
-import { sectionsFor } from "./sections";
+import { sectionCount, sectionsFor } from "./sections";
 import { SheetContext, type SheetCtx, useSheet, useSheetIntents } from "./sheet-context";
 import { sheetSections } from "./sheet-sections";
 import {
@@ -33,6 +34,8 @@ import {
   pinnedPart,
   sheetData,
 } from "./view-model";
+
+const NOTHING_LOADED: LoadedSet = { types: [], ids: {} };
 
 /** Creatures window kind (entities): "Derive to customise" opens it (FR-CHARX-31). */
 const CREATURES_KIND = "ent.creatures";
@@ -305,6 +308,8 @@ export function SheetView({
   initialPinnedPart?: PinnedPart;
 }) {
   const store = useSync((s) => s.store);
+  // A store without lazy state (static test stores) has nothing loaded.
+  const lazyLoaded = useSync((s) => s.lazy?.loaded ?? NOTHING_LOADED);
   const [editing, setEditing] = useState(startEditing);
   const [hint, setHint] = useState(startEditing && client === "player");
   const [tab, setTab] = useState<string>("main");
@@ -345,6 +350,11 @@ export function SheetView({
           creatureId: creature.id,
         });
   const tabs = [...TABS, ...sectionTabs.map((s) => [`section:${s.id}`, s.title ?? s.id] as const)];
+  // FR-CHARX-100: a tab section's count Badge (loaded rows only, FR-CHARX-103).
+  const loaded = (type: string) => isLoaded(lazyLoaded, type);
+  const counts = new Map(
+    sectionTabs.map((s) => [`section:${s.id}`, sectionCount(s, store, creature.id, loaded)]),
+  );
   const current = tabs.some(([v]) => v === tab) ? tab : "main";
   const { bodyRef, headerRef, restRef, part } = usePinnedHeader(initialPinnedPart);
   const compact = part === "compact";
@@ -387,11 +397,25 @@ export function SheetView({
             </div>
             <div className="shrink-0 overflow-x-auto pb-0.5">
               <TabsList className="w-max">
-                {tabs.map(([v, label]) => (
-                  <TabsTrigger key={v} value={v} data-testid="charx-tab" data-value={v}>
-                    {label}
-                  </TabsTrigger>
-                ))}
+                {tabs.map(([v, label]) => {
+                  const n = counts.get(v) ?? null;
+                  return (
+                    <TabsTrigger
+                      key={v}
+                      value={v}
+                      data-testid="charx-tab"
+                      data-value={v}
+                      data-count={n ?? undefined}
+                    >
+                      {label}
+                      {n !== null && (
+                        <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                          {n}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
+                  );
+                })}
               </TabsList>
             </div>
           </div>
