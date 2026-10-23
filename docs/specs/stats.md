@@ -2,7 +2,7 @@
 title: Stats and summaries
 prefix: STATS
 status: complete
-owner: spec-wf, spec-sb, spec-fx
+owner: spec-wf, spec-sb, spec-fx, spec-sp
 phase: post-mvp-9
 ---
 
@@ -22,6 +22,8 @@ phase: post-mvp-9
 > - **BL-90**: players' "No damage yet" beside a kill.
 > - **BL-69**, dates half: the fixture clock. [OQ-STATS-36](#15-open-questions) decided A at DM gate 1 (#339, as [OQ-FIX-21](fixtures-adapters.md#15-open-questions)): [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) anchors CLI loads at load time ([ADR-0068](../architecture/adr/0068-fixture-load-clock.md)).
 > - Slice **FX1** with [notifications](notifications.md) FR-NOTE-70–73; walkthrough [notifications §13 FX1](notifications.md#13-test-plan). No schema, 0 B.
+
+> **Sprint 9, track SP** (DM [#338](../decisions-log.md): session recap): the [session recap](session-recap.md) reads stats' compute helpers. FR-STATS-78–80 ([§6.2](#62-sprint-9-recap-reads-track-sp)): a read seam, a Recap button on the Session tab, separate budgets. No stats number, schema or ack changes; 0 B. The stats files (`compute.ts`, the Session tab) are edited in slice SP3 **after FX1 merges** (seams S7: one holder of stats files at a time).
 
 ## 1. Summary
 
@@ -161,6 +163,16 @@ Tier A rules hold: filter, then aggregate; final roll only; names from facts; pa
 | Dealt, Taken, Healing, Kills, Times downed | FR-STATS-06–08 | | Lifetime |
 | Biggest hit, Biggest overkill | FR-STATS-12 per role, "→ target · fight label" | | Records |
 | Best fight (damage / kills) | max over fights of Dealt / Kills, with the fight label | | Records |
+
+### 6.2 Sprint 9: recap reads (track SP)
+
+The [session recap](session-recap.md) reads stats; it changes no stats number, formula, schema or ack. Decided with RECAP's picks at DM gate 1 (#339).
+
+| ID | Requirement |
+|---|---|
+| FR-STATS-78 | **Read seam**: `src/server/features/stats/compute.ts` keeps `pickSession`, `sessionStats`, `luckStats`, `fightsFor`, `fightStats`, `luckRolls` and `characters` exported with today's signatures (the recap imports them, read-only), and gains **one** export `sessionFights(r, s)`: the fights with a counted fact the viewer sees inside session `s` (the rule `sessionsStats` already counts by). A change to these signatures needs a RECAP review. Test `FR-STATS-78 recap seam` (the recap's compose over `stats-b` equals the Stats acks it is built from). |
+| FR-STATS-79 | **Recap button** on the Session tab (both clients): `stats-session-recap` "Recap" beside the picker (DM: beside Show awards) opens `recap.session` (`by: "user"`) on the picked session ([FR-RECAP-10](session-recap.md#6-functional-requirements)). Hidden until RECAP's window registers. Test `FR-STATS-79 recap button`. |
+| FR-STATS-80 | **Separate budgets**: `recap.query` has its own per-actor rate limit ([FR-RECAP-05](session-recap.md#6-functional-requirements)) and memo ([FR-RECAP-29](session-recap.md#6-functional-requirements): keyed by session, role and fact / loot high-water; all players share one entry); it never counts against `stats.query`'s (FR-STATS-16). The leak scan's stats cases cover `recap.query` acks too ([FR-RECAP-08](session-recap.md#6-functional-requirements)). |
 
 ## 7. UI/UX notes
 
@@ -374,6 +386,8 @@ Named tests (all `FR-STATS-NN …`):
 - **Stats client files have one holder at a time** (seams S7): FX1 first, then SP3's stats edits.
 - [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) (BL-69, seams S13) also lands in FX1: `server/features/fixtures-adapters/loader.ts` (`now`) and test. ⚠ `scripts/fixtures.ts` is shared tooling (AGENTS §9.9): one line passing the load start, `shared change needed`.
 - Order (seams S5, S10): FX1 builds in wave 3 and merges **after PM1**.
+
+**Sprint 9 (track SP).** FR-STATS-78–80 are built in RECAP's slice **SP3** ([session-recap §14](session-recap.md#14-dependencies)): `features/stats/compute.ts` (one export) and the Session tab's button (`@ui/features/stats/*`), **after FX1 (BL-84, BL-74) merges** (seams S7). Tests: `FR-STATS-78 recap seam`, `FR-STATS-79 recap button`, `FR-STATS-80` in the leak scan; walkthrough RC2 ([session-recap §13](session-recap.md#13-test-plan)). No fixture here (RECAP's units).
 
 ## 15. Open questions
 

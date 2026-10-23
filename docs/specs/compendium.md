@@ -2,8 +2,8 @@
 title: Compendium
 prefix: CMP
 status: complete
-owner: spec-followups
-phase: post-mvp-7
+owner: spec-followups, spec-sp
+phase: post-mvp-9
 ---
 
 # Compendium
@@ -55,11 +55,25 @@ phase: post-mvp-7
 
 > **Sprint 7 revision (track FU, BL-48; DM [#311](../decisions-log.md)):** decided, not open: the DM gets a confirmation after Add to party, and a fixture Goblin's row no longer reads "CR 1/4 · Small" with no type. New **FR-CMP-57**, **-58**. Tests `FR-CMP-57 add to party confirmed` (DOM: ack → `cmp-add-to-party-done` "Added: Potion of healing ×2", Popover closes after 1.5 s; `e2e/cmp-add-to-party.e2e.ts` expects the new players' text), `FR-CMP-58 type-less creature label` (unit: no trailing space without a type; the new typed fixture Goblin "Small humanoid"; the old type-less entry unchanged); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. 0 B. Edge cases: client-only text; reconnect re-renders from the store; crash: no server change. No open question.
 
+> **Sprint 9 revision (track SP, rules quick reference; DM [#338](../decisions-log.md), tier B):** decided, not open: a **DM screen of rules lookups** (conditions, actions, cover, …) from content we may ship ([ADR-0018](../architecture/adr/0018-global-imported-content.md), CC BY 4.0). Shape decided at DM gate 1 ([#339](../decisions-log.md), every bold pick; OQ-CMP-45–50): the SRD 5.1 **rules sections** join the bundled source as a new kind **`rule`** (one entry per heading, text quoted verbatim), shown in a new **Rules** window on pages we curate, and searchable like every entry (also from the [command palette](play-shell.md#6-functional-requirements)). **Why here, not a new spec:** the content is compendium entries (same source, adapter, import, visibility, search, attribution); only the window is new. New FR-CMP-59–75 ([§6.1](#61-sprint-9-rules-quick-reference-track-sp)); amended FR-CMP-11, -36. 0 B to any snapshot (REST only). Slice SP2 (§14). Integrator seams S3, S4 and review-a rulings 17–19 applied.
+
+### Sprint 9 at a glance
+
+| FR | What | Named test (§13.3) |
+|---|---|---|
+| FR-CMP-59–61 | Kind `rule`; Open5e `sections` recorded (wotc-srd); filtered to 21 sections, split into 161 cards | `FR-CMP-60 sections are wotc-srd`, `FR-CMP-61 cards` |
+| FR-CMP-62 | Read / search like other kinds; All's empty list skips rules | `FR-CMP-62 rules searchable, not in the default list` |
+| FR-CMP-63–66, -69 | Rules window, curated pages, page REST, pins, open on a card | `FR-CMP-64 every page key resolves`, `FR-CMP-65 page route` |
+| FR-CMP-67, -70 | House rules (homebrew `rule`), players read | `FR-CMP-67 house rules shared only` |
+| FR-CMP-68 | Attribution + "split into cards" note | `FR-CMP-68 attribution` |
+| FR-CMP-71–75 | 0 B, import / search cost, states, test IDs | `FR-CMP-71 CON-44 rules 0 B` |
+
 ## 1. Summary
 
 - A searchable library of SRD 5.1 rules content (**monsters, spells, items, conditions, class features**), imported offline from data bundled in the repo, plus per-campaign **homebrew**. DM decision [#203](../decisions-log.md); system = 5e 2014 SRD ([#23](../decisions-log.md)).
 - Imported entries are **global and read-only**; the DM edits by **cloning** (other kinds) or **deriving** (monsters) into the campaign ([ADR-0018](../architecture/adr/0018-global-imported-content.md), [ADR-0010](../architecture/adr/0010-compendium-design.md) option i). Completes ADR-0010's scope as option A: [ADR-0046](../architecture/adr/0046-compendium-scope.md).
 - **Nothing from the compendium is in a snapshot.** Entries are read on demand over REST; imported creature definitions become a lazy record type (CON-44: all 322 SRD monsters would add 341 KB to the heavy DM snapshot).
+- *(Sprint 9)* **Rules quick reference:** the SRD's rules chapters as **rule cards** (kind `rule`), grouped on curated pages (Combat, Conditions, Checks, Exploration, Spellcasting, Hazards, House rules, Pinned) in a **Rules** window, both clients.
 
 ## 2. Scope
 
@@ -71,6 +85,7 @@ phase: post-mvp-7
 - **Not in S4:** typo-tolerant (fuzzy) search, search syntax beyond plain words (OQ-CMP-26), 5etools class import ([compendium-expansion](post-mvp/compendium-expansion.md), #244).
 - **Sprint 5 (S5, track C):** image slots on homebrew entries (FR-CMP-45–49), the form's slots hosting `ImageAttach` (FR-CMP-50), the entry view's gallery + lightbox in both clients (FR-CMP-51, -52), CON-44 (FR-CMP-53). Upload / paste / drop code is track P's ([FR-ASSET-20–27](assets-pipeline.md#6-functional-requirements)). **Not in S5** (decided #256): images on imported (SRD) entries (OQ-CMP-39), per-image player toggle (OQ-CMP-40), images as token art (OQ-CMP-41), captions and result-row thumbnails (OQ-CMP-42), inline images in entry text.
 - **Sprint 6 (S6, track IM):** the matcher module moves to `@shared/search/` (FR-CMP-54, -56); the homebrew form's slots pass a picker `context` (FR-CMP-55). Tags, image search and the picker are [assets-pipeline](assets-pipeline.md)'s (FR-ASSET-39–50). **Not in S6:** tags on compendium entries; image search inside the Compendium window.
+- **Sprint 9 (S9, track SP):** kind `rule`, the recorded `sections` endpoint, card split, the Rules window with curated pages, pins and house rules (FR-CMP-59–75). **Not in S9:** our own condensed rules text (OQ-CMP-45: SRD wording, #339), SRD 5.2 rules, links from a token's condition chip to its card, rule cards changing rolls.
 
 ## 3. Goals
 
@@ -84,7 +99,7 @@ phase: post-mvp-7
 ## 4. Non-goals
 
 - Open5e download at runtime, SRD 5.2 (2024), 5etools (→ [compendium-expansion](post-mvp/compendium-expansion.md)), homebrew **files**, Griffon's Saddlebag, AI paste ([ADR-0015](../architecture/adr/0015-source-adapters-fixtures.md)): each is a later adapter or form helper.
-- Races, backgrounds, feats, rules chapters (rules quick reference, tier B); structured editors per kind (homebrew is one text form).
+- Races, backgrounds, feats ~~, rules chapters (rules quick reference, tier B)~~ *(sprint 9: rules chapters become `rule` cards, FR-CMP-59; races, backgrounds and feats stay out: the recorder keeps only the pages’ sections, FR-CMP-60)*; structured editors per kind (homebrew is one text form).
 - A rules engine: entries never change rolls or effects by themselves; presets are [effect-modifiers](effect-modifiers.md)' (OQ-CMP-14).
 - Overlays / patches on imported entries (ADR-0010 option C); per-campaign imports (option B). Deleting imported entries. *(S5: this is why imported entries get no images, OQ-CMP-39 decided #256.)*
 - *(S5)* Images inside entry text (markdown-lite stays text-only, FR-CMP-26; P's OQ-ASSET-13), an image library / gallery window, image editing or cropping, player uploads (OQ-ASSET-14).
@@ -105,6 +120,10 @@ phase: post-mvp-7
 - As a player, I want to add Sneak Attack from the compendium to my sheet's Features.
 - *(S4)* As a player, I want "cure wound" to find Cure Wounds, without ever seeing the DM's unshared homebrew.
 - *(S5)* As a player, I want to see what the item the DM just shared looks like, and open its picture large.
+
+**Sprint 9**
+- As the DM, I want a Rules window I can leave open beside Initiative, with Cover, Grappling and Death saves one click away, my house rules on their own page and my favourite cards pinned.
+- As a player, I want to check what Dodge or Help does without asking the DM, in the words of the rules.
 
 ## 6. Functional requirements
 
@@ -177,6 +196,30 @@ All writes: one transaction (rows + event-log entry), then the domain event ([AD
 | FR-CMP-57 | *(S7, track FU)* **Add to party confirms for the DM** (BL-48: no DM confirmation after Add to party; amends FR-CMP-41's "the `loot-received` toast is the confirmation", which only players saw): on `ack` the Popover shows "Added: ‹name› ×‹qty›" (`cmp-add-to-party-done`) for 1.5 s, then closes; reject and lost-intent handling unchanged. Players' toast text per [FR-PARTY-49](party-board.md#69-sprint-7-bl-48-copy-and-tabs-track-fu) ("Party inventory: …"). | BL-48 |
 | FR-CMP-58 | *(S7)* **A creature row without a type** (BL-48: fixture Goblin "CR 1/4 · Small"): the row's summary (`@shared/compendium/schemas.ts`, "CR ‹cr› · ‹Size› ‹type›") drops the empty type cleanly ("CR 1/4 · Small", no trailing space); and a **separate typed Goblin entry** is added to the fixtures (e.g. in `cmp-srd-mini-s3` as a second Goblin with `type: "humanoid"`, "Small humanoid"), leaving the existing type-less entry and every test that reads it untouched (rulings-b #19). | BL-48 |
 
+### 6.1 Sprint 9: rules quick reference (track SP)
+
+Decided at DM gate 1 (#339): OQ-CMP-45–50, every bold pick. Text is the SRD's, never ours; only the page list and order are curated.
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-CMP-59 | **Kind `rule`** in `@shared/compendium` (`COMPENDIUM_KINDS` + `rule`; the DB column is a text enum with no CHECK, so `drizzle-kit push` changes nothing, asserted by a schema test). Facets `{chapter` ≤ 40 (Open5e `parent`, e.g. "Combat"), `section` ≤ 60 (e.g. "Actions in Combat"), `order` int (card position in its section)`}`; body `{text}` (markdown-lite); entry JSON ≤ 32 KB. `sourceKey` `rule/<section-slug>/<card-slug>`; `line` = "‹section› · ‹chapter›". | ADR-0018 |
+| FR-CMP-60 | **Bundled source gains `sections`** (OQ-CMP-45 A): the recorder adds Open5e v1 `sections` (`document__slug = wotc-srd` only, as FR-CMP-06) to `srd-5.1`, **filtered** (review-a ruling 19): only the sections the pages use (FR-CMP-64: `actions-in-combat`, `attacking`, `cover`, `damage-and-healing`, `combat-sequence`, `mounted-combat`, `underwater-combat`, `abilities`, `saving-throws`, `inspiration`, `movement`, `environment`, `rest`, `time`, `objects`, `spellcasting`, `traps`, `poisons`, `diseases`, `madness`) plus a named allow-list `RULES_EXTRA = ["between-adventures"]`. Measured: **21 of 45** wotc-srd sections, 156,719 B (fetched at spec time); the source grows 2.2 → ≈ 2.4 MB. Everything else stays out: races, backgrounds, feats, character options, equipment, `legal-information` (the source row holds the attribution), `conditions` (the `condition` kind has them). A new page section is one list entry. One hand run with network (FR-CMP-06's rule; no network at runtime or in tests). `licence.test.ts` covers the endpoint; `fixtures/srd/open5e/sections.ts` holds a mini subset. | CC BY 4.0 |
+| FR-CMP-61 | **Cards**: the adapter splits each section at `##` and `###` headings, one entry per card (text before the first heading = an intro card named after the section); deeper headings stay inside their card. Name = the heading (trimmed, ≤ 80); a name repeated in one section gets " (‹parent heading›)" (e.g. "Attack Rolls and Damage (Strength)"). Wording verbatim, reformatted to markdown-lite (FR-CMP-26; tables kept). Measured: **161 cards**, longest 7,892 chars. `ADAPTER_VERSION` bumped → the DM sees **Update** (FR-CMP-04, -07). | |
+| FR-CMP-62 | **Read and search** as every imported non-monster kind: DM and players (FR-CMP-14), index rows (FR-CMP-34), filters `chapter`, `section` (amends FR-CMP-11). **Amends FR-CMP-36:** the empty-query default list skips `rule` (161 headings would bury the library); any query finds them. No Rules Tab in the Compendium window (the Rules window is the place). A `rule` entry view shows heading, text and **Open in Rules** (`cmp-rule-open`). | |
+| FR-CMP-63 | **Window `cmp.rules` "Rules"** (OQ-CMP-46 A), both clients: launcher lucide `ScrollText`, label "Rules", order after Compendium; default closed; default 480 × 600 (1280×720: 480 × 412), min 340 × 320; `usefulSize` 420 × 360, criterion: the page Tabs and three card headings visible. Registers **after PM1** (seams S4): one `windows.ts` line per client, a size-table row with that content criterion, goldens regenerated (`UPDATE_GOLDEN=1`), and membership in the replay harness as an **untouched window in the DM set D3 and the player set P1** (FR-SHELL-160; a new failing cell needs a reason or a fix, `replay.failing.json` regenerated, never hand-merged). With its launcher entry added, SP2 re-runs PM1's launcher-label threshold test and updates the recorded number (S3). Opened by the user only (launcher, palette, Open in Rules), `by: "user"`. | Seams S3, S4 |
+| FR-CMP-64 | **Pages** (curated, `@shared/compendium/rules-pages.ts`): ordered `{id, title, items: sourceKey[]}`. **Combat**: the Actions in Combat cards, Attack Rolls, Modifiers to the Roll, Rolling 1 or 20, Unseen Attackers and Targets, Ranged Attacks in Close Combat, Opportunity Attacks, Two-Weapon Fighting, Grappling, Shoving a Creature, Cover, Critical Hits, Damage Resistance and Vulnerability, Dropping to 0 Hit Points, Death Saving Throws, Stabilizing a Creature, Instant Death, Knocking a Creature Out, Temporary Hit Points, Mounted Combat, Underwater Combat. **Conditions**: the 15 `condition` entries. **Checks**: Advantage and Disadvantage, Proficiency Bonus, Ability Checks, Contests, Passive Checks, Working Together, Group Checks, Saving Throws, Inspiration. **Exploration**: Movement (incl. Travel Pace, Jumping), Falling, Suffocating, Vision and Light, Food and Water, Resting, Time, Objects. **Spellcasting**: the Casting a Spell cards (casting time, range, components, duration, concentration, targets, areas of effect, combining effects). **Hazards**: Traps, Poisons, Diseases, Madness. Then **House rules** (FR-CMP-67) and **Pinned** (FR-CMP-66). A key resolves to the best-ranked visible entry with that `sourceKey` (FR-CMP-38). A test resolves every key against the bundled source. | OQ-CMP-45 |
+| FR-CMP-65 | **Page REST**: `GET /api/compendium/rules` → `{pages: [{id, title, cards: [{id, name, section}]}], attribution}` (names only, ≈ 10 KB est.); `GET /api/compendium/rules/:pageId` → `{cards: [{id, name, section, text, house}]}` (measured 9–39 KB a page, §12). Auth, visibility (players: homebrew `shared` only), `ETag` = an opaque hash of source `version` + the campaign's **homebrew-rule version counter** (count of its `rule` homebrew entries + the newest `updatedAt` + the newest delete stamp, so deleting or unsharing any house rule changes it; review-a ruling 17), `Cache-Control` as FR-CMP-12. Unknown page → `404`. | Route-local (FR-CMP-13) |
+| FR-CMP-66 | **Window UI**: page Tabs (a Select below 420 px wide); a search Input = compendium search with `kind=rule` (FR-CMP-10, debounced 200 ms), whose results replace the page until cleared; cards as Collapsibles (heading, muted section, text through the one renderer, dice clickable via `DiceText`). **Pin** (star) per card → the Pinned page, per browser `pp.rules.pins.v1.<campaignId>` (≤ 30 ids, OQ-CMP-49 A). Opening on a card (FR-CMP-69) selects its page, expands it, scrolls it into view. | |
+| FR-CMP-67 | **House rules** (OQ-CMP-47 A): homebrew entries of kind `rule` (the homebrew form; `section` free text ≤ 60, `chapter` = "House rules"), `shared` as any homebrew. The House rules page lists them by name; players see shared ones only; a "House rule" badge. | FR-CMP-24 |
+| FR-CMP-68 | **Attribution** (ADR-0018; CC BY 4.0 asks to say what changed): window footer "Rules text: SRD 5.1 · CC BY 4.0 · About" opens FR-CMP-19's About dialog, which gains "Rules text from the SRD 5.1, split into cards at its headings and reformatted; wording unchanged." (review-a ruling 18); each card carries a muted "SRD 5.1" (homebrew "House rule"). | FR-CMP-19 |
+| FR-CMP-69 | **Open a card from elsewhere**: client API `openRules(entryId)` opens `cmp.rules` (`by: "user"`) on the card's page with it expanded; the palette ([FR-SHELL-188](play-shell.md#6-functional-requirements)) and Open in Rules use it; a card on no page (e.g. Between Adventures, or an ability's skill card) opens in the search view, alone and expanded. | |
+| FR-CMP-70 | **Players** (OQ-CMP-48 A): same window, pages and pins; House rules shared only; no homebrew form, no Update. | FR-CMP-14 |
+| FR-CMP-71 | **CON-44: 0 B.** No record type; REST only. FR-CMP-30's test also imports the `rule` rows and asserts 0 B growth for every viewer. | |
+| FR-CMP-72 | **Cost**: a full import with sections stays inside FR-CMP-31 (target ≤ 2 s; +161 rows); the FR-CMP-34 bench re-runs with rules (gate ≤ 5 ms p95; 0.96 ms worst at spec time without them). | |
+| FR-CMP-73 | **States**: nothing imported → DM "Import SRD 5.1 in the Compendium to fill the rules" (opens Compendium), player "The DM hasn't set up the rules yet"; skeleton cards while loading; "Couldn't load rules" + Retry; offline: pages already loaded stay readable, others "Offline". | |
+| FR-CMP-74 | **Test IDs**: `cmp-rules-window`, `cmp-rules-page` (+ `data-value` page id), `cmp-rules-search`, `cmp-rules-card` (+ `data-record-id` entry id, `data-state` open / closed), `cmp-rules-pin` (+ `data-state`), `cmp-rules-about`, `cmp-rules-empty`, `cmp-rule-open`. | AGENTS §9.5 |
+| FR-CMP-75 | **Still not a rules engine**: cards never change rolls, effects or conditions (§4). | OQ-CMP-14 |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
@@ -194,6 +237,7 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 - *(S5)* **Homebrew form images** (FR-CMP-50): label "Images (‹n› / 4)"; tiles in a wrapping row, ghost icon Buttons Remove / Move left / Move right with Tooltips; "Main" Badge on the first; the attach control below (its own look, P's [ASSET §7](assets-pipeline.md#7-uiux-notes)). Empty: just the control and its hint.
 - *(S5)* **Entry gallery** (FR-CMP-51): main image as a rounded block under the entry header; others as small tiles; the lightbox is a shadcn Dialog (dark backdrop), Prev / Next ghost Buttons, counter in muted text. Same in both clients; DM view adds nothing.
 - *(S5)* **Test IDs:** `cmp-form-images` (strip, `data-value` = count), `cmp-form-image` (+ `data-record-id` = asset ID, `data-value` = position 1–4), `cmp-form-image-remove`, `cmp-form-image-left`, `cmp-form-image-right`, `cmp-form-image-main`, `cmp-form-image-dup` (hint); the control is `asset-attach` with `data-owner="cmp-form"`. View: `cmp-entry-images`, `cmp-entry-image-main` (+ `data-record-id`), `cmp-entry-image` (+ `data-record-id`, `data-value` = position), `cmp-lightbox`, `cmp-lightbox-prev`, `cmp-lightbox-next`, `cmp-lightbox-count`.
+- *(S9)* **Rules window** (FR-CMP-63–66): shadcn Tabs (Select when narrow), Input, Collapsible cards with a ghost star Button (Tooltip "Pin" / "Unpin"), muted section line, footer link About. Cards closed by default; a page remembers which are open for the session (client memory). **DM view:** + House rules homebrew via the Compendium's homebrew form. **Player view:** same pages, shared house rules only.
 
 ## 8. Data model
 
@@ -229,6 +273,9 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 | item | `category` weapon \| armor \| gear \| magic, `rarity?`, `attunement` | `typeLine`, `cost?`, `weight?`, `damage?`, `properties?`, `ac?`, `text` |
 | condition | — | `text` |
 | feature | `className` (SRD class), `subclass?`, `level?` 1–20 | `text`; `presetKey?` (MOD built-in key) or `preset?` (`TriggerRule`, MOD's zod, opaque here); at most one (FR-CMP-29) |
+| rule *(S9)* | `chapter` ≤ 40, `section` ≤ 60, `order` int | `text` (FR-CMP-59, -61); homebrew: `chapter` = "House rules" (FR-CMP-67) |
+
+- *(S9)* **No new table, column or record type.** `kind` gains `rule` (text enum, no DB change). **Derived:** pages (`rules-pages.ts`, code), the page index and page bodies (REST, computed per request). **Browser:** pins `pp.rules.pins.v1.<campaignId>` (≤ 30 ids).
 
 - **Relations:** source 1—* imported entry; campaign 1—* homebrew entry; monster entry 1—1 imported definition (`entity`); homebrew → base (informational). Sheet rows and derived customs are copies, never linked.
 - **Derived:** `readOnly = source != null`, `line`, `featureKey`, XP (from CR, FR-ENT-03), `sourceLabel`.
@@ -250,7 +297,10 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 | POST / PUT / DELETE | `/api/compendium/entries[/:id]` | DM | Homebrew (FR-CMP-24/25) |
 | POST | `/api/compendium/derive-monster` | DM | FR-CMP-27 → `201 {entity}` |
 
-All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
+| GET *(S9)* | `/api/compendium/rules` | DM, player | Page index (FR-CMP-65) |
+| GET *(S9)* | `/api/compendium/rules/:pageId` | DM, player | One page's cards (FR-CMP-65) |
+
+All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12). *(S9)* No new event, intent or record type: rule entries ride the existing `CompendiumImported` / `CompendiumEntrySaved` (DM only) and REST.
 
 **WS intents:** `cmp.addToSheet {entryId, characterId}` (DM; player for own characters; FR-CMP-28), registered feature-locally (no protocol file). Also uses `sync.load {type: "imported-entity", ids}` (P's lazy ADR). *(S5)* Add to party sends party-board's `party.addItem` (FR-CMP-40); its events (`PartyItemAdded`, `NotificationCreated` `loot-received`) and visibility (everyone in the campaign) are party-board's.
 
@@ -284,6 +334,9 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 | *(S4)* Search groups, `sameAs` | ✓ (own + imported) | visible members only; hidden → not counted, empty page | FR-CMP-14 before FR-CMP-35 |
 | *(S5)* Set entry images (upload, paste, library) | ✓ own campaign's homebrew | ✗ (no form; control not rendered) | DM secret on `PUT` / `POST /api/assets`; `assets.require` per ID (FR-CMP-46) |
 | *(S5)* See entry images | ✓ | entries they may read only | FR-CMP-48 (the entry's FR-CMP-14 check) |
+| *(S9)* Read rule cards and pages | ✓ | ✓ (house rules: `shared` only) | FR-CMP-14, -65 |
+| *(S9)* House rules CRUD | ✓ | ✗ (401) | DM secret (FR-CMP-24) |
+| *(S9)* Pins | own browser | own browser | — (browser only) |
 
 ## 11. Edge cases & failure modes
 
@@ -301,6 +354,7 @@ All REST responses: `Cache-Control: private, no-cache` (FR-CMP-12).
 - **Invalid / malicious input:** strict zod; `q` ≤ 100; cursor opaque and validated; text rendered as text nodes only (FR-CMP-26); recorded sources are repo files, never client input (`cmp.import` takes a source key, not data).
 - **Leaks:** a player never receives a monster entry, a monster definition, unshared homebrew or another campaign's homebrew, in REST bodies, errors or WS frames. *(S5: nor the image asset IDs of any of them, FR-CMP-48; an image ID in another campaign's entry or a forged `PUT` → `not_found`, FR-CMP-46.)*
 - *(S5)* **Add to party:** the party row holds a name copy only, so adding an **unshared homebrew** item tells players its name (the party inventory is public by design); the Popover says "Players will see ‹name› in the party inventory" for unshared homebrew. Disconnect → button disabled (needs `live`); lost intent → toast (FR-CMP-41). Crash: `party.addItem` is one transaction (item row, loot row, notification). Two DM tabs adding the same item → both commit, quantities sum (merge).
+- *(S9)* **Rules:** REST only, so disconnect / reconnect change nothing (pages already loaded stay readable offline, FR-CMP-73). Crash mid-import: as any import (one transaction). The DM unshares a house rule while a player has it open → their next fetch drops it. A page key whose card a newer source lacks → skipped silently (the resolve test catches it in CI). A pinned id that no longer resolves → dropped from Pinned. Leaks: the page routes go through FR-CMP-14 like search (unshared house rules never reach players).
 
 ## 12. Performance & bandwidth
 
@@ -357,6 +411,17 @@ Measured with real SRD 5.1 data (Open5e v1 `wotc-srd`) on the realistic-heavy ha
 | `readEntry` | 0.14 ms per call (200 calls 27.8 ms); the stale-ID check adds one indexed lookup for ≤ 4 IDs |
 
 - Ceilings: DM **1.5 MiB** (1,572,864 B; raised at sprint-5 gate 1, [#256](../decisions-log.md)), players 512 KiB (#208). Worst case "every image in the library" (OQ-ASSET-12 B / C) would cost ≈ 325 B per image in the DM snapshot only; entry images themselves never enter it. *(Seams S14 budgets track C at ≈ 1.3 KB of the ≈ 940 KB DM worst case (≈ 632 KB left of 1.5 MiB): the 4 listed ingests above. As specified, entry images are attachments, so C adds 0 B; the 1.3 KB stays as headroom.)*
+
+**Sprint 9 (rules; spec-time fetch of Open5e v1 `sections?document__slug=wotc-srd` into a scratch dir, nothing committed):**
+
+| Figure | Value |
+|---|---|
+| Sections (wotc-srd) | 45, 328,823 B JSON; 304,626 B of text without `legal-information` |
+| Kept after the filter (FR-CMP-60: the pages’ 20 sections + `between-adventures`) | 21 sections, 156,719 B JSON |
+| Cards after the split (`##`, `###`) | **161**; longest 7,892 chars (all 299 cards of every section: longest 11,223) |
+| Page bodies (FR-CMP-65, JSON of the source sections each page draws on; upper bound) | Combat ≈ 36 KB, Checks ≈ 33 KB, Hazards ≈ 39 KB, Exploration ≈ 19 KB, Spellcasting ≈ 19 KB, Conditions ≈ 9 KB |
+| Snapshot | **0 B** (no record type; FR-CMP-71 asserts it) |
+| Search over the full import (FR-CMP-34 bench, re-run, without rules) | p95 ≤ 0.96 ms DM / ≤ 0.57 ms player; build 53 ms. Rules add 161 rows to ≈ 2,400 (+7 %) |
 
 ## 13. Test plan
 
@@ -497,6 +562,33 @@ Isolated per worktree as above. Fixtures: unchanged for the move (in-code cases,
 
 Walkthrough: [ASSET walkthrough IM](assets-pipeline.md#131-sprint-6-image-search-and-tags-track-im) step IM6 (homebrew item → From library → "Gob el"); compendium search itself: unchanged, no new step.
 
+### 13.3 Sprint 9: rules quick reference (track SP)
+
+**Fixtures** (`fixtures/units/compendium/`):
+- **`cmp-rules-mini`** (setup; **joins session-sim-13**): `cmp.importRecorded` of a mini `sections` set (Actions in Combat, Attacking, Cover, Damage and Healing, Movement; wotc-srd, `fixtures/srd/open5e/sections.ts`) under `srd-5.1`. Imports only `rule` rows (FR-CMP-09: other entries untouched), so sim-12's compendium results for "goblin", "potion" and the default list stay as they are (FR-CMP-62 keeps rules out of it). ≈ 50 cards.
+- **`cmp-rule-house`** (setup; `sp-s9` only, not session-sim-13): two homebrew `rule` entries: "Flanking" (shared) and "Critical fumbles" (unshared).
+- **Bundles:** `sp-s9` (play-shell §13, shared by all SP walkthroughs) holds both; `compendium-full` gains the bundled sections automatically (full import).
+
+**Named tests** (all `FR-CMP-NN …`):
+- **Unit:** `59 rule kind schema`; `59 push is a no-op` (schema test); `60 recorder filter` (only the pages’ sections + `RULES_EXTRA`; no races / backgrounds / feats); `61 cards` (split at `##` / `###`, intro card, repeated names suffixed, text verbatim); `64 every page key resolves` (bundled source); `66 pins parse` (≤ 30, stale dropped); `68 attribution` (footer + About line).
+- **Integration:** `60 sections are wotc-srd` (in `licence.test.ts`: every bundled and mini section record); `62 rules searchable, not in the default list`; `65 page route` (DM / player bodies, ETag / 304, unknown page 404; deleting or unsharing a non-newest house rule changes the ETag, no stale 304); `67 house rules shared only` (player body has "Flanking", never "Critical fumbles"; also via search); `71 CON-44 rules 0 B`; `72 import with sections ≤ 2 s target`.
+- **DOM:** `63 rules window registered` (both registries, size-table row); `66 open on a card`; `73 states`.
+- **E2E (thin, `rules.e2e.ts`, `// e2e-bundle: sp-s9-e2e`):** player-1 opens Rules → Combat → "Cover" card text visible; About shows the SRD statement.
+- **Bench:** FR-CMP-34 gate re-run with `compendium-full` (now with rules).
+
+**Browser walkthrough** (bundle `sp-s9`, verify profile, contexts `dm`, `player-1`, 1440×900):
+
+| Step | DM (A) | Player 1 (B) | Expect |
+|---|---|---|---|
+| R1 | Open Rules from the launcher | Same | Tabs Combat · Conditions · Checks · Exploration · Spellcasting · Hazards · House rules · Pinned; Combat shows Dodge, Help, Cover, … (those in the mini set) |
+| R2 | Expand Cover, Opportunity Attacks | Expand Dodge | SRD text, tables rendered; "SRD 5.1" on each card |
+| R3 | Search "grapple" | Search "prone" | A: the Grappling card; B: the Prone condition (Conditions) |
+| R4 | House rules | House rules | A: Flanking + Critical fumbles (DM only marked); B: Flanking only |
+| R5 | Pin Cover; reload | — | Pinned page lists Cover after the reload |
+| R6 | Compendium: search "cover" → the rule → Open in Rules | Palette Ctrl+K "dodge" → Enter | Rules opens on that card, expanded |
+| R7 | Footer About | Footer About | SRD 5.1 CC BY 4.0 statement + the "split into cards" line |
+| R8 | — | Leak scan of the page bodies | No "Critical fumbles", no monster |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -557,6 +649,12 @@ Walkthrough: [ASSET walkthrough IM](assets-pipeline.md#131-sprint-6-image-search
 
 - C1 has no route on purpose: the import UI must not ship before C2 makes `imported-entity` lazy (else one click puts 341 KB in the DM snapshot).
 
+**Sprint 9 (track SP).** Needs [play-shell](play-shell.md) FR-SHELL-112 registration (track PM's frame core first) and, for the palette rows, FR-SHELL-188. **Library: none** (markdown-lite renderer and the shared matcher exist).
+
+| Slice | Files | ⚠ Shared (AGENTS §9.9) | Order |
+|---|---|---|---|
+| **SP2** `build/sp-rules` | `@shared/compendium/*` (kind, facets, `rules-pages.ts`), `src/server/features/compendium/*` (adapter split, page routes), `sources/srd-5.1/` (`record.ts` endpoint, new `sections.json`, `licence.test.ts`), `@ui/features/compendium/rules/*`, `fixtures/srd/open5e/sections.ts`, units `cmp-rules-mini`, `cmp-rule-house` | appends: `windows.ts` ×2, PM's size-table row (`cmp.rules`), goldens regenerated, replay sets **D3 + P1** (untouched), `replay.failing.json` regenerated, PM1's launcher-label threshold number (S3, S4); `bundles/index.ts`, `commands.ts` (the Rules command, if SP1 merged first); the DB schema file imports `COMPENDIUM_KINDS` but its SQL doesn't change (schema test; no schema lane, S10) | **Wave 3, after PM1 merges** (seams build plan); ∥ SP1, SP3. The recorder run needs network once (builder runs it by hand; FR-CMP-06) |
+
 ## 15. Open questions
 
 **Decided (#…)** = settled by the DM at sprint-3 gate 1 (rejected options kept for the record). "Settled" = seams / review ruling. Rows with an owner: non-blocking, the owner's **bold** pick stands unless the owner revisits it in build.
@@ -608,9 +706,21 @@ Walkthrough: [ASSET walkthrough IM](assets-pipeline.md#131-sprint-6-image-search
 | OQ-CMP-43 | *(S6)* **Track CP (companions + summons; [combat-tracker](combat-tracker.md), [entities](entities.md))**: a summon is placed from a compendium entry. Which search does CP use? | **Settled by seams S6: A.** CP3 `build/cp-summon` needs **IM-0 only**: the summon lookup is combat's autocomplete through `@shared/search/match` (store rows) and the compendium's REST search (entries); no matcher of its own, no image picker (summon token art, if any, uses the token Image… picker IM-3 wires). Rejected: ~~B CP filters a client-side list with its own code (a second matcher, against #285)~~ | no · settled S6 | combat-tracker, entities |
 | OQ-CMP-44 | *(S6)* Glossary | **Add "Image tag"** (a label on an image in the asset library, several per image; built-in or the DM's own; DM only) **and "Shared matcher"** (the one word-search module `@shared/search/match.ts`: whitespace-separated words, partial, case-insensitive, every word must match; used by compendium search, creature lookups and image search); amend "Asset library" (the DM's listed images, searchable and filterable by tag in every picker). **Settled by seams S13** (integrator applies at the gate merge) | no · settled S13 | glossary, assets-pipeline |
 
+**Sprint 9 (track SP, rules quick reference; owner spec-sp).** All decided at DM gate 1 (#339): every bold pick accepted.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CMP-45 | Where does the rules text come from? (ADR-0018: only what we may ship) | **Decided (DM #339): A.** Options: **A. SRD 5.1 rules sections recorded from Open5e (wotc-srd), only those the pages use (21 of 45; no races, backgrounds, feats), wording verbatim as cards; we curate only the pages**: exact rules, CC BY 4.0, one recorder run · B. DM-screen tables we write, condensed from the SRD: compact, but our paraphrase can drift from the rules and needs proof-reading · C. Only what we ship today (conditions): nothing new | no (decided) | FR-CMP-59–64 |
+| OQ-CMP-46 | Where does it live? | **Decided (DM #339): A.** Options: **A. Its own Rules window (both launchers), pages + pins**: a DM screen you leave open · B. A Rules tab in the Compendium window: one window fewer, but a 7th tab at 440 px and no page layout · C. Palette lookups only: nothing to leave open | no (decided) | FR-CMP-63 |
+| OQ-CMP-47 | House rules on the screen? | **Decided (DM #339): A.** Options: **A. Homebrew `rule` entries on a House rules page, shared per entry**: the existing homebrew form · B. SRD only | no (decided) | FR-CMP-67 |
+| OQ-CMP-48 | Who sees it? | **Decided (DM #339): A.** Options: **A. DM and players**: SRD text is public and holds no campaign data · B. DM only ("DM screen"): players keep the Compendium | no (decided) | FR-CMP-70 |
+| OQ-CMP-49 | Pinned cards | **Decided (DM #339): A.** Options: **A. A per-browser Pinned page**: no server state · B. No pins · C. Pins stored per person on the server: follows you across browsers; a record, schema and CON-44 | no (decided) | FR-CMP-66 |
+| OQ-CMP-50 | Glossary: **Rules window**, **Rule card**, **House rule** | **Decided (DM #339): A.** Options: **A. Add** | no (decided) | glossary |
+
 ## 16. Out of scope
 
-- Runtime Open5e, SRD 5.2, 5etools, homebrew files, Griffon's Saddlebag, AI paste (§4). Rules quick reference / DM screen; races, backgrounds, feats.
+- *(S9)* Our own condensed rules text, SRD 5.2 rules, opening a card from a token's condition chip, pins across browsers, rules changing rolls.
+- Runtime Open5e, SRD 5.2, 5etools, homebrew files, Griffon's Saddlebag, AI paste (§4). ~~Rules quick reference / DM screen;~~ *(S9: in, §6.1)* races, backgrounds, feats (filtered out of the recorded sections, FR-CMP-60).
 - Real class / subclass data beyond the SRD (e.g. Zealot): the 5etools import ([compendium-expansion](post-mvp/compendium-expansion.md)) maps class features to `preset: TriggerRule` on the feature entry, `ask` where the model can't express a part (#209). This spec's `feature` body already carries the field.
 - Custom monster actions auto-rolled vs targets beyond today's attacks ([combat-extras §16](combat-extras.md#16-out-of-scope)); legendary / lair action tracking.
 - *(S4)* Typo-tolerant search, search syntax beyond plain words, search inside the stat block's numbers (e.g. "cr 5": use Filters), result snippets showing where the text matched.
