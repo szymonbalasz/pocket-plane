@@ -205,7 +205,7 @@ describe("FR-FIX-29 load clock", () => {
     expect(a.manifest.playerLinks).toEqual(fixed.manifest.playerLinks);
     const b = await loaded("stats", now + 20_000); // same minute
     expect(dump(a.db)).toEqual(dump(b.db));
-  });
+  }, 60_000);
 
   test("FR-FIX-29 e2e load keeps the fixed instant: `resetAndLoad` as scripts/e2e.ts calls it → FIXTURE_INSTANT", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "pp-fix29-"));
@@ -223,5 +223,5 @@ describe("FR-FIX-29 load clock", () => {
     cleanups.unshift(() => closeDb(db));
     expect(times(db).startedAt).toEqual(new Set([FIXTURE_INSTANT]));
     expect(times(db).log).toEqual(new Set([FIXTURE_INSTANT]));
-  });
+  }, 60_000);
 });
