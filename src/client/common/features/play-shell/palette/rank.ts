@@ -242,12 +242,14 @@ export function rankLocal(
       const rows = recent.flatMap((k) => byKey.get(k) ?? []).slice(0, GROUP_MAX);
       if (rows.length > 0) out.push({ group: "Recent", rows });
     }
+    // A row shows once: a recent pick isn't listed again under its group.
+    const shown = new Set(out.flatMap((s) => s.rows.map((r) => r.key)));
     const groups = mode === "at" ? (["Characters", "Creatures"] as const) : (["Commands"] as const);
     // `>` and `@` alone list their whole groups, up to the total.
     const cap = mode === "all" ? GROUP_MAX : TOTAL_MAX;
     for (const g of groups) {
       const rows = pool
-        .filter((e) => e.row.group === g)
+        .filter((e) => e.row.group === g && !shown.has(e.row.key))
         .map((e) => e.row)
         .sort((a, b) => a.title.localeCompare(b.title))
         .slice(0, cap);

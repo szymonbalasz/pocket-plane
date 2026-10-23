@@ -12,7 +12,7 @@ import { type DispatchEnv, decide, type KeyEventLike, modalDialogOpen } from "./
 import { PaletteList } from "./Palette";
 import { forClient, localEntries, rankLocal, whenOf } from "./rank";
 import { ShortcutsList, sheetRows } from "./ShortcutsSheet";
-import { closePalette, openPalette, paletteUi } from "./state";
+import { closePalette, closeThenRun, openPalette, paletteUi, settleClose } from "./state";
 import { KEYS_KEY, keysSetting, readKeys, setSingleKey } from "./storage";
 import { PALETTE_BUTTON_W, paletteTip } from "./TopBarButton";
 import { stateOf, testCtx } from "./test-env";
@@ -265,14 +265,22 @@ describe("shortcuts sheet (FR-SHELL-192, -193)", () => {
       true,
     );
     expect(pRows.some((r) => r.id === "cbt.next-turn" || r.id === "cbt.prev-turn")).toBe(false);
-    const html = renderToStaticMarkup(<ShortcutsList rows={dmRows} mac={false} />);
+    const html = renderToStaticMarkup(<ShortcutsList rows={dmRows} mac={false} client="dm" />);
     expect(html.match(/data-testid="ui-shortcuts-row"/g)?.length).toBe(dmRows.length);
     expect(html).toContain('data-record-id="shell.palette"');
     expect(html).toContain("Ctrl+K");
     expect(html).toContain("Shift+N");
     expect(html).toContain("Map and rolls");
     expect(html).toContain("Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y");
-    expect(renderToStaticMarkup(<ShortcutsList rows={dmRows} mac />)).toContain("⌘K");
+    expect(renderToStaticMarkup(<ShortcutsList rows={dmRows} mac client="dm" />)).toContain("⌘K");
+    expect(html).toContain("Duplicate the selected tokens");
+    // Players have none of the DM's map tools: no Ctrl+D, fog / structure / props undo, fog Delete.
+    const pHtml = renderToStaticMarkup(<ShortcutsList rows={pRows} mac={false} client="player" />);
+    expect(pHtml).toContain("Map and rolls");
+    expect(pHtml).toContain("Escape");
+    for (const dmOnly of ["Ctrl+D", "Duplicate the selected tokens", "Ctrl+Z", "fog tool"]) {
+      expect(pHtml).not.toContain(dmOnly);
+    }
   });
 
   test("FR-SHELL-193 single-key off: only Ctrl / ⌘ chords work; the sheet marks the others Off; the setting is device-wide `pp.keys.v1` (default on, bad entry → on)", () => {
@@ -302,6 +310,23 @@ describe("shortcuts sheet (FR-SHELL-192, -193)", () => {
     data.set(KEYS_KEY, '{"singleKey":"no"}');
     expect(readKeys(backend)).toEqual({ singleKey: true });
     setSingleKey(true, backend);
+  });
+});
+
+describe("pick order (FR-SHELL-180, -186)", () => {
+  test("FR-SHELL-186 Pause… opens after the palette's focus return: a pick closes the palette at once and runs only once the dialog has put focus back (a Popover it opens is never dismissed by that focus move)", () => {
+    const steps: string[] = [];
+    openPalette();
+    closeThenRun(() => steps.push("run: open the Pause popover"));
+    // The palette is closed; the command hasn't run yet (Radix returns focus in a later task).
+    expect(paletteUi.getState().open).toBe(false);
+    expect(steps).toEqual([]);
+    // The dialog's close focus step: focus back first, then the pick.
+    settleClose(() => steps.push("focus back to the map"));
+    expect(steps).toEqual(["focus back to the map", "run: open the Pause popover"]);
+    // Runs once: a later close (Escape, the sheet) runs nothing.
+    settleClose(() => steps.push("focus back"));
+    expect(steps).toEqual(["focus back to the map", "run: open the Pause popover", "focus back"]);
   });
 });
 

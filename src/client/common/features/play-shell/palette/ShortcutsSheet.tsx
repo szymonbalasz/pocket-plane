@@ -7,7 +7,7 @@ import { XIcon } from "lucide-react";
 import { Dialog as D } from "radix-ui";
 import { useStore } from "zustand";
 import type { PaletteEnv } from "./context";
-import { FIXED_KEYS, isSingleKey } from "./keys";
+import { fixedKeysFor, isSingleKey } from "./keys";
 import { KeyChips, useFocusReturn } from "./Palette";
 import { whenOf } from "./rank";
 import { closeShortcuts } from "./state";
@@ -46,7 +46,15 @@ export function sheetRows(
   return out;
 }
 
-export function ShortcutsList({ rows, mac }: { rows: readonly SheetRow[]; mac: boolean }) {
+export function ShortcutsList({
+  rows,
+  mac,
+  client,
+}: {
+  rows: readonly SheetRow[];
+  mac: boolean;
+  client: "dm" | "player";
+}) {
   return (
     <div className="flex flex-col gap-3 text-sm">
       <ul className="grid grid-cols-1 gap-x-6 gap-y-1 min-[480px]:grid-cols-2">
@@ -69,7 +77,7 @@ export function ShortcutsList({ rows, mac }: { rows: readonly SheetRow[]; mac: b
       <div>
         <h3 className="mb-1 text-xs font-medium text-muted-foreground">Map and rolls</h3>
         <ul className="grid grid-cols-1 gap-x-6 gap-y-1 min-[480px]:grid-cols-2">
-          {FIXED_KEYS.map((f) => (
+          {fixedKeysFor(client).map((f) => (
             <li key={f.keys} className="flex items-center justify-between gap-2">
               <span className="min-w-0 text-muted-foreground">{f.title}</span>
               <kbd className="shrink-0 rounded border bg-muted px-1.5 font-mono text-[11px] leading-5 text-muted-foreground">
@@ -98,7 +106,7 @@ export function ShortcutsSheet({ env, mac }: { env: PaletteEnv; mac: boolean }) 
         className="pointer-events-auto fixed top-[12vh] left-1/2 flex max-h-[76vh] w-[640px] max-w-[90vw] -translate-x-1/2 flex-col gap-3 overflow-y-auto rounded-lg border bg-background p-5 shadow-lg outline-none"
       >
         <D.Title className="text-base font-semibold">Keyboard shortcuts</D.Title>
-        <ShortcutsList rows={rows} mac={mac} />
+        <ShortcutsList rows={rows} mac={mac} client={env.ctx.client} />
         <D.Close
           className="absolute top-4 right-4 opacity-70 hover:opacity-100"
           aria-label="Close"

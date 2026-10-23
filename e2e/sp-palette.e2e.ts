@@ -18,7 +18,7 @@ async function onMap(page: Page, key: string) {
 
 const lastShortcut = (page: Page) => page.locator("body").getAttribute("data-test-last-shortcut");
 
-test("SP1 DM: Ctrl+K finds and opens a window; L toggles the Game log off the map only; N / Shift+N step the turn; ? lists the keys", async ({
+test("SP1 DM: Ctrl+K finds and opens a window; L toggles the Game log off the map only; N / Shift+N step the turn; ? lists the keys; Pause… opens the Popover", async ({
   browser,
 }) => {
   test.setTimeout(90_000);
@@ -86,6 +86,19 @@ test("SP1 DM: Ctrl+K finds and opens a window; L toggles the Game log off the ma
   ).toBeVisible();
   await dm.keyboard.press("Escape");
   await expect(sheet).toBeHidden();
+
+  // Pause… (walkthrough P9 bug): the top-bar Popover opens and stays open after the palette's
+  // focus return (it used to close within a frame).
+  await onMap(dm, "Control+k");
+  await dm.keyboard.type("pause");
+  await dm.keyboard.press("Enter");
+  const form = dm.getByTestId("ui-pause-form");
+  await expect(form).toBeVisible();
+  await dm.waitForTimeout(500);
+  await expect(form).toBeVisible();
+  await expect(dm.getByTestId("ui-pause-open")).toHaveAttribute("aria-expanded", "true");
+  await dm.keyboard.press("Escape");
+  await expect(form).toBeHidden();
 });
 
 test("SP1 player 1: Ctrl+K 'goblin' lists no monster; '@' only Mira's own rows; the top-bar button opens the palette", async ({

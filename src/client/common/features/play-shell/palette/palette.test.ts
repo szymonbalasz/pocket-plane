@@ -37,6 +37,11 @@ describe("palette (FR-SHELL-182, -183)", () => {
     // Empty: Recent (when there is any), then Commands.
     expect(p.groups("")).toEqual(["Commands"]);
     expect(p.rank("", ["w:dice.log"]).map((s) => s.group)).toEqual(["Recent", "Commands"]);
+    // A recent command shows once: in Recent, not again under Commands.
+    const twice = p.rank("", ["c:shell.reset-layout", "c:shell.pause"]);
+    expect(twice[0]?.rows.map((r) => r.id)).toEqual(["shell.reset-layout", "shell.pause"]);
+    expect(twice[1]?.rows.map((r) => r.id)).not.toContain("shell.reset-layout");
+    expect(twice[1]?.rows.map((r) => r.id)).not.toContain("shell.pause");
     expect(p.rank("")[0]?.rows.length).toBeLessThanOrEqual(GROUP_MAX);
     // Players: no Creatures group.
     expect(setup({ client: "player" }).groups("@")).toEqual(["Characters"]);

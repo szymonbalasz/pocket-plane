@@ -28,7 +28,7 @@ import {
   type Section,
   withServer,
 } from "./rank";
-import { closePalette, setInput, usePaletteUi } from "./state";
+import { closePalette, closeThenRun, setInput, settleClose, usePaletteUi } from "./state";
 import { pushRecent, readRecent, recentKey } from "./storage";
 import type { CommandCtx, PaletteGroup, SearchHit, SearchProvider } from "./types";
 
@@ -227,7 +227,8 @@ export function PaletteList({
 
 /**
  * FR-SHELL-180: focus goes back to the element that had it when the dialog opened (Radix would
- * send it to a trigger these dialogs don't have). Returns the `onCloseAutoFocus` handler.
+ * send it to a trigger these dialogs don't have); then a pending pick runs (`settleClose`).
+ * Returns the `onCloseAutoFocus` handler.
  */
 export function useFocusReturn(): (e: Event) => void {
   const returnTo = useRef<Element | null>(null);
@@ -236,8 +237,10 @@ export function useFocusReturn(): (e: Event) => void {
   }, []);
   return (e: Event) => {
     e.preventDefault();
-    const el = returnTo.current as HTMLElement | null;
-    if (el?.isConnected && typeof el.focus === "function") el.focus({ preventScroll: true });
+    settleClose(() => {
+      const el = returnTo.current as HTMLElement | null;
+      if (el?.isConnected && typeof el.focus === "function") el.focus({ preventScroll: true });
+    });
   };
 }
 
@@ -276,9 +279,8 @@ export function Palette({ env }: { env: PaletteEnv }) {
   const pick = (row: Row) => {
     if (row.disabled) return;
     if (rKey && !row.key.startsWith("s:")) setRecent(pushRecent(rKey, row.key));
-    closePalette();
     // After the palette is gone and focus is back: a command may move focus itself.
-    setTimeout(() => row.run(), 0);
+    closeThenRun(row.run);
   };
 
   return (

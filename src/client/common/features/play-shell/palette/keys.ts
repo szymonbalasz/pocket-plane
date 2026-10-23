@@ -121,15 +121,24 @@ export const RESERVED_KEYS: readonly KeySpec[] = [
 ];
 
 /** The fixed "Map and rolls" rows of the shortcuts sheet (FR-SHELL-191, -192). */
-export const FIXED_KEYS: readonly { keys: string; title: string }[] = [
+export const FIXED_KEYS: readonly { keys: string; title: string; dmOnly?: true }[] = [
   { keys: "Space", title: "Hold and drag to pan the map; press a focused button" },
   { keys: "Escape", title: "Close a dialog, end a tool, dismiss a request" },
-  { keys: "Ctrl+D", title: "Duplicate the selected tokens" },
-  { keys: "Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y", title: "Undo / redo in fog, structure and props" },
-  { keys: "Backspace / Delete", title: "Delete in the fog tool" },
+  // The DM's map tools (FR-MAP-17, fog, structure, props): no player has them.
+  { keys: "Ctrl+D", title: "Duplicate the selected tokens", dmOnly: true },
+  {
+    keys: "Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y",
+    title: "Undo / redo in fog, structure and props",
+    dmOnly: true,
+  },
+  { keys: "Backspace / Delete", title: "Delete in the fog tool", dmOnly: true },
   { keys: "Enter", title: "Roll from a roll field (Shift advantage, Ctrl disadvantage)" },
   { keys: "↑ / ↓", title: "Move in lists and chip rows" },
 ];
+
+/** The fixed rows this client's sheet lists. */
+export const fixedKeysFor = (client: "dm" | "player") =>
+  FIXED_KEYS.filter((f) => client === "dm" || !f.dmOnly);
 
 /** Two specs press the same key (same key, same modifiers, either platform). */
 export function sameKey(a: KeySpec, b: KeySpec): boolean {
