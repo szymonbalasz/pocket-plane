@@ -10,7 +10,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | building | walkthrough M0, M3-M10, M12, M14 |
+| PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | ready (check 5239, e2e 207; replay DM 8, players 22 with one approved exemption; bench settle 11 ms with exact speed-up 3, integrator OK) | test-pm1 walkthrough running |
 | PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | party-board part done (4 commits); waits for PM1 to merge for shared rows | walkthrough M0-M2, M11, M13 |
 | RS0 reminders + strongholds core | merged `fb3884a3` | — | done (walkthrough 23/23; evidence lost at cleanup) | main gates running (gates worktree `gates-main`) |
 | SP3 session recap | `build/sp-recap` (ws w9Z) | build-sp3 | building (server first; window after PM1, stats after FX1) | walkthrough RC1-RC8 |
