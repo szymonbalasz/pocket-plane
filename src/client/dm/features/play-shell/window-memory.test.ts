@@ -154,3 +154,79 @@ test("FR-MAP-115 remembered windows: a remembered window reopened over PCs asks 
   const room = fitRooms("dm", rects, regions, WIDE, null).room;
   expect(room.obstacles).toContainEqual({ ...over, y: bar.y + bar.h + 12 });
 });
+
+/** PM1 walkthrough M9's inputs: Mira at 570,200, Brakka 486,284, Thorn 528,368 (36-px cells). */
+const M9_PCS: PlacementToken[] = [
+  { x: 570, y: 200, w: 36, h: 36, pc: true },
+  { x: 486, y: 284, w: 36, h: 36, pc: true },
+  { x: 528, y: 368, w: 36, h: 36, pc: true },
+];
+
+/** The DM page at 1440×900, `moved`, Initiative's content taller than the screen (it grows). */
+function m9Page(backend = new Map<string, string>()) {
+  const c = createShellController({
+    registry: dmWindows,
+    storage: createLayoutStorage(() => ({
+      getItem: (k) => backend.get(k) ?? null,
+      setItem: (k, v) => void backend.set(k, v),
+    })),
+    viewport: () => WIDE,
+    keepOuts: (v) => keepOuts("dm", v, new Map()),
+    avoid: () => M9_PCS,
+    camera: () => "moved",
+    heights: (id) => (id === "cbt.initiative:main" ? 900 : undefined),
+  });
+  c.restore("k");
+  const log = () => {
+    const w = c.store.getState().windows.find((x) => x.kind === "dice.log");
+    return w ? rectOf(w) : null;
+  };
+  return { c, backend, log };
+}
+
+// Root cause first (PM1 walkthrough M9): the failing repro, before the fix.
+test.failing("FR-SHELL-159 Game log grows back (BL-87, walkthrough M9): DM 1440×900 after Reset, `moved`, Mira at 570,200: Party opened (untouched) squeezes the Game log; Initiative grows into the freed space; Party closed → the Game log back at 1150×240 in its zone; a reload while squeezed stores no squeeze and the close still returns it", () => {
+  for (const cause of ["party.board", "stats.board"]) {
+    const p = m9Page();
+    p.c.dispatch({ type: "reset" }, all);
+    expect(p.log()).toEqual(ZONE);
+    p.c.dispatch({ type: "open", kind: cause }, all);
+    expect({ cause, log: p.log() }).toEqual({ cause, log: SQUEEZED });
+    p.c.dispatch({ type: "close", kind: cause }, all);
+    expect({ cause, log: p.log() }).toEqual({ cause, log: ZONE });
+    // Squeezed, then a reload: the entry holds the zone rect, never the squeeze.
+    p.c.dispatch({ type: "open", kind: cause }, all);
+    expect(p.log()).toEqual(SQUEEZED);
+    const stored = JSON.parse(p.backend.get("k") ?? "{}") as {
+      windows: Rect[] & { kind: string }[];
+    };
+    const entry = stored.windows.find((w) => w.kind === "dice.log");
+    expect(entry && rectOf(entry)).toEqual(ZONE);
+    const again = m9Page(p.backend);
+    expect(again.log()).toEqual(SQUEEZED);
+    again.c.dispatch({ type: "close", kind: cause }, all);
+    expect({ cause, reloaded: again.log() }).toEqual({ cause, reloaded: ZONE });
+  }
+  // An entry stored squeezed by an older build, its cause gone: back in the zone at load.
+  const old = new Map([
+    [
+      "k",
+      JSON.stringify({
+        windows: [
+          { kind: "dice.log", instance: "main", state: "open", ...SQUEEZED, z: 1 },
+          {
+            kind: "cbt.initiative",
+            instance: "main",
+            state: "open",
+            x: 1028,
+            y: 60,
+            w: 400,
+            h: 500,
+            z: 2,
+          },
+        ],
+      }),
+    ],
+  ]);
+  expect(m9Page(old).log()).toEqual(ZONE);
+});
