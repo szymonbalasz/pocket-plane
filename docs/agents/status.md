@@ -18,12 +18,13 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
 | FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | walkthrough 12/12; main (PM2) merged, protocol §154 | branch gates running → merge → main gates |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
-| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14; merging main + commands.ts lines + threshold | re-test R6 + P4 → merge |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14; main merged, palette lines, thresholds 1808 / 1294; replay DM 8 → 10, players 38 → 36 (approved, BL-93) | test-sp2b re-test running |
 
 | RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | walkthrough all PASS (F1 spec test-ID wording fixed on main); main merged, docs §155 / §123 | gates after FX1 → merge |
-| RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | ready (check 5347; replay DM 8 → 10, players 38 → 36, approved, BL-93) | test-rs2 walkthrough running |
+| RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | walkthrough 11/11 | merge after FX1 + RS1 (wire reminder buttons / icon) |
+| RS3 Stores UI | `build/hold-stores` (ws wA5; base RS2) | build-rs3 | building | walkthrough H7, H10, H13 |
 
-Queue: RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
+Queue: SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
 ## Shared-file locks
 
@@ -41,6 +42,7 @@ Queue: RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detache
 - Toast stack: a window's title bar + first 40 px keeps the DM / player toast stack out (amends FR-NOTE-53; FX1 build, 2026-10-23), fallback FR-NOTE-71.
 - Placer speed-up 3 (`roomFor`, exact) kept for the 25 ms bench gate (OQ-SHELL-84).
 - Party Manager 550 px: 20 new player harness cells approved as named exemptions (BL-93).
+- Rules launcher entry (SP2): players' launcher at 1280 wide shows icons only (label threshold 1208 → 1294 px; DM 1722 → 1808), per FR-SHELL-43 / #245.
 - Walkthrough step wording fixed: live-sync FX3 step 4 (ellipsis only when the name doesn't fit), play-shell SP1 P3 / P8 (fixture pets).
 
 ## Pending DM decisions
