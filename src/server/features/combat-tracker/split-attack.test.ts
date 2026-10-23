@@ -173,13 +173,18 @@ describe("FR-CBT-70 to-hit-only card", () => {
 });
 
 describe("FR-CBT-71 cbt.rollDamage", () => {
-  test("FR-CBT-71 completes the latest pending to-hit-only card of the row: DamageRolled + NotificationUpdated, same seq", () => {
+  test("FR-CBT-71 completes the latest pending to-hit-only card of the row: DamageRolled carrying the card, same seq", () => {
     const t = setup();
     const a = t.toHit("Mira", 11, { attackId: t.crossbow });
     const before = t.card(a.cardId);
     const n = t.events.length;
     const d = t.damage("Mira", 5, { attackId: t.crossbow });
-    expect(t.typesSince(n)).toEqual(["DamageRolled", "NotificationUpdated"]);
+    // Sprint 10 (BL-92, gate I15): the card row rides on DamageRolled (one frame).
+    expect(t.typesSince(n)).toEqual(["DamageRolled"]);
+    expect(t.events.at(-1)?.event.changes.map((c) => [c.type, c.id])).toContainEqual([
+      "notification",
+      a.cardId,
+    ]);
     expect(d).toMatchObject({ cardId: a.cardId, attached: true });
     const after = t.card(a.cardId);
     expect(after.text).toBe("Mira: 15 to hit, 7 piercing");
