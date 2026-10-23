@@ -417,13 +417,7 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 
 **The rule in plain words.** A window you moved or resized is yours. It opens exactly where and how big you left it, on top, and nothing else moves for it. On a smaller screen it is only nudged back on-screen. A shown tool bar draws it beside the bar while the tool is open; nothing is saved, so it is back at its spot when the tool closes or after a reload. Windows you never touched are still placed by the ladder (FR-SHELL-97). Reset layout makes every window untouched again.
 
-**Reopen algorithm** (FR-SHELL-146–150; pure; *moves to [protocol §18](../protocol/README.md) in PM1's consolidation, this spec then keeps a pointer*). Inputs: the stored `WindowState` `w`, the viewport `vp`, the hard keep-outs shown now `K`, the windows `ws`.
-
-1. `remembered(w)` = `w.userSpot || w.userSize`. Not remembered → the ladder as built.
-2. Stored rect `s` = `w`'s rect, unchanged; nothing else in `ws` changes; no put-away; no memory entry; `plan.yields = false`.
-3. Render `r = renderedRect(s, w.area, def.minSize, vp)` (FR-SHELL-29 fit, FR-SHELL-12 clamp, rail inset). Never written.
-4. Render-only push: if `r` overlaps a shown `k ∈ K` + 12 px (tool bar, chrome keep-out; not the toast box), `r` = `r` moved by the least move clear of `k` + 12 (below, else right; ties below), clamped. Recomputed every render from `K`; never written.
-5. z: `w.z = maxZ(ws) + 1`, `normaliseZ`.
+**Reopen algorithm** (FR-SHELL-146–150): moved to [protocol §151](../protocol/README.md#151-sprint-9-window-memory-frame-and-canvas-follow-ups-pm1) with invariants I9–I13 (PM1 consolidation). In short: a remembered window shows its stored rect, rendered with the FR-SHELL-29 fit / FR-SHELL-12 clamp and a render-only push off shown tool bars; nothing is written; it goes on top.
 
 | ID | Requirement | Notes |
 |---|---|---|
@@ -1154,12 +1148,12 @@ Teardown: stop, `fixtures:reset --profile verify`.
 |---|---|---|---|
 | P1 | Click the map, Ctrl+K, type "init", Enter | — | Palette centred, input focused; Windows "Initiative" first; Initiative comes to front, palette gone, focus back |
 | P2 | Ctrl+K, "> reset", Enter | — | Only commands listed; Reset layout runs as from Preferences |
-| P3 | Ctrl+K "@mira" → Enter; then "owlbear" → Enter | — | Mira's sheet opens; the SRD Owlbear (Compendium group, ≤ 300 ms) opens in Compendium |
+| P3 | Ctrl+K "@mira" → Enter; then "owlbear": ↓ to the Compendium row → Enter | — | Mira's sheet opens; for "owlbear" Characters rank first (FR-SHELL-183: the pet "Owlbear — Mira's pet" on top), the SRD Owlbear (Compendium group, ≤ 300 ms) opens in Compendium (step wording fixed after the SP1 walkthrough) |
 | P4 | Ctrl+K "cover" → Enter | — | Rules group "Cover" → the Rules window on the Cover card |
 | P5 | Map focused: L, I, B, R, P, S, D; each again | — | Each window opens / comes to front, the second press minimises it |
 | P6 | N, then Shift+N | B, C watch Initiative | Turn advances ≤ 1 s on all three, then goes back |
 | P7 | Click the Game log roll bar, type "lid"; Initiative HP field, type "n"; Ctrl+K from the roll bar | — | "lid" typed, no window toggled; no turn change; the palette opens from the field |
-| P8 | — | B: Ctrl+K "goblin"; "@"; `?`; C | No monster row; only Mira; the sheet has no N / Shift+N; C opens Mira's sheet |
+| P8 | — | B: Ctrl+K "goblin"; "@"; `?`; C: "@" | B: no monster row; "@" lists only B's own characters and companions (Brakka, Mira and their pets in session-sim-12), never another player's PC; the sheet has no N / Shift+N; C: "@" lists only Thorn (step wording fixed after the SP1 walkthrough) |
 | P9 | Pause (no message) | B: Ctrl+K, L, `?`, Space | Nothing happens (`data-test-last-shortcut` `…:paused`); after Resume, Ctrl+K works |
 | P10 | 1280×720 | B 1280×720 | Search button in the top bar, launcher fits (no clipped button); palette ≤ 90 vw |
 | P11 | — | C: Preferences → Keyboard → Single-key shortcuts off; L; Ctrl+K; reload; L | L does nothing, Ctrl+K opens; still off after reload |
