@@ -16,7 +16,6 @@ import {
 import { Badge } from "../../components/ui/primitives";
 import { useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
-import { macroRollIntent } from "../dice-extras/macro-logic";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
 import { ConfirmDialog } from "./dialogs";
 import { FacilityEditor } from "./FacilityEditor";
@@ -24,6 +23,7 @@ import {
   type FacilityView,
   facilityReminderCount,
   figuresLine,
+  incomeRollIntent,
   isDmOnly,
   type LinkedReminder,
   removeFacilityText,
@@ -52,13 +52,7 @@ export function IncomeButton({ f }: { f: FacilityView & { incomeDice: string } }
     label,
     onRoll: (r) => {
       connection
-        .sendIntent(
-          "dice.roll",
-          macroRollIntent(
-            { name: label, expression: f.incomeDice, category: "other", creatureId: null },
-            r,
-          ),
-        )
+        .sendIntent("dice.roll", incomeRollIntent({ name: f.name, incomeDice: f.incomeDice }, r))
         .catch(toastIntentError);
     },
   });

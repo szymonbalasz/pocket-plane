@@ -1,6 +1,7 @@
 // Pure client rules of the Strongholds tab and the Stronghold window (HOLD §6.3, FR-HOLD-22–34):
 // the list rows, state summary, figures, totals, order suggestions, confirm texts, the editors'
 // drafts (validated with the shared zod inputs) and the reminder prefill. No React here.
+import type { DiceRollIntent } from "@shared/dice-roll-log/schemas";
 import { formatCoins } from "@shared/party-loot/format";
 import { COINS, type Coins, ZERO_COINS } from "@shared/party-loot/schemas";
 import { REMINDER_SOURCE_MAX, REMINDER_TEXT_MAX } from "@shared/reminders/schemas";
@@ -12,6 +13,7 @@ import {
   type StrongholdIndexRecord,
   type StrongholdView,
 } from "@shared/strongholds/schemas";
+import type { RollRequest } from "../dice-roll-log/roll-control";
 
 export const HOLD_WINDOW_KIND = "hold.stronghold";
 /** FR-PARTY-71: the Party Manager tab id. */
@@ -421,4 +423,26 @@ export const titleOf = (id: string | null, index: readonly StrongholdIndexRecord
 export function visibleTabs(viewer: HoldViewer, r: Pick<StrongholdView, "notes">): HoldTab[] {
   if (viewer.role === "dm") return [...HOLD_TABS];
   return HOLD_TABS.filter((t) => t !== "notes" || (r.notes ?? "") !== "");
+}
+
+// ---- Income dice (FR-HOLD-33) ----
+
+/**
+ * The income roll's `dice.roll`, as a General macro sends it (FR-DICEX-68's `macroRollIntent`,
+ * kept here so the dice-extras module stays out of the initial chunk): label "‹Facility› income",
+ * category `other`, no actor (the DM rolls as "DM", a player as "Me").
+ */
+export function incomeRollIntent(
+  f: { name: string; incomeDice: string },
+  r: RollRequest,
+): DiceRollIntent {
+  const intent: DiceRollIntent = {
+    expression: f.incomeDice,
+    mode: r.mode,
+    category: "other",
+    label: `${f.name} income`,
+  };
+  if (r.manual?.[0]) intent.manual = r.manual[0];
+  if (r.public !== undefined) intent.public = r.public;
+  return intent;
 }

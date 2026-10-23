@@ -173,3 +173,62 @@ test("FR-PARTY-76 the Party Manager's tab labels stay whole at the default width
     await page.context().close();
   }
 });
+
+/** Drags the window's resize handle to `w` × `h`, as a user would. */
+async function resizeTo(page: Page, win: Locator, w: number, h: number) {
+  const box = await win.boundingBox();
+  const handle = await win.getByTestId("ui-window-resize").boundingBox();
+  if (!box || !handle) throw new Error("window not shown");
+  const x = handle.x + handle.width / 2;
+  const y = handle.y + handle.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 5; i++) {
+    await page.mouse.move(x + ((w - box.width) * i) / 5, y + ((h - box.height) * i) / 5);
+  }
+  await page.mouse.up();
+  await expect
+    .poll(async () => {
+      const b = await win.boundingBox();
+      return b && [Math.round(b.width), Math.round(b.height)];
+    })
+    .toEqual([w, h]);
+}
+
+test("FR-SHELL-171 the Stronghold window at its useful size 400 × 400 (1280×720) shows the header, the tab strip and three facility rows whole (DM, player-1)", async ({
+  browser,
+}) => {
+  for (const make of [() => dmPage(browser), () => playerPage(browser, "Player 1")]) {
+    const page = await make();
+    await page.setViewportSize({ width: 1280, height: 720 });
+    const board = await strongholdsTab(page);
+    await row(board, "Greystone Keep").getByTestId("hold-row-open").click();
+    await board.getByTestId("ui-window-minimise").click();
+    const win = shellWindow(page, "hold.stronghold");
+    await expect(win.getByTestId("hold-facility").first()).toBeVisible();
+    await resizeTo(page, win, 400, 400);
+    const m = await win.getByTestId("ui-window-body").evaluate((body) => {
+      const panel = body.querySelector(
+        '[role="tabpanel"]:not([hidden]) [data-radix-scroll-area-viewport]',
+      );
+      const inside = (sel: string, box = body.getBoundingClientRect()) =>
+        [...body.querySelectorAll(sel)].filter((e) => {
+          const b = box;
+          const r = e.getBoundingClientRect();
+          return r.height > 0 && r.top >= b.top - 0.5 && r.bottom <= b.bottom + 0.5;
+        }).length;
+      return {
+        header: inside('[data-testid="hold-name"]'),
+        tabs: inside('[data-testid="hold-tab"]'),
+        facilities: inside('[data-testid="hold-facility"]', panel?.getBoundingClientRect()),
+        bodyScrolls: body.scrollHeight > body.clientHeight + 1,
+      };
+    });
+    console.log(`FR-SHELL-171 useful size: ${JSON.stringify(m)}`);
+    expect(m.header).toBe(1);
+    expect(m.tabs).toBeGreaterThanOrEqual(3);
+    expect(m.facilities).toBeGreaterThanOrEqual(3);
+    expect(m.bodyScrolls).toBe(false);
+    await page.context().close();
+  }
+});

@@ -20,7 +20,6 @@ import { SyncContext, type SyncState } from "@ui/sync/store";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
-import { macroRollIntent } from "../dice-extras/macro-logic";
 import { openPartyTab } from "../party-board/open-tab";
 import { PARTY_TAB_ENTRIES, partyTabs, shownTab, visibleTabIds } from "../party-board/party-tabs";
 import { createPartyMemory, createTabState, tabKey } from "../party-board/seen";
@@ -35,6 +34,7 @@ import {
   HOLD_GONE,
   HOLD_WINDOW_KIND,
   holdTabVisible,
+  incomeRollIntent,
   NEW_FACILITY,
   NEW_STAFF,
   orderSuggestions,
@@ -571,10 +571,9 @@ describe("Pure rules (FR-HOLD-17, -19, -25, -26, -27, -29, -31, -32, -33)", () =
 
   test('FR-HOLD-33 income dice: the macros\' roll path, label "‹Facility› income", category other, no actor (rolls as DM / Me)', () => {
     expect(
-      macroRollIntent(
-        { name: "Forge Hall income", expression: "2d6", category: "other", creatureId: null },
-        { mode: "normal" } as Parameters<typeof macroRollIntent>[1],
-      ),
+      incomeRollIntent({ name: "Forge Hall", incomeDice: "2d6" }, { mode: "normal" } as Parameters<
+        typeof incomeRollIntent
+      >[1]),
     ).toEqual({ expression: "2d6", mode: "normal", category: "other", label: "Forge Hall income" });
   });
 });
