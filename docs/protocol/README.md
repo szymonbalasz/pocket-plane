@@ -3720,7 +3720,7 @@ From [strongholds](../specs/strongholds.md#63-strongholds-tab-and-stronghold-win
 
 ## 158. Sprint 9: rules quick reference (SP2)
 
-From [compendium](../specs/compendium.md#61-sprint-9-rules-quick-reference-track-sp) FR-CMP-59–75 (#338, #339; review-a rulings 17–19; seams S3, S4, S14). **Built by `build/sp-rules`.** REST only: no intent, event, record type or signal (CON-44: 0 B). Data side: [data model §125](../data-model/README.md#125-sprint-9-rules-quick-reference-sp2).
+From [compendium](../specs/compendium.md#61-sprint-9-rules-quick-reference-track-sp) FR-CMP-59–75 (#338, #339; review-a rulings 17–19; seams S3, S4, S14). **Built by `build/sp-rules`.** REST only: no intent, event, record type or signal (CON-44: 0 B). Data side: [data model §126](../data-model/README.md#126-sprint-9-rules-quick-reference-sp2).
 
 | Route / shape | Contract | FR |
 |---|---|---|

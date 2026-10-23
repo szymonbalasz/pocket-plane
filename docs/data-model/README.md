@@ -2581,7 +2581,7 @@ From [strongholds](../specs/strongholds.md#8-data-model) and [party-loot](../spe
 
 ## 126. Sprint 9: rules quick reference (SP2)
 
-From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#338, #339). **Built by `build/sp-rules`**: no new table, column or record type. Protocol side: [protocol §157](../protocol/README.md#157-sprint-9-rules-quick-reference-sp2).
+From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#338, #339). **Built by `build/sp-rules`**: no new table, column or record type. Protocol side: [protocol §158](../protocol/README.md#158-sprint-9-rules-quick-reference-sp2).
 
 | Field / store | Change | Rule | Source |
 |---|---|---|---|
