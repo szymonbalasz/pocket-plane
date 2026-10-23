@@ -14,6 +14,7 @@ import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
 import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
+import { closeToasts } from "./support/toasts";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -222,6 +223,7 @@ test("FR-CBT-141 FR-CBT-142 FR-CBT-143 FR-CBT-144 FR-CBT-145 FR-CBT-146 FR-CBT-1
 
   await test.step("FR-CBT-141 Start 'Escort to the Ford': the kept-HP note; Goblin 2 keeps 4 / 7; the drake keeps its paw", async () => {
     const enc = await openWindow(dm, "cbt.encounters");
+    await closeToasts(dm); // FR-NOTE-70: the stack may sit on the window's first rows
     await enc
       .locator(
         `[data-testid="cbt-enc-row"][data-record-id="${recordId("enc-friendly", "encounter")}"]`,
