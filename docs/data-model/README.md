@@ -2531,3 +2531,16 @@ From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #33
 - **Derived (client, not stored):** the Party status tab's companion rows under each owner PC (`partySummary`): pets per FR-ENT-37 plus owned combatants of the started encounter; the DM's hidden mark; "Other companions". Tab registry entries are client code, never sent or stored.
 - **Fixtures:** none new (bundles `pm-memory`, `pm-memory-e2e` are PM1's aliases of `session-sim-12`).
 - **CON-44:** 0 B.
+
+## 122. Sprint 9: Strongholds tab and Stronghold window (RS2)
+
+From [strongholds](../specs/strongholds.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-ui`**. Protocol side: [protocol §153](../protocol/README.md#153-sprint-9-strongholds-tab-and-stronghold-window-rs2). **No table, column, record type or wire field.**
+
+| Browser state | Value | Rule | Source |
+|---|---|---|---|
+| Stronghold window selection `pp.hold.v1.<campaignId>.<dm \| playerId>` | `{strongholdId: id \| null, tab: facilities \| staff \| reminders \| notes}` | junk → default (nothing selected, Facilities) + warning; storage failing → memory only for the page; a selected id that is gone or hidden shows "This stronghold isn't available" | FR-HOLD-23, -24 |
+| Party Manager tab choice `pp.party.tab.v1.…` | `strongholds` (new id) | not visible now → Party status, the stored value kept ([§121](#121-sprint-9-party-manager-pm2)) | FR-PARTY-71, -72 |
+
+- **Derived (client, not stored):** state summary, figures line, "Replaced by", staff per facility, totals ("incl. DM only" for the DM), order suggestions, reminder groups, confirm texts.
+- **Fixtures:** none new; bundle `hold-ui-e2e` (alias of `reminders-strongholds`, for `e2e/hold-ui.e2e.ts`).
+- **CON-44:** 0 B.
