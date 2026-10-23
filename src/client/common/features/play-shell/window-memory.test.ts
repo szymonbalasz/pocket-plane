@@ -569,3 +569,33 @@ describe("window memory (FR-SHELL-144–155)", () => {
     expect(bruteBest(left, LAPTOP, scene)[0]).toBe(1);
   });
 });
+
+describe("transient displacements are never stored (FR-SHELL-102, -159)", () => {
+  test("FR-SHELL-102 a tool bar's push or put-away is never written: a reload while the bar shows (the tool gone) → the window back at its rect, open", () => {
+    const crowd: PlacementToken[] = [];
+    for (let x = 0; x < LAPTOP.w; x += 60)
+      for (let y = 48; y < LAPTOP.h; y += 60) crowd.push(pc(x, y));
+    for (const tokens of [[], crowd]) {
+      const reports = new Map<string, Rect>();
+      const s = shell({ current: LAPTOP }, { reports, avoid: () => tokens });
+      s.act({ type: "open", kind: "t.small" });
+      const st = s.c.store.getState();
+      const home = { x: 68, y: 60, w: 320, h: 300 };
+      s.c.store.setState({
+        windows: st.windows.map((w) => (w.kind === "t.small" ? { ...w, ...home } : w)),
+      });
+      reports.set("map.toolbar", bar);
+      s.act({ type: "push", rect: bar });
+      const now = s.win("t.small");
+      // Pushed off the bar (no PCs) or put away (PCs everywhere): either way transient.
+      expect(now.state).toBe(tokens === crowd ? "minimised" : "open");
+      if (now.state === "open") expect(hits(now, bar)).toBe(false);
+      const entry = (JSON.parse(s.backend.get("k") ?? "{}") as { windows: WindowState[] }).windows;
+      expect(rectOf(get(entry, "t.small"))).toEqual(home);
+      expect(get(entry, "t.small").state).toBe("open");
+      // The reload: the tool doesn't survive it.
+      const again = shell({ current: LAPTOP }, { backend: s.backend, avoid: () => tokens });
+      expect(again.win("t.small").state).toBe("open");
+    }
+  });
+});

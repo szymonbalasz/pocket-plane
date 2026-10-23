@@ -356,7 +356,9 @@ describe("Preferences window", () => {
     }
     const html = render("dm", <PreferencesWindow sections={[layoutSection]} />);
     expect(html).toContain('data-testid="ui-prefs-reset-layout"');
-    expect(html).toContain("Windows you moved or resized reopen where you left them.");
+    expect(html).toContain(
+      "Puts every window back where it starts and forgets where you moved them.",
+    );
   });
 
   test("FR-SHELL-75 section owners: a fake zzz.test entry fails, a duplicate id fails, a bad id fails", () => {

@@ -113,8 +113,7 @@ function LayoutSection() {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
       <span className="text-muted-foreground">
-        Windows you moved or resized reopen where you left them. Reset puts every window back where
-        it starts and forgets those spots.
+        Puts every window back where it starts and forgets where you moved them.
       </span>
       <Button size="sm" variant="outline" data-testid="ui-prefs-reset-layout" onClick={reset}>
         Reset layout

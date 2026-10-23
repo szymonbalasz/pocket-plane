@@ -9,6 +9,7 @@ import { isRemembered, type Rect, type Viewport, workArea } from "./geometry";
 import { type KeepOut, keepOuts } from "./keep-outs";
 import { fittedDefaultRect, type PlacementToken } from "./placement";
 import {
+  type Displacement,
   defaultLayout,
   find,
   inferUserSize,
@@ -36,6 +37,7 @@ export {
   type OpenBy,
   type Placed,
   type Plan,
+  persistable,
   placedAs,
   pushBars,
   renderedPlaced,
@@ -118,6 +120,8 @@ export interface Restored {
   migrated?: true;
   /** FR-SHELL-155: entries taken over at this load (the caller runs each `onAbsorb` once). */
   absorbed?: readonly { kind: string; from: string }[];
+  /** The `load` settle's displacement memory (a squeeze re-derived, FR-SHELL-159). */
+  memory?: readonly Displacement[];
 }
 
 /**
@@ -221,6 +225,7 @@ export function restoreLayout(
     stored: true,
     ...(migrated && { migrated: true }),
     ...(taken.absorbed.length > 0 && { absorbed: taken.absorbed }),
+    ...(p.memory.length > 0 && { memory: p.memory }),
   };
 }
 

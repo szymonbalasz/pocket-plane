@@ -954,37 +954,31 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     if (!w || !isShown(w, ctx.available) || isRemembered(w)) return;
     const full = zoneOf(w);
     const def = defOf(w);
-    // A squeeze whose cause goes on stays squeezed in the zone (a viewport change); after a
-    // reload (memory dropped) a window stored squeezed in its zone stays so: its cause still
-    // shows, else it would have returned before (WF2 notes: the DM's reload kept the layout).
-    const storedSqueezed =
-      trigger.type === "load" &&
-      full &&
-      def &&
-      sameRect(w, squeezeRect(full, def)) &&
-      !sameRect(w, full);
-    const z = full && def && (squeezedNow(w) || storedSqueezed) ? squeezeRect(full, def) : full;
+    // A squeeze whose cause goes on stays squeezed in the zone (a viewport change). After a
+    // reload (memory dropped; a squeeze is never stored, FR-SHELL-159) the squeeze comes back
+    // iff an untouched launcher window still sits in the full zone and clears the squeezed rect:
+    // that window is its cause again (WF2 notes: the DM's reload kept the layout).
+    const reCause =
+      trigger.type === "load" && full && def && !squeezedNow(w)
+        ? loadSqueezeCause(id, full, squeezeRect(full, def))
+        : undefined;
+    const z = full && def && (squeezedNow(w) || reCause) ? squeezeRect(full, def) : full;
     if (z) {
       const atZone = { ...w, ...z };
-      const r = shownRect(
+      const at = shownRects(
         out.map((x) => (idOf(x) === id ? atZone : x)),
-        atZone,
         ctx,
       );
+      const r = at.get(atZone) ?? shownRect(out, atZone, ctx);
       // With a `fitted` camera the map refits after the placer and clears the tokens (FR-SHELL-99,
-      // FR-MAP-96, -98): the camera the PCs are drawn at now is the one before that refit.
-      if ((fitted || pcFree(r)) && clearAt(r, id, true)) {
+      // FR-MAP-96, -98): the camera the PCs are drawn at now is the one before that refit. The
+      // other protected windows count as drawn with this one at its zone: a neighbour grown into
+      // the zone's room while it was squeezed shrinks back (BL-87, walkthrough M9).
+      if ((fitted || pcFree(r)) && clearOfProtected(r, id, at)) {
         write(id, z, how, { rung: "zone", keepSize: true });
-        if (storedSqueezed && full) {
-          // Its cause again: the launcher window in its full zone; that one closing (or
-          // ending) returns it to the full zone (FR-SHELL-102).
-          const cause = [...shownMap()].find(
-            ([o, or]) => !isProt(o) && overlaps(or, full) && idOf(o) !== id,
-          );
-          if (cause) {
-            remember({ ...w, ...full }, `window:${cause[0].kind}`, plainRect(z));
-            placed.set(id, "squeezed");
-          }
+        if (reCause && full) {
+          remember({ ...w, ...full }, `window:${reCause}`, plainRect(z));
+          placed.set(id, "squeezed");
         }
       } else {
         // Least movement (ADR-0060 §4): a spot the ladder gave it earlier that still holds (inside,
@@ -1178,21 +1172,50 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   /**
    * Whether `id`'s zone rect `z`, as rendered, is free, and else the untouched window in its way
    * (`by`; none when a hard keep-out blocks it: no window to wait for). Remembered windows are
-   * ignored, as for zones (FR-SHELL-151).
+   * ignored, as for zones (FR-SHELL-151). The others count as drawn with `id` at its zone: a
+   * growing neighbour that grew into the room the squeeze freed is capped by it again (BL-87).
    */
   const zoneBlocker = (id: string, z: Rect): { free: boolean; by?: WindowState } => {
-    const w = get(id) as WindowState;
-    const r = shownRect(
-      out.map((x) => (idOf(x) === id ? { ...x, ...z } : x)),
-      { ...w, ...z },
+    const atZone = { ...(get(id) as WindowState), ...z };
+    const at = shownRects(
+      out.map((x) => (idOf(x) === id ? atZone : x)),
       ctx,
     );
+    const r = at.get(atZone) ?? clampRect(atZone, vp);
     if (hard.some((k) => overlaps(r, k))) return { free: false };
-    for (const [o, or] of shownMap()) {
-      if (idOf(o) === id || isRemembered(o) || !overlaps(r, or)) continue;
+    for (const [o, or] of at) {
+      if (o === atZone || isRemembered(o) || !overlaps(r, or)) continue;
       return { free: false, by: o };
     }
     return { free: true };
+  };
+
+  /**
+   * Clear of the other untouched protected windows (as `at` draws them: a zone pass's not yet
+   * placed ones aside) and of the hard keep-outs: the zone test (FR-SHELL-99, -151).
+   */
+  const clearOfProtected = (r: Rect, id: string, at: ReadonlyMap<WindowState, Rect>) => {
+    if (hard.some((k) => overlaps(r, k))) return false;
+    for (const [o, or] of at) {
+      if (idOf(o) === id || moving.has(idOf(o)) || !isProt(o) || isRemembered(o)) continue;
+      if (zoned !== null && !zoned.has(idOf(o))) continue;
+      if (overlaps(r, or)) return false;
+    }
+    return true;
+  };
+
+  /**
+   * At `load` (FR-SHELL-159): the untouched launcher window sitting in protected window `id`'s
+   * full zone and clear of its squeezed rect, whose squeeze it caused before the reload.
+   */
+  const loadSqueezeCause = (id: string, full: Rect, squeezed: Rect): string | undefined => {
+    let cause: string | undefined;
+    for (const [o, or] of shownMap()) {
+      if (idOf(o) === id || isProt(o) || isRemembered(o) || !overlaps(or, full)) continue;
+      if (overlaps(or, squeezed)) return undefined;
+      cause ??= o.kind;
+    }
+    return cause;
   };
 
   /**
@@ -1351,6 +1374,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       // its memory goes; nothing else moves. Dropped over a shown tool bar it is stored at the
       // drop rect and renders pushed until the bar goes (FR-SHELL-150, -167); over a PC it stays.
       memory.delete(windowId(trigger.kind, trigger.instance));
+      // Nothing makes room for a remembered window (FR-SHELL-149): a squeeze it caused while it
+      // was untouched ends here, the zone back iff clear (FR-SHELL-159, walkthrough M9).
+      for (const d of [...memory.values()]) {
+        if (d.cause !== `window:${trigger.kind}` || d.at === null) continue;
+        const sid = windowId(d.kind, d.instance);
+        const s = get(sid);
+        if (!s || !isProt(s) || !sameRect(s, d.at) || !isShown(s, ctx.available)) continue;
+        memory.delete(sid);
+        zoneBack(sid, d);
+      }
       break;
     }
   }
@@ -1383,6 +1416,32 @@ export function renderedPlaced(
   if (!isRemembered(win)) return placed;
   const at = renderedRect(win, def.minSize, vp);
   return sameRect(at, placedRect(win, def.minSize, vp, bars)) ? "stored" : "pushed";
+}
+
+/**
+ * What a layout entry stores (FR-SHELL-159, -102): never a transient displacement. A protected
+ * window squeezed for a launcher window (`window:`) and a window a tool bar pushed or put away
+ * (`toolbar:`), still where that put it, are written as they were before it; the page shows the
+ * displaced rect meanwhile (memory, client only). A reload re-derives the squeeze while its cause
+ * still sits in the zone (`load`); a tool bar doesn't survive a reload, so nothing is lost.
+ */
+export function persistable(ws: Windows, memory: readonly Displacement[]): Windows {
+  let out: Windows = ws;
+  for (const d of memory) {
+    const squeeze = d.cause.startsWith("window:");
+    if (!squeeze && !d.cause.startsWith("toolbar:")) continue;
+    const w = find(out, d.kind, d.instance);
+    if (!w || isRemembered(w)) continue;
+    const still = d.at === null ? w.state === "minimised" : sameRect(w, d.at);
+    if (!still || (squeeze && d.at === null)) continue;
+    const back: WindowState = {
+      ...w,
+      ...plainRect(d.rect),
+      ...(d.at === null && { state: "open" as const }),
+    };
+    out = out.map((x) => (x === w ? back : x));
+  }
+  return out;
 }
 
 /** The tool bar's cause (FR-SHELL-102): scenes-map's reported `map.toolbar` keep-out. */

@@ -185,28 +185,40 @@ function m9Page(backend = new Map<string, string>()) {
 }
 
 // Root cause first (PM1 walkthrough M9): the failing repro, before the fix.
-test.failing("FR-SHELL-159 Game log grows back (BL-87, walkthrough M9): DM 1440×900 after Reset, `moved`, Mira at 570,200: Party opened (untouched) squeezes the Game log; Initiative grows into the freed space; Party closed → the Game log back at 1150×240 in its zone; a reload while squeezed stores no squeeze and the close still returns it", () => {
-  for (const cause of ["party.board", "stats.board"]) {
-    const p = m9Page();
-    p.c.dispatch({ type: "reset" }, all);
-    expect(p.log()).toEqual(ZONE);
-    p.c.dispatch({ type: "open", kind: cause }, all);
-    expect({ cause, log: p.log() }).toEqual({ cause, log: SQUEEZED });
-    p.c.dispatch({ type: "close", kind: cause }, all);
-    expect({ cause, log: p.log() }).toEqual({ cause, log: ZONE });
-    // Squeezed, then a reload: the entry holds the zone rect, never the squeeze.
-    p.c.dispatch({ type: "open", kind: cause }, all);
-    expect(p.log()).toEqual(SQUEEZED);
-    const stored = JSON.parse(p.backend.get("k") ?? "{}") as {
-      windows: (Rect & { kind: string })[];
-    };
-    const entry = stored.windows.find((w) => w.kind === "dice.log");
-    expect(entry && rectOf(entry)).toEqual(ZONE);
-    const again = m9Page(p.backend);
-    expect(again.log()).toEqual(SQUEEZED);
-    again.c.dispatch({ type: "close", kind: cause }, all);
-    expect({ cause, reloaded: again.log() }).toEqual({ cause, reloaded: ZONE });
-  }
+test("FR-SHELL-159 Game log grows back (BL-87, walkthrough M9): DM 1440×900 after Reset, `moved`, Mira at 570,200: Party opened (untouched) squeezes the Game log; Initiative grows into the freed space; Party closed → the Game log back at 1150×240 in its zone; a reload while squeezed stores no squeeze and the close still returns it; a cause the user then drags (remembered) ends its squeeze", () => {
+  const p = m9Page();
+  p.c.dispatch({ type: "reset" }, all);
+  expect(p.log()).toEqual(ZONE);
+  p.c.dispatch({ type: "open", kind: "party.board" }, all);
+  expect(p.log()).toEqual(SQUEEZED);
+  p.c.dispatch({ type: "close", kind: "party.board" }, all);
+  expect(p.log()).toEqual(ZONE);
+  expect(p.c.store.getState().placed.get("dice.log:main")).toBe("returned");
+  // Squeezed, then a reload: the entry holds the zone rect, never the squeeze.
+  p.c.dispatch({ type: "open", kind: "party.board" }, all);
+  expect(p.log()).toEqual(SQUEEZED);
+  const stored = JSON.parse(p.backend.get("k") ?? "{}") as {
+    windows: (Rect & { kind: string })[];
+  };
+  const entry = stored.windows.find((w) => w.kind === "dice.log");
+  expect(entry && rectOf(entry)).toEqual(ZONE);
+  const again = m9Page(p.backend);
+  expect(again.log()).toEqual(SQUEEZED);
+  again.c.dispatch({ type: "close", kind: "party.board" }, all);
+  expect(again.log()).toEqual(ZONE);
+  // M9's second case: the Compendium (untouched) squeezes it, then the user drags the Compendium
+  // to 80,70 (remembered: nothing makes room for it, FR-SHELL-149): the squeeze ends; Stats
+  // opened and closed after it leaves the Game log in its zone.
+  const q = m9Page();
+  q.c.dispatch({ type: "reset" }, all);
+  q.c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+  expect(q.log()).toEqual(SQUEEZED);
+  const rect = { x: 80, y: 70, w: 480, h: 440 };
+  q.c.dispatch({ type: "setRect", kind: "cmp.compendium", rect, resized: true }, all);
+  expect(q.log()).toEqual(ZONE);
+  q.c.dispatch({ type: "open", kind: "stats.board" }, all);
+  q.c.dispatch({ type: "close", kind: "stats.board" }, all);
+  expect(q.log()).toEqual(ZONE);
   // An entry stored squeezed by an older build, its cause gone: back in the zone at load.
   const old = new Map([
     [

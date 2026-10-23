@@ -861,9 +861,12 @@ export function runReplay(
         kept.set(kind, { x: w.x, y: w.y, w: w.w, h: w.h });
         const problems = check(sim, before);
         problems.push(...checkMemory(sim, kept, kind));
-        // A drag moves nothing else.
+        // A drag moves nothing else (but a protected window the dragged one had squeezed goes
+        // back to its zone: nothing makes room for a remembered window, FR-SHELL-159).
+        const placedNow = sim.ctl.store.getState().placed;
         for (const b of before) {
           const a = windowsOf(sim).find((x) => x.kind === b.kind);
+          if (placedNow.get(`${b.kind}:${MAIN_INSTANCE}`) === "returned") continue;
           if (b.kind !== kind && a && (rectKey(a) !== rectKey(b) || a.state !== b.state)) {
             problems.push(`I12 ${b.kind} moved by dragging ${kind}`);
           }

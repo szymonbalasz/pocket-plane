@@ -111,7 +111,7 @@ test("FR-SHELL-104 push through the ladder (DM): the Fog tool with Scenes and Co
   }
 });
 
-test("FR-SHELL-104 push (DM): written with area and data-placed pushed, cause toolbar in the memory; the bar gone, it returns (FR-SHELL-102); a window off the bar untouched", () => {
+test("FR-SHELL-104 push (DM): pushed with area and data-placed pushed, cause toolbar in the memory, the entry keeping the pre-push rect (FR-SHELL-102: never stored); the bar gone, it returns; a window off the bar untouched", () => {
   const vp = { current: { w: 1440, h: 900 } };
   const { c, backend } = controller(vp);
   c.restore("k");
@@ -137,7 +137,7 @@ test("FR-SHELL-104 push (DM): written with area and data-placed pushed, cause to
   expect(state.windows.find((w) => w.kind === "cbt.initiative")).toBe(initBefore);
   expect(state.placed.get("cbt.initiative:main")).not.toBe("pushed");
   const written = JSON.parse(backend.get("k") ?? "{}") as { windows: WindowState[] };
-  expect(rectIn(written.windows, "map.scenes")).toEqual(rectOf(scenes));
+  expect(rectIn(written.windows, "map.scenes")).toEqual(scenesBefore);
   // The tool closes (the bar's report goes): back at its pre-push rect.
   c.dispatch({ type: "return" }, all);
   expect(rectIn(c.store.getState().windows, "map.scenes")).toEqual(scenesBefore);

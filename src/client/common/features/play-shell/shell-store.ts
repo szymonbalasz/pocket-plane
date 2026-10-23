@@ -14,6 +14,7 @@ import {
   isUserReopen,
   type ManagerContext,
   type Placed,
+  persistable,
   placedAs,
   plan,
   restoreLayout,
@@ -352,13 +353,15 @@ export function createShellController(opts: {
         autoMinimisedCause: new Map(),
         autoMinimiseLog: "",
         settleLog: "",
-        memory: [],
+        memory: r.memory ?? [],
         pcClear: pcClearNow,
         settledAt: vp,
       });
       // The load settle changed the entry (zones, FR-SHELL-53's default sizes, an absorbed
-      // entry, FR-SHELL-155): written.
-      if (r.migrated) storage.write(key, serialise(r.windows, registry));
+      // entry, FR-SHELL-155): written, never a squeeze (FR-SHELL-159).
+      if (r.migrated) {
+        storage.write(key, serialise(persistable(r.windows, r.memory ?? []), registry));
+      }
       for (const a of r.absorbed ?? [])
         registry.get(a.kind)?.onAbsorb?.(a.from, opts.you?.() ?? null);
     },
@@ -456,7 +459,9 @@ export function createShellController(opts: {
         settledAt,
         viewportSettles,
       });
-      storage.write(key, serialise(next, registry));
+      // Transient displacements are never stored (FR-SHELL-159, -102).
+      const memory = action.type === "reset" ? [] : p.memory;
+      storage.write(key, serialise(persistable(next, memory), registry));
       if (p.yields) opts.onYield?.();
       if (p.refit === "window") opts.onRefit?.();
       if (action.type === "reset") opts.onReset?.();
