@@ -3,9 +3,9 @@
 // title comes from `stronghold-index`; no index row (gone, or hidden from this player) → "This
 // stronghold isn't available", no error toast. Header: name, DM "DM only" Badge + "Shown to
 // players" Switch, the Defenders chip (DM: click to edit, eye-off toggle), DM menu Rename /
-// Delete…, "All strongholds" (`openPartyTab("strongholds")`). Tabs Facilities, Staff, Reminders,
-// Notes (tab per browser; visited tabs stay mounted, as FR-PARTY-50); totals under them (FR-HOLD-31).
-// The Stores tab is RS3's. Disconnected → last view, every action disabled (FR-HOLD-34).
+// Delete…, "All strongholds" (`openPartyTab("strongholds")`). Tabs Facilities, Staff, Stores,
+// Reminders, Notes (tab per browser; visited tabs stay mounted, as FR-PARTY-50); totals under them
+// (FR-HOLD-31). Disconnected → last view, every action disabled (FR-HOLD-34).
 import { REMINDER_TYPE } from "@shared/reminders/schemas";
 import {
   DEFENDERS_MAX,
@@ -49,6 +49,7 @@ import {
 import { useHoldSelection } from "./memory";
 import { NotesTab } from "./NotesTab";
 import { StaffTab } from "./StaffTab";
+import { StoresTab } from "./StoresTab";
 import { useHoldIntent, useLive } from "./send";
 
 /** What every tab body gets: the record as this viewer holds it and the viewer's role. */
@@ -256,6 +257,8 @@ function Loaded({
         );
       case "staff":
         return <StaffTab parts={parts} />;
+      case "stores":
+        return <StoresTab parts={parts} />;
       case "reminders":
         return <HoldReminders parts={parts} reminders={reminders} />;
       case "notes":
