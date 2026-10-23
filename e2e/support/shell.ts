@@ -16,9 +16,15 @@ export const shellWindow = (page: Page, kind: string, instance = "main"): Locato
 export async function openWindow(page: Page, kind: string): Promise<Locator> {
   const win = shellWindow(page, kind);
   if (!(await win.isVisible())) {
-    const button = launcherButton(page, kind);
-    if ((await button.count()) > 0) await button.click();
-    else {
+    // The bar may still be rendering (a test-mode window appears with the snapshot): wait for the
+    // button a while before looking in the menu.
+    const clicked = await launcherButton(page, kind)
+      .click({ timeout: 5_000 })
+      .then(
+        () => true,
+        () => false,
+      );
+    if (!clicked) {
       await page.getByTestId("ui-launcher-menu").click();
       await page
         .locator(`[data-testid="ui-launcher-overflow-item"][data-record-id="${kind}"]`)
