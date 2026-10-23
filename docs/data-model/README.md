@@ -2546,9 +2546,9 @@ From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #33
 - **Fixtures:** none new (bundles `pm-memory`, `pm-memory-e2e` are PM1's aliases of `session-sim-12`).
 - **CON-44:** 0 B.
 
-## 122. Sprint 9: Reminders tab and sheet tab (RS1)
+## 123. Sprint 9: Reminders tab and sheet tab (RS1)
 
-From [reminders](../specs/reminders.md#8-data-model) §8 (derived), [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-100–104 (DM #338, #339). **Built by `build/rem-ui`**. Protocol side: [protocol §153](../protocol/README.md#153-sprint-9-reminders-tab-and-sheet-tab-rs1). **No table, column, record type or wire field.**
+From [reminders](../specs/reminders.md#8-data-model) §8 (derived), [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-100–104 (DM #338, #339). **Built by `build/rem-ui`**. Protocol side: [protocol §155](../protocol/README.md#155-sprint-9-reminders-tab-and-sheet-tab-rs1). **No table, column, record type or wire field.**
 
 - **Derived (client, not stored):** groups (Party, then characters by name per viewer), row order (`createdAt`, then id), roll-as actor per surface, the per-character effects line (from `effect` rows already in the snapshot), the sheet tab's count (this character's loaded rows).
 - **Browser state:** Party Manager tab memory may hold `reminders` (§121's key, unchanged).
