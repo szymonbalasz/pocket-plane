@@ -11,6 +11,9 @@ export default defineBundle({
   name: "session-sim-13",
   includes: ["session-sim-12"],
   fixtures: [
+    // SP: rules quick reference (CMP §13.3; `cmp-rule-house` stays in sp-rules / sp-s9). Above
+    // RS's group: RS's fixture test reads its eight units as the bundle's last.
+    "cmp-rules-mini",
     // RS: reminders + strongholds (FR-REM-28, FR-HOLD-36)
     "rem-party",
     "rem-mira-charm",
@@ -20,7 +23,5 @@ export default defineBundle({
     "hold-greystone-reminders",
     "hold-greystone-stores",
     "hold-tower-secret",
-    // SP: rules quick reference (CMP §13.3; `cmp-rule-house` stays in sp-rules / sp-s9)
-    "cmp-rules-mini",
   ],
 });
