@@ -2,40 +2,22 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 9: all slices merged; final main green (check 5530, e2e 225, bench 41/41). **Sprint gate: session-sim-13 running** (agent test-session-13, tab in wR, worktree `gates-main`, port 4163, run `20261023-193558-session-sim-13`), DM gate 1 passed (#339), plan [sprint-9](sprint-9.md).
+**Phase:** Sprint 9 **done** (#338–#340): every slice merged, final `main` check 5,530 / e2e 225 / bench 41 of 41, session-sim-13 14 / 15 (FAIL e → BL-98), "Playtest: sprint 9 features" written in [sprint-9](sprint-9.md). **Next: recap with the DM + sprint 10 scope.**
 
-**Gates on `main`:** run in the detached worktree `~/.herdr/worktrees/pocket-plane/gates-main` (`git -C <it> checkout --detach main`, then `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there.
+**Gates on `main`:** run in a detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, then `bun install`, `bun run env:init`, `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there. Removed at the end of sprint 9.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| RS0 reminders + strongholds core | merged `fb3884a3` | — | done (23/23) | — |
-| FX2 dice + gems lines | merged `d4837dc4` | — | done (10/10; branch gates 5232 / 208) | main gates with PM1 |
-| PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates: check 5307 + 1 timeout flake (passes alone), e2e 207 + 2 load flakes (pass alone) |
-| PM2 Party Manager | merged `77f5fd2f` | — | done (re-test 5/5; e2e 213 + roll-popup flake) | main gates after FX1 |
-| FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
-| SP3 session recap | merged `2160c79d` | — | done (7/7, 13/14 → 8/8) | final main 5530 / 225 green; bench 41 / 41 |
-| FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12) | main gates: check 5392 + 1 load flake (3/3 alone), e2e 215 |
-| SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
-| SP2 rules reference | merged `fb2904b5` | — | done (14/14 + 16/16) | main gates 5476 / 224 green (with RS3) |
+| Sprint 9 (RS0–3, PM1–2, FX1–3, SP1–3) | all merged | — | done | DM recap |
+| Sprint gate | main | — | session-sim-13 14 / 15 (`.verify/20261023-193558-session-sim-13/`); walkthrough evidence `.verify/sprint9/walkthroughs/` | — |
 
-| RS1 Reminders tab + sheet | merged `d52a5587` | — | done (branch gates 5408 / 216) | main gates 5408 / 216 green |
-| RS2 Strongholds tab + window | merged `bee916a5` | — | done (11/11 + 5/5) | main gates 5434 / 220 green |
-| RS3 Stores UI | merged `8884907f` | — | done (18/18; branch gates 5444 / 222 on identical code) | main gates with SP2 |
-
-Queue: SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
+Backlog after sim-13: BL-97 (leak-like, first), BL-98–BL-104, BL-93, BL-94, BL-95, BL-96, BL-92.
 
 ## Shared-file locks
 
-- Play-shell frame + canvas: PM1 merged; grants now per slice: FX3 `ShellWindow.tsx` boundary branch; PM2 / RS2 / SP2 / SP3 append rows (windows.ts, size table, goldens, replay sets: regenerate, never hand-merge).
-- Schema / core lane: free (RS0 merged); SP3 / FX3 append their lines.
-- Toast runtime (ToastRuntime, keep-out, toasts, stack-inputs): `fix/fx-toasts-feed` (FX1).
-- Character sheet `sections.ts` + `SheetView.tsx` (count badge): `build/rem-ui` (RS1), granted 2026-10-23.
-- Stats client files: FX1, then SP3.
-- `sync/connection.ts` + `protocol/frames.ts`: `fix/fx-sync-shell` (FX3).
-- combat-tracker `companions.ts` / `hp.ts` strings ("Party Manager"): `build/party-manager` (PM2), granted 2026-10-23.
-- Backlog: no picks (four sprint slices working).
+- None (every sprint-9 slice merged).
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 

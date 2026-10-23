@@ -48,15 +48,118 @@ DM decision #338 (sprint-8 recap + sprint 9 scope). Process: [orchestrator promp
 | 2026-10-23 | **Merged: Stronghold Stores** (RS3: Stores tab, Move to party / to a character from the existing form, per-item DM-only, loot log names the Stores, Inventory without Stores rows; 18/18). Track RS complete. Queued: rules reference (SP2), session recap (SP3) |
 | 2026-10-23 | **Merged: rules quick reference** (SP2: a Rules window on both launchers with SRD 5.1 cards on curated pages, pins, DM house rules, CC BY attribution; palette rules search; 16/16). Last slice: session recap (SP3) |
 | 2026-10-23 | **Merged: session recap** (SP3: on-demand recap of fights, party tally, loot, notable rolls and awards from the palette or the Stats Session tab; the DM's Share with a 280-char note and unticked sections opens it for everyone; Copy as Markdown; 8/8). **All sprint 9 slices on `main`.** Final gates + quiet bench, then session-sim-13 |
+| 2026-10-23 | **Sprint gate:** final `main` check 5,530 / e2e 225 / bench 41 of 41; **session-sim-13 14 / 15 PASS** (FAIL e palette "cover" lands off the card → BL-98; stale-page step N/A by design), leak scan clean, hard kill byte-identical; sim-12 FAILs c and h fixed; glitches → BL-97–BL-104. "Playtest: sprint 9 features" written below. Next: recap with the DM |
 
-## Check `main` any time (DM)
+## Playtest: sprint 9 features
 
-Bundle **`session-sim-12`** until the sprint adds `session-sim-13`.
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-13 report](../../.verify/20261023-193558-session-sim-13/report.md) (local, gitignored): **14 / 15 PASS** on final `main` (check 5,530, e2e 225, bench 41 / 41; the stale-page step N/A, verified in its branch), leak scan clean for both players, a hard kill mid-fight with a Stronghold window, Party Manager and an open Recap restarted byte-identical. Both sim-12 FAILs (DM toast stack over PCs, no DM callout for hidden kills) are fixed, and so are BL-86–BL-90. The one FAIL and the glitches are the known gaps below.
+
+### Setup
 
 ```powershell
 git pull; bun install
 bun run build
-bun run fixtures:reset-load session-sim-12 --profile verify
+bun run fixtures:reset-load session-sim-13 --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL (paste the secret) and each player link in its own browser. Town may be live at load: show Goblin Ambush from the Scenes window; close Player 1's presented-handout popup if it appears. `session-sim-13` = `session-sim-12` + Greystone Keep (a stronghold with facilities, staff, Stores, a DM-only vault and spy), a secret tower, party / character / DM-only reminders and Mira's Bless. Other bundles: `reminders-strongholds` (reminders + strongholds only, small), `sp-s9` (a recap with a loot haul), `sp-rules` (rule cards + a house rule), `pm-memory` (the window-memory set). To switch: `Ctrl+C`, `bun run fixtures:reset-load <bundle> --profile verify`, `bun run start --profile verify`; player links change on every load. Fixture fights now carry today's date (CLI loads use the load time, ADR-0068).
+
+### Before you start: tips
+
+- **Three browsers side by side.** Reminders, strongholds and the recap are mostly about who sees what: keep the DM, Player 1 and Player 2 visible together.
+- **Window memory is per browser.** Once you drag or resize a window, it is "yours": it reopens exactly there, even over a PC. To get the old automatic placement back: **Preferences** (click your name chip) → **Layout** → **Reset layout**. Clicking a window only brings it to the front; it doesn't make it "yours".
+- **Shortcuts don't fire while you type.** Click the map (or anywhere outside a text field) first. `Ctrl+K` works from anywhere, even inside a field.
+- **Exact screen sizes.** F12 → device toolbar (Ctrl+Shift+M) → Responsive → width × height (1280×720, 1440×900).
+- **Peek at a window's state (optional).** F12 → Elements → a window (`data-testid="ui-window"`): `data-remembered` = you moved / resized it; `data-placed` = why it sits there (`stored`, `auto`, `zone`, `pushed`, `squeezed`…); `data-z` = stacking order.
+
+### Where to find each new thing
+
+| Feature | Who | Where to click | What to look for |
+|---|---|---|---|
+| **Party Manager** | both | Launcher **Party Manager** (was "Party"; the separate Party status button is gone) | Opens on **Party status**: PCs' HP / temp / AC, each owner's companions indented under their PC. Tabs Party status · Handouts · Inventory · Loot · Reminders · Strongholds (the strip scrolls when narrow). It remembers the last tab |
+| **Window memory** | both | Drag or resize any window | It reopens exactly there and that size, on top, even after a reload or a screen-size change (only nudged back on-screen). Tool bars push it aside only while the tool is open. **Preferences → Layout → Reset layout** forgets every window |
+| **Reminders** | both | **Party Manager → Reminders**, or a sheet → tab **Reminders** (a count badge) | Rows grouped Party, then each character; optional source ("Greystone Keep: Forge Hall") and roll buttons (Shift / Ctrl / Alt like macros); **Add reminder**. Players add on the party and their own characters and edit only their own; your "DM only" reminders never reach them. A read-only line shows a character's conditions / effects / concentration |
+| **Strongholds** | both | **Party Manager → Strongholds** → a stronghold | The **Stronghold** window: Defenders in the header; tabs Facilities (state, cost, build days, upkeep, income dice button, effect, order, "replaces"), Staff, Stores, Reminders, Notes. Any row can be **DM only** (eye-off). A new stronghold is DM-only until you show it. Facility menu → **Make reminder**; removing a facility asks before removing its reminders |
+| **Stores** | both | Stronghold window → **Stores** | Coin and items of that stronghold; **Move to party** / to a character uses the usual Move form. Single items can be DM-only. Players see moves to / from a hidden Stores as "Outside the party". Deleting a stronghold moves its Stores to the party (the confirm says what) |
+| **Command palette** | both | `Ctrl+K`, or the search button in the top bar | One list: Commands, Windows, Characters, Creatures (DM), Rules, Compendium. `>` = commands only, `@` = characters. Try "init", "> reset", "@mira", "cover", "recap", "party status" |
+| **Shortcuts** | both | Press `?` (outside a text field) | The shortcuts sheet. `/` = roll bar; letters open / close windows (L Game log, I Initiative, D Dice tray, C your character's sheet, B Compendium, R Rules, P Party Manager, S Stats); DM: `N` next turn, `Shift+N` previous. **Preferences → Keyboard → Single-key shortcuts** turns the letters off |
+| **Rules** | both | Launcher **Rules** (or palette "cover", or Compendium → a rule → **Open in Rules**) | Pages Combat · Conditions · Checks · Exploration · Spellcasting · Hazards · House rules · Pinned; SRD 5.1 cards, wording unchanged, "SRD 5.1" on each; pin ☆ → **Pinned** (per browser); your house rules (Compendium → New → rule) on **House rules**, DM-only ones only for you; footer **About** = the licence line |
+| **Session recap** | both | Palette "Session recap", or **Stats → Session** tab → **Recap** | Fights (kills / downs / MVP), party tally, loot, notable nat 20 / nat 1 rolls, awards, per session (picker). You: **Share** (a note up to 280 characters, untick sections) opens it for everyone; **Copy as Markdown** |
+| **Toast stack (DM)** | DM | Several pending damage cards | Stays in its column near the top centre, never on the map's left edge over PCs, never on a window's title bar; with the **Notifications** window open, card toasts fold into it |
+| **Kill feed (DM)** | DM | Kill a hidden monster | "Wolf falls (hidden)" / "Overkill! … (hidden)" toasts for you only |
+| **Stale page after an update** | both | Keep a page open while `main` is rebuilt, then open a window | "New version available — reload" with a Reload button inside the window instead of an error |
+| **Gem awards** | DM | Click a gem **+** several times quickly | One line "DM awards Brakka 6 Fortune gems" instead of six |
+
+### Part 1: Party Manager + window memory (`session-sim-13`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Player 1 and Player 2: launcher **Party Manager** | Opens on Party status, about 550 px wide (narrower at 1280×720 if needed); companions under their owner; Player 2 doesn't see Player 1's hidden pet |
+| 2 | You: drag the Compendium onto Mira and make it bigger; close it; reopen it; reload | Exactly the same spot and size each time, on top |
+| 3 | Resize the browser 1440×900 → 1280×720 → 1440×900 | The Compendium is nudged on-screen at 1280 and back exactly at 1440; the map is at its normal Fit each time (no stuck zoom) |
+| 4 | Pick the Fog tool with the Compendium under its bar; close the tool | Pushed off the bar while Fog is open, back exactly after |
+| 5 | Open Party Manager (not moved yet) so the Game log shrinks; close it | The Game log grows back to full size |
+| 6 | **Preferences → Layout → Reset layout** | Everything back to the starting layout; reopened windows are placed automatically again |
+
+### Part 2: reminders + strongholds (`session-sim-13`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | **Party Manager → Reminders** on all three | You: Party, Mira, Thorn incl. a "DM only" row. Player 1: Party + Mira only. Player 2: Party + Thorn only |
+| 2 | Player 1: click Mira's "Charm" roll | A normal roll "Mira — Charm" in the Game log |
+| 3 | Player 2: **Add reminder** on Thorn; edit it; you mark it **DM only** | Player 2 sees it and can edit it; after your change it leaves Player 2's list |
+| 4 | **Party Manager → Strongholds → Greystone Keep** on all three | You: 6 facilities incl. the vault (eye-off), staff incl. the spy; players: no vault, no spy, "Wages 3 gp" |
+| 5 | Player 1: Forge Hall **Income 2d6**; you change Forge Hall's order, then the vault's effect | A roll in the log; players see the new order; the vault edit sends players nothing |
+| 6 | Player 1: Stores → **Move to party** 50 gp; take Arrows ×20 to Mira | Party pot +50 gp, Mira has the arrows, log rows name "Greystone Keep Stores" |
+| 7 | You: remove the Steam Rooms facility | The confirm says "Its 1 reminder is removed too."; the reminder leaves every Reminders tab |
+| 8 | Show the secret tower to players, then hide it again | It appears for them, then disappears; their ledger rows read "Outside the party" |
+
+### Part 3: palette, shortcuts, rules, recap (`session-sim-13`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | Click the map, `Ctrl+K`, type "init", Enter; then "> reset"; then "@mira" | Initiative to the front; Reset layout runs; Mira's sheet opens |
+| 2 | Click the map; press `L`, `I`, `R`, `P`, then each again; `N`, `Shift+N` | Windows open / come forward, then minimise; the turn moves on and back for everyone |
+| 3 | Type "n" in the roll bar; press `?` | No turn change while typing; the shortcuts sheet (players don't see N / Shift+N) |
+| 4 | `Ctrl+K` "cover" → Enter; pin Cover; reload | The Rules window on the Cover card; Cover on the Pinned page after the reload |
+| 5 | Player 1: Rules → House rules | Your shared house rule only, not the DM-only one |
+| 6 | **Stats → Session → Recap**; then **Share** with a note, unticking Notable rolls | The recap opens for both players with your note and without notable rolls; fight labels show today's date |
+| 7 | Kill a monster and add 10 gp loot with the Recap open | The open recap updates within a few seconds; the session picker still shows the right session |
+
+### Part 4: fix pack re-checks (`session-sim-13`)
+
+| # | You do | Expect |
+|---|---|---|
+| 1 | DM 1280×720, Game log + Initiative + 4 pending cards; drag Scenes to the top centre | The toast stack stays in its column, not at the left edge over Mira |
+| 2 | Open the Notifications window with a card pending | No card toast over the window; its Apply buttons work |
+| 3 | Kill the hidden Wolf with your own damage | "Wolf falls (hidden)" for you within a second; nothing for players |
+| 4 | Add a monster mid-combat (Initiative → Add…) | Its initiative popup closes by itself after a few seconds |
+| 5 | Player 1: tray "4d6kh3"; copy a log line and paste it | "5 3̶ + 6 + 6" style line; the paste is one line |
+| 6 | Give Brakka 6 Fortune gems with quick clicks | One log line for all six |
+| 7 | Player 2 goes offline (Wi-Fi off or DevTools → Network → Offline) | Their chip flips to "Reconnecting…" within about a second, back on reconnect |
+| 8 | End the Escort fight with Thorn's elementals | The elementals go and Thorn's "Concentrating" chip goes with them; Mira's Bless stays |
+
+### Known gaps
+
+- **Palette "cover" lands off the card** (sim-13 FAIL e, BL-98): the Rules window opens on the right page, but scrolled to its top (or, if already open, to the card's end). Scroll to the card.
+- **Add… with "Add hidden" on an existing visible token joins it public** (BL-97): its name shows in players' hit lines. Until fixed, hide the token first, or add the creature without binding.
+- **Party Manager and the Stronghold window put each other away** on the DM at 1440×900; players at 1280×720 keep one of Recap / Stats / Party Manager / Rules open (BL-99). Drag one of them once and both stay.
+- **The DM map jumps to a corner after a reload** when a window you placed covers the map centre (BL-100): move the window or press Fit.
+- **DM toasts can still cover some window parts** (Scenes list, Rules tabs, the Start dialog title) (BL-101).
+- **Rules cards show raw markup** for some links ("srd:prone") and ">" in indented quotes (BL-102).
+- **Players' "Biggest overkill"** shows the hit's damage, not the overkill (BL-103).
+- Smaller: an unmarked DM-only house rule in the collapsed list, recap refresh ~2 s, the remove-facility confirm repeats its title, the DM's Party Manager opens narrower than players', sounds need one click after a load (BL-104).
+- Layout harness: Party Manager at 550 px and the three new windows added named exemptions (BL-93); the roll-popup e2e flakes under load (BL-95).
+
+## Check `main` any time (DM)
+
+Bundle **`session-sim-13`** (sprint 9 gate).
+
+```powershell
+git pull; bun install
+bun run build
+bun run fixtures:reset-load session-sim-13 --profile verify
 bun run start --profile verify
 ```
 
