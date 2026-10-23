@@ -21,5 +21,7 @@ export default defineBundle({
     "hold-greystone-stores",
     "hold-tower-secret",
     // FX: fix pack (FX1 toasts + kill feed: no unit; `fx-toasts-e2e` aliases session-sim-12)
+    // FX: FX3 Mira's Bless beside Thorn's summon concentration (FR-CBTX-75)
+    "fx-mira-bless",
   ],
 });

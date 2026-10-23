@@ -14,7 +14,7 @@ const cleanups: (() => void)[] = [];
 // Every bundle's temp dir (FR-FIX-03) plus the load-clock loads: removal outlasts 5 s under load.
 afterAll(() => {
   for (const c of cleanups) c();
-}, 60_000);
+}, 60_000); // one temp dir per bundle, removed serially: over the 5 s default while other suites run
 
 async function loaded(bundle: string, now?: number) {
   const r = await loadBundle(bundle, { testMode: true, ...(now !== undefined && { now }) });

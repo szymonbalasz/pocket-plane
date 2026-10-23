@@ -1333,7 +1333,7 @@ Evidence per §9.6 of AGENTS; teardown: stop, `fixtures:reset --profile verify`.
 | `pause/top-bar.tsx` | `PauseControl` (DM) | compact inline Reload in its top-bar slot |
 | `scenes-map/LazyMapCanvas.tsx` | map canvas | reload panel in the map area |
 | DM `campaign-management/session` via `lazyApi` / `import()`: `AlertSoundsSection.tsx`, `combat-extras/add-dialog.tsx`, `combat-tracker/encounters-window.tsx`, `rest.ts`, `summon-dialog.tsx`, `compendium/compendium-window.tsx`, `entities/creatures-window.tsx`, `pet-dialog.tsx`, `pet-rest.ts`, `scenes-map/rest.ts` | DM REST API | the caller's existing error + stale notice |
-| `dm/features/scene-tools/layers-popover.tsx` | none: static imports only (checked) | nothing to wrap; covered by the scan |
+| `dm/features/scene-tools/layers-popover.tsx` | canvas layers popover (dynamic import, found in the FX3 build) | stale notice; through the loader |
 
 - ⚠ **Frame file:** `ShellWindow.tsx` `WindowErrorBoundary` (its render branch picks the panel). PM1 holds every frame file (seams S5), so this lands **after PM1 merges** as a one-function grant in FX3. The loader and the sites are FX3's and build at once (wave 2).
 - *(Seams S5)* BL-76 (`layout-checks.ts`) and BL-90's "Scenes returns to its pre-drag spot" moved to **PM1**. Root-cause hand-offs:

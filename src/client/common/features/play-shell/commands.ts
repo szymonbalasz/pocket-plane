@@ -1,0 +1,23 @@
+// Command registry (FR-SHELL-184, -199, ADR-0067). APPEND-ONLY (AGENTS §9.9): a feature adds its
+// commands to `COMMANDS` and its search providers to `PROVIDERS`; nothing else changes here. The
+// palette lists them, the shortcut dispatcher binds their `keys` (only from play-shell §7's table,
+// assigned via the integrator), the shortcuts sheet is generated from them. A command does only
+// what a click in the UI does: no new intent, event or record. Windows need no line here: the
+// palette's Windows group is generated from each client's `windows.ts` (FR-SHELL-185).
+import { SP1_COMMANDS } from "./palette/launch";
+import { SP1_PROVIDERS } from "./palette/providers";
+import type { PaletteCommand, SearchProvider } from "./palette/types";
+
+export type { CommandCtx, PaletteCommand, SearchProvider } from "./palette/types";
+
+/** The commands (append yours). */
+export const COMMANDS: readonly PaletteCommand[] = [
+  // SP1 (build/sp-palette): palette, sheet, Roll dice, launch commands, window keys
+  ...SP1_COMMANDS,
+];
+
+/** The search providers, one group each or more (append yours; no strongholds yet, seams S9). */
+export const PROVIDERS: readonly SearchProvider[] = [
+  // SP1 (build/sp-palette): characters, creatures (DM), compendium + rules rows
+  ...SP1_PROVIDERS,
+];

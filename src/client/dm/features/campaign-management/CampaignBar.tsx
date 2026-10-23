@@ -1,4 +1,5 @@
-// Campaign switcher, new campaign, rename (CAMP §7, FR-CAMP-06/07/09/10).
+// Campaign switcher, new campaign, rename (CAMP §7, FR-CAMP-06/07/09/10). FR-CAMP-51: the
+// switcher shrinks with the top bar to its chevron + 48 px of name; the name ellipsises.
 import {
   CampaignName,
   type CampaignRecord,
@@ -17,6 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
 } from "@ui/components/ui/overlays";
 import { usePresence, useRecords, useSync } from "@ui/sync/store";
 import { useState } from "react";
@@ -54,13 +56,23 @@ export function CampaignBar({ campaigns }: { campaigns: CampaignSummary[] }) {
   const activeName = liveCampaign?.name ?? active?.name ?? "";
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       <Select value={active?.id ?? ""} onValueChange={choose} disabled={state !== "live"}>
-        <SelectTrigger data-testid="camp-campaign-switcher" aria-label="Active campaign">
-          <SelectValue placeholder="Choose campaign">
-            <span data-testid="camp-campaign-name">{activeName}</span>
-          </SelectValue>
-        </SelectTrigger>
+        <Tooltip content={activeName}>
+          <span className="inline-flex min-w-0">
+            <SelectTrigger
+              data-testid="camp-campaign-switcher"
+              aria-label="Active campaign"
+              className="min-w-24 max-w-full"
+            >
+              <span className="min-w-0 truncate" title={activeName}>
+                <SelectValue placeholder="Choose campaign">
+                  <span data-testid="camp-campaign-name">{activeName}</span>
+                </SelectValue>
+              </span>
+            </SelectTrigger>
+          </span>
+        </Tooltip>
         <SelectContent>
           {campaigns.map((c) => (
             <SelectItem
@@ -81,7 +93,11 @@ export function CampaignBar({ campaigns }: { campaigns: CampaignSummary[] }) {
         schema={CampaignName}
         testId="camp-campaign-new"
         submitLabel="Create"
-        trigger={<Button variant="outline">New campaign</Button>}
+        trigger={
+          <Button variant="outline" className="shrink-0">
+            New campaign
+          </Button>
+        }
         onSubmit={async (name) => {
           await dmCall(api.api.campaigns.$post({ json: { name } }));
           await loadCampaigns();
@@ -96,7 +112,11 @@ export function CampaignBar({ campaigns }: { campaigns: CampaignSummary[] }) {
           initial={activeName}
           testId="camp-campaign-rename"
           submitLabel="Rename"
-          trigger={<Button variant="ghost">Rename</Button>}
+          trigger={
+            <Button variant="ghost" className="shrink-0">
+              Rename
+            </Button>
+          }
           onSubmit={async (name) => {
             await dmCall(
               api.api.campaigns[":id"].$patch({ param: { id: active.id }, json: { name } }),

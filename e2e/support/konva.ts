@@ -23,7 +23,12 @@ export async function konvaNodes(page: Page, name: string, id?: string): Promise
         name(): string;
         isVisible(): boolean;
         getAbsoluteOpacity(): number;
-        getClientRect(): { x: number; y: number; width: number; height: number };
+        getClientRect(o?: { skipShadow?: boolean; skipStroke?: boolean }): {
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+        };
         getClassName(): string;
         text?: () => string;
         findOne?: (s: string) => KNode | undefined;
@@ -36,9 +41,14 @@ export async function konvaNodes(page: Page, name: string, id?: string): Promise
         for (const n of stage.find(`.${name}`)) {
           if (id !== undefined && n.id() !== id) continue;
           if (!n.isVisible()) continue;
-          // A token group's body is its circle (the label below it widens the group's rect).
-          const body = n.getClassName() === "Group" ? (n.findOne?.("Circle") ?? n) : n;
-          const r = body.getClientRect();
+          // BL-81: a token is its footprint (the group's first child, the hit-area Rect: side ×
+          // side at the group's origin), never a child Circle (an icon row's badge) nor the group's
+          // rect (widened by labels / icons). Other groups: their circle, as before.
+          const isToken = n.name() === "map-token" && n.getClassName() === "Group";
+          const footprint = isToken ? n.findOne?.("Rect") : undefined;
+          const body =
+            footprint ?? (n.getClassName() === "Group" ? (n.findOne?.("Circle") ?? n) : n);
+          const r = body.getClientRect({ skipShadow: true, skipStroke: true });
           const textNode = n.getClassName() === "Text" ? n : n.findOne?.("Text");
           out.push({
             id: n.id(),
@@ -58,6 +68,7 @@ export async function konvaNodes(page: Page, name: string, id?: string): Promise
   );
 }
 
+/** A token's footprint (centre + side in page px), BL-81. */
 export async function tokenNode(page: Page, tokenId: string): Promise<NodeInfo | null> {
   return (await konvaNodes(page, "map-token", tokenId))[0] ?? null;
 }
