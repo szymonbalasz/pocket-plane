@@ -11,9 +11,10 @@ import { resetAndLoad } from "@server/features/fixtures-adapters/loader";
 import { library, loadBundle } from "./index";
 
 const cleanups: (() => void)[] = [];
+// Every bundle's temp dir (FR-FIX-03) plus the load-clock loads: removal outlasts 5 s under load.
 afterAll(() => {
   for (const c of cleanups) c();
-});
+}, 60_000);
 
 async function loaded(bundle: string, now?: number) {
   const r = await loadBundle(bundle, { testMode: true, ...(now !== undefined && { now }) });
