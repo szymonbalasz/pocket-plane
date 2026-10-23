@@ -346,6 +346,18 @@ describe("HOLD §13 commands", () => {
     const changes = ev[0]?.event.changes ?? [];
     const count = (type: string) => changes.filter((c) => c.type === type).length;
     expect(count(LOOT_ENTRY_TYPE)).toBe(100);
+    // Review ruling 8: the flip's frame per viewer (window rows only, not all 500).
+    const flipBytes = (v: ReturnType<RsSeed["viewer"]>) =>
+      JSON.stringify({
+        type: "event",
+        seq: 1,
+        cause: { name: "StrongholdUpdated" },
+        changes: t.s.records.filterChanges(changes, v).changes,
+      }).length;
+    console.log(
+      `FR-HOLD-12 500-entry flip: DM ${flipBytes(t.dmV)} B, player ${flipBytes(t.p1V)} B (100 entries)`,
+    );
+    expect(flipBytes(t.dmV)).toBeLessThanOrEqual(60_000);
     expect([count(STRONGHOLD_TYPE), count(STRONGHOLD_INDEX_TYPE), count(REMINDER_TYPE)]).toEqual([
       1, 1, 1,
     ]);
