@@ -200,7 +200,7 @@ fixtures/
 | `bun run typecheck` | `tsc --noEmit`, whole repo | — |
 | `bun run lint` | `biome check` (lint + format) | — |
 | `bun run check` | `typecheck` + `lint` + `bun test`. Run before every commit | — |
-| `bun run bench` | Timed perf gates (`*.bench.ts`: fog vision, scene geometry / guard / area, dice settle / notation, compendium search, map fit visibility, window placement, DM snapshot build time; harness `src/shared/bench-kit.ts`); `bun test` skips them, a new one is added to the script. Run it alone, before merging vision / fog / geometry perf work | in-process |
+| `bun run bench` | Timed perf gates (`*.bench.ts`: fog vision, scene geometry / guard / area, dice settle / notation, compendium search, map fit visibility, window placement, DM snapshot build time, command palette search, session recap compute; harness `src/shared/bench-kit.ts`); `bun test` skips them, a new one is added to the script. Run it alone, before merging vision / fog / geometry perf work | in-process |
 | `bun run state:digest [--profile p]` | Read-only per-table row counts + SHA-256 of the profile's DB (crash walkthroughs compare digests, #163) | profile data |
 
 - **Portable scripts** (Windows + POSIX): `package.json` scripts call only `bun scripts/<x>.ts` or binaries installed as dependencies (`tsc`, `biome`, `vite`, `playwright`). No `VAR=x cmd`, `rm -rf`, shell globs or `&&` chains; put logic in a Bun script.
