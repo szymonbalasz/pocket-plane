@@ -1148,12 +1148,12 @@ Teardown: stop, `fixtures:reset --profile verify`.
 |---|---|---|---|
 | P1 | Click the map, Ctrl+K, type "init", Enter | — | Palette centred, input focused; Windows "Initiative" first; Initiative comes to front, palette gone, focus back |
 | P2 | Ctrl+K, "> reset", Enter | — | Only commands listed; Reset layout runs as from Preferences |
-| P3 | Ctrl+K "@mira" → Enter; then "owlbear" → Enter | — | Mira's sheet opens; the SRD Owlbear (Compendium group, ≤ 300 ms) opens in Compendium |
+| P3 | Ctrl+K "@mira" → Enter; then "owlbear": ↓ to the Compendium row → Enter | — | Mira's sheet opens; for "owlbear" Characters rank first (FR-SHELL-183: the pet "Owlbear — Mira's pet" on top), the SRD Owlbear (Compendium group, ≤ 300 ms) opens in Compendium (step wording fixed after the SP1 walkthrough) |
 | P4 | Ctrl+K "cover" → Enter | — | Rules group "Cover" → the Rules window on the Cover card |
 | P5 | Map focused: L, I, B, R, P, S, D; each again | — | Each window opens / comes to front, the second press minimises it |
 | P6 | N, then Shift+N | B, C watch Initiative | Turn advances ≤ 1 s on all three, then goes back |
 | P7 | Click the Game log roll bar, type "lid"; Initiative HP field, type "n"; Ctrl+K from the roll bar | — | "lid" typed, no window toggled; no turn change; the palette opens from the field |
-| P8 | — | B: Ctrl+K "goblin"; "@"; `?`; C | No monster row; only Mira; the sheet has no N / Shift+N; C opens Mira's sheet |
+| P8 | — | B: Ctrl+K "goblin"; "@"; `?`; C: "@" | B: no monster row; "@" lists only B's own characters and companions (Brakka, Mira and their pets in session-sim-12), never another player's PC; the sheet has no N / Shift+N; C: "@" lists only Thorn (step wording fixed after the SP1 walkthrough) |
 | P9 | Pause (no message) | B: Ctrl+K, L, `?`, Space | Nothing happens (`data-test-last-shortcut` `…:paused`); after Resume, Ctrl+K works |
 | P10 | 1280×720 | B 1280×720 | Search button in the top bar, launcher fits (no clipped button); palette ≤ 90 vw |
 | P11 | — | C: Preferences → Keyboard → Single-key shortcuts off; L; Ctrl+K; reload; L | L does nothing, Ctrl+K opens; still off after reload |
