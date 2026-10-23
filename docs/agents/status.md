@@ -11,7 +11,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Sprint 9 (RS0–3, PM1–2, FX1–3, SP1–3) | all merged | — | done | — |
-| Sprint 10 H1 combat + dice | `fix/h1-combat-dice` (slot 0, ws wA6) | build-h1 | building | walkthrough |
+| Sprint 10 H1 combat + dice | `fix/h1-combat-dice` (slot 0, ws wA6) | build-h1 | ready (check 5541, e2e green); small follow-ups | walkthrough (port 4103) |
 | Sprint 10 H2 window frame + Party Manager | `fix/h2-frame` (slot 2, ws wA7) | build-h2 | building | walkthrough |
 | Sprint 10 H3 toasts | `fix/h3-toasts` (slot 3, ws wA8) | build-h3 (idle), test-h3 | ready (3791c84e; check 5539, e2e 227) → walkthrough (port 4133) | merge |
 | Sprint 10 H4 rules, recap, strongholds, misc | `fix/h4-rules-misc` (slot 4, ws wA9) | build-h4 | building | walkthrough |
@@ -26,6 +26,13 @@ Backlog after sim-13: BL-97 (leak-like, first), BL-98–BL-104, BL-93, BL-94, BL
 ## Integrator rulings this sprint (tell the DM at the recap)
 
 *(Sprint 10: add new rulings above the sprint-9 list.)*
+
+Sprint 10:
+- H1 BL-103: players' "Biggest overkill" amount was the hit's damage (allowed by FR-STATS-12), not a leak; players now read "N damage" on Session, recap Awards, Highlights and Trophies; DM unchanged (FR-STATS-12 amended).
+- H1 BL-97: Add hidden hides a bound visible token like the map's hide; never unhides; Start keeps a bound token's own hidden flag (accepted as is).
+- H1 BL-105: a player's own hidden-request answer follows their dice settings; the DM's own hidden rolls stay popup-only (FR-DICEX-84 amended).
+- H1: granted the stale `DamageRolled` comment fix in `src/shared/events/combat-tracker.ts` (no other holder); one-line role pass in session-recap award views (H4's area; merge order sorts it).
+- H3: "Saved …" toasts stay alerts in the one stack (FR-NOTE-50), placed like cards; new FR-NOTE-75 (content-aware spots), -76 (modal dialog as a keep-out).
 
 - Toast stack: a window's title bar + first 40 px keeps the DM / player toast stack out (amends FR-NOTE-53; FX1 build, 2026-10-23), fallback FR-NOTE-71.
 - Placer speed-up 3 (`roomFor`, exact) kept for the 25 ms bench gate (OQ-SHELL-84).
