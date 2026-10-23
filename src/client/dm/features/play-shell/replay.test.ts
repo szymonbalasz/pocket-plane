@@ -32,11 +32,11 @@ if (process.env.UPDATE_FAILING === "1") {
 const EXEMPTIONS = new Map([
   [
     "FR-SHELL-115 replay D3 fitted @1280×800 resize",
-    "RS2 (pending approval): `hold.stronghold` joins D3 untouched (S4); the resize back re-fits it 480×492 → 412×400, the placer's I7 resize class D1 / D2 / D3 already carry (frame, not the window def)",
+    "RS2 (approved, BL-93): `hold.stronghold` joins D3 untouched (S4); the resize back re-fits it 480×492 → 412×400, the placer's I7 resize class D1 / D2 / D3 already carry (frame, not the window def)",
   ],
   [
     "FR-SHELL-115 replay D3 fitted @1440×900 push",
-    "RS2 (pending approval): with `hold.stronghold` open beside them, Initiative and the Game log return from the tool-bar push at their refitted sizes (I7 push class, as the players' push cells; frame)",
+    "RS2 (approved, BL-93): with `hold.stronghold` open beside them, Initiative and the Game log return from the tool-bar push at their refitted sizes (I7 push class, as the players' push cells; frame)",
   ],
 ]);
 
