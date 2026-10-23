@@ -42,7 +42,7 @@ Queue: SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates
 - Toast stack: a window's title bar + first 40 px keeps the DM / player toast stack out (amends FR-NOTE-53; FX1 build, 2026-10-23), fallback FR-NOTE-71.
 - Placer speed-up 3 (`roomFor`, exact) kept for the 25 ms bench gate (OQ-SHELL-84).
 - Party Manager 550 px: 20 new player harness cells approved as named exemptions (BL-93).
-- Rules launcher entry (SP2): players' launcher at 1280 wide shows icons only (label threshold 1208 → 1294 px; DM 1722 → 1808), per FR-SHELL-43 / #245.
+- Launcher labels (SP2 re-test): with Rules added, the DM's launcher at 1280 shows icons only (threshold 1434 px); players keep full labels at 1280 (1044 px); per FR-SHELL-43 / #245.
 - Walkthrough step wording fixed: live-sync FX3 step 4 (ellipsis only when the name doesn't fit), play-shell SP1 P3 / P8 (fixture pets).
 
 ## Pending DM decisions
