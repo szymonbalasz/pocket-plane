@@ -10,24 +10,34 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | M9 fixed (c4c04bfa; check 5241, e2e 207) | test-pm1b re-test running |
-| PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | party-board part done (4 commits); waits for PM1 to merge for shared rows | walkthrough M0-M2, M11, M13 |
-| RS0 reminders + strongholds core | merged `fb3884a3` | — | done (walkthrough 23/23; evidence lost at cleanup) | main gates green (check 5214 / e2e 206) |
-| SP3 session recap | `build/sp-recap` (ws w9Z) | build-sp3 | server + window + share done; waits PM1 (window rows), SP1 (commands), FX1 (stats edits) | part-1 walkthrough 7/7 (server); part 2 after PM1 + SP1 + FX1 |
-| FX2 dice + gems lines | `fix/fx-dice-lines` (ws w9X, slot 4) | build-fx2 | ready (all FRs tested; CON-44 0) | test-fx2 walkthrough running |
-| FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y) | build-fx3 | ready (check 5180); ShellWindow branch after PM1; merges after RS0 | test-fx3 walkthrough running |
+| RS0 reminders + strongholds core | merged `fb3884a3` | — | done (23/23) | — |
+| FX2 dice + gems lines | merged `d4837dc4` | — | done (10/10; branch gates 5232 / 208) | main gates with PM1 |
+| PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates: check 5307 + 1 timeout flake (passes alone), e2e 207 + 2 load flakes (pass alone) |
+| PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | M13 + X1 (tool-bar put-away never returns) fixed; check + e2e running | re-test M1, M13, X1 |
+| FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y, slot 5) | build-fx3 | ShellWindow wired; 30 s timeouts on 3 heavy tests (granted); check running | merge |
+| SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
+| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | built (check 5331, e2e 210); ruling: window title bar + 40 px keep-out for the toast stack (amends FR-NOTE-53); merging main | walkthrough FX1 |
+| SP1 palette + shortcuts | `build/sp-palette` (ws wA1; base PM1) | build-sp1 | walkthrough 8 PASS + 2 ruled (spec wording); fixing Pause… command bug + 2 small | re-test P9 (+ P4 after SP2) |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | built; second full e2e running | walkthrough R1-R8 |
 
-Queue (`.verify/sprint9/seams.md` build plan): wave 2 FX3, SP3 server (after RS0) · wave 3 after PM1: FX1, SP1, SP2 · wave 4 after RS0 + PM1 + PM2: RS1, RS2 · wave 5 RS3; SP3 stats edits after FX1. Slice defs: `%TEMP%/pocket-plane/slices.json` (`pm1`, `pm2`, `rs0`, `fx2`).
+Queue: RS1 + RS2 after PM2 merges (RS0, PM1 in) · RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
 ## Shared-file locks
 
-- Play-shell frame (placer, manager, placement, geometry, shell-store, ShellWindow, registry, ShellContext, keys, layout-checks, free-area (granted 2026-10-23), replay + goldens, placement bench) + canvas (MapCanvas, camera): `fix/window-memory` (PM1), all sprint.
+- Play-shell frame + canvas: PM1 merged; grants now per slice: FX3 `ShellWindow.tsx` boundary branch; PM2 / RS2 / SP2 / SP3 append rows (windows.ts, size table, goldens, replay sets: regenerate, never hand-merge).
 - Schema / core lane: free (RS0 merged); SP3 / FX3 append their lines.
 - Toast runtime (ToastRuntime, keep-out, toasts, stack-inputs): FX1 (not started).
 - Stats client files: FX1, then SP3.
 - `sync/connection.ts` + `protocol/frames.ts`: `fix/fx-sync-shell` (FX3).
 - combat-tracker `companions.ts` / `hp.ts` strings ("Party Manager"): `build/party-manager` (PM2), granted 2026-10-23.
 - Backlog: no picks (four sprint slices working).
+
+## Integrator rulings this sprint (tell the DM at the recap)
+
+- Toast stack: a window's title bar + first 40 px keeps the DM / player toast stack out (amends FR-NOTE-53; FX1 build, 2026-10-23), fallback FR-NOTE-71.
+- Placer speed-up 3 (`roomFor`, exact) kept for the 25 ms bench gate (OQ-SHELL-84).
+- Party Manager 550 px: 20 new player harness cells approved as named exemptions (BL-93).
+- Walkthrough step wording fixed: live-sync FX3 step 4 (ellipsis only when the name doesn't fit), play-shell SP1 P3 / P8 (fixture pets).
 
 ## Pending DM decisions
 
@@ -50,6 +60,8 @@ Queue (`.verify/sprint9/seams.md` build plan): wave 2 FX3, SP3 server (after RS0
 - Known flake: `init-chips-effect.e2e.ts` Divine Fury hover tooltip under a loaded full run (3 / 3 alone; CP3 build).
 - Known flake: `fog-of-war/leak.test.ts` walkthrough 8 "No frame within 1500 ms" under a parallel suite (main after BL-49, sprint 7; 3 / 3 alone).
 - Known flake: `e2e/popup-line.e2e.ts` FR-DICEX-47 short screens (roll popups count) and `e2e/image-search.e2e.ts` token Image… menu under a loaded full run (sprint 7; pass alone).
+- Known flake (sprint 9): `e2e/roll-popup.e2e.ts` FR-DICEX-39–41 under a loaded full run (3 / 3 alone, main after PM1 + FX2).
+- Known flake (sprint 9): `strongholds/con44.test.ts` "REM / HOLD §12 CON-44 at the caps" hits the 5 s default timeout under load (passes alone; FX3 sets a 30 s timeout).
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
 
 - Integrator picks #142–#144 (badge, snapshot ceilings, registry-driven shell tests, reconnect probe 204, lazy Konva, window layout).
