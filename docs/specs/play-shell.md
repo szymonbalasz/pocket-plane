@@ -417,13 +417,7 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 
 **The rule in plain words.** A window you moved or resized is yours. It opens exactly where and how big you left it, on top, and nothing else moves for it. On a smaller screen it is only nudged back on-screen. A shown tool bar draws it beside the bar while the tool is open; nothing is saved, so it is back at its spot when the tool closes or after a reload. Windows you never touched are still placed by the ladder (FR-SHELL-97). Reset layout makes every window untouched again.
 
-**Reopen algorithm** (FR-SHELL-146–150; pure; *moves to [protocol §18](../protocol/README.md) in PM1's consolidation, this spec then keeps a pointer*). Inputs: the stored `WindowState` `w`, the viewport `vp`, the hard keep-outs shown now `K`, the windows `ws`.
-
-1. `remembered(w)` = `w.userSpot || w.userSize`. Not remembered → the ladder as built.
-2. Stored rect `s` = `w`'s rect, unchanged; nothing else in `ws` changes; no put-away; no memory entry; `plan.yields = false`.
-3. Render `r = renderedRect(s, w.area, def.minSize, vp)` (FR-SHELL-29 fit, FR-SHELL-12 clamp, rail inset). Never written.
-4. Render-only push: if `r` overlaps a shown `k ∈ K` + 12 px (tool bar, chrome keep-out; not the toast box), `r` = `r` moved by the least move clear of `k` + 12 (below, else right; ties below), clamped. Recomputed every render from `K`; never written.
-5. z: `w.z = maxZ(ws) + 1`, `normaliseZ`.
+**Reopen algorithm** (FR-SHELL-146–150): moved to [protocol §151](../protocol/README.md#151-sprint-9-window-memory-frame-and-canvas-follow-ups-pm1) with invariants I9–I13 (PM1 consolidation). In short: a remembered window shows its stored rect, rendered with the FR-SHELL-29 fit / FR-SHELL-12 clamp and a render-only push off shown tool bars; nothing is written; it goes on top.
 
 | ID | Requirement | Notes |
 |---|---|---|
