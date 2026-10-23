@@ -17,7 +17,7 @@ Queue (`.verify/sprint9/seams.md` build plan): wave 2 FX3, SP3 server (after RS0
 
 ## Shared-file locks
 
-- Play-shell frame (placer, manager, placement, geometry, shell-store, ShellWindow, registry, ShellContext, keys, layout-checks, replay + goldens, placement bench) + canvas (MapCanvas, camera): `fix/window-memory` (PM1), all sprint.
+- Play-shell frame (placer, manager, placement, geometry, shell-store, ShellWindow, registry, ShellContext, keys, layout-checks, free-area (granted 2026-10-23), replay + goldens, placement bench) + canvas (MapCanvas, camera): `fix/window-memory` (PM1), all sprint.
 - Schema / core lane (`src/server/db/`, `src/shared/events/`, record-type registry, `features/index.ts`): `fix/rs-core` (RS0) first; then SP3, FX3.
 - Toast runtime (ToastRuntime, keep-out, toasts, stack-inputs): FX1 (not started).
 - Stats client files: FX1, then SP3.
