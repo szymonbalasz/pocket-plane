@@ -1,5 +1,13 @@
 import { describe, expect, test } from "bun:test";
-import { dmStackLefts, dmStackPlacement, dmStackSpot, pushedByPlan, STACK_W } from "./keep-out";
+import {
+  dmStackLefts,
+  dmStackPlacement,
+  dmStackSpot,
+  MIN_SHIFT_LEFT,
+  pushedByPlan,
+  STACK_W,
+  type StackWindow,
+} from "./keep-out";
 
 describe("FR-NOTE-32 toast keep-out", () => {
   const top = 48 + 12 + 32 + 8;
@@ -27,9 +35,11 @@ describe("FR-NOTE-32 toast keep-out", () => {
     expect(dmStackPlacement(vp, init, 200)).toEqual({ left: 352, top: 60 + 500 + 12 });
     // Measured stack height: an Initiative below the stack's bottom (+ gap) leaves it alone;
     // a taller stack reaching it shifts.
-    const low = { x: 400, y: 400, w: 400, h: 200 };
+    const low = { x: 412, y: 400, w: 400, h: 200 };
     expect(dmStackPlacement(vp, low, 200)).toEqual({ left: 352, top });
-    expect(dmStackPlacement(vp, low, 300)).toEqual({ left: 400 - 12 - STACK_W, top });
+    expect(dmStackPlacement(vp, low, 300)).toEqual({ left: 412 - 12 - STACK_W, top });
+    // FR-NOTE-70: a shift to x 68 (no 12 px to the rail) doesn't count: never x 68.
+    expect(dmStackPlacement(vp, { ...low, x: 400 }, 300).left).not.toBe(68);
     // Minimised / closed: the runtime passes no rect.
     expect(dmStackPlacement(vp, null, 200)).toEqual({ left: 352, top });
   });
@@ -150,8 +160,8 @@ describe("FR-NOTE-32 sim-6 glitch 3: toasts keep off open windows' bodies", () =
     const at = dmStackPlacement({ w: 1440, h: 900 }, init, 120, STACK_W, [wolf], [big]);
     const r = stack(at, 120);
     expect(over(r, { ...big, h: 32 })).toBe(false);
-    expect(over(r, wolf)).toBe(false);
-    expect(at.top).toBeGreaterThanOrEqual(48 + 32);
+    // FR-NOTE-71: no body-clear spot → nearest the home row (tokens rank only off the bodies).
+    expect(at).toEqual({ left: 560, top: 100 });
     expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
   });
 });
@@ -191,13 +201,15 @@ describe("FR-NOTE-42 stack stays home", () => {
   const vp = { w: 1440, h: 900 };
 
   // a01: with windows open the summary (320 × 57) jumped to x 68, over the Dragon.
-  test("FR-NOTE-42 stack stays home: sim-9 a01 → never x 68; down past Party first, beside it only to clear its body (walkthrough WF4)", () => {
+  test("FR-NOTE-42 stack stays home: sim-9 a01 → never x 68; down past Party first, never beside it (FR-NOTE-70)", () => {
     const windows = [LOG, COMPENDIUM, PARTY];
-    // Party's body under the home and the Game log below it: beside Party (left), no body.
+    // Party's body under the home and the Game log below it: no body-clear spot in the column →
+    // home, nearest the home row, `covers` > 0 (the runtime folds; never beside Party).
     const at = dmStackSpot(vp, INIT, 57, STACK_W, [GOBLIN_2], windows);
-    expect(at).toMatchObject({ left: 576 - 12 - STACK_W, top: 100, covers: 0 });
+    expect(at).toMatchObject({ left: 560, top: 100 });
+    expect(at.covers).toBeGreaterThan(0);
     expect(hit(rectOf(at, 57), DRAGON)).toBe(false);
-    for (const w of windows) expect(hit(rectOf(at, 57), w)).toBe(false);
+    expect(hit(rectOf(at, 57), { ...PARTY, h: 32 })).toBe(false);
     // Without the Game log below it: below Party's body, still at the home (down before aside).
     const down = dmStackPlacement(vp, INIT, 57, STACK_W, [GOBLIN_2], [COMPENDIUM, PARTY]);
     expect(down).toEqual({ left: 560, top: 60 + 512 + 8 });
@@ -235,7 +247,7 @@ describe("FR-NOTE-42 stack stays home", () => {
     expect(at.left).toBe(560);
   });
 
-  test("FR-NOTE-42 stack stays home: every chosen left ∈ {home, left-of-Initiative shift, beside a window over the home column} at the four sizes", () => {
+  test("FR-NOTE-42 stack stays home: every chosen left ∈ {home, left-of-Initiative shift} at the four sizes (FR-NOTE-70)", () => {
     expect(SIZES.map((s) => dmStackLefts(s, null))).toEqual([[480], [480], [560], [640]]);
     for (const size of SIZES) {
       const home = (size.w - STACK_W) / 2;
@@ -244,7 +256,7 @@ describe("FR-NOTE-42 stack stays home", () => {
           const initiative = { x: ix, y: iy, w: 400, h: Math.min(648, size.h - 72 - iy) };
           const lefts = dmStackLefts(size, initiative);
           expect(lefts[0]).toBe(home);
-          for (const l of lefts) expect(l).toBeGreaterThanOrEqual(68);
+          for (const l of lefts) expect(l).toBeGreaterThanOrEqual(80);
           for (const h of [57, 190, 330]) {
             for (const windows of [[], [PARTY], [LOG, COMPENDIUM], [LOG, COMPENDIUM, PARTY]]) {
               for (const avoid of [
@@ -254,7 +266,7 @@ describe("FR-NOTE-42 stack stays home", () => {
               ]) {
                 for (const hard of [[], [FOG_BAR]]) {
                   const at = dmStackPlacement(size, initiative, h, STACK_W, avoid, windows, hard);
-                  expect(dmStackLefts(size, initiative, STACK_W, windows)).toContain(at.left);
+                  expect(lefts).toContain(at.left);
                 }
               }
             }
@@ -329,21 +341,15 @@ describe("FR-NOTE-44 never over a pushed window's first row", () => {
     const at = dmStackSpot(vp, INIT, 57, STACK_W, targets, [LOG, scenes], [FOG_BAR]);
     expect(hit(rectOf(at, 57), strip)).toBe(false);
     expect(hit(rectOf(at, 57), FOG_BAR)).toBe(false);
-    // Walkthrough WF4: beside Scenes, below the bar, off every body (b05: on Scenes' first row).
-    expect(at).toMatchObject({ left: 546 - 12 - STACK_W, top: 56 + 92 + 8, covers: 0 });
-    // Nothing clear beside Scenes (the left column taken): home, below the strip.
-    const blocked = dmStackPlacement(
-      vp,
-      INIT,
-      57,
-      STACK_W,
-      targets,
-      [LOG, LEFT_COL, scenes],
-      [FOG_BAR],
-    );
+    // FR-NOTE-70, -71: never beside Scenes; below it, off every body (b05: on Scenes' first row).
+    expect(at).toMatchObject({ left: 560, top: 60 + 440 + 8, covers: 0 });
+    // Scenes down to the Game log (no body-clear spot): nearest home, below the strip.
+    const long = { ...scenes, h: 500 };
+    const windows = [LOG, LEFT_COL, long];
+    const blocked = dmStackPlacement(vp, INIT, 57, STACK_W, targets, windows, [FOG_BAR]);
     expect(blocked).toEqual({ left: 560, top: 60 + 72 + 8 });
     // No tool bar shown (nothing pushed): only the title bar blocks, as before (b05's spot).
-    const free = dmStackPlacement(vp, INIT, 57, STACK_W, targets, [LOG, LEFT_COL, scenes], []);
+    const free = dmStackPlacement(vp, INIT, 57, STACK_W, targets, windows, []);
     expect(free).toEqual({ left: 560, top: 60 + 32 + 8 });
   });
 
@@ -367,19 +373,40 @@ describe("FR-NOTE-44 walkthrough U4 (20261021-fu1-frame): Scenes' first row stay
   const probe = { x: 658, y: 162 }; // the row's centre (elementFromPoint)
   // The card's target under the lower spots (what made the stack take 140 in the run).
   const target = [{ x: 560, y: 300, w: 320, h: 280 }];
-  // Walkthrough WF4: a window left of Scenes below the bar, so nothing beside Scenes is clear.
+  // Walkthrough WF4: a window left of Scenes below the bar. FR-NOTE-71: Scenes reaching the Game
+  // log, so no spot clears every body and the stack takes the clear one nearest home.
   const left = { x: 68, y: 214, w: 466, h: 360 };
+  const scenesLong = { ...scenes, h: 480 };
   const inside = (p: { x: number; y: number }, r: Box) =>
     p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h;
 
   test("FR-NOTE-44 toast clear of a pushed window's first row: with the row reported, the stack clears title bar + 40 px and the row; the row's centre isn't under it", () => {
     // The walkthrough's spot without the row report: below title + 40 (132), on the row.
-    const before = dmStackPlacement(vp, init, 152, STACK_W, target, [log, left, scenes], [bar], []);
+    const before = dmStackPlacement(
+      vp,
+      init,
+      152,
+      STACK_W,
+      target,
+      [log, left, scenesLong],
+      [bar],
+      [],
+    );
     expect(before.top).toBeGreaterThanOrEqual(60 + 72);
     expect(inside(probe, rectOf(before, 152))).toBe(true);
-    const at = dmStackPlacement(vp, init, 152, STACK_W, target, [log, left, scenes], [bar], [row]);
+    const at = dmStackPlacement(
+      vp,
+      init,
+      152,
+      STACK_W,
+      target,
+      [log, left, scenesLong],
+      [bar],
+      [row],
+    );
     expect(inside(probe, rectOf(at, 152))).toBe(false);
     expect(hit(rectOf(at, 152), { ...scenes, h: row.bottom - scenes.y })).toBe(false);
+    expect(at.top).toBe(row.bottom + 8); // FR-NOTE-71: the clear spot nearest home
     expect(hit(rectOf(at, 152), bar)).toBe(false);
     expect(at.left).toBe(560); // still at home (FR-NOTE-42)
     // A report for another spot (the window before it was pushed) doesn't count.
@@ -389,14 +416,14 @@ describe("FR-NOTE-44 walkthrough U4 (20261021-fu1-frame): Scenes' first row stay
       152,
       STACK_W,
       target,
-      [log, left, scenes],
+      [log, left, scenesLong],
       [bar],
       [{ x: 68, y: 60, bottom: 179 }],
     );
     expect(stale).toEqual(before);
     // No tool bar: rows don't count (only title bars, as before).
     expect(
-      dmStackPlacement(vp, init, 152, STACK_W, target, [log, left, scenes], [], [row]).top,
+      dmStackPlacement(vp, init, 152, STACK_W, target, [log, left, scenesLong], [], [row]).top,
     ).toBe(100);
   });
 });
@@ -416,19 +443,21 @@ describe("FR-NOTE-53 stack reads the plan", () => {
   });
 
   test("FR-NOTE-53 stack reads the plan: only a pushed window's title bar + 40 px block the stack, whether or not a bar shows", () => {
-    // The card's targets below Scenes (sim-10 b05): the stack stays on Scenes' body.
+    // The card's targets below Scenes (sim-10 b05); Scenes reaching the Game log, so no spot
+    // clears every body and the stack stays on Scenes' body (FR-NOTE-71: nearest home).
     const targets = [
       { x: 600, y: 460, w: 45, h: 45 },
       { x: 600, y: 520, w: 45, h: 45 },
     ];
+    const long = { ...scenes, h: 500 };
     // Pushed per the plan, no bar in the list: below its title bar + 40 px.
     const log = { ...LOG, pushed: false };
     const col = { ...LEFT_COL, pushed: false };
-    const plan = [log, col, { ...scenes, pushed: true }];
+    const plan = [log, col, { ...long, pushed: true }];
     const pushed = dmStackPlacement(vp, INIT, 57, STACK_W, targets, plan, []);
     expect(pushed).toEqual({ left: 560, top: 60 + 72 + 8 });
     // Not pushed (a window the user dropped there) while the Fog bar shows: its title bar only.
-    const dropped = [log, col, { ...scenes, pushed: false }];
+    const dropped = [log, col, { ...long, pushed: false }];
     const user = dmStackPlacement(vp, INIT, 57, STACK_W, targets, dropped, [FOG_BAR]);
     expect(user).toEqual({ left: 560, top: 60 + 32 + 8 });
     expect(hit(rectOf(user, 57), FOG_BAR)).toBe(false);
@@ -442,14 +471,16 @@ describe("FR-NOTE-42 windows in the home band (walkthrough WF4)", () => {
   const stats = { x: 555, y: 60, w: 400, h: 412 };
   const log = { x: 68, y: 584, w: 1150, h: 240 };
 
-  test("FR-NOTE-42 home band: a window under the home spot is treated like Initiative: the stack never covers its controls while a clear spot exists (below it, else beside it)", () => {
+  test("FR-NOTE-42 home band: the stack never covers a window under the home spot while a body-clear spot exists (below it); none → home, folded, never beside it (FR-NOTE-70)", () => {
     const at = dmStackSpot(vp, init, 57, STACK_W, [], [stats, log]);
     expect(at.covers).toBe(0);
     expect(hit(rectOf(at, 57), stats)).toBe(false);
     expect(at).toMatchObject({ left: 560, top: 60 + 412 + 8 }); // down first (FR-NOTE-42)
-    // Taller (2 cards): nothing below fits above the Game log → beside Stats, off every body.
+    // Taller (2 cards): nothing below fits above the Game log → home, nearest the home row,
+    // `covers` > 0 (the runtime folds), never beside Stats.
     const two = dmStackSpot(vp, init, 190, STACK_W, [], [stats, log]);
-    expect(two).toMatchObject({ left: 555 - 12 - STACK_W, top: 100, covers: 0 });
+    expect(two).toMatchObject({ left: 560, top: 100 });
+    expect(two.covers).toBeGreaterThan(0);
   });
 
   test("FR-NOTE-42 home band: no clear spot (Notifications on the left, Initiative right, Game log below) → `covers` > 0, so the runtime folds toasts into '+N more'", () => {
@@ -459,6 +490,134 @@ describe("FR-NOTE-42 windows in the home band (walkthrough WF4)", () => {
     // Folded to the summary + one card (≈ 150 px): still on a body (a full screen); folded to
     // the summary alone it fits below Stats.
     expect(dmStackSpot(vp, init, 57, STACK_W, [], [notes, stats, log]).covers).toBe(0);
+  });
+});
+
+// Sprint 9 (track FX, BL-83 / BL-75 / BL-88; sim-12 c01, c03, r03, WF4 re-test).
+describe("FR-NOTE-70 stack never leaves its column", () => {
+  // sim-12 c01 (1280×720): Initiative and the Game log at their defaults, Scenes dragged to
+  // 400, 112; Mira's token at the left (the stack landed on her at x 68).
+  const small = { w: 1280, h: 720 };
+  const init = { x: 868, y: 60, w: 400, h: 578 };
+  const log = { x: 68, y: 444, w: 788, h: 212 };
+  const mira = { x: 120, y: 140, w: 50, h: 50 };
+
+  test("FR-NOTE-70 stack never leaves its column: sim-12 c01 → left 480, never 68", () => {
+    const scenes = { x: 400, y: 112, w: 260, h: 360 };
+    // The summary, then two cards (taller than the room: the runtime folds before placing).
+    for (const h of [57, 190]) {
+      const at = dmStackSpot(small, init, h, STACK_W, [mira], [log, scenes]);
+      expect(at.left).toBe(480);
+      expect(hit(rectOf(at, h), { ...scenes, h: 32 })).toBe(false);
+      expect(hit(rectOf(at, h), mira)).toBe(false);
+      // On Scenes' body: the runtime folds (`covers` > 0), never moves beside it.
+      expect(at.covers).toBeGreaterThan(0);
+    }
+  });
+
+  test("FR-NOTE-70 stack never leaves its column: sim-12 c03 (1440×900, Fog bar, Scenes pushed) → 560 or the shift, below the bar; never 68 or 276", () => {
+    const vp = { w: 1440, h: 900 };
+    const scenes = { x: 546, y: 60, w: 260, h: 440, pushed: true };
+    const party = { x: 68, y: 160, w: 466, h: 400 };
+    for (const h of [57, 190]) {
+      const at = dmStackSpot(vp, INIT, h, STACK_W, [GOBLIN_2], [LOG, party, scenes], [FOG_BAR]);
+      expect([560, INIT.x - 12 - STACK_W]).toContain(at.left);
+      expect(at.left).not.toBe(68);
+      expect(at.left).not.toBe(276);
+      expect(hit(rectOf(at, h), FOG_BAR)).toBe(false);
+      expect(hit(rectOf(at, h), { ...scenes, h: 32 + 40 })).toBe(false);
+    }
+  });
+
+  test("FR-NOTE-70 stack never leaves its column: 500 seeded random window sets at the four sizes → every left ∈ {home, shift ≥ 80}", () => {
+    let seed = 20261023;
+    const rnd = (n: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      return Math.floor((seed / 2147483648) * n);
+    };
+    const box = (vp: { w: number; h: number }): StackWindow => {
+      const w = 200 + rnd(500);
+      const h = 120 + rnd(500);
+      const x = 68 + rnd(Math.max(1, vp.w - 68 - w));
+      return { x, y: 48 + rnd(Math.max(1, vp.h - 112 - h)), w, h };
+    };
+    for (let i = 0; i < 500; i++) {
+      const vp = SIZES[i % SIZES.length] as { w: number; h: number };
+      const home = (vp.w - STACK_W) / 2;
+      const initiative = rnd(3) === 0 ? null : { ...box(vp), w: 400 };
+      const windows = Array.from({ length: rnd(6) }, () => ({ ...box(vp), pushed: rnd(4) === 0 }));
+      // FR-NOTE-72: sometimes one of them is this client's open Notifications window.
+      const first = windows[0];
+      if (first && rnd(3) === 0) windows[0] = { ...first, blocks: true };
+      const hard = rnd(3) === 0 ? [FOG_BAR] : [];
+      const h = [57, 150, 190, 330][rnd(4)] as number;
+      const at = dmStackSpot(vp, initiative, h, STACK_W, [], windows, hard);
+      const shifts = [initiative, ...windows.filter((w) => w.blocks)]
+        .filter((b) => b !== null)
+        .map((b) => Math.round(b.x - 12 - STACK_W))
+        .filter((l) => l >= MIN_SHIFT_LEFT && l < home);
+      expect([home, ...shifts]).toContain(at.left);
+      expect(at.left).toBeGreaterThanOrEqual(80);
+    }
+  });
+});
+
+describe("FR-NOTE-71 nearest home, not the least body", () => {
+  // WF4 re-test (1440×900): Notifications left of home, Stats in the home band, Initiative right,
+  // the Game log 1150×240 at the bottom (its roll bar is its bottom 48 px).
+  const vp = { w: 1440, h: 900 };
+  const init = { x: 1028, y: 60, w: 400, h: 500 };
+  const notes = { x: 68, y: 92, w: 360, h: 478, blocks: true };
+  const stats = { x: 555, y: 60, w: 400, h: 412 };
+  const log = { x: 68, y: 584, w: 1150, h: 240 };
+  const rollBar = { x: 68, y: 584 + 240 - 48, w: 1150, h: 48 };
+
+  test("FR-NOTE-71 nearest home, not the least body: no body-clear spot → the smallest clear top; the Game log's roll bar is never under the stack", () => {
+    for (const h of [150, 190, 375]) {
+      const at = dmStackSpot(vp, init, h, STACK_W, [], [notes, stats, log]);
+      expect(at.covers).toBeGreaterThan(0);
+      expect(at).toMatchObject({ left: 560, top: 100 });
+      expect(hit(rectOf(at, h), rollBar)).toBe(false);
+    }
+  });
+
+  test("FR-NOTE-71 nearest home, not the least body: a body-clear spot still wins, the least token area first", () => {
+    // Below Stats is clear of every body (the summary alone).
+    expect(dmStackSpot(vp, init, 57, STACK_W, [], [notes, stats, log])).toMatchObject({
+      left: 560,
+      top: 60 + 412 + 8,
+      covers: 0,
+    });
+    // `avoidTokens` ranks first among body-clear spots: a token under the home top moves the
+    // stack down onto the free map, not onto a body.
+    const free = { x: 555, y: 60, w: 400, h: 32 };
+    const wolf = { x: 600, y: 110, w: 40, h: 40 };
+    const at = dmStackSpot(vp, init, 57, STACK_W, [wolf], [free, log]);
+    expect(at.covers).toBe(0);
+    expect(hit(rectOf(at, 57), wolf)).toBe(false);
+    expect(at.left).toBe(560);
+  });
+});
+
+describe("FR-NOTE-72 an open Notifications window counts like Initiative", () => {
+  const vp = { w: 1440, h: 900 };
+  // r03 (1440×900): Notifications at 592, 60 (over the home column), Brakka's card pending.
+  const notes = { x: 592, y: 60, w: 360, h: 480, blocks: true };
+
+  test("FR-NOTE-72 keep clear of an open Notifications window: shift left of it, else below it", () => {
+    for (const h of [57, 190]) {
+      const at = dmStackSpot(vp, INIT, h, STACK_W, [], [notes, LOG]);
+      expect(at).toMatchObject({ left: 592 - 12 - STACK_W, top: 100, covers: 0 });
+      expect(hit(rectOf(at, h), notes)).toBe(false);
+    }
+    // No room left of it (shift < 80): below it, with the 12 px gap.
+    const wide = { ...notes, x: 300 };
+    const at = dmStackSpot(vp, INIT, 57, STACK_W, [], [wide]);
+    expect(at).toMatchObject({ left: 560, top: 60 + 480 + 12 });
+    expect(hit(rectOf(at, 57), wide)).toBe(false);
+    // Not marked (any other window): never a shift beside it.
+    expect(dmStackLefts(vp, INIT, STACK_W, [{ ...notes, blocks: false }])).toEqual([560]);
+    expect(dmStackLefts(vp, INIT, STACK_W, [notes])).toEqual([560, 592 - 12 - STACK_W]);
   });
 });
 
