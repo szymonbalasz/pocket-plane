@@ -18,9 +18,11 @@ import { liveSync } from "./live-sync";
 import { notifications } from "./notifications";
 import { partyBoard } from "./party-board";
 import { partyLootFeature } from "./party-loot";
+import { reminders } from "./reminders";
 import { sceneTools } from "./scene-tools";
 import { scenesMap } from "./scenes-map";
 import { stats } from "./stats";
+import { strongholds } from "./strongholds";
 
 export const features: readonly Feature[] = [
   campaignManagement,
@@ -45,4 +47,7 @@ export const features: readonly Feature[] = [
   stats,
   // Sprint 8 track CB (fix/cb-core)
   combatPolish,
+  // Sprint 9 track RS (fix/rs-core)
+  reminders,
+  strongholds,
 ];

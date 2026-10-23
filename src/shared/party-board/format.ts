@@ -2,7 +2,7 @@
 // notification texts, share labels, item-row text, split preview.
 import { TEXT_MAX } from "@shared/notifications/schemas";
 import { formatCoins } from "@shared/party-loot/format";
-import type { Endpoint } from "@shared/party-loot/schemas";
+import type { WireEndpoint } from "@shared/party-loot/schemas";
 import type { RedactedSharedWith, SharedWith } from "./schemas";
 import type { SplitResult } from "./split";
 
@@ -17,16 +17,29 @@ export const handoutSharedText = (title: string) => cut(`New handout: ${title}`)
  */
 export const itemAddedText = (name: string, qty: number) => cut(`Party inventory: ${name} ×${qty}`);
 
-/** FR-PARTY-25 end label: "Party", "Outside the party", or the character's name. */
-export function endLabel(end: Endpoint, characterName: (id: string) => string): string {
+/**
+ * FR-PARTY-25 end label: "Party", "Outside the party", or the character's name. *(S9)* A Stores
+ * end: "‹Stronghold› Stores" when named, else "Stores (removed)" (FR-LOOT-35); a redacted
+ * `outside` end reads "Outside the party" (FR-LOOT-32).
+ */
+export function endLabel(
+  end: WireEndpoint,
+  characterName: (id: string) => string,
+  strongholdName: (id: string) => string | undefined = () => undefined,
+): string {
   if (end.kind === "party") return "Party";
-  if (end.kind === "world") return "Outside the party";
+  if (end.kind === "world" || end.kind === "outside") return "Outside the party";
+  if (end.kind === "stores") return storesLabel(strongholdName(end.strongholdId));
   return characterName(end.characterId);
 }
 
+/** *(S9)* FR-LOOT-35: "‹Stronghold› Stores"; an id without an index row → "Stores (removed)". */
+export const storesLabel = (name: string | undefined) =>
+  name === undefined ? "Stores (removed)" : `${name} Stores`;
+
 /** FR-PARTY-25 `loot.log` item row: "‹from› → ‹to›: ‹name› ×‹qty›". */
 export function itemRowText(
-  entry: { from: Endpoint; to: Endpoint; text: string; qty: number },
+  entry: { from: WireEndpoint; to: WireEndpoint; text: string; qty: number },
   characterName: (id: string) => string,
 ): string {
   const from = endLabel(entry.from, characterName);
