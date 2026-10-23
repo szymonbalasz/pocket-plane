@@ -4,13 +4,16 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 **Phase:** Sprint 9 Phase B (builds), DM gate 1 passed (#339), plan [sprint-9](sprint-9.md).
 
+**Gates on `main`:** run in the detached worktree `~/.herdr/worktrees/pocket-plane/gates-main` (`git -C <it> checkout --detach main`, then `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there.
+
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | building | walkthrough M0, M3-M10, M12, M14 |
 | PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | party-board part done (4 commits); waits for PM1 to merge for shared rows | walkthrough M0-M2, M11, M13 |
-| RS0 reminders + strongholds core | `fix/rs-core` (ws w9W, slot 3) | build-rs0 | ready (check 5214, e2e 206; CON-44 DM +2.9 KB) | test-rs0 walkthrough running |
+| RS0 reminders + strongholds core | merged `fb3884a3` | — | done (walkthrough 23/23; evidence lost at cleanup) | main gates running (gates worktree `gates-main`) |
+| SP3 session recap | `build/sp-recap` (ws w9Z) | build-sp3 | building (server first; window after PM1, stats after FX1) | walkthrough RC1-RC8 |
 | FX2 dice + gems lines | `fix/fx-dice-lines` (ws w9X, slot 4) | build-fx2 | building | walkthrough FX2 |
 | FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y) | build-fx3 | ready (check 5180); ShellWindow branch after PM1; merges after RS0 | test-fx3 walkthrough running |
 
@@ -19,7 +22,7 @@ Queue (`.verify/sprint9/seams.md` build plan): wave 2 FX3, SP3 server (after RS0
 ## Shared-file locks
 
 - Play-shell frame (placer, manager, placement, geometry, shell-store, ShellWindow, registry, ShellContext, keys, layout-checks, free-area (granted 2026-10-23), replay + goldens, placement bench) + canvas (MapCanvas, camera): `fix/window-memory` (PM1), all sprint.
-- Schema / core lane (`src/server/db/`, `src/shared/events/`, record-type registry, `features/index.ts`): `fix/rs-core` (RS0) first; then SP3, FX3.
+- Schema / core lane: free (RS0 merged); SP3 / FX3 append their lines.
 - Toast runtime (ToastRuntime, keep-out, toasts, stack-inputs): FX1 (not started).
 - Stats client files: FX1, then SP3.
 - `sync/connection.ts` + `protocol/frames.ts`: `fix/fx-sync-shell` (FX3).
