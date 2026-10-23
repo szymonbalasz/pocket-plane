@@ -18,7 +18,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7, part 2 13/14 → re-test 8/8 | merge after RS2 + SP2 |
 | FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12) | main gates: check 5392 + 1 load flake (3/3 alone), e2e 215 |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
-| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14 + re-tests 16/16 | merge after RS1 + RS2 |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | 16/16; branch gates 5440 / 218; builder merging main (RS2: window registry + goldens conflicts) | gates → merge |
 
 | RS1 Reminders tab + sheet | merged `d52a5587` | — | done (branch gates 5408 / 216) | main gates 5408 / 216 green |
 | RS2 Strongholds tab + window | merged | — | done (11/11 + re-test 5/5) | main gates |
