@@ -150,14 +150,14 @@ describe("compendium fixtures (CMP §13)", () => {
     expect(fury?.searchText).not.toContain("ownturn");
   });
 
-  test("CMP §13 compendium-full from empty (S4): the bundled source at its version, 1,150 entries; search homebrew per cmp-search-homebrew", async () => {
+  test("CMP §13 compendium-full from empty (S4): the bundled source at its version, 1,310 entries (sprint 9: + 160 rule cards); search homebrew per cmp-search-homebrew", async () => {
     const r = read(await loadBundle("compendium-full"));
     expect(r.manifest.fixtures).toEqual(
       expect.arrayContaining([...CMP_UNITS, "cmp-srd-full", "cmp-search-homebrew"]),
     );
     const bundled = loadSrd51();
     expect(r.sources.map((s) => [s.key, s.version])).toEqual([["srd-5.1", bundled.version]]);
-    expect(r.entries.filter((e) => e.source === "srd-5.1")).toHaveLength(1150);
+    expect(r.entries.filter((e) => e.source === "srd-5.1")).toHaveLength(1310);
     expect(r.entities.filter((e) => e.source === "srd-5.1")).toHaveLength(322);
     const fixture = r.camps["Fixture Campaign"] as string;
     const brew = r.entries

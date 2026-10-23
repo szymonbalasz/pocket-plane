@@ -26,6 +26,8 @@ export interface IndexRow {
   shared: boolean;
   /** Imported source key; null = homebrew. */
   source: string | null;
+  /** Imported provenance key (e.g. `rule/cover/cover`); null = homebrew or entry-less. */
+  sourceKey: string | null;
   rank: SourceRank;
   facets: unknown;
   name: string;
@@ -79,6 +81,7 @@ export function buildSearchIndex(db: Db): SearchIndex {
       line: compendiumEntry.line,
       facets: compendiumEntry.facets,
       source: compendiumEntry.source,
+      sourceKey: compendiumEntry.sourceKey,
       definitionId: compendiumEntry.definitionId,
       shared: compendiumEntry.shared,
       searchText: compendiumEntry.searchText,
@@ -93,6 +96,7 @@ export function buildSearchIndex(db: Db): SearchIndex {
       campaignId: r.campaignId,
       shared: r.shared,
       source: r.source,
+      sourceKey: r.sourceKey,
       rank: sourceRank(r.source),
       facets: r.facets,
       name: r.name,
@@ -125,6 +129,7 @@ export function buildSearchIndex(db: Db): SearchIndex {
       campaignId: null,
       shared: false,
       source,
+      sourceKey: null,
       rank: sourceRank(source),
       // Only CR filters apply; a `type` filter never matches (entryless rows carry CR only).
       facets: { cr: sb.data.cr },

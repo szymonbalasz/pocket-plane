@@ -73,10 +73,10 @@ test("FR-SHELL-155 party.summary layout migrated (Player): a remembered, minimis
   expect(m.tab).toBe("status");
 });
 
-test("FR-SHELL-161 launcher threshold (Player): every label shows from 1208 px (recorded); below it icons only; nothing in the ⋯ menu at 1280", () => {
+test("FR-SHELL-161 launcher threshold (Player): every product label shows from 1044 px (recorded: test-mode launchers out, 6 px a character; SP2 re-test measured the bar at 1010 px); below it icons only; labels and nothing in the ⋯ menu at 1280", () => {
   const t = launcherThreshold(registry);
   console.log(`FR-SHELL-161 Player labels from ${t.labelsFrom}`);
-  expect(t.labelsFrom).toBe(1208); // measured; SP1 / SP2 update it after their launcher entries (S3)
+  expect(t.labelsFrom).toBe(1044); // measured; SP1 / SP2 update it after their launcher entries (S3)
   expect(t.at1280).toEqual({ compact: false, overflow: [] });
 });
 

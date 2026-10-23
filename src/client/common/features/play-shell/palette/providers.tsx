@@ -6,7 +6,7 @@ import { HOMEBREW_LABEL } from "@shared/compendium/rest";
 import { ENTITY_TYPE, isPet } from "@shared/entities/schemas";
 import { type RecordStore, recordsOf } from "@shared/protocol/store";
 import { hc } from "hono/client";
-import { BookOpenIcon, PawPrintIcon, ScrollTextIcon, SkullIcon, UserIcon } from "lucide-react";
+import { BookOpenIcon, PawPrintIcon, SkullIcon, UserIcon } from "lucide-react";
 import { type Api, createApi } from "../../../api";
 import { selectCompanion } from "../../character-sheet/companion/picker";
 import { openSheetFor } from "../../character-sheet/selection";
@@ -133,26 +133,23 @@ export interface Summary {
 }
 
 /**
- * FR-SHELL-188: the search page split into its groups, ≤ 8 each, server order kept: `rule`
- * entries under Rules (SP2's kind), everything else under Compendium. A compendium row opens
- * `cmp.compendium` on that entry (an entryless monster on its definition, FR-CMP-17); a rule row
- * opens its entry too until SP2's `openRules(entryId)` (FR-CMP-69) takes it to the Rules window.
+ * FR-SHELL-188: the Compendium group, ≤ 8, server order kept. `rule` entries are left out: the
+ * Rules group is SP2's provider (`compendium/rules/palette.ts`, `kind=rule`, opening the Rules
+ * window on the card via `openRules`). A compendium row opens `cmp.compendium` on that entry (an
+ * entryless monster on its definition, FR-CMP-17).
  */
 export function compendiumHits(results: readonly Summary[]): SearchHit[] {
   const out: SearchHit[] = [];
-  const count = { Rules: 0, Compendium: 0 };
   for (const r of results) {
-    const group = r.kind === "rule" ? "Rules" : "Compendium";
-    if (count[group] >= GROUP_MAX) continue;
-    count[group] += 1;
+    if (r.kind === "rule" || out.length >= GROUP_MAX) continue;
     const hint = r.sourceLabel === HOMEBREW_LABEL ? `${r.line} · Homebrew` : r.line;
     out.push({
       id: r.id,
-      group,
+      group: "Compendium",
       title: r.name,
       hint,
       kind: r.kind,
-      icon: group === "Rules" ? ScrollTextIcon : BookOpenIcon,
+      icon: BookOpenIcon,
       run(ctx) {
         if (isEntryless(r) && r.definitionId) openDefinition(r.definitionId);
         else openEntry(r.id);

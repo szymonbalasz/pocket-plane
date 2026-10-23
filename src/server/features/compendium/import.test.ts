@@ -209,7 +209,7 @@ describe("FR-CMP-02 FR-CMP-03 FR-CMP-04 imported entries and source (cmp-srd-min
         url: SRD_51_SOURCE.url,
         version: "mini",
         importedAt: expect.any(String),
-        counts: { monster: 5, spell: 4, item: 4, condition: 3, feature: 39 },
+        counts: { monster: 5, spell: 4, item: 4, condition: 3, feature: 39, rule: 0 },
       },
     ]);
     expect(t.imported()).toHaveLength(55);
@@ -475,14 +475,14 @@ describe("FR-CMP-07 FR-CMP-31 full bundled import", () => {
     } finally {
       armCrashHook(null);
     }
-    expect(count()).toBe(1150);
+    expect(count()).toBe(1310); // 1,150 + 160 rule cards (FR-CMP-61)
     const log = readEventLog(s.db).length;
     const r = run() as ImportResult;
     expect(r.changed).toBe(false);
     expect(readEventLog(s.db)).toHaveLength(log);
   });
 
-  test("FR-CMP-31 full import of srd-5.1: target ≤ 2 s (logged), fails only > 10 s; re-import target ≤ 0.5 s, no writes", () => {
+  test("FR-CMP-31 FR-CMP-72 full import of srd-5.1 (with sections, +160 rule cards): target ≤ 2 s (logged), fails only > 10 s; re-import target ≤ 0.5 s, no writes", () => {
     const s = createTestServices();
     bundledSource("srd-5.1"); // file read + adapt are per process; the timed part is the write.
     const t0 = performance.now();
@@ -501,6 +501,7 @@ describe("FR-CMP-07 FR-CMP-31 full bundled import", () => {
       item: { created: 292, updated: 0, existing: 0 },
       condition: { created: 15, updated: 0, existing: 0 },
       feature: { created: 202, updated: 0, existing: 0 },
+      rule: { created: 160, updated: 0, existing: 0 },
     });
     expect(s.db.select().from(entity).where(isNull(entity.campaignId)).all()).toHaveLength(322);
     const changes = () =>

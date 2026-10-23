@@ -6,7 +6,7 @@ import type { z } from "zod";
 /**
  * CMP §13 `cmp-srd-full` (S4): the **bundled** `srd-5.1` source at its bundled version, through
  * `cmp.importRecorded` (no encounter check): the mini entries are `existing` (or `updated`), the
- * rest created; 1,150 entries. Global rows only (seams S10).
+ * rest created; 1,310 entries (sprint 9: 160 rule cards). Global rows only (seams S10).
  */
 export default defineFixture({
   key: "cmp-srd-full",

@@ -84,6 +84,13 @@ const shared: Record<string, SizeRow> = {
     min: s(340, 360),
     criterion: "header, tab strip and three facility rows",
   },
+  // SP2 (seams S4, FR-CMP-63): short viewports open it band-high.
+  "cmp.rules": {
+    default: four(s(440, 412), s(440, 412), s(440, 600), s(440, 600)),
+    useful: all(420, 360),
+    min: s(340, 320),
+    criterion: "page Tabs + 3 card headings",
+  },
 };
 
 /** The Game log's row (both clients): FR-SHELL-100's useful 460 × 160. */

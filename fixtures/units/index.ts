@@ -45,6 +45,8 @@ import cmpGoblinUntyped from "./compendium/cmp-goblin-untyped";
 import cmpHomebrew from "./compendium/cmp-homebrew";
 import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
 import cmpImages from "./compendium/cmp-images";
+import cmpRuleHouse from "./compendium/cmp-rule-house";
+import cmpRulesMini from "./compendium/cmp-rules-mini";
 import cmpSearchHomebrew from "./compendium/cmp-search-homebrew";
 import cmpSrdFull from "./compendium/cmp-srd-full";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
@@ -277,4 +279,7 @@ export const units: readonly Fixture[] = [
   holdTowerMove,
   // Sprint 9 track FX (fix/fx-sync-shell): Mira's Bless beside Thorn's summon concentration
   fxMiraBless,
+  // Sprint 9 track SP (build/sp-rules): rules quick reference
+  cmpRulesMini,
+  cmpRuleHouse,
 ];

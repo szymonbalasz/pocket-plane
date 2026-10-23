@@ -29,16 +29,9 @@ if (process.env.UPDATE_FAILING === "1") {
  * Named exemptions (FR-SHELL-160: a new failing cell only with a reason, orchestrator-approved):
  * cell → reason. Each must be in `replay.failing.json`.
  */
-const EXEMPTIONS = new Map([
-  [
-    "FR-SHELL-115 replay D3 fitted @1280×800 resize",
-    "RS2 (approved, BL-93): `hold.stronghold` joins D3 untouched (S4); the resize back re-fits it 480×492 → 412×400, the placer's I7 resize class D1 / D2 / D3 already carry (frame, not the window def)",
-  ],
-  [
-    "FR-SHELL-115 replay D3 fitted @1440×900 push",
-    "RS2 (approved, BL-93): with `hold.stronghold` open beside them, Initiative and the Game log return from the tool-bar push at their refitted sizes (I7 push class, as the players' push cells; frame)",
-  ],
-]);
+// RS2's two approved cells (D3 fitted @1280×800 resize, D3 fitted @1440×900 push) pass with
+// `cmp.rules` in D3 too (SP2 merge): no DM cell needs an exemption now (10 → 8 failing).
+const EXEMPTIONS = new Map<string, string>([]);
 
 test("FR-SHELL-160 named exemptions are recorded failing cells (DM)", () => {
   for (const name of EXEMPTIONS.keys()) expect(FAILING.has(name)).toBe(true);

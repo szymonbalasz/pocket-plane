@@ -175,6 +175,7 @@ describe("FR-ENT-29 licence credits", () => {
       "item",
       "condition",
       "feature",
+      "rule",
     ]);
     // One entry per source label, never the entry-less fixture row or homebrew.
     expect(urls.filter((u) => u.pathname.startsWith("/api/compendium/entries/"))).toHaveLength(1);

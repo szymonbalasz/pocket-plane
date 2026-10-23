@@ -86,6 +86,8 @@ import sessionSim12 from "./session-sim-12";
 import sessionSim13 from "./session-sim-13";
 import spPalette from "./sp-palette";
 import spPaletteE2e from "./sp-palette-e2e";
+import spRules from "./sp-rules";
+import spRulesE2e from "./sp-rules-e2e";
 import stats from "./stats";
 import statsB from "./stats-b";
 import statsBE2e from "./stats-b-e2e";
@@ -244,6 +246,9 @@ export const bundles: readonly Bundle[] = [
   // Sprint 9 track FX (fix/fx-sync-shell): stale-chunk reload e2e alias, FX3's bundle
   fxStaleChunkE2e,
   fxS9,
+  // Sprint 9 track SP (build/sp-rules): rules quick reference
+  spRules,
+  spRulesE2e,
   // Sprint 9 track RS (build/hold-stores): Stores tab E2E
   holdStoresE2e,
 ];
