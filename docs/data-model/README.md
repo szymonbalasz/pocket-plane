@@ -2518,3 +2518,18 @@ From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DIC
 - **Fixtures:** no new unit; bundle `fx-dice-e2e` (= `gems-reroll-e2e`, `e2e/fx-dice.e2e.ts`). `session-sim-13` lines: none needed (the walkthrough runs on `session-sim-12`).
 - **Persisted runtime state:** none.
 - **CON-44:** 0 B (no new record or field; a reroll line's items are as many or fewer than before).
+
+## 121. Sprint 9: command palette and keyboard shortcuts (SP1)
+
+From [play-shell](../specs/play-shell.md#8-data-model) §8 sprint 9 (FR-SHELL-184, -193, -194; [ADR-0067](../architecture/adr/0067-command-registry.md)). **Built by `build/sp-palette`**: no table, column or record type. Protocol side: [protocol §152](../protocol/README.md#152-sprint-9-command-palette-and-keyboard-shortcuts-sp1).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| Palette command / search provider *(client code)* | registry entries in `commands.ts` (append-only); never sent or stored | FR-SHELL-184, -199 |
+| Recent picks | browser `localStorage` `pp.palette.v1.<campaignId>.<dm \| playerId>` = JSON array of row keys (`c:<command id>`, `w:<window kind>`, `i:<provider>:<record id>`), newest first, ≤ 8 (zod `RecentPicks`: longer lists cut, duplicates dropped; junk → none + one warning); keys that no longer resolve are dropped when shown; compendium rows are never recorded; never sent | FR-SHELL-194 |
+| Keyboard setting | browser `localStorage` `pp.keys.v1` = `{singleKey: boolean}` (zod strict; missing / junk → `{singleKey: true}`); device-wide (no campaign in the key); never sent | FR-SHELL-193 |
+| Palette UI | page memory: open, input, sheet open; the highlighted row; the element focused before it opened | FR-SHELL-180 |
+
+- **Derived:** palette rows and ranks (client, per keystroke); the sheet's rows (from the registry and `when`).
+- **Persisted runtime state:** the two browser keys above.
+- **CON-44:** 0 B.

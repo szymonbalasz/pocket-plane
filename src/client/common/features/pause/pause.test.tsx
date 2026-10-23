@@ -156,9 +156,12 @@ describe("pause card (FR-SHELL-125, -126)", () => {
 
 describe("registration (FR-SHELL-128, -129, -135)", () => {
   test("FR-SHELL-128 input blocked: the players' pause entry blocks input exactly while paused (WF1's blocksInput)", () => {
-    const [entry] = overlaysFor("player", OVERLAYS);
+    const entry = overlaysFor("player", OVERLAYS).find((o) => o.id === "pause");
     expect(entry?.id).toBe("pause");
-    expect(overlaysFor("dm", OVERLAYS)).toEqual([]);
+    // SP1's palette (FR-SHELL-181) is the DM's only entry: it never blocks input.
+    expect(overlaysFor("dm", OVERLAYS).map((o) => [o.id, o.blocksInput])).toEqual([
+      ["palette", undefined],
+    ]);
     expect(blockingOverlay(overlaysFor("player"), storeOf())?.id).toBe("pause");
     expect(blockingOverlay(overlaysFor("player"), storeOf({ pause: null }))).toBeNull();
     // The DM's store never blocks (the DM is never paused).
@@ -166,8 +169,10 @@ describe("registration (FR-SHELL-128, -129, -135)", () => {
   });
 
   test("FR-SHELL-135 layers: alert flash < pause card < dice layer, via the overlay layer's slot", () => {
-    const [entry] = overlaysFor("player");
+    const entry = overlaysFor("player").find((o) => o.id === "pause");
     expect(entry?.layer).toBe(10);
+    // The palette (FR-SHELL-181) draws below the pause card.
+    expect(overlaysFor("player").map((o) => o.id)).toEqual(["palette", "pause"]);
     // The flash is z-100 (AlertLayer); the toast stack sits below the overlay layer too.
     expect(OVERLAY_LAYER_Z).toBeGreaterThan(100);
     expect(OVERLAY_LAYER_Z + (entry?.layer ?? 0)).toBeLessThan(DICE_LAYER_Z);
@@ -176,12 +181,13 @@ describe("registration (FR-SHELL-128, -129, -135)", () => {
   test("FR-SHELL-129 DM pause control: top-bar item (DM only, fixed slot), label, widths, payload, preview, draft", () => {
     // The slot: 128 px from 1280 wide (the widest state), 40 below (icon-only).
     const items = topBarItemsFor("dm", TOP_BAR_ITEMS);
-    expect(items.map((t) => t.id)).toEqual(["pause"]);
+    // SP1's search button (FR-SHELL-195) sits after it, next to the identity chip.
+    expect(items.map((t) => t.id)).toEqual(["pause", "palette"]);
     const [item] = items;
     expect(
       [1600, 1280, 1279].map((w) => (item ? topBarItemWidth(item, { w, h: 720 }) : 0)),
     ).toEqual([128, 128, 40]);
-    expect(topBarItemsFor("player", TOP_BAR_ITEMS)).toEqual([]);
+    expect(topBarItemsFor("player", TOP_BAR_ITEMS).map((t) => t.id)).toEqual(["palette"]);
     // "Pause"; paused "Paused · m:ss"; no back-in "Paused".
     expect(controlLabel(null, T0)).toBe("Pause");
     expect(controlLabel(PAUSE, T0 + 30_000)).toBe("Paused · 9:30");
