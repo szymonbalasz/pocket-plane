@@ -11,7 +11,9 @@
 // bottom, so the column runs upwards); it re-places on every input change (FR-NOTE-51).
 // *(Sprint 9)* FR-NOTE-72: while this client's Notifications window is open (not minimised) the
 // cards and the summary fold into it; they come back silently when it closes. FR-NOTE-73: each
-// callout show is its own node (`data-callout-seq`).
+// callout show is its own node (`data-callout-seq`). *(Sprint 10, H3)* FR-NOTE-75: the DM stack
+// keeps off windows' drawn content, then their first rows (the content measured while it shows);
+// FR-NOTE-76: an open modal dialog counts like Initiative and nothing under its overlay counts.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
 import { XIcon } from "lucide-react";
@@ -41,7 +43,7 @@ import {
 import { tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, useAlertToasts } from "./alert-toasts";
 import { useDialogRects } from "./dialog-rects";
-import { dmStackSpot } from "./keep-out";
+import { dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
 import {
   actionButton,
   classify,
@@ -341,10 +343,9 @@ export function ToastRuntime({
   const showing =
     !!state.callout ||
     state.toasts.some((t) => !folded || (t.kind !== "summary" && classOfToast(t) !== "card"));
-  const { initiative, windows: windowRects, hard: bars, rows: firstRows } = useStackInputs(isDm);
-  // Walkthrough T4: an open modal dialog keeps the DM stack off it like a hard keep-out.
+  const { initiative, windows: windowRects, hard, rows: firstRows } = useStackInputs(isDm, showing);
+  // Walkthrough T4, FR-NOTE-76: an open modal dialog keeps the DM stack off it like Initiative.
   const dialogs = useDialogRects(isDm && showing);
-  const hard = useMemo(() => (dialogs.length > 0 ? [...bars, ...dialogs] : bars), [bars, dialogs]);
   const vp = useViewport();
   const stackH = useStackHeight(stackRef, isDm, showing);
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
@@ -368,8 +369,9 @@ export function ToastRuntime({
         windowRects,
         hard,
         firstRows,
+        dialogs,
       ),
-    [vp, initiative, stackH, avoidKey, windowRects, hard, firstRows, tick],
+    [vp, initiative, stackH, avoidKey, windowRects, hard, firstRows, dialogs, tick],
   );
 
   // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
@@ -515,13 +517,16 @@ export function ToastRuntime({
 /**
  * Walkthrough T4: the DM stack's room with modal dialogs open: the larger band above their top
  * (below the home row) or below their bottom (above the launcher), never more than `full`.
+ * FR-NOTE-76: `full` when the stack fits left of them (the shift, `dmStackLefts`).
  */
 export function dialogRoom(
   vp: { w: number; h: number },
-  dialogs: readonly { y: number; h: number }[],
+  dialogs: readonly { x: number; y: number; h: number }[],
   full: number,
 ): number {
   if (dialogs.length === 0) return full;
+  const shift = Math.round(Math.min(...dialogs.map((d) => d.x)) - EDGE_GAP - STACK_W);
+  if (shift >= MIN_SHIFT_LEFT && shift < Math.round((vp.w - STACK_W) / 2)) return full;
   const top = Math.min(...dialogs.map((d) => d.y));
   const bottom = Math.max(...dialogs.map((d) => d.y + d.h));
   const above = top - EDGE_GAP - DM_TOAST_TOP;

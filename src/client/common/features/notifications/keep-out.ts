@@ -17,7 +17,13 @@
 // spot → the clear spot nearest the home row, not the least body. FR-NOTE-72 (BL-88): an open
 // Notifications window counts like Initiative (`StackWindow.blocks`). Ruling B (#339 follow-up,
 // amends FR-NOTE-53): every window's title bar + first 40 px keep the stack off while some spot
-// clears them all; none does → FR-NOTE-71 as before. Pure; players keep bottom-right.
+// clears them all; none does → FR-NOTE-71 as before. *(Sprint 10, H3)* FR-NOTE-75 (BL-101): first
+// a spot clear of every window's drawn content (`StackWindow.used`; the empty body below it is
+// fine), then one clear of every window's first rows (title bar + 40 px, or to its first record
+// row: tabs, search box, list header, first row), then ruling B and the title bars as before.
+// FR-NOTE-76: an open modal dialog counts like Initiative (shift left of it, else below or above
+// it); what is under its overlay (windows, Initiative, tool bars, tokens) is inert and ignored.
+// Pure; players keep bottom-right.
 
 import { type FirstRow, firstRows } from "../play-shell/content-heights";
 import {
@@ -46,7 +52,20 @@ export type StackWindow = Rect & {
   pushed?: boolean;
   /** FR-NOTE-72: counts like Initiative (this client's open Notifications window). */
   blocks?: boolean;
+  /**
+   * FR-NOTE-75: viewport y where the window's drawn content ends (below it: empty body). Absent
+   * (not measured): the whole window counts as content.
+   */
+  used?: number;
 };
+
+/** FR-NOTE-75: the window's content part (title bar to `used`; unknown → all of it). */
+const contentOf = (w: StackWindow): Rect => ({
+  x: w.x,
+  y: w.y,
+  w: w.w,
+  h: w.used === undefined ? w.h : Math.max(TITLE_H, Math.min(w.h, w.used - w.y)),
+});
 
 /** FR-NOTE-70: the smallest left a shift may take (12 px clear of the rail, never x 68). */
 export const MIN_SHIFT_LEFT = RAIL_CLEAR + EDGE_GAP;
@@ -128,15 +147,27 @@ export function dmStackPlacement(
   windows: readonly StackWindow[] = [],
   hard: readonly Rect[] = [],
   rows: readonly FirstRow[] = [...firstRows().values()],
+  dialogs: readonly Rect[] = [],
 ): { left: number; top: number } {
-  const { left, top } = dmStackSpot(vp, initiative, stackH, width, avoid, windows, hard, rows);
+  const { left, top } = dmStackSpot(
+    vp,
+    initiative,
+    stackH,
+    width,
+    avoid,
+    windows,
+    hard,
+    rows,
+    dialogs,
+  );
   return { left, top };
 }
 
 /**
- * `dmStackPlacement` and what its spot covers of the windows' bodies, px² (`covers` > 0: no spot
- * clear of every window held this stack; walkthrough WF4, FR-NOTE-70: the runtime then shows
- * fewer toasts, never beside a window).
+ * `dmStackPlacement` and what its spot covers of the windows' content, px² (`covers` > 0: no spot
+ * clear of every window's content held this stack; walkthrough WF4, FR-NOTE-70: the runtime then
+ * shows fewer toasts, never beside a window; FR-NOTE-75: empty body below the content is free).
+ * `dialogs` (FR-NOTE-76): the open modal dialogs' rects; while any is open only they count.
  */
 export function dmStackSpot(
   vp: Viewport,
@@ -147,12 +178,22 @@ export function dmStackSpot(
   windows: readonly StackWindow[] = [],
   hard: readonly Rect[] = [],
   rows: readonly FirstRow[] = [...firstRows().values()],
+  dialogs: readonly Rect[] = [],
 ): { left: number; top: number; covers: number } {
+  if (dialogs.length > 0) {
+    // FR-NOTE-76: under a modal dialog's overlay nothing else takes input; the dialogs count
+    // like Initiative (the left-of shift, below or above them).
+    const modal = dialogs.map((d) => ({ ...d, blocks: true }));
+    return dmStackSpot(vp, null, stackH, width, [], modal, [], []);
+  }
   const lefts = dmStackLefts(vp, initiative, width, windows);
   const p = dmStackSpotOnly(vp, initiative, stackH, width, avoid, windows, hard, rows, lefts);
-  // FR-NOTE-70: `covers` > 0 (no spot in the column clears every body) → the runtime folds.
+  // FR-NOTE-70: `covers` > 0 (no spot in the column clears every window's content) → the
+  // runtime folds. FR-NOTE-75: the empty body below a window's content doesn't count.
   const covers =
-    stackH === 0 ? 0 : coveredArea({ x: p.left, y: p.top, w: width, h: stackH }, windows);
+    stackH === 0
+      ? 0
+      : coveredArea({ x: p.left, y: p.top, w: width, h: stackH }, windows.map(contentOf));
   return { ...p, covers };
 }
 
@@ -177,19 +218,26 @@ function dmStackSpotOnly(
   if (avoid.length === 0 && windows.length === 0 && fits(base) && offHard(base)) return base;
   // FR-NOTE-44: a pushed window's title bar, first 40 px of body and first content row (its
   // reported bottom, walkthrough U4) count as its bar; FR-NOTE-53: pushed per the plan.
-  // Sprint 9 ruling B (amends FR-NOTE-53): every window's title bar + first 40 px count as its bar
-  // first (`everyRow`); no spot clears those → as before (title bars, pushed strips).
-  const strip = (w: StackWindow, everyRow: boolean) => {
-    const pushed = w.pushed ?? hard.length > 0;
-    if (!pushed) return everyRow ? TITLE_H + PUSHED_BODY_CLEAR : TITLE_H;
+  const rowOf = (w: StackWindow) => {
     const row = rows.find((r) => Math.abs(r.x - w.x) <= 1 && Math.abs(r.y - w.y) <= 1);
     return Math.max(TITLE_H + PUSHED_BODY_CLEAR, row ? row.bottom - w.y : 0);
   };
+  const pushed = (w: StackWindow) => w.pushed ?? hard.length > 0;
+  // The strips kept clear, pass by pass (each one's strips inside the one before):
+  // FR-NOTE-75: every window's drawn content (the empty body below it is fine), then every
+  // window's first rows; sprint 9 ruling B (amends FR-NOTE-53): title bar + 40 px (pushed: its
+  // first rows); then the title bars alone (pushed: its first rows).
+  const passes: ((w: StackWindow) => number)[] = [
+    (w) => Math.max(contentOf(w).h, rowOf(w)),
+    rowOf,
+    (w) => (pushed(w) ? rowOf(w) : TITLE_H + PUSHED_BODY_CLEAR),
+    (w) => (pushed(w) ? rowOf(w) : TITLE_H),
+  ];
   // FR-NOTE-72: an open Notifications window keeps the stack off like Initiative.
   const blockers = [...(initiative ? [initiative] : []), ...windows.filter((w) => w.blocks)];
   const maxTop = vp.h - LAUNCHER_CLEAR - stackH;
-  const choose = (everyRow: boolean) => {
-    const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, strip(w, everyRow)) }));
+  const choose = (strip: (w: StackWindow) => number) => {
+    const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, strip(w)) }));
     const clear = (p: { left: number; top: number }) =>
       !blockers.some((b) => hits(at(p), b, EDGE_GAP)) &&
       !bars.some((b) => hits(at(p), b, 0)) &&
@@ -199,8 +247,9 @@ function dmStackSpotOnly(
       ...bars.map((b) => b.y + b.h + STACK_GAP),
       ...windows.map((w) => w.y + w.h + STACK_GAP),
       ...hard.map((k) => k.y + k.h + STACK_GAP),
-      // FR-NOTE-72: below a window that counts like Initiative, with its 12 px gap.
-      ...blockers.map((b) => b.y + b.h + EDGE_GAP),
+      // FR-NOTE-72: below a window that counts like Initiative, with its 12 px gap; FR-NOTE-76:
+      // above it too (a modal dialog low in the column).
+      ...blockers.flatMap((b) => [b.y + b.h + EDGE_GAP, b.y - EDGE_GAP - stackH]),
       ...avoid.flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH]),
     ].map((y) => Math.round(Math.max(DM_TOAST_TOP, Math.min(maxTop, y))));
     // Nearest the home row first (ties keep the earlier spot).
@@ -225,9 +274,12 @@ function dmStackSpotOnly(
     }
     return { best, clear, spots };
   };
-  const first = choose(true);
-  if (first.best) return first.best;
-  const { best, clear, spots } = choose(false);
+  const last = passes.length - 1;
+  for (const strip of passes.slice(0, last)) {
+    const { best } = choose(strip);
+    if (best) return best;
+  }
+  const { best, clear, spots } = choose(passes[last] as (w: StackWindow) => number);
   // Nothing holds it (the runtime then shows fewer toasts): the top row when clear, else
   // FR-NOTE-32's spot, else the top row, each only off the hard keep-outs (FR-NOTE-43).
   const row = spots.filter((p) => p.top === DM_TOAST_TOP);

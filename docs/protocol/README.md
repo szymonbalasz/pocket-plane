@@ -3767,3 +3767,17 @@ From [session-recap](../specs/session-recap.md#6-functional-requirements) FR-REC
 - **Stats seam** (FR-STATS-78, -79): `stats/compute.ts` exports `sessionFights(r, s, facts?, fights?)` and `sessionFactsOf(r, s)`; the Session tab's `stats-session-recap` "Recap" (both roles; DM after Show awards) opens `recap.session` `by: "user"` on the picked session, shown only while the Recap runtime (the window's companion) is mounted. Bench `recap.bench.ts` in `bun run bench` on `stats/testing.ts`'s `history`.
 - **Fixtures:** units `recap-loot-haul` (`sp-s9` only), `recap-share-note`; bundles `sp-s9`, `sp-s9-shared`, `sp-s9-e2e`, `sp-s9-shared-e2e`.
 - **CON-44** (`src/server/features/session-recap/con44.test.ts`, heavy harness): one max share (280 × 4-byte note, all sections omitted) +1,020 B per viewer; worst, every closed row of the notification window a max share: DM 793,503 B (+101,901), players ≤ 390,462 B (+101,901), both under the ceilings. Acks (FR-RECAP-18, bench at 100 sessions): DM ≈ 7.3 KB, player ≈ 6.5 KB; compute DM 23 ms / player 31 ms; memo hit < 1 ms.
+
+## 160. Sprint 10: the DM toast stack keeps off window content and modal dialogs (H3)
+
+From [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-75, -76 (BL-101, DM #341; amends §154's stack spot and FR-NOTE-53 ruling B). **Built by `fix/h3-toasts`**: client only; no record type, intent, event or wire field.
+
+| Seam | Contract | FR |
+|---|---|---|
+| Window content (`stack-inputs.ts` `contentEnd`, `StackWindow.used`) | While the DM stack shows, each open window's `used` = its rendered top + how far below its section top the body's drawn boxes end (leaf elements and `[data-record-id]` rows, document order, clipped to the body; the walk stops at the first box reaching the body's bottom). Nothing drawn → the title bar. Re-read on every stack input change and, once a frame, on a `childList` change inside any `ui-window-body`. Absent `used` → the whole window counts as content | FR-NOTE-75 |
+| DM stack spot (`keep-out.ts` `dmStackSpot`) | Strips per window, pass by pass (Initiative, `blocks` windows + 12 px and hard keep-outs block in every pass): (1) title bar to `used`; (2) `max(title + 40, first-row report)` for **every** window; (3) ruling B (title + 40; pushed: (2)); (4) title bars (pushed: (2)). The first pass with a clear spot decides, ranked per FR-NOTE-71; pass 4 keeps §154's fallback. `covers` = area over windows' content parts (title bar to `used`) | FR-NOTE-75 |
+| Modal dialogs (`dmStackSpot(…, dialogs)`, `dialog-rects.ts`) | The runtime passes open modal dialogs' rects apart (no longer merged into `hard`). Any present → placed against the dialogs alone, each as a `blocks` window (shift left of it ≥ 80, below + 12, above − 12); windows, Initiative, hard keep-outs and tokens are ignored (under the overlay). `dialogRoom` = the full column when the shift fits, else the larger band above or below (T4) | FR-NOTE-76 |
+
+- **Tests:** `keep-out.test.ts` (`FR-NOTE-75 keep off window bodies' first rows`: sim-13 h07, h08, h09, f04; `FR-NOTE-76 an open modal dialog counts like Initiative`: b07; amended FR-NOTE-53 and FR-NOTE-50 dialog room), `stack-inputs.test.ts` (`FR-NOTE-75 content end`); e2e `h3-toasts.e2e.ts` (1280×720, 1440×900).
+- **Fixtures:** no unit; bundle `h3-toasts-e2e` (= `session-sim-13`).
+- **CON-44:** 0 B.

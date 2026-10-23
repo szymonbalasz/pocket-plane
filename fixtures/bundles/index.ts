@@ -47,6 +47,7 @@ import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
 import gemsUiE2e from "./gems-ui-e2e";
+import h3ToastsE2e from "./h3-toasts-e2e";
 import holdStoresE2e from "./hold-stores-e2e";
 import holdUiE2e from "./hold-ui-e2e";
 import imageSearch from "./image-search";
@@ -260,4 +261,6 @@ export const bundles: readonly Bundle[] = [
   spS9Shared,
   spS9E2e,
   spS9SharedE2e,
+  // Sprint 10 track H3 (fix/h3-toasts): toast stack e2e alias of session-sim-13
+  h3ToastsE2e,
 ];

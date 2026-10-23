@@ -443,7 +443,7 @@ describe("FR-NOTE-53 stack reads the plan", () => {
     }
   });
 
-  test("FR-NOTE-53 stack reads the plan: a pushed window's reported first row blocks the stack, whether or not a bar shows; any other window's title bar + 40 px (ruling B)", () => {
+  test("FR-NOTE-53 stack reads the plan: a pushed window's reported first row blocks the stack, whether or not a bar shows; any other window's too (FR-NOTE-75; was title bar + 40 px)", () => {
     // The card's targets below Scenes (sim-10 b05); Scenes reaching the Game log, so no spot
     // clears every body and the stack stays on Scenes' body (FR-NOTE-71: nearest home).
     const targets = [
@@ -459,10 +459,11 @@ describe("FR-NOTE-53 stack reads the plan", () => {
     const rows = [{ x: 546, y: 60, bottom: 60 + 32 + 80 }];
     const pushed = dmStackPlacement(vp, INIT, 57, STACK_W, targets, plan, [], rows);
     expect(pushed).toEqual({ left: 560, top: 60 + 32 + 80 + 8 });
-    // Not pushed (a window the user dropped there) while the Fog bar shows: title bar + 40 px.
+    // Not pushed (a window the user dropped there) while the Fog bar shows: its first row too
+    // (FR-NOTE-75, sprint 10; sprint 9 kept only title bar + 40 px).
     const dropped = [log, col, { ...long, pushed: false }];
     const user = dmStackPlacement(vp, INIT, 57, STACK_W, targets, dropped, [FOG_BAR], rows);
-    expect(user).toEqual({ left: 560, top: 60 + 72 + 8 });
+    expect(user).toEqual({ left: 560, top: 60 + 32 + 80 + 8 });
     expect(hit(rectOf(user, 57), FOG_BAR)).toBe(false);
   });
 });
@@ -665,9 +666,11 @@ describe("FR-NOTE-50 toast policy: dialogs (walkthrough T4)", () => {
     const { dialogRoom } = await import("./ToastRuntime");
     const full = 900 - 64 - 100;
     expect(dialogRoom(vp, [], full)).toBe(full);
-    // Above: 293 − 12 − 100 = 181; below: 900 − 64 − (607 + 12) = 217.
-    expect(dialogRoom(vp, [dialog], full)).toBe(217);
-    expect(dialogRoom(vp, [{ y: 100, h: 740 }], full)).toBe(0);
+    // FR-NOTE-76: the stack fits left of the dialog (shift 164) → the full column.
+    expect(dialogRoom(vp, [dialog], full)).toBe(full);
+    // A wide dialog (shift < 80). Above: 293 − 12 − 100 = 181; below: 900 − 64 − (607 + 12) = 217.
+    expect(dialogRoom(vp, [{ ...dialog, x: 300 }], full)).toBe(217);
+    expect(dialogRoom(vp, [{ x: 300, y: 100, h: 740 }], full)).toBe(0);
   });
 
   test("FR-NOTE-50 toast policy: only modal dialogs count (the attack popup opens over its toast, FR-CBT-75)", async () => {
@@ -677,3 +680,92 @@ describe("FR-NOTE-50 toast policy: dialogs (walkthrough T4)", () => {
     expect(OPEN_DIALOG_SELECTOR).toContain('[role="alertdialog"][data-state="open"]');
   });
 });
+
+// Sprint 10 (H3, BL-101; session-sim-13 glitch 5, `.verify/20261023-193558-session-sim-13/`).
+// Rects read off the screenshots; `used` = where each window's drawn content ends (the runtime
+// measures it), `rows` = ShellWindow's first-row reports. Stack heights as drawn there.
+describe("FR-NOTE-75 keep off window bodies' first rows", () => {
+  const vp = { w: 1440, h: 900 };
+  const init = { x: 1028, y: 60, w: 400, h: 512 };
+  const log = { ...LOG, used: LOG.y + LOG.h };
+  const logRow = { x: LOG.x, y: LOG.y, bottom: LOG.y + 54 };
+
+  test("FR-NOTE-75 sim-13 h07 (1280×720, Scenes at 400, 112, 5 cards): the stack keeps off Scenes' rows, over its empty body only", () => {
+    const small = { w: 1280, h: 720 };
+    const init720 = { x: 868, y: 60, w: 400, h: 578 };
+    const log720 = { x: 68, y: 484, w: 688, h: 160, used: 644 };
+    // New scene row, then "Goblin Ambush" (first row, to 232) and "Town" (to 268).
+    const scenes = { x: 400, y: 112, w: 260, h: 410, used: 268 };
+    const rows = [
+      { x: 400, y: 112, bottom: 232 },
+      { x: 68, y: 484, bottom: 520 },
+    ];
+    // One card + "+4 more" + the kill-feed callout, as drawn (h07: 192..365).
+    const at = dmStackSpot(small, init720, 173, STACK_W, [], [log720, scenes], [], rows);
+    expect(at).toMatchObject({ left: 480, top: 268 + 8, covers: 0 });
+    expect(hit(rectOf(at, 173), { ...scenes, h: 268 - 112 })).toBe(false);
+    expect(hit(rectOf(at, 173), log720)).toBe(false);
+  });
+
+  test("FR-NOTE-75 sim-13 h08 (1440×900, Fog bar, Scenes at 400, 222): below Scenes' rows, off the bar", () => {
+    const fog = { x: 62, y: 56, w: 470, h: 154 };
+    const scenes = { x: 400, y: 222, w: 260, h: 400, used: 376, pushed: false };
+    const rows = [{ x: 400, y: 222, bottom: 342 }, logRow];
+    const at = dmStackSpot(vp, init, 173, STACK_W, [], [log, scenes], [fog], rows);
+    expect(at).toMatchObject({ left: 560, top: 376 + 8, covers: 0 });
+    expect(hit(rectOf(at, 173), { ...scenes, h: 376 - 222 })).toBe(false);
+    expect(hit(rectOf(at, 173), fog)).toBe(false);
+  });
+
+  test("FR-NOTE-75 sim-13 h09 (1440×900, Notifications open, Scenes at 316, 48): the shift left of Notifications, below Scenes' rows", () => {
+    const scenes = { x: 316, y: 48, w: 260, h: 412, used: 204 };
+    const notes = { x: 656, y: 64, w: 360, h: 480, used: 544, blocks: true };
+    const rows = [{ x: 316, y: 48, bottom: 168 }, logRow];
+    // Two info toasts ("Party loot: …" on two lines, "Goblin Lurker falls").
+    const at = dmStackSpot(vp, init, 127, STACK_W, [], [log, scenes, notes], [], rows);
+    expect(at).toMatchObject({ left: 656 - 12 - STACK_W, top: 204 + 8, covers: 0 });
+    expect(hit(rectOf(at, 127), { ...scenes, h: 204 - 48 })).toBe(false);
+    expect(hit(rectOf(at, 127), notes)).toBe(false);
+  });
+
+  test("FR-NOTE-75 sim-13 f04 (1440×900, Rules at 430, 212): 'Saved …' toasts keep off the tabs and the search box (no spot clears all its content: below its first row)", () => {
+    // Tabs (two rows) and search to 363, the first rule card to 452, the footer to 558.
+    const rules = { x: 430, y: 212, w: 440, h: 360, used: 558 };
+    const rows = [{ x: 430, y: 212, bottom: 452 }, logRow];
+    const at = dmStackSpot(vp, init, 119, STACK_W, [], [log, rules], [], rows);
+    expect(at).toMatchObject({ left: 560, top: 452 + 8 });
+    expect(hit(rectOf(at, 119), { ...rules, h: 452 - 212 })).toBe(false);
+    expect(hit(rectOf(at, 119), log)).toBe(false);
+  });
+});
+
+describe("FR-NOTE-76 an open modal dialog counts like Initiative", () => {
+  test("FR-NOTE-76 sim-13 b07 (1280×720, the Start dialog at 416, 94 over the home column): the stack shifts left of it, never over its title", () => {
+    const small = { w: 1280, h: 720 };
+    const dialog = { x: 416, y: 94, w: 448, h: 532 };
+    const encounters = { x: 68, y: 60, w: 440, h: 410 };
+    const log720 = { x: 68, y: 484, w: 688, h: 160 };
+    const init720 = { x: 868, y: 60, w: 400, h: 578 };
+    // Windows, Initiative and tool bars under the modal's overlay are inert: only the dialog counts.
+    const at = dmStackSpot(small, init720, 57, STACK_W, [], [encounters, log720], [], [], [dialog]);
+    expect(at).toMatchObject({ left: 416 - 12 - STACK_W, top: 100 });
+    expect(hit(rectOf(at, 57), dialog)).toBe(false);
+    // At 1440×900 the same dialog is centred at 496, 184: the summary fits above it at home; a
+    // taller stack shifts to 164 (never over it).
+    const centred = { ...dialog, x: 496, y: 184 };
+    const above = dmStackSpot(vp1440, INIT, 57, STACK_W, [], [LOG], [], [], [centred]);
+    expect(above).toMatchObject({ left: 560, top: 100 });
+    const tall = dmStackSpot(vp1440, INIT, 190, STACK_W, [], [LOG], [], [], [centred]);
+    expect(tall).toMatchObject({ left: 496 - 12 - STACK_W, top: 100 });
+    expect(hit(rectOf(tall, 190), centred)).toBe(false);
+    // No room left of a wide dialog (shift < 80): above it while it fits (the home row), else
+    // below it.
+    const wideDialog = { x: 384, y: 300, w: 512, h: 300 };
+    const home = dmStackSpot(small, init720, 57, STACK_W, [], [], [], [], [wideDialog]);
+    expect(home).toMatchObject({ left: 480, top: 100 });
+    const low = { ...wideDialog, y: 140, h: 420 };
+    const under = dmStackSpot(small, init720, 57, STACK_W, [], [], [], [], [low]);
+    expect(under).toMatchObject({ left: 480, top: 140 + 420 + 12 });
+  });
+});
+const vp1440 = { w: 1440, h: 900 };
