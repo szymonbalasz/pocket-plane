@@ -190,7 +190,9 @@ describe("REM / HOLD §13 fixtures", () => {
     const base = await read("session-sim-12");
     const sim = await read("session-sim-13");
     expect(sim.manifest.status).toBe("complete");
-    expect(sim.manifest.fixtures.slice(-8)).toEqual([
+    // The RS units in order; other tracks append theirs after (keep both lines on a merge).
+    const rs = sim.manifest.fixtures.filter((k) => k.startsWith("rem-") || k.startsWith("hold-"));
+    expect(rs).toEqual([
       "rem-party",
       "rem-mira-charm",
       "rem-thorn-own",
@@ -208,7 +210,7 @@ describe("REM / HOLD §13 fixtures", () => {
     expect(party(sim.items)).toEqual(party(base.items));
     expect(sim.reminders).toHaveLength(6);
     expect(sim.holds.map((h) => h.name)).toEqual([GREYSTONE.name, TOWER.name]);
-  });
+  }, 30_000); // loads two full bundles: over the 5 s default while other suites run
 
   test("FR-HOLD-40 licence check: no 2024 bastion facility name in the RS fixtures", () => {
     const catalogue = [

@@ -2,12 +2,14 @@
 // gears' settings panel in the 360-px window, "Dice look…" opening the look pane in place. Same
 // stores as the gears (FR-DICEX-58): `pp.dicex.v2` via `useDiceSettings`, the `dice-look` record.
 // The panel is the lazy chunk the roll popup's gear already loads (initial JS unchanged).
-import { lazy, Suspense, useState } from "react";
+import { Suspense, useState } from "react";
+import { lazyChunk } from "../../lib/lazy-chunk";
 import { definePrefSection } from "../play-shell/PreferencesWindow";
 import type { SettingsPane } from "./SettingsPanel";
 
-const SettingsPanel = lazy(() =>
-  import("./SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
+const SettingsPanel = lazyChunk(
+  () => import("./SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
+  "inline",
 );
 
 /** The section body; `initialPane` only for tests (the window always opens on the settings). */

@@ -53,12 +53,13 @@ test("FR-SHELL-71 prefs window (DM): shell.prefs registered with no launcher ent
   expect(def?.defaultOpen).toBeFalsy();
 });
 
-test("FR-SHELL-72 sections (DM): Your colour, Dice, Stats, Layout, Account; no Sound while the DM has no alert; ids unique", () => {
+test("FR-SHELL-72 sections (DM): Your colour, Dice, Stats, Keyboard, Layout, Account; no Sound while the DM has no alert; ids unique", () => {
   const dm = { ...emptyStore(), you: { campaignId: "c1", role: "dm", playerId: null } } as never;
   expect(shownSections(dmPrefSections, dm).map((s) => s.id)).toEqual([
     "camp.color",
     "dicex.dice",
     "stats.prefs",
+    "shell.keys",
     "shell.layout",
     "camp.account",
   ]);

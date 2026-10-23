@@ -1,9 +1,11 @@
 // DM REST calls for scenes and folders (MAP §9) via the Hono RPC client. The session module is
 // imported lazily: it reads localStorage at load (keeps window registries importable in tests).
 import type { SceneFolderResponse, SceneResponse } from "@shared/scenes-map/schemas";
+import { loadChunk } from "@ui/lib/lazy-chunk";
 
 async function session() {
-  return import("../campaign-management/session");
+  // A stale chunk (BL-91): the caller's existing error + the stale notice.
+  return loadChunk(() => import("../campaign-management/session"), { notice: true });
 }
 
 export const scenesRest = {
