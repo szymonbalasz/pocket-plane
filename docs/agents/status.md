@@ -12,7 +12,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | RS0 reminders + strongholds core | merged `fb3884a3` | — | done (23/23) | — |
 | FX2 dice + gems lines | merged `d4837dc4` | — | done (10/10; branch gates 5232 / 208) | main gates with PM1 |
-| PM1 window memory | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | walkthrough 9/10 → re-test 7/7; main merged in | branch gates running → merge → main gates |
+| PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates running (with FX2) |
 | PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | stacked on PM1: shared rows | walkthrough M0-M2, M11, M13 |
 | FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y, slot 5) | build-fx3 | walkthrough 6/6 (step 4 spec wording ruled) | ShellWindow branch after PM1 merges → gates → merge |
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
@@ -24,7 +24,7 @@ Queue: RS1 + RS2 after PM2 merges (RS0, PM1 in) · RS3 after RS2 · SP3 part 2 a
 
 ## Shared-file locks
 
-- Play-shell frame (placer, manager, placement, geometry, shell-store, ShellWindow, registry, ShellContext, keys, layout-checks, free-area (granted 2026-10-23), replay + goldens, placement bench) + canvas (MapCanvas, camera): `fix/window-memory` (PM1), all sprint.
+- Play-shell frame + canvas: PM1 merged; grants now per slice: FX3 `ShellWindow.tsx` boundary branch; PM2 / RS2 / SP2 / SP3 append rows (windows.ts, size table, goldens, replay sets: regenerate, never hand-merge).
 - Schema / core lane: free (RS0 merged); SP3 / FX3 append their lines.
 - Toast runtime (ToastRuntime, keep-out, toasts, stack-inputs): FX1 (not started).
 - Stats client files: FX1, then SP3.
