@@ -451,6 +451,7 @@ export function SessionView({
 
 function AwardCard({ award: a }: { award: Award }) {
   const colorOf = useColorOf();
+  const role = useSync((s) => (s.store.you?.role === "dm" ? "dm" : "player"));
   const detail = awardDetailText(a);
   return (
     // FR-STATS-67: one line per part (title, value, winners, detail); names and values wrap
@@ -462,7 +463,7 @@ function AwardCard({ award: a }: { award: Award }) {
     >
       <span className="font-medium text-muted-foreground">{AWARD_TITLE[a.key]}</span>
       <span data-testid="stats-award-value" className="text-sm font-semibold tabular-nums">
-        {awardValueText(a)}
+        {awardValueText(a, role)}
       </span>
       <span data-testid="stats-award-winners" className="flex flex-col">
         {a.winners.map((w) => {

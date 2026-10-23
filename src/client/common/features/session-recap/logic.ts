@@ -216,7 +216,7 @@ export function recapMarkdown(r: Recap, role: "dm" | "player"): string {
         if (a.value === null) continue;
         const detail = awardDetailText(a);
         out.push(
-          `- ${AWARD_TITLE[a.key]}: ${a.winners.map(winnerText).join(", ")} (${awardValueText(a)})${detail ? ` · ${detail}` : ""}`,
+          `- ${AWARD_TITLE[a.key]}: ${a.winners.map(winnerText).join(", ")} (${awardValueText(a, role)})${detail ? ` · ${detail}` : ""}`,
         );
       }
     }
