@@ -13,6 +13,8 @@ import {
 } from "@ui/features/party-board/manager-checks";
 import { partyMemory } from "@ui/features/party-board/seen";
 import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
+import { keepOuts } from "@ui/features/play-shell/keep-outs";
+import { defaultLayout, restoreLayout } from "@ui/features/play-shell/manager";
 
 const { playerWindows: registry } = await import("../../windows");
 const YOU: You = { campaignId: "c1", role: "player", playerId: "p1" };
@@ -62,7 +64,7 @@ test("FR-PARTY-64 no party status window (Player): no party.summary def, launche
   });
 });
 
-test("FR-SHELL-155 party.summary layout migrated (Player): a remembered, minimised Party status entry → Party Manager minimised in its z at its x / y, own size; onAbsorb picks Party status; no party.summary left", () => {
+test("FR-SHELL-155 party.summary layout migrated (Player): a remembered, minimised Party status entry → Party Manager in that state (minimised) and z at its x / y, own size; onAbsorb picks Party status; no party.summary left", () => {
   // The registry's onAbsorb writes the page's tab state.
   const m = summaryMigration(registry, YOU, partyMemory().tabs);
   expect(m.absorbed).toEqual([{ kind: "party.board", from: "party.summary" }]);
@@ -76,4 +78,38 @@ test("FR-SHELL-161 launcher threshold (Player): every label shows from 1208 px (
   console.log(`FR-SHELL-161 Player labels from ${t.labelsFrom}`);
   expect(t.labelsFrom).toBe(1208); // measured; SP1 / SP2 update it after their launcher entries (S3)
   expect(t.at1280).toEqual({ compact: false, overflow: [] });
+});
+
+test("FR-SHELL-155 party.summary layout migrated (Player, walkthrough M13): an open Party status entry over an older untouched Stats in Initiative's zone → Party Manager comes back open, Stats (least recently used, I4) put away", () => {
+  const vp = { w: 1280, h: 800 };
+  const base = defaultLayout(registry, vp).filter(
+    (w) => w.kind !== "party.board" && w.kind !== "stats.board",
+  );
+  const windows = [
+    ...base,
+    { kind: "stats.board", instance: "main", state: "open", x: 68, y: 60, w: 400, h: 412, z: 4 },
+    { kind: "party.summary", instance: "main", state: "open", x: 400, y: 80, w: 280, h: 260, z: 6 },
+  ];
+  const r = restoreLayout(registry, JSON.stringify({ windows }), vp, [], keepOuts("player", vp));
+  const win = (kind: string) => r.windows.find((w) => w.kind === kind);
+  expect(r.absorbed).toEqual([{ kind: "party.board", from: "party.summary" }]);
+  expect(win("party.summary")).toBeUndefined();
+  expect(win("party.board")?.state).toBe("open");
+  expect(win("party.board")?.w).toBeGreaterThanOrEqual(440);
+  expect(win("stats.board")?.state).toBe("minimised");
+  // Seeded elsewhere, the same: Party Manager open.
+  for (const at of [
+    { x: 360, y: 60 },
+    { x: 500, y: 200 },
+  ]) {
+    const moved = windows.map((w) => (w.kind === "stats.board" ? { ...w, ...at } : w));
+    const again = restoreLayout(
+      registry,
+      JSON.stringify({ windows: moved }),
+      vp,
+      [],
+      keepOuts("player", vp),
+    );
+    expect(again.windows.find((w) => w.kind === "party.board")?.state).toBe("open");
+  }
 });

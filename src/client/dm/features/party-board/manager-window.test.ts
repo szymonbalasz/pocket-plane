@@ -63,7 +63,7 @@ test("FR-PARTY-64 no party status window (DM): no party.summary def, launcher bu
   });
 });
 
-test("FR-SHELL-155 party.summary layout migrated (DM): a remembered, minimised Party status entry → Party Manager minimised in its z at its x / y, own size; onAbsorb picks Party status; no party.summary left", () => {
+test("FR-SHELL-155 party.summary layout migrated (DM): a remembered, minimised Party status entry → Party Manager in that state (minimised) and z at its x / y, own size; onAbsorb picks Party status; no party.summary left", () => {
   // The registry's onAbsorb writes the page's tab state.
   const m = summaryMigration(registry, YOU, partyMemory().tabs);
   expect(m.absorbed).toEqual([{ kind: "party.board", from: "party.summary" }]);

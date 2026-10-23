@@ -714,6 +714,15 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       if (yielded) return yielded;
       if (o.maxL2) return null;
       const first = o.putAway ? order()[0] : undefined;
+      // I4 (LRU first) at `load`: a restored window re-placed (a zone displacement) that is itself
+      // less recently used than every put-away candidate goes away itself, never a newer one
+      // (walkthrough M13: an absorbed Party Manager put away for an older Stats). Opens and
+      // reopens keep their rule (the window opened is never put away, FR-SHELL-56).
+      const self = get(id);
+      if (trigger.type === "load" && first && self && !isProt(self) && first.z > self.z) {
+        putAwayWin(self, o.cause ?? null, first.kind);
+        return null;
+      }
       if (first) {
         aheadUseful ??= lookAhead({ floor });
         if (aheadUseful) {
