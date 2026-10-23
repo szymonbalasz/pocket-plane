@@ -238,7 +238,7 @@ test("FR-SHELL-45 launcher opens never stack (player, 1280×720 / 1280×800 / 14
   }
 });
 
-test("FR-SHELL-48 FR-SHELL-56 keep-outs (player): the toast corner is hard: auto placement stays out; a feature open and a user reopen stored over it are both re-placed", () => {
+test("FR-SHELL-48 FR-SHELL-56 FR-SHELL-146 keep-outs (player): the toast corner is hard: auto placement stays out; a feature open and a user reopen of an untouched window stored over it are both re-placed; a remembered one reopens there exactly (the toast box never pushes)", () => {
   for (const viewport of REFERENCE_VIEWPORTS) {
     expect(keepOuts("player", viewport)).toEqual([
       { id: "toasts", rect: toastKeepOut("player", viewport), kind: "hard" },
@@ -254,13 +254,20 @@ test("FR-SHELL-48 FR-SHELL-56 keep-outs (player): the toast corner is hard: auto
   );
   expect(overlaps(rectIn(ws, "note.history"), corner)).toBe(false);
   const over = { x: corner.x, y: corner.y - 100, w: 360, h: 300 };
-  ws = reduce(ws, { type: "setRect", kind: "note.history", rect: over }, ctx);
+  const moved = reduce(ws, { type: "setRect", kind: "note.history", rect: over }, ctx);
+  ws = ws.map((w) => (w.kind === "note.history" ? { ...w, ...over } : w));
   ws = reduce(ws, { type: "minimise", kind: "note.history" }, ctx);
   // FR-SHELL-56 (2): a hard keep-out covers a stored rect like a window does.
   const user = reduce(ws, { type: "open", kind: "note.history", by: "user" }, ctx);
   expect(overlaps(rectIn(user, "note.history"), corner)).toBe(false);
   const feature = reduce(ws, { type: "open", kind: "note.history", by: "feature" }, ctx);
   expect(overlaps(rectIn(feature, "note.history"), corner)).toBe(false);
+  // Remembered (FR-SHELL-146): exact, by either open.
+  const away = reduce(moved, { type: "minimise", kind: "note.history" }, ctx);
+  for (const by of ["user", "feature"] as const) {
+    const back = reduce(away, { type: "open", kind: "note.history", by }, ctx);
+    expect(rectIn(back, "note.history")).toEqual(rectIn(moved, "note.history"));
+  }
 });
 
 test("FR-SHELL-50 default layouts (player, token-free): exactly §7's table at the four sizes; Initiative from its top-left line", () => {
@@ -619,7 +626,15 @@ function shellAt(registry: WindowRegistry, vp: { w: number; h: number }) {
   return c;
 }
 
-test("FR-SHELL-56 FR-SHELL-99 reopen covered vs free spot (player, protected): the sheet closed, Compendium moved into the right column, the sheet reopened → the sheet at its zone (`zone`), Compendium displaced clear of it (`displaced`) or put away", () => {
+/** A spot the shell chose for `kind` (untouched: no `userSpot`), written into the store. */
+function shellSpot(c: ReturnType<typeof shellAt>, kind: string, r: Rect) {
+  const s = c.store.getState();
+  c.store.setState({
+    windows: s.windows.map((w) => (w.kind === kind ? { ...w, x: r.x, y: r.y, w: r.w, h: r.h } : w)),
+  });
+}
+
+test("FR-SHELL-56 FR-SHELL-99 FR-SHELL-151 reopen covered vs free spot (player, protected): the sheet closed, an untouched Compendium in the right column, the sheet reopened → the sheet at its zone (`zone`), Compendium displaced clear of it (`displaced`) or put away; a remembered Compendium stays under it", () => {
   for (const viewport of REFERENCE_VIEWPORTS) {
     const where = `${viewport.w}×${viewport.h}`;
     const c = shellAt(playerWindows, viewport);
@@ -627,7 +642,7 @@ test("FR-SHELL-56 FR-SHELL-99 reopen covered vs free spot (player, protected): t
     const home = rectIn(c.store.getState().windows, "char.sheet");
     c.dispatch({ type: "close", kind: "char.sheet" }, all);
     c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
-    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all);
+    shellSpot(c, "cmp.compendium", home);
     c.dispatch({ type: "open", kind: "char.sheet" }, all); // the launcher / token menu → sheet
     const s = c.store.getState();
     expect({ where, sheet: rectIn(s.windows, "char.sheet") }).toEqual({ where, sheet: home });
@@ -639,6 +654,17 @@ test("FR-SHELL-56 FR-SHELL-99 reopen covered vs free spot (player, protected): t
     } else {
       expect(cmp?.state).toBe("minimised");
     }
+    // Remembered: the sheet back in its zone, on top; the Compendium stays under it.
+    c.dispatch({ type: "close", kind: "char.sheet" }, all);
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all);
+    const mine = rectIn(c.store.getState().windows, "cmp.compendium");
+    c.dispatch({ type: "open", kind: "char.sheet" }, all);
+    const r = c.store.getState();
+    expect(rectIn(r.windows, "char.sheet")).toEqual(home);
+    expect(rectIn(r.windows, "cmp.compendium")).toEqual(mine);
+    const z = (k: string) => r.windows.find((w) => w.kind === k)?.z ?? 0;
+    expect(z("char.sheet") > z("cmp.compendium")).toBe(true);
   }
 });
 

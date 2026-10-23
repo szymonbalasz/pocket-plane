@@ -2,13 +2,14 @@ import { describe, expect, test } from "bun:test";
 import {
   isBaseKeyTarget,
   isKeyboardFocus,
+  isTypingTarget,
   SHELL_ZONE_ATTR,
   spaceAction,
   trackFocusModality,
 } from "./keys";
 
 // Minimal element stub: tag, attributes, parent, and `closest` over simple selectors
-// (`tag`, `[attr]`, `[attr="v"]`), enough for the selector list in keys.ts.
+// (`tag`, `[attr]`, `[attr="v"]`, `tag:not([attr="v"])…`), enough for the selector lists in keys.ts.
 interface El {
   tag: string;
   attrs: Record<string, string>;
@@ -18,6 +19,10 @@ interface El {
 }
 
 function matches(el: El, simple: string): boolean {
+  const [head = "", ...nots] = simple.split(":not(");
+  if (nots.length > 0) {
+    return matches(el, head) && nots.every((n) => !matches(el, n.replace(/\)$/, "")));
+  }
   const attr = /^\[([\w-]+)(?:="([^"]*)")?\]$/.exec(simple);
   if (attr) {
     const [, name, value] = attr;
@@ -192,5 +197,32 @@ describe("FR-SHELL-83 Space presses a keyboard-focused control (keeps #199 / FR-
     const icon = { parentElement: button } as unknown as EventTarget;
     onPress({ target: icon });
     expect(isKeyboardFocus(target)).toBe(false);
+  });
+});
+
+describe("FR-SHELL-165 exports", () => {
+  test("FR-SHELL-165 exports: isTypingTarget is true for text inputs, textarea, select and contenteditable (and inside one), false for a window body, a button, a checkbox or the canvas", () => {
+    const body = el("body");
+    const win = el("section", { [SHELL_ZONE_ATTR]: "window" }, body);
+    for (const t of [
+      el("input", {}, win),
+      el("input", { type: "text" }, win),
+      el("textarea", {}, win),
+      el("select", {}, win),
+      el("span", {}, el("div", { contenteditable: "true" }, win)),
+      { ...el("p", {}, win), isContentEditable: true },
+    ]) {
+      expect(isTypingTarget(t)).toBe(true);
+    }
+    for (const t of [
+      win,
+      el("div", {}, win),
+      el("button", {}, win),
+      el("input", { type: "checkbox" }, win),
+      el("canvas", {}, body),
+      null,
+    ]) {
+      expect(isTypingTarget(t)).toBe(false);
+    }
   });
 });

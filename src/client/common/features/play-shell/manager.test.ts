@@ -45,8 +45,17 @@ const ctx: ManagerContext = {
   viewport: vp,
   available: new Set(["a.one", "a.two", "a.three"]),
 };
-const run = (ws: Windows, ...actions: WindowAction[]) =>
-  actions.reduce((acc, a) => reduce(acc, a, ctx), ws);
+/** A spot the shell chose for `kind` (untouched: no `userSpot` / `userSize`), with its area. */
+type ShellSpot = { type: "spot"; kind: string; rect: Rect };
+const shellSpot = (ws: Windows, kind: string, r: Rect, at = vp): Windows =>
+  ws.map((w) =>
+    w.kind === kind ? { ...w, x: r.x, y: r.y, w: r.w, h: r.h, area: workArea(at) } : w,
+  );
+const run = (ws: Windows, ...actions: (WindowAction | ShellSpot)[]) =>
+  actions.reduce(
+    (acc, a) => (a.type === "spot" ? shellSpot(acc, a.kind, a.rect) : reduce(acc, a, ctx)),
+    ws,
+  );
 const get = (ws: Windows, kind: string) => ws.find((w) => w.kind === kind) as WindowState;
 const rectOf = (w: WindowState): Rect => ({ x: w.x, y: w.y, w: w.w, h: w.h });
 const order = (ws: Windows) =>
@@ -173,7 +182,7 @@ describe("window manager", () => {
     expect(get(ws, "a.three")).toMatchObject({ x: 12, y: 60 });
   });
 
-  test("FR-SHELL-18 FR-SHELL-99 FR-SHELL-107 appear: a default window takes its zone, the launcher window in it moves; a user spot stays and the window under it moves", () => {
+  test("FR-SHELL-18 FR-SHELL-99 FR-SHELL-107 FR-SHELL-148 appear: a default window takes its zone, the launcher window in it moves; a user spot stays, on top, and nothing moves for it", () => {
     const reg = createWindowRegistry("dm", [
       def("a.one"),
       def("a.late", { defaultOpen: true, available: () => false }),
@@ -192,16 +201,19 @@ describe("window manager", () => {
     expect(rectOf(fixed)).toEqual(rectOf(zone));
     expect(covered(fixed, get(appeared, "a.one"))).toBe(false);
     expect(reduce(ws, { type: "appear", kind: "a.late" }, gone)).toBe(ws); // still unavailable
-    // Moved by the user clear of a.one → kept; over a.one → kept, a.one moves (FR-SHELL-56 (5)).
+    // Moved by the user (remembered) clear of a.one or over it → kept and fronted; a.one stays
+    // (FR-SHELL-146, -148, -149).
     const clear = { x: 900, y: 500, w: 300, h: 200 };
     const away = reduce(ws, { type: "setRect", kind: "a.late", rect: clear }, here);
-    expect(reduce(away, { type: "appear", kind: "a.late" }, here)).toBe(away);
+    const shown = reduce(away, { type: "appear", kind: "a.late" }, here);
+    expect(rectOf(get(shown, "a.late"))).toEqual(clear);
+    expect(order(shown).at(-1)).toBe("a.late");
     const rect = { x: one.x + 50, y: one.y + 50, w: 300, h: 200 };
     const moved = reduce(ws, { type: "setRect", kind: "a.late", rect }, here);
     const after = reduce(moved, { type: "appear", kind: "a.late" }, here);
     expect(rectOf(get(after, "a.late"))).toEqual(rect);
-    expect(covered(get(after, "a.late"), get(after, "a.one"))).toBe(false);
-    expect(get(after, "a.one").area).toEqual(workArea(vp));
+    expect(rectOf(get(after, "a.one"))).toEqual(rectOf(one));
+    expect(order(after).at(-1)).toBe("a.late");
   });
 
   test("FR-SHELL-08 reopen uses last geometry", () => {
@@ -499,7 +511,7 @@ describe("sprint 4: feature vs user opens, restoreOpen (FR-SHELL-08, -41, -42)",
     );
   const covered = () => {
     const ws = setUp();
-    return run(ws, { type: "setRect", kind: "a.two", rect: onInit(ws) });
+    return run(ws, { type: "spot", kind: "a.two", rect: onInit(ws) });
   };
 
   test("FR-SHELL-41 a feature open whose stored rect overlaps an open window is auto-placed and written with its area", () => {
@@ -602,7 +614,7 @@ describe("sprint 6: reopen rule (FR-SHELL-56)", () => {
     run(
       defaultLayout(registry, vp),
       { type: "open", kind: "a.two" },
-      { type: "setRect", kind: "a.two", rect: spot },
+      { type: "spot", kind: "a.two", rect: spot },
       { type: how, kind: "a.two" },
       { type: "open", kind: "a.three" },
       { type: "setRect", kind: "a.three", rect: other },
@@ -660,9 +672,7 @@ describe("sprint 6: reopen rule (FR-SHELL-56)", () => {
     const pgo = (w0: Windows, ...as: WindowAction[]) =>
       as.reduce((acc, a) => reduce(acc, a, pctx), w0);
     const pws = pgo(
-      defaultLayout(players, vp),
-      { type: "open", kind: "a.two" },
-      { type: "setRect", kind: "a.two", rect: over },
+      shellSpot(pgo(defaultLayout(players, vp), { type: "open", kind: "a.two" }), "a.two", over),
       { type: "close", kind: "a.two" },
     );
     const back = get(reduce(pws, { type: "open", kind: "a.two" }, pctx), "a.two");
@@ -887,10 +897,15 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
     expect(pcAreaOf(lb, spread)).toBeLessThanOrEqual(brutePcArea(defOf("sv.b"), small, scene));
   });
 
-  test("FR-SHELL-77 a protected window (Initiative at Start) auto-minimises launcher windows for its spot, never a protected one", () => {
+  test("FR-SHELL-77 FR-SHELL-151 a protected window (Initiative at Start) auto-minimises untouched launcher windows for its spot, never a protected or a remembered one", () => {
     const home = rectOf(get(defaultLayout(s7, small), "sv.init"));
-    let ws = reduce(withA(), { type: "close", kind: "sv.init" }, ctxWith([]));
-    ws = reduce(ws, { type: "setRect", kind: "sv.a", rect: home }, ctxWith([]));
+    const closed = reduce(withA(), { type: "close", kind: "sv.init" }, ctxWith([]));
+    // Remembered there: stays open, under Initiative.
+    const mine = reduce(closed, { type: "setRect", kind: "sv.a", rect: home }, ctxWith([]));
+    const started = reduce(mine, { type: "open", kind: "sv.init", by: "feature" }, ctxWith([]));
+    expect(stateOf(started, "sv.a")).toBe("open");
+    expect(rectOf(get(started, "sv.a"))).toEqual(rectOf(get(mine, "sv.a")));
+    let ws = shellSpot(closed, "sv.a", home, small);
     // PCs over the rest of the band.
     const tokens: PlacementToken[] = [];
     for (let x = 80; x < 800; x += 110) for (let y = 70; y < 470; y += 110) tokens.push(pc(x, y));
@@ -951,7 +966,7 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
     expect(pcClear(card, tokens)).toBe(true);
   });
 
-  test("FR-SHELL-56 OQ-SHELL-55 B reopen keeps only spots the user set: a move sets userSpot, a shell placement clears it; a shell-chosen spot now over a PC is re-placed, a user's is kept", () => {
+  test("FR-SHELL-56 OQ-SHELL-55 B FR-SHELL-146 reopen keeps only spots the user set: a move sets userSpot; a shell-chosen spot now over a PC is re-placed, a user's is kept, even covered (remembered)", () => {
     const tokens = [pc(100, 100)];
     // Shell-chosen: s7.a auto-placed at 68,60 on an empty map, closed, a PC walks under it.
     const shell = reduce(withA(), { type: "close", kind: "sv.a" }, ctxWith([]));
@@ -966,12 +981,13 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
     user = reduce(user, { type: "open", kind: "sv.a" }, ctxWith(tokens));
     expect(rectOf(get(user, "sv.a"))).toEqual(spot);
     expect(get(user, "sv.a").userSpot).toBe(true);
-    // A covered reopen is auto-placed: userSpot dropped.
+    // A covered reopen of a remembered window: exact, still the user's (FR-SHELL-146).
     let covered = reduce(user, { type: "close", kind: "sv.a" }, ctxWith([]));
     covered = reduce(covered, { type: "open", kind: "sv.b" }, ctxWith([]));
     covered = reduce(covered, { type: "setRect", kind: "sv.b", rect: spot }, ctxWith([]));
     covered = reduce(covered, { type: "open", kind: "sv.a" }, ctxWith([]));
-    expect(get(covered, "sv.a").userSpot).toBeUndefined();
+    expect(rectOf(get(covered, "sv.a"))).toEqual(spot);
+    expect(get(covered, "sv.a").userSpot).toBe(true);
     // Round-trips through the entry; older entries without it parse (absent).
     const raw = JSON.stringify(serialise(user, s7));
     const back = restoreLayout(s7, raw, small).windows.find((w) => w.kind === "sv.a");
@@ -985,31 +1001,29 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
     expect(ws.some((w) => w.kind === "sv.a" || w.fixedH || w.userSpot)).toBe(false);
   });
 
-  test("FR-SHELL-81 FR-SHELL-102 pushed windows return: back to the pre-push rect (userSpot with it) when clear, a user spot ignoring PCs; moved, taken or minimised ones stay", () => {
+  test("FR-SHELL-81 FR-SHELL-102 FR-SHELL-150 pushed windows return: an untouched one back to the pre-push rect when clear and PC-free; moved, taken or minimised ones stay; a remembered one is never written", () => {
     const tokens = [pc(100, 100)];
     const bar = { x: 68, y: 60, w: 300, h: 44 };
     const spot = { x: 68, y: 60, ...box };
-    const base = reduce(withA(), { type: "setRect", kind: "sv.a", rect: spot }, ctxWith([]));
+    // Remembered: the push is render-only (FR-SHELL-150), nothing written.
+    const mine = reduce(withA(), { type: "setRect", kind: "sv.a", rect: spot }, ctxWith([]));
+    expect(reduce(mine, { type: "push", rect: bar }, ctxWith([]))).toBe(mine);
+    const base = shellSpot(withA(), "sv.a", spot, small);
     const pushed = reduce(base, { type: "push", rect: bar }, ctxWith([]));
     const at = rectOf(get(pushed, "sv.a"));
     // FR-SHELL-104: through the ladder; full size (rank 6) before nearest the pre-push rect (8).
     expect(at).toEqual({ ...spot, x: bar.x + bar.w + 12 });
     expect(get(pushed, "sv.a").userSpot).toBeUndefined();
     const memory = [
-      {
-        kind: "sv.a",
-        instance: "main",
-        rect: spot,
-        userSpot: true as const,
-        cause: "toolbar:map.toolbar",
-        at,
-      },
+      { kind: "sv.a", instance: "main", rect: spot, cause: "toolbar:map.toolbar", at },
     ];
     const ret = (ws: Windows, t: PlacementToken[] = []) =>
       reduce(ws, { type: "return" }, { ...ctxWith(t), memory: () => memory });
-    const back = ret(pushed, tokens);
-    expect(rectOf(get(back, "sv.a"))).toEqual(spot); // a PC under it: back all the same
-    expect(get(back, "sv.a").userSpot).toBe(true);
+    const back = ret(pushed);
+    expect(rectOf(get(back, "sv.a"))).toEqual(spot);
+    expect(get(back, "sv.a").userSpot).toBeUndefined();
+    // A PC under the old rect: an untouched window doesn't go back over it.
+    expect(pcClear(get(ret(pushed, tokens), "sv.a"), tokens)).toBe(true);
     // Moved since the push: stays.
     const moved = { ...at, x: at.x + 20 };
     const dragged = reduce(pushed, { type: "setRect", kind: "sv.a", rect: moved }, ctxWith([]));

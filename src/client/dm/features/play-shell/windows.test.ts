@@ -510,7 +510,7 @@ const allKinds = () => new Set(dmWindows.defs.map((d) => d.kind));
 const win = (ws: readonly { kind: string }[], kind: string) => {
   const w = ws.find((x) => x.kind === kind);
   if (!w) throw new Error(`${kind} not in the layout`);
-  return w as Rect & { kind: string; state: string };
+  return w as Rect & { kind: string; state: string; z: number };
 };
 const same = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
 
@@ -565,7 +565,7 @@ test("FR-SHELL-40 toast keep-out: DM default layout clear of the top-centre box;
   }
 });
 
-test("FR-SHELL-41 FR-SHELL-99 DM: Compendium dragged onto Initiative's stored rect; Start restores Initiative into its zone, written with its area, the Compendium displaced; a user open the same", () => {
+test("FR-SHELL-41 FR-SHELL-99 FR-SHELL-151 DM: Compendium on Initiative's stored rect; Start restores Initiative into its zone, written with its area, on top; an untouched Compendium is displaced, a dragged (remembered) one stays under it; a user open the same", () => {
   for (const viewport of SPRINT4) {
     const ctx = { registry: dmWindows, viewport, available: allKinds() };
     let ws = reduce(
@@ -575,6 +575,20 @@ test("FR-SHELL-41 FR-SHELL-99 DM: Compendium dragged onto Initiative's stored re
     );
     ws = reduce(ws, { type: "open", kind: "cmp.compendium" }, ctx);
     const home = win(ws, "cbt.initiative");
+    // Untouched (a spot the shell chose there): displaced out of the zone (FR-SHELL-151).
+    const shell = ws.map((w) =>
+      w.kind === "cmp.compendium" ? { ...w, x: home.x, y: home.y, w: 440, h: 400 } : w,
+    );
+    const placed = reduce(shell, { type: "open", kind: "cbt.initiative", by: "feature" }, ctx);
+    const pinit = win(placed, "cbt.initiative");
+    expect(same(pinit, home)).toBe(true);
+    const pcmp = win(placed, "cmp.compendium");
+    expect(
+      pcmp.state === "open" && overlaps(pinit, pcmp)
+        ? `over the Compendium at ${viewport.w}×${viewport.h}`
+        : "ok",
+    ).toBe("ok");
+    // Dragged there (remembered): it stays, under Initiative (OQ-SHELL-79 A).
     ws = reduce(
       ws,
       { type: "setRect", kind: "cmp.compendium", rect: { ...home, w: 440, h: 400 } },
@@ -583,14 +597,11 @@ test("FR-SHELL-41 FR-SHELL-99 DM: Compendium dragged onto Initiative's stored re
     const started = reduce(ws, { type: "open", kind: "cbt.initiative", by: "feature" }, ctx);
     const init = started.find((w) => w.kind === "cbt.initiative");
     expect(init?.state).toBe("open");
-    // FR-SHELL-99 (ruling 8): Initiative takes its zone; the user's Compendium in it moves.
     expect(init && same(init, home)).toBe(true);
     const cmp = win(started, "cmp.compendium");
-    expect(
-      init && cmp.state === "open" && overlaps(init, cmp)
-        ? `over the Compendium at ${viewport.w}×${viewport.h}`
-        : "ok",
-    ).toBe("ok");
+    expect(same(cmp, win(ws, "cmp.compendium"))).toBe(true);
+    expect(cmp.state).toBe("open");
+    expect((init?.z ?? 0) > cmp.z).toBe(true);
     expect(init?.area).toEqual(workArea(viewport));
     for (const by of [undefined, "user"] as const) {
       const user = win(
@@ -602,21 +613,17 @@ test("FR-SHELL-41 FR-SHELL-99 DM: Compendium dragged onto Initiative's stored re
   }
 });
 
-test('FR-SHELL-08 FR-SHELL-56 user opens keep a clear stored rect (the DM soft box does not count), and re-place one now over another window: the Not-shown badge → Scenes, a notification "Open"', () => {
+test('FR-SHELL-08 FR-SHELL-56 FR-SHELL-146 user opens keep a clear stored rect (the DM soft box does not count), and re-place an untouched one now over another window; a remembered one reopens exactly: the Not-shown badge → Scenes, a notification "Open"', () => {
   const viewport = DESKTOP;
   const ctx = { registry: dmWindows, viewport, available: allKinds() };
   const layout = defaultLayout(dmWindows, viewport);
   const init = win(layout, "cbt.initiative");
-  const reopen = (kind: string, spot: Rect) => {
-    const ws = reduce(
-      reduce(layout, { type: "open", kind }, ctx),
-      {
-        type: "setRect",
-        kind,
-        rect: spot,
-      },
-      ctx,
-    );
+  const reopen = (kind: string, spot: Rect, user = false) => {
+    const opened = reduce(layout, { type: "open", kind }, ctx);
+    // A user move remembers it (FR-SHELL-144); else a spot the shell chose.
+    const ws = user
+      ? reduce(opened, { type: "setRect", kind, rect: spot }, ctx)
+      : opened.map((w) => (w.kind === kind ? { ...w, ...spot } : w));
     // `useOpenWindow()(kind)` dispatches `by: "user"`.
     const closed = reduce(ws, { type: "close", kind }, ctx);
     return {
@@ -633,6 +640,9 @@ test('FR-SHELL-08 FR-SHELL-56 user opens keep a clear stored rect (the DM soft b
     const covered = reopen(kind, { x: init.x + 10, y: init.y + 10, w: 300, h: 300 });
     expect(same(covered.back, covered.stored)).toBe(false);
     expect(overlaps(covered.back, init)).toBe(false);
+    // Remembered: exactly its stored rect, even over Initiative (FR-SHELL-146).
+    const mine = reopen(kind, { x: init.x + 10, y: init.y + 10, w: 300, h: 300 }, true);
+    expect(same(mine.back, mine.stored)).toBe(true);
   }
 });
 
@@ -739,7 +749,15 @@ function shellAt(registry: WindowRegistry, vp: { w: number; h: number }) {
   return c;
 }
 
-test("FR-SHELL-56 FR-SHELL-99 reopen covered vs free spot (DM, protected): Initiative closed, Compendium moved into its spot, Initiative reopened → Initiative at its zone (`zone`), Compendium displaced clear of it (`displaced`) or put away", () => {
+/** A spot the shell chose for `kind` (untouched: no `userSpot`), written into the store. */
+function shellSpot(c: ReturnType<typeof shellAt>, kind: string, r: Rect) {
+  const s = c.store.getState();
+  c.store.setState({
+    windows: s.windows.map((w) => (w.kind === kind ? { ...w, x: r.x, y: r.y, w: r.w, h: r.h } : w)),
+  });
+}
+
+test("FR-SHELL-56 FR-SHELL-99 FR-SHELL-151 reopen covered vs free spot (DM, protected): Initiative closed, an untouched Compendium in its spot, Initiative reopened → Initiative at its zone (`zone`), Compendium displaced clear of it (`displaced`) or put away; a remembered Compendium stays under it", () => {
   for (const viewport of REFERENCE_VIEWPORTS) {
     const at = `${viewport.w}×${viewport.h}`;
     const c = shellAt(dmWindows, viewport);
@@ -747,7 +765,7 @@ test("FR-SHELL-56 FR-SHELL-99 reopen covered vs free spot (DM, protected): Initi
     const home = rectIn(c.store.getState().windows, "cbt.initiative");
     c.dispatch({ type: "close", kind: "cbt.initiative" }, all);
     c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
-    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all);
+    shellSpot(c, "cmp.compendium", home);
     c.dispatch({ type: "toggle", kind: "cbt.initiative" }, all); // the launcher button
     const s = c.store.getState();
     expect({ at, init: rectIn(s.windows, "cbt.initiative") }).toEqual({ at, init: home });
@@ -761,11 +779,24 @@ test("FR-SHELL-56 FR-SHELL-99 reopen covered vs free spot (DM, protected): Initi
     }
     // A launcher window's own reopen: onto Initiative → `reopened`; then clear → `stored`.
     c.dispatch({ type: "close", kind: "cmp.compendium" }, all);
-    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all); // stored only
+    shellSpot(c, "cmp.compendium", home); // stored only
     c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
     expect(c.store.getState().placed.get("cmp.compendium:main")).toBe("reopened");
     c.dispatch({ type: "close", kind: "cmp.compendium" }, all);
     c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    expect(c.store.getState().placed.get("cmp.compendium:main")).toBe("stored");
+    // Remembered (dragged onto Initiative): Initiative reopened in its zone, on top; the
+    // Compendium stays under it (OQ-SHELL-79 A); its own reopen is exact (FR-SHELL-146).
+    c.dispatch({ type: "close", kind: "cbt.initiative" }, all);
+    c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: home }, all);
+    c.dispatch({ type: "toggle", kind: "cbt.initiative" }, all);
+    const r = c.store.getState();
+    expect(rectIn(r.windows, "cmp.compendium")).toEqual(home);
+    const z = (k: string) => r.windows.find((w) => w.kind === k)?.z ?? 0;
+    expect(z("cbt.initiative") > z("cmp.compendium")).toBe(true);
+    c.dispatch({ type: "close", kind: "cmp.compendium" }, all);
+    c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+    expect(rectIn(c.store.getState().windows, "cmp.compendium")).toEqual(home);
     expect(c.store.getState().placed.get("cmp.compendium:main")).toBe("stored");
   }
 });

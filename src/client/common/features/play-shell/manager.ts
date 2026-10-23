@@ -2,10 +2,10 @@
 // Holds every window's *stored* state; rendering fits and clamps (geometry.ts) without writing
 // back. State changes (open, close, minimise, focus, a move / resize end) are made here; every
 // rect the shell chooses comes from the one placer (`placer.ts`, FR-SHELL-95, ADR-0060), stamped
-// with the work area it was set in (`area`). A shell spot drops `userSpot` / `userSize`; a move /
-// resize end sets them.
+// with the work area it was set in (`area`). A move / resize end sets `userSpot` / `userSize`
+// (remembered, FR-SHELL-144: the placer never writes it again); only Reset clears them.
 import { GEOMETRY_LIMIT, Layout, MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
-import { type Rect, type Viewport, workArea } from "./geometry";
+import { isRemembered, type Rect, type Viewport, workArea } from "./geometry";
 import { type KeepOut, keepOuts } from "./keep-outs";
 import { fittedDefaultRect, type PlacementToken } from "./placement";
 import {
@@ -37,6 +37,8 @@ export {
   type Placed,
   type Plan,
   placedAs,
+  pushBars,
+  renderedPlaced,
   USEFUL_H,
   useful,
   usefulSize,
@@ -114,6 +116,52 @@ export interface Restored {
   stored?: true;
   /** The load settle changed the stored windows (FR-SHELL-53, -99): write the entry. */
   migrated?: true;
+  /** FR-SHELL-155: entries taken over at this load (the caller runs each `onAbsorb` once). */
+  absorbed?: readonly { kind: string; from: string }[];
+}
+
+/**
+ * FR-SHELL-155 (`absorbs`): a stored entry of an absorbed kind, open or minimised, while the
+ * absorbing kind (same instance) is closed or has no entry, gives it its state and z; geometry:
+ * the absorbing window's own rect if remembered; else, if the absorbed entry was remembered, its
+ * x / y at the absorbing window's own size (`userSpot`, nudged on render, FR-SHELL-147); else the
+ * `load` settle places it untouched. Absorbed entries are dropped either way.
+ */
+export function absorbEntries(
+  registry: WindowRegistry,
+  windows: readonly WindowState[],
+  vp: Viewport,
+): { windows: WindowState[]; absorbed: { kind: string; from: string }[]; dropped: boolean } {
+  let out = [...windows];
+  const absorbed: { kind: string; from: string }[] = [];
+  let dropped = false;
+  for (const def of registry.defs) {
+    for (const from of def.absorbs ?? []) {
+      for (const e of out.filter((w) => w.kind === from)) {
+        out = out.filter((w) => w !== e);
+        dropped = true;
+        if (e.state === "closed") continue;
+        const own = find(out, def.kind, e.instance);
+        if (own && own.state !== "closed") continue;
+        const size = own ?? fittedDefaultRect(def, vp);
+        const rect = own && isRemembered(own) ? own : isRemembered(e) ? { x: e.x, y: e.y } : size;
+        const next: WindowState = {
+          ...(own ?? { kind: def.kind, instance: e.instance }),
+          state: e.state,
+          z: e.z,
+          x: rect.x,
+          y: rect.y,
+          w: size.w,
+          h: size.h,
+          area: own && isRemembered(own) ? own.area : (e.area ?? own?.area ?? workArea(vp)),
+          ...(!(own && isRemembered(own)) && isRemembered(e) && { userSpot: true as const }),
+        };
+        out = own ? out.map((w) => (w === own ? next : w)) : [...out, next];
+        absorbed.push({ kind: def.kind, from });
+      }
+    }
+  }
+  return { windows: out, absorbed, dropped };
 }
 
 /**
@@ -148,8 +196,9 @@ export function restoreLayout(
       warning: `layout entry invalid (${first?.path.join(".")}: ${first?.message})`,
     };
   }
+  const taken = absorbEntries(registry, parsed.data.windows, vp);
   const windows = normaliseZ(
-    parsed.data.windows.map((w) => {
+    taken.windows.map((w) => {
       const def = registry.get(w.kind);
       const next = inferUserSize(w, def);
       return next.state !== "closed" && def?.restoreOpen === false
@@ -166,8 +215,13 @@ export function restoreLayout(
     ...ctx,
   };
   const p = settle(windows, { type: "load", drawn: avoid.length > 0 }, loadCtx);
-  const migrated = p.windows !== windows;
-  return { windows: [...p.windows], stored: true, ...(migrated && { migrated: true }) };
+  const migrated = p.windows !== windows || taken.dropped;
+  return {
+    windows: [...p.windows],
+    stored: true,
+    ...(migrated && { migrated: true }),
+    ...(taken.absorbed.length > 0 && { absorbed: taken.absorbed }),
+  };
 }
 
 /** What gets written: unknown kinds dropped, unavailable ones kept (FR-SHELL-18). */
@@ -305,9 +359,11 @@ export function plan(ws: Windows, action: WindowAction, ctx: ManagerContext): Pl
       return none(toFront(ws, kind, instance));
     }
     case "appear": {
+      // FR-SHELL-148: an appearance fronts the window (MRU), after the placer.
       const cur = find(ws, kind, instance);
       if (cur?.state !== "open" || !ctx.available.has(kind)) return none(ws);
-      return run(ws, { type: "appear", kind, instance });
+      const p = run(ws, { type: "appear", kind, instance });
+      return { ...p, windows: toFront(p.windows, kind, instance) };
     }
     case "settle": {
       const cur = find(ws, kind, instance);

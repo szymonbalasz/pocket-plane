@@ -12,6 +12,7 @@ import {
   isReopenCovered,
   type ManagerContext,
   plan,
+  pushBars,
   reduce,
   useful,
   type WindowAction,
@@ -90,6 +91,7 @@ export function launcherSequence(
       viewport,
       new Map(),
       hardRects(regions),
+      pushBars(regions),
     );
     const open = shown(ws);
     const mine = me && me.state === "open" ? rects[open.indexOf(me)] : undefined;
@@ -147,7 +149,8 @@ function sizesOf(def: Placeable, vp: Viewport, hard: readonly Rect[], floor?: Si
   const fullH = Math.min(base.h, a.bottom - a.top);
   const minH = Math.min(Math.max(def.minSize.h, floor?.h ?? 0), fullH);
   const openH = def.minOpenH === undefined ? null : Math.max(minH, Math.min(def.minOpenH, fullH));
-  const minX = Math.max(a.left, Math.min(base.x, RAIL_CLEAR));
+  // FR-SHELL-166 (BL-76): candidates start at the rail, as placement's `minX` (FR-SHELL-109).
+  const minX = Math.max(a.left, RAIL_CLEAR);
   const minW = Math.min(Math.max(def.minSize.w, floor?.w ?? 0), base.w);
   return { base, a, fullH, minH, openH, minX, w: base.w, minW };
 }
@@ -354,7 +357,7 @@ function autoPlaceProblems(
     return d !== undefined && !d.defaultOpen && !d.fixedDefault;
   });
   const rectsOf = (list: Windows) =>
-    renderedWindowRects(list, registry, o.available, vp, new Map(), scene.hard);
+    renderedWindowRects(list, registry, o.available, vp, new Map(), scene.hard, []);
   const kept = rectsOf(others.filter((w) => !parkable.includes(w)));
   const pcFree = pcAreaOf(rect, scene.tokens) === 0;
   const atUseful = rect.h >= Math.min(floor.h, z.fullH) && rect.w >= floor.w;
@@ -406,7 +409,7 @@ const sameRect = (a: Rect | null, b: Rect | null) =>
  * FR-SHELL-62 (b): the default layout (token-free, as on first load) at the first viewport; open
  * `kinds` in order, close them all, open them again; then at each next viewport close them,
  * switch, reopen them; then close the protected kind, open the first kind and move it onto the
- * protected one's spot, reopen the protected one. Every open is a user open; each is checked
+ * protected one's spot (remembered), reopen the protected one: at its spot, on top. Every open is a user open; each is checked
  * (FR-SHELL-62 (c)).
  */
 export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): LayoutStep[] {
@@ -415,7 +418,15 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
   const regionsAt = (v: Viewport) => keepOuts(registry.client, v, new Map());
   const shown = (ws: Windows) => ws.filter((w) => w.state === "open" && o.available.has(w.kind));
   const rendered = (ws: Windows, v: Viewport) =>
-    renderedWindowRects(shown(ws), registry, o.available, v, new Map(), hardRects(regionsAt(v)));
+    renderedWindowRects(
+      shown(ws),
+      registry,
+      o.available,
+      v,
+      new Map(),
+      hardRects(regionsAt(v)),
+      pushBars(regionsAt(v)),
+    );
   let ws: Windows = defaultLayout(registry, vp, [], regionsAt(vp));
   let tokens = o.tokensAt(vp, rendered(ws, vp));
   // The shell's client memory between actions (FR-SHELL-102), as the controller keeps it.
@@ -501,8 +512,9 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
     tokens = o.tokensAt(vp, rendered(defaultLayout(registry, vp, [], regionsAt(vp)), vp));
     for (const kind of o.kinds) open(`reopen ${vp.w}×${vp.h}`, kind);
   }
-  // FR-SHELL-56 (5): a launcher window moved onto the closed protected window's spot (test-mode
-  // `fixedDefault` windows keep theirs, (5)).
+  // FR-SHELL-56 (5), FR-SHELL-151: a launcher window moved onto the closed protected window's
+  // spot (test-mode `fixedDefault` windows keep theirs, (5)) is remembered: the protected window
+  // reopens in its zone, on top, and the moved window stays under it (OQ-SHELL-79 A).
   const first = o.kinds.find((k) => !registry.get(k)?.fixedDefault);
   // Closing the launcher windows ends any squeeze they caused (FR-SHELL-101, -102): the protected
   // window's spot is the one it has then.
@@ -512,12 +524,16 @@ export function layoutRun(registry: WindowRegistry, o: LayoutRunOptions): Layout
     act({ type: "close", kind: o.protectedKind });
     open("protected", first);
     act({ type: "setRect", kind: first, rect: prot });
+    const mine = find(ws, first) as WindowState;
     open("protected", o.protectedKind);
     const step = steps.at(-1) as LayoutStep;
     if (!sameRect(step.rect, prot)) step.problems.push("protected window moved");
-    const over = rectNow(ws, first);
-    if (over && step.rect && overlaps(over, step.rect)) {
-      step.problems.push(`${first} still over it`);
+    const after = find(ws, first);
+    if (after?.state !== "open" || !sameRect(rectOf(after), rectOf(mine))) {
+      step.problems.push(`remembered ${first} moved or put away`);
+    }
+    if (after && (find(ws, o.protectedKind)?.z ?? 0) <= after.z) {
+      step.problems.push(`${o.protectedKind} not on top of ${first}`);
     }
   }
   return steps;

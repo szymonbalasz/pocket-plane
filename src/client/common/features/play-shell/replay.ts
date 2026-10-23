@@ -18,10 +18,10 @@ import {
   visibleArea,
 } from "../scenes-map/camera";
 import { fitRooms, renderedWindowRects } from "./free-area";
-import type { Rect, Viewport } from "./geometry";
+import { isRemembered, type Rect, type Viewport } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import { bruteBest, overlaps, REFERENCE_VIEWPORTS } from "./layout-checks";
-import { defaultLayout, useful, type WindowAction, type Windows } from "./manager";
+import { defaultLayout, pushBars, useful, type WindowAction, type Windows } from "./manager";
 import { type PlacementToken, pcBoxes } from "./placement";
 import type { ShellClient, WindowRegistry } from "./registry";
 import {
@@ -253,6 +253,7 @@ function shownOf(sim: Sim): Map<string, { w: WindowState; r: Rect }> {
     sim.vp,
     new Map(),
     hardRects(regionsOf(sim)),
+    pushBars(regionsOf(sim)),
   );
   return new Map(open.map((w, i) => [w.kind, { w, r: rects[i] as Rect }]));
 }
@@ -388,15 +389,21 @@ function check(
   const hard = regionsOf(sim).filter((k) => k.kind === "hard");
   const list = [...shown.entries()];
   for (const [kind, { w, r }] of list) {
-    // I1: no PC footprint + 4 px under a window; user spots are exempt (OQ-SHELL-62 A).
-    if (!w.userSpot && !opts.exemptI1 && pcs.some((p) => overlaps(r, p))) {
+    // I1–I3 exempt remembered windows (FR-SHELL-162; I9–I13 cover them).
+    if (isRemembered(w)) continue;
+    // I1: no PC footprint + 4 px under a window.
+    if (!opts.exemptI1 && pcs.some((p) => overlaps(r, p))) {
       // Within the 4-px margin only: a fit that keeps footprints flush (the camera's, FR-MAP-93).
       const bare = tokens.some((t) => t.pc && overlaps(r, t));
       out.push(`I1 ${kind} over a PC${bare ? "" : " (4-px margin)"}`);
     }
     // I2: no overlap, nothing on a hard keep-out or the rail.
+    // Between untouched windows (an untouched one on a remembered one only at FR-SHELL-45's last
+    // resort, I2's memory clause in `checkMemory`).
     for (const [other, o] of list) {
-      if (other > kind && overlaps(r, o.r)) out.push(`I2 ${kind} over ${other}`);
+      if (other > kind && !isRemembered(o.w) && overlaps(r, o.r)) {
+        out.push(`I2 ${kind} over ${other}`);
+      }
     }
     for (const k of hard) if (overlaps(r, k.rect)) out.push(`I2 ${kind} on keep-out ${k.id}`);
     if (r.x < 56) out.push(`I2 ${kind} on the rail (x ${r.x})`);
@@ -472,6 +479,7 @@ function checkPutAway(sim: Sim, before: Windows, opened: string, beforeTokens: P
       sim.vp,
       new Map(),
       hardRects(regionsOf(sim)),
+      pushBars(regionsOf(sim)),
     );
     const hard = hardRects(regionsOf(sim));
     const best = bruteBest(

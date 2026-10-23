@@ -16,13 +16,20 @@
 // default layout iff PC-clear, else the ladder among the protected windows (zone first); launcher
 // windows in it are displaced. Displacement memory (FR-SHELL-102): what a transient cause moved,
 // shrank or put away comes back when the cause ends.
+// Window memory (FR-SHELL-144–152, ADR-0064, protocol §18): a window the user moved or resized
+// (remembered) is never written here: it is a fixed obstacle for the ladder, never put away,
+// squeezed, displaced or pushed (its tool-bar push and on-screen nudge are render-only); zones
+// ignore it. The ladder above runs for untouched windows only.
 import { MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
 import {
   clampRect,
   EDGE_GAP,
   growsToContent,
+  isRemembered,
   LAUNCHER_CLEAR,
+  placedRect,
   type Rect,
+  renderedRect,
   TOP_BAR_H,
   type Viewport,
   windowRects,
@@ -187,6 +194,13 @@ export const keepOutsOf = (ctx: Pick<ManagerContext, "keepOuts" | "registry" | "
 export const softRects = (list: readonly KeepOut[]) =>
   list.filter((k) => k.kind === "soft").map((k) => k.rect);
 
+/**
+ * The bars that push a remembered window, render-only (FR-SHELL-150): the shown hard keep-outs
+ * (tool bar, chrome keep-outs), never the toast box.
+ */
+export const pushBars = (list: readonly KeepOut[]) =>
+  list.filter((k) => k.kind === "hard" && k.id !== TOASTS_KEEP_OUT).map((k) => k.rect);
+
 export const isShown = (w: WindowState, available: ReadonlySet<string>) =>
   w.state === "open" && available.has(w.kind);
 
@@ -297,7 +311,8 @@ export function shownRects(ws: Windows, ctx: ManagerContext, extra?: WindowState
     if (!def) out.set(w, clampRect(w, vp));
     return def ? [{ win: w, def, needed: ctx.heights?.(idOf(w)) }] : [];
   });
-  const rects = windowRects(known, vp, hardRects(keepOutsOf(ctx)));
+  const regions = keepOutsOf(ctx);
+  const rects = windowRects(known, vp, hardRects(regions), pushBars(regions));
   for (const [i, k] of known.entries()) out.set(k.win, rects[i] as Rect);
   return out;
 }
@@ -356,8 +371,8 @@ export function isReopenCovered(ws: Windows, cur: WindowState, ctx: ManagerConte
 }
 
 /**
- * Windows the ladder may put away for (kind, instance) (FR-SHELL-77, -78): rendered, open, type
- * neither `defaultOpen` nor `fixedDefault`, not the window placed; ascending z (least recently
+ * Windows the ladder may put away for (kind, instance) (FR-SHELL-77, -78): rendered, open,
+ * untouched (FR-SHELL-151), type neither `defaultOpen` nor `fixedDefault`, not the window placed; ascending z (least recently
  * brought to front first), ties → earlier in the entry, a window placed earlier in this settle's
  * own sequence (`late`) last.
  */
@@ -374,6 +389,8 @@ export function autoMinimiseOrder(
     .filter((w) => {
       const d = ctx.registry.get(w.kind);
       if (!d || d.defaultOpen || d.fixedDefault || !isShown(w, ctx.available)) return false;
+      // FR-SHELL-151: only untouched launcher windows are put away.
+      if (isRemembered(w)) return false;
       return !(w.kind === kind && w.instance === instance);
     })
     .sort((a, b) => isLate(a) - isLate(b) || a.z - b.z || (at.get(a) ?? 0) - (at.get(b) ?? 0));
@@ -456,8 +473,9 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const label = trigger.type;
 
   const get = (id: string) => out.find((w) => idOf(w) === id);
+  /** FR-SHELL-145: a remembered window is never written by the placer (I9, I12). */
   const setWin = (id: string, next: WindowState) => {
-    out = out.map((w) => (idOf(w) === id ? next : w));
+    out = out.map((w) => (idOf(w) === id && !isRemembered(w) ? next : w));
   };
   const defOf = (w: WindowState) => registry.get(w.kind);
   const isProt = (w: WindowState) => defOf(w)?.defaultOpen === true;
@@ -471,13 +489,17 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const need = (w: WindowState, def: WindowDef) =>
     growsToContent(w, def) ? ctx.heights?.(idOf(w)) : undefined;
 
-  /** The rendered windows other than `id` (only protected ones with `protectedOnly`). */
+  /**
+   * The rendered windows other than `id`; with `protectedOnly` (a zone and its ladder) only the
+   * untouched protected ones: zones ignore remembered windows (FR-SHELL-151).
+   */
   const obstacles = (id: string, protectedOnly = false): Obstacle[] => {
     const res: Obstacle[] = [];
     for (const [w, r] of shownMap()) {
       if (idOf(w) === id || moving.has(idOf(w))) continue;
       const prot = isProt(w);
-      if (protectedOnly && (!prot || (zoned !== null && !zoned.has(idOf(w))))) continue;
+      if (protectedOnly && (!prot || isRemembered(w))) continue;
+      if (protectedOnly && zoned !== null && !zoned.has(idOf(w))) continue;
       res.push({ ...r, protected: prot });
     }
     return res;
@@ -637,7 +659,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const gone = new Set(order().map(idOf));
       const keep: Obstacle[] = [];
       for (const [w, r] of shownMap()) {
-        if (idOf(w) === id || gone.has(idOf(w)) || (o.protectedOnly && !isProt(w))) continue;
+        if (idOf(w) === id || gone.has(idOf(w))) continue;
+        if (o.protectedOnly && (!isProt(w) || isRemembered(w))) continue;
         keep.push({ ...r, protected: isProt(w) });
       }
       const p = placeWindow(def, vp, { ...input(), windows: keep, ...more, gap: 4 });
@@ -732,7 +755,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     for (const kind of SQUEEZE[registry.client]) {
       const p = find(out, kind, MAIN_INSTANCE);
       const def = p && defOf(p);
-      if (!p || !def?.defaultOpen || !isShown(p, ctx.available) || p.userSize) continue;
+      // FR-SHELL-151: only untouched protected windows are squeezed.
+      if (!p || !def?.defaultOpen || !isShown(p, ctx.available) || isRemembered(p)) continue;
       const r = rendered(p);
       const u = useful(def, vp, registry);
       if (r.w <= u.w && r.h <= u.h) continue;
@@ -844,9 +868,9 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   /**
    * FR-SHELL-104: every shown window over `bar` grown by 12 px is displaced: protected ones first
    * (registry order), then the launcher windows by descending z (FR-SHELL-111). The ones still
-   * waiting are no obstacle (they leave the bar). `only`: just that window (FR-SHELL-105's drag-end).
+   * waiting are no obstacle (they leave the bar). Untouched windows only (FR-SHELL-104, -150).
    */
-  const pushFrom = (bar: Rect, cause: string, only?: string) => {
+  const pushFrom = (bar: Rect, cause: string) => {
     const grown = {
       x: bar.x - EDGE_GAP,
       y: bar.y - EDGE_GAP,
@@ -855,8 +879,9 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     };
     const hit = new Set(
       [...shownMap()]
-        .filter(([w, r]) => (!only || idOf(w) === only) && overlaps(r, grown))
-        .filter(([w]) => !defOf(w)?.fixedDefault)
+        .filter(([, r]) => overlaps(r, grown))
+        // A remembered window's push is render-only (FR-SHELL-150): never written here.
+        .filter(([w]) => !defOf(w)?.fixedDefault && !isRemembered(w))
         .map(([w]) => idOf(w)),
     );
     const order = [
@@ -892,66 +917,66 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   };
 
   /**
-   * FR-SHELL-99, -107: a protected window takes its zone iff PC-clear (and clear of the other
-   * protected windows), else the ladder among the protected ones, zone first; a user spot keeps
-   * its rect. Then the launcher windows over it are displaced (cause `window:<kind>`).
+   * FR-SHELL-99, -107: an untouched protected window takes its zone iff PC-clear (and clear of
+   * the other untouched protected windows; remembered windows ignored, FR-SHELL-151), else the
+   * ladder among them, zone first; a remembered one keeps its rect. Then the untouched launcher
+   * windows over it are displaced (cause `window:<kind>`).
    */
   const placeProtected = (id: string, how: Placed = "zone", cause?: string, displace = true) => {
     const w = get(id);
-    if (!w || !isShown(w, ctx.available)) return;
-    if (!w.userSpot) {
-      const full = zoneOf(w);
-      const def = defOf(w);
-      // A squeeze whose cause goes on stays squeezed in the zone (a viewport change); after a
-      // reload (memory dropped) a window stored squeezed in its zone stays so: its cause still
-      // shows, else it would have returned before (WF2 notes: the DM's reload kept the layout).
-      const storedSqueezed =
-        trigger.type === "load" &&
-        full &&
-        def &&
-        sameRect(w, squeezeRect(full, def)) &&
-        !sameRect(w, full);
-      const z = full && def && (squeezedNow(w) || storedSqueezed) ? squeezeRect(full, def) : full;
-      if (z) {
-        const atZone = { ...w, ...z };
-        const r = shownRect(
-          out.map((x) => (idOf(x) === id ? atZone : x)),
-          atZone,
-          ctx,
-        );
-        // With a `fitted` camera the map refits after the placer and clears the tokens (FR-SHELL-99,
-        // FR-MAP-96, -98): the camera the PCs are drawn at now is the one before that refit.
-        if ((fitted || pcFree(r)) && clearAt(r, id, true)) {
-          write(id, z, how, { rung: "zone", keepSize: true });
-          if (storedSqueezed && full) {
-            // Its cause again: the launcher window in its full zone; that one closing (or
-            // ending) returns it to the full zone (FR-SHELL-102).
-            const cause = [...shownMap()].find(
-              ([o, or]) => !isProt(o) && overlaps(or, full) && idOf(o) !== id,
-            );
-            if (cause) {
-              remember({ ...w, ...full }, `window:${cause[0].kind}`, plainRect(z));
-              placed.set(id, "squeezed");
-            }
+    // FR-SHELL-145, -149: a remembered protected window keeps its rect and makes no room.
+    if (!w || !isShown(w, ctx.available) || isRemembered(w)) return;
+    const full = zoneOf(w);
+    const def = defOf(w);
+    // A squeeze whose cause goes on stays squeezed in the zone (a viewport change); after a
+    // reload (memory dropped) a window stored squeezed in its zone stays so: its cause still
+    // shows, else it would have returned before (WF2 notes: the DM's reload kept the layout).
+    const storedSqueezed =
+      trigger.type === "load" &&
+      full &&
+      def &&
+      sameRect(w, squeezeRect(full, def)) &&
+      !sameRect(w, full);
+    const z = full && def && (squeezedNow(w) || storedSqueezed) ? squeezeRect(full, def) : full;
+    if (z) {
+      const atZone = { ...w, ...z };
+      const r = shownRect(
+        out.map((x) => (idOf(x) === id ? atZone : x)),
+        atZone,
+        ctx,
+      );
+      // With a `fitted` camera the map refits after the placer and clears the tokens (FR-SHELL-99,
+      // FR-MAP-96, -98): the camera the PCs are drawn at now is the one before that refit.
+      if ((fitted || pcFree(r)) && clearAt(r, id, true)) {
+        write(id, z, how, { rung: "zone", keepSize: true });
+        if (storedSqueezed && full) {
+          // Its cause again: the launcher window in its full zone; that one closing (or
+          // ending) returns it to the full zone (FR-SHELL-102).
+          const cause = [...shownMap()].find(
+            ([o, or]) => !isProt(o) && overlaps(or, full) && idOf(o) !== id,
+          );
+          if (cause) {
+            remember({ ...w, ...full }, `window:${cause[0].kind}`, plainRect(z));
+            placed.set(id, "squeezed");
           }
-        } else {
-          // Least movement (ADR-0060 §4): a spot the ladder gave it earlier that still holds (inside,
-          // clear of the protected windows, PC-clear, ≥ useful) is kept; else the ladder.
-          // A shrunk one goes through the ladder again (it may grow back, L1 first).
-          const cur = rendered(w);
-          const holds =
-            !sameRect(w, z) &&
-            w.w === z.w &&
-            w.h === z.h &&
-            inside(w) &&
-            clearAt(cur, id, true) &&
-            pcFree(cur);
-          if (!holds) {
-            setWin(id, { ...w, ...z });
-            const spot = ladder(id, { prev: plainRect(w), putAway: false, protectedOnly: true });
-            if (spot) write(id, spot.rect, "auto", { rung: spot.rung });
-            if (spot) pcFlags.set(id, spot.pcClear);
-          }
+        }
+      } else {
+        // Least movement (ADR-0060 §4): a spot the ladder gave it earlier that still holds (inside,
+        // clear of the protected windows, PC-clear, ≥ useful) is kept; else the ladder.
+        // A shrunk one goes through the ladder again (it may grow back, L1 first).
+        const cur = rendered(w);
+        const holds =
+          !sameRect(w, z) &&
+          w.w === z.w &&
+          w.h === z.h &&
+          inside(w) &&
+          clearAt(cur, id, true) &&
+          pcFree(cur);
+        if (!holds) {
+          setWin(id, { ...w, ...z });
+          const spot = ladder(id, { prev: plainRect(w), putAway: false, protectedOnly: true });
+          if (spot) write(id, spot.rect, "auto", { rung: spot.rung });
+          if (spot) pcFlags.set(id, spot.pcClear);
         }
       }
     }
@@ -961,12 +986,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   /** Launcher windows over protected window `id` move out (FR-SHELL-99), highest z first. */
   const displaceFrom = (id: string, cause?: string) => {
     const p = get(id);
-    if (!p || !isShown(p, ctx.available)) return;
+    if (!p || !isShown(p, ctx.available) || isRemembered(p)) return;
     const pr = rendered(p);
     const hits = [...shownMap()]
       .filter(([w, r]) => {
         const def = defOf(w);
-        return idOf(w) !== id && def && !def.defaultOpen && !def.fixedDefault && overlaps(pr, r);
+        // A remembered window in the zone stays, under it (FR-SHELL-151, OQ-SHELL-79 A).
+        if (idOf(w) === id || !def || def.defaultOpen || def.fixedDefault || isRemembered(w)) {
+          return false;
+        }
+        return overlaps(pr, r);
       })
       .map(([w]) => w)
       .sort((a, b) => b.z - a.z);
@@ -990,7 +1019,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const w = get(id);
     const def = w && defOf(w);
     if (!w || !def || !isShown(w, ctx.available) || def.fixedDefault) return;
-    if (w.userSpot) return;
+    if (isRemembered(w)) return;
     // The settle after the first token draw reconsiders the restored layout only: a window
     // placed on this page since (an open, a displacement) keeps its spot (no re-placing when a PC
     // comes under a window, play-shell §16).
@@ -1190,14 +1219,21 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const w = get(id);
       const def = w && defOf(w);
       if (!w || !def || !isShown(w, ctx.available)) break;
+      if (isRemembered(w)) {
+        // FR-SHELL-146, -149: a remembered window opens at its stored rect; no rung runs for
+        // anyone (no move, squeeze, put-away, memory change or yield).
+        placed.set(id, "stored");
+        log.push(`${label}:${w.kind}>remembered`);
+        break;
+      }
       if (def.defaultOpen) {
         if (trigger.type === "settle") {
           const r = rendered(w);
           if (!pcFree(r) || !clearAt(r, id)) placeProtected(id);
         } else {
-          // FR-SHELL-99, -107: its zone (a reopen, appearance, feature open); the user's spot is
-          // kept on a user reopen (FR-SHELL-56 (5)); the windows over it move.
-          placeProtected(id, trigger.type === "reopen" && w.userSpot ? "stored" : "zone");
+          // FR-SHELL-99, -107: its zone (a reopen, appearance, feature open); the windows over it
+          // move.
+          placeProtected(id);
         }
         break;
       }
@@ -1235,19 +1271,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       break;
     }
     case "drag-end": {
-      // The user's own move / resize (FR-SHELL-95): its memory goes; nothing else moves. Dropped
-      // over a shown hard keep-out (a tool bar, a chrome keep-out; not the toast box), it is pushed
-      // and returns to the dropped rect at `return` (FR-SHELL-105, BL-52). Over a PC it stays
-      // (FR-SHELL-106).
-      const id = windowId(trigger.kind, trigger.instance);
-      memory.delete(id);
-      const w = get(id);
-      if (!w || !isShown(w, ctx.available)) break;
-      const r = rendered(w);
-      const bar = regions.find(
-        (k) => k.kind === "hard" && k.id !== TOASTS_KEEP_OUT && overlaps(r, k.rect),
-      );
-      if (bar) pushFrom(bar.rect, `toolbar:${bar.id}`, id);
+      // The user's own move / resize (FR-SHELL-95): the window is remembered now (FR-SHELL-144),
+      // its memory goes; nothing else moves. Dropped over a shown tool bar it is stored at the
+      // drop rect and renders pushed until the bar goes (FR-SHELL-150, -167); over a PC it stays.
+      memory.delete(windowId(trigger.kind, trigger.instance));
       break;
     }
   }
@@ -1262,6 +1289,23 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     log,
     yields,
   };
+}
+
+/**
+ * FR-SHELL-164: `data-placed` as drawn. A remembered window is `stored` at its stored rect, or
+ * `pushed` while a shown bar pushes it (render-only, FR-SHELL-150); any other window as the
+ * placer placed it (`placed`).
+ */
+export function renderedPlaced(
+  win: WindowState,
+  def: Pick<WindowDef, "minSize">,
+  vp: Viewport,
+  bars: readonly Rect[],
+  placed: Placed | undefined,
+): Placed | undefined {
+  if (!isRemembered(win)) return placed;
+  const at = renderedRect(win, def.minSize, vp);
+  return sameRect(at, placedRect(win, def.minSize, vp, bars)) ? "stored" : "pushed";
 }
 
 /** The tool bar's cause (FR-SHELL-102): scenes-map's reported `map.toolbar` keep-out. */

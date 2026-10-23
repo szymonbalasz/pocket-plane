@@ -7,7 +7,7 @@ import type { ComponentType } from "react";
 import { Button } from "../../components/ui/button";
 import { useSync } from "../../sync/store";
 import { defineWindow, type ShellClient, type WindowDef } from "./registry";
-import { useWindowDispatch } from "./ShellContext";
+import { useResetLayout } from "./ShellContext";
 
 export const PREFS_KIND = "shell.prefs";
 
@@ -107,18 +107,16 @@ export function prefsWindow(client: ShellClient, sections: readonly PrefSection[
   });
 }
 
-/** Layout section (FR-SHELL-74): FR-SHELL-14's reset; Preferences closes with it. */
+/** Layout section (FR-SHELL-74): FR-SHELL-153's reset; Preferences closes with it. */
 function LayoutSection() {
-  const dispatch = useWindowDispatch();
+  const reset = useResetLayout();
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">Puts every window back where it starts.</span>
-      <Button
-        size="sm"
-        variant="outline"
-        data-testid="ui-prefs-reset-layout"
-        onClick={() => dispatch({ type: "reset" })}
-      >
+      <span className="text-muted-foreground">
+        Windows you moved or resized reopen where you left them. Reset puts every window back where
+        it starts and forgets those spots.
+      </span>
+      <Button size="sm" variant="outline" data-testid="ui-prefs-reset-layout" onClick={reset}>
         Reset layout
       </Button>
     </div>

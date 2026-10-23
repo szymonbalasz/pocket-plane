@@ -1,8 +1,10 @@
 // Shell state: the stored windows of the current layout key, plus restore and write rules
 // (FR-SHELL-15/16), and the placer's client memory (FR-SHELL-102, -110). One per play page;
 // survives waiting / reconnect screens.
+
+import type { You } from "@shared/protocol/frames";
 import { createStore, type StoreApi } from "zustand";
-import type { Rect, Viewport } from "./geometry";
+import { isRemembered, type Rect, type Viewport } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import {
   type Displacement,
@@ -156,7 +158,8 @@ function nextSettling(
   // others away instead of moving it).
   const featureOpen =
     action.type === "open" && action.by === "feature" && b !== undefined && b.state !== "open";
-  if (!w || (b && sameRect(b, w) && !featureOpen) || prev.has(id)) return prev;
+  // A remembered window opens at its stored rect: nothing to settle (FR-SHELL-146).
+  if (!w || isRemembered(w) || (b && sameRect(b, w) && !featureOpen) || prev.has(id)) return prev;
   return new Set(prev).add(id);
 }
 
@@ -247,6 +250,8 @@ export function createShellController(opts: {
   onYield?: () => void;
   /** Reset layout was applied (FR-SHELL-80): the page requests one Fit of the map. */
   onReset?: () => void;
+  /** Who this page is, for `onAbsorb` (FR-SHELL-155). */
+  you?: () => You | null;
   warn?: (msg: string) => void;
 }): ShellController {
   const { registry, storage } = opts;
@@ -317,7 +322,10 @@ export function createShellController(opts: {
       for (const w of r.windows) {
         const def = registry.get(w.kind);
         const how = r.stored || !def ? "stored" : placedAs(def, w, vp, hard);
-        placed.set(windowId(w.kind, w.instance), def?.defaultOpen && !w.userSpot ? "zone" : how);
+        placed.set(
+          windowId(w.kind, w.instance),
+          def?.defaultOpen && !isRemembered(w) ? "zone" : how,
+        );
       }
       const pcClearNow = new Set(
         r.windows
@@ -340,8 +348,11 @@ export function createShellController(opts: {
         pcClear: pcClearNow,
         settledAt: vp,
       });
-      // The load settle changed the entry (zones, FR-SHELL-53's default sizes): written.
+      // The load settle changed the entry (zones, FR-SHELL-53's default sizes, an absorbed
+      // entry, FR-SHELL-155): written.
       if (r.migrated) storage.write(key, serialise(r.windows, registry));
+      for (const a of r.absorbed ?? [])
+        registry.get(a.kind)?.onAbsorb?.(a.from, opts.you?.() ?? null);
     },
     refreshPcClear() {
       const state = store.getState();
