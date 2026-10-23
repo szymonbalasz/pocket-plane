@@ -20,5 +20,6 @@ export default defineBundle({
     "hold-greystone-reminders",
     "hold-greystone-stores",
     "hold-tower-secret",
+    // FX: fix pack (FX1 toasts + kill feed: no unit; `fx-toasts-e2e` aliases session-sim-12)
   ],
 });
