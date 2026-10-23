@@ -4,6 +4,9 @@
 // one callout (not a notification, `showCallout`) hides after 4 s and a new one replaces it.
 // Timers pause while the stack is hovered or the tab is hidden. At most 3 cards / alerts / info
 // show (info held back first, then alerts); the rest count as "+N more". Client memory only.
+// *(Sprint 9)* FR-NOTE-72: while this client's Notifications window is open, cards and the summary
+// fold into it (`visibleToasts(…, folded)`), and come back silently when it closes (`unfold`).
+// FR-NOTE-73: each callout show has a page-wide `seq` (its node's key).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import {
   type NotificationToastClass,
@@ -68,6 +71,8 @@ export type Toast =
 /** FR-NOTE-50: the one callout (not a notification): a newer one replaces it. */
 export interface Callout {
   id: string;
+  /** FR-NOTE-73: this show's page-wide counter (a fresh node per show); absent = 0. */
+  seq?: number;
   content: ReactNode;
   remaining: number;
 }
@@ -172,10 +177,14 @@ export function syncAlerts(s: ToastState, list: readonly AlertInput[], now: numb
   return { ...ran, toasts };
 }
 
-/** FR-NOTE-50: shows a callout; one showing is replaced (one at a time). */
-export function setCallout(s: ToastState, c: CalloutInput, now: number): ToastState {
+/**
+ * FR-NOTE-50: shows a callout; one showing is replaced (one at a time). FR-NOTE-73: `seq` (the
+ * show's page-wide counter) makes the replacement a new node with its own 4 s.
+ */
+export function setCallout(s: ToastState, c: CalloutInput, now: number, seq = 0): ToastState {
   const ran = advance(s, now);
-  return { ...ran, callout: { id: c.id, content: c.content, remaining: c.ms ?? CALLOUT_MS } };
+  const remaining = c.ms ?? CALLOUT_MS;
+  return { ...ran, callout: { id: c.id, seq, content: c.content, remaining } };
 }
 
 /** Closes the callout (any; or only the one with `id`). */
@@ -339,6 +348,20 @@ export function syncToasts(
   return s === m.toasts && campaignId === m.campaignId ? m : { toasts: s, campaignId };
 }
 
+/**
+ * FR-NOTE-72: the Notifications window closed or minimised: the folded cards show again as they
+ * are (silent: no cue starts here) and the summary comes back for the pending rows without a
+ * toast of their own. A card the user closed stays closed (it is no longer on the stack).
+ */
+export function unfold(
+  s: ToastState,
+  store: RecordStore,
+  now: number,
+  waitingOf: WaitingCount = NONE,
+): ToastState {
+  return setSummary(s, untoastedPending(s, store), now, waitingOf(store));
+}
+
 /** A toast's class (FR-NOTE-50); the summary comes before every class. */
 export function classOfToast(t: Toast): NotificationToastClass | "summary" {
   if (t.kind === "summary") return "summary";
@@ -361,14 +384,17 @@ const RANK: Record<NotificationToastClass | "summary", number> = {
  * cards, then the newest info (info held back before cards), at least one of those beside the
  * alerts; `more` counts the held-back ones
  * ("+N more"). The summary and the callout don't count. The runtime lowers `max` while the stack
- * doesn't fit the viewport (P3 E3).
+ * doesn't fit the viewport (P3 E3). FR-NOTE-72: `folded` (this client's Notifications window open)
+ * leaves out the summary and every card; they stay on the stack and neither shows nor counts.
  */
 export function visibleToasts(
   s: ToastState,
   max: number = MAX_VISIBLE,
+  folded = false,
 ): { shown: Toast[]; more: number; callout: Callout | null } {
   const room = Math.max(1, max);
-  const counted = s.toasts.filter((t) => t.kind !== "summary");
+  const out = (t: Toast) => folded && (t.kind === "summary" || classOfToast(t) === "card");
+  const counted = s.toasts.filter((t) => t.kind !== "summary" && !out(t));
   const kept = new Set<Toast>(counted.filter((t) => classOfToast(t) === "alert"));
   // P3 E3: at least one card / info still shows beside the alerts (a pending action stays one
   // click away).
@@ -379,7 +405,7 @@ export function visibleToasts(
   }
   const shown = s.toasts
     .map((t, i) => ({ t, i }))
-    .filter(({ t }) => t.kind === "summary" || kept.has(t))
+    .filter(({ t }) => (t.kind === "summary" && !folded) || kept.has(t))
     .sort((a, b) => RANK[classOfToast(a.t)] - RANK[classOfToast(b.t)] || a.i - b.i)
     .map(({ t }) => t);
   return { shown, more: counted.length - kept.size, callout: s.callout ?? null };
@@ -426,13 +452,19 @@ export interface CalloutInput {
   ms?: number | undefined;
 }
 
+/** FR-NOTE-73: the page-wide callout show counter. */
+let calloutSeq = 0;
+
 /**
  * FR-NOTE-50, -52: shows a callout in this page's one stack, after the info toasts. Not a
- * notification (no row, bell or history), one at a time (a new one replaces it), outside the
- * count of 3; the caller keeps to live frames. Client memory only; no runtime mounted → dropped.
+ * notification (no row, bell or history), one at a time (a new one replaces it, as a new node:
+ * FR-NOTE-73), outside the count of 3; the caller keeps to live frames. Client memory only; no
+ * runtime mounted → dropped.
  */
 export function showCallout(c: CalloutInput): void {
   if (pauseGate.paused()) return; // FR-SHELL-127: dropped under the pause card, not replayed
   const now = Date.now();
-  for (const m of memories) m.setState((x) => ({ toasts: setCallout(x.toasts, c, now) }));
+  calloutSeq += 1;
+  const seq = calloutSeq;
+  for (const m of memories) m.setState((x) => ({ toasts: setCallout(x.toasts, c, now, seq) }));
 }

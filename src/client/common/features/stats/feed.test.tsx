@@ -1,11 +1,14 @@
 // The kill feed (pure, FR-STATS-26–29, FR-NOTE-69): which lines of a live frame toast, their words
 // per role, and the batcher (one apply = one toast, ≤ 3 lines, a line once). The toast itself is a
-// callout in the one stack, never a notification row.
+// callout in the one stack, never a notification row. Sprint 9 (FX1, BL-84): FR-STATS-68 hidden
+// kills reach the DM's feed, as a new line or an upsert that first carries `fell` (the real-frame
+// half is `src/server/features/stats/feed-sync.test.tsx`).
 import { describe, expect, test } from "bun:test";
 import { LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import type { EventFrame } from "@shared/protocol/frames";
 import { renderToStaticMarkup } from "react-dom/server";
+import { CalloutToast } from "../notifications/ToastRuntime";
 import { createToastMemory, registerToastMemory } from "../notifications/toasts";
 import {
   createFeed,
@@ -17,7 +20,7 @@ import {
   feedToastText,
 } from "./feed";
 import type { Timers } from "./refresh";
-import { firstOpen, showFeedToast, summaryWaits } from "./runtime";
+import { firstOpen, onStatsFrame, showFeedToast, summaryWaits } from "./runtime";
 
 type Frame = Pick<EventFrame, "cause" | "changes">;
 
@@ -263,5 +266,99 @@ describe("FR-STATS-34 FR-STATS-53 opens", () => {
     expect(summaryWaits("dm", own, "minimised")).toBe(false);
     expect(summaryWaits("dm", other, "open")).toBe(false);
     expect(summaryWaits("player", own, "open")).toBe(false);
+  });
+});
+
+describe("FR-STATS-68 hidden kill reaches the DM's feed", () => {
+  const NO_GATE = { paused: () => false, deferUntilResume: () => {} };
+  /** One page: the feed (fake timers) into a registered toast memory, as the runtime wires it. */
+  function page(role: "dm" | "player") {
+    const t = fakeTimers();
+    const m = createToastMemory(Date.now());
+    const off = registerToastMemory(m);
+    const feed = createFeed({ show: showFeedToast, timers: t.timers });
+    const push = (f: Frame) => {
+      onStatsFrame(f as EventFrame, {
+        role,
+        prefs: { feed: true, openSummary: false },
+        feed,
+        openAwards: () => {},
+        openFight: () => {},
+        wait: () => {},
+        initiative: undefined,
+        gate: NO_GATE,
+        seen: new Set(),
+      });
+      t.advance(FEED_BATCH_MS);
+    };
+    const callout = () => m.getState().toasts.callout ?? null;
+    /** The callout as drawn: its node's seq and its feed lines. */
+    const drawn = () => {
+      const c = callout();
+      if (!c) return null;
+      const html = renderToStaticMarkup(<CalloutToast c={c} onClose={() => {}} />);
+      return {
+        seq: Number(/data-callout-seq="(\d+)"/.exec(html)?.[1]),
+        lines: [...html.matchAll(/data-testid="stats-feed-line">([^<]*)</g)].map((x) => x[1]),
+      };
+    };
+    return { push, callout, drawn, off };
+  }
+  // The hidden Elite's card: the roll's line without `fell`, then the Apply's upsert with it.
+  const eliteRoll = attack(
+    { id: "elite", public: false },
+    { targetName: "Elite Goblin Warrior 2", fell: undefined, callout: undefined, damage: 0 },
+  );
+  const eliteApply = attack(
+    { id: "elite", public: false },
+    { targetName: "Elite Goblin Warrior 2", fell: "kill", callout: "overkill" },
+    // overkill 15 (sim-12 h)
+  );
+  (eliteApply.dmPayload as { overkill: number }).overkill = 15;
+  const wolf = hp(
+    { targetName: "Wolf", kind: "damage", amount: 12, fell: "kill" },
+    { id: "wolf", public: false },
+  );
+  const upsert = (d: unknown, cause = "AttackApplied"): Frame => ({
+    cause: { name: cause },
+    changes: [{ type: GAME_LOG_ENTRY_TYPE, id: (d as { id: string }).id, op: "upsert", data: d }],
+  });
+
+  test("FR-STATS-68 hidden kill reaches the DM's feed: the DM's direct hp line and the card-Apply upsert each show '(hidden)', the second while the first shows (a new callout seq)", () => {
+    const dm = page("dm");
+    try {
+      dm.push(upsert(wolf, "HpApplied"));
+      const first = dm.drawn();
+      expect(first?.lines).toEqual(["Wolf falls (hidden)"]);
+      // Card-Apply upsert case: the roll's line (no `fell`) toasts nothing; its upsert carrying
+      // `fell` toasts exactly once, replacing the Wolf's callout as a new node.
+      dm.push(upsert(eliteRoll, "AttackRolled"));
+      expect(dm.drawn()).toEqual(first);
+      dm.push(upsert(eliteApply));
+      const second = dm.drawn();
+      expect(second?.lines).toEqual([
+        "Overkill! Thorn finished Elite Goblin Warrior 2, overkill 15 (hidden)",
+      ]);
+      expect(second?.seq).toBe((first?.seq ?? 0) + 1);
+      // The same line again (an edit) and its undo upsert: no toast.
+      dm.push(upsert(eliteApply));
+      dm.push(upsert({ ...eliteApply, undone: true }, "Undone"));
+      expect(dm.drawn()?.seq).toBe(second?.seq);
+    } finally {
+      dm.off();
+    }
+  });
+
+  test("FR-STATS-68 hidden kill reaches the DM's feed: players' frames give none", () => {
+    const p = page("player");
+    try {
+      // The hub sends players no line for a hidden side (FR-STATS-29): their frames of both
+      // kills hold no log change, so nothing toasts.
+      p.push({ cause: { name: "HpApplied" }, changes: [] });
+      p.push({ cause: { name: "AttackApplied" }, changes: [] });
+      expect(p.callout()).toBeNull();
+    } finally {
+      p.off();
+    }
   });
 });

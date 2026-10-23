@@ -117,9 +117,21 @@ export function sessionLabel(s: SessionSummary, now: Date = new Date()): string 
   return `${day} · ${hhmm(s.from)}–${hhmm(s.to)} · ${fights}`;
 }
 
-/** FR-STATS-24: a fight none of whose rows has a number yet. */
-export const noDamageYet = (rows: readonly (PlayerFightRow | DmFightRow)[]) =>
-  rows.every((r) => r.dealt === 0 && r.taken === 0 && r.healed === 0 && r.kills === 0);
+/**
+ * FR-STATS-24, -70 (BL-90): "No damage yet this fight": every row's numbers are 0 **and** the
+ * viewer's Highlights hold no event (a kill, a down, a callout). A player's fight whose damage was
+ * the DM's own or on hidden sides has all-zero rows; its kill in Highlights carries the fight.
+ */
+export const noDamageYet = (
+  rows: readonly (PlayerFightRow | DmFightRow)[],
+  highlights?: Pick<PlayerHighlights, "kills" | "downed" | "biggest-overkill">,
+) =>
+  rows.every((r) => r.dealt === 0 && r.taken === 0 && r.healed === 0 && r.kills === 0) &&
+  !(highlights && highlightEvents(highlights));
+
+/** FR-STATS-70: Highlights hold an event: a kill, a down or a callout (Biggest overkill). */
+const highlightEvents = (h: Pick<PlayerHighlights, "kills" | "downed" | "biggest-overkill">) =>
+  h.kills.events.length > 0 || h.downed.events.length > 0 || h["biggest-overkill"].value !== null;
 
 /** FR-STATS-12 detail line: "Thorn → Goblin 1, 30, ‹fight label›". */
 export const awardDetailText = (a: Award) =>

@@ -4,6 +4,8 @@
 // window rects were grown against keep-outs read inside a memo that never re-ran on a keep-out
 // change, the first rows were a default argument read inside the placement memo, and the stack
 // stayed below a pushed window for as long as the window wasn't returned (the placer's part).
+// FR-NOTE-72 (sprint 9): this client's open Notifications window counts like Initiative
+// (`blocks`). Remembered windows (window memory) are ordinary rendered windows here.
 // Its own module, so the runtime test can stub it (a static render reads no layout).
 import { useMemo } from "react";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
@@ -16,13 +18,14 @@ import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
 import { windowId } from "../play-shell/manager";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
 import { pushedByPlan, type StackWindow } from "./keep-out";
+import { HISTORY_KIND } from "./logic";
 
 export interface StackInputs {
   /** FR-NOTE-32: the open, non-minimised `cbt.initiative` window's rendered rect, else null. */
   initiative: Rect | null;
   /**
    * The other open windows as rendered (title bars never covered, bodies when nothing else), each
-   * with FR-NOTE-53's `pushed` from the placer's plan.
+   * with FR-NOTE-53's `pushed` from the placer's plan and FR-NOTE-72's `blocks` (Notifications).
    */
   windows: StackWindow[];
   /** FR-NOTE-43: hard keep-out rects (the active tool bar). */
@@ -62,10 +65,22 @@ export function useStackInputs(isDm: boolean): StackInputs {
       windows: rects(others).map((r, i) => {
         const w = others[i] as (typeof others)[number];
         const how = placed.get(windowId(w.kind, w.instance));
-        return { ...r, pushed: pushedByPlan(how, causes(w.kind, w.instance)) };
+        const pushed = pushedByPlan(how, causes(w.kind, w.instance));
+        return w.kind === HISTORY_KIND ? { ...r, pushed, blocks: true } : { ...r, pushed };
       }),
       hard,
       rows: [...firstRows().values()],
     };
   }, [isDm, windows, registry, available, vp, measured, keepOuts, placed, memory]);
+}
+
+/**
+ * FR-NOTE-72: this client's Notifications window is open and not minimised (both clients): the
+ * stack folds its cards and summary into it. Here, so the runtime test can stub it.
+ */
+export function useHistoryOpen(): boolean {
+  const open = useShellState((s) =>
+    s.windows.some((w) => w.kind === HISTORY_KIND && w.state === "open"),
+  );
+  return useAvailableKinds().has(HISTORY_KIND) && open;
 }

@@ -188,6 +188,36 @@ describe("FR-STATS-19 labels", () => {
     expect(noDamageYet([row])).toBe(true);
     expect(noDamageYet([row, { ...row, key: "b", taken: 1 }])).toBe(false);
   });
+
+  test("FR-STATS-70 no 'No damage yet' beside a kill: zero rows + a kill, a down or a callout in Highlights → no copy; zero rows and no event → the copy", () => {
+    const row = {
+      key: "a",
+      name: "A",
+      kind: "pc" as const,
+      dealt: 0,
+      taken: 0,
+      healed: 0,
+      kills: 0,
+    };
+    // f09: only the DM's damage killed the monster, so the party's rows are 0.
+    const kill = { fell: "kill" as const, from: null, to: "Goblin 1", callout: false };
+    const killed = { ...EMPTY_PLAYER_HIGHLIGHTS, kills: { events: [kill] } };
+    expect(noDamageYet([row], killed)).toBe(false);
+    expect(noDamageYet([], killed)).toBe(false);
+    const down = {
+      ...EMPTY_PLAYER_HIGHLIGHTS,
+      downed: { events: [{ ...kill, fell: "down" as const }] },
+    };
+    expect(noDamageYet([row], down)).toBe(false);
+    const callout = {
+      ...EMPTY_PLAYER_HIGHLIGHTS,
+      "biggest-overkill": { value: 14, winners: [] },
+    };
+    expect(noDamageYet([row], callout)).toBe(false);
+    expect(noDamageYet([row], EMPTY_PLAYER_HIGHLIGHTS)).toBe(true);
+    expect(noDamageYet([row], EMPTY_DM_HIGHLIGHTS)).toBe(true);
+    expect(noDamageYet([row], DM_HIGHLIGHTS)).toBe(false);
+  });
 });
 
 describe("FR-STATS-41 FR-STATS-52 refresh (tier B)", () => {
