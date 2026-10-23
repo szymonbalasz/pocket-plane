@@ -59,6 +59,8 @@ import partyLoot from "./party-loot";
 import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
 import playerColours from "./player-colours";
+import pmMemory from "./pm-memory";
+import pmMemoryE2e from "./pm-memory-e2e";
 import prefsS6 from "./prefs-s6";
 import prefsS6E2e from "./prefs-s6-e2e";
 import remindersStrongholds from "./reminders-strongholds";
@@ -213,6 +215,9 @@ export const bundles: readonly Bundle[] = [
   // Sprint 8 track TT (build/tt-pause): the pause screen
   tableToolsPaused,
   tableToolsPausedE2e,
+  // Sprint 9 track PM (fix/window-memory): aliases of session-sim-12
+  pmMemory,
+  pmMemoryE2e,
   // Sprint 9 track RS (fix/rs-core): the sprint-9 gate bundle (each track appends its units)
   sessionSim13,
   remindersStrongholds,

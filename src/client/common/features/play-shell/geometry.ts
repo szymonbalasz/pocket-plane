@@ -128,6 +128,66 @@ export function renderedRect(
 }
 
 /**
+ * FR-SHELL-144 (#338): a window the user moved (`userSpot`) or resized (`userSize`) is
+ * **remembered**: the placer never writes it; it reopens at its stored rect. Else untouched.
+ */
+export const isRemembered = (w: { userSpot?: true | undefined; userSize?: true | undefined }) =>
+  w.userSpot === true || w.userSize === true;
+
+const grown = (r: Rect, m: number): Rect => ({
+  x: r.x - m,
+  y: r.y - m,
+  w: r.w + 2 * m,
+  h: r.h + 2 * m,
+});
+
+const hit = (a: Rect, b: Rect) =>
+  a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+
+/**
+ * FR-SHELL-150, render-only (the reopen algorithm's step 4, protocol §18): while `r` overlaps a
+ * shown bar (the tool bar, a chrome keep-out; never the toast box) + 12 px, it moves by the least
+ * move clear of it: below, else right (ties below), clamped (FR-SHELL-12). Same size; may overlap
+ * windows or PCs. Recomputed every render, never written.
+ */
+export function pushedRect(r: Rect, bars: readonly Rect[], vp: Viewport): Rect {
+  let out = r;
+  for (let pass = 0; pass < bars.length * 2; pass++) {
+    const k = bars.find((b) => hit(out, grown(b, EDGE_GAP)));
+    if (!k) return out;
+    const g = grown(k, EDGE_GAP);
+    const below = clampRect({ ...out, y: g.y + g.h }, vp);
+    const right = clampRect({ ...out, x: g.x + g.w }, vp);
+    const dy = Math.abs(below.y - out.y) + Math.abs(below.x - out.x);
+    const dx = Math.abs(right.x - out.x) + Math.abs(right.y - out.y);
+    const okBelow = !hit(below, g);
+    const okRight = !hit(right, g);
+    out = okBelow && (!okRight || dy <= dx) ? below : okRight ? right : below;
+  }
+  return out;
+}
+
+type Flags = {
+  area?: Viewport | undefined;
+  userSpot?: true | undefined;
+  userSize?: true | undefined;
+};
+
+/**
+ * Where a stored window renders before growth (FR-SHELL-29 fit, FR-SHELL-12 clamp), then, for a
+ * remembered window, pushed off the shown `bars` (FR-SHELL-147, -150): render-only.
+ */
+export function placedRect(
+  win: Rect & Flags,
+  min: Size,
+  vp: Viewport,
+  bars: readonly Rect[] = [],
+): Rect {
+  const r = renderedRect(win, min, vp);
+  return bars.length > 0 && isRemembered(win) ? pushedRect(r, bars, vp) : r;
+}
+
+/**
  * Grow to content (FR-SHELL-39, -52), render-only: `r` (the rendered rect) made as tall as
  * `needed` (the window height its content asks for), never shorter than `r`, capped 12 px before
  * the usable area's edge (above the launcher) and before the first of `caps` (other rendered
@@ -163,38 +223,43 @@ export const growsToContent = (win: { fixedH?: true | undefined }, def: GrowDef)
   def.growToContent === true && win.fixedH !== true;
 
 /**
- * Where a window draws (FR-SHELL-29, -12, -39, -52): fit + clamp, then, while it grows to
+ * Where a window draws (FR-SHELL-29, -12, -39, -52): fit + clamp (a remembered window pushed off
+ * `bars`, FR-SHELL-150), then, while it grows to
  * content, the height `needed` measured by `ShellWindow`, capped by `caps`. `ShellWindow` and
  * `renderedWindowRects` both use it, so what is drawn is what the free area and other consumers
  * see.
  */
 export function windowRect(
-  win: Rect & { area?: Viewport | undefined; fixedH?: true | undefined },
+  win: Rect & Flags & { fixedH?: true | undefined },
   def: GrowDef,
   vp: Viewport,
   needed?: number,
   caps: readonly Rect[] = [],
+  bars: readonly Rect[] = [],
 ): Rect {
-  const r = renderedRect(win, def.minSize, vp);
+  const r = placedRect(win, def.minSize, vp, bars);
   if (!growsToContent(win, def)) return r;
   return grownRect(r, needed, def.defaultPosition.anchor.startsWith("bottom"), vp, caps);
 }
 
 /**
  * Rendered rects of several windows at once (FR-SHELL-52): each growing window is capped by the
- * others' fitted rects (not grown) and by `hard` regions. Same order as `items`.
+ * others' fitted rects (not grown) and by `hard` regions; remembered windows pushed off `bars`
+ * (FR-SHELL-150). Same order as `items`.
  */
-export function windowRects<
-  W extends Rect & { area?: Viewport | undefined; fixedH?: true | undefined },
->(
+export function windowRects<W extends Rect & Flags & { fixedH?: true | undefined }>(
   items: readonly { win: W; def: GrowDef; needed?: number | undefined }[],
   vp: Viewport,
   hard: readonly Rect[] = [],
+  bars: readonly Rect[] = [],
 ): Rect[] {
-  const plain = items.map(({ win, def }) => renderedRect(win, def.minSize, vp));
+  const plain = items.map(({ win, def }) => placedRect(win, def.minSize, vp, bars));
   return items.map(({ win, def, needed }, i) =>
     growsToContent(win, def)
-      ? windowRect(win, def, vp, needed, [...plain.filter((_, j) => j !== i), ...hard])
+      ? grownRect(plain[i] as Rect, needed, def.defaultPosition.anchor.startsWith("bottom"), vp, [
+          ...plain.filter((_, j) => j !== i),
+          ...hard,
+        ])
       : (plain[i] as Rect),
   );
 }

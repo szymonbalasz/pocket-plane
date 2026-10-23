@@ -8,7 +8,7 @@ import type { WindowState } from "@shared/play-shell/layout";
 import { fitScene } from "../scenes-map/camera";
 import { freeAreas } from "./free-area";
 import { defaultLayout, type ManagerContext, plan, reduce } from "./manager";
-import { type Placeable, type PlacementToken, placeWindow } from "./placement";
+import { type Placeable, type PlacementToken, placeStats, placeWindow } from "./placement";
 import { createWindowRegistry, type WindowDef } from "./registry";
 
 const vp = { w: 1600, h: 900 };
@@ -150,7 +150,8 @@ describe("FR-SHELL-77 auto placement", () => {
   );
 });
 
-// FR-SHELL-119 perf gates (WF1): one settle (`plan` → `settle`) through the whole ladder (L1–L5, the look-ahead,
+// FR-SHELL-119 perf gates (WF1), FR-SHELL-158 (BL-82: ≤ 25 ms inside the full `bun run bench`,
+// same world: 12 untouched windows; the profile printed first): one settle (`plan` → `settle`) through the whole ladder (L1–L5, the look-ahead,
 // put-aways, the protected squeeze) and one dry fit of the base port (L2b, the real `fitScene` on
 // 20 tokens), 12 windows × 200 token boxes best of 5 ≤ 25 ms; 40 windows ≤ 100 ms.
 const fitTokens = Array.from({ length: 20 }, (_, i) => ({
@@ -195,6 +196,20 @@ describe("FR-SHELL-119 settle", () => {
           dryFit,
         };
         const kind = `b.w${n - 1}`;
+        // FR-SHELL-158: the profile first: searches per settle, token grids built, one search.
+        placeStats.searches = 0;
+        placeStats.grids = 0;
+        const p = plan(ws, { type: "open", kind }, ctx);
+        const { searches, grids } = placeStats;
+        const one = await best(
+          () => placeWindow(launcher(kind), vp, { windows: ws, tokens }),
+          99,
+          5,
+          3,
+        );
+        console.log(
+          `FR-SHELL-158 profile, ${n - 1} windows: ${searches} searches (${grids} token grids, ${searches - grids} reused), ${p.putAway.size} put away, one search ${one.toFixed(2)} ms`,
+        );
         const ms = await best(() => plan(ws, { type: "open", kind }, ctx), budget, 5, 3);
         console.log(
           `FR-SHELL-119 settle, ${n - 1} windows × 200 boxes: best of 5 ${ms.toFixed(2)} ms`,

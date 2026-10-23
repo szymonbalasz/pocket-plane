@@ -61,6 +61,18 @@ const TYPING_SELECTOR = [
   '[contenteditable="true"]',
 ].join(", ");
 
+/**
+ * FR-SHELL-165 (the one helper granted to SP, seams S3): the key event's target is a typing
+ * target: a text-like `input`, `textarea`, `select` or contenteditable (or inside one). Window
+ * bodies, buttons and the canvas are not.
+ */
+export function isTypingTarget(target: EventTarget | TargetLike | null): boolean {
+  const t = target as TargetLike | null;
+  if (!t) return false;
+  if (t.isContentEditable) return true;
+  return typeof t.closest === "function" && t.closest(TYPING_SELECTOR) !== null;
+}
+
 /** Dialogs, popovers and menus: Space never reaches the map from inside them. */
 const OVERLAY_SELECTOR = [
   '[role="dialog"]',

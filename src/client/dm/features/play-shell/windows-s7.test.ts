@@ -109,13 +109,16 @@ test("FR-SHELL-87 sim-10 replays (DM b02, b03): 1440×900 Compendium, Party, Enc
   }
 });
 
-test("FR-SHELL-87 sim-10 replay (DM Scenes + Fog): Scenes at the top-left, the Fog bar pushes it through the ladder: the edge column below the bar, ≥ useful (FR-SHELL-104); the bar gone, it returns (FR-SHELL-102)", () => {
+test("FR-SHELL-87 sim-10 replay (DM Scenes + Fog): an untouched Scenes at the top-left, the Fog bar pushes it through the ladder: the edge column below the bar, ≥ useful (FR-SHELL-104); the bar gone, it returns (FR-SHELL-102)", () => {
   const storage = createLayoutStorage(() => ({ getItem: () => null, setItem: () => {} }));
   const c = createShellController({ registry: dmWindows, storage, viewport: () => WIDE });
   c.restore("k");
   c.dispatch({ type: "open", kind: "map.scenes" }, all());
   const home = { x: 68, y: 60, w: 260, h: 440 };
-  c.dispatch({ type: "setRect", kind: "map.scenes", rect: home }, all());
+  const s = c.store.getState();
+  c.store.setState({
+    windows: s.windows.map((w) => (w.kind === "map.scenes" ? { ...w, ...home } : w)),
+  });
   const fogBar = { x: 62, y: 56, w: 472, h: 92 };
   c.dispatch({ type: "push", rect: fogBar }, all());
   const ws = c.store.getState().windows;

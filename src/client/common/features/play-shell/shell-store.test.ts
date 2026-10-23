@@ -287,11 +287,10 @@ describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
     expect(fits.n).toBe(1);
   });
 
-  test("FR-SHELL-81 FR-SHELL-102 pushed windows return: bar shown → Initiative pushed; bar gone → back at the pre-push rect, `returned`, userSpot restored; Fog → AoE switch → back to the pre-Fog rect; reload → no memory, the protected window at its zone (FR-SHELL-99)", () => {
+  test("FR-SHELL-81 FR-SHELL-102 FR-SHELL-150 pushed windows return: bar shown → an untouched Initiative pushed; bar gone → back at the pre-push rect, `returned`; Fog → AoE switch → back to the pre-Fog rect; reload → no memory, the protected window at its zone (FR-SHELL-99); a remembered one is never written by a push", () => {
     const { c, rect, win, storage } = make({ n: 0 });
     const home = rect("c.init");
-    // The user's spot (userSpot), then the Fog bar pushes it.
-    c.dispatch({ type: "setRect", kind: "c.init", rect: home as Rect }, kinds);
+    // Untouched (at its zone), then the Fog bar pushes it.
     c.dispatch({ type: "push", rect: bar }, kinds);
     // FR-SHELL-104: off the bar + 12 through the ladder, nearest the pre-push rect.
     const off = (b: Rect) => ({ x: b.x - 12, y: b.y - 12, w: b.w + 24, h: b.h + 24 });
@@ -309,7 +308,7 @@ describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
     c.dispatch({ type: "return" }, kinds);
     expect(rect("c.init")).toEqual(home);
     expect(c.store.getState().placed.get("c.init:main")).toBe("returned");
-    expect(win("c.init")?.userSpot).toBe(true);
+    expect(win("c.init")?.userSpot).toBeUndefined();
     expect(c.store.getState().memory.length).toBe(0);
     // Pushed, then the page reloads (no bar shown yet): no memory; the pushed shell spot is
     // stored, and the load settle puts the protected window back in its zone.
@@ -321,6 +320,12 @@ describe("sprint 7: reset, returns, test hooks (FR-SHELL-80, -81, -88)", () => {
     reloaded.dispatch({ type: "return" }, kinds);
     const after = reloaded.store.getState().windows.find((w) => w.kind === "c.init");
     expect(after && { x: after.x, y: after.y, w: after.w, h: after.h }).toEqual(home);
+    // Remembered (the user's spot): a push writes nothing, no memory (render-only).
+    reloaded.dispatch({ type: "setRect", kind: "c.init", rect: home as Rect }, kinds);
+    const mine = reloaded.store.getState().windows;
+    reloaded.dispatch({ type: "push", rect: bar }, kinds);
+    expect(reloaded.store.getState().windows).toBe(mine);
+    expect(reloaded.store.getState().memory).toEqual([]);
   });
 
   test("FR-SHELL-81 a window moved or minimised while pushed drops out of the memory and stays", () => {
