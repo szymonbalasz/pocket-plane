@@ -885,6 +885,7 @@ const GOLDEN_KINDS = [
   "stats.board", // ST2 (FR-SHELL-86 (5)): appended, goldens regenerated
   "dicex.requests", // TT2 (FR-SHELL-112 (1)): appended, goldens regenerated
   "party.summary", // CB3 (FR-SHELL-143): appended, goldens regenerated
+  "cmp.rules", // SP2 (seams S4, FR-CMP-63: 480 wide, min 340×320): appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

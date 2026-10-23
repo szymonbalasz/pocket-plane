@@ -10,6 +10,7 @@ import { playerCompanionWindow } from "./features/character-sheet/companion-wind
 import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { playerInitiativeWindow } from "./features/combat-tracker/initiative-window";
 import { playerCompendiumWindow } from "./features/compendium/compendium-window";
+import { playerRulesWindow } from "./features/compendium/rules-window";
 import { playerTrayWindow } from "./features/dice-extras/tray-window";
 import { playerDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
@@ -32,6 +33,7 @@ const windows: WindowDef[] = [
   playerCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
   statsWindow, // stats.board (stats, FR-SHELL-93)
   partySummaryWindow, // party.summary (party-board, FR-SHELL-140)
+  playerRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);

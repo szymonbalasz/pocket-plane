@@ -75,6 +75,13 @@ const shared: Record<string, SizeRow> = {
     min: s(320, 280),
     criterion: "5 rows names whole, or 2 award cards, or the first 4 Highlights lines (S5)",
   },
+  // SP2 (seams S4, FR-CMP-63): short viewports open it band-high.
+  "cmp.rules": {
+    default: four(s(480, 412), s(480, 412), s(480, 600), s(480, 600)),
+    useful: all(420, 360),
+    min: s(340, 320),
+    criterion: "page Tabs + 3 card headings",
+  },
   // CB3 (seams S12, FR-SHELL-141): grows to its rows (`growToContent`).
   "party.summary": {
     default: all(280, 260),

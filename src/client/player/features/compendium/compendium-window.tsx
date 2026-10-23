@@ -22,7 +22,8 @@ export function playerCompendiumApi(token: string | null): Api {
 }
 
 let api: Api | null = null;
-const playerApi = () => {
+/** This page's player REST client (Compendium and Rules windows). */
+export const playerApi = () => {
   api ??= playerCompendiumApi(linkTokenFromPath(window.location.pathname));
   return api;
 };

@@ -32,6 +32,29 @@ const EXEMPTIONS = new Map([
     "FR-SHELL-115 replay P2 moved @1280×720 memory",
     "PM1 (approved): inherits the shared open phase's I2 (Compendium / Party Manager on the toast keep-out), as every other P2 moved @1280×720 cell; its memory steps (I9–I13) pass",
   ],
+  // SP2 (seams S4: cmp.rules joins P1 untouched; proposed, pending orchestrator approval). P1
+  // 22 → 24 failing: these 5 new, 3 fixed (fitted 1600×900 resize, moved 1280×800 resize, moved
+  // 1440×900 load). The party.summary ones are its grow-to-content height after a round trip.
+  [
+    "FR-SHELL-115 replay P1 fitted @1280×800 push",
+    "SP2 (proposed): I7 after the bar goes: party.summary (grow-to-content) returns 20 px lower and 20 px shorter beside cmp.rules; cmp.rules itself returns exactly",
+  ],
+  [
+    "FR-SHELL-115 replay P1 fitted @1280×800 resize",
+    "SP2 (proposed): I7 resize round trip: cmp.rules returns 480×392 at x 456, not its useful 420×360 at 516; party.summary as in push",
+  ],
+  [
+    "FR-SHELL-115 replay P1 moved @1280×800 Start",
+    "SP2 (proposed): I3 at End: the 800-px band leaves cmp.rules 347×320, below its useful 420×360 (spec size 480 × 600, min 340×320)",
+  ],
+  [
+    "FR-SHELL-115 replay P1 moved @1600×900 push",
+    "SP2 (proposed): I7 after the bar goes: party.summary returns 6 px higher (grow-to-content); cmp.rules returns exactly",
+  ],
+  [
+    "FR-SHELL-115 replay P1 moved @1600×900 resize",
+    "SP2 (proposed): I7 resize round trip: party.summary as in push; cmp.rules returns exactly",
+  ],
 ]);
 
 test("FR-SHELL-160 named exemptions are recorded failing cells", () => {

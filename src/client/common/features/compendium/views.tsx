@@ -32,6 +32,7 @@ import { AboutDialog } from "./credits";
 import { EntryGallery } from "./gallery";
 import { crText, footerLabel, type Role, scoreText, signed } from "./logic";
 import { MarkdownLite, type TextContext } from "./MarkdownLite";
+import { OpenInRules } from "./rules/OpenInRules";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const ABILITY_SHORT = { str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA" };
@@ -394,6 +395,7 @@ export function EntryView({
   else view = <TextView e={e} />;
   const drag = viewer === "dm" && e.kind === "monster" && data.definition;
   const sheetable = isSheetable(e.kind);
+  const rule = e.kind === "rule";
   return (
     <article
       data-testid="cmp-entry"
@@ -401,12 +403,13 @@ export function EntryView({
       data-value={e.kind}
       className="space-y-2"
     >
-      {(drag || sheetable || actions) && (
+      {(drag || sheetable || rule || actions) && (
         <div
           className="flex flex-wrap items-center justify-end gap-1"
           data-testid="cmp-entry-actions"
         >
           {actions}
+          {rule && <OpenInRules entryId={e.id} />}
           {sheetable && <AddToSheet entryId={e.id} />}
           {drag && data.definition && (
             <DragHandle definitionId={data.definition.id} name={e.name} />
