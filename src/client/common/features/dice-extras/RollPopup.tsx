@@ -13,7 +13,6 @@ import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import { isMeshDie, type ThrowDie } from "@shared/dice-extras/throw";
 import { EyeOffIcon, SettingsIcon, XIcon } from "lucide-react";
 import {
-  lazy,
   type RefObject,
   Suspense,
   useEffect,
@@ -26,6 +25,7 @@ import {
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
+import { lazyChunk } from "../../lib/lazy-chunk";
 import { cn } from "../../lib/utils";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { focusLogEntry } from "../dice-roll-log/focus";
@@ -89,8 +89,9 @@ import { type DisplaySetting, is3dDisplay } from "./settings";
 import { useDiceExtras } from "./store";
 import { MINIATURE_MS } from "./timing";
 
-const SettingsPanel = lazy(() =>
-  import("./SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
+const SettingsPanel = lazyChunk(
+  () => import("./SettingsPanel").then((m) => ({ default: m.SettingsPanel })),
+  "inline",
 );
 
 /** True one frame after mount: flat chips fade in (≤ 300 ms). */

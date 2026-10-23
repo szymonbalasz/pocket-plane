@@ -3,12 +3,16 @@
 // (left edge, above its `dice.log`). The companion runs throws whether the tray is open or not.
 // The tray body loads on first open (FR-DICEX-22 initial budget), like `LazyMapCanvas`.
 import { DicesIcon } from "lucide-react";
-import { createElement, lazy, Suspense } from "react";
+import { createElement, Suspense } from "react";
+import { lazyChunk } from "../../lib/lazy-chunk";
 import type { WindowDef } from "../play-shell/registry";
 import { DiceExtrasRuntime } from "./ThrowLayer";
 import { DICEX_TRAY_KIND } from "./window-kind";
 
-const TrayBody = lazy(() => import("./TrayWindow").then((m) => ({ default: m.TrayWindow })));
+const TrayBody = lazyChunk(
+  () => import("./TrayWindow").then((m) => ({ default: m.TrayWindow })),
+  "window",
+);
 
 function LazyTrayWindow() {
   return createElement(Suspense, { fallback: null }, createElement(TrayBody));

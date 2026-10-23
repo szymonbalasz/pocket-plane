@@ -63,10 +63,9 @@ export function CampaignBar({ campaigns }: { campaigns: CampaignSummary[] }) {
             <SelectTrigger
               data-testid="camp-campaign-switcher"
               aria-label="Active campaign"
-              title={activeName}
               className="min-w-24 max-w-full"
             >
-              <span className="min-w-0 truncate">
+              <span className="min-w-0 truncate" title={activeName}>
                 <SelectValue placeholder="Choose campaign">
                   <span data-testid="camp-campaign-name">{activeName}</span>
                 </SelectValue>

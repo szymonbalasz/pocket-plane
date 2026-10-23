@@ -43,8 +43,10 @@ test("FR-CAMP-51 switcher ellipsises", () => {
   const cls = trigger.match(/class="([^"]*)"/)?.[1]?.split(" ") ?? [];
   expect(cls).not.toContain("min-w-48");
   expect(cls).toContain("min-w-24");
-  expect(trigger).toContain(`title="${LONG}"`);
-  // The name sits in a truncating box inside the trigger.
-  expect(html).toMatch(/<span class="min-w-0 truncate">.*data-testid="camp-campaign-name"/);
+  // The name sits in a truncating box inside the trigger, its `title` the full name (FR-SHELL-30
+  // allows a native title on a truncated non-interactive element; the Tooltip wraps the trigger).
+  expect(html).toMatch(
+    new RegExp(`<span class="min-w-0 truncate" title="${LONG}">.*data-testid="camp-campaign-name"`),
+  );
   expect(html).toContain(LONG);
 });
