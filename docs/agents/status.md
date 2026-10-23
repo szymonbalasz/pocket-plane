@@ -14,7 +14,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | party-board part done (4 commits); waits for PM1 to merge for shared rows | walkthrough M0-M2, M11, M13 |
 | RS0 reminders + strongholds core | merged `fb3884a3` | — | done (walkthrough 23/23; evidence lost at cleanup) | main gates green (check 5214 / e2e 206) |
 | SP3 session recap | `build/sp-recap` (ws w9Z) | build-sp3 | server + window + share done; waits PM1 (window rows), SP1 (commands), FX1 (stats edits) | part-1 walkthrough 7/7 (server); part 2 after PM1 + SP1 + FX1 |
-| FX2 dice + gems lines | `fix/fx-dice-lines` (ws w9X, slot 4) | build-fx2 | building | walkthrough FX2 |
+| FX2 dice + gems lines | `fix/fx-dice-lines` (ws w9X, slot 4) | build-fx2 | ready (all FRs tested; CON-44 0) | test-fx2 walkthrough running |
 | FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y) | build-fx3 | ready (check 5180); ShellWindow branch after PM1; merges after RS0 | test-fx3 walkthrough running |
 
 Queue (`.verify/sprint9/seams.md` build plan): wave 2 FX3, SP3 server (after RS0) · wave 3 after PM1: FX1, SP1, SP2 · wave 4 after RS0 + PM1 + PM2: RS1, RS2 · wave 5 RS3; SP3 stats edits after FX1. Slice defs: `%TEMP%/pocket-plane/slices.json` (`pm1`, `pm2`, `rs0`, `fx2`).
