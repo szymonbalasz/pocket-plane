@@ -75,6 +75,10 @@ import sessionSim10 from "./session-sim-10";
 import sessionSim11 from "./session-sim-11";
 import sessionSim12 from "./session-sim-12";
 import sessionSim13 from "./session-sim-13";
+import spS9 from "./sp-s9";
+import spS9E2e from "./sp-s9-e2e";
+import spS9Shared from "./sp-s9-shared";
+import spS9SharedE2e from "./sp-s9-shared-e2e";
 import stats from "./stats";
 import statsB from "./stats-b";
 import statsBE2e from "./stats-b-e2e";
@@ -216,4 +220,9 @@ export const bundles: readonly Bundle[] = [
   sessionSim13,
   remindersStrongholds,
   rsE2e,
+  // Sprint 9 track SP (build/sp-recap): the SP walkthrough bundle + the shared recap
+  spS9,
+  spS9Shared,
+  spS9E2e,
+  spS9SharedE2e,
 ];

@@ -118,6 +118,8 @@ import mtCrowd from "./scenes-map/mt-crowd";
 import scenesExtras from "./scenes-map/scenes-extras";
 import thornTown from "./scenes-map/thorn-town";
 import town from "./scenes-map/town";
+import recapLootHaul from "./session-recap/recap-loot-haul";
+import recapShareNote from "./session-recap/recap-share-note";
 import sbFightFacts from "./stats/sb-fight-facts";
 import sbLuckReroll from "./stats/sb-luck-reroll";
 import sbLuckRolls from "./stats/sb-luck-rolls";
@@ -274,4 +276,7 @@ export const units: readonly Fixture[] = [
   holdGreystoneStores,
   holdTowerSecret,
   holdTowerMove,
+  // Sprint 9 track SP (build/sp-recap): the recap's loot haul + a share
+  recapLootHaul,
+  recapShareNote,
 ];

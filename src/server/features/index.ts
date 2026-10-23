@@ -21,6 +21,7 @@ import { partyLootFeature } from "./party-loot";
 import { reminders } from "./reminders";
 import { sceneTools } from "./scene-tools";
 import { scenesMap } from "./scenes-map";
+import { sessionRecap } from "./session-recap";
 import { stats } from "./stats";
 import { strongholds } from "./strongholds";
 
@@ -50,4 +51,6 @@ export const features: readonly Feature[] = [
   // Sprint 9 track RS (fix/rs-core)
   reminders,
   strongholds,
+  // Sprint 9 track SP (build/sp-recap)
+  sessionRecap,
 ];

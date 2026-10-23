@@ -9,6 +9,7 @@ import { rollRequestKind } from "../dice-extras/request-kind";
 import { modTriggerKind } from "../effect-modifiers/reminders";
 import { handoutSharedKind } from "../party-board/kind";
 import { lootReceivedKind } from "../party-loot/kind";
+import { sessionRecapKind } from "../session-recap/kind";
 import { statsAwardsKind, statsFightSummaryKind } from "../stats/kind";
 import type { RegisteredKindDef } from "./kind";
 import { testKind } from "./test-kind";
@@ -26,4 +27,5 @@ export const notificationKinds: readonly RegisteredKindDef[] = [
   { ...statsAwardsKind, toastClass: "info" }, // stats-awards (stats, FR-NOTE-48)
   { ...rollRequestKind, toastClass: "card" }, // roll-request (dice-extras, FR-NOTE-58)
   { ...statsFightSummaryKind, toastClass: "info" }, // stats-fight-summary (stats, FR-NOTE-68)
+  { ...sessionRecapKind, toastClass: "info" }, // session-recap (session-recap, FR-RECAP-23)
 ];

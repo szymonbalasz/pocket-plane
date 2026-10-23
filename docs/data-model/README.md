@@ -2501,3 +2501,16 @@ From [reminders](../specs/reminders.md#8-data-model) §8, [strongholds](../specs
 - **Persisted runtime state:** the two tables and seven columns. No migration (push-time defaults).
 - **Fixtures:** units `rem-party`, `rem-mira-charm`, `rem-thorn-own`, `rem-thorn-secret`, `hold-greystone`, `hold-greystone-reminders`, `hold-greystone-stores`, `hold-tower-secret`, `hold-tower-move`; bundles `reminders-strongholds`, `rs-e2e`, `session-sim-13` (= `session-sim-12` + the RS units but `hold-tower-move`).
 - **CON-44:** see [protocol §149](../protocol/README.md#149-sprint-9-reminders--strongholds-core--records-intents-stores-holder-rs0).
+
+## 120. Sprint 9: session recap (SP3)
+
+From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). **Built by `build/sp-recap`**. Protocol side: [protocol §150](../protocol/README.md#150-sprint-9-session-recap--recapquery-recapshare-session-recap-kind-sp3). **No table, column or record type** (ADR-0013: sessions stay derived).
+
+| Field / table | Change | Rule | Source |
+|---|---|---|---|
+| `notification` (kind `session-recap`) | new kind, payload `{fromN, toN, from, to, label, note?, omit}` ≤ 2 KB | made only by `recap.share`; no FK to a session (derived); the newest row with that `fromN` is the session's share | FR-RECAP-20, -23 |
+| `loot_entry` | read only, through `party-loot/recap-read.ts` (`lootRows`, `lootHighWater`) | rows with one end `world` and the other `party` / `character`, by `createdAt` in the session's range; any `stores` end = left out | FR-RECAP-14 |
+
+- **Derived:** the whole recap (stats' compute helpers + the ledger), per viewer; Markdown text (client).
+- **Persisted runtime state:** share rows only. **Server memory:** the recap memo + per-actor rate limit (`session-recap/memo.ts`, LRU 32, dropped freely) on stats' session cache.
+- **Fixtures:** `recap-loot-haul`, `recap-share-note`; bundles `sp-s9`, `sp-s9-shared` (+ e2e aliases).
