@@ -13,14 +13,17 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | RS0 reminders + strongholds core | merged `fb3884a3` | — | done (23/23) | — |
 | FX2 dice + gems lines | merged `d4837dc4` | — | done (10/10; branch gates 5232 / 208) | main gates with PM1 |
 | PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates: check 5307 + 1 timeout flake (passes alone), e2e 207 + 2 load flakes (pass alone) |
-| PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | M13 + X1 (tool-bar put-away never returns) fixed; check + e2e running | re-test M1, M13, X1 |
+| PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | walkthrough 14/15 → re-test 5/5 (M13, X1 fixed; e2e 211) | merge after SP1 (adds the Party status command + launcher threshold numbers) |
 | FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
 | FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | built (check 5331, e2e 210); ruling: window title bar + 40 px keep-out for the toast stack (amends FR-NOTE-53); merging main | walkthrough FX1 |
 | SP1 palette + shortcuts | `build/sp-palette` (ws wA1; base PM1) | build-sp1 | re-test 11/11; main (FX3) merged in | branch gates running → merge → main gates |
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | main merged (check 5339) | test-sp2 walkthrough R1-R8 running |
 
-Queue: RS1 + RS2 after PM2 merges (RS0, PM1 in) · RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
+| RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | building | walkthrough RS-R |
+| RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | building | walkthrough RS-H |
+
+Queue: RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
 ## Shared-file locks
 
