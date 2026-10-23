@@ -43,13 +43,16 @@ test("FR-PARTY-29 FR-LOOT-21 Loot tab right of Inventory, no Coin button, no loo
     ).toHaveCount(0);
     const board = await openWindow(page, "party.board");
     const tabs = board.getByTestId("party-tab");
-    // Sprint 9: Party status first, Companions gone (FR-PARTY-60).
-    await expect(tabs).toHaveCount(4);
+    // Sprint 9: Party status first, Companions gone (FR-PARTY-60); RS2: the DM's Strongholds
+    // (FR-PARTY-72; this bundle has no stronghold, so player-2 has none).
+    const rs = page === dm ? ["strongholds"] : [];
+    await expect(tabs).toHaveCount(4 + rs.length);
     expect(await tabs.evaluateAll((els) => els.map((e) => e.getAttribute("data-value")))).toEqual([
       "status",
       "handouts",
       "inventory",
       "loot",
+      ...rs,
     ]);
     await expect(tabs.nth(3)).toHaveText("Loot");
     await expect(page.getByTestId("party-loot-link")).toHaveCount(0);
