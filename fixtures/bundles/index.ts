@@ -37,6 +37,7 @@ import fuS7 from "./fu-s7";
 import fuS7E2e from "./fu-s7-e2e";
 import fuSmallCopy from "./fu-small-copy";
 import furyLogLine from "./fury-log-line";
+import fxDiceE2e from "./fx-dice-e2e";
 import fxS9 from "./fx-s9";
 import fxStaleChunkE2e from "./fx-stale-chunk-e2e";
 import gems from "./gems";
@@ -60,6 +61,8 @@ import partyLoot from "./party-loot";
 import partyS5 from "./party-s5";
 import physicalDiceCombat from "./physical-dice-combat";
 import playerColours from "./player-colours";
+import pmMemory from "./pm-memory";
+import pmMemoryE2e from "./pm-memory-e2e";
 import prefsS6 from "./prefs-s6";
 import prefsS6E2e from "./prefs-s6-e2e";
 import remindersStrongholds from "./reminders-strongholds";
@@ -214,10 +217,15 @@ export const bundles: readonly Bundle[] = [
   // Sprint 8 track TT (build/tt-pause): the pause screen
   tableToolsPaused,
   tableToolsPausedE2e,
+  // Sprint 9 track PM (fix/window-memory): aliases of session-sim-12
+  pmMemory,
+  pmMemoryE2e,
   // Sprint 9 track RS (fix/rs-core): the sprint-9 gate bundle (each track appends its units)
   sessionSim13,
   remindersStrongholds,
   rsE2e,
+  // Sprint 9 track FX (fix/fx-dice-lines): dice + gems lines
+  fxDiceE2e,
   // Sprint 9 track FX (fix/fx-sync-shell): stale-chunk reload e2e alias, FX3's bundle
   fxStaleChunkE2e,
   fxS9,

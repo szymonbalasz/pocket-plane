@@ -481,7 +481,14 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
   const card = useRef<HTMLElement>(null);
   const { rows, line } = useMemo(() => layoutOf(p), [p]);
   const landed = useAllLanded(p.t.entryIds);
-  const hover = (on: boolean) => rollPopups.hover(p.id, on);
+  // FR-DICEX-94 (BL-89): held only after a real pointer move on the card since it showed (a
+  // popup that opens under a resting pointer isn't), or focus inside; the flags start clear on
+  // every mount and go with the card, so a stale one never holds it.
+  useLayoutEffect(() => {
+    const el = card.current;
+    rollPopups.mounted(p.id, () => el?.matches(":hover") === true);
+    return () => rollPopups.mounted(p.id, null);
+  }, [p.id]);
   return (
     <section
       ref={card}
@@ -500,11 +507,15 @@ function Card({ p, display }: { p: RollPopup; display: DisplaySetting }) {
         p.state === "closing" ? "opacity-0" : "opacity-100",
       )}
       style={{ width: ROLL_POPUP_W, maxHeight: ROLL_POPUP_H, ...CARD_PAD }}
-      onMouseEnter={() => hover(true)}
-      onMouseLeave={() => hover(false)}
-      onFocus={() => hover(true)}
+      onPointerMove={(e) => {
+        if (e.movementX !== 0 || e.movementY !== 0) rollPopups.pointer(p.id, true);
+      }}
+      onPointerLeave={() => rollPopups.pointer(p.id, false)}
+      onFocus={() => rollPopups.focus(p.id, true)}
       onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) hover(false);
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          rollPopups.focus(p.id, false);
+        }
       }}
     >
       <header className="flex shrink-0 items-start gap-1">

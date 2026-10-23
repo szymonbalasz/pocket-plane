@@ -88,7 +88,7 @@ describe("FR-DICEX-48 tray preview", () => {
     expect(html).toContain('data-testid="dicex-tray-preview" data-mode="chips"');
     expect(html).toMatch(/data-shape="d20" data-faces="20" data-value="20"/);
     expect(html).toMatch(
-      /data-shape="d10" data-faces="100" data-value="100"[\s\S]*?>00<[\s\S]*?>0</,
+      /data-shape="d10" data-faces="100" data-value="100"[\s\S]*?data-face="00"[\s\S]*?data-face="0"/,
     );
     expect(html).not.toContain(">d12<"); // never the old text badge
 

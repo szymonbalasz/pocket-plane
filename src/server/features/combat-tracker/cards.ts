@@ -4,6 +4,9 @@
 // with damage on the card (FR-CBT-127, OQ-CBT-85 A) sends the damage to "not used" and the card
 // waits for a new damage roll (`cbt.rollDamage` doubles it after a natural 20). `maxDice`
 // (FR-CBT-128) sets 1–3 weapon dice of the card's damage to their max on new roll rows.
+// FR-GEM-42 (BL-63): both write the card with `updateNotification({emit: false})` and return its
+// change; the caller's `GemSpent` carries it (one frame per spend). `cardLineItems` (FR-GEM-41,
+// BL-62): a rerolled attack line's other items as the card now shows them.
 import {
   type CardDiePick,
   type CardKnownDice,
@@ -15,12 +18,15 @@ import {
   UNUSED_ROLLS_MAX,
 } from "@shared/combat-tracker/schemas";
 import type { DieResult, RollPayloadItem } from "@shared/dice-roll-log/schemas";
+import { modsTotal } from "@shared/effect-modifiers/line";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { and, desc, eq } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
 import { notification, roll, triggerUse } from "../../db/schema";
+import type { RecordChange } from "../../events/types";
 import type { Roll } from "../dice-roll-log/evaluate";
+import type { OldEntry, RerollOthers } from "../dice-roll-log/reroll";
 import {
   loadNotification,
   toNotificationRecord,
@@ -63,6 +69,10 @@ export function toHitBlock(env: Pick<CommandEnv, "tx">, card: NotificationRecord
 export interface ReplacedToHit {
   /** The card's crit changed with damage on it: the damage moved to `unusedRolls`. */
   critFlipped: boolean;
+  /** The card's upsert, for the caller's event (FR-GEM-42). */
+  change: RecordChange;
+  /** The card's payload now. */
+  payload: DamageCardPayload;
 }
 
 /**
@@ -71,7 +81,8 @@ export interface ReplacedToHit {
  * `updateNotification` (no toast, same `seq`). FR-CBT-127: `crit` changed and damage on the card
  * → the damage (with its extra parts, offers and maxed dice) moves to `unusedRolls` as
  * `{rollId, total}` (cap 3, oldest dropped), `damage` null, its offered trigger uses dropped;
- * `diceMaxed` goes with it (review-a #15), so a new Combat gem may max the new damage.
+ * `diceMaxed` goes with it (review-a #15), so a new Combat gem may max the new damage. No event:
+ * the change is returned (FR-GEM-42).
  */
 export function replaceToHit(
   env: CommandEnv,
@@ -109,11 +120,70 @@ export function replaceToHit(
       .where(and(eq(triggerUse.cardId, card.id), eq(triggerUse.state, "offered")))
       .run();
   }
-  updateNotification(env, card.id, {
-    text: damageCardText(payload),
-    payload: fitCardPayload(payload),
+  const change = updateNotification(
+    env,
+    card.id,
+    { text: damageCardText(payload), payload: fitCardPayload(payload) },
+    { emit: false },
+  );
+  return { critFlipped, change, payload };
+}
+
+/** A roll id and the ids it replaced (`replacesRollId`, newest first). */
+function rollChain(env: Pick<CommandEnv, "tx" | "actor">, id: string): string[] {
+  const ids = [id];
+  for (let r = rollRow(env, id); r.replacesRollId && ids.length < 8; ) {
+    ids.push(r.replacesRollId);
+    r = rollRow(env, r.replacesRollId);
+  }
+  return ids;
+}
+
+/**
+ * FR-GEM-41 (BL-62, FR-DICE-91): a rerolled attack line's other items as the card `p` shows them
+ * now. An item whose roll is (or was replaced by) a card damage part takes that part's current
+ * roll (maxed dice, total + its `mods`, FR-GEM-27); any other item is dropped (its damage went to
+ * "not used" on a crit flip, FR-CBT-127); the rerolled to-hit's slot is the new `item`'s (it
+ * matches no part). Roll ids: the old line's, the to-hit's and a maxed part's swapped for the new
+ * rows, a dropped item's (with its part and offered rolls) left out.
+ */
+export function cardLineItems(
+  env: Pick<CommandEnv, "tx" | "actor">,
+  p: DamageCardPayload,
+  item: RollPayloadItem,
+  old: OldEntry,
+): RerollOthers {
+  const parts = p.damage ? [p.damage, ...(p.damage.extra ?? [])] : [];
+  const chains = parts.map((part) => rollChain(env, part.rollId));
+  const items = old.items.map((x, i): RollPayloadItem | null => {
+    if (i === old.at) return item;
+    const at = chains.findIndex((c) => c.includes(x.rollId));
+    const part = parts[at];
+    if (!part) return null;
+    if (part.rollId === x.rollId) return x;
+    const row = rollRow(env, part.rollId);
+    return {
+      ...x,
+      rollId: row.id,
+      manual: row.manual,
+      dice: row.dice,
+      total: row.total + modsTotal(x.mods),
+    };
   });
-  return { critFlipped };
+  const swap = new Map<string, string>();
+  const dropped = new Set<string>();
+  old.items.forEach((x, i) => {
+    const now = items[i];
+    if (now) {
+      if (now.rollId !== x.rollId) swap.set(x.rollId, now.rollId);
+      return;
+    }
+    dropped.add(x.rollId);
+    for (const m of x.mods ?? []) if (m.rollId) dropped.add(m.rollId);
+    for (const o of x.offered ?? []) if (o.rollId) dropped.add(o.rollId);
+  });
+  const rollIds = old.rollIds.filter((id) => !dropped.has(id)).map((id) => swap.get(id) ?? id);
+  return { items, rollIds };
 }
 
 /** FR-CBT-128: why a card can't take maxed dice now (`conflict`). */
@@ -234,14 +304,15 @@ function knownDice(row: Roll, part: CardPartRef, known: readonly CardKnownDice[]
  * FR-CBT-128: writes a plan: per touched part a new roll row (a copy of the part's row with the
  * picked dice at their faces, `replacesRollId` = the old id, `manual` kept, total recomputed); the
  * card part takes the new `rollId`, `dice`, `total` (base: + its mods, FR-MOD-16) and `maxed`; the
- * card `diceMaxed`; `updateNotification` (no toast, same `seq`). `ids`: the new rows' ids when the
- * caller named them already (its event, in `plan.parts` order). Returns the new roll ids.
+ * card `diceMaxed`; `updateNotification` (no toast, same `seq`, no event: FR-GEM-42). `ids`: the
+ * new rows' ids when the caller named them already (its event, in `plan.parts` order). Returns
+ * the new roll ids and the card's change for the caller's event.
  */
 export function applyMaxDice(
   env: CommandEnv,
   plan: MaxDicePlan,
   ids: readonly string[] = [],
-): string[] {
+): { rollIds: string[]; change: RecordChange } {
   const { p } = plan;
   if (!p.damage) throw conflict(NO_DAMAGE_YET);
   let damage = p.damage;
@@ -275,11 +346,13 @@ export function applyMaxDice(
     }
   }
   const payload: DamageCardPayload = { ...p, damage, diceMaxed: true };
-  updateNotification(env, plan.card.id, {
-    text: damageCardText(payload),
-    payload: fitCardPayload(payload),
-  });
-  return rollIds;
+  const change = updateNotification(
+    env,
+    plan.card.id,
+    { text: damageCardText(payload), payload: fitCardPayload(payload) },
+    { emit: false },
+  );
+  return { rollIds, change };
 }
 
 /** FR-CBT-128: `cards.maxDice(env, cardId, picks, known?)`, plan + write in one call. */
@@ -288,7 +361,7 @@ export function maxDice(
   cardId: string,
   picks: readonly CardDiePick[],
   known?: readonly CardKnownDice[],
-): string[] {
+): { rollIds: string[]; change: RecordChange } {
   return applyMaxDice(env, planMaxDice(env, cardId, picks, known));
 }
 
@@ -296,6 +369,7 @@ export const cards = {
   findToHitCard,
   toHitBlock,
   replaceToHit,
+  cardLineItems,
   planMaxDice,
   applyMaxDice,
   maxDice,

@@ -408,9 +408,11 @@ describe("FR-GEM-22 combat to-hits (FR-CBT-126, -127, -129)", () => {
     expect(after.p.crit).toBe(false);
     expect(after.seq).toBe(before.seq);
     expect(after.text).toBe(`Mira: ${item.total} to hit (${before.p.attackName})`);
+    // FR-GEM-42: one event, the card's upsert in it.
     const types = t.events.slice(n).map((x) => x.event.type);
-    expect(types).toEqual([GemSpent.type, "NotificationUpdated"]);
-    expect(t.events.at(-2)?.event.payload).toMatchObject({ cardId });
+    expect(types).toEqual([GemSpent.type]);
+    expect(t.events.at(-1)?.event.payload).toMatchObject({ cardId });
+    expect(t.events.at(-1)?.event.changes.find((c) => c.id === cardId)).toBeDefined();
     // FR-CBT-129: the popup's old to-hit id → conflict, nothing written; the new one applies.
     const hits = t.count("hit_ruling");
     const stale = t.err(() =>
@@ -482,10 +484,11 @@ describe("FR-GEM-22 combat to-hits (FR-CBT-126, -127, -129)", () => {
     expect(p.unusedRolls).toEqual([
       { rollId: old.damage?.rollId as string, total: old.damage?.total as number },
     ]);
-    // The new line copies the damage item as rolled (FR-DICE-62); the card waits.
-    expect((t.items(r.rerollEntryId as string)[1] as RollPayloadItem).rollId).toBe(
-      old.damage?.rollId as string,
-    );
+    // FR-GEM-41: the new line holds the to-hit only (the damage went to "not used"); the card
+    // waits.
+    expect(t.items(r.rerollEntryId as string).map((i) => i.rollId)).toEqual([
+      p.toHit?.rollId as string,
+    ]);
     const dmg = t.damage("Mira", 9);
     expect(dmg.attached).toBe(true);
     const done = cardOf(t, a.cardId);

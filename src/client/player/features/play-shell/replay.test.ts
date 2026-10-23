@@ -23,6 +23,21 @@ if (process.env.UPDATE_FAILING === "1") {
   for (const n of failing) FAILING.add(n);
 }
 
+/**
+ * Named exemptions (FR-SHELL-160: a new failing cell only with a reason, orchestrator-approved):
+ * cell → reason. Each must be in `replay.failing.json`.
+ */
+const EXEMPTIONS = new Map([
+  [
+    "FR-SHELL-115 replay P2 moved @1280×720 memory",
+    "PM1 (approved): inherits the shared open phase's I2 (Compendium / Party Manager on the toast keep-out), as every other P2 moved @1280×720 cell; its memory steps (I9–I13) pass",
+  ],
+]);
+
+test("FR-SHELL-160 named exemptions are recorded failing cells", () => {
+  for (const name of EXEMPTIONS.keys()) expect(FAILING.has(name)).toBe(true);
+});
+
 for (const c of cells) {
   (FAILING.has(c.name) ? test.failing : test)(
     c.name,

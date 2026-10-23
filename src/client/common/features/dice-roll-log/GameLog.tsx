@@ -89,7 +89,8 @@ function Segment({
   if (s.die) {
     // FR-DICE-35: a wrapper per chip (review B31); the shape inside keeps `dicex-die`. A dropped
     // die's wrapper is `<s>`, as its text was (struck for assistive tech too). FR-DICE-40: held →
-    // blank, no `data-value`; it fades in at the landing (`data-landing`).
+    // blank, no `data-value`; it fades in at the landing (`data-landing`). FR-DICE-93: an
+    // `inline-block` wrapper (never `inline-flex`), so the line copies as one line.
     const d = s.die;
     const Wrap = d.kept ? "span" : "s";
     return (
@@ -100,7 +101,7 @@ function Segment({
         data-kept={d.kept}
         data-offered={d.offered === true}
         data-landing
-        className="-my-0.5 inline-flex align-middle"
+        className="-my-0.5 inline-block align-middle leading-none"
       >
         <DieShape
           faces={d.faces}
@@ -138,7 +139,8 @@ function Segment({
       return (
         <Badge
           variant="outline"
-          className="px-1 py-0 text-[10px]"
+          // FR-DICE-93: inline-level text in the line, not the Badge's `inline-flex`.
+          className="inline-block px-1 py-0 text-[10px]"
           data-testid={s.text === "physical" ? "dice-log-entry-manual" : undefined}
         >
           {s.text}
@@ -228,6 +230,7 @@ function Entry({
       <Tooltip content={tooltipOf(e, landed)}>
         <span
           ref={line}
+          data-testid="dice-log-entry-text"
           className={cn(
             "min-w-0 flex-1 break-words",
             (e.undone || rerolled) && "line-through",

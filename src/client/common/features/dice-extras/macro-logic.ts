@@ -127,13 +127,39 @@ export interface MacroDraft {
   dmOnly: boolean;
 }
 
+const nameError = (name: string): string | null => {
+  const r = MacroName.safeParse(name);
+  return r.success ? null : (r.error.issues[0]?.message ?? "Name is required");
+};
+const expressionError = (expression: string): string | null => {
+  const r = MacroExpression.safeParse(expression);
+  return r.success ? null : (r.error.issues[0]?.message ?? "Not dice notation");
+};
+
 /** FR-DICEX-71: the editor's first problem (Save disabled), or null. */
 export function draftError(d: Pick<MacroDraft, "name" | "expression">): string | null {
-  const name = MacroName.safeParse(d.name);
-  if (!name.success) return name.error.issues[0]?.message ?? "Name is required";
-  const expr = MacroExpression.safeParse(d.expression);
-  if (!expr.success) return expr.error.issues[0]?.message ?? "Not dice notation";
-  return null;
+  return nameError(d.name) ?? expressionError(d.expression);
+}
+
+/** FR-DICEX-95: the fields the user touched (changed or blurred), and whether Save was pressed. */
+export interface MacroTouched {
+  name: boolean;
+  expression: boolean;
+  submitted: boolean;
+}
+export const UNTOUCHED: MacroTouched = { name: false, expression: false, submitted: false };
+
+/**
+ * FR-DICEX-95 (BL-90): the error text the editor shows: a field's problem only once that field
+ * was touched or Save was pressed (Save stays disabled meanwhile, `draftError`). A preset (Save as
+ * macro: the expression filled in, no name) opens with none.
+ */
+export function shownError(
+  d: Pick<MacroDraft, "name" | "expression">,
+  t: MacroTouched,
+): string | null {
+  const name = t.name || t.submitted ? nameError(d.name) : null;
+  return name ?? (t.expression || t.submitted ? expressionError(d.expression) : null);
 }
 
 /** FR-DICEX-71: "DM only" is the DM's, on an owned PC. */

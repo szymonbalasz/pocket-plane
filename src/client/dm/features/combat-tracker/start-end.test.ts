@@ -99,12 +99,13 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
     const ctx = { registry: dmWindows, viewport, available };
     const overlaps = (a: Rect, b: Rect) =>
       a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
-    // Reset layout, Initiative idle (minimised); Compendium dragged over its spot; Encounters open.
+    // Reset layout, Initiative idle (minimised); an untouched Compendium over its spot (a dragged,
+    // remembered one would stay under Initiative: FR-SHELL-151); Encounters open.
     let ws: Windows = reduce(defaultLayout(dmWindows, viewport), { type: "reset" }, ctx);
     ws = reduce(ws, { type: "minimise", kind: "cbt.initiative" }, ctx);
     ws = reduce(ws, { type: "open", kind: "cmp.compendium" }, ctx);
     const spot = { x: 808, y: 104, w: 440, h: 560 };
-    ws = reduce(ws, { type: "setRect", kind: "cmp.compendium", rect: spot }, ctx);
+    ws = ws.map((w) => (w.kind === "cmp.compendium" ? { ...w, ...spot } : w));
     ws = reduce(ws, { type: "open", kind: "cbt.encounters" }, ctx);
     await startAndFollow(async () => null, {
       dispatch: (a) => {
@@ -132,6 +133,34 @@ describe("FR-CBT-60 windows follow the DM's own Start / End", () => {
     }
     // Initiative is in front of every other window.
     expect(Math.max(...ws.map((w) => w.z))).toBe(init.z);
+  });
+
+  test("FR-CBT-60 / FR-SHELL-151 Start at 1280×720, Compendium dragged onto Initiative's spot (remembered): Initiative takes its zone on top, the Compendium's stored rect unchanged under it", async () => {
+    const viewport = { w: 1280, h: 720 };
+    const available = new Set(dmWindows.defs.map((d) => d.kind));
+    const ctx = { registry: dmWindows, viewport, available };
+    let ws: Windows = reduce(defaultLayout(dmWindows, viewport), { type: "reset" }, ctx);
+    const zone = ws.find((w) => w.kind === "cbt.initiative");
+    ws = reduce(ws, { type: "minimise", kind: "cbt.initiative" }, ctx);
+    ws = reduce(ws, { type: "open", kind: "cmp.compendium" }, ctx);
+    const spot = { x: 808, y: 104, w: 440, h: 560 };
+    ws = reduce(ws, { type: "setRect", kind: "cmp.compendium", rect: spot }, ctx);
+    await startAndFollow(async () => null, {
+      dispatch: (a) => {
+        ws = reduce(ws, a, ctx);
+      },
+      noteAppearance: () => {},
+    });
+    const init = ws.find((w) => w.kind === "cbt.initiative");
+    const cmp = ws.find((w) => w.kind === "cmp.compendium");
+    expect(init && { x: init.x, y: init.y, w: init.w, h: init.h }).toEqual(
+      zone && { x: zone.x, y: zone.y, w: zone.w, h: zone.h },
+    );
+    expect(cmp && { state: cmp.state, x: cmp.x, y: cmp.y, w: cmp.w, h: cmp.h }).toEqual({
+      state: "open",
+      ...spot,
+    });
+    expect(Math.max(...ws.map((w) => w.z))).toBe(init?.z ?? -1);
   });
 
   test("FR-CBT-60 own Start ack → settle (one layout frame) before any window changes", async () => {

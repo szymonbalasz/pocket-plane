@@ -279,7 +279,8 @@ describe("FR-DICEX-49 total hidden until landed", () => {
     frame([entry("a")], { settings: { others: false } });
     expect(landing.api.getState().holding.get("a")).toBe(500 + LANDING_MAX_MS);
     // The miniature never reports; the popup's own cap rests it at the same 6 s.
-    popups.hover("a", true);
+    popups.mounted("a", () => true);
+    popups.pointer("a", true);
     t.advance(LANDING_MAX_MS - 1);
     expect(landing.landed("a")).toBe(false);
     t.advance(1);

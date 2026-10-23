@@ -35,6 +35,9 @@ interface CharacterLike {
   ownerPlayerId: string | null;
 }
 
+/** FR-GEM-44: the log line action's confirm text ("Spend Inspiration? ✓ ✗"). */
+export const REROLL_CONFIRM = "Spend Inspiration?";
+
 /** The d20 item a reroll takes (FR-DICE-70), or null. */
 export function rerollItem(entry: GameLogEntryView): RollPayloadItem | null {
   const rollId = rerollableRoll(entry);
@@ -115,7 +118,8 @@ export const gemRerollAction: EntryAction = {
   available: rerollAvailable,
   Icon: SparklesIcon,
   label: "Inspiration: reroll",
-  confirm: "Spend?",
+  // FR-GEM-44 (BL-72): the confirm names the gem; fits a line at the log's 300-px minimum.
+  confirm: REROLL_CONFIRM,
   roll(entry) {
     const item = rerollItem(entry);
     if (!item) return null;
