@@ -117,7 +117,7 @@ export function TrophiesView({
             <h3 className="text-xs font-medium text-muted-foreground">Records</h3>
             <dl className="flex flex-col gap-1">
               {RECORD_ROWS.map((r) => {
-                const { value, detail } = recordText(ready.records[r.key]);
+                const { value, detail } = recordText(ready.records[r.key], r.key, client);
                 return (
                   <div
                     key={r.key}
