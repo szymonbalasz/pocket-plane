@@ -227,6 +227,11 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
     onYield: () => {
       (sim as Sim).cam = fitNow(sim as Sim, undefined, "window").cam;
     },
+    // FR-MAP-114: the same `window` refit, `fitted` only.
+    onRefit: () => {
+      if ((sim as Sim).mode === "fitted")
+        (sim as Sim).cam = fitNow(sim as Sim, undefined, "window").cam;
+    },
     warn: () => {},
   });
 }

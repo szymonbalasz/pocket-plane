@@ -169,6 +169,11 @@ export interface Plan {
   log: readonly string[];
   /** L2b accepted: the map refits once (`window`, FR-MAP-97). */
   yields: boolean;
+  /**
+   * FR-MAP-114: a squeezed protected window went back to its zone over a PC footprint + 4 with a
+   * `fitted` camera: the map runs one `window` refit after this settle.
+   */
+  refit?: "window";
 }
 
 export const windowId = (kind: string, instance: string = MAIN_INSTANCE) => `${kind}:${instance}`;
@@ -469,6 +474,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const putAway = new Map<string, string>();
   const log: string[] = [];
   let yields = false;
+  /** FR-MAP-114: a protected window went back to its zone over a PC (`fitted`): one refit. */
+  let refit: "window" | undefined;
   const late = new Set<string>();
   const label = trigger.type;
 
@@ -600,6 +607,13 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const putAwayWin = (w: WindowState, cause: string | null, forKind: string) => {
     const id = idOf(w);
     if (cause) remember(w, cause, null);
+    else {
+      // FR-SHELL-159 (BL-87): put away for an open, it never comes back (FR-SHELL-152): the
+      // squeezes it caused are the opened window's now, and end when that one does.
+      for (const [k, d] of memory) {
+        if (d.cause === `window:${w.kind}`) memory.set(k, { ...d, cause: `window:${forKind}` });
+      }
+    }
     setWin(id, { ...w, state: "minimised" });
     putAway.set(id, cause ?? `open:${forKind}`);
     ctx.onAutoMinimise?.(id, forKind);
@@ -1076,7 +1090,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const v = causeViewport(d.cause);
     if (v) return vp.w >= v.w && vp.h >= v.h;
     if (d.cause.startsWith("window:")) {
-      // The kind closes, is minimised by the user or ends; one the shell put away may come back.
+      // The kind closes, is minimised by the user or ends; one the shell put away for a transient
+      // cause comes back (one put away for an open hands its squeezes on, `putAwayWin`).
       const kind = d.cause.slice("window:".length);
       const away = ctx.autoMinimised?.() ?? new Set<string>();
       return !out.some(
@@ -1111,8 +1126,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const untouched = d.at === null ? w.state === "minimised" : sameRect(w, d.at);
       if (!untouched || (d.at !== null && w.state !== "open")) continue;
       if (isProt(w) && d.cause.startsWith("window:") && !d.userSpot && !d.userSize) {
-        // A squeezed protected window takes its zone back; launcher windows in it move.
-        placeProtected(id, "returned");
+        zoneBack(id, d);
         continue;
       }
       const back: WindowState = {
@@ -1149,8 +1163,58 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     }
   };
 
+  /**
+   * The untouched window (other than `id`) in the way of `id`'s zone rect `z`, as rendered; a
+   * hard keep-out over it is `null` too (blocked, no window to wait for). Remembered windows are
+   * ignored, as for zones (FR-SHELL-151).
+   */
+  const zoneBlocker = (id: string, z: Rect): { free: boolean; by?: WindowState } => {
+    const w = get(id) as WindowState;
+    const r = shownRect(
+      out.map((x) => (idOf(x) === id ? { ...x, ...z } : x)),
+      { ...w, ...z },
+      ctx,
+    );
+    if (hard.some((k) => overlaps(r, k))) return { free: false };
+    for (const [o, or] of shownMap()) {
+      if (idOf(o) === id || isRemembered(o) || !overlaps(r, or)) continue;
+      return { free: false, by: o };
+    }
+    return { free: true };
+  };
+
+  /**
+   * FR-SHELL-159 (BL-87): a squeezed (or shell-shrunk) untouched protected window whose cause
+   * ended goes back to its zone rect iff that is clear of untouched windows and hard keep-outs
+   * (remembered windows ignored); with a `fitted` camera a PC under it is the map's (one `window`
+   * refit, FR-MAP-114), with `moved` the zone ladder as built. Not clear: it waits for the
+   * untouched window in the way (its memory's cause becomes that window); `d` absent (grow back,
+   * FR-SHELL-103) → nothing is remembered.
+   */
+  const zoneBack = (id: string, d?: Displacement): boolean => {
+    const w = get(id);
+    const full = w && zoneOf(w);
+    if (!w || !full) return false;
+    const { free, by } = zoneBlocker(id, full);
+    if (!free) {
+      if (d) memory.set(id, by ? { ...d, cause: `window:${by.kind}` } : d);
+      return false;
+    }
+    placeProtected(id, d ? "returned" : "grown");
+    const now = get(id) as WindowState;
+    if (fitted && sameRect(now, full) && !pcFree(rendered(now))) refit = "window";
+    return true;
+  };
+
   /** FR-SHELL-103 up: shell-shrunk windows grow back toward their target (L1–L2, none put away). */
   const growBack = () => {
+    // FR-SHELL-159: shell-shrunk untouched protected windows grow back to their zone.
+    for (const id of protectedIds()) {
+      const w = get(id);
+      const full = w && !isRemembered(w) && !squeezedNow(w) && zoneOf(w);
+      if (!w || !full || (w.w >= full.w && w.h >= full.h)) continue;
+      zoneBack(id);
+    }
     for (const id of [...launchersByZ()].reverse()) {
       const w = get(id);
       const def = w && defOf(w);
@@ -1288,6 +1352,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     putAway,
     log,
     yields,
+    ...(refit && { refit }),
   };
 }
 

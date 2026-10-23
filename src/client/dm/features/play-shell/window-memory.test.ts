@@ -1,11 +1,12 @@
 // Sprint 9 (track PM, PM1) on the DM's real windows: BL-87 (FR-SHELL-159, FR-MAP-114), the
-// squeezed Game log growing back. Pure: the in-memory shell controller at 1440×900.
+// squeezed Game log growing back, and its refit. Pure: the in-memory shell controller at 1440×900.
 import { expect, mock, test } from "bun:test";
 import type { Rect } from "@ui/features/play-shell/geometry";
 import { keepOuts } from "@ui/features/play-shell/keep-outs";
-import type { PlacementToken } from "@ui/features/play-shell/placement";
+import { type PlacementToken, pcClear } from "@ui/features/play-shell/placement";
 import { createShellController } from "@ui/features/play-shell/shell-store";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
+import { fitBounds } from "@ui/features/scenes-map/camera";
 
 mock.module("../campaign-management/PlayersPanel", () => ({ PlayersPanel: () => null }));
 const { dmWindows } = await import("../../windows");
@@ -36,6 +37,7 @@ function shellAt(camera: "fitted" | "moved", tokens: () => readonly PlacementTok
     keepOuts: (v) => keepOuts("dm", v, new Map()),
     avoid: tokens,
     camera: () => camera,
+    onRefit: () => void refits.push("window"),
   });
   c.restore("k");
   const log = () => {
@@ -49,8 +51,7 @@ function shellAt(camera: "fitted" | "moved", tokens: () => readonly PlacementTok
 const ZONE = { x: 68, y: 584, w: 1150, h: 240 };
 const SQUEEZED = { x: 68, y: 664, w: 460, h: 160 };
 
-// Root cause first (BL-87): the failing repro, before the fix.
-test.failing("FR-SHELL-159 Game log grows back (BL-87): DM 1440×900, Party Manager then a sheet opened as sim-12 → squeezed to 460×160; the cause closed, or put away for another open → back to 1150×240 in its zone (`returned`)", () => {
+test("FR-SHELL-159 Game log grows back (BL-87): DM 1440×900, Party Manager then a sheet opened as sim-12 → squeezed to 460×160; the cause closed, or put away for another open → back to 1150×240 in its zone (`returned`)", () => {
   for (const camera of ["fitted", "moved"] as const) {
     // Plain: open → squeezed; close → back.
     const a = shellAt(camera, bandPcs);
@@ -77,5 +78,34 @@ test.failing("FR-SHELL-159 Game log grows back (BL-87): DM 1440×900, Party Mana
     for (const k of ["stats.board", "cmp.compendium", "char.sheet"]) b.act("close", k);
     expect({ camera, log: b.log() }).toEqual({ camera, log: ZONE });
     expect(b.c.store.getState().memory).toEqual([]);
+    // Shell-shrunk with no memory left (e.g. reloaded squeezed): the next `return` grows it back.
+    const st = a.c.store.getState();
+    a.c.store.setState({
+      windows: st.windows.map((w) => (w.kind === "dice.log" ? { ...w, ...SQUEEZED } : w)),
+    });
+    a.c.dispatch({ type: "return" }, all);
+    expect(a.log()).toEqual(ZONE);
+    expect(a.c.store.getState().placed.get("dice.log:main")).toBe("grown");
   }
+});
+
+test("FR-MAP-114 refit on return: DM 1440×900, a PC under the Game log's zone: squeeze (Party Manager opens) → close → the Game log in its zone, one `window` refit (bounded by the last full fit: never zooms in past it); `moved` → no refit (the zone ladder)", () => {
+  for (const camera of ["fitted", "moved"] as const) {
+    let tokens: readonly PlacementToken[] = [];
+    const s = shellAt(camera, () => tokens);
+    // A PC under the zone's right part, clear of the squeezed log and of Party Manager's spot.
+    tokens = [...bandPcs(), { x: 1150, y: 700, w: 40, h: 40, pc: true }];
+    s.act("open", "party.board");
+    expect(s.log()).toEqual(SQUEEZED);
+    s.act("close", "party.board");
+    if (camera === "fitted") {
+      expect(s.log()).toEqual(ZONE);
+      expect(s.refits).toEqual(["window"]);
+    } else {
+      expect(s.refits).toEqual([]);
+      expect(pcClear(s.log() as Rect, tokens)).toBe(true);
+    }
+  }
+  // The refit's bound (FR-MAP-94): a `window` refit never draws a cell above the last full fit.
+  expect(fitBounds("window", 40, "dm").maxCell).toBe(40);
 });

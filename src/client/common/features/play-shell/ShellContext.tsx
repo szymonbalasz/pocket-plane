@@ -102,6 +102,8 @@ export function ShellProvider({
         dryFit: (windows) => fitPort()?.dryFit(windows) ?? null,
         lastFullCell: () => fitPort()?.lastFullCell() ?? null,
         onYield: () => fitPort()?.yieldRefit(),
+        // FR-MAP-114: a squeezed protected window back in its zone over a PC → one `window` refit.
+        onRefit: () => fitPort()?.yieldRefit(),
         // FR-SHELL-155: `onAbsorb` learns who this page is.
         you: () => sync?.getState().store.you ?? null,
         // FR-SHELL-80: the map refits once on the client that reset.

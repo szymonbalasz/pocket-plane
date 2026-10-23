@@ -248,6 +248,8 @@ export function createShellController(opts: {
   lastFullCell?: () => number | null;
   /** The placer accepted a yield (L2b): the map refits once (FR-MAP-97). */
   onYield?: () => void;
+  /** A protected window went back to its zone over a PC (FR-MAP-114): one `window` refit. */
+  onRefit?: () => void;
   /** Reset layout was applied (FR-SHELL-80): the page requests one Fit of the map. */
   onReset?: () => void;
   /** Who this page is, for `onAbsorb` (FR-SHELL-155). */
@@ -447,6 +449,7 @@ export function createShellController(opts: {
       });
       storage.write(key, serialise(next, registry));
       if (p.yields) opts.onYield?.();
+      if (p.refit === "window") opts.onRefit?.();
       if (action.type === "reset") opts.onReset?.();
     },
   };
