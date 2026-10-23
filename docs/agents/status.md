@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 9: all slices merged; final gates + bench, then session-sim-13, DM gate 1 passed (#339), plan [sprint-9](sprint-9.md).
+**Phase:** Sprint 9: all slices merged; final main green (check 5530, e2e 225, bench 41/41). **Sprint gate: session-sim-13 running** (agent test-session-13, tab in wR, worktree `gates-main`, port 4163, run `20261023-193558-session-sim-13`), DM gate 1 passed (#339), plan [sprint-9](sprint-9.md).
 
 **Gates on `main`:** run in the detached worktree `~/.herdr/worktrees/pocket-plane/gates-main` (`git -C <it> checkout --detach main`, then `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there.
 
@@ -15,7 +15,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates: check 5307 + 1 timeout flake (passes alone), e2e 207 + 2 load flakes (pass alone) |
 | PM2 Party Manager | merged `77f5fd2f` | — | done (re-test 5/5; e2e 213 + roll-popup flake) | main gates after FX1 |
 | FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
-| SP3 session recap | merged `2160c79d` | — | done (7/7, 13/14 → 8/8; branch gates 5530 / 225) | final main gates running |
+| SP3 session recap | merged `2160c79d` | — | done (7/7, 13/14 → 8/8) | final main 5530 / 225 green; bench 41 / 41 |
 | FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12) | main gates: check 5392 + 1 load flake (3/3 alone), e2e 215 |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
 | SP2 rules reference | merged `fb2904b5` | — | done (14/14 + 16/16) | main gates 5476 / 224 green (with RS3) |
