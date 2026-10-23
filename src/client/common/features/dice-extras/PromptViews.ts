@@ -5,15 +5,21 @@
 import { ROLL_REQUEST_KIND } from "@shared/dice-extras/request-names";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { DicesIcon } from "lucide-react";
-import { createElement, lazy, Suspense } from "react";
+import { createElement, Suspense } from "react";
+import { lazyChunk } from "../../lib/lazy-chunk";
 import { defineNotificationView, type NotificationView } from "../notifications/views";
 import { createChunkLoader } from "./lazy3d";
 
 /** The prompt bodies' chunk (`DiceExtrasRuntime` loads it at idle). */
 export const promptChunk = createChunkLoader(() => import("./PromptBody"));
 
-const Player = lazy(() => import("./PromptBody").then((m) => ({ default: m.PlayerPrompt })));
-const Dm = lazy(() => import("./PromptBody").then((m) => ({ default: m.DmPrompt })));
+// A stale chunk: an inline reload panel in the prompt card; the prompt re-toasts after the
+// reload (FR-NOTE-60).
+const Player = lazyChunk(
+  () => import("./PromptBody").then((m) => ({ default: m.PlayerPrompt })),
+  "inline",
+);
+const Dm = lazyChunk(() => import("./PromptBody").then((m) => ({ default: m.DmPrompt })), "inline");
 
 type Body = typeof Player;
 const withText = (Inner: Body) =>

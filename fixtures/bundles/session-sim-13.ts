@@ -20,5 +20,7 @@ export default defineBundle({
     "hold-greystone-reminders",
     "hold-greystone-stores",
     "hold-tower-secret",
+    // FX: FX3 Mira's Bless beside Thorn's summon concentration (FR-CBTX-75)
+    "fx-mira-bless",
   ],
 });

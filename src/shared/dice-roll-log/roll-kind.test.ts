@@ -399,3 +399,59 @@ describe("FR-CHARX-55 weapon damage parts on the roll line", () => {
     );
   });
 });
+
+describe("FR-DICE-92 kept dice joined across dropped ones (BL-72)", () => {
+  const d6 = (value: number, kept: boolean) => ({ faces: 6, value, kept });
+  const d20 = (value: number, kept: boolean) => ({ faces: 20, value, kept });
+
+  test("FR-DICE-92 keep-highest joins kept dice", () => {
+    const kh3 = item({
+      expression: "4d6kh3",
+      dice: [d6(5, true), d6(3, false), d6(6, true), d6(6, true)],
+      constant: 0,
+      total: 17,
+      natural: null,
+    });
+    expect(lineText(rollSegments(kh3))).toBe("4d6kh3: 5 ~3~ + 6 + 6 = 17");
+    // A dropped die first or last: no "+" of its own, one space on each side.
+    const kl2 = item({
+      expression: "3d6kh2",
+      dice: [d6(1, false), d6(4, true), d6(6, true)],
+      constant: 0,
+      total: 10,
+      natural: null,
+    });
+    expect(lineText(rollSegments(kl2))).toBe("3d6kh2: ~1~ 4 + 6 = 10");
+    const last = item({
+      expression: "3d6kh2",
+      dice: [d6(4, true), d6(6, true), d6(1, false)],
+      constant: 0,
+      total: 10,
+      natural: null,
+    });
+    expect(lineText(rollSegments(last))).toBe("3d6kh2: 4 + 6 ~1~ = 10");
+    // Adv / dis stay as built.
+    const adv = item({
+      expression: "2d20kh1+5",
+      mode: "advantage",
+      dice: [d20(13, true), d20(7, false)],
+      constant: 5,
+      total: 18,
+      natural: 13,
+    });
+    expect(lineText(rollSegments(adv))).toBe("2d20kh1+5 (adv): 13 ~7~ + 5 = 18");
+    const dis = item({
+      expression: "2d20kl1+5",
+      mode: "disadvantage",
+      dice: [d20(13, false), d20(7, true)],
+      constant: 5,
+      total: 12,
+      natural: 7,
+    });
+    expect(lineText(rollSegments(dis))).toBe("2d20kl1+5 (dis): ~13~ 7 + 5 = 12");
+    // FR-DICE-78: no stray spaces.
+    for (const l of [kh3, kl2, last, adv, dis].map((i) => lineText(rollSegments(i)))) {
+      expect(l).not.toMatch(/ {2}|\( | \)|^ | $/);
+    }
+  });
+});

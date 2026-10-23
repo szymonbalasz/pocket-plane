@@ -3,6 +3,7 @@
 // one line there; no shell code changes.
 
 import { WindowKind } from "@shared/play-shell/layout";
+import type { You } from "@shared/protocol/frames";
 import type { RecordStore } from "@shared/protocol/store";
 import type { ComponentType } from "react";
 import type { Viewport } from "./geometry";
@@ -113,6 +114,14 @@ export interface WindowDef {
    * window whose content needs a target only a feature can give (e.g. the handout viewer).
    */
   restoreOpen?: false;
+  /**
+   * FR-SHELL-155: window kinds (removed from the registry) whose stored layout entry this type
+   * takes over at `load`: an absorbed entry open or minimised, while this type is closed or has
+   * no entry, gives it its state, z and (if the absorbed one was remembered) its x / y.
+   */
+  absorbs?: readonly string[];
+  /** FR-SHELL-155: runs once after this type absorbed `fromKind`'s entry (e.g. picks a tab). */
+  onAbsorb?: (fromKind: string, you: You | null) => void;
   /**
    * Always mounted while the kind is available, whatever the window state (e.g. the toast
    * runtime of `note.history`). Renders its own UI, if any; gets no props.

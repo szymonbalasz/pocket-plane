@@ -27,6 +27,7 @@ import cbTies from "./combat-extras/cb-ties";
 import cbtxEffects from "./combat-extras/cbtx-effects";
 import cbtxReinforcement from "./combat-extras/cbtx-reinforcement";
 import cbtxTemp from "./combat-extras/cbtx-temp";
+import fxMiraBless from "./combat-extras/fx-mira-bless";
 import combat1 from "./combat-tracker/combat-1";
 import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
@@ -276,6 +277,8 @@ export const units: readonly Fixture[] = [
   holdGreystoneStores,
   holdTowerSecret,
   holdTowerMove,
+  // Sprint 9 track FX (fix/fx-sync-shell): Mira's Bless beside Thorn's summon concentration
+  fxMiraBless,
   // Sprint 9 track SP (build/sp-recap): the recap's loot haul + a share
   recapLootHaul,
   recapShareNote,

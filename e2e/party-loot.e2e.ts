@@ -43,7 +43,7 @@ test("FR-LOOT-03 FR-LOOT-13 FR-LOOT-15 FR-LOOT-18 FR-LOOT-21 DM adds 50 gp → p
   for (const page of [dm, player]) await expect(launcherButton(page, "loot.log")).toHaveCount(0);
   const dmWin = await openLoot(dm);
   const pWin = await openLoot(player);
-  await expect(dmWin.getByTestId("ui-window-title")).toHaveText("Party");
+  await expect(dmWin.getByTestId("ui-window-title")).toHaveText("Party Manager");
   // Bundle state: pot 5 pp, 30 gp; Mira 21 gp (own, first); 9 rows; player has no add form.
   for (const w of [dmWin, pWin]) {
     await expect(potCoin(w, "gp")).toHaveText("30 gp");

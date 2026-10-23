@@ -173,4 +173,39 @@ describe("gems Combat gem over real sockets (gems)", () => {
     expect(leakScan(h.s, p2)).toEqual([]);
     for (const c of [dm, p1, p2]) c.close();
   }, 60_000);
+
+  test("FR-GEM-42 one frame per spend: each connection gets one `event` frame (GemSpent) with row + line (+ the card for its audience); no NotificationUpdated after", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(P1());
+    const p2 = await h.live(P2());
+    await ok(dm, "gem.adjust", { characterId: brakka, gem: "combat", delta: 1 });
+    const { cardId } = await flame(p1);
+    await until(() => [dm, p1].every((c) => card(c, cardId) !== undefined));
+    await Bun.sleep(100);
+    const marks = [dm, p1, p2].map((c) => c.frames.length);
+    const r = await ok<{ entryId: string }>(p1, GEM_SPEND_INTENT, {
+      characterId: brakka,
+      gem: "combat",
+      cardId,
+      dice: [{ part: "base", index: 0 }],
+    });
+    await until(() => [dm, p1, p2].every((c) => entry(c, r.entryId) !== undefined));
+    // A trailing `NotificationUpdated` used to follow about 25 ms later (BL-63).
+    await Bun.sleep(250);
+    const types = (f: { type: string; changes?: { type: string }[] }) =>
+      [...new Set((f.changes ?? []).map((c) => c.type))].sort();
+    [dm, p1, p2].forEach((c, i) => {
+      const events = c.frames.slice(marks[i]).filter((f) => f.type === "event");
+      expect(events.map((f) => (f.type === "event" ? f.cause.name : ""))).toEqual(["GemSpent"]);
+      const want =
+        c === p2
+          ? ["character-gems", "game-log-entry"]
+          : ["character-gems", "game-log-entry", "notification"];
+      expect(types(events[0] as { type: string; changes?: { type: string }[] })).toEqual(want);
+    });
+    expect(payloadOf(p1, cardId).diceMaxed).toBe(true);
+    expect(card(p2, cardId)).toBeUndefined();
+    expect(leakScan(h.s, p2)).toEqual([]);
+    for (const c of [dm, p1, p2]) c.close();
+  }, 60_000);
 });

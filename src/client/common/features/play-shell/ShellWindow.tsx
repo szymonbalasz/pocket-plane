@@ -2,7 +2,9 @@
 // (FR-SHELL-10/11). Drag and resize move the element by CSS only; the store is written once,
 // on pointer up (SHELL §12). A minimised window stays mounted, parked: invisible and inert
 // (FR-SHELL-36). `visibility`, not `display: none`, so its scroll positions survive. A
-// `growToContent` type measures its content and reports the height it needs (FR-SHELL-39).
+// `growToContent` type measures its content and reports the height it needs (FR-SHELL-39). A
+// remembered window (FR-SHELL-144) draws at its stored rect, nudged on-screen and pushed off a
+// shown tool bar render-only (FR-SHELL-147, -150).
 import type { WindowState } from "@shared/play-shell/layout";
 import { MinusIcon, XIcon } from "lucide-react";
 import {
@@ -14,28 +16,34 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { Tooltip } from "../../components/ui/overlays";
+import { ChunkReloadPanel } from "../../lib/chunk-reload";
+import { isStaleChunk } from "../../lib/chunk-stale";
 import { cn } from "../../lib/utils";
 import { reportContentHeight, reportFirstRow } from "./content-heights";
 import { useGrowthCaps } from "./free-area";
 import {
   growsToContent,
+  isRemembered,
   moveRect,
+  placedRect,
   type Rect,
   type ResizeEdge,
-  renderedRect,
   resizeRect,
   type Viewport,
   windowRect,
 } from "./geometry";
 import { onGestureCancel } from "./input-block";
+import { useKeepOuts } from "./keep-outs";
 import { SHELL_ZONE_ATTR } from "./keys";
-import { type Placed, type WindowAction, windowId } from "./manager";
+import { type Placed, pushBars, renderedPlaced, type WindowAction, windowId } from "./manager";
 import type { WindowDef } from "./registry";
-import { useShellState } from "./ShellContext";
+import { useAvailableKinds, useRegistry, useShellState } from "./ShellContext";
+import { SHELL_TEST_KIND } from "./test-windows";
 
 function applyRect(el: HTMLElement, r: Rect) {
   el.style.transform = `translate(${r.x}px, ${r.y}px)`;
@@ -65,7 +73,10 @@ class WindowErrorBoundary extends Component<{ children: ReactNode }, { error: Er
     console.error("window body failed", error, info.componentStack);
   }
   override render() {
-    if (this.state.error) {
+    const { error } = this.state;
+    // FR-SHELL-175 (BL-91): a stale chunk offers a reload; any other error keeps the message.
+    if (isStaleChunk(error)) return <ChunkReloadPanel chunk={error.chunk} fallback="window" />;
+    if (error) {
       return <p className="text-sm text-destructive">This window failed to render.</p>;
     }
     return this.props.children;
@@ -119,6 +130,14 @@ export function ShellWindow({
   const pcClear = useShellState((s) => s.pcClear.has(wid));
   // FR-SHELL-88: the kind it was auto-minimised for (walkthroughs).
   const autoFor = useShellState((s) => s.autoMinimisedFor.get(wid));
+  // FR-SHELL-150: the shown tool bars / chrome keep-outs a remembered window is drawn aside of.
+  const regions = useKeepOuts(useRegistry().client);
+  const bars = useMemo(() => pushBars(regions), [regions]);
+  // FR-SHELL-164, test mode: the z rank among the mounted windows (1 = bottom).
+  const testMode = useAvailableKinds().has(SHELL_TEST_KIND);
+  const zRank = useShellState((s) =>
+    testMode ? s.windows.filter((w) => w.state !== "closed" && w.z <= win.z).length : undefined,
+  );
   // Measured heights are reported as they are taken; a window that stops growing reports none.
   useEffect(() => {
     if (!grows) reportContentHeight(wid, null);
@@ -134,7 +153,7 @@ export function ShellWindow({
   // Render-only fit to the work area, then clamp (FR-SHELL-29, -12), then grow to content
   // (FR-SHELL-39), capped by the next window or hard keep-out (FR-SHELL-52); a gesture starts here
   // and its end stores the result with the current work area.
-  const rect = windowRect(win, def, viewport, needed, caps);
+  const rect = windowRect(win, def, viewport, needed, caps, bars);
   useFirstRow(wid, open, rect, ref, bodyRef);
   // A gesture's end re-applies the rendered rect once: a drop the placer pushed back to the rect it
   // had before the gesture (FR-SHELL-105) changes no style prop, so React wouldn't undo the drag's.
@@ -153,7 +172,7 @@ export function ShellWindow({
    * window grown upwards keeps the bottom the user dropped it at.
    */
   function movedRect(last: Rect): Rect {
-    const base = renderedRect(win, def.minSize, viewport);
+    const base = placedRect(win, def.minSize, viewport, bars);
     if (last.h === base.h) return last;
     const up = rect.y !== base.y;
     return { ...last, y: up ? last.y + last.h - base.h : last.y, h: base.h };
@@ -212,7 +231,9 @@ export function ShellWindow({
       data-testid="ui-window"
       data-record-id={wid}
       data-state={win.state}
-      data-placed={placed}
+      data-placed={renderedPlaced(win, def, viewport, bars, placed)}
+      data-remembered={isRemembered(win) || undefined}
+      data-z={zRank}
       data-pc-clear={pcClear || undefined}
       data-auto-minimised={(parked && autoMinimised) || undefined}
       data-auto-minimised-for={(parked && autoMinimised && autoFor) || undefined}

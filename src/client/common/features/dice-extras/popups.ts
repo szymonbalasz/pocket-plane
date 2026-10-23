@@ -1,9 +1,15 @@
 // Roll popups, client memory (FR-DICEX-39–41): one popup per live frame with new `roll` entries,
 // on every client that received them (the roller too), ≤ 3 (the oldest closes), "Rolling…" until
-// its dice rest, then 6 s (hover / focus pauses), ✕ closes. Its PiP parts: `handoff` = the big
-// throw's dice, flown in at its hand-off (the run in `diceExtras` tells when they rest); `play` =
-// a miniature on the one canvas; either falls back to chips. Never stored or sent; in the initial
-// chunk (the UI is the lazy `RollPopup` chunk).
+// its dice rest, then 6 s, ✕ closes. FR-DICEX-94 (BL-89): at 6 s it closes unless **held** then:
+// the pointer moved on it after it showed (and is over it now) or focus went into it; a held
+// popup re-checks shortly after a leave / blur and every 1 s; the card's flags clear when it
+// unmounts. Root cause (BL-89): the old hover pause trusted `mouseenter` / `focus` to be followed
+// by `mouseleave` / `blur` on the same node; a popup that opened under the resting pointer, or
+// whose card was replaced (the portal remounting) or moved away while hovered, kept `hovered`
+// with its 6 s parked as `left` forever. Its PiP parts: `handoff` = the big throw's dice, flown in
+// at its hand-off (the run in `diceExtras` tells when they rest); `play` = a miniature on the one
+// canvas; either falls back to chips. Never stored or sent; in the initial chunk (the UI is the
+// lazy `RollPopup` chunk).
 import type { DiceLook } from "@shared/dice-extras/looks";
 import { type DiceThrow, isMeshDie, throwDice } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
@@ -70,8 +76,15 @@ export interface RollPopup {
   /** FR-DICEX-46 a: each handed-off die's still (copied pixels) by die key, kept by its cell. */
   stills: Record<string, HTMLCanvasElement>;
   state: "rolling" | "rest" | "closing";
-  hovered: boolean;
 }
+
+/** FR-DICEX-94: while held after its 6 s, a popup re-checks this often. */
+export const HOLD_CHECK_MS = 1000;
+/**
+ * FR-DICEX-94: after a leave / blur an expired popup re-checks this much later (≤ 1 s), so a card
+ * that slides from under a following pointer (the stack lifting) isn't lost on the way.
+ */
+export const LEAVE_CHECK_MS = 300;
 
 /** `data-mode` of a popup's PiP. */
 export function pipModeOf(p: Pick<RollPopup, "parts">): PipMode {
@@ -111,7 +124,20 @@ export interface RollPopups {
   fallback(id: string, part: PartName, to: "play" | "chips"): void;
   /** Hand-off stills by die key (FR-DICEX-46 a). */
   still(id: string, stills: Record<string, HTMLCanvasElement>): void;
-  hover(id: string, on: boolean): void;
+  /**
+   * FR-DICEX-94: the pointer moved on the card (`true`, a real `pointermove` after it showed) or
+   * left it (`false`).
+   */
+  pointer(id: string, on: boolean): void;
+  /** FR-DICEX-94: focus went into the card (`true`) or out of it (`false`). */
+  focus(id: string, on: boolean): void;
+  /**
+   * FR-DICEX-94: the card mounted with its `:hover` check, or unmounted (`null`): either way its
+   * pointer and focus flags start clear, so a stale flag never holds it.
+   */
+  mounted(id: string, over: (() => boolean) | null): void;
+  /** FR-DICEX-94: is the popup held now? */
+  held(id: string): boolean;
   close(id: string): void;
   /** FR-DICEX-47 short screens: these popups don't fit the toast region; gone at once. */
   drop(ids: readonly string[]): void;
@@ -136,8 +162,10 @@ export function createRollPopups(
 ): RollPopups {
   const api = createStore<RollPopupsState>()(() => ({ popups: [] }));
   let seq = 0;
-  /** Each popup's close timer and the time it is due (paused: `left` ms). */
-  const clocks = new Map<string, { h: unknown; due: number; left: number | null }>();
+  /** Each popup's close timer; `expired` = its 6 s ran out while it was held. */
+  const clocks = new Map<string, { h: unknown; expired: boolean }>();
+  /** FR-DICEX-94: each card's hold flags and its `:hover` check (client memory, not state). */
+  const holds = new Map<string, { pointer: boolean; focus: boolean; over: () => boolean }>();
 
   const get = (id: string) => api.getState().popups.find((p) => p.id === id) ?? null;
   const patch = (id: string, fn: (p: RollPopup) => RollPopup) =>
@@ -149,6 +177,7 @@ export function createRollPopups(
   };
   const remove = (id: string) => {
     stop(id);
+    holds.delete(id);
     api.setState((s) => ({ popups: s.popups.filter((p) => p.id !== id) }));
   };
   const close = (id: string) => {
@@ -158,22 +187,38 @@ export function createRollPopups(
     patch(id, (x) => ({ ...x, state: "closing" }));
     timers.setTimeout(() => remove(id), POPUP_CLOSE_MS);
   };
-  /** The 6 s after rest; `ms` = what is left after a pause. */
+  const held = (id: string) => {
+    const h = holds.get(id);
+    return !!h && ((h.pointer && h.over()) || h.focus);
+  };
+  /** FR-DICEX-94: the time is up: close, unless held (then check again in 1 s). */
+  const expire = (id: string) => {
+    const p = get(id);
+    if (p?.state !== "rest") return;
+    if (!held(id)) {
+      close(id);
+      return;
+    }
+    clocks.set(id, { h: timers.setTimeout(() => expire(id), HOLD_CHECK_MS), expired: true });
+  };
+  /** The 6 s after rest (FR-DICEX-39), whatever the pointer does meanwhile. */
   const arm = (id: string, ms: number) => {
     stop(id);
-    clocks.set(id, {
-      h: timers.setTimeout(() => close(id), ms),
-      due: timers.now() + ms,
-      left: null,
-    });
+    clocks.set(id, { h: timers.setTimeout(() => expire(id), ms), expired: false });
+  };
+  /** FR-DICEX-94: on leave / blur / unmount: an expired popup re-checks shortly (then closes). */
+  const recheck = (id: string) => {
+    const c = clocks.get(id);
+    if (!c?.expired || held(id)) return;
+    timers.clearTimeout(c.h);
+    clocks.set(id, { h: timers.setTimeout(() => expire(id), LEAVE_CHECK_MS), expired: true });
   };
   const settle = (id: string) => {
     const p = get(id);
     if (p?.state !== "rolling") return;
     if (Object.values(p.parts).some((x) => x?.state === "moving")) return;
     patch(id, (x) => ({ ...x, state: "rest" }));
-    if (!p.hovered) arm(id, POPUP_MS);
-    else clocks.set(id, { h: null, due: 0, left: POPUP_MS });
+    arm(id, POPUP_MS);
   };
   const rested = (id: string, part: PartName) => {
     const p = get(id);
@@ -265,7 +310,6 @@ export function createRollPopups(
         parts,
         stills: {},
         state: "rolling",
-        hovered: false,
       };
       api.setState((s) => ({ popups: [...s.popups.filter((p) => p.id !== t.id), popup] }));
       // FR-DICEX-39: ≤ 3 popups; the oldest closes.
@@ -286,19 +330,24 @@ export function createRollPopups(
     still(id, stills) {
       patch(id, (x) => ({ ...x, stills: { ...x.stills, ...stills } }));
     },
-    hover(id, on) {
-      const p = get(id);
-      if (!p || p.hovered === on) return;
-      patch(id, (x) => ({ ...x, hovered: on }));
-      if (p.state !== "rest") return;
-      const c = clocks.get(id);
-      if (on && c && c.left === null) {
-        timers.clearTimeout(c.h);
-        clocks.set(id, { h: null, due: 0, left: Math.max(0, c.due - timers.now()) });
-      } else if (!on) {
-        arm(id, c?.left ?? POPUP_MS);
-      }
+    pointer(id, on) {
+      const h = holds.get(id);
+      if (!h || !get(id)) return;
+      h.pointer = on;
+      if (!on) recheck(id);
     },
+    focus(id, on) {
+      const h = holds.get(id);
+      if (!h || !get(id)) return;
+      h.focus = on;
+      if (!on) recheck(id);
+    },
+    mounted(id, over) {
+      if (over) holds.set(id, { pointer: false, focus: false, over });
+      else holds.delete(id);
+      recheck(id);
+    },
+    held,
     close,
     drop(ids) {
       for (const id of ids) remove(id);

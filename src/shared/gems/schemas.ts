@@ -26,8 +26,8 @@ export const GEM_NAME: Record<GemKind, string> = {
 
 /** FR-GEM-06: per-gem count bounds (the "max 5" is a label only, FR-GEM-08). */
 export const GEM_COUNT_MAX = 99;
-/** FR-GEM-07: one adjust moves a count by at most 5. */
-export const GEM_DELTA_MAX = 5;
+/** FR-GEM-07: one adjust moves a count by at most 10 (FR-GEM-43: a quick-click sum, review-b 10). */
+export const GEM_DELTA_MAX = 10;
 
 const Count = z.int().min(0).max(GEM_COUNT_MAX);
 
@@ -46,7 +46,7 @@ export type CharacterGemsRecord = z.infer<typeof CharacterGemsRecord>;
 
 const Id = z.string().min(1).max(64);
 
-/** FR-GEM-07: `gem.adjust` (DM): `delta` −5…+5, never 0. */
+/** FR-GEM-07: `gem.adjust` (DM): `delta` −10…+10 (FR-GEM-43), never 0. */
 export const GemAdjustInput = z.strictObject({
   characterId: Id,
   gem: GemKind,

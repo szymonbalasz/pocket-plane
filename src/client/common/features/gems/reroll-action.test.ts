@@ -18,7 +18,7 @@ import { CHARACTER_GEMS_TYPE } from "@shared/gems/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import { actionsFor, entryActions } from "../dice-roll-log/entry-actions";
-import { gemRerollAction, rerollAvailable } from "./reroll-action";
+import { gemRerollAction, REROLL_CONFIRM, rerollAvailable } from "./reroll-action";
 
 const item = (p: Partial<RollPayloadItem> = {}): RollPayloadItem => ({
   rollId: "r1",
@@ -196,5 +196,18 @@ describe("FR-GEM-33 log action available", () => {
         { characterId: "mira", gem: "inspiration", entryId: "e1", manual: { diceTotal: 17 } },
       ],
     ]);
+  });
+});
+
+describe("FR-GEM-44 the confirm names the gem (BL-72)", () => {
+  test('FR-GEM-44 confirm names the gem: "Spend Inspiration?" fits a 300-px Game log line', () => {
+    expect(gemRerollAction.confirm).toBe(REROLL_CONFIRM);
+    expect(REROLL_CONFIRM).toBe("Spend Inspiration?");
+    // Width bound at the log's minimum (FR-SHELL-35, 300 px; layout in e2e/fx-dice.e2e.ts): the
+    // text at text-xs (12 px, ≤ 0.6 em a glyph) + ✓ and ✗ (24 px each) + gaps (2 px), next to the
+    // category Badge (≤ 80 px) and the window's padding (≤ 24 px) stays inside the line; the
+    // line text wraps beside it (`min-w-0`).
+    const confirm = REROLL_CONFIRM.length * 12 * 0.6 + 2 * 24 + 2 * 2;
+    expect(confirm).toBeLessThanOrEqual(300 - 80 - 24);
   });
 });

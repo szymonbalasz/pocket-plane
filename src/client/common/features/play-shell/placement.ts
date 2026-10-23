@@ -177,7 +177,40 @@ export interface PlaceInput {
    * before nearest the fitted default).
    */
   prev?: Rect;
+  /** One settle's token grids (FR-SHELL-158), for searches on these same `tokens`. */
+  memo?: PlaceMemo;
 }
+
+/**
+ * FR-SHELL-158 (BL-82): the token-derived half of the candidate grid, built once per (window
+ * position, size, gap, heights) and reused: the footprints nearest the default rect, their rows,
+ * their full-width columns and the spot cap's drop order (`capSpots`: farthest first).
+ */
+interface TokenGrid {
+  edgeTokens: Rect[];
+  rows: number[];
+  cols: number[];
+  drop: { v: number; d: number; x: boolean }[];
+}
+
+/**
+ * FR-SHELL-158 (BL-82): one settle's token grids and PC boxes, shared by every search on the same
+ * `tokens` (the 12-px / 4-px retries, the look-ahead, the yield). Results are the same as without.
+ */
+export interface PlaceMemo {
+  tokens: readonly PlacementToken[];
+  plain?: Rect[];
+  pcs?: Rect[];
+  grids: Map<string, TokenGrid>;
+}
+
+export const placeMemo = (tokens: readonly PlacementToken[]): PlaceMemo => ({
+  tokens,
+  grids: new Map(),
+});
+
+/** FR-SHELL-158's profile (printed by `placement.bench.ts`): searches run, token grids built. */
+export const placeStats = { searches: 0, grids: 0 };
 
 export interface Placement {
   rect: Rect;
@@ -217,6 +250,67 @@ export function capSpots(
   return { cols: [...xs], rows: [...ys] };
 }
 
+/**
+ * `capSpots` with the token values' drop order given (`drop`: unique token values, farthest from
+ * the default rect first): the same spots, without sorting them again on every search.
+ */
+function capGrid(
+  fixedCols: readonly number[],
+  tokenCols: readonly number[],
+  fixedRows: readonly number[],
+  tokenRows: readonly number[],
+  drop: readonly { v: number; x: boolean }[],
+): { cols: number[]; rows: number[] } {
+  const xs = new Set([...fixedCols, ...tokenCols]);
+  const ys = new Set([...fixedRows, ...tokenRows]);
+  if (xs.size * ys.size > SPOTS_MAX) {
+    const fixedX = new Set(fixedCols);
+    const fixedY = new Set(fixedRows);
+    for (const e of drop) {
+      if (xs.size * ys.size <= SPOTS_MAX) break;
+      if ((e.x ? fixedX : fixedY).has(e.v)) continue;
+      (e.x ? xs : ys).delete(e.v);
+    }
+  }
+  return { cols: [...xs], rows: [...ys] };
+}
+
+/**
+ * FR-SHELL-158 (BL-82): whether `placeWindow(def, vp, input)` can find a **clear** spot at all
+ * (rank (1)): some rect of its smallest candidate size (the min / `floor` size, `need`), inside
+ * its candidate bounds, 12 (`gap`) px clear of every window and hard region. Exact: every
+ * candidate is at least that size, so none is clear when this is false; a clear placement slides
+ * left and up until it touches a blocker or the bounds, so testing those corners suffices. The
+ * ladder skips searches that can't be accepted.
+ */
+export function roomFor(def: Placeable, vp: Viewport, input: PlaceInput = {}): boolean {
+  if (def.fixedDefault) return true;
+  const plain = (r: Rect): Rect => ({ x: r.x, y: r.y, w: r.w, h: r.h });
+  const hard = (input.hard ?? []).map(plain);
+  const base = fittedDefaultRect(def, vp, hard, input.size);
+  const a = usableArea(vp);
+  const g = input.gap ?? EDGE_GAP;
+  const need = Math.ceil(input.need ?? 0);
+  const fullH = Math.min(Math.max(base.h, need), a.bottom - a.top);
+  const h = Math.min(Math.max(def.minSize.h, input.floor?.h ?? 0, need), fullH);
+  const w = Math.min(Math.max(def.minSize.w, input.floor?.w ?? 0), base.w);
+  const minX = Math.max(a.left, RAIL_CLEAR);
+  const blocks = [...(input.windows ?? []).map(plain), ...hard].map((o) => ({
+    x: o.x - g,
+    y: o.y - g,
+    w: o.w + 2 * g,
+    h: o.h + 2 * g,
+  }));
+  const xs = new Set(
+    [minX, ...blocks.map((b) => b.x + b.w)].map((x) => Math.max(minX, Math.min(x, a.right - w))),
+  );
+  const ys = new Set(
+    [a.top, ...blocks.map((b) => b.y + b.h)].map((y) => Math.min(Math.max(a.top, y), a.bottom - h)),
+  );
+  for (const x of xs) for (const y of ys) if (!anyHit({ x, y, w, h }, blocks)) return true;
+  return false;
+}
+
 /** Where a window opens by itself (auto placement; rank in the header). */
 export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}): Placement {
   // Plain {x, y, w, h} copies: one object shape keeps the thousands of overlap tests fast.
@@ -225,7 +319,9 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const prots = (input.windows ?? []).filter((o) => o.protected).map(plain);
   const hard = (input.hard ?? []).map(plain);
   const soft = (input.soft ?? []).map(plain);
-  const tokens = (input.tokens ?? []).map(plain);
+  const memo = input.memo && input.memo.tokens === input.tokens ? input.memo : undefined;
+  if (memo && !memo.plain) memo.plain = memo.tokens.map(plain);
+  const tokens = memo?.plain ?? (input.tokens ?? []).map(plain);
   const base = fittedDefaultRect(def, vp, hard, input.size);
   if (def.fixedDefault)
     return { rect: base, clear: true, pcClear: pcClear(base, input.tokens ?? []) };
@@ -248,22 +344,39 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const rowHeights = [...new Set([...heights, Math.min(Math.max(def.minSize.h, need), fullH)])];
   const sizes = [...new Set(heights)];
   const titleBars = windows.map((o) => ({ x: o.x, y: o.y, w: o.w, h: TITLE_H }));
-  const pcs = pcBoxes(input.tokens ?? []);
-  // FR-SHELL-58: the footprints nearest the default rect give rows and columns too.
-  const near = (t: Rect) => Math.abs(t.x - base.x) + Math.abs(t.y - base.y);
-  const edgeTokens = [...tokens].sort((p, q) => near(p) - near(q)).slice(0, TOKEN_EDGES_MAX);
-  const rowList = [base.y, a.top, ...rowHeights.map((h) => a.bottom - h)].map((v) => ({
-    v,
-    token: false,
-  }));
-  for (const o of regions) {
-    rowList.push({ v: o.y, token: false }, { v: o.y + o.h + g, token: false });
-    for (const h of rowHeights) rowList.push({ v: o.y - g - h, token: false });
+  if (memo && !memo.pcs) memo.pcs = pcBoxes(memo.tokens);
+  const pcs = memo?.pcs ?? pcBoxes(input.tokens ?? []);
+  /** The token half of the grid (FR-SHELL-58), memoised per settle (FR-SHELL-158). */
+  const tokenGrid = (): TokenGrid => {
+    // FR-SHELL-58: the footprints nearest the default rect give rows and columns too.
+    const near = (t: Rect) => Math.abs(t.x - base.x) + Math.abs(t.y - base.y);
+    const edgeTokens = [...tokens].sort((p, q) => near(p) - near(q)).slice(0, TOKEN_EDGES_MAX);
+    // Footprints sit at fractional screen px; stored geometry is whole px, 12 px clear of them.
+    const rows: number[] = [];
+    for (const t of edgeTokens) {
+      rows.push(Math.ceil(t.y + t.h + g));
+      for (const h of rowHeights) rows.push(Math.floor(t.y - g - h));
+    }
+    const cols = edgeTokens.flatMap((t) => [Math.ceil(t.x + t.w + g), Math.floor(t.x - g - w)]);
+    const drop = [
+      ...[...new Set(cols)].map((v) => ({ v, d: Math.abs(v - base.x), x: true })),
+      ...[...new Set(rows)].map((v) => ({ v, d: Math.abs(v - base.y), x: false })),
+    ].sort((p, q) => q.d - p.d || p.v - q.v || Number(p.x) - Number(q.x));
+    return { edgeTokens, rows, cols, drop };
+  };
+  const gridKey = `${base.x},${base.y},${w},${g},${rowHeights.join("/")}`;
+  placeStats.searches += 1;
+  let grid = memo?.grids.get(gridKey);
+  if (!grid) {
+    placeStats.grids += 1;
+    grid = tokenGrid();
+    memo?.grids.set(gridKey, grid);
   }
-  // Footprints sit at fractional screen px; stored geometry is whole px, 12 px clear of them.
-  for (const t of edgeTokens) {
-    rowList.push({ v: Math.ceil(t.y + t.h + g), token: true });
-    for (const h of rowHeights) rowList.push({ v: Math.floor(t.y - g - h), token: true });
+  const { edgeTokens } = grid;
+  const fixedRows = [base.y, a.top, ...rowHeights.map((h) => a.bottom - h)];
+  for (const o of regions) {
+    fixedRows.push(o.y, o.y + o.h + g);
+    for (const h of rowHeights) fixedRows.push(o.y - g - h);
   }
   /**
    * Inward columns for width `cw`: beside every region and token footprint (FR-SHELL-46, -58);
@@ -283,7 +396,12 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
     }),
   ];
   const edges = (cw: number) => [base.x, minX, a.right - cw].map((v) => ({ v, token: false }));
-  const spots = capSpots([...edges(w), ...inwardCols(w)], rowList, base.x, base.y);
+  // `capSpots` on the full-width grid, its token drop order precomputed (same spots).
+  const fixedCols = [
+    ...edges(w).map((e) => e.v),
+    ...regions.flatMap((o) => [o.x + o.w + g, o.x - g - w]),
+  ];
+  const spots = capGrid(fixedCols, grid.cols, fixedRows, grid.rows, grid.drop);
   const ys = spots.rows.sort((p, q) => p - q);
   const keptX = new Set(spots.cols);
 

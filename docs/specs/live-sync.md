@@ -218,7 +218,7 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 | 1 | C: context offline; after 5 s back online | Chip "Reconnecting…" within 1 s; "Connected" within 2 s of online; no intent resent |
 | 2 | C: stop pongs silently (`routeWebSocket`, server → client dropped) | Chip leaves "Connected" within 20 s; with pongs restored before then, no drop |
 | 3 | A: page open; `bun run build` **in the worktree only, never on `main`'s `dist/`** (new chunk hashes); open the Dice tray; then B (player) the same with the prompt or roll popup | DM: "Rebuild finished — reload" + Reload in the tray's body; B: "New version available — reload" (the stale notice for the popup); map, socket and other windows live; Reload → the tray opens (BL-91, the DM's real repro) |
-| 4 | A at 1280×720 and 1024×768: rename the campaign to a 40-character name | Switcher name ends in "…", full name in the Tooltip; nothing cut; switching still works (BL-77) |
+| 4 | A at 1280×720 and 1024×768: rename the campaign to a 40-character name; then a name too wide for the top bar (e.g. 40 × "W" at 1024×768) | Nothing cut at either size; a name that fits shows whole, a name that doesn't fit ends in "…" with the full name in the Tooltip; switching still works (BL-77; integrator ruling 2026-10-23 after the FX3 walkthrough) |
 | 5 | Thorn concentrating on Conjure Elemental with his elementals; Mira on Bless; A: End | Elementals gone, Thorn's concentration ended on A, B, C; Mira's Bless kept |
 | 6 | Hard kill + restart after step 5 | `state:digest` equal; step 5's state kept |
 

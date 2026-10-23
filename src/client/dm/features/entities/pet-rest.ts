@@ -8,9 +8,11 @@ import type {
   TurnMode,
   UpdateEntityBody,
 } from "@shared/entities/schemas";
+import { loadChunk } from "@ui/lib/lazy-chunk";
 
 async function session() {
-  return import("../campaign-management/session");
+  // A stale chunk (BL-91): the caller's existing error + the stale notice.
+  return loadChunk(() => import("../campaign-management/session"), { notice: true });
 }
 
 export interface PetChange {

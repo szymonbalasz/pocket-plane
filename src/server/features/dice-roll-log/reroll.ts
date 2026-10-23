@@ -4,6 +4,8 @@
 // roll hooks **not** run, the old item's `mods` copied (a `natural` rule trigger doesn't fire).
 // A new `roll` entry (the old payload with that item replaced + `replaces`, FR-DICE-64; audience
 // copied, never re-stamped), then the old entry superseded (FR-DICE-63). The caller emits.
+// FR-DICE-91 (BL-62): the caller may name the new entry's other items and roll ids (`others`,
+// called once the new roll is written); absent → copied as above.
 import {
   type DiceTerm,
   diceTerms,
@@ -15,6 +17,7 @@ import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import {
   type DieResult,
   type ManualEntry,
+  RollEntryDmPayload,
   RollEntryPayload,
   type RollPayloadItem,
 } from "@shared/dice-roll-log/schemas";
@@ -34,6 +37,28 @@ export interface RerollInput {
   rollId: string;
   /** FR-DICE-62 / FR-GEM-21: the new d20(s) by hand (adv / dis: `dice` with both). */
   manual?: ManualEntry;
+  /**
+   * FR-DICE-91: the new entry's other items and roll ids, from the new item (combat's card
+   * reroll passes the card's current view, FR-GEM-41). Absent → copied.
+   */
+  others?: (item: RollPayloadItem, old: OldEntry) => RerollOthers;
+}
+
+/** FR-DICE-91: the rerolled entry as `others` reads it: its items, roll ids, the rerolled slot. */
+export interface OldEntry {
+  items: readonly RollPayloadItem[];
+  rollIds: readonly string[];
+  at: number;
+}
+
+/**
+ * FR-DICE-91: `items` aligned with the old payload: an item replaces the old one, null drops it
+ * (with its `dmPayload` names); the rerolled slot is ignored (the new item). `rollIds`: the new
+ * entry's, in full (the new roll included).
+ */
+export interface RerollOthers {
+  items: readonly (RollPayloadItem | null)[];
+  rollIds: readonly string[];
 }
 
 export interface RerollResult {
@@ -69,6 +94,14 @@ function d20Values(env: CommandEnv, term: DiceTerm, manual: ManualEntry | undefi
     throw manualIssue("Dice values must add up to the dice total", ["dice"]);
   }
   return values;
+}
+
+/** FR-DICE-91: the old `dmPayload` with the dropped items' names left out (kept aligned). */
+function keptDmPayload(dmPayload: unknown, kept: readonly (RollPayloadItem | null)[]): unknown {
+  const dm = RollEntryDmPayload.safeParse(dmPayload);
+  if (!dm.success) return dmPayload;
+  const items = dm.data.items.filter((_, i) => kept[i] !== null && kept[i] !== undefined);
+  return { ...dm.data, items };
 }
 
 export function reroll(env: CommandEnv, input: RerollInput): RerollResult {
@@ -129,13 +162,15 @@ export function reroll(env: CommandEnv, input: RerollInput): RerollResult {
     natural: next.natural,
     replaces: { entryId: old.id, total: oldItem.total },
   };
+  const others = input.others?.(item, { items, rollIds: old.rollIds, at });
+  const slots = items.map((x, i) => (i === at ? item : others ? (others.items[i] ?? null) : x));
   const entry = append(env, {
     kind: ROLL_KIND,
     category: old.category,
     actorName: old.actorName,
-    payload: items.map((x, i) => (i === at ? item : x)),
-    dmPayload: old.dmPayload,
-    rollIds: old.rollIds.map((id) => (id === row.id ? next.id : id)),
+    payload: slots.filter((x) => x !== null),
+    dmPayload: others ? keptDmPayload(old.dmPayload, slots) : old.dmPayload,
+    rollIds: others ? [...others.rollIds] : old.rollIds.map((id) => (id === row.id ? next.id : id)),
     encounterId: old.encounterId,
     copyAudience: { public: old.public, audiencePlayerId: old.audiencePlayerId },
   });

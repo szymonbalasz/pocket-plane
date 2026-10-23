@@ -1378,7 +1378,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). *
 From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §50](../protocol/README.md#50-sprint-3-party-board-handouts-p2).
 
 - **Notification rows:** kind `handout-shared` in `notification` (payload `{handoutId}`, state `info`, audience `all` or `player`; FR-PARTY-06). The row and its handout id stay after an unshare or delete (OQ-PARTY-15); the handout's records still leave the player.
-- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab: handouts | inventory}` (FR-PARTY-11); the viewer's selected handout + mode (page memory).
+- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab}` (FR-PARTY-11; sprint 9 values per [§122](#122-sprint-9-party-manager-pm2)); the viewer's selected handout + mode (page memory).
 - **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
 - **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
 - **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
@@ -2502,9 +2502,53 @@ From [reminders](../specs/reminders.md#8-data-model) §8, [strongholds](../specs
 - **Fixtures:** units `rem-party`, `rem-mira-charm`, `rem-thorn-own`, `rem-thorn-secret`, `hold-greystone`, `hold-greystone-reminders`, `hold-greystone-stores`, `hold-tower-secret`, `hold-tower-move`; bundles `reminders-strongholds`, `rs-e2e`, `session-sim-13` (= `session-sim-12` + the RS units but `hold-tower-move`).
 - **CON-44:** see [protocol §149](../protocol/README.md#149-sprint-9-reminders--strongholds-core--records-intents-stores-holder-rs0).
 
-## 120. Sprint 9: session recap (SP3)
+## 120. Sprint 9: dice + gems lines (FX2)
 
-From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). **Built by `build/sp-recap`**. Protocol side: [protocol §150](../protocol/README.md#150-sprint-9-session-recap--recapquery-recapshare-session-recap-kind-sp3). **No table, column or record type** (ADR-0013: sessions stay derived).
+From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-91–93, [gems](../specs/gems.md#6-functional-requirements) FR-GEM-41–44, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-74 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-94–95 (#338, #339). **Built by `fix/fx-dice-lines`**: no table, column or record type. Protocol side: [protocol §150](../protocol/README.md#150-sprint-9-dice--gems-lines-fx2).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| `gem.award` payload `count` | 1–10 (was 1–5): one line per net award of a summed `gem.adjust` | FR-GEM-43 |
+| A reroll `roll` entry's `payload` / `rollIds` / `dmPayload` (combat to-hit with a pending card) | the new to-hit item + the card's **current** damage items (a maxed part's new roll row: its `rollId`, `dice`, `total` + `mods`); none once a crit flip moved the damage to "not used". `rollIds` = the new to-hit's and the kept items' rolls (their part and offered rolls); `dmPayload.items` keep the kept items' names, aligned. Any other reroll: copied as before | FR-GEM-41, FR-DICE-91 |
+| DM quick-award sum | client memory per sheet block: per character + gem, the unsent sum and the sum in flight; dropped when not live or on reload | FR-GEM-43 |
+| Popup hold flags | client memory per mounted card: pointer moved on it since it showed, focus inside; cleared on mount / unmount | FR-DICEX-94 |
+| Macro editor touched flags | component state per editor: name, expression, Save pressed | FR-DICEX-95 |
+
+- **Derived:** a line's text breakdown joins kept dice with " + " across dropped ones (`groupSegments`, FR-DICE-92); counted rolls (FR-DICE-67) now leave out a maxed card part's pre-max roll after a reroll.
+- **Fixtures:** no new unit; bundle `fx-dice-e2e` (= `gems-reroll-e2e`, `e2e/fx-dice.e2e.ts`). `session-sim-13` lines: none needed (the walkthrough runs on `session-sim-12`).
+- **Persisted runtime state:** none.
+- **CON-44:** 0 B (no new record or field; a reroll line's items are as many or fewer than before).
+
+## 121. Sprint 9: command palette and keyboard shortcuts (SP1)
+
+From [play-shell](../specs/play-shell.md#8-data-model) §8 sprint 9 (FR-SHELL-184, -193, -194; [ADR-0067](../architecture/adr/0067-command-registry.md)). **Built by `build/sp-palette`**: no table, column or record type. Protocol side: [protocol §152](../protocol/README.md#152-sprint-9-command-palette-and-keyboard-shortcuts-sp1).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| Palette command / search provider *(client code)* | registry entries in `commands.ts` (append-only); never sent or stored | FR-SHELL-184, -199 |
+| Recent picks | browser `localStorage` `pp.palette.v1.<campaignId>.<dm \| playerId>` = JSON array of row keys (`c:<command id>`, `w:<window kind>`, `i:<provider>:<record id>`), newest first, ≤ 8 (zod `RecentPicks`: longer lists cut, duplicates dropped; junk → none + one warning); keys that no longer resolve are dropped when shown; compendium rows are never recorded; never sent | FR-SHELL-194 |
+| Keyboard setting | browser `localStorage` `pp.keys.v1` = `{singleKey: boolean}` (zod strict; missing / junk → `{singleKey: true}`); device-wide (no campaign in the key); never sent | FR-SHELL-193 |
+| Palette UI | page memory: open, input, sheet open; the highlighted row; the element focused before it opened | FR-SHELL-180 |
+
+- **Derived:** palette rows and ranks (client, per keystroke); the sheet's rows (from the registry and `when`).
+- **Persisted runtime state:** the two browser keys above.
+
+## 122. Sprint 9: Party Manager (PM2)
+
+From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #339). **Built by `build/party-manager`**. Protocol side: [protocol §153](../protocol/README.md#153-sprint-9-party-manager--party-status-tab-companions-under-owners-tab-registry-pm2). **No table, column, record type or wire field.**
+
+| Browser state | Change | Rule | Source |
+|---|---|---|---|
+| Tab choice `pp.party.tab.v1.<campaignId>.<dm \| playerId>` = `{tab}` | values: `status` new (the landing tab), `companions` retired; any registered id (`party-tabs.ts`) | junk → nothing stored + warning; shown tab falls back to `status` for nothing stored, `companions`, unknown or not visible now (the stored value kept) | FR-PARTY-60, -67 |
+| Layout `pp.layout.v1` entry `party.summary` | absorbed by `party.board` once (state, z; its x / y if it was remembered), then dropped at the write | FR-SHELL-155, FR-PARTY-64 |
+
+- **Derived (client, not stored):** the Party status tab's companion rows under each owner PC (`partySummary`): pets per FR-ENT-37 plus owned combatants of the started encounter; the DM's hidden mark; "Other companions". Tab registry entries are client code, never sent or stored.
+- **Fixtures:** none new (bundles `pm-memory`, `pm-memory-e2e` are PM1's aliases of `session-sim-12`).
+- **CON-44:** 0 B.
+
+## 123. Sprint 9: session recap (SP3)
+
+From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). **Built by `build/sp-recap`**. Protocol side: [protocol §154](../protocol/README.md#154-sprint-9-session-recap--recapquery-recapshare-session-recap-kind-sp3). **No table, column or record type** (ADR-0013: sessions stay derived).
 
 | Field / table | Change | Rule | Source |
 |---|---|---|---|

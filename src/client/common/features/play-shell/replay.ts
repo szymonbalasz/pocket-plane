@@ -18,10 +18,10 @@ import {
   visibleArea,
 } from "../scenes-map/camera";
 import { fitRooms, renderedWindowRects } from "./free-area";
-import type { Rect, Viewport } from "./geometry";
+import { isRemembered, placedRect, type Rect, type Viewport, workArea } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import { bruteBest, overlaps, REFERENCE_VIEWPORTS } from "./layout-checks";
-import { defaultLayout, useful, type WindowAction, type Windows } from "./manager";
+import { defaultLayout, pushBars, useful, type WindowAction, type Windows } from "./manager";
 import { type PlacementToken, pcBoxes } from "./placement";
 import type { ShellClient, WindowRegistry } from "./registry";
 import {
@@ -43,7 +43,8 @@ export type ReplayPath =
   | "reveal"
   | "load"
   | "Start"
-  | "reset";
+  | "reset"
+  | "memory";
 
 /**
  * A window set (FR-SHELL-115): the kinds open in it, protected ones included, in open order;
@@ -78,12 +79,11 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
         "note.history",
         "dicex.tray",
         "dicex.requests", // TT2 (S3)
-        "party.summary", // CB3 (S12)
       ],
     },
   ],
   player: [
-    { name: "P1", viewer: "player-1", kinds: [...P1, "party.summary"] }, // CB3 (S12)
+    { name: "P1", viewer: "player-1", kinds: [...P1, "party.board"] }, // PM2 (FR-SHELL-160)
     {
       name: "P2",
       viewer: "player-1",
@@ -92,7 +92,7 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
     {
       name: "P3",
       viewer: "player-2",
-      kinds: ["char.sheet", "cbt.initiative", "dice.log", "stats.board", "party.summary"], // CB3
+      kinds: ["char.sheet", "cbt.initiative", "dice.log", "stats.board", "party.board"], // PM2
     },
   ],
 };
@@ -102,7 +102,10 @@ export const REPLAY_CAMERAS: readonly ReplayCamera[] = ["fitted", "moved"];
 /** The paths each client runs (FR-SHELL-115): reveal is the players' (FR-MAP-82). */
 export function replayPaths(client: ShellClient): ReplayPath[] {
   const all: ReplayPath[] = ["open", "reopen", "push", "resize", "load", "Start", "reset"];
-  return client === "player" ? [...all.slice(0, 4), "reveal", ...all.slice(4)] : all;
+  const paths: ReplayPath[] =
+    client === "player" ? [...all.slice(0, 4), "reveal", ...all.slice(4)] : all;
+  // FR-SHELL-162: window memory (sprint 9).
+  return [...paths, "memory"];
 }
 
 /** `FR-SHELL-115 replay <set> <camera> @<size> <path>`. */
@@ -125,6 +128,8 @@ export interface ReplayStep {
   /** The last settle's `data-settle-log` (FR-SHELL-110). */
   log: string;
   problems: string[];
+  /** Memory path (FR-SHELL-163): each open window's rendered rect, `kind@x,y,w×h`. */
+  drawn?: string;
 }
 
 export interface ReplayRun {
@@ -227,6 +232,11 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
     onYield: () => {
       (sim as Sim).cam = fitNow(sim as Sim, undefined, "window").cam;
     },
+    // FR-MAP-114: the same `window` refit, `fitted` only.
+    onRefit: () => {
+      if ((sim as Sim).mode === "fitted")
+        (sim as Sim).cam = fitNow(sim as Sim, undefined, "window").cam;
+    },
     warn: () => {},
   });
 }
@@ -253,6 +263,7 @@ function shownOf(sim: Sim): Map<string, { w: WindowState; r: Rect }> {
     sim.vp,
     new Map(),
     hardRects(regionsOf(sim)),
+    pushBars(regionsOf(sim)),
   );
   return new Map(open.map((w, i) => [w.kind, { w, r: rects[i] as Rect }]));
 }
@@ -314,6 +325,23 @@ function moveCamera(sim: Sim) {
     scale: s,
     x: Math.round(zone.x + zone.w / 2 - (box.x + box.w / 2) * s),
     y: Math.round(zone.y + Math.min(zone.h, 300) / 2 - (box.y + box.h / 2) * s),
+  };
+  sim.mode = "moved";
+}
+
+/** A pan (the camera `moved`): the PCs' footprint box centred on screen point `at`. */
+function panTo(sim: Sim, at: { x: number; y: number }) {
+  if (!sim.cam) return;
+  const box = footprintBox(
+    cellsNow(sim).tokens.filter((t) => t.pc),
+    gridOf(sim.state, sim.set.viewer),
+  );
+  if (!box) return;
+  const s = sim.cam.scale;
+  sim.cam = {
+    scale: s,
+    x: Math.round(at.x - (box.x + box.w / 2) * s),
+    y: Math.round(at.y - (box.y + box.h / 2) * s),
   };
   sim.mode = "moved";
 }
@@ -388,15 +416,21 @@ function check(
   const hard = regionsOf(sim).filter((k) => k.kind === "hard");
   const list = [...shown.entries()];
   for (const [kind, { w, r }] of list) {
-    // I1: no PC footprint + 4 px under a window; user spots are exempt (OQ-SHELL-62 A).
-    if (!w.userSpot && !opts.exemptI1 && pcs.some((p) => overlaps(r, p))) {
+    // I1–I3 exempt remembered windows (FR-SHELL-162; I9–I13 cover them).
+    if (isRemembered(w)) continue;
+    // I1: no PC footprint + 4 px under a window.
+    if (!opts.exemptI1 && pcs.some((p) => overlaps(r, p))) {
       // Within the 4-px margin only: a fit that keeps footprints flush (the camera's, FR-MAP-93).
       const bare = tokens.some((t) => t.pc && overlaps(r, t));
       out.push(`I1 ${kind} over a PC${bare ? "" : " (4-px margin)"}`);
     }
     // I2: no overlap, nothing on a hard keep-out or the rail.
+    // Between untouched windows (an untouched one on a remembered one only at FR-SHELL-45's last
+    // resort, I2's memory clause in `checkMemory`).
     for (const [other, o] of list) {
-      if (other > kind && overlaps(r, o.r)) out.push(`I2 ${kind} over ${other}`);
+      if (other > kind && !isRemembered(o.w) && overlaps(r, o.r)) {
+        out.push(`I2 ${kind} over ${other}`);
+      }
     }
     for (const k of hard) if (overlaps(r, k.rect)) out.push(`I2 ${kind} on keep-out ${k.id}`);
     if (r.x < 56) out.push(`I2 ${kind} on the rail (x ${r.x})`);
@@ -439,6 +473,106 @@ function check(
 }
 
 /**
+ * FR-SHELL-162's memory invariants after a step (protocol §18): `kept` = each remembered kind →
+ * its stored rect; `touched` = the kind the step opened, focused or dragged.
+ *   I9  a remembered window's stored rect never changes except by Reset;
+ *   I10 it renders at the reopen algorithm's steps 3–4 (fit + clamp, then pushed off a shown bar),
+ *       which is the stored rect at the size it was set with no bar shown;
+ *   I11 the touched window has the highest z;
+ *   I12 no remembered window is put away, squeezed or displaced (its flags and state kept).
+ */
+function checkMemory(sim: Sim, kept: ReadonlyMap<string, Rect>, touched?: string): string[] {
+  const out: string[] = [];
+  const ws = windowsOf(sim);
+  const regions = regionsOf(sim);
+  const bars = pushBars(regions);
+  const shown = shownOf(sim);
+  for (const [kind, rect] of kept) {
+    const w = ws.find((x) => x.kind === kind && x.instance === MAIN_INSTANCE);
+    if (!w) {
+      out.push(`I9 ${kind} gone`);
+      continue;
+    }
+    if (rectKey(w) !== rectKey(rect))
+      out.push(`I9 ${kind} stored ${rectKey(w)} ≠ ${rectKey(rect)}`);
+    if (!isRemembered(w)) out.push(`I12 ${kind} forgotten`);
+    if (sim.ctl.store.getState().autoMinimised.has(`${kind}:${MAIN_INSTANCE}`)) {
+      out.push(`I12 ${kind} put away`);
+    }
+    const def = sim.registry.get(kind);
+    const s = shown.get(kind);
+    if (!def || !s) continue;
+    const want = placedRect(w, def.minSize, sim.vp, bars);
+    if (rectKey(s.r) !== rectKey(want))
+      out.push(`I10 ${kind} drawn ${rectKey(s.r)} ≠ ${rectKey(want)}`);
+    const atSet = w.area?.w === workArea(sim.vp).w && w.area?.h === workArea(sim.vp).h;
+    const onScreen = rect.x >= 0 && rect.x + rect.w <= sim.vp.w;
+    if (bars.length === 0 && atSet && onScreen && rectKey(s.r) !== rectKey(rect)) {
+      out.push(`I10 ${kind} drawn ${rectKey(s.r)} ≠ stored ${rectKey(rect)}`);
+    }
+  }
+  if (touched) {
+    const top = [...ws].sort((a, b) => b.z - a.z)[0];
+    if (top?.kind !== touched) out.push(`I11 ${touched} not on top (${top?.kind})`);
+  }
+  return out;
+}
+
+/** I13: after Reset no entry has `userSpot` / `userSize` / `fixedH`; the layout = the named default. */
+function checkReset(sim: Sim): string[] {
+  const ws = windowsOf(sim);
+  const out = ws
+    .filter((w) => w.userSpot || w.userSize || w.fixedH)
+    .map((w) => `I13 ${w.kind} still remembered`);
+  const named = defaultLayout(sim.registry, sim.vp, [], regionsOf(sim));
+  if (snapshot(ws) !== snapshot(named)) out.push(`I13 not the named default layout`);
+  return out;
+}
+
+const snapshot = (ws: Windows) =>
+  ws
+    .map((w) => `${w.kind}:${w.state}:${rectKey(w)}`)
+    .sort()
+    .join(" ");
+
+/**
+ * FR-SHELL-162 (1)'s scripted spots for the open launcher kinds, in order: over a PC, over another
+ * window, at the right edge, partly off-screen; the first one is also resized.
+ */
+export function memorySpots(
+  kinds: readonly string[],
+  vp: Viewport,
+  pc: Rect | undefined,
+  other: Rect | undefined,
+): Map<string, Rect> {
+  const out = new Map<string, Rect>();
+  const w = 360;
+  const h = 360;
+  const spots: Rect[] = [
+    {
+      x: Math.round((pc?.x ?? 400) - 40),
+      y: Math.max(60, Math.round((pc?.y ?? 200) - 40)),
+      w: 400,
+      h: 380,
+    },
+    // Over another window, kept above the launcher strip.
+    {
+      x: (other?.x ?? 500) + 30,
+      y: Math.max(60, Math.min((other?.y ?? 100) + 30, vp.h - 64 - h)),
+      w,
+      h,
+    },
+    { x: vp.w - w - 12, y: 140, w, h },
+    { x: vp.w - 140, y: 220, w, h },
+  ];
+  kinds.forEach((k, i) => {
+    const s = spots[i % spots.length] as Rect;
+    out.set(k, { ...s, y: s.y + Math.floor(i / spots.length) * 24 });
+  });
+  return out;
+}
+
+/**
  * I4: windows the step put away (minimised, not named by the action) were the least recently
  * used launcher windows (FR-SHELL-78: ascending z, then entry order) and the look-ahead needed
  * them: before the step no PC-clear spot at the opened kind's useful size existed.
@@ -454,6 +588,8 @@ function checkPutAway(sim: Sim, before: Windows, opened: string, beforeTokens: P
   const parkable = before
     .filter((w) => w.state === "open" && available.has(w.kind) && w.kind !== opened)
     .filter((w) => !isProtected(sim.registry, w.kind) && !sim.registry.get(w.kind)?.fixedDefault)
+    // FR-SHELL-151: only untouched launcher windows are put away.
+    .filter((w) => !isRemembered(w))
     .map((w, i) => ({ w, i }))
     .sort((a, b) => a.w.z - b.w.z || a.i - b.i)
     .map((e) => e.w.kind);
@@ -472,6 +608,7 @@ function checkPutAway(sim: Sim, before: Windows, opened: string, beforeTokens: P
       sim.vp,
       new Map(),
       hardRects(regionsOf(sim)),
+      pushBars(regionsOf(sim)),
     );
     const hard = hardRects(regionsOf(sim));
     const best = bruteBest(
@@ -700,12 +837,128 @@ export function runReplay(
       record("reset", check(sim, before));
       break;
     }
+    case "memory": {
+      const drawnNow = () =>
+        [...shownOf(sim).entries()]
+          .map(([k, s]) => `${k}@${rectKey(s.r)}`)
+          .sort()
+          .join(" ");
+      // FR-SHELL-162: (1) drag each open launcher window to a scripted spot, resize the first.
+      const open = launcherKinds.filter(
+        (k) => windowsOf(sim).find((w) => w.kind === k)?.state === "open",
+      );
+      const shown = shownOf(sim);
+      const pc = tokensNow(sim).find((t) => t.pc);
+      const other = [...shown.entries()].find(([k]) => isProtected(registry, k))?.[1].r;
+      const spots = memorySpots(open, sim.vp, pc, other);
+      const kept = new Map<string, Rect>();
+      for (const [i, kind] of open.entries()) {
+        const before = windowsOf(sim);
+        dispatch(sim, { type: "focus", kind }); // the pointer-down that starts the drag
+        dispatch(sim, { type: "setRect", kind, rect: spots.get(kind) as Rect, resized: i === 0 });
+        const w = windowsOf(sim).find((x) => x.kind === kind) as WindowState;
+        kept.set(kind, { x: w.x, y: w.y, w: w.w, h: w.h });
+        const problems = check(sim, before);
+        problems.push(...checkMemory(sim, kept, kind));
+        // A drag moves nothing else (but a protected window the dragged one had squeezed goes
+        // back to its zone: nothing makes room for a remembered window, FR-SHELL-159).
+        const placedNow = sim.ctl.store.getState().placed;
+        for (const b of before) {
+          const a = windowsOf(sim).find((x) => x.kind === b.kind);
+          if (placedNow.get(`${b.kind}:${MAIN_INSTANCE}`) === "returned") continue;
+          if (b.kind !== kind && a && (rectKey(a) !== rectKey(b) || a.state !== b.state)) {
+            problems.push(`I12 ${b.kind} moved by dragging ${kind}`);
+          }
+        }
+        record(`memory drag ${kind}`, problems);
+        (steps.at(-1) as ReplayStep).drawn = drawnNow();
+      }
+      // (2) close + reopen each: exact, on top.
+      for (const kind of open) {
+        const before = windowsOf(sim);
+        dispatch(sim, { type: "close", kind });
+        userOpen(sim, kind);
+        record(`memory reopen ${kind}`, [...check(sim, before), ...checkMemory(sim, kept, kind)]);
+      }
+      // (3) reload.
+      load("memory reload");
+      (steps.at(-1) as ReplayStep).problems.push(...checkMemory(sim, kept));
+      // (4) resize down and back.
+      const down = chainBelow(vp0);
+      const route =
+        down.length > 0
+          ? [...down, ...down.slice(0, -1).reverse(), vp0]
+          : [REFERENCE_VIEWPORTS[2] as Viewport, vp0];
+      for (const next of route) {
+        const before = windowsOf(sim);
+        sim.vp = next;
+        dispatch(sim, { type: "viewport" });
+        if (sim.mode === "fitted") fullFit(sim, "resize");
+        record(`memory viewport ${next.w}×${next.h}`, [
+          ...check(sim, before),
+          ...checkMemory(sim, kept),
+        ]);
+        (steps.at(-1) as ReplayStep).drawn = drawnNow();
+      }
+      // (5) the tool bar shown, a reload while shown, the bar gone.
+      const bar = toolBar(client, sim.vp);
+      sim.reports.set("map.toolbar", bar);
+      dispatch(sim, { type: "push", rect: bar });
+      record("memory bar shown", [
+        ...check(sim, windowsOf(sim), { push: true }),
+        ...checkMemory(sim, kept),
+      ]);
+      load("memory reload with the bar");
+      (steps.at(-1) as ReplayStep).problems.push(...checkMemory(sim, kept));
+      sim.reports.delete("map.toolbar");
+      dispatch(sim, { type: "return" });
+      record("memory bar gone", [...check(sim, windowsOf(sim)), ...checkMemory(sim, kept)]);
+      // (6) End, then Start: remembered windows stay where they are.
+      sim.combat = false;
+      dispatch(sim, { type: "return" });
+      record("memory End", checkMemory(sim, kept));
+      const before = windowsOf(sim);
+      sim.state = "escort";
+      sim.combat = true;
+      if (client === "dm") dispatch(sim, { type: "open", kind: "cbt.initiative", by: "feature" });
+      else dispatch(sim, { type: "appear", kind: "cbt.initiative" });
+      const refit = appearanceRefit(sim);
+      record("memory Start", [
+        ...check(sim, before, { refit }),
+        ...checkMemory(sim, kept, "cbt.initiative"),
+      ]);
+      // (7) Reset: every window untouched, the named default.
+      dispatch(sim, { type: "reset" });
+      fullFit(sim);
+      record("memory reset", checkReset(sim));
+      // (8) one untouched window opened: placed by the ladder.
+      const first = launcherKinds[0];
+      if (first) {
+        const b = windowsOf(sim);
+        const beforeTokens = tokensNow(sim);
+        userOpen(sim, first);
+        const problems = check(sim, b, { opened: first });
+        problems.push(...checkPutAway(sim, b, first, beforeTokens));
+        record(`memory open ${first}`, problems);
+      }
+      break;
+    }
   }
   return { steps, problems: steps.flatMap((s) => s.problems.map((p) => `${s.step}: ${p}`)) };
 }
 
-/** One step of a scripted run (walkthrough repros): a user open, a fight's End / Start, a reload, Fit. */
-export type ScriptStep = { open: string } | { close: string } | "end" | "start" | "reload" | "fit";
+/**
+ * One step of a scripted run (walkthrough repros): a user open, a fight's End / Start, a reload,
+ * Fit, or a pan putting the PCs' centre at a screen point (the camera `moved`).
+ */
+export type ScriptStep =
+  | { open: string }
+  | { close: string }
+  | { pan: { x: number; y: number } }
+  | "end"
+  | "start"
+  | "reload"
+  | "fit";
 
 /**
  * A walkthrough repro in the harness's world (`fitted` camera): load in `state` at `vp` with
@@ -772,6 +1025,9 @@ export function runScript(
       else dispatch(sim, { type: "appear", kind: "cbt.initiative" });
       const refit = appearanceRefit(sim);
       record("Start", check(sim, before, { refit }));
+    } else if ("pan" in step) {
+      panTo(sim, step.pan);
+      record(`pan ${step.pan.x},${step.pan.y}`, []);
     } else if ("open" in step) {
       const beforeTokens = tokensNow(sim);
       userOpen(sim, step.open);
@@ -843,3 +1099,42 @@ export const REPROS: Record<ShellClient, readonly { name: string; cell: string }
     },
   ],
 };
+
+/**
+ * FR-SHELL-163's `memory` golden table: FR-SHELL-162 (1)'s scripted spots in the client's first
+ * set (`fitted`), set at 1600×900 → each dragged window's stored rect and its rendered rect at
+ * the four sizes (FR-SHELL-147's render-only nudge on the way down).
+ */
+export function memoryGolden(registry: WindowRegistry) {
+  const set = REPLAY_SETS[registry.client][0] as ReplaySet;
+  const big = REFERENCE_VIEWPORTS.at(-1) as Viewport;
+  const run = runReplay(registry, set, "fitted", big, "memory");
+  const drags = run.steps.filter((s) => s.step.startsWith("memory drag"));
+  const last = drags.at(-1);
+  if (!last) return [];
+  const parse = (list: string | undefined) =>
+    new Map(
+      (list ?? "")
+        .split(" ")
+        .map((e) => [e.slice(0, e.indexOf("@")), e.slice(e.indexOf("@") + 1)] as const),
+    );
+  const stored = new Map(
+    last.windows.split(" ").map((e) => {
+      const [kind, , rect] = e.split(":");
+      return [kind, rect] as const;
+    }),
+  );
+  const at = new Map<string, Map<string, string>>([[`${big.w}×${big.h}`, parse(last.drawn)]]);
+  for (const s of run.steps) {
+    const m = /^memory viewport (\d+×\d+)$/.exec(s.step);
+    if (m?.[1] && !at.has(m[1])) at.set(m[1], parse(s.drawn));
+  }
+  return drags.map((d) => {
+    const kind = d.step.slice("memory drag ".length);
+    return {
+      kind,
+      stored: stored.get(kind),
+      drawn: Object.fromEntries([...at].map(([vp, m]) => [vp, m.get(kind) ?? null])),
+    };
+  });
+}

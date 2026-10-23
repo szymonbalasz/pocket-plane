@@ -195,7 +195,7 @@ describe("REM / HOLD §12 CON-44 at the caps", () => {
     after = snapshotSizes(b.s);
     db.update(lootEntry).set({ storesHidden: false }).where(eq(lootEntry.fromKind, "stores")).run();
     afterShown = snapshotSizes(b.s);
-  });
+  }, 30_000); // bundle load + heavy world: over the 5 s default while other suites run
 
   afterAll(() => b.cleanup());
 

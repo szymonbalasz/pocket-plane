@@ -3,7 +3,7 @@
 import { expect, mock, test } from "bun:test";
 import type { WindowState } from "@shared/play-shell/layout";
 import { renderedWindowRects } from "@ui/features/play-shell/free-area";
-import type { Rect, Viewport } from "@ui/features/play-shell/geometry";
+import { placedRect, type Rect, type Viewport } from "@ui/features/play-shell/geometry";
 import { hardRects, keepOuts } from "@ui/features/play-shell/keep-outs";
 import {
   launcherSequence,
@@ -12,7 +12,15 @@ import {
   rectIn,
   rectOf,
 } from "@ui/features/play-shell/layout-checks";
-import { defaultLayout, plan, reduce, useful, type Windows } from "@ui/features/play-shell/manager";
+import {
+  defaultLayout,
+  plan,
+  pushBars,
+  reduce,
+  renderedPlaced,
+  useful,
+  type Windows,
+} from "@ui/features/play-shell/manager";
 import type { WindowDef } from "@ui/features/play-shell/registry";
 import { createShellController } from "@ui/features/play-shell/shell-store";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
@@ -103,7 +111,7 @@ test("FR-SHELL-104 push through the ladder (DM): the Fog tool with Scenes and Co
   }
 });
 
-test("FR-SHELL-104 push (DM): written with area and data-placed pushed, cause toolbar in the memory; the bar gone, it returns (FR-SHELL-102); a window off the bar untouched", () => {
+test("FR-SHELL-104 push (DM): pushed with area and data-placed pushed, cause toolbar in the memory, the entry keeping the pre-push rect (FR-SHELL-102: never stored); the bar gone, it returns; a window off the bar untouched", () => {
   const vp = { current: { w: 1440, h: 900 } };
   const { c, backend } = controller(vp);
   c.restore("k");
@@ -129,7 +137,7 @@ test("FR-SHELL-104 push (DM): written with area and data-placed pushed, cause to
   expect(state.windows.find((w) => w.kind === "cbt.initiative")).toBe(initBefore);
   expect(state.placed.get("cbt.initiative:main")).not.toBe("pushed");
   const written = JSON.parse(backend.get("k") ?? "{}") as { windows: WindowState[] };
-  expect(rectIn(written.windows, "map.scenes")).toEqual(rectOf(scenes));
+  expect(rectIn(written.windows, "map.scenes")).toEqual(scenesBefore);
   // The tool closes (the bar's report goes): back at its pre-push rect.
   c.dispatch({ type: "return" }, all);
   expect(rectIn(c.store.getState().windows, "map.scenes")).toEqual(scenesBefore);
@@ -141,12 +149,8 @@ test("FR-SHELL-104 push (DM, OQ-SHELL-61 A): no spot ≥ useful → the pushed l
     const label = `${vp.w}×${vp.h}`;
     let ws = reduce(defaultLayout(dmWindows, vp), { type: "open", kind: "map.scenes" }, ctxAt(vp));
     ws = reduce(ws, { type: "open", kind: "cmp.compendium" }, ctxAt(vp));
-    // Initiative moved by the user over the top-left too.
-    ws = reduce(
-      ws,
-      { type: "setRect", kind: "cbt.initiative", rect: { x: 68, y: 60, w: 400, h: 500 } },
-      ctxAt(vp),
-    );
+    // Initiative placed (untouched) over the top-left too.
+    ws = ws.map((w) => (w.kind === "cbt.initiative" ? { ...w, x: 68, y: 60, w: 400, h: 500 } : w));
     const scenes0 = ws.find((w) => w.kind === "map.scenes") as WindowState;
     // A bar over all but a strip on the right: no launcher window fits there at its useful size.
     const bar = { x: 64, y: 56, w: vp.w - 64 - 12 - 12 - 320, h: vp.h - 200 };
@@ -214,4 +218,52 @@ test("FR-SHELL-53 live viewport change (DM, W2 finding): the never-resized Game 
   const rendered = shown(c.store.getState().windows, vp.current).get("dice.log") as Rect;
   expect(rendered.y + rendered.h).toBeLessThanOrEqual(720 - 64);
   expect(rendered.x + rendered.w).toBeLessThanOrEqual(1280);
+});
+
+test("FR-SHELL-167 pushed window returns to its drop spot (BL-90, sim-12 glitch 9): Scenes dragged under the Fog bar at 1280×720 and 1440×900 → drawn pushed off the bar while Fog is open; on Fog close at the drop rect (`stored`), not its pre-drag spot", () => {
+  for (const vp of [
+    { w: 1280, h: 720 },
+    { w: 1440, h: 900 },
+  ]) {
+    const label = `${vp.w}×${vp.h}`;
+    const reports = new Map<string, Rect>();
+    const backend = new Map<string, string>();
+    const storage = createLayoutStorage(() => ({
+      getItem: (k) => backend.get(k) ?? null,
+      setItem: (k, v) => void backend.set(k, v),
+    }));
+    const c = createShellController({
+      registry: dmWindows,
+      storage,
+      viewport: () => vp,
+      keepOuts: (v) => keepOuts("dm", v, reports),
+    });
+    c.restore("k");
+    const scenes = dmWindows.get("map.scenes") as WindowDef;
+    const drawn = () => {
+      const w = c.store.getState().windows.find((x) => x.kind === "map.scenes") as WindowState;
+      const bars = pushBars(keepOuts("dm", vp, reports));
+      const how = renderedPlaced(
+        w,
+        scenes,
+        vp,
+        bars,
+        c.store.getState().placed.get("map.scenes:main"),
+      );
+      return { r: placedRect(w, scenes.minSize, vp, bars), how };
+    };
+    c.dispatch({ type: "open", kind: "map.scenes" }, all);
+    const bar = fogBar(vp);
+    reports.set("map.toolbar", bar);
+    c.dispatch({ type: "push", rect: bar }, all);
+    const preDrag = drawn().r;
+    // The DM drags Scenes up under the bar.
+    const drop = { x: 120, y: 100, w: preDrag.w, h: preDrag.h };
+    c.dispatch({ type: "setRect", kind: "map.scenes", rect: drop }, all);
+    expect(overlaps(drawn().r, grownBy12(bar)), label).toBe(false);
+    expect(drawn().how, label).toBe("pushed");
+    reports.delete("map.toolbar");
+    c.dispatch({ type: "return" }, all);
+    expect(drawn(), label).toEqual({ r: drop, how: "stored" });
+  }
 });

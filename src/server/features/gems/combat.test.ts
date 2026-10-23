@@ -16,6 +16,7 @@ import {
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
 import { formatEntry } from "@shared/dice-roll-log/line";
+import { countedRollIds } from "@shared/dice-roll-log/reroll";
 import type { DieResult, GameLogEntryRecord, ManualEntry } from "@shared/dice-roll-log/schemas";
 import { GemSpent } from "@shared/events/gems";
 import type { NotificationRecord } from "@shared/notifications/schemas";
@@ -214,9 +215,10 @@ describe("FR-GEM-25 / FR-CBT-128 Combat gem: max dice", () => {
     const after = t.note(cardId);
     expect([after.seq, after.state]).toEqual([before.seq, "pending"]);
     expect(after.text.startsWith("Brakka: 22 to hit, 18 slashing + 8 fire")).toBe(true);
-    // Order: the owner's event, then the card (protocol §22); the event names the new row.
+    // FR-GEM-42: one event, the card's upsert in it; the event names the new row.
     const events = t.events.slice(n).map((x) => x.event);
-    expect(events.map((e) => e.type)).toEqual([GemSpent.type, "NotificationUpdated"]);
+    expect(events.map((e) => e.type)).toEqual([GemSpent.type]);
+    expect(events[0]?.changes.map((c) => c.type)).toContain("notification");
     expect(events[0]?.payload).toMatchObject({ cardId, cost: 1, held: 3, rollIds: [row?.id] });
     expect(t.text(t.entry(r.entryId))).toBe(
       "Brakka spends a Combat gem — Flame Tongue greatsword: slashing d6 3 → 6 (rolled 23 → 26)",
@@ -599,6 +601,73 @@ describe("FR-GEM-31 / FR-CBT-129–134 the maxed card at apply", () => {
       12,
     ]);
     expect(t.combat()).toBe(2);
+  });
+});
+
+describe("FR-GEM-41 a reroll line follows the card (BL-62)", () => {
+  /** d20 9; slashing 3, 5 → the 3 maxed; then an Inspiration reroll of the to-hit to `d20`. */
+  function maxThenReroll(d20: number) {
+    const t = setup({ rage: false });
+    const { cardId } = t.flame(
+      [{ diceTotal: 9 }, { diceTotal: 8, dice: [3, 5] }],
+      [{ diceTotal: 8, dice: [2, 6] }],
+    );
+    const old = t.card(cardId);
+    t.spend(cardId, [{ part: "base", index: 0 }]);
+    const maxed = t.card(cardId);
+    const all = () => t.s.db.select().from(gameLogEntry).all() as GameLogEntryRecord[];
+    const line = all().find(
+      (e) => e.kind === "roll" && e.rollIds.includes(maxed.toHit?.rollId as string),
+    ) as GameLogEntryRecord;
+    const r = t.run<{ rerollEntryId: string }>(
+      spendGem.name,
+      { characterId: t.brakkaId, gem: "inspiration", entryId: line.id, manual: { diceTotal: d20 } },
+      t.p1,
+    );
+    const next = t.entry(r.rerollEntryId);
+    return { t, old, maxed, line, next, card: t.card(cardId), all };
+  }
+  const itemsOf = (e: GameLogEntryRecord) => e.payload as { rollId: string; total: number }[];
+
+  test("FR-GEM-41 reroll line follows the card: the new to-hit + the maxed damage; roll ids final only", () => {
+    const { t, old, maxed, line, next, card, all } = maxThenReroll(12);
+    const preMax = old.damage?.rollId as string;
+    const maxedId = maxed.damage?.rollId as string;
+    const fire = maxed.damage?.extra?.[0]?.rollId as string;
+    expect(maxedId).not.toBe(preMax);
+    expect(card.toHit?.natural).toBe(12);
+    // Items: to-hit (new), base (maxed, as the card shows it), fire (unchanged).
+    const hit = card.toHit?.rollId as string;
+    expect(itemsOf(next).map((i) => i.rollId)).toEqual([hit, maxedId, fire]);
+    expect(itemsOf(next)[1]?.total).toBe(maxed.damage?.total as number);
+    expect(t.text(next)).toContain("6 + 5");
+    expect(t.text(next)).not.toContain("3 + 5");
+    expect(t.text(line)).toContain("3 + 5"); // the old line stays as rolled
+    expect(next.rollIds).toContain(hit);
+    expect(next.rollIds).toContain(maxedId);
+    expect(next.rollIds).toContain(fire);
+    expect(next.rollIds).not.toContain(preMax);
+    expect(next.rollIds).not.toContain(maxed.toHit?.rollId as string);
+    // FR-DICE-67: stats (Biggest hit included) count the final rolls only.
+    const counted = countedRollIds(all());
+    expect(counted.has(maxedId)).toBe(true);
+    expect(counted.has(preMax)).toBe(false);
+    expect(counted.has(maxed.toHit?.rollId as string)).toBe(false);
+    // The card's change rides on the spend's one event.
+    const last = t.events.at(-1)?.event;
+    expect(last?.type).toBe(GemSpent.type);
+  });
+
+  test("FR-GEM-41 reroll into a crit flip: the new line holds the to-hit only", () => {
+    const { t, maxed, next, card, all } = maxThenReroll(20);
+    expect([card.crit, card.damage]).toEqual([true, null]);
+    const hit = card.toHit?.rollId as string;
+    expect(itemsOf(next).map((i) => i.rollId)).toEqual([hit]);
+    expect(next.rollIds).toEqual([hit]);
+    // GM2 repro: never the old pre-max part, nor the maxed one now "not used".
+    expect(t.text(next)).not.toMatch(/damage|3 \+ 5|6 \+ 5/);
+    const counted = countedRollIds(all());
+    expect(counted.has(maxed.damage?.rollId as string)).toBe(false);
   });
 });
 
