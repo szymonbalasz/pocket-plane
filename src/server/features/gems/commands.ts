@@ -19,6 +19,7 @@ import {
 } from "@shared/gems/schemas";
 import { defineCommand } from "../../commands/commands";
 import { conflict, invalid } from "../../commands/errors";
+import type { RecordChange } from "../../events/types";
 import { assertFeatureOn } from "../campaign-management/features";
 import { cards } from "../combat-tracker/cards";
 import { dice as diceLog, gameLog } from "../dice-roll-log";
@@ -116,9 +117,10 @@ export const spendGem = defineCommand({
       public: true,
     });
     if (combat) {
-      // FR-GEM-29 (FR-CBT-128): the new roll rows' ids are allocated by the card write, after the
-      // owner's event (protocol §22); the event names them.
+      // FR-GEM-29 (FR-CBT-128): the new roll rows' ids, named by the event. FR-GEM-42 (BL-63):
+      // the card is written first, its change rides on `GemSpent` (one frame per spend).
       const rollIds = combat.plan.parts.map(() => env.ctx.ids.next());
+      const card = cards.applyMaxDice(env, combat.plan, rollIds);
       env.emit({
         type: GemSpent.type,
         campaignId: ch.campaignId,
@@ -131,9 +133,8 @@ export const spendGem = defineCommand({
           cardId: combat.plan.card.id,
           rollIds,
         },
-        changes: [count, line],
+        changes: [count, line, card.change],
       });
-      cards.applyMaxDice(env, combat.plan, rollIds);
       return { held, entryId: line.id };
     }
     if (!target) {
@@ -146,7 +147,25 @@ export const spendGem = defineCommand({
       return { held, entryId: line.id };
     }
     // FR-GEM-19, -21, -24: the new roll + line (audience copied), the old line superseded.
-    const rr = diceLog.reroll(env, { entryId: target.entry.id, rollId: target.rollId, manual });
+    // FR-GEM-41 (BL-62): a pending card follows the new to-hit (FR-GEM-22) before the line is
+    // built, and the line takes the card's current damage (FR-DICE-91); FR-GEM-42: its change
+    // rides on `GemSpent`.
+    const { card: followed } = target;
+    let cardChange: RecordChange | null = null;
+    const rr = diceLog.reroll(env, {
+      entryId: target.entry.id,
+      rollId: target.rollId,
+      manual,
+      ...(followed
+        ? {
+            others: (item, old) => {
+              const r = cards.replaceToHit(env, followed.id, item);
+              cardChange = r.change;
+              return cards.cardLineItems(env, r.payload, item, old);
+            },
+          }
+        : {}),
+    });
     env.emit({
       type: GemSpent.type,
       campaignId: ch.campaignId,
@@ -161,10 +180,8 @@ export const spendGem = defineCommand({
         ...(target.card ? { cardId: target.card.id } : {}),
         rollIds: [rr.roll.id],
       },
-      changes: [count, line, rr.entry, rr.superseded],
+      changes: [count, line, rr.entry, rr.superseded, ...(cardChange ? [cardChange] : [])],
     });
-    // FR-GEM-22 (FR-CBT-126, -127): the card follows after the owner's event (protocol §22).
-    if (target.card) cards.replaceToHit(env, target.card.id, rr.item);
     return { held, entryId: line.id, rerollEntryId: rr.entry.id };
   },
 });
