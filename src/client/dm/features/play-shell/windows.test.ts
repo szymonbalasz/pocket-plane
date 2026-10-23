@@ -33,6 +33,7 @@ import {
   type WindowDef,
   type WindowRegistry,
 } from "@ui/features/play-shell/registry";
+import { memoryGolden } from "@ui/features/play-shell/replay";
 import { createShellController } from "@ui/features/play-shell/shell-store";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
 import { ambushTokens } from "@ui/features/play-shell/test-cells";
@@ -933,6 +934,21 @@ test("FR-SHELL-61 every user-opened kind (DM): every non-default kind, launcher 
 }, 15_000);
 
 const GOLDEN_FILE = fileURLToPath(new URL("./windows.golden.json", import.meta.url));
+
+const MEMORY_GOLDEN_FILE = fileURLToPath(new URL("./windows.memory.golden.json", import.meta.url));
+
+test("FR-SHELL-163 memory golden table (DM): FR-SHELL-162 (1)'s scripted spots in the first set at the four sizes → stored and rendered rects per dragged window (UPDATE_GOLDEN=1 rewrites)", () => {
+  const table = memoryGolden(dmWindows);
+  expect(table.length).toBeGreaterThan(0);
+  if (process.env.UPDATE_GOLDEN === "1") {
+    writeFileSync(
+      MEMORY_GOLDEN_FILE,
+      `${JSON.stringify(table, null, 2)}
+`,
+    );
+  }
+  expect(table).toEqual(JSON.parse(readFileSync(MEMORY_GOLDEN_FILE, "utf8")));
+}, 15_000);
 
 test("FR-SHELL-62 golden layouts (DM): four sizes, open / close / reopen / smaller viewport / protected reopen; invariants + brute check, golden rects per kind (UPDATE_GOLDEN=1 rewrites), deterministic", () => {
   const t0 = performance.now();
