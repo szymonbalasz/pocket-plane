@@ -1,6 +1,6 @@
-# proposed — Window memory: the placer leaves windows you arranged alone
+# 0064 — Window memory: the placer leaves windows you arranged alone
 
-- Status: proposed (sprint 9, track PM; the rule is DM decision [#338](../../decisions-log.md); the sub-picks OQ-SHELL-74–79 wait for DM gate 1)
+- Status: accepted (DM gate, [#339](../../decisions-log.md))
 - Date: 2026-10-22
 - **Amends** [ADR-0060](0060-one-window-placer.md) decisions 2, 3, 5, 6 (below), #333's reading at #335 and **#310** (park the oldest launcher window instead of covering a PC) for windows the user moved or resized: both now hold for untouched windows only. Extends [ADR-0025](0025-play-shell-windows.md) (layouts stay browser-only, #121).
 - Supersedes: BL-85 (put-away windows coming back), by design.
@@ -26,7 +26,7 @@
 
 ## Decision
 
-**A** (#338). Sub-picks proposed: OQ-SHELL-74 A (confirm: a click only fronts), -75 A (smaller screen: render-only nudge), -76 A (push = render-only least move, nothing written), -77 A (untouched windows: the ladder, never putting a remembered window away), -78 A (Party Manager 550, useful 440), -79 A (a zone may overlap a remembered window).
+**A** (#338; accepted with every sub-pick at DM gate 1, #339): OQ-SHELL-74 A (confirm: a click only fronts), -75 A (smaller screen: render-only nudge), -76 A (push = render-only least move, nothing written), -77 A (untouched windows: the ladder, never putting a remembered window away), -78 A (Party Manager 550, useful 440), -79 A (a zone may overlap a remembered window).
 
 | ADR-0060 decision | Status | What changes |
 |---|---|---|
