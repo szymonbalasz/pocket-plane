@@ -210,7 +210,7 @@ describe("REM / HOLD §13 fixtures", () => {
     expect(party(sim.items)).toEqual(party(base.items));
     expect(sim.reminders).toHaveLength(6);
     expect(sim.holds.map((h) => h.name)).toEqual([GREYSTONE.name, TOWER.name]);
-  });
+  }, 30_000); // loads two full bundles: over the 5 s default while other suites run
 
   test("FR-HOLD-40 licence check: no 2024 bastion facility name in the RS fixtures", () => {
     const catalogue = [
