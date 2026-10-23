@@ -13,7 +13,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 9 (RS0–3, PM1–2, FX1–3, SP1–3) | all merged | — | done | — |
 | Sprint 10 H1 combat + dice | `fix/h1-combat-dice` (slot 0, ws wA6) | build-h1 | building | walkthrough |
 | Sprint 10 H2 window frame + Party Manager | `fix/h2-frame` (slot 2, ws wA7) | build-h2 | building | walkthrough |
-| Sprint 10 H3 toasts | `fix/h3-toasts` (slot 3, ws wA8) | build-h3 | building | walkthrough |
+| Sprint 10 H3 toasts | `fix/h3-toasts` (slot 3, ws wA8) | build-h3 (idle), test-h3 | ready (3791c84e; check 5539, e2e 227) → walkthrough (port 4133) | merge |
 | Sprint 10 H4 rules, recap, strongholds, misc | `fix/h4-rules-misc` (slot 4, ws wA9) | build-h4 | building | walkthrough |
 | Sprint gate | main | — | session-sim-13 14 / 15 (`.verify/20261023-193558-session-sim-13/`); walkthrough evidence `.verify/sprint9/walkthroughs/` | — |
 
