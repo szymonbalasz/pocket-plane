@@ -44,6 +44,7 @@ import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
 import gemsUiE2e from "./gems-ui-e2e";
+import holdUiE2e from "./hold-ui-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
@@ -222,6 +223,8 @@ export const bundles: readonly Bundle[] = [
   sessionSim13,
   remindersStrongholds,
   rsE2e,
+  // Sprint 9 track RS (build/hold-ui): Strongholds tab + window E2E
+  holdUiE2e,
   // Sprint 9 track FX (fix/fx-dice-lines): dice + gems lines
   fxDiceE2e,
 ];

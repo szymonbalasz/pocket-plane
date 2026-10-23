@@ -155,6 +155,7 @@ function FacilityRow({
             />
           )}
           <span
+            data-testid="hold-facility-name"
             className={`break-words font-medium ${f.state === "replaced" ? "line-through" : ""}`}
           >
             {f.name}
