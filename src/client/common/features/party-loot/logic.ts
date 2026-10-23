@@ -2,7 +2,7 @@
 // rows, form drafts → intent payloads (FR-LOOT-02/06/07, FR-PARTY-26 mirrored with the shared zod
 // schemas), Move form options, item-row text, the Split… dialog. No React.
 import type { CreatureSheetRecord } from "@shared/character-sheet/sheet";
-import { itemRowText, splitPreview } from "@shared/party-board/format";
+import { itemRowText, splitPreview, storesLabel } from "@shared/party-board/format";
 import { LootSplitIntent } from "@shared/party-board/schemas";
 import { splitCoins } from "@shared/party-board/split";
 import {
@@ -15,6 +15,7 @@ import {
   type LootInput,
   LootMoveIntent,
   type WalletRecord,
+  type WireEndpoint,
   ZERO_COINS,
 } from "@shared/party-loot/schemas";
 import { IntentRejected } from "../../sync/connection";
@@ -30,9 +31,18 @@ export interface CharacterRef {
   ownerPlayerId: string;
 }
 
-/** FR-LOOT-15: newest first (row `seq`). */
-export function newestFirst(entries: readonly LootEntryRecord[]): LootEntryRecord[] {
-  return [...entries].sort((a, b) => b.seq - a.seq);
+/**
+ * FR-LOOT-15: newest first (row `seq`). *(S9)* Player entries carry no `seq` (FR-LOOT-32): they
+ * order by `createdAt` (strictly increasing for new entries), then id.
+ */
+export function newestFirst<T extends Pick<LootEntryRecord, "id" | "createdAt"> & { seq?: number }>(
+  entries: readonly T[],
+): T[] {
+  return [...entries].sort((a, b) => {
+    if (a.seq !== undefined && b.seq !== undefined) return b.seq - a.seq;
+    if (a.createdAt !== b.createdAt) return a.createdAt < b.createdAt ? 1 : -1;
+    return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+  });
 }
 
 /** Characters by name; the viewer's own first (FR-LOOT-15). */
@@ -120,24 +130,33 @@ export function editPayload(
 
 // ---- Move form (FR-LOOT-18) ----
 
-/** Select value of an endpoint: `party`, `world`, `char:<id>`. */
+/** Select value of an endpoint: `party`, `world`, `char:<id>`, *(S9)* `stores:<id>`. */
 export type EndpointKey = string;
 
 export function endpointKey(e: Endpoint): EndpointKey {
-  return e.kind === "character" ? `char:${e.characterId}` : e.kind;
+  if (e.kind === "character") return `char:${e.characterId}`;
+  if (e.kind === "stores") return `stores:${e.strongholdId}`;
+  return e.kind;
 }
 
 export function endpointOf(key: EndpointKey): Endpoint {
   if (key === "party" || key === "world") return { kind: key };
+  if (key.startsWith("stores:")) return { kind: "stores", strongholdId: key.slice(7) };
   return { kind: "character", characterId: key.slice("char:".length) };
 }
 
 export const PARTY_LABEL = "Party pot";
 export const WORLD_LABEL = "Outside the party";
 
-export function endpointLabel(e: Endpoint, nameOf: (id: string) => string | undefined): string {
+/** *(S9)* `stores` ends name their stronghold (FR-LOOT-35); `outside` is a player's hidden Stores. */
+export function endpointLabel(
+  e: WireEndpoint,
+  nameOf: (id: string) => string | undefined,
+  strongholdName: (id: string) => string | undefined = () => undefined,
+): string {
   if (e.kind === "party") return PARTY_LABEL;
-  if (e.kind === "world") return WORLD_LABEL;
+  if (e.kind === "world" || e.kind === "outside") return WORLD_LABEL;
+  if (e.kind === "stores") return storesLabel(strongholdName(e.strongholdId));
   return nameOf(e.characterId) ?? "Unknown character";
 }
 

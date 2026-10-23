@@ -5,13 +5,32 @@ import { defineEvent } from "./types";
 
 const Id = z.string().min(1).max(64);
 
-/** A coin move's end (LOOT §6): `characterId` present iff `kind = character`. */
-export const Endpoint = z.discriminatedUnion("kind", [
+/** Stored end kinds (LOOT §8; `stores` = a stronghold's Stores, FR-LOOT-30). */
+export const ENDPOINT_KINDS = ["party", "world", "character", "stores"] as const;
+
+const endpointOptions = [
   z.strictObject({ kind: z.literal("party") }),
   z.strictObject({ kind: z.literal("world") }),
   z.strictObject({ kind: z.literal("character"), characterId: Id }),
-]);
+  z.strictObject({ kind: z.literal("stores"), strongholdId: Id }),
+] as const;
+
+/**
+ * A coin move's end (LOOT §6): `characterId` present iff `kind = character`; *(S9)*
+ * `strongholdId` iff `kind = stores` (FR-LOOT-30).
+ */
+export const Endpoint = z.discriminatedUnion("kind", [...endpointOptions]);
 export type Endpoint = z.infer<typeof Endpoint>;
+
+/**
+ * A `loot-entry` end on the wire (FR-LOOT-32): an `Endpoint`, or the wire-only `outside` a player
+ * gets for a DM-only Stores end ("Outside the party"). Never stored, never accepted in an intent.
+ */
+export const WireEndpoint = z.discriminatedUnion("kind", [
+  ...endpointOptions,
+  z.strictObject({ kind: z.literal("outside") }),
+]);
+export type WireEndpoint = z.infer<typeof WireEndpoint>;
 
 /** `loot-entry` kinds (LOOT §8; `item` = a party-board item move, FR-PARTY-25). */
 export const LOOT_ENTRY_KINDS = ["loot", "move", "item"] as const;

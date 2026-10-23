@@ -11,7 +11,6 @@ import {
   PartyItemAdded,
 } from "@shared/events/party-board";
 import { handoutSharedText, itemAddedText } from "@shared/party-board/format";
-import { mergeConflictMessage, planMerge } from "@shared/party-board/items";
 import {
   AddItemIntent,
   type AddItemResult,
@@ -26,8 +25,6 @@ import {
   type HandoutInput,
   ITEM_GONE_MESSAGE,
   NOT_SHARED,
-  PARTY_ITEM_MAX,
-  PARTY_ITEM_TYPE,
   type PartyItemRecord,
   ShareHandoutIntent,
   UpdateHandoutIntent,
@@ -37,17 +34,23 @@ import { LOOT_ENTRY_TYPE, LOOT_RECEIVED_KIND } from "@shared/party-loot/schemas"
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, notFound } from "../../commands/errors";
-import { handout, handoutSeqNext, partyItem, partyItemSeqNext } from "../../db/schema";
+import { handout, handoutSeqNext, partyItem } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { notify } from "../notifications/helpers";
 import { insertItemEntry } from "../party-loot/item-entries";
+import {
+  requireStores,
+  storesCoinChanges,
+  storesCoinsBefore,
+  storesIds,
+} from "../party-loot/stores";
+import { type HolderEnd, putToHolder } from "./holders";
 import { closeLostPresents, presentTo } from "./presents";
 import {
   campaignPlayerIds,
   getHandoutRow,
   handoutCount,
-  listPartyItems,
   toHandoutBodyRecord,
   toHandoutRecord,
   toPartyItemRecord,
@@ -272,61 +275,43 @@ export function getItem(env: CommandEnv, cid: string, id: string): PartyItemReco
 /**
  * FR-PARTY-19: merge into the row with the same key (qty sum > 9 999 → `conflict`) or insert
  * (61st row → `conflict`). Writes a `loot-entry` kind `item` `world → party` and a
- * `loot-received` notification to all (after the event, protocol §22).
+ * `loot-received` notification to all (after the event, protocol §22). *(S9)* FR-LOOT-37: with
+ * `holder` a Stores (`not_found` "Stores are gone" if no such stronghold), `world → stores`, no
+ * notification (not in the party's hands); `dmOnly` makes a DM-only Stores row (FR-LOOT-36).
  */
 export const addItem = defineCommand({
   name: PARTY_INTENTS.addItem,
   input: AddItemIntent,
-  execute(input, env): AddItemResult {
+  execute({ holder, dmOnly, ...item }, env): AddItemResult {
     const cid = campaignOf(env);
-    const rows = listPartyItems(env.tx, cid);
-    const plan = planMerge(rows, input, PARTY_ITEM_MAX);
-    if (plan.kind === "conflict")
-      throw conflict(mergeConflictMessage(plan.reason, { kind: "party" }, "Party"));
-    const now = env.ctx.clock.iso();
-    let before: PartyItemRecord | null = null;
-    let itemId: string;
-    if (plan.kind === "merge") {
-      before = plan.row;
-      itemId = plan.row.id;
-      env.tx
-        .update(partyItem)
-        .set({ qty: plan.qty, updatedAt: now })
-        .where(eq(partyItem.id, itemId))
-        .run();
-    } else {
-      itemId = env.ctx.ids.next();
-      env.tx
-        .insert(partyItem)
-        .values({
-          id: itemId,
-          campaignId: cid,
-          seq: partyItemSeqNext,
-          name: input.name,
-          qty: input.qty,
-          notes: input.notes,
-          createdAt: now,
-          updatedAt: now,
-        })
-        .run();
-    }
-    const after = getItem(env, cid, itemId);
-    const entry = insertItemEntry(env, cid, WORLD, PARTY, after.name, input.qty);
+    const end: HolderEnd = holder ?? PARTY;
+    if (end.kind === "stores") requireStores(env, cid, end.strongholdId);
+    const stores = storesCoinsBefore(env, cid, storesIds(end));
+    const { change, after } = putToHolder(env, cid, end, item, dmOnly === true);
+    const entry = insertItemEntry(env, cid, WORLD, end, after.name, item.qty, dmOnly === true);
     env.emit({
       type: PartyItemAdded.type,
       campaignId: cid,
-      payload: { itemId, entryId: entry.id, name: after.name, qty: input.qty, notes: after.notes },
+      payload: {
+        itemId: after.id,
+        entryId: entry.id,
+        name: after.name,
+        qty: item.qty,
+        notes: after.notes,
+      },
       changes: [
-        { type: PARTY_ITEM_TYPE, id: itemId, before, after },
+        change,
         { type: LOOT_ENTRY_TYPE, id: entry.id, before: null, after: entry },
+        ...storesCoinChanges(env, cid, stores),
       ],
     });
-    notify(env, {
-      kind: LOOT_RECEIVED_KIND,
-      audience: "all",
-      text: itemAddedText(after.name, input.qty),
-      payload: { entryId: entry.id },
-    });
-    return { itemId };
+    if (end.kind === "party")
+      notify(env, {
+        kind: LOOT_RECEIVED_KIND,
+        audience: "all",
+        text: itemAddedText(after.name, item.qty),
+        payload: { entryId: entry.id },
+      });
+    return { itemId: after.id };
   },
 });

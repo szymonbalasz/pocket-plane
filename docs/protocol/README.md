@@ -3486,3 +3486,52 @@ From [campaign-management](../specs/campaign-management.md#6-functional-requirem
 - **Reveal refit** (`MapCanvas.tsx`, players): `pauseGate.deferUntilResume("map.reveal", …)`: under the card it runs once at resume.
 - **Fixtures:** unit `camp-paused` ("Pizza break, back soon", `town`, 10 min; not in `session-sim-12`); bundles `table-tools-paused` (= `table-tools` + `camp-paused`), `table-tools-paused-e2e` (`e2e/tt-pause.e2e.ts`).
 - **CON-44:** no new record; the paused card's +488 B and the events' sizes are TT0's (`con44-tt.test.ts`).
+
+## 149. Sprint 9: reminders + strongholds core — records, intents, Stores holder (RS0)
+
+From [reminders](../specs/reminders.md#6-functional-requirements) FR-REM-01–16, -27–31, [strongholds](../specs/strongholds.md#6-functional-requirements) FR-HOLD-01–21, -35–40 and [party-loot](../specs/party-loot.md#6-functional-requirements) FR-LOOT-30–39 (#338, #339; review-a rulings 1–3, 6–10, 21–23; [ADR-0065](../architecture/adr/0065-reminder-stronghold-records.md), [ADR-0066](../architecture/adr/0066-stores-holder.md)). **Built by `fix/rs-core`** (server only; clients RS1–RS3). Data side: [data model §119](../data-model/README.md#119-sprint-9-reminders--strongholds-core-rs0). No new registry (§26 unchanged).
+
+**Record types** (scope `campaign`)
+
+| Type | Visibility | Snapshot | Source |
+|---|---|---|---|
+| `reminder {id, campaignId, seq, characterId \| null, text, source, rolls [{id, label, expression, category}], strongholdId \| null, facilityId \| null, dmOnly, ownerPlayerId \| null, linkHidden, createdByPlayerId \| null, createdAt, updatedAt}` *(new)* | DM full. Player hidden if `dmOnly`, `linkHidden` or another player's character (`ownerPlayerId` ≠ them); else redacted: no `seq`, `updatedAt`, `dmOnly`, `linkHidden`, `ownerPlayerId` (order by `createdAt`, then id) | **lazy `all`** | FR-REM-01, -13 |
+| `stronghold {id, campaignId, seq, name, dmOnly, defenders, defendersDmOnly, notes, notesDmOnly, facilities [...], staff [...], createdAt, updatedAt}` *(new)* | DM full. Player hidden if `dmOnly`; else redacted inside: DM-only facilities / staff removed, `defenders` / `notes` omitted when DM-only, pointers at a removed facility → null, every flag, `seq` and `updatedAt` removed | **lazy `all`** | FR-HOLD-01, -08 |
+| `stronghold-index {id, campaignId, name, dmOnly?: true}` *(new, derived)* | DM full; player hidden while `dmOnly`, else `{id, campaignId, name}` | every row (≤ 8) | FR-HOLD-01 |
+| `stores-coin {id = strongholdId, campaignId, strongholdId, cp…pp, hidden?: true}` *(new, derived)* | DM full; player hidden while `hidden` | one row per existing stronghold with ≥ 1 entry (≤ 8) | FR-LOOT-31 |
+| `loot-entry` | ends gain `{kind: stores, strongholdId}`; DM-only keys `storesHidden?: true`, `itemHidden?: true`. **Player: every row redacted** (no `seq`, no DM keys); a hidden Stores end → wire-only `{kind: outside}`; hidden if `itemHidden` or no end is party-side (only `world` / `outside` left) | window unchanged | FR-LOOT-30, -32, -36 |
+| `party-item` | + `strongholdId?` (a Stores row), DM-only keys `storesHidden?: true`, `dmOnly?: true`; player hidden if either | lazy `all` unchanged (one load = party + every Stores) | FR-LOOT-36 |
+
+**Intents** (none optimistic)
+
+| Intent | Who | Rules | Result |
+|---|---|---|---|
+| `rem.save {id?, target, text, source?, rolls?, dmOnly?, strongholdId?, facilityId?}` | DM, player | strict zod (text 1–500, source 0–60, ≤ 4 rolls); caps 200 / 30 (`conflict`; a player's message has no number); player: party / own character, edit only own-created rows still on party / own PC, never the DM keys (`forbidden`), a save keeps the stored ones; links DM only (`not_found` / `invalid`); same values → `ack` | `{reminderId}` |
+| `rem.delete {id}` | DM, player | as `rem.save`; a row the player can't see → `not_found` | `{reminderId}` |
+| `hold.create {name}` | DM | name 1–60 unique ci (`conflict`); ≤ 8 | `{strongholdId}` |
+| `hold.update {strongholdId, name?, dmOnly?, defenders?, defendersDmOnly?, notes?, notesDmOnly?}` | DM | patch ≥ 1 field; same → `ack`; a `dmOnly` flip rewrites `linkHidden`, Stores items' and every Stores entry's `stores_hidden` (changes: entries **inside the loot window only**) | — |
+| `hold.saveFacility {strongholdId, facility}` / `hold.saveStaff {strongholdId, staff}` | DM | append (no id; ≤ 24 / ≤ 40) or replace (`not_found`); `replacesId` / `facilityId` of the same stronghold (self → `invalid`) | `{facilityId}` / `{staffId}` |
+| `hold.moveRow {strongholdId, list, id, index}` | DM | index clamped; same place → `ack` | — |
+| `hold.removeStaff`, `hold.removeFacility` | DM | removing a facility deletes its linked reminders and nulls pointers, one transaction | — |
+| `hold.delete {strongholdId}` | DM | deletes linked reminders; Stores items → party (merge; full → `conflict` "Party inventory is full (60) — move or remove items first", nothing written); coin balance → 0 by move entries ≤ 999 999 per coin (negative coins paid by the pot), text "Stronghold deleted" or empty for a hidden Stores; then the row | — |
+| `loot.move` | DM, player | ends may be `stores`; `world` pairs with `character` or `stores`; player with a visible Stores: Stores ↔ pot, Stores → own PC, own PC → Stores; hidden / gone Stores → `not_found` "Stores are gone" | `{entryId}` |
+| `party.addItem {…, holder?: {kind: stores, strongholdId}, dmOnly?}` / `party.editItem {…, dmOnly?}` / `party.removeItem` / `party.moveItem` (ends + `stores`) | as before; Stores rights as `loot.move` | per-holder caps (`Stores are full (60)`) and keys; no `loot-received` for a Stores add; a player's take of a DM-only Stores item → `not_found` | as before |
+
+Internal (fixture loader only, no WS intent): `hold.saveFacilityByName`, `hold.saveStaffByName`, `rem.saveByName` take a facility **by name** and run the commands above unchanged.
+
+**Domain events** (`src/shared/events/reminders.ts`, `strongholds.ts`; all logged, none undoable; all **`quietWhenUnchanged`**: a change no player can see sends players no frame)
+
+| Event | Changes | Player sees |
+|---|---|---|
+| `ReminderSaved {reminderId, created}` / `ReminderDeleted {reminderIds}` | `reminder` | per row (FR-REM-13) |
+| `StrongholdCreated {strongholdId}` | `stronghold`, `stronghold-index` | nothing (new = DM-only) |
+| `StrongholdUpdated {strongholdId, part: header \| facility \| staff \| order, facilityId?, staffId?}` | `stronghold`; rename / flip + `stronghold-index`; flip + reminders, Stores items, `stores-coin`, window entries; facility `dmOnly` + reminders | the redacted change, or no frame |
+| `FacilityRemoved {strongholdId, facilityId, reminderIds}` | `stronghold`, reminder deletes | per row |
+| `StrongholdDeleted {strongholdId, reminderIds, entryIds}` | `stronghold` / `stronghold-index` / `stores-coin` → null, reminder deletes, `party-item`, entries, `party-pot` | per row |
+| `CoinMoved`, `PartyItemAdded`, `PartyItemRemoved`, `ItemMoved` | + `stores-coin` per Stores end | per row |
+| entities' `EntityUpdated` (owner change) | + reminder `ownerPlayerId` upserts | old owner deletes, new owner upserts |
+
+- **Zod:** `@shared/reminders` (`schemas.ts`, `text.ts`), `@shared/strongholds`, `@shared/party-loot` (`Endpoint` + `stores`, `WireEndpoint` + `outside`, `StoresCoinRecord`, `PlayerLootEntryRecord`, `playerMayMove`, `visibility.ts`), `@shared/party-board` (`StoresHolder`, `ItemEnd` + `stores`, `PartyItemRecord` keys, `planHolderMerge`).
+- **Hook line:** `reminders.owner-copy` in `definitionChangedHooks` (FR-REM-05).
+- **Fixtures:** bundles `reminders-strongholds`, `rs-e2e`, `session-sim-13` (RS group; other sprint-9 tracks append).
+- **CON-44** (`src/server/features/strongholds/con44.test.ts`, heavy harness at the caps: 200 reminders, 8 × 24 × 40 strongholds, 8 Stores with coin, the whole loot window with Stores ends): DM 691,615 → 694,491 B (+2,876 B; 878,373 B left of 1.5 MiB); `stronghold-index` 1,364 B, `stores-coin` 1,831 B per frame; players +786 B worst (289,358 B of 512 KiB); `reminder` / `stronghold` 0 B in every snapshot; DM `sync.load` 364,036 B (reminders) / 377,798 B (strongholds). `StrongholdUpdated` at the caps: DM 46,645 B, player 45,579 B (≤ 48 KB); a 500-entry show flip sends 100 entries (37,687 B DM in the test's rows).

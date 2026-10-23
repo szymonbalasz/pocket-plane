@@ -15,8 +15,10 @@ import * as liveSync from "./live-sync";
 import * as notifications from "./notifications";
 import * as partyBoard from "./party-board";
 import * as partyLoot from "./party-loot";
+import * as reminders from "./reminders";
 import * as sceneTools from "./scene-tools";
 import * as scenesMap from "./scenes-map";
+import * as strongholds from "./strongholds";
 import { type DomainEventDef, isDomainEventDef } from "./types";
 
 export type { DomainEventDef } from "./types";
@@ -50,6 +52,9 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values<unknown>(diceExtras).filter(isDomainEventDef),
   // gems (fix/gems-core).
   ...Object.values<unknown>(gems).filter(isDomainEventDef),
+  // reminders + strongholds (fix/rs-core).
+  ...Object.values<unknown>(reminders).filter(isDomainEventDef),
+  ...Object.values<unknown>(strongholds).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */

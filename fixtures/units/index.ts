@@ -105,6 +105,10 @@ import loot1 from "./party-loot/loot-1";
 import lootSecond from "./party-loot/loot-second";
 import lootWallets from "./party-loot/loot-wallets";
 import winLayout from "./play-shell/win-layout";
+import remMiraCharm from "./reminders/rem-mira-charm";
+import remParty from "./reminders/rem-party";
+import remThornOwn from "./reminders/rem-thorn-own";
+import remThornSecret from "./reminders/rem-thorn-secret";
 import mtTemplates from "./scene-tools/mt-templates";
 import scnPropImages from "./scene-tools/scn-prop-images";
 import scnProps from "./scene-tools/scn-props";
@@ -121,6 +125,11 @@ import sbLuckRolls from "./stats/sb-luck-rolls";
 import sbPastBandits from "./stats/sb-past-bandits";
 import stAmbushFacts from "./stats/st-ambush-facts";
 import stPastCrypt from "./stats/st-past-crypt";
+import holdGreystone from "./strongholds/hold-greystone";
+import holdGreystoneReminders from "./strongholds/hold-greystone-reminders";
+import holdGreystoneStores from "./strongholds/hold-greystone-stores";
+import holdTowerMove from "./strongholds/hold-tower-move";
+import holdTowerSecret from "./strongholds/hold-tower-secret";
 
 export const units: readonly Fixture[] = [
   campaign,
@@ -256,6 +265,16 @@ export const units: readonly Fixture[] = [
   cbPartySix,
   // Sprint 8 track TT (build/tt-pause): the table paused
   campPaused,
+  // Sprint 9 track RS (fix/rs-core): reminders + strongholds
+  remParty,
+  remMiraCharm,
+  remThornOwn,
+  remThornSecret,
+  holdGreystone,
+  holdGreystoneReminders,
+  holdGreystoneStores,
+  holdTowerSecret,
+  holdTowerMove,
   // Sprint 9 track FX (fix/fx-sync-shell): Mira's Bless beside Thorn's summon concentration
   fxMiraBless,
 ];
