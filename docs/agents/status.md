@@ -10,7 +10,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | building | walkthrough M0, M3-M10, M12, M14 |
 | PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | party-board part done (4 commits); waits for PM1 to merge for shared rows | walkthrough M0-M2, M11, M13 |
-| RS0 reminders + strongholds core | `fix/rs-core` (ws w9W, slot 3) | build-rs0 | building | raw-intent walkthrough |
+| RS0 reminders + strongholds core | `fix/rs-core` (ws w9W, slot 3) | build-rs0 | ready (check 5214, e2e 206; CON-44 DM +2.9 KB) | test-rs0 walkthrough running |
 | FX2 dice + gems lines | `fix/fx-dice-lines` (ws w9X, slot 4) | build-fx2 | building | walkthrough FX2 |
 | FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y) | build-fx3 | building (ShellWindow branch after PM1; merges after RS0) | walkthrough FX3 |
 
