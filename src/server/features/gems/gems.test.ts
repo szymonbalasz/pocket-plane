@@ -2,6 +2,8 @@
 // visibility per viewer, owner check, races, owner change, campaign isolation, crash.
 import { afterEach, describe, expect, test } from "bun:test";
 import { GEMS_FEATURE } from "@shared/campaign-management/features";
+import { lineText } from "@shared/dice-roll-log/kind-types";
+import { formatEntry } from "@shared/dice-roll-log/line";
 import type { GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { GemSpent, GemsAdjusted } from "@shared/events/gems";
 import { CHARACTER_GEMS_TYPE, type CharacterGemsRecord } from "@shared/gems/schemas";
@@ -100,7 +102,9 @@ describe("gems core (GEM §6, GM0)", () => {
       message: "Mira has no Inspiration gem to remove",
     });
     expect(errOf(() => t.adjust(t.seed.miraId, "fortune", 0)).code).toBe("invalid");
-    expect(errOf(() => t.adjust(t.seed.miraId, "fortune", 6)).code).toBe("invalid");
+    // FR-GEM-43: ±10 since sprint 9.
+    expect(errOf(() => t.adjust(t.seed.miraId, "fortune", 11)).code).toBe("invalid");
+    expect(errOf(() => t.adjust(t.seed.miraId, "fortune", -11)).code).toBe("invalid");
     for (let i = 0; i < 19; i++) t.adjust(t.seed.miraId, "fortune", 5);
     expect(t.adjust(t.seed.miraId, "fortune", 4)).toEqual({ held: 99 });
     expect(errOf(() => t.adjust(t.seed.miraId, "fortune", 1))).toEqual({
@@ -115,6 +119,18 @@ describe("gems core (GEM §6, GM0)", () => {
     );
     // One row per character (FR-GEM-06), whatever the number of writes.
     expect(t.rows()).toHaveLength(1);
+  });
+
+  test('FR-GEM-43 quick awards make one line: delta 10 accepted, 11 → invalid; one line "6 Fortune gems"', () => {
+    const t = setup();
+    expect(t.adjust(t.seed.miraId, "fortune", 10)).toEqual({ held: 10 });
+    expect(errOf(() => t.adjust(t.seed.miraId, "fortune", 11)).code).toBe("invalid");
+    expect(t.adjust(t.seed.miraId, "fortune", -10)).toEqual({ held: 0 });
+    t.adjust(t.seed.miraId, "fortune", 6);
+    const lines = t.entries("gem.award");
+    expect(lines.map((l) => (l.payload as { count: number }).count)).toEqual([10, 6]);
+    const last = lines.at(-1) as GameLogEntryRecord;
+    expect(lineText(formatEntry(last).segments)).toBe("DM awards Mira 6 Fortune gems (6 held)");
   });
 
   test("FR-GEM-09 award public, removal silent: one public gem.award line per award; GemsAdjusted carries row + line", () => {

@@ -106,6 +106,7 @@ function transition(
     | "NotificationReopened"
     | "NotificationUpdated",
   extra: RecordChange[] = [],
+  emit = true,
 ): RecordChange {
   const after: NotificationRecord = { ...before, ...patch, updatedAt: env.ctx.clock.iso() };
   env.tx
@@ -123,6 +124,7 @@ function transition(
     .where(eq(notification.id, before.id))
     .run();
   const change: RecordChange = { type: NOTIFICATION_TYPE, id: before.id, before, after };
+  if (!emit) return change;
   env.emit({
     type: eventType,
     campaignId: before.campaignId,
@@ -290,12 +292,26 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
    * FR-NOTE-21: a broken call throws a plain error (the caller fails `internal`). Audience,
    * action, `seq` and `createdAt` never change; `updatedAt` from the clock. Emits
    * `NotificationUpdated` (record upsert); no toast, unread unchanged (same `seq`).
+   * FR-NOTE-74: `{emit: false}` emits nothing and returns the row's change instead; the caller
+   * puts it in its own event's `changes` (one frame, protocol gate I15).
    */
   function updateNotification(
     env: CommandEnv,
     id: string,
     patch: { text?: string; payload: unknown },
-  ): NotificationRecord {
+  ): NotificationRecord;
+  function updateNotification(
+    env: CommandEnv,
+    id: string,
+    patch: { text?: string; payload: unknown },
+    opts: { emit: false },
+  ): RecordChange;
+  function updateNotification(
+    env: CommandEnv,
+    id: string,
+    patch: { text?: string; payload: unknown },
+    opts: { emit?: boolean } = {},
+  ): NotificationRecord | RecordChange {
     const before = loadNotification(env, id);
     if (before.state !== "pending") throw conflict("No longer pending");
     const def = kindOf(before.kind);
@@ -317,8 +333,16 @@ export function createNotificationHelpers(kinds: readonly NotificationKindDef[])
         throw new Error("updateNotification: text must be 1–280 chars of plain text");
       text = parsed.data;
     }
-    const change = transition(env, before, { text, payload: payload.data }, "NotificationUpdated");
-    return change.after as NotificationRecord;
+    const emit = opts.emit !== false;
+    const change = transition(
+      env,
+      before,
+      { text, payload: payload.data },
+      "NotificationUpdated",
+      [],
+      emit,
+    );
+    return emit ? (change.after as NotificationRecord) : change;
   }
 
   /** FR-NOTE-10: `resolved` → `pending` (kind owner's undo, after the owner's event). */

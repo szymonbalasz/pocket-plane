@@ -26,6 +26,8 @@ import {
   NOT_LIVE,
   NOT_YOURS,
   saveInput,
+  shownError,
+  UNTOUCHED,
 } from "./macro-logic";
 import { diceExtras } from "./store";
 import { TrayWindow } from "./TrayWindow";
@@ -219,7 +221,8 @@ describe("TT1 macros (client)", () => {
       <MacroEditor draft={draftOf({ name: "Bad", expression: "3x" })} onDone={() => {}} />,
       DM,
     );
-    expect(bad).toContain('data-testid="dicex-macro-error"');
+    // FR-DICEX-95: no error text before a field is touched; Save disabled meanwhile.
+    expect(bad).not.toContain('data-testid="dicex-macro-error"');
     expect(bad).toMatch(/data-testid="dicex-macro-save"[^>]*disabled=""/);
     // DM on Thorn (owned) → "DM only" offered; on the Elite (monster) → not.
     const insp = draftOf(MACROS[3] as RollMacroRecord);
@@ -243,6 +246,28 @@ describe("TT1 macros (client)", () => {
     expect(saveInput(draftOf({ name: "N", expression: "1d4" }), false)).not.toHaveProperty(
       "dmOnly",
     );
+  });
+
+  test("FR-DICEX-95 no error before typing: Save as macro's preset → no 'Name is required', Save disabled; type then clear the name → the error shows", () => {
+    // Save as macro: the tray's expression filled in, no name (BL-90).
+    const preset = draftOf({ expression: "1d20+2" });
+    const html = render(<MacroEditor draft={preset} onDone={() => {}} />, P1);
+    expect(html).not.toContain("Name is required");
+    expect(html).not.toContain('data-testid="dicex-macro-error"');
+    expect(html).toMatch(/data-testid="dicex-macro-save"[^>]*disabled=""/);
+    expect(html).not.toMatch(/data-testid="dicex-macro-name"[^>]*aria-invalid="true"/);
+    // The editor's rule (changed or blurred = touched).
+    expect(shownError(preset, UNTOUCHED)).toBeNull();
+    expect(draftError(preset)).toBe("Name is required");
+    const typed = { ...preset, name: "Bless" };
+    expect(shownError(typed, { ...UNTOUCHED, name: true })).toBeNull();
+    const cleared = { ...typed, name: "" };
+    expect(shownError(cleared, { ...UNTOUCHED, name: true })).toBe("Name is required");
+    // A bad expression shows once that field was touched, or Save was pressed.
+    const badExpr = { name: "Bless", expression: "1d4+" };
+    expect(shownError(badExpr, { ...UNTOUCHED, name: true })).toBeNull();
+    expect(shownError(badExpr, { ...UNTOUCHED, expression: true })).not.toBeNull();
+    expect(shownError(draftOf({}), { ...UNTOUCHED, submitted: true })).toBe("Name is required");
   });
 
   test("FR-DICEX-70 save as macro: the tray header has Macros by the gear; the preset is the tray's draft", () => {

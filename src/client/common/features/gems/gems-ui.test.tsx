@@ -14,6 +14,7 @@ import { SheetSlotView } from "../character-sheet/SheetSections";
 import { SummaryCard } from "../character-sheet/SummaryCard";
 import { sectionsFor } from "../character-sheet/sections";
 import { sheetSections } from "../character-sheet/sheet-sections";
+import { type AdjustPayload, AWARD_BATCH_MS, createAwardBatch } from "./award-batch";
 import { GemBlock, gemCountsSection } from "./GemBlock";
 import { PartyLineGems } from "./GemCounts";
 import {
@@ -303,5 +304,94 @@ describe("FR-CAMP-43 party gem counts", () => {
     expect(render(store("dm", false), <PartyLineGems characterId="brakka" />)).toBe("");
     // The feature key the line reads is the registry's.
     expect(GEMS_FEATURE).toBe("gems");
+  });
+});
+
+describe("FR-GEM-43 quick awards (award batch)", () => {
+  /** Fake timers + a recorded `send` that acks when `ack()` runs. */
+  function rig() {
+    let now = 0;
+    let next = 1;
+    const due = new Map<number, { at: number; fn: () => void }>();
+    const timers = {
+      setTimeout: (fn: () => void, ms: number) => {
+        const id = next++;
+        due.set(id, { at: now + ms, fn });
+        return id;
+      },
+      clearTimeout: (id: unknown) => void due.delete(id as number),
+    };
+    const advance = (ms: number) => {
+      now += ms;
+      for (const [id, t] of [...due].sort((a, b) => a[1].at - b[1].at)) {
+        if (t.at > now) continue;
+        due.delete(id);
+        t.fn();
+      }
+    };
+    const sent: AdjustPayload[] = [];
+    const acks: (() => void)[] = [];
+    const batch = createAwardBatch({
+      timers,
+      send: (_name, payload) => {
+        sent.push(payload);
+        return new Promise<void>((resolve) => acks.push(resolve));
+      },
+    });
+    const ack = async () => {
+      for (const a of acks.splice(0)) a();
+      await Promise.resolve();
+      await Promise.resolve();
+    };
+    return { batch, sent, advance, ack };
+  }
+
+  test("FR-GEM-43 quick awards make one line: six + within 1.5 s → one {delta: 6}; eleven → 10 at once, then 1; + − → nothing; closing flushes", async () => {
+    const t = rig();
+    for (let i = 0; i < 6; i++) {
+      t.batch.click("brakka", "fortune", 1, 0);
+      t.advance(AWARD_BATCH_MS - 100);
+    }
+    // The count shows the pending sum at once, muted until the ack.
+    expect(t.batch.shown("brakka", "fortune", 0)).toEqual({ count: 6, pending: true });
+    expect(t.sent).toEqual([]);
+    t.advance(100);
+    expect(t.sent).toEqual([{ characterId: "brakka", gem: "fortune", delta: 6 }]);
+    // The event frame lands before the ack: never counted twice.
+    expect(t.batch.shown("brakka", "fortune", 6)).toEqual({ count: 6, pending: true });
+    await t.ack();
+    expect(t.batch.shown("brakka", "fortune", 6)).toEqual({ count: 6, pending: false });
+
+    // Eleven: the tenth click sends {delta: 10} at once, the eleventh 1.5 s later.
+    t.sent.length = 0;
+    for (let i = 0; i < 11; i++) t.batch.click("mira", "inspiration", 1, 0);
+    expect(t.sent).toEqual([{ characterId: "mira", gem: "inspiration", delta: 10 }]);
+    expect(t.batch.shown("mira", "inspiration", 0).count).toBe(11);
+    t.advance(AWARD_BATCH_MS);
+    expect(t.sent.map((p) => p.delta)).toEqual([10, 1]);
+    await t.ack();
+
+    // + then − → net 0, nothing sent; the count back to the stored one.
+    t.sent.length = 0;
+    t.batch.click("mira", "fortune", 1, 2);
+    t.batch.click("mira", "fortune", -1, 2);
+    t.advance(AWARD_BATCH_MS);
+    expect(t.sent).toEqual([]);
+    expect(t.batch.shown("mira", "fortune", 2)).toEqual({ count: 2, pending: false });
+
+    // Closing the popover flushes now; another gem's sum keeps waiting.
+    t.batch.click("mira", "combat", 1, 0);
+    t.batch.click("mira", "combat", 1, 0);
+    t.batch.click("mira", "divine", -1, 3);
+    t.batch.flush("mira", "combat");
+    expect(t.sent).toEqual([{ characterId: "mira", gem: "combat", delta: 2 }]);
+    // Not live: the unsent sum is dropped and the count reverts.
+    t.batch.drop();
+    expect(t.batch.shown("mira", "divine", 3)).toEqual({ count: 3, pending: false });
+    t.advance(AWARD_BATCH_MS);
+    expect(t.sent).toHaveLength(1);
+    // A reject (or a disconnect) settles the in-flight sum too: the stored count shows.
+    await t.ack();
+    expect(t.batch.shown("mira", "combat", 0)).toEqual({ count: 0, pending: false });
   });
 });

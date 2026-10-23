@@ -19,11 +19,11 @@ const line = (kind: string, actorName: string, payload: unknown) =>
   lineText(formatEntry({ kind, actorName, payload }).segments);
 
 describe("gems schemas and lines (GEM §6)", () => {
-  test("FR-GEM-07 adjust input: delta −5…+5, never 0; known gem", () => {
+  test("FR-GEM-07 FR-GEM-43 adjust input: delta −10…+10 (sprint 9, summed clicks), never 0; known gem", () => {
     const ok = (delta: number) =>
       GemAdjustInput.safeParse({ characterId: "c", gem: "fortune", delta }).success;
-    expect([-5, -1, 1, 5].map(ok)).toEqual([true, true, true, true]);
-    expect([-6, 0, 6, 1.5].map(ok)).toEqual([false, false, false, false]);
+    expect([-10, -5, -1, 1, 6, 10].map(ok)).toEqual([true, true, true, true, true, true]);
+    expect([-11, 0, 11, 1.5].map(ok)).toEqual([false, false, false, false]);
     expect(GemAdjustInput.safeParse({ characterId: "c", gem: "luck", delta: 1 }).success).toBe(
       false,
     );

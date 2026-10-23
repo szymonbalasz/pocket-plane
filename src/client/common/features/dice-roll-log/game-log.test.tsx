@@ -3,6 +3,8 @@
 // open / front through a real shell controller.
 import { afterEach, describe, expect, test } from "bun:test";
 import { DICE_LOOK_TYPE, STYLE_LOOK } from "@shared/dice-extras/looks";
+import { lineText } from "@shared/dice-roll-log/kind-types";
+import { formatEntry } from "@shared/dice-roll-log/line";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -174,6 +176,95 @@ describe("FR-DICE-35 log die chips (GameLog)", () => {
     const html = render([entry()]);
     expect(html).toContain('width="18" height="18"');
     expect(html).toMatch(/data-testid="dice-log-die"[^>]*class="[^"]*-my-0\.5[^"]*align-middle/);
+  });
+});
+
+/** The element opening at `from`, as markup (static render, balanced tags). */
+function elementAt(html: string, from: number): string {
+  const tag = /<(\/?)[a-z][\w-]*[^>]*?(\/?)>/gi;
+  tag.lastIndex = from;
+  let depth = 0;
+  for (let m = tag.exec(html); m; m = tag.exec(html)) {
+    if (m[2]) continue;
+    depth += m[1] ? -1 : 1;
+    if (depth === 0) return html.slice(from, tag.lastIndex);
+  }
+  return html.slice(from);
+}
+
+/** Its text content: the text nodes in order. */
+function textContentAt(html: string, from: number): string {
+  return elementAt(html, from)
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;/g, "'");
+}
+
+describe("FR-DICE-93 a log line copies as one line (BL-57)", () => {
+  test("FR-DICE-93 line copies as one line: the value is a text node outside <svg>, no inline-flex, textContent = lineText", () => {
+    const kh3 = entry({
+      id: "e2",
+      n: 2,
+      actorName: "Brakka",
+      payload: [
+        {
+          rollId: "r2",
+          expression: "4d6kh3",
+          mode: "normal",
+          manual: true,
+          dice: [
+            { faces: 6, value: 5, kept: true },
+            { faces: 6, value: 3, kept: false },
+            { faces: 6, value: 6, kept: true },
+            { faces: 6, value: 6, kept: true },
+          ],
+          constant: 0,
+          total: 17,
+          natural: null,
+          label: null,
+        },
+      ],
+    });
+    const d100 = entry({
+      id: "e3",
+      n: 3,
+      payload: [
+        {
+          rollId: "r3",
+          expression: "1d100+2",
+          mode: "normal",
+          manual: false,
+          dice: [{ faces: 100, value: 47, kept: true }],
+          constant: 2,
+          total: 49,
+          natural: null,
+          label: "Wild",
+        },
+      ],
+    });
+    const entries = [entry(), kh3, d100];
+    const html = render(entries);
+    // No `<text>` in any svg; no inline-flex on a line, its chips or its badges.
+    expect(html).not.toContain("<text");
+    const starts = [...html.matchAll(/<span[^>]*data-testid="dice-log-entry-text"/g)].map(
+      (m) => m.index ?? 0,
+    );
+    expect(starts).toHaveLength(3);
+    starts.forEach((at, i) => {
+      expect(elementAt(html, at)).not.toContain("inline-flex");
+      const e = entries[i] as GameLogEntryView;
+      const segs = formatEntry(e).segments;
+      // lineText's markup (dropped "~3~", badge "(physical)") aside, digit for digit.
+      const plain = segs.map((s) => s.text).join("");
+      expect(lineText(segs).replace(/~/g, "").replace("(physical)", "physical")).toBe(plain);
+      expect(textContentAt(html, at)).toBe(plain);
+    });
+    expect(textContentAt(html, starts[0] ?? 0)).toBe("Mira — Athletics (adv): 13 4 + 5 = 18");
+    expect(textContentAt(html, starts[1] ?? 0)).toBe("Brakka — 4d6kh3: 5 3 + 6 + 6 = 17 physical");
+    expect(textContentAt(html, starts[2] ?? 0)).toBe("Mira — Wild: 47 + 2 = 49");
   });
 });
 

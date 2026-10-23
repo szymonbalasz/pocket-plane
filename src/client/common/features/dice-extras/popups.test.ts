@@ -13,7 +13,14 @@ import {
   popupRows,
   shownPopupStack,
 } from "./popup-logic";
-import { createRollPopups, pipModeOf, pipPlan, type RollPopup } from "./popups";
+import {
+  createRollPopups,
+  HOLD_CHECK_MS,
+  LEAVE_CHECK_MS,
+  pipModeOf,
+  pipPlan,
+  type RollPopup,
+} from "./popups";
 import { createDiceExtrasStore } from "./store";
 import { FLAT_IN_MS, POPUP_CLOSE_MS, POPUP_MS, POPUP_ROLLING_MAX_MS } from "./timing";
 
@@ -98,6 +105,85 @@ const bigOf = (entries: GameLogEntryView[]) => {
 };
 const screen = { arena: "screen", draw: "3d", caption: false, handoff: true } as const;
 
+describe("FR-DICEX-94 a popup never sticks (BL-89)", () => {
+  const rest = () => {
+    const s = setup();
+    s.popups.add({ entries: [entry()], looks: {}, big: null, threeD: false });
+    s.t.advance(FLAT_IN_MS);
+    expect(s.one().state).toBe("rest");
+    return s;
+  };
+
+  test("FR-DICEX-94 popup never sticks: the hover flag set, then the card unmounts without a leave → closes 6 s after rest", () => {
+    const { t, popups, one } = rest();
+    popups.mounted("e1", () => true);
+    popups.pointer("e1", true);
+    popups.focus("e1", true);
+    expect(popups.held("e1")).toBe(true);
+    // The card goes (a remount through the portal): no leave, no blur.
+    popups.mounted("e1", null);
+    expect(popups.held("e1")).toBe(false);
+    // Its replacement mounts under the pointer: flags start clear.
+    popups.mounted("e1", () => true);
+    t.advance(POPUP_MS - 1);
+    expect(one().state).toBe("rest");
+    t.advance(1);
+    expect(one().state).toBe("closing");
+  });
+
+  test("FR-DICEX-94 popup never sticks: opens under a resting pointer (:hover, no move since it showed) → closes at 6 s after rest", () => {
+    const { t, popups, one } = rest();
+    popups.mounted("e1", () => true);
+    expect(popups.held("e1")).toBe(false);
+    t.advance(POPUP_MS);
+    expect(one().state).toBe("closing");
+  });
+
+  test("FR-DICEX-94 popup never sticks: moved onto it after it showed, hovered at expiry → held; leaving → closes within 1 s", () => {
+    const { t, popups, one } = rest();
+    let over = false;
+    popups.mounted("e1", () => over);
+    t.advance(2000);
+    over = true;
+    popups.pointer("e1", true);
+    t.advance(POPUP_MS - 2000 + 30_000);
+    expect(one().state).toBe("rest");
+    // The pointer leaves without a leave event (the card moved away): the 1-s check closes it.
+    over = false;
+    t.advance(HOLD_CHECK_MS);
+    expect(one().state).toBe("closing");
+    // A move before the 6 s and a leave after: the 6 s still close it on time.
+    const s = rest();
+    let o2 = true;
+    s.popups.mounted("e1", () => o2);
+    s.popups.pointer("e1", true);
+    s.t.advance(1000);
+    o2 = false;
+    s.popups.pointer("e1", false);
+    s.t.advance(POPUP_MS - 1000);
+    expect(s.one().state).toBe("closing");
+  });
+
+  test("FR-DICEX-94 popup never sticks: focus inside → held until blur", () => {
+    const { t, popups, one } = rest();
+    popups.mounted("e1", () => false);
+    popups.focus("e1", true);
+    t.advance(POPUP_MS + 10_000);
+    expect(one().state).toBe("rest");
+    popups.focus("e1", false);
+    t.advance(LEAVE_CHECK_MS);
+    expect(one().state).toBe("closing");
+  });
+
+  test("FR-DICEX-94 popup never sticks: ✕ always closes, held or not", () => {
+    const { popups, one } = rest();
+    popups.mounted("e1", () => true);
+    popups.pointer("e1", true);
+    popups.close("e1");
+    expect(one().state).toBe("closing");
+  });
+});
+
 describe("FR-DICEX-39 roll popup", () => {
   test("FR-DICEX-39 a live frame → one popup, 'Rolling…' until its dice rest, then 6 s; the oldest of 4 closes (≤ 3)", () => {
     const { t, popups, state, one } = setup();
@@ -120,18 +206,39 @@ describe("FR-DICEX-39 roll popup", () => {
     expect(state().map((p) => p.id)).toEqual(["b3", "b4", "b5"]);
   });
 
-  test("FR-DICEX-39 hover / focus pauses the 6 s timer; leaving resumes what was left", () => {
+  test("FR-DICEX-39 FR-DICEX-94 hovered when the 6 s run out → held; leaving closes it (within 1 s)", () => {
     const { t, popups, one } = setup();
+    let over = true;
     popups.add({ entries: [entry()], looks: {}, big: null, threeD: false });
+    popups.mounted("e1", () => over);
     t.advance(FLAT_IN_MS + 4000);
-    popups.hover("e1", true);
+    popups.pointer("e1", true);
     t.advance(60_000);
     expect(one().state).toBe("rest");
-    popups.hover("e1", false);
-    t.advance(1999);
+    popups.pointer("e1", false);
+    over = false;
+    // FR-DICEX-94: re-checked shortly after the leave (≤ 1 s), then closed.
+    t.advance(LEAVE_CHECK_MS - 1);
     expect(one().state).toBe("rest");
     t.advance(1);
     expect(one().state).toBe("closing");
+  });
+
+  test("FR-DICEX-94 a card that slides from under the pointer and is followed stays held", () => {
+    const { t, popups, one } = setup();
+    let over = true;
+    popups.add({ entries: [entry()], looks: {}, big: null, threeD: false });
+    popups.mounted("e1", () => over);
+    t.advance(FLAT_IN_MS);
+    popups.pointer("e1", true);
+    t.advance(POPUP_MS + 500);
+    over = false;
+    popups.pointer("e1", false);
+    t.advance(100);
+    over = true;
+    popups.pointer("e1", true);
+    t.advance(10_000);
+    expect(one().state).toBe("rest");
   });
 
   test("FR-DICEX-39 a popup whose dice nothing reports on (its view never mounted) rests by the rolling cap, then closes", () => {
