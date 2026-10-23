@@ -1167,8 +1167,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const was = w;
       if (w.state !== "open") setWin(id, { ...w, state: "open" });
       const spot = ladder(id, { putAway: false, maxL2: true, prev: d.rect });
+      // A tool bar's put-away comes back when the bar goes, whatever holds its old spot (a
+      // remembered window, walkthrough X1): the rest of the ladder places it (below useful, else
+      // the least PC area), still putting nothing away. Nothing else would retry it.
+      const toolbar = !spot && was.state !== "open" && d.cause.startsWith("toolbar:");
+      const rest = toolbar ? ladder(id, { putAway: false, prev: d.rect }) : null;
       if (spot) {
         write(id, spot.rect, "grown", { rung: spot.rung });
+      } else if (rest) {
+        write(id, rest.rect, "returned", { rung: rest.rung });
+        pcFlags.set(id, rest.pcClear);
       } else if (was.state !== "open") {
         setWin(id, was);
         // Still put away: a later settle tries again (a window displaced by the same cause may
