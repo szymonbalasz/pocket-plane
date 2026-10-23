@@ -3,6 +3,7 @@
 // the display draws 3D (`screen` / `zone`); `flat` / `off` never load it. A throw arriving while
 // it loads waits ≤ 1.5 s. A load failure → `flat` for the session + one console warning.
 import { useSyncExternalStore } from "react";
+import { loadChunk } from "../../lib/lazy-chunk";
 import { type DisplaySetting, is3dDisplay } from "./settings";
 import { CHUNK_WAIT_MS, IDLE_FALLBACK_MS } from "./timing";
 
@@ -34,7 +35,8 @@ export function createChunkLoader<M = Dice3DModule>(
     load() {
       if (state !== "idle") return;
       set("loading");
-      importer().then(
+      // FR-SHELL-176: one retry; a stale chunk also shows the stale notice (BL-91).
+      loadChunk(importer, { notice: true }).then(
         (m) => {
           mod = m;
           set("ready");

@@ -7,7 +7,7 @@ import { library, loadBundle } from "./index";
 const cleanups: (() => void)[] = [];
 afterAll(() => {
   for (const c of cleanups) c();
-});
+}, 30_000); // one temp dir per bundle, removed serially: over the 5 s default while other suites run
 
 async function loaded(bundle: string) {
   const r = await loadBundle(bundle, { testMode: true });
