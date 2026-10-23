@@ -2545,9 +2545,17 @@ From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #33
 - **Derived (client, not stored):** the Party status tab's companion rows under each owner PC (`partySummary`): pets per FR-ENT-37 plus owned combatants of the started encounter; the DM's hidden mark; "Other companions". Tab registry entries are client code, never sent or stored.
 - **Fixtures:** none new (bundles `pm-memory`, `pm-memory-e2e` are PM1's aliases of `session-sim-12`).
 
-## 123. Sprint 9: rules quick reference (SP2)
+## 123. Sprint 9: Reminders tab and sheet tab (RS1)
 
-From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#338, #339). **Built by `build/sp-rules`**: no new table, column or record type. Protocol side: [protocol §154](../protocol/README.md#154-sprint-9-rules-quick-reference-sp2).
+From [reminders](../specs/reminders.md#8-data-model) §8 (derived), [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-100–104 (DM #338, #339). **Built by `build/rem-ui`**. Protocol side: [protocol §155](../protocol/README.md#155-sprint-9-reminders-tab-and-sheet-tab-rs1). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** groups (Party, then characters by name per viewer), row order (`createdAt`, then id), roll-as actor per surface, the per-character effects line (from `effect` rows already in the snapshot), the sheet tab's count (this character's loaded rows).
+- **Browser state:** Party Manager tab memory may hold `reminders` (§121's key, unchanged).
+- **Fixtures:** none new; bundle `rem-ui-e2e` (alias of `reminders-strongholds` for the state-changing e2e).
+- **CON-44:** 0 B (no snapshot change; `reminder` stays lazy).
+## 124. Sprint 9: rules quick reference (SP2)
+
+From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#338, #339). **Built by `build/sp-rules`**: no new table, column or record type. Protocol side: [protocol §156](../protocol/README.md#156-sprint-9-rules-quick-reference-sp2).
 
 | Field / store | Change | Rule | Source |
 |---|---|---|---|
@@ -2563,11 +2571,3 @@ From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#33
 - **Persisted runtime state:** rule rows (imported: global; house rules: per campaign) in `compendium_entry`.
 - **CON-44:** 0 B.
 
-## 123. Sprint 9: Reminders tab and sheet tab (RS1)
-
-From [reminders](../specs/reminders.md#8-data-model) §8 (derived), [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-100–104 (DM #338, #339). **Built by `build/rem-ui`**. Protocol side: [protocol §155](../protocol/README.md#155-sprint-9-reminders-tab-and-sheet-tab-rs1). **No table, column, record type or wire field.**
-
-- **Derived (client, not stored):** groups (Party, then characters by name per viewer), row order (`createdAt`, then id), roll-as actor per surface, the per-character effects line (from `effect` rows already in the snapshot), the sheet tab's count (this character's loaded rows).
-- **Browser state:** Party Manager tab memory may hold `reminders` (§121's key, unchanged).
-- **Fixtures:** none new; bundle `rem-ui-e2e` (alias of `reminders-strongholds` for the state-changing e2e).
-- **CON-44:** 0 B (no snapshot change; `reminder` stays lazy).
