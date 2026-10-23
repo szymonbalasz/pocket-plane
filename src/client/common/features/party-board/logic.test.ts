@@ -181,6 +181,7 @@ describe("FR-PARTY-60 tab memory", () => {
       ["handouts", "Handouts"],
       ["inventory", "Inventory"],
       ["loot", "Loot"],
+      ["strongholds", "Strongholds"], // RS2 (FR-PARTY-71)
     ]);
     const ids = partyTabs().map((t) => t.id);
     const warnings: string[] = [];
