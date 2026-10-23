@@ -153,11 +153,11 @@ export function removeFacilityBody(reminderCount: number, staffCount: number): s
 }
 
 /**
- * FR-HOLD-19's confirm: reminders removed and what the Stores send to the party, including a
- * negative balance the pot pays (review ruling 9).
+ * FR-HOLD-19's confirm body under its "Delete ‹name›?" title (not the title again, sprint 10 H4):
+ * reminders removed and what the Stores send to the party, including a negative balance the pot
+ * pays (review ruling 9).
  */
-export function deleteText(
-  name: string,
+export function deleteBody(
   reminderCount: number,
   storesItems: number,
   coins: Coins = ZERO_COINS,
@@ -173,7 +173,7 @@ export function deleteText(
     ...(formatCoins(plus) ? [formatCoins(plus)] : []),
   ];
   const owes = formatCoins(owed);
-  const head = `Delete ${name}? ${reminders(reminderCount)} removed`;
+  const head = `${reminderCount === 0 ? "No reminders are" : reminders(reminderCount)} removed`;
   if (moving.length === 0 && !owes) return `${head}; its Stores are empty.`;
   const move = moving.length > 0 ? `its Stores (${moving.join(", ")}) move to the party` : "";
   if (!owes) return `${head}; ${move}.`;
