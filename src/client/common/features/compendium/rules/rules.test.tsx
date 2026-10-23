@@ -349,3 +349,17 @@ describe("FR-CMP-66 search and pins", () => {
     }
   });
 });
+
+describe("FR-SHELL-188 palette parts", () => {
+  test("FR-SHELL-186 FR-SHELL-188 the Rules command opens cmp.rules by user; a rule row opens it on that card", async () => {
+    const { rulesCommand, openRuleRow } = await import("./palette");
+    const calls: unknown[] = [];
+    const ctx = { shell: { openWindow: (...a: unknown[]) => void calls.push(a) } };
+    rulesCommand.run(ctx);
+    expect(calls).toEqual([[RULES_KIND, undefined, { by: "user" }]]);
+    expect(rulesNav.getState().target).toBeNull();
+    openRuleRow(ctx, "r-dodge");
+    expect(rulesNav.getState().target).toBe("r-dodge");
+    expect(rulesCommand.clients).toEqual(["dm", "player"]);
+  });
+});

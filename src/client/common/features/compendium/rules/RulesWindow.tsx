@@ -413,7 +413,7 @@ function PagePicker({ page, narrow }: { page: string; narrow: boolean }) {
   }
   return (
     <Tabs value={page} onValueChange={setRulesPage}>
-      <TabsList className="w-full justify-start overflow-x-auto">
+      <TabsList className="h-auto w-full flex-wrap justify-start">
         {RULES_TABS.map((t) => (
           <TabsTrigger key={t.id} value={t.id} data-testid="cmp-rules-page" data-value={t.id}>
             {t.title}
@@ -430,14 +430,16 @@ function useNarrow(ref: React.RefObject<HTMLElement | null>): boolean {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // The window's own width (its frame), not the body's inner one.
+    const frame = el.closest('[data-testid="ui-window"]') ?? el;
     const measure = () => {
-      const w = el.getBoundingClientRect().width;
+      const w = frame.getBoundingClientRect().width;
       if (w > 0) setNarrow(w < RULES_TABS_MIN_W);
     };
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
-    ro.observe(el);
+    ro.observe(frame);
     return () => ro.disconnect();
   }, [ref]);
   return narrow;
