@@ -2,8 +2,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { srdMini } from "@fixtures/srd/open5e";
+import { rulesMini, srdMini } from "@fixtures/srd/open5e";
 import { SRD_ATTRIBUTION } from "@fixtures/srd/source";
+import { RULE_SECTION_SLUGS } from "@shared/compendium/rules-pages";
 import { OPEN5E_ENDPOINTS } from "../../adapter/open5e";
 import { loadSrd51, SRD_51_DIR } from ".";
 import { ATTRIBUTION_FILE, OPEN5E_V1_URL, SRD_51_ATTRIBUTION } from "./source";
@@ -36,7 +37,7 @@ describe("FR-CMP-06 bundled licence", () => {
   test("every fixture record (fixtures/srd/open5e) is wotc-srd and matches the bundled one", () => {
     const { responses } = loadSrd51();
     for (const e of OPEN5E_ENDPOINTS) {
-      const mini = srdMini[e] ?? [];
+      const mini = srdMini[e] ?? rulesMini[e] ?? [];
       expect(mini.length).toBeGreaterThan(0);
       expect(nonSrd(e, mini)).toEqual([]);
       for (const r of mini as Rec[]) {
@@ -50,5 +51,24 @@ describe("FR-CMP-06 bundled licence", () => {
     expect(SRD_51_ATTRIBUTION).toBe(SRD_ATTRIBUTION);
     expect(text).toContain(SRD_ATTRIBUTION);
     expect(text).toContain(OPEN5E_V1_URL);
+  });
+
+  test("FR-CMP-60 sections are wotc-srd: bundled and mini `sections` hold only the pages' sections + RULES_EXTRA (21), never races, backgrounds, feats, legal text or conditions", () => {
+    const bundled = (loadSrd51().responses.sections ?? []) as Rec[];
+    const mini = (rulesMini.sections ?? []) as Rec[];
+    expect(nonSrd("sections", bundled)).toEqual([]);
+    expect(nonSrd("sections", mini)).toEqual([]);
+    expect(bundled.map((r) => r.slug).sort()).toEqual([...RULE_SECTION_SLUGS].sort());
+    expect(bundled).toHaveLength(21);
+    for (const out of ["races", "backgrounds", "feats", "legal-information", "conditions"]) {
+      expect(bundled.some((r) => r.slug === out)).toBe(false);
+    }
+    expect(mini.map((r) => r.slug).sort()).toEqual([
+      "actions-in-combat",
+      "attacking",
+      "cover",
+      "damage-and-healing",
+      "movement",
+    ]);
   });
 });

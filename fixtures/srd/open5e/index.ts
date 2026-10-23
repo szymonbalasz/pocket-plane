@@ -6,6 +6,7 @@ import { classes } from "./classes";
 import { conditions } from "./conditions";
 import { magicitems } from "./magicitems";
 import { monsters } from "./monsters";
+import { sections } from "./sections";
 import { spells } from "./spells";
 import { weapons } from "./weapons";
 
@@ -21,3 +22,9 @@ export const srdMini: Open5eResponses = {
   conditions,
   classes,
 };
+
+/**
+ * CMP §13.3 `cmp-rules-mini`: the mini `sections` set (Actions in Combat, Attacking, Cover, Damage
+ * and Healing, Movement). Not in `srdMini`, so bundles with `cmp-srd-mini` hold no rule cards.
+ */
+export const rulesMini: Open5eResponses = { sections };

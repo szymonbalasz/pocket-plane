@@ -2544,11 +2544,62 @@ From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #33
 
 - **Derived (client, not stored):** the Party status tab's companion rows under each owner PC (`partySummary`): pets per FR-ENT-37 plus owned combatants of the started encounter; the DM's hidden mark; "Other companions". Tab registry entries are client code, never sent or stored.
 - **Fixtures:** none new (bundles `pm-memory`, `pm-memory-e2e` are PM1's aliases of `session-sim-12`).
+
+## 123. Sprint 9: Reminders tab and sheet tab (RS1)
+
+From [reminders](../specs/reminders.md#8-data-model) §8 (derived), [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-100–104 (DM #338, #339). **Built by `build/rem-ui`**. Protocol side: [protocol §155](../protocol/README.md#155-sprint-9-reminders-tab-and-sheet-tab-rs1). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** groups (Party, then characters by name per viewer), row order (`createdAt`, then id), roll-as actor per surface, the per-character effects line (from `effect` rows already in the snapshot), the sheet tab's count (this character's loaded rows).
+- **Browser state:** Party Manager tab memory may hold `reminders` (§121's key, unchanged).
+- **Fixtures:** none new; bundle `rem-ui-e2e` (alias of `reminders-strongholds` for the state-changing e2e).
+- **CON-44:** 0 B (no snapshot change; `reminder` stays lazy).
+
+## 124. Sprint 9: Strongholds tab and Stronghold window (RS2)
+
+From [strongholds](../specs/strongholds.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-ui`**. Protocol side: [protocol §156](../protocol/README.md#156-sprint-9-strongholds-tab-and-stronghold-window-rs2). **No table, column, record type or wire field.**
+
+| Browser state | Value | Rule | Source |
+|---|---|---|---|
+| Stronghold window selection `pp.hold.v1.<campaignId>.<dm \| playerId>` | `{strongholdId: id \| null, tab: facilities \| staff \| reminders \| notes}` | junk → default (nothing selected, Facilities) + warning; storage failing → memory only for the page; a selected id that is gone or hidden shows "This stronghold isn't available" | FR-HOLD-23, -24 |
+| Party Manager tab choice `pp.party.tab.v1.…` | `strongholds` (new id) | not visible now → Party status, the stored value kept ([§122](#122-sprint-9-party-manager-pm2)) | FR-PARTY-71, -72 |
+
+- **Derived (client, not stored):** state summary, figures line, "Replaced by", staff per facility, totals ("incl. DM only" for the DM), order suggestions, reminder groups, confirm texts.
+- **Fixtures:** none new; bundle `hold-ui-e2e` (alias of `reminders-strongholds`, for `e2e/hold-ui.e2e.ts`).
 - **CON-44:** 0 B.
 
-## 123. Sprint 9: session recap (SP3)
+## 125. Sprint 9: Stronghold Stores tab (RS3)
 
-From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). **Built by `build/sp-recap`**. Protocol side: [protocol §155](../protocol/README.md#155-sprint-9-session-recap--recapquery-recapshare-session-recap-kind-sp3). **No table, column or record type** (ADR-0013: sessions stay derived).
+From [strongholds](../specs/strongholds.md#8-data-model) and [party-loot](../specs/party-loot.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-stores`**. Protocol side: [protocol §157](../protocol/README.md#157-sprint-9-stronghold-stores-tab-move-form-stores-options-inventory-filter-rs3). **No table, column, record type or wire field.**
+
+| Browser state | Value | Rule | Source |
+|---|---|---|---|
+| Stronghold window selection `pp.hold.v1.<campaignId>.<dm \| playerId>` | `tab` gains `stores` (`facilities \| staff \| stores \| reminders \| notes`) | as [§124](#124-sprint-9-strongholds-tab-and-stronghold-window-rs2) | FR-HOLD-24, -28 |
+
+- **Derived (client, not stored):** Move form Stores options per viewer (from `stronghold-index`), Stores names in the loot log ("Stores (removed)" without an index row), a Stores' item rows (`party-item` with its `strongholdId`), the party inventory's rows (no `strongholdId`, FR-PARTY-77).
+- **Fixtures:** none new; bundle `hold-stores-e2e` (alias of `reminders-strongholds`, for `e2e/hold-stores.e2e.ts`).
+- **CON-44:** 0 B.
+
+## 126. Sprint 9: rules quick reference (SP2)
+
+From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#338, #339). **Built by `build/sp-rules`**: no new table, column or record type. Protocol side: [protocol §158](../protocol/README.md#158-sprint-9-rules-quick-reference-sp2).
+
+| Field / store | Change | Rule | Source |
+|---|---|---|---|
+| `compendium_entry.kind` | + `rule` | text enum with no CHECK: `drizzle-kit push` changes nothing (schema test) | FR-CMP-59 |
+| `rule` facets / body | `{chapter, section, order}` / `{text}` | chapter ≤ 40 (Open5e `parent`; homebrew "House rules"), section ≤ 60 (homebrew free text, may be empty), order 0–999 (card position; homebrew 0); text markdown-lite; entry ≤ 32 KB; `sourceKey` `rule/<section-slug>/<card-slug>` | FR-CMP-59, -61, -67 |
+| `compendium_source.counts` | + `rule` | a source imported before sprint 9 has no `rule` count (read as a partial record) | FR-CMP-59 |
+| Bundled `srd-5.1` | + `sections.json` | 21 `wotc-srd` sections (`RULES_SECTIONS` + `RULES_EXTRA`) → 160 cards; `version` changes (new file + `ADAPTER_VERSION` 4) | FR-CMP-60 |
+| Pins *(browser `localStorage`)* | `pp.rules.pins.v1.<campaignId>` | JSON array ≤ 30 entry ids, oldest dropped past 30, unknown / 404 ids dropped; never sent | FR-CMP-66 |
+| Open cards, page, search *(client memory)* | per page load | which cards are open per page, the shown page, the search text, an `openRules` target | FR-CMP-66, -69 |
+
+- **Derived:** pages (`@shared/compendium/rules-pages.ts`, code), the page index and page bodies (REST, per request: the best-ranked visible entry per page key), the rules ETag (source version, role, homebrew-rule version `count:newest updatedAt`, body hash).
+- **Fixtures:** `cmp-rules-mini`, `cmp-rule-house`; bundles `sp-rules`, `sp-rules-e2e`; `session-sim-13` + `cmp-rules-mini`.
+- **Persisted runtime state:** rule rows (imported: global; house rules: per campaign) in `compendium_entry`.
+- **CON-44:** 0 B.
+
+## 127. Sprint 9: session recap (SP3)
+
+From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). **Built by `build/sp-recap`**. Protocol side: [protocol §159](../protocol/README.md#159-sprint-9-session-recap--recapquery-recapshare-session-recap-kind-sp3). **No table, column or record type** (ADR-0013: sessions stay derived).
 
 | Field / table | Change | Rule | Source |
 |---|---|---|---|

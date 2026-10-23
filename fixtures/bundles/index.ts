@@ -47,6 +47,8 @@ import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
 import gemsUiE2e from "./gems-ui-e2e";
+import holdStoresE2e from "./hold-stores-e2e";
+import holdUiE2e from "./hold-ui-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
@@ -66,6 +68,7 @@ import pmMemory from "./pm-memory";
 import pmMemoryE2e from "./pm-memory-e2e";
 import prefsS6 from "./prefs-s6";
 import prefsS6E2e from "./prefs-s6-e2e";
+import remUiE2e from "./rem-ui-e2e";
 import remindersStrongholds from "./reminders-strongholds";
 import rsE2e from "./rs-e2e";
 import ruleTriggers from "./rule-triggers";
@@ -83,6 +86,8 @@ import sessionSim12 from "./session-sim-12";
 import sessionSim13 from "./session-sim-13";
 import spPalette from "./sp-palette";
 import spPaletteE2e from "./sp-palette-e2e";
+import spRules from "./sp-rules";
+import spRulesE2e from "./sp-rules-e2e";
 import spS9 from "./sp-s9";
 import spS9E2e from "./sp-s9-e2e";
 import spS9Shared from "./sp-s9-shared";
@@ -231,6 +236,10 @@ export const bundles: readonly Bundle[] = [
   sessionSim13,
   remindersStrongholds,
   rsE2e,
+  // Sprint 9 track RS (build/rem-ui): the reminders UI e2e
+  remUiE2e,
+  // Sprint 9 track RS (build/hold-ui): Strongholds tab + window E2E
+  holdUiE2e,
   // Sprint 9 track FX (fix/fx-dice-lines): dice + gems lines
   fxDiceE2e,
   // Sprint 9 track FX (fix/fx-toasts-feed): toast stack + kill feed
@@ -241,6 +250,11 @@ export const bundles: readonly Bundle[] = [
   // Sprint 9 track FX (fix/fx-sync-shell): stale-chunk reload e2e alias, FX3's bundle
   fxStaleChunkE2e,
   fxS9,
+  // Sprint 9 track SP (build/sp-rules): rules quick reference
+  spRules,
+  spRulesE2e,
+  // Sprint 9 track RS (build/hold-stores): Stores tab E2E
+  holdStoresE2e,
   // Sprint 9 track SP (build/sp-recap): the SP walkthrough bundle + the shared recap
   spS9,
   spS9Shared,

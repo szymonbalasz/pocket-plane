@@ -10,6 +10,9 @@ export default defineBundle({
   name: "sp-s9",
   includes: ["session-sim-12"],
   fixtures: [
+    // SP2 (build/sp-rules): the rules cards and two house rules (compendium §13.3)
+    "cmp-rules-mini",
+    "cmp-rule-house",
     // SP3 (build/sp-recap): the session's loot haul
     "recap-loot-haul",
   ],

@@ -5,6 +5,7 @@
 // (50 largest rows) is logged for §12.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
+import { HOUSE_RULES_CHAPTER } from "@shared/compendium/schemas";
 import { IMPORTED_ENTITY_TYPE } from "@shared/entities/schemas";
 import { eq } from "drizzle-orm";
 import { campaign } from "../../db/schema";
@@ -17,6 +18,7 @@ import {
   snapshotSizes,
   type ViewerSize,
 } from "../../ws/testing/snapshot-size";
+import { PUT_ENTRY } from "./homebrew";
 import { IMPORT_RECORDED, type ImportResult } from "./import";
 import { bundledSource } from "./sources";
 import { SRD_51_SOURCE } from "./sources/srd-5.1/source";
@@ -71,6 +73,37 @@ describe("CON-44 with the full SRD import (CMP §12, FR-CMP-30)", () => {
     console.log(
       `CMP CON-44 (C2): heavy DM ${dm.bytes} B before and after the full SRD import (${1_048_576 - dm.bytes} B left of 1 MiB); players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B`,
     );
+  });
+
+  test("FR-CMP-71 CON-44 rules 0 B: the full import's 160 rule cards and two house rules add nothing to any viewer's snapshot (REST only, no record type)", () => {
+    expect(result.counts.rule.created).toBe(160);
+    const cid = b.s.db.select().from(campaign).where(eq(campaign.active, true)).get()?.id ?? null;
+    for (const [name, shared] of [
+      ["CON-44 house rule shared", true],
+      ["CON-44 house rule hidden", false],
+    ] as const) {
+      b.s.commands.run(
+        PUT_ENTRY,
+        {
+          shared,
+          entry: {
+            kind: "rule",
+            name,
+            facets: { chapter: HOUSE_RULES_CHAPTER, section: "Combat", order: 0 },
+            body: { text: "x".repeat(4_000) },
+          },
+        },
+        { actor: { role: "dm", playerId: null, campaignId: cid } },
+      );
+    }
+    const now = snapshotSizes(b.s);
+    for (const [i, v] of now.entries()) {
+      const was = before[i] as ViewerSize;
+      expect({ viewer: v.label, growth: v.bytes - was.bytes }).toEqual({
+        viewer: v.label,
+        growth: 0,
+      });
+    }
   });
 
   test("CMP §12 worst imported-entity load: 50 largest definitions ≤ 70 KB for the DM; players refused (audience dm)", () => {

@@ -58,6 +58,7 @@ const KIND_LABEL: Record<HomebrewKind, string> = {
   item: "Item",
   condition: "Condition",
   feature: "Feature",
+  rule: "House rule",
 };
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const LEVELS = Array.from({ length: 10 }, (_, i) => String(i));
@@ -229,6 +230,8 @@ function KindFields({
           <div className="col-span-2">{text("subclass", "Subclass (optional)")}</div>
         </>
       );
+    case "rule":
+      return <div className="col-span-2">{text("section", "Section (optional)", "Combat")}</div>;
     case "condition":
       return null;
   }
@@ -369,11 +372,13 @@ function HomebrewForm({
   mode,
   close,
   target,
+  onSaved,
 }: {
   api: Api;
   mode: FormMode;
   close(): void;
   target: RefObject<HTMLElement | null>;
+  onSaved?: (entryId: string) => void;
 }) {
   const [f, setF] = useState<HomebrewFields>(() => initialFields(mode));
   const [error, setError] = useState<string | null>(null);
@@ -417,7 +422,8 @@ function HomebrewForm({
       });
       toast.success(`Saved ${f.name.trim()}`);
       close();
-      if (mode.kind === "edit") refetch();
+      if (onSaved) onSaved(r.entryId);
+      else if (mode.kind === "edit") refetch();
       else openEntry(r.entryId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");
@@ -530,10 +536,13 @@ export function HomebrewDialog({
   api,
   mode,
   onClose,
+  onSaved,
 }: {
   api: Api;
   mode: FormMode | null;
   onClose(): void;
+  /** Instead of opening the saved entry in the Compendium (the Rules window refetches). */
+  onSaved?: (entryId: string) => void;
 }) {
   // Paste / drop anywhere in the Dialog (name and text included) adds images (FR-CMP-50).
   const content = useRef<HTMLDivElement>(null);
@@ -545,7 +554,9 @@ export function HomebrewDialog({
         className="max-w-lg"
         aria-describedby={undefined}
       >
-        {mode && <HomebrewForm api={api} mode={mode} close={onClose} target={content} />}
+        {mode && (
+          <HomebrewForm api={api} mode={mode} close={onClose} target={content} onSaved={onSaved} />
+        )}
       </DialogContent>
     </Dialog>
   );

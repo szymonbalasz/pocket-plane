@@ -6,10 +6,12 @@ import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/re
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { recapWindow } from "@ui/features/session-recap/window";
 import { statsWindow } from "@ui/features/stats/window";
+import { strongholdWindow } from "@ui/features/strongholds/window";
 import { playerCompanionWindow } from "./features/character-sheet/companion-window";
 import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { playerInitiativeWindow } from "./features/combat-tracker/initiative-window";
 import { playerCompendiumWindow } from "./features/compendium/compendium-window";
+import { playerRulesWindow } from "./features/compendium/rules-window";
 import { playerTrayWindow } from "./features/dice-extras/tray-window";
 import { playerDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
@@ -31,6 +33,8 @@ const windows: WindowDef[] = [
   prefsWindow("player", playerPrefSections), // shell.prefs, no launcher (play-shell, FR-SHELL-71)
   playerCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
   statsWindow, // stats.board (stats, FR-SHELL-93)
+  strongholdWindow, // hold.stronghold, no launcher (strongholds, FR-SHELL-170)
+  playerRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
   recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
 ];
 

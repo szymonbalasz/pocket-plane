@@ -1,10 +1,13 @@
 // Party window Loot tab body (FR-LOOT-21; was window `loot.log`), both clients (FR-LOOT-15–19, FR-PARTY-25/27): pot strip with the DM's
 // Split… dialog, wallets, DM add form, Move form, log (newest first) with DM Edit on loot rows and
 // item rows. Reads the synced store; every change is an intent (`loot.add`, `loot.edit`,
-// `loot.move`, `loot.split`). DM-only parts render from `you.role`.
+// `loot.move`, `loot.split`). DM-only parts render from `you.role`. *(S9)* The Move form offers the
+// Stores (FR-LOOT-34) and the log names them from `stronghold-index` (FR-LOOT-35; a name opens the
+// Stronghold window); the Stronghold window's Stores tab reuses `MoveForm` (preset) and `Purse`.
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { formatCoin, formatGpValue, nonZeroCoins } from "@shared/party-loot/format";
+import type { WireEndpoint } from "@shared/party-loot/schemas";
 import {
   COINS_DISPLAY,
   type CoinKey,
@@ -17,7 +20,8 @@ import {
   type WalletRecord,
   ZERO_COINS,
 } from "@shared/party-loot/schemas";
-import { PencilIcon } from "lucide-react";
+import { STRONGHOLD_INDEX_TYPE, type StrongholdIndexRecord } from "@shared/strongholds/schemas";
+import { EyeOffIcon, PencilIcon } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
@@ -41,6 +45,7 @@ import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { useHasType, useRecords, useSync } from "../../sync/store";
 import { timeOf } from "../notifications/parts";
+import { useOpenStronghold } from "../strongholds/memory";
 import {
   type CharacterRef,
   type CoinDraft,
@@ -51,20 +56,23 @@ import {
   endpointLabel,
   fromOptions,
   intentFailure,
-  itemLine,
   LOST_ADD,
   LOST_EDIT,
   LOST_MOVE,
   LOST_SPLIT,
   lootPayload,
+  MOVE_TO_PARTY,
+  type MoveScope,
   type MoveViewer,
   movePayload,
   NO_MOVE_TEXT,
   newestFirst,
   parseCoin,
+  type StoresRef,
   splitCharacters,
   splitPayload,
   splitPrefill,
+  storesRefs,
   submitEnabled,
   toOptions,
   walletRows,
@@ -92,7 +100,7 @@ function CoinBadges({ coins, testId }: { coins: Coins; testId: string }) {
 }
 
 /** Coin Badges with the "≈ gp" Tooltip; all zero → "No coin". */
-function Purse({
+export function Purse({
   coins,
   testId,
   emptyTestId,
@@ -117,7 +125,10 @@ function Purse({
   );
 }
 
-function SectionTitle({ children, ...props }: { children: string } & React.ComponentProps<"h3">) {
+export function SectionTitle({
+  children,
+  ...props
+}: { children: string } & React.ComponentProps<"h3">) {
   return (
     <h3 className="text-xs font-medium text-muted-foreground" {...props}>
       {children}
@@ -270,26 +281,67 @@ function AddForm({ live }: { live: boolean }) {
   );
 }
 
-/** Move form, both clients (FR-LOOT-18). */
-function MoveForm({
+/** The characters (full or redacted `entity` records) as the Move form and wallets need them. */
+export function useCharacters(): CharacterRef[] {
+  const entities = useRecords<CharacterRecordLike>(ENTITY_TYPE);
+  return useMemo(
+    () =>
+      entities
+        .filter((e) => e.kind === "character")
+        .map((e) => ({ id: e.id, name: e.name, ownerPlayerId: e.ownerPlayerId })),
+    [entities],
+  );
+}
+
+/** *(S9)* The Stores the viewer may use, from the snapshot's `stronghold-index` (FR-LOOT-34). */
+export function useStores(): StoresRef[] {
+  const index = useRecords<StrongholdIndexRecord>(STRONGHOLD_INDEX_TYPE);
+  return useMemo(() => storesRefs(index), [index]);
+}
+
+/** One From / To option; the DM's DM-only Stores with eye-off (FR-LOOT-34). */
+function OptionItem({ o }: { o: { key: string; label: string; hidden?: true } }) {
+  return (
+    <SelectItem
+      value={o.key}
+      data-testid="loot-move-option"
+      data-value={o.key}
+      data-dm-only={o.hidden ? "true" : undefined}
+    >
+      {o.hidden && <EyeOffIcon className="size-3.5 text-muted-foreground" aria-label="DM only" />}
+      {o.label}
+    </SelectItem>
+  );
+}
+
+/**
+ * Move form, both clients (FR-LOOT-18). *(S9)* `scope` adds the Stores (FR-LOOT-34); with a
+ * `preset` Stores it is the Stronghold window's "Move to party" (From = the Stores, To = Party pot
+ * by default; only pairs with that Stores).
+ */
+export function MoveForm({
   chars,
   viewer,
   live,
+  scope,
 }: {
   chars: CharacterRef[];
   viewer: MoveViewer;
   live: boolean;
+  scope: MoveScope;
 }) {
-  const froms = fromOptions(chars, viewer);
+  const froms = fromOptions(chars, viewer, scope);
   const [fromSel, setFrom] = useState<string>("");
   const from = froms.some((o) => o.key === fromSel) ? fromSel : (froms[0]?.key ?? "");
-  const tos = toOptions(chars, viewer, from);
+  const tos = toOptions(chars, viewer, from, scope);
   const [toSel, setTo] = useState<string>("");
   const to = tos.some((o) => o.key === toSel) ? toSel : (tos[0]?.key ?? "");
   const [text, setText] = useState("");
   const [draft, setDraft] = useState<CoinDraft>(EMPTY_DRAFT);
   const { busy, error, send } = useSend(LOST_MOVE);
-  const parsed = movePayload(chars, viewer, from, to, text, draft);
+  const parsed = movePayload(chars, viewer, from, to, text, draft, scope);
+  const preset = scope.preset !== undefined;
+  const title = preset ? MOVE_TO_PARTY : "Move coin";
   const enabled = submitEnabled({ valid: parsed.ok, live, busy });
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -300,14 +352,15 @@ function MoveForm({
     }
   };
   const message = error ?? (!parsed.ok && dirty(text, draft) ? parsed.message : null);
-  if (!canMove(chars, viewer)) {
+  if (!canMove(chars, viewer, scope)) {
     return (
       <form
         data-testid="loot-move"
+        data-preset={preset ? "stores" : undefined}
         onSubmit={(e) => e.preventDefault()}
         className="flex flex-col gap-1"
       >
-        <SectionTitle>Move coin</SectionTitle>
+        <SectionTitle>{title}</SectionTitle>
         <div className="flex items-center gap-1">
           <span data-testid="loot-move-empty" className="flex-1 text-xs text-muted-foreground">
             {NO_MOVE_TEXT}
@@ -320,8 +373,13 @@ function MoveForm({
     );
   }
   return (
-    <form data-testid="loot-move" onSubmit={submit} className="flex flex-col gap-1">
-      <SectionTitle>Move coin</SectionTitle>
+    <form
+      data-testid="loot-move"
+      data-preset={preset ? "stores" : undefined}
+      onSubmit={submit}
+      className="flex flex-col gap-1"
+    >
+      <SectionTitle data-testid="loot-move-title">{title}</SectionTitle>
       <fieldset disabled={!live} className="flex flex-col gap-1">
         <div className="flex items-center gap-1">
           <Select value={from} onValueChange={setFrom}>
@@ -334,14 +392,7 @@ function MoveForm({
             </SelectTrigger>
             <SelectContent>
               {froms.map((o) => (
-                <SelectItem
-                  key={o.key}
-                  value={o.key}
-                  data-testid="loot-move-option"
-                  data-value={o.key}
-                >
-                  {o.label}
-                </SelectItem>
+                <OptionItem key={o.key} o={o} />
               ))}
             </SelectContent>
           </Select>
@@ -358,14 +409,7 @@ function MoveForm({
             </SelectTrigger>
             <SelectContent>
               {tos.map((o) => (
-                <SelectItem
-                  key={o.key}
-                  value={o.key}
-                  data-testid="loot-move-option"
-                  data-value={o.key}
-                >
-                  {o.label}
-                </SelectItem>
+                <OptionItem key={o.key} o={o} />
               ))}
             </SelectContent>
           </Select>
@@ -584,23 +628,70 @@ export function EditRow({
   );
 }
 
+/** *(S9)* A named Stores end opens its Stronghold window (FR-HOLD-23, FR-LOOT-35). */
+function StoresName({ strongholdId, label }: { strongholdId: string; label: string }) {
+  const open = useOpenStronghold();
+  return (
+    <button
+      type="button"
+      data-testid="loot-entry-stores"
+      data-record-id={strongholdId}
+      className="underline decoration-dotted underline-offset-2 hover:text-foreground"
+      onClick={() => open(strongholdId)}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** One end of a route: its label (FR-LOOT-35), a named Stores as a link. */
+function EndName({
+  end,
+  nameOf,
+  strongholdName,
+  item,
+}: {
+  end: WireEndpoint;
+  nameOf(id: string): string | undefined;
+  strongholdName(id: string): string | undefined;
+  item: boolean;
+}) {
+  if (end.kind === "stores" && strongholdName(end.strongholdId) !== undefined) {
+    const label = endpointLabel(end, nameOf, strongholdName);
+    return <StoresName strongholdId={end.strongholdId} label={label} />;
+  }
+  if (item && end.kind === "party") return <>Party</>;
+  return <>{endpointLabel(end, nameOf, strongholdName)}</>;
+}
+
 function EntryRow({
   entry,
   nameOf,
+  strongholdName,
   canEdit,
   onEdit,
 }: {
   entry: LootEntryRecord;
   nameOf(id: string): string | undefined;
+  strongholdName(id: string): string | undefined;
   canEdit: boolean;
   onEdit?: () => void;
 }) {
   const isMove = entry.kind === "move";
   const edited = entry.editedAt !== null;
-  const line =
-    entry.kind === "item" && entry.qty !== undefined
-      ? itemLine({ ...entry, qty: entry.qty }, nameOf)
-      : null;
+  const isItem = entry.kind === "item" && entry.qty !== undefined;
+  const route = (item: boolean) => (
+    <>
+      <EndName end={entry.from} nameOf={nameOf} strongholdName={strongholdName} item={item} /> →{" "}
+      <EndName end={entry.to} nameOf={nameOf} strongholdName={strongholdName} item={item} />
+    </>
+  );
+  // FR-PARTY-25's item line (as `itemLine` writes it), with named Stores as links.
+  const line = isItem ? (
+    <span data-testid="loot-entry-item">
+      {route(true)}: {entry.text} ×{entry.qty}
+    </span>
+  ) : null;
   return (
     <li
       data-testid="loot-entry"
@@ -612,13 +703,7 @@ function EntryRow({
       <div className="flex items-start gap-1.5">
         <span className="min-w-0 flex-1 break-words">
           {line ??
-            (isMove ? (
-              <span data-testid="loot-entry-route">
-                {endpointLabel(entry.from, nameOf)} → {endpointLabel(entry.to, nameOf)}
-              </span>
-            ) : (
-              entry.text
-            ))}
+            (isMove ? <span data-testid="loot-entry-route">{route(false)}</span> : entry.text)}
         </span>
         <Time iso={entry.createdAt} />
         {onEdit && (
@@ -668,15 +753,10 @@ export function LootLog() {
   const entries = useRecords<LootEntryRecord>(LOOT_ENTRY_TYPE);
   const pot = useRecords<PartyPotRecord>(PARTY_POT_TYPE)[0];
   const wallets = useRecords<WalletRecord>(WALLET_TYPE);
-  const entities = useRecords<CharacterRecordLike>(ENTITY_TYPE);
-  const chars = useMemo(
-    () =>
-      entities
-        .filter((e) => e.kind === "character")
-        .map((e) => ({ id: e.id, name: e.name, ownerPlayerId: e.ownerPlayerId })),
-    [entities],
-  );
+  const chars = useCharacters();
+  const stores = useStores();
   const names = useMemo(() => new Map(chars.map((c) => [c.id, c.name])), [chars]);
+  const holdNames = useMemo(() => new Map(stores.map((s) => [s.id, s.name])), [stores]);
   const [editing, setEditing] = useState<string | null>(null);
   const [splitting, setSplitting] = useState(false);
   const campaignId = you?.campaignId ?? null;
@@ -760,7 +840,9 @@ export function LootLog() {
         </section>
 
         {isDm && <AddForm live={live} />}
-        {(isDm || ownCount > 0) && <MoveForm chars={chars} viewer={viewer} live={live} />}
+        {(isDm || ownCount > 0 || stores.length > 0) && (
+          <MoveForm chars={chars} viewer={viewer} live={live} scope={{ stores }} />
+        )}
 
         <section className="flex flex-col gap-1">
           <SectionTitle>Log</SectionTitle>
@@ -783,6 +865,7 @@ export function LootLog() {
                     key={e.id}
                     entry={e}
                     nameOf={(id) => names.get(id)}
+                    strongholdName={(id) => holdNames.get(id)}
                     canEdit={live}
                     onEdit={isDm && e.kind === "loot" ? () => setEditing(e.id) : undefined}
                   />

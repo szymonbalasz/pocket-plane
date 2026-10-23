@@ -1,6 +1,7 @@
 // FR-SHELL-182, -183: groups, prefixes and ranking with the shared matcher; local rows never wait
 // for the server's, which come after them under Rules / Compendium.
 import { describe, expect, test } from "bun:test";
+import { ruleHits } from "../../compendium/rules/palette";
 import { COMMANDS, PROVIDERS } from "../commands";
 import { compendiumHits } from "./providers";
 import { forClient, localEntries, parseQuery, rankLocal, TOTAL_MAX, withServer } from "./rank";
@@ -79,10 +80,14 @@ describe("palette (FR-SHELL-182, -183)", () => {
     expect(big[0]?.rows).toHaveLength(GROUP_MAX);
     // Late server rows: appended after every local section, never reordering them.
     const local = p.rank("goblin");
-    const hits = compendiumHits([
-      { id: "e1", kind: "rule", name: "Goblin rule", line: "", sourceLabel: "SRD 5.1" },
-      { id: "e2", kind: "monster", name: "Goblin", line: "", sourceLabel: "SRD 5.1" },
-    ]);
+    const hits = [
+      ...ruleHits([
+        { id: "e1", kind: "rule", name: "Goblin rule", line: "", sourceLabel: "SRD 5.1" },
+      ]),
+      ...compendiumHits([
+        { id: "e2", kind: "monster", name: "Goblin", line: "", sourceLabel: "SRD 5.1" },
+      ]),
+    ];
     const merged = withServer(local, hits, p.ctx);
     expect(merged.slice(0, local.length)).toEqual(local);
     expect(merged.slice(local.length).map((s) => s.group)).toEqual(["Rules", "Compendium"]);

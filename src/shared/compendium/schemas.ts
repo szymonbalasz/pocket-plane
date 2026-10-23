@@ -5,7 +5,15 @@ import { TriggerRule } from "@shared/effect-modifiers/triggers";
 import { Cr, Size } from "@shared/entities/schemas";
 import { z } from "zod";
 
-export const COMPENDIUM_KINDS = ["monster", "spell", "item", "condition", "feature"] as const;
+export const COMPENDIUM_KINDS = [
+  "monster",
+  "spell",
+  "item",
+  "condition",
+  "feature",
+  // Sprint 9 (FR-CMP-59): SRD rules sections, one entry per heading (rule card).
+  "rule",
+] as const;
 export const CompendiumKind = z.enum(COMPENDIUM_KINDS);
 export type CompendiumKind = z.infer<typeof CompendiumKind>;
 
@@ -176,6 +184,23 @@ export const FeatureBody = z
     path: ["preset"],
   });
 
+// ---------- rule (sprint 9, FR-CMP-59 / -67) ----------
+
+export const RULE_CHAPTER_MAX = 40;
+export const RULE_SECTION_MAX = 60;
+/** FR-CMP-67: a house rule's chapter (homebrew `rule` entries). */
+export const HOUSE_RULES_CHAPTER = "House rules";
+
+export const RuleFacets = z.strictObject({
+  /** Open5e `parent`, e.g. "Combat"; homebrew "House rules". */
+  chapter: z.string().trim().min(1).max(RULE_CHAPTER_MAX),
+  /** The SRD section, e.g. "Actions in Combat"; homebrew free text (may be empty). */
+  section: z.string().trim().max(RULE_SECTION_MAX),
+  /** Card position in its section (0 = the intro card). */
+  order: int(0, 999),
+});
+export const RuleBody = z.strictObject({ text: text(ENTRY_TEXT_MAX) });
+
 // ---------- kind registry (FR-CMP-01) ----------
 
 export const kindRegistry = {
@@ -184,6 +209,7 @@ export const kindRegistry = {
   item: { facets: ItemFacets, body: ItemBody },
   condition: { facets: ConditionFacets, body: ConditionBody },
   feature: { facets: FeatureFacets, body: FeatureBody },
+  rule: { facets: RuleFacets, body: RuleBody },
 } as const satisfies Record<CompendiumKind, { facets: z.ZodType; body: z.ZodType }>;
 
 export type FacetsOf<K extends CompendiumKind> = z.infer<(typeof kindRegistry)[K]["facets"]>;
@@ -206,6 +232,7 @@ export const EntryDraft = z
     draft("item", kindRegistry.item),
     draft("condition", kindRegistry.condition),
     draft("feature", kindRegistry.feature),
+    draft("rule", kindRegistry.rule),
   ])
   .refine((e) => jsonBytes({ facets: e.facets, body: e.body }) <= ENTRY_MAX_BYTES, {
     message: "Entry is too large (32 KB)",
@@ -221,7 +248,7 @@ export const SourceKey = z
   .string()
   .min(1)
   .max(200)
-  .regex(/^(monster|spell|item|condition|feature)\/[a-z0-9-]+(?:\/[a-z0-9-]+)*$/);
+  .regex(/^(monster|spell|item|condition|feature|rule)\/[a-z0-9-]+(?:\/[a-z0-9-]+)*$/);
 
 /** `compendium_source` (global, FR-CMP-04). */
 export const CompendiumSource = z.strictObject({
@@ -233,7 +260,8 @@ export const CompendiumSource = z.strictObject({
   /** SHA-256 hex over the bundled files + `ADAPTER_VERSION`; fixtures may use a label. */
   version: z.string().min(1).max(128),
   importedAt: Iso,
-  counts: z.record(CompendiumKind, z.number().int().min(0)),
+  /** Partial: a source imported before a kind existed has no count for it (sprint 9: `rule`). */
+  counts: z.partialRecord(CompendiumKind, z.number().int().min(0)),
 });
 export type CompendiumSource = z.infer<typeof CompendiumSource>;
 
@@ -337,6 +365,10 @@ export function entryLine(e: EntryDraft): string {
       break;
     case "condition":
       line = "Condition";
+      break;
+    case "rule":
+      // FR-CMP-59: "‹section› · ‹chapter›" (a house rule without a section: the chapter only).
+      line = e.facets.section ? `${e.facets.section} · ${e.facets.chapter}` : e.facets.chapter;
       break;
     case "feature": {
       const who = e.facets.subclass

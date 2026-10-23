@@ -279,15 +279,9 @@ describe("compendium rows (FR-SHELL-188)", () => {
     const many = Array.from({ length: 12 }, (_, i) =>
       summary(`r${i}`, i % 2 ? "rule" : "item", `X${i}`),
     );
+    // Rule entries are SP2's Rules provider's (`kind=rule`), never Compendium rows.
     const hits = compendiumHits(many);
-    expect(hits.filter((h) => h.group === "Rules").map((h) => h.id)).toEqual([
-      "r1",
-      "r3",
-      "r5",
-      "r7",
-      "r9",
-      "r11",
-    ]);
+    expect(hits.filter((h) => h.group === "Rules")).toEqual([]);
     expect(hits.filter((h) => h.group === "Compendium")).toHaveLength(6);
     expect(
       compendiumHits(Array.from({ length: 20 }, (_, i) => summary(`i${i}`, "item", `I${i}`))),

@@ -720,6 +720,8 @@ const GOLDEN_KINDS = [
   "shell.prefs",
   "charx.companion",
   "stats.board", // ST2 (FR-SHELL-86 (5)): appended, goldens regenerated
+  "hold.stronghold", // RS2 (S4, FR-SHELL-171): appended, goldens regenerated
+  "cmp.rules", // SP2 (seams S4, FR-CMP-63; min 340×320): appended, goldens regenerated
   "recap.session", // SP3 (S4, FR-RECAP-10): appended, goldens regenerated
 ];
 

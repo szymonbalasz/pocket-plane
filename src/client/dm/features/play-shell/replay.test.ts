@@ -29,11 +29,12 @@ if (process.env.UPDATE_FAILING === "1") {
  * Named exemptions (FR-SHELL-160: a new failing cell only with a reason, orchestrator-approved):
  * cell → reason. Each must be in `replay.failing.json`.
  */
+// RS2's two approved cells (D3 fitted @1280×800 resize, D3 fitted @1440×900 push) pass with
+// `cmp.rules` in D3 too (SP2 merge): 10 → 8 failing. SP3's merge (`recap.session` in D3): 8 → 10.
 const SP3_RESIZE =
-  "SP3 (approved, BL-93): `recap.session` joins D3 untouched (S4); the resize down and back re-fits it (e.g. 440×492 → 412×360 at 1280×800), the placer's I7 resize class D1 / D2 / D3 already carry (frame, not the window def: a constant 440×560 default fails the same cells)";
-const EXEMPTIONS = new Map([
+  "SP3 (approved, BL-93): `recap.session` joins D3 untouched (S4); the resize down and back re-fits the newest no-launcher windows (1280×800: recap.session 440×492 → 412×360; 1600×900: cmp.rules 440×600 → 440×372), the placer's I7 resize class D1 / D2 / D3 already carry (frame, not the window defs)";
+const EXEMPTIONS = new Map<string, string>([
   ["FR-SHELL-115 replay D3 fitted @1280×800 resize", SP3_RESIZE],
-  ["FR-SHELL-115 replay D3 fitted @1440×900 resize", SP3_RESIZE],
   ["FR-SHELL-115 replay D3 fitted @1600×900 resize", SP3_RESIZE],
 ]);
 

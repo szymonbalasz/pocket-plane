@@ -6,12 +6,14 @@ import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/re
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { recapWindow } from "@ui/features/session-recap/window";
 import { statsWindow } from "@ui/features/stats/window";
+import { strongholdWindow } from "@ui/features/strongholds/window";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
 import { dmCompanionWindow } from "./features/character-sheet/companion-window";
 import { dmCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { encountersWindow } from "./features/combat-tracker/encounters-window";
 import { dmInitiativeWindow } from "./features/combat-tracker/initiative-window";
 import { dmCompendiumWindow } from "./features/compendium/compendium-window";
+import { dmRulesWindow } from "./features/compendium/rules-window";
 import { requestsWindow } from "./features/dice-extras/requests-window";
 import { dmTrayWindow } from "./features/dice-extras/tray-window";
 import { dmDiceLogWindow } from "./features/dice-roll-log/log-window";
@@ -43,6 +45,8 @@ const windows: WindowDef[] = [
   dmCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
   statsWindow, // stats.board (stats, FR-SHELL-93)
   requestsWindow, // dicex.requests (dice-extras, FR-DICEX-86)
+  strongholdWindow, // hold.stronghold, no launcher (strongholds, FR-SHELL-170)
+  dmRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
   recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
 ];
 

@@ -24,6 +24,7 @@ const counts = {
   item: zero,
   condition: zero,
   feature: zero,
+  rule: zero,
 };
 
 describe("CMP domain events (§9)", () => {

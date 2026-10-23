@@ -1,6 +1,9 @@
 // Pure client rules of the Inventory tab (FR-PARTY-24): row order, Take / Give… options per role
 // (FR-PARTY-23 mirrored), form drafts → intent payloads (FR-PARTY-18–22 mirrored with the shared
-// zod schemas), and the lost-intent texts. No React.
+// zod schemas), and the lost-intent texts. No React. *(S9)* A holder: the party inventory lists
+// rows without `strongholdId` only (FR-PARTY-77); a Stores (the Stronghold window's Stores tab,
+// FR-HOLD-28, FR-LOOT-34, -36, -37) lists its own rows, Take / Move… goes to the Party or a
+// character, Give… brings a sheet item into it, and the DM's rows carry "DM only".
 import type { CreatureSheetRecord, ItemRow } from "@shared/character-sheet/sheet";
 import { canMoveItem } from "@shared/party-board/items";
 import {
@@ -12,6 +15,7 @@ import {
   onlyLeftMessage,
   type PartyItemRecord,
   RemoveItemIntent,
+  type StoresHolder,
 } from "@shared/party-board/schemas";
 import type { z } from "zod";
 import type { Parsed } from "./logic";
@@ -29,6 +33,59 @@ export const LOST_ITEM_ADD = "Connection lost — check the party inventory befo
 export const LOST_ITEM_EDIT = "Connection lost — check the party inventory before saving again";
 export const LOST_ITEM_REMOVE = "Connection lost — check the party inventory before removing again";
 export const LOST_ITEM_MOVE = "Connection lost — check the party inventory before moving again";
+
+/** *(S9)* Whose rows a list shows: the party inventory (`null`) or one Stores. */
+export type ItemHolder = StoresHolder | null;
+
+/** *(S9)* The holder's texts (FR-PARTY-24; the Stores tab, HOLD §7 "Stores are empty"). */
+export interface HolderCopy {
+  empty: string;
+  removeFrom: string;
+  lostAdd: string;
+  lostEdit: string;
+  lostRemove: string;
+  lostMove: string;
+}
+
+const lost = (what: string, verb: string) => `Connection lost — check ${what} before ${verb} again`;
+
+export function holderCopy(holder: ItemHolder): HolderCopy {
+  if (holder === null)
+    return {
+      empty: INVENTORY_EMPTY,
+      removeFrom: "Remove from the party",
+      lostAdd: LOST_ITEM_ADD,
+      lostEdit: LOST_ITEM_EDIT,
+      lostRemove: LOST_ITEM_REMOVE,
+      lostMove: LOST_ITEM_MOVE,
+    };
+  return {
+    empty: STORES_EMPTY,
+    removeFrom: "Remove from the Stores",
+    lostAdd: lost("the Stores", "adding"),
+    lostEdit: lost("the Stores", "saving"),
+    lostRemove: lost("the Stores", "removing"),
+    lostMove: lost("the Stores", "moving"),
+  };
+}
+
+export const STORES_EMPTY = "Stores are empty";
+
+/**
+ * *(S9)* FR-PARTY-77: the party inventory lists `party-item` rows without `strongholdId`; a Stores
+ * lists its own (FR-LOOT-36). One lazy load brings both.
+ */
+export function holderRows<T extends Pick<PartyItemRecord, "strongholdId">>(
+  rows: readonly T[],
+  holder: ItemHolder,
+): T[] {
+  return rows.filter((r) =>
+    holder === null ? r.strongholdId === undefined : r.strongholdId === holder.strongholdId,
+  );
+}
+
+/** The holder as a move end. */
+export const holderEnd = (holder: ItemHolder): ItemEnd => holder ?? { kind: "party" };
 
 /** A character as the tab needs it (full or redacted `entity` record). */
 export interface InvCharacter {
@@ -92,10 +149,13 @@ export function giveSources(
 
 export const PARTY_KEY = "party";
 export const characterKey = (id: string) => `character:${id}`;
+/** *(S9)* A Stores as an item target. */
+export const storesItemKey = (strongholdId: string) => `stores:${strongholdId}`;
 
 export function endOf(key: string): ItemEnd | null {
   if (key === PARTY_KEY) return { kind: "party" };
   if (key.startsWith("character:")) return { kind: "character", characterId: key.slice(10) };
+  if (key.startsWith("stores:")) return { kind: "stores", strongholdId: key.slice(7) };
   return null;
 }
 
@@ -119,6 +179,31 @@ export function giveTargets(
   return [{ key: PARTY_KEY, label: "Party" }, ...others].filter((o) =>
     canMoveItem(v.role, from, endOf(o.key) as ItemEnd, own),
   );
+}
+
+/**
+ * *(S9)* Take / Move… targets of a holder's row: the party's → the viewer's characters (any for
+ * the DM); a Stores' → Party, then those characters (FR-LOOT-33: Stores → party, own character).
+ */
+export function holderTakeTargets(
+  chars: readonly InvCharacter[],
+  v: InvViewer,
+  holder: ItemHolder,
+): TargetOption[] {
+  const own = takeTargets(chars, v).map((c) => ({ key: characterKey(c.id), label: c.name }));
+  return holder === null ? own : [{ key: PARTY_KEY, label: "Party" }, ...own];
+}
+
+/** *(S9)* Give… targets: into a Stores only that Stores; else FR-PARTY-24's (`giveTargets`). */
+export function holderGiveTargets(
+  chars: readonly InvCharacter[],
+  v: InvViewer,
+  sourceCharacterId: string,
+  holder: ItemHolder,
+  storesLabel: string,
+): TargetOption[] {
+  if (holder === null) return giveTargets(chars, v, sourceCharacterId);
+  return [{ key: storesItemKey(holder.strongholdId), label: storesLabel }];
 }
 
 /** A qty Input: whole number 1–9 999 and ≤ `held`, else why not. */
@@ -145,11 +230,23 @@ export function takePayload(
   qtyDraft: string,
 ): Parsed<MoveItemIntent> {
   if (!characterId) return { ok: false, message: "Pick a character" };
+  return holderTakePayload(item, null, characterKey(characterId), qtyDraft);
+}
+
+/** *(S9)* Take / Move… from a holder's row to a target key (`holderTakeTargets`). */
+export function holderTakePayload(
+  item: Pick<PartyItemRecord, "id" | "qty">,
+  holder: ItemHolder,
+  targetKey: string,
+  qtyDraft: string,
+): Parsed<MoveItemIntent> {
+  const to = endOf(targetKey);
+  if (!to) return { ok: false, message: "Pick where it goes" };
   const q = qtyOf(qtyDraft, item.qty);
   if (!q.ok) return q;
   return parsed(MoveItemIntent, {
-    from: { kind: "party" },
-    to: { kind: "character", characterId },
+    from: holderEnd(holder),
+    to,
     qty: q.value,
     itemId: item.id,
   });
@@ -178,6 +275,8 @@ export interface ItemDraft {
   name: string;
   qty: string;
   notes: string;
+  /** *(S9)* Stores rows only (OQ-HOLD-12 A, FR-LOOT-36). */
+  dmOnly?: boolean;
 }
 export const EMPTY_ITEM: ItemDraft = { name: "", qty: "1", notes: "" };
 
@@ -189,26 +288,45 @@ function itemFields(d: ItemDraft): Parsed<{ name: string; qty: number; notes: st
   return r.success ? { ok: true, value: payload } : { ok: false, message: firstIssue(r.error) };
 }
 
-/** FR-PARTY-24 DM Add form (FR-PARTY-18 mirrored). */
-export const addPayload = (d: ItemDraft): Parsed<AddItemIntent> => itemFields(d);
+/**
+ * FR-PARTY-24 DM Add form (FR-PARTY-18 mirrored). *(S9)* Into a Stores: `holder` and `dmOnly`
+ * (DM Add to Stores, FR-LOOT-37).
+ */
+export function addPayload(d: ItemDraft, holder: ItemHolder = null): Parsed<AddItemIntent> {
+  const f = itemFields(d);
+  if (!f.ok || holder === null) return f;
+  return parsed(AddItemIntent, { ...f.value, holder, dmOnly: d.dmOnly === true });
+}
 
-export const editDraftOf = (i: Pick<PartyItemRecord, "name" | "qty" | "notes">): ItemDraft => ({
+export const editDraftOf = (
+  i: Pick<PartyItemRecord, "name" | "qty" | "notes" | "strongholdId" | "dmOnly">,
+): ItemDraft => ({
   name: i.name,
   qty: String(i.qty),
   notes: i.notes,
+  ...(i.strongholdId !== undefined ? { dmOnly: i.dmOnly === true } : {}),
 });
 
-/** FR-PARTY-20 Edit: the payload, and `unchanged` when it equals the row after cleaning. */
+/**
+ * FR-PARTY-20 Edit: the payload, and `unchanged` when it equals the row after cleaning. *(S9)*
+ * A Stores row also sends `dmOnly` (FR-LOOT-37; a party row never does).
+ */
 export function editPayload(
-  item: Pick<PartyItemRecord, "id" | "name" | "qty" | "notes">,
+  item: Pick<PartyItemRecord, "id" | "name" | "qty" | "notes" | "strongholdId" | "dmOnly">,
   d: ItemDraft,
 ): Parsed<EditItemIntent> & { unchanged: boolean } {
   const f = itemFields(d);
   if (!f.ok) return { ...f, unchanged: false };
+  const stores = item.strongholdId !== undefined;
+  const dmOnly = d.dmOnly === true;
   const clean = EditItemIntent.parse({ itemId: item.id, ...f.value });
   const unchanged =
-    clean.name === item.name && clean.qty === item.qty && clean.notes === item.notes;
-  return { ok: true, value: { itemId: item.id, ...f.value }, unchanged };
+    clean.name === item.name &&
+    clean.qty === item.qty &&
+    clean.notes === item.notes &&
+    (!stores || dmOnly === (item.dmOnly === true));
+  const value = stores ? { itemId: item.id, ...f.value, dmOnly } : { itemId: item.id, ...f.value };
+  return { ok: true, value, unchanged };
 }
 
 /** FR-PARTY-21 Remove (qty ≤ held). */

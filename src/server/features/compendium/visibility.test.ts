@@ -22,7 +22,7 @@ function expected(v: EntryViewer, kind: CompendiumKind, o: Origin): boolean {
 }
 
 describe("FR-CMP-14 entryVisibleTo", () => {
-  test("FR-CMP-14 entryVisibleTo matrix: DM / player × 5 kinds × imported / own shared / own hidden / other campaign", () => {
+  test("FR-CMP-14 entryVisibleTo matrix: DM / player × 6 kinds (sprint 9: `rule`) × imported / own shared / own hidden / other campaign", () => {
     const got: string[] = [];
     const want: string[] = [];
     for (const v of [DM, P1]) {
@@ -35,7 +35,7 @@ describe("FR-CMP-14 entryVisibleTo", () => {
       }
     }
     expect(got).toEqual(want);
-    expect(got).toHaveLength(2 * 5 * 4);
+    expect(got).toHaveLength(2 * 6 * 4);
   });
 
   test("FR-CMP-14 a player of another campaign never sees this campaign's shared homebrew", () => {

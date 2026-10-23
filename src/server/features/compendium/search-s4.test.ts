@@ -148,7 +148,7 @@ describe("compendium search S4 (C-search)", () => {
           "Fire Shield SRD",
           "Fire Elemental SRD",
         ],
-        136,
+        137, // sprint 9: + the rule card "Fire-Breathing Statue" (All matches rule names only)
       ],
       [
         "cure wound",
@@ -174,7 +174,8 @@ describe("compendium search S4 (C-search)", () => {
         ],
         24,
       ],
-      ["a", ["Aid SRD", "Ape SRD", "Azer SRD", "Alarm SRD", "Ankheg SRD", "Augury SRD"], 816],
+      // Sprint 9: rule card names count too (All: names only, FR-CMP-62): + 116 hits, "Attack".
+      ["a", ["Aid SRD", "Ape SRD", "Azer SRD", "Alarm SRD", "Ankheg SRD", "Attack SRD"], 932],
       ["zzqx", [], 0],
     ];
     for (const [q, first, n] of table) {

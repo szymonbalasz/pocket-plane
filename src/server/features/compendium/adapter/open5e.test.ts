@@ -47,6 +47,8 @@ describe("FR-CMP-05 adapter", () => {
       item: 237 + 37 + 18,
       condition: 15,
       feature: 202,
+      // FR-CMP-61: 161 headings in the 21 kept sections, less one heading without text.
+      rule: 160,
     });
     for (const r of result.records) expect(EntryDraft.safeParse(r.data).success).toBe(true);
     expect(new Set(result.records.map((r) => r.sourceKey)).size).toBe(result.records.length);

@@ -9,7 +9,7 @@ import { fitLauncher, launcherMetrics } from "../play-shell/launcher-fit";
 import { absorbEntries, defaultLayout, reduce } from "../play-shell/manager";
 import type { WindowRegistry } from "../play-shell/registry";
 import { REPLAY_SETS } from "../play-shell/replay";
-import { SIZE_TABLE } from "../play-shell/size-table";
+import { SIZE_TABLE, TEST_KINDS } from "../play-shell/size-table";
 import { PARTY_BOARD_KIND } from "./logic";
 import { tabKeyOf } from "./open-tab";
 import type { TabState } from "./seen";
@@ -102,13 +102,22 @@ export function summaryMigration(registry: WindowRegistry, you: You, tabs: TabSt
 }
 
 /**
- * FR-SHELL-161 (BL-80, reasoned drop): the narrowest viewport at which every launcher label shows
- * (labels measured as `Launcher.tsx`'s fallback, 7 px a character); below it icons + Tooltips,
- * then "⋯". Also whether every entry stays in the bar (icons) at 1280.
+ * Label width a character, px, for the threshold: the bar's 500 12 px font averages ≈ 5.8 (the SP2
+ * re-test measured the player bar at 1010 px at 1280×720; this model gives 1028, still on the safe
+ * side). `Launcher.tsx`'s no-canvas fallback (7 px) overstated it: the old 1294 px said "icons
+ * only at 1280" while the real bar showed every label.
+ */
+export const LABEL_PX_PER_CHAR = 6;
+
+/**
+ * FR-SHELL-161 (BL-80, reasoned drop): the narrowest viewport at which every product launcher
+ * label shows (test-mode windows left out, as on a real table; labels `LABEL_PX_PER_CHAR` a
+ * character); below it icons + Tooltips, then "⋯". Also whether every entry stays in the bar at
+ * 1280.
  */
 export function launcherThreshold(registry: WindowRegistry) {
   const entries = registry.defs
-    .filter((d) => d.launcher)
+    .filter((d) => d.launcher && !TEST_KINDS.has(d.kind))
     .sort((a, b) => (a.launcher?.order ?? 0) - (b.launcher?.order ?? 0));
   const labels = new Map(entries.map((d) => [d.kind, d.launcher?.label ?? ""]));
   const items = entries.map((d) => ({
@@ -116,7 +125,7 @@ export function launcherThreshold(registry: WindowRegistry) {
     order: d.launcher?.order ?? 0,
     state: "closed" as const,
   }));
-  const metrics = launcherMetrics(labels, (l) => l.length * 7 + 1);
+  const metrics = launcherMetrics(labels, (l) => Math.ceil(l.length * LABEL_PX_PER_CHAR) + 1);
   let labelsFrom = 4000;
   while (labelsFrom > 0 && !fitLauncher(items, labelsFrom - 1, metrics).compact) labelsFrom--;
   const at1280 = fitLauncher(items, 1280, metrics);

@@ -23,6 +23,12 @@ export interface SheetSection {
   kinds?: readonly SheetCreatureKind[];
   /** False → not rendered. */
   available?(store: RecordStore, creatureId: string): boolean;
+  /**
+   * Slot `tab` only: a count Badge on the tab label when > 0 (`charx-tab` `data-count`); null =
+   * none. `loaded(type)`: whether a lazy type is loaded this snapshot generation (FR-SYNC-35), so
+   * a count never shows rows merely present in the store (FR-CHARX-103).
+   */
+  count?(store: RecordStore, creatureId: string, loaded: (type: string) => boolean): number | null;
   component: ComponentType<{ creatureId: string; client: SheetClient }>;
 }
 
@@ -60,4 +66,24 @@ export function sectionsFor(sections: readonly SheetSection[], c: SectionContext
       }
     })
     .sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
+ * A tab section's count Badge value (FR-CHARX-100): `count` when > 0, else null. A throwing
+ * `count` shows no Badge (console warning), as `available`.
+ */
+export function sectionCount(
+  s: SheetSection,
+  store: RecordStore,
+  creatureId: string,
+  loaded: (type: string) => boolean,
+): number | null {
+  if (!s.count) return null;
+  try {
+    const n = s.count(store, creatureId, loaded);
+    return n !== null && n > 0 ? n : null;
+  } catch (err) {
+    console.warn(`sheet section ${s.id}: count() threw`, err);
+    return null;
+  }
 }

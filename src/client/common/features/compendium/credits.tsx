@@ -4,11 +4,14 @@
 // the imported sources on open: the first search page of each kind, then one entry per source
 // label for its attribution (read on demand, FR-CMP-23); entry-less definitions (GET would 404)
 // and homebrew are skipped. With nothing imported only the token art shows.
+
+import { BUNDLED_SOURCE_KEYS } from "@shared/compendium/match";
 import {
   HOMEBREW_LABEL,
   type SearchResponse,
   type SourceAttribution,
 } from "@shared/compendium/rest";
+import { RULES_CHANGE_NOTE } from "@shared/compendium/rules";
 import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
 import { CREATURE_TYPES } from "@shared/entities/schemas";
 import { InfoIcon } from "lucide-react";
@@ -104,6 +107,11 @@ function SourceSection({ source }: { source: SourceAttribution }) {
         {source.attribution}
       </p>
       {source.url && <p className="break-all text-xs text-muted-foreground">{source.url}</p>}
+      {(BUNDLED_SOURCE_KEYS as readonly string[]).includes(source.key) && (
+        <p className="text-xs text-muted-foreground" data-testid="cmp-about-rules">
+          {RULES_CHANGE_NOTE}
+        </p>
+      )}
     </section>
   );
 }

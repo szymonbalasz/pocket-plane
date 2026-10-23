@@ -6,6 +6,7 @@ import {
   type EntryDraft,
   entryNameKey,
   HOMEBREW_TEXT_MAX,
+  HOUSE_RULES_CHAPTER,
   isReadOnlyEntry,
 } from "@shared/compendium/schemas";
 import { CompendiumEntryDeleted, CompendiumEntrySaved } from "@shared/events/compendium";
@@ -70,13 +71,21 @@ function requireImages(env: CommandEnv, cid: string, ids: readonly string[]): vo
   }
 }
 
+/** FR-CMP-67: a homebrew `rule` is a house rule: chapter "House rules", order 0. */
+function asHouseRule(d: EntryDraft): EntryDraft {
+  return d.kind === "rule"
+    ? { ...d, facets: { ...d.facets, chapter: HOUSE_RULES_CHAPTER, order: 0 } }
+    : d;
+}
+
 export const putEntry = defineCommand({
   name: PUT_ENTRY,
   input: PutEntryInput,
-  execute({ id, entry: d, shared, derivedFromId, imageAssetIds }, env): { entryId: string } {
+  execute({ id, entry, shared, derivedFromId, imageAssetIds }, env): { entryId: string } {
     const { tx, ctx } = env;
     const cid = campaignOf(env);
-    checkDraft(d);
+    checkDraft(entry);
+    const d = asHouseRule(entry);
     if (derivedFromId !== null && !visibleToDm(cid, derivedFromId, env)) {
       throw notFound("Base entry not found");
     }
