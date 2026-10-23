@@ -10,7 +10,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | walkthrough 9/10 (M9 Game log stays squeezed) → fixing | re-test M7-M9, M12 |
+| PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | M9 fixed (c4c04bfa; check 5241, e2e 207) | test-pm1b re-test running |
 | PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | party-board part done (4 commits); waits for PM1 to merge for shared rows | walkthrough M0-M2, M11, M13 |
 | RS0 reminders + strongholds core | merged `fb3884a3` | — | done (walkthrough 23/23; evidence lost at cleanup) | main gates green (check 5214 / e2e 206) |
 | SP3 session recap | `build/sp-recap` (ws w9Z) | build-sp3 | server + window + share done; waits PM1 (window rows), SP1 (commands), FX1 (stats edits) | part-1 walkthrough 7/7 (server); part 2 after PM1 + SP1 + FX1 |
