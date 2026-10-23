@@ -8,7 +8,7 @@ import type { EntrySummary } from "@shared/compendium/rest";
 import type { RuleCardBody, RulesIndexResponse } from "@shared/compendium/rules";
 import { HOUSE_PAGE_ID, PINNED_PAGE_ID } from "@shared/compendium/rules-pages";
 import { ArrowLeftIcon, ChevronDownIcon, ChevronRightIcon, StarIcon } from "lucide-react";
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Api } from "../../../api";
 import { Button } from "../../../components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../../components/ui/menus";
@@ -25,10 +25,11 @@ import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { cn } from "../../../lib/utils";
 import { useSync } from "../../../sync/store";
 import { AboutDialog } from "../credits";
-import { MarkdownLite } from "../MarkdownLite";
+import { MarkdownLite, type OnRef } from "../MarkdownLite";
 import {
   fetchRuleCard,
   type RulesRead,
+  resolveRuleRef,
   useRuleCards,
   useRuleSearch,
   useRulesIndex,
@@ -44,11 +45,13 @@ import {
 } from "./logic";
 import {
   clearSingle,
+  landScrollTop,
   placeTarget,
   scrolled,
   setCardOpen,
   setRulesPage,
   setRulesQuery,
+  targetCard,
   useRulesNav,
 } from "./nav";
 import { rulesPins, usePins } from "./pins";
@@ -59,6 +62,15 @@ export interface CardCtx {
   pins: readonly string[];
   /** Where the card sits: a page id, `search` or `card` (its open state is kept per place). */
   where: string;
+  /** BL-102: an `srd:` reference in a card's text opens its card here. */
+  onRef?: OnRef;
+}
+
+/** BL-102: open the card an `srd:` reference names; none (or offline) → search its words. */
+export async function followRuleRef(api: Api, slug: string) {
+  const id = await resolveRuleRef(api, slug).catch(() => null);
+  if (id === null) setRulesQuery(slug.replaceAll("-", " "));
+  else targetCard(id);
 }
 
 function PinButton({ id, ctx }: { id: string; ctx: CardCtx }) {
@@ -95,21 +107,66 @@ function CardSource({ card, viewer }: { card: RuleCardBody; viewer: RulesRole })
   );
 }
 
-function CardBody({ card, viewer }: { card: RuleCardBody; viewer: RulesRole }) {
+function CardBody({ card, ctx }: { card: RuleCardBody; ctx: CardCtx }) {
   return (
     <div className="space-y-1.5 px-2 pb-2 text-sm">
-      <MarkdownLite text={card.text} context={{ kind: "plain", label: card.name }} />
-      <CardSource card={card} viewer={viewer} />
+      <MarkdownLite
+        text={card.text}
+        context={{ kind: "plain", label: card.name }}
+        onRef={ctx.onRef}
+      />
+      <CardSource card={card} viewer={ctx.viewer} />
     </div>
   );
 }
 
-/** A collapsible card; `body` renders only while open (a search result loads its text then). */
+/** Frames a landing re-applies itself (late layout: the window placed, text laid out). */
+const LAND_FRAMES = 6;
+
+/**
+ * FR-CMP-69 (BL-98): put a placed card's heading at the top of the rules scroller, now and for a
+ * few frames after, then clear `scrollTo`. Only the scroller moves (no `scrollIntoView`: it would
+ * also scroll the window body and the page). Returns the cleanup.
+ */
+function landCard(el: HTMLElement): () => void {
+  const scroller = el.closest<HTMLElement>('[data-testid="cmp-rules-scroll"]');
+  const align = () => {
+    if (!scroller) return;
+    const r = scroller.getBoundingClientRect();
+    scroller.scrollTop = landScrollTop(
+      {
+        top: r.top,
+        scrollTop: scroller.scrollTop,
+        scrollHeight: scroller.scrollHeight,
+        clientHeight: scroller.clientHeight,
+      },
+      el.getBoundingClientRect().top,
+    );
+  };
+  align();
+  if (typeof requestAnimationFrame === "undefined") {
+    scrolled();
+    return () => {};
+  }
+  let frames = 0;
+  let raf = requestAnimationFrame(function again() {
+    align();
+    if (++frames < LAND_FRAMES) raf = requestAnimationFrame(again);
+    else scrolled();
+  });
+  return () => cancelAnimationFrame(raf);
+}
+
+/**
+ * A collapsible card; `body` renders only while open (a search result loads its text then). The
+ * card an `openRules` placed lands itself once it renders (its page's cards may arrive later).
+ */
 function CardShell({
   id,
   name,
   section,
   house,
+  dmOnly = false,
   ctx,
   body,
 }: {
@@ -117,12 +174,20 @@ function CardShell({
   name: string;
   section: string;
   house: boolean;
+  /** BL-104: the DM's unshared house rule, marked while collapsed too. */
+  dmOnly?: boolean;
   ctx: CardCtx;
   body: () => ReactNode;
 }) {
   const open = useRulesNav((s) => (s.open[ctx.where] ?? []).includes(id));
+  const land = useRulesNav((s) => s.scrollTo === id);
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (land && ref.current) return landCard(ref.current);
+  }, [land]);
   return (
     <Collapsible
+      ref={ref}
       open={open}
       onOpenChange={(o) => setCardOpen(ctx.where, id, o)}
       className="rounded-md border"
@@ -142,7 +207,18 @@ function CardShell({
               <ChevronRightIcon className="size-3.5 shrink-0" />
             )}
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{name}</span>
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-sm font-medium">{name}</span>
+                {dmOnly && (
+                  <Badge
+                    variant="secondary"
+                    className="shrink-0 px-1.5 py-0 text-[10px]"
+                    data-testid="cmp-rules-dm-only"
+                  >
+                    DM only
+                  </Badge>
+                )}
+              </span>
               <span className="block truncate text-xs text-muted-foreground">
                 {house && section === "" ? "House rule" : section}
               </span>
@@ -163,13 +239,14 @@ export function RuleCard({ card, ctx }: { card: RuleCardBody; ctx: CardCtx }) {
       name={card.name}
       section={card.section}
       house={card.house}
+      dmOnly={ctx.viewer === "dm" && card.house && !card.shared}
       ctx={ctx}
-      body={() => <CardBody card={card} viewer={ctx.viewer} />}
+      body={() => <CardBody card={card} ctx={ctx} />}
     />
   );
 }
 
-function LoadedText({ api, id, viewer }: { api: Api; id: string; viewer: RulesRole }) {
+function LoadedText({ api, id, ctx }: { api: Api; id: string; ctx: CardCtx }) {
   const [card, setCard] = useState<RuleCardBody | "error" | null>(null);
   useEffect(() => {
     let live = true;
@@ -185,7 +262,7 @@ function LoadedText({ api, id, viewer }: { api: Api; id: string; viewer: RulesRo
   if (card === "error") {
     return <p className="px-2 pb-2 text-xs text-muted-foreground">Couldn't load this card</p>;
   }
-  return <CardBody card={card} viewer={viewer} />;
+  return <CardBody card={card} ctx={ctx} />;
 }
 
 function ResultCard({ api, r, ctx }: { api: Api; r: EntrySummary; ctx: CardCtx }) {
@@ -196,7 +273,7 @@ function ResultCard({ api, r, ctx }: { api: Api; r: EntrySummary; ctx: CardCtx }
       section={r.kind === "condition" ? "Conditions" : r.line}
       house={r.sourceLabel === "Homebrew"}
       ctx={ctx}
-      body={() => <LoadedText api={api} id={r.id} viewer={ctx.viewer} />}
+      body={() => <LoadedText api={api} id={r.id} ctx={ctx} />}
     />
   );
 }
@@ -464,7 +541,6 @@ export function RulesBody({
   const q = useRulesNav((s) => s.q);
   const target = useRulesNav((s) => s.target);
   const single = useRulesNav((s) => s.single);
-  const scrollTo = useRulesNav((s) => s.scrollTo);
   const nonce = useRulesNav((s) => s.nonce);
   const campaignId = useSync((s) => s.store.you?.campaignId ?? null);
   const pins = usePins(campaignId);
@@ -477,20 +553,10 @@ export function RulesBody({
     placeTarget(target, pageOfCard(index.data, target));
   }, [target, index]);
 
-  // …and scroll it into view once its page has rendered it.
-  useLayoutEffect(() => {
-    if (scrollTo === null || !root.current) return;
-    const el = root.current.querySelector(
-      `[data-testid="cmp-rules-card"][data-record-id="${CSS.escape(scrollTo)}"]`,
-    );
-    if (!el) return;
-    el.scrollIntoView?.({ block: "nearest" });
-    scrolled();
-  });
-
   const searching = q.trim() !== "";
   const where = searching ? "search" : single !== null ? "card" : page;
-  const ctx: CardCtx = { viewer, campaignId, pins, where };
+  const onRef = useCallback((slug: string) => void followRuleRef(api, slug), [api]);
+  const ctx: CardCtx = { viewer, campaignId, pins, where, onRef };
   const attribution = index.state === "ready" ? index.data.attribution : null;
   return (
     <div
@@ -511,7 +577,10 @@ export function RulesBody({
           onChange={(e) => setRulesQuery(e.target.value)}
         />
       </div>
-      <div className="mt-1.5 min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div
+        className="mt-1.5 min-h-0 flex-1 overflow-y-auto px-2 pb-2"
+        data-testid="cmp-rules-scroll"
+      >
         {searching ? (
           <SearchView api={api} q={q} ctx={ctx} />
         ) : single !== null ? (

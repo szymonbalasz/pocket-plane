@@ -10,6 +10,7 @@ import {
   RulesIndexResponse,
   RulesPageResponse,
 } from "@shared/compendium/rules";
+import { fold } from "@shared/search/match";
 import { useEffect, useState } from "react";
 import { type Api, ApiError, call } from "../../../api";
 import { fetchEntry } from "../fetch";
@@ -151,4 +152,19 @@ export function useRuleSearch(api: Api, q: string) {
     };
   }, [api, text, retries]);
   return read;
+}
+
+/**
+ * BL-102: the entry an Open5e `srd:<slug>` reference names: a condition, else a rule card, whose
+ * name folds to the slug's words (the viewer's visibility, FR-CMP-14); null = none.
+ */
+export async function resolveRuleRef(api: Api, slug: string): Promise<string | null> {
+  const words = slug.replaceAll("-", " ");
+  const source = eagerApi(api);
+  for (const kind of ["condition", "rule"] as const) {
+    const page = await searchCompendium(source, { q: words, kind });
+    const hit = page.results.find((r) => fold(r.name) === fold(words));
+    if (hit) return hit.id;
+  }
+  return null;
 }
