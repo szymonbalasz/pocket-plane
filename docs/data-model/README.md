@@ -2518,3 +2518,21 @@ From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DIC
 - **Fixtures:** no new unit; bundle `fx-dice-e2e` (= `gems-reroll-e2e`, `e2e/fx-dice.e2e.ts`). `session-sim-13` lines: none needed (the walkthrough runs on `session-sim-12`).
 - **Persisted runtime state:** none.
 - **CON-44:** 0 B (no new record or field; a reroll line's items are as many or fewer than before).
+
+## 121. Sprint 9: rules quick reference (SP2)
+
+From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#338, #339). **Built by `build/sp-rules`**: no new table, column or record type. Protocol side: [protocol §152](../protocol/README.md#152-sprint-9-rules-quick-reference-sp2).
+
+| Field / store | Change | Rule | Source |
+|---|---|---|---|
+| `compendium_entry.kind` | + `rule` | text enum with no CHECK: `drizzle-kit push` changes nothing (schema test) | FR-CMP-59 |
+| `rule` facets / body | `{chapter, section, order}` / `{text}` | chapter ≤ 40 (Open5e `parent`; homebrew "House rules"), section ≤ 60 (homebrew free text, may be empty), order 0–999 (card position; homebrew 0); text markdown-lite; entry ≤ 32 KB; `sourceKey` `rule/<section-slug>/<card-slug>` | FR-CMP-59, -61, -67 |
+| `compendium_source.counts` | + `rule` | a source imported before sprint 9 has no `rule` count (read as a partial record) | FR-CMP-59 |
+| Bundled `srd-5.1` | + `sections.json` | 21 `wotc-srd` sections (`RULES_SECTIONS` + `RULES_EXTRA`) → 160 cards; `version` changes (new file + `ADAPTER_VERSION` 4) | FR-CMP-60 |
+| Pins *(browser `localStorage`)* | `pp.rules.pins.v1.<campaignId>` | JSON array ≤ 30 entry ids, oldest dropped past 30, unknown / 404 ids dropped; never sent | FR-CMP-66 |
+| Open cards, page, search *(client memory)* | per page load | which cards are open per page, the shown page, the search text, an `openRules` target | FR-CMP-66, -69 |
+
+- **Derived:** pages (`@shared/compendium/rules-pages.ts`, code), the page index and page bodies (REST, per request: the best-ranked visible entry per page key), the rules ETag (source version, role, homebrew-rule version `count:newest updatedAt`, body hash).
+- **Fixtures:** `cmp-rules-mini`, `cmp-rule-house`; bundles `sp-rules`, `sp-rules-e2e`; `session-sim-13` + `cmp-rules-mini`.
+- **Persisted runtime state:** rule rows (imported: global; house rules: per campaign) in `compendium_entry`.
+- **CON-44:** 0 B.
