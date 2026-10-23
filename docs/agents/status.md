@@ -4,7 +4,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 **Phase:** Sprint 9 done (#338–#340); recap done, **sprint 10 planned (#341): hardening run, overnight, no gate unless blocking** ([sprint-10](sprint-10.md)). Briefs ready: `%TEMP%/pocket-plane/briefs/build-h{1,2,3,4}.md` (slice defs `h1`–`h4` in `slices.json`); inputs `.verify/sprint10/{seams,rulings-a,rulings-b,gate}.md`. All four builders started 2026-10-24 (sim-13 evidence copied into each worktree).
 
-**Gates on `main`:** run in a detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, then `bun install`, `bun run env:init`, `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there. Removed at the end of sprint 9; recreate it at the first merge of sprint 10.
+**Gates on `main`:** run in a detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, then `bun install`, `bun run env:init`, `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there. Sprint 10: `~/.herdr/worktrees/pocket-plane/gates-main` (slot 5). Baseline `main` d4a5027e: check 5530 pass, e2e 225 passed.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
