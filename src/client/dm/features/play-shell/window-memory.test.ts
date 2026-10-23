@@ -198,7 +198,7 @@ test.failing("FR-SHELL-159 Game log grows back (BL-87, walkthrough M9): DM 1440Ã
     p.c.dispatch({ type: "open", kind: cause }, all);
     expect(p.log()).toEqual(SQUEEZED);
     const stored = JSON.parse(p.backend.get("k") ?? "{}") as {
-      windows: Rect[] & { kind: string }[];
+      windows: (Rect & { kind: string })[];
     };
     const entry = stored.windows.find((w) => w.kind === "dice.log");
     expect(entry && rectOf(entry)).toEqual(ZONE);
