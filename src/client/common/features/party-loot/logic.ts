@@ -2,7 +2,7 @@
 // rows, form drafts → intent payloads (FR-LOOT-02/06/07, FR-PARTY-26 mirrored with the shared zod
 // schemas), Move form options, item-row text, the Split… dialog. No React.
 import type { CreatureSheetRecord } from "@shared/character-sheet/sheet";
-import { itemRowText, splitPreview, storesLabel } from "@shared/party-board/format";
+import { endLabel, splitPreview, storesLabel } from "@shared/party-board/format";
 import { LootSplitIntent } from "@shared/party-board/schemas";
 import { splitCoins } from "@shared/party-board/split";
 import {
@@ -163,6 +163,8 @@ export function endpointLabel(
 export interface MoveOption {
   key: EndpointKey;
   label: string;
+  /** *(S9)* A DM-only stronghold's Stores (the DM's eye-off, FR-LOOT-34). */
+  hidden?: true;
 }
 
 export interface MoveViewer {
@@ -170,46 +172,122 @@ export interface MoveViewer {
   playerId: string | null;
 }
 
-const charOption = (c: CharacterRef): MoveOption => ({ key: `char:${c.id}`, label: c.name });
-const PARTY: MoveOption = { key: "party", label: PARTY_LABEL };
-const WORLD: MoveOption = { key: "world", label: WORLD_LABEL };
+/** *(S9)* A Stores the viewer may use (FR-LOOT-34): `stronghold-index` rows (DM all, players shown). */
+export interface StoresRef {
+  id: string;
+  name: string;
+  hidden: boolean;
+}
 
-/** "From" options: DM = pot, every character, outside; player = own characters + pot. */
-export function fromOptions(chars: readonly CharacterRef[], v: MoveViewer): MoveOption[] {
-  if (v.role === "dm") return [PARTY, ...sortCharacters(chars, null).map(charOption), WORLD];
-  const own = sortCharacters(chars, v.playerId).filter((c) => c.ownerPlayerId === v.playerId);
-  return [...own.map(charOption), PARTY];
+/** `stronghold-index` rows → Stores refs by name (DM-only ones flagged for the DM's eye-off). */
+export function storesRefs(
+  index: readonly { id: string; name: string; dmOnly?: true }[],
+): StoresRef[] {
+  return [...index]
+    .map((r) => ({ id: r.id, name: r.name, hidden: r.dmOnly === true }))
+    .sort((a, b) => a.name.localeCompare(b.name) || (a.id < b.id ? -1 : 1));
 }
 
 /**
- * "To" options for a "From". DM: every other end, `world` only opposite a character.
- * Player: own character → pot + other characters; pot → own characters only.
+ * *(S9)* What the Move form offers beyond the pot and characters (FR-LOOT-34): the Stores; and a
+ * `preset` Stores (the Stronghold window's "Move to party", FR-HOLD-28): only pairs with that
+ * Stores at one end, the Stores first in From.
  */
+export interface MoveScope {
+  stores: readonly StoresRef[];
+  preset?: EndpointKey;
+}
+const NO_SCOPE: MoveScope = { stores: [] };
+
+export const storesKey = (strongholdId: string): EndpointKey => `stores:${strongholdId}`;
+
+const charOption = (c: CharacterRef): MoveOption => ({ key: `char:${c.id}`, label: c.name });
+const storesOption = (s: StoresRef): MoveOption =>
+  s.hidden
+    ? { key: storesKey(s.id), label: storesLabel(s.name), hidden: true }
+    : { key: storesKey(s.id), label: storesLabel(s.name) };
+const PARTY: MoveOption = { key: "party", label: PARTY_LABEL };
+const WORLD: MoveOption = { key: "world", label: WORLD_LABEL };
+
+/** DM = pot, every character, Stores, outside; player = own characters + pot + Stores. */
+function allFrom(chars: readonly CharacterRef[], v: MoveViewer, scope: MoveScope): MoveOption[] {
+  const stores = scope.stores.map(storesOption);
+  if (v.role === "dm")
+    return [PARTY, ...sortCharacters(chars, null).map(charOption), ...stores, WORLD];
+  const own = sortCharacters(chars, v.playerId).filter((c) => c.ownerPlayerId === v.playerId);
+  return [...own.map(charOption), PARTY, ...stores];
+}
+
+/**
+ * DM: every other end, `world` only opposite a character or a Stores (FR-LOOT-30). Player
+ * (FR-LOOT-07, -33): own character → pot, other characters, Stores; pot → own characters, Stores;
+ * Stores → pot, own characters.
+ */
+function allTo(
+  chars: readonly CharacterRef[],
+  v: MoveViewer,
+  from: EndpointKey,
+  scope: MoveScope,
+): MoveOption[] {
+  const sorted = sortCharacters(chars, v.role === "dm" ? null : v.playerId);
+  const stores = scope.stores.map(storesOption);
+  const pairsWithWorld = (k: EndpointKey) => k.startsWith("char:") || k.startsWith("stores:");
+  if (v.role === "dm") {
+    const all = [
+      PARTY,
+      ...sorted.map(charOption),
+      ...stores,
+      ...(pairsWithWorld(from) ? [WORLD] : []),
+    ];
+    return all.filter((o) => o.key !== from && (from !== "world" || pairsWithWorld(o.key)));
+  }
+  const own = sorted.filter((c) => c.ownerPlayerId === v.playerId).map(charOption);
+  if (from === "party") return [...own, ...stores];
+  if (from.startsWith("stores:")) return [PARTY, ...own];
+  return [PARTY, ...sorted.map(charOption).filter((o) => o.key !== from), ...stores];
+}
+
+/** "From" options (FR-LOOT-18; *(S9)* Stores per FR-LOOT-34, a preset's pairs only). */
+export function fromOptions(
+  chars: readonly CharacterRef[],
+  v: MoveViewer,
+  scope: MoveScope = NO_SCOPE,
+): MoveOption[] {
+  const all = allFrom(chars, v, scope);
+  const p = scope.preset;
+  if (p === undefined) return all;
+  const others = all.filter(
+    (o) => o.key !== p && allTo(chars, v, o.key, scope).some((t) => t.key === p),
+  );
+  return [...all.filter((o) => o.key === p), ...others];
+}
+
+/** "To" options for a "From" (FR-LOOT-18; *(S9)* FR-LOOT-33, -34). */
 export function toOptions(
   chars: readonly CharacterRef[],
   v: MoveViewer,
   from: EndpointKey,
+  scope: MoveScope = NO_SCOPE,
 ): MoveOption[] {
-  const sorted = sortCharacters(chars, v.role === "dm" ? null : v.playerId);
-  const fromIsChar = from.startsWith("char:");
-  if (v.role === "dm") {
-    const all = [PARTY, ...sorted.map(charOption), ...(fromIsChar ? [WORLD] : [])];
-    return all.filter((o) => o.key !== from && (from !== "world" || o.key.startsWith("char:")));
-  }
-  if (from === "party") {
-    return sorted.filter((c) => c.ownerPlayerId === v.playerId).map(charOption);
-  }
-  return [PARTY, ...sorted.map(charOption).filter((o) => o.key !== from)];
+  const all = allTo(chars, v, from, scope);
+  const p = scope.preset;
+  return p === undefined || from === p ? all : all.filter((o) => o.key === p);
 }
 
-/** Some From → To pair exists (none in a campaign without characters: every move has one). */
-export function canMove(chars: readonly CharacterRef[], v: MoveViewer): boolean {
-  return fromOptions(chars, v).some((o) => toOptions(chars, v, o.key).length > 0);
+/** Some From → To pair exists (none in a campaign without characters or Stores). */
+export function canMove(
+  chars: readonly CharacterRef[],
+  v: MoveViewer,
+  scope: MoveScope = NO_SCOPE,
+): boolean {
+  return fromOptions(chars, v, scope).some((o) => toOptions(chars, v, o.key, scope).length > 0);
 }
 
 export const NO_MOVE_TEXT = "No characters to move coin to/from";
+/** *(S9)* The Stores tab's Move form title (FR-LOOT-34). */
+export const MOVE_TO_PARTY = "Move to party";
 
-/** FR-LOOT-18: the move's payload, valid per FR-LOOT-06/07, or why not. */
+/** FR-LOOT-18: the move's payload, valid per FR-LOOT-06/07 (*(S9)* -30, -33), or why not. */
 export function movePayload(
   chars: readonly CharacterRef[],
   v: MoveViewer,
@@ -217,11 +295,12 @@ export function movePayload(
   to: EndpointKey,
   text: string,
   draft: CoinDraft,
+  scope: MoveScope = NO_SCOPE,
 ): Parsed<LootMoveIntent> {
-  if (!fromOptions(chars, v).some((o) => o.key === from)) {
+  if (!fromOptions(chars, v, scope).some((o) => o.key === from)) {
     return { ok: false, message: "Pick where the coin comes from" };
   }
-  if (!toOptions(chars, v, from).some((o) => o.key === to)) {
+  if (!toOptions(chars, v, from, scope).some((o) => o.key === to)) {
     return { ok: false, message: "Pick where the coin goes" };
   }
   const coins = coinsOf(draft, false);
@@ -273,12 +352,19 @@ export function editedSuffix(
 
 // ---- Item rows (FR-PARTY-25) ----
 
-/** An item row's line: "‹from› → ‹to›: ‹name› ×‹qty›" ("Party", "Outside the party"). */
+/**
+ * An item row's line: "‹from› → ‹to›: ‹name› ×‹qty›" ("Party", "Outside the party"; *(S9)*
+ * "‹Stronghold› Stores", or "Stores (removed)" without an index row, FR-LOOT-35).
+ */
 export function itemLine(
   entry: LootEntryRecord & { qty: number },
   nameOf: (id: string) => string | undefined,
+  strongholdName: (id: string) => string | undefined = () => undefined,
 ): string {
-  return itemRowText(entry, (id) => nameOf(id) ?? "Unknown character");
+  const character = (id: string) => nameOf(id) ?? "Unknown character";
+  const from = endLabel(entry.from, character, strongholdName);
+  const to = endLabel(entry.to, character, strongholdName);
+  return `${from} → ${to}: ${entry.text} ×${entry.qty}`;
 }
 
 // ---- Split… dialog (FR-PARTY-27) ----
