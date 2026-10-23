@@ -111,9 +111,10 @@ test("FR-DICEX-39 FR-DICEX-40 FR-DICEX-41 a sheet roll pops on every client in i
   const popup2 = popupOf(p2, entryId);
   // A slow software-GL device's "3D was slow" toast lifts the stack after the throw has gone and
   // drops it again when it leaves; the 98 px card (FR-DICEX-47) can slide from under a still
-  // pointer, so the pointer follows the card for the whole wait.
-  for (let t = 0; t < 6_500; t += 500) {
-    await popup2.hover();
+  // pointer, so the pointer follows the card for the whole wait. FR-DICEX-94: a held popup is
+  // one the pointer moves on, so each step moves it a little (a resting pointer doesn't hold).
+  for (let t = 0, i = 0; t < 6_500; t += 500, i++) {
+    await popup2.hover({ position: { x: 40 + (i % 2) * 6, y: 30 } });
     await p2.waitForTimeout(500);
   }
   await expect(popup2).toHaveAttribute("data-state", "rest");
