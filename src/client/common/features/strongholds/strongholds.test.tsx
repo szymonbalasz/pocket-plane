@@ -42,7 +42,7 @@ import {
   orderSuggestions,
   reminderGroups,
   reminderPrefill,
-  removeFacilityText,
+  removeFacilityBody,
   replacedBy,
   sameDraft,
   staffByFacility,
@@ -490,11 +490,12 @@ describe("Pure rules (FR-HOLD-17, -19, -25, -26, -27, -29, -31, -32, -33)", () =
   });
 
   test("FR-HOLD-17 FR-HOLD-19 confirm texts name the reminders and the Stores, including a negative balance", () => {
-    expect(removeFacilityText("Steam Rooms", 1)).toBe(
-      "Remove Steam Rooms? Its 1 reminder is removed too.",
+    expect(removeFacilityBody(1, 0)).toBe(
+      "It leaves the Facilities list; its 1 reminder is removed too.",
     );
-    expect(removeFacilityText("Map Room", 0)).toBe("Remove Map Room?");
-    expect(removeFacilityText("X", 2)).toBe("Remove X? Its 2 reminders are removed too.");
+    expect(removeFacilityBody(2, 0)).toBe(
+      "It leaves the Facilities list; its 2 reminders are removed too.",
+    );
     const zero = { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
     expect(deleteText("Greystone Keep", 3, 2, { ...zero, gp: 120 })).toBe(
       "Delete Greystone Keep? 3 reminders are removed; its Stores (2 items, 120 gp) move to the party.",
@@ -677,5 +678,23 @@ describe("Window registration and memory (FR-SHELL-170–172, FR-HOLD-23)", () =
     third.bind(holdKey(DM));
     expect(third.state.getState()).toMatchObject({ strongholdId: null, tab: "facilities" });
     expect(warnings.length).toBe(1);
+  });
+});
+
+describe("Sprint 10 H4 (BL-104)", () => {
+  test("FR-HOLD-17 BL-104 the remove-facility confirm's body doesn't repeat its title: what leaves, the reminders removed, the staff kept", () => {
+    const title = "Remove Steam Rooms?";
+    const body = removeFacilityBody(1, 0);
+    expect(body).not.toContain(title);
+    expect(body).toBe("It leaves the Facilities list; its 1 reminder is removed too.");
+    expect(removeFacilityBody(0, 0)).toBe(
+      "It leaves the Facilities list; no reminders are linked to it.",
+    );
+    expect(removeFacilityBody(2, 1)).toBe(
+      "It leaves the Facilities list; its 2 reminders are removed too; 1 staff member who works there stays, unassigned.",
+    );
+    expect(removeFacilityBody(0, 3)).toBe(
+      "It leaves the Facilities list; no reminders are linked to it; 3 staff who work there stay, unassigned.",
+    );
   });
 });

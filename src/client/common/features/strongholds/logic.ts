@@ -136,11 +136,20 @@ export function orderSuggestions(records: readonly Pick<StrongholdView, "facilit
 
 const reminders = (n: number) => (n === 1 ? "1 reminder is" : `${n} reminders are`);
 
-/** FR-HOLD-17: "Remove Steam Rooms? Its 1 reminder is removed too." */
-export function removeFacilityText(name: string, reminderCount: number): string {
-  return reminderCount === 0
-    ? `Remove ${name}?`
-    : `Remove ${name}? Its ${reminders(reminderCount)} removed too.`;
+/**
+ * FR-HOLD-17's confirm body under its "Remove ‹name›?" title (BL-104: not the title again): it
+ * leaves the list, its linked reminders go, the staff who work there stay with no facility.
+ */
+export function removeFacilityBody(reminderCount: number, staffCount: number): string {
+  const parts = [
+    "It leaves the Facilities list",
+    reminderCount === 0
+      ? "no reminders are linked to it"
+      : `its ${reminders(reminderCount)} removed too`,
+  ];
+  if (staffCount === 1) parts.push("1 staff member who works there stays, unassigned");
+  else if (staffCount > 1) parts.push(`${staffCount} staff who work there stay, unassigned`);
+  return `${parts.join("; ")}.`;
 }
 
 /**
