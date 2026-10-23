@@ -5,7 +5,9 @@
 // throw rests on the server's face first (or shows flat chips without WebGL). At 1280×800 the
 // popup covers no window (toast keep-out, A11). Hover keeps it; a click fronts the Game log at the
 // entry, highlighted for 2 s with no page error. The DM's hidden roll pops only on the DM's side,
-// eye-off, never big; players get nothing.
+// eye-off, never big; players get nothing. BL-95 (sprint 10): each client's popup is held by focus
+// (FR-DICEX-94) as soon as it shows, so a loaded run's slow checks never outlive its 6 s, and a
+// stack that lifts under a following pointer can't drop it.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -24,6 +26,13 @@ const hasWebgl = (page: Page) =>
 
 const popupOf = (page: Page, entryId: string) =>
   page.locator(`[data-testid="dicex-popup"][data-record-id="${entryId}"]`);
+
+/**
+ * FR-DICEX-94: focus inside a popup holds it past its 6 s until the focus leaves; unlike a
+ * hovering pointer it survives the stack moving (BL-95).
+ */
+const hold = (page: Page, entryId: string) =>
+  popupOf(page, entryId).getByTestId("dicex-popup-close").focus();
 
 test("FR-DICEX-39 FR-DICEX-40 FR-DICEX-41 a sheet roll pops on every client in its toast region with the same dice; clear of windows at 1280×800; click → Game log", async ({
   browser,
@@ -52,7 +61,11 @@ test("FR-DICEX-39 FR-DICEX-40 FR-DICEX-41 a sheet roll pops on every client in i
   const first = p2.locator('[data-testid="dicex-popup"][data-record-id]');
   await expect(first).toHaveCount(1);
   const entryId = (await first.getAttribute("data-record-id")) as string;
+  await hold(p2, entryId);
+  await hold(p1, entryId);
+  // The DM's launcher click comes first: it moves the DM's focus, so the hold follows it.
   const log = await openWindow(dm, "dice.log");
+  await hold(dm, entryId);
   await expect(
     log.locator(`[data-testid="dice-log-entry"][data-record-id="${entryId}"]`),
   ).toContainText("Athletics");
@@ -107,16 +120,11 @@ test("FR-DICEX-39 FR-DICEX-40 FR-DICEX-41 a sheet roll pops on every client in i
   }, entryId);
   expect(overlaps).toEqual([]);
 
-  // Hover keeps it past its 6 s; a click fronts the Game log at the entry, highlighted.
+  // Held (focus, since it showed) it stays past its 6 s; a click fronts the Game log at the entry,
+  // highlighted. (A pointer hold is FR-DICEX-94's unit test: a software-GL "3D was slow" toast
+  // can lift the stack from under a hovering pointer, BL-95.)
   const popup2 = popupOf(p2, entryId);
-  // A slow software-GL device's "3D was slow" toast lifts the stack after the throw has gone and
-  // drops it again when it leaves; the 98 px card (FR-DICEX-47) can slide from under a still
-  // pointer, so the pointer follows the card for the whole wait. FR-DICEX-94: a held popup is
-  // one the pointer moves on, so each step moves it a little (a resting pointer doesn't hold).
-  for (let t = 0, i = 0; t < 6_500; t += 500, i++) {
-    await popup2.hover({ position: { x: 40 + (i % 2) * 6, y: 30 } });
-    await p2.waitForTimeout(500);
-  }
+  await p2.waitForTimeout(6_500);
   await expect(popup2).toHaveAttribute("data-state", "rest");
   // Real timers: the highlight's native setTimeout must run unbound (FR-DICE-37, 2 s).
   const errors: string[] = [];
