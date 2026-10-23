@@ -2,7 +2,7 @@
 title: Play shell
 prefix: SHELL
 status: complete
-owner: spec-wf, spec-cb, spec-tt, spec-pm, spec-fx
+owner: spec-wf, spec-cb, spec-tt, spec-pm, spec-fx, spec-rs
 phase: post-mvp-9
 ---
 
@@ -115,6 +115,14 @@ Decided by the DM (#288, every bold pick): OQ-SHELL-47–50 all A (what moves, c
 | FR-SHELL-141 | Sizes: grows to its rows; default / useful / min per WF's table | CB3 | `FR-SHELL-140 party status registered` |
 | FR-SHELL-142 | No feature open; user opens only | CB3 | `FR-SHELL-140 party status registered` |
 | FR-SHELL-143 | Registry rows (sets P1 / P3 / D3, both goldens) filled in CB3's branch; launcher fits at 1280×720 | CB3 | WF's layout harness, `FR-SHELL-140 launcher fits` |
+
+> **Sprint 9 (track RS, reminders + strongholds, BL-73; owner spec-rs).** One new window, **Stronghold** (`hold.stronghold`, both clients, no launcher: opened from the Party Manager's Strongholds tab), for [strongholds](strongholds.md) FR-HOLD-23–34. It registers through the window registries (append) **after PM1 merges** (seams S2, S4; PM owns the frame, window memory and the Party Manager this sprint). New **FR-SHELL-170–172**. No frame, placer or keep-out file here. 0 B on the wire from SHELL. Seam [OQ-SHELL-85](#15-open-questions) closed by S2 + S4.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-SHELL-170 | Window type `hold.stronghold` "Stronghold", both clients, no launcher, loads closed, opened by the user from the tab | RS2 `build/hold-ui` | `FR-SHELL-170 stronghold window registered` |
+| FR-SHELL-171 | Size-table row and contract rows (goldens, harness sets) | RS2 | `FR-SHELL-170 stronghold window registered` + PM's layout harness |
+| FR-SHELL-172 | No Strongholds launcher entry (OQ-HOLD-07 A, DM #339) | RS2 | `FR-SHELL-170 stronghold window registered` (no launcher entry for `hold.*`) |
 
 > **Sprint 7 (track ST, stats tier A, DM [#311](../decisions-log.md); spec-stats).** A new launcher window **Stats** (`stats.board`, both clients) for the [stats](stats.md) leaderboard and session awards. It registers through the window registry (append) under FU's **FR-SHELL-86** contract (seam S5), and opens itself on the awards when the DM shows them. New **FR-SHELL-93–94**. **FU owns the frame this sprint** (#310 parking, default sizes, Reset layout). Slice ST2 registers `stats.board` **after FU1 merges**. 0 B on the wire from SHELL.
 
@@ -481,6 +489,10 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 - **Retired / amended by sprint 9** (IDs kept): FR-SHELL-140–143 retired (FR-SHELL-157); FR-SHELL-56 (2)'s "covered" re-place, -41 and -106 → untouched windows only (-106's "kept as a user spot" is now the general rule); FR-SHELL-99's "user spots included" → untouched only; FR-SHELL-101 squeezes untouched protected windows only (today: not `userSize`; now not `userSpot` either); FR-SHELL-102: causes gain `open:<kind>` (a put-away for an open; never returns); remembered windows get no displacement memory at all (their push is render-only); FR-SHELL-104 → untouched windows; FR-SHELL-80 → FR-SHELL-153; #310 → untouched windows. Unchanged: FR-SHELL-95, -96, -98, -100, -103 for untouched windows, -105, -107–117 except as listed, -119.
 - **DM view / player view:** the same rules in both clients, each on its own layout entry, PCs and zones. The DM's remembered windows never move at Start; a player's remembered sheet or Initiative stays where the player put it.
 - **Seams** (no frame edit by other tracks): RS's Stronghold window and Party Manager tabs, SP's palette and shortcuts, FX's toast runtime: settled by sprint-9 seams S1–S6, S14 (OQ-SHELL-80–82, FR-SHELL-160, -165) and §14.
+
+| FR-SHELL-170 | *(Sprint 9, RS)* **Window type `hold.stronghold`** "Stronghold" ([FR-HOLD-23](strongholds.md#6-functional-requirements)): one `defineWindow` line in each client's `windows.ts` (append, **after PM1 merges**, seams S2); `defaultOpen: false` (never protected); **no launcher entry** (OQ-HOLD-07 A, DM #339; opened from the Party Manager's Strongholds tab, a reminder's link or a loot-log Stores name, always `by: "user"`); **one `main` instance with a selection** (the open stronghold id; client state kept per browser with the layout, as `party.handout`); anchor `top-right`; no keep-out; no activity dot. Under window memory an ordinary window: PM's placer places it while untouched, afterwards it reopens where the user left it (#338); **switching the selected stronghold doesn't count as "touched"** (S2, OQ-SHELL-74 A). A stored layout naming a stronghold that is gone or hidden opens on FR-HOLD-23's "isn't available" message. | BL-73 |
+| FR-SHELL-171 | *(Sprint 9, RS)* **Size-table row** (same at 1280×720, 1280×800, 1440×900, 1600×900, both clients): **default 480 × 560**, **useful 400 × 400** (criterion: header, tab strip and three facility rows visible without scrolling at the default text size), **min 340 × 360**, `minOpenH` 400. The useful height (400) must fit the 1280×720 band PM1 documents (412 px under FR-SHELL-141's band today); RS2 checks it against PM1's value in a `bun test` on the size table, and if the band is smaller the useful height becomes the band and the criterion "header, tab strip and two facility rows". **Contract rows** (seams S4; as FR-SHELL-143): `size-table.ts` row, both goldens regenerated with `UPDATE_GOLDEN=1`, and replay-harness membership **as an untouched window in the DM set D3 and the player set P1** (PM1's FR-SHELL-160); any new failing cell gets a reason or a fix, `replay.failing.json` regenerated, never hand-merged. All in RS2, after PM1. | S2, S4 |
+| FR-SHELL-172 | *(Sprint 9, RS)* **No Strongholds launcher entry** (OQ-HOLD-07 A, DM #339): neither client's launcher gains an entry for strongholds; the list lives in the Party Manager's Strongholds tab ([FR-PARTY-72](party-board.md#611-sprint-9-reminders-and-strongholds-tabs-track-rs)), so the launcher-fit test needs no new row for RS. | DM #339 |
 
 ## 7. UI/UX notes
 
@@ -1374,6 +1386,15 @@ Teardown: stop, `fixtures:reset --profile verify`.
 | OQ-SHELL-82 | **Seam with FX** ([notifications](notifications.md), BL-83 / BL-88): FX holds `ToastRuntime.tsx` and the notifications keep-out; PM holds the frame. A remembered window may now sit in the DM's toast home band (it is never moved for toasts); the stack's step-aside (FR-NOTE-50) reads rendered window rects as today | **Resolved (integrator, sprint-9 seams S5, S6):** FX1 owns `ToastRuntime.tsx`, `keep-out.ts`, `toasts.ts`, `stack-inputs.ts` all sprint; remembered windows in the DM's home band are ordinary rendered windows to the stack (FR-NOTE-70 / -71); FX1 merges after PM1; FX3's BL-91 boundary is a one-function `ShellWindow.tsx` grant after PM1; BL-76 and BL-90's Scenes drop spot move to PM1 (FR-SHELL-166, -167). Rejected: ~~a "toast home" keep-out that remembered windows respect~~ (contradicts #338) | no · settled | FX, FR-NOTE-50 |
 | OQ-SHELL-83 | Glossary | **Add "Remembered window: a window you moved or resized; it reopens exactly there and the placer leaves it alone until Reset layout"; amend "Placer" (… for windows you haven't moved or resized), "Auto placement" (untouched windows only; #310's parking for untouched windows only), "Zone" (used while clear of PCs, ignoring windows you moved or resized); "Party status" → a tab of Party Manager (OQ-PARTY-38). Pointer: [stats FR-STATS-34](stats.md#6-functional-requirements)'s summary open follows FR-SHELL-146 for a remembered `stats.board`** | no · integrator | glossary |
 | OQ-SHELL-84 | BL-82 fallback if FR-SHELL-158's speed-ups miss 25 ms in the full bench | **The builder reports the profile; the orchestrator decides (a re-budget needs a measured reason)** / re-budget to 35 ms now: no evidence yet that it's needed | no · orchestrator | FR-SHELL-158 |
+
+**Sprint 9, track RS** (owner spec-rs). Both rows settled (seams S2, S4; DM gate 1, #339).
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-SHELL-85 | **Seam with PM (frame + window memory): registering the Stronghold window.** RS2 needs PM's contract for new windows this sprint (size-table row, useful size, goldens, harness sets) and PM's frame core merged first; under window memory a moved / resized Stronghold window reopens where the user left it | **Closed per seams S2 + S4:** one `main` instance with a selection, no launcher, registered after PM1 (`windows.ts` lines, size-table row 480 × 560 / useful 400 × 400 / min 340 × 360, goldens via `UPDATE_GOLDEN=1`), untouched member of replay sets D3 and P1; selection switches aren't "touched" (FR-SHELL-170, -171). Rejected: ~~RS2 registers before PM and rebases~~ | — · closed (S2, S4) | PM, FR-SHELL-170–172 |
+| OQ-SHELL-86 | **PM ↔ RS:** does a Strongholds launcher entry join the launchers? | **Decided (DM #339, OQ-HOLD-07 A): no launcher entry**; strongholds live in the Party Manager tab (FR-SHELL-172). Rejected: ~~a "Strongholds" launcher window~~ | — · decided | PM, FR-SHELL-172 |
+
+- *(Sprint 9)* Test IDs: the window frame's usual `ui-window` `data-kind="hold.stronghold"`; content IDs are HOLD's (`hold-*`). Edges (FR-HOLD-23, -34): a stored layout with the window open on a stronghold that is gone / hidden opens on the "isn't available" message; reconnect reloads its content; 0 B.
 
 ## 16. Out of scope
 

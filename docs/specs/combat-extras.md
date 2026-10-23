@@ -2,7 +2,7 @@
 title: Combat extras
 prefix: CBTX
 status: complete
-owner: spec-cb, spec-fx
+owner: spec-cb, spec-fx, spec-rs
 phase: post-mvp-9
 ---
 
@@ -20,6 +20,7 @@ phase: post-mvp-9
 - **Sprint 2, phase 1** (DM notes #188 + session-sim-4; FR-CBTX-44–50): the Add dialog rolls initiative on the way in, creates tokens (hidden by default) at the centre of the DM's view and offers average / rolled HP (N5); a token-less combatant can be **linked** to a token dropped later, which fixes missing movement and targeting for added creatures (N6, N6.1); chips use the room they have (G1); death-save lines no longer show counters (G7); concentration cards show in Initiative and on the DM's bell, close as "Closed", and cue the player's token on the DM map (G9, N11); a dead or downed PC keeps its map cue after End (item 14).
 - **Sprint 4** (track R, DM [#243](../decisions-log.md) [19]; FR-CBTX-51–53): **trigger badges**: Initiative rows show the rule triggers in effect (Divine Fury, Sneak Attack) with their state (ready / used this turn / uses left) beside the effect chips, tokens show one trigger icon with the list on hover; data from MOD's `trigger-state` ([FR-MOD-53–55](effect-modifiers.md#6-functional-requirements)). A new append-only effect-changed registry (seams S6, in or out of combat; also fog-of-war's Blinded line) keeps "in effect" right when an effect starts or ends ([ADR: trigger state](../architecture/adr/0049-trigger-state.md), accepted at sprint-4 gate 1, #245). Badges go to the DM and the owner only (OQ-MOD-40, -41 decided #245). Test plan: [MOD §13.1](effect-modifiers.md#131-sprint-4-track-r-mod-cbt-cbtx-charx).
 - **Sprint 5, track W** (FR-CBTX-54–56): trigger chips shrink to icons before anything folds, so Divine Fury stays visible next to "Rage 10r"; Effect… starts with a source players could see; the token menu has one Invisible (fog's). Client only, 0 B.
+- **Sprint 9, track RS** (FR-CBTX-70; owner spec-rs): a **read-only effects line** export for the Reminders tab's character groups ([reminders](reminders.md) FR-REM-22): the same chips, no actions, the existing visibility. Client only, 0 B; slice RS1.
 - **Sprint 6, track WF** (FR-CBTX-57, -58): every part beside a name (hidden icon, Ally / Enemy chip, effect and trigger chips) moves to a second line before the name is cut; a trigger chip shows its whole label or just ⚡ + uses, never "Searing Str…". Client only, 0 B.
 
 **Sprint 4 at a glance**
@@ -194,6 +195,9 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 | FR-CBTX-68 | **Players can't reorder** (decided #335, [OQ-CBTX-33](#15-open-questions) **A**): no grip or menu item in the player Initiative; their rows re-sort live by `playerPosition`. | |
 | FR-CBTX-69 | **Failures and races**: reject → the row stays where the store has it + Toast with the reason; lost in-flight intent → FR-CBTX-40's Toast; disconnected → grips and items disabled. Two DM tabs: commands serialise, each placed by its own anchor (last wins); an anchor removed or attached meanwhile → `invalid`, Toast. Crash: number ⇔ tie order ⇔ ranks ⇔ event in one transaction; restart → identical snapshots. | |
 | FR-CBTX-75 | *(Sprint 9, track FX, BL-90; [OQ-CBTX-37](#15-open-questions) A, DM #339)* **End ends a concentration whose summons it removed** (amends FR-CBTX-12).<br>• **Cause:** session-sim-12 left Thorn "Concentrating: Conjure Elemental" after End removed his elementals. That is by spec: FR-CBTX-12 keeps PC concentration without a duration, and `companionsAtEnd` deletes the summons but never touches their owner's effect.<br>• **Rule:** at End (`ended` hook), a PC's concentration effect that a summoned combatant of this encounter names (`concentrationEffectId`) ends with those summons, `endedReason: encounter-ended`, in `EncounterEnded.changes`. FR-CBTX-10 then closes its pending concentration cards.<br>• Any other PC concentration (Bless, Spirit Guardians: no summon) stays, as FR-CBTX-12 says.<br>• Test `FR-CBTX-75 End ends a summon-only concentration`. | sim-12 glitch 12 |
+
+| **Sprint 9** (track RS; BL-73; owner spec-rs) | | |
+| FR-CBTX-70 | **Read-only effects line** for [reminders](reminders.md) (BL-73: "per character a read-only block of active conditions / effects / concentration from combat, under existing visibility"; [FR-REM-22](reminders.md#6-functional-requirements)): `sheet-sections.tsx` exports `EffectsLine({characterId})`, the same chips as `cbtx.effects` (FR-CBTX-29 icons, labels, exhaustion level, "3r" when timed, concentration's label; fit per FR-CBTX-46 / -59) **without** menus, Concentrate… or click actions. It reads only `effect` rows the viewer already receives (FR-CBTX-31: players never secret, hidden or ended ones; the DM sees secret ones with eye-off), targeting that character (`targetCharacterId`), active only. None → renders nothing. **No data, record, intent or event change** (0 B). Test `FR-CBTX-70 read-only effects line` (DOM: Poisoned + "Bless 3r" + concentration "Hold Person" for Mira; a secret effect only in the DM render; no menu trigger in the DOM). Built in RS1 `build/rem-ui` (this file is CBTX-owned; edited by assignment). | 0 B |
 
 ## 7. UI/UX notes
 

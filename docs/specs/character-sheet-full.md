@@ -2,8 +2,8 @@
 title: Character sheet (full)
 prefix: CHARX
 status: complete
-owner: spec-wf, spec-sb, spec-tt
-phase: post-mvp-8
+owner: spec-wf, spec-sb, spec-tt, spec-rs
+phase: post-mvp-9
 ---
 
 # Character sheet (full)
@@ -23,6 +23,8 @@ phase: post-mvp-8
 > **Sprint 8 (track SB, stats tier B, DM [#334](../decisions-log.md); spec-sb).** Decided (not open): a **trophy case** of campaign-wide records on the character. It is one sheet section, `stats.trophies`, a **Trophies** tab owned by [stats](stats.md#61-tier-b-sprint-8) (FR-STATS-42–44), registered through `sheet-sections.ts` (append). New FR-CHARX-97–99. Client only; it reads `stats.query`, not sheet data; 0 B snapshot. Placement and audience decided at DM gate 1 (#335: OQ-STATS-22, -23, OQ-CHARX-44 A). Slice SB2 `build/sb-trophies`. Tests `FR-CHARX-97 trophies tab`, `FR-CHARX-98 trophies layout`, `FR-CHARX-99 trophies never on summary cards`.
 
 > **Sprint 7 (track FU, DM [#311](../decisions-log.md); session-sim-10 a03).** Decided, not open: the **companion card** no longer opens at its minimum with the attacks below the fold. New **FR-CHARX-81** (a useful size, so the shell auto-minimises a window rather than shrink the card; [play-shell FR-SHELL-79](play-shell.md#6-functional-requirements), OQ-SHELL-53) and **FR-CHARX-82** (attacks before conditions, two attack rows visible at 320 × 360). Client only, 0 B. Tests `FR-CHARX-81 card useful size` (registry: `usefulSize` 320 × 360; with Compendium open at 1280×800 the card opens 320 × 360 and Compendium is auto-minimised), `FR-CHARX-82 attacks above the fold` (DOM at 320 × 360: both Owlbear attack rows' buttons inside the rect with 3 conditions); walkthrough U2, U15 in [play-shell §13](play-shell.md#13-test-plan); slices FU1 (the window line) and FU4 (the card's order) in [play-shell §14](play-shell.md#14-dependencies). GM (gems) edits this spec in parallel with its own range. Edge cases: client-only layout; reconnect re-renders from the store; crash: no server change. No open question.
+
+> **Sprint 9 (track RS, BL-73, DM [#338](../decisions-log.md); owner spec-rs).** Decided (not open): a **Reminders** section on the character sheet ([reminders](reminders.md)). One sheet section `rem.reminders` (append to `sheet-sections.ts`), a tab "Reminders" before Macros (OQ-CHARX-45). New **FR-CHARX-100–104**; no sheet data, no `creature-sheet` field, 0 B snapshot (reminders load lazily, [REM §12](reminders.md#12-performance--bandwidth)). Slice RS1 `build/rem-ui`. Tests `FR-CHARX-100 reminders tab`, `FR-CHARX-101 contents and roll as`, `FR-CHARX-102 rights and lock`. [OQ-CHARX-45, -46](#15-open-questions) decided at DM gate 1 (#339): A, A.
 
 > Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Extends [character-sheet](character-sheet.md) (CHAR, basics); every FR-CHAR stays in force unless amended here.
 
@@ -206,6 +208,16 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-98 | **Layout** (the component is stats', `@ui/features/stats/trophies/`): **Lifetime**, a label / value grid (2 columns, 1 under 360 px), then **Records**, each value with a muted detail line ("→ Ogre · Fight 3 · Tue 20 Oct"), then a footnote "Whole campaign, counted from the game log". DM adds a muted "Includes hidden rolls and fights". "—" for 0. Test IDs: `stats-trophies` (+ `data-record-id` = character id), `stats-trophy` (+ `data-record-id` = key, `data-value`), `stats-trophy-detail`. States per FR-STATS-50. | FR-STATS-42 |
 | FR-CHARX-99 | **Data and refresh**: the tab sends `stats.query {scope: "trophies", characterId}` when shown and refreshes per FR-STATS-44. It reads no `creature-sheet` or stat-block field, and other players never get it (no section on the summary card, FR-CHARX-32; the server answers players only for their own characters, FR-STATS-43). | FR-STATS-43, -44 |
 
+**Sprint 9 (track RS): Reminders section**
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-CHARX-100 | **Reminders tab** (BL-73): sheet section `rem.reminders` (REM-owned component, `@ui/features/reminders/`; one line in `sheet-sections.ts`, append): slot `tab`, title "Reminders", **`order: 80`** (tabs end "… Reminders, Macros, Trophies", by `order`, OQ-CHARX-45 **A**), both clients, kinds `["character"]`, `available` = always. Renders only on full sheets (DM's sheets and the owner's own, FR-CHARX-36); never on summary cards or imported-definition sheets (§7.1), so another player never sees it. The tab label carries a count Badge when > 0: **count = this character's visible reminders** (the viewer's rows aimed at this character; party reminders not counted; review ruling 22). | BL-73 |
+| FR-CHARX-101 | **Contents**: this character's reminders ([FR-REM-18](reminders.md#6-functional-requirements)'s rows, creation order), then a **Party** subheading with the party reminders; DM-only rows only for the DM (eye-off). Rolls **roll as this character** ([FR-REM-21](reminders.md#6-functional-requirements)); not `live` → disabled. No effects line here (the header's `cbtx.effects` chips already show them). A link "Open in Party Manager" → `openPartyTab("reminders")` ([FR-PARTY-75](party-board.md#611-sprint-9-reminders-and-strongholds-tabs-track-rs)). | |
+| FR-CHARX-102 | **Rights**: Add (prefilled target = this character; "Party" selectable), Edit, Delete per [FR-REM-08](reminders.md#6-functional-requirements) (owner: own-created rows; DM any). The **sheet lock doesn't block reminders** (OQ-CHARX-46 **A**: they aren't sheet data, as item moves, OQ-PARTY-11); view and edit mode alike. | OQ-CHARX-46 |
+| FR-CHARX-103 | **Loading**: the tab loads `reminder` lazily when first shown ([FR-REM-14](reminders.md#6-functional-requirements)); skeleton, Retry; reloads after a snapshot. The count Badge shows once loaded (no load just for the count). | 0 B |
+| FR-CHARX-104 | **Test IDs**: `charx-section` `data-record-id="rem.reminders"`; REM's `rem-*` inside (`rem-group` `data-record-id` = the character id, then `party`); `rem-sheet-open-party` (the link); `charx-tab` `data-value="rem.reminders"` + `data-count`. | AGENTS §9.5 |
+
 ### 6.1 N7 sheet buttons
 
 DM-specified (#188): a third button **Attack + damage**, and the three behave the same everywhere. P2b owns where they show, labels, the out-of-combat roll and test IDs; P2a ([combat-tracker](combat-tracker.md)) owns what each does when routed into combat (settled S1, FR-CHARX-43).
@@ -274,6 +286,7 @@ interface SheetSection {
 | `cbtx.temp-hp` | `vitals` | always | Temp HP |
 | `cbtx.death-saves` | `vitals` | `deathState != null` | Death-save successes / failures |
 | `cbtx.effects` | `header` | always | Condition / effect chips; owner "Concentrate…", DM add / edit / end from the chip row's menu |
+| `rem.reminders` *(sprint 9, RS)* | `tab` "Reminders" (`order: 80`, before Macros) | always | This character's reminders, then the party's; rolls as this character (FR-CHARX-100–104) |
 | `stats.trophies` *(sprint 8, SB)* | `tab` "Trophies" (`order: 100`, last) | always | Campaign trophy case (FR-CHARX-97–99) |
 | `gem.counts` *(sprint 7, GM)* | `header` (after `cbtx.effects`) | gems on (FR-CHARX-71) | Five gem icons + counts; owner Spend menu; DM ± (FR-CHARX-72) |
 
@@ -471,6 +484,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 **Sprint 7 (track GM):** bundles `gems`, `gems-hidden` ([gems §13](gems.md#13-test-plan)). DOM tests (in-code store): `FR-CHARX-71 gem section off / on` (no `campaign.features` → no `gem-block`, sheet DOM byte-identical to sprint 6; on → block in the header after the effect chips; NPC sheet / companion card → absent); `FR-CHARX-72 owner / DM controls` (owner: Spend menu, no ±; DM: ± and Spend; locked sheet → still enabled; not `live` → disabled; `FR-GEM-08 max 5 label shown, no over-limit styling at 6`); `FR-CHARX-73 summary counts` (another player's view of Mira: counts row, no menu; under OQ-GEM-01 B → absent). Walkthrough: [gems §13](gems.md#13-test-plan) steps 2, 3, 9, 10.
 
+**Sprint 9 (track RS):** bundle `reminders-strongholds` ([REM §13](reminders.md#13-test-plan)). DOM tests (in-code store, mocked load ack): `FR-CHARX-100 reminders tab` (tab order "… Reminders, Macros, Trophies" on Mira's sheet for the DM and player-1; absent on player-2's summary card of Mira and on an imported sheet; count Badge 1 for player-1, 1 for the DM), `FR-CHARX-101 contents and roll as` (Mira's rows then Party; "Charm" sends `dice.roll` as Mira; Steam Rooms' party roll on Thorn's sheet rolls as Thorn), `FR-CHARX-102 rights and lock` (player-2 on Thorn: Edit on REM-THORN-OWN only; locked sheet → still enabled; not `live` → disabled). Integration (REM-owned): `FR-REM-16 leak scan` covers the section's loads. Walkthrough: [REM §13](reminders.md#13-test-plan) R8. *Shared change:* one append line in `sheet-sections.ts` (RS1).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -607,8 +622,12 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-CHARX-44 | Where the trophy case sits on the sheet | **Decided (#335): A** · **A. Its own tab "Trophies", last**: room for records, out of the way · B. End of the Main tab (`main` slot): seen without a click, makes Main longer · C. A header chip "12 kills" (trophy icon) opening a popover: compact, tiny | no (DM pick, with OQ-STATS-23) | CHARX, STATS |
+| OQ-CHARX-45 | *(S9)* Where reminders sit on the sheet | **Decided (DM #339): A. Its own tab "Reminders", before Macros.** Rejected: ~~B. end of the Main tab~~, ~~C. a header chip with a popover~~ | — · decided | CHARX, REM |
+| OQ-CHARX-46 | *(S9)* Does the sheet lock also lock a player's reminders? | **Decided (DM #339): A. No: reminders aren't sheet data (as item moves and macros).** Rejected: ~~B. yes~~ | — · decided | CHARX, REM |
 
 ## 16. Out of scope
+
+- *(Sprint 9)* Reminders on other players' summary cards (BL-73: players see their own characters'); an effects line inside the Reminders tab (the header chips already show it).
 
 - *(Sprint 8)* Trophies on other players' summary cards (OQ-STATS-23 B); editing or resetting trophies.
 - See §4. Levelling, builder, compendium lookups, rests, encumbrance, rest-time hit-die healing; temp HP / death saves / conditions data (combat-extras); party HP / AC view (tier B, play-shell); several sheet windows at once; DM-only notes on a PC; gems ([gems](gems.md)).
