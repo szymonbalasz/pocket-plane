@@ -9,9 +9,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | building | walkthrough M0, M3-M10, M12, M14 |
-| PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | building (party-board files; shared rows after PM1 merges) | walkthrough M0-M2, M11, M13 |
+| PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | party-board part done (4 commits); waits for PM1 to merge for shared rows | walkthrough M0-M2, M11, M13 |
 | RS0 reminders + strongholds core | `fix/rs-core` (ws w9W, slot 3) | build-rs0 | building | raw-intent walkthrough |
 | FX2 dice + gems lines | `fix/fx-dice-lines` (ws w9X, slot 4) | build-fx2 | building | walkthrough FX2 |
+| FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y) | build-fx3 | building (ShellWindow branch after PM1; merges after RS0) | walkthrough FX3 |
 
 Queue (`.verify/sprint9/seams.md` build plan): wave 2 FX3, SP3 server (after RS0) · wave 3 after PM1: FX1, SP1, SP2 · wave 4 after RS0 + PM1 + PM2: RS1, RS2 · wave 5 RS3; SP3 stats edits after FX1. Slice defs: `%TEMP%/pocket-plane/slices.json` (`pm1`, `pm2`, `rs0`, `fx2`).
 
@@ -21,7 +22,8 @@ Queue (`.verify/sprint9/seams.md` build plan): wave 2 FX3, SP3 server (after RS0
 - Schema / core lane (`src/server/db/`, `src/shared/events/`, record-type registry, `features/index.ts`): `fix/rs-core` (RS0) first; then SP3, FX3.
 - Toast runtime (ToastRuntime, keep-out, toasts, stack-inputs): FX1 (not started).
 - Stats client files: FX1, then SP3.
-- `sync/connection.ts` + `protocol/frames.ts`: FX3 (not started).
+- `sync/connection.ts` + `protocol/frames.ts`: `fix/fx-sync-shell` (FX3).
+- combat-tracker `companions.ts` / `hp.ts` strings ("Party Manager"): `build/party-manager` (PM2), granted 2026-10-23.
 - Backlog: no picks (four sprint slices working).
 
 ## Pending DM decisions
