@@ -33,7 +33,7 @@ import { campaignOf, combatantsOf, getCombatant, readCombatant, readEncounter } 
 type Read = Pick<Tx, "select">;
 
 /** FR-CBT-111 / FR-PARTY-43: a pet's owner lives on the pet. */
-export const PET_OWNER_HERE = "Change a pet's owner in the Party window";
+export const PET_OWNER_HERE = "Change a pet's owner in Party Manager";
 /** FR-CBT-111: a mode change that would take the turn combatant's row away. */
 export const AFTER_ITS_TURN = "Change it after its turn";
 

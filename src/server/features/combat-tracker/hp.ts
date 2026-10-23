@@ -597,7 +597,7 @@ export const applyHp = defineCommand({
 });
 
 /** FR-CBT-112: Undo of a step with an entry on a dismissed companion. */
-export const UNDO_DISMISSED = "Dismissed: adjust it in the Party window";
+export const UNDO_DISMISSED = "Dismissed: adjust it in Party Manager";
 
 /** FR-CBT-35: the encounter's undo unit (latest non-undone entry + its card's), latest first. */
 export function undoUnit(env: Pick<CommandEnv, "tx">, encounterId: string): HpChangeRecord[] {
