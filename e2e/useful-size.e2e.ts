@@ -2,7 +2,8 @@
 // FR-SHELL-100 (sprint 8, WF1; review-b #3): every registered kind at its useful size (play-shell
 // §7's sprint-8 table, at 1280×720) shows its criterion without scrolling: the body's
 // `scrollHeight ≤ clientHeight`, and the named rows whole inside it. One page per client; each
-// window resized by its handle as a user would. CB `party.summary` checks `cb-party-six`. WF4:
+// window resized by its handle as a user would. PM2 `party.board` (Party Manager, FR-PARTY-63)
+// checks the Party status tab on `cb-party-six` + this bundle's pets. WF4:
 // Stats (FR-STATS-66, -67: the award grid fits at 400 and 320 wide) and the companion card
 // (FR-CHARX-83: Owlbear and Drake at exactly 320 × 360) have their own tests below.
 import { expect, type Locator, type Page, test } from "@playwright/test";
@@ -17,28 +18,44 @@ interface Case {
   /**
    * How it is checked: `body` = the whole body without scrolling; a number = at least that many
    * record rows (`[data-record-id]`, AGENTS §9.5) whole inside the body (fewer if the fixture has
-   * fewer), the rest of the body (search, controls) unscrolled above them.
+   * fewer), the rest of the body (search, controls) unscrolled above them; `all` = every counted
+   * row whole (at least one).
    */
-  check: "body" | number;
+  check: "body" | number | "all";
   /** Rows counted by `check` (default: every `[data-record-id]`). */
   rows?: string;
   /** Test IDs inside each counted row that must show whole (not clipped, not cut). */
   uncut?: readonly string[];
+  /** The scroll box the rows must be whole inside (default: the window body). */
+  clip?: string;
+  /** Tab triggers whose labels must show whole inside the window (no strip scrolling needed). */
+  tabs?: string;
   /** Not checked here yet, and why. */
   skip?: string;
 }
 
 /**
- * CB3 (FR-SHELL-141, FR-PARTY-58): every PC row of `cb-party-six`'s 6-PC party whole, names and
- * figures uncut; companions (listed after the PCs) may scroll.
+ * PM2 (FR-SHELL-156, FR-PARTY-63; review-b ruling 16): Party Manager on its Party status tab at
+ * the useful size: every PC row of `cb-party-six`'s party and every companion row under them
+ * whole, names and figures uncut; the labels Party status, Handouts, Inventory, Loot whole.
  */
-const PARTY_SUMMARY: Case = {
-  kind: "party.summary",
-  useful: { w: 280, h: 236 },
-  criterion: "every PC row of a 6-PC party whole (name, HP, temp, AC uncut); companions may scroll",
-  check: 6,
-  rows: '[data-testid="party-summary-row"]',
-  uncut: ["party-summary-name", "party-summary-hp", "party-summary-temp", "party-summary-ac"],
+const PARTY_MANAGER: Case = {
+  kind: "party.board",
+  useful: { w: 440, h: 400 },
+  criterion: "Party status: every PC row and its companion rows whole + 4 tab labels whole",
+  check: "all",
+  rows: '[data-testid="party-summary-row"], [data-testid="party-companion-row"]',
+  uncut: [
+    "party-summary-name",
+    "party-summary-hp",
+    "party-summary-temp",
+    "party-summary-ac",
+    "party-companion-name",
+    "party-companion-hp",
+    "party-companion-band",
+  ],
+  clip: '[data-testid="party-status"] [data-radix-scroll-area-viewport]',
+  tabs: '[data-testid="party-tab"]',
 };
 
 /** §7 sprint-8 useful sizes at 1280×720 (band 412). */
@@ -61,12 +78,7 @@ const DM: Case[] = [
     criterion: "search, filters, 5 rows",
     check: 5,
   },
-  {
-    kind: "party.board",
-    useful: { w: 440, h: 400 },
-    criterion: "tab labels whole + 4 rows",
-    check: 4,
-  },
+  PARTY_MANAGER,
   {
     kind: "note.history",
     useful: { w: 360, h: 412 },
@@ -108,7 +120,6 @@ const DM: Case[] = [
     criterion: "composer folded + a 6-row card",
     check: "body",
   },
-  PARTY_SUMMARY,
 ];
 const PLAYER: Case[] = [
   { kind: "cbt.initiative", useful: { w: 280, h: 320 }, criterion: "header + 4 rows", check: 4 },
@@ -124,12 +135,7 @@ const PLAYER: Case[] = [
     criterion: "search, filters, 5 rows",
     check: 5,
   },
-  {
-    kind: "party.board",
-    useful: { w: 440, h: 400 },
-    criterion: "tab labels whole + 4 rows",
-    check: 4,
-  },
+  PARTY_MANAGER,
   {
     kind: "note.history",
     useful: { w: 360, h: 412 },
@@ -157,7 +163,6 @@ const PLAYER: Case[] = [
     criterion: "5 rows names whole",
     check: 5,
   },
-  PARTY_SUMMARY,
 ];
 /** FR-SHELL-112 (1): pending until their owners register them (none left this sprint). */
 const PENDING: string[] = [];
@@ -190,10 +195,10 @@ async function resizeTo(page: Page, win: Locator, w: number, h: number) {
  * The body's scroll state and the record rows whole inside its visible box; `cut` = the `uncut`
  * parts that are clipped (wider than shown, or outside their row / the body).
  */
-const measure = (win: Locator, c?: Pick<Case, "rows" | "uncut">) =>
+const measure = (win: Locator, c?: Pick<Case, "rows" | "uncut" | "clip">) =>
   win.getByTestId("ui-window-body").evaluate(
-    (body, { selector, uncut }) => {
-      const b = body.getBoundingClientRect();
+    (body, { selector, uncut, clip }) => {
+      const b = (clip ? (body.querySelector(clip) ?? body) : body).getBoundingClientRect();
       const rows = [...body.querySelectorAll(selector)].filter(
         (r) => (r as HTMLElement).offsetParent !== null,
       );
@@ -226,7 +231,7 @@ const measure = (win: Locator, c?: Pick<Case, "rows" | "uncut">) =>
         cut,
       };
     },
-    { selector: c?.rows ?? "[data-record-id]", uncut: c?.uncut ?? [] },
+    { selector: c?.rows ?? "[data-record-id]", uncut: c?.uncut ?? [], clip: c?.clip ?? null },
   );
 
 async function checkClient(page: Page, cases: readonly Case[]) {
@@ -241,10 +246,36 @@ async function checkClient(page: Page, cases: readonly Case[]) {
       console.log(`useful-size ${c.kind}: ${JSON.stringify(m)}`);
       if (c.check === "body") {
         expect(m.scroll, `${c.kind}: body scrolls`).toBeLessThanOrEqual(m.client + 1);
+      } else if (c.check === "all") {
+        expect(m.rows, `${c.kind}: rows`).toBeGreaterThan(0);
+        expect(m.whole, `${c.kind}: whole rows`).toBe(m.rows);
       } else {
         expect(m.whole, `${c.kind}: whole rows`).toBeGreaterThanOrEqual(Math.min(c.check, m.rows));
       }
       expect(m.cut, `${c.kind}: cut parts`).toEqual([]);
+      if (c.tabs) {
+        const w = await win.boundingBox();
+        if (!w) throw new Error("window not shown");
+        const tabs = await win.locator(c.tabs).evaluateAll((els) =>
+          els.map((e) => {
+            const r = e.getBoundingClientRect();
+            return {
+              label: e.textContent ?? "",
+              left: r.left,
+              right: r.right,
+              whole: e.scrollWidth <= e.clientWidth + 1,
+            };
+          }),
+        );
+        expect(tabs.length, `${c.kind}: tabs`).toBeGreaterThan(0);
+        const cutTabs = tabs.filter(
+          (t) => !t.whole || t.left < w.x - 0.5 || t.right > w.x + w.width + 0.5,
+        );
+        expect(
+          cutTabs.map((t) => t.label),
+          `${c.kind}: tab labels cut`,
+        ).toEqual([]);
+      }
       // A named row set (CB3's 6 PCs) must all be there: the fixture loaded.
       if (c.rows && typeof c.check === "number") expect(m.rows).toBeGreaterThanOrEqual(c.check);
       // Put it back out of the way for the next one.

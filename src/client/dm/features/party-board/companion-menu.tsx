@@ -59,11 +59,12 @@ function NewPet({ disabled }: { disabled: boolean }) {
     <>
       <Button
         size="sm"
+        className="h-6 px-2 text-xs"
         data-testid="party-companion-new"
         disabled={disabled}
         onClick={() => setOpen(true)}
       >
-        <PlusIcon className="size-4" />
+        <PlusIcon className="size-3.5" />
         New pet…
       </Button>
       <PetDialog open={open} onOpenChange={setOpen} />
@@ -123,13 +124,13 @@ function RowMenu({ row, disabled }: { row: CompanionRow; disabled: boolean }) {
           <Button
             size="icon"
             variant="ghost"
-            className="size-7 shrink-0"
+            className="size-5 shrink-0"
             aria-label={`Actions for ${row.name}`}
             data-testid="party-companion-menu"
             data-record-id={row.id}
             data-locked={fight !== null}
           >
-            <EllipsisVerticalIcon className="size-4" />
+            <EllipsisVerticalIcon className="size-3.5" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

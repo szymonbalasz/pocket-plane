@@ -4,17 +4,20 @@
 // eye-off, condition icons); HP "45 / 59" + bar for the DM and the owner (the combatant's in a
 // fight), a band for others; DM: the base name; Card (DM, owner) opens the companion card. The
 // DM's New pet… and row menu come from the DM client (`dm`, FR-PARTY-62).
+
+import { initials } from "@shared/scenes-map/geometry";
 import { IdCardIcon } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
+import { AssetImg } from "../assets-pipeline/AssetImg";
 import {
   COMPANION_CARD_KIND,
   useOpenCompanionCard,
 } from "../combat-tracker/companion-card-request";
 import { ModeIcon } from "../combat-tracker/companions";
-import { BandBadge, Portrait } from "../combat-tracker/parts";
+import { BandBadge } from "../combat-tracker/parts";
 import { useRegistry } from "../play-shell/ShellContext";
 import { type CompanionRow, hpValue } from "./logic";
 
@@ -22,6 +25,16 @@ import { type CompanionRow, hpValue } from "./logic";
 export interface CompanionsDmParts {
   header: ComponentType<{ disabled: boolean }>;
   menu: ComponentType<{ row: CompanionRow; disabled: boolean }>;
+}
+
+/** A 20-px portrait / initials: one dense line per row (FR-PARTY-58, -63). */
+export function SmallPortrait({ name, id }: { name: string; id: string | null }) {
+  if (id) return <AssetImg id={id} file="thumb" alt="" className="size-5 shrink-0 rounded-sm" />;
+  return (
+    <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-muted text-[9px] font-semibold text-muted-foreground">
+      {initials(name)}
+    </span>
+  );
 }
 
 const HP_BAR = { healthy: "bg-hp-full", bloodied: "bg-hp-bloodied", down: "bg-hp-down" } as const;
@@ -35,12 +48,12 @@ function CardButton({ row }: { row: CompanionRow }) {
     <Button
       size="sm"
       variant="outline"
-      className="h-6 px-1.5 text-xs"
+      className="h-5 gap-1 px-1.5 text-[11px]"
       data-testid="party-companion-card"
       data-record-id={row.id}
       onClick={() => openCard(row.id)}
     >
-      <IdCardIcon className="size-3.5" />
+      <IdCardIcon className="size-3" />
       Card
     </Button>
   );
@@ -50,15 +63,15 @@ function Health({ row }: { row: CompanionRow }) {
   if (!row.hp) return <BandBadge band={row.band} testId="party-companion-band" />;
   const pct = row.hp.max > 0 ? Math.min(100, Math.round((100 * row.hp.current) / row.hp.max)) : 0;
   return (
-    <div className="flex min-w-16 shrink-0 flex-col items-end gap-0.5">
+    <div className="flex min-w-16 shrink-0 flex-col items-end gap-px">
       <span
         data-testid="party-companion-hp"
         data-value={hpValue(row.hp)}
-        className="whitespace-nowrap text-xs tabular-nums"
+        className="whitespace-nowrap text-xs leading-4 tabular-nums"
       >
         {row.hp.current} / {row.hp.max}
       </span>
-      <div className="h-1 w-16 overflow-hidden rounded-full bg-accent" aria-hidden>
+      <div className="h-0.5 w-16 overflow-hidden rounded-full bg-accent" aria-hidden>
         <div className={cn("h-full", HP_BAR[row.band])} style={{ width: `${pct}%` }} />
       </div>
     </div>
@@ -86,9 +99,9 @@ export function CompanionLine({
       data-testid="party-companion-row"
       data-record-id={row.id}
       data-in-combat={row.inCombat}
-      className="flex items-center gap-1.5 py-0.5 pl-4 text-muted-foreground"
+      className="flex min-h-[22px] items-center gap-1.5 pl-4 text-muted-foreground"
     >
-      <Portrait name={row.name} imageAssetId={row.portraitAssetId} />
+      <SmallPortrait name={row.name} id={row.portraitAssetId} />
       {/* FR-PARTY-46: badges wrap, the name is never cut. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
         <span className="break-words" data-testid="party-companion-name">
@@ -104,7 +117,7 @@ export function CompanionLine({
           />
         )}
         {row.inCombat && (
-          <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
+          <Badge variant="secondary" className="px-1 py-0 text-[10px]">
             In combat
           </Badge>
         )}

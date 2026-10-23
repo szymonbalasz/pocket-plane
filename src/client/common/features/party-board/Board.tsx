@@ -58,8 +58,9 @@ export function PartyBoard({ parts }: { parts: PartyTabParts }) {
   const visited = useVisited(tab);
   const tabs = partyTabs().filter((t) => visible.includes(t.id));
   return (
-    <div data-testid="party-board" className="flex h-full flex-col gap-2 p-2">
-      <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-2">
+    // The window body's own padding frames it (FR-PARTY-63: every row fits the useful height).
+    <div data-testid="party-board" className="flex h-full flex-col">
+      <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-1.5">
         <TabsList
           data-testid="party-tabs"
           className="w-full max-w-full justify-start overflow-x-auto overflow-y-hidden"

@@ -13,7 +13,6 @@ import { EFFECT_TYPE, type EffectView } from "@shared/combat-extras/schemas";
 import { COMBATANT_TYPE, ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import type { HealthBand } from "@shared/entities/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
-import { initials } from "@shared/scenes-map/geometry";
 import { SCENE_TYPE, TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { ChevronRightIcon, EyeOffIcon, ShieldIcon } from "lucide-react";
 import { type KeyboardEvent, useMemo } from "react";
@@ -21,7 +20,6 @@ import { Tooltip } from "../../components/ui/overlays";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
-import { AssetImg } from "../assets-pipeline/AssetImg";
 import { useColorOf } from "../campaign-management/colors";
 import { openSheetFor } from "../character-sheet/selection";
 import { CHAR_SHEET_KIND } from "../character-sheet/window";
@@ -29,7 +27,7 @@ import { EffectIcon, effectValue } from "../combat-extras/icons";
 import { DeathBadge } from "../combat-extras/parts";
 import { useDefinitions } from "../compendium/definitions";
 import { useOpenWindow } from "../play-shell/ShellContext";
-import { CompanionLine, type CompanionsDmParts } from "./Companions";
+import { CompanionLine, type CompanionsDmParts, SmallPortrait } from "./Companions";
 import {
   EMPTY_PARTY,
   OTHER_COMPANIONS,
@@ -47,15 +45,6 @@ const BAR: Record<HealthBand, string> = {
   bloodied: "bg-hp-bloodied",
   down: "bg-hp-down",
 };
-
-function SmallPortrait({ name, id }: { name: string; id: string | null }) {
-  if (id) return <AssetImg id={id} file="thumb" alt="" className="size-5 shrink-0 rounded-sm" />;
-  return (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-muted text-[9px] font-semibold text-muted-foreground">
-      {initials(name)}
-    </span>
-  );
-}
 
 /** "cur / max" over a thin bar in band tone; numbers never cut. */
 function Hp({ hp, band }: { hp: { current: number; max: number }; band: HealthBand }) {
@@ -135,7 +124,7 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
         data-turn={r.turn}
         data-can-open={r.canOpen}
         className={cn(
-          "flex flex-wrap items-center gap-x-1.5 rounded-sm px-1 py-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "flex flex-wrap items-center gap-x-1.5 rounded-sm px-1 py-px outline-none focus-visible:ring-2 focus-visible:ring-ring",
           r.canOpen && "cursor-pointer hover:bg-accent/50",
         )}
         onClick={r.canOpen ? () => open(r.id) : undefined}
@@ -281,7 +270,7 @@ export function StatusTab({ dm }: { dm?: CompanionsDmParts }) {
     openWindow(CHAR_SHEET_KIND);
   };
   return (
-    <div data-testid="party-status" className="flex h-full min-h-0 flex-col gap-1.5">
+    <div data-testid="party-status" className="flex h-full min-h-0 flex-col gap-1">
       {dm && (
         <div className="flex justify-end">
           <dm.header disabled={!live} />
