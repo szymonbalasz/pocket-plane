@@ -2,9 +2,9 @@
 title: Notifications
 prefix: NOTE
 status: complete
-owner: spec-wf, spec-sb, spec-tt
+owner: spec-wf, spec-sb, spec-tt, spec-fx
 wave: 2
-phase: post-mvp-8
+phase: post-mvp-9
 ---
 
 # Notifications
@@ -53,6 +53,22 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR-NOTE-69 | The kill-feed toast is a callout (FR-NOTE-50), not a notification; it replaces the overkill toast (FR-NOTE-49 amended) | SB1 (after WF4) | `FR-NOTE-69 feed toast is not a notification` |
 
 > **Sprint 8 (track TT; DM [#334](../decisions-log.md)).** A DM roll request is a notification with a roll action: [dice-extras](dice-extras.md) adds kind **`roll-request`** (toast class **card**, FR-NOTE-50; seams S3, S13), one pending prompt per target PC, resolved only by dice-extras' commands. FR-NOTE-58–64, incl. a view flag `restoreToast`. CON-44: a prompt row 994 B ([dice-extras §12](dice-extras.md#12-performance--bandwidth)). Tests and walkthrough (T4–T8, T10, T12): [dice-extras §13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-NOTE-32–34.
+
+> **Sprint 9 (track FX, fix pack; DM [#338](../decisions-log.md)).** Fixes session-sim-12 FAIL c (**BL-83**: the DM stack left its home band, landing at x 68 over Mira at 1280×720 and at 276, 218 over the party at 1440×900), **BL-75** (stack over the Game log's roll bar) and **BL-88** (a card toast over the Notifications window's own Apply). It also makes each kill-feed callout its own node (**BL-84**, with [stats](stats.md) FR-STATS-68).
+> - **Root cause of BL-83** (code read, `keep-out.ts` `dmStackLefts`):
+>   - Walkthrough WF4's fix added "beside a window over the home column, left then right" to the candidate lefts. It clamped them only at the rail (`left ≥ 68`).
+>   - Such a spot wins whenever it clears every window body, whatever tokens it covers. That contradicts FR-NOTE-42 (decided #288: never x 68, never beside windows).
+>   - The drawn stack then also differs from the frame's soft `toasts` keep-out (the home column), as c01 reported.
+> - **Root cause of BL-75**: "least window body" prefers a thin overlap at a low window's bottom edge, which is where the Game log's roll bar is.
+> - FR-NOTE-70–73 (slice **FX1**, client only) and FR-NOTE-74 (slice FX2, a server helper option for **BL-63**). Walkthrough [§13 FX1](#13-test-plan). 0 B.
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-NOTE-70 | The DM stack's lefts are home and the Initiative shift only (BL-83) | FX1 | `FR-NOTE-70 stack never leaves its column` |
+| FR-NOTE-71 | No body-clear spot → the clear spot nearest home, not the least body (BL-75) | FX1 | `FR-NOTE-71 nearest home, not the least body` |
+| FR-NOTE-72 | The DM stack keeps clear of an open Notifications window, and card toasts fold into it (BL-88; OQ-NOTE-38 B, DM #339) | FX1 | `FR-NOTE-72 keep clear of an open Notifications window`, `FR-NOTE-72 cards fold into an open Notifications window` |
+| FR-NOTE-73 | Each callout show is a new node (BL-84) | FX1 | `FR-NOTE-73 callout node per show` |
+| FR-NOTE-74 | `updateNotification({emit: false})` folds the row into the caller's event (BL-63) | FX2 | `FR-NOTE-74 update folds into the caller's event` |
 
 ## 1. Summary
 
@@ -157,6 +173,12 @@ Decided at sprint-5 DM gate 1 (#256, every pick accepted): §15 OQ-NOTE-22–24.
 | FR-NOTE-64 | *(Sprint 8)* **Leak rules**: no DC unless shown, never `success`; `resolution.total` only to the roller. Test `FR-NOTE-64 roll-request leak`. | |
 | FR-NOTE-68 | **Kind `stats-fight-summary`** (owner stats; one line in `kinds.ts`, append). No action, so state `info`; its kind def names toast class **info** (FR-NOTE-50, seam S13): a 6 s toast per FR-NOTE-13 / -14 plus a history row. Audience **`all`** when the ended fight has a counted public fact, else **`dm`** ([FR-STATS-33](stats.md#6-functional-requirements)). Payload zod `{encounterId}` (player-safe: the id is already on public lines, #327); text **"Fight summary"** (no encounter name, no numbers). Made only by stats' `ended` rule hook through `notify` inside `cbt.end` (system actor: no stripe, FR-NOTE-38). Client views (both `notification-views.ts`, append): icon lucide `Swords`; renderer "Fight summary" + **Open** (`stats-summary-open`), which opens Stats on that fight with Highlights ([FR-STATS-34](stats.md#6-functional-requirements)); the DM's row adds the encounter name from its store. No end rule (an info row). | OQ-STATS-27 |
 | FR-NOTE-69 | **Kill-feed toasts are not notifications** ([FR-STATS-28](stats.md#6-functional-requirements); amends FR-NOTE-49). `stats-feed-toast` takes the overkill toast's place in the **callout** toast class (FR-NOTE-50, seam S4): no row, bell or history, at most one (a newer one replaces it), live frames only, never pushes windows, ignored by Fit and the pending-toast rules. 4 s; the timer pauses on hover. Off with the viewer's "Kill feed" preference; dropped for players while paused (seam S10). | OQ-STATS-21 |
+| **Sprint 9** (track FX, fix pack) | | |
+| FR-NOTE-70 | **The stack never leaves its column** (BL-83, sim-12 FAIL c). Restores FR-NOTE-42 and removes walkthrough WF4's "beside a window over the home column".<br>• The DM stack's candidate lefts are its **home** (centred) and FR-NOTE-32's **left-of shift** for a window that counts like Initiative (Initiative; an open Notifications window, FR-NOTE-72), nothing else.<br>• The shift counts only if it leaves ≥ 12 px to the rail (left ≥ 80), so the stack is never at x 68 and never beside any other window.<br>• No spot in the column clears every window body → WF4's fold stays (the runtime shows fewer toasts, then "+N more"; alerts never fold, #336).<br>• The drawn rect is the computed one: `data-left` / `data-top`, the FR-SHELL-59 report and `getBoundingClientRect()` agree within 1 px.<br>• Outcome, sim-12 c01 (1280×720, Scenes at 400, 112): left 480.<br>• Outcome, sim-12 c03 (1440×900, Fog bar shown, Scenes pushed): left 560 or the shift, below the bar (FR-NOTE-43); never 68, never 276. | sim-12 c01, c03 |
+| FR-NOTE-71 | **Nearest home, not the least body** (BL-75; amends FR-NOTE-42's "then the least window body").<br>• Of the clear spots (Initiative, title bars, hard keep-outs, FR-NOTE-44 strips), one that covers **no window body** wins, nearest the home row first.<br>• None does → the clear spot **nearest the home row** (smallest top), folded per FR-NOTE-70. It no longer slides down to a thin overlap at a low window's bottom edge.<br>• `avoidTokens` still ranks first among body-clear spots.<br>• Outcome (WF4 re-test: home band and both sides taken, Game log 1150×240 at the bottom): `elementFromPoint` at the centre of the Game log's Roll button hits it.<br>• Accepted at DM gate 1 ([#339](../decisions-log.md)) as an amendment of #288's FR-NOTE-42 ranking: "nearest home when no spot is body-clear". | WF4 re-test |
+| FR-NOTE-72 | **An open Notifications window** (BL-88, sim-12 glitch 7, r03; review-b ruling 14).<br>• **Always:** on the DM, while this client's `note.history` window is open and not minimised, it counts like Initiative: the stack shifts left of it if FR-NOTE-70 allows, else drops below it.<br>• **Fold** ([OQ-NOTE-38](#15-open-questions) B, DM #339; amends FR-NOTE-13 / -15, both clients): the stack also shows **no card toasts and no "N pending" summary** while the window is open, because the window lists the same rows with their actions.<br>&nbsp;&nbsp;– Alerts, info and the callout still show. Players keep their corner and get the fold only.<br>&nbsp;&nbsp;– When the window closes or minimises, pending cards the user hadn't closed re-toast **silent, no cue** (like FR-NOTE-60), under the max of 3, and the summary comes back.<br>• Outcome (r03: Notifications at 592, 60 on the DM at 1440×900, Brakka's card pending): no toast overlaps the window, and `elementFromPoint` at its first row's Apply hits it. | sim-12 r03 |
+| FR-NOTE-73 | **One callout node per show** (BL-84; amends FR-NOTE-50's "a new one replaces it").<br>• Each `showCallout` mounts a fresh `note-callout` element: React key and `data-callout-seq` = a page-wide show counter.<br>• So a replacement re-announces (`role=status`), restarts its 4 s, and a recorder that notes each node once still sees it.<br>• Outcome: two kill-feed callouts 1 s apart → two nodes, seq n and n + 1; the second shows the newer line. | sim-12 h |
+| FR-NOTE-74 | **`updateNotification` can fold into the caller's event** (BL-63; protocol gate I15 already says that only `notify`, resolve and reopen emit their own event).<br>• Option `{emit: false}` returns the row's `RecordChange` instead of emitting `NotificationUpdated`. The caller puts it in its own event's `changes`.<br>• Default unchanged: every other caller still emits.<br>• **Known I15 exceptions** (review-b ruling 11: recorded, not widened): `combat-tracker/cards.ts:112`, `damage.ts:235`, `damage.ts:241` and `hit.ts:183` still emit their own `NotificationUpdated` (two frames). Protocol §8 lists them as a known exception at consolidation, and the integrator adds a backlog row. FX2 folds `gem.spend` only.<br>• Visibility, `seq` and unread are unchanged (an update never toasts or bumps unread, FR-NOTE-25).<br>• First user: `gem.spend` ([FR-GEM-42](gems.md#6-functional-requirements)). | BL-63 |
 
 ## 7. UI/UX notes
 
@@ -241,6 +263,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Toast (shell's toa
 - **Sprint 2.** *Update:* commits with the owner's change or not at all; an update racing a resolve / dismiss → whichever commits first wins, the other gets `conflict` (FR-NOTE-20). A client offline during an update gets the new text in its reconnect snapshot; nothing replays. *Hidden toast* (FR-NOTE-26) is page memory: a reload shows the summary toast as usual (FR-NOTE-15). *DM bell* (FR-NOTE-27) is derived from the store, so it survives reconnect and restart. *Action cue* is live-only: a DM offline or on another scene at creation sees no cue, and a crash between commit and send loses it (the row stays pending; accepted, as the turn alert).
 - *(Sprint 5)* **Colours:** the stamp is part of the insert: it commits with the notification or not at all (crash-safe, nothing new to lose); disconnect → stripes keep their last colours; reconnect / restart → the snapshot brings rows and colours. A player sending `byPlayerId` in `note.testSend` → `invalid` (strict schema). The creator's colour changes → existing rows restripe (derived). A row created by one DM tab shows the DM colour in every tab.
 - *(Sprint 6)* **Stack placement:** client-only; disconnect / reconnect / restart re-place the stack from what is on screen (the reconnect summary toast lands at the home, FR-NOTE-42); a tool bar shown after a reload re-reports and the stack re-places (FR-NOTE-43). A sticky stack taller than the band above the launcher → "+N more" as built. The DM moves Initiative onto the home band → the stack shifts left of it, and drops below a tool bar it would meet.
+- *(Sprint 9)* **Notifications window open** (FR-NOTE-72): a reload or reconnect with it open keeps the cards folded (the window comes back from shell storage first). A card that resolves while folded never re-toasts. Window memory ([play-shell](play-shell.md), track PM) may leave any window on the home band: the stack still keeps to its column (FR-NOTE-70) and folds.
 - **Invalid / malicious input:** players create only via feature commands and test mode; text per FR-NOTE-21, never HTML; frames > 64 KB closed by live-sync.
 - **Sprint 8 (toast policy):** snapshots never toast, so the policy covers live frames only; a reconnect snapshot re-places the stack like any input change (also after a server crash). Reload: the stack starts home; callouts are transient. A burst: info overflows first, callouts replace each other.
 
@@ -313,6 +336,40 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 
 **Sprint 8 (track WF):** `FR-NOTE-50 toast policy` (order, max 3, info before cards, one callout); `FR-NOTE-51 stack returns home (BL-59)` (pure + `ToastRuntime` DOM: bar gone and windows returned → home within one frame; hover released; a first-row change re-places); `FR-NOTE-52 toast classes`; `FR-NOTE-53 stack reads the plan`. Walkthrough F8, bundle `wf-frame`.
 
+**Sprint 9 (track FX, fix pack).** Tests:
+- **Unit, `keep-out.test.ts` (pure).**
+  - `FR-NOTE-70 stack never leaves its column`:
+    - sim-12 c01 input (1280×720; Game log + Initiative as in a01; Scenes at 400, 112; Mira's box) → left 480.
+    - c03 input (1440×900; Fog bar rect; Scenes `pushed`) → left 560 or the shift, top below the bar.
+    - Property, 500 seeded random window sets at the four sizes → every left ∈ {home, shift ≥ 80}.
+    - WF4's "home band" cases rewritten: no body-clear spot → `covers` > 0 at home, never beside.
+  - `FR-NOTE-71 nearest home, not the least body`: the WF4 re-test input (Notifications left of home, Initiative right, Game log at the bottom) → the chosen top is the smallest clear one, and the Game log's bottom 48 px are not under the stack.
+- **Client DOM, `toast-runtime.test.tsx`.**
+  - `FR-NOTE-70`: `data-left` / `data-top` = the style = the FR-SHELL-59 report.
+  - `FR-NOTE-72 keep clear of an open Notifications window`: DM, the stack's rect is clear of the window's rect (shift, else below).
+  - `FR-NOTE-72 cards fold into an open Notifications window`:
+    - Open `note.history` → card and summary toasts gone; an alert and the callout stay.
+    - Minimise or close it → the card is back, no cue, no sound; a card the user closed stays closed.
+  - `FR-NOTE-73 callout node per show`: two `showCallout` 1 s apart → two node identities, `data-callout-seq` n and n + 1.
+- **Integration, `helpers.test.ts`.** `FR-NOTE-74 update folds into the caller's event`: `{emit: false}` returns one `notification` change and emits nothing; the default still emits `NotificationUpdated`; the player view of the change equals today's.
+- **E2E (thin)**, `e2e/fx-toasts.e2e.ts`, bundle **`fx-toasts-e2e`** (alias of `session-sim-12`; the spec changes state):
+  - DM 1280×720: drag Scenes to 400, 112 → `note-toasts` left 480.
+  - Open Notifications at the home → no `note-toast` box intersects it.
+
+**Walkthrough FX1** (test agent; bundle `session-sim-12`, profile `verify`, DM + `player-1` + `player-2`). Each sim-12 repro is re-checked at the same size; the toast recorder reads the content of `note-toasts` / `note-callout` / `stats-feed-line` every 50 ms, not "each node once".
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | DM 1280×720, Game log + Initiative open, 4 pending cards; drag Scenes to 400, 112 (c01) | Stack left 480 (never 68); `data-left` = drawn left; folds to fewer toasts + "+N more" if it would cover Scenes' body; no window put under it |
+| 2 | DM 1440×900, Fog on, Scenes pushed (c03) | Stack at 560 or left of Initiative, below the Fog bar; 16 / 16 Fog controls hit-testable; never at 276, 218 |
+| 3 | WF4 re-test layout: home band and both sides taken, Game log 1150×240 | Game log Roll button hit-testable; the stack sits nearest its home row |
+| 4 | Notifications at the home (r03), Brakka's card pending | No toast over the window; Apply hit-testable; Apply works. No card or summary toast while it's open; close it → the card toasts back silently, no cue |
+| 5 | DM 1440×900: DM damage kills the hidden Wolf; then Thorn's card kills the hidden Elite (overkill 15) (h) | DM: "Wolf falls (hidden)", then "Overkill! Elite Goblin Warrior 2 falls, overkill 15 (hidden)", each within 1 s (screenshot), each a new `data-callout-seq`; players: none (leak scan clean) |
+| 6 | DM in two tabs: switch the Stats fight picker fast in both (≥ 6 queries in 1 s) ([FR-STATS-69](stats.md#6-functional-requirements)) | No "Too many stats queries"; both tabs show the answer within 1.5 s |
+| 7 | Players: End a fight in which only DM damage killed a monster (f09) ([FR-STATS-70](stats.md#6-functional-requirements)) | Players' summary shows the kill in Highlights and no "No damage yet this fight" |
+| 8 | Stats on the fixture-started fight, after `fixtures:reset-load` ([FR-FIX-29](fixtures-adapters.md#6-functional-requirements), BL-69); record Luck "Today" and the Session tab before and after | Label "Fight 3 · ‹load day›" (e.g. "Thu 22 Oct"); duration = minutes since the load, never thousands of hours; Today / Session show the named change (fixture + live = one session), Campaign unchanged |
+| 9 | DM reload with Notifications open; then Probes → Drop | Cards still folded after the reload; the stack re-places at its home after the reconnect |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -363,6 +420,13 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 - Client `FR-NOTE-69 feed toast is not a notification`: a live kill line → toast, no store row, bell unchanged, a newer one replaces it; a snapshot with the same line → none; preference off → none.
 - Walkthrough [stats §13.1](stats.md#131-sprint-8-tier-b) steps 2, 6, 9, 10.
 
+**Sprint 9 (track FX).** No schema and no new dependency.
+- **FX1** `fix/fx-toasts-feed` (FR-NOTE-70–73, with [stats](stats.md#14-dependencies) FR-STATS-68–70). FX holds the toast runtime this sprint (sprint-9 hotspots); PM doesn't touch it.
+  - Notifications-owned files: `keep-out.ts`, `ToastRuntime.tsx`, `toasts.ts` (callout seq), `stack-inputs.ts` (the `note.history` rect), their tests.
+  - Shared files: none. It reads play-shell's `useShellState` (`windows`, `placed`, `memory`) and `useKeepOuts`, with no frame edit.
+  - Order (seams S5, S6, S10): wave 3; FX1 builds and merges **after PM1** (`fix/window-memory`). Window memory may change `placed` / `memory`, which `stack-inputs.ts` reads. FX1 holds the toast runtime all sprint; SP3's `session-recap` kind only appends to `kinds.ts` and the views.
+- **FX2** owns FR-NOTE-74: notifications-owned `src/server/features/notifications/helpers.ts` (the `emit` option) with [gems](gems.md#14-dependencies) FR-GEM-42.
+
 ## 15. Open questions
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
@@ -399,6 +463,7 @@ Teardown: stop the server, `fixtures:reset --profile verify`.
 |---|---|---|---|---|
 | ~~OQ-NOTE-36~~ | Seam **WF**: the feed and summary toasts in WF's toast policy | **Resolved (integrator, sprint-8 seams / rulings)** (S4, S5): the feed is the **callout** class (FR-NOTE-50), the summary's toast is **info** class; no new region or keep-out | — | NOTE, SHELL, STATS |
 | OQ-NOTE-37 | Summary: toast **and** the window opening? | **Decided (#335): A** · **A. Both** (as OQ-NOTE-28: the toast says why Stats opened; with the "open at End" preference off it is the only signal) · B. Window only (a per-kind "no toast" flag, new to the registry) | no (DM pick) | NOTE, STATS |
+| OQ-NOTE-38 | *(Sprint 9, BL-88; review-b ruling 14)* While the Notifications window is open, what happens to card toasts? (sim-12 r03: a card toast covered the window's own Apply.) | **Decided (DM #339): B.** Card and summary toasts fold into the open window and re-toast silently on close; the stack also keeps clear of it (FR-NOTE-72). | no (decided) | NOTE |
 
 **Sprint 7** (track ST).
 

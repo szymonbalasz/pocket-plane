@@ -2,7 +2,7 @@
 title: Party board
 prefix: PARTY
 status: complete
-owner: spec-cb, spec-pm
+owner: spec-cb, spec-pm, spec-fx
 phase: post-mvp-9
 ---
 
@@ -663,6 +663,7 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-30 | **What players see of other PCs** (A and B **amend #178 G6 / ADR-0036's "No HP, AC"**: a decision reversal) | **Decided (#335): A.** **A. HP numbers (cur / max), temp HP and AC, plus the conditions and death state they already get: what a table says aloud anyway; +343 B a player** / B. A band (healthy / bloodied / down) and AC: HP stays private, still a glance / C. A band only, no AC: closest to today (ADR-0036) | no (decided #335) | entities, ADR-0036 (proposed ADR), FR-PARTY-52 |
 | OQ-PARTY-31 | **A PC hidden from players (#141)** in the summary | **Decided (#335): A.** **A. Accepted: its row and figures still show to other players (as Down and death state already do); hidden PCs are rare and DM-run** / B. Hide its figures while its combatant is hidden: a server-written copy flag on the character (one column, ADR-0039 pattern) | no (decided #335) | entities, FR-PARTY-52 |
 | OQ-PARTY-32 | **Which AC** | **Decided (#335): A.** **A. The sheet's stored AC (`statBlock.ac`): one plain field, same for every viewer** / B. Effective AC with active modifiers (Shield of Faith +2, FR-MOD-24): truer in a fight, but others never get modifiers, so it needs a server-written copy column refreshed by every effect change | no (decided #335) | effect-modifiers, FR-PARTY-52 |
+| OQ-PARTY-47 | *(Sprint 9, track FX, BL-79)* Other players see a draft PC, with its HP and AC, in Party status. The draft flag lives on the owner-only sheet, so FR-PARTY-51's "drafts out" can't apply for them. The CB3 ruling (#336) allowed it; the BL asks whether a draft PC's existence is private. | **Decided (DM #339): A.** Keep: other players see a draft PC in Party status; BL-79 closed as by design (a draft behaves as ready, token included, FR-CHARX-11). | no (decided) | PARTY, ENT, CHARX |
 
 **Sprint 9, track PM** (owner spec-pm). Decided before the spec (#338): the rename, Party status first, `party.summary` gone, Companions as a section of the Party status tab (owners' companions under their PC), 550 px. Decided at DM gate 1 (#339): every bold pick below.
 

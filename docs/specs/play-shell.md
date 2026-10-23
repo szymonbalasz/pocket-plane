@@ -2,13 +2,15 @@
 title: Play shell
 prefix: SHELL
 status: complete
-owner: spec-wf, spec-cb, spec-tt, spec-pm
+owner: spec-wf, spec-cb, spec-tt, spec-pm, spec-fx
 phase: post-mvp-9
 ---
 
 # Play shell
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
+
+> **Sprint 9, track FX (fix pack, #338; BL-91 only, PM owns the rest of this spec this sprint).** A page loaded before a rebuild offers a reload (DM: "Rebuild finished — reload"; players: "New version available — reload") wherever a lazily loaded chunk is gone, instead of "This window failed to render." Every dynamic import goes through one loader (review-b ruling 2). FR-SHELL-175–176, OQ-SHELL-87 (no build id); slice FX3, walkthrough [live-sync §13 FX3](live-sync.md#13-test-plan). The one frame edit (`ShellWindow.tsx` boundary) waits on PM's frame core.
 
 > **Sprint 4 (track M; session-sim-7 glitches: windows over the map's tokens, Initiative over the Compendium at Start, the player sheet over the map at 1280×800, an empty Handout window after a reload, the DM launcher clipped at 1280×720).** New FR-SHELL-40–44; amended FR-SHELL-07, -08, -16, -34. *Sprint-4 gate 1 (DM, 2026-10-17, **#245**):* the placement rule (OQ-SHELL-24: token-aware, clear of the toast corner, your own spot remembered, no feature open over another window) and launcher overflow (OQ-SHELL-25: icons only, then "⋯") decided as picked; user opens keep their spot and Initiative at Start is the only feature open (bulk). One map-tools design with [scenes-map](scenes-map.md) (the fit uses FR-SHELL-44; shared walkthrough there) and [scene-tools](scene-tools.md). Track D's roll popup shares the bottom-right corner (sequenced, §14). *Seams pass:* S7 applied (toast keep-out in FR-SHELL-40; M4 → D7; OQ-SHELL-27 settled).
 
@@ -381,6 +383,9 @@ BL-59 → [FR-NOTE-51](notifications.md#6-functional-requirements); BL-53 → FR
 | FR-SHELL-141 | **Size-table row** (seams S12; same at 1280×720, 1280×800, 1440×900, 1600×900, both clients): **default** 280 × 260, `growToContent` (FR-SHELL-39: height follows its rows, capped by the client's band, 412 at 1280×720, until the user resizes); **useful** 280 × 236, **criterion**: every PC row of a 6-PC party whole (name, HP, temp, AC uncut; FR-PARTY-58), companions may scroll; **min** 240 × 120. Rows, not the frame, decide wrapping. The criterion is checked in a browser (review-b #3): `party.summary`'s case in `e2e/useful-size.e2e.ts` on `wf-frame-e2e` + fixture `cb-party-six` (6 PCs, worst-width figures): `scrollHeight ≤ clientHeight`, every PC row visible and whole; `bun test` checks the table row's shape only. WF1 adds the pending row in the append-only `size-table.ts`; CB3 fills its values (review-b #14). | S12; review-b #3, #14, #21 |
 | FR-SHELL-142 | **No feature open**: only the launcher opens it (a reload restores it if it was open); a fight's Start opens nothing new (Initiative stays the only feature open at Start, FR-CBT-60). Layout remembered per browser as every window. | FR-SHELL-41 |
 | FR-SHELL-143 | **Contract rows** (FR-SHELL-112 (1)): the golden list, the harness sets and `size-table.ts` are **append-only registries** (review-b #14); WF1 adds `party.summary`'s pending entries to the player sets **P1 / P3**, the DM set **D3** and both goldens (player and DM); CB3 fills them and regenerates the goldens **after WF1 merges**. **Launcher fit** (review-b #20): with "Party status" added (and TT's top-bar items), the launcher still fits at 1280×720 in both clients (`launcher-fit.ts`, FR-SHELL-43: icons only, then "⋯"). Opened by the launcher only (`by: "user"`). | Seams S12; review-b #14, #20 |
+| **Sprint 9** (track FX, BL-91 only) | | |
+| FR-SHELL-175 | **A stale chunk offers a reload** (BL-91: after `main`'s `dist/` was rebuilt, the DM's open page showed "TypeError: Failed to fetch dynamically imported module …/TrayWindow-<hash>.js" and "This window failed to render." in the Dice tray).<br>• **Root cause** (code read): lazy parts use bare `React.lazy(() => import(…))` or `import()`. A hashed chunk deleted by the rebuild makes the import reject, and `ShellWindow.tsx`'s `WindowErrorBoundary` shows the generic error. The server's cache headers are right (`index.html` `no-cache`, `/assets/*` immutable), so a reload always gets the new build.<br>• **Rule:** a chunk failure is a dynamic `import()` that still rejects after FR-SHELL-176's retry with the browser's chunk error ("Failed to fetch dynamically imported module", "Importing a module script failed", "error loading dynamically imported module").<br>• **The import rejection picks the panel.** No handler calls `preventDefault` on `vite:preloadError`, so Vite lets the import reject.<br>• A window body shows the **reload panel**, a **Reload** Button (`ui-window-reload`) with client-specific copy:<br>&nbsp;&nbsp;– DM: "Rebuild finished — reload".<br>&nbsp;&nbsp;– Players: "New version available — reload".<br>• The rest of the page stays live: other windows, the map, the socket, open dialogs. The window still closes and minimises. Other errors keep "This window failed to render.".<br>• A part outside a window body falls back per the [§14 site list](#14-dependencies): 3D dice → flat dice; roll popup → the log's chips + the stale notice; prompt body, settings panels, macros panel, pause control → an inline reload panel (`ui-chunk-reload`); map canvas → a reload panel in the map area; DM REST `session` → the caller's existing error + the stale notice.<br>• The **stale notice** is one sticky alert-class toast per page ("Rebuild finished — reload" / "New version available — reload", `ui-chunk-reload-toast`), shown at the first chunk failure that has no panel of its own.<br>• Test `FR-SHELL-175 stale chunk offers a reload`. | BL-91 |
+| FR-SHELL-176 | **One loader, retry once, no loop** (BL-91; review-b ruling 2).<br>• Every dynamic `import()` and `lazy(` in `src/client` goes through one loader, in new `src/client/common/lib/lazy-chunk.ts`:<br>&nbsp;&nbsp;– `loadChunk(factory)`: a promise; retries once after 500 ms on a chunk error, then classifies.<br>&nbsp;&nbsp;– `lazyChunk(factory)`: a React component over `loadChunk`.<br>&nbsp;&nbsp;– dice-extras' `createChunkLoader` and compendium's `lazyApi` call `loadChunk` inside.<br>• A **`bun test` scan** in `lazy-chunk.test.ts` reads every non-test `.ts` / `.tsx` under `src/client` and fails on a `lazy(` or `import(` that isn't the direct argument of `lazyChunk` / `loadChunk` / `createChunkLoader` / `lazyApi`, or inside `lazy-chunk.ts`. No `biome.json` change.<br>• A Reload pressed within 10 s of the previous one for the same chunk (sessionStorage) doesn't reload again. It shows the failed-reload copy instead:<br>&nbsp;&nbsp;– DM: "Still failing — is the server on the new build?"<br>&nbsp;&nbsp;– Players: "Still failing — check with your DM" (players only, and only after a failed reload).<br>• **No build id** ([OQ-SHELL-87](#15-open-questions)).<br>• Test `FR-SHELL-176 one loader, retry once, no loop`. | BL-91 |
 
 **Sprint 9, track PM: window memory** (DM #338, decided; amends ADR-0060 per [ADR-0064](../architecture/adr/0064-window-memory.md); every pick decided at DM gate 1, #339)
 
@@ -1033,6 +1038,17 @@ Covers SHELL FR-144–167, [PARTY FR-59–67](party-board.md#611-sprint-9-party-
 
 Teardown: stop, `fixtures:reset --profile verify`.
 
+**Sprint 9, track FX (BL-91 only).** Tests:
+- **DOM, new `shell-window-error.test.tsx`.** `FR-SHELL-175 stale chunk offers a reload`:
+  - A test window whose import rejects twice with `TypeError("Failed to fetch dynamically imported module …")` → `ui-window-reload` with the DM copy (DM store) or the player copy (player store).
+  - A sibling window still renders. A non-chunk error → "This window failed to render.".
+  - A failing 3D-dice loader → flat dice + one `ui-chunk-reload-toast`. A second failure on the same page → still one toast.
+- **Unit, `lazy-chunk.test.ts`.** `FR-SHELL-176 one loader, retry once, no loop`:
+  - One rejection then success → it resolves; two → classified stale; a non-chunk error → rethrown as is.
+  - A Reload within 10 s → the failed-reload copy (the DM's never says "check with your DM").
+  - The source scan: no bare `lazy(` / `import(` outside the loader. It fails on a planted bare site in a fixture string.
+- **E2E and walkthrough:** [live-sync §13 FX3](live-sync.md#13-test-plan): `e2e/fx-stale-chunk.e2e.ts`, and step 3 rebuilds `dist/` under an open page, in the worktree only.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -1191,6 +1207,29 @@ Teardown: stop, `fixtures:reset --profile verify`.
 - **Docs at consolidation:** protocol §18 (window memory, z-order, push of remembered windows, Reset), §24 (size table: Party Manager row, `party.summary` gone); glossary (OQ-SHELL-83, OQ-PARTY-38). No data-model change (no column; the browser-only `WindowState` keeps its fields). **None:** events, intents, record types, wire bytes.
 - **Dependency:** none. The nudge reuses `renderedRect`; z-order is the existing `normaliseZ`; the migration is ≤ 40 entries at load.
 
+**Sprint 9, track FX (BL-91), in FX3** `fix/fx-sync-shell`:
+- **Files:** new `src/client/common/lib/lazy-chunk.ts` (+ test), the reload panel, the stale notice. Every dynamic-import site below goes through the loader (FR-SHELL-176). Checked by the scan, so the list can't drift.
+
+| Site | Chunk | Fallback on a stale chunk |
+|---|---|---|
+| `dice-extras/window.ts` | Dice tray body | window reload panel |
+| `dm/features/dice-extras/requests-window.ts` | Requests body (DM) | window reload panel |
+| `dice-extras/TrayWindow.tsx`, `MacrosSection.tsx` | macros panel (tray, sheet tab) | inline `ui-chunk-reload` in that section |
+| `dice-extras/DiceSection.tsx`, `RollPopup.tsx` | `SettingsPanel` (Preferences Dice, popup gear) | inline panel in the section / popover |
+| `dice-extras/lazy3d.ts` (`createChunkLoader`) | 3D dice | flat dice (today's `failed` state) + stale notice |
+| `dice-extras/ThrowLayer.tsx` | `ThrowViews`; `RollPopup` stack | flat dice; no popup, the log keeps the chips + stale notice |
+| `dice-extras/PromptViews.ts` | prompt body (`promptChunk`, Player / Dm) | inline panel in the prompt card; the prompt re-toasts after the reload (FR-NOTE-60) |
+| `pause/top-bar.tsx` | `PauseControl` (DM) | compact inline Reload in its top-bar slot |
+| `scenes-map/LazyMapCanvas.tsx` | map canvas | reload panel in the map area |
+| DM `campaign-management/session` via `lazyApi` / `import()`: `AlertSoundsSection.tsx`, `combat-extras/add-dialog.tsx`, `combat-tracker/encounters-window.tsx`, `rest.ts`, `summon-dialog.tsx`, `compendium/compendium-window.tsx`, `entities/creatures-window.tsx`, `pet-dialog.tsx`, `pet-rest.ts`, `scenes-map/rest.ts` | DM REST API | the caller's existing error + stale notice |
+| `dm/features/scene-tools/layers-popover.tsx` | none: static imports only (checked) | nothing to wrap; covered by the scan |
+
+- ⚠ **Frame file:** `ShellWindow.tsx` `WindowErrorBoundary` (its render branch picks the panel). PM1 holds every frame file (seams S5), so this lands **after PM1 merges** as a one-function grant in FX3. The loader and the sites are FX3's and build at once (wave 2).
+- *(Seams S5)* BL-76 (`layout-checks.ts`) and BL-90's "Scenes returns to its pre-drag spot" moved to **PM1**. Root-cause hand-offs:
+  - BL-76: `layout-checks.ts:150` `Math.min(base.x, RAIL_CLEAR)` → `Math.max(a.left, RAIL_CLEAR)`.
+  - Scenes: at 1280×720 the drop spot wasn't free at return (hypothesis), so FR-SHELL-102's grow branch ran. Window memory decides it now.
+- No server change, no dependency.
+
 ## 15. Open questions
 
 **Bold** option = suggested pick (not decided).
@@ -1318,6 +1357,7 @@ Teardown: stop, `fixtures:reset --profile verify`.
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-SHELL-73 | **Seam with WF (window-frame pass): registering Party status.** CB3 needs WF's contract for new windows (the FR-SHELL-86 successor: size-table row, useful size, golden list, put-away order) and its frame core merged first | **Resolved (integrator, sprint-8 seams / rulings).** **Closed by seams S12:** `party.summary` (both clients) registers per FR-SHELL-112 (1) after WF1, with its size-table row (FR-SHELL-141: default, useful + criterion, min), goldens and harness sets P1 / P3 / D3 (append-only registries, review-b #14); WF's placer decides its spot; no keep-out; WF adds it as a pending row. (If the DM picks a strip, OQ-PARTY-29 B, WF owns the strip region and CB3 fills it) | — | WF, FR-SHELL-140–143 |
+| OQ-SHELL-87 | *(Sprint 9, BL-91)* Should the server send a build id so a client can tell it is stale before a chunk fails? | **Resolved (integrator, seams S5, per T5): A. No build id.** The failed chunk is the signal (FR-SHELL-175 / -176), and `index.html` is `no-cache`, so a reload always gets the new build. · B. A build id in the snapshot: a stale page could offer "New version" before anything fails. But the server keeps running while `dist/` is rebuilt (the BL-91 case), so a start-time id would be wrong; it would need a `dist` watch plus a protocol field, for a case only gates and DM updates hit. | no | SHELL, SYNC |
 
 **Sprint 9** (track PM, owner spec-pm). Decided before the spec (#338): window memory as stated in the sprint-9 block; Party Manager. Decided at DM gate 1 (#339): every bold pick below.
 

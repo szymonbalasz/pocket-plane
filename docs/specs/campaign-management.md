@@ -2,14 +2,16 @@
 title: Campaign management
 prefix: CAMP
 status: complete
-owner: spec-tt
+owner: spec-tt, spec-fx
 wave: 1
-phase: post-mvp-8
+phase: post-mvp-9
 ---
 
 # Campaign management
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
+
+> **Sprint 9 (track FX, fix pack, #338).** BL-77: the DM campaign switcher keeps a 192-px minimum and is cut at narrow widths. FR-CAMP-51 makes it ellipsise like the players' name. Slice FX3; 0 B.
 
 > **Sprint 5 (track K, BL-17; DM decisions [#243](../decisions-log.md) [4], [#251](../decisions-log.md)).** Decided by the DM (not open): **players and the DM pick a colour**; it carries through to their laser pointer, pings, templates (the only player "drawings": freehand is out, #21), drag path, and shows in log lines and notifications. This spec owns the colour (record field, intent, picker, palette, client helper); the surfaces are in [scenes-map](scenes-map.md) (FR-MAP-68–73), [scene-tools](scene-tools.md) (FR-SCN-47; plus the kept-template right-click menu, DM #250 [1], FR-SCN-48–51), [dice-roll-log](dice-roll-log.md) (FR-DICE-60–61), [notifications](notifications.md) (FR-NOTE-38–41). New FR-CAMP-23–29; proposed [ADR: player colour stored once](../architecture/adr/0055-player-colour.md). The shared **§13 colours walkthrough** (K1–K12) is here.
 
@@ -154,6 +156,7 @@ N/A — the goals in §3 are the stories; listing them again adds nothing.
 | FR-CAMP-48 | *(Sprint 8)* **`campaign.alertSounds`** (JSON leaf, default `{}`): `{turn?, request?, pause?, resume?: audio asset ID \| "none"}`; absent = default (FR-SHELL-130); wire only when non-empty. **`camp.setAlertSound {alert, sound: "default" \| "none" \| assetId}`** (DM; `assets.require(…, {kind: "audio"})`; `default` removes the key) → `AlertSoundSet {alert}`, `campaign` upsert to every connection (players need the picked IDs; the library stays DM only). Test `FR-CAMP-48 alert sound picks`. | OQ-CAMP-36 |
 | FR-CAMP-49 | *(Sprint 8)* **Alert sounds in Campaign options** (FR-CAMP-42's Dialog, under the features): a row per key (Select Default / None / library sounds, Test ▶), one "Upload sound…" (rejects inline). Library via `sync.load {type: "audio-asset"}` on open. DM only, `live` only. Test IDs `camp-sound` (+ `data-value` = key), `camp-sound-{select,test,upload,error}`. Test `FR-CAMP-49 alert sounds section`. | OQ-CAMP-35 |
 | FR-CAMP-50 | *(Sprint 8)* **CON-44** (measured): +150 B (picks), +488 B (paused); `CampaignPaused` 834 B, `CampaignResumed` / `AlertSoundSet` 497 B. Edges: row + event commit together; two DM tabs → last wins; nothing dangles (no asset delete). | #256 |
+| FR-CAMP-51 | *(Sprint 9, track FX, BL-77)* **The DM switcher ellipsises** (amends §7's campaign switcher).<br>• **Root cause:** the shared `SelectTrigger` carries `min-w-48` (192 px), and `CampaignBar.tsx` neither overrides it nor truncates the name, so the top bar clips the trigger.<br>• **Rule:** the DM campaign switcher shrinks with the top bar down to its chevron plus 48 px of name, and the name ellipsises as the players' does. The full name goes in a Tooltip and `title`.<br>• Fixed locally in `CampaignBar.tsx` (`min-w-0` on the trigger, `truncate` on the name); the shared `overlays.tsx` (81 Selects) is unchanged.<br>• Outcome at 1280×720 and 1024×768 with a 40-character name: the trigger's right edge ≤ its container's, and the name ends in "…".<br>• Test `FR-CAMP-51 switcher ellipsises`. | BL-77 |
 
 ## 7. UI/UX notes
 
@@ -395,6 +398,10 @@ Fixture `gems-on` (setup: `camp.setFeature {gems, on: true}`), `gems-hidden` (of
 | DOM | `FR-CAMP-42 options dialog` (rows from the registry; off asks once; disabled while not `live`); `FR-CAMP-43 party gem counts` (gems on: icons + counts, a count of 6 with no over-limit styling; off: absent) | in-code |
 
 Walkthrough: [gems §13](gems.md#13-test-plan) steps 1–3 and 12.
+
+**Sprint 9 (track FX, FX3):**
+- DOM, new `campaign-bar.test.tsx`: `FR-CAMP-51 switcher ellipsises` (trigger without `min-w-48`, name `truncate`, `title` = full name).
+- Walkthrough [live-sync §13 FX3](live-sync.md#13-test-plan) step 4. Slice FX3 `fix/fx-sync-shell`; file `client/dm/features/campaign-management/CampaignBar.tsx` only; no shared file (`PlayFrame.tsx` untouched).
 
 ## 14. Dependencies
 

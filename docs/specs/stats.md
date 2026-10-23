@@ -2,8 +2,8 @@
 title: Stats and summaries
 prefix: STATS
 status: complete
-owner: spec-wf, spec-sb
-phase: post-mvp-8
+owner: spec-wf, spec-sb, spec-fx
+phase: post-mvp-9
 ---
 
 # Stats and summaries
@@ -15,6 +15,13 @@ phase: post-mvp-8
 > **Sprint 8, track SB** (DM [#334](../decisions-log.md), decided): tier B, with tier A's visibility rules. FR-STATS-26–53 ([§6.1](#61-tier-b-sprint-8)); also FR-CBT-152–153, FR-NOTE-68–69, FR-CHARX-97–99, FR-DICE-89–90. No schema. [ADR: session partials](../architecture/adr/0062-stats-session-partials.md). Seams applied. OQ-STATS-20–30 decided at DM gate 1 (#335).
 
 > **Sprint 8, track WF** (DM [#333](../decisions-log.md); size rows only): FR-STATS-66 gives `stats.board` a useful size checked by content; FR-STATS-67 sizes the award grid to the window (BL-66). Slice WF4; walkthrough F9, F13 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
+
+> **Sprint 9, track FX** (fix pack, DM [#338](../decisions-log.md)): FR-STATS-68–70 ([§6.2](#62-sprint-9-fix-pack)).
+> - **BL-84** (sim-12 FAIL h): the DM got no kill-feed callout for hidden kills.
+> - **BL-74**: a `conflict` on rapid queries from a viewer's two tabs.
+> - **BL-90**: players' "No damage yet" beside a kill.
+> - **BL-69**, dates half: the fixture clock. [OQ-STATS-36](#15-open-questions) decided A at DM gate 1 (#339, as [OQ-FIX-21](fixtures-adapters.md#15-open-questions)): [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) anchors CLI loads at load time ([ADR-0068](../architecture/adr/0068-fixture-load-clock.md)).
+> - Slice **FX1** with [notifications](notifications.md) FR-NOTE-70–73; walkthrough [notifications §13 FX1](notifications.md#13-test-plan). No schema, 0 B.
 
 ## 1. Summary
 
@@ -133,6 +140,14 @@ Tier A rules hold: filter, then aggregate; final roll only; names from facts; pa
 | FR-STATS-51 | **Bench** (100 sessions): fight + highlights ≤ 20 ms; luck, one session ≤ 50 ms; campaign warm ≤ 50 ms; the chunked build's **longest single block ≤ 50 ms**. |
 | FR-STATS-52 | **BL-69** (default-fight half only; flagged at the gate): a player's default fight is the started one even before a public fact ("This fight", party rows at 0; amends FR-STATS-15). |
 | FR-STATS-53 | **BL-71**: Show awards toasts and opens Stats once per client. |
+
+### 6.2 Sprint 9 (fix pack)
+
+| ID | Requirement |
+|---|---|
+| FR-STATS-68 | **The DM's feed shows hidden kills** (BL-84, sim-12 FAIL h; FR-STATS-27 / -28 unchanged).<br>• Every live line the DM receives with `fell` or `callout` shows its feed callout within 1 s. That includes hidden lines, from a card (`cbt.attack` line) or from the DM's direct damage (`hp` line), and lines that arrive while another callout shows (it replaces that one, [FR-NOTE-73](notifications.md#6-functional-requirements)).<br>• **Root cause: not confirmed.**<br>&nbsp;&nbsp;– Probe (real server, `stats-b`, DM direct 30 on the hidden Elite): `feedLinesOf(frame, "dm")` returns "Overkill! Elite Goblin Warrior falls, overkill 15 (hidden)". So the server, the frame and the feed parse work, and the unit `feed.test.tsx` hidden case passes. The loss is downstream.<br>&nbsp;&nbsp;– Hypothesis 1: the callout replaced one already showing in the same unkeyed node, which the sim recorder (each node once) can't see. FR-NOTE-73 fixes both.<br>&nbsp;&nbsp;– Hypothesis 2: the show path (`onStatsFrame` → `showFeedToast` → `showCallout`).<br>• Hypothesis 3 (review-b ruling 13): a hidden card Apply reaches the DM as an **upsert of the existing attack line** (or a `dmPayload` change) rather than a new line, and FR-STATS-28's "a new line" rule drops it.<br>• **Amends FR-STATS-28:** a line toasts the first time this page sees it carry `fell` or `callout`, whether as a new line or as an upsert of one it already held. Undo and supersede upserts still never toast, and a line toasts once.<br>• The builder reproduces sim-12 step h first, at 1440×900 with a content recorder, covering **both paths** (the DM's direct `hp` line, the card-Apply upsert), and writes down which cause it was. |
+| FR-STATS-69 | **A query limit is per viewer; the client retries it quietly** (BL-74; amends FR-STATS-16's "per connection; the excess is coalesced into the next"; review-b ruling 18).<br>• The ≤ 4 / s limit is **per viewer** (role + player, all their tabs): the sprint-7 integrator pick in [#327](../decisions-log.md) ("per-actor (not per-connection) rate limit"), and the [protocol](../protocol/README.md) `stats.query` row's "an actor's 5th computed answer". Commands see no connection.<br>• **Server outcome, unchanged:** an over-limit query whose input has a memo gets that memo; one with no memo is answered **`conflict`** "Too many stats queries", **not coalesced**.<br>• Client: a `stats.query` answered `conflict` keeps the last result shown (no error state) and asks again once, 1 s later, with the latest input.<br>• "Couldn't load stats" shows only if that retry fails too. Server unchanged. |
+| FR-STATS-70 | **No "No damage yet" beside a kill** (BL-90, sim-12 f09; amends FR-STATS-24).<br>• "No damage yet this fight" shows only when every row's numbers are 0 **and** the viewer's Highlights for the fight hold no event (kill, down, callout).<br>• Otherwise an all-zero table shows no copy and Highlights carry the fight. For players that is a fight whose damage was the DM's own or on hidden sides (OQ-STATS-01). |
 
 **Formulas** (per character; companions rolled up, FR-STATS-09)
 
@@ -317,6 +332,18 @@ Named tests (all `FR-STATS-NN …`):
 9. Player 2 turns Kill feed off: no toast for them.
 10. Reload, then history Open: same numbers. Hard kill + restart: `state:digest` equal.
 
+### 13.2 Sprint 9 (fix pack)
+
+- **Client integration, `feed.test.tsx`.** `FR-STATS-68 hidden kill reaches the DM's feed`:
+  - Real frames come from the test harness on `stats-b`: Thorn's card kills the hidden Elite (`cbt.attack` line), and DM direct damage kills the hidden Wolf (`hp` line). They go through `onStatsFrame` into a mounted `ToastRuntime`.
+  - **Card-Apply upsert case:** the hidden Elite's attack line first arrives without `fell` (the roll), then as an upsert carrying `fell` (the Apply) → exactly one toast, on the upsert.
+  - Each shows a visible `stats-feed-line` with "(hidden)": once with no callout showing, once while one shows (a new `data-callout-seq`). An undo upsert of the same line → none.
+  - Players' frames give none.
+- **Client, `refresh.test.ts`.** `FR-STATS-69 conflict retried quietly`: a `conflict` keeps the last result, re-asks once 1 s later with the latest input, and shows no error. A second `conflict` → "Couldn't load stats" + Retry.
+- **Server, `stats.test.ts`.** `FR-STATS-16 rate limit coalesces` is reworded "per viewer"; its cases are unchanged.
+- **Client, `logic.test.ts`.** `FR-STATS-70 no "No damage yet" beside a kill`: zero rows + a kill highlight → no copy; zero rows and no highlight → the copy. `render.test.tsx` gets the same case.
+- Walkthrough: [notifications §13 FX1](notifications.md#13-test-plan) steps 5–8. Bundles: `session-sim-12`, `stats-b` (tests). E2E: none new (FR-STATS-68's outcome is in FX1's walkthrough).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -340,6 +367,13 @@ Named tests (all `FR-STATS-NN …`):
 | **SB0** `build/sb-core` | `features/stats/*`, `shared/stats/*`, both `stats-read.ts`, `combat-tracker/hp.ts` + `@shared/combat-tracker/log-kinds.ts` (`fell`), `stats.bench.ts`, `fixtures/units/stats/sb-*` | appends: `rule-hooks.ts`, `notifications/kinds.ts`, `bundles/index.ts` | wave 1, ∥ WF1 / TT0 / CB0; no schema, no `lifecycle.ts` |
 | **SB1** `build/sb-stats-ui` | `@ui/features/stats/*` (feed, Highlights, Luck, End open) | appends: `notification-views.ts` ×2, `pref-sections.ts` ×2 | after SB0 + WF1 + WF4 |
 | **SB2** `build/sb-trophies` | `@ui/features/stats/trophies/*` | append: `sheet-sections.ts` (`order: 100`) | after SB0 + WF1 + WF4; ∥ SB1 (or one builder, one walkthrough) |
+
+**Sprint 9 (track FX).** FR-STATS-68–70 go in **FX1** `fix/fx-toasts-feed`, with [notifications](notifications.md#14-dependencies) FR-NOTE-70–73: one builder and one walkthrough.
+- Files: `@ui/features/stats/{feed.ts, runtime.tsx, query.ts, refresh.ts, StatsWindow.tsx, logic.ts}` and their tests. Server: none (FR-STATS-16's test wording only).
+- Shared: none. Docs: the protocol `stats.query` row gets "per viewer; client retries" (written with FX1).
+- **Stats client files have one holder at a time** (seams S7): FX1 first, then SP3's stats edits.
+- [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) (BL-69, seams S13) also lands in FX1: `server/features/fixtures-adapters/loader.ts` (`now`) and test. ⚠ `scripts/fixtures.ts` is shared tooling (AGENTS §9.9): one line passing the load start, `shared change needed`.
+- Order (seams S5, S10): FX1 builds in wave 3 and merges **after PM1**.
 
 ## 15. Open questions
 
@@ -384,6 +418,7 @@ Named tests (all `FR-STATS-NN …`):
 | OQ-STATS-29 | End with hidden monsters | **Decided (#335): A** · **A. Public facts only; no survivors / "victory"; DM sees Still standing** · B. No players' summary while a hidden monster has HP: missed summaries | no | STATS |
 | OQ-STATS-30 | Campaign numbers (≈ 1 s at 100 sessions) | **Decided (#335): A** · **A. Session partials ([ADR](../architecture/adr/0062-stats-session-partials.md))**: ≈ 25 ms warm · B. Compute each time · C. Tables: schema, drift | no | STATS |
 | OQ-STATS-31 | Glossary: Kill feed, Fight summary (Highlights), Luck tracker, Trophy case | **Resolved (integrator, sprint-8 seams / rulings)** · **A. Add** | no (integrator, S16) | glossary |
+| OQ-STATS-36 | *(Sprint 9, BL-69 dates half)* The fixture-started fight reads "Fight 3 · Thu 1 Jan" and "Duration 7074 h 18 min". Cause (code read): the seeded clock is the fixed `FIXTURE_INSTANT` 2026-01-01 (`commands/context.ts`, FR-FIX-08). The fight's `startedAt` comes from the fixture, but its live lines and End use real time, and the label and duration read `startedAt` (`rules.ts` `neutralFightLabel`, `rules-b.ts`). | **Decided (DM #339, as [OQ-FIX-21](fixtures-adapters.md#15-open-questions)): A.** [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) and [ADR-0068](../architecture/adr/0068-fixture-load-clock.md): `fixtures:load` / `reset-load` anchor the seeded clock at load time (minute); `bun test` and `bun run e2e` keep the fixed instant. | no (decided) | STATS, FIX |
 
 **Resolved (integrator, sprint-8 seams / rulings)**: ~~OQ-STATS-32~~ (S4 / S5: feed = callout class; summary = `stats.board` via the ladder), ~~OQ-STATS-33~~ (S6: counted iff the entry is public), ~~OQ-STATS-34~~ (S8: no `lifecycle.ts`).
 
