@@ -5,7 +5,7 @@
 // "user"` for the palette and Stats' Recap button.
 import type { You } from "@shared/protocol/frames";
 import { RECAP_WINDOW_KIND } from "@shared/session-recap/schemas";
-import { useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { createStore } from "zustand";
 import { useSync } from "../../sync/store";
 import type { OpenBy } from "../play-shell/manager";
@@ -57,4 +57,18 @@ export function useOpenRecap(): (fromN: number | null, by: OpenBy) => void {
     (fromN: number | null, by: OpenBy) => openRecap(fromN, { you, open, by }),
     [you, open],
   );
+}
+
+export type RecapOpener = (fromN: number | null, by: OpenBy) => void;
+
+/**
+ * FR-STATS-79: the page's Recap opener, set by the Recap runtime (`recap.session`'s companion,
+ * mounted only while the kind is registered and available on this client) and read by Stats'
+ * Session tab, which shows its Recap button only while one is set.
+ */
+export const recapOpener = createStore<{ open: RecapOpener | null }>(() => ({ open: null }));
+
+export function useRecapOpener(): RecapOpener | null {
+  const read = () => recapOpener.getState().open;
+  return useSyncExternalStore(recapOpener.subscribe, read, read);
 }

@@ -40,32 +40,20 @@ import {
 } from "../combat-tracker/stats-read";
 import { entryVisible, type RollFact } from "../dice-roll-log/stats-read";
 import { lootRows } from "../party-loot/recap-read";
-import { characters, type Fights, fightsFor, luckRolls, type StatsRead } from "../stats/compute";
+import {
+  characters,
+  fightsFor,
+  luckRolls,
+  type StatsRead,
+  sessionFactsOf,
+  sessionFights,
+} from "../stats/compute";
 
 type Read = Pick<Tx, "select" | "all">;
 
 /** FR-STATS-03: a fact counts for the viewer only if its line is visible to them. */
 const visibleFacts = (r: StatsRead, facts: readonly CombatFact[]) =>
   facts.filter((f) => entryVisible(r.viewer, { public: f.public, kind: f.entryKind }));
-
-/** The session's counted facts the viewer sees (by line `n`, FR-STATS-13). */
-const sessionFacts = (r: StatsRead, s: SessionBounds) =>
-  visibleFacts(r, combatFacts(r.db, { campaignId: r.campaignId, fromN: s.fromN, toN: s.toN }));
-
-/**
- * FR-STATS-78 `sessionFights(r, s)`: the fights with a counted fact the viewer sees inside session
- * `s` (the rule `sessionsStats` counts by), oldest `startedAt` first, among the viewer's fights.
- * > Moves to `stats/compute.ts` with SP3's stats edits (after FX1, seams S7).
- */
-export function sessionFights(
-  r: StatsRead,
-  s: SessionBounds,
-  facts: readonly CombatFact[] = sessionFacts(r, s),
-  fights: Fights = fightsFor(r),
-): FightRow[] {
-  const ids = new Set(facts.map((f) => f.encounterId));
-  return fights.listed.filter((f) => ids.has(f.id));
-}
 
 // ---------- header and share (per query) ----------
 
@@ -285,7 +273,7 @@ export function recapBody(
   s: SessionBounds,
 ): RecapBody {
   const chars = characters(r.db, r.campaignId);
-  const facts = sessionFacts(r, s);
+  const facts = sessionFactsOf(r, s);
   // FR-RECAP-25: one `fightsFor` per query (labels, the session's fights, the awards' details).
   const fights = fightsFor(r);
   const inSession = sessionFights(r, s, facts, fights);

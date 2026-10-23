@@ -19,6 +19,8 @@ import { createPauseGate } from "../pause/gate";
 import type { QueryStatus, Timers } from "../stats/refresh";
 import {
   CONFLICT_RETRY_MS,
+  listBehind,
+  pickerSessions,
   RECAP_REFRESH_MS,
   RECAP_WINDOW_KIND,
   type Recap,
@@ -346,5 +348,58 @@ describe("FR-RECAP-24 share dialog", () => {
     expect(html(false)).toMatch(/data-testid="recap-share-send"[^>]*disabled/);
     // A reject: the message inline, the draft kept (the form is unchanged).
     expect(html(true, "Session not found")).toContain("Session not found");
+  });
+});
+
+describe("RC5 session picker", () => {
+  const s1 = {
+    fromN: 1,
+    toN: 46,
+    from: "2026-01-01T00:00:00.000Z",
+    to: "2026-01-01T00:00:00.000Z",
+    fights: 3,
+  };
+  const s47 = {
+    ...DM_RECAP,
+    fromN: 47,
+    toN: 48,
+    from: "2026-10-23T13:40:00.000Z",
+    to: "2026-10-23T13:40:02.000Z",
+  };
+
+  test("FR-RECAP-11 RC5 repro: a new derived session starts while the Recap is open → the picker lists it at once, stats' list is asked again, a pick keeps its session id", () => {
+    // The open window's list still holds only session 1; the live re-query answered session 47.
+    expect(listBehind([s1], s47)).toBe(true);
+    expect(pickerSessions([s1], s47).map((s) => s.fromN)).toEqual([47, 1]);
+    const html = body("dm", s47);
+    expect(html).not.toContain("No session");
+    // The refreshed list covers it: nothing more to ask.
+    const fresh = [{ fromN: 47, toN: 48, from: s47.from, to: s47.to, fights: 1 }, s1];
+    expect(listBehind(fresh, s47)).toBe(false);
+    expect(pickerSessions(fresh, s47).map((s) => s.fromN)).toEqual([47, 1]);
+    // Picking "Thu 1 Jan" asks for session 1 by id (never "the newest"): its recap is covered.
+    expect(listBehind(fresh, { ...DM_RECAP, fromN: 1, toN: 46 })).toBe(false);
+    // The newest session grows (a line in it): the list's span is behind again.
+    expect(listBehind(fresh, { ...s47, toN: 50 })).toBe(true);
+  });
+
+  test("RC5 note: a loot row with neither coins nor qty shows no empty amount", () => {
+    const r = {
+      ...PLAYER_RECAP,
+      loot: {
+        ...PLAYER_RECAP.loot,
+        rows: [
+          {
+            id: "x",
+            kind: "coins" as const,
+            holder: { kind: "party" as const },
+            text: "Potion of healing ×2",
+            coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+          },
+        ],
+      },
+    } as PlayerRecap;
+    expect(recapMarkdown(r, "player")).toContain("- Potion of healing ×2 (Party)");
+    expect(body("player", r)).toContain(">—<");
   });
 });

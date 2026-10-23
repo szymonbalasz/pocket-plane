@@ -58,8 +58,10 @@ import {
   headerText,
   holderText,
   isEmptyRecap,
+  listBehind,
   lootAmount,
   mvpText,
+  pickerSessions,
   type Recap,
   recapMarkdown,
   refreshes,
@@ -115,7 +117,9 @@ export function RecapWindow() {
     SessionsSchema.parse,
     () => false,
   );
-  const newestFromN = list.state.result?.sessions[0]?.fromN ?? null;
+  const listed = list.state.result?.sessions ?? null;
+  const lastRecap = useRef<Recap | null>(null);
+  const newestFromN = pickerSessions(listed ?? [], lastRecap.current)[0]?.fromN ?? null;
   const newest = fromN === null || fromN === newestFromN;
   const parse = role === "dm" ? DmRecapResult.parse : PlayerRecapResult.parse;
   const shownFromN = useRef<number | null>(null);
@@ -126,6 +130,17 @@ export function RecapWindow() {
     (f) => shareOpenOf(f)?.fromN === shownFromN.current,
   );
   shownFromN.current = recap.state.result?.recap?.fromN ?? null;
+  lastRecap.current = recap.state.result?.recap ?? null;
+  // RC5: a recap answer the session list doesn't cover yet (a new session, a grown span) asks
+  // stats' list again, so the picker lists the shown session and a pick keeps its id.
+  // Checked once per recap answer (a list answer that is still behind never loops).
+  const behind = useRef(false);
+  behind.current = listBehind(listed, lastRecap.current);
+  const retryList = list.retry;
+  const answered = recap.state.result;
+  useEffect(() => {
+    if (answered && behind.current) retryList();
+  }, [answered, retryList]);
   // A picked session gone (`not_found`): back to the newest.
   const missing = recap.state.status === "error" && recap.state.error?.code === "not_found";
   useEffect(() => {
@@ -197,7 +212,7 @@ export function RecapBody({
   now?: Date;
 }) {
   const r = recap.result?.recap ?? null;
-  const sessions = list.result?.sessions ?? [];
+  const sessions = pickerSessions(list.result?.sessions ?? [], r);
   const failed = live && recap.status === "error";
   return (
     <div
@@ -208,7 +223,7 @@ export function RecapBody({
       <div className="flex items-center gap-2">
         <Select
           value={r ? String(r.fromN) : ""}
-          onValueChange={(v) => onPick(Number(v) === sessions[0]?.fromN ? null : Number(v))}
+          onValueChange={(v) => onPick(Number(v))}
           disabled={!live || sessions.length === 0}
         >
           <SelectTrigger
@@ -512,7 +527,7 @@ function LootTable({ loot }: { loot: NonNullable<Recap["loot"]> }) {
             <TableRow key={row.id} data-testid="recap-loot-row" data-record-id={row.id}>
               <TableCell className="wrap-anywhere">{row.text || "Coins"}</TableCell>
               <TableCell className="text-muted-foreground">{holderText(row)}</TableCell>
-              <TableCell className="text-right tabular-nums">{lootAmount(row)}</TableCell>
+              <TableCell className="text-right tabular-nums">{lootAmount(row) || "—"}</TableCell>
             </TableRow>
           ))}
         </TableBody>

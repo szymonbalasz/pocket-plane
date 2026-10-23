@@ -263,6 +263,28 @@ export function sessionStats(
   };
 }
 
+/** A session's counted facts the viewer sees (by line `n`, FR-STATS-13). */
+export const sessionFactsOf = (r: StatsRead, s: SessionBounds): CombatFact[] =>
+  visibleFacts(
+    r.viewer,
+    combatFacts(r.db, { campaignId: r.campaignId, fromN: s.fromN, toN: s.toN }),
+  );
+
+/**
+ * FR-STATS-78 (RECAP's read seam): the fights with a counted fact the viewer sees inside session
+ * `s` (the rule `sessionsStats` counts by), oldest `startedAt` first, among the viewer's fights
+ * (`fightsFor`). A caller holding the session's facts and `fightsFor` passes them (one read each).
+ */
+export function sessionFights(
+  r: StatsRead,
+  s: SessionBounds,
+  facts: readonly CombatFact[] = sessionFactsOf(r, s),
+  fights: Fights = fightsFor(r),
+): FightRow[] {
+  const ids = new Set(facts.map((f) => f.encounterId));
+  return fights.listed.filter((f) => ids.has(f.id));
+}
+
 /** FR-NOTE-48's payload: the key, the times players see (else the DM's) and a date label. */
 export function awardsPayload(s: SessionBounds, features: readonly string[]) {
   const span = visibleSpan(s, "player", features) ?? s;

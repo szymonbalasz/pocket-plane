@@ -1,10 +1,12 @@
 // e2e-bundle: sp-s9-e2e
 // Thin SP3 flow (session-recap §13, FR-RECAP-10, -21, -24, -28): the DM's Ctrl+K "recap" Enter
 // opens the Recap on the fixture session; Share with a note and Notable rolls unticked → player-1's
-// Recap opens by itself ≤ 2 s with the note and no Notable rolls. Numbers, visibility and the
+// Recap opens by itself ≤ 2 s with the note and no Notable rolls. RC5: a new session started while
+// the Recap is open joins the picker; the old one stays pickable. Numbers, visibility and the
 // memo: bun test.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { openWindow } from "./support/shell";
 
 const NOTE = "Cleared the Bandit Camp";
 
@@ -60,4 +62,20 @@ test("FR-RECAP-28 FR-RECAP-24 FR-RECAP-21 DM opens Recap from the palette and sh
   await expect(section(p1, "rolls")).toHaveCount(0);
   await expect(p1.getByTestId("recap-share")).toHaveCount(0);
   await expect(p1.locator('[data-testid="recap-fight"]').first()).toContainText("Fight 1 · ");
+
+  // RC5 repro: a line now (the e2e fixture clock is months back: a ≥ 6 h gap) starts a new
+  // session while the DM's Recap is open; ≤ 2 s later it shows the new one and the picker lists
+  // both; picking the fixture session by id shows it again.
+  const log = await openWindow(dm, "dice.log");
+  await log.getByTestId("dice-roll-expression").fill("1d20");
+  await log.getByTestId("dice-roll-expression").press("Enter");
+  await expect(dm.locator('[data-testid="recap-fight"]')).toHaveCount(0, { timeout: 5_000 });
+  await dm.getByTestId("recap-session-picker").click();
+  const options = dm.getByTestId("recap-session-option");
+  await expect(options).toHaveCount(2);
+  // By keyboard: a pending toast may sit over the list (its pointer events win).
+  await dm.locator('[data-testid="recap-session-option"][data-record-id="1"]').focus();
+  await dm.keyboard.press("Enter");
+  await expect(dm.locator('[data-testid="recap-fight"]')).toHaveCount(3);
+  await expect(dm.getByTestId("recap-session-picker")).toContainText("Thu 1 Jan");
 });

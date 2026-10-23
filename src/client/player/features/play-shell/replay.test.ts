@@ -34,7 +34,7 @@ const EXEMPTIONS = new Map([
   ],
   [
     "FR-SHELL-115 replay P1 fitted @1600×900 resize",
-    "SP3 (pending approval): `recap.session` joins P1 untouched (S4); the resize back leaves it at 440×472 → 440×360 (the placer's I7 resize class, as P1 / P2 / P3's other resize cells; frame). The same change flips P1 fitted @1280×720 push and @1440×900 resize to passing",
+    "SP3 (approved, BL-93): `recap.session` joins P1 untouched (S4); the resize back leaves it at 440×472 → 440×360 (the placer's I7 resize class, as P1 / P2 / P3's other resize cells; frame). The same change flips P1 fitted @1280×720 push and @1440×900 resize to passing",
   ],
 ]);
 

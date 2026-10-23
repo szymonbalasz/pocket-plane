@@ -19,7 +19,7 @@ import {
   SessionRecapPayload,
 } from "@shared/session-recap/schemas";
 import { feedText } from "@shared/stats/feed";
-import { AWARD_TITLE } from "@shared/stats/schemas";
+import { AWARD_TITLE, type SessionSummary } from "@shared/stats/schemas";
 import { NOTIFICATION_TYPE } from "../notifications/logic";
 import { awardDetailText, awardValueText, durationText, winnerText } from "../stats/logic";
 
@@ -42,6 +42,36 @@ export const refreshes = (frame: Frame, newest: boolean): boolean =>
   frame.changes.some(
     (c) => (c.type === GAME_LOG_ENTRY_TYPE || c.type === LOOT_ENTRY_TYPE) && c.op === "upsert",
   );
+
+/**
+ * FR-RECAP-11: the picker's sessions, newest first: stats' list, plus the shown session while the
+ * list predates it (a new derived session started while the window was open, RC5), so the picker
+ * never goes blank and a pick is always a listed session.
+ */
+export function pickerSessions(
+  list: readonly SessionSummary[],
+  recap: Recap | null,
+): SessionSummary[] {
+  if (!recap || list.some((s) => s.fromN === recap.fromN)) return [...list];
+  const shown: SessionSummary = {
+    fromN: recap.fromN,
+    toN: recap.toN,
+    from: recap.from,
+    to: recap.to,
+    fights: recap.fights.length + (recap.fightsMore ?? 0),
+  };
+  return [...list, shown].sort((a, b) => b.fromN - a.fromN);
+}
+
+/**
+ * RC5: stats' session list is behind the recap just answered: the shown session is missing from
+ * it, or its span has grown (a new session starts, or the newest one gets a line). Ask it again.
+ */
+export function listBehind(list: readonly SessionSummary[] | null, recap: Recap | null): boolean {
+  if (!list || !recap) return false;
+  const s = list.find((x) => x.fromN === recap.fromN);
+  return !s || s.toN !== recap.toN;
+}
 
 /** FR-RECAP-21: the session a live frame's new `session-recap` notification opens; else null. */
 export function shareOpenOf(
@@ -169,7 +199,8 @@ export function recapMarkdown(r: Recap, role: "dm" | "player"): string {
       }
     } else if (k === "loot" && r.loot) {
       for (const row of r.loot.rows) {
-        out.push(`- ${row.text || "Coins"}: ${lootAmount(row)} (${holderText(row)})`);
+        const amount = lootAmount(row);
+        out.push(`- ${row.text || "Coins"}${amount ? `: ${amount}` : ""} (${holderText(row)})`);
       }
       if (r.loot.more) out.push(`- +${r.loot.more} more`);
       const totals = [

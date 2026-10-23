@@ -20,6 +20,7 @@ import { SyncContext, type SyncState } from "@ui/sync/store";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
+import { recapOpener } from "../session-recap/open";
 import { LuckView } from "./Luck";
 import type { QueryStatus } from "./refresh";
 import { FightView, SessionView, StatsWindow } from "./StatsWindow";
@@ -290,6 +291,57 @@ const sessionHtml = (
       now={new Date("2026-10-21T19:30:00.000Z")}
     />,
   );
+
+describe("FR-STATS-79 recap button", () => {
+  const withRecap = (you: You, onRecap?: (fromN: number) => void) =>
+    wrap(
+      you,
+      <SessionView
+        role={you.role === "dm" ? "dm" : "player"}
+        list={ok(SESSIONS)}
+        session={ok(SESSION)}
+        live
+        onPick={() => {}}
+        onShowAwards={() => {}}
+        {...(onRecap ? { onRecap } : {})}
+        retry={() => {}}
+        now={new Date("2026-10-21T19:30:00.000Z")}
+      />,
+    );
+
+  test("FR-STATS-79 recap button: 'Recap' beside the picker (DM: after Show awards) for both roles while the Recap window is registered; hidden without it; off with no session", () => {
+    for (const you of [DM, PLAYER]) {
+      const html = withRecap(you, () => {});
+      expect(count(html, "stats-session-recap")).toBe(1);
+      expect(disabled(html, "stats-session-recap")).toBe(false);
+      expect(count(withRecap(you), "stats-session-recap")).toBe(0);
+    }
+    const dm = withRecap(DM, () => {});
+    expect(dm.indexOf("stats-show-awards")).toBeLessThan(dm.indexOf("stats-session-recap"));
+    const none = wrap(
+      DM,
+      <SessionView
+        role={DM.role === "dm" ? "dm" : "player"}
+        list={ok({ sessions: [] })}
+        session={ok({ session: null })}
+        live
+        onPick={() => {}}
+        onShowAwards={() => {}}
+        onRecap={() => {}}
+        retry={() => {}}
+      />,
+    );
+    expect(disabled(none, "stats-session-recap")).toBe(true);
+  });
+
+  test("FR-STATS-79 the Recap runtime publishes the opener the button uses; it opens recap.session by the user on the picked session", () => {
+    const calls: unknown[] = [];
+    recapOpener.setState({ open: (fromN, by) => calls.push([fromN, by]) });
+    recapOpener.getState().open?.(SESSION.session?.fromN ?? 0, "user");
+    expect(calls).toEqual([[SESSION.session?.fromN, "user"]]);
+    recapOpener.setState({ open: null });
+  });
+});
 
 describe("FR-STATS-19 session cards", () => {
   test("FR-STATS-19 session cards: 9 stats-award cards in award order (data-record-id = key) holding stats-award-value; winners in the player colour; companion roll-up; detail; empty line for nobody", () => {

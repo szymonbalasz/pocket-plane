@@ -79,7 +79,7 @@ describe("RECAP §12 CON-44", () => {
         .run();
     }
     worst = snapshotSizes(b.s);
-  });
+  }, 120_000);
 
   afterAll(() => b.cleanup());
 

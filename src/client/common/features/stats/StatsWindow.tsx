@@ -44,6 +44,7 @@ import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { type ColorPerson, useColorOf } from "../campaign-management/colors";
+import { useRecapOpener } from "../session-recap/open";
 import { Highlights } from "./Highlights";
 import { LuckPanel } from "./Luck";
 import {
@@ -307,6 +308,8 @@ function SessionPanel({ role, view, setView }: PanelProps) {
   );
   const drop = useCallback(() => setView({ sessionFromN: null }), [setView]);
   useDropMissing(one.state, view.sessionFromN !== null, drop);
+  // FR-STATS-79: set while the Recap window is registered here (its companion is mounted).
+  const openRecap = useRecapOpener();
   const [sending, setSending] = useState(false);
   const showAwards = (fromN: number) => {
     setSending(true);
@@ -326,6 +329,7 @@ function SessionPanel({ role, view, setView }: PanelProps) {
       sending={sending}
       onPick={(fromN) => setView({ sessionFromN: fromN })}
       onShowAwards={showAwards}
+      onRecap={openRecap ? (fromN) => openRecap(fromN, "user") : undefined}
       retry={() => {
         list.retry();
         one.retry();
@@ -342,6 +346,7 @@ export function SessionView({
   sending = false,
   onPick,
   onShowAwards,
+  onRecap,
   retry,
   now,
 }: {
@@ -352,6 +357,8 @@ export function SessionView({
   sending?: boolean;
   onPick(fromN: number): void;
   onShowAwards(fromN: number): void;
+  /** FR-STATS-79: opens the Recap on the picked session; absent = no Recap window on this client. */
+  onRecap?(fromN: number): void;
   retry(): void;
   /** "Today" in the picker (tests pin it). */
   now?: Date;
@@ -400,6 +407,18 @@ export function SessionView({
             onClick={() => s && onShowAwards(s.fromN)}
           >
             Show awards
+          </Button>
+        ) : null}
+        {onRecap ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            data-testid="stats-session-recap"
+            disabled={!s}
+            onClick={() => s && onRecap(s.fromN)}
+          >
+            Recap
           </Button>
         ) : null}
       </div>
