@@ -16,7 +16,7 @@ import {
   type StrongholdRecord,
   type StrongholdView,
 } from "@shared/strongholds/schemas";
-import { EllipsisIcon, EyeOffIcon, ShieldIcon } from "lucide-react";
+import { EllipsisIcon, EyeOffIcon, ListIcon, ShieldIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger, Switch } from "../../components/ui/controls";
@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../../components/ui/menus";
+import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -263,20 +264,26 @@ function Loaded({
   };
   return (
     <div className="flex h-full min-h-0 flex-col gap-1.5">
-      <header className="flex flex-wrap items-center gap-1.5">
+      <header className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
         <h3 className="min-w-0 break-words text-base font-semibold" data-testid="hold-name">
           {parts.hold.name}
         </h3>
         <DefendersChip parts={parts} />
         {parts.dm && <DmHeader hold={parts.hold as StrongholdRecord} />}
-        <button
-          type="button"
-          className="ml-auto text-xs text-muted-foreground underline"
-          data-testid="hold-all"
-          onClick={() => openTab(HOLD_PARTY_TAB)}
-        >
-          All strongholds
-        </button>
+        {/* An icon keeps the header on one line at the useful width (FR-SHELL-171). */}
+        <Tooltip content="All strongholds">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="ml-auto size-7 shrink-0"
+            aria-label="All strongholds"
+            data-testid="hold-all"
+            onClick={() => openTab(HOLD_PARTY_TAB)}
+          >
+            <ListIcon className="size-4" />
+          </Button>
+        </Tooltip>
       </header>
       <Tabs
         value={tab}

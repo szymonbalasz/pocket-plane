@@ -63,7 +63,7 @@ export function IncomeButton({ f }: { f: FacilityView & { incomeDice: string } }
       data-record-id={f.id}
       size="sm"
       variant="outline"
-      className="h-7 px-2"
+      className="h-6 px-2"
       disabled={!live}
     >
       Income {f.incomeDice}
@@ -137,7 +137,7 @@ function FacilityRow({
       data-record-id={f.id}
       data-state={f.state}
       data-dm-only={String(dmOnly)}
-      className="flex min-w-0 flex-col gap-1 rounded-md border px-2 py-1.5"
+      className="flex min-w-0 flex-col rounded-md border px-2 py-1"
     >
       <div className="flex min-w-0 items-start gap-1.5">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -166,7 +166,7 @@ function FacilityRow({
                 type="button"
                 size="icon"
                 variant="ghost"
-                className="size-7 shrink-0"
+                className="size-6 shrink-0"
                 aria-label={`${f.name} menu`}
                 data-testid="hold-facility-menu"
                 data-record-id={f.id}
@@ -280,7 +280,7 @@ export function FacilitiesTab({
           No facilities yet
         </p>
       ) : (
-        <ul className="flex flex-col gap-1.5">
+        <ul className="flex flex-col gap-1">
           {facilities.map((f, i) => (
             <FacilityRow
               key={f.id}

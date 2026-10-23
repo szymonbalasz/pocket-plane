@@ -203,7 +203,9 @@ test("FR-SHELL-171 the Stronghold window at its useful size 400 × 400 (1280×72
     await page.setViewportSize({ width: 1280, height: 720 });
     const board = await strongholdsTab(page);
     await row(board, "Greystone Keep").getByTestId("hold-row-open").click();
-    await board.getByTestId("ui-window-minimise").click();
+    // The placer may already have put the Party Manager away to make room (player, 1280×720).
+    const minimise = board.getByTestId("ui-window-minimise");
+    if (await minimise.isVisible()) await minimise.click();
     const win = shellWindow(page, "hold.stronghold");
     await expect(win.getByTestId("hold-facility").first()).toBeVisible();
     await resizeTo(page, win, 400, 400);
