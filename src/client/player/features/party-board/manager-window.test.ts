@@ -73,11 +73,11 @@ test("FR-SHELL-155 party.summary layout migrated (Player): a remembered, minimis
   expect(m.tab).toBe("status");
 });
 
-test("FR-SHELL-161 launcher threshold (Player): every label shows from 1294 px (recorded; SP2's Rules entry: was 1208); below it icons only, so 1280 is icons only; nothing in the ⋯ menu at 1280", () => {
+test("FR-SHELL-161 launcher threshold (Player): every product label shows from 1044 px (recorded: test-mode launchers out, 6 px a character; SP2 re-test measured the bar at 1010 px); below it icons only; labels and nothing in the ⋯ menu at 1280", () => {
   const t = launcherThreshold(registry);
   console.log(`FR-SHELL-161 Player labels from ${t.labelsFrom}`);
-  expect(t.labelsFrom).toBe(1294); // measured; SP1 / SP2 update it after their launcher entries (S3)
-  expect(t.at1280).toEqual({ compact: true, overflow: [] });
+  expect(t.labelsFrom).toBe(1044); // measured; SP1 / SP2 update it after their launcher entries (S3)
+  expect(t.at1280).toEqual({ compact: false, overflow: [] });
 });
 
 test("FR-SHELL-155 party.summary layout migrated (Player, walkthrough M13): an open Party status entry over an older untouched Stats in Initiative's zone → Party Manager comes back open, Stats (least recently used, I4) put away", () => {

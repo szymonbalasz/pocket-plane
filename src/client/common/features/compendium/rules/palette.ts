@@ -26,11 +26,15 @@ export interface RulesPaletteCtx {
 export const openRuleRow = (ctx: RulesPaletteCtx, entryId: string) =>
   openRules(ctx.shell.openWindow, entryId);
 
-/** FR-SHELL-186 launch command, both clients; opens `by: "user"` (window memory and MRU). */
+/**
+ * FR-SHELL-186 launch command, both clients; opens `by: "user"` (window memory and MRU). No card
+ * words in its keywords: a local keyword match ranks above every server row, so "cover" must reach
+ * the Rules row "Cover", not this command (SP2 re-test P4).
+ */
 export const rulesCommand: PaletteCommand = {
   id: "cmp.rules.open",
   title: "Open Rules",
-  keywords: ["rules", "srd", "reference", "conditions", "cover", "actions", "house rules"],
+  keywords: ["rules", "srd", "reference", "quick reference", "house rules"],
   group: "Commands",
   clients: ["dm", "player"],
   run: (ctx) => openRules(ctx.shell.openWindow),

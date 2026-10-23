@@ -388,3 +388,47 @@ describe("FR-SHELL-188 palette parts", () => {
     expect(calls).toEqual([[RULES_KIND, undefined, { by: "user" }]]);
   });
 });
+
+describe("FR-SHELL-183 P4 ranking", () => {
+  test("FR-SHELL-188 P4: 'cover' (and 'dodge', 'grapple') → the first row is the Rules card, not the Open Rules command; Enter opens Rules on it; 'rules' still finds the command", async () => {
+    const { COMMANDS, PROVIDERS } = await import("../../play-shell/commands");
+    const { flatRows, localEntries, rankLocal, withServer } = await import(
+      "../../play-shell/palette/rank"
+    );
+    const { testCtx } = await import("../../play-shell/palette/test-env");
+    const { ruleHits, rulesCommand } = await import("./palette");
+    const ctx = testCtx({ registryExtra: [RULES_KIND] });
+    const entries = localEntries(COMMANDS, PROVIDERS, ctx);
+    for (const [q, id, name] of [
+      ["cover", "r-cover", "Cover"],
+      ["dodge", "r-dodge", "Dodge"],
+      ["grapple", "r-grapple", "Grappling"],
+    ] as const) {
+      const server = ruleHits([
+        { id, kind: "rule", name, sourceLabel: "SRD 5.1", line: "x · Combat" },
+      ]);
+      const rows = flatRows(withServer(rankLocal(entries, q), server, ctx));
+      expect({ q, first: rows[0]?.id }).toEqual({ q, first: id });
+      expect(rows.some((r) => r.id === rulesCommand.id)).toBe(false);
+    }
+    const rows = flatRows(
+      withServer(
+        rankLocal(entries, "cover"),
+        ruleHits([
+          {
+            id: "r-cover",
+            kind: "rule",
+            name: "Cover",
+            sourceLabel: "SRD 5.1",
+            line: "Cover · Combat",
+          },
+        ]),
+        ctx,
+      ),
+    );
+    rows[0]?.run();
+    expect(rulesNav.getState().target).toBe("r-cover");
+    const rules = flatRows(rankLocal(entries, "rules"));
+    expect(rules.some((r) => r.id === rulesCommand.id)).toBe(true);
+  });
+});

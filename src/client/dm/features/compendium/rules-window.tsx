@@ -7,7 +7,6 @@ import { Button } from "@ui/components/ui/button";
 import { Skeleton } from "@ui/components/ui/primitives";
 import { useLive } from "@ui/features/combat-tracker/store";
 import { CMP_KIND } from "@ui/features/compendium/logic";
-import { refetchRules } from "@ui/features/compendium/rules/nav";
 import { RulesBody } from "@ui/features/compendium/rules/RulesWindow";
 import { rulesWindowBase } from "@ui/features/compendium/rules/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
@@ -37,7 +36,8 @@ function NewHouseRule({ api }: { api: Api }) {
         api={api}
         mode={mode}
         onClose={() => setMode(null)}
-        onSaved={() => refetchRules()}
+        // The save refetches the Rules window itself (homebrew-rest); stay on House rules.
+        onSaved={() => {}}
       />
     </>
   );

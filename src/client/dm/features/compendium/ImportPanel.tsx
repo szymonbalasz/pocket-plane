@@ -22,6 +22,7 @@ import {
 } from "@ui/components/ui/overlays";
 import { Skeleton } from "@ui/components/ui/primitives";
 import { refetch } from "@ui/features/compendium/nav";
+import { refetchRules } from "@ui/features/compendium/rules/nav";
 import { useSync } from "@ui/sync/store";
 import { DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -99,6 +100,7 @@ function SourceRow({ api, s, reload }: { api: Api; s: SourceStatus; reload(): vo
         toast.success(`${s.name} imported: ${importSummary(r.counts)}`);
         reload();
         refetch(); // FR-CMP-23: the DM's own writes refetch at once.
+        refetchRules(); // …the Rules window too (an Update brings the rule cards).
       })
       .catch((err: unknown) => {
         toast.error(err instanceof ApiError ? err.message : "Import failed");
