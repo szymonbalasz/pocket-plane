@@ -4,7 +4,9 @@
 // the DM-only tower; player-1's only Greystone; each opens the Stronghold window (DM 6 facilities,
 // player 5, no secret); a DM order edit reaches the player live; a reload reopens the window on
 // Greystone; hiding it takes the tab and the window's content away from the player; the tab strip
-// keeps every label whole and scrolls. Rows per viewer, totals and texts: `strongholds.test.tsx`.
+// keeps every label whole and scrolls. After RS1: Make reminder opens REM's editor prefilled, the
+// reminder's source icon opens the Stronghold window (FR-REM-18), and removing Steam Rooms
+// removes its reminder for the player (H8). Rows per viewer, totals and texts: `strongholds.test.tsx`.
 import { type Browser, expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
@@ -233,4 +235,55 @@ test("FR-SHELL-171 the Stronghold window at its useful size 400 × 400 (1280×72
     expect(m.bodyScrolls).toBe(false);
     await page.context().close();
   }
+});
+
+test("FR-HOLD-29 FR-REM-18 FR-HOLD-17 Make reminder opens REM's editor prefilled; the player's source icon opens the Stronghold window; removing Steam Rooms removes its reminder (H8)", async ({
+  browser,
+}) => {
+  const dm = await dmPage(browser);
+  const p1 = await playerPage(browser, "Player 1");
+  const dmBoard = await strongholdsTab(dm);
+  await row(dmBoard, "Greystone Keep").getByTestId("hold-row-open").click();
+  const dmWin = shellWindow(dm, "hold.stronghold");
+
+  // Make reminder on Forge Hall: source and link prefilled.
+  await facility(dmWin, "Forge Hall").getByTestId("hold-facility-menu").click();
+  await dm.getByTestId("hold-facility-make-reminder").click();
+  const editor = dm.getByTestId("rem-editor");
+  await expect(editor.getByTestId("rem-editor-source")).toHaveValue("Greystone Keep: Forge Hall");
+  await editor.getByTestId("rem-editor-text").fill("Forge Hall: check the bellows");
+  await editor.getByTestId("rem-editor-save").click();
+  await expect(editor).toHaveCount(0);
+  await dmWin.locator('[data-testid="hold-tab"][data-value="reminders"]').click();
+  await expect(
+    dmWin.getByTestId("rem-row").filter({ hasText: "Forge Hall: check the bellows" }),
+  ).toHaveCount(1);
+  await expect(dmWin.getByTestId("hold-reminders-add")).toBeVisible();
+
+  // Player-1: Party Manager → Reminders → the row's link icon opens Greystone Keep.
+  const board = await openWindow(p1, "party.board");
+  await partyTab(board, "reminders").click();
+  const mine = board.getByTestId("rem-row").filter({ hasText: "Forge Hall: check the bellows" });
+  await mine.getByTestId("rem-row-link").click();
+  const pWin = shellWindow(p1, "hold.stronghold");
+  await expect(pWin.getByTestId("hold-name")).toHaveText("Greystone Keep");
+  const steamText = "Steam Rooms: advantage on the first CON save after a long rest";
+  await expect(board.getByTestId("rem-row").filter({ hasText: steamText })).toHaveCount(1);
+
+  // H8: remove Steam Rooms; the confirm names its reminder; the player's row goes.
+  await dmWin.locator('[data-testid="hold-tab"][data-value="facilities"]').click();
+  await facility(dmWin, "Steam Rooms").getByTestId("hold-facility-menu").click();
+  await dm.getByTestId("hold-facility-remove").click();
+  await expect(dm.getByTestId("hold-facility-remove-summary")).toHaveText(
+    "Remove Steam Rooms? Its 1 reminder is removed too.",
+  );
+  await dm.getByTestId("hold-facility-remove-confirm").click();
+  await expect(facility(dmWin, "Steam Rooms")).toHaveCount(0);
+  await expect(board.getByTestId("rem-row").filter({ hasText: steamText })).toHaveCount(0);
+  await expect(facility(pWin, "Old Bathhouse").getByTestId("hold-facility-replaces")).toHaveCount(
+    0,
+  );
+
+  await dm.context().close();
+  await p1.context().close();
 });

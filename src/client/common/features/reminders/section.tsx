@@ -7,8 +7,8 @@ import type { RecordStore } from "@shared/protocol/store";
 import { Button } from "../../components/ui/button";
 import type { SheetSection } from "../character-sheet/sections";
 import { useOpenPartyTab } from "../party-board/open-tab";
+import { RemindersWithLinks } from "../strongholds/links";
 import { reminderCount } from "./logic";
-import { RemindersTab } from "./RemindersTab";
 
 /** The Party Manager tab id (FR-PARTY-71). */
 export const REMINDERS_TAB = "reminders";
@@ -17,7 +17,8 @@ function RemindersSection({ creatureId }: { creatureId: string }) {
   const openPartyTab = useOpenPartyTab();
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <RemindersTab characterId={creatureId} />
+      {/* RS2: the source link opens the Stronghold window (FR-REM-18). */}
+      <RemindersWithLinks characterId={creatureId} />
       <Button
         type="button"
         data-testid="rem-sheet-open-party"

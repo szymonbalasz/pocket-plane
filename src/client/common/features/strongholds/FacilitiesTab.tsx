@@ -3,6 +3,7 @@
 // "Order: …", the effect (3 lines, More expands), Replaces / Replaced by, the staff who work there,
 // DM eye-off on DM-only rows. DM: Add facility, row menu Edit, Move up / down, Remove… (FR-HOLD-17's
 // confirm names the reminders it removes).
+import type { ReminderView } from "@shared/reminders/schemas";
 import { HOLD_INTENTS } from "@shared/strongholds/schemas";
 import { EllipsisIcon, EyeOffIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
@@ -25,7 +26,8 @@ import {
   figuresLine,
   incomeRollIntent,
   isDmOnly,
-  type LinkedReminder,
+  type ReminderPrefill,
+  reminderPrefill,
   removeFacilityText,
   replacedBy,
   STATE_LABELS,
@@ -106,6 +108,7 @@ function FacilityRow({
   reminders,
   parts,
   onEdit,
+  onMakeReminder,
 }: {
   f: FacilityView;
   index: number;
@@ -113,9 +116,10 @@ function FacilityRow({
   names: Map<string, string>;
   replacer: string | undefined;
   staff: string[];
-  reminders: readonly LinkedReminder[];
+  reminders: readonly ReminderView[];
   parts: HoldParts;
   onEdit(f: FacilityView): void;
+  onMakeReminder(p: ReminderPrefill): void;
 }) {
   const live = useLive();
   const move = useHoldIntent();
@@ -178,6 +182,12 @@ function FacilityRow({
             <DropdownMenuContent align="end">
               <DropdownMenuItem data-testid="hold-facility-edit" onSelect={() => onEdit(f)}>
                 Edit…
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                data-testid="hold-facility-make-reminder"
+                onSelect={() => onMakeReminder(reminderPrefill(parts.hold, f))}
+              >
+                Make reminder
               </DropdownMenuItem>
               <DropdownMenuItem
                 data-testid="hold-facility-up"
@@ -262,10 +272,13 @@ export function FacilitiesTab({
   parts,
   reminders,
   suggestions,
+  onMakeReminder,
 }: {
   parts: HoldParts;
-  reminders: readonly LinkedReminder[];
+  reminders: readonly ReminderView[];
   suggestions: readonly string[];
+  /** FR-HOLD-29: opens REM's editor prefilled from this facility. */
+  onMakeReminder(p: ReminderPrefill): void;
 }) {
   const live = useLive();
   const { facilities, staff } = parts.hold;
@@ -293,6 +306,7 @@ export function FacilitiesTab({
               reminders={reminders}
               parts={parts}
               onEdit={(facility) => setEditing({ facility })}
+              onMakeReminder={onMakeReminder}
             />
           ))}
         </ul>

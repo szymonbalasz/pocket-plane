@@ -26,6 +26,8 @@ import { createPartyMemory, createTabState, tabKey } from "../party-board/seen";
 import { createWindowRegistry } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { BANDS, SIZE_TABLE } from "../play-shell/size-table";
+import { prefillDraft } from "./HoldReminders";
+import { RemindersWithLinks } from "./links";
 import {
   deleteText,
   facilityDraft,
@@ -124,8 +126,19 @@ const TOWER: StrongholdRecord = {
   createdAt: "2026-01-01T00:00:00.001Z",
 };
 
+const REM_BASE = {
+  campaignId: "c",
+  rolls: [],
+  createdByPlayerId: null,
+  seq: 1,
+  dmOnly: false,
+  ownerPlayerId: null,
+  linkHidden: false,
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
 const REMINDERS = [
   {
+    ...REM_BASE,
     id: "r-steam",
     characterId: null,
     text: "Steam Rooms: advantage on the first CON save after a long rest",
@@ -135,8 +148,10 @@ const REMINDERS = [
     createdAt: "2026-01-01T00:00:01.000Z",
   },
   {
+    ...REM_BASE,
     id: "r-whole",
     characterId: "mira",
+    ownerPlayerId: "p1",
     text: "Check the walls",
     source: "Greystone Keep",
     strongholdId: "grey",
@@ -144,6 +159,7 @@ const REMINDERS = [
     createdAt: "2026-01-01T00:00:02.000Z",
   },
   {
+    ...REM_BASE,
     id: "r-vault",
     characterId: null,
     text: "REM-SECRET-VAULT",
@@ -575,6 +591,44 @@ describe("Pure rules (FR-HOLD-17, -19, -25, -26, -27, -29, -31, -32, -33)", () =
         typeof incomeRollIntent
       >[1]),
     ).toEqual({ expression: "2d6", mode: "normal", category: "other", label: "Forge Hall income" });
+  });
+});
+
+describe("Reminders wiring (FR-HOLD-29, FR-REM-18)", () => {
+  test("FR-HOLD-29 Add reminder / Make reminder open REM's editor prefilled (party, linked, no rolls); the DM's tab has Add reminder and REM's rows, a player's neither the button nor a hidden row", () => {
+    const steam = GREY.facilities[4];
+    if (!steam) throw new Error("fixture");
+    expect(prefillDraft(reminderPrefill(GREY, steam))).toEqual({
+      target: "party",
+      text: "",
+      source: "Greystone Keep: Steam Rooms",
+      rolls: [],
+      dmOnly: false,
+      strongholdId: "grey",
+      facilityId: "steam",
+    });
+    expect(prefillDraft(reminderPrefill(GREY))).toMatchObject({
+      source: "Greystone Keep",
+      facilityId: null,
+    });
+    const mem = holdMemory();
+    mem.bind(holdKey(DM));
+    mem.select("grey");
+    mem.chooseTab("reminders");
+    const dm = render(<StrongholdWindow kind={HOLD_WINDOW_KIND} instance="main" />, { you: DM });
+    expect(dm).toContain('data-testid="hold-reminders-add"');
+    expect(attrs(dm, "rem-row", "data-record-id")).toEqual(["r-whole", "r-steam", "r-vault"]);
+    mem.bind(holdKey(P1));
+    mem.select("grey");
+    mem.chooseTab("reminders");
+    const p = render(<StrongholdWindow kind={HOLD_WINDOW_KIND} instance="main" />, { you: P1 });
+    expect(p).not.toContain('data-testid="hold-reminders-add"');
+    expect(attrs(p, "rem-row", "data-record-id")).toEqual(["r-whole", "r-steam"]);
+  });
+
+  test("FR-REM-18 the Party Manager's and the sheet's reminder rows carry the link icon that opens the Stronghold window", () => {
+    const html = render(<RemindersWithLinks />, { you: DM });
+    expect(attrs(html, "rem-row-link", "data-testid").length).toBeGreaterThan(0);
   });
 });
 
