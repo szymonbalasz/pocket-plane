@@ -13,12 +13,12 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | RS0 reminders + strongholds core | merged `fb3884a3` | — | done (23/23) | — |
 | FX2 dice + gems lines | merged `d4837dc4` | — | done (10/10; branch gates 5232 / 208) | main gates with PM1 |
 | PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates: check 5307 + 1 timeout flake (passes alone), e2e 207 + 2 load flakes (pass alone) |
-| PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | re-test 5/5; merging main (SP1) + Party status command + threshold | gates → merge → main gates |
+| PM2 Party Manager | merged `77f5fd2f` | — | done (re-test 5/5; e2e 213 + roll-popup flake) | main gates after FX1 |
 | FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
-| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | walkthrough 12/12; main (SP1, FX3) merged in | gates after PM2 → merge |
+| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | walkthrough 12/12; main (PM2) merged, protocol §154 | branch gates running → merge → main gates |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
-| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14 | after SP1 + PM2 merge: merge main, commands.ts lines, threshold → re-test R6 + P4 → merge |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14; merging main + commands.ts lines + threshold | re-test R6 + P4 → merge |
 
 | RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | ready (sheet count grant; wf-push e2e tab scroll kept) | test-rs1 walkthrough running |
 | RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | building | walkthrough RS-H |
