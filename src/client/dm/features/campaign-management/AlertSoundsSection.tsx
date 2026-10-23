@@ -27,6 +27,7 @@ import { intentErrorText } from "@ui/features/character-sheet/routing";
 import type { SoundOutcome } from "@ui/features/play-shell/audio";
 import { useAlertController } from "@ui/features/play-shell/ShellContext";
 import { ALERT_LABELS } from "@ui/features/play-shell/sounds";
+import { loadChunk } from "@ui/lib/lazy-chunk";
 import { useLazyRecords, useSync } from "@ui/sync/store";
 import { PlayIcon, UploadIcon } from "lucide-react";
 import { useRef, useState } from "react";
@@ -264,7 +265,7 @@ export function AlertSoundsSection({ picks }: { picks: AlertSounds | undefined }
       onPreview={(alert, sound) => alerts.preview(alert, sound)}
       onUpload={async (file) => {
         // Loaded on use: the session store reads browser storage when its module loads.
-        const { useDmSession } = await import("./session");
+        const { useDmSession } = await loadChunk(() => import("./session"), { notice: true });
         const secret = useDmSession.getState().secret;
         if (!secret) return { kind: "unauthorized" };
         const r = await uploadSound(file, secret);

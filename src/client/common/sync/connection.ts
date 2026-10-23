@@ -2,7 +2,10 @@
 // No feature logic: features read records from the store and send intents.
 import { CloseCode } from "@shared/protocol/codes";
 import {
+  CLIENT_CHECK_INTERVAL_MS,
+  CLIENT_DROP_FLOOR_MS,
   CLIENT_PONG_TIMEOUT_MS,
+  CLIENT_WAKE_DRIFT_MS,
   type Credential,
   type EventFrame,
   PING_INTERVAL_MS,
@@ -62,7 +65,10 @@ export class IntentRejected extends Error {
 }
 
 export interface Clock {
+  /** Epoch ms (`notLiveSince`). */
   now(): number;
+  /** Monotonic ms for the heartbeat (FR-SYNC-40, `performance.now`); defaults to `now`. */
+  mono?(): number;
   setTimeout(fn: () => void, ms: number): unknown;
   clearTimeout(h: unknown): void;
   setInterval(fn: () => void, ms: number): unknown;
@@ -71,6 +77,7 @@ export interface Clock {
 
 const browserClock: Clock = {
   now: () => Date.now(),
+  mono: () => performance.now(),
   setTimeout: (fn, ms) => setTimeout(fn, ms),
   clearTimeout: (h) => clearTimeout(h as number),
   setInterval: (fn, ms) => setInterval(fn, ms),
@@ -112,6 +119,8 @@ export interface ConnectionOptions {
   onWake?: (fn: () => void) => () => void;
   /** Is the WS endpoint reachable? Default: `httpProbe`. May answer synchronously (tests). */
   probe?: (url: string) => Promise<boolean> | boolean;
+  /** Subscribe to "the link is gone" (FR-SYNC-40); returns an unsubscribe. Default: `offline`. */
+  onOffline?: (fn: () => void) => () => void;
 }
 
 const PROBE_TIMEOUT_MS = 2_000;
@@ -156,6 +165,12 @@ function browserWake(fn: () => void): () => void {
   };
 }
 
+function browserOffline(fn: () => void): () => void {
+  if (typeof window === "undefined") return () => {};
+  window.addEventListener("offline", fn);
+  return () => window.removeEventListener("offline", fn);
+}
+
 export function defaultWsUrl(): string {
   const { protocol, host } = window.location;
   return `${protocol === "https:" ? "wss" : "ws"}://${host}${WS_PATH}`;
@@ -166,7 +181,15 @@ export class SyncConnection {
   private attempt = 0;
   private retryTimer: unknown = null;
   private pingTimer: unknown = null;
-  private lastPongAt = 0;
+  /** Heartbeat (FR-SYNC-40), monotonic ms: last frame of any kind, last check, pings. */
+  private lastFrameAt = 0;
+  private lastCheckAt = 0;
+  private lastPingAt = 0;
+  /** The ping / probe awaiting any frame back; null when none is outstanding. */
+  private pingSentAt: number | null = null;
+  private missedPongs = 0;
+  /** The current socket reached `onopen` (a drop before it counts as a failed open). */
+  private opened = false;
   private stopped = false;
   /** WS attempts since the last open that never reached `onopen`; > 0 → probe before the next. */
   private failedOpens = 0;
@@ -189,6 +212,7 @@ export class SyncConnection {
   };
   private readonly clock: Clock;
   private wakeOff: (() => void) | null = null;
+  private offlineOff: (() => void) | null = null;
 
   constructor(private readonly opts: ConnectionOptions) {
     this.clock = opts.clock ?? browserClock;
@@ -201,6 +225,7 @@ export class SyncConnection {
   start(): void {
     this.stopped = false;
     this.wakeOff = (this.opts.onWake ?? browserWake)(() => this.retryNow());
+    this.offlineOff = (this.opts.onOffline ?? browserOffline)(() => this.dropSocket());
     this.open();
   }
 
@@ -210,6 +235,8 @@ export class SyncConnection {
     this.probing = false;
     this.wakeOff?.();
     this.wakeOff = null;
+    this.offlineOff?.();
+    this.offlineOff = null;
     this.clearTimers();
     this.ws?.close(1000);
     this.ws = null;
@@ -463,40 +490,102 @@ export class SyncConnection {
     const url = this.opts.url ?? defaultWsUrl();
     const ws = this.opts.createSocket ? this.opts.createSocket(url) : new WebSocket(url);
     this.ws = ws;
-    let opened = false;
+    this.opened = false;
     ws.onopen = () => {
-      opened = true;
+      if (this.ws !== ws) return;
+      this.opened = true;
       this.failedOpens = 0;
       ws.send(JSON.stringify({ type: "hello", credential: this.opts.credential }));
-      this.lastPongAt = this.clock.now();
-      this.pingTimer = this.clock.setInterval(() => this.heartbeat(), PING_INTERVAL_MS);
+      const now = this.mono();
+      this.lastFrameAt = now;
+      this.lastCheckAt = now;
+      this.lastPingAt = now;
+      this.pingSentAt = null;
+      this.missedPongs = 0;
+      this.pingTimer = this.clock.setInterval(() => this.heartbeat(), CLIENT_CHECK_INTERVAL_MS);
     };
-    ws.onmessage = (e) => this.onFrame(String(e.data));
+    ws.onmessage = (e) => {
+      if (this.ws === ws) this.onFrame(String(e.data));
+    };
     ws.onclose = (e) => {
       if (this.ws !== ws) return;
-      if (!opened) this.failedOpens += 1;
+      if (!this.opened) this.failedOpens += 1;
       this.onClose(e.code);
     };
   }
 
+  private mono(): number {
+    return this.clock.mono ? this.clock.mono() : this.clock.now();
+  }
+
+  private ping(now: number): void {
+    this.lastPingAt = now;
+    this.pingSentAt = now;
+    this.ws?.send(JSON.stringify({ type: "ping" }));
+  }
+
+  /**
+   * FR-SYNC-40, every 1 s: a ping every 10 s; no frame within 5 s of a ping → one probe ping;
+   * dropped after both are missed and ≥ 10 s since the last frame. A check > 2 s late (stall,
+   * throttled tab, laptop wake, a big frame being handled) is a wake-up: deadlines restart.
+   */
   private heartbeat(): void {
-    const ws = this.ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    if (this.clock.now() - this.lastPongAt > CLIENT_PONG_TIMEOUT_MS) {
-      ws.close(4998, "pong timeout"); // FR-SYNC-04: treat as dropped
+    if (this.ws?.readyState !== 1) return; // WebSocket.OPEN
+    const now = this.mono();
+    const drift = now - this.lastCheckAt - CLIENT_CHECK_INTERVAL_MS;
+    this.lastCheckAt = now;
+    if (drift > CLIENT_WAKE_DRIFT_MS) {
+      this.lastFrameAt = now;
+      this.missedPongs = 0;
+      this.ping(now);
       return;
     }
-    ws.send(JSON.stringify({ type: "ping" }));
+    if (this.pingSentAt !== null && now - this.pingSentAt >= CLIENT_PONG_TIMEOUT_MS) {
+      this.missedPongs += 1;
+      this.pingSentAt = null;
+      if (this.missedPongs < 2) this.ping(now);
+    }
+    if (this.missedPongs >= 2 && now - this.lastFrameAt >= CLIENT_DROP_FLOOR_MS) {
+      this.dropSocket();
+      return;
+    }
+    if (
+      this.pingSentAt === null &&
+      this.missedPongs === 0 &&
+      now - this.lastPingAt >= PING_INTERVAL_MS
+    ) {
+      this.ping(now);
+    }
+  }
+
+  /**
+   * FR-SYNC-40 dropped (`offline`, or a silent link): detach the socket so its late `onclose`
+   * and frames are ignored, close it best-effort and reconnect on the backoff (FR-SYNC-05).
+   */
+  private dropSocket(): void {
+    const ws = this.ws;
+    if (!ws || this.stopped) return;
+    if (!this.opened) this.failedOpens += 1;
+    this.ws = null;
+    try {
+      ws.close(4998, "dropped");
+    } catch {
+      // best effort
+    }
+    this.onClose(4998);
   }
 
   private onFrame(text: string): void {
+    // Any frame is a sign of life, parsed or not (FR-SYNC-40).
+    this.lastFrameAt = this.mono();
+    this.pingSentAt = null;
+    this.missedPongs = 0;
     let frame: ServerFrame;
     try {
       frame = ServerFrame.parse(JSON.parse(text));
     } catch {
       return;
     }
-    this.lastPongAt = this.clock.now();
     switch (frame.type) {
       case "snapshot": {
         this.attempt = 0;

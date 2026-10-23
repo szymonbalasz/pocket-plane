@@ -38,6 +38,8 @@ import fuS7E2e from "./fu-s7-e2e";
 import fuSmallCopy from "./fu-small-copy";
 import furyLogLine from "./fury-log-line";
 import fxDiceE2e from "./fx-dice-e2e";
+import fxS9 from "./fx-s9";
+import fxStaleChunkE2e from "./fx-stale-chunk-e2e";
 import gems from "./gems";
 import gemsCombatE2e from "./gems-combat-e2e";
 import gemsE2e from "./gems-e2e";
@@ -224,4 +226,7 @@ export const bundles: readonly Bundle[] = [
   rsE2e,
   // Sprint 9 track FX (fix/fx-dice-lines): dice + gems lines
   fxDiceE2e,
+  // Sprint 9 track FX (fix/fx-sync-shell): stale-chunk reload e2e alias, FX3's bundle
+  fxStaleChunkE2e,
+  fxS9,
 ];

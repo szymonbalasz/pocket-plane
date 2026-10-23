@@ -10,6 +10,7 @@ import { Label } from "@ui/components/ui/primitives";
 import { browserLayerMemory, layerSwitches } from "@ui/features/scene-tools/layer-switches";
 import { type LayerToggle, layerToggles, toggleOn } from "@ui/features/scenes-map/layers";
 import { useLayerToggles } from "@ui/features/scenes-map/tool-store";
+import { loadChunk } from "@ui/lib/lazy-chunk";
 import { cn } from "@ui/lib/utils";
 import { useSync } from "@ui/sync/store";
 import { LayersIcon } from "lucide-react";
@@ -23,7 +24,7 @@ function useSwitches(): LayerToggle[] {
   const [toggles, setToggles] = useState<LayerToggle[]>([]);
   useEffect(() => {
     let on = true;
-    import("@ui/features/scenes-map/canvas-layers").then(
+    loadChunk(() => import("@ui/features/scenes-map/canvas-layers"), { notice: true }).then(
       (m) => on && setToggles(layerToggles(m.canvasLayers)),
       (err) => console.error("scene-tools: layer toggles failed to load", err),
     );
