@@ -353,7 +353,7 @@ describe("FR-STATS-16 read path", () => {
     expect(JSON.stringify(t.s.db.select().from(hpChange).all())).toBe(digest);
   });
 
-  test("FR-STATS-16 rate limit coalesces: ≤ 4 computed answers a second; the excess gets the last answer", () => {
+  test("FR-STATS-16 rate limit coalesces, per viewer (FR-STATS-69: role + player, all their tabs): ≤ 4 computed answers a second; the excess gets the memo, else `conflict` (not coalesced)", () => {
     const t = statsSetup();
     t.hp("Goblin", "damage", 3, { from: "Thorn" });
     const gate = t.memory().gate;

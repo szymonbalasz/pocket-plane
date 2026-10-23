@@ -1,7 +1,7 @@
 // The window's query controller with fake timers and a manual sender (FR-STATS-17, -23, -24).
 import { describe, expect, test } from "bun:test";
 import { REFRESH_MS } from "./logic";
-import { createStatsQuery, type QueryState, type Timers } from "./refresh";
+import { CONFLICT_RETRY_MS, createStatsQuery, type QueryState, type Timers } from "./refresh";
 
 function fakeTimers() {
   let now = 0;
@@ -42,7 +42,7 @@ function harness() {
   });
   const last = () => states.at(-1) as QueryState<In, string>;
   const flush = () => new Promise((r) => setTimeout(r, 0));
-  return { q, t, sent, last, flush };
+  return { q, t, sent, states, last, flush };
 }
 
 describe("FR-STATS-17 refresh", () => {
@@ -173,5 +173,62 @@ describe("FR-STATS-23 / -24 states", () => {
     h.t.advance(5000);
     expect(h.sent).toHaveLength(1);
     expect(h.last()).toBe(n);
+  });
+});
+
+// Sprint 9 (FX1, BL-74): the server answers an over-limit query with no memo `conflict`.
+describe("FR-STATS-69 conflict retried quietly", () => {
+  const conflict = { code: "conflict", message: "Too many stats queries, try again in a moment" };
+
+  test("FR-STATS-69 conflict retried quietly: a `conflict` keeps the last result, shows no error and re-asks once 1 s later with the latest input", async () => {
+    const h = harness();
+    h.q.set({ scope: "fight" });
+    h.sent[0]?.resolve("a");
+    await h.flush();
+    // The picker moves twice; the first answers `conflict`, the second asks after it.
+    h.q.set({ scope: "fight", n: 1 });
+    h.sent[1]?.reject(conflict);
+    await h.flush();
+    expect(h.states.some((s) => s.status === "error")).toBe(false);
+    expect(h.last()).toMatchObject({ status: "loading", result: "a", error: null });
+    h.q.set({ scope: "fight", n: 2 });
+    h.sent[2]?.reject(conflict);
+    await h.flush();
+    expect(h.last()).toMatchObject({ status: "loading", result: "a" });
+    h.t.advance(CONFLICT_RETRY_MS - 1);
+    expect(h.sent).toHaveLength(3);
+    h.t.advance(1);
+    expect(h.sent).toHaveLength(4);
+    expect(h.sent[3]?.input).toEqual({ scope: "fight", n: 2 });
+    h.sent[3]?.resolve("c");
+    await h.flush();
+    expect(h.last()).toMatchObject({
+      status: "ok",
+      result: "c",
+      resultFor: { scope: "fight", n: 2 },
+    });
+    expect(h.states.some((s) => s.status === "error")).toBe(false);
+    expect(CONFLICT_RETRY_MS).toBe(1000);
+  });
+
+  test("FR-STATS-69 conflict retried quietly: a second `conflict` → 'Couldn't load stats' (status error) + Retry asks again", async () => {
+    const h = harness();
+    h.q.set({ scope: "session" });
+    h.sent[0]?.reject(conflict);
+    await h.flush();
+    expect(h.last().status).toBe("loading");
+    h.t.advance(CONFLICT_RETRY_MS);
+    h.sent[1]?.reject(conflict);
+    await h.flush();
+    expect(h.last()).toMatchObject({ status: "error", error: { code: "conflict" } });
+    // Nothing else queued; Retry asks (and gets its own quiet retry again).
+    h.t.advance(5000);
+    expect(h.sent).toHaveLength(2);
+    h.q.retry();
+    expect(h.sent).toHaveLength(3);
+    // Any other reject is an error at once, as before.
+    h.sent[2]?.reject({ code: "not_found", message: "Unknown fight" });
+    await h.flush();
+    expect(h.last()).toMatchObject({ status: "error", error: { code: "not_found" } });
   });
 });

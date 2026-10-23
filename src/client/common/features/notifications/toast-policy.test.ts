@@ -212,3 +212,22 @@ describe("FR-NOTE-50 toast policy: alerts from toast()", () => {
     expect(alertKey("7")).not.toBe(alertKey(7));
   });
 });
+
+// Sprint 9 (FX1, BL-88; OQ-NOTE-38 B).
+describe("FR-NOTE-72 cards fold into an open Notifications window (model)", () => {
+  test("FR-NOTE-72 cards fold into an open Notifications window: folded → no summary and no card, shown or counted; alerts (both kinds), info and the callout stay", () => {
+    let s = setSummary(initialToasts(0), 2, 0);
+    for (const n of [card(), card(), note(), card(), card()]) s = addNote(s, n, 0, alertKind);
+    s = addNote(s, alert(), 0, alertKind);
+    s = syncAlerts(s, [{ id: "boom" }], 0);
+    s = setCallout(s, { id: "c", content: "x" }, 0, 1);
+    const open = visibleToasts(s, 3, true);
+    expect(open.shown.map(classOfToast)).toEqual(["alert", "alert", "info"]);
+    expect(open.more).toBe(0);
+    expect(open.callout?.id).toBe("c");
+    // Closed again: the same stack shows as before (cards back, the summary first, "+N more").
+    const shut = visibleToasts(s, 3);
+    expect(shut.shown.map(classOfToast)).toEqual(["summary", "card", "alert", "alert"]);
+    expect(shut.more).toBe(4);
+  });
+});

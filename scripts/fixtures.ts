@@ -47,8 +47,8 @@ async function main() {
       if (!bundle) throw new FixtureError(`Usage: bun run fixtures:${cmd} <bundle> [--profile p]`);
       const m =
         cmd === "load"
-          ? await load(config, library, bundle, { notice })
-          : await resetAndLoad(config, library, bundle, { notice });
+          ? await load(config, library, bundle, { notice, now: Date.now() })
+          : await resetAndLoad(config, library, bundle, { notice, now: Date.now() });
       printSummary(m, config.dmSecret, Math.round(performance.now() - t0));
       return;
     }

@@ -68,9 +68,11 @@ function eventOf(e: GameLogEntryView, role: "dm" | "player"): FeedEvent | null {
 }
 
 /**
- * FR-STATS-28, -29: the feed lines of a live frame: each new outcome line upsert with `fell` or
- * `callout`, not undone and not superseded (an undo or supersede upsert never toasts). The caller
- * keeps to live frames (never a snapshot or resync) and to lines it hasn't toasted.
+ * FR-STATS-28, -29: the feed lines of a live frame: each outcome line upsert with `fell` or
+ * `callout`, not undone and not superseded (an undo or supersede upsert never toasts). FR-STATS-68
+ * (amends FR-STATS-28): a new line or an upsert of one already held both count, so a line toasts
+ * the first time this page sees it carry `fell` / `callout`. The caller keeps to live frames
+ * (never a snapshot or resync) and to lines it hasn't toasted (`createFeed`).
  */
 export function feedLinesOf(
   frame: Pick<EventFrame, "cause" | "changes">,
