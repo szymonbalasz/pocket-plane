@@ -18,7 +18,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0010](0010-compendium-design.md) | Compendium design | accepted (scope A via 0046, #207; re-import safety option i) |
 | [0011](0011-cross-references.md) | Cross-reference model | proposed |
 | [0012](0012-character-derived-values.md) | Character sheet: derived vs stored, homebrew overrides | accepted for MVP basics (stored), amended by 0032; full sheet decided by 0036 (C, derived with overrides) |
-| [0013](0013-session-journal-scope.md) | Session outcomes / journal: MVP or post-MVP | accepted — no session tracking |
+| [0013](0013-session-journal-scope.md) | Session outcomes / journal: MVP or post-MVP | accepted — no session tracking (sprint-9 note: on-demand recap from the event log, #339) |
 | [0014](0014-mvp-scope.md) | MVP is a playable session simulation | accepted |
 | [0015](0015-source-adapters-fixtures.md) | Import pipeline and source adapters | accepted |
 | [0016](0016-domain-events-pending-actions.md) | Domain events and pending actions | accepted (core), refined by 0034, 0035, 0037, 0061; undo scope amended by 0039 |
@@ -27,7 +27,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0019](0019-auth-credentials.md) | DM secret and player link credentials | accepted; amended by 0046 (player REST header on compendium routes) |
 | [0020](0020-single-active-campaign.md) | Several campaigns, one active per server | accepted |
 | [0021](0021-sync-protocol-conventions.md) | Sync protocol conventions | accepted, C refined by 0041, 0045, D refined by 0036, 0038 |
-| [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted |
+| [0022](0022-deterministic-seams.md) | Deterministic IDs, tokens and clock for fixtures and tests | accepted; fixed clock amended by 0068 for CLI loads |
 | [0023](0023-asset-access-by-capability-id.md) | Asset access by capability ID | accepted; amended by 0054 |
 | [0024](0024-definition-visibility.md) | Creature definitions DM-only for players; instances carry read-only display copies | accepted (refines 0009), redaction whitelist refined by 0036; refined by 0050; amended by 0056 (pets) |
 | [0025](0025-play-shell-windows.md) | Feature UI as play-shell windows; layout in browser storage | accepted; placement extended by 0060 |
@@ -65,10 +65,15 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0057](0057-free-player-colour.md) | Free player colour (`#rrggbb`, validity + distance rules) | accepted (#288; amends 0055) |
 | [0058](0058-feature-switches.md) | Campaign feature switches (optional features off by default; one hub rule) | accepted (#315) |
 | [0059](0059-stats-read-models.md) | Stats as read models over the fact tables, filtered per viewer | accepted (#315); §4 caching refined by 0062 |
-| [0060](0060-one-window-placer.md) | One placer for every window path: PCs first, then shrink, then put away | accepted (#335; extends 0025; amends #245) |
+| [0060](0060-one-window-placer.md) | One placer for every window path: PCs first, then shrink, then put away | accepted (#335; extends 0025; amends #245); amended by 0064 (window memory) |
 | [0061](0061-roll-requests.md) | DM roll requests as pending actions; hidden answers to DM + the target's player | accepted (#335; refines 0016, 0027; amends #73 for answers) |
 | [0062](0062-stats-session-partials.md) | Campaign-wide stats from per-session partials kept in memory | accepted (#335; refines 0059) |
 | [0063](0063-party-hp-visibility.md) | Party status: other players see a PC's HP, temp HP and AC | accepted (#335; amends 0036 / #178 G6) |
+| [0064](0064-window-memory.md) | Window memory: the placer leaves windows you arranged alone | accepted (#339; amends 0060 decisions 2, 3, 5, 6, #310, #333) |
+| [0065](0065-reminder-stronghold-records.md) | Reminders and strongholds as record families | accepted (#339; extends 0045) |
+| [0066](0066-stores-holder.md) | A stronghold's Stores as a holder in the loot / inventory ledger | accepted (#339) |
+| [0067](0067-command-registry.md) | One client command registry for the palette and keyboard shortcuts | accepted (#339; extends 0025, 0060 §7) |
+| [0068](0068-fixture-load-clock.md) | CLI fixture loads anchor the seeded clock at load time | accepted (#339; amends 0022 for CLI loads) |
 
 ## Proposing a new ADR
 

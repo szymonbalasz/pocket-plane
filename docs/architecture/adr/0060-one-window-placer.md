@@ -1,6 +1,6 @@
 # 0060 — One placer for every window path: PCs first, then shrink, then put away
 
-- Status: accepted (DM gate, [#335](../../decisions-log.md))
+- Status: accepted (DM gate, [#335](../../decisions-log.md)); decisions 2, 3, 5, 6 amended by [ADR-0064](0064-window-memory.md) (window memory, #339)
 - Date: 2026-10-21
 - Extends: [ADR-0025](0025-play-shell-windows.md) (registry + browser layout stay; this fixes **how** the shell places windows). Layouts stay browser-only (#121).
 - Supersedes (placement means only; the outcomes they fixed stay): the separate placers behind [FR-SHELL-29](../../specs/play-shell.md#6-functional-requirements) (written shrinks), -47, -53 (live follow), -55 (push right), -56 (5) (protected reopen moves), -77 / -78 / -79 (folded in as the ladder), -81 (generalised to displacement memory). Amends #245's token-aware Initiative at Start (OQ-SHELL-63 A, #335).

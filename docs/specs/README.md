@@ -103,6 +103,27 @@ All revisions, gate 1 #335 (ADRs 0060–0063).
 | [Combat extras](combat-extras.md) (drag to reorder initiative) | CBTX | complete | spec-cb |
 | [Party board](party-board.md) (Party status) | PARTY | complete | spec-cb |
 
+## Sprint 9 (post-MVP)
+
+Gate 1 #339 (ADRs 0064–0068).
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Reminders](reminders.md) (party / character reminders with rolls, Party Manager tab, sheet tab) | REM | complete | spec-rs |
+| [Strongholds](strongholds.md) (staff, facilities, defenders, Stores, Stronghold window) | HOLD | complete | spec-rs |
+| [Session recap](session-recap.md) (on-demand recap, DM Share) | RECAP | complete | spec-sp |
+| [Play shell](play-shell.md) (window memory, Party Manager, command palette + shortcuts, stale-chunk reload, Stronghold window) | SHELL | complete | spec-pm, spec-fx, spec-rs, spec-sp |
+| [Party board](party-board.md) (Party Manager: Party status first, Companions section, 550 px; Reminders / Strongholds tabs) | PARTY | complete | spec-pm, spec-rs, spec-fx |
+| [Scenes and map](scenes-map.md) (resize refits, BL-86 / -87) | MAP | complete | spec-pm |
+| [Party loot](party-loot.md) (Stores holder) | LOOT | complete | spec-rs |
+| [Character sheet full](character-sheet-full.md) (Reminders tab) | CHARX | complete | spec-rs |
+| [Compendium](compendium.md) (rules quick reference, Rules window, house rules) | CMP | complete | spec-sp |
+| [Stats](stats.md) (hidden-kill feed, query retry, recap reads) | STATS | complete | spec-fx, spec-sp |
+| [Notifications](notifications.md) (toast stack column, Notifications window fold) | NOTE | complete | spec-fx |
+| [Combat extras](combat-extras.md) (effects line export, summon concentration at End) | CBTX | complete | spec-rs, spec-fx |
+| [Dice and game log](dice-roll-log.md), [Dice extras](dice-extras.md), [Gems](gems.md) (reroll line, keep-highest join, copy, popup expiry, macro name, gem batching, one spend frame) | DICE, DICEX, GEM | complete | spec-fx |
+| [Live sync](live-sync.md) (drop detection), [Campaign management](campaign-management.md) (switcher ellipsis), [Fixtures and adapters](fixtures-adapters.md) (load clock) | SYNC, CAMP, FIX | complete | spec-fx |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.

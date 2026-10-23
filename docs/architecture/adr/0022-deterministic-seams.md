@@ -1,6 +1,6 @@
 # 0022 — Deterministic IDs, tokens and clock for fixtures and tests
 
-- Status: accepted (2026-10-12; option A, Phase 1 gate D4, [decisions-log](../../decisions-log.md) #111)
+- Status: accepted (2026-10-12; option A, Phase 1 gate D4, [decisions-log](../../decisions-log.md) #111); "Fixed clock" amended for CLI loads by [ADR-0068](0068-fixture-load-clock.md) (#339)
 - Date: 2026-10-11
 - Affects: fixtures-adapters, campaign-management, live-sync, all specs that create records
 - Extends: [ADR-0008](0008-parallel-dev-isolation.md) ("non-deterministic inputs need a test seam"). Raised by [OQ-FIX-12](../../specs/fixtures-adapters.md#15-open-questions). Implements the seam behind [FR-SYNC-26](../../specs/live-sync.md#6-functional-requirements) (injectable clock and timers)

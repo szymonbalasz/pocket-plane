@@ -88,7 +88,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Journal entries with DM-only / player-visible sections | B | [world-builder](specs/post-mvp/world-builder.md) | |
 | Map pins linked to notes/locations | B | [scene-tools](specs/scene-tools.md) | |
 | Shared party notes | B | [party-board](specs/post-mvp/party-board.md) | |
-| Session recap / journal | B | [campaign-manager](specs/post-mvp/campaign-manager.md) | See [ADR-0013](architecture/adr/0013-session-journal-scope.md) |
+| Session recap / journal | B | [session-recap](specs/session-recap.md) (recap, sprint 9); journal: [campaign-manager](specs/post-mvp/campaign-manager.md) | On-demand recap from the event log (#339); see [ADR-0013](architecture/adr/0013-session-journal-scope.md) |
 | Quest log with status | C | [world-builder](specs/post-mvp/world-builder.md) | |
 | In-game calendar / time tracking | C | [campaign-manager](specs/post-mvp/campaign-manager.md) | |
 | Text chat | C–D | [dice-roll-log](specs/dice-roll-log.md) | Only as part of the game log (Roll20-style): text and pasted descriptions alongside rolls. No separate chat. |
@@ -124,7 +124,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Kill-feed toasts ("Thorn finished the Ogre, overkill 37") | B | [stats](specs/stats.md) | Notification kind |
 | Character trophy case (campaign stats on sheet) | B | [stats](specs/stats.md) | |
 | Dice luck tracker (avg d20, nat 20s/1s) | B | [stats](specs/stats.md) | |
-| Auto session recap from event log | D | — | Recaps are story, not combat |
+| Auto session recap from event log | D | — | Automatic recaps stay out; the on-demand recap is tier B ([session-recap](specs/session-recap.md), #339) |
 | Live AI follow-along / summariser | F | — | Distinct from [agent-api](specs/post-mvp/agent-api.md) |
 | Combat rewind / timeline replay | F | — | |
 | External stream / overlay of the log | F | — | Log lives in the game client |

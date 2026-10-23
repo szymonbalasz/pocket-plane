@@ -27,5 +27,5 @@
 
 ## Consequences
 
-- Session recap (tier B) and calendar (C) stay in [campaign-manager](../../specs/post-mvp/campaign-manager.md) as story tools, not combat history.
+- ~~Session recap (tier B) and calendar (C) stay in [campaign-manager](../../specs/post-mvp/campaign-manager.md) as story tools, not combat history.~~ **Note (sprint 9, DM #338 / #339):** an on-demand [session recap](../../specs/session-recap.md) is computed on read from the event log, stats and the loot ledger; the decision is unchanged (no session entity, no stored recap). The calendar stays in campaign-manager.
 - Stats like "this session" use time ranges or encounter lists, not a session record.

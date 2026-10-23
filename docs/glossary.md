@@ -121,7 +121,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Combat** | The running state of a started encounter: initiative order, rounds, turns. | Encounter |
 | **Combatant** | A participant in a combat, linked to an entity (and a token if on a scene). Holds HP and temp HP (for PCs, both live on the character); effects target the combatant (monsters) or the character (PCs). | Token; Entity |
 | **Companion** | A creature with an owner PC (and that PC's player): a pet or a summon; acts in a turn mode and gives its owner a companion card ([combat-tracker](specs/combat-tracker.md), [ADR-0056](architecture/adr/0056-companion-visibility.md)). | Ally |
-| **Pet** | A companion that is its own copy of a creature definition, HP kept between fights, listed in the Party window; its owner may edit its stats ([entities](specs/entities.md)). | Summon |
+| **Pet** | A companion that is its own copy of a creature definition, HP kept between fights, listed in the Party Manager's Party status tab; its owner may edit its stats ([entities](specs/entities.md)). | Summon |
 | **Summon** | A companion placed from any monster for one fight; HP for that fight; Dismiss removes it and its token. | Pet |
 | **Turn mode** | When a companion acts: right after its owner (default), in its owner's turn (no own Initiative row), or its own initiative. | Initiative |
 | **Companion card** | The owner's window for a companion: HP, AC, speed, attacks with Roll, conditions. Not a character sheet ([character-sheet-full](specs/character-sheet-full.md)). | Character sheet |
@@ -130,13 +130,24 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Initiative order** | Ordered list of combatants for the current combat: sorted by initiative, then the DM's tie order ([combat-tracker](specs/combat-tracker.md) FR-CBT-162). | — |
 | **Tie order** | The DM's order inside a group of equal initiative, set by dragging a row; kept for the fight ([combat-extras](specs/combat-extras.md)). | Initiative |
 | **Turn highlight** | The ring on the current turn's token, for everyone who may know whose turn it is ([scenes-map](specs/scenes-map.md)). | Target ring |
-| **Party status** | The small window showing each PC's HP, temp HP and AC, companions under their owners; never monsters ([party-board](specs/party-board.md), [ADR-0063](architecture/adr/0063-party-hp-visibility.md)). | Party window |
+| **Party status** | The first tab of the Party Manager (was its own window until sprint 9), showing each PC's HP, temp HP and AC, companions under their owners; never monsters ([party-board](specs/party-board.md), [ADR-0063](architecture/adr/0063-party-hp-visibility.md)). | Party window |
+| **Party Manager** | The party window (launcher "Party Manager"): tabs Party status, Handouts, Inventory, Loot, Reminders, Strongholds ([party-board](specs/party-board.md), #338). | Party status |
+| **Reminder** | A note with optional clickable rolls aimed at the party or one character, with an optional source text; no mechanics ([reminders](specs/reminders.md)). | Condition, Effect |
+| **Stronghold** | A party base (keep, ship) with staff, facilities, defenders, Stores and notes, opened in the Stronghold window; DM-only until shown ([strongholds](specs/strongholds.md)). | Scene |
+| **Facility** | A room or building of a stronghold: planned / building / built / replaced, cost, build days, upkeep, income dice, effect, current order ([strongholds](specs/strongholds.md)). | — |
+| **Staff** | A stronghold's hired people: name, role, wage, notes, optional facility they work in ([strongholds](specs/strongholds.md)). | Companion |
+| **Defenders** | A stronghold's count of defenders ([strongholds](specs/strongholds.md)). | — |
+| **Stores** | A stronghold's coin and items, a holder in the loot / inventory ledger next to the party pot and wallets ([ADR-0066](architecture/adr/0066-stores-holder.md)). | Party loot |
+| **Session recap** | The on-demand summary of one session (fights, party tally, loot, notable rolls, awards), computed from the event log; the DM can Share it ([session-recap](specs/session-recap.md)). | Stats |
+| **Rules window** | The quick-reference window of SRD rule cards on curated pages, with pins and house rules ([compendium](specs/compendium.md)). | Compendium |
+| **Rule card** | One SRD rules section (a `rule` compendium entry), quoted verbatim ([compendium](specs/compendium.md)). | — |
+| **House rule** | A DM-written `rule` entry shown on the Rules window's House rules page ([compendium](specs/compendium.md)). | Homebrew |
 | **Macro** | A saved, named roll button ("Sneak Attack 3d6") that rolls through the normal roll path; on the sheet's Macros tab and the tray ([dice-extras](specs/dice-extras.md)). | Roll request |
 | **Roll request** | The DM's request for a roll from chosen PCs (skill / save / check / custom; optional DC; results public or hidden) ([ADR-0061](architecture/adr/0061-roll-requests.md)). | Macro |
 | **Prompt** | The pending card toast a roll request puts on each target's screen, with Roll and Decline. | Roll popup |
 | **Pause screen** | The full-screen card players see while the DM pauses the table; input blocked, the DM keeps working ([play-shell](specs/play-shell.md)). | — |
 | **Alert sound** | A DM-uploaded short audio file picked for an alert (turn, roll request, pause, resume); players' mute still wins ([assets-pipeline](specs/assets-pipeline.md)). | Alert |
-| **Condition** | A 5e condition (e.g. prone, poisoned; exhaustion with a level), stored as an Effect on a combatant or character. Reminder only, except incapacitating ones end concentration. | Effect |
+| **Condition** | A 5e condition (e.g. prone, poisoned; exhaustion with a level), stored as an Effect on a combatant or character. No mechanics, except incapacitating ones end concentration. | Effect |
 | **Effect** | A row on a creature in play: a condition, a custom label, or a concentration; optional duration in rounds ([combat-extras](specs/combat-extras.md)); custom effects may carry modifiers ([effect-modifiers](specs/effect-modifiers.md)). | Modifier |
 | **Preset** | A named effect template with modifiers (built-in, customised per campaign, or a character's own), e.g. Bless, Rage; trigger presets (Sneak Attack …) create rule triggers ([effect-modifiers](specs/effect-modifiers.md)). | Effect; Dice style |
 | **Rule trigger** | A data rule on a character or monster definition: event, requires, filters, frequency, effect (e.g. Sneak Attack once per turn); interpreted by built-in code, never user code ([ADR-0043](architecture/adr/0043-rule-triggers.md)). | Rule hook |
@@ -223,8 +234,11 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Free area** | A part of the work area, right of the tool rail, that no open window covers; the map frames its tokens there (FR-SHELL-34, FR-MAP-44). *(Sprint 4)* Fit picks among the candidate free rectangles: PCs inside first, then the map's top row visible, then other tokens clear of windows, then the largest scale (FR-MAP-58). | Work area |
 | **Auto placement** | Where a window opens when the user didn't choose: a free edge slot covering the fewest tokens, never on a window, a keep-out region or a PC while another window can be auto-minimised ([play-shell](specs/play-shell.md), #310). | Layout |
 | **Useful size** | The smallest size a window opens at before the shell puts another window away to make room, checked by a content criterion per window ([play-shell](specs/play-shell.md) §7). | Minimum size |
-| **Placer** | The one shell function that places every window on every path (open, reopen, push, resize, refits): PCs clear first, then shrink to useful size, then put away the least recently used launcher window ([ADR-0060](architecture/adr/0060-one-window-placer.md)). | Auto placement |
-| **Zone** | The default spot of a protected window (Game log, Initiative, sheet); used while it is clear of PCs, else the placer decides. | Keep-out region |
+| **Placer** | The one shell function that places every untouched window (remembered windows keep their spot, [ADR-0064](architecture/adr/0064-window-memory.md)) on every path (open, reopen, push, resize, refits): PCs clear first, then shrink to useful size, then put away the least recently used launcher window ([ADR-0060](architecture/adr/0060-one-window-placer.md)). | Auto placement |
+| **Zone** | The default spot of a protected window (Game log, Initiative, sheet); used while it is clear of PCs, else the placer decides; taken on top of a remembered window ([ADR-0064](architecture/adr/0064-window-memory.md)). | Keep-out region |
+| **Remembered window** | A window the user moved or resized: it reopens at exactly that size and spot (only nudged on-screen), the placer never moves, shrinks or puts it away; Reset layout forgets it ([ADR-0064](architecture/adr/0064-window-memory.md)). | Auto placement |
+| **Command palette** | The Ctrl+K overlay that searches commands, windows, characters, creatures (DM), rules and the compendium in one list ([play-shell](specs/play-shell.md), [ADR-0067](architecture/adr/0067-command-registry.md)). | Launcher |
+| **Shortcuts sheet** | The `?` overlay listing every keyboard shortcut; single-key shortcuts can be switched off in Preferences ([play-shell](specs/play-shell.md)). | Command palette |
 | **Alert** | The shell's attention signal for one client: screen flash, short UI sound ([ADR-0030](architecture/adr/0030-ui-notification-sounds.md)) and a Toast; per-browser mute and volume. Not persisted. | Notification |
 | **Layout** | Every window's state, geometry and z-order for one (campaign, owner); stored only in browser `localStorage` (decisions #121). | — |
 
