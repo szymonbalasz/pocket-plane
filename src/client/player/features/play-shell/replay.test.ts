@@ -32,6 +32,10 @@ const EXEMPTIONS = new Map([
     "FR-SHELL-115 replay P2 moved @1280×720 memory",
     "PM1 (approved): inherits the shared open phase's I2 (Compendium / Party Manager on the toast keep-out), as every other P2 moved @1280×720 cell; its memory steps (I9–I13) pass",
   ],
+  [
+    "FR-SHELL-115 replay P1 fitted @1600×900 resize",
+    "RS2 (pending approval): `hold.stronghold` joins P1 untouched (S4); the resize back leaves it at its band height 400×472 → 400×400 (the placer's I7 resize class, 10 player cells; frame). The same change flips P1 fitted @1280×720 push, @1280×800 resize and @1440×900 resize to passing",
+  ],
 ]);
 
 test("FR-SHELL-160 named exemptions are recorded failing cells", () => {
