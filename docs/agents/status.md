@@ -18,7 +18,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7, part 2 13/14 (RC5 session picker stale) → fixing + stats edits after FX1 | re-test RC2, RC5, RC1 |
 | FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12) | main gates: check 5392 + 1 load flake (3/3 alone), e2e 215 |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
-| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | re-test 13/16 (palette 'cover' ranking, Rules stale after a Compendium delete, threshold test) → fixing | re-test P4, 12, 7 |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14 + re-tests 16/16 | merge after RS1 + RS2 |
 
 | RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | walkthrough all PASS (F1 spec test-ID wording fixed on main); main merged, docs §155 / §123 | gates after FX1 → merge |
 | RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | walkthrough 11/11 | merge after FX1 + RS1 (wire reminder buttons / icon) |
