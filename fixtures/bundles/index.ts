@@ -47,6 +47,7 @@ import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
 import gemsUiE2e from "./gems-ui-e2e";
+import holdStoresE2e from "./hold-stores-e2e";
 import holdUiE2e from "./hold-ui-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
@@ -248,4 +249,6 @@ export const bundles: readonly Bundle[] = [
   // Sprint 9 track SP (build/sp-rules): rules quick reference
   spRules,
   spRulesE2e,
+  // Sprint 9 track RS (build/hold-stores): Stores tab E2E
+  holdStoresE2e,
 ];

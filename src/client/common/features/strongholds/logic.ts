@@ -19,11 +19,13 @@ export const HOLD_WINDOW_KIND = "hold.stronghold";
 /** FR-PARTY-71: the Party Manager tab id. */
 export const HOLD_PARTY_TAB = "strongholds";
 
-export const HOLD_TABS = ["facilities", "staff", "reminders", "notes"] as const;
+/** FR-HOLD-24's tabs in order (*(S9)* Stores: RS3, FR-HOLD-28). */
+export const HOLD_TABS = ["facilities", "staff", "stores", "reminders", "notes"] as const;
 export type HoldTab = (typeof HOLD_TABS)[number];
 export const HOLD_TAB_LABELS: Record<HoldTab, string> = {
   facilities: "Facilities",
   staff: "Staff",
+  stores: "Stores",
   reminders: "Reminders",
   notes: "Notes",
 };

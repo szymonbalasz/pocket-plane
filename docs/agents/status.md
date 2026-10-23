@@ -21,8 +21,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | 16/16; branch gates 5440 / 218; builder merging main (RS2: window registry + goldens conflicts) | gates → merge |
 
 | RS1 Reminders tab + sheet | merged `d52a5587` | — | done (branch gates 5408 / 216) | main gates 5408 / 216 green |
-| RS2 Strongholds tab + window | merged | — | done (11/11 + re-test 5/5) | main gates |
-| RS3 Stores UI | `build/hold-stores` (ws wA5; base RS2) | build-rs3 | walkthrough 18/18 | merge after RS2 |
+| RS2 Strongholds tab + window | merged `bee916a5` | — | done (11/11 + 5/5) | main gates 5434 / 220 green |
+| RS3 Stores UI | merged `8884907f` | — | done (18/18; branch gates 5444 / 222 on identical code) | main gates with SP2 |
 
 Queue: SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
