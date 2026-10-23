@@ -344,7 +344,7 @@ describe("Stronghold window (FR-HOLD-23–34)", () => {
     expect(failed).toContain('data-testid="hold-retry"');
   });
 
-  test("FR-HOLD-24 FR-HOLD-25 DM view: header (Shown switch, Defenders, menu, All strongholds), four tabs, six facilities in the DM's order with states, figures, Income, order, replaces / replaced by, staff, eye-off on the vault; totals incl. DM only", () => {
+  test("FR-HOLD-24 FR-HOLD-25 DM view: header (Shown switch, Defenders, menu, All strongholds), five tabs (RS3's Stores third), six facilities in the DM's order with states, figures, Income, order, replaces / replaced by, staff, eye-off on the vault; totals incl. DM only", () => {
     select(DM, "grey");
     const html = render(<StrongholdWindow kind={HOLD_WINDOW_KIND} instance="main" />, { you: DM });
     expect(attrs(html, "hold-window", "data-record-id")).toEqual(["grey"]);
@@ -355,6 +355,7 @@ describe("Stronghold window (FR-HOLD-23–34)", () => {
     expect(attrs(html, "hold-tab", "data-value")).toEqual([
       "facilities",
       "staff",
+      "stores",
       "reminders",
       "notes",
     ]);
