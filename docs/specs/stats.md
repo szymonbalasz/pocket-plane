@@ -1,7 +1,7 @@
 ---
 title: Stats and summaries
 prefix: STATS
-status: in-review
+status: complete
 owner: spec-wf, spec-sb, spec-sp
 phase: post-mvp-9
 ---
@@ -151,7 +151,7 @@ Tier A rules hold: filter, then aggregate; final roll only; names from facts; pa
 
 ### 6.2 Sprint 9: recap reads (track SP)
 
-The [session recap](session-recap.md) reads stats; it changes no stats number, formula, schema or ack. Proposed with RECAP's picks.
+The [session recap](session-recap.md) reads stats; it changes no stats number, formula, schema or ack. Decided with RECAP's picks at DM gate 1 (#339).
 
 | ID | Requirement |
 |---|---|

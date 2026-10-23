@@ -1,7 +1,7 @@
 ---
 title: Campaign manager
 prefix: CMGR
-status: in-review
+status: complete
 owner: spec-sp
 phase: post-mvp-9
 ---
@@ -16,4 +16,4 @@ phase: post-mvp-9
   - How much session/journal lands in MVP: [ADR-0013](../../architecture/adr/0013-session-journal-scope.md).
   - In-world calendar/timeline vs real-world session dates.
 
-> TODO (spec phase): expand from [_template.md](../_template.md) after MVP.
+> Not specified yet (post-MVP, not sprint 9): timeline, quest board, prep notes and calendar stay this stub until picked; expand from [_template.md](../_template.md) then.

@@ -1,7 +1,7 @@
 ---
 title: Compendium
 prefix: CMP
-status: in-review
+status: complete
 owner: spec-followups, spec-sp
 phase: post-mvp-9
 ---
@@ -55,7 +55,7 @@ phase: post-mvp-9
 
 > **Sprint 7 revision (track FU, BL-48; DM [#311](../decisions-log.md)):** decided, not open: the DM gets a confirmation after Add to party, and a fixture Goblin's row no longer reads "CR 1/4 · Small" with no type. New **FR-CMP-57**, **-58**. Tests `FR-CMP-57 add to party confirmed` (DOM: ack → `cmp-add-to-party-done` "Added: Potion of healing ×2", Popover closes after 1.5 s; `e2e/cmp-add-to-party.e2e.ts` expects the new players' text), `FR-CMP-58 type-less creature label` (unit: no trailing space without a type; the new typed fixture Goblin "Small humanoid"; the old type-less entry unchanged); walkthrough U17 in [play-shell §13](play-shell.md#13-test-plan); slice FU4. 0 B. Edge cases: client-only text; reconnect re-renders from the store; crash: no server change. No open question.
 
-> **Sprint 9 revision (track SP, rules quick reference; DM [#338](../decisions-log.md), tier B):** decided, not open: a **DM screen of rules lookups** (conditions, actions, cover, …) from content we may ship ([ADR-0018](../architecture/adr/0018-global-imported-content.md), CC BY 4.0). Shape proposed here (OQ-CMP-45–50): the SRD 5.1 **rules sections** join the bundled source as a new kind **`rule`** (one entry per heading, text quoted verbatim), shown in a new **Rules** window on pages we curate, and searchable like every entry (also from the [command palette](play-shell.md#6-functional-requirements)). **Why here, not a new spec:** the content is compendium entries (same source, adapter, import, visibility, search, attribution); only the window is new. New FR-CMP-59–75 ([§6.1](#61-sprint-9-rules-quick-reference-track-sp)); amended FR-CMP-11, -36. 0 B to any snapshot (REST only). Slice SP2 (§14). Integrator seams S3, S4 and review-a rulings 17–19 applied.
+> **Sprint 9 revision (track SP, rules quick reference; DM [#338](../decisions-log.md), tier B):** decided, not open: a **DM screen of rules lookups** (conditions, actions, cover, …) from content we may ship ([ADR-0018](../architecture/adr/0018-global-imported-content.md), CC BY 4.0). Shape decided at DM gate 1 ([#339](../decisions-log.md), every bold pick; OQ-CMP-45–50): the SRD 5.1 **rules sections** join the bundled source as a new kind **`rule`** (one entry per heading, text quoted verbatim), shown in a new **Rules** window on pages we curate, and searchable like every entry (also from the [command palette](play-shell.md#6-functional-requirements)). **Why here, not a new spec:** the content is compendium entries (same source, adapter, import, visibility, search, attribution); only the window is new. New FR-CMP-59–75 ([§6.1](#61-sprint-9-rules-quick-reference-track-sp)); amended FR-CMP-11, -36. 0 B to any snapshot (REST only). Slice SP2 (§14). Integrator seams S3, S4 and review-a rulings 17–19 applied.
 
 ### Sprint 9 at a glance
 
@@ -85,7 +85,7 @@ phase: post-mvp-9
 - **Not in S4:** typo-tolerant (fuzzy) search, search syntax beyond plain words (OQ-CMP-26), 5etools class import ([compendium-expansion](post-mvp/compendium-expansion.md), #244).
 - **Sprint 5 (S5, track C):** image slots on homebrew entries (FR-CMP-45–49), the form's slots hosting `ImageAttach` (FR-CMP-50), the entry view's gallery + lightbox in both clients (FR-CMP-51, -52), CON-44 (FR-CMP-53). Upload / paste / drop code is track P's ([FR-ASSET-20–27](assets-pipeline.md#6-functional-requirements)). **Not in S5** (decided #256): images on imported (SRD) entries (OQ-CMP-39), per-image player toggle (OQ-CMP-40), images as token art (OQ-CMP-41), captions and result-row thumbnails (OQ-CMP-42), inline images in entry text.
 - **Sprint 6 (S6, track IM):** the matcher module moves to `@shared/search/` (FR-CMP-54, -56); the homebrew form's slots pass a picker `context` (FR-CMP-55). Tags, image search and the picker are [assets-pipeline](assets-pipeline.md)'s (FR-ASSET-39–50). **Not in S6:** tags on compendium entries; image search inside the Compendium window.
-- **Sprint 9 (S9, track SP):** kind `rule`, the recorded `sections` endpoint, card split, the Rules window with curated pages, pins and house rules (FR-CMP-59–75). **Not in S9:** our own condensed rules text (OQ-CMP-45 B), SRD 5.2 rules, links from a token's condition chip to its card, rule cards changing rolls.
+- **Sprint 9 (S9, track SP):** kind `rule`, the recorded `sections` endpoint, card split, the Rules window with curated pages, pins and house rules (FR-CMP-59–75). **Not in S9:** our own condensed rules text (OQ-CMP-45: SRD wording, #339), SRD 5.2 rules, links from a token's condition chip to its card, rule cards changing rolls.
 
 ## 3. Goals
 
@@ -198,7 +198,7 @@ All writes: one transaction (rows + event-log entry), then the domain event ([AD
 
 ### 6.1 Sprint 9: rules quick reference (track SP)
 
-Picks proposed (OQ-CMP-45–50), not decided. Text is the SRD's, never ours; only the page list and order are curated.
+Decided at DM gate 1 (#339): OQ-CMP-45–50, every bold pick. Text is the SRD's, never ours; only the page list and order are curated.
 
 | ID | Requirement | Notes |
 |---|---|---|
@@ -706,16 +706,16 @@ Walkthrough: [ASSET walkthrough IM](assets-pipeline.md#131-sprint-6-image-search
 | OQ-CMP-43 | *(S6)* **Track CP (companions + summons; [combat-tracker](combat-tracker.md), [entities](entities.md))**: a summon is placed from a compendium entry. Which search does CP use? | **Settled by seams S6: A.** CP3 `build/cp-summon` needs **IM-0 only**: the summon lookup is combat's autocomplete through `@shared/search/match` (store rows) and the compendium's REST search (entries); no matcher of its own, no image picker (summon token art, if any, uses the token Image… picker IM-3 wires). Rejected: ~~B CP filters a client-side list with its own code (a second matcher, against #285)~~ | no · settled S6 | combat-tracker, entities |
 | OQ-CMP-44 | *(S6)* Glossary | **Add "Image tag"** (a label on an image in the asset library, several per image; built-in or the DM's own; DM only) **and "Shared matcher"** (the one word-search module `@shared/search/match.ts`: whitespace-separated words, partial, case-insensitive, every word must match; used by compendium search, creature lookups and image search); amend "Asset library" (the DM's listed images, searchable and filterable by tag in every picker). **Settled by seams S13** (integrator applies at the gate merge) | no · settled S13 | glossary, assets-pipeline |
 
-**Sprint 9 (track SP, rules quick reference; owner spec-sp).** **Bold** = suggested pick, not decided.
+**Sprint 9 (track SP, rules quick reference; owner spec-sp).** All decided at DM gate 1 (#339): every bold pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CMP-45 | Where does the rules text come from? (ADR-0018: only what we may ship) | **A. SRD 5.1 rules sections recorded from Open5e (wotc-srd), only those the pages use (21 of 45; no races, backgrounds, feats), wording verbatim as cards; we curate only the pages**: exact rules, CC BY 4.0, one recorder run · B. DM-screen tables we write, condensed from the SRD: compact, but our paraphrase can drift from the rules and needs proof-reading · C. Only what we ship today (conditions): nothing new | yes (DM) | FR-CMP-59–64 |
-| OQ-CMP-46 | Where does it live? | **A. Its own Rules window (both launchers), pages + pins**: a DM screen you leave open · B. A Rules tab in the Compendium window: one window fewer, but a 7th tab at 440 px and no page layout · C. Palette lookups only: nothing to leave open | yes (DM) | FR-CMP-63 |
-| OQ-CMP-47 | House rules on the screen? | **A. Homebrew `rule` entries on a House rules page, shared per entry**: the existing homebrew form · B. SRD only | no | FR-CMP-67 |
-| OQ-CMP-48 | Who sees it? | **A. DM and players**: SRD text is public and holds no campaign data · B. DM only ("DM screen"): players keep the Compendium | yes (DM) | FR-CMP-70 |
-| OQ-CMP-49 | Pinned cards | **A. A per-browser Pinned page**: no server state · B. No pins · C. Pins stored per person on the server: follows you across browsers; a record, schema and CON-44 | no | FR-CMP-66 |
-| OQ-CMP-50 | Glossary: **Rules window**, **Rule card**, **House rule** | **A. Add** | no (integrator) | glossary |
+| OQ-CMP-45 | Where does the rules text come from? (ADR-0018: only what we may ship) | **Decided (DM #339): A.** Options: **A. SRD 5.1 rules sections recorded from Open5e (wotc-srd), only those the pages use (21 of 45; no races, backgrounds, feats), wording verbatim as cards; we curate only the pages**: exact rules, CC BY 4.0, one recorder run · B. DM-screen tables we write, condensed from the SRD: compact, but our paraphrase can drift from the rules and needs proof-reading · C. Only what we ship today (conditions): nothing new | no (decided) | FR-CMP-59–64 |
+| OQ-CMP-46 | Where does it live? | **Decided (DM #339): A.** Options: **A. Its own Rules window (both launchers), pages + pins**: a DM screen you leave open · B. A Rules tab in the Compendium window: one window fewer, but a 7th tab at 440 px and no page layout · C. Palette lookups only: nothing to leave open | no (decided) | FR-CMP-63 |
+| OQ-CMP-47 | House rules on the screen? | **Decided (DM #339): A.** Options: **A. Homebrew `rule` entries on a House rules page, shared per entry**: the existing homebrew form · B. SRD only | no (decided) | FR-CMP-67 |
+| OQ-CMP-48 | Who sees it? | **Decided (DM #339): A.** Options: **A. DM and players**: SRD text is public and holds no campaign data · B. DM only ("DM screen"): players keep the Compendium | no (decided) | FR-CMP-70 |
+| OQ-CMP-49 | Pinned cards | **Decided (DM #339): A.** Options: **A. A per-browser Pinned page**: no server state · B. No pins · C. Pins stored per person on the server: follows you across browsers; a record, schema and CON-44 | no (decided) | FR-CMP-66 |
+| OQ-CMP-50 | Glossary: **Rules window**, **Rule card**, **House rule** | **Decided (DM #339): A.** Options: **A. Add** | no (decided) | glossary |
 
 ## 16. Out of scope
 

@@ -1,6 +1,6 @@
-# Proposed — One client command registry for the palette and keyboard shortcuts
+# 0067 — One client command registry for the palette and keyboard shortcuts
 
-- Status: proposed (sprint 9, track SP; the integrator numbers it at merge)
+- Status: accepted (DM gate, [#339](../../decisions-log.md))
 - Date: 2026-10-22
 - Extends: [ADR-0025](0025-play-shell-windows.md) (features register, the shell never changes for them), [ADR-0060](0060-one-window-placer.md) §7 (overlays are registered, never placed).
 - Raised by: DM [#338](../../decisions-log.md) (keyboard shortcuts + command palette, Obsidian / VS Code style).
@@ -20,7 +20,7 @@
 | B. Each feature binds its own keys and exports palette items it builds | No shared file | Collisions found by players; the sheet is hand-written; typing / pause guards copied N times |
 | C. Commands as server intents ("command bus") | One permission story | Duplicates the intents we have; adds round trips for opening a window |
 
-## Decision (proposed)
+## Decision
 
 **A.**
 

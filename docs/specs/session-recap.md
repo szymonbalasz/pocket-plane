@@ -1,14 +1,14 @@
 ---
 title: Session recap
 prefix: RECAP
-status: in-review
+status: complete
 owner: spec-sp
 phase: post-mvp-9
 ---
 
 # Session recap
 
-> Five-minute read. See [AGENTS.md](../../AGENTS.md). **Sprint 9, track SP** (DM [#338](../decisions-log.md), decided: a session recap, tier B, from the event log and stats). Promoted from the [campaign-manager](post-mvp/campaign-manager.md) stub's recap row. Everything below the decision is **proposed**: picks in §15 (OQ-RECAP-01–15). Integrator seams S4, S6–S10, S14 applied (OQ-RECAP-08, -10, -14, -15 resolved); review-a rulings 4, 5, 16, 20 applied. Sessions stay derived ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)'s decision unchanged; a note on its consequences, OQ-RECAP-13); numbers follow [stats](stats.md) ([ADR-0059](../architecture/adr/0059-stats-read-models.md), [ADR-0062](../architecture/adr/0062-stats-session-partials.md)).
+> Five-minute read. See [AGENTS.md](../../AGENTS.md). **Sprint 9, track SP** (DM [#338](../decisions-log.md), decided: a session recap, tier B, from the event log and stats). Promoted from the [campaign-manager](post-mvp/campaign-manager.md) stub's recap row. Shape decided at DM gate 1 ([#339](../decisions-log.md)): every bold pick in §15 (OQ-RECAP-01–15). Integrator seams S4, S6–S10, S14 applied (OQ-RECAP-08, -10, -14, -15 resolved); review-a rulings 4, 5, 16, 20 applied. Sessions stay derived ([ADR-0013](../architecture/adr/0013-session-journal-scope.md)'s decision unchanged; a note on its consequences, OQ-RECAP-13); numbers follow [stats](stats.md) ([ADR-0059](../architecture/adr/0059-stats-read-models.md), [ADR-0062](../architecture/adr/0062-stats-session-partials.md)).
 
 ## 1. Summary
 
@@ -22,7 +22,7 @@ phase: post-mvp-9
 - Recap of any session the viewer can list (stats' derived sessions: a ≥ 6 h gap starts a new one), the newest live.
 - DM Share (note ≤ 280 chars, sections to leave out); share notification + open on every client; history **Open**.
 - Copy as Markdown (both roles; what the viewer sees).
-- *(proposed)* Entry points: the palette ([FR-SHELL-186](play-shell.md#6-functional-requirements)), a **Recap** button on Stats' Session tab ([FR-STATS-79](stats.md#62-sprint-9-recap-reads-track-sp)), the share notification. No launcher button (OQ-RECAP-02).
+- Entry points: the palette ([FR-SHELL-186](play-shell.md#6-functional-requirements)), a **Recap** button on Stats' Session tab ([FR-STATS-79](stats.md#62-sprint-9-recap-reads-track-sp)), the share notification. No launcher button (OQ-RECAP-02).
 
 ## 3. Goals
 
@@ -148,7 +148,7 @@ phase: post-mvp-9
 - **DM disconnect / reconnect:** Share disabled until `live`; the dialog keeps its draft.
 - **Server crash mid-share:** one transaction: no row or the row and its log entry; a crash after commit is a normal share (reconnect snapshot carries the row). Test seam `PP_TEST_CRASH=recap.share:before-commit` / `:after-commit`.
 - **Undo, rerolls, late reveals:** a recap re-reads facts, so an undo drops the kill, a reroll counts only the final roll; a reveal doesn't backfill players' numbers (FR-STATS-04).
-- **A session grows after its share:** the recap is live, the note stays (no frozen copy; OQ-RECAP-05 C would freeze it).
+- **A session grows after its share:** the recap is live, the note stays (no frozen copy, OQ-RECAP-05 B).
 - **A fight across two sessions:** listed in each session it has counted facts in; highlights cover the whole fight (stats' fight scope) — accepted.
 - **Loot between sessions** (a ledger row in a ≥ 6 h gap) belongs to the earlier session (`createdAt` < the next `from`).
 - **Concurrent shares** (two DM tabs): two rows; the newest wins on view.
@@ -222,23 +222,23 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 ## 15. Open questions
 
-**Bold** = suggested pick, not decided.
+All decided at DM gate 1 (#339): every bold pick accepted; seam questions resolved by the integrator.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-RECAP-01 | When does it appear? | **A. On demand; the DM's Share opens it for everyone**: like Show awards · B. Automatically at the next session's first entry ("Last time…" for everyone): no click, but sessions end only in hindsight (≥ 6 h gap) · C. An "End session" button that shares it: needs a session marker (supersedes ADR-0013) | yes (DM) | FR-RECAP-20, -21 |
-| OQ-RECAP-02 | Where does it live? | **A. Its own window, no launcher button (palette, Stats' Session tab, share)**: room to read; launcher stays lean · B. A Recap tab in the Stats window: no new window, but 400 px and the stats client files track FX is fixing · C. Its own launcher button: easier to find, one more at 1280 px | yes (DM) | FR-RECAP-10 |
-| OQ-RECAP-03 | What does it list? | **A. Fights (kills, downs), party tally, loot, notable rolls, awards** · B. A + XP from the killed monsters' CR · C. A + reminders, handouts, gems spent | yes (DM) | FR-RECAP-11–16 |
-| OQ-RECAP-04 | Who sees it? | **A. Players any session they can list, same public numbers for all**: as Stats · B. Players only sessions the DM shared: a reveal moment, but the numbers are already public · C. DM only | yes (DM) | FR-RECAP-02, -08 |
-| OQ-RECAP-05 | Can the DM edit it before sharing? | A. No: Share as is · **B. A note (≤ 280) + untick sections, carried in the share row**: no new table · C. A stored, editable recap (frozen text): a new table and record type, no longer live; a step towards a session entity (ADR-0013) | yes (DM) | FR-RECAP-20, -22 |
-| OQ-RECAP-06 | Kept per session? | **A. Computed for every session; shares kept as notification rows (history)** · B. Only shared sessions kept | no | FR-RECAP-07 |
-| OQ-RECAP-07 | XP? | **A. None** (the table may use milestones; stats has no XP either) · B. CR-based XP of counted kills, DM only · C. B for everyone (hidden monsters' XP leaks their CR) | yes (DM) | FR-RECAP-13 |
+| OQ-RECAP-01 | When does it appear? | **Decided (DM #339): A.** Options: **A. On demand; the DM's Share opens it for everyone**: like Show awards · B. Automatically at the next session's first entry ("Last time…" for everyone): no click, but sessions end only in hindsight (≥ 6 h gap) · C. An "End session" button that shares it: needs a session marker (supersedes ADR-0013) | no (decided) | FR-RECAP-20, -21 |
+| OQ-RECAP-02 | Where does it live? | **Decided (DM #339): A.** Options: **A. Its own window, no launcher button (palette, Stats' Session tab, share)**: room to read; launcher stays lean · B. A Recap tab in the Stats window: no new window, but 400 px and the stats client files track FX is fixing · C. Its own launcher button: easier to find, one more at 1280 px | no (decided) | FR-RECAP-10 |
+| OQ-RECAP-03 | What does it list? | **Decided (DM #339): A.** Options: **A. Fights (kills, downs), party tally, loot, notable rolls, awards** · B. A + XP from the killed monsters' CR · C. A + reminders, handouts, gems spent | no (decided) | FR-RECAP-11–16 |
+| OQ-RECAP-04 | Who sees it? | **Decided (DM #339): A.** Options: **A. Players any session they can list, same public numbers for all**: as Stats · B. Players only sessions the DM shared: a reveal moment, but the numbers are already public · C. DM only | no (decided) | FR-RECAP-02, -08 |
+| OQ-RECAP-05 | Can the DM edit it before sharing? | **Decided (DM #339): B.** Options: A. No: Share as is · **B. A note (≤ 280) + untick sections, carried in the share row**: no new table · C. A stored, editable recap (frozen text): a new table and record type, no longer live; a step towards a session entity (ADR-0013) | no (decided) | FR-RECAP-20, -22 |
+| OQ-RECAP-06 | Kept per session? | **Decided (DM #339): A.** Options: **A. Computed for every session; shares kept as notification rows (history)** · B. Only shared sessions kept | no (decided) | FR-RECAP-07 |
+| OQ-RECAP-07 | XP? | **Decided (DM #339): A.** Options: **A. None** (the table may use milestones; stats has no XP either) · B. CR-based XP of counted kills, DM only · C. B for everyone (hidden monsters' XP leaks their CR) | no (decided) | FR-RECAP-13 |
 | ~~OQ-RECAP-08~~ | **Track RS (reminders, strongholds):** list reminders added / done this session? | **Resolved (integrator, seams S9):** no reminders and no stronghold events in the recap this sprint (agrees with OQ-REM-06 A and OQ-RECAP-03 A) | — | RS's reminders spec |
-| OQ-RECAP-09 | Copy as Markdown | **A. Both roles, what the viewer sees** · B. DM only · C. None | no | FR-RECAP-19 |
+| OQ-RECAP-09 | Copy as Markdown | **Decided (DM #339): A.** Options: **A. Both roles, what the viewer sees** · B. DM only · C. None | no (decided) | FR-RECAP-19 |
 | ~~OQ-RECAP-10~~ | **party-loot / track RS:** how the recap reads the ledger, now that RS adds a Stores holder | **Resolved (integrator, seams S8):** A: `lootRows` in party-loot's folder (by assignment) after RS0; any Stores end = a move, left out (FR-RECAP-14, leak test) | — | FR-RECAP-14 |
-| OQ-RECAP-11 | Which loot rows? | **A. `world` ↔ party / character (gains, spends, items found / removed); no moves** · B. Every row incl. moves: noisy | no | FR-RECAP-14 |
-| OQ-RECAP-12 | Glossary: **Session recap** ("the Recap window's summary of one derived session; computed, shareable with a note"), **Command palette**, **Shortcuts sheet** (play-shell) | **A. Add** | no (integrator) | glossary |
-| OQ-RECAP-13 | **ADR-0013**'s consequence says the session recap stays a story tool, "not combat history"; DM #338 asks for a summary "from the event log and stats" | **A. The integrator adds an amendment note to ADR-0013 at merge (decision unchanged: no session entity, sessions derived; the recap may summarise combat and loot facts)** · B. A superseding ADR | no (integrator; DM ack at gate) | ADR-0013 |
+| OQ-RECAP-11 | Which loot rows? | **Decided (DM #339): A.** Options: **A. `world` ↔ party / character (gains, spends, items found / removed); no moves** · B. Every row incl. moves: noisy | no (decided) | FR-RECAP-14 |
+| OQ-RECAP-12 | Glossary: **Session recap** ("the Recap window's summary of one derived session; computed, shareable with a note"), **Command palette**, **Shortcuts sheet** (play-shell) | **Decided (DM #339): A.** Options: **A. Add** | no (decided) | glossary |
+| OQ-RECAP-13 | **ADR-0013**'s consequence says the session recap stays a story tool, "not combat history"; DM #338 asks for a summary "from the event log and stats" | **Decided (DM #339): A.** Options: **A. The integrator adds an amendment note to ADR-0013 at merge (decision unchanged: no session entity, sessions derived; the recap may summarise combat and loot facts)** · B. A superseding ADR | no (decided) | ADR-0013 |
 | ~~OQ-RECAP-14~~ | **notifications (track FX holds the toast runtime):** the `session-recap` kind | **Resolved (integrator, seams S6 + S7):** info class; SP3 appends only to `notifications/kinds.ts` and both `notification-views.ts`, no toast-runtime change; the NOTE kind row from FR-RECAP-23 at merge | — | FR-RECAP-21, -23 |
 | ~~OQ-RECAP-15~~ | **stats / track FX:** SP3's stats edits (one `compute.ts` export, the Session tab button) | **Resolved (integrator, seams S7):** one holder at a time: FX1 first, then SP3's stats edits; SP3's server work and window start without waiting; no read-model change by FX | — | FR-STATS-78, -79 |
 
