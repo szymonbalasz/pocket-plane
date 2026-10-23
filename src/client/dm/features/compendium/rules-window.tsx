@@ -12,6 +12,7 @@ import { RulesBody } from "@ui/features/compendium/rules/RulesWindow";
 import { rulesWindowBase } from "@ui/features/compendium/rules/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
+import { loadChunk } from "@ui/lib/lazy-chunk";
 import { PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { HomebrewDialog } from "./HomebrewForm";
@@ -47,7 +48,11 @@ function DmRules() {
   const openWindow = useOpenWindow();
   useEffect(() => {
     let live = true;
-    void import("../campaign-management/session").then((m) => live && setApi(() => m.api)); // hc clients are callable proxies: never a setState updater
+    // hc clients are callable proxies: never a setState updater. Stale chunk: skeleton + notice.
+    loadChunk(() => import("../campaign-management/session"), { notice: true }).then(
+      (m) => live && setApi(() => m.api),
+      (err) => console.error("compendium: session failed to load", err),
+    );
     return () => {
       live = false;
     };
