@@ -1,14 +1,14 @@
 ---
 title: Reminders
 prefix: REM
-status: in-review
+status: complete
 owner: spec-rs
 phase: post-mvp-9
 ---
 
 # Reminders
 
-> Five-minute read for §1–§7. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Sprint 9, track RS: **BL-73** as the DM wrote it ([backlog](../agents/backlog.md), [#338](../decisions-log.md)); scope is decided, not open. DM questions are framed in [§15](#15-open-questions) with a **bold** pick. Companion spec: [strongholds](strongholds.md) (linked reminders). Cross-cutting design: [proposed ADR: reminders and strongholds as record families](../architecture/adr/proposed-s9-rs-record-families.md).
+> Five-minute read for §1–§7. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Sprint 9, track RS: **BL-73** as the DM wrote it ([backlog](../agents/backlog.md), [#338](../decisions-log.md)); scope is decided, not open. Every DM question in [§15](#15-open-questions) was decided at DM gate 1 ([#339](../decisions-log.md)): every bold pick accepted. Companion spec: [strongholds](strongholds.md) (linked reminders). Cross-cutting design: [ADR-0065](../architecture/adr/0065-reminder-stronghold-records.md) (reminders and strongholds as record families, accepted #339).
 
 ### At a glance
 
@@ -253,21 +253,21 @@ Teardown: stop the server, then `fixtures:reset --profile verify`.
 
 ## 15. Open questions
 
-**Bold** = suggested pick (not decided). DM questions first.
+Every question decided; DM gate 1 ([#339](../decisions-log.md)) accepted every bold pick. Rejected options kept for the record.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-REM-01 | **DM:** who can add / edit / delete reminders? | A. DM only; players read / **B. Players add on the party and their own characters and edit / delete only what they created; the DM any; the DM's are read-only for players (as macros)** / C. Players edit any reminder they can see. *Tradeoff:* B lets players keep their own notes without touching the DM's | yes | FR-REM-08 |
-| OQ-REM-02 | **DM:** can a reminder be hidden from players? | **A. Yes: the DM marks any reminder "DM only"** (eye-off for the DM) / B. No hidden reminders (DM notes elsewhere). *Tradeoff:* A costs one flag and one leak test; sprint-9 gate already plans "a hidden reminder" | yes | FR-REM-12, -13 |
-| OQ-REM-03 | **DM:** does a reminder's roll use the macros' roll path? | **A. Yes: roll buttons exactly like macros (`dice.roll`, Shift / Ctrl, physical dice, Alt → tray)** / B. Clickable notation inside the text only (as handouts) / C. A reminder points at a saved macro. *Tradeoff:* A reuses a built path with no parser; B has no labels; C couples two lists | yes | FR-REM-21 |
-| OQ-REM-04 | **DM:** ordering inside a group | **A. Creation order, oldest first** / B. Manual ↑ / ↓ (one more intent, a shared order) / C. Newest first. *Tradeoff:* A costs nothing; reorder is additive later | no · owner: DM gate | FR-REM-17 |
-| OQ-REM-05 | **DM:** "done" / dismiss vs permanent | **A. Permanent until deleted** / B. A "Done" tick that strikes it out (kept; "Hide done") / C. One-shot: Done deletes it. *Tradeoff:* A is simplest and matches "no mechanics"; B adds state per row | no · owner: DM gate | FR-REM-07 |
+| OQ-REM-01 | Who can add / edit / delete reminders? | **Decided (DM #339): B. Players add on the party and their own characters and edit / delete only what they created; the DM any; the DM's are read-only for players (as macros).** Rejected: ~~A. DM only~~, ~~C. players edit any reminder they can see~~ | — · decided | FR-REM-08 |
+| OQ-REM-02 | Can a reminder be hidden from players? | **Decided (DM #339): A. Yes: the DM marks any reminder "DM only".** Rejected: ~~B. no hidden reminders~~ | — · decided | FR-REM-12, -13 |
+| OQ-REM-03 | Does a reminder's roll use the macros' roll path? | **Decided (DM #339): A. Yes: roll buttons exactly like macros.** Rejected: ~~B. clickable notation in the text only~~, ~~C. a link to a saved macro~~ | — · decided | FR-REM-21 |
+| OQ-REM-04 | Ordering inside a group | **Decided (DM #339): A. Creation order, oldest first.** Rejected: ~~B. manual ↑ / ↓~~, ~~C. newest first~~ | — · decided | FR-REM-17 |
+| OQ-REM-05 | "Done" / dismiss vs permanent | **Decided (DM #339): A. Permanent until deleted.** Rejected: ~~B. a "Done" tick~~, ~~C. one-shot~~ | — · decided | FR-REM-07 |
 | OQ-REM-06 | **SP (session recap):** should the recap list reminders added this session? | **Closed per seams S9 + OQ-RECAP-03 (both picks A):** the recap lists no reminders and no stronghold events this sprint; no strongholds palette provider either (later append). Rejected: ~~list reminders added / removed this session~~ | — · closed (S9) | session-recap (SP) |
-| OQ-REM-07 | **Glossary:** add **Reminder** ("a text note with optional rolls for the party or one character; no mechanics"); amend **Condition** ("Reminder only" → "no mechanics", to avoid two meanings) | **Add + amend** | no · owner: integrator | glossary |
-| OQ-REM-08 | Snapshot or lazy (measured §12) | **Lazy `"all"`** (0 B; ADR-0045's one path) / in the snapshot (+17.8 KB DM realistic, +369 KB at the cap). In the proposed ADR | no · owner: DM gate (ADR) | live-sync |
+| OQ-REM-07 | **Glossary:** add **Reminder** ("a text note with optional rolls for the party or one character; no mechanics"); amend **Condition** ("Reminder only" → "no mechanics", to avoid two meanings) | **Decided (DM #339): add + amend** (integrator writes it at merge) | — · decided | glossary |
+| OQ-REM-08 | Snapshot or lazy (measured §12) | **Decided (DM #339, [ADR-0065](../architecture/adr/0065-reminder-stronghold-records.md)): lazy `"all"`** (0 B). Rejected: ~~in the snapshot~~ (+17.8 KB DM realistic, +369 KB at the cap) | — · decided | live-sync |
 
 ## 16. Out of scope
 
 - Mechanics, timers, game-time expiry, toasts or bell entries for reminders (later: an info toast when the DM adds one to your character).
-- Reminders on monsters, pets, NPC creatures; manual ordering (OQ-REM-04 B); "Done" state (OQ-REM-05 B); clickable notation in the text (OQ-REM-03 B).
+- Reminders on monsters, pets, NPC creatures; manual ordering; a "Done" state; clickable notation in the text (DM #339).
 - Reminders in the session recap (seams S9, OQ-REM-06 closed).

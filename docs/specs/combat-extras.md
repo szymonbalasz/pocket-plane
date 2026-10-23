@@ -1,7 +1,7 @@
 ---
 title: Combat extras
 prefix: CBTX
-status: in-review
+status: complete
 owner: spec-cb, spec-rs
 phase: post-mvp-9
 ---

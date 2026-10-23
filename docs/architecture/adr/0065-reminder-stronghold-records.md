@@ -1,6 +1,6 @@
-# Proposed — Reminders and strongholds as record families
+# 0065 — Reminders and strongholds as record families
 
-- Status: proposed (sprint 9, track RS; integrator numbers it at merge)
+- Status: accepted (DM gate, [#339](../../decisions-log.md))
 - Date: 2026-10-22
 - Extends: [ADR-0045](0045-lazy-record-types.md) (lazy types), [ADR-0021](0021-sync-protocol-conventions.md) B (one visibility fn per type, reads only the record), [ADR-0024](0024-definition-visibility.md) (copies written in the same transaction)
 - Affects: [reminders](../../specs/reminders.md), [strongholds](../../specs/strongholds.md), [party-board](../../specs/party-board.md), [character-sheet-full](../../specs/character-sheet-full.md), [protocol](../../protocol/README.md), [data model](../../data-model/README.md)
@@ -22,7 +22,7 @@
 
 ## Decision
 
-> Undecided. Suggested pick **A**.
+> **A** (DM, #339). Rejected: B (one record per facility / staff row), C (rows in the snapshot).
 
 - `reminder`: campaign scope, `lazy: "all"`; DM full; player hidden if `dmOnly`, `linkHidden`, or another player's character (`ownerPlayerId` ≠ viewer); else redacted (the three DM keys dropped). `ownerPlayerId` is refreshed through one `definitionChangedHooks` line on an owner change; `linkHidden` by every HOLD command that flips a stronghold's or facility's `dmOnly`, in that transaction (changes ride on its event).
 - `stronghold`: campaign scope, `lazy: "all"`; DM full; player hidden if `dmOnly`; else redacted inside the record. Events `quietWhenUnchanged` (#276) so an edit invisible to players sends them no frame.

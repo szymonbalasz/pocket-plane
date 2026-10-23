@@ -1,7 +1,7 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: in-review
+status: complete
 owner: spec-wf, spec-sb, spec-tt, spec-rs
 phase: post-mvp-9
 ---
@@ -24,7 +24,7 @@ phase: post-mvp-9
 
 > **Sprint 7 (track FU, DM [#311](../decisions-log.md); session-sim-10 a03).** Decided, not open: the **companion card** no longer opens at its minimum with the attacks below the fold. New **FR-CHARX-81** (a useful size, so the shell auto-minimises a window rather than shrink the card; [play-shell FR-SHELL-79](play-shell.md#6-functional-requirements), OQ-SHELL-53) and **FR-CHARX-82** (attacks before conditions, two attack rows visible at 320 × 360). Client only, 0 B. Tests `FR-CHARX-81 card useful size` (registry: `usefulSize` 320 × 360; with Compendium open at 1280×800 the card opens 320 × 360 and Compendium is auto-minimised), `FR-CHARX-82 attacks above the fold` (DOM at 320 × 360: both Owlbear attack rows' buttons inside the rect with 3 conditions); walkthrough U2, U15 in [play-shell §13](play-shell.md#13-test-plan); slices FU1 (the window line) and FU4 (the card's order) in [play-shell §14](play-shell.md#14-dependencies). GM (gems) edits this spec in parallel with its own range. Edge cases: client-only layout; reconnect re-renders from the store; crash: no server change. No open question.
 
-> **Sprint 9 (track RS, BL-73, DM [#338](../decisions-log.md); owner spec-rs).** Decided (not open): a **Reminders** section on the character sheet ([reminders](reminders.md)). One sheet section `rem.reminders` (append to `sheet-sections.ts`), a tab "Reminders" before Macros (OQ-CHARX-45). New **FR-CHARX-100–104**; no sheet data, no `creature-sheet` field, 0 B snapshot (reminders load lazily, [REM §12](reminders.md#12-performance--bandwidth)). Slice RS1 `build/rem-ui`. Tests `FR-CHARX-100 reminders tab`, `FR-CHARX-101 contents and roll as`, `FR-CHARX-102 rights and lock`. Questions [OQ-CHARX-45, -46](#15-open-questions).
+> **Sprint 9 (track RS, BL-73, DM [#338](../decisions-log.md); owner spec-rs).** Decided (not open): a **Reminders** section on the character sheet ([reminders](reminders.md)). One sheet section `rem.reminders` (append to `sheet-sections.ts`), a tab "Reminders" before Macros (OQ-CHARX-45). New **FR-CHARX-100–104**; no sheet data, no `creature-sheet` field, 0 B snapshot (reminders load lazily, [REM §12](reminders.md#12-performance--bandwidth)). Slice RS1 `build/rem-ui`. Tests `FR-CHARX-100 reminders tab`, `FR-CHARX-101 contents and roll as`, `FR-CHARX-102 rights and lock`. [OQ-CHARX-45, -46](#15-open-questions) decided at DM gate 1 (#339): A, A.
 
 > Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Extends [character-sheet](character-sheet.md) (CHAR, basics); every FR-CHAR stays in force unless amended here.
 
@@ -622,8 +622,8 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-CHARX-44 | Where the trophy case sits on the sheet | **Decided (#335): A** · **A. Its own tab "Trophies", last**: room for records, out of the way · B. End of the Main tab (`main` slot): seen without a click, makes Main longer · C. A header chip "12 kills" (trophy icon) opening a popover: compact, tiny | no (DM pick, with OQ-STATS-23) | CHARX, STATS |
-| OQ-CHARX-45 | *(S9)* **DM:** where reminders sit on the sheet | **A. Its own tab "Reminders", before Macros** / B. End of the Main tab (`main` slot) / C. A header chip "3 reminders" opening a popover. *Tradeoff:* A has room for rolls and text; B is seen without a click but makes Main longer; C is compact but cramped | no · owner: DM gate | CHARX, REM |
-| OQ-CHARX-46 | *(S9)* **DM:** does the sheet lock also lock a player's reminders? | **A. No: reminders aren't sheet data (as item moves and macros)** / B. Yes: a locked sheet's player can't add / edit them. *Tradeoff:* A keeps one rule for "not sheet data"; B gives the DM a freeze | no · owner: DM gate | CHARX, REM |
+| OQ-CHARX-45 | *(S9)* Where reminders sit on the sheet | **Decided (DM #339): A. Its own tab "Reminders", before Macros.** Rejected: ~~B. end of the Main tab~~, ~~C. a header chip with a popover~~ | — · decided | CHARX, REM |
+| OQ-CHARX-46 | *(S9)* Does the sheet lock also lock a player's reminders? | **Decided (DM #339): A. No: reminders aren't sheet data (as item moves and macros).** Rejected: ~~B. yes~~ | — · decided | CHARX, REM |
 
 ## 16. Out of scope
 
