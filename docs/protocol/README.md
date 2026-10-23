@@ -694,6 +694,7 @@ All logged in the command's transaction; none transient. **Undoable: `AttackAppl
 | `TokenUpdated` / `TokenHidden` / `TokenRevealed` / `TokenDeleted`, `SceneDeleted` *(scenes-map)* | MAP | token commands, scene delete | | + `combatant` / `encounter` rows from token-changed hooks ([§25](#25-combat-token-changed-hooks)) | no | [FR-CBT-09](../specs/combat-tracker.md#6-functional-requirements), [ADR-0028](../architecture/adr/0028-token-changed-hooks.md) |
 
 - **Event order** within one command: owner event first, helper events after (`AttackRolled` → `NotificationCreated`; `AttackApplied` → `NotificationResolved`; `CombatEntryUndone` → `NotificationReopened`; *(polish, built)* `EncounterEnded` → `NotificationDismissed` × N, FR-CBT-61).
+- *(Sprint 9, FX2, FR-GEM-42)* **`GemSpent`** carries the card's upsert in its own `changes` (the cards helpers write it with `updateNotification({emit: false})`, FR-NOTE-74): one `event` frame per spend, no `NotificationUpdated` after ([§150](#150-sprint-9-dice--gems-lines-fx2)).
 - **Listeners, signals:** none added in Combat. No listener writes state; damage cards are created by `cbt.attack` via `notify` ([ADR-0027](../architecture/adr/0027-notification-creation.md)).
 - Not in MVP: `LogEntryVisibilitySet` (single-entry reveal → tier B, #139 P8).
 
@@ -3535,3 +3536,31 @@ Internal (fixture loader only, no WS intent): `hold.saveFacilityByName`, `hold.s
 - **Hook line:** `reminders.owner-copy` in `definitionChangedHooks` (FR-REM-05).
 - **Fixtures:** bundles `reminders-strongholds`, `rs-e2e`, `session-sim-13` (RS group; other sprint-9 tracks append).
 - **CON-44** (`src/server/features/strongholds/con44.test.ts`, heavy harness at the caps: 200 reminders, 8 × 24 × 40 strongholds, 8 Stores with coin, the whole loot window with Stores ends): DM 691,615 → 694,491 B (+2,876 B; 878,373 B left of 1.5 MiB); `stronghold-index` 1,364 B, `stores-coin` 1,831 B per frame; players +786 B worst (289,358 B of 512 KiB); `reminder` / `stronghold` 0 B in every snapshot; DM `sync.load` 364,036 B (reminders) / 377,798 B (strongholds). `StrongholdUpdated` at the caps: DM 46,645 B, player 45,579 B (≤ 48 KB); a 500-entry show flip sends 100 entries (37,687 B DM in the test's rows).
+
+## 150. Sprint 9: dice + gems lines (FX2)
+
+From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-91–93, [gems](../specs/gems.md#6-functional-requirements) FR-GEM-41–44, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-74 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-94–95 (#338, #339; review-b rulings 10–12). **Built by `fix/fx-dice-lines`**. Data side: [data model §120](../data-model/README.md#120-sprint-9-dice--gems-lines-fx2).
+
+| Intent / helper | Change | FR |
+|---|---|---|
+| `gem.adjust {characterId, gem, delta}` | `delta` −10…+10, ≠ 0 (was ±5; gems' own zod, `GEM_DELTA_MAX`); 11 → `invalid`. A net award writes one line "DM awards Brakka 6 Fortune gems (6 held)" | FR-GEM-43 |
+| `dice.reroll(env, {entryId, rollId, manual?, others?})` | `others(item, {items, rollIds, at}) → {items, rollIds}` (the old entry's items, roll ids and rerolled slot), called once the new roll row is written, before the entry: `items` aligned with the old payload (an item replaces, `null` drops it and its `dmPayload.items` names; the rerolled slot is the new item), `rollIds` the new entry's in full. Absent → copied as before | FR-DICE-91 |
+| `updateNotification(env, id, patch, {emit: false}) → RecordChange` | no `NotificationUpdated`; the caller puts the change in its own event's `changes`. Default unchanged | FR-NOTE-74 |
+| `cards.replaceToHit → {critFlipped, change, payload}`, `cards.applyMaxDice → {rollIds, change}` | write the card with `{emit: false}`; `cards.cardLineItems(env, p, item, old)` = the attack line's items as the card shows them, roll ids swapped (to-hit, maxed part) or left out (a dropped item's, with its part and offered rolls) (FR-DICE-91's `others`) | FR-GEM-41, -42 |
+
+**Events and visibility** (amends [§22](#22-combat-domain-events)'s event order and §130 / §134's `GemSpent` rows)
+
+| Event | Changes (order) | Player sees |
+|---|---|---|
+| `GemSpent` (Combat gem) | `character-gems`, the `gem.spend` line, **the card's upsert**; no `NotificationUpdated` after | the count and the public spend line; the card only its audience (owner + DM, or the DM alone) |
+| `GemSpent` (Inspiration reroll) | `character-gems`, the spend line, the new `roll` entry (its items per the card, FR-GEM-41), the old entry's supersede upsert, **a pending card's upsert**; no `NotificationUpdated` after | as before; the card only its audience |
+
+- **One frame per spend** (FR-SYNC-17, gate I15): each connection gets one `event` frame (cause `GemSpent`) per spend. Known I15 exceptions, recorded not widened (review-b ruling 11): `damage.ts` (×2) and `hit.ts` still emit their own `NotificationUpdated` after the owner's event; `cards.ts`' two helpers are called only by `gem.spend` and now fold (the ruling's `cards.ts:112` is `replaceToHit`).
+- **Reroll line follows the card** (BL-62): the new line holds the new to-hit + the card's current damage (maxed dice as the card shows them), or the to-hit only after a crit flip; never the old pre-max part. `rollIds` name only final rolls (FR-DICE-67).
+- **Client:**
+  - Log lines (FR-DICE-92, -93): " + " joins kept dice across dropped ones ("4d6kh3: 5 3̶ + 6 + 6 = 17"). A die chip's number is HTML text over the shape (an `inline-block` `<span data-face>` pulled back over the `<svg>` by a negative margin, centred by padding so the chip stays 18 px with no scroll overflow; the `<svg>` stays `aria-hidden`, no `<text>`); chips, their `dice-log-die` wrappers (`leading-none`) and the line's badges are `inline-block`, so `innerText` and a selection copy read on one line. A whole d100 draws its two faces from `data-face` (CSS) and carries its value as one text node. New test ID `dice-log-entry-text` (the line's text).
+  - Gems (FR-GEM-43, -44): the DM's ± clicks per character + gem sum client-side and send one `gem.adjust` 1.5 s after the last click (±10 at once; net 0 → nothing; popover close → now; not live → dropped). The count shows the pending sum at once, muted (`gem-count` / `gem-adjust-count` `data-pending`). The log's reroll confirm reads "Spend Inspiration?".
+  - Roll popups (FR-DICEX-94): the 6 s after rest always run; at expiry a popup closes unless held (a `pointermove` with movement on it since it showed and `:hover` now, or focus inside), re-checked 0.3 s after a leave / blur (a card that slides from under a following pointer stays held) and every 1 s; the hold flags clear when the card mounts or unmounts; ✕ always closes.
+  - Macro editor (FR-DICEX-95): a field's error shows only after it was touched (changed or blurred) or Save was pressed; Save stays disabled while invalid; a new macro (Save as macro's preset) opens with focus in Name.
+- **Fixtures:** bundle `fx-dice-e2e` (= `gems-reroll-e2e`) for `e2e/fx-dice.e2e.ts`; no new unit.
+- **CON-44:** 0 B (no new record or field); one frame fewer per Combat / reroll spend with a card.

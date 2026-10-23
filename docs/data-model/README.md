@@ -2501,3 +2501,20 @@ From [reminders](../specs/reminders.md#8-data-model) §8, [strongholds](../specs
 - **Persisted runtime state:** the two tables and seven columns. No migration (push-time defaults).
 - **Fixtures:** units `rem-party`, `rem-mira-charm`, `rem-thorn-own`, `rem-thorn-secret`, `hold-greystone`, `hold-greystone-reminders`, `hold-greystone-stores`, `hold-tower-secret`, `hold-tower-move`; bundles `reminders-strongholds`, `rs-e2e`, `session-sim-13` (= `session-sim-12` + the RS units but `hold-tower-move`).
 - **CON-44:** see [protocol §149](../protocol/README.md#149-sprint-9-reminders--strongholds-core--records-intents-stores-holder-rs0).
+
+## 120. Sprint 9: dice + gems lines (FX2)
+
+From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-91–93, [gems](../specs/gems.md#6-functional-requirements) FR-GEM-41–44, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-74 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-94–95 (#338, #339). **Built by `fix/fx-dice-lines`**: no table, column or record type. Protocol side: [protocol §150](../protocol/README.md#150-sprint-9-dice--gems-lines-fx2).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| `gem.award` payload `count` | 1–10 (was 1–5): one line per net award of a summed `gem.adjust` | FR-GEM-43 |
+| A reroll `roll` entry's `payload` / `rollIds` / `dmPayload` (combat to-hit with a pending card) | the new to-hit item + the card's **current** damage items (a maxed part's new roll row: its `rollId`, `dice`, `total` + `mods`); none once a crit flip moved the damage to "not used". `rollIds` = the new to-hit's and the kept items' rolls (their part and offered rolls); `dmPayload.items` keep the kept items' names, aligned. Any other reroll: copied as before | FR-GEM-41, FR-DICE-91 |
+| DM quick-award sum | client memory per sheet block: per character + gem, the unsent sum and the sum in flight; dropped when not live or on reload | FR-GEM-43 |
+| Popup hold flags | client memory per mounted card: pointer moved on it since it showed, focus inside; cleared on mount / unmount | FR-DICEX-94 |
+| Macro editor touched flags | component state per editor: name, expression, Save pressed | FR-DICEX-95 |
+
+- **Derived:** a line's text breakdown joins kept dice with " + " across dropped ones (`groupSegments`, FR-DICE-92); counted rolls (FR-DICE-67) now leave out a maxed card part's pre-max roll after a reroll.
+- **Fixtures:** no new unit; bundle `fx-dice-e2e` (= `gems-reroll-e2e`, `e2e/fx-dice.e2e.ts`). `session-sim-13` lines: none needed (the walkthrough runs on `session-sim-12`).
+- **Persisted runtime state:** none.
+- **CON-44:** 0 B (no new record or field; a reroll line's items are as many or fewer than before).
