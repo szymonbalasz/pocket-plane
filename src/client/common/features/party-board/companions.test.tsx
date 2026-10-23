@@ -204,6 +204,7 @@ describe("FR-PARTY-41 companions in Party status", () => {
       "inventory",
       "loot",
       "reminders",
+      "strongholds", // RS2 (FR-PARTY-72): the DM's
     ]);
     expect(html).not.toContain(">Companions<");
     expect(html).toContain('data-testid="party-status"');

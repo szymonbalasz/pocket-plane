@@ -2554,3 +2554,16 @@ From [reminders](../specs/reminders.md#8-data-model) §8 (derived), [character-s
 - **Browser state:** Party Manager tab memory may hold `reminders` (§121's key, unchanged).
 - **Fixtures:** none new; bundle `rem-ui-e2e` (alias of `reminders-strongholds` for the state-changing e2e).
 - **CON-44:** 0 B (no snapshot change; `reminder` stays lazy).
+
+## 124. Sprint 9: Strongholds tab and Stronghold window (RS2)
+
+From [strongholds](../specs/strongholds.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-ui`**. Protocol side: [protocol §156](../protocol/README.md#156-sprint-9-strongholds-tab-and-stronghold-window-rs2). **No table, column, record type or wire field.**
+
+| Browser state | Value | Rule | Source |
+|---|---|---|---|
+| Stronghold window selection `pp.hold.v1.<campaignId>.<dm \| playerId>` | `{strongholdId: id \| null, tab: facilities \| staff \| reminders \| notes}` | junk → default (nothing selected, Facilities) + warning; storage failing → memory only for the page; a selected id that is gone or hidden shows "This stronghold isn't available" | FR-HOLD-23, -24 |
+| Party Manager tab choice `pp.party.tab.v1.…` | `strongholds` (new id) | not visible now → Party status, the stored value kept ([§122](#122-sprint-9-party-manager-pm2)) | FR-PARTY-71, -72 |
+
+- **Derived (client, not stored):** state summary, figures line, "Replaced by", staff per facility, totals ("incl. DM only" for the DM), order suggestions, reminder groups, confirm texts.
+- **Fixtures:** none new; bundle `hold-ui-e2e` (alias of `reminders-strongholds`, for `e2e/hold-ui.e2e.ts`).
+- **CON-44:** 0 B.

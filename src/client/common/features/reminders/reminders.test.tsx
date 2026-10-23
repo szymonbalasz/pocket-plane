@@ -357,6 +357,7 @@ describe("FR-PARTY-71 Reminders tab", () => {
       ["inventory", 30],
       ["loot", 40],
       ["reminders", 50],
+      ["strongholds", 60], // RS2 (FR-PARTY-71)
     ]);
     expect(PARTY_TAB_ENTRIES.find((t) => t.id === REMINDERS_TAB)?.visible).toBeUndefined();
     for (const you of [DM, P1]) {

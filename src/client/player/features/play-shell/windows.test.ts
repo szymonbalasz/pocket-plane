@@ -720,6 +720,7 @@ const GOLDEN_KINDS = [
   "shell.prefs",
   "charx.companion",
   "stats.board", // ST2 (FR-SHELL-86 (5)): appended, goldens regenerated
+  "hold.stronghold", // RS2 (S4, FR-SHELL-171): appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */
