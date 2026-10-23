@@ -6,7 +6,8 @@
 // as FR-LOOT-16. *(S9)* `holder`: the party inventory lists rows without `strongholdId` only
 // (FR-PARTY-77); a Stores (the Stronghold window's Stores tab, FR-HOLD-28) lists its rows with
 // Take / Move… to the Party or a character, Give… into it, the DM's Add to Stores and "DM only"
-// rows (eye-off; OQ-HOLD-12 A, FR-LOOT-36, -37).
+// rows (eye-off; OQ-HOLD-12 A, FR-LOOT-36, -37). *(S10 H4, BL-96)* A party row's Take / Move… also
+// goes into the Stores the viewer may use (players: shown strongholds, FR-LOOT-33).
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { PARTY_ITEM_TYPE, type PartyItemRecord } from "@shared/party-board/schemas";
@@ -33,6 +34,7 @@ import {
 import { Input, Label } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useLazyRecords, useRecords, useSync } from "../../sync/store";
+import { useStores } from "../party-loot/LootLog";
 import { submitEnabled } from "../party-loot/logic";
 import {
   addPayload,
@@ -40,6 +42,7 @@ import {
   EMPTY_ITEM,
   editDraftOf,
   editPayload,
+  endOf,
   type GiveSource,
   givePayload,
   giveSources,
@@ -152,7 +155,11 @@ function TargetPicker({
             value={o.key}
             data-testid="party-item-target-option"
             data-value={o.key}
+            data-dm-only={o.hidden ? "true" : undefined}
           >
+            {o.hidden && (
+              <EyeOffIcon className="size-3.5 text-muted-foreground" aria-label="DM only" />
+            )}
             {o.label}
           </SelectItem>
         ))}
@@ -169,8 +176,8 @@ const escapeTo = (onCancel: () => void) => (e: KeyboardEvent) => {
 };
 
 /**
- * Take: this party row → one of the viewer's characters (any for the DM). *(S9)* A Stores row:
- * → Party or those characters.
+ * Take: this party row → one of the viewer's characters (any for the DM) *(S10 H4)* or a Stores
+ * ("Move"). *(S9)* A Stores row: → Party or those characters.
  */
 function TakeForm({
   item,
@@ -209,7 +216,7 @@ function TakeForm({
         <TargetPicker options={options} value={target} onChange={setChosen} />
         <QtyInput value={qty} onChange={setQty} />
         <Button type="submit" size="sm" data-testid="party-item-submit" disabled={!enabled}>
-          Take
+          {endOf(target)?.kind === "stores" ? "Move" : "Take"}
         </Button>
         <Button
           type="button"
@@ -568,6 +575,7 @@ export function InventoryTab({
     [entities],
   );
   const sorted = useMemo(() => sortItems(holderRows(rows, holder)), [rows, holder]);
+  const stores = useStores();
   const [open, setOpen] = useState<Open>(null);
   const campaignId = you?.campaignId ?? null;
   // A campaign switch closes any open form.
@@ -579,7 +587,8 @@ export function InventoryTab({
   const isDm = viewer.role === "dm";
   const copy = holderCopy(holder);
   const givable = canTakeOrGive(chars, viewer);
-  const targets = holderTakeTargets(chars, viewer, holder);
+  const targets = holderTakeTargets(chars, viewer, holder, stores);
+  const intoStores = targets.some((t) => endOf(t.key)?.kind === "stores");
   const movable = targets.length > 0;
   const sources = giveSources(chars, sheets ?? {}, viewer);
   const targetsOf = (s: GiveSource) =>
@@ -637,7 +646,7 @@ export function InventoryTab({
                   disabled={!live}
                   onClick={() => setOpen({ kind: "take", itemId: i.id })}
                 >
-                  {isDm ? "Move…" : "Take"}
+                  {isDm || intoStores ? "Move…" : "Take"}
                 </Button>
               )}
               {isDm && (

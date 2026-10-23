@@ -5,6 +5,7 @@
 // FR-HOLD-28, FR-LOOT-34, -36, -37) lists its own rows, Take / Move… goes to the Party or a
 // character, Give… brings a sheet item into it, and the DM's rows carry "DM only".
 import type { CreatureSheetRecord, ItemRow } from "@shared/character-sheet/sheet";
+import { storesLabel } from "@shared/party-board/format";
 import { canMoveItem } from "@shared/party-board/items";
 import {
   AddItemIntent,
@@ -18,6 +19,7 @@ import {
   type StoresHolder,
 } from "@shared/party-board/schemas";
 import type { z } from "zod";
+import type { StoresRef } from "../party-loot/logic";
 import type { Parsed } from "./logic";
 
 /** The item intents (PARTY §9). */
@@ -162,6 +164,8 @@ export function endOf(key: string): ItemEnd | null {
 export interface TargetOption {
   key: string;
   label: string;
+  /** *(S10 H4)* The DM's DM-only Stores (eye-off, FR-LOOT-34). */
+  hidden?: true;
 }
 
 /** Give… targets from `sourceCharacterId`: Party, then every other character by name. */
@@ -183,15 +187,29 @@ export function giveTargets(
 
 /**
  * *(S9)* Take / Move… targets of a holder's row: the party's → the viewer's characters (any for
- * the DM); a Stores' → Party, then those characters (FR-LOOT-33: Stores → party, own character).
+ * the DM), then *(S10 H4, BL-96)* each Stores the viewer may use (`stores`, from the viewer's
+ * `stronghold-index`: players get shown strongholds only; the DM's DM-only ones `hidden`;
+ * FR-LOOT-33: party → Stores); a Stores' → Party, then those characters (Stores → party, own
+ * character; never Stores → Stores).
  */
 export function holderTakeTargets(
   chars: readonly InvCharacter[],
   v: InvViewer,
   holder: ItemHolder,
+  stores: readonly StoresRef[] = [],
 ): TargetOption[] {
   const own = takeTargets(chars, v).map((c) => ({ key: characterKey(c.id), label: c.name }));
-  return holder === null ? own : [{ key: PARTY_KEY, label: "Party" }, ...own];
+  if (holder !== null) return [{ key: PARTY_KEY, label: "Party" }, ...own];
+  return [
+    ...own,
+    ...stores.map(
+      (s): TargetOption => ({
+        key: storesItemKey(s.id),
+        label: storesLabel(s.name),
+        ...(s.hidden ? { hidden: true as const } : {}),
+      }),
+    ),
+  ];
 }
 
 /** *(S9)* Give… targets: into a Stores only that Stores; else FR-PARTY-24's (`giveTargets`). */
