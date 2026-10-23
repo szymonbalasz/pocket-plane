@@ -1,6 +1,6 @@
 // `useRecapQuery`: one `recap.query` bound to the Recap window (FR-RECAP-06, -07): asks on mount
-// and on input change, pokes on the live frames `wants` picks, asks after each snapshot, pauses
-// while the window is minimised. The ack is parsed with the viewer's role schema (FR-RECAP-08).
+// and on input change, pokes on the live frames `wants` picks (asks at once on `urgent`'s), asks
+// after each snapshot, pauses while the window is minimised. The ack is parsed with the viewer's role schema (FR-RECAP-08).
 import type { EventFrame } from "@shared/protocol/frames";
 import { RECAP_QUERY_INTENT, type RecapQueryInput } from "@shared/session-recap/schemas";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,6 +20,8 @@ export function useRecapQuery<R>(
   input: RecapQueryInput,
   parse: (ack: unknown) => R,
   wants: (frame: EventFrame) => boolean,
+  /** Frames that ask at once (a new share of this session: its note and omit, FR-RECAP-22). */
+  urgent: (frame: EventFrame) => boolean = () => false,
 ): { state: QueryState<RecapQueryInput, R>; retry(): void } {
   const connection = useSync((s) => s.connection);
   const generation = useSync((s) => s.lazy?.generation);
@@ -28,8 +30,8 @@ export function useRecapQuery<R>(
   const q = useRef<RecapQuery<RecapQueryInput, R> | null>(null);
   const parseRef = useRef(parse);
   parseRef.current = parse;
-  const wantsRef = useRef(wants);
-  wantsRef.current = wants;
+  const wantsRef = useRef({ wants, urgent });
+  wantsRef.current = { wants, urgent };
   const inputKey = JSON.stringify(input);
   const now = useRef({ inputKey, shown });
   now.current = { inputKey, shown };
@@ -63,7 +65,8 @@ export function useRecapQuery<R>(
   }, [generation]);
 
   useEventFrame((frame) => {
-    if (wantsRef.current(frame)) q.current?.poke();
+    if (wantsRef.current.urgent(frame)) q.current?.snapshot();
+    else if (wantsRef.current.wants(frame)) q.current?.poke();
   });
 
   const retry = useCallback(() => q.current?.retry(), []);

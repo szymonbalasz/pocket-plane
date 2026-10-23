@@ -25,6 +25,22 @@ if (process.env.UPDATE_FAILING === "1") {
   for (const n of failing) FAILING.add(n);
 }
 
+/**
+ * Named exemptions (FR-SHELL-160: a new failing cell only with a reason, orchestrator-approved):
+ * cell → reason. Each must be in `replay.failing.json`.
+ */
+const SP3_RESIZE =
+  "SP3 (pending approval): `recap.session` joins D3 untouched (S4); the resize down and back re-fits it (e.g. 440×492 → 412×360 at 1280×800), the placer's I7 resize class D1 / D2 / D3 already carry (frame, not the window def: a constant 440×560 default fails the same cells)";
+const EXEMPTIONS = new Map([
+  ["FR-SHELL-115 replay D3 fitted @1280×800 resize", SP3_RESIZE],
+  ["FR-SHELL-115 replay D3 fitted @1440×900 resize", SP3_RESIZE],
+  ["FR-SHELL-115 replay D3 fitted @1600×900 resize", SP3_RESIZE],
+]);
+
+test("FR-SHELL-160 named exemptions are recorded failing cells (DM)", () => {
+  for (const name of EXEMPTIONS.keys()) expect(FAILING.has(name)).toBe(true);
+});
+
 for (const c of cells) {
   (FAILING.has(c.name) ? test.failing : test)(
     c.name,

@@ -18,7 +18,14 @@ import {
   SessionsResult as SessionsSchema,
 } from "@shared/stats/schemas";
 import { CopyIcon, EyeOffIcon, Share2Icon } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
 import { Button } from "../../components/ui/button";
 import {
@@ -27,6 +34,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
 } from "../../components/ui/overlays";
 import {
   Card,
@@ -57,6 +65,7 @@ import {
   refreshes,
   rollText,
   sectionState,
+  shareOpenOf,
   visibleSections,
 } from "./logic";
 import { recapViews } from "./open";
@@ -109,9 +118,14 @@ export function RecapWindow() {
   const newestFromN = list.state.result?.sessions[0]?.fromN ?? null;
   const newest = fromN === null || fromN === newestFromN;
   const parse = role === "dm" ? DmRecapResult.parse : PlayerRecapResult.parse;
-  const recap = useRecapQuery<RecapResult>(fromN === null ? {} : { n: fromN }, parse, (f) =>
-    refreshes(f, newest),
+  const shownFromN = useRef<number | null>(null);
+  const recap = useRecapQuery<RecapResult>(
+    fromN === null ? {} : { n: fromN },
+    parse,
+    (f) => refreshes(f, newest),
+    (f) => shareOpenOf(f)?.fromN === shownFromN.current,
   );
+  shownFromN.current = recap.state.result?.recap?.fromN ?? null;
   // A picked session gone (`not_found`): back to the newest.
   const missing = recap.state.status === "error" && recap.state.error?.code === "not_found";
   useEffect(() => {
@@ -229,18 +243,19 @@ export function RecapBody({
             Share
           </Button>
         ) : null}
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8"
-          data-testid="recap-copy"
-          aria-label="Copy as Markdown"
-          title="Copy as Markdown"
-          disabled={!r}
-          onClick={() => r && onCopy(r)}
-        >
-          <CopyIcon className="size-3.5" />
-        </Button>
+        <Tooltip content="Copy as Markdown">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8"
+            data-testid="recap-copy"
+            aria-label="Copy as Markdown"
+            disabled={!r}
+            onClick={() => r && onCopy(r)}
+          >
+            <CopyIcon className="size-3.5" />
+          </Button>
+        </Tooltip>
       </div>
       {failed ? (
         <div data-testid="recap-error" className="flex items-center gap-2 text-sm text-destructive">

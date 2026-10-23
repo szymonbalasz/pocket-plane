@@ -5,6 +5,7 @@
 // what a click in the UI does: no new intent, event or record. Windows need no line here: the
 // palette's Windows group is generated from each client's `windows.ts` (FR-SHELL-185).
 import { PM2_COMMANDS } from "../party-board/commands";
+import { SP3_COMMANDS } from "../session-recap/commands";
 import { SP1_COMMANDS } from "./palette/launch";
 import { SP1_PROVIDERS } from "./palette/providers";
 import type { PaletteCommand, SearchProvider } from "./palette/types";
@@ -17,6 +18,8 @@ export const COMMANDS: readonly PaletteCommand[] = [
   ...SP1_COMMANDS,
   // PM2 (build/party-manager): Party status (seams S3)
   ...PM2_COMMANDS,
+  // SP3 (build/sp-recap): Session recap (FR-RECAP-28)
+  ...SP3_COMMANDS,
 ];
 
 /** The search providers, one group each or more (append yours; no strongholds yet, seams S9). */

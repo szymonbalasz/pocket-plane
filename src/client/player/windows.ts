@@ -4,6 +4,7 @@
 import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
+import { recapWindow } from "@ui/features/session-recap/window";
 import { statsWindow } from "@ui/features/stats/window";
 import { playerCompanionWindow } from "./features/character-sheet/companion-window";
 import { playerCharSheetWindow } from "./features/character-sheet/sheet-window";
@@ -30,6 +31,7 @@ const windows: WindowDef[] = [
   prefsWindow("player", playerPrefSections), // shell.prefs, no launcher (play-shell, FR-SHELL-71)
   playerCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
   statsWindow, // stats.board (stats, FR-SHELL-93)
+  recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);

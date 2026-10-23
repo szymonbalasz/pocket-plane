@@ -79,11 +79,13 @@ export const REPLAY_SETS: Record<ShellClient, readonly ReplaySet[]> = {
         "note.history",
         "dicex.tray",
         "dicex.requests", // TT2 (S3)
+        "recap.session", // SP3 (S4, FR-RECAP-10)
       ],
     },
   ],
   player: [
-    { name: "P1", viewer: "player-1", kinds: [...P1, "party.board"] }, // PM2 (FR-SHELL-160)
+    // PM2 (FR-SHELL-160); SP3 (S4, FR-RECAP-10)
+    { name: "P1", viewer: "player-1", kinds: [...P1, "party.board", "recap.session"] },
     {
       name: "P2",
       viewer: "player-1",

@@ -4,6 +4,7 @@
 import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
+import { recapWindow } from "@ui/features/session-recap/window";
 import { statsWindow } from "@ui/features/stats/window";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
 import { dmCompanionWindow } from "./features/character-sheet/companion-window";
@@ -42,6 +43,7 @@ const windows: WindowDef[] = [
   dmCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
   statsWindow, // stats.board (stats, FR-SHELL-93)
   requestsWindow, // dicex.requests (dice-extras, FR-DICEX-86)
+  recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

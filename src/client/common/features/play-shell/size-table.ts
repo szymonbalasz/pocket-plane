@@ -77,6 +77,13 @@ const shared: Record<string, SizeRow> = {
     min: s(320, 280),
     criterion: "5 rows names whole, or 2 award cards, or the first 4 Highlights lines (S5)",
   },
+  // SP3 (FR-RECAP-10, S4): Recap, no launcher.
+  "recap.session": {
+    default: four(s(440, 412), s(440, 560), s(440, 560), s(440, 560)),
+    useful: all(400, 360),
+    min: s(340, 320),
+    criterion: "header + the first 4 fight lines",
+  },
 };
 
 /** The Game log's row (both clients): FR-SHELL-100's useful 460 × 160. */
