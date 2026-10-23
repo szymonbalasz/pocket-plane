@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 9 done (#338–#340); recap done, **sprint 10 planned (#341): hardening run, overnight, no gate unless blocking** ([sprint-10](sprint-10.md)). Briefs ready: `%TEMP%/pocket-plane/briefs/build-h{1,2,3,4}.md` (slice defs `h1`–`h4` in `slices.json`); inputs `.verify/sprint10/{seams,rulings-a,rulings-b,gate}.md`. Next: start all four (`SPRINT_VERIFY=.verify/sprint10 startslice.sh h1` … `h4`).
+**Phase:** Sprint 9 done (#338–#340); recap done, **sprint 10 planned (#341): hardening run, overnight, no gate unless blocking** ([sprint-10](sprint-10.md)). Briefs ready: `%TEMP%/pocket-plane/briefs/build-h{1,2,3,4}.md` (slice defs `h1`–`h4` in `slices.json`); inputs `.verify/sprint10/{seams,rulings-a,rulings-b,gate}.md`. All four builders started 2026-10-24 (sim-13 evidence copied into each worktree).
 
 **Gates on `main`:** run in a detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, then `bun install`, `bun run env:init`, `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there. Removed at the end of sprint 9; recreate it at the first merge of sprint 10.
 
@@ -11,17 +11,17 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
 | Sprint 9 (RS0–3, PM1–2, FX1–3, SP1–3) | all merged | — | done | — |
-| Sprint 10 H1 combat + dice | `fix/h1-combat-dice` | — | brief ready | start |
-| Sprint 10 H2 window frame + Party Manager | `fix/h2-frame` | — | brief ready | start |
-| Sprint 10 H3 toasts | `fix/h3-toasts` | — | brief ready | start |
-| Sprint 10 H4 rules, recap, strongholds, misc | `fix/h4-rules-misc` | — | brief ready | start |
+| Sprint 10 H1 combat + dice | `fix/h1-combat-dice` (slot 0, ws wA6) | build-h1 | building | walkthrough |
+| Sprint 10 H2 window frame + Party Manager | `fix/h2-frame` (slot 2, ws wA7) | build-h2 | building | walkthrough |
+| Sprint 10 H3 toasts | `fix/h3-toasts` (slot 3, ws wA8) | build-h3 | building | walkthrough |
+| Sprint 10 H4 rules, recap, strongholds, misc | `fix/h4-rules-misc` (slot 4, ws wA9) | build-h4 | building | walkthrough |
 | Sprint gate | main | — | session-sim-13 14 / 15 (`.verify/20261023-193558-session-sim-13/`); walkthrough evidence `.verify/sprint9/walkthroughs/` | — |
 
 Backlog after sim-13: BL-97 (leak-like, first), BL-98–BL-104, BL-93, BL-94, BL-95, BL-96, BL-92.
 
 ## Shared-file locks
 
-- None (every sprint-9 slice merged).
+- H1: `fixtures/bundles/index.ts` (append), protocol / data-model rows; H2: play-shell frame + goldens + replay harness + scenes-map camera; H3: toast runtime; per [sprint-10 hotspots](sprint-10.md#boundaries-and-hotspots).
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
