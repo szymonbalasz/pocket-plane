@@ -22,7 +22,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | walkthrough all PASS (F1 spec test-ID wording fixed on main); main merged, docs §155 / §123 | gates after FX1 → merge |
 | RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | walkthrough 11/11 | merge after FX1 + RS1 (wire reminder buttons / icon) |
-| RS3 Stores UI | `build/hold-stores` (ws wA5; base RS2) | build-rs3 | building | walkthrough H7, H10, H13 |
+| RS3 Stores UI | `build/hold-stores` (ws wA5; base RS2) | build-rs3 | ready (check 5357) | test-rs3 walkthrough running |
 
 Queue: SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
