@@ -115,7 +115,7 @@ const LEAKS = [
 
 /**
  * Every stats answer a player can ask for, parsed strictly with the player schemas: 4 computed
- * answers, the per-connection rate (FR-STATS-16); callers wait a second between rounds.
+ * answers, the per-viewer rate (FR-STATS-16, -69); callers wait a second between rounds.
  */
 async function playerAnswers(c: TestClient) {
   const fight = PlayerFightResult.parse(await result(c, STATS_QUERY_INTENT, { scope: "fight" }));
@@ -133,7 +133,7 @@ async function playerAnswers(c: TestClient) {
   return { fight, fights, sessions, session };
 }
 
-/** Past the per-connection rate window (FR-STATS-16) between query rounds. */
+/** Past the per-viewer rate window (FR-STATS-16, -69) between query rounds. */
 const RATE_WINDOW_MS = 1050;
 
 const ackText = (frames: readonly ServerFrame[]) =>

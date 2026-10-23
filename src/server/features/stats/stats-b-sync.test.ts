@@ -126,7 +126,7 @@ const LEAKS = [
   "DM dice",
 ];
 
-/** Past the per-connection rate window (FR-STATS-16) between query rounds. */
+/** Past the per-viewer rate window (FR-STATS-16, -69) between query rounds. */
 const RATE_WINDOW_MS = 1050;
 
 const ackText = (frames: readonly ServerFrame[]) =>
