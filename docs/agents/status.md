@@ -13,12 +13,12 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | RS0 reminders + strongholds core | merged `fb3884a3` | — | done (23/23) | — |
 | FX2 dice + gems lines | merged `d4837dc4` | — | done (10/10; branch gates 5232 / 208) | main gates with PM1 |
 | PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates: check 5307 + 1 timeout flake (passes alone), e2e 207 + 2 load flakes (pass alone) |
-| PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | walkthrough 14/15 (M13 migration comes back minimised) → fixing | re-test M13, M1 |
-| FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y, slot 5) | build-fx3 | walkthrough 6/6; merging main + wiring ShellWindow.tsx | gates → merge |
+| PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | M13 + X1 (tool-bar put-away never returns) fixed; check + e2e running | re-test M1, M13, X1 |
+| FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y, slot 5) | build-fx3 | ShellWindow wired; 30 s timeouts on 3 heavy tests (granted); check running | merge |
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
 | FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | building | walkthrough FX1 |
-| SP1 palette + shortcuts | `build/sp-palette` (ws wA1; base PM1) | build-sp1 | building | walkthrough P1-P11 |
-| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | building | walkthrough R1-R8 |
+| SP1 palette + shortcuts | `build/sp-palette` (ws wA1; base PM1) | build-sp1 | ready; main merged (check 5335 + known timeout flake) | test-sp1 walkthrough running (P4 after SP2) |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | built; second full e2e running | walkthrough R1-R8 |
 
 Queue: RS1 + RS2 after PM2 merges (RS0, PM1 in) · RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
