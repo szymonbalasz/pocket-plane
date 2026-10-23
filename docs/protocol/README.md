@@ -694,6 +694,7 @@ All logged in the command's transaction; none transient. **Undoable: `AttackAppl
 | `TokenUpdated` / `TokenHidden` / `TokenRevealed` / `TokenDeleted`, `SceneDeleted` *(scenes-map)* | MAP | token commands, scene delete | | + `combatant` / `encounter` rows from token-changed hooks ([§25](#25-combat-token-changed-hooks)) | no | [FR-CBT-09](../specs/combat-tracker.md#6-functional-requirements), [ADR-0028](../architecture/adr/0028-token-changed-hooks.md) |
 
 - **Event order** within one command: owner event first, helper events after (`AttackRolled` → `NotificationCreated`; `AttackApplied` → `NotificationResolved`; `CombatEntryUndone` → `NotificationReopened`; *(polish, built)* `EncounterEnded` → `NotificationDismissed` × N, FR-CBT-61).
+- *(Sprint 9, FX2, FR-GEM-42)* **`GemSpent`** carries the card's upsert in its own `changes` (the cards helpers write it with `updateNotification({emit: false})`, FR-NOTE-74): one `event` frame per spend, no `NotificationUpdated` after ([§150](#150-sprint-9-dice--gems-lines-fx2)).
 - **Listeners, signals:** none added in Combat. No listener writes state; damage cards are created by `cbt.attack` via `notify` ([ADR-0027](../architecture/adr/0027-notification-creation.md)).
 - Not in MVP: `LogEntryVisibilitySet` (single-entry reveal → tier B, #139 P8).
 
@@ -3487,7 +3488,84 @@ From [campaign-management](../specs/campaign-management.md#6-functional-requirem
 - **Fixtures:** unit `camp-paused` ("Pizza break, back soon", `town`, 10 min; not in `session-sim-12`); bundles `table-tools-paused` (= `table-tools` + `camp-paused`), `table-tools-paused-e2e` (`e2e/tt-pause.e2e.ts`).
 - **CON-44:** no new record; the paused card's +488 B and the events' sizes are TT0's (`con44-tt.test.ts`).
 
-## 149. Sprint 9: window memory, frame and canvas follow-ups (PM1)
+## 149. Sprint 9: reminders + strongholds core — records, intents, Stores holder (RS0)
+
+From [reminders](../specs/reminders.md#6-functional-requirements) FR-REM-01–16, -27–31, [strongholds](../specs/strongholds.md#6-functional-requirements) FR-HOLD-01–21, -35–40 and [party-loot](../specs/party-loot.md#6-functional-requirements) FR-LOOT-30–39 (#338, #339; review-a rulings 1–3, 6–10, 21–23; [ADR-0065](../architecture/adr/0065-reminder-stronghold-records.md), [ADR-0066](../architecture/adr/0066-stores-holder.md)). **Built by `fix/rs-core`** (server only; clients RS1–RS3). Data side: [data model §119](../data-model/README.md#119-sprint-9-reminders--strongholds-core-rs0). No new registry (§26 unchanged).
+
+**Record types** (scope `campaign`)
+
+| Type | Visibility | Snapshot | Source |
+|---|---|---|---|
+| `reminder {id, campaignId, seq, characterId \| null, text, source, rolls [{id, label, expression, category}], strongholdId \| null, facilityId \| null, dmOnly, ownerPlayerId \| null, linkHidden, createdByPlayerId \| null, createdAt, updatedAt}` *(new)* | DM full. Player hidden if `dmOnly`, `linkHidden` or another player's character (`ownerPlayerId` ≠ them); else redacted: no `seq`, `updatedAt`, `dmOnly`, `linkHidden`, `ownerPlayerId` (order by `createdAt`, then id) | **lazy `all`** | FR-REM-01, -13 |
+| `stronghold {id, campaignId, seq, name, dmOnly, defenders, defendersDmOnly, notes, notesDmOnly, facilities [...], staff [...], createdAt, updatedAt}` *(new)* | DM full. Player hidden if `dmOnly`; else redacted inside: DM-only facilities / staff removed, `defenders` / `notes` omitted when DM-only, pointers at a removed facility → null, every flag, `seq` and `updatedAt` removed | **lazy `all`** | FR-HOLD-01, -08 |
+| `stronghold-index {id, campaignId, name, dmOnly?: true}` *(new, derived)* | DM full; player hidden while `dmOnly`, else `{id, campaignId, name}` | every row (≤ 8) | FR-HOLD-01 |
+| `stores-coin {id = strongholdId, campaignId, strongholdId, cp…pp, hidden?: true}` *(new, derived)* | DM full; player hidden while `hidden` | one row per existing stronghold with ≥ 1 entry (≤ 8) | FR-LOOT-31 |
+| `loot-entry` | ends gain `{kind: stores, strongholdId}`; DM-only keys `storesHidden?: true`, `itemHidden?: true`. **Player: every row redacted** (no `seq`, no DM keys); a hidden Stores end → wire-only `{kind: outside}`; hidden if `itemHidden` or no end is party-side (only `world` / `outside` left) | window unchanged | FR-LOOT-30, -32, -36 |
+| `party-item` | + `strongholdId?` (a Stores row), DM-only keys `storesHidden?: true`, `dmOnly?: true`; player hidden if either | lazy `all` unchanged (one load = party + every Stores) | FR-LOOT-36 |
+
+**Intents** (none optimistic)
+
+| Intent | Who | Rules | Result |
+|---|---|---|---|
+| `rem.save {id?, target, text, source?, rolls?, dmOnly?, strongholdId?, facilityId?}` | DM, player | strict zod (text 1–500, source 0–60, ≤ 4 rolls); caps 200 / 30 (`conflict`; a player's message has no number); player: party / own character, edit only own-created rows still on party / own PC, never the DM keys (`forbidden`), a save keeps the stored ones; links DM only (`not_found` / `invalid`); same values → `ack` | `{reminderId}` |
+| `rem.delete {id}` | DM, player | as `rem.save`; a row the player can't see → `not_found` | `{reminderId}` |
+| `hold.create {name}` | DM | name 1–60 unique ci (`conflict`); ≤ 8 | `{strongholdId}` |
+| `hold.update {strongholdId, name?, dmOnly?, defenders?, defendersDmOnly?, notes?, notesDmOnly?}` | DM | patch ≥ 1 field; same → `ack`; a `dmOnly` flip rewrites `linkHidden`, Stores items' and every Stores entry's `stores_hidden` (changes: entries **inside the loot window only**) | — |
+| `hold.saveFacility {strongholdId, facility}` / `hold.saveStaff {strongholdId, staff}` | DM | append (no id; ≤ 24 / ≤ 40) or replace (`not_found`); `replacesId` / `facilityId` of the same stronghold (self → `invalid`) | `{facilityId}` / `{staffId}` |
+| `hold.moveRow {strongholdId, list, id, index}` | DM | index clamped; same place → `ack` | — |
+| `hold.removeStaff`, `hold.removeFacility` | DM | removing a facility deletes its linked reminders and nulls pointers, one transaction | — |
+| `hold.delete {strongholdId}` | DM | deletes linked reminders; Stores items → party (merge; full → `conflict` "Party inventory is full (60) — move or remove items first", nothing written); coin balance → 0 by move entries ≤ 999 999 per coin (negative coins paid by the pot), text "Stronghold deleted" or empty for a hidden Stores; then the row | — |
+| `loot.move` | DM, player | ends may be `stores`; `world` pairs with `character` or `stores`; player with a visible Stores: Stores ↔ pot, Stores → own PC, own PC → Stores; hidden / gone Stores → `not_found` "Stores are gone" | `{entryId}` |
+| `party.addItem {…, holder?: {kind: stores, strongholdId}, dmOnly?}` / `party.editItem {…, dmOnly?}` / `party.removeItem` / `party.moveItem` (ends + `stores`) | as before; Stores rights as `loot.move` | per-holder caps (`Stores are full (60)`) and keys; no `loot-received` for a Stores add; a player's take of a DM-only Stores item → `not_found` | as before |
+
+Internal (fixture loader only, no WS intent): `hold.saveFacilityByName`, `hold.saveStaffByName`, `rem.saveByName` take a facility **by name** and run the commands above unchanged.
+
+**Domain events** (`src/shared/events/reminders.ts`, `strongholds.ts`; all logged, none undoable; all **`quietWhenUnchanged`**: a change no player can see sends players no frame)
+
+| Event | Changes | Player sees |
+|---|---|---|
+| `ReminderSaved {reminderId, created}` / `ReminderDeleted {reminderIds}` | `reminder` | per row (FR-REM-13) |
+| `StrongholdCreated {strongholdId}` | `stronghold`, `stronghold-index` | nothing (new = DM-only) |
+| `StrongholdUpdated {strongholdId, part: header \| facility \| staff \| order, facilityId?, staffId?}` | `stronghold`; rename / flip + `stronghold-index`; flip + reminders, Stores items, `stores-coin`, window entries; facility `dmOnly` + reminders | the redacted change, or no frame |
+| `FacilityRemoved {strongholdId, facilityId, reminderIds}` | `stronghold`, reminder deletes | per row |
+| `StrongholdDeleted {strongholdId, reminderIds, entryIds}` | `stronghold` / `stronghold-index` / `stores-coin` → null, reminder deletes, `party-item`, entries, `party-pot` | per row |
+| `CoinMoved`, `PartyItemAdded`, `PartyItemRemoved`, `ItemMoved` | + `stores-coin` per Stores end | per row |
+| entities' `EntityUpdated` (owner change) | + reminder `ownerPlayerId` upserts | old owner deletes, new owner upserts |
+
+- **Zod:** `@shared/reminders` (`schemas.ts`, `text.ts`), `@shared/strongholds`, `@shared/party-loot` (`Endpoint` + `stores`, `WireEndpoint` + `outside`, `StoresCoinRecord`, `PlayerLootEntryRecord`, `playerMayMove`, `visibility.ts`), `@shared/party-board` (`StoresHolder`, `ItemEnd` + `stores`, `PartyItemRecord` keys, `planHolderMerge`).
+- **Hook line:** `reminders.owner-copy` in `definitionChangedHooks` (FR-REM-05).
+- **Fixtures:** bundles `reminders-strongholds`, `rs-e2e`, `session-sim-13` (RS group; other sprint-9 tracks append).
+- **CON-44** (`src/server/features/strongholds/con44.test.ts`, heavy harness at the caps: 200 reminders, 8 × 24 × 40 strongholds, 8 Stores with coin, the whole loot window with Stores ends): DM 691,615 → 694,491 B (+2,876 B; 878,373 B left of 1.5 MiB); `stronghold-index` 1,364 B, `stores-coin` 1,831 B per frame; players +786 B worst (289,358 B of 512 KiB); `reminder` / `stronghold` 0 B in every snapshot; DM `sync.load` 364,036 B (reminders) / 377,798 B (strongholds). `StrongholdUpdated` at the caps: DM 46,645 B, player 45,579 B (≤ 48 KB); a 500-entry show flip sends 100 entries (37,687 B DM in the test's rows).
+
+## 150. Sprint 9: dice + gems lines (FX2)
+
+From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-91–93, [gems](../specs/gems.md#6-functional-requirements) FR-GEM-41–44, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-74 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-94–95 (#338, #339; review-b rulings 10–12). **Built by `fix/fx-dice-lines`**. Data side: [data model §120](../data-model/README.md#120-sprint-9-dice--gems-lines-fx2).
+
+| Intent / helper | Change | FR |
+|---|---|---|
+| `gem.adjust {characterId, gem, delta}` | `delta` −10…+10, ≠ 0 (was ±5; gems' own zod, `GEM_DELTA_MAX`); 11 → `invalid`. A net award writes one line "DM awards Brakka 6 Fortune gems (6 held)" | FR-GEM-43 |
+| `dice.reroll(env, {entryId, rollId, manual?, others?})` | `others(item, {items, rollIds, at}) → {items, rollIds}` (the old entry's items, roll ids and rerolled slot), called once the new roll row is written, before the entry: `items` aligned with the old payload (an item replaces, `null` drops it and its `dmPayload.items` names; the rerolled slot is the new item), `rollIds` the new entry's in full. Absent → copied as before | FR-DICE-91 |
+| `updateNotification(env, id, patch, {emit: false}) → RecordChange` | no `NotificationUpdated`; the caller puts the change in its own event's `changes`. Default unchanged | FR-NOTE-74 |
+| `cards.replaceToHit → {critFlipped, change, payload}`, `cards.applyMaxDice → {rollIds, change}` | write the card with `{emit: false}`; `cards.cardLineItems(env, p, item, old)` = the attack line's items as the card shows them, roll ids swapped (to-hit, maxed part) or left out (a dropped item's, with its part and offered rolls) (FR-DICE-91's `others`) | FR-GEM-41, -42 |
+
+**Events and visibility** (amends [§22](#22-combat-domain-events)'s event order and §130 / §134's `GemSpent` rows)
+
+| Event | Changes (order) | Player sees |
+|---|---|---|
+| `GemSpent` (Combat gem) | `character-gems`, the `gem.spend` line, **the card's upsert**; no `NotificationUpdated` after | the count and the public spend line; the card only its audience (owner + DM, or the DM alone) |
+| `GemSpent` (Inspiration reroll) | `character-gems`, the spend line, the new `roll` entry (its items per the card, FR-GEM-41), the old entry's supersede upsert, **a pending card's upsert**; no `NotificationUpdated` after | as before; the card only its audience |
+
+- **One frame per spend** (FR-SYNC-17, gate I15): each connection gets one `event` frame (cause `GemSpent`) per spend. Known I15 exceptions, recorded not widened (review-b ruling 11): `damage.ts` (×2) and `hit.ts` still emit their own `NotificationUpdated` after the owner's event; `cards.ts`' two helpers are called only by `gem.spend` and now fold (the ruling's `cards.ts:112` is `replaceToHit`).
+- **Reroll line follows the card** (BL-62): the new line holds the new to-hit + the card's current damage (maxed dice as the card shows them), or the to-hit only after a crit flip; never the old pre-max part. `rollIds` name only final rolls (FR-DICE-67).
+- **Client:**
+  - Log lines (FR-DICE-92, -93): " + " joins kept dice across dropped ones ("4d6kh3: 5 3̶ + 6 + 6 = 17"). A die chip's number is HTML text over the shape (an `inline-block` `<span data-face>` pulled back over the `<svg>` by a negative margin, centred by padding so the chip stays 18 px with no scroll overflow; the `<svg>` stays `aria-hidden`, no `<text>`); chips, their `dice-log-die` wrappers (`leading-none`) and the line's badges are `inline-block`, so `innerText` and a selection copy read on one line. A whole d100 draws its two faces from `data-face` (CSS) and carries its value as one text node. New test ID `dice-log-entry-text` (the line's text).
+  - Gems (FR-GEM-43, -44): the DM's ± clicks per character + gem sum client-side and send one `gem.adjust` 1.5 s after the last click (±10 at once; net 0 → nothing; popover close → now; not live → dropped). The count shows the pending sum at once, muted (`gem-count` / `gem-adjust-count` `data-pending`). The log's reroll confirm reads "Spend Inspiration?".
+  - Roll popups (FR-DICEX-94): the 6 s after rest always run; at expiry a popup closes unless held (a `pointermove` with movement on it since it showed and `:hover` now, or focus inside), re-checked 0.3 s after a leave / blur (a card that slides from under a following pointer stays held) and every 1 s; the hold flags clear when the card mounts or unmounts; ✕ always closes.
+  - Macro editor (FR-DICEX-95): a field's error shows only after it was touched (changed or blurred) or Save was pressed; Save stays disabled while invalid; a new macro (Save as macro's preset) opens with focus in Name.
+- **Fixtures:** bundle `fx-dice-e2e` (= `gems-reroll-e2e`) for `e2e/fx-dice.e2e.ts`; no new unit.
+- **CON-44:** 0 B (no new record or field); one frame fewer per Combat / reroll spend with a card.
+
+## 151. Sprint 9: window memory, frame and canvas follow-ups (PM1)
 
 From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-144–155, -158, -159, -162–167 and [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-113–115 ([ADR-0064](../architecture/adr/0064-window-memory.md), amends [ADR-0060](../architecture/adr/0060-one-window-placer.md); #338, #339). **Built by `fix/window-memory`.** Client only: no intent, event, record, signal or stored field (CON-44: 0 B). Amends §139's zone row ("user spots included" → untouched only), §142's `drag-end` row (now render-only, below) and §143's settled-refit row (FR-MAP-113). This section holds the reopen algorithm and the harness invariants the spec points to (review-b ruling 22).
 

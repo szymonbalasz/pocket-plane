@@ -8,8 +8,37 @@ import { FlatDie } from "./FlatDie";
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(node);
 const attr = (h: string, name: string) => h.match(new RegExp(`${name}="([^"]*)"`))?.[1];
-/** The numbers drawn inside the shape(s). */
-const texts = (h: string) => [...h.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1]);
+/** The numbers drawn over the shape(s) (FR-DICE-93: HTML text, `data-face`). */
+const texts = (h: string) => [...h.matchAll(/data-face="([^"]*)"/g)].map((m) => m[1]);
+
+describe("FR-DICE-93 a log line copies as one line (BL-57)", () => {
+  test("FR-DICE-93 line copies as one line: the number is a text node outside the aria-hidden <svg>; inline-block, never inline-flex", () => {
+    for (const faces of [4, 6, 8, 10, 12, 20]) {
+      const h = html(<DieShape faces={faces} value={13} size="sm" />);
+      expect(h).not.toContain("<text");
+      expect(h).not.toContain("inline-flex");
+      expect(h).toMatch(
+        /<svg[^>]*aria-hidden="true"[\s\S]*<\/svg><span data-face="13"[^>]*>13<\/span>/,
+      );
+      expect(h).toMatch(/data-testid="dicex-die"[^>]*class="inline-block/);
+      // In flow (negative margin, padding): Chromium breaks `innerText` around an absolute span,
+      // and a relative `top` would add scroll overflow under the last log line.
+      expect(h).not.toContain("absolute");
+      expect(h).not.toMatch(/[;"]top:/);
+    }
+    // A round chip: inline-block, its value a text node.
+    const round = html(<DieShape faces={null} value={9} size="sm" />);
+    expect(round).not.toContain("inline-flex");
+    expect(round).toMatch(/>9<\/span>/);
+    // d100: both kites drawn (`data-face`, no text node), the value once as text.
+    const d100 = html(<DieShape faces={100} value={47} size="sm" />);
+    expect(texts(d100)).toEqual(["40", "7"]);
+    expect(d100.replace(/<[^>]+>/g, "")).toBe("47");
+    // Held: no number at all.
+    expect(html(<DieShape faces={20} value={13} blank />).replace(/<[^>]+>/g, "")).toBe("");
+    expect(html(<DieShape faces={100} value={47} blank />).replace(/<[^>]+>/g, "")).toBe("");
+  });
+});
 
 describe("FR-DICEX-42 die-shape chips", () => {
   test("FR-DICEX-42 die-shape chips per die type: d4 / d6 / d8 / d10 / d12 / d20 → data-shape", () => {
@@ -25,8 +54,7 @@ describe("FR-DICEX-42 die-shape chips", () => {
     // d20: flat icosahedron = hexagon outline + centre triangle (a second path), value centred.
     const d20 = html(<DieShape faces={20} value={13} />);
     expect(d20.match(/<path/g)).toHaveLength(2);
-    expect(d20).toContain('x="50"');
-    expect(d20).toContain('text-anchor="middle"');
+    expect(d20).toContain("text-center");
     expect(attr(d20, "aria-label")).toBe("d20: 13");
   });
 
@@ -207,7 +235,7 @@ describe("FR-DICEX-42 die-shape chips", () => {
     // Fill = look body; number and outline = look pips.
     expect(offered).toContain(`fill="${look.body}"`);
     expect(offered).toContain(`stroke="${look.pips}"`);
-    expect(offered).toMatch(new RegExp(`<text[^>]*fill="${look.pips}"`));
+    expect(offered).toMatch(new RegExp(`data-face="5"[^>]*color:${look.pips}`));
     const plain = html(<DieShape faces={6} value={4} look={look} />);
     expect(plain).not.toContain("stroke-dasharray");
     expect(plain).not.toContain("<line");

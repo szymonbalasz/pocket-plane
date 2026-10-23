@@ -42,11 +42,15 @@ function dieSegment(d: RunDie): LineSegment {
   return d.kept ? { text, die } : { text, style: "dropped", die };
 }
 
-/** One group's dice: "3 + 5" between kept dice, " " next to a dropped one. */
+/**
+ * One group's dice: " + " between consecutive kept dice, also across dropped ones between them
+ * (FR-DICE-92, BL-72: "5 3̶ + 6 + 6"); a dropped die gets " " on each side and no "+" of its own.
+ */
 function groupSegments(dice: readonly RunDie[], out: LineSegment[]): void {
+  let keptBefore = false;
   dice.forEach((d, i) => {
-    const prev = dice[i - 1];
-    if (prev) out.push({ text: prev.kept && d.kept ? " + " : " " });
+    if (i > 0) out.push({ text: d.kept && keptBefore ? " + " : " " });
+    if (d.kept) keptBefore = true;
     out.push(dieSegment(d));
     if (d.auto) out.push({ text: ` ${AUTO_PART_TEXT}`, style: "muted" });
   });
