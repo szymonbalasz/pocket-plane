@@ -8,7 +8,8 @@
 // pet itself, one each) joins as itself: owner copies, its mode, its kept HP, `card`, side ally;
 // its owner PC must be in the fight. Sprint 7 (FR-CBT-141): a monster binding a token from an
 // earlier fight keeps that fight's HP (a token kept at 0 bound last); a pet's tokens keep its
-// owner (FR-MAP-88's safety net).
+// owner (FR-MAP-88's safety net). Sprint 10 (BL-97): with `hidden`, a monster binding a free
+// visible token hides that token as `map.setTokenHidden` does, so it joins hidden.
 import {
   AddCombatantsInput,
   CBTX_INTENTS,
@@ -19,10 +20,11 @@ import type { CombatantKind, HpMode } from "@shared/combat-tracker/schemas";
 import { companionCard, type DefinitionRecord, type MonsterRecord } from "@shared/entities/schemas";
 import { CombatantsAdded } from "@shared/events/combat-extras";
 import { numberedName } from "@shared/scenes-map/geometry";
-import type { TokenRecord } from "@shared/scenes-map/schemas";
+import { TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
+import { eq } from "drizzle-orm";
 import { defineCommand } from "../../commands/commands";
 import { conflict, invalid, notFound } from "../../commands/errors";
-import { combatant, combatantSeqNext } from "../../db/schema";
+import { combatant, combatantSeqNext, token } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { getCharacter } from "../character-sheet/hp";
 import { assertCompanionCap, ownerOfCompanion } from "../combat-tracker/companions";
@@ -48,8 +50,9 @@ import type { CombatRuleHooks } from "../combat-tracker/rule-hooks";
 import { resolveDefinition } from "../entities/commands";
 import { syncPetPresence } from "../entities/pet-presence";
 import { getRow, toEntityRecord } from "../entities/rows";
-import { getScene, sceneTokens } from "../scenes-map/rows";
-import { tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
+import { getScene, readToken, sceneTokens } from "../scenes-map/rows";
+import { runTokenChangedHooks } from "../scenes-map/token-hooks";
+import { rederiveDependants, tokenHiddenForPlayers } from "../scenes-map/visibility-hooks";
 
 interface Slot {
   kind: CombatantKind;
@@ -101,6 +104,24 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
         const t = tokens.find((x) => !taken.has(x.id) && x.definitionId === definitionId);
         if (t) taken.add(t.id);
         return t ?? null;
+      };
+      // BL-97 (FR-CBTX-44): "Add hidden" hides a bound visible token (FR-MAP-19's rows: token,
+      // re-derived dependants, token-changed hooks), listed before the combatants.
+      const hides: RecordChange[] = [];
+      const hideBound = (tok: TokenRecord): TokenRecord => {
+        if (!hidden || tok.hidden) return tok;
+        tx.update(token)
+          .set({ hidden: true, updatedAt: ctx.clock.iso() })
+          .where(eq(token.id, tok.id))
+          .run();
+        const after = readToken(tx, tok.id);
+        const change: RecordChange = { type: TOKEN_TYPE, id: tok.id, before: tok, after };
+        hides.push(
+          change,
+          ...rederiveDependants(env, change),
+          ...runTokenChangedHooks(env, tok, after),
+        );
+        return after;
       };
       // FR-CBT-08: a token's name, image and hidden flag (hidden or fog-hidden, FR-FOG-14);
       // token-less → numbered, visible.
@@ -174,7 +195,7 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
           return;
         }
         if (tok) {
-          push("monster", def, "average", tok);
+          push("monster", def, "average", hideBound(tok));
           return;
         }
         const hpMode = ("definitionId" in it && it.hpMode) || "average";
@@ -184,8 +205,9 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
         }
         for (let n = 0; n < instances(it); n++) {
           const free = nextFreeToken(def.id);
-          // FR-CBTX-44: a created token takes `hidden`; a bound existing token keeps its own.
-          const made = free ?? placer?.place(def, hidden ?? false) ?? null;
+          // FR-CBTX-44: a created token takes `hidden`; a bound existing token keeps its own
+          // flag unless `hidden` (BL-97: then it is hidden too, never unhidden).
+          const made = (free && hideBound(free)) ?? placer?.place(def, hidden ?? false) ?? null;
           push("monster", def, hpMode, made);
         }
       });
@@ -265,6 +287,7 @@ export function addCombatantsCommand(hooks: CombatRuleHooks) {
       rerank(tx, encounterId);
       const after = syncPlayerTurn(env, encounterId);
       const changes: RecordChange[] = [
+        ...hides,
         ...(placer?.changes ?? []),
         ...ids.map((id) => combatantChange(null, readCombatant(tx, id))),
         ...hpEntries,
