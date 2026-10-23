@@ -47,6 +47,7 @@ import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
 import gemsUiE2e from "./gems-ui-e2e";
+import h4RecapE2e from "./h4-recap-e2e";
 import h4RulesE2e from "./h4-rules-e2e";
 import holdStoresE2e from "./hold-stores-e2e";
 import holdUiE2e from "./hold-ui-e2e";
@@ -263,4 +264,5 @@ export const bundles: readonly Bundle[] = [
   spS9SharedE2e,
   // Sprint 10 track H (fix/h4-rules-misc): rules, recap, strongholds and small fixes
   h4RulesE2e,
+  h4RecapE2e,
 ];
