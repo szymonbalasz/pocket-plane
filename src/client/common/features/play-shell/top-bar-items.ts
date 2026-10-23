@@ -6,6 +6,7 @@ import type { ComponentType } from "react";
 import { pauseSlotWidth } from "../pause/logic";
 import { PauseTopBarItem } from "../pause/top-bar";
 import type { Viewport } from "./geometry";
+import { PALETTE_BUTTON_W, PaletteTopBarButton } from "./palette/TopBarButton";
 import type { ShellClient } from "./registry";
 
 export interface TopBarItem {
@@ -22,6 +23,14 @@ export interface TopBarItem {
 export const TOP_BAR_ITEMS: readonly TopBarItem[] = [
   // TT4 (FR-SHELL-129): the DM's Pause control.
   { id: "pause", clients: ["dm"], width: pauseSlotWidth, order: 10, Component: PauseTopBarItem },
+  // SP1 (FR-SHELL-195): the palette's search button, next to the identity chip.
+  {
+    id: "palette",
+    clients: ["dm", "player"],
+    width: PALETTE_BUTTON_W,
+    order: 90,
+    Component: PaletteTopBarButton,
+  },
 ];
 
 /** An item's width at `viewport`, px. */

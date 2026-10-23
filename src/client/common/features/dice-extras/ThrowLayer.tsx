@@ -16,9 +16,10 @@ import {
 } from "@shared/dice-extras/looks";
 import { type DiceThrow, throwDice } from "@shared/dice-extras/throw";
 import { recordsOf } from "@shared/protocol/store";
-import { lazy, Suspense, useEffect, useRef, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useRef, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
+import { lazyChunk } from "../../lib/lazy-chunk";
 import { useSync } from "../../sync/store";
 import { isPausedFor } from "../pause/logic";
 import { useOpenWindow, useRegistry, useShellState } from "../play-shell/ShellContext";
@@ -37,17 +38,19 @@ import { DICEX_TRAY_KIND } from "./window-kind";
 
 /** The throw views (zone, dice layer, 3D runs): a small lazy chunk, preloaded at idle. */
 const views = createChunkLoader(() => import("./ThrowViews"));
-const LazyViews = lazy(() => {
-  views.load();
-  return import("./ThrowViews").then((m) => ({ default: m.ThrowViews }));
-});
+// A stale chunk (BL-91): nothing drawn (the log keeps the result) + the stale notice.
+const LazyViews = lazyChunk(
+  () => import("./ThrowViews").then((m) => ({ default: m.ThrowViews })),
+  "notice",
+);
 
 /** FR-DICEX-39: the popup UI, a lazy chunk (≤ 8 KB gz) preloaded at idle in every display mode. */
 const popupUi = createChunkLoader(() => import("./RollPopup"));
-const LazyPopups = lazy(() => {
-  popupUi.load();
-  return import("./RollPopup").then((m) => ({ default: m.RollPopupStack }));
-});
+// A stale chunk (BL-91): no popup, the log keeps the chips + the stale notice.
+const LazyPopups = lazyChunk(
+  () => import("./RollPopup").then((m) => ({ default: m.RollPopupStack })),
+  "notice",
+);
 
 // A miniature can play once the 3D chunk is in (FR-DICEX-41 b).
 setThreeDReady(() => dice3d.state() === "ready");
@@ -206,6 +209,13 @@ export function DiceExtrasRuntime() {
   // The views chunk loads at idle (or with the first throw / pending before that).
   const busy = current !== null || leaving !== null || pending;
   const viewsShown = display !== "off" && (viewsState !== "idle" || busy);
+  // Shown before idle: the loader leaves `idle`, so the part stays mounted after the throw.
+  useEffect(() => {
+    if (viewsShown) views.load();
+  }, [viewsShown]);
+  useEffect(() => {
+    if (popupsShown) popupUi.load();
+  }, [popupsShown]);
   return (
     <>
       {viewsShown && (
