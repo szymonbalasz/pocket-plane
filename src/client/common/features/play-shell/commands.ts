@@ -4,6 +4,7 @@
 // assigned via the integrator), the shortcuts sheet is generated from them. A command does only
 // what a click in the UI does: no new intent, event or record. Windows need no line here: the
 // palette's Windows group is generated from each client's `windows.ts` (FR-SHELL-185).
+import { PM2_COMMANDS } from "../party-board/commands";
 import { SP1_COMMANDS } from "./palette/launch";
 import { SP1_PROVIDERS } from "./palette/providers";
 import type { PaletteCommand, SearchProvider } from "./palette/types";
@@ -14,6 +15,8 @@ export type { CommandCtx, PaletteCommand, SearchProvider } from "./palette/types
 export const COMMANDS: readonly PaletteCommand[] = [
   // SP1 (build/sp-palette): palette, sheet, Roll dice, launch commands, window keys
   ...SP1_COMMANDS,
+  // PM2 (build/party-manager): Party status (seams S3)
+  ...PM2_COMMANDS,
 ];
 
 /** The search providers, one group each or more (append yours; no strongholds yet, seams S9). */

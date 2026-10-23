@@ -1,8 +1,8 @@
-// Sprint 6 CP1 (PARTY §13): the Companions tab (FR-PARTY-41–46) as a static render over a fake
-// sync store per viewer, and its view model: groups by owner PC, HP numbers for the DM and the
-// owner (the combatant's in a fight), a band for other players, Card for DM / owner, the empty
-// states and the footer, the tab strip that scrolls rather than cutting a label. Clicks (New
-// pet…, Release…) and the real 340-px layout: e2e/cp-pets.e2e.ts.
+// Sprint 6 CP1 (PARTY §13): the companion rows (FR-PARTY-41–46; since sprint 9 inside the Party
+// status tab, FR-PARTY-61) as a static render over a fake sync store per viewer, and their view
+// model: grouped under the owner PC, HP numbers for the DM and the owner (the combatant's in a
+// fight), a band for other players, Card for DM / owner, the tab strip that scrolls rather than
+// cutting a label. Clicks (New pet…, Release…) and the real 340-px layout: e2e/cp-pets.e2e.ts.
 import { afterEach, describe, expect, test } from "bun:test";
 import type { You } from "@shared/protocol/frames";
 import { lazyAfterSnapshot } from "@shared/protocol/lazy";
@@ -15,15 +15,9 @@ import { COMPANION_CARD_KIND } from "../combat-tracker/companion-card-request";
 import { createWindowRegistry, defineWindow } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { PartyBoard } from "./Board";
-import { type CompanionsDmParts, CompanionsTab } from "./Companions";
-import {
-  companionGroups,
-  EMPTY_COMPANIONS,
-  EMPTY_COMPANIONS_PLAYER,
-  fightRunning,
-  PARTY_TABS,
-} from "./logic";
-import { tabKeyOf } from "./open-tab";
+import type { CompanionsDmParts } from "./Companions";
+import { companionGroups } from "./logic";
+import { StatusTab } from "./StatusTab";
 import { partyMemory } from "./seen";
 
 const DM: You = { campaignId: "c", role: "dm", playerId: null };
@@ -67,8 +61,32 @@ const drakeDm = {
   companionOf: "brakka",
   turnMode: "in-owner-turn",
 };
-const mira = { id: "mira", kind: "character", name: "Mira", ownerPlayerId: "p1" };
-const brakka = { id: "brakka", kind: "character", name: "Brakka", ownerPlayerId: "p1" };
+/** A PC as the DM and its owner hold it (the Party status row parses it). */
+const pc = (id: string, name: string) => ({
+  ...at,
+  id,
+  kind: "character",
+  campaignId: "c",
+  name,
+  portraitAssetId: null,
+  derivedFromId: null,
+  statBlock: {
+    size: "medium",
+    ac: 15,
+    hpMax: 20,
+    initBonus: 1,
+    attacks: [],
+    level: 3,
+    className: "Ranger",
+  },
+  ownerPlayerId: "p1",
+  hpCurrent: 20,
+  tempHp: 0,
+  deathSuccesses: 0,
+  deathFailures: 0,
+});
+const mira = pc("mira", "Mira");
+const brakka = pc("brakka", "Brakka");
 const players = {
   p1: { id: "p1", campaignId: "c", name: "Player 1", color: "#19b98a" },
   p2: { id: "p2", campaignId: "c", name: "Player 2", color: "#56b4e9" },
@@ -76,6 +94,7 @@ const players = {
 // In a fight: the DM's combatant row (entityId), the owner's and another player's views.
 const cDm = {
   id: "cb",
+  encounterId: "e1",
   kind: "monster",
   entityId: "owl",
   name: "Owlbear",
@@ -90,6 +109,7 @@ const cDm = {
 const { entityId: _e, active: _a, ...cOwner } = cDm;
 const cOther = {
   id: "cb",
+  encounterId: "e1",
   kind: "monster",
   name: "Owlbear",
   removed: false,
@@ -105,7 +125,7 @@ function render(
   you: You,
   entities: object[],
   combatants: object[] = [],
-  opts: { card?: boolean; dm?: CompanionsDmParts; board?: boolean } = {},
+  opts: { card?: boolean; dm?: CompanionsDmParts; board?: boolean; tokens?: object[] } = {},
 ) {
   const store = createStore<SyncState>()(
     () =>
@@ -118,6 +138,8 @@ function render(
           records: {
             entity: byId(entities),
             combatant: byId(combatants),
+            encounter: { e1: { id: "e1", status: "started" } },
+            token: byId(opts.tokens ?? []),
             player: players,
             "loot-entry": {},
             "party-pot": {},
@@ -150,9 +172,9 @@ function render(
         <ShellProvider registry={createWindowRegistry(you.role === "dm" ? "dm" : "player", defs)}>
           <TooltipProvider delayDuration={0} skipDelayDuration={0}>
             {opts.board ? (
-              <PartyBoard handouts={<p />} companions={opts.dm} />
+              <PartyBoard parts={{ handouts: <p />, companions: opts.dm }} />
             ) : (
-              <CompanionsTab dm={opts.dm} />
+              <StatusTab dm={opts.dm} />
             )}
           </TooltipProvider>
         </ShellProvider>
@@ -170,15 +192,21 @@ const attr = (html: string, testId: string, name: string) =>
 
 afterEach(() => partyMemory().tabs.bind(null));
 
-describe("FR-PARTY-41 companions tab", () => {
-  test("FR-PARTY-41 companions tab: Handouts, Inventory, Loot, Companions; a stored `companions` restores; groups by PC with the owner's colour dot", () => {
-    expect(PARTY_TABS).toEqual(["handouts", "inventory", "loot", "companions"]);
-    partyMemory().tabs.choose(tabKeyOf(DM), "companions");
+/** Player 1's Owlbear token on the active scene, as a player holds it (no `definitionId`). */
+const owlToken = { id: "t-owl", name: "Owlbear", ownerPlayerId: "p1", characterId: null };
+
+describe("FR-PARTY-41 companions in Party status", () => {
+  test("FR-PARTY-41 companions under their owner PC (the Companions tab is gone: tabs Party status, Handouts, Inventory, Loot); the owner's colour dot on the PC row", () => {
     const html = render(DM, [mira, brakka, owlbearDm, drakeDm], [], { board: true });
-    expect(attr(html, "party-tab", "data-value")).toEqual([...PARTY_TABS]);
-    expect(html).toContain(">Companions<");
-    expect(html).toContain('data-testid="party-companions"');
-    // Groups by PC name (Brakka, Mira), each with Player 1's colour.
+    expect(attr(html, "party-tab", "data-value")).toEqual([
+      "status",
+      "handouts",
+      "inventory",
+      "loot",
+    ]);
+    expect(html).not.toContain(">Companions<");
+    expect(html).toContain('data-testid="party-status"');
+    // Groups by PC name (Brakka, Mira), each PC row with Player 1's colour.
     expect(attr(html, "party-companion-group", "data-record-id")).toEqual(["brakka", "mira"]);
     expect(html.match(/background-color:#19b98a/g)).toHaveLength(2);
     expect(attr(html, "party-companion-row", "data-record-id")).toEqual(["drake", "owl"]);
@@ -203,7 +231,7 @@ describe("FR-PARTY-41 companions tab", () => {
 
 describe("FR-PARTY-42 band for other players", () => {
   test("FR-PARTY-42 band for other players: player-2 sees 'Bloodied' at 24 / 59, no numbers, no Card; player-1 sees 24 / 59 and Card", () => {
-    const p2 = render(P2, [mira, owlbearOther], [], { card: true });
+    const p2 = render(P2, [mira, owlbearOther], [], { card: true, tokens: [owlToken] });
     expect(attr(p2, "party-companion-band", "data-value")).toEqual(["bloodied"]);
     expect(p2).toContain(">Bloodied<");
     for (const leak of [
@@ -218,8 +246,8 @@ describe("FR-PARTY-42 band for other players", () => {
     expect(attr(p1, "party-companion-hp", "data-value")).toEqual(["24/59"]);
     expect(attr(p1, "party-companion-card", "data-record-id")).toEqual(["owl"]);
     expect(p1).not.toContain("party-companion-base");
-    // A pet player-2 doesn't receive (not present) isn't listed: the empty state.
-    expect(render(P2, [mira])).toContain(EMPTY_COMPANIONS_PLAYER);
+    // A pet player-2 doesn't receive (not present) isn't listed.
+    expect(render(P2, [mira])).not.toContain("party-companion-row");
   });
 
   test("FR-PARTY-42 in a fight every viewer reads the combatant: DM by entityId, owner and others by owner + name; 'In combat'", () => {
@@ -261,18 +289,7 @@ describe("FR-PARTY-42 band for other players", () => {
   });
 });
 
-describe("FR-PARTY-44 empty and other states", () => {
-  test("FR-PARTY-44 empty states: DM and player texts; the summons footer only while a fight runs", () => {
-    expect(render(DM, [mira])).toContain(EMPTY_COMPANIONS);
-    expect(render(DM, [mira])).not.toContain(EMPTY_COMPANIONS_PLAYER);
-    expect(render(P1, [mira])).toContain(EMPTY_COMPANIONS_PLAYER);
-    expect(fightRunning([])).toBe(false);
-    expect(fightRunning([{ ...cDm, active: false }])).toBe(false);
-    expect(fightRunning([cOther])).toBe(true);
-    expect(render(P1, [mira, owlbearOwner], [cOwner])).toContain("Summons show in Initiative");
-    expect(render(P1, [mira, owlbearOwner])).not.toContain("party-companions-footer");
-  });
-
+describe("FR-PARTY-44 other states", () => {
   test("FR-PARTY-44 a released pet leaves the list; a reassigned one moves group", () => {
     const released = { ...owlbearDm, companionOf: null, ownerPlayerId: null, turnMode: null };
     expect(companionGroups([mira, released], [], { role: "dm", playerId: null })).toEqual([]);

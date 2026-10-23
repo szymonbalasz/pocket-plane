@@ -1,9 +1,9 @@
 // e2e-bundle: cp-pets-e2e
 // Thin pets flow (CP1, CBT §13.3 C1 / C2 parts; ENT FR-ENT-32, -39; PARTY FR-PARTY-41–46):
-// the DM's Party → Companions → New pet…: "owl" → Owlbear, Pet of Mira, After the owner, Create;
-// the DM and player-1 see "59 / 59", player-2 no row (a pet not yet present); Creatures shows the
-// "Pet of Mira" badge; the DM releases it from the row menu. Tabs fit at the Party window's min
-// width (FR-PARTY-46). Rules, visibility and leak scans: bun test.
+// the DM's Party Manager → Party status → New pet…: "owl" → Owlbear, Pet of Mira, After the owner,
+// Create (FR-PARTY-62); the DM and player-1 see "59 / 59" under Mira, player-2 no row (a pet not
+// yet present); Creatures shows the "Pet of Mira" badge; the DM releases it from the row menu.
+// Tabs fit at Party Manager's min width (FR-PARTY-46). Rules, visibility and leak scans: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -14,12 +14,13 @@ const live = (page: Page) =>
 const tab = (win: Locator, value: string) =>
   win.locator(`[data-testid="party-tab"][data-value="${value}"]`);
 
+/** Party Manager on its Party status tab, where companions sit under their PCs (FR-PARTY-61). */
 async function companions(page: Page): Promise<Locator> {
   const board = await openWindow(page, "party.board");
   await closeToasts(page); // FR-NOTE-70, -71: the stack may sit on this window's body, below its first row
-  await tab(board, "companions").click();
-  await expect(tab(board, "companions")).toHaveAttribute("aria-selected", "true");
-  await expect(board.getByTestId("party-companions")).toBeVisible();
+  await tab(board, "status").click();
+  await expect(tab(board, "status")).toHaveAttribute("aria-selected", "true");
+  await expect(board.getByTestId("party-status")).toBeVisible();
   return board;
 }
 
@@ -50,12 +51,12 @@ test("FR-ENT-32 FR-PARTY-41 FR-PARTY-42 FR-ENT-39 FR-PARTY-43 New pet: owl → O
   await live(p2);
 
   const board = await companions(dm);
-  await expect(board.getByTestId("party-companions-empty")).toHaveText("No companions yet");
+  // FR-PARTY-62: no companions → nothing under the PCs (no empty line).
+  await expect(board.getByTestId("party-summary-row").first()).toBeVisible();
+  await expect(board.getByTestId("party-companion-row")).toHaveCount(0);
   const b1 = await companions(p1);
   const b2 = await companions(p2);
-  await expect(b2.getByTestId("party-companions-empty")).toHaveText(
-    "No companions yet — your DM can give you one",
-  );
+  await expect(b2.getByTestId("party-companion-row")).toHaveCount(0);
   await expect(b2.getByTestId("party-companion-new")).toHaveCount(0);
 
   // C1: New pet… → "owl" → Owlbear; Pet of Mira; After the owner; Create.
@@ -136,7 +137,7 @@ test("FR-ENT-32 FR-PARTY-41 FR-PARTY-42 FR-ENT-39 FR-PARTY-43 New pet: owl → O
   for (const page of [p2, p1, dm]) await page.context().close();
 });
 
-test("FR-PARTY-46 tabs fit at min width: every label whole, the strip scrolls to Companions", async ({
+test("FR-PARTY-46 tabs fit at min width: every label whole, the strip scrolls to Loot", async ({
   browser,
 }) => {
   const { link } = e2eEnv();
@@ -157,16 +158,16 @@ test("FR-PARTY-46 tabs fit at min width: every label whole, the strip scrolls to
     }),
   );
   expect(cut).toEqual([]);
-  const companionsTab = tab(board, "companions");
-  await companionsTab.scrollIntoViewIfNeeded();
-  await expect(companionsTab).toBeInViewport();
+  const lastTab = tab(board, "loot");
+  await lastTab.scrollIntoViewIfNeeded();
+  await expect(lastTab).toBeInViewport();
   const s = await strip.boundingBox();
-  const c = await companionsTab.boundingBox();
+  const c = await lastTab.boundingBox();
   if (!s || !c) throw new Error("no boxes");
   // Wholly inside the visible strip after scrolling.
   expect(c.x).toBeGreaterThanOrEqual(s.x - 1);
   expect(c.x + c.width).toBeLessThanOrEqual(s.x + s.width + 1);
-  await companionsTab.click();
-  await expect(board.getByTestId("party-companions")).toBeVisible();
+  await lastTab.click();
+  await expect(board.getByTestId("loot-log")).toBeVisible();
   await p1.context().close();
 });

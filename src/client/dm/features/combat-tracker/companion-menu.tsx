@@ -1,7 +1,7 @@
 // Companion ▸ (FR-CBT-111, -118; sprint 6, #252) in the DM's Initiative row menu, companion line
 // menu and token menu, over `cbt.setCompanion`: Owner ▸ (a PC of the fight: makes a monster a
 // companion or moves it), Turn mode (three radio items), Release, Turn hostile. Hints only: the
-// server decides (a pet's owner → "Change a pet's owner in the Party window", the turn
+// server decides (a pet's owner → "Change a pet's owner in Party Manager", the turn
 // combatant → "Change it after its turn"). Dismiss (FR-CBT-112, CP3): out of the fight; a
 // summon's token goes, a pet's HP is kept; not the turn combatant ("Press Next first"). Card
 // (FR-CHARX-59, walkthrough 9): the menu item and the row / line icon open the companion card.
@@ -44,7 +44,7 @@ import { useMemo } from "react";
 import { useHoverSafeSub } from "./hover-sub";
 
 /** FR-CBT-111 (server's `PET_OWNER_HERE`): a pet's owner lives on the pet. */
-export const PET_OWNER_HINT = "Change a pet's owner in the Party window";
+export const PET_OWNER_HINT = "Change a pet's owner in Party Manager";
 const NOT_COMPANION = "Pick an owner first";
 
 /** A PC of the fight that can own a companion (FR-CBT-105). */

@@ -1,5 +1,5 @@
-// DM parts of the Party Companions tab (FR-PARTY-43, sprint 6): header **New pet…** (entities'
-// dialog, FR-ENT-32) and the row menu: Rename, Turn mode ▸, Owner…, Open NPC sheet (FR-CHARX-31),
+// DM parts of the companion rows (FR-PARTY-43, sprint 6; in Party Manager's Party status tab since
+// sprint 9, FR-PARTY-62): header **New pet…** (entities' dialog, FR-ENT-32) and the pet row menu: Rename, Turn mode ▸, Owner…, Open NPC sheet (FR-CHARX-31),
 // Release… (confirm → `PUT` with `companionOf: null`, FR-ENT-33). Rename, mode and owner send the
 // whole `PUT` with the loaded fields. While the pet is in a fight Owner… and Release… are disabled
 // ("Dismiss it from the fight first"). A reject shows inline; a lost request → Toast.
@@ -59,11 +59,12 @@ function NewPet({ disabled }: { disabled: boolean }) {
     <>
       <Button
         size="sm"
+        className="h-6 px-2 text-xs"
         data-testid="party-companion-new"
         disabled={disabled}
         onClick={() => setOpen(true)}
       >
-        <PlusIcon className="size-4" />
+        <PlusIcon className="size-3.5" />
         New pet…
       </Button>
       <PetDialog open={open} onOpenChange={setOpen} />
@@ -95,6 +96,10 @@ function usePetPut(row: CompanionRow) {
 
 type Open = "rename" | "owner" | "release" | null;
 
+/** FR-PARTY-43: why Owner… and Release… are disabled (the pet is in a fight), else null. */
+export const petMenuLock = (row: Pick<CompanionRow, "inCombat">) =>
+  row.inCombat ? PET_IN_FIGHT_HINT : null;
+
 function RowMenu({ row, disabled }: { row: CompanionRow; disabled: boolean }) {
   const openWindow = useOpenWindow();
   const put = usePetPut(row);
@@ -106,7 +111,7 @@ function RowMenu({ row, disabled }: { row: CompanionRow; disabled: boolean }) {
   const close = () => setOpen(null);
   if (!row.record) return null;
   const pet = row.record;
-  const fight = row.inCombat ? PET_IN_FIGHT_HINT : null;
+  const fight = petMenuLock(row);
   return (
     <>
       {open === null && put.error && (
@@ -119,12 +124,13 @@ function RowMenu({ row, disabled }: { row: CompanionRow; disabled: boolean }) {
           <Button
             size="icon"
             variant="ghost"
-            className="size-7 shrink-0"
+            className="size-5 shrink-0"
             aria-label={`Actions for ${row.name}`}
             data-testid="party-companion-menu"
             data-record-id={row.id}
+            data-locked={fight !== null}
           >
-            <EllipsisVerticalIcon className="size-4" />
+            <EllipsisVerticalIcon className="size-3.5" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

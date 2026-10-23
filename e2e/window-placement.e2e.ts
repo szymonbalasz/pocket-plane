@@ -22,6 +22,8 @@ test("FR-SHELL-42 player-1 opens a handout, reloads → no viewer window, Party 
   await live(p1);
 
   const board = await openWindow(p1, "party.board");
+  // Party status is the landing tab (FR-PARTY-60): show the handouts.
+  await board.locator('[data-testid="party-tab"][data-value="handouts"]').click();
   const row = board.locator(`[data-testid="party-handout-row"][data-record-id="${mayor}"]`);
   await row.locator("button").first().click();
   const viewer = shellWindow(p1, "party.handout");
