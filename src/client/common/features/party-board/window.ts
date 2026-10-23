@@ -1,11 +1,12 @@
-// `party.board` and `party.handout` window geometry (FR-PARTY-11, FR-PARTY-14; protocol §18 /
-// §24 rows); each client registers its own defs with its own bodies. Sprint 8: `party.summary`
-// (FR-SHELL-140, CB3), one def for both clients.
-import { HeartPulseIcon, ScrollIcon } from "lucide-react";
-import { createElement } from "react";
-import { defineWindow, type WindowDef } from "../play-shell/registry";
-import { handoutActivity, PARTY_BOARD_KIND, PARTY_HANDOUT_KIND } from "./logic";
-import { StatusTab } from "./StatusTab";
+// `party.board` "Party Manager" and `party.handout` window geometry (FR-PARTY-11, FR-PARTY-14,
+// FR-SHELL-156; protocol §18 / §24 rows); each client registers its own defs with its own bodies.
+// Sprint 9: the `party.summary` window is gone (FR-SHELL-157); `party.board` absorbs its stored
+// layout entry and lands on Party status (FR-SHELL-155, FR-PARTY-64).
+import { ScrollIcon } from "lucide-react";
+import type { WindowDef } from "../play-shell/registry";
+import { handoutActivity, PARTY_BOARD_KIND, PARTY_HANDOUT_KIND, STATUS_TAB } from "./logic";
+import { tabKeyOf } from "./open-tab";
+import { partyMemory } from "./seen";
 import { PARTY_SUMMARY_KIND } from "./summary-logic";
 
 type Base = Omit<WindowDef, "component" | "clients">;
@@ -14,7 +15,10 @@ export const partyBoardWindowBase = {
   kind: PARTY_BOARD_KIND,
   // FR-PARTY-59 / FR-SHELL-156: "Party Manager" (kind, test IDs and tab memory unchanged).
   title: "Party Manager",
-  defaultSize: { w: 440, h: 560 },
+  // FR-SHELL-156 (OQ-SHELL-78 A): 1.25 × 440, band-capped; useful 440 × 400 (every PC row and its
+  // companion rows whole on Party status, measured on `wf-frame-e2e`).
+  defaultSize: { w: 550, h: 560 },
+  usefulSize: { w: 440, h: 400 },
   minSize: { w: 340, h: 360 },
   // Left edge, clear of the tool rail (#162; where `loot.log` was before FR-PARTY-29).
   defaultPosition: { anchor: "top-left", dx: 56 },
@@ -24,6 +28,10 @@ export const partyBoardWindowBase = {
   launcher: { icon: ScrollIcon, label: "Party Manager", order: 58 },
   // FR-PARTY-11: dot when a handout arrives or is updated while minimised.
   activity: handoutActivity,
+  // FR-SHELL-155 / FR-PARTY-64: an old layout's open or minimised Party status window becomes
+  // Party Manager in that state, on the Party status tab.
+  absorbs: [PARTY_SUMMARY_KIND],
+  onAbsorb: (_from, you) => partyMemory().tabs.choose(tabKeyOf(you), STATUS_TAB),
 } satisfies Base;
 
 export const partyHandoutWindowBase = {
@@ -36,22 +44,3 @@ export const partyHandoutWindowBase = {
   minOpenH: 400,
   defaultOpen: false,
 } satisfies Base;
-
-/**
- * FR-SHELL-140–142 "Party status": a launcher window right after Party, loads closed, never
- * protected, no keep-out, no activity dot; grows to its rows (FR-SHELL-141: default 280 × 260,
- * useful 280 × 236, min 240 × 120). WF's one placer picks its spot.
- */
-export const partySummaryWindow = defineWindow({
-  kind: PARTY_SUMMARY_KIND,
-  title: "Party status",
-  clients: ["dm", "player"],
-  defaultSize: { w: 280, h: 260 },
-  minSize: { w: 240, h: 120 },
-  usefulSize: { w: 280, h: 236 },
-  defaultPosition: { anchor: "top-left", dx: 56 },
-  defaultOpen: false,
-  growToContent: true,
-  launcher: { icon: HeartPulseIcon, label: "Party status", order: 58.5 },
-  component: () => createElement(StatusTab),
-});
