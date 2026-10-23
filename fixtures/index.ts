@@ -6,7 +6,10 @@ import { units } from "./units";
 
 export const library: FixtureLibrary = { fixtures: units, bundles };
 
-/** In-process loader for `bun test` (FR-FIX-11). */
-export function loadBundle(bundle: string, opts: { testMode?: boolean; dmSecret?: string } = {}) {
+/** In-process loader for `bun test` (FR-FIX-11); `now` anchors the clock (FR-FIX-29). */
+export function loadBundle(
+  bundle: string,
+  opts: { testMode?: boolean; dmSecret?: string; now?: number } = {},
+) {
   return loadInProcess(library, bundle, opts);
 }

@@ -74,6 +74,8 @@ test("FR-NOTE-14 FR-NOTE-15 DM reconnect: the sticky toast stays and the summary
   await win.getByTestId("note-test-owner").selectOption("dm");
   await win.getByTestId("note-test-label").fill("Apply");
   await win.getByTestId("note-test-send").click();
+  // FR-NOTE-72: cards fold into the open Notifications window; closed, the card toasts.
+  await win.getByTestId("ui-window-close").click();
   const card = dm.getByTestId("note-toast").filter({ hasText: "Reconnect card" });
   await expect(card).toHaveAttribute("data-sticky", "true");
 
@@ -149,10 +151,9 @@ test("FR-NOTE-32 sim-6 glitch 3: the DM's toast stack keeps off an open window's
   await dm.mouse.move(t.x + 40, 92 + t.height / 2, { steps: 4 });
   await dm.mouse.up();
   await expect.poll(async () => Math.abs(((await win.boundingBox())?.y ?? 0) - 92)).toBeLessThan(4);
+  // FR-NOTE-72: cards fold into the open window, so an info toast (no action) is the one shown.
   await win.getByTestId("note-test-text").fill("Window card");
   await win.getByTestId("note-test-audience").selectOption("dm");
-  await win.getByTestId("note-test-owner").selectOption("dm");
-  await win.getByTestId("note-test-label").fill("Apply");
   await win.getByTestId("note-test-send").click();
   const card = dm.getByTestId("note-toast").filter({ hasText: "Window card" });
   await expect(card).toBeVisible();
@@ -168,8 +169,5 @@ test("FR-NOTE-32 sim-6 glitch 3: the DM's toast stack keeps off an open window's
       return over ? `stack ${JSON.stringify(s)} over window ${JSON.stringify(w)}` : "clear";
     })
     .toBe("clear");
-  // Clean up: resolve the card.
-  await card.getByTestId("note-toast-action").click();
-  await expect(card).toHaveCount(0);
   await dm.context().close();
 });

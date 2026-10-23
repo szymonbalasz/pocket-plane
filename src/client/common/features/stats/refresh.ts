@@ -5,7 +5,13 @@
 // - while hidden (minimised) nothing is asked: a poke or snapshot marks it, and showing asks;
 // - one request in flight; a request wanted meanwhile follows when it answers.
 // The last answer stays while a new one loads or fails (offline = muted, FR-STATS-24).
+// *(Sprint 9)* FR-STATS-69 (BL-74): an answer `conflict` (over the per-viewer rate, no memo) keeps
+// what shows, no error, and asks once more `CONFLICT_RETRY_MS` later with the latest input; only a
+// second `conflict` in a row is an error ("Couldn't load stats" + Retry).
 import { REFRESH_MS } from "./logic";
+
+/** FR-STATS-69: the quiet retry after a `conflict` answer, ms. */
+export const CONFLICT_RETRY_MS = 1000;
 
 export type QueryStatus = "loading" | "ok" | "error";
 
@@ -54,6 +60,8 @@ export function createStatsQuery<I, R>(opts: {
   let again = false;
   let disposed = false;
   let asked = 0;
+  /** FR-STATS-69: the next request is the one quiet retry after a `conflict`. */
+  let conflictRetry = false;
 
   const emit = (patch: Partial<QueryState<I, R>>) => {
     state = { ...state, ...patch };
@@ -79,6 +87,8 @@ export function createStatsQuery<I, R>(opts: {
     }
     inFlight = true;
     const id = ++asked;
+    const retried = conflictRetry;
+    conflictRetry = false;
     if (state.status !== "loading") emit({ status: "loading" });
     opts.send(input).then(
       (result) =>
@@ -86,6 +96,15 @@ export function createStatsQuery<I, R>(opts: {
       (err: unknown) =>
         done(id, input, () => {
           const e = err as { code?: unknown; message?: unknown };
+          // FR-STATS-69: keep what shows (still loading, no error) and ask once more in 1 s with
+          // the latest input; a request already wanted asks at once instead.
+          if (e?.code === "conflict" && !retried) {
+            if (again) return;
+            cancelTimer();
+            conflictRetry = true;
+            timer = timers.setTimeout(ask, CONFLICT_RETRY_MS);
+            return;
+          }
           emit({
             status: "error",
             error: {
@@ -115,6 +134,7 @@ export function createStatsQuery<I, R>(opts: {
     /** A new input asks at once; the same one is a no-op. */
     set(input: I) {
       if (state.input !== null && same(state.input, input)) return;
+      conflictRetry = false; // a new input gets its own quiet retry (FR-STATS-69)
       emit({ input, status: "loading", error: null });
       ask();
     },

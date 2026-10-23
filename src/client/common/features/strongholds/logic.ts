@@ -350,11 +350,11 @@ export interface LinkedReminder {
   linkHidden?: boolean;
 }
 
-export interface ReminderGroup {
+export interface ReminderGroup<T extends LinkedReminder = LinkedReminder> {
   /** null = the whole stronghold. */
   facilityId: string | null;
   label: string;
-  rows: LinkedReminder[];
+  rows: T[];
 }
 
 const byCreated = (a: LinkedReminder, b: LinkedReminder) =>
@@ -365,13 +365,13 @@ const byCreated = (a: LinkedReminder, b: LinkedReminder) =>
  * group per facility in the DM's order; empty groups left out; rows oldest first (FR-REM-17).
  * A reminder on a facility the viewer doesn't receive is never received either (FR-REM-06).
  */
-export function reminderGroups(
+export function reminderGroups<T extends LinkedReminder>(
   strongholdId: string,
   facilities: readonly Pick<FacilityView, "id" | "name">[],
-  rows: readonly LinkedReminder[],
-): ReminderGroup[] {
+  rows: readonly T[],
+): ReminderGroup<T>[] {
   const mine = rows.filter((r) => r.strongholdId === strongholdId).sort(byCreated);
-  const groups: ReminderGroup[] = [
+  const groups: ReminderGroup<T>[] = [
     { facilityId: null, label: WHOLE_STRONGHOLD, rows: mine.filter((r) => r.facilityId === null) },
     ...facilities.map((f) => ({
       facilityId: f.id,

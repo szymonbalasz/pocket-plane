@@ -38,6 +38,9 @@ import fuS7E2e from "./fu-s7-e2e";
 import fuSmallCopy from "./fu-small-copy";
 import furyLogLine from "./fury-log-line";
 import fxDiceE2e from "./fx-dice-e2e";
+import fxS9 from "./fx-s9";
+import fxStaleChunkE2e from "./fx-stale-chunk-e2e";
+import fxToastsE2e from "./fx-toasts-e2e";
 import gems from "./gems";
 import gemsCombatE2e from "./gems-combat-e2e";
 import gemsE2e from "./gems-e2e";
@@ -65,6 +68,7 @@ import pmMemory from "./pm-memory";
 import pmMemoryE2e from "./pm-memory-e2e";
 import prefsS6 from "./prefs-s6";
 import prefsS6E2e from "./prefs-s6-e2e";
+import remUiE2e from "./rem-ui-e2e";
 import remindersStrongholds from "./reminders-strongholds";
 import rsE2e from "./rs-e2e";
 import ruleTriggers from "./rule-triggers";
@@ -80,6 +84,8 @@ import sessionSim10 from "./session-sim-10";
 import sessionSim11 from "./session-sim-11";
 import sessionSim12 from "./session-sim-12";
 import sessionSim13 from "./session-sim-13";
+import spPalette from "./sp-palette";
+import spPaletteE2e from "./sp-palette-e2e";
 import stats from "./stats";
 import statsB from "./stats-b";
 import statsBE2e from "./stats-b-e2e";
@@ -224,10 +230,20 @@ export const bundles: readonly Bundle[] = [
   sessionSim13,
   remindersStrongholds,
   rsE2e,
+  // Sprint 9 track RS (build/rem-ui): the reminders UI e2e
+  remUiE2e,
   // Sprint 9 track RS (build/hold-ui): Strongholds tab + window E2E
   holdUiE2e,
   // Sprint 9 track FX (fix/fx-dice-lines): dice + gems lines
   fxDiceE2e,
+  // Sprint 9 track FX (fix/fx-toasts-feed): toast stack + kill feed
+  fxToastsE2e,
+  // Sprint 9 track SP (build/sp-palette): aliases of session-sim-12 for the palette
+  spPalette,
+  spPaletteE2e,
+  // Sprint 9 track FX (fix/fx-sync-shell): stale-chunk reload e2e alias, FX3's bundle
+  fxStaleChunkE2e,
+  fxS9,
   // Sprint 9 track RS (build/hold-stores): Stores tab E2E
   holdStoresE2e,
 ];

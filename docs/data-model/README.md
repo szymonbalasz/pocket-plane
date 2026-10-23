@@ -1378,7 +1378,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). *
 From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §50](../protocol/README.md#50-sprint-3-party-board-handouts-p2).
 
 - **Notification rows:** kind `handout-shared` in `notification` (payload `{handoutId}`, state `info`, audience `all` or `player`; FR-PARTY-06). The row and its handout id stay after an unshare or delete (OQ-PARTY-15); the handout's records still leave the player.
-- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab}` (FR-PARTY-11; sprint 9 values per [§121](#121-sprint-9-party-manager-pm2)); the viewer's selected handout + mode (page memory).
+- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab}` (FR-PARTY-11; sprint 9 values per [§122](#122-sprint-9-party-manager-pm2)); the viewer's selected handout + mode (page memory).
 - **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
 - **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
 - **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
@@ -2519,9 +2519,23 @@ From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DIC
 - **Persisted runtime state:** none.
 - **CON-44:** 0 B (no new record or field; a reroll line's items are as many or fewer than before).
 
-## 121. Sprint 9: Party Manager (PM2)
+## 121. Sprint 9: command palette and keyboard shortcuts (SP1)
 
-From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #339). **Built by `build/party-manager`**. Protocol side: [protocol §152](../protocol/README.md#152-sprint-9-party-manager--party-status-tab-companions-under-owners-tab-registry-pm2). **No table, column, record type or wire field.**
+From [play-shell](../specs/play-shell.md#8-data-model) §8 sprint 9 (FR-SHELL-184, -193, -194; [ADR-0067](../architecture/adr/0067-command-registry.md)). **Built by `build/sp-palette`**: no table, column or record type. Protocol side: [protocol §152](../protocol/README.md#152-sprint-9-command-palette-and-keyboard-shortcuts-sp1).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| Palette command / search provider *(client code)* | registry entries in `commands.ts` (append-only); never sent or stored | FR-SHELL-184, -199 |
+| Recent picks | browser `localStorage` `pp.palette.v1.<campaignId>.<dm \| playerId>` = JSON array of row keys (`c:<command id>`, `w:<window kind>`, `i:<provider>:<record id>`), newest first, ≤ 8 (zod `RecentPicks`: longer lists cut, duplicates dropped; junk → none + one warning); keys that no longer resolve are dropped when shown; compendium rows are never recorded; never sent | FR-SHELL-194 |
+| Keyboard setting | browser `localStorage` `pp.keys.v1` = `{singleKey: boolean}` (zod strict; missing / junk → `{singleKey: true}`); device-wide (no campaign in the key); never sent | FR-SHELL-193 |
+| Palette UI | page memory: open, input, sheet open; the highlighted row; the element focused before it opened | FR-SHELL-180 |
+
+- **Derived:** palette rows and ranks (client, per keystroke); the sheet's rows (from the registry and `when`).
+- **Persisted runtime state:** the two browser keys above.
+
+## 122. Sprint 9: Party Manager (PM2)
+
+From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #339). **Built by `build/party-manager`**. Protocol side: [protocol §153](../protocol/README.md#153-sprint-9-party-manager--party-status-tab-companions-under-owners-tab-registry-pm2). **No table, column, record type or wire field.**
 
 | Browser state | Change | Rule | Source |
 |---|---|---|---|
@@ -2532,26 +2546,35 @@ From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #33
 - **Fixtures:** none new (bundles `pm-memory`, `pm-memory-e2e` are PM1's aliases of `session-sim-12`).
 - **CON-44:** 0 B.
 
-## 122. Sprint 9: Strongholds tab and Stronghold window (RS2)
+## 123. Sprint 9: Reminders tab and sheet tab (RS1)
 
-From [strongholds](../specs/strongholds.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-ui`**. Protocol side: [protocol §153](../protocol/README.md#153-sprint-9-strongholds-tab-and-stronghold-window-rs2). **No table, column, record type or wire field.**
+From [reminders](../specs/reminders.md#8-data-model) §8 (derived), [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-100–104 (DM #338, #339). **Built by `build/rem-ui`**. Protocol side: [protocol §155](../protocol/README.md#155-sprint-9-reminders-tab-and-sheet-tab-rs1). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** groups (Party, then characters by name per viewer), row order (`createdAt`, then id), roll-as actor per surface, the per-character effects line (from `effect` rows already in the snapshot), the sheet tab's count (this character's loaded rows).
+- **Browser state:** Party Manager tab memory may hold `reminders` (§121's key, unchanged).
+- **Fixtures:** none new; bundle `rem-ui-e2e` (alias of `reminders-strongholds` for the state-changing e2e).
+- **CON-44:** 0 B (no snapshot change; `reminder` stays lazy).
+
+## 124. Sprint 9: Strongholds tab and Stronghold window (RS2)
+
+From [strongholds](../specs/strongholds.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-ui`**. Protocol side: [protocol §156](../protocol/README.md#156-sprint-9-strongholds-tab-and-stronghold-window-rs2). **No table, column, record type or wire field.**
 
 | Browser state | Value | Rule | Source |
 |---|---|---|---|
 | Stronghold window selection `pp.hold.v1.<campaignId>.<dm \| playerId>` | `{strongholdId: id \| null, tab: facilities \| staff \| reminders \| notes}` | junk → default (nothing selected, Facilities) + warning; storage failing → memory only for the page; a selected id that is gone or hidden shows "This stronghold isn't available" | FR-HOLD-23, -24 |
-| Party Manager tab choice `pp.party.tab.v1.…` | `strongholds` (new id) | not visible now → Party status, the stored value kept ([§121](#121-sprint-9-party-manager-pm2)) | FR-PARTY-71, -72 |
+| Party Manager tab choice `pp.party.tab.v1.…` | `strongholds` (new id) | not visible now → Party status, the stored value kept ([§122](#122-sprint-9-party-manager-pm2)) | FR-PARTY-71, -72 |
 
 - **Derived (client, not stored):** state summary, figures line, "Replaced by", staff per facility, totals ("incl. DM only" for the DM), order suggestions, reminder groups, confirm texts.
 - **Fixtures:** none new; bundle `hold-ui-e2e` (alias of `reminders-strongholds`, for `e2e/hold-ui.e2e.ts`).
 - **CON-44:** 0 B.
 
-## 123. Sprint 9: Stronghold Stores tab (RS3)
+## 125. Sprint 9: Stronghold Stores tab (RS3)
 
-From [strongholds](../specs/strongholds.md#8-data-model) and [party-loot](../specs/party-loot.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-stores`**. Protocol side: [protocol §154](../protocol/README.md#154-sprint-9-stronghold-stores-tab-move-form-stores-options-inventory-filter-rs3). **No table, column, record type or wire field.**
+From [strongholds](../specs/strongholds.md#8-data-model) and [party-loot](../specs/party-loot.md#8-data-model) (sprint 9, DM #339). **Built by `build/hold-stores`**. Protocol side: [protocol §157](../protocol/README.md#157-sprint-9-stronghold-stores-tab-move-form-stores-options-inventory-filter-rs3). **No table, column, record type or wire field.**
 
 | Browser state | Value | Rule | Source |
 |---|---|---|---|
-| Stronghold window selection `pp.hold.v1.<campaignId>.<dm \| playerId>` | `tab` gains `stores` (`facilities \| staff \| stores \| reminders \| notes`) | as [§122](#122-sprint-9-strongholds-tab-and-stronghold-window-rs2) | FR-HOLD-24, -28 |
+| Stronghold window selection `pp.hold.v1.<campaignId>.<dm \| playerId>` | `tab` gains `stores` (`facilities \| staff \| stores \| reminders \| notes`) | as [§124](#124-sprint-9-strongholds-tab-and-stronghold-window-rs2) | FR-HOLD-24, -28 |
 
 - **Derived (client, not stored):** Move form Stores options per viewer (from `stronghold-index`), Stores names in the loot log ("Stores (removed)" without an index row), a Stores' item rows (`party-item` with its `strongholdId`), the party inventory's rows (no `strongholdId`, FR-PARTY-77).
 - **Fixtures:** none new; bundle `hold-stores-e2e` (alias of `reminders-strongholds`, for `e2e/hold-stores.e2e.ts`).

@@ -170,6 +170,8 @@ test("FR-SHELL-109 rail inset (player-1 1280×800, BL-53): Party at its min widt
     const tabs = party.getByTestId("party-tab");
     expect(await tabs.count()).toBeGreaterThan(0);
     for (const t of await tabs.all()) {
+      // Five tabs at 340 px: the strip scrolls, never cutting a label (FR-PARTY-46, -76).
+      await t.scrollIntoViewIfNeeded();
       const b = await box(t);
       expect(b.x, "tab right of the rail").toBeGreaterThanOrEqual(rail.x + rail.w);
       expect(b.x + b.w, "tab inside the window").toBeLessThanOrEqual(r.x + r.w);

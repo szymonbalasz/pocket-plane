@@ -9,6 +9,9 @@
 // rendered rect for the Fit (FR-SHELL-59). *(Sprint 8)* One stack per client (FR-NOTE-50): the
 // summary, cards, alerts, info, then the callout, in that order from home (players: home is the
 // bottom, so the column runs upwards); it re-places on every input change (FR-NOTE-51).
+// *(Sprint 9)* FR-NOTE-72: while this client's Notifications window is open (not minimised) the
+// cards and the summary fold into it; they come back silently when it closes. FR-NOTE-73: each
+// callout show is its own node (`data-callout-seq`).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
 import { XIcon } from "lucide-react";
@@ -52,7 +55,7 @@ import {
 import type { NoteClient } from "./note-client";
 import { NoteBody, NoteStripe, useNoteActions, useNoteStripe } from "./parts";
 import { useStackHeight } from "./stack-height";
-import { useStackInputs } from "./stack-inputs";
+import { useHistoryOpen, useStackInputs } from "./stack-inputs";
 import {
   advance,
   type Callout,
@@ -70,6 +73,7 @@ import {
   type Toast,
   type ToastMemoryStore,
   type ToastState,
+  unfold,
   visibleToasts,
 } from "./toasts";
 import { cueTriggers, startCues } from "./token-cue";
@@ -200,13 +204,17 @@ function useAvoidTokens(
   }, [isDm, toasts, rows, views, store]);
 }
 
-/** FR-NOTE-50: the one callout (`showCallout`), last in the stack; not a notification. */
-function CalloutToast({ c, onClose }: { c: Callout; onClose: () => void }) {
+/**
+ * FR-NOTE-50: the one callout (`showCallout`), last in the stack; not a notification. FR-NOTE-73:
+ * the caller keys it by `seq`, so each show is a new node (re-announced, its own 4 s).
+ */
+export function CalloutToast({ c, onClose }: { c: Callout; onClose: () => void }) {
   return (
     <div
       role="status"
       data-testid="note-callout"
       data-callout-id={c.id}
+      data-callout-seq={c.seq ?? 0}
       data-class="callout"
       className="pointer-events-auto flex items-start gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
     >
@@ -315,10 +323,24 @@ export function ToastRuntime({
     return () => document.removeEventListener("visibilitychange", on);
   }, [dispatch]);
 
+  // FR-NOTE-72: this client's Notifications window open (not minimised) folds the cards and the
+  // summary into it; closing or minimising it brings them back silently (no cue starts here).
+  const folded = useHistoryOpen();
+  const wasFolded = useRef(folded);
+  useEffect(() => {
+    if (wasFolded.current && !folded && sync) {
+      const store = sync.getState().store;
+      dispatch((s, now) => unfold(s, store, now, (st) => waitingForPlayers(st, views)));
+    }
+    wasFolded.current = folded;
+  }, [folded, sync, dispatch, views]);
+
   // FR-NOTE-32: the DM's stack keeps clear of the rendered Initiative window. FR-NOTE-51: every
   // input is subscribed (windows, Initiative, hard keep-outs, first rows, height, viewport).
   const stackRef = useRef<HTMLElement>(null);
-  const showing = state.toasts.length > 0 || !!state.callout;
+  const showing =
+    !!state.callout ||
+    state.toasts.some((t) => !folded || (t.kind !== "summary" && classOfToast(t) !== "card"));
   const { initiative, windows: windowRects, hard: bars, rows: firstRows } = useStackInputs(isDm);
   // Walkthrough T4: an open modal dialog keeps the DM stack off it like a hard keep-out.
   const dialogs = useDialogRects(isDm && showing);
@@ -381,7 +403,7 @@ export function ToastRuntime({
   }, [stackH, room, cap, covers]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
-  const { shown, more, callout } = visibleToasts(state, cap);
+  const { shown, more, callout } = visibleToasts(state, cap, folded);
   if (!showing) return null;
   const stack = (
     <section
@@ -476,6 +498,7 @@ export function ToastRuntime({
       )}
       {callout && (
         <CalloutToast
+          key={callout.seq ?? 0}
           c={callout}
           onClose={() => dispatch((s, now) => clearCallout(s, now, callout.id))}
         />

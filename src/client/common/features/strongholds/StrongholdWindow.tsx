@@ -6,7 +6,7 @@
 // Delete…, "All strongholds" (`openPartyTab("strongholds")`). Tabs Facilities, Staff, Stores,
 // Reminders, Notes (tab per browser; visited tabs stay mounted, as FR-PARTY-50); totals under them
 // (FR-HOLD-31). Disconnected → last view, every action disabled (FR-HOLD-34).
-import { REMINDER_TYPE } from "@shared/reminders/schemas";
+import { REMINDER_TYPE, type ReminderView } from "@shared/reminders/schemas";
 import {
   DEFENDERS_MAX,
   HOLD_INTENTS,
@@ -33,15 +33,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { useLazyRecords, useRecords, useSync } from "../../sync/store";
 import { useOpenPartyTab } from "../party-board/open-tab";
 import type { WindowProps } from "../play-shell/registry";
+import type { ReminderDraft } from "../reminders/logic";
 import { DeleteDialog, RenameDialog } from "./dialogs";
 import { FacilitiesTab } from "./FacilitiesTab";
-import { HoldReminders } from "./HoldReminders";
+import { HoldReminderEditor, HoldReminders, prefillDraft } from "./HoldReminders";
 import {
   HOLD_GONE,
   HOLD_PARTY_TAB,
   HOLD_TAB_LABELS,
   type HoldTab,
-  type LinkedReminder,
   orderSuggestions,
   totalsLine,
   visibleTabs,
@@ -242,25 +242,32 @@ function Loaded({
 }: {
   parts: HoldParts;
   all: readonly StrongholdView[];
-  reminders: readonly LinkedReminder[];
+  reminders: readonly ReminderView[];
 }) {
   const sel = useHoldSelection();
   const openTab = useOpenPartyTab();
   const tabs = visibleTabs({ role: parts.dm ? "dm" : "player" }, parts.hold);
   const tab = tabs.includes(sel.tab) ? sel.tab : "facilities";
   const visited = useVisited(tab);
+  // FR-HOLD-29: one REM editor for Add reminder, a facility's Make reminder and a row's Edit.
+  const [remDraft, setRemDraft] = useState<ReminderDraft | null>(null);
   const body = (t: HoldTab) => {
     switch (t) {
       case "facilities":
         return (
-          <FacilitiesTab parts={parts} reminders={reminders} suggestions={orderSuggestions(all)} />
+          <FacilitiesTab
+            parts={parts}
+            reminders={reminders}
+            suggestions={orderSuggestions(all)}
+            onMakeReminder={(p) => setRemDraft(prefillDraft(p))}
+          />
         );
       case "staff":
         return <StaffTab parts={parts} />;
       case "stores":
         return <StoresTab parts={parts} />;
       case "reminders":
-        return <HoldReminders parts={parts} reminders={reminders} />;
+        return <HoldReminders parts={parts} reminders={reminders} onEdit={setRemDraft} />;
       case "notes":
         return <NotesTab parts={parts} />;
     }
@@ -317,6 +324,7 @@ function Loaded({
       <p className="text-xs text-muted-foreground" data-testid="hold-totals">
         {totalsLine(parts.hold)}
       </p>
+      {remDraft && <HoldReminderEditor draft={remDraft} onDone={() => setRemDraft(null)} />}
     </div>
   );
 }
@@ -326,7 +334,7 @@ export function StrongholdWindow(_: WindowProps) {
   const dm = useSync((s) => s.store.you?.role === "dm");
   const index = useRecords<StrongholdIndexRecord>(STRONGHOLD_INDEX_TYPE);
   const holds = useLazyRecords<StrongholdView>(STRONGHOLD_TYPE);
-  const reminders = useLazyRecords<LinkedReminder>(REMINDER_TYPE);
+  const reminders = useLazyRecords<ReminderView>(REMINDER_TYPE);
   const row = strongholdId ? index.find((r) => r.id === strongholdId) : undefined;
   const hold = row ? holds.rows.find((r) => r.id === row.id) : undefined;
   let body: React.ReactNode;

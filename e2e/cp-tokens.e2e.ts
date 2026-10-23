@@ -5,7 +5,7 @@
 // on A, B and C, with "Player 1's companion" / "Player 2's companion" on hover; PC tokens carry
 // none. Double-click on the Owlbear: B and A open the companion card, C gets nothing (with the
 // card not yet registered, nobody does). Overlay rule, compact sizes, bound-combatant case: bun
-// test (companion-token.test.ts).
+// test (companion-token.test.ts). BL-81: `tokenNode` centres on the token's footprint.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
@@ -97,6 +97,27 @@ test("FR-MAP-76 FR-MAP-77 cp-tokens: a paw in the owner's colour on owned pet to
   expect(byId.get(owl)?.tip).toBe("Player 1's companion");
   expect(byId.get(wolf)?.tip).toBe("Player 2's companion");
   expect(byId.get(owl)?.color).not.toBe(byId.get(wolf)?.color);
+
+  // BL-81 tokenNode centres on the footprint: the Owlbear (art + an icon row with the paw) is
+  // centred on its group's origin + side / 2 (side = cells × data-cell-px), not on a child.
+  const cellPx = Number(await dm.getByTestId("map-canvas").getAttribute("data-cell-px"));
+  const origin = await dm.evaluate((id) => {
+    type KNode = { id(): string; getAbsolutePosition(): { x: number; y: number } };
+    type KStage = { container(): HTMLElement; find(s: string): KNode[] };
+    const stage = (window as unknown as { Konva: { stages: KStage[] } }).Konva.stages[0];
+    const g = stage?.find(".map-token").find((n) => n.id() === id);
+    const box = stage?.container().getBoundingClientRect();
+    const p = g?.getAbsolutePosition();
+    return p && box ? { x: box.left + p.x, y: box.top + p.y } : null;
+  }, owl);
+  const owlNode = await tokenNode(dm, owl);
+  expect(origin).not.toBeNull();
+  expect(owlNode).not.toBeNull();
+  const cells = Math.round((owlNode?.width ?? 0) / cellPx);
+  expect(cells).toBeGreaterThanOrEqual(1);
+  expect(Math.abs((owlNode?.width ?? 0) - cells * cellPx)).toBeLessThanOrEqual(2);
+  expect(Math.abs((owlNode?.x ?? 0) - ((origin?.x ?? 0) + (cells * cellPx) / 2))).toBeLessThan(2);
+  expect(Math.abs((owlNode?.y ?? 0) - ((origin?.y ?? 0) + (cells * cellPx) / 2))).toBeLessThan(2);
 
   // FR-MAP-77: double-click on the Owlbear. The card (CP4) may not be registered yet: then no
   // client opens anything.

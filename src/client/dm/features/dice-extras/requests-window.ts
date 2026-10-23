@@ -8,11 +8,14 @@ import type { RollRequestRecord } from "@shared/dice-extras/requests";
 import type { RecordStore } from "@shared/protocol/store";
 import { DICEX_REQUESTS_KIND } from "@ui/features/dice-extras/window-kind";
 import { defineWindow } from "@ui/features/play-shell/registry";
+import { lazyChunk } from "@ui/lib/lazy-chunk";
 import { ListChecksIcon } from "lucide-react";
-import { createElement, lazy, Suspense } from "react";
+import { createElement, Suspense } from "react";
 
-const Body = lazy(() =>
-  import("@ui/features/dice-extras/RequestsWindow").then((m) => ({ default: m.RequestsWindow })),
+const Body = lazyChunk(
+  () =>
+    import("@ui/features/dice-extras/RequestsWindow").then((m) => ({ default: m.RequestsWindow })),
+  "window",
 );
 
 function LazyRequestsWindow() {

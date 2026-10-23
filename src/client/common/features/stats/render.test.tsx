@@ -198,6 +198,26 @@ describe("FR-STATS-24 states", () => {
     expect(rowsOf(zero)).toHaveLength(1);
   });
 
+  test("FR-STATS-70 no 'No damage yet' beside a kill: a players' fight whose only kill was the DM's damage shows the kill in Highlights and no copy", () => {
+    const zeroRows = [{ key: "t", name: "Thorn", kind: "pc" as const, ...counts }];
+    const kill = { fell: "kill" as const, from: null, to: "Goblin 1", callout: false };
+    const ended = {
+      ...PLAYER_FIGHT.fight!,
+      status: "ended" as const,
+      rows: zeroRows,
+      highlights: { ...EMPTY_PLAYER_HIGHLIGHTS, kills: { events: [kill] } },
+    };
+    const html = fightHtml(PLAYER, ok({ ...PLAYER_FIGHT, fight: ended }));
+    expect(html).not.toContain("No damage yet this fight");
+    expect(html).toContain("Goblin 1 falls");
+    // No event either: the copy.
+    const empty = fightHtml(
+      PLAYER,
+      ok({ ...PLAYER_FIGHT, fight: { ...ended, highlights: EMPTY_PLAYER_HIGHLIGHTS } }),
+    );
+    expect(empty).toContain("No damage yet this fight");
+  });
+
   test("FR-STATS-24 offline: the last result muted, the picker off, no error", () => {
     const html = fightHtml(PLAYER, { status: "error", result: PLAYER_FIGHT }, false);
     expect(html).toContain('data-state="offline"');

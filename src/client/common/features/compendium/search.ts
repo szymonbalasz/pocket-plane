@@ -4,6 +4,7 @@
 import { type SearchQuery, SearchResponse } from "@shared/compendium/rest";
 import { useEffect, useState } from "react";
 import { type Api, call } from "../../api";
+import { loadChunk } from "../../lib/lazy-chunk";
 
 /** FR-CMP-17: lookups and the Creatures window wait this long after the last keystroke. */
 export const LOOKUP_DEBOUNCE_MS = 150;
@@ -19,7 +20,11 @@ export type ApiSource =
   | { readonly kind: "lazy"; readonly load: () => Promise<Api> };
 
 export const eagerApi = (api: Api): ApiSource => ({ kind: "api", api });
-export const lazyApi = (load: () => Promise<Api>): ApiSource => ({ kind: "lazy", load });
+/** Loads through `loadChunk` (FR-SHELL-176): a stale chunk → the caller's error + the stale notice. */
+export const lazyApi = (load: () => Promise<Api>): ApiSource => ({
+  kind: "lazy",
+  load: () => loadChunk(load, { notice: true }),
+});
 
 export async function resolveApi(source: ApiSource): Promise<Api> {
   return source.kind === "api" ? source.api : source.load();
