@@ -15,14 +15,14 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates: check 5307 + 1 timeout flake (passes alone), e2e 207 + 2 load flakes (pass alone) |
 | PM2 Party Manager | merged `77f5fd2f` | — | done (re-test 5/5; e2e 213 + roll-popup flake) | main gates after FX1 |
 | FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
-| SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7, part 2 13/14 (RC5 session picker stale) → fixing + stats edits after FX1 | re-test RC2, RC5, RC1 |
+| SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7, part 2 13/14 → re-test 8/8 | merge after RS2 + SP2 |
 | FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12) | main gates: check 5392 + 1 load flake (3/3 alone), e2e 215 |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
-| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | re-test 13/16 (palette 'cover' ranking, Rules stale after a Compendium delete, threshold test) → fixing | re-test P4, 12, 7 |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14 + re-tests 16/16 | merge after RS1 + RS2 |
 
-| RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | walkthrough all PASS (F1 spec test-ID wording fixed on main); main merged, docs §155 / §123 | gates after FX1 → merge |
-| RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | walkthrough 11/11 | merge after FX1 + RS1 (wire reminder buttons / icon) |
-| RS3 Stores UI | `build/hold-stores` (ws wA5; base RS2) | build-rs3 | building | walkthrough H7, H10, H13 |
+| RS1 Reminders tab + sheet | merged `d52a5587` | — | done (branch gates 5408 / 216) | main gates 5408 / 216 green |
+| RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | walkthrough 11/11; stacking on RS1 to wire reminder buttons + icon | short re-test → merge after RS1 |
+| RS3 Stores UI | `build/hold-stores` (ws wA5; base RS2) | build-rs3 | walkthrough 18/18 | merge after RS2 |
 
 Queue: SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
