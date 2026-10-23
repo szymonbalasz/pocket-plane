@@ -6,8 +6,8 @@ import { clampRect, TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { defaultLayout, reduce } from "@ui/features/play-shell/manager";
 import { touchedEdge } from "@ui/features/play-shell/map-coverage";
 import { fittedDefaultRect } from "@ui/features/play-shell/placement";
+import { linkTokenFromPath } from "@ui/session";
 import { playerWindows } from "../../windows";
-import { linkTokenFromPath } from "./compendium-window";
 
 const KIND = "cmp.compendium";
 
