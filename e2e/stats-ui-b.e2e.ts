@@ -11,6 +11,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
+import { closeToasts } from "./support/toasts";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -115,6 +116,7 @@ test("FR-STATS-28 FR-STATS-34 FR-STATS-36 FR-STATS-41 FR-CHARX-97 one feed toast
   await test.step("FR-STATS-41 Luck · Campaign: rows for both; only the DM has DM dice", async () => {
     for (const page of [dm, p2]) {
       const stats = await openWindow(page, "stats.board");
+      await closeToasts(page); // FR-NOTE-70, -71: the stack may sit on this window's body, below its first row
       await stats.locator('[data-testid="stats-tab"][data-value="luck"]').click();
       await stats.getByTestId("stats-luck-scope").click();
       await page

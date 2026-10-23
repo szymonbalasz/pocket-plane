@@ -2548,7 +2548,7 @@ From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #33
 
 ## 123. Sprint 9: session recap (SP3)
 
-From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). **Built by `build/sp-recap`**. Protocol side: [protocol §154](../protocol/README.md#154-sprint-9-session-recap--recapquery-recapshare-session-recap-kind-sp3). **No table, column or record type** (ADR-0013: sessions stay derived).
+From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). **Built by `build/sp-recap`**. Protocol side: [protocol §155](../protocol/README.md#155-sprint-9-session-recap--recapquery-recapshare-session-recap-kind-sp3). **No table, column or record type** (ADR-0013: sessions stay derived).
 
 | Field / table | Change | Rule | Source |
 |---|---|---|---|
