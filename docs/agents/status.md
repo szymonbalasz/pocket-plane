@@ -20,7 +20,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14 | after SP1 + PM2 merge: merge main, commands.ts lines, threshold → re-test R6 + P4 → merge |
 
-| RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | building | walkthrough RS-R |
+| RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | ready (sheet count grant; wf-push e2e tab scroll kept) | test-rs1 walkthrough running |
 | RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | building | walkthrough RS-H |
 
 Queue: RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
