@@ -55,7 +55,11 @@ const PARTY_MANAGER: Case = {
     "party-companion-band",
   ],
   clip: '[data-testid="party-status"] [data-radix-scroll-area-viewport]',
-  tabs: '[data-testid="party-tab"]',
+  // PM's four labels (the criterion); RS's Reminders / Strongholds may need the strip to scroll at
+  // 440 (FR-PARTY-76: labels never cut, the strip scrolls; checked in \`hold-ui.e2e.ts\`).
+  tabs: ["status", "handouts", "inventory", "loot"]
+    .map((t) => `[data-testid="party-tab"][data-value="${t}"]`)
+    .join(", "),
 };
 
 /** §7 sprint-8 useful sizes at 1280×720 (band 412). */
