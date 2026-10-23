@@ -39,6 +39,7 @@ DM decision #338 (sprint-8 recap + sprint 9 scope). Process: [orchestrator promp
 | 2026-10-22 | Specs drafted; seams S1–S14 (`.verify/sprint9/seams.md`); reviews (RS + SP 1 blocker / 5 majors; PM + FX 0 / 5) ruled and applied. **DM gate 1** ready (`.verify/sprint9/gate.md`) |
 | 2026-10-23 | **DM gate 1 passed (#339):** every pick, ADRs 0064–0068 accepted; specs merged and integrated (glossary, spec index, registries, backlog). Phase B wave 1 building: window memory (PM1), Party Manager (PM2), reminders + strongholds core (RS0), dice + gem line fixes (FX2) |
 | 2026-10-23 | **Merged: reminders + strongholds core** (RS0: records, commands, Stores in the loot ledger, stronghold-index; walkthrough 23/23, leak scans clean, DM snapshot +2.9 KB). Recap builder (SP3) started |
+| 2026-10-23 | **Merged: dice + gem line fixes** (FX2: keep-highest join, one-line copy, reroll line follows the card, one frame per gem spend, six quick awards = one line, roll popup never sticks, macro name error; walkthrough 10/10). Window memory (PM1) re-test 7/7, merging. Started stacked on it: toast stack + kill feed (FX1), command palette (SP1), rules reference (SP2); Party Manager (PM2) adds its shared rows |
 
 ## Check `main` any time (DM)
 

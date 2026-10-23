@@ -10,14 +10,17 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 | Task | Branch / worktree | Agent | State | Next |
 |---|---|---|---|---|
-| PM1 window memory (frame + canvas) | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | M9 fixed (c4c04bfa; check 5241, e2e 207) | test-pm1b re-test running |
-| PM2 Party Manager | `build/party-manager` (ws w9V, slot 2) | build-pm2 | party-board part done (4 commits); waits for PM1 to merge for shared rows | walkthrough M0-M2, M11, M13 |
-| RS0 reminders + strongholds core | merged `fb3884a3` | — | done (walkthrough 23/23; evidence lost at cleanup) | main gates green (check 5214 / e2e 206) |
-| SP3 session recap | `build/sp-recap` (ws w9Z) | build-sp3 | server + window + share done; waits PM1 (window rows), SP1 (commands), FX1 (stats edits) | part-1 walkthrough 7/7 (server); part 2 after PM1 + SP1 + FX1 |
-| FX2 dice + gems lines | `fix/fx-dice-lines` (ws w9X, slot 4) | build-fx2 | ready (all FRs tested; CON-44 0) | test-fx2 walkthrough running |
-| FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y) | build-fx3 | ready (check 5180); ShellWindow branch after PM1; merges after RS0 | test-fx3 walkthrough running |
+| RS0 reminders + strongholds core | merged `fb3884a3` | — | done (23/23) | — |
+| FX2 dice + gems lines | merged `d4837dc4` | — | done (10/10; branch gates 5232 / 208) | main gates with PM1 |
+| PM1 window memory | `fix/window-memory` (ws w9T, slot 0) | build-pm1 | walkthrough 9/10 → re-test 7/7; main merged in | branch gates running → merge → main gates |
+| PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | stacked on PM1: shared rows | walkthrough M0-M2, M11, M13 |
+| FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y, slot 5) | build-fx3 | walkthrough 6/6 (step 4 spec wording ruled) | ShellWindow branch after PM1 merges → gates → merge |
+| SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
+| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | building | walkthrough FX1 |
+| SP1 palette + shortcuts | `build/sp-palette` (ws wA1; base PM1) | build-sp1 | building | walkthrough P1-P11 |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | building | walkthrough R1-R8 |
 
-Queue (`.verify/sprint9/seams.md` build plan): wave 2 FX3, SP3 server (after RS0) · wave 3 after PM1: FX1, SP1, SP2 · wave 4 after RS0 + PM1 + PM2: RS1, RS2 · wave 5 RS3; SP3 stats edits after FX1. Slice defs: `%TEMP%/pocket-plane/slices.json` (`pm1`, `pm2`, `rs0`, `fx2`).
+Queue: RS1 + RS2 after PM2 merges (RS0, PM1 in) · RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
 ## Shared-file locks
 
