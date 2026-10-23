@@ -159,12 +159,11 @@ describe("REM / HOLD §13 fixtures", () => {
       [HOLD_SECRET_GEM, 1, true, false],
     ]);
     expect(stores(tower?.id)).toEqual([[TOWER.item, 1, false, true]]);
-    expect(r.storesCoins.map((c) => [c.strongholdId, c.gp, c.hidden])).toEqual(
-      [
-        [grey?.id, 120, undefined],
-        [tower?.id, 5, true],
-      ].sort((a, b) => ((a[0] as string) < (b[0] as string) ? -1 : 1)),
-    );
+    const coin = Object.fromEntries(r.storesCoins.map((c) => [c.strongholdId, [c.gp, c.hidden]]));
+    expect(coin).toEqual({
+      [grey?.id as string]: [120, undefined],
+      [tower?.id as string]: [5, true],
+    });
     // `hold-tower-move`: +5 gp on party-board's pot (5 pp, 30 gp); the row is hidden-Stores.
     expect([r.pot.pp, r.pot.gp]).toEqual([5, 35]);
     const last = r.entries.at(-1);
