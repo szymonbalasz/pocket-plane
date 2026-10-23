@@ -7,7 +7,9 @@
 // FR-NOTE-72 (sprint 9): this client's open Notifications window counts like Initiative
 // (`blocks`). Remembered windows (window memory) are ordinary rendered windows here.
 // *(Sprint 10, H3)* FR-NOTE-75: where each window's drawn content ends (`used`), read from the
-// DOM while the stack shows and re-read when a window body's content changes.
+// DOM while the stack shows and re-read when a window body's content changes. FR-NOTE-77: also
+// its first rows (`head`: the first row-sized record row, not a record container such as the
+// Encounters editor, which the frame's first-row report takes) and its controls.
 // Its own module, so the runtime test can stub it (a static render reads no layout).
 import { useEffect, useMemo, useState } from "react";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
@@ -19,7 +21,7 @@ import { useViewport } from "../play-shell/hooks";
 import { hardRects, useKeepOuts } from "../play-shell/keep-outs";
 import { windowId } from "../play-shell/manager";
 import { useAvailableKinds, useRegistry, useShellState } from "../play-shell/ShellContext";
-import { pushedByPlan, type StackWindow } from "./keep-out";
+import { PUSHED_BODY_CLEAR, pushedByPlan, type StackWindow } from "./keep-out";
 import { HISTORY_KIND } from "./logic";
 
 export interface StackInputs {
@@ -60,30 +62,84 @@ export function contentEnd(
   return end;
 }
 
-/** The body's drawn boxes, in document order: its leaf elements and record rows (padded cards). */
-function* drawnBoxes(body: Element): Generator<DOMRect> {
-  const walk = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT);
-  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
-    const el = n as Element;
-    if (el.childElementCount === 0 || el.hasAttribute("data-record-id")) {
-      yield el.getBoundingClientRect();
-    }
+/** FR-NOTE-77: a record element taller than this is a container (an editor), not a row. */
+export const ROW_MAX_H = 120;
+
+/**
+ * FR-NOTE-77: where a window body's first rows end, viewport px: the bottom of its first record
+ * element (document order) inside `top`..`bottom` that is row-sized (≤ `ROW_MAX_H`), so the tabs,
+ * search box and list header above it count too; none → null. Pure.
+ */
+export function firstRowEnd(
+  top: number,
+  bottom: number,
+  records: Iterable<{ top: number; bottom: number }>,
+): number | null {
+  for (const r of records) {
+    const h = r.bottom - r.top;
+    if (h <= 0 || h > ROW_MAX_H || r.bottom <= top || r.top >= bottom) continue;
+    return Math.min(r.bottom, bottom);
   }
+  return null;
+}
+
+/** FR-NOTE-77: what counts as a window control (the fallback covers the fewest). */
+const CONTROL_SELECTOR =
+  'button, input, select, textarea, a[href], [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="combobox"], [role="slider"]';
+
+/** A window body as drawn, px relative to its window's top-left (it may move before the DOM). */
+interface BodyMeasure {
+  /** FR-NOTE-75: below its top, where the drawn content ends (nothing → its title bar). */
+  used: number;
+  /** FR-NOTE-77: below its top, where its first rows end; null → no row-sized record. */
+  head: number | null;
+  /** FR-NOTE-77: its visible controls. */
+  controls: Rect[];
 }
 
 /**
- * FR-NOTE-75: how far below its top a window's drawn content ends, px (nothing drawn → its title
- * bar); null when the window isn't in the DOM.
+ * One walk over the body's elements (subtrees outside its visible band skipped): its leaves and
+ * record rows for `used` (FR-NOTE-75), record rows for `head`, controls (FR-NOTE-77). Null when
+ * the window isn't in the DOM.
  */
-function usedHeight(id: string): number | null {
+function measureBody(id: string): BodyMeasure | null {
   if (typeof document === "undefined") return null;
   const section = document.querySelector(`${WINDOW_SELECTOR}[data-record-id="${CSS.escape(id)}"]`);
   const body = section?.querySelector(BODY_SELECTOR);
   if (!section || !body) return null;
-  const top = section.getBoundingClientRect().top;
+  const s = section.getBoundingClientRect();
   const b = body.getBoundingClientRect();
-  const end = contentEnd(b.top, b.bottom, drawnBoxes(body));
-  return end === null ? TITLE_H : Math.ceil(end - top);
+  const drawn: DOMRect[] = [];
+  const records: DOMRect[] = [];
+  const controls: Rect[] = [];
+  const walk = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT, {
+    acceptNode: (n) => {
+      const r = (n as Element).getBoundingClientRect();
+      // A scrolled-away row and everything in it: not drawn in the body (a box-less element,
+      // `display: contents`, is walked into).
+      if (r.height > 0 && (r.bottom <= b.top || r.top >= b.bottom)) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+    const el = n as Element;
+    const r = el.getBoundingClientRect();
+    const record = el.hasAttribute("data-record-id");
+    if (el.childElementCount === 0 || record) drawn.push(r);
+    if (record) records.push(r);
+    if (r.width >= 4 && r.height >= 4 && el.matches(CONTROL_SELECTOR)) {
+      const top = Math.max(r.top, b.top);
+      const bottom = Math.min(r.bottom, b.bottom);
+      controls.push({ x: r.left - s.left, y: top - s.top, w: r.width, h: bottom - top });
+    }
+  }
+  const end = contentEnd(b.top, b.bottom, drawn);
+  const head = firstRowEnd(b.top, b.bottom, records);
+  return {
+    used: end === null ? TITLE_H : Math.ceil(end - s.top),
+    head: head === null ? null : Math.ceil(head - s.top),
+    controls,
+  };
 }
 
 /** Bumps (once a frame) when a window body's DOM changes while `on`: content grew or shrank. */
@@ -144,9 +200,17 @@ export function useStackInputs(isDm: boolean, showing = true): StackInputs {
         const w = others[i] as (typeof others)[number];
         const id = windowId(w.kind, w.instance);
         const pushed = pushedByPlan(placed.get(id), causes(w.kind, w.instance));
-        // FR-NOTE-75: the drawn content's end, on this rect (it may move before the DOM does).
-        const h = measure ? usedHeight(id) : null;
-        const used = h === null ? {} : { used: r.y + Math.min(r.h, h) };
+        // FR-NOTE-75, -77: the drawn content's end, first rows and controls, on this rect (it
+        // may move before the DOM does).
+        const m = measure ? measureBody(id) : null;
+        const used =
+          m === null
+            ? {}
+            : {
+                used: r.y + Math.min(r.h, m.used),
+                head: r.y + Math.min(r.h, m.head ?? TITLE_H + PUSHED_BODY_CLEAR),
+                controls: m.controls.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
+              };
         return w.kind === HISTORY_KIND
           ? { ...r, pushed, blocks: true, ...used }
           : { ...r, pushed, ...used };

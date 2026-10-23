@@ -1,7 +1,7 @@
 // FR-NOTE-75 (sprint 10, H3; BL-101): where a window body's drawn content ends, from its boxes in
 // document order (the runtime walks the body's leaf elements and record rows).
 import { describe, expect, test } from "bun:test";
-import { contentEnd } from "./stack-inputs";
+import { contentEnd, firstRowEnd, ROW_MAX_H } from "./stack-inputs";
 
 const box = (top: number, bottom: number) => ({ top, bottom });
 
@@ -38,5 +38,25 @@ describe("FR-NOTE-75 content end", () => {
     }
     expect(contentEnd(top, bottom, boxes())).toBe(bottom);
     expect(read).toBe(2);
+  });
+});
+
+describe("FR-NOTE-77 first rows", () => {
+  // Walkthrough H3 4: the Encounters editor at 68, 60; its body 93..470. The editor's root carries
+  // `data-record-id` and fills the body; the first entry row is 196..248.
+  const top = 93;
+  const bottom = 470;
+
+  test("FR-NOTE-77 first rows: a record container filling the body is skipped; the first row-sized record row ends them", () => {
+    expect(firstRowEnd(top, bottom, [box(93, 470), box(196, 248), box(252, 304)])).toBe(248);
+    // Rules: tabs and search above the first card (370..418).
+    expect(firstRowEnd(212 + 33, 572, [box(370, 418), box(426, 474)])).toBe(418);
+  });
+
+  test("FR-NOTE-77 first rows: rows scrolled out of the body don't count; none → null", () => {
+    expect(firstRowEnd(top, bottom, [box(40, 80), box(300, 340)])).toBe(340);
+    expect(firstRowEnd(top, bottom, [box(93, 470)])).toBeNull();
+    expect(firstRowEnd(top, bottom, [])).toBeNull();
+    expect(firstRowEnd(top, bottom, [box(100, 100 + ROW_MAX_H + 1)])).toBeNull();
   });
 });

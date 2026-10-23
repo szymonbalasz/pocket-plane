@@ -14,8 +14,12 @@
 // callout show is its own node (`data-callout-seq`). *(Sprint 10, H3)* FR-NOTE-75: the DM stack
 // keeps off windows' drawn content, then their first rows (the content measured while it shows);
 // FR-NOTE-76: an open modal dialog counts like Initiative and nothing under its overlay counts.
+// FR-NOTE-77: it may slide beside a window off the PCs' tokens; over a body the cards fold into
+// the summary.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
+import { recordsOf } from "@shared/protocol/store";
+import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { XIcon } from "lucide-react";
 import {
   useCallback,
@@ -33,6 +37,7 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
+import { pcBoxes } from "../play-shell/placement";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import {
   DM_TOAST_TOP,
@@ -40,7 +45,7 @@ import {
   PLAYER_TOAST_BOTTOM,
   reportShownStack,
 } from "../play-shell/toast-region";
-import { tokenScreenBoxes } from "../play-shell/token-boxes";
+import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, useAlertToasts } from "./alert-toasts";
 import { useDialogRects } from "./dialog-rects";
 import { dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
@@ -207,6 +212,22 @@ function useAvoidTokens(
 }
 
 /**
+ * FR-NOTE-77: the player characters' token ids (a character with an owner, as play-shell's PC
+ * rule counts them), sorted; a slide beside a window never covers one. DM only.
+ */
+function usePcTokens(isDm: boolean): string[] {
+  const store = useSync((s) => s.store);
+  return useMemo(() => {
+    if (!isDm) return [];
+    type Tok = { id: string; ownerPlayerId: string | null; characterId: string | null };
+    return recordsOf<Tok>(store, TOKEN_TYPE)
+      .filter((t) => isPlacementPc(t))
+      .map((t) => t.id)
+      .sort();
+  }, [isDm, store]);
+}
+
+/**
  * FR-NOTE-50: the one callout (`showCallout`), last in the stack; not a notification. FR-NOTE-73:
  * the caller keys it by `seq`, so each show is a new node (re-announced, its own 4 s).
  */
@@ -351,6 +372,7 @@ export function ToastRuntime({
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
   // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
   const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
+  const pcKey = usePcTokens(isDm).join(",");
   // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
   // pointer is on the stack (FR-NOTE-51: only while; every other input re-places at once).
   const settled = useMapSettled(isDm && showing);
@@ -370,8 +392,9 @@ export function ToastRuntime({
         hard,
         firstRows,
         dialogs,
+        pcBoxes(tokenScreenBoxes(pcKey ? pcKey.split(",") : []).map((b) => ({ ...b, pc: true }))),
       ),
-    [vp, initiative, stackH, avoidKey, windowRects, hard, firstRows, dialogs, tick],
+    [vp, initiative, stackH, avoidKey, pcKey, windowRects, hard, firstRows, dialogs, tick],
   );
 
   // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
@@ -399,10 +422,12 @@ export function ToastRuntime({
   // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
   useLayoutEffect(() => setCap(MAX_VISIBLE), [count, room]);
   // Walkthrough WF4: likewise while the DM stack can only sit on a window's body (its controls).
+  // FR-NOTE-77: down to no card at all while the summary shows (its Open stays one click away).
   const covers = isDm && at.covers > 0;
+  const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
   useLayoutEffect(() => {
-    if ((stackH > room || covers) && cap > 1) setCap((c) => Math.max(1, c - 1));
-  }, [stackH, room, cap, covers]);
+    if ((stackH > room || covers) && cap > minCap) setCap((c) => Math.max(minCap, c - 1));
+  }, [stackH, room, cap, covers, minCap]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
   const { shown, more, callout } = visibleToasts(state, cap, folded);
