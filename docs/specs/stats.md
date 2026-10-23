@@ -1,7 +1,7 @@
 ---
 title: Stats and summaries
 prefix: STATS
-status: in-review
+status: complete
 owner: spec-wf, spec-sb, spec-fx
 phase: post-mvp-9
 ---
@@ -20,7 +20,7 @@ phase: post-mvp-9
 > - **BL-84** (sim-12 FAIL h): the DM got no kill-feed callout for hidden kills.
 > - **BL-74**: a `conflict` on rapid queries from a viewer's two tabs.
 > - **BL-90**: players' "No damage yet" beside a kill.
-> - **BL-69**, dates half: the fixture clock. [OQ-STATS-36](#15-open-questions) moved to the DM as [OQ-FIX-21](fixtures-adapters.md#15-open-questions) (review-b ruling 4: it amends ADR-0022). Under A, [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) anchors CLI loads at load time.
+> - **BL-69**, dates half: the fixture clock. [OQ-STATS-36](#15-open-questions) decided A at DM gate 1 (#339, as [OQ-FIX-21](fixtures-adapters.md#15-open-questions)): [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) anchors CLI loads at load time ([ADR-0068](../architecture/adr/0068-fixture-load-clock.md)).
 > - Slice **FX1** with [notifications](notifications.md) FR-NOTE-70–73; walkthrough [notifications §13 FX1](notifications.md#13-test-plan). No schema, 0 B.
 
 ## 1. Summary
@@ -372,7 +372,7 @@ Named tests (all `FR-STATS-NN …`):
 - Files: `@ui/features/stats/{feed.ts, runtime.tsx, query.ts, refresh.ts, StatsWindow.tsx, logic.ts}` and their tests. Server: none (FR-STATS-16's test wording only).
 - Shared: none. Docs: the protocol `stats.query` row gets "per viewer; client retries" (written with FX1).
 - **Stats client files have one holder at a time** (seams S7): FX1 first, then SP3's stats edits.
-- *(If OQ-FIX-21 A)* [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) (BL-69, seams S13) also lands in FX1: `server/features/fixtures-adapters/loader.ts` (`now`) and test. ⚠ `scripts/fixtures.ts` is shared tooling (AGENTS §9.9): one line passing the load start, `shared change needed`.
+- [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) (BL-69, seams S13) also lands in FX1: `server/features/fixtures-adapters/loader.ts` (`now`) and test. ⚠ `scripts/fixtures.ts` is shared tooling (AGENTS §9.9): one line passing the load start, `shared change needed`.
 - Order (seams S5, S10): FX1 builds in wave 3 and merges **after PM1**.
 
 ## 15. Open questions
@@ -418,7 +418,7 @@ Named tests (all `FR-STATS-NN …`):
 | OQ-STATS-29 | End with hidden monsters | **Decided (#335): A** · **A. Public facts only; no survivors / "victory"; DM sees Still standing** · B. No players' summary while a hidden monster has HP: missed summaries | no | STATS |
 | OQ-STATS-30 | Campaign numbers (≈ 1 s at 100 sessions) | **Decided (#335): A** · **A. Session partials ([ADR](../architecture/adr/0062-stats-session-partials.md))**: ≈ 25 ms warm · B. Compute each time · C. Tables: schema, drift | no | STATS |
 | OQ-STATS-31 | Glossary: Kill feed, Fight summary (Highlights), Luck tracker, Trophy case | **Resolved (integrator, sprint-8 seams / rulings)** · **A. Add** | no (integrator, S16) | glossary |
-| OQ-STATS-36 | *(Sprint 9, BL-69 dates half)* The fixture-started fight reads "Fight 3 · Thu 1 Jan" and "Duration 7074 h 18 min". Cause (code read): the seeded clock is the fixed `FIXTURE_INSTANT` 2026-01-01 (`commands/context.ts`, FR-FIX-08). The fight's `startedAt` comes from the fixture, but its live lines and End use real time, and the label and duration read `startedAt` (`rules.ts` `neutralFightLabel`, `rules-b.ts`). | **Moved to [OQ-FIX-21](fixtures-adapters.md#15-open-questions)** (DM, gate 1; review-b ruling 4: an ADR-0022 amendment, [proposed ADR](../architecture/adr/proposed-s9-fx-load-clock.md)). Under A it is [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) (CLI loads anchor at load time, minute; tests and e2e keep the fixed instant). Options as first written: · **A. Fixtures anchor the seeded clock at the load** (`bun test` keeps the fixed instant unless a test passes `now`; amends FR-FIX-08). Fixes the root, but loads on different days differ. · B. Stats takes the label and duration from the fight's first counted fact and shows "—" over 24 h: no fixture change, but it hides the date half rather than fixing it. · C. Drop it as a fixture-only artefact: real play never mixes clocks. | no (→ OQ-FIX-21, DM) | STATS, FIX |
+| OQ-STATS-36 | *(Sprint 9, BL-69 dates half)* The fixture-started fight reads "Fight 3 · Thu 1 Jan" and "Duration 7074 h 18 min". Cause (code read): the seeded clock is the fixed `FIXTURE_INSTANT` 2026-01-01 (`commands/context.ts`, FR-FIX-08). The fight's `startedAt` comes from the fixture, but its live lines and End use real time, and the label and duration read `startedAt` (`rules.ts` `neutralFightLabel`, `rules-b.ts`). | **Decided (DM #339, as [OQ-FIX-21](fixtures-adapters.md#15-open-questions)): A.** [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) and [ADR-0068](../architecture/adr/0068-fixture-load-clock.md): `fixtures:load` / `reset-load` anchor the seeded clock at load time (minute); `bun test` and `bun run e2e` keep the fixed instant. | no (decided) | STATS, FIX |
 
 **Resolved (integrator, sprint-8 seams / rulings)**: ~~OQ-STATS-32~~ (S4 / S5: feed = callout class; summary = `stats.board` via the ladder), ~~OQ-STATS-33~~ (S6: counted iff the entry is public), ~~OQ-STATS-34~~ (S8: no `lifecycle.ts`).
 

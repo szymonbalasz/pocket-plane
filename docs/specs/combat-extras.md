@@ -1,7 +1,7 @@
 ---
 title: Combat extras
 prefix: CBTX
-status: in-review
+status: complete
 owner: spec-cb, spec-fx
 phase: post-mvp-9
 ---
@@ -10,7 +10,7 @@ phase: post-mvp-9
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Builds on [combat-tracker](combat-tracker.md) (CBT); sprint plan [sprint-1](../agents/sprint-1.md) track D (#177).
 
-> **Sprint 9 (track FX, fix pack, #338).** BL-90: a concentration outlived the summons End removed. That is by FR-CBTX-12, so it's a DM call: [OQ-CBTX-37](#15-open-questions), with FR-CBTX-75 proposed under A. Slice FX3 if A; 0 B.
+> **Sprint 9 (track FX, fix pack, #338).** BL-90: a concentration outlived the summons End removed. Decided A ([OQ-CBTX-37](#15-open-questions), DM #339): FR-CBTX-75, End ends a PC concentration whose summons it removed. Slice FX3; 0 B.
 
 ## 1. Summary
 
@@ -193,7 +193,7 @@ All commands: rows + event-log entry + domain event in one transaction; IDs, tim
 | FR-CBTX-67 | **Visibility**: `tieOrder` is DM-only (every player redaction omits it, as `position`). Players get each changed visible row's usual redaction (`playerPosition`; a PC's `initiative`); the hub drops unchanged redactions (FR-SYNC-17), so moving a **hidden** row (or an `ownerHidden` / fog-hidden one) changes no `playerPosition` and sends players **nothing**; a monster's number (old or rewritten) is never in a player frame, and a PC's new number is never one only a private row had (FR-CBTX-65 (b); leak case "PC dropped under the hidden Elite"). | ADR-0021; review-b #16 |
 | FR-CBTX-68 | **Players can't reorder** (decided #335, [OQ-CBTX-33](#15-open-questions) **A**): no grip or menu item in the player Initiative; their rows re-sort live by `playerPosition`. | |
 | FR-CBTX-69 | **Failures and races**: reject → the row stays where the store has it + Toast with the reason; lost in-flight intent → FR-CBTX-40's Toast; disconnected → grips and items disabled. Two DM tabs: commands serialise, each placed by its own anchor (last wins); an anchor removed or attached meanwhile → `invalid`, Toast. Crash: number ⇔ tie order ⇔ ranks ⇔ event in one transaction; restart → identical snapshots. | |
-| FR-CBTX-75 | *(Sprint 9, track FX, BL-90; per [OQ-CBTX-37](#15-open-questions) A, proposed)* **End ends a concentration whose summons it removed** (amends FR-CBTX-12).<br>• **Cause:** session-sim-12 left Thorn "Concentrating: Conjure Elemental" after End removed his elementals. That is by spec: FR-CBTX-12 keeps PC concentration without a duration, and `companionsAtEnd` deletes the summons but never touches their owner's effect.<br>• **Rule:** at End (`ended` hook), a PC's concentration effect that a summoned combatant of this encounter names (`concentrationEffectId`) ends with those summons, `endedReason: encounter-ended`, in `EncounterEnded.changes`. FR-CBTX-10 then closes its pending concentration cards.<br>• Any other PC concentration (Bless, Spirit Guardians: no summon) stays, as FR-CBTX-12 says.<br>• Test `FR-CBTX-75 End ends a summon-only concentration`. | sim-12 glitch 12 |
+| FR-CBTX-75 | *(Sprint 9, track FX, BL-90; [OQ-CBTX-37](#15-open-questions) A, DM #339)* **End ends a concentration whose summons it removed** (amends FR-CBTX-12).<br>• **Cause:** session-sim-12 left Thorn "Concentrating: Conjure Elemental" after End removed his elementals. That is by spec: FR-CBTX-12 keeps PC concentration without a duration, and `companionsAtEnd` deletes the summons but never touches their owner's effect.<br>• **Rule:** at End (`ended` hook), a PC's concentration effect that a summoned combatant of this encounter names (`concentrationEffectId`) ends with those summons, `endedReason: encounter-ended`, in `EncounterEnded.changes`. FR-CBTX-10 then closes its pending concentration cards.<br>• Any other PC concentration (Bless, Spirit Guardians: no summon) stays, as FR-CBTX-12 says.<br>• Test `FR-CBTX-75 End ends a summon-only concentration`. | sim-12 glitch 12 |
 
 ## 7. UI/UX notes
 
@@ -430,7 +430,7 @@ The one test plan for CB's three items (CBTX, CBT, MAP, PARTY, SHELL); the other
 | CB12 | Hard-kill + restart | All reload | Order, numbers, rings, Party status identical; `state:digest` equal before / after |
 | CB13 | End encounter | — | Rings gone for A, B, C; Party status keeps PCs (pets only while present); no console errors; leak scan B, C clean |
 
-**Sprint 9 (track FX; only if [OQ-CBTX-37](#15-open-questions) A):**
+**Sprint 9 (track FX):**
 - Integration `effects.test.ts`: `FR-CBTX-75 End ends a summon-only concentration` (Thorn concentrating on Conjure Elemental with summons + Mira on Bless; End → Thorn's effect ended `encounter-ended`, his pending concentration card closed, Mira's kept; one `EncounterEnded` event; restart → identical snapshot).
 - Walkthrough [live-sync §13 FX3](live-sync.md#13-test-plan) step 5.
 
@@ -514,7 +514,7 @@ Split and order in [MOD §14.3](effect-modifiers.md#143-build-split-sprint-4-tra
 
 ### Shared changes — sprint 9 (track FX)
 
-- *(Only if OQ-CBTX-37 A)* **FX3** `fix/fx-sync-shell`: `server/features/combat-extras/rule-hooks.ts` (the `ended` hook gains the summon-concentration set) and its test. Shared: none (the registry `combat-tracker/rule-hooks.ts` is untouched). No schema.
+- **FX3** `fix/fx-sync-shell`: `server/features/combat-extras/rule-hooks.ts` (the `ended` hook gains the summon-concentration set) and its test. Shared: none (the registry `combat-tracker/rule-hooks.ts` is untouched). No schema.
 
 ## 15. Open questions
 
@@ -574,7 +574,7 @@ Sprint-1 rows: all decided (the DM accepted every pick, #178; the D/S seam rows 
 | OQ-CBTX-32 | **What keeps a dragged order** (a new round, a new combatant, a new number) | **Decided (#335): A.** **A. Rounds never re-sort; a new combatant goes by its number, after the arranged rows on a tie; a new number for one row (set, round-0 re-roll) puts only that row back by its number: each rule is local and predictable** / B. Any set or re-roll clears the whole fight's arranged ties: a clean reset, but loses the DM's work / C. A also gets a "Sort by initiative" reset button: a way back, one more control and command (could come later) | no (decided #335) | FR-CBT-163 |
 | OQ-CBTX-33 | **Can players reorder anything?** | **Decided (#335): A.** **A. No, the DM only: one authority, no player path** / B. A player may reorder their own PC inside an exact tie with another PC (a common table rule): needs a player path and a tie check / C. No feature: players ask, the DM drags (= A plus table talk) | no (decided #335) | FR-CBTX-68 |
 | OQ-CBTX-34 | **Glossary** (integrator applies) | **Resolved (integrator, sprint-8 seams / rulings).** **Add "Tie order"** (the DM's order inside a group of equal initiative, kept for the fight), **"Turn highlight"** (the ring on the current turn's token), **"Party status"** (the window with each PC's HP / AC); amend **Initiative order** ("… sorted by initiative, then the DM's tie order") | no · owner: integrator | glossary |
-| OQ-CBTX-37 | *(Sprint 9, BL-90)* After End removed Thorn's summoned elementals he still showed "Concentrating: Conjure Elemental" (FR-CBTX-12 keeps PC concentration). Should End end it? | **A. End ends a PC concentration whose summons End removed; any other concentration stays** (FR-CBTX-75): matches the table (the elementals are gone), one hook line, no schema. · B. Keep FR-CBTX-12: the player or DM ends it from the chip, no change, but it reads as a bug. · C. End ends every PC concentration: simplest, but a 10-minute spell cast before the fight is lost. | no (DM) | CBTX, CBT |
+| OQ-CBTX-37 | *(Sprint 9, BL-90)* After End removed Thorn's summoned elementals he still showed "Concentrating: Conjure Elemental" (FR-CBTX-12 keeps PC concentration). Should End end it? | **Decided (DM #339): A.** End ends a PC concentration whose summons End removed; any other concentration stays (FR-CBTX-75). | no (decided) | CBTX, CBT |
 
 ## 16. Out of scope
 

@@ -1,6 +1,6 @@
-# Proposed — CLI fixture loads anchor the seeded clock at load time
+# 0068 — CLI fixture loads anchor the seeded clock at load time
 
-- Status: proposed (sprint 9, track FX; review-b ruling 4; the DM picks at gate 1: **A** anchor / C drop, [OQ-FIX-21](../../specs/fixtures-adapters.md#15-open-questions))
+- Status: accepted (DM gate, [#339](../../decisions-log.md)) ([OQ-FIX-21](../../specs/fixtures-adapters.md#15-open-questions) A; sprint 9, track FX)
 - Date: 2026-10-22
 - Amends: [ADR-0022](0022-deterministic-seams.md), decision row "Fixed clock", **for CLI loads only**. IDs, tokens, the per-key seed, "disposable only", the scope and the tiebreak are unchanged.
 - Affects: [fixtures-adapters](../../specs/fixtures-adapters.md) FR-FIX-08, FR-FIX-29; [stats](../../specs/stats.md) (fight labels, durations, sessions on fixture data); BL-69
@@ -19,7 +19,7 @@
 | B. Stats takes labels and durations from the fight's first counted fact, with "—" over 24 h | No fixture change | Hides the symptom; fixture facts still date 1 Jan |
 | C. Drop BL-69's date half | No change | The DM keeps seeing "Thu 1 Jan" and 7,000-hour durations in every playtest |
 
-## Decision (proposed)
+## Decision
 
 **A**, written as FR-FIX-29.
 - The anchor is one instant for the whole load. The relative offsets between fixture facts are kept: today all are 0 apart, so no fixture changes.

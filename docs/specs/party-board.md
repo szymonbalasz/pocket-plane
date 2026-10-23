@@ -1,7 +1,7 @@
 ---
 title: Party board
 prefix: PARTY
-status: in-review
+status: complete
 owner: spec-cb, spec-fx
 phase: post-mvp-9
 ---
@@ -220,7 +220,6 @@ DM #334 (not open): each PC's HP / AC for players, companions per ADR-0056, mons
 | FR-PARTY-56 | **States**: no PCs → "No player characters yet"; disconnected → last values, figures muted (live-sync banner); reconnect / reload → from the snapshot; a PC deleted or its owner changed → the row leaves or moves (live delete / upsert). | |
 | FR-PARTY-57 | **CON-44** (measured, §12): other players' character redactions + 49 B each → **players +343 B** on the heavy harness (7 other PCs), DM 0 B; per HP change other players get the same `entity` upsert as today + 49 B. | measured |
 | FR-PARTY-58 | **Layout**: one line per row at the default width (name, HP, temp, AC; conditions on the line if they fit, else a second line); names wrap, never cut (W4 rule); numbers never cut; at the min width (240 px) the bar goes under the name. Checked in a browser, not `bun test` (no layout engine there; review-b #3): `e2e/useful-size.e2e.ts` on `wf-frame-e2e` opens `party.summary` at its useful size (FR-SHELL-141) with fixture **`cb-party-six`** (6 PCs, worst-width figures) and asserts `scrollHeight ≤ clientHeight` and every PC row visible, names and figures whole. | |
-| FR-PARTY-86 | *(Sprint 9, track FX, BL-79; **only if [OQ-PARTY-47](#15-open-questions) B**, else not built)* **Drafts out for every player** (amends FR-PARTY-51's last sentence).<br>• The redacted `character` carries `draft: boolean`, mirrored from the sheet status onto the entity row. That is an entities whitelist line (an ENT FR at integration) and a schema column riding RS0's lane.<br>• The Party status tab (FR-PARTY-61) leaves a draft PC out for every player but its owner; the DM keeps the "Draft" badge (review-b ruling 19).<br>• Visibility rule: `draft` goes to every viewer of the redacted row (it reveals only what the token already shows). CON-44: +≈ 14 B per PC (measure if picked).<br>• Test `FR-PARTY-86 drafts out for others`. | BL-79 |
 
 ## 7. UI/UX notes
 
@@ -595,7 +594,7 @@ DM gate 1 decided every DM question (#207, 2026-10-16; gate rows G4, G5, G26–G
 | OQ-PARTY-30 | **What players see of other PCs** (A and B **amend #178 G6 / ADR-0036's "No HP, AC"**: a decision reversal) | **Decided (#335): A.** **A. HP numbers (cur / max), temp HP and AC, plus the conditions and death state they already get: what a table says aloud anyway; +343 B a player** / B. A band (healthy / bloodied / down) and AC: HP stays private, still a glance / C. A band only, no AC: closest to today (ADR-0036) | no (decided #335) | entities, ADR-0036 (proposed ADR), FR-PARTY-52 |
 | OQ-PARTY-31 | **A PC hidden from players (#141)** in the summary | **Decided (#335): A.** **A. Accepted: its row and figures still show to other players (as Down and death state already do); hidden PCs are rare and DM-run** / B. Hide its figures while its combatant is hidden: a server-written copy flag on the character (one column, ADR-0039 pattern) | no (decided #335) | entities, FR-PARTY-52 |
 | OQ-PARTY-32 | **Which AC** | **Decided (#335): A.** **A. The sheet's stored AC (`statBlock.ac`): one plain field, same for every viewer** / B. Effective AC with active modifiers (Shield of Faith +2, FR-MOD-24): truer in a fight, but others never get modifiers, so it needs a server-written copy column refreshed by every effect change | no (decided #335) | effect-modifiers, FR-PARTY-52 |
-| OQ-PARTY-47 | *(Sprint 9, track FX, BL-79)* Other players see a draft PC, with its HP and AC, in Party status. The draft flag lives on the owner-only sheet, so FR-PARTY-51's "drafts out" can't apply for them. The CB3 ruling (#336) allowed it; the BL asks whether a draft PC's existence is private. | **A. Keep: other players see it; close BL-79 as by design.** A draft behaves as ready, token included (FR-CHARX-11), so its existence already shows on the map. · B. Drafts out for everyone: the redacted character gains `draft` (entities whitelist plus an entity column, riding RS0's lane; FR-PARTY-86, in the Party status tab, FR-PARTY-61): lists match, at the cost of a column and a mirror of the sheet status. · C. Hide a draft PC from other players entirely: breaks its token and FR-CHARX-11. | no (DM) | PARTY, ENT, CHARX |
+| OQ-PARTY-47 | *(Sprint 9, track FX, BL-79)* Other players see a draft PC, with its HP and AC, in Party status. The draft flag lives on the owner-only sheet, so FR-PARTY-51's "drafts out" can't apply for them. The CB3 ruling (#336) allowed it; the BL asks whether a draft PC's existence is private. | **Decided (DM #339): A.** Keep: other players see a draft PC in Party status; BL-79 closed as by design (a draft behaves as ready, token included, FR-CHARX-11). | no (decided) | PARTY, ENT, CHARX |
 
 ## 16. Out of scope
 

@@ -1,7 +1,7 @@
 ---
 title: Gems (homebrew)
 prefix: GEM
-status: in-review
+status: complete
 owner: spec-gems, spec-fx
 phase: post-mvp-9
 ---
@@ -16,7 +16,7 @@ phase: post-mvp-9
 >   - Combat's max and the crit flip update only the card, never the line.
 > - **BL-63**: a spend reached clients as two frames. The cards helper emits its own `NotificationUpdated` after `GemSpent`, against §9 and protocol gate I15.
 > - **BL-72**: the "Spend?" confirm doesn't name the gem.
-> - **BL-68**: one public line per + click. A DM call, [OQ-GEM-22](#15-open-questions).
+> - **BL-68**: one public line per + click. Decided A ([OQ-GEM-22](#15-open-questions), DM #339): FR-GEM-43.
 
 ## 1. Summary
 
@@ -125,7 +125,7 @@ phase: post-mvp-9
 |---|---|
 | FR-GEM-41 | **A reroll on a card follows the card** (BL-62; amends FR-DICE-62's "every other item copied" for a combat attack line with a pending card).<br>• The new line carries the **new to-hit**, plus the card's **current** damage: maxed dice as the card shows them (FR-GEM-27) while the damage applies, none once the reroll sent it to "not used" (crit flip, FR-GEM-22).<br>• Never the old line's pre-max damage.<br>• Its `rollIds` are the new to-hit roll plus the card's current damage rolls, so FR-DICE-67 counts only final rolls.<br>• Means: `gem.spend` runs `cards.replaceToHit` before it builds the line and passes the card's items to `dice.reroll` (an `items` override, FR-DICE-91).<br>• Outcome (GM2 repro: Combat max, then a reroll that flips the crit): the new line shows the to-hit only, never "3 + 2 = 5". |
 | FR-GEM-42 | **One event per spend** (BL-63; as §9 and [CBT §9](combat-tracker.md#9-api--events) already say).<br>• `GemSpent.changes` holds the row, the lines **and the card upsert**. The cards helpers write the card with [FR-NOTE-74](notifications.md#6-functional-requirements)'s `{emit: false}`.<br>• So each connection gets **one** `event` frame per spend (FR-SYNC-17), not `GemSpent` and then `NotificationUpdated` about 25 ms apart.<br>• The card's visibility is per record, unchanged (the owner and the DM). |
-| FR-GEM-43 | *(Per [OQ-GEM-22](#15-open-questions) A, proposed)* **Quick awards make one line** (BL-68; amends FR-GEM-09).<br>• The DM's + / − clicks on one gem of one character within **1.5 s** of the last click are summed client-side and sent as one `gem.adjust` with the net `delta`.<br>• **`gem.adjust`'s `delta` widens to −10…+10** (review-b ruling 10; gems' own zod schema, plus a protocol note at consolidation). A sum reaching ±10 flushes at once.<br>• Six clicks → one `{delta: 6}` → one line.<br>• The count shows the pending sum at once, muted until the ack.<br>• A net award writes one line: "DM awards Brakka 6 Fortune gems (6 held)". A net removal or 0 writes none.<br>• Closing the popover, a reload or a disconnect flushes or drops the pending sum: sent if live, else dropped, and the count reverts. |
+| FR-GEM-43 | *([OQ-GEM-22](#15-open-questions) A, DM #339)* **Quick awards make one line** (BL-68; amends FR-GEM-09).<br>• The DM's + / − clicks on one gem of one character within **1.5 s** of the last click are summed client-side and sent as one `gem.adjust` with the net `delta`.<br>• **`gem.adjust`'s `delta` widens to −10…+10** (review-b ruling 10; gems' own zod schema, plus a protocol note at consolidation). A sum reaching ±10 flushes at once.<br>• Six clicks → one `{delta: 6}` → one line.<br>• The count shows the pending sum at once, muted until the ack.<br>• A net award writes one line: "DM awards Brakka 6 Fortune gems (6 held)". A net removal or 0 writes none.<br>• Closing the popover, a reload or a disconnect flushes or drops the pending sum: sent if live, else dropped, and the count reverts. |
 | FR-GEM-44 | **The confirm names the gem** (BL-72; amends FR-GEM-17's "Spend? ✓ ✗" for the log line action): "Spend Inspiration? ✓ ✗". It still fits a line at the Game log's minimum width (FR-SHELL-35). |
 
 ## 7. UI/UX notes
@@ -152,7 +152,7 @@ phase: post-mvp-9
 
 | Intent | Who | Result |
 |---|---|---|
-| `gem.adjust {characterId, gem, delta}` | DM | `{held}`. *(Sprint 9, FR-GEM-43, if OQ-GEM-22 A)* `delta` −10…+10 |
+| `gem.adjust {characterId, gem, delta}` | DM | `{held}`. *(Sprint 9, FR-GEM-43)* `delta` −10…+10 |
 | `gem.spend {characterId, gem, use?, entryId?, manual?, cardId?, dice?, known?}` | DM, player (own) | `{held, entryId, rerollEntryId?}` |
 
 | Record / kind | Visibility |
@@ -228,7 +228,7 @@ Per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md) / [ADR-0017](
   - Reroll into a crit flip → the line holds the to-hit only.
   - Stats' Biggest hit counts the final rolls only.
 - **Integration, `combat-sync.test.ts`.** `FR-GEM-42 one frame per spend`: over real sockets, a Combat spend on a pending card gives each connection exactly one `event` frame, cause `GemSpent`, holding row + line + card. The player who doesn't own the card gets row + line only. No `NotificationUpdated` frame follows.
-- **Client DOM, `gems-ui.test.tsx`.** *(If OQ-GEM-22 A)* `FR-GEM-43 quick awards make one line`: six + clicks within 1.5 s → one `gem.adjust {delta: 6}`; eleven → `{delta: 10}` at once, then `{delta: 1}`; + then − → nothing sent; closing the popover flushes. Integration `gems.test.ts`: `delta` 10 accepted, 11 → `invalid`.
+- **Client DOM, `gems-ui.test.tsx`.** `FR-GEM-43 quick awards make one line`: six + clicks within 1.5 s → one `gem.adjust {delta: 6}`; eleven → `{delta: 10}` at once, then `{delta: 1}`; + then − → nothing sent; closing the popover flushes. Integration `gems.test.ts`: `delta` 10 accepted, 11 → `invalid`.
 - **Client, `reroll-action.test.ts`.** `FR-GEM-44 confirm names the gem`: "Spend Inspiration?" fits a 300-px Game log line.
 - E2E: the existing `gems-e2e` gains one assertion: after P1's reroll, the new line's text has no damage part when the card flipped (bundle `gems-reroll-e2e`, unchanged).
 - Walkthrough: [dice-roll-log §13 FX2](dice-roll-log.md#13-test-plan).
@@ -281,7 +281,7 @@ Decided before the spec (#140, #311, #312): optional, off by default, off = noth
 | ~~OQ-GEM-19~~ | ~~Popup order~~ | **Resolved (integrator, sprint-7 seams / rulings)** (S3): GM1 ∥ ST core → GM2 | — · resolved | CBT |
 | OQ-GEM-20 | Rerolling rule-driven rolls (death / concentration saves, roll-request DCs) | **Decided (#315): A.** **A. Excluded in v1 (table rerolls by hand, DM fixes state)** / B. Death saves follow, concentration excluded / C. Both follow (restoring ended effects: large) | — · decided | CBTX, DICE |
 | OQ-GEM-21 | Dice history while off | **Decided (#315): B.** A. Keep struck lines and max badges (simpler; traces stay) / **B. Hide them; only final rolls; on restores (#312 literally; one more hub rule)** | — · decided | DICE, CBT |
-| OQ-GEM-22 | *(Sprint 9, BL-68)* Six quick + clicks write six public award lines (sim-11: "six Fortune lines in a row"). Batch them? | **A. Client sums quick clicks (1.5 s) per character + gem → one `gem.adjust`, one line "awards Brakka 6 Fortune gems"** (FR-GEM-43): `gem.adjust`'s `delta` widens to ±10 (schema + protocol note), the count waits up to 1.5 s for its ack. · B. Server folds an award into the previous award line for that character + gem within 30 s: works across popovers, but needs a line edit or supersede, and players see a struck line. · C. Keep one line per click: no change, and the log stays noisy. | no (DM) | GEM, DICE |
+| OQ-GEM-22 | *(Sprint 9, BL-68)* Six quick + clicks write six public award lines (sim-11: "six Fortune lines in a row"). Batch them? | **Decided (DM #339): A.** The client sums quick clicks (1.5 s) per character + gem → one `gem.adjust`, one line "DM awards Brakka 6 Fortune gems"; `delta` widens to ±10 (FR-GEM-43). | no (decided) | GEM, DICE |
 
 ## 16. Out of scope
 

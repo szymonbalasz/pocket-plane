@@ -1,7 +1,7 @@
 ---
 title: Campaign management
 prefix: CAMP
-status: in-review
+status: complete
 owner: spec-tt, spec-fx
 wave: 1
 phase: post-mvp-9

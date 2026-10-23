@@ -1,7 +1,7 @@
 ---
 title: Live sync, reconnect, visibility
 prefix: SYNC
-status: in-review
+status: complete
 owner: spec-live-sync, spec-fx
 wave: 1
 phase: post-mvp-9
@@ -195,7 +195,7 @@ phase: post-mvp-9
 
 The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map §13](scenes-map.md#13-test-plan) step 10: the hidden Wolf's drag never reaches B, C).
 
-**Sprint 9, track FX: slice FX3** (sync, shell, misc; FR-SYNC-40, [FR-SHELL-175–176](play-shell.md#6-functional-requirements), [FR-CAMP-51](campaign-management.md#6-functional-requirements), BL-81's e2e helper; [FR-CBTX-75](combat-extras.md#6-functional-requirements) / [FR-PARTY-86](party-board.md#6-functional-requirements) only if the DM picks them).
+**Sprint 9, track FX: slice FX3** (sync, shell, misc; FR-SYNC-40, [FR-SHELL-175–176](play-shell.md#6-functional-requirements), [FR-CAMP-51](campaign-management.md#6-functional-requirements), BL-81's e2e helper; [FR-CBTX-75](combat-extras.md#6-functional-requirements)).
 - **Unit `connection.test.ts`** (fake socket, fake `performance.now` + timers, FR-SYNC-26). `FR-SYNC-40 drop detection`:
   - The fake socket never fires `onclose` and answers nothing → a probe at ping + 5 s, then `reconnecting` once both are missed and ≥ 10 s passed (≤ 20 s after the last frame); a new socket opens on the backoff.
   - `offline` → `reconnecting` within one tick.
@@ -219,9 +219,8 @@ The audience hook's browser check is scenes-map's drag walkthrough ([scenes-map 
 | 2 | C: stop pongs silently (`routeWebSocket`, server → client dropped) | Chip leaves "Connected" within 20 s; with pongs restored before then, no drop |
 | 3 | A: page open; `bun run build` **in the worktree only, never on `main`'s `dist/`** (new chunk hashes); open the Dice tray; then B (player) the same with the prompt or roll popup | DM: "Rebuild finished — reload" + Reload in the tray's body; B: "New version available — reload" (the stale notice for the popup); map, socket and other windows live; Reload → the tray opens (BL-91, the DM's real repro) |
 | 4 | A at 1280×720 and 1024×768: rename the campaign to a 40-character name | Switcher name ends in "…", full name in the Tooltip; nothing cut; switching still works (BL-77) |
-| 5 | *(If [OQ-CBTX-37](combat-extras.md#15-open-questions) A)* Thorn concentrating on Conjure Elemental with his elementals; Mira on Bless; A: End | Elementals gone, Thorn's concentration ended on A, B, C; Mira's Bless kept |
-| 6 | *(If [OQ-PARTY-47](party-board.md#15-open-questions) B)* B creates a draft PC | C's Party status doesn't list it; A and B do |
-| 7 | Hard kill + restart after step 5 | `state:digest` equal; step 5's state kept |
+| 5 | Thorn concentrating on Conjure Elemental with his elementals; Mira on Bless; A: End | Elementals gone, Thorn's concentration ended on A, B, C; Mira's Bless kept |
+| 6 | Hard kill + restart after step 5 | `state:digest` equal; step 5's state kept |
 
 ## 14. Dependencies
 

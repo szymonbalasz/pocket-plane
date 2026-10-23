@@ -1,7 +1,7 @@
 ---
 title: Play shell
 prefix: SHELL
-status: in-review
+status: complete
 owner: spec-wf, spec-cb, spec-tt, spec-fx
 phase: post-mvp-9
 ---
