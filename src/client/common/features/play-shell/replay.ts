@@ -319,6 +319,23 @@ function moveCamera(sim: Sim) {
   sim.mode = "moved";
 }
 
+/** A pan (the camera `moved`): the PCs' footprint box centred on screen point `at`. */
+function panTo(sim: Sim, at: { x: number; y: number }) {
+  if (!sim.cam) return;
+  const box = footprintBox(
+    cellsNow(sim).tokens.filter((t) => t.pc),
+    gridOf(sim.state, sim.set.viewer),
+  );
+  if (!box) return;
+  const s = sim.cam.scale;
+  sim.cam = {
+    scale: s,
+    x: Math.round(at.x - (box.x + box.w / 2) * s),
+    y: Math.round(at.y - (box.y + box.h / 2) * s),
+  };
+  sim.mode = "moved";
+}
+
 /** The appearance refit (FR-MAP-61, -90): `fitted` only; kept while every token is clear. */
 function appearanceRefit(sim: Sim): boolean {
   if (sim.mode !== "fitted" || !sim.cam) return false;
@@ -712,8 +729,18 @@ export function runReplay(
   return { steps, problems: steps.flatMap((s) => s.problems.map((p) => `${s.step}: ${p}`)) };
 }
 
-/** One step of a scripted run (walkthrough repros): a user open, a fight's End / Start, a reload, Fit. */
-export type ScriptStep = { open: string } | { close: string } | "end" | "start" | "reload" | "fit";
+/**
+ * One step of a scripted run (walkthrough repros): a user open, a fight's End / Start, a reload,
+ * Fit, or a pan putting the PCs' centre at a screen point (the camera `moved`).
+ */
+export type ScriptStep =
+  | { open: string }
+  | { close: string }
+  | { pan: { x: number; y: number } }
+  | "end"
+  | "start"
+  | "reload"
+  | "fit";
 
 /**
  * A walkthrough repro in the harness's world (`fitted` camera): load in `state` at `vp` with
@@ -780,6 +807,9 @@ export function runScript(
       else dispatch(sim, { type: "appear", kind: "cbt.initiative" });
       const refit = appearanceRefit(sim);
       record("Start", check(sim, before, { refit }));
+    } else if ("pan" in step) {
+      panTo(sim, step.pan);
+      record(`pan ${step.pan.x},${step.pan.y}`, []);
     } else if ("open" in step) {
       const beforeTokens = tokensNow(sim);
       userOpen(sim, step.open);
