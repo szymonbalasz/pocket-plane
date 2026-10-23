@@ -295,6 +295,8 @@ export function MapCanvas(props: MapCanvasProps) {
       view: size,
       room: rooms.room,
       stripRoom: rooms.stripRoom,
+      // BL-100: the rooms without remembered windows (not for a dry fit's candidate rects).
+      ...(!windows && free.untouched && { untouched: free.untouched }),
     };
   };
   const fitNow = useRef((_reason: FitReason) => {});

@@ -1202,6 +1202,11 @@ export interface FitInputs {
   room: FitRoom;
   /** The same with only the DM's summary strip (FR-MAP-91); players: `room`. */
   stripRoom: FitRoom;
+  /**
+   * BL-100 (FR-MAP-115): `room` / `stripRoom` without the remembered windows; present while one
+   * is shown (absent for a dry fit's candidate rects).
+   */
+  untouched?: { room: FitRoom; stripRoom: FitRoom };
 }
 
 /**
@@ -1226,6 +1231,15 @@ export function fitFor(
     (bounds.maxCell === undefined || cell <= bounds.maxCell + EPS) &&
     (bounds.minCell === undefined || cell >= bounds.minCell - EPS);
   if (!within) fit = run(bounds);
+  // BL-100 (FR-MAP-115): remembered windows are obstacles while some view keeps every token clear
+  // of them; where they leave none (one dragged over the map centre), the map is framed around
+  // the other windows and they stay over it where the user put them, never FR-MAP-46's PCs-only
+  // floor in a corner.
+  if (fit.visible === "pcs" && inputs.untouched) {
+    const { untouched, ...rest } = inputs;
+    const alt = fitFor(reason, { ...rest, ...untouched }, lastFullCell);
+    if (alt.visible === "all") return alt;
+  }
   const { pastToasts, ...rest } = fit;
   return { ...rest, reason: pastToasts ? "fit-past-toasts" : reason };
 }

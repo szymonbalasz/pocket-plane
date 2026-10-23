@@ -47,6 +47,9 @@ import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
 import gemsUiE2e from "./gems-ui-e2e";
+import h2FitE2e from "./h2-fit-e2e";
+import h2Frame from "./h2-frame";
+import h2FrameE2e from "./h2-frame-e2e";
 import holdStoresE2e from "./hold-stores-e2e";
 import holdUiE2e from "./hold-ui-e2e";
 import imageSearch from "./image-search";
@@ -260,4 +263,8 @@ export const bundles: readonly Bundle[] = [
   spS9Shared,
   spS9E2e,
   spS9SharedE2e,
+  // Sprint 10 H2 (fix/h2-frame): window frame + Party Manager walkthrough and e2e aliases
+  h2Frame,
+  h2FrameE2e,
+  h2FitE2e,
 ];

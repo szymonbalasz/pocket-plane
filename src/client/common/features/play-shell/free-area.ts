@@ -8,6 +8,7 @@ import type { DryFitResult, FitRoom } from "../scenes-map/camera";
 import { contentHeights, useContentHeights } from "./content-heights";
 import {
   growsToContent,
+  isRemembered,
   placedRect,
   type Rect,
   TOP_BAR_H,
@@ -374,6 +375,8 @@ export interface FreeAreaState {
   /** FR-MAP-93, -95: the fit's rooms (`fitRooms`), what every fit reads. */
   room: FitRoom;
   stripRoom: FitRoom;
+  /** BL-100 (FR-MAP-115): the same rooms without the remembered windows; null while none shows. */
+  untouched: { room: FitRoom; stripRoom: FitRoom } | null;
   /**
    * FR-MAP-96: every open `growToContent` window has reported its content height, so the rects
    * above are the grown ones the load fit should frame around.
@@ -416,6 +419,7 @@ export function useFreeArea(): FreeAreaState {
     stripOnly,
     room,
     stripRoom,
+    untouched,
     grown,
     settling,
     roomsWith,
@@ -431,6 +435,15 @@ export function useFreeArea(): FreeAreaState {
     );
     const client = registry.client;
     const rooms = fitRooms(client, shown, regions, vp, shownStack(client, reports));
+    // `shown` lines up with the open, available, registered windows (`renderedWindowRects`).
+    const open = windows.filter(
+      (w) => w.state === "open" && available.has(w.kind) && registry.get(w.kind) !== undefined,
+    );
+    const kept = shown.filter((_, i) => !isRemembered(open[i] ?? {}));
+    const untouched =
+      kept.length < shown.length
+        ? fitRooms(client, kept, regions, vp, shownStack(client, reports))
+        : null;
     const grown = grownAll(windows, registry, available, measured);
     // Only a rendered window settles (ShellWindow): an unavailable one never holds a fit back.
     const settling = windows.some(
@@ -446,6 +459,7 @@ export function useFreeArea(): FreeAreaState {
       obstacles: rooms.room.obstacles,
       stripOnly: { areas: rooms.stripRoom.areas, obstacles: rooms.stripRoom.obstacles },
       ...rooms,
+      untouched,
       grown,
       settling,
       roomsWith: (rects: readonly Rect[]) =>
@@ -471,6 +485,7 @@ export function useFreeArea(): FreeAreaState {
     stripOnly,
     room,
     stripRoom,
+    untouched,
     grown,
     settledAt,
     settles,

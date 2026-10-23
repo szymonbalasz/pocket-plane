@@ -281,10 +281,19 @@ function shownOf(sim: Sim): Map<string, { w: WindowState; r: Rect }> {
   return new Map(open.map((w, i) => [w.kind, { w, r: rects[i] as Rect }]));
 }
 
-/** The fit's inputs (FR-MAP-93): the rendered windows (or `with_`) and toast box as obstacles. */
+/**
+ * The fit's inputs (FR-MAP-93): the rendered windows (or `with_`) and toast box as obstacles; the
+ * same without the remembered windows while one is shown (BL-100).
+ */
 function fitInputs(sim: Sim, with_?: readonly Rect[]): FitInputs {
-  const windows = with_ ? [...with_] : [...shownOf(sim).values()].map((s) => s.r);
+  const shown = [...shownOf(sim).values()];
+  const windows = with_ ? [...with_] : shown.map((s) => s.r);
   const rooms = fitRooms(sim.client, windows, regionsOf(sim), sim.vp, null);
+  const kept = shown.filter((s) => !isRemembered(s.w)).map((s) => s.r);
+  const untouched =
+    !with_ && kept.length < shown.length
+      ? fitRooms(sim.client, kept, regionsOf(sim), sim.vp, null)
+      : undefined;
   const cells = cellsNow(sim);
   const tokens: FitToken[] = cells.tokens.map((t) => ({
     col: t.col,
@@ -294,7 +303,15 @@ function fitInputs(sim: Sim, with_?: readonly Rect[]): FitInputs {
   }));
   const map = { w: cells.scene.mapWidth, h: cells.scene.mapHeight };
   const grid = gridOf(sim.state, sim.set.viewer);
-  return { client: sim.client, tokens, grid, map, view: sim.vp, ...rooms };
+  return {
+    client: sim.client,
+    tokens,
+    grid,
+    map,
+    view: sim.vp,
+    ...rooms,
+    ...(untouched && { untouched }),
+  };
 }
 
 /** The fit (FR-MAP-95: the canvas's one fit path) for `reason`, bounded by the last full fit. */

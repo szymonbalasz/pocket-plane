@@ -45,3 +45,38 @@ test("FR-SHELL-97 FR-SHELL-102 BL-99 Party Manager and the Stronghold window sta
   const after = run.steps.at(-1)?.windows;
   expect(entry(after, "party.board")).toBe("party.board:open:68,60,600×512");
 });
+
+test("FR-MAP-115 BL-100 a remembered window over the map centre: reload and Fit frame the map around the other windows (`all`), never the 48-px PCs-only view", () => {
+  // sim-13 b02 / b04: Compendium dragged onto the party and resized 480×440, then a reload.
+  const run = runScript(dmWindows, "dm", VP, "escort", [
+    { open: "cmp.compendium" },
+    { drag: "cmp.compendium", rect: { x: 400, y: 250, w: 480, h: 440 }, resized: true },
+    "reload",
+    "fit",
+  ]);
+  expect(run.problems).toEqual([]);
+  const first = run.steps[0];
+  for (const name of ["reload", "fit"]) {
+    const s = run.steps.find((x) => x.step === name);
+    // The map as framed around Initiative + the Game log (the load fit before the Compendium).
+    expect({ name, fit: s?.fit, cell: s?.cell }).toEqual({ name, fit: "all", cell: first?.cell });
+  }
+});
+
+test("FR-MAP-115 BL-100 a remembered window at the edge stays an obstacle: reload and Fit frame the map around it like any window", () => {
+  const run = runScript(dmWindows, "dm", VP, "escort", [
+    { open: "cmp.compendium" },
+    { drag: "cmp.compendium", rect: { x: 68, y: 60, w: 360, h: 400 }, resized: true },
+    "reload",
+    "fit",
+  ]);
+  expect(run.problems).toEqual([]);
+  // 42 px framed around Initiative + the Game log; 31 px with the Compendium left as well.
+  expect(run.steps.map((s) => [s.step, s.fit, s.cell])).toEqual([
+    ["load", "all", 42],
+    ["open cmp.compendium", "all", 42],
+    ["drag cmp.compendium", "all", 42],
+    ["reload", "all", 31],
+    ["fit", "all", 31],
+  ]);
+});

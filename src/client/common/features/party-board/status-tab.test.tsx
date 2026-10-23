@@ -448,6 +448,34 @@ describe("Party status (FR-PARTY-51–56)", () => {
     expect(owl(partySummary(ownerHidden, viewerOf(P1)))).toBe(true);
   });
 
+  test("FR-PARTY-61 BL-104 a pet hidden in the fight (sim-13: Owlbear): the DM keeps In combat + eye-off; its owner lists it with numbers but no In combat (ADR-0056: a hidden combatant reaches no player, the owner included); player 2 doesn't list it", () => {
+    const hide = (c: (typeof combatantsDm)[number]) =>
+      c.id === "c-owl" ? { ...c, hidden: true } : c;
+    const dmIn = { ...inputs.dm, combatants: combatantsDm.map(hide) };
+    const owl = (s: PartySummary) => comps(s).find((r) => r.id === "owl");
+    expect(owl(partySummary(dmIn, viewerOf(DM)))).toMatchObject({ inCombat: true, hidden: true });
+    const dmHtml = render(DM, dmIn);
+    expect(dmHtml).toContain('data-record-id="owl"');
+    expect(dmHtml).toMatch(/data-record-id="owl"[^>]*data-in-combat="true"/);
+    // The owner's frames carry no hidden combatant: the pet row alone, its own HP.
+    const p1In = {
+      ...inputs.p1,
+      combatants: inputs.p1.combatants.filter((c) => (c as { id: string }).id !== "c-owl"),
+    };
+    expect(owl(partySummary(p1In, viewerOf(P1)))).toMatchObject({
+      inCombat: false,
+      hidden: false,
+      hp: { current: 45, max: 59 },
+    });
+    expect(render(P1, p1In)).toMatch(/data-record-id="owl"[^>]*data-in-combat="false"/);
+    const p2In = {
+      ...inputs.p2,
+      combatants: inputs.p2.combatants.filter((c) => (c as { id: string }).id !== "c-owl"),
+      entities: inputs.p2.entities.filter((e) => (e as { id: string }).id !== "owl"),
+    };
+    expect(owl(partySummary(p2In, viewerOf(P2)))).toBeUndefined();
+  });
+
   test("FR-PARTY-56 states: no PCs → empty text; disconnected → figures muted; Dying badge at 0 HP", () => {
     expect(render(P1, { ...inputs.p1, entities: [] })).toContain(EMPTY_PARTY);
     expect(render(P1, inputs.p1, false)).toContain('data-live="false"');
