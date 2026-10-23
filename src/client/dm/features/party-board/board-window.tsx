@@ -1,8 +1,8 @@
 // DM `party.board` (FR-PARTY-11, -12): "New handout", every handout incl. unshared prep, newest
 // first; row: thumb, title, share Badge ("Not shared" / "Everyone" / player names), Updated time;
 // row menu Edit, Share…, Unshare (while shared), Delete (inline confirm). *(S5)* "Open on
-// screens…" (shared only) and the "On screen: ‹n›" Badge (FR-PARTY-38). *(S6)* Companions: New pet…
-// and the pet row menu (FR-PARTY-43, `companion-menu.tsx`).
+// screens…" (shared only) and the "On screen: ‹n›" Badge (FR-PARTY-38). *(S6, S9)* Party status:
+// New pet… and the pet row menu (FR-PARTY-43, -62, `companion-menu.tsx`).
 import { dmShareLabel } from "@shared/party-board/format";
 import { type HandoutRecord, NOT_SHARED } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
@@ -191,7 +191,7 @@ function DmHandouts() {
 }
 
 function DmPartyBoard() {
-  return <PartyBoard handouts={<DmHandouts />} companions={dmCompanionParts} />;
+  return <PartyBoard parts={{ handouts: <DmHandouts />, companions: dmCompanionParts }} />;
 }
 
 export const dmPartyBoardWindow = defineWindow({

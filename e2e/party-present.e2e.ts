@@ -9,6 +9,13 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
 
+/** Party Manager on its Handouts tab (Party status is the landing tab since FR-PARTY-60). */
+async function openHandouts(page: Page): Promise<Locator> {
+  const board = await openWindow(page, "party.board");
+  await board.locator('[data-testid="party-tab"][data-value="handouts"]').click();
+  return board;
+}
+
 const row = (win: Locator, id: string) =>
   win.locator(`[data-testid="party-handout-row"][data-record-id="${id}"]`);
 
@@ -38,7 +45,7 @@ test("FR-PARTY-36 popup on connect FR-PARTY-37 close: h2 waits for player-1, ope
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
   await live(dm);
-  const dmBoard = await openWindow(dm, "party.board");
+  const dmBoard = await openHandouts(dm);
   // h2 is presented to player-1 (`handout-present-1`); a spec file earlier in this bundle may
   // have closed it, so present it again while player-1 is offline (the row waits either way).
   await row(dmBoard, thievesMap).getByTestId("party-handout-menu").click();
@@ -100,7 +107,7 @@ test("FR-PARTY-38 FR-PARTY-36 FR-PARTY-37 share + open on screens → popup, no 
   const p1Popup = p1.getByTestId("party-present-popup");
 
   // S5-4: Share… → Chosen: Player 1 + "Also open it on the screens…" ("Opens on: Player 1").
-  const dmBoard = await openWindow(dm, "party.board");
+  const dmBoard = await openHandouts(dm);
   await row(dmBoard, shipManifest).getByTestId("party-handout-menu").click();
   await expect(dm.getByTestId("party-present-open")).toHaveCount(0); // not shared yet
   await dm.getByTestId("party-share-open").click();

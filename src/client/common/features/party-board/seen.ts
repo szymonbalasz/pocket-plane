@@ -1,12 +1,14 @@
 // Per-browser memory of the Party windows, never sent to the server:
 // - FR-PARTY-13 seen revs (player): `localStorage` `pp.party.v1.<campaignId>.<playerId>` =
 //   `{seen: {handoutId: rev}}`, ≤ 500 entries, oldest dropped;
-// - FR-PARTY-11 tab choice (both): `pp.party.tab.v1.<campaignId>.<dm | playerId>`.
+// - FR-PARTY-11 tab choice (both): `pp.party.tab.v1.<campaignId>.<dm | playerId>`; any tab id is
+//   kept as stored, `Board.tsx` shows Party status for one not registered or not visible
+//   (FR-PARTY-60, -67).
 // As FR-SHELL-17: an invalid entry → default + console warning, the next change overwrites it;
 // storage unavailable or throwing → memory only for this page, one console warning, no error UI.
 import { z } from "zod";
 import { createStore } from "zustand";
-import { PARTY_TABS, type PartyTab } from "./logic";
+import type { PartyTab } from "./logic";
 
 export const SEEN_MAX = 500;
 
@@ -23,7 +25,7 @@ export const SeenMap = z.strictObject({
 });
 export type SeenRevs = Readonly<Record<string, number>>;
 
-const TabMemory = z.strictObject({ tab: z.enum(PARTY_TABS) });
+const TabMemory = z.strictObject({ tab: z.string().min(1).max(64) });
 
 export type MemoryBackend = Pick<Storage, "getItem" | "setItem">;
 
@@ -85,7 +87,8 @@ export function createPartyMemory(
   return {
     readSeen: (key: string): SeenRevs => parse(key, SeenMap)?.seen ?? {},
     writeSeen: (key: string, seen: SeenRevs) => writeRaw(key, JSON.stringify({ seen })),
-    readTab: (key: string): PartyTab => parse(key, TabMemory)?.tab ?? "handouts",
+    /** The stored tab id; null = no (valid) entry. */
+    readTab: (key: string): PartyTab | null => parse(key, TabMemory)?.tab ?? null,
     writeTab: (key: string, tab: PartyTab) => writeRaw(key, JSON.stringify({ tab })),
   };
 }
@@ -121,16 +124,17 @@ export function createSeenState(mem: PartyMemory) {
  * switches an open board as a click would.
  */
 export function createTabState(mem: PartyMemory) {
-  const state = createStore<{ key: string | null; tab: PartyTab }>(() => ({
+  // `tab` null = nothing stored (FR-PARTY-60: Party status shows).
+  const state = createStore<{ key: string | null; tab: PartyTab | null }>(() => ({
     key: null,
-    tab: "handouts",
+    tab: null,
   }));
   return {
     state,
     /** Binds the viewer's key (campaign + viewer); reads its stored tab once per key. */
     bind(key: string | null) {
       if (state.getState().key === key) return;
-      state.setState({ key, tab: key ? mem.readTab(key) : "handouts" });
+      state.setState({ key, tab: key ? mem.readTab(key) : null });
     },
     /** A tab click or `openPartyTab`: shown at once, stored for the key. */
     choose(key: string | null, tab: PartyTab) {

@@ -8,6 +8,13 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
 
+/** Party Manager on its Handouts tab (Party status is the landing tab since FR-PARTY-60). */
+async function openHandouts(page: Page): Promise<Locator> {
+  const board = await openWindow(page, "party.board");
+  await board.locator('[data-testid="party-tab"][data-value="handouts"]').click();
+  return board;
+}
+
 const row = (win: Locator, id: string) =>
   win.locator(`[data-testid="party-handout-row"][data-record-id="${id}"]`);
 
@@ -34,7 +41,7 @@ test("FR-PARTY-05 FR-PARTY-06 FR-PARTY-07 FR-PARTY-09 FR-PARTY-16 DM shares Ship
   await live(p2);
 
   // DM board: all five, newest first; h5 unshared.
-  const dmBoard = await openWindow(dm, "party.board");
+  const dmBoard = await openHandouts(dm);
   await expect(dmBoard.getByTestId("party-handout-row")).toHaveCount(5);
   await expect(dmBoard.getByTestId("party-handout-row").first()).toHaveAttribute(
     "data-record-id",
@@ -70,7 +77,7 @@ test("FR-PARTY-05 FR-PARTY-06 FR-PARTY-07 FR-PARTY-09 FR-PARTY-16 DM shares Ship
   await expect(viewer.getByTestId("party-handout-body")).toContainText("PARTY-PREP-5");
 
   // Player-1's board: h5 newest shared, seen (opened); h2 / h1 New; never another player's name.
-  const p1Board = await openWindow(p1, "party.board");
+  const p1Board = await openHandouts(p1);
   await expect(p1Board.getByTestId("party-handout-row")).toHaveCount(3);
   await expect(p1Board.getByTestId("party-handout-row").first()).toHaveAttribute(
     "data-record-id",
@@ -81,7 +88,7 @@ test("FR-PARTY-05 FR-PARTY-06 FR-PARTY-07 FR-PARTY-09 FR-PARTY-16 DM shares Ship
   await expect(row(p1Board, thievesMap)).toHaveAttribute("data-new", "true");
 
   // Player-2: only the Mayor's Letter; nothing of h5 anywhere.
-  const p2Board = await openWindow(p2, "party.board");
+  const p2Board = await openHandouts(p2);
   await expect(p2Board.getByTestId("party-handout-row")).toHaveCount(1);
   await expect(row(p2Board, mayor)).toContainText("Everyone");
   await expect(row(p2Board, shipManifest)).toHaveCount(0);
@@ -111,7 +118,7 @@ test("FR-PARTY-15 FR-PARTY-14 FR-PARTY-13 FR-PARTY-10 DM creates Wanted Poster w
   await p2.goto(link("Player 2"));
   await live(p2);
 
-  const dmBoard = await openWindow(dm, "party.board");
+  const dmBoard = await openHandouts(dm);
   await dmBoard.getByTestId("party-handout-create").click();
   const editor = shellWindow(dm, "party.handout");
   await expect(editor.getByTestId("party-editor-save")).toBeDisabled(); // no title yet
@@ -130,7 +137,7 @@ test("FR-PARTY-15 FR-PARTY-14 FR-PARTY-13 FR-PARTY-10 DM creates Wanted Poster w
   const id = (await view.getAttribute("data-record-id")) as string;
   await expect(row(dmBoard, id)).toHaveAttribute("data-shared", "none");
 
-  const p2Board = await openWindow(p2, "party.board");
+  const p2Board = await openHandouts(p2);
   await expect(row(p2Board, mayor)).toBeVisible();
   await expect(row(p2Board, id)).toHaveCount(0);
 
@@ -161,7 +168,7 @@ test("FR-PARTY-15 FR-PARTY-14 FR-PARTY-13 FR-PARTY-10 DM creates Wanted Poster w
   // Reload: skeleton, then the same list; seen marks survive (this browser).
   await p2.reload();
   await live(p2);
-  const again = await openWindow(p2, "party.board");
+  const again = await openHandouts(p2);
   await expect(row(again, id)).toBeVisible();
   await expect(row(again, mayor)).toHaveAttribute("data-new", "true");
 

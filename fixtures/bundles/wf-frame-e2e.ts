@@ -10,6 +10,6 @@ export default defineBundle({
   includes: ["session-sim-11"],
   fixtures: [
     "cb-party", // CB3 (required by cb-party-six)
-    "cb-party-six", // CB3: party.summary useful-size case
+    "cb-party-six", // CB3: the Party status useful-size case (PM2: Party Manager's tab)
   ],
 });

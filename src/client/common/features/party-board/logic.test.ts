@@ -22,13 +22,13 @@ import {
   LOST_SAVE,
   markOf,
   moveImage,
-  PARTY_TABS,
   playerOrder,
   removeImage,
   shareEnabled,
   sharePayload,
   togglePlayer,
 } from "./logic";
+import { PARTY_TAB_ENTRIES, partyTabs, shownTab } from "./party-tabs";
 import {
   createPartyMemory,
   createSeenState,
@@ -159,14 +159,14 @@ describe("FR-PARTY-13 New / Updated marks and the seen map", () => {
     s.markSeen("h2", 1);
     expect(s.state.getState().seen).toEqual({ h1: 1, h2: 1 });
     expect(mem.readSeen("k")).toEqual({ h1: 1, h2: 1 });
-    expect(mem.readTab("t")).toBe("handouts");
+    expect(mem.readTab("t")).toBeNull();
     mem.writeTab("t", "inventory");
     expect(mem.readTab("t")).toBe("inventory");
     expect(warnings).toHaveLength(1);
   });
 });
 
-describe("FR-PARTY-29 tab memory", () => {
+describe("FR-PARTY-60 tab memory", () => {
   const backend = (init: Record<string, string> = {}) => {
     const m = new Map(Object.entries(init));
     return {
@@ -175,31 +175,58 @@ describe("FR-PARTY-29 tab memory", () => {
     };
   };
 
-  test("FR-PARTY-29 Loot tab right of Inventory (order; stored loot restored; unknown value → Handouts)", () => {
-    expect(PARTY_TABS.slice(0, 3)).toEqual(["handouts", "inventory", "loot"]);
+  test("FR-PARTY-60 tabs order and memory: Party status, Handouts, Inventory, Loot; no entry, `companions`, unknown → status; a stored tab restores", () => {
+    expect(partyTabs().map((t) => [t.id, t.label])).toEqual([
+      ["status", "Party status"],
+      ["handouts", "Handouts"],
+      ["inventory", "Inventory"],
+      ["loot", "Loot"],
+    ]);
+    const ids = partyTabs().map((t) => t.id);
     const warnings: string[] = [];
     const store = backend({
       a: JSON.stringify({ tab: "loot" }),
-      b: JSON.stringify({ tab: "log" }),
+      b: JSON.stringify({ tab: "companions" }),
+      c: JSON.stringify({ tab: 7 }),
     });
     const mem = createPartyMemory(
       () => store,
       (m) => void warnings.push(m),
     );
+    // The stored value is kept as is; what shows is `shownTab` (Board).
     expect(mem.readTab("a")).toBe("loot");
-    expect(mem.readTab("b")).toBe("handouts");
+    expect(mem.readTab("b")).toBe("companions");
+    expect(mem.readTab("none")).toBeNull();
+    expect(mem.readTab("c")).toBeNull();
     expect(warnings).toHaveLength(1);
+    expect(shownTab(mem.readTab("a"), ids)).toBe("loot");
+    expect(shownTab(mem.readTab("b"), ids)).toBe("status");
+    expect(shownTab(mem.readTab("none"), ids)).toBe("status");
+    expect(shownTab("log", ids)).toBe("status");
 
     const tabs = createTabState(mem);
     tabs.bind("a");
     expect(tabs.state.getState()).toEqual({ key: "a", tab: "loot" });
-    tabs.bind("b");
-    expect(tabs.state.getState().tab).toBe("handouts");
-    tabs.choose("b", "loot"); // a click: shown at once and stored
-    expect(tabs.state.getState()).toEqual({ key: "b", tab: "loot" });
-    expect(store.getItem("b")).toBe(JSON.stringify({ tab: "loot" }));
-    tabs.bind("b"); // same key: the chosen tab stays
-    expect(tabs.state.getState().tab).toBe("loot");
+    tabs.bind("none");
+    expect(tabs.state.getState().tab).toBeNull();
+    tabs.choose("none", "status"); // a click: shown at once and stored
+    expect(tabs.state.getState()).toEqual({ key: "none", tab: "status" });
+    expect(store.getItem("none")).toBe(JSON.stringify({ tab: "status" }));
+    tabs.bind("none"); // same key: the chosen tab stays
+    expect(tabs.state.getState().tab).toBe("status");
+  });
+
+  test("FR-PARTY-67 tab registry: ids unique, orders unique, PM's entries at 10–40", () => {
+    const ids = PARTY_TAB_ENTRIES.map((t) => t.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const orders = PARTY_TAB_ENTRIES.map((t) => t.order);
+    expect(new Set(orders).size).toBe(orders.length);
+    expect(PARTY_TAB_ENTRIES.filter((t) => t.order <= 40).map((t) => [t.id, t.order])).toEqual([
+      ["status", 10],
+      ["handouts", 20],
+      ["inventory", 30],
+      ["loot", 40],
+    ]);
   });
 });
 
@@ -292,16 +319,16 @@ describe("FR-PARTY-16 Share dialog", () => {
 });
 
 describe("FR-PARTY-11 / FR-PARTY-14 windows", () => {
-  test("FR-PARTY-11 party.board: Party, closed, top-left dx 56, 440×560, min 340×360, minOpenH 400, launcher", () => {
+  test("FR-PARTY-11 party.board: Party Manager (FR-PARTY-59), closed, top-left dx 56, 550×560 (FR-SHELL-156), min 340×360, minOpenH 400, launcher", () => {
     expect(partyBoardWindowBase).toMatchObject({
       kind: "party.board",
-      title: "Party",
+      title: "Party Manager",
       defaultOpen: false,
       defaultPosition: { anchor: "top-left", dx: 56 },
-      defaultSize: { w: 440, h: 560 },
+      defaultSize: { w: 550, h: 560 },
       minSize: { w: 340, h: 360 },
       minOpenH: 400,
-      launcher: { label: "Party" },
+      launcher: { label: "Party Manager" },
     });
   });
 

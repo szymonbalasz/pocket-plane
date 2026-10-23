@@ -1,6 +1,6 @@
 // Player present popup (FR-PARTY-36, -37) as a static render over a fake sync store: the popup's
 // inside per content state (images + pager, body, text-only, loading, error) and which row a
-// snapshot makes it show. The Dialog portal, Close / Esc / click outside and "Open in Party":
+// snapshot makes it show. The Dialog portal, Close / Esc / click outside and "Open in Party Manager":
 // e2e/party-present.e2e.ts.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type {
@@ -86,7 +86,7 @@ const content = (state: "loading" | "error" | "show", l: LoadedHandout | null) =
 const count = (html: string, testId: string) => html.split(`data-testid="${testId}"`).length - 1;
 
 describe("FR-PARTY-36 popup content", () => {
-  test("FR-PARTY-36 three images: the first, Prev disabled, 1 / 3, then the body; Close + Open in Party", () => {
+  test("FR-PARTY-36 three images: the first, Prev disabled, 1 / 3, then the body; Close + Open in Party Manager", () => {
     const html = content("show", loaded(["a1", "a2", "a3"]));
     expect(html).toContain("Smuggler&#x27;s Route");
     expect(count(html, "party-present-image")).toBe(1);
@@ -101,6 +101,11 @@ describe("FR-PARTY-36 popup content", () => {
     expect(html.indexOf("party-present-body")).toBeGreaterThan(html.indexOf("party-present-image"));
   });
 
+  test("FR-PARTY-59 renamed: the popup's secondary button reads Open in Party Manager", () => {
+    const html = content("show", loaded(["a1"]));
+    expect(html).toMatch(/data-testid="party-present-open-board"[^>]*>Open in Party Manager</);
+  });
+
   test("FR-PARTY-36 one image: no pager; text-only: title + body, no image", () => {
     const one = content("show", loaded(["a1"]));
     expect(count(one, "party-present-image")).toBe(1);
@@ -112,7 +117,7 @@ describe("FR-PARTY-36 popup content", () => {
     expect(count(content("show", loaded(["a1"], "")), "party-present-body")).toBe(0);
   });
 
-  test("FR-PARTY-36 loading → skeleton; reject → Couldn't load — Retry; Open in Party waits", () => {
+  test("FR-PARTY-36 loading → skeleton; reject → Couldn't load — Retry; Open in Party Manager waits", () => {
     const loading = content("loading", null);
     expect(count(loading, "party-present-loading")).toBe(1);
     expect(loading).toMatch(/data-testid="party-present-open-board"[^>]*disabled/);
