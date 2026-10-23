@@ -21,7 +21,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14; merging main + commands.ts lines + threshold | re-test R6 + P4 → merge |
 
 | RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | walkthrough all PASS (F1 spec test-ID wording fixed on main); main merged, docs §155 / §123 | gates after FX1 → merge |
-| RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | building | walkthrough RS-H |
+| RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | ready (check 5347; replay DM 8 → 10, players 38 → 36, approved, BL-93) | test-rs2 walkthrough running |
 
 Queue: RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates-main`.
 
