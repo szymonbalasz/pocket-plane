@@ -15,10 +15,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | PM1 window memory | merged `4179c883` | — | done (re-test 7/7; branch gates 5309 / 209) | main gates: check 5307 + 1 timeout flake (passes alone), e2e 207 + 2 load flakes (pass alone) |
 | PM2 Party Manager | merged `77f5fd2f` | — | done (re-test 5/5; e2e 213 + roll-popup flake) | main gates after FX1 |
 | FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
-| SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7, part 2 13/14 → re-test 8/8 | merge after RS2 + SP2 |
+| SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | re-test 8/8; merging main (windows / goldens / docs) | gates → merge (last slice) |
 | FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12) | main gates: check 5392 + 1 load flake (3/3 alone), e2e 215 |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
-| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | 16/16; branch gates 5440 / 218; builder merging main (RS2: window registry + goldens conflicts) | gates → merge |
+| SP2 rules reference | merged `fb2904b5` | — | done (14/14 + 16/16; branch gates 5466 / 222) | main gates running |
 
 | RS1 Reminders tab + sheet | merged `d52a5587` | — | done (branch gates 5408 / 216) | main gates 5408 / 216 green |
 | RS2 Strongholds tab + window | merged `bee916a5` | — | done (11/11 + 5/5) | main gates 5434 / 220 green |
