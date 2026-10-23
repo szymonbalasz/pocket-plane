@@ -172,10 +172,25 @@ describe("one placer (FR-SHELL-95–113)", () => {
     expect(plan(base(WIDE), { type: "open", kind: "t.small" }, ctxAt(WIDE)).log).toEqual([
       "open:t.small>L1",
     ]);
-    // L2: 440 × 560 doesn't fit above the Game log; useful (440 × 400) up to the band does.
-    const l2 = plan(base(WIDE), { type: "open", kind: "t.a" }, ctxAt(WIDE));
-    expect(l2.log).toEqual(["open:t.a>L2"]);
-    expect(get(l2.windows, "t.a")).toMatchObject({ w: 440, h: 512 });
+    // L1 band-capped (BL-104): 440 × 560 doesn't fit above the Game log; its full width at the
+    // band's height (512) does.
+    const l1 = plan(base(WIDE), { type: "open", kind: "t.a" }, ctxAt(WIDE));
+    expect(l1.log).toEqual(["open:t.a>L1"]);
+    expect(get(l1.windows, "t.a")).toMatchObject({ w: 440, h: 512 });
+    // L2: 1000 wide doesn't fit left of Initiative (948 px); down to useful (440 × 400) does.
+    const wide = createWindowRegistry("dm", [
+      ...dm.defs.filter((d) => d.defaultOpen),
+      def("t.wide", { defaultSize: { w: 1000, h: 412 }, usefulSize: { w: 440, h: 400 } }),
+    ]);
+    const wctx = {
+      ...ctxAt(WIDE),
+      registry: wide,
+      available: new Set(wide.defs.map((d) => d.kind)),
+    };
+    const l2 = plan(defaultLayout(wide, WIDE), { type: "open", kind: "t.wide" }, wctx);
+    expect(l2.log).toEqual(["open:t.wide>L2"]);
+    expect(get(l2.windows, "t.wide").w).toBeLessThan(1000);
+    expect(get(l2.windows, "t.wide").w).toBeGreaterThanOrEqual(440);
     // L3: at 1280×720 one 440-wide window fits left of Initiative: the next puts it away (LRU).
     let ws = reduce(base(LAPTOP), { type: "open", kind: "t.a" }, ctxAt(LAPTOP));
     const l3 = plan(ws, { type: "open", kind: "t.b" }, ctxAt(LAPTOP));

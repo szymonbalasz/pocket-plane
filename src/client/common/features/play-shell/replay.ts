@@ -12,6 +12,7 @@ import {
   type FitInputs,
   type FitReason,
   type FitToken,
+  type FitVisible,
   fitFor,
   footprintBox,
   revealRefit,
@@ -138,6 +139,8 @@ export interface ReplayStep {
   problems: string[];
   /** Memory path (FR-SHELL-163): each open window's rendered rect, `kind@x,y,w×h`. */
   drawn?: string;
+  /** Scripts: the last fit's `data-fit-visible`. */
+  fit?: FitVisible;
 }
 
 export interface ReplayRun {
@@ -193,6 +196,8 @@ interface Sim {
   mode: ReplayCamera;
   /** The last full fit's cell, screen px (FR-MAP-94). */
   lastFull: number;
+  /** The last fit's `data-fit-visible` (FR-MAP-46, -59). */
+  visible?: FitVisible;
   key: string;
 }
 
@@ -297,17 +302,20 @@ function fitNow(
   sim: Sim,
   with_?: readonly Rect[],
   reason: FitReason = "fit",
-): { cam: Camera; obstacles: readonly Rect[] } {
+): { cam: Camera; obstacles: readonly Rect[]; visible: FitVisible } {
   const inputs = fitInputs(sim, with_);
   const f = fitFor(reason, inputs, sim.lastFull || null);
-  return { cam: { x: f.x, y: f.y, scale: f.scale }, obstacles: inputs.room.obstacles };
+  const cam = { x: f.x, y: f.y, scale: f.scale };
+  return { cam, obstacles: inputs.room.obstacles, visible: f.visible };
 }
 
 const cellPx = (sim: Sim) => (sim.cam ? sim.cam.scale * cellsNow(sim).scene.gridCellSize : 0);
 
 /** A full fit (Fit, open, load, reset, resize): the camera `fitted`, its cell the new baseline. */
 function fullFit(sim: Sim, reason: FitReason = "fit") {
-  sim.cam = fitNow(sim, undefined, reason).cam;
+  const f = fitNow(sim, undefined, reason);
+  sim.cam = f.cam;
+  sim.visible = f.visible;
   sim.mode = "fitted";
   sim.lastFull = cellPx(sim);
 }
@@ -460,16 +468,23 @@ function check(
       if (best[0] === 0 && best[1] === 0) out.push(`I3 ${kind} ${r.w}×${r.h} below useful`);
     }
   }
-  // I5: a user open moves no other window (it may put the least recently used one away, and
-  // squeeze a protected one inside its rect, FR-SHELL-101).
+  // I5: a user open moves no other window (it may put the least recently used one away, squeeze
+  // a protected one inside its rect, FR-SHELL-101, and shrink an untouched launcher window inside
+  // its rect down to no less than its useful size, L3s, BL-99).
   if (opts.opened) {
     const within = (a: Rect, b: Rect) =>
       a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
+    const atLeastUseful = (w: WindowState) => {
+      const def = sim.registry.get(w.kind);
+      const u = def && useful(def, sim.vp, sim.registry);
+      return u !== undefined && w.w >= u.w && w.h >= u.h;
+    };
     for (const w of windowsOf(sim)) {
       if (w.kind === opts.opened) continue;
       const b = before.find((x) => x.kind === w.kind && x.instance === w.instance);
       if (b?.state !== "open" || w.state !== "open" || rectKey(b) === rectKey(w)) continue;
       if (isProtected(sim.registry, w.kind) && within(w, b)) continue;
+      if (!isRemembered(b) && within(w, b) && atLeastUseful(w)) continue;
       out.push(`I5 ${w.kind} moved by opening ${opts.opened}`);
     }
   }
@@ -957,11 +972,13 @@ export function runReplay(
 
 /**
  * One step of a scripted run (walkthrough repros): a user open, a fight's End / Start, a reload,
- * Fit, or a pan putting the PCs' centre at a screen point (the camera `moved`).
+ * Fit, a pan putting the PCs' centre at a screen point (the camera `moved`), or a user's drag (and
+ * resize) of a window to `rect` (remembered, FR-SHELL-144).
  */
 export type ScriptStep =
   | { open: string }
   | { close: string }
+  | { drag: string; rect: Rect; resized?: boolean }
   | { pan: { x: number; y: number } }
   | "end"
   | "start"
@@ -1005,6 +1022,7 @@ export function runScript(
       cell: cellPx(sim),
       log: sim.ctl.store.getState().settleLog,
       problems,
+      ...(sim.visible && { fit: sim.visible }),
     });
   const load = (label: string) => {
     sim.cam = null;
@@ -1033,6 +1051,11 @@ export function runScript(
       else dispatch(sim, { type: "appear", kind: "cbt.initiative" });
       const refit = appearanceRefit(sim);
       record("Start", check(sim, before, { refit }));
+    } else if ("drag" in step) {
+      dispatch(sim, { type: "focus", kind: step.drag });
+      const resized = step.resized === true;
+      dispatch(sim, { type: "setRect", kind: step.drag, rect: step.rect, resized });
+      record(`drag ${step.drag}`, check(sim, before));
     } else if ("pan" in step) {
       panTo(sim, step.pan);
       record(`pan ${step.pan.x},${step.pan.y}`, []);

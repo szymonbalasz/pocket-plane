@@ -1,5 +1,5 @@
 // Sprint 9 PM2 (FR-SHELL-155–157, -161, FR-PARTY-63, -64) on the Player registry: `party.board`
-// registered as "Party Manager" 550 × 560 (useful 440 × 400, min 340 × 360), absorbing
+// registered as "Party Manager" 600 × 560 (BL-106) (useful 440 × 400, min 340 × 360), absorbing
 // `party.summary`; no Party status window, launcher entry, size-table row or harness set left;
 // it opens inside the viewport at the four sizes; an old layout migrates onto Party status; the
 // launcher-label threshold recorded (BL-80, a reasoned drop).
@@ -27,19 +27,19 @@ const all = (w: number, h: number) => [
 
 afterEach(() => partyMemory().tabs.bind(null));
 
-test("FR-SHELL-156 Party Manager registered (Player): title / label Party Manager, order 58, 550 × 560, useful 440 × 400, min 340 × 360, minOpenH 400, absorbs party.summary; size-table row and sets; opens inside the viewport at the four sizes, 550 wide", () => {
+test("FR-SHELL-156 Party Manager registered (Player): title / label Party Manager, order 58, 600 × 560, useful 440 × 400, min 340 × 360, minOpenH 400, absorbs party.summary; size-table row and sets; opens inside the viewport at the four sizes, ≤ 600 wide", () => {
   const r = managerRegistration(registry);
   expect(r).toMatchObject({
     title: "Party Manager",
     label: "Party Manager",
     order: 58,
-    defaultSize: { w: 550, h: 560 },
+    defaultSize: { w: 600, h: 560 },
     usefulSize: { w: 440, h: 400 },
     minSize: { w: 340, h: 360 },
     minOpenH: 400,
     absorbs: ["party.summary"],
     onAbsorb: "function",
-    sizeRow: { default: all(550, 560), useful: all(440, 400), min: { w: 340, h: 360 } },
+    sizeRow: { default: all(600, 560), useful: all(440, 400), min: { w: 340, h: 360 } },
     sets: ["P1", "P2", "P3"],
   });
   expect(r.sizeRow?.criterion).toContain("every PC row and its companion rows whole");
@@ -49,9 +49,9 @@ test("FR-SHELL-156 Party Manager registered (Player): title / label Party Manage
       vp,
       inside: rect.x >= 0 && rect.y >= TOP_BAR_H && rect.x + rect.w <= w && rect.y + rect.h <= h,
     }).toEqual({ vp, inside: true });
-    // OQ-SHELL-78 A: 550 where a PC-clear spot has it, never under the useful width.
+    // OQ-SHELL-78 A, BL-106: 600 where a PC-clear spot has it, never under the useful width.
     expect(rect.w).toBeGreaterThanOrEqual(440);
-    expect(rect.w).toBeLessThanOrEqual(550);
+    expect(rect.w).toBeLessThanOrEqual(600);
   }
 });
 
@@ -69,7 +69,7 @@ test("FR-SHELL-155 party.summary layout migrated (Player): a remembered, minimis
   const m = summaryMigration(registry, YOU, partyMemory().tabs);
   expect(m.absorbed).toEqual([{ kind: "party.board", from: "party.summary" }]);
   expect(m.left).toBe(0);
-  expect(m.board).toMatchObject({ state: "minimised", x: 300, y: 120, w: 550, remembered: true });
+  expect(m.board).toMatchObject({ state: "minimised", x: 300, y: 120, w: 600, remembered: true });
   expect(m.tab).toBe("status");
 });
 
