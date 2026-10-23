@@ -45,6 +45,7 @@ DM decision #338 (sprint-8 recap + sprint 9 scope). Process: [orchestrator promp
 | 2026-10-23 | **Merged: toast stack + kill feed** (FX1: the DM's toast stack stays in its column and off window title bars, cards fold into an open Notifications window, hidden kills reach the DM's feed, quiet stats retry, real dates on fixture fights; 12/12). Reminders UI (RS1) and Strongholds UI (RS2) passed; Stores UI (RS3) building |
 | 2026-10-23 | **Merged: reminders UI** (RS1: Party Manager Reminders tab, the sheet's Reminders tab with a count, roll buttons like macros, read-only effects line; all PASS). Passed and queued: strongholds UI (RS2 11/11, wiring the reminder buttons), rules reference (SP2 16/16), Stores UI (RS3 18/18); recap re-test running |
 | 2026-10-23 | **Merged: strongholds UI** (RS2: Strongholds tab, Stronghold window with Facilities, Staff, Reminders, Notes and Defenders, DM-only rows, income rolls, Add / Make reminder, the reminder source icon; 11/11 + re-test 5/5). Queued: rules reference (SP2 16/16), session recap (SP3 re-test 8/8), Stores UI (RS3 18/18) |
+| 2026-10-23 | **Merged: Stronghold Stores** (RS3: Stores tab, Move to party / to a character from the existing form, per-item DM-only, loot log names the Stores, Inventory without Stores rows; 18/18). Track RS complete. Queued: rules reference (SP2), session recap (SP3) |
 
 ## Check `main` any time (DM)
 
