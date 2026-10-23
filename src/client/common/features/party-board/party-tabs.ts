@@ -8,6 +8,7 @@ import type { RecordStore } from "@shared/protocol/store";
 import { createElement, type ReactNode } from "react";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { LootLog } from "../party-loot/LootLog";
+import { RemindersTab } from "../reminders/RemindersTab";
 import type { CompanionsDmParts } from "./Companions";
 import { InventoryTab } from "./Inventory";
 import { STATUS_TAB } from "./logic";
@@ -56,6 +57,13 @@ export const PARTY_TAB_ENTRIES: readonly PartyTabEntry[] = [
     render: () => createElement(ScrollArea, { className: "h-full" }, createElement(InventoryTab)),
   },
   { id: "loot", label: "Loot", order: 40, render: () => createElement(LootLog) },
+  // RS1 (reminders, FR-PARTY-71 / -73): REM's list, party first (FR-REM-17).
+  {
+    id: "reminders",
+    label: "Reminders",
+    order: 50,
+    render: () => createElement(ScrollArea, { className: "h-full" }, createElement(RemindersTab)),
+  },
 ];
 
 /** The registered tabs in `order` (FR-PARTY-67). */

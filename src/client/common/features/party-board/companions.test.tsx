@@ -196,13 +196,14 @@ afterEach(() => partyMemory().tabs.bind(null));
 const owlToken = { id: "t-owl", name: "Owlbear", ownerPlayerId: "p1", characterId: null };
 
 describe("FR-PARTY-41 companions in Party status", () => {
-  test("FR-PARTY-41 companions under their owner PC (the Companions tab is gone: tabs Party status, Handouts, Inventory, Loot); the owner's colour dot on the PC row", () => {
+  test("FR-PARTY-41 companions under their owner PC (the Companions tab is gone: tabs Party status, Handouts, Inventory, Loot, then RS's Reminders); the owner's colour dot on the PC row", () => {
     const html = render(DM, [mira, brakka, owlbearDm, drakeDm], [], { board: true });
     expect(attr(html, "party-tab", "data-value")).toEqual([
       "status",
       "handouts",
       "inventory",
       "loot",
+      "reminders",
     ]);
     expect(html).not.toContain(">Companions<");
     expect(html).toContain('data-testid="party-status"');
@@ -312,7 +313,7 @@ describe("FR-PARTY-46 layout", () => {
     const triggers = [...html.matchAll(/<button[^>]*data-testid="party-tab"[^>]*>/g)].map(
       (m) => m[0],
     );
-    expect(triggers).toHaveLength(4);
+    expect(triggers).toHaveLength(5);
     for (const t of triggers) {
       expect(t).toContain("shrink-0");
       expect(t).toContain("whitespace-nowrap");
