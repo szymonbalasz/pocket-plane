@@ -16,7 +16,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | walkthrough 14/15 → re-test 5/5 (M13, X1 fixed; e2e 211) | merge after SP1 (adds the Party status command + launcher threshold numbers) |
 | FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
-| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | built (check 5331, e2e 210); ruling: window title bar + 40 px keep-out for the toast stack (amends FR-NOTE-53); merging main | walkthrough FX1 |
+| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | ready (main + ruling B in; check 5332; e2e 71/72 bundles + 1 test fix) | test-fx1 walkthrough running |
 | SP1 palette + shortcuts | `build/sp-palette` (ws wA1; base PM1) | build-sp1 | re-test 11/11; main (FX3) merged in | branch gates running → merge → main gates |
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14 | after SP1 + PM2 merge: merge main, commands.ts lines, threshold → re-test R6 + P4 → merge |
 
