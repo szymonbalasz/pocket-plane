@@ -31,7 +31,7 @@ import { characterFor, heldOf, writeCount } from "./rows";
 export const GEMS_OFF = "Gems are off in this campaign";
 
 /**
- * FR-GEM-07: `delta` −5…+5 (≠ 0, zod); the result must stay 0–99 (`invalid`). An award (delta > 0)
+ * FR-GEM-07: `delta` −10…+10 (≠ 0, zod; FR-GEM-43 widened it for summed quick clicks); the result must stay 0–99 (`invalid`). An award (delta > 0)
  * writes a public `gem.award` line (FR-GEM-09); a removal writes none (OQ-GEM-10 A).
  */
 export const adjustGems = defineCommand({
