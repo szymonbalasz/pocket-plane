@@ -5,6 +5,7 @@ import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
 import { statsWindow } from "@ui/features/stats/window";
+import { strongholdWindow } from "@ui/features/strongholds/window";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
 import { dmCompanionWindow } from "./features/character-sheet/companion-window";
 import { dmCharSheetWindow } from "./features/character-sheet/sheet-window";
@@ -43,6 +44,7 @@ const windows: WindowDef[] = [
   dmCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
   statsWindow, // stats.board (stats, FR-SHELL-93)
   requestsWindow, // dicex.requests (dice-extras, FR-DICEX-86)
+  strongholdWindow, // hold.stronghold, no launcher (strongholds, FR-SHELL-170)
   dmRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
 ];
 

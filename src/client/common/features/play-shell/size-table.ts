@@ -77,6 +77,13 @@ const shared: Record<string, SizeRow> = {
     min: s(320, 280),
     criterion: "5 rows names whole, or 2 award cards, or the first 4 Highlights lines (S5)",
   },
+  // RS2 (FR-SHELL-171, S2 / S4): Stronghold, no launcher.
+  "hold.stronghold": {
+    default: all(480, 560),
+    useful: all(400, 400),
+    min: s(340, 360),
+    criterion: "header, tab strip and three facility rows",
+  },
   // SP2 (seams S4, FR-CMP-63): short viewports open it band-high.
   "cmp.rules": {
     default: four(s(440, 412), s(440, 412), s(440, 600), s(440, 600)),

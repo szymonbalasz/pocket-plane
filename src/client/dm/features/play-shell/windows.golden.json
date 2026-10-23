@@ -78,6 +78,12 @@
     "parked": "charx.companion,stats.board"
   },
   {
+    "at": "open @1600×900 hold.stronghold",
+    "rect": "514,172,434×400",
+    "placed": "auto",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "open @1600×900 cmp.rules",
     "rect": "1148,452,440×372",
     "placed": "auto",
@@ -160,6 +166,12 @@
     "rect": "588,60,360×460",
     "placed": "reopened",
     "parked": "charx.companion,stats.board"
+  },
+  {
+    "at": "reopen @1600×900 hold.stronghold",
+    "rect": "514,172,434×400",
+    "placed": "reopened",
+    "parked": "dicex.requests"
   },
   {
     "at": "reopen @1600×900 cmp.rules",
@@ -246,6 +258,12 @@
     "parked": "charx.companion,stats.board"
   },
   {
+    "at": "reopen 1440×900 @1440×900 hold.stronghold",
+    "rect": "430,60,480×560",
+    "placed": "reopened",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "reopen 1440×900 @1440×900 cmp.rules",
     "rect": "988,452,440×372",
     "placed": "stored",
@@ -330,10 +348,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "reopen 1280×800 @1280×800 hold.stronghold",
+    "rect": "366,60,402×400",
+    "placed": "reopened",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 cmp.rules",
     "rect": "362,60,440×412",
     "placed": "reopened",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -414,10 +438,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "reopen 1280×720 @1280×720 hold.stronghold",
+    "rect": "422,60,412×412",
+    "placed": "reopened",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 cmp.rules",
     "rect": "416,60,440×412",
     "placed": "reopened",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -510,6 +540,12 @@
     "parked": "charx.companion,stats.board"
   },
   {
+    "at": "open @1440×900 hold.stronghold",
+    "rect": "430,60,480×560",
+    "placed": "auto",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "open @1440×900 cmp.rules",
     "rect": "988,452,440×372",
     "placed": "auto",
@@ -592,6 +628,12 @@
     "rect": "540,364,360×460",
     "placed": "reopened",
     "parked": "charx.companion,stats.board"
+  },
+  {
+    "at": "reopen @1440×900 hold.stronghold",
+    "rect": "430,60,480×560",
+    "placed": "reopened",
+    "parked": "dicex.requests"
   },
   {
     "at": "reopen @1440×900 cmp.rules",
@@ -678,10 +720,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "reopen 1280×800 @1280×800 hold.stronghold",
+    "rect": "366,60,402×400",
+    "placed": "reopened",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 cmp.rules",
     "rect": "362,60,440×412",
     "placed": "reopened",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -762,10 +810,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "reopen 1280×720 @1280×720 hold.stronghold",
+    "rect": "422,60,412×412",
+    "placed": "reopened",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 cmp.rules",
     "rect": "416,60,440×412",
     "placed": "reopened",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -858,10 +912,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "open @1280×800 hold.stronghold",
+    "rect": "366,60,402×400",
+    "placed": "auto",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "open @1280×800 cmp.rules",
     "rect": "362,60,440×412",
     "placed": "auto",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "reopen @1280×800 camp.players",
@@ -942,10 +1002,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "reopen @1280×800 hold.stronghold",
+    "rect": "366,60,402×400",
+    "placed": "reopened",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "reopen @1280×800 cmp.rules",
     "rect": "362,60,440×412",
     "placed": "reopened",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "reopen 1280×720 @1280×720 camp.players",
@@ -1026,10 +1092,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "reopen 1280×720 @1280×720 hold.stronghold",
+    "rect": "422,60,412×412",
+    "placed": "reopened",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 cmp.rules",
     "rect": "416,60,440×412",
     "placed": "reopened",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "protected @1280×720 camp.players",
@@ -1122,10 +1194,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "open @1280×720 hold.stronghold",
+    "rect": "422,60,412×412",
+    "placed": "auto",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "open @1280×720 cmp.rules",
     "rect": "416,60,440×412",
     "placed": "auto",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "reopen @1280×720 camp.players",
@@ -1206,10 +1284,16 @@
     "parked": "stats.board"
   },
   {
+    "at": "reopen @1280×720 hold.stronghold",
+    "rect": "422,60,412×412",
+    "placed": "reopened",
+    "parked": "dicex.requests"
+  },
+  {
     "at": "reopen @1280×720 cmp.rules",
     "rect": "416,60,440×412",
     "placed": "reopened",
-    "parked": "dicex.requests"
+    "parked": "hold.stronghold"
   },
   {
     "at": "protected @1280×720 camp.players",

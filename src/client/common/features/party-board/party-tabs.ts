@@ -5,10 +5,13 @@
 // RS appends Reminders 50, Strongholds 60. Tab memory accepts any registered id; one not
 // registered or not visible shows Party status (FR-PARTY-60).
 import type { RecordStore } from "@shared/protocol/store";
+import { STRONGHOLD_INDEX_TYPE } from "@shared/strongholds/schemas";
 import { createElement, type ReactNode } from "react";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { LootLog } from "../party-loot/LootLog";
-import { RemindersTab } from "../reminders/RemindersTab";
+import { RemindersWithLinks } from "../strongholds/links";
+import { HOLD_PARTY_TAB, holdTabVisible } from "../strongholds/logic";
+import { StrongholdsTab } from "../strongholds/StrongholdsTab";
 import type { CompanionsDmParts } from "./Companions";
 import { InventoryTab } from "./Inventory";
 import { STATUS_TAB } from "./logic";
@@ -57,12 +60,23 @@ export const PARTY_TAB_ENTRIES: readonly PartyTabEntry[] = [
     render: () => createElement(ScrollArea, { className: "h-full" }, createElement(InventoryTab)),
   },
   { id: "loot", label: "Loot", order: 40, render: () => createElement(LootLog) },
-  // RS1 (reminders, FR-PARTY-71 / -73): REM's list, party first (FR-REM-17).
+  // RS1 (reminders, FR-PARTY-71 / -73): REM's list, party first (FR-REM-17); RS2: with the
+  // stronghold link icon (FR-REM-18).
   {
     id: "reminders",
     label: "Reminders",
     order: 50,
-    render: () => createElement(ScrollArea, { className: "h-full" }, createElement(RemindersTab)),
+    render: () =>
+      createElement(ScrollArea, { className: "h-full" }, createElement(RemindersWithLinks, {})),
+  },
+  // RS2 (FR-PARTY-72, S1): DM always; a player while they receive a `stronghold-index` row.
+  {
+    id: HOLD_PARTY_TAB,
+    label: "Strongholds",
+    order: 60,
+    visible: (v) =>
+      holdTabVisible(v, Object.keys(v.store.records[STRONGHOLD_INDEX_TYPE] ?? {}).length),
+    render: () => createElement(StrongholdsTab),
   },
 ];
 
