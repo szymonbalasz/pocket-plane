@@ -16,7 +16,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | PM2 Party Manager | `build/party-manager` (ws w9V) | build-pm2 | M13 + X1 (tool-bar put-away never returns) fixed; check + e2e running | re-test M1, M13, X1 |
 | FX3 sync, stale chunk, misc | `fix/fx-sync-shell` (ws w9Y, slot 5) | build-fx3 | ShellWindow wired; 30 s timeouts on 3 heavy tests (granted); check running | merge |
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
-| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | building | walkthrough FX1 |
+| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | built (check 5331, e2e 210); ruling: window title bar + 40 px keep-out for the toast stack (amends FR-NOTE-53); merging main | walkthrough FX1 |
 | SP1 palette + shortcuts | `build/sp-palette` (ws wA1; base PM1) | build-sp1 | walkthrough 8 PASS + 2 ruled (spec wording); fixing Pause… command bug + 2 small | re-test P9 (+ P4 after SP2) |
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | built; second full e2e running | walkthrough R1-R8 |
 
@@ -31,6 +31,13 @@ Queue: RS1 + RS2 after PM2 merges (RS0, PM1 in) · RS3 after RS2 · SP3 part 2 a
 - `sync/connection.ts` + `protocol/frames.ts`: `fix/fx-sync-shell` (FX3).
 - combat-tracker `companions.ts` / `hp.ts` strings ("Party Manager"): `build/party-manager` (PM2), granted 2026-10-23.
 - Backlog: no picks (four sprint slices working).
+
+## Integrator rulings this sprint (tell the DM at the recap)
+
+- Toast stack: a window's title bar + first 40 px keeps the DM / player toast stack out (amends FR-NOTE-53; FX1 build, 2026-10-23), fallback FR-NOTE-71.
+- Placer speed-up 3 (`roomFor`, exact) kept for the 25 ms bench gate (OQ-SHELL-84).
+- Party Manager 550 px: 20 new player harness cells approved as named exemptions (BL-93).
+- Walkthrough step wording fixed: live-sync FX3 step 4 (ellipsis only when the name doesn't fit), play-shell SP1 P3 / P8 (fixture pets).
 
 ## Pending DM decisions
 
