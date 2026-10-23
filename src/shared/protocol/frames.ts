@@ -123,7 +123,17 @@ export const WS_PROBE_PARAM = "probe";
 export const HELLO_TIMEOUT_MS = 5_000;
 export const PING_INTERVAL_MS = 10_000;
 export const SERVER_SILENCE_MS = 30_000;
-export const CLIENT_PONG_TIMEOUT_MS = 20_000;
+/**
+ * Client drop detection (FR-SYNC-40): a ping (or probe) with no frame back within this → missed;
+ * the first miss sends one probe ping at once.
+ */
+export const CLIENT_PONG_TIMEOUT_MS = 5_000;
+/** Dropped only after two missed pongs and at least this long since the last frame. */
+export const CLIENT_DROP_FLOOR_MS = 10_000;
+/** A check running later than scheduled by more than this is a wake-up, never a drop. */
+export const CLIENT_WAKE_DRIFT_MS = 2_000;
+/** Heartbeat check interval. */
+export const CLIENT_CHECK_INTERVAL_MS = 1_000;
 /** Reconnect backoff: 0.5 s doubling to a 1.5 s cap (decision #131), ±20 % jitter → ≤ 1.8 s. */
 export const BACKOFF_START_MS = 500;
 export const BACKOFF_MAX_MS = 1_500;
