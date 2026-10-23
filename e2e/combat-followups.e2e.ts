@@ -223,7 +223,7 @@ test("FR-CBT-141 FR-CBT-142 FR-CBT-143 FR-CBT-144 FR-CBT-145 FR-CBT-146 FR-CBT-1
 
   await test.step("FR-CBT-141 Start 'Escort to the Ford': the kept-HP note; Goblin 2 keeps 4 / 7; the drake keeps its paw", async () => {
     const enc = await openWindow(dm, "cbt.encounters");
-    await closeToasts(dm); // FR-NOTE-70: the stack may sit on the window's first rows
+    await closeToasts(dm); // FR-NOTE-70, -71: the stack may sit on this window's body, below its first row
     await enc
       .locator(
         `[data-testid="cbt-enc-row"][data-record-id="${recordId("enc-friendly", "encounter")}"]`,

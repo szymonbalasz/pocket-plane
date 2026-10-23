@@ -16,7 +16,7 @@ const tab = (win: Locator, value: string) =>
 
 async function companions(page: Page): Promise<Locator> {
   const board = await openWindow(page, "party.board");
-  await closeToasts(page); // FR-NOTE-70: the stack may sit on the board's tabs
+  await closeToasts(page); // FR-NOTE-70, -71: the stack may sit on this window's body, below its first row
   await tab(board, "companions").click();
   await expect(tab(board, "companions")).toHaveAttribute("aria-selected", "true");
   await expect(board.getByTestId("party-companions")).toBeVisible();

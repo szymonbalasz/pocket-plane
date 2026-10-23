@@ -3,9 +3,10 @@ import type { Page } from "@playwright/test";
 
 /**
  * Closes the toasts and the callout this page shows (closing ≠ dismissing: pending rows stay in
- * Notifications). Sprint 9 (FR-NOTE-70, -71): with a window in the DM's home column and no spot
- * clear of every body, the stack sits on that window's first row (its tabs) by design; a spec
- * that clicks there closes the stack first. A hovered info toast never times out (FR-NOTE-14).
+ * Notifications). Sprint 9 (FR-NOTE-70, -71, ruling B): with a window in the DM's home column and
+ * no spot clear of every body, the stack sits on that window's body just below its title bar +
+ * 40 px by design; a spec that clicks there closes the stack first. A hovered info toast never
+ * times out (FR-NOTE-14).
  */
 export async function closeToasts(page: Page): Promise<void> {
   const close = page

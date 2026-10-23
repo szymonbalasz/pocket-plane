@@ -8,7 +8,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { launcherButton, shellWindow } from "./support/shell";
-import { closeToasts } from "./support/toasts";
 
 interface Case {
   kind: string;
@@ -355,7 +354,6 @@ test("FR-STATS-66 Stats useful size FR-STATS-67 award grid fits: at 400 × 360 t
   const p1 = await playerPage(browser);
   for (const page of [dm, p1]) {
     const win = await openAt(page, "stats.board", 400, 360);
-    await closeToasts(page); // FR-NOTE-70: the stack may sit on Stats' tabs
     await win.locator('[data-testid="stats-tab"][data-value="fight"]').click();
     const rows = win.getByTestId("stats-fight-row");
     await expect(rows.first()).toBeVisible();

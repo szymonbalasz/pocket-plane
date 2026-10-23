@@ -160,8 +160,9 @@ describe("FR-NOTE-32 sim-6 glitch 3: toasts keep off open windows' bodies", () =
     const at = dmStackPlacement({ w: 1440, h: 900 }, init, 120, STACK_W, [wolf], [big]);
     const r = stack(at, 120);
     expect(over(r, { ...big, h: 32 })).toBe(false);
-    // FR-NOTE-71: no body-clear spot → nearest the home row (tokens rank only off the bodies).
-    expect(at).toEqual({ left: 560, top: 100 });
+    // FR-NOTE-71: no body-clear spot → nearest the home row (tokens rank only off the bodies),
+    // below the window's title bar + first 40 px (ruling B).
+    expect(at).toEqual({ left: 560, top: 48 + 72 + 8 });
     expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
   });
 });
@@ -206,7 +207,7 @@ describe("FR-NOTE-42 stack stays home", () => {
     // Party's body under the home and the Game log below it: no body-clear spot in the column →
     // home, nearest the home row, `covers` > 0 (the runtime folds; never beside Party).
     const at = dmStackSpot(vp, INIT, 57, STACK_W, [GOBLIN_2], windows);
-    expect(at).toMatchObject({ left: 560, top: 100 });
+    expect(at).toMatchObject({ left: 560, top: 60 + 72 + 8 }); // below Party's first row (B)
     expect(at.covers).toBeGreaterThan(0);
     expect(hit(rectOf(at, 57), DRAGON)).toBe(false);
     expect(hit(rectOf(at, 57), { ...PARTY, h: 32 })).toBe(false);
@@ -348,9 +349,9 @@ describe("FR-NOTE-44 never over a pushed window's first row", () => {
     const windows = [LOG, LEFT_COL, long];
     const blocked = dmStackPlacement(vp, INIT, 57, STACK_W, targets, windows, [FOG_BAR]);
     expect(blocked).toEqual({ left: 560, top: 60 + 72 + 8 });
-    // No tool bar shown (nothing pushed): only the title bar blocks, as before (b05's spot).
+    // No tool bar shown (nothing pushed): ruling B, every window's title bar + 40 px blocks too.
     const free = dmStackPlacement(vp, INIT, 57, STACK_W, targets, windows, []);
-    expect(free).toEqual({ left: 560, top: 60 + 32 + 8 });
+    expect(free).toEqual({ left: 560, top: 60 + 72 + 8 });
   });
 
   test("FR-NOTE-44 no room in the band below the strip → over a body, never over the strip", () => {
@@ -421,10 +422,10 @@ describe("FR-NOTE-44 walkthrough U4 (20261021-fu1-frame): Scenes' first row stay
       [{ x: 68, y: 60, bottom: 179 }],
     );
     expect(stale).toEqual(before);
-    // No tool bar: rows don't count (only title bars, as before).
+    // No tool bar: rows don't count, only title bar + 40 px (ruling B).
     expect(
       dmStackPlacement(vp, init, 152, STACK_W, target, [log, left, scenesLong], [], [row]).top,
-    ).toBe(100);
+    ).toBeGreaterThanOrEqual(60 + 72);
   });
 });
 
@@ -442,7 +443,7 @@ describe("FR-NOTE-53 stack reads the plan", () => {
     }
   });
 
-  test("FR-NOTE-53 stack reads the plan: only a pushed window's title bar + 40 px block the stack, whether or not a bar shows", () => {
+  test("FR-NOTE-53 stack reads the plan: a pushed window's reported first row blocks the stack, whether or not a bar shows; any other window's title bar + 40 px (ruling B)", () => {
     // The card's targets below Scenes (sim-10 b05); Scenes reaching the Game log, so no spot
     // clears every body and the stack stays on Scenes' body (FR-NOTE-71: nearest home).
     const targets = [
@@ -454,12 +455,14 @@ describe("FR-NOTE-53 stack reads the plan", () => {
     const log = { ...LOG, pushed: false };
     const col = { ...LEFT_COL, pushed: false };
     const plan = [log, col, { ...long, pushed: true }];
-    const pushed = dmStackPlacement(vp, INIT, 57, STACK_W, targets, plan, []);
-    expect(pushed).toEqual({ left: 560, top: 60 + 72 + 8 });
-    // Not pushed (a window the user dropped there) while the Fog bar shows: its title bar only.
+    // Its first content row reported 80 px into the body.
+    const rows = [{ x: 546, y: 60, bottom: 60 + 32 + 80 }];
+    const pushed = dmStackPlacement(vp, INIT, 57, STACK_W, targets, plan, [], rows);
+    expect(pushed).toEqual({ left: 560, top: 60 + 32 + 80 + 8 });
+    // Not pushed (a window the user dropped there) while the Fog bar shows: title bar + 40 px.
     const dropped = [log, col, { ...long, pushed: false }];
-    const user = dmStackPlacement(vp, INIT, 57, STACK_W, targets, dropped, [FOG_BAR]);
-    expect(user).toEqual({ left: 560, top: 60 + 32 + 8 });
+    const user = dmStackPlacement(vp, INIT, 57, STACK_W, targets, dropped, [FOG_BAR], rows);
+    expect(user).toEqual({ left: 560, top: 60 + 72 + 8 });
     expect(hit(rectOf(user, 57), FOG_BAR)).toBe(false);
   });
 });
@@ -479,7 +482,7 @@ describe("FR-NOTE-42 windows in the home band (walkthrough WF4)", () => {
     // Taller (2 cards): nothing below fits above the Game log → home, nearest the home row,
     // `covers` > 0 (the runtime folds), never beside Stats.
     const two = dmStackSpot(vp, init, 190, STACK_W, [], [stats, log]);
-    expect(two).toMatchObject({ left: 560, top: 100 });
+    expect(two).toMatchObject({ left: 560, top: 60 + 72 + 8 }); // below Stats' first row (B)
     expect(two.covers).toBeGreaterThan(0);
   });
 
@@ -576,7 +579,8 @@ describe("FR-NOTE-71 nearest home, not the least body", () => {
     for (const h of [150, 190, 375]) {
       const at = dmStackSpot(vp, init, h, STACK_W, [], [notes, stats, log]);
       expect(at.covers).toBeGreaterThan(0);
-      expect(at).toMatchObject({ left: 560, top: 100 });
+      // Below Stats' title bar + 40 px (ruling B), never down at the Game log.
+      expect(at).toMatchObject({ left: 560, top: 60 + 72 + 8 });
       expect(hit(rectOf(at, h), rollBar)).toBe(false);
     }
   });
@@ -596,6 +600,28 @@ describe("FR-NOTE-71 nearest home, not the least body", () => {
     expect(at.covers).toBe(0);
     expect(hit(rectOf(at, 57), wolf)).toBe(false);
     expect(at.left).toBe(560);
+  });
+});
+
+describe("FR-NOTE-53 every window's first row (sprint 9 ruling B)", () => {
+  const vp = { w: 1440, h: 900 };
+  const init = { x: 1028, y: 60, w: 400, h: 500 };
+
+  test("FR-NOTE-53 every window's first row keeps the stack off (ruling B): title bar + 40 px of any window; no spot clears them → FR-NOTE-71 as before (title bars only)", () => {
+    // Stats under the home spot, the Game log below: no body-clear spot; the stack goes below
+    // Stats' first 40 px of body (its tabs), not right under its title bar.
+    const stats = { x: 555, y: 60, w: 400, h: 412 };
+    const log = { x: 68, y: 584, w: 1150, h: 240 };
+    const tabs = { x: 555, y: 60 + 32, w: 400, h: 40 };
+    for (const h of [190, 330]) {
+      const at = dmStackSpot(vp, init, h, STACK_W, [], [stats, log]);
+      expect(at).toMatchObject({ left: 560, top: 60 + 72 + 8 });
+      expect(hit(rectOf(at, h), tabs)).toBe(false);
+    }
+    // A stack too tall to clear any window's first 40 px (it must sit by 136): the title bars
+    // alone decide, nearest home (FR-NOTE-71 as before).
+    const low = { x: 500, y: 100, w: 440, h: 600 };
+    expect(dmStackSpot(vp, init, 700, STACK_W, [], [low])).toMatchObject({ left: 560, top: 136 });
   });
 });
 

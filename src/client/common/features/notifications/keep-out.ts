@@ -15,8 +15,9 @@
 // *(Sprint 9)* FR-NOTE-70 (BL-83): the lefts are home and the left-of shift only (WF4's "beside a
 // window" lefts are gone; the shift keeps 12 px to the rail). FR-NOTE-71 (BL-75): no body-clear
 // spot → the clear spot nearest the home row, not the least body. FR-NOTE-72 (BL-88): an open
-// Notifications window counts like Initiative (`StackWindow.blocks`). Pure; players keep
-// bottom-right.
+// Notifications window counts like Initiative (`StackWindow.blocks`). Ruling B (#339 follow-up,
+// amends FR-NOTE-53): every window's title bar + first 40 px keep the stack off while some spot
+// clears them all; none does → FR-NOTE-71 as before. Pure; players keep bottom-right.
 
 import { type FirstRow, firstRows } from "../play-shell/content-heights";
 import {
@@ -176,48 +177,57 @@ function dmStackSpotOnly(
   if (avoid.length === 0 && windows.length === 0 && fits(base) && offHard(base)) return base;
   // FR-NOTE-44: a pushed window's title bar, first 40 px of body and first content row (its
   // reported bottom, walkthrough U4) count as its bar; FR-NOTE-53: pushed per the plan.
-  const strip = (w: StackWindow) => {
-    if (!(w.pushed ?? hard.length > 0)) return TITLE_H;
+  // Sprint 9 ruling B (amends FR-NOTE-53): every window's title bar + first 40 px count as its bar
+  // first (`everyRow`); no spot clears those → as before (title bars, pushed strips).
+  const strip = (w: StackWindow, everyRow: boolean) => {
+    const pushed = w.pushed ?? hard.length > 0;
+    if (!pushed) return everyRow ? TITLE_H + PUSHED_BODY_CLEAR : TITLE_H;
     const row = rows.find((r) => Math.abs(r.x - w.x) <= 1 && Math.abs(r.y - w.y) <= 1);
     return Math.max(TITLE_H + PUSHED_BODY_CLEAR, row ? row.bottom - w.y : 0);
   };
-  const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, strip(w)) }));
   // FR-NOTE-72: an open Notifications window keeps the stack off like Initiative.
   const blockers = [...(initiative ? [initiative] : []), ...windows.filter((w) => w.blocks)];
-  const clear = (p: { left: number; top: number }) =>
-    !blockers.some((b) => hits(at(p), b, EDGE_GAP)) &&
-    !bars.some((b) => hits(at(p), b, 0)) &&
-    offHard(p);
   const maxTop = vp.h - LAUNCHER_CLEAR - stackH;
-  const tops = [
-    DM_TOAST_TOP,
-    ...bars.map((b) => b.y + b.h + STACK_GAP),
-    ...windows.map((w) => w.y + w.h + STACK_GAP),
-    ...hard.map((k) => k.y + k.h + STACK_GAP),
-    // FR-NOTE-72: below a window that counts like Initiative, with its 12 px gap.
-    ...blockers.map((b) => b.y + b.h + EDGE_GAP),
-    ...avoid.flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH]),
-  ].map((y) => Math.round(Math.max(DM_TOAST_TOP, Math.min(maxTop, y))));
-  // Nearest the home row first (ties keep the earlier spot).
-  const byTop = [...new Set(tops)].sort((a, b) => a - b);
-  const spots = [base, ...byTop.flatMap((top) => lefts.map((left) => ({ left, top })))];
-  // FR-NOTE-71: a spot over no window body wins (the least token area, then the earlier spot:
-  // FR-NOTE-32's, then nearest the home row); none → the clear spot nearest the home row, never
-  // a thin overlap low on a window (BL-75: the Game log's roll bar).
-  let best: { left: number; top: number } | null = null;
-  let bestKey = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
-  for (const p of spots) {
-    if (!clear(p) || !fits(p)) continue;
-    const body = coveredArea(at(p), windows) > 0;
-    const key = body ? [1, p.top] : [0, coveredArea(at(p), avoid)];
-    const [a0 = 0, a1 = 0] = key;
-    const [b0 = 0, b1 = 0] = bestKey;
-    // Strictly less wins: ties keep the earlier spot.
-    if (a0 < b0 || (a0 === b0 && a1 < b1)) {
-      best = p;
-      bestKey = key;
+  const choose = (everyRow: boolean) => {
+    const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, strip(w, everyRow)) }));
+    const clear = (p: { left: number; top: number }) =>
+      !blockers.some((b) => hits(at(p), b, EDGE_GAP)) &&
+      !bars.some((b) => hits(at(p), b, 0)) &&
+      offHard(p);
+    const tops = [
+      DM_TOAST_TOP,
+      ...bars.map((b) => b.y + b.h + STACK_GAP),
+      ...windows.map((w) => w.y + w.h + STACK_GAP),
+      ...hard.map((k) => k.y + k.h + STACK_GAP),
+      // FR-NOTE-72: below a window that counts like Initiative, with its 12 px gap.
+      ...blockers.map((b) => b.y + b.h + EDGE_GAP),
+      ...avoid.flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH]),
+    ].map((y) => Math.round(Math.max(DM_TOAST_TOP, Math.min(maxTop, y))));
+    // Nearest the home row first (ties keep the earlier spot).
+    const byTop = [...new Set(tops)].sort((a, b) => a - b);
+    const spots = [base, ...byTop.flatMap((top) => lefts.map((left) => ({ left, top })))];
+    // FR-NOTE-71: a spot over no window body wins (the least token area, then the earlier spot:
+    // FR-NOTE-32's, then nearest the home row); none → the clear spot nearest the home row,
+    // never a thin overlap low on a window (BL-75: the Game log's roll bar).
+    let best: { left: number; top: number } | null = null;
+    let bestKey = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
+    for (const p of spots) {
+      if (!clear(p) || !fits(p)) continue;
+      const body = coveredArea(at(p), windows) > 0;
+      const key = body ? [1, p.top] : [0, coveredArea(at(p), avoid)];
+      const [a0 = 0, a1 = 0] = key;
+      const [b0 = 0, b1 = 0] = bestKey;
+      // Strictly less wins: ties keep the earlier spot.
+      if (a0 < b0 || (a0 === b0 && a1 < b1)) {
+        best = p;
+        bestKey = key;
+      }
     }
-  }
+    return { best, clear, spots };
+  };
+  const first = choose(true);
+  if (first.best) return first.best;
+  const { best, clear, spots } = choose(false);
   // Nothing holds it (the runtime then shows fewer toasts): the top row when clear, else
   // FR-NOTE-32's spot, else the top row, each only off the hard keep-outs (FR-NOTE-43).
   const row = spots.filter((p) => p.top === DM_TOAST_TOP);
