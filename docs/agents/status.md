@@ -29,7 +29,8 @@ Queue: RS3 after RS2 · SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detache
 
 - Play-shell frame + canvas: PM1 merged; grants now per slice: FX3 `ShellWindow.tsx` boundary branch; PM2 / RS2 / SP2 / SP3 append rows (windows.ts, size table, goldens, replay sets: regenerate, never hand-merge).
 - Schema / core lane: free (RS0 merged); SP3 / FX3 append their lines.
-- Toast runtime (ToastRuntime, keep-out, toasts, stack-inputs): FX1 (not started).
+- Toast runtime (ToastRuntime, keep-out, toasts, stack-inputs): `fix/fx-toasts-feed` (FX1).
+- Character sheet `sections.ts` + `SheetView.tsx` (count badge): `build/rem-ui` (RS1), granted 2026-10-23.
 - Stats client files: FX1, then SP3.
 - `sync/connection.ts` + `protocol/frames.ts`: `fix/fx-sync-shell` (FX3).
 - combat-tracker `companions.ts` / `hp.ts` strings ("Party Manager"): `build/party-manager` (PM2), granted 2026-10-23.
