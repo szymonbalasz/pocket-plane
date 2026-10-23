@@ -50,6 +50,8 @@ export interface Row {
 /** A local row prepared for matching (once per store / layout change, not per keystroke). */
 export interface LocalEntry {
   row: Row;
+  /** What the query matches: the title (a window's own title, without "Open" / "Go to"). */
+  label: string;
   name: FoldedName;
   text: readonly string[];
   /** Index in `GROUPS`. */
@@ -87,10 +89,11 @@ export function forClient<T extends { clients: readonly string[]; feature?: stri
 
 const groupIndex = (g: PaletteGroup) => GROUPS.indexOf(g as (typeof GROUPS)[number]);
 
-function entry(row: Row, keywords: readonly string[] = []): LocalEntry {
+function entry(row: Row, keywords: readonly string[] = [], label = row.title): LocalEntry {
   return {
     row,
-    name: foldName(row.title),
+    label,
+    name: foldName(label),
     text: textWordsOf(keywords.join(" ")),
     order: groupIndex(row.group),
   };
@@ -142,12 +145,13 @@ function windowEntries(commands: readonly PaletteCommand[], ctx: CommandCtx): Lo
         key: `w:${def.kind}`,
         id: def.kind,
         group: "Windows",
-        title: def.title,
-        hint: `${verb} window`,
+        title: `${verb} ${def.title}`,
+        hint: "Window",
         keys: keyOf.get(def.kind),
         run: () => ctx.shell.openWindow(def.kind),
       },
       ["window", verb, def.launcher?.label ?? ""],
+      def.title,
     );
     out.push(e);
   }
@@ -208,13 +212,15 @@ export interface Section {
   rows: Row[];
 }
 
+interface Hit {
+  tier: SearchTier;
+  label: string;
+  row: Row;
+}
+
 /** Rows of one group, best first: tier, shorter title, then title. */
-function byTier(a: { tier: number; row: Row }, b: { tier: number; row: Row }) {
-  return (
-    a.tier - b.tier ||
-    a.row.title.length - b.row.title.length ||
-    a.row.title.localeCompare(b.row.title)
-  );
+function byTier(a: Hit, b: Hit) {
+  return a.tier - b.tier || a.label.length - b.label.length || a.label.localeCompare(b.label);
 }
 
 /**
@@ -249,12 +255,12 @@ export function rankLocal(
     }
     return capTotal(out);
   }
-  const hits = new Map<PaletteGroup, { tier: SearchTier; row: Row }[]>();
+  const hits = new Map<PaletteGroup, Hit[]>();
   for (const e of pool) {
     const tier = searchTier(e.name, e.text, words);
     if (tier === null) continue;
     const list = hits.get(e.row.group) ?? [];
-    list.push({ tier, row: e.row });
+    list.push({ tier, label: e.label, row: e.row });
     hits.set(e.row.group, list);
   }
   const sections = [...hits].map(([group, list]) => {

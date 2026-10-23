@@ -124,10 +124,10 @@ describe("Windows group (FR-SHELL-185)", () => {
       rankLocal(localEntries([], [], ctx), "game log")
         .flatMap((s) => s.rows)
         .find((r) => r.id === "dice.log");
-    expect(row()?.hint).toBe("Open window");
+    expect(row()?.title).toBe("Open Game log");
     row()?.run();
     expect(stateOf(ctx, "dice.log")).toBe("open");
-    expect(row()?.hint).toBe("Go to window");
+    expect(row()?.title).toBe("Go to Game log");
     const before = ctx.controller.store.getState().windows.find((w) => w.kind === "dice.log");
     row()?.run();
     const after = ctx.controller.store.getState().windows.find((w) => w.kind === "dice.log");
