@@ -67,7 +67,7 @@ async function hitTestable(page: Page, controls: Locator) {
   }
 }
 
-test("FR-SHELL-104 FR-SHELL-105 tool-bar pushes (DM 1440×900): the Fog bar pushes Scenes PC-clear (never over Mira) or puts it away (cause toolbar); pressing Fog again keeps the bar; Scenes dragged under the bar is pushed off it and every Fog control is hit-testable; Fog closed → Scenes back at its drop spot", async ({
+test("FR-SHELL-104 FR-SHELL-105 FR-SHELL-150 FR-SHELL-167 tool-bar pushes (DM 1440×900): the Fog bar pushes an untouched Scenes PC-clear (never over Mira) or puts it away (cause toolbar); pressing Fog again keeps the bar; Scenes dragged under the bar (remembered) is drawn aside of it and every Fog control is hit-testable; Fog closed → Scenes back at its drop spot", async ({
   browser,
 }) => {
   test.setTimeout(120_000);
@@ -86,14 +86,18 @@ test("FR-SHELL-104 FR-SHELL-105 tool-bar pushes (DM 1440×900): the Fog bar push
   const page = dm.getByTestId("ui-play-page");
   const panel = dm.getByTestId("map-tool-panel");
 
-  await test.step("F6: Scenes at the top-left, Fog tool → Scenes pushed PC-clear, or put away until the tool closes (BL-61)", async () => {
-    await drop(dm, scenes, 68, 60);
-    await expect.poll(async () => (await box(scenes)).x).toBe(68);
+  await test.step("F6: Scenes untouched where the placer put it, Fog tool → Scenes, if under the bar, pushed PC-clear, or put away until the tool closes (BL-61)", async () => {
+    await expect(scenes).not.toHaveAttribute("data-remembered", "true");
     await dm.getByTestId("map-tool-fog").click();
     await expect(dm.getByTestId("fog-bar")).toBeVisible();
     await expect(panel).toHaveAttribute("data-spot", "home");
-    await expect(page).toHaveAttribute("data-settle-log", /push:map\.scenes>/);
     const bar = await box(panel);
+    const log = (await page.getAttribute("data-settle-log")) ?? "";
+    if (!/push:map\.scenes>/.test(log)) {
+      // Not under the bar: nothing to push.
+      expect(overlaps(await box(scenes), grown(bar))).toBe(false);
+      return;
+    }
     const mira = await footprintsOf(dm, ["Mira"]);
     expect(mira.length).toBeGreaterThan(0);
     if (await scenes.isVisible()) {
@@ -107,25 +111,24 @@ test("FR-SHELL-104 FR-SHELL-105 tool-bar pushes (DM 1440×900): the Fog bar push
     }
   });
 
-  await test.step("F7: Fog pressed again keeps the bar (a re-select push); Scenes dragged under the bar is pushed off it; every Fog control hit-testable (BL-52)", async () => {
+  await test.step("F7: Fog pressed again keeps the bar (a re-select push); Scenes dragged under the bar is remembered and drawn aside of it (render-only, FR-SHELL-150); every Fog control hit-testable (BL-52)", async () => {
     await dm.getByTestId("map-tool-fog").click();
     await expect(dm.getByTestId("fog-bar")).toBeVisible();
     await expect(dm.getByTestId("map-tool-fog")).toHaveAttribute("data-state", "on");
     const win = await openWindow(dm, "map.scenes");
     await drop(dm, win, 68, 60);
+    await expect(win).toHaveAttribute("data-remembered", "true");
     await expect(win).toHaveAttribute("data-placed", "pushed");
-    await expect(page).toHaveAttribute("data-settle-log", /drag-end:map\.scenes>/);
     const bar = await box(panel);
     const w = await box(win);
     expect(overlaps(w, grown(bar)), JSON.stringify({ w, bar })).toBe(false);
-    await expect(win).toHaveAttribute("data-pc-clear", "true");
     await hitTestable(dm, panel.locator("button"));
   });
 
-  await test.step("F8 (push half): Fog closed → Scenes returned to its drop spot", async () => {
+  await test.step("F8 (push half), FR-SHELL-167: Fog closed → Scenes at its drop spot (`stored`)", async () => {
     await dm.getByTestId("map-tool-select").click();
     await expect(panel).toHaveCount(0);
-    await expect(scenes).toHaveAttribute("data-placed", "returned");
+    await expect(scenes).toHaveAttribute("data-placed", "stored");
     expect(await box(scenes)).toMatchObject({ x: 68, y: 60 });
   });
   await dm.context().close();

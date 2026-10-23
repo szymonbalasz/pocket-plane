@@ -5,6 +5,10 @@
 // offered trigger die: dashed outline, never struck. Used by the tray, the throw zone's flat
 // dice, the roll popup and the game log (FR-DICE-35). `blank`: the shape without its number while
 // the entry is held (FR-DICEX-49, table E).
+// FR-DICE-93 (BL-57): the number is HTML text over the shape (an inline-block `<span>` pulled
+// back over the `<svg>` by a negative margin; the `<svg>` stays `aria-hidden`, no `<text>`) and
+// every box is inline-level, so a log line's `innerText` / a selection copy reads on one line.
+// Neither `inline-flex` nor an absolutely positioned span: Chromium breaks `innerText` around both.
 import { type DiceLook, STYLE_LOOK } from "@shared/dice-extras/looks";
 import { cn } from "../../lib/utils";
 
@@ -41,9 +45,9 @@ export const DIE_PX = { sm: 18, md: 36, lg: 44 } as const;
 
 /** The round chip per `size`. */
 const ROUND: Record<keyof typeof DIE_PX, string> = {
-  sm: "h-[18px] min-w-[18px] px-1 text-[10px]",
-  md: "h-9 min-w-9 px-1.5 text-sm",
-  lg: "h-11 min-w-11 px-1.5 text-base",
+  sm: "h-[18px] min-w-[18px] px-1 text-[10px] leading-[16px]",
+  md: "h-9 min-w-9 px-1.5 text-sm leading-[32px]",
+  lg: "h-11 min-w-11 px-1.5 text-base leading-[40px]",
 };
 
 // Outlines in a 100 × 100 box; `cy` = where the number sits.
@@ -68,6 +72,7 @@ const fontOf = (text: string, scale = 1) =>
 function Outline({
   kind,
   text,
+  copy = true,
   look,
   kept,
   offered,
@@ -76,6 +81,8 @@ function Outline({
   kind: Exclude<DieShapeKind, "round">;
   /** "" = blank. */
   text: string;
+  /** false: the face is drawn (`data-face`) but is no text node (a d100 kite; the chip's value is). */
+  copy?: boolean;
   look: DiceLook;
   kept: boolean;
   offered: boolean;
@@ -83,34 +90,49 @@ function Outline({
 }) {
   const o = OUTLINE[kind];
   const stroke = { stroke: look.pips, strokeWidth: 6, strokeLinejoin: "round" as const };
+  /** Box units → px, two decimals. */
+  const toPx = (u: number) => Math.round(u * px) / 100;
+  // The number's centre sits at `cy`: padding on one side and a shorter line, so the box stays
+  // `px` high (a relative `top` would add scroll overflow under the last log line).
+  const shift = 2 * toPx(o.cy - 50);
   return (
-    <svg
-      viewBox="0 0 100 100"
-      width={px}
-      height={px}
-      aria-hidden
-      className="shrink-0 overflow-visible"
-    >
-      <path d={o.d} fill={look.body} {...stroke} strokeDasharray={offered ? "12 9" : undefined} />
-      {kind === "d20" && <path d={D20_FACE} fill="none" {...stroke} strokeWidth={3} />}
+    <>
+      <svg
+        viewBox="0 0 100 100"
+        width={px}
+        height={px}
+        aria-hidden
+        className="inline-block overflow-visible align-top"
+      >
+        <path d={o.d} fill={look.body} {...stroke} strokeDasharray={offered ? "12 9" : undefined} />
+        {kind === "d20" && <path d={D20_FACE} fill="none" {...stroke} strokeWidth={3} />}
+        {!kept && !offered && (
+          <line x1={14} y1={o.cy} x2={86} y2={o.cy} stroke={look.pips} strokeWidth={7} />
+        )}
+      </svg>
       {text !== "" && (
-        <text
-          x={50}
-          y={o.cy}
-          textAnchor="middle"
-          dominantBaseline="central"
-          fill={look.pips}
-          fontSize={fontOf(text, o.scale)}
-          fontWeight={700}
-          className="tabular-nums"
+        <span
+          data-face={text}
+          className={cn(
+            "relative box-border inline-block text-center align-top font-bold tabular-nums",
+            !copy && "before:content-[attr(data-face)]",
+            !kept && !offered && "line-through",
+          )}
+          style={{
+            width: px,
+            height: px,
+            marginLeft: -px,
+            paddingTop: Math.max(0, shift),
+            paddingBottom: Math.max(0, -shift),
+            lineHeight: `${px - Math.abs(shift)}px`,
+            fontSize: toPx(fontOf(text, o.scale)),
+            color: look.pips,
+          }}
         >
-          {text}
-        </text>
+          {copy ? text : null}
+        </span>
       )}
-      {!kept && !offered && (
-        <line x1={14} y1={o.cy} x2={86} y2={o.cy} stroke={look.pips} strokeWidth={7} />
-      )}
-    </svg>
+    </>
   );
 }
 
@@ -157,6 +179,8 @@ export function DieShape({
         ? d100Faces(value)
         : [String(value)];
   const dimmed = !kept && !offered;
+  // A whole d100 (two kites, "40" + "0"): the faces are drawn, the value is the text node.
+  const split = texts.length > 1;
   return (
     <span
       data-testid="dicex-die"
@@ -170,14 +194,14 @@ export function DieShape({
         label ?? `${faces ? `d${faces}` : "dice"}: ${blank ? "rolling" : `${sign}${value}`}`
       }
       className={cn(
-        "inline-flex shrink-0 items-center gap-px align-middle leading-none",
+        "inline-block shrink-0 whitespace-nowrap align-middle leading-none",
         dimmed && "opacity-40",
       )}
     >
       {kind === "round" ? (
         <span
           className={cn(
-            "inline-flex items-center justify-center rounded-full border font-bold tabular-nums",
+            "inline-block rounded-full border text-center align-top font-bold tabular-nums",
             ROUND[size],
             offered && "border-dashed",
             dimmed && "line-through",
@@ -193,18 +217,22 @@ export function DieShape({
           {!blank && value}
         </span>
       ) : (
-        texts.map((t, i) => (
-          <Outline
-            // biome-ignore lint/suspicious/noArrayIndexKey: d100 tens then units, positional
-            key={i}
-            kind={kind}
-            text={blank ? "" : i === 0 ? `${sign}${t}` : t}
-            look={look}
-            kept={kept}
-            offered={offered}
-            px={px}
-          />
-        ))
+        <>
+          {texts.map((t, i) => (
+            <Outline
+              // biome-ignore lint/suspicious/noArrayIndexKey: d100 tens then units, positional
+              key={i}
+              kind={kind}
+              text={blank ? "" : i === 0 ? `${sign}${t}` : t}
+              copy={!split}
+              look={look}
+              kept={kept}
+              offered={offered}
+              px={px}
+            />
+          ))}
+          {split && !blank && <span className="text-[0px]">{`${sign}${value}`}</span>}
+        </>
       )}
     </span>
   );

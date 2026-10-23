@@ -102,6 +102,10 @@ export function ShellProvider({
         dryFit: (windows) => fitPort()?.dryFit(windows) ?? null,
         lastFullCell: () => fitPort()?.lastFullCell() ?? null,
         onYield: () => fitPort()?.yieldRefit(),
+        // FR-MAP-114: a squeezed protected window back in its zone over a PC → one `window` refit.
+        onRefit: () => fitPort()?.yieldRefit(),
+        // FR-SHELL-155: `onAbsorb` learns who this page is.
+        you: () => sync?.getState().store.you ?? null,
         // FR-SHELL-80: the map refits once on the client that reset.
         onReset: () => {
           requestFit();
@@ -311,6 +315,16 @@ export function useWindowDispatch(): (action: WindowAction) => void {
     },
     [controller, sync],
   );
+}
+
+/**
+ * FR-SHELL-153, -165 (exported for SP's palette, seams S3): Reset layout, the same action as the
+ * launcher's "⋯" and Preferences → Layout: every window untouched again (remembered spots and
+ * sizes forgotten), the named default layout, displacement memory dropped, one Fit of the map.
+ */
+export function useResetLayout(): () => void {
+  const dispatch = useWindowDispatch();
+  return useCallback(() => dispatch({ type: "reset" }), [dispatch]);
 }
 
 /**

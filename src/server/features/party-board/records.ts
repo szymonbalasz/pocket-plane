@@ -18,7 +18,8 @@ import {
   redactHandout,
   redactHandoutBody,
 } from "@shared/party-board/visibility";
-import { defineRecordType, type Visibility } from "../../ws/records";
+import { partyItemVisibility } from "@shared/party-loot/visibility";
+import { defineRecordType } from "../../ws/records";
 import { handoutBodiesByIds, listHandouts, listPartyItems, listPresents } from "./rows";
 
 /** FR-PARTY-01 header: lazy `"all"` (the board loads every visible header). */
@@ -53,10 +54,10 @@ export const handoutBodyType = defineRecordType<HandoutBodyRecord>({
   byIds: ({ db }, _v, ids) => handoutBodiesByIds(db, ids),
 });
 
-/** FR-PARTY-17: no DM-only field (as LOOT-10); the scope gate keeps other campaigns out. */
-export const partyItemVisibility = (): Visibility => "full";
-
-/** FR-PARTY-17: lazy `"all"`. */
+/**
+ * FR-PARTY-17: lazy `"all"`; full for the campaign (as LOOT-10). *(S9)* Rows of a hidden Stores and
+ * DM-only Stores items are hidden from players (FR-LOOT-32, -36).
+ */
 export const partyItemType = defineRecordType<PartyItemRecord>({
   type: PARTY_ITEM_TYPE,
   scope: "campaign",
@@ -64,7 +65,7 @@ export const partyItemType = defineRecordType<PartyItemRecord>({
   schema: PartyItemRecord,
   idOf: (r) => r.id,
   campaignOf: (r) => r.campaignId,
-  visibility: partyItemVisibility,
+  visibility: (r, v) => partyItemVisibility(r, v),
   snapshot: ({ db }, v) => listPartyItems(db, v.campaignId),
 });
 

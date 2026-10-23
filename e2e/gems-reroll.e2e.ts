@@ -1,7 +1,7 @@
 // e2e-bundle: gems-reroll-e2e
 // Thin Inspiration reroll flow (GEM §13 E2E, GM1; DICE FR-DICE-65, -68): DM, player-1 (Mira),
 // player-2. Gems on, Mira holds 2 Inspiration gems. player-1 hovers Mira's Perception line (4 + 3
-// = 7) → "Inspiration: reroll" → "Spend?" ✓ → the spend line and the new roll line show for all
+// = 7) → "Inspiration: reroll" → "Spend Inspiration?" ✓ → the spend line and the new roll line show for all
 // three; the old line is struck with a "rerolled" Badge that jumps to the new line. The DM
 // switches gems off → the struck line and the spend line go without a reload, the final roll
 // stays; on → back. player-2's frames never carry the DM's hidden DM-SECRET-GEM line. Rules,
@@ -78,7 +78,7 @@ test("FR-GEM-19 FR-GEM-33 FR-DICE-65 FR-DICE-68 FR-GEM-05 P1 rerolls Perception 
   const action = perc.locator('[data-testid="dice-log-action"][data-value="gem.reroll"]');
   await expect(action).toHaveAttribute("aria-label", "Inspiration: reroll");
   await action.click();
-  await expect(perc.getByTestId("dice-log-action-confirm")).toContainText("Spend?");
+  await expect(perc.getByTestId("dice-log-action-confirm")).toContainText("Spend Inspiration?");
   await perc.getByTestId("dice-log-action-yes").click();
 
   for (const log of logs) {

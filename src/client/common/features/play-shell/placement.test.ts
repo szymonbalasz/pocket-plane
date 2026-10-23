@@ -9,8 +9,10 @@ import {
   type PlacementToken,
   pcBoxes,
   pcClear,
+  placeMemo,
   placeWindow,
   RAIL_CLEAR,
+  roomFor,
   SPOTS_MAX,
   usableArea,
 } from "./placement";
@@ -434,4 +436,82 @@ describe("sprint 6 placement (FR-SHELL-57, -58)", () => {
       clear: false,
     });
   });
+});
+
+test("FR-SHELL-158 one token grid per settle (BL-82): searches sharing a `placeMemo` give the same spots as without, at 12 and 4 px, any floor, with fewer windows (a restart after a put-away)", () => {
+  const vp = { w: 1600, h: 900 };
+  const tokens = Array.from({ length: 200 }, (_, i) => ({
+    x: (i * 37) % 1500,
+    y: 60 + ((i * 53) % 760),
+    w: 48,
+    h: 48,
+    pc: i % 20 === 0,
+  }));
+  const windows = Array.from({ length: 10 }, (_, i) => ({
+    x: 68 + (i % 4) * 380,
+    y: 60 + Math.floor(i / 4) * 160,
+    w: 440,
+    h: 400,
+  }));
+  const def: Placeable = {
+    defaultPosition: { anchor: "top-left", dx: 56 },
+    defaultSize: { w: 440, h: 400 },
+    minSize: { w: 320, h: 240 },
+  };
+  const memo = placeMemo(tokens);
+  for (const gap of [12, 4]) {
+    for (const floor of [undefined, { w: 440, h: 266 }]) {
+      for (let n = windows.length; n >= 0; n -= 3) {
+        const input = { windows: windows.slice(0, n), tokens, gap, ...(floor && { floor }) };
+        expect(placeWindow(def, vp, { ...input, memo })).toEqual(placeWindow(def, vp, input));
+      }
+    }
+  }
+  expect(memo.grids.size).toBe(4); // (gap, heights): built once each, reused after
+});
+
+test("FR-SHELL-158 roomFor is exact for clear spots (BL-82): whenever it says no room, the search finds no clear spot; whenever the search finds one, it says room", () => {
+  const vp = { w: 1280, h: 720 };
+  const def: Placeable = {
+    defaultPosition: { anchor: "top-left", dx: 56 },
+    defaultSize: { w: 440, h: 400 },
+    minSize: { w: 320, h: 240 },
+    minOpenH: 300,
+  };
+  let seed = 7;
+  const rnd = (n: number) => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed % n;
+  };
+  let none = 0;
+  for (let i = 0; i < 300; i++) {
+    const windows = Array.from({ length: 1 + rnd(8) }, () => ({
+      x: 60 + rnd(1000),
+      y: 48 + rnd(500),
+      w: 200 + rnd(400),
+      h: 150 + rnd(300),
+    }));
+    const tokens = Array.from({ length: rnd(30) }, () => ({
+      x: rnd(1200),
+      y: 48 + rnd(600),
+      w: 40,
+      h: 40,
+      pc: rnd(3) === 0,
+    }));
+    for (const gap of [12, 4]) {
+      for (const floor of [undefined, { w: 440, h: 300 }]) {
+        const input = { windows, tokens, gap, ...(floor && { floor }) };
+        const room = roomFor(def, vp, input);
+        const p = placeWindow(def, vp, input);
+        if (!room) none += 1;
+        expect({ i, gap, room, clear: p.clear }).toEqual({
+          i,
+          gap,
+          room: room || p.clear,
+          clear: p.clear && room,
+        });
+      }
+    }
+  }
+  expect(none).toBeGreaterThan(0);
 });

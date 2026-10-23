@@ -5,7 +5,15 @@ import { describe, expect, test } from "bun:test";
 import type { WindowState } from "@shared/play-shell/layout";
 import { emptyStore } from "@shared/protocol/store";
 import { type ChromeKeepOut, chromeFits, chromeKeepOuts } from "./chrome-keep-outs";
-import { clampRect, moveRect, type Rect, renderedRect, type Viewport } from "./geometry";
+import {
+  clampRect,
+  moveRect,
+  placedRect,
+  type Rect,
+  renderedRect,
+  type Viewport,
+  workArea,
+} from "./geometry";
 import { blockInput, cancelGestures, onGestureCancel } from "./input-block";
 import { keepOuts } from "./keep-outs";
 import * as managerModule from "./manager";
@@ -14,7 +22,9 @@ import {
   defaultLayout,
   type ManagerContext,
   plan,
+  pushBars,
   reduce,
+  renderedPlaced,
   restoreLayout,
   serialise,
   type WindowAction,
@@ -80,6 +90,11 @@ const hits = (a: Rect, b: Rect) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 const pc = (x: number, y: number): PlacementToken => ({ x, y, w: 40, h: 40, pc: true });
 const zone = (vp: Viewport, kind: string) => rectOf(get(defaultLayout(dm, vp), kind));
+/** A spot the shell chose for `kind` (untouched: no `userSpot` / `userSize`), with its area. */
+const shellSpot = (ws: Windows, kind: string, r: Rect, vp: Viewport): Windows =>
+  ws.map((w) =>
+    w.kind === kind ? { ...w, x: r.x, y: r.y, w: r.w, h: r.h, area: workArea(vp) } : w,
+  );
 
 /** A small in-memory shell (the page's controller). */
 function shell(
@@ -222,29 +237,36 @@ describe("one placer (FR-SHELL-95–113)", () => {
     expect(gapTo(b, blocker)).toBeGreaterThanOrEqual(4);
   });
 
-  test("FR-SHELL-99 zones: protected windows take their named default rect; with a `moved` camera and a PC under it, the ladder (zone first); a launcher window in it, user spot included, is displaced and returns when the zone's window closes", () => {
+  test("FR-SHELL-99 FR-SHELL-151 zones: protected windows take their named default rect; with a `moved` camera and a PC under it, the ladder (zone first); an untouched launcher window in it is displaced and returns when the zone's window closes; a remembered one stays under it", () => {
     for (const vp of [LAPTOP, WIDE]) {
       const init = zone(vp, "t.init");
-      // A user's Compendium dropped in Initiative's zone while it was closed.
+      // A Compendium the shell put in Initiative's zone while it was closed.
       let ws = reduce(defaultLayout(dm, vp), { type: "close", kind: "t.init" }, ctxAt(vp));
       ws = reduce(ws, { type: "open", kind: "t.a" }, ctxAt(vp));
       const drop = { x: init.x, y: init.y, w: 440, h: 400 };
-      ws = reduce(ws, { type: "setRect", kind: "t.a", rect: drop }, ctxAt(vp));
+      // Remembered (the user dropped it there): it stays, no memory; Initiative on top.
+      const mine = reduce(ws, { type: "setRect", kind: "t.a", rect: drop }, ctxAt(vp));
+      const kept = plan(mine, { type: "open", kind: "t.init", by: "feature" }, ctxAt(vp));
+      expect(rectOf(get(kept.windows, "t.init"))).toEqual(init);
+      expect({ ...get(kept.windows, "t.a"), z: 0 }).toEqual({ ...get(mine, "t.a"), z: 0 });
+      expect(kept.memory).toEqual([]);
+      expect(get(kept.windows, "t.init").z).toBeGreaterThan(get(kept.windows, "t.a").z);
+      ws = shellSpot(ws, "t.a", drop, vp);
       const p = plan(ws, { type: "open", kind: "t.init", by: "feature" }, ctxAt(vp));
       expect(rectOf(get(p.windows, "t.init"))).toEqual(init);
       expect(p.placed.get("t.init:main")).toBe("zone");
       const a = get(p.windows, "t.a");
       expect(a.state === "minimised" || !hits(a, init)).toBe(true);
       expect(p.memory.find((d) => d.kind === "t.a")?.cause).toBe("window:t.init");
-      // Initiative closes: the user's Compendium goes back to its drop spot, a user spot again.
+      // Initiative closes: the Compendium goes back to its spot (then, shell-shrunk, grows back
+      // toward its default size, FR-SHELL-103).
       const back = plan(
         p.windows,
         { type: "close", kind: "t.init" },
         ctxAt(vp, { memory: () => p.memory }),
       );
-      expect(rectOf(get(back.windows, "t.a"))).toEqual(drop);
-      expect(get(back.windows, "t.a").userSpot).toBe(true);
-      expect(back.placed.get("t.a:main")).toBe("returned");
+      expect(back.log).toContain("return:t.a>returned");
+      expect(get(back.windows, "t.a").state).toBe("open");
     }
     // A moved camera with PCs under the zone: Initiative goes through the ladder, PC-clear.
     const pcs = [pc(zone(WIDE, "t.init").x + 100, 200)];
@@ -853,10 +875,11 @@ describe("pushes and the rail inset (FR-SHELL-104–106, -109; WF2)", () => {
     expect(rectOf(get(back.windows, "t.small"))).toEqual(before);
     expect(back.placed.get("t.small:main")).toBe("returned");
     // A protected window over the bar, PCs everywhere: moved off it, never put away, flagged L5.
-    let prot = reduce(
+    let prot = shellSpot(
       defaultLayout(dm, LAPTOP),
-      { type: "setRect", kind: "t.init", rect: { x: 68, y: 60, w: 400, h: 400 } },
-      withBar(new Map()),
+      "t.init",
+      { x: 68, y: 60, w: 400, h: 400 },
+      LAPTOP,
     );
     prot = reduce(prot, { type: "minimise", kind: "t.log" }, withBar(new Map()));
     reports.set("map.toolbar", bar);
@@ -869,34 +892,34 @@ describe("pushes and the rail inset (FR-SHELL-104–106, -109; WF2)", () => {
     expect(pushed.putAway.size).toBe(0);
   });
 
-  test("FR-SHELL-105 drag under a bar (BL-52): a move end over the shown tool bar pushes the window off it (`pushed`); the bar gone, it returns to the dropped rect with its user spot; dropped off the bar, it stays", () => {
+  test("FR-SHELL-105 FR-SHELL-150 drag under a bar (BL-52): a move end over the shown tool bar stores the dropped rect (remembered) and renders it pushed off the bar (`pushed`), nothing written; the bar gone, it renders at the dropped rect; dropped off the bar, it stays", () => {
     const reports = new Map<string, Rect>();
     const { c, win } = shell({ current: LAPTOP }, { keepOuts: (v) => keepOuts("dm", v, reports) });
+    const t = dm.get("t.small") as WindowDef;
+    const shownNow = () => {
+      const bars = pushBars(keepOuts("dm", LAPTOP, reports));
+      const w = win("t.small");
+      const placed = c.store.getState().placed.get("t.small:main");
+      return {
+        r: placedRect(w, t.minSize, LAPTOP, bars),
+        how: renderedPlaced(w, t, LAPTOP, bars, placed),
+      };
+    };
     c.dispatch({ type: "open", kind: "t.small" }, all);
     reports.set("map.toolbar", bar);
     c.dispatch({ type: "push", rect: bar }, all);
     expect(hits(win("t.small"), grown(bar))).toBe(false);
     const dropped = { x: 70, y: 70, w: 320, h: 300 };
     c.dispatch({ type: "setRect", kind: "t.small", rect: dropped }, all);
-    const at = rectOf(win("t.small"));
-    expect(hits(at, grown(bar))).toBe(false);
-    expect(c.store.getState().placed.get("t.small:main")).toBe("pushed");
-    expect(c.store.getState().settleLog).toMatch(/^drag-end:t\.small>L[12]/);
-    expect(c.store.getState().memory).toEqual([
-      {
-        kind: "t.small",
-        instance: "main",
-        rect: dropped,
-        userSpot: true,
-        cause: "toolbar:map.toolbar",
-        at,
-      },
-    ]);
+    expect(rectOf(win("t.small"))).toEqual(dropped);
+    expect(win("t.small").userSpot).toBe(true);
+    expect(hits(shownNow().r, grown(bar))).toBe(false);
+    expect(shownNow().how).toBe("pushed");
+    expect(c.store.getState().memory).toEqual([]);
     reports.delete("map.toolbar");
     c.dispatch({ type: "return" }, all);
     expect(rectOf(win("t.small"))).toEqual(dropped);
-    expect(win("t.small").userSpot).toBe(true);
-    expect(c.store.getState().placed.get("t.small:main")).toBe("returned");
+    expect(shownNow()).toEqual({ r: dropped, how: "stored" });
     // Off a shown bar: the user's spot, nothing pushed.
     reports.set("map.toolbar", bar);
     const off = { x: 600, y: 200, w: 320, h: 300 };
@@ -905,12 +928,12 @@ describe("pushes and the rail inset (FR-SHELL-104–106, -109; WF2)", () => {
     expect(c.store.getState().placed.get("t.small:main")).toBe("stored");
   });
 
-  test("FR-SHELL-105 re-select pushes: the same bar rect again pushes a window that got under it (a reload with the tool active); a tool swap pushes with the new bar, the first pre-push rect kept", () => {
+  test("FR-SHELL-105 re-select pushes: the same bar rect again pushes an untouched window that got under it (a reload with the tool active); a tool swap pushes with the new bar, the first pre-push rect kept", () => {
     const reports = new Map<string, Rect>();
-    // t.small moved under the bar while no bar was shown; then the tool comes up.
+    // t.small placed under the bar while no bar was shown; then the tool comes up.
     let ws = reduce(defaultLayout(dm, LAPTOP), { type: "open", kind: "t.small" }, withBar(reports));
     const home = { x: 68, y: 60, w: 320, h: 300 };
-    ws = reduce(ws, { type: "setRect", kind: "t.small", rect: home }, withBar(reports));
+    ws = shellSpot(ws, "t.small", home, LAPTOP);
     reports.set("map.toolbar", bar);
     const p = plan(ws, { type: "push", rect: bar }, withBar(reports));
     expect(hits(get(p.windows, "t.small"), grown(bar))).toBe(false);
@@ -939,7 +962,7 @@ describe("pushes and the rail inset (FR-SHELL-104–106, -109; WF2)", () => {
       { ...withBar(reports), memory: () => swap.memory },
     );
     expect(rectOf(get(back.windows, "t.small"))).toEqual(home);
-    expect(get(back.windows, "t.small").userSpot).toBe(true);
+    expect(get(back.windows, "t.small").userSpot).toBeUndefined();
   });
 
   test("FR-SHELL-106 drag onto a PC: kept as a user spot; no load, viewport, reopen or other open moves it for PCs", () => {

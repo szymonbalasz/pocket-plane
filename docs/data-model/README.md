@@ -1378,7 +1378,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). *
 From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §50](../protocol/README.md#50-sprint-3-party-board-handouts-p2).
 
 - **Notification rows:** kind `handout-shared` in `notification` (payload `{handoutId}`, state `info`, audience `all` or `player`; FR-PARTY-06). The row and its handout id stay after an unshare or delete (OQ-PARTY-15); the handout's records still leave the player.
-- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab}` (FR-PARTY-11; sprint 9 values per [§119](#119-sprint-9-party-manager-pm2)); the viewer's selected handout + mode (page memory).
+- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab}` (FR-PARTY-11; sprint 9 values per [§121](#121-sprint-9-party-manager-pm2)); the viewer's selected handout + mode (page memory).
 - **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
 - **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
 - **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
@@ -2486,9 +2486,42 @@ From [campaign-management](../specs/campaign-management.md#6-functional-requirem
 - **Fixtures:** `camp-paused`; bundles `table-tools-paused`, `table-tools-paused-e2e`.
 - **CON-44:** 0 B beyond TT0's measured +488 B (paused).
 
-## 119. Sprint 9: Party Manager (PM2)
+## 119. Sprint 9: reminders + strongholds core (RS0)
 
-From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #339). **Built by `build/party-manager`**. Protocol side: [protocol §149](../protocol/README.md#149-sprint-9-party-manager--party-status-tab-companions-under-owners-tab-registry-pm2). **No table, column, record type or wire field.**
+From [reminders](../specs/reminders.md#8-data-model) §8, [strongholds](../specs/strongholds.md#8-data-model) §8 and [party-loot](../specs/party-loot.md#8-data-model) §8 sprint 9 (#338, #339; [ADR-0065](../architecture/adr/0065-reminder-stronghold-records.md), [ADR-0066](../architecture/adr/0066-stores-holder.md)). **Built by `fix/rs-core`** (schema / core lane first and alone, seams S10). Protocol side: [protocol §149](../protocol/README.md#149-sprint-9-reminders--strongholds-core--records-intents-stores-holder-rs0).
+
+| Field / table | Change | Rule | Source |
+|---|---|---|---|
+| `reminder` *(new table, record type `reminder`, lazy)* | `id` PK, `campaign_id` FK, `seq` (unique, CON-20), `character_id` null (= party; no FK), `text`, `source`, `rolls` (JSON leaf 0–4 × `{id, label, expression, category}`), `stronghold_id` / `facility_id` null (no FK), `dm_only`, `owner_player_id` null (copy), `link_hidden` (copy), `created_by_player_id` null (= the DM), `created_at`, `updated_at`; indexes `(campaign_id, seq)`, `(campaign_id, character_id)`, `(stronghold_id)` | text 1–500 (keeps `\n`), source 0–60, rolls canonical FR-DICE-01; ≤ 200 per campaign, ≤ 30 per target (commands); `owner_player_id` = the PC's owner at write, rewritten by entities' owner-change hook; `link_hidden` = linked stronghold or facility DM-only, rewritten by HOLD commands; `created_at` strictly increasing per campaign (≥ previous + 1 ms); deleted with its facility / stronghold | FR-REM-01–07, -11 |
+| `stronghold` *(new table, record type `stronghold`, lazy)* | `id` PK, `campaign_id` FK, `seq` (unique), `name`, `dm_only`, `defenders`, `defenders_dm_only`, `notes`, `notes_dm_only`, `facilities` (JSON leaf ≤ 24 × `{id, name, state, cost, buildDays, upkeep, incomeDice, effect, order, replacesId, dmOnly}`), `staff` (JSON leaf ≤ 40 × `{id, name, role, wage, notes, facilityId, dmOnly}`), `created_at`, `updated_at`; index `(campaign_id, seq)`, unique `(campaign_id, lower(name))` | ≤ 8 per campaign; new = DM-only (FR-HOLD-06); array order = the DM's order; element ids from `ctx.ids`; `created_at` strictly increasing per campaign | FR-HOLD-01–08 |
+| `loot_entry` | `from_kind` / `to_kind` + `stores`; + `from_stronghold_id`, `to_stronghold_id` (null, no FK: a deleted stronghold's rows stay); + `stores_hidden`, `item_hidden` NOT NULL default false; indexes `(campaign_id, from_stronghold_id)`, `(campaign_id, to_stronghold_id)` | `stores_hidden` = some Stores end's stronghold is DM-only (written at insert, rewritten on every row by a show / hide); `item_hidden` = adds / removes a DM-only Stores item (`world ↔ stores`, or between Stores); new rows' `created_at` strictly increasing per campaign | FR-LOOT-30, -32, -36 |
+| `party_item` | + `stronghold_id` (null = party inventory), `stores_hidden`, `dm_only` NOT NULL default false; index `(campaign_id, stronghold_id)` | ≤ 60 rows per holder; merge key (name ci, notes, DM-only) within the holder; `dm_only` on Stores rows only | FR-LOOT-36, -37 |
+
+- **Relations:** campaign 1–n reminder / stronghold; stronghold 1–n reminders (by id); stronghold 1–1 Stores (ledger rows by `*_stronghold_id`, items by `stronghold_id`). **Derived:** `stronghold-index` (from `stronghold`), `stores-coin` (Σ over `loot_entry` per existing stronghold with ≥ 1 entry; `hidden` = its `dm_only`).
+- **Persisted runtime state:** the two tables and seven columns. No migration (push-time defaults).
+- **Fixtures:** units `rem-party`, `rem-mira-charm`, `rem-thorn-own`, `rem-thorn-secret`, `hold-greystone`, `hold-greystone-reminders`, `hold-greystone-stores`, `hold-tower-secret`, `hold-tower-move`; bundles `reminders-strongholds`, `rs-e2e`, `session-sim-13` (= `session-sim-12` + the RS units but `hold-tower-move`).
+- **CON-44:** see [protocol §149](../protocol/README.md#149-sprint-9-reminders--strongholds-core--records-intents-stores-holder-rs0).
+
+## 120. Sprint 9: dice + gems lines (FX2)
+
+From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-91–93, [gems](../specs/gems.md#6-functional-requirements) FR-GEM-41–44, [notifications](../specs/notifications.md#6-functional-requirements) FR-NOTE-74 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-94–95 (#338, #339). **Built by `fix/fx-dice-lines`**: no table, column or record type. Protocol side: [protocol §150](../protocol/README.md#150-sprint-9-dice--gems-lines-fx2).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| `gem.award` payload `count` | 1–10 (was 1–5): one line per net award of a summed `gem.adjust` | FR-GEM-43 |
+| A reroll `roll` entry's `payload` / `rollIds` / `dmPayload` (combat to-hit with a pending card) | the new to-hit item + the card's **current** damage items (a maxed part's new roll row: its `rollId`, `dice`, `total` + `mods`); none once a crit flip moved the damage to "not used". `rollIds` = the new to-hit's and the kept items' rolls (their part and offered rolls); `dmPayload.items` keep the kept items' names, aligned. Any other reroll: copied as before | FR-GEM-41, FR-DICE-91 |
+| DM quick-award sum | client memory per sheet block: per character + gem, the unsent sum and the sum in flight; dropped when not live or on reload | FR-GEM-43 |
+| Popup hold flags | client memory per mounted card: pointer moved on it since it showed, focus inside; cleared on mount / unmount | FR-DICEX-94 |
+| Macro editor touched flags | component state per editor: name, expression, Save pressed | FR-DICEX-95 |
+
+- **Derived:** a line's text breakdown joins kept dice with " + " across dropped ones (`groupSegments`, FR-DICE-92); counted rolls (FR-DICE-67) now leave out a maxed card part's pre-max roll after a reroll.
+- **Fixtures:** no new unit; bundle `fx-dice-e2e` (= `gems-reroll-e2e`, `e2e/fx-dice.e2e.ts`). `session-sim-13` lines: none needed (the walkthrough runs on `session-sim-12`).
+- **Persisted runtime state:** none.
+- **CON-44:** 0 B (no new record or field; a reroll line's items are as many or fewer than before).
+
+## 121. Sprint 9: Party Manager (PM2)
+
+From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #339). **Built by `build/party-manager`**. Protocol side: [protocol §152](../protocol/README.md#152-sprint-9-party-manager--party-status-tab-companions-under-owners-tab-registry-pm2). **No table, column, record type or wire field.**
 
 | Browser state | Change | Rule | Source |
 |---|---|---|---|

@@ -317,8 +317,23 @@ export function MapCanvas(props: MapCanvasProps) {
    * `settle`, grown windows measured; a resize refit also waits for the last `viewport` settle.
    */
   const settledReason = useRef<FitReason>("open");
+  /**
+   * FR-MAP-113 (BL-86): the `viewport` settle count the pending resize refit waits for (set at
+   * each resize event: the settle after it). Never framed on an older settle's windows.
+   */
+  const resizeSince = useRef<number | undefined>(undefined);
   const settledFor = (reason: FitReason) =>
-    placerSettled(freeRef.current, reason, { w: window.innerWidth, h: window.innerHeight });
+    placerSettled(
+      freeRef.current,
+      reason,
+      { w: window.innerWidth, h: window.innerHeight },
+      reason === "resize" ? resizeSince.current : undefined,
+    );
+  /** A resize refit whose viewport settle hasn't landed keeps waiting (FR-MAP-113). */
+  const resizeHeld = () =>
+    settledReason.current === "resize" &&
+    resizeSince.current !== undefined &&
+    freeRef.current.settles < resizeSince.current;
   /**
    * FR-MAP-61, -96: the appearance refit, after the `appear` settle. FR-MAP-90: every token already
    * inside the area and clear of every obstacle (PCs + 4 px) → the camera stays.
@@ -352,6 +367,8 @@ export function MapCanvas(props: MapCanvasProps) {
         fitNow.current(reason);
       },
       () => settledFor(settledReason.current),
+      undefined,
+      () => resizeHeld(),
     ),
   );
   useEffect(
@@ -474,9 +491,14 @@ export function MapCanvas(props: MapCanvasProps) {
       () => dragRef.current !== null,
     );
     resizeRefit.current = r;
-    window.addEventListener("resize", r.resize);
+    // FR-MAP-113: the refit for this resize waits for the viewport settle after it.
+    const on = () => {
+      resizeSince.current = freeRef.current.settles + 1;
+      r.resize();
+    };
+    window.addEventListener("resize", on);
     return () => {
-      window.removeEventListener("resize", r.resize);
+      window.removeEventListener("resize", on);
       r.dispose();
     };
   }, [onCamera]);

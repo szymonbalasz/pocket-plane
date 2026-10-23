@@ -26,10 +26,14 @@ const DM = { role: "dm" as const, secret: TEST_SECRET };
 const c = (x: Partial<Coins>): Coins => ({ cp: 0, sp: 0, ep: 0, gp: 0, pp: 0, ...x });
 const coinsOnly = ({ cp, sp, ep, gp, pp }: Coins): Coins => ({ cp, sp, ep, gp, pp });
 
+// S9 (FR-LOOT-32): players' entries carry no `seq`; everyone orders by `createdAt` (strictly
+// increasing per campaign), then id. `seq` dropped so DM and player rows compare equal.
 const entriesOf = (cl: TestClient) =>
-  (Object.values(cl.store.records[LOOT_ENTRY_TYPE] ?? {}) as LootEntryRecord[]).sort(
-    (a, b) => a.seq - b.seq,
-  );
+  (Object.values(cl.store.records[LOOT_ENTRY_TYPE] ?? {}) as LootEntryRecord[])
+    .map(({ seq: _seq, ...e }) => e)
+    .sort((a, b) =>
+      a.createdAt === b.createdAt ? (a.id < b.id ? -1 : 1) : a.createdAt < b.createdAt ? -1 : 1,
+    );
 const potOf = (cl: TestClient) =>
   coinsOnly(Object.values(cl.store.records[PARTY_POT_TYPE] ?? {})[0] as PartyPotRecord);
 const walletOf = (cl: TestClient, id: string) => {

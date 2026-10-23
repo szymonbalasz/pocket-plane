@@ -1,11 +1,12 @@
 // The sheet's gem block (FR-CHARX-71, -72, FR-GEM-32, -35; OQ-CHARX-37 A: the header chip row).
 // Five icon + count chips and the static "max 5" label for everyone who sees the sheet; the owner
 // gets the Spend menu (plain spends, 4-s confirm, FR-GEM-17); the DM gets a Popover per chip with
-// − / + (`gem.adjust` ±1) and the same Spend menu (OQ-GEM-14 A). Gems are DM-awarded play state,
-// so the sheet lock never blocks this; controls are disabled while not `live` (FR-CHARX-76).
-import { GEM_ADJUST_INTENT, GEM_SPEND_INTENT, type GemKind } from "@shared/gems/schemas";
+// − / + and the same Spend menu (OQ-GEM-14 A). Gems are DM-awarded play state, so the sheet lock
+// never blocks this; controls are disabled while not `live` (FR-CHARX-76). FR-GEM-43: quick ± clicks
+// are summed (`award-batch.ts`) into one `gem.adjust`; the count shows the sum at once, muted.
+import { GEM_SPEND_INTENT, type GemKind } from "@shared/gems/schemas";
 import { CheckIcon, ChevronDownIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "../../components/ui/button";
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { intentErrorText } from "../character-sheet/routing";
 import type { SheetSection } from "../character-sheet/sections";
+import { type AwardBatch, createAwardBatch } from "./award-batch";
 import { GemCountChip, GemIcon } from "./GemCounts";
 import {
   affordable,
@@ -71,29 +73,36 @@ export function useGemIntent() {
   return { send, live, error, disabled: busy || !live };
 }
 
-/** DM: the chip opens a Popover with − / + for that gem. */
+/** DM: the chip opens a Popover with − / + for that gem; clicks sum (FR-GEM-43). */
 function DmChip({
   chip,
   creatureId,
   disabled,
-  send,
+  batch,
 }: {
   chip: GemChip;
   creatureId: string;
   disabled: boolean;
-  send(name: string, payload: unknown): Promise<boolean>;
+  batch: AwardBatch;
 }) {
-  const adjust = (gem: GemKind, delta: 1 | -1) =>
-    void send(GEM_ADJUST_INTENT, { characterId: creatureId, gem, delta });
+  const { count, pending } = batch.shown(creatureId, chip.gem, chip.count);
+  const adjust = (gem: GemKind, step: 1 | -1) => batch.click(creatureId, gem, step, chip.count);
+  const shown = cn("tabular-nums", pending && "text-muted-foreground");
   return (
-    <Popover>
+    <Popover
+      onOpenChange={(open) => {
+        // FR-GEM-43: closing the popover sends the pending sum now.
+        if (!open) batch.flush(creatureId, chip.gem);
+      }}
+    >
       <Tooltip content={GEM_TIP[chip.gem]}>
         <PopoverTrigger asChild>
           <button
             type="button"
             data-testid="gem-count"
             data-value={chip.gem}
-            data-count={chip.count}
+            data-count={count}
+            data-pending={pending || undefined}
             aria-label={chip.label}
             className={cn(
               "inline-flex h-6 items-center gap-0.5 rounded-sm px-1 text-xs tabular-nums hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -101,7 +110,7 @@ function DmChip({
             )}
           >
             <GemIcon gem={chip.gem} className={cn(chip.muted && "opacity-60")} />
-            {chip.count}
+            <span className={shown}>{count}</span>
           </button>
         </PopoverTrigger>
       </Tooltip>
@@ -119,12 +128,19 @@ function DmChip({
           data-testid="gem-remove"
           data-value={chip.gem}
           aria-label={`Remove a ${chip.name} gem`}
-          disabled={disabled || chip.count === 0}
+          disabled={disabled || count <= 0}
           onClick={() => adjust(chip.gem, -1)}
         >
           <MinusIcon className="size-3.5" />
         </Button>
-        <span className="w-6 text-center text-sm tabular-nums">{chip.count}</span>
+        <span
+          data-testid="gem-adjust-count"
+          data-value={chip.gem}
+          data-pending={pending || undefined}
+          className={cn("w-6 text-center text-sm", shown)}
+        >
+          {count}
+        </span>
         <Button
           size="icon"
           variant="outline"
@@ -242,6 +258,27 @@ export function GemBlock({ creatureId }: { creatureId: string; client: "dm" | "p
   const { send, live, error, disabled } = useGemIntent();
   const [pending, setPending] = useState<SpendChoice | null>(null);
   const counts = countsOf(row);
+  const connection = useSync((s) => s.connection);
+  const [awardError, setAwardError] = useState<string | null>(null);
+  // FR-GEM-43: one batch per block; a reject shows inline like any gem intent.
+  const batch = useMemo(
+    () =>
+      createAwardBatch({
+        send: (name, payload) => {
+          setAwardError(null);
+          return connection.sendIntent(name, payload).catch((err: unknown) => {
+            setAwardError(intentErrorText(err));
+          });
+        },
+      }),
+    [connection],
+  );
+  useSyncExternalStore(batch.subscribe, batch.version, batch.version);
+  // Not live → the unsent sum is dropped (the count reverts); unmount → sent now.
+  useEffect(() => {
+    if (!live) batch.drop();
+  }, [live, batch]);
+  useEffect(() => () => batch.flush(), [batch]);
 
   // FR-GEM-17: the confirm resets after 4 s; FR-CHARX-76: and when the connection drops.
   useEffect(() => {
@@ -266,7 +303,7 @@ export function GemBlock({ creatureId }: { creatureId: string; client: "dm" | "p
       <div className="flex flex-wrap items-center gap-1">
         {gemChips(counts).map((c) =>
           isDm ? (
-            <DmChip key={c.gem} chip={c} creatureId={creatureId} disabled={disabled} send={send} />
+            <DmChip key={c.gem} chip={c} creatureId={creatureId} disabled={!live} batch={batch} />
           ) : (
             <GemCountChip key={c.gem} chip={c} testId="gem-count" className="h-6 px-1 text-xs" />
           ),
@@ -292,9 +329,9 @@ export function GemBlock({ creatureId }: { creatureId: string; client: "dm" | "p
           </span>
         )}
       </div>
-      {error && (
+      {(error ?? awardError) && (
         <p data-testid="gem-error" role="alert" className="text-xs text-destructive">
-          {error}
+          {error ?? awardError}
         </p>
       )}
     </div>

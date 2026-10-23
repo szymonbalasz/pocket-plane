@@ -8,8 +8,8 @@ import type { DryFitResult, FitRoom } from "../scenes-map/camera";
 import { contentHeights, useContentHeights } from "./content-heights";
 import {
   growsToContent,
+  placedRect,
   type Rect,
-  renderedRect,
   TOP_BAR_H,
   type Viewport,
   windowRects,
@@ -17,7 +17,7 @@ import {
 } from "./geometry";
 import { useViewport } from "./hooks";
 import { hardRects, type KeepOut, keepOuts, TOASTS_KEEP_OUT, useKeepOuts } from "./keep-outs";
-import { type Windows, windowId } from "./manager";
+import { pushBars, type Windows, windowId } from "./manager";
 import { RAIL_CLEAR } from "./placement";
 import type { ShellClient, WindowRegistry } from "./registry";
 import { useAvailableKinds, useRegistry, useShellState } from "./ShellContext";
@@ -39,8 +39,9 @@ export { contentHeights, reportContentHeight, useContentHeights } from "./conten
 /**
  * What each rendered window covers: open, available, fitted and clamped as `ShellWindow` draws it,
  * a `growToContent` window at its measured grown height (FR-SHELL-39), capped by the next window
- * or hard keep-out region (`hard`, default this client's; FR-SHELL-52). Every consumer of window
- * rects (free area, toast keep-out, attack popup) reads them here.
+ * or hard keep-out region (`hard`, default this client's; FR-SHELL-52); a remembered window
+ * pushed off the shown `bars` (render-only, FR-SHELL-150: the fits see the pushed rect). Every
+ * consumer of window rects (free area, toast keep-out, attack popup) reads them here.
  */
 export function renderedWindowRects(
   windows: Windows,
@@ -49,13 +50,14 @@ export function renderedWindowRects(
   vp: Viewport,
   measured: ReadonlyMap<string, number> = contentHeights(),
   hard: readonly Rect[] = hardRects(keepOuts(registry.client, vp)),
+  bars: readonly Rect[] = pushBars(keepOuts(registry.client, vp)),
 ): Rect[] {
   const items = windows.flatMap((w) => {
     const def = registry.get(w.kind);
     if (!def || w.state !== "open" || !available.has(w.kind)) return [];
     return [{ win: w, def, needed: measured.get(windowId(w.kind, w.instance)) }];
   });
-  return windowRects(items, vp, hard);
+  return windowRects(items, vp, hard, bars);
 }
 
 /**
@@ -70,10 +72,11 @@ export function useGrowthCaps(id: string): Rect[] {
   const regions = useKeepOuts(registry.client);
   return useMemo(() => {
     const out = hardRects(regions);
+    const bars = pushBars(regions);
     for (const w of windows) {
       const def = registry.get(w.kind);
       if (!def || w.state !== "open" || !available.has(w.kind)) continue;
-      if (windowId(w.kind, w.instance) !== id) out.push(renderedRect(w, def.minSize, vp));
+      if (windowId(w.kind, w.instance) !== id) out.push(placedRect(w, def.minSize, vp, bars));
     }
     return out;
   }, [registry, windows, available, vp, regions, id]);
@@ -378,6 +381,8 @@ export interface FreeAreaState {
   grown: boolean;
   /** FR-MAP-98: the viewport the placer last settled at (`viewport`, `load`, reset); null before. */
   settledAt: Viewport | null;
+  /** FR-MAP-113: `viewport` settles applied so far (a resize refit waits for its own). */
+  settles: number;
   /** FR-MAP-96: a window the placer just placed (open, `appear`) still waits for its `settle`. */
   settling: boolean;
   /** FR-MAP-97: the fit's rooms with `windows` (rendered rects) as the window obstacles. */
@@ -401,6 +406,7 @@ export function useFreeArea(): FreeAreaState {
   const regions = useKeepOuts(registry.client);
   const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
   const settledAt = useShellState((s) => s.settledAt);
+  const settles = useShellState((s) => s.viewportSettles);
   const settlingIds = useShellState((s) => s.settling);
   const {
     area,
@@ -421,6 +427,7 @@ export function useFreeArea(): FreeAreaState {
       vp,
       measured,
       hardRects(regions),
+      pushBars(regions),
     );
     const client = registry.client;
     const rooms = fitRooms(client, shown, regions, vp, shownStack(client, reports));
@@ -466,6 +473,7 @@ export function useFreeArea(): FreeAreaState {
     stripRoom,
     grown,
     settledAt,
+    settles,
     settling,
     roomsWith,
     appearances: flips + notedNow,

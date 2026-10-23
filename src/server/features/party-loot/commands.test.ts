@@ -407,7 +407,8 @@ describe("derived pot and wallets (FR-LOOT-09), visibility (FR-LOOT-10), window 
     const snap = t.snapshot(t.viewer("player", t.p1.id))[LOOT_ENTRY_TYPE] as LootEntryRecord[];
     expect(snap).toHaveLength(LOOT_WINDOW);
     const all = entries(t) as unknown as LootEntryRecord[];
-    expect(snap.map((e) => e.seq)).toEqual(all.slice(-LOOT_WINDOW).map((e) => e.seq));
+    // S9 (FR-LOOT-32): player entries carry no `seq`; the same rows by id.
+    expect(snap.map((e) => e.id)).toEqual(all.slice(-LOOT_WINDOW).map((e) => e.id));
   });
 
   test("FR-LOOT-10 visibility: DM and player full for the campaign; other campaign hidden", () => {
@@ -416,10 +417,18 @@ describe("derived pot and wallets (FR-LOOT-09), visibility (FR-LOOT-10), window 
     move(t, { from: t.party, to: t.thorn, gp: 1 });
     const dm = t.snapshot(t.viewer("dm"));
     const p1 = t.snapshot(t.viewer("player", t.p1.id));
+    // S9 (FR-LOOT-32, review ruling 7): a player's entry is the DM's without `seq` (redacted).
+    const noSeq = (rows: unknown[]) => rows.map((r) => ({ ...(r as object), seq: undefined }));
     for (const type of [LOOT_ENTRY_TYPE, PARTY_POT_TYPE, WALLET_TYPE]) {
-      expect([type, p1[type]]).toEqual([type, dm[type]]);
+      const entry = type === LOOT_ENTRY_TYPE;
+      expect([type, entry ? noSeq(p1[type] ?? []) : p1[type]]).toEqual([
+        type,
+        entry ? noSeq(dm[type] ?? []) : dm[type],
+      ]);
       for (const r of dm[type] as { id: string }[]) {
-        expect(t.s.records.view(type, r, t.viewer("player", t.p1.id)).vis).toBe("full");
+        expect(t.s.records.view(type, r, t.viewer("player", t.p1.id)).vis).toBe(
+          entry ? "redacted" : "full",
+        );
         expect(t.s.records.view(type, r, t.viewer("dm")).vis).toBe("full");
         const other = t.viewer("dm", null, t.secondCampaignId);
         expect(t.s.records.view(type, r, other).vis).toBe("hidden");

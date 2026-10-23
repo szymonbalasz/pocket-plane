@@ -36,7 +36,7 @@ import {
 } from "@shared/entities/schemas";
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
-import { LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
+import { ENDPOINT_KINDS, LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
 import {
   type DoorSeen,
   FOG_EDIT_KINDS,
@@ -45,8 +45,10 @@ import {
 } from "@shared/fog-of-war/schemas";
 import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
 import type { SharedWith } from "@shared/party-board/schemas";
+import type { ReminderRoll } from "@shared/reminders/schemas";
 import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
 import type { TokenTrail } from "@shared/scenes-map/schemas";
+import type { Facility, Staff } from "@shared/strongholds/schemas";
 import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
@@ -822,6 +824,9 @@ export const hitRuling = sqliteTable(
  * Loot entry (party-loot, `loot-entry`): DM loot / spend (`world → party`), a coin move, or an
  * item move (`item`, party-board FR-PARTY-25: `text` = item name, `qty` set, coins 0). Window
  * orderBy `seq` (CON-20). Pot and wallets are derived sums, never stored (FR-LOOT-09).
+ * *(S9)* Ends may be a stronghold's Stores (`stores` + `*_stronghold_id`, no FK: a deleted
+ * stronghold's rows stay, FR-LOOT-30); copies `stores_hidden` (FR-LOOT-32) and `item_hidden`
+ * (FR-LOOT-36); `created_at` strictly increasing per campaign for new rows.
  */
 export const lootEntry = sqliteTable(
   "loot_entry",
@@ -832,11 +837,14 @@ export const lootEntry = sqliteTable(
       .references((): AnySQLiteColumn => campaign.id),
     seq: integer("seq").notNull(),
     kind: text("kind", { enum: LOOT_ENTRY_KINDS }).notNull(),
-    fromKind: text("from_kind", { enum: ["party", "world", "character"] }).notNull(),
+    fromKind: text("from_kind", { enum: ENDPOINT_KINDS }).notNull(),
     /** Plain id, no FK (entities has no delete, FR-ENT-14). */
     fromCharacterId: text("from_character_id"),
-    toKind: text("to_kind", { enum: ["party", "world", "character"] }).notNull(),
+    /** *(S9)* `stores` ends: the stronghold (plain id, FR-LOOT-30). */
+    fromStrongholdId: text("from_stronghold_id"),
+    toKind: text("to_kind", { enum: ENDPOINT_KINDS }).notNull(),
     toCharacterId: text("to_character_id"),
+    toStrongholdId: text("to_stronghold_id"),
     text: text("text").notNull(),
     /** Columns, not JSON: summed per coin (LOOT §8). */
     cp: integer("cp").notNull(),
@@ -846,12 +854,18 @@ export const lootEntry = sqliteTable(
     pp: integer("pp").notNull(),
     /** Item rows only (1–9 999, FR-PARTY-25); null on `loot` / `move`. */
     qty: integer("qty"),
+    /** *(S9)* Copy: some `stores` end belongs to a DM-only stronghold (FR-LOOT-32). */
+    storesHidden: integer("stores_hidden", { mode: "boolean" }).notNull().default(false),
+    /** *(S9)* Copy: adds / removes a DM-only Stores item (`world ↔ stores`, FR-LOOT-36). */
+    itemHidden: integer("item_hidden", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     editedAt: text("edited_at"),
   },
   (t) => [
     uniqueIndex("loot_entry_seq").on(t.seq),
     index("loot_entry_campaign_seq").on(t.campaignId, t.seq),
+    index("loot_entry_from_stores").on(t.campaignId, t.fromStrongholdId),
+    index("loot_entry_to_stores").on(t.campaignId, t.toStrongholdId),
   ],
 );
 
@@ -892,7 +906,9 @@ export const handout = sqliteTable(
 
 /**
  * Party item (party-board, `party-item`, data model §28): the party inventory, ≤ 60 rows per
- * campaign; merge key (name ci, notes) checked by the commands (FR-PARTY-18).
+ * campaign; merge key (name ci, notes) checked by the commands (FR-PARTY-18). *(S9)* A row with
+ * `stronghold_id` is in that stronghold's Stores (≤ 60 per holder, key per holder, FR-LOOT-36);
+ * copy `stores_hidden` (FR-LOOT-32) and `dm_only` (Stores rows only, OQ-HOLD-12 A).
  */
 export const partyItem = sqliteTable(
   "party_item",
@@ -905,12 +921,17 @@ export const partyItem = sqliteTable(
     name: text("name").notNull(),
     qty: integer("qty").notNull(),
     notes: text("notes").notNull(),
+    /** *(S9)* null = party inventory; else that stronghold's Stores (plain id). */
+    strongholdId: text("stronghold_id"),
+    storesHidden: integer("stores_hidden", { mode: "boolean" }).notNull().default(false),
+    dmOnly: integer("dm_only", { mode: "boolean" }).notNull().default(false),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
   (t) => [
     uniqueIndex("party_item_seq").on(t.seq),
     index("party_item_campaign_seq").on(t.campaignId, t.seq),
+    index("party_item_stores").on(t.campaignId, t.strongholdId),
   ],
 );
 
@@ -1605,6 +1626,78 @@ export const rollRequest = sqliteTable(
   ],
 );
 
+/**
+ * Reminder (reminders, `reminder`, lazy `"all"`, REM §8): a text note with 0–4 rolls (JSON leaf)
+ * for the party (`character_id` null) or one character (no FK: entities has no delete). Copies
+ * `owner_player_id` (FR-REM-05) and `link_hidden` (FR-REM-06) feed the pure visibility fn.
+ * `stronghold_id` / `facility_id` plain ids (deleted with their source, FR-REM-11). `created_at`
+ * strictly increasing per campaign (players' order). Caps (200 / 30 per target) are the commands'.
+ */
+export const reminder = sqliteTable(
+  "reminder",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    characterId: text("character_id"),
+    text: text("text").notNull(),
+    source: text("source").notNull(),
+    rolls: text("rolls", { mode: "json" }).$type<ReminderRoll[]>().notNull(),
+    strongholdId: text("stronghold_id"),
+    facilityId: text("facility_id"),
+    dmOnly: integer("dm_only", { mode: "boolean" }).notNull(),
+    ownerPlayerId: text("owner_player_id"),
+    linkHidden: integer("link_hidden", { mode: "boolean" }).notNull(),
+    createdByPlayerId: text("created_by_player_id"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("reminder_seq").on(t.seq),
+    index("reminder_campaign_seq").on(t.campaignId, t.seq),
+    index("reminder_campaign_character").on(t.campaignId, t.characterId),
+    index("reminder_stronghold").on(t.strongholdId),
+  ],
+);
+
+/**
+ * Stronghold (strongholds, `stronghold`, lazy `"all"`, HOLD §8): one row per stronghold, ≤ 8 per
+ * campaign; facilities (≤ 24) and staff (≤ 40) are JSON leaves in the DM's order, element ids from
+ * `ctx.ids`. Each row / field has its own DM-only flag (FR-HOLD-07). Name unique per campaign,
+ * case-insensitive. `created_at` strictly increasing per campaign (players' order).
+ */
+export const stronghold = sqliteTable(
+  "stronghold",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    seq: integer("seq").notNull(),
+    name: text("name").notNull(),
+    dmOnly: integer("dm_only", { mode: "boolean" }).notNull(),
+    defenders: integer("defenders").notNull(),
+    defendersDmOnly: integer("defenders_dm_only", { mode: "boolean" }).notNull(),
+    notes: text("notes").notNull(),
+    notesDmOnly: integer("notes_dm_only", { mode: "boolean" }).notNull(),
+    facilities: text("facilities", { mode: "json" }).$type<Facility[]>().notNull(),
+    staff: text("staff", { mode: "json" }).$type<Staff[]>().notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("stronghold_seq").on(t.seq),
+    index("stronghold_campaign_seq").on(t.campaignId, t.seq),
+    uniqueIndex("stronghold_campaign_name_ci").on(t.campaignId, sql`lower(${t.name})`),
+  ],
+);
+
+/** CON-20: `seq` for reminders and strongholds (REM / HOLD §8). */
+export const reminderSeqNext = sql<number>`(select coalesce(max(${reminder.seq}), 0) + 1 from ${reminder})`;
+export const strongholdSeqNext = sql<number>`(select coalesce(max(${stronghold.seq}), 0) + 1 from ${stronghold})`;
+
 /** CON-20: `seq` for props and templates, computed by the DB inside the insert's transaction. */
 export const propSeqNext = sql<number>`(select coalesce(max(${prop.seq}), 0) + 1 from ${prop})`;
 export const aoeTemplateSeqNext = sql<number>`(select coalesce(max(${aoeTemplate.seq}), 0) + 1 from ${aoeTemplate})`;
@@ -1655,4 +1748,6 @@ export const schema = {
   characterGems,
   rollMacro,
   rollRequest,
+  reminder,
+  stronghold,
 };

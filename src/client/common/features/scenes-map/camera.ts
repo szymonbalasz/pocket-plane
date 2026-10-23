@@ -1468,18 +1468,33 @@ export interface PlacerState {
   settling: boolean;
   /** The viewport of the last `viewport` (or `load`, reset) settle. */
   settledAt: Size | null;
+  /** `viewport` settles applied so far (FR-MAP-113). */
+  settles?: number;
 }
 
 /**
- * FR-MAP-96, -98: a fit for `reason` may frame now: the layout applied, no placed window waiting
- * for its `settle`, grown windows measured; a resize refit also waits for the last `viewport`
- * settle (`settledAt` = the viewport `view`), so zones, returns and grow-back are in place.
+ * FR-MAP-96, -98, -113: a fit for `reason` may frame now: the layout applied, no placed window
+ * waiting for its `settle`, grown windows measured; a resize refit also waits for the last
+ * `viewport` settle (`settledAt` = the viewport `view`), and, with `since` (the settle count its
+ * resize is waiting for), for that settle itself: never an older one's windows render-fit.
  */
-export function placerSettled(s: PlacerState, reason: FitReason, view: Size): boolean {
+export function placerSettled(
+  s: PlacerState,
+  reason: FitReason,
+  view: Size,
+  since?: number,
+): boolean {
   if (!s.ready || !s.grown || s.settling) return false;
   if (reason !== "resize") return true;
+  if (since !== undefined && (s.settles ?? 0) < since) return false;
   return s.settledAt !== null && s.settledAt.w === view.w && s.settledAt.h === view.h;
 }
+
+/**
+ * FR-MAP-113: while `hold()` is true (a resize refit whose viewport settle hasn't landed) a
+ * settled fit keeps waiting past `SETTLED_FIT_MAX_WAITS`, up to this many frames.
+ */
+export const SETTLED_FIT_HOLD_MAX = 600;
 
 /** FR-MAP-96, -98: the most frames a settled fit waits for the placer before it fits anyway. */
 export const SETTLED_FIT_MAX_WAITS = 60;
@@ -1487,7 +1502,8 @@ export const SETTLED_FIT_MAX_WAITS = 60;
 /**
  * FR-MAP-96, -98 (replaces FR-MAP-89 (2)'s frame wait): `request()` fits once the placer has
  * settled: on the first animation frame at which `ready()` holds (the `load`, `appear` or last
- * `viewport` settle applied, grown windows measured), or after `SETTLED_FIT_MAX_WAITS` frames.
+ * `viewport` settle applied, grown windows measured), or after `SETTLED_FIT_MAX_WAITS` frames
+ * (`SETTLED_FIT_HOLD_MAX` while `hold()`: a resize refit waiting for its settle, FR-MAP-113).
  * `applied()` (new tokens, window rects or size reached the canvas) moves a pending fit to the
  * frame after, at most `APPEARANCE_REFIT_MAX_WAITS` times (FR-MAP-61), so it reads them.
  */
@@ -1495,13 +1511,15 @@ export function createSettledRefit(
   refit: () => void,
   ready: () => boolean,
   frames: Frames = realFrames,
+  hold: () => boolean = () => false,
 ) {
   let handle: unknown = null;
   let waits = 0;
   let nudges = 0;
   const fire = () => {
     handle = null;
-    if (!ready() && waits < SETTLED_FIT_MAX_WAITS) {
+    const max = hold() ? SETTLED_FIT_HOLD_MAX : SETTLED_FIT_MAX_WAITS;
+    if (!ready() && waits < max) {
       waits += 1;
       handle = frames.request(fire);
       return;
