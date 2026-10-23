@@ -16,7 +16,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | PM2 Party Manager | merged `77f5fd2f` | — | done (re-test 5/5; e2e 213 + roll-popup flake) | main gates after FX1 |
 | FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
-| FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | walkthrough 12/12; main (PM2) merged, protocol §154 | branch gates running → merge → main gates |
+| FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12; check 5393, e2e 214 + BL-95 flake) | main gates running |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14; main merged, palette lines, thresholds 1808 / 1294; replay DM 8 → 10, players 38 → 36 (approved, BL-93) | test-sp2b re-test running |
 
