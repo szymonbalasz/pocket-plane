@@ -16,7 +16,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | PM2 Party Manager | merged `77f5fd2f` | — | done (re-test 5/5; e2e 213 + roll-popup flake) | main gates after FX1 |
 | FX3 sync, stale chunk, misc | merged `dcd5e20e` | — | done (6/6; branch gates 5326 / 210) | main gates with SP1 |
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7, part 2 13/14 (RC5 session picker stale) → fixing + stats edits after FX1 | re-test RC2, RC5, RC1 |
-| FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12; check 5393, e2e 214 + BL-95 flake) | main gates running |
+| FX1 toasts + kill feed + stats retry | merged `ed177bd1` | — | done (12/12) | main gates: check 5392 + 1 load flake (3/3 alone), e2e 215 |
 | SP1 palette + shortcuts | merged `54ea15b2` | — | done (re-test 11/11; branch gates 5355 / 212) | main gates after PM2 |
 | SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | re-test 13/16 (palette 'cover' ranking, Rules stale after a Compendium delete, threshold test) → fixing | re-test P4, 12, 7 |
 
@@ -66,6 +66,7 @@ Queue: SP3 part 2 after PM1 + SP1 + FX1. Gates on main: detached worktree `gates
 - Known flake: `init-chips-effect.e2e.ts` Divine Fury hover tooltip under a loaded full run (3 / 3 alone; CP3 build).
 - Known flake: `fog-of-war/leak.test.ts` walkthrough 8 "No frame within 1500 ms" under a parallel suite (main after BL-49, sprint 7; 3 / 3 alone).
 - Known flake: `e2e/popup-line.e2e.ts` FR-DICEX-47 short screens (roll popups count) and `e2e/image-search.e2e.ts` token Image… menu under a loaded full run (sprint 7; pass alone).
+- Known flake (sprint 9): `party-loot/sync.test.ts` FR-LOOT-03 "No frame within 1000 ms" under a full check (3 / 3 alone, main after FX1).
 - Known flake (sprint 9): `e2e/roll-popup.e2e.ts` FR-DICEX-39–41 under a loaded full run (3 / 3 alone, main after PM1 + FX2).
 - Known flake (sprint 9): `strongholds/con44.test.ts` "REM / HOLD §12 CON-44 at the caps" hits the 5 s default timeout under load (passes alone; FX3 sets a 30 s timeout).
 - Known flake: `snapshot-size.test.ts` (CON-44) fails with SQLITE_BUSY when several worktrees run the suite at once; passes alone and on re-run. Builders re-run before treating it as real.
