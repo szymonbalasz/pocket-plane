@@ -27,6 +27,7 @@ import cbTies from "./combat-extras/cb-ties";
 import cbtxEffects from "./combat-extras/cbtx-effects";
 import cbtxReinforcement from "./combat-extras/cbtx-reinforcement";
 import cbtxTemp from "./combat-extras/cbtx-temp";
+import fxMiraBless from "./combat-extras/fx-mira-bless";
 import combat1 from "./combat-tracker/combat-1";
 import combatHit from "./combat-tracker/combat-hit";
 import combatPending from "./combat-tracker/combat-pending";
@@ -255,4 +256,6 @@ export const units: readonly Fixture[] = [
   cbPartySix,
   // Sprint 8 track TT (build/tt-pause): the table paused
   campPaused,
+  // Sprint 9 track FX (fix/fx-sync-shell): Mira's Bless beside Thorn's summon concentration
+  fxMiraBless,
 ];

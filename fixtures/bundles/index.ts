@@ -37,6 +37,7 @@ import fuS7 from "./fu-s7";
 import fuS7E2e from "./fu-s7-e2e";
 import fuSmallCopy from "./fu-small-copy";
 import furyLogLine from "./fury-log-line";
+import fxS9 from "./fx-s9";
 import fxStaleChunkE2e from "./fx-stale-chunk-e2e";
 import gems from "./gems";
 import gemsCombatE2e from "./gems-combat-e2e";
@@ -210,6 +211,7 @@ export const bundles: readonly Bundle[] = [
   // Sprint 8 track TT (build/tt-pause): the pause screen
   tableToolsPaused,
   tableToolsPausedE2e,
-  // Sprint 9 track FX (fix/fx-sync-shell): stale-chunk reload e2e alias
+  // Sprint 9 track FX (fix/fx-sync-shell): stale-chunk reload e2e alias, FX3's bundle
   fxStaleChunkE2e,
+  fxS9,
 ];
