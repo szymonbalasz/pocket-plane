@@ -32,11 +32,10 @@ const byName = (c: TestClient, name: string) =>
   );
 const card = (c: TestClient, id: string) =>
   c.store.records.notification?.[id] as NotificationRecord | undefined;
+type Ev = Extract<ServerFrame, { type: "event" }>;
 /** The event frames a client got since `mark` (after a barrier). */
 const eventsSince = (c: TestClient, mark: number) =>
-  c.frames.slice(mark).filter((f): f is Extract<ServerFrame, { type: "event" }> => {
-    return f.type === "event";
-  });
+  c.frames.slice(mark).filter((f): f is Ev => f.type === "event");
 
 describe("BL-92 one frame per card action (mid-combat)", () => {
   let h: TestServer;
@@ -85,7 +84,11 @@ describe("BL-92 one frame per card action (mid-combat)", () => {
       const marks = [dm, p1, p2].map((c) => c.frames.length);
       await act();
       for (const c of [dm, p1, p2]) await barrier(c);
-      const [d, a, b] = [dm, p1, p2].map((c, i) => eventsSince(c, marks[i] as number));
+      const [d, a, b] = [dm, p1, p2].map((c, i) => eventsSince(c, marks[i] as number)) as [
+        Ev[],
+        Ev[],
+        Ev[],
+      ];
       for (const evs of [d, a]) {
         expect(evs.map((e) => e.cause.name)).toEqual([cause]);
         expect(evs[0]?.changes.filter((x) => x.id === cardId)).toHaveLength(1);
