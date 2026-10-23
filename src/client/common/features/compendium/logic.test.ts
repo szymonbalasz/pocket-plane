@@ -175,7 +175,7 @@ describe("FR-CMP-20 import panel", () => {
         ]),
       ),
     );
-    expect(importSummary(counts)).toBe("1,040 new · 5 updated · 10 unchanged");
+    expect(importSummary(counts)).toBe("1,050 new · 6 updated · 12 unchanged"); // 6 kinds (sprint 9: rule)
   });
 });
 

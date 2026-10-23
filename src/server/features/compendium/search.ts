@@ -83,6 +83,8 @@ export function matchesFilters(facets: unknown, q: SearchQuery): boolean {
   if (q.category !== undefined && f.category !== q.category) return false;
   if (q.rarity !== undefined && !same(f.rarity, q.rarity)) return false;
   if (q.subclass !== undefined && !same(f.subclass, q.subclass)) return false;
+  if (q.chapter !== undefined && !same(f.chapter, q.chapter)) return false;
+  if (q.section !== undefined && !same(f.section, q.section)) return false;
   return true;
 }
 
@@ -125,12 +127,19 @@ export function matchingRows(
   words: readonly string[],
 ): Hit[] {
   const hits: Hit[] = [];
+  // FR-CMP-62 (amends FR-CMP-36): the All tab's empty list skips rule cards; a query finds them,
+  // on All by name only (tiers 0–3), so a monster or item word ("goblin") never pulls in the rules
+  // text that mentions it; `kind=rule` (the Rules window) matches their text too.
+  const skipRules = query.kind === undefined && words.length === 0;
+  const ruleNamesOnly = query.kind === undefined;
   for (const row of idx.rows) {
     if (query.kind !== undefined && row.kind !== query.kind) continue;
+    if (skipRules && row.kind === "rule") continue;
     // Entry-less definitions: DM only (they are global monsters, so `entryVisibleTo` agrees).
     if (row.entryless && v.role !== "dm") continue;
     if (!entryVisibleTo(row, v) || !matchesFilters(row.facets, query)) continue;
-    const tier = rowTier(row, words);
+    const tier =
+      ruleNamesOnly && row.kind === "rule" ? nameTier(row.folded, words) : rowTier(row, words);
     if (tier !== null) hits.push({ row, tier, key: keyOf(row, tier) });
   }
   return hits;

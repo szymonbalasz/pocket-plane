@@ -11,6 +11,8 @@ import {
   MATERIAL_MAX,
   META_TEXT_MAX,
   type MonsterMeta,
+  RULE_CHAPTER_MAX,
+  RULE_SECTION_MAX,
   SRD_CLASSES,
   type SrdClass,
   type StatBlockSection,
@@ -32,9 +34,10 @@ import {
   SIZES,
 } from "@shared/entities/schemas";
 import { z } from "zod";
+import { keepsRuleSection, ruleCards } from "./rules";
 import { slugify, splitSections, toMarkdownLite } from "./text";
 
-export const ADAPTER_VERSION = "3";
+export const ADAPTER_VERSION = "4";
 export const SRD_DOCUMENT_SLUG = "wotc-srd";
 
 export const OPEN5E_ENDPOINTS = [
@@ -45,6 +48,8 @@ export const OPEN5E_ENDPOINTS = [
   "armor",
   "conditions",
   "classes",
+  // Sprint 9 (FR-CMP-60): rules sections → `rule` cards.
+  "sections",
 ] as const;
 export type Open5eEndpoint = (typeof OPEN5E_ENDPOINTS)[number];
 /** Recorded responses: each endpoint's `results`, concatenated. */
@@ -168,6 +173,7 @@ const RawArmor = Doc.extend({
 });
 const RawCondition = Doc.extend({ desc: z.string() });
 const RawArchetype = Doc.extend({ desc: z.string() });
+const RawSection = Doc.extend({ desc: z.string(), parent: str });
 const RawClass = Doc.extend({
   desc: z.string(),
   table: str,
@@ -668,6 +674,33 @@ function features(c: Run, raw: unknown, i: number) {
   for (const key of order) push(c, { kind: "feature", sourceKey: key, data: byKey.get(key)! });
 }
 
+// ---------- sections → rule cards (sprint 9, FR-CMP-60 / -61) ----------
+
+function rules(c: Run, raw: unknown, i: number) {
+  const x = parse(c, RawSection, raw, `sections#${i}`);
+  if (!x) return;
+  const sectionSlug = slugify(x.slug);
+  // Defence in depth: the recorder already kept only these (review-a ruling 19).
+  if (!keepsRuleSection(sectionSlug)) {
+    c.skipped++;
+    return;
+  }
+  const section = x.name.trim().slice(0, RULE_SECTION_MAX);
+  const chapter = (nonEmpty(x.parent) ?? section).slice(0, RULE_CHAPTER_MAX);
+  ruleCards(section, x.desc).forEach((card, order) => {
+    push(c, {
+      kind: "rule",
+      sourceKey: `rule/${sectionSlug}/${card.slug}`,
+      data: {
+        kind: "rule",
+        name: card.name,
+        facets: { chapter, section, order },
+        body: { text: card.text },
+      },
+    });
+  });
+}
+
 // ---------- entry point ----------
 
 const MAPPERS: Record<Open5eEndpoint, (c: Run, raw: unknown, i: number) => void> = {
@@ -678,6 +711,7 @@ const MAPPERS: Record<Open5eEndpoint, (c: Run, raw: unknown, i: number) => void>
   armor,
   conditions: condition,
   classes: features,
+  sections: rules,
 };
 
 export function adaptOpen5e(responses: Open5eResponses): AdapterResult {
@@ -694,7 +728,7 @@ export function adaptOpen5e(responses: Open5eResponses): AdapterResult {
     c.warn(r.sourceKey, "sourceKey", "Duplicate; later record dropped");
     return false;
   });
-  const counts = { monster: 0, spell: 0, item: 0, condition: 0, feature: 0 };
+  const counts = { monster: 0, spell: 0, item: 0, condition: 0, feature: 0, rule: 0 };
   for (const r of records) counts[r.kind]++;
   return { records, warnings: c.warnings, skipped: c.skipped, counts };
 }

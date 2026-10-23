@@ -78,6 +78,8 @@ import sessionSim10 from "./session-sim-10";
 import sessionSim11 from "./session-sim-11";
 import sessionSim12 from "./session-sim-12";
 import sessionSim13 from "./session-sim-13";
+import spRules from "./sp-rules";
+import spRulesE2e from "./sp-rules-e2e";
 import stats from "./stats";
 import statsB from "./stats-b";
 import statsBE2e from "./stats-b-e2e";
@@ -224,4 +226,7 @@ export const bundles: readonly Bundle[] = [
   rsE2e,
   // Sprint 9 track FX (fix/fx-dice-lines): dice + gems lines
   fxDiceE2e,
+  // Sprint 9 track SP (build/sp-rules): rules quick reference
+  spRules,
+  spRulesE2e,
 ];

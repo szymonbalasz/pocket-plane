@@ -29,6 +29,8 @@ export const TAB_LABEL: Record<CmpTab, string> = {
   item: "Items",
   condition: "Conditions",
   feature: "Features",
+  // FR-CMP-62: no Rules tab (the Rules window is the place); the label serves the kind line.
+  rule: "Rules",
 };
 
 export interface FilterField {
@@ -64,6 +66,10 @@ export const FILTER_FIELDS: Record<CompendiumKind, readonly FilterField[]> = {
   feature: [
     { key: "className", label: "Class", options: opts(SRD_CLASSES) },
     { key: "subclass", label: "Subclass" },
+  ],
+  rule: [
+    { key: "chapter", label: "Chapter" },
+    { key: "section", label: "Section" },
   ],
 };
 

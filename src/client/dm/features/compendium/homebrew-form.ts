@@ -8,15 +8,17 @@ import {
   type CompendiumEntry,
   EntryDraft,
   HOMEBREW_TEXT_MAX,
+  HOUSE_RULES_CHAPTER,
   type SrdClass,
 } from "@shared/compendium/schemas";
 import { copyName } from "@shared/scenes-map/geometry";
 
-export const HOMEBREW_KINDS = ["spell", "item", "condition", "feature"] as const;
+export const HOMEBREW_KINDS = ["spell", "item", "condition", "feature", "rule"] as const;
 export type HomebrewKind = (typeof HOMEBREW_KINDS)[number];
 
 export type FormMode =
-  | { kind: "new" }
+  /** `preset`: the kind to start with (the Rules window's New house rule: `rule`). */
+  | { kind: "new"; preset?: HomebrewKind }
   | { kind: "clone"; base: CompendiumEntry }
   | { kind: "edit"; entry: CompendiumEntry };
 
@@ -43,6 +45,8 @@ export interface HomebrewFields {
   className: SrdClass;
   subclass: string;
   featureLevel: string;
+  /** House rule (FR-CMP-67): free text ≤ 60; the chapter is always "House rules". */
+  section: string;
   /** Image asset IDs in slot order, first = main (FR-CMP-45). */
   images: string[];
   /** The source's facets / body: what the form doesn't show is kept from here. */
@@ -69,12 +73,16 @@ const BLANK: Omit<HomebrewFields, "kind" | "images" | "facets" | "body"> = {
   className: "Fighter",
   subclass: "",
   featureLevel: "",
+  section: "",
 };
 
 const str = (v: unknown, fallback: string) => (typeof v === "string" ? v : fallback);
 const bool = (v: unknown) => v === true;
 
-export function initialFields(mode: FormMode, kind: HomebrewKind = "item"): HomebrewFields {
+export function initialFields(
+  mode: FormMode,
+  kind: HomebrewKind = mode.kind === "new" ? (mode.preset ?? "item") : "item",
+): HomebrewFields {
   const src = mode.kind === "clone" ? mode.base : mode.kind === "edit" ? mode.entry : null;
   if (!src || src.kind === "monster") return { ...BLANK, kind, images: [], facets: {}, body: {} };
   const f = (src.facets ?? {}) as Record<string, unknown>;
@@ -102,6 +110,7 @@ export function initialFields(mode: FormMode, kind: HomebrewKind = "item"): Home
     className: str(f.className, BLANK.className) as SrdClass,
     subclass: str(f.subclass, ""),
     featureLevel: src.kind === "feature" && typeof f.level === "number" ? String(f.level) : "",
+    section: src.kind === "rule" ? str(f.section, "") : "",
     // Imported bases have none (FR-CMP-45); a homebrew base's carry over (FR-CMP-49).
     images: src.source === null ? [...src.imageAssetIds] : [],
     facets: f,
@@ -165,6 +174,12 @@ export function draftOf(f: HomebrewFields): unknown {
           ...(opt(f.featureLevel) ? { level: Number(f.featureLevel) } : {}),
         },
         body: { text: f.text, ...keep("presetKey"), ...keep("preset") },
+      };
+    case "rule":
+      return {
+        ...base,
+        facets: { chapter: HOUSE_RULES_CHAPTER, section: f.section.trim(), order: 0 },
+        body: { text: f.text },
       };
   }
 }

@@ -10,6 +10,8 @@ import {
   ItemCategory,
   LINE_MAX,
   NAME_MAX,
+  RULE_CHAPTER_MAX,
+  RULE_SECTION_MAX,
   SpellSchool,
   SrdClass,
 } from "./schemas";
@@ -28,6 +30,8 @@ export const FILTER_KEYS = {
   item: ["category", "rarity"],
   condition: [],
   feature: ["className", "subclass"],
+  // Sprint 9 (FR-CMP-62, amends FR-CMP-11).
+  rule: ["chapter", "section"],
 } as const satisfies Record<CompendiumKind, readonly string[]>;
 export const ALL_FILTER_KEYS = [
   "crMin",
@@ -39,6 +43,8 @@ export const ALL_FILTER_KEYS = [
   "category",
   "rarity",
   "subclass",
+  "chapter",
+  "section",
 ] as const;
 export type FilterKey = (typeof ALL_FILTER_KEYS)[number];
 
@@ -65,6 +71,8 @@ export const SearchQuery = z
     category: ItemCategory.optional(),
     rarity: z.string().min(1).max(100).optional(),
     subclass: z.string().min(1).max(NAME_MAX).optional(),
+    chapter: z.string().min(1).max(RULE_CHAPTER_MAX).optional(),
+    section: z.string().min(1).max(RULE_SECTION_MAX).optional(),
   })
   .superRefine((q, c) => {
     if (q.sameAs !== undefined) {

@@ -20,5 +20,7 @@ export default defineBundle({
     "hold-greystone-reminders",
     "hold-greystone-stores",
     "hold-tower-secret",
+    // SP: rules quick reference (CMP §13.3; `cmp-rule-house` stays in sp-rules / sp-s9)
+    "cmp-rules-mini",
   ],
 });
