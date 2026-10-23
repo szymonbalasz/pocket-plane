@@ -1,8 +1,10 @@
 // Sprint 9 (track PM, PM1) on the DM's real windows: BL-87 (FR-SHELL-159, FR-MAP-114), the
 // squeezed Game log growing back, and its refit. Pure: the in-memory shell controller at 1440×900.
 import { expect, mock, test } from "bun:test";
+import { fitRooms, renderedWindowRects } from "@ui/features/play-shell/free-area";
 import type { Rect } from "@ui/features/play-shell/geometry";
-import { keepOuts } from "@ui/features/play-shell/keep-outs";
+import { hardRects, keepOuts } from "@ui/features/play-shell/keep-outs";
+import { pushBars } from "@ui/features/play-shell/manager";
 import { type PlacementToken, pcClear } from "@ui/features/play-shell/placement";
 import { createShellController } from "@ui/features/play-shell/shell-store";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
@@ -108,4 +110,47 @@ test("FR-MAP-114 refit on return: DM 1440×900, a PC under the Game log's zone: 
   }
   // The refit's bound (FR-MAP-94): a `window` refit never draws a cell above the last full fit.
   expect(fitBounds("window", 40, "dm").maxCell).toBe(40);
+});
+
+test("FR-MAP-115 remembered windows: a remembered window reopened over PCs asks for no refit and no yield (the camera stays); the fits count it as an obstacle, at its rendered (pushed) rect", () => {
+  const tokens = bandPcs();
+  let yields = 0;
+  const s = shellAt("fitted", () => tokens);
+  const c = createShellController({
+    registry: dmWindows,
+    storage: createLayoutStorage(() => ({ getItem: () => null, setItem() {} })),
+    viewport: () => WIDE,
+    keepOuts: (v) => keepOuts("dm", v, new Map()),
+    avoid: () => tokens,
+    camera: () => "fitted",
+    lastFullCell: () => 40,
+    dryFit: () => ({ cellPx: 40, clear: true }),
+    onYield: () => {
+      yields += 1;
+    },
+    onRefit: () => void s.refits.push("window"),
+  });
+  c.restore("k");
+  const over = { x: 100, y: 80, w: 440, h: 420 }; // over the PCs
+  c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+  c.dispatch({ type: "setRect", kind: "cmp.compendium", rect: over }, all);
+  c.dispatch({ type: "close", kind: "cmp.compendium" }, all);
+  c.dispatch({ type: "open", kind: "cmp.compendium" }, all);
+  expect(c.store.getState().settleLog).toBe("reopen:cmp.compendium>remembered");
+  expect({ yields, refits: s.refits }).toEqual({ yields: 0, refits: [] });
+  // The fit's obstacles: the remembered window as rendered, pushed off a shown bar.
+  const bar = { x: 64, y: 56, w: 300, h: 100 };
+  const regions = keepOuts("dm", WIDE, new Map([["map.toolbar", bar]]));
+  const open = c.store.getState().windows.filter((w) => w.state === "open");
+  const rects = renderedWindowRects(
+    open,
+    dmWindows,
+    all,
+    WIDE,
+    new Map(),
+    hardRects(regions),
+    pushBars(regions),
+  );
+  const room = fitRooms("dm", rects, regions, WIDE, null).room;
+  expect(room.obstacles).toContainEqual({ ...over, y: bar.y + bar.h + 12 });
 });

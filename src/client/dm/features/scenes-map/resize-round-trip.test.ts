@@ -12,6 +12,7 @@ import { createShellController } from "@ui/features/play-shell/shell-store";
 import { TEST_KINDS } from "@ui/features/play-shell/size-table";
 import { createLayoutStorage } from "@ui/features/play-shell/storage";
 import {
+  cameraOn,
   createSettledRefit,
   type FitReason,
   type Frames,
@@ -91,6 +92,9 @@ function page() {
   };
   let camera = fitNow("load");
   const f = fakeFrames();
+  // MapCanvas's wiring: each resize event waits for the settle after it (FR-MAP-113).
+  let since: number | undefined;
+  const settles = () => c.store.getState().viewportSettles;
   const refit = createSettledRefit(
     () => {
       camera = fitNow("resize");
@@ -98,21 +102,26 @@ function page() {
     () => {
       const s = c.store.getState();
       return placerSettled(
-        { ready: true, grown: true, settling: false, settledAt: s.settledAt },
+        { ready: true, grown: true, settling: false, settledAt: s.settledAt, settles: settles() },
         "resize",
         vp.current,
+        since,
       );
     },
     f.frames,
+    () => since !== undefined && settles() < since,
   );
-  return { c, vp, f, refit, fitNow, camera: () => camera };
+  const resizeEvent = () => {
+    since = settles() + 1;
+  };
+  return { c, vp, f, refit, fitNow, resizeEvent, camera: () => camera };
 }
 
-// Root cause first (BL-86): the failing repro, before the fix. The resize refit fits anyway after
-// SETTLED_FIT_MAX_WAITS frames; a viewport settle that lands later (a busy or throttled page)
-// leaves the camera framed on the previous size's windows, render-fit: at 1280×720 the 1150-wide
-// Game log leaves a strip, the 48-px floor, `pcs` (sim-12's numbers).
-test.failing("FR-MAP-113 resize round trip (BL-86): 1280×720 → 1440×900 → 1280×720 → 1440×900, `fitted`: each step's cell px and fit-visible = Fit's at that size (34 px `all` at 1280×720), even when the viewport settle lands late", () => {
+// Root cause (BL-86): the resize refit fit anyway after SETTLED_FIT_MAX_WAITS frames; a viewport
+// settle landing later (a busy or throttled page) left the camera framed on the previous size's
+// windows, render-fit: at 1280×720 the 1150-wide Game log leaves a strip, the 48-px floor, `pcs`
+// (sim-12's numbers). Now the refit waits for the settle of its own resize.
+test("FR-MAP-113 resize round trip (BL-86): 1280×720 → 1440×900 → 1280×720 → 1440×900, `fitted`: each step's cell px and fit-visible = Fit's at that size (34 px `all` at 1280×720), even when the viewport settle lands late", () => {
   const p = page();
   expect(p.camera()).toBe("34.0 all");
   for (const next of [
@@ -121,6 +130,7 @@ test.failing("FR-MAP-113 resize round trip (BL-86): 1280×720 → 1440×900 → 
     { w: 1440, h: 900 },
   ]) {
     p.vp.current = next;
+    p.resizeEvent();
     p.refit.request(); // RESIZE_REFIT_MS after the last resize event
     for (let i = 0; i <= SETTLED_FIT_MAX_WAITS; i++) p.f.tick();
     p.c.dispatch({ type: "viewport" }, available); // the settle, late
@@ -130,4 +140,16 @@ test.failing("FR-MAP-113 resize round trip (BL-86): 1280×720 → 1440×900 → 
     expect({ at, camera: p.camera() }).toEqual({ at, camera: p.fitNow("fit") });
   }
   expect(p.camera()).toBe("42.0 all");
+});
+
+test("FR-MAP-113 resize round trip (BL-86): the old order shows the cause: framed before the late settle, 1280×720 gives the 48-px floor, `pcs`; a `moved` camera never refits", () => {
+  const p = page();
+  p.vp.current = { w: 1440, h: 900 };
+  p.c.dispatch({ type: "viewport" }, available);
+  p.vp.current = { w: 1280, h: 720 };
+  // The 1440×900 windows render-fit at 1280×720: what the refit saw before the fix.
+  expect(p.fitNow("resize")).toBe("48.0 pcs");
+  p.c.dispatch({ type: "viewport" }, available);
+  expect(p.fitNow("resize")).toBe("34.0 all");
+  expect(cameraOn("moved", "resize")).toEqual({ mode: "moved", fit: false });
 });

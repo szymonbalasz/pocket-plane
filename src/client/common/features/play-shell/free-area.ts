@@ -381,6 +381,8 @@ export interface FreeAreaState {
   grown: boolean;
   /** FR-MAP-98: the viewport the placer last settled at (`viewport`, `load`, reset); null before. */
   settledAt: Viewport | null;
+  /** FR-MAP-113: `viewport` settles applied so far (a resize refit waits for its own). */
+  settles: number;
   /** FR-MAP-96: a window the placer just placed (open, `appear`) still waits for its `settle`. */
   settling: boolean;
   /** FR-MAP-97: the fit's rooms with `windows` (rendered rects) as the window obstacles. */
@@ -404,6 +406,7 @@ export function useFreeArea(): FreeAreaState {
   const regions = useKeepOuts(registry.client);
   const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
   const settledAt = useShellState((s) => s.settledAt);
+  const settles = useShellState((s) => s.viewportSettles);
   const settlingIds = useShellState((s) => s.settling);
   const {
     area,
@@ -470,6 +473,7 @@ export function useFreeArea(): FreeAreaState {
     stripRoom,
     grown,
     settledAt,
+    settles,
     settling,
     roomsWith,
     appearances: flips + notedNow,

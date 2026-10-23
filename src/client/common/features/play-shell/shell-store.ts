@@ -73,6 +73,11 @@ export interface ShellState {
   pcClear: ReadonlySet<string>;
   /** The viewport the layout was last settled at (FR-SHELL-95 `viewport`, -103). */
   settledAt: Viewport | null;
+  /**
+   * `viewport` settles applied on this page so far (FR-MAP-113: a resize refit waits for the
+   * settle of its own resize, not an older one at the same size). Client memory only.
+   */
+  viewportSettles: number;
 }
 
 export interface ShellController {
@@ -271,6 +276,7 @@ export function createShellController(opts: {
     memory: [],
     pcClear: new Set(),
     settledAt: null,
+    viewportSettles: 0,
   }));
   const regionsAt = (vp: Viewport) => opts.keepOuts?.(vp) ?? keepOuts(registry.client, vp);
   const allKinds = () => new Set(registry.defs.map((d) => d.kind));
@@ -414,12 +420,14 @@ export function createShellController(opts: {
       const settling = nextSettling(state.settling, windows, next, action);
       const settledAt =
         action.type === "viewport" || action.type === "reset" ? ctx.viewport : state.settledAt;
+      const viewportSettles = state.viewportSettles + (action.type === "viewport" ? 1 : 0);
       const log = p.log.length > 0 ? p.log.join(";") : state.settleLog;
       if (next === windows) {
         const patch: Partial<ShellState> = {};
         if (settling !== state.settling) patch.settling = settling;
         if (p.memory !== state.memory) patch.memory = p.memory;
         if (settledAt !== state.settledAt) patch.settledAt = settledAt;
+        if (viewportSettles !== state.viewportSettles) patch.viewportSettles = viewportSettles;
         if (log !== state.settleLog) patch.settleLog = log;
         if (Object.keys(patch).length > 0) store.setState(patch);
         if (action.type === "reset") opts.onReset?.();
@@ -446,6 +454,7 @@ export function createShellController(opts: {
         settleLog: log,
         memory: action.type === "reset" ? [] : p.memory,
         settledAt,
+        viewportSettles,
       });
       storage.write(key, serialise(next, registry));
       if (p.yields) opts.onYield?.();
