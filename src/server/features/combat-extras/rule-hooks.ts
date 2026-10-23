@@ -3,7 +3,8 @@
 // follow it), and return the `effect` rows for that event:
 //   started / added — hidden copies of the new PC combatants' effects (FR-CBTX-13);
 //   turnChanged     — Next: expiry (FR-CBTX-06); Prev: restore what that Next expired (-07);
-//   ended           — monster and timed effects end; PC effects stay, visible (FR-CBTX-12).
+//   ended           — monster and timed effects end; PC effects stay, visible (FR-CBTX-12),
+//                     except a concentration its summons named (FR-CBTX-75).
 // `cbtxEffectHookLine`, the last combat rule-hook line, runs the effect hooks (FR-CBTX-51) for
 // whatever the lines before it changed, once per hook point.
 import { expiresAt } from "@shared/combat-extras/rules";
@@ -117,6 +118,13 @@ export const cbtxRuleHooks: CombatRuleHookSet = {
     const monsterIds = rows.filter((c) => c.kind === "monster").map((c) => c.id);
     const conds = [and(eq(effect.encounterId, enc.id), isNotNull(effect.endsRound))];
     if (monsterIds.length > 0) conds.push(inArray(effect.targetCombatantId, monsterIds));
+    // FR-CBTX-75 (BL-90): a PC concentration a summon of this encounter names ends with them.
+    const summonConc = rows.flatMap((c) =>
+      c.summoned && c.concentrationEffectId !== null ? [c.concentrationEffectId] : [],
+    );
+    if (summonConc.length > 0) {
+      conds.push(and(eq(effect.kind, "concentration"), inArray(effect.id, summonConc)));
+    }
     const toEnd = env.tx
       .select()
       .from(effect)

@@ -1,9 +1,21 @@
 // CBTX effects, in-process: FR-CBTX-04 add (bulk, duplicate, exhaustion, limits), FR-CBTX-05
 // timing, FR-CBTX-08 update / end, FR-CBTX-09 concentration, FR-CBTX-10 links + card closure,
-// FR-CBTX-11 incapacitating conditions, FR-CBTX-43 rule closures, rollback.
+// FR-CBTX-11 incapacitating conditions, FR-CBTX-43 rule closures, rollback, FR-CBTX-75 End and
+// summon concentration.
 import { describe, expect, test } from "bun:test";
-import { EFFECTS_PER_TARGET_MAX } from "@shared/combat-extras/schemas";
+import {
+  CONCENTRATION_CARD_KIND,
+  EFFECT_TYPE,
+  EFFECTS_PER_TARGET_MAX,
+} from "@shared/combat-extras/schemas";
+import { eq } from "drizzle-orm";
+import { effect, notification } from "../../db/schema";
+import { silentLogger } from "../../log";
+import { createServices } from "../../services";
+import { applyHp } from "../combat-tracker/hp";
+import { summonSetup } from "../combat-tracker/summon-testing";
 import { updateEffect } from "./effect-commands";
+import { toEffectRecord } from "./rows";
 import { cbtxSetup } from "./testing";
 
 describe("FR-CBTX-04 addEffect", () => {
@@ -293,5 +305,52 @@ describe("FR-CBTX-43 rule closures", () => {
       ).code,
     ).toBe("not_found");
     expect([t.effects().length, t.events.length]).toEqual([before, n]);
+  });
+});
+
+describe("FR-CBTX-75 End and summon concentration", () => {
+  test("FR-CBTX-75 End ends a summon-only concentration", async () => {
+    const t = summonSetup();
+    // Thorn concentrates on Conjure Elemental with two linked elementals; Mira on Bless.
+    const conj = t.concentrate();
+    t.summon({ ownerCharacterId: t.thornId, count: 2, linkConcentration: true });
+    const bless = t.concentrate(t.miraId, "Bless");
+    // A pending concentration card for Thorn (damage while concentrating).
+    t.run(applyHp.name, { combatantId: t.id("Thorn"), kind: "damage", amount: 3 });
+    const thornCard = t.s.db
+      .select()
+      .from(notification)
+      .where(eq(notification.kind, CONCENTRATION_CARD_KIND))
+      .all()
+      .find((n) => n.state === "pending");
+    expect(thornCard).toBeDefined();
+    const n = t.events.length;
+    t.endEncounter();
+    const fx = (id: string) =>
+      toEffectRecord(t.s.db.select().from(effect).where(eq(effect.id, id)).get() as never);
+    expect(fx(conj).endedReason).toBe("encounter-ended");
+    expect(fx(bless).endedAt).toBeNull();
+    const ended = t.events.slice(n).filter((e) => e.event.type === "EncounterEnded");
+    expect(ended).toHaveLength(1);
+    expect(
+      ended[0]?.event.changes.some(
+        (c) => c.type === EFFECT_TYPE && c.id === conj && c.after !== null,
+      ),
+    ).toBe(true);
+    const card = t.s.db
+      .select()
+      .from(notification)
+      .where(eq(notification.id, thornCard?.id as string))
+      .get();
+    expect(card?.state).not.toBe("pending");
+    // Restart (a fresh server on the same DB) → identical effect / encounter / card / token rows.
+    const pick = (snap: Record<string, unknown>) =>
+      [EFFECT_TYPE, "encounter", "notification", "token"].map((k) => snap[k]);
+    const before = pick(t.h.snapshot(t.dmV));
+    expect(before.every((rows) => Array.isArray(rows) && rows.length > 0)).toBe(true);
+    const s2 = createServices({ config: t.s.config, db: t.s.db, log: silentLogger });
+    for (const h of s2.startHooks) await h.fn(s2);
+    const after = s2.records.snapshot({ db: t.s.db, presence: { list: () => [] } }, t.dmV);
+    expect(pick(after)).toEqual(before);
   });
 });
