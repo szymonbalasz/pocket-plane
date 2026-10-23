@@ -351,15 +351,40 @@ describe("FR-CMP-66 search and pins", () => {
 });
 
 describe("FR-SHELL-188 palette parts", () => {
-  test("FR-SHELL-186 FR-SHELL-188 the Rules command opens cmp.rules by user; a rule row opens it on that card", async () => {
-    const { rulesCommand, openRuleRow } = await import("./palette");
+  test("FR-SHELL-186 FR-SHELL-188 Open Rules opens cmp.rules by user; Rules rows (kind=rule only, ≤ 8, house rules marked) open it on that card", async () => {
+    const { rulesCommand, ruleHits, rulesProvider } = await import("./palette");
     const calls: unknown[] = [];
     const ctx = { shell: { openWindow: (...a: unknown[]) => void calls.push(a) } };
-    rulesCommand.run(ctx);
+    type Ctx = Parameters<typeof rulesCommand.run>[0];
+    await rulesCommand.run(ctx as unknown as Ctx);
     expect(calls).toEqual([[RULES_KIND, undefined, { by: "user" }]]);
     expect(rulesNav.getState().target).toBeNull();
-    openRuleRow(ctx, "r-dodge");
-    expect(rulesNav.getState().target).toBe("r-dodge");
     expect(rulesCommand.clients).toEqual(["dm", "player"]);
+    expect(rulesProvider).toMatchObject({ group: "Rules", clients: ["dm", "player"] });
+    const sum = (
+      id: string,
+      kind: EntrySummary["kind"],
+      sourceLabel = "SRD 5.1",
+    ): EntrySummary => ({
+      id,
+      kind,
+      name: id,
+      sourceLabel,
+      line: "Cover · Combat",
+    });
+    const hits = ruleHits([
+      sum("r-cover", "rule"),
+      sum("c-prone", "condition"),
+      sum("h-flank", "rule", "Homebrew"),
+      ...Array.from({ length: 10 }, (_, i) => sum(`r${i}`, "rule")),
+    ]);
+    expect(hits).toHaveLength(8);
+    expect(hits.map((h) => h.id).slice(0, 2)).toEqual(["r-cover", "h-flank"]);
+    expect(hits.every((h) => h.group === "Rules")).toBe(true);
+    expect(hits[1]?.hint).toBe("Cover · Combat · Homebrew");
+    calls.length = 0;
+    hits[0]?.run(ctx as unknown as Ctx);
+    expect(rulesNav.getState().target).toBe("r-cover");
+    expect(calls).toEqual([[RULES_KIND, undefined, { by: "user" }]]);
   });
 });

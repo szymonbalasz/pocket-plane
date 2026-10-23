@@ -1,5 +1,5 @@
 // FR-CMP-63 player registry (seams S4): `cmp.rules` "Rules", default closed, launcher after
-// Compendium, 480 × 600 (short viewports 480 × 412), min 340 × 320, useful 420 × 360, and its
+// Compendium, 440 × 600 (short viewports 440 × 412; FR-SHELL-61 width, not 480), min 340 × 320, useful 420 × 360, and its
 // size-table row with a content criterion.
 import { expect, test } from "bun:test";
 import { defaultSizeAt } from "@ui/features/play-shell/registry";
@@ -22,8 +22,8 @@ test("FR-CMP-63 rules window registered (player): cmp.rules 'Rules', closed by d
     .map((x) => x.kind);
   expect(orders[orders.indexOf("cmp.compendium") + 1]).toBe("cmp.rules");
   if (!d) throw new Error("not registered");
-  expect(defaultSizeAt(d, { w: 1280, h: 720 })).toEqual({ w: 480, h: 412 });
-  expect(defaultSizeAt(d, { w: 1440, h: 900 })).toEqual({ w: 480, h: 600 });
+  expect(defaultSizeAt(d, { w: 1280, h: 720 })).toEqual({ w: 440, h: 412 });
+  expect(defaultSizeAt(d, { w: 1440, h: 900 })).toEqual({ w: 440, h: 600 });
   const row = SIZE_TABLE.player["cmp.rules"];
   expect(row?.criterion).toBe("page Tabs + 3 card headings");
   expect(row?.protected).toBeUndefined();

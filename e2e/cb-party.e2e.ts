@@ -1,9 +1,10 @@
 // e2e-bundle: cb-party-e2e
-// Thin CB3 flows (CBTX §13.1 E2E, FR-PARTY-51–55): player 1 opens Party status from the launcher
-// at 1280×720 → own Mira and Brakka on top, Thorn "10/10" with "+5" temp and his AC, no monster
-// row; the DM damages Thorn by 4 → player 1's row reads "+1" ≤ 1 s and the DM's Party status
-// shows the same; player 1's own row opens the sheet, Thorn's row has no action. Rows, figures and
-// visibility per viewer: bun test (`summary.test.tsx`, `party-status.test.ts`).
+// Thin CB3 flows (CBTX §13.1 E2E, FR-PARTY-51–55; sprint 9: in Party Manager's Party status tab,
+// FR-PARTY-61): player 1 opens Party Manager from the launcher at 1280×720 → the Party status tab
+// first: own Mira and Brakka on top, Thorn "10/10" with "+5" temp and his AC, no monster row; the
+// DM damages Thorn by 4 → player 1's row reads "+1" ≤ 1 s and the DM's tab shows the same; player
+// 1's own row opens the sheet, Thorn's row has no action. Rows, figures and visibility per viewer:
+// bun test (`status-tab.test.tsx`, `party-status.test.ts`, `party-manager.test.ts`).
 import { type Browser, expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm } from "./support/env";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
@@ -16,7 +17,7 @@ async function page1280(browser: Browser) {
   return ctx.newPage();
 }
 
-test("FR-PARTY-51 FR-PARTY-52 FR-PARTY-55 Party status: player 1 sees Thorn's HP, temp HP and AC; DM damage → the row updates ≤ 1 s; own row opens the sheet", async ({
+test("FR-PARTY-51 FR-PARTY-52 FR-PARTY-55 FR-PARTY-61 Party status tab: player 1 sees Thorn's HP, temp HP and AC; DM damage → the row updates ≤ 1 s; own row opens the sheet", async ({
   browser,
 }) => {
   const { secret, link, recordId } = e2eEnv();
@@ -34,10 +35,14 @@ test("FR-PARTY-51 FR-PARTY-52 FR-PARTY-55 Party status: player 1 sees Thorn's HP
     await p1.getByTestId("party-present-close").click();
     await expect(popup).toHaveCount(0);
   }
-  // FR-SHELL-140: in the launcher at 1280×720 (not the "⋯" menu), loads closed.
-  await expect(launcherButton(p1, "party.summary")).toBeVisible();
-  await expect(shellWindow(p1, "party.summary")).toHaveCount(0);
-  const win = await openWindow(p1, "party.summary");
+  // In the launcher at 1280×720 (not the "⋯" menu), loads closed; opens on Party status.
+  await expect(launcherButton(p1, "party.board")).toBeVisible();
+  await expect(shellWindow(p1, "party.board")).toHaveCount(0);
+  const win = await openWindow(p1, "party.board");
+  await expect(win.locator('[data-testid="party-tab"][data-value="status"]')).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   const rows = win.getByTestId("party-summary-row");
   await expect(rows).toHaveCount(3);
   const order = await rows.evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
@@ -67,8 +72,8 @@ test("FR-PARTY-51 FR-PARTY-52 FR-PARTY-55 Party status: player 1 sees Thorn's HP
   await expect(thornRow.getByTestId("party-summary-temp")).toHaveText("+1", { timeout: 1_000 });
   expect(Date.now() - sent).toBeLessThan(1_000);
   await expect(thornRow.getByTestId("party-summary-hp")).toHaveAttribute("data-value", "10/10");
-  // The DM's Party status: the same numbers from the full record.
-  const dmWin = await openWindow(dm, "party.summary");
+  // The DM's Party status tab: the same numbers from the full record.
+  const dmWin = await openWindow(dm, "party.board");
   const dmThorn = dmWin.locator(`[data-testid="party-summary-row"][data-record-id="${thorn}"]`);
   await expect(dmThorn.getByTestId("party-summary-temp")).toHaveText("+1");
   await expect(dmThorn).toHaveAttribute("data-can-open", "true");

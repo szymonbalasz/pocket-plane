@@ -5,10 +5,14 @@
 // the lazy `TableTools` chunk on first open.
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import { createElement, lazy, Suspense } from "react";
+import { createElement, Suspense } from "react";
+import { lazyChunk } from "../../lib/lazy-chunk";
 import type { SheetSection } from "../character-sheet/sections";
 
-const Panel = lazy(() => import("./MacrosPanel").then((m) => ({ default: m.MacrosPanel })));
+const Panel = lazyChunk(
+  () => import("./MacrosPanel").then((m) => ({ default: m.MacrosPanel })),
+  "inline",
+);
 
 function MacrosSection({ creatureId }: { creatureId: string }) {
   return createElement(

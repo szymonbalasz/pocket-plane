@@ -21,6 +21,8 @@ import {
   useState,
 } from "react";
 import { Tooltip } from "../../components/ui/overlays";
+import { ChunkReloadPanel } from "../../lib/chunk-reload";
+import { isStaleChunk } from "../../lib/chunk-stale";
 import { cn } from "../../lib/utils";
 import { reportContentHeight, reportFirstRow } from "./content-heights";
 import { useGrowthCaps } from "./free-area";
@@ -71,7 +73,10 @@ class WindowErrorBoundary extends Component<{ children: ReactNode }, { error: Er
     console.error("window body failed", error, info.componentStack);
   }
   override render() {
-    if (this.state.error) {
+    const { error } = this.state;
+    // FR-SHELL-175 (BL-91): a stale chunk offers a reload; any other error keeps the message.
+    if (isStaleChunk(error)) return <ChunkReloadPanel chunk={error.chunk} fallback="window" />;
+    if (error) {
       return <p className="text-sm text-destructive">This window failed to render.</p>;
     }
     return this.props.children;

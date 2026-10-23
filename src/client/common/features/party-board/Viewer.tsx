@@ -135,9 +135,7 @@ export function HandoutBody({
   render(loaded: LoadedHandout): ReactNode;
 }) {
   if (handoutId === null) {
-    return (
-      <p className="p-4 text-sm text-muted-foreground">Open a handout from the Party board.</p>
-    );
+    return <p className="p-4 text-sm text-muted-foreground">Open a handout from Party Manager.</p>;
   }
   return <SelectedHandout handoutId={handoutId} render={render} />;
 }

@@ -1,7 +1,6 @@
 // Player window registry (FR-SHELL-07, ADR-0025). APPEND-ONLY (AGENTS §9.9): a feature adds one
 // import and one line in the list for each of its player window types; nothing else changes here.
 
-import { partySummaryWindow } from "@ui/features/party-board/window";
 import { prefsWindow } from "@ui/features/play-shell/PreferencesWindow";
 import { createWindowRegistry, type WindowDef } from "@ui/features/play-shell/registry";
 import { shellTestWindow, syncProbesWindow } from "@ui/features/play-shell/test-windows";
@@ -26,13 +25,12 @@ const windows: WindowDef[] = [
   playerCharSheetWindow, // char.sheet (character-sheet, FR-CHAR-15)
   playerInitiativeWindow, // cbt.initiative (combat-tracker, CBT §7)
   playerTrayWindow, // dicex.tray (dice-extras, FR-DICEX-01)
-  playerPartyBoardWindow, // party.board (party-board, FR-PARTY-11)
+  playerPartyBoardWindow, // party.board "Party Manager" (party-board, FR-PARTY-11, -59; absorbs party.summary, FR-SHELL-155)
   { ...playerHandoutWindow, restoreOpen: false }, // party.handout (party-board, FR-PARTY-14; FR-SHELL-42)
   playerCompendiumWindow, // cmp.compendium (compendium, FR-CMP-18)
   prefsWindow("player", playerPrefSections), // shell.prefs, no launcher (play-shell, FR-SHELL-71)
   playerCompanionWindow, // charx.companion (character-sheet-full, FR-CHARX-59)
   statsWindow, // stats.board (stats, FR-SHELL-93)
-  partySummaryWindow, // party.summary (party-board, FR-SHELL-140)
   playerRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
 ];
 

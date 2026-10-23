@@ -714,6 +714,15 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       if (yielded) return yielded;
       if (o.maxL2) return null;
       const first = o.putAway ? order()[0] : undefined;
+      // I4 (LRU first) at `load`: a restored window re-placed (a zone displacement) that is itself
+      // less recently used than every put-away candidate goes away itself, never a newer one
+      // (walkthrough M13: an absorbed Party Manager put away for an older Stats). Opens and
+      // reopens keep their rule (the window opened is never put away, FR-SHELL-56).
+      const self = get(id);
+      if (trigger.type === "load" && first && self && !isProt(self) && first.z > self.z) {
+        putAwayWin(self, o.cause ?? null, first.kind);
+        return null;
+      }
       if (first) {
         aheadUseful ??= lookAhead({ floor });
         if (aheadUseful) {
@@ -1158,8 +1167,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const was = w;
       if (w.state !== "open") setWin(id, { ...w, state: "open" });
       const spot = ladder(id, { putAway: false, maxL2: true, prev: d.rect });
+      // A tool bar's put-away comes back when the bar goes, whatever holds its old spot (a
+      // remembered window, walkthrough X1): the rest of the ladder places it (below useful, else
+      // the least PC area), still putting nothing away. Nothing else would retry it.
+      const toolbar = !spot && was.state !== "open" && d.cause.startsWith("toolbar:");
+      const rest = toolbar ? ladder(id, { putAway: false, prev: d.rect }) : null;
       if (spot) {
         write(id, spot.rect, "grown", { rung: spot.rung });
+      } else if (rest) {
+        write(id, rest.rect, "returned", { rung: rest.rung });
+        pcFlags.set(id, rest.pcClear);
       } else if (was.state !== "open") {
         setWin(id, was);
         // Still put away: a later settle tries again (a window displaced by the same cause may

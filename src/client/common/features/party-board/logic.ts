@@ -1,7 +1,7 @@
 // Pure client rules of the Party windows' handout parts (FR-PARTY-09–16): list order per role,
 // New / Updated marks from the seen revs, editor and Share drafts → intent payloads (FR-PARTY-02
-// and FR-PARTY-05 mirrored with the shared zod schemas), launcher activity; the Companions tab's
-// groups and rows (FR-PARTY-41–44, sprint 6). No React.
+// and FR-PARTY-05 mirrored with the shared zod schemas), launcher activity; the companion rows
+// (FR-PARTY-41–44, sprint 6; listed in the Party status tab, FR-PARTY-61). No React.
 
 import { healthBand } from "@shared/combat-tracker/rules";
 import {
@@ -28,9 +28,10 @@ import { IntentRejected } from "../../sync/connection";
 export const PARTY_BOARD_KIND = "party.board";
 export const PARTY_HANDOUT_KIND = "party.handout";
 
-// FR-PARTY-29: Loot right of Inventory; FR-PARTY-41 (sprint 6): Companions after Loot.
-export const PARTY_TABS = ["handouts", "inventory", "loot", "companions"] as const;
-export type PartyTab = (typeof PARTY_TABS)[number];
+/** FR-PARTY-60: the landing tab and every fallback (Party status). */
+export const STATUS_TAB = "status";
+/** A tab id registered in `party-tabs.ts` (FR-PARTY-67; RS appends its own). */
+export type PartyTab = string;
 
 export const EMPTY_HANDOUTS = "No handouts yet";
 export const GONE_TEXT = "No longer shared";
@@ -208,11 +209,8 @@ export function handoutIdOf(payload: unknown): string | null {
   return typeof id === "string" ? id : null;
 }
 
-// ---- Companions tab (FR-PARTY-41–44, sprint 6) ----
+// ---- Companion rows (FR-PARTY-41–44, sprint 6; in the Party status tab since FR-PARTY-61) ----
 
-export const EMPTY_COMPANIONS = "No companions yet";
-export const EMPTY_COMPANIONS_PLAYER = "No companions yet — your DM can give you one";
-export const SUMMONS_FOOTER = "Summons show in Initiative";
 /** FR-PARTY-43: Owner… and Release… while the pet is an active combatant (FR-ENT-33). */
 export const PET_IN_FIGHT_HINT = "Dismiss it from the fight first";
 export const LOST_PET = "Connection lost — check the pet before trying again";
@@ -369,10 +367,6 @@ export function companionGroups(
       (a, b) => byName(a.characterName, b.characterName) || byName(a.characterId, b.characterId),
     );
 }
-
-/** FR-PARTY-44: the muted "Summons show in Initiative" footer while a fight runs. */
-export const fightRunning = (combatants: readonly unknown[]) =>
-  (combatants as readonly CombatantLike[]).some((c) => c.active !== false);
 
 /** FR-PARTY-42 `party-companion-hp` `data-value`: "45/59". */
 export const hpValue = (hp: { current: number; max: number }) => `${hp.current}/${hp.max}`;

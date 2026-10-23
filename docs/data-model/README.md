@@ -1378,7 +1378,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). *
 From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §50](../protocol/README.md#50-sprint-3-party-board-handouts-p2).
 
 - **Notification rows:** kind `handout-shared` in `notification` (payload `{handoutId}`, state `info`, audience `all` or `player`; FR-PARTY-06). The row and its handout id stay after an unshare or delete (OQ-PARTY-15); the handout's records still leave the player.
-- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab: handouts | inventory}` (FR-PARTY-11); the viewer's selected handout + mode (page memory).
+- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab}` (FR-PARTY-11; sprint 9 values per [§122](#122-sprint-9-party-manager-pm2)); the viewer's selected handout + mode (page memory).
 - **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
 - **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
 - **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
@@ -2519,9 +2519,35 @@ From [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DIC
 - **Persisted runtime state:** none.
 - **CON-44:** 0 B (no new record or field; a reroll line's items are as many or fewer than before).
 
-## 121. Sprint 9: rules quick reference (SP2)
+## 121. Sprint 9: command palette and keyboard shortcuts (SP1)
 
-From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#338, #339). **Built by `build/sp-rules`**: no new table, column or record type. Protocol side: [protocol §152](../protocol/README.md#152-sprint-9-rules-quick-reference-sp2).
+From [play-shell](../specs/play-shell.md#8-data-model) §8 sprint 9 (FR-SHELL-184, -193, -194; [ADR-0067](../architecture/adr/0067-command-registry.md)). **Built by `build/sp-palette`**: no table, column or record type. Protocol side: [protocol §152](../protocol/README.md#152-sprint-9-command-palette-and-keyboard-shortcuts-sp1).
+
+| Field / store | Rule | Source |
+|---|---|---|
+| Palette command / search provider *(client code)* | registry entries in `commands.ts` (append-only); never sent or stored | FR-SHELL-184, -199 |
+| Recent picks | browser `localStorage` `pp.palette.v1.<campaignId>.<dm \| playerId>` = JSON array of row keys (`c:<command id>`, `w:<window kind>`, `i:<provider>:<record id>`), newest first, ≤ 8 (zod `RecentPicks`: longer lists cut, duplicates dropped; junk → none + one warning); keys that no longer resolve are dropped when shown; compendium rows are never recorded; never sent | FR-SHELL-194 |
+| Keyboard setting | browser `localStorage` `pp.keys.v1` = `{singleKey: boolean}` (zod strict; missing / junk → `{singleKey: true}`); device-wide (no campaign in the key); never sent | FR-SHELL-193 |
+| Palette UI | page memory: open, input, sheet open; the highlighted row; the element focused before it opened | FR-SHELL-180 |
+
+- **Derived:** palette rows and ranks (client, per keystroke); the sheet's rows (from the registry and `when`).
+- **Persisted runtime state:** the two browser keys above.
+
+## 122. Sprint 9: Party Manager (PM2)
+
+From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #339). **Built by `build/party-manager`**. Protocol side: [protocol §153](../protocol/README.md#153-sprint-9-party-manager--party-status-tab-companions-under-owners-tab-registry-pm2). **No table, column, record type or wire field.**
+
+| Browser state | Change | Rule | Source |
+|---|---|---|---|
+| Tab choice `pp.party.tab.v1.<campaignId>.<dm \| playerId>` = `{tab}` | values: `status` new (the landing tab), `companions` retired; any registered id (`party-tabs.ts`) | junk → nothing stored + warning; shown tab falls back to `status` for nothing stored, `companions`, unknown or not visible now (the stored value kept) | FR-PARTY-60, -67 |
+| Layout `pp.layout.v1` entry `party.summary` | absorbed by `party.board` once (state, z; its x / y if it was remembered), then dropped at the write | FR-SHELL-155, FR-PARTY-64 |
+
+- **Derived (client, not stored):** the Party status tab's companion rows under each owner PC (`partySummary`): pets per FR-ENT-37 plus owned combatants of the started encounter; the DM's hidden mark; "Other companions". Tab registry entries are client code, never sent or stored.
+- **Fixtures:** none new (bundles `pm-memory`, `pm-memory-e2e` are PM1's aliases of `session-sim-12`).
+
+## 123. Sprint 9: rules quick reference (SP2)
+
+From [compendium](../specs/compendium.md#8-data-model) §8 / §8.1 sprint 9 (#338, #339). **Built by `build/sp-rules`**: no new table, column or record type. Protocol side: [protocol §154](../protocol/README.md#154-sprint-9-rules-quick-reference-sp2).
 
 | Field / store | Change | Rule | Source |
 |---|---|---|---|

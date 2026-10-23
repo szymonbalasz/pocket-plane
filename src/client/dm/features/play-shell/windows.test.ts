@@ -170,7 +170,11 @@ test("FR-SHELL-45 FR-SHELL-46 FR-SHELL-47 sim-8 sequence (DM, Initiative + Game 
   expect(laptop.steps[0]?.rect).toEqual({ x: 68, y: 60, w: 440, h: 412 });
   expect(laptop.steps[1]?.parked).toEqual(["cmp.compendium"]);
   expect(laptop.steps[2]?.parked).toEqual(["party.board"]);
-  for (const s of laptop.steps) expect(s.rect).toEqual({ x: 68, y: 60, w: 440, h: 412 });
+  // Party Manager opens 550 wide (FR-SHELL-156) where it is alone at the left edge.
+  const widths = [440, 550, 440];
+  laptop.steps.forEach((s, i) => {
+    expect(s.rect).toEqual({ x: 68, y: 60, w: widths[i] as number, h: 412 });
+  });
 });
 
 test("FR-SHELL-47 FR-SHELL-56 screen full (DM): the auto-minimised window is written minimised; a user restore onto its taken spot re-places it, parking the least recently used other window", () => {
@@ -884,8 +888,7 @@ const GOLDEN_KINDS = [
   "charx.companion", // CP4 (S2): appended, goldens regenerated
   "stats.board", // ST2 (FR-SHELL-86 (5)): appended, goldens regenerated
   "dicex.requests", // TT2 (FR-SHELL-112 (1)): appended, goldens regenerated
-  "party.summary", // CB3 (FR-SHELL-143): appended, goldens regenerated
-  "cmp.rules", // SP2 (seams S4, FR-CMP-63: 480 wide, min 340×320): appended, goldens regenerated
+  "cmp.rules", // SP2 (seams S4, FR-CMP-63; min 340×320): appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

@@ -11,6 +11,13 @@ import { dropOn, pasteInto, pngBytes } from "./support/clipboard";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
 
+/** Party Manager on its Handouts tab (Party status is the landing tab since FR-PARTY-60). */
+async function openHandouts(page: Page): Promise<Locator> {
+  const board = await openWindow(page, "party.board");
+  await board.locator('[data-testid="party-tab"][data-value="handouts"]').click();
+  return board;
+}
+
 const POSTER = path.join(
   import.meta.dirname,
   "..",
@@ -43,7 +50,7 @@ test("FR-PARTY-39 FR-ASSET-20 FR-ASSET-21 FR-ASSET-22 FR-ASSET-23 paste adds an 
   await loginDm(dm, secret);
   await live(dm);
 
-  const board = await openWindow(dm, "party.board");
+  const board = await openHandouts(dm);
   await board.getByTestId("party-handout-create").click();
   const win = shellWindow(dm, "party.handout");
   const editor = win.getByTestId("party-editor");
@@ -145,7 +152,7 @@ test("FR-ASSET-27 no player upload: the player client renders no attach control"
   // party-s5 presents h2 to player-1 (`handout-present-1`): close the popup over the launcher.
   await p1.getByTestId("party-present-close").click();
   await expect(p1.getByTestId("party-present-popup")).toHaveCount(0);
-  const board = await openWindow(p1, "party.board");
+  const board = await openHandouts(p1);
   await expect(board.getByTestId("party-handout-row").first()).toBeVisible();
   await expect(p1.getByTestId("asset-attach")).toHaveCount(0);
   await expect(p1.getByTestId("asset-picker")).toHaveCount(0);

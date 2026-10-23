@@ -273,3 +273,152 @@ test("wake never reconnects a rejected (4401) or stopped connection", () => {
   b.wake();
   expect(b.sockets).toHaveLength(1);
 });
+
+/** Fake clock with intervals (FR-SYNC-40): `advance` steps 100 ms at a time; `jump` skips ticks. */
+function tickingClock() {
+  let now = 0;
+  let id = 0;
+  const timeouts = new Map<number, { at: number; fn: () => void }>();
+  const intervals = new Map<number, { next: number; every: number; fn: () => void }>();
+  const fire = () => {
+    for (const [k, t] of [...timeouts]) {
+      if (t.at <= now) {
+        timeouts.delete(k);
+        t.fn();
+      }
+    }
+    for (const iv of [...intervals.values()]) {
+      if (iv.next <= now) {
+        // A late interval fires once and resumes from now (like a browser after a stall).
+        iv.next = now + iv.every;
+        iv.fn();
+      }
+    }
+  };
+  const clock: Clock & { advance(ms: number): void; jump(ms: number): void } = {
+    now: () => 1_000_000 + now,
+    mono: () => now,
+    setTimeout(fn, ms) {
+      timeouts.set(++id, { at: now + ms, fn });
+      return id;
+    },
+    clearTimeout: (h) => void timeouts.delete(h as number),
+    setInterval(fn, ms) {
+      intervals.set(++id, { next: now + ms, every: ms, fn });
+      return id;
+    },
+    clearInterval: (h) => void intervals.delete(h as number),
+    advance(ms) {
+      for (let t = 0; t < ms; t += 100) {
+        now += Math.min(100, ms - t);
+        fire();
+      }
+    },
+    jump(ms) {
+      now += ms;
+      fire();
+    },
+  };
+  return clock;
+}
+
+function liveSetup() {
+  const sockets: FakeSocket[] = [];
+  let offline: (() => void) | null = null;
+  const clock = tickingClock();
+  const conn = new SyncConnection({
+    probe: () => true,
+    credential: { role: "player", token: "t" },
+    url: "ws://x/ws",
+    clock,
+    onChange() {},
+    createSocket: () => {
+      const s = new FakeSocket();
+      sockets.push(s);
+      return s as unknown as WebSocket;
+    },
+    onWake: () => () => {},
+    onOffline: (fn) => {
+      offline = fn;
+      return () => {
+        offline = null;
+      };
+    },
+  });
+  conn.start();
+  const s = sockets[0] as FakeSocket;
+  s.readyState = 1;
+  s.onopen?.();
+  s.onmessage?.({ data: snapshotFrame });
+  const pings = (x: FakeSocket) => x.sent.filter((d) => JSON.parse(d).type === "ping").length;
+  // A dead link: the socket never fires `onclose` on its own.
+  s.close = () => {};
+  return { conn, sockets, clock, s, pings, offline: () => offline?.() };
+}
+
+const pong = JSON.stringify({ type: "pong" });
+
+test("FR-SYNC-40 drop detection: silent link → probe at ping + 5 s, reconnecting once both missed and ≥ 10 s passed; a new socket on the backoff", () => {
+  const { conn, sockets, clock, s, pings } = liveSetup();
+  clock.advance(10_000);
+  expect(pings(s)).toBe(1);
+  clock.advance(4_900);
+  expect(pings(s)).toBe(1);
+  clock.advance(100);
+  expect(pings(s)).toBe(2); // the probe
+  clock.advance(4_900);
+  expect(conn.snapshot.state).toBe("live");
+  clock.advance(100);
+  expect(conn.snapshot.state).toBe("reconnecting"); // 20 s after the last frame
+  expect(sockets).toHaveLength(1);
+  clock.advance(700);
+  expect(sockets).toHaveLength(2);
+});
+
+test("FR-SYNC-40 drop detection: offline → reconnecting within one tick", () => {
+  const { conn, offline } = liveSetup();
+  offline();
+  expect(conn.snapshot.state).toBe("reconnecting");
+});
+
+test("FR-SYNC-40 drop detection: a 60 s clock jump with the pong right after is a wake-up (ping at once), no drop", () => {
+  const { conn, clock, s, pings } = liveSetup();
+  clock.advance(3_000);
+  clock.jump(60_000);
+  expect(pings(s)).toBe(1); // sent at once on the wake-up
+  expect(conn.snapshot.state).toBe("live");
+  s.onmessage?.({ data: pong });
+  clock.advance(9_000);
+  expect(conn.snapshot.state).toBe("live");
+});
+
+test("FR-SYNC-40 drop detection: a frame taking 6 s to arrive (one missed pong) is no drop", () => {
+  const { conn, clock, s, pings } = liveSetup();
+  clock.advance(10_000);
+  clock.advance(6_000);
+  expect(pings(s)).toBe(2); // ping + probe
+  s.onmessage?.({ data: snapshotFrame });
+  clock.advance(8_000);
+  expect(conn.snapshot.state).toBe("live");
+  expect(pings(s)).toBe(2);
+  clock.advance(1_000);
+  expect(pings(s)).toBe(3); // back on the 10 s cadence (from the probe), counters reset
+  clock.advance(20_000);
+  expect(conn.snapshot.state).toBe("reconnecting"); // and a later silence still drops
+});
+
+test("FR-SYNC-40 drop detection: a detached socket's late onclose or frame changes nothing; any frame resets both counters", () => {
+  const { conn, sockets, clock, s, offline } = liveSetup();
+  // Counters reset: ping, probe missed, then a pong just before the drop → still live.
+  clock.advance(19_900);
+  s.onmessage?.({ data: pong });
+  clock.advance(10_000);
+  expect(conn.snapshot.state).toBe("live");
+  offline();
+  expect(conn.snapshot.state).toBe("reconnecting");
+  s.onmessage?.({ data: snapshotFrame });
+  s.onclose?.({ code: 4401 });
+  expect(conn.snapshot.state).toBe("reconnecting");
+  clock.advance(700);
+  expect(sockets).toHaveLength(2);
+});

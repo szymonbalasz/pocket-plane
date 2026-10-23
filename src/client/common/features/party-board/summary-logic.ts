@@ -1,11 +1,13 @@
-// Pure rows of the `party.summary` "Party status" window (FR-PARTY-51–56, sprint 8, CB3): one row
-// per player character the viewer receives (drafts out where the viewer holds the sheet), the
-// viewer's own first, then by name (DM: by name); companions per ADR-0056 grouped under their
-// owner PC after the PC rows (present pets: another player's only while the viewer holds a visible
-// combatant or token for it; owned combatants of the started encounter; never an unowned or
-// hostile creature, never a hidden / `ownerHidden` one). Reads only records the client
-// already holds (FR-PARTY-55): `entity`, `combatant`, `encounter`, `effect`, `creature-sheet`.
-// No React.
+// Pure rows of the Party Manager's **Party status** tab (FR-PARTY-51–56, sprint 8 CB3; FR-PARTY-61,
+// sprint 9 PM2): one row per player character the viewer receives (drafts out where the viewer
+// holds the sheet), the viewer's own first, then by name (DM: by name); under each PC its
+// companions (ADR-0056) in the companion row form (FR-PARTY-42): pets per FR-ENT-37 (DM and owner
+// every pet, the DM's hidden one marked; another player's only while that player holds a visible
+// combatant or token for it) and owned combatants of the started encounter (summons, charmed
+// creatures; never a hidden / `ownerHidden` one); a companion whose owner PC has no row goes to
+// "Other companions". Never an unowned or hostile creature. Reads only records the client already
+// holds (FR-PARTY-55): `entity`, `combatant`, `encounter`, `effect`, `creature-sheet`, `token`,
+// `scene`. No React.
 
 import { deathStateOf, effectName } from "@shared/combat-extras/rules";
 import type { EffectView } from "@shared/combat-extras/schemas";
@@ -16,10 +18,15 @@ import {
   type HealthBand,
   RedactedCharacter,
 } from "@shared/entities/schemas";
-import { type CompanionViewer, companionGroups, hpValue } from "./logic";
+import { type CompanionRow, type CompanionViewer, companionGroups, hpValue } from "./logic";
 
+/** The retired `party.summary` window (FR-PARTY-64): absorbed by `party.board` (FR-SHELL-155). */
 export const PARTY_SUMMARY_KIND = "party.summary";
 export const EMPTY_PARTY = "No player characters yet";
+/** FR-PARTY-61: companions whose owner PC has no row for this viewer. */
+export const OTHER_COMPANIONS = "Other companions";
+/** The mode Tooltip's owner name when the owner PC isn't held. */
+export const OWNER_UNKNOWN = "(unknown)";
 /** FR-CBTX-29's cap: ≤ 4 icons, then "+N". */
 export const SUMMARY_ICONS_MAX = 4;
 
@@ -43,30 +50,24 @@ export interface SummaryPc {
   hidden: boolean;
   /** FR-PARTY-54: a player's own row, any row for the DM. */
   canOpen: boolean;
+  /** FR-PARTY-61: its companions, by name. */
+  companions: SummaryCompanion[];
 }
 
-export interface SummaryCompanion {
-  id: string;
-  name: string;
-  portraitAssetId: string | null;
-  /** Numbers for the DM and the owner; null = band only (ADR-0056). */
-  hp: { current: number; max: number } | null;
-  band: HealthBand;
-  ac: number | null;
+/** FR-PARTY-61: a companion in the Companions tab's row form (FR-PARTY-42) plus the marks. */
+export interface SummaryCompanion extends CompanionRow {
+  /** A pet entity (the DM's row menu) or an owned combatant (summon; no menu, FR-PARTY-62). */
+  pet: boolean;
+  /** DM: hidden from the other players right now (combatant hidden, or only hidden tokens). */
+  hidden: boolean;
   effects: EffectView[];
   turn: boolean;
 }
 
-export interface SummaryGroup {
-  characterId: string;
-  characterName: string;
-  playerId: string;
-  rows: SummaryCompanion[];
-}
-
 export interface PartySummary {
   pcs: SummaryPc[];
-  companions: SummaryGroup[];
+  /** FR-PARTY-61 "Other companions": owner PC not listed for this viewer, by name. */
+  others: SummaryCompanion[];
 }
 
 /** A combatant as either client holds it: only the fields read here. */
@@ -84,10 +85,10 @@ interface CombatantLike {
   pet?: boolean;
   ownerCharacterId?: string | null;
   ownerPlayerId?: string | null;
+  turnMode?: CompanionRow["turnMode"];
   hpCurrent?: number | null;
   hpMax?: number | null;
   band?: HealthBand;
-  card?: { ac: number } | null;
 }
 
 interface EncounterLike {
@@ -144,6 +145,17 @@ export interface SummaryInput {
   sheets: readonly unknown[];
   /** Tokens the viewer holds (players: visible ones of the active scene only). */
   tokens: readonly unknown[];
+  /** Scenes the viewer holds (the DM's pet tokens count on the active one only). */
+  scenes?: readonly unknown[];
+}
+
+interface TokenLike {
+  sceneId?: string;
+  definitionId?: string;
+  characterId?: string | null;
+  ownerPlayerId?: string | null;
+  name?: string;
+  hidden?: boolean;
 }
 
 /**
@@ -151,15 +163,24 @@ export interface SummaryInput {
  * token (no `characterId`) with the pet's owner and name; hidden tokens never reach a player.
  */
 const holdsPetToken = (tokens: readonly unknown[], pet: { name: string; ownerPlayerId: string }) =>
-  (
-    tokens as readonly {
-      characterId?: string | null;
-      ownerPlayerId?: string | null;
-      name?: string;
-    }[]
-  ).some((t) => !t.characterId && t.ownerPlayerId === pet.ownerPlayerId && t.name === pet.name);
+  (tokens as readonly TokenLike[]).some(
+    (t) => !t.characterId && t.ownerPlayerId === pet.ownerPlayerId && t.name === pet.name,
+  );
 
-/** FR-PARTY-51–53: the window's rows for this viewer. */
+/**
+ * DM: a pet out of a fight is hidden from players while it has tokens on the active scene and
+ * all of them are hidden (FR-ENT-37's presence, ADR-0056).
+ */
+function petTokensHidden(input: SummaryInput, petId: string): boolean {
+  const scenes = (input.scenes ?? []) as readonly { id?: string; active?: boolean }[];
+  const active = scenes.find((x) => x.active === true);
+  const mine = (input.tokens as readonly TokenLike[]).filter(
+    (t) => t.definitionId === petId && (!active || t.sceneId === active.id),
+  );
+  return mine.length > 0 && mine.every((t) => t.hidden === true);
+}
+
+/** FR-PARTY-51–53, -61: the Party status tab's rows for this viewer. */
 export function partySummary(input: SummaryInput, viewer: CompanionViewer): PartySummary {
   const dm = viewer.role === "dm";
   const enc =
@@ -198,34 +219,20 @@ export function partySummary(input: SummaryInput, viewer: CompanionViewer): Part
       turn: combatant !== undefined && combatant.id === turnId,
       hidden: dm && combatant?.hidden === true,
       canOpen: dm || own,
+      companions: [],
     });
   }
   pcs.sort((a, b) => Number(b.own) - Number(a.own) || byName(a, b));
 
-  // Companions: present pets (FR-ENT-37) first resolve their combatant, then the other owned
-  // combatants (summons, charmed creatures). Players hold no hidden companion (ADR-0056).
-  const listed = new Set(pcs.map((p) => p.id));
-  const groups = new Map<string, SummaryGroup>();
-  const add = (ownerId: string, playerId: string, row: SummaryCompanion) => {
-    const owner = pcs.find((p) => p.id === ownerId);
-    if (!owner || !listed.has(ownerId)) return;
-    const g = groups.get(ownerId) ?? {
-      characterId: ownerId,
-      characterName: owner.name,
-      playerId,
-      rows: [],
-    };
-    g.rows.push(row);
-    groups.set(ownerId, g);
+  // Companions: pets first resolve their combatant, then the other owned combatants (summons,
+  // charmed creatures). Players hold no hidden companion combatant (ADR-0056).
+  const byPc = new Map(pcs.map((p) => [p.id, p]));
+  const others: SummaryCompanion[] = [];
+  const add = (row: SummaryCompanion) => {
+    const owner = byPc.get(row.ownerCharacterId);
+    (owner ? owner.companions : others).push(row);
   };
   const claimed = new Set<string>();
-  const fullPets = new Map<string, { ac: number; present: boolean }>();
-  for (const r of input.entities) {
-    const p = EntityRecord.safeParse({ derivedFromId: null, ...(r as object) });
-    if (p.success && p.data.kind === "monster" && p.data.companionOf !== null) {
-      fullPets.set(p.data.id, { ac: p.data.statBlock.ac, present: p.data.petPresent });
-    }
-  }
   for (const g of companionGroups(input.entities, combatants, viewer)) {
     for (const row of g.rows) {
       const c = combatants.find(
@@ -237,21 +244,17 @@ export function partySummary(input: SummaryInput, viewer: CompanionViewer): Part
               x.name === row.name)),
       );
       if (c) claimed.add(c.id);
-      // The DM holds every pet: only present ones count; the owner's view carries no
-      // `petPresent` (FR-ENT-37), so the owner sees its pets always.
-      if (dm && row.record?.petPresent !== true) continue;
-      if (dm && (c?.hidden === true || c?.ownerHidden === true)) continue;
       // Another player's pet: only while that player holds a visible combatant or token for it
-      // (a hidden one is never sent; the pet row alone would tell them it is around).
-      const others = !dm && row.ownerPlayerId !== viewer.playerId;
-      if (others && !c && !holdsPetToken(input.tokens, row)) continue;
-      add(row.ownerCharacterId, row.ownerPlayerId, {
-        id: row.id,
-        name: row.name,
-        portraitAssetId: row.portraitAssetId,
-        hp: row.hp,
-        band: row.band,
-        ac: row.hp ? (c?.card?.ac ?? fullPets.get(row.id)?.ac ?? null) : null,
+      // (a hidden one is never sent; the pet row alone would tell them it is around). The DM and
+      // the owner list every pet (FR-ENT-37); only the DM marks a hidden one.
+      const notMine = !dm && row.ownerPlayerId !== viewer.playerId;
+      if (notMine && !c && !holdsPetToken(input.tokens, row)) continue;
+      const hidden =
+        dm && (c ? c.hidden === true || c.ownerHidden === true : petTokensHidden(input, row.id));
+      add({
+        ...row,
+        pet: true,
+        hidden,
         effects: c ? effects.filter((e) => e.targetCombatantId === c.id) : [],
         turn: c !== undefined && c.id === turnId,
       });
@@ -266,22 +269,27 @@ export function partySummary(input: SummaryInput, viewer: CompanionViewer): Part
       typeof c.hpCurrent === "number" &&
       typeof c.hpMax === "number";
     const hp = numbers ? { current: c.hpCurrent as number, max: c.hpMax as number } : null;
-    add(c.ownerCharacterId, c.ownerPlayerId, {
+    add({
       id: c.id,
       name: c.name ?? "",
       portraitAssetId: c.imageAssetId ?? null,
+      ownerCharacterId: c.ownerCharacterId,
+      ownerPlayerId: c.ownerPlayerId,
+      turnMode: c.turnMode ?? null,
+      baseId: null,
+      inCombat: true,
       hp,
       band: hp ? healthBand(hp.current, hp.max) : (c.band ?? "healthy"),
-      ac: hp ? (c.card?.ac ?? null) : null,
+      card: numbers,
+      record: null,
+      pet: false,
+      hidden: false,
       effects: effects.filter((e) => e.targetCombatantId === c.id),
       turn: c.id === turnId,
     });
   }
-  const companions = pcs.flatMap((p) => {
-    const g = groups.get(p.id);
-    return g ? [{ ...g, rows: g.rows.sort(byName) }] : [];
-  });
-  return { pcs, companions };
+  for (const p of pcs) p.companions.sort(byName);
+  return { pcs, others: others.sort(byName) };
 }
 
 /** `party-summary-hp` `data-value`: "cur/max", or the band for a band-only companion. */
