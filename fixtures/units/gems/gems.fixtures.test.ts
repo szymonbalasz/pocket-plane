@@ -55,6 +55,8 @@ const GEM_BUNDLES = [
   "stats-b-e2e",
   // stats tier-B UI (SB1 + SB2): the e2e alias of `stats-b`
   "stats-b-ui-e2e",
+  // sprint 9 FX2: the e2e alias of `gems-reroll-e2e` (DICE §13 FX2)
+  "fx-dice-e2e",
 ];
 
 async function frames(bundle: string) {
