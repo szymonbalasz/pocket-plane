@@ -1,11 +1,10 @@
 // party-loot's add helper for item rows (FR-PARTY-25; PARTY slices by assignment, seams S8): one
 // `loot_entry` of kind `item` (`text` = item name, `qty`, coins 0) in the caller's transaction.
 // Pot and wallet sums are unaffected (coins 0). Callers: `party.addItem` / `removeItem` /
-// `moveItem`.
-import { type Endpoint, type LootEntryRecord, ZERO_COINS } from "@shared/party-loot/schemas";
+// `moveItem`, *(S9)* `hold.delete` (Stores items to the party, FR-LOOT-38).
+import type { Endpoint, LootEntryRecord } from "@shared/party-loot/schemas";
 import type { CommandEnv } from "../../commands/commands";
-import { lootEntry, lootEntrySeqNext } from "../../db/schema";
-import { endpointColumns, getEntry } from "./rows";
+import { insertLootEntry } from "./rows";
 
 export function insertItemEntry(
   env: CommandEnv,
@@ -14,27 +13,8 @@ export function insertItemEntry(
   to: Endpoint,
   name: string,
   qty: number,
+  /** *(S9)* FR-LOOT-36: the row adds / removes a DM-only Stores item (`world ↔ stores`). */
+  itemHidden = false,
 ): LootEntryRecord {
-  const id = env.ctx.ids.next();
-  const f = endpointColumns(from);
-  const t = endpointColumns(to);
-  env.tx
-    .insert(lootEntry)
-    .values({
-      id,
-      campaignId,
-      seq: lootEntrySeqNext,
-      kind: "item",
-      fromKind: f.kind,
-      fromCharacterId: f.characterId,
-      toKind: t.kind,
-      toCharacterId: t.characterId,
-      text: name,
-      ...ZERO_COINS,
-      qty,
-      createdAt: env.ctx.clock.iso(),
-      editedAt: null,
-    })
-    .run();
-  return getEntry(env.tx, campaignId, id) as LootEntryRecord;
+  return insertLootEntry(env, campaignId, { kind: "item", from, to, text: name, qty, itemHidden });
 }

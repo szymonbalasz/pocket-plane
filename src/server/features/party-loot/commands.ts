@@ -1,6 +1,6 @@
 // party-loot commands (LOOT §6, §9): `loot.add` / `loot.edit` (DM), `loot.move` (DM, player),
 // `loot.split` (DM, FR-PARTY-26), and the internal helper `partyLoot.add` (FR-LOOT-03) that runs
-// in the caller's transaction.
+// in the caller's transaction. *(S9)* `loot.move` takes Stores ends (FR-LOOT-30, -33).
 import { CoinMoved, CoinSplit, LootAdded, LootEdited } from "@shared/events/party-loot";
 import {
   ITEM_EDIT_MESSAGE,
@@ -23,16 +23,18 @@ import {
   type LootResult,
   PARTY_POT_TYPE,
   type PartyPotRecord,
+  playerMayMove,
   WALLET_TYPE,
   type WalletRecord,
 } from "@shared/party-loot/schemas";
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound, zodIssues } from "../../commands/errors";
-import { entity, lootEntry, lootEntrySeqNext } from "../../db/schema";
+import { entity, lootEntry } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { notify } from "../notifications/helpers";
-import { endpointColumns, getEntry, partyPot, wallets } from "./rows";
+import { getEntry, insertLootEntry, partyPot, wallets } from "./rows";
+import { requireStores, storesCoinChanges, storesCoinsBefore, storesIds } from "./stores";
 
 export const LOOT_ADD = "loot.add";
 export const LOOT_EDIT = "loot.edit";
@@ -44,7 +46,7 @@ function campaignOf(env: CommandEnv): string {
   return env.actor.campaignId;
 }
 
-const potChange = (before: PartyPotRecord, after: PartyPotRecord): RecordChange => ({
+export const potChange = (before: PartyPotRecord, after: PartyPotRecord): RecordChange => ({
   type: PARTY_POT_TYPE,
   id: after.id,
   before,
@@ -63,27 +65,7 @@ function insertEntry(
   text: string,
   coins: Coins,
 ): LootEntryRecord {
-  const id = env.ctx.ids.next();
-  const f = endpointColumns(from);
-  const t = endpointColumns(to);
-  env.tx
-    .insert(lootEntry)
-    .values({
-      id,
-      campaignId: cid,
-      seq: lootEntrySeqNext,
-      kind,
-      fromKind: f.kind,
-      fromCharacterId: f.characterId,
-      toKind: t.kind,
-      toCharacterId: t.characterId,
-      text,
-      ...coinsOf(coins),
-      createdAt: env.ctx.clock.iso(),
-      editedAt: null,
-    })
-    .run();
-  return getEntry(env.tx, cid, id) as LootEntryRecord;
+  return insertLootEntry(env, cid, { kind, from, to, text, coins: coinsOf(coins) });
 }
 
 /**
@@ -183,10 +165,39 @@ function characterOwner(env: CommandEnv, cid: string, characterId: string): stri
   return row.owner;
 }
 
-/** FR-LOOT-07: own → party / another character, or party → own. Checked at commit. */
-function playerMayMove(from: Endpoint, to: Endpoint, owns: (e: Endpoint) => boolean): boolean {
-  if (owns(from)) return to.kind === "party" || to.kind === "character";
-  return from.kind === "party" && owns(to);
+/**
+ * Changes of one or more coin entries: the entries, `party-pot` iff touched, one `wallet` per
+ * character, *(S9)* one `stores-coin` per Stores (FR-LOOT-08, -31).
+ */
+export function coinMoveChanges(
+  env: CommandEnv,
+  cid: string,
+  entries: readonly LootEntryRecord[],
+  before: {
+    pot: PartyPotRecord | null;
+    wallets: Map<string, WalletRecord>;
+    characterIds: readonly string[];
+    stores: ReturnType<typeof storesCoinsBefore>;
+  },
+): RecordChange[] {
+  const changes: RecordChange[] = entries.map((entry) => ({
+    type: LOOT_ENTRY_TYPE,
+    id: entry.id,
+    before: null,
+    after: entry,
+  }));
+  if (before.pot) changes.push(potChange(before.pot, partyPot(env.tx, cid)));
+  const walletsAfter = new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const));
+  for (const characterId of before.characterIds) {
+    changes.push({
+      type: WALLET_TYPE,
+      id: characterId,
+      before: before.wallets.get(characterId) ?? null,
+      after: walletsAfter.get(characterId) as WalletRecord,
+    });
+  }
+  changes.push(...storesCoinChanges(env, cid, before.stores));
+  return changes;
 }
 
 export const lootMove = defineCommand({
@@ -199,6 +210,8 @@ export const lootMove = defineCommand({
     for (const e of [from, to]) {
       if (e.kind === "character")
         owners.set(e.characterId, characterOwner(env, cid, e.characterId));
+      // FR-LOOT-30 / -33: a gone Stores, or a hidden one for a player → `not_found`.
+      if (e.kind === "stores") requireStores(env, cid, e.strongholdId);
     }
     if (env.actor.role === "player") {
       const me = env.actor.playerId;
@@ -208,28 +221,18 @@ export const lootMove = defineCommand({
     }
     const coins = coinsOf(rest);
     const touchesParty = from.kind === "party" || to.kind === "party";
-    const potBefore = touchesParty ? partyPot(env.tx, cid) : null;
-    const walletsBefore = new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const));
+    const before = {
+      pot: touchesParty ? partyPot(env.tx, cid) : null,
+      wallets: new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const)),
+      characterIds: [...owners.keys()],
+      stores: storesCoinsBefore(env, cid, storesIds(from, to)),
+    };
     const entry = insertEntry(env, cid, "move", from, to, text, coins);
-    const changes: RecordChange[] = [
-      { type: LOOT_ENTRY_TYPE, id: entry.id, before: null, after: entry },
-    ];
-    if (potBefore) changes.push(potChange(potBefore, partyPot(env.tx, cid)));
-    const walletsAfter = new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const));
-    for (const characterId of owners.keys()) {
-      const after = walletsAfter.get(characterId) as WalletRecord;
-      changes.push({
-        type: WALLET_TYPE,
-        id: characterId,
-        before: walletsBefore.get(characterId) ?? null,
-        after,
-      });
-    }
     env.emit({
       type: CoinMoved.type,
       campaignId: cid,
       payload: { entryId: entry.id, from, to, text, ...coins },
-      changes,
+      changes: coinMoveChanges(env, cid, [entry], before),
     });
     return { entryId: entry.id };
   },
@@ -248,34 +251,22 @@ export const lootSplit = defineCommand({
     for (const id of characterIds) characterOwner(env, cid, id);
     // The intent guarantees a non-empty list and some share > 0 ("Nothing to split").
     const { share } = splitCoins(coinsOf(rest), characterIds.length) as { share: Coins };
-    const potBefore = partyPot(env.tx, cid);
-    const walletsBefore = new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const));
+    const before = {
+      pot: partyPot(env.tx, cid),
+      wallets: new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const)),
+      characterIds,
+      stores: new Map(),
+    };
     const party: Endpoint = { kind: "party" };
     const created = characterIds.map((characterId) =>
       insertEntry(env, cid, "move", party, { kind: "character", characterId }, SPLIT_TEXT, share),
     );
-    const changes: RecordChange[] = created.map((entry) => ({
-      type: LOOT_ENTRY_TYPE,
-      id: entry.id,
-      before: null,
-      after: entry,
-    }));
-    changes.push(potChange(potBefore, partyPot(env.tx, cid)));
-    const walletsAfter = new Map(wallets(env.tx, cid).map((w) => [w.id, w] as const));
-    for (const characterId of characterIds) {
-      changes.push({
-        type: WALLET_TYPE,
-        id: characterId,
-        before: walletsBefore.get(characterId) ?? null,
-        after: walletsAfter.get(characterId) as WalletRecord,
-      });
-    }
     const entryIds = created.map((e) => e.id);
     env.emit({
       type: CoinSplit.type,
       campaignId: cid,
       payload: { entryIds, characterIds, shares: share },
-      changes,
+      changes: coinMoveChanges(env, cid, created, before),
     });
     return { entryIds };
   },

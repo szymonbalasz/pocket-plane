@@ -19,8 +19,9 @@ export const HANDOUT_BODY_MAX = 10_000;
 export const HANDOUT_IMAGES_MAX = 10;
 /** FR-PARTY-05: chosen players per share; FR-PARTY-32: per present. */
 export const SHARE_PLAYERS_MAX = 20;
-/** FR-PARTY-17: party rows per campaign. */
+/** FR-PARTY-17: party rows per campaign. *(S9)* Also each Stores' rows (FR-LOOT-36, OQ-HOLD-05). */
 export const PARTY_ITEM_MAX = 60;
+export const STORES_ITEM_MAX = 60;
 /** FR-PARTY-22: sheet `items` rows ([FR-CHARX-16](character-sheet-full.md)). */
 export const SHEET_ITEM_MAX = 80;
 export const ITEM_NAME_MAX = 60;
@@ -32,6 +33,10 @@ export const SPLIT_COIN_MAX = 999_999;
 
 export const HANDOUT_LIMIT_MESSAGE = `Handout limit reached (${HANDOUT_MAX})`;
 export const PARTY_FULL_MESSAGE = `Party inventory is full (${PARTY_ITEM_MAX})`;
+/** *(S9)* FR-LOOT-36: a Stores' row cap. */
+export const STORES_FULL_MESSAGE = `Stores are full (${STORES_ITEM_MAX})`;
+/** *(S9)* FR-LOOT-30 / FR-HOLD-19: a gone (or hidden, for a player) stronghold's Stores. */
+export const STORES_GONE_MESSAGE = "Stores are gone";
 export const ITEM_CLASH_MESSAGE = "Same item exists — move or remove one";
 export const ITEM_GONE_MESSAGE = "Item is gone";
 export const NOTHING_TO_SPLIT = "Nothing to split";
@@ -241,34 +246,56 @@ export const ItemQty = z.int().min(1).max(ITEM_QTY_MAX);
 /** FR-PARTY-18: item input fields. */
 const itemFields = { name: ItemName, qty: ItemQty, notes: ItemNotes };
 
-/** `party.addItem` (DM, FR-PARTY-19). */
-export const AddItemIntent = z.strictObject(itemFields);
+/** *(S9)* A Stores holder (FR-LOOT-37): `party.addItem`'s optional `holder`. */
+export const StoresHolder = z.strictObject({ kind: z.literal("stores"), strongholdId: Id });
+export type StoresHolder = z.infer<typeof StoresHolder>;
+
+/**
+ * `party.addItem` (DM, FR-PARTY-19). *(S9)* `holder` = a Stores (absent = the party) and
+ * `dmOnly` (Stores rows only, OQ-HOLD-12 A; FR-LOOT-36, -37).
+ */
+export const AddItemIntent = z
+  .strictObject({ ...itemFields, holder: StoresHolder.optional(), dmOnly: z.boolean().optional() })
+  .refine((v) => v.dmOnly !== true || v.holder !== undefined, {
+    message: "Only Stores items can be DM only",
+    path: ["dmOnly"],
+  });
 export type AddItemIntent = z.input<typeof AddItemIntent>;
 export type ItemInput = z.output<typeof AddItemIntent>;
 
-/** `party.editItem` (DM, FR-PARTY-20): full replacement. */
-export const EditItemIntent = z.strictObject({ itemId: Id, ...itemFields });
+/** `party.editItem` (DM, FR-PARTY-20): full replacement. *(S9)* `dmOnly` on Stores rows (FR-LOOT-37). */
+export const EditItemIntent = z.strictObject({
+  itemId: Id,
+  ...itemFields,
+  dmOnly: z.boolean().optional(),
+});
 export type EditItemIntent = z.input<typeof EditItemIntent>;
 
 /** `party.removeItem` (DM, FR-PARTY-21). */
 export const RemoveItemIntent = z.strictObject({ itemId: Id, qty: ItemQty });
 export type RemoveItemIntent = z.input<typeof RemoveItemIntent>;
 
-/** An item move's end (FR-PARTY-22): `party` or a character. */
+/** An item move's end (FR-PARTY-22): `party` or a character. *(S9)* Or a Stores (FR-LOOT-37). */
 export const ItemEnd = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("party") }),
   z.strictObject({ kind: z.literal("character"), characterId: Id }),
+  StoresHolder,
 ]);
 export type ItemEnd = z.infer<typeof ItemEnd>;
 
 export function sameItemEnd(a: ItemEnd, b: ItemEnd): boolean {
   if (a.kind !== b.kind) return false;
-  return a.kind === "party" || a.characterId === (b as typeof a).characterId;
+  if (a.kind === "character") return a.characterId === (b as typeof a).characterId;
+  if (a.kind === "stores") return a.strongholdId === (b as typeof a).strongholdId;
+  return true;
 }
 
+/** *(S9)* A party-item holder end (party or Stores: rows of `party_item`), vs a sheet. */
+export const isItemTableEnd = (e: ItemEnd) => e.kind === "party" || e.kind === "stores";
+
 /**
- * `party.moveItem` (DM, player; FR-PARTY-22). `from ≠ to`; from `party` needs `itemId`, from a
- * character needs `rowId` (the sheet's `items` row); the other id is rejected (strict).
+ * `party.moveItem` (DM, player; FR-PARTY-22). `from ≠ to`; from `party` *(S9: or a Stores)* needs
+ * `itemId`, from a character needs `rowId` (the sheet's `items` row); the other id is rejected.
  */
 export const MoveItemIntent = z
   .strictObject({
@@ -281,7 +308,7 @@ export const MoveItemIntent = z
   .superRefine((v, ctx) => {
     if (sameItemEnd(v.from, v.to))
       ctx.addIssue({ code: "custom", message: "From and To must differ", path: ["to"] });
-    const fromParty = v.from.kind === "party";
+    const fromParty = isItemTableEnd(v.from);
     if (fromParty && v.itemId === undefined)
       ctx.addIssue({ code: "custom", message: "Choose a party item", path: ["itemId"] });
     if (fromParty && v.rowId !== undefined)
@@ -299,7 +326,11 @@ export type AddItemResult = z.infer<typeof AddItemResult>;
 export const ItemEntryResult = z.strictObject({ entryId: z.string() });
 export type ItemEntryResult = z.infer<typeof ItemEntryResult>;
 
-/** Record `party-item` (FR-PARTY-17, §8); DM and player full. */
+/**
+ * Record `party-item` (FR-PARTY-17, §8); DM and player full. *(S9)* A Stores row carries
+ * `strongholdId` (FR-LOOT-36); DM-only keys `storesHidden` (FR-LOOT-32) and `dmOnly` (OQ-HOLD-12
+ * A), on the wire only when true: a row with either is hidden from players.
+ */
 export const PartyItemRecord = z.strictObject({
   id: z.string(),
   campaignId: z.string(),
@@ -307,6 +338,9 @@ export const PartyItemRecord = z.strictObject({
   name: z.string(),
   qty: z.int().min(1).max(ITEM_QTY_MAX),
   notes: z.string(),
+  strongholdId: z.string().optional(),
+  storesHidden: z.literal(true).optional(),
+  dmOnly: z.literal(true).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

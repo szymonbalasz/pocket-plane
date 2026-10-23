@@ -7,6 +7,8 @@ import {
   PARTY_FULL_MESSAGE,
   PARTY_ITEM_MAX,
   SHEET_ITEM_MAX,
+  STORES_FULL_MESSAGE,
+  STORES_ITEM_MAX,
 } from "./schemas";
 
 /** The fields the merge rule reads; party rows and sheet `items` rows both fit. */
@@ -72,26 +74,49 @@ export function mergeConflictMessage(
   side: string,
 ): string {
   if (reason === "qty") return `${side} can't hold more than ${ITEM_QTY_MAX} of this item`;
-  return target.kind === "party"
-    ? PARTY_FULL_MESSAGE
-    : `${side}'s inventory is full (${SHEET_ITEM_MAX})`;
+  if (target.kind === "party") return PARTY_FULL_MESSAGE;
+  if (target.kind === "stores") return STORES_FULL_MESSAGE;
+  return `${side}'s inventory is full (${SHEET_ITEM_MAX})`;
 }
 
-/** Row cap of a move's target side (FR-PARTY-22). */
-export const rowCapOf = (end: ItemEnd) => (end.kind === "party" ? PARTY_ITEM_MAX : SHEET_ITEM_MAX);
+/** Row cap of a move's target side (FR-PARTY-22; *(S9)* a Stores 60, FR-LOOT-36). */
+export const rowCapOf = (end: ItemEnd) =>
+  end.kind === "party" ? PARTY_ITEM_MAX : end.kind === "stores" ? STORES_ITEM_MAX : SHEET_ITEM_MAX;
+
+/**
+ * *(S9)* FR-LOOT-36 merge within one holder: the key is name + notes **and** the DM-only flag
+ * (a DM-only Stores row never merges with a visible one); the row cap counts every holder row.
+ */
+export function planHolderMerge<R extends ItemLike & { dmOnly?: true }>(
+  holderRows: readonly R[],
+  item: ItemLike,
+  maxRows: number,
+  dmOnly = false,
+): MergePlan<R> {
+  const same = holderRows.filter((r) => (r.dmOnly === true) === dmOnly);
+  const plan = planMerge(same, item, Number.POSITIVE_INFINITY);
+  if (plan.kind === "append" && holderRows.length >= maxRows)
+    return { kind: "conflict", reason: "rows" };
+  return plan;
+}
 
 /** FR-PARTY-20: another row (not `itemId`) with the edited key → `conflict`. */
-export function editKeyClash<R extends ItemLike & { id: string }>(
+export function editKeyClash<R extends ItemLike & { id: string; dmOnly?: true }>(
   rows: readonly R[],
   itemId: string,
   item: { name: string; notes: string },
+  dmOnly = false,
 ): R | undefined {
-  return rows.find((r) => r.id !== itemId && sameItemKey(r, item));
+  return rows.find(
+    (r) => r.id !== itemId && (r.dmOnly === true) === dmOnly && sameItemKey(r, item),
+  );
 }
 
 /**
  * FR-PARTY-23 (as FR-LOOT-07): DM any move. Player: own character → `party` or another
  * character; `party` → own character. `ownCharacterIds` = characters the player owns at commit.
+ * *(S9)* FR-LOOT-33 (OQ-LOOT-21 A; the Stores' visibility is the server's check): Stores ↔ party,
+ * Stores → own character, own character → Stores.
  */
 export function canMoveItem(
   role: "dm" | "player",
@@ -102,5 +127,6 @@ export function canMoveItem(
   if (role === "dm") return true;
   const own = (e: ItemEnd) => e.kind === "character" && ownCharacterIds.includes(e.characterId);
   if (from.kind === "character") return own(from);
-  return own(to);
+  if (from.kind === "party") return own(to) || to.kind === "stores";
+  return to.kind === "party" || own(to);
 }

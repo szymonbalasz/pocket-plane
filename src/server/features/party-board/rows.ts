@@ -6,7 +6,7 @@ import type {
   HandoutRecord,
   PartyItemRecord,
 } from "@shared/party-board/schemas";
-import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import type { Db, Tx } from "../../db/client";
 import { handout, handoutPresent, partyItem, player } from "../../db/schema";
 
@@ -64,6 +64,10 @@ export function toPartyItemRecord(r: ItemRow): PartyItemRecord {
     name: r.name,
     qty: r.qty,
     notes: r.notes,
+    // *(S9)* FR-LOOT-36: on the wire only when set / true.
+    ...(r.strongholdId === null ? {} : { strongholdId: r.strongholdId }),
+    ...(r.storesHidden ? { storesHidden: true as const } : {}),
+    ...(r.dmOnly ? { dmOnly: true as const } : {}),
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -114,12 +118,37 @@ export function handoutCount(db: Reader, campaignId: string): number {
   );
 }
 
-/** Every party item of the campaign, `seq` order. */
+/**
+ * Every `party_item` row of the campaign, `seq` order: *(S9)* the party's and every Stores' (one
+ * lazy load brings both, FR-LOOT-36). Holder-scoped rules use `holderItems`.
+ */
 export function listPartyItems(db: Reader, campaignId: string): PartyItemRecord[] {
   return db
     .select()
     .from(partyItem)
     .where(eq(partyItem.campaignId, campaignId))
+    .orderBy(asc(partyItem.seq))
+    .all()
+    .map(toPartyItemRecord);
+}
+
+/** *(S9)* One holder's rows (`strongholdId` null = the party inventory), `seq` order. */
+export function holderItems(
+  db: Reader,
+  campaignId: string,
+  strongholdId: string | null,
+): PartyItemRecord[] {
+  return db
+    .select()
+    .from(partyItem)
+    .where(
+      and(
+        eq(partyItem.campaignId, campaignId),
+        strongholdId === null
+          ? isNull(partyItem.strongholdId)
+          : eq(partyItem.strongholdId, strongholdId),
+      ),
+    )
     .orderBy(asc(partyItem.seq))
     .all()
     .map(toPartyItemRecord);

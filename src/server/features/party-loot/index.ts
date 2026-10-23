@@ -1,9 +1,9 @@
 // party-loot (LOOT): intents `loot.add`, `loot.edit`, `loot.move`, `loot.split` (FR-PARTY-26);
 // record types `loot-entry`, `party-pot`, `wallet`; internal helper `partyLoot.add` (FR-LOOT-03)
-// for later features.
+// for later features. *(S9)* derived `stores-coin` (FR-LOOT-31).
 import type { Feature } from "../../services";
 import { add, lootAdd, lootEdit, lootMove, lootSplit } from "./commands";
-import { lootEntryType, partyPotType, walletType } from "./records";
+import { lootEntryType, partyPotType, storesCoinType, walletType } from "./records";
 
 /** `partyLoot.add(env, input) → {entryId}`, in the caller's transaction (FR-LOOT-03). */
 export const partyLoot = { add } as const;
@@ -18,5 +18,6 @@ export const partyLootFeature: Feature = {
     r.recordType(lootEntryType);
     r.recordType(partyPotType);
     r.recordType(walletType);
+    r.recordType(storesCoinType);
   },
 };
