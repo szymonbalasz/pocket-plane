@@ -37,6 +37,7 @@ DM decision #338 (sprint-8 recap + sprint 9 scope). Process: [orchestrator promp
 |---|---|
 | 2026-10-22 | Phase A started: spec agents RS, PM, FX, SP working in `spec/s9-{rs,pm,fx,sp}` (ID ranges from `ab10c460`, specs unchanged since; no Axeholm notes in `.verify/sprint9/`) |
 | 2026-10-22 | Specs drafted; seams S1–S14 (`.verify/sprint9/seams.md`); reviews (RS + SP 1 blocker / 5 majors; PM + FX 0 / 5) ruled and applied. **DM gate 1** ready (`.verify/sprint9/gate.md`) |
+| 2026-10-23 | **DM gate 1 passed (#339):** every pick, ADRs 0064–0068 accepted; specs merged and integrated (glossary, spec index, registries, backlog). Phase B wave 1 building: window memory (PM1), Party Manager (PM2), reminders + strongholds core (RS0), dice + gem line fixes (FX2) |
 
 ## Check `main` any time (DM)
 
