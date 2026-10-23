@@ -45,7 +45,9 @@ import {
   type PlacementToken,
   pcBoxes,
   pcClear,
+  placeMemo,
   placeWindow,
+  roomFor,
   usableArea,
 } from "./placement";
 import {
@@ -465,6 +467,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   // the tokens drawn now sit where the old viewport's fit put them; PCs count after the refit.
   const fitted = (ctx.camera?.() ?? "fitted") === "fitted";
   const tokens = trigger.type === "viewport" && fitted ? [] : (ctx.avoid?.() ?? []);
+  // FR-SHELL-158 (BL-82): one token grid per (window, size, gap) for every search of this settle.
+  const memo = placeMemo(tokens);
   let out: WindowState[] = [...ws];
   const memory = new Map<string, Displacement>(
     (ctx.memory?.() ?? []).map((d) => [windowId(d.kind, d.instance), d]),
@@ -650,13 +654,14 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       tokens,
       need: need(w0, def),
       size,
+      memo,
       ...(o.prev && { prev: o.prev }),
     });
-    const accepted = (p: Placement) => p.clear && p.pcClear;
+    const accepted = (p: Placement | null) => p?.clear === true && p.pcClear;
     const tryAt = (more: Partial<PlaceInput>): Placement | null => {
       const base = input();
       for (const gap of GAPS) {
-        const p = placeWindow(def, vp, { ...base, ...more, gap });
+        const p = clearSearch(def, { ...base, ...more, gap });
         if (accepted(p)) return p;
       }
       return null;
@@ -677,7 +682,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         if (o.protectedOnly && (!isProt(w) || isRemembered(w))) continue;
         keep.push({ ...r, protected: isProt(w) });
       }
-      const p = placeWindow(def, vp, { ...input(), windows: keep, ...more, gap: 4 });
+      const p = clearSearch(def, { ...input(), windows: keep, ...more, gap: 4 });
       if (accepted(p)) return true;
       return !o.push && more.floor !== undefined
         ? yieldFor(def, { ...input(), windows: keep }, more.floor, true) !== null
@@ -688,7 +693,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
      * permissive; every L1 candidate is an L2 one), before the rung-by-rung searches.
      */
     const anyAt = (more: Partial<PlaceInput>) =>
-      accepted(placeWindow(def, vp, { ...input(), ...more, gap: 4 }));
+      accepted(clearSearch(def, { ...input(), ...more, gap: 4 }));
     let squeezed = false;
     for (;;) {
       if (anyAt({ floor })) {
@@ -740,6 +745,13 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       return { rect: last.rect, rung: "L5", pcClear: last.pcClear };
     }
   };
+
+  /**
+   * A search whose answer only matters when clear (accepted, a yield): skipped when no clear spot
+   * of its size exists at all (`roomFor`, exact; FR-SHELL-158).
+   */
+  const clearSearch = (def: WindowDef, input: PlaceInput): Placement | null =>
+    roomFor(def, vp, input) ? placeWindow(def, vp, input) : null;
 
   /** A protected window's rect `r` shrunk to its useful size in its anchor corner (FR-SHELL-101). */
   const squeezeRect = (r: Rect, def: WindowDef): Rect => {
@@ -816,8 +828,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const sizes =
       input.size && (input.size.w > floor.w || input.size.h > floor.h) ? [input.size] : [];
     for (const f of [...sizes, floor]) {
-      const p = placeWindow(def, vp, { ...input, floor: f });
-      if (!p.clear || p.pcClear) continue;
+      const p = clearSearch(def, { ...input, floor: f });
+      if (!p?.clear || p.pcClear) continue;
       const fit = ctx.dryFit([...(input.windows ?? []).map(plainRect), p.rect]);
       if (!fit?.clear || fit.cellPx < Math.max(YIELD_SHARE * last, YIELD_MIN_CELL)) continue;
       if (!dry) yields = true;
