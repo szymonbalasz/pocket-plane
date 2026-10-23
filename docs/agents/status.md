@@ -18,7 +18,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | SP3 session recap | `build/sp-recap` (ws w9Z, slot 3) | build-sp3 | part 1 7/7 | window rows after PM1, commands after SP1, stats after FX1 |
 | FX1 toasts + kill feed + stats retry | `fix/fx-toasts-feed` (ws w90; base PM1) | build-fx1 | built (check 5331, e2e 210); ruling: window title bar + 40 px keep-out for the toast stack (amends FR-NOTE-53); merging main | walkthrough FX1 |
 | SP1 palette + shortcuts | `build/sp-palette` (ws wA1; base PM1) | build-sp1 | re-test 11/11; main (FX3) merged in | branch gates running → merge → main gates |
-| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | main merged (check 5339) | test-sp2 walkthrough R1-R8 running |
+| SP2 rules reference | `build/sp-rules` (ws wA2; base PM1) | build-sp2 | walkthrough 14/14 | after SP1 + PM2 merge: merge main, commands.ts lines, threshold → re-test R6 + P4 → merge |
 
 | RS1 Reminders tab + sheet | `build/rem-ui` (ws wA3; base PM2) | build-rs1 | building | walkthrough RS-R |
 | RS2 Strongholds tab + window | `build/hold-ui` (ws wA4; base PM2) | build-rs2 | building | walkthrough RS-H |
