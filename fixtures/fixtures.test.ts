@@ -1,7 +1,13 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { closeDb } from "@server/db/client";
-import { campaign, eventLog, player, syncProbe } from "@server/db/schema";
+import { mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { FIXTURE_INSTANT } from "@server/commands/context";
+import { parseConfig } from "@server/config";
+import { closeDb, openFileDb } from "@server/db/client";
+import { campaign, encounter, eventLog, gameLogEntry, player, syncProbe } from "@server/db/schema";
 import { readEventLog } from "@server/events/log";
+import { resetAndLoad } from "@server/features/fixtures-adapters/loader";
 import { library, loadBundle } from "./index";
 
 const cleanups: (() => void)[] = [];
@@ -9,8 +15,8 @@ afterAll(() => {
   for (const c of cleanups) c();
 });
 
-async function loaded(bundle: string) {
-  const r = await loadBundle(bundle, { testMode: true });
+async function loaded(bundle: string, now?: number) {
+  const r = await loadBundle(bundle, { testMode: true, ...(now !== undefined && { now }) });
   cleanups.push(r.cleanup);
   const db = r.openDb();
   cleanups.unshift(() => closeDb(db));
@@ -148,5 +154,74 @@ describe("fixture library", () => {
     if (ms > 1000)
       console.warn(`session-sim in-process load took ${Math.round(ms)} ms (> 1 s budget)`);
     expect(ms).toBeLessThan(2000);
+  });
+});
+
+// Sprint 9 (FX1, BL-69; ADR-0068): CLI loads anchor the seeded clock at load time.
+describe("FR-FIX-29 load clock", () => {
+  /** The stats bundle's started fight (Goblin Ambush), its log lines and the event log. */
+  function times(db: Awaited<ReturnType<typeof loaded>>["db"]) {
+    const started = db
+      .select()
+      .from(encounter)
+      .all()
+      .filter((e) => e.status === "started");
+    return {
+      startedAt: new Set(started.map((e) => e.startedAt)),
+      lines: new Set(
+        db
+          .select()
+          .from(gameLogEntry)
+          .all()
+          .map((l) => l.at),
+      ),
+      log: new Set(
+        db
+          .select()
+          .from(eventLog)
+          .all()
+          .map((l) => l.at),
+      ),
+    };
+  }
+
+  test("FR-FIX-29 load anchors the clock: `now` 19:40:31 → the started fight and its lines at 19:40:00; without `now` → FIXTURE_INSTANT; the same `now` twice → identical dumps", async () => {
+    const now = Date.parse("2026-10-22T19:40:31Z");
+    const anchor = "2026-10-22T19:40:00.000Z";
+    const a = await loaded("stats", now);
+    expect(times(a.db)).toEqual({
+      startedAt: new Set([anchor]),
+      lines: new Set([anchor]),
+      log: new Set([anchor]),
+    });
+    const fixed = await loaded("stats");
+    expect(times(fixed.db)).toEqual({
+      startedAt: new Set([FIXTURE_INSTANT]),
+      lines: new Set([FIXTURE_INSTANT]),
+      log: new Set([FIXTURE_INSTANT]),
+    });
+    // IDs, tokens, links and counts never depend on `now` (FR-FIX-08).
+    expect(a.manifest.records).toEqual(fixed.manifest.records);
+    expect(a.manifest.playerLinks).toEqual(fixed.manifest.playerLinks);
+    const b = await loaded("stats", now + 20_000); // same minute
+    expect(dump(a.db)).toEqual(dump(b.db));
+  });
+
+  test("FR-FIX-29 e2e load keeps the fixed instant: `resetAndLoad` as scripts/e2e.ts calls it → FIXTURE_INSTANT", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "pp-fix29-"));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const config = parseConfig({
+      PP_PROFILE: "verify",
+      PP_PORT: "0",
+      PP_DATA_DIR: dir,
+      PP_DATA_DISPOSABLE: "1",
+      PP_TEST_MODE: "1",
+      PP_DM_SECRET: "fix29-e2e-secret",
+    });
+    await resetAndLoad(config, library, "stats");
+    const db = openFileDb(config.dbPath);
+    cleanups.unshift(() => closeDb(db));
+    expect(times(db).startedAt).toEqual(new Set([FIXTURE_INSTANT]));
+    expect(times(db).log).toEqual(new Set([FIXTURE_INSTANT]));
   });
 });
