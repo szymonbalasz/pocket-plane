@@ -10,7 +10,7 @@ import {
 import { CATEGORY_LABEL, ROLL_CATEGORIES, type RollCategory } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/controls";
 import { Input, Label } from "../../components/ui/primitives";
@@ -24,9 +24,12 @@ import {
   draftOf,
   type MacroCreature,
   type MacroDraft,
+  type MacroTouched,
   type MacroViewer,
   macroGroups,
   saveInput,
+  shownError,
+  UNTOUCHED,
 } from "./macro-logic";
 
 const SELECT =
@@ -55,6 +58,17 @@ export function MacroEditor({ draft: initial, onDone }: { draft: MacroDraft; onD
   const creature = creatures.find((c) => c.id === d.creatureId);
   const offered = dmOnlyOffered(viewer, creature);
   const error = draftError(d);
+  // FR-DICEX-95 (BL-90): a field's error shows once it was touched or Save was pressed.
+  const [touched, setTouched] = useState<MacroTouched>(UNTOUCHED);
+  const touch = (field: keyof MacroTouched) =>
+    setTouched((t) => (t[field] ? t : { ...t, [field]: true }));
+  const shown = shownError(d, touched);
+  // A new macro (Save as macro's preset included) opens with focus in Name.
+  const nameRef = useRef<HTMLInputElement>(null);
+  const isNew = initial.id === undefined;
+  useEffect(() => {
+    if (isNew) nameRef.current?.focus();
+  }, [isNew]);
   const row = d.id ? macros.find((m) => m.id === d.id) : undefined;
   const list = row
     ? macros.filter((m) => m.playerId === row.playerId && m.creatureId === row.creatureId)
@@ -78,6 +92,7 @@ export function MacroEditor({ draft: initial, onDone }: { draft: MacroDraft; onD
       className="flex flex-col gap-2"
       onSubmit={(e) => {
         e.preventDefault();
+        touch("submitted");
         if (!error && !off) void send(DICEX_MACRO_INTENTS.saveMacro, saveInput(d, offered));
       }}
     >
@@ -91,8 +106,14 @@ export function MacroEditor({ draft: initial, onDone }: { draft: MacroDraft; onD
           data-testid="dicex-macro-name"
           className="h-7 text-sm"
           maxLength={40}
+          ref={nameRef}
           value={d.name}
-          onChange={(e) => setD({ ...d, name: e.target.value })}
+          aria-invalid={shownError({ name: d.name, expression: "1d4" }, touched) !== null}
+          onChange={(e) => {
+            setD({ ...d, name: e.target.value });
+            touch("name");
+          }}
+          onBlur={() => touch("name")}
         />
       </Label>
       <Label className="flex flex-col gap-1 text-xs">
@@ -101,9 +122,13 @@ export function MacroEditor({ draft: initial, onDone }: { draft: MacroDraft; onD
           data-testid="dicex-macro-expression"
           className="h-7 font-mono text-sm"
           placeholder="1d20+4"
-          aria-invalid={draftError({ name: "x", expression: d.expression }) !== null}
+          aria-invalid={shownError({ name: "x", expression: d.expression }, touched) !== null}
           value={d.expression}
-          onChange={(e) => setD({ ...d, expression: e.target.value })}
+          onChange={(e) => {
+            setD({ ...d, expression: e.target.value });
+            touch("expression");
+          }}
+          onBlur={() => touch("expression")}
         />
       </Label>
       <div className="flex flex-wrap items-center gap-2">
@@ -131,9 +156,9 @@ export function MacroEditor({ draft: initial, onDone }: { draft: MacroDraft; onD
           </Label>
         )}
       </div>
-      {error && (d.name !== "" || d.expression !== "") && (
+      {shown && (
         <p data-testid="dicex-macro-error" role="alert" className="text-xs text-destructive">
-          {error}
+          {shown}
         </p>
       )}
       <div className="flex items-center gap-1">
