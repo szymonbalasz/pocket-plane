@@ -55,6 +55,7 @@ import dicexLooks from "./dice-extras/dicex-looks";
 import dicexMacros from "./dice-extras/dicex-macros";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import dicexRequestOpen from "./dice-extras/dicex-request-open";
+import h1RequestInsight from "./dice-extras/h1-request-insight";
 import diceSettings from "./dice-roll-log/dice-settings";
 import logColours from "./dice-roll-log/log-colours";
 import rolls1 from "./dice-roll-log/rolls-1";
@@ -287,4 +288,6 @@ export const units: readonly Fixture[] = [
   // Sprint 9 track SP (build/sp-recap): the recap's loot haul + a share
   recapLootHaul,
   recapShareNote,
+  // Sprint 10 track H1 (fix/h1-combat-dice): an open hidden request to Mira (BL-105)
+  h1RequestInsight,
 ];
