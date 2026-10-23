@@ -3486,3 +3486,23 @@ From [campaign-management](../specs/campaign-management.md#6-functional-requirem
 - **Reveal refit** (`MapCanvas.tsx`, players): `pauseGate.deferUntilResume("map.reveal", …)`: under the card it runs once at resume.
 - **Fixtures:** unit `camp-paused` ("Pizza break, back soon", `town`, 10 min; not in `session-sim-12`); bundles `table-tools-paused` (= `table-tools` + `camp-paused`), `table-tools-paused-e2e` (`e2e/tt-pause.e2e.ts`).
 - **CON-44:** no new record; the paused card's +488 B and the events' sizes are TT0's (`con44-tt.test.ts`).
+
+## 149. Sprint 9: Party Manager — Party status tab, companions under owners, tab registry (PM2)
+
+From [party-board](../specs/party-board.md#611-sprint-9-party-manager-track-pm) FR-PARTY-59–67, [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-155 (use), -156, -157, -160, -161 (DM #338, #339; seams S1, S3). **Built by `build/party-manager`**: browser only. No intent, event, record type, signal or wire field (CON-44: 0 B). Data side: [data model §119](../data-model/README.md#119-sprint-9-party-manager-pm2).
+
+| Kind | Owner | Clients | Default open | Default geometry | Launcher | Gate | Source |
+|---|---|---|---|---|---|---|---|
+| `party.board` *(renamed "Party Manager"; kind, test IDs, `openPartyTab`, tab-memory key unchanged)* | PARTY | both | no | top-left `dx` 56, **550 × 560** (band-capped), `usefulSize` 440 × 400, min 340 × 360, `minOpenH` 400; `absorbs: ["party.summary"]`, `onAbsorb` → tab `status` | "Party Manager" (lucide `Scroll`, order 58) | — | FR-SHELL-155, -156 |
+| ~~`party.summary`~~ | — | — | — | removed: def, both registry lines, size-table / golden / harness rows, launcher button; a stored entry is absorbed by `party.board` (FR-SHELL-155) | — | — | FR-SHELL-157, FR-PARTY-64 |
+
+| Piece | Contract | Source |
+|---|---|---|
+| Tab registry (`party-tabs.ts`, ★ append-only) | `PARTY_TAB_ENTRIES`: `{id, label, order, visible?(viewer), render(parts)}`; `viewer` = `{role, playerId, store}`, re-read on store changes; rendered in `order`, visible ones only; `parts` = each board window's `PartyTabParts` (`handouts`, DM `companions`; a track adds its own keys). PM2: `status` "Party status" 10, `handouts` 20, `inventory` 30, `loot` 40; RS: `reminders` 50, `strongholds` 60 | FR-PARTY-67 |
+| Tab memory (`seen.ts`) | `pp.party.tab.v1.<campaignId>.<dm \| playerId>` = `{tab}` (any id ≤ 64 chars, stored as is); shown = `shownTab(stored, visible)`: nothing stored, `companions` (retired), unknown or not visible now → `status`; the stored value is kept, so a tab that turns visible comes back. `openPartyTab(tab)` stores and opens `by: "feature"`; `openPartyTab("status")` is SP's palette entry (seams S3) | FR-PARTY-60 |
+| Party status tab (`StatusTab.tsx` from `Summary.tsx`; rows `summary-logic.ts` `partySummary`) | PC rows as §145 (unchanged rules); each PC in a `party-companion-group` (+ `data-record-id` = PC id) followed by its companions in the companion row form (`Companions.tsx` `CompanionLine`): pets per FR-ENT-37 (DM and owner every pet; another player's only while that player holds a visible combatant or token for it) and owned combatants of the started encounter (not hidden / `ownerHidden`); DM `party-companion-hidden` (eye-off) on a pet hidden from players (its combatant hidden / `ownerHidden`, or out of a fight only hidden tokens on the active scene); owner + DM numbers and Card, others the band; DM menu on pets only (summons none). Owner PC not listed → `party-companion-other` "Other companions". DM header `party-companion-new` (New pet…). No companions → nothing under the PCs; the "Summons show in Initiative" footer is gone | FR-PARTY-61, -62 |
+| Copy | title / launcher "Party Manager"; present popup "Open in Party Manager"; viewer "Open a handout from Party Manager."; combat's DM hint "Change a pet's owner in Party Manager" | FR-PARTY-59 |
+
+- **Retired test IDs:** `party-tab` `data-value="companions"`, `party-companions`, `party-companions-empty`, `party-companions-footer`, `party-summary-group`, `party-summary-companion`. New: `party-tab` `data-value="status"`, `party-status` (tab body), `party-companion-other`, `party-companion-hidden`; `party-companion-menu` gains `data-locked` (in a fight).
+- **Harness / goldens:** `party.summary` leaves D3, P1, P3; `party.board` (550) joins P1, P3 (stays in D1, P2); `replay.failing.json` and both goldens regenerated (FR-SHELL-160).
+- **E2E:** `party-manager.e2e.ts` (`pm-memory-e2e`), `cb-party.e2e.ts` (on the tab), `useful-size.e2e.ts` `party.board` case (`wf-frame-e2e` + `cb-party-six`).

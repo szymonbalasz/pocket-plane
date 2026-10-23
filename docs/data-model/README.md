@@ -1378,7 +1378,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). *
 From [party-board](../specs/party-board.md#8-data-model) (PARTY slice 2). **Built by `build/party-handouts`**: no new table, column or record type. Protocol side: [protocol §50](../protocol/README.md#50-sprint-3-party-board-handouts-p2).
 
 - **Notification rows:** kind `handout-shared` in `notification` (payload `{handoutId}`, state `info`, audience `all` or `player`; FR-PARTY-06). The row and its handout id stay after an unshare or delete (OQ-PARTY-15); the handout's records still leave the player.
-- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab: handouts | inventory}` (FR-PARTY-11); the viewer's selected handout + mode (page memory).
+- **Browser-only state (never sent):** seen revs `localStorage` `pp.party.v1.<campaignId>.<playerId>` = `{seen: {handoutId: rev}}` (zod `SeenMap`, ≤ 500 entries, oldest dropped; invalid → empty + warning, overwritten by the next mark; unavailable → memory only, one warning; FR-PARTY-13); tab choice `pp.party.tab.v1.<campaignId>.<dm | playerId>` = `{tab}` (FR-PARTY-11; sprint 9 values per [§119](#119-sprint-9-party-manager-pm2)); the viewer's selected handout + mode (page memory).
 - **Derived (client, `@ui/features/party-board/logic`):** DM order newest `seq`, player order newest `sharedAt`; mark New (never opened) / Updated (`rev` > seen rev); share label (`@shared/party-board/format`); launcher activity.
 - **Fixtures:** `handouts-1` now also writes 3 `handout-shared` rows through its shares: h1 `all`, h2 `player` player-1, h4 `all` (kept after h4's unshare); `party-second` 1 (`all`, Second Campaign).
 - **CON-44:** no new snapshot bytes in the worst case: notifications stay within NOTE's 100-row window, and a `handout-shared` row (text ≤ 93 chars, payload ≈ 51 B) is smaller than the heavy harness's damage-card rows that fill it; PARTY's CON-44 test unchanged (+1,100 B, DM 673,998 B).
@@ -2485,3 +2485,16 @@ From [campaign-management](../specs/campaign-management.md#6-functional-requirem
 - **Derived:** countdown from `backAt` on the client clock; paused = a player whose campaign row has `pause`.
 - **Fixtures:** `camp-paused`; bundles `table-tools-paused`, `table-tools-paused-e2e`.
 - **CON-44:** 0 B beyond TT0's measured +488 B (paused).
+
+## 119. Sprint 9: Party Manager (PM2)
+
+From [party-board](../specs/party-board.md#8-data-model) (sprint 9, DM #338, #339). **Built by `build/party-manager`**. Protocol side: [protocol §149](../protocol/README.md#149-sprint-9-party-manager--party-status-tab-companions-under-owners-tab-registry-pm2). **No table, column, record type or wire field.**
+
+| Browser state | Change | Rule | Source |
+|---|---|---|---|
+| Tab choice `pp.party.tab.v1.<campaignId>.<dm \| playerId>` = `{tab}` | values: `status` new (the landing tab), `companions` retired; any registered id (`party-tabs.ts`) | junk → nothing stored + warning; shown tab falls back to `status` for nothing stored, `companions`, unknown or not visible now (the stored value kept) | FR-PARTY-60, -67 |
+| Layout `pp.layout.v1` entry `party.summary` | absorbed by `party.board` once (state, z; its x / y if it was remembered), then dropped at the write | FR-SHELL-155, FR-PARTY-64 |
+
+- **Derived (client, not stored):** the Party status tab's companion rows under each owner PC (`partySummary`): pets per FR-ENT-37 plus owned combatants of the started encounter; the DM's hidden mark; "Other companions". Tab registry entries are client code, never sent or stored.
+- **Fixtures:** none new (bundles `pm-memory`, `pm-memory-e2e` are PM1's aliases of `session-sim-12`).
+- **CON-44:** 0 B.
