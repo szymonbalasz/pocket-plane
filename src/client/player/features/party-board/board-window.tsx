@@ -48,7 +48,7 @@ function PlayerHandouts() {
 }
 
 function PlayerPartyBoard() {
-  return <PartyBoard handouts={<PlayerHandouts />} />;
+  return <PartyBoard parts={{ handouts: <PlayerHandouts /> }} />;
 }
 
 export const playerPartyBoardWindow = defineWindow({

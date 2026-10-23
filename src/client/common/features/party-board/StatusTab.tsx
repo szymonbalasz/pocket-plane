@@ -1,9 +1,12 @@
-// `party.summary` "Party status" (FR-PARTY-51–58, sprint 8, CB3), both clients: one dense line
-// per PC (portrait, owner's colour dot + name, HP "38 / 52" with a thin band-tone bar, "+5" temp,
-// shield AC, death / Down Badge, ≤ 4 condition icons + "+N", turn marker; DM: eye-off on a PC
-// hidden from players), then companions grouped under their owner PC in muted type (owner and DM:
-// numbers + AC; others: the band). No editing. A row the viewer may open (own PC; any for the DM)
-// opens the sheet; every row has a Tooltip with its figures. The list is one tab stop (roving).
+// Party Manager's **Party status** tab (FR-PARTY-51–56 sprint 8 CB3, FR-PARTY-61, -62 sprint 9
+// PM2), both clients: one dense line per PC (portrait, owner's colour dot + name, HP "38 / 52"
+// with a thin band-tone bar, "+5" temp, shield AC, death / Down Badge, ≤ 4 condition icons + "+N",
+// turn marker; DM: eye-off on a PC hidden from players), each followed, indented, by its
+// companions in the companion row form (`Companions.tsx`; owner and DM: numbers + Card, others:
+// the band; DM: eye-off on a hidden pet, the row menu on pets), then "Other companions" whose
+// owner PC has no row here. DM header: New pet…. No editing of figures. A row the viewer may open
+// (own PC; any for the DM) opens the sheet; every PC row has a Tooltip with its figures. The list
+// is one tab stop (roving).
 
 import { CREATURE_SHEET_TYPE } from "@shared/character-sheet/sheet";
 import { EFFECT_TYPE, type EffectView } from "@shared/combat-extras/schemas";
@@ -11,10 +14,11 @@ import { COMBATANT_TYPE, ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import type { HealthBand } from "@shared/entities/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { initials } from "@shared/scenes-map/geometry";
-import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { SCENE_TYPE, TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { ChevronRightIcon, EyeOffIcon, ShieldIcon } from "lucide-react";
 import { type KeyboardEvent, useMemo } from "react";
 import { Tooltip } from "../../components/ui/overlays";
+import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
@@ -23,14 +27,16 @@ import { openSheetFor } from "../character-sheet/selection";
 import { CHAR_SHEET_KIND } from "../character-sheet/window";
 import { EffectIcon, effectValue } from "../combat-extras/icons";
 import { DeathBadge } from "../combat-extras/parts";
-import { BandBadge } from "../combat-tracker/parts";
+import { useDefinitions } from "../compendium/definitions";
 import { useOpenWindow } from "../play-shell/ShellContext";
+import { CompanionLine, type CompanionsDmParts } from "./Companions";
 import {
   EMPTY_PARTY,
+  OTHER_COMPANIONS,
+  OWNER_UNKNOWN,
   partySummary,
   SUMMARY_ICONS_MAX,
   type SummaryCompanion,
-  type SummaryGroup,
   type SummaryPc,
   summaryHpValue,
   summaryTip,
@@ -152,13 +158,7 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
             {r.name}
           </span>
           <Turn on={r.turn} />
-          {r.hidden && (
-            <EyeOffIcon
-              data-testid="party-summary-hidden"
-              className="size-3 shrink-0 text-muted-foreground"
-              aria-label="Hidden from players"
-            />
-          )}
+          {r.hidden && <Hidden testId="party-summary-hidden" />}
         </span>
         <span
           className={cn("flex shrink-0 items-center gap-1.5", !live && "text-muted-foreground")}
@@ -182,50 +182,46 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
   );
 }
 
-function CompanionRow({ r, live }: { r: SummaryCompanion; live: boolean }) {
+function Hidden({ testId }: { testId: string }) {
   return (
-    <li
-      data-testid="party-summary-companion"
-      data-record-id={r.id}
-      data-turn={r.turn}
-      className="flex flex-wrap items-center gap-x-1.5 py-0.5 pl-4 text-muted-foreground"
-    >
-      <SmallPortrait name={r.name} id={r.portraitAssetId} />
-      <span className="flex min-w-0 flex-1 basis-16 items-center gap-1">
-        <span className="min-w-0 [overflow-wrap:anywhere]">{r.name}</span>
-        <Turn on={r.turn} />
-      </span>
-      <span className={cn("flex shrink-0 items-center gap-1.5", !live && "opacity-70")}>
-        {r.hp ? (
-          <Hp hp={r.hp} band={r.band} />
-        ) : (
-          <BandBadge band={r.band} testId="party-summary-hp" />
-        )}
-        {r.ac !== null && <Ac ac={r.ac} />}
-      </span>
-      <Icons effects={r.effects} />
-    </li>
+    <EyeOffIcon
+      data-testid={testId}
+      className="size-3 shrink-0 text-muted-foreground"
+      aria-label="Hidden from players"
+    />
   );
 }
 
-function Group({ g, live }: { g: SummaryGroup; live: boolean }) {
-  const color = useColorOf()({ role: "player", playerId: g.playerId });
+/** FR-PARTY-61: the companion row form plus the tab's marks (turn, DM eye-off, conditions). */
+function Companion({
+  r,
+  ownerName,
+  bases,
+  dm,
+  live,
+}: {
+  r: SummaryCompanion;
+  ownerName: string;
+  bases: ReadonlyMap<string, string>;
+  dm?: CompanionsDmParts;
+  live: boolean;
+}) {
   return (
-    <section data-testid="party-summary-group" data-record-id={g.characterId}>
-      <h3 className="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-        <span
-          className="size-1.5 shrink-0 rounded-full"
-          style={color ? { backgroundColor: color } : undefined}
-          aria-hidden
-        />
-        <span className="[overflow-wrap:anywhere]">{g.characterName}</span>
-      </h3>
-      <ul>
-        {g.rows.map((r) => (
-          <CompanionRow key={r.id} r={r} live={live} />
-        ))}
-      </ul>
-    </section>
+    <CompanionLine
+      row={r}
+      ownerName={ownerName}
+      base={r.baseId ? (bases.get(r.baseId) ?? null) : null}
+      // FR-PARTY-62: summons get no menu (Initiative owns them).
+      dm={r.pet ? dm : undefined}
+      live={live}
+      marks={
+        <>
+          <Turn on={r.turn} />
+          {r.hidden && <Hidden testId="party-companion-hidden" />}
+          <Icons effects={r.effects} />
+        </>
+      }
+    />
   );
 }
 
@@ -242,13 +238,15 @@ function onListKey(e: KeyboardEvent<HTMLUListElement>) {
   to.focus();
 }
 
-export function PartySummaryWindow() {
+/** FR-PARTY-61, -62: the tab body; `dm` = the DM client's New pet… and pet row menu. */
+export function StatusTab({ dm }: { dm?: CompanionsDmParts }) {
   const entities = useRecords<unknown>(ENTITY_TYPE);
   const combatants = useRecords<unknown>(COMBATANT_TYPE);
   const encounters = useRecords<unknown>(ENCOUNTER_TYPE);
   const effects = useRecords<EffectView>(EFFECT_TYPE);
   const sheets = useRecords<unknown>(CREATURE_SHEET_TYPE);
   const tokens = useRecords<unknown>(TOKEN_TYPE);
+  const scenes = useRecords<unknown>(SCENE_TYPE);
   const you = useSync((s) => s.store.you);
   const live = useSync((s) => s.state === "live");
   const viewer = useMemo(
@@ -256,34 +254,96 @@ export function PartySummaryWindow() {
     [you],
   );
   const summary = useMemo(
-    () => partySummary({ entities, combatants, encounters, effects, sheets, tokens }, viewer),
-    [entities, combatants, encounters, effects, sheets, tokens, viewer],
+    () =>
+      partySummary({ entities, combatants, encounters, effects, sheets, tokens, scenes }, viewer),
+    [entities, combatants, encounters, effects, sheets, tokens, scenes, viewer],
   );
+  // DM: the pets' bases' names ("Owlbear", muted); imported ones load on demand.
+  const baseIds = useMemo(() => {
+    const all = [...summary.pcs.flatMap((p) => p.companions), ...summary.others];
+    return [...new Set(all.flatMap((r) => (r.baseId ? [r.baseId] : [])))];
+  }, [summary]);
+  const defs = useDefinitions(viewer.role === "dm" ? baseIds : []).byId;
+  const bases = useMemo(() => new Map([...defs.values()].map((d) => [d.id, d.name])), [defs]);
+  const names = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of entities) {
+      const r = e as { id?: unknown; kind?: unknown; name?: unknown };
+      if (r.kind === "character" && typeof r.id === "string" && typeof r.name === "string") {
+        m.set(r.id, r.name);
+      }
+    }
+    return m;
+  }, [entities]);
   const openWindow = useOpenWindow();
   const open = (id: string) => {
     openSheetFor(id, "character");
     openWindow(CHAR_SHEET_KIND);
   };
-  if (summary.pcs.length === 0) {
-    return (
-      <p
-        data-testid="party-summary-empty"
-        className="py-4 text-center text-sm text-muted-foreground"
-      >
-        {EMPTY_PARTY}
-      </p>
-    );
-  }
   return (
-    <div data-testid="party-summary" data-live={live} className="flex flex-col gap-1.5 text-xs">
-      <ul data-chip-row="" aria-label="Party" onKeyDown={onListKey}>
-        {summary.pcs.map((r) => (
-          <PcRow key={r.id} r={r} live={live} open={open} />
-        ))}
-      </ul>
-      {summary.companions.map((g) => (
-        <Group key={g.characterId} g={g} live={live} />
-      ))}
+    <div data-testid="party-status" className="flex h-full min-h-0 flex-col gap-1.5">
+      {dm && (
+        <div className="flex justify-end">
+          <dm.header disabled={!live} />
+        </div>
+      )}
+      <ScrollArea className="min-h-0 flex-1">
+        <div
+          data-testid="party-summary"
+          data-live={live}
+          className="flex flex-col gap-1.5 pr-2 text-xs"
+        >
+          {summary.pcs.length === 0 && (
+            <p
+              data-testid="party-summary-empty"
+              className="py-4 text-center text-sm text-muted-foreground"
+            >
+              {EMPTY_PARTY}
+            </p>
+          )}
+          {summary.pcs.length > 0 && (
+            <ul data-chip-row="" aria-label="Party" onKeyDown={onListKey}>
+              {summary.pcs.map((r) => (
+                <li key={r.id}>
+                  {/* FR-PARTY-61: the group wraps the PC row and its companions (indented). */}
+                  <ul data-testid="party-companion-group" data-record-id={r.id}>
+                    <PcRow r={r} live={live} open={open} />
+                    {r.companions.map((c) => (
+                      <Companion
+                        key={c.id}
+                        r={c}
+                        ownerName={r.name}
+                        bases={bases}
+                        dm={dm}
+                        live={live}
+                      />
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+          {summary.others.length > 0 && (
+            <section data-testid="party-companion-other">
+              <h3 className="text-[11px] font-semibold text-muted-foreground">
+                {OTHER_COMPANIONS}
+              </h3>
+              <ul>
+                {summary.others.map((c) => (
+                  <Companion
+                    key={c.id}
+                    r={c}
+                    ownerName={names.get(c.ownerCharacterId) ?? OWNER_UNKNOWN}
+                    bases={bases}
+                    dm={dm}
+                    live={live}
+                  />
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 }

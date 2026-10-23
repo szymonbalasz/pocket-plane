@@ -1,7 +1,7 @@
 // Player present popup (FR-PARTY-36, -37): while the store holds the viewer's own
 // `handout-present` row (live event or snapshot), a modal Dialog over every window and toast
 // (under the dice layer) shows that handout: title, images one at a time (Prev / Next), the body
-// through `DiceText`. Close, Esc, a click outside or "Open in Party" hide it at once and send
+// through `DiceText`. Close, Esc, a click outside or "Open in Party Manager" hide it at once and send
 // `party.closePresent`; a close that never reached the server shows again after the next snapshot.
 // Mounted by one line in the player play page (seams S4); not a window. *(Sprint 8, TT4)* Under the
 // pause card it waits: shown at resume (FR-SHELL-127, a deferred feature open).
@@ -188,7 +188,7 @@ export function PresentContent({
           disabled={!shown}
           onClick={onOpenBoard}
         >
-          Open in Party
+          Open in Party Manager
         </Button>
         <Button ref={closeRef} size="sm" data-testid="party-present-close" onClick={onClose}>
           Close

@@ -2,16 +2,18 @@
 // §24 rows); each client registers its own defs with its own bodies. Sprint 8: `party.summary`
 // (FR-SHELL-140, CB3), one def for both clients.
 import { HeartPulseIcon, ScrollIcon } from "lucide-react";
+import { createElement } from "react";
 import { defineWindow, type WindowDef } from "../play-shell/registry";
 import { handoutActivity, PARTY_BOARD_KIND, PARTY_HANDOUT_KIND } from "./logic";
-import { PartySummaryWindow } from "./Summary";
+import { StatusTab } from "./StatusTab";
 import { PARTY_SUMMARY_KIND } from "./summary-logic";
 
 type Base = Omit<WindowDef, "component" | "clients">;
 
 export const partyBoardWindowBase = {
   kind: PARTY_BOARD_KIND,
-  title: "Party",
+  // FR-PARTY-59 / FR-SHELL-156: "Party Manager" (kind, test IDs and tab memory unchanged).
+  title: "Party Manager",
   defaultSize: { w: 440, h: 560 },
   minSize: { w: 340, h: 360 },
   // Left edge, clear of the tool rail (#162; where `loot.log` was before FR-PARTY-29).
@@ -19,7 +21,7 @@ export const partyBoardWindowBase = {
   // No full-size slot at 1280×720 (above `dice.log`): open this tall on top, not shrunk.
   minOpenH: 400,
   defaultOpen: false,
-  launcher: { icon: ScrollIcon, label: "Party", order: 58 },
+  launcher: { icon: ScrollIcon, label: "Party Manager", order: 58 },
   // FR-PARTY-11: dot when a handout arrives or is updated while minimised.
   activity: handoutActivity,
 } satisfies Base;
@@ -51,5 +53,5 @@ export const partySummaryWindow = defineWindow({
   defaultOpen: false,
   growToContent: true,
   launcher: { icon: HeartPulseIcon, label: "Party status", order: 58.5 },
-  component: PartySummaryWindow,
+  component: () => createElement(StatusTab),
 });

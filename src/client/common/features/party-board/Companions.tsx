@@ -1,37 +1,24 @@
-// `party.board` **Companions** tab, both clients (FR-PARTY-41–46, sprint 6): every pet the viewer
-// receives (entities' FR-ENT-37: DM and owner every pet, other players present pets only),
-// grouped by owner PC (header: PC name + owner player's colour dot). Row: portrait / initials,
-// name, turn mode icon, "In combat"; HP "45 / 59" + bar for the DM and the owner (the combatant's
-// in a fight), a band for others; Card (DM, owner) opens the companion card. The DM's New pet… and
-// row menu come from the DM client (`dm`). Reads `entity` / `combatant` rows only (FR-PARTY-45).
+// The companion row form (FR-PARTY-42, sprint 6), both clients; since sprint 9 listed under each
+// owner PC in the Party status tab (FR-PARTY-61, `StatusTab.tsx`; the Companions tab is gone).
+// Row: portrait / initials, name, turn mode icon, "In combat", the marks the tab adds (turn,
+// eye-off, condition icons); HP "45 / 59" + bar for the DM and the owner (the combatant's in a
+// fight), a band for others; DM: the base name; Card (DM, owner) opens the companion card. The
+// DM's New pet… and row menu come from the DM client (`dm`, FR-PARTY-62).
 import { IdCardIcon } from "lucide-react";
-import { type ComponentType, useMemo } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/primitives";
-import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
-import { useRecords, useSync } from "../../sync/store";
-import { useColorOf } from "../campaign-management/colors";
 import {
   COMPANION_CARD_KIND,
   useOpenCompanionCard,
 } from "../combat-tracker/companion-card-request";
 import { ModeIcon } from "../combat-tracker/companions";
 import { BandBadge, Portrait } from "../combat-tracker/parts";
-import { useDefinitions } from "../compendium/definitions";
 import { useRegistry } from "../play-shell/ShellContext";
-import {
-  type CompanionGroup,
-  type CompanionRow,
-  companionGroups,
-  EMPTY_COMPANIONS,
-  EMPTY_COMPANIONS_PLAYER,
-  fightRunning,
-  hpValue,
-  SUMMONS_FOOTER,
-} from "./logic";
+import { type CompanionRow, hpValue } from "./logic";
 
-/** The DM client's parts (FR-PARTY-43): header New pet…, the row menu. */
+/** The DM client's parts (FR-PARTY-43, -62): header New pet…, the row menu. */
 export interface CompanionsDmParts {
   header: ComponentType<{ disabled: boolean }>;
   menu: ComponentType<{ row: CompanionRow; disabled: boolean }>;
@@ -48,7 +35,7 @@ function CardButton({ row }: { row: CompanionRow }) {
     <Button
       size="sm"
       variant="outline"
-      className="h-7 px-2"
+      className="h-6 px-1.5 text-xs"
       data-testid="party-companion-card"
       data-record-id={row.id}
       onClick={() => openCard(row.id)}
@@ -61,9 +48,9 @@ function CardButton({ row }: { row: CompanionRow }) {
 
 function Health({ row }: { row: CompanionRow }) {
   if (!row.hp) return <BandBadge band={row.band} testId="party-companion-band" />;
-  const pct = row.hp.max > 0 ? Math.round((100 * row.hp.current) / row.hp.max) : 0;
+  const pct = row.hp.max > 0 ? Math.min(100, Math.round((100 * row.hp.current) / row.hp.max)) : 0;
   return (
-    <div className="flex min-w-16 flex-col items-end gap-0.5">
+    <div className="flex min-w-16 shrink-0 flex-col items-end gap-0.5">
       <span
         data-testid="party-companion-hp"
         data-value={hpValue(row.hp)}
@@ -78,152 +65,61 @@ function Health({ row }: { row: CompanionRow }) {
   );
 }
 
-function Row({
+/** One companion line (FR-PARTY-42 form); `marks` sit after the badges (FR-PARTY-61). */
+export function CompanionLine({
   row,
   ownerName,
   base,
   dm,
   live,
+  marks,
 }: {
   row: CompanionRow;
   ownerName: string;
   base: string | null;
   dm?: CompanionsDmParts;
   live: boolean;
+  marks?: ReactNode;
 }) {
   return (
     <li
       data-testid="party-companion-row"
       data-record-id={row.id}
       data-in-combat={row.inCombat}
-      className="flex items-center gap-2 py-1"
+      className="flex items-center gap-1.5 py-0.5 pl-4 text-muted-foreground"
     >
       <Portrait name={row.name} imageAssetId={row.portraitAssetId} />
-      <div className="min-w-0 flex-1">
-        {/* FR-PARTY-46: badges wrap, the name is never cut. */}
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-          <span className="break-words font-medium" data-testid="party-companion-name">
-            {row.name}
-          </span>
-          {/* FR-PARTY-42: FR-CBT-118's icon; the Tooltip names the mode. */}
-          {row.turnMode && (
-            <ModeIcon
-              id={row.id}
-              mode={row.turnMode}
-              ownerName={ownerName}
-              testId="party-companion-mode-icon"
-            />
-          )}
-          {row.inCombat && (
-            <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
-              In combat
-            </Badge>
-          )}
-        </div>
-        {base && (
-          <div
-            className="truncate text-xs text-muted-foreground"
-            data-testid="party-companion-base"
-          >
-            {base}
-          </div>
-        )}
-      </div>
-      <Health row={row} />
-      {row.card && <CardButton row={row} />}
-      {dm && <dm.menu row={row} disabled={!live} />}
-    </li>
-  );
-}
-
-function Group({
-  g,
-  bases,
-  dm,
-  live,
-}: {
-  g: CompanionGroup;
-  bases: ReadonlyMap<string, string>;
-  dm?: CompanionsDmParts;
-  live: boolean;
-}) {
-  const colorOf = useColorOf();
-  const color = colorOf({ role: "player", playerId: g.playerId });
-  return (
-    <section data-testid="party-companion-group" data-record-id={g.characterId}>
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-        <span
-          className="size-2 shrink-0 rounded-full"
-          style={color ? { backgroundColor: color } : undefined}
-          aria-hidden
-        />
-        {g.characterName}
-      </h3>
-      <ul className="divide-y">
-        {g.rows.map((r) => (
-          <Row
-            key={r.id}
-            row={r}
-            ownerName={g.characterName}
-            base={r.baseId ? (bases.get(r.baseId) ?? null) : null}
-            dm={dm}
-            live={live}
+      {/* FR-PARTY-46: badges wrap, the name is never cut. */}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        <span className="break-words" data-testid="party-companion-name">
+          {row.name}
+        </span>
+        {/* FR-PARTY-42: FR-CBT-118's icon; the Tooltip names the mode. */}
+        {row.turnMode && (
+          <ModeIcon
+            id={row.id}
+            mode={row.turnMode}
+            ownerName={ownerName}
+            testId="party-companion-mode-icon"
           />
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-export function CompanionsTab({ dm }: { dm?: CompanionsDmParts }) {
-  const entities = useRecords<unknown>("entity");
-  const combatants = useRecords<unknown>("combatant");
-  const you = useSync((s) => s.store.you);
-  const live = useSync((s) => s.state === "live");
-  const viewer = useMemo(
-    () => ({ role: you?.role ?? "player", playerId: you?.playerId ?? null }) as const,
-    [you],
-  );
-  const groups = useMemo(
-    () => companionGroups(entities, combatants, viewer),
-    [entities, combatants, viewer],
-  );
-  // DM: the bases' names ("Owlbear", muted); imported ones load on demand.
-  const baseIds = useMemo(
-    () => [...new Set(groups.flatMap((g) => g.rows.flatMap((r) => (r.baseId ? [r.baseId] : []))))],
-    [groups],
-  );
-  const defs = useDefinitions(viewer.role === "dm" ? baseIds : []).byId;
-  const bases = useMemo(() => new Map([...defs.values()].map((d) => [d.id, d.name])), [defs]);
-  const running = fightRunning(combatants);
-  return (
-    <div data-testid="party-companions" className="flex h-full min-h-0 flex-col gap-2">
-      {dm && (
-        <div>
-          <dm.header disabled={!live} />
-        </div>
-      )}
-      <ScrollArea className="min-h-0 flex-1">
-        {groups.length === 0 ? (
-          <p
-            data-testid="party-companions-empty"
-            className="py-6 text-center text-sm text-muted-foreground"
-          >
-            {viewer.role === "dm" ? EMPTY_COMPANIONS : EMPTY_COMPANIONS_PLAYER}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3 pr-2">
-            {groups.map((g) => (
-              <Group key={g.characterId} g={g} bases={bases} dm={dm} live={live} />
-            ))}
-          </div>
         )}
-      </ScrollArea>
-      {running && (
-        <p data-testid="party-companions-footer" className="text-xs text-muted-foreground">
-          {SUMMONS_FOOTER}
-        </p>
-      )}
-    </div>
+        {row.inCombat && (
+          <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">
+            In combat
+          </Badge>
+        )}
+        {base && (
+          <span className="text-[11px] [overflow-wrap:anywhere]" data-testid="party-companion-base">
+            {base}
+          </span>
+        )}
+        {marks}
+      </div>
+      <span className={cn("flex shrink-0 items-center gap-1.5", !live && "opacity-70")}>
+        <Health row={row} />
+        {row.card && <CardButton row={row} />}
+        {dm && <dm.menu row={row} disabled={!live} />}
+      </span>
+    </li>
   );
 }
