@@ -27,5 +27,6 @@ export default defineBundle({
     "fx-mira-bless",
     // T1 (sprint 10, DM #343): Dice tray 40 % bigger (no unit: client-only, the tray needs no records)
     // T5 (sprint 10, DM #347): dice visuals: thin d20 lines, tray +25 %, roll popup +40 % (no unit: client-only)
+    // F1 (sprint 11, DM #349): frame + camera fixes, BL-107 / BL-109 / BL-113 (no unit: client-only)
   ],
 });
