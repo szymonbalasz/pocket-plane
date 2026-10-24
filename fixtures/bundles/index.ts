@@ -31,6 +31,12 @@ import dicePolish from "./dice-polish";
 import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
 import f2ToastsE2e from "./f2-toasts-e2e";
+import f1FitE2e from "./f1-fit-e2e";
+import f1Frame from "./f1-frame";
+import f1FrameE2e from "./f1-frame-e2e";
+import f3CombatDice from "./f3-combat-dice";
+import f3PromptTrayE2e from "./f3-prompt-tray-e2e";
+import f3SkipE2e from "./f3-skip-e2e";
 import fog from "./fog";
 import fogScn from "./fog-scn";
 import fuMapE2e from "./fu-map-e2e";
@@ -291,4 +297,12 @@ export const bundles: readonly Bundle[] = [
   statsCampaignE2e,
   // Sprint 11 F2 (fix/f2-toasts): toast keep-outs e2e alias of session-sim-13 (BL-108)
   f2ToastsE2e,
+  // Sprint 11 F1 (fix/f1-frame): frame + camera fixes walkthrough and e2e aliases
+  f1Frame,
+  f1FrameE2e,
+  f1FitE2e,
+  // Sprint 11 track F3 (fix/f3-combat-dice): combat + dice fixes walkthrough and e2e bundles
+  f3CombatDice,
+  f3SkipE2e,
+  f3PromptTrayE2e,
 ];

@@ -33,3 +33,4 @@ Evidence: the [session-sim-14 report](../../.verify/20261024-061849-session-sim-
 | Date | What |
 |---|---|
 | 2026-10-24 | Planned (DM #349): fix track F1–F3 + DM's art track in parallel |
+| 2026-10-24 | **F3 merged**: the DM's skip toast names a downed companion that acts in its owner's turn; a roll request answered through the tray puts the tray back as it was; "Add hidden" default confirmed. Walkthrough 16 / 16 |

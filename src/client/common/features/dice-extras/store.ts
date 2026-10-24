@@ -46,6 +46,11 @@ export interface DiceExtrasState {
   request: TrayRequest | null;
   /** Bumped per stage: the runtime opens the tray on a change (FR-DICEX-01). */
   staged: number;
+  /**
+   * Bumped when a one-shot staged request is spent (BL-112: a roll-request answer): the runtime
+   * puts the tray back as it was before that stage (`trayRestore`).
+   */
+  restored: number;
   /** The tray's roll mode (FR-DICEX-05): the staged request's, back to normal after a roll. */
   mode: RollMode;
   /** A tray Roll is in flight (`rolling`). */
@@ -88,6 +93,10 @@ export interface DiceExtrasStore {
   setMode(mode: RollMode): void;
   /** Esc / Clear / the tray window closed. */
   clear(): void;
+  /** BL-112: the staged request is this roll control's (`control`, its `onRoll` verbatim). */
+  holds(onRoll: RollControlOptions["onRoll"]): boolean;
+  /** BL-112: the staged one-shot request was spent (answered, declined): put the tray back. */
+  restoreTray(): void;
   /** A roll left this client (button or tray); `tray` = from the tray (→ `rolling`). */
   sent(tray: boolean): void;
   /** The tray's roll was rejected: the shake stops, the tray goes back (FR-DICEX-09). */
@@ -115,6 +124,7 @@ const browserTimers: DiceExtrasTimers = {
 const initial = (): DiceExtrasState => ({
   request: null,
   staged: 0,
+  restored: 0,
   mode: "normal",
   rolling: false,
   result: null,
@@ -196,6 +206,13 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
     clear() {
       api.setState({ request: null, rolling: false, result: null });
     },
+    holds(onRoll) {
+      const r = api.getState().request;
+      return r?.kind === "control" && r.options.onRoll === onRoll;
+    },
+    restoreTray() {
+      api.setState((s) => ({ restored: s.restored + 1 }));
+    },
     sent(tray) {
       stopTimer();
       timer = timers.setTimeout(() => {
@@ -246,6 +263,17 @@ export function createDiceExtrasStore(timers: DiceExtrasTimers = browserTimers):
     },
     done,
   };
+}
+
+/**
+ * BL-112 (FR-DICEX-83): how the tray goes back once a staged roll-request answer is spent: to
+ * its state before that stage. Closed → close, minimised → minimise; open stays open on the
+ * result (FR-DICEX-10, as any tray roll).
+ */
+export function trayRestore(before: "open" | "minimised" | "closed"): "close" | "minimise" | null {
+  if (before === "closed") return "close";
+  if (before === "minimised") return "minimise";
+  return null;
 }
 
 /** The page's one store (client memory; a reload starts `idle`, FR-DICEX-03). */

@@ -14,7 +14,6 @@ import {
   d20Expression,
   healthBand,
   showRollMonsters,
-  skippedOnStep,
   unrolledMonsters,
 } from "@shared/combat-tracker/rules";
 import {
@@ -57,9 +56,9 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Skeleton } from "@ui/components/ui/primitives";
-import { characterOf, deadPc, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
+import { characterOf, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
 import { NameLine } from "@ui/features/combat-extras/parts";
-import { skipText } from "@ui/features/combat-extras/skip";
+import { skipText, stepSkip } from "@ui/features/combat-extras/skip";
 import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
 import {
   companionLayout,
@@ -1213,23 +1212,11 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   const start = useStartRound(enc.round, rows);
   /**
    * FR-CBT-50: skipped names from the order at send time, toasted once the step is acked. A dead
-   * PC skips like a monster at 0 (FR-CBTX-25): "Skipped Thorn (dead)".
+   * PC skips like a monster at 0 (FR-CBTX-25): "Skipped Thorn (dead)"; a down in-turn companion
+   * is named as its owner's turn starts (BL-110).
    */
   const step = async (direction: "next" | "prev", sender: typeof send = send) => {
-    const dead = new Set(rows.filter((c) => deadPc(store, c)).map((c) => c.name));
-    // FR-CBT-107: in-turn companions (no rank) never take a turn of their own.
-    const turnRows = rows
-      .filter((c) => c.position != null)
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        position: c.position ?? 0,
-        kind: dead.has(c.name) ? ("monster" as const) : c.kind,
-        removed: c.removed === true,
-        hpCurrent: dead.has(c.name) ? 0 : (c.hpCurrent ?? null),
-        initiative: c.initiative ?? null,
-      }));
-    const skipped = skippedOnStep(turnRows, enc.round, enc.turnCombatantId ?? null, direction);
+    const { skipped, dead } = stepSkip(store, rows, enc, direction);
     const r = await sender<TurnResult>(
       direction === "next" ? "cbt.nextTurn" : "cbt.prevTurn",
       turnArgs,
