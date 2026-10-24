@@ -2,7 +2,7 @@
 // (session-sim + `buildRealisticHeavy` + `writeWorstPresents`), every colour field a hex. Growth
 // over the frame without colour fields ≤ 160 B per viewer; −3 B a field vs the worst sprint-5
 // key (`vermillion`), +2 B vs all-Amber; ceilings hold (DM 1.5 MiB, players 512 KiB). The
-// cumulative worst case in `ws/snapshot-size.test.ts` keeps `vermillion`, which stays the larger.
+// cumulative worst case in `ws/snapshot-size.slow.test.ts` keeps `vermillion`, which stays the larger.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import { SNAPSHOT_CEILING } from "../../ws/hub";
