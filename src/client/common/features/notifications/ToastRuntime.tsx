@@ -17,6 +17,7 @@
 // FR-NOTE-77: it may slide beside a window off the PCs' tokens; over a body the cards fold into
 // the summary. *(Sprint 11, F2)* BL-115: the stack settles: a layout change refolds once it held
 // still, the stack holds its drawn spot while the fold steps, tokens are read as footprints.
+// FR-NOTE-78 (BL-108): off windows' headings and first records first; off the damage-card popup.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
 import { recordsOf } from "@shared/protocol/store";
@@ -48,7 +49,7 @@ import {
 } from "../play-shell/toast-region";
 import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, useAlertToasts } from "./alert-toasts";
-import { useDialogRects } from "./dialog-rects";
+import { useDialogRects, usePopupRects } from "./dialog-rects";
 import { dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
 import {
   actionButton,
@@ -372,6 +373,8 @@ export function ToastRuntime({
   const { initiative, windows: windowRects, hard, rows: firstRows } = useStackInputs(isDm, showing);
   // Walkthrough T4, FR-NOTE-76: an open modal dialog keeps the DM stack off it like Initiative.
   const dialogs = useDialogRects(isDm && showing);
+  // FR-NOTE-78 (BL-108): and off an open non-modal popup (the damage-card popup) like Initiative.
+  const popups = usePopupRects(isDm && showing);
   const vp = useViewport();
   const stackH = useStackHeight(stackRef, isDm, showing);
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
@@ -405,8 +408,22 @@ export function ToastRuntime({
             pc: true,
           })),
         ),
+        popups,
       ),
-    [vp, initiative, stackH, avoidKey, pcKey, windowRects, hard, firstRows, dialogs, tick, sync],
+    [
+      vp,
+      initiative,
+      stackH,
+      avoidKey,
+      pcKey,
+      windowRects,
+      hard,
+      firstRows,
+      dialogs,
+      popups,
+      tick,
+      sync,
+    ],
   );
 
   // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
@@ -432,8 +449,9 @@ export function ToastRuntime({
         windowRects.map(({ x, y, w, h }) => [x, y, w, h]),
         hard,
         dialogs,
+        popups.map(({ x, y, w, h }) => [x, y, w, h]),
       ]),
-    [initiative, windowRects, hard, dialogs],
+    [initiative, windowRects, hard, dialogs, popups],
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
   useLayoutEffect(() => setSettle(refold), [count, room]);

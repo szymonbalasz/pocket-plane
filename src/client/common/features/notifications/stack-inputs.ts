@@ -10,7 +10,8 @@
 // DOM while the stack shows and re-read when a window body's content changes. FR-NOTE-77: also
 // its first rows (`head`: the first row-sized record row, not a record container such as the
 // Encounters editor, which the frame's first-row report takes) and its controls; the Game log's
-// newest entries (re-test 3).
+// newest entries (re-test 3). *(Sprint 11, F2)* FR-NOTE-78 (BL-108): its headings and records
+// too (the first record and the headings are its primary parts).
 // Its own module, so the runtime test can stub it (a static render reads no layout).
 import { useEffect, useMemo, useState } from "react";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
@@ -104,6 +105,37 @@ export function newestRows<T extends { top: number; bottom: number }>(
   return rows.slice(-LOG_ROWS);
 }
 
+/**
+ * FR-NOTE-78: a record up to this share of its body's height counts (a request card with its
+ * buttons is 122 px); a container filling the body (the Encounters editor) doesn't.
+ */
+export const RECORD_MAX_SHARE = 0.5;
+
+/**
+ * FR-NOTE-78 (BL-108): a body's records as the stack counts them: the outermost records drawn
+ * inside `top`..`bottom` that aren't controls and are no taller than `ROW_MAX_H` or
+ * `RECORD_MAX_SHARE` of the body, in document order (`inside`: it sits in that record; a taller
+ * container doesn't count, the records inside it do). Pure.
+ */
+export function outerRecords<T extends { top: number; bottom: number; control: boolean }>(
+  top: number,
+  bottom: number,
+  records: readonly (T & { inside: (other: T) => boolean })[],
+): T[] {
+  const out: (T & { inside: (other: T) => boolean })[] = [];
+  const maxH = Math.max(ROW_MAX_H, (bottom - top) * RECORD_MAX_SHARE);
+  for (const r of records) {
+    const h = r.bottom - r.top;
+    if (r.control || h <= 0 || h > maxH || r.bottom <= top || r.top >= bottom) continue;
+    if (out.some((o) => r.inside(o))) continue;
+    out.push(r);
+  }
+  return out;
+}
+
+/** FR-NOTE-78: a window's headings. */
+const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6, [role="heading"]';
+
 /** FR-NOTE-77: what counts as a window control (the fallback covers the fewest). */
 const CONTROL_SELECTOR =
   'button, input, select, textarea, a[href], [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="combobox"], [role="slider"]';
@@ -118,6 +150,10 @@ interface BodyMeasure {
   controls: Rect[];
   /** FR-NOTE-77 (re-test 3): a log's newest rows (`log` only). */
   logRows: Rect[];
+  /** FR-NOTE-78: its headings and first record (not a log: its newest rows stand for them). */
+  primary: Rect[];
+  /** FR-NOTE-78: its other records (not a log: older entries are free). */
+  records: Rect[];
 }
 
 /**
@@ -137,6 +173,9 @@ function measureBody(id: string, log: boolean): BodyMeasure | null {
   const outer: DOMRect[] = [];
   let lastOuter: Element | null = null;
   const controls: Rect[] = [];
+  const headings: DOMRect[] = [];
+  type Rec = { top: number; bottom: number; control: boolean; el: Element; r: DOMRect };
+  const recs: (Rec & { inside: (o: Rec) => boolean })[] = [];
   const walk = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT, {
     acceptNode: (n) => {
       const r = (n as Element).getBoundingClientRect();
@@ -152,12 +191,17 @@ function measureBody(id: string, log: boolean): BodyMeasure | null {
     const record = el.hasAttribute("data-record-id");
     if (el.childElementCount === 0 || record) drawn.push(r);
     if (record) records.push(r);
+    const control = el.matches(CONTROL_SELECTOR);
+    if (record && !log) {
+      recs.push({ top: r.top, bottom: r.bottom, control, el, r, inside: (o) => o.el.contains(el) });
+    }
+    if (!log && r.width >= 4 && r.height >= 4 && el.matches(HEADING_SELECTOR)) headings.push(r);
     // A log's entries: records not inside another (a re-roll mark sits inside its entry).
     if (record && log && !lastOuter?.contains(el)) {
       outer.push(r);
       lastOuter = el;
     }
-    if (r.width >= 4 && r.height >= 4 && el.matches(CONTROL_SELECTOR)) {
+    if (r.width >= 4 && r.height >= 4 && control) {
       const top = Math.max(r.top, b.top);
       const bottom = Math.min(r.bottom, b.bottom);
       controls.push({ x: r.left - s.left, y: top - s.top, w: r.width, h: bottom - top });
@@ -171,11 +215,14 @@ function measureBody(id: string, log: boolean): BodyMeasure | null {
     w: r.width,
     h: Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top),
   });
+  const [first, ...rest] = outerRecords(b.top, b.bottom, recs);
   return {
     used: end === null ? TITLE_H : Math.ceil(end - s.top),
     head: head === null ? null : Math.ceil(head - s.top),
     controls,
     logRows: log ? newestRows(b.top, b.bottom, outer).map(rel) : [],
+    primary: [...headings, ...(first ? [first.r] : [])].map(rel),
+    records: rest.map((x) => rel(x.r)),
   };
 }
 
@@ -248,6 +295,8 @@ export function useStackInputs(isDm: boolean, showing = true): StackInputs {
                 head: r.y + Math.min(r.h, m.head ?? TITLE_H + PUSHED_BODY_CLEAR),
                 controls: m.controls.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
                 logRows: m.logRows.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
+                primary: m.primary.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
+                records: m.records.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
               };
         return w.kind === HISTORY_KIND
           ? { ...r, pushed, blocks: true, ...used }

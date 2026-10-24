@@ -30,6 +30,7 @@ import diceLog from "./dice-log";
 import dicePolish from "./dice-polish";
 import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
+import f2ToastsE2e from "./f2-toasts-e2e";
 import fog from "./fog";
 import fogScn from "./fog-scn";
 import fuMapE2e from "./fu-map-e2e";
@@ -288,4 +289,6 @@ export const bundles: readonly Bundle[] = [
   t2PetHiddenE2e,
   // Sprint 10 T3 (fix/stats-campaign): the Stats Campaign tab e2e alias of stats-b
   statsCampaignE2e,
+  // Sprint 11 F2 (fix/f2-toasts): toast keep-outs e2e alias of session-sim-13 (BL-108)
+  f2ToastsE2e,
 ];
