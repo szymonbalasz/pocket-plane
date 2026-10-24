@@ -99,7 +99,7 @@ export function ShellProvider({
         available: () => availableIn(registry, sync),
         camera: cameraMode,
         // FR-SHELL-108, FR-MAP-97: the map canvas's base port (players' L2b, the map yields).
-        dryFit: (windows) => fitPort()?.dryFit(windows) ?? null,
+        dryFit: (windows, reason) => fitPort()?.dryFit(windows, reason) ?? null,
         lastFullCell: () => fitPort()?.lastFullCell() ?? null,
         onYield: () => fitPort()?.yieldRefit(),
         // FR-MAP-114: a squeezed protected window back in its zone over a PC → one `window` refit.

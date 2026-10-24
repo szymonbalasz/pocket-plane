@@ -1,7 +1,7 @@
 // e2e-bundle: pm-memory-e2e
 // Sprint 9 PM2 (party-board FR-PARTY-59–64, play-shell FR-SHELL-155–157; walkthrough M0, M1, M13):
 // the launcher says "Party Manager" and has no "Party status" button; Party Manager opens on the
-// Party status tab, 550 wide where that fits (≥ 440 otherwise), with each owner's companions under
+// Party status tab, 600 wide where that fits (BL-106; ≥ 440 otherwise), with each owner's companions under
 // their PC (Owlbear under Mira, the Drake under Brakka); an old layout with `party.summary` open
 // loads Party Manager open on Party status and is written without `party.summary`. Rows per viewer
 // and visibility: bun test (`status-tab.test.tsx`, `party-manager.test.ts`).
@@ -35,7 +35,7 @@ const groupOf = (win: Locator, pc: string) =>
     has: win.page().getByTestId("party-summary-name").getByText(pc, { exact: true }),
   });
 
-test("FR-PARTY-59 FR-PARTY-60 FR-PARTY-61 Party Manager: launcher label, no Party status button; opens on Party status 550 wide (≥ 440 where placed smaller); companions under their owners", async ({
+test("FR-PARTY-59 FR-PARTY-60 FR-PARTY-61 Party Manager: launcher label, no Party status button; opens on Party status 600 wide (BL-106; ≥ 440 where placed smaller); companions under their owners", async ({
   browser,
 }) => {
   const p1 = await player(browser, "Player 1", 1280, 720);
@@ -51,7 +51,7 @@ test("FR-PARTY-59 FR-PARTY-60 FR-PARTY-61 Party Manager: launcher label, no Part
   expect(tabs).toEqual(["Party status", "Handouts", "Inventory", "Loot", "Reminders"]);
   const w = Math.round((await win.boundingBox())?.width ?? 0);
   expect(w).toBeGreaterThanOrEqual(440);
-  expect(w).toBeLessThanOrEqual(550);
+  expect(w).toBeLessThanOrEqual(600);
   // The owner's pets under their PCs, with numbers.
   const owl = groupOf(win, "Mira")
     .getByTestId("party-companion-row")
@@ -69,10 +69,10 @@ test("FR-PARTY-59 FR-PARTY-60 FR-PARTY-61 Party Manager: launcher label, no Part
   }
   await p1.context().close();
 
-  // A wide screen: 550.
+  // A wide screen: 600 (BL-106).
   const wide = await player(browser, "Player 1", 1600, 900);
   const big = await openWindow(wide, "party.board");
-  await expect.poll(async () => Math.round((await big.boundingBox())?.width ?? 0)).toBe(550);
+  await expect.poll(async () => Math.round((await big.boundingBox())?.width ?? 0)).toBe(600);
   await wide.context().close();
 });
 

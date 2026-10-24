@@ -8,16 +8,19 @@ import { footprint } from "@shared/scenes-map/geometry";
 import {
   appearanceKeeps,
   type Camera,
+  createSizeCameras,
   dryFitScene,
   type FitInputs,
   type FitReason,
   type FitToken,
+  type FitVisible,
   fitFor,
   footprintBox,
+  layoutKey,
   revealRefit,
   visibleArea,
 } from "../scenes-map/camera";
-import { fitRooms, renderedWindowRects } from "./free-area";
+import { fitRooms, renderedWindowRects, storedLayout } from "./free-area";
 import { isRemembered, placedRect, type Rect, type Viewport, workArea } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import { bruteBest, overlaps, REFERENCE_VIEWPORTS } from "./layout-checks";
@@ -138,6 +141,8 @@ export interface ReplayStep {
   problems: string[];
   /** Memory path (FR-SHELL-163): each open window's rendered rect, `kind@x,y,w×h`. */
   drawn?: string;
+  /** Scripts: the last fit's `data-fit-visible`. */
+  fit?: FitVisible;
 }
 
 export interface ReplayRun {
@@ -193,7 +198,17 @@ interface Sim {
   mode: ReplayCamera;
   /** The last full fit's cell, screen px (FR-MAP-94). */
   lastFull: number;
+  /** The last fit's `data-fit-visible` (FR-MAP-46, -59). */
+  visible?: FitVisible;
+  /** The canvas's camera per viewport size (H2 FAIL 5), dropped at a page load. */
+  sizeCams: ReturnType<typeof createSizeCameras<SizeCam>>;
   key: string;
+}
+
+interface SizeCam {
+  cam: Camera;
+  visible: FitVisible | undefined;
+  lastFull: number;
 }
 
 const KEY = "pp.layout.v1.replay.viewer";
@@ -234,7 +249,7 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
     keepOuts: (vp) => regionsOf(sim as Sim, vp),
     available: () => availableOf(sim as Sim),
     camera: () => sim.mode,
-    dryFit: (obstacles) => dryFit(sim as Sim, obstacles),
+    dryFit: (obstacles, reason) => dryFit(sim as Sim, obstacles, reason),
     lastFullCell: () => sim.lastFull || null,
     // FR-MAP-97: an accepted yield refits once, still `fitted`.
     onYield: () => {
@@ -253,9 +268,9 @@ function newController(sim: Omit<Sim, "ctl">): ShellController {
  * The base port's dry fit (FR-SHELL-108, FR-MAP-97): the `window` fit with `obstacles` as the
  * windows, not applied (the canvas's own `dryFitScene`).
  */
-function dryFit(sim: Sim, obstacles: readonly Rect[]) {
+function dryFit(sim: Sim, obstacles: readonly Rect[], reason?: "window" | "resize") {
   if (!sim.cam) return null;
-  return dryFitScene(fitInputs(sim, obstacles), sim.lastFull || null);
+  return dryFitScene(fitInputs(sim, obstacles), sim.lastFull || null, reason);
 }
 
 const windowsOf = (sim: Sim): Windows => sim.ctl.store.getState().windows;
@@ -276,10 +291,19 @@ function shownOf(sim: Sim): Map<string, { w: WindowState; r: Rect }> {
   return new Map(open.map((w, i) => [w.kind, { w, r: rects[i] as Rect }]));
 }
 
-/** The fit's inputs (FR-MAP-93): the rendered windows (or `with_`) and toast box as obstacles. */
+/**
+ * The fit's inputs (FR-MAP-93): the rendered windows (or `with_`) and toast box as obstacles; the
+ * same without the remembered windows while one is shown (BL-100).
+ */
 function fitInputs(sim: Sim, with_?: readonly Rect[]): FitInputs {
-  const windows = with_ ? [...with_] : [...shownOf(sim).values()].map((s) => s.r);
+  const shown = [...shownOf(sim).values()];
+  const windows = with_ ? [...with_] : shown.map((s) => s.r);
   const rooms = fitRooms(sim.client, windows, regionsOf(sim), sim.vp, null);
+  const kept = shown.filter((s) => !isRemembered(s.w)).map((s) => s.r);
+  const untouched =
+    !with_ && kept.length < shown.length
+      ? fitRooms(sim.client, kept, regionsOf(sim), sim.vp, null)
+      : undefined;
   const cells = cellsNow(sim);
   const tokens: FitToken[] = cells.tokens.map((t) => ({
     col: t.col,
@@ -289,7 +313,15 @@ function fitInputs(sim: Sim, with_?: readonly Rect[]): FitInputs {
   }));
   const map = { w: cells.scene.mapWidth, h: cells.scene.mapHeight };
   const grid = gridOf(sim.state, sim.set.viewer);
-  return { client: sim.client, tokens, grid, map, view: sim.vp, ...rooms };
+  return {
+    client: sim.client,
+    tokens,
+    grid,
+    map,
+    view: sim.vp,
+    ...rooms,
+    ...(untouched && { untouched }),
+  };
 }
 
 /** The fit (FR-MAP-95: the canvas's one fit path) for `reason`, bounded by the last full fit. */
@@ -297,19 +329,53 @@ function fitNow(
   sim: Sim,
   with_?: readonly Rect[],
   reason: FitReason = "fit",
-): { cam: Camera; obstacles: readonly Rect[] } {
+): { cam: Camera; obstacles: readonly Rect[]; visible: FitVisible } {
   const inputs = fitInputs(sim, with_);
   const f = fitFor(reason, inputs, sim.lastFull || null);
-  return { cam: { x: f.x, y: f.y, scale: f.scale }, obstacles: inputs.room.obstacles };
+  const cam = { x: f.x, y: f.y, scale: f.scale };
+  return { cam, obstacles: inputs.room.obstacles, visible: f.visible };
 }
 
 const cellPx = (sim: Sim) => (sim.cam ? sim.cam.scale * cellsNow(sim).scene.gridCellSize : 0);
 
 /** A full fit (Fit, open, load, reset, resize): the camera `fitted`, its cell the new baseline. */
 function fullFit(sim: Sim, reason: FitReason = "fit") {
-  sim.cam = fitNow(sim, undefined, reason).cam;
+  const f = fitNow(sim, undefined, reason);
+  sim.cam = f.cam;
+  sim.visible = f.visible;
   sim.mode = "fitted";
   sim.lastFull = cellPx(sim);
+}
+
+/** The layout a recorded camera framed (`layoutKey`, as the canvas keys it). */
+const layoutOf = (sim: Sim) =>
+  layoutKey(
+    sim.state,
+    cellsNow(sim).tokens,
+    storedLayout(windowsOf(sim).filter((w) => w.state === "open" && availableOf(sim).has(w.kind))),
+  );
+
+/**
+ * A browser resize to `next` (FR-MAP-47, -113): the camera kept for the size it leaves, the
+ * `viewport` settle, then while `fitted` the resize refit, or the camera recorded at `next` when
+ * the layout there is the same (H2 FAIL 5, the canvas's `createSizeCameras`).
+ */
+function resizeTo(sim: Sim, next: Viewport) {
+  if (sim.mode === "fitted" && sim.cam) {
+    sim.sizeCams.record(sim.vp, layoutOf(sim), {
+      cam: sim.cam,
+      visible: sim.visible,
+      lastFull: sim.lastFull,
+    });
+  }
+  sim.vp = next;
+  dispatch(sim, { type: "viewport" });
+  if (sim.mode !== "fitted") return;
+  const kept = sim.sizeCams.take(sim.vp, layoutOf(sim));
+  if (!kept) return fullFit(sim, "resize");
+  sim.cam = kept.cam;
+  sim.visible = kept.visible;
+  sim.lastFull = kept.lastFull;
 }
 
 /**
@@ -460,16 +526,23 @@ function check(
       if (best[0] === 0 && best[1] === 0) out.push(`I3 ${kind} ${r.w}×${r.h} below useful`);
     }
   }
-  // I5: a user open moves no other window (it may put the least recently used one away, and
-  // squeeze a protected one inside its rect, FR-SHELL-101).
+  // I5: a user open moves no other window (it may put the least recently used one away, squeeze
+  // a protected one inside its rect, FR-SHELL-101, and shrink an untouched launcher window inside
+  // its rect down to no less than its useful size, L3s, BL-99).
   if (opts.opened) {
     const within = (a: Rect, b: Rect) =>
       a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
+    const atLeastUseful = (w: WindowState) => {
+      const def = sim.registry.get(w.kind);
+      const u = def && useful(def, sim.vp, sim.registry);
+      return u !== undefined && w.w >= u.w && w.h >= u.h;
+    };
     for (const w of windowsOf(sim)) {
       if (w.kind === opts.opened) continue;
       const b = before.find((x) => x.kind === w.kind && x.instance === w.instance);
       if (b?.state !== "open" || w.state !== "open" || rectKey(b) === rectKey(w)) continue;
       if (isProtected(sim.registry, w.kind) && within(w, b)) continue;
+      if (!isRemembered(b) && within(w, b) && atLeastUseful(w)) continue;
       out.push(`I5 ${w.kind} moved by opening ${opts.opened}`);
     }
   }
@@ -676,6 +749,7 @@ export function runReplay(
     mode: "fitted",
     lastFull: 0,
     key: KEY,
+    sizeCams: createSizeCameras<SizeCam>(),
   };
   const sim = base as Sim;
   sim.ctl = newController(sim);
@@ -694,6 +768,7 @@ export function runReplay(
   /** `moved`: the camera is panned after the load fit (a reload always fits: `fitted`). */
   const load = (label: string, moved = camera === "moved") => {
     sim.cam = null;
+    sim.sizeCams = createSizeCameras<SizeCam>();
     sim.ctl = newController(sim);
     sim.ctl.restore(sim.key);
     fullFit(sim, "load");
@@ -775,9 +850,7 @@ export function runReplay(
       const route = down.length > 0 ? chain : [REFERENCE_VIEWPORTS[2] as Viewport, vp0];
       for (const next of route) {
         const before = windowsOf(sim);
-        sim.vp = next;
-        dispatch(sim, { type: "viewport" });
-        if (sim.mode === "fitted") fullFit(sim, "resize");
+        resizeTo(sim, next);
         record(`viewport ${next.w}×${next.h}`, check(sim, before));
       }
       // I7: down and back up restores the start (1280×720 has nothing below: up and back, no I7).
@@ -899,9 +972,7 @@ export function runReplay(
           : [REFERENCE_VIEWPORTS[2] as Viewport, vp0];
       for (const next of route) {
         const before = windowsOf(sim);
-        sim.vp = next;
-        dispatch(sim, { type: "viewport" });
-        if (sim.mode === "fitted") fullFit(sim, "resize");
+        resizeTo(sim, next);
         record(`memory viewport ${next.w}×${next.h}`, [
           ...check(sim, before),
           ...checkMemory(sim, kept),
@@ -957,11 +1028,15 @@ export function runReplay(
 
 /**
  * One step of a scripted run (walkthrough repros): a user open, a fight's End / Start, a reload,
- * Fit, or a pan putting the PCs' centre at a screen point (the camera `moved`).
+ * Fit, a pan putting the PCs' centre at a screen point (the camera `moved`), a user's drag (and
+ * resize) of a window to `rect` (remembered, FR-SHELL-144), or a browser resize (the `viewport`
+ * settle, then the resize refit while `fitted`).
  */
 export type ScriptStep =
   | { open: string }
   | { close: string }
+  | { drag: string; rect: Rect; resized?: boolean }
+  | { viewport: Viewport }
   | { pan: { x: number; y: number } }
   | "end"
   | "start"
@@ -994,6 +1069,7 @@ export function runScript(
     mode: "fitted",
     lastFull: 0,
     key: KEY,
+    sizeCams: createSizeCameras<SizeCam>(),
   } as unknown as Sim;
   sim.ctl = newController(sim);
   const steps: ReplayStep[] = [];
@@ -1005,9 +1081,11 @@ export function runScript(
       cell: cellPx(sim),
       log: sim.ctl.store.getState().settleLog,
       problems,
+      ...(sim.visible && { fit: sim.visible }),
     });
   const load = (label: string) => {
     sim.cam = null;
+    sim.sizeCams = createSizeCameras<SizeCam>();
     sim.ctl = newController(sim);
     sim.ctl.restore(sim.key);
     fullFit(sim, "load");
@@ -1033,6 +1111,14 @@ export function runScript(
       else dispatch(sim, { type: "appear", kind: "cbt.initiative" });
       const refit = appearanceRefit(sim);
       record("Start", check(sim, before, { refit }));
+    } else if ("viewport" in step) {
+      resizeTo(sim, step.viewport);
+      record(`viewport ${sim.vp.w}×${sim.vp.h}`, check(sim, before));
+    } else if ("drag" in step) {
+      dispatch(sim, { type: "focus", kind: step.drag });
+      const resized = step.resized === true;
+      dispatch(sim, { type: "setRect", kind: step.drag, rect: step.rect, resized });
+      record(`drag ${step.drag}`, check(sim, before));
     } else if ("pan" in step) {
       panTo(sim, step.pan);
       record(`pan ${step.pan.x},${step.pan.y}`, []);

@@ -321,13 +321,13 @@ describe("FR-PARTY-16 Share dialog", () => {
 });
 
 describe("FR-PARTY-11 / FR-PARTY-14 windows", () => {
-  test("FR-PARTY-11 party.board: Party Manager (FR-PARTY-59), closed, top-left dx 56, 550×560 (FR-SHELL-156), min 340×360, minOpenH 400, launcher", () => {
+  test("FR-PARTY-11 party.board: Party Manager (FR-PARTY-59), closed, top-left dx 56, 600×560 (FR-SHELL-156, BL-106), min 340×360, minOpenH 400, launcher", () => {
     expect(partyBoardWindowBase).toMatchObject({
       kind: "party.board",
       title: "Party Manager",
       defaultOpen: false,
       defaultPosition: { anchor: "top-left", dx: 56 },
-      defaultSize: { w: 550, h: 560 },
+      defaultSize: { w: 600, h: 560 },
       minSize: { w: 340, h: 360 },
       minOpenH: 400,
       launcher: { label: "Party Manager" },

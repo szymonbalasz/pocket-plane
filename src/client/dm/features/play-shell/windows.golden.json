@@ -43,19 +43,19 @@
   },
   {
     "at": "open @1600×900 party.board",
-    "rect": "514,172,462×400",
+    "rect": "552,60,600×512",
     "placed": "auto",
     "parked": "char.sheet,cbt.encounters"
   },
   {
     "at": "open @1600×900 cmp.compendium",
-    "rect": "550,172,440×400",
+    "rect": "550,60,440×512",
     "placed": "auto",
     "parked": "dicex.tray,party.board"
   },
   {
     "at": "open @1600×900 shell.prefs",
-    "rect": "552,172,360×400",
+    "rect": "588,60,360×512",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
@@ -79,7 +79,7 @@
   },
   {
     "at": "open @1600×900 hold.stronghold",
-    "rect": "514,172,434×400",
+    "rect": "510,60,480×512",
     "placed": "auto",
     "parked": "dicex.requests"
   },
@@ -91,9 +91,9 @@
   },
   {
     "at": "open @1600×900 recap.session",
-    "rect": "540,264,440×560",
+    "rect": "532,464,400×360",
     "placed": "auto",
-    "parked": "hold.stronghold"
+    "parked": ""
   },
   {
     "at": "reopen @1600×900 camp.players",
@@ -139,19 +139,19 @@
   },
   {
     "at": "reopen @1600×900 party.board",
-    "rect": "514,172,462×400",
+    "rect": "552,60,600×512",
     "placed": "reopened",
     "parked": "char.sheet,cbt.encounters"
   },
   {
     "at": "reopen @1600×900 cmp.compendium",
-    "rect": "550,172,440×400",
+    "rect": "550,60,440×512",
     "placed": "reopened",
     "parked": "dicex.tray,party.board"
   },
   {
     "at": "reopen @1600×900 shell.prefs",
-    "rect": "552,172,360×400",
+    "rect": "588,60,360×512",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -175,7 +175,7 @@
   },
   {
     "at": "reopen @1600×900 hold.stronghold",
-    "rect": "514,172,434×400",
+    "rect": "510,60,480×512",
     "placed": "reopened",
     "parked": "dicex.requests"
   },
@@ -187,9 +187,9 @@
   },
   {
     "at": "reopen @1600×900 recap.session",
-    "rect": "540,264,440×560",
+    "rect": "532,464,400×360",
     "placed": "reopened",
-    "parked": "hold.stronghold"
+    "parked": ""
   },
   {
     "at": "reopen 1440×900 @1440×900 camp.players",
@@ -205,7 +205,7 @@
   },
   {
     "at": "reopen 1440×900 @1440×900 map.scenes",
-    "rect": "540,379,260×440",
+    "rect": "540,452,260×372",
     "placed": "reopened",
     "parked": "camp.players"
   },
@@ -235,7 +235,7 @@
   },
   {
     "at": "reopen 1440×900 @1440×900 party.board",
-    "rect": "466,60,550×560",
+    "rect": "424,60,600×560",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },
@@ -283,9 +283,9 @@
   },
   {
     "at": "reopen 1440×900 @1440×900 recap.session",
-    "rect": "430,60,440×560",
+    "rect": "532,464,440×360",
     "placed": "reopened",
-    "parked": "hold.stronghold"
+    "parked": ""
   },
   {
     "at": "reopen 1280×800 @1280×800 camp.players",
@@ -295,7 +295,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 ent.creatures",
-    "rect": "399,60,340×360",
+    "rect": "399,60,340×492",
     "placed": "reopened",
     "parked": "camp.players"
   },
@@ -319,7 +319,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 cbt.encounters",
-    "rect": "362,60,440×412",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "char.sheet"
   },
@@ -331,19 +331,19 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 party.board",
-    "rect": "366,60,472×400",
+    "rect": "366,60,490×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×800 @1280×800 cmp.compendium",
-    "rect": "362,60,440×400",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen 1280×800 @1280×800 shell.prefs",
-    "rect": "399,60,360×400",
+    "rect": "399,60,360×492",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -367,7 +367,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 hold.stronghold",
-    "rect": "366,60,402×400",
+    "rect": "376,60,480×492",
     "placed": "reopened",
     "parked": "dicex.requests"
   },
@@ -379,7 +379,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 recap.session",
-    "rect": "366,60,416×360",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
@@ -409,7 +409,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 char.sheet",
-    "rect": "450,112,320×360",
+    "rect": "450,60,320×412",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -505,7 +505,7 @@
   },
   {
     "at": "open @1440×900 map.scenes",
-    "rect": "540,379,260×440",
+    "rect": "540,452,260×372",
     "placed": "auto",
     "parked": "camp.players"
   },
@@ -535,7 +535,7 @@
   },
   {
     "at": "open @1440×900 party.board",
-    "rect": "466,60,550×560",
+    "rect": "424,60,600×560",
     "placed": "auto",
     "parked": "cbt.encounters"
   },
@@ -583,9 +583,9 @@
   },
   {
     "at": "open @1440×900 recap.session",
-    "rect": "430,60,440×560",
+    "rect": "532,464,440×360",
     "placed": "auto",
-    "parked": "hold.stronghold"
+    "parked": ""
   },
   {
     "at": "reopen @1440×900 camp.players",
@@ -601,7 +601,7 @@
   },
   {
     "at": "reopen @1440×900 map.scenes",
-    "rect": "540,379,260×440",
+    "rect": "540,452,260×372",
     "placed": "reopened",
     "parked": "camp.players"
   },
@@ -631,7 +631,7 @@
   },
   {
     "at": "reopen @1440×900 party.board",
-    "rect": "466,60,550×560",
+    "rect": "424,60,600×560",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },
@@ -679,9 +679,9 @@
   },
   {
     "at": "reopen @1440×900 recap.session",
-    "rect": "430,60,440×560",
+    "rect": "532,464,440×360",
     "placed": "reopened",
-    "parked": "hold.stronghold"
+    "parked": ""
   },
   {
     "at": "reopen 1280×800 @1280×800 camp.players",
@@ -691,7 +691,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 ent.creatures",
-    "rect": "399,60,340×360",
+    "rect": "399,60,340×492",
     "placed": "reopened",
     "parked": "camp.players"
   },
@@ -715,7 +715,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 cbt.encounters",
-    "rect": "362,60,440×412",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "char.sheet"
   },
@@ -727,19 +727,19 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 party.board",
-    "rect": "366,60,472×400",
+    "rect": "366,60,490×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×800 @1280×800 cmp.compendium",
-    "rect": "362,60,440×400",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen 1280×800 @1280×800 shell.prefs",
-    "rect": "399,60,360×400",
+    "rect": "399,60,360×492",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -763,7 +763,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 hold.stronghold",
-    "rect": "366,60,402×400",
+    "rect": "376,60,480×492",
     "placed": "reopened",
     "parked": "dicex.requests"
   },
@@ -775,7 +775,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 recap.session",
-    "rect": "366,60,416×360",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
@@ -805,7 +805,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 char.sheet",
-    "rect": "450,112,320×360",
+    "rect": "450,60,320×412",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -895,7 +895,7 @@
   },
   {
     "at": "open @1280×800 ent.creatures",
-    "rect": "399,60,340×360",
+    "rect": "399,60,340×492",
     "placed": "auto",
     "parked": "camp.players"
   },
@@ -919,7 +919,7 @@
   },
   {
     "at": "open @1280×800 cbt.encounters",
-    "rect": "362,60,440×412",
+    "rect": "362,60,440×492",
     "placed": "auto",
     "parked": "char.sheet"
   },
@@ -931,19 +931,19 @@
   },
   {
     "at": "open @1280×800 party.board",
-    "rect": "366,60,472×400",
+    "rect": "366,60,490×400",
     "placed": "auto",
     "parked": "dicex.tray"
   },
   {
     "at": "open @1280×800 cmp.compendium",
-    "rect": "362,60,440×400",
+    "rect": "362,60,440×492",
     "placed": "auto",
     "parked": "party.board"
   },
   {
     "at": "open @1280×800 shell.prefs",
-    "rect": "399,60,360×400",
+    "rect": "399,60,360×492",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
@@ -967,7 +967,7 @@
   },
   {
     "at": "open @1280×800 hold.stronghold",
-    "rect": "366,60,402×400",
+    "rect": "376,60,480×492",
     "placed": "auto",
     "parked": "dicex.requests"
   },
@@ -979,7 +979,7 @@
   },
   {
     "at": "open @1280×800 recap.session",
-    "rect": "366,60,416×360",
+    "rect": "362,60,440×492",
     "placed": "auto",
     "parked": "cmp.rules"
   },
@@ -991,7 +991,7 @@
   },
   {
     "at": "reopen @1280×800 ent.creatures",
-    "rect": "399,60,340×360",
+    "rect": "399,60,340×492",
     "placed": "reopened",
     "parked": "camp.players"
   },
@@ -1015,7 +1015,7 @@
   },
   {
     "at": "reopen @1280×800 cbt.encounters",
-    "rect": "362,60,440×412",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "char.sheet"
   },
@@ -1027,19 +1027,19 @@
   },
   {
     "at": "reopen @1280×800 party.board",
-    "rect": "366,60,472×400",
+    "rect": "366,60,490×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen @1280×800 cmp.compendium",
-    "rect": "362,60,440×400",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen @1280×800 shell.prefs",
-    "rect": "399,60,360×400",
+    "rect": "399,60,360×492",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
@@ -1063,7 +1063,7 @@
   },
   {
     "at": "reopen @1280×800 hold.stronghold",
-    "rect": "366,60,402×400",
+    "rect": "376,60,480×492",
     "placed": "reopened",
     "parked": "dicex.requests"
   },
@@ -1075,7 +1075,7 @@
   },
   {
     "at": "reopen @1280×800 recap.session",
-    "rect": "366,60,416×360",
+    "rect": "362,60,440×492",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
@@ -1105,7 +1105,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 char.sheet",
-    "rect": "450,112,320×360",
+    "rect": "450,60,320×412",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -1213,7 +1213,7 @@
   },
   {
     "at": "open @1280×720 char.sheet",
-    "rect": "450,112,320×360",
+    "rect": "450,60,320×412",
     "placed": "auto",
     "parked": "note.history"
   },
@@ -1309,7 +1309,7 @@
   },
   {
     "at": "reopen @1280×720 char.sheet",
-    "rect": "450,112,320×360",
+    "rect": "450,60,320×412",
     "placed": "reopened",
     "parked": "note.history"
   },

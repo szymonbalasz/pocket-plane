@@ -8,6 +8,8 @@
 //   L1  the target size (a user size, else the fitted default);
 //   L2  down to the useful size; then the protected squeeze (FR-SHELL-101, launcher windows only);
 //   L2b players, `fitted` camera: the map yields (FR-SHELL-108, through the canvas's base port);
+//   L3s the other untouched launcher windows shrink to their useful size in their own rect, least
+//       recently used first (BL-99), and they grow back when the opened window ends;
 //   L3  the look-ahead with every launcher window put away helps → put away the least recently
 //       used one (FR-SHELL-78) and restart;
 //   L4  below useful, down to the min size (same look-ahead);
@@ -91,7 +93,12 @@ export type Placed =
 /**
  * A window the placer moved, shrank or put away for a transient cause (FR-SHELL-102), client
  * memory: its first prior stored rect, `userSpot`, `userSize`; `cause` = `toolbar:<id>`,
- * `viewport:<w>×<h>` or `window:<kind>`; `at` = the rect the displacement wrote (null: put away).
+ * `viewport:<w>×<h>` or `window:<kind>`, or `grown:<w>×<h>` (a window a viewport settle moved or
+ * grew on the way up from that size: back when the viewport is ≤ it again, I7); `at` = the rect the
+ * displacement wrote (null: put away);
+ * `shrunk`: a launcher window shrunk to its useful size for `window:<kind>` (L3s, BL-99), stored
+ * shrunk (a reload keeps the layout it shows); `under`: that shrink, when a later cause displaced
+ * the shrunk window (it applies again once the window is back).
  */
 export interface Displacement {
   kind: string;
@@ -101,6 +108,8 @@ export interface Displacement {
   userSize?: true;
   cause: string;
   at: Rect | null;
+  shrunk?: true;
+  under?: Displacement;
 }
 
 /** L2b's dry fit (FR-SHELL-108, FR-MAP-97): the cell it would draw and whether it keeps clear. */
@@ -108,6 +117,8 @@ export interface DryFit {
   cellPx: number;
   /** Every PC, and every token the last fit kept clear, clear of the windows at that cell. */
   clear: boolean;
+  /** `data-fit-visible` of that fit: every token clear (`all`) or FR-MAP-46's PCs first. */
+  verdict?: "all" | "pcs";
 }
 
 /** The world a settle sees (FR-SHELL-96), besides the windows. */
@@ -128,8 +139,11 @@ export interface ManagerContext {
   memory?: () => readonly Displacement[];
   /** The camera mode (FR-SHELL-99): with `moved`, a zone over a PC goes through the ladder. */
   camera?: () => "fitted" | "moved";
-  /** The canvas's base port for L2b (FR-SHELL-108, players): a dry fit with these obstacles. */
-  dryFit?: (obstacles: readonly Rect[]) => DryFit | null;
+  /**
+   * The canvas's base port: a dry fit with these obstacles, `window` (L2b, FR-SHELL-108, players)
+   * or `resize` (the full refit a `viewport` settle is followed by, H2 FAIL 5).
+   */
+  dryFit?: (obstacles: readonly Rect[], reason?: "window" | "resize") => DryFit | null;
   /** The last full fit's cell, px (FR-SHELL-108: a yield keeps ≥ 75 % of it). */
   lastFullCell?: () => number | null;
   /** The viewport the layout was last settled at (`viewport` trigger, FR-SHELL-103). */
@@ -416,7 +430,7 @@ const GAPS = [EDGE_GAP, 4] as const;
 export const YIELD_SHARE = 0.75;
 export const YIELD_MIN_CELL = 24;
 
-type Rung = "L1" | "L2" | "L2s" | "L2b" | "L4" | "L5";
+type Rung = "L1" | "L2" | "L2s" | "L2b" | "L3s" | "L4" | "L5";
 
 interface Spot {
   rect: Rect;
@@ -433,6 +447,15 @@ export function targetSize(w: WindowState, def: WindowDef, vp: Viewport): Size {
 }
 
 /**
+ * L1's floor (FR-SHELL-97, -156, BL-104): the target size, its height band-capped (FR-SHELL-79)
+ * for a window the user didn't size: a default taller than the band (Party Manager 600 × 560 over
+ * the DM's 512) takes its full width at the band's height at L1, never a narrower L2 spot.
+ */
+export function bandTarget(w: WindowState, size: Size, u: Size, band: number): Size {
+  return w.userSize ? size : { w: size.w, h: Math.min(size.h, Math.max(u.h, band)) };
+}
+
+/**
  * FR-SHELL-100: an entry stored before `userSize` existed is the user's size iff it has a user
  * spot and its size is neither a known default (FR-SHELL-53) nor the min size.
  */
@@ -446,6 +469,12 @@ export function inferUserSize(w: WindowState, def: WindowDef | undefined): Windo
 /** Parses a `viewport:<w>×<h>` cause. */
 const causeViewport = (cause: string): Viewport | null => {
   const m = /^viewport:(\d+)×(\d+)$/.exec(cause);
+  return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+};
+
+/** Parses a `grown:<w>×<h>` cause (H2 FAIL 5). */
+const causeGrown = (cause: string): Viewport | null => {
+  const m = /^grown:(\d+)×(\d+)$/.exec(cause);
   return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
 };
 
@@ -469,6 +498,11 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const tokens = trigger.type === "viewport" && fitted ? [] : (ctx.avoid?.() ?? []);
   // FR-SHELL-158 (BL-82): one token grid per (window, size, gap) for every search of this settle.
   const memo = placeMemo(tokens);
+  // H2 FAIL 5 (I7): a `viewport` settle on the way up remembers what it moves or grows (cause
+  // `grown:<from>`), so the way back down puts it back.
+  const from = ctx.settledViewport ?? vp;
+  const up = trigger.type === "viewport" && vp.w >= from.w && vp.h >= from.h;
+  const grewFrom = up && (vp.w > from.w || vp.h > from.h) ? `grown:${from.w}×${from.h}` : undefined;
   let out: WindowState[] = [...ws];
   const memory = new Map<string, Displacement>(
     (ctx.memory?.() ?? []).map((d) => [windowId(d.kind, d.instance), d]),
@@ -536,6 +570,20 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
 
   /** No PC footprint + 4 px under `r` (FR-SHELL-57). */
   const pcFree = (r: Rect) => pcClear(r, tokens);
+  /**
+   * H2 FAIL 5: a `viewport` settle with a `fitted` camera ignores PCs (they follow the resize
+   * refit), so a launcher window's new rect `r` must leave that refit an all-tokens fit wherever
+   * the map has one without it (a grown window never takes the map's room down to FR-MAP-46's
+   * PCs-only floor).
+   */
+  const fitKeeps = (id: string, r: Rect): boolean => {
+    if (trigger.type !== "viewport" || !fitted || !ctx.dryFit) return true;
+    const others = [...shownMap()].filter(([w]) => idOf(w) !== id).map(([, x]) => plainRect(x));
+    if (ctx.dryFit([...others, plainRect(r)], "resize")?.verdict !== "pcs") return true;
+    return ctx.dryFit(others, "resize")?.verdict === "pcs";
+  };
+  /** Some token footprint under `r` (FR-SHELL-58 (2c): bare footprints). */
+  const overTokens = (r: Rect) => tokens.some((t) => overlaps(r, t));
   /** Clear of every other rendered window (no overlap) and hard keep-out. */
   const clearAt = (r: Rect, id: string, protectedOnly = false) =>
     !obstacles(id, protectedOnly).some((o) => overlaps(r, o)) && !hard.some((k) => overlaps(r, k));
@@ -557,10 +605,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   const inside = (r: Rect) =>
     r.x >= 0 && r.y >= TOP_BAR_H && r.x + r.w <= vp.w && r.y + r.h <= vp.h - LAUNCHER_CLEAR;
 
-  /** Records a displacement's first prior state for `cause` (FR-SHELL-102). */
+  /**
+   * Records a displacement's first prior state for `cause` (FR-SHELL-102). An L3s shrink (BL-99)
+   * a later cause displaces waits under it: the window comes back shrunk, still shrunk for its
+   * own cause.
+   */
   const remember = (w: WindowState, cause: string, at: Rect | null) => {
     const id = idOf(w);
-    const prior = memory.get(id);
+    const old = memory.get(id);
+    const under = old?.shrunk && old.cause !== cause ? old : undefined;
+    const prior = under ? undefined : old;
     memory.set(
       id,
       prior
@@ -573,6 +627,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
             ...(w.userSize && { userSize: true as const }),
             cause,
             at,
+            ...(under && { under }),
           },
     );
   };
@@ -639,14 +694,18 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       maxL2?: boolean;
       /** A tool-bar push (FR-SHELL-104): the map never yields for it (FR-SHELL-48). */
       push?: boolean;
+      /** The target size capped at this (H2 FAIL 5: the useful size). */
+      cap?: Size;
     },
   ): Spot | null => {
     const w0 = get(id);
     const def = w0 && defOf(w0);
     if (!w0 || !def) return null;
-    const size = targetSize(w0, def, vp);
+    const t = targetSize(w0, def, vp);
+    const size = o.cap ? { w: Math.min(t.w, o.cap.w), h: Math.min(t.h, o.cap.h) } : t;
     const u = useful(def, vp, registry);
     const floor = { w: Math.min(u.w, size.w), h: Math.min(u.h, size.h) };
+    const full = bandTarget(w0, size, u, bandAt(registry, vp));
     const input = (): PlaceInput => ({
       windows: obstacles(id, o.protectedOnly),
       hard,
@@ -695,13 +754,22 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     const anyAt = (more: Partial<PlaceInput>) =>
       accepted(clearSearch(def, { ...input(), ...more, gap: 4 }));
     let squeezed = false;
+    let shrunk = false;
     for (;;) {
       if (anyAt({ floor })) {
-        const l1 = tryAt({ floor: size });
-        // Within L1–L2 the edge column ranks before the inward ones (FR-SHELL-45 (3), map-first
-        // #162): a full-size spot mid-map loses to the edge at a size down to useful.
-        const l2 = !l1 || l1.inward ? tryAt({ floor }) : null;
-        if (l1 && (!l1.inward || !l2 || l2.inward))
+        // The target size at either gap first (FR-SHELL-98), then its band height (BL-104).
+        const l1 = tryAt({ floor: size }) ?? (full.h < size.h ? tryAt({ floor: full }) : null);
+        // Within L1–L2 a spot over no token (FR-SHELL-58 (2c), rulings-b #16), then the edge
+        // column (FR-SHELL-45 (3), map-first #162) rank before size: a full-size spot over a token
+        // or mid-map loses to one at a size down to useful.
+        const l2 = !l1 || l1.inward || overTokens(l1.rect) ? tryAt({ floor }) : null;
+        const key = (p: Placement): [number, number] => [
+          overTokens(p.rect) ? 1 : 0,
+          p.inward ? 1 : 0,
+        ];
+        const [t1, i1] = l1 ? key(l1) : [1, 1];
+        const [t2, i2] = l2 ? key(l2) : [1, 1];
+        if (l1 && (!l2 || t1 < t2 || (t1 === t2 && i1 <= i2)))
           return { rect: l1.rect, rung: "L1", pcClear: true };
         if (l2) return { rect: l2.rect, rung: "L2", pcClear: true };
       } else if (o.squeeze && !squeezed) {
@@ -722,6 +790,17 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       if (trigger.type === "load" && first && self && !isProt(self) && first.z > self.z) {
         putAwayWin(self, o.cause ?? null, first.kind);
         return null;
+      }
+      if (first && !shrunk) {
+        // L3s (BL-99): the other launcher windows down to their useful size before one goes away.
+        shrunk = true;
+        const s = shrinkFor(w0, () => {
+          const p = anyAt({ floor }) ? tryAt({ floor }) : null;
+          if (p) return { rect: p.rect, rung: "L3s", pcClear: true };
+          const y = o.push ? null : yieldFor(def, input(), floor);
+          return y && { ...y, rung: "L3s" };
+        });
+        if (s) return s;
       }
       if (first) {
         aheadUseful ??= lookAhead({ floor });
@@ -824,6 +903,71 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   };
 
   /**
+   * L3s (BL-99): before L3 puts a launcher window away for `w`, the untouched launcher windows on
+   * screen shrink to their useful size inside their own rect (FR-SHELL-79: never below it), least
+   * recently used first (FR-SHELL-78's order): the width alone (keeping the side nearer the screen
+   * edge, else the other), the height alone, then both; until `retry` finds `w` a spot. A shrink
+   * the spot doesn't need is undone; none helps → all restored. Cause `window:<kind>`
+   * (FR-SHELL-102): they grow back when `w` ends.
+   */
+  const shrinkFor = (w: WindowState, retry: () => Spot | null): Spot | null => {
+    const done: { id: string; before: WindowState }[] = [];
+    for (const o of autoMinimiseOrder(out, ctx, w.kind, w.instance, late)) {
+      const def = defOf(o);
+      if (!def) continue;
+      const r = rendered(o);
+      const u = useful(def, vp, registry);
+      if (r.w <= u.w && r.h <= u.h) continue;
+      const bottom = def.defaultPosition.anchor.startsWith("bottom");
+      const leftFirst = r.x + r.w / 2 <= vp.w / 2;
+      const cut = (sw: number, sh: number): Rect[] => {
+        const y = bottom ? r.y + r.h - sh : r.y;
+        const left = { x: r.x, y, w: sw, h: sh };
+        const right = { x: r.x + r.w - sw, y, w: sw, h: sh };
+        return sw === r.w ? [left] : leftFirst ? [left, right] : [right, left];
+      };
+      const sw = Math.min(r.w, u.w);
+      const sh = Math.min(r.h, u.h);
+      const tries = [
+        ...(sw < r.w ? cut(sw, r.h) : []),
+        ...(sh < r.h ? cut(r.w, sh) : []),
+        ...(sw < r.w && sh < r.h ? cut(sw, sh) : []),
+      ];
+      const id = idOf(o);
+      done.push({ id, before: o });
+      // Stored height only (growth stays render-only), as the protected squeeze.
+      const at = (s: Rect) =>
+        setWin(id, { ...shellRect(o, s, area), ...(o.fixedH && { fixedH: true as const }) });
+      for (const s of tries) {
+        at(s);
+        const spot = retry();
+        if (!spot) continue;
+        // Least movement (ADR-0060 §4): an earlier shrink the spot doesn't need is undone.
+        for (const d of done.slice(0, -1)) {
+          const shrunkTo = get(d.id) as WindowState;
+          setWin(d.id, d.before);
+          const b = rendered(d.before);
+          const grown = { x: b.x - 4, y: b.y - 4, w: b.w + 8, h: b.h + 8 };
+          if (overlaps(grown, spot.rect) || !clearAt(spot.rect, idOf(w))) setWin(d.id, shrunkTo);
+        }
+        for (const d of done.filter((x) => get(x.id) !== x.before)) {
+          const now = get(d.id) as WindowState;
+          remember(d.before, `window:${w.kind}`, plainRect(now));
+          const m = memory.get(d.id);
+          if (m?.cause === `window:${w.kind}`) memory.set(d.id, { ...m, shrunk: true });
+          placed.set(d.id, "squeezed");
+          pcFlags.set(d.id, pcFree(rendered(now)));
+          log.push(`${label}:${d.before.kind}>squeezed`);
+        }
+        return spot;
+      }
+      at(tries.at(-1) as Rect);
+    }
+    for (const d of done.reverse()) setWin(d.id, d.before);
+    return null;
+  };
+
+  /**
    * FR-SHELL-108 (OQ-SHELL-64 B, players, `fitted` camera): a spot ≥ useful, clear of windows but
    * over PCs, is accepted iff the dry fit with it as an obstacle keeps every PC (and every token
    * the fit kept) clear at ≥ 75 % of the last full fit's cell and ≥ 24 px; the map then refits.
@@ -847,16 +991,27 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     return null;
   };
 
-  /** Places a launcher window through the ladder and writes it. */
+  /**
+   * Places a launcher window through the ladder and writes it; `track`: a memory cause that is not
+   * a displacement (`grown:`, H2 FAIL 5).
+   */
   const placeLauncher = (
     id: string,
     how: Placed | ((r: Rect) => Placed),
-    o: { cause?: string; prev?: Rect; putAway?: boolean } = {},
+    o: { cause?: string; prev?: Rect; putAway?: boolean; track?: string } = {},
   ) => {
     const w = get(id);
-    if (!w) return;
-    const spot = ladder(id, { ...o, putAway: o.putAway ?? true, squeeze: true });
+    const def = w && defOf(w);
+    if (!w || !def) return;
+    const { track, ...lo } = o;
+    let spot = ladder(id, { ...lo, putAway: o.putAway ?? true, squeeze: true });
     if (!spot) return;
+    if (!fitKeeps(id, spot.rect)) {
+      // H2 FAIL 5: no bigger than its useful size where more would cost the map its all-tokens
+      // fit (the useful size itself stays the window's, FR-SHELL-79).
+      const small = ladder(id, { ...lo, putAway: false, cap: useful(def, vp, registry) });
+      if (small) spot = small;
+    }
     if (o.cause && spot.rung === "L5") {
       // A window displaced for a transient cause is put away itself rather than cover a PC
       // (#310; as a pushed one, OQ-SHELL-61 A); it returns when the cause ends (FR-SHELL-102).
@@ -867,7 +1022,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     }
     late.add(id);
     const kind = typeof how === "function" ? how(spot.rect) : how;
-    write(id, spot.rect, kind, { ...(o.cause && { cause: o.cause }), rung: spot.rung });
+    const cause = o.cause ?? track;
+    write(id, spot.rect, kind, { ...(cause && { cause }), rung: spot.rung });
     pcFlags.set(id, spot.pcClear);
   };
 
@@ -1068,17 +1224,21 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
         { ...w, ...cand, area },
         ctx,
       );
-      if (inside(cand) && clearAt(r, id) && (!pcs || pcFree(r))) {
-        write(id, cand, "grown", { rung: "grown" });
+      if (inside(cand) && clearAt(r, id) && (!pcs || pcFree(r)) && fitKeeps(id, r)) {
+        write(id, cand, "grown", { rung: "grown", ...(grewFrom && { cause: grewFrom }) });
         return;
       }
     }
     const r = rendered(w);
     const u = useful(def, vp, registry);
-    const big = r.w >= Math.min(u.w, size.w) && r.h >= Math.min(u.h, size.h);
+    // Back at its rect from before the cause (FR-SHELL-102, this settle): kept as it was, below
+    // useful too (I7: a resize down and back restores the layout).
+    const back = placed.get(id) === "returned";
+    const big = back || (r.w >= Math.min(u.w, size.w) && r.h >= Math.min(u.h, size.h));
     if (inside(w) && clearAt(r, id) && (!pcs || pcFree(r)) && big) return;
     placeLauncher(id, cause ? "displaced" : autoKind(w), {
       ...(cause && { cause }),
+      ...(grewFrom && { track: grewFrom }),
       prev: plainRect(w),
     });
   };
@@ -1104,6 +1264,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     }
     const v = causeViewport(d.cause);
     if (v) return vp.w >= v.w && vp.h >= v.h;
+    const g = causeGrown(d.cause);
+    if (g) return vp.w <= g.w && vp.h <= g.h;
     if (d.cause.startsWith("window:")) {
       // The kind closes, is minimised by the user or ends; one the shell put away for a transient
       // cause comes back (one put away for an open hands its squeezes on, `putAwayWin`).
@@ -1156,6 +1318,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const free = !blocked && !hard.some((k) => overlaps(r, k));
       if (free && (d.userSpot || pcFree(r))) {
         setWin(id, back);
+        // Back at its L3s rect (BL-99): that shrink holds again until its own cause ends.
+        if (d.under && sameRect(back, d.under.at)) memory.set(id, d.under);
         placed.set(id, "returned");
         pcFlags.set(id, pcFree(r));
         log.push(`${label}:${w.kind}>returned`);
@@ -1271,12 +1435,22 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const w = get(id);
       const def = w && defOf(w);
       if (!w || !def || w.userSize || w.userSpot || def.fixedDefault) continue;
+      // Shrunk (L3s, BL-99) for a window still open: it grows back when that one ends. Back at
+      // its rect from before the cause in this settle: as it was (I7).
+      if (squeezedNow(w) || placed.get(id) === "returned") continue;
       const size = targetSize(w, def, vp);
       const fitted = fittedDefaultRect(def, vp, hard, size);
-      if (w.w >= fitted.w && w.h >= fitted.h) continue;
-      const spot = ladder(id, { putAway: false, maxL2: true, prev: plainRect(w) });
+      // Band-capped as L1 (BL-104): a window at its band height is not shrunk.
+      const band = bandTarget(w, fitted, useful(def, vp, registry), bandAt(registry, vp));
+      if (w.w >= band.w && w.h >= band.h) continue;
+      const u = useful(def, vp, registry);
+      let spot = ladder(id, { putAway: false, maxL2: true, prev: plainRect(w) });
+      // H2 FAIL 5: beyond its useful size only where the map keeps an all-tokens fit.
+      if (spot && !fitKeeps(id, spot.rect)) {
+        spot = ladder(id, { putAway: false, maxL2: true, prev: plainRect(w), cap: u });
+      }
       if (spot && spot.rect.w * spot.rect.h > w.w * w.h) {
-        write(id, spot.rect, "grown", { rung: spot.rung });
+        write(id, spot.rect, "grown", { rung: spot.rung, ...(grewFrom && { cause: grewFrom }) });
       }
     }
     // OQ-SHELL-60 B: windows the small screen put away come back if they fit, nothing put away.
@@ -1312,7 +1486,6 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       break;
     }
     case "viewport": {
-      const from = ctx.settledViewport ?? vp;
       const shrank = vp.w < from.w || vp.h < from.h;
       const cause = shrank ? `viewport:${from.w}×${from.h}` : undefined;
       // Zones first (the frame the rest fits around); a protected window's squeeze ends with them.
@@ -1446,7 +1619,8 @@ export function persistable(ws: Windows, memory: readonly Displacement[]): Windo
   let out: Windows = ws;
   for (const d of memory) {
     const squeeze = d.cause.startsWith("window:");
-    if (!squeeze && !d.cause.startsWith("toolbar:")) continue;
+    // L3s (BL-99): a launcher window shrunk for an open is stored shrunk (else a reload overlaps).
+    if (d.shrunk || (!squeeze && !d.cause.startsWith("toolbar:"))) continue;
     const w = find(out, d.kind, d.instance);
     if (!w || isRemembered(w)) continue;
     const still = d.at === null ? w.state === "minimised" : sameRect(w, d.at);

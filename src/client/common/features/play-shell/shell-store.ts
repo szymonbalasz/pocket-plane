@@ -249,7 +249,7 @@ export function createShellController(opts: {
   /** The camera mode now (FR-SHELL-99); default `fitted`. */
   camera?: () => "fitted" | "moved";
   /** The canvas's base port for L2b (FR-SHELL-108); absent → the map never yields. */
-  dryFit?: (obstacles: readonly Rect[]) => DryFit | null;
+  dryFit?: (obstacles: readonly Rect[], reason?: "window" | "resize") => DryFit | null;
   /** The last full fit's cell px (FR-SHELL-108). */
   lastFullCell?: () => number | null;
   /** The placer accepted a yield (L2b): the map refits once (FR-MAP-97). */

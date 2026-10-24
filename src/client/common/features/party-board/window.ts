@@ -15,9 +15,9 @@ export const partyBoardWindowBase = {
   kind: PARTY_BOARD_KIND,
   // FR-PARTY-59 / FR-SHELL-156: "Party Manager" (kind, test IDs and tab memory unchanged).
   title: "Party Manager",
-  // FR-SHELL-156 (OQ-SHELL-78 A): 1.25 × 440, band-capped; useful 440 × 400 (every PC row and its
-  // companion rows whole on Party status, measured on `wf-frame-e2e`).
-  defaultSize: { w: 550, h: 560 },
+  // FR-SHELL-156 (OQ-SHELL-78 A; BL-106, DM #341: 550 → 600), band-capped; useful 440 × 400
+  // (every PC row and its companion rows whole on Party status, measured on `wf-frame-e2e`).
+  defaultSize: { w: 600, h: 560 },
   usefulSize: { w: 440, h: 400 },
   minSize: { w: 340, h: 360 },
   // Left edge, clear of the tool rail (#162; where `loot.log` was before FR-PARTY-29).

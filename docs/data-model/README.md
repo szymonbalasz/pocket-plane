@@ -2609,3 +2609,14 @@ From [session-recap](../specs/session-recap.md#8-data-model) §8 (#338, #339). *
 - **Derived:** the whole recap (stats' compute helpers + the ledger), per viewer; Markdown text (client).
 - **Persisted runtime state:** share rows only. **Server memory:** the recap memo + per-actor rate limit (`session-recap/memo.ts`, LRU 32, dropped freely) on stats' session cache.
 - **Fixtures:** `recap-loot-haul`, `recap-share-note`; bundles `sp-s9`, `sp-s9-shared` (+ e2e aliases).
+
+## 128. Sprint 10: window frame and Party Manager hardening (H2)
+
+From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-97, -102, -156 and [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-115 (sprint-10 notes; DM #341). **Built by `fix/h2-frame`**. Protocol side: [protocol §160](../protocol/README.md#160-sprint-10-window-frame-and-party-manager-hardening-h2). **No table, column, record type or wire field.**
+
+| Browser state | Change | Rule | Source |
+|---|---|---|---|
+| Layout `pp.layout.v1` entries | no new field; a launcher window shrunk to its useful size for another window's open (L3s) is written shrunk (not its pre-shrink rect), so a reload shows the layout as left | `persistable` skips `shrunk` displacements | FR-SHELL-97, -102 (BL-99) |
+
+- **Derived (client, not stored):** the displacement memory's `shrunk` / `under` (client memory, dropped on reload); the fit's rooms without remembered windows (`untouched`, BL-100).
+- **Fixtures:** none new; bundles `h2-frame`, `h2-frame-e2e`, `h2-fit-e2e` are aliases.

@@ -39,9 +39,9 @@ const shared: Record<string, SizeRow> = {
     min: s(320, 360),
     criterion: "search, filters, 5 rows",
   },
-  // PM2 (FR-SHELL-156, OQ-SHELL-78 A): Party Manager, 1.25 × 440 (shown band-capped).
+  // PM2 (FR-SHELL-156, OQ-SHELL-78 A): Party Manager (shown band-capped); BL-106 (H2): 550 → 600.
   "party.board": {
-    default: all(550, 560),
+    default: all(600, 560),
     useful: all(440, 400),
     min: s(340, 360),
     criterion:

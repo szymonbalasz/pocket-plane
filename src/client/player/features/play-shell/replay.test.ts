@@ -27,18 +27,14 @@ if (process.env.UPDATE_FAILING === "1") {
  * Named exemptions (FR-SHELL-160: a new failing cell only with a reason, orchestrator-approved):
  * cell → reason. Each must be in `replay.failing.json`.
  */
+// H2 (sprint 10, BL-93): a window back at its pre-cause rect stays as it was (I7), the L1 band
+// height (BL-104) and L3s (BL-99) pass P1 fitted @1600×900 / @1280×800 resize again (RS2's and
+// SP3's exemptions retired): 37 → 31 failing; H2 FAIL 5 (`grown:` returns, the resize fit check):
+// 31 → 30 (P3 fitted @1280×800 resize).
 const EXEMPTIONS = new Map([
   [
     "FR-SHELL-115 replay P2 moved @1280×720 memory",
     "PM1 (approved): inherits the shared open phase's I2 (Compendium / Party Manager on the toast keep-out), as every other P2 moved @1280×720 cell; its memory steps (I9–I13) pass",
-  ],
-  [
-    "FR-SHELL-115 replay P1 fitted @1600×900 resize",
-    "RS2 (approved, BL-93): `hold.stronghold` joins P1 untouched (S4); the resize back leaves it at its band height 400×472 → 400×400 (the placer's I7 resize class, 10 player cells; frame). The same change flips P1 fitted @1280×720 push, @1280×800 resize and @1440×900 resize to passing. SP2 (approved, BL-93): with `cmp.rules` in P1 too the same cell still fails the same way (cmp.rules 440×472 → 440×360); P1 failing cells unchanged by SP2's merge",
-  ],
-  [
-    "FR-SHELL-115 replay P1 fitted @1280×800 resize",
-    "SP3 (approved, BL-93): `recap.session` joins P1 untouched (S4) beside `hold.stronghold` and `cmp.rules`; the resize back leaves it at 440×492 → 440×360 (the placer's I7 resize class, as P1 fitted @1600×900 and P2 / P3's resize cells; frame). It re-fails the cell RS2's merge had flipped to passing",
   ],
 ]);
 
