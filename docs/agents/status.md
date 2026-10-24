@@ -23,7 +23,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T5 dice visuals (#347, #348) | merged bfdc44a9 | — | **merged** (visual walkthrough PASS; branch check:full 5635, e2e 242 + weapon-rows load flake 2/2 alone); main gates skipped (same code) | — |
 | Sprint 11 F1 frame + camera | `fix/f1-frame` (slot 0, ws wAF) | build-f1 (idle), test-f1 | ready (check:full green, 31 frame e2e) → walkthrough | branch gate, merge |
 | Sprint 11 F2 toasts | `fix/f2-toasts` (slot 2, ws wAG) | build-f2 | building (toast runtime) | walkthrough (port 4123) |
-| Sprint 11 F3 combat + dice | `fix/f3-combat-dice` (slot 3, ws wAH) | build-f3 (idle) | walkthrough **16/16 PASS** (`.verify/20261024-f3/`); branch gate running | merge |
+| Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
 | Sprint 11 art track (DM) | DM's own agent | — | planning in docs/design/ | — |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
