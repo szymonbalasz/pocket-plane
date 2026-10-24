@@ -1,7 +1,7 @@
 // Launcher: bottom-centre bar, one button per available window type with a launcher entry, and
 // a trailing "⋯" menu with "Reset layout" (FR-SHELL-09, FR-SHELL-14). It fits the viewport
-// (FR-SHELL-43): icon-only buttons first, then the buttons that still don't fit move into the
-// "⋯" menu (`launcher-fit.ts`).
+// (FR-SHELL-43): icon-only buttons first (keeping the labels that fit, BL-113), then the buttons
+// that still don't fit move into the "⋯" menu (`launcher-fit.ts`).
 import { EllipsisIcon } from "lucide-react";
 import { DropdownMenu as M } from "radix-ui";
 import { useRef } from "react";
@@ -69,6 +69,7 @@ export function Launcher({
   }
   const { fit } = fitRef.current;
   const inBar = new Set(fit.bar);
+  const labelled = new Set(fit.labelled);
   const overflow = entries.filter((d) => !inBar.has(d.kind));
   return (
     <nav
@@ -93,6 +94,7 @@ export function Launcher({
               data-testid="ui-launcher-button"
               data-record-id={d.kind}
               data-state={state}
+              data-compact={!labelled.has(d.kind)}
               aria-label={l.label}
               aria-pressed={state === "open"}
               className={cn(
@@ -102,7 +104,7 @@ export function Launcher({
               onClick={() => dispatch({ type: "toggle", kind: d.kind })}
             >
               <Icon className="size-4" />
-              {!fit.compact && <span className="text-xs">{l.label}</span>}
+              {labelled.has(d.kind) && <span className="text-xs">{l.label}</span>}
               {badge !== null && (
                 <span
                   data-testid={`${d.kind.split(".")[0]}-launcher-badge`}
