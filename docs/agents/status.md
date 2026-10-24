@@ -20,7 +20,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | merged ef4835d1 | — | **merged** (walkthrough 11/11; branch check 5593 / e2e 240); evidence `.verify/sprint10/walkthroughs/20261024-t2/`; main gates green (5593 / 240) | — |
 | Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
 | Sprint 10 T4 faster test loop (#345) | merged aa9ddba0 | — | **merged** (branch check:full 5634 / e2e 243 at 4 workers, 752 s wall for the whole gate); main gates skipped (same code) | — |
-| Sprint 10 T5 dice visuals (#347) | `fix/dice-visuals` (slot 0, ws wAE) | build-t5 (idle), test-t5 | built (d20 lines 1, tray 450 × 375 / 50-px dice, popup 448 px / 62-px dice; check:full green; 42 dice e2e) → visual walkthrough | one full gate, merge |
+| Sprint 10 T5 dice visuals (#347) | `fix/dice-visuals` (slot 0, ws wAE) | build-t5 (idle) | visual walkthrough PASS (`.verify/20261024-t5/`; popup stacks cover controls ~6 s: DM keeps as is, #348); branch gate running | merge |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
