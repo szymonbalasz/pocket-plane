@@ -15,7 +15,8 @@
 // keeps off windows' drawn content, then their first rows (the content measured while it shows);
 // FR-NOTE-76: an open modal dialog counts like Initiative and nothing under its overlay counts.
 // FR-NOTE-77: it may slide beside a window off the PCs' tokens; over a body the cards fold into
-// the summary.
+// the summary. *(Sprint 11, F2)* BL-115: the stack settles: a layout change refolds once it held
+// still, the stack holds its drawn spot while the fold steps, tokens are read as footprints.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
 import { recordsOf } from "@shared/protocol/store";
@@ -70,18 +71,20 @@ import {
   classOfToast,
   clearCallout,
   closeToast,
-  type FoldState,
-  foldCap,
-  MAX_VISIBLE,
   nextExpiry,
+  REFOLD_QUIET_MS,
+  refold,
   registerToastMemory,
+  SETTLE_HOLD_MS,
   SUMMARY_KEY,
   setHidden,
   setHovered,
+  settleStack,
   syncToasts,
   type Toast,
   type ToastMemoryStore,
   type ToastState,
+  UNSETTLED,
   unfold,
   visibleToasts,
 } from "./toasts";
@@ -265,9 +268,6 @@ export function CalloutToast({ c, onClose }: { c: Callout; onClose: () => void }
  */
 export const TOAST_STACK_Z = 900;
 
-/** No fold: the policy's max (FR-NOTE-50). */
-const UNFOLDED: FoldState = { cap: MAX_VISIBLE, foldedAt: null };
-
 /** Id of this stack's FR-SHELL-59 report. */
 export const SHOWN_STACK_ID = "note.toasts";
 
@@ -376,6 +376,8 @@ export function ToastRuntime({
   const stackH = useStackHeight(stackRef, isDm, showing);
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
   // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
+  // BL-115: as footprints (play-shell's PC rule), not drawn boxes: a pulsing cue ring, a turn
+  // ring or a label grows a token's drawn box frame by frame, and each re-read moved the stack.
   const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
   const pcKey = usePcTokens(isDm).join(",");
   // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
@@ -392,28 +394,20 @@ export function ToastRuntime({
         initiative,
         stackH,
         undefined,
-        tokenScreenBoxes(avoidKey ? avoidKey.split(",") : []),
+        tokenScreenBoxes(avoidKey ? avoidKey.split(",") : [], sync?.getState().store),
         windowRects,
         hard,
         firstRows,
         dialogs,
-        pcBoxes(tokenScreenBoxes(pcKey ? pcKey.split(",") : []).map((b) => ({ ...b, pc: true }))),
+        pcBoxes(
+          tokenScreenBoxes(pcKey ? pcKey.split(",") : [], sync?.getState().store).map((b) => ({
+            ...b,
+            pc: true,
+          })),
+        ),
       ),
-    [vp, initiative, stackH, avoidKey, pcKey, windowRects, hard, firstRows, dialogs, tick],
+    [vp, initiative, stackH, avoidKey, pcKey, windowRects, hard, firstRows, dialogs, tick, sync],
   );
-
-  // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
-  useLayoutEffect(() => {
-    const el = stackRef.current;
-    if (!isDm || !el || stackH === 0) {
-      reportShownStack(SHOWN_STACK_ID, null);
-      return;
-    }
-    // Fixed at `at`; the width and measured height as rendered.
-    const w = Math.round(el.getBoundingClientRect().width);
-    reportShownStack(SHOWN_STACK_ID, { x: at.left, y: at.top, w, h: stackH });
-  }, [isDm, at.left, at.top, stackH]);
-  useEffect(() => () => reportShownStack(SHOWN_STACK_ID, null), []);
 
   // P3 E3: the stack always fits the viewport: while it is taller than the room (DM: below the
   // top row, above the launcher; player: above its corner, below the top bar), one more toast
@@ -422,11 +416,15 @@ export function ToastRuntime({
   const room = isDm
     ? dialogRoom(vp, dialogs, vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP)
     : vp.h - PLAYER_TOAST_BOTTOM - TOP_BAR_H - EDGE_GAP;
-  const [fold, setFold] = useState<FoldState>(UNFOLDED);
-  const cap = fold.cap;
+  // BL-115: the fold and the spot drawn (`settleStack`): while the fold steps the stack holds
+  // where it was drawn, then moves once.
+  const [settle, setSettle] = useState(UNSETTLED);
+  const cap = settle.fold.cap;
   const count = state.toasts.length;
   // FR-NOTE-77 (walkthrough H3 re-test): the fold starts over when what places the stack changes
-  // (windows moved, a tool bar or dialog shown), not only on a new count or room.
+  // (windows moved, a tool bar or dialog shown), not only on a new count or room. BL-115: once
+  // that layout held still for `REFOLD_QUIET_MS` (a window that grows or a dialog that animates
+  // restarted the fold every frame, and the stack hopped while it re-folded).
   const placeKey = useMemo(
     () =>
       JSON.stringify([
@@ -437,8 +435,17 @@ export function ToastRuntime({
       ]),
     [initiative, windowRects, hard, dialogs],
   );
-  // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count, room or layout
-  useLayoutEffect(() => setFold(UNFOLDED), [count, room, placeKey]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
+  useLayoutEffect(() => setSettle(refold), [count, room]);
+  const placedKey = useRef(placeKey);
+  useEffect(() => {
+    if (placedKey.current === placeKey) return;
+    const t = setTimeout(() => {
+      placedKey.current = placeKey;
+      setSettle(refold);
+    }, REFOLD_QUIET_MS);
+    return () => clearTimeout(t);
+  }, [placeKey]);
   // Walkthrough WF4: likewise while the DM stack can only sit on a window's body (its controls).
   // FR-NOTE-77: down to no card at all while the summary shows (its Open stays one click away);
   // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
@@ -446,10 +453,35 @@ export function ToastRuntime({
   const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
   const { shown, more, callout } = visibleToasts(state, cap, folded);
   const foldable = shown.filter((t) => t.kind !== "summary" && classOfToast(t) !== "alert").length;
+  // BL-115: a hold that never sees a new height ends after `SETTLE_HOLD_MS`.
+  const [holdOver, setHoldOver] = useState(0);
+  useEffect(() => {
+    if (!settle.hold) return;
+    const t = setTimeout(() => setHoldOver((n) => n + 1), SETTLE_HOLD_MS);
+    return () => clearTimeout(t);
+  }, [settle.hold]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `holdOver` re-steps an expired hold
   useLayoutEffect(() => {
     const need = stackH > room || covers;
-    setFold((f) => foldCap(f, { need, min: minCap, stackH, shown: foldable }));
-  }, [stackH, room, covers, minCap, foldable]);
+    const spot = { left: at.left, top: at.top };
+    const now = performance.now();
+    setSettle((s) => settleStack(s, { need, min: minCap, stackH, shown: foldable, spot, now }));
+  }, [stackH, room, covers, minCap, foldable, at.left, at.top, holdOver]);
+  // FR-NOTE-70: the drawn spot (`data-left` / `data-top`, the style and the FR-SHELL-59 report).
+  const pos = settle.hold && settle.drawn ? settle.drawn : { left: at.left, top: at.top };
+
+  // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
+  useLayoutEffect(() => {
+    const el = stackRef.current;
+    if (!isDm || !el || stackH === 0) {
+      reportShownStack(SHOWN_STACK_ID, null);
+      return;
+    }
+    // Fixed at `pos`; the width and measured height as rendered.
+    const w = Math.round(el.getBoundingClientRect().width);
+    reportShownStack(SHOWN_STACK_ID, { x: pos.left, y: pos.top, w, h: stackH });
+  }, [isDm, pos.left, pos.top, stackH]);
+  useEffect(() => () => reportShownStack(SHOWN_STACK_ID, null), []);
 
   const openHistory = () => openWindow(HISTORY_KIND);
   if (!showing) return null;
@@ -459,8 +491,8 @@ export function ToastRuntime({
       aria-label="Notifications"
       data-testid="note-toasts"
       data-placement={isDm ? "top-center" : "bottom-right"}
-      data-left={isDm ? at.left : undefined}
-      data-top={isDm ? at.top : undefined}
+      data-left={isDm ? pos.left : undefined}
+      data-top={isDm ? pos.top : undefined}
       // FR-NOTE-50: DOM order = order from home; the players' home is the bottom.
       className={cn(
         "pointer-events-none fixed flex w-80 gap-2",
@@ -470,7 +502,7 @@ export function ToastRuntime({
       style={{
         zIndex: TOAST_STACK_Z,
         ...(isDm
-          ? { left: at.left, top: at.top }
+          ? { left: pos.left, top: pos.top }
           : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }),
       }}
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}

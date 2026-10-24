@@ -494,3 +494,67 @@ export function foldCap(
   const cap = Math.max(o.min, Math.min(s.cap, o.shown) - 1);
   return cap === s.cap ? s : { cap, foldedAt: o.stackH };
 }
+
+/** BL-115: how long the drawn spot may hold while the fold steps (a step that never re-measures). */
+export const SETTLE_HOLD_MS = 300;
+
+/** BL-115: a layout change (window rects, tool bars, dialogs) refolds once it held still this long. */
+export const REFOLD_QUIET_MS = 250;
+
+/** The runtime's fold and the spot it draws the DM stack at (BL-115). */
+export interface StackSettle {
+  fold: FoldState;
+  /** The spot drawn: the computed one, held where it was while the fold steps. */
+  drawn: { left: number; top: number } | null;
+  /** The fold is stepping and `drawn` holds. */
+  hold: boolean;
+  /** When the hold began (`SETTLE_HOLD_MS` caps it); null while not stepping. */
+  heldSince: number | null;
+}
+
+/** No fold, nothing drawn yet. */
+export const UNSETTLED: StackSettle = {
+  fold: { cap: MAX_VISIBLE, foldedAt: null },
+  drawn: null,
+  hold: false,
+  heldSince: null,
+};
+
+/**
+ * BL-115 (sim-14, H3 re-test 2 O1: 520,100 → 480,140 → 480,254 → 520,100 within ~70 ms): one
+ * frame of the runtime's fold (`foldCap`) and the spot it draws. While the fold steps (it just
+ * folded, or waits for the new height of a stack that still doesn't fit) the stack holds the spot
+ * it was drawn at; once it rests it moves once, to the spot computed for its folded height. A hold
+ * lasts at most `SETTLE_HOLD_MS`. Same state back when nothing changed.
+ */
+export function settleStack(
+  s: StackSettle,
+  o: {
+    need: boolean;
+    min: number;
+    stackH: number;
+    shown: number;
+    spot: { left: number; top: number };
+    now: number;
+  },
+): StackSettle {
+  const fold = foldCap(s.fold, o);
+  const stepping = o.stackH > 0 && o.need && fold.cap > o.min && fold.foldedAt === o.stackH;
+  const fresh = s.heldSince === null || o.now - s.heldSince < SETTLE_HOLD_MS;
+  const hold = stepping && s.drawn !== null && fresh;
+  const drawn = hold ? s.drawn : { left: o.spot.left, top: o.spot.top };
+  const heldSince = stepping ? (s.heldSince ?? o.now) : null;
+  const same =
+    fold === s.fold &&
+    hold === s.hold &&
+    heldSince === s.heldSince &&
+    drawn?.left === s.drawn?.left &&
+    drawn?.top === s.drawn?.top;
+  return same ? s : { fold, drawn, hold, heldSince };
+}
+
+/** A new count or room (and a quiet layout change, `REFOLD_QUIET_MS`): the fold starts over. */
+export const refold = (s: StackSettle): StackSettle =>
+  s.fold.cap === MAX_VISIBLE && s.fold.foldedAt === null
+    ? s
+    : { ...s, fold: { cap: MAX_VISIBLE, foldedAt: null } };
