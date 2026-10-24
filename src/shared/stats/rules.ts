@@ -74,6 +74,19 @@ export const isParty = (s: StatsSide): boolean => s.kind === "pc" || isCompanion
 export const characterOf = (s: StatsSide): string | null =>
   s.kind === "pc" ? s.entityId : s.ownerCharacterId;
 
+/**
+ * Sprint 10 BL-111 (FR-STATS-12, DM #343): a counted damage line credited to a party character (a
+ * PC, or a companion's current owner). One the viewer doesn't see could change "Most damage dealt"
+ * (and the fight's MVP), so players don't get that award while the window holds one.
+ */
+export const creditsParty = (
+  f: StatsFact,
+  characters: ReadonlyMap<string, StatsCharacter>,
+): boolean => {
+  const ch = f.kind === "damage" && f.raw > 0 && f.attacker ? characterOf(f.attacker) : null;
+  return ch !== null && characters.has(ch);
+};
+
 /** FR-STATS-08: a monster (not a companion) going `hpBefore > 0 → 0`. */
 export const isKill = (f: StatsFact): boolean =>
   f.kind === "damage" &&
@@ -227,9 +240,17 @@ export interface AwardsInput {
   characters: ReadonlyMap<string, StatsCharacter>;
   /** The viewer's fight label (DM: the name; a player: "Fight N · Tue 20 Oct"). */
   fightLabel(encounterId: string): string;
+  /**
+   * BL-111: players only: the session holds party damage they don't see (`creditsParty`), so
+   * "Most damage dealt" is left out of their cards. Never set for the DM.
+   */
+  dealtUnseen?: boolean;
 }
 
-/** FR-STATS-12: the 9 awards in card order; party only, ties list all (≤ 8), zero = empty. */
+/**
+ * FR-STATS-12: the 9 awards in card order; party only, ties list all (≤ 8), zero = empty. BL-111:
+ * with `dealtUnseen`, 8 (no "Most damage dealt").
+ */
 export function sessionAwards(input: AwardsInput): Award[] {
   const { role, facts, rolls, characters } = input;
   const scores = new Map<AwardKey, Map<string, Score>>(AWARD_KEYS.map((k) => [k, new Map()]));
@@ -285,7 +306,8 @@ export function sessionAwards(input: AwardsInput): Award[] {
     s.value += 1;
     m.set(ch.id, s);
   }
-  return AWARD_KEYS.map((key) => {
+  const keys = input.dealtUnseen ? AWARD_KEYS.filter((k) => k !== "most-dealt") : AWARD_KEYS;
+  return keys.map((key) => {
     const m = scores.get(key) as Map<string, Score>;
     let best = 0;
     for (const s of m.values()) best = Math.max(best, s.value);

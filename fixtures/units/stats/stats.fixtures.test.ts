@@ -10,7 +10,7 @@
 // Fight "Old Crypt" (players: "Fight 1 · ‹day›"): Thorn Dealt 43, Kills 2; Mira Taken 15, down;
 //   DM: Skeleton 2 Dealt 15, "Unattributed" Healed 12.
 // Session awards, DM | players: Biggest hit Thorn 30 | 30; Biggest overkill Thorn 23 | 30;
-//   Most damage dealt Thorn 73; Most damage taken Brakka 55; Most healing Brakka 8; Most kills
+//   Most damage dealt Thorn 73 | none (BL-111: Mira's DM-only 11); Most damage taken Brakka 55; Most healing Brakka 8; Most kills
 //   Thorn 3; Most nat 20s Thorn 3 | 2 (one hidden DM roll); Most nat 1s Mira 1; Most times
 //   downed Mira, Brakka 1 (tie).
 //
@@ -161,7 +161,7 @@ describe("STATS §13 fixtures", () => {
     expect(awardsOf(p?.awards ?? [])).toEqual({
       "biggest-hit": [30, "Thorn"],
       "biggest-overkill": [30, "Thorn"],
-      "most-dealt": [73, "Thorn"],
+      // BL-111: no "Most damage dealt" (Mira's late 11 on the hidden Goblin 2 is DM-only).
       "most-taken": [55, "Brakka"],
       "most-healing": [8, "Brakka"],
       "most-kills": [3, "Thorn"],
