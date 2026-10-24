@@ -27,7 +27,11 @@
 // sideways beside a window, at most half its width (it stays in its band, #288), to a spot that
 // covers no window, PC or card target, before it takes "below the first row"; none → over a body,
 // the fewest controls first. First rows are the window's own measure (`head`), so a record
-// container filling the body (the Encounters editor) isn't its "first row".
+// container filling the body (the Encounters editor) isn't its "first row". *(Sprint 11, F2)*
+// FR-NOTE-78 (BL-108): over a body, the fallback keeps off each window's primary parts first (its
+// headings and first record; a log's newest rows), then the fewest controls and other records;
+// an open non-modal popup (the damage-card popup) blocks like Initiative and, when nothing clears
+// it, the stack folds over its fewest controls.
 // Pure; players keep bottom-right.
 
 import { type FirstRow, firstRows } from "../play-shell/content-heights";
@@ -74,6 +78,13 @@ export type StackWindow = Rect & {
    * what the DM reads first); they count like controls.
    */
   logRows?: readonly Rect[];
+  /**
+   * FR-NOTE-78 (BL-108): the window's primary parts as drawn: its headings and its first record
+   * (the first row-sized record that isn't a control); the fallback keeps off them first.
+   */
+  primary?: readonly Rect[];
+  /** FR-NOTE-78: its other row-sized records as drawn; they count like controls. */
+  records?: readonly Rect[];
 };
 
 /** FR-NOTE-75: the window's content part (title bar to `used`; unknown → all of it). */
@@ -166,6 +177,7 @@ export function dmStackPlacement(
   rows: readonly FirstRow[] = [...firstRows().values()],
   dialogs: readonly Rect[] = [],
   pcs: readonly Rect[] = [],
+  popups: readonly StackWindow[] = [],
 ): { left: number; top: number } {
   const { left, top } = dmStackSpot(
     vp,
@@ -178,6 +190,7 @@ export function dmStackPlacement(
     rows,
     dialogs,
     pcs,
+    popups,
   );
   return { left, top };
 }
@@ -188,6 +201,9 @@ export function dmStackPlacement(
  * shows fewer toasts, never beside a window; FR-NOTE-75: empty body below the content is free).
  * `dialogs` (FR-NOTE-76): the open modal dialogs' rects; while any is open only they count.
  * `pcs` (FR-NOTE-77): the PC tokens' footprints + 4 px; a spot beside a window never covers one.
+ * `popups` (FR-NOTE-78): open non-modal popups (the damage-card popup) with their controls; they
+ * block like Initiative, count in `covers` (the runtime folds) and, when no spot clears them, the
+ * stack takes the one over their fewest controls.
  */
 export function dmStackSpot(
   vp: Viewport,
@@ -200,6 +216,7 @@ export function dmStackSpot(
   rows: readonly FirstRow[] = [...firstRows().values()],
   dialogs: readonly Rect[] = [],
   pcs: readonly Rect[] = [],
+  popups: readonly StackWindow[] = [],
 ): { left: number; top: number; covers: number } {
   if (dialogs.length > 0) {
     // FR-NOTE-76: under a modal dialog's overlay nothing else takes input; the dialogs count
@@ -207,14 +224,32 @@ export function dmStackSpot(
     const modal = dialogs.map((d) => ({ ...d, blocks: true }));
     return dmStackSpot(vp, null, stackH, width, [], modal, [], []);
   }
-  const lefts = dmStackLefts(vp, initiative, width, windows);
-  const p = dmStackSpotOnly(vp, initiative, stackH, width, avoid, windows, hard, rows, lefts, pcs);
+  // FR-NOTE-78: a popup's shift left of it is a candidate left like Initiative's.
+  const blocking = popups.map((w) => ({ ...w, blocks: true }));
+  const lefts = dmStackLefts(vp, initiative, width, [...windows, ...blocking]);
+  const p = dmStackSpotOnly(
+    vp,
+    initiative,
+    stackH,
+    width,
+    avoid,
+    windows,
+    hard,
+    rows,
+    lefts,
+    pcs,
+    popups,
+  );
   // FR-NOTE-70: `covers` > 0 (no spot in the column clears every window's content) → the
   // runtime folds. FR-NOTE-75: the empty body below a window's content doesn't count.
+  // FR-NOTE-78: a popup counts whole.
   const covers =
     stackH === 0
       ? 0
-      : coveredArea({ x: p.left, y: p.top, w: width, h: stackH }, windows.map(contentOf));
+      : coveredArea({ x: p.left, y: p.top, w: width, h: stackH }, [
+          ...windows.map(contentOf),
+          ...popups,
+        ]);
   return { ...p, covers };
 }
 
@@ -229,6 +264,7 @@ function dmStackSpotOnly(
   rows: readonly FirstRow[],
   lefts: readonly number[],
   pcs: readonly Rect[],
+  popups: readonly StackWindow[],
 ): { left: number; top: number } {
   const base = initiativeKeepOut(vp, initiative, stackH, width);
   const at = (p: { left: number; top: number }) => ({ x: p.left, y: p.top, w: width, h: stackH });
@@ -237,7 +273,14 @@ function dmStackSpotOnly(
   // P3 E3: a spot must hold the whole stack above the launcher bar.
   const fits = (p: { top: number }) => p.top + stackH <= vp.h - LAUNCHER_CLEAR;
   if (stackH === 0) return base;
-  if (avoid.length === 0 && windows.length === 0 && fits(base) && offHard(base)) return base;
+  if (
+    avoid.length === 0 &&
+    windows.length === 0 &&
+    popups.length === 0 &&
+    fits(base) &&
+    offHard(base)
+  )
+    return base;
   // FR-NOTE-44: a pushed window's title bar, first 40 px of body and first content row (its
   // reported bottom, walkthrough U4) count as its bar; FR-NOTE-53: pushed per the plan.
   // FR-NOTE-77: the window's own first-row measure (`head`) when drawn, else the frame's report.
@@ -259,7 +302,9 @@ function dmStackSpotOnly(
   ];
   const bars = passes.map((strip) => windows.map((w) => ({ ...w, h: Math.min(w.h, strip(w)) })));
   // FR-NOTE-72: an open Notifications window keeps the stack off like Initiative.
-  const blockers = [...(initiative ? [initiative] : []), ...windows.filter((w) => w.blocks)];
+  // FR-NOTE-78: so does an open non-modal popup (the damage-card popup), whole.
+  const fixed = [...(initiative ? [initiative] : []), ...windows.filter((w) => w.blocks)];
+  const blockers = [...fixed, ...popups];
   const maxTop = vp.h - LAUNCHER_CLEAR - stackH;
   const clamp = (ys: number[]) =>
     ys.map((y) => Math.round(Math.max(DM_TOAST_TOP, Math.min(maxTop, y))));
@@ -277,6 +322,12 @@ function dmStackSpotOnly(
       // above it too (a modal dialog low in the column).
       ...blockers.flatMap((b) => [b.y + b.h + EDGE_GAP, b.y - EDGE_GAP - stackH]),
       ...avoid.flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH]),
+      // FR-NOTE-78: off a window's primary parts (below or above each heading and first record;
+      // not between its other records: walkthrough H3 4 keeps the home row over Encounters'
+      // name fields rather than a gap lower in its form).
+      ...windows.flatMap((w) =>
+        (w.primary ?? []).flatMap((r) => [r.y + r.h + STACK_GAP, r.y - STACK_GAP - stackH]),
+      ),
     ]);
   // Nearest the home row first (ties keep the earlier spot): FR-NOTE-32's spot, then by top.
   const spotsAt = (tops: number[], ls: readonly number[]) => [
@@ -286,6 +337,8 @@ function dmStackSpotOnly(
   // FR-NOTE-71: a spot over no window body wins (the least token area, then the earlier spot);
   // none → the one nearest the home row, never a thin overlap low on a window (BL-75).
   // FR-NOTE-77: before that, the fewest window controls under it, then the stricter pass.
+  // FR-NOTE-78 (BL-108): first of all the fewest primary parts (headings, first records, a log's
+  // newest rows); other records count like controls.
   const pick = (spots: { left: number; top: number }[], level: (p: Spot) => number | null) => {
     let best: Spot | null = null;
     let bestKey: number[] = [];
@@ -295,14 +348,16 @@ function dmStackSpotOnly(
       const body = coveredArea(at(p), windows) > 0;
       // Pass 1 (content-clear): nearest home, the least token area first (empty body below a
       // window's content is as good as the map, re-test 3 O2); later passes: FR-NOTE-71.
+      const r = at(p);
       const key =
         pass === 0
-          ? [controlsUnder(at(p), windows), 0, coveredArea(at(p), avoid)]
+          ? [primaryUnder(r, windows), controlsUnder(r, windows), 0, coveredArea(r, avoid)]
           : [
-              controlsUnder(at(p), windows),
+              primaryUnder(r, windows),
+              controlsUnder(r, windows),
               pass,
               body ? 1 : 0,
-              body ? p.top : coveredArea(at(p), avoid),
+              body ? p.top : coveredArea(r, avoid),
             ];
       // Strictly less wins: ties keep the earlier spot.
       if (best === null || less(key, bestKey)) {
@@ -327,6 +382,27 @@ function dmStackSpotOnly(
     fallback.find((f) => (p === base || f.tops.has(p.top)) && clearIn(f.pass, p))?.pass ?? null;
   const best = pick(spotsAt(tops, lefts), level);
   if (best) return best;
+  // FR-NOTE-78: no spot clears a popup → the runtime folds (`covers`); the stack takes the spot
+  // over the popups' fewest controls, then the least popup area, still clear of Initiative,
+  // Notifications, the title bars and the hard keep-outs; nearest home on a tie.
+  if (popups.length > 0) {
+    let over: Spot | null = null;
+    let overKey: number[] = [];
+    // Between the popups' controls too (above or below each).
+    const between = popups.flatMap((w) =>
+      (w.controls ?? []).flatMap((c) => [c.y + c.h + STACK_GAP, c.y - STACK_GAP - stackH]),
+    );
+    for (const p of spotsAt([...tops, ...clamp(between)], lefts)) {
+      if (!fits(p) || !offHard(p) || fixed.some((b) => hits(at(p), b, EDGE_GAP))) continue;
+      if ((bars[3] ?? []).some((b) => hits(at(p), b, 0))) continue;
+      const key = [controlsUnder(at(p), popups), coveredArea(at(p), popups)];
+      if (over === null || less(key, overKey)) {
+        over = p;
+        overKey = key;
+      }
+    }
+    if (over) return over;
+  }
   // Nothing holds it (the runtime then shows fewer toasts): the top row when clear, else
   // FR-NOTE-32's spot, else the top row, each only off the hard keep-outs (FR-NOTE-43).
   const row = spotsAt([DM_TOAST_TOP], lefts).filter((p) => p.top === DM_TOAST_TOP);
@@ -344,17 +420,32 @@ const less = (a: readonly number[], b: readonly number[]) => {
   return false;
 };
 
-/**
- * FR-NOTE-77: how many of the windows' key parts `r` overlaps: their controls and a log's newest
- * rows (re-test 3: the summary alone sat on the Game log's last entries, which hold no control).
- */
-function controlsUnder(r: Rect, windows: readonly StackWindow[]): number {
+/** How many of `parts(w)` over all `windows` `r` overlaps. */
+function partsUnder(
+  r: Rect,
+  windows: readonly StackWindow[],
+  parts: (w: StackWindow) => readonly (readonly Rect[] | undefined)[],
+): number {
   let n = 0;
   for (const w of windows) {
-    for (const c of [...(w.controls ?? []), ...(w.logRows ?? [])]) if (hits(r, c, 0)) n++;
+    for (const list of parts(w)) for (const c of list ?? []) if (hits(r, c, 0)) n++;
   }
   return n;
 }
+
+/**
+ * FR-NOTE-78 (BL-108): how many of the windows' primary parts `r` overlaps: their headings and
+ * first records, and a log's newest rows (FR-NOTE-77 re-test 3: what the DM reads first).
+ */
+const primaryUnder = (r: Rect, windows: readonly StackWindow[]) =>
+  partsUnder(r, windows, (w) => [w.primary, w.logRows]);
+
+/**
+ * FR-NOTE-77: how many of the windows' other key parts `r` overlaps: their controls and
+ * (FR-NOTE-78) their other records.
+ */
+const controlsUnder = (r: Rect, windows: readonly StackWindow[]) =>
+  partsUnder(r, windows, (w) => [w.controls, w.records]);
 
 /** FR-NOTE-77: how far the stack may slide sideways from home: half its width (it stays in its band). */
 export const MAX_SLIDE = STACK_W / 2;

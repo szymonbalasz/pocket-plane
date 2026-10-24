@@ -1,7 +1,15 @@
 // FR-NOTE-75 (sprint 10, H3; BL-101): where a window body's drawn content ends, from its boxes in
-// document order (the runtime walks the body's leaf elements and record rows).
+// document order (the runtime walks the body's leaf elements and record rows). Sprint 11 (F2):
+// FR-NOTE-78 records (BL-108).
 import { describe, expect, test } from "bun:test";
-import { contentEnd, firstRowEnd, LOG_ROWS, newestRows, ROW_MAX_H } from "./stack-inputs";
+import {
+  contentEnd,
+  firstRowEnd,
+  LOG_ROWS,
+  newestRows,
+  outerRecords,
+  ROW_MAX_H,
+} from "./stack-inputs";
 
 const box = (top: number, bottom: number) => ({ top, bottom });
 
@@ -70,5 +78,46 @@ describe("FR-NOTE-77 a log's newest rows", () => {
     // A tall record (not a row) and entries out of the body don't count.
     expect(newestRows(517, 643, [box(517, 643), box(650, 670)])).toEqual([]);
     expect(LOG_ROWS).toBe(3);
+  });
+});
+
+describe("FR-NOTE-78 records", () => {
+  // sim-14 e09: Roll requests' body 92..470; the target chips are buttons with a record id, each
+  // request card holds its target rows (records too).
+  type R = { id: string; top: number; bottom: number; control: boolean; parent?: string };
+  const rec = (id: string, top: number, bottom: number, control = false, parent?: string): R => ({
+    id,
+    top,
+    bottom,
+    control,
+    ...(parent ? { parent } : {}),
+  });
+  const walk = (list: R[]) => list.map((r) => ({ ...r, inside: (o: R) => r.parent === o.id }));
+
+  test("FR-NOTE-78 records: the outermost row-sized records that aren't controls, in document order", () => {
+    const list = walk([
+      rec("chip-all", 174, 197, true),
+      rec("chip-brakka", 174, 197, true),
+      rec("insight", 276, 366),
+      rec("insight-brakka", 296, 312, false, "insight"),
+      rec("insight-mira", 312, 328, false, "insight"),
+      rec("perception", 372, 459),
+      rec("perception-brakka", 392, 408, false, "perception"),
+    ]);
+    expect(outerRecords(92, 470, list).map((r) => r.id)).toEqual(["insight", "perception"]);
+  });
+
+  test("FR-NOTE-78 records: a container taller than a row doesn't count, the rows inside it do; rows out of the body don't", () => {
+    const list = walk([
+      rec("editor", 93, 470),
+      rec("goblin", 196, 248, false, "editor"),
+      rec("wolf", 252, 304, false, "editor"),
+      rec("below", 480, 500),
+    ]);
+    expect(outerRecords(92, 470, list).map((r) => r.id)).toEqual(["goblin", "wolf"]);
+    // Up to half the body: a request card with its buttons (122 px) counts in a 378-px body,
+    // not in a 200-px one (its rows do).
+    expect(outerRecords(92, 470, walk([rec("card", 275, 397)])).map((r) => r.id)).toEqual(["card"]);
+    expect(outerRecords(92, 292, walk([rec("big", 100, 100 + ROW_MAX_H + 1)]))).toEqual([]);
   });
 });

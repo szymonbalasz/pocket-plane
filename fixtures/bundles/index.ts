@@ -33,6 +33,7 @@ import entities from "./entities";
 import f1FitE2e from "./f1-fit-e2e";
 import f1Frame from "./f1-frame";
 import f1FrameE2e from "./f1-frame-e2e";
+import f2ToastsE2e from "./f2-toasts-e2e";
 import f3CombatDice from "./f3-combat-dice";
 import f3PromptTrayE2e from "./f3-prompt-tray-e2e";
 import f3SkipE2e from "./f3-skip-e2e";
@@ -294,6 +295,8 @@ export const bundles: readonly Bundle[] = [
   t2PetHiddenE2e,
   // Sprint 10 T3 (fix/stats-campaign): the Stats Campaign tab e2e alias of stats-b
   statsCampaignE2e,
+  // Sprint 11 F2 (fix/f2-toasts): toast keep-outs e2e alias of session-sim-13 (BL-108)
+  f2ToastsE2e,
   // Sprint 11 F1 (fix/f1-frame): frame + camera fixes walkthrough and e2e aliases
   f1Frame,
   f1FrameE2e,

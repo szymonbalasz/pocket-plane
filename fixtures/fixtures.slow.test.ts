@@ -40,7 +40,8 @@ describe("fixture library", () => {
       expect(r.manifest.status).toBe("complete");
     }
     // One load per bundle, serially; grows with every bundle (scenes rasterises map-large).
-  }, 60_000);
+    // 300 s: ~190 s under load with 126 bundles (sprint 11 F2), past the old 60 s.
+  }, 300_000);
 
   test("FR-FIX-15 bundle contents per FIX §8", async () => {
     const keys = (name: string) =>
