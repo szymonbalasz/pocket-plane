@@ -130,6 +130,7 @@ test("FR-SHELL-104 push (DM): pushed with area and data-placed pushed, cause too
       kind: "map.scenes",
       instance: "main",
       rect: scenesBefore,
+      area: { w: 1440, h: 900 - 48 - 64 },
       cause: "toolbar:map.toolbar",
       at: rectOf(scenes),
     },

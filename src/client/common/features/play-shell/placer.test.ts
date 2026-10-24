@@ -859,7 +859,14 @@ describe("pushes and the rail inset (FR-SHELL-104–106, -109; WF2)", () => {
     expect(p.placed.get("t.small:main")).toBe("pushed");
     expect(p.pcClear.get("t.small:main")).toBe(true);
     expect(p.memory).toEqual([
-      { kind: "t.small", instance: "main", rect: before, cause: "toolbar:map.toolbar", at: r },
+      {
+        kind: "t.small",
+        instance: "main",
+        rect: before,
+        area: get(ws, "t.small").area,
+        cause: "toolbar:map.toolbar",
+        at: r,
+      },
     ]);
     // PCs everywhere: t.small is put away itself; t.a (open, off the bar) stays open.
     reports.delete("map.toolbar");

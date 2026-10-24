@@ -18,12 +18,22 @@ const size = (windows: string | undefined, kind: string) => {
   return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
 };
 
-test("FR-SHELL-156 BL-104 the DM's Party Manager opens at its size row's width at 1440×900 (sim-13: 456 / 340 px)", () => {
-  // Escort, fitted: PCs left of the free area, monsters across it (sim-13 a02).
-  const run = runScript(dmWindows, "dm", VP, "escort", [{ open: "party.board" }]);
-  expect(run.problems).toEqual([]);
-  // The default width, at the band's height (512 at 1440×900): L1, not a token-avoiding L2 cut.
-  expect(size(run.steps.at(-1)?.windows, "party.board")).toEqual({ w: 600, h: 512 });
+test("FR-SHELL-156 BL-104 the DM's Party Manager opens at its size row's width where the map keeps an all-tokens fit (sim-13: 456 / 340 px)", () => {
+  // Escort, fitted: PCs left of the free area, monsters across it (sim-13 a02). At 1600×900 the
+  // default width, at the band's height (512): L1, not a token-avoiding L2 cut. At 1440×900 that
+  // width leaves Fit only the 48-px PCs-only view (sprint 11 F1, BL-107): the useful size.
+  for (const [vp, want] of [
+    [
+      { w: 1600, h: 900 },
+      { w: 600, h: 512 },
+    ],
+    [VP, { w: 440, h: 400 }],
+  ] as const) {
+    const run = runScript(dmWindows, "dm", vp, "escort", [{ open: "party.board" }, "fit"]);
+    expect(run.problems).toEqual([]);
+    expect(size(run.steps.at(-1)?.windows, "party.board")).toEqual(want);
+    expect(run.steps.at(-1)?.fit).toBe("all");
+  }
 });
 
 test("FR-SHELL-97 FR-SHELL-102 BL-99 Party Manager and the Stronghold window stay open together at 1440×900 where they fit at their useful sizes; the Party Manager grows back when the Stronghold closes", () => {

@@ -528,8 +528,12 @@ function check(
   }
   // I5: a user open moves no other window (it may put the least recently used one away, squeeze
   // a protected one inside its rect, FR-SHELL-101, and shrink an untouched launcher window inside
-  // its rect down to no less than its useful size, L3s, BL-99).
+  // its rect down to no less than its useful size, L3s, BL-99; sprint 11 F1, BL-109: after one
+  // put-away, move an untouched launcher window at its size rather than put away a second, L3r).
   if (opts.opened) {
+    const moved = new Set(
+      [...sim.ctl.store.getState().settleLog.matchAll(/:([^:;>]+)>L3r/g)].map((m) => m[1]),
+    );
     const within = (a: Rect, b: Rect) =>
       a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
     const atLeastUseful = (w: WindowState) => {
@@ -543,6 +547,8 @@ function check(
       if (b?.state !== "open" || w.state !== "open" || rectKey(b) === rectKey(w)) continue;
       if (isProtected(sim.registry, w.kind) && within(w, b)) continue;
       if (!isRemembered(b) && within(w, b) && atLeastUseful(w)) continue;
+      const sameSize = w.w === b.w && w.h === b.h;
+      if (!isRemembered(b) && moved.has(w.kind) && sameSize && atLeastUseful(w)) continue;
       out.push(`I5 ${w.kind} moved by opening ${opts.opened}`);
     }
   }
