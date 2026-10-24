@@ -2,9 +2,9 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 9 done (#338–#340); recap done, **sprint 10 planned (#341): hardening run, overnight, no gate unless blocking** ([sprint-10](sprint-10.md)). Briefs ready: `%TEMP%/pocket-plane/briefs/build-h{1,2,3,4}.md` (slice defs `h1`–`h4` in `slices.json`); inputs `.verify/sprint10/{seams,rulings-a,rulings-b,gate}.md`. All four builders started 2026-10-24 (sim-13 evidence copied into each worktree).
+**Phase:** Sprint 10 done (#341–#342): hardening run, all four slices merged, final `main` check 5,587 / e2e 238 / bench 41 / 41, **session-sim-14 13 / 13 PASS** (`.verify/20261024-061849-session-sim-14/`). **Paused for the DM recap** ([sprint-10 Playtest](sprint-10.md#playtest-sprint-10-fixes)). Next: recap + sprint 11 scope with the DM.
 
-**Gates on `main`:** run in a detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, then `bun install`, `bun run env:init`, `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there. Sprint 10: `~/.herdr/worktrees/pocket-plane/gates-main` (slot 5). Baseline `main` d4a5027e: check 5530 pass, e2e 225 passed.
+**Gates on `main`:** run in a detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, then `bun install`, `bun run env:init`, `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there. Removed at the end of sprint 10; recreate it at the first merge of sprint 11.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -15,13 +15,13 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 H2 window frame + Party Manager | merged 47409405 | — | **merged** (walkthrough 5/6 → re-test 5/5; branch check 5565 / e2e 235); evidence `.verify/sprint10/walkthroughs/20261024-h2{,r}/`; main gates green (5565 / 235) | — |
 | Sprint 10 H3 toasts | merged 8b279504 | — | **merged** (walkthrough 5/8 → re-tests 7/8, 9/10, 12/12; branch check 5587 / e2e 237 + known combat2-polish FR-CBT-75 flake, 3 × 8/8 alone); evidence `.verify/sprint10/walkthroughs/20261024-h3*/` ; main gates green (5587 / 238), bench 41 / 41 | — |
 | Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/`; main gates green (5545 / 229) | — |
-| Sprint gate | gates-main @ 8b279504 | test-session-14 (tab in wR, server pane wR:p32, port 4153) | session-sim-14 running (`.verify/20261024-061849-session-sim-14/` in gates-main) | Playtest section, recap |
+| Sprint gate | final main 8b279504 | — | **session-sim-14 13 / 13 PASS** (leak scan clean; hard kill byte-identical); glitches → BL-107–BL-114 | DM recap |
 
-Backlog after sim-13: BL-97 (leak-like, first), BL-98–BL-104, BL-93, BL-94, BL-95, BL-96, BL-92.
+Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
 ## Shared-file locks
 
-- H1: `fixtures/bundles/index.ts` (append), protocol / data-model rows; H2: play-shell frame + goldens + replay harness + scenes-map camera; H3: toast runtime; per [sprint-10 hotspots](sprint-10.md#boundaries-and-hotspots).
+- None (every sprint-10 slice merged).
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
@@ -54,7 +54,7 @@ Sprint 10:
 
 ## Pending DM decisions
 
-- None (gate 1 passed, #335).
+- Recap: BL-111 (players' "Most damage dealt" winner can differ: hide that award for players while hidden damage could change it, or keep), BL-114 (drop a hidden pet's redacted entity for non-owners while hidden, or keep per FR-ENT-37); sprint 11 scope.
 
 ## Resolved locally (report at gate)
 
