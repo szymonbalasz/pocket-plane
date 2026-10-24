@@ -20,7 +20,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | merged ef4835d1 | — | **merged** (walkthrough 11/11; branch check 5593 / e2e 240); evidence `.verify/sprint10/walkthroughs/20261024-t2/`; main gates green (5593 / 240) | — |
 | Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
 | Sprint 10 T4 faster test loop (#345) | merged aa9ddba0 | — | **merged** (branch check:full 5634 / e2e 243 at 4 workers, 752 s wall for the whole gate); main gates skipped (same code) | — |
-| Sprint 10 T5 dice visuals (#347) | `fix/dice-visuals` (slot 0, ws wAE) | build-t5 | building (frame lock: dicex.tray row + goldens) | short visual walkthrough (port 4103), one full gate |
+| Sprint 10 T5 dice visuals (#347) | `fix/dice-visuals` (slot 0, ws wAE) | build-t5 (idle), test-t5 | built (d20 lines 1, tray 450 × 375 / 50-px dice, popup 448 px / 62-px dice; check:full green; 42 dice e2e) → visual walkthrough | one full gate, merge |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
@@ -33,6 +33,7 @@ Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and 
 *(Sprint 10: add new rulings above the sprint-9 list.)*
 
 Sprint 10:
+- T5: the toast keep-out box stays sized for the old 320 × 190 popup (growing it breaks default layouts / replay cells); the bigger popup may spill ~92 px left / 30 px up past it for its 6 s (spec allows a tall stack to); fewer full popups at once on short screens (players 1, DM 2 at 1280 × 720). Known flake: `pause.test.ts` FR-CAMP-47 once in check:full (3/3 alone).
 - T1 Dice tray: 504 × 420 default with 56-px dice; 360 × 300 counts as a previous default so unremembered trays grow, remembered keep their size; where PCs leave little room the tray opens at useful 360 × 300, so the dice there must still be ≥ 48 px (wrap rows), only the 300 × 240 min may stay at 40 px (FR-DICEX-96). Harness delta 0.
 - T2 BL-111: players' "Most damage dealt" is withheld per session when damage to creatures hidden from them could change its winner; BL-114: pet presence ignores a DM-hidden combatant (non-owners get a delete, back on show); pre-fix hidden pets update on their next write (accepted). Recap reads two new stats exports (FR-STATS-78 note).
 - T3 Campaign tab: party rows only (DM too, as Trophies), companions roll into their owner, monsters slain counts any attacker, record ties → earlier fact, all tie winners counted for awards won, DM record labels encounter + day / players "Fight N · day"; players' awards won drop Most damage dealt where T2 withholds it; table scrolls sideways inside today's 400 × 412 window.
