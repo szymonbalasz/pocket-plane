@@ -111,3 +111,52 @@ test("FR-SHELL-102 FR-MAP-113 H2 FAIL 5 resize round trip: DM 1280×720 Ambush, 
     });
   }
 });
+
+test("FR-SHELL-45 FR-SHELL-78 BL-38 H3 re-test step 5: DM 1280×720 crowded (Encounters, Scenes, Rules, Stats over Initiative + the Game log) → open windows never overlap; the others are put away (minimised, LRU), keeping their last rect", () => {
+  // H3 re-tests (`fix-h3-toasts` `.verify/20261024-h3r*/`, step 5) read Encounters, Rules and
+  // Stats "stacked at 480,60": a put-away window stays mounted, invisible, at its last rect
+  // (FR-SHELL-36); only `data-state="open"` windows are on screen.
+  const kinds = ["cbt.encounters", "map.scenes", "cmp.rules", "stats.board"];
+  for (const state of ["ambush", "escort"] as const) {
+    const run = runScript(
+      dmWindows,
+      "dm",
+      { w: 1280, h: 720 },
+      state,
+      kinds.map((open) => ({ open })),
+    );
+    // I2 (no overlap between untouched windows) and I4 (put-aways LRU, only when needed).
+    expect(run.problems).toEqual([]);
+    for (const [i, kind] of kinds.entries()) {
+      const windows = run.steps.find((s) => s.step === `open ${kind}`)?.windows ?? "";
+      const open = windows
+        .split(" ")
+        .filter((e) => e.includes(":open:"))
+        .map((e) => {
+          const [, , rect] = e.split(":");
+          const [x, y, wh] = (rect ?? "").split(",");
+          const [w, h] = (wh ?? "").split("×");
+          return { e, x: Number(x), y: Number(y), w: Number(w), h: Number(h) };
+        });
+      for (const a of open) {
+        for (const b of open) {
+          if (a === b) continue;
+          const hit = a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+          expect({ state, kind, pair: [a.e, b.e], hit }).toEqual({
+            state,
+            kind,
+            pair: [a.e, b.e],
+            hit: false,
+          });
+        }
+      }
+      // The window just opened is on screen; every earlier one of the set is put away.
+      expect(entry(windows, kind)).toContain(":open:");
+      for (const earlier of kinds.slice(0, i)) {
+        expect({ state, earlier, entry: entry(windows, earlier) }).toMatchObject({
+          entry: expect.stringContaining(":minimised:"),
+        });
+      }
+    }
+  }
+});
