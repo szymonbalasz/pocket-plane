@@ -1,7 +1,7 @@
 // FR-NOTE-75 (sprint 10, H3; BL-101): where a window body's drawn content ends, from its boxes in
 // document order (the runtime walks the body's leaf elements and record rows).
 import { describe, expect, test } from "bun:test";
-import { contentEnd, firstRowEnd, ROW_MAX_H } from "./stack-inputs";
+import { contentEnd, firstRowEnd, LOG_ROWS, newestRows, ROW_MAX_H } from "./stack-inputs";
 
 const box = (top: number, bottom: number) => ({ top, bottom });
 
@@ -58,5 +58,17 @@ describe("FR-NOTE-77 first rows", () => {
     expect(firstRowEnd(top, bottom, [box(93, 470)])).toBeNull();
     expect(firstRowEnd(top, bottom, [])).toBeNull();
     expect(firstRowEnd(top, bottom, [box(100, 100 + ROW_MAX_H + 1)])).toBeNull();
+  });
+});
+
+describe("FR-NOTE-77 a log's newest rows", () => {
+  // Walkthrough H3 re-test 3: the Game log at 68, 484 (1280×720), body 517..643; entries scrolled
+  // so the oldest is clipped at the top, the newest end at 597 above the roll bar.
+  test("FR-NOTE-77 a log's newest rows: the last 3 row-sized entries drawn in the body", () => {
+    const entries = [box(380, 401), box(501, 534), box(534, 555), box(555, 576), box(576, 597)];
+    expect(newestRows(517, 643, entries)).toEqual([box(534, 555), box(555, 576), box(576, 597)]);
+    // A tall record (not a row) and entries out of the body don't count.
+    expect(newestRows(517, 643, [box(517, 643), box(650, 670)])).toEqual([]);
+    expect(LOG_ROWS).toBe(3);
   });
 });

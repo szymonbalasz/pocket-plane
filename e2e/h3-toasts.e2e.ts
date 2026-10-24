@@ -196,3 +196,46 @@ test("FR-NOTE-75 FR-NOTE-77 H3 DM 1440×900: Fog bar + Scenes at 400, 222 with c
   await clearOf(dm, rules.getByTestId("cmp-rules-page"));
   await clearOf(dm, rules.getByTestId("cmp-rules-search"));
 });
+
+test("FR-NOTE-77 H3 re-test 3 DM 1280×720: Encounters at 396, 60 (376 wide), Escort selected, reload → the summary alone sits near home, never on the Game log; the same after Start → Escape", async ({
+  browser,
+}) => {
+  const { recordId } = e2eEnv();
+  const dm = await dmAt(browser, 1280, 720);
+  const stack = dm.getByTestId("note-toasts");
+  const enc = await openWindow(dm, "cbt.encounters");
+  await dragTo(dm, enc, 396, 60);
+  await toWidth(dm, enc, 376);
+  const escort = enc.locator(
+    `[data-testid="cbt-enc-row"][data-record-id="${recordId("enc-friendly", "encounter")}"]`,
+  );
+  await escort.click();
+  // Reload: the pending rows come back in the snapshot (the summary alone, no card toast).
+  await dm.reload();
+  await live(dm);
+  const summary = dm.getByTestId("note-toast-pending-summary");
+  await expect(summary).toBeVisible();
+  await expect(dm.locator('[data-testid="note-toast"][data-class="card"]')).toHaveCount(0);
+  if (await escort.isVisible()) await escort.click();
+  await expect(enc.getByTestId("cbt-enc-start")).toBeVisible();
+  const log = dm.locator('[data-testid="ui-window"][data-record-id^="dice.log"]');
+  const offLog = async () => {
+    await dm.waitForTimeout(400);
+    const s = await box(stack);
+    expect(Math.round(s.x)).toBe(480);
+    expect(s.y).toBeLessThanOrEqual(140);
+    expect(overlaps(s, await box(log.getByTestId("ui-window-body")))).toBe(false);
+    await clearOf(dm, enc.getByTestId("cbt-enc-entry-dec"));
+    await clearOf(dm, enc.getByTestId("cbt-enc-entry-inc"));
+  };
+  await offLog();
+  await enc.getByTestId("cbt-enc-start").click();
+  const dialog = dm.getByTestId("cbt-enc-start-dialog");
+  await expect(dialog).toBeVisible();
+  await expect
+    .poll(async () => overlaps(await box(stack), await box(dialog)), { timeout: 3_000 })
+    .toBe(false);
+  await dm.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await offLog();
+});

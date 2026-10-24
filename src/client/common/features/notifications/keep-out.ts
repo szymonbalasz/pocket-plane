@@ -69,6 +69,11 @@ export type StackWindow = Rect & {
   head?: number;
   /** FR-NOTE-77: the window body's controls as drawn (buttons, inputs, tabs…), viewport px. */
   controls?: readonly Rect[];
+  /**
+   * FR-NOTE-77 (re-test 3): a log's newest rows as drawn (the Game log: newest at the bottom,
+   * what the DM reads first); they count like controls.
+   */
+  logRows?: readonly Rect[];
 };
 
 /** FR-NOTE-75: the window's content part (title bar to `used`; unknown → all of it). */
@@ -288,12 +293,17 @@ function dmStackSpotOnly(
       const pass = fits(p) ? level(p) : null;
       if (pass === null) continue;
       const body = coveredArea(at(p), windows) > 0;
-      const key = [
-        controlsUnder(at(p), windows),
-        pass,
-        body ? 1 : 0,
-        body ? p.top : coveredArea(at(p), avoid),
-      ];
+      // Pass 1 (content-clear): nearest home, the least token area first (empty body below a
+      // window's content is as good as the map, re-test 3 O2); later passes: FR-NOTE-71.
+      const key =
+        pass === 0
+          ? [controlsUnder(at(p), windows), 0, coveredArea(at(p), avoid)]
+          : [
+              controlsUnder(at(p), windows),
+              pass,
+              body ? 1 : 0,
+              body ? p.top : coveredArea(at(p), avoid),
+            ];
       // Strictly less wins: ties keep the earlier spot.
       if (best === null || less(key, bestKey)) {
         best = p;
@@ -334,10 +344,15 @@ const less = (a: readonly number[], b: readonly number[]) => {
   return false;
 };
 
-/** FR-NOTE-77: how many of the windows' controls (`StackWindow.controls`) `r` overlaps. */
+/**
+ * FR-NOTE-77: how many of the windows' key parts `r` overlaps: their controls and a log's newest
+ * rows (re-test 3: the summary alone sat on the Game log's last entries, which hold no control).
+ */
 function controlsUnder(r: Rect, windows: readonly StackWindow[]): number {
   let n = 0;
-  for (const w of windows) for (const c of w.controls ?? []) if (hits(r, c, 0)) n++;
+  for (const w of windows) {
+    for (const c of [...(w.controls ?? []), ...(w.logRows ?? [])]) if (hits(r, c, 0)) n++;
+  }
   return n;
 }
 

@@ -961,3 +961,115 @@ describe("FR-NOTE-77 the fold drops only the cards that don't fit", () => {
     expect(r.spot).toMatchObject({ left: 520, top: 100, covers: 0 });
   });
 });
+
+// Walkthrough H3 re-test 3 (`.verify/20261024-h3r2/report.md` 4 @ 396, O2, O3): the summary alone
+// (cards from before a reload) takes the same spots as a card stack. Rects as the browser gave
+// them; `logRows`: the Game log's newest entries (what the DM reads first, like a first row).
+describe("FR-NOTE-77 the summary alone takes a card stack's spots", () => {
+  const small = { w: 1280, h: 720 };
+  const init720 = { x: 868, y: 60, w: 400, h: 583 };
+  const rollBar = [
+    { x: 81, y: 608, w: 320, h: 28 },
+    { x: 408, y: 608, w: 33, h: 28 },
+    { x: 441, y: 608, w: 56, h: 28 },
+    { x: 497, y: 608, w: 38, h: 28 },
+    { x: 545, y: 610, w: 22, h: 22 },
+    { x: 576, y: 608, w: 48, h: 28 },
+    { x: 632, y: 610, w: 24, h: 24 },
+    { x: 666, y: 610, w: 24, h: 24 },
+  ];
+  const log720 = {
+    x: 68,
+    y: 484,
+    w: 690,
+    h: 160,
+    used: 644,
+    head: 534,
+    controls: rollBar,
+    logRows: [
+      { x: 81, y: 534, w: 620, h: 21 },
+      { x: 81, y: 555, w: 620, h: 21 },
+      { x: 81, y: 576, w: 620, h: 21 },
+    ],
+  };
+  const onLog = (p: { left: number; top: number }, h: number) =>
+    hit(rectOf(p, h), { x: 68, y: 484 + 33, w: 690, h: 127 });
+
+  test("FR-NOTE-77 walkthrough H3 re-test 3, 4 @ 396 (1280×720, Encounters 396, 60 376 wide, reload: summary only) → near home over the fewest Encounters controls, never on the Game log", () => {
+    const row = (y: number) => [
+      { x: 421, y, w: 24, h: 24 },
+      { x: 485, y, w: 24, h: 24 },
+      { x: 509, y, w: 190, h: 24 },
+      { x: 727, y: y + 2, w: 36, h: 20 },
+    ];
+    const enc = {
+      x: 396,
+      y: 60,
+      w: 376,
+      h: 410,
+      used: 470,
+      head: 248,
+      controls: [
+        { x: 413, y: 108, w: 24, h: 24 },
+        { x: 449, y: 105, w: 240, h: 36 },
+        { x: 409, y: 153, w: 350, h: 28 },
+        ...row(220),
+        ...row(276),
+        { x: 409, y: 314, w: 16, h: 16 },
+        { x: 534, y: 314, w: 16, h: 16 },
+        { x: 409, y: 425, w: 86, h: 33 },
+        { x: 507, y: 430, w: 66, h: 24 },
+      ],
+    };
+    for (const h of [58, 92]) {
+      const at = dmStackSpot(small, init720, h, STACK_W, [], [log720, enc], [], []);
+      expect(at.left).toBe(480);
+      expect(at.top).toBeLessThanOrEqual(140);
+      expect(onLog(at, h)).toBe(false);
+      for (const c of [...row(220), ...row(276)]) expect(hit(rectOf(at, h), c)).toBe(false);
+    }
+  });
+
+  test("FR-NOTE-77 walkthrough H3 re-test 3, O3 (1280×720, Roll requests at 496, 60): the summary + '+3 more' at home over the request form, never on the Game log's entries or roll bar", () => {
+    const requests = {
+      x: 496,
+      y: 60,
+      w: 360,
+      h: 410,
+      used: 404,
+      controls: [
+        { x: 509, y: 138, w: 146, h: 28 },
+        { x: 661, y: 138, w: 182, h: 28 },
+        { x: 509, y: 174, w: 52, h: 24 },
+        { x: 568, y: 174, w: 56, h: 24 },
+        { x: 628, y: 174, w: 40, h: 24 },
+        { x: 674, y: 174, w: 50, h: 24 },
+        { x: 509, y: 205, w: 56, h: 28 },
+        { x: 571, y: 211, w: 16, h: 16 },
+        { x: 647, y: 205, w: 116, h: 28 },
+        { x: 771, y: 207, w: 24, h: 24 },
+        { x: 509, y: 239, w: 56, h: 28 },
+        { x: 645, y: 361, w: 125, h: 26 },
+        { x: 781, y: 361, w: 48, h: 26 },
+      ],
+    };
+    const pcs = [
+      { x: 366, y: 286, w: 52, h: 54 },
+      { x: 414, y: 286, w: 52, h: 54 },
+    ];
+    const at = dmStackSpot(small, init720, 92, STACK_W, [], [log720, requests], [], [], [], pcs);
+    expect(at).toMatchObject({ left: 480, top: 100 });
+    expect(onLog(at, 92)).toBe(false);
+  });
+
+  test("FR-NOTE-77 walkthrough H3 re-test 3, O2 (1440×900, Notifications closed, Scenes 316, 48, summary only) → below Scenes' rows like the card stack, not below the whole window", () => {
+    const vp = { w: 1440, h: 900 };
+    const scenes = { x: 316, y: 48, w: 260, h: 440, used: 201, head: 167 };
+    const log = { ...LOG, used: LOG.y + LOG.h, head: LOG.y + 60 };
+    const init = { x: 1028, y: 60, w: 400, h: 512 };
+    const summary = dmStackSpot(vp, init, 58, STACK_W, [], [log, scenes], [], []);
+    const cards = dmStackSpot(vp, init, 340, STACK_W, [], [log, scenes], [], []);
+    expect(cards).toMatchObject({ left: 560, top: 209 });
+    expect(summary).toMatchObject({ left: 560, top: 209, covers: 0 });
+  });
+});

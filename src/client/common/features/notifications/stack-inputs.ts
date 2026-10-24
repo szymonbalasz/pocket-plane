@@ -9,10 +9,12 @@
 // *(Sprint 10, H3)* FR-NOTE-75: where each window's drawn content ends (`used`), read from the
 // DOM while the stack shows and re-read when a window body's content changes. FR-NOTE-77: also
 // its first rows (`head`: the first row-sized record row, not a record container such as the
-// Encounters editor, which the frame's first-row report takes) and its controls.
+// Encounters editor, which the frame's first-row report takes) and its controls; the Game log's
+// newest entries (re-test 3).
 // Its own module, so the runtime test can stub it (a static render reads no layout).
 import { useEffect, useMemo, useState } from "react";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
+import { DICE_LOG_KIND } from "../dice-roll-log/window";
 import type { FirstRow } from "../play-shell/content-heights";
 import { firstRows } from "../play-shell/content-heights";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
@@ -83,6 +85,25 @@ export function firstRowEnd(
   return null;
 }
 
+/** FR-NOTE-77 (re-test 3): how many of a log's newest rows count like controls. */
+export const LOG_ROWS = 3;
+
+/**
+ * FR-NOTE-77 (re-test 3): a log's newest rows: the last `LOG_ROWS` outermost row-sized records
+ * (document order) drawn inside `top`..`bottom`. Pure.
+ */
+export function newestRows<T extends { top: number; bottom: number }>(
+  top: number,
+  bottom: number,
+  records: readonly T[],
+): T[] {
+  const rows = records.filter((r) => {
+    const h = r.bottom - r.top;
+    return h > 0 && h <= ROW_MAX_H && r.bottom > top && r.top < bottom;
+  });
+  return rows.slice(-LOG_ROWS);
+}
+
 /** FR-NOTE-77: what counts as a window control (the fallback covers the fewest). */
 const CONTROL_SELECTOR =
   'button, input, select, textarea, a[href], [role="button"], [role="tab"], [role="checkbox"], [role="switch"], [role="combobox"], [role="slider"]';
@@ -95,6 +116,8 @@ interface BodyMeasure {
   head: number | null;
   /** FR-NOTE-77: its visible controls. */
   controls: Rect[];
+  /** FR-NOTE-77 (re-test 3): a log's newest rows (`log` only). */
+  logRows: Rect[];
 }
 
 /**
@@ -102,7 +125,7 @@ interface BodyMeasure {
  * record rows for `used` (FR-NOTE-75), record rows for `head`, controls (FR-NOTE-77). Null when
  * the window isn't in the DOM.
  */
-function measureBody(id: string): BodyMeasure | null {
+function measureBody(id: string, log: boolean): BodyMeasure | null {
   if (typeof document === "undefined") return null;
   const section = document.querySelector(`${WINDOW_SELECTOR}[data-record-id="${CSS.escape(id)}"]`);
   const body = section?.querySelector(BODY_SELECTOR);
@@ -111,6 +134,8 @@ function measureBody(id: string): BodyMeasure | null {
   const b = body.getBoundingClientRect();
   const drawn: DOMRect[] = [];
   const records: DOMRect[] = [];
+  const outer: DOMRect[] = [];
+  let lastOuter: Element | null = null;
   const controls: Rect[] = [];
   const walk = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT, {
     acceptNode: (n) => {
@@ -127,6 +152,11 @@ function measureBody(id: string): BodyMeasure | null {
     const record = el.hasAttribute("data-record-id");
     if (el.childElementCount === 0 || record) drawn.push(r);
     if (record) records.push(r);
+    // A log's entries: records not inside another (a re-roll mark sits inside its entry).
+    if (record && log && !lastOuter?.contains(el)) {
+      outer.push(r);
+      lastOuter = el;
+    }
     if (r.width >= 4 && r.height >= 4 && el.matches(CONTROL_SELECTOR)) {
       const top = Math.max(r.top, b.top);
       const bottom = Math.min(r.bottom, b.bottom);
@@ -135,10 +165,17 @@ function measureBody(id: string): BodyMeasure | null {
   }
   const end = contentEnd(b.top, b.bottom, drawn);
   const head = firstRowEnd(b.top, b.bottom, records);
+  const rel = (r: DOMRect): Rect => ({
+    x: r.left - s.left,
+    y: Math.max(r.top, b.top) - s.top,
+    w: r.width,
+    h: Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top),
+  });
   return {
     used: end === null ? TITLE_H : Math.ceil(end - s.top),
     head: head === null ? null : Math.ceil(head - s.top),
     controls,
+    logRows: log ? newestRows(b.top, b.bottom, outer).map(rel) : [],
   };
 }
 
@@ -202,7 +239,7 @@ export function useStackInputs(isDm: boolean, showing = true): StackInputs {
         const pushed = pushedByPlan(placed.get(id), causes(w.kind, w.instance));
         // FR-NOTE-75, -77: the drawn content's end, first rows and controls, on this rect (it
         // may move before the DOM does).
-        const m = measure ? measureBody(id) : null;
+        const m = measure ? measureBody(id, w.kind === DICE_LOG_KIND) : null;
         const used =
           m === null
             ? {}
@@ -210,6 +247,7 @@ export function useStackInputs(isDm: boolean, showing = true): StackInputs {
                 used: r.y + Math.min(r.h, m.used),
                 head: r.y + Math.min(r.h, m.head ?? TITLE_H + PUSHED_BODY_CLEAR),
                 controls: m.controls.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
+                logRows: m.logRows.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
               };
         return w.kind === HISTORY_KIND
           ? { ...r, pushed, blocks: true, ...used }
