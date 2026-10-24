@@ -36,3 +36,33 @@ Evidence: the [session-sim-14 report](../../.verify/20261024-061849-session-sim-
 | 2026-10-24 | **F3 merged**: the DM's skip toast names a downed companion that acts in its owner's turn; a roll request answered through the tray puts the tray back as it was; "Add hidden" default confirmed. Walkthrough 16 / 16 |
 | 2026-10-24 | **F1 merged**: Fit keeps every token in view with an untouched window open (also after a resize); opening a window puts away only one other (moving one aside first); launcher labels drop one at a time. Walkthrough 11 / 12 → re-test 6 / 6 |
 | 2026-10-24 | **F2 merged**: the DM toast stack settles (one move per change) and keeps off windows' headings, first records and the damage-card popup; "+N more" joins the summary row when every card folds. Walkthrough 10 / 12 → re-test 8 / 8. All F-slices on `main` |
+| 2026-10-25 | Final `main` bench 42 / 42. **session-sim-15 10 / 11 PASS** (leak scan clean, hard kill byte-identical); FAIL c (toast + popup flicker on each new card) → BL-118; glitches → BL-119–BL-123. Decision #350. Paused for the recap |
+
+## Playtest: sprint 11 fixes
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). About 10 minutes. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-15 report](../../.verify/20261024-234809-session-sim-15/report.md) (local, gitignored): **10 / 11 PASS**, leak scan clean, hard kill byte-identical; every sim-14 glitch fixed or by design.
+
+```powershell
+git pull; bun install
+bun run build
+bun run fixtures:reset-load session-sim-13 --profile verify
+bun run start --profile verify
+```
+
+Open the printed DM URL and each player link in its own browser; show Goblin Ambush from Scenes if Town is live. Hard-reload tabs that were open before (Ctrl+Shift+R).
+
+| # | Fix | You do | Expect |
+|---|---|---|---|
+| 1 | **Fit keeps every token** | DM 1440×900 mid-fight: Layout → Reset, open Party Manager, press Fit; reload; also open it at 1280×720 then widen to 1440 | Party Manager opens 440 wide (600 when there's room, e.g. 1600) and the map shows every token, never the tiny "PCs only" corner view |
+| 2 | **Only one window put away** | Player 1 at 1280×720 after the fight: open Recap, Stats, then Rules | Rules and Stats stay open side by side; only Recap is put away; close Rules and Stats stays put |
+| 3 | **Launcher labels** | Narrow the DM browser from 1920 to 1280 | Labels disappear one button at a time, not all at once |
+| 4 | **Calmer toasts** | Queue damage cards (players' Attack + damage) with Roll requests or Party Manager → Loot open, or a damage card's popup open | The pending-actions toast stays still once placed and keeps off window headings, forms and the popup; with several cards it shrinks to one line "N pending actions +2 more" |
+| 5 | **Skip toast for companions** | Down a companion (e.g. charmed Goblin 2), then Next past its owner, in either turn mode | You get "Skipped Goblin 2 (down)"; players get nothing |
+| 6 | **Tray after a roll request** | Player: Alt-click a roll request's Roll (tray), then Roll in the tray | The tray goes back to how it was (closed, open or minimised) |
+
+### Known gaps (backlog)
+
+- **New card flicker (BL-118, the one FAIL):** for ~85 ms on each new damage card the toast stack redraws a few times and the roll popup jumps with it.
+- The older card in Roll requests can still sit under the toast (BL-119); pending counts don't always add up with the Initiative "Pending (N)" badge (BL-120); a quick Prev after Next still shows the earlier skip toast (BL-122); small items (BL-123).
+- **Your call:** "Most kills" can name a different winner for players (hidden kills excluded), like "Most damage dealt" did (BL-121): withhold every award a hidden fact could change?
+- **Your call:** at DM 1440 mid-fight the Party Manager now opens 440 wide (not 600) so the map keeps every token in view.

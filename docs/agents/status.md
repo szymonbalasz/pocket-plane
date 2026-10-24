@@ -2,9 +2,9 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 10 done (#341–#348). **Sprint 11 (#349)**: fix track F1–F3 building ([sprint-11](sprint-11.md)); the DM runs an art-pass planning agent in parallel (docs/design/ only, branch `spec/art-pass` suggested).
+**Phase:** Sprint 11 fix track done (#349–#350): F1–F3 merged, **session-sim-15 10 / 11** (`.verify/20261024-234809-session-sim-15/`; FAIL c → BL-118). **Paused for the DM recap** ([sprint-11 Playtest](sprint-11.md#playtest-sprint-11-fixes)). The DM's art-pass planning runs separately (docs/design/).
 
-**Gates on `main`:** detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, `bun install`, `bun run env:init`, `gates.sh <it> <tag>` = check:full + e2e with 4 workers, ~12 min). Removed at the end of sprint 10. Skip when `main`'s code equals the tested branch (#345).
+**Gates on `main`:** detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, `bun install`, `bun run env:init`, `gates.sh <it> <tag>` = check:full + e2e on 4 workers, ~12 min). Removed at the end of sprint 11. Skip when `main`'s code equals the tested branch (#345).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -25,9 +25,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 11 F2 toasts | merged 9da2b751 | — | **merged** (re-test 8/8; branch check:full 5667 / e2e 253/253; import sort after merge) | — |
 | Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
 | Sprint 11 art track (DM) | DM's own agent | — | planning in docs/design/ | — |
-| Sprint 11 gate | gates-main @ final main | test-session-15 (tab in wR, server pane wR:p35, port 4153) | session-sim-15 running (`.verify/20261024-234809-session-sim-15/` in gates-main); bench 42/42 | Playtest section, recap |
+| Sprint 11 gate | final main 9da2b751 | — | **session-sim-15 10 / 11 PASS** (leak scan clean; hard kill byte-identical); FAIL c → BL-118; glitches → BL-119–BL-123 | DM recap |
 
-Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
+Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
 ## Shared-file locks
 
@@ -75,7 +75,7 @@ Sprint 10:
 
 ## Pending DM decisions
 
-- None (sprint 11 scoped, #349).
+- Recap: BL-121 (withhold every award a hidden fact could change, for players?); Party Manager 440 at DM 1440 mid-fight (F1) vs #341's 600; whether to fix BL-118 before the art sprint; next sprint scope.
 
 ## Resolved locally (report at gate)
 
