@@ -3824,3 +3824,16 @@ From [stats](../specs/stats.md#63-sprint-10-t3-campaign-tab) FR-STATS-81–88 (D
 - **Tests:** `src/shared/stats/campaign.test.ts` (FR-STATS-82–84, -87 ack limit), `src/server/features/stats/stats-campaign.test.ts` (two sittings, every number per role; the Session tab's winners; Trophies' Lifetime; memo, rate, undo, pending), `stats-campaign-sync.test.ts` (FR-STATS-86 leak scan per player over real sockets: live, reconnect, a live hidden kill, hard restart), `fixtures/units/stats/stats.fixtures.test.ts` (`stats-b` per role), `src/client/common/features/stats/campaign.test.tsx`, `render.test.tsx` (tab order); bench `stats.bench.ts` `FR-STATS-87 campaign tab warm ≤ 50 ms`; e2e `e2e/t3-campaign.e2e.ts` (`stats-campaign-e2e`).
 - **Fixtures:** no unit; bundle `stats-campaign-e2e` (= `stats-b`). Walkthrough on `stats-b`.
 - **CON-44:** 0 B (an ack only, not in the snapshot).
+
+## 163. Sprint 11: combat + dice fixes (F3)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-50, [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-44 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-83 (sprint-11 notes; DM #349, no spec phase). **Built by `fix/f3-combat-dice`.** No intent, event, signal, record type, snapshot or wire field changes (CON-44: 0 B). Data side: [data model §130](../data-model/README.md#130-sprint-11-combat--dice-fixes-f3).
+
+| Seam | Who | Contract | FR |
+|---|---|---|---|
+| Skip cue (`skippedOnStep(…, inTurnOf)`, `@shared/combat-tracker/rules`; `stepSkip`, `@ui/features/combat-extras/skip`) | DM client | the Initiative's Next / Prev and the palette's N / Shift+N toast (`cbt-init-skipped`) also name the step target's down `in-owner-turn` companions (no rank), after the passed-over rows; computed from the DM's store at send time, shown on the ack. Players: none (unchanged) | FR-CBT-50 (BL-110) |
+| Add dialog defaults | DM client | **Create tokens** and **Add hidden** ticked on every open (unchanged, by design) | FR-CBTX-44 (BL-113) |
+| Tray after a prompt answer (`diceExtras.holds` / `restoreTray`, `trayRestore`) | both clients | an acked `dicex.answerRequest` / `dicex.declineRequest` whose answer the tray holds (Alt → tray) puts `dicex.tray` back to its state before that stage: closed → close, minimised → minimise, open → stays on the result | FR-DICEX-83 (BL-112) |
+
+- **Tests:** `src/client/common/features/combat-extras/skip.test.ts`, `src/server/features/combat-tracker/f3-skip-sync.test.ts` (the DM's helper over a real socket on `f3-combat-dice`, after a reconnect too), `src/client/common/features/dice-extras/tray-restore.test.ts`; e2e `f3-skip-toast`, `f3-add-hidden`, `f3-prompt-tray`.
+- **Fixtures:** units `f3-down-companions`, `f3-request-perception`; bundles `f3-combat-dice` (walkthrough), `f3-skip-e2e`, `f3-prompt-tray-e2e`.

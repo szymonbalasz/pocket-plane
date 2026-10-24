@@ -36,6 +36,7 @@ import cpCombat from "./combat-tracker/cp-combat";
 import cpSrd from "./combat-tracker/cp-srd";
 import encFriendly from "./combat-tracker/enc-friendly";
 import encounter1 from "./combat-tracker/encounter-1";
+import f3DownCompanions from "./combat-tracker/f3-down-companions";
 import fuHurtGoblins from "./combat-tracker/fu-hurt-goblins";
 import goblin2 from "./combat-tracker/goblin-2";
 import lateHitRuled from "./combat-tracker/late-hit-ruled";
@@ -55,6 +56,7 @@ import dicexLooks from "./dice-extras/dicex-looks";
 import dicexMacros from "./dice-extras/dicex-macros";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
 import dicexRequestOpen from "./dice-extras/dicex-request-open";
+import f3RequestPerception from "./dice-extras/f3-request-perception";
 import h1RequestInsight from "./dice-extras/h1-request-insight";
 import diceSettings from "./dice-roll-log/dice-settings";
 import logColours from "./dice-roll-log/log-colours";
@@ -290,4 +292,7 @@ export const units: readonly Fixture[] = [
   recapShareNote,
   // Sprint 10 track H1 (fix/h1-combat-dice): an open hidden request to Mira (BL-105)
   h1RequestInsight,
+  // Sprint 11 track F3 (fix/f3-combat-dice): down companions (BL-110), a second prompt (BL-112)
+  f3DownCompanions,
+  f3RequestPerception,
 ];

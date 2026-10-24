@@ -2629,3 +2629,11 @@ From [stats](../specs/stats.md#63-sprint-10-t3-campaign-tab) FR-STATS-81–88 (D
 - **Persisted runtime state:** none. **Server memory** (ADR-0062): each session partial also keeps its award winners (counts per character and key), its encounters and its kill count; same build, invalidation and rebuild.
 - **Client memory:** the Stats view's tab defaults to `campaign` and returns to it when the window closes (page memory, never sent or stored).
 - **Fixtures:** none new; `stats-campaign-e2e` aliases `stats-b`; expected numbers in `fixtures/units/stats/stats.fixtures.test.ts`.
+
+## 130. Sprint 11: combat + dice fixes (F3)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-50, [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-44 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-83 (DM #349). **Built by `fix/f3-combat-dice`**. Protocol side: [protocol §163](../protocol/README.md#163-sprint-11-combat--dice-fixes-f3). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** the skip cue's down in-turn companions (from the DM's combatant rows at send time); the Dice tray's state before the last stage (page memory, for putting it back after a prompt answer).
+- **Fixtures:** unit `f3-down-companions` (Goblin 2, Mira's charmed `after-owner` companion, 4 → 0; Brakka's `in-owner-turn` Drake Companion 22 → 0; still the Wolf's turn); unit `f3-request-perception` (a second open request: public Perception, Mira only); bundles `f3-combat-dice` (= `fu-s7` + both + `h1-request-insight`; walkthrough), `f3-skip-e2e` (= `fu-s7` + `f3-down-companions`), `f3-prompt-tray-e2e` (= `dice-display` + `h1-request-insight` + `f3-request-perception`). Not in `session-sim-13`: `f3-down-companions` changes existing HP.
+- **CON-44: 0 B.**

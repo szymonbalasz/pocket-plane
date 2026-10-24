@@ -27,5 +27,7 @@ export default defineBundle({
     "fx-mira-bless",
     // T1 (sprint 10, DM #343): Dice tray 40 % bigger (no unit: client-only, the tray needs no records)
     // T5 (sprint 10, DM #347): dice visuals: thin d20 lines, tray +25 %, roll popup +40 % (no unit: client-only)
+    // F3 (sprint 11, DM #349): skip toast, tray after a prompt answer, Add hidden (no unit: client-only;
+    // `f3-down-companions` changes existing HP, so it stays in `f3-combat-dice`)
   ],
 });
