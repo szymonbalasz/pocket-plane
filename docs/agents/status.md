@@ -23,7 +23,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T5 dice visuals (#347, #348) | merged bfdc44a9 | — | **merged** (visual walkthrough PASS; branch check:full 5635, e2e 242 + weapon-rows load flake 2/2 alone); main gates skipped (same code) | — |
 | Sprint 11 F1 frame + camera | `fix/f1-frame` (slot 0, ws wAF) | build-f1 | building (frame lock, camera, launcher) | walkthrough (port 4103) |
 | Sprint 11 F2 toasts | `fix/f2-toasts` (slot 2, ws wAG) | build-f2 | building (toast runtime) | walkthrough (port 4123) |
-| Sprint 11 F3 combat + dice | `fix/f3-combat-dice` (slot 3, ws wAH) | build-f3 | building | walkthrough (port 4133) |
+| Sprint 11 F3 combat + dice | `fix/f3-combat-dice` (slot 3, ws wAH) | build-f3 (idle), test-f3 | ready (check 5153 / check:full 5644, 23 area e2e) → walkthrough | branch gate, merge |
 | Sprint 11 art track (DM) | DM's own agent | — | planning in docs/design/ | — |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
@@ -35,7 +35,7 @@ Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
 Sprint 11:
-- (none yet)
+- F3 BL-110: the reported "After Mira" case already toasts; the gap was "In Mira's turn" companions (no rank): now named in the DM's skip toast on the owner's turn (Next / Prev, Initiative and palette), DM only. BL-113 "Add hidden" default: current behaviour confirmed (dated note FR-CBTX-44). F3 edited `palette/launch.tsx` (palette, not F1's launcher): accepted.
 
 
 *(Sprint 10: add new rulings above the sprint-9 list.)*
