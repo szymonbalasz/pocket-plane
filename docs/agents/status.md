@@ -25,6 +25,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 11 F2 toasts | merged 9da2b751 | — | **merged** (re-test 8/8; branch check:full 5667 / e2e 253/253; import sort after merge) | — |
 | Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
 | Sprint 11 art track (DM) | DM's own agent | — | planning in docs/design/ | — |
+| Sprint 11 gate | gates-main @ final main | test-session-15 (tab in wR, server pane wR:p35, port 4153) | session-sim-15 running (`.verify/20261024-234809-session-sim-15/` in gates-main); bench 42/42 | Playtest section, recap |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
