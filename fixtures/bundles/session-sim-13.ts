@@ -25,5 +25,6 @@ export default defineBundle({
     // FX: fix pack (FX1 toasts + kill feed: no unit; `fx-toasts-e2e` aliases session-sim-12)
     // FX: FX3 Mira's Bless beside Thorn's summon concentration (FR-CBTX-75)
     "fx-mira-bless",
+    // T1 (sprint 10, DM #343): Dice tray 40 % bigger (no unit: client-only, the tray needs no records)
   ],
 });

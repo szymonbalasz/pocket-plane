@@ -59,7 +59,7 @@ const shared: Record<string, SizeRow> = {
     min: s(320, 280),
     criterion: "first 2 sections",
   },
-  // T1 (FR-DICEX-96, DM #343): 360 × 300 → 504 × 420 (× 1.4, band-capped); useful / min unchanged.
+  // T1 (FR-DICEX-96, DM #343): 360 × 300 → 504 × 420 (× 1.4); useful (the old default) / min unchanged.
   "dicex.tray": {
     default: all(504, 420),
     useful: all(360, 300),

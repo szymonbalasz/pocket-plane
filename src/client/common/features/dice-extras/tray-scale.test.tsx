@@ -71,7 +71,7 @@ describe("FR-DICEX-96 tray dice scale", () => {
     expect(TRAY_USEFUL).toEqual({ w: 360, h: 300 });
     expect(TRAY_SCALE_MAX).toBe(1.4);
     expect(trayScale({ w: 504, h: 420 })).toBe(1.4);
-    // Band-capped at 1280×720 (DM band 412): the height decides.
+    // A tray held to a 412-px band: the height decides.
     expect(trayScale({ w: 504, h: 412 })).toBe(1.37);
     expect(trayScale({ w: 432, h: 360 })).toBe(1.2);
     expect(trayScale({ w: 504, h: 300 })).toBe(1);
