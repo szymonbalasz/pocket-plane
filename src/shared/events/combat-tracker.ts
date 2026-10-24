@@ -110,9 +110,10 @@ export const AttackRolled = defineEvent({
 });
 
 /**
- * `cbt.rollDamage` (FR-CBT-71, ADR-0037): `game-log-entry`; then `NotificationUpdated`
- * (`attached`: completed the attacker's pending to-hit-only card) or `NotificationCreated` (a new
- * damage-only card).
+ * `cbt.rollDamage` (FR-CBT-71, ADR-0037): `game-log-entry`, plus the card upsert in these changes
+ * when it updates a card (`attached`: completed the attacker's pending to-hit-only card; or an
+ * unused roll on a completed one, FR-CBT-92; sprint 10, BL-92: one frame), else a following
+ * `NotificationCreated` (a new damage-only card).
  */
 export const DamageRolled = defineEvent({
   type: "DamageRolled",

@@ -166,10 +166,10 @@ describe("FR-STATS-19 labels", () => {
       winners: [{ characterId: "t", name: "Thorn", playerId: "p2" }],
       detail: { from: "Thorn", to: "Goblin 1", raw: 30, fight: "Goblin Ambush" },
     };
-    expect(awardValueText(a)).toBe("30 damage");
+    expect(awardValueText(a, "player")).toBe("30 damage");
     expect(awardDetailText(a)).toBe("Thorn → Goblin 1, 30, Goblin Ambush");
-    expect(awardValueText({ key: "most-kills", value: null, winners: [] })).toBe("—");
-    expect(awardValueText({ key: "most-kills", value: 2, winners: [] })).toBe("2");
+    expect(awardValueText({ key: "most-kills", value: null, winners: [] }, "dm")).toBe("—");
+    expect(awardValueText({ key: "most-kills", value: 2, winners: [] }, "player")).toBe("2");
     expect(winnerText({ characterId: "m", name: "Mira", playerId: "p1", with: ["Owlbear"] })).toBe(
       "Mira + Owlbear",
     );
@@ -311,7 +311,8 @@ describe("FR-STATS-31 FR-STATS-36 Highlights items", () => {
     expect(values).toMatchObject({
       mvp: "45 damage",
       "biggest-hit": "30 damage",
-      "biggest-overkill": "30",
+      // Sprint 10 (BL-103): the player's is the callout line's damage, labelled so.
+      "biggest-overkill": "30 damage",
       "most-healing": "8 HP",
       nat20: "1",
     });

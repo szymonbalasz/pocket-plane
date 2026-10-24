@@ -1,6 +1,8 @@
 // FR-DICEX-32 / -38 / -43: where one frame's dice show on this device, pure. The big throw holds
 // only the frame's public entries (DM-only entries never animate big, FR-DICEX-38) and, with
 // "Show others' rolls" off, only this client's own (FR-DICEX-43); those wait for the popup.
+// Sprint 10 (BL-105, FR-DICEX-84): a player's own answer to a hidden request (`public: false`,
+// audience = them) follows their display like any own roll; only the DM's DM-only rolls stay PiP.
 import { type DiceThrow, throwDice } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import type { You } from "@shared/protocol/frames";
@@ -42,7 +44,9 @@ export function planThrow(
 ): { t: DiceThrow; plan: ThrowPlan } | null {
   const { settings, display } = input;
   if (display === "off" || input.tabHidden) return null;
-  const big = entries.filter((e) => e.public && (settings.others || isOwn(e, you)));
+  const big = entries.filter((e) =>
+    e.public ? settings.others || isOwn(e, you) : you?.role === "player" && isOwn(e, you),
+  );
   const t = throwDice(big);
   if (!t) return null;
   const timing = { caption: !settings.popup, handoff: settings.popup };

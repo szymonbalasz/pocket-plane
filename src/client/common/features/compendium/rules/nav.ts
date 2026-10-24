@@ -78,3 +78,18 @@ export const clearSingle = () => rulesNav.setState({ single: null });
 export const scrolled = () => rulesNav.setState({ scrollTo: null });
 export const refetchRules = () => rulesNav.setState((s) => ({ nonce: s.nonce + 1 }));
 export const resetRulesNav = () => rulesNav.setState(initial());
+
+/** Gap kept above a landed card's heading (px). */
+export const LAND_GAP = 4;
+
+/**
+ * FR-CMP-66 / -69 (BL-98): the scroll offset that puts a card's heading at the top of its
+ * scroller (`LAND_GAP` above it), clamped to the scrollable range. Tops are viewport y's.
+ */
+export function landScrollTop(
+  scroller: { top: number; scrollTop: number; scrollHeight: number; clientHeight: number },
+  cardTop: number,
+): number {
+  const want = scroller.scrollTop + cardTop - scroller.top - LAND_GAP;
+  return Math.max(0, Math.min(want, scroller.scrollHeight - scroller.clientHeight));
+}

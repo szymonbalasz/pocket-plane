@@ -32,10 +32,19 @@ export function lifetimeText(key: keyof TrophyLifetime, l: TrophyLifetime): stri
   return key === "avgD20" ? v.toFixed(1) : String(v);
 }
 
-/** FR-CHARX-98: a record's value ("—" for none) and muted detail ("→ Ogre · Fight 3 · Tue 20 Oct"). */
-export function recordText(r: TrophyRecord): { value: string; detail: string | null } {
+/**
+ * FR-CHARX-98: a record's value ("—" for none) and muted detail ("→ Ogre · Fight 3 · Tue 20 Oct").
+ * Sprint 10 (BL-103): a player's Biggest overkill is the callout line's damage (FR-STATS-12), so it
+ * reads "30 damage" as on the Session tab; the DM's stays the overkill amount.
+ */
+export function recordText(
+  r: TrophyRecord,
+  key?: keyof TrophyRecords,
+  role: "dm" | "player" = "dm",
+): { value: string; detail: string | null } {
   if (!r || r.value === 0) return { value: "—", detail: null };
-  return { value: String(r.value), detail: r.to ? `→ ${r.to} · ${r.fight}` : r.fight };
+  const unit = key === "biggest-overkill" && role === "player" ? " damage" : "";
+  return { value: `${r.value}${unit}`, detail: r.to ? `→ ${r.to} · ${r.fight}` : r.fight };
 }
 
 /**

@@ -98,8 +98,9 @@ describe("split attack over WS (mid-combat)", () => {
     dm.intent("cbt.rollDamage", { attackerId: mira.id, manual: { diceTotal: 4 } });
     const r = (await dm.next("ack")).result as RollDamageResult;
     expect(r).toMatchObject({ cardId, attached: true });
-    const upd = await nextEvent(p1, "NotificationUpdated");
-    expect(upd.cause.name).toBe("NotificationUpdated");
+    // Sprint 10 (BL-92, gate I15): one frame: the line and the completed card in DamageRolled.
+    const upd = await nextEvent(p1, "DamageRolled");
+    expect(upd.changes.map((c) => c.type).sort()).toEqual(["game-log-entry", "notification"]);
     expect(card(p1, cardId)?.text).toBe("Mira: 15 to hit, 6 piercing");
     for (const c of [p1, p2]) await barrier(c);
     // The damage line is public (the owner's rule): both players hold it; player-2 no card.

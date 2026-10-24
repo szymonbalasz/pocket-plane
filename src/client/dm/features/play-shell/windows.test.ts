@@ -170,8 +170,8 @@ test("FR-SHELL-45 FR-SHELL-46 FR-SHELL-47 sim-8 sequence (DM, Initiative + Game 
   expect(laptop.steps[0]?.rect).toEqual({ x: 68, y: 60, w: 440, h: 412 });
   expect(laptop.steps[1]?.parked).toEqual(["cmp.compendium"]);
   expect(laptop.steps[2]?.parked).toEqual(["party.board"]);
-  // Party Manager opens 550 wide (FR-SHELL-156) where it is alone at the left edge.
-  const widths = [440, 550, 440];
+  // Party Manager opens 600 wide (FR-SHELL-156, BL-106) where it is alone at the left edge.
+  const widths = [440, 600, 440];
   laptop.steps.forEach((s, i) => {
     expect(s.rect).toEqual({ x: 68, y: 60, w: widths[i] as number, h: 412 });
   });
@@ -728,7 +728,9 @@ test("FR-SHELL-45 (2) sweep (DM, Town): every launcher window in registry order 
       const def = dmWindows.get(s.kind);
       if (!s.rect || !def) continue;
       const scene = { windows: s.others, hard: s.hard, tokens: pcs };
-      const got = placeFields(s.rect, def, viewport, scene);
+      // Clear at 12 px, or at the 4-px retry (FR-SHELL-98; L3s's spot beside a shrunk window).
+      const gap = placeFields(s.rect, def, viewport, scene)[0] === 0 ? 12 : 4;
+      const got = placeFields(s.rect, def, viewport, scene, 0, gap);
       expect(got[0] === 0 ? "ok" : `${at} not clear`).toBe("ok");
       if (got[1] === 1) expect(bruteBest(def, viewport, scene)[1]).toBe(1);
     }
@@ -829,10 +831,18 @@ test("FR-SHELL-58 token-free spot first (DM, sim-9 a01): 1440×900, Initiative +
     const def = dmWindows.get(kind);
     const rect = steps[0]?.rect;
     if (!rect || !def) throw new Error(`${kind} not open`);
-    const got = placeFields(rect, def, WIDE, scene);
-    // Sprint 7 (FR-SHELL-79): ranked at ≥ its useful size first.
+    // A rect clear only at the 4-px retry (FR-SHELL-98) is ranked at 4 px (as the goldens' check).
+    const gap = placeFields(rect, def, WIDE, scene)[0] === 0 ? 12 : 4;
+    const got = placeFields(rect, def, WIDE, scene, 0, gap);
+    // Sprint 7 (FR-SHELL-79): ranked at ≥ its useful size first; no spot the brute check finds
+    // ranks before it (the goldens' check).
     const floor = useful(def, WIDE, dmWindows);
-    expect({ kind, got }).toEqual({ kind, got: bruteBest(def, WIDE, scene, floor) });
+    const best = bruteBest(def, WIDE, scene, floor, gap);
+    const i = best.findIndex((v, k) => v !== got[k]);
+    expect({ kind, better: i >= 0 && (best[i] as number) < (got[i] as number) }).toEqual({
+      kind,
+      better: false,
+    });
     fields[kind] = got.join("");
   }
   // The 42-px fit spreads the ambush over the map band: Compendium has no token-free spot (sim-9

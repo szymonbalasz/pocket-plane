@@ -2,6 +2,7 @@
 // combat (FR-CBT-63); rows: creature, count 1–20 (characters 1), HP Average / Rolled (monsters),
 // remove; Create tokens + Add hidden (both ticked, OQ-CBTX-22); per-instance preview as Start;
 // `at` = the free area's centre cell when the DM views the encounter's scene (FR-CBT-65).
+// Sprint 10 (BL-97): with Add hidden a bound visible monster token previews (and joins) hidden.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
   ADD_INSTANCES_MAX,
@@ -173,6 +174,7 @@ export function AddForm() {
     {
       ...addFlags(opts, hidden),
       sceneTokenNames: sceneTokens.map((t) => t.name),
+      hideBound: true,
     },
   );
   const total = instancesOf(rows);

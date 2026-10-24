@@ -151,7 +151,7 @@ describe("FR-MOD-15/16 cbt.attack and apply", () => {
     expect(after.damage?.mods).toEqual([{ label: "Rage", value: 2 }]);
     expect(after.damage?.total).toBe(2 + 3 + 2);
     expect(t.note(r.cardId)?.text).toBe(`Thorn: ${after.toHit?.total} to hit, 7 piercing`);
-    const damageLine = t.events.at(-2)?.event.changes.find((c) => c.type === "game-log-entry");
+    const damageLine = t.events.at(-1)?.event.changes.find((c) => c.type === "game-log-entry");
     expect(lines(t, damageLine?.id as string).player).toBe(
       "Thorn — Dagger damage (piercing): 2 + 3 + 2 Rage = 7 (physical)",
     );

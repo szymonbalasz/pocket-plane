@@ -8,6 +8,7 @@ import type { DryFitResult, FitRoom } from "../scenes-map/camera";
 import { contentHeights, useContentHeights } from "./content-heights";
 import {
   growsToContent,
+  isRemembered,
   placedRect,
   type Rect,
   TOP_BAR_H,
@@ -27,6 +28,13 @@ import { shownStack, shownStacks, subscribeShownStack, summaryStrip } from "./to
 export const FREE_MIN_W = 320;
 export const FREE_MIN_H = 240;
 export const FREE_MIN_SHARE = 0.25;
+
+/** H2 FAIL 5: `windows`' stored rects as one string, `kind@x,y,w×h` sorted (`FreeAreaState.layout`). */
+export const storedLayout = (windows: Windows) =>
+  windows
+    .map((w) => `${w.kind}:${w.instance}@${w.x},${w.y},${w.w}×${w.h}`)
+    .sort()
+    .join(" ");
 
 /** The work area right of the tool rail, in viewport px. */
 export function railArea(vp: Viewport): Rect {
@@ -257,7 +265,7 @@ export function freeAreas(rects: readonly Rect[], vp: Viewport): Rect[] {
  * the canvas.
  */
 export interface FitPort {
-  dryFit(windows: readonly Rect[]): DryFitResult | null;
+  dryFit(windows: readonly Rect[], reason?: "window" | "resize"): DryFitResult | null;
   lastFullCell(): number | null;
   yieldRefit(): void;
 }
@@ -375,6 +383,13 @@ export interface FreeAreaState {
   room: FitRoom;
   stripRoom: FitRoom;
   /**
+   * H2 FAIL 5: the open, available windows' stored rects (`kind@x,y,w×h`, sorted), the layout a
+   * camera per viewport size is kept for (`layoutKey`).
+   */
+  layout: string;
+  /** BL-100 (FR-MAP-115): the same rooms without the remembered windows; null while none shows. */
+  untouched: { room: FitRoom; stripRoom: FitRoom } | null;
+  /**
    * FR-MAP-96: every open `growToContent` window has reported its content height, so the rects
    * above are the grown ones the load fit should frame around.
    */
@@ -416,6 +431,8 @@ export function useFreeArea(): FreeAreaState {
     stripOnly,
     room,
     stripRoom,
+    untouched,
+    layout,
     grown,
     settling,
     roomsWith,
@@ -431,6 +448,15 @@ export function useFreeArea(): FreeAreaState {
     );
     const client = registry.client;
     const rooms = fitRooms(client, shown, regions, vp, shownStack(client, reports));
+    // `shown` lines up with the open, available, registered windows (`renderedWindowRects`).
+    const open = windows.filter(
+      (w) => w.state === "open" && available.has(w.kind) && registry.get(w.kind) !== undefined,
+    );
+    const kept = shown.filter((_, i) => !isRemembered(open[i] ?? {}));
+    const untouched =
+      kept.length < shown.length
+        ? fitRooms(client, kept, regions, vp, shownStack(client, reports))
+        : null;
     const grown = grownAll(windows, registry, available, measured);
     // Only a rendered window settles (ShellWindow): an unavailable one never holds a fit back.
     const settling = windows.some(
@@ -446,6 +472,8 @@ export function useFreeArea(): FreeAreaState {
       obstacles: rooms.room.obstacles,
       stripOnly: { areas: rooms.stripRoom.areas, obstacles: rooms.stripRoom.obstacles },
       ...rooms,
+      untouched,
+      layout: storedLayout(open),
       grown,
       settling,
       roomsWith: (rects: readonly Rect[]) =>
@@ -471,6 +499,8 @@ export function useFreeArea(): FreeAreaState {
     stripOnly,
     room,
     stripRoom,
+    untouched,
+    layout,
     grown,
     settledAt,
     settles,

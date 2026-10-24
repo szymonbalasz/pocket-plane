@@ -31,10 +31,11 @@ if (process.env.UPDATE_FAILING === "1") {
  */
 // RS2's two approved cells (D3 fitted @1280×800 resize, D3 fitted @1440×900 push) pass with
 // `cmp.rules` in D3 too (SP2 merge): 10 → 8 failing. SP3's merge (`recap.session` in D3): 8 → 10.
+// H2 (sprint 10, BL-93): a window back at its pre-cause rect stays as it was (I7), the L1 band
+// height (BL-104) and L3s (BL-99): 10 → 7; D3 fitted @1280×800 resize passes again.
 const SP3_RESIZE =
   "SP3 (approved, BL-93): `recap.session` joins D3 untouched (S4); the resize down and back re-fits the newest no-launcher windows (1280×800: recap.session 440×492 → 412×360; 1600×900: cmp.rules 440×600 → 440×372), the placer's I7 resize class D1 / D2 / D3 already carry (frame, not the window defs)";
 const EXEMPTIONS = new Map<string, string>([
-  ["FR-SHELL-115 replay D3 fitted @1280×800 resize", SP3_RESIZE],
   ["FR-SHELL-115 replay D3 fitted @1600×900 resize", SP3_RESIZE],
 ]);
 
