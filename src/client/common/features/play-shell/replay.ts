@@ -20,7 +20,7 @@ import {
   revealRefit,
   visibleArea,
 } from "../scenes-map/camera";
-import { fitRooms, renderedWindowRects } from "./free-area";
+import { fitRooms, renderedWindowRects, storedLayout } from "./free-area";
 import { isRemembered, placedRect, type Rect, type Viewport, workArea } from "./geometry";
 import { hardRects, type KeepOut, keepOuts } from "./keep-outs";
 import { bruteBest, overlaps, REFERENCE_VIEWPORTS } from "./layout-checks";
@@ -349,7 +349,11 @@ function fullFit(sim: Sim, reason: FitReason = "fit") {
 
 /** The layout a recorded camera framed (`layoutKey`, as the canvas keys it). */
 const layoutOf = (sim: Sim) =>
-  layoutKey(sim.state, cellsNow(sim).tokens, fitInputs(sim).room.obstacles);
+  layoutKey(
+    sim.state,
+    cellsNow(sim).tokens,
+    storedLayout(windowsOf(sim).filter((w) => w.state === "open" && availableOf(sim).has(w.kind))),
+  );
 
 /**
  * A browser resize to `next` (FR-MAP-47, -113): the camera kept for the size it leaves, the

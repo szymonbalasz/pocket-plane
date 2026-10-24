@@ -309,7 +309,7 @@ export function MapCanvas(props: MapCanvasProps) {
   /** What this camera frames now (`layoutKey`). */
   const layoutNow = useRef((): string => "");
   layoutNow.current = () =>
-    layoutKey(scene.id, fitTokensOf(tokensRef.current), obstaclesRef.current);
+    layoutKey(scene.id, fitTokensOf(tokensRef.current), freeRef.current.layout);
   const fitNow = useRef((_reason: FitReason) => {});
   fitNow.current = (reason) => {
     const inputs = fitInputs.current();

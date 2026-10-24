@@ -29,6 +29,13 @@ export const FREE_MIN_W = 320;
 export const FREE_MIN_H = 240;
 export const FREE_MIN_SHARE = 0.25;
 
+/** H2 FAIL 5: `windows`' stored rects as one string, `kind@x,y,w×h` sorted (`FreeAreaState.layout`). */
+export const storedLayout = (windows: Windows) =>
+  windows
+    .map((w) => `${w.kind}:${w.instance}@${w.x},${w.y},${w.w}×${w.h}`)
+    .sort()
+    .join(" ");
+
 /** The work area right of the tool rail, in viewport px. */
 export function railArea(vp: Viewport): Rect {
   const wa = workArea(vp);
@@ -375,6 +382,11 @@ export interface FreeAreaState {
   /** FR-MAP-93, -95: the fit's rooms (`fitRooms`), what every fit reads. */
   room: FitRoom;
   stripRoom: FitRoom;
+  /**
+   * H2 FAIL 5: the open, available windows' stored rects (`kind@x,y,w×h`, sorted), the layout a
+   * camera per viewport size is kept for (`layoutKey`).
+   */
+  layout: string;
   /** BL-100 (FR-MAP-115): the same rooms without the remembered windows; null while none shows. */
   untouched: { room: FitRoom; stripRoom: FitRoom } | null;
   /**
@@ -420,6 +432,7 @@ export function useFreeArea(): FreeAreaState {
     room,
     stripRoom,
     untouched,
+    layout,
     grown,
     settling,
     roomsWith,
@@ -460,6 +473,7 @@ export function useFreeArea(): FreeAreaState {
       stripOnly: { areas: rooms.stripRoom.areas, obstacles: rooms.stripRoom.obstacles },
       ...rooms,
       untouched,
+      layout: storedLayout(open),
       grown,
       settling,
       roomsWith: (rects: readonly Rect[]) =>
@@ -486,6 +500,7 @@ export function useFreeArea(): FreeAreaState {
     room,
     stripRoom,
     untouched,
+    layout,
     grown,
     settledAt,
     settles,

@@ -1327,17 +1327,16 @@ export function createSizeCameras<T>() {
 /** The canvas's recorded fit (H2 FAIL 5): the camera, its fit state and the last full fit's cell. */
 export type SizeCamera = SceneFit & { reason: FitReason; lastFull: number | null };
 
-/** What a recorded camera framed: the scene, its tokens' cells and the fit's obstacles. */
+/**
+ * What a recorded camera framed: the scene, its tokens' cells and the shell's stored window layout
+ * (`layout`: the open windows' stored rects; not the rendered ones, whose grown heights are
+ * measured later, nor the shown toast stack, which comes and goes on its own timer).
+ */
 export const layoutKey = (
   sceneId: string,
   tokens: readonly { col: number; row: number; size: string }[],
-  obstacles: readonly Box[],
-) =>
-  JSON.stringify([
-    sceneId,
-    tokens.map((t) => [t.col, t.row, t.size]),
-    obstacles.map((o) => [o.x, o.y, o.w, o.h]),
-  ]);
+  layout: string,
+) => JSON.stringify([sceneId, tokens.map((t) => [t.col, t.row, t.size]), layout]);
 
 export interface Timers {
   set(fn: () => void, ms: number): unknown;
