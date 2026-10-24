@@ -4,6 +4,7 @@
 
 import { campaignAwards, campaignRecords, campaignRows } from "@shared/stats/campaign";
 import {
+  creditsParty,
   dayLabel,
   fightRows,
   neutralFightLabel,
@@ -65,6 +66,27 @@ export interface StatsRead {
 /** FR-STATS-03: a fact counts for the viewer only if its line is visible to them. */
 const visibleFacts = (v: StatsViewer, facts: readonly CombatFact[]) =>
   facts.filter((f) => entryVisible(v, { public: f.public, kind: f.entryKind }));
+
+/**
+ * Sprint 10 BL-111 (FR-STATS-12, DM #343): a window's facts the viewer counts (FR-STATS-03) and
+ * `dealtUnseen`: the DM counts a party damage line in it (`creditsParty`) that this viewer doesn't
+ * see, so damage they can't see could change "Most damage dealt" / MVP and they don't get it.
+ * Existence only, never an amount, a name or a side: the same answer for every player.
+ */
+export function seenFacts(
+  v: StatsViewer,
+  all: readonly CombatFact[],
+  chars: ReadonlyMap<string, StatsCharacter>,
+): { facts: CombatFact[]; dealtUnseen: boolean } {
+  const facts = visibleFacts(v, all);
+  if (v.role === "dm" || facts.length === all.length) return { facts, dealtUnseen: false };
+  const dm: StatsViewer = { role: "dm", features: v.features };
+  const dealtUnseen = all.some((f) => {
+    const e = { public: f.public, kind: f.entryKind };
+    return creditsParty(f, chars) && entryVisible(dm, e) && !entryVisible(v, e);
+  });
+  return { facts, dealtUnseen };
+}
 
 export interface Fights {
   /** The viewer's fights, oldest `startedAt` first. */
@@ -146,7 +168,9 @@ export function fightStats(r: StatsRead, encounterId: string | undefined) {
       ].slice(0, FIGHTS_MAX)
     : summaries(f);
   if (!pick) return { fight: null, fights };
-  const facts = visibleFacts(r.viewer, combatFacts(r.db, { encounterId: pick.id }));
+  const chars = characters(r.db, r.campaignId);
+  const seen = seenFacts(r.viewer, combatFacts(r.db, { encounterId: pick.id }), chars);
+  const facts = seen.facts;
   const combatants = fightCombatants(r.db, pick.id);
   // A started fight's duration runs to the newest entry (the same answer after a restart).
   const until = pick.endedAt ?? lastEntryAt(r.db, r.campaignId) ?? pick.startedAt;
@@ -161,10 +185,11 @@ export function fightStats(r: StatsRead, encounterId: string | undefined) {
         role: r.viewer.role,
         facts,
         rolls: fightRolls(r, pick),
-        characters: characters(r.db, r.campaignId),
+        characters: chars,
         round: pick.round,
         span: pick.startedAt ? { from: pick.startedAt, to: until } : null,
         standing: r.viewer.role === "dm" ? standingOf(r.db, pick.id) : [],
+        dealtUnseen: seen.dealtUnseen,
       }),
     },
     fights,
@@ -240,17 +265,16 @@ export function sessionStats(
   const hit = pickSession(r, sessions, n);
   if (!hit) return { session: null };
   const { s, span } = hit;
-  const facts = visibleFacts(
-    r.viewer,
-    combatFacts(r.db, { campaignId: r.campaignId, fromN: s.fromN, toN: s.toN }),
-  );
+  const chars = characters(r.db, r.campaignId);
+  const { facts, dealtUnseen } = sessionSeenFacts(r, s, chars);
   const labels = fightsFor(r).label;
   const awards = sessionAwards({
     role: r.viewer.role,
     facts,
     rolls: rollFacts(r.db, r.viewer, r.campaignId, s.fromN, s.toN),
-    characters: characters(r.db, r.campaignId),
+    characters: chars,
     fightLabel: (id) => labels.get(id) ?? "",
+    dealtUnseen,
   });
   return {
     session: {
@@ -269,6 +293,18 @@ export const sessionFactsOf = (r: StatsRead, s: SessionBounds): CombatFact[] =>
   visibleFacts(
     r.viewer,
     combatFacts(r.db, { campaignId: r.campaignId, fromN: s.fromN, toN: s.toN }),
+  );
+
+/** `sessionFactsOf` + BL-111's `dealtUnseen` (one read; `seenFacts`). */
+export const sessionSeenFacts = (
+  r: StatsRead,
+  s: SessionBounds,
+  chars: ReadonlyMap<string, StatsCharacter>,
+) =>
+  seenFacts(
+    r.viewer,
+    combatFacts(r.db, { campaignId: r.campaignId, fromN: s.fromN, toN: s.toN }),
+    chars,
   );
 
 /**

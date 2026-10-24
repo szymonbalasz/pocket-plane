@@ -295,8 +295,15 @@ export const Award = z.strictObject({
 });
 export type Award = z.infer<typeof Award>;
 
+/** BL-111: a player's cards may leave out "Most damage dealt" (8); the DM's are always 9. */
 export const SessionAwards = SessionSummary.extend({
-  awards: z.array(Award).length(AWARD_KEYS.length),
+  awards: z
+    .array(Award)
+    .min(AWARD_KEYS.length - 1)
+    .max(AWARD_KEYS.length)
+    .refine((a) => a.length === AWARD_KEYS.length || !a.some((x) => x.key === "most-dealt"), {
+      message: "Only Most damage dealt may be left out",
+    }),
 });
 export type SessionAwards = z.infer<typeof SessionAwards>;
 

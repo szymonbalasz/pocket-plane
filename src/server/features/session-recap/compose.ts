@@ -32,28 +32,20 @@ import { type Award, DM_DICE_KEY, type DmHighlights } from "@shared/stats/schema
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { Tx } from "../../db/client";
 import { gameLogEntry, notification, roll } from "../../db/schema";
-import {
-  type CombatFact,
-  combatFacts,
-  type FightRow,
-  standingOf,
-} from "../combat-tracker/stats-read";
-import { entryVisible, type RollFact } from "../dice-roll-log/stats-read";
+import { combatFacts, type FightRow, standingOf } from "../combat-tracker/stats-read";
+import type { RollFact } from "../dice-roll-log/stats-read";
 import { lootRows } from "../party-loot/recap-read";
 import {
   characters,
   fightsFor,
   luckRolls,
   type StatsRead,
-  sessionFactsOf,
+  seenFacts,
   sessionFights,
+  sessionSeenFacts,
 } from "../stats/compute";
 
 type Read = Pick<Tx, "select" | "all">;
-
-/** FR-STATS-03: a fact counts for the viewer only if its line is visible to them. */
-const visibleFacts = (r: StatsRead, facts: readonly CombatFact[]) =>
-  facts.filter((f) => entryVisible(r.viewer, { public: f.public, kind: f.entryKind }));
 
 // ---------- header and share (per query) ----------
 
@@ -103,9 +95,12 @@ const more = (total: number, max: number) => (total > max ? { more: total - max 
 
 /** FR-RECAP-12: one fight line from its Highlights (the whole fight, stats' fight scope). */
 function fightLine(r: StatsRead, f: FightRow, label: string, chars: ReturnType<typeof characters>) {
+  // FR-STATS-03 + BL-111: the viewer's facts; players get no MVP while party damage is unseen.
+  const seen = seenFacts(r.viewer, combatFacts(r.db, { encounterId: f.id }), chars);
   const h = fightHighlights({
     role: r.viewer.role,
-    facts: visibleFacts(r, combatFacts(r.db, { encounterId: f.id })),
+    facts: seen.facts,
+    dealtUnseen: seen.dealtUnseen,
     rolls: [],
     characters: chars,
     round: f.round,
@@ -273,7 +268,7 @@ export function recapBody(
   s: SessionBounds,
 ): RecapBody {
   const chars = characters(r.db, r.campaignId);
-  const facts = sessionFactsOf(r, s);
+  const { facts, dealtUnseen } = sessionSeenFacts(r, s, chars);
   // FR-RECAP-25: one `fightsFor` per query (labels, the session's fights, the awards' details).
   const fights = fightsFor(r);
   const inSession = sessionFights(r, s, facts, fights);
@@ -298,6 +293,8 @@ export function recapBody(
       rolls,
       characters: chars,
       fightLabel: (id) => fights.label.get(id) ?? "",
+      // BL-111: players' cards leave out "Most damage dealt" while party damage is unseen.
+      dealtUnseen,
     }),
   };
 }

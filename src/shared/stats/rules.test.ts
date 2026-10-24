@@ -2,6 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import { isOverkillCallout } from "./callout";
 import {
+  creditsParty,
   extendSessions,
   fightRows,
   type SessionBounds,
@@ -13,7 +14,14 @@ import {
   sessionOf,
   visibleSpan,
 } from "./rules";
-import { AwardDetail, FIGHT_ROWS_MAX, SESSION_GAP_MS, TIED_MAX } from "./schemas";
+import {
+  AWARD_KEYS,
+  AwardDetail,
+  FIGHT_ROWS_MAX,
+  SESSION_GAP_MS,
+  SessionAwards,
+  TIED_MAX,
+} from "./schemas";
 
 const side = (id: string, o: Partial<StatsSide> = {}): StatsSide => ({
   id,
@@ -184,6 +192,46 @@ describe("STATS formulas", () => {
       winners: [{ name: "Mira", with: ["Owlbear"] }],
     });
     expect(b["biggest-hit"]).toMatchObject({ value: 10, winners: [{ name: "Thorn" }] });
+  });
+
+  test("FR-STATS-12 BL-111 creditsParty: a counted damage line by a PC or a companion's owner", () => {
+    const has = (f: StatsFact) => creditsParty(f, chars);
+    expect(has(fact(MIRA, GOBLIN, 11))).toBe(true);
+    // A companion rolls into its current owner (FR-STATS-09): its hidden damage counts too.
+    expect(has(fact(OWLBEAR, GOBLIN, 7))).toBe(true);
+    expect(has(fact(GOBLIN, MIRA, 9))).toBe(false);
+    expect(has(fact(null, GOBLIN, 3))).toBe(false);
+    expect(has(fact(MIRA, GOBLIN, 8, { kind: "heal" }))).toBe(false);
+    expect(has(fact(MIRA, GOBLIN, 0))).toBe(false);
+    // A charmed-away companion (no owner) is a monster; a PC no longer in the campaign: none.
+    expect(has(fact(side("Owlbear", { ownerCharacterId: null }), GOBLIN, 7))).toBe(false);
+    expect(has(fact(pc("Gone"), GOBLIN, 7))).toBe(false);
+  });
+
+  test("FR-STATS-12 BL-111 dealtUnseen: players' cards leave out Most damage dealt; the others stay", () => {
+    const facts = [fact(THORN, GOBLIN, 30), fact(MIRA, GOBLIN, 12)];
+    const run = (dealtUnseen: boolean) =>
+      sessionAwards({
+        role: "player",
+        facts,
+        rolls: [],
+        characters: chars,
+        fightLabel: () => "Fight 1",
+        dealtUnseen,
+      });
+    const out = run(true);
+    expect(out.map((a) => a.key)).toEqual(AWARD_KEYS.filter((k) => k !== "most-dealt"));
+    expect(Object.fromEntries(out.map((a) => [a.key, a]))["biggest-hit"]).toMatchObject({
+      value: 30,
+      winners: [{ name: "Thorn" }],
+    });
+    expect(run(false).map((a) => a.key)).toEqual([...AWARD_KEYS]);
+    // The schema: 8 cards only without Most damage dealt; 9 always parse.
+    const summary = { fromN: 1, toN: 9, from: "a", to: "b", fights: 1 };
+    expect(SessionAwards.safeParse({ ...summary, awards: out }).success).toBe(true);
+    expect(SessionAwards.safeParse({ ...summary, awards: run(false) }).success).toBe(true);
+    const wrong = run(false).filter((a) => a.key !== "most-kills");
+    expect(SessionAwards.safeParse({ ...summary, awards: wrong }).success).toBe(false);
   });
 
   test("FR-STATS-12 overkill value per role: DM the amount; players the callout line's raw", () => {

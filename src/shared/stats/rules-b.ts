@@ -172,6 +172,8 @@ export interface HighlightsInput {
   span: { from: string; to: string } | null;
   /** DM only: monsters still standing. */
   standing: readonly { id: string; name: string; hidden: boolean }[];
+  /** BL-111: players only: the fight holds party damage they don't see; MVP is left empty. */
+  dealtUnseen?: boolean;
 }
 
 const hiddenSide = (s: StatsSide | null) => !!s && (s.hidden || s.ownerHidden);
@@ -233,7 +235,8 @@ export function fightHighlights(input: HighlightsInput): DmHighlights {
   const nameable = (f: StatsFact) =>
     role === "dm" || !(hiddenSide(f.target) || hiddenSide(f.attacker));
   const out = {
-    mvp: boards.mvp.stat(role),
+    // BL-111 (FR-STATS-12): an empty MVP item is hidden, as when nobody scored.
+    mvp: input.dealtUnseen ? { value: null, winners: [] } : boards.mvp.stat(role),
     "biggest-hit": boards.hit.stat(role, nameable),
     "biggest-overkill": boards.overkill.stat(role, nameable),
     "most-healing": boards.healing.stat(role),

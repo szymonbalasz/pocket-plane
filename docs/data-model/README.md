@@ -2073,7 +2073,7 @@ From [combat-tracker](../specs/combat-tracker.md#8-data-model) FR-CBT-105–124 
 |---|---|---|---|
 | `entity.companion_of` | + ID (character of the campaign) \| null, plain id (no FK) | a pet's owner PC; null = not a pet; set by `POST /api/pets` or `PUT` (`companionOf`), cleared by release | FR-ENT-31, -33 |
 | `entity.turn_mode` | + `after-owner` \| `in-owner-turn` \| `own` \| null | a pet's default mode (default `after-owner`), copied to its combatant at join; a mode change in a fight never writes it back | FR-ENT-31, FR-CBT-106 |
-| `entity.pet_present` | + bool, default false; DM only | the pet has an active combatant or an unhidden token on the active scene; server-written in the causing command's transaction | FR-ENT-37 |
+| `entity.pet_present` | + bool, default false; DM only | the pet has an active combatant the DM didn't hide (sprint 10 BL-114: a bound one by its token's `hidden`) or an unhidden token on the active scene; server-written in the causing command's transaction | FR-ENT-37 |
 | `entity.owner_player_id`, `entity.hp_current` | now also set on pets | owner copy of `companion_of`'s player (rewritten with it, FR-ENT-34); kept HP 0…`hpMax` (written back at End) | FR-ENT-31, FR-CBT-113 |
 | `combatant.owner_character_id`, `owner_player_id` | + ID \| null ×2, plain ids | both set or both null; `owner_player_id` = the owner PC's player, rewritten with it | FR-CBT-105, FR-ENT-34 |
 | `combatant.turn_mode` | + mode \| null | null iff not a companion; a release clears it (ranks as `own` with the owner's number) | FR-CBT-106, -111 |

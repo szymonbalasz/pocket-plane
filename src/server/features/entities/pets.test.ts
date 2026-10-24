@@ -302,6 +302,34 @@ describe("FR-ENT-37 visibility and presence", () => {
     // The owner had it all along.
     expect(view(t, t.p1V, hawk)).toMatchObject({ name: "Hawk" });
   });
+
+  test("FR-ENT-37 BL-114 a pet hidden in a fight: other players get its delete and no snapshot row; back on show; owner and DM unchanged", () => {
+    const t = cpSetup();
+    const n0 = t.events.length;
+    const last = (v: Viewer) =>
+      t
+        .wire(t.lastEvent()?.changes ?? [], v)
+        .filter((w) => typeof w !== "string" && w.type === ENTITY_TYPE && w.id === t.owlbear);
+    expect(view(t, t.p2V, t.owlbear)).toMatchObject({ name: "Owlbear", band: "healthy" });
+    // The DM hides the Owlbear's token (its combatant follows, FR-CBT-24): a delete for player 2.
+    t.run(MAP_INTENTS.setTokenHidden, { tokenId: t.petTokens.owlbear, hidden: true });
+    expect(t.combatantNamed("Owlbear").hidden).toBe(true);
+    expect(last(t.p2V)).toMatchObject([{ op: "delete" }]);
+    expect(view(t, t.p2V, t.owlbear)).toBeUndefined();
+    expect(t.framesSince(n0, t.p2V)).not.toContain("Owlbear");
+    // Owner: full row, unchanged; DM: full row (petPresent false while hidden).
+    expect(last(t.p1V)).toEqual([]);
+    expect(view(t, t.p1V, t.owlbear)).toMatchObject({ name: "Owlbear", hpCurrent: 59 });
+    expect(t.entityRow(t.owlbear)).toMatchObject({ petPresent: false });
+    // A turn step while hidden never brings it back.
+    t.step("next");
+    expect(view(t, t.p2V, t.owlbear)).toBeUndefined();
+    // Shown → upsert of the redacted row, as before.
+    t.run(MAP_INTENTS.setTokenHidden, { tokenId: t.petTokens.owlbear, hidden: false });
+    expect(last(t.p2V)).toMatchObject([{ op: "upsert" }]);
+    expect(RedactedPet.parse(view(t, t.p2V, t.owlbear))).toMatchObject({ band: "healthy" });
+    expect(t.entityRow(t.owlbear)).toMatchObject({ petPresent: true });
+  });
 });
 
 describe("FR-ENT-38 owner edits own pet", () => {

@@ -2723,7 +2723,7 @@ From [combat-tracker](../specs/combat-tracker.md#9-api--events) FR-CBT-105–124
 | `EncounterEnded` | + pets' `entity` (HP write-back, presence), summons' `token` deletes (`deleteTokenIn`) | the pet per FR-ENT-37; token deletes | no |
 | `EntityUpdated` (a character's owner change) | + its pets, their tokens, its active companion combatants and their bound tokens (one hook line) | per rule | no |
 | `TurnChanged` | + reranked rows (owner states), the in-turn companions' `movedFt` reset | as before | no |
-| Token writes (place, duplicate, hide / reveal, delete), `SceneActivated`, `SceneDeleted` | + the pet's `entity` when `petPresent` flips | upsert / delete for non-owners | as before |
+| Token writes (place, duplicate, hide / reveal, delete), `SceneActivated`, `SceneDeleted` | + the pet's `entity` when `petPresent` flips (sprint 10 BL-114: hiding an in-fight pet's token flips it too; its hidden combatant no longer counts) | upsert / delete for non-owners | as before |
 
 **Helpers and hooks**
 
@@ -3072,7 +3072,7 @@ From [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-88 (c
 
 | `stats.query {scope: "fight", encounterId?}` *(new)* | DM, player | unknown, planned or (player) not listed fight → `not_found`; an actor's 5th computed answer in 1 s with no earlier answer for that input → `conflict` "Too many stats queries, try again in a moment" (per viewer: role + player, all their tabs; not coalesced. *Sprint 9, FR-STATS-69:* the client keeps the last result and asks again once 1 s later with the latest input; only a second `conflict` shows "Couldn't load stats") | `{fight: {key, label, round, status, rows} \| null, fights: [{key, label, status}]}` (`fights` = the picker, newest first, ≤ 50) | FR-STATS-15, -16, -18 |
 | `stats.query {scope: "sessions"}` *(new)* | DM, player | rate as above | `{sessions: [{fromN, toN, from, to, fights}]}` (≤ 200, newest first) | FR-STATS-13, -19 |
-| `stats.query {scope: "session", n?}` *(new)* | DM, player | `n` in no session the viewer can list → `not_found`; rate as above | `{session: {fromN, toN, from, to, fights, awards[9]} \| null}` (absent `n` = the newest; null = none yet) | FR-STATS-12, -13 |
+| `stats.query {scope: "session", n?}` *(new)* | DM, player | `n` in no session the viewer can list → `not_found`; rate as above | `{session: {fromN, toN, from, to, fights, awards[9]} \| null}` (absent `n` = the newest; null = none yet). *Sprint 10 T2 (BL-111): a player's `awards` may hold 8, without `most-dealt`, and a fight's `highlights.mvp` (and the recap's fight `mvp`) `{value: null, winners: []}`, while the window holds party damage players don't see; the DM's always 9* | FR-STATS-12, -13 |
 | `stats.showAwards {fromN}` *(new)* | DM (player → `forbidden`) | `fromN` not a session key → `not_found` | `{notificationId}` | FR-STATS-20 |
 | `cbt.applyHp` + `sourceId?` *(changed)* | DM | not an active, non-removed combatant of the started encounter → `not_found` (the target itself allowed) | as before | FR-CBT-136 |
 
