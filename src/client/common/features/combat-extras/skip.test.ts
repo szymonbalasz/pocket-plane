@@ -82,7 +82,7 @@ describe("FR-CBT-50 BL-110 down companions in the skip cue", () => {
 
   test("FR-CBT-50 BL-110 a removed or inactive in-turn companion is not named", () => {
     const removed = rows({ drake: 0 }).map((c) =>
-      c.name === "Drake" ? { ...c, removed: true } : c,
+      c.name === "Drake" ? ({ ...c, removed: true } as CombatantView) : c,
     );
     expect(stepSkip(store, removed, at("Wolf"), "next").skipped).toBeNull();
     const gone = rows({ drake: 0 }).map((c) => (c.name === "Drake" ? { ...c, active: false } : c));
