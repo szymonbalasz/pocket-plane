@@ -274,8 +274,9 @@ test("FR-HOLD-29 FR-REM-18 FR-HOLD-17 Make reminder opens REM's editor prefilled
   await dmWin.locator('[data-testid="hold-tab"][data-value="facilities"]').click();
   await facility(dmWin, "Steam Rooms").getByTestId("hold-facility-menu").click();
   await dm.getByTestId("hold-facility-remove").click();
+  // BL-104: the body doesn't repeat the "Remove Steam Rooms?" title.
   await expect(dm.getByTestId("hold-facility-remove-summary")).toHaveText(
-    "Remove Steam Rooms? Its 1 reminder is removed too.",
+    "It leaves the Facilities list; its 1 reminder is removed too.",
   );
   await dm.getByTestId("hold-facility-remove-confirm").click();
   await expect(facility(dmWin, "Steam Rooms")).toHaveCount(0);

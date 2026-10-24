@@ -1,13 +1,12 @@
 // SP1's search providers (FR-SHELL-187, -188): characters and creatures from the synced store
 // (already filtered per viewer server-side), compendium and rule rows from compendium search
 // (FR-CMP-10, the viewer's visibility FR-CMP-14). Rows open what a click opens elsewhere.
-import type { AppType } from "@server/app";
 import { HOMEBREW_LABEL } from "@shared/compendium/rest";
 import { ENTITY_TYPE, isPet } from "@shared/entities/schemas";
 import { type RecordStore, recordsOf } from "@shared/protocol/store";
-import { hc } from "hono/client";
 import { BookOpenIcon, PawPrintIcon, SkullIcon, UserIcon } from "lucide-react";
-import { type Api, createApi } from "../../../api";
+import type { Api } from "../../../api";
+import { pageApi } from "../../../session";
 import { selectCompanion } from "../../character-sheet/companion/picker";
 import { openSheetFor } from "../../character-sheet/selection";
 import { CHAR_SHEET_KIND } from "../../character-sheet/window";
@@ -85,42 +84,8 @@ function creatureItems(store: RecordStore): PaletteItem[] {
 
 // ---- compendium search (FR-SHELL-188) ----
 
-/** The DM secret as the DM session stores it (FR-CAMP-04). */
-const DM_SECRET_KEY = "pocket-plane.dmSecret";
-
-function readDmSecret(): string | null {
-  try {
-    return window.localStorage.getItem(DM_SECRET_KEY);
-  } catch {
-    return null;
-  }
-}
-
-/** The link token of a player page (`/p/<token>`). */
-export function linkToken(pathname: string): string | null {
-  const m = /^\/p\/([^/?#]+)/.exec(pathname);
-  return m?.[1] ? decodeURIComponent(m[1]) : null;
-}
-
-const apis = new Map<string, Api>();
-
-/** The REST client with this page's credential (DM secret; player `Authorization: Player`). */
-export function compendiumApi(role: "dm" | "player"): Api {
-  let api = apis.get(role);
-  if (!api) {
-    api =
-      role === "dm"
-        ? createApi(readDmSecret)
-        : hc<AppType>(window.location.origin, {
-            headers: (): Record<string, string> => {
-              const token = linkToken(window.location.pathname);
-              return token ? { Authorization: `Player ${token}` } : {};
-            },
-          });
-    apis.set(role, api);
-  }
-  return api;
-}
+/** The REST client with this page's credential (the session helper, BL-94). */
+export const compendiumApi = (role: "dm" | "player"): Api => pageApi(role);
 
 /** One server summary as the palette uses it. */
 export interface Summary {

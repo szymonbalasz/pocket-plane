@@ -2,9 +2,8 @@
 
 import type { CampaignSummary } from "@shared/campaign-management/schemas";
 import { type Api, ApiError, call, createApi } from "@ui/api";
+import { readDmSecret, writeDmSecret } from "@ui/session";
 import { create } from "zustand";
-
-const KEY = "pocket-plane.dmSecret";
 
 interface DmSession {
   secret: string | null;
@@ -14,11 +13,10 @@ interface DmSession {
 }
 
 export const useDmSession = create<DmSession>((set) => ({
-  secret: localStorage.getItem(KEY),
+  secret: readDmSecret(),
   campaigns: null,
   setSecret(s) {
-    if (s === null) localStorage.removeItem(KEY);
-    else localStorage.setItem(KEY, s);
+    writeDmSecret(s);
     set({ secret: s, campaigns: null });
   },
   async loadCampaigns() {

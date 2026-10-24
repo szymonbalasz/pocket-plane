@@ -546,6 +546,7 @@ function LootTable({ loot }: { loot: NonNullable<Recap["loot"]> }) {
 /** Stats' award card, as the Session tab shows it (FR-RECAP-16). */
 function AwardCard({ award: a }: { award: Award }) {
   const colorOf = useColorOf();
+  const role = useSync((s) => (s.store.you?.role === "dm" ? "dm" : "player"));
   const detail = awardDetailText(a);
   return (
     <Card
@@ -554,7 +555,7 @@ function AwardCard({ award: a }: { award: Award }) {
       className="flex min-w-0 flex-col gap-0.5 wrap-anywhere p-2 text-xs"
     >
       <span className="font-medium text-muted-foreground">{AWARD_TITLE[a.key]}</span>
-      <span className="text-sm font-semibold tabular-nums">{awardValueText(a)}</span>
+      <span className="text-sm font-semibold tabular-nums">{awardValueText(a, role)}</span>
       <span className="flex flex-col">
         {a.winners.map((w) => {
           const person: ColorPerson = w.playerId

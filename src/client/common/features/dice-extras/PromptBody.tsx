@@ -14,6 +14,7 @@ import { Button } from "../../components/ui/button";
 import { useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
+import { TOAST_STACK_Z } from "../notifications/ToastRuntime";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import {
   answerIntent,
@@ -92,6 +93,9 @@ function PromptActions({ n, p }: { n: NotificationRecord; p: Payload }) {
       <RollButton
         control={control}
         hint="Shift: advantage · Ctrl: disadvantage"
+        // H1 re-test: the prompt is a card toast (`TOAST_STACK_Z`), so its physical-dice form
+        // opens above the stack, never under its own card (still below the overlay layer).
+        formZ={TOAST_STACK_Z + 1}
         data-testid="dicex-prompt-roll"
         data-record-id={n.id}
         size="sm"

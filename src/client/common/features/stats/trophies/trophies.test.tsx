@@ -112,6 +112,17 @@ describe("FR-CHARX-98 trophies layout", () => {
     expect(recordText(null)).toEqual({ value: "—", detail: null });
   });
 
+  test("FR-CHARX-98 BL-103 Biggest overkill trophy: a player's reads 'N damage' (the callout line's), the DM's the bare amount", () => {
+    expect(trophy(html("player", { status: "ok", result: TROPHIES }), "biggest-overkill")).toBe(
+      "25 damage",
+    );
+    expect(trophy(html("dm", { status: "ok", result: TROPHIES }), "biggest-overkill")).toBe("25");
+    expect(trophy(html("player", { status: "ok", result: TROPHIES }), "biggest-hit")).not.toContain(
+      "damage",
+    );
+    expect(recordText(null, "biggest-overkill", "player")).toEqual({ value: "—", detail: null });
+  });
+
   test("FR-STATS-50 trophies states: skeleton while loading and pending, error + Retry, 'No fights yet' at 0 fights, offline muted", () => {
     expect(html("player", { status: "loading", result: null })).toContain(
       'data-testid="stats-loading"',

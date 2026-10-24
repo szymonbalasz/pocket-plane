@@ -76,7 +76,7 @@ phase: post-mvp-9
 | FR-STATS-09 | Companions | Own line under the owner; awards roll dealt, healed, kills, hits into the **current** owner ("Mira + Owlbear"). A charmed-away companion (#310) is a monster, past facts too. |
 | FR-STATS-10 | Nat 20 / 1 | Per character actor: `natural` 20 / 1 (kept die), not `initiative`; death saves count. |
 | FR-STATS-11 | Gems | A Combat-gem maxed die counts only via the applied `raw` (S2). Gems off → no change. |
-| FR-STATS-12 | Awards | Session scope: Biggest hit, Biggest overkill, Most damage dealt / taken, Most healing, Most kills, Most nat 20s, Most nat 1s, Most times downed. Party only; ties list all; 0 → an empty line. **`value`** = the sum / count / max raw, except **Biggest overkill: DM the overkill amount; players the callout line (FR-CBT-137) with the largest `raw`, valued and ranked by `raw`** (no `raw − value`). Detail: "Thorn → Goblin 1, 30, ‹fight label›". |
+| FR-STATS-12 | Awards | Session scope: Biggest hit, Biggest overkill, Most damage dealt / taken, Most healing, Most kills, Most nat 20s, Most nat 1s, Most times downed. Party only; ties list all; 0 → an empty line. **`value`** = the sum / count / max raw, except **Biggest overkill: DM the overkill amount; players the callout line (FR-CBT-137) with the largest `raw`, valued and ranked by `raw`** (no `raw − value`). Detail: "Thorn → Goblin 1, 30, ‹fight label›". *(Sprint 10, BL-103, 2026-10-24: the player's card (Session tab, recap Awards, fight Highlights, the Trophies record) reads the value as damage, "30 damage", as FR-STATS-22's toast; never a bare number under "Biggest overkill" beside the DM's amount. The DM's card unchanged. Client text only.)* |
 
 **Scopes**
 

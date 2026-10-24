@@ -1,4 +1,5 @@
-// FR-CBTX-25 skip cue: dead PCs join FR-CBT-50's "Skipped …" Toast as "(dead)".
+// FR-CBTX-25 skip cue: dead PCs join FR-CBT-50's "Skipped …" Toast as "(dead)". One copy for the
+// Initiative window's step and the palette's N / Shift+N (BL-94).
 import { skippedText } from "@shared/combat-tracker/rules";
 
 /** "Skipped Goblin (down), Thorn (dead) · Round 2"; FR-CBT-50's text when nobody is dead. */

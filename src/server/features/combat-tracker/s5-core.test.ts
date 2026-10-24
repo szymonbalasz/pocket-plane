@@ -42,8 +42,10 @@ describe("FR-CBT-88 cbt.applyHit", () => {
       t.target("Goblin", true, "half"),
       t.target("Goblin 2", false),
     ]);
-    expect(t.typesSince(n)).toEqual(["HitApplied", "NotificationUpdated"]);
-    const ev = t.events.at(-2)?.event;
+    // Sprint 10 (BL-92, gate I15): the card's `ruled` row rides on HitApplied (one frame).
+    expect(t.typesSince(n)).toEqual(["HitApplied"]);
+    const ev = t.events.at(-1)?.event;
+    expect(ev?.changes.at(-1)).toMatchObject({ type: "notification", id: cardId });
     const lines = t.entries().slice(-2);
     expect(ev?.payload).toEqual({
       cardId,
@@ -87,7 +89,7 @@ describe("FR-CBT-88 cbt.applyHit", () => {
     const after = t.card(cardId);
     expect(after.p).toEqual({ ...before.p, ruled: true });
     expect([after.state, after.seq, after.text]).toEqual([before.state, before.seq, before.text]);
-    expect(ev?.changes.some((c) => c.type === "notification")).toBe(false);
+    expect(ev?.changes.filter((c) => c.type === "notification").map((c) => c.id)).toEqual([cardId]);
     // FR-MOD-63: Apply hit spends nothing.
     expect(t.count("trigger_use")).toBe(0);
   });

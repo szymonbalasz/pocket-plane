@@ -1,7 +1,8 @@
 // `cbt.rollDamage` (FR-CBT-71, ADR-0037, N7): rolls one row's damage server-side. The attacker's
 // latest pending to-hit-only card of the same row gets it (doubled after a natural 20) through
 // `updateNotification`; none → a new damage-only card via `notify`. One transaction: roll, roll
-// line, card. Healing never makes a card (the sheet never routes it). Sprint 5 (FR-CBT-92): the
+// line, card. Sprint 10 (BL-92, protocol gate I15): an updated card rides on `DamageRolled`'s
+// changes (`{emit: false}`), so the action sends one frame. Healing never makes a card (the sheet never routes it). Sprint 5 (FR-CBT-92): the
 // card owner's second roll on a completed pending card makes no card (`unusedRolls`).
 import { characterRolls } from "@shared/character-sheet/logic";
 import { withCardIds } from "@shared/combat-tracker/companion";
@@ -232,16 +233,25 @@ export const rollDamageCommand = defineCommand({
         -UNUSED_ROLLS_MAX,
       );
       rolled.payload.cardId = unusedOn.card.id;
-      updateNotification(env, unusedOn.card.id, {
-        payload: fitCardPayload({ ...unusedOn.p, unusedRolls }),
-      });
+      rolled.changes.push(
+        updateNotification(
+          env,
+          unusedOn.card.id,
+          { payload: fitCardPayload({ ...unusedOn.p, unusedRolls }) },
+          { emit: false },
+        ),
+      );
       return { cardId: unusedOn.card.id, rollIds, attached: false, unused: true };
     }
     if (pending) {
-      updateNotification(env, pending.card.id, {
-        text: damageCardText(payload),
-        payload: fitCardPayload(payload),
-      });
+      rolled.changes.push(
+        updateNotification(
+          env,
+          pending.card.id,
+          { text: damageCardText(payload), payload: fitCardPayload(payload) },
+          { emit: false },
+        ),
+      );
       recordOffers(env, pending.card.id, payload);
       return { cardId: pending.card.id, rollIds, attached: true };
     }

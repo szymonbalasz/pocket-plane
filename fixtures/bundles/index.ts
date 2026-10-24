@@ -47,9 +47,13 @@ import gemsE2e from "./gems-e2e";
 import gemsHidden from "./gems-hidden";
 import gemsRerollE2e from "./gems-reroll-e2e";
 import gemsUiE2e from "./gems-ui-e2e";
+import h1PromptRollE2e from "./h1-prompt-roll-e2e";
 import h2FitE2e from "./h2-fit-e2e";
 import h2Frame from "./h2-frame";
 import h2FrameE2e from "./h2-frame-e2e";
+import h4RecapE2e from "./h4-recap-e2e";
+import h4RulesE2e from "./h4-rules-e2e";
+import h4StoresE2e from "./h4-stores-e2e";
 import holdStoresE2e from "./hold-stores-e2e";
 import holdUiE2e from "./hold-ui-e2e";
 import imageSearch from "./image-search";
@@ -267,4 +271,10 @@ export const bundles: readonly Bundle[] = [
   h2Frame,
   h2FrameE2e,
   h2FitE2e,
+  // Sprint 10 track H1 (fix/h1-combat-dice): the prompt Roll e2e (BL-105)
+  h1PromptRollE2e,
+  // Sprint 10 track H (fix/h4-rules-misc): rules, recap, strongholds and small fixes
+  h4RulesE2e,
+  h4RecapE2e,
+  h4StoresE2e,
 ];

@@ -41,6 +41,9 @@ Dropped as by design: BL-104's "sounds locked until the first click after a load
 | Date | What |
 |---|---|
 | 2026-10-24 | Planned (DM #341): hardening run, no gate unless blocking; briefs `%TEMP%/pocket-plane/briefs/build-h{1,2,3,4}.md`, slice defs in `slices.json` (`h1`–`h4`) |
+| 2026-10-24 | All four builders started (H1 combat + dice, H2 window frame, H3 toasts, H4 rules / recap / misc) |
+| 2026-10-24 | **H4 merged** (Rules opens on the card, rule links / quotes render, DM-only house-rule badge, recap refresh ≤ 2 s, confirm bodies, party item → Stores, one session helper); walkthrough 11 / 11 |
+| 2026-10-24 | **H1 merged** (Add hidden on a bound visible token joins hidden; request Roll follows dice settings, physical form reachable; players' overkill award reads as damage; one frame per card update; roll-popup e2e steady); walkthrough 7 / 8 → re-test 5 / 5 |
 
 ## Check `main` any time (DM)
 

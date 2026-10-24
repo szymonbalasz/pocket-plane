@@ -29,7 +29,7 @@ import { BANDS, SIZE_TABLE } from "../play-shell/size-table";
 import { prefillDraft } from "./HoldReminders";
 import { RemindersWithLinks } from "./links";
 import {
-  deleteText,
+  deleteBody,
   facilityDraft,
   facilityErrors,
   figuresLine,
@@ -42,7 +42,7 @@ import {
   orderSuggestions,
   reminderGroups,
   reminderPrefill,
-  removeFacilityText,
+  removeFacilityBody,
   replacedBy,
   sameDraft,
   staffByFacility,
@@ -490,26 +490,24 @@ describe("Pure rules (FR-HOLD-17, -19, -25, -26, -27, -29, -31, -32, -33)", () =
   });
 
   test("FR-HOLD-17 FR-HOLD-19 confirm texts name the reminders and the Stores, including a negative balance", () => {
-    expect(removeFacilityText("Steam Rooms", 1)).toBe(
-      "Remove Steam Rooms? Its 1 reminder is removed too.",
+    expect(removeFacilityBody(1, 0)).toBe(
+      "It leaves the Facilities list; its 1 reminder is removed too.",
     );
-    expect(removeFacilityText("Map Room", 0)).toBe("Remove Map Room?");
-    expect(removeFacilityText("X", 2)).toBe("Remove X? Its 2 reminders are removed too.");
+    expect(removeFacilityBody(2, 0)).toBe(
+      "It leaves the Facilities list; its 2 reminders are removed too.",
+    );
     const zero = { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
-    expect(deleteText("Greystone Keep", 3, 2, { ...zero, gp: 120 })).toBe(
-      "Delete Greystone Keep? 3 reminders are removed; its Stores (2 items, 120 gp) move to the party.",
+    expect(deleteBody(3, 2, { ...zero, gp: 120 })).toBe(
+      "3 reminders are removed; its Stores (2 items, 120 gp) move to the party.",
     );
-    expect(deleteText("HOLD-SECRET-TOWER", 0, 1, { ...zero, gp: 5 })).toBe(
-      "Delete HOLD-SECRET-TOWER? 0 reminders are removed; its Stores (1 item, 5 gp) move to the party.",
+    expect(deleteBody(0, 1, { ...zero, gp: 5 })).toBe(
+      "No reminders are removed; its Stores (1 item, 5 gp) move to the party.",
     );
-    expect(deleteText("Keep", 1, 0, { ...zero, gp: -15 })).toBe(
-      "Delete Keep? 1 reminder is removed; its Stores owe 15 gp: the party pot pays it.",
+    expect(deleteBody(1, 0, { ...zero, gp: -15 })).toBe(
+      "1 reminder is removed; its Stores owe 15 gp: the party pot pays it.",
     );
-    expect(deleteText("Keep", 1, 1, { ...zero, gp: -15, sp: 3 })).toBe(
-      "Delete Keep? 1 reminder is removed; its Stores (1 item, 3 sp) move to the party; they owe 15 gp: the party pot pays it.",
-    );
-    expect(deleteText("Keep", 0, 0)).toBe(
-      "Delete Keep? 0 reminders are removed; its Stores are empty.",
+    expect(deleteBody(1, 1, { ...zero, gp: -15, sp: 3 })).toBe(
+      "1 reminder is removed; its Stores (1 item, 3 sp) move to the party; they owe 15 gp: the party pot pays it.",
     );
   });
 
@@ -677,5 +675,33 @@ describe("Window registration and memory (FR-SHELL-170–172, FR-HOLD-23)", () =
     third.bind(holdKey(DM));
     expect(third.state.getState()).toMatchObject({ strongholdId: null, tab: "facilities" });
     expect(warnings.length).toBe(1);
+  });
+});
+
+describe("Sprint 10 H4 (BL-104)", () => {
+  test("FR-HOLD-17 BL-104 the remove-facility confirm's body doesn't repeat its title: what leaves, the reminders removed, the staff kept", () => {
+    const title = "Remove Steam Rooms?";
+    const body = removeFacilityBody(1, 0);
+    expect(body).not.toContain(title);
+    expect(body).toBe("It leaves the Facilities list; its 1 reminder is removed too.");
+    expect(removeFacilityBody(0, 0)).toBe(
+      "It leaves the Facilities list; no reminders are linked to it.",
+    );
+    expect(removeFacilityBody(2, 1)).toBe(
+      "It leaves the Facilities list; its 2 reminders are removed too; 1 staff member who works there stays, unassigned.",
+    );
+    expect(removeFacilityBody(0, 3)).toBe(
+      "It leaves the Facilities list; no reminders are linked to it; 3 staff who work there stay, unassigned.",
+    );
+  });
+});
+
+describe("Sprint 10 H4 follow-up (orchestrator ruling 1)", () => {
+  test("FR-HOLD-19 the stronghold Delete confirm's body doesn't repeat its 'Delete ‹name›?' title", () => {
+    const zero = { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 };
+    const body = deleteBody(3, 2, { ...zero, gp: 120 });
+    expect(body).not.toContain("Delete Greystone Keep?");
+    expect(body).toBe("3 reminders are removed; its Stores (2 items, 120 gp) move to the party.");
+    expect(deleteBody(0, 0)).toBe("No reminders are removed; its Stores are empty.");
   });
 });

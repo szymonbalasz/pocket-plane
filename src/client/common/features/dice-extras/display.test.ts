@@ -171,3 +171,27 @@ describe("FR-DICEX-44 slow devices", () => {
     expect(isSlow(null)).toBe(false); // too few frames to judge
   });
 });
+
+describe("BL-105 FR-DICEX-83 FR-DICEX-84 own hidden answer", () => {
+  // Mira's (p1's) answer to a hidden request: `public: false`, audience p1, rolled by p1.
+  const answer = entry({ id: "a1", n: 7, public: false });
+  test("FR-DICEX-84 the roller's own hidden answer follows their display (screen / zone / flat), like a sheet roll", () => {
+    expect(plan("screen", {}, [answer], p1)?.plan).toEqual(plan("screen", {}, [entry()], p1)?.plan);
+    expect(plan("zone", {}, [answer], p1)?.plan.arena).toBe("zone");
+    expect(plan("flat", {}, [answer], p1)).toBeNull(); // chips in the popup, as any flat roll
+    expect(plan("flat", { popup: false }, [answer], p1)?.plan.draw).toBe("flat");
+    expect(plan("off", {}, [answer], p1)).toBeNull();
+  });
+  test("FR-DICEX-38 still: the DM never throws a public: false entry big, a DM roll-for-missing answer included", () => {
+    const missing = entry({
+      id: "m1",
+      n: 8,
+      public: false,
+      rollerRole: "dm",
+      rollerPlayerId: null,
+    });
+    for (const e of [answer, missing]) expect(plan("screen", {}, [e], dm)).toBeNull();
+    // The player it was rolled for gets it in the popup only (not their own roll).
+    expect(plan("screen", {}, [missing], p1)).toBeNull();
+  });
+});

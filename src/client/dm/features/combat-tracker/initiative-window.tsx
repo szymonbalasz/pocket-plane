@@ -59,6 +59,7 @@ import {
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deadPc, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
 import { NameLine } from "@ui/features/combat-extras/parts";
+import { skipText } from "@ui/features/combat-extras/skip";
 import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
 import {
   companionLayout,
@@ -133,7 +134,6 @@ import {
   useDeathSaveRoll,
 } from "../combat-extras/row";
 import { CbtxRuntime } from "../combat-extras/runtime";
-import { skipText } from "../combat-extras/skip";
 import { useCbtxDialogs } from "../combat-extras/store";
 import { type AttackAction, attackChoices, attackRolls, attackSummary } from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";

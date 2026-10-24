@@ -39,7 +39,13 @@ export interface JoinRow extends Binding {
 export function previewJoin(
   slots: readonly JoinSlot[],
   freeTokens: readonly BindToken[],
-  opts: { createTokens: boolean; hidden: boolean; sceneTokenNames: readonly string[] },
+  opts: {
+    createTokens: boolean;
+    hidden: boolean;
+    sceneTokenNames: readonly string[];
+    /** Add dialog (BL-97): `hidden` also hides a monster's bound visible token (Start: no). */
+    hideBound?: boolean;
+  },
 ): JoinRow[] {
   const names = [...opts.sceneTokenNames];
   return planBindings(slots, freeTokens).map((b, i) => {
@@ -48,7 +54,10 @@ export function previewJoin(
       hpMode: s.hpMode,
       averageFallback: s.kind === "monster" && s.hpMode === "rolled" && !s.hasFormula && !s.pet,
     };
-    if (b.tokenId !== null) return { ...b, ...base, binding: "token" as const };
+    if (b.tokenId !== null) {
+      const hide = opts.hideBound === true && opts.hidden && s.kind === "monster" && !s.pet;
+      return { ...b, ...base, hidden: b.hidden || hide, binding: "token" as const };
+    }
     // FR-CBT-109: a pet never gets a new token.
     if (s.kind === "monster" && opts.createTokens && !s.pet) {
       const name = numberedName(s.name.slice(0, 40), names);
