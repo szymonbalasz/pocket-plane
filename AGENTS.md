@@ -139,8 +139,8 @@ Implements [ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md). Val
 |---|---|---|---|---|
 | `dev` | Builder | `bun run dev`: Hono (watch) + Vite (HMR) | Hono base+0, Vite base+1 | `data/dev/` |
 | `verify` | Test agent walkthroughs | `bun run start`: Hono serves the built client, API and WS | Hono base+2 (one port) | `data/verify/` |
-| (e2e) | `bun run e2e` | `start` on a temp dir | port `0` | fresh temp dir per run |
-| (tests) | `bun test` | in-process | port `0` | `:memory:` DB + temp asset dir per test file |
+| (e2e) | `bun run e2e` | `start` on a temp dir, one per bundle, up to `PP_E2E_WORKERS` at once | port `0` | fresh temp dir per bundle |
+| (tests) | `bun test` / `check` | in-process; `check` runs `PP_TEST_SHARDS` `bun test` processes | port `0` | `:memory:` DB + temp asset dir per test file |
 
 - WS endpoint path: `/ws` *(proposed; [OQ-SYNC-15](docs/specs/live-sync.md#15-open-questions) open)* ([FR-SYNC-01](docs/specs/live-sync.md#6-functional-requirements)).
 - **DM URL in dev** is the Vite port; Vite proxies `/api` and the WS path to Hono. Everywhere else (verify, e2e, real play, tunnel) one Hono port serves everything; that is the port a tunnel needs.
@@ -195,11 +195,13 @@ fixtures/
 | `bun run dev [--profile p]` | Hono (watch) + Vite; logs to stdout and `$PP_DATA_DIR/server.log` | profile ports |
 | `bun run build` | Vite build of both clients to `dist/client/` | — |
 | `bun run start [--profile p]` | Hono serving `dist/client/`, API and WS on one port | profile port |
-| `bun test` | Unit + integration: commands, zod schemas, domain events + event log, visibility filter (DM vs player), WS hub via real socket, fixture load, import boundaries, guards | `:memory:` DB, temp asset dir, port 0 |
-| `bun run e2e` | Builds, then Playwright, thin critical flows only. DM and player in separate browser contexts | port 0, temp data dir, own server |
+| `bun test` | Unit + integration: commands, zod schemas, domain events + event log, visibility filter (DM vs player), WS hub via real socket, fixture load, import boundaries, guards. Plain `bun test` runs every file, the slow set too | `:memory:` DB, temp asset dir, port 0 |
+| `bun run e2e [spec.ts…]` | Builds once, then Playwright per bundle, thin critical flows only. DM and player in separate browser contexts. Up to `PP_E2E_WORKERS` bundles at once (default 4; `1` = one after another), output prefixed `[bundle]`, a passed / failed / flaky summary per bundle at the end; longest bundles first (`data/e2e-times.json`) | per bundle: port 0, temp data dir, own server, Playwright output `test-results/<bundle>/` |
 | `bun run typecheck` | `tsc --noEmit`, whole repo | — |
 | `bun run lint` | `biome check` (lint + format) | — |
-| `bun run check` | `typecheck` + `lint` + `bun test`. Run before every commit | — |
+| `bun run check` | `typecheck` + `lint` + `bun test` minus the slow set, all at once. Tests split into `PP_TEST_SHARDS` processes (default min(6, cores / 4); `1` = one process), balanced by `scripts/test-times.json`; prints failures with their file. Run before every commit | each shard: own `bun test` process, same preload |
+| `bun run check:full` | `check` + the slow set (`*.slow.test.ts`: heavy harnesses and sweeps). The orchestrator's gates (`gates.sh`) and session-sims; builders touching a slow file run that file | as `check` |
+| `bun run test:times [filters…]` | Runs each test file in its own process (`PP_TEST_TIMES_JOBS` at once, default 8), rewrites `scripts/test-times.json` (shard weights) and writes `data/test-times.md`, slowest first | as `bun test` |
 | `bun run bench` | Timed perf gates (`*.bench.ts`: fog vision, scene geometry / guard / area, dice settle / notation, compendium search, map fit visibility, window placement, DM snapshot build time, command palette search, session recap compute; harness `src/shared/bench-kit.ts`); `bun test` skips them, a new one is added to the script. Run it alone, before merging vision / fog / geometry perf work | in-process |
 | `bun run state:digest [--profile p]` | Read-only per-table row counts + SHA-256 of the profile's DB (crash walkthroughs compare digests, #163) | profile data |
 
