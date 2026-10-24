@@ -2,9 +2,9 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 10 done (#341–#342): hardening run, all four slices merged, final `main` check 5,587 / e2e 238 / bench 41 / 41, **session-sim-14 13 / 13 PASS** (`.verify/20261024-061849-session-sim-14/`). **Paused for the DM recap** ([sprint-10 Playtest](sprint-10.md#playtest-sprint-10-fixes)). Next: recap + sprint 11 scope with the DM.
+**Phase:** Sprint 10 slices merged, session-sim-14 13 / 13. Recap part 1 (#343): DM asked for the **Dice tray +40 %** before closing, and accepted BL-111 / BL-114 picks → slices **T1** `fix/dice-tray-size`, **T2** `fix/s10-dm-calls` running; recap part 2 (#344): **T3** `fix/stats-campaign` (Stats Campaign tab, first) running. Then: walkthroughs, merge, main gates, update the Playtest section, pause for the rest of the recap.
 
-**Gates on `main`:** run in a detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, then `bun install`, `bun run env:init`, `gates.sh <it> <tag>`), so `main`'s own `dist/` is never rebuilt while the DM tests there. Removed at the end of sprint 10; recreate it at the first merge of sprint 11.
+**Gates on `main`:** detached worktree `~/.herdr/worktrees/pocket-plane/gates-main` (recreated for T1 / T2); `gates.sh <it> <tag>`; `main`'s own `dist/` is never rebuilt.
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -16,18 +16,23 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 H3 toasts | merged 8b279504 | — | **merged** (walkthrough 5/8 → re-tests 7/8, 9/10, 12/12; branch check 5587 / e2e 237 + known combat2-polish FR-CBT-75 flake, 3 × 8/8 alone); evidence `.verify/sprint10/walkthroughs/20261024-h3*/` ; main gates green (5587 / 238), bench 41 / 41 | — |
 | Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/`; main gates green (5545 / 229) | — |
 | Sprint gate | final main 8b279504 | — | **session-sim-14 13 / 13 PASS** (leak scan clean; hard kill byte-identical); glitches → BL-107–BL-114 | DM recap |
+| Sprint 10 T1 Dice tray +40 % (#343) | `fix/dice-tray-size` (slot 0, ws wAA) | build-t1 | building (holds the frame lock: size table, goldens, replay sets) | walkthrough (port 4103) |
+| Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | `fix/s10-dm-calls` (slot 2, ws wAB) | build-t2 (idle), test-t2 | ready (check 5593, e2e 240) → walkthrough (port 4123) | merge (before T3) |
+| Sprint 10 T3 Stats Campaign tab (#344) | `fix/stats-campaign` (slot 4, ws wAC) | build-t3 (idle), test-t3 | built (bench 12.7 / 18.2 ms) → walkthrough (port 4143); then merge main after T2 + apply BL-111 to awards won | merge |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
 ## Shared-file locks
 
-- None (every sprint-10 slice merged).
+- T1: play-shell size table / goldens / replay sets (frame lock).
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
 *(Sprint 10: add new rulings above the sprint-9 list.)*
 
 Sprint 10:
+- T2 BL-111: players' "Most damage dealt" is withheld per session when damage to creatures hidden from them could change its winner; BL-114: pet presence ignores a DM-hidden combatant (non-owners get a delete, back on show); pre-fix hidden pets update on their next write (accepted). Recap reads two new stats exports (FR-STATS-78 note).
+- T3 Campaign tab: party rows only (DM too, as Trophies), companions roll into their owner, monsters slain counts any attacker, record ties → earlier fact, all tie winners counted for awards won, DM record labels encounter + day / players "Fight N · day"; players' awards won drop Most damage dealt where T2 withholds it; table scrolls sideways inside today's 400 × 412 window.
 - H1 BL-103: players' "Biggest overkill" amount was the hit's damage (allowed by FR-STATS-12), not a leak; players now read "N damage" on Session, recap Awards, Highlights and Trophies; DM unchanged (FR-STATS-12 amended).
 - H1 BL-97: Add hidden hides a bound visible token like the map's hide; never unhides; Start keeps a bound token's own hidden flag (accepted as is).
 - H1 BL-105: a player's own hidden-request answer follows their dice settings; the DM's own hidden rolls stay popup-only (FR-DICEX-84 amended).
@@ -54,7 +59,7 @@ Sprint 10:
 
 ## Pending DM decisions
 
-- Recap: BL-111 (players' "Most damage dealt" winner can differ: hide that award for players while hidden damage could change it, or keep), BL-114 (drop a hidden pet's redacted entity for non-owners while hidden, or keep per FR-ENT-37); sprint 11 scope.
+- Rest of the recap: sprint 11 scope (BL-111 / BL-114 decided, #343).
 
 ## Resolved locally (report at gate)
 
