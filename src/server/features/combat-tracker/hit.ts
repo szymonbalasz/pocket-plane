@@ -2,8 +2,8 @@
 // its damage exists. One transaction: the DM-only `hit_ruling` row, one `cbt.attack` line per
 // ruled target without damage (`awaitingDamage`), `HitApplied`. No HP, no `hp_change`, the card
 // stays pending; nothing is spent (FR-MOD-63: no apply hooks run). Not undoable. Sprint 7 (GM1):
-// the card gains `ruled` (its only change, `NotificationUpdated`, no toast) so its owner's
-// client knows a reroll of the to-hit is no longer offered.
+// the card gains `ruled` (its only change, no toast; sprint 10: in `HitApplied`'s changes) so
+// its owner's client knows a reroll of the to-hit is no longer offered.
 
 import {
   companionLineRollIds,
@@ -168,6 +168,14 @@ export const applyHitCommand = defineCommand({
       })
       .returning()
       .get();
+    // Sprint 7 (GM1): the owner's no-leak "ruled" flag. Sprint 10 (BL-92, protocol gate I15): its
+    // row rides on the owner's event (`{emit: false}`), one frame per Apply hit.
+    const ruled = updateNotification(
+      env,
+      card.id,
+      { payload: fitCardPayload({ ...p, ruled: true }) },
+      { emit: false },
+    );
     env.emit({
       type: HitApplied.type,
       campaignId: cid,
@@ -177,10 +185,8 @@ export const applyHitCommand = defineCommand({
         rulingId: id,
         entryIds: entries.map((e) => e.id),
       },
-      changes: [hitRulingChange(null, toHitRulingRecord(row)), ...entries],
+      changes: [hitRulingChange(null, toHitRulingRecord(row)), ...entries, ruled],
     });
-    // Sprint 7 (GM1): the owner's no-leak "ruled" flag, after the owner's event (protocol §22).
-    updateNotification(env, card.id, { payload: fitCardPayload({ ...p, ruled: true }) });
     return { rulingId: id };
   },
 });

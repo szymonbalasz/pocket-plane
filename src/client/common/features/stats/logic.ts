@@ -153,8 +153,18 @@ const UNIT: Record<AwardKey, string> = {
   "most-nat1": "",
   "most-downed": "",
 };
-export const awardValueText = (a: Award) =>
-  a.value === null ? "—" : UNIT[a.key] ? `${a.value} ${UNIT[a.key]}` : String(a.value);
+/**
+ * Sprint 10 (BL-103): a player's Biggest overkill is the callout line's damage (FR-STATS-12, -22:
+ * players never get an overkill amount), so it reads "30 damage", never a bare "30" beside the
+ * DM's "17"; the DM's stays the overkill amount.
+ */
+const unitOf = (key: AwardKey | HighlightKey, role: "dm" | "player") =>
+  key === "biggest-overkill" && role === "player" ? "damage" : null;
+
+export const awardValueText = (a: Award, role: "dm" | "player") => {
+  const unit = unitOf(a.key, role) ?? UNIT[a.key];
+  return a.value === null ? "—" : unit ? `${a.value} ${unit}` : String(a.value);
+};
 
 // ---------- Highlights (FR-STATS-31, -36) ----------
 
@@ -207,7 +217,7 @@ export function highlightItems(h: PlayerHighlights | DmHighlights): HighlightIte
   ) => {
     const s = h[key];
     if (s.value === null || s.winners.length === 0) return;
-    const unit = STAT_UNIT[key];
+    const unit = unitOf(key, "standing" in h ? "dm" : "player") ?? STAT_UNIT[key];
     out.push({ key, kind: "stat", stat: s, value: unit ? `${s.value} ${unit}` : String(s.value) });
   };
   const fell = (key: "kills" | "downed") => {

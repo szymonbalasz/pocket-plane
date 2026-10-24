@@ -816,16 +816,20 @@ function PhysicalMarker() {
  * A button that rolls through `control`; the manual popover anchors to it. Its tooltip is
  * `rollButtonTip` (FR-DICEX-51): a caller with tooltip text of its own passes it as `hint`
  * instead of wrapping the button in a Tooltip. `hint={false}`: an invisible anchor (the roll
- * starts from a menu, whose trigger or open menu shows the Alt hint), no tooltip.
+ * starts from a menu, whose trigger or open menu shows the Alt hint), no tooltip. `formZ`: the
+ * manual popover's layer when the button sits above the default (z-50), e.g. in a toast.
  */
 export function RollButton({
   control,
   hint,
+  formZ,
   onClick,
   className,
   children,
   ...props
-}: { control: RollControl; hint?: string | false } & ComponentProps<typeof Button>) {
+}: { control: RollControl; hint?: string | false; formZ?: number } & ComponentProps<
+  typeof Button
+>) {
   const anchor = (
     <PopoverAnchor asChild>
       <Button
@@ -858,6 +862,7 @@ export function RollButton({
         align="end"
         side="top"
         className="w-80"
+        {...(formZ !== undefined ? { style: { zIndex: formZ } } : {})}
         onFocusOutside={(e) => e.preventDefault()}
       >
         <ManualForm control={control} />
