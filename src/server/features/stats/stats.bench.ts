@@ -4,12 +4,14 @@
 // session list cold (a fresh boundary cache) ≤ 300 ms and warm (cache + memo) ≤ 5 ms. Sprint 8
 // (FR-STATS-51): fight + Highlights ≤ 20 ms; luck, one session ≤ 50 ms; campaign warm (built
 // partials, newest session recomputed, memo stale) ≤ 50 ms; the chunked build's longest block
-// ≤ 50 ms.
+// ≤ 50 ms. Sprint 10 T3 (FR-STATS-87): the Campaign tab's answer warm (built partials, newest
+// session recomputed, memo stale) ≤ 50 ms, DM and player.
 import { beforeAll, describe, expect, test } from "bun:test";
 import { best, GATE_TIMEOUT, logResults } from "@shared/bench-kit";
 import type { Actor } from "../../events/types";
 import { SessionCache } from "./cache";
 import {
+  campaignStats,
   fightStats,
   luckStats,
   type StatsRead,
@@ -143,6 +145,31 @@ describe("STATS §12 bench gates (100 sessions)", () => {
       expect(warmDm).toBeLessThanOrEqual(GATES.campaignWarm);
       expect(warmPlayer).toBeLessThanOrEqual(GATES.campaignWarm);
       expect(trophiesDm).toBeLessThanOrEqual(GATES.campaignWarm);
+    },
+    GATE_TIMEOUT * 2,
+  );
+
+  test(
+    "FR-STATS-87 campaign tab warm ≤ 50 ms (DM and player)",
+    async () => {
+      const { partials, cache } = statsMemory(t.s);
+      await partials.build(t.h.campaignId);
+      const sessions = cache.sessions(t.s.db, t.h.campaignId);
+      const answer = campaignStats(dm, sessions, partials).campaign;
+      expect("pending" in answer).toBe(false);
+      const warmDm = await best(() => campaignStats(dm, sessions, partials), GATES.campaignWarm);
+      const warmPlayer = await best(
+        () => campaignStats(player, sessions, partials),
+        GATES.campaignWarm,
+      );
+      const ackBytes = JSON.stringify(campaignStats(dm, sessions, partials)).length;
+      logResults("STATS §12 sprint 10 T3 (100 sessions)", {
+        "campaign tab warm DM ms": warmDm,
+        "campaign tab warm player ms": warmPlayer,
+        "campaign ack DM bytes": ackBytes,
+      });
+      expect(warmDm).toBeLessThanOrEqual(GATES.campaignWarm);
+      expect(warmPlayer).toBeLessThanOrEqual(GATES.campaignWarm);
     },
     GATE_TIMEOUT * 2,
   );

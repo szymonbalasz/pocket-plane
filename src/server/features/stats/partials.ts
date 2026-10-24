@@ -3,11 +3,20 @@
 // from facts: built at server start (and after a drop-all) in yielding 5-session chunks; the
 // newest session is always recomputed. A commit touching an entry / fact drops its session's
 // partials; a combatant's owner / kind change or a feature switch drops all. Unsure → drop all.
+// Sprint 10 T3 (FR-STATS-81–84): a partial also keeps the session's award winners, its fights and
+// its monster kills, for the Campaign tab.
 import { COMBATANT_TYPE, HP_CHANGE_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
-import { type SessionBounds, type StatsCharacter, sessionOf } from "@shared/stats/rules";
+import { type AwardWins, addWins, mergeWins } from "@shared/stats/campaign";
+import {
+  isKill,
+  type SessionBounds,
+  type StatsCharacter,
+  sessionAwards,
+  sessionOf,
+} from "@shared/stats/rules";
 import {
   addLuck,
   addTrophies,
@@ -30,7 +39,21 @@ type Read = Pick<Tx, "select" | "all">;
 export interface SessionPartial {
   luck: Map<string, LuckTally>;
   trophies: Map<string, TrophyTally>;
+  /** The session's awards (FR-STATS-12) won per character (FR-STATS-84). */
+  wins: AwardWins;
+  /** Encounters with a counted fact the viewer sees (FR-STATS-81's fights). */
+  fights: Set<string>;
+  /** Monster kills the viewer sees, whoever the attacker (FR-STATS-81's monsters slain). */
+  slain: number;
 }
+
+const emptyPartial = (): SessionPartial => ({
+  luck: new Map(),
+  trophies: new Map(),
+  wins: new Map(),
+  fights: new Set(),
+  slain: 0,
+});
 
 /** Sessions per chunk (≈ 40 ms at 100 sessions, ADR-0062). */
 export const CHUNK_SESSIONS = 5;
@@ -53,7 +76,7 @@ export function computePartials(
   const first = sessions[0];
   const last = sessions.at(-1);
   if (!first || !last) return out;
-  for (const s of sessions) out.set(s.fromN, { luck: new Map(), trophies: new Map() });
+  for (const s of sessions) out.set(s.fromN, emptyPartial());
   const facts = combatFacts(r.db, {
     campaignId: r.campaignId,
     fromN: first.fromN,
@@ -77,8 +100,27 @@ export function computePartials(
     rollsBy.set(s.fromN, xs);
   }
   for (const [fromN, p] of out) {
-    addTrophies(p.trophies, factsBy.get(fromN) ?? [], characters, r.viewer.role);
-    addLuck(p.luck, rollsBy.get(fromN) ?? [], characters, r.viewer.role);
+    const sf = factsBy.get(fromN) ?? [];
+    const sr = rollsBy.get(fromN) ?? [];
+    addTrophies(p.trophies, sf, characters, r.viewer.role);
+    addLuck(p.luck, sr, characters, r.viewer.role);
+    for (const f of sf) {
+      p.fights.add(f.encounterId);
+      if (isKill(f)) p.slain += 1;
+    }
+    // FR-STATS-84: the Session tab's awards for this session (winners only: no labels needed).
+    if (sf.length > 0 || sr.length > 0) {
+      addWins(
+        p.wins,
+        sessionAwards({
+          role: r.viewer.role,
+          facts: sf,
+          rolls: sr,
+          characters,
+          fightLabel: () => "",
+        }),
+      );
+    }
   }
   return out;
 }
@@ -108,9 +150,7 @@ interface CampaignMemo {
   generation: number;
 }
 
-export type CampaignTallies =
-  | { pending: true }
-  | { pending?: undefined; luck: Map<string, LuckTally>; trophies: Map<string, TrophyTally> };
+export type CampaignTallies = { pending: true } | ({ pending?: undefined } & SessionPartial);
 
 export interface BuildEnv {
   db: Read;
@@ -228,24 +268,25 @@ export class Partials {
     for (const run of runsOf(sessions, missing)) {
       this.store(r.campaignId, key, computePartials(r, run, characters));
     }
-    const luck = new Map<string, LuckTally>();
-    const trophies = new Map<string, TrophyTally>();
+    const all = emptyPartial();
+    const merge = (p: SessionPartial) => {
+      mergeLuck(all.luck, p.luck);
+      mergeTrophies(all.trophies, p.trophies);
+      mergeWins(all.wins, p.wins);
+      for (const e of p.fights) all.fights.add(e);
+      all.slain += p.slain;
+    };
     const parts = m.byClass.get(key);
     for (const s of closed) {
       const p = parts?.get(s.fromN);
-      if (!p) continue;
-      mergeLuck(luck, p.luck);
-      mergeTrophies(trophies, p.trophies);
+      if (p) merge(p);
     }
     const newest = sessions.at(-1);
     if (newest) {
       const p = computePartials(r, [newest], characters).get(newest.fromN);
-      if (p) {
-        mergeLuck(luck, p.luck);
-        mergeTrophies(trophies, p.trophies);
-      }
+      if (p) merge(p);
     }
-    return { luck, trophies };
+    return all;
   }
 
   /** Drops every partial of the campaign; a running build stops; the owner rebuilds. */

@@ -27,12 +27,26 @@
 //   Trophies: Mira (Player 1) fights 2, dealt 43, taken 26, kills 3, downed 1; Biggest hit and
 //   overkill 25 → Bandit; Best fight 43 dmg / 3 kills. Thorn (DM) dealt 93, taken 209, kills 4,
 //   nat 20s 5; Biggest hit 30 → Skeleton (Old Crypt), overkill 23 → Goblin Scout.
+//
+// Sprint 10 T3 `stats-b` Campaign tab (one session), DM | players:
+//   Header: sessions 1, fights 2, monsters slain 9 | 7 (the hidden Goblin 2 and Captain).
+//   Party (dealt, taken, healed, kills, downed, nat 20s, nat 1s, fights):
+//     Thorn  93 | 73, 209 | 200, 0, 4 | 3, 1, 5 | 3, 1, 2
+//     Mira   54 | 43, 26, 0, 4 | 3, 1, 1, 1, 2
+//     Brakka 12, 55, 8, 1, 1, 0, 0, 1
+//   Records: Biggest hit Thorn 30 → Skeleton (Old Crypt | Fight 1); Biggest overkill Thorn 23 →
+//   Goblin Scout (Ambush) | 30 → Skeleton (Fight 1); most damage in a fight Mira 54 (Ambush) |
+//   Thorn 43 (Fight 1); most kills Mira 4 (Ambush) | 3 (Fight 2); most healing Brakka 8.
+//   Awards won: Thorn 8, Mira 3, Brakka 2 (both roles; the one session's winners, ties count).
 import { afterAll, describe, expect, test } from "bun:test";
 import { combatant, encounter, entity, hpChange, notification, player } from "@server/db/schema";
 import { servicesFromBundle } from "@server/ws/testing/snapshot-size";
 import { DamageCardPayload } from "@shared/combat-tracker/schemas";
+import { dayLabel } from "@shared/stats/rules";
 import {
   type Award,
+  CampaignResult,
+  type CampaignStats,
   type DmFightResult,
   DmHighlights,
   type DmLuckResult,
@@ -275,6 +289,80 @@ describe("STATS §13 fixtures", () => {
     expect(library.bundles.find((b) => b.name === "stats-b-e2e")?.includes).toEqual(["stats-b"]);
     // SB1 + SB2's e2e alias (`e2e/stats-ui-b.e2e.ts` changes state on its own server).
     expect(library.bundles.find((b) => b.name === "stats-b-ui-e2e")?.includes).toEqual(["stats-b"]);
+  }, 60_000);
+
+  test("FR-STATS-81 FR-STATS-82 FR-STATS-83 FR-STATS-84 stats-b bundle: the Campaign tab per role (header)", async () => {
+    const t = await loaded("stats-b");
+    const ask = (actor: typeof t.dm | ReturnType<typeof t.as>) => {
+      const c = CampaignResult.parse(t.q({ scope: "campaign" }, actor)).campaign;
+      if ("pending" in c) throw new Error("pending");
+      return c;
+    };
+    const rows = (c: CampaignStats) =>
+      Object.fromEntries(
+        c.rows.map((r) => [
+          r.name,
+          [r.dealt, r.taken, r.healed, r.kills, r.downed, r.nat20, r.nat1, r.fights],
+        ]),
+      );
+    const records = (c: CampaignStats) =>
+      Object.fromEntries(
+        Object.entries(c.records).map(([k, r]) => [k, r && [r.name, r.value, r.to, r.fight]]),
+      );
+    const awards = (c: CampaignStats) => c.awards.map((a) => [a.name, a.total]);
+    const day = (iso: string) => dayLabel(iso);
+    const at = t.s.db.select().from(encounter).all();
+    const started = (name: string) => day(at.find((e) => e.name === name)?.startedAt as string);
+    const dm = ask(t.dm);
+    expect([dm.sessions, dm.fights, dm.slain]).toEqual([1, 2, 9]);
+    expect(rows(dm)).toEqual({
+      Thorn: [93, 209, 0, 4, 1, 5, 1, 2],
+      Mira: [54, 26, 0, 4, 1, 1, 1, 2],
+      Brakka: [12, 55, 8, 1, 1, 0, 0, 1],
+    });
+    expect(dm.rows.map((r) => r.name)).toEqual(["Thorn", "Mira", "Brakka"]);
+    const crypt = `Old Crypt · ${started("Old Crypt")}`;
+    const ambush = `Ambush at the Ford · ${started("Ambush at the Ford")}`;
+    expect(records(dm)).toEqual({
+      "biggest-hit": ["Thorn", 30, "Skeleton", crypt],
+      "biggest-overkill": ["Thorn", 23, "Goblin Scout", ambush],
+      "best-fight-damage": ["Mira", 54, undefined, ambush],
+      "best-fight-kills": ["Mira", 4, undefined, ambush],
+      "best-fight-healing": ["Brakka", 8, undefined, ambush],
+    });
+    expect(awards(dm)).toEqual([
+      ["Thorn", 8],
+      ["Mira", 3],
+      ["Brakka", 2],
+    ]);
+    const first = ask(t.as("Player 1"));
+    expect(ask(t.as("Player 2"))).toEqual(first);
+    expect([first.sessions, first.fights, first.slain]).toEqual([1, 2, 7]);
+    expect(rows(first)).toEqual({
+      Thorn: [73, 200, 0, 3, 1, 3, 1, 2],
+      Mira: [43, 26, 0, 3, 1, 1, 1, 2],
+      Brakka: [12, 55, 8, 1, 1, 0, 0, 1],
+    });
+    const f1 = `Fight 1 · ${started("Old Crypt")}`;
+    const f2 = `Fight 2 · ${started("Ambush at the Ford")}`;
+    expect(records(first)).toEqual({
+      "biggest-hit": ["Thorn", 30, "Skeleton", f1],
+      // FR-STATS-12: players' Biggest overkill is the callout line's damage, never an amount.
+      "biggest-overkill": ["Thorn", 30, "Skeleton", f1],
+      "best-fight-damage": ["Thorn", 43, undefined, f1],
+      "best-fight-kills": ["Mira", 3, undefined, f2],
+      "best-fight-healing": ["Brakka", 8, undefined, f2],
+    });
+    expect(awards(first)).toEqual([
+      ["Thorn", 8],
+      ["Mira", 3],
+      ["Brakka", 2],
+    ]);
+    // Thorn's and Mira's rows match the trophies above (Lifetime definitions, FR-STATS-42).
+    // T3's e2e alias (`e2e/t3-campaign.e2e.ts`).
+    expect(library.bundles.find((b) => b.name === "stats-campaign-e2e")?.includes).toEqual([
+      "stats-b",
+    ]);
   }, 60_000);
 
   test("session-sim-12 loads from empty; sb-past-bandits and sb-luck-rolls are session-sim-11-safe (no gems, Goblins untouched)", async () => {

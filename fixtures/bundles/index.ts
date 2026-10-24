@@ -105,6 +105,7 @@ import statsB from "./stats-b";
 import statsBE2e from "./stats-b-e2e";
 import statsBPast from "./stats-b-past";
 import statsBUiE2e from "./stats-b-ui-e2e";
+import statsCampaignE2e from "./stats-campaign-e2e";
 import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
 import statsWindowE2e from "./stats-window-e2e";
@@ -280,4 +281,6 @@ export const bundles: readonly Bundle[] = [
   h4RulesE2e,
   h4RecapE2e,
   h4StoresE2e,
+  // Sprint 10 T3 (fix/stats-campaign): the Stats Campaign tab e2e alias of stats-b
+  statsCampaignE2e,
 ];

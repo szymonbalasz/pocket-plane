@@ -2,6 +2,7 @@
 // a viewer with no `playerId`, public lines only; DM all; feature-tagged kinds skipped while off),
 // then the pure formulas of `@shared/stats/rules`. Reads only, through the owners' read helpers.
 
+import { campaignAwards, campaignRecords, campaignRows } from "@shared/stats/campaign";
 import {
   dayLabel,
   fightRows,
@@ -372,6 +373,44 @@ export function trophiesStats(
         all.luck.get(characterId),
         (id) => labels.get(id) ?? "",
       ),
+    },
+  };
+}
+
+// ---------- campaign (sprint 10 T3, FR-STATS-81–87) ----------
+
+/** FR-STATS-83: a record's fight: the DM's name + day; a player's neutral label (holds the day). */
+function fightWhen(r: StatsRead, fights: Fights): (encounterId: string) => string {
+  const startedAt = new Map(fights.listed.map((f) => [f.id, f.startedAt]));
+  return (id) => {
+    const label = fights.label.get(id) ?? "";
+    const at = startedAt.get(id);
+    if (r.viewer.role !== "dm" || !at) return label;
+    return `${label.slice(0, 64)} · ${dayLabel(at)}`;
+  };
+}
+
+/**
+ * `stats.query {scope: "campaign"}` (FR-STATS-81–84): the header (sessions the viewer lists,
+ * fights with a counted fact they see, monsters slain), the party's lifetime table, the records
+ * and the session awards won, all from the session partials (FR-STATS-46, ADR-0062).
+ */
+export function campaignStats(
+  r: StatsRead,
+  sessions: readonly SessionBounds[],
+  partials: Partials,
+) {
+  const chars = characters(r.db, r.campaignId);
+  const all = partials.campaign(r, chars);
+  if (all.pending) return { campaign: { pending: true as const } };
+  return {
+    campaign: {
+      sessions: listable(r, sessions).length,
+      fights: all.fights.size,
+      slain: all.slain,
+      rows: campaignRows(all.trophies, all.luck, chars),
+      records: campaignRecords(all.trophies, chars, fightWhen(r, fightsFor(r))),
+      awards: campaignAwards(all.wins, chars),
     },
   };
 }
