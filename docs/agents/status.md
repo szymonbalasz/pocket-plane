@@ -22,7 +22,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T4 faster test loop (#345) | merged aa9ddba0 | — | **merged** (branch check:full 5634 / e2e 243 at 4 workers, 752 s wall for the whole gate); main gates skipped (same code) | — |
 | Sprint 10 T5 dice visuals (#347, #348) | merged bfdc44a9 | — | **merged** (visual walkthrough PASS; branch check:full 5635, e2e 242 + weapon-rows load flake 2/2 alone); main gates skipped (same code) | — |
 | Sprint 11 F1 frame + camera | `fix/f1-frame` (slot 0, ws wAF) | build-f1 (idle), test-f1 | ready (check:full green, 31 frame e2e) → walkthrough | branch gate, merge |
-| Sprint 11 F2 toasts | `fix/f2-toasts` (slot 2, ws wAG) | build-f2 | building (toast runtime) | walkthrough (port 4123) |
+| Sprint 11 F2 toasts | `fix/f2-toasts` (slot 2, ws wAG) | build-f2 (idle), test-f2 | ready (1b66629e; check 5157, toast e2e green, combat2-polish 10/10 loaded) → walkthrough | branch gate, merge |
 | Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
 | Sprint 11 art track (DM) | DM's own agent | — | planning in docs/design/ | — |
 
@@ -35,6 +35,7 @@ Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
 Sprint 11:
+- F2 BL-115: refold only after 250 ms of layout stillness, draw once per fold (hold ≤ 300 ms), read card targets / PCs as footprints (FR-NOTE-77 note). BL-108 (FR-NOTE-78): fallback avoids headings and first records first; the damage-card popup blocks like Initiative, else fold. g01 lands right of "Party pot" (accepted). FR-FIX-03 every-bundle test timeout 60 → 300 s (granted; ~190 s under load).
 - F1 BL-107: an untouched launcher window grows past useful only where Fit still frames every token (all placements): DM 1440 mid-fight Party Manager opens 440 × 400, not 600 — **raise at recap** (DM #341 asked 600; 600 still where it fits). BL-109: new rung L3r moves one other untouched window aside at its size before a put-away (amends invariant I5): accepted. Launcher labels drop one at a time (10 / 17 at DM 1440 test mode). Party Manager over the enemy line: no spot of useful size avoids tokens; covers 10 / 20 (was 14). Harness DM 7 → 6 (last DM exemption retired), players 30 → 29.
 - F3 BL-110: the reported "After Mira" case already toasts; the gap was "In Mira's turn" companions (no rank): now named in the DM's skip toast on the owner's turn (Next / Prev, Initiative and palette), DM only. BL-113 "Add hidden" default: current behaviour confirmed (dated note FR-CBTX-44). F3 edited `palette/launch.tsx` (palette, not F1's launcher): accepted.
 
