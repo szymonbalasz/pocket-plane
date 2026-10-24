@@ -21,8 +21,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
 | Sprint 10 T4 faster test loop (#345) | merged aa9ddba0 | — | **merged** (branch check:full 5634 / e2e 243 at 4 workers, 752 s wall for the whole gate); main gates skipped (same code) | — |
 | Sprint 10 T5 dice visuals (#347, #348) | merged bfdc44a9 | — | **merged** (visual walkthrough PASS; branch check:full 5635, e2e 242 + weapon-rows load flake 2/2 alone); main gates skipped (same code) | — |
-| Sprint 11 F1 frame + camera | `fix/f1-frame` (slot 0, ws wAF) | build-f1 (idle) | walkthrough 11/12 → re-test **6/6** (`.verify/20261024-f1{,r}/`); main merged (protocol §163 → §164); branch gate running | merge |
-| Sprint 11 F2 toasts | `fix/f2-toasts` (slot 2, ws wAG) | build-f2 (idle) | walkthrough 10/12 → re-test **8/8** (`.verify/20261024-f2{,r}/`) | merge main after F1, gate, merge |
+| Sprint 11 F1 frame + camera | merged 0b628f94 | — | **merged** (re-test 6/6; branch check:full 5651 / e2e 250/250); main gates skipped (same code) | — |
+| Sprint 11 F2 toasts | `fix/f2-toasts` (slot 2, ws wAG) | build-f2 (idle) | re-test 8/8; main (F1 + F3) merged, protocol §165; branch gate running | merge, then session-sim-15 |
 | Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
 | Sprint 11 art track (DM) | DM's own agent | — | planning in docs/design/ | — |
 
