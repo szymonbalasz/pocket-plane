@@ -12,8 +12,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 |---|---|---|---|---|
 | Sprint 9 (RS0–3, PM1–2, FX1–3, SP1–3) | all merged | — | done | — |
 | Sprint 10 H1 combat + dice | merged cf97ba09 | — | **merged** (walkthrough 7/8 → re-test 5/5; branch check 5557 / e2e 231); evidence `.verify/sprint10/walkthroughs/20261024-h1{,r}/` | main gates |
-| Sprint 10 H2 window frame + Party Manager | `fix/h2-frame` (slot 2, ws wA7) | build-h2 | walkthrough 5/6 (`.verify/20261024-h2/`): fixing resize round trip → 48-px floor | re-test |
-| Sprint 10 H3 toasts | `fix/h3-toasts` (slot 3, ws wA8) | build-h3 (idle), test-h3r | fixes 782118bc+ (FR-NOTE-77; check 5546, e2e 227) → re-test (port 4133) | merge |
+| Sprint 10 H2 window frame + Party Manager | `fix/h2-frame` (slot 2, ws wA7) | build-h2 (idle), test-h2r | fixes c8378cf8 + cd77128c (check green, e2e 229/229) → re-test (port 4123) | merge |
+| Sprint 10 H3 toasts | `fix/h3-toasts` (slot 3, ws wA8) | build-h3 | re-test 2 9/10 (`.verify/20261024-h3r2/`): fixing summary-only stack landing on the Game log | re-test 3 |
 | Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/`; main gates green (5545 / 229) | — |
 | Sprint gate | main | — | session-sim-13 14 / 15 (`.verify/20261023-193558-session-sim-13/`); walkthrough evidence `.verify/sprint9/walkthroughs/` | — |
 
@@ -33,6 +33,9 @@ Sprint 10:
 - H1 BL-105: a player's own hidden-request answer follows their dice settings; the DM's own hidden rolls stay popup-only (FR-DICEX-84 amended).
 - H1: granted the stale `DamageRolled` comment fix in `src/shared/events/combat-tracker.ts` (no other holder); one-line role pass in session-recap award views (H4's area; merge order sorts it).
 - H3: the stack's slide toward the map's top-left stays capped (DM #288: never over the map's top-left / tokens), so a crowded Rules case folds instead of moving left of Rules; two unfoldable "Saved" alerts + a card that can't fit above Rules sit on Rules' body over the fewest controls (FR-NOTE-71 fallback, accepted).
+- H2: "windows stacked at 480,60" in a crowded DM 1280x720 (H3 re-tests) = put-away windows (minimised, rect kept), not open overlap; by design (FR-SHELL-152); regression test added. Walkthrough rect helpers count only `[data-state="open"]` windows.
+- H2 FAIL 5 fix: a window moved / grown by an upward resize returns on the way back; growth past useful only if the map keeps an all-tokens fit; the canvas remembers its fitted camera per viewport size (keyed on scene, tokens, stored layout). Fit with a window left mid-map at 1280 still gives the PCs-only view (no all-tokens view exists).
+- H3 re-test 2 O1 (stack folds with 2+ live cards next to PCs): PC rule, accepted.
 - H2 BL-104 pet chip: a hidden pet's combatant never reaches its owner (ADR-0056), so the owner shows no "In combat" chip; DM keeps chip + eye-off (FR-PARTY-61 note). Leak-safe.
 - H2 BL-99: new shrink-in-place rung before put-away (never below useful, grow back on close). Where PCs fill the free area, or players in a fight at 1280x720 (576 px between Initiative and sheet), one window is still put away: PCs first stays (ADR-0060 / #310). Two DM windows.test.ts checks relaxed to the goldens' 4-px gap ranking (accepted).
 - H2: 27 player "moved @1280x720" harness cells (360-px-tall windows vs the toast corner) stay named exemptions (BL-93); harness DM 10 → 7, players 37 → 31.
