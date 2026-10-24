@@ -76,7 +76,7 @@ const UNDONE_ROW = 8;
  * - One undone apply: Thorn → Goblin Scout 2, 5, undone (it stays at 7 HP: the walkthrough's
  *   "Goblin 4").
  * - The DM's direct 3 on the hidden Wolf, no From: the DM's "DM (direct)" row (DM-only line).
- * Expected numbers: the header of `stats.fixtures.test.ts` (DM and players).
+ * Expected numbers: the header of `stats.fixtures.slow.test.ts` (DM and players).
  */
 export default defineFixture({
   key: KEY,
