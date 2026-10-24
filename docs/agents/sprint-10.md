@@ -50,6 +50,7 @@ Dropped as by design: BL-104's "sounds locked until the first click after a load
 | 2026-10-24 | Recap part 1–2 (#343, #344): **T2 merged** (players' "Most damage dealt" withheld while hidden damage could change its winner; a hidden pet leaves other players' data); **T3 merged** (Stats opens on a **Campaign** tab). #345: faster test loop (process + T4 tooling) |
 | 2026-10-24 | **T1 merged**: Dice tray 504 × 420 by default, dice 56 px (≥ 48 px when the tray has to open at 360 × 300) |
 | 2026-10-24 | **T4 merged** (#345): `bun run check` ~2 min (was 8–16), `check:full` ~3 min, full e2e ~10 min on 4 workers (was ~27). Decision #346. Paused for the rest of the recap |
+| 2026-10-24 | **T5 merged** (#347, #348): thin d20 inner lines, Dice tray +25 % (450 × 375), roll popup +40 % |
 
 ## Playtest: sprint 10 fixes
 
@@ -81,7 +82,8 @@ Open the printed DM URL (paste the secret) and each player link in its own brows
 | 9 | **Rule text renders** | Rules → Combat → Grappling | No "srd:…" text: "grappled" / "prone" are links that open those cards; the indented quote is a quote, no ">" |
 | 10 | **House rule badge, recap speed, confirms** | A DM-only house rule; kill something with the Recap open; Stronghold → remove a facility / Delete stronghold (cancel) | "DM only" badge on the collapsed row (you only); Recap updates within ~1 s; the confirms say what happens, not the title twice |
 | 11 | **Party item → Stores** | Player 1: **Party Manager → Inventory** → an item → **Move…** | "Greystone Keep Stores" is offered (never the secret tower); the item moves there for everyone |
-| 12 | **Bigger Dice tray** (#343) | Launcher **Dice tray** (or `D`) on all three; stage d20 + 2d6 + d8 | Opens about 504 × 420 where there's room (dice ~56 px, 40 % bigger); where the PCs leave little room it opens 360 × 300 with dice still ~48 px; Roll always visible. A tray you resized before keeps your size |
+| 12 | **Bigger Dice tray** (#343, #347) | Launcher **Dice tray** (or `D`) on all three; stage d20 + 2d6 + d8 | Opens about 450 × 375 where there's room (dice ~50 px, 25 % bigger); where the PCs leave little room it opens 360 × 300 with dice still ~48 px; Roll always visible. A tray you resized before keeps your size. The d20's inner lines are thin, so its number reads clearly |
+| 15 | **Bigger roll popups** (#347) | Player 1 attacks from the sheet; Player 2 watches bottom-right | The roll popup is about 40 % bigger (448 px wide, 62-px dice, larger total); fewer stack at once on short screens; a quick burst of rolls may cover controls for ~6 s (kept, #348) |
 | 13 | **Campaign stats** (#344) | Launcher **Stats** (or `S`, or palette "stats") on all three | Opens on the new **Campaign** tab (first): sessions · fights · monsters slain; each PC's lifetime Dealt / Taken / Healed / Kills / Down / nat 20s / 1s / Fights (same as their sheet's Trophies); campaign records with who and when; awards won per character. Players' numbers leave out hidden monsters and your hidden rolls |
 | 14 | **Your two calls** (#343) | Damage a hidden monster "from" a PC, then Stats → Session; hide the Owlbear mid-fight | Players don't get "Most damage dealt" when hidden damage would change its winner (you still do); Player 2 loses the Owlbear entirely while hidden and gets it back when you show it; Player 1 (owner) unchanged |
 

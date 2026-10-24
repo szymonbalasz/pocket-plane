@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 10 done (#341–#346): H1–H4 + recap additions T1 (Dice tray +40 %), T2 (BL-111, BL-114), T3 (Stats Campaign tab), T4 (faster test loop) all merged; session-sim-14 13 / 13 on the H-slices; T-slices walkthroughs 18/18, 11/11, 7/7 + full gates. **Paused for the rest of the DM recap** (sprint 11 scope).
+**Phase:** Sprint 10 done (#341–#346): H1–H4 + recap additions T1 (Dice tray +40 %), T2 (BL-111, BL-114), T3 (Stats Campaign tab), T4 (faster test loop), T5 (d20 lines, tray +25 %, popup +40 %) all merged; session-sim-14 13 / 13 on the H-slices; T-slices walkthroughs 18/18, 11/11, 7/7 + full gates. **Paused for the rest of the DM recap** (sprint 11 scope).
 
 **Gates on `main`:** detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, `bun install`, `bun run env:init`, `gates.sh <it> <tag>` = check:full + e2e with 4 workers, ~12 min). Removed at the end of sprint 10. Skip when `main`'s code equals the tested branch (#345).
 
@@ -20,7 +20,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | merged ef4835d1 | — | **merged** (walkthrough 11/11; branch check 5593 / e2e 240); evidence `.verify/sprint10/walkthroughs/20261024-t2/`; main gates green (5593 / 240) | — |
 | Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
 | Sprint 10 T4 faster test loop (#345) | merged aa9ddba0 | — | **merged** (branch check:full 5634 / e2e 243 at 4 workers, 752 s wall for the whole gate); main gates skipped (same code) | — |
-| Sprint 10 T5 dice visuals (#347) | `fix/dice-visuals` (slot 0, ws wAE) | build-t5 (idle) | visual walkthrough PASS (`.verify/20261024-t5/`; popup stacks cover controls ~6 s: DM keeps as is, #348); branch gate running | merge |
+| Sprint 10 T5 dice visuals (#347, #348) | merged bfdc44a9 | — | **merged** (visual walkthrough PASS; branch check:full 5635, e2e 242 + weapon-rows load flake 2/2 alone); main gates skipped (same code) | — |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
