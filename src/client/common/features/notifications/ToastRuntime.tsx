@@ -11,9 +11,15 @@
 // bottom, so the column runs upwards); it re-places on every input change (FR-NOTE-51).
 // *(Sprint 9)* FR-NOTE-72: while this client's Notifications window is open (not minimised) the
 // cards and the summary fold into it; they come back silently when it closes. FR-NOTE-73: each
-// callout show is its own node (`data-callout-seq`).
+// callout show is its own node (`data-callout-seq`). *(Sprint 10, H3)* FR-NOTE-75: the DM stack
+// keeps off windows' drawn content, then their first rows (the content measured while it shows);
+// FR-NOTE-76: an open modal dialog counts like Initiative and nothing under its overlay counts.
+// FR-NOTE-77: it may slide beside a window off the PCs' tokens; over a body the cards fold into
+// the summary.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
+import { recordsOf } from "@shared/protocol/store";
+import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { XIcon } from "lucide-react";
 import {
   useCallback,
@@ -31,6 +37,7 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
+import { pcBoxes } from "../play-shell/placement";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import {
   DM_TOAST_TOP,
@@ -38,10 +45,10 @@ import {
   PLAYER_TOAST_BOTTOM,
   reportShownStack,
 } from "../play-shell/toast-region";
-import { tokenScreenBoxes } from "../play-shell/token-boxes";
+import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, useAlertToasts } from "./alert-toasts";
 import { useDialogRects } from "./dialog-rects";
-import { dmStackSpot } from "./keep-out";
+import { dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
 import {
   actionButton,
   classify,
@@ -63,6 +70,8 @@ import {
   classOfToast,
   clearCallout,
   closeToast,
+  type FoldState,
+  foldCap,
   MAX_VISIBLE,
   nextExpiry,
   registerToastMemory,
@@ -205,6 +214,22 @@ function useAvoidTokens(
 }
 
 /**
+ * FR-NOTE-77: the player characters' token ids (a character with an owner, as play-shell's PC
+ * rule counts them), sorted; a slide beside a window never covers one. DM only.
+ */
+function usePcTokens(isDm: boolean): string[] {
+  const store = useSync((s) => s.store);
+  return useMemo(() => {
+    if (!isDm) return [];
+    type Tok = { id: string; ownerPlayerId: string | null; characterId: string | null };
+    return recordsOf<Tok>(store, TOKEN_TYPE)
+      .filter((t) => isPlacementPc(t))
+      .map((t) => t.id)
+      .sort();
+  }, [isDm, store]);
+}
+
+/**
  * FR-NOTE-50: the one callout (`showCallout`), last in the stack; not a notification. FR-NOTE-73:
  * the caller keys it by `seq`, so each show is a new node (re-announced, its own 4 s).
  */
@@ -239,6 +264,9 @@ export function CalloutToast({ c, onClose }: { c: Callout; onClose: () => void }
  * pause card sits above it) and the popups above every toast (`PRESENT_POPUP_Z`, the dice layer).
  */
 export const TOAST_STACK_Z = 900;
+
+/** No fold: the policy's max (FR-NOTE-50). */
+const UNFOLDED: FoldState = { cap: MAX_VISIBLE, foldedAt: null };
 
 /** Id of this stack's FR-SHELL-59 report. */
 export const SHOWN_STACK_ID = "note.toasts";
@@ -341,15 +369,15 @@ export function ToastRuntime({
   const showing =
     !!state.callout ||
     state.toasts.some((t) => !folded || (t.kind !== "summary" && classOfToast(t) !== "card"));
-  const { initiative, windows: windowRects, hard: bars, rows: firstRows } = useStackInputs(isDm);
-  // Walkthrough T4: an open modal dialog keeps the DM stack off it like a hard keep-out.
+  const { initiative, windows: windowRects, hard, rows: firstRows } = useStackInputs(isDm, showing);
+  // Walkthrough T4, FR-NOTE-76: an open modal dialog keeps the DM stack off it like Initiative.
   const dialogs = useDialogRects(isDm && showing);
-  const hard = useMemo(() => (dialogs.length > 0 ? [...bars, ...dialogs] : bars), [bars, dialogs]);
   const vp = useViewport();
   const stackH = useStackHeight(stackRef, isDm, showing);
   // P3 glitch 2: and of the tokens its cards' likely targets are on (`avoidTokens`), measured
   // when the stack, Initiative or the viewport change (never on hover: the stack holds still).
   const avoidKey = useAvoidTokens(isDm, state.toasts, rows, views).join(",");
+  const pcKey = usePcTokens(isDm).join(",");
   // P3 E1: token boxes re-read once the map settles (resize refit, pan, zoom), not while the
   // pointer is on the stack (FR-NOTE-51: only while; every other input re-places at once).
   const settled = useMapSettled(isDm && showing);
@@ -368,8 +396,10 @@ export function ToastRuntime({
         windowRects,
         hard,
         firstRows,
+        dialogs,
+        pcBoxes(tokenScreenBoxes(pcKey ? pcKey.split(",") : []).map((b) => ({ ...b, pc: true }))),
       ),
-    [vp, initiative, stackH, avoidKey, windowRects, hard, firstRows, tick],
+    [vp, initiative, stackH, avoidKey, pcKey, windowRects, hard, firstRows, dialogs, tick],
   );
 
   // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
@@ -392,18 +422,36 @@ export function ToastRuntime({
   const room = isDm
     ? dialogRoom(vp, dialogs, vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP)
     : vp.h - PLAYER_TOAST_BOTTOM - TOP_BAR_H - EDGE_GAP;
-  const [cap, setCap] = useState(MAX_VISIBLE);
+  const [fold, setFold] = useState<FoldState>(UNFOLDED);
+  const cap = fold.cap;
   const count = state.toasts.length;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
-  useLayoutEffect(() => setCap(MAX_VISIBLE), [count, room]);
+  // FR-NOTE-77 (walkthrough H3 re-test): the fold starts over when what places the stack changes
+  // (windows moved, a tool bar or dialog shown), not only on a new count or room.
+  const placeKey = useMemo(
+    () =>
+      JSON.stringify([
+        initiative,
+        windowRects.map(({ x, y, w, h }) => [x, y, w, h]),
+        hard,
+        dialogs,
+      ]),
+    [initiative, windowRects, hard, dialogs],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count, room or layout
+  useLayoutEffect(() => setFold(UNFOLDED), [count, room, placeKey]);
   // Walkthrough WF4: likewise while the DM stack can only sit on a window's body (its controls).
+  // FR-NOTE-77: down to no card at all while the summary shows (its Open stays one click away);
+  // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
   const covers = isDm && at.covers > 0;
+  const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
+  const { shown, more, callout } = visibleToasts(state, cap, folded);
+  const foldable = shown.filter((t) => t.kind !== "summary" && classOfToast(t) !== "alert").length;
   useLayoutEffect(() => {
-    if ((stackH > room || covers) && cap > 1) setCap((c) => Math.max(1, c - 1));
-  }, [stackH, room, cap, covers]);
+    const need = stackH > room || covers;
+    setFold((f) => foldCap(f, { need, min: minCap, stackH, shown: foldable }));
+  }, [stackH, room, covers, minCap, foldable]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
-  const { shown, more, callout } = visibleToasts(state, cap, folded);
   if (!showing) return null;
   const stack = (
     <section
@@ -515,13 +563,16 @@ export function ToastRuntime({
 /**
  * Walkthrough T4: the DM stack's room with modal dialogs open: the larger band above their top
  * (below the home row) or below their bottom (above the launcher), never more than `full`.
+ * FR-NOTE-76: `full` when the stack fits left of them (the shift, `dmStackLefts`).
  */
 export function dialogRoom(
   vp: { w: number; h: number },
-  dialogs: readonly { y: number; h: number }[],
+  dialogs: readonly { x: number; y: number; h: number }[],
   full: number,
 ): number {
   if (dialogs.length === 0) return full;
+  const shift = Math.round(Math.min(...dialogs.map((d) => d.x)) - EDGE_GAP - STACK_W);
+  if (shift >= MIN_SHIFT_LEFT && shift < Math.round((vp.w - STACK_W) / 2)) return full;
   const top = Math.min(...dialogs.map((d) => d.y));
   const bottom = Math.max(...dialogs.map((d) => d.y + d.h));
   const above = top - EDGE_GAP - DM_TOAST_TOP;

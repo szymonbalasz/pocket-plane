@@ -101,7 +101,8 @@ describe("FR-NOTE-50 toast policy", () => {
     expect(v.more).toBe(5);
     // P3 E3: the runtime's lowered cap: the alert never overflows, and the newest card stays.
     expect(classes(s, 1)).toEqual(["summary", "card", "alert"]);
-    expect(classes(s, 0)).toEqual(["summary", "card", "alert"]);
+    // FR-NOTE-77 (sprint 10): with the summary showing, 0 folds the cards too (its Open stays).
+    expect(classes(s, 0)).toEqual(["summary", "alert"]);
   });
 
   test("FR-NOTE-50 toast policy: card sticky, alert and info 6 s, callout 4 s; every timer pauses while hovered", () => {
@@ -229,5 +230,24 @@ describe("FR-NOTE-72 cards fold into an open Notifications window (model)", () =
     const shut = visibleToasts(s, 3);
     expect(shut.shown.map(classOfToast)).toEqual(["summary", "card", "alert", "alert"]);
     expect(shut.more).toBe(4);
+  });
+});
+
+describe("FR-NOTE-77 fold to the summary (walkthrough H3 4)", () => {
+  test("FR-NOTE-77 fold to the summary: max 0 with the summary showing → no card, '+N more'; without it a card still shows (P3 E3)", () => {
+    let s = setSummary(initialToasts(0), 4, 0);
+    const cards = [card(), card()] as const;
+    for (const n of cards) s = addNote(s, n, 1, alertKind);
+    expect(visibleToasts(s, 0)).toMatchObject({ more: 2 });
+    expect(classes(s, 0)).toEqual(["summary"]);
+    // Alerts never fold (#336).
+    const a = alert();
+    const withAlert = addNote(s, a, 2, alertKind);
+    expect(classes(withAlert, 0)).toEqual(["summary", "alert"]);
+    // No summary (folded into an open Notifications window, or none): one card stays.
+    let bare = initialToasts(0);
+    for (const n of cards) bare = addNote(bare, n, 1, alertKind);
+    expect(visibleToasts(bare, 0)).toMatchObject({ more: 1 });
+    expect(classes(bare, 0)).toEqual(["card"]);
   });
 });

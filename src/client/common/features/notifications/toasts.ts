@@ -386,19 +386,22 @@ const RANK: Record<NotificationToastClass | "summary", number> = {
  * ("+N more"). The summary and the callout don't count. The runtime lowers `max` while the stack
  * doesn't fit the viewport (P3 E3). FR-NOTE-72: `folded` (this client's Notifications window open)
  * leaves out the summary and every card; they stay on the stack and neither shows nor counts.
+ * FR-NOTE-77: `max` 0 while the summary shows (its Open keeps the pending actions one click
+ * away) folds every card and info into "+N more"; without the summary one still shows.
  */
 export function visibleToasts(
   s: ToastState,
   max: number = MAX_VISIBLE,
   folded = false,
 ): { shown: Toast[]; more: number; callout: Callout | null } {
-  const room = Math.max(1, max);
   const out = (t: Toast) => folded && (t.kind === "summary" || classOfToast(t) === "card");
+  const summary = !folded && s.toasts.some((t) => t.kind === "summary");
+  const room = Math.max(summary ? 0 : 1, max);
   const counted = s.toasts.filter((t) => t.kind !== "summary" && !out(t));
   const kept = new Set<Toast>(counted.filter((t) => classOfToast(t) === "alert"));
   // P3 E3: at least one card / info still shows beside the alerts (a pending action stays one
-  // click away).
-  const fill = Math.max(room, kept.size + 1);
+  // click away); FR-NOTE-77: the summary's Open does that at `max` 0.
+  const fill = room === 0 ? kept.size : Math.max(room, kept.size + 1);
   for (const cls of ["card", "info"] as const) {
     const of = counted.filter((t) => classOfToast(t) === cls);
     for (let i = of.length - 1; i >= 0 && kept.size < fill; i--) kept.add(of[i] as Toast);
@@ -467,4 +470,27 @@ export function showCallout(c: CalloutInput): void {
   calloutSeq += 1;
   const seq = calloutSeq;
   for (const m of memories) m.setState((x) => ({ toasts: setCallout(x.toasts, c, now, seq) }));
+}
+
+/** The runtime's fold state: its cap and the stack height it last folded at. */
+export interface FoldState {
+  cap: number;
+  foldedAt: number | null;
+}
+
+/**
+ * P3 E3, walkthrough WF4, FR-NOTE-77: one fold step. While the stack doesn't fit (`need`: taller
+ * than the room, or only a spot on window content holds it), one shown card / info (`shown` of
+ * them at this cap) folds into "+N more", down to `min`. Walkthrough H3 re-test 1a: the next step
+ * waits for the stack's new height (`stackH` ≠ `foldedAt`, measured a frame after the cap
+ * changes), so it never folds a card that fits.
+ */
+export function foldCap(
+  s: FoldState,
+  o: { need: boolean; min: number; stackH: number; shown: number },
+): FoldState {
+  if (!o.need || s.cap <= o.min) return s;
+  if (s.foldedAt !== null && s.foldedAt === o.stackH) return s;
+  const cap = Math.max(o.min, Math.min(s.cap, o.shown) - 1);
+  return cap === s.cap ? s : { cap, foldedAt: o.stackH };
 }

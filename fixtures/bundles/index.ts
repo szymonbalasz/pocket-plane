@@ -51,6 +51,7 @@ import h1PromptRollE2e from "./h1-prompt-roll-e2e";
 import h2FitE2e from "./h2-fit-e2e";
 import h2Frame from "./h2-frame";
 import h2FrameE2e from "./h2-frame-e2e";
+import h3ToastsE2e from "./h3-toasts-e2e";
 import h4RecapE2e from "./h4-recap-e2e";
 import h4RulesE2e from "./h4-rules-e2e";
 import h4StoresE2e from "./h4-stores-e2e";
@@ -267,6 +268,8 @@ export const bundles: readonly Bundle[] = [
   spS9Shared,
   spS9E2e,
   spS9SharedE2e,
+  // Sprint 10 track H3 (fix/h3-toasts): toast stack e2e alias of session-sim-13
+  h3ToastsE2e,
   // Sprint 10 H2 (fix/h2-frame): window frame + Party Manager walkthrough and e2e aliases
   h2Frame,
   h2FrameE2e,

@@ -17,7 +17,18 @@
 // spot → the clear spot nearest the home row, not the least body. FR-NOTE-72 (BL-88): an open
 // Notifications window counts like Initiative (`StackWindow.blocks`). Ruling B (#339 follow-up,
 // amends FR-NOTE-53): every window's title bar + first 40 px keep the stack off while some spot
-// clears them all; none does → FR-NOTE-71 as before. Pure; players keep bottom-right.
+// clears them all; none does → FR-NOTE-71 as before. *(Sprint 10, H3)* FR-NOTE-75 (BL-101): first
+// a spot clear of every window's drawn content (`StackWindow.used`; the empty body below it is
+// fine), then one clear of every window's first rows (title bar + 40 px, or to its first record
+// row: tabs, search box, list header, first row), then ruling B and the title bars as before.
+// FR-NOTE-76: an open modal dialog counts like Initiative (shift left of it, else below or above
+// it); what is under its overlay (windows, Initiative, tool bars, tokens) is inert and ignored.
+// FR-NOTE-77 (walkthrough H3): no spot in the column clears the windows' content → the stack slides
+// sideways beside a window, at most half its width (it stays in its band, #288), to a spot that
+// covers no window, PC or card target, before it takes "below the first row"; none → over a body,
+// the fewest controls first. First rows are the window's own measure (`head`), so a record
+// container filling the body (the Encounters editor) isn't its "first row".
+// Pure; players keep bottom-right.
 
 import { type FirstRow, firstRows } from "../play-shell/content-heights";
 import {
@@ -46,7 +57,32 @@ export type StackWindow = Rect & {
   pushed?: boolean;
   /** FR-NOTE-72: counts like Initiative (this client's open Notifications window). */
   blocks?: boolean;
+  /**
+   * FR-NOTE-75: viewport y where the window's drawn content ends (below it: empty body). Absent
+   * (not measured): the whole window counts as content.
+   */
+  used?: number;
+  /**
+   * FR-NOTE-77: viewport y where the window's first rows end (tabs, search box, the first record
+   * row that is row-sized), measured; absent → the frame's first-row report.
+   */
+  head?: number;
+  /** FR-NOTE-77: the window body's controls as drawn (buttons, inputs, tabs…), viewport px. */
+  controls?: readonly Rect[];
+  /**
+   * FR-NOTE-77 (re-test 3): a log's newest rows as drawn (the Game log: newest at the bottom,
+   * what the DM reads first); they count like controls.
+   */
+  logRows?: readonly Rect[];
 };
+
+/** FR-NOTE-75: the window's content part (title bar to `used`; unknown → all of it). */
+const contentOf = (w: StackWindow): Rect => ({
+  x: w.x,
+  y: w.y,
+  w: w.w,
+  h: w.used === undefined ? w.h : Math.max(TITLE_H, Math.min(w.h, w.used - w.y)),
+});
 
 /** FR-NOTE-70: the smallest left a shift may take (12 px clear of the rail, never x 68). */
 export const MIN_SHIFT_LEFT = RAIL_CLEAR + EDGE_GAP;
@@ -128,15 +164,30 @@ export function dmStackPlacement(
   windows: readonly StackWindow[] = [],
   hard: readonly Rect[] = [],
   rows: readonly FirstRow[] = [...firstRows().values()],
+  dialogs: readonly Rect[] = [],
+  pcs: readonly Rect[] = [],
 ): { left: number; top: number } {
-  const { left, top } = dmStackSpot(vp, initiative, stackH, width, avoid, windows, hard, rows);
+  const { left, top } = dmStackSpot(
+    vp,
+    initiative,
+    stackH,
+    width,
+    avoid,
+    windows,
+    hard,
+    rows,
+    dialogs,
+    pcs,
+  );
   return { left, top };
 }
 
 /**
- * `dmStackPlacement` and what its spot covers of the windows' bodies, px² (`covers` > 0: no spot
- * clear of every window held this stack; walkthrough WF4, FR-NOTE-70: the runtime then shows
- * fewer toasts, never beside a window).
+ * `dmStackPlacement` and what its spot covers of the windows' content, px² (`covers` > 0: no spot
+ * clear of every window's content held this stack; walkthrough WF4, FR-NOTE-70: the runtime then
+ * shows fewer toasts, never beside a window; FR-NOTE-75: empty body below the content is free).
+ * `dialogs` (FR-NOTE-76): the open modal dialogs' rects; while any is open only they count.
+ * `pcs` (FR-NOTE-77): the PC tokens' footprints + 4 px; a spot beside a window never covers one.
  */
 export function dmStackSpot(
   vp: Viewport,
@@ -147,12 +198,23 @@ export function dmStackSpot(
   windows: readonly StackWindow[] = [],
   hard: readonly Rect[] = [],
   rows: readonly FirstRow[] = [...firstRows().values()],
+  dialogs: readonly Rect[] = [],
+  pcs: readonly Rect[] = [],
 ): { left: number; top: number; covers: number } {
+  if (dialogs.length > 0) {
+    // FR-NOTE-76: under a modal dialog's overlay nothing else takes input; the dialogs count
+    // like Initiative (the left-of shift, below or above them).
+    const modal = dialogs.map((d) => ({ ...d, blocks: true }));
+    return dmStackSpot(vp, null, stackH, width, [], modal, [], []);
+  }
   const lefts = dmStackLefts(vp, initiative, width, windows);
-  const p = dmStackSpotOnly(vp, initiative, stackH, width, avoid, windows, hard, rows, lefts);
-  // FR-NOTE-70: `covers` > 0 (no spot in the column clears every body) → the runtime folds.
+  const p = dmStackSpotOnly(vp, initiative, stackH, width, avoid, windows, hard, rows, lefts, pcs);
+  // FR-NOTE-70: `covers` > 0 (no spot in the column clears every window's content) → the
+  // runtime folds. FR-NOTE-75: the empty body below a window's content doesn't count.
   const covers =
-    stackH === 0 ? 0 : coveredArea({ x: p.left, y: p.top, w: width, h: stackH }, windows);
+    stackH === 0
+      ? 0
+      : coveredArea({ x: p.left, y: p.top, w: width, h: stackH }, windows.map(contentOf));
   return { ...p, covers };
 }
 
@@ -166,6 +228,7 @@ function dmStackSpotOnly(
   hard: readonly Rect[],
   rows: readonly FirstRow[],
   lefts: readonly number[],
+  pcs: readonly Rect[],
 ): { left: number; top: number } {
   const base = initiativeKeepOut(vp, initiative, stackH, width);
   const at = (p: { left: number; top: number }) => ({ x: p.left, y: p.top, w: width, h: stackH });
@@ -177,59 +240,177 @@ function dmStackSpotOnly(
   if (avoid.length === 0 && windows.length === 0 && fits(base) && offHard(base)) return base;
   // FR-NOTE-44: a pushed window's title bar, first 40 px of body and first content row (its
   // reported bottom, walkthrough U4) count as its bar; FR-NOTE-53: pushed per the plan.
-  // Sprint 9 ruling B (amends FR-NOTE-53): every window's title bar + first 40 px count as its bar
-  // first (`everyRow`); no spot clears those → as before (title bars, pushed strips).
-  const strip = (w: StackWindow, everyRow: boolean) => {
-    const pushed = w.pushed ?? hard.length > 0;
-    if (!pushed) return everyRow ? TITLE_H + PUSHED_BODY_CLEAR : TITLE_H;
-    const row = rows.find((r) => Math.abs(r.x - w.x) <= 1 && Math.abs(r.y - w.y) <= 1);
-    return Math.max(TITLE_H + PUSHED_BODY_CLEAR, row ? row.bottom - w.y : 0);
+  // FR-NOTE-77: the window's own first-row measure (`head`) when drawn, else the frame's report.
+  const rowOf = (w: StackWindow) => {
+    const reported = rows.find((r) => Math.abs(r.x - w.x) <= 1 && Math.abs(r.y - w.y) <= 1);
+    const bottom = w.head ?? reported?.bottom;
+    return Math.max(TITLE_H + PUSHED_BODY_CLEAR, bottom === undefined ? 0 : bottom - w.y);
   };
+  const pushed = (w: StackWindow) => w.pushed ?? hard.length > 0;
+  // The strips kept clear, pass by pass (each one's strips inside the one before):
+  // FR-NOTE-75: every window's drawn content (the empty body below it is fine), then every
+  // window's first rows; sprint 9 ruling B (amends FR-NOTE-53): title bar + 40 px (pushed: its
+  // first rows); then the title bars alone (pushed: its first rows).
+  const passes: ((w: StackWindow) => number)[] = [
+    (w) => Math.max(contentOf(w).h, rowOf(w)),
+    rowOf,
+    (w) => (pushed(w) ? rowOf(w) : TITLE_H + PUSHED_BODY_CLEAR),
+    (w) => (pushed(w) ? rowOf(w) : TITLE_H),
+  ];
+  const bars = passes.map((strip) => windows.map((w) => ({ ...w, h: Math.min(w.h, strip(w)) })));
   // FR-NOTE-72: an open Notifications window keeps the stack off like Initiative.
   const blockers = [...(initiative ? [initiative] : []), ...windows.filter((w) => w.blocks)];
   const maxTop = vp.h - LAUNCHER_CLEAR - stackH;
-  const choose = (everyRow: boolean) => {
-    const bars = windows.map((w) => ({ ...w, h: Math.min(w.h, strip(w, everyRow)) }));
-    const clear = (p: { left: number; top: number }) =>
-      !blockers.some((b) => hits(at(p), b, EDGE_GAP)) &&
-      !bars.some((b) => hits(at(p), b, 0)) &&
-      offHard(p);
-    const tops = [
+  const clamp = (ys: number[]) =>
+    ys.map((y) => Math.round(Math.max(DM_TOAST_TOP, Math.min(maxTop, y))));
+  const clearIn = (pass: number, p: { left: number; top: number }) =>
+    !blockers.some((b) => hits(at(p), b, EDGE_GAP)) &&
+    !(bars[pass] ?? []).some((b) => hits(at(p), b, 0)) &&
+    offHard(p);
+  const topsIn = (pass: number) =>
+    clamp([
       DM_TOAST_TOP,
-      ...bars.map((b) => b.y + b.h + STACK_GAP),
+      ...(bars[pass] ?? []).map((b) => b.y + b.h + STACK_GAP),
       ...windows.map((w) => w.y + w.h + STACK_GAP),
       ...hard.map((k) => k.y + k.h + STACK_GAP),
-      // FR-NOTE-72: below a window that counts like Initiative, with its 12 px gap.
-      ...blockers.map((b) => b.y + b.h + EDGE_GAP),
+      // FR-NOTE-72: below a window that counts like Initiative, with its 12 px gap; FR-NOTE-76:
+      // above it too (a modal dialog low in the column).
+      ...blockers.flatMap((b) => [b.y + b.h + EDGE_GAP, b.y - EDGE_GAP - stackH]),
       ...avoid.flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH]),
-    ].map((y) => Math.round(Math.max(DM_TOAST_TOP, Math.min(maxTop, y))));
-    // Nearest the home row first (ties keep the earlier spot).
-    const byTop = [...new Set(tops)].sort((a, b) => a - b);
-    const spots = [base, ...byTop.flatMap((top) => lefts.map((left) => ({ left, top })))];
-    // FR-NOTE-71: a spot over no window body wins (the least token area, then the earlier spot:
-    // FR-NOTE-32's, then nearest the home row); none → the clear spot nearest the home row,
-    // never a thin overlap low on a window (BL-75: the Game log's roll bar).
-    let best: { left: number; top: number } | null = null;
-    let bestKey = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
+    ]);
+  // Nearest the home row first (ties keep the earlier spot): FR-NOTE-32's spot, then by top.
+  const spotsAt = (tops: number[], ls: readonly number[]) => [
+    base,
+    ...[...new Set(tops)].sort((a, b) => a - b).flatMap((top) => ls.map((left) => ({ left, top }))),
+  ];
+  // FR-NOTE-71: a spot over no window body wins (the least token area, then the earlier spot);
+  // none → the one nearest the home row, never a thin overlap low on a window (BL-75).
+  // FR-NOTE-77: before that, the fewest window controls under it, then the stricter pass.
+  const pick = (spots: { left: number; top: number }[], level: (p: Spot) => number | null) => {
+    let best: Spot | null = null;
+    let bestKey: number[] = [];
     for (const p of spots) {
-      if (!clear(p) || !fits(p)) continue;
+      const pass = fits(p) ? level(p) : null;
+      if (pass === null) continue;
       const body = coveredArea(at(p), windows) > 0;
-      const key = body ? [1, p.top] : [0, coveredArea(at(p), avoid)];
-      const [a0 = 0, a1 = 0] = key;
-      const [b0 = 0, b1 = 0] = bestKey;
+      // Pass 1 (content-clear): nearest home, the least token area first (empty body below a
+      // window's content is as good as the map, re-test 3 O2); later passes: FR-NOTE-71.
+      const key =
+        pass === 0
+          ? [controlsUnder(at(p), windows), 0, coveredArea(at(p), avoid)]
+          : [
+              controlsUnder(at(p), windows),
+              pass,
+              body ? 1 : 0,
+              body ? p.top : coveredArea(at(p), avoid),
+            ];
       // Strictly less wins: ties keep the earlier spot.
-      if (a0 < b0 || (a0 === b0 && a1 < b1)) {
+      if (best === null || less(key, bestKey)) {
         best = p;
         bestKey = key;
       }
     }
-    return { best, clear, spots };
+    return best;
   };
-  const first = choose(true);
-  if (first.best) return first.best;
-  const { best, clear, spots } = choose(false);
+  // 1. FR-NOTE-75: in the column, clear of every window's drawn content.
+  const content = pick(spotsAt(topsIn(0), lefts), (p) => (clearIn(0, p) ? 0 : null));
+  if (content) return content;
+  // 2. FR-NOTE-77: beside a window, clear of every window, the PCs and the cards' targets.
+  const beside = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs);
+  if (beside && fits(beside) && lefts.every((l) => l !== beside.left)) return beside;
+  // 3. Over a body, in the column: the first rows kept (FR-NOTE-75), then ruling B, then the
+  // title bars; the fewest controls covered first (FR-NOTE-77).
+  // A spot counts for a pass only at that pass's own tops (8 px below its strips).
+  const fallback = [1, 2, 3].map((pass) => ({ pass, tops: new Set(topsIn(pass)) }));
+  const tops = fallback.flatMap((f) => [...f.tops]);
+  const level = (p: Spot) =>
+    fallback.find((f) => (p === base || f.tops.has(p.top)) && clearIn(f.pass, p))?.pass ?? null;
+  const best = pick(spotsAt(tops, lefts), level);
+  if (best) return best;
   // Nothing holds it (the runtime then shows fewer toasts): the top row when clear, else
   // FR-NOTE-32's spot, else the top row, each only off the hard keep-outs (FR-NOTE-43).
-  const row = spots.filter((p) => p.top === DM_TOAST_TOP);
-  return best ?? row.find(clear) ?? [base, ...row].find(offHard) ?? base;
+  const row = spotsAt([DM_TOAST_TOP], lefts).filter((p) => p.top === DM_TOAST_TOP);
+  return row.find((p) => clearIn(3, p)) ?? [base, ...row].find(offHard) ?? base;
+}
+
+type Spot = { left: number; top: number };
+
+const less = (a: readonly number[], b: readonly number[]) => {
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) return x < y;
+  }
+  return false;
+};
+
+/**
+ * FR-NOTE-77: how many of the windows' key parts `r` overlaps: their controls and a log's newest
+ * rows (re-test 3: the summary alone sat on the Game log's last entries, which hold no control).
+ */
+function controlsUnder(r: Rect, windows: readonly StackWindow[]): number {
+  let n = 0;
+  for (const w of windows) {
+    for (const c of [...(w.controls ?? []), ...(w.logRows ?? [])]) if (hits(r, c, 0)) n++;
+  }
+  return n;
+}
+
+/** FR-NOTE-77: how far the stack may slide sideways from home: half its width (it stays in its band). */
+export const MAX_SLIDE = STACK_W / 2;
+
+/**
+ * FR-NOTE-77 (walkthrough H3 1b, 4; amends FR-NOTE-70): when no spot in the column clears the
+ * windows' content, a spot beside a window, Initiative or a tool bar (12 px gap, ≥ 80 px from the
+ * left like the shift, inside the viewport) at most `MAX_SLIDE` from home (half the stack still
+ * over its home column: never the rail or the map's edge, sim-9 a01, BL-83) that covers no
+ * window, no PC token (`pcs`, + 4 px), no card target and no hard keep-out; nearest the home
+ * spot. Null → none.
+ */
+function besideSpot(
+  vp: Viewport,
+  width: number,
+  stackH: number,
+  windows: readonly StackWindow[],
+  initiative: Rect | null,
+  hard: readonly Rect[],
+  blockers: readonly Rect[],
+  avoid: readonly TokenBox[],
+  pcs: readonly Rect[],
+): Spot | null {
+  const home = Math.round((vp.w - width) / 2);
+  const edges = [...windows, ...(initiative ? [initiative] : []), ...hard];
+  const lefts = [
+    ...new Set(
+      edges.flatMap((w) => [w.x - EDGE_GAP - width, w.x + w.w + EDGE_GAP]).map(Math.round),
+    ),
+  ].filter(
+    (l) => l >= MIN_SHIFT_LEFT && l + width <= vp.w - EDGE_GAP && Math.abs(l - home) <= width / 2,
+  );
+  if (lefts.length === 0) return null;
+  const maxTop = vp.h - LAUNCHER_CLEAR - stackH;
+  const tops = [
+    DM_TOAST_TOP,
+    ...windows.map((w) => w.y + w.h + STACK_GAP),
+    ...hard.map((k) => k.y + k.h + STACK_GAP),
+    ...blockers.map((b) => b.y + b.h + EDGE_GAP),
+    ...[...pcs, ...avoid].flatMap((t) => [t.y + t.h + EDGE_GAP, t.y - EDGE_GAP - stackH]),
+  ]
+    .filter((y) => y >= DM_TOAST_TOP && y <= maxTop)
+    .map(Math.round);
+  let best: Spot | null = null;
+  let bestD = Number.POSITIVE_INFINITY;
+  for (const top of [...new Set(tops)].sort((a, b) => a - b)) {
+    for (const left of lefts) {
+      const r = { x: left, y: top, w: width, h: stackH };
+      if (blockers.some((b) => hits(r, b, EDGE_GAP))) continue;
+      if ([...windows, ...hard, ...pcs, ...avoid].some((b) => hits(r, b, 0))) continue;
+      const d = Math.abs(left - home) + (top - DM_TOAST_TOP);
+      if (d < bestD) {
+        best = { left, top };
+        bestD = d;
+      }
+    }
+  }
+  return best;
 }
