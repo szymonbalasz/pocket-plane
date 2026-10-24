@@ -14,7 +14,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 H1 combat + dice | `fix/h1-combat-dice` (slot 0, ws wA6) | build-h1 | walkthrough 7/8 (`.verify/20261024-h1/`): fixing physical-dice popover under the prompt toast | re-test |
 | Sprint 10 H2 window frame + Party Manager | `fix/h2-frame` (slot 2, ws wA7) | build-h2 (idle), test-h2 | ready (check green, e2e 227/228 one load flake per run) → walkthrough (port 4123) | merge |
 | Sprint 10 H3 toasts | `fix/h3-toasts` (slot 3, ws wA8) | build-h3 | walkthrough 5/8 (`.verify/20261024-h3/`): fixing 1b, 2, 4 | re-test |
-| Sprint 10 H4 rules, recap, strongholds, misc | `fix/h4-rules-misc` (slot 4, ws wA9) | build-h4 (idle) | walkthrough **11/11 PASS** (`.verify/20261024-h4/`); main merged in, branch gates running | merge |
+| Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/` | main gates |
 | Sprint gate | main | — | session-sim-13 14 / 15 (`.verify/20261023-193558-session-sim-13/`); walkthrough evidence `.verify/sprint9/walkthroughs/` | — |
 
 Backlog after sim-13: BL-97 (leak-like, first), BL-98–BL-104, BL-93, BL-94, BL-95, BL-96, BL-92.
