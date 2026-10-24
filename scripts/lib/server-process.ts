@@ -36,8 +36,8 @@ export function spawnServer(
   const onLine =
     opts.onLine ??
     ((line, stream) => (stream === "stderr" ? console.error(line) : console.log(line)));
-  void forward(proc.stdout, (l) => onLine(l, "stdout"));
-  void forward(proc.stderr, (l) => onLine(l, "stderr"));
+  void forwardLines(proc.stdout, (l) => onLine(l, "stdout"));
+  void forwardLines(proc.stderr, (l) => onLine(l, "stderr"));
   return {
     proc,
     async stop(graceMs = 3_000) {
@@ -56,7 +56,8 @@ export function spawnServer(
   };
 }
 
-async function forward(stream: ReadableStream<Uint8Array>, fn: (line: string) => void) {
+/** Call `fn` per output line of `stream`; resolves when the stream ends. */
+export async function forwardLines(stream: ReadableStream<Uint8Array>, fn: (line: string) => void) {
   const decoder = new TextDecoder();
   let buf = "";
   try {

@@ -18,7 +18,9 @@ test("FR-ASSET-52 FR-CAMP-49 FR-SHELL-130 FR-SHELL-132 upload refusals, Chime fo
   const { secret, link, recordId } = e2eEnv();
   const chime = recordId("audio-chime", "audio-asset");
   const mira = recordId("combat-1", "combatant", 0);
-  const files = writeAudioLimitFiles(path.join(os.tmpdir(), `pp-e2e-audio-${info.workerIndex}`));
+  const files = writeAudioLimitFiles(
+    path.join(os.tmpdir(), `pp-e2e-audio-${process.pid}-${info.workerIndex}`),
+  );
 
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
