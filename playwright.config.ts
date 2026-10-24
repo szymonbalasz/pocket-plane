@@ -10,6 +10,9 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   timeout: 30_000,
+  // A hang guard, not a timing check: with bundles side by side (PP_E2E_WORKERS) a live update can
+  // take over the 5 s default to land.
+  expect: { timeout: 10_000 },
   use: {
     baseURL: process.env.E2E_BASE_URL,
     trace: "retain-on-failure",

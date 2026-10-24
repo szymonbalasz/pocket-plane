@@ -10,7 +10,8 @@
 // child process (`--bundle <name>`) with its own temp data dir, server port and Playwright
 // output dir `test-results/<bundle>/`; their output is prefixed `[bundle]` and a per-bundle
 // summary closes the run. The longest bundles (data/e2e-times.json, else most spec files) start
-// first.
+// first. A bundle with a spec carrying a header line `// e2e-serial: <why>` (timing-sensitive
+// under load) runs after the others, alone.
 import {
   existsSync,
   mkdirSync,
@@ -33,6 +34,7 @@ import { envCount, pool } from "./lib/test-files";
 const DEFAULT_BUNDLE = "sync-probe";
 const SERVER_START_TIMEOUT_MS = 60_000;
 const BUNDLE_LINE = /^\/\/\s*e2e-bundle:\s*([a-z0-9][a-z0-9-]*)\s*$/m;
+const SERIAL_LINE = /^\/\/\s*e2e-serial:\s*\S/m;
 const TIMES_FILE = path.join(WORKTREE_ROOT, "data", "e2e-times.json");
 
 async function run(cmd: string[], env: Record<string, string | undefined> = process.env) {
@@ -54,6 +56,17 @@ export function groupSpecs(filters: string[], root = WORKTREE_ROOT): Map<string,
     groups.set(bundle, [...(groups.get(bundle) ?? []), f]);
   }
   return groups;
+}
+
+/** Bundles with a spec marked `// e2e-serial: <why>`: run alone, after the parallel ones. */
+export function serialBundles(groups: Map<string, string[]>, root = WORKTREE_ROOT): Set<string> {
+  const out = new Set<string>();
+  for (const [bundle, files] of groups) {
+    if (files.some((f) => SERIAL_LINE.test(readFileSync(path.join(root, f), "utf8")))) {
+      out.add(bundle);
+    }
+  }
+  return out;
 }
 
 /** Bundle names, longest first: by recorded seconds, then spec file count, then name. */
@@ -252,11 +265,20 @@ if (import.meta.main) {
   const workers = Math.min(envCount("PP_E2E_WORKERS", 4), groups.size);
   const times = readTimes();
   const order = bundleOrder(groups, times);
-  console.log(`\n=== e2e: ${order.length} bundle(s), ${workers} at a time`);
-  const t0 = performance.now();
-  const done = await pool(order, workers, (b) =>
-    spawnBundle(b, groups.get(b)!, pwArgs, workers > 1),
+  const serial = serialBundles(groups);
+  console.log(
+    `\n=== e2e: ${order.length} bundle(s), ${workers} at a time` +
+      (serial.size > 0 ? `; then alone: ${[...serial].join(", ")}` : ""),
   );
+  const t0 = performance.now();
+  const done = await pool(
+    order.filter((b) => !serial.has(b)),
+    workers,
+    (b) => spawnBundle(b, groups.get(b)!, pwArgs, workers > 1),
+  );
+  for (const b of order.filter((x) => serial.has(x))) {
+    done.push(await spawnBundle(b, groups.get(b)!, pwArgs, workers > 1));
+  }
   const results = done.sort((a, b) => a.bundle.localeCompare(b.bundle));
   // Record bundle times for the next run's order (whole-suite runs and filtered ones alike).
   try {

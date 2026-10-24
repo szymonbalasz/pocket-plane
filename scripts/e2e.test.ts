@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { bundleOrder, countLine, FAILURE_LINE, groupSpecs } from "./e2e";
+import { bundleOrder, countLine, FAILURE_LINE, groupSpecs, serialBundles } from "./e2e";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -37,6 +37,16 @@ test("e2e runner: specs grouped by their `// e2e-bundle:` line, default sync-pro
     "dice-log": ["e2e/dice.e2e.ts"],
     combat: ["e2e/sub/combat.e2e.ts"],
   });
+});
+
+test("e2e runner: a bundle with a spec marked `// e2e-serial: <why>` runs alone", () => {
+  const root = tree({
+    "e2e/a.e2e.ts": "// e2e-bundle: a\n// e2e-serial: feed batch window under load\n",
+    "e2e/a2.e2e.ts": "// e2e-bundle: a\n",
+    "e2e/b.e2e.ts": "// e2e-bundle: b\n// e2e-serial:\n",
+    "e2e/c.e2e.ts": "// e2e-bundle: c\nconst s = '// e2e-serial: x';\n",
+  });
+  expect([...serialBundles(groupSpecs([], root), root)]).toEqual(["a"]);
 });
 
 test("e2e runner: bundles start longest first (recorded seconds, then spec count, then name)", () => {

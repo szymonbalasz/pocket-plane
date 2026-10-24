@@ -1,4 +1,6 @@
 // e2e-bundle: stats-b-ui-e2e
+// e2e-serial: FR-STATS-28's one toast per apply batches frames 150 ms apart (FEED_BATCH_MS); under
+// parallel bundles the second target's frame lands later and replaces the toast (1 line, not 2).
 // Thin stats tier-B UI flow (SB1 + SB2: FR-STATS-28, -34, -36, -41, FR-CHARX-97), DM + player-1
 // (Mira, Owlbear) + player-2 (Thorn) on the `stats-b` bundle's running Goblin Ambush:
 // - one two-target apply (two event frames) = ONE kill-feed toast per client naming both targets;
