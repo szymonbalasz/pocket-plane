@@ -80,12 +80,15 @@ Open the printed DM URL (paste the secret) and each player link in its own brows
 | 9 | **Rule text renders** | Rules → Combat → Grappling | No "srd:…" text: "grappled" / "prone" are links that open those cards; the indented quote is a quote, no ">" |
 | 10 | **House rule badge, recap speed, confirms** | A DM-only house rule; kill something with the Recap open; Stronghold → remove a facility / Delete stronghold (cancel) | "DM only" badge on the collapsed row (you only); Recap updates within ~1 s; the confirms say what happens, not the title twice |
 | 11 | **Party item → Stores** | Player 1: **Party Manager → Inventory** → an item → **Move…** | "Greystone Keep Stores" is offered (never the secret tower); the item moves there for everyone |
+| 12 | **Bigger Dice tray** (#343) | Launcher **Dice tray** (or `D`) on all three; stage d20 + 2d6 + d8 | Opens about 504 × 420 where there's room (dice ~56 px, 40 % bigger); where the PCs leave little room it opens 360 × 300 with dice still ~48 px; Roll always visible. A tray you resized before keeps your size |
+| 13 | **Campaign stats** (#344) | Launcher **Stats** (or `S`, or palette "stats") on all three | Opens on the new **Campaign** tab (first): sessions · fights · monsters slain; each PC's lifetime Dealt / Taken / Healed / Kills / Down / nat 20s / 1s / Fights (same as their sheet's Trophies); campaign records with who and when; awards won per character. Players' numbers leave out hidden monsters and your hidden rolls |
+| 14 | **Your two calls** (#343) | Damage a hidden monster "from" a PC, then Stats → Session; hide the Owlbear mid-fight | Players don't get "Most damage dealt" when hidden damage would change its winner (you still do); Player 2 loses the Owlbear entirely while hidden and gets it back when you show it; Player 1 (owner) unchanged |
 
 ### Known gaps (backlog)
 
 - Fit with an untouched Party Manager mid-map at 1440 still zooms to the PCs-only view (BL-107); the pending-actions toast can still cover window content when no clear spot exists (BL-108); a player's Rules beside Recap + Stats puts both away (BL-109).
 - Next skips a downed companion without the "Skipped" toast (BL-110); the Dice tray stays open after an Alt → tray prompt answer (BL-112); small items (BL-113).
-- **Your call:** "Most damage dealt" can name a different winner for players (they don't count damage to hidden creatures) (BL-111); a hidden pet's name / owner / health band stays in other players' data with no row shown (BL-114).
+- Decided at the recap (#343): BL-111 and BL-114 are built (row 14). The DM's dev loop got faster (#345): `bun run check` ~2 min, full e2e ~10 min.
 
 ## Check `main` any time (DM)
 
