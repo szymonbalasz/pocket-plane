@@ -1313,7 +1313,12 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     // useful too (I7: a resize down and back restores the layout).
     const back = placed.get(id) === "returned";
     const big = back || (r.w >= Math.min(u.w, size.w) && r.h >= Math.min(u.h, size.h));
-    if (inside(w) && clearAt(r, id) && (!pcs || pcFree(r)) && big) return;
+    // BL-107 (walkthrough F1 1c): on a viewport change a kept window above its useful size must
+    // also leave the resize refit its all-tokens fit (the fit-keeping size, as when placed); one
+    // back at its rect from before the cause stays (I7).
+    const resized = trigger.type === "viewport";
+    const keepsFit = back || (r.w <= u.w && r.h <= u.h) || !resized || fitKeeps(id, r);
+    if (inside(w) && clearAt(r, id) && (!pcs || pcFree(r)) && big && keepsFit) return;
     placeLauncher(id, cause ? "displaced" : autoKind(w), {
       ...(cause && { cause }),
       ...(grewFrom && { track: grewFrom }),

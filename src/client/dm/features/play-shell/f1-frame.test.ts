@@ -84,3 +84,35 @@ test("FR-SHELL-43 BL-113 the DM launcher at 1440×900 in test mode (every entry,
   expect(entries.length).toBeGreaterThanOrEqual(17);
   expect(at1440.labelled.length).toBeGreaterThanOrEqual(8);
 });
+
+test("FR-SHELL-103 FR-MAP-115 BL-107 walkthrough F1 1c: DM 1280×720 Ambush, Initiative open, the untouched Party Manager placed wider than useful (367,72 489 × 400, Fit `pcs`, the accepted 1280 class) → 1440×900: it takes its fit-keeping size, so the resize refit, Fit and a reload frame every token; back at 1280×720 it returns", () => {
+  const W = { w: 1280, h: 720 };
+  const run = runScript(dmWindows, "dm", W, "ambush", [
+    // The PCs where the walkthrough's camera had them: the Party Manager placed 489 wide.
+    { pan: { x: 300, y: 200 } },
+    { open: "party.board" },
+    "fit",
+    { viewport: VP },
+    "fit",
+    { viewport: W },
+    { viewport: VP },
+    "reload",
+    "fit",
+  ]);
+  expect(run.problems).toEqual([]);
+  const opened = entry(
+    run.steps.find((s) => s.step === "open party.board")?.windows,
+    "party.board",
+  );
+  expect(opened).toBe("party.board:open:367,72,489×400");
+  expect(run.steps.find((s) => s.step === "fit")?.fit).toBe("pcs");
+  // Before the fix: 367,72 489 × 400 kept at 1440×900, `pcs` at 48 px on every step.
+  for (const [i, s] of run.steps.entries()) {
+    if (s.vp.w !== VP.w) continue;
+    expect({ i, step: s.step, fit: s.fit }).toEqual({ i, step: s.step, fit: "all" });
+    expect(entry(s.windows, "party.board")).toBe("party.board:open:68,60,440×400");
+  }
+  // I7: back at 1280×720 the Party Manager as placed there.
+  const back = run.steps.find((s, i) => i > 4 && s.vp.w === W.w);
+  expect(entry(back?.windows, "party.board")).toBe(opened);
+});

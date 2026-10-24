@@ -4,6 +4,7 @@
 // (`data-fit-visible="all"`, no floor), never the 48-px PCs-only view; and the DM launcher in test
 // mode keeps the labels that fit (BL-113). The rules in detail: bun test (`f1-frame.test.ts`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { footprintsOf } from "./support/canvas";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { showToPlayers } from "./support/scenes";
 import { openWindow, shellWindow } from "./support/shell";
@@ -69,6 +70,71 @@ test("FR-MAP-115 FR-SHELL-97 BL-107 DM 1440×900 Goblin Ambush, Reset layout, Pa
   await expect(canvas).toHaveAttribute("data-fit-floor", "false");
   expect(await box(board)).toEqual(b);
 
+  await dm.reload();
+  await live(dm);
+  await expect(board).toBeVisible();
+  await expect(canvas).toHaveAttribute("data-fit-visible", "all");
+  await expect(canvas).toHaveAttribute("data-fit-floor", "false");
+  await dm.context().close();
+});
+
+test("FR-SHELL-103 FR-MAP-115 BL-107 walkthrough F1 1c: DM 1280×720 Goblin Ambush, Reset layout, Party Manager opened → 1440×900: the resize refit, Fit and a reload frame every token (`all`, no floor); back at 1280×720 the Party Manager as before", async ({
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  const { secret, recordId } = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+  const ambush = recordId("battlemap", "scene");
+  const scenes = await showToPlayers(dm, "Goblin Ambush");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
+    .first()
+    .click();
+  const canvas = dm.getByTestId("map-canvas");
+  await expect(canvas).toHaveAttribute("data-scene-id", ambush);
+  await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
+  const log = shellWindow(dm, "dice.log");
+  await dm.setViewportSize({ width: 1280, height: 720 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await dm.getByTestId("ui-launcher-menu").click();
+  await dm.getByTestId("ui-launcher-reset").click();
+  await expect(shellWindow(dm, "map.scenes")).toHaveCount(0);
+  await openWindow(dm, "cbt.initiative");
+  await dm.getByTestId("map-tool-fit").click();
+  // The PCs panned to (300, 200) (middle drag), as the walkthrough's camera had them: the Party
+  // Manager then opens wider than useful beside them (walkthrough: 505, here 489 as the harness).
+  const pcs = await footprintsOf(dm, ["Mira", "Brakka", "Thorn"]);
+  const cx = (Math.min(...pcs.map((t) => t.x)) + Math.max(...pcs.map((t) => t.x + t.w))) / 2;
+  const cy = (Math.min(...pcs.map((t) => t.y)) + Math.max(...pcs.map((t) => t.y + t.h))) / 2;
+  await dm.mouse.move(cx, cy);
+  await dm.mouse.down({ button: "middle" });
+  await dm.mouse.move(300, 200, { steps: 8 });
+  await dm.mouse.up({ button: "middle" });
+  const board = await openWindow(dm, "party.board");
+  await dm.getByTestId("map-tool-fit").click();
+  const before = await box(board);
+  expect(before.w).toBeGreaterThan(440);
+
+  // Before the fix: the Party Manager kept 505 × 400 and every fit `pcs` at the 48-px floor.
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  await expect(canvas).toHaveAttribute("data-fit-visible", "all");
+  await expect(canvas).toHaveAttribute("data-fit-floor", "false");
+  const wide = await box(board);
+  expect(wide.w).toBeGreaterThanOrEqual(440);
+  await dm.getByTestId("map-tool-fit").click();
+  await expect(canvas).toHaveAttribute("data-fit-visible", "all");
+  await expect(canvas).toHaveAttribute("data-fit-floor", "false");
+
+  await dm.setViewportSize({ width: 1280, height: 720 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await expect.poll(() => box(board)).toEqual(before);
+
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(() => box(board)).toEqual(wide);
   await dm.reload();
   await live(dm);
   await expect(board).toBeVisible();
