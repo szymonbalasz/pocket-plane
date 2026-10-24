@@ -146,11 +146,12 @@ describe("FR-STATS-81 Campaign scope", () => {
     expect(p1.records["biggest-hit"]?.fight).toMatch(/^Fight 1 · /);
     expect(p1.records["best-fight-kills"]?.fight).toMatch(/^Fight 2 · /);
     expect(awardsOf(p1)).toEqual({
+      // BL-111 (T2): sitting 1 holds Mira's hidden 30 on the Wolf, so players get no Most damage
+      // dealt card there and Thorn doesn't win it.
       Thorn: [
-        6,
+        5,
         "biggest-hit×1",
         "biggest-overkill×1",
-        "most-dealt×1",
         "most-healing×1",
         "most-kills×1",
         "most-nat20×1",
@@ -167,6 +168,24 @@ describe("FR-STATS-81 Campaign scope", () => {
         "most-downed×1",
       ],
     });
+  });
+
+  test("FR-STATS-84 BL-111 players' awards won leave out Most damage dealt for a session that withholds the card; the DM keeps it", () => {
+    const t = twoSittings();
+    const [newest, oldest] = t.sessions(t.p1).sessions;
+    const cards = (actor: Actor, fromN: number) =>
+      (t.session(actor, fromN).session as NonNullable<SessionResult["session"]>).awards.map(
+        (a) => a.key,
+      );
+    expect(cards(t.p1, oldest?.fromN as number)).not.toContain("most-dealt");
+    expect(cards(t.p1, newest?.fromN as number)).toContain("most-dealt");
+    const won = (c: CampaignStats, name: string) =>
+      c.awards.find((a) => a.name === name)?.won.find((w) => w.key === "most-dealt")?.count ?? 0;
+    const p = campaignOf(t, t.p1);
+    expect([won(p, "Thorn"), won(p, "Mira")]).toEqual([0, 1]);
+    const dm = campaignOf(t);
+    expect([won(dm, "Thorn"), won(dm, "Mira")]).toEqual([1, 2]);
+    expect(JSON.stringify(p)).not.toContain('"most-dealt","count":2');
   });
 
   test("FR-STATS-84 awards won = the Session tab's winners summed over the listed sessions, per role", () => {

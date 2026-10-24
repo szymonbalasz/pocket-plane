@@ -29,9 +29,8 @@ import { eq } from "drizzle-orm";
 import type { Tx } from "../../db/client";
 import { gameLogEntry } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
-import { combatFacts } from "../combat-tracker/stats-read";
-import { entryVisible } from "../dice-roll-log/stats-read";
-import { luckRolls, type StatsRead } from "./compute";
+import { type CombatFact, combatFacts } from "../combat-tracker/stats-read";
+import { luckRolls, type StatsRead, seenFacts } from "./compute";
 
 type Read = Pick<Tx, "select" | "all">;
 
@@ -77,19 +76,21 @@ export function computePartials(
   const last = sessions.at(-1);
   if (!first || !last) return out;
   for (const s of sessions) out.set(s.fromN, emptyPartial());
-  const facts = combatFacts(r.db, {
+  // Every counted fact, grouped by session, then filtered per session (BL-111 reads the unseen).
+  const allBy = new Map<number, CombatFact[]>();
+  for (const f of combatFacts(r.db, {
     campaignId: r.campaignId,
     fromN: first.fromN,
     toN: last.toN,
-  }).filter((f) => entryVisible(r.viewer, { public: f.public, kind: f.entryKind }));
-  const factsBy = new Map<number, typeof facts>();
-  for (const f of facts) {
+  })) {
     const s = sessionOf(sessions, f.n);
     if (!s) continue;
-    const xs = factsBy.get(s.fromN) ?? [];
+    const xs = allBy.get(s.fromN) ?? [];
     xs.push(f);
-    factsBy.set(s.fromN, xs);
+    allBy.set(s.fromN, xs);
   }
+  const factsBy = new Map<number, { facts: CombatFact[]; dealtUnseen: boolean }>();
+  for (const [fromN, all] of allBy) factsBy.set(fromN, seenFacts(r.viewer, all, characters));
   const rolls = luckRolls(r, first.fromN, last.toN);
   const rollsBy = new Map<number, typeof rolls>();
   for (const x of rolls) {
@@ -100,7 +101,8 @@ export function computePartials(
     rollsBy.set(s.fromN, xs);
   }
   for (const [fromN, p] of out) {
-    const sf = factsBy.get(fromN) ?? [];
+    const seen = factsBy.get(fromN);
+    const sf = seen?.facts ?? [];
     const sr = rollsBy.get(fromN) ?? [];
     addTrophies(p.trophies, sf, characters, r.viewer.role);
     addLuck(p.luck, sr, characters, r.viewer.role);
@@ -118,6 +120,9 @@ export function computePartials(
           rolls: sr,
           characters,
           fightLabel: () => "",
+          // BL-111 (T2): players' cards leave out Most damage dealt while party damage is unseen,
+          // so it isn't counted as won either (FR-STATS-84).
+          dealtUnseen: seen?.dealtUnseen ?? false,
         }),
       );
     }

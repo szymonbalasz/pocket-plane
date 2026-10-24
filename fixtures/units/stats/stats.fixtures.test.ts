@@ -37,7 +37,8 @@
 //   Records: Biggest hit Thorn 30 → Skeleton (Old Crypt | Fight 1); Biggest overkill Thorn 23 →
 //   Goblin Scout (Ambush) | 30 → Skeleton (Fight 1); most damage in a fight Mira 54 (Ambush) |
 //   Thorn 43 (Fight 1); most kills Mira 4 (Ambush) | 3 (Fight 2); most healing Brakka 8.
-//   Awards won: Thorn 8, Mira 3, Brakka 2 (both roles; the one session's winners, ties count).
+//   Awards won: Thorn 8 | 7, Mira 3, Brakka 2 (the one session's winners, ties count; BL-111:
+//   players get no Most damage dealt card, Mira's late damage on the hidden Goblin 2 is unseen).
 import { afterAll, describe, expect, test } from "bun:test";
 import { combatant, encounter, entity, hpChange, notification, player } from "@server/db/schema";
 import { servicesFromBundle } from "@server/ws/testing/snapshot-size";
@@ -354,7 +355,7 @@ describe("STATS §13 fixtures", () => {
       "best-fight-healing": ["Brakka", 8, undefined, f2],
     });
     expect(awards(first)).toEqual([
-      ["Thorn", 8],
+      ["Thorn", 7],
       ["Mira", 3],
       ["Brakka", 2],
     ]);
