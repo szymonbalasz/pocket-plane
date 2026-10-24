@@ -1,4 +1,4 @@
-// Stats window client logic (STATS §7, FR-STATS-17–25, -34, -41, -52), pure: which live frames
+// Stats window client logic (STATS §7, FR-STATS-17–25, -34, -41, -52, -85), pure: which live frames
 // re-query, the live awards and fight-summary opens (FR-SHELL-94, FR-STATS-34), picker labels. The
 // kill feed (FR-STATS-28) is `./feed`. The numbers are always the server's (`stats.query`'s ack):
 // nothing here aggregates a fact.
@@ -9,8 +9,12 @@ import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { EventFrame } from "@shared/protocol/frames";
 import { dayLabel } from "@shared/stats/rules";
 import {
+  AWARD_TITLE,
   type Award,
   type AwardKey,
+  type CampaignAwardsRow,
+  type CampaignRecord,
+  type CampaignRecordKey,
   type DmFellEvent,
   type DmFightRow,
   type DmHighlightStat,
@@ -29,8 +33,10 @@ import {
 import { NOTIFICATION_TYPE } from "../notifications/logic";
 
 export const STATS_WINDOW_KIND = "stats.board";
-export const STATS_TABS = ["fight", "session", "luck"] as const;
+/** FR-STATS-85 (sprint 10 T3): Campaign first, and the tab a user open lands on. */
+export const STATS_TABS = ["campaign", "fight", "session", "luck"] as const;
 export type StatsTab = (typeof STATS_TABS)[number];
+export const DEFAULT_TAB: StatsTab = "campaign";
 
 /** FR-STATS-17: trailing re-query delay after a live log upsert. */
 export const REFRESH_MS = 1000;
@@ -48,14 +54,15 @@ export const logUpserts = (frame: Frame) =>
  * FR-STATS-17: does this live frame re-query? Fight tab: a log upsert in the shown fight; with no
  * fight picked, any fight's (the default may move to a fight just started); FR-STATS-52 (BL-69):
  * also an `encounter` change (a Start reaches players before any public fact; rounds tick).
- * Session tab: any log upsert. Luck tab (FR-STATS-41): a log upsert holding a roll.
+ * Session and Campaign (FR-STATS-87) tabs: any log upsert. Luck tab (FR-STATS-41): a log upsert
+ * holding a roll.
  */
 export function refreshes(
   frame: Frame,
   view: { tab: StatsTab; pickedFight: string | null },
 ): boolean {
   const entries = logUpserts(frame);
-  if (view.tab === "session") return entries.length > 0;
+  if (view.tab === "session" || view.tab === "campaign") return entries.length > 0;
   if (view.tab === "luck") return entries.some((e) => e.rollIds.length > 0);
   if (
     frame.changes.some(
@@ -158,7 +165,7 @@ const UNIT: Record<AwardKey, string> = {
  * players never get an overkill amount), so it reads "30 damage", never a bare "30" beside the
  * DM's "17"; the DM's stays the overkill amount.
  */
-const unitOf = (key: AwardKey | HighlightKey, role: "dm" | "player") =>
+const unitOf = (key: AwardKey | HighlightKey | CampaignRecordKey, role: "dm" | "player") =>
   key === "biggest-overkill" && role === "player" ? "damage" : null;
 
 export const awardValueText = (a: Award, role: "dm" | "player") => {
@@ -250,3 +257,60 @@ export const highlightsOpenByDefault = (status: "started" | "ended") => status =
 
 /** "Avg": 1 decimal, "—" with no d20. */
 export const avgText = (avg: number | null) => (avg === null ? "—" : avg.toFixed(1));
+
+// ---------- Campaign (FR-STATS-81–85) ----------
+
+/**
+ * FR-STATS-85: a user open lands on Campaign, so the window's close (not a minimise or put-away)
+ * sends the tab back to it; a feature open (End, Show awards) sets its own tab before opening.
+ * True when the window went from shown or minimised to closed / gone.
+ */
+export const closedNow = (prev: string | undefined, next: string | undefined) =>
+  (prev === "open" || prev === "minimised") && next !== "open" && next !== "minimised";
+
+/** FR-STATS-81: "2 sessions · 5 fights · 14 monsters slain". */
+export function campaignHeaderText(c: { sessions: number; fights: number; slain: number }) {
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  return [
+    n(c.sessions, "session", "sessions"),
+    n(c.fights, "fight", "fights"),
+    `${n(c.slain, "monster", "monsters")} slain`,
+  ].join(" · ");
+}
+
+export const CAMPAIGN_RECORD_TITLE: Record<CampaignRecordKey, string> = {
+  "biggest-hit": "Biggest hit",
+  "biggest-overkill": "Biggest overkill",
+  "best-fight-damage": "Most damage in a fight",
+  "best-fight-kills": "Most kills in a fight",
+  "best-fight-healing": "Most healing in a fight",
+};
+
+const RECORD_UNIT: Record<CampaignRecordKey, (v: number) => string> = {
+  "biggest-hit": () => "damage",
+  "biggest-overkill": () => "",
+  "best-fight-damage": () => "damage",
+  "best-fight-kills": (v) => (v === 1 ? "kill" : "kills"),
+  "best-fight-healing": () => "HP",
+};
+
+/**
+ * FR-STATS-83: a record's value: "30 damage", "4 kills", "8 HP"; Biggest overkill per role as the
+ * award card (BL-103): the DM's bare amount, a player's "30 damage" (the callout line's damage).
+ */
+export function recordValueText(
+  key: CampaignRecordKey,
+  r: NonNullable<CampaignRecord>,
+  role: "dm" | "player",
+) {
+  const unit = unitOf(key, role) ?? RECORD_UNIT[key](r.value);
+  return unit ? `${r.value} ${unit}` : String(r.value);
+}
+
+/** FR-STATS-83: "→ Skeleton · Old Crypt · Tue 20 Oct" (the target of a hit, then the fight). */
+export const recordWhereText = (r: NonNullable<CampaignRecord>) =>
+  r.to !== undefined ? `→ ${r.to} · ${r.fight}` : r.fight;
+
+/** FR-STATS-84: "Biggest hit ×2 · Most kills" (card order, ×N above 1). */
+export const awardsWonText = (row: Pick<CampaignAwardsRow, "won">) =>
+  row.won.map((w) => `${AWARD_TITLE[w.key]}${w.count > 1 ? ` ×${w.count}` : ""}`).join(" · ");

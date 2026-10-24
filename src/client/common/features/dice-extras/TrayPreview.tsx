@@ -6,6 +6,8 @@
 // (click removes one), a span otherwise. More than 12 dice → one die per term "×N".
 // FR-DICEX-54: the dice area shrinks first: 40-px cells while every die fits the area, else 28,
 // else "×N" (forced by room), else the area scrolls on its own (`stillSize`).
+// FR-DICEX-96 (DM #343): cells, chips and their numbers scale with the tray (`trayScale`: × 1 at
+// the min, × 1.2 at the useful size, × 1.4 at the default); the steps stay 40 / 28 (`data-cell`).
 import type { DiceLook } from "@shared/dice-extras/looks";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -24,6 +26,8 @@ import {
   type PreviewDie,
   parseStill,
   previewDice,
+  scaledFont,
+  scaledPx,
   stillParts,
   type TrayChip,
   trayPreviewMode,
@@ -40,7 +44,8 @@ export interface AreaBox {
   h: number;
 }
 
-const fitsIn = (cells: number, size: StillCell, area: AreaBox) => {
+const fitsIn = (cells: number, step: StillCell, area: AreaBox, scale: number) => {
+  const size = scaledPx(step, scale);
   const perRow = Math.max(1, Math.floor((area.w + CELL_GAP) / (size + CELL_GAP)));
   const rows = Math.ceil(cells / perRow);
   return rows * size + (rows - 1) * CELL_GAP <= area.h;
@@ -49,20 +54,22 @@ const fitsIn = (cells: number, size: StillCell, area: AreaBox) => {
 /**
  * FR-DICEX-54: the still size for `cells` cells (one per still, d100 = two, plus one per constant
  * / label) or `groupedCells` once grouped "×N". 40 while all fit; else 28; else grouped (40 or 28,
- * `grouped` = forced by room, not by > 12 dice); else grouped at 28 and the area scrolls.
+ * `grouped` = forced by room, not by > 12 dice); else grouped at 28 and the area scrolls. Each
+ * step is drawn at `scale` (FR-DICEX-96: 40 → 56 px at × 1.4).
  */
 export function stillSize(
   o: { cells: number; groupedCells: number; byCount: boolean },
   area: AreaBox,
+  scale = 1,
 ): { cell: StillCell; grouped: boolean; scroll: boolean } {
   if (!o.byCount) {
     for (const cell of [40, 28] as const) {
-      if (fitsIn(o.cells, cell, area)) return { cell, grouped: false, scroll: false };
+      if (fitsIn(o.cells, cell, area, scale)) return { cell, grouped: false, scroll: false };
     }
   }
   const grouped = !o.byCount;
   for (const cell of [40, 28] as const) {
-    if (fitsIn(o.groupedCells, cell, area)) return { cell, grouped, scroll: false };
+    if (fitsIn(o.groupedCells, cell, area, scale)) return { cell, grouped, scroll: false };
   }
   return { cell: 28, grouped, scroll: true };
 }
@@ -111,6 +118,7 @@ export function TrayDie({
   look,
   onRemove,
   cell = 40,
+  scale = 1,
 }: {
   die: PreviewDie;
   render: "3d" | "chips";
@@ -118,20 +126,29 @@ export function TrayDie({
   onRemove?: () => void;
   /** FR-DICEX-54: 40 or 28 px; chips `md` → `sm`. */
   cell?: StillCell;
+  /** FR-DICEX-96: the tray's dice scale (× 1 = `cell` px, drawn by the classes). */
+  scale?: number;
 }) {
   const text = `${die.sign === -1 ? "−" : ""}d${die.faces}`;
   const parts = render === "3d" ? stillParts(die.faces) : null;
+  const px = scaledPx(cell, scale);
+  const box = scale === 1 ? undefined : { height: px, minWidth: px };
   const body = (
     <>
       {parts ? (
         <>
-          {die.sign === -1 && <span className="font-mono text-sm">−</span>}
+          {die.sign === -1 && (
+            <span className="font-mono text-sm" style={scaledFont(14, scale)}>
+              −
+            </span>
+          )}
           {parts.map((p) => (
             <span
               key={p}
               data-still={p}
               aria-hidden
               className={cn("block shrink-0", CELL_SIZE[cell])}
+              style={scale === 1 ? undefined : { width: px, height: px }}
             />
           ))}
         </>
@@ -143,15 +160,22 @@ export function TrayDie({
           negative={die.sign === -1}
           label={text}
           size={cell === 40 ? "md" : "sm"}
+          scale={scale}
         />
       )}
       {die.tag && (
-        <span className="absolute -top-1.5 -right-1.5 rounded bg-primary px-1 text-[9px] leading-tight text-primary-foreground">
+        <span
+          className="absolute -top-1.5 -right-1.5 rounded bg-primary px-1 text-[9px] leading-tight text-primary-foreground"
+          style={scaledFont(9, scale)}
+        >
           {die.tag}
         </span>
       )}
       {die.group && (
-        <span className="absolute -right-1.5 -bottom-1.5 rounded bg-secondary px-1 font-mono text-[10px] leading-tight">
+        <span
+          className="absolute -right-1.5 -bottom-1.5 rounded bg-secondary px-1 font-mono text-[10px] leading-tight"
+          style={scaledFont(10, scale)}
+        >
           ×{die.group}
         </span>
       )}
@@ -170,6 +194,7 @@ export function TrayDie({
     <button
       type="button"
       {...attrs}
+      style={box}
       aria-label={`Remove one ${text}`}
       className={cn(
         cls,
@@ -180,7 +205,7 @@ export function TrayDie({
       {body}
     </button>
   ) : (
-    <span {...attrs} className={cls}>
+    <span {...attrs} className={cls} style={box}>
       {body}
     </span>
   );
@@ -193,6 +218,7 @@ function ExtraDice({
   render,
   look,
   cell,
+  scale,
 }: {
   extraKey: string;
   dice: TrayExtraDice[];
@@ -200,6 +226,7 @@ function ExtraDice({
   render: "3d" | "chips";
   look: DiceLook;
   cell: StillCell;
+  scale: number;
 }) {
   if (dice.length === 0) return null;
   return (
@@ -217,13 +244,20 @@ function ExtraDice({
           {...(d.key ? { "data-key": d.key } : {})}
           className="flex items-center gap-1 rounded-md border border-dashed pl-1.5 text-muted-foreground"
         >
-          <span className="font-mono text-xs">
+          <span className="font-mono text-xs" style={scaledFont(12, scale)}>
             {d.label} {d.sign === -1 ? "−" : "+"}
             {d.count}d{d.faces}
           </span>
           {previewDice(extraChips([d]), grouped).map((c, j) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: one die per position
-            <TrayDie key={j} die={{ ...c, term: i }} render={render} look={look} cell={cell} />
+            <TrayDie
+              // biome-ignore lint/suspicious/noArrayIndexKey: one die per position
+              key={j}
+              die={{ ...c, term: i }}
+              render={render}
+              look={look}
+              cell={cell}
+              scale={scale}
+            />
           ))}
         </span>
       ))}
@@ -238,6 +272,7 @@ export function TrayPreview({
   onRemove,
   dimmed = false,
   area,
+  scale = 1,
 }: {
   request: TrayRequest;
   groups: TrayGroup[];
@@ -249,6 +284,8 @@ export function TrayPreview({
   dimmed?: boolean;
   /** FR-DICEX-54: the dice area's content box; unknown (not measured yet) → 40 px, as built. */
   area?: AreaBox | null;
+  /** FR-DICEX-96: the tray's dice scale (`trayScale`). */
+  scale?: number;
 }) {
   const extras = useExtraDice(request, mode);
   const look = useOwnLook();
@@ -275,7 +312,7 @@ export function TrayPreview({
     // An extra's text ("MOD +1d4") takes about two cells.
     extras.reduce((n, x) => n + x.dice.length * 2 + previewDice(extraChips(x.dice), g).length, 0);
   const fit = area
-    ? stillSize({ cells: cellsOf(byCount), groupedCells: cellsOf(true), byCount }, area)
+    ? stillSize({ cells: cellsOf(byCount), groupedCells: cellsOf(true), byCount }, area, scale)
     : { cell: 40 as const, grouped: false, scroll: false };
   const grouped = byCount || fit.grouped;
   const cell = fit.cell;
@@ -284,7 +321,7 @@ export function TrayPreview({
   const root = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   // Redraw when the dice, tags, look or the area's size change; one draw each, no loop.
-  const drawKey = JSON.stringify([dice, extras, grouped, cell, look]);
+  const drawKey = JSON.stringify([dice, extras, grouped, cell, scale, look]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: redraws on `drawKey`
   useLayoutEffect(() => {
     const mod = dice3d.module();
@@ -332,6 +369,7 @@ export function TrayPreview({
         cell === 40 ? "min-h-10" : "min-h-7",
         dimmed && "opacity-50",
       )}
+      style={scale === 1 ? undefined : { minHeight: scaledPx(cell, scale) }}
     >
       <canvas
         // A fresh canvas per mode: chips never sit over an old still.
@@ -340,6 +378,7 @@ export function TrayPreview({
         data-testid="dicex-tray-preview"
         data-mode={render}
         data-cell={cell}
+        data-px={scaledPx(cell, scale)}
         {...(fit.grouped && { "data-grouped": "true" })}
         {...(fit.scroll && { "data-scroll": "true" })}
         aria-hidden
@@ -354,6 +393,7 @@ export function TrayPreview({
               data-testid="dicex-tray-group-label"
               data-index={i}
               className="relative text-xs text-muted-foreground"
+              style={scaledFont(12, scale)}
             >
               {g.label}
             </span>
@@ -366,11 +406,15 @@ export function TrayPreview({
               render={render}
               look={look}
               cell={cell}
+              scale={scale}
               onRemove={onRemove && !d.tag ? () => onRemove(d.term) : undefined}
             />
           ))}
           {g.constant !== 0 && (
-            <span className="relative font-mono text-sm text-muted-foreground">
+            <span
+              className="relative font-mono text-sm text-muted-foreground"
+              style={scaledFont(14, scale)}
+            >
               {signed(g.constant)}
             </span>
           )}
@@ -385,6 +429,7 @@ export function TrayPreview({
           render={render}
           look={look}
           cell={cell}
+          scale={scale}
         />
       ))}
     </div>

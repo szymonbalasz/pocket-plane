@@ -25,6 +25,8 @@ phase: post-mvp-9
 
 > **Sprint 9, track SP** (DM [#338](../decisions-log.md): session recap): the [session recap](session-recap.md) reads stats' compute helpers. FR-STATS-78–80 ([§6.2](#62-sprint-9-recap-reads-track-sp)): a read seam, a Recap button on the Session tab, separate budgets. No stats number, schema or ack changes; 0 B. The stats files (`compute.ts`, the Session tab) are edited in slice SP3 **after FX1 merges** (seams S7: one holder of stats files at a time).
 
+> **Sprint 10, T3** (2026-10-24; DM [#344](../decisions-log.md), no spec phase, integrator rulings): a **Campaign** tab, first and the tab a user open lands on. FR-STATS-81–88 ([§6.3](#63-sprint-10-t3-campaign-tab)). No schema, 0 B; built on the session partials ([ADR-0062](../architecture/adr/0062-stats-session-partials.md)). Slice `fix/stats-campaign`.
+
 ## 1. Summary
 
 - A **Stats** window (both clients): **Fight** = a live leaderboard; **Session** = 9 awards and the DM's **Show awards**.
@@ -174,11 +176,27 @@ The [session recap](session-recap.md) reads stats; it changes no stats number, f
 | FR-STATS-79 | **Recap button** on the Session tab (both clients): `stats-session-recap` "Recap" beside the picker (DM: beside Show awards) opens `recap.session` (`by: "user"`) on the picked session ([FR-RECAP-10](session-recap.md#6-functional-requirements)). Hidden until RECAP's window registers. Test `FR-STATS-79 recap button`. |
 | FR-STATS-80 | **Separate budgets**: `recap.query` has its own per-actor rate limit ([FR-RECAP-05](session-recap.md#6-functional-requirements)) and memo ([FR-RECAP-29](session-recap.md#6-functional-requirements): keyed by session, role and fact / loot high-water; all players share one entry); it never counts against `stats.query`'s (FR-STATS-16). The leak scan's stats cases cover `recap.query` acks too ([FR-RECAP-08](session-recap.md#6-functional-requirements)). |
 
+### 6.3 Sprint 10 T3: Campaign tab
+
+*Sprint 10 T3, 2026-10-24* (DM #344). Tier A / B rules hold: filter, then aggregate; party = PCs + companions, rolled into the current owner; per-role values as FR-STATS-12. *Ruling* = integrator pick (spec-consistent, leak-safe).
+
+| ID | Requirement |
+|---|---|
+| FR-STATS-81 | **Campaign scope**: `stats.query {scope: "campaign"}` (§9), campaign-wide over every session. **Header**: sessions (the ones the viewer lists, FR-STATS-13), fights (encounters with a counted fact the viewer sees, FR-STATS-15's rule), monsters slain (kills, FR-STATS-08, the viewer sees, **any attacker** incl. the DM's direct damage; *ruling*). "2 sessions · 5 fights · 14 monsters slain". |
+| FR-STATS-82 | **Party table**: one row per party character with a non-zero number for the viewer: Dealt, Taken, Healed, Kills, Downed, Nat 20s, Nat 1s, Fights, **Trophies' Lifetime definitions** (FR-STATS-42 table). Companions have no row: rolled into the owner (dealt, healed, kills); taken / downs stay the PC's (OQ-STATS-12 A, as Trophies; *ruling*). Sorted by Dealt, then name (server order). **No monster rows for the DM either** (Trophies has none; *ruling*): the DM's party numbers include hidden facts and rolls. |
+| FR-STATS-83 | **Records** (party only): Biggest hit, Biggest overkill (per role: DM the amount; players the callout line's `raw`, read "30 damage", BL-103), Most damage / kills / healing **in one fight** (by one character; healing per fight is new, from the same facts). Each: who, value, the target (hits), the fight as the viewer labels it **plus its day** (DM "Old Crypt · Tue 20 Oct"; players the neutral "Fight 1 · Tue 20 Oct"). Ties → the earlier fact. None → "—". |
+| FR-STATS-84 | **Session awards won**: for every session, the viewer's nine Session-tab awards (FR-STATS-12); each named winner wins once per award (ties: every named winner; *ruling*). One line per character: total, then "Biggest hit ×2 · Most kills" in card order; by total. **BL-111 (T2):** a session whose players' cards leave out Most damage dealt (FR-STATS-12) counts no Most damage dealt win for players; the DM's count keeps it. Test `FR-STATS-84 BL-111 …`. |
+| FR-STATS-85 | **Tabs** Campaign · Fight · Session · Luck. **A user open lands on Campaign** (launcher, palette, S key): the tab returns to Campaign when the window **closes** (not on minimise or put-away; the view is page memory and the spec remembered no last tab; *ruling*). Unchanged: End opens Fight with Highlights (FR-STATS-34, -36), Show awards opens Session (FR-SHELL-94), the Recap button stays on Session (FR-STATS-79). |
+| FR-STATS-86 | **Visibility** exactly as Trophies / awards per role: players the hub filter (public facts and rolls only; no hidden creature, DM roll or hidden request answer in any number), party only, neutral fight labels, no overkill amount; every player the same answer. Ack leak-scanned per player (live, after reconnect, after a hard restart). |
+| FR-STATS-87 | **Read path**: same pipeline, rate limit and memo as FR-STATS-16 / -69 (one memo for all players); from the session partials (FR-STATS-46; a partial also keeps its award winners, fights and kills), `{pending: true}` while building (asked again in 1 s). **Live refresh**: re-query 1 s after any live log upsert (trailing, as Session) and after each snapshot. Ack ≤ 64 KB (rows, award rows ≤ 70). **Bench**: campaign warm ≤ 50 ms at 100 sessions (DM, player). |
+| FR-STATS-88 | **Fits today's Stats window** (400 × 412, useful 400 × 360; no size change): header, then the party table (narrow columns "Dealt Taken Healed Kills Down 20s 1s Fights", names whole; the table **scrolls sideways inside its own box**, the window body never), then records and awards as compact lines. States as FR-STATS-24 / -50 ("No fights yet", "No awards yet", skeleton while pending). |
+
 ## 7. UI/UX notes
 
 - [visual-direction](../design/visual-direction.md); shadcn Table, Tabs, Select, Card, Tooltip, Toast. Window `stats.board` (FR-SHELL-93). Layout and test IDs: FR-STATS-18, -19.
 - **Player view:** party rows, neutral fight labels, no Show awards; awards open by themselves.
 - **DM view:** everything (FR-STATS-18).
+- *(Sprint 10 T3)* **Campaign** first (FR-STATS-81–88): header line; Party table (shadcn Table in an `overflow-x-auto` box); Records and Session awards won as compact lines; names in the player colour. Same for both roles; the numbers differ by the filter.
 - *(Sprint 8)* Tabs Fight · Session · Luck (fit 320 px); Highlights a Collapsible, two columns from 400 px; Luck a Table. **Player:** party only, own Trophies. **DM:** + monsters, hidden marks, Still standing, DM dice, any Trophies.
 
 ## 8. Data model
@@ -215,6 +233,7 @@ The [session recap](session-recap.md) reads stats; it changes no stats number, f
 | `stats.query {scope: "fight", …}` | DM, player | as above | + `highlights` per role |
 | `stats.query {scope: "luck", n? \| campaign: true}` | DM, player | `n` in a listed session | `{luck: {scope, fromN?, rows}}`; DM + `dm-dice` |
 | `stats.query {scope: "trophies", characterId}` | DM; player, own | else `forbidden` | `{trophies: {characterId, lifetime, records}}` per role |
+| *(Sprint 10 T3)* `stats.query {scope: "campaign"}` | DM, player | as above | `{campaign: {pending: true} \| {sessions, fights, slain, rows, records, awards}}`, one strict schema; numbers per viewer ([protocol](../protocol/README.md)) |
 | Line `fell` (existing upsert) | — | at apply | DM all; players public lines (the band already reads "down") + a companion owner's audience lines |
 | `NotificationCreated` `stats-fight-summary` (in `cbt.end`) | hook | FR-STATS-33 | DM always; players only for audience `all`; payload `{encounterId}` (already public, #327) |
 
@@ -356,6 +375,25 @@ Named tests (all `FR-STATS-NN …`):
 - **Client, `logic.test.ts`.** `FR-STATS-70 no "No damage yet" beside a kill`: zero rows + a kill highlight → no copy; zero rows and no highlight → the copy. `render.test.tsx` gets the same case.
 - Walkthrough: [notifications §13 FX1](notifications.md#13-test-plan) steps 5–8. Bundles: `session-sim-12`, `stats-b` (tests). E2E: none new (FR-STATS-68's outcome is in FX1's walkthrough).
 
+### 13.4 Sprint 10 T3 (Campaign tab)
+
+- **Fixtures:** no unit. Bundle `stats-b` (walkthrough; one session on the fixed / load clock); e2e alias **`stats-campaign-e2e`**. Expected numbers per role: `stats.fixtures.test.ts` header (DM | players: slain 9 | 7; Thorn 93 / 209 / 4 kills / 5 nat 20s | 73 / 200 / 3 / 3; Biggest overkill Thorn 23 | "30 damage"; awards won Thorn 8 | 7 (BL-111), Mira 3, Brakka 2).
+- **Named tests** (`FR-STATS-NN …`):
+  - **Unit** (`campaign.test.ts`): 82 lifetime totals, companions, zero rows, ≤ 70; 83 records per role, ties; 84 winners per session, ties, card order; 87 a full ack ≤ 64 KB.
+  - **Integration** (`stats-campaign.test.ts`, two sittings via the injected clock): 81–84 every number per role; 84 = the Session tab's winners summed; 82 = Trophies' Lifetime; 81 empty campaign; 87 memo shared by players, over the rate the last answer, an old undo, pending → built. `stats.fixtures.test.ts`: the `stats-b` numbers per role. `stats-campaign-sync.test.ts`: **86 leak scan per player** over real sockets (live, reconnect, a live hidden kill, hard restart).
+  - **Client** (`campaign.test.tsx`, `render.test.tsx`): 81 header; 82 rows, colours, sideways scroll box; 83 records per role; 84 awards line; 85 tab order, default, close → Campaign; 87 refresh, pending, error, offline; 88 empty states.
+  - **E2E** (`t3-campaign.e2e.ts`): opens on Campaign; DM vs Player 2 numbers; no sideways body scroll at 400 × 412; a live kill updates both; close + reopen lands on Campaign. **Bench:** FR-STATS-87 (`stats.bench.ts`).
+
+**Browser walkthrough T3** (bundle `stats-b`, verify profile, contexts `dm`, `player-1`, `player-2`, 1440×900; the Stats window at its default 400 × 412):
+1. All three open Stats (DM: S key; player-1: the palette; player-2: the launcher): it opens on **Campaign**, the first tab. Header DM "1 session · 2 fights · 9 monsters slain"; players "… 7 monsters slain".
+2. Party table per the fixture header: the DM's Thorn row 93 / 209 / 0 / 4 / 1 / 5 / 1 / 2; the players' 73 / 200 / 0 / 3 / 1 / 3 / 1 / 2. Names whole; the table scrolls sideways inside its box if needed; the window body never does.
+3. Records: the DM's Biggest overkill "23" Thorn → Goblin Scout · Ambush at the Ford · day; the players' "30 damage" Thorn → Skeleton · Fight 1 · day. No encounter name or hidden creature on a player's tab.
+4. Session awards won: the DM Thorn 8, Mira 3, Brakka 2; the players Thorn 7 (no Most damage dealt: BL-111, the session holds Mira's hidden late damage), Mira 3, Brakka 2.
+5. DM: Thorn applies 25 to Bandit 4 → every Campaign tab updates ≤ 2 s (DM Thorn Dealt 118, slain 10; players 98, slain 8).
+6. DM: Thorn kills the hidden Elite → the DM's numbers move; the players' don't. Player 2 leak scan over frames and acks.
+7. Player 2: Luck, then close Stats and reopen → Campaign. DM: End → Stats opens on the Fight tab with Highlights; Show awards → Session on both players.
+8. Reload, then a hard kill + restart: the same numbers (`state:digest` equal).
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -386,6 +424,8 @@ Named tests (all `FR-STATS-NN …`):
 - **Stats client files have one holder at a time** (seams S7): FX1 first, then SP3's stats edits.
 - [FR-FIX-29](fixtures-adapters.md#6-functional-requirements) (BL-69, seams S13) also lands in FX1: `server/features/fixtures-adapters/loader.ts` (`now`) and test. ⚠ `scripts/fixtures.ts` is shared tooling (AGENTS §9.9): one line passing the load start, `shared change needed`.
 - Order (seams S5, S10): FX1 builds in wave 3 and merges **after PM1**.
+
+**Sprint 10 T3** `fix/stats-campaign` (DM #344): `features/stats/*` (campaign query, partials), `shared/stats/*` (`campaign.ts`, `CampaignResult`, `rules-b.ts` per-fight healing), `@ui/features/stats/*` (Campaign tab, tab order / default), `e2e/t3-campaign.e2e.ts`. Shared: append `fixtures/bundles/index.ts` (`stats-campaign-e2e`); docs protocol / data-model rows. No size-table, golden or schema change (T1 holds the frame). T2's BL-111 rule applies to FR-STATS-84 (per session, `seenFacts` in the partials).
 
 **Sprint 9 (track SP).** FR-STATS-78–80 are built in RECAP's slice **SP3** ([session-recap §14](session-recap.md#14-dependencies)): `features/stats/compute.ts` (one export) and the Session tab's button (`@ui/features/stats/*`), **after FX1 (BL-84, BL-74) merges** (seams S7). Tests: `FR-STATS-78 recap seam`, `FR-STATS-79 recap button`, `FR-STATS-80` in the leak scan; walkthrough RC2 ([session-recap §13](session-recap.md#13-test-plan)). No fixture here (RECAP's units).
 

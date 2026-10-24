@@ -119,6 +119,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-112 | The Dice tray stays open after a roll-request prompt is answered via Alt → tray (sim-14 glitch 7, `.verify/20261024-061849-session-sim-14/`) | S | dice-extras tray / prompt | none | dice work | open |
 | BL-113 | Small (sim-14 glitch 8): "Add hidden" already ticked when Add… first opens (check FR-CBTX default); Party Manager at 600 covers the whole enemy line at DM 1440 (PC rule only); DM launcher icon-only at 1440 in test mode (`.verify/20261024-061849-session-sim-14/`) | S | combat-extras Add dialog, play-shell | none | — | open |
 | BL-114 | A hidden pet's redacted entity (name, owner, health band) stays in other players' snapshots after the DM hides it, with no row shown (FR-ENT-37 `petPresent` counts the hidden combatant; FR-PARTY-61 "no row" holds) (H2 re-test, sim-14 leak note, `.verify/20261024-061849-session-sim-14/`) | S | entities pet redaction | DM call (drop the entity for non-owners while hidden?) | entities work | open (DM call) |
+| BL-115 | `e2e/combat2-polish.e2e.ts` FR-CBT-75 (1280×720 / 1440×900) times out in `stableBox` waiting for the DM toast stack to stop moving: 2 of ~5 loaded runs since H3 (branch gates H3, T1; once alone under load). sim-14 also saw the stack hop within ~70 ms while the dice popup moves (H3 re-test 2 O1). Check for toast jitter (fold restarting on each layout change) and make the stack settle; then the test | S | notifications ToastRuntime / combat2-polish e2e | none | toast work | open |
 
 ## How to add items
 

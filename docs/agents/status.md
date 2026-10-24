@@ -16,15 +16,16 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 H3 toasts | merged 8b279504 | — | **merged** (walkthrough 5/8 → re-tests 7/8, 9/10, 12/12; branch check 5587 / e2e 237 + known combat2-polish FR-CBT-75 flake, 3 × 8/8 alone); evidence `.verify/sprint10/walkthroughs/20261024-h3*/` ; main gates green (5587 / 238), bench 41 / 41 | — |
 | Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/`; main gates green (5545 / 229) | — |
 | Sprint gate | final main 8b279504 | — | **session-sim-14 13 / 13 PASS** (leak scan clean; hard kill byte-identical); glitches → BL-107–BL-114 | DM recap |
-| Sprint 10 T1 Dice tray +40 % (#343) | `fix/dice-tray-size` (slot 0, ws wAA) | build-t1 | built (504 × 420, 56-px dice; check 5596); making dice ≥ 48 px at useful 360 × 300 | walkthrough (port 4103) |
-| Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | merged ef4835d1 | — | **merged** (walkthrough 11/11; branch check 5593 / e2e 240); evidence `.verify/sprint10/walkthroughs/20261024-t2/` | main gates |
-| Sprint 10 T3 Stats Campaign tab (#344) | `fix/stats-campaign` (slot 4, ws wAC) | build-t3 | walkthrough **7/7 PASS** (`.verify/20261024-t3/`); merging main + BL-111 rule for awards won | merge |
+| Sprint 10 T1 Dice tray +40 % (#343) | merged 4c356249 | — | **merged** (walkthrough 18/18; branch check 5602 / e2e 241 + FR-CBT-75 toast flake → BL-115); evidence `.verify/sprint10/walkthroughs/20261024-t1/` | main gates (T1 + T3) |
+| Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | merged ef4835d1 | — | **merged** (walkthrough 11/11; branch check 5593 / e2e 240); evidence `.verify/sprint10/walkthroughs/20261024-t2/`; main gates green (5593 / 240) | — |
+| Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
+| Sprint 10 T4 faster test loop (#345) | `fix/test-speed` (slot 2, ws wAD) | build-t4 | building (tooling lock: package.json scripts, scripts/, bunfig, playwright config, gates.sh); merges after T1 / T3, never while a gate runs | review + branch gates |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
 ## Shared-file locks
 
-- T1: play-shell size table / goldens / replay sets (frame lock).
+- T4: tooling (package.json scripts, scripts/, bunfig, playwright config, gates.sh). Don't merge T4 while a gate runs.
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 

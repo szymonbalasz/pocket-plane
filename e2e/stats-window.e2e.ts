@@ -51,9 +51,13 @@ test("FR-STATS-18 FR-STATS-17 FR-STATS-22 FR-STATS-20 FR-SHELL-94 an overkill up
   await p2.goto(link("Player 2"));
   await live(p2);
 
-  // FR-SHELL-93 / FR-STATS-18: the launcher opens Stats on the Fight tab, the running Ambush.
+  // FR-SHELL-93 / FR-STATS-18: the Fight tab shows the running Ambush. *(Sprint 10 T3,
+  // FR-STATS-85: the launcher opens on Campaign, so the Fight tab is picked.)*
   const dmStats = await openWindow(dm, "stats.board");
   const p2Stats = await openWindow(p2, "stats.board");
+  for (const win of [dmStats, p2Stats]) {
+    await win.locator('[data-testid="stats-tab"][data-value="fight"]').click();
+  }
   await expect(statsRow(dmStats, thorn)).toHaveCount(1);
   await expect(statsRow(p2Stats, thorn)).toHaveCount(1);
   // DM-only parts: monster rows, the Effective column; players get party rows only.

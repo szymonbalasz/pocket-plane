@@ -2620,3 +2620,12 @@ From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-97,
 
 - **Derived (client, not stored):** the displacement memory's `shrunk` / `under` (client memory, dropped on reload); the fit's rooms without remembered windows (`untouched`, BL-100).
 - **Fixtures:** none new; bundles `h2-frame`, `h2-frame-e2e`, `h2-fit-e2e` are aliases.
+
+## 129. Sprint 10: Stats Campaign tab (T3)
+
+From [stats](../specs/stats.md#63-sprint-10-t3-campaign-tab) FR-STATS-81–88 (DM #344). **Built by `fix/stats-campaign`**. Protocol side: [protocol §162](../protocol/README.md#162-sprint-10-stats-campaign-tab--statsquery-scope-campaign-t3). **No table, column, record type or wire field in the snapshot.**
+
+- **Derived (not stored):** the campaign header (sessions listed, fights with a counted fact, monsters slain), the party's lifetime rows, the five campaign records (incl. **most healing in one fight**, new: a character's healing per encounter) and the session awards won per character, all per viewer from the session partials.
+- **Persisted runtime state:** none. **Server memory** (ADR-0062): each session partial also keeps its award winners (counts per character and key), its encounters and its kill count; same build, invalidation and rebuild.
+- **Client memory:** the Stats view's tab defaults to `campaign` and returns to it when the window closes (page memory, never sent or stored).
+- **Fixtures:** none new; `stats-campaign-e2e` aliases `stats-b`; expected numbers in `fixtures/units/stats/stats.fixtures.test.ts`.

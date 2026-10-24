@@ -8,6 +8,8 @@
 // - FR-STATS-34: a new `stats-fight-summary` notification opens Stats on that fight with
 //   Highlights (preference "Open the fight summary at End"); the DM's own End first minimises
 //   Initiative (FR-CBT-60, on the ack after this frame), so its open waits for that (≤ 2 s).
+// *(Sprint 10 T3)* FR-STATS-85: closing the window sends its tab back to Campaign, so the next user
+// open (launcher, palette, S key) lands there; a feature open sets its own tab first.
 // *(Sprint 8, TT4)* Under the pause card (players, seams S10, FR-SHELL-127): no kill feed (dropped,
 // not replayed); the awards and fight-summary opens wait for resume (`pauseGate`).
 import type { EventFrame } from "@shared/protocol/frames";
@@ -25,9 +27,10 @@ import {
   feedLinesOf,
   feedToastText,
 } from "./feed";
-import { awardsOpenOf, summaryOpenOf } from "./logic";
+import { awardsOpenOf, closedNow, DEFAULT_TAB, STATS_WINDOW_KIND, summaryOpenOf } from "./logic";
 import { useOpenStatsAwards, useOpenStatsFight } from "./open";
 import { type StatsPrefs, statsPrefs } from "./prefs";
+import { statsViews, viewKey } from "./view";
 
 const INITIATIVE_KIND = "cbt.initiative";
 /** FR-STATS-34: the longest the DM's open waits for its own End's Initiative minimise. */
@@ -113,6 +116,15 @@ export function StatsRuntime() {
   const openAwards = useOpenStatsAwards();
   const openFight = useOpenStatsFight();
   const initiative = useShellState((s) => s.windows.find((w) => w.kind === INITIATIVE_KIND)?.state);
+  const you = useSync((s) => s.store.you);
+  const board = useShellState((s) => s.windows.find((w) => w.kind === STATS_WINDOW_KIND)?.state);
+  const lastBoard = useRef(board);
+  useEffect(() => {
+    if (closedNow(lastBoard.current, board) && you) {
+      statsViews().set(viewKey(you), { tab: DEFAULT_TAB });
+    }
+    lastBoard.current = board;
+  }, [board, you]);
   const [waiting, setWaiting] = useState<{ encounterId: string; since: number } | null>(null);
   const openFightRef = useRef(openFight);
   openFightRef.current = openFight;

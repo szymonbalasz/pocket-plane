@@ -74,6 +74,8 @@ export const StatsQueryInput = z.discriminatedUnion("scope", [
     campaign: z.literal(true).optional(),
   }),
   z.strictObject({ scope: z.literal("trophies"), characterId: Id }),
+  // Sprint 10 T3 (FR-STATS-81): the Campaign tab, campaign-wide over every session.
+  z.strictObject({ scope: z.literal("campaign") }),
 ]);
 export type StatsQueryInput = z.infer<typeof StatsQueryInput>;
 
@@ -400,12 +402,103 @@ export const TrophiesResult = z.strictObject({
 });
 export type TrophiesResult = z.infer<typeof TrophiesResult>;
 
+// ---------- campaign (sprint 10 T3, FR-STATS-81–87) ----------
+
+/** FR-STATS-84: party rows and awards rows. */
+export const CAMPAIGN_ROWS_MAX = 70;
+
+/** FR-STATS-82: one party character's lifetime totals (Trophies' Lifetime definitions). */
+export const CampaignRow = z.strictObject({
+  /** The character id (companions roll into the current owner, FR-STATS-09). */
+  key: Id,
+  name: Name,
+  playerId: Id.nullable(),
+  dealt: Count,
+  taken: Count,
+  healed: Count,
+  kills: Count,
+  downed: Count,
+  nat20: Count,
+  nat1: Count,
+  fights: Count,
+});
+export type CampaignRow = z.infer<typeof CampaignRow>;
+
+/** FR-STATS-83: the campaign records, in display order. */
+export const CAMPAIGN_RECORD_KEYS = [
+  "biggest-hit",
+  "biggest-overkill",
+  "best-fight-damage",
+  "best-fight-kills",
+  "best-fight-healing",
+] as const;
+export type CampaignRecordKey = (typeof CAMPAIGN_RECORD_KEYS)[number];
+
+/**
+ * One record: who (a party character), `value` (Biggest overkill per role, FR-STATS-12: a player's
+ * is the callout line's `raw`), the target of a hit, `fight` = the viewer's fight label with its
+ * day (DM "Old Crypt · Tue 20 Oct"; players "Fight 1 · Tue 20 Oct"). Null = none yet.
+ */
+export const CampaignRecord = z
+  .strictObject({
+    value: Count,
+    characterId: Id,
+    name: Name,
+    playerId: Id.nullable(),
+    to: Name.optional(),
+    fight: Label,
+  })
+  .nullable();
+export type CampaignRecord = z.infer<typeof CampaignRecord>;
+export const CampaignRecords = z.strictObject({
+  "biggest-hit": CampaignRecord,
+  "biggest-overkill": CampaignRecord,
+  "best-fight-damage": CampaignRecord,
+  "best-fight-kills": CampaignRecord,
+  "best-fight-healing": CampaignRecord,
+});
+export type CampaignRecords = z.infer<typeof CampaignRecords>;
+
+/** FR-STATS-84: one character's session awards won (ties: each winner counts), by card order. */
+export const CampaignAwardsRow = z.strictObject({
+  key: Id,
+  name: Name,
+  playerId: Id.nullable(),
+  total: z.int().min(1),
+  won: z
+    .array(z.strictObject({ key: AwardKey, count: z.int().min(1) }))
+    .min(1)
+    .max(AWARD_KEYS.length),
+});
+export type CampaignAwardsRow = z.infer<typeof CampaignAwardsRow>;
+
+/** FR-STATS-81: the header (sessions, fights, monsters slain) and the three parts. */
+export const CampaignStats = z.strictObject({
+  sessions: Count,
+  fights: Count,
+  slain: Count,
+  rows: z.array(CampaignRow).max(CAMPAIGN_ROWS_MAX),
+  records: CampaignRecords,
+  awards: z.array(CampaignAwardsRow).max(CAMPAIGN_ROWS_MAX),
+});
+export type CampaignStats = z.infer<typeof CampaignStats>;
+
+/**
+ * Both roles (the numbers differ by the filter, not the shape; FR-STATS-86). `pending`: as luck's
+ * (FR-STATS-46: partials still building; asked again in 1 s).
+ */
+export const CampaignResult = z.strictObject({
+  campaign: z.union([z.strictObject({ pending: z.literal(true) }), CampaignStats]),
+});
+export type CampaignResult = z.infer<typeof CampaignResult>;
+
 export const PlayerStatsResult = z.union([
   PlayerFightResult,
   SessionResult,
   SessionsResult,
   PlayerLuckResult,
   TrophiesResult,
+  CampaignResult,
 ]);
 export const DmStatsResult = z.union([
   DmFightResult,
@@ -413,6 +506,7 @@ export const DmStatsResult = z.union([
   SessionsResult,
   DmLuckResult,
   TrophiesResult,
+  CampaignResult,
 ]);
 export type PlayerStatsResult = z.infer<typeof PlayerStatsResult>;
 export type DmStatsResult = z.infer<typeof DmStatsResult>;

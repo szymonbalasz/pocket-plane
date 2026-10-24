@@ -49,6 +49,8 @@ const ROUND: Record<keyof typeof DIE_PX, string> = {
   md: "h-9 min-w-9 px-1.5 text-sm leading-[32px]",
   lg: "h-11 min-w-11 px-1.5 text-base leading-[40px]",
 };
+/** The round chip's font px per `size` (its class), for a scaled chip. */
+const ROUND_FONT: Record<keyof typeof DIE_PX, number> = { sm: 10, md: 14, lg: 16 };
 
 // Outlines in a 100 × 100 box; `cy` = where the number sits.
 const OUTLINE: Record<Exclude<DieShapeKind, "round">, { d: string; cy: number; scale?: number }> = {
@@ -148,6 +150,7 @@ export function DieShape({
   negative = false,
   label,
   blank = false,
+  scale = 1,
 }: {
   /** Faces as rolled (a d100 part keeps 100); null = unknown → round. */
   faces: number | null;
@@ -166,9 +169,12 @@ export function DieShape({
   label?: string;
   /** Held (FR-DICEX-49): the shape in the look, no number, no `data-value`. */
   blank?: boolean;
+  /** FR-DICEX-96: the tray's dice scale (× 1 = `size`'s px). */
+  scale?: number;
 }) {
   const kind = round ? "round" : dieShapeOf(faces);
-  const px = DIE_PX[size];
+  const px = Math.round(DIE_PX[size] * scale);
+  const border = size === "sm" ? 1 : 2;
   const sign = negative ? "−" : "";
   const faceText =
     part === "tens" ? String(value).padStart(2, "0") : part === "units" ? String(value) : null;
@@ -210,7 +216,13 @@ export function DieShape({
             backgroundColor: look.body,
             color: look.pips,
             borderColor: look.pips,
-            borderWidth: size === "sm" ? 1 : 2,
+            borderWidth: border,
+            ...(scale !== 1 && {
+              height: px,
+              minWidth: px,
+              fontSize: Math.round(ROUND_FONT[size] * scale),
+              lineHeight: `${px - 2 * border}px`,
+            }),
           }}
         >
           {!blank && sign}
