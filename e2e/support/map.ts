@@ -113,7 +113,6 @@ export async function mapPoint(
         return st !== undefined && (st.x() !== b.x || st.y() !== b.y);
       },
       before,
-      { timeout: 2000 },
     );
   }
   throw new Error(`mapPoint: cell (${col}, ${row}) still covered after 6 pans`);

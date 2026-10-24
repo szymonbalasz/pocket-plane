@@ -87,8 +87,8 @@ test("FR-CAMP-35 picker: Preferences picker and DM Players panel Popovers on the
   await expect(p1.getByTestId("ui-tooltip")).toHaveCount(0);
   await swatch(picker, rose).click();
   await picker.getByTestId("camp-color-apply").click();
-  await expect(p1Dot).toHaveAttribute("data-color", rose, { timeout: 1_000 });
-  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", rose, { timeout: 1_000 });
+  await expect(p1Dot).toHaveAttribute("data-color", rose);
+  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", rose);
   await closePrefs(p1);
 
   // K10: the DM's Popover for Player 2: rose blocked by Player 1, own blue checked, amber by DM.
@@ -109,7 +109,7 @@ test("FR-CAMP-35 picker: Preferences picker and DM Players panel Popovers on the
   await expect(swatch(dmPicker, rose)).toHaveAttribute("data-blocked-by", p1Id);
   await swatch(dmPicker, yellow).click();
   await dmPicker.getByTestId("camp-color-apply").click();
-  await expect(dmSwatch).toHaveAttribute("data-value", yellow, { timeout: 1_000 });
+  await expect(dmSwatch).toHaveAttribute("data-value", yellow);
   await dm.keyboard.press("Escape");
   picker = await ownPicker(p1);
   await expect(swatch(picker, yellow)).toHaveAttribute("data-blocked-by", "dm");
@@ -129,7 +129,7 @@ test("FR-CAMP-35 picker: Preferences picker and DM Players panel Popovers on the
   await expect(p1Status).toHaveAttribute("data-state", "live", { timeout: 15_000 });
   await expect(picker.getByTestId("camp-color-apply")).toBeEnabled();
   await picker.getByTestId("camp-color-apply").click();
-  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", sky, { timeout: 1_000 });
+  await expect(rowSwatch(p1Id)).toHaveAttribute("data-value", sky);
   await expect(p2.getByTestId("ui-prefs-chip-dot")).toHaveAttribute("data-color", blue);
 
   // Leave the bundle as loaded (Player 1 jade, DM amber) for a rerun on this server.

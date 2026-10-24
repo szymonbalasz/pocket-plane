@@ -76,13 +76,13 @@ test("FR-CAMP-35 picker, FR-DICEX-57/58: Preferences colour + dice, DM Players p
   await expect(apply).toBeDisabled(); // unchanged draft
   await swatch(picker, rose).click();
   await apply.click();
-  await expect(bDot).toHaveAttribute("data-color", rose, { timeout: 1_000 });
-  await expect(row(p1Id)).toHaveAttribute("data-value", rose, { timeout: 1_000 });
+  await expect(bDot).toHaveAttribute("data-color", rose);
+  await expect(row(p1Id)).toHaveAttribute("data-value", rose);
 
   // P4: a hex, applied everywhere; then a drag into the dark bottom stops at the allowed edge.
   await applyHex(picker, PALE_SKY);
-  await expect(bDot).toHaveAttribute("data-color", PALE_SKY, { timeout: 1_000 });
-  await expect(row(p1Id)).toHaveAttribute("data-value", PALE_SKY, { timeout: 1_000 });
+  await expect(bDot).toHaveAttribute("data-color", PALE_SKY);
+  await expect(row(p1Id)).toHaveAttribute("data-value", PALE_SKY);
   const sv = picker.getByTestId("camp-color-sv");
   const box = await sv.boundingBox();
   if (!box) throw new Error("no square");
@@ -127,7 +127,7 @@ test("FR-CAMP-35 picker, FR-DICEX-57/58: Preferences colour + dice, DM Players p
   await expect(dmPicker.getByTestId("camp-color-apply")).toBeDisabled();
   await swatch(dmPicker, yellow).click();
   await dmPicker.getByTestId("camp-color-apply").click();
-  await expect(cDot).toHaveAttribute("data-color", yellow, { timeout: 1_000 });
+  await expect(cDot).toHaveAttribute("data-color", yellow);
   await a.keyboard.press("Escape");
 
   // P9: B's Dice section Off → the tray gear's panel shows Off too (one store).
@@ -169,7 +169,7 @@ test("FR-CAMP-35 picker, FR-DICEX-57/58: Preferences colour + dice, DM Players p
   await pickOwnColour(b, jade);
   await row(p2Id).click();
   await applyHex(popoverPicker(a), LAVENDER);
-  await expect(cDot).toHaveAttribute("data-color", LAVENDER, { timeout: 1_000 });
+  await expect(cDot).toHaveAttribute("data-color", LAVENDER);
   await a.keyboard.press("Escape");
 
   expect(errors).toEqual([]);

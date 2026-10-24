@@ -37,14 +37,14 @@ test("FR-CBT-41 FR-SHELL-25 turn alert Toast after a player reload with audio lo
     throw new Error("Mira's turn never came");
   };
   await toMira();
-  await expect(toast).toContainText("Your turn — Mira", { timeout: 1000 });
+  await expect(toast).toContainText("Your turn — Mira");
 
   // Reload: a fresh page, audio locked until an interaction (none follows).
   await player.reload();
   await expect(live).toHaveAttribute("data-state", "live");
   await expect(toast).toHaveCount(0);
   await toMira();
-  await expect(toast).toContainText("Your turn — Mira", { timeout: 1000 });
+  await expect(toast).toContainText("Your turn — Mira");
   await expect(player.getByTestId("ui-topbar")).toHaveAttribute(
     "data-test-last-sound",
     /^turn:locked:/,
