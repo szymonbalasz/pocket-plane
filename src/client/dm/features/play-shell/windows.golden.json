@@ -37,7 +37,7 @@
   },
   {
     "at": "open @1600×900 dicex.tray",
-    "rect": "68,100,360×300",
+    "rect": "68,103,360×300",
     "placed": "auto",
     "parked": ""
   },
@@ -133,7 +133,7 @@
   },
   {
     "at": "reopen @1600×900 dicex.tray",
-    "rect": "68,100,360×300",
+    "rect": "68,103,360×300",
     "placed": "stored",
     "parked": ""
   },
@@ -229,7 +229,7 @@
   },
   {
     "at": "reopen 1440×900 @1440×900 dicex.tray",
-    "rect": "1068,452,360×300",
+    "rect": "1068,452,360×372",
     "placed": "reopened",
     "parked": "char.sheet"
   },
@@ -325,7 +325,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 dicex.tray",
-    "rect": "399,238,360×300",
+    "rect": "360,60,504×420",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },
@@ -421,7 +421,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 dicex.tray",
-    "rect": "418,69,360×300",
+    "rect": "422,60,434×300",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },
@@ -529,7 +529,7 @@
   },
   {
     "at": "open @1440×900 dicex.tray",
-    "rect": "1068,452,360×300",
+    "rect": "1068,452,360×372",
     "placed": "auto",
     "parked": "char.sheet"
   },
@@ -625,7 +625,7 @@
   },
   {
     "at": "reopen @1440×900 dicex.tray",
-    "rect": "1068,452,360×300",
+    "rect": "1068,452,360×372",
     "placed": "reopened",
     "parked": "char.sheet"
   },
@@ -721,7 +721,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 dicex.tray",
-    "rect": "399,238,360×300",
+    "rect": "360,60,504×420",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },
@@ -817,7 +817,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 dicex.tray",
-    "rect": "418,69,360×300",
+    "rect": "422,60,434×300",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },
@@ -925,7 +925,7 @@
   },
   {
     "at": "open @1280×800 dicex.tray",
-    "rect": "399,238,360×300",
+    "rect": "360,60,504×420",
     "placed": "auto",
     "parked": "cbt.encounters"
   },
@@ -1021,7 +1021,7 @@
   },
   {
     "at": "reopen @1280×800 dicex.tray",
-    "rect": "399,238,360×300",
+    "rect": "360,60,504×420",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },
@@ -1117,7 +1117,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 dicex.tray",
-    "rect": "418,69,360×300",
+    "rect": "422,60,434×300",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },
@@ -1225,7 +1225,7 @@
   },
   {
     "at": "open @1280×720 dicex.tray",
-    "rect": "418,69,360×300",
+    "rect": "422,60,434×300",
     "placed": "auto",
     "parked": "cbt.encounters"
   },
@@ -1321,7 +1321,7 @@
   },
   {
     "at": "reopen @1280×720 dicex.tray",
-    "rect": "418,69,360×300",
+    "rect": "422,60,434×300",
     "placed": "reopened",
     "parked": "cbt.encounters"
   },

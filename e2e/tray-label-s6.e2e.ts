@@ -56,6 +56,8 @@ const trayFacts = (win: Locator) =>
       hit: hit?.closest("[data-testid]")?.getAttribute("data-testid") ?? null,
       bodyScrolls: body.scrollHeight > body.clientHeight,
       dice: area.clientHeight - 12,
+      scale: Number(tray.dataset.scale),
+      notation: Number(tray.dataset.notationScale),
       parts: {
         header: part("header"),
         palette: part("palette"),
@@ -89,20 +91,23 @@ test("FR-DICEX-53 tray Roll visible at min: 2d6 + 1d8 + 1 and 12 d6 as opened an
     expect(f.inside).toBe(true);
     expect(f.hit).toBe("dicex-tray-roll");
     expect(f.bodyScrolls).toBe(false);
-    // The pure layout's budget (TRAY_PART_PX) is what the browser draws.
-    expect(f.parts).toEqual({ header: 24, palette: 28, expression: 28, bar: 33 });
+    // The pure layout's budget (TRAY_PART_PX) is what the browser draws; the notation row grows
+    // with a tray above its useful size (FR-DICEX-96: 28 px × the notation scale).
+    const expression = Math.round(28 * f.notation);
+    expect(f.parts).toEqual({ header: 24, palette: 28, expression, bar: 33 });
+    if (size) expect(f.scale).toBe(1);
     expect(f.dice).toBeGreaterThanOrEqual(40);
     return f;
   };
 
-  // As opened (360 × 300, or placement's shrunk size).
+  // As opened (504 × 420 since T1, or placement's shrunk size down to useful / min).
   await check();
   await expect(preview).toHaveAttribute("data-cell", "40");
 
-  // Resize to the min (the frame clamps at 300 × 240).
+  // Resize to the min (the frame clamps at 300 × 240; from up to 504 × 420 since T1).
   const handle = await tray.getByTestId("ui-window-resize").boundingBox();
   if (!handle) throw new Error("no resize handle");
-  await drag(p1, { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }, -200, -200);
+  await drag(p1, { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }, -300, -300);
   const min = await check({ w: 300, h: 240 });
   expect(min.dice).toBe(41);
   await expect(preview).toHaveAttribute("data-cell", "40");

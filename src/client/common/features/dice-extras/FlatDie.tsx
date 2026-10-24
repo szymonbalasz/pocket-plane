@@ -15,6 +15,7 @@ export function FlatDie({
   settled,
   flat = false,
   blank = false,
+  scale = 1,
 }: {
   die: ThrowDie;
   look?: DiceLook;
@@ -25,6 +26,8 @@ export function FlatDie({
   flat?: boolean;
   /** Held (FR-DICEX-49): the shape without its number (no `data-value` / `data-settled`). */
   blank?: boolean;
+  /** FR-DICEX-96: the tray's dice scale. */
+  scale?: number;
 }) {
   return (
     <span
@@ -52,6 +55,7 @@ export function FlatDie({
         part={die.d100}
         negative={die.sign === -1}
         blank={blank}
+        scale={scale}
       />
       {(die.label || die.offered || die.physical) && size === "md" && (
         <span className="max-w-16 truncate text-[10px] leading-none text-muted-foreground">
