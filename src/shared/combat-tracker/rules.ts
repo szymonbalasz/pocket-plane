@@ -384,13 +384,16 @@ export const skippedWhileDown = (r: TurnRow) => !r.removed && !eligible(r);
 /**
  * FR-CBT-50 skip cue, computed from the order at send time: the down combatants the turn passes
  * over from `turnId` to the step's target, in passing order (removed ones are not named), and
- * the new round if it changed. Null when the step fails or skips nobody.
+ * the new round if it changed. Null when the step fails or skips nobody. Sprint 11 (BL-110):
+ * `inTurnOf` = the `in-owner-turn` companions acting inside a combatant's turn (no rank,
+ * FR-CBT-108); the target's down ones are named after the passed-over rows.
  */
 export function skippedOnStep<T extends TurnRow & { name: string }>(
   rows: readonly T[],
   round: number,
   turnId: string | null,
   direction: "next" | "prev",
+  inTurnOf: (combatantId: string) => readonly (TurnRow & { name: string })[] = () => [],
 ): { names: string[]; round: number | null } | null {
   const step = stepTurn(rows, round, turnId, direction);
   if (!step.ok) return null;
@@ -406,6 +409,7 @@ export function skippedOnStep<T extends TurnRow & { name: string }>(
     if (r.id === step.turnCombatantId) break;
     if (skippedWhileDown(r)) names.push(r.name);
   }
+  for (const c of inTurnOf(step.turnCombatantId)) if (skippedWhileDown(c)) names.push(c.name);
   if (names.length === 0) return null;
   return { names, round: round !== 0 && step.round !== round ? step.round : null };
 }

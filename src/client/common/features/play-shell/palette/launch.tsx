@@ -4,7 +4,6 @@
 // `cbt.prevTurn`, `camp.resume`), checked by the server as today.
 import { RESUME_INTENT } from "@shared/campaign-management/table-state";
 import { notRestoredText } from "@shared/combat-extras/rules";
-import { skippedOnStep } from "@shared/combat-tracker/rules";
 import {
   COMBATANT_TYPE,
   type CombatantView,
@@ -15,8 +14,7 @@ import { type RecordStore, recordsOf } from "@shared/protocol/store";
 import { toast } from "sonner";
 import { openSheetFor } from "../../character-sheet/selection";
 import { CHAR_SHEET_KIND } from "../../character-sheet/window";
-import { deadPc } from "../../combat-extras/logic";
-import { skipText } from "../../combat-extras/skip";
+import { skipText, stepSkip } from "../../combat-extras/skip";
 import { startedIn } from "../../combat-tracker/store";
 import { INITIATIVE_KIND } from "../../combat-tracker/window";
 import { CMP_KIND } from "../../compendium/logic";
@@ -94,27 +92,13 @@ function turnStep(store: RecordStore, direction: "next" | "prev") {
   const rows = recordsOf<CombatantView>(store, COMBATANT_TYPE).filter(
     (c) => c.encounterId === enc.id && c.active !== false,
   );
-  const dead = new Set(rows.filter((c) => deadPc(store, c)).map((c) => c.name));
-  // FR-CBT-107: in-turn companions (no rank) never take a turn of their own.
-  const turnRows = rows
-    .filter((c) => c.position != null)
-    .map((c) => ({
-      id: c.id,
-      name: c.name,
-      position: c.position ?? 0,
-      kind: dead.has(c.name) ? ("monster" as const) : c.kind,
-      removed: c.removed === true,
-      hpCurrent: dead.has(c.name) ? 0 : (c.hpCurrent ?? null),
-      initiative: c.initiative ?? null,
-    }));
   return {
     payload: {
       encounterId: enc.id,
       expectedRound: enc.round,
       expectedTurnId: enc.turnCombatantId ?? null,
     },
-    skipped: skippedOnStep(turnRows, enc.round, enc.turnCombatantId ?? null, direction),
-    dead,
+    ...stepSkip(store, rows, enc, direction),
   };
 }
 

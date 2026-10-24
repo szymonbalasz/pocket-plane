@@ -4,16 +4,17 @@
 // Alt → tray (expression locked: a `control` request) work, sending `dicex.answerRequest`; and
 // **Decline**. Resolved rows read "Rolled 17" / "Declined" / "Closed". DM: "‹PC› · ‹label›", no
 // toast (player-owned action), no token cue, no action. A small lazy chunk preloaded at idle
-// (`PromptViews.tsx` holds the view defs, DICEX §12 initial budget).
+// (`PromptViews.tsx` holds the view defs, DICEX §12 initial budget). Sprint 11 (BL-112): an answer
+// staged in the tray puts the tray back as it was before the stage once the prompt is spent.
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { DICEX_REQUEST_INTENTS, REQUEST_CATEGORY } from "@shared/dice-extras/request-names";
 import { type CharacterStatBlock, ENTITY_TYPE } from "@shared/entities/schemas";
 import { isActionOwner, type NotificationRecord } from "@shared/notifications/schemas";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
-import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
+import { RollButton, type RollRequest, useRollControl } from "../dice-roll-log/roll-control";
 import { TOAST_STACK_Z } from "../notifications/ToastRuntime";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import {
@@ -23,6 +24,7 @@ import {
   promptPayload,
   promptSubject,
 } from "./prompt-logic";
+import { diceExtras } from "./store";
 import { DICEX_REQUESTS_KIND } from "./window-kind";
 
 type Payload = NonNullable<ReturnType<typeof promptPayload>>;
@@ -54,13 +56,24 @@ function PromptActions({ n, p }: { n: NotificationRecord; p: Payload }) {
       (x) => x.entityId === p.characterId,
     ) ?? null;
   const [busy, setBusy] = useState(false);
+  /**
+   * BL-112: an acked answer or decline spends the prompt; if the tray holds its answer (Alt →
+   * tray), the tray goes back as it was before that stage (FR-DICEX-83).
+   */
   const send = (name: string, payload: unknown) => {
     setBusy(true);
     connection
       .sendIntent(name, payload)
+      .then(() => {
+        if (diceExtras.holds(onRoll)) diceExtras.restoreTray();
+      })
       .catch(toastIntentError)
       .finally(() => setBusy(false));
   };
+  // One `onRoll` for the prompt's life, so the tray's staged copy is known as this answer.
+  const answer = useRef((_r: RollRequest) => {});
+  answer.current = (r) => send(DICEX_REQUEST_INTENTS.answerRequest, answerIntent(p, r));
+  const [onRoll] = useState(() => (r: RollRequest) => answer.current(r));
   const subject = useMemo(() => promptSubject(p.roll, p.characterId), [p.roll, p.characterId]);
   const control = useRollControl({
     expressions: [promptExpression(p.roll, stats, sheet)],
@@ -68,7 +81,7 @@ function PromptActions({ n, p }: { n: NotificationRecord; p: Payload }) {
     label: `${p.characterName} — ${p.label}`,
     mode: p.mode,
     ...(subject ? { subject } : {}),
-    onRoll: (r) => send(DICEX_REQUEST_INTENTS.answerRequest, answerIntent(p, r)),
+    onRoll,
   });
   const off = !live || busy;
   return (

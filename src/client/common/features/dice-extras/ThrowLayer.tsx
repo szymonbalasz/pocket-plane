@@ -22,7 +22,12 @@ import { toast } from "sonner";
 import { lazyChunk } from "../../lib/lazy-chunk";
 import { useSync } from "../../sync/store";
 import { isPausedFor } from "../pause/logic";
-import { useOpenWindow, useRegistry, useShellState } from "../play-shell/ShellContext";
+import {
+  useOpenWindow,
+  useRegistry,
+  useShellState,
+  useWindowDispatch,
+} from "../play-shell/ShellContext";
 import { useRollPopupMount } from "../play-shell/ShellToaster";
 import { popupHost, type ThrowPlan } from "./display";
 import { onRollFrame } from "./frame-handler";
@@ -32,7 +37,7 @@ import { promptChunk } from "./PromptViews";
 import { rollPopups, setThreeDReady, useRollPopups } from "./popups";
 import { useRequestSound } from "./request-sound";
 import { is3dDisplay, useDiceSettings } from "./settings";
-import { diceExtras, useDiceExtras } from "./store";
+import { diceExtras, trayRestore, useDiceExtras } from "./store";
 import { useRollFrames } from "./throw-source";
 import { DICEX_TRAY_KIND } from "./window-kind";
 
@@ -75,17 +80,32 @@ export function looksOf(
 
 function useTrayWindowSync() {
   const open = useOpenWindow();
+  const dispatch = useWindowDispatch();
   const staged = useDiceExtras((s) => s.staged);
-  const seen = useRef(staged);
-  useEffect(() => {
-    if (staged === seen.current) return;
-    seen.current = staged;
-    open(DICEX_TRAY_KIND); // FR-DICEX-01: open / restore + front (FR-SHELL-08)
-  }, [staged, open]);
-  // FR-DICEX-03: closing the window drops the staged request; minimising keeps it.
+  const restored = useDiceExtras((s) => s.restored);
   const status = useShellState(
     (s) => s.windows.find((w) => w.kind === DICEX_TRAY_KIND)?.state ?? "closed",
   );
+  const seen = useRef(staged);
+  // BL-112: the tray's state now, and before the last stage (for `trayRestore`).
+  const now = useRef(status);
+  now.current = status;
+  const before = useRef(status);
+  useEffect(() => {
+    if (staged === seen.current) return;
+    seen.current = staged;
+    before.current = now.current;
+    open(DICEX_TRAY_KIND); // FR-DICEX-01: open / restore + front (FR-SHELL-08)
+  }, [staged, open]);
+  // BL-112: a spent prompt answer puts the tray back as it was before its stage.
+  const seenRestore = useRef(restored);
+  useEffect(() => {
+    if (restored === seenRestore.current) return;
+    seenRestore.current = restored;
+    const back = trayRestore(before.current);
+    if (back) dispatch({ type: back, kind: DICEX_TRAY_KIND });
+  }, [restored, dispatch]);
+  // FR-DICEX-03: closing the window drops the staged request; minimising keeps it.
   const prev = useRef(status);
   useEffect(() => {
     if (prev.current !== "closed" && status === "closed") diceExtras.clear();

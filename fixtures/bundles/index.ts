@@ -33,6 +33,9 @@ import entities from "./entities";
 import f1FitE2e from "./f1-fit-e2e";
 import f1Frame from "./f1-frame";
 import f1FrameE2e from "./f1-frame-e2e";
+import f3CombatDice from "./f3-combat-dice";
+import f3PromptTrayE2e from "./f3-prompt-tray-e2e";
+import f3SkipE2e from "./f3-skip-e2e";
 import fog from "./fog";
 import fogScn from "./fog-scn";
 import fuMapE2e from "./fu-map-e2e";
@@ -295,4 +298,8 @@ export const bundles: readonly Bundle[] = [
   f1Frame,
   f1FrameE2e,
   f1FitE2e,
+  // Sprint 11 track F3 (fix/f3-combat-dice): combat + dice fixes walkthrough and e2e bundles
+  f3CombatDice,
+  f3SkipE2e,
+  f3PromptTrayE2e,
 ];

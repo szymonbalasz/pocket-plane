@@ -3825,7 +3825,20 @@ From [stats](../specs/stats.md#63-sprint-10-t3-campaign-tab) FR-STATS-81–88 (D
 - **Fixtures:** no unit; bundle `stats-campaign-e2e` (= `stats-b`). Walkthrough on `stats-b`.
 - **CON-44:** 0 B (an ack only, not in the snapshot).
 
-## 163. Sprint 11: frame and camera fixes (F1)
+## 163. Sprint 11: combat + dice fixes (F3)
+
+From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-CBT-50, [combat-extras](../specs/combat-extras.md#6-functional-requirements) FR-CBTX-44 and [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-83 (sprint-11 notes; DM #349, no spec phase). **Built by `fix/f3-combat-dice`.** No intent, event, signal, record type, snapshot or wire field changes (CON-44: 0 B). Data side: [data model §130](../data-model/README.md#130-sprint-11-combat--dice-fixes-f3).
+
+| Seam | Who | Contract | FR |
+|---|---|---|---|
+| Skip cue (`skippedOnStep(…, inTurnOf)`, `@shared/combat-tracker/rules`; `stepSkip`, `@ui/features/combat-extras/skip`) | DM client | the Initiative's Next / Prev and the palette's N / Shift+N toast (`cbt-init-skipped`) also name the step target's down `in-owner-turn` companions (no rank), after the passed-over rows; computed from the DM's store at send time, shown on the ack. Players: none (unchanged) | FR-CBT-50 (BL-110) |
+| Add dialog defaults | DM client | **Create tokens** and **Add hidden** ticked on every open (unchanged, by design) | FR-CBTX-44 (BL-113) |
+| Tray after a prompt answer (`diceExtras.holds` / `restoreTray`, `trayRestore`) | both clients | an acked `dicex.answerRequest` / `dicex.declineRequest` whose answer the tray holds (Alt → tray) puts `dicex.tray` back to its state before that stage: closed → close, minimised → minimise, open → stays on the result | FR-DICEX-83 (BL-112) |
+
+- **Tests:** `src/client/common/features/combat-extras/skip.test.ts`, `src/server/features/combat-tracker/f3-skip-sync.test.ts` (the DM's helper over a real socket on `f3-combat-dice`, after a reconnect too), `src/client/common/features/dice-extras/tray-restore.test.ts`; e2e `f3-skip-toast`, `f3-add-hidden`, `f3-prompt-tray`.
+- **Fixtures:** units `f3-down-companions`, `f3-request-perception`; bundles `f3-combat-dice` (walkthrough), `f3-skip-e2e`, `f3-prompt-tray-e2e`.
+
+## 164. Sprint 11: frame and camera fixes (F1)
 
 From [play-shell](../specs/play-shell.md#6-functional-requirements) FR-SHELL-43, -97, -102, -103, -116, -156 and [scenes-map](../specs/scenes-map.md#6-functional-requirements) FR-MAP-115 (dated sprint-11 notes; DM #349: fix track, no spec phase; BL-107, BL-109, BL-113, BL-93; session-sim-14 glitches 1, 4, 8). **Built by `fix/f1-frame`**: client only; no record type, intent, event or wire field.
 
