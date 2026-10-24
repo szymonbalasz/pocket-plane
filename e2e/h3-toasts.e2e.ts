@@ -2,7 +2,7 @@
 // Thin H3 flows (sprint 10, BL-101; FR-NOTE-75–77): the DM with sim-12's pending rows (the
 // "N pending actions" summary), plus test cards the DM sends itself (owner: the DM, like damage
 // cards). At 1280×720 Scenes at 400, 112 (sim-13 h07) → the stack keeps left 480 and covers none
-// of Scenes' rows; the Start dialog over the home column (b07) → the stack left of it; Escape with
+// of Scenes' rows; four cards arrive → one still shows (re-test 1a, no over-fold); the Start dialog over the home column (b07) → the stack left of it; Escape with
 // Encounters at 68, 60 (walkthrough H3 4) → next to home, on neither Encounters nor the Game log.
 // At 1440×900 with the Fog bar, Scenes at 400, 222 (H3 1b) → no scene row under the stack; Rules
 // at 430, 212 with cards (H3 2) → no Rules tab or search box under it. Placement rules: bun test
@@ -119,6 +119,19 @@ test("FR-NOTE-75 FR-NOTE-76 FR-NOTE-77 H3 DM 1280×720: Scenes at 400, 112 → n
   await expect.poll(async () => Math.round((await box(stack)).x)).toBe(480);
   await clearOf(dm, scenes.getByTestId("ui-window-title"));
   await clearOf(dm, scenes.getByTestId("map-scene-row"));
+  // H3 re-test 1a: four cards arrive → one still shows (summary + card + "+N more" fits below
+  // Town, above the Game log), never folded to the summary alone; still off the rows and the log.
+  await sendCards(dm, 4, "1a");
+  const cards = dm.locator(
+    '[data-testid="note-toasts"] [data-testid="note-toast"][data-class="card"]',
+  );
+  await expect(cards.first()).toBeVisible();
+  await dm.waitForTimeout(500);
+  await expect(cards).not.toHaveCount(0);
+  await expect.poll(async () => Math.round((await box(stack)).x)).toBe(480);
+  await clearOf(dm, scenes.getByTestId("map-scene-row"));
+  const log720 = dm.locator('[data-testid="ui-window"][data-record-id^="dice.log"]');
+  expect(overlaps(await box(stack), await box(log720.getByTestId("ui-window-title")))).toBe(false);
   await scenes.getByTestId("ui-window-close").click();
 
   // b07: the Start dialog spans the home column → the stack shifts left of it, never over it.

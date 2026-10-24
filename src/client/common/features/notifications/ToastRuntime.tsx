@@ -70,6 +70,8 @@ import {
   classOfToast,
   clearCallout,
   closeToast,
+  type FoldState,
+  foldCap,
   MAX_VISIBLE,
   nextExpiry,
   registerToastMemory,
@@ -263,6 +265,9 @@ export function CalloutToast({ c, onClose }: { c: Callout; onClose: () => void }
  */
 export const TOAST_STACK_Z = 900;
 
+/** No fold: the policy's max (FR-NOTE-50). */
+const UNFOLDED: FoldState = { cap: MAX_VISIBLE, foldedAt: null };
+
 /** Id of this stack's FR-SHELL-59 report. */
 export const SHOWN_STACK_ID = "note.toasts";
 
@@ -417,20 +422,36 @@ export function ToastRuntime({
   const room = isDm
     ? dialogRoom(vp, dialogs, vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP)
     : vp.h - PLAYER_TOAST_BOTTOM - TOP_BAR_H - EDGE_GAP;
-  const [cap, setCap] = useState(MAX_VISIBLE);
+  const [fold, setFold] = useState<FoldState>(UNFOLDED);
+  const cap = fold.cap;
   const count = state.toasts.length;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
-  useLayoutEffect(() => setCap(MAX_VISIBLE), [count, room]);
+  // FR-NOTE-77 (walkthrough H3 re-test): the fold starts over when what places the stack changes
+  // (windows moved, a tool bar or dialog shown), not only on a new count or room.
+  const placeKey = useMemo(
+    () =>
+      JSON.stringify([
+        initiative,
+        windowRects.map(({ x, y, w, h }) => [x, y, w, h]),
+        hard,
+        dialogs,
+      ]),
+    [initiative, windowRects, hard, dialogs],
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count, room or layout
+  useLayoutEffect(() => setFold(UNFOLDED), [count, room, placeKey]);
   // Walkthrough WF4: likewise while the DM stack can only sit on a window's body (its controls).
-  // FR-NOTE-77: down to no card at all while the summary shows (its Open stays one click away).
+  // FR-NOTE-77: down to no card at all while the summary shows (its Open stays one click away);
+  // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
   const covers = isDm && at.covers > 0;
   const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
+  const { shown, more, callout } = visibleToasts(state, cap, folded);
+  const foldable = shown.filter((t) => t.kind !== "summary" && classOfToast(t) !== "alert").length;
   useLayoutEffect(() => {
-    if ((stackH > room || covers) && cap > minCap) setCap((c) => Math.max(minCap, c - 1));
-  }, [stackH, room, cap, covers, minCap]);
+    const need = stackH > room || covers;
+    setFold((f) => foldCap(f, { need, min: minCap, stackH, shown: foldable }));
+  }, [stackH, room, covers, minCap, foldable]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
-  const { shown, more, callout } = visibleToasts(state, cap, folded);
   if (!showing) return null;
   const stack = (
     <section

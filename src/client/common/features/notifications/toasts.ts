@@ -471,3 +471,26 @@ export function showCallout(c: CalloutInput): void {
   const seq = calloutSeq;
   for (const m of memories) m.setState((x) => ({ toasts: setCallout(x.toasts, c, now, seq) }));
 }
+
+/** The runtime's fold state: its cap and the stack height it last folded at. */
+export interface FoldState {
+  cap: number;
+  foldedAt: number | null;
+}
+
+/**
+ * P3 E3, walkthrough WF4, FR-NOTE-77: one fold step. While the stack doesn't fit (`need`: taller
+ * than the room, or only a spot on window content holds it), one shown card / info (`shown` of
+ * them at this cap) folds into "+N more", down to `min`. Walkthrough H3 re-test 1a: the next step
+ * waits for the stack's new height (`stackH` ≠ `foldedAt`, measured a frame after the cap
+ * changes), so it never folds a card that fits.
+ */
+export function foldCap(
+  s: FoldState,
+  o: { need: boolean; min: number; stackH: number; shown: number },
+): FoldState {
+  if (!o.need || s.cap <= o.min) return s;
+  if (s.foldedAt !== null && s.foldedAt === o.stackH) return s;
+  const cap = Math.max(o.min, Math.min(s.cap, o.shown) - 1);
+  return cap === s.cap ? s : { cap, foldedAt: o.stackH };
+}

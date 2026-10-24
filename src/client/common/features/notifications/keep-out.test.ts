@@ -905,3 +905,59 @@ describe("FR-NOTE-77 after a dialog closes: home, or beside the window over it",
     }
   });
 });
+
+// Walkthrough H3 re-test 2 (`.verify/20261024-h3r/report.md` 1a, O1): the runtime's fold, frame by
+// frame. A cap change re-renders at once; the stack's new height is measured a frame later
+// (ResizeObserver), so a fold must wait for it. Heights as drawn: summary + "+N more" 92, each card
+// + 94 (summary + 3 cards 394; 1a drew summary + 1 card + "+4 more" 206).
+describe("FR-NOTE-77 the fold drops only the cards that don't fit", () => {
+  const small = { w: 1280, h: 720 };
+  const init = { x: 868, y: 60, w: 400, h: 578 };
+  const log = { x: 68, y: 484, w: 690, h: 160, used: 644, head: 540 };
+
+  /** Runs the runtime's fold to rest; returns the cap and the spot at the last measured height. */
+  async function settle(
+    windows: StackWindow[],
+    heightOf: (cards: number) => number,
+    pcs: Box[] = [],
+    pending = 4,
+  ) {
+    const { foldCap, MAX_VISIBLE } = await import("./toasts");
+    let s = { cap: MAX_VISIBLE, foldedAt: null as number | null };
+    let measured = heightOf(Math.min(s.cap, pending));
+    for (let frame = 0; frame < 40; frame++) {
+      const spot = dmStackSpot(small, init, measured, STACK_W, [], windows, [], [], [], pcs);
+      const shown = Math.min(s.cap, pending);
+      const next = foldCap(s, { need: spot.covers > 0, min: 0, stackH: measured, shown });
+      if (next.cap !== s.cap) {
+        s = next; // re-render; the height is still the old one
+        continue;
+      }
+      const h = heightOf(Math.min(s.cap, pending));
+      if (h === measured) return { cap: s.cap, spot, h };
+      measured = h; // ResizeObserver: the new height
+    }
+    throw new Error("the fold never settled");
+  }
+
+  test("FR-NOTE-77 walkthrough H3 1a (1280×720, Scenes at 400, 112, 4 live cards): one card stays, at 480, 273 above the Game log", async () => {
+    const scenes = { x: 400, y: 112, w: 260, h: 410, used: 265, head: 229 };
+    const r = await settle([log, scenes], (cards) => (cards === 0 ? 92 : 206 + (cards - 1) * 94));
+    expect(r.cap).toBe(1);
+    expect(r.h).toBe(206);
+    expect(r.spot).toMatchObject({ left: 480, top: 273, covers: 0 });
+  });
+
+  test("FR-NOTE-77 walkthrough H3 O1 (1280×720, Encounters at 68, 60, 440 wide, live cards): one card stays, at 520, 100", async () => {
+    const enc = { x: 68, y: 60, w: 440, h: 410, used: 470, head: 248 };
+    // Thorn and Mira right of Encounters (+ 4 px): a taller stack at 520 would cover them.
+    const pcs = [
+      { x: 522, y: 290, w: 52, h: 54 },
+      { x: 570, y: 290, w: 52, h: 54 },
+    ];
+    const r = await settle([log, enc], (cards) => (cards === 0 ? 92 : 186 + (cards - 1) * 94), pcs);
+    expect(r.cap).toBe(1);
+    expect(r.h).toBe(186);
+    expect(r.spot).toMatchObject({ left: 520, top: 100, covers: 0 });
+  });
+});
