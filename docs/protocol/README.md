@@ -2723,7 +2723,7 @@ From [combat-tracker](../specs/combat-tracker.md#9-api--events) FR-CBT-105–124
 | `EncounterEnded` | + pets' `entity` (HP write-back, presence), summons' `token` deletes (`deleteTokenIn`) | the pet per FR-ENT-37; token deletes | no |
 | `EntityUpdated` (a character's owner change) | + its pets, their tokens, its active companion combatants and their bound tokens (one hook line) | per rule | no |
 | `TurnChanged` | + reranked rows (owner states), the in-turn companions' `movedFt` reset | as before | no |
-| Token writes (place, duplicate, hide / reveal, delete), `SceneActivated`, `SceneDeleted` | + the pet's `entity` when `petPresent` flips | upsert / delete for non-owners | as before |
+| Token writes (place, duplicate, hide / reveal, delete), `SceneActivated`, `SceneDeleted` | + the pet's `entity` when `petPresent` flips (sprint 10 BL-114: hiding an in-fight pet's token flips it too; its hidden combatant no longer counts) | upsert / delete for non-owners | as before |
 
 **Helpers and hooks**
 

@@ -1,5 +1,5 @@
 // Pet presence (sprint 6, FR-ENT-37, ADR-0056): `petPresent` = the pet has an active companion
-// combatant or an unhidden token on the active scene; other players receive a pet only while it
+// combatant the DM didn't hide (BL-114) or an unhidden token on the active scene; other players receive a pet only while it
 // is true. Re-derived in the transaction of every command that changes either (combat join / End,
 // token writes through the scene visibility hook, scene switches through the scene hook); the
 // rows join the causing event. Kept free of command imports: the scenes-map registries load it.
@@ -22,7 +22,7 @@ const record = (tx: Read, id: string): EntityRecord =>
 
 /**
  * FR-ENT-37: rewrites `petPresent` of the campaign's pets (all, or `petIds`): an active
- * companion combatant, or an unhidden token on the active scene (`excludeSceneId`: a scene being
+ * companion combatant the DM didn't hide (BL-114), or an unhidden token on the active scene (`excludeSceneId`: a scene being
  * deleted counts as gone). Returns the `entity` changes (other players: upsert or delete).
  */
 export function syncPetPresence(
@@ -45,12 +45,18 @@ export function syncPetPresence(
     .all();
   if (pets.length === 0) return [];
   const ids = pets.map((p) => p.id);
+  // BL-114 (#343): a combatant the DM hid doesn't make its pet present. A bound one is hidden by
+  // its token's flag, read here: this runs in the token write's visibility hooks, before the
+  // token-changed hooks copy it to the combatant (fog never counts, as for `shown`); a token-less
+  // one by its own flag (Add hidden).
   const fighting = new Set(
     tx
-      .select({ id: combatant.entityId })
+      .select({ id: combatant.entityId, hidden: combatant.hidden, tokenHidden: token.hidden })
       .from(combatant)
+      .leftJoin(token, eq(token.id, combatant.tokenId))
       .where(and(inArray(combatant.entityId, ids), eq(combatant.active, true)))
       .all()
+      .filter((r) => !(r.tokenHidden ?? r.hidden))
       .map((r) => r.id),
   );
   const active = tx
