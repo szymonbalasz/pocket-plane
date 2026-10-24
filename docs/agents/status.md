@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 10 done (#341–#346): H1–H4 + recap additions T1 (Dice tray +40 %), T2 (BL-111, BL-114), T3 (Stats Campaign tab), T4 (faster test loop), T5 (d20 lines, tray +25 %, popup +40 %) all merged; session-sim-14 13 / 13 on the H-slices; T-slices walkthroughs 18/18, 11/11, 7/7 + full gates. **Paused for the rest of the DM recap** (sprint 11 scope).
+**Phase:** Sprint 10 done (#341–#348). **Sprint 11 (#349)**: fix track F1–F3 building ([sprint-11](sprint-11.md)); the DM runs an art-pass planning agent in parallel (docs/design/ only, branch `spec/art-pass` suggested).
 
 **Gates on `main`:** detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, `bun install`, `bun run env:init`, `gates.sh <it> <tag>` = check:full + e2e with 4 workers, ~12 min). Removed at the end of sprint 10. Skip when `main`'s code equals the tested branch (#345).
 
@@ -21,6 +21,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
 | Sprint 10 T4 faster test loop (#345) | merged aa9ddba0 | — | **merged** (branch check:full 5634 / e2e 243 at 4 workers, 752 s wall for the whole gate); main gates skipped (same code) | — |
 | Sprint 10 T5 dice visuals (#347, #348) | merged bfdc44a9 | — | **merged** (visual walkthrough PASS; branch check:full 5635, e2e 242 + weapon-rows load flake 2/2 alone); main gates skipped (same code) | — |
+| Sprint 11 F1 frame + camera | `fix/f1-frame` (slot 0, ws wAF) | build-f1 | building (frame lock, camera, launcher) | walkthrough (port 4103) |
+| Sprint 11 F2 toasts | `fix/f2-toasts` (slot 2, ws wAG) | build-f2 | building (toast runtime) | walkthrough (port 4123) |
+| Sprint 11 F3 combat + dice | `fix/f3-combat-dice` (slot 3, ws wAH) | build-f3 | building | walkthrough (port 4133) |
+| Sprint 11 art track (DM) | DM's own agent | — | planning in docs/design/ | — |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
@@ -29,6 +33,10 @@ Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and 
 - None.
 
 ## Integrator rulings this sprint (tell the DM at the recap)
+
+Sprint 11:
+- (none yet)
+
 
 *(Sprint 10: add new rulings above the sprint-9 list.)*
 
@@ -63,7 +71,7 @@ Sprint 10:
 
 ## Pending DM decisions
 
-- Rest of the recap: sprint 11 scope.
+- None (sprint 11 scoped, #349).
 
 ## Resolved locally (report at gate)
 
