@@ -197,6 +197,24 @@ describe("FR-STATS-31 highlights", () => {
     }
   });
 
+  test("FR-STATS-12 BL-111 dealtUnseen: players' MVP is empty (the item hides); the rest stays", () => {
+    const p = PlayerHighlights.parse(
+      fightHighlights({
+        role: "player",
+        facts: playerFacts(),
+        rolls: [],
+        characters: chars,
+        round: 3,
+        span: null,
+        standing: [],
+        dealtUnseen: true,
+      }),
+    );
+    expect(p.mvp).toEqual({ value: null, winners: [] });
+    expect(p["biggest-hit"]).toMatchObject({ value: 30, winners: [{ name: "Thorn" }] });
+    expect(p.kills.events).toHaveLength(2);
+  });
+
   test("FR-STATS-31 ties ≤ 8, zero = empty, companions roll into the owner (with)", () => {
     const p = highlights("player", [
       fact(MIRA, GOBLIN, 5),

@@ -109,6 +109,8 @@ import statsE2e from "./stats-e2e";
 import statsPast from "./stats-past";
 import statsWindowE2e from "./stats-window-e2e";
 import syncProbe from "./sync-probe";
+import t2AwardsE2e from "./t2-awards-e2e";
+import t2PetHiddenE2e from "./t2-pet-hidden-e2e";
 import tableTools from "./table-tools";
 import tableToolsE2e from "./table-tools-e2e";
 import tableToolsPaused from "./table-tools-paused";
@@ -280,4 +282,7 @@ export const bundles: readonly Bundle[] = [
   h4RulesE2e,
   h4RecapE2e,
   h4StoresE2e,
+  // Sprint 10 T2 (fix/s10-dm-calls): DM calls BL-111 / BL-114 e2e aliases
+  t2AwardsE2e,
+  t2PetHiddenE2e,
 ];
