@@ -2,9 +2,9 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 10 slices merged, session-sim-14 13 / 13. Recap part 1 (#343): DM asked for the **Dice tray +40 %** before closing, and accepted BL-111 / BL-114 picks → slices **T1** `fix/dice-tray-size`, **T2** `fix/s10-dm-calls` running; recap part 2 (#344): **T3** `fix/stats-campaign` (Stats Campaign tab, first) running. Then: walkthroughs, merge, main gates, update the Playtest section, pause for the rest of the recap.
+**Phase:** Sprint 10 done (#341–#346): H1–H4 + recap additions T1 (Dice tray +40 %), T2 (BL-111, BL-114), T3 (Stats Campaign tab), T4 (faster test loop) all merged; session-sim-14 13 / 13 on the H-slices; T-slices walkthroughs 18/18, 11/11, 7/7 + full gates. **Paused for the rest of the DM recap** (sprint 11 scope).
 
-**Gates on `main`:** detached worktree `~/.herdr/worktrees/pocket-plane/gates-main` (recreated for T1 / T2); `gates.sh <it> <tag>`; `main`'s own `dist/` is never rebuilt.
+**Gates on `main`:** detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, `bun install`, `bun run env:init`, `gates.sh <it> <tag>` = check:full + e2e with 4 workers, ~12 min). Removed at the end of sprint 10. Skip when `main`'s code equals the tested branch (#345).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -19,13 +19,13 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 T1 Dice tray +40 % (#343) | merged 4c356249 | — | **merged** (walkthrough 18/18; branch check 5602 / e2e 241 + FR-CBT-75 toast flake → BL-115); evidence `.verify/sprint10/walkthroughs/20261024-t1/` ; main gates (T1 + T3): check 5626 green, e2e 241 + 2 load flakes (colour-picker-2, prefs-window: 1 s expect timeouts; 2 × 3/3 alone → T4) | — |
 | Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | merged ef4835d1 | — | **merged** (walkthrough 11/11; branch check 5593 / e2e 240); evidence `.verify/sprint10/walkthroughs/20261024-t2/`; main gates green (5593 / 240) | — |
 | Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
-| Sprint 10 T4 faster test loop (#345) | `fix/test-speed` (slot 2, ws wAD) | build-t4 | done: check 977 → 104–132 s (6 shards), check:full 189–207 s, e2e 1634 → 661 / 686 s (4 workers); merging main + feed batch 400 ms + short expect timeouts | branch gates (new gates.sh), merge |
+| Sprint 10 T4 faster test loop (#345) | merged aa9ddba0 | — | **merged** (branch check:full 5634 / e2e 243 at 4 workers, 752 s wall for the whole gate); main gates skipped (same code) | — |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
 ## Shared-file locks
 
-- T4: tooling (package.json scripts, scripts/, bunfig, playwright config, gates.sh). Don't merge T4 while a gate runs.
+- None.
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
@@ -61,7 +61,7 @@ Sprint 10:
 
 ## Pending DM decisions
 
-- Rest of the recap: sprint 11 scope (BL-111 / BL-114 decided, #343).
+- Rest of the recap: sprint 11 scope.
 
 ## Resolved locally (report at gate)
 

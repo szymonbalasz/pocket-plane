@@ -49,6 +49,7 @@ Dropped as by design: BL-104's "sounds locked until the first click after a load
 | 2026-10-24 | Final `main` check 5,587 / e2e 238 / bench 41 / 41. **session-sim-14 13 / 13 PASS** (leak scan clean, hard kill byte-identical); glitches → BL-107–BL-114. [Playtest: sprint 10 fixes](#playtest-sprint-10-fixes) written. Decision #342. Paused for the DM recap |
 | 2026-10-24 | Recap part 1–2 (#343, #344): **T2 merged** (players' "Most damage dealt" withheld while hidden damage could change its winner; a hidden pet leaves other players' data); **T3 merged** (Stats opens on a **Campaign** tab). #345: faster test loop (process + T4 tooling) |
 | 2026-10-24 | **T1 merged**: Dice tray 504 × 420 by default, dice 56 px (≥ 48 px when the tray has to open at 360 × 300) |
+| 2026-10-24 | **T4 merged** (#345): `bun run check` ~2 min (was 8–16), `check:full` ~3 min, full e2e ~10 min on 4 workers (was ~27). Decision #346. Paused for the rest of the recap |
 
 ## Playtest: sprint 10 fixes
 
