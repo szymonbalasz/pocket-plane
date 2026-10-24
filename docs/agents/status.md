@@ -17,8 +17,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/`; main gates green (5545 / 229) | — |
 | Sprint gate | final main 8b279504 | — | **session-sim-14 13 / 13 PASS** (leak scan clean; hard kill byte-identical); glitches → BL-107–BL-114 | DM recap |
 | Sprint 10 T1 Dice tray +40 % (#343) | `fix/dice-tray-size` (slot 0, ws wAA) | build-t1 | building (holds the frame lock: size table, goldens, replay sets) | walkthrough (port 4103) |
-| Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | `fix/s10-dm-calls` (slot 2, ws wAB) | build-t2 | building | walkthrough (port 4123) |
-| Sprint 10 T3 Stats Campaign tab (#344) | `fix/stats-campaign` (slot 4, ws wAC) | build-t3 | building (merges after T2: both touch stats awards) | walkthrough (port 4143) |
+| Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | `fix/s10-dm-calls` (slot 2, ws wAB) | build-t2 (idle), test-t2 | ready (check 5593, e2e 240) → walkthrough (port 4123) | merge (before T3) |
+| Sprint 10 T3 Stats Campaign tab (#344) | `fix/stats-campaign` (slot 4, ws wAC) | build-t3 (idle), test-t3 | built (bench 12.7 / 18.2 ms) → walkthrough (port 4143); then merge main after T2 + apply BL-111 to awards won | merge |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
@@ -31,6 +31,8 @@ Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and 
 *(Sprint 10: add new rulings above the sprint-9 list.)*
 
 Sprint 10:
+- T2 BL-111: players' "Most damage dealt" is withheld per session when damage to creatures hidden from them could change its winner; BL-114: pet presence ignores a DM-hidden combatant (non-owners get a delete, back on show); pre-fix hidden pets update on their next write (accepted). Recap reads two new stats exports (FR-STATS-78 note).
+- T3 Campaign tab: party rows only (DM too, as Trophies), companions roll into their owner, monsters slain counts any attacker, record ties → earlier fact, all tie winners counted for awards won, DM record labels encounter + day / players "Fight N · day"; players' awards won drop Most damage dealt where T2 withholds it; table scrolls sideways inside today's 400 × 412 window.
 - H1 BL-103: players' "Biggest overkill" amount was the hit's damage (allowed by FR-STATS-12), not a leak; players now read "N damage" on Session, recap Awards, Highlights and Trophies; DM unchanged (FR-STATS-12 amended).
 - H1 BL-97: Add hidden hides a bound visible token like the map's hide; never unhides; Start keeps a bound token's own hidden flag (accepted as is).
 - H1 BL-105: a player's own hidden-request answer follows their dice settings; the DM's own hidden rolls stay popup-only (FR-DICEX-84 amended).
