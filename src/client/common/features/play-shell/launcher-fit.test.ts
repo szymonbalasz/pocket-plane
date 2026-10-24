@@ -22,11 +22,18 @@ describe("launcher fit (FR-SHELL-43)", () => {
     const ten = items(10);
     expect(fitLauncher(ten, 1106, m)).toEqual({
       compact: false,
+      labelled: ten.map((i) => i.kind),
       bar: ten.map((i) => i.kind),
       overflow: [],
     });
+    // BL-113: one label short of room → that one (the highest order) is icon-only, not all.
     const icons = fitLauncher(ten, 1105, m);
-    expect(icons).toEqual({ compact: true, bar: ten.map((i) => i.kind), overflow: [] });
+    expect(icons).toEqual({
+      compact: true,
+      labelled: ten.slice(0, 9).map((i) => i.kind),
+      bar: ten.map((i) => i.kind),
+      overflow: [],
+    });
     expect(fitLauncher(ten, 506, m).overflow).toEqual([]);
     const tight = fitLauncher(ten, 505, m);
     expect(tight.compact).toBe(true);
@@ -53,6 +60,21 @@ describe("launcher fit (FR-SHELL-43)", () => {
     const list = items(12);
     expect(fitLauncher(list, 400, m).overflow.length).toBeGreaterThan(0);
     const wide = fitLauncher(list, 1600, m);
-    expect(wide).toEqual({ compact: false, bar: list.map((i) => i.kind), overflow: [] });
+    expect(wide).toEqual({
+      compact: false,
+      labelled: list.map((i) => i.kind),
+      bar: list.map((i) => i.kind),
+      overflow: [],
+    });
+  });
+
+  test("FR-SHELL-43 BL-113 labels where they fit: the lowest orders keep theirs, whatever the window states; none once a button leaves for the menu", () => {
+    const list = items(10, [9, 8], [7]);
+    // Compact 490 + 60 per label: 790 → 774 of room holds 4 labels (730), not 5 (790).
+    const fit = fitLauncher(list, 790, m);
+    expect(fit.compact).toBe(true);
+    expect(fit.labelled).toEqual(["k.n0", "k.n1", "k.n2", "k.n3"]);
+    expect(inside(fittedBarWidth(fit, m), 790)).toBe(true);
+    expect(fitLauncher(list, 505, m).labelled).toEqual([]);
   });
 });

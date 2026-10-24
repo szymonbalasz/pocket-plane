@@ -213,13 +213,13 @@
     "at": "reopen 1440×900 @1440×900 note.history",
     "rect": "540,344,360×480",
     "placed": "reopened",
-    "parked": "ent.creatures,map.scenes"
+    "parked": "ent.creatures"
   },
   {
     "at": "reopen 1440×900 @1440×900 char.sheet",
     "rect": "1108,452,320×372",
-    "placed": "stored",
-    "parked": ""
+    "placed": "reopened",
+    "parked": "map.scenes"
   },
   {
     "at": "reopen 1440×900 @1440×900 cbt.encounters",
@@ -513,13 +513,13 @@
     "at": "open @1440×900 note.history",
     "rect": "540,344,360×480",
     "placed": "auto",
-    "parked": "ent.creatures,map.scenes"
+    "parked": "ent.creatures"
   },
   {
     "at": "open @1440×900 char.sheet",
     "rect": "1108,452,320×372",
     "placed": "auto",
-    "parked": ""
+    "parked": "map.scenes"
   },
   {
     "at": "open @1440×900 cbt.encounters",
@@ -609,13 +609,13 @@
     "at": "reopen @1440×900 note.history",
     "rect": "540,344,360×480",
     "placed": "reopened",
-    "parked": "ent.creatures,map.scenes"
+    "parked": "ent.creatures"
   },
   {
     "at": "reopen @1440×900 char.sheet",
     "rect": "1108,452,320×372",
-    "placed": "stored",
-    "parked": ""
+    "placed": "reopened",
+    "parked": "map.scenes"
   },
   {
     "at": "reopen @1440×900 cbt.encounters",
