@@ -1,11 +1,12 @@
 // e2e-bundle: dice-polish
 // Thin popup-line flows (D11; DICEX §13 sprint 5 E2E, walkthrough 30, 31, 33). B (player-1) rolls
-// from the Game log's roll bar; every popup lays its dice out in 44 px cells (never shrunk): 3 dice
+// from the Game log's roll bar; every popup lays its dice out in 62 px cells (T5, DM #347: 44 ×
+// 1.4 on a 448 px card; never shrunk by the count): 3 dice
 // in one line with each row's total at its right, 10d6 in 2 lines (6 + 4), 20d6 as 11 dice + "+9"
 // whose click fronts the Game log at the entry with all 20 chips. With others' rolls off, C's
 // popup plays the miniature into its cells and lands only once they rest. Short screens: with a
 // toast up, only the popups that fit the toast region show (the oldest dropped), none past the
-// viewport or over the top bar (1280×800, 1280×720, 1280×560).
+// viewport or over the top bar (1280×1080, 1280×720, 1280×560: 3, 2, 1 of T5's 206-px cards).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -63,7 +64,7 @@ const cellsOf = (popup: Locator) =>
     }),
   );
 
-test("FR-DICEX-46 FR-DICEX-47 popup line: 3 dice in one line at 44 px, each row's total at its right; 10d6 → 6 + 4; 20d6 → 11 + '+9' → Game log at the entry", async ({
+test("FR-DICEX-46 FR-DICEX-47 popup line: 3 dice in one line at 62 px (T5), each row's total at its right; 10d6 → 6 + 4; 20d6 → 11 + '+9' → Game log at the entry", async ({
   browser,
 }) => {
   const p1 = await player(browser, "Player 1");
@@ -76,10 +77,11 @@ test("FR-DICEX-46 FR-DICEX-47 popup line: 3 dice in one line at 44 px, each row'
     await expect(popup).toHaveAttribute("data-landed", "true", { timeout: 10_000 });
     await expect(popup).toHaveAttribute("data-shown", "3");
     const cells = await cellsOf(popup);
-    expect(cells).toEqual(Array(3).fill({ line: "1", w: 44, h: 44 }));
+    expect(cells).toEqual(Array(3).fill({ line: "1", w: 62, h: 62 }));
     const card = await box(popup);
-    expect(card.width).toBe(320);
-    expect(Math.round(card.height)).toBe(98); // table B: one row + one line
+    expect(card.width).toBe(448);
+    expect(Math.round(card.height)).toBe(138); // table B × 1.4: one row + one line
+    await expect(popup).toHaveAttribute("data-scale", "1.4");
     const row = await box(popup.getByTestId("dicex-popup-row"));
     const total = await box(popup.getByTestId("dicex-popup-total"));
     expect(total.x + total.width).toBeLessThanOrEqual(row.x + row.width + 0.5);
@@ -95,8 +97,8 @@ test("FR-DICEX-46 FR-DICEX-47 popup line: 3 dice in one line at 44 px, each row'
   const cells10 = await cellsOf(popup10);
   expect(cells10.filter((c) => c.line === "1")).toHaveLength(6);
   expect(cells10.filter((c) => c.line === "2")).toHaveLength(4);
-  expect(cells10.every((c) => c.w === 44 && c.h === 44)).toBe(true);
-  expect(Math.round((await box(popup10)).height)).toBe(146);
+  expect(cells10.every((c) => c.w === 62 && c.h === 62)).toBe(true);
+  expect(Math.round((await box(popup10)).height)).toBe(206);
 
   // 20d6 → 11 dice + "+9"; its click fronts the Game log at the entry with all 20 chips.
   const twenty = await roll(p1, "20d6");
@@ -107,8 +109,8 @@ test("FR-DICEX-46 FR-DICEX-47 popup line: 3 dice in one line at 44 px, each row'
   await expect(more).toHaveAttribute("data-value", "9");
   await expect(more).toHaveAttribute("data-entry-id", twenty);
   await expect(more).toHaveText("+9");
-  expect((await cellsOf(popup20)).every((c) => c.w === 44 && c.h === 44)).toBe(true);
-  expect(Math.round((await box(popup20)).height)).toBeLessThanOrEqual(190);
+  expect((await cellsOf(popup20)).every((c) => c.w === 62 && c.h === 62)).toBe(true);
+  expect(Math.round((await box(popup20)).height)).toBeLessThanOrEqual(268);
   await more.click();
   const log2 = p2.locator('[data-testid="ui-window"][data-record-id="dice.log:main"]');
   await expect(log2).toBeVisible();
@@ -180,13 +182,14 @@ test("FR-DICEX-47 short screens: with a toast up only the popups that fit show (
   await live(dm);
   const p1 = await player(browser, "Player 1");
 
+  // T5: 206-px cards (1 row + 2 lines × 1.4): fewer at once on short screens.
   for (const [h, fit] of [
-    [800, 3],
-    [720, 3],
-    [560, 2],
+    [1080, 3],
+    [720, 2],
+    [560, 1],
   ] as const) {
     for (const page of [p1, dm]) await page.setViewportSize({ width: 1280, height: h });
-    // A toast in each region (FR-SHELL-27's test alert), then three 10d6 popups (146 px each).
+    // A toast in each region (FR-SHELL-27's test alert), then three 10d6 popups (206 px each).
     for (const page of [p1, dm]) {
       const win = await openWindow(page, "shell.test");
       // The last round's popups may cover the button: no pointer needed for the alert. The same

@@ -23,6 +23,8 @@ phase: post-mvp-9
 
 > **Sprint 10 recap (slice T1 `fix/dice-tray-size`; DM [#343](../decisions-log.md), 2026-10-24).** No spec phase (#341). The Dice tray is **about 40 % bigger** (it was hard to read the dice): **FR-DICEX-96** (amends FR-DICEX-01, -48, -53, -54). Client only, no schema, 0 B. Walkthrough [§13 Sprint 10](#sprint-10-t1-dice-tray-40--bigger).
 
+> **Sprint 10 recap (slice T5 `fix/dice-visuals`; DM [#347](../decisions-log.md), 2026-10-24).** No spec phase. (1) The d20 chip's facet lines are thinner (FR-DICEX-42 note). (2) The Dice tray is **+25 %**, not +40 %: 450 × 375, dice × 1.25 (FR-DICEX-96 note). (3) The **roll popup is about 40 % bigger** on every client (box, dice, numbers, name line, total): FR-DICEX-46 / -47 notes, §6.1 tables A / B. Client only, no schema, 0 B. Walkthrough [§13 Sprint 10 (T5)](#sprint-10-t5-dice-visuals).
+
 ## 1. Summary
 
 - **Dice tray**: a window where a roll is composed or adjusted before it is sent. It becomes the roll control's second face: roll buttons still roll at once, Alt+click stages the roll in the tray; clicked dice notation always lands there.
@@ -183,8 +185,8 @@ phase: post-mvp-9
 | FR-DICEX-44 | **Slow devices and links** (OQ-DICEX-27): the screen layer renders at pixel ratio ≤ 1.5, without shadows above 2.5 MP; auto-flat (FR-DICEX-23) measures screen, zone and PiP throws. A late frame (slow tunnel) throws on arrival with the server's faces; nothing waits for other clients. The popup never needs 3D. | OQ-DICEX-27 |
 | FR-DICEX-45 | ~~**Reduced motion** (`prefers-reduced-motion: reduce`): effective `flat`: no screen layer, no flight, popup chips appear without motion, "Rolling…" static, no 3D chunk load.~~ **Superseded by #247 (DM): the OS / browser reduced-motion preference is ignored, as Owlbear does.** Display modes behave the same with it on or off; no hint, nothing greyed out. Flat and Off stay as the user's own per-device choices; auto-flat for no WebGL / a slow device / a failed chunk (FR-DICEX-32, -44) is unchanged. | #247 |
 | **Sprint 5: dice polish** (#250 [2, 3], #251) | | |
-| FR-DICEX-46 | **Popup dice in a line** (amends FR-DICEX-41 a–c; #250 [2], BL-22): the popup lays the frame's `throwDice` list out in fixed **cells**, in `throwDice` order (entry `n`, payload item, die); rules in §6.1 table A. The die size never depends on the count or the viewport. Each die shows its server value upright towards the viewer, in the roller's look. Hand-off, miniature and chips modes use the same cells. `data-dice` counts every die of the frame, `data-shown` the dice drawn in cells. | #250 [2]; BL-22 |
-| FR-DICEX-47 | **Popup size** (amends §7 constants; settled by seams S2, OQ-DICEX-42): a popup is **320 px** wide (was 280) and up to **190 px** tall (pixel budget: §6.1 table B). W1 sets `ROLL_POPUP_W` 320 / `ROLL_POPUP_H` 190 in `toast-region.ts`; the toast regions and their keep-out boxes are W's ([FR-SHELL-49](play-shell.md#6-functional-requirements): the DM's top-centre region, the players' bottom-right corner). Each entry row keeps its own total at the row's right (FR-DICEX-40). **Short screens:** the stack holds as many popups as fit in the client's toast region (≤ 3); the oldest drops first; no popup leaves the viewport or crosses the top bar. D11 edits only the popup's internals. | Seam W (S2) |
+| FR-DICEX-46 | **Popup dice in a line** (amends FR-DICEX-41 a–c; #250 [2], BL-22): the popup lays the frame's `throwDice` list out in fixed **cells**, in `throwDice` order (entry `n`, payload item, die); rules in §6.1 table A. The die size never depends on the count or the viewport *(sprint 10 T5, 2026-10-24, DM #347: 62 px on the × 1.4 card; today's 44 px card only where the viewport can't hold the big one, FR-DICEX-47 note)*. Each die shows its server value upright towards the viewer, in the roller's look. Hand-off, miniature and chips modes use the same cells. `data-dice` counts every die of the frame, `data-shown` the dice drawn in cells. | #250 [2]; BL-22 |
+| FR-DICEX-47 | **Popup size** (amends §7 constants; settled by seams S2, OQ-DICEX-42): a popup is **320 px** wide (was 280) and up to **190 px** tall (pixel budget: §6.1 table B). W1 sets `ROLL_POPUP_W` 320 / `ROLL_POPUP_H` 190 in `toast-region.ts`; the toast regions and their keep-out boxes are W's ([FR-SHELL-49](play-shell.md#6-functional-requirements): the DM's top-centre region, the players' bottom-right corner). Each entry row keeps its own total at the row's right (FR-DICEX-40). **Short screens:** the stack holds as many popups as fit in the client's toast region (≤ 3); the oldest drops first; no popup leaves the viewport or crosses the top bar. D11 edits only the popup's internals. *(Sprint 10 T5, 2026-10-24, DM #347: the popup **about 40 % bigger** on every client (the other player's roll bottom-right, the DM's top-centre, the roller's own): table B × 1.4 = **448 × ≤ 268** (pad 14, rows 31, gap 11, cells **62** with gap 6, line 402, tag 6; one row + one line 138, one row + two lines 206); the name line, labels and each row's total 14 → 20 px, "Rolling…" / "natural 20!" 12 → 17, badges / offers 10 → 14, cell tags 9 → 13, ✕ / ⚙ 20 → 28 px, chips `DieShape` `lg` × 1.4. `popupGeomAt(client, vp)`: the big card where the viewport holds it (width + 2 × 16; height + the region's insets: DM 112, players 132), else today's 320 × 190 card (phones, very short windows). `dicex-popup` gains `data-scale` (1.4 \| 1). **Short screens**: the same rule (as many as fit, ≤ 3, oldest drops first, the newest always shows), so fewer at once: full cards (3 rows + 2 lines) with a toast up at 1280×720: players 1, the DM 2; 1280×800 and 1440×900: 2; 1920×1080: 3; one-line rolls (138 px): 3 at 1280×720. **Keep-outs unchanged**: W1's `ROLL_POPUP_W` / `_H` (320 × 190) still size the toast keep-out box windows avoid (growing it moves the default layouts, FR-SHELL-50); the bigger card overhangs that box while it shows (6 s, as a tall stack already does), right edge on the region's; the DM stack keeps clear of Initiative, the combat popup, the tool bar and the toast stack at its real 448 px width (FR-DICEX-55).)* | Seam W (S2) |
 | FR-DICEX-48 | **Tray preview** (#250 [3]; amends FR-DICEX-04, -05): in `compose` and `adjust` the tray's dice area shows **the 3D dice that will be rolled** in place of the "d12" text badges; rules in §6.1 table C. Stills are drawn on the page's one WebGL context into the tray's **own 2D canvas**, so they sit in the window's z-order. Fallback chips are never the text badge. | #250 [3] |
 | FR-DICEX-49 | **Landing: totals wait for the dice** (sim-8 glitch 8; amends FR-DICEX-10, -16): the client keeps `holding: Map<entryId, deadline>`, filled **only** by the live-throw path (FR-DICEX-11 source: an entry this client throws or pops up). Every entry not in `holding` is shown: snapshot, resync-only, undo upserts and rows below the window floor never need an id added. An entry leaves `holding` when this client's presentation of its dice **lands** (§6.1 table D) or at its deadline (arrival + 6 s, `POPUP_ROLLING_MAX_MS`). A held entry stays held across a resync / reconnect until it lands or reaches its deadline; a reload empties `holding` (everything shown). While held, the dice surfaces hide its die values, total and adv / natural markers (§6.1 table E). Not held: actor, label, category, line order, the "N new" count, the launcher dot, other features' numbers (OQ-DICEX-39 decided #256). Reduced motion changes nothing (#247). `useLanded(entryId)` (`@ui`) = not in `holding`. Client memory only; server and frames unchanged. | sim-8 #8 |
 | FR-DICEX-50 | **Label reset** (BL-18): label, actor and category belong to the staged request; which actions start a fresh request is §6.1 table F. The palette path is built on `main` (`e0acd71`, test `FR-DICEX-04 BL-18 …`); this FR makes the rule hold for every path. | BL-18 |
@@ -244,7 +246,7 @@ phase: post-mvp-9
 
 | Rule | Value |
 |---|---|
-| Cell | 44 px (OQ-DICEX-34 decided #256), gap 4 px, 6 cells per line (inner width 296 px) |
+| Cell | 44 px (OQ-DICEX-34 decided #256), gap 4 px, 6 cells per line (inner width 296 px) *(T5, DM #347: 62 px, gap 6, line 402 px in the 448 px card's 416; 44 / 4 on today's card)* |
 | Lines | ≤ 2 (OQ-DICEX-33 decided #256): > 6 dice wrap; > 12 → 11 dice + a "+N" cell |
 | "+N" | Counts every die not shown (3D and chips, FR-DICEX-14's "+N more" included); click → `focusLogEntry(entry of the first hidden die)` |
 | Dropped / offered | Dropped dimmed; offered dashed |
@@ -256,14 +258,14 @@ phase: post-mvp-9
 
 **B. Popup pixel budget** (FR-DICEX-47)
 
-| Part | px |
-|---|---|
-| Padding top + bottom | 2 × 10 = 20 |
-| Entry rows: actor, label, total at the row's right (the first row also holds ✕ and ⚙) | 22 each; ≤ 3 visible = 66, more scroll inside |
-| Gap rows → dice | 8 |
-| Dice lines | 44 + 4 + 44 = 92 |
-| Tag overhang under the last line | 4 |
-| **Max** (3 rows, 2 lines) | **190**; one row + one line = 98 |
+| Part | px | *T5 × 1.4 (DM #347)* |
+|---|---|---|
+| Padding top + bottom | 2 × 10 = 20 | 2 × 14 = 28 |
+| Entry rows: actor, label, total at the row's right (the first row also holds ✕ and ⚙) | 22 each; ≤ 3 visible = 66, more scroll inside | 31 each; 93 |
+| Gap rows → dice | 8 | 11 |
+| Dice lines | 44 + 4 + 44 = 92 | 62 + 6 + 62 = 130 |
+| Tag overhang under the last line | 4 | 6 |
+| **Max** (3 rows, 2 lines) | **190**; one row + one line = 98 | **268**; 138 (width 320 → **448**) |
 
 **C. Tray preview** (FR-DICEX-48)
 
@@ -377,7 +379,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, semantic
 | `off` | — | die-shape chips | chips |
 
 - **Roll popup** (FR-DICEX-39–41): a card ≈ 280 px wide in the toast region. **Size constants** (ruling A11; M4's keep-out box uses them): ~~popup 280 × 160 px max (rows beyond 2 scroll inside), gap 8 px, ≤ 3 popups → stack 280 × 496 px~~ *(sprint 5: 320 × ≤ 190 px, gap 8 px, as many popups as fit in the client's toast region, ≤ 3, oldest drops first: FR-DICEX-47, §6.1 table B; constants set by W1)*. Header: actor name + label (one row per entry when coalesced), ✕, gear. Body: ~~PiP dice area (≈ 260×96 px; ≤ 20 dice shrink to fit, then "+N more"), **total** large on the right with its markers~~ *(sprint 5: see "Popup line" below)*. Muted "Rolling…" until rest. DM-only rows: eye-off marker + muted background. Click body → Game log at the entry.
-- *(Sprint 5)* **Popup line** (FR-DICEX-46, -47): 320 px card in the DM's top-centre region (FR-SHELL-49) or the players' bottom-right corner. Rows: actor + label, each row's **total** bold at that row's right (markers beside it; "Rolling…" until the landing); ✕ and gear at the first row's far right. Dice line(s) below, full width:
+- *(Sprint 5)* **Popup line** (FR-DICEX-46, -47) *(sprint 10 T5, DM #347: everything × 1.4: 448 px card, 62 px cells, 20 px rows and total; FR-DICEX-47 note)*: 320 px card in the DM's top-centre region (FR-SHELL-49) or the players' bottom-right corner. Rows: actor + label, each row's **total** bold at that row's right (markers beside it; "Rolling…" until the landing); ✕ and gear at the first row's far right. Dice line(s) below, full width:
 
 ```text
 ┌────────────────────────────────┐   ┌────────────────────────────────┐
@@ -794,6 +796,19 @@ The one TT plan (macros, requests, pause, sounds); the other TT specs name their
   5. Reload: the resized tray keeps its size. Reset layout → the tray reopens at its default.
   6. Player 1 at 1280×720 and 1280×800: steps 1–3; the tray never covers the sheet, Initiative or a PC where a spot exists.
 
+### Sprint 10 (T5): dice visuals
+
+- **Unit** (`die-shape.test.tsx`): `FR-DICEX-42 d20 facet lines thin` (outline 6, facets 1 box unit, never under 0.5 px drawn: 2.78 at the 18-px log chip, 1.39 at 36, 1 at ≥ 50; d4 … d12, d100 outline only).
+- **Unit / harness** (tray): `FR-DICEX-96 tray size row` (DM, player: 450 × 375, previous defaults 360 × 300 and 504 × 420), `FR-DICEX-96 tray layout` (1280×720, 1440×900, I1–I6; DM 1440×900 opens 450 × 375), `FR-DICEX-96 tray window memory` (stored 360 × 300 or 504 × 420 → 450 × 375; remembered keep), `FR-DICEX-96 tray dice scale` (× 1.25 at 450 × 375, 1.24 at 432 × 360, × 1.2 at useful, × 1 at min; 50-px cells, chips 45, notation 35; 12 d6 one by one). Goldens: tray rects only; `replay.failing.json` unchanged (DM 7, players 30; cell delta 0).
+- **Unit / DOM** (popup, `popup-line.test.tsx`, `roll-popup.test.tsx`): `FR-DICEX-46 popup line layout` (62-px cells, 6-px gap, 402-px line at 1280×720 / 1920×1080; 44 px at 390×844), `FR-DICEX-47 popup size (T5)` (448 × 268 / 138 / 206; today's 320 × 190 / 98 on `POPUP_BASE`; `popupGeomAt` big on desktop, base at 390×844 and 1280×360; text-xl rows and total, 62-px die, 28-px ✕), `FR-DICEX-47 popup size: short screen` (full cards: 1 / 2 at 1280×720 with a toast, 2 at 800 / 900, 3 at 1080; one-line cards 3 at 720).
+- **E2E**: `dice-tray-size.e2e.ts` (DM 1440×900 opens 450 × 375, `data-scale` 1.25, dice 50 px, notation 35 px; resized to 360 × 300 → × 1.2, 48 px; Player 1 1280×720: 450 wide), `popup-line.e2e.ts` (cells 62 px, card 448 × 138 / 206, ≤ 268, `data-scale` 1.4; short screens 1280×1080 / 720 / 560 → 3 / 2 / 1 of three 10d6 popups), `roll-popup.e2e.ts` unchanged.
+- **Walkthrough** (bundle `session-sim-13`, verify profile; DM 1440×900, Player 1 1280×720, Player 2 1280×800):
+  1. Game log, a sheet, the tray and a roll popup each show a d20: its centre-triangle lines are visibly thinner than its outline and still readable at the log's small size; numbers as before.
+  2. DM: open the Dice tray → 450 × 375 (smaller than T1's 504 × 420), dice 50 px; a tray left at 504 × 420 by T1 and never moved reopens at 450 × 375; a resized one keeps its size.
+  3. Player 1 rolls 2d6 + 1d8: Player 2's popup bottom-right is clearly bigger than before (448 px wide, 62-px dice, bigger name, label and total), right edge where it was, inside the viewport; the DM's top-centre popup the same size, clear of Initiative and the toast stack; Player 1's own popup too.
+  4. Player 1 rolls 10d6 three times at 1280×720 with a toast up: one or two popups show (the oldest dropped), none over the top bar or past the bottom edge.
+  5. A phone-width player (390×844): today's 320 px popup, inside the viewport.
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -901,6 +916,7 @@ Walkthrough steps per slice: D8 → 30, 32, 33, 35, 37; D11 → 30, 31, 33; D12 
 | TT4 | `build/tt-pause` | `camp.pause` / `camp.resume`; the card; the DM control; suppression; fixture `camp-paused`; e2e | `play-shell/overlays.ts`, `play-shell/top-bar-items.ts` (append, S2); no `PlayFrame.tsx` line | wave 3, **after WF1 + TT3** |
 
 - *(Sprint 9)* **FX2** `fix/fx-dice-lines` (FR-DICEX-94–95, FR-DICE-93's chip): `DieShape.tsx`, `popups.ts`, `RollPopup.tsx`, `MacrosPanel.tsx`, `macro-logic.ts` and their tests. Shared: none. Split: [dice-roll-log §14](dice-roll-log.md#14-dependencies).
+- *(Sprint 10)* **T5** `fix/dice-visuals` (DM #347; FR-DICEX-42, -46, -47, -96 notes): `DieShape.tsx`, `window.ts`, `tray-logic.ts`, `TrayPreview.tsx`, `RollPopup.tsx`, `popup-logic.ts` and their tests; shared (frame lock): play-shell `size-table.ts` row, goldens (tray rects), replay sets (unchanged); docs: protocol §24 tray row, §100 popup row, play-shell size table rows. `toast-region.ts` untouched.
 - *(Sprint 10)* **T1** `fix/dice-tray-size` (FR-DICEX-96): `dice-extras/window.ts`, `TrayWindow.tsx`, `TrayPreview.tsx`, `DieShape.tsx`, `FlatDie.tsx`, `tray-logic.ts` and their tests; shared (frame lock): play-shell `size-table.ts` row, goldens, replay sets (regenerated, unchanged); docs: protocol §24 row.
 - Walkthrough per slice: TT1+TT2 → T1–T8, T15, T16; TT3 → T13, T14 (+ T7's sound); TT4 → T9–T12, T17. TT1+TT2 also adds the `answer` refusal to `gem.spend` (gems' server file, assigned line) and the entities hook's target closing.
 

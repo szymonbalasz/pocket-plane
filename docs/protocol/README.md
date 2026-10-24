@@ -2489,6 +2489,7 @@ From [dice-extras](../specs/dice-extras.md#6-functional-requirements) FR-DICEX-4
 | Test IDs | `dicex-popup` + `data-shown` (cells), `data-dice` = every die of the frame (incl. those beyond 20); `dicex-popup-cell` (+ `data-entry-id`, `data-line` = 1 \| 2, `data-index`, `data-faces`, `data-kept`, `data-offered`, `data-value` only once its entry landed); `dicex-popup-more` (+ `data-value` = N, `data-entry-id`); §75's other IDs unchanged |
 | Bundle | Lazy `RollPopup` **5.8 KB gz** (cap 8); dice-extras initial 13.1 KB gz (cap 15); 3D chunk 157.6 KB gz (cap 170) |
 | CON-44 | 0 B: no record, field or frame added |
+| *Sprint 10 T5 (DM #347, fix/dice-visuals)* Size | Everything above × 1.4 (`popup-logic.ts` `popupGeom(k)`, `POPUP_BIG`): card **448 × ≤ 268** (pad 14, rows 31, 11 px, cells **62** + 6 px gap, line 402, tag 6; `popupHeight` 138 (1 + 1) … 268 (3 + 2)); rows, total 20 px; chips `DieShape` `lg` × 1.4; the hand-off and miniature target the 62-px cells (the flight reads the cell rects). `popupGeomAt(client, vp)` → `POPUP_BASE` (the 320 × 190 card above) where the viewport is narrower than 480 or too short for one big card. Short screens: same rule, fewer cards. W1's `ROLL_POPUP_W` / `_H` / `ROLL_POPUPS_MAX` and the toast keep-out box unchanged (the card overhangs the box while it shows; players' stack column `items-end`, right edge on the region's); `dmStackAt` gets the real width. `dicex-popup` + `data-scale`. 0 B |
 
 ## 101. Sprint 5: ally side client (R4)
 
