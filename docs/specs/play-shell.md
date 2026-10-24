@@ -592,7 +592,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 | `note.history` | DM | 360×480 | 360×412 / 360×480 / 360×480 / 360×480 (`minOpenH` 480, band-capped) | 280×240 |
 | `note.history` | player | 360×480 | 360×412 / 360×480 / 360×472 / 360×472 (`minOpenH` 480, band-capped) | 280×240 |
 | `shell.prefs` | both | 360×560 | 360×400 (`minOpenH`) | 320×280 |
-| `dicex.tray` | both | 360×300 *(sprint 10 T1, DM #343: **504×420**; FR-DICEX-96)* | 360×300 (*new* `usefulSize`) | 300×240 |
+| `dicex.tray` | both | 360×300 *(sprint 10 T1, DM #343: ~~504×420~~; T5, 2026-10-24, DM #347: **450×375**; FR-DICEX-96)* | 360×300 (*new* `usefulSize`) | 300×240 |
 | `charx.companion` | both | 320×360 | **320×360** (*new* `usefulSize`, [FR-CHARX-81](character-sheet-full.md#6-functional-requirements)) | 280×240 |
 | `cbt.encounters` | DM | 440×512 | **440×412** (*new* `usefulSize`, [FR-CBT-148](combat-tracker.md#6-functional-requirements)) | 360×320 |
 | `ent.creatures` | DM | 340×512 | 340×360 | 300×240 |
@@ -618,7 +618,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 | `party.handout` | both | 640×412 | 640×400 | title + 300 px body | 360×320 |
 | `note.history` | both | 360×412 | 360×412 | pending + 3 rows (integrator, WF4: handout rows take three lines; 412 is the band maximum) | 280×240 |
 | `shell.prefs` | both | 360×412 | 360×400 | first 2 sections | 320×280 |
-| `dicex.tray` | both | 360×300 *(sprint 10 T1, DM #343: **504×420**; FR-DICEX-96)* | 360×300 | dice, notation, Roll | 300×240 |
+| `dicex.tray` | both | 360×300 *(sprint 10 T1, DM #343: ~~504×420~~; T5, 2026-10-24, DM #347: **450×375**; FR-DICEX-96)* | 360×300 | dice, notation, Roll | 300×240 |
 | `charx.companion` | both | 320×360 | 320×360 | header, stats, 2 attacks + 3 buttons | 280×240 |
 | `stats.board` | both | 400×412 | 400×360 | 5 rows names whole, **or** 2 award cards, **or** the first 4 Highlights lines (S5) | 320×280 |
 | `cbt.encounters` | DM | 440×412 | 440×412 | 4 entries + Save / Start | 360×320 |

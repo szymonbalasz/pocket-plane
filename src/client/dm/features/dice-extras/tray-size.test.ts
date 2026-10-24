@@ -1,8 +1,8 @@
-// T1 (sprint 10, DM #343; FR-DICEX-96): the DM's Dice tray about 40 % bigger. The size row on the
+// T1 / T5 (sprint 10, DM #343, #347; FR-DICEX-96): the DM's Dice tray 25 % bigger (T1's 40 % cut). The size row on the
 // real registry, placement at 1280×720 and 1440×900 in the harness world (`runScript`: the shell
 // controller, the real pure camera, `session-sim-11` states, I1–I6 after every step) and window
-// memory (FR-SHELL-53: an unremembered tray at the old default grows, a remembered one keeps its
-// size).
+// memory (FR-SHELL-53: an unremembered tray at an old default moves to the new one, a remembered
+// one keeps its size).
 import { expect, mock, test } from "bun:test";
 import type { Rect } from "@ui/features/play-shell/geometry";
 import { runScript } from "@ui/features/play-shell/replay";
@@ -28,14 +28,17 @@ function rectIn(windows: string | undefined, kind: string): Rect | null {
     : null;
 }
 
-test("FR-DICEX-96 tray size row (DM): default 504 × 420 (360 × 300 × 1.4), useful 360 × 300, min 300 × 240, 360 × 300 a previous default", () => {
+test("FR-DICEX-96 tray size row (DM): default 450 × 375 (360 × 300 × 1.25), useful 360 × 300, min 300 × 240, 360 × 300 and T1's 504 × 420 previous defaults", () => {
   const def = dmWindows.get(KIND);
-  expect(def?.defaultSize).toEqual({ w: 504, h: 420 });
+  expect(def?.defaultSize).toEqual({ w: 450, h: 375 });
   expect(def?.usefulSize).toEqual({ w: 360, h: 300 });
   expect(def?.minSize).toEqual({ w: 300, h: 240 });
-  expect(def?.previousDefaults).toEqual([{ w: 360, h: 300 }]);
+  expect(def?.previousDefaults).toEqual([
+    { w: 360, h: 300 },
+    { w: 504, h: 420 },
+  ]);
   const row = SIZE_TABLE.dm[KIND];
-  for (const s of row?.default ?? []) expect(s).toEqual({ w: 504, h: 420 });
+  for (const s of row?.default ?? []) expect(s).toEqual({ w: 450, h: 375 });
   for (const s of row?.useful ?? []) expect(s).toEqual({ w: 360, h: 300 });
   expect(row?.min).toEqual({ w: 300, h: 240 });
 });
@@ -60,12 +63,12 @@ test("FR-DICEX-96 tray layout (DM) at 1280×720 and 1440×900: opens beside the 
       }
       expect(tray.w, at).toBeGreaterThanOrEqual(360);
       expect(tray.h, at).toBeGreaterThanOrEqual(300);
-      expect(tray.w, at).toBeLessThanOrEqual(504);
+      expect(tray.w, at).toBeLessThanOrEqual(450);
     }
   }
-  // 1440×900: room for the whole default (sim-14's 360 × 300 spot, now 504 × 420).
+  // 1440×900: room for the whole default (sim-14's 360 × 300 spot, now 450 × 375).
   const wide = runScript(dmWindows, "dm", { w: 1440, h: 900 }, "escort", [{ open: KIND }]);
-  expect(rectIn(wide.steps.at(-1)?.windows, KIND)).toMatchObject({ w: 504, h: 420 });
+  expect(rectIn(wide.steps.at(-1)?.windows, KIND)).toMatchObject({ w: 450, h: 375 });
 });
 
 function shellWith(entry: Record<string, unknown>) {
@@ -91,10 +94,14 @@ function shellWith(entry: Record<string, unknown>) {
   return { w };
 }
 
-test("FR-DICEX-96 tray window memory: a stored tray still at the old 360 × 300 default grows to 504 × 420 where it is; a remembered one (moved or resized) keeps its stored size", () => {
+test("FR-DICEX-96 tray window memory: a stored tray still at an old default (360 × 300, T1's 504 × 420) takes 450 × 375 where it is; a remembered one (moved or resized) keeps its stored size", () => {
   const spot = { x: 600, y: 200, w: 360, h: 300 };
-  // FR-SHELL-53: an auto-placed tray at the previous default takes the new one in place.
-  expect(shellWith(spot).w).toMatchObject({ x: 600, y: 200, w: 504, h: 420 });
+  // FR-SHELL-53: an auto-placed tray at a previous default takes the new one in place.
+  expect(shellWith(spot).w).toMatchObject({ x: 600, y: 200, w: 450, h: 375 });
+  const t1 = { x: 600, y: 200, w: 504, h: 420 };
+  expect(shellWith(t1).w).toMatchObject({ x: 600, y: 200, w: 450, h: 375 });
+  // A remembered T1-size tray keeps 504 × 420.
+  expect(shellWith({ ...t1, userSpot: true, userSize: true }).w).toMatchObject(t1);
   // Remembered (FR-SHELL-144): a user spot, or a user size, keeps 360 × 300.
   expect(shellWith({ ...spot, userSpot: true }).w).toMatchObject(spot);
   expect(shellWith({ ...spot, userSpot: true, userSize: true }).w).toMatchObject(spot);
