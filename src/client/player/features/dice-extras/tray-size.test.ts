@@ -1,4 +1,4 @@
-// T1 (sprint 10, DM #343; FR-DICEX-96): a player's Dice tray about 40 % bigger. The size row on
+// T1 / T5 (sprint 10, DM #343, #347; FR-DICEX-96): a player's Dice tray 25 % bigger (T1's 40 % cut). The size row on
 // the real registry and placement at 1280×720 and 1440×900 in the harness world (`runScript`:
 // the shell controller, the real pure camera, `session-sim-11` states, I1–I6 after every step).
 import { expect, test } from "bun:test";
@@ -22,13 +22,13 @@ function rectIn(windows: string | undefined, kind: string): Rect | null {
     : null;
 }
 
-test("FR-DICEX-96 tray size row (player): default 504 × 420, useful 360 × 300, min 300 × 240", () => {
+test("FR-DICEX-96 tray size row (player): default 450 × 375, useful 360 × 300, min 300 × 240", () => {
   const def = playerWindows.get(KIND);
-  expect(def?.defaultSize).toEqual({ w: 504, h: 420 });
+  expect(def?.defaultSize).toEqual({ w: 450, h: 375 });
   expect(def?.usefulSize).toEqual({ w: 360, h: 300 });
   expect(def?.minSize).toEqual({ w: 300, h: 240 });
   const row = SIZE_TABLE.player[KIND];
-  for (const s of row?.default ?? []) expect(s).toEqual({ w: 504, h: 420 });
+  for (const s of row?.default ?? []) expect(s).toEqual({ w: 450, h: 375 });
   for (const s of row?.useful ?? []) expect(s).toEqual({ w: 360, h: 300 });
 });
 
@@ -52,10 +52,10 @@ test("FR-DICEX-96 tray layout (player-1) at 1280×720 and 1440×900: opens besid
       }
       expect(tray.w, at).toBeGreaterThanOrEqual(360);
       expect(tray.h, at).toBeGreaterThanOrEqual(300);
-      expect(tray.w, at).toBeLessThanOrEqual(504);
+      expect(tray.w, at).toBeLessThanOrEqual(450);
     }
   }
   // Where the party leaves room the tray opens wider than before (sim-14: 360 × 300).
   const run = runScript(playerWindows, "player-1", { w: 1280, h: 720 }, "ambush", [{ open: KIND }]);
-  expect(rectIn(run.steps.at(-1)?.windows, KIND)?.w).toBe(504);
+  expect(rectIn(run.steps.at(-1)?.windows, KIND)?.w).toBe(450);
 });

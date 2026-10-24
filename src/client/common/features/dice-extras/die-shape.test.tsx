@@ -3,7 +3,14 @@ import { describe, expect, test } from "bun:test";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import { throwDice } from "@shared/dice-extras/throw";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DieShape, d100Faces, dieShapeOf } from "./DieShape";
+import {
+  D20_FACE_STROKE,
+  DieShape,
+  d20FaceStroke,
+  d100Faces,
+  dieShapeOf,
+  OUTLINE_STROKE,
+} from "./DieShape";
 import { FlatDie } from "./FlatDie";
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(node);
@@ -244,6 +251,35 @@ describe("FR-DICEX-42 die-shape chips", () => {
   test("FR-DICEX-42 die-shape chips: sizes sm 18 px (log), md 36 px (popup, tray, zone)", () => {
     expect(attr(html(<DieShape faces={20} value={1} size="sm" />), "width")).toBe("18");
     expect(attr(html(<DieShape faces={20} value={1} />), "width")).toBe("36");
+  });
+
+  test("FR-DICEX-42 d20 facet lines thin (DM #347): 1 box unit (was 3) beside the outline's 6, never under 0.5 px drawn; the other shapes have no inner lines", () => {
+    const strokes = (h: string) => [...h.matchAll(/stroke-width="([^"]*)"/g)].map((m) => m[1]);
+    expect([OUTLINE_STROKE, D20_FACE_STROKE]).toEqual([6, 1]);
+    // Popup (lg × 1.4 = 62 px), tray (md × 1.25 = 45), lg 44, md 36, the log's sm 18.
+    expect(d20FaceStroke(62)).toBe(1);
+    expect(d20FaceStroke(50)).toBe(1);
+    expect(d20FaceStroke(44)).toBe(1.14);
+    expect(d20FaceStroke(36)).toBe(1.39);
+    expect(d20FaceStroke(18)).toBe(2.78);
+    for (const [size, px] of [
+      ["sm", 18],
+      ["md", 36],
+      ["lg", 44],
+    ] as const) {
+      const [outline, face] = strokes(html(<DieShape faces={20} value={13} size={size} />));
+      expect(outline).toBe("6");
+      expect(Number(face)).toBe(d20FaceStroke(px));
+      expect(Number(face) * (px / 100)).toBeGreaterThanOrEqual(0.5);
+      expect(Number(face)).toBeLessThan(3);
+    }
+    const scaled = strokes(html(<DieShape faces={20} value={13} size="lg" scale={1.4} />));
+    expect(scaled).toEqual(["6", "1"]);
+    // d4 … d12 draw their outline only: one path, no thinner inner line to match.
+    for (const faces of [4, 6, 8, 10, 12, 100]) {
+      const h = html(<DieShape faces={faces} value={3} size="lg" />);
+      expect(new Set(strokes(h))).toEqual(new Set(["6"]));
+    }
   });
 
   test("FR-DICEX-42 FlatDie keeps its test ID and data, the shape inside is the only dicex-die", () => {

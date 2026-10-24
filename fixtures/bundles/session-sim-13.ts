@@ -26,5 +26,6 @@ export default defineBundle({
     // FX: FX3 Mira's Bless beside Thorn's summon concentration (FR-CBTX-75)
     "fx-mira-bless",
     // T1 (sprint 10, DM #343): Dice tray 40 % bigger (no unit: client-only, the tray needs no records)
+    // T5 (sprint 10, DM #347): dice visuals: thin d20 lines, tray +25 %, roll popup +40 % (no unit: client-only)
   ],
 });

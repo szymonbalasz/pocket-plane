@@ -7,7 +7,7 @@
 // FR-DICEX-54: the dice area shrinks first: 40-px cells while every die fits the area, else 28,
 // else "×N" (forced by room), else the area scrolls on its own (`stillSize`).
 // FR-DICEX-96 (DM #343): cells, chips and their numbers scale with the tray (`trayScale`: × 1 at
-// the min, × 1.2 at the useful size, × 1.4 at the default); the steps stay 40 / 28 (`data-cell`).
+// the min, × 1.2 at the useful size, × 1.25 at the default); the steps stay 40 / 28 (`data-cell`).
 import type { DiceLook } from "@shared/dice-extras/looks";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -55,7 +55,7 @@ const fitsIn = (cells: number, step: StillCell, area: AreaBox, scale: number) =>
  * FR-DICEX-54: the still size for `cells` cells (one per still, d100 = two, plus one per constant
  * / label) or `groupedCells` once grouped "×N". 40 while all fit; else 28; else grouped (40 or 28,
  * `grouped` = forced by room, not by > 12 dice); else grouped at 28 and the area scrolls. Each
- * step is drawn at `scale` (FR-DICEX-96: 40 → 56 px at × 1.4).
+ * step is drawn at `scale` (FR-DICEX-96: 40 → 50 px at × 1.25).
  */
 export function stillSize(
   o: { cells: number; groupedCells: number; byCount: boolean },

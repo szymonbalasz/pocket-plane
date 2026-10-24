@@ -1,6 +1,7 @@
 // The popup line (FR-DICEX-46, -47; DICEX §6.1 tables A, B): the pure cell layout, "+N", tags,
 // hand-off flights and pixel budget, the short-screen fit, and the static render of the cards
-// (cells, `data-shown`, per-row totals) inside a shell over the page's popup store.
+// (cells, `data-shown`, per-row totals) inside a shell over the page's popup store. T5 (DM #347):
+// the card × 1.4 (62-px cells, 448 × ≤ 268), today's 320 × 190 where the viewport can't hold it.
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { type DiceThrow, throwDice } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
@@ -20,11 +21,11 @@ import {
 } from "../play-shell/toast-region";
 import { landing } from "./landing";
 import {
-  CELL_GAP,
-  CELL_PX,
   cellTag,
-  LINE_W,
-  POPUP_PAD,
+  POPUP_BASE,
+  POPUP_BIG,
+  POPUP_SCALE,
+  popupGeomAt,
   popupHeight,
   popupLine,
   popupsThatFit,
@@ -157,23 +158,26 @@ describe("FR-DICEX-46 popup line layout", () => {
     expect(popupLine(two.dice, 5).more?.n).toBe(14);
   });
 
-  test("FR-DICEX-46 popup line layout: 44 px cells, 4 px gap, 6 per line; never scaled at 390×844, 1280×720, 1920×1080; throwDice order", () => {
+  test("FR-DICEX-46 popup line layout: 62 px cells (T5: 44 × 1.4), 6 px gap, 6 per line, never scaled by the count, at 1280×720 and 1920×1080; today's 44 px at 390×844; throwDice order", () => {
     const l = popupLine(throwOf([nd6(10)]).dice);
     expect(l.cells.map((c) => [c.x, c.y])).toEqual([
-      ...[0, 1, 2, 3, 4, 5].map((i) => [i * 48, 0]),
-      ...[0, 1, 2, 3].map((i) => [i * 48, 48]),
+      ...[0, 1, 2, 3, 4, 5].map((i) => [i * 68, 0]),
+      ...[0, 1, 2, 3].map((i) => [i * 68, 68]),
     ]);
-    expect([CELL_PX, CELL_GAP, LINE_W, l.h]).toEqual([44, 4, 284, 92]);
-    for (const [w, h] of [
-      [390, 844],
-      [1280, 720],
-      [1920, 1080],
+    expect([POPUP_BIG.cell, POPUP_BIG.gap, POPUP_BIG.lineW, l.h]).toEqual([62, 6, 402, 130]);
+    const base = popupLine(throwOf([nd6(10)]).dice, 0, POPUP_BASE);
+    expect([POPUP_BASE.cell, POPUP_BASE.gap, POPUP_BASE.lineW, base.h]).toEqual([44, 4, 284, 92]);
+    expect(base.cells[7]).toMatchObject({ x: 48, y: 48 });
+    for (const [w, h, px] of [
+      [390, 844, 44],
+      [1280, 720, 62],
+      [1920, 1080, 62],
     ] as const) {
       setViewport(w, h);
       rollPopups.add({ entries: [nd6(10)], looks: {}, big: null, threeD: false });
       const cells = cellsOf(render());
       expect(cells).toHaveLength(10);
-      for (const c of cells) expect(c.style).toContain("width:44px;height:44px");
+      for (const c of cells) expect(c.style).toContain(`width:${px}px;height:${px}px`);
       expect(cells.map((c) => c.index)).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
       expect(cells.map((c) => c.line)).toEqual([...Array(6).fill("1"), ...Array(4).fill("2")]);
       rollPopups.api.setState({ popups: [] });
@@ -240,12 +244,12 @@ describe("FR-DICEX-46 popup line layout", () => {
     expect(html).toMatch(/class="absolute -bottom-1 left-0 w-full truncate[^"]*">Divine Fury</);
   });
 
-  test("FR-DICEX-46 popup line layout: hand-off targets = cell centres, the die at full size (44 px), turned upright; dice past cell 11 target '+N' and fade", () => {
+  test("FR-DICEX-46 popup line layout: hand-off targets = cell centres, the die at full size (62 px, T5), turned upright; dice past cell 11 target '+N' and fade", () => {
     const cell = (i: number) => ({
-      x: 900 + (i % 6) * 48,
-      y: 500 + Math.floor(i / 6) * 48,
-      w: 44,
-      h: 44,
+      x: 800 + (i % 6) * 68,
+      y: 500 + Math.floor(i / 6) * 68,
+      w: 62,
+      h: 62,
     });
     const boxes: Record<string, { x: number; y: number; w: number; h: number }> = {};
     const turns: Record<string, number> = {};
@@ -264,8 +268,8 @@ describe("FR-DICEX-46 popup line layout", () => {
       const to = i < 11 ? cell(i) : more;
       expect(f.fade).toBe(i >= 11);
       expect(f.turn).toBe(i < 11 ? 0.5 : 0);
-      // The box holds the die and its margin: the die itself ends 44 px wide.
-      expect((box.w * f.k) / CELL_STILL_PAD).toBeCloseTo(44);
+      // The box holds the die and its margin: the die itself ends as wide as its cell.
+      expect((box.w * f.k) / CELL_STILL_PAD).toBeCloseTo(62);
       // The box's centre after the flight = the target cell's centre.
       expect(box.x + box.w / 2 + f.dx).toBeCloseTo(to.x + to.w / 2);
       expect(box.y + box.h / 2 + f.dy).toBeCloseTo(to.y + to.h / 2);
@@ -308,17 +312,48 @@ describe("FR-DICEX-46 popup line layout", () => {
 });
 
 describe("FR-DICEX-47 popup size", () => {
-  test("FR-DICEX-47 popup size: ≤ 320 × 190 with 3 rows and 2 dice lines, 98 px with 1 row + 1 line (table B); W1's constants", () => {
+  test("FR-DICEX-47 popup size (T5, DM #347): × 1.4 of table B: ≤ 448 × 268 with 3 rows and 2 dice lines, 138 px with 1 row + 1 line; today's 320 × 190 / 98 kept for small viewports", () => {
+    expect(POPUP_SCALE).toBe(1.4);
+    // Table B (W1's keep-out constants) × 1.4, whole px: pad 14, rows 31, gap 11, tag 6.
     expect([ROLL_POPUP_W, ROLL_POPUP_H]).toEqual([320, 190]);
-    expect(popupHeight(3, 2)).toBe(ROLL_POPUP_H);
-    expect(popupHeight(5, 2)).toBe(ROLL_POPUP_H); // rows beyond 3 scroll inside
-    expect(popupHeight(1, 1)).toBe(98);
-    expect(popupHeight(1, 2)).toBe(146);
-    // The line fits the card's inner width (320 − 2 × 12).
-    expect(LINE_W).toBeLessThanOrEqual(ROLL_POPUP_W - 2 * (POPUP_PAD + 2));
+    expect(POPUP_BIG).toMatchObject({ w: 448, maxH: 268, pad: 14, row: 31, rowsGap: 11, tag: 6 });
+    expect(popupHeight(3, 2)).toBe(POPUP_BIG.maxH);
+    expect(popupHeight(5, 2)).toBe(POPUP_BIG.maxH); // rows beyond 3 scroll inside
+    expect(popupHeight(1, 1)).toBe(138);
+    expect(popupHeight(1, 2)).toBe(206);
+    expect(POPUP_BASE).toMatchObject({ w: ROLL_POPUP_W, maxH: ROLL_POPUP_H, pad: 10, row: 22 });
+    expect(popupHeight(3, 2, POPUP_BASE)).toBe(190);
+    expect(popupHeight(1, 1, POPUP_BASE)).toBe(98);
+    // The line fits the card's inner width (448 − 2 × 16; 320 − 2 × 12).
+    for (const g of [POPUP_BIG, POPUP_BASE]) {
+      expect(g.lineW).toBeLessThanOrEqual(g.w - 2 * (g.pad + 2));
+    }
+    // The big card wherever the viewport holds it (desktop, both clients), else today's.
+    for (const client of ["dm", "player"] as const) {
+      expect(popupGeomAt(client, { w: 1280, h: 720 })).toBe(POPUP_BIG);
+      expect(popupGeomAt(client, { w: 1920, h: 1080 })).toBe(POPUP_BIG);
+      expect(popupGeomAt(client, { w: 390, h: 844 })).toBe(POPUP_BASE);
+      expect(popupGeomAt(client, { w: 1280, h: 360 })).toBe(POPUP_BASE);
+    }
     rollPopups.add({ entries: [nd6(1)], looks: {}, big: null, threeD: false });
     const html = render();
-    expect(html).toContain("width:320px;max-height:190px;padding-block:9px;padding-inline:11px");
+    expect(html).toContain(
+      "width:448px;max-height:268px;gap:11px;padding-block:13px;padding-inline:15px",
+    );
+    expect(attr(html, "dicex-popup", "data-scale")).toBe("1.4");
+    // Numbers, name line and total bigger (14 → 20 px; markers 12 → 17), the die 62 px.
+    expect(html).toMatch(/data-testid="dicex-popup-row"[^>]*class="[^"]*text-xl/);
+    expect(html).toMatch(/data-testid="dicex-popup-total" class="[^"]*text-xl/);
+    expect(html).toMatch(/<svg viewBox="0 0 100 100" width="62" height="62"/);
+    expect(html).toMatch(/data-face="1"[^>]*style="[^"]*font-size:28.52px/);
+    expect(html).toMatch(/class="[^"]*size-7"[^>]*data-testid="dicex-popup-close"/);
+    setViewport(390, 844);
+    const small = render();
+    expect(small).toContain(
+      "width:320px;max-height:190px;gap:8px;padding-block:9px;padding-inline:11px",
+    );
+    expect(small).toMatch(/data-testid="dicex-popup-total" class="[^"]*text-sm/);
+    setViewport(1280, 720);
   });
 
   test("FR-DICEX-47 popup size: each row's total at its right, in its own row", () => {
@@ -339,11 +374,11 @@ describe("FR-DICEX-47 popup size", () => {
       ["b", "11"],
       ["c", "12"],
     ]);
-    expect(html).toContain("max-height:66px");
+    expect(html).toContain("max-height:93px");
   });
 
-  test("FR-DICEX-47 popup size: short screen → only the popups that fit the toast region (oldest dropped), none past the viewport or over the top bar", () => {
-    const H = ROLL_POPUP_H;
+  test("FR-DICEX-47 popup size: short screen → only the popups that fit the toast region (oldest dropped), none past the viewport or over the top bar; T5's bigger cards: fewer at once", () => {
+    const H = POPUP_BIG.maxH;
     const three = [H, H, H];
     const toast = 40;
     const playerRoom = (vh: number, noteH: number) => {
@@ -354,11 +389,23 @@ describe("FR-DICEX-47 popup size", () => {
       const r = popupRegion("dm", noteH, 0);
       return vh - EDGE_GAP - ("top" in r ? r.top : 0);
     };
-    // 1280×720 with a toast: 2 fit on either side; 1280×800: all 3.
-    expect(popupsThatFit(three, playerRoom(720, toast))).toBe(2);
+    // Full cards (3 rows, 2 lines, 268 px). 1280×720 with a toast: 1 on the player's side (room
+    // 540), 2 on the DM's (560); without a toast 2 each. 1280×800, 1440×900: 2. 1920×1080: all 3.
+    expect([playerRoom(720, toast), dmRoom(720, toast)]).toEqual([540, 560]);
+    expect(popupsThatFit(three, playerRoom(720, toast))).toBe(1);
     expect(popupsThatFit(three, dmRoom(720, toast))).toBe(2);
-    expect(popupsThatFit(three, playerRoom(800, toast))).toBe(ROLL_POPUPS_MAX);
-    expect(popupsThatFit(three, dmRoom(800, toast))).toBe(ROLL_POPUPS_MAX);
+    expect(popupsThatFit(three, playerRoom(720, 0))).toBe(2);
+    expect(popupsThatFit(three, dmRoom(720, 0))).toBe(2);
+    for (const vh of [800, 900]) {
+      expect(popupsThatFit(three, playerRoom(vh, toast)), `${vh}`).toBe(2);
+      expect(popupsThatFit(three, dmRoom(vh, toast)), `${vh}`).toBe(2);
+    }
+    expect(popupsThatFit(three, playerRoom(1080, toast))).toBe(ROLL_POPUPS_MAX);
+    expect(popupsThatFit(three, dmRoom(1080, toast))).toBe(ROLL_POPUPS_MAX);
+    // A one-line roll (1 row, 1 line: 138 px): all 3 even at 1280×720 with a toast.
+    const one = popupHeight(1, 1);
+    expect(popupsThatFit([one, one, one], playerRoom(720, toast))).toBe(3);
+    expect(popupsThatFit([one, one, one], dmRoom(720, toast))).toBe(3);
     // Smaller cards fit more; the newest always shows.
     expect(popupsThatFit([98, 98, 98], playerRoom(720, toast))).toBe(3);
     expect(popupsThatFit([H], 50)).toBe(1);

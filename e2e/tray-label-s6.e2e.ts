@@ -100,11 +100,11 @@ test("FR-DICEX-53 tray Roll visible at min: 2d6 + 1d8 + 1 and 12 d6 as opened an
     return f;
   };
 
-  // As opened (504 × 420 since T1, or placement's shrunk size down to useful / min).
+  // As opened (450 × 375 since T5, or placement's shrunk size down to useful / min).
   await check();
   await expect(preview).toHaveAttribute("data-cell", "40");
 
-  // Resize to the min (the frame clamps at 300 × 240; from up to 504 × 420 since T1).
+  // Resize to the min (the frame clamps at 300 × 240; from up to 450 × 375 since T5).
   const handle = await tray.getByTestId("ui-window-resize").boundingBox();
   if (!handle) throw new Error("no resize handle");
   await drag(p1, { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }, -300, -300);

@@ -66,6 +66,18 @@ const OUTLINE: Record<Exclude<DieShapeKind, "round">, { d: string; cy: number; s
 };
 /** d20: the centre triangle and its spokes to the hexagon's corners. */
 const D20_FACE = "M50 22 L76 67 L24 67 Z M50 22 L50 3 M76 67 L91 73.5 M24 67 L9 73.5";
+/** The outline's stroke in box units (every shape). */
+export const OUTLINE_STROKE = 6;
+/**
+ * DM #347: the d20's facet lines, thin beside the outline: 1 box unit (was 3), never under
+ * `FACE_MIN_PX` drawn, so an 18-px log chip keeps them.
+ */
+export const D20_FACE_STROKE = 1;
+export const FACE_MIN_PX = 0.5;
+
+/** The d20 facet stroke in box units at `px`, two decimals. */
+export const d20FaceStroke = (px: number) =>
+  Math.round(Math.max(D20_FACE_STROKE, (FACE_MIN_PX * 100) / px) * 100) / 100;
 
 /** Font size in box units: shorter numbers bigger. */
 const fontOf = (text: string, scale = 1) =>
@@ -91,7 +103,11 @@ function Outline({
   px: number;
 }) {
   const o = OUTLINE[kind];
-  const stroke = { stroke: look.pips, strokeWidth: 6, strokeLinejoin: "round" as const };
+  const stroke = {
+    stroke: look.pips,
+    strokeWidth: OUTLINE_STROKE,
+    strokeLinejoin: "round" as const,
+  };
   /** Box units → px, two decimals. */
   const toPx = (u: number) => Math.round(u * px) / 100;
   // The number's centre sits at `cy`: padding on one side and a shorter line, so the box stays
@@ -107,7 +123,9 @@ function Outline({
         className="inline-block overflow-visible align-top"
       >
         <path d={o.d} fill={look.body} {...stroke} strokeDasharray={offered ? "12 9" : undefined} />
-        {kind === "d20" && <path d={D20_FACE} fill="none" {...stroke} strokeWidth={3} />}
+        {kind === "d20" && (
+          <path d={D20_FACE} fill="none" {...stroke} strokeWidth={d20FaceStroke(px)} />
+        )}
         {!kept && !offered && (
           <line x1={14} y1={o.cy} x2={86} y2={o.cy} stroke={look.pips} strokeWidth={7} />
         )}

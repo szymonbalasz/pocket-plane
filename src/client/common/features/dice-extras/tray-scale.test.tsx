@@ -1,6 +1,6 @@
-// T1 (sprint 10, DM #343; FR-DICEX-96, orchestrator ruling): the tray's dice scale with the
-// window: × 1 at the min (300 × 240, today's dice), × 1.2 at the useful size (360 × 300, 48-px
-// cells), × 1.4 at the default (504 × 420); the notation row stays 28 px up to useful. The pure
+// T1 / T5 (sprint 10, DM #343, #347; FR-DICEX-96, orchestrator ruling): the tray's dice scale with
+// the window: × 1 at the min (300 × 240, today's dice), × 1.2 at the useful size (360 × 300, 48-px
+// cells), × 1.25 at the default (450 × 375, 50 px); the notation row stays 28 px up to useful. The pure
 // scales and still size, the layout budget (Roll visible), and a static render of the scaled
 // cells and chips.
 import { afterEach, describe, expect, test } from "bun:test";
@@ -72,35 +72,37 @@ const canvasTag = (html: string) =>
 afterEach(() => diceExtras.clear());
 
 describe("FR-DICEX-96 tray dice scale", () => {
-  test("FR-DICEX-96 tray dice scale: × 1 at the min 300 × 240, × 1.2 at the useful 360 × 300, × 1.4 at the default 504 × 420, linear between by the tighter side; notation row compact up to useful", () => {
+  test("FR-DICEX-96 tray dice scale: × 1 at the min 300 × 240, × 1.2 at the useful 360 × 300, × 1.25 at the default 450 × 375, linear between by the tighter side; notation row compact up to useful", () => {
     expect([TRAY_MIN, TRAY_USEFUL, TRAY_DEFAULT]).toEqual([
       { w: 300, h: 240 },
       { w: 360, h: 300 },
-      { w: 504, h: 420 },
+      { w: 450, h: 375 },
     ]);
-    expect(TRAY_SCALE_MAX).toBe(1.4);
-    expect(trayScale({ w: 504, h: 420 })).toBe(1.4);
+    expect(TRAY_SCALE_MAX).toBe(1.25);
+    expect(trayScale({ w: 450, h: 375 })).toBe(1.25);
     expect(trayScale({ w: 360, h: 300 })).toBe(1.2);
     expect(trayScale({ w: 300, h: 240 })).toBe(1);
     // Smooth between the steps; the tighter axis decides.
-    expect(trayScale({ w: 432, h: 360 })).toBe(1.3);
+    expect(trayScale({ w: 432, h: 360 })).toBe(1.24);
     expect(trayScale({ w: 330, h: 270 })).toBe(1.1);
-    expect(trayScale({ w: 504, h: 412 })).toBe(1.39);
+    expect(trayScale({ w: 450, h: 340 })).toBe(1.23);
+    // T1's 504 × 420 (a remembered tray): × 1.25, the cap.
+    expect(trayScale({ w: 504, h: 420 })).toBe(1.25);
     expect(trayScale({ w: 504, h: 300 })).toBe(1.2);
     expect(trayScale({ w: 360, h: 420 })).toBe(1.2);
-    // Never past × 1.4, never below today's dice.
-    expect(trayScale({ w: 900, h: 800 })).toBe(1.4);
+    // Never past × 1.25, never below today's dice.
+    expect(trayScale({ w: 900, h: 800 })).toBe(1.25);
     expect(trayScale({ w: 280, h: 200 })).toBe(1);
     expect(trayScale(null)).toBe(1);
     expect(trayScale({ w: 0, h: 0 })).toBe(1);
-    // The notation row: × 1 up to the useful size, × 1.4 at the default.
+    // The notation row: × 1 up to the useful size, × 1.25 at the default.
     expect(notationScale({ w: 360, h: 300 })).toBe(1);
     expect(notationScale({ w: 300, h: 240 })).toBe(1);
     expect(notationScale({ w: 432, h: 360 })).toBe(1.2);
-    expect(notationScale({ w: 504, h: 420 })).toBe(1.4);
-    // Cells: 40 → 48 at useful, 56 at the default (28 → 34 / 39); chips `md` 36 → 43 / 50.
+    expect(notationScale({ w: 450, h: 375 })).toBe(1.25);
+    // Cells: 40 → 48 at useful, 50 at the default (28 → 34 / 35); chips `md` 36 → 43 / 45.
     expect([scaledPx(40, 1.2), scaledPx(28, 1.2), scaledPx(36, 1.2)]).toEqual([48, 34, 43]);
-    expect([scaledPx(40, 1.4), scaledPx(28, 1.4), scaledPx(36, 1.4)]).toEqual([56, 39, 50]);
+    expect([scaledPx(40, 1.25), scaledPx(28, 1.25), scaledPx(36, 1.25)]).toEqual([50, 35, 45]);
   });
 
   test("FR-DICEX-96 tray dice scale at useful and default: a typical stage (up to 5 dice + adv, constant) one by one at ≥ 48 px with notation and Roll in the window", () => {
@@ -119,16 +121,15 @@ describe("FR-DICEX-96 tray dice scale", () => {
         scroll: false,
       });
     }
-    // Default 504 × 420: notation row 39 px; 12 d6 one by one in two rows of 56 (OQ-DICEX-36).
-    const big = areaOf(504, 420);
-    expect(big.h).toBeGreaterThanOrEqual(2 * 56 + 4);
-    expect(stillSize({ cells: 12, groupedCells: 1, byCount: false }, big, 1.4)).toEqual({
+    // Default 450 × 375: notation row 35 px; 12 d6 one by one in two rows of 50 (OQ-DICEX-36).
+    const big = areaOf(450, 375);
+    expect(big).toEqual({ w: 418, h: 169 });
+    expect(big.h).toBeGreaterThanOrEqual(2 * 50 + 4);
+    expect(stillSize({ cells: 12, groupedCells: 1, byCount: false }, big, 1.25)).toEqual({
       cell: 40,
       grouped: false,
       scroll: false,
     });
-    const banded = areaOf(504, 412);
-    expect(stillSize({ cells: 12, groupedCells: 1, byCount: false }, banded, 1.39).cell).toBe(40);
     // Min 300 × 240: × 1, the FR-DICEX-53 / -54 layout unchanged (41 px, one row of 40).
     expect(areaOf(300, 240).h).toBe(41);
     expect(trayScale({ w: 300, h: 240 })).toBe(1);
@@ -148,20 +149,20 @@ describe("FR-DICEX-96 tray dice scale", () => {
           groups={[group("2d6+1d8+1")]}
           mode="normal"
           onRemove={() => {}}
-          area={areaOf(504, 420)}
+          area={areaOf(450, 375)}
           scale={scale}
         />,
       );
-    const big = at(1.4);
+    const big = at(1.25);
     expect(canvasTag(big)).toContain('data-cell="40"');
-    expect(canvasTag(big)).toContain('data-px="56"');
+    expect(canvasTag(big)).toContain('data-px="50"');
     expect(dieTags(big)).toHaveLength(3);
-    for (const d of dieTags(big)) expect(d).toContain("height:56px;min-width:56px");
-    // Fallback chips (no 3D chunk in a static render): `md` 36 → 50 px, the number 46 → 64 %.
-    expect(big).toContain('width="50"');
+    for (const d of dieTags(big)) expect(d).toContain("height:50px;min-width:50px");
+    // Fallback chips (no 3D chunk in a static render): `md` 36 → 45 px, the number with it.
+    expect(big).toContain('width="45"');
     expect(big).not.toContain('width="36"');
-    // The constant "+1" grows with the dice: 14 → 20 px.
-    expect(big).toMatch(/font-size:20px[^>]*>\+1</);
+    // The constant "+1" grows with the dice: 14 → 18 px.
+    expect(big).toMatch(/font-size:18px[^>]*>\+1</);
 
     const today = at(1);
     expect(canvasTag(today)).toContain('data-px="40"');
@@ -184,10 +185,10 @@ describe("FR-DICEX-96 tray dice scale", () => {
       flat: true,
       sign: 1 as const,
     };
-    const html = render(<FlatDie die={die} look={STYLE_LOOK.ivory} scale={1.4} />);
-    expect(html).toContain('width="50"');
-    const round = render(<DieShape faces={3} value={2} size="md" scale={1.4} />);
-    expect(round).toContain("height:50px;min-width:50px;font-size:20px;line-height:46px");
+    const html = render(<FlatDie die={die} look={STYLE_LOOK.ivory} scale={1.25} />);
+    expect(html).toContain('width="45"');
+    const round = render(<DieShape faces={3} value={2} size="md" scale={1.25} />);
+    expect(round).toContain("height:45px;min-width:45px;font-size:18px;line-height:41px");
     const plain = render(<DieShape faces={3} value={2} size="md" />);
     expect(plain).not.toContain("min-width:");
   });
