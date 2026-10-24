@@ -57,6 +57,7 @@ const trayFacts = (win: Locator) =>
       bodyScrolls: body.scrollHeight > body.clientHeight,
       dice: area.clientHeight - 12,
       scale: Number(tray.dataset.scale),
+      notation: Number(tray.dataset.notationScale),
       parts: {
         header: part("header"),
         palette: part("palette"),
@@ -91,8 +92,8 @@ test("FR-DICEX-53 tray Roll visible at min: 2d6 + 1d8 + 1 and 12 d6 as opened an
     expect(f.hit).toBe("dicex-tray-roll");
     expect(f.bodyScrolls).toBe(false);
     // The pure layout's budget (TRAY_PART_PX) is what the browser draws; the notation row grows
-    // with a tray above its useful size (FR-DICEX-96: 28 px × the dice scale).
-    const expression = Math.round(28 * f.scale);
+    // with a tray above its useful size (FR-DICEX-96: 28 px × the notation scale).
+    const expression = Math.round(28 * f.notation);
     expect(f.parts).toEqual({ header: 24, palette: 28, expression, bar: 33 });
     if (size) expect(f.scale).toBe(1);
     expect(f.dice).toBeGreaterThanOrEqual(40);

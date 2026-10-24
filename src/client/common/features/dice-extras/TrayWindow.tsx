@@ -87,6 +87,7 @@ import {
   editRequest,
   editStartsFresh,
   notationOf,
+  notationScale,
   PALETTE,
   previewMode,
   removeDie,
@@ -148,15 +149,20 @@ function useAreaBox(ref: RefObject<HTMLElement | null>): AreaBox | null {
 }
 
 /**
- * FR-DICEX-96: the dice scale from the tray window's rendered size (its `ui-window` frame, kept up
- * to date as it resizes); × 1 until measured.
+ * FR-DICEX-96: the dice and notation scales from the tray window's rendered size (its `ui-window`
+ * frame, kept up to date as it resizes); × 1 until measured.
  */
-function useTrayScale(ref: RefObject<HTMLElement | null>): number {
-  const [scale, setScale] = useState(1);
+function useTrayScale(ref: RefObject<HTMLElement | null>): { dice: number; notation: number } {
+  const [scale, setScale] = useState({ dice: 1, notation: 1 });
   useLayoutEffect(() => {
     const frame = ref.current?.closest<HTMLElement>('[data-testid="ui-window"]');
     if (!frame) return;
-    const read = () => setScale(trayScale({ w: frame.offsetWidth, h: frame.offsetHeight }));
+    const read = () => {
+      const win = { w: frame.offsetWidth, h: frame.offsetHeight };
+      const dice = trayScale(win);
+      const notation = notationScale(win);
+      setScale((s) => (s.dice === dice && s.notation === notation ? s : { dice, notation }));
+    };
     read();
     if (typeof ResizeObserver !== "function") return;
     const ro = new ResizeObserver(read);
@@ -406,10 +412,10 @@ export function TrayWindow() {
   const lastValid = useRef(termsOf(draft) ?? []);
   const diceArea = useRef<HTMLDivElement>(null);
   const area = useAreaBox(diceArea);
-  const scale = useTrayScale(diceArea);
-  // FR-DICEX-96: the notation row grows with the dice (28-px inputs, 14-px text at × 1).
+  const { dice: scale, notation: rowScale } = useTrayScale(diceArea);
+  // FR-DICEX-96: the notation row stays 28 px (14-px text) up to the useful size, then grows.
   const notation =
-    scale === 1 ? undefined : { height: scaledPx(28, scale), ...scaledFont(14, scale) };
+    rowScale === 1 ? undefined : { height: scaledPx(28, rowScale), ...scaledFont(14, rowScale) };
 
   // A new stage resets the draft to the request's (FR-DICEX-02); the store resets the mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per stage (`staged`)
@@ -529,6 +535,7 @@ export function TrayWindow() {
       data-testid="dicex-tray"
       aria-label="Dice tray"
       data-scale={scale}
+      data-notation-scale={rowScale}
       className="flex h-full min-h-0 flex-col gap-1"
       onKeyDown={onKeyDown}
       onKeyUp={trackKeys}

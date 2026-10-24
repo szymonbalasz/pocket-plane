@@ -1,8 +1,9 @@
 // e2e-bundle: base
 // T1 (sprint 10, DM #343; FR-DICEX-96): the Dice tray opens about 40 % bigger and its dice scale
 // with it. An empty map (bundle `base`, no scene), so placement has room for the whole default:
-// the DM at 1440×900 gets 504 × 420 and 56-px dice (× 1.4); resized to the useful 360 × 300, the
-// dice are today's 40 px. Player 1 at 1280×720: the default, dice scaled by its size. Roll is
+// the DM at 1440×900 gets 504 × 420 and 56-px dice (× 1.4); resized to the useful 360 × 300 the
+// dice are 48 px (× 1.2, orchestrator ruling), a typical stage (5 dice + adv, constant) one by one
+// with the compact 28-px notation row. Player 1 at 1280×720: the default, dice ≥ 48 px. Roll is
 // inside the window and the `elementFromPoint` hit, the body never scrolls. Client-only: no intent.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
@@ -27,8 +28,10 @@ const facts = (win: Locator) =>
     const tray = q("dicex-tray");
     const roll = q("dicex-tray-roll");
     const die = q("dicex-tray-die");
+    const area = q("dicex-tray-area");
+    const preview = q("dicex-tray-preview");
     const expr = q("dicex-tray-expression");
-    if (!tray || !roll || !die || !expr) throw new Error("tray parts missing");
+    if (!tray || !roll || !die || !expr || !area || !preview) throw new Error("tray parts missing");
     const wr = w.getBoundingClientRect();
     const r = roll.getBoundingClientRect();
     const body = tray.parentElement as HTMLElement;
@@ -38,8 +41,16 @@ const facts = (win: Locator) =>
     return {
       win: { w: Math.round(wr.width), h: Math.round(wr.height) },
       scale: Number(tray.dataset.scale),
-      px: Number(q("dicex-tray-preview")?.dataset.px),
+      px: Number(preview.dataset.px),
       die: Math.round(die.getBoundingClientRect().height),
+      /** The smallest die box (every staged die). */
+      smallest: Math.min(
+        ...[...w.querySelectorAll('[data-testid="dicex-tray-die"]')].map((d) =>
+          Math.round(d.getBoundingClientRect().height),
+        ),
+      ),
+      grouped: preview.dataset.grouped === "true",
+      areaScrolls: area.scrollHeight > area.clientHeight,
       expression: Math.round(expr.getBoundingClientRect().height),
       rollInside: inside(r),
       expressionInside: inside(expr.getBoundingClientRect()),
@@ -57,7 +68,7 @@ async function stage(tray: Locator) {
   await expect(tray.getByTestId("dicex-tray-die")).toHaveCount(3);
 }
 
-test("FR-DICEX-96 tray default size and dice scale: DM 1440×900 opens 504 × 420 with 56-px dice and Roll visible; at the useful 360 × 300 the dice are 40 px", async ({
+test("FR-DICEX-96 tray default size and dice scale: DM 1440×900 opens 504 × 420 with 56-px dice and Roll visible; at the useful 360 × 300 the dice are 48 px, 5 dice + adv one by one, Roll the click target", async ({
   browser,
 }) => {
   const dm = await rolePage(browser);
@@ -74,16 +85,26 @@ test("FR-DICEX-96 tray default size and dice scale: DM 1440×900 opens 504 × 42
   expect(big).toMatchObject({ rollInside: true, expressionInside: true, bodyScrolls: false });
   expect(big.hit).toBe("dicex-tray-roll");
 
-  // Resize to the useful size: × 1, today's dice.
+  // Resize to the useful size: × 1.2, 48-px dice, the notation row back to 28 px.
   const handle = await tray.getByTestId("ui-window-resize").boundingBox();
   if (!handle) throw new Error("no resize handle");
   await drag(dm, { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }, -144, -120);
-  await expect(tray.getByTestId("dicex-tray")).toHaveAttribute("data-scale", "1");
+  await expect(tray.getByTestId("dicex-tray")).toHaveAttribute("data-scale", "1.2");
   const useful = await facts(tray);
   expect(useful.win).toEqual({ w: 360, h: 300 });
-  expect(useful).toMatchObject({ px: 40, die: 40, expression: 28 });
+  expect(useful).toMatchObject({ px: 48, die: 48, expression: 28 });
   expect(useful).toMatchObject({ rollInside: true, expressionInside: true, bodyScrolls: false });
   expect(useful.hit).toBe("dicex-tray-roll");
+
+  // A typical stage at the useful size: 5 dice + adv (the d20 pair) + a constant.
+  await tray.getByTestId("dicex-tray-expression").fill("1d20+1d8+2d6+1d4+3");
+  await tray.locator('[data-testid="dicex-tray-mode-option"][data-value="advantage"]').click();
+  await expect(tray.getByTestId("dicex-tray-die")).toHaveCount(6);
+  const typical = await facts(tray);
+  expect(typical.smallest).toBeGreaterThanOrEqual(48);
+  expect(typical).toMatchObject({ grouped: false, areaScrolls: false, bodyScrolls: false });
+  expect(typical).toMatchObject({ rollInside: true, expressionInside: true });
+  expect(typical.hit).toBe("dicex-tray-roll");
 
   // The remembered (resized) tray keeps its size over a reload (FR-SHELL-144).
   await dm.reload();
@@ -97,7 +118,7 @@ test("FR-DICEX-96 tray default size and dice scale: DM 1440×900 opens 504 × 42
     .toEqual({ w: 360, h: 300 });
 });
 
-test("FR-DICEX-96 tray default size and dice scale: Player 1 at 1280×720 opens at its default, dice scaled by the window's size, Roll visible", async ({
+test("FR-DICEX-96 tray default size and dice scale: Player 1 at 1280×720 opens at its default, dice ≥ 48 px, Roll visible", async ({
   browser,
 }) => {
   const p1 = await rolePage(browser);
@@ -110,9 +131,10 @@ test("FR-DICEX-96 tray default size and dice scale: Player 1 at 1280×720 opens 
   // The whole default where the work area holds it (band-capped only when it doesn't).
   expect(f.win.w).toBe(504);
   expect(f.win.h).toBeGreaterThanOrEqual(400);
-  const scale = Math.min(1.4, Math.round(Math.min(f.win.w / 360, f.win.h / 300) * 100) / 100);
-  expect(f.scale).toBe(scale);
-  expect(f).toMatchObject({ px: Math.round(40 * scale), die: Math.round(40 * scale) });
+  expect(f.scale).toBeGreaterThanOrEqual(1.2);
+  expect(f.px).toBe(Math.round(40 * f.scale));
+  expect(f.die).toBe(f.px);
+  expect(f.smallest).toBeGreaterThanOrEqual(48);
   expect(f).toMatchObject({ rollInside: true, expressionInside: true, bodyScrolls: false });
   expect(f.hit).toBe("dicex-tray-roll");
 });

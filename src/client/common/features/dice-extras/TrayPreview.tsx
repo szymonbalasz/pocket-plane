@@ -6,8 +6,8 @@
 // (click removes one), a span otherwise. More than 12 dice → one die per term "×N".
 // FR-DICEX-54: the dice area shrinks first: 40-px cells while every die fits the area, else 28,
 // else "×N" (forced by room), else the area scrolls on its own (`stillSize`).
-// FR-DICEX-96 (DM #343): cells, chips and their numbers scale with the tray (`trayScale`, × 1 at
-// the useful size up to × 1.4 at the default); the steps stay 40 / 28 (`data-cell`).
+// FR-DICEX-96 (DM #343): cells, chips and their numbers scale with the tray (`trayScale`: × 1 at
+// the min, × 1.2 at the useful size, × 1.4 at the default); the steps stay 40 / 28 (`data-cell`).
 import type { DiceLook } from "@shared/dice-extras/looks";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";

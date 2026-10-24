@@ -1,7 +1,8 @@
-// T1 (sprint 10, DM #343; FR-DICEX-96): the tray's dice scale with the window, × 1 at the useful
-// size (360 × 300, today's dice) up to × 1.4 at the default (504 × 420). The pure scale and still
-// size, the layout budget with the grown notation row (Roll visible), and a static render of the
-// scaled cells and chips.
+// T1 (sprint 10, DM #343; FR-DICEX-96, orchestrator ruling): the tray's dice scale with the
+// window: × 1 at the min (300 × 240, today's dice), × 1.2 at the useful size (360 × 300, 48-px
+// cells), × 1.4 at the default (504 × 420); the notation row stays 28 px up to useful. The pure
+// scales and still size, the layout budget (Roll visible), and a static render of the scaled
+// cells and chips.
 import { afterEach, describe, expect, test } from "bun:test";
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import { emptyStore } from "@shared/protocol/store";
@@ -17,7 +18,10 @@ import { TRAY_PART_PX, trayLayout } from "./TrayWindow";
 import {
   chipsOf,
   constantOfTerms,
+  notationScale,
   scaledPx,
+  TRAY_DEFAULT,
+  TRAY_MIN,
   TRAY_SCALE_MAX,
   TRAY_USEFUL,
   termsOf,
@@ -50,9 +54,10 @@ const body = (w: number, h: number) => ({ w: w - 2 - 24, h: h - 2 - 32 - 24 });
 const { header, palette, expression, bar } = TRAY_PART_PX;
 /** Compose's fixed parts with the notation row at `scale` (28-px inputs at × 1). */
 const composeParts = (scale: number) => [header, palette, scaledPx(expression, scale), bar];
-const areaOf = (w: number, h: number, scale: number): AreaBox => ({
+/** The dice area of a `w` × `h` tray in compose, its notation row at `notationScale`. */
+const areaOf = (w: number, h: number): AreaBox => ({
   w: body(w, h).w - 6,
-  h: trayLayout(body(w, h).h, composeParts(scale)).dice,
+  h: trayLayout(body(w, h).h, composeParts(notationScale({ w, h }))).dice,
 });
 const group = (expression: string): TrayGroup => {
   const t = termsOf(expression) ?? [];
@@ -67,53 +72,68 @@ const canvasTag = (html: string) =>
 afterEach(() => diceExtras.clear());
 
 describe("FR-DICEX-96 tray dice scale", () => {
-  test("FR-DICEX-96 tray dice scale: × 1.4 at the default 504 × 420, × 1 at the useful 360 × 300 and below, in between by the tighter side", () => {
-    expect(TRAY_USEFUL).toEqual({ w: 360, h: 300 });
+  test("FR-DICEX-96 tray dice scale: × 1 at the min 300 × 240, × 1.2 at the useful 360 × 300, × 1.4 at the default 504 × 420, linear between by the tighter side; notation row compact up to useful", () => {
+    expect([TRAY_MIN, TRAY_USEFUL, TRAY_DEFAULT]).toEqual([
+      { w: 300, h: 240 },
+      { w: 360, h: 300 },
+      { w: 504, h: 420 },
+    ]);
     expect(TRAY_SCALE_MAX).toBe(1.4);
     expect(trayScale({ w: 504, h: 420 })).toBe(1.4);
-    // A tray held to a 412-px band: the height decides.
-    expect(trayScale({ w: 504, h: 412 })).toBe(1.37);
-    expect(trayScale({ w: 432, h: 360 })).toBe(1.2);
-    expect(trayScale({ w: 504, h: 300 })).toBe(1);
-    // Never smaller than today, never past × 1.4.
-    expect(trayScale({ w: 360, h: 300 })).toBe(1);
+    expect(trayScale({ w: 360, h: 300 })).toBe(1.2);
     expect(trayScale({ w: 300, h: 240 })).toBe(1);
+    // Smooth between the steps; the tighter axis decides.
+    expect(trayScale({ w: 432, h: 360 })).toBe(1.3);
+    expect(trayScale({ w: 330, h: 270 })).toBe(1.1);
+    expect(trayScale({ w: 504, h: 412 })).toBe(1.39);
+    expect(trayScale({ w: 504, h: 300 })).toBe(1.2);
+    expect(trayScale({ w: 360, h: 420 })).toBe(1.2);
+    // Never past × 1.4, never below today's dice.
     expect(trayScale({ w: 900, h: 800 })).toBe(1.4);
+    expect(trayScale({ w: 280, h: 200 })).toBe(1);
     expect(trayScale(null)).toBe(1);
     expect(trayScale({ w: 0, h: 0 })).toBe(1);
-    // The cells: 40 → 56, 28 → 39; chips `md` 36 → 50.
+    // The notation row: × 1 up to the useful size, × 1.4 at the default.
+    expect(notationScale({ w: 360, h: 300 })).toBe(1);
+    expect(notationScale({ w: 300, h: 240 })).toBe(1);
+    expect(notationScale({ w: 432, h: 360 })).toBe(1.2);
+    expect(notationScale({ w: 504, h: 420 })).toBe(1.4);
+    // Cells: 40 → 48 at useful, 56 at the default (28 → 34 / 39); chips `md` 36 → 43 / 50.
+    expect([scaledPx(40, 1.2), scaledPx(28, 1.2), scaledPx(36, 1.2)]).toEqual([48, 34, 43]);
     expect([scaledPx(40, 1.4), scaledPx(28, 1.4), scaledPx(36, 1.4)]).toEqual([56, 39, 50]);
   });
 
-  test("FR-DICEX-96 tray dice scale at default: 3 dice + constant and 12 d6 one by one at 56 px with Roll in the window; the useful size is today's 40-px layout", () => {
-    // Roll visible: the fixed parts (notation row grown to 39 px) leave ≥ two rows of 56.
-    const big = areaOf(504, 420, 1.4);
+  test("FR-DICEX-96 tray dice scale at useful and default: a typical stage (up to 5 dice + adv, constant) one by one at ≥ 48 px with notation and Roll in the window", () => {
+    // Useful 360 × 300: the compact notation row (28 px) leaves 101 px: two rows of 48.
+    const useful = areaOf(360, 300);
+    expect(useful).toEqual({ w: 328, h: 101 });
+    expect(useful.h).toBeGreaterThanOrEqual(2 * 48 + 4);
+    // 5 dice + adv (the d20 pair) + a constant = 8 cells; 12 cells (two rows of 6) still fit.
+    for (const cells of [4, 8, 12]) {
+      expect(
+        stillSize({ cells, groupedCells: 1, byCount: false }, useful, 1.2),
+        `${cells}`,
+      ).toEqual({
+        cell: 40,
+        grouped: false,
+        scroll: false,
+      });
+    }
+    // Default 504 × 420: notation row 39 px; 12 d6 one by one in two rows of 56 (OQ-DICEX-36).
+    const big = areaOf(504, 420);
     expect(big.h).toBeGreaterThanOrEqual(2 * 56 + 4);
-    const banded = areaOf(504, 412, 1.37);
-    expect(banded.h).toBeGreaterThanOrEqual(2 * 55 + 4);
-    expect(stillSize({ cells: 4, groupedCells: 4, byCount: false }, big, 1.4)).toEqual({
-      cell: 40,
-      grouped: false,
-      scroll: false,
-    });
-    // OQ-DICEX-36: ≤ 12 one by one, two rows in the default tray (7 per row at 56 px).
     expect(stillSize({ cells: 12, groupedCells: 1, byCount: false }, big, 1.4)).toEqual({
       cell: 40,
       grouped: false,
       scroll: false,
     });
-    expect(stillSize({ cells: 12, groupedCells: 1, byCount: false }, banded, 1.37).cell).toBe(40);
-    // Useful size: × 1, the FR-DICEX-53 / -54 layout unchanged.
-    const useful = areaOf(360, 300, 1);
-    expect(trayLayout(body(360, 300).h, composeParts(1)).dice).toBe(101);
-    expect(stillSize({ cells: 12, groupedCells: 1, byCount: false }, useful, 1)).toEqual({
-      cell: 40,
-      grouped: false,
-      scroll: false,
-    });
-    // Still steps down to 28 (39 px) or "×N" by room at × 1.4 rather than overflow.
-    const tight = { w: 472, h: 60 };
-    expect(stillSize({ cells: 8, groupedCells: 1, byCount: false }, tight, 1.4)).toEqual({
+    const banded = areaOf(504, 412);
+    expect(stillSize({ cells: 12, groupedCells: 1, byCount: false }, banded, 1.39).cell).toBe(40);
+    // Min 300 × 240: × 1, the FR-DICEX-53 / -54 layout unchanged (41 px, one row of 40).
+    expect(areaOf(300, 240).h).toBe(41);
+    expect(trayScale({ w: 300, h: 240 })).toBe(1);
+    // More dice than room: still steps down (28 × scale) or "×N" rather than overflow.
+    expect(stillSize({ cells: 14, groupedCells: 1, byCount: false }, useful, 1.2)).toEqual({
       cell: 28,
       grouped: false,
       scroll: false,
@@ -128,7 +148,7 @@ describe("FR-DICEX-96 tray dice scale", () => {
           groups={[group("2d6+1d8+1")]}
           mode="normal"
           onRemove={() => {}}
-          area={areaOf(504, 420, scale)}
+          area={areaOf(504, 420)}
           scale={scale}
         />,
       );

@@ -207,19 +207,48 @@ export function editRequest(
   return { expression, mode, category: "other" };
 }
 
-/**
- * FR-DICEX-96 (DM #343): the tray's dice grow with the window, from × 1 at the useful size
- * (360 × 300, today's dice) to × 1.4 at the default (504 × 420); never below × 1. `win` = the
- * window's rendered size (null = not measured yet → × 1).
- */
+/** FR-DICEX-96: the tray's min, useful and default sizes, the steps its dice scale between. */
+export const TRAY_MIN = { w: 300, h: 240 } as const;
 export const TRAY_USEFUL = { w: 360, h: 300 } as const;
+export const TRAY_DEFAULT = { w: 504, h: 420 } as const;
+/** The dice scale at each step: today's dice at min, 48-px cells at useful, 56 at the default. */
+export const TRAY_SCALE_STEPS = [1, 1.2, 1.4] as const;
 export const TRAY_SCALE_MAX = 1.4;
 
-export function trayScale(win: { w: number; h: number } | null): number {
-  if (!win || win.w <= 0 || win.h <= 0) return 1;
-  const s = Math.min(win.w / TRAY_USEFUL.w, win.h / TRAY_USEFUL.h, TRAY_SCALE_MAX);
-  return Math.max(1, Math.round(s * 100) / 100);
+type Box = { w: number; h: number };
+
+/** Along one axis: the piecewise-linear value of `v` over `at` → `to` (clamped at both ends). */
+function lerpAxis(v: number, at: readonly number[], to: readonly number[]): number {
+  if (v <= (at[0] ?? 0)) return to[0] ?? 1;
+  for (let i = 1; i < at.length; i++) {
+    const a = at[i - 1] ?? 0;
+    const b = at[i] ?? 0;
+    if (v <= b) return (to[i - 1] ?? 1) + (((to[i] ?? 1) - (to[i - 1] ?? 1)) * (v - a)) / (b - a);
+  }
+  return to[to.length - 1] ?? 1;
 }
+
+/** The tighter axis's value over the three sizes, two decimals. */
+function overSizes(win: Box | null, to: readonly number[]): number {
+  if (!win || win.w <= 0 || win.h <= 0) return to[0] ?? 1;
+  const w = lerpAxis(win.w, [TRAY_MIN.w, TRAY_USEFUL.w, TRAY_DEFAULT.w], to);
+  const h = lerpAxis(win.h, [TRAY_MIN.h, TRAY_USEFUL.h, TRAY_DEFAULT.h], to);
+  return Math.round(Math.min(w, h) * 100) / 100;
+}
+
+/**
+ * FR-DICEX-96 (DM #343, orchestrator ruling): the tray's dice grow with the window, × 1 at the
+ * min (300 × 240, today's dice), × 1.2 at the useful size (360 × 300: 48-px cells), × 1.4 at the
+ * default (504 × 420: 56 px), linear between, by the tighter axis. `win` = the window's rendered
+ * size (null = not measured yet → × 1).
+ */
+export const trayScale = (win: Box | null): number => overSizes(win, TRAY_SCALE_STEPS);
+
+/**
+ * FR-DICEX-96: the notation row (expression + constant) stays compact (28 px) up to the useful
+ * size, so its room goes to a second row of dice, then grows × 1 → × 1.4 to the default.
+ */
+export const notationScale = (win: Box | null): number => overSizes(win, [1, 1, TRAY_SCALE_MAX]);
 
 /** A base px size at `scale`, whole px. */
 export const scaledPx = (px: number, scale: number) => Math.round(px * scale);
