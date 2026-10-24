@@ -25,8 +25,11 @@ import { awardDetailText, awardValueText, durationText, winnerText } from "../st
 
 export { RECAP_WINDOW_KIND } from "@shared/session-recap/schemas";
 
-/** FR-RECAP-06: trailing re-query delay after a live log / loot upsert. */
-export const RECAP_REFRESH_MS = 2000;
+/**
+ * FR-RECAP-06: trailing re-query delay after a live log / loot upsert (coalesces the burst); 1 s
+ * leaves the answer 1 s so the refresh lands ≤ 2 s (BL-104: 2 s + the round trip was 2.1 s).
+ */
+export const RECAP_REFRESH_MS = 1000;
 /** FR-RECAP-05: a `conflict` (rate limit) is asked again once, this much later. */
 export const CONFLICT_RETRY_MS = 1000;
 

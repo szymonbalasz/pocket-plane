@@ -1,6 +1,7 @@
 import type { CampaignRecord, JoinInfo, PlayerRecord } from "@shared/campaign-management/schemas";
 import { ApiError, call, createApi } from "@ui/api";
 import { Skeleton } from "@ui/components/ui/primitives";
+import { linkTokenFromPath } from "@ui/session";
 import { SyncProvider } from "@ui/sync/SyncProvider";
 import { useRecords, useSync } from "@ui/sync/store";
 import { useEffect, useState } from "react";
@@ -13,10 +14,7 @@ import { PlayerPlayPage } from "./features/play-shell/PlayerPlayPage";
 
 const api = createApi();
 
-function tokenFromPath(): string | null {
-  const m = /^\/p\/([^/?#]+)/.exec(window.location.pathname);
-  return m?.[1] ? decodeURIComponent(m[1]) : null;
-}
+const tokenFromPath = () => linkTokenFromPath(window.location.pathname);
 
 function Loading() {
   return (

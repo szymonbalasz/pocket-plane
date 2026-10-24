@@ -17,7 +17,7 @@ import {
 } from "../../components/ui/overlays";
 import { Input } from "../../components/ui/primitives";
 import { useLazyRecords, useRecords } from "../../sync/store";
-import { deleteText, type LinkedReminder, strongholdReminderCount } from "./logic";
+import { deleteBody, type LinkedReminder, strongholdReminderCount } from "./logic";
 import { useHoldIntent, useLive } from "./send";
 
 export function RenameDialog({
@@ -142,8 +142,7 @@ function DeleteBody({ hold }: { hold: { id: string; name: string } }) {
   const stores = items.rows.filter((i) => i.strongholdId === hold.id).length;
   return (
     <>
-      {deleteText(
-        hold.name,
+      {deleteBody(
         strongholdReminderCount(hold.id, reminders.rows),
         stores,
         coins ? coinsOf(coins) : undefined,

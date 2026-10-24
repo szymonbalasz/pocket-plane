@@ -428,3 +428,39 @@ describe("Stores tab (FR-HOLD-28)", () => {
     expect(off).toMatch(/<fieldset disabled=""/);
   });
 });
+
+describe("Sprint 10 H4 (BL-96)", () => {
+  test("FR-LOOT-33 FR-LOOT-34 BL-96 a party-inventory row's Take / Move… also offers the Stores the viewer may use: player-1 the shown Greystone only, the DM both (the tower marked); the payload moves party → Stores", () => {
+    const p1 = holderTakeTargets(chars, p1V, null, storesRefs(p1Index));
+    expect(p1).toEqual([
+      { key: "character:mira", label: "Mira" },
+      { key: storesItemKey("grey"), label: "Greystone Keep Stores" },
+    ]);
+    expect(JSON.stringify(p1)).not.toContain("tower");
+    expect(JSON.stringify(p1)).not.toContain("HOLD-SECRET");
+    const dm = holderTakeTargets(chars, dmV, null, storesRefs(dmIndex));
+    expect(dm).toEqual([
+      { key: "character:mira", label: "Mira" },
+      { key: "character:thorn", label: "Thorn" },
+      { key: storesItemKey("grey"), label: "Greystone Keep Stores" },
+      { key: storesItemKey("tower"), label: "HOLD-SECRET-TOWER Stores", hidden: true },
+    ]);
+    // A Stores' own rows never offer Stores (Stores → Stores isn't a move, FR-LOOT-33).
+    expect(keys(holderTakeTargets(chars, p1V, stores("grey"), storesRefs(p1Index)))).toEqual([
+      "party",
+      "character:mira",
+    ]);
+    // No character but a shown Stores: the row still moves (into the Stores).
+    expect(keys(holderTakeTargets([], p1V, null, storesRefs(p1Index)))).toEqual(["stores:grey"]);
+    const potion = ITEMS[0] as PartyItemRecord;
+    expect(holderTakePayload(potion, null, storesItemKey("grey"), "1")).toEqual({
+      ok: true,
+      value: {
+        from: { kind: "party" },
+        to: { kind: "stores", strongholdId: "grey" },
+        qty: 1,
+        itemId: "potion",
+      },
+    });
+  });
+});

@@ -25,10 +25,17 @@ import {
   rulesEmpty,
   rulesError,
 } from "./logic";
-import { placeTarget, resetRulesNav, rulesNav, setCardOpen } from "./nav";
+import { LAND_GAP, landScrollTop, placeTarget, resetRulesNav, rulesNav, setCardOpen } from "./nav";
 import { openRules } from "./open";
 import { createPins } from "./pins";
-import { type CardCtx, EmptyRules, ReadState, RuleCard, RulesBody } from "./RulesWindow";
+import {
+  type CardCtx,
+  EmptyRules,
+  followRuleRef,
+  ReadState,
+  RuleCard,
+  RulesBody,
+} from "./RulesWindow";
 
 const SRD = {
   key: "srd-5.1",
@@ -430,5 +437,113 @@ describe("FR-SHELL-183 P4 ranking", () => {
     expect(rulesNav.getState().target).toBe("r-cover");
     const rules = flatRows(rankLocal(entries, "rules"));
     expect(rules.some((r) => r.id === rulesCommand.id)).toBe(true);
+  });
+});
+
+describe("Sprint 10 H4 (BL-98, BL-102)", () => {
+  test("FR-CMP-69 BL-98 landing puts the card's heading at the scroller's top (4 px gap), clamped to the scroll range", () => {
+    // sim-13 e02: Cover's top at y 1729, the scroller's at 120, scrolled 0 → heading on top.
+    const scroller = { top: 120, scrollTop: 0, scrollHeight: 4000, clientHeight: 700 };
+    expect(landScrollTop(scroller, 1729)).toBe(1729 - 120 - LAND_GAP);
+    // e03: already scrolled past the heading (card top above the view) → back up to it.
+    expect(landScrollTop({ ...scroller, scrollTop: 900 }, 60)).toBe(900 + 60 - 120 - LAND_GAP);
+    // The last card can't rise above the end; the first can't go below 0.
+    expect(landScrollTop(scroller, 4000)).toBe(3300);
+    expect(landScrollTop(scroller, 122)).toBe(0);
+  });
+
+  test("FR-CMP-61 BL-102 an srd: reference opens its card: a condition first, else a rule card with that name; none → a search for its words", async () => {
+    const asked: Record<string, string>[] = [];
+    const rows: Record<string, EntrySummary[]> = {
+      condition: [
+        { id: "c-prone", kind: "condition", name: "Prone", sourceLabel: "SRD 5.1", line: "" },
+      ],
+      rule: [
+        {
+          id: "r-diff",
+          kind: "rule",
+          name: "Difficult Terrain",
+          sourceLabel: "SRD 5.1",
+          line: "Movement · Movement",
+        },
+      ],
+    };
+    const api = {
+      api: {
+        compendium: {
+          search: {
+            $get: async ({ query }: { query: Record<string, string> }) => {
+              asked.push(query);
+              const all = rows[query.kind ?? ""] ?? [];
+              return Response.json({
+                results: all.filter((r) => r.name.toLowerCase().includes(query.q ?? "")),
+                nextCursor: null,
+              });
+            },
+          },
+        },
+      },
+    } as unknown as Api;
+    await followRuleRef(api, "prone");
+    expect(rulesNav.getState().target).toBe("c-prone");
+    expect(asked).toEqual([{ q: "prone", kind: "condition" }]);
+    await followRuleRef(api, "difficult-terrain");
+    expect(rulesNav.getState().target).toBe("r-diff");
+    await followRuleRef(api, "exhaustion");
+    expect(rulesNav.getState()).toMatchObject({ q: "exhaustion" });
+    // Offline: the words in the search.
+    await followRuleRef({} as Api, "grappled");
+    expect(rulesNav.getState()).toMatchObject({ q: "grappled" });
+  });
+
+  test("FR-CMP-61 BL-102 a card's srd: reference is a link in the window (cmp-rules-link), its quote a blockquote", () => {
+    resetRulesNav();
+    setCardOpen("combat", "r-shove", true);
+    const html = wrap(
+      <RuleCard
+        card={{
+          id: "r-shove",
+          name: "Shoving a Creature",
+          section: "Attacking",
+          text: "Knock it srd:prone or push it.\n\n> **Contests in Combat**\n\n> Battle often involves…",
+          house: false,
+          shared: true,
+        }}
+        ctx={ctx({ onRef: () => {} })}
+      />,
+    );
+    expect(html).toContain('data-testid="cmp-rules-link" data-value="prone"');
+    expect(text(html)).toContain("Knock it prone or push it.");
+    expect(html).toContain("<blockquote");
+    expect(text(html)).not.toContain("&gt;");
+  });
+});
+
+describe("Sprint 10 H4 (BL-104)", () => {
+  test("FR-CMP-67 BL-104 the DM's unshared house rule is marked 'DM only' while collapsed; shared ones and players' rows are not", () => {
+    const secret = {
+      id: "h-2",
+      name: "SIM13-HOUSE-SECRET Critical fumbles",
+      section: "Combat",
+      text: "t",
+      house: true,
+      shared: false,
+    };
+    const dm = wrap(<RuleCard card={secret} ctx={ctx({ viewer: "dm", where: "house" })} />, "dm");
+    expect(dm).toContain('data-state="closed"');
+    expect(dm).toContain('data-testid="cmp-rules-dm-only"');
+    const shared = wrap(
+      <RuleCard card={{ ...secret, shared: true }} ctx={ctx({ viewer: "dm", where: "house" })} />,
+      "dm",
+    );
+    expect(shared).not.toContain("cmp-rules-dm-only");
+    const srd = wrap(
+      <RuleCard
+        card={{ ...secret, house: false, shared: true }}
+        ctx={ctx({ viewer: "dm", where: "house" })}
+      />,
+      "dm",
+    );
+    expect(srd).not.toContain("cmp-rules-dm-only");
   });
 });
