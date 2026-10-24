@@ -4,7 +4,7 @@
 // `cbt.prevTurn`, `camp.resume`), checked by the server as today.
 import { RESUME_INTENT } from "@shared/campaign-management/table-state";
 import { notRestoredText } from "@shared/combat-extras/rules";
-import { skippedOnStep, skippedText } from "@shared/combat-tracker/rules";
+import { skippedOnStep } from "@shared/combat-tracker/rules";
 import {
   COMBATANT_TYPE,
   type CombatantView,
@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { openSheetFor } from "../../character-sheet/selection";
 import { CHAR_SHEET_KIND } from "../../character-sheet/window";
 import { deadPc } from "../../combat-extras/logic";
+import { skipText } from "../../combat-extras/skip";
 import { startedIn } from "../../combat-tracker/store";
 import { INITIATIVE_KIND } from "../../combat-tracker/window";
 import { CMP_KIND } from "../../compendium/logic";
@@ -117,21 +118,6 @@ function turnStep(store: RecordStore, direction: "next" | "prev") {
   };
 }
 
-/** FR-CBTX-25's skip cue (as the Initiative window's): dead PCs read "(dead)". */
-export function skipCue(
-  s: { names: readonly string[]; round: number | null },
-  dead: ReadonlySet<string>,
-): string {
-  const deadNames = s.names.filter((n) => dead.has(n));
-  if (deadNames.length === 0) return skippedText(s);
-  const down = s.names.filter((n) => !dead.has(n));
-  const parts = [
-    ...(down.length > 0 ? [`${down.join(", ")} (down)`] : []),
-    `${deadNames.join(", ")} (dead)`,
-  ];
-  return `Skipped ${parts.join(", ")}${s.round !== null ? ` · Round ${s.round}` : ""}`;
-}
-
 function turnCommand(direction: "next" | "prev"): PaletteCommand {
   const name = direction === "next" ? "cbt.nextTurn" : "cbt.prevTurn";
   return {
@@ -153,7 +139,7 @@ function turnCommand(direction: "next" | "prev"): PaletteCommand {
       const r = await ctx.send<TurnResult>(name, step.payload);
       if (r === undefined) return;
       if (step.skipped) {
-        toast(<span data-testid="cbt-init-skipped">{skipCue(step.skipped, step.dead)}</span>);
+        toast(<span data-testid="cbt-init-skipped">{skipText(step.skipped, step.dead)}</span>);
       }
       if (r?.notRestored?.length) {
         toast(<span data-testid="cbtx-not-restored">{notRestoredText(r.notRestored)}</span>);

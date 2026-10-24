@@ -2,12 +2,13 @@
 // commands' `when` reasons and what they send, the characters / creatures each viewer gets,
 // compendium rows, reserved keys and recent picks. Over a fake store and a real shell controller.
 import { describe, expect, test } from "bun:test";
+import { linkTokenFromPath as linkToken } from "../../../session";
 import { COMMANDS, PROVIDERS } from "../commands";
 import { PREFS_KIND } from "../PreferencesWindow";
 import { SHELL_TEST_KIND } from "../test-windows";
 import { RESERVED_KEYS, SHORTCUT_TABLE, sameKey } from "./keys";
 import { NO_FIGHT, NOT_CONNECTED, RULES_KIND, SP1_COMMANDS } from "./launch";
-import { compendiumHits, linkToken, type Summary } from "./providers";
+import { compendiumHits, type Summary } from "./providers";
 import { forClient, localEntries, rankLocal, whenOf } from "./rank";
 import { pushRecent, RecentPicks, readRecent, recentKey } from "./storage";
 import { GOBLIN_BOSS, MIRA, OWL, stateOf, THORN, testCtx } from "./test-env";

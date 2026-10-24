@@ -28,7 +28,7 @@ import {
   isDmOnly,
   type ReminderPrefill,
   reminderPrefill,
-  removeFacilityText,
+  removeFacilityBody,
   replacedBy,
   STATE_LABELS,
   staffByFacility,
@@ -250,7 +250,7 @@ function FacilityRow({
           open={removing}
           onOpenChange={setRemoving}
           title={`Remove ${f.name}?`}
-          summary={removeFacilityText(f.name, facilityReminderCount(f.id, reminders))}
+          summary={removeFacilityBody(facilityReminderCount(f.id, reminders), staff.length)}
           action="Remove"
           testId="hold-facility-remove"
           busy={remove.busy}

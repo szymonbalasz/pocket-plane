@@ -147,7 +147,7 @@ describe("FR-RECAP-06 live refresh", () => {
     expect(refreshes(log, false)).toBe(false);
   });
 
-  test("FR-RECAP-06 trailing 2 s; minimised asks nothing, showing again asks once", async () => {
+  test("FR-RECAP-06 trailing 1 s; minimised asks nothing, showing again asks once", async () => {
     const h = harness();
     h.q.set({});
     h.sent[0]?.resolve("a");
@@ -401,5 +401,23 @@ describe("RC5 session picker", () => {
     } as PlayerRecap;
     expect(recapMarkdown(r, "player")).toContain("- Potion of healing ×2 (Party)");
     expect(body("player", r)).toContain(">—<");
+  });
+});
+
+describe("Sprint 10 H4 (BL-104)", () => {
+  test("FR-RECAP-06 BL-104 a live upsert's re-query goes out by 1 s, so the refresh lands ≤ 2 s (sim-13 g: 2.1 s)", async () => {
+    const h = harness();
+    h.q.set({});
+    h.sent[0]?.resolve("a");
+    await h.flush();
+    // The kill's frames arrive as a burst: one re-query, sent 1 s after the first.
+    h.q.poke();
+    h.t.advance(400);
+    h.q.poke();
+    h.t.advance(599);
+    expect(h.sent).toHaveLength(1);
+    h.t.advance(1);
+    expect(h.sent).toHaveLength(2);
+    expect(RECAP_REFRESH_MS).toBeLessThanOrEqual(1000);
   });
 });

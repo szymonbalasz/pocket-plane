@@ -2,8 +2,8 @@
 // FR-CBTX-25 skip cue with dead PCs.
 import { describe, expect, test } from "bun:test";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
+import { skipText } from "@ui/features/combat-extras/skip";
 import { expiredToastText } from "./expired";
-import { skipText } from "./skip";
 
 const store: RecordStore = {
   ...emptyStore(),
