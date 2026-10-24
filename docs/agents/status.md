@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 10 slices merged, session-sim-14 13 / 13. Recap part 1 (#343): DM asked for the **Dice tray +40 %** before closing, and accepted BL-111 / BL-114 picks → slices **T1** `fix/dice-tray-size`, **T2** `fix/s10-dm-calls` running. Then: walkthroughs, merge, main gates, update the Playtest section, pause for the rest of the recap.
+**Phase:** Sprint 10 slices merged, session-sim-14 13 / 13. Recap part 1 (#343): DM asked for the **Dice tray +40 %** before closing, and accepted BL-111 / BL-114 picks → slices **T1** `fix/dice-tray-size`, **T2** `fix/s10-dm-calls` running; recap part 2 (#344): **T3** `fix/stats-campaign` (Stats Campaign tab, first) running. Then: walkthroughs, merge, main gates, update the Playtest section, pause for the rest of the recap.
 
 **Gates on `main`:** detached worktree `~/.herdr/worktrees/pocket-plane/gates-main` (recreated for T1 / T2); `gates.sh <it> <tag>`; `main`'s own `dist/` is never rebuilt.
 
@@ -18,6 +18,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint gate | final main 8b279504 | — | **session-sim-14 13 / 13 PASS** (leak scan clean; hard kill byte-identical); glitches → BL-107–BL-114 | DM recap |
 | Sprint 10 T1 Dice tray +40 % (#343) | `fix/dice-tray-size` (slot 0, ws wAA) | build-t1 | building (holds the frame lock: size table, goldens, replay sets) | walkthrough (port 4103) |
 | Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | `fix/s10-dm-calls` (slot 2, ws wAB) | build-t2 | building | walkthrough (port 4123) |
+| Sprint 10 T3 Stats Campaign tab (#344) | `fix/stats-campaign` (slot 4, ws wAC) | build-t3 | building (merges after T2: both touch stats awards) | walkthrough (port 4143) |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).
 
