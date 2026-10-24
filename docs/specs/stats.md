@@ -114,7 +114,7 @@ Tier A rules hold: filter, then aggregate; final roll only; names from facts; pa
 | | **Kill feed** |
 | FR-STATS-26 | **Events**: a damage fact `hpBefore > 0 → 0` on a non-companion monster = **kill**, on a PC or companion = **down**, whoever the attacker *(OQ-STATS-20)*. Read from the line's `fell` ([FR-CBT-152](combat-tracker.md#6-functional-requirements)). |
 | FR-STATS-27 | **Text** (the line's names): "Thorn finished Goblin 1" / "Goblin 1 falls"; "Goblin 2 dropped Brakka" / "Brakka is down"; a callout starts "Overkill! ". DM adds ", overkill 23" and "(hidden)"; players never get an amount. |
-| FR-STATS-28 | **Toast** `stats-feed-toast`, **callout** class ([FR-NOTE-50](notifications.md#6-functional-requirements)), 4 s *(OQ-STATS-21)*. Live frames only: a new line with `fell` or `callout`, not undone. One per frame (≤ 3 lines, then "and N more"), one listener per client (BL-71). Dropped while paused (S10). |
+| FR-STATS-28 | **Toast** `stats-feed-toast`, **callout** class ([FR-NOTE-50](notifications.md#6-functional-requirements)), 4 s *(OQ-STATS-21)*. Live frames only: a new line with `fell` or `callout`, not undone. One per frame (≤ 3 lines, then "and N more"), one listener per client (BL-71). Dropped while paused (S10). *(2026-10-24, sprint 10 T4, orchestrator: one apply's lines share a toast when they arrive within **400 ms** of the first (was 150 ms; on a busy client the second target's frame landed later and replaced the toast).)* |
 | FR-STATS-29 | **Visibility**: only lines the hub sent (a hidden side → DM only, FR-CBT-24). Snapshots, resyncs, undo / supersede upserts never toast. |
 | FR-STATS-30 | **Preference** "Kill feed" (per browser, both clients, default on; Preferences sections, append). |
 | | **Fight summary** |
