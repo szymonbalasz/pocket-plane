@@ -206,6 +206,29 @@ describe("FR-STATS-28 feed toast", () => {
     expect(shown).toHaveLength(2);
   });
 
+  test("FR-STATS-28 the batch wait is 400 ms: a target's frame 350 ms after the first still joins its toast (a busy client); one after the wait starts a new toast", () => {
+    expect(FEED_BATCH_MS).toBe(400);
+    const t = fakeTimers();
+    const shown: string[][] = [];
+    const feed = createFeed({ show: (ls) => shown.push(ls.map((l) => l.text)), timers: t.timers });
+    feed.push([line("a", "Overkill! Mira finished Bandit 2")]);
+    t.advance(350);
+    feed.push([line("b", "Overkill! Mira finished Bandit 4")]);
+    expect(shown).toEqual([]);
+    t.advance(50);
+    expect(shown).toEqual([
+      ["Overkill! Mira finished Bandit 2", "Overkill! Mira finished Bandit 4"],
+    ]);
+    feed.push([line("c", "Overkill! Mira finished Bandit 5")]);
+    t.advance(FEED_BATCH_MS + 1);
+    feed.push([line("d", "Overkill! Thorn finished Bandit 6")]);
+    t.advance(FEED_BATCH_MS);
+    expect(shown.slice(1)).toEqual([
+      ["Overkill! Mira finished Bandit 5"],
+      ["Overkill! Thorn finished Bandit 6"],
+    ]);
+  });
+
   test("FR-STATS-28 a line toasts once: the same line upserted again (an edit) never toasts; a frame with no feed line starts nothing", () => {
     const t = fakeTimers();
     const shown: FeedLine[][] = [];

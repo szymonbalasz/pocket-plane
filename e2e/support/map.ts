@@ -106,15 +106,11 @@ export async function mapPoint(
     for (let k = 1; k <= 4; k++)
       await page.mouse.move(near.x + ((to.x - near.x) * k) / 4, near.y + ((to.y - near.y) * k) / 4);
     await page.mouse.up({ button: "middle" });
-    await page.waitForFunction(
-      (b) => {
-        const st = (window as unknown as { Konva: { stages: { x(): number; y(): number }[] } })
-          .Konva.stages[0];
-        return st !== undefined && (st.x() !== b.x || st.y() !== b.y);
-      },
-      before,
-      { timeout: 2000 },
-    );
+    await page.waitForFunction((b) => {
+      const st = (window as unknown as { Konva: { stages: { x(): number; y(): number }[] } }).Konva
+        .stages[0];
+      return st !== undefined && (st.x() !== b.x || st.y() !== b.y);
+    }, before);
   }
   throw new Error(`mapPoint: cell (${col}, ${row}) still covered after 6 pans`);
 }

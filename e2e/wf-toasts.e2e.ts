@@ -63,7 +63,7 @@ test("FR-NOTE-51 stack returns home (BL-59) F8 DM at 1440×900: the Fog bar push
   // The tool closes: Scenes returns, the stack is home at once.
   await dm.getByTestId("map-tool-select").click();
   await expect(dm.getByTestId("fog-bar")).toHaveCount(0);
-  await expect(stack).toHaveAttribute("data-top", "100", { timeout: 1000 });
+  await expect(stack).toHaveAttribute("data-top", "100");
   await expect(stack).toHaveAttribute("data-left", "560");
   const b = await stack.boundingBox();
   expect(b && [Math.round(b.x), Math.round(b.y)]).toEqual([560, 100]);

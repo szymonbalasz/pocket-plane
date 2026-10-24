@@ -21,8 +21,12 @@ import type { Timers } from "./refresh";
 export const FEED_TOAST_MS = 4000;
 /** FR-NOTE-50: one callout at a time; the feed's id (a newer toast replaces it). */
 export const FEED_TOAST_ID = "stats-feed";
-/** Lines of one apply arrive as back-to-back frames: this long after the first, they share a toast. */
-export const FEED_BATCH_MS = 150;
+/**
+ * Lines of one apply arrive as back-to-back frames: this long after the first, they share a toast.
+ * 400 ms (sprint 10 T4, was 150): on a busy client the second target's frame landed later and
+ * replaced the toast (1 line, not 2).
+ */
+export const FEED_BATCH_MS = 400;
 /** FR-STATS-28: lines shown in one toast; the rest are "and N more". */
 export const FEED_LINES_MAX = 3;
 

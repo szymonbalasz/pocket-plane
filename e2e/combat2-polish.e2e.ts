@@ -553,8 +553,12 @@ for (const [width, height] of [
       // the cells under the toast's popup span stay grabbable.
       await closeRollPopups(dm);
       // FR-NOTE-50 (sprint 8): alert toasts ("Dice set to flat …") sit in the one stack under the
-      // card: closed too, and the card's box read again once the shorter stack holds still.
-      if (await closeAlertToasts(dm)) card = { ...card, box: await stableBox(dm, card.toast) };
+      // card: closed too, and the card's box read again once the shorter stack holds still. The
+      // first card closed when its popup opened (FR-CBT-76): its last box stands. (Under load the
+      // dice tray's slow-device alert, FR-DICEX-44, is what lands here.)
+      if ((await closeAlertToasts(dm)) && (await card.toast.count()) > 0) {
+        card = { ...card, box: await stableBox(dm, card.toast) };
+      }
       // A monster the DM can grab (not under a window), the lowest one.
       const grabbable: Awaited<ReturnType<typeof monsters>> = [];
       for (const t of await monsters()) {

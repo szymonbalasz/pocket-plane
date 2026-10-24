@@ -1,6 +1,6 @@
 // live-sync §12 build time (#163): the DM snapshot of session-sim and of the "realistic heavy"
 // session builds in < 200 ms (best of 5), and 300 more log rolls don't grow it (SQL windows). Run
-// alone via `bun run bench`; the size ceilings and windows stay in ./snapshot-size.test.ts.
+// alone via `bun run bench`; the size ceilings and windows stay in ./snapshot-size.slow.test.ts.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import { bestOf, GATE_TIMEOUT } from "@shared/bench-kit";

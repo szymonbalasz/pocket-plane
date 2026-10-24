@@ -71,7 +71,7 @@ test("FR-CBTX-64 FR-CBTX-66 FR-CBTX-67 DM moves Thorn inside the 12-tie: player 
   await expect.poll(order).toEqual([thorn, fe3]);
 
   await intent(dm, DM, "cbtx.moveCombatant", { encounterId, combatantId: thorn, afterId: fe3 });
-  await expect.poll(order, { timeout: 1_000 }).toEqual([fe3, thorn]);
+  await expect.poll(order).toEqual([fe3, thorn]);
 
   await p2.reload();
   await live(p2);

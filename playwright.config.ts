@@ -9,7 +9,11 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   reporter: [["list"]],
-  timeout: 30_000,
+  // Hang guards, not timing checks: with bundles side by side (PP_E2E_WORKERS) a test runs up to
+  // twice as long (popup-line's 3D dice rounds: 15 s alone, 25–30 s at 4 workers) and a live update
+  // can take over the 5 s expect default to land.
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   use: {
     baseURL: process.env.E2E_BASE_URL,
     trace: "retain-on-failure",

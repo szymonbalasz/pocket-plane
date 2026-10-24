@@ -61,7 +61,7 @@ const UNDONE_ROW = 5;
  * - Thorn → Bandit 4 11, undone: Bandit 4 stays at 11 HP, a live target (walkthrough step 2).
  * Expected (this unit's facts only), DM | players: kills Mira 1 + Owlbear 1 | same; Thorn 1 | 0;
  * downs Thorn 1 | 1; Still standing (DM) Bandit 2, Bandit 4. Bundle totals: the header of
- * `stats.fixtures.test.ts`.
+ * `stats.fixtures.slow.test.ts`.
  */
 export default defineFixture({
   key: KEY,
