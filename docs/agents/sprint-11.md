@@ -35,3 +35,4 @@ Evidence: the [session-sim-14 report](../../.verify/20261024-061849-session-sim-
 | 2026-10-24 | Planned (DM #349): fix track F1–F3 + DM's art track in parallel |
 | 2026-10-24 | **F3 merged**: the DM's skip toast names a downed companion that acts in its owner's turn; a roll request answered through the tray puts the tray back as it was; "Add hidden" default confirmed. Walkthrough 16 / 16 |
 | 2026-10-24 | **F1 merged**: Fit keeps every token in view with an untouched window open (also after a resize); opening a window puts away only one other (moving one aside first); launcher labels drop one at a time. Walkthrough 11 / 12 → re-test 6 / 6 |
+| 2026-10-24 | **F2 merged**: the DM toast stack settles (one move per change) and keeps off windows' headings, first records and the damage-card popup; "+N more" joins the summary row when every card folds. Walkthrough 10 / 12 → re-test 8 / 8. All F-slices on `main` |
