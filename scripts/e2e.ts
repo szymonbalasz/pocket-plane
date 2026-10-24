@@ -161,9 +161,12 @@ interface BundleResult {
   code: number;
   counts: Counts;
   secs: number;
-  /** Playwright's numbered failure headers ("1) [chromium] › e2e/x.e2e.ts:12:3 › …"). */
+  /** Playwright's numbered failure headers ("1) e2e\x.e2e.ts:12:3 › …"). */
   failures: string[];
 }
+
+/** A numbered failure header, with or without a `[project]` tag. */
+export const FAILURE_LINE = /^\s+\d+\) \S.* › /;
 
 /** One bundle in a child process, its output forwarded (prefixed when bundles run at once). */
 async function spawnBundle(
@@ -184,7 +187,7 @@ async function spawnBundle(
   const tag = prefix ? `[${bundle}] ` : "";
   const onLine = (line: string, err: boolean) => {
     countLine(line, counts);
-    if (/^\s+\d+\) \[/.test(line) && !failures.includes(line.trim())) failures.push(line.trim());
+    if (FAILURE_LINE.test(line) && !failures.includes(line.trim())) failures.push(line.trim());
     (err ? console.error : console.log)(`${tag}${line}`);
   };
   await Promise.all([

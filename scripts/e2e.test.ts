@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { bundleOrder, countLine, groupSpecs } from "./e2e";
+import { bundleOrder, countLine, FAILURE_LINE, groupSpecs } from "./e2e";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -63,6 +63,14 @@ test("e2e runner: Playwright list summary lines → passed / failed / flaky / sk
   ];
   expect(lines.filter((l) => countLine(l, c)).length).toBe(5);
   expect(c).toEqual({ passed: 12, failed: 1, flaky: 2, skipped: 1, notRun: 3 });
+  const failures = [
+    "  1) e2e\\combat2-polish.e2e.ts:495:3 › FR-CBT-75 sim-6 N8 at 1440×900: the popup … ",
+    "  2) [chromium] › e2e/x.e2e.ts:3:1 › FR-X-01 thing ",
+    "    Error: Timeout 10000ms exceeded while waiting on the predicate",
+    "      484 |       { timeout: 10_000 },",
+    "  ok  1 e2e\\a.e2e.ts:12:1 › FR-ASSET-17 picker (1.0s)",
+  ];
+  expect(failures.filter((l) => FAILURE_LINE.test(l)).length).toBe(2);
 });
 
 test("e2e runner: the repo's specs all resolve to registered bundles", async () => {
