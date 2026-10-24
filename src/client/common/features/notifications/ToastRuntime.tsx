@@ -72,6 +72,7 @@ import {
   classOfToast,
   clearCallout,
   closeToast,
+  moreInSummary,
   nextExpiry,
   REFOLD_QUIET_MS,
   refold,
@@ -502,6 +503,22 @@ export function ToastRuntime({
   useEffect(() => () => reportShownStack(SHOWN_STACK_ID, null), []);
 
   const openHistory = () => openWindow(HISTORY_KIND);
+  // FR-NOTE-78 (walkthrough F2 1b, 2a): folded to the summary alone, "+N more" sits in its row.
+  const inRow = moreInSummary(shown, more);
+  const moreButton = (
+    <button
+      type="button"
+      data-testid="note-toast-more"
+      data-in-summary={inRow}
+      className={cn(
+        "pointer-events-auto rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground",
+        inRow ? "shrink-0" : "self-end shadow",
+      )}
+      onClick={openHistory}
+    >
+      +{more} more
+    </button>
+  );
   if (!showing) return null;
   const stack = (
     <section
@@ -538,6 +555,7 @@ export function ToastRuntime({
               className="pointer-events-auto flex items-center gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
             >
               <span className="flex-1">{summaryText(t.count, t.waiting)}</span>
+              {inRow && moreButton}
               <Button
                 size="sm"
                 data-testid="note-toast-open"
@@ -584,16 +602,7 @@ export function ToastRuntime({
           />
         );
       })}
-      {more > 0 && (
-        <button
-          type="button"
-          data-testid="note-toast-more"
-          className="pointer-events-auto self-end rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground shadow"
-          onClick={openHistory}
-        >
-          +{more} more
-        </button>
-      )}
+      {more > 0 && !inRow && moreButton}
       {callout && (
         <CalloutToast
           key={callout.seq ?? 0}

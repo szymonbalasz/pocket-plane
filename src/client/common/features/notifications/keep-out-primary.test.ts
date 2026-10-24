@@ -316,3 +316,151 @@ describe("FR-NOTE-78 keep off the damage-card popup", () => {
     expect(hits(r, { ...init720, x: init720.x - 12, w: init720.w + 12 })).toBe(false);
   });
 });
+
+// Walkthrough F2 (`.verify/20261024-f2/report.md`) 1b, 2a: with live cards folded, the stack was
+// the summary + a "+2 more" pill below it, 92 px; no primary-clear spot held that height, so it
+// took the form (the Roll requests composer, Loot's "Add loot"). Folded to the summary alone, the
+// pill sits in the summary's row (`moreInSummary`): the stack is the summary's 58 px, and takes 1a
+// / 2b's spots. Rects as the walkthrough's screenshots (02, 03) draw them.
+describe("FR-NOTE-78 walkthrough F2 1b / 2a: live cards folded into the summary", () => {
+  const FOLDED_OLD_H = 92;
+  const FOLDED_H = 58;
+
+  test("FR-NOTE-78 walkthrough F2 1b (1280×720, Roll requests at 504, 60, Perception + Insight, 2 live cards): folded to the summary's 58 px → 480, 405 below the Insight card, off the composer (92 px: 480, 175 on it)", () => {
+    const small = { w: 1280, h: 720 };
+    const init720 = { x: 868, y: 60, w: 400, h: 583 };
+    const insight = { x: 517, y: 275, w: 334, h: 122 };
+    const perception = { x: 517, y: 403, w: 334, h: 122 };
+    const newRequest = { x: 517, y: 111, w: 300, h: 13 };
+    const composer = [
+      { x: 517, y: 138, w: 145, h: 27 },
+      { x: 669, y: 138, w: 182, h: 27 },
+      { x: 517, y: 174, w: 54, h: 23 },
+      { x: 576, y: 174, w: 55, h: 23 },
+      { x: 635, y: 174, w: 42, h: 23 },
+      { x: 682, y: 174, w: 51, h: 23 },
+      { x: 517, y: 206, w: 56, h: 26 },
+      { x: 580, y: 212, w: 14, h: 14 },
+      { x: 655, y: 206, w: 115, h: 26 },
+      { x: 777, y: 205, w: 24, h: 24 },
+      { x: 517, y: 239, w: 56, h: 27 },
+    ];
+    const requests: StackWindow = {
+      x: 504,
+      y: 60,
+      w: 360,
+      h: 410,
+      used: 470,
+      head: 197,
+      controls: [
+        { x: 829, y: 110, w: 20, h: 20 },
+        ...composer,
+        { x: 654, y: 360, w: 124, h: 28 },
+        { x: 785, y: 360, w: 57, h: 28 },
+      ],
+      primary: [newRequest, insight],
+      records: [perception],
+    };
+    const log: StackWindow = {
+      x: 68,
+      y: 484,
+      w: 690,
+      h: 160,
+      used: 636,
+      head: 533,
+      controls: [
+        { x: 81, y: 608, w: 320, h: 28 },
+        { x: 408, y: 608, w: 128, h: 28 },
+        { x: 542, y: 608, w: 28, h: 28 },
+        { x: 576, y: 608, w: 48, h: 28 },
+        { x: 630, y: 608, w: 28, h: 28 },
+        { x: 664, y: 608, w: 28, h: 28 },
+      ],
+      logRows: [
+        { x: 81, y: 535, w: 660, h: 21 },
+        { x: 81, y: 556, w: 660, h: 21 },
+        { x: 81, y: 577, w: 660, h: 21 },
+      ],
+    };
+    // The repro: summary + "+2 more" below it (92 px) → on the composer.
+    const before = dmStackSpot(small, init720, FOLDED_OLD_H, STACK_W, [], [log, requests]);
+    expect(before).toMatchObject({ left: 480, top: 175 });
+    expect(composer.some((c) => hits(stack(before, FOLDED_OLD_H), c))).toBe(true);
+    // The pill in the summary's row: 1a's spot.
+    const at = dmStackSpot(small, init720, FOLDED_H, STACK_W, [], [log, requests]);
+    expect(at).toMatchObject({ left: 480, top: 405 });
+    const r = stack(at, FOLDED_H);
+    for (const p of [newRequest, insight, ...composer, ...(log.logRows ?? [])])
+      expect(hits(r, p)).toBe(false);
+  });
+
+  test("FR-NOTE-78 walkthrough F2 2a (1440×900, Party Manager Loot at 424, 60, 2 live cards): folded to the summary's 58 px → 560, 624 over older Game log entries, off 'Add loot' (92 px: 560, 333 on it)", () => {
+    const vp = { w: 1440, h: 900 };
+    const init = { x: 1028, y: 60, w: 400, h: 512 };
+    const wide = (y: number, h = 15) => ({ x: 449, y, w: 419, h });
+    const wallets = [wide(235, 18), wide(259, 18), wide(283, 18)];
+    const headings = [{ x: 449, y: 160, w: 51, h: 15 }, wide(214), wide(314), wide(433)];
+    const coins = (y: number) => [449, 531, 613, 695, 778].map((x) => ({ x, y, w: 78, h: 31 }));
+    const addLoot = [
+      { x: 449, y: 334, w: 345, h: 31 },
+      { x: 800, y: 334, w: 56, h: 31 },
+      ...coins(370),
+    ];
+    const pm: StackWindow = {
+      x: 424,
+      y: 60,
+      w: 456,
+      h: 512,
+      used: 572,
+      head: 253,
+      controls: [
+        { x: 437, y: 106, w: 88, h: 30 },
+        { x: 525, y: 106, w: 72, h: 30 },
+        { x: 597, y: 106, w: 71, h: 30 },
+        { x: 668, y: 106, w: 45, h: 30 },
+        { x: 713, y: 106, w: 76, h: 30 },
+        { x: 789, y: 106, w: 77, h: 30 },
+        { x: 804, y: 157, w: 52, h: 22 },
+        ...addLoot,
+        { x: 449, y: 454, w: 207, h: 31 },
+        { x: 663, y: 454, w: 193, h: 31 },
+        ...coins(490),
+        { x: 449, y: 526, w: 342, h: 31 },
+        { x: 796, y: 526, w: 60, h: 31 },
+      ],
+      primary: [...headings, wallets[0] as Box],
+      records: wallets.slice(1),
+    };
+    const log: StackWindow = {
+      x: 68,
+      y: 584,
+      w: 1150,
+      h: 240,
+      used: 824,
+      head: 650,
+      controls: [
+        { x: 81, y: 788, w: 320, h: 28 },
+        { x: 408, y: 788, w: 128, h: 28 },
+        { x: 545, y: 790, w: 22, h: 22 },
+        { x: 576, y: 788, w: 48, h: 28 },
+        { x: 632, y: 790, w: 24, h: 24 },
+        { x: 666, y: 790, w: 24, h: 24 },
+      ],
+      logRows: [
+        { x: 81, y: 715, w: 1130, h: 21 },
+        { x: 81, y: 736, w: 1130, h: 21 },
+        { x: 81, y: 757, w: 1130, h: 22 },
+      ],
+    };
+    // The repro: 92 px reaches the Game log's newest row at 624, so it took "Add loot".
+    const before = dmStackSpot(vp, init, FOLDED_OLD_H, STACK_W, [], [log, pm]);
+    expect(before).toMatchObject({ left: 560, top: 333 });
+    expect(addLoot.some((c) => hits(stack(before, FOLDED_OLD_H), c))).toBe(true);
+    // The pill in the summary's row: 2b's spot (accepted).
+    const at = dmStackSpot(vp, init, FOLDED_H, STACK_W, [], [log, pm]);
+    expect(at).toMatchObject({ left: 560, top: 624 });
+    const r = stack(at, FOLDED_H);
+    for (const p of [...wallets, ...headings, ...(pm.controls ?? []), ...(log.logRows ?? [])])
+      expect(hits(r, p)).toBe(false);
+  });
+});

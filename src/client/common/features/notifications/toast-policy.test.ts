@@ -15,6 +15,7 @@ import {
   createToastMemory,
   INFO_TOAST_MS,
   initialToasts,
+  moreInSummary,
   nextExpiry,
   registerToastMemory,
   setCallout,
@@ -249,5 +250,24 @@ describe("FR-NOTE-77 fold to the summary (walkthrough H3 4)", () => {
     for (const n of cards) bare = addNote(bare, n, 1, alertKind);
     expect(visibleToasts(bare, 0)).toMatchObject({ more: 1 });
     expect(classes(bare, 0)).toEqual(["card"]);
+  });
+});
+
+describe("FR-NOTE-78 '+N more' in the summary's row (walkthrough F2 1b, 2a)", () => {
+  test("FR-NOTE-78 '+N more' in the summary's row: the summary alone with cards folded → in its row; a card, an alert or nothing folded beside it → below the stack as before", () => {
+    let s = setSummary(initialToasts(0), 1, 0);
+    for (const n of [card(), card()]) s = addNote(s, n, 1, alertKind);
+    const folded = visibleToasts(s, 0);
+    expect(folded.more).toBe(2);
+    expect(moreInSummary(folded.shown, folded.more)).toBe(true);
+    // A card still shows: the pill stays below the stack.
+    const one = visibleToasts(s, 1);
+    expect(moreInSummary(one.shown, one.more)).toBe(false);
+    // An alert beside the summary (alerts never fold): below the stack.
+    const withAlert = visibleToasts(addNote(s, alert(), 2, alertKind), 0);
+    expect(moreInSummary(withAlert.shown, withAlert.more)).toBe(false);
+    // The summary alone with nothing folded: no pill.
+    const bare = visibleToasts(setSummary(initialToasts(0), 1, 0), 0);
+    expect(moreInSummary(bare.shown, bare.more)).toBe(false);
   });
 });

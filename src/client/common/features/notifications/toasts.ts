@@ -414,6 +414,14 @@ export function visibleToasts(
   return { shown, more: counted.length - kept.size, callout: s.callout ?? null };
 }
 
+/**
+ * FR-NOTE-78 (walkthrough F2 1b, 2a): the summary alone shows (every card and info folded) →
+ * "+N more" sits in the summary's row, so the folded stack is the summary's height (58 px, not 92:
+ * the taller one found no spot off the windows' forms).
+ */
+export const moreInSummary = (shown: readonly Toast[], more: number): boolean =>
+  more > 0 && shown.length === 1 && shown[0]?.kind === "summary";
+
 /** Milliseconds until the next timed toast (alert, info, callout) ends; null if none or paused. */
 export function nextExpiry(s: ToastState): number | null {
   if (s.runningSince === null) return null;
