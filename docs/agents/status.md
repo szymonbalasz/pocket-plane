@@ -18,7 +18,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint gate | final main 8b279504 | — | **session-sim-14 13 / 13 PASS** (leak scan clean; hard kill byte-identical); glitches → BL-107–BL-114 | DM recap |
 | Sprint 10 T1 Dice tray +40 % (#343) | `fix/dice-tray-size` (slot 0, ws wAA) | build-t1 (idle) | walkthrough **18/18 PASS** (`.verify/20261024-t1/`); branch gates queued after T3's | merge |
 | Sprint 10 T2 DM calls BL-111 + BL-114 (#343) | merged ef4835d1 | — | **merged** (walkthrough 11/11; branch check 5593 / e2e 240); evidence `.verify/sprint10/walkthroughs/20261024-t2/`; main gates green (5593 / 240) | — |
-| Sprint 10 T3 Stats Campaign tab (#344) | `fix/stats-campaign` (slot 4, ws wAC) | build-t3 (idle) | walkthrough 7/7; main + BL-111 rule merged (players' Thorn awards 8 → 7 on stats-b); branch gates running | merge |
+| Sprint 10 T3 Stats Campaign tab (#344) | merged 9cceead1 | — | **merged** (walkthrough 7/7; branch check 5617 / e2e 241); main gates skipped (tree = tested branch, #345); evidence `.verify/sprint10/walkthroughs/20261024-t3/` | — |
 | Sprint 10 T4 faster test loop (#345) | `fix/test-speed` (slot 2, ws wAD) | build-t4 | building (tooling lock: package.json scripts, scripts/, bunfig, playwright config, gates.sh); merges after T1 / T3, never while a gate runs | review + branch gates |
 
 Backlog after sim-14: BL-107–BL-110, BL-112, BL-113 (small, open); BL-111 and BL-114 need a DM call; BL-93 open (27 player harness cells).

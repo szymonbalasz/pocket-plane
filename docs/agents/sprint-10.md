@@ -47,6 +47,7 @@ Dropped as by design: BL-104's "sounds locked until the first click after a load
 | 2026-10-24 | **H2 merged** (Party Manager 600 px; windows shrink in place before one is put away; Fit and resize round trips no longer fall to the 48-px PCs-only view; DM Party Manager full width at 1440; layout-harness failures DM 10 → 7, players 37 → 30); walkthrough 5 / 6 → re-test 5 / 5 |
 | 2026-10-24 | **H3 merged** (DM toast stack off window content, first rows and modal dialogs; slides beside windows, back home after a dialog, folds only what doesn't fit); walkthrough 5 / 8 → re-tests 7 / 8, 9 / 10, 12 / 12. All four slices on `main` |
 | 2026-10-24 | Final `main` check 5,587 / e2e 238 / bench 41 / 41. **session-sim-14 13 / 13 PASS** (leak scan clean, hard kill byte-identical); glitches → BL-107–BL-114. [Playtest: sprint 10 fixes](#playtest-sprint-10-fixes) written. Decision #342. Paused for the DM recap |
+| 2026-10-24 | Recap part 1–2 (#343, #344): **T2 merged** (players' "Most damage dealt" withheld while hidden damage could change its winner; a hidden pet leaves other players' data); **T3 merged** (Stats opens on a **Campaign** tab). #345: faster test loop (process + T4 tooling) |
 
 ## Playtest: sprint 10 fixes
 
