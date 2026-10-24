@@ -90,8 +90,11 @@ import {
   PALETTE,
   previewMode,
   removeDie,
+  scaledFont,
+  scaledPx,
   setConstant,
   termsOf,
+  trayScale,
 } from "./tray-logic";
 
 export type TrayState = "idle" | "compose" | "adjust" | "manual" | "rolling" | "result";
@@ -142,6 +145,25 @@ function useAreaBox(ref: RefObject<HTMLElement | null>): AreaBox | null {
     return () => ro.disconnect();
   }, [ref]);
   return box;
+}
+
+/**
+ * FR-DICEX-96: the dice scale from the tray window's rendered size (its `ui-window` frame, kept up
+ * to date as it resizes); × 1 until measured.
+ */
+function useTrayScale(ref: RefObject<HTMLElement | null>): number {
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const frame = ref.current?.closest<HTMLElement>('[data-testid="ui-window"]');
+    if (!frame) return;
+    const read = () => setScale(trayScale({ w: frame.offsetWidth, h: frame.offsetHeight }));
+    read();
+    if (typeof ResizeObserver !== "function") return;
+    const ro = new ResizeObserver(read);
+    ro.observe(frame);
+    return () => ro.disconnect();
+  }, [ref]);
+  return scale;
 }
 
 /** FR-DICEX-03 / DICEX §7: the tray's state from what is staged and in flight. */
@@ -308,7 +330,7 @@ function MacrosPopover({
  * (table E): while its entries are held, blank die shapes and "…"; at the landing the numbers
  * fade in.
  */
-function ResultView({ entries }: { entries: GameLogEntryView[] }) {
+function ResultView({ entries, scale }: { entries: GameLogEntryView[]; scale: number }) {
   const t = useMemo(() => throwDice(entries), [entries]);
   const look = useOwnLook();
   const holding = useHolding();
@@ -322,7 +344,7 @@ function ResultView({ entries }: { entries: GameLogEntryView[] }) {
     <div ref={fade} className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-1">
         {t?.dice.map((d) => (
-          <FlatDie key={d.key} die={d} look={look} blank={holding.has(d.entryId)} />
+          <FlatDie key={d.key} die={d} look={look} blank={holding.has(d.entryId)} scale={scale} />
         ))}
         {t && t.more > 0 && <span className="text-xs text-muted-foreground">+{t.more} more</span>}
         {t && t.totals.length > 0 && (
@@ -331,6 +353,7 @@ function ResultView({ entries }: { entries: GameLogEntryView[] }) {
             data-landed={landed}
             data-landing
             className="ml-1 text-lg"
+            style={scaledFont(18, scale)}
           >
             {landed ? t.totals.join(" · ") : HELD_TEXT}
           </strong>
@@ -383,6 +406,10 @@ export function TrayWindow() {
   const lastValid = useRef(termsOf(draft) ?? []);
   const diceArea = useRef<HTMLDivElement>(null);
   const area = useAreaBox(diceArea);
+  const scale = useTrayScale(diceArea);
+  // FR-DICEX-96: the notation row grows with the dice (28-px inputs, 14-px text at × 1).
+  const notation =
+    scale === 1 ? undefined : { height: scaledPx(28, scale), ...scaledFont(14, scale) };
 
   // A new stage resets the draft to the request's (FR-DICEX-02); the store resets the mode.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per stage (`staged`)
@@ -501,6 +528,7 @@ export function TrayWindow() {
     <section
       data-testid="dicex-tray"
       aria-label="Dice tray"
+      data-scale={scale}
       className="flex h-full min-h-0 flex-col gap-1"
       onKeyDown={onKeyDown}
       onKeyUp={trackKeys}
@@ -574,12 +602,13 @@ export function TrayWindow() {
             onRemove={state === "compose" ? (term) => setTerms(removeDie(terms, term)) : undefined}
             dimmed={state === "rolling"}
             area={area}
+            scale={scale}
           />
         )}
         {state === "rolling" && !request && (
           <p className="text-sm text-muted-foreground">Rolling…</p>
         )}
-        {state === "result" && result && <ResultView entries={result} />}
+        {state === "result" && result && <ResultView entries={result} scale={scale} />}
         {state === "manual" && (
           <div className="w-full rounded-md border p-2">
             <ManualForm control={control} />
@@ -595,6 +624,7 @@ export function TrayWindow() {
             aria-label="Dice expression"
             placeholder="1d20+4"
             className="h-7 min-w-0 flex-1 font-mono text-sm"
+            style={notation}
             value={draft}
             onChange={(e) => {
               const v = e.target.value;
@@ -615,6 +645,7 @@ export function TrayWindow() {
             aria-label="Constant"
             inputMode="numeric"
             className="h-7 w-16 font-mono text-sm"
+            style={notation}
             value={String(constantOfTerms(terms))}
             onChange={(e) => {
               const n = Number.parseInt(e.target.value.replace("−", "-"), 10);

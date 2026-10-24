@@ -206,3 +206,24 @@ export function editRequest(
   if (staged && !fresh) return { ...staged, expression };
   return { expression, mode, category: "other" };
 }
+
+/**
+ * FR-DICEX-96 (DM #343): the tray's dice grow with the window, from × 1 at the useful size
+ * (360 × 300, today's dice) to × 1.4 at the default (504 × 420); never below × 1. `win` = the
+ * window's rendered size (null = not measured yet → × 1).
+ */
+export const TRAY_USEFUL = { w: 360, h: 300 } as const;
+export const TRAY_SCALE_MAX = 1.4;
+
+export function trayScale(win: { w: number; h: number } | null): number {
+  if (!win || win.w <= 0 || win.h <= 0) return 1;
+  const s = Math.min(win.w / TRAY_USEFUL.w, win.h / TRAY_USEFUL.h, TRAY_SCALE_MAX);
+  return Math.max(1, Math.round(s * 100) / 100);
+}
+
+/** A base px size at `scale`, whole px. */
+export const scaledPx = (px: number, scale: number) => Math.round(px * scale);
+
+/** Inline font size for a base px at `scale`; none at × 1 (the class draws it). */
+export const scaledFont = (px: number, scale: number) =>
+  scale === 1 ? undefined : { fontSize: scaledPx(px, scale) };
