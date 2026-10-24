@@ -14,7 +14,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 10 H1 combat + dice | `fix/h1-combat-dice` (slot 0, ws wA6) | build-h1 (idle) | re-test **5/5 PASS** (`.verify/20261024-h1r/`); main merged in; branch gates queued after main's | merge |
 | Sprint 10 H2 window frame + Party Manager | `fix/h2-frame` (slot 2, ws wA7) | build-h2 | walkthrough 5/6 (`.verify/20261024-h2/`): fixing resize round trip → 48-px floor | re-test |
 | Sprint 10 H3 toasts | `fix/h3-toasts` (slot 3, ws wA8) | build-h3 (idle), test-h3r | fixes 782118bc+ (FR-NOTE-77; check 5546, e2e 227) → re-test (port 4133) | merge |
-| Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/` | main gates |
+| Sprint 10 H4 rules, recap, strongholds, misc | merged cf9e0fbe | — | **merged** (walkthrough 11/11, branch check 5545 / e2e 229); evidence `.verify/sprint10/walkthroughs/20261024-h4/`; main gates green (5545 / 229) | — |
 | Sprint gate | main | — | session-sim-13 14 / 15 (`.verify/20261023-193558-session-sim-13/`); walkthrough evidence `.verify/sprint9/walkthroughs/` | — |
 
 Backlog after sim-13: BL-97 (leak-like, first), BL-98–BL-104, BL-93, BL-94, BL-95, BL-96, BL-92.
