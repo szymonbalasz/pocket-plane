@@ -47,6 +47,7 @@ import {
   createResizeRefit,
   createRevealRefit,
   createSettledRefit,
+  createSizeCameras,
   dryFitScene,
   type FitInputs,
   type FitReason,
@@ -55,9 +56,11 @@ import {
   fitTokensOf,
   footprintBox,
   isFullFit,
+  layoutKey,
   placerSettled,
   refitsOnReveal,
   revealRefit,
+  type SizeCamera,
   visibleArea,
   zoomAt,
 } from "./camera";
@@ -299,19 +302,35 @@ export function MapCanvas(props: MapCanvasProps) {
       ...(!windows && free.untouched && { untouched: free.untouched }),
     };
   };
+  /** H2 FAIL 5: the fitted camera (and fit state) last shown at each viewport size. */
+  const [sizeCams] = useState(() => createSizeCameras<SizeCamera>());
+  /** The last fit's state, for `sizeCams` (recorded once per resize, at its first event). */
+  const fitState = useRef<SizeCamera | null>(null);
+  /** What this camera frames now (`layoutKey`). */
+  const layoutNow = useRef((): string => "");
+  layoutNow.current = () =>
+    layoutKey(scene.id, fitTokensOf(tokensRef.current), obstaclesRef.current);
   const fitNow = useRef((_reason: FitReason) => {});
   fitNow.current = (reason) => {
     const inputs = fitInputs.current();
     if (!inputs) return;
+    // H2 FAIL 5 (FR-MAP-113 note): back at a size whose layout is the one it showed before, the
+    // camera it had there (a resize round trip restores the map too).
+    const kept = reason === "resize" ? sizeCams.take(size, layoutNow.current()) : null;
     // FR-MAP-95: every reason runs Fit's function with this client's obstacles, bounded by the
     // last full fit (FR-MAP-94).
-    const fit = fitFor(reason, inputs, lastFullCell.current);
+    const fit = kept ?? {
+      ...fitFor(reason, inputs, lastFullCell.current),
+      lastFull: lastFullCell.current,
+    };
     setCam({ x: fit.x, y: fit.y, scale: fit.scale });
     setFitFloor(fit.floor);
     setFitVisible(fit.visible);
     setFitRect(`${fit.rect.x},${fit.rect.y},${fit.rect.w},${fit.rect.h}`);
     setFitReason(fit.reason);
-    if (isFullFit(fit.reason)) lastFullCell.current = fit.scale * grid.gridCellSize;
+    if (kept) lastFullCell.current = kept.lastFull;
+    else if (isFullFit(fit.reason)) lastFullCell.current = fit.scale * grid.gridCellSize;
+    fitState.current = { ...fit, lastFull: lastFullCell.current };
     drawn.current = { scene: scene.id, ids: new Set(tokens.map((t) => t.id)) };
   };
   /**
@@ -405,10 +424,10 @@ export function MapCanvas(props: MapCanvasProps) {
   // FR-SHELL-96, -108; FR-MAP-97: the base port the placer's L2b reads (the players' map yields).
   useEffect(() => {
     setFitPort({
-      dryFit: (windows) => {
+      dryFit: (windows, reason) => {
         const inputs = fitInputs.current(windows);
         if (!inputs) return null;
-        return dryFitScene(inputs, lastFullCell.current);
+        return dryFitScene(inputs, lastFullCell.current, reason);
       },
       lastFullCell: () => lastFullCell.current,
       // The placer wrote the windows; the refit frames them once they render.
@@ -496,6 +515,12 @@ export function MapCanvas(props: MapCanvasProps) {
     // FR-MAP-113: the refit for this resize waits for the viewport settle after it.
     const on = () => {
       resizeSince.current = freeRef.current.settles + 1;
+      // H2 FAIL 5: the camera of the size this resize leaves (its first event), while fitted.
+      const at = fitState.current;
+      if (at && cameraModeRef.current === "fitted" && sizeRef.current.w > 0) {
+        sizeCams.record(sizeRef.current, layoutNow.current(), { ...at, ...camRef.current });
+        fitState.current = null;
+      }
       r.resize();
     };
     window.addEventListener("resize", on);
@@ -503,7 +528,7 @@ export function MapCanvas(props: MapCanvasProps) {
       window.removeEventListener("resize", on);
       r.dispose();
     };
-  }, [onCamera]);
+  }, [onCamera, sizeCams]);
   // FR-SHELL-80: Reset layout on this page runs one Fit, with the windows it wrote.
   const seenFits = useRef(free.fitRequests);
   useEffect(() => {

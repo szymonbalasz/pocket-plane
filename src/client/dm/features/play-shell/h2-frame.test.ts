@@ -80,3 +80,34 @@ test("FR-MAP-115 BL-100 a remembered window at the edge stays an obstacle: reloa
     ["fit", "all", 31],
   ]);
 });
+
+test("FR-SHELL-102 FR-MAP-113 H2 FAIL 5 resize round trip: DM 1280×720 Ambush, no fight, Initiative open, Party Manager placed 346 wide → 1440×900 → 1280×720: at 1440 the map keeps an all-tokens fit (Party Manager at a size that leaves it room, not 600 × 512 and the 48-px PCs-only floor); back at 1280 the layout and the camera as before the trip", () => {
+  // Walkthrough H2 step 5 (`.verify/20261024-h2/`): before the fix 1440 drew Party Manager
+  // 600 × 512 at 68,60 with the map `pcs` at 48 px, and 1280 kept 600 × 412 and the floor.
+  const run = runScript(dmWindows, "dm", { w: 1280, h: 720 }, "ambush", [
+    "end",
+    { open: "party.board" },
+    { viewport: VP },
+    { viewport: { w: 1280, h: 720 } },
+    { viewport: VP },
+    { viewport: { w: 1280, h: 720 } },
+  ]);
+  expect(run.problems).toEqual([]);
+  const at = (i: number) => run.steps[i];
+  const opened = at(2);
+  expect(entry(opened?.windows, "party.board")).toBe("party.board:open:442,60,346×400");
+  expect([opened?.fit, opened?.cell]).toEqual(["all", 34]);
+  for (const i of [3, 5]) {
+    const wide = at(i);
+    expect(wide?.fit).toBe("all");
+    expect(size(wide?.windows, "party.board")).toEqual({ w: 440, h: 400 });
+  }
+  for (const i of [4, 6]) {
+    // I7: the layout and the camera as before the trip.
+    expect({ windows: at(i)?.windows, fit: at(i)?.fit, cell: at(i)?.cell }).toEqual({
+      windows: opened?.windows,
+      fit: "all",
+      cell: 34,
+    });
+  }
+});

@@ -29,7 +29,8 @@ if (process.env.UPDATE_FAILING === "1") {
  */
 // H2 (sprint 10, BL-93): a window back at its pre-cause rect stays as it was (I7), the L1 band
 // height (BL-104) and L3s (BL-99) pass P1 fitted @1600×900 / @1280×800 resize again (RS2's and
-// SP3's exemptions retired): 37 → 31 failing.
+// SP3's exemptions retired): 37 → 31 failing; H2 FAIL 5 (`grown:` returns, the resize fit check):
+// 31 → 30 (P3 fitted @1280×800 resize).
 const EXEMPTIONS = new Map([
   [
     "FR-SHELL-115 replay P2 moved @1280×720 memory",

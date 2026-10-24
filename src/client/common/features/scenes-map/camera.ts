@@ -1258,11 +1258,15 @@ export interface DryFitResult {
 
 /**
  * FR-MAP-97: the `window` fit with `inputs` (the placer's candidate as one more obstacle), not
- * applied.
+ * applied; `reason` `resize` (H2 FAIL 5): the full resize refit a `viewport` settle is followed by.
  */
-export function dryFitScene(inputs: FitInputs, lastFullCell: number | null): DryFitResult {
+export function dryFitScene(
+  inputs: FitInputs,
+  lastFullCell: number | null,
+  reason: "window" | "resize" = "window",
+): DryFitResult {
   const { grid, view, tokens } = inputs;
-  const fit = fitFor("window", inputs, lastFullCell);
+  const fit = fitFor(reason, inputs, lastFullCell);
   const pcs = tokens.flatMap((t) => {
     const b = t.pc ? footprintBox([t], grid) : null;
     return b ? [{ ...b, pc: true }] : [];
@@ -1298,6 +1302,42 @@ export function cameraOn(mode: CameraMode, e: CameraEvent): { mode: CameraMode; 
 
 /** FR-MAP-47: a viewport resize refits this long after the last `resize` event. */
 export const RESIZE_REFIT_MS = 200;
+
+/**
+ * H2 FAIL 5 (FR-MAP-113 note, I7 for the camera): the `fitted` camera last shown at each viewport
+ * size, with the layout it framed (`layoutKey`). A resize refit back at a size whose layout is the
+ * same takes that camera (and its fit state) instead of a new fit, so a round trip restores the
+ * map too; any other layout fits as before. Client memory, per page.
+ */
+export function createSizeCameras<T>() {
+  const at = new Map<string, { key: string; state: T }>();
+  const sizeKey = (v: Size) => `${v.w}×${v.h}`;
+  return {
+    record(view: Size, key: string, state: T) {
+      at.set(sizeKey(view), { key, state });
+    },
+    /** The state recorded at `view` iff its layout key is `key`. */
+    take(view: Size, key: string): T | null {
+      const e = at.get(sizeKey(view));
+      return e && e.key === key ? e.state : null;
+    },
+  };
+}
+
+/** The canvas's recorded fit (H2 FAIL 5): the camera, its fit state and the last full fit's cell. */
+export type SizeCamera = SceneFit & { reason: FitReason; lastFull: number | null };
+
+/** What a recorded camera framed: the scene, its tokens' cells and the fit's obstacles. */
+export const layoutKey = (
+  sceneId: string,
+  tokens: readonly { col: number; row: number; size: string }[],
+  obstacles: readonly Box[],
+) =>
+  JSON.stringify([
+    sceneId,
+    tokens.map((t) => [t.col, t.row, t.size]),
+    obstacles.map((o) => [o.x, o.y, o.w, o.h]),
+  ]);
 
 export interface Timers {
   set(fn: () => void, ms: number): unknown;

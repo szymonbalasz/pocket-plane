@@ -258,7 +258,7 @@ export function freeAreas(rects: readonly Rect[], vp: Viewport): Rect[] {
  * the canvas.
  */
 export interface FitPort {
-  dryFit(windows: readonly Rect[]): DryFitResult | null;
+  dryFit(windows: readonly Rect[], reason?: "window" | "resize"): DryFitResult | null;
   lastFullCell(): number | null;
   yieldRefit(): void;
 }

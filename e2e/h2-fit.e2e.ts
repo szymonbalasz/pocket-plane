@@ -97,3 +97,46 @@ test("FR-MAP-115 BL-100 DM 1440×900: a remembered Compendium over the map centr
   expect(await box(cmp)).toEqual(mine);
   await dm.context().close();
 });
+
+test("FR-SHELL-102 FR-MAP-113 H2 FAIL 5 DM resize round trip: 1280×720, Reset layout, Party Manager opened → 1440×900 keeps an all-tokens fit (not the 48-px floor) → 1280×720: Party Manager and the map as before", async ({
+  browser,
+}) => {
+  test.setTimeout(90_000);
+  const { secret, recordId } = e2eEnv();
+  const dm = await rolePage(browser);
+  // The scene picked at 1440 (at 1280 the pending-action toast sits over the Scenes rows).
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+  const ambush = recordId("battlemap", "scene");
+  const scenes = await showToPlayers(dm, "Goblin Ambush");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
+    .first()
+    .click();
+  const canvas = dm.getByTestId("map-canvas");
+  await expect(canvas).toHaveAttribute("data-scene-id", ambush);
+  await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
+  const log = shellWindow(dm, "dice.log");
+  await dm.setViewportSize({ width: 1280, height: 720 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await dm.getByTestId("ui-launcher-menu").click();
+  await dm.getByTestId("ui-launcher-reset").click();
+  await expect(shellWindow(dm, "map.scenes")).toHaveCount(0);
+  await expect(canvas).toHaveAttribute("data-fit-visible", "all");
+  const board = await openWindow(dm, "party.board");
+  const before = await box(board);
+  const cell = await canvas.getAttribute("data-cell-px");
+
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  await expect(canvas).toHaveAttribute("data-fit-visible", "all");
+  await expect(canvas).toHaveAttribute("data-fit-floor", "false");
+
+  await dm.setViewportSize({ width: 1280, height: 720 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await expect.poll(() => box(board)).toEqual(before);
+  await expect(canvas).toHaveAttribute("data-fit-visible", "all");
+  await expect(canvas).toHaveAttribute("data-cell-px", cell ?? "");
+  await dm.context().close();
+});
