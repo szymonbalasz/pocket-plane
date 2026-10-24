@@ -1,4 +1,5 @@
-// `stats.board` "Stats" body, both clients (FR-STATS-18, -19, -24; FR-SHELL-93): Fight = a live
+// `stats.board` "Stats" body, both clients (FR-STATS-18, -19, -24; FR-SHELL-93): *(sprint 10 T3)*
+// Campaign first (FR-STATS-81–85: campaign-wide totals, records, awards won), Fight = a live
 // leaderboard over the fight picker, with Highlights above it (FR-STATS-36), Session = 9 award
 // cards over the session picker (DM: Show awards), Luck = the luck table (FR-STATS-41). Renders
 // only what the ack holds (rows in server order, no client aggregation); the DM's extra fields are
@@ -45,6 +46,7 @@ import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { type ColorPerson, useColorOf } from "../campaign-management/colors";
 import { useRecapOpener } from "../session-recap/open";
+import { CampaignPanel } from "./Campaign";
 import { Highlights } from "./Highlights";
 import { LuckPanel } from "./Luck";
 import {
@@ -67,7 +69,12 @@ type Role = "dm" | "player";
 type FightResult = DmFightResult | PlayerFightResult;
 type AnyRow = DmFightRow | PlayerFightRow;
 
-const TAB_LABEL: Record<StatsTab, string> = { fight: "Fight", session: "Session", luck: "Luck" };
+const TAB_LABEL: Record<StatsTab, string> = {
+  campaign: "Campaign",
+  fight: "Fight",
+  session: "Session",
+  luck: "Luck",
+};
 
 function useView(you: You | null): [StatsView, (patch: Partial<StatsView>) => void] {
   const key = you ? viewKey(you) : null;
@@ -94,7 +101,9 @@ export function StatsWindow() {
           ))}
         </TabsList>
       </Tabs>
-      {view.tab === "fight" ? (
+      {view.tab === "campaign" ? (
+        <CampaignPanel role={role} />
+      ) : view.tab === "fight" ? (
         <FightPanel role={role} view={view} setView={setView} />
       ) : view.tab === "session" ? (
         <SessionPanel role={role} view={view} setView={setView} />

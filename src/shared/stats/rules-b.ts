@@ -361,6 +361,14 @@ interface Best {
   n: number;
 }
 
+/** One character's numbers in one fight (sprint 10 T3: + `healing`, FR-STATS-83). */
+export interface FightTally {
+  dealt: number;
+  kills: number;
+  healing: number;
+  n: number;
+}
+
 export interface TrophyTally {
   dealt: number;
   taken: number;
@@ -369,7 +377,7 @@ export interface TrophyTally {
   downed: number;
   fights: Set<string>;
   /** Per encounter (`n` = its first fact's, the tie order): the Best fight records. */
-  perFight: Map<string, { dealt: number; kills: number; n: number }>;
+  perFight: Map<string, FightTally>;
   biggestHit: Best | null;
   biggestOverkill: Best | null;
 }
@@ -418,12 +426,17 @@ export function addTrophies(
     if (a) a.fights.add(f.encounterId);
     if (d) d.fights.add(f.encounterId);
     if (f.kind === "heal") {
-      if (a) a.healing += f.raw;
+      if (a) {
+        a.healing += f.raw;
+        const fight = a.perFight.get(f.encounterId) ?? { dealt: 0, kills: 0, healing: 0, n: f.n };
+        fight.healing += f.raw;
+        a.perFight.set(f.encounterId, fight);
+      }
       continue;
     }
     if (a) {
       a.dealt += f.raw;
-      const fight = a.perFight.get(f.encounterId) ?? { dealt: 0, kills: 0, n: f.n };
+      const fight = a.perFight.get(f.encounterId) ?? { dealt: 0, kills: 0, healing: 0, n: f.n };
       fight.dealt += f.raw;
       if (isKill(f)) {
         a.kills += 1;
@@ -455,9 +468,10 @@ export function mergeTrophies(
     x.downed += t.downed;
     for (const e of t.fights) x.fights.add(e);
     for (const [e, f] of t.perFight) {
-      const y = x.perFight.get(e) ?? { dealt: 0, kills: 0, n: f.n };
+      const y = x.perFight.get(e) ?? { dealt: 0, kills: 0, healing: 0, n: f.n };
       y.dealt += f.dealt;
       y.kills += f.kills;
+      y.healing += f.healing;
       y.n = Math.min(y.n, f.n);
       x.perFight.set(e, y);
     }

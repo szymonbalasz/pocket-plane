@@ -20,6 +20,7 @@ import { notify } from "../notifications";
 import type { QueryGate, SessionCache } from "./cache";
 import {
   awardsPayload,
+  campaignStats,
   fightStats,
   luckStats,
   type StatsRead,
@@ -47,8 +48,12 @@ function readOf(env: CommandEnv): StatsRead {
 
 /** FR-STATS-46: a campaign answer still waiting for its partials (never memoised). */
 const isPending = (x: unknown): boolean => {
-  const v = x as { luck?: { pending?: true }; trophies?: { pending?: true } };
-  return v.luck?.pending === true || v.trophies?.pending === true;
+  const v = x as {
+    luck?: { pending?: true };
+    trophies?: { pending?: true };
+    campaign?: { pending?: true };
+  };
+  return v.luck?.pending === true || v.trophies?.pending === true || v.campaign?.pending === true;
 };
 
 export function statsCommands(cache: SessionCache, gate: QueryGate, partials: Partials) {
@@ -80,7 +85,9 @@ export function statsCommands(cache: SessionCache, gate: QueryGate, partials: Pa
                   ? luckStats(r, sessions(), partials, input)
                   : input.scope === "trophies"
                     ? trophiesStats(r, partials, input.characterId, env.actor.playerId)
-                    : sessionsStats(r, sessions());
+                    : input.scope === "campaign"
+                      ? campaignStats(r, sessions(), partials)
+                      : sessionsStats(r, sessions());
           // FR-STATS-05: the role's strict schema; a field it lacks is a bug, never sent.
           return role === "dm" ? DmStatsResult.parse(result) : PlayerStatsResult.parse(result);
         },

@@ -3,7 +3,7 @@
 // view state); `openStatsAwards` (FR-SHELL-94) and `openStatsFight` (FR-STATS-34) write it as a
 // click would, so an open window switches at once.
 import { createStore } from "zustand";
-import type { StatsTab } from "./logic";
+import { DEFAULT_TAB, type StatsTab } from "./logic";
 
 export interface StatsView {
   tab: StatsTab;
@@ -18,7 +18,7 @@ export interface StatsView {
 }
 
 export const DEFAULT_VIEW: StatsView = {
-  tab: "fight",
+  tab: DEFAULT_TAB,
   fightKey: null,
   sessionFromN: null,
   highlightsOpen: null,

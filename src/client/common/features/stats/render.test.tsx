@@ -410,17 +410,20 @@ describe("FR-STATS-19 session cards", () => {
 });
 
 describe("Stats window", () => {
-  test("FR-STATS-18 FR-STATS-19 tabs Fight, Session; the stored view picks the tab (FR-SHELL-94 writes it)", () => {
+  test("FR-STATS-18 FR-STATS-19 FR-STATS-85 tabs Campaign, Fight, Session, Luck; Campaign by default; the stored view picks the tab (FR-SHELL-94 writes it)", () => {
     const html = wrap(PLAYER, <StatsWindow />);
     expect(
       [...html.matchAll(/data-testid="stats-tab" data-value="(\w+)"/g)].map((m) => m[1]),
-    ).toEqual(["fight", "session", "luck"]);
-    expect(html).toContain('data-testid="stats-fight"');
+    ).toEqual(["campaign", "fight", "session", "luck"]);
+    expect(html).toContain('data-testid="stats-campaign"');
+    expect(html).not.toContain('data-testid="stats-fight"');
+    statsViews().set(viewKey(PLAYER), { tab: "fight" });
+    expect(wrap(PLAYER, <StatsWindow />)).toContain('data-testid="stats-fight"');
     statsViews().set(viewKey(PLAYER), { tab: "session", sessionFromN: 1 });
     const after = wrap(PLAYER, <StatsWindow />);
     expect(after).toContain('data-testid="stats-session"');
     expect(after).not.toContain('data-testid="stats-fight"');
-    statsViews().set(viewKey(PLAYER), { tab: "fight", sessionFromN: null });
+    statsViews().set(viewKey(PLAYER), { tab: "campaign", sessionFromN: null });
   });
 });
 
