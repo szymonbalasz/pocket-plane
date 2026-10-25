@@ -232,15 +232,19 @@ for (const [width, height] of [
       expect(shown.length, report).toBeGreaterThan(0);
       const column = runs(shown, (f) => f.column);
       const timeline = runs(frames, (f) => [f.stack, f.column, f.popups]);
-      // One move per arrival at most (the card; an alert after it is its own).
-      const arrivals = runs(after, (f) => f.holds).length;
-      expect(column.length, JSON.stringify(timeline)).toBeLessThanOrEqual(arrivals + 1);
+      // One move per real change at most: a stack change (the card; an alert coming or going)
+      // or a popup arriving or leaving.
+      const ids = (x: Frame) => Object.keys(x.popups).sort().join();
+      const changes = frames.filter((f, k) => {
+        const p = frames[k - 1];
+        return p !== undefined && (p.holds !== f.holds || ids(p) !== ids(f));
+      }).length;
+      expect(column.length, JSON.stringify(timeline)).toBeLessThanOrEqual(changes + 1);
       // It moves only in a frame where a popup arrived or left or the stack changed, never on a
       // popup's own rolling → rest.
       for (const [k, f] of frames.entries()) {
         const p = frames[k - 1];
         if (!p || p.column === null || f.column === null || p.column === f.column) continue;
-        const ids = (x: Frame) => Object.keys(x.popups).sort().join();
         expect(p.holds !== f.holds || ids(p) !== ids(f), JSON.stringify(timeline)).toBe(true);
       }
       // The resting stack keeps clear of the popups (FR-DICEX-55).
