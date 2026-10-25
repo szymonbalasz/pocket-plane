@@ -3872,3 +3872,23 @@ From [notifications](../specs/notifications.md#6-functional-requirements) FR-NOT
 - **Tests:** `keep-out-primary.test.ts` (sim-14 e09, g01, r02 with repros; popup shift; popup across the column), `stack-inputs.test.ts` (`FR-NOTE-78 records`), `settle.test.ts` (`FR-NOTE-77 BL-115 the stack settles`: frame by frame, the pre-fix runtime as repro); e2e `f2-toasts.e2e.ts` (e09, r02), `combat2-polish.e2e.ts` FR-CBT-75 (both sizes).
 - **Fixtures:** no unit; bundle `f2-toasts-e2e` (= `session-sim-13`).
 - **CON-44:** 0 B.
+
+## 166. Sprint 12: theme switch (T1)
+
+From [theme-system](../specs/post-mvp/theme-system.md#6-functional-requirements) FR-THEME-01–04, -06, -08, -09, -16, -18, -20 ([ADR-0069](../architecture/adr/0069-theme-switch.md); DM #351, #353). **Built by `build/theme-switch`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Data side: [data model §131](../data-model/README.md#131-sprint-12-theme-switch-t1).
+
+| Seam | Contract | FR |
+|---|---|---|
+| Active theme | `data-theme="<id>"` on `<html>`; Default = no attribute. Ids `default`, `gilt` (`@ui/themes/theme.ts` `THEME_IDS`) | FR-THEME-01 |
+| Boot script (both `index.html`, `<head>`, classic inline, before the app's module script) | Reads `pp.theme.v1`; `{"theme": "gilt"}` → the attribute; missing → nothing; unreadable (blocked storage, not JSON, unknown id) → nothing + one `console.warn`. Same result as the store for every stored value (tested) | FR-THEME-04 |
+| Store (`@ui/themes/theme.ts` `themeStore()`, `useTheme()`) | `read()` zod-parses the entry (invalid / blocked → `default`); `write(id)` stores `{theme}`, sets / removes the attribute at once and notifies this tab's subscribers; a failed write keeps the choice in page memory, one warning. No `storage` listener: other tabs apply it on their next load | FR-THEME-02, -03 |
+| Tokens (`styles.css`) | Default: `:root, [data-theme="default"]`. Gilt: `[data-theme="gilt"] body, body [data-theme="gilt"]`, so `<html>` keeps Default's tokens and the map canvas (`scenes-map/theme.ts` reads `<html>`) stays unthemed (OQ-THEME-09 A). Theme tokens (§8) + `--frame-corner-tr` / `-bl` / `-br` (the kit's other three corner pieces); `body` font = `var(--font-body)`. Gilt keeps Default's `--destructive`, `--overlay`, `--caution*`, `--positive*`, `--success`, `--warning`; meaning tokens (`--hp-*`, `--visibility-hidden`, `--swatch-ink`, `--player-*`) only on `:root` | FR-THEME-08, -09 |
+| Preview | An element with `data-theme="<id>"` inside the page draws that theme's tokens (the Appearance swatches); a gilt preview inside another theme gets fallback fonts only (`:root:not([data-theme="gilt"]) [data-theme="gilt"]`) | FR-THEME-02, -16 |
+| Fonts (`@ui/themes/fonts.css`, `themes/fonts/*.woff2`) | Six Latin-subset woff2 (IM Fell English SC 400; EB Garamond variable 500–700; Alegreya Sans 400, 400 italic, 500, 700), 197 KB, `font-display: swap`; built as hashed `/assets/*.woff2`, no preload; named only by the gilt block, so fetched only while gilt is on. OFL licences + `ATTRIBUTION.md` beside them | FR-THEME-16 |
+| Appearance section (`theme.appearance`, order 15, both `pref-sections.ts`) | `theme-section`; one `theme-option` per theme (`data-value` = id, `data-state` `on` \| `off`, `aria-pressed`), hint "Only on this browser"; a click calls `write` | FR-THEME-02, -20 |
+| Player colours (`@shared/campaign-management/colors.ts`) | `WINDOW_SURFACES = {default: #171717, gilt: #101414}` (each theme's `--card`, tested); `colorProblem` (a) uses `surfaceContrast` = the lower ratio. Unchanged verdicts: gilt's surface is darker | FR-THEME-18 |
+| Dice tray | Its die-slot attribute is `data-die-slot` (was `data-slot`, which `components/ui` parts own since T0); test IDs unchanged | ADR-0069 |
+
+- **Tests:** `themes/theme.test.ts` (`FR-THEME-03 storage`, `FR-THEME-01`, `FR-THEME-04 boot script` per client), `themes/tokens.test.ts` (`FR-THEME-08 token completeness`, `FR-THEME-09`, `OQ-THEME-09`, `FR-THEME-06`, `FR-THEME-17 contrast`, `FR-THEME-18 player colours on both surfaces`, `FR-THEME-16 fonts`), `themes/appearance.test.tsx` + `{dm,player}/features/theme-system/pref-sections.test.ts` (`FR-THEME-02`, `FR-THEME-20`); e2e `theme-switch.e2e.ts` (`base`).
+- **Fixtures:** none (browser only).
+- **CON-44:** 0 B.
