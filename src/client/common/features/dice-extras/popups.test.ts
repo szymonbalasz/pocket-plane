@@ -5,6 +5,7 @@ import { type DiceThrow, throwDice } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import type { Rect } from "../play-shell/geometry";
 import {
+  dmColumnTop,
   dmPopupClear,
   dmStackAt,
   pipClip,
@@ -567,5 +568,97 @@ describe("FR-DICEX-63 popup line spacing", () => {
       "DM 6 on a hit",
     ]);
     for (const t of texts) expect([t, strays(t)]).toEqual([t, []]);
+  });
+});
+
+// BL-118 (X1 walkthrough `.verify/20261025-x1-toasts/`, steps 1 and 4): the DM popup column moved
+// with no arrival. Each commit of the column, from the report's frame series: the toast stack's
+// resting report, the column's height, the region row's drawn top the column started from (it
+// follows the toast height late) and where the column was drawn.
+describe("FR-DICEX-55 BL-118 the DM popup column moves once per real change", () => {
+  const vp = { w: 1440, h: 900 };
+  const W = 448;
+  interface Commit {
+    t: number;
+    /** What changed: a popup arrived / left, the toast stack settled, a popup's own rolling → rest. */
+    why: "popup" | "stack" | "rest" | "leave";
+    toast: Rect;
+    h: number;
+    /** The region row's drawn top as the old column read it (`box.top`). */
+    row: number;
+    drawn: [number, number];
+  }
+  const place = (c: Commit, start: number) => {
+    const clear = dmPopupClear(null, [], [], new Map([["note.toasts", c.toast]]), "dicex.popups");
+    const at = dmStackAt(vp, start, { w: W, h: c.h }, clear);
+    return [at.left, at.top] as [number, number];
+  };
+  const toast = (y: number, h: number): Rect => ({ x: 560, y, w: 320, h });
+  /** The commits where the column's spot differs from the one before. */
+  const moves = (series: Commit[], at: (c: Commit) => [number, number]) =>
+    series.flatMap((c, i) => {
+      const prev = series[i - 1];
+      return prev && at(prev).join() !== at(c).join() ? [c] : [];
+    });
+
+  // Step 1, run 5 (1440, PM at 424, 60, after a reload): B Attack + damage × 3, 2.5 s apart.
+  const run5: Commit[] = [
+    { t: 1824, why: "popup", toast: toast(442, 58), h: 138, row: 166, drawn: [496, 166] },
+    { t: 1915, why: "stack", toast: toast(377, 152), h: 138, row: 166, drawn: [496, 166] },
+    { t: 4139, why: "rest", toast: toast(377, 152), h: 138, row: 260, drawn: [104, 260] },
+    { t: 4254, why: "popup", toast: toast(377, 152), h: 284, row: 260, drawn: [104, 260] },
+    { t: 6767, why: "popup", toast: toast(377, 152), h: 430, row: 260, drawn: [104, 260] },
+  ];
+  // Step 4 (1440, Initiative + Game log): B × 2 (1.2 s apart), then C; 5 s rAF sample.
+  const step4: Commit[] = [
+    { t: 1292, why: "popup", toast: toast(100, 152), h: 138, row: 260, drawn: [496, 260] },
+    { t: 1343, why: "stack", toast: toast(100, 246), h: 138, row: 260, drawn: [104, 260] },
+    { t: 2590, why: "popup", toast: toast(100, 340), h: 284, row: 354, drawn: [104, 354] },
+    { t: 2889, why: "rest", toast: toast(100, 340), h: 284, row: 448, drawn: [496, 448] },
+    { t: 8641, why: "leave", toast: toast(100, 340), h: 138, row: 448, drawn: [496, 448] },
+    { t: 8785, why: "popup", toast: toast(100, 360), h: 284, row: 448, drawn: [104, 448] },
+    { t: 10593, why: "rest", toast: toast(100, 360), h: 284, row: 468, drawn: [496, 468] },
+    { t: 10743, why: "leave", toast: toast(100, 360), h: 138, row: 468, drawn: [496, 468] },
+  ];
+
+  for (const [name, series] of [
+    ["step 1 run 5", run5],
+    ["step 4", step4],
+  ] as const) {
+    test(`FR-DICEX-55 BL-118 X1 walkthrough ${name}: no move on a popup's own rolling → rest, one per arrival or settled stack change`, () => {
+      // The repro: started from the row's drawn top, the old column lands where it was drawn,
+      // and moves on its own rest commits (step 1: 2.2 s after the card; step 4: back right).
+      for (const c of series) expect([c.t, ...place(c, c.row)]).toEqual([c.t, ...c.drawn]);
+      const old = moves(series, (c) => place(c, c.row));
+      expect(old.some((c) => c.why === "rest")).toBe(true);
+      // BL-118: from the toast stack's resting report.
+      const at = (c: Commit) => place(c, dmColumnTop(c.toast.h));
+      const now = moves(series, at);
+      expect(now.every((c) => c.why === "popup" || c.why === "stack")).toBe(true);
+      // Never back and forth: each spot once.
+      const spots = series.map((c) => at(c).join()).filter((x, i, a) => i === 0 || a[i - 1] !== x);
+      expect(new Set(spots).size).toBe(spots.length);
+    });
+  }
+
+  test("FR-DICEX-55 BL-118 the column's spots from the report (step 1 run 5: left of the stack once the card lands; step 4: centred below it)", () => {
+    expect(run5.map((c) => place(c, dmColumnTop(c.toast.h)).join())).toEqual([
+      "496,166",
+      "104,260",
+      "104,260",
+      "104,260",
+      "104,260",
+    ]);
+    expect(step4.map((c) => place(c, dmColumnTop(c.toast.h)).join())).toEqual([
+      "496,260",
+      "496,354",
+      "496,448",
+      "496,448",
+      "496,448",
+      "496,468",
+      "496,468",
+      "496,468",
+    ]);
+    expect(dmColumnTop(0)).toBe(100);
   });
 });

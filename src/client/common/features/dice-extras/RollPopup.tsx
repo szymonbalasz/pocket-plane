@@ -31,6 +31,7 @@ import { cn } from "../../lib/utils";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { focusLogEntry } from "../dice-roll-log/focus";
 import { RollerName } from "../dice-roll-log/name-color";
+import { SHOWN_STACK_ID as NOTE_STACK_ID } from "../notifications/ToastRuntime";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
@@ -47,6 +48,7 @@ import { dice3d, whenChunk } from "./lazy3d";
 import {
   CELL_LINES,
   cellTag,
+  dmColumnTop,
   dmPopupClear,
   dmStackAt,
   linesH,
@@ -714,7 +716,10 @@ export function RollPopupStack({
     dm ? reports : new Map(),
     SHOWN_ID,
   );
-  const at = dmStackAt(vp, box.top, { w: g.w, h: box.h }, clear);
+  // BL-118: from the toast stack's resting report, so the column moves only when a popup arrives
+  // or leaves or that stack settles elsewhere, never on a popup's own rolling → rest re-render.
+  const start = dmColumnTop(reports.get(NOTE_STACK_ID)?.h ?? 0);
+  const at = dmStackAt(vp, start, { w: g.w, h: box.h }, clear);
   // FR-DICEX-47 short screens: only the popups that fit the region (newest first; the oldest
   // drops), never past the viewport's bottom (DM) or over the top bar (players).
   useLayoutEffect(() => {

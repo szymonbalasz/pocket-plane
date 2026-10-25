@@ -19,7 +19,7 @@ interface Box {
 }
 
 /**
- * One rAF sample on the DM page: the stack as drawn, its cards, the roll-popup column's top (its
+ * One rAF sample on the DM page: the stack as drawn, its cards, the roll-popup column's left,top (its
  * newest card: older ones move down as newer ones arrive above them) and each popup's top.
  */
 interface Frame {
@@ -30,7 +30,7 @@ interface Frame {
   text: string;
   /** What the stack holds: pending actions (summary, waiting, cards, "+N more") and other toasts. */
   holds: string;
-  column: number | null;
+  column: string | null;
   popups: Record<string, number>;
 }
 
@@ -145,7 +145,8 @@ async function startSampling(dm: Page) {
         })(),
         column: (() => {
           const col = document.querySelector('[data-testid="dicex-popup"]')?.parentElement;
-          return col ? Math.round(col.getBoundingClientRect().top) : null;
+          const c = col?.getBoundingClientRect();
+          return c ? `${Math.round(c.left)},${Math.round(c.top)}` : null;
         })(),
         popups,
       });
@@ -196,7 +197,9 @@ for (const [width, height] of [
       await sheet.getByTestId("charx-roll-attack-damage").first().click();
       await expect.poll(() => pendingCount(init)).toBe(before + 1);
       // The dice land and the popup's rows fill in; the fold has long settled.
-      await dm.waitForTimeout(1500);
+      // The dice land and the popups rest (X1 walkthrough 1: the column moved at its rest, 2.2 s
+      // after the card).
+      await dm.waitForTimeout(3500);
       const frames = await stopSampling(dm);
       // rAF runs slow in a loaded headless browser (~15 fps): a few frames per arrival suffice.
       expect(frames.length).toBeGreaterThan(10);
@@ -232,6 +235,14 @@ for (const [width, height] of [
       // One move per arrival at most (the card; an alert after it is its own).
       const arrivals = runs(after, (f) => f.holds).length;
       expect(column.length, JSON.stringify(timeline)).toBeLessThanOrEqual(arrivals + 1);
+      // It moves only in a frame where a popup arrived or left or the stack changed, never on a
+      // popup's own rolling → rest.
+      for (const [k, f] of frames.entries()) {
+        const p = frames[k - 1];
+        if (!p || p.column === null || f.column === null || p.column === f.column) continue;
+        const ids = (x: Frame) => Object.keys(x.popups).sort().join();
+        expect(p.holds !== f.holds || ids(p) !== ids(f), JSON.stringify(timeline)).toBe(true);
+      }
       // The resting stack keeps clear of the popups (FR-DICEX-55).
       const stack = await box(dm.getByTestId("note-toasts"));
       for (const p of await dm.getByTestId("dicex-popup").all()) {
@@ -347,5 +358,46 @@ test("BL-119 FR-NOTE-78 sim-15 c01 DM 1280×720: Roll requests at 504, 60 with t
     });
     expect(hit).toBe("");
   }
+  await dm.context().close();
+});
+
+test("BL-120 FR-NOTE-26 X1 walkthrough 3 DM 1440×900: Party Manager open (folded), a snapshot card's popup from Pending → the popup's card counts once", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+  await dm.getByTestId("ui-launcher-menu").click();
+  await dm.getByTestId("ui-launcher-reset").click();
+  const summary = dm.getByTestId("note-toast-pending-summary");
+  await expect(summary).toBeVisible();
+  await openWindow(dm, "party.board");
+  const init = await openWindow(dm, "cbt.initiative");
+  const drawn = dm
+    .getByTestId("note-toasts")
+    .locator('[data-testid="note-toast"][data-class="card"]');
+  const onStack = async () =>
+    Number(await summary.getAttribute("data-count")) +
+    Number(await summary.getAttribute("data-waiting")) +
+    (await drawn.count());
+  await settled(dm);
+  const pending = await pendingCount(init);
+  const base = (await onStack()) - pending;
+  // The oldest card: in the snapshot, counted in the summary (no toast of its own).
+  const card = init.getByTestId("cbt-init-card").first();
+  const id = (await card.getAttribute("data-record-id")) as string;
+  await expect(dm.locator(`[data-testid="note-toast"][data-record-id="${id}"]`)).toHaveCount(0);
+  await card.click();
+  const popup = dm.getByTestId("cbt-popup");
+  await expect(popup).toHaveAttribute("data-record-id", id);
+  // The popup shows it: the stack counts the rest (walkthrough: 13 + 1 + popup = 15 vs 14).
+  await expect.poll(onStack).toBe(base + pending - 1);
+  await settled(dm);
+  expect(await onStack()).toBe(base + pending - 1);
+  await popup.getByTestId("cbt-popup-later").click();
+  await expect(popup).toHaveCount(0);
+  await expect.poll(onStack).toBe(base + pending);
   await dm.context().close();
 });
