@@ -78,6 +78,8 @@ export function TrophiesView({
     t && !t.pending && t.lifetime && t.records
       ? { ...t, lifetime: t.lifetime, records: t.records }
       : null;
+  // BL-121: a record the server left out (withheld for players) has no row; none → no section.
+  const recordRows = ready ? RECORD_ROWS.filter((r) => r.key in ready.records) : [];
   return (
     <div
       data-testid="stats-trophies"
@@ -113,34 +115,36 @@ export function TrophiesView({
               })}
             </dl>
           </section>
-          <section className="flex flex-col gap-1">
-            <h3 className="text-xs font-medium text-muted-foreground">Records</h3>
-            <dl className="flex flex-col gap-1">
-              {RECORD_ROWS.map((r) => {
-                const { value, detail } = recordText(ready.records[r.key], r.key, client);
-                return (
-                  <div
-                    key={r.key}
-                    data-testid="stats-trophy"
-                    data-record-id={r.key}
-                    data-value={value}
-                    className="flex flex-wrap justify-between gap-x-2"
-                  >
-                    <dt className="text-muted-foreground">{r.label}</dt>
-                    <dd className="tabular-nums">{value}</dd>
-                    {detail ? (
-                      <dd
-                        data-testid="stats-trophy-detail"
-                        className="w-full wrap-anywhere text-xs text-muted-foreground"
-                      >
-                        {detail}
-                      </dd>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </dl>
-          </section>
+          {recordRows.length > 0 ? (
+            <section className="flex flex-col gap-1">
+              <h3 className="text-xs font-medium text-muted-foreground">Records</h3>
+              <dl className="flex flex-col gap-1">
+                {recordRows.map((r) => {
+                  const { value, detail } = recordText(ready.records[r.key] ?? null, r.key, client);
+                  return (
+                    <div
+                      key={r.key}
+                      data-testid="stats-trophy"
+                      data-record-id={r.key}
+                      data-value={value}
+                      className="flex flex-wrap justify-between gap-x-2"
+                    >
+                      <dt className="text-muted-foreground">{r.label}</dt>
+                      <dd className="tabular-nums">{value}</dd>
+                      {detail ? (
+                        <dd
+                          data-testid="stats-trophy-detail"
+                          className="w-full wrap-anywhere text-xs text-muted-foreground"
+                        >
+                          {detail}
+                        </dd>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </dl>
+            </section>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             Whole campaign, counted from the game log
             {client === "dm" ? (

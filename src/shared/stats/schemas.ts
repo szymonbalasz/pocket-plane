@@ -295,15 +295,22 @@ export const Award = z.strictObject({
 });
 export type Award = z.infer<typeof Award>;
 
-/** BL-111: a player's cards may leave out "Most damage dealt" (8); the DM's are always 9. */
+/**
+ * BL-111 / BL-121: a player's cards leave out each award an unseen line could change (FR-STATS-12),
+ * the rest in card order; the DM's are always 9.
+ */
 export const SessionAwards = SessionSummary.extend({
   awards: z
     .array(Award)
-    .min(AWARD_KEYS.length - 1)
     .max(AWARD_KEYS.length)
-    .refine((a) => a.length === AWARD_KEYS.length || !a.some((x) => x.key === "most-dealt"), {
-      message: "Only Most damage dealt may be left out",
-    }),
+    .refine(
+      (a) =>
+        a.every(
+          (x, i) =>
+            i === 0 || AWARD_KEYS.indexOf(x.key) > AWARD_KEYS.indexOf(a[i - 1]?.key as AwardKey),
+        ),
+      { message: "Awards in card order, each once" },
+    ),
 });
 export type SessionAwards = z.infer<typeof SessionAwards>;
 
@@ -383,11 +390,12 @@ export const TrophyRecord = z
   .strictObject({ value: Count, to: Name.optional(), fight: Label })
   .nullable();
 export type TrophyRecord = z.infer<typeof TrophyRecord>;
+/** BL-121: a key left out = withheld for players (an unseen line could change it; no row). */
 export const TrophyRecords = z.strictObject({
-  "biggest-hit": TrophyRecord,
-  "biggest-overkill": TrophyRecord,
-  "best-fight-damage": TrophyRecord,
-  "best-fight-kills": TrophyRecord,
+  "biggest-hit": TrophyRecord.optional(),
+  "biggest-overkill": TrophyRecord.optional(),
+  "best-fight-damage": TrophyRecord.optional(),
+  "best-fight-kills": TrophyRecord.optional(),
 });
 export type TrophyRecords = z.infer<typeof TrophyRecords>;
 
@@ -450,12 +458,13 @@ export const CampaignRecord = z
   })
   .nullable();
 export type CampaignRecord = z.infer<typeof CampaignRecord>;
+/** BL-121: a key left out = withheld for players (an unseen line could change it; no line). */
 export const CampaignRecords = z.strictObject({
-  "biggest-hit": CampaignRecord,
-  "biggest-overkill": CampaignRecord,
-  "best-fight-damage": CampaignRecord,
-  "best-fight-kills": CampaignRecord,
-  "best-fight-healing": CampaignRecord,
+  "biggest-hit": CampaignRecord.optional(),
+  "biggest-overkill": CampaignRecord.optional(),
+  "best-fight-damage": CampaignRecord.optional(),
+  "best-fight-kills": CampaignRecord.optional(),
+  "best-fight-healing": CampaignRecord.optional(),
 });
 export type CampaignRecords = z.infer<typeof CampaignRecords>;
 

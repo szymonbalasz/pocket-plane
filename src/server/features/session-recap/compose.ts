@@ -95,12 +95,13 @@ const more = (total: number, max: number) => (total > max ? { more: total - max 
 
 /** FR-RECAP-12: one fight line from its Highlights (the whole fight, stats' fight scope). */
 function fightLine(r: StatsRead, f: FightRow, label: string, chars: ReturnType<typeof characters>) {
-  // FR-STATS-03 + BL-111: the viewer's facts; players get no MVP while party damage is unseen.
+  // FR-STATS-03 + BL-111 / BL-121: the viewer's facts; players get no MVP while party damage is
+  // unseen.
   const seen = seenFacts(r.viewer, combatFacts(r.db, { encounterId: f.id }), chars);
   const h = fightHighlights({
     role: r.viewer.role,
     facts: seen.facts,
-    dealtUnseen: seen.dealtUnseen,
+    unseen: seen.unseen,
     rolls: [],
     characters: chars,
     round: f.round,
@@ -268,11 +269,11 @@ export function recapBody(
   s: SessionBounds,
 ): RecapBody {
   const chars = characters(r.db, r.campaignId);
-  const { facts, dealtUnseen } = sessionSeenFacts(r, s, chars);
+  const rolls = luckRolls(r, s.fromN, s.toN);
+  const { facts, unseen } = sessionSeenFacts(r, s, chars, rolls);
   // FR-RECAP-25: one `fightsFor` per query (labels, the session's fights, the awards' details).
   const fights = fightsFor(r);
   const inSession = sessionFights(r, s, facts, fights);
-  const rolls = luckRolls(r, s.fromN, s.toN);
   const trophies = new Map<string, TrophyTally>();
   addTrophies(trophies, facts, chars, r.viewer.role);
   const luck = new Map<string, LuckTally>();
@@ -293,8 +294,8 @@ export function recapBody(
       rolls,
       characters: chars,
       fightLabel: (id) => fights.label.get(id) ?? "",
-      // BL-111: players' cards leave out "Most damage dealt" while party damage is unseen.
-      dealtUnseen,
+      // BL-111 / BL-121: players' cards leave out each award an unseen line could change.
+      unseen,
     }),
   };
 }

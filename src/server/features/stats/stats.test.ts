@@ -147,7 +147,15 @@ describe("FR-STATS-04 hidden never leaks", () => {
     expect(names(player.fight?.rows ?? [])).toEqual(["Mira", "Thorn"]);
     expect(rowOf(player.fight?.rows ?? [], "Thorn")?.taken).toBe(2);
     expect(awardOf(t.session().session?.awards ?? [], "most-nat20").value).toBe(1);
-    expect(awardOf(t.session(t.p1).session?.awards ?? [], "most-nat20").value).toBeNull();
+    // BL-121: the hidden nat 20 withholds players' Most nat 20s / 1s, the hidden Elite's hit on
+    // Thorn their Most damage taken / times downed (no card; the others stay).
+    expect((t.session(t.p1).session?.awards ?? []).map((a) => a.key)).toEqual([
+      "biggest-hit",
+      "biggest-overkill",
+      "most-dealt",
+      "most-healing",
+      "most-kills",
+    ]);
     // A reveal doesn't backfill (the line stays non-public).
     t.run("map.setTokenHidden", { tokenId: t.tokens.elite, hidden: false });
     expect(rowOf(t.fight(t.p1).fight?.rows ?? [], "Thorn")?.taken).toBe(2);

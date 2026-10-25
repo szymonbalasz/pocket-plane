@@ -3,7 +3,8 @@
 // `stats-b` bundle (expected numbers: `fixtures/units/stats/stats.fixtures.test.ts` header):
 // - Stats opens on Campaign (the first tab); the header, Thorn's row and Biggest overkill match
 //   the fixture per role: the DM counts the hidden Captain / Goblin 2 kills, the hidden Elite's 9
-//   and the hidden nat 20s; the player's overkill reads "30 damage";
+//   and the hidden nat 20s; the player gets only the healing record (BL-121: the damage records
+//   are withheld);
 // - at the default 400 × 412 nothing scrolls the window body sideways (the table scrolls in its box);
 // - a live public kill (Thorn 25 → Bandit 4) updates both Campaign tabs (trailing refresh);
 // - Fight, then close and reopen from the launcher: back on Campaign. Rules: bun test.
@@ -111,7 +112,13 @@ test("FR-STATS-81 FR-STATS-82 FR-STATS-83 FR-STATS-85 FR-STATS-86 FR-STATS-87 St
         .locator('[data-testid="stats-campaign-record"][data-record-id="biggest-overkill"]')
         .getByTestId("stats-campaign-record-value");
     await expect(overkill(wins.dm)).toHaveText("23");
-    await expect(overkill(wins.p2)).toHaveText("30 damage");
+    // BL-121 (sprint 12): the campaign holds party damage players don't see, so their damage
+    // records are withheld (no line); Most healing in one fight (Brakka 8) stays.
+    await expect(overkill(wins.p2)).toHaveCount(0);
+    await expect(wins.p2.getByTestId("stats-campaign-record")).toHaveCount(1);
+    await expect(
+      wins.p2.locator('[data-testid="stats-campaign-record"][data-record-id="best-fight-healing"]'),
+    ).toContainText("Brakka");
     await expect(wins.p2).not.toContainText("Old Crypt");
     await expect(wins.dm).toContainText("Old Crypt");
   });

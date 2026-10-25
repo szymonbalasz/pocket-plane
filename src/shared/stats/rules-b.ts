@@ -13,6 +13,8 @@ import {
   type StatsRole,
   type StatsRoll,
   type StatsSide,
+  type Unseen,
+  type UnseenKind,
 } from "./rules";
 import {
   DM_DICE_KEY,
@@ -172,9 +174,23 @@ export interface HighlightsInput {
   span: { from: string; to: string } | null;
   /** DM only: monsters still standing. */
   standing: readonly { id: string; name: string; hidden: boolean }[];
-  /** BL-111: players only: the fight holds party damage they don't see; MVP is left empty. */
-  dealtUnseen?: boolean;
+  /**
+   * BL-111 / BL-121: players only: the kinds of party line or roll in the fight they don't see;
+   * the items those could change (`HIGHLIGHT_UNSEEN`) are left empty (hidden, as when nobody
+   * scored).
+   */
+  unseen?: Unseen;
 }
+
+/** BL-121: the kind of unseen line that empties each award-like Highlights item (FR-STATS-31). */
+export const HIGHLIGHT_UNSEEN = {
+  mvp: "dealt",
+  "biggest-hit": "dealt",
+  "biggest-overkill": "dealt",
+  "most-healing": "healed",
+  nat20: "rolled",
+  nat1: "rolled",
+} as const satisfies Record<string, UnseenKind>;
 
 const hiddenSide = (s: StatsSide | null) => !!s && (s.hidden || s.ownerHidden);
 
@@ -234,16 +250,18 @@ export function fightHighlights(input: HighlightsInput): DmHighlights {
   });
   const nameable = (f: StatsFact) =>
     role === "dm" || !(hiddenSide(f.target) || hiddenSide(f.attacker));
+  // BL-111 / BL-121 (FR-STATS-12): an item an unseen line could change is empty, so hidden.
+  const item = (key: keyof typeof HIGHLIGHT_UNSEEN, stat: () => DmHighlightStat) =>
+    input.unseen?.has(HIGHLIGHT_UNSEEN[key]) ? { value: null, winners: [] } : stat();
   const out = {
-    // BL-111 (FR-STATS-12): an empty MVP item is hidden, as when nobody scored.
-    mvp: input.dealtUnseen ? { value: null, winners: [] } : boards.mvp.stat(role),
-    "biggest-hit": boards.hit.stat(role, nameable),
-    "biggest-overkill": boards.overkill.stat(role, nameable),
-    "most-healing": boards.healing.stat(role),
+    mvp: item("mvp", () => boards.mvp.stat(role)),
+    "biggest-hit": item("biggest-hit", () => boards.hit.stat(role, nameable)),
+    "biggest-overkill": item("biggest-overkill", () => boards.overkill.stat(role, nameable)),
+    "most-healing": item("most-healing", () => boards.healing.stat(role)),
     kills: list(kills),
     downed: list(downs),
-    nat20: boards.nat20.stat(role),
-    nat1: boards.nat1.stat(role),
+    nat20: item("nat20", () => boards.nat20.stat(role)),
+    nat1: item("nat1", () => boards.nat1.stat(role)),
     rounds: input.round,
     duration: input.span ? Math.max(0, Date.parse(input.span.to) - Date.parse(input.span.from)) : 0,
   };
@@ -481,11 +499,24 @@ export function mergeTrophies(
   }
 }
 
-/** FR-STATS-42: Lifetime + Records for one character (`fightLabel`: the viewer's label). */
+/** BL-121: the kind of unseen line that withholds each Trophies record (all damage). */
+export const TROPHY_RECORD_UNSEEN = {
+  "biggest-hit": "dealt",
+  "biggest-overkill": "dealt",
+  "best-fight-damage": "dealt",
+  "best-fight-kills": "dealt",
+} as const satisfies Record<keyof TrophyRecords, UnseenKind>;
+
+/**
+ * FR-STATS-42: Lifetime + Records for one character (`fightLabel`: the viewer's label). BL-121:
+ * players get no record an `unseen` kind (anywhere in the campaign) could change: the key is left
+ * out, no row (Lifetime counts stay: numbers, not awards).
+ */
 export function trophyCase(
   t: TrophyTally | undefined,
   luck: LuckTally | undefined,
   fightLabel: (encounterId: string) => string,
+  unseen?: Unseen,
 ): { lifetime: TrophyLifetime; records: TrophyRecords } {
   const x = t ?? trophyTally();
   const l = luck ?? luckTally();
@@ -513,11 +544,27 @@ export function trophyCase(
       kills: x.kills,
       downed: x.downed,
     },
-    records: {
-      "biggest-hit": record(x.biggestHit),
-      "biggest-overkill": record(x.biggestOverkill),
-      "best-fight-damage": bestFight("dealt"),
-      "best-fight-kills": bestFight("kills"),
-    },
+    records: withoutUnseen(
+      {
+        "biggest-hit": record(x.biggestHit),
+        "biggest-overkill": record(x.biggestOverkill),
+        "best-fight-damage": bestFight("dealt"),
+        "best-fight-kills": bestFight("kills"),
+      },
+      TROPHY_RECORD_UNSEEN,
+      unseen,
+    ),
   };
+}
+
+/** BL-121: `records` without the keys an `unseen` kind withholds (absent `unseen`: all of them). */
+export function withoutUnseen<K extends string, V>(
+  records: Record<K, V>,
+  kinds: Readonly<Record<K, UnseenKind>>,
+  unseen: Unseen | undefined,
+): Partial<Record<K, V>> {
+  if (!unseen?.size) return records;
+  return Object.fromEntries(
+    Object.entries(records).filter(([k]) => !unseen.has(kinds[k as K])),
+  ) as Partial<Record<K, V>>;
 }
