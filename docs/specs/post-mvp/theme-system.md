@@ -1,7 +1,7 @@
 ---
 title: Theme system
 prefix: THEME
-status: draft
+status: in-review
 owner: spec-theme-system
 phase: post-mvp
 ---
@@ -66,7 +66,7 @@ phase: post-mvp
 | FR-THEME-13 | **Toasts** (ShellToaster, notification cards, damage-card popup): framed like a small window without corner pieces; actions as stone buttons. | |
 | FR-THEME-14 | **Scrollbars:** always visible, thin gold thumb on a dark track, in every scroll container (`scrollbar-color` + WebKit fallback). Horizontal tab strips scroll with the mouse wheel and show arrow buttons while they overflow. | Kit draft 2 feedback |
 | FR-THEME-15 | **Numbers** use `--font-num` with lining, tabular figures everywhere digits are shown in boxes, tables, rows and results. | |
-| FR-THEME-16 | **Fonts:** IM Fell English SC (titles, labels), EB Garamond 500/700 (numbers, names), Alegreya Sans 400/500/700 + italic (body). Committed as Latin-subset woff2 with their OFL licence files (proposed, OQ-THEME-04); declared by `@font-face` so they download only while `gilt` is on. Fallback stacks keep the page usable if a font fails. | ADR-0018 attribution style |
+| FR-THEME-16 | **Fonts:** IM Fell English SC (titles, labels), EB Garamond 500/700 (numbers, names), Alegreya Sans 400/500/700 + italic (body). Committed as Latin-subset woff2 with their OFL licence files (decided, OQ-THEME-04); declared by `@font-face` so they download only while `gilt` is on. Fallback stacks keep the page usable if a font fails. | ADR-0018 attribution style |
 | FR-THEME-17 | **Contrast:** under `gilt`, body text ≥ 7 : 1 and labels, numbers and gold text ≥ 4.5 : 1 on `--card`; focus ring visible on every surface. | Test `FR-THEME-17 contrast` |
 | FR-THEME-18 | **Player colours:** FR-CAMP-31's contrast check runs against both themes' window surfaces; a colour must pass both. | OQ-THEME-12 |
 | FR-THEME-19 | **Default unchanged:** the token cleanup (§2) and the theme layer change no pixel under `default`. | Walkthrough step D1 |
@@ -152,10 +152,10 @@ None. No REST, intents or events; 0 bytes on the wire.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-THEME-01 | How do themes style components? | **A: one stylesheet per theme, keyed on `[data-theme] [data-slot=…]` and test IDs, no component edits** · B: Tailwind `gilt:` variants in every className | yes | ADR proposed, shared UI |
+| OQ-THEME-01 | How do themes style components? | **Decided (DM, 2026-10-25): A**, one stylesheet per theme, keyed on `[data-theme] [data-slot=…]` and test IDs, no theme logic in components · ~~B: Tailwind `gilt:` variants in every className~~ | decided | ADR proposed, shared UI |
 | OQ-THEME-02 | Who picks the theme? | **A: each person, per browser** · B: per user, stored on the server · C: the DM sets a campaign default, people can override | no | SHELL |
 | OQ-THEME-03 | Default for a browser with no choice yet | **A: Default** until the T2 walkthrough passes, then the DM decides · B: Gilt & Stone | no | owner: DM |
-| OQ-THEME-04 | How are fonts shipped? | **A: committed Latin-subset woff2 + OFL licences** · B: `@fontsource/*` packages (new dependency, DM OK needed) · C: Google Fonts CDN (no: offline play, privacy) | yes | tooling |
+| OQ-THEME-04 | How are fonts shipped? | **Decided (DM, 2026-10-25): A**, committed Latin-subset woff2 + OFL licences · ~~B: `@fontsource/*` packages~~ · ~~C: Google Fonts CDN~~ | decided | tooling |
 | OQ-THEME-05 | Alegreya Sans looks smaller than the system sans at 14 px. Bump body text under Gilt & Stone? | **A: same scale (FR-THEME-06), judge in the walkthrough** · B: +1 px body under `gilt` (grown windows change height) | no | SHELL layout tests |
 | OQ-THEME-06 | The printed-sheet layout (shield AC, ability blocks with saves, boxed skills, passives row): where? | **A: a CHARX amendment, same markup in both themes, styled per theme** · B: Gilt-only markup | no | [character-sheet-full](../character-sheet-full.md) |
 | OQ-THEME-07 | The sheet's default window is 320 × 440; the printed look wants more room | **A: keep 320 × 440 (it holds, kit draft 2)** · B: a larger default, needs a placer check | no | CHARX, SHELL |

@@ -1,6 +1,6 @@
 # Proposed ADR: Theme switch
 
-- **Status:** proposed ([theme-system](../../specs/post-mvp/theme-system.md), OQ-THEME-01)
+- **Status:** proposed; the DM picked this option on 2026-10-25 ([theme-system](../../specs/post-mvp/theme-system.md), OQ-THEME-01). Integrator numbers it at merge.
 - **Context:** The DM wants a BG2/NWN-inspired look (Gilt & Stone) as an option next to today's shadcn look. The client already styles almost everything through shadcn tokens (≈ 970 token class uses; 21 raw colour classes in 15 files; raw hex mostly in the map canvas). The play shell's placer, Fit and layout tests depend on exact window and chrome sizes.
 
 ## Decision
