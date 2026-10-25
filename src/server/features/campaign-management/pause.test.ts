@@ -11,7 +11,7 @@ import { stateDigest } from "../../db/digest";
 import { campaign } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import type { TestClient } from "../../testing/harness";
-import { DM_ACTOR } from "../../testing/services";
+import { createTestServices, DM_ACTOR } from "../../testing/services";
 import { silentWav } from "../assets-pipeline/audio-bytes";
 import { ingestAsset } from "../assets-pipeline/ingest";
 import {
@@ -20,6 +20,7 @@ import {
   TEST_SECRET,
   testPng,
 } from "../assets-pipeline/testing";
+import { createCampaign } from "./commands";
 import { pauseCampaign, resumeCampaign } from "./pause";
 
 let h: AssetServer;
@@ -51,7 +52,15 @@ const logged = () =>
   readEventLog(h.db)
     .filter((e) => e.type === CampaignPaused.type || e.type === CampaignResumed.type)
     .map((e) => e.type);
-const settle = () => new Promise((r) => setTimeout(r, 60));
+/**
+ * BL-116: other connections' frames land after the sender's ack, later on a loaded machine: wait
+ * (≤ 2 s) until every client holds the campaign row `ok` expects, instead of a fixed 60 ms.
+ */
+const settled = async (cs: TestClient[], ok: (c: CampaignRecord | undefined) => boolean) => {
+  for (const deadline = Date.now() + 2000; Date.now() < deadline; await Bun.sleep(10)) {
+    if (cs.every((c) => ok(camp(c)))) return;
+  }
+};
 const image = async (seed = 1) =>
   (
     await ingestAsset(
@@ -62,6 +71,15 @@ const image = async (seed = 1) =>
   ).asset.id;
 const minutes = (from: string, to: string | null) =>
   to === null ? null : (Date.parse(to) - Date.parse(from)) / 60_000;
+/**
+ * BL-116: `backAt` (from `clock.now()`) and `startedAt` (`clock.iso()`) are two clock reads, so on
+ * a loaded machine they may straddle a millisecond (sim gate: 9.99998 min). `backInMin` is whole
+ * minutes: compare to the minute.
+ */
+const wholeMinutes = (from: string, to: string | null) => {
+  const m = minutes(from, to);
+  return m === null ? null : Math.round(m);
+};
 
 describe("pause commands (FR-CAMP-46, -47)", () => {
   test("FR-CAMP-46 pause field: on the wire only while paused, for every connection of the campaign", async () => {
@@ -74,7 +92,7 @@ describe("pause commands (FR-CAMP-46, -47)", () => {
     expect(await pause(dm, { message: "Pizza break", imageAssetId: town, backInMin: 10 })).toBe(
       "ack",
     );
-    await settle();
+    await settled([dm, p1, p2], (x) => x?.pause?.message === "Pizza break");
     for (const c of [dm, p1, p2]) {
       expect(camp(c)?.pause).toMatchObject({ message: "Pizza break", imageAssetId: town });
     }
@@ -86,7 +104,7 @@ describe("pause commands (FR-CAMP-46, -47)", () => {
     expect(ev?.changes.map((c) => c.type)).toEqual(["campaign"]);
 
     expect(await resume(dm)).toBe("ack");
-    await settle();
+    await settled([dm, p1, p2], (x) => x !== undefined && !("pause" in x));
     for (const c of [dm, p1, p2]) expect(camp(c)).not.toHaveProperty("pause");
     // Leak: after resume a reconnecting player's snapshot has no pause and no image ID.
     const again = await h.live({ role: "player", token: h.p1.linkToken });
@@ -109,7 +127,7 @@ describe("pause commands (FR-CAMP-46, -47)", () => {
     );
     const first = row()?.pause;
     expect(first).toMatchObject({ message: "Pizza break", imageAssetId: town });
-    expect(minutes(first?.startedAt as string, first?.backAt ?? null)).toBe(10);
+    expect(wholeMinutes(first?.startedAt as string, first?.backAt ?? null)).toBe(10);
     // Update: a field left out keeps its value; startedAt kept.
     expect(await pause(dm, { imageAssetId: other })).toBe("ack");
     expect(row()?.pause).toEqual({ ...(first as object), imageAssetId: other } as never);
@@ -166,7 +184,7 @@ describe("pause commands (FR-CAMP-46, -47)", () => {
     expect(await pause(b, { message: "B" })).toBe("ack");
     expect(row()?.pause?.message).toBe("B");
     expect(await resume(a)).toBe("ack");
-    await settle();
+    await settled([p2], (x) => x !== undefined && !("pause" in x));
     expect(camp(p2)).not.toHaveProperty("pause");
   });
 
@@ -190,4 +208,19 @@ describe("pause commands (FR-CAMP-46, -47)", () => {
     s.commands.run(resumeCampaign, {}, { actor });
     expect(row()?.pause).toBeNull();
   });
+});
+
+test("FR-CAMP-47 BL-116 a pause's minutes survive a clock that moves between its two reads", () => {
+  // The load-only flake, reproduced: every clock read 1 ms later than the one before.
+  let ms = Date.parse("2026-10-24T20:00:00.000Z");
+  const s = createTestServices({
+    clock: { now: () => ms++, iso: () => new Date(ms++).toISOString() },
+  });
+  const c = s.commands.run(createCampaign, { name: "Ticking" }, { actor: DM_ACTOR });
+  const actor = { ...DM_ACTOR, campaignId: c.id };
+  s.commands.run(pauseCampaign, { backInMin: 10 }, { actor });
+  const p = s.db.select().from(campaign).where(eq(campaign.id, c.id)).get()?.pause;
+  const from = p?.startedAt as string;
+  expect(minutes(from, p?.backAt ?? null)).not.toBe(10);
+  expect(wholeMinutes(from, p?.backAt ?? null)).toBe(10);
 });
