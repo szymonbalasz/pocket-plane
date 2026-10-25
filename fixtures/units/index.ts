@@ -137,6 +137,7 @@ import holdGreystoneReminders from "./strongholds/hold-greystone-reminders";
 import holdGreystoneStores from "./strongholds/hold-greystone-stores";
 import holdTowerMove from "./strongholds/hold-tower-move";
 import holdTowerSecret from "./strongholds/hold-tower-secret";
+import themeRound3 from "./theme-system/theme-round-3";
 
 export const units: readonly Fixture[] = [
   campaign,
@@ -295,4 +296,6 @@ export const units: readonly Fixture[] = [
   // Sprint 11 track F3 (fix/f3-combat-dice): down companions (BL-110), a second prompt (BL-112)
   f3DownCompanions,
   f3RequestPerception,
+  // Sprint 12 T2 (build/theme-gilt): combat-1 stepped to round 3 for the Gilt & Stone walkthrough
+  themeRound3,
 ];

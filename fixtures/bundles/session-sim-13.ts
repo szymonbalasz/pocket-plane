@@ -33,5 +33,7 @@ export default defineBundle({
     // `f3-down-companions` changes existing HP, so it stays in `f3-combat-dice`)
     // CS (sprint 12, DM #353): printed sheet layout, FR-CHARX-105–120 (no unit: layout only)
     // T1 (sprint 12, DM #353): theme switch (no unit: client-only, browser storage)
+    // T2 (sprint 12, DM #353): Gilt & Stone (no unit: client-only; `theme-round-3` steps turns, so it
+    // stays in `theme-gilt`)
   ],
 });
