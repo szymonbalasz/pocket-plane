@@ -81,7 +81,7 @@ Sprint 10:
 
 ## Pending DM decisions
 
-- After T2's walkthrough: the default theme (OQ-THEME-03). *(Recap answered #351–#353; art build plan was:* for the next sprint: T0 `fix/theme-tokens` (raw colour classes in 15 files → tokens, `data-slot` on every `components/ui` part, Launcher measures the computed font; shared files, no visible change) → T1 `build/theme-switch` (data-theme, boot script, `pp.theme.v1`, Appearance section, bundled fonts) ∥ `build/charx-print-sheet` (character-sheet folders only) → T2 `build/theme-gilt` last (`themes/gilt.css` incl. `sheet-*` slots, bundle `theme-gilt`, walkthrough). Test plans: theme-system §13–14, character-sheet-full §6.2 / §13.)
+- After T2's walkthrough: which theme is the default (OQ-THEME-03). Recap answered (#351–#353).
 
 ## Resolved locally (report at gate)
 
