@@ -198,7 +198,8 @@ for (const [width, height] of [
       // The dice land and the popup's rows fill in; the fold has long settled.
       await dm.waitForTimeout(1500);
       const frames = await stopSampling(dm);
-      expect(frames.length).toBeGreaterThan(30);
+      // rAF runs slow in a loaded headless browser (~15 fps): a few frames per arrival suffice.
+      expect(frames.length).toBeGreaterThan(10);
       // The card's arrival: the first frame the stack shows one more pending action (a card or
       // the summary's count).
       const first = frames[0] as Frame;
