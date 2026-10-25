@@ -303,7 +303,7 @@ function PartChip({
         <span
           data-testid="mod-popup-part-defense"
           data-value={index}
-          className="text-amber-500 dark:text-amber-400"
+          className="text-caution-foreground"
         >
           {hint}
         </span>

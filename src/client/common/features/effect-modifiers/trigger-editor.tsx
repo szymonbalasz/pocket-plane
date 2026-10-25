@@ -428,7 +428,7 @@ function ConfirmBox({
   onChange(v: boolean): void;
 }) {
   return (
-    <span className="flex items-center gap-1 text-xs text-amber-500">
+    <span className="flex items-center gap-1 text-xs text-caution">
       <Checkbox
         data-testid="mod-trig-editor-confirm"
         data-value={what}

@@ -13,9 +13,13 @@ import { cn } from "../../lib/utils";
 
 // ---- DropdownMenu ----
 export const DropdownMenu = DM.Root;
-export const DropdownMenuTrigger = DM.Trigger;
+export function DropdownMenuTrigger(props: React.ComponentProps<typeof DM.Trigger>) {
+  return <DM.Trigger data-slot={props.asChild ? undefined : "dropdown-menu-trigger"} {...props} />;
+}
 export const DropdownMenuSub = DM.Sub;
-export const DropdownMenuRadioGroup = DM.RadioGroup;
+export function DropdownMenuRadioGroup(props: React.ComponentProps<typeof DM.RadioGroup>) {
+  return <DM.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
+}
 
 const menuSurface =
   "z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md";
@@ -29,7 +33,12 @@ export function DropdownMenuContent({
 }: React.ComponentProps<typeof DM.Content>) {
   return (
     <DM.Portal>
-      <DM.Content sideOffset={sideOffset} className={cn(menuSurface, className)} {...props} />
+      <DM.Content
+        data-slot="dropdown-menu-content"
+        sideOffset={sideOffset}
+        className={cn(menuSurface, className)}
+        {...props}
+      />
     </DM.Portal>
   );
 }
@@ -41,6 +50,7 @@ export function DropdownMenuItem({
 }: React.ComponentProps<typeof DM.Item> & { variant?: "destructive" }) {
   return (
     <DM.Item
+      data-slot="dropdown-menu-item"
       className={cn(
         menuItem,
         variant === "destructive" && "text-destructive focus:text-destructive",
@@ -55,12 +65,19 @@ export function DropdownMenuSeparator({
   className,
   ...props
 }: React.ComponentProps<typeof DM.Separator>) {
-  return <DM.Separator className={cn("-mx-1 my-1 h-px bg-border", className)} {...props} />;
+  return (
+    <DM.Separator
+      data-slot="dropdown-menu-separator"
+      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      {...props}
+    />
+  );
 }
 
 export function DropdownMenuLabel({ className, ...props }: React.ComponentProps<typeof DM.Label>) {
   return (
     <DM.Label
+      data-slot="dropdown-menu-label"
       className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
       {...props}
     />
@@ -73,7 +90,11 @@ export function DropdownMenuSubTrigger({
   ...props
 }: React.ComponentProps<typeof DM.SubTrigger>) {
   return (
-    <DM.SubTrigger className={cn(menuItem, "data-[state=open]:bg-accent", className)} {...props}>
+    <DM.SubTrigger
+      data-slot="dropdown-menu-sub-trigger"
+      className={cn(menuItem, "data-[state=open]:bg-accent", className)}
+      {...props}
+    >
       {children}
       <ChevronRightIcon className="ml-auto" />
     </DM.SubTrigger>
@@ -86,7 +107,11 @@ export function DropdownMenuSubContent({
 }: React.ComponentProps<typeof DM.SubContent>) {
   return (
     <DM.Portal>
-      <DM.SubContent className={cn(menuSurface, className)} {...props} />
+      <DM.SubContent
+        data-slot="dropdown-menu-sub-content"
+        className={cn(menuSurface, className)}
+        {...props}
+      />
     </DM.Portal>
   );
 }
@@ -97,7 +122,11 @@ export function DropdownMenuRadioItem({
   ...props
 }: React.ComponentProps<typeof DM.RadioItem>) {
   return (
-    <DM.RadioItem className={cn(menuItem, "pl-8", className)} {...props}>
+    <DM.RadioItem
+      data-slot="dropdown-menu-radio-item"
+      className={cn(menuItem, "pl-8", className)}
+      {...props}
+    >
       <span className="absolute left-2 flex size-3.5 items-center justify-center">
         <DM.ItemIndicator>
           <CheckIcon />
@@ -120,6 +149,7 @@ export function PopoverContent({
   return (
     <P.Portal>
       <P.Content
+        data-slot="popover-content"
         sideOffset={sideOffset}
         className={cn(
           "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none",
@@ -133,12 +163,19 @@ export function PopoverContent({
 
 // ---- ToggleGroup ----
 export function ToggleGroup({ className, ...props }: React.ComponentProps<typeof TG.Root>) {
-  return <TG.Root className={cn("flex items-center gap-1", className)} {...props} />;
+  return (
+    <TG.Root
+      data-slot="toggle-group"
+      className={cn("flex items-center gap-1", className)}
+      {...props}
+    />
+  );
 }
 
 export function ToggleGroupItem({ className, ...props }: React.ComponentProps<typeof TG.Item>) {
   return (
     <TG.Item
+      data-slot="toggle-group-item"
       className={cn(
         "inline-flex size-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&_svg]:size-4",
         className,
@@ -152,13 +189,17 @@ export function ToggleGroupItem({ className, ...props }: React.ComponentProps<ty
 export function Switch({ className, ...props }: React.ComponentProps<typeof SW.Root>) {
   return (
     <SW.Root
+      data-slot="switch"
       className={cn(
         "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
         className,
       )}
       {...props}
     >
-      <SW.Thumb className="pointer-events-none block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+      <SW.Thumb
+        data-slot="switch-thumb"
+        className="pointer-events-none block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0"
+      />
     </SW.Root>
   );
 }
@@ -167,21 +208,34 @@ export function Switch({ className, ...props }: React.ComponentProps<typeof SW.R
 export function Slider({ className, ...props }: React.ComponentProps<typeof SL.Root>) {
   return (
     <SL.Root
+      data-slot="slider"
       className={cn(
         "relative flex w-full touch-none select-none items-center data-[disabled]:opacity-50",
         className,
       )}
       {...props}
     >
-      <SL.Track className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-muted">
-        <SL.Range className="absolute h-full bg-primary" />
+      <SL.Track
+        data-slot="slider-track"
+        className="relative h-1.5 w-full grow overflow-hidden rounded-full bg-muted"
+      >
+        <SL.Range data-slot="slider-range" className="absolute h-full bg-primary" />
       </SL.Track>
-      <SL.Thumb className="block size-4 rounded-full border border-primary bg-background shadow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+      <SL.Thumb
+        data-slot="slider-thumb"
+        className="block size-4 rounded-full border border-primary bg-background shadow transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
     </SL.Root>
   );
 }
 
 // ---- Collapsible ----
-export const Collapsible = C.Root;
-export const CollapsibleTrigger = C.Trigger;
-export const CollapsibleContent = C.Content;
+export function Collapsible(props: React.ComponentProps<typeof C.Root>) {
+  return <C.Root data-slot="collapsible" {...props} />;
+}
+export function CollapsibleTrigger(props: React.ComponentProps<typeof C.Trigger>) {
+  return <C.Trigger data-slot={props.asChild ? undefined : "collapsible-trigger"} {...props} />;
+}
+export function CollapsibleContent(props: React.ComponentProps<typeof C.Content>) {
+  return <C.Content data-slot="collapsible-content" {...props} />;
+}
