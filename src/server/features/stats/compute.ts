@@ -4,14 +4,16 @@
 
 import { campaignAwards, campaignRecords, campaignRows } from "@shared/stats/campaign";
 import {
-  creditsParty,
   dayLabel,
   fightRows,
   neutralFightLabel,
+  rollsForParty,
   type SessionBounds,
   type StatsCharacter,
   sessionAwards,
   sessionOf,
+  type UnseenKind,
+  unseenKindsOf,
   visibleSpan,
 } from "@shared/stats/rules";
 import {
@@ -28,7 +30,7 @@ import {
   type SessionAwards,
   type SessionSummary,
 } from "@shared/stats/schemas";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { forbidden, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { entity } from "../../db/schema";
@@ -67,25 +69,88 @@ export interface StatsRead {
 const visibleFacts = (v: StatsViewer, facts: readonly CombatFact[]) =>
   facts.filter((f) => entryVisible(v, { public: f.public, kind: f.entryKind }));
 
+/** The DM's view with the viewer's features (what the DM counts that the viewer may not see). */
+export const dmView = (v: StatsViewer): StatsViewer => ({ role: "dm", features: v.features });
+
 /**
- * Sprint 10 BL-111 (FR-STATS-12, DM #343): a window's facts the viewer counts (FR-STATS-03) and
- * `dealtUnseen`: the DM counts a party damage line in it (`creditsParty`) that this viewer doesn't
- * see, so damage they can't see could change "Most damage dealt" / MVP and they don't get it.
- * Existence only, never an amount, a name or a side: the same answer for every player.
+ * Sprint 10 BL-111 / sprint 12 BL-121 (FR-STATS-12, DM #343 / #353): a window's facts the viewer
+ * counts (FR-STATS-03) and `unseen`: the kinds of party line the DM counts in it that this viewer
+ * doesn't see (`unseenKindsOf`: dealt, healed, taken), so they don't get the awards those could
+ * change. Existence only, never an amount, a name or a side: the same answer for every player.
  */
 export function seenFacts(
   v: StatsViewer,
   all: readonly CombatFact[],
   chars: ReadonlyMap<string, StatsCharacter>,
-): { facts: CombatFact[]; dealtUnseen: boolean } {
+): { facts: CombatFact[]; unseen: Set<UnseenKind> } {
   const facts = visibleFacts(v, all);
-  if (v.role === "dm" || facts.length === all.length) return { facts, dealtUnseen: false };
-  const dm: StatsViewer = { role: "dm", features: v.features };
-  const dealtUnseen = all.some((f) => {
+  const unseen = new Set<UnseenKind>();
+  if (v.role === "dm" || facts.length === all.length) return { facts, unseen };
+  const dm = dmView(v);
+  for (const f of all) {
     const e = { public: f.public, kind: f.entryKind };
-    return creditsParty(f, chars) && entryVisible(dm, e) && !entryVisible(v, e);
-  });
-  return { facts, dealtUnseen };
+    if (!entryVisible(dm, e) || entryVisible(v, e)) continue;
+    for (const k of unseenKindsOf(f, chars)) unseen.add(k);
+  }
+  return { facts, unseen };
+}
+
+/** A roll of a counted entry that isn't public, by a party character with a kept d20 (BL-121). */
+export interface HiddenPartyRoll {
+  rollId: string;
+  n: number;
+  encounterId: string | null;
+  category: string;
+  actorId: string | null;
+}
+
+/**
+ * BL-121: the rolls listed by counted entries in `fromN…toN` that aren't public (FR-DICE-72's
+ * counting: not undone, not superseded; a feature-tagged kind only while it's on), by a party
+ * character with a kept d20 (`rollsForParty`): what could change players' Most nat 20s / 1s. One
+ * pass over the non-public entries only, read for players (never the DM). A roll a public entry
+ * lists too is theirs: `rolledUnseen` drops the ones they count.
+ */
+export function hiddenPartyRolls(
+  r: StatsRead,
+  chars: ReadonlyMap<string, StatsCharacter>,
+  fromN: number,
+  toN: number,
+): HiddenPartyRoll[] {
+  const rows = r.db.all<{
+    n: number;
+    kind: string;
+    encounterId: string | null;
+    rollId: string;
+    natural: number | null;
+    category: string;
+    actorKind: string;
+    actorId: string | null;
+  }>(sql`SELECT e.n AS n, e.kind AS kind, e.encounter_id AS encounterId, r.id AS rollId,
+      r.natural AS natural, r.category AS category, r.actor_kind AS actorKind, r.actor_id AS actorId
+    FROM game_log_entry e, json_each(e.roll_ids) j JOIN roll r ON r.id = j.value
+    WHERE e.campaign_id = ${r.campaignId} AND e.undone = 0 AND e.superseded_by IS NULL
+      AND e.public = 0 AND e.n BETWEEN ${fromN} AND ${toN} AND r.natural IS NOT NULL`);
+  const dm = dmView(r.viewer);
+  return rows
+    .filter((x) => entryVisible(dm, { public: false, kind: x.kind }) && rollsForParty(x, chars))
+    .map(({ rollId, n, encounterId, category, actorId }) => ({
+      rollId,
+      n,
+      encounterId,
+      category,
+      actorId,
+    }));
+}
+
+/** BL-121: a hidden party roll the viewer doesn't count (`seen`: their counted rolls). */
+export function rolledUnseen(
+  hidden: readonly HiddenPartyRoll[],
+  seen: readonly { rollId: string }[],
+): boolean {
+  if (hidden.length === 0) return false;
+  const ids = new Set(seen.map((x) => x.rollId));
+  return hidden.some((x) => !ids.has(x.rollId));
 }
 
 export interface Fights {
@@ -123,20 +188,41 @@ export const THIS_FIGHT_LABEL = "This fight";
 /** FR-STATS-32: the categories a combatant's roll counts in its fight by. */
 const FIGHT_ROLL_CATEGORIES: ReadonlySet<string> = new Set(["attack", "saving-throw"]);
 
+/** FR-STATS-32: a fight's `n` span `startedAt…endedAt` (now while started) and its actors. */
+interface FightScope {
+  fromN: number;
+  toN: number;
+  actors: ReadonlySet<string>;
+}
+
+function fightScope(r: StatsRead, fight: FightRow): FightScope | null {
+  if (!fight.startedAt) return null;
+  const span = nSpanOf(r.db, r.campaignId, fight.startedAt, fight.endedAt);
+  return span ? { ...span, actors: fightActorIds(r.db, fight.id) } : null;
+}
+
+/** FR-STATS-32: a roll in the fight's span counts in it (its entry's encounter, or its actor's). */
+const inFight = (
+  x: Pick<RollFact, "encounterId" | "category" | "actorId">,
+  fight: FightRow,
+  scope: FightScope,
+) =>
+  x.encounterId === fight.id ||
+  (FIGHT_ROLL_CATEGORIES.has(x.category) && x.actorId !== null && scope.actors.has(x.actorId));
+
 /**
  * FR-STATS-32: a fight's rolls: counted rolls in its `n` span `startedAt…endedAt` (now while
  * started) listed by an entry with its `encounterId`, plus attack / saving-throw rolls by its
  * combatants' actors.
  */
-export function fightRolls(r: StatsRead, fight: FightRow): RollFact[] {
-  if (!fight.startedAt) return [];
-  const span = nSpanOf(r.db, r.campaignId, fight.startedAt, fight.endedAt);
-  if (!span) return [];
-  const actors = fightActorIds(r.db, fight.id);
-  return rollFacts(r.db, r.viewer, r.campaignId, span.fromN, span.toN).filter(
-    (x) =>
-      x.encounterId === fight.id ||
-      (FIGHT_ROLL_CATEGORIES.has(x.category) && x.actorId !== null && actors.has(x.actorId)),
+export function fightRolls(
+  r: StatsRead,
+  fight: FightRow,
+  scope: FightScope | null = fightScope(r, fight),
+): RollFact[] {
+  if (!scope) return [];
+  return rollFacts(r.db, r.viewer, r.campaignId, scope.fromN, scope.toN).filter((x) =>
+    inFight(x, fight, scope),
   );
 }
 
@@ -171,6 +257,15 @@ export function fightStats(r: StatsRead, encounterId: string | undefined) {
   const chars = characters(r.db, r.campaignId);
   const seen = seenFacts(r.viewer, combatFacts(r.db, { encounterId: pick.id }), chars);
   const facts = seen.facts;
+  const scope = fightScope(r, pick);
+  const rolls = fightRolls(r, pick, scope);
+  // BL-121: a party roll of the fight (FR-STATS-32's rule) the DM counts and players don't see.
+  if (r.viewer.role !== "dm" && scope) {
+    const hidden = hiddenPartyRolls(r, chars, scope.fromN, scope.toN).filter((x) =>
+      inFight(x, pick, scope),
+    );
+    if (rolledUnseen(hidden, rolls)) seen.unseen.add("rolled");
+  }
   const combatants = fightCombatants(r.db, pick.id);
   // A started fight's duration runs to the newest entry (the same answer after a restart).
   const until = pick.endedAt ?? lastEntryAt(r.db, r.campaignId) ?? pick.startedAt;
@@ -184,12 +279,12 @@ export function fightStats(r: StatsRead, encounterId: string | undefined) {
       highlights: fightHighlights({
         role: r.viewer.role,
         facts,
-        rolls: fightRolls(r, pick),
+        rolls,
         characters: chars,
         round: pick.round,
         span: pick.startedAt ? { from: pick.startedAt, to: until } : null,
         standing: r.viewer.role === "dm" ? standingOf(r.db, pick.id) : [],
-        dealtUnseen: seen.dealtUnseen,
+        unseen: seen.unseen,
       }),
     },
     fights,
@@ -266,15 +361,16 @@ export function sessionStats(
   if (!hit) return { session: null };
   const { s, span } = hit;
   const chars = characters(r.db, r.campaignId);
-  const { facts, dealtUnseen } = sessionSeenFacts(r, s, chars);
+  const rolls = rollFacts(r.db, r.viewer, r.campaignId, s.fromN, s.toN);
+  const { facts, unseen } = sessionSeenFacts(r, s, chars, rolls);
   const labels = fightsFor(r).label;
   const awards = sessionAwards({
     role: r.viewer.role,
     facts,
-    rolls: rollFacts(r.db, r.viewer, r.campaignId, s.fromN, s.toN),
+    rolls,
     characters: chars,
     fightLabel: (id) => labels.get(id) ?? "",
-    dealtUnseen,
+    unseen,
   });
   return {
     session: {
@@ -295,17 +391,28 @@ export const sessionFactsOf = (r: StatsRead, s: SessionBounds): CombatFact[] =>
     combatFacts(r.db, { campaignId: r.campaignId, fromN: s.fromN, toN: s.toN }),
   );
 
-/** `sessionFactsOf` + BL-111's `dealtUnseen` (one read; `seenFacts`). */
-export const sessionSeenFacts = (
+/**
+ * `sessionFactsOf` + BL-121's `unseen` for the session's awards: the facts' kinds (`seenFacts`)
+ * and, for players, `rolled` when the DM counts a party roll in it they don't see (`rolls`: the
+ * viewer's counted rolls of the session, when the caller holds them).
+ */
+export function sessionSeenFacts(
   r: StatsRead,
   s: SessionBounds,
   chars: ReadonlyMap<string, StatsCharacter>,
-) =>
-  seenFacts(
+  rolls?: readonly { rollId: string }[],
+): { facts: CombatFact[]; unseen: Set<UnseenKind> } {
+  const seen = seenFacts(
     r.viewer,
     combatFacts(r.db, { campaignId: r.campaignId, fromN: s.fromN, toN: s.toN }),
     chars,
   );
+  if (r.viewer.role === "dm") return seen;
+  const hidden = hiddenPartyRolls(r, chars, s.fromN, s.toN);
+  const counted = () => rolls ?? rollFacts(r.db, r.viewer, r.campaignId, s.fromN, s.toN);
+  if (hidden.length > 0 && rolledUnseen(hidden, counted())) seen.unseen.add("rolled");
+  return seen;
+}
 
 /**
  * FR-STATS-78 (RECAP's read seam): the fights with a counted fact the viewer sees inside session
@@ -408,6 +515,7 @@ export function trophiesStats(
         all.trophies.get(characterId),
         all.luck.get(characterId),
         (id) => labels.get(id) ?? "",
+        all.unseen,
       ),
     },
   };
@@ -445,7 +553,7 @@ export function campaignStats(
       fights: all.fights.size,
       slain: all.slain,
       rows: campaignRows(all.trophies, all.luck, chars),
-      records: campaignRecords(all.trophies, chars, fightWhen(r, fightsFor(r))),
+      records: campaignRecords(all.trophies, chars, fightWhen(r, fightsFor(r)), all.unseen),
       awards: campaignAwards(all.wins, chars),
     },
   };

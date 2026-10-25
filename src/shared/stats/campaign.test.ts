@@ -197,6 +197,18 @@ describe("FR-STATS-83 records", () => {
     const player = campaignRecords(campaign("player", [S1(), S2()]).trophies, CHARS, fight);
     expect(player["biggest-overkill"]).toMatchObject({ name: "Thorn", value: 30, to: "Goblin" });
     expect(campaignRecords(new Map(), CHARS, fight)["biggest-hit"]).toBeNull();
+    // BL-121: unseen party damage withholds the damage records, unseen healing the healing one.
+    const tallies = campaign("player", [S1(), S2()]).trophies;
+    expect(Object.keys(campaignRecords(tallies, CHARS, fight, new Set(["dealt"])))).toEqual([
+      "best-fight-healing",
+    ]);
+    expect(Object.keys(campaignRecords(tallies, CHARS, fight, new Set(["healed"])))).toEqual([
+      "biggest-hit",
+      "biggest-overkill",
+      "best-fight-damage",
+      "best-fight-kills",
+    ]);
+    expect(campaignRecords(tallies, CHARS, fight, new Set(["taken", "rolled"]))).toEqual(player);
   });
 });
 

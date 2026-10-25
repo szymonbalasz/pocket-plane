@@ -1,6 +1,6 @@
 // Sprint 10 T2 (BL-111, DM #343) over real sockets on `stats`: players don't get "Most damage
 // dealt" (Session cards, recap Awards) or the fight's MVP while the window holds party damage they
-// don't see; the DM keeps both. sim-14's case: Thorn leads in public, the DM's hidden 80 From Mira
+// don't see (sprint 12 BL-121: nor the other damage awards); the DM keeps all. sim-14's case: Thorn leads in public, the DM's hidden 80 From Mira
 // on the hidden Elite makes Mira the DM's winner. No player frame or ack carries the hidden line,
 // its amount, its target or the DM's winner; acks are the same after a reconnect and a restart.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -139,13 +139,12 @@ describe("BL-111 Most damage dealt over WS (stats)", () => {
       const out = [];
       for (const c of clients) {
         const a = await answers(c);
-        // Session cards and recap Awards: 8, no Most damage dealt; the other cards stay.
-        expect(a.session.session?.awards.map((x) => x.key)).not.toContain("most-dealt");
-        expect(a.session.session?.awards).toHaveLength(8);
-        expect(card(a.session.session?.awards, "biggest-hit")).toMatchObject({
-          winners: [{ name: "Thorn" }],
-        });
-        expect(a.recap.recap?.awards?.map((x) => x.key)).not.toContain("most-dealt");
+        // Session cards and recap Awards: no Most damage dealt; BL-121 (sprint 12): nor any other
+        // card party damage could change (Biggest hit, Biggest overkill, Most kills).
+        const kept = ["most-taken", "most-healing", "most-nat20", "most-nat1", "most-downed"];
+        expect(a.session.session?.awards.map((x): string => x.key)).toEqual(kept);
+        expect(card(a.session.session?.awards, "biggest-hit")).toBeUndefined();
+        expect(a.recap.recap?.awards?.map((x): string => x.key)).toEqual(kept);
         // The Ambush holds hidden party damage: no MVP; the Old Crypt doesn't: Thorn's 43 stays.
         expect(a.fight.fight.highlights.mvp).toEqual({ value: null, winners: [] });
         expect(a.past.fight.highlights.mvp).toMatchObject({

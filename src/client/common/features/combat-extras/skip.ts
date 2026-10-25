@@ -1,9 +1,12 @@
 // FR-CBTX-25 skip cue: dead PCs join FR-CBT-50's "Skipped …" Toast as "(dead)". One copy for the
 // Initiative window's step and the palette's N / Shift+N (BL-94). Sprint 11 (BL-110): a down
-// `in-owner-turn` companion (no rank) is named when its owner's turn starts.
+// `in-owner-turn` companion (no rank) is named when its owner's turn starts. Sprint 12 (BL-122):
+// one skip toast at a time; every acked step replaces it (or clears it when nobody was skipped).
 import { inTurnCompanionsOf, skippedOnStep, skippedText } from "@shared/combat-tracker/rules";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import type { RecordStore } from "@shared/protocol/store";
+import { createElement } from "react";
+import { toast } from "sonner";
 import { deadPc } from "./logic";
 
 /** "Skipped Goblin (down), Thorn (dead) · Round 2"; FR-CBT-50's text when nobody is dead. */
@@ -55,4 +58,25 @@ export function stepSkip(
     inTurnCompanionsOf(view, id),
   );
   return { skipped, dead };
+}
+
+let skipToastId: string | null = null;
+let skipToastSeq = 0;
+
+/**
+ * FR-CBT-50, BL-122: after an acked Next / Prev (Initiative window, palette N / Shift+N), the
+ * step's skip toast replaces the one showing; a step that skipped nobody only clears it, so a Prev
+ * right after a skipping Next never shows the Next's names. A fresh id per toast: the replacement
+ * gets its own full time in the stack.
+ */
+export function showStepSkip(step: ReturnType<typeof stepSkip>): void {
+  if (skipToastId !== null) toast.dismiss(skipToastId);
+  skipToastId = null;
+  if (!step.skipped) return;
+  skipToastSeq += 1;
+  skipToastId = `cbt-init-skipped-${skipToastSeq}`;
+  toast(
+    createElement("span", { "data-testid": "cbt-init-skipped" }, skipText(step.skipped, step.dead)),
+    { id: skipToastId },
+  );
 }

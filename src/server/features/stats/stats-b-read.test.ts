@@ -111,7 +111,10 @@ describe("FR-STATS-31 highlights in the fight ack", () => {
       expect(h.downed.events).toEqual([
         { fell: "down", from: "Goblin 2", to: "Mira", callout: true },
       ]);
-      expect(h["biggest-overkill"]).toMatchObject({ value: 30, winners: [{ name: "Thorn" }] });
+      // BL-121: Mira's hidden 30 on the Wolf could change the damage items: empty (hidden).
+      for (const k of ["mvp", "biggest-hit", "biggest-overkill"] as const) {
+        expect(h[k]).toEqual({ value: null, winners: [] });
+      }
       const json = JSON.stringify(h);
       for (const leak of ["Wolf", "Elite", '"standing"', '"hidden"', '"overkill"']) {
         expect(json).not.toContain(leak);
