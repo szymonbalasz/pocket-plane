@@ -38,8 +38,8 @@ import { useHoldIntent, useLive } from "./send";
 
 const STATE_CLASS: Record<FacilityView["state"], string> = {
   planned: "border-border bg-transparent text-muted-foreground",
-  building: "border-transparent bg-amber-500/15 text-amber-700 dark:text-amber-400",
-  built: "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  building: "border-transparent bg-caution/15 text-caution-foreground",
+  built: "border-transparent bg-positive/15 text-positive-foreground",
   replaced: "border-border bg-transparent text-muted-foreground line-through",
 };
 

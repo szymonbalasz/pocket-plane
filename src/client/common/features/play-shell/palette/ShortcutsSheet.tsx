@@ -97,7 +97,7 @@ export function ShortcutsSheet({ env, mac }: { env: PaletteEnv; mac: boolean }) 
   const returnFocus = useFocusReturn();
   return (
     <D.Root open onOpenChange={(o) => !o && closeShortcuts()}>
-      <D.Overlay className="pointer-events-auto fixed inset-0 bg-black/40" />
+      <D.Overlay className="pointer-events-auto fixed inset-0 bg-overlay/40" />
       <D.Content
         data-testid="ui-shortcuts"
         data-palette=""
