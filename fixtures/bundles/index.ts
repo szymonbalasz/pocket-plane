@@ -133,6 +133,7 @@ import wfFrame from "./wf-frame";
 import wfFrameE2e from "./wf-frame-e2e";
 import windowsS5 from "./windows-s5";
 import x1ToastsE2e from "./x1-toasts-e2e";
+import x2SkipE2e from "./x2-skip-e2e";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -308,4 +309,6 @@ export const bundles: readonly Bundle[] = [
   f3PromptTrayE2e,
   // Sprint 12 X1 (fix/x1-toasts): toast fixes e2e alias of session-sim-13 (BL-118–120)
   x1ToastsE2e,
+  // Sprint 12 X2 (fix/x2-stats-combat): stats awards, skip toast e2e bundles
+  x2SkipE2e,
 ];

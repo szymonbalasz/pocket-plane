@@ -155,11 +155,14 @@ function PartyTable({ rows }: { rows: CampaignStats["rows"] }) {
 }
 
 function Records({ role, records }: { role: Role; records: CampaignStats["records"] }) {
+  // BL-121: a record the server left out (withheld for players) has no line; none → no section.
+  const keys = CAMPAIGN_RECORD_KEYS.filter((key) => key in records);
+  if (keys.length === 0) return null;
   return (
     <section data-testid="stats-campaign-records" className="flex flex-col gap-1">
       <h3 className="text-xs font-medium">Records</h3>
       <ul className="flex flex-col gap-1 text-xs">
-        {CAMPAIGN_RECORD_KEYS.map((key) => {
+        {keys.map((key) => {
           const r = records[key];
           return (
             <li

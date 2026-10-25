@@ -77,7 +77,7 @@ export function RowTemp({ c }: { c: CombatantView }) {
         data-testid="cbtx-init-row-temp"
         data-record-id={c.id}
         data-value={temp}
-        className="shrink-0 text-sky-400"
+        className="shrink-0 text-hp-temp"
       >
         +{temp}
       </span>

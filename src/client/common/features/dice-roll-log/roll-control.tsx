@@ -285,10 +285,22 @@ export const rollTooltip = (control: Pick<RollControl, "preview">, hint: string)
 
 /**
  * FR-DICEX-51: a `RollButton`'s tooltip — the parts the roll picks up (FR-MOD-27), the caller's
- * `hint`, then the Alt hint, once.
+ * `hint`, then the Alt hint, once. A node `hint` (CHARX FR-CHARX-113: the sheet's breakdown with
+ * its own test ID) sits where a string hint would.
  */
-export function rollButtonTip(control: Pick<RollControl, "preview">, hint?: string): ReactNode {
-  const lead = hint ? rollTooltip(control, hint) : control.preview.text;
+export function rollButtonTip(control: Pick<RollControl, "preview">, hint?: ReactNode): ReactNode {
+  if (hint !== null && typeof hint === "object") {
+    const preview = control.preview.text;
+    return (
+      <>
+        {preview && `${preview} · `}
+        {hint}
+        {" · "}
+        <StageHint />
+      </>
+    );
+  }
+  const lead = hint ? rollTooltip(control, String(hint)) : control.preview.text;
   return (
     <>
       {lead && `${lead} · `}
@@ -814,7 +826,7 @@ function PhysicalMarker() {
 
 /**
  * A button that rolls through `control`; the manual popover anchors to it. Its tooltip is
- * `rollButtonTip` (FR-DICEX-51): a caller with tooltip text of its own passes it as `hint`
+ * `rollButtonTip` (FR-DICEX-51): a caller with tooltip text (or a node) of its own passes it as `hint`
  * instead of wrapping the button in a Tooltip. `hint={false}`: an invisible anchor (the roll
  * starts from a menu, whose trigger or open menu shows the Alt hint), no tooltip. `formZ`: the
  * manual popover's layer when the button sits above the default (z-50), e.g. in a toast.
@@ -827,9 +839,7 @@ export function RollButton({
   className,
   children,
   ...props
-}: { control: RollControl; hint?: string | false; formZ?: number } & ComponentProps<
-  typeof Button
->) {
+}: { control: RollControl; hint?: ReactNode; formZ?: number } & ComponentProps<typeof Button>) {
   const anchor = (
     <PopoverAnchor asChild>
       <Button

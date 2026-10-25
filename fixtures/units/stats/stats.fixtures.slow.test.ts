@@ -9,10 +9,11 @@
 //   DM only: Elite Dealt 9 (hidden), "DM (direct)" Dealt 3 (on the hidden Wolf)
 // Fight "Old Crypt" (players: "Fight 1 · ‹day›"): Thorn Dealt 43, Kills 2; Mira Taken 15, down;
 //   DM: Skeleton 2 Dealt 15, "Unattributed" Healed 12.
-// Session awards, DM | players: Biggest hit Thorn 30 | 30; Biggest overkill Thorn 23 | 30;
-//   Most damage dealt Thorn 73 | none (BL-111: Mira's DM-only 11); Most damage taken Brakka 55; Most healing Brakka 8; Most kills
-//   Thorn 3; Most nat 20s Thorn 3 | 2 (one hidden DM roll); Most nat 1s Mira 1; Most times
-//   downed Mira, Brakka 1 (tie).
+// Session awards, DM: Biggest hit Thorn 30; Biggest overkill Thorn 23; Most damage dealt Thorn 73;
+//   Most damage taken Brakka 55; Most healing Brakka 8; Most kills Thorn 3; Most nat 20s Thorn 3;
+//   Most nat 1s Mira 1; Most times downed Mira, Brakka 1 (tie). Players (BL-111 / BL-121): only
+//   Most healing Brakka 8: Mira's DM-only 11 withholds the damage cards, the hidden Elite's 9 on
+//   Thorn Most damage taken / times downed, the hidden DM roll as Thorn Most nat 20s / 1s.
 //
 // Sprint 8 `stats-b` (= `stats` + gems on + `sb-fight-facts`, `sb-luck-rolls`, `sb-luck-reroll`),
 // DM | players:
@@ -24,8 +25,8 @@
 //   (Mira) and the Bandit Captain (Thorn), both hidden. Downs: Brakka (Goblin Scout 2), Thorn
 //   (Bandit 2, overkill). Still standing (DM): Goblin, Wolf, Elite (hidden), Goblin Scout 2,
 //   Bandit 2, Bandit 4.
-//   Trophies: Mira (Player 1) fights 2, dealt 43, taken 26, kills 3, downed 1; Biggest hit and
-//   overkill 25 → Bandit; Best fight 43 dmg / 3 kills. Thorn (DM) dealt 93, taken 209, kills 4,
+//   Trophies: Mira (Player 1) fights 2, dealt 43, taken 26, kills 3, downed 1; no Records (BL-121:
+//   the campaign holds party damage players don't see). Thorn (DM) dealt 93, taken 209, kills 4,
 //   nat 20s 5; Biggest hit 30 → Skeleton (Old Crypt), overkill 23 → Goblin Scout.
 //
 // Sprint 10 T3 `stats-b` Campaign tab (one session), DM | players:
@@ -34,11 +35,11 @@
 //     Thorn  93 | 73, 209 | 200, 0, 4 | 3, 1, 5 | 3, 1, 2
 //     Mira   54 | 43, 26, 0, 4 | 3, 1, 1, 1, 2
 //     Brakka 12, 55, 8, 1, 1, 0, 0, 1
-//   Records: Biggest hit Thorn 30 → Skeleton (Old Crypt | Fight 1); Biggest overkill Thorn 23 →
-//   Goblin Scout (Ambush) | 30 → Skeleton (Fight 1); most damage in a fight Mira 54 (Ambush) |
-//   Thorn 43 (Fight 1); most kills Mira 4 (Ambush) | 3 (Fight 2); most healing Brakka 8.
-//   Awards won: Thorn 8 | 7, Mira 3, Brakka 2 (the one session's winners, ties count; BL-111:
-//   players get no Most damage dealt card, Mira's late damage on the hidden Goblin 2 is unseen).
+//   Records, DM: Biggest hit Thorn 30 → Skeleton (Old Crypt); Biggest overkill Thorn 23 → Goblin
+//   Scout (Ambush); most damage in a fight Mira 54 (Ambush); most kills Mira 4 (Ambush); most
+//   healing Brakka 8. Players (BL-121): most healing Brakka 8 only (the damage records withheld).
+//   Awards won: DM Thorn 8, Mira 3, Brakka 2 (the one session's winners, ties count); players
+//   Brakka 1 (Most healing, the one card they get: BL-111 / BL-121).
 import { afterAll, describe, expect, test } from "bun:test";
 import { combatant, encounter, entity, hpChange, notification, player } from "@server/db/schema";
 import { servicesFromBundle } from "@server/ws/testing/snapshot-size";
@@ -173,17 +174,10 @@ describe("STATS §13 fixtures", () => {
     });
     const p = t.q<SessionResult>({ scope: "session" }, t.as("Player 2")).session;
     expect(p?.fromN).toBe(dm?.fromN);
-    expect(awardsOf(p?.awards ?? [])).toEqual({
-      "biggest-hit": [30, "Thorn"],
-      "biggest-overkill": [30, "Thorn"],
-      // BL-111: no "Most damage dealt" (Mira's late 11 on the hidden Goblin 2 is DM-only).
-      "most-taken": [55, "Brakka"],
-      "most-healing": [8, "Brakka"],
-      "most-kills": [3, "Thorn"],
-      "most-nat20": [2, "Thorn"],
-      "most-nat1": [1, "Mira"],
-      "most-downed": [1, "Brakka", "Mira"],
-    });
+    // BL-111 / BL-121: Mira's late 11 on the hidden Goblin 2 (dealt), the hidden Elite's 9 on
+    // Thorn (taken) and the DM's hidden nat 20 as Thorn (rolled) leave one card, the same as the
+    // DM's.
+    expect(awardsOf(p?.awards ?? [])).toEqual({ "most-healing": [8, "Brakka"] });
   }, 60_000);
 
   test("stats-e2e and session-sim-11: the past crypt loads first; sim-10's running fight is unchanged", async () => {
@@ -272,8 +266,8 @@ describe("STATS §13 fixtures", () => {
       t.as("Player 1"),
     ).trophies;
     expect(mira.lifetime).toMatchObject({ fights: 2, dealt: 43, taken: 26, kills: 3, downed: 1 });
-    expect(mira.records?.["biggest-hit"]).toMatchObject({ value: 25, to: "Bandit" });
-    expect(mira.records?.["best-fight-kills"]).toMatchObject({ value: 3 });
+    // BL-121: no Records for players (the campaign holds party damage they don't see).
+    expect(mira.records).toEqual({});
     const thorn = t.q<TrophiesResult>(
       { scope: "trophies", characterId: id("Thorn") },
       t.dm,
@@ -346,19 +340,10 @@ describe("STATS §13 fixtures", () => {
     });
     const f1 = `Fight 1 · ${started("Old Crypt")}`;
     const f2 = `Fight 2 · ${started("Ambush at the Ford")}`;
-    expect(records(first)).toEqual({
-      "biggest-hit": ["Thorn", 30, "Skeleton", f1],
-      // FR-STATS-12: players' Biggest overkill is the callout line's damage, never an amount.
-      "biggest-overkill": ["Thorn", 30, "Skeleton", f1],
-      "best-fight-damage": ["Thorn", 43, undefined, f1],
-      "best-fight-kills": ["Mira", 3, undefined, f2],
-      "best-fight-healing": ["Brakka", 8, undefined, f2],
-    });
-    expect(awards(first)).toEqual([
-      ["Thorn", 7],
-      ["Mira", 3],
-      ["Brakka", 2],
-    ]);
+    // BL-121: the damage records are withheld (party damage players don't see); healing stays.
+    expect(f1).toMatch(/^Fight 1 · /);
+    expect(records(first)).toEqual({ "best-fight-healing": ["Brakka", 8, undefined, f2] });
+    expect(awards(first)).toEqual([["Brakka", 1]]);
     // Thorn's and Mira's rows match the trophies above (Lifetime definitions, FR-STATS-42).
     // T3's e2e alias (`e2e/t3-campaign.e2e.ts`).
     expect(library.bundles.find((b) => b.name === "stats-campaign-e2e")?.includes).toEqual([

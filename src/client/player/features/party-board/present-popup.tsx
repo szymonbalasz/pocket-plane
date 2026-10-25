@@ -100,7 +100,7 @@ function Shown({ present }: { present: HandoutPresentRecord }) {
       }}
     >
       <D.Portal>
-        <D.Overlay className="fixed inset-0 bg-black/60" style={{ zIndex: PRESENT_POPUP_Z }} />
+        <D.Overlay className="fixed inset-0 bg-overlay/60" style={{ zIndex: PRESENT_POPUP_Z }} />
         <D.Content
           data-testid="party-present-popup"
           data-record-id={present.handoutId}

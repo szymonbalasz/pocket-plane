@@ -260,6 +260,13 @@ Both themes. Default draws the boxes with today's tokens (border, card, rounded)
 | FR-CHARX-119 | **Theme hooks:** `data-slot` names `sheet-box`, `sheet-shield`, `sheet-ability`, `sheet-skill-row`, `sheet-roll`, `sheet-pip`, `sheet-tabs`, for [theme-system](post-mvp/theme-system.md) stylesheets. No theme logic in the components. | `FR-CHARX-119 slots present` |
 | FR-CHARX-120 | **Unchanged:** summary cards (FR-CHARX-32) and the companion card keep their layout (themes still style them); 0 B snapshot and wire. | existing tests |
 
+> **Build note (CS `build/charx-print-sheet`, 2026-10-25).** Details the table leaves open, as built:
+> - **Width:** both switches read the sheet body (`@container/sheet` on `char-sheet`), not the scrolling tab content, so the content's scrollbar never flips them: wide at ≥ 560 px (a 600 px window); the ability grid is 3 columns from 268 px, **2 below** (a 280 px window), so cells stay ≥ 80 px (FR-CHARX-118).
+> - **Slots:** the Armor Class box is `data-slot="sheet-shield"` (not `sheet-box`); `charx-box` `passives` is the row of three boxes, each `sheet-box`. `sheet-roll`: the Check, Save, skill and Initiative buttons; `sheet-pip`: proficiency dots, spell-slot and feature-use pips.
+> - **Test ID:** new `charx-hp-temp` (+ `data-value` = temp HP), the read-only "Temp N". `char-sheet-ability-mod` is now the number on the Check button (the check bonus, = the modifier unless overridden).
+> - **Initiative:** the DM's `char-sheet-public-init` sits at the end of the HP control row. Edit mode: the Init box holds the bonus input and no roll button (back on Done).
+> - **Breakdowns on roll buttons:** play-shell's roll Tooltip takes a node hint (`RollButton` / `rollButtonTip`, dice-roll-log), so `charx-breakdown` leads it, then the mode keys and the Alt hint.
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, dense. No custom styling.

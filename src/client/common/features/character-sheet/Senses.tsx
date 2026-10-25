@@ -161,13 +161,13 @@ function SensesEditor({ senses }: { senses: Senses | undefined }) {
   );
 }
 
-/** FR-CHARX-50: "Senses Vision normal · Darkvision 60 ft · …"; editors below. */
+/** FR-CHARX-50: "Senses Vision normal · Darkvision 60 ft · …", centred (FR-CHARX-108); editors below. */
 export function SensesLine() {
   const ctx = useSheet();
   const senses = ctx.stats.senses;
   return (
     <div className="flex flex-col gap-1.5">
-      <p data-testid="charx-senses" className="text-xs">
+      <p data-testid="charx-senses" className="text-center text-xs">
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Senses</span>{" "}
         <span>{sensesText(senses)}</span>
       </p>

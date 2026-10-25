@@ -135,38 +135,16 @@ describe("FR-STATS-81 Campaign scope", () => {
       Mira: [17, 40, 12, 2, 1, 0, 1, 2],
       Thorn: [30, 0, 5, 1, 0, 1, 0, 2],
     });
-    expect(recordsOf(p1)).toEqual({
-      "biggest-hit": ["Thorn", 30, "Goblin"],
-      // FR-STATS-12: the callout line's damage, never the amount.
-      "biggest-overkill": ["Thorn", 30, "Goblin"],
-      "best-fight-damage": ["Thorn", 30, null],
-      "best-fight-kills": ["Mira", 2, null],
-      "best-fight-healing": ["Mira", 12, null],
-    });
-    expect(p1.records["biggest-hit"]?.fight).toMatch(/^Fight 1 · /);
-    expect(p1.records["best-fight-kills"]?.fight).toMatch(/^Fight 2 · /);
+    // BL-121: the campaign holds Mira's hidden 30 on the Wolf (party damage players don't see),
+    // so players get no damage record; healing was all in sight.
+    expect(recordsOf(p1)).toEqual({ "best-fight-healing": ["Mira", 12, null] });
+    expect(p1.records["best-fight-healing"]?.fight).toMatch(/^Fight 2 · /);
     expect(awardsOf(p1)).toEqual({
-      // BL-111 (T2): sitting 1 holds Mira's hidden 30 on the Wolf, so players get no Most damage
-      // dealt card there and Thorn doesn't win it.
-      Thorn: [
-        5,
-        "biggest-hit×1",
-        "biggest-overkill×1",
-        "most-healing×1",
-        "most-kills×1",
-        "most-nat20×1",
-      ],
-      // Sitting 1: taken, downed; sitting 2: hit, dealt, healing, kills, nat 1 (no callout).
-      Mira: [
-        7,
-        "biggest-hit×1",
-        "most-dealt×1",
-        "most-taken×1",
-        "most-healing×1",
-        "most-kills×1",
-        "most-nat1×1",
-        "most-downed×1",
-      ],
+      // Sitting 2: hit, dealt, healing, kills, nat 1 (no callout). Sitting 1 (BL-111 / BL-121)
+      // holds Mira's hidden 30 on the Wolf (dealt), the hidden Elite's 4 on Thorn (taken) and the
+      // DM's hidden nat 20 as Thorn (rolled): players' only card there is Most healing.
+      Mira: [5, "biggest-hit×1", "most-dealt×1", "most-healing×1", "most-kills×1", "most-nat1×1"],
+      Thorn: [1, "most-healing×1"],
     });
   });
 

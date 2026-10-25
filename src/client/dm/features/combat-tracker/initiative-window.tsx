@@ -58,7 +58,7 @@ import {
 import { Input, Skeleton } from "@ui/components/ui/primitives";
 import { characterOf, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
 import { NameLine } from "@ui/features/combat-extras/parts";
-import { skipText, stepSkip } from "@ui/features/combat-extras/skip";
+import { showStepSkip, stepSkip } from "@ui/features/combat-extras/skip";
 import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
 import {
   companionLayout,
@@ -1216,14 +1216,13 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
    * is named as its owner's turn starts (BL-110).
    */
   const step = async (direction: "next" | "prev", sender: typeof send = send) => {
-    const { skipped, dead } = stepSkip(store, rows, enc, direction);
+    const skip = stepSkip(store, rows, enc, direction);
     const r = await sender<TurnResult>(
       direction === "next" ? "cbt.nextTurn" : "cbt.prevTurn",
       turnArgs,
     );
-    if (r !== undefined && skipped) {
-      toast(<span data-testid="cbt-init-skipped">{skipText(skipped, dead)}</span>);
-    }
+    // BL-122: the turn changed: this step's skip toast replaces the last one (or clears it).
+    if (r !== undefined) showStepSkip(skip);
     // FR-CBTX-07: Prev could not restore an effect whose slot is taken.
     if (r?.notRestored?.length) {
       toast(<span data-testid="cbtx-not-restored">{notRestoredText(r.notRestored)}</span>);

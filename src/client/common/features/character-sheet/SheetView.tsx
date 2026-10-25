@@ -1,13 +1,14 @@
 // One full sheet (CHARX §7, FR-CHARX-26): header (FR-CHAR-03 + Draft / Locked badges, Edit
 // toggle, DM Approve / Lock), header sections, then the tabs Main · Actions · Features ·
 // Inventory · Notes · section tabs. Header + tab strip pinned, the tab content scrolls; in a
-// small window only the name row + tab strip (FR-CHARX-48). NPC sheets: CR + XP; imported
-// definitions read-only.
+// small window only the name row + tab strip (FR-CHARX-48). The tab strip scrolls sideways with
+// the wheel and arrows (FR-CHARX-115); the sheet body is the `sheet` container the printed
+// layout switches on (FR-CHARX-112). NPC sheets: CR + XP; imported definitions read-only.
 import { initials, levelLine } from "@shared/character-sheet/logic";
 import { CHARX_INTENTS, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import { isLoaded, type LoadedSet } from "@shared/protocol/lazy";
-import { LockIcon } from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, LockIcon } from "lucide-react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
@@ -29,10 +30,15 @@ import { sheetSections } from "./sheet-sections";
 import {
   canEdit,
   canUseCounters,
+  compactFullPx,
   crLine,
   type PinnedPart,
   pinnedPart,
+  type SeenFull,
   sheetData,
+  TAB_ARROW_STEP_PX,
+  tabArrows,
+  wheelScroll,
 } from "./view-model";
 
 const NOTHING_LOADED: LoadedSet = { types: [], ids: {} };
@@ -254,18 +260,85 @@ function HeaderRest({
   );
 }
 
+/**
+ * FR-CHARX-115: the tab strip scrolls sideways only (the active marker sits inside the tab): the
+ * wheel turns into sideways scroll, arrows show at an end with hidden tabs, a thin scrollbar
+ * stays. The arrows sit beside the strip, never over a tab.
+ */
+function TabStrip({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [arrows, setArrows] = useState({ prev: false, next: false });
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const sync = () => {
+      const next = tabArrows(el.scrollLeft, el.scrollWidth, el.clientWidth);
+      setArrows((a) => (a.prev === next.prev && a.next === next.next ? a : next));
+    };
+    // React's wheel listener is passive; turning the wheel sideways needs `preventDefault`.
+    const wheel = (e: WheelEvent) => {
+      const dx = wheelScroll(e.deltaX, e.deltaY, el.scrollWidth > el.clientWidth);
+      if (dx === null) return;
+      e.preventDefault();
+      el.scrollLeft += dx;
+    };
+    sync();
+    el.addEventListener("scroll", sync, { passive: true });
+    el.addEventListener("wheel", wheel, { passive: false });
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(sync);
+    ro?.observe(el);
+    if (el.firstElementChild) ro?.observe(el.firstElementChild);
+    return () => {
+      el.removeEventListener("scroll", sync);
+      el.removeEventListener("wheel", wheel);
+      ro?.disconnect();
+    };
+  }, []);
+  const step = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * TAB_ARROW_STEP_PX });
+  const arrow = (dir: 1 | -1) => (
+    <button
+      type="button"
+      data-testid={dir < 0 ? "charx-tabs-prev" : "charx-tabs-next"}
+      aria-label={dir < 0 ? "Earlier tabs" : "More tabs"}
+      className="mb-1.5 flex w-5 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:bg-accent hover:text-foreground"
+      onClick={() => step(dir)}
+    >
+      {dir < 0 ? (
+        <ChevronLeftIcon className="size-3.5" />
+      ) : (
+        <ChevronRightIcon className="size-3.5" />
+      )}
+    </button>
+  );
+  return (
+    <div data-slot="sheet-tabs" className="flex shrink-0 items-stretch gap-1">
+      {arrows.prev && arrow(-1)}
+      <div
+        ref={ref}
+        className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]"
+      >
+        {children}
+      </div>
+      {arrows.next && arrow(1)}
+    </div>
+  );
+}
+
 /** Gap between the pinned part and the scrolling header rest (`gap-2`). */
 const HEADER_GAP_PX = 8;
 
 /**
  * FR-CHARX-48: measures the window body (the Card) and the full header (pinned part, plus the
  * scrolling header rest in the compact fallback); full while it takes at most half the body,
- * else compact. Window size and geometry are untouched (FR-CHARX-26).
+ * else compact. The full header's own height, last seen at this width, counts in compact too:
+ * its badges and buttons lay out taller than the compact parts, which flipped the part back and
+ * forth for ever (CS walkthrough F1). Window size and geometry are untouched (FR-CHARX-26).
  */
 function usePinnedHeader(initial: PinnedPart) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const restRef = useRef<HTMLDivElement>(null);
+  const seenFull = useRef<SeenFull | null>(null);
   const [part, setPart] = useState<PinnedPart>(initial);
   useLayoutEffect(() => {
     const body = bodyRef.current;
@@ -273,7 +346,11 @@ function usePinnedHeader(initial: PinnedPart) {
     if (!body || !header || typeof ResizeObserver === "undefined") return;
     const rest = part === "compact" ? restRef.current : null;
     const measure = () => {
-      const full = header.offsetHeight + (rest ? rest.offsetHeight + HEADER_GAP_PX : 0);
+      const width = body.clientWidth;
+      let full = header.offsetHeight;
+      if (rest)
+        full = compactFullPx(full + rest.offsetHeight + HEADER_GAP_PX, seenFull.current, width);
+      else seenFull.current = { px: full, width };
       setPart((p) => pinnedPart(full, body.clientHeight, p));
     };
     measure();
@@ -378,7 +455,7 @@ export function SheetView({
         data-testid="char-sheet"
         data-record-id={creature.id}
         data-editing={ctx.editing ? "true" : "false"}
-        className="flex h-full flex-col overflow-hidden border-0 bg-transparent p-1 shadow-none"
+        className="@container/sheet flex h-full flex-col overflow-hidden border-0 bg-transparent p-1 shadow-none"
       >
         {/* FR-CHARX-48: the pinned part stays, only the content box scrolls. Compact: the name
             row + tab strip are pinned; badges, buttons, picker, sections scroll with the content.
@@ -395,7 +472,7 @@ export function SheetView({
               <NameRow picker={picker} full={!compact} />
               {!compact && rest}
             </div>
-            <div className="shrink-0 overflow-x-auto pb-0.5">
+            <TabStrip>
               <TabsList className="w-max">
                 {tabs.map(([v, label]) => {
                   const n = counts.get(v) ?? null;
@@ -417,7 +494,7 @@ export function SheetView({
                   );
                 })}
               </TabsList>
-            </div>
+            </TabStrip>
           </div>
           <div data-testid="charx-content" className="min-h-0 flex-1 overflow-y-auto">
             {compact && (

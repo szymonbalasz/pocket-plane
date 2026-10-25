@@ -148,6 +148,22 @@ describe("FR-CHARX-98 trophies layout", () => {
   });
 });
 
+describe("FR-STATS-42 BL-121 withheld records", () => {
+  test("FR-STATS-42 BL-121 records the player ack leaves out have no row; none left → no Records section; Lifetime stays", () => {
+    const some: TrophiesResult = {
+      trophies: { ...TROPHIES.trophies, records: { "best-fight-kills": null } },
+    };
+    const h = html("player", { status: "ok", result: some });
+    expect(trophy(h, "best-fight-kills")).toBe("—");
+    expect(trophy(h, "biggest-hit")).toBeUndefined();
+    const none: TrophiesResult = { trophies: { ...TROPHIES.trophies, records: {} } };
+    const n = html("player", { status: "ok", result: none });
+    expect(n).not.toContain(">Records<");
+    expect(count(n, "stats-trophy")).toBe(9);
+    expect(n).not.toMatch(/withheld|hidden/i);
+  });
+});
+
 describe("FR-STATS-44 trophies refresh", () => {
   const frame = (actorName: string, targetName: string) => ({
     cause: { name: "AttackApplied" },

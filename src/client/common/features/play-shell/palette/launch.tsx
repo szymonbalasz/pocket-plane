@@ -14,7 +14,7 @@ import { type RecordStore, recordsOf } from "@shared/protocol/store";
 import { toast } from "sonner";
 import { openSheetFor } from "../../character-sheet/selection";
 import { CHAR_SHEET_KIND } from "../../character-sheet/window";
-import { skipText, stepSkip } from "../../combat-extras/skip";
+import { showStepSkip, stepSkip } from "../../combat-extras/skip";
 import { startedIn } from "../../combat-tracker/store";
 import { INITIATIVE_KIND } from "../../combat-tracker/window";
 import { CMP_KIND } from "../../compendium/logic";
@@ -122,9 +122,8 @@ function turnCommand(direction: "next" | "prev"): PaletteCommand {
       if (!step) return;
       const r = await ctx.send<TurnResult>(name, step.payload);
       if (r === undefined) return;
-      if (step.skipped) {
-        toast(<span data-testid="cbt-init-skipped">{skipText(step.skipped, step.dead)}</span>);
-      }
+      // BL-122: the turn changed: this step's skip toast replaces the last one (or clears it).
+      showStepSkip(step);
       if (r?.notRestored?.length) {
         toast(<span data-testid="cbtx-not-restored">{notRestoredText(r.notRestored)}</span>);
       }

@@ -19,6 +19,7 @@ import { Button } from "../../components/ui/button";
 import { Badge, Input } from "../../components/ui/primitives";
 import { useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
+import { Box } from "./boxes";
 import { SheetRoll } from "./CharacterSheet";
 import {
   IntField,
@@ -434,9 +435,11 @@ function AttacksBlock({ overrides }: { overrides: PublicOverrides }) {
   const attacks = ctx.stats.attacks;
   const e = ctx.editing && ctx.canEdit;
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Attacks</span>
+    <Box
+      box="attacks"
+      list
+      label="Attacks"
+      aside={
         <span className="flex items-center gap-2">
           <PublicSwitch
             category="attack"
@@ -451,7 +454,8 @@ function AttacksBlock({ overrides }: { overrides: PublicOverrides }) {
             overrides={overrides}
           />
         </span>
-      </div>
+      }
+    >
       {attacks.length === 0 && !e && <p className="text-xs text-muted-foreground">No attacks</p>}
       {attacks.map((a, i) => (
         <AttackRow
@@ -470,7 +474,7 @@ function AttacksBlock({ overrides }: { overrides: PublicOverrides }) {
           row={{ name: "New attack", toHit: 0, damage: "1d6" }}
         />
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -506,6 +510,7 @@ function SlotPips() {
                 data-used={p.used}
                 aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
                 disabled={!live || busy.busy || !counters}
+                data-slot="sheet-pip"
                 className={`size-3 rounded-full border border-foreground/60 ${i < p.used ? "bg-foreground" : ""}`}
                 onClick={(e) => use(p.level, { delta: pipDelta(e.shiftKey) })}
               />
@@ -579,7 +584,7 @@ function SpellcastingHeader() {
   const dc = spellSaveDc(ctx.stats);
   if (!ctx.stats.spellcasting && !e) return null;
   return (
-    <div className="flex flex-col gap-1 border-t pt-2">
+    <div className="flex flex-col gap-1">
       <span className="text-xs font-medium text-muted-foreground">Spellcasting</span>
       {e && <SpellcastingEditor />}
       {atk !== null && dc !== null && (
@@ -756,8 +761,7 @@ function SpellsBlock({ overrides }: { overrides: PublicOverrides }) {
   const e = ctx.editing && ctx.canEdit;
   if (spells.length === 0 && !e) return null;
   return (
-    <div className="flex flex-col gap-1 border-t pt-2">
-      <span className="text-xs font-medium text-muted-foreground">Spells</span>
+    <div className="flex flex-col gap-1">
       {spellGroups(spells).map((g) => (
         <div key={g.level} className="flex flex-col">
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
@@ -786,6 +790,19 @@ function SpellsBlock({ overrides }: { overrides: PublicOverrides }) {
   );
 }
 
+/** FR-CHARX-114: the Spells box: the spellcasting header and slot pips, then the spells. */
+function SpellsBox({ overrides }: { overrides: PublicOverrides }) {
+  const ctx = useSheet();
+  const e = ctx.editing && ctx.canEdit;
+  if (!ctx.stats.spellcasting && ctx.sheet.spells.length === 0 && !e) return null;
+  return (
+    <Box box="spells" list label="Spells" className="gap-2">
+      <SpellcastingHeader />
+      <SpellsBlock overrides={overrides} />
+    </Box>
+  );
+}
+
 export function ActionsTab() {
   // One set of DM public overrides for the tab: the Attacks block's switches apply to every
   // attack / damage roll on it (FR-CHAR-22's rule; §6.1 "Public").
@@ -793,8 +810,7 @@ export function ActionsTab() {
   return (
     <div className="flex flex-col gap-2">
       <AttacksBlock overrides={overrides} />
-      <SpellcastingHeader />
-      <SpellsBlock overrides={overrides} />
+      <SpellsBox overrides={overrides} />
     </div>
   );
 }

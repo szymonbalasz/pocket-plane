@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { fellOf } from "./callout";
 import { feedText } from "./feed";
-import type { StatsCharacter, StatsSide } from "./rules";
+import type { StatsCharacter, StatsSide, UnseenKind } from "./rules";
 import {
   addLuck,
   addTrophies,
@@ -24,6 +24,7 @@ import {
   FELL_LIST_MAX,
   PlayerHighlights,
   PlayerLuckRow,
+  TrophiesResult,
 } from "./schemas";
 
 const side = (id: string, o: Partial<StatsSide> = {}): StatsSide => ({
@@ -197,22 +198,36 @@ describe("FR-STATS-31 highlights", () => {
     }
   });
 
-  test("FR-STATS-12 BL-111 dealtUnseen: players' MVP is empty (the item hides); the rest stays", () => {
-    const p = PlayerHighlights.parse(
-      fightHighlights({
-        role: "player",
-        facts: playerFacts(),
-        rolls: [],
-        characters: chars,
-        round: 3,
-        span: null,
-        standing: [],
-        dealtUnseen: true,
-      }),
-    );
-    expect(p.mvp).toEqual({ value: null, winners: [] });
-    expect(p["biggest-hit"]).toMatchObject({ value: 30, winners: [{ name: "Thorn" }] });
+  test("FR-STATS-12 BL-111 BL-121 unseen dealt: players' MVP, Biggest hit and Biggest overkill are empty (the items hide); the rest stays", () => {
+    const run = (unseen: UnseenKind[]) =>
+      PlayerHighlights.parse(
+        fightHighlights({
+          role: "player",
+          facts: [...playerFacts(), fact(THORN, MIRA, 6, { kind: "heal" })],
+          rolls: [roll("ch-Mira", { natural: 20 })],
+          characters: chars,
+          round: 3,
+          span: null,
+          standing: [],
+          unseen: new Set(unseen),
+        }),
+      );
+    const empty = { value: null, winners: [] };
+    const p = run(["dealt"]);
+    expect(p.mvp).toEqual(empty);
+    expect(p["biggest-hit"]).toEqual(empty);
+    expect(p["biggest-overkill"]).toEqual(empty);
+    expect(p["most-healing"]).toMatchObject({ value: 6, winners: [{ name: "Thorn" }] });
+    expect(p.nat20).toMatchObject({ value: 1, winners: [{ name: "Mira" }] });
+    // Kills / downs are events the players saw, not awards: unchanged.
     expect(p.kills.events).toHaveLength(2);
+    expect(run(["healed"])["most-healing"]).toEqual(empty);
+    expect(run(["healed"])["biggest-hit"]).toMatchObject({ value: 30 });
+    expect(run(["rolled"]).nat20).toEqual(empty);
+    expect(run(["rolled"]).nat1).toEqual(empty);
+    expect(run(["rolled"]).mvp.value).not.toBeNull();
+    // `taken` is no Highlights item (Times downed is the downs list).
+    expect(run(["taken"])).toEqual(run([]));
   });
 
   test("FR-STATS-31 ties ≤ 8, zero = empty, companions roll into the owner (with)", () => {
@@ -379,6 +394,17 @@ describe("FR-STATS-42 trophies", () => {
     const thorn = trophyCase(t.get("ch-Thorn"), undefined, label);
     expect(thorn.lifetime.healing).toBe(4);
     expect(thorn.records["biggest-hit"]).toBeNull();
+    // BL-121: unseen party damage in the campaign withholds every record (no key, no row); the
+    // Lifetime numbers stay. Other kinds withhold none.
+    const withheld = trophyCase(t.get("ch-Mira"), undefined, label, new Set(["dealt"]));
+    expect(withheld.records).toEqual({});
+    expect(
+      TrophiesResult.parse({ trophies: { characterId: "ch-Mira", ...withheld } }).trophies.records,
+    ).toEqual({});
+    expect(withheld.lifetime).toEqual(mira.lifetime);
+    expect(
+      trophyCase(t.get("ch-Mira"), undefined, label, new Set(["healed", "taken", "rolled"])),
+    ).toEqual(mira);
   });
 
   test("FR-STATS-42 Biggest overkill per role: players the callout line's raw; merge keeps the best", () => {
