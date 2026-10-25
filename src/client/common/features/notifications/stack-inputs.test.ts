@@ -1,6 +1,6 @@
 // FR-NOTE-75 (sprint 10, H3; BL-101): where a window body's drawn content ends, from its boxes in
 // document order (the runtime walks the body's leaf elements and record rows). Sprint 11 (F2):
-// FR-NOTE-78 records (BL-108).
+// FR-NOTE-78 records (BL-108). Sprint 12 (X1): BL-119 record headings.
 import { describe, expect, test } from "bun:test";
 import {
   contentEnd,
@@ -9,6 +9,7 @@ import {
   newestRows,
   outerRecords,
   ROW_MAX_H,
+  recordHeadings,
 } from "./stack-inputs";
 
 const box = (top: number, bottom: number) => ({ top, bottom });
@@ -119,5 +120,25 @@ describe("FR-NOTE-78 records", () => {
     // not in a 200-px one (its rows do).
     expect(outerRecords(92, 470, walk([rec("card", 275, 397)])).map((r) => r.id)).toEqual(["card"]);
     expect(outerRecords(92, 292, walk([rec("big", 100, 100 + ROW_MAX_H + 1)]))).toEqual([]);
+  });
+});
+
+describe("BL-119 record headings", () => {
+  test("FR-NOTE-78 BL-119 record headings: a card-sized record's first child (the Perception card's title line); not a one-line row's, a control or a lone child", () => {
+    const line = (top: number, bottom: number, control = false) => ({ top, bottom, control });
+    // sim-15 c01: the older Perception card 372..459, its title 381..400, three name rows below.
+    const card = { r: box(372, 459), children: 2, first: line(381, 400) };
+    expect(recordHeadings([card])).toEqual([line(381, 400)]);
+    // A wallet row (18 px), a card whose first child is a button, one child only, none drawn.
+    expect(
+      recordHeadings([
+        { r: box(235, 253), children: 3, first: line(235, 253) },
+        { ...card, first: line(381, 400, true) },
+        { ...card, children: 1 },
+        { ...card, first: line(381, 381) },
+        { ...card, first: null },
+        { ...card, first: line(372, 459) },
+      ]),
+    ).toEqual([]);
   });
 });

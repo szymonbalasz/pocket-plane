@@ -288,6 +288,16 @@ export function pipClip(
 }
 
 /**
+ * BL-118 (X1 walkthrough 1, 4): the DM column's start row, as play-shell's `popupRegion` lays the
+ * region row out below the toast stack: from the stack's resting height (its FR-SHELL-59 report,
+ * `noteH`; 0 = none), not the row's drawn top, which follows the toast height late (the column
+ * moved on its own rolling → rest re-render, 2.2 s after the card, or flipped left / right).
+ */
+export function dmColumnTop(noteH: number): number {
+  return DM_TOAST_TOP + (noteH > 0 ? noteH + STACK_GAP : 0);
+}
+
+/**
  * FR-DICEX-39 / FR-NOTE-32 rule for the DM's popup stack: centred at `top`; over a rect it keeps
  * clear of (Initiative; the open combat popup, FR-CBT-75, which may sit where its toast was; the
  * hard keep-outs, FR-DICEX-55: the map tool bar) → left of it with a 12 px gap; no room there

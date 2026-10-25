@@ -149,3 +149,45 @@ export function usePopupRects(on: boolean): PopupRect[] {
   }, [on]);
   return rects;
 }
+
+/** BL-120: the record ids the `POPUP_SELECTOR` elements show now (measuring ones too), sorted. */
+export function openPopupIds(root: ParentNode = document): string[] {
+  const ids = new Set<string>();
+  for (const el of root.querySelectorAll(POPUP_SELECTOR)) {
+    const id = el.getAttribute("data-record-id");
+    if (id) ids.add(id);
+  }
+  return [...ids].sort();
+}
+
+/**
+ * BL-120: the open non-modal popups' record ids while `on` (the DM), re-read once a frame on DOM
+ * changes (a popup opens, closes or switches to another card), joined with ",".
+ */
+export function usePopupIds(on: boolean): string {
+  const [ids, setIds] = useState("");
+  useEffect(() => {
+    if (!on || typeof document === "undefined" || typeof MutationObserver === "undefined") return;
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      setIds(openPopupIds().join(","));
+    };
+    const mo = new MutationObserver(() => {
+      if (!raf) raf = requestAnimationFrame(read);
+    });
+    mo.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-record-id"],
+    });
+    read();
+    return () => {
+      mo.disconnect();
+      cancelAnimationFrame(raf);
+      setIds("");
+    };
+  }, [on]);
+  return ids;
+}

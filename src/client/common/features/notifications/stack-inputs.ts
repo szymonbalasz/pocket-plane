@@ -133,6 +133,35 @@ export function outerRecords<T extends { top: number; bottom: number; control: b
   return out;
 }
 
+/**
+ * BL-119 (sim-15 glitch 2): a record this tall (a card: title line + rows, not a one-line row)
+ * has a heading: its first child, a primary part like the window's headings.
+ */
+export const CARD_MIN_H = 40;
+
+/**
+ * BL-119: the heading of each card-sized record (≥ `CARD_MIN_H`, ≥ 2 children): its first child
+ * element, when that is drawn, not a control and shorter than the record. Pure over the boxes.
+ */
+export function recordHeadings<T extends { top: number; bottom: number }>(
+  records: readonly {
+    r: T;
+    children: number;
+    first: (T & { control: boolean }) | null;
+  }[],
+): T[] {
+  return records.flatMap(({ r, children, first }) =>
+    r.bottom - r.top >= CARD_MIN_H &&
+    children >= 2 &&
+    first &&
+    !first.control &&
+    first.bottom > first.top &&
+    first.bottom - first.top < r.bottom - r.top
+      ? [first]
+      : [],
+  );
+}
+
 /** FR-NOTE-78: a window's headings. */
 const HEADING_SELECTOR = 'h1, h2, h3, h4, h5, h6, [role="heading"]';
 
@@ -154,6 +183,8 @@ interface BodyMeasure {
   primary: Rect[];
   /** FR-NOTE-78: its other records (not a log: older entries are free). */
   records: Rect[];
+  /** BL-119: those records' headings (`recordHeadings`). */
+  headings: Rect[];
 }
 
 /**
@@ -216,6 +247,18 @@ function measureBody(id: string, log: boolean): BodyMeasure | null {
     h: Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top),
   });
   const [first, ...rest] = outerRecords(b.top, b.bottom, recs);
+  // BL-119: the older Roll requests cards' title lines too, not only the newest card's.
+  const titles = recordHeadings(
+    rest.map((x) => {
+      const c = x.el.firstElementChild;
+      const cr = c?.getBoundingClientRect();
+      return {
+        r: x.r,
+        children: x.el.childElementCount,
+        first: c && cr ? Object.assign(cr, { control: c.matches(CONTROL_SELECTOR) }) : null,
+      };
+    }),
+  ).filter((t) => t.width >= 4 && t.top < b.bottom && t.bottom > b.top);
   return {
     used: end === null ? TITLE_H : Math.ceil(end - s.top),
     head: head === null ? null : Math.ceil(head - s.top),
@@ -223,6 +266,7 @@ function measureBody(id: string, log: boolean): BodyMeasure | null {
     logRows: log ? newestRows(b.top, b.bottom, outer).map(rel) : [],
     primary: [...headings, ...(first ? [first.r] : [])].map(rel),
     records: rest.map((x) => rel(x.r)),
+    headings: titles.map(rel),
   };
 }
 
@@ -297,6 +341,7 @@ export function useStackInputs(isDm: boolean, showing = true): StackInputs {
                 logRows: m.logRows.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
                 primary: m.primary.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
                 records: m.records.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
+                headings: m.headings.map((c) => ({ ...c, x: r.x + c.x, y: r.y + c.y })),
               };
         return w.kind === HISTORY_KIND
           ? { ...r, pushed, blocks: true, ...used }
