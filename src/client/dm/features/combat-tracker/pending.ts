@@ -7,7 +7,8 @@ import {
   type HitRulingRecord,
 } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
-import { encounterIdOfView, type NotificationViews } from "@ui/features/notifications/views";
+import { encounterPending } from "@ui/features/notifications/logic";
+import type { NotificationViews } from "@ui/features/notifications/views";
 
 /**
  * Pending rows linked to `encounterId` by their kind's view: linked actions (concentration, a
@@ -19,13 +20,10 @@ export function pendingForEncounter(
   encounterId: string | null | undefined,
   views: NotificationViews,
 ): NotificationRecord[] {
-  if (!encounterId) return [];
-  return notes
-    .filter(
-      (n) =>
-        n.state === "pending" && encounterIdOfView(views.get(n.kind), n.payload) === encounterId,
-    )
-    .sort((a, b) => Number(isDamageCard(a)) - Number(isDamageCard(b)) || a.seq - b.seq);
+  // BL-120: the rows the DM summary counts (`encounterPending`, its waiting part too).
+  return encounterPending(notes, encounterId, views).sort(
+    (a, b) => Number(isDamageCard(a)) - Number(isDamageCard(b)) || a.seq - b.seq,
+  );
 }
 
 export const isDamageCard = (n: Pick<NotificationRecord, "kind">) => n.kind === DAMAGE_CARD_KIND;

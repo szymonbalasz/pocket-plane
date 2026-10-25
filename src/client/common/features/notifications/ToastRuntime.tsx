@@ -49,7 +49,7 @@ import {
 } from "../play-shell/toast-region";
 import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, useAlertToasts } from "./alert-toasts";
-import { useDialogRects, usePopupRects } from "./dialog-rects";
+import { useDialogRects, usePopupIds, usePopupRects } from "./dialog-rects";
 import { dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
 import {
   actionButton,
@@ -74,9 +74,11 @@ import {
   closeToast,
   moreInSummary,
   nextExpiry,
+  pruneToasts,
   REFOLD_QUIET_MS,
   refold,
   registerToastMemory,
+  releaseHidden,
   SETTLE_HOLD_MS,
   SUMMARY_KEY,
   setHidden,
@@ -365,6 +367,31 @@ export function ToastRuntime({
     wasFolded.current = folded;
   }, [folded, sync, dispatch, views]);
 
+  // BL-120 (X1 walkthrough 3): a row hidden by its popup (FR-NOTE-26) leaves the summary's count
+  // before the paint. `hideToast` has no store: a row the summary counted (no toast of its own,
+  // e.g. a card from the snapshot) stayed in it while its popup showed it too.
+  const hiddenKey = state.hiddenIds?.join(",") ?? "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: recount when a row is hidden
+  useLayoutEffect(() => {
+    if (!sync || !hiddenKey) return;
+    const store = sync.getState().store;
+    dispatch((s, now) => pruneToasts(s, store, now, (st) => waitingForPlayers(st, views)));
+  }, [hiddenKey]);
+
+  // BL-120: a hidden card whose popup closed while still pending (Later, another card opened)
+  // counts in the summary (FR-NOTE-26: no toast of its own again).
+  const popupIds = usePopupIds(isDm);
+  const heldIds = useRef("");
+  useEffect(() => {
+    const was = heldIds.current;
+    heldIds.current = popupIds;
+    const open = new Set(popupIds ? popupIds.split(",") : []);
+    const gone = (was ? was.split(",") : []).filter((id) => !open.has(id));
+    if (gone.length === 0 || !sync) return;
+    const store = sync.getState().store;
+    dispatch((s, now) => releaseHidden(s, gone, store, now, (st) => waitingForPlayers(st, views)));
+  }, [popupIds, sync, dispatch, views]);
+
   // FR-NOTE-32: the DM's stack keeps clear of the rendered Initiative window. FR-NOTE-51: every
   // input is subscribed (windows, Initiative, hard keep-outs, first rows, height, viewport).
   const stackRef = useRef<HTMLElement>(null);
@@ -470,7 +497,7 @@ export function ToastRuntime({
   // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
   const covers = isDm && at.covers > 0;
   const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
-  const { shown, more, callout } = visibleToasts(state, cap, folded);
+  const { shown, more, inSummary, callout } = visibleToasts(state, cap, folded);
   const foldable = shown.filter((t) => t.kind !== "summary" && classOfToast(t) !== "alert").length;
   // BL-115: a hold that never sees a new height ends after `SETTLE_HOLD_MS`.
   const [holdOver, setHoldOver] = useState(0);
@@ -488,18 +515,23 @@ export function ToastRuntime({
   }, [stackH, room, covers, minCap, foldable, at.left, at.top, holdOver]);
   // FR-NOTE-70: the drawn spot (`data-left` / `data-top`, the style and the FR-SHELL-59 report).
   const pos = settle.hold && settle.drawn ? settle.drawn : { left: at.left, top: at.top };
+  // BL-118: the fold is done: no hold, and no step due on this height (`foldCap`).
+  const resting =
+    !settle.hold && !((stackH > room || covers) && cap > minCap && settle.fold.foldedAt !== stackH);
 
-  // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
+  // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows. BL-118: only
+  // the resting stack (the roll popups keep clear of it, FR-DICEX-55), never a fold step's.
   useLayoutEffect(() => {
     const el = stackRef.current;
     if (!isDm || !el || stackH === 0) {
       reportShownStack(SHOWN_STACK_ID, null);
       return;
     }
+    if (!resting) return;
     // Fixed at `pos`; the width and measured height as rendered.
     const w = Math.round(el.getBoundingClientRect().width);
     reportShownStack(SHOWN_STACK_ID, { x: pos.left, y: pos.top, w, h: stackH });
-  }, [isDm, pos.left, pos.top, stackH]);
+  }, [isDm, pos.left, pos.top, stackH, resting]);
   useEffect(() => () => reportShownStack(SHOWN_STACK_ID, null), []);
 
   const openHistory = () => openWindow(HISTORY_KIND);
@@ -528,6 +560,8 @@ export function ToastRuntime({
       data-placement={isDm ? "top-center" : "bottom-right"}
       data-left={isDm ? pos.left : undefined}
       data-top={isDm ? pos.top : undefined}
+      // BL-118: the fold rests (the FR-SHELL-59 report carries only a resting stack).
+      data-settled={isDm ? resting : undefined}
       // FR-NOTE-50: DOM order = order from home; the players' home is the bottom.
       className={cn(
         "pointer-events-none fixed flex w-80 gap-2",
@@ -550,11 +584,12 @@ export function ToastRuntime({
               key={SUMMARY_KEY}
               role="status"
               data-testid="note-toast-pending-summary"
-              data-count={t.count}
+              // BL-120: with the cards folded into it (`inSummary`).
+              data-count={t.count + inSummary}
               data-waiting={t.waiting ?? 0}
               className="pointer-events-auto flex items-center gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
             >
-              <span className="flex-1">{summaryText(t.count, t.waiting)}</span>
+              <span className="flex-1">{summaryText(t.count + inSummary, t.waiting)}</span>
               {inRow && moreButton}
               <Button
                 size="sm"

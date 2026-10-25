@@ -119,13 +119,24 @@ export function waitingForPlayers(store: RecordStore, views: NotificationViews):
   const started = Object.values(store.records[ENCOUNTER_TYPE] ?? {}).find(
     (e) => (e as { status?: string }).status === "started",
   ) as { id: string } | undefined;
-  if (!started) return 0;
-  return notificationsOf(store).filter(
-    (n) =>
-      n.state === "pending" &&
-      n.actionRole === "player" &&
-      encounterIdOfView(views.get(n.kind), n.payload) === started.id,
+  return encounterPending(notificationsOf(store), started?.id, views).filter(
+    (n) => n.actionRole === "player",
   ).length;
+}
+
+/**
+ * BL-120: the pending rows linked to `encounterId` by their kind's view (FR-NOTE-29), store order:
+ * the one count source of Initiative's "Pending (n)" (FR-CBT-79) and the summary's waiting part.
+ */
+export function encounterPending(
+  notes: readonly NotificationRecord[],
+  encounterId: string | null | undefined,
+  views: NotificationViews,
+): NotificationRecord[] {
+  if (!encounterId) return [];
+  return notes.filter(
+    (n) => n.state === "pending" && encounterIdOfView(views.get(n.kind), n.payload) === encounterId,
+  );
 }
 
 /**

@@ -2640,7 +2640,7 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 
 ## 131. Sprint 12: theme switch (T1)
 
-From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351, #353). **Built by `build/theme-switch`**. Protocol side: [protocol §166](../protocol/README.md#166-sprint-12-theme-switch-t1). **No table, column, record type or wire field.**
+From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351, #353). **Built by `build/theme-switch`**. Protocol side: [protocol §167](../protocol/README.md#167-sprint-12-theme-switch-t1). **No table, column, record type or wire field.**
 
 | Browser state | Store | Rule | Source |
 |---|---|---|---|
@@ -2651,7 +2651,7 @@ From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351
 
 ## 132. Sprint 12: Gilt & Stone (T2)
 
-From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351, #353). **Built by `build/theme-gilt`**. Protocol side: [protocol §167](../protocol/README.md#167-sprint-12-gilt--stone-t2). **No table, column, record type or wire field.**
+From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351, #353). **Built by `build/theme-gilt`**. Protocol side: [protocol §168](../protocol/README.md#168-sprint-12-gilt--stone-t2). **No table, column, record type or wire field.**
 
 - **Derived (client, not stored):** the Gilt & Stone look, from `data-theme="gilt"` on `<html>` (`@ui/themes/gilt.css`); its extra tones are `--gs-*` custom properties on `<body>` (contrast-tested).
 - **Fixtures:** unit `theme-round-3` (`combat-1` stepped on two rounds with Next: round 3, Wolf's turn; steps turns, so not in `session-sim-13`); bundle `theme-gilt` = `combat` + `combat-1` + `theme-round-3` + `rolls-1` (Mira's full sheet, the Goblin and the Elite Goblin's sheets from session-sim).

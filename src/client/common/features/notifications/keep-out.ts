@@ -31,7 +31,8 @@
 // FR-NOTE-78 (BL-108): over a body, the fallback keeps off each window's primary parts first (its
 // headings and first record; a log's newest rows), then the fewest controls and other records;
 // an open non-modal popup (the damage-card popup) blocks like Initiative and, when nothing clears
-// it, the stack folds over its fewest controls.
+// it, the stack folds over its fewest controls. *(Sprint 12, X1)* BL-119: then off the other
+// records' headings (every Roll requests card's title line, not only the newest card's).
 // Pure; players keep bottom-right.
 
 import { type FirstRow, firstRows } from "../play-shell/content-heights";
@@ -85,6 +86,11 @@ export type StackWindow = Rect & {
   primary?: readonly Rect[];
   /** FR-NOTE-78: its other row-sized records as drawn; they count like controls. */
   records?: readonly Rect[];
+  /**
+   * BL-119 (sim-15 glitch 2): those records' headings as drawn (an older Roll requests card's
+   * title line); after the fewest controls, the fallback covers the fewest of them.
+   */
+  headings?: readonly Rect[];
 };
 
 /** FR-NOTE-75: the window's content part (title bar to `used`; unknown → all of it). */
@@ -328,6 +334,10 @@ function dmStackSpotOnly(
       ...windows.flatMap((w) =>
         (w.primary ?? []).flatMap((r) => [r.y + r.h + STACK_GAP, r.y - STACK_GAP - stackH]),
       ),
+      // BL-119: and below or above each record heading (over the older card's rows).
+      ...windows.flatMap((w) =>
+        (w.headings ?? []).flatMap((r) => [r.y + r.h + STACK_GAP, r.y - STACK_GAP - stackH]),
+      ),
     ]);
   // Nearest the home row first (ties keep the earlier spot): FR-NOTE-32's spot, then by top.
   const spotsAt = (tops: number[], ls: readonly number[]) => [
@@ -338,7 +348,7 @@ function dmStackSpotOnly(
   // none → the one nearest the home row, never a thin overlap low on a window (BL-75).
   // FR-NOTE-77: before that, the fewest window controls under it, then the stricter pass.
   // FR-NOTE-78 (BL-108): first of all the fewest primary parts (headings, first records, a log's
-  // newest rows); other records count like controls.
+  // newest rows); other records count like controls. BL-119: then the fewest record headings.
   const pick = (spots: { left: number; top: number }[], level: (p: Spot) => number | null) => {
     let best: Spot | null = null;
     let bestKey: number[] = [];
@@ -351,10 +361,17 @@ function dmStackSpotOnly(
       const r = at(p);
       const key =
         pass === 0
-          ? [primaryUnder(r, windows), controlsUnder(r, windows), 0, coveredArea(r, avoid)]
+          ? [
+              primaryUnder(r, windows),
+              controlsUnder(r, windows),
+              headingsUnder(r, windows),
+              0,
+              coveredArea(r, avoid),
+            ]
           : [
               primaryUnder(r, windows),
               controlsUnder(r, windows),
+              headingsUnder(r, windows),
               pass,
               body ? 1 : 0,
               body ? p.top : coveredArea(r, avoid),
@@ -446,6 +463,10 @@ const primaryUnder = (r: Rect, windows: readonly StackWindow[]) =>
  */
 const controlsUnder = (r: Rect, windows: readonly StackWindow[]) =>
   partsUnder(r, windows, (w) => [w.controls, w.records]);
+
+/** BL-119: how many of the windows' record headings `r` overlaps (an older card's title line). */
+const headingsUnder = (r: Rect, windows: readonly StackWindow[]) =>
+  partsUnder(r, windows, (w) => [w.headings]);
 
 /** FR-NOTE-77: how far the stack may slide sideways from home: half its width (it stays in its band). */
 export const MAX_SLIDE = STACK_W / 2;

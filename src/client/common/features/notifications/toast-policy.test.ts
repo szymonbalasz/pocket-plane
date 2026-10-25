@@ -99,7 +99,8 @@ describe("FR-NOTE-50 toast policy", () => {
     for (const n of more) s = addNote(s, n, 3, alertKind);
     v = visibleToasts(s);
     expect(v.shown.map((t) => t.key)).toEqual(["summary", more[0].id, more[1].id, a.id]);
-    expect(v.more).toBe(5);
+    // BL-120: the two held-back cards count in the summary, the three info in "+N more".
+    expect(v).toMatchObject({ more: 3, inSummary: 2 });
     // P3 E3: the runtime's lowered cap: the alert never overflows, and the newest card stays.
     expect(classes(s, 1)).toEqual(["summary", "card", "alert"]);
     // FR-NOTE-77 (sprint 10): with the summary showing, 0 folds the cards too (its Open stays).
@@ -230,16 +231,17 @@ describe("FR-NOTE-72 cards fold into an open Notifications window (model)", () =
     // Closed again: the same stack shows as before (cards back, the summary first, "+N more").
     const shut = visibleToasts(s, 3);
     expect(shut.shown.map(classOfToast)).toEqual(["summary", "card", "alert", "alert"]);
-    expect(shut.more).toBe(4);
+    // BL-120: the held-back cards in the summary, the info in "+N more".
+    expect(shut).toMatchObject({ more: 1, inSummary: 3 });
   });
 });
 
 describe("FR-NOTE-77 fold to the summary (walkthrough H3 4)", () => {
-  test("FR-NOTE-77 fold to the summary: max 0 with the summary showing → no card, '+N more'; without it a card still shows (P3 E3)", () => {
+  test("FR-NOTE-77 fold to the summary: max 0 with the summary showing → no card, counted in it (BL-120); without it a card still shows (P3 E3)", () => {
     let s = setSummary(initialToasts(0), 4, 0);
     const cards = [card(), card()] as const;
     for (const n of cards) s = addNote(s, n, 1, alertKind);
-    expect(visibleToasts(s, 0)).toMatchObject({ more: 2 });
+    expect(visibleToasts(s, 0)).toMatchObject({ more: 0, inSummary: 2 });
     expect(classes(s, 0)).toEqual(["summary"]);
     // Alerts never fold (#336).
     const a = alert();
@@ -248,19 +250,26 @@ describe("FR-NOTE-77 fold to the summary (walkthrough H3 4)", () => {
     // No summary (folded into an open Notifications window, or none): one card stays.
     let bare = initialToasts(0);
     for (const n of cards) bare = addNote(bare, n, 1, alertKind);
-    expect(visibleToasts(bare, 0)).toMatchObject({ more: 1 });
+    expect(visibleToasts(bare, 0)).toMatchObject({ more: 1, inSummary: 0 });
     expect(classes(bare, 0)).toEqual(["card"]);
   });
 });
 
 describe("FR-NOTE-78 '+N more' in the summary's row (walkthrough F2 1b, 2a)", () => {
-  test("FR-NOTE-78 '+N more' in the summary's row: the summary alone with cards folded → in its row; a card, an alert or nothing folded beside it → below the stack as before", () => {
+  test("FR-NOTE-78 '+N more' in the summary's row: the summary alone with info folded → in its row; a card, an alert or nothing folded beside it → below the stack as before", () => {
     let s = setSummary(initialToasts(0), 1, 0);
-    for (const n of [card(), card()]) s = addNote(s, n, 1, alertKind);
+    for (const n of [note(), note()]) s = addNote(s, n, 1, alertKind);
     const folded = visibleToasts(s, 0);
     expect(folded.more).toBe(2);
     expect(moreInSummary(folded.shown, folded.more)).toBe(true);
+    // BL-120: folded cards count in the summary, not in a pill.
+    let cards = setSummary(initialToasts(0), 1, 0);
+    for (const n of [card(), card()]) cards = addNote(cards, n, 1, alertKind);
+    const inIt = visibleToasts(cards, 0);
+    expect(inIt).toMatchObject({ more: 0, inSummary: 2 });
+    expect(moreInSummary(inIt.shown, inIt.more)).toBe(false);
     // A card still shows: the pill stays below the stack.
+    s = addNote(s, card(), 1, alertKind);
     const one = visibleToasts(s, 1);
     expect(moreInSummary(one.shown, one.more)).toBe(false);
     // An alert beside the summary (alerts never fold): below the stack.
