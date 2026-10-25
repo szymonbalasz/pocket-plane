@@ -174,7 +174,7 @@ function HitPoints() {
           )
         )}
         {hp !== null && isDown(hp) && (
-          <Badge data-testid="char-sheet-down" className="bg-hp-down text-white">
+          <Badge data-testid="char-sheet-down" className="bg-hp-down text-hp-down-foreground">
             Down
           </Badge>
         )}
