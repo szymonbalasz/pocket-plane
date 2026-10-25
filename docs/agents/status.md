@@ -37,7 +37,7 @@ Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL),
 
 ## Shared-file locks
 
-- `src/client/common/components/ui/*`, `styles.css`, `Launcher.tsx` + 13 raw-colour files: **T0** (then T1). Character-sheet folders + `dice-roll-log/roll-control.tsx` (RollButton `hint` → ReactNode, granted 2026-10-25): **CS**. Merge order: T0 before CS (CS uses T0's `hp-down-foreground` token).
+- `src/client/common/components/ui/*`, `styles.css`, `Launcher.tsx` + 13 raw-colour files: **T0** (then T1). Character-sheet folders + `dice-roll-log/roll-control.tsx` (RollButton `hint` → ReactNode) + one assertion in `components/ui/tooltip-titles.test.ts` (granted 2026-10-25; T0 holds the rest of components/ui): **CS**. Merge order: T0 before CS (CS uses T0's `hp-down-foreground` token).
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
