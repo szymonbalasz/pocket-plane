@@ -62,7 +62,7 @@ export function OnlineDot({ dot }: { dot: ReturnType<typeof onlineDot> }) {
         data-online={dot === "unknown" ? undefined : dot === "online"}
         className={
           dot === "online"
-            ? "size-2 rounded-full bg-emerald-500"
+            ? "size-2 rounded-full bg-positive"
             : "size-2 rounded-full bg-muted-foreground/40"
         }
       />

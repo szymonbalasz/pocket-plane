@@ -26,18 +26,18 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
 | Sprint 11 art track (DM) | merged f118e724 (theme-system), 56347ecf (charx print sheet) | — | **merged** (#351; ADR-0069); #352: theme-system complete, OQ-CHARX-47–50 all A | art build in sprint 12 |
 | Sprint 11 gate | final main 9da2b751 | — | **session-sim-15 10 / 11 PASS** (leak scan clean; hard kill byte-identical); FAIL c → BL-118; glitches → BL-119–BL-123 | DM recap |
-| Sprint 12 T0 theme tokens | `fix/theme-tokens` | test-th0 | built; gates check:full 5767 green, e2e 252 + gems-reroll load flake (1/1 alone) | walkthrough: Default pixel diff vs main |
-| Sprint 12 CS printed sheet | `build/charx-print-sheet` (T0 merged in) | test-cs | built; check 5197 green | walkthrough PS1–PS6 (Default) |
+| Sprint 12 T0 theme tokens | merged 2c5a379f | — | **merged** (Default pixel-identical walkthrough PASS, `.verify/sprint12/walkthroughs/20261025-th0-default-identical/`; check:full 5767, e2e 252 + gems-reroll load flake 1/1 alone); main gates skipped (docs-only since tested) | — |
+| Sprint 12 CS printed sheet | `build/charx-print-sheet` (T0 merged in) | build-cs | walkthrough 18/19: F1 DM sheet crash for a PC in a started fight (React #185, Tooltip ref loop) → fixing | re-test |
 | Sprint 12 X1 toasts (BL-118–120) | `fix/x1-toasts` | build-x1 | building | walkthrough |
 | Sprint 12 X2 stats + skip toast + flakes (BL-121, -122, -116) | `fix/x2-stats-combat` | build-x2 | building | walkthrough |
-| Sprint 12 T1 theme switch | — | — | waits for T0 | — |
+| Sprint 12 T1 theme switch | `build/theme-switch` | build-th1 | building | walkthrough D1, D2, D4, P1 |
 | Sprint 12 T2 Gilt & Stone | — | — | waits for T1 + CS | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
 ## Shared-file locks
 
-- `src/client/common/components/ui/*`, `styles.css`, `Launcher.tsx` + 13 raw-colour files: **T0** (then T1). Character-sheet folders + `dice-roll-log/roll-control.tsx` (RollButton `hint` → ReactNode) + one assertion in `components/ui/tooltip-titles.test.ts` (granted 2026-10-25; T0 holds the rest of components/ui): **CS**. Merge order: T0 before CS (CS uses T0's `hp-down-foreground` token).
+- `styles.css`, both `index.html`, the dice tray's `data-slot` → `data-die-slot` rename (`roll-control.tsx` attribute lines + 3 tests): **T1** (T0 merged). Character-sheet folders + `dice-roll-log/roll-control.tsx` (RollButton `hint` → ReactNode) + one assertion in `components/ui/tooltip-titles.test.ts` (granted 2026-10-25; T0 holds the rest of components/ui): **CS**. Merge order: T0 before CS (CS uses T0's `hp-down-foreground` token).
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 

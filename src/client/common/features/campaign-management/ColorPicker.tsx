@@ -335,7 +335,7 @@ export function ColorPicker({ target }: { target: ColorTarget }) {
             onFocus={() => setHint(s)}
             onBlur={() => setHint(null)}
             style={{ backgroundColor: s.hex }}
-            className="inline-flex size-6 items-center justify-center rounded-full text-black ring-offset-2 ring-offset-popover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
+            className="inline-flex size-6 items-center justify-center rounded-full text-swatch-ink ring-offset-2 ring-offset-popover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-disabled:cursor-not-allowed aria-disabled:opacity-40"
           >
             {s.checked && <CheckIcon className="size-4" strokeWidth={3} />}
           </button>

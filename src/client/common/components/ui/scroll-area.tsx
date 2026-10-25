@@ -9,8 +9,14 @@ export function ScrollArea({
   ...props
 }: React.ComponentProps<typeof SA.Root>) {
   return (
-    <SA.Root className={cn("relative overflow-hidden", className)} {...props}>
-      <SA.Viewport className="size-full rounded-[inherit]">{children}</SA.Viewport>
+    <SA.Root
+      data-slot="scroll-area"
+      className={cn("relative overflow-hidden", className)}
+      {...props}
+    >
+      <SA.Viewport data-slot="scroll-area-viewport" className="size-full rounded-[inherit]">
+        {children}
+      </SA.Viewport>
       <ScrollBar />
       <SA.Corner />
     </SA.Root>
@@ -24,6 +30,7 @@ export function ScrollBar({
 }: React.ComponentProps<typeof SA.ScrollAreaScrollbar>) {
   return (
     <SA.ScrollAreaScrollbar
+      data-slot="scroll-area-scrollbar"
       orientation={orientation}
       className={cn(
         "flex touch-none select-none p-px transition-colors",
@@ -33,7 +40,10 @@ export function ScrollBar({
       )}
       {...props}
     >
-      <SA.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
+      <SA.ScrollAreaThumb
+        data-slot="scroll-area-thumb"
+        className="relative flex-1 rounded-full bg-border"
+      />
     </SA.ScrollAreaScrollbar>
   );
 }

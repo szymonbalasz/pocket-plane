@@ -71,7 +71,7 @@ export function ChipView({ name, color, state, sound, onClick }: ChipViewProps) 
           aria-hidden
           data-testid="ui-prefs-chip-dot"
           data-color={color ?? undefined}
-          className="pointer-events-none size-3 shrink-0 rounded-full ring-1 ring-black/60"
+          className="pointer-events-none size-3 shrink-0 rounded-full ring-1 ring-swatch-ink/60"
           style={color ? { backgroundColor: color } : undefined}
         />
         <span className="pointer-events-none max-w-40 truncate">{name}</span>
