@@ -5,7 +5,9 @@ import { describe, expect, test } from "bun:test";
 import { skippedOnStep } from "@shared/combat-tracker/rules";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
-import { skipText, stepSkip } from "./skip";
+import { isValidElement, type ReactElement } from "react";
+import { toast } from "sonner";
+import { showStepSkip, skipText, stepSkip } from "./skip";
 
 const store: RecordStore = emptyStore();
 let seq = 0;
@@ -102,5 +104,47 @@ describe("FR-CBT-50 BL-110 down companions in the skip cue", () => {
         initiative: 10,
       }));
     expect(skippedOnStep(turnRows, 1, "Wolf", "next")).toBeNull();
+  });
+});
+
+/** The skip toasts showing in sonner's store (the stack mirrors it), by text. */
+const skipToasts = () =>
+  toast.getToasts().flatMap((t) => {
+    const el = "title" in t ? t.title : null;
+    if (!isValidElement(el)) return [];
+    const props = (el as ReactElement<{ "data-testid"?: string; children?: unknown }>).props;
+    return props["data-testid"] === "cbt-init-skipped" ? [String(props.children)] : [];
+  });
+
+describe("FR-CBT-50 BL-122 one skip toast at a time", () => {
+  // sonner sends a dismissal to its subscribers on the next frame (no DOM here); its store drops
+  // the toast at once.
+  globalThis.requestAnimationFrame ??= (cb) => setTimeout(cb, 0) as unknown as number;
+  globalThis.cancelAnimationFrame ??= (h) => clearTimeout(h);
+
+  test("FR-CBT-50 BL-122 sim-15: Next skips Goblin 2, then a Prev that skips nobody → no 'Skipped' left", () => {
+    toast.dismiss();
+    const r = rows({ g2: 0 });
+    // Next from Mira passes the downed Goblin 2 (after Mira) onto the Owlbear.
+    showStepSkip(stepSkip(store, r, at("Mira"), "next"));
+    expect(skipToasts()).toEqual(["Skipped Goblin 2 (down)"]);
+    // Then a Prev that skips nobody (Mira's turn back to Brakka's): the Next's toast goes.
+    const back = stepSkip(store, r, at("Mira"), "prev");
+    expect(back.skipped).toBeNull();
+    showStepSkip(back);
+    expect(skipToasts()).toEqual([]);
+  });
+
+  test("FR-CBT-50 BL-122 two skipping steps in a row: the newer replaces the older (no stack)", () => {
+    toast.dismiss();
+    showStepSkip(stepSkip(store, rows({ g2: 0 }), at("Mira"), "next"));
+    showStepSkip(stepSkip(store, rows({ drake: 0 }), at("Wolf"), "next"));
+    expect(skipToasts()).toEqual(["Skipped Drake (down)"]);
+    // Other toasts stay.
+    toast("Saved");
+    showStepSkip(stepSkip(store, rows(), at("Wolf"), "next"));
+    expect(skipToasts()).toEqual([]);
+    expect(toast.getToasts().some((t) => "title" in t && t.title === "Saved")).toBe(true);
+    toast.dismiss();
   });
 });
