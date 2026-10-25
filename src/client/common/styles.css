@@ -1,9 +1,18 @@
-/* Tailwind v4 + shadcn/ui tokens, dark only (visual-direction: MVP binding). */
+/* Tailwind v4 + shadcn/ui tokens, dark only (visual-direction: MVP binding). Themes (theme-system,
+   ADR-0069): Default is the bare `:root` block; another theme is a block keyed on its
+   `data-theme="<id>"` (set on <html>) that redefines the themeable tokens for <body> (FR-THEME-08).
+   <html> itself keeps Default's, so the map canvas, which reads its colours there, stays unthemed
+   (OQ-THEME-09 A). The meaning tokens below them are not themed (FR-THEME-09). A theme block never
+   sets sizes, padding or anything else that moves a box. */
 @import "tailwindcss";
+@import "./themes/fonts.css";
 
 @custom-variant dark (&:is(.dark *));
 
-:root {
+/* Default (FR-THEME-19: today's look, unchanged). Also on `[data-theme="default"]` so a preview
+   can show it inside another theme (the Appearance section's swatch). */
+:root,
+[data-theme="default"] {
   --radius: 0.5rem;
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
@@ -33,6 +42,85 @@
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
+  /* Theme tokens (theme-system §8), Default values reproduce today's look: the window's border,
+     focused border and shadow (`ShellWindow`), no corners or grain, the body font everywhere. */
+  --frame-rule: var(--border);
+  --frame-rule-strong: var(--ring);
+  --frame-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --frame-corner: none;
+  --frame-corner-tr: none;
+  --frame-corner-bl: none;
+  --frame-corner-br: none;
+  --panel-grain: none;
+  --gem: var(--destructive);
+  --gem-deep: var(--destructive);
+  --gem-hi: var(--destructive);
+  --gold: var(--primary);
+  --parchment: var(--popover);
+  --parchment-ink: var(--popover-foreground);
+  --font-body: var(--font-sans);
+  --font-title: var(--font-body);
+  --font-label: var(--font-body);
+  --font-num: var(--font-body);
+}
+
+/* Gilt & Stone (theme-system FR-THEME-08; values: docs/design/art/kit/gilt-stone.html `:root`), for
+   the page's body or a preview. Colours and type only; frames, controls and textures are drawn by
+   `themes/gilt.css` (T2). Not redefined, so the same as Default: `--destructive` (a danger red
+   FR-CAMP-31 measures against), `--overlay`, `--caution*`, `--positive*`, `--success`, `--warning`. */
+[data-theme="gilt"] body,
+body [data-theme="gilt"] {
+  --radius: 0.1875rem;
+  --background: #070a0a;
+  --foreground: #efe6d2;
+  --card: #101414;
+  --card-foreground: #efe6d2;
+  --popover: #181c1b;
+  --popover-foreground: #efe6d2;
+  --primary: #e2c27c;
+  --primary-foreground: #101414;
+  --secondary: #22231f;
+  --secondary-foreground: #e2c27c;
+  --muted: #181c1b;
+  --muted-foreground: #a69d88;
+  --accent: #261d0f;
+  --accent-foreground: #f6e2ae;
+  --border: #3a3122;
+  --input: #3a3122;
+  --ring: #c9a35c;
+  --frame-rule: #5e4426;
+  --frame-rule-strong: #b08a4a;
+  --frame-shadow:
+    inset 0 0 0 1px #5e4426, inset 0 0 0 3px #090b0b, inset 0 0 0 4px rgb(176 138 74 / 0.55),
+    0 12px 32px rgb(0 0 0 / 0.7);
+  --frame-corner: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg fill='none' stroke='%23c9a35c' stroke-width='1.3'%3E%3Cpath d='M1.5 25V8Q1.5 1.5 8 1.5H25'/%3E%3Cpath d='M5.5 25V11Q5.5 5.5 11 5.5H25' stroke-opacity='.5'/%3E%3Cpath d='M13 9.5l2 2-2 2-2-2z' fill='%23c9a35c' stroke='none'/%3E%3C/g%3E%3Ccircle cx='4' cy='4' r='2.6' fill='%23e2c27c' stroke='%235e4426' stroke-width='.8'/%3E%3C/svg%3E");
+  --frame-corner-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg transform='matrix(-1 0 0 1 26 0)'%3E%3Cg fill='none' stroke='%23c9a35c' stroke-width='1.3'%3E%3Cpath d='M1.5 25V8Q1.5 1.5 8 1.5H25'/%3E%3Cpath d='M5.5 25V11Q5.5 5.5 11 5.5H25' stroke-opacity='.5'/%3E%3Cpath d='M13 9.5l2 2-2 2-2-2z' fill='%23c9a35c' stroke='none'/%3E%3C/g%3E%3Ccircle cx='4' cy='4' r='2.6' fill='%23e2c27c' stroke='%235e4426' stroke-width='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --frame-corner-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg transform='matrix(1 0 0 -1 0 26)'%3E%3Cg fill='none' stroke='%23c9a35c' stroke-width='1.3'%3E%3Cpath d='M1.5 25V8Q1.5 1.5 8 1.5H25'/%3E%3Cpath d='M5.5 25V11Q5.5 5.5 11 5.5H25' stroke-opacity='.5'/%3E%3Cpath d='M13 9.5l2 2-2 2-2-2z' fill='%23c9a35c' stroke='none'/%3E%3C/g%3E%3Ccircle cx='4' cy='4' r='2.6' fill='%23e2c27c' stroke='%235e4426' stroke-width='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --frame-corner-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg transform='matrix(-1 0 0 -1 26 26)'%3E%3Cg fill='none' stroke='%23c9a35c' stroke-width='1.3'%3E%3Cpath d='M1.5 25V8Q1.5 1.5 8 1.5H25'/%3E%3Cpath d='M5.5 25V11Q5.5 5.5 11 5.5H25' stroke-opacity='.5'/%3E%3Cpath d='M13 9.5l2 2-2 2-2-2z' fill='%23c9a35c' stroke='none'/%3E%3C/g%3E%3Ccircle cx='4' cy='4' r='2.6' fill='%23e2c27c' stroke='%235e4426' stroke-width='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --panel-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .85 0 0 0 0 .75 0 0 0 0 .55 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --gem: #c81f22;
+  --gem-deep: #6e1415;
+  --gem-hi: #ff8676;
+  --gold: #e2c27c;
+  --parchment: #e8d6a8;
+  --parchment-ink: #2b1d0e;
+  --font-title: "IM Fell English SC", Georgia, serif;
+  --font-label: "IM Fell English SC", Georgia, serif;
+  --font-num: "EB Garamond", Georgia, serif;
+  --font-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+/* A Gilt & Stone preview inside another theme shows its type with the fallbacks only, so the web
+   fonts still download only while Gilt & Stone is on (FR-THEME-16). */
+:root:not([data-theme="gilt"]) [data-theme="gilt"] {
+  --font-title: Georgia, serif;
+  --font-label: Georgia, serif;
+  --font-num: Georgia, serif;
+  --font-body: "Segoe UI", system-ui, sans-serif;
+}
+
+/* Meaning tokens, the same in every theme (FR-THEME-09). */
+:root {
   /* Game state tokens (visual-direction: hp.full, hp.bloodied, hp.down, visibility.hidden). */
   --hp-full: oklch(0.723 0.219 149.579);
   --hp-bloodied: oklch(0.795 0.184 86.047);
@@ -101,5 +189,7 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    /* Default: Tailwind's sans stack, as <html> has (FR-THEME-19); a theme swaps `--font-body`. */
+    font-family: var(--font-body);
   }
 }

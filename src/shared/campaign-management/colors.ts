@@ -75,8 +75,13 @@ export function colorName(color: string): string {
 
 // ---- FR-CAMP-31 validity ----
 
-/** The window surface: log names are text on it. */
-export const WINDOW_SURFACE = "#171717";
+/**
+ * The window surface (`--card`) of each theme: log names are text on it. FR-THEME-18: a colour
+ * must read on both, Default's `#171717` and Gilt & Stone's `#101414`.
+ */
+export const WINDOW_SURFACES = { default: "#171717", gilt: "#101414" } as const;
+/** Default's window surface. */
+export const WINDOW_SURFACE = WINDOW_SURFACES.default;
 /** The danger reds the app draws: `accent.danger` / `hp.down`, the canvas `--destructive`. */
 export const DANGER_REDS = ["#ef4444", "#ff6467"] as const;
 export const MIN_CONTRAST = 4.5;
@@ -102,15 +107,21 @@ export function chroma(hex: string): number {
 
 /**
  * FR-CAMP-31: null when the colour reads on the map and stays a person colour; else the first
- * rule it breaks: (a) contrast ≥ 4.5 : 1 on `#171717`; (b) C* ≥ 25; (c) ΔE ≥ 15 from `#ef4444`
- * in normal vision and ≥ 5 from each danger red in the worst of the three views.
+ * rule it breaks: (a) contrast ≥ 4.5 : 1 on every theme's window surface (FR-THEME-18); (b)
+ * C* ≥ 25; (c) ΔE ≥ 15 from `#ef4444` in normal vision and ≥ 5 from each danger red in the worst
+ * of the three views.
  */
 export function colorProblem(hex: string): ColorProblem | null {
-  if (contrastRatio(hex, WINDOW_SURFACE) < MIN_CONTRAST) return "too-dark";
+  if (surfaceContrast(hex) < MIN_CONTRAST) return "too-dark";
   if (chroma(hex) < MIN_CHROMA) return "too-grey";
   if (deltaE(hex, DANGER_REDS[0]) < MIN_DANGER_NORMAL) return "too-red";
   if (DANGER_REDS.some((red) => colorDistance(hex, red) < MIN_DANGER_WORST)) return "too-red";
   return null;
+}
+
+/** FR-THEME-18: the lowest contrast of `hex` over the window surfaces of all themes. */
+export function surfaceContrast(hex: string): number {
+  return Math.min(...Object.values(WINDOW_SURFACES).map((s) => contrastRatio(hex, s)));
 }
 
 // ---- FR-CAMP-32 distance between people ----
