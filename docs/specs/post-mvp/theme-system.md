@@ -115,6 +115,12 @@ No server data.
 > - **Appearance** is order 15 (after "Your colour"); cards are toggle buttons (`aria-pressed`). Fonts: 6 files, 197 KB (EB Garamond is one variable file for 500–700).
 > - **Dice tray:** its die-slot attribute is now `data-die-slot` (`roll-control.tsx`), so every `Input` there is `data-slot="input"` again.
 
+> **T2 note (2026-10-25, `build/theme-gilt`):**
+> - **One stylesheet** `themes/gilt.css`, every rule keyed on `:root[data-theme="gilt"]` (stricter than `[data-theme]`: previews and Default never match; tested, plus an e2e that removes every gilt rule and finds Default's computed styles unchanged). Colours and fonts sit in `@layer base` so a part's Tailwind colour utilities still win (meaning colours, FR-THEME-09); decoration is unlayered.
+> - **Hooks beyond `data-slot`:** Button variants are read off the classes cva renders (`bg-primary`, `bg-destructive`, `bg-secondary`, `border`; none = ghost); the menus ToggleGroup is told apart by context (`map-tool-rail`); raw Radix menus by `role="menu"`; numbers by `.tabular-nums`; the sheet's box labels by `.uppercase`. A `data-variant` on Button would make the first explicit (not needed now).
+> - **Kit → app:** corner pieces 18 px on windows (our title bar is 32 px; 26 px on dialogs); close / minimise drawn 6 px in (`transform`) to clear the top-right piece; no letter spacing anywhere (the launcher measures text with the canvas, FR-THEME-07); box labels in small caps (`text-transform: none` on the upper-case label line); kit font sizes not taken (FR-THEME-06).
+> - **Tab strips:** only the sheet's strip has wheel + arrows (CS, FR-CHARX-115); other `TabsList`s keep their layout (CSS can't add arrows). Radix ScrollAreas keep their auto-hide (a markup prop); their thumb is gold.
+
 ## 9. API & events
 
 None. No REST, intents or events; 0 bytes on the wire.
