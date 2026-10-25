@@ -35,6 +35,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
+**Resource rule (#354):** one heavy run at a time (gates / `check:full` / e2e / walkthrough server); `PP_TEST_SHARDS=3` in every worktree `.env` (gates-main too).
+
 ## Shared-file locks
 
 - `styles.css`, both `index.html`, the dice tray's `data-slot` → `data-die-slot` rename (`roll-control.tsx` attribute lines + 3 tests): **T1** (T0 merged). Character-sheet folders + `dice-roll-log/roll-control.tsx` (RollButton `hint` → ReactNode) + one assertion in `components/ui/tooltip-titles.test.ts` (granted 2026-10-25; T0 holds the rest of components/ui): **CS**. Merge order: T0 before CS (CS uses T0's `hp-down-foreground` token).
@@ -80,6 +82,8 @@ Sprint 10:
 - Walkthrough step wording fixed: live-sync FX3 step 4 (ellipsis only when the name doesn't fit), play-shell SP1 P3 / P8 (fixture pets).
 
 ## Pending DM decisions
+
+- **Next after sprint 12 (DM #354): a new test strategy** before feature work: the loop is too slow / heavy. Bring a proposal at the recap.
 
 - After T2's walkthrough: which theme is the default (OQ-THEME-03). Recap answered (#351–#353).
 
