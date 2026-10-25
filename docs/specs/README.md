@@ -124,6 +124,15 @@ Gate 1 #339 (ADRs 0064–0068).
 | [Dice and game log](dice-roll-log.md), [Dice extras](dice-extras.md), [Gems](gems.md) (reroll line, keep-highest join, copy, popup expiry, macro name, gem batching, one spend frame) | DICE, DICEX, GEM | complete | spec-fx |
 | [Live sync](live-sync.md) (drop detection), [Campaign management](campaign-management.md) (switcher ellipsis), [Fixtures and adapters](fixtures-adapters.md) (load clock) | SYNC, CAMP, FIX | complete | spec-fx |
 
+## Art track (2026-10-25)
+
+DM picks #351 (ADR-0069). Look: the Gilt & Stone kit page [gilt-stone.html](../design/art/kit/gilt-stone.html); art sources in [design/art](../design/art/README.md).
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Theme system](post-mvp/theme-system.md) (Default + Gilt & Stone, per-browser switch in Preferences, bundled fonts) | THEME | in-review | spec-theme-system |
+| [Character sheet full](character-sheet-full.md) (printed sheet layout, both themes, FR-CHARX-105–120; OQ-CHARX-47–50 with the DM) | CHARX | complete | spec-charx-print-sheet |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.
@@ -136,6 +145,6 @@ Stubs only. Not to be claimed during MVP spec phase.
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |
 | [Levelling workflows](post-mvp/levelling.md) | LVL | |
 | [Agent / MCP API](post-mvp/agent-api.md) | AGENT | |
-| [Theme system](post-mvp/theme-system.md) | THEME | |
+| [Theme system](post-mvp/theme-system.md) | THEME | Expanded, see [Art track](#art-track-2026-10-25) |
 | [Single executable](post-mvp/single-executable.md) | PKG | |
 | [Obsidian importer](post-mvp/obsidian-importer.md) | OBS | |

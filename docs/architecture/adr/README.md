@@ -74,6 +74,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0066](0066-stores-holder.md) | A stronghold's Stores as a holder in the loot / inventory ledger | accepted (#339) |
 | [0067](0067-command-registry.md) | One client command registry for the palette and keyboard shortcuts | accepted (#339; extends 0025, 0060 §7) |
 | [0068](0068-fixture-load-clock.md) | CLI fixture loads anchor the seeded clock at load time | accepted (#339; amends 0022 for CLI loads) |
+| [0069](0069-theme-switch.md) | Theme switch: one stylesheet per theme keyed on `data-slot`, no theme logic in components, no geometry change | accepted (#351; theme-system OQ-THEME-01 A) |
 
 ## Proposing a new ADR
 

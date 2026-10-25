@@ -15,7 +15,7 @@ Feature specs reference this in their UI/UX section. Don't invent styling in spe
 
 A modernised-for-web take on the **Baldur's Gate 2** UI: what BG2's interface would look like if designed today as a responsive web app, without 800×600 constraints.
 
-Delivered via the [theme system](../specs/post-mvp/theme-system.md). MVP markup should not block it: use semantic tokens, not hard-coded colours.
+Delivered as the **Gilt & Stone** theme via the [theme system](../specs/post-mvp/theme-system.md) ([ADR-0069](../architecture/adr/0069-theme-switch.md)). Source of truth for its look: the kit page [art/kit/gilt-stone.html](art/kit/gilt-stone.html) (open it in a browser); concept rounds and prompts in [art/](art/README.md). Use semantic tokens, not hard-coded colours, so markup never blocks a theme.
 
 ## BG2 motifs
 

@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** Sprint 11 fix track done (#349–#350): F1–F3 merged, **session-sim-15 10 / 11** (`.verify/20261024-234809-session-sim-15/`; FAIL c → BL-118). **Paused for the DM recap** ([sprint-11 Playtest](sprint-11.md#playtest-sprint-11-fixes)). The DM's art-pass planning runs separately (docs/design/).
+**Phase:** Sprint 11 fix track done (#349–#350): F1–F3 merged, **session-sim-15 10 / 11** (`.verify/20261024-234809-session-sim-15/`; FAIL c → BL-118). **Paused for the DM recap** ([sprint-11 Playtest](sprint-11.md#playtest-sprint-11-fixes)). **Art track integrated (#351):** `spec/theme-system` + `spec/charx-print-sheet` merged, ADR-0069 accepted, glossary **Theme**, visual-direction → kit page; art references + PNG originals copied into the main checkout (gitignored, nowhere else); both spec worktrees removed.
 
 **Gates on `main`:** detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, `bun install`, `bun run env:init`, `gates.sh <it> <tag>` = check:full + e2e on 4 workers, ~12 min). Removed at the end of sprint 11. Skip when `main`'s code equals the tested branch (#345).
 
@@ -24,7 +24,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 11 F1 frame + camera | merged 0b628f94 | — | **merged** (re-test 6/6; branch check:full 5651 / e2e 250/250); main gates skipped (same code) | — |
 | Sprint 11 F2 toasts | merged 9da2b751 | — | **merged** (re-test 8/8; branch check:full 5667 / e2e 253/253; import sort after merge) | — |
 | Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
-| Sprint 11 art track (DM) | DM's own agent | — | planning in docs/design/ | — |
+| Sprint 11 art track (DM) | merged f118e724 (theme-system), 56347ecf (charx print sheet) | — | **merged** (#351; ADR-0069; theme-system in-review, CHARX amendment with OQ-CHARX-47–50 open) | DM: theme-system complete? OQ-CHARX-47–50; art build in next sprint |
 | Sprint 11 gate | final main 9da2b751 | — | **session-sim-15 10 / 11 PASS** (leak scan clean; hard kill byte-identical); FAIL c → BL-118; glitches → BL-119–BL-123 | DM recap |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
@@ -76,6 +76,7 @@ Sprint 10:
 ## Pending DM decisions
 
 - Recap: BL-121 (withhold every award a hidden fact could change, for players?); Party Manager 440 at DM 1440 mid-fight (F1) vs #341's 600; whether to fix BL-118 before the art sprint; next sprint scope.
+- Art track: set [theme-system](../specs/post-mvp/theme-system.md) `complete`?; OQ-CHARX-47–50 (suggested picks A, A, A, A, [character-sheet-full §15](../specs/character-sheet-full.md#15-open-questions)); proposed art build for the next sprint: T0 `fix/theme-tokens` (raw colour classes in 15 files → tokens, `data-slot` on every `components/ui` part, Launcher measures the computed font; shared files, no visible change) → T1 `build/theme-switch` (data-theme, boot script, `pp.theme.v1`, Appearance section, bundled fonts) ∥ `build/charx-print-sheet` (character-sheet folders only) → T2 `build/theme-gilt` last (`themes/gilt.css` incl. `sheet-*` slots, bundle `theme-gilt`, walkthrough). Test plans: theme-system §13–14, character-sheet-full §6.2 / §13.
 
 ## Resolved locally (report at gate)
 

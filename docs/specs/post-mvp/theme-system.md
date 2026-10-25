@@ -8,7 +8,7 @@ phase: post-mvp
 
 # Theme system
 
-> First theme: **Gilt & Stone**, the BG2/NWN-inspired skin. Source of truth for its look: the kit page [gilt-stone.html](../../design/art/kit/gilt-stone.html) (open it in a browser), with the concept rounds in [art/prompts](../../design/art/prompts/). Mechanism: [proposed ADR](../../architecture/adr/proposed-theme-switch.md).
+> First theme: **Gilt & Stone**, the BG2/NWN-inspired skin. Source of truth for its look: the kit page [gilt-stone.html](../../design/art/kit/gilt-stone.html) (open it in a browser), with the concept rounds in [art/prompts](../../design/art/prompts/). Mechanism: [ADR-0069](../../architecture/adr/0069-theme-switch.md).
 
 ## 1. Summary
 
@@ -51,7 +51,7 @@ phase: post-mvp
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-THEME-01 | Themes: `default` "Default", `gilt` "Gilt & Stone". The active theme is a `data-theme` attribute on `<html>`; `default` = no attribute. | ADR proposed |
+| FR-THEME-01 | Themes: `default` "Default", `gilt` "Gilt & Stone". The active theme is a `data-theme` attribute on `<html>`; `default` = no attribute. | [ADR-0069](../../architecture/adr/0069-theme-switch.md) |
 | FR-THEME-02 | **Appearance** section in Preferences, both clients (`theme.appearance`, one line in each pref-sections registry, append). Two option cards, each with a small preview swatch (panel, frame, accent, display type sample); selecting one applies it at once. | FR-SHELL-72 |
 | FR-THEME-03 | Stored per browser in `localStorage` `pp.theme.v1` = `{theme}` (zod-parsed), shared by both clients and all campaigns on that browser. Never sent. Invalid or unavailable storage → `default`, console warning. | OQ-THEME-02, -08 |
 | FR-THEME-04 | **No flash:** the stored theme is set on `<html>` before first paint (inline boot script in both `index.html` files), including pre-play pages. | |
@@ -153,7 +153,7 @@ None. No REST, intents or events; 0 bytes on the wire.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-THEME-01 | How do themes style components? | **Decided (DM, 2026-10-25): A**, one stylesheet per theme, keyed on `[data-theme] [data-slot=…]` and test IDs, no theme logic in components · ~~B: Tailwind `gilt:` variants in every className~~ | decided | ADR proposed, shared UI |
+| OQ-THEME-01 | How do themes style components? | **Decided (DM, 2026-10-25): A**, one stylesheet per theme, keyed on `[data-theme] [data-slot=…]` and test IDs, no theme logic in components · ~~B: Tailwind `gilt:` variants in every className~~ | decided | [ADR-0069](../../architecture/adr/0069-theme-switch.md), shared UI |
 | OQ-THEME-02 | Who picks the theme? | **Decided (DM, 2026-10-25): A**: each person, per browser · B: per user, stored on the server · C: the DM sets a campaign default, people can override | decided | SHELL |
 | OQ-THEME-03 | Default for a browser with no choice yet | **Decided (DM, 2026-10-25): A**: Default until the T2 walkthrough passes, then the DM decides · B: Gilt & Stone | decided | owner: DM |
 | OQ-THEME-04 | How are fonts shipped? | **Decided (DM, 2026-10-25): A**, committed Latin-subset woff2 + OFL licences · ~~B: `@fontsource/*` packages~~ · ~~C: Google Fonts CDN~~ | decided | tooling |
