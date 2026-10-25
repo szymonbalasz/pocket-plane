@@ -56,7 +56,12 @@ beforeAll(() => {
       : { fontWeight: label ? "500" : "400", fontSize: size, fontFamily: BODY };
   };
 });
-afterAll(() => Object.assign(g, saved));
+afterAll(() => {
+  for (const [k, v] of Object.entries(saved)) {
+    if (v === undefined) delete g[k];
+    else g[k] = v;
+  }
+});
 beforeEach(() => {
   themed = false;
   measured.length = 0;

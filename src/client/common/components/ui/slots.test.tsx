@@ -470,6 +470,20 @@ describe("ADR-0069 data-slot on every components/ui part (ADR-0069)", () => {
     expect(slots(markup)).toEqual(["button"]);
   });
 
+  test("ADR-0069 a caller's data-slot wins on a Button (the sheet's sheet-roll, FR-CHARX-119)", () => {
+    expect(slots(html(<button.Button data-slot="sheet-roll">r</button.Button>))).toEqual([
+      "sheet-roll",
+    ]);
+    const asChild = html(
+      <overlays.Dialog>
+        <overlays.DialogTrigger asChild>
+          <span data-slot="sheet-roll">r</span>
+        </overlays.DialogTrigger>
+      </overlays.Dialog>,
+    );
+    expect(slots(asChild)).toEqual(["sheet-roll"]);
+  });
+
   test("ADR-0069 a caller's data-slot still wins on an Input (dice tray slots)", () => {
     expect(slots(html(<primitives.Input data-slot="2" />))).toEqual(["2"]);
   });

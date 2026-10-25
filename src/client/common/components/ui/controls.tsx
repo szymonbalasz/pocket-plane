@@ -56,7 +56,7 @@ export function Popover({
   );
 }
 export function PopoverTrigger(props: React.ComponentProps<typeof P.Trigger>) {
-  return <P.Trigger data-slot="popover-trigger" {...props} />;
+  return <P.Trigger data-slot={props.asChild ? undefined : "popover-trigger"} {...props} />;
 }
 
 /** Marks the anchor while its popover is open so the anchor's Tooltip stays shut (FR-SHELL-31). */
@@ -72,7 +72,7 @@ export function PopoverAnchor({ ref, ...props }: React.ComponentProps<typeof P.A
   );
   return (
     <P.Anchor
-      data-slot="popover-anchor"
+      data-slot={props.asChild ? undefined : "popover-anchor"}
       {...{ [OVERLAY_OPEN_ATTR]: state?.open ? "true" : undefined }}
       {...props}
       ref={setRef}
@@ -80,7 +80,7 @@ export function PopoverAnchor({ ref, ...props }: React.ComponentProps<typeof P.A
   );
 }
 export function PopoverClose(props: React.ComponentProps<typeof P.Close>) {
-  return <P.Close data-slot="popover-close" {...props} />;
+  return <P.Close data-slot={props.asChild ? undefined : "popover-close"} {...props} />;
 }
 
 export function PopoverContent({

@@ -42,7 +42,10 @@ export function launcherFont(nav: ParentNode | null): string | null {
 
 /** Before the first button renders: today's launcher label font. */
 function fallbackFont(): string {
-  const family = typeof document === "undefined" ? "" : getComputedStyle(document.body).fontFamily;
+  const family =
+    typeof getComputedStyle === "function" && typeof document !== "undefined" && document.body
+      ? getComputedStyle(document.body).fontFamily
+      : "";
   return `500 12px ${family}`;
 }
 

@@ -14,7 +14,7 @@ import { cn } from "../../lib/utils";
 // ---- DropdownMenu ----
 export const DropdownMenu = DM.Root;
 export function DropdownMenuTrigger(props: React.ComponentProps<typeof DM.Trigger>) {
-  return <DM.Trigger data-slot="dropdown-menu-trigger" {...props} />;
+  return <DM.Trigger data-slot={props.asChild ? undefined : "dropdown-menu-trigger"} {...props} />;
 }
 export const DropdownMenuSub = DM.Sub;
 export function DropdownMenuRadioGroup(props: React.ComponentProps<typeof DM.RadioGroup>) {
@@ -234,7 +234,7 @@ export function Collapsible(props: React.ComponentProps<typeof C.Root>) {
   return <C.Root data-slot="collapsible" {...props} />;
 }
 export function CollapsibleTrigger(props: React.ComponentProps<typeof C.Trigger>) {
-  return <C.Trigger data-slot="collapsible-trigger" {...props} />;
+  return <C.Trigger data-slot={props.asChild ? undefined : "collapsible-trigger"} {...props} />;
 }
 export function CollapsibleContent(props: React.ComponentProps<typeof C.Content>) {
   return <C.Content data-slot="collapsible-content" {...props} />;

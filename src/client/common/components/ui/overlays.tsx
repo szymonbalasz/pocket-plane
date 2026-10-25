@@ -8,10 +8,10 @@ import { enrollTrigger, TIP_ATTR } from "./roving";
 // ---- Dialog ----
 export const Dialog = D.Root;
 export function DialogTrigger(props: React.ComponentProps<typeof D.Trigger>) {
-  return <D.Trigger data-slot="dialog-trigger" {...props} />;
+  return <D.Trigger data-slot={props.asChild ? undefined : "dialog-trigger"} {...props} />;
 }
 export function DialogClose(props: React.ComponentProps<typeof D.Close>) {
-  return <D.Close data-slot="dialog-close" {...props} />;
+  return <D.Close data-slot={props.asChild ? undefined : "dialog-close"} {...props} />;
 }
 
 export function DialogContent({

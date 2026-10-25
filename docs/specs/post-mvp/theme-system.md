@@ -94,7 +94,7 @@ No server data.
 >
 > | File | Part → `data-slot` |
 > |---|---|
-> | `button.tsx` | Button `button` (it keeps it as an `asChild` trigger's child) |
+> | `button.tsx` | Button `button` |
 > | `primitives.tsx` | Input `input`, Label `label`, Badge `badge`, Card `card`, CardHeader `card-header`, CardTitle `card-title`, CardContent `card-content`, Alert `alert`, Skeleton `skeleton`, Table `table`, TableHeader `table-header`, TableBody `table-body`, TableRow `table-row`, TableHead `table-head`, TableCell `table-cell` |
 > | `controls.tsx` | PopoverTrigger `popover-trigger`, PopoverAnchor `popover-anchor`, PopoverClose `popover-close`, PopoverContent `popover-content`, Switch `switch` + `switch-thumb`, Checkbox `checkbox` + `checkbox-indicator`, ToggleGroup `toggle-group`, ToggleGroupItem `toggle-group-item` (segmented, bordered) |
 > | `menus.tsx` | DropdownMenuTrigger `dropdown-menu-trigger`, DropdownMenuContent `dropdown-menu-content`, DropdownMenuItem `dropdown-menu-item`, DropdownMenuSeparator `dropdown-menu-separator`, DropdownMenuLabel `dropdown-menu-label`, DropdownMenuRadioGroup `dropdown-menu-radio-group`, DropdownMenuRadioItem `dropdown-menu-radio-item`, DropdownMenuSubTrigger `dropdown-menu-sub-trigger`, DropdownMenuSubContent `dropdown-menu-sub-content`, PopoverContent `popover-content`, ToggleGroup `toggle-group` + ToggleGroupItem `toggle-group-item` (tool group), Switch `switch` + `switch-thumb`, Slider `slider` + `slider-track` / `slider-range` / `slider-thumb`, Collapsible `collapsible`, CollapsibleTrigger `collapsible-trigger`, CollapsibleContent `collapsible-content` |
@@ -104,7 +104,7 @@ No server data.
 > | `tabs.tsx` | Tabs `tabs`, TabsList `tabs-list`, TabsTrigger `tabs-trigger`, TabsContent `tabs-content` |
 > | `toggle-tip.tsx` | ToggleTip wrapper `toggle-tip` |
 >
-> - A caller's own `data-slot` wins over the part's (shadcn order), except on Button. The dice tray already passes numeric `data-slot` values to some `Input`s (`roll-control.tsx`); those inputs are not `input` to a theme.
+> - A caller's own `data-slot` wins over the part's (shadcn order), so the sheet's `sheet-*` slots (FR-CHARX-119) hold on Buttons. Triggers, closes and the anchor add no slot when `asChild`: the child keeps its own (a Button child stays `button`). The dice tray already passes numeric `data-slot` values to some `Input`s (`roll-control.tsx`); those inputs are not `input` to a theme.
 > - **Tokens added with today's values** (`styles.css`): themeable: `--destructive-foreground` (#fff), `--overlay` (#000, scrims at /40 and /60), `--caution` / `--caution-foreground` (amber-500 / -400), `--positive` / `--positive-foreground` (emerald-500 / -400). Meaning, not themed (FR-THEME-09): `--hp-temp` (sky-400), `--hp-down-foreground` (#fff), `--swatch-ink` (#000, the check mark and ring on a player-colour swatch). Test `FR-THEME-19 swapped classes keep their computed colour`.
 
 ## 9. API & events

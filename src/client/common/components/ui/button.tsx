@@ -29,16 +29,18 @@ export function Button({
   variant,
   size,
   asChild = false,
+  "data-slot": slot,
   ...props
-}: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
+}: React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & { asChild?: boolean; "data-slot"?: string }) {
   const Comp = asChild ? Slot.Root : "button";
-  // `data-slot` after the props: a Button stays `button` as an `asChild` trigger's child, whose
-  // merged props carry the trigger's slot (ADR-0069 styles buttons by slot).
+  // A caller's slot wins (e.g. the sheet's `sheet-roll`); an `asChild` trigger passes none, so a
+  // Button stays `button` inside one (ADR-0069 styles buttons by slot).
   return (
     <Comp
+      data-slot={slot ?? "button"}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
-      data-slot="button"
     />
   );
 }
