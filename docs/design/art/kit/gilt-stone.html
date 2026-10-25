@@ -751,6 +751,166 @@ body::before {
 .about li span { color: var(--muted); }
 .about p { margin: 0; color: var(--muted); }
 
+/* ── Draft 3: chrome, notices, remaining components ─ */
+.minbtn {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--gold-deep);
+  border-radius: 3px;
+  background: var(--grain), linear-gradient(#26271f, #151612);
+  color: var(--gold-mid);
+  cursor: pointer;
+}
+.minbtn svg { width: 12px; height: 12px; }
+.minbtn:hover { border-color: var(--gold-mid); color: var(--gold); }
+
+.btn.primary { border-color: var(--gold-mid); background: var(--grain), linear-gradient(#45371c, #2a2010 60%, #211909); color: #f8e6b4; }
+.btn.primary:hover { border-color: var(--gold); }
+.btn.danger { border-color: #6e2a24; background: var(--grain), linear-gradient(#3a1513, #230b0a); color: #f2b2a6; }
+.btn.danger:hover { border-color: #b2443a; color: #ffd0c6; }
+
+/* App top bar: 48 px, as play-shell keeps it */
+.appbar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px 0 14px;
+  margin-bottom: 16px;
+  background: var(--grain), linear-gradient(#171b1a, #0e1111);
+  border: 1px solid #000;
+  box-shadow: inset 0 -1px 0 var(--gold-deep), inset 0 -3px 0 #0a0c0c, inset 0 -4px 0 rgba(176,138,74,.45), 0 6px 18px rgba(0,0,0,.55);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.appbar .camp { font-family: var(--f-title); letter-spacing: var(--title-track); font-size: 19px; color: var(--gold); white-space: nowrap; }
+.launcher { display: flex; gap: 6px; margin-inline: auto; }
+.lbtn { position: relative; min-height: 32px; padding: 3px 12px; font-size: 14px; }
+.lbtn[data-state="open"] { border-color: var(--gold); color: #fff1cf; box-shadow: inset 0 0 10px rgba(226,194,124,.18), 0 0 8px rgba(226,194,124,.25); }
+.lbtn[data-state="minimised"] { color: #c9ad74; }
+.lbtn[data-state="minimised"]::after { content: ""; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; transform: rotate(45deg); background: var(--gem); border: 1px solid var(--gold-mid); }
+.live { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.live i { width: 8px; height: 8px; border-radius: 50%; background: var(--hp-full); box-shadow: 0 0 6px var(--hp-full); }
+.ident { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 2px 10px; font-family: var(--f-body); letter-spacing: 0; font-size: 14px; color: var(--cream); }
+.ident .dot { width: 12px; height: 12px; border-radius: 50%; background: #e69f00; box-shadow: 0 0 0 1px #000; }
+.ident svg { width: 14px; height: 14px; color: var(--gold-mid); }
+
+/* Notices */
+.notices { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.stack { display: flex; flex-direction: column; gap: 6px; width: 356px; max-width: 100%; }
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 12px;
+  background: var(--grain), var(--panel);
+  border: 1px solid #000;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--gold-deep), inset 0 0 0 3px #090b0b, inset 0 0 0 4px rgba(176,138,74,.4), 0 8px 22px rgba(0,0,0,.65);
+}
+.toast .msg { flex: 1; min-width: 0; font-size: 14px; }
+.toast .msg b { font-weight: 500; }
+.toast .msg small { display: block; color: var(--muted); font-size: 13px; }
+.toast.turn { justify-content: center; }
+.toast.turn .msg { flex: none; font-family: var(--f-title); letter-spacing: var(--title-track); font-size: 18px; color: var(--gold); }
+.gemmark { width: 11px; height: 11px; flex: none; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, var(--gem-hi), var(--gem) 45%, var(--gem-deep)); border: 1px solid var(--gold-mid); box-shadow: 0 0 6px rgba(255,80,60,.55); }
+.toast .acts { display: flex; gap: 6px; }
+.more { align-self: center; padding: 1px 12px; font-size: 13px; color: var(--muted); border: 1px solid var(--gold-deep); border-radius: 999px; background: #0d0f0f; }
+.dmgcard { width: 330px; max-width: 100%; }
+.dc-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 14px; }
+.dc-line .res { font-size: 22px; }
+.tgts { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 0 10px; border-bottom: 1px solid #262219; }
+.tgt { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 3px; border: 1px solid var(--gold-deep); border-radius: 999px; background: #121410; font-size: 14px; cursor: pointer; }
+.tgt .med { width: 22px; height: 22px; font-size: 11px; }
+.tgt[aria-pressed="true"] { border-color: var(--gold); background: #2a2210; box-shadow: 0 0 8px rgba(226,194,124,.25); }
+.dc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 10px; flex-wrap: wrap; }
+
+/* Menus, select, popover */
+.menu {
+  min-width: 200px;
+  padding: 4px;
+  background: var(--grain), #0e1212;
+  border: 1px solid #000;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--gold-deep), 0 10px 24px rgba(0,0,0,.7);
+}
+.mi { display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 8px; border-radius: 2px; font-size: 14px; cursor: pointer; }
+.mi:hover, .mi.hl { background: linear-gradient(90deg, #2c2311, #1a160c); color: #fff1cf; box-shadow: inset 2px 0 0 var(--gold); }
+.mi .ico { width: 14px; height: 14px; display: grid; place-items: center; color: var(--gold-mid); flex: none; }
+.mi .ico svg { width: 14px; height: 14px; }
+.mi .kbd { margin-left: auto; color: var(--dim); font-size: 12px; }
+.mi.danger { color: #f2a196; }
+.mlabel { padding: 6px 10px 3px; font-family: var(--f-label); letter-spacing: var(--label-track); font-size: 13px; color: var(--gold); }
+.msep { height: 1px; margin: 4px 6px; background: linear-gradient(90deg, transparent, var(--gold-deep), transparent); }
+.selbtn { justify-content: space-between; min-width: 180px; font-family: var(--f-body); letter-spacing: 0; color: var(--cream); font-size: 14px; }
+.selbtn svg { color: var(--gold-mid); transform: rotate(90deg); }
+.demo-stack { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.pop { padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
+
+/* Dialog */
+.backdrop { position: relative; padding: 26px 18px; border-radius: 3px; background: rgba(0,0,0,.55); box-shadow: inset 0 0 40px rgba(0,0,0,.8); display: grid; place-items: center; }
+.dialog { width: 360px; max-width: 100%; }
+.dialog p { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+.dlg-foot { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Slider */
+.slider { -webkit-appearance: none; appearance: none; width: 180px; max-width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer; }
+.slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--gold-mid) var(--v, 70%), #2a2620 var(--v, 70%)); box-shadow: inset 0 0 0 1px #000; }
+.slider::-moz-range-track { height: 4px; border-radius: 2px; background: #2a2620; box-shadow: inset 0 0 0 1px #000; }
+.slider::-moz-range-progress { height: 4px; background: var(--gold-mid); }
+.slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; transform: rotate(45deg); border: 1px solid #000; background: radial-gradient(circle at 35% 30%, #fff1c6, var(--gold) 50%, var(--gold-mid)); }
+.slider::-moz-range-thumb { width: 12px; height: 12px; border-radius: 0; transform: rotate(45deg); border: 1px solid #000; background: var(--gold); }
+
+/* Collapsible */
+.coll summary { list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 4px 0; font-family: var(--f-label); letter-spacing: var(--label-track); color: var(--gold); font-size: 15px; }
+.coll summary::-webkit-details-marker { display: none; }
+.coll summary svg { width: 12px; height: 12px; transition: transform .15s; color: var(--gold-mid); }
+.coll[open] summary svg { transform: rotate(90deg); }
+.coll p { margin: 2px 0 8px 20px; font-size: 14px; color: var(--cream); }
+.coll p b { font-style: italic; font-weight: 700; }
+
+/* Table */
+.tablewrap { overflow-x: auto; }
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th { text-align: left; padding: 6px 10px; font-family: var(--f-label); letter-spacing: var(--label-track); font-weight: 400; color: var(--gold); font-size: 13px; border-bottom: 1px solid var(--gold-deep); white-space: nowrap; }
+.tbl td { padding: 5px 10px; border-bottom: 1px solid #1d1a14; white-space: nowrap; }
+.tbl tbody tr:nth-child(even) td { background: rgba(255,240,200,.025); }
+.tbl tbody tr:hover td { background: #1f1a0e; }
+.tbl .r { text-align: right; }
+
+/* Alert, skeleton, card */
+.alert { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--gold-deep); border-radius: 3px; background: linear-gradient(90deg, #1d170b, #111311); font-size: 14px; }
+.alert .msg { flex: 1; }
+.alert.warn { border-color: #6e2a24; background: linear-gradient(90deg, #2a0f0d, #111311); }
+.skel { height: 12px; border-radius: 2px; background: linear-gradient(90deg, #171a18 0%, #262619 40%, #171a18 80%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.card { padding: 10px 12px; border: 1px solid var(--gold-deep); border-radius: 3px; background: linear-gradient(#141716, #0e1111); box-shadow: inset 0 1px 0 rgba(255,236,190,.05); display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
+.card .cn { font-family: var(--f-name); font-weight: 700; font-size: 17px; color: #f3dca3; }
+.card .cs { font-size: 13px; color: var(--muted); }
+.card .ac-mini { display: grid; place-items: center; width: 34px; height: 38px; font-family: var(--f-num); font-weight: 700; font-size: 16px; background: no-repeat center / contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 112'%3E%3Cpath d='M50 4L94 17V52C94 81 73 98 50 108 27 98 6 81 6 52V17Z' fill='%230b0e0e' stroke='%23b08a4a' stroke-width='5'/%3E%3C/svg%3E"); }
+.card .hp { grid-column: 2 / -1; margin-top: 0; }
+.ttip-btn { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 1px solid var(--gold-mid); background: #121410; color: var(--gold); font-family: var(--f-num); font-weight: 700; font-style: italic; font-size: 13px; cursor: pointer; }
+
+/* Sheet Actions tab */
+.arow { padding: 7px 10px; border-bottom: 1px solid #1f1c16; }
+.arow:last-child { border-bottom: 0; }
+.arow-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.arow-name { font-weight: 700; font-size: 15px; }
+.arow-line { color: var(--muted); font-size: 14px; }
+.arow-btns { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.slots { display: flex; align-items: center; gap: 10px; padding: 6px 10px; font-size: 14px; color: var(--muted); flex-wrap: wrap; }
+.slot-pip { width: 12px; height: 12px; transform: rotate(45deg); border: 1px solid var(--gold-mid); background: #0a0c0c; }
+.slot-pip.full { background: radial-gradient(circle at 35% 30%, #fff1c6, var(--gold) 50%, var(--gold-mid)); }
+.tag { display: inline-block; padding: 0 6px; border: 1px solid #3b3222; border-radius: 999px; font-size: 12px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; }
+}
+
 @media (max-width: 1100px) {
   .play { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "rail stat" "rail init" "rail log"; }
   .statwin { width: auto; max-width: 340px; }
@@ -791,13 +951,22 @@ body::before {
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 2.5V11c0 5-3.2 8.3-7 10-3.8-1.7-7-5-7-10V5.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
     <symbol id="i-prone" viewBox="0 0 24 24"><path d="M3 18h18M6 14.5h9l3-3M8 11a2 2 0 100-4 2 2 0 000 4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 17h14" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5C6.5 4 9.5 4 12 5.5 14.5 4 17.5 4 20 5.5V19c-2.5-1.5-5.5-1.5-8 0-2.5-1.5-5.5-1.5-8 0zM12 5.5V19" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-party" viewBox="0 0 24 24"><path d="M8.5 11a3 3 0 100-6 3 3 0 000 6zM3 19c.5-3.5 2.7-5.5 5.5-5.5S13.5 15.5 14 19M16 11a2.5 2.5 0 100-5M17.5 13.6c2 .6 3.2 2.5 3.5 5.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-swords" viewBox="0 0 24 24"><path d="M4 4l9 9M4 4v3.5M4 4h3.5M20 4l-9 9M20 4v3.5M20 4h-3.5M7 15.5l-3 3 1.5 1.5 3-3M17 15.5l3 3-1.5 1.5-3-3M9 14l1 1M15 14l-1 1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M7 4h11a2 2 0 010 4h-2v10a2 2 0 01-2 2H6a2 2 0 010-4h2V6a2 2 0 00-2-2 2 2 0 00-2 2v1h4M9.5 10h4M9.5 13h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM12 15a3 3 0 100-6 3 3 0 000 6z" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   </defs>
 </svg>
 
 <header class="topbar">
-  <h1 class="brand">Gilt &amp; Stone <small>Pocket Plane skin kit · draft 2</small></h1>
+  <h1 class="brand">Gilt &amp; Stone <small>Pocket Plane skin kit · draft 3</small></h1>
   <div class="typepick" role="group" aria-label="Type pairing">
     <span>Type</span>
     <div class="seg">
@@ -817,12 +986,26 @@ body::before {
       <li>Hover or tab to any boxed number, roll button or condition icon. <span>The scroll tooltip unrolls after the shared 400 ms delay.</span></li>
       <li>The narrow sheet is a true 320 × 440 window, today's default. <span>Compare it with the enlarged one beside it.</span></li>
       <li>Button states, gem close, tabs and the active tool. <span>Compact rows come from concept B, the tool highlight and Game log from C.</span></li>
+      <li>New in draft 3: the 48 px top bar and launcher, minimise buttons, the toast stack and damage card, the sheet's Actions tab, menus, dialog, popover, toggle tip, table, slider and loading states. <span>Every shared component the app uses now has a look.</span></li>
     </ul>
   </div>
 </div>
 
 <!-- ── Play pieces ── -->
 <section class="sect"><h2>At the table</h2></section>
+<nav class="appbar" aria-label="Top bar">
+  <span class="camp">Greyhollow Pass</span>
+  <div class="launcher">
+    <button class="btn lbtn" id="l-scenes" data-state="closed"><svg><use href="#i-map"/></svg>Scenes</button>
+    <button class="btn lbtn" id="l-comp" data-state="open"><svg><use href="#i-book"/></svg>Compendium</button>
+    <button class="btn lbtn" id="l-party" data-state="minimised" data-tip="<b>Party Manager</b><br><span class='faint'>Minimised · something new inside</span>"><svg><use href="#i-party"/></svg>Party</button>
+    <button class="btn lbtn" id="l-enc" data-state="closed"><svg><use href="#i-swords"/></svg>Encounters</button>
+    <button class="btn lbtn" id="l-hand" data-state="closed"><svg><use href="#i-scroll"/></svg>Handouts</button>
+    <button class="btn lbtn" id="l-more" data-state="closed" aria-label="More windows"><svg><use href="#i-dots"/></svg></button>
+  </div>
+  <span class="live"><i></i>Live · 3 players</span>
+  <button class="btn ident" id="ident"><span class="dot"></span>DM<svg><use href="#i-gear"/></svg></button>
+</nav>
 <div class="play">
   <div class="rail-wrap win">
     <div class="rail" role="toolbar" aria-label="Map tools">
@@ -863,7 +1046,7 @@ body::before {
   </div>
 
   <div class="win initwin">
-    <div class="win-hd"><h3>Initiative</h3><button class="gem" aria-label="Close Initiative"><svg><use href="#i-x"/></svg></button></div>
+    <div class="win-hd"><h3>Initiative</h3><button class="minbtn" aria-label="Minimise Initiative"><svg><use href="#i-min"/></svg></button><button class="gem" aria-label="Close Initiative"><svg><use href="#i-x"/></svg></button></div>
     <div class="win-bd">
       <div class="round">Round <b>3</b></div>
       <ol class="ilist" id="ilist"></ol>
@@ -875,7 +1058,7 @@ body::before {
   </div>
 
   <div class="win logwin">
-    <div class="win-hd"><h3>Game log</h3><span class="meta">Session 14</span><button class="gem" aria-label="Close Game log"><svg><use href="#i-x"/></svg></button></div>
+    <div class="win-hd"><h3>Game log</h3><span class="meta">Session 14</span><button class="minbtn" aria-label="Minimise Game log"><svg><use href="#i-min"/></svg></button><button class="gem" aria-label="Close Game log"><svg><use href="#i-x"/></svg></button></div>
     <div class="win-bd">
       <ul class="log">
         <li><span class="med humanoid">T</span><span class="what"><b>Thorne</b> <span>· Perception check</span></span><span class="t num">21:13</span><span class="res num" tabindex="0" data-tip="<b>Perception</b> · Thorne<br>d20 (18) + 4 = <b>22</b>">22</span></li>
@@ -887,6 +1070,45 @@ body::before {
         <input class="field" id="compose-input" placeholder="Roll dice or send a message, e.g. /r 2d6+3" aria-label="Roll dice or send a message">
         <button class="btn" id="compose-send" type="submit"><svg><use href="#i-send"/></svg>Send</button>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Notices ── -->
+<section class="sect"><h2>Notices</h2><p>The DM's top-centre stack and the damage-card popup</p></section>
+<div class="notices">
+  <div class="stack">
+    <div class="toast turn"><span class="gemmark" aria-hidden="true"></span><span class="msg">Mira's turn</span><span class="gemmark" aria-hidden="true"></span></div>
+    <div class="toast">
+      <span class="med humanoid" aria-hidden="true" style="width:28px;height:28px;font-size:13px">P</span>
+      <span class="msg"><b>Player 1</b> wants to add Longsword +1<small>to Mira's sheet · just now</small></span>
+      <span class="acts"><button class="btn sm primary" id="t-approve">Approve</button><button class="btn sm" id="t-decline">Decline</button></span>
+    </div>
+    <div class="toast">
+      <span class="med humanoid" aria-hidden="true" style="width:28px;height:28px;font-size:13px">B</span>
+      <span class="msg"><b>Bram</b> must save to keep concentration<small>Constitution DC 10 · Bless</small></span>
+      <span class="acts"><button class="btn sm" id="t-roll">Roll</button></span>
+    </div>
+    <span class="more">+2 more</span>
+  </div>
+
+  <div class="win dmgcard">
+    <div class="win-hd"><h3>Damage card</h3><button class="gem" aria-label="Close damage card"><svg><use href="#i-x"/></svg></button></div>
+    <div class="win-bd">
+      <div class="dc-line"><span><b>Mira</b> · Longbow attack</span><span class="res num crit" tabindex="0" data-tip="d20 (<b>20</b>) + 9 = 29 · <b>critical hit</b>">29</span></div>
+      <div class="dc-line"><span>Damage, piercing</span><span class="res num dmg" tabindex="0" data-tip="2d8 (5, 7) + 4 = <b>16</b> piercing">16</span></div>
+      <div class="tgts" role="group" aria-label="Targets">
+        <button class="tgt" id="tgt-goblin" aria-pressed="true"><span class="med humanoid">G</span>Goblin · AC 15</button>
+        <button class="tgt" id="tgt-wolf" aria-pressed="false"><span class="med beast">D</span>Dire Wolf · AC 14</button>
+      </div>
+      <div class="dc-foot">
+        <div class="seg" role="group" aria-label="Damage taken">
+          <button class="btn sm" id="dc-full" aria-pressed="true">Full</button>
+          <button class="btn sm" id="dc-half" aria-pressed="false">Half</button>
+          <button class="btn sm" id="dc-double" aria-pressed="false">Double</button>
+        </div>
+        <span class="rowx"><button class="btn sm" id="dc-miss">Miss</button><button class="btn sm primary" id="dc-apply">Apply 16</button></span>
+      </div>
     </div>
   </div>
 </div>
@@ -927,6 +1149,89 @@ body::before {
       <span>Switch</span><div class="rowx"><input type="checkbox" class="switch" id="s-darkness" checked aria-label="Sees through magical darkness"><label for="s-darkness" style="font-size:14px">Sees through magical darkness</label></div>
       <span>Field</span><div><input class="field" id="f-hp" value="38" aria-label="Hit points" style="width:90px"></div>
       <span>Chips</span><div class="chips"><span class="chip"><svg><use href="#i-star"/></svg>Blessed</span><span class="chip conc"><svg><use href="#i-swirl"/></svg>Concentrating</span><span class="chip"><svg><use href="#i-prone"/></svg>Prone</span></div>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="win-hd"><h3>Menus</h3><span class="meta">dropdown · select</span></div>
+    <div class="win-bd demo-stack">
+      <div class="menu" role="menu" aria-label="Token actions">
+        <div class="mlabel">Goblin</div>
+        <div class="mi hl" role="menuitem" tabindex="0"><span class="ico"><svg><use href="#i-scroll"/></svg></span>Open sheet<span class="kbd">Enter</span></div>
+        <div class="mi" role="menuitem" tabindex="0"><span class="ico"><svg><use href="#i-swords"/></svg></span>Add to combat</div>
+        <div class="mi" role="menuitemcheckbox" aria-checked="true" tabindex="0"><span class="ico"><svg><use href="#i-check"/></svg></span>Hidden from players</div>
+        <div class="msep"></div>
+        <div class="mi" role="menuitem" tabindex="0"><span class="ico"><svg><use href="#i-eye"/></svg></span>Set condition<span class="kbd"><svg width="12" height="12"><use href="#i-chev"/></svg></span></div>
+        <div class="mi danger" role="menuitem" tabindex="0"><span class="ico"><svg><use href="#i-x"/></svg></span>Remove from scene<span class="kbd">Del</span></div>
+      </div>
+      <button class="btn selbtn" id="sel-roll" aria-haspopup="listbox" aria-expanded="true">Public roll<svg><use href="#i-chev"/></svg></button>
+      <div class="menu" role="listbox" aria-label="Roll visibility" style="min-width:180px">
+        <div class="mi hl" role="option" aria-selected="true" tabindex="0"><span class="ico"><svg><use href="#i-check"/></svg></span>Public roll</div>
+        <div class="mi" role="option" aria-selected="false" tabindex="0"><span class="ico"></span>DM only</div>
+        <div class="mi" role="option" aria-selected="false" tabindex="0"><span class="ico"></span>Only me</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="win-hd"><h3>Dialog &amp; popover</h3></div>
+    <div class="win-bd demo-stack" style="gap:14px;align-items:stretch">
+      <div class="backdrop">
+        <div class="win dialog" role="dialog" aria-modal="false" aria-labelledby="dlg-title">
+          <div class="win-hd"><h3 id="dlg-title">End the encounter?</h3><button class="gem" aria-label="Close dialog"><svg><use href="#i-x"/></svg></button></div>
+          <div class="win-bd">
+            <p>Initiative clears. The 3 monsters still standing stay on the map.</p>
+            <div class="dlg-foot"><button class="btn" id="dlg-cancel">Keep fighting</button><button class="btn danger" id="dlg-end">End encounter</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="rowx" style="align-items:flex-start">
+        <div class="menu pop" role="group" aria-label="Damage or heal Bram">
+          <div class="mlabel" style="padding:0">Bram · 11 / 26 HP</div>
+          <input class="field num" id="pop-amount" value="7" aria-label="Amount">
+          <div class="rowx"><button class="btn sm danger" id="pop-dmg">Damage</button><button class="btn sm" id="pop-heal">Heal</button><button class="btn sm" id="pop-temp">Temp</button></div>
+        </div>
+        <span class="rowx" style="font-size:14px;color:var(--muted)">Toggle tip <button class="ttip-btn" id="ttip" aria-label="What is Expertise?" data-toggletip="<b>Expertise</b><br>Double your proficiency bonus for this skill.<br><span class='faint'>Click again or press Esc to close</span>">i</button></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="win-hd"><h3>Compendium</h3><span class="meta">table</span></div>
+    <div class="win-bd">
+      <div class="tablewrap">
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Type</th><th class="r">CR</th><th class="r">AC</th><th class="r">HP</th></tr></thead>
+          <tbody>
+            <tr><td>Bandit Captain</td><td>Humanoid</td><td class="r num">2</td><td class="r num">15</td><td class="r num">65</td></tr>
+            <tr><td>Dire Wolf</td><td>Beast</td><td class="r num">1</td><td class="r num">14</td><td class="r num">37</td></tr>
+            <tr><td>Goblin</td><td>Humanoid</td><td class="r num">1/4</td><td class="r num">15</td><td class="r num">7</td></tr>
+            <tr><td>Owlbear</td><td>Monstrosity</td><td class="r num">3</td><td class="r num">13</td><td class="r num">59</td></tr>
+            <tr><td>Skeleton</td><td>Undead</td><td class="r num">1/4</td><td class="r num">13</td><td class="r num">13</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="win-hd"><h3>More pieces</h3><span class="meta">slider · collapsible · alert · loading · card</span></div>
+    <div class="win-bd" style="display:flex;flex-direction:column;gap:12px">
+      <div class="rowx" style="font-size:14px"><label for="vol">Volume</label><input type="range" class="slider" id="vol" min="0" max="100" value="70"><span class="num" id="vol-out">70</span></div>
+      <details class="coll" open>
+        <summary><svg><use href="#i-chev"/></svg>Traits (2)</summary>
+        <p><b>Fey Ancestry.</b> Advantage on saves against being charmed; magic can't put you to sleep.</p>
+        <p><b>Mask of the Wild.</b> You can try to hide when only lightly obscured by foliage, rain or mist.</p>
+      </details>
+      <div class="alert"><span class="gemmark" aria-hidden="true"></span><span class="msg">Rebuild finished — reload</span><button class="btn sm" id="al-reload">Reload</button></div>
+      <div class="alert warn"><span class="msg">Connection lost. Reconnecting…</span></div>
+      <div style="display:grid;gap:7px" aria-label="Loading" role="status"><div class="skel" style="width:70%"></div><div class="skel" style="width:90%"></div><div class="skel" style="width:55%"></div></div>
+      <div class="card">
+        <span class="med humanoid" aria-hidden="true">T</span>
+        <div><div class="cn">Thorne</div><div class="cs">Level 5 Fighter · Human</div></div>
+        <span class="ac-mini" aria-label="Armor Class 18">18</span>
+        <div class="hp"><span class="bar"><i style="width:100%;background:var(--hp-full)"></i></span><span class="hpnum num">32 / 32</span></div>
+      </div>
     </div>
   </div>
 
@@ -1003,7 +1308,7 @@ body::before {
     }).join("");
     const tabs = ["Main", "Actions", "Features", "Inventory", "Notes", "Reminders", "Macros", "Trophies"];
     return `
-      <div class="win-hd"><h3>Character sheet</h3><button class="gem" aria-label="Close character sheet"><svg><use href="#i-x"/></svg></button></div>
+      <div class="win-hd"><h3>Character sheet</h3><button class="minbtn" aria-label="Minimise character sheet"><svg><use href="#i-min"/></svg></button><button class="gem" aria-label="Close character sheet"><svg><use href="#i-x"/></svg></button></div>
       <div class="win-bd">
         <div class="pinned">
           <div class="who">
@@ -1060,6 +1365,34 @@ body::before {
               </div>
             </div>
           </div>
+          <div class="tabpanel" data-panel="Actions" hidden>
+            <div class="box skillbox"><span class="lbl">Attacks</span>
+              <div class="arow">
+                <div class="arow-top"><span class="arow-name">Longbow</span><span class="tag">150 / 600 ft</span></div>
+                <div class="arow-line"><span class="num">+9</span> · <span class="num">1d8+4</span> piercing</div>
+                <div class="arow-btns"><button class="btn sm" id="${id("lb-atk")}">Attack</button><button class="btn sm" id="${id("lb-dmg")}">Damage</button><button class="btn sm" id="${id("lb-both")}">Attack + damage</button></div>
+              </div>
+              <div class="arow">
+                <div class="arow-top"><span class="arow-name">Shortsword</span><span class="tag">finesse, light</span></div>
+                <div class="arow-line"><span class="num">+7</span> · <span class="num">1d6+4</span> piercing</div>
+                <div class="arow-btns"><button class="btn sm" id="${id("ss-atk")}">Attack</button><button class="btn sm" id="${id("ss-dmg")}">Damage</button><button class="btn sm" id="${id("ss-both")}">Attack + damage</button></div>
+              </div>
+            </div>
+            <div class="box skillbox"><span class="lbl">Spells</span>
+              <div class="slots"><span class="lbl" style="font-size:12px">1st</span><span class="pips"><i class="slot-pip full"></i><i class="slot-pip full"></i><i class="slot-pip full"></i><i class="slot-pip"></i></span><span class="num">3 / 4</span><span class="lbl" style="font-size:12px;margin-left:8px">2nd</span><span class="pips"><i class="slot-pip full"></i><i class="slot-pip"></i></span><span class="num">1 / 2</span></div>
+              <div class="arow">
+                <div class="arow-top"><span class="arow-name">Hunter's Mark</span><span class="tag">bonus action · conc.</span></div>
+                <div class="arow-line">+<span class="num">1d6</span> force on each hit</div>
+                <div class="arow-btns"><button class="btn sm" id="${id("hm-dmg")}">Damage</button></div>
+              </div>
+            </div>
+            <div class="box skillbox"><span class="lbl">Limited uses</span>
+              <div class="arow">
+                <div class="arow-top"><span class="arow-name">Favored Enemy</span><span class="num" style="color:var(--cream)">2 / 3</span></div>
+                <div class="arow-line">Cast Hunter's Mark without a slot · long rest</div>
+              </div>
+            </div>
+          </div>
           <div class="tabpanel" data-panel="other" hidden><p class="placeholder"></p></div>
         </div>
       </div>`;
@@ -1071,11 +1404,10 @@ body::before {
       const tab = e.target.closest(".tab");
       if (tab) {
         el.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
-        const main = tab.dataset.tab === "Main";
-        el.querySelector('[data-panel="Main"]').hidden = !main;
-        const other = el.querySelector('[data-panel="other"]');
-        other.hidden = main;
-        other.querySelector("p").textContent = `${tab.dataset.tab} isn't in this kit yet. Main shows the box and row styles every tab will share.`;
+        const name = tab.dataset.tab;
+        const built = name === "Main" || name === "Actions";
+        el.querySelectorAll("[data-panel]").forEach((p) => { p.hidden = p.dataset.panel !== (built ? name : "other"); });
+        if (!built) el.querySelector('[data-panel="other"] p').textContent = `${name} isn't in this kit. Main and Actions show the box and row styles every tab shares.`;
       }
       const edit = e.target.closest(".edit-tg");
       if (edit) edit.setAttribute("aria-pressed", String(edit.getAttribute("aria-pressed") !== "true"));
@@ -1132,13 +1464,33 @@ body::before {
 
   document.getElementById("compose").addEventListener("submit", (e) => { e.preventDefault(); document.getElementById("compose-input").value = ""; });
 
+  // Damage card: segmented choice and target toggles
+  document.querySelectorAll(".dc-foot .seg").forEach((seg) => seg.addEventListener("click", (e) => {
+    const b = e.target.closest(".btn");
+    if (!b) return;
+    seg.querySelectorAll(".btn").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    const amt = { "dc-full": 16, "dc-half": 8, "dc-double": 32 }[b.id];
+    document.getElementById("dc-apply").textContent = `Apply ${amt}`;
+  }));
+  document.querySelectorAll(".tgt").forEach((t) => t.addEventListener("click", () => t.setAttribute("aria-pressed", String(t.getAttribute("aria-pressed") !== "true"))));
+
+  // Slider fill
+  const vol = document.getElementById("vol");
+  const volSync = () => { vol.style.setProperty("--v", vol.value + "%"); document.getElementById("vol-out").textContent = vol.value; };
+  vol.addEventListener("input", volSync);
+  volSync();
+
+  // Launcher: click cycles closed → open → minimised
+  const NEXT = { closed: "open", open: "minimised", minimised: "open" };
+  document.querySelectorAll(".lbtn").forEach((b) => b.addEventListener("click", () => { b.dataset.state = NEXT[b.dataset.state]; }));
+
   // Type pairing
   const PAIRS = {
     alegreya: { label: "Alegreya", title: "Alegreya SC", name: "Alegreya Bold", num: "Alegreya Bold, lining", body: "Alegreya Sans" },
     cinzel: { label: "Cinzel", title: "Cinzel", name: "Alegreya Bold", num: "Alegreya Bold, lining", body: "Alegreya Sans" },
     book: { label: "Old book", title: "IM Fell English SC", name: "EB Garamond Bold", num: "EB Garamond Bold, lining", body: "Alegreya Sans" },
   };
-  const typeBtns = document.querySelectorAll(".seg .btn");
+  const typeBtns = document.querySelectorAll(".typepick .btn");
   function setType(key) {
     if (key === "book") document.documentElement.removeAttribute("data-type");
     else document.documentElement.setAttribute("data-type", key);
@@ -1180,10 +1532,10 @@ body::before {
 
   // Scroll tooltip: shared 400 ms delay, opens on hover and keyboard focus
   const tip = document.getElementById("tip");
-  let timer = null, current = null;
+  let timer = null, current = null, sticky = false;
   function show(el) {
     current = el;
-    tip.innerHTML = el.dataset.tip;
+    tip.innerHTML = el.dataset.tip ?? el.dataset.toggletip;
     tip.hidden = false;
     tip.classList.remove("open");
     const r = el.getBoundingClientRect();
@@ -1197,8 +1549,15 @@ body::before {
     void tip.offsetWidth;
     tip.classList.add("open");
   }
-  function hide() { clearTimeout(timer); timer = null; current = null; tip.hidden = true; }
+  function hide() { clearTimeout(timer); timer = null; current = null; sticky = false; tip.hidden = true; }
+  // Toggle tip: opens on click and stays until clicked again, clicked away or Esc
+  document.addEventListener("click", (e) => {
+    const el = e.target.closest("[data-toggletip]");
+    if (el) { if (sticky && current === el) hide(); else { hide(); show(el); sticky = true; } return; }
+    if (sticky) hide();
+  });
   function arm(e) {
+    if (sticky) return;
     const el = e.target.closest("[data-tip]");
     if (!el || el === current) return;
     clearTimeout(timer);
@@ -1206,6 +1565,7 @@ body::before {
     timer = setTimeout(() => show(el), 400);
   }
   function disarm(e) {
+    if (sticky) return;
     const el = e.target.closest("[data-tip]");
     if (!el) return;
     const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest("[data-tip]");
