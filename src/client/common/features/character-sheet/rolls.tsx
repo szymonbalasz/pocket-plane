@@ -21,6 +21,7 @@ import { Switch } from "../../components/ui/controls";
 import { useRecords, useSync } from "../../sync/store";
 import { slotLabelsOf } from "../dice-roll-log/logic";
 import { useRollControl } from "../dice-roll-log/roll-control";
+import { Breakdown } from "./breakdown";
 import { useBusy } from "./fields";
 import {
   claimRollOptions,
@@ -30,9 +31,31 @@ import {
   sendSheetRoll,
 } from "./routing";
 import { useSheet } from "./sheet-context";
+import { type BreakdownKey, breakdownText } from "./view-model";
 
 /** Sheet roll buttons' tooltip; `RollButton` adds "Alt: adjust in tray" (FR-DICEX-51). */
 export const ROLL_HINT = "Shift: advantage · Ctrl: disadvantage";
+
+/**
+ * FR-CHARX-113: a sheet roll button's hint: the breakdown of its number (when the sheet derives
+ * one), else the caller's text; then the mode keys. `RollButton` adds the Alt hint.
+ */
+export function rollHint(
+  stats: Parameters<typeof breakdownText>[0],
+  breakdown: BreakdownKey | undefined,
+  hint: string | undefined,
+): ReactNode {
+  const text = breakdown ? breakdownText(stats, breakdown) : null;
+  if (text && breakdown) {
+    return (
+      <>
+        <Breakdown okey={breakdown} text={text} />
+        {` · ${ROLL_HINT}`}
+      </>
+    );
+  }
+  return hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT;
+}
 
 /** DM per-roll public override per category; absent = the category's setting. */
 export function usePublicOverrides() {
@@ -89,6 +112,8 @@ export interface SheetRollProps extends Omit<ComponentProps<typeof Button>, "ref
   /** Popover heading, e.g. "Stealth check" (prefixed with the creature name). */
   title: string;
   hint?: string;
+  /** FR-CHARX-113: the number's breakdown leads the Tooltip (replaces `hint`). */
+  breakdown?: BreakdownKey;
   overrides?: PublicOverrides;
   children: ReactNode;
 }

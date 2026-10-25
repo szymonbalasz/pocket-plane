@@ -13,9 +13,12 @@ import {
   type SpellRow,
 } from "@shared/character-sheet/sheet";
 import {
+  ABILITY_NAMES,
+  type Ability,
   type AbilityStats,
   ATTACK_BONUS_MAX,
   type Attack,
+  abilityMod,
   type ClassRow,
   DAMAGE_TYPES,
   EXTRA_DAMAGE_MAX,
@@ -28,6 +31,7 @@ import {
   PASSIVE_SKILLS,
   type PassiveSkill,
   passiveScore,
+  proficiencyBonus,
   type Senses,
   SKILL_ABILITY,
   SKILL_NAMES,
@@ -252,6 +256,95 @@ export function overrideTooltip(stats: AbilityStats, key: OverrideKey): string |
   return `Derived ${fmt(derived)} · Override${o.note ? `: ${o.note}` : ` ${fmt(o.value)}`}`;
 }
 
+/** FR-CHARX-113: a breakdown key: an override key, or the two stored numbers of the stat row. */
+export type BreakdownKey = OverrideKey | "ac" | "init";
+
+const PROF_WORD: Readonly<Record<SkillProficiency, string>> = {
+  proficient: "proficiency",
+  expertise: "expertise",
+};
+
+/**
+ * FR-CHARX-113: the breakdown Tooltip of one number on Main, from the derivation's own terms:
+ * "Stealth +10 · DEX +4 · expertise +6", "Dexterity save +4 · DEX +4", "Passive Perception 15 ·
+ * 10 + Perception +5". An overridden number reads "Name value · Derived … · Override: …"
+ * (`overrideTooltip`). AC and Initiative are stored, so their value alone. Null when the number
+ * isn't on this sheet (no scores, no spellcasting).
+ */
+export function breakdownText(
+  stats: AbilityStats & { ac?: number; initBonus?: number },
+  key: BreakdownKey,
+): string | null {
+  if (key === "ac") return stats.ac === undefined ? null : `Armor Class ${stats.ac}`;
+  if (key === "init")
+    return stats.initBonus === undefined ? null : `Initiative ${signed(stats.initBonus)}`;
+  const value = sheetValue(stats, key);
+  if (value === null) return null;
+  const plain = key === "spellDc" || key.startsWith("passive.");
+  const head = `${breakdownName(key)} ${plain ? value : signed(value)}`;
+  const over = overrideTooltip(stats, key);
+  if (over) return `${head} · ${over}`;
+  const pb = proficiencyBonus(stats);
+  const mod = (a: Ability) =>
+    `${a.toUpperCase()} ${signed(abilityMod(stats.abilities?.[a] ?? 10))}`;
+  const [group, name] = key.split(".") as [string, string];
+  const terms: string[] = [];
+  if (key === "proficiency")
+    terms.push("level" in stats ? `level ${stats.level}` : `CR ${stats.cr}`);
+  else if (key === "spellAttack" || key === "spellDc") {
+    const a = stats.spellcasting?.ability ?? "wis";
+    if (key === "spellDc") terms.push("8");
+    terms.push(`proficiency ${signed(pb)}`, mod(a));
+  } else if (group === "check") {
+    terms.push(mod(name as Ability), `score ${stats.abilities?.[name as Ability]}`);
+  } else if (group === "save") {
+    terms.push(mod(name as Ability));
+    if (stats.saveProficiencies?.includes(name as Ability)) terms.push(`proficiency ${signed(pb)}`);
+  } else if (group === "skill") {
+    const p = stats.skills?.[name as Skill];
+    terms.push(mod(SKILL_ABILITY[name as Skill]));
+    if (p) terms.push(`${PROF_WORD[p]} ${signed(pb * (p === "expertise" ? 2 : 1))}`);
+  } else {
+    const bonus = sheetValue(stats, `skill.${name as PassiveSkill}`) ?? 0;
+    terms.push(`10 + ${SKILL_NAMES[name as PassiveSkill]} ${signed(bonus)}`);
+  }
+  return [head, ...terms].join(" · ");
+}
+
+function breakdownName(key: OverrideKey): string {
+  if (key === "proficiency") return "Proficiency";
+  if (key === "spellAttack") return "Spell attack";
+  if (key === "spellDc") return "Spell save DC";
+  const [group, name] = key.split(".") as [string, string];
+  if (group === "check") return `${ABILITY_NAMES[name as Ability]} check`;
+  if (group === "save") return `${ABILITY_NAMES[name as Ability]} save`;
+  if (group === "skill") return SKILL_NAMES[name as Skill];
+  return `Passive ${SKILL_NAMES[name as PassiveSkill]}`;
+}
+
+/** FR-CHARX-115: which tab-strip arrows show (an end with hidden tabs); 1 px of rounding slack. */
+export function tabArrows(
+  scrollLeft: number,
+  scrollWidth: number,
+  clientWidth: number,
+): { prev: boolean; next: boolean } {
+  const max = scrollWidth - clientWidth;
+  if (max <= 1) return { prev: false, next: false };
+  return { prev: scrollLeft > 1, next: scrollLeft < max - 1 };
+}
+
+/**
+ * FR-CHARX-115: how far a wheel turn scrolls the tab strip sideways; null = leave it to the
+ * browser (a sideways gesture already, or nothing to scroll).
+ */
+export function wheelScroll(deltaX: number, deltaY: number, overflows: boolean): number | null {
+  if (!overflows || Math.abs(deltaY) <= Math.abs(deltaX)) return null;
+  return deltaY;
+}
+
+/** FR-CHARX-115: one arrow press scrolls the strip this far. */
+export const TAB_ARROW_STEP_PX = 120;
+
 /** Spells by level, cantrips first; row order kept inside a level (CHARX §7 Actions). */
 export function spellGroups(spells: readonly SpellRow[]): { level: number; spells: SpellRow[] }[] {
   const out: { level: number; spells: SpellRow[] }[] = [];
@@ -402,6 +495,22 @@ export function pinnedPart(fullPx: number, bodyPx: number, current: PinnedPart):
   if (bodyPx <= 0) return current;
   const room = bodyPx - (current === "compact" ? PIN_HYSTERESIS_PX : 0);
   return fullPx * 2 <= room ? "full" : "compact";
+}
+
+/** FR-CHARX-48: the full header's height as last measured while it was pinned, and at which width. */
+export interface SeenFull {
+  px: number;
+  width: number;
+}
+
+/**
+ * FR-CHARX-48: the full header's height while compact: the compact parts' sum, but never less than
+ * the full header itself last measured at this width. The full header lays its badges and buttons
+ * out beside the name, which can be taller than the compact parts (CS walkthrough F1: 206 vs
+ * 166 px in a 382 px body): without this, full → compact → full … never settles.
+ */
+export function compactFullPx(sumPx: number, seen: SeenFull | null, width: number): number {
+  return seen && seen.width === width ? Math.max(sumPx, seen.px) : sumPx;
 }
 
 /** A pip click (CHARX §7): click = use one, Shift+click = restore one. */
