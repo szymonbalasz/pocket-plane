@@ -26,8 +26,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 11 F3 combat + dice | merged 878b2549 | — | **merged** (walkthrough 16/16; branch check:full + e2e green bar load flakes pause / popup-line → BL-116); main gates skipped (same code) | — |
 | Sprint 11 art track (DM) | merged f118e724 (theme-system), 56347ecf (charx print sheet) | — | **merged** (#351; ADR-0069); #352: theme-system complete, OQ-CHARX-47–50 all A | art build in sprint 12 |
 | Sprint 11 gate | final main 9da2b751 | — | **session-sim-15 10 / 11 PASS** (leak scan clean; hard kill byte-identical); FAIL c → BL-118; glitches → BL-119–BL-123 | DM recap |
-| Sprint 12 T0 theme tokens | `fix/theme-tokens` | build-th0 | building | walkthrough: Default screenshots vs main |
-| Sprint 12 CS printed sheet | `build/charx-print-sheet` | build-cs | building | walkthrough PS1–PS6 (Default) |
+| Sprint 12 T0 theme tokens | `fix/theme-tokens` | test-th0 | built; gates check:full 5767 green, e2e 252 + gems-reroll load flake (1/1 alone) | walkthrough: Default pixel diff vs main |
+| Sprint 12 CS printed sheet | `build/charx-print-sheet` (T0 merged in) | test-cs | built; check 5197 green | walkthrough PS1–PS6 (Default) |
 | Sprint 12 X1 toasts (BL-118–120) | `fix/x1-toasts` | build-x1 | building | walkthrough |
 | Sprint 12 X2 stats + skip toast + flakes (BL-121, -122, -116) | `fix/x2-stats-combat` | build-x2 | building | walkthrough |
 | Sprint 12 T1 theme switch | — | — | waits for T0 | — |
