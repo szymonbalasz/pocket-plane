@@ -250,7 +250,7 @@ function PlayerCompanionLine({
                   <span
                     data-testid="cbtx-init-row-temp"
                     data-record-id={c.id}
-                    className="shrink-0 text-sky-400"
+                    className="shrink-0 text-hp-temp"
                   >
                     +{temp}
                   </span>
