@@ -50,7 +50,13 @@ describe("theme-gilt bundle (theme-system §13)", () => {
       "Elite Goblin Warrior",
     ]);
     expect(enc).toMatchObject({ round: 3, turnCombatantId: rows[0]?.id as string });
-    const lines = JSON.stringify(db.select().from(gameLogEntry).all().map((e) => e.payload));
+    const lines = JSON.stringify(
+      db
+        .select()
+        .from(gameLogEntry)
+        .all()
+        .map((e) => e.payload),
+    );
     for (const l of ["Scimitar", "Perception", "DM-SECRET-ROLL"]) expect(lines).toContain(l);
     expect(db.select().from(entity).where(eq(entity.name, "Goblin")).get()).toBeTruthy();
   }, 60_000);
