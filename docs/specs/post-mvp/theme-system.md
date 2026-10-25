@@ -136,6 +136,7 @@ None. No REST, intents or events; 0 bytes on the wire.
 |---|---|---|
 | [play-shell](../play-shell.md) | Pref-sections registries (FR-SHELL-72); a new storage key next to FR-SHELL-76 (OQ-THEME-08); frame hooks on `ShellWindow` (title, close, minimise test IDs exist) | complete |
 | [campaign-management](../campaign-management.md) | FR-CAMP-31 run per theme surface (FR-THEME-18) | complete |
+| [character-sheet-full](../character-sheet-full.md) | Printed sheet layout, FR-CHARX-105–120 (branch `spec/charx-print-sheet`); its `sheet-*` slots (FR-CHARX-119) are styled by T2 | in review |
 | Shared UI | Edits to `components/ui/*` and `styles.css` (shared files, §9.9): token cleanup + `data-slot` on every component (none today) | orchestrator |
 
 **Proposed build split** (one commit per slice):
@@ -144,7 +145,7 @@ None. No REST, intents or events; 0 bytes on the wire.
 |---|---|---|
 | T0 | `fix/theme-tokens` | 15 files' raw colour classes → tokens; `data-slot` on every `components/ui/` part; Launcher measures computed font. No visible change |
 | T1 | `build/theme-switch` | Tokens, `data-theme`, boot script, storage, Appearance section, fonts |
-| T2 | `build/theme-gilt` | `themes/gilt.css`: frame, controls, scrollbars, toasts, scroll tooltip; bundle `theme-gilt`; walkthrough |
+| T2 | `build/theme-gilt` | `themes/gilt.css`: frame, controls, scrollbars, toasts, scroll tooltip, the printed sheet's `sheet-*` slots; bundle `theme-gilt`; walkthrough |
 
 ## 15. Open questions
 
