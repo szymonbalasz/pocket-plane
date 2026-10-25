@@ -49,7 +49,7 @@ import {
 } from "../play-shell/toast-region";
 import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, useAlertToasts } from "./alert-toasts";
-import { useDialogRects, usePopupRects } from "./dialog-rects";
+import { useDialogRects, usePopupIds, usePopupRects } from "./dialog-rects";
 import { dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
 import {
   actionButton,
@@ -77,6 +77,7 @@ import {
   REFOLD_QUIET_MS,
   refold,
   registerToastMemory,
+  releaseHidden,
   SETTLE_HOLD_MS,
   SUMMARY_KEY,
   setHidden,
@@ -365,6 +366,20 @@ export function ToastRuntime({
     wasFolded.current = folded;
   }, [folded, sync, dispatch, views]);
 
+  // BL-120: a hidden card whose popup closed while still pending (Later, another card opened)
+  // counts in the summary (FR-NOTE-26: no toast of its own again).
+  const popupIds = usePopupIds(isDm);
+  const heldIds = useRef("");
+  useEffect(() => {
+    const was = heldIds.current;
+    heldIds.current = popupIds;
+    const open = new Set(popupIds ? popupIds.split(",") : []);
+    const gone = (was ? was.split(",") : []).filter((id) => !open.has(id));
+    if (gone.length === 0 || !sync) return;
+    const store = sync.getState().store;
+    dispatch((s, now) => releaseHidden(s, gone, store, now, (st) => waitingForPlayers(st, views)));
+  }, [popupIds, sync, dispatch, views]);
+
   // FR-NOTE-32: the DM's stack keeps clear of the rendered Initiative window. FR-NOTE-51: every
   // input is subscribed (windows, Initiative, hard keep-outs, first rows, height, viewport).
   const stackRef = useRef<HTMLElement>(null);
@@ -470,7 +485,7 @@ export function ToastRuntime({
   // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
   const covers = isDm && at.covers > 0;
   const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
-  const { shown, more, callout } = visibleToasts(state, cap, folded);
+  const { shown, more, inSummary, callout } = visibleToasts(state, cap, folded);
   const foldable = shown.filter((t) => t.kind !== "summary" && classOfToast(t) !== "alert").length;
   // BL-115: a hold that never sees a new height ends after `SETTLE_HOLD_MS`.
   const [holdOver, setHoldOver] = useState(0);
@@ -550,11 +565,12 @@ export function ToastRuntime({
               key={SUMMARY_KEY}
               role="status"
               data-testid="note-toast-pending-summary"
-              data-count={t.count}
+              // BL-120: with the cards folded into it (`inSummary`).
+              data-count={t.count + inSummary}
               data-waiting={t.waiting ?? 0}
               className="pointer-events-auto flex items-center gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
             >
-              <span className="flex-1">{summaryText(t.count, t.waiting)}</span>
+              <span className="flex-1">{summaryText(t.count + inSummary, t.waiting)}</span>
               {inRow && moreButton}
               <Button
                 size="sm"

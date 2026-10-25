@@ -87,6 +87,12 @@ export interface ToastState {
    * their toast doesn't come back in this page load. Optional: absent = none.
    */
   hiddenIds?: readonly string[];
+  /**
+   * BL-120: hidden rows whose popup closed while still pending (the damage-card popup's Later,
+   * another card opened): they stay without a toast (FR-NOTE-26) and count in the summary.
+   * Optional: absent = none.
+   */
+  releasedIds?: readonly string[];
   hovered: boolean;
   hidden: boolean;
   /** When timers last ran up to; null while paused. */
@@ -223,9 +229,42 @@ export function closeToast(s: ToastState, key: string, now: number): ToastState 
  * hidden for this page load; the row stays in `note.history` and the bell.
  */
 export function hideNote(s: ToastState, notificationId: string, now: number): ToastState {
-  const ran = closeToast(s, notificationId, now);
+  let ran = closeToast(s, notificationId, now);
+  // BL-120: hidden again (its popup reopened): the popup shows it, the summary counts it no more.
+  if (ran.releasedIds?.includes(notificationId)) {
+    const releasedIds = ran.releasedIds.filter((id) => id !== notificationId);
+    const toasts = ran.toasts.flatMap((t): Toast[] => {
+      if (t.kind !== "summary") return [t];
+      const count = Math.max(0, t.count - 1);
+      return count > 0 || (t.waiting ?? 0) > 0 ? [{ ...t, count }] : [];
+    });
+    ran = { ...ran, toasts, releasedIds };
+  }
   if (ran.hiddenIds?.includes(notificationId)) return ran;
   return { ...ran, hiddenIds: [...(ran.hiddenIds ?? []), notificationId] };
+}
+
+/**
+ * BL-120 (sim-15 glitch 3: a card put off with "Later" was counted nowhere): the popups showing
+ * `ids` closed. Each hidden row among them that is still pending for this client stays without a
+ * toast (FR-NOTE-26) and counts in the summary, which shows for it if it didn't; resolved rows
+ * stay hidden (their Undo's reopen doesn't toast, as before). Nothing to release → the same state.
+ */
+export function releaseHidden(
+  s: ToastState,
+  ids: readonly string[],
+  store: RecordStore,
+  now: number,
+  waitingOf: WaitingCount = NONE,
+): ToastState {
+  const mine = new Set(pendingForMe(store).map((n) => n.id));
+  const released = s.releasedIds ?? [];
+  const add = ids.filter(
+    (id) => mine.has(id) && s.hiddenIds?.includes(id) && !released.includes(id),
+  );
+  if (add.length === 0) return s;
+  const next = { ...advance(s, now), releasedIds: [...released, ...add] };
+  return setSummary(next, untoastedPending(next, store), now, waitingOf(store));
 }
 
 /** Clears every toast and the callout (campaign switch). */
@@ -237,13 +276,15 @@ export function clearToasts(s: ToastState, now: number): ToastState {
 /**
  * FR-NOTE-15 (P3 glitch 8: one toast per pending action): the pending-for-me rows without their
  * own toast on the stack; the summary counts only these (0 → no summary). A row whose toast was
- * hidden (FR-NOTE-26, e.g. its popup is or was open) counts as toasted: it doesn't come back as
- * the summary either (sim-6 glitch 3).
+ * hidden (FR-NOTE-26, e.g. its popup is open) counts as toasted: it doesn't come back as the
+ * summary either (sim-6 glitch 3). BL-120: once its popup closed with it still pending
+ * (`releaseHidden`), it counts.
  */
 export function untoastedPending(s: ToastState, store: RecordStore): number {
+  const released = new Set(s.releasedIds ?? []);
   const toasted = new Set([
     ...s.toasts.flatMap((t) => (t.kind === "note" ? [t.notificationId] : [])),
-    ...(s.hiddenIds ?? []),
+    ...(s.hiddenIds ?? []).filter((id) => !released.has(id)),
   ]);
   return pendingForMe(store).filter((n) => !toasted.has(n.id)).length;
 }
@@ -388,12 +429,15 @@ const RANK: Record<NotificationToastClass | "summary", number> = {
  * leaves out the summary and every card; they stay on the stack and neither shows nor counts.
  * FR-NOTE-77: `max` 0 while the summary shows (its Open keeps the pending actions one click
  * away) folds every card and info into "+N more"; without the summary one still shows.
+ * BL-120 (sim-15 glitch 3: "1 pending action +2 more" beside Initiative's "Pending (3)"): while
+ * the summary shows, the held-back cards count in it (`inSummary`, added to its count), not in
+ * "+N more" (held-back alerts and info only), so each pending action counts once on the stack.
  */
 export function visibleToasts(
   s: ToastState,
   max: number = MAX_VISIBLE,
   folded = false,
-): { shown: Toast[]; more: number; callout: Callout | null } {
+): { shown: Toast[]; more: number; inSummary: number; callout: Callout | null } {
   const out = (t: Toast) => folded && (t.kind === "summary" || classOfToast(t) === "card");
   const summary = !folded && s.toasts.some((t) => t.kind === "summary");
   const room = Math.max(summary ? 0 : 1, max);
@@ -411,7 +455,11 @@ export function visibleToasts(
     .filter(({ t }) => (t.kind === "summary" && !folded) || kept.has(t))
     .sort((a, b) => RANK[classOfToast(a.t)] - RANK[classOfToast(b.t)] || a.i - b.i)
     .map(({ t }) => t);
-  return { shown, more: counted.length - kept.size, callout: s.callout ?? null };
+  const inSummary = summary
+    ? counted.filter((t) => !kept.has(t) && classOfToast(t) === "card").length
+    : 0;
+  const more = counted.length - kept.size - inSummary;
+  return { shown, more, inSummary, callout: s.callout ?? null };
 }
 
 /**
