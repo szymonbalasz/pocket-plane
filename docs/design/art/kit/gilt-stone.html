@@ -1,0 +1,1222 @@
+<title>Gilt &amp; Stone</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400;0,500;0,700;0,800;1,400&family=Alegreya+SC:wght@500;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Cinzel:wght@500;600;700&family=EB+Garamond:wght@500;600;700&family=IM+Fell+English+SC&display=swap">
+<style>
+/* Layout: skin pieces float as real windows over a night-dark battle map, the way they sit in play. Dark only (visual-direction). */
+:root {
+  color-scheme: dark;
+
+  /* Surfaces, sampled from concepts round-01 A and round-02 sheet-02 */
+  --ground: #070a0a;
+  --panel: #101414;
+  --panel-hi: #181c1b;
+  --panel-lo: #0a0d0d;
+  --wash-prof: #1f1a0d;
+  --wash-turn: #2b0b0b;
+
+  /* Gilt */
+  --gold: #e2c27c;
+  --gold-mid: #b08a4a;
+  --gold-deep: #5e4426;
+
+  /* Text */
+  --cream: #efe6d2;
+  --muted: #a69d88;
+  --dim: #746e61;
+
+  /* Gem */
+  --gem: #c81f22;
+  --gem-deep: #6e1415;
+  --gem-hi: #ff8676;
+
+  /* Parchment, tooltips only */
+  --parch: #e8d6a8;
+  --parch-lo: #c7aa72;
+  --ink: #2b1d0e;
+
+  /* Game state (visual-direction token groups) */
+  --hp-full: #4f9a3a;
+  --hp-bloodied: #c8902a;
+  --hp-down: #b8322a;
+  --conc: #5b9be0;
+  --creature-humanoid: #355f9e;
+  --creature-beast: #5c6f2b;
+  --creature-undead: #4b4f63;
+
+  /* Type pairing (picked, kit draft 1): old book */
+  --f-title: "IM Fell English SC", Georgia, serif;
+  --f-label: "IM Fell English SC", Georgia, serif;
+  --f-num: "EB Garamond", Georgia, serif;
+  --f-name: "EB Garamond", Georgia, serif;
+  --f-body: "Alegreya Sans", "Segoe UI", system-ui, sans-serif;
+  --title-track: 0.04em;
+  --label-track: 0.05em;
+
+  /* Gilded scrollbars, always visible */
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-mid) #0a0c0c;
+
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .85 0 0 0 0 .75 0 0 0 0 .55 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --cn-tl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg fill='none' stroke='%23c9a35c' stroke-width='1.3'%3E%3Cpath d='M1.5 25V8Q1.5 1.5 8 1.5H25'/%3E%3Cpath d='M5.5 25V11Q5.5 5.5 11 5.5H25' stroke-opacity='.5'/%3E%3Cpath d='M13 9.5l2 2-2 2-2-2z' fill='%23c9a35c' stroke='none'/%3E%3C/g%3E%3Ccircle cx='4' cy='4' r='2.6' fill='%23e2c27c' stroke='%235e4426' stroke-width='.8'/%3E%3C/svg%3E");
+  --cn-tr: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg transform='matrix(-1 0 0 1 26 0)'%3E%3Cg fill='none' stroke='%23c9a35c' stroke-width='1.3'%3E%3Cpath d='M1.5 25V8Q1.5 1.5 8 1.5H25'/%3E%3Cpath d='M5.5 25V11Q5.5 5.5 11 5.5H25' stroke-opacity='.5'/%3E%3Cpath d='M13 9.5l2 2-2 2-2-2z' fill='%23c9a35c' stroke='none'/%3E%3C/g%3E%3Ccircle cx='4' cy='4' r='2.6' fill='%23e2c27c' stroke='%235e4426' stroke-width='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --cn-bl: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg transform='matrix(1 0 0 -1 0 26)'%3E%3Cg fill='none' stroke='%23c9a35c' stroke-width='1.3'%3E%3Cpath d='M1.5 25V8Q1.5 1.5 8 1.5H25'/%3E%3Cpath d='M5.5 25V11Q5.5 5.5 11 5.5H25' stroke-opacity='.5'/%3E%3Cpath d='M13 9.5l2 2-2 2-2-2z' fill='%23c9a35c' stroke='none'/%3E%3C/g%3E%3Ccircle cx='4' cy='4' r='2.6' fill='%23e2c27c' stroke='%235e4426' stroke-width='.8'/%3E%3C/g%3E%3C/svg%3E");
+  --cn-br: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 26'%3E%3Cg transform='matrix(-1 0 0 -1 26 26)'%3E%3Cg fill='none' stroke='%23c9a35c' stroke-width='1.3'%3E%3Cpath d='M1.5 25V8Q1.5 1.5 8 1.5H25'/%3E%3Cpath d='M5.5 25V11Q5.5 5.5 11 5.5H25' stroke-opacity='.5'/%3E%3Cpath d='M13 9.5l2 2-2 2-2-2z' fill='%23c9a35c' stroke='none'/%3E%3C/g%3E%3Ccircle cx='4' cy='4' r='2.6' fill='%23e2c27c' stroke='%235e4426' stroke-width='.8'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Alternative: Alegreya family */
+:root[data-type="alegreya"] {
+  --f-title: "Alegreya SC", Georgia, serif;
+  --f-label: "Alegreya SC", Georgia, serif;
+  --f-num: "Alegreya", Georgia, serif;
+  --f-name: "Alegreya", Georgia, serif;
+  --title-track: 0.06em;
+  --label-track: 0.07em;
+}
+/* Alternative: Cinzel titles over Alegreya */
+:root[data-type="cinzel"] {
+  --f-title: "Cinzel", Georgia, serif;
+  --f-label: "Cinzel", Georgia, serif;
+  --f-num: "Alegreya", Georgia, serif;
+  --f-name: "Alegreya", Georgia, serif;
+  --title-track: 0.08em;
+  --label-track: 0.09em;
+}
+
+/* WebKit / Safari fallback for the scrollbar colours */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0a0c0c; }
+::-webkit-scrollbar-thumb { background: var(--gold-deep); border: 2px solid #0a0c0c; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--gold-mid); }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100%;
+  color: var(--cream);
+  font: 15px/1.4 var(--f-body);
+  background-color: var(--ground);
+  background-image:
+    radial-gradient(ellipse at 50% 35%, transparent 0 35%, rgba(0,0,0,.75) 100%),
+    repeating-linear-gradient(0deg, rgba(226,194,124,.035) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, rgba(226,194,124,.035) 0 1px, transparent 1px 48px),
+    radial-gradient(circle at 18% 22%, #1b231d 0 9%, transparent 22%),
+    radial-gradient(circle at 72% 12%, #1d1f1a 0 7%, transparent 18%),
+    radial-gradient(circle at 84% 64%, #17201b 0 10%, transparent 24%),
+    radial-gradient(circle at 34% 78%, #1e1d17 0 8%, transparent 20%),
+    linear-gradient(#0c1110, #080b0a);
+  background-attachment: fixed;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.num { font-family: var(--f-num); font-variant-numeric: lining-nums tabular-nums; }
+.lbl { font-family: var(--f-label); letter-spacing: var(--label-track); color: var(--gold); }
+
+/* ── Top bar ───────────────────────────────────────── */
+.topbar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 20;
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  background: var(--grain), linear-gradient(#161a19, #0d1010);
+  border-bottom: 1px solid var(--gold-deep);
+  box-shadow: inset 0 -3px 0 #0a0c0c, inset 0 -4px 0 rgba(176,138,74,.45), 0 6px 18px rgba(0,0,0,.6);
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 30;
+  background: #161a19;
+}
+.brand {
+  font-family: var(--f-title);
+  font-size: 22px;
+  letter-spacing: var(--title-track);
+  color: var(--gold);
+  margin: 0;
+  font-weight: 500;
+  text-shadow: 0 1px 0 #000;
+}
+.brand small {
+  font-family: var(--f-body);
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--muted);
+  margin-left: 10px;
+}
+.typepick { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.typepick > span { font-size: 13px; color: var(--muted); }
+.seg { display: flex; }
+.seg .btn { border-radius: 0; }
+.seg .btn:first-child { border-radius: 3px 0 0 3px; }
+.seg .btn:last-child { border-radius: 0 3px 3px 0; }
+.seg .btn + .btn { margin-left: -1px; }
+
+/* ── Section plaques ───────────────────────────────── */
+.sect {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 36px 0 14px;
+}
+.sect h2 {
+  margin: 0;
+  font-family: var(--f-title);
+  font-weight: 500;
+  font-size: 19px;
+  letter-spacing: var(--title-track);
+  color: var(--gold);
+  text-shadow: 0 1px 2px #000, 0 0 12px rgba(0,0,0,.9);
+  white-space: nowrap;
+}
+.sect::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gold-mid), transparent);
+}
+.sect p { margin: 0; color: var(--muted); font-size: 14px; text-shadow: 0 1px 2px #000; }
+
+/* ── Window frame ──────────────────────────────────── */
+.win {
+  position: relative;
+  padding: 5px;
+  background: var(--grain), var(--panel);
+  border: 1px solid #000;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 0 0 1px var(--gold-deep),
+    inset 0 0 0 3px #090b0b,
+    inset 0 0 0 4px rgba(176,138,74,.55),
+    0 12px 32px rgba(0,0,0,.7);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.win::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+  background:
+    var(--cn-tl) top left / 26px 26px no-repeat,
+    var(--cn-tr) top right / 26px 26px no-repeat,
+    var(--cn-bl) bottom left / 26px 26px no-repeat,
+    var(--cn-br) bottom right / 26px 26px no-repeat;
+}
+.win-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px 7px 16px;
+  background: linear-gradient(#1c201f, #121615);
+  border-bottom: 1px solid var(--gold-deep);
+  position: relative;
+}
+.win-hd::after {
+  content: "";
+  position: absolute;
+  left: 12px; right: 12px; bottom: -3px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(176,138,74,.6) 20%, rgba(176,138,74,.6) 80%, transparent);
+}
+.win-hd h3 {
+  margin: 0;
+  flex: 1;
+  font-family: var(--f-title);
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: var(--title-track);
+  color: var(--gold);
+  text-shadow: 0 1px 0 #000;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.win-hd .meta { font-size: 13px; color: var(--muted); }
+.win-bd { padding: 12px 12px 10px; }
+
+/* Gem close button */
+.gem {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--gold-mid);
+  background: radial-gradient(circle at 36% 30%, var(--gem-hi) 0 9%, #d42a24 26%, #7a0f12 68%, #3a0507 100%);
+  box-shadow: 0 0 0 1px #000, inset 0 -2px 3px rgba(0,0,0,.55);
+  color: #ffe9df;
+  cursor: pointer;
+  transition: filter .15s, box-shadow .15s;
+}
+.gem svg { width: 11px; height: 11px; }
+.gem:hover { filter: brightness(1.25); box-shadow: 0 0 0 1px #000, 0 0 10px rgba(255,80,60,.45), inset 0 -2px 3px rgba(0,0,0,.5); }
+.gem:active { filter: brightness(.9); }
+.gem.dot { width: 10px; height: 10px; border-width: 1px; pointer-events: none; }
+
+/* Stone buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 4px 14px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 3px;
+  background: var(--grain), linear-gradient(#2a2b27, #191a17 55%, #141512);
+  box-shadow: inset 0 1px 0 rgba(255,236,190,.09), inset 0 -1px 0 rgba(0,0,0,.6), 0 1px 0 #000;
+  color: var(--gold);
+  font-family: var(--f-label);
+  font-size: 15px;
+  letter-spacing: var(--label-track);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color .15s, color .15s, box-shadow .15s;
+}
+.btn:hover { border-color: var(--gold-mid); color: #f3dca3; box-shadow: inset 0 1px 0 rgba(255,236,190,.12), inset 0 0 10px rgba(226,194,124,.12), 0 1px 0 #000; }
+.btn:active, .btn.is-pressed { background: var(--grain), linear-gradient(#121310, #1c1d19); box-shadow: inset 0 2px 4px rgba(0,0,0,.7); transform: translateY(1px); }
+.btn[aria-pressed="true"] { border-color: var(--gold-mid); background: var(--grain), linear-gradient(#3a2e18, #261d0f); color: #f6e2ae; }
+.btn:disabled { color: var(--dim); border-color: #2c2a24; cursor: not-allowed; box-shadow: none; }
+.btn.sm { min-height: 24px; padding: 2px 9px; font-size: 13px; }
+.btn.wide { width: 100%; }
+.btn svg { width: 14px; height: 14px; }
+
+/* Chips */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 6px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 999px;
+  background: #15140f;
+  font-size: 13px;
+  color: var(--cream);
+}
+.chip svg { width: 14px; height: 14px; color: var(--gold); }
+.chip.conc { border-color: #2c4a6e; background: #0f1824; }
+.chip.conc svg { color: var(--conc); }
+
+/* Medallion portraits (creature-type backdrops) */
+.med {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-family: var(--f-name);
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  border: 1.5px solid var(--gold-mid);
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 2px rgba(0,0,0,.35);
+}
+.med.humanoid { background: var(--creature-humanoid); }
+.med.beast { background: var(--creature-beast); }
+.med.undead { background: var(--creature-undead); }
+
+/* ── Play pieces ───────────────────────────────────── */
+.play {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 340px);
+  grid-template-areas: "rail stat init" "rail log init";
+  gap: 16px;
+  align-items: start;
+}
+.rail-wrap { grid-area: rail; }
+.statwin { grid-area: stat; width: 300px; }
+.initwin { grid-area: init; }
+.logwin { grid-area: log; }
+
+.rail { display: flex; flex-direction: column; gap: 6px; padding: 6px; }
+.tool {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--gold-deep);
+  border-radius: 3px;
+  background: var(--grain), linear-gradient(#22231f, #141512);
+  color: #cdb27a;
+  cursor: pointer;
+  padding: 0;
+}
+.tool svg { width: 20px; height: 20px; }
+.tool:hover { border-color: var(--gold-mid); color: var(--gold); }
+.tool[aria-pressed="true"] {
+  border-color: var(--gold);
+  color: #fff3d6;
+  background: radial-gradient(circle at 50% 40%, #5a1416, #2a0709 75%);
+  box-shadow: 0 0 0 1px #000, 0 0 10px rgba(226,194,124,.35), inset 0 0 6px rgba(0,0,0,.6);
+}
+
+/* Initiative */
+.round { text-align: center; color: var(--muted); font-size: 14px; padding: 6px 0 8px; }
+.round b { font-family: var(--f-num); color: var(--cream); font-weight: 700; }
+.ilist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.irow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px 22px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--panel-lo);
+}
+.irow.turn { background: linear-gradient(90deg, var(--wash-turn), #1a0a0a); border-color: rgba(200,31,34,.55); }
+.irow.turn::before {
+  content: "";
+  position: absolute;
+  left: -6px; top: 50%;
+  width: 10px; height: 10px;
+  transform: translateY(-50%) rotate(45deg);
+  background: radial-gradient(circle at 35% 30%, var(--gem-hi), var(--gem) 45%, var(--gem-deep));
+  border: 1px solid var(--gold-mid);
+  box-shadow: 0 0 6px rgba(255,80,60,.6);
+}
+.iname { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hp { display: flex; align-items: center; gap: 8px; margin-top: 3px; }
+.bar { flex: 1; height: 5px; background: #2a2620; border-radius: 1px; overflow: hidden; box-shadow: inset 0 0 0 1px #000; }
+.bar i { display: block; height: 100%; }
+.hpnum { font-size: 13px; color: var(--muted); }
+.init { font-size: 24px; font-weight: 700; text-align: right; color: var(--cream); }
+.cond { display: grid; place-items: center; width: 22px; height: 22px; color: var(--gold); border-radius: 50%; }
+.cond svg { width: 16px; height: 16px; }
+.cond.blue { color: var(--conc); }
+.cond.red { color: #e0605a; }
+.winft { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 2px 2px; }
+
+/* Stat block */
+.sb-sub { margin: 0 0 8px; font-style: italic; color: var(--muted); font-size: 14px; }
+.sb-row { display: flex; gap: 14px; padding: 6px 0; border-top: 1px solid #262219; font-size: 14px; }
+.sb-row b { color: var(--gold); font-weight: 500; font-family: var(--f-label); letter-spacing: var(--label-track); }
+.sb-abil { display: grid; grid-template-columns: repeat(6, 1fr); text-align: center; padding: 6px 0; border-block: 1px solid #262219; }
+.sb-abil span { display: block; font-family: var(--f-label); letter-spacing: var(--label-track); font-size: 12px; color: var(--gold); }
+.sb-abil .num { font-size: 16px; font-weight: 700; }
+.sb-abil small { color: var(--muted); font-size: 12px; }
+.atk { padding: 8px 0 4px; }
+.atk-name { font-weight: 700; }
+.atk-line { color: var(--muted); font-size: 14px; }
+.atk-btns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+
+/* Game log */
+.log { list-style: none; margin: 0; padding: 0; }
+.log li {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  border-bottom: 1px solid #1f1c16;
+}
+.log .med { width: 28px; height: 28px; font-size: 13px; }
+.log .what { font-size: 15px; min-width: 0; }
+.log .what b { font-weight: 500; }
+.log .what span { color: var(--muted); }
+.log .t { color: var(--dim); font-size: 12px; }
+.res {
+  min-width: 40px;
+  padding: 1px 8px;
+  text-align: center;
+  border: 1px solid var(--gold-mid);
+  border-radius: 3px;
+  background: linear-gradient(#1f1b12, #14120c);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--gold);
+  cursor: help;
+}
+.res.crit { border-color: var(--hp-full); color: #b8e39a; }
+.res.dmg { color: #f1a296; border-color: #7c3a32; }
+.compose { display: flex; gap: 8px; margin-top: 10px; }
+.field {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid #3a3122;
+  border-radius: 3px;
+  background: #080a0a;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.8);
+  color: var(--cream);
+}
+.field::placeholder { color: var(--dim); }
+.field:focus { border-color: var(--gold-mid); outline: none; box-shadow: inset 0 1px 3px rgba(0,0,0,.8), 0 0 0 1px rgba(226,194,124,.35); }
+
+/* ── Character sheet ───────────────────────────────── */
+.sheets { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.sheet-col { display: flex; flex-direction: column; gap: 8px; }
+.cap { font-size: 13px; color: var(--muted); text-shadow: 0 1px 2px #000; }
+.sheet.narrow { width: 320px; height: 440px; }
+.sheet.full { width: 680px; }
+.sheet .win-bd { padding: 0; display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.sheet.narrow .scrollbody { overflow-y: auto; flex: 1; min-height: 0; }
+.sheet .pinned { padding: 10px 12px 0; }
+
+.who { display: flex; gap: 12px; align-items: flex-start; }
+.portrait {
+  flex: none;
+  width: 64px; height: 64px;
+  display: grid; place-items: center;
+  border: 1.5px solid var(--gold-mid);
+  box-shadow: 0 0 0 1px #000, inset 0 0 0 2px #000;
+  background: radial-gradient(circle at 40% 35%, #3f6db0, var(--creature-humanoid) 60%, #1d3459);
+  font-family: var(--f-name);
+  font-size: 30px;
+  font-weight: 700;
+  color: #fff;
+}
+.sheet.full .portrait { width: 84px; height: 84px; font-size: 40px; }
+.who-txt { flex: 1; min-width: 0; }
+.cname { margin: 0; font-family: var(--f-name); font-weight: 700; font-size: 21px; line-height: 1.1; color: #f3dca3; text-wrap: balance; }
+.sheet.full .cname { font-size: 32px; }
+.csub { margin: 3px 0 6px; color: var(--muted); font-size: 14px; }
+.sheet.full .csub { font-size: 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.edit-tg { align-self: flex-start; }
+
+.tabrow {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-top: 10px;
+  border-bottom: 1px solid var(--gold-deep);
+}
+.tabs {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scroll-behavior: smooth;
+}
+.tabnav {
+  flex: none;
+  width: 22px;
+  padding: 0;
+  margin-bottom: 4px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--gold-deep);
+  border-radius: 3px;
+  background: var(--grain), linear-gradient(#22231f, #141512);
+  color: var(--gold);
+  cursor: pointer;
+}
+.tabnav svg { width: 14px; height: 14px; }
+.tabnav:hover { border-color: var(--gold-mid); }
+.tab {
+  position: relative;
+  flex: none;
+  padding: 5px 10px 10px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  color: #bfa36c;
+  font-family: var(--f-label);
+  font-size: 15px;
+  line-height: 1.2;
+  letter-spacing: var(--label-track);
+  cursor: pointer;
+}
+.tab:hover { color: var(--gold); }
+.tab[aria-selected="true"] {
+  color: #f6e2ae;
+  border-color: var(--gold-deep);
+  background: linear-gradient(#1d1f1c, var(--panel));
+}
+.tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 8px; right: 8px; bottom: 4px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gem) 20%, var(--gem) 80%, transparent);
+}
+.tab[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  left: 50%; bottom: 2px;
+  width: 6px; height: 6px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--gem);
+  border: 1px solid var(--gold-mid);
+  z-index: 1;
+}
+
+.tabpanel { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.placeholder { color: var(--muted); font-style: italic; padding: 24px 4px; }
+
+/* Boxes: engraved, notched corners like a printed sheet */
+.box {
+  position: relative;
+  border: 1px solid var(--gold-deep);
+  background: linear-gradient(#0d1010, #0b0e0e);
+  box-shadow: inset 0 0 0 2px #070909, inset 0 0 0 3px rgba(176,138,74,.28);
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+  text-align: center;
+  padding: 5px 4px 6px;
+}
+.box .lbl { display: block; font-size: 12px; line-height: 1.2; }
+.box .big { display: block; font-size: 26px; font-weight: 700; line-height: 1.15; color: var(--cream); }
+.sheet.full .box .big { font-size: 34px; }
+.box .unit { font-size: .55em; font-weight: 500; color: var(--muted); }
+
+.stats { display: grid; grid-template-columns: 64px repeat(4, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+.sheet.full .stats { grid-template-columns: 96px 1.8fr repeat(3, 1fr); gap: 8px; }
+.sheet.narrow .stats .hpbox { grid-column: 2 / -1; grid-row: 1; }
+.sheet.narrow .stats { grid-template-columns: 64px repeat(3, minmax(0, 1fr)); }
+.sheet.narrow .stats .ac { grid-row: 1 / span 2; }
+
+.ac { display: grid; place-items: center; position: relative; }
+.ac svg { width: 100%; height: auto; max-height: 86px; }
+.sheet.full .ac svg { max-height: 104px; }
+.ac .ac-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 6px; }
+.ac .lbl { font-size: 12px; }
+.ac .big { font-size: 26px; font-weight: 700; line-height: 1; color: var(--cream); }
+.sheet.full .ac .big { font-size: 36px; }
+
+.hpbox { text-align: left; padding: 5px 10px 8px; display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: end; }
+.hpbox .lbl { grid-column: 1 / -1; text-align: center; }
+.hpbox .big { text-align: left; }
+.hpbox .bar { grid-column: 1; height: 6px; }
+.temp { grid-row: 2 / span 2; grid-column: 2; text-align: center; border-left: 1px solid #2b261c; padding-left: 10px; }
+.temp .lbl { font-size: 11px; }
+.temp .num { font-size: 20px; font-weight: 700; }
+
+.vitals { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 6px 10px; text-align: left; }
+.vitals .grp { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
+.vitals .num { font-size: 18px; font-weight: 700; color: var(--cream); }
+.pips { display: flex; gap: 4px; }
+.pip { width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--muted); }
+.senses { text-align: center; color: var(--muted); font-size: 14px; }
+
+.cols { display: flex; flex-direction: column; gap: 10px; }
+.sheet.full .cols { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; align-items: start; }
+.abil { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.sheet.full .abil { grid-template-columns: 1fr; gap: 8px; }
+.ab .mod { display: block; font-size: 24px; font-weight: 700; line-height: 1.1; color: var(--cream); }
+.sheet.full .ab { display: grid; grid-template-columns: 1fr 70px; grid-template-rows: auto auto auto; text-align: center; padding: 4px 6px 6px; }
+.sheet.full .ab .lbl { grid-column: 1 / -1; }
+.sheet.full .ab .mod { font-size: 34px; }
+.score {
+  display: inline-block;
+  min-width: 38px;
+  margin: 2px auto 0;
+  padding: 0 8px;
+  border: 1px solid #3b3222;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.save { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; font-size: 13px; color: var(--muted); }
+.save .num { color: var(--cream); font-size: 15px; font-weight: 700; }
+.sheet.full .ab .save { grid-column: 2; grid-row: 2 / span 2; flex-direction: column; gap: 2px; margin: 0; border-left: 1px solid #2b261c; }
+.sheet.full .ab .score { grid-column: 1; justify-self: center; }
+
+.prof { width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid #8a7a5c; flex: none; }
+.prof.on { background: radial-gradient(circle at 35% 30%, #fff1c6, var(--gold) 45%, var(--gold-mid)); border-color: var(--gold-mid); }
+.prof.exp { background: radial-gradient(circle at 35% 30%, #fff1c6, var(--gold) 45%, var(--gold-mid)); border-color: var(--gold-mid); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--gold-mid); }
+
+.skillbox { padding: 0; text-align: left; }
+.skillbox > .lbl { padding: 6px 10px 4px; text-align: center; border-bottom: 1px solid #262219; }
+.skills { list-style: none; margin: 0; padding: 2px 0; }
+.sk {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) 34px 54px;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 8px 2px 10px;
+  font-size: 15px;
+}
+.sk.on { background: linear-gradient(90deg, var(--wash-prof), transparent 90%); }
+.sk-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sk-ab { font-size: 12px; color: var(--dim); letter-spacing: .04em; }
+.roll {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 0 6px;
+  height: 24px;
+  border: 1px solid var(--gold-deep);
+  border-radius: 3px;
+  background: linear-gradient(#1c1a14, #121109);
+  color: var(--cream);
+  cursor: pointer;
+  font-family: var(--f-num);
+  font-variant-numeric: lining-nums tabular-nums;
+  font-weight: 700;
+  font-size: 16px;
+}
+.roll svg { width: 13px; height: 13px; color: var(--gold-mid); flex: none; }
+.roll:hover { border-color: var(--gold); color: #fff3d6; }
+.roll:hover svg { color: var(--gold); }
+.passives { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.passives .big { font-size: 22px; }
+.sheet.full .passives .big { font-size: 28px; }
+
+/* ── Scroll tooltip ────────────────────────────────── */
+.scroll {
+  position: absolute;
+  z-index: 50;
+  max-width: 260px;
+  padding: 7px 18px 8px;
+  color: var(--ink);
+  font-family: var(--f-num);
+  font-size: 15px;
+  line-height: 1.3;
+  background:
+    linear-gradient(rgba(120,80,30,.12), transparent 30%, transparent 70%, rgba(120,80,30,.16)),
+    radial-gradient(ellipse at 30% 40%, #f1e3bb, var(--parch) 55%, var(--parch-lo));
+  border-block: 1px solid #a58552;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,.6));
+  pointer-events: none;
+}
+.scroll::before, .scroll::after {
+  content: "";
+  position: absolute;
+  top: -4px; bottom: -4px;
+  width: 9px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #7c5a2c, #d9bf86 35%, #f3e2b6 50%, #b8955b 75%, #6b4a20);
+  box-shadow: 0 0 0 1px rgba(60,36,10,.6);
+}
+.scroll::before { left: -4px; }
+.scroll::after { right: -4px; }
+.scroll b { font-weight: 700; }
+.scroll .faint { color: #6a5233; font-size: 14px; }
+.scroll.open { animation: unroll .26s ease-out both; }
+@keyframes unroll {
+  from { clip-path: inset(-6px 46% -6px 46%); }
+  to { clip-path: inset(-6px -6px -6px -6px); }
+}
+.scroll.pinned-demo { position: absolute; right: 40px; bottom: calc(100% + 4px); white-space: nowrap; }
+
+/* ── Controls ──────────────────────────────────────── */
+.kit { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; align-items: start; }
+.states { display: grid; grid-template-columns: max-content 1fr; gap: 10px 14px; align-items: center; }
+.states > span { font-size: 13px; color: var(--muted); }
+.rowx { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 15px; }
+.check input { appearance: none; width: 16px; height: 16px; margin: 0; border: 1px solid var(--gold-mid); border-radius: 2px; background: #080a0a; display: grid; place-items: center; cursor: pointer; }
+.check input:checked::after { content: ""; width: 8px; height: 8px; transform: rotate(45deg); background: radial-gradient(circle at 35% 30%, var(--gem-hi), var(--gem) 50%, var(--gem-deep)); }
+.switch { appearance: none; position: relative; width: 34px; height: 18px; margin: 0; border: 1px solid var(--gold-deep); border-radius: 999px; background: #0a0c0c; cursor: pointer; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: #6b6150; transition: transform .15s, background .15s; }
+.switch:checked { border-color: var(--gold-mid); background: #241c0e; }
+.switch:checked::after { transform: translateX(16px); background: radial-gradient(circle at 35% 30%, #fff1c6, var(--gold) 50%, var(--gold-mid)); }
+
+/* Type + palette */
+.spec { display: flex; flex-direction: column; }
+.spec-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid #1f1c16; }
+.spec-row:last-child { border-bottom: 0; }
+.spec-role { font-size: 13px; color: var(--muted); }
+.spec-role em { display: block; font-style: normal; color: var(--dim); font-size: 12px; }
+.spec .s-title { font-family: var(--f-title); letter-spacing: var(--title-track); color: var(--gold); font-size: 22px; }
+.spec .s-label { font-family: var(--f-label); letter-spacing: var(--label-track); color: var(--gold); font-size: 15px; }
+.spec .s-name { font-family: var(--f-name); font-weight: 700; color: #f3dca3; font-size: 28px; line-height: 1.1; }
+.spec .s-num { font-family: var(--f-num); font-weight: 700; font-size: 34px; line-height: 1; font-variant-numeric: lining-nums tabular-nums; }
+.spec .s-body { font-size: 15px; max-width: 60ch; }
+.sw { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.sw div { border: 1px solid #000; box-shadow: inset 0 0 0 1px rgba(176,138,74,.35); border-radius: 3px; overflow: hidden; }
+.sw i { display: block; height: 34px; }
+.sw p { margin: 0; padding: 5px 7px 6px; font-size: 12px; line-height: 1.35; background: #0b0d0d; }
+.sw code { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: var(--muted); }
+.sw .cr { color: var(--dim); }
+
+.about { max-width: 760px; }
+.about ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.about li { color: var(--cream); }
+.about li span { color: var(--muted); }
+.about p { margin: 0; color: var(--muted); }
+
+@media (max-width: 1100px) {
+  .play { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "rail stat" "rail init" "rail log"; }
+  .statwin { width: auto; max-width: 340px; }
+}
+@media (max-width: 760px) {
+  .sheet.full { width: 100%; }
+  .sheet.full .cols { grid-template-columns: 1fr; }
+  .sheet.full .abil { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sheet.full .stats { grid-template-columns: 80px repeat(3, minmax(0, 1fr)); }
+  .sheet.full .stats .hpbox { grid-column: 2 / -1; grid-row: 1; }
+  .sheet.full .stats .ac { grid-row: 1 / span 2; }
+}
+@media (max-width: 560px) {
+  .play { grid-template-columns: minmax(0, 1fr); grid-template-areas: "rail" "stat" "init" "log"; }
+  .rail { flex-direction: row; flex-wrap: wrap; }
+  .log li { grid-template-columns: 28px minmax(0, 1fr) auto; }
+  .log .t { display: none; }
+  .typepick { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll.open { animation: none; }
+  * { transition: none !important; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-pointer" viewBox="0 0 24 24"><path d="M5 3l13 7-6 1.6L9.5 18z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V5.5a1.5 1.5 0 013 0V11m0-6.5a1.5 1.5 0 013 0V11m0-5a1.5 1.5 0 013 0v7c0 4-2.5 7-6.5 7S6 17.5 5 15l-1.5-3.5a1.4 1.4 0 012.4-1.4L8 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 16L16 3l5 5L8 21zM7 12l2 2M10 9l2 2M13 6l2 2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9.3h16M4 14.6h16M9.3 4v16M14.6 4v16" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+    <symbol id="i-quill" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16zM14 7l3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-fog" viewBox="0 0 24 24"><path d="M7 17h10a4 4 0 00.5-8 5.5 5.5 0 00-10.6 1.5A3.3 3.3 0 007 17zM5 20.5h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-d20" viewBox="0 0 24 24"><path d="M12 2.5l8.5 5v9l-8.5 5-8.5-5v-9zM12 7l5 8.5H7zM12 2.5V7M3.5 7.5L7 15.5M20.5 7.5L17 15.5M7 15.5l5 6 5-6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zM12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .6-4.5 4 1.3 6L12 16.2 6.6 19.2l1.3-6-4.5-4 6-.6z" fill="currentColor"/></symbol>
+    <symbol id="i-swirl" viewBox="0 0 24 24"><path d="M12 12a2 2 0 112 2 4 4 0 11-4-4 6 6 0 116 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 2.5V11c0 5-3.2 8.3-7 10-3.8-1.7-7-5-7-10V5.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-prone" viewBox="0 0 24 24"><path d="M3 18h18M6 14.5h9l3-3M8 11a2 2 0 100-4 2 2 0 000 4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <h1 class="brand">Gilt &amp; Stone <small>Pocket Plane skin kit · draft 2</small></h1>
+  <div class="typepick" role="group" aria-label="Type pairing">
+    <span>Type</span>
+    <div class="seg">
+      <button class="btn sm" id="type-book" data-type="book" aria-pressed="true">Old book</button>
+      <button class="btn sm" id="type-alegreya" data-type="alegreya" aria-pressed="false">Alegreya</button>
+      <button class="btn sm" id="type-cinzel" data-type="cinzel" aria-pressed="false">Cinzel</button>
+    </div>
+  </div>
+</header>
+
+<section class="sect"><h2>What to check</h2></section>
+<div class="win about">
+  <div class="win-bd">
+    <p>The round-01 A skin and round-02 sheet built for real: browser fonts, CSS frames, SVG corners. Every size here is the size it will be in the app.</p>
+    <ul>
+      <li>Switch the type pairing in the top bar. <span>Titles and labels change; numbers and body follow the pairing.</span></li>
+      <li>Hover or tab to any boxed number, roll button or condition icon. <span>The scroll tooltip unrolls after the shared 400 ms delay.</span></li>
+      <li>The narrow sheet is a true 320 × 440 window, today's default. <span>Compare it with the enlarged one beside it.</span></li>
+      <li>Button states, gem close, tabs and the active tool. <span>Compact rows come from concept B, the tool highlight and Game log from C.</span></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── Play pieces ── -->
+<section class="sect"><h2>At the table</h2></section>
+<div class="play">
+  <div class="rail-wrap win">
+    <div class="rail" role="toolbar" aria-label="Map tools">
+      <button class="tool" id="tool-select" aria-pressed="true" data-tip="<b>Select</b><br><span class='faint'>Move and pick tokens · V</span>"><svg><use href="#i-pointer"/></svg></button>
+      <button class="tool" id="tool-pan" aria-pressed="false" data-tip="<b>Pan</b><br><span class='faint'>Hold Space to pan from any tool</span>"><svg><use href="#i-hand"/></svg></button>
+      <button class="tool" id="tool-measure" aria-pressed="false" data-tip="<b>Measure</b><br><span class='faint'>5 ft per square</span>"><svg><use href="#i-ruler"/></svg></button>
+      <button class="tool" id="tool-grid" aria-pressed="false" data-tip="<b>Grid</b>"><svg><use href="#i-grid"/></svg></button>
+      <button class="tool" id="tool-draw" aria-pressed="false" data-tip="<b>Draw</b>"><svg><use href="#i-quill"/></svg></button>
+      <button class="tool" id="tool-fog" aria-pressed="false" data-tip="<b>Fog of war</b><br><span class='faint'>Reveal and hide areas</span>"><svg><use href="#i-fog"/></svg></button>
+      <button class="tool" id="tool-dice" aria-pressed="false" data-tip="<b>Dice tray</b>"><svg><use href="#i-d20"/></svg></button>
+      <button class="tool" id="tool-prefs" aria-pressed="false" data-tip="<b>Preferences</b>"><svg><use href="#i-gear"/></svg></button>
+    </div>
+  </div>
+
+  <div class="win statwin">
+    <div class="win-hd"><h3>Goblin</h3><button class="gem" aria-label="Close Goblin"><svg><use href="#i-x"/></svg></button></div>
+    <div class="win-bd">
+      <p class="sb-sub">Small humanoid (goblinoid), neutral evil</p>
+      <div class="sb-row"><span><b>AC</b> <span class="num">15</span></span><span><b>HP</b> <span class="num">7</span> <span style="color:var(--muted)">(2d6)</span></span><span><b>Speed</b> <span class="num">30</span> ft</span></div>
+      <div class="sb-abil">
+        <div><span>Str</span><b class="num">8</b> <small>−1</small></div>
+        <div><span>Dex</span><b class="num">14</b> <small>+2</small></div>
+        <div><span>Con</span><b class="num">10</b> <small>+0</small></div>
+        <div><span>Int</span><b class="num">10</b> <small>+0</small></div>
+        <div><span>Wis</span><b class="num">8</b> <small>−1</small></div>
+        <div><span>Cha</span><b class="num">8</b> <small>−1</small></div>
+      </div>
+      <div class="atk">
+        <div class="atk-name">Scimitar</div>
+        <div class="atk-line"><span class="num">+4</span> · <span class="num">1d6+2</span> slashing</div>
+        <div class="atk-btns">
+          <button class="btn sm" id="gob-atk">Attack</button>
+          <button class="btn sm" id="gob-dmg">Damage</button>
+          <button class="btn sm" id="gob-both">Attack + damage</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="win initwin">
+    <div class="win-hd"><h3>Initiative</h3><button class="gem" aria-label="Close Initiative"><svg><use href="#i-x"/></svg></button></div>
+    <div class="win-bd">
+      <div class="round">Round <b>3</b></div>
+      <ol class="ilist" id="ilist"></ol>
+      <div class="winft">
+        <label class="check" for="auto-adv"><input type="checkbox" id="auto-adv" checked> Auto-advance</label>
+        <button class="btn" id="next-turn">Next turn</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="win logwin">
+    <div class="win-hd"><h3>Game log</h3><span class="meta">Session 14</span><button class="gem" aria-label="Close Game log"><svg><use href="#i-x"/></svg></button></div>
+    <div class="win-bd">
+      <ul class="log">
+        <li><span class="med humanoid">T</span><span class="what"><b>Thorne</b> <span>· Perception check</span></span><span class="t num">21:13</span><span class="res num" tabindex="0" data-tip="<b>Perception</b> · Thorne<br>d20 (18) + 4 = <b>22</b>">22</span></li>
+        <li><span class="med humanoid">M</span><span class="what"><b>Mira</b> <span>· Longbow attack vs Goblin</span></span><span class="t num">21:14</span><span class="res num crit" tabindex="0" data-tip="<b>Longbow attack</b> · Mira<br>d20 (<b>20</b>) + 9 = 29 · <b>critical hit</b><br><span class='faint'>Archery +2 included</span>">29</span></li>
+        <li><span class="med humanoid">M</span><span class="what"><b>Mira</b> <span>· Longbow damage, piercing</span></span><span class="t num">21:14</span><span class="res num dmg" tabindex="0" data-tip="<b>Longbow damage</b> · critical<br>2d8 (5, 7) + 4 = <b>16</b> piercing<br><span class='faint'>Hunter's Mark 2d6 rolled separately</span>">16</span></li>
+        <li><span class="med humanoid">G</span><span class="what"><b>Goblin</b> <span>· Dexterity save vs DC 14</span></span><span class="t num">21:15</span><span class="res num" tabindex="0" data-tip="<b>Dexterity save</b> · Goblin<br>d20 (6) + 2 = <b>8</b> · fails DC 14">8</span></li>
+      </ul>
+      <form class="compose" id="compose">
+        <input class="field" id="compose-input" placeholder="Roll dice or send a message, e.g. /r 2d6+3" aria-label="Roll dice or send a message">
+        <button class="btn" id="compose-send" type="submit"><svg><use href="#i-send"/></svg>Send</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ── Character sheet ── -->
+<section class="sect"><h2>Character sheet</h2></section>
+<div class="sheets">
+  <div class="sheet-col">
+    <span class="cap">Default window · 320 × 440 · body scrolls under the pinned header</span>
+    <div class="win sheet narrow" data-sheet="narrow"></div>
+  </div>
+  <div class="sheet-col">
+    <span class="cap">Enlarged window · 680 wide · one tooltip pinned open for review</span>
+    <div class="win sheet full" data-sheet="full"></div>
+  </div>
+</div>
+
+<!-- ── Controls ── -->
+<section class="sect"><h2>Controls</h2></section>
+<div class="kit">
+  <div class="win">
+    <div class="win-hd"><h3>Buttons</h3><button class="gem" aria-label="Close Buttons"><svg><use href="#i-x"/></svg></button></div>
+    <div class="win-bd states">
+      <span>Rest</span><div><button class="btn" id="b-rest">Roll attack</button></div>
+      <span>Hover</span><div><button class="btn" id="b-hover" style="border-color:var(--gold-mid);color:#f3dca3;box-shadow:inset 0 1px 0 rgba(255,236,190,.12),inset 0 0 10px rgba(226,194,124,.12),0 1px 0 #000">Roll attack</button></div>
+      <span>Pressed</span><div><button class="btn is-pressed" id="b-pressed">Roll attack</button></div>
+      <span>On</span><div><button class="btn" id="b-on" aria-pressed="true">Public roll</button></div>
+      <span>Disabled</span><div><button class="btn" id="b-off" disabled>Approve</button></div>
+      <span>Small</span><div class="rowx"><button class="btn sm" id="b-sm1">Short rest</button><button class="btn sm" id="b-sm2">Long rest</button></div>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="win-hd"><h3>Inputs &amp; chips</h3><button class="gem" aria-label="Close Inputs and chips"><svg><use href="#i-x"/></svg></button></div>
+    <div class="win-bd states">
+      <span>Gems</span><div class="rowx"><button class="gem" aria-label="Close example"><svg><use href="#i-x"/></svg></button><span class="gem dot" aria-hidden="true"></span><span style="font-size:13px;color:var(--muted)">close · unread dot</span></div>
+      <span>Check</span><div><label class="check" for="c-dm"><input type="checkbox" id="c-dm" checked> DM only</label></div>
+      <span>Switch</span><div class="rowx"><input type="checkbox" class="switch" id="s-darkness" checked aria-label="Sees through magical darkness"><label for="s-darkness" style="font-size:14px">Sees through magical darkness</label></div>
+      <span>Field</span><div><input class="field" id="f-hp" value="38" aria-label="Hit points" style="width:90px"></div>
+      <span>Chips</span><div class="chips"><span class="chip"><svg><use href="#i-star"/></svg>Blessed</span><span class="chip conc"><svg><use href="#i-swirl"/></svg>Concentrating</span><span class="chip"><svg><use href="#i-prone"/></svg>Prone</span></div>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="win-hd"><h3>Type</h3><span class="meta" id="type-name">Alegreya</span></div>
+    <div class="win-bd spec">
+      <div class="spec-row"><span class="spec-role">Window title<em id="tn-title"></em></span><span class="s-title">Initiative</span></div>
+      <div class="spec-row"><span class="spec-role">Label, tab, button<em id="tn-label"></em></span><span class="s-label">Armor Class · Saving Throws</span></div>
+      <div class="spec-row"><span class="spec-role">Name<em id="tn-name"></em></span><span class="s-name">Mira Thornwood</span></div>
+      <div class="spec-row"><span class="spec-role">Numbers<em id="tn-num"></em></span><span class="s-num">16 · 38 / 44 · +10</span></div>
+      <div class="spec-row"><span class="spec-role">Body, rows<em id="tn-body"></em></span><span class="s-body">You have advantage on Dexterity (Stealth) checks while you are lightly obscured by foliage, heavy rain, falling snow or mist.</span></div>
+    </div>
+  </div>
+
+  <div class="win">
+    <div class="win-hd"><h3>Palette</h3><span class="meta">contrast on panel</span></div>
+    <div class="win-bd"><div class="sw" id="swatches"></div></div>
+  </div>
+</div>
+
+<div class="scroll" id="tip" role="tooltip" hidden></div>
+
+<script>
+(() => {
+  const ABIL = [
+    ["Strength", "str", 10, true], ["Dexterity", "dex", 18, true], ["Constitution", "con", 14, false],
+    ["Intelligence", "int", 12, false], ["Wisdom", "wis", 16, false], ["Charisma", "cha", 8, false],
+  ];
+  const PB = 3;
+  const mod = (s) => Math.floor((s - 10) / 2);
+  const sign = (n) => (n >= 0 ? "+" : "−") + Math.abs(n);
+  const score = Object.fromEntries(ABIL.map(([, k, s]) => [k, s]));
+  // [name, ability, 0 none | 1 proficient | 2 expertise]
+  const SKILLS = [
+    ["Acrobatics", "dex", 0], ["Animal Handling", "wis", 1], ["Arcana", "int", 0], ["Athletics", "str", 0],
+    ["Deception", "cha", 0], ["History", "int", 0], ["Insight", "wis", 0], ["Intimidation", "cha", 0],
+    ["Investigation", "int", 0], ["Medicine", "wis", 0], ["Nature", "int", 1], ["Perception", "wis", 1],
+    ["Performance", "cha", 0], ["Persuasion", "cha", 0], ["Religion", "int", 0], ["Sleight of Hand", "dex", 0],
+    ["Stealth", "dex", 2], ["Survival", "wis", 1],
+  ];
+  const skillBonus = ([, ab, p]) => mod(score[ab]) + p * PB;
+  const sk = (name) => skillBonus(SKILLS.find((s) => s[0] === name));
+  const profWord = ["", "proficient", "expertise"];
+  const tipFor = ([name, ab, p]) => {
+    const parts = [`${ab.toUpperCase()} ${sign(mod(score[ab]))}`];
+    if (p) parts.push(`${p === 2 ? "expertise" : "proficiency"} ${sign(p * PB)}`);
+    return `<b>${name}</b> ${sign(skillBonus([name, ab, p]))}<br><span class='faint'>${parts.join(" · ")}</span><br><span class='faint'>Click to roll · right-click for advantage</span>`;
+  };
+
+  const dice = '<svg aria-hidden="true"><use href="#i-d20"/></svg>';
+
+  function sheetHTML(kind) {
+    const full = kind === "full";
+    const id = (s) => `${kind}-${s}`;
+    const abil = ABIL.map(([name, k, s, sp]) => {
+      const sv = mod(s) + (sp ? PB : 0);
+      return `<div class="box ab">
+        <span class="lbl">${full ? name : name.slice(0, 3)}</span>
+        <span class="mod num" tabindex="0" data-tip="<b>${name} check</b> ${sign(mod(s))}<br><span class='faint'>Score ${s}</span>">${sign(mod(s))}</span>
+        <span class="score num">${s}</span>
+        <span class="save"><span class="prof${sp ? " on" : ""}" aria-label="${sp ? "Proficient" : "Not proficient"}"></span>${full ? "Save" : ""} <button class="roll" id="${id("save-" + k)}" data-tip="<b>${name} save</b> ${sign(sv)}${sp ? "<br><span class='faint'>proficiency +3</span>" : ""}">${full ? "" : ""}${sign(sv)}</button></span>
+      </div>`;
+    }).join("");
+    const skills = SKILLS.map((s) => {
+      const [name, ab, p] = s;
+      const pinned = full && name === "Stealth";
+      return `<li class="sk${p ? " on" : ""}" style="position:relative">
+        <span class="prof${p === 2 ? " exp" : p ? " on" : ""}" aria-label="${profWord[p] || "not proficient"}"></span>
+        <span class="sk-name">${name}</span>
+        <span class="sk-ab">${ab.toUpperCase()}</span>
+        <button class="roll" id="${id("skill-" + ab + "-" + name.replace(/\s/g, ""))}" data-tip="${tipFor(s)}">${dice}${sign(skillBonus(s))}</button>
+        ${pinned ? `<div class="scroll pinned-demo" aria-hidden="true"><b>Stealth</b> +10 · expertise<br><span class="faint">DEX +4 · expertise +6</span></div>` : ""}
+      </li>`;
+    }).join("");
+    const tabs = ["Main", "Actions", "Features", "Inventory", "Notes", "Reminders", "Macros", "Trophies"];
+    return `
+      <div class="win-hd"><h3>Character sheet</h3><button class="gem" aria-label="Close character sheet"><svg><use href="#i-x"/></svg></button></div>
+      <div class="win-bd">
+        <div class="pinned">
+          <div class="who">
+            <div class="portrait" aria-hidden="true">M</div>
+            <div class="who-txt">
+              <p class="cname">Mira Thornwood</p>
+              <p class="csub">Level 5 Ranger · Wood Elf${full ? " · Outlander" : ""}</p>
+              <div class="chips">
+                <span class="chip" tabindex="0" data-tip="<b>Blessed</b><br><span class='faint'>+1d4 to attacks and saves · 7 rounds left</span>"><svg><use href="#i-star"/></svg>Blessed</span>
+                <span class="chip conc" tabindex="0" data-tip="<b>Concentrating</b> · Hunter's Mark<br><span class='faint'>On the Goblin · 58 min left</span>"><svg><use href="#i-swirl"/></svg>${full ? "Concentrating" : "Conc."}</span>
+              </div>
+            </div>
+            <button class="btn sm edit-tg" id="${id("edit")}" aria-pressed="false">Edit</button>
+          </div>
+          <div class="tabrow">
+            <button class="tabnav" data-dir="-1" aria-label="Earlier tabs" hidden><svg style="transform:scaleX(-1)"><use href="#i-chev"/></svg></button>
+            <div class="tabs" role="tablist" aria-label="Sheet tabs">
+              ${tabs.map((t, i) => `<button class="tab" role="tab" id="${id("tab-" + t.toLowerCase())}" aria-selected="${i === 0}" data-tab="${t}">${t}</button>`).join("")}
+            </div>
+            <button class="tabnav" data-dir="1" aria-label="More tabs" hidden><svg><use href="#i-chev"/></svg></button>
+          </div>
+        </div>
+        <div class="scrollbody">
+          <div class="tabpanel" data-panel="Main">
+            <div class="stats">
+              <div class="ac" tabindex="0" data-tip="<b>Armor Class</b> 16<br><span class='faint'>Studded leather 12 + DEX 4</span>">
+                <svg viewBox="0 0 100 112" aria-hidden="true"><path d="M50 4L94 17V52C94 81 73 98 50 108 27 98 6 81 6 52V17Z" fill="#0b0e0e" stroke="#b08a4a" stroke-width="2.5"/><path d="M50 11L87 22V52C87 76 70 91 50 100 30 91 13 76 13 52V22Z" fill="none" stroke="#5e4426" stroke-width="1.5"/></svg>
+                <div class="ac-in"><span class="lbl">${full ? "Armor Class" : "AC"}</span><span class="big num">16</span></div>
+              </div>
+              <div class="box hpbox" tabindex="0" data-tip="<b>Hit points</b> 38 of 44<br><span class='faint'>Temp 5 is lost first</span>">
+                <span class="lbl">Hit Points</span>
+                <span class="big num">38 <span class="unit">/ 44</span></span>
+                <span class="bar"><i style="width:86%;background:var(--hp-full)"></i></span>
+                <span class="temp"><span class="lbl">Temp</span><span class="num">5</span></span>
+              </div>
+              <div class="box"><span class="lbl">Speed</span><span class="big num">35<span class="unit"> ft</span></span></div>
+              <div class="box"><span class="lbl">${full ? "Initiative" : "Init"}</span><span class="big num">+4</span></div>
+              <div class="box"><span class="lbl">${full ? "Proficiency" : "Prof"}</span><span class="big num">+3</span></div>
+            </div>
+            <div class="box vitals">
+              <span class="grp"><span class="lbl">Hit Dice</span><span class="num">3 / 5</span><span>d10</span></span>
+              <span class="grp"><span class="lbl">Death Saves</span><span class="pips" aria-label="0 successes"><i class="pip"></i><i class="pip"></i><i class="pip"></i></span><span class="pips" aria-label="0 failures" style="margin-left:6px"><i class="pip" style="border-color:#8a3a33"></i><i class="pip" style="border-color:#8a3a33"></i><i class="pip" style="border-color:#8a3a33"></i></span></span>
+            </div>
+            <div class="senses">Vision normal · Darkvision 60 ft</div>
+            <div class="cols">
+              <div class="abil">${abil}</div>
+              <div style="display:flex;flex-direction:column;gap:10px;min-width:0">
+                <div class="box skillbox"><span class="lbl">Skills</span><ul class="skills">${skills}</ul></div>
+                <div class="passives">
+                  <div class="box"><span class="lbl">${full ? "Passive Perception" : "Perc."}</span><span class="big num">${10 + sk("Perception")}</span></div>
+                  <div class="box"><span class="lbl">${full ? "Passive Investigation" : "Invest."}</span><span class="big num">${10 + sk("Investigation")}</span></div>
+                  <div class="box"><span class="lbl">${full ? "Passive Insight" : "Insight"}</span><span class="big num">${10 + sk("Insight")}</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tabpanel" data-panel="other" hidden><p class="placeholder"></p></div>
+        </div>
+      </div>`;
+  }
+
+  document.querySelectorAll("[data-sheet]").forEach((el) => {
+    el.innerHTML = sheetHTML(el.dataset.sheet);
+    el.addEventListener("click", (e) => {
+      const tab = e.target.closest(".tab");
+      if (tab) {
+        el.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+        const main = tab.dataset.tab === "Main";
+        el.querySelector('[data-panel="Main"]').hidden = !main;
+        const other = el.querySelector('[data-panel="other"]');
+        other.hidden = main;
+        other.querySelector("p").textContent = `${tab.dataset.tab} isn't in this kit yet. Main shows the box and row styles every tab will share.`;
+      }
+      const edit = e.target.closest(".edit-tg");
+      if (edit) edit.setAttribute("aria-pressed", String(edit.getAttribute("aria-pressed") !== "true"));
+      const nav = e.target.closest(".tabnav");
+      if (nav) strip.scrollBy({ left: Number(nav.dataset.dir) * 140 });
+    });
+    // Tab strip: wheel scrolls sideways, arrows show only when tabs overflow
+    const strip = el.querySelector(".tabs");
+    const [prev, next] = el.querySelectorAll(".tabnav");
+    const sync = () => {
+      const max = strip.scrollWidth - strip.clientWidth;
+      prev.hidden = strip.scrollLeft <= 1;
+      next.hidden = strip.scrollLeft >= max - 1;
+    };
+    strip.addEventListener("wheel", (e) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      if (strip.scrollWidth <= strip.clientWidth) return;
+      e.preventDefault();
+      strip.scrollBy({ left: e.deltaY, behavior: "auto" });
+    }, { passive: false });
+    strip.addEventListener("scroll", sync, { passive: true });
+    new ResizeObserver(sync).observe(strip);
+    sync();
+  });
+
+  // Initiative
+  const ROWS = [
+    ["Thorne", "humanoid", 21, 32, 32, null],
+    ["Mira", "humanoid", 18, 38, 44, ["swirl", "blue", "<b>Concentrating</b> · Hunter's Mark"]],
+    ["Goblin", "humanoid", 15, 7, 7, null],
+    ["Dire Wolf", "beast", 13, 21, 37, ["prone", "", "<b>Prone</b><br><span class='faint'>Melee attacks against it have advantage</span>"]],
+    ["Bram", "humanoid", 11, 11, 26, ["shield", "", "<b>Dodging</b><br><span class='faint'>Attacks against him have disadvantage</span>"]],
+    ["Skeleton", "undead", 8, 4, 13, null],
+  ];
+  const hpColor = (c, m) => (c / m > 0.5 ? "var(--hp-full)" : c / m > 0.25 ? "var(--hp-bloodied)" : "var(--hp-down)");
+  let turn = 1;
+  const ilist = document.getElementById("ilist");
+  function renderInit() {
+    ilist.innerHTML = ROWS.map(([n, t, i, c, m, cond], idx) => `
+      <li class="irow${idx === turn ? " turn" : ""}" ${idx === turn ? 'aria-current="true"' : ""}>
+        <span class="med ${t}" aria-hidden="true">${n[0]}</span>
+        <div style="min-width:0"><div class="iname">${n}</div>
+          <div class="hp"><span class="bar"><i style="width:${Math.round((c / m) * 100)}%;background:${hpColor(c, m)}"></i></span><span class="hpnum num">${c} / ${m}</span></div></div>
+        <span class="init num">${i}</span>
+        ${cond ? `<span class="cond ${cond[1]}" tabindex="0" data-tip="${cond[2]}"><svg><use href="#i-${cond[0]}"/></svg></span>` : "<span></span>"}
+      </li>`).join("");
+  }
+  renderInit();
+  document.getElementById("next-turn").addEventListener("click", () => { turn = (turn + 1) % ROWS.length; renderInit(); });
+
+  // Tools
+  const tools = document.querySelectorAll(".tool");
+  tools.forEach((b) => b.addEventListener("click", () => tools.forEach((t) => t.setAttribute("aria-pressed", String(t === b)))));
+
+  document.getElementById("compose").addEventListener("submit", (e) => { e.preventDefault(); document.getElementById("compose-input").value = ""; });
+
+  // Type pairing
+  const PAIRS = {
+    alegreya: { label: "Alegreya", title: "Alegreya SC", name: "Alegreya Bold", num: "Alegreya Bold, lining", body: "Alegreya Sans" },
+    cinzel: { label: "Cinzel", title: "Cinzel", name: "Alegreya Bold", num: "Alegreya Bold, lining", body: "Alegreya Sans" },
+    book: { label: "Old book", title: "IM Fell English SC", name: "EB Garamond Bold", num: "EB Garamond Bold, lining", body: "Alegreya Sans" },
+  };
+  const typeBtns = document.querySelectorAll(".seg .btn");
+  function setType(key) {
+    if (key === "book") document.documentElement.removeAttribute("data-type");
+    else document.documentElement.setAttribute("data-type", key);
+    typeBtns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.type === key)));
+    const p = PAIRS[key];
+    document.getElementById("type-name").textContent = p.label;
+    document.getElementById("tn-title").textContent = p.title;
+    document.getElementById("tn-label").textContent = p.title;
+    document.getElementById("tn-name").textContent = p.name;
+    document.getElementById("tn-num").textContent = p.num;
+    document.getElementById("tn-body").textContent = p.body;
+    try { localStorage.setItem("gs-type", key); } catch {}
+  }
+  typeBtns.forEach((b) => b.addEventListener("click", () => setType(b.dataset.type)));
+  let saved = "book";
+  try { saved = localStorage.getItem("gs-type") || "book"; } catch {}
+  setType(PAIRS[saved] ? saved : "book");
+
+  // Palette with contrast on --panel
+  const css = getComputedStyle(document.documentElement);
+  const hex = (v) => v.trim();
+  const lum = (h) => {
+    const n = parseInt(h.slice(1), 16);
+    return [n >> 16, (n >> 8) & 255, n & 255].map((c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; })
+      .reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0);
+  };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const panel = hex(css.getPropertyValue("--panel"));
+  const SW = [
+    ["--panel", "Panel"], ["--panel-hi", "Panel raised"], ["--gold", "Gold"], ["--gold-mid", "Gold rule"],
+    ["--gold-deep", "Gold shadow"], ["--cream", "Text"], ["--muted", "Text muted"], ["--gem", "Gem"],
+    ["--parch", "Parchment"], ["--hp-full", "HP full"], ["--hp-bloodied", "HP bloodied"], ["--hp-down", "HP down"],
+  ];
+  document.getElementById("swatches").innerHTML = SW.map(([v, name]) => {
+    const h = hex(css.getPropertyValue(v));
+    const r = v === "--panel" ? "" : `<span class="cr">${ratio(h, panel).toFixed(1)} : 1</span>`;
+    return `<div><i style="background:${h}"></i><p>${name}<br><code>${h}</code> ${r}</p></div>`;
+  }).join("");
+
+  // Scroll tooltip: shared 400 ms delay, opens on hover and keyboard focus
+  const tip = document.getElementById("tip");
+  let timer = null, current = null;
+  function show(el) {
+    current = el;
+    tip.innerHTML = el.dataset.tip;
+    tip.hidden = false;
+    tip.classList.remove("open");
+    const r = el.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let left = r.left + window.scrollX + r.width / 2 - tw / 2;
+    left = Math.max(window.scrollX + 12, Math.min(left, window.scrollX + document.documentElement.clientWidth - tw - 12));
+    let top = r.top + window.scrollY - th - 10;
+    if (r.top - th - 10 < 60) top = r.bottom + window.scrollY + 10;
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+    void tip.offsetWidth;
+    tip.classList.add("open");
+  }
+  function hide() { clearTimeout(timer); timer = null; current = null; tip.hidden = true; }
+  function arm(e) {
+    const el = e.target.closest("[data-tip]");
+    if (!el || el === current) return;
+    clearTimeout(timer);
+    if (current) { show(el); return; }
+    timer = setTimeout(() => show(el), 400);
+  }
+  function disarm(e) {
+    const el = e.target.closest("[data-tip]");
+    if (!el) return;
+    const to = e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest("[data-tip]");
+    if (to === el) return;
+    hide();
+  }
+  document.addEventListener("mouseover", arm);
+  document.addEventListener("mouseout", disarm);
+  document.addEventListener("focusin", arm);
+  document.addEventListener("focusout", disarm);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
+  window.addEventListener("scroll", () => { if (current) hide(); }, { passive: true });
+})();
+</script>
