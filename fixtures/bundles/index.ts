@@ -132,6 +132,7 @@ import visionParty from "./vision-party";
 import wfFrame from "./wf-frame";
 import wfFrameE2e from "./wf-frame-e2e";
 import windowsS5 from "./windows-s5";
+import x1ToastsE2e from "./x1-toasts-e2e";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -305,4 +306,6 @@ export const bundles: readonly Bundle[] = [
   f3CombatDice,
   f3SkipE2e,
   f3PromptTrayE2e,
+  // Sprint 12 X1 (fix/x1-toasts): toast fixes e2e alias of session-sim-13 (BL-118–120)
+  x1ToastsE2e,
 ];

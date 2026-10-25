@@ -700,13 +700,13 @@ export function RollPopupStack({
   const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
   const stack = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ top: 0, h: 0 });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the cards change
-  useEffect(() => {
+  // BL-118: re-measured after every commit, before the paint (the cards, the toast reports).
+  useLayoutEffect(() => {
     const el = stack.current;
     const top = Math.round(el?.parentElement?.getBoundingClientRect().top ?? 0);
     const h = Math.round(el?.getBoundingClientRect().height ?? 0);
     setBox((b) => (b.top === top && b.h === h ? b : { top, h }));
-  }, [popups, pending, vp]);
+  });
   const clear = dmPopupClear(
     initiative,
     dialogs,
@@ -744,12 +744,11 @@ export function RollPopupStack({
       </div>
     );
   }
+  // BL-118: fixed at its viewport spot, not offset from the region row: that row follows the
+  // toast stack's height a frame later (play-shell's `ShellToaster`), which moved the column
+  // with it until the next re-measure (sim-15: 388 → 442 → 388 under a new alert toast).
   return (
-    <div
-      ref={stack}
-      className="absolute flex flex-col gap-2"
-      style={{ left: at.left, top: at.top - box.top }}
-    >
+    <div ref={stack} className="fixed flex flex-col gap-2" style={{ left: at.left, top: at.top }}>
       {cards.reverse()}
     </div>
   );

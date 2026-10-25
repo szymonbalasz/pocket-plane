@@ -158,3 +158,66 @@ describe("FR-NOTE-77 BL-115 the stack settles", () => {
     expect(settleStack(s, { ...o, now: 500 })).toBe(s);
   });
 });
+
+/**
+ * BL-118 (sim-15 FAIL c): the stack as painted each frame (spot and height). `sync`: the runtime
+ * since BL-118, whose layout effect measures the height after every commit, so a fold step and
+ * the steps after it run before the paint; else the BL-115 runtime (`ResizeObserver` reports a
+ * frame later: each step painted).
+ */
+function paint(frames: Frame[], sync: boolean): string[] {
+  let s: StackSettle = UNSETTLED;
+  let prev: Frame | null = null;
+  let measured = 0;
+  return frames.map((fr, i) => {
+    const now = i * FRAME;
+    if (prev && prev.cards !== fr.cards) s = refold(s);
+    prev = fr;
+    const heightAt = () => heightOf(Math.min(s.fold.cap, fr.cards));
+    if (sync || measured === 0) measured = heightAt();
+    // Commits until nothing changes (each layout effect's update re-renders before the paint).
+    for (let commit = 0; commit < 10; commit++) {
+      const spot = dmStackSpot(small, init, measured, STACK_W, [], fr.windows, [], [], [], pcs);
+      const o = {
+        need: spot.covers > 0,
+        min: 0,
+        stackH: measured,
+        shown: Math.min(s.fold.cap, fr.cards),
+      };
+      const next = settleStack(s, { ...o, spot, now });
+      const h = sync ? heightOf(Math.min(next.fold.cap, fr.cards)) : measured;
+      if (next === s && h === measured) break;
+      s = next;
+      measured = h;
+    }
+    const painted = `${s.drawn?.left},${s.drawn?.top},${heightOf(Math.min(s.fold.cap, fr.cards))}`;
+    if (!sync) measured = heightAt();
+    return painted;
+  });
+}
+
+/** The consecutive distinct states. */
+const states = (p: string[]) => p.filter((x, i) => i === 0 || p[i - 1] !== x);
+
+describe("FR-NOTE-77 BL-118 fold before the first paint", () => {
+  test("FR-NOTE-77 BL-118 sim-15 c (two more cards arrive, Encounters at 68, 60): the stack is painted in one state per arriving card, folded", () => {
+    const frames: Frame[] = [
+      ...Array.from({ length: 10 }, () => ({ windows: [log, enc], cards: 1 })),
+      ...Array.from({ length: 10 }, () => ({ windows: [log, enc], cards: 2 })),
+      ...Array.from({ length: 10 }, () => ({ windows: [log, enc], cards: 3 })),
+    ];
+    // The repro: each arrival paints the unfolded stack (+ 94 px a card), then the fold steps.
+    const before = states(paint(frames, false));
+    // BL-118: one state per arrival (here the same folded stack: one card at 520, 100).
+    expect(before).toEqual([
+      "520,100,186",
+      "520,100,280",
+      "520,100,186",
+      "520,100,374",
+      "520,100,280",
+      "520,100,186",
+    ]);
+    const after = states(paint(frames, true));
+    expect(after).toEqual([`520,100,${heightOf(1)}`]);
+  });
+});

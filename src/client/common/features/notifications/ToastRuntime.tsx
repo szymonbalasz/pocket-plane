@@ -503,18 +503,23 @@ export function ToastRuntime({
   }, [stackH, room, covers, minCap, foldable, at.left, at.top, holdOver]);
   // FR-NOTE-70: the drawn spot (`data-left` / `data-top`, the style and the FR-SHELL-59 report).
   const pos = settle.hold && settle.drawn ? settle.drawn : { left: at.left, top: at.top };
+  // BL-118: the fold is done: no hold, and no step due on this height (`foldCap`).
+  const resting =
+    !settle.hold && !((stackH > room || covers) && cap > minCap && settle.fold.foldedAt !== stackH);
 
-  // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows.
+  // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows. BL-118: only
+  // the resting stack (the roll popups keep clear of it, FR-DICEX-55), never a fold step's.
   useLayoutEffect(() => {
     const el = stackRef.current;
     if (!isDm || !el || stackH === 0) {
       reportShownStack(SHOWN_STACK_ID, null);
       return;
     }
+    if (!resting) return;
     // Fixed at `pos`; the width and measured height as rendered.
     const w = Math.round(el.getBoundingClientRect().width);
     reportShownStack(SHOWN_STACK_ID, { x: pos.left, y: pos.top, w, h: stackH });
-  }, [isDm, pos.left, pos.top, stackH]);
+  }, [isDm, pos.left, pos.top, stackH, resting]);
   useEffect(() => () => reportShownStack(SHOWN_STACK_ID, null), []);
 
   const openHistory = () => openWindow(HISTORY_KIND);
@@ -543,6 +548,8 @@ export function ToastRuntime({
       data-placement={isDm ? "top-center" : "bottom-right"}
       data-left={isDm ? pos.left : undefined}
       data-top={isDm ? pos.top : undefined}
+      // BL-118: the fold rests (the FR-SHELL-59 report carries only a resting stack).
+      data-settled={isDm ? resting : undefined}
       // FR-NOTE-50: DOM order = order from home; the players' home is the bottom.
       className={cn(
         "pointer-events-none fixed flex w-80 gap-2",
