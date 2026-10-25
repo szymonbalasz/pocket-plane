@@ -1,8 +1,8 @@
 ---
 title: Theme system
 prefix: THEME
-status: stub
-owner: —
+status: claimed
+owner: spec-theme-system
 phase: post-mvp
 ---
 
