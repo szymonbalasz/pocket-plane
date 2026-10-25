@@ -52,9 +52,9 @@
   --frame-corner-bl: none;
   --frame-corner-br: none;
   --panel-grain: none;
-  --gem: var(--destructive);
-  --gem-deep: var(--destructive);
-  --gem-hi: var(--destructive);
+  --gem: var(--primary);
+  --gem-deep: var(--primary);
+  --gem-hi: var(--primary);
   --gold: var(--primary);
   --parchment: var(--popover);
   --parchment-ink: var(--popover-foreground);

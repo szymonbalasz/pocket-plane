@@ -111,6 +111,7 @@ No server data.
 > - **Scope of a theme's tokens:** the gilt block is `[data-theme="gilt"] body, body [data-theme="gilt"]`, so `<html>` keeps Default's tokens. The map canvas reads its colours from `<html>` (`scenes-map/theme.ts`), so it stays unthemed (OQ-THEME-09 A) and its selection outline stays white (FR-CAMP-31 (b)). Body font: `body { font-family: var(--font-body) }`.
 > - **Tokens beyond §8:** `--frame-corner` is the kit's top-left piece; `--frame-corner-tr`, `-bl`, `-br` hold the other three (a background can't mirror one image). Gilt keeps Default's `--destructive`, `--overlay`, `--caution*`, `--positive*`, `--success`, `--warning` (the danger red FR-CAMP-31 measures stays one value).
 > - **Previews:** an element with `data-theme="<id>"` draws that theme (the Appearance swatches). A gilt preview inside another theme uses the fallback fonts only, so the web fonts still download only while gilt is on (FR-THEME-16).
+> - **Default's gem** (`--gem`, `-deep`, `-hi`) = `var(--primary)`: Default has no gem, and its preview accent must not read as the danger red (orchestrator ruling).
 > - **Appearance** is order 15 (after "Your colour"); cards are toggle buttons (`aria-pressed`). Fonts: 6 files, 197 KB (EB Garamond is one variable file for 500–700).
 > - **Dice tray:** its die-slot attribute is now `data-die-slot` (`roll-control.tsx`), so every `Input` there is `data-slot="input"` again.
 

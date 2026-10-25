@@ -164,6 +164,9 @@ describe("FR-THEME-08 token completeness", () => {
       "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
     );
     expect(DEFAULT.get("--font-body")).toBe("var(--font-sans)");
+    // Default has no gem: its accent is the primary, never the danger red (orchestrator ruling).
+    for (const t of ["--gem", "--gem-deep", "--gem-hi"])
+      expect(DEFAULT.get(t)).toBe("var(--primary)");
     expect(CSS).toMatch(/ body \{[^}]*font-family: var\(--font-body\);/);
   });
 });
