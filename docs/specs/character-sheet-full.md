@@ -2,7 +2,7 @@
 title: Character sheet (full)
 prefix: CHARX
 status: complete
-owner: spec-wf, spec-sb, spec-tt, spec-rs
+owner: spec-wf, spec-sb, spec-tt, spec-rs, spec-charx-print-sheet
 phase: post-mvp-9
 ---
 
@@ -29,6 +29,8 @@ phase: post-mvp-9
 > Five-minute read for §1–§7; §8 onwards is reference. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Extends [character-sheet](character-sheet.md) (CHAR, basics); every FR-CHAR stays in force unless amended here.
 
 > **Sprint 8, track WF** (DM [#333](../decisions-log.md); companion card size only): FR-CHARX-83 (BL-66, sim-11 h01: the card at 280 × 240). Slice WF4 (test) + WF1 (placer); walkthrough F9 ([play-shell §13](play-shell.md#13-test-plan)). 0 B.
+
+> **Printed sheet (DM, 2026-10-25; [theme-system](post-mvp/theme-system.md) OQ-THEME-06 A; owner spec-charx-print-sheet).** Decided (not open): the Main tab reads like a printed D&D sheet in **every theme**: labelled boxes, a shield-shaped Armor Class, ability blocks with the save inside, a boxed Skills list, a row of passive boxes, and a breakdown Tooltip on every derived number. Actions and Features rows sit in labelled boxes. The tab strip scrolls sideways with the wheel and shows arrows. Layout and markup only: no data, rules, rolls, intents or window sizes change, and every existing test ID keeps its meaning. Gilt & Stone styles it through `data-slot` names (FR-CHARX-119). Look: kit page [gilt-stone.html](../design/art/kit/gilt-stone.html), sheet section (Main and Actions tabs). New **FR-CHARX-105–120** (§6.2), OQ-CHARX-47–50. 0 B.
 
 ## 1. Summary
 
@@ -235,6 +237,29 @@ DM-specified (#188): a third button **Attack + damage**, and the three behave th
 - **Public:** DM public switch per category in the block header (FR-CHAR-22 rule): `charx-public-attack` for Attack and Attack + damage, `charx-public-damage` for Damage.
 - **Layout:** name and numbers on the first line, the three buttons right-aligned on the second (fits 280 px min width).
 
+### 6.2 Printed sheet layout
+
+Both themes. Default draws the boxes with today's tokens (border, card, rounded); Gilt & Stone per the kit. The view model already derives every number shown; nothing new is computed on the server.
+
+| ID | Requirement | Test |
+|---|---|---|
+| FR-CHARX-105 | **Boxes:** Main is built from labelled boxes: a small-caps label on the top edge, the value large inside. Each box is `data-slot="sheet-box"` with test ID `charx-box` + `data-value` (key, FR-CHARX-117). | `FR-CHARX-105 boxes` |
+| FR-CHARX-106 | **Stat row:** Armor Class in a shield shape (inline SVG, `currentColor`), Hit Points (`current / max`, the HP bar, "Down" Badge at 0; Temp per OQ-CHARX-47), Speed, Initiative, Proficiency. "Prof +N" leaves the Abilities header for its own box. The **Initiative box is the Initiative button** whenever FR-CHAR-24 shows that button (`char-sheet-roll-init` moves onto the box); otherwise a plain box. Narrow (< 560 px): Armor Class tall on the left, Hit Points across the top, Speed / Initiative / Proficiency below; wide: one row. | `FR-CHARX-106 stat row` |
+| FR-CHARX-107 | **HP control** (FR-CHAR-10's input + Damage / Heal) stays a row under the stat row (proposed, OQ-CHARX-48). | `FR-CHARX-107 hp control` |
+| FR-CHARX-108 | **Vitals box:** Hit Dice and the `vitals` sections (temp HP, death saves, §7.1) render inside one box under the stat row; the Senses line (FR-CHARX-50) sits under it, centred. Sections keep their own components and test IDs. | `FR-CHARX-108 vitals box` |
+| FR-CHARX-109 | **Ability blocks** (amends FR-CHAR-22's cell layout, not its behaviour): name; the large signed modifier **is the Check button** (`char-sheet-roll-check`); the score in a small pill (`char-sheet-ability-score`); a Save line: proficiency dot (`char-sheet-save-prof`) + "Save" + the signed save as the Save button (`char-sheet-roll-save`). Narrow: 3 × 2 grid; wide: one column of six beside Skills. The DM public switches stay in the block header. | `FR-CHARX-109 ability block` |
+| FR-CHARX-110 | **Skills box:** the 18 rows as today (dot / double dot, name, ability tag, bonus as the roll button with a d20 glyph); proficient and expertise rows tinted. Order alphabetical (proposed, OQ-CHARX-50). | existing `charx-skill` tests |
+| FR-CHARX-111 | **Passives:** three boxes (Perception, Investigation, Insight) under Skills; `charx-passive` kept. Narrow labels may shorten ("Perc.", "Invest.", "Insight"); the full name is in the Tooltip. | `FR-CHARX-111 passives` |
+| FR-CHARX-112 | **Wide layout:** the Main body switches on its own width (CSS container query), at ≥ 560 px (proposed, OQ-CHARX-49): abilities column left (≈ 200 px), Skills + passives right. Resizing the window switches it live. | `FR-CHARX-112 wide at 560` |
+| FR-CHARX-113 | **Breakdown Tooltips** on every derived number on Main (check, save, skill, passive, initiative, Armor Class, proficiency), from the view model's terms: "Stealth +10 · DEX +4 · expertise +6"; "Armor Class 16" plus its parts where the sheet derives them; an override reads as today ("Derived +3 · Override: …"). Shared Tooltip rules (delay, keyboard focus, FR-SHELL-29). | `FR-CHARX-113 breakdown text` |
+| FR-CHARX-114 | **Actions and Features** rows sit in labelled boxes: "Attacks", "Spells" (spellcasting header and slot pips inside), "Features" / limited uses. Rows and buttons unchanged (§6.1). | `FR-CHARX-114 action boxes` |
+| FR-CHARX-115 | **Tab strip:** when tabs overflow, the mouse wheel scrolls it sideways, arrow buttons show at the end(s) with hidden tabs (`charx-tabs-prev`, `charx-tabs-next`), and a thin scrollbar stays visible. The strip never scrolls vertically: the active marker sits inside the tab. Pinned per FR-CHARX-48. | `FR-CHARX-115 tab strip` |
+| FR-CHARX-116 | **Edit mode and NPC sheets:** edit mode keeps the boxes with inputs in place (FR-CHARX-27). NPC sheets (FR-CHARX-31) use the same boxes; a box without data is left out (no hit dice, death saves or proficiency box when absent). | `FR-CHARX-116 edit and NPC` |
+| FR-CHARX-117 | **Test IDs:** every existing ID keeps its meaning. New: `charx-box` (+ `data-value` = `ac` \| `hp` \| `speed` \| `init` \| `prof` \| `vitals` \| `skills` \| `passives` \| `attacks` \| `spells` \| `features`), `charx-tabs-prev`, `charx-tabs-next`, `charx-breakdown` (Tooltip content, + `data-value` = number key, e.g. `skill.stealth`). | `FR-CHARX-117 ids kept` |
+| FR-CHARX-118 | **Geometry:** `char.sheet` stays 320 × 440, min 280 × 320 (OQ-THEME-07 A); the body scrolls; at 280 px nothing overflows sideways (ability cells ≥ 80 px). | `FR-CHARX-118 280 px` (e2e) |
+| FR-CHARX-119 | **Theme hooks:** `data-slot` names `sheet-box`, `sheet-shield`, `sheet-ability`, `sheet-skill-row`, `sheet-roll`, `sheet-pip`, `sheet-tabs`, for [theme-system](post-mvp/theme-system.md) stylesheets. No theme logic in the components. | `FR-CHARX-119 slots present` |
+| FR-CHARX-120 | **Unchanged:** summary cards (FR-CHARX-32) and the companion card keep their layout (themes still style them); 0 B snapshot and wire. | existing tests |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, dense. No custom styling.
@@ -244,6 +269,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, de
 | `char.sheet` | DM, player | player yes; DM no | unchanged: CHAR §7, 320×440, min 280×320 (#162 floors kept) | unchanged |
 | `charx.companion` *(S6)* | DM, player | no | `top-left`, `dx` 56, **320×360, min 280×240**, `defaultOpen: false`; the body scrolls (≤ 8 attacks); placement, keep-outs and reopen rules are play-shell's (seams S3, OQ-CHARX-32) | player "Companions" (`available` iff they own one, FR-CHARX-59); DM none |
 
+- *(Printed sheet, §6.2: boxes, shield AC, ability blocks with the save inside, passive boxes, wide layout ≥ 560 px; the bullet below is the content, §6.2 the layout.)*
 - **Main**: stat row (AC, HP + control, Speed, Init, Prof), *(sprint 3)* the Senses line (FR-CHARX-50), then vitals sections (§7.1), Abilities block (FR-CHAR-22), **Skills** block (18 rows: proficiency dot / double dot for expertise, name, ability abbreviation, signed bonus = roll button; passives under it), main sections. No attack row (N4, FR-CHARX-44).
 - **Pinned** (FR-CHARX-48): header + tab strip stay at the top; the tab content scrolls under them.
 - **Actions**: Attacks (row: name, "+4 · 1d8+2 piercing", then **Attack**, **Damage**, **Attack + damage**, §6.1); Spellcasting header (ability, "Spell attack +5 · DC 13", slot pips per level 1–9 with max > 0, click = use, Shift+click = restore, "Reset"); Spells grouped by level (cantrips first): name, C / R / prepared marks, roll buttons per row.
@@ -484,6 +510,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 **Sprint 7 (track GM):** bundles `gems`, `gems-hidden` ([gems §13](gems.md#13-test-plan)). DOM tests (in-code store): `FR-CHARX-71 gem section off / on` (no `campaign.features` → no `gem-block`, sheet DOM byte-identical to sprint 6; on → block in the header after the effect chips; NPC sheet / companion card → absent); `FR-CHARX-72 owner / DM controls` (owner: Spend menu, no ±; DM: ± and Spend; locked sheet → still enabled; not `live` → disabled; `FR-GEM-08 max 5 label shown, no over-limit styling at 6`); `FR-CHARX-73 summary counts` (another player's view of Mira: counts row, no menu; under OQ-GEM-01 B → absent). Walkthrough: [gems §13](gems.md#13-test-plan) steps 2, 3, 9, 10.
 
+**Printed sheet (§6.2):** bundle `character-sheet-full` (Mira full, Sela draft, Elite Goblin NPC sheet); no new fixtures (layout only). DOM tests named per §6.2's Test column; `FR-CHARX-117 ids kept` = the existing sheet tests pass unchanged. `FR-CHARX-113 breakdown text` is a pure function over the view model (Stealth with expertise, an overridden passive, a save without proficiency). E2E `charx-print-sheet.e2e.ts`: Main at 320 × 440 and 280 px (no horizontal overflow), resize to 600 px → wide layout, tab arrows at 320. **Walkthrough PS1–PS6** (DM + `player-1`, both themes once [theme-system](post-mvp/theme-system.md) T1 lands): PS1 player opens Mira's sheet at default size, boxes and shield shown, nothing clipped; PS2 click the DEX modifier → a Dexterity check in the log, click Save → a save; PS3 hover / focus Stealth → "Stealth +… · DEX … · expertise …"; PS4 wheel over the tab strip → it scrolls sideways, arrows show; PS5 resize to 600 px → wide layout, back to 320 → narrow; PS6 DM opens the Elite Goblin NPC sheet → same boxes, no hit dice or death saves.
+
 **Sprint 9 (track RS):** bundle `reminders-strongholds` ([REM §13](reminders.md#13-test-plan)). DOM tests (in-code store, mocked load ack): `FR-CHARX-100 reminders tab` (tab order "… Reminders, Macros, Trophies" on Mira's sheet for the DM and player-1; absent on player-2's summary card of Mira and on an imported sheet; count Badge 1 for player-1, 1 for the DM), `FR-CHARX-101 contents and roll as` (Mira's rows then Party; "Charm" sends `dice.roll` as Mira; Steam Rooms' party roll on Thorn's sheet rolls as Thorn), `FR-CHARX-102 rights and lock` (player-2 on Thorn: Edit on REM-THORN-OWN only; locked sheet → still enabled; not `live` → disabled). Integration (REM-owned): `FR-REM-16 leak scan` covers the section's loads. Walkthrough: [REM §13](reminders.md#13-test-plan) R8. *Shared change:* one append line in `sheet-sections.ts` (RS1).
 
 ## 14. Dependencies
@@ -492,6 +520,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 |---|---|---|
 | ADR-0004, 0009, 0012, 0016, 0021, 0022, 0024, 0025, 0029, 0032; #106, #139, #149, #154, #177 | Ownership, model, derivation, events, sync, seams, visibility, windows, log window | accepted |
 | [ADR-0036](../architecture/adr/0036-full-sheet-derivation.md) | Option C + storage split; refines ADR-0021 D, ADR-0024 | accepted #178 (numbered at merge) |
+| [theme-system](post-mvp/theme-system.md) *(printed sheet)* | The `data-slot` convention (FR-CHARX-119) and the kit page this layout follows; lands with branch `spec/theme-system`. The printed layout builds on its own (Default look); Gilt & Stone styles it after theme T2 | in review |
 | [character-sheet](character-sheet.md) | Window, roll routes, `char.roll`, `char.adjustHp`, `characters.adjustHp`, roll control usage | complete, built |
 | [entities](entities.md) | New optional core fields, attacks 0–20, helpers + overrides, summary redaction, internal create / update API, hook + `creatureActions` lines (OQ-CHARX-19) | complete; changes needed |
 | [combat-tracker](combat-tracker.md) | Route passes `ref`; `cbt.attack` gains `attackId?` / `spellId?` via `sheetAttack`; drafts out of whole-party (OQ-CHARX-12/13) | complete; changes needed |
@@ -625,7 +654,18 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 | OQ-CHARX-45 | *(S9)* Where reminders sit on the sheet | **Decided (DM #339): A. Its own tab "Reminders", before Macros.** Rejected: ~~B. end of the Main tab~~, ~~C. a header chip with a popover~~ | — · decided | CHARX, REM |
 | OQ-CHARX-46 | *(S9)* Does the sheet lock also lock a player's reminders? | **Decided (DM #339): A. No: reminders aren't sheet data (as item moves and macros).** Rejected: ~~B. yes~~ | — · decided | CHARX, REM |
 
+**Printed sheet** (§6.2). Bold = suggested pick.
+
+| ID | Question | Options (pick marked) | Blocking? | Affects |
+|---|---|---|---|---|
+| OQ-CHARX-47 | Show temp HP inside the Hit Points box too? | **A. Yes: a read-only "Temp 5" when > 0; combat-extras' temp HP control stays in the vitals box** · B. Only in the vitals box, as today | no | FR-CHARX-106, combat-extras |
+| OQ-CHARX-48 | Where does the HP control (input + Damage / Heal) go? | **A. Keep the row under the stat row: no change to existing tests and walkthroughs** · B. A popover on the Hit Points box: saves ≈ 40 px at 320, but every HP test gains a click | no | FR-CHARX-107 |
+| OQ-CHARX-49 | Width where Main switches to two columns | **A. 560 px** (the kit's enlarged sheet is 680) · B. 640 px | no | FR-CHARX-112 |
+| OQ-CHARX-50 | Skill order | **A. Alphabetical, as today** · B. Grouped under their ability, as the 2024 printed sheet does | no | FR-CHARX-110 |
+
 ## 16. Out of scope
+
+- *(Printed sheet)* A larger default sheet window (OQ-THEME-07 A: keeps 320 × 440); a bottom action bar or portrait strip; the Game log cleanup ([dice-roll-log](dice-roll-log.md)).
 
 - *(Sprint 9)* Reminders on other players' summary cards (BL-73: players see their own characters'); an effects line inside the Reminders tab (the header chips already show it).
 
