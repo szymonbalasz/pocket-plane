@@ -130,8 +130,8 @@ DM picks #351 (ADR-0069). Look: the Gilt & Stone kit page [gilt-stone.html](../d
 
 | Spec | Prefix | Status | Owner |
 |---|---|---|---|
-| [Theme system](post-mvp/theme-system.md) (Default + Gilt & Stone, per-browser switch in Preferences, bundled fonts) | THEME | in-review | spec-theme-system |
-| [Character sheet full](character-sheet-full.md) (printed sheet layout, both themes, FR-CHARX-105–120; OQ-CHARX-47–50 with the DM) | CHARX | complete | spec-charx-print-sheet |
+| [Theme system](post-mvp/theme-system.md) (Default + Gilt & Stone, per-browser switch in Preferences, bundled fonts) | THEME | complete | spec-theme-system |
+| [Character sheet full](character-sheet-full.md) (printed sheet layout, both themes, FR-CHARX-105–120; OQ-CHARX-47–50 decided A, #352) | CHARX | complete | spec-charx-print-sheet |
 
 ## Post-MVP
 

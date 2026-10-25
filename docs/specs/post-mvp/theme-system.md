@@ -1,7 +1,7 @@
 ---
 title: Theme system
 prefix: THEME
-status: in-review
+status: complete
 owner: spec-theme-system
 phase: post-mvp
 ---
@@ -56,7 +56,7 @@ phase: post-mvp
 | FR-THEME-03 | Stored per browser in `localStorage` `pp.theme.v1` = `{theme}` (zod-parsed), shared by both clients and all campaigns on that browser. Never sent. Invalid or unavailable storage → `default`, console warning. | OQ-THEME-02, -08 |
 | FR-THEME-04 | **No flash:** the stored theme is set on `<html>` before first paint (inline boot script in both `index.html` files), including pre-play pages. | |
 | FR-THEME-05 | **Geometry invariance:** under `gilt`, every layout metric the shell uses stays the same: title bar 32 px (`TITLE_H`), top bar 48 px, window body padding, launcher button padding and gap, tool rail size, every `defaultSize` / `minSize`. Frames, corners and glows are drawn with box-shadows, outlines and pseudo-elements, never with extra layout borders or padding. | FR-SHELL-61, placer |
-| FR-THEME-06 | **Font sizes** follow the existing Tailwind scale in both themes (proposed, OQ-THEME-05). Content that grows to fit is measured live, so different glyph widths are allowed. | |
+| FR-THEME-06 | **Font sizes** follow the existing Tailwind scale in both themes (OQ-THEME-05). Content that grows to fit is measured live, so different glyph widths are allowed. | |
 | FR-THEME-07 | **Launcher measurement** uses the computed font of a launcher button, not a fixed font string, so FR-SHELL-43's fit holds under both themes. | `Launcher.tsx` |
 | FR-THEME-08 | **Tokens:** Gilt & Stone redefines the shadcn tokens in `styles.css` (`--background`, `--card`, `--primary`, …, `--radius`) and adds theme tokens (`--frame-*`, `--gem-*`, `--parchment-*`, `--font-title`, `--font-label`, `--font-num`, `--font-body`). Every theme token also has a Default value that reproduces today's look. Values: kit page `:root`. | Token names: §8 |
 | FR-THEME-09 | **Meaning tokens are not themed:** `hp.*`, `visibility.hidden`, `creature.*`, `player.*` keep their values in every theme. | visual-direction |
@@ -103,7 +103,7 @@ None. No REST, intents or events; 0 bytes on the wire.
 ## 11. Edge cases & failure modes
 
 - **Disconnect / reconnect, server crash:** no effect; the theme is local.
-- **Two tabs:** a change in one tab applies to the other on its next load (no `storage` event sync, proposed).
+- **Two tabs:** a change in one tab applies to the other on its next load (no `storage` event sync).
 - **Font file missing or blocked:** fallback stack; layout metrics unaffected (FR-THEME-05).
 - **Old browser without `scrollbar-color`:** WebKit pseudo-elements; else native bars.
 - **Invalid stored value:** Default, one console warning.
@@ -136,7 +136,7 @@ None. No REST, intents or events; 0 bytes on the wire.
 |---|---|---|
 | [play-shell](../play-shell.md) | Pref-sections registries (FR-SHELL-72); a new storage key next to FR-SHELL-76 (OQ-THEME-08); frame hooks on `ShellWindow` (title, close, minimise test IDs exist) | complete |
 | [campaign-management](../campaign-management.md) | FR-CAMP-31 run per theme surface (FR-THEME-18) | complete |
-| [character-sheet-full](../character-sheet-full.md) | Printed sheet layout, FR-CHARX-105–120 (branch `spec/charx-print-sheet`); its `sheet-*` slots (FR-CHARX-119) are styled by T2 | in review |
+| [character-sheet-full](../character-sheet-full.md) | Printed sheet layout, FR-CHARX-105–120 (branch `spec/charx-print-sheet`); its `sheet-*` slots (FR-CHARX-119) are styled by T2 | complete (#352) |
 | Shared UI | Edits to `components/ui/*` and `styles.css` (shared files, §9.9): token cleanup + `data-slot` on every component (none today) | orchestrator |
 
 **Proposed build split** (one commit per slice):
