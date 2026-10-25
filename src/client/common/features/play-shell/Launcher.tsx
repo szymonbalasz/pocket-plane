@@ -4,7 +4,7 @@
 // that still don't fit move into the "⋯" menu (`launcher-fit.ts`).
 import { EllipsisIcon } from "lucide-react";
 import { DropdownMenu as M } from "radix-ui";
-import { useRef } from "react";
+import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
@@ -18,22 +18,91 @@ import { launcherState, launcherTooltip, type WindowAction, type Windows } from 
 import type { WindowDef } from "./registry";
 import { useShellState } from "./ShellContext";
 
-let canvas: CanvasRenderingContext2D | null | undefined;
-const widths = new Map<string, number>();
+let canvas: CanvasRenderingContext2D | null = null;
+/** Label widths, px, per CSS font string (FR-THEME-07), then per label. */
+const widths = new Map<string, Map<string, number>>();
+/** Bumped when the widths are dropped, so the bar re-fits. */
+let widthsGen = 0;
+/** The last font read off a rendered launcher button; a remount starts from it. */
+let lastFont: string | null = null;
 
-/** Rendered width of a launcher label (`text-xs font-medium`), px, measured once per label. */
-function labelWidth(label: string): number {
-  const known = widths.get(label);
-  if (known !== undefined) return known;
-  if (canvas === undefined) {
-    canvas =
-      typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
-    if (canvas) canvas.font = `500 12px ${getComputedStyle(document.body).fontFamily}`;
+/**
+ * The font launcher labels render in (FR-THEME-07): the computed weight, size and family of a
+ * rendered launcher button (`text-xs font-medium`; the label inherits it), so a theme's font is
+ * what gets measured. `nav` = the launcher; null before it mounts.
+ */
+export function launcherFont(nav: ParentNode | null): string | null {
+  const button =
+    nav?.querySelector('[data-testid="ui-launcher-button"]') ??
+    nav?.querySelector('[data-testid="ui-launcher-menu"]');
+  if (!button) return null;
+  const s = getComputedStyle(button);
+  return `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+}
+
+/** Before the first button renders: today's launcher label font. */
+function fallbackFont(): string {
+  const family = typeof document === "undefined" ? "" : getComputedStyle(document.body).fontFamily;
+  return `500 12px ${family}`;
+}
+
+/** Rendered width of a launcher label in `font`, px, measured once per font and label. */
+export function labelWidth(label: string, font: string): number {
+  let known = widths.get(font);
+  if (!known) {
+    known = new Map();
+    widths.set(font, known);
   }
+  const w0 = known.get(label);
+  if (w0 !== undefined) return w0;
+  if (!canvas && typeof document !== "undefined") {
+    canvas = document.createElement("canvas").getContext("2d");
+  }
+  if (canvas) canvas.font = font;
   const w = Math.ceil(canvas ? canvas.measureText(label).width : label.length * 7) + 1;
-  widths.set(label, w);
+  known.set(label, w);
   return w;
 }
+
+/** Drops the measured widths (a web font finished loading: same font string, new glyphs). */
+export function forgetLabelWidths(): void {
+  widths.clear();
+  widthsGen++;
+}
+
+/**
+ * FR-THEME-07: the launcher's label font, read after each mount, when `<html>`'s attributes change
+ * (a theme switch) and when web fonts finish loading. A change re-fits before paint.
+ */
+function useLauncherFont(nav: RefObject<HTMLElement | null>): string {
+  const [font, setFont] = useState(() => lastFont ?? fallbackFont());
+  const [, setLoaded] = useState(0);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const f = launcherFont(nav.current);
+      if (f === null) return;
+      lastFont = f;
+      setFont(f);
+    };
+    measure();
+    const observer = new MutationObserver(measure);
+    observer.observe(document.documentElement, { attributes: true });
+    const loaded = () => {
+      forgetLabelWidths();
+      setLoaded((n) => n + 1);
+      measure();
+    };
+    document.fonts?.addEventListener("loadingdone", loaded);
+    return () => {
+      observer.disconnect();
+      document.fonts?.removeEventListener("loadingdone", loaded);
+    };
+  }, [nav]);
+  return font;
+}
+
+/** The label font, set on every launcher button so its computed font is the label's (FR-THEME-07). */
+export const LAUNCHER_FONT = "text-xs";
 
 export function Launcher({
   defs,
@@ -50,6 +119,8 @@ export function Launcher({
   const layoutKey = useShellState((s) => s.key);
   useBadgeVersion(); // re-render on `refreshBadges()`
   const dots = useActivityDots(windows);
+  const navRef = useRef<HTMLElement | null>(null);
+  const font = useLauncherFont(navRef);
   const entries = defs
     .filter((d) => d.launcher)
     .sort((a, b) => (a.launcher?.order ?? 0) - (b.launcher?.order ?? 0));
@@ -59,12 +130,17 @@ export function Launcher({
     state: launcherState(windows, d.kind),
   }));
   // Recomputed on viewport resize, availability change and layout restore only (FR-SHELL-43):
-  // opening a window from the menu leaves it there until then. Label widths: measured once each.
+  // opening a window from the menu leaves it there until then. Label widths: measured once each
+  // per font; a new font (FR-THEME-07: theme switch, web font loaded) re-fits too.
   const labels = new Map(entries.map((d) => [d.kind, d.launcher?.label ?? ""]));
-  const fitKey = `${viewport.w}|${layoutKey}|${[...labels].join(",")}`;
+  const fitKey = `${viewport.w}|${layoutKey}|${[...labels].join(",")}|${font}|${widthsGen}`;
   const fitRef = useRef<{ key: string; fit: LauncherFit } | null>(null);
   if (fitRef.current?.key !== fitKey) {
-    const fit = fitLauncher(items, viewport.w, launcherMetrics(labels, labelWidth));
+    const fit = fitLauncher(
+      items,
+      viewport.w,
+      launcherMetrics(labels, (l) => labelWidth(l, font)),
+    );
     fitRef.current = { key: fitKey, fit };
   }
   const { fit } = fitRef.current;
@@ -73,6 +149,7 @@ export function Launcher({
   const overflow = entries.filter((d) => !inBar.has(d.kind));
   return (
     <nav
+      ref={navRef}
       {...{ [SHELL_ZONE_ATTR]: "launcher" }}
       data-testid="ui-launcher"
       data-compact={fit.compact}
@@ -98,13 +175,14 @@ export function Launcher({
               aria-label={l.label}
               aria-pressed={state === "open"}
               className={cn(
+                LAUNCHER_FONT,
                 "relative gap-1.5",
                 state === "open" && "bg-secondary text-secondary-foreground",
               )}
               onClick={() => dispatch({ type: "toggle", kind: d.kind })}
             >
               <Icon className="size-4" />
-              {labelled.has(d.kind) && <span className="text-xs">{l.label}</span>}
+              {labelled.has(d.kind) && <span>{l.label}</span>}
               {badge !== null && (
                 <span
                   data-testid={`${d.kind.split(".")[0]}-launcher-badge`}
@@ -137,6 +215,7 @@ export function Launcher({
             <Button
               variant="ghost"
               size="sm"
+              className={LAUNCHER_FONT}
               data-testid="ui-launcher-menu"
               aria-label={overflow.length > 0 ? `More windows (${overflow.length})` : "Layout menu"}
             >
