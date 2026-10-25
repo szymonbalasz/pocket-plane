@@ -32,6 +32,7 @@ test("FR-SHELL-70/71/72/74 chip opens Preferences; minimised → restored by the
   await expect(chip).toHaveAttribute("data-state", "open");
   expect(await sectionIds(p)).toEqual([
     "camp.color",
+    "theme.appearance",
     "shell.sound",
     "dicex.dice",
     "stats.prefs",
@@ -68,6 +69,7 @@ test("FR-SHELL-70/72, FR-CAMP-35 DM chip and Account: no Log out in the top bar;
   await expect(dm.getByTestId("ui-prefs-window")).toBeVisible();
   expect(await sectionIds(dm)).toEqual([
     "camp.color",
+    "theme.appearance",
     "dicex.dice",
     "stats.prefs",
     "shell.keys",
