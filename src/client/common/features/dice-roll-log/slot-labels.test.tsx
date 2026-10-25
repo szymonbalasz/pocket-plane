@@ -92,10 +92,10 @@ describe("FR-DICE-41 damage types in the physical form", () => {
       "Slashing — 2d6+5",
       "Fire — 2d6",
     ]);
-    expect(html.match(/data-testid="dice-manual-slot-label" data-slot="\d"/g)).toEqual([
-      'data-testid="dice-manual-slot-label" data-slot="0"',
-      'data-testid="dice-manual-slot-label" data-slot="1"',
-      'data-testid="dice-manual-slot-label" data-slot="2"',
+    expect(html.match(/data-testid="dice-manual-slot-label" data-die-slot="\d"/g)).toEqual([
+      'data-testid="dice-manual-slot-label" data-die-slot="0"',
+      'data-testid="dice-manual-slot-label" data-die-slot="1"',
+      'data-testid="dice-manual-slot-label" data-die-slot="2"',
     ]);
     expect(html).toContain('aria-label="Dice total for 2d6 fire"');
   });

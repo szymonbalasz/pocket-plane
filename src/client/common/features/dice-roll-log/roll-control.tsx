@@ -331,7 +331,7 @@ function GroupInputs({
 }) {
   const prefix = `${part ? "mod-tray-group" : "dice-manual"}${extra ? "-crit" : ""}`;
   const value = part ? part.key : index;
-  const slotAttr = part ? { "data-slot": part.slot } : {};
+  const slotAttr = part ? { "data-die-slot": part.slot } : {};
   const computed = computedTotal(slot, input);
   const name = part
     ? `${part.label} (${slot.expression}${extra ? ", critical" : ""})`
@@ -352,7 +352,7 @@ function GroupInputs({
         ) : label && !part ? (
           <span
             data-testid="dice-manual-slot-label"
-            data-slot={index}
+            data-die-slot={index}
             className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
           >
             {label} — <code>{slot.expression}</code>
@@ -590,7 +590,7 @@ export function PartGroup({
     <div
       data-testid="mod-tray-group"
       data-value={f.group.key}
-      data-slot={f.slot}
+      data-die-slot={f.slot}
       data-state={invalid ? "invalid" : undefined}
       className={cn(
         "flex flex-col gap-1.5 border-l-2 border-primary/40 pl-2",
@@ -611,7 +611,7 @@ export function PartGroup({
         <div
           data-testid="mod-tray-group-crit"
           data-value={f.group.key}
-          data-slot={f.slot}
+          data-die-slot={f.slot}
           className="flex flex-col gap-1.5 border-l-2 border-muted pl-2"
         >
           <GroupInputs
@@ -688,7 +688,8 @@ export function ManualForm({ control }: { control: RollControl }) {
           const field = `${group === "extra" ? "-crit" : ""}-${die === null ? "total" : "die"}`;
           const at = die === null ? "" : `[data-index="${die}"]`;
           if (key === null) focus(`dice-manual${field}`, `[data-value="${slot}"]${at}`);
-          else focus(`mod-tray-group${field}`, `[data-value="${key}"][data-slot="${slot}"]${at}`);
+          else
+            focus(`mod-tray-group${field}`, `[data-value="${key}"][data-die-slot="${slot}"]${at}`);
           return;
         }
         reset();
