@@ -153,17 +153,17 @@ None. No REST, intents or events; 0 bytes on the wire.
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
 | OQ-THEME-01 | How do themes style components? | **Decided (DM, 2026-10-25): A**, one stylesheet per theme, keyed on `[data-theme] [data-slot=…]` and test IDs, no theme logic in components · ~~B: Tailwind `gilt:` variants in every className~~ | decided | ADR proposed, shared UI |
-| OQ-THEME-02 | Who picks the theme? | **A: each person, per browser** · B: per user, stored on the server · C: the DM sets a campaign default, people can override | no | SHELL |
-| OQ-THEME-03 | Default for a browser with no choice yet | **A: Default** until the T2 walkthrough passes, then the DM decides · B: Gilt & Stone | no | owner: DM |
+| OQ-THEME-02 | Who picks the theme? | **Decided (DM, 2026-10-25): A**: each person, per browser · B: per user, stored on the server · C: the DM sets a campaign default, people can override | decided | SHELL |
+| OQ-THEME-03 | Default for a browser with no choice yet | **Decided (DM, 2026-10-25): A**: Default until the T2 walkthrough passes, then the DM decides · B: Gilt & Stone | decided | owner: DM |
 | OQ-THEME-04 | How are fonts shipped? | **Decided (DM, 2026-10-25): A**, committed Latin-subset woff2 + OFL licences · ~~B: `@fontsource/*` packages~~ · ~~C: Google Fonts CDN~~ | decided | tooling |
-| OQ-THEME-05 | Alegreya Sans looks smaller than the system sans at 14 px. Bump body text under Gilt & Stone? | **A: same scale (FR-THEME-06), judge in the walkthrough** · B: +1 px body under `gilt` (grown windows change height) | no | SHELL layout tests |
-| OQ-THEME-06 | The printed-sheet layout (shield AC, ability blocks with saves, boxed skills, passives row): where? | **A: a CHARX amendment, same markup in both themes, styled per theme** · B: Gilt-only markup | no | [character-sheet-full](../character-sheet-full.md) |
-| OQ-THEME-07 | The sheet's default window is 320 × 440; the printed look wants more room | **A: keep 320 × 440 (it holds, kit draft 2)** · B: a larger default, needs a placer check | no | CHARX, SHELL |
-| OQ-THEME-08 | FR-SHELL-76 says Preferences adds no new keys. A theme is a new setting, so it needs one | **A: allowed: FR-SHELL-76 covers moved settings, not new ones** · B: store it inside an existing key | no | [play-shell](../play-shell.md) |
-| OQ-THEME-09 | Theme the map canvas (selection ring, measure line, pings) later? | **A: not in v1** · B: v1 with `scenes-map/theme.ts` reading tokens | no | scenes-map |
-| OQ-THEME-10 | Glossary: **Theme**: "A named look for the whole client (colour, type, frames), chosen per browser in Preferences: Default or Gilt & Stone." Avoid: skin, style | **A: add** | no | glossary |
-| OQ-THEME-11 | [visual-direction](../../design/visual-direction.md) "Long-term reference" should point at the kit and this spec | **A: integrator updates at merge** | no | visual-direction |
-| OQ-THEME-12 | FR-CAMP-31 measures player colours on `#171717`; Gilt's surface is `#101414` (darker, so contrast only rises) | **A: check both (FR-THEME-18)** · B: Default only | no | campaign-management |
+| OQ-THEME-05 | Alegreya Sans looks smaller than the system sans at 14 px. Bump body text under Gilt & Stone? | **Decided (DM, 2026-10-25): A**: same scale (FR-THEME-06), judge in the walkthrough · B: +1 px body under `gilt` (grown windows change height) | decided | SHELL layout tests |
+| OQ-THEME-06 | The printed-sheet layout (shield AC, ability blocks with saves, boxed skills, passives row): where? | **Decided (DM, 2026-10-25): A**: a CHARX amendment, same markup in both themes, styled per theme · B: Gilt-only markup | decided | [character-sheet-full](../character-sheet-full.md) |
+| OQ-THEME-07 | The sheet's default window is 320 × 440; the printed look wants more room | **Decided (DM, 2026-10-25): A**: keep 320 × 440 (it holds, kit draft 2) · B: a larger default, needs a placer check | decided | CHARX, SHELL |
+| OQ-THEME-08 | FR-SHELL-76 says Preferences adds no new keys. A theme is a new setting, so it needs one | **Decided (DM, 2026-10-25): A**: allowed: FR-SHELL-76 covers moved settings, not new ones · B: store it inside an existing key | decided | [play-shell](../play-shell.md) |
+| OQ-THEME-09 | Theme the map canvas (selection ring, measure line, pings) later? | **Decided (DM, 2026-10-25): A**: not in v1 · B: v1 with `scenes-map/theme.ts` reading tokens | decided | scenes-map |
+| OQ-THEME-10 | Glossary: **Theme**: "A named look for the whole client (colour, type, frames), chosen per browser in Preferences: Default or Gilt & Stone." Avoid: skin, style | **Decided (DM, 2026-10-25): A**: add | decided | glossary |
+| OQ-THEME-11 | [visual-direction](../../design/visual-direction.md) "Long-term reference" should point at the kit and this spec | **Decided (DM, 2026-10-25): A**: integrator updates at merge | decided | visual-direction |
+| OQ-THEME-12 | FR-CAMP-31 measures player colours on `#171717`; Gilt's surface is `#101414` (darker, so contrast only rises) | **Decided (DM, 2026-10-25): A**: check both (FR-THEME-18) · B: Default only | decided | campaign-management |
 
 ## 16. Out of scope
 
