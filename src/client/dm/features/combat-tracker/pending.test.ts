@@ -187,6 +187,27 @@ describe("BL-120 one count source: summary, '+N more', Pending (n)", () => {
     expect(onStack(pruneToasts(s, st, 15, waitingOf), 3).total).toBe(10);
   });
 
+  test("FR-CBT-79 BL-120 X1 walkthrough 3 (1440, Party Manager open, folded '14 pending actions'): a snapshot card's popup from Pending → the stack unfolds one card; the popup's card counts once: 12 + 1 + popup = Pending (14)", () => {
+    const rows = Array.from({ length: 14 }, (_, i) => cardN(i + 1));
+    const st = storeOf(rows);
+    // 13 cards in the snapshot (the summary), one live card (038f2328's place: a toast).
+    let s = play(rows.slice(0, 13), rows.slice(13));
+    expect(badge(rows)).toBe(14);
+    expect(onStack(s, 0)).toEqual({ own: 14, waiting: 0, cards: 0, more: 0, total: 14 });
+    // Pending row → popup of snapshot card 4: its toast hides; the stack slides beside the popup
+    // and shows the live card (cap 3).
+    s = hideNote(s, "card-4", 10);
+    // The repro: the stored count still has card 4: "13 pending actions" + 1 card + the popup = 15.
+    expect(onStack(s, 3)).toEqual({ own: 13, waiting: 0, cards: 1, more: 0, total: 14 });
+    // BL-120: the runtime recounts on a hidden row (layout effect, before the paint).
+    s = pruneToasts(s, st, 11, waitingOf);
+    expect(onStack(s, 3)).toEqual({ own: 12, waiting: 0, cards: 1, more: 0, total: 13 });
+    expect(onStack(s, 0).total).toBe(13);
+    // Later: back in the summary, 14 / 0 (folded) without the popup.
+    s = releaseHidden(s, ["card-4"], st, 12, waitingOf);
+    expect(onStack(s, 0)).toEqual({ own: 14, waiting: 0, cards: 0, more: 0, total: 14 });
+  });
+
   test("FR-CBT-79 BL-120 Later with no summary showing: the summary comes back for it; player-owned rows in its waiting part; resolved cards stay out", () => {
     const rows = [1, 2].map(cardN);
     const save = note("save", 3, {

@@ -74,6 +74,7 @@ import {
   closeToast,
   moreInSummary,
   nextExpiry,
+  pruneToasts,
   REFOLD_QUIET_MS,
   refold,
   registerToastMemory,
@@ -365,6 +366,17 @@ export function ToastRuntime({
     }
     wasFolded.current = folded;
   }, [folded, sync, dispatch, views]);
+
+  // BL-120 (X1 walkthrough 3): a row hidden by its popup (FR-NOTE-26) leaves the summary's count
+  // before the paint. `hideToast` has no store: a row the summary counted (no toast of its own,
+  // e.g. a card from the snapshot) stayed in it while its popup showed it too.
+  const hiddenKey = state.hiddenIds?.join(",") ?? "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: recount when a row is hidden
+  useLayoutEffect(() => {
+    if (!sync || !hiddenKey) return;
+    const store = sync.getState().store;
+    dispatch((s, now) => pruneToasts(s, store, now, (st) => waitingForPlayers(st, views)));
+  }, [hiddenKey]);
 
   // BL-120: a hidden card whose popup closed while still pending (Later, another card opened)
   // counts in the summary (FR-NOTE-26: no toast of its own again).
