@@ -19,7 +19,7 @@ import { RollButton } from "../dice-roll-log/roll-control";
 import { CreateCharacterDialog } from "./CreateCharacter";
 import { SELECT } from "./fields";
 import { rollRoutes } from "./roll-routes";
-import { ROLL_HINT, type SheetRollProps, useSheetRollControl } from "./rolls";
+import { rollHint, type SheetRollProps, useSheetRollControl } from "./rolls";
 import { rollActionView, routeFor, routeRef } from "./routing";
 import { SheetView } from "./SheetView";
 import { SummaryCard } from "./SummaryCard";
@@ -51,6 +51,7 @@ export function SheetRoll({
   rollRef,
   title,
   hint,
+  breakdown,
   overrides,
   children,
   ...button
@@ -69,7 +70,7 @@ export function SheetRoll({
   return (
     <RollButton
       control={control}
-      hint={hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT}
+      hint={rollHint(ctx.stats, breakdown, hint)}
       type="button"
       size="sm"
       variant="secondary"
@@ -88,6 +89,7 @@ export function SheetRoll({
 export function RoutedRoll({
   kind,
   title,
+  breakdown,
   overrides,
   children,
   ...button
@@ -108,7 +110,7 @@ export function RoutedRoll({
   return (
     <RollButton
       control={control}
-      hint={ROLL_HINT}
+      hint={rollHint(ctx.stats, breakdown, undefined)}
       type="button"
       size="sm"
       variant="secondary"
