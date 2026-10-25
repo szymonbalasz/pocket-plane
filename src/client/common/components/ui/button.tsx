@@ -32,5 +32,13 @@ export function Button({
   ...props
 }: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot.Root : "button";
-  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
+  // `data-slot` after the props: a Button stays `button` as an `asChild` trigger's child, whose
+  // merged props carry the trigger's slot (ADR-0069 styles buttons by slot).
+  return (
+    <Comp
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+      data-slot="button"
+    />
+  );
 }

@@ -90,6 +90,23 @@ No server data.
 - **Theme tokens** (CSS custom properties, new): `--frame-rule`, `--frame-rule-strong`, `--frame-shadow`, `--frame-corner` (SVG url), `--panel-grain` (url or `none`), `--gem`, `--gem-deep`, `--gem-hi`, `--gold`, `--parchment`, `--parchment-ink`, `--font-title`, `--font-label`, `--font-num`, `--font-body`. Exact values: kit page.
 - **Derived values:** none.
 
+> **T0 note (2026-10-25, `fix/theme-tokens`): `data-slot` names** for T2. Every `components/ui/` part carries one (test `ADR-0069 data-slot on every components/ui part`). Context roots that render no element have none: `Popover`, `Dialog`, `Select`, `DropdownMenu`, `DropdownMenuSub`, `TooltipProvider`. `Tooltip` adds nothing to its trigger (the caller's child); its bubble is `TooltipContent`.
+>
+> | File | Part → `data-slot` |
+> |---|---|
+> | `button.tsx` | Button `button` (it keeps it as an `asChild` trigger's child) |
+> | `primitives.tsx` | Input `input`, Label `label`, Badge `badge`, Card `card`, CardHeader `card-header`, CardTitle `card-title`, CardContent `card-content`, Alert `alert`, Skeleton `skeleton`, Table `table`, TableHeader `table-header`, TableBody `table-body`, TableRow `table-row`, TableHead `table-head`, TableCell `table-cell` |
+> | `controls.tsx` | PopoverTrigger `popover-trigger`, PopoverAnchor `popover-anchor`, PopoverClose `popover-close`, PopoverContent `popover-content`, Switch `switch` + `switch-thumb`, Checkbox `checkbox` + `checkbox-indicator`, ToggleGroup `toggle-group`, ToggleGroupItem `toggle-group-item` (segmented, bordered) |
+> | `menus.tsx` | DropdownMenuTrigger `dropdown-menu-trigger`, DropdownMenuContent `dropdown-menu-content`, DropdownMenuItem `dropdown-menu-item`, DropdownMenuSeparator `dropdown-menu-separator`, DropdownMenuLabel `dropdown-menu-label`, DropdownMenuRadioGroup `dropdown-menu-radio-group`, DropdownMenuRadioItem `dropdown-menu-radio-item`, DropdownMenuSubTrigger `dropdown-menu-sub-trigger`, DropdownMenuSubContent `dropdown-menu-sub-content`, PopoverContent `popover-content`, ToggleGroup `toggle-group` + ToggleGroupItem `toggle-group-item` (tool group), Switch `switch` + `switch-thumb`, Slider `slider` + `slider-track` / `slider-range` / `slider-thumb`, Collapsible `collapsible`, CollapsibleTrigger `collapsible-trigger`, CollapsibleContent `collapsible-content` |
+> | `overlays.tsx` | DialogTrigger `dialog-trigger`, DialogContent `dialog-overlay` + `dialog-content` + its × `dialog-close`, DialogHeader `dialog-header`, DialogFooter `dialog-footer`, DialogTitle `dialog-title`, DialogDescription `dialog-description`, DialogClose `dialog-close`, SelectTrigger `select-trigger`, SelectValue `select-value`, SelectContent `select-content`, SelectItem `select-item` + `select-item-indicator`, TooltipContent `tooltip-content` (also `ui-tooltip`) |
+> | `progress.tsx` | Progress `progress` + `progress-indicator` |
+> | `scroll-area.tsx` | ScrollArea `scroll-area` + `scroll-area-viewport`, ScrollBar `scroll-area-scrollbar` + `scroll-area-thumb` |
+> | `tabs.tsx` | Tabs `tabs`, TabsList `tabs-list`, TabsTrigger `tabs-trigger`, TabsContent `tabs-content` |
+> | `toggle-tip.tsx` | ToggleTip wrapper `toggle-tip` |
+>
+> - A caller's own `data-slot` wins over the part's (shadcn order), except on Button. The dice tray already passes numeric `data-slot` values to some `Input`s (`roll-control.tsx`); those inputs are not `input` to a theme.
+> - **Tokens added with today's values** (`styles.css`): themeable: `--destructive-foreground` (#fff), `--overlay` (#000, scrims at /40 and /60), `--caution` / `--caution-foreground` (amber-500 / -400), `--positive` / `--positive-foreground` (emerald-500 / -400). Meaning, not themed (FR-THEME-09): `--hp-temp` (sky-400), `--hp-down-foreground` (#fff), `--swatch-ink` (#000, the check mark and ring on a player-colour swatch). Test `FR-THEME-19 swapped classes keep their computed colour`.
+
 ## 9. API & events
 
 None. No REST, intents or events; 0 bytes on the wire.

@@ -16,7 +16,7 @@ export function ToggleTip({
 }) {
   return (
     <Tooltip content={content}>
-      <span data-testid={offTestId} className="inline-flex">
+      <span data-slot="toggle-tip" data-testid={offTestId} className="inline-flex">
         {children}
       </span>
     </Tooltip>

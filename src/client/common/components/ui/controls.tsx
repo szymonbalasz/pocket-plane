@@ -55,7 +55,9 @@ export function Popover({
     </PopoverStateContext.Provider>
   );
 }
-export const PopoverTrigger = P.Trigger;
+export function PopoverTrigger(props: React.ComponentProps<typeof P.Trigger>) {
+  return <P.Trigger data-slot="popover-trigger" {...props} />;
+}
 
 /** Marks the anchor while its popover is open so the anchor's Tooltip stays shut (FR-SHELL-31). */
 export function PopoverAnchor({ ref, ...props }: React.ComponentProps<typeof P.Anchor>) {
@@ -70,13 +72,16 @@ export function PopoverAnchor({ ref, ...props }: React.ComponentProps<typeof P.A
   );
   return (
     <P.Anchor
+      data-slot="popover-anchor"
       {...{ [OVERLAY_OPEN_ATTR]: state?.open ? "true" : undefined }}
       {...props}
       ref={setRef}
     />
   );
 }
-export const PopoverClose = P.Close;
+export function PopoverClose(props: React.ComponentProps<typeof P.Close>) {
+  return <P.Close data-slot="popover-close" {...props} />;
+}
 
 export function PopoverContent({
   className,
@@ -91,6 +96,7 @@ export function PopoverContent({
   return (
     <P.Portal>
       <P.Content
+        data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}
         className={cn(
@@ -121,13 +127,17 @@ export function PopoverContent({
 export function Switch({ className, ...props }: React.ComponentProps<typeof S.Root>) {
   return (
     <S.Root
+      data-slot="switch"
       className={cn(
         "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
         className,
       )}
       {...props}
     >
-      <S.Thumb className="pointer-events-none block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0" />
+      <S.Thumb
+        data-slot="switch-thumb"
+        className="pointer-events-none block size-4 rounded-full bg-background shadow-lg ring-0 transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0"
+      />
     </S.Root>
   );
 }
@@ -136,13 +146,17 @@ export function Switch({ className, ...props }: React.ComponentProps<typeof S.Ro
 export function Checkbox({ className, ...props }: React.ComponentProps<typeof C.Root>) {
   return (
     <C.Root
+      data-slot="checkbox"
       className={cn(
         "peer size-4 shrink-0 rounded-sm border border-input shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
         className,
       )}
       {...props}
     >
-      <C.Indicator className="flex items-center justify-center text-current">
+      <C.Indicator
+        data-slot="checkbox-indicator"
+        className="flex items-center justify-center text-current"
+      >
         <CheckIcon className="size-3.5" />
       </C.Indicator>
     </C.Root>
@@ -156,6 +170,7 @@ export function ToggleGroup({
 }: React.ComponentProps<typeof T.Root> & { type: "single" }) {
   return (
     <T.Root
+      data-slot="toggle-group"
       className={cn("inline-flex items-center rounded-md border border-input", className)}
       {...props}
     />
@@ -165,6 +180,7 @@ export function ToggleGroup({
 export function ToggleGroupItem({ className, ...props }: React.ComponentProps<typeof T.Item>) {
   return (
     <T.Item
+      data-slot="toggle-group-item"
       className={cn(
         "inline-flex h-8 items-center justify-center px-2.5 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground",
         className,
