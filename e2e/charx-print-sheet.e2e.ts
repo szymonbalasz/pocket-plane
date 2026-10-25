@@ -54,10 +54,11 @@ test("FR-CHARX-105 FR-CHARX-106 FR-CHARX-109 FR-CHARX-112 FR-CHARX-113 FR-CHARX-
   await p1.goto(link("Player 1"));
   await live(p1);
   const win = await openWindow(p1, "char.sheet");
-  await expect(win.getByTestId("char-sheet")).toHaveAttribute(
-    "data-record-id",
-    recordId("char-mira", "entity"),
-  );
+  // Specs sharing the bundle may add characters that sort before Mira: pick her.
+  const miraId = recordId("char-mira", "entity");
+  const picker = win.getByTestId("char-sheet-picker");
+  if (await picker.count()) await picker.selectOption(miraId);
+  await expect(win.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
   // PS1: the default 320 × 440; every box and the shield show, nothing clipped sideways.
   expect(await win.boundingBox()).toMatchObject({ width: 320, height: 440 });
   for (const key of ["ac", "hp", "speed", "init", "prof", "skills", "passives"]) {
