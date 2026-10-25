@@ -47,7 +47,10 @@ export function SummaryCard({
             </span>
           )}
           {v.status && (
-            <Badge data-testid="charx-summary-status" className="w-fit bg-hp-down text-white">
+            <Badge
+              data-testid="charx-summary-status"
+              className="w-fit bg-hp-down text-hp-down-foreground"
+            >
               {v.status}
             </Badge>
           )}

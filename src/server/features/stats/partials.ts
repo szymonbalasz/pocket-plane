@@ -16,6 +16,7 @@ import {
   type StatsCharacter,
   sessionAwards,
   sessionOf,
+  type UnseenKind,
 } from "@shared/stats/rules";
 import {
   addLuck,
@@ -30,7 +31,7 @@ import type { Tx } from "../../db/client";
 import { gameLogEntry } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { type CombatFact, combatFacts } from "../combat-tracker/stats-read";
-import { luckRolls, type StatsRead, seenFacts } from "./compute";
+import { hiddenPartyRolls, luckRolls, rolledUnseen, type StatsRead, seenFacts } from "./compute";
 
 type Read = Pick<Tx, "select" | "all">;
 
@@ -44,6 +45,11 @@ export interface SessionPartial {
   fights: Set<string>;
   /** Monster kills the viewer sees, whoever the attacker (FR-STATS-81's monsters slain). */
   slain: number;
+  /**
+   * BL-121: the kinds of party line or roll in the session the viewer doesn't see (players; the
+   * DM's is empty). The campaign's union withholds records (FR-STATS-83, Trophies).
+   */
+  unseen: Set<UnseenKind>;
 }
 
 const emptyPartial = (): SessionPartial => ({
@@ -52,6 +58,7 @@ const emptyPartial = (): SessionPartial => ({
   wins: new Map(),
   fights: new Set(),
   slain: 0,
+  unseen: new Set(),
 });
 
 /** Sessions per chunk (≈ 40 ms at 100 sessions, ADR-0062). */
@@ -89,7 +96,7 @@ export function computePartials(
     xs.push(f);
     allBy.set(s.fromN, xs);
   }
-  const factsBy = new Map<number, { facts: CombatFact[]; dealtUnseen: boolean }>();
+  const factsBy = new Map<number, { facts: CombatFact[]; unseen: Set<UnseenKind> }>();
   for (const [fromN, all] of allBy) factsBy.set(fromN, seenFacts(r.viewer, all, characters));
   const rolls = luckRolls(r, first.fromN, last.toN);
   const rollsBy = new Map<number, typeof rolls>();
@@ -100,10 +107,22 @@ export function computePartials(
     xs.push(x);
     rollsBy.set(s.fromN, xs);
   }
+  // BL-121: players: the sessions holding a party roll the DM counts and they don't see.
+  const rolledIn = new Set<number>();
+  if (r.viewer.role !== "dm") {
+    for (const x of hiddenPartyRolls(r, characters, first.fromN, last.toN)) {
+      const s = sessionOf(sessions, x.n);
+      if (s && !rolledIn.has(s.fromN) && rolledUnseen([x], rollsBy.get(s.fromN) ?? [])) {
+        rolledIn.add(s.fromN);
+      }
+    }
+  }
   for (const [fromN, p] of out) {
     const seen = factsBy.get(fromN);
     const sf = seen?.facts ?? [];
     const sr = rollsBy.get(fromN) ?? [];
+    for (const k of seen?.unseen ?? []) p.unseen.add(k);
+    if (rolledIn.has(fromN)) p.unseen.add("rolled");
     addTrophies(p.trophies, sf, characters, r.viewer.role);
     addLuck(p.luck, sr, characters, r.viewer.role);
     for (const f of sf) {
@@ -120,9 +139,9 @@ export function computePartials(
           rolls: sr,
           characters,
           fightLabel: () => "",
-          // BL-111 (T2): players' cards leave out Most damage dealt while party damage is unseen,
-          // so it isn't counted as won either (FR-STATS-84).
-          dealtUnseen: seen?.dealtUnseen ?? false,
+          // BL-111 / BL-121: an award players' cards leave out isn't counted as won either
+          // (FR-STATS-84).
+          unseen: p.unseen,
         }),
       );
     }
@@ -280,6 +299,7 @@ export class Partials {
       mergeWins(all.wins, p.wins);
       for (const e of p.fights) all.fights.add(e);
       all.slain += p.slain;
+      for (const k of p.unseen) all.unseen.add(k);
     };
     const parts = m.byClass.get(key);
     for (const s of closed) {

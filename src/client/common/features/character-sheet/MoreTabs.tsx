@@ -14,6 +14,7 @@ import { useState } from "react";
 import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
 import { useOpenPartyTab } from "../party-board/open-tab";
+import { Box } from "./boxes";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
 import { OverspendPopover, OverspentTip } from "./overspend";
 import { AddRow, RowTools, useRows } from "./rows";
@@ -67,6 +68,7 @@ function FeatureUses({ f }: { f: FeatureRow }) {
               data-used={f.used}
               data-left={left}
               aria-label={`${f.name}: ${f.used} of ${f.usesMax} used`}
+              data-slot="sheet-pip"
               disabled={!live || busy.busy || !counters}
               className={`size-3 rounded-full border border-foreground/60 ${i < f.used ? (left < 0 ? "bg-hp-down" : "bg-foreground") : ""}`}
               onClick={(e) => {
@@ -193,7 +195,7 @@ export function FeaturesTab() {
   const list = ctx.sheet.features;
   const e = ctx.editing && ctx.canEdit;
   return (
-    <div className="flex flex-col gap-1">
+    <Box box="features" list label="Features">
       {list.length === 0 && !e && <p className="text-xs text-muted-foreground">No features</p>}
       {list.map((f, i) => (
         <FeatureView key={f.id} f={f} index={i} count={list.length} />
@@ -206,7 +208,7 @@ export function FeaturesTab() {
           row={{ name: "New feature" }}
         />
       )}
-    </div>
+    </Box>
   );
 }
 

@@ -2,9 +2,11 @@
 import { describe, expect, test } from "bun:test";
 import { isOverkillCallout } from "./callout";
 import {
+  AWARD_UNSEEN,
   creditsParty,
   extendSessions,
   fightRows,
+  rollsForParty,
   type SessionBounds,
   type StatsCharacter,
   type StatsFact,
@@ -12,6 +14,8 @@ import {
   type StatsSide,
   sessionAwards,
   sessionOf,
+  type UnseenKind,
+  unseenKindsOf,
   visibleSpan,
 } from "./rules";
 import {
@@ -208,30 +212,131 @@ describe("STATS formulas", () => {
     expect(has(fact(pc("Gone"), GOBLIN, 7))).toBe(false);
   });
 
-  test("FR-STATS-12 BL-111 dealtUnseen: players' cards leave out Most damage dealt; the others stay", () => {
+  test("FR-STATS-12 BL-121 unseenKindsOf: dealt (party damage), healed (party healing), taken (damage to a party PC); existence only", () => {
+    const kinds = (f: StatsFact) => unseenKindsOf(f, chars);
+    expect(kinds(fact(MIRA, GOBLIN, 11))).toEqual(["dealt"]);
+    // Kill or not, big or small: the same answer (never the outcome or the amount).
+    expect(kinds(fact(MIRA, GOBLIN, 30, { hpBefore: 4 }))).toEqual(["dealt"]);
+    expect(kinds(fact(OWLBEAR, GOBLIN, 7))).toEqual(["dealt"]);
+    expect(kinds(fact(GOBLIN, MIRA, 9))).toEqual(["taken"]);
+    expect(kinds(fact(THORN, MIRA, 9))).toEqual(["dealt", "taken"]);
+    expect(kinds(fact(null, THORN, 9))).toEqual(["taken"]);
+    // Damage to a companion is no PC's taken (OQ-STATS-12 A).
+    expect(kinds(fact(GOBLIN, OWLBEAR, 9))).toEqual([]);
+    expect(kinds(fact(THORN, MIRA, 8, { kind: "heal" }))).toEqual(["healed"]);
+    expect(kinds(fact(OWLBEAR, MIRA, 8, { kind: "heal" }))).toEqual(["healed"]);
+    expect(kinds(fact(null, MIRA, 8, { kind: "heal" }))).toEqual([]);
+    expect(kinds(fact(GOBLIN, side("Wolf"), 8))).toEqual([]);
+    expect(kinds(fact(MIRA, GOBLIN, 0))).toEqual([]);
+    expect(kinds(fact(pc("Gone"), GOBLIN, 7))).toEqual([]);
+    // Rolls: a party character's kept d20 (any face), not initiative.
+    const r = (o: Partial<StatsRoll>): StatsRoll => ({
+      natural: 7,
+      category: "check",
+      actorKind: "entity",
+      actorId: "ch-Mira",
+      ...o,
+    });
+    expect(rollsForParty(r({}), chars)).toBe(true);
+    expect(rollsForParty(r({ natural: 20 }), chars)).toBe(true);
+    expect(rollsForParty(r({ natural: null }), chars)).toBe(false);
+    expect(rollsForParty(r({ category: "initiative" }), chars)).toBe(false);
+    expect(rollsForParty(r({ actorKind: "dm", actorId: null }), chars)).toBe(false);
+    expect(rollsForParty(r({ actorId: "def-Goblin" }), chars)).toBe(false);
+  });
+
+  test("FR-STATS-12 BL-121 sim-15 Most kills: DM Thorn 3; players saw Mira 2 / Thorn 2 → withheld for players with every damage award", () => {
+    const hidden = fact(THORN, side("Elite", { hidden: true }), 12, { hpBefore: 6 });
+    const dmFacts = [
+      fact(MIRA, side("G1"), 9, { hpBefore: 5 }),
+      fact(THORN, side("G2"), 9, { hpBefore: 5 }),
+      fact(MIRA, side("G3"), 9, { hpBefore: 5 }),
+      hidden,
+      fact(THORN, side("G4"), 9, { hpBefore: 5 }),
+      fact(GOBLIN, MIRA, 4),
+      fact(THORN, MIRA, 3, { kind: "heal" }),
+    ];
+    const seen = dmFacts.filter((f) => f !== hidden);
+    const run = (role: "dm" | "player", facts: StatsFact[], unseen?: Set<UnseenKind>) =>
+      Object.fromEntries(
+        sessionAwards({
+          role,
+          facts,
+          rolls: [],
+          characters: chars,
+          fightLabel: () => "F",
+          unseen,
+        }).map((a) => [a.key, a]),
+      );
+    expect(run("dm", dmFacts)["most-kills"]).toMatchObject({
+      value: 3,
+      winners: [{ name: "Thorn" }],
+    });
+    // The glitch: from the visible facts alone, players' winners differ from the DM's.
+    expect(run("player", seen)["most-kills"]?.winners.map((w) => w.name)).toEqual([
+      "Mira",
+      "Thorn",
+    ]);
+    // The fix: the hidden line's kinds withhold every award it could change.
+    const unseen = new Set(unseenKindsOf(hidden, chars));
+    const player = run("player", seen, unseen);
+    expect(Object.keys(player)).toEqual([
+      "most-taken",
+      "most-healing",
+      "most-nat20",
+      "most-nat1",
+      "most-downed",
+    ]);
+    expect(player["most-taken"]).toMatchObject({ value: 4, winners: [{ name: "Mira" }] });
+    expect(player["most-healing"]).toMatchObject({ value: 3, winners: [{ name: "Thorn" }] });
+  });
+
+  test("FR-STATS-12 BL-121 each kind withholds exactly its awards, in card order; the schema takes any such subset", () => {
     const facts = [fact(THORN, GOBLIN, 30), fact(MIRA, GOBLIN, 12)];
-    const run = (dealtUnseen: boolean) =>
+    const keys = (unseen: UnseenKind[]) =>
       sessionAwards({
         role: "player",
         facts,
         rolls: [],
         characters: chars,
         fightLabel: () => "Fight 1",
-        dealtUnseen,
-      });
-    const out = run(true);
-    expect(out.map((a) => a.key)).toEqual(AWARD_KEYS.filter((k) => k !== "most-dealt"));
-    expect(Object.fromEntries(out.map((a) => [a.key, a]))["biggest-hit"]).toMatchObject({
-      value: 30,
-      winners: [{ name: "Thorn" }],
-    });
-    expect(run(false).map((a) => a.key)).toEqual([...AWARD_KEYS]);
-    // The schema: 8 cards only without Most damage dealt; 9 always parse.
+        unseen: new Set(unseen),
+      }).map((a) => a.key);
     const summary = { fromN: 1, toN: 9, from: "a", to: "b", fights: 1 };
-    expect(SessionAwards.safeParse({ ...summary, awards: out }).success).toBe(true);
-    expect(SessionAwards.safeParse({ ...summary, awards: run(false) }).success).toBe(true);
-    const wrong = run(false).filter((a) => a.key !== "most-kills");
-    expect(SessionAwards.safeParse({ ...summary, awards: wrong }).success).toBe(false);
+    for (const k of ["dealt", "healed", "taken", "rolled"] as const) {
+      const out = keys([k]);
+      expect(out).toEqual(AWARD_KEYS.filter((a) => AWARD_UNSEEN[a] !== k));
+      const awards = sessionAwards({
+        role: "player",
+        facts,
+        rolls: [],
+        characters: chars,
+        fightLabel: () => "Fight 1",
+        unseen: new Set([k]),
+      });
+      expect(SessionAwards.safeParse({ ...summary, awards }).success).toBe(true);
+    }
+    expect(keys(["dealt"])).toEqual([
+      "most-taken",
+      "most-healing",
+      "most-nat20",
+      "most-nat1",
+      "most-downed",
+    ]);
+    expect(keys(["rolled"])).not.toContain("most-nat20");
+    expect(keys(["dealt", "healed", "taken", "rolled"])).toEqual([]);
+    expect(keys([])).toEqual([...AWARD_KEYS]);
+    // Out of card order or twice → not an ack.
+    const all = sessionAwards({
+      role: "dm",
+      facts,
+      rolls: [],
+      characters: chars,
+      fightLabel: () => "F",
+    });
+    expect(SessionAwards.safeParse({ ...summary, awards: [...all].reverse() }).success).toBe(false);
+    expect(SessionAwards.safeParse({ ...summary, awards: [all[0], all[0]] }).success).toBe(false);
+    expect(SessionAwards.safeParse({ ...summary, awards: [] }).success).toBe(true);
   });
 
   test("FR-STATS-12 overkill value per role: DM the amount; players the callout line's raw", () => {

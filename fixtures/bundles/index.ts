@@ -132,6 +132,7 @@ import visionParty from "./vision-party";
 import wfFrame from "./wf-frame";
 import wfFrameE2e from "./wf-frame-e2e";
 import windowsS5 from "./windows-s5";
+import x2SkipE2e from "./x2-skip-e2e";
 
 export const bundles: readonly Bundle[] = [
   base,
@@ -305,4 +306,6 @@ export const bundles: readonly Bundle[] = [
   f3CombatDice,
   f3SkipE2e,
   f3PromptTrayE2e,
+  // Sprint 12 X2 (fix/x2-stats-combat): stats awards, skip toast e2e bundles
+  x2SkipE2e,
 ];

@@ -5,7 +5,11 @@ import { describe, expect, test } from "bun:test";
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
 import type { You } from "@shared/protocol/frames";
 import { emptyStore } from "@shared/protocol/store";
-import { type CampaignResult, CampaignResult as CampaignSchema } from "@shared/stats/schemas";
+import {
+  type CampaignResult,
+  CampaignResult as CampaignSchema,
+  type CampaignStats,
+} from "@shared/stats/schemas";
 import { SyncContext, type SyncState } from "@ui/sync/store";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -231,6 +235,28 @@ describe("FR-STATS-83 records", () => {
     const player = render(PLAYER, ok(PLAYER_ACK));
     expect(recordValue(player, "biggest-overkill")).toBe("30 damage");
     expect(text(player)).toContain("Thorn → Goblin · Fight 1 · Tue 20 Oct");
+  });
+});
+
+describe("FR-STATS-83 BL-121 withheld records", () => {
+  test("FR-STATS-83 BL-121 a record the player ack leaves out has no line (no —, no note); none left → no Records section", () => {
+    const healing = (DM_ACK.campaign as CampaignStats).records["best-fight-healing"];
+    expect(healing).not.toBeUndefined();
+    const only = CampaignSchema.parse({
+      campaign: { ...PLAYER_ACK.campaign, records: { "best-fight-healing": healing } },
+    });
+    const html = render(PLAYER, ok(only));
+    expect(
+      [...html.matchAll(/data-testid="stats-campaign-record" data-record-id="([^"]+)"/g)].map(
+        (m) => m[1],
+      ),
+    ).toEqual(["best-fight-healing"]);
+    const none = render(
+      PLAYER,
+      ok(CampaignSchema.parse({ campaign: { ...PLAYER_ACK.campaign, records: {} } })),
+    );
+    expect(none).not.toContain('data-testid="stats-campaign-records"');
+    expect(text(none)).not.toMatch(/withheld|hidden|Records/i);
   });
 });
 

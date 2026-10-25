@@ -7,6 +7,8 @@
 // popup plays the miniature into its cells and lands only once they rest. Short screens: with a
 // toast up, only the popups that fit the toast region show (the oldest dropped), none past the
 // viewport or over the top bar (1280×1080, 1280×720, 1280×560: 3, 2, 1 of T5's 206-px cards).
+// BL-116 (sprint 12): a round whose popup (or toast) ran out of time before the check is void and
+// rolled again (≤ 3), so a loaded machine can't fail it, and a real layout fault still does.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
@@ -173,14 +175,101 @@ test("FR-DICEX-46 others off: C's popup plays the miniature into its cells and l
   for (const page of [p1, p2]) await page.context().close();
 });
 
+/**
+ * BL-116: records the popups whose own time ran out (FR-DICEX-39's close fades them through
+ * `data-state="closing"`; a short-screen drop removes a card at once and never shows it).
+ */
+const watchClosing = (page: Page) =>
+  page.evaluate(() => {
+    const w = window as unknown as { __ppClosing?: Set<string> };
+    if (w.__ppClosing) return;
+    const seen = new Set<string>();
+    w.__ppClosing = seen;
+    const mark = (el: Element) => {
+      const id = el.getAttribute("data-record-id");
+      if (el.matches('[data-testid="dicex-popup"][data-state="closing"]') && id) seen.add(id);
+    };
+    new MutationObserver((ms) => {
+      for (const m of ms) {
+        if (m.type === "attributes" && m.target instanceof Element) mark(m.target);
+        for (const n of m.addedNodes) {
+          if (!(n instanceof Element)) continue;
+          mark(n);
+          for (const el of n.querySelectorAll('[data-testid="dicex-popup"]')) mark(el);
+        }
+      }
+    }).observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["data-state"],
+    });
+  });
+const closingOf = (page: Page) =>
+  page.evaluate(() => [
+    ...((window as unknown as { __ppClosing?: Set<string> }).__ppClosing ?? []),
+  ]);
+
+/**
+ * One short-screen round on `page`: once the newest of `ids` shows, only the newest `fit` of them
+ * show (the oldest dropped), inside the viewport and below the top bar. BL-116: "void" when the
+ * round can't tell: one of its popups ran out of time first (a loaded machine; the 6 s start at
+ * rest), or the toast did and the answer differs. The reason is returned; the caller rolls again.
+ */
+async function shortScreenRound(
+  page: Page,
+  ids: readonly string[],
+  fit: number,
+  h: number,
+): Promise<string> {
+  await expect(popupOf(page, ids[2] as string)).toBeAttached();
+  const shown = page.locator(
+    '[data-testid="dicex-popup"][data-record-id]:not([data-state="closing"])',
+  );
+  const want = ids.slice(3 - fit);
+  const sorted = (xs: readonly (string | null)[]) => [...xs].sort().join(" ");
+  let got: (string | null)[] = [];
+  // The drop runs in the commit that shows the newest card; a short poll covers the paint.
+  await expect
+    .poll(
+      async () => {
+        got = await shown.evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
+        return sorted(got);
+      },
+      { timeout: 3_000 },
+    )
+    .toBe(sorted(want))
+    .catch(() => {});
+  const expired = (await closingOf(page)).filter((id) => ids.includes(id));
+  const toastUp = (await page.getByTestId("ui-alert-toast").count()) > 0;
+  // The alert's own few seconds may end first, even unloaded: the room it held then grows, so only
+  // a matching answer still counts without it.
+  if (expired.length > 0 || (!toastUp && sorted(got) !== sorted(want))) {
+    return `void: shown [${sorted(got)}], want [${sorted(want)}], ran out [${expired.join(" ")}]${toastUp ? "" : ", no toast"}`;
+  }
+  expect(sorted(got)).toBe(sorted(want));
+  for (const b of await shown.evaluateAll((els) =>
+    els.map((e) => {
+      const r = e.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom };
+    }),
+  )) {
+    expect(b.top).toBeGreaterThanOrEqual(TOP_BAR_H);
+    expect(b.bottom).toBeLessThanOrEqual(h);
+  }
+  return "ok";
+}
+
 test("FR-DICEX-47 short screens: with a toast up only the popups that fit show (oldest dropped), none past the viewport or over the top bar", async ({
   browser,
 }) => {
+  test.setTimeout(150_000);
   const { secret } = e2eEnv();
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
   await live(dm);
   const p1 = await player(browser, "Player 1");
+  for (const page of [p1, dm]) await watchClosing(page);
 
   // T5: 206-px cards (1 row + 2 lines × 1.4): fewer at once on short screens.
   for (const [h, fit] of [
@@ -189,39 +278,26 @@ test("FR-DICEX-47 short screens: with a toast up only the popups that fit show (
     [560, 1],
   ] as const) {
     for (const page of [p1, dm]) await page.setViewportSize({ width: 1280, height: h });
-    // A toast in each region (FR-SHELL-27's test alert), then three 10d6 popups (206 px each).
-    for (const page of [p1, dm]) {
-      const win = await openWindow(page, "shell.test");
-      // The last round's popups may cover the button: no pointer needed for the alert. The same
-      // alert id re-fired while its last toast leaves can be swallowed: fire until one shows.
-      await expect(async () => {
-        await win.getByTestId("shell-test-alert").dispatchEvent("click");
-        await expect(page.getByTestId("ui-alert-toast").first()).toBeVisible({ timeout: 1_000 });
-      }).toPass({ timeout: 8_000 });
-    }
-    const ids: string[] = [];
-    for (let i = 0; i < 3; i++) ids.push(await roll(p1, "10d6"));
-    for (const page of [p1, dm]) {
-      await expect(popupOf(page, ids[2] as string)).toBeVisible();
-      const shown = page.locator(
-        '[data-testid="dicex-popup"][data-record-id]:not([data-state="closing"])',
-      );
-      // Only this round's newest `fit` popups stay; the oldest dropped first.
-      const want = ids.slice(3 - fit);
-      await expect(shown).toHaveCount(want.length);
-      const got = await shown.evaluateAll((els) =>
-        els.map((e) => e.getAttribute("data-record-id")),
-      );
-      expect(got.sort()).toEqual([...want].sort());
-      for (const b of await shown.evaluateAll((els) =>
-        els.map((e) => {
-          const r = e.getBoundingClientRect();
-          return { top: r.top, bottom: r.bottom };
-        }),
-      )) {
-        expect(b.top).toBeGreaterThanOrEqual(TOP_BAR_H);
-        expect(b.bottom).toBeLessThanOrEqual(h);
+    for (let attempt = 1; ; attempt++) {
+      // A toast in each region (FR-SHELL-27's test alert), then three 10d6 popups (206 px each).
+      for (const page of [p1, dm]) {
+        const win = await openWindow(page, "shell.test");
+        // The last round's popups may cover the button: no pointer needed for the alert. The
+        // same alert id re-fired while its last toast leaves can be swallowed: fire until one
+        // shows.
+        await expect(async () => {
+          await win.getByTestId("shell-test-alert").dispatchEvent("click");
+          await expect(page.getByTestId("ui-alert-toast").first()).toBeVisible({ timeout: 1_000 });
+        }).toPass({ timeout: 8_000 });
       }
+      const ids: string[] = [];
+      for (let i = 0; i < 3; i++) ids.push(await roll(p1, "10d6"));
+      // Both clients at once: each popup's 6 s run on both.
+      const got = await Promise.all([p1, dm].map((page) => shortScreenRound(page, ids, fit, h)));
+      if (got.every((v) => v === "ok")) break;
+      // Every void round is reported; three in a row fail the test (never a silent pass).
+      console.log(`FR-DICEX-47 ${h}: round ${attempt} (p1, dm): ${got.join(" | ")}`);
+      expect(attempt, "three void rounds: the popups' 6 s ran out every time").toBeLessThan(3);
     }
   }
 

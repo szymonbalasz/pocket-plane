@@ -2,8 +2,8 @@
 // session partials of one viewer class (filter, then aggregate; ADR-0062). The party table uses
 // Trophies' Lifetime definitions (FR-STATS-42), the records its Records rules plus a fight's
 // healing, and the awards count each session's winners (FR-STATS-12; ties: every winner).
-import type { StatsCharacter } from "./rules";
-import type { FightTally, LuckTally, TrophyTally } from "./rules-b";
+import type { StatsCharacter, Unseen, UnseenKind } from "./rules";
+import { type FightTally, type LuckTally, type TrophyTally, withoutUnseen } from "./rules-b";
 import {
   AWARD_KEYS,
   type Award,
@@ -91,15 +91,26 @@ interface Candidate {
 const pick = (a: Candidate | null, b: Candidate): Candidate =>
   !a || b.value > a.value || (b.value === a.value && b.n < a.n) ? b : a;
 
+/** BL-121: the kind of unseen line that withholds each campaign record. */
+export const CAMPAIGN_RECORD_UNSEEN = {
+  "biggest-hit": "dealt",
+  "biggest-overkill": "dealt",
+  "best-fight-damage": "dealt",
+  "best-fight-kills": "dealt",
+  "best-fight-healing": "healed",
+} as const satisfies Record<keyof CampaignRecords, UnseenKind>;
+
 /**
  * FR-STATS-83: the party's records: biggest hit, biggest overkill (per role: the tallies already
  * hold the DM's amount or a player's callout `raw`), and the most damage / kills / healing by one
- * character in one fight; `fight(encounterId)` = the viewer's label with its day.
+ * character in one fight; `fight(encounterId)` = the viewer's label with its day. BL-121: players
+ * get no record an `unseen` kind (anywhere in the campaign) could change (the key is left out).
  */
 export function campaignRecords(
   trophies: ReadonlyMap<string, TrophyTally>,
   characters: ReadonlyMap<string, StatsCharacter>,
   fight: (encounterId: string) => string,
+  unseen?: Unseen,
 ): CampaignRecords {
   let hit: Candidate | null = null;
   let overkill: Candidate | null = null;
@@ -137,13 +148,17 @@ export function campaignRecords(
       fight: fight(c.encounterId),
     };
   };
-  return {
-    "biggest-hit": record(hit),
-    "biggest-overkill": record(overkill),
-    "best-fight-damage": record(best.dealt),
-    "best-fight-kills": record(best.kills),
-    "best-fight-healing": record(best.healing),
-  };
+  return withoutUnseen(
+    {
+      "biggest-hit": record(hit),
+      "biggest-overkill": record(overkill),
+      "best-fight-damage": record(best.dealt),
+      "best-fight-kills": record(best.kills),
+      "best-fight-healing": record(best.healing),
+    },
+    CAMPAIGN_RECORD_UNSEEN,
+    unseen,
+  );
 }
 
 /** FR-STATS-84: per character, awards won in card order; by total (then name). */

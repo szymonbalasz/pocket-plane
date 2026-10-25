@@ -11,10 +11,11 @@ import { Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useSync } from "../../sync/store";
+import { Breakdown } from "./breakdown";
 import { changedHint, fieldReducer, idleField, parseIntField } from "./edit-model";
 import { intentErrorText } from "./routing";
 import { toastIntentError, useSheet, useSheetIntents } from "./sheet-context";
-import { overrideTooltip } from "./view-model";
+import { breakdownText, overrideTooltip } from "./view-model";
 
 export const SELECT =
   "h-7 min-w-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
@@ -232,9 +233,31 @@ export function useBusy() {
  * Overridden marker + Tooltip "Derived +3 · Override: note" (CHARX §7); in edit mode also the
  * "Override" popover (value + note, Clear) on any derived number (FR-CHARX-06).
  */
-export function OverrideControl({ okey, children }: { okey: OverrideKey; children: ReactNode }) {
+export function OverrideControl({
+  okey,
+  breakdown = false,
+  children,
+}: {
+  okey: OverrideKey;
+  /** FR-CHARX-113: the Tooltip is the number's breakdown (always, override text included). */
+  breakdown?: boolean;
+  children: ReactNode;
+}) {
   const ctx = useSheet();
   const tip = overrideTooltip(ctx.stats, okey);
+  const lines = breakdown ? breakdownText(ctx.stats, okey) : null;
+  if (lines) {
+    return (
+      <span className="inline-flex items-center gap-0.5">
+        <Tooltip content={<Breakdown okey={okey} text={lines} />}>
+          <span className="inline-flex items-center">
+            <OverrideMark okey={okey}>{children}</OverrideMark>
+          </span>
+        </Tooltip>
+        <OverrideEdit okey={okey} />
+      </span>
+    );
+  }
   return (
     <span className="inline-flex items-center gap-0.5">
       {tip ? (

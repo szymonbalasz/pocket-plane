@@ -77,7 +77,8 @@ export const characterOf = (s: StatsSide): string | null =>
 /**
  * Sprint 10 BL-111 (FR-STATS-12, DM #343): a counted damage line credited to a party character (a
  * PC, or a companion's current owner). One the viewer doesn't see could change "Most damage dealt"
- * (and the fight's MVP), so players don't get that award while the window holds one.
+ * (and the fight's MVP), so players don't get that award while the window holds one (BL-121: the
+ * `dealt` kind, which withholds every damage award).
  */
 export const creditsParty = (
   f: StatsFact,
@@ -85,6 +86,60 @@ export const creditsParty = (
 ): boolean => {
   const ch = f.kind === "damage" && f.raw > 0 && f.attacker ? characterOf(f.attacker) : null;
   return ch !== null && characters.has(ch);
+};
+
+/**
+ * Sprint 12 X2 (BL-121, DM #353; BL-111 for every award): the kinds of counted line or roll the
+ * DM counts in a window that a viewer may not see. Each one could change some awards, so players
+ * don't get those awards there: `dealt` party damage (`creditsParty`: Most damage dealt, Biggest
+ * hit, Biggest overkill, Most kills, the MVP), `healed` party healing (Most healing), `taken`
+ * damage to a party PC (Most damage taken, Most times downed), `rolled` a party character's kept
+ * d20 (`natural` set: Most nat 20s / 1s). Existence only: never an amount, a face, a kill, a name,
+ * a side or which party member, so every player gets the same answer and a withheld award tells
+ * no more than "something of that kind happened out of sight".
+ */
+export const UNSEEN_KINDS = ["dealt", "healed", "taken", "rolled"] as const;
+export type UnseenKind = (typeof UNSEEN_KINDS)[number];
+export type Unseen = ReadonlySet<UnseenKind>;
+
+/** BL-121: the kinds of a counted fact, for the party (none: it can't change an award). */
+export function unseenKindsOf(
+  f: StatsFact,
+  characters: ReadonlyMap<string, StatsCharacter>,
+): UnseenKind[] {
+  if (f.raw <= 0) return [];
+  const party = (s: StatsSide | null) => {
+    const ch = s ? characterOf(s) : null;
+    return ch !== null && characters.has(ch);
+  };
+  if (f.kind === "heal") return party(f.attacker) ? ["healed"] : [];
+  const out: UnseenKind[] = creditsParty(f, characters) ? ["dealt"] : [];
+  if (f.target.kind === "pc" && party(f.target)) out.push("taken");
+  return out;
+}
+
+/** BL-121: a counted roll that scores Most nat 20s / 1s when its face says so (FR-STATS-10). */
+export const rollsForParty = (
+  r: StatsRoll,
+  characters: ReadonlyMap<string, StatsCharacter>,
+): boolean =>
+  r.actorKind === "entity" &&
+  r.actorId !== null &&
+  r.category !== "initiative" &&
+  r.natural !== null &&
+  characters.has(r.actorId);
+
+/** BL-121: the kind of unseen line that withholds each award (FR-STATS-12). */
+export const AWARD_UNSEEN: Readonly<Record<AwardKey, UnseenKind>> = {
+  "biggest-hit": "dealt",
+  "biggest-overkill": "dealt",
+  "most-dealt": "dealt",
+  "most-taken": "taken",
+  "most-healing": "healed",
+  "most-kills": "dealt",
+  "most-nat20": "rolled",
+  "most-nat1": "rolled",
+  "most-downed": "taken",
 };
 
 /** FR-STATS-08: a monster (not a companion) going `hpBefore > 0 → 0`. */
@@ -241,15 +296,15 @@ export interface AwardsInput {
   /** The viewer's fight label (DM: the name; a player: "Fight N · Tue 20 Oct"). */
   fightLabel(encounterId: string): string;
   /**
-   * BL-111: players only: the session holds party damage they don't see (`creditsParty`), so
-   * "Most damage dealt" is left out of their cards. Never set for the DM.
+   * BL-111 / BL-121: players only: the kinds of party line or roll in the session they don't see;
+   * the awards those could change (`AWARD_UNSEEN`) are left out of their cards. Never set for the DM.
    */
-  dealtUnseen?: boolean;
+  unseen?: Unseen;
 }
 
 /**
- * FR-STATS-12: the 9 awards in card order; party only, ties list all (≤ 8), zero = empty. BL-111:
- * with `dealtUnseen`, 8 (no "Most damage dealt").
+ * FR-STATS-12: the 9 awards in card order; party only, ties list all (≤ 8), zero = empty. BL-121:
+ * the cards `unseen` could change are left out (players; the rest keep card order).
  */
 export function sessionAwards(input: AwardsInput): Award[] {
   const { role, facts, rolls, characters } = input;
@@ -306,7 +361,7 @@ export function sessionAwards(input: AwardsInput): Award[] {
     s.value += 1;
     m.set(ch.id, s);
   }
-  const keys = input.dealtUnseen ? AWARD_KEYS.filter((k) => k !== "most-dealt") : AWARD_KEYS;
+  const keys = AWARD_KEYS.filter((k) => !input.unseen?.has(AWARD_UNSEEN[k]));
   return keys.map((key) => {
     const m = scores.get(key) as Map<string, Score>;
     let best = 0;
