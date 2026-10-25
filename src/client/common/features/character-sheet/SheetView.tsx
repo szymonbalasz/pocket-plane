@@ -30,9 +30,11 @@ import { sheetSections } from "./sheet-sections";
 import {
   canEdit,
   canUseCounters,
+  compactFullPx,
   crLine,
   type PinnedPart,
   pinnedPart,
+  type SeenFull,
   sheetData,
   TAB_ARROW_STEP_PX,
   tabArrows,
@@ -328,12 +330,15 @@ const HEADER_GAP_PX = 8;
 /**
  * FR-CHARX-48: measures the window body (the Card) and the full header (pinned part, plus the
  * scrolling header rest in the compact fallback); full while it takes at most half the body,
- * else compact. Window size and geometry are untouched (FR-CHARX-26).
+ * else compact. The full header's own height, last seen at this width, counts in compact too:
+ * its badges and buttons lay out taller than the compact parts, which flipped the part back and
+ * forth for ever (CS walkthrough F1). Window size and geometry are untouched (FR-CHARX-26).
  */
 function usePinnedHeader(initial: PinnedPart) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
   const restRef = useRef<HTMLDivElement>(null);
+  const seenFull = useRef<SeenFull | null>(null);
   const [part, setPart] = useState<PinnedPart>(initial);
   useLayoutEffect(() => {
     const body = bodyRef.current;
@@ -341,7 +346,11 @@ function usePinnedHeader(initial: PinnedPart) {
     if (!body || !header || typeof ResizeObserver === "undefined") return;
     const rest = part === "compact" ? restRef.current : null;
     const measure = () => {
-      const full = header.offsetHeight + (rest ? rest.offsetHeight + HEADER_GAP_PX : 0);
+      const width = body.clientWidth;
+      let full = header.offsetHeight;
+      if (rest)
+        full = compactFullPx(full + rest.offsetHeight + HEADER_GAP_PX, seenFull.current, width);
+      else seenFull.current = { px: full, width };
       setPart((p) => pinnedPart(full, body.clientHeight, p));
     };
     measure();

@@ -35,7 +35,17 @@ import { ROLL_HINT, rollHint } from "./rolls";
 import type { RollRoute } from "./routing";
 import { SheetView } from "./SheetView";
 import { SheetContext, type SheetCtx } from "./sheet-context";
-import { breakdownText, skillRows, TAB_ARROW_STEP_PX, tabArrows, wheelScroll } from "./view-model";
+import {
+  breakdownText,
+  compactFullPx,
+  type PinnedPart,
+  pinnedPart,
+  type SeenFull,
+  skillRows,
+  TAB_ARROW_STEP_PX,
+  tabArrows,
+  wheelScroll,
+} from "./view-model";
 
 const testRoutes = rollRoutes as RollRoute[];
 
@@ -333,7 +343,7 @@ describe("FR-CHARX-109 ability block", () => {
     expect(order.every((i) => i > -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(dex).toMatch(
-      /<button class="[^"]*text-xl[^"]*"[^>]*data-testid="char-sheet-roll-check"[^>]*>.*\+4/,
+      /<button [^>]*class="[^"]*text-xl[^"]*"[^>]*data-testid="char-sheet-roll-check"[^>]*>.*\+4/,
     );
     expect(text(dex)).toBe("DEXDexterity+418Save+7");
     expect(text(ability(html, "cha"))).toBe("CHACharisma−18Save−1");
@@ -407,7 +417,7 @@ describe("FR-CHARX-112 wide at 560", () => {
       at(cols, 'data-value="skills"'),
     );
     expect(sheetHtml()).toMatch(
-      /<div class="[^"]*@container\/sheet [^"]*" data-testid="char-sheet"/,
+      /<div [^>]*class="[^"]*@container\/sheet [^"]*" data-testid="char-sheet"/,
     );
   });
 });
@@ -521,6 +531,32 @@ describe("FR-CHARX-115 tab strip", () => {
     expect(at(html, 'data-slot="sheet-tabs"')).toBeGreaterThan(
       at(html, 'data-testid="charx-header"'),
     );
+  });
+});
+
+describe("FR-CHARX-48 pinned header settles (CS walkthrough F1)", () => {
+  test("FR-CHARX-48 pinned header settles: a full header taller than the compact parts stays compact", () => {
+    // F1, measured: the DM's locked PC in a fight, body 382 px: the full header 206 px (badges and
+    // Unlock / Edit beside the name), the compact parts 166 px. Before: full → compact → full …
+    const body = 382;
+    const width = 286;
+    const measured = (p: PinnedPart) => (p === "full" ? 206 : 166);
+    let part: PinnedPart = "full";
+    let seen: SeenFull | null = null;
+    const parts: PinnedPart[] = [];
+    for (let i = 0; i < 6; i++) {
+      const px: number =
+        part === "full" ? measured(part) : compactFullPx(measured(part), seen, width);
+      if (part === "full") seen = { px, width };
+      part = pinnedPart(px, body, part);
+      parts.push(part);
+    }
+    expect(parts).toEqual(["compact", "compact", "compact", "compact", "compact", "compact"]);
+    // The full height counts only at the width it was seen at; a taller window brings full back.
+    expect(compactFullPx(166, { px: 206, width }, width)).toBe(206);
+    expect(compactFullPx(166, { px: 206, width }, 400)).toBe(166);
+    expect(compactFullPx(220, { px: 206, width }, width)).toBe(220);
+    expect(pinnedPart(compactFullPx(166, { px: 206, width }, width), 440, "compact")).toBe("full");
   });
 });
 

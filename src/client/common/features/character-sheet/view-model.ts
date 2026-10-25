@@ -497,6 +497,22 @@ export function pinnedPart(fullPx: number, bodyPx: number, current: PinnedPart):
   return fullPx * 2 <= room ? "full" : "compact";
 }
 
+/** FR-CHARX-48: the full header's height as last measured while it was pinned, and at which width. */
+export interface SeenFull {
+  px: number;
+  width: number;
+}
+
+/**
+ * FR-CHARX-48: the full header's height while compact: the compact parts' sum, but never less than
+ * the full header itself last measured at this width. The full header lays its badges and buttons
+ * out beside the name, which can be taller than the compact parts (CS walkthrough F1: 206 vs
+ * 166 px in a 382 px body): without this, full → compact → full … never settles.
+ */
+export function compactFullPx(sumPx: number, seen: SeenFull | null, width: number): number {
+  return seen && seen.width === width ? Math.max(sumPx, seen.px) : sumPx;
+}
+
 /** A pip click (CHARX §7): click = use one, Shift+click = restore one. */
 export const pipDelta = (shiftKey: boolean) => (shiftKey ? -1 : 1);
 
