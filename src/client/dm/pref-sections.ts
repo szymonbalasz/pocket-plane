@@ -6,6 +6,7 @@ import { diceSection } from "@ui/features/dice-extras/DiceSection";
 import { layoutSection, type PrefSection } from "@ui/features/play-shell/PreferencesWindow";
 import { keyboardSection } from "@ui/features/play-shell/palette/KeyboardSection";
 import { statsPrefSection } from "@ui/features/stats/PrefsSection";
+import { appearanceSection } from "@ui/themes/AppearanceSection";
 import { accountSection } from "./features/campaign-management/AccountSection";
 
 export const dmPrefSections: readonly PrefSection[] = [
@@ -15,4 +16,5 @@ export const dmPrefSections: readonly PrefSection[] = [
   diceSection, // dicex.dice "Dice", 30 (dice-extras, FR-DICEX-57)
   statsPrefSection, // stats.prefs "Stats", 40 (stats, FR-STATS-30, -34)
   keyboardSection, // shell.keys "Keyboard", 70 (play-shell, FR-SHELL-193)
+  appearanceSection, // theme.appearance "Appearance", 15 (theme-system, FR-THEME-02)
 ];

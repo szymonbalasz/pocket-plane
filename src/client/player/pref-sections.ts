@@ -8,6 +8,7 @@ import { soundSection } from "@ui/features/play-shell/AlertLayer";
 import { layoutSection, type PrefSection } from "@ui/features/play-shell/PreferencesWindow";
 import { keyboardSection } from "@ui/features/play-shell/palette/KeyboardSection";
 import { statsPrefSection } from "@ui/features/stats/PrefsSection";
+import { appearanceSection } from "@ui/themes/AppearanceSection";
 
 export const playerPrefSections: readonly PrefSection[] = [
   soundSection, // shell.sound "Sound", 20 (play-shell, FR-SHELL-73)
@@ -16,4 +17,5 @@ export const playerPrefSections: readonly PrefSection[] = [
   diceSection, // dicex.dice "Dice", 30 (dice-extras, FR-DICEX-57)
   statsPrefSection, // stats.prefs "Stats", 40 (stats, FR-STATS-30, -34)
   keyboardSection, // shell.keys "Keyboard", 70 (play-shell, FR-SHELL-193)
+  appearanceSection, // theme.appearance "Appearance", 15 (theme-system, FR-THEME-02)
 ];
