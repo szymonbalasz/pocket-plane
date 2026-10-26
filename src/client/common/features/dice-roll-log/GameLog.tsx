@@ -64,6 +64,7 @@ import {
   actorSelection,
   createStickToBottom,
   heldSegments,
+  keepPinned,
   modeFromKeys,
   optionsDirty,
   type ShownSegment,
@@ -270,7 +271,8 @@ function Entry({
 
 /**
  * FR-DICE-21: oldest at the top; sticks to the bottom unless scrolled up, then "N new". The
- * roll bar's height changes (Options row, Physical strip; FR-DICE-30) keep a pinned list pinned.
+ * roll bar's height changes (Options row, Physical strip; FR-DICE-30) and the rows' own (a theme
+ * switch, late fonts) keep a pinned list pinned.
  */
 function EntryList({
   entries,
@@ -282,6 +284,7 @@ function EntryList({
   actions: readonly EntryAction[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const looks = useRollerLooks();
   const keyOf = useColorKeyOf();
   const focusedId = useLogFocus((s) => s.entryId);
@@ -305,13 +308,9 @@ function EntryList({
 
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
-      const top = stick.resized(el);
-      if (top !== null) el.scrollTop = top;
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
+    const content = listRef.current;
+    if (!el || !content || typeof ResizeObserver === "undefined") return;
+    return keepPinned(el, content, stick, ResizeObserver);
   }, [stick]);
 
   // FR-DICE-37: scroll the focused entry into view (on a new focus, and when the log mounts).
@@ -345,7 +344,7 @@ function EntryList({
           }
         }}
       >
-        <ul className="flex flex-col">
+        <ul ref={listRef} className="flex flex-col">
           {entries.map((e) => (
             <Entry
               key={e.id}

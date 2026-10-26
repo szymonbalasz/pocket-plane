@@ -180,6 +180,12 @@ async function settled(page: Page) {
   return geometry(page);
 }
 
+/** The Game log list's distance from its bottom (0 = pinned). */
+const logGap = (page: Page) =>
+  page
+    .getByTestId("dice-log-list")
+    .evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
+
 async function pickMira(win: Locator) {
   const miraId = e2eEnv().recordId("char-mira", "entity");
   const picker = win.getByTestId("char-sheet-picker");
@@ -226,6 +232,8 @@ test("FR-THEME-05 FR-THEME-10 FR-THEME-11 FR-THEME-12 FR-THEME-13 FR-THEME-14 FR
   expect(await settled(dm)).toEqual(before);
   await railReady(dm, "dm");
   expect(await railHeight(dm)).toBe(rail);
+  // FR-DICE-21: Gilt's taller rows keep the pinned log at the bottom (newest entry whole).
+  await expect.poll(() => logGap(dm)).toBeLessThan(1);
 
   // FR-THEME-10: frame, corner pieces, title face, gem close, stone minimise.
   const look = await styles(dm);
