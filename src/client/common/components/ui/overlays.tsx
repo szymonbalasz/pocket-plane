@@ -6,6 +6,11 @@ import { cn } from "../../lib/utils";
 import { enrollTrigger, TIP_ATTR } from "./roving";
 
 // ---- Dialog ----
+// FR-KIT-70: a dialog is a small window. Its header is a title bar flush with the top (title left,
+// the built-in close centred on the right, a rule under it); the description and the content sit
+// in the padded body (`dialog-body`). The bar is drawn from inside the body (negative margins), so
+// a header rendered by a form inside the dialog is a bar too; a title outside a header makes its
+// own bar (FR-KIT-71).
 export const Dialog = D.Root;
 export function DialogTrigger(props: React.ComponentProps<typeof D.Trigger>) {
   return <D.Trigger data-slot={props.asChild ? undefined : "dialog-trigger"} {...props} />;
@@ -14,26 +19,40 @@ export function DialogClose(props: React.ComponentProps<typeof D.Close>) {
   return <D.Close data-slot={props.asChild ? undefined : "dialog-close"} {...props} />;
 }
 
+/** The body's padding (`p-6`), undone by the bar's negative margins. */
+const DIALOG_BAR =
+  "-mx-6 -mt-6 flex min-h-10 shrink-0 items-center gap-2 rounded-t-lg border-b py-1.5 pl-6 pr-12";
+
+/** True inside a `DialogHeader`: its title is in the bar already. */
+const InHeader = React.createContext(false);
+
 export function DialogContent({
   className,
   children,
   ...props
 }: React.ComponentProps<typeof D.Content>) {
+  // A caller's flex column (a form that scrolls under the header) carries on inside the body.
+  const column = /(^|\s)flex(\s|$)/.test(className ?? "");
   return (
     <D.Portal>
       <D.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-50 bg-overlay/60" />
       <D.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 shadow-lg",
+          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background shadow-lg",
           className,
         )}
         {...props}
       >
-        {children}
+        <div
+          data-slot="dialog-body"
+          className={cn("gap-4 p-6", column ? "flex min-h-0 flex-1 flex-col" : "grid")}
+        >
+          {children}
+        </div>
         <D.Close
           data-slot="dialog-close"
-          className="absolute right-4 top-4 opacity-70 hover:opacity-100"
+          className="absolute right-4 top-3 opacity-70 hover:opacity-100"
           aria-label="Close"
         >
           <XIcon className="size-4" />
@@ -43,9 +62,18 @@ export function DialogContent({
   );
 }
 
-export function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+/** The title bar; its descriptions move under it, into the body (the kit's dialog). */
+export function DialogHeader({ className, children, ...props }: React.ComponentProps<"div">) {
+  const kids = React.Children.toArray(children);
+  const isDescription = (k: React.ReactNode) =>
+    React.isValidElement(k) && k.type === DialogDescription;
   return (
-    <div data-slot="dialog-header" className={cn("flex flex-col gap-2", className)} {...props} />
+    <InHeader.Provider value>
+      <div data-slot="dialog-header" className={cn(DIALOG_BAR, className)} {...props}>
+        {kids.filter((k) => !isDescription(k))}
+      </div>
+      {kids.filter(isDescription)}
+    </InHeader.Provider>
   );
 }
 export function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
@@ -54,12 +82,21 @@ export function DialogFooter({ className, ...props }: React.ComponentProps<"div"
   );
 }
 export function DialogTitle({ className, ...props }: React.ComponentProps<typeof D.Title>) {
-  return (
+  const inHeader = React.useContext(InHeader);
+  const title = (
     <D.Title
       data-slot="dialog-title"
-      className={cn("text-lg font-semibold", className)}
+      className={cn("min-w-0 text-lg font-semibold leading-7", className)}
       {...props}
     />
+  );
+  // A visible title outside a header is the bar on its own (an image lightbox keeps its sr-only
+  // title and no bar).
+  if (inHeader || /\bsr-only\b/.test(className ?? "")) return title;
+  return (
+    <div data-slot="dialog-header" className={DIALOG_BAR}>
+      {title}
+    </div>
   );
 }
 export function DialogDescription({

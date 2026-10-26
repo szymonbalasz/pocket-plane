@@ -2655,3 +2655,10 @@ From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351
 
 - **Derived (client, not stored):** the Gilt & Stone look, from `data-theme="gilt"` on `<html>` (`@ui/themes/gilt.css`); its extra tones are `--gs-*` custom properties on `<body>` (contrast-tested).
 - **Fixtures:** unit `theme-round-3` (`combat-1` stepped on two rounds with Next: round 3, Wolf's turn; steps turns, so not in `session-sim-13`); bundle `theme-gilt` = `combat` + `combat-1` + `theme-round-3` + `rolls-1` (Mira's full sheet, the Goblin and the Elite Goblin's sheets from session-sim).
+
+## 133. Sprint 13: kit parts (K0)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #356). **Built by `fix/kit-parts`**. Protocol side: [protocol §169](../protocol/README.md#169-sprint-13-kit-parts-variants-as-data-dialog-title-bar-k0). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `medallionOf(name, imageAssetId?, colour?)` → `{letter, imageAssetId, colour}`; `medallionInk(colour)`; `hpFill(cur, max)` (0–100 %) and `hpBarMode` (`bar` \| `band` \| none); the HP bar's band = the given band, else `healthBand(cur, max)` (FR-CBT-26).
+- **Fixtures:** none.
