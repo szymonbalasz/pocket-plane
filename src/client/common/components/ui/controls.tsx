@@ -128,6 +128,7 @@ export function Switch({ className, ...props }: React.ComponentProps<typeof S.Ro
   return (
     <S.Root
       data-slot="switch"
+      data-variant="default"
       className={cn(
         "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border border-transparent shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
         className,
@@ -164,6 +165,7 @@ export function Checkbox({ className, ...props }: React.ComponentProps<typeof C.
 }
 
 // ---- ToggleGroup (single) ----
+// FR-KIT-06 (BL-127): the bordered segmented control; `menus.tsx`'s is the `tool` group.
 export function ToggleGroup({
   className,
   ...props
@@ -171,6 +173,7 @@ export function ToggleGroup({
   return (
     <T.Root
       data-slot="toggle-group"
+      data-variant="segmented"
       className={cn("inline-flex items-center rounded-md border border-input", className)}
       {...props}
     />
@@ -181,6 +184,7 @@ export function ToggleGroupItem({ className, ...props }: React.ComponentProps<ty
   return (
     <T.Item
       data-slot="toggle-group-item"
+      data-variant="segmented"
       className={cn(
         "inline-flex h-8 items-center justify-center px-2.5 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground",
         className,

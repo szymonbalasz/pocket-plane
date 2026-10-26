@@ -13,6 +13,7 @@ const buttonVariants = cva(
         outline: "border bg-transparent hover:bg-accent hover:text-accent-foreground",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
@@ -23,6 +24,9 @@ const buttonVariants = cva(
     defaultVariants: { variant: "default", size: "default" },
   },
 );
+
+export type ButtonVariant = NonNullable<VariantProps<typeof buttonVariants>["variant"]>;
+export type ButtonSize = NonNullable<VariantProps<typeof buttonVariants>["size"]>;
 
 export function Button({
   className,
@@ -35,10 +39,13 @@ export function Button({
   VariantProps<typeof buttonVariants> & { asChild?: boolean; "data-slot"?: string }) {
   const Comp = asChild ? Slot.Root : "button";
   // A caller's slot wins (e.g. the sheet's `sheet-roll`); an `asChild` trigger passes none, so a
-  // Button stays `button` inside one (ADR-0069 styles buttons by slot).
+  // Button stays `button` inside one (ADR-0069 styles buttons by slot). FR-KIT-06 (BL-127): the
+  // variant and size are data, so a theme never reads them off the utility classes.
   return (
     <Comp
       data-slot={slot ?? "button"}
+      data-variant={variant ?? "default"}
+      data-size={size ?? "default"}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
