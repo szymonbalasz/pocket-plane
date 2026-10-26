@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 12 PAUSED for the night (DM, 2026-10-25), safe standby.** No agents, panes or servers running. On `main`: T0, CS, X1, X2 (4 / 6). Parked: **T1** `build/theme-switch` walkthrough **PASS** (D1 / D2 / D4 / P1, `.verify/sprint12/walkthroughs/20261025-th1-theme-switch/`), needs gates + merge; **T2** `build/theme-gilt` (stacked on T1, main merged in) built and committed, resume note `.verify/sprint12/t2-resume.md`: re-run its e2e specs, then walkthrough.
+**Phase:** **Sprint 12 resumed (2026-10-26).** On `main`: T0, CS, X1, X2, **T1** (a15785ed; 5 / 6). **T2** `build/theme-gilt` (main merged in): geometry e2e FAIL (tool rail grows under gilt: DM 291 → 451, player 166 → 206) → build-th2 fixing (Herdr workspace w76), then walkthrough (`tpl-test-th2.md`) → gates → merge → session-sim-16.
 
 **Resume (in order, one heavy run at a time, #354):** (1) `gates.sh` on `build-theme-switch` (merge main first: protocol §166 collides with X1's, run `resolve_docs.py` + `fixlinks.py`) → merge T1. (2) Restart a T2 builder in `build-theme-gilt` (brief `.verify/sprint12/briefs/build-th2.md` + `t2-resume.md`): merge main, its e2e, report ready. (3) T2 walkthrough (D1–D4, P1–P2, PS1–PS6 under Gilt & Stone; template to write from `tpl-test-th1.md`) → gates → merge. (4) session-sim-16 in `gates-main`, "Playtest: sprint 12", recap: default theme (OQ-THEME-03), the test-strategy proposal (#354). Briefs + `slices.json` backed up in `.verify/sprint12/` (copy back to `%TEMP%/pocket-plane/` if Storage Sense cleared it). Worktrees on disk: `build-theme-switch` (slot 0), `build-theme-gilt` (slot 2), `gates-main` (slot 5, detached at adc8b0dd); all `.env` have `PP_TEST_SHARDS=3`.
 
@@ -32,8 +32,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 12 CS printed sheet | merged f4b51d8e | — | **merged** (walkthrough 18/19 → re-test 24/24; check:full 5788 + shutdown load flake, e2e 254 + weapon-rows load flake, both pass alone) | — |
 | Sprint 12 X1 toasts (BL-118–120) | merged b46c010b | — | **merged** (walkthrough 2/5 → re-test 5/5; check:full 5807, e2e 261/261) | — |
 | Sprint 12 X2 stats + skip toast + flakes (BL-121, -122, -116) | merged beacd9e6 | — | **merged** (walkthrough 4/4; check:full 5797, e2e 256/256) | — |
-| Sprint 12 T1 theme switch | `build/theme-switch` (main merged in) | — (parked) | **walkthrough PASS** (D1 0-px Default, D2 rects equal, D4 no flash, P1 per browser; fonts 149 KB, only under gilt) | gates → merge |
-| Sprint 12 T2 Gilt & Stone | `build/theme-gilt` (on T1, main merged in) | — (parked) | built + committed (gilt.css, theme-geometry e2e, bundle theme-gilt, docs); notes: Button variants read off classes (suggests data-variant later), 18-px corners, no letter spacing (launcher canvas), arrows only on the sheet's tab strip | its e2e → walkthrough → gates → merge |
+| Sprint 12 T1 theme switch | merged a15785ed | — | **merged** (walkthrough PASS; check:full 5835 + no-copy load timeout, e2e 259 + 3 load flakes: cb-party, dice-extras, popup-line (popup-line again after BL-116), all pass alone) | — |
+| Sprint 12 T2 Gilt & Stone | `build/theme-gilt` (main merged in) | build-th2 (w76) | tool rail height differs across themes (FR-THEME-05) → fixing; rulings accepted: Button variants via classes (data-variant → backlog), 18-px corners, no letter spacing, arrows only on the sheet's tabs | walkthrough → gates → merge |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
