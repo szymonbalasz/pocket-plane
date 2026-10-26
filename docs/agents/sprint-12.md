@@ -13,6 +13,7 @@ Look: the kit page [gilt-stone.html](../design/art/kit/gilt-stone.html) (source 
 | **X1** toasts | `fix/x1-toasts` | BL-118 (stack + roll popup flicker on each new card, sim-15 FAIL c), BL-119 (older Roll requests card under the stack), BL-120 (pending counts don't add up) | now |
 | **X2** stats + combat | `fix/x2-stats-combat` | BL-121 (DM #353: for players, withhold **every** award a hidden fact could change, as BL-111 did for "Most damage dealt"), BL-122 (a new turn's skip toast replaces the previous one), BL-116 (two load-only flakes) | now |
 | **T1** theme switch | `build/theme-switch` | FR-THEME-01–04, -06, -08, -09, -16, -18, -20: `data-theme`, boot script, `pp.theme.v1`, both themes' token blocks (Default values reproduce today), Preferences **Appearance** section (both clients), bundled fonts (Latin woff2 + OFL) | after T0 merges |
+| **T3** default theme (DM #355) | `fix/theme-default` | Gilt & Stone is the default for a browser with no choice; the original look is renamed **Simple Dark** (stored `default` keeps meaning it) | after T2 merges |
 | **T2** Gilt & Stone | `build/theme-gilt` | FR-THEME-05, -10–15, -17, -19: `themes/gilt.css` (frame, controls, scrollbars, toasts, scroll tooltip, the sheet's `sheet-*` slots), bundle `theme-gilt`, `theme-geometry.e2e.ts`, walkthrough D1–D4, P1–P2 + CS's PS1–PS6 under Gilt & Stone | after T1 and CS merge |
 
 ```mermaid
@@ -49,3 +50,4 @@ flowchart LR
 | 2026-10-25 | Planned (DM #353): art build T0 → T1 → T2 with CS in parallel, fix lane X1 / X2 |
 | 2026-10-25 | **T0 merged** (Default pixel-identical). **CS merged** (printed sheet; DM sheet crash in a fight fixed; re-test 24 / 24). **X2 merged** (awards withheld for players when a hidden fact could change them; skip toast replaced; two flaky tests steadied; 4 / 4). **X1 merged** (toast flicker gone, popups move only on real changes, one pending count; re-test 5 / 5) |
 | 2026-10-25 | Machine ran out of memory under parallel test runs: DM #354 (one heavy run at a time now; new test strategy after this sprint). **T1 walkthrough PASS** (theme switch). T2 built. **Paused overnight** at this milestone |
+| 2026-10-26 | **T1 merged** (theme switch). T2 walkthrough 11 / 12 (hue slider; kit deviations) → fixes → re-test. DM #355: the goal is the kit **mockup**: T2 merges as the paint layer, **Gilt & Stone becomes the default** (T3), the old look is **Simple Dark**, then a **kit-parity layout track** (spec `kit-parity` started) until the look matches |
