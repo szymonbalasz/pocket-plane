@@ -50,7 +50,7 @@ export function ChunkReloadPanel({
           variant="outline"
           className="h-8 w-full"
           data-testid={testId}
-          data-variant={fallback}
+          data-fallback={fallback}
           data-failed={failed || undefined}
           aria-label={copy}
           onClick={onReload}

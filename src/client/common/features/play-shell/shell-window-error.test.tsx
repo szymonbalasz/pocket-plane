@@ -84,7 +84,10 @@ describe("FR-SHELL-175 stale chunk offers a reload", () => {
     const inline = render("dm", caught(stale, "inline"));
     expect(inline).toContain('data-testid="ui-chunk-reload"');
     expect(inline).toContain('data-variant="inline"');
-    expect(render("dm", caught(stale, "compact"))).toContain('data-variant="compact"');
+    const compact = render("dm", caught(stale, "compact"));
+    expect(compact).toContain('data-fallback="compact"');
+    // Its Button keeps the variant a theme reads (FR-KIT-06).
+    expect(compact).toContain('data-variant="outline"');
     expect(render("player", caught(stale, "map"))).toContain('data-variant="map"');
     expect(caught(stale, "notice")).toBeNull();
   });
