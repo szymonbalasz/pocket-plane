@@ -301,6 +301,7 @@ const MODULES: Record<string, { mod: Record<string, unknown>; spec: Spec }> = {
         "TooltipGroup",
         "TooltipController",
         "splitDialogClasses",
+        "focusOnOpen",
       ],
     },
   },

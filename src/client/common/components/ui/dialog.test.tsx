@@ -77,16 +77,24 @@ describe("FR-KIT-70 dialog bar", () => {
     expect([...idx].sort((a, b) => a - b)).toEqual(idx);
     // The bar cancels the body's padding: flush with the top and both sides, a rule under it.
     const bar = tag(m, "dialog-header");
-    for (const c of ["-mx-6", "-mt-6", "border-b", "items-center", "min-h-10", "pr-12"])
+    for (const c of ["-mx-6", "-mt-6", "border-b", "items-center", "min-h-10", "pl-6", "pr-4"])
       expect(bar).toContain(c);
     // The description is not inside the bar.
     const header = m.slice(at(m, "dialog-header"), m.indexOf("</div>", at(m, "dialog-header")));
     expect(header).not.toContain("dialog-description");
     expect(header).toContain("dialog-title");
-    // The built-in close: after the body, top 12 px = centred in the 40 px bar; footer right-aligned.
-    expect(at(m, "dialog-close")).toBeGreaterThan(at(m, "dialog-footer"));
-    expect(tag(m, "dialog-close")).toMatch(/aria-label="Close"/);
-    expect(tag(m, "dialog-close")).toContain("top-3");
+    // The built-in × is the bar's last item (a flex item of an `items-center` bar: centred for any
+    // title height, re-test #2), after the title; the corner × is hidden while a bar exists.
+    const closes = [...m.matchAll(/<button[^>]*data-slot="dialog-close"[^>]*>/g)].map((x) => x[0]);
+    expect(closes).toHaveLength(2);
+    expect(header.indexOf("dialog-close")).toBeGreaterThan(header.indexOf("dialog-title"));
+    expect(closes[0]).toMatch(/aria-label="Close"/);
+    expect(closes[0]).toContain("ml-auto shrink-0");
+    expect(closes[0]).not.toContain("absolute");
+    expect(closes[1]).toContain(
+      "[[data-slot=dialog-content]:has([data-slot=dialog-header])&gt;&amp;]:hidden",
+    );
+    expect(at(m, "dialog-footer")).toBeLessThan(m.lastIndexOf('data-slot="dialog-close"'));
     expect(tag(m, "dialog-footer")).toContain("justify-end");
   });
 
