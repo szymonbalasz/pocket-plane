@@ -79,7 +79,7 @@ T2 = what `gilt.css` (theme T2) already fixed. Markup = what this spec changes. 
 | Dialog & popover | Dialog = small window: title bar + gem close, body, framed buttons ("Keep fighting") | Title inside a padded body, small ✕ floating top-right, ghost Cancel | Frame | Header becomes a title bar; copy of End-encounter buttons | shared UI, combat-tracker |
 | Compendium (table) | Table: header row, zebra, right-aligned numbers | List of buttons: name + muted line + source chip | Paint | Table rows (0 B, OQ-KIT-05) | compendium |
 | More pieces (card) | Card = medallion, name, sub line, AC mini shield, HP bar | Party status = one-line rows; Creatures = icon tile rows | Paint | Party status cards, medallions | [party-board](../party-board.md), entities |
-| Slider · collapsible · alert · skeleton | As kit | Same | ✓, except the hue slider range (T2 FAIL) | None (T2 follow-up in gilt.css) | theme-system |
+| Slider · collapsible · alert · skeleton | As kit | Same | ✓ (the hue slider range was fixed in T2, `2cd30178`) | None | theme-system |
 | Type, Palette | Old book, kit `:root` | Same | ✓ | — | theme-system |
 | Preferences, launcher "⋯" menu | (Uses kit menu / section look) | Section headings muted small text | Paint | None (CSS: headings in label type) | play-shell |
 
@@ -170,6 +170,8 @@ Row grid: `medallion (md, 28) · what · time · result boxes · actions (hover)
 | FR-KIT-70 | **Title bar:** `DialogHeader` (`dialog-header`) renders flush to the top of `DialogContent` as a bar: the title (`dialog-title`, title type) on the left, the built-in close (`dialog-close`) vertically centred on the right, and a rule under it. The description and the content sit in a padded body (`dialog-body`, new); the footer (`dialog-footer`) is right-aligned. `max-w-md` is unchanged. | `FR-KIT-70 dialog bar` |
 | FR-KIT-71 | Every Dialog in both clients has a `DialogHeader` with a `DialogTitle` (also Radix's a11y rule); a test lists any that don't. | `FR-KIT-71 every dialog titled` |
 | FR-KIT-72 | **End encounter** (`cbt-init-end`, `cbt-enc-end`): the title stays `End “name”?`. Buttons: **Keep fighting** (outline) and **End encounter** (destructive, `…-end-confirm`). | `FR-KIT-72 end copy` |
+
+> **K0 note (2026-10-26, `fix/kit-parts`, orchestrator ruling after the K0 walkthrough):** the title bar holds only the title and the close; anything else a `DialogHeader` holds (a description, also one a caller wraps in a component) renders under the bar, in the body. **FR-KIT-71 exemptions:** the compendium image lightbox (`cmp-lightbox`) stays a chrome-less image viewer: a screen-reader-only title, no bar, and its size equals the pre-K0 one (a caller's padding / gap on `DialogContent` replaces the body's, so no band is added). Raw Radix overlays that are not dialogs in the kit's sense stay outside the Dialog parts: the pause card preview, the command palette and its shortcut sheet (listed in the `FR-KIT-71` test). The player's present popup (`party-present-popup`) moved onto the Dialog parts (title bar + close gem; test IDs and Close kept).
 
 ### 6.8 Compendium and stat block
 
@@ -275,7 +277,9 @@ The size table is authoritative ([play-shell §7](../play-shell.md#7-uiux-notes)
 | Compendium, stat-block window | `cmp-table`, `cmp-row`, `statblock`, `statblock-core`, `statblock-abilities`, `statblock-attack` | Table head in label type; zebra; stat block rules, ability labels in label type, small stone roll buttons |
 | Party / Creatures | `party-card` | Card gradient, AC mini shield |
 | Sheet header | `sheet-portrait`, `sheet-name` | Framed square portrait; name in name type |
-| Others (no markup) | — | Hue slider range shows the spectrum (T2 FAIL); Preferences headings in label type; window titles' slight emboss |
+| Others (no markup) | — | Preferences headings in label type; window titles' slight emboss |
+
+> **K0 note (2026-10-26, `fix/kit-parts`, orchestrator ruling):** the HP bar also carries `kit-hpbar-track` (the 5 px track) and `kit-hpbar-fill` (its `hp.*` fill), so a theme styles the track without structural selectors; gilt.css paints the track only, never the fill. Also `data-variant` on Switch (`default` in `controls.tsx`, `tool` in `menus.tsx`) and on DropdownMenuItem (`default` \| `destructive`), beside FR-KIT-06's Button and ToggleGroup.
 
 ## 8. Data model
 

@@ -51,6 +51,7 @@ export function DropdownMenuItem({
   return (
     <DM.Item
       data-slot="dropdown-menu-item"
+      data-variant={variant ?? "default"}
       className={cn(
         menuItem,
         variant === "destructive" && "text-destructive focus:text-destructive",
@@ -162,10 +163,12 @@ export function PopoverContent({
 }
 
 // ---- ToggleGroup ----
+// FR-KIT-06 (BL-127): the tool group (icon buttons, no border); `controls.tsx`'s is `segmented`.
 export function ToggleGroup({ className, ...props }: React.ComponentProps<typeof TG.Root>) {
   return (
     <TG.Root
       data-slot="toggle-group"
+      data-variant="tool"
       className={cn("flex items-center gap-1", className)}
       {...props}
     />
@@ -176,6 +179,7 @@ export function ToggleGroupItem({ className, ...props }: React.ComponentProps<ty
   return (
     <TG.Item
       data-slot="toggle-group-item"
+      data-variant="tool"
       className={cn(
         "inline-flex size-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-muted hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=on]:bg-accent data-[state=on]:text-accent-foreground [&_svg]:size-4",
         className,
@@ -190,6 +194,7 @@ export function Switch({ className, ...props }: React.ComponentProps<typeof SW.R
   return (
     <SW.Root
       data-slot="switch"
+      data-variant="tool"
       className={cn(
         "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input",
         className,

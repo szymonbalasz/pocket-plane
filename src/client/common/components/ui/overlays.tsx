@@ -6,6 +6,11 @@ import { cn } from "../../lib/utils";
 import { enrollTrigger, TIP_ATTR } from "./roving";
 
 // ---- Dialog ----
+// FR-KIT-70: a dialog is a small window. Its header is a title bar flush with the top (title left,
+// the built-in close centred on the right, a rule under it); the description and the content sit
+// in the padded body (`dialog-body`). The bar is drawn from inside the body (negative margins), so
+// a header rendered by a form inside the dialog is a bar too; a title outside a header makes its
+// own bar (FR-KIT-71).
 export const Dialog = D.Root;
 export function DialogTrigger(props: React.ComponentProps<typeof D.Trigger>) {
   return <D.Trigger data-slot={props.asChild ? undefined : "dialog-trigger"} {...props} />;
@@ -14,38 +19,138 @@ export function DialogClose(props: React.ComponentProps<typeof D.Close>) {
   return <D.Close data-slot={props.asChild ? undefined : "dialog-close"} {...props} />;
 }
 
+/** The body's padding (`p-6`), undone by the bar's negative margins. */
+const DIALOG_BAR =
+  "-mx-6 -mt-6 flex min-h-10 shrink-0 items-center gap-4 rounded-t-lg border-b py-1.5 pl-6 pr-4";
+
+/** True inside a `DialogHeader`: its title is in the bar already. */
+const InHeader = React.createContext(false);
+
+/** The built-in ×. One per dialog: in its bar, else (no bar: an image lightbox) top-right. */
+function BuiltInClose({ className }: { className: string }) {
+  return (
+    <D.Close
+      data-slot="dialog-close"
+      className={cn("opacity-70 hover:opacity-100", className)}
+      aria-label="Close"
+    >
+      <XIcon className="size-4" />
+    </D.Close>
+  );
+}
+
+/** The title bar: the title, then the × as its last item, centred for any title height. */
+function DialogBar({ className, children, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div data-slot="dialog-header" className={cn(DIALOG_BAR, className)} {...props}>
+      {children}
+      <BuiltInClose className="relative ml-auto shrink-0" />
+    </div>
+  );
+}
+
+/** Tabbable elements in Radix's sense (enabled, shown, not `tabindex=-1`), in DOM order. */
+const TABBABLE =
+  'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Radix's open focus (the first tabbable, an input's text selected) minus the bar's ×, which now
+ * comes first in the DOM: the first field or button still gets the focus, the × only when it is
+ * the only one, else the dialog itself.
+ */
+export function focusOnOpen(content: HTMLElement): void {
+  const candidates = [...content.querySelectorAll<HTMLElement>(TABBABLE)].filter(
+    (el) => el.tabIndex >= 0 && el.getClientRects().length > 0,
+  );
+  const target =
+    candidates.find((el) => !el.matches('[data-slot="dialog-close"][aria-label="Close"]')) ??
+    candidates[0] ??
+    content;
+  target.focus({ preventScroll: true });
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) target.select();
+}
+
+/** A caller's inner spacing (padding, gap): it belongs to the body and replaces the body's own. */
+const INNER_SPACING = /^(?:[\w-]+:)*(?:p[trblxy]?|gap(?:-[xy])?)-/;
+
+/** `className` split into the frame's classes and the body's spacing (FR-KIT-70). */
+export function splitDialogClasses(className: string | undefined): {
+  frame: string;
+  body: string;
+} {
+  const all = (className ?? "").split(/\s+/).filter(Boolean);
+  return {
+    frame: all.filter((c) => !INNER_SPACING.test(c)).join(" "),
+    body: all.filter((c) => INNER_SPACING.test(c)).join(" "),
+  };
+}
+
 export function DialogContent({
   className,
   children,
+  zIndex,
+  style,
+  onOpenAutoFocus,
   ...props
-}: React.ComponentProps<typeof D.Content>) {
+}: React.ComponentProps<typeof D.Content> & {
+  /** A layer above the shell's own (overlay and content), e.g. the player's present popup. */
+  zIndex?: number;
+}) {
+  // A caller's flex column (a form that scrolls under the header) carries on inside the body; its
+  // padding replaces the body's (an image lightbox keeps its size: no band added round it).
+  const column = /(^|\s)flex(\s|$)/.test(className ?? "");
+  const { frame, body } = splitDialogClasses(className);
   return (
     <D.Portal>
-      <D.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-50 bg-overlay/60" />
+      <D.Overlay
+        data-slot="dialog-overlay"
+        className="fixed inset-0 z-50 bg-overlay/60"
+        style={zIndex === undefined ? undefined : { zIndex }}
+      />
       <D.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg border bg-background p-6 shadow-lg",
-          className,
+          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background shadow-lg",
+          frame,
         )}
+        style={zIndex === undefined ? style : { ...style, zIndex }}
+        onOpenAutoFocus={(e) => {
+          onOpenAutoFocus?.(e);
+          if (e.defaultPrevented) return;
+          e.preventDefault();
+          if (e.currentTarget instanceof HTMLElement) focusOnOpen(e.currentTarget);
+        }}
         {...props}
       >
-        {children}
-        <D.Close
-          data-slot="dialog-close"
-          className="absolute right-4 top-4 opacity-70 hover:opacity-100"
-          aria-label="Close"
+        <div
+          data-slot="dialog-body"
+          className={cn("gap-4 p-6", column ? "flex min-h-0 flex-1 flex-col" : "grid", body)}
         >
-          <XIcon className="size-4" />
-        </D.Close>
+          {children}
+        </div>
+        {/* A dialog with a bar has its × there; this one is for a dialog without one. */}
+        <BuiltInClose className="absolute right-4 top-3 [[data-slot=dialog-content]:has([data-slot=dialog-header])>&]:hidden" />
       </D.Content>
     </D.Portal>
   );
 }
 
-export function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+/**
+ * The title bar holds the title only (and the built-in ×); everything else in the header (a
+ * description, however a caller wraps it) goes under it, into the body (the kit's dialog).
+ */
+export function DialogHeader({ className, children, ...props }: React.ComponentProps<"div">) {
+  const kids = React.Children.toArray(children);
+  const isTitle = (k: React.ReactNode) => React.isValidElement(k) && k.type === DialogTitle;
   return (
-    <div data-slot="dialog-header" className={cn("flex flex-col gap-2", className)} {...props} />
+    <>
+      <InHeader.Provider value>
+        <DialogBar className={className} {...props}>
+          {kids.filter(isTitle)}
+        </DialogBar>
+      </InHeader.Provider>
+      {kids.filter((k) => !isTitle(k))}
+    </>
   );
 }
 export function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
@@ -54,13 +159,18 @@ export function DialogFooter({ className, ...props }: React.ComponentProps<"div"
   );
 }
 export function DialogTitle({ className, ...props }: React.ComponentProps<typeof D.Title>) {
-  return (
+  const inHeader = React.useContext(InHeader);
+  const title = (
     <D.Title
       data-slot="dialog-title"
-      className={cn("text-lg font-semibold", className)}
+      className={cn("min-w-0 text-lg font-semibold leading-7", className)}
       {...props}
     />
   );
+  // A visible title outside a header is the bar on its own (an image lightbox keeps its sr-only
+  // title and no bar).
+  if (inHeader || /\bsr-only\b/.test(className ?? "")) return title;
+  return <DialogBar>{title}</DialogBar>;
 }
 export function DialogDescription({
   className,

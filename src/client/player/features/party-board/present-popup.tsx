@@ -8,6 +8,7 @@
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { HANDOUT_PRESENT_TYPE, type HandoutPresentRecord } from "@shared/party-board/schemas";
 import { Button } from "@ui/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@ui/components/ui/overlays";
 import { Skeleton } from "@ui/components/ui/primitives";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { DiceText } from "@ui/features/dice-extras/DiceText";
@@ -30,7 +31,6 @@ import { type LoadedHandout, useHandout } from "@ui/features/party-board/Viewer"
 import { usePaused } from "@ui/features/pause/hooks";
 import { useRecords, useSync } from "@ui/sync/store";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
-import { Dialog as D } from "radix-ui";
 import { type ElementType, type Ref, useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 
@@ -93,42 +93,40 @@ function Shown({ present }: { present: HandoutPresentRecord }) {
   }, [notes, present.handoutId]);
   if (view === "gone") return null;
   return (
-    <D.Root
+    // The shared Dialog parts (FR-KIT-70): the title is the title bar, its × closes as Close / Esc.
+    <Dialog
       open
       onOpenChange={(open) => {
         if (!open) close(present.id);
       }}
     >
-      <D.Portal>
-        <D.Overlay className="fixed inset-0 bg-overlay/60" style={{ zIndex: PRESENT_POPUP_Z }} />
-        <D.Content
-          data-testid="party-present-popup"
-          data-record-id={present.handoutId}
-          data-present-id={present.id}
-          aria-describedby={undefined}
-          className="fixed top-1/2 left-1/2 flex max-h-[90vh] w-[min(90vw,64rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-3 rounded-lg border bg-background p-4 shadow-lg"
-          style={{ zIndex: PRESENT_POPUP_Z }}
-          onOpenAutoFocus={(e) => {
-            e.preventDefault();
-            closeRef.current?.focus();
+      <DialogContent
+        data-testid="party-present-popup"
+        data-record-id={present.handoutId}
+        data-present-id={present.id}
+        aria-describedby={undefined}
+        className="flex max-h-[90vh] w-[min(90vw,64rem)] max-w-none flex-col gap-3"
+        zIndex={PRESENT_POPUP_Z}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          closeRef.current?.focus();
+        }}
+      >
+        <PresentContent
+          key={present.id}
+          state={view}
+          loaded={loaded}
+          onRetry={retry}
+          onClose={() => close(present.id)}
+          onOpenBoard={() => {
+            openHandout(present.handoutId);
+            close(present.id);
           }}
-        >
-          <PresentContent
-            key={present.id}
-            state={view}
-            loaded={loaded}
-            onRetry={retry}
-            onClose={() => close(present.id)}
-            onOpenBoard={() => {
-              openHandout(present.handoutId);
-              close(present.id);
-            }}
-            closeRef={closeRef}
-            TitleAs={D.Title}
-          />
-        </D.Content>
-      </D.Portal>
-    </D.Root>
+          closeRef={closeRef}
+          TitleAs={DialogTitle}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 

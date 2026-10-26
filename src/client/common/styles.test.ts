@@ -206,8 +206,8 @@ const SWAPS: { el: string; file: string; marker: string; pairs: [string, string]
     pairs: [["text-sky-400", "text-hp-temp"]],
   },
   {
-    el: "present popup overlay (party-present-popup)",
-    file: "src/client/player/features/party-board/present-popup.tsx",
+    el: "dialog overlay (Dialog parts; the present popup since K0, party-present-popup)",
+    file: "src/client/common/components/ui/overlays.tsx",
     marker: "bg-overlay/60",
     pairs: [["bg-black/60", "bg-overlay/60"]],
   },

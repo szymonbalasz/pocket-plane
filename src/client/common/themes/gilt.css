@@ -245,7 +245,7 @@
   :root[data-theme="gilt"] [data-testid="note-toast-close"],
   :root[data-theme="gilt"] [data-testid="note-callout-close"],
   :root[data-theme="gilt"]
-    [data-slot="dialog-content"]
+    :is([data-slot="dialog-content"], [data-slot="dialog-header"])
     > [data-slot="dialog-close"][aria-label="Close"] {
     color: var(--gs-gem-ink);
   }
@@ -265,7 +265,7 @@
 :root[data-theme="gilt"] [data-testid="note-toast-close"] svg,
 :root[data-theme="gilt"] [data-testid="note-callout-close"] svg,
 :root[data-theme="gilt"]
-  [data-slot="dialog-content"]
+  :is([data-slot="dialog-content"], [data-slot="dialog-header"])
   > [data-slot="dialog-close"][aria-label="Close"]
   svg {
   transform: scale(0.8);
@@ -434,14 +434,13 @@
 }
 
 /* ── FR-THEME-11 Button: stone with a gold label ────────────────────────────────────────────── */
-/* Variants are read off the classes Button already renders (cva): `bg-primary` = default,
-   `bg-destructive` = destructive, `bg-secondary` = secondary, `border` = outline, none = ghost. */
+/* Variants are read off `data-variant` (FR-KIT-06, BL-127), never off the utility classes. */
 @layer base {
   :root[data-theme="gilt"] [data-slot="button"] {
     color: var(--gold);
     font-family: var(--font-label);
   }
-  :root[data-theme="gilt"] [data-slot="button"].border {
+  :root[data-theme="gilt"] [data-slot="button"][data-variant="outline"] {
     border-color: var(--frame-rule);
   }
 }
@@ -450,7 +449,8 @@
     color 0.15s,
     box-shadow 0.15s;
 }
-:root[data-theme="gilt"] [data-slot="button"]:is(.bg-secondary, .border) {
+:root[data-theme="gilt"]
+  [data-slot="button"]:is([data-variant="secondary"], [data-variant="outline"]) {
   --secondary: var(--gs-stone);
   --secondary-foreground: var(--gold);
   --accent: var(--gs-stone);
@@ -463,7 +463,7 @@
     0 1px 0 #000;
 }
 /* Default (primary): the gold-tinted stone. */
-:root[data-theme="gilt"] [data-slot="button"].bg-primary {
+:root[data-theme="gilt"] [data-slot="button"][data-variant="default"] {
   --primary: var(--gs-primary);
   --primary-foreground: var(--gs-primary-ink);
   background-image:
@@ -474,7 +474,7 @@
     inset 0 2px 0 rgb(255 236 190 / 0.08),
     0 1px 0 #000;
 }
-:root[data-theme="gilt"] [data-slot="button"].bg-destructive {
+:root[data-theme="gilt"] [data-slot="button"][data-variant="destructive"] {
   --destructive: var(--gs-danger);
   --destructive-foreground: var(--gs-danger-ink);
   background-image: var(--panel-grain), linear-gradient(var(--gs-danger-hi), var(--gs-danger));
@@ -483,8 +483,7 @@
     0 1px 0 #000;
 }
 /* Ghost: no stone at rest (dense rows), stone on hover. */
-:root[data-theme="gilt"]
-[data-slot="button"]:not(.bg-primary, .bg-secondary, .bg-destructive, .border) {
+:root[data-theme="gilt"] [data-slot="button"][data-variant="ghost"] {
   --accent: var(--gs-stone);
   --accent-foreground: var(--gs-label-hover);
 }
@@ -494,7 +493,7 @@
     inset 0 0 10px rgb(226 194 124 / 0.12),
     0 1px 0 #000;
 }
-:root[data-theme="gilt"] [data-slot="button"].bg-destructive:not(:disabled):hover {
+:root[data-theme="gilt"] [data-slot="button"][data-variant="destructive"]:not(:disabled):hover {
   box-shadow:
     inset 0 0 0 1px #b2443a,
     0 1px 0 #000;
@@ -870,19 +869,19 @@
 }
 /* Its × is a 16 px box: the gem is painted round it at the kit's 22 px; the hit box stays. */
 :root[data-theme="gilt"]
-  [data-slot="dialog-content"]
+  :is([data-slot="dialog-content"], [data-slot="dialog-header"])
   > [data-slot="dialog-close"][aria-label="Close"] {
   border-radius: 50%;
   opacity: 1;
   transition: filter 0.15s;
 }
 :root[data-theme="gilt"]
-  [data-slot="dialog-content"]
+  :is([data-slot="dialog-content"], [data-slot="dialog-header"])
   > [data-slot="dialog-close"][aria-label="Close"]:focus-visible {
   outline-offset: 5px;
 }
 :root[data-theme="gilt"]
-  [data-slot="dialog-content"]
+  :is([data-slot="dialog-content"], [data-slot="dialog-header"])
   > [data-slot="dialog-close"][aria-label="Close"]::before {
   content: "";
   position: absolute;
@@ -903,12 +902,12 @@
     inset 0 -2px 3px rgb(0 0 0 / 0.55);
 }
 :root[data-theme="gilt"]
-  [data-slot="dialog-content"]
+  :is([data-slot="dialog-content"], [data-slot="dialog-header"])
   > [data-slot="dialog-close"][aria-label="Close"]:hover {
   filter: brightness(1.25);
 }
 :root[data-theme="gilt"]
-  [data-slot="dialog-content"]
+  :is([data-slot="dialog-content"], [data-slot="dialog-header"])
   > [data-slot="dialog-close"][aria-label="Close"]:hover::before {
   box-shadow:
     inset 0 0 0 1.5px var(--frame-rule-strong),
@@ -920,10 +919,7 @@
    pressed are the shared Button states). */
 :root[data-theme="gilt"]
   [data-slot="dialog-footer"]
-  [data-slot="button"]:not(.bg-primary, .bg-secondary, .bg-destructive, .border):not(
-    :hover,
-    :active
-  ) {
+  [data-slot="button"][data-variant="ghost"]:not(:hover, :active) {
   background-image:
     var(--panel-grain), linear-gradient(var(--gs-stone-hi), var(--gs-stone) 55%, var(--gs-stone-lo));
   box-shadow:
@@ -1181,7 +1177,7 @@
   --accent: var(--gs-roll-hi);
   --accent-foreground: var(--gs-label-glow);
 }
-:root[data-theme="gilt"] [data-slot="sheet-roll"].bg-primary {
+:root[data-theme="gilt"] [data-slot="sheet-roll"][data-variant="default"] {
   --primary: var(--gs-roll);
   --primary-foreground: var(--foreground);
   background-image: linear-gradient(var(--gs-roll-hi), var(--gs-roll));
@@ -1262,4 +1258,106 @@
   :root[data-theme="gilt"] [data-testid="ui-window-close"] {
     transition: none;
   }
+}
+
+/* KIT: parts (kit-parity K0: Medallion, Result box, HP bar; dialog title bar; menus) ────────── */
+@layer base {
+  :root[data-theme="gilt"] [data-slot="kit-medallion"] {
+    border-color: var(--frame-rule-strong);
+    font-family: var(--font-num);
+  }
+  :root[data-theme="gilt"] [data-slot="kit-result"] {
+    border-color: var(--frame-rule-strong);
+    color: var(--gold);
+    font-family: var(--font-num);
+  }
+  :root[data-theme="gilt"] [data-slot="kit-result"][data-outcome="damage"] {
+    border-color: var(--gs-danger-rule);
+  }
+  :root[data-theme="gilt"] [data-slot="kit-hpbar"] {
+    font-family: var(--font-num);
+  }
+  :root[data-theme="gilt"] [data-slot="dialog-header"] {
+    border-color: var(--frame-rule);
+  }
+}
+/* Medallion: the gold ring, a black hairline outside it, a soft shade inside. */
+:root[data-theme="gilt"] [data-slot="kit-medallion"] {
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px rgb(0 0 0 / 0.35);
+}
+/* Result box: gold-ruled on a dark box (crit green, damage red, fumble dim: the meaning
+   utilities on the box win over the gold). */
+:root[data-theme="gilt"] [data-slot="kit-result"] {
+  border-radius: 3px;
+  background-image: linear-gradient(var(--gs-result), #14120c);
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-slot="kit-result"][tabindex] {
+  cursor: help;
+}
+/* HP bar: a dark inset track (the fill keeps its `hp.*` colour). */
+:root[data-theme="gilt"] [data-slot="kit-hpbar-track"] {
+  --muted: #2a2620;
+  box-shadow: inset 0 0 0 1px #000;
+}
+
+/* Dialog title bar (FR-KIT-70): the window title bar's dark band and gold rule. The frame's
+   double rule and corner pieces move onto an overlay above the bar, so the bar can't hide them. */
+:root[data-theme="gilt"] [data-slot="dialog-content"] {
+  background-image: var(--panel-grain);
+  background-size: auto;
+  background-repeat: repeat;
+  background-position: 0 0;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.7);
+}
+:root[data-theme="gilt"] [data-slot="dialog-content"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: var(--frame-shadow);
+  background:
+    var(--frame-corner) top left / 26px 26px no-repeat,
+    var(--frame-corner-tr) top right / 26px 26px no-repeat,
+    var(--frame-corner-bl) bottom left / 26px 26px no-repeat,
+    var(--frame-corner-br) bottom right / 26px 26px no-repeat;
+}
+:root[data-theme="gilt"] [data-slot="dialog-header"] {
+  position: relative;
+  background-image: linear-gradient(#1c201f, #121615);
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-slot="dialog-header"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -3px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(176 138 74 / 0.6) 20%,
+    rgb(176 138 74 / 0.6) 80%,
+    transparent
+  );
+}
+/* The gem paints behind its ×, so the close keeps its own stack above the bar's band. */
+:root[data-theme="gilt"]
+  :is([data-slot="dialog-content"], [data-slot="dialog-header"])
+  > [data-slot="dialog-close"][aria-label="Close"] {
+  isolation: isolate;
+}
+
+/* Menus: an open submenu's trigger keeps the highlight (the kit's gold bar on a warm wash). */
+:root[data-theme="gilt"] [data-slot="dropdown-menu-sub-trigger"][data-state="open"] {
+  --accent: var(--gs-highlight);
+  --accent-foreground: var(--gs-label-bright);
+  background-image: linear-gradient(90deg, #2c2311, #1a160c);
+  box-shadow: inset 2px 0 0 var(--gold);
 }

@@ -23,7 +23,8 @@ async function closePresented(page: Page) {
   const dialog = page.getByRole("dialog");
   await page.waitForTimeout(500);
   if ((await dialog.count()) === 0) return;
-  await dialog.getByRole("button", { name: "Close" }).click();
+  // The present popup has the title bar's close gem and its own Close button (FR-KIT-70).
+  await dialog.getByRole("button", { name: "Close" }).first().click();
   await expect(dialog).toHaveCount(0);
 }
 

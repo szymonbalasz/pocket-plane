@@ -2665,4 +2665,10 @@ From [theme-system](../specs/post-mvp/theme-system.md#6-functional-requirements)
 | Theme | `localStorage` `pp.theme.v1` = `{theme: "default" \| "gilt"}`, unchanged shape; `default` = Simple Dark | missing / invalid / blocked → **`gilt`** (was `default`); invalid / blocked warn once; stored values need no migration | FR-THEME-03 |
 
 - **Derived (client, not stored):** `data-theme` on `<html>`: `gilt` with no stored choice; none for Simple Dark.
+
+## 134. Sprint 13: kit parts (K0)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #356). **Built by `fix/kit-parts`**. Protocol side: [protocol §170](../protocol/README.md#170-sprint-13-kit-parts-variants-as-data-dialog-title-bar-k0). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `medallionOf(name, imageAssetId?, colour?)` → `{letter, imageAssetId, colour}`; `medallionInk(colour)`; `hpFill(cur, max)` (0–100 %) and `hpBarMode` (`bar` \| `band` \| none); the HP bar's band = the given band, else `healthBand(cur, max)` (FR-CBT-26).
 - **Fixtures:** none.
