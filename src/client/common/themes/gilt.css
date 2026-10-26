@@ -107,9 +107,7 @@
 /* Parts inside clipping strips or lists draw it inside their box. */
 :root[data-theme="gilt"] [data-slot="tabs-trigger"]:focus-visible,
 :root[data-theme="gilt"] [data-slot="toggle-group-item"]:focus-visible,
-:root[data-theme="gilt"] [data-slot="sheet-roll"]:focus-visible,
-:root[data-theme="gilt"] [role="menuitem"]:focus-visible,
-:root[data-theme="gilt"] [role="option"]:focus-visible {
+:root[data-theme="gilt"] [data-slot="sheet-roll"]:focus-visible {
   outline-offset: -2px;
 }
 
@@ -223,10 +221,7 @@
 /* Close = the red gem. */
 :root[data-theme="gilt"] [data-testid="ui-window-close"],
 :root[data-theme="gilt"] [data-testid="note-toast-close"],
-:root[data-theme="gilt"] [data-testid="note-callout-close"],
-:root[data-theme="gilt"]
-  [data-slot="dialog-content"]
-  > [data-slot="dialog-close"][aria-label="Close"] {
+:root[data-theme="gilt"] [data-testid="note-callout-close"] {
   border-radius: 50%;
   opacity: 1;
   background-color: var(--gem);
@@ -278,10 +273,7 @@
 }
 :root[data-theme="gilt"] [data-testid="ui-window-close"]:hover,
 :root[data-theme="gilt"] [data-testid="note-toast-close"]:hover,
-:root[data-theme="gilt"] [data-testid="note-callout-close"]:hover,
-:root[data-theme="gilt"]
-  [data-slot="dialog-content"]
-  > [data-slot="dialog-close"][aria-label="Close"]:hover {
+:root[data-theme="gilt"] [data-testid="note-callout-close"]:hover {
   filter: brightness(1.25);
   box-shadow:
     inset 0 0 0 1.5px var(--frame-rule-strong),
@@ -828,16 +820,16 @@
     color: var(--frame-rule-strong);
   }
 }
-/* Highlighted item: a gold wash and a gold edge. */
+/* Highlighted (or keyboard-focused) item: a gold bar on the left over a warm wash. The bar is the
+   item's focus mark, so the gold ring is not drawn round it. */
 :root[data-theme="gilt"]
-:is(
-  [role="menuitem"],
-  [role="menuitemradio"],
-  [role="menuitemcheckbox"],
-  [role="option"]
-)[data-highlighted] {
+:is([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"]):is(
+  [data-highlighted],
+  :focus-visible
+) {
   --accent: var(--gs-highlight);
   --accent-foreground: var(--gs-label-bright);
+  outline: none;
   background-image: linear-gradient(90deg, #2c2311, #1a160c);
   box-shadow: inset 2px 0 0 var(--gold);
 }
@@ -875,6 +867,69 @@
 }
 :root[data-theme="gilt"] [data-slot="dialog-overlay"] {
   box-shadow: inset 0 0 80px rgb(0 0 0 / 0.8);
+}
+/* Its × is a 16 px box: the gem is painted round it at the kit's 22 px; the hit box stays. */
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"] {
+  border-radius: 50%;
+  opacity: 1;
+  transition: filter 0.15s;
+}
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]:focus-visible {
+  outline-offset: 5px;
+}
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 36% 30%,
+    var(--gem-hi) 0 9%,
+    #d42a24 26%,
+    #7a0f12 68%,
+    #3a0507 100%
+  );
+  box-shadow:
+    inset 0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 1px #000,
+    inset 0 -2px 3px rgb(0 0 0 / 0.55);
+}
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]:hover {
+  filter: brightness(1.25);
+}
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]:hover::before {
+  box-shadow:
+    inset 0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 1px #000,
+    0 0 10px rgb(255 80 60 / 0.45),
+    inset 0 -2px 3px rgb(0 0 0 / 0.5);
+}
+/* Its ghost button (Cancel) is a stone button at rest, as the kit's "Keep fighting" (hover and
+   pressed are the shared Button states). */
+:root[data-theme="gilt"]
+  [data-slot="dialog-footer"]
+  [data-slot="button"]:not(.bg-primary, .bg-secondary, .bg-destructive, .border):not(
+    :hover,
+    :active
+  ) {
+  background-image:
+    var(--panel-grain), linear-gradient(var(--gs-stone-hi), var(--gs-stone) 55%, var(--gs-stone-lo));
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 2px 0 rgb(255 236 190 / 0.06),
+    0 1px 0 #000;
 }
 
 /* ── FR-THEME-12 the scroll tooltip ─────────────────────────────────────────────────────────── */
