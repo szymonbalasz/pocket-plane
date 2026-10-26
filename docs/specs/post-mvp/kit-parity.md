@@ -1,7 +1,7 @@
 ---
 title: Kit parity
 prefix: KIT
-status: draft
+status: in-review
 owner: spec-kit-parity
 phase: post-mvp
 ---
