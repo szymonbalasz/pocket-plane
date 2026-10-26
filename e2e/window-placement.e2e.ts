@@ -55,7 +55,7 @@ test("FR-SHELL-42 player-1 opens a handout, reloads → no viewer window, Party 
   expect(await viewer.boundingBox()).toEqual(before);
 });
 
-test("FR-SHELL-43 DM at 1280×720: no launcher button outside the viewport; narrower → icon only, then the ⋯ menu holds the rest", async ({
+test("FR-SHELL-43 FR-KIT-14 DM at 1280×720: the launcher inside the top bar's centre zone, no button outside it; narrower → icon only, more in the ⋯ menu", async ({
   browser,
 }) => {
   const { secret } = e2eEnv();
@@ -65,12 +65,16 @@ test("FR-SHELL-43 DM at 1280×720: no launcher button outside the viewport; narr
   await live(dm);
 
   const launcher = dm.getByTestId("ui-launcher");
+  const zone = dm.getByTestId("ui-topbar-centre");
   // Polled: after a resize the bar re-fits over a frame or two (compact first, then overflow).
+  // FR-KIT-14: inside the centre zone (between the title and the right cluster), 8 px gutters.
   const inside = (width: number) =>
     expect
       .poll(async () => {
         const bar = await launcher.boundingBox();
-        if (!(bar && bar.x >= 8 && bar.x + bar.width <= width - 8)) return "bar outside";
+        const z = await zone.boundingBox();
+        if (!(bar && z && bar.x >= z.x + 8 - 1 && bar.x + bar.width <= z.x + z.width - 8 + 1))
+          return "bar outside its zone";
         for (const b of await dm.getByTestId("ui-launcher-button").all()) {
           const r = await b.boundingBox();
           if (!(r && r.x >= 0 && r.x + r.width <= width)) return "button outside";
@@ -79,7 +83,8 @@ test("FR-SHELL-43 DM at 1280×720: no launcher button outside the viewport; narr
       })
       .toBe("ok");
   await inside(1280);
-  await expect(dm.getByTestId("ui-launcher-overflow")).toHaveAttribute("data-count", "0");
+  // ADR-0070: at 1280 the zone may leave some buttons in the menu.
+  const at1280 = Number(await dm.getByTestId("ui-launcher-overflow").getAttribute("data-count"));
 
   // Narrow: icon only, some buttons in the menu.
   await dm.setViewportSize({ width: 480, height: 720 });
@@ -87,7 +92,7 @@ test("FR-SHELL-43 DM at 1280×720: no launcher button outside the viewport; narr
   await inside(480);
   const overflow = dm.getByTestId("ui-launcher-overflow");
   const count = Number(await overflow.getAttribute("data-count"));
-  expect(count).toBeGreaterThan(0);
+  expect(count).toBeGreaterThan(at1280);
   await dm.getByTestId("ui-launcher-menu").click();
   const items = dm.getByTestId("ui-launcher-overflow-item");
   await expect(items).toHaveCount(count);
@@ -102,9 +107,16 @@ test("FR-SHELL-43 DM at 1280×720: no launcher button outside the viewport; narr
   ).toHaveAttribute("data-state", "open");
   await dm.keyboard.press("Escape");
 
-  // Wide again: labels back, menu empty. 1920: with Requests (TT2) and Party status (CB3) the DM's
-  // labelled bar no longer fits 1600 (FR-SHELL-143 only needs it to fit at 1280, icons allowed).
+  // Wide again: labels back (from the left, BL-113), menu empty. K5 (FR-KIT-14): the zone between
+  // the title and the right cluster no longer holds every DM label at 1920, so some stay icons.
   await dm.setViewportSize({ width: 1920, height: 1080 });
-  await expect(launcher).toHaveAttribute("data-compact", "false");
   await expect(overflow).toHaveAttribute("data-count", "0");
+  await inside(1920);
+  const buttons = dm.getByTestId("ui-launcher-button");
+  await expect(buttons.first()).toHaveAttribute("data-compact", "false");
+  const compact = await buttons.evaluateAll((els) =>
+    els.map((e) => e.getAttribute("data-compact") === "true"),
+  );
+  const from = compact.indexOf(true);
+  expect(from === -1 || compact.slice(from).every(Boolean)).toBe(true);
 });

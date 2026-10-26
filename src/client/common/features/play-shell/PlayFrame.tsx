@@ -12,6 +12,7 @@ import { IdentityChip } from "./IdentityChip";
 import { keepOutsAttr, useKeepOuts } from "./keep-outs";
 import { SHELL_ZONE_ATTR } from "./keys";
 import { Launcher } from "./Launcher";
+import { LAUNCHER_MIN_ZONE } from "./launcher-fit";
 import { mountedWindows, topWindow, type WindowAction } from "./manager";
 import { OverlayLayer } from "./OverlayLayer";
 import type { ShellClient } from "./registry";
@@ -184,7 +185,8 @@ export function PlayFrame({ client, topLeft, topStatus, topEnd, base, toolRail }
         <div
           ref={centre}
           data-testid="ui-topbar-centre"
-          className="flex h-full min-w-0 flex-1 items-center justify-center overflow-hidden"
+          className="flex h-full flex-1 items-center justify-center overflow-hidden"
+          style={{ minWidth: LAUNCHER_MIN_ZONE }}
         >
           <Launcher
             defs={registry.defs.filter((d) => available.has(d.kind))}

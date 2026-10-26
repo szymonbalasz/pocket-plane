@@ -275,6 +275,8 @@ describe("kit-parity top bar", () => {
       expect(tagOf(html, "ui-topbar-left")).toContain("max-width:30%");
       expect(tagOf(html, "ui-topbar-right")).toContain("shrink-0");
       expect(tagOf(html, "ui-topbar-centre")).toContain("flex-1");
+      // The "⋯" menu (Reset layout) always fits: the title shrinks first.
+      expect(tagOf(html, "ui-topbar-centre")).toContain("min-width:66px");
     }
   });
 

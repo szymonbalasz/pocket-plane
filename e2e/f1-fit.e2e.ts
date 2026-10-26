@@ -98,7 +98,7 @@ test("FR-SHELL-103 FR-MAP-115 BL-107 walkthrough F1 1c: DM 1280×720 Goblin Ambu
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
   const log = shellWindow(dm, "dice.log");
   await dm.setViewportSize({ width: 1280, height: 720 });
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 508, w: 690, h: 200 }); // K5
   await dm.getByTestId("ui-launcher-menu").click();
   await dm.getByTestId("ui-launcher-reset").click();
   await expect(shellWindow(dm, "map.scenes")).toHaveCount(0);
@@ -120,7 +120,7 @@ test("FR-SHELL-103 FR-MAP-115 BL-107 walkthrough F1 1c: DM 1280×720 Goblin Ambu
 
   // Before the fix: the Party Manager kept 505 × 400 and every fit `pcs` at the 48-px floor.
   await dm.setViewportSize({ width: 1440, height: 900 });
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 608, w: 1150, h: 280 }); // K5
   await expect(canvas).toHaveAttribute("data-fit-visible", "all");
   await expect(canvas).toHaveAttribute("data-fit-floor", "false");
   const wide = await box(board);
@@ -130,7 +130,7 @@ test("FR-SHELL-103 FR-MAP-115 BL-107 walkthrough F1 1c: DM 1280×720 Goblin Ambu
   await expect(canvas).toHaveAttribute("data-fit-floor", "false");
 
   await dm.setViewportSize({ width: 1280, height: 720 });
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 508, w: 690, h: 200 }); // K5
   await expect.poll(() => box(board)).toEqual(before);
 
   await dm.setViewportSize({ width: 1440, height: 900 });
@@ -143,12 +143,15 @@ test("FR-SHELL-103 FR-MAP-115 BL-107 walkthrough F1 1c: DM 1280×720 Goblin Ambu
   await dm.context().close();
 });
 
-test("FR-SHELL-43 BL-113 DM 1440×900 in test mode: the launcher keeps the labels that fit (left first), not icon-only throughout; the bar inside the viewport, nothing in the menu", async ({
+// K5 (FR-KIT-14, ADR-0070): the launcher fits the top bar's centre zone; at 1440×900 test mode's
+// 17+ buttons no longer fit icon-only there (some go to ⋯, no labels), so BL-113 is checked where
+// they all fit: 1920×1080.
+test("FR-SHELL-43 BL-113 FR-KIT-14 DM 1920×1080 in test mode: the launcher keeps the labels that fit (left first), not icon-only throughout; the bar inside its zone, nothing in the menu", async ({
   browser,
 }) => {
   const { secret } = e2eEnv();
   const dm = await rolePage(browser);
-  await dm.setViewportSize({ width: 1440, height: 900 });
+  await dm.setViewportSize({ width: 1920, height: 1080 });
   await loginDm(dm, secret);
   await live(dm);
   const buttons = dm.getByTestId("ui-launcher-button");
@@ -156,8 +159,9 @@ test("FR-SHELL-43 BL-113 DM 1440×900 in test mode: the launcher keeps the label
   await expect(buttons.first()).toHaveAttribute("data-compact", "false");
   await expect(dm.getByTestId("ui-launcher-overflow")).toHaveAttribute("data-count", "0");
   const bar = await box(dm.getByTestId("ui-launcher"));
-  expect(bar.x).toBeGreaterThanOrEqual(8);
-  expect(bar.x + bar.w).toBeLessThanOrEqual(1440 - 8);
+  const zone = await box(dm.getByTestId("ui-topbar-centre"));
+  expect(bar.x).toBeGreaterThanOrEqual(zone.x + 8 - 1);
+  expect(bar.x + bar.w).toBeLessThanOrEqual(zone.x + zone.w - 8 + 1);
   // Labels from the left: once a button is icon-only, every later one is too.
   const compact = await buttons.evaluateAll((els) =>
     els.map((e) => e.getAttribute("data-compact") === "true"),

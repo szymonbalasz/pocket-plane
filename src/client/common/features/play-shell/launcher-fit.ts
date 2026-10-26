@@ -39,6 +39,12 @@ export interface LauncherFit {
   overflow: string[];
 }
 
+/**
+ * The narrowest zone the launcher needs: the "⋯" trigger alone in its bar, plus the gutters
+ * (FR-KIT-14: the top bar's title shrinks first, so "⋯" and Reset layout stay reachable).
+ */
+export const LAUNCHER_MIN_ZONE = 2 * LAUNCHER_GUTTER + 2 * 4 + 2 * 1 + 40;
+
 // Widths from `Launcher.tsx`'s classes: `size="sm"` button = px-3 (24) + icon 16, label
 // `text-xs` after `gap-1.5`; bar `p-1` + a transparent border, buttons `gap-1`.
 const ICON_BUTTON_W = 40;
