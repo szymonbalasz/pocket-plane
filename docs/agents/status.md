@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 12 resumed (2026-10-26).** On `main`: T0, CS, X1, X2, **T1** (a15785ed; 5 / 6). **T2** `build/theme-gilt` (main merged in): geometry e2e FAIL (tool rail grows under gilt: DM 291 → 451, player 166 → 206) → build-th2 fixing (Herdr workspace w76), then walkthrough (`tpl-test-th2.md`) → gates → merge → session-sim-16.
+**Phase:** **Sprint 12 resumed (2026-10-26).** On `main`: T0, CS, X1, X2, T1 (5 / 6). **T2** re-test running (test-th2r, Herdr w76) → gates → merge → **T3** `fix/theme-default` (DM #355: Gilt & Stone default, old look "Simple Dark") → session-sim-16. **Kit parity (DM #355: keep working until the look matches the mockup):** spec agent `spec-kit-parity` (w77, worktree spec-kit-parity) writing `docs/specs/post-mvp/kit-parity.md`; then layout build slices (2–3 at a time, #354).
 
 **Resume (in order, one heavy run at a time, #354):** (1) `gates.sh` on `build-theme-switch` (merge main first: protocol §166 collides with X1's, run `resolve_docs.py` + `fixlinks.py`) → merge T1. (2) Restart a T2 builder in `build-theme-gilt` (brief `.verify/sprint12/briefs/build-th2.md` + `t2-resume.md`): merge main, its e2e, report ready. (3) T2 walkthrough (D1–D4, P1–P2, PS1–PS6 under Gilt & Stone; template to write from `tpl-test-th1.md`) → gates → merge. (4) session-sim-16 in `gates-main`, "Playtest: sprint 12", recap: default theme (OQ-THEME-03), the test-strategy proposal (#354). Briefs + `slices.json` backed up in `.verify/sprint12/` (copy back to `%TEMP%/pocket-plane/` if Storage Sense cleared it). Worktrees on disk: `build-theme-switch` (slot 0), `build-theme-gilt` (slot 2), `gates-main` (slot 5, detached at adc8b0dd); all `.env` have `PP_TEST_SHARDS=3`.
 
@@ -87,7 +87,7 @@ Sprint 10:
 
 - **Next after sprint 12 (DM #354): a new test strategy** before feature work: the loop is too slow / heavy. Bring a proposal at the recap.
 
-- After T2's walkthrough: which theme is the default (OQ-THEME-03). Recap answered (#351–#353).
+- Default theme decided (#355: Gilt & Stone; old look = Simple Dark). Kit-parity spec: review its open questions when it's in review.
 
 ## Resolved locally (report at gate)
 
