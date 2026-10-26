@@ -343,6 +343,27 @@
     border-color: #000;
   }
 }
+/* The tool rail is framed like a window: the double rule (in its padding) and the corner pieces,
+   hung 3 px outside its edge so they clear the tools (paint only, inert). */
+:root[data-theme="gilt"] [data-testid="map-tool-rail"] {
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 0 0 3px #090b0b,
+    inset 0 0 0 4px rgb(176 138 74 / 0.55),
+    0 8px 22px rgb(0 0 0 / 0.65);
+}
+:root[data-theme="gilt"] [data-testid="map-tool-rail"]::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    var(--frame-corner) top left / 16px 16px no-repeat,
+    var(--frame-corner-tr) top right / 16px 16px no-repeat,
+    var(--frame-corner-bl) bottom left / 16px 16px no-repeat,
+    var(--frame-corner-br) bottom right / 16px 16px no-repeat;
+}
 :root[data-theme="gilt"] [data-testid="ui-launcher-button"],
 :root[data-theme="gilt"] [data-testid="ui-launcher-menu"] {
   background-image:
@@ -928,20 +949,24 @@
 }
 
 /* ── FR-THEME-13 toasts: framed like a small window, no corner pieces ───────────────────────── */
+/* The double rule (the inner one as bright as a window's, so it reads at 1×), square corners.
+   The 3D-dice roll popup's chrome too; its dice stay unthemed. */
 :root[data-theme="gilt"]
 :is(
   [data-testid="note-toast"],
   [data-testid="note-callout"],
   [data-testid="note-toast-pending-summary"],
   [data-testid="cbt-popup"],
+  [data-testid="dicex-popup"],
   [data-sonner-toast]
 ) {
   --popover: var(--card);
+  border-radius: 3px;
   background-image: var(--panel-grain);
   box-shadow:
     inset 0 0 0 1px var(--frame-rule),
     inset 0 0 0 3px #090b0b,
-    inset 0 0 0 4px rgb(176 138 74 / 0.4),
+    inset 0 0 0 4px rgb(176 138 74 / 0.55),
     0 8px 22px rgb(0 0 0 / 0.65);
 }
 @layer base {
@@ -950,7 +975,8 @@
       [data-testid="note-toast"],
       [data-testid="note-callout"],
       [data-testid="note-toast-pending-summary"],
-      [data-testid="cbt-popup"]
+      [data-testid="cbt-popup"],
+      [data-testid="dicex-popup"]
     ) {
     border-color: #000;
   }
