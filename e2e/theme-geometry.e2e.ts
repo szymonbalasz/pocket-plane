@@ -6,10 +6,12 @@
 // close, frame, corner pieces, title face, scroll tooltip, gold scrollbars, number face); back in
 // Default every key part's computed style is what it was, and equals the page with every gilt
 // rule removed (FR-THEME-19). Player-1's sheet at 320 × 440 (P2) keeps its rects too; reduced
-// motion drops the tooltip's unroll. Client-only: no records (CON-44 unchanged).
+// motion drops the tooltip's unroll. Both start from a stored Simple Dark (`default`): a fresh
+// browser opens in Gilt & Stone (DM #355). Client-only: no records (CON-44 unchanged).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
+import { storedTheme } from "./support/theme";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
@@ -200,6 +202,7 @@ test("FR-THEME-05 FR-THEME-10 FR-THEME-11 FR-THEME-12 FR-THEME-13 FR-THEME-14 FR
 }) => {
   const { secret } = e2eEnv();
   const dm = await rolePage(browser);
+  await storedTheme(dm, "default");
   await dm.setViewportSize({ width: 1600, height: 900 });
   await loginDm(dm, secret);
   await live(dm);
@@ -301,6 +304,7 @@ test("FR-THEME-05 FR-THEME-12 FR-THEME-14 theme geometry (P2): player-1's sheet 
 }) => {
   const { link } = e2eEnv();
   const p1 = await rolePage(browser);
+  await storedTheme(p1, "default");
   await p1.setViewportSize({ width: 1440, height: 900 });
   await p1.emulateMedia({ reducedMotion: "reduce" });
   await p1.goto(link("Player 1"));

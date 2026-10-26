@@ -1,8 +1,8 @@
 // e2e-bundle: init-chips-effect
 // Sprint 5 W4 (play-shell §13 W6–W8): DM and player-1 at 1440×900. W6 Brakka's Rage on (`windows-s5`) →
 // "Rage 10r" and Divine Fury both shown on her Initiative row, no trigger in "+N"; at the min
-// width (DM 320, player 240) Divine Fury is an icon chip with a Tooltip naming it, DM and player-1
-// (FR-CBTX-54). W7 Goblin 2's token menu: one "Invisible" (fog's, with its Tooltip), Conditions ▸
+// width (DM 320, player 240) Divine Fury is whole or an icon chip with a Tooltip naming it (icon
+// on the player's 240 in both themes; the DM's 320 by the theme's glyph widths) (FR-CBTX-54). W7 Goblin 2's token menu: one "Invisible" (fog's, with its Tooltip), Conditions ▸
 // 14 without Invisible; the Initiative row's Conditions ▸ keeps 15 (FR-CBTX-56, FR-FOG-59). W8 the
 // hidden Wolf's turn: Mira's Effect… → Blinded defaults its source to Mira, the hint follows, the
 // source is sent as shown and player-1 gets Blinded (FR-CBTX-55). Fit rule, icon markup, source
@@ -82,6 +82,7 @@ test("FR-CBTX-54 W6 trigger chips never fold: 'Rage 10r' + Divine Fury on Brakka
   await live(p1);
 
   // The DM's Initiative: 400 → 320 (min); the player's: 280 → 240 (min).
+  const compacted: string[] = [];
   for (const [page, min, rageFolds] of [
     [dm, 320, false],
     [p1, 240, true],
@@ -109,13 +110,19 @@ test("FR-CBTX-54 W6 trigger chips never fold: 'Rage 10r' + Divine Fury on Brakka
         init.locator('[data-testid="cbt-init-row"][data-hidden="true"]'),
       ).not.toHaveCount(0);
     }
-    await expect(compact).toHaveAttribute("data-compact", "true");
-    await expect(compact.locator("svg.lucide-zap")).toBeVisible();
-    await compact.hover();
-    await expect(page.getByTestId("ui-tooltip")).toContainText("Divine Fury");
-    await page.mouse.move(5, 450);
+    // Icon-only once the full label no longer fits (FR-CBTX-58): the theme's glyph widths decide
+    // where (Gilt & Stone's narrower type keeps it whole on the DM's 320 line); whole otherwise.
+    if ((await compact.getAttribute("data-compact")) === "true") {
+      compacted.push(page === dm ? "dm" : "player-1");
+      await expect(compact.locator("svg.lucide-zap")).toBeVisible();
+      await compact.hover();
+      await expect(page.getByTestId("ui-tooltip")).toContainText("Divine Fury");
+      await page.mouse.move(5, 450);
+    } else await expect(compact).toContainText("Divine Fury"); // whole: bothShown checked the fit
     expect(await fury.count()).toBe(1);
   }
+  // The icon-only chip shows on at least one client (the player's 240 at the latest).
+  expect(compacted).toContain("player-1");
 
   for (const page of [p1, dm]) await page.context().close();
 });

@@ -3931,3 +3931,23 @@ From [theme-system](../specs/post-mvp/theme-system.md#6-functional-requirements)
 
 - **Tests:** `themes/gilt.test.ts` (`FR-THEME-19 Default unchanged`, `FR-THEME-05 geometry invariance`, `FR-THEME-09`, `FR-THEME-10` – `-15`, `FR-THEME-17 contrast` for every text colour the sheet sets, focus ring ≥ 3 : 1 on every surface); e2e `theme-geometry.e2e.ts` (`theme-gilt`: DM Initiative, Game log, sheet, Preferences; player-1 sheet at 320 × 440; window / body / title rects, top bar, tool rail and launcher labels equal across themes; Gilt's computed look; Default's computed styles equal before, after and with every gilt rule removed).
 - **CON-44:** 0 B (bundle `theme-gilt`: DM 30 164 B, P1 14 339 B, P2 12 836 B).
+
+## 169. Sprint 12: Gilt & Stone default, Simple Dark (T3)
+
+From [theme-system](../specs/post-mvp/theme-system.md#6-functional-requirements) FR-THEME-01, -03, -04, -20 T3 notes and OQ-THEME-03 B ([ADR-0069](../architecture/adr/0069-theme-switch.md); DM #355; amends §167). **Built by `fix/theme-default`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Data side: [data model §133](../data-model/README.md#133-sprint-12-gilt--stone-default-simple-dark-t3).
+
+| Seam | Contract | FR |
+|---|---|---|
+| Fallback (`@ui/themes/theme.ts` `FALLBACK_THEME` = `gilt`) | Store `read()`: no entry, invalid entry, blocked storage → `gilt` (was `default`) | FR-THEME-03 |
+| Boot script (both `index.html`) | No entry → `data-theme="gilt"`; unreadable → `gilt` + one `console.warn`; `{"theme":"default"}` → no attribute. Set before `<body>` is parsed (tested in e2e), so no flash of Simple Dark | FR-THEME-04 |
+| Labels (`THEME_LABELS`) | `default` → "Simple Dark", `gilt` → "Gilt & Stone". Ids, `pp.theme.v1` shape and `theme-option` `data-value` unchanged: no migration | FR-THEME-01, -20 |
+| Fonts | Unchanged files; now fetched on a fresh browser. `/assets/*.woff2` hashed, `Cache-Control: public, max-age=31536000, immutable` (§ FR-DICEX-52): fetched once, a reload reads the cache; `font-display: swap`, so pages render on the fallback stack first and window rects don't move when the fonts land | FR-THEME-16 |
+| Alert toasts under gilt (`gilt.css`) | `[data-class="alert"]` (the shell's alert toasts in the notification stack) joins FR-THEME-13's toast frame and black edge, so alerts and notification cards keep one surface (#159; found by `play-shell-toasts.e2e.ts` under the new default) | FR-THEME-13 |
+| Initiative name line (`combat-extras/logic.ts` `fitNameLine`, `NameLineWidths.word`) | A name that fits its line but not with its marks wraps between words when its longest word + the marks fit (the eye-off stays beside it, FR-CBTX-57); only otherwise the marks move down (CP2 note 3). Found by `init-rows-s6.e2e.ts` under the new default: "Goblin Lurker" 74 px on a 74-px line (orchestrator grant, T3) | FR-CBTX-57 |
+| Number face metrics (`fonts.css`, EB Garamond) | `ascent-override: 80%; descent-override: 20%; line-gap-override: 31%` (Alegreya Sans' 80 / 20 split; `line-height: normal` stays 1.31). A figure inside body text no longer grows its line: a one-line Game log row is 21.25 px as in Simple Dark (was 22.25, so the 160-high log showed one entry with Physical dice on, not two; FR-SHELL-35) | FR-THEME-05 |
+| Launcher on a web font load (`Launcher.tsx` `remeasureLabelWidths`) | Measures the known labels again; re-fits only if a width changed. A face the labels don't use (a window's title or number face loading when it first shows) leaves the bar alone, so a window opened from "⋯" stays in the menu until the next resize (FR-SHELL-43; was: every load re-fitted) | FR-THEME-07 |
+| E2E helper (`e2e/support/theme.ts` `storedTheme`) | Stores `pp.theme.v1` before the page's scripts when nothing is stored; specs about Simple Dark (`theme-geometry`) start from it | — |
+
+- **Tests:** `themes/theme.test.ts` (`FR-THEME-03 storage` none / invalid / blocked → gilt, `FR-THEME-04 boot script` per client, same cases); `themes/appearance.test.tsx` (`FR-THEME-02` "Simple Dark" label; no entry → gilt on, stored `default` → Simple Dark on); e2e `theme-switch.e2e.ts` (`base`: fresh DM login + play page gilt at first `<body>` and at mount, fonts once + immutable + cached on reload, Simple Dark and back with rects unchanged; fresh player-1 with fonts held renders, rects unchanged when they land; stored `default` stays Simple Dark, no font fetched), `theme-geometry.e2e.ts` (starts in Simple Dark).
+- **Fixtures:** none (browser only).
+- **CON-44:** 0 B.

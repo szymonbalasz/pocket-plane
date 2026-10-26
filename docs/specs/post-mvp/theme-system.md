@@ -12,6 +12,8 @@ phase: post-mvp
 
 > **Kit parity (DM, 2026-10-26, [#355](../../decisions-log.md)).** Decided: **Gilt & Stone is the default theme** for a browser with no stored choice (OQ-THEME-03 → B, after the T2 walkthrough), and the original look is renamed **Simple Dark** in the UI (stored value `default` keeps meaning Simple Dark; slice T3 `fix/theme-default`). Where this spec says "Default" for the original look, read "Simple Dark". The goal is now parity with the kit page's mockup: the layout changes that a stylesheet cannot make are specified in [kit-parity](kit-parity.md) (markup for every theme; ADR-0069 unchanged).
 
+> **T3 built (2026-10-26, `fix/theme-default`).** No stored choice, or an unreadable one → Gilt & Stone, set by the boot script before first paint (DM, player link and login pages; no flash of Simple Dark). The stored id `default` is kept and shown as "Simple Dark" (no migration). The fonts now load for most browsers: fetched once as hashed `immutable` assets, a reload takes them from the cache; `font-display: swap` keeps every page usable before they arrive, window rects unchanged when they land. Amends FR-THEME-01, -03, -04, -20 and OQ-THEME-03.
+
 ## 1. Summary
 
 - A **theme** is a named look for the whole client. Each person picks one per browser in **Preferences**. Two themes: **Default** (today's shadcn look) and **Gilt & Stone**.
@@ -53,10 +55,10 @@ phase: post-mvp
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-THEME-01 | Themes: `default` "Default", `gilt` "Gilt & Stone". The active theme is a `data-theme` attribute on `<html>`; `default` = no attribute. | [ADR-0069](../../architecture/adr/0069-theme-switch.md) |
+| FR-THEME-01 | Themes: `default` "Default", `gilt` "Gilt & Stone". The active theme is a `data-theme` attribute on `<html>`; `default` = no attribute. *T3 (2026-10-26, #355): `default` is labelled **"Simple Dark"** (the original look); the id is unchanged, so stored choices need no migration. `gilt` is the theme of a browser with no choice (FR-THEME-03).* | [ADR-0069](../../architecture/adr/0069-theme-switch.md) |
 | FR-THEME-02 | **Appearance** section in Preferences, both clients (`theme.appearance`, one line in each pref-sections registry, append). Two option cards, each with a small preview swatch (panel, frame, accent, display type sample); selecting one applies it at once. | FR-SHELL-72 |
-| FR-THEME-03 | Stored per browser in `localStorage` `pp.theme.v1` = `{theme}` (zod-parsed), shared by both clients and all campaigns on that browser. Never sent. Invalid or unavailable storage → `default`, console warning. | OQ-THEME-02, -08 |
-| FR-THEME-04 | **No flash:** the stored theme is set on `<html>` before first paint (inline boot script in both `index.html` files), including pre-play pages. | |
+| FR-THEME-03 | Stored per browser in `localStorage` `pp.theme.v1` = `{theme}` (zod-parsed), shared by both clients and all campaigns on that browser. Never sent. Invalid or unavailable storage → `default`, console warning. *T3 (2026-10-26, #355): no entry, an invalid one or unavailable storage → **`gilt`** (Gilt & Stone); invalid / unavailable warn once. A stored `{"theme":"default"}` stays Simple Dark.* | OQ-THEME-02, -08 |
+| FR-THEME-04 | **No flash:** the stored theme is set on `<html>` before first paint (inline boot script in both `index.html` files), including pre-play pages. *T3 (2026-10-26): with no stored choice the script sets `gilt`, so a fresh browser never flashes Simple Dark; fonts follow with `font-display: swap` (page usable on the fallback stack, window rects unchanged when they land).* | |
 | FR-THEME-05 | **Geometry invariance:** under `gilt`, every layout metric the shell uses stays the same: title bar 32 px (`TITLE_H`), top bar 48 px, window body padding, launcher button padding and gap, tool rail size, every `defaultSize` / `minSize`. Frames, corners and glows are drawn with box-shadows, outlines and pseudo-elements, never with extra layout borders or padding. | FR-SHELL-61, placer |
 | FR-THEME-06 | **Font sizes** follow the existing Tailwind scale in both themes (OQ-THEME-05). Content that grows to fit is measured live, so different glyph widths are allowed. | |
 | FR-THEME-07 | **Launcher measurement** uses the computed font of a launcher button, not a fixed font string, so FR-SHELL-43's fit holds under both themes. *T0 (2026-10-25): every launcher button (and "⋯") carries the label size (`text-xs`), so its computed weight, size and family are the label's; read after mount, on any `<html>` attribute change (theme switch) and when web fonts finish loading; widths cached per font string, dropped on a font load. A font change re-fits the bar (an extra FR-SHELL-43 trigger). Before the first button renders: `500 12px <body font>`, the Default value.* | `Launcher.tsx`, test `FR-THEME-07 launcher measures computed font` |
@@ -72,7 +74,7 @@ phase: post-mvp
 | FR-THEME-17 | **Contrast:** under `gilt`, body text ≥ 7 : 1 and labels, numbers and gold text ≥ 4.5 : 1 on `--card`; focus ring visible on every surface. | Test `FR-THEME-17 contrast` |
 | FR-THEME-18 | **Player colours:** FR-CAMP-31's contrast check runs against both themes' window surfaces; a colour must pass both. | OQ-THEME-12 |
 | FR-THEME-19 | **Default unchanged:** the token cleanup (§2) and the theme layer change no pixel under `default`. | Walkthrough step D1 |
-| FR-THEME-20 | **Test IDs** unchanged; new: `theme-option` (+ `data-value` = theme id, `data-state` = `on` \| `off`), `theme-section`. | AGENTS §9.5 |
+| FR-THEME-20 | **Test IDs** unchanged; new: `theme-option` (+ `data-value` = theme id, `data-state` = `on` \| `off`), `theme-section`. *T3 (2026-10-26): Simple Dark's card keeps `data-value="default"` (the stored id; no rename, no migration).* | AGENTS §9.5 |
 
 ## 7. UI/UX notes
 
@@ -189,7 +191,7 @@ None. No REST, intents or events; 0 bytes on the wire.
 |---|---|---|---|---|
 | OQ-THEME-01 | How do themes style components? | **Decided (DM, 2026-10-25): A**, one stylesheet per theme, keyed on `[data-theme] [data-slot=…]` and test IDs, no theme logic in components · ~~B: Tailwind `gilt:` variants in every className~~ | decided | [ADR-0069](../../architecture/adr/0069-theme-switch.md), shared UI |
 | OQ-THEME-02 | Who picks the theme? | **Decided (DM, 2026-10-25): A**: each person, per browser · B: per user, stored on the server · C: the DM sets a campaign default, people can override | decided | SHELL |
-| OQ-THEME-03 | Default for a browser with no choice yet | **Decided (DM, 2026-10-25): A**: Default until the T2 walkthrough passes, then the DM decides · B: Gilt & Stone | decided | owner: DM |
+| OQ-THEME-03 | Default for a browser with no choice yet | ~~A: Default until the T2 walkthrough passes, then the DM decides~~ (DM, 2026-10-25) · **Decided (DM, 2026-10-26, #355): B**: Gilt & Stone; the original look is renamed Simple Dark (built by T3) | decided | owner: DM |
 | OQ-THEME-04 | How are fonts shipped? | **Decided (DM, 2026-10-25): A**, committed Latin-subset woff2 + OFL licences · ~~B: `@fontsource/*` packages~~ · ~~C: Google Fonts CDN~~ | decided | tooling |
 | OQ-THEME-05 | Alegreya Sans looks smaller than the system sans at 14 px. Bump body text under Gilt & Stone? | **Decided (DM, 2026-10-25): A**: same scale (FR-THEME-06), judge in the walkthrough · B: +1 px body under `gilt` (grown windows change height) | decided | SHELL layout tests |
 | OQ-THEME-06 | The printed-sheet layout (shield AC, ability blocks with saves, boxed skills, passives row): where? | **Decided (DM, 2026-10-25): A**: a CHARX amendment, same markup in both themes, styled per theme · B: Gilt-only markup | decided | [character-sheet-full](../character-sheet-full.md) |

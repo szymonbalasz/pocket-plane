@@ -2655,3 +2655,14 @@ From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351
 
 - **Derived (client, not stored):** the Gilt & Stone look, from `data-theme="gilt"` on `<html>` (`@ui/themes/gilt.css`); its extra tones are `--gs-*` custom properties on `<body>` (contrast-tested).
 - **Fixtures:** unit `theme-round-3` (`combat-1` stepped on two rounds with Next: round 3, Wolf's turn; steps turns, so not in `session-sim-13`); bundle `theme-gilt` = `combat` + `combat-1` + `theme-round-3` + `rolls-1` (Mira's full sheet, the Goblin and the Elite Goblin's sheets from session-sim).
+
+## 133. Sprint 12: Gilt & Stone default, Simple Dark (T3)
+
+From [theme-system](../specs/post-mvp/theme-system.md#6-functional-requirements) FR-THEME-01, -03 T3 notes (DM #355; amends §131). **Built by `fix/theme-default`**. Protocol side: [protocol §169](../protocol/README.md#169-sprint-12-gilt--stone-default-simple-dark-t3). **No table, column, record type or wire field.**
+
+| Browser state | Store | Rule | Source |
+|---|---|---|---|
+| Theme | `localStorage` `pp.theme.v1` = `{theme: "default" \| "gilt"}`, unchanged shape; `default` = Simple Dark | missing / invalid / blocked → **`gilt`** (was `default`); invalid / blocked warn once; stored values need no migration | FR-THEME-03 |
+
+- **Derived (client, not stored):** `data-theme` on `<html>`: `gilt` with no stored choice; none for Simple Dark.
+- **Fixtures:** none.

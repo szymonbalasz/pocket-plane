@@ -67,10 +67,28 @@ export function labelWidth(label: string, font: string): number {
   return w;
 }
 
-/** Drops the measured widths (a web font finished loading: same font string, new glyphs). */
+/** Drops the measured widths. */
 export function forgetLabelWidths(): void {
   widths.clear();
   widthsGen++;
+}
+
+/**
+ * A web font finished loading (same font string, maybe new glyphs): measures every known label
+ * again and re-fits only if a width changed. A face the labels don't use (a window's title or
+ * number face loading late) leaves the bar alone, so a window opened from the "⋯" menu stays
+ * there until the next resize (FR-SHELL-43). True = changed.
+ */
+export function remeasureLabelWidths(): boolean {
+  let changed = false;
+  for (const [font, known] of widths) {
+    for (const [label, before] of [...known]) {
+      known.delete(label);
+      if (labelWidth(label, font) !== before) changed = true;
+    }
+  }
+  if (changed) widthsGen++;
+  return changed;
 }
 
 /**
@@ -91,8 +109,7 @@ function useLauncherFont(nav: RefObject<HTMLElement | null>): string {
     const observer = new MutationObserver(measure);
     observer.observe(document.documentElement, { attributes: true });
     const loaded = () => {
-      forgetLabelWidths();
-      setLoaded((n) => n + 1);
+      if (remeasureLabelWidths()) setLoaded((n) => n + 1);
       measure();
     };
     document.fonts?.addEventListener("loadingdone", loaded);
@@ -134,7 +151,8 @@ export function Launcher({
   }));
   // Recomputed on viewport resize, availability change and layout restore only (FR-SHELL-43):
   // opening a window from the menu leaves it there until then. Label widths: measured once each
-  // per font; a new font (FR-THEME-07: theme switch, web font loaded) re-fits too.
+  // per font; a new font (FR-THEME-07: theme switch) or new label widths (a web font loaded)
+  // re-fit too.
   const labels = new Map(entries.map((d) => [d.kind, d.launcher?.label ?? ""]));
   const fitKey = `${viewport.w}|${layoutKey}|${[...labels].join(",")}|${font}|${widthsGen}`;
   const fitRef = useRef<{ key: string; fit: LauncherFit } | null>(null);

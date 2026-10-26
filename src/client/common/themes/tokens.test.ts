@@ -376,6 +376,24 @@ describe("FR-THEME-16 fonts", () => {
     }
   });
 
+  test("FR-THEME-05 FR-THEME-16 fonts: EB Garamond takes Alegreya Sans' 80 / 20 ascent / descent split, so a figure in body text doesn't grow the line; the gap keeps its normal line height (1.31)", () => {
+    const body = (family: string) =>
+      [...FONT_CSS.matchAll(/@font-face\s*\{([^}]*)\}/g)]
+        .map((m) => m[1] ?? "")
+        .filter((b) => b.includes(`font-family: "${family}"`));
+    const pct = (b: string, p: string) => Number(new RegExp(`${p}:\\s*([\\d.]+)%;`).exec(b)?.[1]);
+    const [garamond] = body("EB Garamond");
+    expect([
+      pct(garamond!, "ascent-override"),
+      pct(garamond!, "descent-override"),
+      pct(garamond!, "line-gap-override"),
+    ]).toEqual([80, 20, 31]);
+    // The body faces keep their own metrics: only the number face moves onto theirs.
+    for (const b of [...body("Alegreya Sans"), ...body("IM Fell English SC")]) {
+      expect(b).not.toContain("-override");
+    }
+  });
+
   test("FR-THEME-16 fonts: only the gilt block names them, with a fallback stack; a preview elsewhere uses the fallbacks", () => {
     for (const t of ["--font-title", "--font-label", "--font-num", "--font-body"]) {
       const v = GILT.get(t) ?? "";
