@@ -13,6 +13,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  splitDialogClasses,
 } from "./overlays";
 
 /** `DialogContent` rendered in place of its portal. */
@@ -28,6 +29,11 @@ const tag = (markup: string, slot: string) =>
   new RegExp(`<\\w+[^>]*data-slot="${slot}"[^>]*>`).exec(markup)?.[0] ?? "";
 /** Index of the element with `data-slot=slot`, -1 if absent. */
 const at = (markup: string, slot: string) => markup.indexOf(`data-slot="${slot}"`);
+
+/** A description a caller wraps in its own component (End encounter's `EndConfirmDescription`). */
+function WrappedDescription() {
+  return <DialogDescription>3 monsters still stand. Initiative clears.</DialogDescription>;
+}
 
 function Form() {
   return (
@@ -105,6 +111,59 @@ describe("FR-KIT-70 dialog bar", () => {
     expect(at(sr, "dialog-header")).toBe(-1);
     expect(at(sr, "dialog-title")).toBeGreaterThan(-1);
   });
+
+  test("FR-KIT-70 dialog bar: the bar holds only the title; a description a caller wraps in its own component goes under the bar, in the body (End encounter)", () => {
+    const m = dialog(
+      <>
+        <DialogHeader>
+          <DialogTitle>End “Goblin ambush”?</DialogTitle>
+          <WrappedDescription />
+        </DialogHeader>
+        <DialogFooter>f</DialogFooter>
+      </>,
+    );
+    const start = at(m, "dialog-header");
+    const bar = m.slice(start, m.indexOf("</div>", start));
+    expect(bar).toContain("dialog-title");
+    expect(bar).not.toContain("dialog-description");
+    expect(bar).not.toContain("monsters");
+    // Description after the bar, before the footer, inside the body.
+    expect(at(m, "dialog-description")).toBeGreaterThan(start);
+    expect(at(m, "dialog-description")).toBeLessThan(at(m, "dialog-footer"));
+    expect(at(m, "dialog-description")).toBeGreaterThan(at(m, "dialog-body"));
+  });
+
+  test("FR-KIT-70 dialog bar: a caller's padding and gap replace the body's own, so a chrome-less image lightbox keeps its size (no 24 px band)", () => {
+    expect(splitDialogClasses("w-auto max-w-[90vw] p-4 pt-10")).toEqual({
+      frame: "w-auto max-w-[90vw]",
+      body: "p-4 pt-10",
+    });
+    expect(
+      splitDialogClasses("flex max-h-[90vh] sm:max-w-md gap-3 sm:p-2 pointer-events-auto"),
+    ).toEqual({
+      frame: "flex max-h-[90vh] sm:max-w-md pointer-events-auto",
+      body: "gap-3 sm:p-2",
+    });
+    // The lightbox as main drew it: the frame has no padding of its own, the body is p-4 pt-10.
+    const m = dialog(
+      <DialogTitle className="sr-only">Goblin</DialogTitle>,
+      "w-auto max-w-[90vw] p-4 pt-10",
+    );
+    expect(tag(m, "dialog-content")).not.toMatch(/\bp[tblrxy]?-\d/);
+    const body = tag(m, "dialog-body");
+    expect(body).toContain("p-4 pt-10");
+    expect(body).not.toContain("p-6");
+    expect(at(m, "dialog-header")).toBe(-1);
+  });
+
+  test("FR-KIT-70 dialog bar: a layer above the shell (zIndex) reaches the overlay and the content", () => {
+    const portal = DialogContent({ children: "x", zIndex: 1_000_000_000 }) as React.ReactElement<{
+      children: React.ReactNode;
+    }>;
+    const m = renderToStaticMarkup(<Dialog open>{portal.props.children}</Dialog>);
+    expect(tag(m, "dialog-overlay")).toContain("z-index:1000000000");
+    expect(tag(m, "dialog-content")).toContain("z-index:1000000000");
+  });
 });
 
 // ---- FR-KIT-71 ----
@@ -121,6 +180,12 @@ function files(dir: string): string[] {
 const SR_ONLY_TITLE: Record<string, string> = {
   "common/features/compendium/gallery.tsx": "image lightbox: the picture is the content",
 };
+/** Raw Radix dialogs outside the Dialog parts (no title bar), with the reason. */
+const RAW_RADIX: Record<string, string> = {
+  "common/features/pause/PauseControl.tsx": "pause card preview: the card itself, chrome-less",
+  "common/features/play-shell/palette/Palette.tsx": "command palette: a search field, no window",
+  "common/features/play-shell/palette/ShortcutsSheet.tsx": "shortcut sheet over the palette",
+};
 
 describe("FR-KIT-71 every dialog titled", () => {
   test("FR-KIT-71 every dialog titled: each file with a DialogContent renders a DialogTitle (in a DialogHeader, or as its own bar)", () => {
@@ -130,8 +195,23 @@ describe("FR-KIT-71 every dialog titled", () => {
     }));
     const dialogs = sources.filter((s) => s.text.includes("<DialogContent"));
     expect(dialogs.length).toBeGreaterThan(30);
-    const untitled = dialogs.filter((s) => !s.text.includes("<DialogTitle")).map((s) => s.file);
+    // A title is a `<DialogTitle>` element or the component handed to a part (`TitleAs`).
+    const untitled = dialogs
+      .filter((s) => !/<DialogTitle\b|=\{DialogTitle\}/.test(s.text))
+      .map((s) => s.file);
     expect(untitled).toEqual([]);
+    // The player's present popup is on the Dialog parts now (title bar + close gem).
+    const present = sources.find(
+      (s) => s.file === "player/features/party-board/present-popup.tsx",
+    )?.text;
+    expect(present).toContain("<DialogContent");
+    expect(present).toContain("TitleAs={DialogTitle}");
+    // Every other dialog goes through the parts: raw Radix dialogs only where listed.
+    const raw = sources
+      .filter((s) => !s.file.startsWith("common/components/ui/"))
+      .filter((s) => /import \{[^}]*\bDialog as \w+[^}]*\} from "radix-ui"/.test(s.text))
+      .map((s) => s.file);
+    expect(raw.sort()).toEqual(Object.keys(RAW_RADIX).sort());
     // A title the reader can't see draws no bar: only the listed ones.
     const srOnly = sources
       .filter((s) => /<DialogTitle[^>]*className="[^"]*\bsr-only\b/.test(s.text))

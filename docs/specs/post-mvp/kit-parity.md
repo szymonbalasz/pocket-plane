@@ -171,6 +171,8 @@ Row grid: `medallion (md, 28) · what · time · result boxes · actions (hover)
 | FR-KIT-71 | Every Dialog in both clients has a `DialogHeader` with a `DialogTitle` (also Radix's a11y rule); a test lists any that don't. | `FR-KIT-71 every dialog titled` |
 | FR-KIT-72 | **End encounter** (`cbt-init-end`, `cbt-enc-end`): the title stays `End “name”?`. Buttons: **Keep fighting** (outline) and **End encounter** (destructive, `…-end-confirm`). | `FR-KIT-72 end copy` |
 
+> **K0 note (2026-10-26, `fix/kit-parts`, orchestrator ruling after the K0 walkthrough):** the title bar holds only the title and the close; anything else a `DialogHeader` holds (a description, also one a caller wraps in a component) renders under the bar, in the body. **FR-KIT-71 exemptions:** the compendium image lightbox (`cmp-lightbox`) stays a chrome-less image viewer: a screen-reader-only title, no bar, and its size equals the pre-K0 one (a caller's padding / gap on `DialogContent` replaces the body's, so no band is added). Raw Radix overlays that are not dialogs in the kit's sense stay outside the Dialog parts: the pause card preview, the command palette and its shortcut sheet (listed in the `FR-KIT-71` test). The player's present popup (`party-present-popup`) moved onto the Dialog parts (title bar + close gem; test IDs and Close kept).
+
 ### 6.8 Compendium and stat block
 
 | ID | Requirement | Test |

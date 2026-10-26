@@ -9,8 +9,8 @@ import type {
   PlayerHandoutRecord,
 } from "@shared/party-board/schemas";
 import { emptyStore } from "@shared/protocol/store";
-import { TooltipProvider } from "@ui/components/ui/overlays";
-import { shownPresent } from "@ui/features/party-board/present-logic";
+import { Dialog, DialogContent, DialogTitle, TooltipProvider } from "@ui/components/ui/overlays";
+import { PRESENT_POPUP_Z, shownPresent } from "@ui/features/party-board/present-logic";
 import type { LoadedHandout } from "@ui/features/party-board/Viewer";
 import { SyncContext, type SyncState } from "@ui/sync/store";
 import type { ReactNode } from "react";
@@ -137,6 +137,36 @@ describe("FR-PARTY-36 popup content", () => {
     // A fresh page: generation 1, no local hides.
     expect(shownPresent([row], "p1", {}, 1)).toEqual(row);
     expect(shownPresent([], "p1", {}, 1)).toBeNull();
+  });
+
+  test("FR-KIT-70 present popup on the Dialog parts: the handout title is the title bar, the close gem beside it, Close kept; above the shell", () => {
+    const portal = DialogContent({
+      "data-testid": "party-present-popup",
+      className: "flex max-h-[90vh] w-[min(90vw,64rem)] max-w-none flex-col gap-3",
+      zIndex: PRESENT_POPUP_Z,
+      children: (
+        <PresentContent
+          state="show"
+          loaded={loaded([])}
+          onRetry={noop}
+          onClose={noop}
+          onOpenBoard={noop}
+          TitleAs={DialogTitle}
+        />
+      ),
+    } as React.ComponentProps<typeof DialogContent>) as React.ReactElement<{
+      children: ReactNode;
+    }>;
+    const html = render(<Dialog open>{portal.props.children}</Dialog>);
+    const bar = html.slice(html.indexOf('data-slot="dialog-header"'));
+    expect(bar.slice(0, bar.indexOf("</div>"))).toContain('data-testid="party-present-title"');
+    expect(html).toMatch(/data-slot="dialog-close"[^>]*aria-label="Close"/);
+    expect(count(html, "party-present-close")).toBe(1);
+    expect(count(html, "party-present-open-board")).toBe(1);
+    const popup = /<div[^>]*data-slot="dialog-content"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(popup).toContain(`style="z-index:${PRESENT_POPUP_Z}"`);
+    expect(popup).toContain('data-testid="party-present-popup"');
+    expect(html).toMatch(/data-slot="dialog-overlay"[^>]*z-index:1000000000/);
   });
 });
 

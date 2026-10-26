@@ -300,6 +300,7 @@ const MODULES: Record<string, { mod: Record<string, unknown>; spec: Spec }> = {
         "overlayOpenOn",
         "TooltipGroup",
         "TooltipController",
+        "splitDialogClasses",
       ],
     },
   },

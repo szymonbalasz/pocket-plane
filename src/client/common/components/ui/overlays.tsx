@@ -26,27 +26,54 @@ const DIALOG_BAR =
 /** True inside a `DialogHeader`: its title is in the bar already. */
 const InHeader = React.createContext(false);
 
+/** A caller's inner spacing (padding, gap): it belongs to the body and replaces the body's own. */
+const INNER_SPACING = /^(?:[\w-]+:)*(?:p[trblxy]?|gap(?:-[xy])?)-/;
+
+/** `className` split into the frame's classes and the body's spacing (FR-KIT-70). */
+export function splitDialogClasses(className: string | undefined): {
+  frame: string;
+  body: string;
+} {
+  const all = (className ?? "").split(/\s+/).filter(Boolean);
+  return {
+    frame: all.filter((c) => !INNER_SPACING.test(c)).join(" "),
+    body: all.filter((c) => INNER_SPACING.test(c)).join(" "),
+  };
+}
+
 export function DialogContent({
   className,
   children,
+  zIndex,
+  style,
   ...props
-}: React.ComponentProps<typeof D.Content>) {
-  // A caller's flex column (a form that scrolls under the header) carries on inside the body.
+}: React.ComponentProps<typeof D.Content> & {
+  /** A layer above the shell's own (overlay and content), e.g. the player's present popup. */
+  zIndex?: number;
+}) {
+  // A caller's flex column (a form that scrolls under the header) carries on inside the body; its
+  // padding replaces the body's (an image lightbox keeps its size: no band added round it).
   const column = /(^|\s)flex(\s|$)/.test(className ?? "");
+  const { frame, body } = splitDialogClasses(className);
   return (
     <D.Portal>
-      <D.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-50 bg-overlay/60" />
+      <D.Overlay
+        data-slot="dialog-overlay"
+        className="fixed inset-0 z-50 bg-overlay/60"
+        style={zIndex === undefined ? undefined : { zIndex }}
+      />
       <D.Content
         data-slot="dialog-content"
         className={cn(
           "fixed left-1/2 top-1/2 z-50 grid w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-background shadow-lg",
-          className,
+          frame,
         )}
+        style={zIndex === undefined ? style : { ...style, zIndex }}
         {...props}
       >
         <div
           data-slot="dialog-body"
-          className={cn("gap-4 p-6", column ? "flex min-h-0 flex-1 flex-col" : "grid")}
+          className={cn("gap-4 p-6", column ? "flex min-h-0 flex-1 flex-col" : "grid", body)}
         >
           {children}
         </div>
@@ -62,18 +89,22 @@ export function DialogContent({
   );
 }
 
-/** The title bar; its descriptions move under it, into the body (the kit's dialog). */
+/**
+ * The title bar holds the title only (and the built-in close); everything else in the header (a
+ * description, however a caller wraps it) goes under it, into the body (the kit's dialog).
+ */
 export function DialogHeader({ className, children, ...props }: React.ComponentProps<"div">) {
   const kids = React.Children.toArray(children);
-  const isDescription = (k: React.ReactNode) =>
-    React.isValidElement(k) && k.type === DialogDescription;
+  const isTitle = (k: React.ReactNode) => React.isValidElement(k) && k.type === DialogTitle;
   return (
-    <InHeader.Provider value>
-      <div data-slot="dialog-header" className={cn(DIALOG_BAR, className)} {...props}>
-        {kids.filter((k) => !isDescription(k))}
-      </div>
-      {kids.filter(isDescription)}
-    </InHeader.Provider>
+    <>
+      <InHeader.Provider value>
+        <div data-slot="dialog-header" className={cn(DIALOG_BAR, className)} {...props}>
+          {kids.filter(isTitle)}
+        </div>
+      </InHeader.Provider>
+      {kids.filter((k) => !isTitle(k))}
+    </>
   );
 }
 export function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
