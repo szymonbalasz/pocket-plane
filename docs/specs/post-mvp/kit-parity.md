@@ -9,7 +9,7 @@ phase: post-mvp
 # Kit parity
 
 > **Goal (DM, 2026-10-26, [#355](../../decisions-log.md)):** "get to that mockup". The source of truth is the kit page [gilt-stone.html](../../design/art/kit/gilt-stone.html). Open it in a browser and compare it with `.verify/t2/pairs/*.png`. The concept art (`.verify/t2/a-gilt-stone-01.png`) is inspiration, not binding.
-> **Decided (DM + orchestrator, 2026-10-26):** OQ-KIT-01 A (the launcher moves into the top bar; [proposed ADR](../../architecture/adr/proposed-launcher-in-top-bar.md) accepted), -02 **B** (kit 40-px log rows; `dice.log` 40 px taller), -03 A, -04 **B** (a rollable DM stat-block window now, §6.11), -05 to -11 A. All geometry changes land together in slice K5 (§7.3).
+> **Decided (DM + orchestrator, 2026-10-26):** OQ-KIT-01 A (the launcher moves into the top bar; [ADR](../../architecture/adr/proposed-launcher-in-top-bar.md) accepted), -02 **B** (kit 40-px log rows; `dice.log` 40 px taller), -03 A, -04 **B** (a rollable DM stat-block window now, §6.11), -05 to -11 A. All geometry changes land together in slice K5 (§7.3).
 > **Model:** the printed-sheet amendment, [character-sheet-full §6.2](../character-sheet-full.md#62-printed-sheet-layout) (FR-CHARX-105–120). Every layout change is a **markup change in every theme**. Simple Dark draws the new rows with its plain tokens, and Gilt & Stone styles them through `data-slot` names. [ADR-0069](../../architecture/adr/0069-theme-switch.md) holds: no theme logic in components, and themes never change geometry. Sizes change only through the size table (§7.3).
 
 ## 1. Summary
@@ -99,7 +99,7 @@ T2 = what `gilt.css` (theme T2) already fixed. Markup = what this spec changes. 
 
 | ID | Requirement | Test |
 |---|---|---|
-| FR-KIT-10 | **Three zones** in the 48 px bar (`TOP_BAR_H` unchanged): left = title (`ui-topbar-left`), centre = the launcher if OQ-KIT-01 A, else empty, right = status, DM items (Pause, search), identity chip (`ui-topbar-right`, order unchanged). | `FR-KIT-10 bar zones` |
+| FR-KIT-10 | **Three zones** in the 48 px bar (`TOP_BAR_H` unchanged): left = title (`ui-topbar-left`), centre = the launcher (OQ-KIT-01 A), right = status, DM items (Pause, search), identity chip (`ui-topbar-right`, order unchanged). | `FR-KIT-10 bar zones` |
 | FR-KIT-11 | **DM title:** the campaign switcher's trigger (`camp-campaign-switcher`) shows the campaign name in title type with a chevron, with no box. Its menu lists the campaigns (`camp-campaign-option`), then a separator, then **New campaign…** and **Rename…** (Rename only with an active campaign). Both open today's dialogs (`camp-campaign-new`, `camp-campaign-rename`), whose trigger IDs move onto the items. The switch confirm (`camp-switch-dialog`) is unchanged. | `FR-KIT-11 campaign menu` |
 | FR-KIT-12 | **Player title:** the campaign name in title type (`camp-joined-campaign-name`), then "· playing as Player 1" in small muted text (`camp-joined-player-name`). `camp-player-joined` stays the wrapper. | `FR-KIT-12 player title` |
 | FR-KIT-13 | **One status pill** `ui-topbar-status`, a group of two parts. (1) `sync-connection-status`: a dot plus "Live", "Reconnecting…", etc. "Connected" reads "Live". (2) DM only, `ui-presence-badge`: "· 0 / 2 online"; click and Tooltip are unchanged. `data-state` values are unchanged. | `FR-KIT-13 status pill` |
