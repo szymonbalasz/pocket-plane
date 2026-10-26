@@ -3911,6 +3911,7 @@ From [theme-system](../specs/post-mvp/theme-system.md#6-functional-requirements)
 - **Fixtures:** none (browser only).
 - **CON-44:** 0 B.
 
+
 ## 168. Sprint 12: Gilt & Stone (T2)
 
 From [theme-system](../specs/post-mvp/theme-system.md#6-functional-requirements) FR-THEME-05, -10 – -15, -17, -19 and [character-sheet-full](../specs/character-sheet-full.md#62-printed-sheet-layout) FR-CHARX-119 ([ADR-0069](../architecture/adr/0069-theme-switch.md); DM #351, #353). **Built by `build/theme-gilt`**: one stylesheet, client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Data side: [data model §132](../data-model/README.md#132-sprint-12-gilt--stone-t2).
