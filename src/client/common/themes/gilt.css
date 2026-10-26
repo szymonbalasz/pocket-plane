@@ -1256,3 +1256,105 @@
     transition: none;
   }
 }
+
+/* KIT: parts (kit-parity K0: Medallion, Result box, HP bar; dialog title bar; menus) ────────── */
+@layer base {
+  :root[data-theme="gilt"] [data-slot="kit-medallion"] {
+    border-color: var(--frame-rule-strong);
+    font-family: var(--font-num);
+  }
+  :root[data-theme="gilt"] [data-slot="kit-result"] {
+    border-color: var(--frame-rule-strong);
+    color: var(--gold);
+    font-family: var(--font-num);
+  }
+  :root[data-theme="gilt"] [data-slot="kit-result"][data-outcome="damage"] {
+    border-color: var(--gs-danger-rule);
+  }
+  :root[data-theme="gilt"] [data-slot="kit-hpbar"] {
+    font-family: var(--font-num);
+  }
+  :root[data-theme="gilt"] [data-slot="dialog-header"] {
+    border-color: var(--frame-rule);
+  }
+}
+/* Medallion: the gold ring, a black hairline outside it, a soft shade inside. */
+:root[data-theme="gilt"] [data-slot="kit-medallion"] {
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 2px rgb(0 0 0 / 0.35);
+}
+/* Result box: gold-ruled on a dark box (crit green, damage red, fumble dim: the meaning
+   utilities on the box win over the gold). */
+:root[data-theme="gilt"] [data-slot="kit-result"] {
+  border-radius: 3px;
+  background-image: linear-gradient(var(--gs-result), #14120c);
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-slot="kit-result"][tabindex] {
+  cursor: help;
+}
+/* HP bar: a dark inset track (the fill keeps its `hp.*` colour). */
+:root[data-theme="gilt"] [data-slot="kit-hpbar-track"] {
+  --muted: #2a2620;
+  box-shadow: inset 0 0 0 1px #000;
+}
+
+/* Dialog title bar (FR-KIT-70): the window title bar's dark band and gold rule. The frame's
+   double rule and corner pieces move onto an overlay above the bar, so the bar can't hide them. */
+:root[data-theme="gilt"] [data-slot="dialog-content"] {
+  background-image: var(--panel-grain);
+  background-size: auto;
+  background-repeat: repeat;
+  background-position: 0 0;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.7);
+}
+:root[data-theme="gilt"] [data-slot="dialog-content"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: var(--frame-shadow);
+  background:
+    var(--frame-corner) top left / 26px 26px no-repeat,
+    var(--frame-corner-tr) top right / 26px 26px no-repeat,
+    var(--frame-corner-bl) bottom left / 26px 26px no-repeat,
+    var(--frame-corner-br) bottom right / 26px 26px no-repeat;
+}
+:root[data-theme="gilt"] [data-slot="dialog-header"] {
+  position: relative;
+  background-image: linear-gradient(#1c201f, #121615);
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-slot="dialog-header"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -3px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(176 138 74 / 0.6) 20%,
+    rgb(176 138 74 / 0.6) 80%,
+    transparent
+  );
+}
+/* The gem paints behind its ×, so the close keeps its own stack above the bar's band. */
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"] {
+  isolation: isolate;
+}
+
+/* Menus: an open submenu's trigger keeps the highlight (the kit's gold bar on a warm wash). */
+:root[data-theme="gilt"] [data-slot="dropdown-menu-sub-trigger"][data-state="open"] {
+  --accent: var(--gs-highlight);
+  --accent-foreground: var(--gs-label-bright);
+  background-image: linear-gradient(90deg, #2c2311, #1a160c);
+  box-shadow: inset 2px 0 0 var(--gold);
+}
