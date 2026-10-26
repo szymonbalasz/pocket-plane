@@ -131,9 +131,14 @@ describe("FR-CBTX-57 hidden ally name whole", () => {
     expect(
       fitNameLine({ line: P_280, name: 300, marks: [], side: ally, end: 0, chips: true }),
     ).toEqual({ nameWrap: true, marksWrap: false, split: true, room: P_280 - 46 - 4 });
-    // DM 320 (sim-9 Ambush): "Elite Goblin Warrior" (125) fits its 138-px line but not with the
-    // eye-off (+ 4 + 14): the name keeps its line whole, the eye-off leads the second line, the
-    // chips get the rest of it (sprint 6 CP2 note 3: never break a word that fits).
+    // DM 320 (sim-9 Ambush): "Elite Goblin Warrior" (125, longest word ≈ 50) fits its 138-px line
+    // but not with the eye-off (+ 4 + 14): it wraps between words, the eye-off beside it, the
+    // chips on the second line, Moved after them (T3). A one-word name keeps its line whole and
+    // the eye-off leads the second line, the chips get the rest of it (sprint 6 CP2 note 3: never
+    // break a word that fits).
+    expect(
+      fitNameLine({ line: 138, name: 125, word: 50, marks: [eye], side: 0, end: 60, chips: true }),
+    ).toEqual({ nameWrap: true, marksWrap: false, split: true, room: 138 - 60 - 4 });
     expect(
       fitNameLine({ line: 138, name: 125, marks: [eye], side: 0, end: 60, chips: true }),
     ).toEqual({ nameWrap: false, marksWrap: true, split: true, room: 138 - 18 });
@@ -232,6 +237,37 @@ describe("FR-CBTX-58 trigger label never cut", () => {
       expect(html).toContain("opacity-70");
       expect(html).not.toContain("truncate");
     }
+  });
+});
+
+describe("FR-CBTX-57 the eye-off stays beside the name (T3, Gilt & Stone default)", () => {
+  // Measured in the build at the DM's 320 min, the hidden Ally row (init-rows-s6, sim-9): the
+  // name line is 74 px; "Goblin Lurker" is 74 (Goblin 37, Lurker 35) under Gilt & Stone and 86
+  // (42, 40) under Simple Dark.
+  const line = 74;
+  test("FR-CBTX-57 the eye-off stays beside the name: 'Goblin Lurker' filling its 74-px line exactly wraps between words in both themes; the eye-off and Ally never leave the name for the eye's sake", () => {
+    const gilt = { line, name: 74, word: 37, marks: [eye], side: ally, end: 0, chips: false };
+    const simpleDark = { ...gilt, name: 86, word: 42 };
+    for (const w of [gilt, simpleDark]) {
+      expect({ name: w.name, fit: fitNameLine(w) }).toEqual({
+        name: w.name,
+        fit: { nameWrap: true, marksWrap: false, split: true, room: 0 },
+      });
+    }
+    // With chips: they get the second line after the Ally chip, nothing for moved marks.
+    expect(fitNameLine({ ...gilt, chips: true })).toEqual({
+      nameWrap: true,
+      marksWrap: false,
+      split: true,
+      room: line - ally - 4,
+    });
+    // The longest word + the eye-off don't fit (37 + 18 > 50): the marks move down instead.
+    expect(fitNameLine({ ...gilt, line: 50, name: 50 })).toMatchObject({
+      nameWrap: false,
+      marksWrap: true,
+    });
+    // Room for name + eye-off on one line: nothing wraps.
+    expect(fitNameLine({ ...gilt, line: 92 })).toMatchObject({ nameWrap: false, marksWrap: false });
   });
 });
 
