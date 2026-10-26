@@ -174,6 +174,13 @@ describe("FR-THEME-09 meaning colours untouched", () => {
       }).toEqual({ s, ok: true });
     }
   });
+
+  test("FR-THEME-09 meaning colours untouched: the colour picker's hue spectrum stays (Slider track and range retinted by token, never painted)", () => {
+    const painted = declsOf((s) => /slider-(track|range)/.test(s)).filter(([p]) =>
+      p.startsWith("background"),
+    );
+    expect(painted).toEqual([]);
+  });
 });
 
 describe("FR-THEME-10 – -15 parts", () => {

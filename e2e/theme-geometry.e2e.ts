@@ -62,6 +62,8 @@ const PARTS: Record<string, string> = {
   pip: '[data-slot="sheet-pip"]',
   logEntry: '[data-testid="dice-log-entry"]',
   option: '[data-testid="theme-option"][data-value="default"]',
+  hueTrack: '[data-testid="camp-color-hue"] [data-slot="slider-track"]',
+  hueRange: '[data-testid="camp-color-hue"] [data-slot="slider-range"]',
 };
 
 const PROPS = [
@@ -256,6 +258,9 @@ test("FR-THEME-05 FR-THEME-10 FR-THEME-11 FR-THEME-12 FR-THEME-13 FR-THEME-14 FR
   expect(look.init).toContain("EB Garamond");
   expect(look.init).toMatch(/fontVariantNumeric=[^;]*lining-nums/);
   expect(look.roll).toContain("EB Garamond");
+  // FR-THEME-09: the colour picker's hue track keeps its spectrum; its range stays unpainted.
+  expect(look.hueTrack).toMatch(/backgroundImage=linear-gradient\(to right, rgb\(255, 0, 0\)/);
+  expect(look.hueRange).toContain("backgroundColor=rgba(0, 0, 0, 0)");
 
   // FR-THEME-12: hovering a log line unrolls the parchment after the shared delay.
   await dm.getByTestId("dice-log-entry-text").first().hover();

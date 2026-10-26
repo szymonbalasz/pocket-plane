@@ -678,12 +678,14 @@
 }
 
 /* ── Slider: thin gold track, a diamond thumb ───────────────────────────────────────────────── */
+/* Track and range retinted through their own utilities' tokens, so a slider that paints its own
+   track (the colour picker's hue spectrum, a meaning control) keeps it. */
 :root[data-theme="gilt"] [data-slot="slider-track"] {
-  background-color: #2a2620;
+  --muted: #2a2620;
   box-shadow: inset 0 0 0 1px #000;
 }
 :root[data-theme="gilt"] [data-slot="slider-range"] {
-  background-color: var(--frame-rule-strong);
+  --primary: var(--frame-rule-strong);
 }
 :root[data-theme="gilt"] [data-slot="slider-thumb"] {
   border-radius: 0;
