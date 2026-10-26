@@ -47,7 +47,8 @@ describe("FR-THEME-02 appearance section", () => {
         "default",
         "gilt",
       ]);
-      expect(html).toContain(">Default<");
+      expect(html).toContain(">Simple Dark<");
+      expect(html).not.toContain(">Default<");
       expect(html).toContain(">Gilt &amp; Stone<");
       expect(html).toContain("Only on this browser");
     }
@@ -60,6 +61,19 @@ describe("FR-THEME-02 appearance section", () => {
     const on = options(renderToStaticMarkup(<Component />)).filter((o) => o.state === "on");
     expect(on.map((o) => o.value)).toEqual(["gilt"]);
     expect(themeStore().read()).toBe("gilt");
+  });
+
+  test("FR-THEME-02 appearance section: no stored choice → Gilt & Stone on; a stored `default` → Simple Dark on (DM #355)", () => {
+    const data = new Map<string, string>();
+    g.localStorage = { getItem: (k: string) => data.get(k) ?? null, setItem() {} };
+    const { Component } = appearanceSection;
+    const on = () =>
+      options(renderToStaticMarkup(<Component />))
+        .filter((o) => o.state === "on")
+        .map((o) => o.value);
+    expect(on()).toEqual(["gilt"]);
+    data.set(THEME_KEY, '{"theme":"default"}');
+    expect(on()).toEqual(["default"]);
   });
 });
 

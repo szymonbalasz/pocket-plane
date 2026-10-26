@@ -174,6 +174,8 @@ export function fitChipRow(
 export interface NameLineWidths {
   line: number;
   name: number;
+  /** The name's longest word; absent = the name is one word (its width is `name`). */
+  word?: number;
   /** Beside the name, never moved: the hidden eye-off, the skip icon. */
   marks: readonly number[];
   /** The side chip (Ally / Enemy, never folds); 0 = none. */
@@ -187,13 +189,15 @@ export interface NameLineWidths {
 /** `fitNameLine`'s pick. */
 export interface NameLineFit {
   /**
-   * The name alone is wider than the line: it wraps onto two lines (no "…"), between words, and
-   * inside a word only when that word is wider than the line.
+   * The name wraps onto two lines (no "…"), between words, and inside a word only when that word
+   * is wider than the line: the name alone is wider than the line, or it fits but not with its
+   * marks while its longest word does (the marks stay beside it, FR-CBTX-57).
    */
   nameWrap: boolean;
   /**
-   * The name fits but not with its marks: the marks leave the name's line (to the next one, before
-   * the side chip), so a word that fits on its own line never breaks (sprint 6 CP2, note 3).
+   * The name fits but not with its marks, and neither does its longest word: the marks leave the
+   * name's line (to the next one, before the side chip), so a word that fits on its own line never
+   * breaks (sprint 6 CP2, note 3).
    */
   marksWrap: boolean;
   /** The side chip and every chip take a second line under the name. */
@@ -207,22 +211,28 @@ export interface NameLineFit {
  * the fixed parts on it (marks, side chip, Moved) − the gaps. If the name and its fixed parts
  * don't fit with at least a "+N" chip's room, the side chip and the chips move to a second line
  * (the marks stay beside the name), where the chips get the line after the side chip (and after
- * Moved too when the name wraps: Moved then follows the chips). Only a name wider than the line
- * wraps; a name that fits but not with its marks keeps its line and the marks move down first.
+ * Moved too when the name wraps: Moved then follows the chips). A name wider than the line wraps; a
+ * name that fits but not with its marks wraps between words when its longest word and the marks
+ * fit (T3, 2026-10-26: "Goblin Lurker" exactly filling its line under Gilt & Stone), else it keeps
+ * its line and the marks move down.
  */
 export function fitNameLine(w: NameLineWidths, gap = 4): NameLineFit {
   const head = w.name + w.marks.reduce((s, m) => s + gap + m, 0);
   const side = w.side > 0 ? w.side + gap : 0;
   const end = w.end > 0 ? w.end + gap : 0;
-  const nameWrap = w.name > w.line;
-  const marksWrap = !nameWrap && head > w.line;
+  const markW = head - w.name;
+  const tooWide = w.name > w.line;
+  // Fits alone but not with its marks: break between words if the longest word keeps them beside.
+  const crowded = !tooWide && head > w.line;
+  const nameWrap = tooWide || (crowded && (w.word ?? w.name) + markW <= w.line);
+  const marksWrap = crowded && !nameWrap;
   const room = w.line - head - side - end - gap;
   const moves = w.side > 0 || w.chips;
   const split =
     moves && (nameWrap || marksWrap || head + side + end > w.line || (w.chips && room < MORE_W));
   if (!w.chips) return { nameWrap, marksWrap, split, room: 0 };
   // Marks moved down: they lead the second line, before the side chip.
-  const marks = marksWrap ? head - w.name : 0;
+  const marks = marksWrap ? markW : 0;
   const below = w.line - side - marks - (nameWrap ? end : 0);
   return { nameWrap, marksWrap, split, room: Math.max(0, split ? below : room) };
 }

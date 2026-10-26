@@ -1,7 +1,11 @@
 /* Gilt & Stone fonts (theme-system FR-THEME-16, OQ-THEME-04 A): Latin-subset woff2 from Google
    Fonts, committed with their OFL licences (fonts/ATTRIBUTION.md). A browser fetches a face only
    when text is drawn in its family, and only the gilt token block names these families, so they
-   download only while Gilt & Stone is on. EB Garamond is one variable file for 500–700. */
+   download only while Gilt & Stone is on. EB Garamond is one variable file for 500–700.
+   EB Garamond (numbers) takes Alegreya Sans' (body) ascent / descent split, 80 / 20 (theirs:
+   101 / 30), so a figure inside a line of body text sits on the same box and the line doesn't
+   grow (FR-THEME-05; T3: a one-line Game log row was 1 px taller than in Simple Dark). The line
+   gap makes up the rest, so `line-height: normal` keeps EB Garamond's 1.31. Glyphs unchanged. */
 
 @font-face {
   font-family: "IM Fell English SC";
@@ -19,6 +23,9 @@
   font-style: normal;
   font-weight: 500 700;
   font-display: swap;
+  ascent-override: 80%;
+  descent-override: 20%;
+  line-gap-override: 31%;
   src: url("./fonts/eb-garamond-500-700.latin.woff2") format("woff2");
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,

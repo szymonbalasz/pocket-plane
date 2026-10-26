@@ -770,9 +770,12 @@ function nameLineWidths(line: HTMLElement) {
   const width = (sel: string) => line.querySelector<HTMLElement>(sel)?.offsetWidth ?? 0;
   // Beside the name, or moved down (`marksWrap`): measured wherever they are.
   const marks = width(":scope > [data-name-head] > [data-name-marks], :scope > [data-name-marks]");
+  // FR-CBT-143: each word's natural width; the longest decides a between-words wrap.
+  const words = [...line.querySelectorAll<HTMLElement>("[data-word-measure]")];
   return {
     line: line.clientWidth,
     name: width("[data-name-measure]"),
+    word: Math.max(0, ...words.map((w) => w.offsetWidth)),
     marks: marks > 0 ? [marks] : [],
     side: width(":scope > [data-name-side]"),
     end: width(":scope > [data-name-end]"),
@@ -813,10 +816,10 @@ export function NameLine({
   const measure = useCallback(() => {
     const line = ref.current;
     if (!line || line.clientWidth === 0) return;
+    const widths = nameLineWidths(line);
     // FR-CBT-143: the longest word's natural width, capped at the line.
-    const words = [...line.querySelectorAll<HTMLElement>("[data-word-measure]")];
-    const wordW = Math.min(Math.max(0, ...words.map((w) => w.offsetWidth)), line.clientWidth);
-    const next = { ...fitNameLine(nameLineWidths(line)), wordW };
+    const wordW = Math.min(widths.word, widths.line);
+    const next = { ...fitNameLine(widths), wordW };
     setFit((f) =>
       f?.nameWrap === next.nameWrap &&
       f.marksWrap === next.marksWrap &&

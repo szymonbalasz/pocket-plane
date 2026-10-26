@@ -8,7 +8,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
-import { forgetLabelWidths, Launcher, labelWidth, launcherFont } from "./Launcher";
+import {
+  forgetLabelWidths,
+  Launcher,
+  labelWidth,
+  launcherFont,
+  remeasureLabelWidths,
+} from "./Launcher";
 import { fitLauncher, LAUNCHER_GUTTER, launcherMetrics } from "./launcher-fit";
 import { createWindowRegistry, defineWindow } from "./registry";
 import { ShellProvider } from "./ShellContext";
@@ -148,6 +154,25 @@ describe("FR-THEME-07 launcher measures computed font", () => {
     forgetLabelWidths(); // a web font loaded: same string, new glyphs → measured again
     labelWidth("Initiative", font);
     expect(measured).toHaveLength(3);
+  });
+
+  test("FR-THEME-07 FR-SHELL-43 a web font load re-fits only when a label's width changed (a window's title face loading late leaves the bar alone)", () => {
+    labelWidth("Initiative", FIXED);
+    labelWidth("Game log", FIXED);
+    measured.length = 0;
+    // A face the labels don't use finished loading: the same widths → no re-fit.
+    expect(remeasureLabelWidths()).toBe(false);
+    expect(measured.map((m) => m.text)).toEqual(["Initiative", "Game log"]);
+    expect(labelWidth("Initiative", FIXED)).toBe(71);
+    // The labels' own face arrived: new glyph widths → re-fit, the new widths kept.
+    ADVANCE[FIXED] = 8;
+    try {
+      expect(remeasureLabelWidths()).toBe(true);
+      expect(labelWidth("Initiative", FIXED)).toBe(81);
+      expect(remeasureLabelWidths()).toBe(false);
+    } finally {
+      ADVANCE[FIXED] = 7;
+    }
   });
 
   test("FR-THEME-07 the fit follows the font: a wider theme font drops a label the fixed font kept", () => {

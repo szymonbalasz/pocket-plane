@@ -1,9 +1,10 @@
 // Theme choice (theme-system FR-THEME-01, -03; ADR-0069): one browser-storage entry `pp.theme.v1`
 // = {theme}, zod-parsed, shared by both clients and every campaign on this browser; never sent.
-// The active theme is `data-theme` on <html>; Default has none. The boot script in both
-// index.html files applies the stored choice before first paint and warns once about an
-// unreadable one (FR-THEME-04); this store reads, writes and applies it after that and tells
-// this tab's subscribers. No `storage` listener: another tab picks a change up on its next load.
+// The active theme is `data-theme` on <html>; Simple Dark (`default`, the original look) has none.
+// No stored choice, or an unreadable one → Gilt & Stone (DM #355). The boot script in both
+// index.html files applies that before first paint and warns once about an unreadable choice
+// (FR-THEME-04); this store reads, writes and applies it after that and tells this tab's
+// subscribers. No `storage` listener: another tab picks a change up on its next load.
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
 import type { StorageBackend } from "../features/play-shell/storage";
@@ -16,9 +17,11 @@ export const ThemePref = z.object({ theme: ThemeId });
 export type ThemePref = z.infer<typeof ThemePref>;
 
 export const THEME_KEY = "pp.theme.v1";
-export const DEFAULT_THEME: ThemeId = "default";
+/** The theme of a browser with no (readable) stored choice (DM #355, OQ-THEME-03 B). */
+export const FALLBACK_THEME: ThemeId = "gilt";
+/** The stored id `default` keeps meaning the original look, shown as "Simple Dark" (no migration). */
 export const THEME_LABELS: Readonly<Record<ThemeId, string>> = {
-  default: "Default",
+  default: "Simple Dark",
   gilt: "Gilt & Stone",
 };
 
@@ -37,9 +40,9 @@ export function parseTheme(raw: string | null): ThemeId | null {
 
 type Root = Pick<Element, "setAttribute" | "removeAttribute">;
 
-/** The attribute side of FR-THEME-01: `data-theme="<id>"`, none for Default. */
+/** The attribute side of FR-THEME-01: `data-theme="<id>"`, none for Simple Dark. */
 export function applyTheme(root: Root, t: ThemeId) {
-  if (t === DEFAULT_THEME) root.removeAttribute("data-theme");
+  if (t === "default") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", t);
 }
 
@@ -59,9 +62,9 @@ export function createThemeStore(
   const read = (): ThemeId => {
     if (memory) return memory;
     try {
-      return parseTheme(getBackend()?.getItem(THEME_KEY) ?? null) ?? DEFAULT_THEME;
+      return parseTheme(getBackend()?.getItem(THEME_KEY) ?? null) ?? FALLBACK_THEME;
     } catch {
-      return DEFAULT_THEME;
+      return FALLBACK_THEME;
     }
   };
   return {

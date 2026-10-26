@@ -1001,10 +1001,12 @@
 
 /* ── FR-THEME-13 toasts: framed like a small window, no corner pieces ───────────────────────── */
 /* The double rule (the inner one as bright as a window's, so it reads at 1×), square corners.
-   The 3D-dice roll popup's chrome too; its dice stay unthemed. */
+   The 3D-dice roll popup's chrome too; its dice stay unthemed. Alert toasts (`data-class="alert"`,
+   the shell's alerts in the notification stack) share the notification surface (#159). */
 :root[data-theme="gilt"]
 :is(
   [data-testid="note-toast"],
+  [data-class="alert"],
   [data-testid="note-callout"],
   [data-testid="note-toast-pending-summary"],
   [data-testid="cbt-popup"],
@@ -1024,6 +1026,7 @@
   :root[data-theme="gilt"]
     :is(
       [data-testid="note-toast"],
+      [data-class="alert"],
       [data-testid="note-callout"],
       [data-testid="note-toast-pending-summary"],
       [data-testid="cbt-popup"],
