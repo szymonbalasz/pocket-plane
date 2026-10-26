@@ -1,6 +1,7 @@
 // Theme choice store and boot script (theme-system FR-THEME-01, -03, -04): `pp.theme.v1` parse,
-// invalid and blocked storage, the `data-theme` attribute, and the inline script in both
-// index.html files, run here over the same inputs as the store so the two can't disagree.
+// invalid and blocked storage (→ Gilt & Stone, DM #355), the `data-theme` attribute, and the
+// inline script in both index.html files, run here over the same inputs as the store so the two
+// can't disagree.
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,7 +9,7 @@ import type { StorageBackend } from "../features/play-shell/storage";
 import {
   applyTheme,
   createThemeStore,
-  DEFAULT_THEME,
+  FALLBACK_THEME,
   parseTheme,
   THEME_IDS,
   THEME_KEY,
@@ -45,25 +46,31 @@ function fakeRoot() {
 
 /** Stored strings and the theme they must give; null = no entry. */
 const CASES: [string | null, ThemeId][] = [
-  [null, "default"],
+  [null, "gilt"],
   ['{"theme":"gilt"}', "gilt"],
   ['{"theme":"default"}', "default"],
+  ['{"theme":"default","extra":1}', "default"],
   ['{"theme":"gilt","extra":1}', "gilt"],
-  ['{"theme":"neon"}', "default"],
-  ['{"theme":null}', "default"],
-  ["{}", "default"],
-  ["null", "default"],
-  ['"gilt"', "default"],
-  ["not json", "default"],
-  ["", "default"],
+  ['{"theme":"neon"}', "gilt"],
+  ['{"theme":"simple-dark"}', "gilt"],
+  ['{"theme":null}', "gilt"],
+  ["{}", "gilt"],
+  ["null", "gilt"],
+  ['"default"', "gilt"],
+  ["not json", "gilt"],
+  ["", "gilt"],
 ];
 
+/** The theme a page shows from its <html> attribute: none = Simple Dark (`default`). */
+const shown = (attr: string | null): ThemeId => (attr ?? "default") as ThemeId;
+
 describe("FR-THEME-03 storage", () => {
-  test("FR-THEME-03 storage: parse, invalid → Default", () => {
+  test("FR-THEME-03 storage: parse; none or invalid → Gilt & Stone (DM #355)", () => {
     expect(THEME_KEY).toBe("pp.theme.v1");
     expect(THEME_IDS).toEqual(["default", "gilt"]);
+    expect(FALLBACK_THEME).toBe("gilt");
     for (const [raw, want] of CASES) {
-      expect({ raw, got: parseTheme(raw) ?? DEFAULT_THEME }).toEqual({ raw, got: want });
+      expect({ raw, got: parseTheme(raw) ?? FALLBACK_THEME }).toEqual({ raw, got: want });
       const s = createThemeStore(
         () => memory(raw === null ? {} : { [THEME_KEY]: raw }).backend,
         fakeRoot,
@@ -96,7 +103,7 @@ describe("FR-THEME-03 storage", () => {
     expect([...data.keys()]).toEqual([THEME_KEY]);
   });
 
-  test("FR-THEME-03 storage: blocked or missing storage → Default, the choice holds for the page, one warning", () => {
+  test("FR-THEME-03 storage: blocked or missing storage → Gilt & Stone, the choice holds for the page, one warning", () => {
     for (const getBackend of [() => blocked, () => undefined]) {
       const warnings: string[] = [];
       const root = fakeRoot();
@@ -105,19 +112,20 @@ describe("FR-THEME-03 storage", () => {
         () => root,
         (m) => warnings.push(m),
       );
+      expect(s.read()).toBe("gilt");
+      s.write("default");
       expect(s.read()).toBe("default");
+      expect(root.getAttribute("data-theme")).toBeNull();
       s.write("gilt");
       expect(s.read()).toBe("gilt");
       expect(root.getAttribute("data-theme")).toBe("gilt");
-      s.write("default");
-      expect(s.read()).toBe("default");
       expect(warnings).toEqual(["theme: storage unavailable; keeping the choice for this page"]);
     }
     // getBackend itself throwing (access to `localStorage` denied).
     const s = createThemeStore(() => {
       throw new Error("denied");
     }, fakeRoot);
-    expect(s.read()).toBe("default");
+    expect(s.read()).toBe("gilt");
   });
 
   test("FR-THEME-03 storage: never sent — the module imports no sync, API or server code", () => {
@@ -126,7 +134,7 @@ describe("FR-THEME-03 storage", () => {
     expect(imports).toEqual(["react", "zod", "../features/play-shell/storage"]);
   });
 
-  test("FR-THEME-01 data-theme on <html>: gilt sets it, Default removes it", () => {
+  test("FR-THEME-01 data-theme on <html>: gilt sets it, Simple Dark (`default`) removes it", () => {
     const root = fakeRoot();
     applyTheme(root, "gilt");
     expect(root.getAttribute("data-theme")).toBe("gilt");
@@ -182,20 +190,20 @@ describe("FR-THEME-04 boot script", () => {
       expect(html.indexOf('<div id="root">')).toBeGreaterThan(bootScript!.at);
     });
 
-    test(`FR-THEME-04 boot script (${client}): same result as the store for every stored value; unreadable → Default + one warning`, () => {
+    test(`FR-THEME-04 boot script (${client}): same result as the store for every stored value; none → Gilt & Stone; unreadable → Gilt & Stone + one warning`, () => {
       const body = inlineScripts(html).find((s) => s.body.includes(THEME_KEY))!.body;
       for (const [raw, want] of CASES) {
         const r = boot(body, raw);
-        expect({ raw, theme: r.theme ?? DEFAULT_THEME }).toEqual({ raw, theme: want });
+        expect({ raw, theme: shown(r.theme) }).toEqual({ raw, theme: want });
         if (want === "default") expect(r.attrs).toBe(0);
         const valid = raw === null || parseTheme(raw) !== null;
         expect({ raw, warnings: r.warnings.length }).toEqual({ raw, warnings: valid ? 0 : 1 });
       }
       for (const id of THEME_IDS) {
-        expect(boot(body, JSON.stringify({ theme: id })).theme ?? DEFAULT_THEME).toBe(id);
+        expect(shown(boot(body, JSON.stringify({ theme: id })).theme)).toBe(id);
       }
       const b = boot(body, "blocked");
-      expect([b.theme, b.warnings.length]).toEqual([null, 1]);
+      expect([b.theme, b.warnings.length]).toEqual(["gilt", 1]);
     });
   }
 
