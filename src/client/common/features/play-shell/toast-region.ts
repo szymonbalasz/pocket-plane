@@ -12,8 +12,8 @@ export const NOTE_EDGE = 16;
 /** Gap between the two stacks (the notifications stack's own gap). */
 export const STACK_GAP = 8;
 /**
- * The player stack's distance from the bottom edge: above the launcher bar, so a toast never
- * covers a launcher button (a long launcher row reaches the bottom-right corner).
+ * The player stack's distance from the bottom edge: the work area's bottom gap + the stack gap
+ * (20 px; the launcher sits in the top bar, FR-KIT-14).
  */
 export const PLAYER_TOAST_BOTTOM = LAUNCHER_CLEAR + STACK_GAP;
 /** DM stack top: below the title bars of top-anchored windows, so their controls stay clickable. */
@@ -83,7 +83,7 @@ export const KEEP_OUT_H =
 
 /**
  * Where this client's toasts and roll popups go, in viewport px (FR-SHELL-49): players
- * bottom-right above the launcher (vw − 372, vh − 310), the DM top-centre below the top bar and
+ * bottom-right, 20 px above the bottom edge (vw − 372, vh − 258), the DM top-centre below the top bar and
  * window title bars ((vw − 356) / 2, 100); 356 × 238 both. Auto-placed windows keep out of it
  * (players: hard, DM: soft; FR-SHELL-48) and the fit frames no token under it (FR-MAP-59).
  */

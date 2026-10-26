@@ -47,14 +47,14 @@ const benchTokens = Array.from({ length: 200 }, (_, i) => ({
 }));
 
 describe("open placement (FR-SHELL-08, -45)", () => {
-  test("fitted default: a tall window ends above the launcher, never below min size", () => {
+  test("fitted default: a tall window ends at the work area's bottom, never below min size", () => {
     const tall = def({
       defaultPosition: { anchor: "top-right", dy: 200 },
       defaultSize: { w: 300, h: 900 },
     });
     const r = fittedDefaultRect(tall, small);
     expect(r.y).toBe(TOP_BAR_H + EDGE_GAP + 200);
-    expect(r.y + r.h).toBe(small.h - EDGE_GAP - LAUNCHER_CLEAR);
+    expect(r.y + r.h).toBe(small.h - LAUNCHER_CLEAR);
     const tiny = fittedDefaultRect({ ...tall, minSize: { w: 200, h: 500 } }, small);
     expect(tiny.h).toBe(500);
     expect(tiny.y + tiny.h).toBeLessThanOrEqual(usableArea(small).bottom);
@@ -91,8 +91,9 @@ describe("open placement (FR-SHELL-08, -45)", () => {
   test("FR-SHELL-45 full size before shrunk; shrunk clear before anything over a window", () => {
     const a = usableArea(vp);
     const tall = def({ defaultSize: { w: 300, h: 400 }, minSize: { w: 200, h: 150 } });
-    // The default (left) column has only 200 above a log: the right edge has full size.
-    const log = { x: EDGE_GAP, y: 272, w: 300, h: 200 };
+    // The default (left) column has only 200 above a log and 344 below it: the right edge has
+    // full size.
+    const log = { x: EDGE_GAP, y: 272, w: 300, h: 260 };
     expect(place(tall, vp, { windows: [log] })).toEqual({
       x: a.right - 300,
       y: a.top,
@@ -100,7 +101,7 @@ describe("open placement (FR-SHELL-08, -45)", () => {
       h: 400,
     });
     // Both edges short of 400 → shrunk but clear, never over a window.
-    const right = { x: a.right - 300, y: 372, w: 300, h: 100 };
+    const right = { x: a.right - 300, y: 372, w: 300, h: 160 };
     const r = place(tall, vp, { windows: [log, right] });
     expect(r.h).toBeLessThan(400);
     expect(overlaps(r, log) || overlaps(r, right)).toBe(false);
@@ -220,7 +221,7 @@ describe("sprint 5 placement (FR-SHELL-46–48, -51)", () => {
 
   test("FR-SHELL-46 inward column for 10 windows × 200 token boxes: same inputs, same rect (timed in ./placement.bench.ts)", () => {
     const placed = placeWindow(tall, vp, { windows: benchWindows, tokens: benchTokens });
-    expect(placed).toMatchObject({ rect: { x: 1288, y: 424, w: 300, h: 400 }, clear: false });
+    expect(placed).toMatchObject({ rect: { x: 876, y: 488, w: 300, h: 400 }, clear: false });
     expect(placeWindow(tall, vp, { windows: benchWindows, tokens: benchTokens })).toEqual(placed);
   });
 
@@ -429,10 +430,10 @@ describe("sprint 6 placement (FR-SHELL-57, -58)", () => {
       minSize: { w: 300, h: 400 },
       defaultPosition: { anchor: "top-left", dx: 56 },
     });
-    expect(placeWindow(tall, vp, input).rect).toEqual({ x: 1288, y: 424, w: 300, h: 400 });
+    expect(placeWindow(tall, vp, input).rect).toEqual({ x: 876, y: 488, w: 300, h: 400 });
     // A window that may also narrow (min width < width) searches the columns twice.
     expect(placeWindow(cmp, vp, input)).toMatchObject({
-      rect: { x: 68, y: 524, w: 440, h: 300 },
+      rect: { x: 1148, y: 588, w: 316, h: 300 },
       clear: false,
     });
   });

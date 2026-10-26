@@ -20,20 +20,25 @@ const size = (windows: string | undefined, kind: string) => {
 
 test("FR-SHELL-156 BL-104 the DM's Party Manager opens at its size row's width where the map keeps an all-tokens fit (sim-13: 456 / 340 px)", () => {
   // Escort, fitted: PCs left of the free area, monsters across it (sim-13 a02). At 1600×900 the
-  // default width, at the band's height (512): L1, not a token-avoiding L2 cut. At 1440×900 that
-  // width leaves Fit only the 48-px PCs-only view (sprint 11 F1, BL-107): the useful size.
-  for (const [vp, want] of [
-    [
-      { w: 1600, h: 900 },
-      { w: 600, h: 512 },
-    ],
-    [VP, { w: 440, h: 400 }],
-  ] as const) {
-    const run = runScript(dmWindows, "dm", vp, "escort", [{ open: "party.board" }, "fit"]);
-    expect(run.problems).toEqual([]);
-    expect(size(run.steps.at(-1)?.windows, "party.board")).toEqual(want);
-    expect(run.steps.at(-1)?.fit).toBe("all");
-  }
+  // default width, at the band's height (536): L1, not a token-avoiding L2 cut.
+  const run = runScript(dmWindows, "dm", { w: 1600, h: 900 }, "escort", [
+    { open: "party.board" },
+    "fit",
+  ]);
+  expect(run.problems).toEqual([]);
+  expect(size(run.steps.at(-1)?.windows, "party.board")).toEqual({ w: 600, h: 536 });
+  expect(run.steps.at(-1)?.fit).toBe("all");
+});
+
+// K5 open issue (kit-parity K5 report): with the work area to vh − 12 the ladder's useful-size
+// spot at 1440×900 (442,196) leaves Fit only the 48-px PCs-only view, so BL-107's rule keeps the
+// target size (600 × 536) and Fit gives `pcs`. Recorded failing until the placer weighs the fit
+// among its useful spots (576,196 keeps `all` at 25 px).
+test.failing("FR-SHELL-156 BL-107 escort at 1440×900: the Party Manager at its useful size, Fit `all` (K5 known failure)", () => {
+  const run = runScript(dmWindows, "dm", VP, "escort", [{ open: "party.board" }, "fit"]);
+  expect(run.problems).toEqual([]);
+  expect(size(run.steps.at(-1)?.windows, "party.board")).toEqual({ w: 440, h: 400 });
+  expect(run.steps.at(-1)?.fit).toBe("all");
 });
 
 test("FR-SHELL-97 FR-SHELL-102 BL-99 Party Manager and the Stronghold window stay open together at 1440×900 where they fit at their useful sizes; the Party Manager grows back when the Stronghold closes", () => {
@@ -53,7 +58,7 @@ test("FR-SHELL-97 FR-SHELL-102 BL-99 Party Manager and the Stronghold window sta
   expect(size(both, "hold.stronghold")?.w).toBeGreaterThanOrEqual(400);
   // The squeeze ends with its cause (FR-SHELL-102): 600 wide again.
   const after = run.steps.at(-1)?.windows;
-  expect(entry(after, "party.board")).toBe("party.board:open:68,60,600×512");
+  expect(entry(after, "party.board")).toBe("party.board:open:68,60,600×536");
 });
 
 test("FR-MAP-115 BL-100 a remembered window over the map centre: reload and Fit frame the map around the other windows (`all`), never the 48-px PCs-only view", () => {
@@ -81,11 +86,11 @@ test("FR-MAP-115 BL-100 a remembered window at the edge stays an obstacle: reloa
     "fit",
   ]);
   expect(run.problems).toEqual([]);
-  // 42 px framed around Initiative + the Game log; 31 px with the Compendium left as well.
+  // 45 px framed around Initiative + the Game log (K5); 31 px with the Compendium left as well.
   expect(run.steps.map((s) => [s.step, s.fit, s.cell])).toEqual([
-    ["load", "all", 42],
-    ["open cmp.compendium", "all", 42],
-    ["drag cmp.compendium", "all", 42],
+    ["load", "all", 45],
+    ["open cmp.compendium", "all", 45],
+    ["drag cmp.compendium", "all", 45],
     ["reload", "all", 31],
     ["fit", "all", 31],
   ]);

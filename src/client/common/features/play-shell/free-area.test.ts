@@ -19,8 +19,8 @@ import { createWindowRegistry, defineWindow } from "./registry";
 import { reportShownStack, summaryStrip, toastKeepOut } from "./toast-region";
 
 const VP = { w: 1440, h: 900 };
-/** Work area right of the rail at 1440×900: x 68…1440, y 48…836. */
-const RAIL = { x: 68, y: 48, w: 1372, h: 788 };
+/** Work area right of the rail at 1440×900: x 68…1440, y 48…888. */
+const RAIL = { x: 68, y: 48, w: 1372, h: 840 };
 
 describe("FR-SHELL-34 free area", () => {
   test("FR-SHELL-34 no windows → the work area right of the rail", () => {
@@ -30,7 +30,7 @@ describe("FR-SHELL-34 free area", () => {
 
   test("FR-SHELL-34 largest rect beside a right-edge window", () => {
     const init = { x: 1028, y: 60, w: 400, h: 500 };
-    expect(freeArea([init], VP)).toEqual({ x: 68, y: 48, w: 960, h: 788 });
+    expect(freeArea([init], VP)).toEqual({ x: 68, y: 48, w: 960, h: 840 });
   });
 
   test("FR-SHELL-34 DM default layout at 1440×900: left of Initiative, above the log", () => {
@@ -42,33 +42,33 @@ describe("FR-SHELL-34 free area", () => {
   test("FR-SHELL-34 overlapping windows count once", () => {
     const a = { x: 900, y: 60, w: 400, h: 400 };
     const b = { x: 1000, y: 100, w: 440, h: 400 };
-    expect(freeArea([a, b], VP)).toEqual({ x: 68, y: 48, w: 832, h: 788 });
+    expect(freeArea([a, b], VP)).toEqual({ x: 68, y: 48, w: 832, h: 840 });
   });
 
   test("FR-SHELL-34 the rail strip is excluded; a window over it doesn't count there", () => {
-    const left = { x: 0, y: 48, w: 200, h: 788 };
-    expect(freeArea([left], VP)).toEqual({ x: 200, y: 48, w: 1240, h: 788 });
+    const left = { x: 0, y: 48, w: 200, h: 840 };
+    expect(freeArea([left], VP)).toEqual({ x: 200, y: 48, w: 1240, h: 840 });
   });
 
   test("FR-SHELL-34 tie → the higher, then the more left one", () => {
     // A full-width band across the middle: equal halves above and below → the upper one.
-    const band = { x: 0, y: 418, w: 1440, h: 48 };
-    expect(freeArea([band], VP)).toEqual({ x: 68, y: 48, w: 1372, h: 370 });
+    const band = { x: 0, y: 444, w: 1440, h: 48 };
+    expect(freeArea([band], VP)).toEqual({ x: 68, y: 48, w: 1372, h: 396 });
     // A full-height column in the middle: equal halves left and right → the left one.
     const col = { x: 704, y: 0, w: 100, h: 900 };
-    expect(freeArea([col], { w: 1440, h: 900 })).toEqual({ x: 68, y: 48, w: 636, h: 788 });
+    expect(freeArea([col], { w: 1440, h: 900 })).toEqual({ x: 68, y: 48, w: 636, h: 840 });
   });
 
   test("FR-SHELL-34 window wider than the area → the larger strip it leaves", () => {
-    const wide = { x: -100, y: 300, w: 2000, h: 300 };
-    expect(freeArea([wide], VP)).toEqual({ x: 68, y: 48, w: 1372, h: 252 });
+    const wide = { x: -100, y: 336, w: 2000, h: 300 };
+    expect(freeArea([wide], VP)).toEqual({ x: 68, y: 48, w: 1372, h: 288 });
   });
 
   test("FR-SHELL-34 < 320×240 or < 25 % of the work area → the work area right of the rail", () => {
     // Only a 1372 × 200 strip is left: too low.
     const big = { x: 0, y: 248, w: 1440, h: 700 };
     expect(freeArea([big], VP)).toEqual(RAIL);
-    // 600 × 400 is ≥ 320×240 but < 25 % of 1440 × 788.
+    // 600 × 400 is ≥ 320×240 but < 25 % of 1440 × 840.
     const frame = [
       { x: 0, y: 48, w: 1440, h: 200 },
       { x: 0, y: 648, w: 1440, h: 200 },
@@ -90,13 +90,13 @@ describe("FR-SHELL-44 freeAreas", () => {
     expect(freeAreas([], VP)).toEqual([RAIL]);
     // Left of Initiative (full height) and below it (full width); the 12 px above it is too low.
     expect(freeAreas([init], VP)).toEqual([
-      { x: 68, y: 48, w: 960, h: 788 },
-      { x: 68, y: 560, w: 1372, h: 276 },
+      { x: 68, y: 48, w: 960, h: 840 },
+      { x: 68, y: 560, w: 1372, h: 328 },
     ]);
     const areas = freeAreas([init, log], VP);
     expect(areas[0]).toEqual({ x: 68, y: 48, w: 960, h: 536 });
-    expect(areas).toContainEqual({ x: 528, y: 48, w: 500, h: 788 }); // between log and Initiative
-    expect(areas).toContainEqual({ x: 528, y: 560, w: 912, h: 276 }); // right of the log
+    expect(areas).toContainEqual({ x: 528, y: 48, w: 500, h: 840 }); // between log and Initiative
+    expect(areas).toContainEqual({ x: 528, y: 560, w: 912, h: 328 }); // right of the log
     for (const [i, a] of areas.entries()) {
       expect(a.w >= 320 && a.h >= 240).toBe(true);
       expect(overlaps(a, init) || overlaps(a, log)).toBe(false);
@@ -118,10 +118,10 @@ describe("FR-SHELL-44 freeAreas", () => {
     expect(many.length).toBe(FREE_AREAS_MAX);
     const sizes = many.map((r) => r.w * r.h);
     expect(sizes).toEqual([...sizes].sort((a, b) => b - a));
-    const band = { x: 0, y: 418, w: 1440, h: 48 };
+    const band = { x: 0, y: 444, w: 1440, h: 48 };
     expect(freeAreas([band], VP)).toEqual([
-      { x: 68, y: 48, w: 1372, h: 370 },
-      { x: 68, y: 466, w: 1372, h: 370 },
+      { x: 68, y: 48, w: 1372, h: 396 },
+      { x: 68, y: 492, w: 1372, h: 396 },
     ]);
   });
 
@@ -130,9 +130,9 @@ describe("FR-SHELL-44 freeAreas", () => {
       [],
       [init],
       [init, log],
-      [{ x: 0, y: 48, w: 200, h: 788 }],
-      [{ x: 0, y: 418, w: 1440, h: 48 }],
-      [{ x: -100, y: 300, w: 2000, h: 300 }],
+      [{ x: 0, y: 48, w: 200, h: 840 }],
+      [{ x: 0, y: 444, w: 1440, h: 48 }],
+      [{ x: -100, y: 336, w: 2000, h: 300 }],
       [{ x: 0, y: 248, w: 1440, h: 700 }],
     ];
     let fellBack = 0;
@@ -234,8 +234,8 @@ describe("FR-SHELL-39 rendered rects use the measured grown height", () => {
     const wide = { ...init, x: 68, w: 1372 };
     const at = (m: Map<string, number>) =>
       freeArea(renderedWindowRects([wide], growing, all, VP, m), VP);
-    expect(at(new Map())).toEqual({ x: 68, y: 360, w: 1372, h: 476 });
-    expect(at(new Map([["cbt.initiative:main", 500]]))).toEqual({ x: 68, y: 560, w: 1372, h: 276 });
+    expect(at(new Map())).toEqual({ x: 68, y: 360, w: 1372, h: 528 });
+    expect(at(new Map([["cbt.initiative:main", 500]]))).toEqual({ x: 68, y: 560, w: 1372, h: 328 });
   });
 
   test("FR-SHELL-39 the reported heights are what consumers read by default", () => {

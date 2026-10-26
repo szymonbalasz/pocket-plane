@@ -64,23 +64,23 @@ describe("FR-NOTE-78 keep off windows' primary content", () => {
   };
   const log720: StackWindow = {
     x: 68,
-    y: 484,
+    y: 508,
     w: 690,
-    h: 160,
-    used: 644,
-    head: 540,
+    h: 200,
+    used: 708,
+    head: 564,
     controls: [
-      { x: 81, y: 608, w: 320, h: 28 },
-      { x: 408, y: 608, w: 128, h: 28 },
-      { x: 545, y: 610, w: 22, h: 22 },
-      { x: 576, y: 608, w: 48, h: 28 },
-      { x: 632, y: 610, w: 24, h: 24 },
-      { x: 666, y: 610, w: 24, h: 24 },
+      { x: 81, y: 672, w: 320, h: 28 },
+      { x: 408, y: 672, w: 128, h: 28 },
+      { x: 545, y: 674, w: 22, h: 22 },
+      { x: 576, y: 672, w: 48, h: 28 },
+      { x: 632, y: 674, w: 24, h: 24 },
+      { x: 666, y: 674, w: 24, h: 24 },
     ],
     logRows: [
-      { x: 81, y: 535, w: 664, h: 22 },
-      { x: 81, y: 557, w: 664, h: 21 },
-      { x: 81, y: 578, w: 664, h: 21 },
+      { x: 81, y: 599, w: 664, h: 22 },
+      { x: 81, y: 621, w: 664, h: 21 },
+      { x: 81, y: 642, w: 664, h: 21 },
     ],
   };
 
@@ -163,30 +163,32 @@ describe("FR-NOTE-78 keep off windows' primary content", () => {
     };
     const log: StackWindow = {
       x: 68,
-      y: 584,
+      y: 608,
       w: 1150,
-      h: 240,
-      used: 824,
-      head: 650,
+      h: 280,
+      used: 888,
+      head: 674,
       controls: [
-        { x: 81, y: 788, w: 320, h: 28 },
-        { x: 408, y: 788, w: 128, h: 28 },
-        { x: 545, y: 790, w: 22, h: 22 },
-        { x: 576, y: 788, w: 48, h: 28 },
-        { x: 632, y: 790, w: 24, h: 24 },
-        { x: 666, y: 790, w: 24, h: 24 },
+        { x: 81, y: 852, w: 320, h: 28 },
+        { x: 408, y: 852, w: 128, h: 28 },
+        { x: 545, y: 854, w: 22, h: 22 },
+        { x: 576, y: 852, w: 48, h: 28 },
+        { x: 632, y: 854, w: 24, h: 24 },
+        { x: 666, y: 854, w: 24, h: 24 },
       ],
       logRows: [
-        { x: 81, y: 716, w: 1130, h: 21 },
-        { x: 81, y: 738, w: 1130, h: 21 },
-        { x: 81, y: 759, w: 1130, h: 21 },
+        { x: 81, y: 780, w: 1130, h: 21 },
+        { x: 81, y: 802, w: 1130, h: 21 },
+        { x: 81, y: 823, w: 1130, h: 21 },
       ],
     };
     // The repro: on Mira's and Thorn's wallets (no control there).
     const before = dmStackSpot(vp, init, SUMMARY_H, STACK_W, [], [log, old(pm)]);
     expect(wallets.some((w) => hits(stack(before, SUMMARY_H), w))).toBe(true);
     const at = dmStackSpot(vp, init, SUMMARY_H, STACK_W, [], [log, pm]);
-    expect(at).toMatchObject({ left: 560, top: 140 });
+    // K5: the 280-px Game log has room between its first row and its newest entries: the summary
+    // sits over older entries there (as F2 2a's), before the free row right of 'Party pot' (140).
+    expect(at).toMatchObject({ left: 560, top: 688 });
     const r = stack(at, SUMMARY_H);
     for (const p of [...wallets, ...headings, ...(log.logRows ?? [])])
       expect(hits(r, p)).toBe(false);
@@ -225,7 +227,7 @@ describe("FR-NOTE-78 keep off windows' primary content", () => {
       primary: [{ x: 409, y: 194, w: 350, h: 52 }],
       records: [{ x: 409, y: 250, w: 350, h: 52 }],
     };
-    const log: StackWindow = { ...log720, used: 636, head: 533 };
+    const log: StackWindow = { ...log720, used: 700, head: 557 };
     const at = dmStackSpot(small, { ...init720, h: 584 }, 58, STACK_W, [], [log, enc]);
     expect(at.left).toBe(480);
     expect(at.top).toBeLessThanOrEqual(140);
@@ -254,7 +256,7 @@ describe("FR-NOTE-78 keep off the damage-card popup", () => {
   const vp = { w: 1440, h: 900 };
   const init = { x: 1028, y: 60, w: 400, h: 512 };
   const scenes: StackWindow = { x: 68, y: 60, w: 260, h: 438, used: 210, head: 212 };
-  const log: StackWindow = { x: 68, y: 584, w: 1150, h: 240, used: 824, head: 650 };
+  const log: StackWindow = { x: 68, y: 608, w: 1150, h: 280, used: 888, head: 674 };
   // r02: Brakka's damage card popup at 377, 67 (440 × 258): heading, To hit / damage fields,
   // Add target, Dismiss / Later / Apply.
   const popup = {
@@ -383,37 +385,38 @@ describe("FR-NOTE-78 walkthrough F2 1b / 2a: live cards folded into the summary"
     };
     const log: StackWindow = {
       x: 68,
-      y: 484,
+      y: 508,
       w: 690,
-      h: 160,
-      used: 636,
-      head: 533,
+      h: 200,
+      used: 700,
+      head: 557,
       controls: [
-        { x: 81, y: 608, w: 320, h: 28 },
-        { x: 408, y: 608, w: 128, h: 28 },
-        { x: 542, y: 608, w: 28, h: 28 },
-        { x: 576, y: 608, w: 48, h: 28 },
-        { x: 630, y: 608, w: 28, h: 28 },
-        { x: 664, y: 608, w: 28, h: 28 },
+        { x: 81, y: 672, w: 320, h: 28 },
+        { x: 408, y: 672, w: 128, h: 28 },
+        { x: 542, y: 672, w: 28, h: 28 },
+        { x: 576, y: 672, w: 48, h: 28 },
+        { x: 630, y: 672, w: 28, h: 28 },
+        { x: 664, y: 672, w: 28, h: 28 },
       ],
       logRows: [
-        { x: 81, y: 535, w: 660, h: 21 },
-        { x: 81, y: 556, w: 660, h: 21 },
-        { x: 81, y: 577, w: 660, h: 21 },
+        { x: 81, y: 599, w: 660, h: 21 },
+        { x: 81, y: 620, w: 660, h: 21 },
+        { x: 81, y: 641, w: 660, h: 21 },
       ],
     };
-    // The repro: summary + "+2 more" below it (92 px) → on the composer.
+    // The repro: summary + "+2 more" below it (92 px) → on the composer (480, 175). K5: the
+    // 200-px Game log leaves room for 92 px below the Insight card too, off the composer.
     const before = dmStackSpot(small, init720, FOLDED_OLD_H, STACK_W, [], [log, requests]);
-    expect(before).toMatchObject({ left: 480, top: 175 });
-    expect(composer.some((c) => hits(stack(before, FOLDED_OLD_H), c))).toBe(true);
+    expect(before).toMatchObject({ left: 480, top: 405 });
+    expect(composer.some((c) => hits(stack(before, FOLDED_OLD_H), c))).toBe(false);
     // The pill in the summary's row: 1a's spot.
     const at = dmStackSpot(small, init720, FOLDED_H, STACK_W, [], [log, requests]);
     expect(at).toMatchObject({ left: 480, top: 405 });
     const r = stack(at, FOLDED_H);
     for (const p of [newRequest, insight, ...composer, ...(log.logRows ?? [])])
       expect(hits(r, p)).toBe(false);
-    // BL-119: with the Perception card's heading measured, no spot clears it, the composer and
-    // the Game log's title bar: the fewest controls stay first (it keeps 405, off the composer).
+    // BL-119: with the Perception card's heading measured, it moves off the heading too. K5: below
+    // it (440), above the 200-px Game log (before: no spot cleared it, it kept 405).
     const heading = { x: 526, y: 412, w: 316, h: 20 };
     const withHeading = dmStackSpot(
       small,
@@ -423,7 +426,8 @@ describe("FR-NOTE-78 walkthrough F2 1b / 2a: live cards folded into the summary"
       [],
       [log, { ...requests, headings: [heading] }],
     );
-    expect(withHeading).toMatchObject({ left: 480, top: 405 });
+    expect(withHeading).toMatchObject({ left: 480, top: 440 });
+    expect(hits(stack(withHeading, FOLDED_H), heading)).toBe(false);
   });
 
   test("FR-NOTE-78 walkthrough F2 2a (1440×900, Party Manager Loot at 424, 60, 2 live cards): folded to the summary's 58 px → 560, 624 over older Game log entries, off 'Add loot' (92 px: 560, 333 on it)", () => {
@@ -465,32 +469,34 @@ describe("FR-NOTE-78 walkthrough F2 1b / 2a: live cards folded into the summary"
     };
     const log: StackWindow = {
       x: 68,
-      y: 584,
+      y: 608,
       w: 1150,
-      h: 240,
-      used: 824,
-      head: 650,
+      h: 280,
+      used: 888,
+      head: 674,
       controls: [
-        { x: 81, y: 788, w: 320, h: 28 },
-        { x: 408, y: 788, w: 128, h: 28 },
-        { x: 545, y: 790, w: 22, h: 22 },
-        { x: 576, y: 788, w: 48, h: 28 },
-        { x: 632, y: 790, w: 24, h: 24 },
-        { x: 666, y: 790, w: 24, h: 24 },
+        { x: 81, y: 852, w: 320, h: 28 },
+        { x: 408, y: 852, w: 128, h: 28 },
+        { x: 545, y: 854, w: 22, h: 22 },
+        { x: 576, y: 852, w: 48, h: 28 },
+        { x: 632, y: 854, w: 24, h: 24 },
+        { x: 666, y: 854, w: 24, h: 24 },
       ],
       logRows: [
-        { x: 81, y: 715, w: 1130, h: 21 },
-        { x: 81, y: 736, w: 1130, h: 21 },
-        { x: 81, y: 757, w: 1130, h: 22 },
+        { x: 81, y: 779, w: 1130, h: 21 },
+        { x: 81, y: 800, w: 1130, h: 21 },
+        { x: 81, y: 821, w: 1130, h: 22 },
       ],
     };
-    // The repro: 92 px reaches the Game log's newest row at 624, so it took "Add loot".
+    // The repro: 92 px reached the Game log's newest row from 624, so it took "Add loot" (560,
+    // 333). K5: the 280-px log has room for 92 px over its older entries, off "Add loot".
     const before = dmStackSpot(vp, init, FOLDED_OLD_H, STACK_W, [], [log, pm]);
-    expect(before).toMatchObject({ left: 560, top: 333 });
-    expect(addLoot.some((c) => hits(stack(before, FOLDED_OLD_H), c))).toBe(true);
-    // The pill in the summary's row: 2b's spot (accepted).
+    expect(before).toMatchObject({ left: 560, top: 648 });
+    expect(addLoot.some((c) => hits(stack(before, FOLDED_OLD_H), c))).toBe(false);
+    // The pill in the summary's row: 2b's spot (accepted); K5: lower, over the 280-px log's older
+    // entries.
     const at = dmStackSpot(vp, init, FOLDED_H, STACK_W, [], [log, pm]);
-    expect(at).toMatchObject({ left: 560, top: 624 });
+    expect(at).toMatchObject({ left: 560, top: 688 });
     const r = stack(at, FOLDED_H);
     for (const p of [...wallets, ...headings, ...(pm.controls ?? []), ...(log.logRows ?? [])])
       expect(hits(r, p)).toBe(false);

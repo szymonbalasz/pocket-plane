@@ -137,9 +137,10 @@ test("FR-SHELL-14 player default layout (#162): sheet top-right, Initiative at a
   }
 });
 
-test("FR-SHELL-54 player map-first: battlemap uncovered ≥ 55% at 1440×900, ≥ 65% at 1280×720 (sheet, log and Initiative open)", () => {
+test("FR-SHELL-54 player map-first: battlemap uncovered ≥ 54% at 1440×900, ≥ 65% at 1280×720 (sheet, log and Initiative open)", () => {
+  // K5 (OQ-KIT-02 B): the Game log 40 px taller covers about 1 point more at 1440×900 (55 → 54).
   for (const [viewport, min] of [
-    [WIDE, 0.55],
+    [WIDE, 0.54],
     [LAPTOP, 0.65],
   ] as const) {
     // The `battlemap` fixture's map (20 × 14 cells at 70 px); the gated Initiative counts (combat).
@@ -275,22 +276,22 @@ test("FR-SHELL-50 default layouts (player, token-free): exactly §7's table at t
   const table = [
     [
       LAPTOP,
-      { x: 948, y: 60, w: 320, h: 338 },
-      { x: 68, y: 484, w: 510, h: 160 },
-      { x: 908, y: 410 },
+      { x: 948, y: 60, w: 320, h: 390 },
+      { x: 68, y: 508, w: 510, h: 200 },
+      { x: 908, y: 462 },
     ],
-    [MID, { x: 948, y: 60, w: 320, h: 418 }, { x: 68, y: 564, w: 510, h: 160 }, { x: 908, y: 490 }],
+    [MID, { x: 948, y: 60, w: 320, h: 440 }, { x: 68, y: 588, w: 510, h: 200 }, { x: 908, y: 542 }],
     [
       WIDE,
       { x: 1108, y: 60, w: 320, h: 440 },
-      { x: 68, y: 544, w: 850, h: 280 },
-      { x: 1068, y: 590 },
+      { x: 68, y: 568, w: 850, h: 320 },
+      { x: 1068, y: 642 },
     ],
     [
       DESKTOP,
       { x: 1268, y: 60, w: 320, h: 440 },
-      { x: 68, y: 544, w: 850, h: 280 },
-      { x: 1228, y: 590 },
+      { x: 68, y: 568, w: 850, h: 320 },
+      { x: 1228, y: 642 },
     ],
   ] as const;
   expect(playerWindows.get("cbt.initiative")?.defaultPosition).toEqual({
@@ -328,10 +329,10 @@ test("FR-SHELL-50 FR-SHELL-79 at Start with tokens (player): Initiative appears 
   }
 });
 
-test("FR-SHELL-51 fitted default (player): the sheet 320×338 at 1280×720 and 320×418 at 1280×800 in its default column (12 px above the toast corner)", () => {
+test("FR-SHELL-51 fitted default (player): the sheet 320×390 at 1280×720 (K5: the toast corner 52 px lower) and 320×440 from 1280×800 in its default column (12 px above the toast corner)", () => {
   for (const [viewport, h] of [
-    [LAPTOP, 338],
-    [MID, 418],
+    [LAPTOP, 390],
+    [MID, 440],
     [WIDE, 440],
   ] as const) {
     const sheet = rectIn(defaultLayout(playerWindows, viewport), "char.sheet");
@@ -340,17 +341,21 @@ test("FR-SHELL-51 fitted default (player): the sheet 320×338 at 1280×720 and 3
   }
 });
 
-test("FR-DICE-38 Game log width (player): 510×160 / 510×160 / 850×280 / 850×280; min 300×160; previous default 340×280", () => {
+test("FR-DICE-38 FR-KIT-92 Game log size (player): 510×200 / 510×200 / 850×320 / 850×320 (OQ-KIT-02 B: +40); min 300×160; previous defaults 340×280 and the pre-kit 850×280 / 510×160", () => {
   const log = playerWindows.get("dice.log");
   if (!log) throw new Error("no dice.log");
   expect(REFERENCE_VIEWPORTS.map((vp) => defaultSizeAt(log, vp))).toEqual([
-    { w: 510, h: 160 },
-    { w: 510, h: 160 },
-    { w: 850, h: 280 },
-    { w: 850, h: 280 },
+    { w: 510, h: 200 },
+    { w: 510, h: 200 },
+    { w: 850, h: 320 },
+    { w: 850, h: 320 },
   ]);
   expect(log.minSize).toEqual({ w: 300, h: 160 });
-  expect(log.previousDefaults).toEqual([{ w: 340, h: 280 }]);
+  expect(log.previousDefaults).toEqual([
+    { w: 340, h: 280 },
+    { w: 850, h: 280 },
+    { w: 510, h: 160 },
+  ]);
 });
 
 test("FR-SHELL-52 growth cap (player): Initiative with 900 px of content stops 12 px above the Game log", () => {
@@ -380,7 +385,7 @@ test("FR-SHELL-53 previous defaults (player): a stored 340×280 log takes the vi
         instance: "main",
         state: "open",
         x: 68,
-        y: 544,
+        y: 568,
         w: 340,
         h: 280,
         z: 1,
@@ -390,7 +395,7 @@ test("FR-SHELL-53 previous defaults (player): a stored 340×280 log takes the vi
   });
   const r = restoreLayout(playerWindows, raw, WIDE);
   expect(r.migrated).toBe(true);
-  expect(r.windows[0]).toMatchObject({ x: 68, y: 544, w: 850, h: 280, area: workArea(WIDE) });
+  expect(r.windows[0]).toMatchObject({ x: 68, y: 568, w: 850, h: 320, area: workArea(WIDE) });
 });
 
 test("FR-SHELL-18 player Initiative appearing on Start avoids an open Notifications (layout check 7)", () => {

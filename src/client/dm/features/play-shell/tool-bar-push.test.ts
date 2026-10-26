@@ -123,14 +123,14 @@ test("FR-SHELL-104 push (DM): pushed with area and data-placed pushed, cause too
   const state = c.store.getState();
   const scenes = state.windows.find((w) => w.kind === "map.scenes") as WindowState;
   expect(overlaps(rectOf(scenes), grownBy12(bar))).toBe(false);
-  expect(scenes.area).toEqual({ w: 1440, h: 900 - 48 - 64 });
+  expect(scenes.area).toEqual({ w: 1440, h: 900 - 48 - 12 });
   expect(state.placed.get("map.scenes:main")).toBe("pushed");
   expect(state.memory).toEqual([
     {
       kind: "map.scenes",
       instance: "main",
       rect: scenesBefore,
-      area: { w: 1440, h: 900 - 48 - 64 },
+      area: { w: 1440, h: 900 - 48 - 12 },
       cause: "toolbar:map.toolbar",
       at: rectOf(scenes),
     },
@@ -190,10 +190,10 @@ test("FR-SHELL-53 live viewport change (DM, W2 finding): the never-resized Game 
   const { c, backend } = controller(vp);
   c.restore("k");
   const log = () => rectIn(c.store.getState().windows, "dice.log");
-  expect(log()).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  expect(log()).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
   vp.current = { w: 1280, h: 720 };
   c.dispatch({ type: "viewport" }, all);
-  expect(log()).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  expect(log()).toEqual({ x: 68, y: 508, w: 690, h: 200 });
   const stored = JSON.parse(backend.get("k") ?? "{}") as { windows: WindowState[] };
   expect(rectIn(stored.windows, "dice.log")).toEqual(log());
   // Same viewport again: nothing changes (same array, no write).
@@ -202,22 +202,22 @@ test("FR-SHELL-53 live viewport change (DM, W2 finding): the never-resized Game 
   expect(c.store.getState().windows).toBe(same);
   vp.current = { w: 1440, h: 900 };
   c.dispatch({ type: "viewport" }, all);
-  expect(log()).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  expect(log()).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
   // Resized by the user: kept at its size on the next live change (render-only fit / clamp).
   c.dispatch(
     {
       type: "setRect",
       kind: "dice.log",
-      rect: { x: 68, y: 584, w: 900, h: 240 },
+      rect: { x: 68, y: 608, w: 900, h: 280 },
       resized: true,
     },
     all,
   );
   vp.current = { w: 1280, h: 720 };
   c.dispatch({ type: "viewport" }, all);
-  expect(log()).toEqual({ x: 68, y: 584, w: 900, h: 240 });
+  expect(log()).toEqual({ x: 68, y: 608, w: 900, h: 280 });
   const rendered = shown(c.store.getState().windows, vp.current).get("dice.log") as Rect;
-  expect(rendered.y + rendered.h).toBeLessThanOrEqual(720 - 64);
+  expect(rendered.y + rendered.h).toBeLessThanOrEqual(720 - 12);
   expect(rendered.x + rendered.w).toBeLessThanOrEqual(1280);
 });
 

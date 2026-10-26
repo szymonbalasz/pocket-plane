@@ -99,11 +99,13 @@ const onScreen = (fit: { x: number; y: number; scale: number }, tokens: readonly
 
 /**
  * Sprint-6 named outcomes (scenes-map §12, OQ-MAP-57 D, #288): cell px per size; sprint 8
- * (FR-MAP-93): 1 px less at 1280×720 (+ Scenes, and 1280×800 + Scenes) for the PCs' 4-px margin.
+ * (FR-MAP-93): 1 px less at 1280×720 (+ Scenes, and 1280×800 + Scenes) for the PCs' 4-px margin;
+ * K5 (the work area to vh − 12): 36 / 39 / 45 / 45 and 29 / 29 / 38 / 45 (were 35 / 37 / 42 / 42,
+ * 29 / 29 / 38 / 42).
  */
-const D_CELLS = { plain: [35, 37, 42, 42], scenes: [29, 29, 38, 42] };
+const D_CELLS = { plain: [36, 39, 45, 45], scenes: [29, 29, 38, 45] };
 
-test("FR-MAP-59 every token visible: DM Game log + Initiative → all at 35 / 37 / 42 / 42 px; + Scenes → all at 29 / 29 / 38 / 42 px (sprint 8: PCs + 4 px, FR-MAP-93; sprint 6: the summary strip, not the box, FR-MAP-80; was pcs at 1280×720 / + Scenes, OQ-SHELL-40)", () => {
+test("FR-MAP-59 every token visible: DM Game log + Initiative → all at 36 / 39 / 45 / 45 px; + Scenes → all at 29 / 29 / 38 / 45 px (sprint 8: PCs + 4 px, FR-MAP-93; sprint 6: the summary strip, not the box, FR-MAP-80; was pcs at 1280×720 / + Scenes, OQ-SHELL-40)", () => {
   const cells: string[] = [];
   for (const [i, vp] of SIZES.entries()) {
     for (const scenes of [false, true]) {
@@ -165,7 +167,7 @@ test("FR-MAP-80 fit without the empty box: nothing shown → obstacles = windows
   );
 });
 
-test("FR-MAP-81 pcs keeps the top row: sim-9 a03 (1280×720, Game log + Initiative, the box forced as an obstacle) → pcs at 44 px (48 until FR-MAP-93's PC margin), every PC + 4 px clear, the top row starts at or below y 64 (was y 36 under the top bar)", () => {
+test("FR-MAP-81 pcs keeps the top row: sim-9 a03 (1280×720, Game log + Initiative, the box forced as an obstacle) → pcs at 48 px (K5; 44 with the old work area, FR-MAP-93's PC margin), every PC + 4 px clear, the top row starts at or below y 64 (was y 36 under the top bar)", () => {
   const vp = { w: 1280, h: 720 };
   const all = new Set(dmWindows.defs.map((d) => d.kind));
   const windows = renderedWindowRects(defaultLayout(dmWindows, vp), dmWindows, all, vp);
@@ -176,7 +178,7 @@ test("FR-MAP-81 pcs keeps the top row: sim-9 a03 (1280×720, Game log + Initiati
   const fit = fitScene(SIM9_AMBUSH_DM, AMBUSH_GRID, AMBUSH_MAP, vp, room);
   expect(fit.visible).toBe("pcs");
   // FR-MAP-94's ladder: the largest cell with every PC + 4 px clear (FR-MAP-93).
-  expect(fit.scale * AMBUSH_GRID.gridCellSize).toBeCloseTo(44, 9);
+  expect(fit.scale * AMBUSH_GRID.gridCellSize).toBeCloseTo(48, 9);
   const area = visibleArea(vp);
   expect(area.y).toBe(64);
   const drawn = SIM9_AMBUSH_DM.map((t) => {

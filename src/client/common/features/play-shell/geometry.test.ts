@@ -76,17 +76,17 @@ describe("geometry", () => {
     const inWorkArea = (r: Rect, vp: { w: number; h: number }) =>
       r.x >= 0 && r.x + r.w <= vp.w && r.y >= TOP_BAR_H && r.y + r.h <= TOP_BAR_H + workArea(vp).h;
 
-    test("work area = viewport below the top bar, above the launcher", () => {
-      expect(workArea(big)).toEqual({ w: 1440, h: 900 - TOP_BAR_H - LAUNCHER_CLEAR });
+    test("FR-KIT-14 work area = viewport below the top bar, to 12 px above the bottom edge", () => {
+      expect(workArea(big)).toEqual({ w: 1440, h: 900 - TOP_BAR_H - 12 });
     });
 
-    test("1440×900 → 1280×720: right-edge window keeps its gap, ends above the launcher", () => {
-      // shell.test's default (bottom-right, 320×220): 12 px from the right and the launcher.
+    test("1440×900 → 1280×720: right-edge window keeps its gap, ends at the work area's bottom", () => {
+      // shell.test's default (bottom-right, 320×220): 12 px from the right and the bottom edge.
       const r = defaultRect({ anchor: "bottom-right" }, { w: 320, h: 220 }, big);
       const out = render(r, small);
       expect(out).toEqual({
         x: 1280 - EDGE_GAP - 320,
-        y: 720 - LAUNCHER_CLEAR - EDGE_GAP - 220,
+        y: 720 - LAUNCHER_CLEAR - 220,
         w: 320,
         h: 220,
       });
@@ -94,7 +94,7 @@ describe("geometry", () => {
     });
 
     test("1440×900 → 1280×720: a mid window moves only as far as needed", () => {
-      expect(render({ x: 900, y: 400, w: 400, h: 300 }, small)).toEqual({
+      expect(render({ x: 900, y: 460, w: 400, h: 300 }, small)).toEqual({
         x: 1280 - 400,
         y: TOP_BAR_H + workArea(small).h - 300,
         w: 400,
@@ -173,7 +173,7 @@ describe("FR-SHELL-39 grow to content", () => {
   /** Window height for `rows` rows of 36 px under a 34 px title bar + borders and 24 px padding. */
   const rows = (n: number) => 34 + 24 + 36 * n;
   // FR-SHELL-52: 12 px above the work area's bottom (the usable area), 824 at 1600×900.
-  const waBottom = TOP_BAR_H + workArea(vp).h - EDGE_GAP;
+  const waBottom = TOP_BAR_H + workArea(vp).h;
 
   test("FR-SHELL-39 content 6 → 9 rows: rendered height grows, render-only", () => {
     expect(windowRect(win, grow, vp, rows(6))).toEqual(win); // 274 < stored 300: stored wins
@@ -181,7 +181,7 @@ describe("FR-SHELL-39 grow to content", () => {
     expect(win.h).toBe(300); // nothing written
   });
 
-  test("FR-SHELL-39 FR-SHELL-52 capped 12 px above the work-area bottom (then the body scrolls)", () => {
+  test("FR-SHELL-39 FR-SHELL-52 capped at the work-area bottom, 12 px above the viewport's (then the body scrolls)", () => {
     expect(windowRect(win, grow, vp, rows(40))).toEqual({ ...win, h: waBottom - win.y });
     // Already past the cap (a user-placed window): never shorter than its rendered rect.
     const low = { ...win, y: 700 };
@@ -212,18 +212,18 @@ describe("FR-SHELL-39 grow to content", () => {
       windowRect(stored, grow, small, rows(9)),
     );
     expect(windowRect(stored, grow, small, rows(40)).h).toBe(
-      TOP_BAR_H + workArea(small).h - EDGE_GAP - fitted.y,
+      TOP_BAR_H + workArea(small).h - fitted.y,
     );
   });
 
   test("FR-SHELL-52 growth cap: stops 12 px above the first window or hard keep-out below whose x-range overlaps it", () => {
-    const log = { x: 68, y: 584, w: 1150, h: 240 };
+    const log = { x: 68, y: 608, w: 1150, h: 280 };
     const init = { x: 1028, y: 60, w: 400, h: 500 };
-    expect(windowRect(init, grow, { w: 1440, h: 900 }, 900, [log]).h).toBe(572 - 60);
-    // Not across: the work area (12 px above the launcher strip).
-    const aside = { x: 68, y: 484, w: 690, h: 160 };
+    expect(windowRect(init, grow, { w: 1440, h: 900 }, 900, [log]).h).toBe(596 - 60);
+    // Not across: the work area (to 12 px above the bottom edge, FR-KIT-14).
+    const aside = { x: 68, y: 508, w: 690, h: 200 };
     const init720 = { x: 868, y: 60, w: 400, h: 500 };
-    expect(windowRect(init720, grow, { w: 1280, h: 720 }, 900, [aside]).h).toBe(644 - 60);
+    expect(windowRect(init720, grow, { w: 1280, h: 720 }, 900, [aside]).h).toBe(708 - 60);
     // Already past a window below: never shorter than its rendered rect.
     expect(windowRect(init, grow, { w: 1440, h: 900 }, 900, [{ ...log, y: 300 }]).h).toBe(500);
   });

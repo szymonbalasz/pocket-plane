@@ -121,7 +121,8 @@ test("FR-SHELL-60 player sheet 1280×800: fit on the 4 r02 tokens, 7 more come i
       vp,
     )[0];
     expect(sheet).toBeDefined();
-    if (vp.w === 1280 && vp.h === 800) expect(sheet).toEqual({ x: 948, y: 60, w: 320, h: 418 });
+    // K5: the sheet fits 12 px above the toast corner, 52 px lower than before (418 → 440).
+    if (vp.w === 1280 && vp.h === 800) expect(sheet).toEqual({ x: 948, y: 60, w: 320, h: 440 });
     const obstacles = fitObstacles("player", windows, keepOuts("player", vp), vp);
     const room = {
       areas: freeAreas(obstacles, vp),
@@ -149,7 +150,9 @@ test("FR-SHELL-60 player sheet 1280×800: fit on the 4 r02 tokens, 7 more come i
       });
     }
   }
-  // BL-42: at 1280×800 the newly seen tokens land under the sheet or off-screen → a refit.
-  expect(refits[1]).toMatch(/^1280×800: refit/);
+  // BL-42: where the newly seen tokens land under the sheet or off-screen → a refit. K5 (the
+  // taller sheet and work area): 1280×800 frames them all already; 1280×720 still refits.
+  expect(refits[0]).toMatch(/^1280×720: refit/);
+  expect(refits[1]).toBe("1280×800: none");
   console.info(`FR-SHELL-60 reveal refits: ${refits.join("; ")}`);
 });

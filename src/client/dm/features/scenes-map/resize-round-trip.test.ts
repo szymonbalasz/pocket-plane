@@ -139,16 +139,16 @@ test("FR-MAP-113 resize round trip (BL-86): 1280×720 → 1440×900 → 1280×72
     const at = `${next.w}×${next.h}`;
     expect({ at, camera: p.camera() }).toEqual({ at, camera: p.fitNow("fit") });
   }
-  expect(p.camera()).toBe("42.0 all");
+  expect(p.camera()).toBe("45.0 all"); // K5: the work area to vh − 12 (was 42)
 });
 
-test("FR-MAP-113 resize round trip (BL-86): the old order shows the cause: framed before the late settle, 1280×720 gives the 48-px floor, `pcs`; a `moved` camera never refits", () => {
+test("FR-MAP-113 resize round trip (BL-86): the old order shows the cause: framed before the late settle, 1280×720 gives a worse camera (sim-12: the 48-px floor, `pcs`; K5: 24 px, FR-MAP-59's hard floor); a `moved` camera never refits", () => {
   const p = page();
   p.vp.current = { w: 1440, h: 900 };
   p.c.dispatch({ type: "viewport" }, available);
   p.vp.current = { w: 1280, h: 720 };
   // The 1440×900 windows render-fit at 1280×720: what the refit saw before the fix.
-  expect(p.fitNow("resize")).toBe("48.0 pcs");
+  expect(p.fitNow("resize")).toBe("24.0 all");
   p.c.dispatch({ type: "viewport" }, available);
   expect(p.fitNow("resize")).toBe("34.0 all");
   expect(cameraOn("moved", "resize")).toEqual({ mode: "moved", fit: false });

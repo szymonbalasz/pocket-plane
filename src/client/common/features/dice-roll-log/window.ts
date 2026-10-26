@@ -10,23 +10,33 @@ export const DICE_LOG_KIND = "dice.log";
 
 /**
  * FR-DICE-38 (decided [7], #256 OQ-SHELL-31 A): 2.5× today's width from 1440 wide, 1.5× below;
- * today's height from 900 high, 160 below. `wide` / `tall`: the sizes on a wide + tall screen.
+ * today's height from 900 high, 200 below (kit-parity OQ-KIT-02 B: +40 for the kit's 40-px rows).
+ * `wide` / `tall`: the sizes on a wide + tall screen.
  */
 export const logSize =
   (wide: Size) =>
   (vp: Viewport): Size => ({
     w: isWide(vp) ? wide.w : Math.round((wide.w / 2.5) * 1.5),
-    h: isTall(vp) ? wide.h : 160,
+    h: isTall(vp) ? wide.h : 200,
   });
+
+/** FR-SHELL-100: 2 entries + the roll bar (kit-parity §7.3, 40-px rows). */
+export const LOG_USEFUL: Size = { w: 460, h: 200 };
 
 export const diceLogWindowBase = {
   kind: DICE_LOG_KIND,
   title: "Game log",
   // DICE §7: bottom-left. Player default (protocol §24): bottom-left, clear of the tool rail;
-  // 850×280 wide + tall, 510 / 160 below (FR-DICE-38). The DM's def overrides the size (1150×240).
-  defaultSize: logSize({ w: 850, h: 280 }),
-  // FR-SHELL-53: the sprint-4 default; a log still at it takes the new default once.
-  previousDefaults: [{ w: 340, h: 280 }],
+  // 850×320 wide + tall, 510 / 200 below (FR-DICE-38, OQ-KIT-02 B). The DM's def overrides the
+  // size (1150×280).
+  defaultSize: logSize({ w: 850, h: 320 }),
+  // FR-SHELL-53: the sprint-4 default and the pre-kit ones (K5); a log still at one takes the
+  // new default once.
+  previousDefaults: [
+    { w: 340, h: 280 },
+    { w: 850, h: 280 },
+    { w: 510, h: 160 },
+  ],
   minSize: { w: 300, h: 160 },
   defaultPosition: { anchor: "bottom-left", dx: 56 },
   defaultOpen: true,

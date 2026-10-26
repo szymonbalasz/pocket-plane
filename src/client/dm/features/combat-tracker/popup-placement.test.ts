@@ -18,8 +18,8 @@ describe("FR-CBT-55 popup placement", () => {
   test("FR-CBT-55 targets right of centre → left edge, clear of the tool rail", () => {
     const p = popupPlacement({ ...base, tokens: at([1000, 1100]) });
     expect(p).toMatchObject({ side: "left", x: 68 });
-    // Vertically: the work area below the top bar, above the launcher.
-    expect([p.top, p.bottom]).toEqual([60, 836]);
+    // Vertically: the work area below the top bar, to 12 px above the bottom edge (FR-KIT-14).
+    expect([p.top, p.bottom]).toEqual([60, 888]);
   });
 
   test("FR-CBT-55 targets left of centre → right edge, just left of an open Initiative window", () => {
@@ -88,7 +88,7 @@ describe("FR-CBT-56 placement by overlap (walkthrough step 8)", () => {
     const above = { x: 100, y: 10, w: 30, h: 30 }; // under the top bar
     // Nothing covered anywhere → the side rule (away from the token: right).
     const p = popupPlacement({ ...base, tokens: [above] });
-    expect(p).toMatchObject({ side: "right", x: 988, top: 60, bottom: 836 });
+    expect(p).toMatchObject({ side: "right", x: 988, top: 60, bottom: 888 });
   });
 });
 
@@ -183,10 +183,10 @@ describe("FR-CBT-75 FR-CBT-76 popup over its notification, movable", () => {
 
   test("FR-CBT-75 placement: origin rect → top-left, clamped into the work area", () => {
     expect(originPlacement({ x: 560, y: 92 }, size, vp)).toEqual({ x: 560, y: 92, ...size });
-    // Off the right / bottom edge → moved in (bottom = above the launcher).
+    // Off the right / bottom edge → moved in (bottom = the work area's, 12 px above the edge).
     expect(originPlacement({ x: 1300, y: 800 }, size, vp)).toEqual({
       x: 1440 - 440,
-      y: 900 - 64 - 300,
+      y: 900 - 12 - 300,
       ...size,
     });
     // Above the top bar / left of the viewport → moved in.
@@ -198,7 +198,7 @@ describe("FR-CBT-75 FR-CBT-76 popup over its notification, movable", () => {
   test("FR-CBT-76 drag: follows the pointer, stops at the work-area edge", () => {
     const start = { x: 100, y: 200, ...size };
     expect(dragPopup(start, 300, 50, vp)).toEqual({ x: 400, y: 250, ...size });
-    expect(dragPopup(start, 5000, 5000, vp)).toEqual({ x: 1000, y: 536, ...size });
+    expect(dragPopup(start, 5000, 5000, vp)).toEqual({ x: 1000, y: 588, ...size });
     expect(dragPopup(start, -5000, -5000, vp)).toEqual({ x: 0, y: 48, ...size });
   });
 });
@@ -307,7 +307,7 @@ describe("FR-CBT-56 FR-CBT-75 P3 glitch 2: free area away from the likely target
         height: 258,
         prefer: { x: 68, y: 100 },
       });
-      expect(p).toMatchObject({ side: "left", x: 68, y: 319 });
+      expect(p).toMatchObject({ side: "left", x: 68, y: 327 }); // K5: the taller work area
       for (const t of monsters) expect(covers(p, 258, t)).toBe(false);
     }
   });

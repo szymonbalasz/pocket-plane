@@ -50,10 +50,10 @@ function shellAt(camera: "fitted" | "moved", tokens: () => readonly PlacementTok
   return { c, log, act, refits };
 }
 
-const ZONE = { x: 68, y: 584, w: 1150, h: 240 };
-const SQUEEZED = { x: 68, y: 664, w: 460, h: 160 };
+const ZONE = { x: 68, y: 608, w: 1150, h: 280 };
+const SQUEEZED = { x: 68, y: 688, w: 460, h: 200 };
 
-test("FR-SHELL-159 Game log grows back (BL-87): DM 1440×900, Party Manager then a sheet opened as sim-12 → squeezed to 460×160; the cause closed, or put away for another open → back to 1150×240 in its zone (`returned`)", () => {
+test("FR-SHELL-159 Game log grows back (BL-87): DM 1440×900, Party Manager then a sheet opened as sim-12 → squeezed to 460×200; the cause closed, or put away for another open → back to 1150×280 in its zone (`returned`)", () => {
   for (const camera of ["fitted", "moved"] as const) {
     // Plain: open → squeezed; close → back.
     const a = shellAt(camera, bandPcs);
@@ -185,7 +185,7 @@ function m9Page(backend = new Map<string, string>()) {
 }
 
 // Root cause first (PM1 walkthrough M9): the failing repro, before the fix.
-test("FR-SHELL-159 Game log grows back (BL-87, walkthrough M9): DM 1440×900 after Reset, `moved`, Mira at 570,200: Party opened (untouched) squeezes the Game log; Initiative grows into the freed space; Party closed → the Game log back at 1150×240 in its zone; a reload while squeezed stores no squeeze and the close still returns it; a cause the user then drags (remembered) ends its squeeze", () => {
+test("FR-SHELL-159 Game log grows back (BL-87, walkthrough M9): DM 1440×900 after Reset, `moved`, Mira at 570,200: Party opened (untouched) squeezes the Game log; Initiative grows into the freed space; Party closed → the Game log back at 1150×280 in its zone; a reload while squeezed stores no squeeze and the close still returns it; a cause the user then drags (remembered) ends its squeeze", () => {
   const p = m9Page();
   p.c.dispatch({ type: "reset" }, all);
   expect(p.log()).toEqual(ZONE);

@@ -7,14 +7,14 @@ import { RAIL_CLEAR } from "./placement";
 
 /**
  * Which screen edge a window touches, if any: left (at the edge or right of the tool rail),
- * right, top (under the top bar) or bottom (above the launcher). Product windows must be at
+ * right, top (under the top bar) or bottom (the work area's bottom). Product windows must be at
  * the left or right edge (#162); top / bottom alone is mid-map for a landscape map.
  */
 export function touchedEdge(r: Rect, vp: Viewport): "left" | "right" | "top" | "bottom" | null {
   if (r.x <= RAIL_CLEAR) return "left";
   if (r.x + r.w >= vp.w - EDGE_GAP) return "right";
   if (r.y <= TOP_BAR_H + EDGE_GAP) return "top";
-  if (r.y + r.h >= vp.h - EDGE_GAP - LAUNCHER_CLEAR) return "bottom";
+  if (r.y + r.h >= vp.h - LAUNCHER_CLEAR) return "bottom";
   return null;
 }
 

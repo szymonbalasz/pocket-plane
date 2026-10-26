@@ -123,8 +123,9 @@ test("FR-DICEX-17 a throw: bottom centre of the free area, ≤ 720×420, not int
   diceExtras.play(t, zoneFlat);
   const html = render();
   expect(html).toContain("pointer-events-none");
-  // 1280×720, no windows: free area right of the rail, above the launcher → 720×420 bottom centre.
-  expect(html).toContain("left:314px;top:236px;width:720px;height:420px");
+  // 1280×720, no windows: free area right of the rail, to the work area's bottom → 720×420 bottom
+  // centre.
+  expect(html).toContain("left:314px;top:288px;width:720px;height:420px");
   // A flat render: every die `data-flat` (DICEX §13 E2E).
   expect(html).not.toContain('data-flat="false"');
   expect(html).toMatch(
