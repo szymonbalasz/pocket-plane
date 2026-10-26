@@ -123,6 +123,7 @@ import tableTools from "./table-tools";
 import tableToolsE2e from "./table-tools-e2e";
 import tableToolsPaused from "./table-tools-paused";
 import tableToolsPausedE2e from "./table-tools-paused-e2e";
+import themeGilt from "./theme-gilt";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
 import tplMenu from "./tpl-menu";
@@ -311,4 +312,6 @@ export const bundles: readonly Bundle[] = [
   x1ToastsE2e,
   // Sprint 12 X2 (fix/x2-stats-combat): stats awards, skip toast e2e bundles
   x2SkipE2e,
+  // Sprint 12 T2 (build/theme-gilt): Gilt & Stone walkthrough + theme-geometry e2e
+  themeGilt,
 ];

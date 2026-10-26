@@ -722,3 +722,28 @@ export function createStickToBottom(slack = 8): StickToBottom {
     },
   };
 }
+
+/** The part of `ResizeObserver` `keepPinned` uses (a fake in tests). */
+export type ResizeObserverLike = new (
+  cb: () => void,
+) => { observe(target: never): void; disconnect(): void };
+
+/**
+ * FR-DICE-21: a pinned list stays pinned whenever its viewport or its content changes height,
+ * whatever the cause (roll bar rows, a theme's taller rows, late fonts); a list scrolled up
+ * keeps its position. Returns the disconnect.
+ */
+export function keepPinned<T extends ScrollMetrics>(
+  view: T,
+  content: unknown,
+  stick: StickToBottom,
+  Observer: ResizeObserverLike,
+): () => void {
+  const ro = new Observer(() => {
+    const top = stick.resized(view);
+    if (top !== null) view.scrollTop = top;
+  });
+  ro.observe(view as never);
+  ro.observe(content as never);
+  return () => ro.disconnect();
+}

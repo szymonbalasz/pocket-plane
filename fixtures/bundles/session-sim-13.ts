@@ -35,5 +35,7 @@ export default defineBundle({
     // BL-118 / BL-119 / BL-120 (no unit: client-only)
     // CS (sprint 12, DM #353): printed sheet layout, FR-CHARX-105–120 (no unit: layout only)
     // T1 (sprint 12, DM #353): theme switch (no unit: client-only, browser storage)
+    // T2 (sprint 12, DM #353): Gilt & Stone (no unit: client-only; `theme-round-3` steps turns, so it
+    // stays in `theme-gilt`)
   ],
 });

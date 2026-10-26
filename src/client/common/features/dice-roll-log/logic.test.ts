@@ -15,6 +15,7 @@ import {
   formEntries,
   formSlots,
   type GroupInput,
+  keepPinned,
   manualNatural,
   manualSlots,
   mergeCrit,
@@ -530,5 +531,39 @@ describe("FR-DICE-21 stick to the bottom", () => {
     s.scrolled(m(0, 106));
     s.pin(); // "N new" clicked
     expect(s.atBottom).toBe(true);
+  });
+
+  test("FR-DICE-21 content grows (a theme switch makes rows taller): a pinned list stays at the bottom; scrolled up, it stays put", () => {
+    const observed: unknown[] = [];
+    let fire = () => {};
+    let disconnected = false;
+    class FakeObserver {
+      constructor(cb: () => void) {
+        fire = cb;
+      }
+      observe(t: unknown) {
+        observed.push(t);
+      }
+      disconnect() {
+        disconnected = true;
+      }
+    }
+    const view = m(210, 223, 433);
+    const content = {};
+    const s = createStickToBottom();
+    const stop = keepPinned(view, content, s, FakeObserver);
+    expect(observed).toEqual([view, content]);
+    // Gilt's boxed results: 13 px more rows, the viewport unchanged, no scroll event.
+    view.scrollHeight = 446;
+    fire();
+    expect(view.scrollTop).toBe(446);
+    // Scrolled up: a content change leaves the position alone.
+    view.scrollTop = 40;
+    s.scrolled(view);
+    view.scrollHeight = 433;
+    fire();
+    expect(view.scrollTop).toBe(40);
+    stop();
+    expect(disconnected).toBe(true);
   });
 });

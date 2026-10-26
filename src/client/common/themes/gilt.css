@@ -1,0 +1,1262 @@
+/* biome-ignore-all lint/style/noDescendingSpecificity: context rules (a part inside the tool rail, a
+   gem close inside a dialog) follow the general part rule on purpose; order is the intent. */
+/* Gilt & Stone (theme-system FR-THEME-10–15; ADR-0069). The look of docs/design/art/kit/gilt-stone.html
+   ported onto the app's parts, found by `data-slot` names and existing test IDs only. Colours and
+   type come from the gilt token block in styles.css; this file adds frames, textures, gems and
+   motion.
+
+   Rules of this file (tested, gilt.test.ts):
+   - Every rule starts with `:root[data-theme="gilt"]`: nothing here can match under Default
+     (FR-THEME-19), nor inside a theme preview swatch.
+   - Geometry never changes (FR-THEME-05, -06): no size, padding, margin, border width, font size,
+     line height or letter spacing on a part. Frames are box-shadows, outlines, backgrounds and
+     absolutely placed pseudo-elements; a part may only become `position: relative` (no offsets)
+     so its pseudo-elements have a box, and may move by `transform` (paint only).
+   - Colour, fonts and border colours sit in `@layer base`, so any Tailwind colour utility on the
+     element still wins: meaning colours (HP, visibility, creature, player, danger) stay
+     (FR-THEME-09). A part's own default utilities are retinted through local token values
+     (`--primary` inside a primary Button, …). Decoration (background images, shadows,
+     pseudo-elements, filters) is unlayered.
+   - Text colours are tokens or the `--gs-*` palette below, each pair contrast-tested
+     (FR-THEME-17). */
+
+/* ── Palette: the kit's extra tones (named once, contrast-tested) ───────────────────────────── */
+:root[data-theme="gilt"] body {
+  --gs-panel-lo: #0a0d0d;
+  --gs-track: #0a0c0c;
+  --gs-field: #080a0a;
+  --gs-box: #0d1010;
+  --gs-menu: #0e1212;
+  --gs-stone-hi: #2a2b27;
+  --gs-stone: #191a17;
+  --gs-stone-lo: #141512;
+  --gs-min-stone: #26271f;
+  --gs-tool-stone: #22231f;
+  --gs-tool-on: #2a0709;
+  --gs-chip: #15140f;
+  --gs-roll-hi: #1c1a14;
+  --gs-roll: #121109;
+  --gs-highlight: #2c2311;
+  --gs-row-hover: #3e3418;
+  --gs-result: #1f1b12;
+  --gs-on-hi: #3a2e18;
+  --gs-on: #261d0f;
+  --gs-primary-hi: #45371c;
+  --gs-primary: #2a2010;
+  --gs-primary-lo: #211909;
+  --gs-danger-hi: #3a1513;
+  --gs-danger: #230b0a;
+  --gs-danger-rule: #6e2a24;
+  --gs-rule-soft: #262219;
+  --gs-row-rule: #1f1c16;
+  --gs-label-hover: #f3dca3;
+  --gs-label-on: #f6e2ae;
+  --gs-label-bright: #fff1cf;
+  --gs-label-glow: #fff3d6;
+  --gs-primary-ink: #f8e6b4;
+  --gs-tab: #bfa36c;
+  --gs-tool: #cdb27a;
+  --gs-dim: #746e61;
+  --gs-gem-ink: #ffe9df;
+  --gs-danger-ink: #f2b2a6;
+  --gs-wash-prof: #1f1a0d;
+  --gs-wash-turn: #2b0b0b;
+  --gs-parch-hi: #f1e3bb;
+  --gs-parch-lo: #c7aa72;
+  --gs-ink-faint: #6a5233;
+  --gs-ink-accent: #6b4410;
+  --gs-ink-positive: #2e5f1f;
+  --gs-ink-caution: #7a4d00;
+  --gs-ink-danger: #9b1c1c;
+}
+
+/* ── FR-THEME-14 scrollbars: always shown, thin gold thumb on a dark track ──────────────────── */
+/* In `base`, so a part that hides its scrollbar on purpose (a utility) keeps it hidden. */
+@layer base {
+  :root[data-theme="gilt"],
+  :root[data-theme="gilt"] * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--frame-rule-strong) var(--gs-track);
+  }
+}
+/* WebKit without `scrollbar-color` (older Safari); Chromium ignores these once the above apply. */
+:root[data-theme="gilt"] ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+:root[data-theme="gilt"] ::-webkit-scrollbar-track {
+  background: var(--gs-track);
+}
+:root[data-theme="gilt"] ::-webkit-scrollbar-thumb {
+  background: var(--frame-rule);
+  border: 2px solid var(--gs-track);
+  border-radius: 5px;
+}
+:root[data-theme="gilt"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-slot="scroll-area-thumb"] {
+  background-color: var(--frame-rule-strong);
+}
+
+/* ── FR-THEME-17 focus: a gold ring on every surface ────────────────────────────────────────── */
+:root[data-theme="gilt"] :focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+/* Parts inside clipping strips or lists draw it inside their box. */
+:root[data-theme="gilt"] [data-slot="tabs-trigger"]:focus-visible,
+:root[data-theme="gilt"] [data-slot="toggle-group-item"]:focus-visible,
+:root[data-theme="gilt"] [data-slot="sheet-roll"]:focus-visible {
+  outline-offset: -2px;
+}
+
+/* ── FR-THEME-15 numbers: the number face with lining, tabular figures ──────────────────────── */
+@layer base {
+  :root[data-theme="gilt"] .tabular-nums,
+  :root[data-theme="gilt"] input[type="number"],
+  :root[data-theme="gilt"] [data-slot="table-cell"],
+  :root[data-theme="gilt"] [data-slot="progress"],
+  :root[data-theme="gilt"] [data-testid="cbt-init-row-init"],
+  :root[data-theme="gilt"] [data-testid="cbt-init-row-hp"],
+  :root[data-theme="gilt"] [data-testid="cbt-init-row-ac"],
+  :root[data-theme="gilt"] [data-testid="cbt-init-round"],
+  :root[data-theme="gilt"] [data-testid="dice-log-entry-text"] strong[data-landing] {
+    font-family: var(--font-num);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+}
+/* The `tabular-nums` utility composes its figures from this variable (not inherited). */
+:root[data-theme="gilt"] .tabular-nums {
+  --tw-numeric-figure: lining-nums;
+}
+
+/* ── FR-THEME-10 window frame ───────────────────────────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-testid="ui-window"] {
+  background-image: var(--panel-grain);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.7);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-window"] {
+    border-color: #000;
+  }
+}
+/* The double rule and the corner pieces lie over the window's edge, above its content and inert:
+   the frame needs no padding. Corners are the kit's pieces at 18 px (our title bar is 32 px, the
+   kit's 38), so they clear the title text and the gem. */
+:root[data-theme="gilt"] [data-testid="ui-window"]::before,
+:root[data-theme="gilt"] [data-testid="ui-window"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  border-radius: inherit;
+}
+:root[data-theme="gilt"] [data-testid="ui-window"]::before {
+  box-shadow: var(--frame-shadow);
+}
+:root[data-theme="gilt"] [data-testid="ui-window"]::after {
+  background:
+    var(--frame-corner) top left / 18px 18px no-repeat,
+    var(--frame-corner-tr) top right / 18px 18px no-repeat,
+    var(--frame-corner-bl) bottom left / 18px 18px no-repeat,
+    var(--frame-corner-br) bottom right / 18px 18px no-repeat;
+}
+/* Focused: the brighter rule. */
+:root[data-theme="gilt"] [data-testid="ui-window"][data-focused="true"]::before {
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule-strong),
+    inset 0 0 0 3px #090b0b,
+    inset 0 0 0 4px rgb(226 194 124 / 0.8);
+}
+:root[data-theme="gilt"] [data-testid="ui-window"][data-focused="true"] {
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 0.7),
+    0 0 14px rgb(226 194 124 / 0.12);
+}
+/* The resize grip: the bottom-right corner piece is the cue. */
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-window-resize"] {
+    border-color: transparent;
+  }
+}
+
+/* Title bar: dark band, gold rule under it, title in the title face. */
+:root[data-theme="gilt"] [data-testid="ui-window-title"] {
+  position: relative;
+  background-image: linear-gradient(#1c201f, #121615);
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-testid="ui-window-title"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -3px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(176 138 74 / 0.6) 20%,
+    rgb(176 138 74 / 0.6) 80%,
+    transparent
+  );
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-window-title"] {
+    border-color: var(--frame-rule);
+    color: var(--gold);
+    font-family: var(--font-title);
+  }
+}
+/* Close + minimise sit 6 px further in, clear of the top-right corner piece (paint only). */
+:root[data-theme="gilt"] [data-testid="ui-window-close"],
+:root[data-theme="gilt"] [data-testid="ui-window-minimise"] {
+  transform: translateX(-6px);
+  text-shadow: none;
+}
+
+/* Close = the red gem. */
+:root[data-theme="gilt"] [data-testid="ui-window-close"],
+:root[data-theme="gilt"] [data-testid="note-toast-close"],
+:root[data-theme="gilt"] [data-testid="note-callout-close"] {
+  border-radius: 50%;
+  opacity: 1;
+  background-color: var(--gem);
+  background-image: radial-gradient(
+    circle at 36% 30%,
+    var(--gem-hi) 0 9%,
+    #d42a24 26%,
+    #7a0f12 68%,
+    #3a0507 100%
+  );
+  box-shadow:
+    inset 0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 1px #000,
+    inset 0 -2px 3px rgb(0 0 0 / 0.55);
+  transition:
+    filter 0.15s,
+    box-shadow 0.15s;
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-window-close"],
+  :root[data-theme="gilt"] [data-testid="note-toast-close"],
+  :root[data-theme="gilt"] [data-testid="note-callout-close"],
+  :root[data-theme="gilt"]
+    [data-slot="dialog-content"]
+    > [data-slot="dialog-close"][aria-label="Close"] {
+    color: var(--gs-gem-ink);
+  }
+}
+:root[data-theme="gilt"] [data-testid="ui-window-close"] {
+  /* Its hover background (a utility) stays under the gem. */
+  --accent: var(--gem);
+  --foreground: var(--gs-gem-ink);
+  --muted-foreground: var(--gs-gem-ink);
+}
+:root[data-theme="gilt"] [data-testid="note-toast-close"],
+:root[data-theme="gilt"] [data-testid="note-callout-close"] {
+  --foreground: var(--gs-gem-ink);
+  --muted-foreground: var(--gs-gem-ink);
+}
+:root[data-theme="gilt"] [data-testid="ui-window-close"] svg,
+:root[data-theme="gilt"] [data-testid="note-toast-close"] svg,
+:root[data-theme="gilt"] [data-testid="note-callout-close"] svg,
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]
+  svg {
+  transform: scale(0.8);
+  stroke-width: 3;
+}
+:root[data-theme="gilt"] [data-testid="ui-window-close"]:hover,
+:root[data-theme="gilt"] [data-testid="note-toast-close"]:hover,
+:root[data-theme="gilt"] [data-testid="note-callout-close"]:hover {
+  filter: brightness(1.25);
+  box-shadow:
+    inset 0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 1px #000,
+    0 0 10px rgb(255 80 60 / 0.45),
+    inset 0 -2px 3px rgb(0 0 0 / 0.5);
+}
+:root[data-theme="gilt"] [data-testid="ui-window-close"]:active {
+  filter: brightness(0.9);
+}
+
+/* Minimise = a small stone square with a gold bar. */
+:root[data-theme="gilt"] [data-testid="ui-window-minimise"] {
+  border-radius: 3px;
+  background-image: var(--panel-grain), linear-gradient(var(--gs-min-stone), #151612);
+  box-shadow: inset 0 0 0 1px var(--frame-rule);
+  --accent: var(--gs-min-stone);
+  --foreground: var(--gold);
+  --muted-foreground: var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-testid="ui-window-minimise"]:hover {
+  box-shadow: inset 0 0 0 1px var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-testid="ui-window-minimise"] svg {
+  stroke-width: 3.2;
+}
+
+/* ── Top bar and launcher ───────────────────────────────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-testid="ui-topbar"] {
+  background-image: var(--panel-grain), linear-gradient(#171b1a, #0e1111);
+  box-shadow:
+    inset 0 -3px 0 var(--gs-track),
+    inset 0 -4px 0 rgb(176 138 74 / 0.45),
+    0 6px 18px rgb(0 0 0 / 0.55);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-topbar"] {
+    border-color: var(--frame-rule);
+  }
+  :root[data-theme="gilt"] [data-testid="ui-topbar-left"] {
+    color: var(--gold);
+    font-family: var(--font-title);
+  }
+}
+
+/* Launcher: a small frame with stone buttons. */
+:root[data-theme="gilt"] [data-testid="ui-launcher"],
+:root[data-theme="gilt"] [data-testid="map-tool-rail"],
+:root[data-theme="gilt"] [data-testid="map-tool-panel"] {
+  background-image: var(--panel-grain), linear-gradient(var(--card), var(--card));
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    0 8px 22px rgb(0 0 0 / 0.65);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-launcher"],
+  :root[data-theme="gilt"] [data-testid="map-tool-rail"],
+  :root[data-theme="gilt"] [data-testid="map-tool-panel"] {
+    border-color: #000;
+  }
+}
+/* The tool rail is framed like a window: the double rule (in its padding) and the corner pieces,
+   hung 3 px outside its edge so they clear the tools (paint only, inert). */
+:root[data-theme="gilt"] [data-testid="map-tool-rail"] {
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 0 0 3px #090b0b,
+    inset 0 0 0 4px rgb(176 138 74 / 0.55),
+    0 8px 22px rgb(0 0 0 / 0.65);
+}
+:root[data-theme="gilt"] [data-testid="map-tool-rail"]::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    var(--frame-corner) top left / 16px 16px no-repeat,
+    var(--frame-corner-tr) top right / 16px 16px no-repeat,
+    var(--frame-corner-bl) bottom left / 16px 16px no-repeat,
+    var(--frame-corner-br) bottom right / 16px 16px no-repeat;
+}
+:root[data-theme="gilt"] [data-testid="ui-launcher-button"],
+:root[data-theme="gilt"] [data-testid="ui-launcher-menu"] {
+  background-image:
+    var(--panel-grain), linear-gradient(var(--gs-stone-hi), var(--gs-stone) 55%, var(--gs-stone-lo));
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 2px 0 rgb(255 236 190 / 0.06),
+    0 1px 0 #000;
+  --accent: var(--gs-stone);
+  --accent-foreground: var(--gs-label-hover);
+}
+:root[data-theme="gilt"] [data-testid="ui-launcher-button"]:hover,
+:root[data-theme="gilt"] [data-testid="ui-launcher-menu"]:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule-strong),
+    inset 0 0 10px rgb(226 194 124 / 0.12),
+    0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-testid="ui-launcher-button"][data-state="open"] {
+  --secondary: var(--gs-on);
+  --secondary-foreground: var(--gs-label-bright);
+  background-image: var(--panel-grain), linear-gradient(var(--gs-on-hi), var(--gs-on));
+  box-shadow:
+    inset 0 0 0 1px var(--gold),
+    inset 0 0 10px rgb(226 194 124 / 0.18),
+    0 0 8px rgb(226 194 124 / 0.25);
+}
+:root[data-theme="gilt"] [data-testid="ui-launcher-button"] [data-marker="open"] {
+  background-color: var(--gold);
+  box-shadow: 0 0 4px rgb(226 194 124 / 0.6);
+}
+/* Minimised: a gem diamond for the hollow ring. */
+:root[data-theme="gilt"] [data-testid="ui-launcher-button"] [data-marker="minimised"] {
+  border-radius: 0;
+  rotate: 45deg;
+  border-color: var(--frame-rule-strong);
+  background-image: radial-gradient(
+    circle at 35% 30%,
+    var(--gem-hi),
+    var(--gem) 45%,
+    var(--gem-deep)
+  );
+}
+
+/* Map tools (the tool group in menus.tsx): stone squares; the active tool glows like a gem. */
+:root[data-theme="gilt"] [data-testid="map-tool-rail"] [data-slot="toggle-group-item"],
+:root[data-theme="gilt"] [data-testid="map-tool-rail"] [data-slot="button"] {
+  background-image: var(--panel-grain), linear-gradient(var(--gs-tool-stone), var(--gs-stone-lo));
+  box-shadow: inset 0 0 0 1px var(--frame-rule);
+  --muted: var(--gs-tool-stone);
+  --muted-foreground: var(--gold);
+  --accent: var(--gs-tool-stone);
+  --accent-foreground: var(--gold);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="map-tool-rail"] [data-slot="toggle-group-item"],
+  :root[data-theme="gilt"] [data-testid="map-tool-rail"] [data-slot="button"] {
+    color: var(--gs-tool);
+  }
+}
+:root[data-theme="gilt"] [data-testid="map-tool-rail"] [data-slot="toggle-group-item"]:hover,
+:root[data-theme="gilt"] [data-testid="map-tool-rail"] [data-slot="button"]:hover {
+  box-shadow: inset 0 0 0 1px var(--frame-rule-strong);
+}
+:root[data-theme="gilt"]
+  [data-testid="map-tool-rail"]
+  [data-slot="toggle-group-item"][data-state="on"] {
+  --accent: var(--gs-tool-on);
+  --accent-foreground: var(--gs-label-glow);
+  background-image: radial-gradient(circle at 50% 40%, #5a1416, #2a0709 75%);
+  box-shadow:
+    inset 0 0 0 1px var(--gold),
+    0 0 0 1px #000,
+    0 0 10px rgb(226 194 124 / 0.35),
+    inset 0 0 6px rgb(0 0 0 / 0.6);
+}
+
+/* ── FR-THEME-11 Button: stone with a gold label ────────────────────────────────────────────── */
+/* Variants are read off the classes Button already renders (cva): `bg-primary` = default,
+   `bg-destructive` = destructive, `bg-secondary` = secondary, `border` = outline, none = ghost. */
+@layer base {
+  :root[data-theme="gilt"] [data-slot="button"] {
+    color: var(--gold);
+    font-family: var(--font-label);
+  }
+  :root[data-theme="gilt"] [data-slot="button"].border {
+    border-color: var(--frame-rule);
+  }
+}
+:root[data-theme="gilt"] [data-slot="button"] {
+  transition:
+    color 0.15s,
+    box-shadow 0.15s;
+}
+:root[data-theme="gilt"] [data-slot="button"]:is(.bg-secondary, .border) {
+  --secondary: var(--gs-stone);
+  --secondary-foreground: var(--gold);
+  --accent: var(--gs-stone);
+  --accent-foreground: var(--gs-label-hover);
+  background-image:
+    var(--panel-grain), linear-gradient(var(--gs-stone-hi), var(--gs-stone) 55%, var(--gs-stone-lo));
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 2px 0 rgb(255 236 190 / 0.06),
+    0 1px 0 #000;
+}
+/* Default (primary): the gold-tinted stone. */
+:root[data-theme="gilt"] [data-slot="button"].bg-primary {
+  --primary: var(--gs-primary);
+  --primary-foreground: var(--gs-primary-ink);
+  background-image:
+    var(--panel-grain),
+    linear-gradient(var(--gs-primary-hi), var(--gs-primary) 60%, var(--gs-primary-lo));
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule-strong),
+    inset 0 2px 0 rgb(255 236 190 / 0.08),
+    0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-slot="button"].bg-destructive {
+  --destructive: var(--gs-danger);
+  --destructive-foreground: var(--gs-danger-ink);
+  background-image: var(--panel-grain), linear-gradient(var(--gs-danger-hi), var(--gs-danger));
+  box-shadow:
+    inset 0 0 0 1px var(--gs-danger-rule),
+    0 1px 0 #000;
+}
+/* Ghost: no stone at rest (dense rows), stone on hover. */
+:root[data-theme="gilt"]
+[data-slot="button"]:not(.bg-primary, .bg-secondary, .bg-destructive, .border) {
+  --accent: var(--gs-stone);
+  --accent-foreground: var(--gs-label-hover);
+}
+:root[data-theme="gilt"] [data-slot="button"]:not(:disabled):hover {
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule-strong),
+    inset 0 0 10px rgb(226 194 124 / 0.12),
+    0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-slot="button"].bg-destructive:not(:disabled):hover {
+  box-shadow:
+    inset 0 0 0 1px #b2443a,
+    0 1px 0 #000;
+}
+/* Pressed. */
+:root[data-theme="gilt"] [data-slot="button"]:not(:disabled):active {
+  background-image: var(--panel-grain), linear-gradient(#121310, #1c1d19);
+  box-shadow: inset 0 2px 4px rgb(0 0 0 / 0.7);
+  transform: translateY(1px);
+}
+/* On (a toggled button). */
+:root[data-theme="gilt"] [data-slot="button"]:is([aria-pressed="true"], [data-state="on"]) {
+  --primary: var(--gs-on);
+  --primary-foreground: var(--gs-label-on);
+  --secondary: var(--gs-on);
+  --secondary-foreground: var(--gs-label-on);
+  --accent: var(--gs-on);
+  --accent-foreground: var(--gs-label-on);
+  background-image: var(--panel-grain), linear-gradient(var(--gs-on-hi), var(--gs-on));
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule-strong),
+    0 1px 0 #000;
+}
+/* Disabled: dim label, flat stone (no fade-out). */
+:root[data-theme="gilt"] [data-slot="button"]:disabled {
+  opacity: 1;
+  box-shadow: inset 0 0 0 1px #2c2a24;
+  --primary-foreground: var(--gs-dim);
+  --secondary-foreground: var(--gs-dim);
+  --destructive-foreground: var(--gs-dim);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="button"]:disabled {
+    color: var(--gs-dim);
+  }
+}
+
+/* ── ToggleGroup (both): stone segments, on = gold-tinted ───────────────────────────────────── */
+@layer base {
+  :root[data-theme="gilt"] [data-slot="toggle-group"] {
+    border-color: var(--frame-rule);
+  }
+  :root[data-theme="gilt"] [data-slot="toggle-group-item"] {
+    color: var(--gold);
+    font-family: var(--font-label);
+  }
+}
+:root[data-theme="gilt"] [data-slot="toggle-group-item"] {
+  --accent: var(--gs-stone);
+  --accent-foreground: var(--gs-label-hover);
+  --muted: var(--gs-stone);
+  --muted-foreground: var(--gs-label-hover);
+}
+:root[data-theme="gilt"] [data-slot="toggle-group-item"][data-state="on"] {
+  --accent: var(--gs-on);
+  --accent-foreground: var(--gs-label-on);
+  background-image: var(--panel-grain), linear-gradient(var(--gs-on-hi), var(--gs-on));
+  box-shadow: inset 0 0 0 1px var(--frame-rule-strong);
+}
+
+/* ── Tabs: a gem underline and a diamond on the active tab, inside its box ──────────────────── */
+:root[data-theme="gilt"] [data-slot="tabs-list"] {
+  background-color: transparent;
+  box-shadow: inset 0 -1px 0 var(--frame-rule);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="tabs-list"] {
+    color: var(--gs-tab);
+  }
+  :root[data-theme="gilt"] [data-slot="tabs-trigger"] {
+    font-family: var(--font-label);
+  }
+}
+:root[data-theme="gilt"] [data-slot="tabs-list"] {
+  --muted-foreground: var(--gs-tab);
+}
+:root[data-theme="gilt"] [data-slot="tabs-trigger"] {
+  position: relative;
+}
+:root[data-theme="gilt"] [data-slot="tabs-trigger"]:hover {
+  color: var(--gold);
+}
+:root[data-theme="gilt"] [data-slot="tabs-trigger"][data-state="active"] {
+  --background: var(--card);
+  --foreground: var(--gs-label-on);
+  background-image: linear-gradient(#1d1f1c, var(--card));
+  box-shadow: inset 0 0 0 1px var(--frame-rule);
+}
+:root[data-theme="gilt"] [data-slot="tabs-trigger"][data-state="active"]::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 2px;
+  height: 2px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--gem) 20%, var(--gem) 80%, transparent);
+}
+:root[data-theme="gilt"] [data-slot="tabs-trigger"][data-state="active"]::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0.5px;
+  width: 5px;
+  height: 5px;
+  z-index: 1;
+  pointer-events: none;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--gem);
+  box-shadow: 0 0 0 1px var(--frame-rule-strong);
+}
+
+/* ── Fields: Input, Select trigger ──────────────────────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-slot="input"] {
+  background-color: var(--gs-field);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.8);
+}
+:root[data-theme="gilt"] [data-slot="input"]::placeholder {
+  color: var(--gs-dim);
+}
+:root[data-theme="gilt"] [data-slot="input"]:focus-visible,
+:root[data-theme="gilt"] [data-slot="select-trigger"]:focus-visible {
+  outline: 1px solid var(--frame-rule-strong);
+  outline-offset: 0;
+  box-shadow:
+    inset 0 1px 3px rgb(0 0 0 / 0.8),
+    0 0 0 2px rgb(226 194 124 / 0.35);
+}
+:root[data-theme="gilt"] [data-slot="select-trigger"] {
+  background-image:
+    var(--panel-grain), linear-gradient(var(--gs-stone-hi), var(--gs-stone) 55%, var(--gs-stone-lo));
+  box-shadow:
+    inset 0 2px 0 rgb(255 236 190 / 0.06),
+    0 1px 0 #000;
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="input"],
+  :root[data-theme="gilt"] [data-slot="select-trigger"] {
+    border-color: var(--input);
+  }
+  :root[data-theme="gilt"] [data-slot="select-trigger"] {
+    border-color: var(--frame-rule);
+  }
+  :root[data-theme="gilt"] [data-slot="select-trigger"] > svg {
+    color: var(--frame-rule-strong);
+  }
+}
+
+/* ── Switch (both): dark track, gold knob when on ───────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-slot="switch"] {
+  background-color: var(--gs-track);
+  box-shadow: inset 0 0 0 1px var(--frame-rule);
+}
+:root[data-theme="gilt"] [data-slot="switch"][data-state="checked"] {
+  background-color: #241c0e;
+  box-shadow: inset 0 0 0 1px var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-slot="switch-thumb"] {
+  background-color: #6b6150;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.6);
+}
+:root[data-theme="gilt"] [data-slot="switch-thumb"][data-state="checked"] {
+  background-image: radial-gradient(
+    circle at 35% 30%,
+    #fff1c6,
+    var(--gold) 50%,
+    var(--frame-rule-strong)
+  );
+}
+
+/* ── Checkbox: a gem diamond for the tick ───────────────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-slot="checkbox"] {
+  position: relative;
+  background-color: var(--gs-field);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="checkbox"] {
+    border-color: var(--frame-rule-strong);
+  }
+}
+:root[data-theme="gilt"] [data-slot="checkbox-indicator"] svg {
+  opacity: 0;
+}
+:root[data-theme="gilt"] [data-slot="checkbox-indicator"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  transform: rotate(45deg);
+  background: radial-gradient(circle at 35% 30%, var(--gem-hi), var(--gem) 50%, var(--gem-deep));
+}
+
+/* ── Slider: thin gold track, a diamond thumb ───────────────────────────────────────────────── */
+/* Track and range retinted through their own utilities' tokens, so a slider that paints its own
+   track (the colour picker's hue spectrum, a meaning control) keeps it. */
+:root[data-theme="gilt"] [data-slot="slider-track"] {
+  --muted: #2a2620;
+  box-shadow: inset 0 0 0 1px #000;
+}
+:root[data-theme="gilt"] [data-slot="slider-range"] {
+  --primary: var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-slot="slider-thumb"] {
+  border-radius: 0;
+  border-color: #000;
+  transform: rotate(45deg) scale(0.85);
+  background-image: radial-gradient(
+    circle at 35% 30%,
+    #fff1c6,
+    var(--gold) 50%,
+    var(--frame-rule-strong)
+  );
+}
+
+/* ── Progress, Skeleton ─────────────────────────────────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-slot="progress"] {
+  background-color: #2a2620;
+  box-shadow: inset 0 0 0 1px #000;
+}
+:root[data-theme="gilt"] [data-slot="progress-indicator"] {
+  background-image: linear-gradient(#e9cf91, var(--frame-rule-strong));
+}
+:root[data-theme="gilt"] [data-slot="skeleton"] {
+  background-color: #171a18;
+  background-image: linear-gradient(90deg, #171a18 0%, #262619 40%, #171a18 80%);
+  background-size: 200% 100%;
+  animation: gs-shimmer 1.4s linear infinite;
+}
+@keyframes gs-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* ── Badge = chip ───────────────────────────────────────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-slot="badge"] {
+  border-radius: 999px;
+  --primary: var(--gs-chip);
+  --primary-foreground: var(--foreground);
+  --secondary: var(--gs-chip);
+  --secondary-foreground: var(--foreground);
+  box-shadow: inset 0 0 0 1px var(--frame-rule);
+}
+
+/* ── Card, Alert, Table, Collapsible ────────────────────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-slot="card"] {
+  background-image: linear-gradient(rgb(255 255 255 / 0.025), transparent);
+  box-shadow: inset 0 1px 0 rgb(255 236 190 / 0.05);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="card"],
+  :root[data-theme="gilt"] [data-slot="alert"] {
+    border-color: var(--frame-rule);
+  }
+  :root[data-theme="gilt"] [data-slot="card-title"] {
+    color: var(--gs-label-hover);
+    font-family: var(--font-num);
+  }
+  :root[data-theme="gilt"] [data-slot="dialog-title"],
+  :root[data-theme="gilt"] [data-slot="collapsible-trigger"] {
+    color: var(--gold);
+    font-family: var(--font-title);
+  }
+  :root[data-theme="gilt"] [data-slot="table-head"],
+  :root[data-theme="gilt"] [data-slot="dropdown-menu-label"],
+  :root[data-theme="gilt"] [data-slot="label"] {
+    font-family: var(--font-label);
+  }
+  :root[data-theme="gilt"] [data-slot="table-header"] [data-slot="table-row"] {
+    border-color: var(--frame-rule);
+  }
+  :root[data-theme="gilt"] [data-slot="table-row"] {
+    border-color: var(--gs-row-rule);
+  }
+}
+:root[data-theme="gilt"] [data-slot="alert"] {
+  background-image: linear-gradient(90deg, rgb(226 194 124 / 0.07), transparent);
+}
+:root[data-theme="gilt"] [data-slot="table-head"],
+:root[data-theme="gilt"] [data-slot="dropdown-menu-label"] {
+  --muted-foreground: var(--gold);
+}
+:root[data-theme="gilt"] [data-slot="table-body"] [data-slot="table-row"]:nth-child(even) {
+  background-image: linear-gradient(rgb(255 240 200 / 0.025), rgb(255 240 200 / 0.025));
+}
+:root[data-theme="gilt"] [data-slot="table-row"] {
+  --muted: var(--gs-row-hover);
+}
+
+/* ── Overlays: Popover, DropdownMenu, Select content, Dialog ────────────────────────────────── */
+:root[data-theme="gilt"]
+:is(
+  [data-slot="popover-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="dropdown-menu-sub-content"],
+  [data-slot="select-content"],
+  [role="menu"]
+) {
+  --popover: var(--gs-menu);
+  background-image: var(--panel-grain);
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    0 10px 24px rgb(0 0 0 / 0.7);
+}
+@layer base {
+  :root[data-theme="gilt"]
+    :is(
+      [data-slot="popover-content"],
+      [data-slot="dropdown-menu-content"],
+      [data-slot="dropdown-menu-sub-content"],
+      [data-slot="select-content"],
+      [role="menu"]
+    ) {
+    border-color: #000;
+  }
+  :root[data-theme="gilt"] :is([role="menuitem"], [role="menuitemradio"], [role="option"]) svg {
+    color: var(--frame-rule-strong);
+  }
+}
+/* Highlighted (or keyboard-focused) item: a gold bar on the left over a warm wash. The bar is the
+   item's focus mark, so the gold ring is not drawn round it. */
+:root[data-theme="gilt"]
+:is([role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"], [role="option"]):is(
+  [data-highlighted],
+  :focus-visible
+) {
+  --accent: var(--gs-highlight);
+  --accent-foreground: var(--gs-label-bright);
+  outline: none;
+  background-image: linear-gradient(90deg, #2c2311, #1a160c);
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+:root[data-theme="gilt"] [data-slot="dropdown-menu-separator"],
+:root[data-theme="gilt"] [role="menu"] [role="separator"] {
+  background-color: transparent;
+  background-image: linear-gradient(90deg, transparent, var(--frame-rule), transparent);
+}
+
+/* Dialog: framed like a window, the gem for its ×. */
+:root[data-theme="gilt"] [data-slot="dialog-content"] {
+  --background: var(--card);
+  background-image:
+    var(--frame-corner), var(--frame-corner-tr), var(--frame-corner-bl), var(--frame-corner-br),
+    var(--panel-grain);
+  background-position:
+    top left,
+    top right,
+    bottom left,
+    bottom right,
+    0 0;
+  background-size:
+    26px 26px,
+    26px 26px,
+    26px 26px,
+    26px 26px,
+    auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat;
+  box-shadow: var(--frame-shadow);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="dialog-content"] {
+    border-color: #000;
+  }
+}
+:root[data-theme="gilt"] [data-slot="dialog-overlay"] {
+  box-shadow: inset 0 0 80px rgb(0 0 0 / 0.8);
+}
+/* Its × is a 16 px box: the gem is painted round it at the kit's 22 px; the hit box stays. */
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"] {
+  border-radius: 50%;
+  opacity: 1;
+  transition: filter 0.15s;
+}
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]:focus-visible {
+  outline-offset: 5px;
+}
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 36% 30%,
+    var(--gem-hi) 0 9%,
+    #d42a24 26%,
+    #7a0f12 68%,
+    #3a0507 100%
+  );
+  box-shadow:
+    inset 0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 1px #000,
+    inset 0 -2px 3px rgb(0 0 0 / 0.55);
+}
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]:hover {
+  filter: brightness(1.25);
+}
+:root[data-theme="gilt"]
+  [data-slot="dialog-content"]
+  > [data-slot="dialog-close"][aria-label="Close"]:hover::before {
+  box-shadow:
+    inset 0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 1px #000,
+    0 0 10px rgb(255 80 60 / 0.45),
+    inset 0 -2px 3px rgb(0 0 0 / 0.5);
+}
+/* Its ghost button (Cancel) is a stone button at rest, as the kit's "Keep fighting" (hover and
+   pressed are the shared Button states). */
+:root[data-theme="gilt"]
+  [data-slot="dialog-footer"]
+  [data-slot="button"]:not(.bg-primary, .bg-secondary, .bg-destructive, .border):not(
+    :hover,
+    :active
+  ) {
+  background-image:
+    var(--panel-grain), linear-gradient(var(--gs-stone-hi), var(--gs-stone) 55%, var(--gs-stone-lo));
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 2px 0 rgb(255 236 190 / 0.06),
+    0 1px 0 #000;
+}
+
+/* ── FR-THEME-12 the scroll tooltip ─────────────────────────────────────────────────────────── */
+/* A parchment strip with rolled ends, dark ink in the number face; it unrolls from the centre.
+   The open delay is the controller's (FR-SHELL-29), untouched. */
+:root[data-theme="gilt"] [data-slot="tooltip-content"] {
+  position: relative;
+  border-radius: 0;
+  background-color: var(--parchment);
+  background-image:
+    linear-gradient(rgb(120 80 30 / 0.12), transparent 30%, transparent 70%, rgb(120 80 30 / 0.16)),
+    radial-gradient(
+      ellipse at 30% 40%,
+      var(--gs-parch-hi),
+      var(--parchment) 55%,
+      var(--gs-parch-lo)
+    );
+  box-shadow:
+    inset 0 1px 0 #a58552,
+    inset 0 -1px 0 #a58552;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.6));
+  animation: gs-unroll 260ms ease-out both;
+  /* The ink set: tokens text inside a tip may use, dark enough for the parchment. */
+  --primary: var(--parchment);
+  --primary-foreground: var(--parchment-ink);
+  --foreground: var(--parchment-ink);
+  --card-foreground: var(--parchment-ink);
+  --popover-foreground: var(--parchment-ink);
+  --muted-foreground: var(--gs-ink-faint);
+  --accent-foreground: var(--gs-ink-accent);
+  --secondary-foreground: var(--gs-ink-accent);
+  --positive-foreground: var(--gs-ink-positive);
+  --caution-foreground: var(--gs-ink-caution);
+  --destructive: var(--gs-ink-danger);
+  --border: rgb(43 29 14 / 0.3);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="tooltip-content"] {
+    color: var(--parchment-ink);
+    font-family: var(--font-num);
+  }
+}
+:root[data-theme="gilt"] [data-slot="tooltip-content"]::before,
+:root[data-theme="gilt"] [data-slot="tooltip-content"]::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 9px;
+  border-radius: 5px;
+  pointer-events: none;
+  background: linear-gradient(90deg, #7c5a2c, #d9bf86 35%, #f3e2b6 50%, #b8955b 75%, #6b4a20);
+  box-shadow: 0 0 0 1px rgb(60 36 10 / 0.6);
+}
+:root[data-theme="gilt"] [data-slot="tooltip-content"]::before {
+  left: -4px;
+}
+:root[data-theme="gilt"] [data-slot="tooltip-content"]::after {
+  right: -4px;
+}
+/* Radix's arrow, if a tip ever draws one, would point off the rolled end. */
+:root[data-theme="gilt"] [data-slot="tooltip-content"] svg[width="10"][height="5"] {
+  visibility: hidden;
+}
+@keyframes gs-unroll {
+  from {
+    clip-path: inset(-24px 46% -24px 46%);
+  }
+  to {
+    clip-path: inset(-24px -24px -24px -24px);
+  }
+}
+
+/* ── FR-THEME-13 toasts: framed like a small window, no corner pieces ───────────────────────── */
+/* The double rule (the inner one as bright as a window's, so it reads at 1×), square corners.
+   The 3D-dice roll popup's chrome too; its dice stay unthemed. */
+:root[data-theme="gilt"]
+:is(
+  [data-testid="note-toast"],
+  [data-testid="note-callout"],
+  [data-testid="note-toast-pending-summary"],
+  [data-testid="cbt-popup"],
+  [data-testid="dicex-popup"],
+  [data-sonner-toast]
+) {
+  --popover: var(--card);
+  border-radius: 3px;
+  background-image: var(--panel-grain);
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 0 0 3px #090b0b,
+    inset 0 0 0 4px rgb(176 138 74 / 0.55),
+    0 8px 22px rgb(0 0 0 / 0.65);
+}
+@layer base {
+  :root[data-theme="gilt"]
+    :is(
+      [data-testid="note-toast"],
+      [data-testid="note-callout"],
+      [data-testid="note-toast-pending-summary"],
+      [data-testid="cbt-popup"],
+      [data-testid="dicex-popup"]
+    ) {
+    border-color: #000;
+  }
+  :root[data-theme="gilt"] [data-testid="cbt-popup"] h2 {
+    color: var(--gold);
+    font-family: var(--font-title);
+  }
+}
+/* Sonner's own toasts (alerts, errors): its dark-theme variables. */
+:root[data-theme="gilt"] [data-sonner-toaster] {
+  --normal-bg: var(--card);
+  --normal-border: #000;
+  --normal-text: var(--foreground);
+}
+:root[data-theme="gilt"] [data-sonner-toast][data-styled="true"] {
+  border-color: #000;
+  font-family: var(--font-body);
+}
+/* "+N more": the kit's pill. */
+:root[data-theme="gilt"] [data-testid="note-toast-more"] {
+  border-radius: 999px;
+  background-image: linear-gradient(#0d0f0f, #0d0f0f);
+  box-shadow: inset 0 0 0 1px var(--frame-rule);
+}
+
+/* ── At the table: Initiative rows, Game log results ────────────────────────────────────────── */
+:root[data-theme="gilt"] [data-testid="cbt-init-row"] {
+  position: relative;
+  --accent: var(--gs-wash-turn);
+  background-image: linear-gradient(var(--gs-panel-lo), var(--gs-panel-lo));
+}
+:root[data-theme="gilt"] [data-testid="cbt-init-row"][data-turn="true"] {
+  background-image: linear-gradient(90deg, var(--gs-wash-turn), #1a0a0a);
+  box-shadow: inset 0 0 0 1px rgb(200 31 34 / 0.55);
+}
+:root[data-theme="gilt"] [data-testid="cbt-init-row"][data-turn="true"]::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+  transform: translateY(-50%) rotate(45deg);
+  background: radial-gradient(circle at 35% 30%, var(--gem-hi), var(--gem) 45%, var(--gem-deep));
+  box-shadow:
+    0 0 0 1px var(--frame-rule-strong),
+    0 0 6px rgb(255 80 60 / 0.6);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="cbt-init-row-init"] {
+    color: var(--foreground);
+  }
+  :root[data-theme="gilt"]
+    [data-testid="dice-log-entry"][data-public="true"]
+    [data-testid="dice-log-entry-text"]
+    strong[data-landing] {
+    color: var(--gold);
+  }
+}
+/* A result in the log: boxed in gold (outline: no layout); a hidden line's box stays muted. */
+:root[data-theme="gilt"] [data-testid="dice-log-entry-text"] strong[data-landing] {
+  border-radius: 2px;
+  outline: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  outline-offset: 1px;
+  background-image: linear-gradient(var(--gs-result), #14120c);
+}
+:root[data-theme="gilt"]
+  [data-testid="dice-log-entry"][data-public="true"]
+  [data-testid="dice-log-entry-text"]
+  strong[data-landing] {
+  outline-color: var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-testid="dice-log-entry"] {
+  box-shadow: inset 0 -1px 0 var(--gs-row-rule);
+}
+
+/* ── The printed sheet (FR-CHARX-119 slots; kit "Character sheet") ──────────────────────────── */
+/* Boxes: engraved, notched corners like a printed sheet. */
+:root[data-theme="gilt"] :is([data-slot="sheet-box"], [data-slot="sheet-ability"]) {
+  background-image: linear-gradient(var(--gs-box), #0b0e0e);
+  box-shadow:
+    inset 0 0 0 2px #070909,
+    inset 0 0 0 3px rgb(176 138 74 / 0.28);
+  clip-path: polygon(
+    6px 0,
+    calc(100% - 6px) 0,
+    100% 6px,
+    100% calc(100% - 6px),
+    calc(100% - 6px) 100%,
+    6px 100%,
+    0 calc(100% - 6px),
+    0 6px
+  );
+}
+@layer base {
+  :root[data-theme="gilt"] :is([data-slot="sheet-box"], [data-slot="sheet-ability"]) {
+    border-color: var(--frame-rule);
+  }
+}
+/* Box labels (the sheet's upper-case label line): small caps in the label face, gold. */
+:root[data-theme="gilt"]
+  :is(
+    [data-slot="sheet-box"],
+    [data-slot="sheet-ability"],
+    [data-slot="sheet-shield"],
+    [data-slot="sheet-roll"]
+  )
+  .uppercase {
+  color: var(--gold);
+  font-family: var(--font-label);
+  text-transform: none;
+}
+/* Armor Class shield: gold rule round a dark field. */
+:root[data-theme="gilt"] [data-slot="sheet-shield"] > svg {
+  color: var(--frame-rule-strong);
+  filter: drop-shadow(0 0 0.5px #000);
+}
+:root[data-theme="gilt"] [data-slot="sheet-shield"] > svg path {
+  fill: #0b0e0e;
+  stroke-width: 2.5;
+}
+/* Score pill. */
+@layer base {
+  :root[data-theme="gilt"] [data-testid="char-sheet-ability-score"] {
+    border-color: #3b3222;
+  }
+}
+/* Skill rows: proficient and expertise rows get the gold wash. */
+:root[data-theme="gilt"] [data-slot="sheet-skill-row"]:not([data-proficiency="none"]) {
+  background-color: transparent;
+  background-image: linear-gradient(90deg, var(--gs-wash-prof), transparent 90%);
+}
+/* Roll buttons: dark box, gold rule, cream figures; the d20 in gold. */
+@layer base {
+  :root[data-theme="gilt"] [data-slot="sheet-roll"] {
+    color: var(--foreground);
+    font-family: var(--font-num);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+}
+:root[data-theme="gilt"] [data-slot="sheet-roll"] {
+  --muted-foreground: var(--frame-rule-strong);
+  --accent: var(--gs-roll-hi);
+  --accent-foreground: var(--gs-label-glow);
+}
+:root[data-theme="gilt"] [data-slot="sheet-roll"].bg-primary {
+  --primary: var(--gs-roll);
+  --primary-foreground: var(--foreground);
+  background-image: linear-gradient(var(--gs-roll-hi), var(--gs-roll));
+  box-shadow: inset 0 0 0 1px var(--frame-rule);
+}
+:root[data-theme="gilt"] [data-slot="sheet-roll"]:not(:disabled):hover {
+  color: var(--gs-label-glow);
+  box-shadow: inset 0 0 0 1px var(--gold);
+  --muted-foreground: var(--gold);
+}
+/* Save values: the kit's gold-ruled box on the dark roll fill (not the stone of a secondary). */
+:root[data-theme="gilt"] [data-testid="char-sheet-roll-save"][data-slot="sheet-roll"] {
+  --secondary: var(--gs-roll);
+  --secondary-foreground: var(--foreground);
+  background-image: linear-gradient(var(--gs-roll-hi), var(--gs-roll));
+  box-shadow: inset 0 0 0 1px var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-testid="char-sheet-roll-save"][data-slot="sheet-roll"]:hover {
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+/* The Senses label: small caps in the label face, gold (its utility colour retinted). */
+:root[data-theme="gilt"] [data-testid="charx-senses"] > .uppercase {
+  --muted-foreground: var(--gold);
+  font-family: var(--font-label);
+  font-variant-caps: small-caps;
+  text-transform: none;
+}
+/* Portrait: a framed square (paint only: radius, an outer gold rule, a black inner edge). */
+:root[data-theme="gilt"] [data-testid="char-sheet-portrait"] {
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 2.5px #000;
+}
+:root[data-theme="gilt"] [data-testid="char-sheet-portrait"] > * {
+  outline: 2px solid #000;
+  outline-offset: -2px;
+}
+/* The damage card's dice values ("[1 2]"): the number face, not the mono one. */
+:root[data-theme="gilt"] [data-testid="cbt-popup"] .font-mono {
+  font-family: var(--font-num);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+/* Pips: proficiency dots and slot / use pips in gold. */
+:root[data-theme="gilt"] [data-slot="sheet-pip"] {
+  --foreground: var(--gold);
+}
+:root[data-theme="gilt"] button[data-slot="sheet-pip"] {
+  border-radius: 1px;
+  transform: rotate(45deg) scale(0.8);
+}
+/* Tab strip: a gold rule under it, stone arrows. */
+:root[data-theme="gilt"] [data-slot="sheet-tabs"] {
+  box-shadow: inset 0 -1px 0 var(--frame-rule);
+}
+:root[data-theme="gilt"] [data-slot="sheet-tabs"] [data-slot="tabs-list"] {
+  box-shadow: none;
+}
+:root[data-theme="gilt"] :is([data-testid="charx-tabs-prev"], [data-testid="charx-tabs-next"]) {
+  color: var(--gold);
+  background-image: var(--panel-grain), linear-gradient(var(--gs-tool-stone), var(--gs-stone-lo));
+  --accent: var(--gs-tool-stone);
+  --foreground: var(--gs-label-hover);
+}
+@layer base {
+  :root[data-theme="gilt"] :is([data-testid="charx-tabs-prev"], [data-testid="charx-tabs-next"]) {
+    border-color: var(--frame-rule);
+  }
+}
+
+/* ── Reduced motion: no unroll, no shimmer, no transitions ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root[data-theme="gilt"] [data-slot="tooltip-content"],
+  :root[data-theme="gilt"] [data-slot="skeleton"] {
+    animation: none;
+  }
+  :root[data-theme="gilt"] [data-slot="button"],
+  :root[data-theme="gilt"] [data-testid="ui-window-close"] {
+    transition: none;
+  }
+}

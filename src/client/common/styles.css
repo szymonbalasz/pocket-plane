@@ -6,6 +6,7 @@
    sets sizes, padding or anything else that moves a box. */
 @import "tailwindcss";
 @import "./themes/fonts.css";
+@import "./themes/gilt.css";
 
 @custom-variant dark (&:is(.dark *));
 
