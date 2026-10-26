@@ -1,7 +1,7 @@
 ---
 title: Kit parity
 prefix: KIT
-status: in-review
+status: complete
 owner: spec-kit-parity
 phase: post-mvp
 ---
@@ -9,7 +9,7 @@ phase: post-mvp
 # Kit parity
 
 > **Goal (DM, 2026-10-26, [#355](../../decisions-log.md)):** "get to that mockup". The source of truth is the kit page [gilt-stone.html](../../design/art/kit/gilt-stone.html). Open it in a browser and compare it with `.verify/t2/pairs/*.png`. The concept art (`.verify/t2/a-gilt-stone-01.png`) is inspiration, not binding.
-> **Decided (DM + orchestrator, 2026-10-26):** OQ-KIT-01 A (the launcher moves into the top bar; [ADR](../../architecture/adr/proposed-launcher-in-top-bar.md) accepted), -02 **B** (kit 40-px log rows; `dice.log` 40 px taller), -03 A, -04 **B** (a rollable DM stat-block window now, §6.11), -05 to -11 A. All geometry changes land together in slice K5 (§7.3).
+> **Decided (DM + orchestrator, 2026-10-26):** OQ-KIT-01 A (the launcher moves into the top bar; [ADR](../../architecture/adr/0070-launcher-in-top-bar.md) accepted), -02 **B** (kit 40-px log rows; `dice.log` 40 px taller), -03 A, -04 **B** (a rollable DM stat-block window now, §6.11), -05 to -11 A. All geometry changes land together in slice K5 (§7.3).
 > **Model:** the printed-sheet amendment, [character-sheet-full §6.2](../character-sheet-full.md#62-printed-sheet-layout) (FR-CHARX-105–120). Every layout change is a **markup change in every theme**. Simple Dark draws the new rows with its plain tokens, and Gilt & Stone styles them through `data-slot` names. [ADR-0069](../../architecture/adr/0069-theme-switch.md) holds: no theme logic in components, and themes never change geometry. Sizes change only through the size table (§7.3).
 
 ## 1. Summary
@@ -103,7 +103,7 @@ T2 = what `gilt.css` (theme T2) already fixed. Markup = what this spec changes. 
 | FR-KIT-11 | **DM title:** the campaign switcher's trigger (`camp-campaign-switcher`) shows the campaign name in title type with a chevron, with no box. Its menu lists the campaigns (`camp-campaign-option`), then a separator, then **New campaign…** and **Rename…** (Rename only with an active campaign). Both open today's dialogs (`camp-campaign-new`, `camp-campaign-rename`), whose trigger IDs move onto the items. The switch confirm (`camp-switch-dialog`) is unchanged. | `FR-KIT-11 campaign menu` |
 | FR-KIT-12 | **Player title:** the campaign name in title type (`camp-joined-campaign-name`), then "· playing as Player 1" in small muted text (`camp-joined-player-name`). `camp-player-joined` stays the wrapper. | `FR-KIT-12 player title` |
 | FR-KIT-13 | **One status pill** `ui-topbar-status`, a group of two parts. (1) `sync-connection-status`: a dot plus "Live", "Reconnecting…", etc. "Connected" reads "Live". (2) DM only, `ui-presence-badge`: "· 0 / 2 online"; click and Tooltip are unchanged. `data-state` values are unchanged. | `FR-KIT-13 status pill` |
-| FR-KIT-14 | **Launcher in the top bar** (OQ-KIT-01 A, [ADR](../../architecture/adr/proposed-launcher-in-top-bar.md)): the launcher sits in the centre zone. Its fit width is the gap between the left and right zones (≥ 8 px each side); FR-SHELL-43's label-drop and "⋯" rules are unchanged, and the "⋯" menu opens downward. The bottom reservation `LAUNCHER_CLEAR` becomes the 12 px edge gap. The work area, default layouts, bands, the player toast corner and the goldens are recomputed in K5 (§7.3). | `FR-SHELL-43` tests, `FR-SHELL-62 golden layouts` (regenerated) |
+| FR-KIT-14 | **Launcher in the top bar** (OQ-KIT-01 A, [ADR](../../architecture/adr/0070-launcher-in-top-bar.md)): the launcher sits in the centre zone. Its fit width is the gap between the left and right zones (≥ 8 px each side); FR-SHELL-43's label-drop and "⋯" rules are unchanged, and the "⋯" menu opens downward. The bottom reservation `LAUNCHER_CLEAR` becomes the 12 px edge gap. The work area, default layouts, bands, the player toast corner and the goldens are recomputed in K5 (§7.3). | `FR-SHELL-43` tests, `FR-SHELL-62 golden layouts` (regenerated) |
 | FR-KIT-15 | **Launcher buttons** keep their DOM (`ui-launcher-button`, `data-state`, `[data-marker]`, badge, activity dot). The kit's open glow and minimised gem diamond are CSS on `[data-state]` / `[data-marker]`. | existing |
 
 ### 6.3 Initiative (DM and player)
@@ -347,7 +347,7 @@ Isolated per worktree ([ADR-0008](../../architecture/adr/0008-parallel-dev-isola
 | On | What we need | Status |
 |---|---|---|
 | [theme-system](theme-system.md) T2 `build/theme-gilt` | `gilt.css` exists (the paint layer); T3 `fix/theme-default` (Gilt & Stone default, "Simple Dark") is independent | T2 merging (#355) |
-| [play-shell](../play-shell.md) | Launcher in the top bar and the new work area ([ADR](../../architecture/adr/proposed-launcher-in-top-bar.md), accepted); `dice.log` sizes, bands, default layouts and criteria (§7.3); the `ent.statblock` row | decided (OQ-KIT-01, -02); integrator amends play-shell §7 at merge |
+| [play-shell](../play-shell.md) | Launcher in the top bar and the new work area ([ADR](../../architecture/adr/0070-launcher-in-top-bar.md), accepted); `dice.log` sizes, bands, default layouts and criteria (§7.3); the `ent.statblock` row | decided (OQ-KIT-01, -02); integrator amends play-shell §7 at merge |
 | [dice-roll-log](../dice-roll-log.md) | FR-DICE-20 line layout → row layout; FR-DICE-93 copy via handler (OQ-KIT-06 A) | decided |
 | [combat-tracker](../combat-tracker.md) | Initiative header/footer/rows; End-encounter copy; damage popup layout; the Stat block row-menu item; attack routing reused (FR-CBT-74) | via this spec |
 | [entities](../entities.md), [scenes-map](../scenes-map.md) | `ent.statblock` window; a `tokenDoubleClick` line (FR-MAP-29, append) | via this spec |
@@ -389,7 +389,7 @@ All decided 2026-10-26 (DM: 01–04; orchestrator: 05–11).
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-KIT-01 | **Launcher place.** The kit centres the launcher in the 48 px top bar; play-shell keeps it bottom-centre (and visual-direction lists a "bottom action bar" motif) | **Decided (DM): A**, move it into the top bar (FR-KIT-14; the [ADR](../../architecture/adr/proposed-launcher-in-top-bar.md) is accepted and the integrator numbers it) · ~~B: keep it at the bottom~~ · ~~C: B now, A later~~ | decided | play-shell, notifications (player corner) |
+| OQ-KIT-01 | **Launcher place.** The kit centres the launcher in the 48 px top bar; play-shell keeps it bottom-centre (and visual-direction lists a "bottom action bar" motif) | **Decided (DM): A**, move it into the top bar (FR-KIT-14; the [ADR](../../architecture/adr/0070-launcher-in-top-bar.md) is accepted and the integrator numbers it) · ~~B: keep it at the bottom~~ · ~~C: B now, A later~~ | decided | play-shell, notifications (player corner) |
 | OQ-KIT-02 | Game log rows: the kit's ≈ 40-px rows show fewer entries in today's 160-px log | ~~A: 30-px rows, sizes kept~~ · **Decided (DM): B**, kit 40-px rows; `dice.log` +40 px tall everywhere, landing in K5 with the launcher move (§7.3) · ~~C: container query~~ | decided | play-shell size table, dice-roll-log |
 | OQ-KIT-03 | DM turn card ("Mira's turn" in the kit's DM stack) | **Decided (DM): A**, a client-derived card at the top of the DM stack for 4 s on each turn change (0 B, from the combat state) · ~~B: players only~~ · ~~C: none~~ | decided | notifications, combat-tracker |
 | OQ-KIT-04 | The kit's "Goblin" stat-block window at the table (with Attack / Damage buttons) | ~~A: compendium card now, window later~~ · **Decided (DM): B**, a rollable DM window `ent.statblock` now (§6.11, slice K7) | decided | entities, compendium, combat-tracker, scenes-map |

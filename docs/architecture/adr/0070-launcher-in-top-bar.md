@@ -1,6 +1,6 @@
-# Proposed — Launcher in the top bar
+# 0070 — Launcher in the top bar
 
-- **Status:** accepted (DM, 2026-10-26; [kit-parity](../../specs/post-mvp/kit-parity.md#15-open-questions) OQ-KIT-01 A; the integrator numbers it at merge)
+- **Status:** accepted (DM, [#356](../../decisions-log.md); [kit-parity](../../specs/post-mvp/kit-parity.md#15-open-questions) OQ-KIT-01 A)
 - **Date:** 2026-10-26
 - **Context:** DM [#355](../../decisions-log.md) makes the Gilt & Stone kit page the goal. The kit's 48 px top bar shows the campaign title on the left, the window launcher centred, and the status and DM chip on the right; the concept art agrees. [play-shell](../../specs/play-shell.md) puts the launcher bottom-centre (§7, FR-SHELL-01, -29), and [visual-direction](../../design/visual-direction.md) lists a "bottom action bar" motif. The bottom reservation is hard-coded: `LAUNCHER_CLEAR = 64` feeds `workArea`, default placement, the player toast corner and every golden layout.
 
