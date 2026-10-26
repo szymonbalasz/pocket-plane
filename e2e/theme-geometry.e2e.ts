@@ -142,8 +142,29 @@ async function pick(page: Page, id: "default" | "gilt") {
   });
 }
 
-/** Waits for the layout to stop moving (grown windows settle after a font swap). */
+/**
+ * The rail's tools: the base three plus the canvas registry's for this client. Registry tools join
+ * the rail only once the lazy MapCanvas chunk mounts (it sets the tool store's client), so a
+ * measure taken before then sees a shorter rail; wait for them first.
+ */
+const RAIL_TOOLS = {
+  dm: ["select", "ruler", "ping", "structure", "props", "aoe", "fog"],
+  player: ["select", "ruler", "ping", "aoe"],
+};
+async function railReady(page: Page, client: keyof typeof RAIL_TOOLS) {
+  const items = page.locator('[data-testid="map-tool-rail"] [data-slot="toggle-group-item"]');
+  await expect(items).toHaveCount(RAIL_TOOLS[client].length);
+  for (const id of RAIL_TOOLS[client])
+    await expect(page.getByTestId(`map-tool-${id}`)).toBeVisible();
+}
+
+/** The rail's height: equal under both themes (FR-THEME-05). */
+const railHeight = (page: Page) =>
+  page.getByTestId("map-tool-rail").evaluate((el) => el.getBoundingClientRect().height);
+
+/** Waits for fonts and the layout to stop moving (grown windows settle after a font swap). */
 async function settled(page: Page) {
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   let last = "";
   await expect
     .poll(
@@ -183,8 +204,10 @@ test("FR-THEME-05 FR-THEME-10 FR-THEME-11 FR-THEME-12 FR-THEME-13 FR-THEME-14 FR
   await dm.getByTestId("ui-prefs-open").click();
   await shellWindow(dm, "shell.prefs").waitFor({ state: "visible" });
   await expect(option(dm, "default")).toHaveAttribute("data-state", "on");
+  await railReady(dm, "dm");
 
   const before = await settled(dm);
+  const rail = await railHeight(dm);
   expect(
     Object.keys(before)
       .filter((k) => k.startsWith("window "))
@@ -201,6 +224,8 @@ test("FR-THEME-05 FR-THEME-10 FR-THEME-11 FR-THEME-12 FR-THEME-13 FR-THEME-14 FR
   // Gilt & Stone: the same boxes everywhere.
   await pick(dm, "gilt");
   expect(await settled(dm)).toEqual(before);
+  await railReady(dm, "dm");
+  expect(await railHeight(dm)).toBe(rail);
 
   // FR-THEME-10: frame, corner pieces, title face, gem close, stone minimise.
   const look = await styles(dm);
@@ -250,6 +275,7 @@ test("FR-THEME-05 FR-THEME-10 FR-THEME-11 FR-THEME-12 FR-THEME-13 FR-THEME-14 FR
   // Default again restores every part exactly (FR-THEME-19).
   await pick(dm, "default");
   expect(await settled(dm)).toEqual(before);
+  expect(await railHeight(dm)).toBe(rail);
   expect(await styles(dm)).toEqual(defaultLook);
   // … and equals the page with every gilt rule removed: gilt adds nothing under Default.
   expect(await dropGiltRules(dm)).toBeGreaterThan(100);
@@ -272,10 +298,14 @@ test("FR-THEME-05 FR-THEME-12 FR-THEME-14 theme geometry (P2): player-1's sheet 
   await openWindow(p1, "dice.log");
   await p1.getByTestId("ui-prefs-open").click();
   await shellWindow(p1, "shell.prefs").waitFor({ state: "visible" });
+  await railReady(p1, "player");
   const before = await settled(p1);
+  const rail = await railHeight(p1);
 
   await pick(p1, "gilt");
   expect(await settled(p1)).toEqual(before);
+  await railReady(p1, "player");
+  expect(await railHeight(p1)).toBe(rail);
   // P2: the strip overflows at 320: the next arrow shows; its scrollbar is the gold one.
   await expect(sheet.getByTestId("charx-tabs-next")).toBeVisible();
   const strip = await sheet
