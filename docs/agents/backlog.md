@@ -138,6 +138,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-131 | sim-16 glitch: with 5–7 pending cards the DM's Initiative shows about one combatant row, its name clipped under the header (h04) | S | combat-tracker Initiative pending block | none | kit K2 | open |
 | BL-132 | sim-16 glitch: the DM's tray roll popup now covers the Party Manager's tabs and pot for ~6 s; three quick player rolls stack popups over the Game log (g01; #348 accepted size) | S | dice-extras popup placement | maybe | dice work | open |
 | BL-133 | sim-16 small: a dragged window can hang below the launcher bar, resize grip out of reach (r08, BL-124 family, ADR-0070 moves the launcher); the sheet name squeezed to 74 px at 320; "Spend Inspiration?" closes by itself after ~4 s; new house rules start unshared; the sheet's condition badge has no tooltip; map labels overlap | S | various | maybe | — | open |
+| BL-134 | Kit K5 follow-up: DM 1440 escort state, opening Party Manager makes Fit show PCs only again (BL-107 regression with the launcher in the top bar); 8 new failing replay cells approved as named exemptions (6 resize / push round trips, 2 just below useful size): have the placer compare Fit results across its useful-size spots, then retire the exemptions (`build/kit-topbar` report) | M | play-shell placer + scenes-map Fit | none | frame work | open |
 
 ## How to add items
 
