@@ -51,3 +51,32 @@ flowchart LR
 | 2026-10-25 | **T0 merged** (Default pixel-identical). **CS merged** (printed sheet; DM sheet crash in a fight fixed; re-test 24 / 24). **X2 merged** (awards withheld for players when a hidden fact could change them; skip toast replaced; two flaky tests steadied; 4 / 4). **X1 merged** (toast flicker gone, popups move only on real changes, one pending count; re-test 5 / 5) |
 | 2026-10-25 | Machine ran out of memory under parallel test runs: DM #354 (one heavy run at a time now; new test strategy after this sprint). **T1 walkthrough PASS** (theme switch). T2 built. **Paused overnight** at this milestone |
 | 2026-10-26 | **T1 merged** (theme switch). T2 walkthrough 11 / 12 (hue slider; kit deviations) → fixes → re-test. DM #355: the goal is the kit **mockup**: T2 merges as the paint layer, **Gilt & Stone becomes the default** (T3), the old look is **Simple Dark**, then a **kit-parity layout track** (spec `kit-parity` started) until the look matches |
+| 2026-10-27 | **T2, T3 merged** (Gilt & Stone skin; Gilt & Stone default, old look "Simple Dark"). **session-sim-16 12 / 13 PASS** (leak scan clean, hard kill identical); FAIL reloads → BL-129; glitches → BL-130–BL-133. Decision #357. Kit parity continues in [sprint-13](sprint-13.md) |
+
+## Playtest: sprint 12
+
+Run from `C:\Repos\pocket-plane` on `main` (PowerShell). About 10 minutes. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-16 report](../../.verify/20261026-234022-session-sim-16/report.md) (local): **12 / 13 PASS**.
+
+```powershell
+git pull; bun install
+bun run build
+bun run fixtures:reset-load session-sim-13 --profile verify
+bun run start --profile verify
+```
+
+Hard-reload tabs that were open before (Ctrl+Shift+R).
+
+| # | What | You do | Expect |
+|---|---|---|---|
+| 1 | **Gilt & Stone by default** | Open the DM URL and a player link in fresh browsers | Dark stone, gold rules, small-caps titles, red gem close buttons; no flash of the old look |
+| 2 | **Simple Dark** | Preferences → Appearance → Simple Dark, then back | The whole app switches at once, nothing moves; each browser keeps its own pick after a reload |
+| 3 | **Parchment tooltips** | Hover a Game log result, a skill on the sheet, a condition chip | A parchment strip unrolls after a moment |
+| 4 | **Printed sheet** | Player 1: open Mira's sheet; widen it past 560 px; click DEX, then Save; hover Stealth | Labelled boxes, shield AC, ability blocks with saves; two columns when wide; check / save lines in the log; the breakdown tooltip |
+| 5 | **Calmer toasts** | Players: several Attack + damage while a roll popup shows | Each card appears in place, no flicker; the popup moves at most once |
+| 6 | **Fair awards** | Kill a creature hidden from players, open Stats → Session on a player | Players don't see an award the hidden kill could change; the DM sees all |
+| 7 | **Skip toast** | Next past a downed goblin, then Prev | The old "Skipped …" toast is replaced, not stacked |
+
+### Known gaps
+
+- **Not the mockup yet:** Game log rows, Initiative rows, the top bar and the launcher still have the old layout in gold paint. That's the kit-parity work now running ([sprint-13](sprint-13.md)).
+- An open Party Manager can come back minimised after a player reload at 1280 (BL-129); toast and popup placement nits (BL-130–BL-132).
