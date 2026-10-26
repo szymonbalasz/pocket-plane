@@ -44,7 +44,11 @@ test("FR-NOTE-51 stack returns home (BL-59) F8 DM at 1440×900: the Fog bar push
   await expect(stack).toHaveAttribute("data-top", "100");
   await expect(stack).toHaveAttribute("data-left", "560");
 
-  // Scenes at the top-left: the Fog bar pushes it right, into the home band (sim-10 b05).
+  // Scenes at the top-left: the Fog bar pushes it right, into the home band (sim-10 b05). The Game
+  // log raised to y 510 first, so pushing Scenes down under the bar is never the placer's pick:
+  // the bar's height follows its text (taller in Simple Dark, where it wraps more), and under
+  // Gilt & Stone's shorter bar a push down would fit above the log at its default spot.
+  await dragTo(dm, await openWindow(dm, "dice.log"), 68, 510);
   const scenes = await openWindow(dm, "map.scenes");
   await dragTo(dm, scenes, 68, 60);
   await dm.getByTestId("map-tool-fog").click();

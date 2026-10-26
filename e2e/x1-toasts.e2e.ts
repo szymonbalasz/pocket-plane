@@ -247,11 +247,16 @@ for (const [width, height] of [
         if (!p || p.column === null || f.column === null || p.column === f.column) continue;
         expect(p.holds !== f.holds || ids(p) !== ids(f), JSON.stringify(timeline)).toBe(true);
       }
-      // The resting stack keeps clear of the popups (FR-DICEX-55).
+      // The resting stack keeps clear of the popups (FR-DICEX-55). Read in one go: the first
+      // card's popup ends its 6 s (FR-DICEX-39) about now, so it may leave between two reads.
       const stack = await box(dm.getByTestId("note-toasts"));
-      for (const p of await dm.getByTestId("dicex-popup").all()) {
-        expect(overlaps(stack, await box(p))).toBe(false);
-      }
+      const popupBoxes = await dm.getByTestId("dicex-popup").evaluateAll((ps) =>
+        ps.map((p) => {
+          const r = p.getBoundingClientRect();
+          return { x: r.x, y: r.y, w: r.width, h: r.height };
+        }),
+      );
+      for (const p of popupBoxes) expect(overlaps(stack, p)).toBe(false);
     }
     await player.context().close();
     await dm.context().close();
