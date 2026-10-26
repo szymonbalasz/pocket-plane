@@ -1189,6 +1189,39 @@
   box-shadow: inset 0 0 0 1px var(--gold);
   --muted-foreground: var(--gold);
 }
+/* Save values: the kit's gold-ruled box on the dark roll fill (not the stone of a secondary). */
+:root[data-theme="gilt"] [data-testid="char-sheet-roll-save"][data-slot="sheet-roll"] {
+  --secondary: var(--gs-roll);
+  --secondary-foreground: var(--foreground);
+  background-image: linear-gradient(var(--gs-roll-hi), var(--gs-roll));
+  box-shadow: inset 0 0 0 1px var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-testid="char-sheet-roll-save"][data-slot="sheet-roll"]:hover {
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+/* The Senses label: small caps in the label face, gold (its utility colour retinted). */
+:root[data-theme="gilt"] [data-testid="charx-senses"] > .uppercase {
+  --muted-foreground: var(--gold);
+  font-family: var(--font-label);
+  font-variant-caps: small-caps;
+  text-transform: none;
+}
+/* Portrait: a framed square (paint only: radius, an outer gold rule, a black inner edge). */
+:root[data-theme="gilt"] [data-testid="char-sheet-portrait"] {
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 2.5px #000;
+}
+:root[data-theme="gilt"] [data-testid="char-sheet-portrait"] > * {
+  outline: 2px solid #000;
+  outline-offset: -2px;
+}
+/* The damage card's dice values ("[1 2]"): the number face, not the mono one. */
+:root[data-theme="gilt"] [data-testid="cbt-popup"] .font-mono {
+  font-family: var(--font-num);
+  font-variant-numeric: lining-nums tabular-nums;
+}
 /* Pips: proficiency dots and slot / use pips in gold. */
 :root[data-theme="gilt"] [data-slot="sheet-pip"] {
   --foreground: var(--gold);

@@ -279,11 +279,47 @@ describe("FR-THEME-10 – -15 parts", () => {
     for (const t of [
       '[data-testid="note-toast"]',
       '[data-testid="cbt-popup"]',
+      '[data-testid="dicex-popup"]',
       "[data-sonner-toast]",
     ]) {
-      expect(has(t, "box-shadow", /inset 0 0 0 1px var\(--frame-rule\)/)).toBe(true);
+      expect(
+        has(t, "box-shadow", /1px var\(--frame-rule\), inset 0 0 0 3px #090b0b, inset 0 0 0 4px/),
+      ).toBe(true);
       expect(has(t, "background-image", /--frame-corner/)).toBe(false);
     }
+  });
+
+  test("FR-THEME-10 FR-THEME-11 kit details (walkthrough fixes): tool rail framed like a window, menu highlight a gold bar, dialog gem at the kit's size and a stone Cancel, sheet saves / senses / portrait, damage-card dice in the number face", () => {
+    expect(has('[data-testid="map-tool-rail"]', "box-shadow", /inset 0 0 0 3px #090b0b/)).toBe(
+      true,
+    );
+    const rail = declsOf((s) => s.endsWith('[data-testid="map-tool-rail"]::after'))
+      .map(([, v]) => v)
+      .join(" ");
+    expect(rail.match(/--frame-corner/g)?.length).toBe(4);
+    const hl = declsOf(sel("[data-highlighted]"));
+    expect(hl).toContainEqual(["outline", "none"]);
+    expect(hl).toContainEqual(["box-shadow", "inset 2px 0 0 var(--gold)"]);
+    const gem = declsOf((s) =>
+      s.endsWith('[data-slot="dialog-close"][aria-label="Close"]::before'),
+    );
+    expect(gem).toContainEqual(["inset", "-3px"]); // the 16 px box → a 22 px gem
+    expect(gem).toContainEqual(["pointer-events", "none"]);
+    expect(
+      has(
+        '[data-slot="dialog-footer"]',
+        "background-image",
+        /linear-gradient\(var\(--gs-stone-hi\)/,
+      ),
+    ).toBe(true);
+    expect(
+      has('[data-testid="char-sheet-roll-save"]', "box-shadow", /var\(--frame-rule-strong\)/),
+    ).toBe(true);
+    expect(has('[data-testid="charx-senses"]', "font-variant-caps", /small-caps/)).toBe(true);
+    expect(has('[data-testid="char-sheet-portrait"]', "border-radius", /2px/)).toBe(true);
+    expect(has('[data-testid="cbt-popup"] .font-mono', "font-family", /var\(--font-num\)/)).toBe(
+      true,
+    );
   });
 
   test("FR-THEME-14 scrollbars: thin gold thumb on a dark track everywhere, WebKit fallback", () => {
