@@ -1361,3 +1361,61 @@
   background-image: linear-gradient(90deg, #2c2311, #1a160c);
   box-shadow: inset 2px 0 0 var(--gold);
 }
+
+/* KIT: top bar (kit-parity K5, §6.2: title, status pill, the launcher in the bar) ───────────── */
+/* The launcher sits in the bar (FR-KIT-14): stone buttons on the bar's paint, no frame of its own
+   (the kit's `.launcher`). Its transparent border keeps the box, so nothing moves. */
+:root[data-theme="gilt"] [data-testid="ui-topbar"] [data-testid="ui-launcher"] {
+  background-image: none;
+  box-shadow: none;
+}
+:root[data-theme="gilt"] [data-slot="topbar-title"] {
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"] button[data-slot="topbar-title"]:hover {
+  --accent: var(--gs-highlight);
+}
+/* The status pill (the kit's `.live`): a dark inset well, muted text, the dot glowing. */
+:root[data-theme="gilt"] [data-slot="topbar-status"] {
+  background-image: linear-gradient(var(--gs-track), var(--gs-box));
+  box-shadow:
+    inset 0 1px 2px rgb(0 0 0 / 0.6),
+    0 1px 0 rgb(176 138 74 / 0.15);
+}
+:root[data-theme="gilt"] [data-slot="topbar-status-dot"] {
+  box-shadow: 0 0 6px currentColor;
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-topbar"] [data-testid="ui-launcher"] {
+    border-color: transparent;
+  }
+  /* The campaign title in title type and gold (the kit's `.camp`); the chevron in dim gold. */
+  :root[data-theme="gilt"] [data-slot="topbar-title"] {
+    color: var(--gold);
+    font-family: var(--font-title);
+  }
+  :root[data-theme="gilt"] button[data-slot="topbar-title"] svg {
+    color: var(--frame-rule-strong);
+  }
+  :root[data-theme="gilt"] [data-slot="topbar-sub"] {
+    color: var(--gs-dim);
+    font-family: var(--font-body);
+  }
+  :root[data-theme="gilt"] [data-slot="topbar-status"] {
+    border-color: var(--frame-rule);
+    color: var(--muted-foreground);
+  }
+  :root[data-theme="gilt"] [data-slot="topbar-status-dot"] {
+    color: var(--warning);
+  }
+  :root[data-theme="gilt"]
+    [data-testid="sync-connection-status"][data-state="live"]
+    [data-slot="topbar-status-dot"] {
+    color: var(--success);
+  }
+  :root[data-theme="gilt"]
+    [data-testid="sync-connection-status"][data-state="rejected"]
+    [data-slot="topbar-status-dot"] {
+    color: var(--destructive);
+  }
+}

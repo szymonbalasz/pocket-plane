@@ -1,8 +1,8 @@
 // The play page frame (FR-SHELL-01/02/05). Stacking, bottom → top:
-// base layer (z-0) < windows (z-10) < chrome: top bar, tool rail, launcher (z-20)
+// base layer (z-0) < windows (z-10) < chrome: top bar (with the launcher, FR-KIT-14), tool rail (z-20)
 // < reconnect banner (z-30) < dialogs, menus, tooltips (z-50, portalled) < alert flash (z-100,
 // portalled, FR-SHELL-22) < overlay layer (FR-SHELL-112 (2), -135) < dice layer.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ConnectionIndicator, ReconnectBanner } from "../live-sync/ConnectionStatus";
 import { AlertFlash } from "./AlertLayer";
 import { testSoundAttr } from "./alerts";
@@ -50,10 +50,10 @@ export function BaseEmpty({ client }: { client: ShellClient }) {
 
 export interface PlayFrameProps {
   client: ShellClient;
-  /** Top bar, left: campaign (DM switcher / player "Playing as …"). */
+  /** Top bar, left: the campaign title (DM: its menu; player: "· playing as …", FR-KIT-11/12). */
   topLeft: React.ReactNode;
-  /** Top bar, right, before the connection indicator. */
-  topRight?: React.ReactNode;
+  /** In the status pill, after the connection state (DM: presence, FR-KIT-13). */
+  topStatus?: React.ReactNode;
   /** Top bar, after the connection indicator, before the identity chip (FR-SHELL-70). */
   topEnd?: React.ReactNode;
   /** Base layer (scenes-map canvas). Omitted → the empty state. */
@@ -62,7 +62,29 @@ export interface PlayFrameProps {
   toolRail?: React.ReactNode;
 }
 
-export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }: PlayFrameProps) {
+/**
+ * The top bar's centre zone width, px (FR-KIT-14): the launcher's fit width, measured; null before
+ * it is laid out (the launcher then fits the viewport).
+ */
+function useZoneWidth(ref: React.RefObject<HTMLElement | null>): number | null {
+  const [w, setW] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setW(Math.floor(el.getBoundingClientRect().width));
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return w;
+}
+
+/** The title zone's widest share of the top bar, so the launcher keeps room (FR-KIT-10). */
+export const TOP_TITLE_MAX = "30%";
+
+export function PlayFrame({ client, topLeft, topStatus, topEnd, base, toolRail }: PlayFrameProps) {
   const registry = useRegistry();
   const windows = useShellState((s) => s.windows);
   const placed = useShellState((s) => s.placed);
@@ -78,6 +100,8 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
   const top = topWindow(windows, available);
   const testMode = available.has(SHELL_TEST_KIND);
   const lastSound = useAlertState((s) => s.lastSound);
+  const centre = useRef<HTMLDivElement | null>(null);
+  const room = useZoneWidth(centre);
   useAppearPlacement(available, dispatch);
   // FR-SHELL-95, -103: while the viewport changes windows only render-fit; one `viewport` settle
   // runs, and writes, after the last resize event. Timed from the event itself (not a render), so
@@ -143,20 +167,43 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
         data-testid="ui-topbar"
         {...testSoundAttr(testMode, lastSound)}
         tabIndex={-1}
-        className="outline-none absolute inset-x-0 top-0 z-20 flex items-center gap-3 border-b bg-background/85 px-3 backdrop-blur"
+        className="outline-none absolute inset-x-0 top-0 z-20 flex items-center border-b bg-background/85 px-3 backdrop-blur"
         style={{ height: TOP_BAR_H }}
       >
-        {/* FR-SHELL-109 (BL-53): the left slot shrinks and its text ellipsises; the right cluster
-            never shrinks, so nothing runs under it (its items have fixed widths). */}
+        {/* FR-KIT-10: three zones. FR-SHELL-109 (BL-53): the title shrinks (to at most 30 % of the
+            bar) and its text ellipsises; the right cluster never shrinks, so nothing runs under
+            it (its items have fixed widths). The centre takes the rest: the launcher's fit width
+            (FR-KIT-14, ≥ 8 px gutters inside it). */}
         <div
           data-testid="ui-topbar-left"
-          className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap *:min-w-0 *:truncate"
+          className="flex min-w-0 shrink items-center gap-2 overflow-hidden whitespace-nowrap *:min-w-0 *:truncate"
+          style={{ maxWidth: TOP_TITLE_MAX }}
         >
           {topLeft}
         </div>
+        <div
+          ref={centre}
+          data-testid="ui-topbar-centre"
+          className="flex h-full min-w-0 flex-1 items-center justify-center overflow-hidden"
+        >
+          <Launcher
+            defs={registry.defs.filter((d) => available.has(d.kind))}
+            windows={windows}
+            viewport={viewport}
+            room={room}
+            dispatch={dispatch}
+          />
+        </div>
         <div data-testid="ui-topbar-right" className="flex shrink-0 items-center gap-2">
-          {topRight}
-          <ConnectionIndicator />
+          {/* FR-KIT-13: one status pill, the connection state then (DM) presence. */}
+          <div
+            data-testid="ui-topbar-status"
+            data-slot="topbar-status"
+            className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap"
+          >
+            <ConnectionIndicator />
+            {topStatus}
+          </div>
           {topEnd}
           {/* FR-SHELL-112 (3): registered top-bar items, fixed width each, before the chip. */}
           {topBarItemsFor(client).map((t) => (
@@ -182,13 +229,6 @@ export function PlayFrame({ client, topLeft, topRight, topEnd, base, toolRail }:
       >
         {toolRail}
       </aside>
-
-      <Launcher
-        defs={registry.defs.filter((d) => available.has(d.kind))}
-        windows={windows}
-        viewport={viewport}
-        dispatch={dispatch}
-      />
 
       {/* Companions: mounted while their kind is available, open or not (e.g. toasts). */}
       {registry.defs.map((d) => {

@@ -68,7 +68,7 @@ test("FR-CAMP-35 picker: Preferences picker and DM Players panel Popovers on the
   await expect(p1Dot).toHaveAttribute("data-color", jade);
   await expect(p2.getByTestId("ui-prefs-chip-dot")).toHaveAttribute("data-color", blue);
   await expect(p1.getByTestId("camp-my-color")).toHaveCount(0);
-  await expect(p1.getByTestId("camp-player-joined")).toHaveText(/^Playing as Player 1 in /);
+  await expect(p1.getByTestId("camp-player-joined")).toHaveText(/ · playing as Player 1$/);
 
   // K2: player-1's picker: 8 swatches, own checked, blue / amber blocked with reasons.
   let picker = await ownPicker(p1);

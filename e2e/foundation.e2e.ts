@@ -30,7 +30,7 @@ test("DM and players: login, join, presence, reveal/hide, edit, reload, invalid 
   // Players join with no input.
   await p1.goto(link("Player 1"));
   await expect(p1.getByTestId("camp-player-joined")).toHaveText(
-    "Playing as Player 1 in Fixture Campaign",
+    "Fixture Campaign · playing as Player 1",
   );
   await p2.goto(link("Player 2"));
   await expect(p2.getByTestId("camp-player-joined")).toBeVisible();

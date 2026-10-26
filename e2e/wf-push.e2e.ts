@@ -180,7 +180,7 @@ test("FR-SHELL-109 rail inset (player-1 1280×800, BL-53): Party at its min widt
     }
   });
 
-  await test.step("Top bar: at 520 px the 'Playing as …' line ellipsises; the right cluster stays whole, nothing under it", async () => {
+  await test.step("Top bar: at 520 px the player's title line ellipsises; the right cluster stays whole, nothing under it", async () => {
     await p1.setViewportSize({ width: 520, height: 800 });
     const left = p1.getByTestId("ui-topbar-left");
     const right = p1.getByTestId("ui-topbar-right");

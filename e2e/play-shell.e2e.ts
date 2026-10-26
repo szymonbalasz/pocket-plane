@@ -123,7 +123,7 @@ test("FR-SHELL-02/08/10/15/16/19 player: move + resize + front, reload restores;
   });
   await p1.goto(link("Player 1"));
   await expect(p1.getByTestId("camp-player-joined")).toHaveText(
-    "Playing as Player 1 in Fixture Campaign",
+    "Fixture Campaign · playing as Player 1",
   );
   await expect(p1.getByTestId("ui-base-empty")).toHaveText("Waiting for the DM to show a scene");
   // Player default = the registry's default-open windows (never a test window).

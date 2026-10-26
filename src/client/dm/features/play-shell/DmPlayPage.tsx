@@ -2,7 +2,6 @@
 // badge; `screen` (loading) replaces the frame while the window manager stays mounted.
 import type { CampaignSummary, PlayerRecord } from "@shared/campaign-management/schemas";
 import { Tooltip } from "@ui/components/ui/overlays";
-import { Badge } from "@ui/components/ui/primitives";
 import { PlayFrame } from "@ui/features/play-shell/PlayFrame";
 import { ShellProvider, useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { cn } from "@ui/lib/utils";
@@ -16,7 +15,8 @@ import { PLAYERS_KIND } from "./players-window";
 
 /**
  * "N/M online", tooltip lists names; opens the Players window (FR-SHELL-06, OQ-SHELL-11).
- * While not live: "– / M online", muted, `data-state="unknown"` (FR-SHELL-33).
+ * While not live: "– / M online", muted, `data-state="unknown"` (FR-SHELL-33). The status pill's
+ * second part (kit-parity FR-KIT-13), after a "·".
  */
 function PresenceBadge() {
   const players = useRecords<PlayerRecord>("player");
@@ -31,16 +31,12 @@ function PresenceBadge() {
         data-online={badge.online ?? undefined}
         data-total={players.length}
         onClick={() => openWindow(PLAYERS_KIND)}
+        className={cn(
+          "cursor-pointer rounded-sm whitespace-nowrap outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring",
+          badge.state === "unknown" && "text-muted-foreground",
+        )}
       >
-        <Badge
-          variant="outline"
-          className={cn(
-            "cursor-pointer hover:bg-accent",
-            badge.state === "unknown" && "text-muted-foreground",
-          )}
-        >
-          {badge.text}
-        </Badge>
+        {badge.text}
       </button>
     </Tooltip>
   );
@@ -64,7 +60,14 @@ export function DmPlayPage({
           <PlayFrame
             client="dm"
             topLeft={<CampaignBar campaigns={campaigns} />}
-            topRight={<PresenceBadge />}
+            topStatus={
+              <>
+                <span aria-hidden="true" className="text-muted-foreground">
+                  ·
+                </span>
+                <PresenceBadge />
+              </>
+            }
             base={<DmMapBase />}
             toolRail={<DmMapToolRail />}
           />

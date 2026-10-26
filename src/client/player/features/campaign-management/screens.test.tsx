@@ -31,11 +31,21 @@ function render(color: string) {
 }
 
 describe("FR-CAMP-35 picker (player header)", () => {
-  test("FR-CAMP-35 picker: camp-my-color gone from the player header; the line reads 'Playing as Player 1 in …'", () => {
+  test("FR-CAMP-35 FR-KIT-12 picker: camp-my-color gone from the player header; the line reads 'Fixture Campaign · playing as Player 1'", () => {
     const html = render("#19b98a");
     expect(html).not.toContain("camp-my-color");
     expect(html.replace(/<[^>]+>/g, "").replace(/\s+/g, " ")).toBe(
-      "Playing as Player 1 in Fixture Campaign",
+      "Fixture Campaign · playing as Player 1",
+    );
+  });
+
+  test("FR-KIT-12 player title: the campaign name in the title slot, the player in the small muted line; IDs kept", () => {
+    const html = render("#19b98a");
+    expect(html).toMatch(
+      /<p data-testid="camp-player-joined"[^>]*><span data-testid="camp-joined-campaign-name" data-slot="topbar-title"[^>]*>Fixture Campaign<\/span>/,
+    );
+    expect(html).toMatch(
+      /<span data-slot="topbar-sub" class="[^"]*text-muted-foreground[^"]*">· playing as <span data-testid="camp-joined-player-name">Player 1<\/span><\/span>/,
     );
   });
 });
