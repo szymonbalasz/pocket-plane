@@ -2640,7 +2640,7 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 
 ## 131. Sprint 12: theme switch (T1)
 
-From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351, #353). **Built by `build/theme-switch`**. Protocol side: [protocol §166](../protocol/README.md#166-sprint-12-theme-switch-t1). **No table, column, record type or wire field.**
+From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351, #353). **Built by `build/theme-switch`**. Protocol side: [protocol §167](../protocol/README.md#167-sprint-12-theme-switch-t1). **No table, column, record type or wire field.**
 
 | Browser state | Store | Rule | Source |
 |---|---|---|---|

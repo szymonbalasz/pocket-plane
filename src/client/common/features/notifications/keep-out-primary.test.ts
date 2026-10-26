@@ -103,6 +103,26 @@ describe("FR-NOTE-78 keep off windows' primary content", () => {
     expect(at.covers).toBeGreaterThan(0);
   });
 
+  test("FR-NOTE-78 BL-119 sim-15 c01 (1280×720, Roll requests at 504, 60): the summary keeps off the older (Perception) card's heading too: over its rows, at 480, 408", () => {
+    const avoid = [{ x: 495, y: 355, w: 44, h: 44 }];
+    // The Perception card's title line ("Perception · public · 3 / 3"), inside its p-2.
+    const heading = { x: 526, y: 381, w: 316, h: 19 };
+    // The repro (sim-15 c01: 480, 373): on the heading.
+    const before = dmStackSpot(small, init720, SUMMARY_H, STACK_W, avoid, [log720, requests]);
+    expect(before).toMatchObject({ left: 480, top: 374 });
+    expect(hits(stack(before, SUMMARY_H), heading)).toBe(true);
+    const at = dmStackSpot(small, init720, SUMMARY_H, STACK_W, avoid, [
+      log720,
+      { ...requests, headings: [heading] },
+    ]);
+    expect(at).toMatchObject({ left: 480, top: 408 });
+    const r = stack(at, SUMMARY_H);
+    for (const p of [newRequest, insight, heading, ...(log720.logRows ?? [])])
+      expect(hits(r, p)).toBe(false);
+    for (const c of [...(requests.controls ?? []), ...(log720.controls ?? [])])
+      expect(hits(r, c)).toBe(false);
+  });
+
   test("FR-NOTE-78 BL-108 sim-14 g01 (1440×900, Party Manager Loot at 424, 60): the summary leaves the wallets for the free row right of 'Party pot', above 'Wallets', at 560, 140", () => {
     const vp = { w: 1440, h: 900 };
     const init = { x: 1028, y: 60, w: 400, h: 512 };
@@ -392,6 +412,18 @@ describe("FR-NOTE-78 walkthrough F2 1b / 2a: live cards folded into the summary"
     const r = stack(at, FOLDED_H);
     for (const p of [newRequest, insight, ...composer, ...(log.logRows ?? [])])
       expect(hits(r, p)).toBe(false);
+    // BL-119: with the Perception card's heading measured, no spot clears it, the composer and
+    // the Game log's title bar: the fewest controls stay first (it keeps 405, off the composer).
+    const heading = { x: 526, y: 412, w: 316, h: 20 };
+    const withHeading = dmStackSpot(
+      small,
+      init720,
+      FOLDED_H,
+      STACK_W,
+      [],
+      [log, { ...requests, headings: [heading] }],
+    );
+    expect(withHeading).toMatchObject({ left: 480, top: 405 });
   });
 
   test("FR-NOTE-78 walkthrough F2 2a (1440×900, Party Manager Loot at 424, 60, 2 live cards): folded to the summary's 58 px → 560, 624 over older Game log entries, off 'Add loot' (92 px: 560, 333 on it)", () => {

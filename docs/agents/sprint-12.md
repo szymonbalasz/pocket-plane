@@ -47,3 +47,5 @@ flowchart LR
 | Date | What |
 |---|---|
 | 2026-10-25 | Planned (DM #353): art build T0 → T1 → T2 with CS in parallel, fix lane X1 / X2 |
+| 2026-10-25 | **T0 merged** (Default pixel-identical). **CS merged** (printed sheet; DM sheet crash in a fight fixed; re-test 24 / 24). **X2 merged** (awards withheld for players when a hidden fact could change them; skip toast replaced; two flaky tests steadied; 4 / 4). **X1 merged** (toast flicker gone, popups move only on real changes, one pending count; re-test 5 / 5) |
+| 2026-10-25 | Machine ran out of memory under parallel test runs: DM #354 (one heavy run at a time now; new test strategy after this sprint). **T1 walkthrough PASS** (theme switch). T2 built. **Paused overnight** at this milestone |

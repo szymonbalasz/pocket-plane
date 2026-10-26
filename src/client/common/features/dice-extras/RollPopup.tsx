@@ -31,6 +31,7 @@ import { cn } from "../../lib/utils";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { focusLogEntry } from "../dice-roll-log/focus";
 import { RollerName } from "../dice-roll-log/name-color";
+import { SHOWN_STACK_ID as NOTE_STACK_ID } from "../notifications/ToastRuntime";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
@@ -47,6 +48,7 @@ import { dice3d, whenChunk } from "./lazy3d";
 import {
   CELL_LINES,
   cellTag,
+  dmColumnTop,
   dmPopupClear,
   dmStackAt,
   linesH,
@@ -700,13 +702,13 @@ export function RollPopupStack({
   const reports = useSyncExternalStore(subscribeShownStack, shownStacks, shownStacks);
   const stack = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ top: 0, h: 0 });
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the cards change
-  useEffect(() => {
+  // BL-118: re-measured after every commit, before the paint (the cards, the toast reports).
+  useLayoutEffect(() => {
     const el = stack.current;
     const top = Math.round(el?.parentElement?.getBoundingClientRect().top ?? 0);
     const h = Math.round(el?.getBoundingClientRect().height ?? 0);
     setBox((b) => (b.top === top && b.h === h ? b : { top, h }));
-  }, [popups, pending, vp]);
+  });
   const clear = dmPopupClear(
     initiative,
     dialogs,
@@ -714,7 +716,10 @@ export function RollPopupStack({
     dm ? reports : new Map(),
     SHOWN_ID,
   );
-  const at = dmStackAt(vp, box.top, { w: g.w, h: box.h }, clear);
+  // BL-118: from the toast stack's resting report, so the column moves only when a popup arrives
+  // or leaves or that stack settles elsewhere, never on a popup's own rolling → rest re-render.
+  const start = dmColumnTop(reports.get(NOTE_STACK_ID)?.h ?? 0);
+  const at = dmStackAt(vp, start, { w: g.w, h: box.h }, clear);
   // FR-DICEX-47 short screens: only the popups that fit the region (newest first; the oldest
   // drops), never past the viewport's bottom (DM) or over the top bar (players).
   useLayoutEffect(() => {
@@ -744,12 +749,11 @@ export function RollPopupStack({
       </div>
     );
   }
+  // BL-118: fixed at its viewport spot, not offset from the region row: that row follows the
+  // toast stack's height a frame later (play-shell's `ShellToaster`), which moved the column
+  // with it until the next re-measure (sim-15: 388 → 442 → 388 under a new alert toast).
   return (
-    <div
-      ref={stack}
-      className="absolute flex flex-col gap-2"
-      style={{ left: at.left, top: at.top - box.top }}
-    >
+    <div ref={stack} className="fixed flex flex-col gap-2" style={{ left: at.left, top: at.top }}>
       {cards.reverse()}
     </div>
   );
