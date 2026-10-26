@@ -21,3 +21,4 @@ Each slice: build → kit-vs-app walkthrough → gates → merge. K6 compares ev
 | Date | What |
 |---|---|
 | 2026-10-26 | Spec merged (complete, #356), ADR-0070 accepted. K0 started |
+| 2026-10-27 | **K0 merged**: kit parts (Medallion, Result box, HP bar), variants as data, every dialog with a title bar and centred close gem (walkthrough 3/5 → re-test 4/5 → fixed). K5 building |
