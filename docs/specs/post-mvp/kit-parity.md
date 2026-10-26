@@ -9,19 +9,21 @@ phase: post-mvp
 # Kit parity
 
 > **Goal (DM, 2026-10-26, [#355](../../decisions-log.md)):** "get to that mockup". The source of truth is the kit page [gilt-stone.html](../../design/art/kit/gilt-stone.html). Open it in a browser and compare it with `.verify/t2/pairs/*.png`. The concept art (`.verify/t2/a-gilt-stone-01.png`) is inspiration, not binding.
+> **Decided (DM + orchestrator, 2026-10-26):** OQ-KIT-01 A (the launcher moves into the top bar; [proposed ADR](../../architecture/adr/proposed-launcher-in-top-bar.md) accepted), -02 **B** (kit 40-px log rows; `dice.log` 40 px taller), -03 A, -04 **B** (a rollable DM stat-block window now, §6.11), -05 to -11 A. All geometry changes land together in slice K5 (§7.3).
 > **Model:** the printed-sheet amendment, [character-sheet-full §6.2](../character-sheet-full.md#62-printed-sheet-layout) (FR-CHARX-105–120). Every layout change is a **markup change in every theme**. Simple Dark draws the new rows with its plain tokens, and Gilt & Stone styles them through `data-slot` names. [ADR-0069](../../architecture/adr/0069-theme-switch.md) holds: no theme logic in components, and themes never change geometry. Sizes change only through the size table (§7.3).
 
 ## 1. Summary
 
 - [theme-system](theme-system.md) T0–T2 repaint today's markup. The DM finds the result "very far off": the gap is the structure inside windows, not the paint.
 - This spec redesigns the rows, cards and bars that differ from the kit: Game log rows, Initiative rows, the top bar, notices, the damage-card popup, dialogs, the compendium list and stat block, Party status, and the sheet header. It also adds a few shared **kit parts** (medallion, result box, HP bar) that they all reuse.
+- One new DM-only window: the **stat block** (`ent.statblock`), the kit's "Goblin" card, with roll buttons that use today's combat and dice intents (§6.11).
 - Client only: 0 bytes on the wire, no new intents, no visibility change.
 
 ## 2. Scope
 
 - Markup and layout for every area in §6 (both clients, both themes). Each area also gets `data-slot` hooks, plus the `gilt.css` block that styles them (§7.4).
 - Kit parts: `Medallion`, `ResultBox`, `HpBar` (new files under `src/client/common/components/kit/`), and `data-variant` on Button and the ToggleGroup items (BL-127).
-- Three geometry decisions: the launcher's place (OQ-KIT-01), the Game log row height (OQ-KIT-02), and whether any default or minimum size changes (§7.3).
+- Geometry (decided, §7.3): the launcher moves into the top bar (OQ-KIT-01 A), `dice.log` grows 40 px for the kit's 40-px rows (OQ-KIT-02 B), and `ent.statblock` gets its size-table row.
 - A final **parity walkthrough** that compares each kit section with the app side by side (slice K6).
 
 ## 3. Goals
@@ -36,11 +38,11 @@ phase: post-mvp
   - Auto-advance turns (kit Initiative footer).
   - A chat "Send" in the Game log.
   - The "Session 14" title meta: sessions are not stored ([ADR-0013](../../architecture/adr/0013-session-journal-scope.md)).
-  - A rollable stat-block window (OQ-KIT-04).
 - The kit page's type-pairing switch (Old book is decided, FR-THEME-16).
 - Character sheet body: done by FR-CHARX-105–120. Only the sheet **header** is in scope here (§6.9).
 - The map canvas, tokens and 3D dice (OQ-THEME-09).
 - Bigger windows "because the kit is roomier". Sizes are kept unless §7.3 says otherwise.
+- Players opening a stat block: `ent.statblock` is DM-only (§6.11).
 
 ## 5. User stories
 
@@ -48,6 +50,7 @@ phase: post-mvp
 - As the DM, I want the table to look like the kit, so the session feels like a CRPG and not a dashboard.
 - As the DM, I want each Initiative row to show at a glance whose turn it is, their HP and their initiative, with the many controls one hover away.
 - As the DM, I want each Game log row to show who rolled, what they rolled and a big result, with the dice maths on hover.
+- As the DM, I want a monster's stat block open beside the map, with Attack / Damage buttons, like the kit's Goblin card.
 
 **Player**
 - As a player, I want the same clean rows and big numbers on my screen. I see nothing I couldn't see before.
@@ -61,10 +64,10 @@ T2 = what `gilt.css` (theme T2) already fixed. Markup = what this spec changes. 
 
 | Area (kit section) | Kit | App today | T2 fixed | Needs markup | Owner spec |
 |---|---|---|---|---|---|
-| Top bar (At the table) | Campaign title left · launcher centred · "● Live · 3 players" + DM chip right | Switcher Select + "New campaign" + "Rename" left; "0/2 online", "Connected", Pause, search, chip right; launcher **at the bottom** | Stone buttons, bar paint | Title + menu, one status pill; launcher place (OQ-KIT-01) | [play-shell](../play-shell.md), [campaign-management](../campaign-management.md), [live-sync](../live-sync.md) |
-| Launcher | Stone icon + label buttons; open = gold glow; minimised = gem diamond | Same buttons; open bar, minimised ring | Stone look | Only if OQ-KIT-01 A (move); markers by CSS | play-shell |
+| Top bar (At the table) | Campaign title left · launcher centred · "● Live · 3 players" + DM chip right | Switcher Select + "New campaign" + "Rename" left; "0/2 online", "Connected", Pause, search, chip right; launcher **at the bottom** | Stone buttons, bar paint | Title + menu, one status pill; launcher in the centre zone (OQ-KIT-01 A) | [play-shell](../play-shell.md), [campaign-management](../campaign-management.md), [live-sync](../live-sync.md) |
+| Launcher | Stone icon + label buttons; open = gold glow; minimised = gem diamond | Same buttons; open bar, minimised ring | Stone look | Moves into the top bar (FR-KIT-14); markers by CSS | play-shell |
 | Tool rail | Rail framed like a window (double rule, corners) | 1 px rule, no corners | Tools, active gem | None (gilt.css frame on `map-tool-rail`) | [scenes-map](../scenes-map.md) |
-| Goblin stat block | Card: italic type line, AC/HP/Speed row, 6-column abilities, attack rows | No stat-block window; compendium `StatBlock` is a plain read-only view | Paint | Compendium stat block as the kit card; window → OQ-KIT-04 | [compendium](../compendium.md), [entities](../entities.md) |
+| Goblin stat block | Card: italic type line, AC/HP/Speed row, 6-column abilities, attack rows | No stat-block window; compendium `StatBlock` is a plain read-only view | Paint | Compendium stat block as the kit card; new DM window `ent.statblock` with roll buttons (§6.11, OQ-KIT-04 B) | [compendium](../compendium.md), [entities](../entities.md), combat-tracker |
 | Initiative | Round line; rows = medallion, name, HP bar + "x / y", **large bare init**, one status icon; turn = red wash + gem; footer "Next turn" | Header with 6 buttons, "Combatant / Init" strip, rows with grip, chips, AC/HP text, band chip, moved ft, init input box, attack + ⋯ | Frame, fonts | Row grid, header/footer, hover actions | [combat-tracker](../combat-tracker.md), [combat-extras](../combat-extras.md) |
 | Game log | Rows = medallion, "Name · action", time, **large boxed result** coloured by outcome | One inline line: name — label: dice faces + mods = small boxed total, "physical" chip, category chip | Boxed totals, colours | Row grid, details move to hover, copy rule | [dice-roll-log](../dice-roll-log.md) |
 | Roll popup (3D dice) | (Not in kit; shell UI) | Plain dark panel, inline totals | — (unthemed, T2 #8) | Totals as result boxes; frame by CSS | [dice-extras](../dice-extras.md) |
@@ -100,7 +103,7 @@ T2 = what `gilt.css` (theme T2) already fixed. Markup = what this spec changes. 
 | FR-KIT-11 | **DM title:** the campaign switcher's trigger (`camp-campaign-switcher`) shows the campaign name in title type with a chevron, with no box. Its menu lists the campaigns (`camp-campaign-option`), then a separator, then **New campaign…** and **Rename…** (Rename only with an active campaign). Both open today's dialogs (`camp-campaign-new`, `camp-campaign-rename`), whose trigger IDs move onto the items. The switch confirm (`camp-switch-dialog`) is unchanged. | `FR-KIT-11 campaign menu` |
 | FR-KIT-12 | **Player title:** the campaign name in title type (`camp-joined-campaign-name`), then "· playing as Player 1" in small muted text (`camp-joined-player-name`). `camp-player-joined` stays the wrapper. | `FR-KIT-12 player title` |
 | FR-KIT-13 | **One status pill** `ui-topbar-status`, a group of two parts. (1) `sync-connection-status`: a dot plus "Live", "Reconnecting…", etc. "Connected" reads "Live". (2) DM only, `ui-presence-badge`: "· 0 / 2 online"; click and Tooltip are unchanged. `data-state` values are unchanged. | `FR-KIT-13 status pill` |
-| FR-KIT-14 | **Launcher placement** per OQ-KIT-01. **If A:** the launcher sits in the centre zone. Its fit width is the gap between the left and right zones (≥ 8 px each side); FR-SHELL-43's label-drop and "⋯" rules are unchanged. The "⋯" menu opens downward. The bottom reservation `LAUNCHER_CLEAR` becomes the 12 px edge gap; the work area, default layouts, bands, the player toast corner and the goldens are recomputed (§7.3, [proposed ADR](../../architecture/adr/proposed-launcher-in-top-bar.md)). **If B:** the launcher stays bottom-centre, unchanged. | `FR-SHELL-43` tests, `FR-SHELL-62 golden layouts` (regenerated if A) |
+| FR-KIT-14 | **Launcher in the top bar** (OQ-KIT-01 A, [ADR](../../architecture/adr/proposed-launcher-in-top-bar.md)): the launcher sits in the centre zone. Its fit width is the gap between the left and right zones (≥ 8 px each side); FR-SHELL-43's label-drop and "⋯" rules are unchanged, and the "⋯" menu opens downward. The bottom reservation `LAUNCHER_CLEAR` becomes the 12 px edge gap. The work area, default layouts, bands, the player toast corner and the goldens are recomputed in K5 (§7.3). | `FR-SHELL-43` tests, `FR-SHELL-62 golden layouts` (regenerated) |
 | FR-KIT-15 | **Launcher buttons** keep their DOM (`ui-launcher-button`, `data-state`, `[data-marker]`, badge, activity dot). The kit's open glow and minimised gem diamond are CSS on `[data-state]` / `[data-marker]`. | existing |
 
 ### 6.3 Initiative (DM and player)
@@ -118,13 +121,13 @@ Row grid (both clients): `turn marker · medallion (lg) · name block · init nu
 | FR-KIT-26 | **Player HP line:** PCs and the player's own companions show `HpBar` with numbers, from the character record or companion data the player already holds (Party status shows the same values, [ADR-0063](../../architecture/adr/0063-party-hp-visibility.md)). Monsters show the band word only (`cbt-init-row-band`), never a bar length. Hidden combatants are never sent (unchanged). | `FR-KIT-26 player hp`, FR-KIT-04 |
 | FR-KIT-27 | **Init number:** a set value is a large bare number (`cbt-init-row-init`). The DM clicks it, or presses Enter on it, to edit it as today's input (same ID, commit on blur / Enter). An unset value shows today's input + Roll button (`cbt-init-row-roll`). Companions acting after their owner keep the read-only text. | `FR-KIT-27 init edit` |
 | FR-KIT-28 | **Status:** effects render as icon chips (icon + rounds, label in the Tooltip). The first one shows, then "+N" (today's fold IDs `cbtx-init-row-effect`, `…-more`). Chip menus (Edit… / End) and the concentration chip (`cbtx-conc-chip`, blue) are unchanged. | `FR-KIT-28 status icons` |
-| FR-KIT-29 | **Row actions** (DM): Attack (`cbt-init-row-attack`) and ⋯ (`cbt-init-row-menu`) form a hover group (FR-KIT-03), always shown on the current-turn row. The menu's items and order are unchanged. Death items and companion lines (`cbt-init-companion`) keep their place. Companion lines and removed rows (`data-removed`, Restore) use the grid at medallion `sm`. | `FR-KIT-29 hover actions` |
+| FR-KIT-29 | **Row actions** (DM): Attack (`cbt-init-row-attack`) and ⋯ (`cbt-init-row-menu`) form a hover group (FR-KIT-03), always shown on the current-turn row. The menu's items and order are unchanged, plus **Stat block** for non-PC rows (FR-KIT-101, added by K7). Death items and companion lines (`cbt-init-companion`) keep their place. Companion lines and removed rows (`data-removed`, Restore) use the grid at medallion `sm`. | `FR-KIT-29 hover actions` |
 | FR-KIT-30 | **Player body:** a centred "Round N" (`cbt-init-round`) and the hint (`cbt-init-hint`), then rows on the same grid without grip or actions. A companion row the player owns stays clickable (opens its card). | `FR-KIT-30 player rows` |
 | FR-KIT-31 | "↓ N more" (`cbt-init-more`), the below-fold logic, drag reorder, the drop line and every intent are unchanged. | existing |
 
 ### 6.4 Game log and roll popup
 
-Row grid: `medallion (md) · what · time · result boxes · actions (hover)`, one line, ≈ 30 px (OQ-KIT-02).
+Row grid: `medallion (md, 28) · what · time · result boxes · actions (hover)`, one line, 40 px as in the kit (OQ-KIT-02 B; the window grows 40 px, §7.3).
 
 | ID | Requirement | Test |
 |---|---|---|
@@ -173,7 +176,7 @@ Row grid: `medallion (md) · what · time · result boxes · actions (hover)`, o
 | ID | Requirement | Test |
 |---|---|---|
 | FR-KIT-76 | **Results as a table:** a sticky header row (Name · Details · Source) over rows. Each `cmp-result` row has the name (`cmp-result-name`, name type), the details line (`r.line`, e.g. "CR 1/4 · Small humanoid") and the source chip. Rows are zebra-striped with a hover tint; numbers use tabular figures. Group rows (`cmp-group-toggle`) are expandable rows with a count. Drag, keyboard and every state ID are unchanged. 0 B (OQ-KIT-05). | `FR-KIT-76 table rows` |
-| FR-KIT-77 | **Stat block card** (`cmp-statblock-*`): an italic type line ("Small humanoid (goblinoid), neutral evil"); one ruled row "AC n · HP n (formula) · Speed n ft" (`-core`); a 6-column ability grid with label, score and modifier (`-scores`, `-score`); then each section's entries as name + muted line rows (`-section`). It is read-only (no new roll buttons, OQ-KIT-04). | `FR-KIT-77 stat block card` |
+| FR-KIT-77 | **Stat block card** (`cmp-statblock-*`): an italic type line ("Small humanoid (goblinoid), neutral evil"); one ruled row "AC n · HP n (formula) · Speed n ft" (`-core`); a 6-column ability grid with label, score and modifier (`-scores`, `-score`); then each section's entries as name + muted line rows (`-section`). It stays read-only; a monster entry gains **Open at the table** (FR-KIT-101), which opens the rollable window. It shares its markup and slots with `ent.statblock`. | `FR-KIT-77 stat block card` |
 
 ### 6.9 Party status, Creatures, sheet header
 
@@ -188,9 +191,26 @@ Row grid: `medallion (md) · what · time · result boxes · actions (hover)`, o
 
 | ID | Requirement | Test |
 |---|---|---|
-| FR-KIT-92 | **Sizes:** every `defaultSize`, `usefulSize` and `minSize` stays as today (§7.3), except what OQ-KIT-01 A changes (work area and default layouts). The `dice.log` useful criterion changes per OQ-KIT-02. The theme-geometry e2e still finds every window rect equal across themes. | `FR-SHELL-85 size table`, `theme-geometry.e2e.ts` |
+| FR-KIT-92 | **Sizes:** every `defaultSize`, `usefulSize` and `minSize` stays as today, except the §7.3 changes: the work area (launcher in the top bar), `dice.log` +40 px tall, and the new `ent.statblock` row. The size-table test, goldens and replay cells match §7.3. The theme-geometry e2e still finds every window rect equal across themes. | `FR-SHELL-85 size table`, `FR-SHELL-62 golden layouts`, `theme-geometry.e2e.ts` |
 | FR-KIT-93 | **Narrow:** at the minimum sizes (Initiative 320 / player 240, Game log 300, Party Manager 340, sheet 280) nothing overflows sideways; names truncate with an ellipsis. | `FR-KIT-93 min widths` (DOM, fixed widths) |
 | FR-KIT-94 | **Parity walkthrough** (slice K6): each kit section next to the app at 1440 × 900, both clients. It produces a report row per section: match, accepted ruling, or a new BL item. | walkthrough |
+
+### 6.11 Stat-block window (DM only, OQ-KIT-04 B)
+
+The kit's "Goblin" card as a window you can roll from. The window is new; every roll goes through today's intents, and no new intent is added.
+
+| ID | Requirement | Test |
+|---|---|---|
+| FR-KIT-100 | **Window type `ent.statblock`** "Stat block", **DM registry only** (`src/client/dm/windows.ts`, append). Code lives in `src/client/dm/features/entities/statblock/`. `defaultOpen: false`, `restoreOpen: false` (a reload leaves it closed). Launcher entry "Stat block" at order 31 (after Creatures); a click on it while closed shows the last creature, or the empty state. Sizes per §7.3. | `FR-KIT-100 statblock registered` (DM yes, player no) |
+| FR-KIT-101 | **Openers** (each opens with `by: "user"` and brings the window to front, restoring it if minimised): (1) Initiative row ⋯ → **Stat block** (`cbt-init-row-statblock`), on monster rows; (2) the DM token menu's **Stat block** (FR-CMP-22, amended), for every monster token, imported or custom; (3) token **double-click** on a monster token, via a new `tokenDoubleClick` line after the companion entry (an owned companion still opens its card); (4) the compendium's monster entry: **Open at the table** (`cmp-statblock-open`, in `cmp-entry-actions`). | `FR-KIT-101 openers` |
+| FR-KIT-102 | **One reused window** (`ent.statblock:main`). Opening another creature replaces the content. The window title stays "Stat block"; the creature's name heads the body. | `FR-KIT-102 reused` |
+| FR-KIT-103 | **Card** (kit "Goblin"; same markup and slots as FR-KIT-77), top to bottom: the name (`ent-statblock-name`, name type) and an "In combat" chip while bound (`ent-statblock-combat`); the type line (`ent-statblock-type`: size, type, alignment when known); one ruled row (`ent-statblock-core`) "AC n · HP · Speed n ft" (HP = `HpBar` + cur / max while bound to a combatant, else max and formula); a six-column ability grid (`ent-statblock-ability` + `data-value` = `str` … `cha`: label, score, signed modifier); attack rows (`ent-statblock-attack` + `data-record-id` = attack id: name, "+4 · 1d6+2 slashing", then **Attack** / **Damage** / **Attack + damage** buttons `ent-statblock-roll-attack` / `-damage` / `-both`); traits and other actions (`ent-statblock-section`, collapsible) when the definition or its compendium entry has them; a footer link, **Open NPC sheet** (`ent-statblock-sheet`, custom definitions) or **Compendium entry** (`ent-statblock-compendium`, imported ones). Empty: `ent-statblock-empty` "Pick a creature: Initiative ⋯, a token, or the compendium". | `FR-KIT-103 card` |
+| FR-KIT-104 | **Binding:** opened from an Initiative row, or from a token bound to a combatant of the running encounter, the window is **bound** to that combatant; otherwise it is bound to the **definition**. When the combatant leaves the fight or the encounter ends, the window falls back to the definition (the chip goes, rolls become plain). HP updates live from the store. | `FR-KIT-104 binding` |
+| FR-KIT-105 | **Attack buttons, routed like the Initiative row's Attack ▸ and the companion card** (FR-CBT-74, FR-CHARX-64), reusing the row's attack pick. **Bound:** Attack → `cbt.attack {attackerId, attackId, rolls: "toHit"}`; Damage → `cbt.rollDamage {attackerId, attackId}` (a natural-20 crit per FR-CBT-74); Attack + damage → `cbt.attack {attackerId, attackId}`. The damage card opens in the DM popup as today. **Definition:** plain `dice.roll`, labelled "<name> — <attack> attack / damage", category `attack` / `damage`. Attack + damage sends the to-hit roll, then the damage roll (two entries, no card). The shared roll control applies (Shift / Ctrl, Alt to stage, physical-dice popover, the DM public switch per category). Disabled while not `live` or in flight (FR-CBT-29). **No new intent.** | `FR-KIT-105 attack routing` (stub `send`: names + payloads, bound vs definition) |
+| FR-KIT-106 | **Checks and saves:** each ability's modifier is its Check button (`ent-statblock-roll-check`) and a "Save +n" under it is its Save button (`ent-statblock-roll-save`), both with `data-value` = ability. Bound → `cbt.rollAbility {combatantId, kind, ability}` (as Initiative ⋯ Check ▸ / Save ▸); definition → `dice.roll` (categories `ability-check` / `saving-throw`). A definition without abilities shows no grid. | `FR-KIT-106 ability rolls` |
+| FR-KIT-107 | **Visibility:** DM only. Players have no window type, launcher entry, token-menu or compendium opener, and receive nothing new; the player bundle contains no `statblock` module (import-boundary test). Data: the DM's definitions in the snapshot for scene creatures; a compendium-opened monster uses the compendium's existing on-demand definition fetch. 0 B. | `FR-KIT-107 dm only`, boundary test |
+
+> **Pick: one reused window** (FR-KIT-102) over one window per creature. It has a single size-table row and a single placement, and the kit shows one card. To compare two creatures, use the compendium.
 
 ## 7. UI/UX notes
 
@@ -198,7 +218,7 @@ Per [visual-direction](../../design/visual-direction.md): the kit page is bindin
 
 ### 7.1 Screens (DM view / player view)
 
-- **DM:** the top bar (§6.2), Initiative with hover actions (§6.3), the Game log (§6.4), the top-centre notices and the damage popup (§6.5–6.6), dialogs (§6.7), and the Compendium, Creatures and Party Manager windows (§6.8–6.9).
+- **DM:** the top bar (§6.2), Initiative with hover actions (§6.3), the Game log (§6.4), the top-centre notices and the damage popup (§6.5–6.6), dialogs (§6.7), the Compendium, Creatures and Party Manager windows (§6.8–6.9), and the stat-block window (§6.11).
 - **Player:** the same top bar (title, status, chip), the player Initiative (§6.3, FR-KIT-26/30), the Game log, bottom-right notices with the turn card, the player card view, the sheet header, and Party status.
 - **States:** empty, loading and error keep today's components and copy. While disconnected, the windows stay usable as today, and the status pill reads "Reconnecting…".
 
@@ -209,22 +229,35 @@ Per [visual-direction](../../design/visual-direction.md): the kit page is bindin
  {accent:◆}{dim:┃}( M ) Mira {dim:◎ Ally}                18   {note:◌}  {dim:⚔ ⋯}
      {dim:┃}       {ok:██████████}{dim:░░} 38 / 44  +5   {dim:AC 16 · 0/30 ft}
 
- Game log row (≈ 30 px)
+ Game log row (40 px)
  ( M ) {strong:Mira} · Longbow attack vs Goblin        21:14  {ok:[ 29 ]} {warn:[ 16 ]}
 ```
 
 ### 7.3 Window geometry
 
-The size table is authoritative ([play-shell §7](../play-shell.md#7-uiux-notes), protocol §18 / §24). This spec prefers keeping sizes.
+The size table is authoritative ([play-shell §7](../play-shell.md#7-uiux-notes), protocol §18 / §24). This spec keeps sizes except where stated.
 
-| Window | Default / min today | After | Note for the placer, goldens and harness |
+**Where the geometry lands:** the launcher move and the `dice.log` height land together in **K5**, which runs right after K0 and alone. That means one golden and replay regeneration, and K1's 40-px rows land in the taller log. K7 adds `ent.statblock` later and regenerates the goldens for its own kind in its branch, as any new window does (FR-SHELL-61).
+
+| Window | Today (default @ 1280×720 / ×800 / 1440×900 / 1600×900; useful; min) | After | Note for the placer, goldens and harness |
 |---|---|---|---|
-| `cbt.initiative` DM / player | 400×500 / 320×240 · 280×400 / 240×200 | **unchanged** | Rows ≈ 46 px (today ≈ 50); useful criteria "header, controls, 4 rows" / "header + 4 rows" still hold (footer replaces the header button row) |
-| `dice.log` DM / player | 690×160 … 1150×240 / 300×160 | **unchanged** (OQ-KIT-02 A) | Useful 460×160 criterion becomes "**2** entries + roll bar" (30-px rows); sizes, goldens and harness are unchanged |
+| **Work area** | y 60 … vh − 76 (launcher bar at the bottom) | y 60 … **vh − 12** | Launcher in the top bar (FR-KIT-14). Player toast corner bottom (`LAUNCHER_CLEAR + STACK_GAP`) 72 → **20**: the corner rects move down 52 px; the DM top-centre box is unchanged |
+| `dice.log` DM ★ | 690×160 / 690×160 / 1150×240 / 1150×240; useful 460×160; min 300×160 | **690×200 / 690×200 / 1150×280 / 1150×280; useful 460×200**; min unchanged | Kit 40-px rows (OQ-KIT-02 B). Useful criterion "**2** entries + roll bar" (2.6 rows show) |
+| `dice.log` player ★ | 510×160 / 510×160 / 850×280 / 850×280; useful 460×160 | **510×200 / 510×200 / 850×320 / 850×320; useful 460×200** | Same |
+| Default layout: `dice.log` (x, y) | DM 68, 484 / 564 / 584 / 584; player 68, 484 / 564 / 544 / 544 | DM **68, 508 / 588 / 608 / 608**; player **68, 508 / 588 / 568 / 568** | y = vh − 12 − h. DM Initiative grows to the log's top − 12 (596 at 900 high; at 1280 to the work area's bottom as today) |
+| Bands (FR-SHELL-79) | DM 412 / 492 / 512 / 512; player 412 / 492 / 472 / 472 | DM **436 / 516 / 536 / 536**; player **436 / 516 / 496 / 496** | +24 everywhere (+64 work area − 40 log). Useful sizes are unchanged (all fit); `note.history`'s band cap follows `BANDS` |
+| `ent.statblock` DM (new) | — | **300×440** all four; useful **300×360** (`minOpenH` 360); min **280×240** | `top-left`, `dx` 56 (as the companion card); auto-placed per FR-SHELL-45 / -61; may be auto-minimised; no keep-out. Criterion: name, type line, core row, abilities, 2 attack rows with their buttons |
+| `cbt.initiative` DM / player | 400×500 / 280×400 | **unchanged** | Rows ≈ 46 px (today ≈ 50); the useful criteria still hold (the footer replaces the header's button row) |
 | `party.board` | 600×560 (440 mid-fight) / 340×360 | **unchanged** | Criterion "tab labels whole + 4 rows" becomes "+ 3 cards" (≈ 64 px cards) |
 | `cmp.compendium`, `ent.creatures`, `char.sheet`, `shell.prefs` | — | **unchanged** | Row heights within ±4 px of today |
 | Dialogs, damage popup (440), toast stack (320), roll popup (448) | not windows | **unchanged** | — |
-| **All windows, if OQ-KIT-01 A** | usable y 60 … vh − 76 | y 60 … **vh − 12** | The sprint-5 default layouts move the Game log down 64, so the bands above it (FR-SHELL-79) are recomputed (+64 where the useful sizes don't cap them). The player toast corner's bottom (`LAUNCHER_CLEAR + STACK_GAP`) goes from 72 to 20. Goldens (`windows.golden.json`, `windows.memory.golden.json`, both clients) regenerate once (`UPDATE_GOLDEN=1`, diff reviewed); the replay cells and `replay.failing.json` re-run; `useful-size.e2e.ts` is unchanged |
+
+- **K5 regenerates**, all at once with the diff reviewed:
+  - `SIZE_TABLE` and `BANDS` (`size-table.ts`);
+  - §7's sprint-5 default-layout table in play-shell (integrator, at merge);
+  - `windows.golden.json` and `windows.memory.golden.json` (both clients, `UPDATE_GOLDEN=1`);
+  - `replay-cells.generated.ts` (`UPDATE_CELLS=1`) and `replay.failing.json`.
+- **Re-run after K5:** `useful-size.e2e.ts`, with the new `dice.log` criterion.
 
 ### 7.4 Theme hooks (`data-slot`) and what gilt.css adds
 
@@ -239,7 +272,7 @@ The size table is authoritative ([play-shell §7](../play-shell.md#7-uiux-notes)
 | Damage popup | `card-bar`, `card-line`, `card-target`, `card-footer` | Window title bar + gem; target chips |
 | Dialog | `dialog-body` (+ existing `dialog-header`) | Header as a window title bar; bigger gem (T2 #7); framed `outline` buttons in `dialog-footer` |
 | Menus / select | (existing) | Highlight = left gold bar on a warm fill (T2 #6) |
-| Compendium | `cmp-table`, `cmp-row`, `statblock`, `statblock-abilities` | Table head in label type; zebra; stat block rules |
+| Compendium, stat-block window | `cmp-table`, `cmp-row`, `statblock`, `statblock-core`, `statblock-abilities`, `statblock-attack` | Table head in label type; zebra; stat block rules, ability labels in label type, small stone roll buttons |
 | Party / Creatures | `party-card` | Card gradient, AC mini shield |
 | Sheet header | `sheet-portrait`, `sheet-name` | Framed square portrait; name in name type |
 | Others (no markup) | — | Hue slider range shows the spectrum (T2 FAIL); Preferences headings in label type; window titles' slight emboss |
@@ -256,11 +289,13 @@ No server data, no new client store. 0 B.
 - **Read, already on the client:**
   - token `creatureType` (FR-KIT-24 / -84);
   - the character record's level, class and species (FR-KIT-82);
-  - the player colour of `byPlayerId` (FR-KIT-55).
+  - the player colour of `byPlayerId` (FR-KIT-55);
+  - the DM's creature definitions and combatants (FR-KIT-103 / -104).
+- **Client-only state:** the stat-block window's creature (`{combatantId}` or `{definitionId}`), in memory; it is lost on reload (`restoreOpen: false`).
 
 ## 9. API & events
 
-None. No REST, intents or events change.
+None. No REST, intents or events change. The stat-block window sends existing intents only: `cbt.attack`, `cbt.rollDamage`, `cbt.rollAbility`, `dice.roll` (FR-KIT-105 / -106).
 
 ## 10. Permissions
 
@@ -269,6 +304,7 @@ Unchanged. Every control keeps its server check; hover groups and menus change p
 | Action | DM | Player | Server check |
 |---|---|---|---|
 | Any control moved by this spec | as today | as today | as today |
+| Open the stat-block window, roll from it | ✓ | ✗ (no window type) | the existing intents' DM checks |
 
 ## 11. Edge cases & failure modes
 
@@ -278,6 +314,7 @@ Unchanged. Every control keeps its server check; hover groups and menus change p
 - **Held or hidden rolls:** no number or outcome leaks before landing (FR-KIT-44). Hidden entries stay DM-only, as today.
 - **Touch / no hover:** hover groups stay visible (FR-KIT-03).
 - **Reduced motion:** no new animation. The turn card appears without motion.
+- **Stat block:** if its combatant is removed or the encounter ends, it falls back to the definition (FR-KIT-104). A deleted definition or a failed fetch shows the empty state with the error line. A reconnect re-reads it from the store.
 
 ## 12. Performance & bandwidth
 
@@ -292,8 +329,8 @@ Isolated per worktree ([ADR-0008](../../architecture/adr/0008-parallel-dev-isola
 |---|---|---|
 | Unit / DOM | One test per FR, named `FR-KIT-NN …` (§6 Test column); pure: `rowAction`, `resultOutcome`, medallion source; DM vs player renders for FR-KIT-04 / -26 | in-code view models |
 | Existing | Every area's current tests stay green; a selector that now needs a hover / menu step is updated in the same slice and listed in its commit | — |
-| Geometry | Only K5 (if OQ-KIT-01 A): `FR-SHELL-62 golden layouts` regenerated, replay re-run, `theme-geometry.e2e.ts` | registry |
-| E2E (thin, ≤ 1 per slice) | K1 `kit-log.e2e.ts` (roll → row with medallion, time, box; hover → dice), K2 `kit-initiative.e2e.ts` (Next turn in the footer, hover ⋯ → Damage / heal), K3 `kit-notices.e2e.ts` (player approve toast inline action; damage popup Apply), K5 `theme-geometry` | bundle `kit-parity` |
+| Geometry | Only where sizes change. **K5:** `FR-SHELL-85 size table` (new `dice.log` rows, `BANDS`), `FR-SHELL-62 golden layouts` regenerated, replay re-run, `useful-size.e2e.ts`, `theme-geometry.e2e.ts`. **K7:** the `ent.statblock` row + its per-kind goldens, `FR-SHELL-61 every user-opened kind` | registry |
+| E2E (thin, ≤ 1 per slice) | K1 `kit-log.e2e.ts` (roll → row with medallion, time, box; hover → dice), K2 `kit-initiative.e2e.ts` (Next turn in the footer, hover ⋯ → Damage / heal), K3 `kit-notices.e2e.ts` (player approve toast inline action; damage popup Apply), K5 `theme-geometry` + `useful-size`, K7 `kit-statblock.e2e.ts` (Initiative ⋯ → Stat block → Attack + damage → the damage popup opens; the player page has no stat block) | bundle `kit-parity` |
 
 - **Bundle `kit-parity`** (new, composes existing units only; no new record type). It is `theme-gilt` (`base` + `char-mira` + a round-3 combat with 6 combatants + a goblin stat block) plus:
   - a crit attack + damage entry, a hidden DM roll and a held roll in the Game log;
@@ -302,6 +339,7 @@ Isolated per worktree ([ADR-0008](../../architecture/adr/0008-parallel-dev-isola
   - a concentration effect on Mira and a prone effect on the Dire Wolf;
   - SRD monsters for the compendium table.
 - **Walkthrough per slice** (test agent, verify profile, both themes, 1440 × 900 DM + `player-1`): one screenshot pair per kit piece the slice touches (`kit-<piece>.png` from the kit page vs `app-<piece>-<theme>.png`). The report rates each pair match / ruling / gap.
+- **K7 walkthrough:** the stat block opened from each of its four openers; Attack, Damage and Attack + damage bound (card in the popup) and unbound (plain log entries); a player page has no opener. Pair: kit "Goblin" card vs the app, both themes.
 - **K6 parity walkthrough:** every kit section (At the table, Notices, Damage card, Character sheet, Controls: buttons, inputs & chips, menus, dialog & popover, Compendium, More pieces, Type, Palette) side by side. It ends with a gap list for the DM.
 
 ## 14. Dependencies
@@ -309,11 +347,12 @@ Isolated per worktree ([ADR-0008](../../architecture/adr/0008-parallel-dev-isola
 | On | What we need | Status |
 |---|---|---|
 | [theme-system](theme-system.md) T2 `build/theme-gilt` | `gilt.css` exists (the paint layer); T3 `fix/theme-default` (Gilt & Stone default, "Simple Dark") is independent | T2 merging (#355) |
-| [play-shell](../play-shell.md) | Launcher placement and work area (OQ-KIT-01, [proposed ADR](../../architecture/adr/proposed-launcher-in-top-bar.md)); size-table criteria for `dice.log` and `party.board` (§7.3) | open → OQ-KIT-01, -02 |
-| [dice-roll-log](../dice-roll-log.md) | FR-DICE-20 line layout → row layout; FR-DICE-93 copy via handler (OQ-KIT-06) | open → OQ-KIT-06 |
-| [combat-tracker](../combat-tracker.md) | Initiative header/footer/rows; End-encounter copy; damage popup layout | via this spec |
+| [play-shell](../play-shell.md) | Launcher in the top bar and the new work area ([ADR](../../architecture/adr/proposed-launcher-in-top-bar.md), accepted); `dice.log` sizes, bands, default layouts and criteria (§7.3); the `ent.statblock` row | decided (OQ-KIT-01, -02); integrator amends play-shell §7 at merge |
+| [dice-roll-log](../dice-roll-log.md) | FR-DICE-20 line layout → row layout; FR-DICE-93 copy via handler (OQ-KIT-06 A) | decided |
+| [combat-tracker](../combat-tracker.md) | Initiative header/footer/rows; End-encounter copy; damage popup layout; the Stat block row-menu item; attack routing reused (FR-CBT-74) | via this spec |
+| [entities](../entities.md), [scenes-map](../scenes-map.md) | `ent.statblock` window; a `tokenDoubleClick` line (FR-MAP-29, append) | via this spec |
 | [notifications](../notifications.md) | Card row, relative time, turn card (OQ-KIT-03) | via this spec |
-| [compendium](../compendium.md) | Table rows (OQ-KIT-05), stat block card | via this spec |
+| [compendium](../compendium.md) | Table rows (OQ-KIT-05 A), stat block card, "Open at the table"; FR-CMP-22's token entry now opens `ent.statblock` | via this spec |
 | [character-sheet-full](../character-sheet-full.md) | Header (FR-KIT-85) on top of FR-CHARX-48 | via this spec |
 | [campaign-management](../campaign-management.md), [live-sync](../live-sync.md) | Switcher as a menu (FR-KIT-11), status pill text "Live" (FR-KIT-13) | via this spec |
 | Shared UI (AGENTS §9.9) | `overlays.tsx` (dialog bar), `button.tsx` / `menus.tsx` / `controls.tsx` (`data-variant`), `gilt.css` | orchestrator (K0; OQ-KIT-10) |
@@ -323,46 +362,48 @@ Isolated per worktree ([ADR-0008](../../architecture/adr/0008-parallel-dev-isola
 | # | Branch | Does | Folders | After |
 |---|---|---|---|---|
 | K0 | `fix/kit-parts` | Kit parts; `data-variant` (BL-127); dialog title bar (FR-KIT-70/71); gilt.css: parts, dialog, menus, hue-slider fix | `components/kit/` (new), ★ `components/ui/*`, ★ `themes/gilt.css` | T2 |
-| K1 | `build/kit-log` | Game log rows, copy, re-pin; roll popup totals (§6.4) | `common/features/dice-roll-log/`, `dice-extras/RollPopup.tsx`, `src/shared/dice-roll-log/` | K0 |
-| K2 | `build/kit-initiative` | DM + player Initiative (§6.3); End-encounter copy (FR-KIT-72) | `*/features/combat-tracker/initiative-window.tsx`, `common/features/combat-tracker/parts.tsx`, `combat-extras/parts.tsx` | K0 (beside K1) |
+| K5 | `build/kit-topbar` | **All geometry, once:** launcher in the top bar, work area, `dice.log` +40, bands, toast corner; goldens + replay regenerated. Also top bar zones, campaign menu, status pill (§6.2) | `play-shell/` (★ frame, `Launcher.tsx`, `geometry.ts`, `toast-region.ts`, `size-table.ts`, goldens, replay cells), `campaign-management/CampaignBar.tsx`, `live-sync/ConnectionStatus.tsx` | K0; **runs alone** |
+| K1 | `build/kit-log` | Game log 40-px rows, copy, re-pin; roll popup totals (§6.4) | `common/features/dice-roll-log/`, `dice-extras/RollPopup.tsx`, `src/shared/dice-roll-log/` | K5 |
+| K2 | `build/kit-initiative` | DM + player Initiative (§6.3); End-encounter copy (FR-KIT-72) | `*/features/combat-tracker/initiative-window.tsx`, `common/features/combat-tracker/parts.tsx`, `combat-extras/parts.tsx` | K5 (beside K1) |
 | K3 | `build/kit-notices` | Toast cards, summary, turn card; damage popup + player card view (§6.5–6.6) | `common/features/notifications/`, `dm/features/combat-tracker/attack-popup.tsx`, `player/.../card-view.tsx`, `turn-alert-runtime.tsx` | K2 |
-| K4 | `build/kit-library` | Compendium table + stat block; Party status cards; Creatures medallions; sheet header (§6.8–6.9) | `compendium/`, `party-board/`, `dm/features/entities/`, `character-sheet/SheetView.tsx` | K0 (beside K3) |
-| K5 | `build/kit-topbar` | Top bar zones, campaign menu, status pill; launcher move if OQ-KIT-01 A, with goldens + replay regenerated | `play-shell/` (★ frame, `Launcher.tsx`, `geometry.ts`, `toast-region.ts`), `campaign-management/CampaignBar.tsx`, `live-sync/ConnectionStatus.tsx` | K1–K4 merged; **runs alone** (golden regen) |
-| K6 | `test/kit-parity` | Parity walkthrough (FR-KIT-94); BL items for the gaps left | `.verify/` only | K5 |
+| K4 | `build/kit-library` | Compendium table + stat block card; Party status cards; Creatures medallions; sheet header (§6.8–6.9) | `compendium/`, `party-board/`, `dm/features/entities/` (rows), `character-sheet/SheetView.tsx` | K1 (beside K3) |
+| K7 | `build/kit-statblock` | `ent.statblock` window, openers, routing (§6.11); its size row + per-kind goldens | `dm/features/entities/statblock/` (new), append lines: `dm/windows.ts`, `size-table.ts`, `token-menu.ts` (double-click), Initiative row menu, `cmp` entry actions + token entry | K0, K2 (row menu) and K4 (card markup); beside K3 or after it |
+| K6 | `test/kit-parity` | Parity walkthrough (FR-KIT-94) incl. the stat block; BL items for the gaps left | `.verify/` only | all |
 
 Each slice appends its own `/* KIT: <area> */` block to `gilt.css` (OQ-KIT-10).
 
 ```mermaid
 flowchart LR
   T2[T2 gilt.css] --> K0
-  K0 --> K1 & K2
+  K0 --> K5[K5 geometry + top bar, alone]
+  K5 --> K1 & K2
   K2 --> K3
-  K0 --> K4
-  K1 & K3 & K4 --> K5[K5 top bar, alone]
-  K5 --> K6[K6 parity walkthrough]
+  K1 --> K4
+  K2 & K4 --> K7[K7 stat block]
+  K3 & K7 --> K6[K6 parity walkthrough]
 ```
 
 ## 15. Open questions
 
-**Bold** option = suggested pick (not decided).
+All decided 2026-10-26 (DM: 01–04; orchestrator: 05–11).
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-KIT-01 | **Launcher place.** The kit centres the launcher in the 48 px top bar; play-shell keeps it bottom-centre (and visual-direction lists a "bottom action bar" motif) | **A: move it into the top bar**, as the kit and concept art show (+64 px of map height; more buttons go to "⋯" at 1280; every default layout and golden regenerates once, K5) · B: keep it at the bottom; the top bar takes only the title and status changes · C: B now, A as a later slice | yes (K5 only) | play-shell, notifications (player corner), [proposed ADR](../../architecture/adr/proposed-launcher-in-top-bar.md) |
-| OQ-KIT-02 | Game log rows: the kit's ≈ 40-px rows show fewer entries in today's 160-px log | **A: 30-px rows (medallion 28, box 22 px high), sizes kept, useful criterion "2 entries"** · B: kit 40-px rows, `dice.log` +40 px tall everywhere (bands shrink, goldens regenerate) · C: container query: kit rows when the list is ≥ 200 px tall, else today's inline line | no | play-shell size table, dice-roll-log |
-| OQ-KIT-03 | DM turn card ("Mira's turn" in the kit's DM stack) | **A: client-derived card at the top of the DM stack for 4 s on each turn change** (0 B, from the combat state) · B: players only (their existing turn alert) · C: none | no (owner: DM) | notifications, combat-tracker |
-| OQ-KIT-04 | The kit's "Goblin" stat-block window at the table (with Attack / Damage buttons) | **A: the compendium stat block takes the kit card now; a rollable stat-block window is a later feature spec** · B: a new DM window `ent.statblock` (from an Initiative row / token menu) with roll buttons in this track | no (owner: DM) | entities, compendium, combat-tracker |
-| OQ-KIT-05 | Compendium table columns | **A: Name · Details · Source from today's fields (0 B)** · B: real CR / AC / HP columns for monsters (+≈ 24 B per search row) | no | compendium |
-| OQ-KIT-06 | FR-DICE-93 (a row's text = its copied line) no longer holds once details move to hover | **A: a copy handler writes `lineText` per selected row** · B: the full line stays in the DOM, visually hidden | no | dice-roll-log |
-| OQ-KIT-07 | Initiative AC and movement: the kit shows neither | **A: muted tail on the HP line, into the row Tooltip when it doesn't fit** · B: always in the Tooltip | no | combat-tracker |
-| OQ-KIT-08 | End encounter, Add…, Summon…: the kit header has no buttons | **A: a window ⋯ menu** · B: keep End encounter as a small header text button | no | combat-tracker |
-| OQ-KIT-09 | Glossary: **Medallion** ("a round portrait: image, else initial on a colour") and **Result box** ("a boxed roll total coloured by outcome") | **A: add** · B: describe in specs only | no | glossary |
-| OQ-KIT-10 | `gilt.css` is a shared file; several slices add to it | **A: append-only `/* KIT: <area> */` blocks, one per slice** · B: one final gilt slice after K5 | no | orchestrator, AGENTS §9.9 |
-| OQ-KIT-11 | Damage card targets: the kit has target chips plus one Full / Half / Double for all; the app has a multiplier per target | **A: keep per-target rows, kit look** · B: the kit's single multiplier (a behaviour change) | no | combat-tracker |
+| OQ-KIT-01 | **Launcher place.** The kit centres the launcher in the 48 px top bar; play-shell keeps it bottom-centre (and visual-direction lists a "bottom action bar" motif) | **Decided (DM): A**, move it into the top bar (FR-KIT-14; the [ADR](../../architecture/adr/proposed-launcher-in-top-bar.md) is accepted and the integrator numbers it) · ~~B: keep it at the bottom~~ · ~~C: B now, A later~~ | decided | play-shell, notifications (player corner) |
+| OQ-KIT-02 | Game log rows: the kit's ≈ 40-px rows show fewer entries in today's 160-px log | ~~A: 30-px rows, sizes kept~~ · **Decided (DM): B**, kit 40-px rows; `dice.log` +40 px tall everywhere, landing in K5 with the launcher move (§7.3) · ~~C: container query~~ | decided | play-shell size table, dice-roll-log |
+| OQ-KIT-03 | DM turn card ("Mira's turn" in the kit's DM stack) | **Decided (DM): A**, a client-derived card at the top of the DM stack for 4 s on each turn change (0 B, from the combat state) · ~~B: players only~~ · ~~C: none~~ | decided | notifications, combat-tracker |
+| OQ-KIT-04 | The kit's "Goblin" stat-block window at the table (with Attack / Damage buttons) | ~~A: compendium card now, window later~~ · **Decided (DM): B**, a rollable DM window `ent.statblock` now (§6.11, slice K7) | decided | entities, compendium, combat-tracker, scenes-map |
+| OQ-KIT-05 | Compendium table columns | **Decided: A**, Name · Details · Source from today's fields (0 B) · ~~B: CR / AC / HP columns~~ | decided | compendium |
+| OQ-KIT-06 | FR-DICE-93 (a row's text = its copied line) no longer holds once details move to hover | **Decided: A**, a copy handler writes `lineText` per selected row · ~~B: hidden full line~~ | decided | dice-roll-log |
+| OQ-KIT-07 | Initiative AC and movement: the kit shows neither | **Decided: A**, a muted tail on the HP line, into the row Tooltip when it doesn't fit · ~~B: always in the Tooltip~~ | decided | combat-tracker |
+| OQ-KIT-08 | End encounter, Add…, Summon…: the kit header has no buttons | **Decided: A**, a window ⋯ menu · ~~B: header text button~~ | decided | combat-tracker |
+| OQ-KIT-09 | Glossary: **Medallion** ("a round portrait: image, else initial on a colour") and **Result box** ("a boxed roll total coloured by outcome") | **Decided: A**, add (integrator, at merge) · ~~B: specs only~~ | decided | glossary |
+| OQ-KIT-10 | `gilt.css` is a shared file; several slices add to it | **Decided: A**, append-only `/* KIT: <area> */` blocks, one per slice · ~~B: one final gilt slice~~ | decided | orchestrator, AGENTS §9.9 |
+| OQ-KIT-11 | Damage card targets: the kit has target chips plus one Full / Half / Double for all; the app has a multiplier per target | **Decided: A**, keep per-target rows in the kit look · ~~B: single multiplier~~ | decided | combat-tracker |
 
 ## 16. Out of scope
 
-- A rollable stat-block window (OQ-KIT-04 B), auto-advance, chat: later feature specs.
+- Auto-advance and chat: later feature specs. More than one stat-block window at once (FR-KIT-102).
 - Portrait art in medallions beyond today's assets (the concept art's painted faces).
-- The bottom action bar and portrait strip motifs (visual-direction), if OQ-KIT-01 goes B or C.
+- The portrait strip motif (visual-direction); the "bottom action bar" motif is retired by OQ-KIT-01 A.
 - Map canvas, token art and 3D dice looks ([theme-system](theme-system.md) OQ-THEME-09).
