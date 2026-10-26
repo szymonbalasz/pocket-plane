@@ -126,11 +126,12 @@ Gate 1 #339 (ADRs 0064–0068).
 
 ## Art track (2026-10-25)
 
-DM picks #351 (ADR-0069). Look: the Gilt & Stone kit page [gilt-stone.html](../design/art/kit/gilt-stone.html); art sources in [design/art](../design/art/README.md).
+DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit parity, ADR-0070). Look: the Gilt & Stone kit page [gilt-stone.html](../design/art/kit/gilt-stone.html); art sources in [design/art](../design/art/README.md).
 
 | Spec | Prefix | Status | Owner |
 |---|---|---|---|
 | [Theme system](post-mvp/theme-system.md) (Default + Gilt & Stone, per-browser switch in Preferences, bundled fonts) | THEME | complete | spec-theme-system |
+| [Kit parity](post-mvp/kit-parity.md) (the Gilt & Stone mockup: Game log / Initiative rows, top bar with the launcher, notices, damage card, compendium, Party status, stat-block window; ADR-0070) | KIT | complete | spec-kit-parity |
 | [Character sheet full](character-sheet-full.md) (printed sheet layout, both themes, FR-CHARX-105–120; OQ-CHARX-47–50 decided A, #352) | CHARX | complete | spec-charx-print-sheet |
 
 ## Post-MVP
