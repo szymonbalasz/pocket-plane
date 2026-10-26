@@ -94,7 +94,7 @@ describe("BL-45 FR-DICE-32 no silent Roll in the physical form", () => {
     const marked = renderToStaticMarkup(
       <PartGroup form={form} inputs={{}} problem={r.problem} onChange={() => {}} />,
     );
-    expect(marked).toContain('data-testid="mod-tray-group" data-value="t:trg" data-slot="1"');
+    expect(marked).toContain('data-testid="mod-tray-group" data-value="t:trg" data-die-slot="1"');
     expect(marked).toContain('data-state="invalid"');
     expect(marked).toMatch(/data-testid="mod-tray-group-total"[^>]*aria-invalid="true"/);
     const plain = renderToStaticMarkup(

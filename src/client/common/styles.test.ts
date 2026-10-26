@@ -70,7 +70,8 @@ describe("FR-THEME-19 no raw palette classes", () => {
 async function compiler() {
   const css = readFileSync(join(ROOT, "src/client/common/styles.css"), "utf8");
   return compile(css, {
-    base: ROOT,
+    // styles.css's own folder: its relative `@import` (themes/fonts.css) resolves from there.
+    base: join(ROOT, "src/client/common"),
     loadStylesheet: async (id: string, base: string) => {
       const path =
         id === "tailwindcss"

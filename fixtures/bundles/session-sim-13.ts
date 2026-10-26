@@ -34,5 +34,6 @@ export default defineBundle({
     // X1 (sprint 12, DM #353): toast fold before paint, request headings, one pending count,
     // BL-118 / BL-119 / BL-120 (no unit: client-only)
     // CS (sprint 12, DM #353): printed sheet layout, FR-CHARX-105–120 (no unit: layout only)
+    // T1 (sprint 12, DM #353): theme switch (no unit: client-only, browser storage)
   ],
 });

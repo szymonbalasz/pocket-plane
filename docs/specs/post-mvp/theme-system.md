@@ -107,6 +107,14 @@ No server data.
 > - A caller's own `data-slot` wins over the part's (shadcn order), so the sheet's `sheet-*` slots (FR-CHARX-119) hold on Buttons. Triggers, closes and the anchor add no slot when `asChild`: the child keeps its own (a Button child stays `button`). The dice tray already passes numeric `data-slot` values to some `Input`s (`roll-control.tsx`); those inputs are not `input` to a theme.
 > - **Tokens added with today's values** (`styles.css`): themeable: `--destructive-foreground` (#fff), `--overlay` (#000, scrims at /40 and /60), `--caution` / `--caution-foreground` (amber-500 / -400), `--positive` / `--positive-foreground` (emerald-500 / -400). Meaning, not themed (FR-THEME-09): `--hp-temp` (sky-400), `--hp-down-foreground` (#fff), `--swatch-ink` (#000, the check mark and ring on a player-colour swatch). Test `FR-THEME-19 swapped classes keep their computed colour`.
 
+> **T1 note (2026-10-25, `build/theme-switch`):**
+> - **Scope of a theme's tokens:** the gilt block is `[data-theme="gilt"] body, body [data-theme="gilt"]`, so `<html>` keeps Default's tokens. The map canvas reads its colours from `<html>` (`scenes-map/theme.ts`), so it stays unthemed (OQ-THEME-09 A) and its selection outline stays white (FR-CAMP-31 (b)). Body font: `body { font-family: var(--font-body) }`.
+> - **Tokens beyond §8:** `--frame-corner` is the kit's top-left piece; `--frame-corner-tr`, `-bl`, `-br` hold the other three (a background can't mirror one image). Gilt keeps Default's `--destructive`, `--overlay`, `--caution*`, `--positive*`, `--success`, `--warning` (the danger red FR-CAMP-31 measures stays one value).
+> - **Previews:** an element with `data-theme="<id>"` draws that theme (the Appearance swatches). A gilt preview inside another theme uses the fallback fonts only, so the web fonts still download only while gilt is on (FR-THEME-16).
+> - **Default's gem** (`--gem`, `-deep`, `-hi`) = `var(--primary)`: Default has no gem, and its preview accent must not read as the danger red (orchestrator ruling).
+> - **Appearance** is order 15 (after "Your colour"); cards are toggle buttons (`aria-pressed`). Fonts: 6 files, 197 KB (EB Garamond is one variable file for 500–700).
+> - **Dice tray:** its die-slot attribute is now `data-die-slot` (`roll-control.tsx`), so every `Input` there is `data-slot="input"` again.
+
 ## 9. API & events
 
 None. No REST, intents or events; 0 bytes on the wire.

@@ -6,6 +6,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="referrer" content="no-referrer" />
     <title>Pocket Plane</title>
+    <script>
+      // Theme before first paint (theme-system FR-THEME-01, -04; store: @ui/themes/theme.ts):
+      // `pp.theme.v1` = {"theme": "<id>"}; Default = no attribute; unreadable → Default + warning.
+      (() => {
+        try {
+          const raw = localStorage.getItem("pp.theme.v1");
+          if (raw === null) return;
+          const theme = JSON.parse(raw).theme;
+          if (!["default", "gilt"].includes(theme)) throw new Error(`unknown theme ${theme}`);
+          if (theme !== "default") document.documentElement.setAttribute("data-theme", theme);
+        } catch (err) {
+          console.warn("theme: stored choice unreadable; using Default", err);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

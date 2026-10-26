@@ -204,7 +204,9 @@ describe("FR-MOD-18 physical groups → manualParts", () => {
       <ManualForm control={{ ...c, manual: { mode: "normal" } }} />,
       withEffects(BLESS),
     );
-    expect(html).toContain('data-testid="mod-tray-group" data-value="e:fx-bless" data-slot="0"');
+    expect(html).toContain(
+      'data-testid="mod-tray-group" data-value="e:fx-bless" data-die-slot="0"',
+    );
     expect(html).toContain('data-testid="mod-tray-group-total" data-value="e:fx-bless"');
     expect(html).toContain("Bless: <code>1d4</code>");
     expect(html).toContain('data-testid="mod-roll-parts"');
@@ -364,7 +366,7 @@ describe("FR-MOD-18 physical groups → manualParts", () => {
     const html = render(<ManualForm control={{ ...c, manual: { mode: "normal" } }} />, {});
     expect(html).toContain("Mark: <code>1d6</code>");
     expect(html).toContain(
-      'data-testid="mod-tray-group-crit-label" data-value="e:fx-hm" data-slot="0" class="min-w-0 flex-1 truncate text-xs text-muted-foreground">Extra critical dice: 1d6',
+      'data-testid="mod-tray-group-crit-label" data-value="e:fx-hm" data-die-slot="0" class="min-w-0 flex-1 truncate text-xs text-muted-foreground">Extra critical dice: 1d6',
     );
   });
 });

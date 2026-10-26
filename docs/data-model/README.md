@@ -2637,3 +2637,14 @@ From [combat-tracker](../specs/combat-tracker.md#6-functional-requirements) FR-C
 - **Derived (client, not stored):** the skip cue's down in-turn companions (from the DM's combatant rows at send time); the Dice tray's state before the last stage (page memory, for putting it back after a prompt answer).
 - **Fixtures:** unit `f3-down-companions` (Goblin 2, Mira's charmed `after-owner` companion, 4 → 0; Brakka's `in-owner-turn` Drake Companion 22 → 0; still the Wolf's turn); unit `f3-request-perception` (a second open request: public Perception, Mira only); bundles `f3-combat-dice` (= `fu-s7` + both + `h1-request-insight`; walkthrough), `f3-skip-e2e` (= `fu-s7` + `f3-down-companions`), `f3-prompt-tray-e2e` (= `dice-display` + `h1-request-insight` + `f3-request-perception`). Not in `session-sim-13`: `f3-down-companions` changes existing HP.
 - **CON-44: 0 B.**
+
+## 131. Sprint 12: theme switch (T1)
+
+From [theme-system](../specs/post-mvp/theme-system.md#8-data-model) §8 (DM #351, #353). **Built by `build/theme-switch`**. Protocol side: [protocol §167](../protocol/README.md#167-sprint-12-theme-switch-t1). **No table, column, record type or wire field.**
+
+| Browser state | Store | Rule | Source |
+|---|---|---|---|
+| Theme | `localStorage` `pp.theme.v1` = `{theme: "default" \| "gilt"}` (zod `ThemePref`); per browser, shared by both clients and every campaign; never sent | missing / invalid / blocked → `default` (the boot script warns once); a blocked write → page memory, one warning; the new key OQ-THEME-08 A allows (FR-SHELL-76) | FR-THEME-03 |
+
+- **Derived (client, not stored):** `data-theme` on `<html>` (none for Default), from the entry at boot and on each pick.
+- **Fixtures:** none.
