@@ -275,9 +275,10 @@ describe("FR-THEME-10 – -15 parts", () => {
     ).toBe(true);
   });
 
-  test("FR-THEME-13 toasts: notification cards, the damage-card popup and sonner framed like a small window, no corner pieces", () => {
+  test("FR-THEME-13 toasts: notification cards, alert toasts, the damage-card popup and sonner framed like a small window, no corner pieces", () => {
     for (const t of [
       '[data-testid="note-toast"]',
+      '[data-class="alert"]',
       '[data-testid="cbt-popup"]',
       '[data-testid="dicex-popup"]',
       "[data-sonner-toast]",
@@ -287,6 +288,8 @@ describe("FR-THEME-10 – -15 parts", () => {
       ).toBe(true);
       expect(has(t, "background-image", /--frame-corner/)).toBe(false);
     }
+    // #159: alert toasts take the notification cards' black edge too (one toast surface).
+    expect(has('[data-class="alert"]', "border-color", /^#000$/)).toBe(true);
   });
 
   test("FR-THEME-10 FR-THEME-11 kit details (walkthrough fixes): tool rail framed like a window, menu highlight a gold bar, dialog gem at the kit's size and a stone Cancel, sheet saves / senses / portrait, damage-card dice in the number face", () => {
