@@ -137,11 +137,12 @@ test("FR-SHELL-14 player default layout (#162): sheet top-right, Initiative at a
   }
 });
 
-test("FR-SHELL-54 player map-first: battlemap uncovered ≥ 54% at 1440×900, ≥ 65% at 1280×720 (sheet, log and Initiative open)", () => {
-  // K5 (OQ-KIT-02 B): the Game log 40 px taller covers about 1 point more at 1440×900 (55 → 54).
+test("FR-SHELL-54 player map-first: battlemap uncovered ≥ 54% at 1440×900, ≥ 62% at 1280×720 (sheet, log and Initiative open)", () => {
+  // K5 (OQ-KIT-02 B, FR-KIT-14): the Game log 40 px taller (55 → 54 at 1440×900); at 1280×720
+  // also the sheet fitted 390 high above the lower toast corner (was 338): 65 → 62.
   for (const [viewport, min] of [
     [WIDE, 0.54],
-    [LAPTOP, 0.65],
+    [LAPTOP, 0.62],
   ] as const) {
     // The `battlemap` fixture's map (20 × 14 cells at 70 px); the gated Initiative counts (combat).
     const map = fittedMapRect({ w: 1400, h: 980 }, viewport);

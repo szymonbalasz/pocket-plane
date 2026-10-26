@@ -62,7 +62,7 @@ const PARTY_MANAGER: Case = {
     .join(", "),
 };
 
-/** §7 sprint-8 useful sizes at 1280×720 (band 412). */
+/** §7 sprint-8 useful sizes at 1280×720 (band 436 since K5). */
 const DM: Case[] = [
   {
     kind: "cbt.initiative",
@@ -72,9 +72,9 @@ const DM: Case[] = [
   },
   {
     kind: "dice.log",
-    useful: { w: 460, h: 160 },
-    criterion: "3 one-line entries + roll bar",
-    check: 3,
+    useful: { w: 460, h: 200 },
+    criterion: "2 entries + roll bar",
+    check: 2,
   },
   {
     kind: "cmp.compendium",
@@ -129,9 +129,9 @@ const PLAYER: Case[] = [
   { kind: "cbt.initiative", useful: { w: 280, h: 320 }, criterion: "header + 4 rows", check: 4 },
   {
     kind: "dice.log",
-    useful: { w: 460, h: 160 },
-    criterion: "3 one-line entries + roll bar",
-    check: 3,
+    useful: { w: 460, h: 200 },
+    criterion: "2 entries + roll bar",
+    check: 2,
   },
   {
     kind: "cmp.compendium",

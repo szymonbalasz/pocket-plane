@@ -109,12 +109,12 @@ test("FR-MAP-80 fit without the empty box: DM Fit at 1440×900 and 1280×720 wit
     await expect(canvas).toHaveAttribute("data-fit-visible", "all");
     const cell = Number(await canvas.getAttribute("data-cell-px"));
     cells.push(`${size.width}×${size.height}: ${cell} px`);
-    const launcher = await dm.getByTestId("ui-launcher").boundingBox();
+    // The work area right of the rail: to 12 px above the bottom edge (FR-KIT-14).
     const area = {
       x: RAIL_CLEAR,
       y: TOP_BAR_H,
       w: size.width - RAIL_CLEAR,
-      h: (launcher?.y ?? size.height) - TOP_BAR_H,
+      h: size.height - 12 - TOP_BAR_H,
     };
     const windows = await shownWindows(dm);
     const home = strip(size.width);

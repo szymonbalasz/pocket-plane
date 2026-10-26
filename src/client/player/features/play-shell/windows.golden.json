@@ -1,889 +1,889 @@
 [
   {
     "at": "open @1600×900 note.history",
-    "rect": "772,60,360×480",
+    "rect": "774,76,360×480",
     "placed": "auto",
     "parked": ""
   },
   {
     "at": "open @1600×900 dicex.tray",
-    "rect": "708,157,450×375",
+    "rect": "540,568,450×320",
+    "placed": "auto",
+    "parked": ""
+  },
+  {
+    "at": "open @1600×900 party.board",
+    "rect": "656,60,600×496",
     "placed": "auto",
     "parked": "note.history"
   },
   {
-    "at": "open @1600×900 party.board",
-    "rect": "656,60,600×472",
-    "placed": "auto",
-    "parked": "dicex.tray"
-  },
-  {
     "at": "open @1600×900 cmp.compendium",
-    "rect": "708,60,440×472",
+    "rect": "590,472,440×416",
     "placed": "auto",
-    "parked": "party.board"
+    "parked": "dicex.tray,party.board"
   },
   {
     "at": "open @1600×900 shell.prefs",
-    "rect": "764,60,360×472",
+    "rect": "774,60,360×400",
+    "placed": "auto",
+    "parked": ""
+  },
+  {
+    "at": "open @1600×900 charx.companion",
+    "rect": "590,472,320×360",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
   {
-    "at": "open @1600×900 charx.companion",
-    "rect": "848,172,320×360",
+    "at": "open @1600×900 stats.board",
+    "rect": "718,60,400×360",
     "placed": "auto",
     "parked": "shell.prefs"
   },
   {
-    "at": "open @1600×900 stats.board",
-    "rect": "708,60,400×412",
+    "at": "open @1600×900 hold.stronghold",
+    "rect": "638,472,480×416",
     "placed": "auto",
     "parked": "charx.companion"
   },
   {
-    "at": "open @1600×900 hold.stronghold",
-    "rect": "688,60,480×472",
+    "at": "open @1600×900 cmp.rules",
+    "rect": "678,60,440×360",
     "placed": "auto",
     "parked": "stats.board"
   },
   {
-    "at": "open @1600×900 cmp.rules",
-    "rect": "708,60,440×472",
+    "at": "open @1600×900 recap.session",
+    "rect": "590,472,440×416",
     "placed": "auto",
     "parked": "hold.stronghold"
   },
   {
-    "at": "open @1600×900 recap.session",
-    "rect": "708,60,440×472",
-    "placed": "auto",
-    "parked": "cmp.rules"
-  },
-  {
     "at": "reopen @1600×900 note.history",
-    "rect": "772,60,360×480",
+    "rect": "774,76,360×480",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "reopen @1600×900 dicex.tray",
-    "rect": "708,157,450×375",
+    "rect": "540,568,450×320",
+    "placed": "reopened",
+    "parked": ""
+  },
+  {
+    "at": "reopen @1600×900 party.board",
+    "rect": "656,60,600×496",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
-    "at": "reopen @1600×900 party.board",
-    "rect": "656,60,600×472",
-    "placed": "reopened",
-    "parked": "dicex.tray"
-  },
-  {
     "at": "reopen @1600×900 cmp.compendium",
-    "rect": "708,60,440×472",
+    "rect": "590,472,440×416",
     "placed": "reopened",
-    "parked": "party.board"
+    "parked": "dicex.tray,party.board"
   },
   {
     "at": "reopen @1600×900 shell.prefs",
-    "rect": "764,60,360×472",
+    "rect": "774,60,360×400",
+    "placed": "stored",
+    "parked": ""
+  },
+  {
+    "at": "reopen @1600×900 charx.companion",
+    "rect": "590,472,320×360",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
-    "at": "reopen @1600×900 charx.companion",
-    "rect": "848,172,320×360",
+    "at": "reopen @1600×900 stats.board",
+    "rect": "718,60,400×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
-    "at": "reopen @1600×900 stats.board",
-    "rect": "708,60,400×412",
+    "at": "reopen @1600×900 hold.stronghold",
+    "rect": "638,472,480×416",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
-    "at": "reopen @1600×900 hold.stronghold",
-    "rect": "688,60,480×472",
+    "at": "reopen @1600×900 cmp.rules",
+    "rect": "678,60,440×360",
     "placed": "reopened",
     "parked": "stats.board"
   },
   {
-    "at": "reopen @1600×900 cmp.rules",
-    "rect": "708,60,440×472",
+    "at": "reopen @1600×900 recap.session",
+    "rect": "590,472,440×416",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
-    "at": "reopen @1600×900 recap.session",
-    "rect": "708,60,440×472",
-    "placed": "reopened",
-    "parked": "cmp.rules"
-  },
-  {
     "at": "reopen 1440×900 @1440×900 note.history",
-    "rect": "612,60,360×480",
+    "rect": "604,76,360×480",
     "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1440×900 @1440×900 dicex.tray",
-    "rect": "548,157,450×375",
+    "rect": "540,588,450×300",
+    "placed": "reopened",
+    "parked": ""
+  },
+  {
+    "at": "reopen 1440×900 @1440×900 party.board",
+    "rect": "496,60,600×496",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
-    "at": "reopen 1440×900 @1440×900 party.board",
-    "rect": "496,60,600×472",
-    "placed": "reopened",
-    "parked": "dicex.tray"
-  },
-  {
     "at": "reopen 1440×900 @1440×900 cmp.compendium",
-    "rect": "548,60,440×472",
+    "rect": "540,328,440×560",
     "placed": "reopened",
-    "parked": "party.board"
+    "parked": "dicex.tray,party.board"
   },
   {
     "at": "reopen 1440×900 @1440×900 shell.prefs",
-    "rect": "604,60,360×472",
+    "rect": "604,456,360×432",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1440×900 @1440×900 charx.companion",
-    "rect": "688,172,320×360",
+    "rect": "644,60,320×360",
+    "placed": "reopened",
+    "parked": ""
+  },
+  {
+    "at": "reopen 1440×900 @1440×900 stats.board",
+    "rect": "540,456,400×412",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
-    "at": "reopen 1440×900 @1440×900 stats.board",
-    "rect": "548,60,400×412",
-    "placed": "reopened",
-    "parked": "charx.companion"
-  },
-  {
     "at": "reopen 1440×900 @1440×900 hold.stronghold",
-    "rect": "528,60,480×472",
+    "rect": "564,456,400×432",
     "placed": "reopened",
-    "parked": "stats.board"
+    "parked": "charx.companion,stats.board"
   },
   {
     "at": "reopen 1440×900 @1440×900 cmp.rules",
-    "rect": "548,60,440×472",
+    "rect": "540,60,440×360",
+    "placed": "reopened",
+    "parked": ""
+  },
+  {
+    "at": "reopen 1440×900 @1440×900 recap.session",
+    "rect": "540,456,400×432",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
-    "at": "reopen 1440×900 @1440×900 recap.session",
-    "rect": "548,60,440×472",
-    "placed": "reopened",
-    "parked": "cmp.rules"
-  },
-  {
     "at": "reopen 1280×800 @1280×800 note.history",
-    "rect": "505,72,360×480",
+    "rect": "479,83,360×480",
     "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1280×800 @1280×800 dicex.tray",
-    "rect": "486,60,450×375",
+    "rect": "442,60,450×375",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
     "at": "reopen 1280×800 @1280×800 party.board",
-    "rect": "496,60,440×400",
+    "rect": "442,60,440×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×800 @1280×800 cmp.compendium",
-    "rect": "462,60,440×500",
+    "rect": "442,60,440×516",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen 1280×800 @1280×800 shell.prefs",
-    "rect": "505,134,360×418",
+    "rect": "479,60,360×470",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×800 @1280×800 charx.companion",
-    "rect": "505,173,320×360",
-    "placed": "reopened",
-    "parked": "shell.prefs"
-  },
-  {
-    "at": "reopen 1280×800 @1280×800 stats.board",
-    "rect": "466,140,400×412",
-    "placed": "reopened",
-    "parked": "charx.companion"
-  },
-  {
-    "at": "reopen 1280×800 @1280×800 hold.stronghold",
-    "rect": "464,60,480×418",
-    "placed": "reopened",
-    "parked": "stats.board"
-  },
-  {
-    "at": "reopen 1280×800 @1280×800 cmp.rules",
-    "rect": "496,60,440×412",
-    "placed": "reopened",
-    "parked": "hold.stronghold"
-  },
-  {
-    "at": "reopen 1280×800 @1280×800 recap.session",
-    "rect": "462,60,440×500",
-    "placed": "reopened",
-    "parked": "cmp.rules"
-  },
-  {
-    "at": "reopen 1280×720 @1280×720 note.history",
-    "rect": "505,60,360×412",
-    "placed": "reopened",
-    "parked": ""
-  },
-  {
-    "at": "reopen 1280×720 @1280×720 dicex.tray",
-    "rect": "474,172,376×300",
-    "placed": "reopened",
-    "parked": "note.history"
-  },
-  {
-    "at": "reopen 1280×720 @1280×720 party.board",
-    "rect": "462,60,440×400",
-    "placed": "reopened",
-    "parked": "dicex.tray"
-  },
-  {
-    "at": "reopen 1280×720 @1280×720 cmp.compendium",
-    "rect": "462,60,440×420",
-    "placed": "reopened",
-    "parked": "party.board"
-  },
-  {
-    "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "505,134,360×338",
-    "placed": "reopened",
-    "parked": "cmp.compendium"
-  },
-  {
-    "at": "reopen 1280×720 @1280×720 charx.companion",
     "rect": "505,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
+    "at": "reopen 1280×800 @1280×800 stats.board",
+    "rect": "462,60,400×412",
+    "placed": "reopened",
+    "parked": "charx.companion"
+  },
+  {
+    "at": "reopen 1280×800 @1280×800 hold.stronghold",
+    "rect": "456,60,480×470",
+    "placed": "reopened",
+    "parked": "stats.board"
+  },
+  {
+    "at": "reopen 1280×800 @1280×800 cmp.rules",
+    "rect": "442,60,440×412",
+    "placed": "reopened",
+    "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen 1280×800 @1280×800 recap.session",
+    "rect": "442,60,440×516",
+    "placed": "reopened",
+    "parked": "cmp.rules"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 note.history",
+    "rect": "505,60,360×436",
+    "placed": "reopened",
+    "parked": ""
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dicex.tray",
+    "rect": "486,60,450×375",
+    "placed": "reopened",
+    "parked": "note.history"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 party.board",
+    "rect": "491,96,340×400",
+    "placed": "reopened",
+    "parked": "dicex.tray"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 cmp.compendium",
+    "rect": "474,96,326×400",
+    "placed": "reopened",
+    "parked": "party.board"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 shell.prefs",
+    "rect": "505,106,360×390",
+    "placed": "reopened",
+    "parked": "cmp.compendium"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 charx.companion",
+    "rect": "505,136,320×360",
+    "placed": "reopened",
+    "parked": "shell.prefs"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 stats.board",
-    "rect": "466,60,400×412",
+    "rect": "466,84,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×720 @1280×720 hold.stronghold",
-    "rect": "474,60,406×400",
+    "rect": "464,60,480×390",
     "placed": "reopened",
     "parked": "stats.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 cmp.rules",
-    "rect": "462,60,440×412",
+    "rect": "474,136,422×360",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
     "at": "reopen 1280×720 @1280×720 recap.session",
-    "rect": "462,60,440×412",
+    "rect": "474,136,401×360",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
   {
     "at": "protected @1280×720 note.history",
-    "rect": "505,60,360×412",
+    "rect": "505,60,360×436",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "protected @1280×720 char.sheet",
-    "rect": "948,60,320×338",
+    "rect": "948,60,320×390",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "open @1440×900 note.history",
-    "rect": "612,60,360×480",
+    "rect": "604,76,360×480",
     "placed": "auto",
     "parked": ""
   },
   {
     "at": "open @1440×900 dicex.tray",
-    "rect": "548,157,450×375",
+    "rect": "540,588,450×300",
+    "placed": "auto",
+    "parked": ""
+  },
+  {
+    "at": "open @1440×900 party.board",
+    "rect": "496,60,600×496",
     "placed": "auto",
     "parked": "note.history"
   },
   {
-    "at": "open @1440×900 party.board",
-    "rect": "496,60,600×472",
-    "placed": "auto",
-    "parked": "dicex.tray"
-  },
-  {
     "at": "open @1440×900 cmp.compendium",
-    "rect": "548,60,440×472",
+    "rect": "540,328,440×560",
     "placed": "auto",
-    "parked": "party.board"
+    "parked": "dicex.tray,party.board"
   },
   {
     "at": "open @1440×900 shell.prefs",
-    "rect": "604,60,360×472",
+    "rect": "604,456,360×432",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
   {
     "at": "open @1440×900 charx.companion",
-    "rect": "688,172,320×360",
+    "rect": "644,60,320×360",
+    "placed": "auto",
+    "parked": ""
+  },
+  {
+    "at": "open @1440×900 stats.board",
+    "rect": "540,456,400×412",
     "placed": "auto",
     "parked": "shell.prefs"
   },
   {
-    "at": "open @1440×900 stats.board",
-    "rect": "548,60,400×412",
-    "placed": "auto",
-    "parked": "charx.companion"
-  },
-  {
     "at": "open @1440×900 hold.stronghold",
-    "rect": "528,60,480×472",
+    "rect": "564,456,400×432",
     "placed": "auto",
-    "parked": "stats.board"
+    "parked": "charx.companion,stats.board"
   },
   {
     "at": "open @1440×900 cmp.rules",
-    "rect": "548,60,440×472",
+    "rect": "540,60,440×360",
+    "placed": "auto",
+    "parked": ""
+  },
+  {
+    "at": "open @1440×900 recap.session",
+    "rect": "540,456,400×432",
     "placed": "auto",
     "parked": "hold.stronghold"
   },
   {
-    "at": "open @1440×900 recap.session",
-    "rect": "548,60,440×472",
-    "placed": "auto",
-    "parked": "cmp.rules"
-  },
-  {
     "at": "reopen @1440×900 note.history",
-    "rect": "612,60,360×480",
+    "rect": "604,76,360×480",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "reopen @1440×900 dicex.tray",
-    "rect": "548,157,450×375",
+    "rect": "540,588,450×300",
+    "placed": "reopened",
+    "parked": ""
+  },
+  {
+    "at": "reopen @1440×900 party.board",
+    "rect": "496,60,600×496",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
-    "at": "reopen @1440×900 party.board",
-    "rect": "496,60,600×472",
-    "placed": "reopened",
-    "parked": "dicex.tray"
-  },
-  {
     "at": "reopen @1440×900 cmp.compendium",
-    "rect": "548,60,440×472",
+    "rect": "540,328,440×560",
     "placed": "reopened",
-    "parked": "party.board"
+    "parked": "dicex.tray,party.board"
   },
   {
     "at": "reopen @1440×900 shell.prefs",
-    "rect": "604,60,360×472",
+    "rect": "604,456,360×432",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen @1440×900 charx.companion",
-    "rect": "688,172,320×360",
+    "rect": "644,60,320×360",
+    "placed": "stored",
+    "parked": ""
+  },
+  {
+    "at": "reopen @1440×900 stats.board",
+    "rect": "540,456,400×412",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
-    "at": "reopen @1440×900 stats.board",
-    "rect": "548,60,400×412",
-    "placed": "reopened",
-    "parked": "charx.companion"
-  },
-  {
     "at": "reopen @1440×900 hold.stronghold",
-    "rect": "528,60,480×472",
+    "rect": "564,456,400×432",
     "placed": "reopened",
-    "parked": "stats.board"
+    "parked": "charx.companion,stats.board"
   },
   {
     "at": "reopen @1440×900 cmp.rules",
-    "rect": "548,60,440×472",
+    "rect": "540,60,440×360",
+    "placed": "stored",
+    "parked": ""
+  },
+  {
+    "at": "reopen @1440×900 recap.session",
+    "rect": "540,456,400×432",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
-    "at": "reopen @1440×900 recap.session",
-    "rect": "548,60,440×472",
-    "placed": "reopened",
-    "parked": "cmp.rules"
-  },
-  {
     "at": "reopen 1280×800 @1280×800 note.history",
-    "rect": "505,72,360×480",
+    "rect": "479,83,360×480",
     "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1280×800 @1280×800 dicex.tray",
-    "rect": "486,60,450×375",
+    "rect": "442,60,450×375",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
     "at": "reopen 1280×800 @1280×800 party.board",
-    "rect": "496,60,440×400",
+    "rect": "442,60,440×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×800 @1280×800 cmp.compendium",
-    "rect": "462,60,440×500",
+    "rect": "442,60,440×516",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen 1280×800 @1280×800 shell.prefs",
-    "rect": "505,134,360×418",
+    "rect": "479,60,360×470",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×800 @1280×800 charx.companion",
-    "rect": "505,173,320×360",
+    "rect": "505,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×800 @1280×800 stats.board",
-    "rect": "466,140,400×412",
+    "rect": "462,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×800 @1280×800 hold.stronghold",
-    "rect": "464,60,480×418",
+    "rect": "456,60,480×470",
     "placed": "reopened",
     "parked": "stats.board"
   },
   {
     "at": "reopen 1280×800 @1280×800 cmp.rules",
-    "rect": "496,60,440×412",
+    "rect": "442,60,440×412",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
     "at": "reopen 1280×800 @1280×800 recap.session",
-    "rect": "462,60,440×500",
+    "rect": "442,60,440×516",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
   {
     "at": "reopen 1280×720 @1280×720 note.history",
-    "rect": "505,60,360×412",
+    "rect": "505,60,360×436",
     "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1280×720 @1280×720 dicex.tray",
-    "rect": "474,172,376×300",
+    "rect": "486,60,450×375",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
     "at": "reopen 1280×720 @1280×720 party.board",
-    "rect": "462,60,440×400",
+    "rect": "491,96,340×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×720 @1280×720 cmp.compendium",
-    "rect": "462,60,440×420",
+    "rect": "474,96,326×400",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "505,134,360×338",
+    "rect": "505,106,360×390",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "505,60,320×360",
+    "rect": "505,136,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×720 @1280×720 stats.board",
-    "rect": "466,60,400×412",
+    "rect": "466,84,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×720 @1280×720 hold.stronghold",
-    "rect": "474,60,406×400",
+    "rect": "464,60,480×390",
     "placed": "reopened",
     "parked": "stats.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 cmp.rules",
-    "rect": "462,60,440×412",
+    "rect": "474,136,422×360",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
     "at": "reopen 1280×720 @1280×720 recap.session",
-    "rect": "462,60,440×412",
+    "rect": "474,136,401×360",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
   {
     "at": "protected @1280×720 note.history",
-    "rect": "505,60,360×412",
+    "rect": "505,60,360×436",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "protected @1280×720 char.sheet",
-    "rect": "948,60,320×338",
+    "rect": "948,60,320×390",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "open @1280×800 note.history",
-    "rect": "505,72,360×480",
+    "rect": "479,83,360×480",
     "placed": "auto",
     "parked": ""
   },
   {
     "at": "open @1280×800 dicex.tray",
-    "rect": "486,60,450×375",
+    "rect": "442,60,450×375",
     "placed": "auto",
     "parked": "note.history"
   },
   {
     "at": "open @1280×800 party.board",
-    "rect": "496,60,440×400",
+    "rect": "442,60,440×400",
     "placed": "auto",
     "parked": "dicex.tray"
   },
   {
     "at": "open @1280×800 cmp.compendium",
-    "rect": "462,60,440×500",
+    "rect": "442,60,440×516",
     "placed": "auto",
     "parked": "party.board"
   },
   {
     "at": "open @1280×800 shell.prefs",
-    "rect": "505,134,360×418",
+    "rect": "479,60,360×470",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
   {
     "at": "open @1280×800 charx.companion",
-    "rect": "505,173,320×360",
+    "rect": "505,60,320×360",
     "placed": "auto",
     "parked": "shell.prefs"
   },
   {
     "at": "open @1280×800 stats.board",
-    "rect": "466,140,400×412",
+    "rect": "462,60,400×412",
     "placed": "auto",
     "parked": "charx.companion"
   },
   {
     "at": "open @1280×800 hold.stronghold",
-    "rect": "464,60,480×418",
+    "rect": "456,60,480×470",
     "placed": "auto",
     "parked": "stats.board"
   },
   {
     "at": "open @1280×800 cmp.rules",
-    "rect": "496,60,440×412",
+    "rect": "442,60,440×412",
     "placed": "auto",
     "parked": "hold.stronghold"
   },
   {
     "at": "open @1280×800 recap.session",
-    "rect": "462,60,440×500",
+    "rect": "442,60,440×516",
     "placed": "auto",
     "parked": "cmp.rules"
   },
   {
     "at": "reopen @1280×800 note.history",
-    "rect": "505,72,360×480",
+    "rect": "479,83,360×480",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "reopen @1280×800 dicex.tray",
-    "rect": "486,60,450×375",
+    "rect": "442,60,450×375",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
     "at": "reopen @1280×800 party.board",
-    "rect": "496,60,440×400",
+    "rect": "442,60,440×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen @1280×800 cmp.compendium",
-    "rect": "462,60,440×500",
+    "rect": "442,60,440×516",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen @1280×800 shell.prefs",
-    "rect": "505,134,360×418",
+    "rect": "479,60,360×470",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen @1280×800 charx.companion",
-    "rect": "505,173,320×360",
+    "rect": "505,60,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen @1280×800 stats.board",
-    "rect": "466,140,400×412",
+    "rect": "462,60,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen @1280×800 hold.stronghold",
-    "rect": "464,60,480×418",
+    "rect": "456,60,480×470",
     "placed": "reopened",
     "parked": "stats.board"
   },
   {
     "at": "reopen @1280×800 cmp.rules",
-    "rect": "496,60,440×412",
+    "rect": "442,60,440×412",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
     "at": "reopen @1280×800 recap.session",
-    "rect": "462,60,440×500",
+    "rect": "442,60,440×516",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
   {
     "at": "reopen 1280×720 @1280×720 note.history",
-    "rect": "505,60,360×412",
+    "rect": "505,60,360×436",
     "placed": "reopened",
     "parked": ""
   },
   {
     "at": "reopen 1280×720 @1280×720 dicex.tray",
-    "rect": "474,172,376×300",
+    "rect": "486,60,450×375",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
     "at": "reopen 1280×720 @1280×720 party.board",
-    "rect": "462,60,440×400",
+    "rect": "491,96,340×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen 1280×720 @1280×720 cmp.compendium",
-    "rect": "462,60,440×420",
+    "rect": "474,96,326×400",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 shell.prefs",
-    "rect": "505,134,360×338",
+    "rect": "505,106,360×390",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen 1280×720 @1280×720 charx.companion",
-    "rect": "505,60,320×360",
+    "rect": "505,136,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen 1280×720 @1280×720 stats.board",
-    "rect": "466,60,400×412",
+    "rect": "466,84,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen 1280×720 @1280×720 hold.stronghold",
-    "rect": "474,60,406×400",
+    "rect": "464,60,480×390",
     "placed": "reopened",
     "parked": "stats.board"
   },
   {
     "at": "reopen 1280×720 @1280×720 cmp.rules",
-    "rect": "462,60,440×412",
+    "rect": "474,136,422×360",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
     "at": "reopen 1280×720 @1280×720 recap.session",
-    "rect": "462,60,440×412",
+    "rect": "474,136,401×360",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
   {
     "at": "protected @1280×720 note.history",
-    "rect": "505,60,360×412",
+    "rect": "505,60,360×436",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "protected @1280×720 char.sheet",
-    "rect": "948,60,320×338",
+    "rect": "948,60,320×390",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "open @1280×720 note.history",
-    "rect": "505,60,360×412",
+    "rect": "505,60,360×436",
     "placed": "auto",
     "parked": ""
   },
   {
     "at": "open @1280×720 dicex.tray",
-    "rect": "474,172,376×300",
+    "rect": "486,60,450×375",
     "placed": "auto",
     "parked": "note.history"
   },
   {
     "at": "open @1280×720 party.board",
-    "rect": "462,60,440×400",
+    "rect": "491,96,340×400",
     "placed": "auto",
     "parked": "dicex.tray"
   },
   {
     "at": "open @1280×720 cmp.compendium",
-    "rect": "462,60,440×420",
+    "rect": "474,96,326×400",
     "placed": "auto",
     "parked": "party.board"
   },
   {
     "at": "open @1280×720 shell.prefs",
-    "rect": "505,134,360×338",
+    "rect": "505,106,360×390",
     "placed": "auto",
     "parked": "cmp.compendium"
   },
   {
     "at": "open @1280×720 charx.companion",
-    "rect": "505,60,320×360",
+    "rect": "505,136,320×360",
     "placed": "auto",
     "parked": "shell.prefs"
   },
   {
     "at": "open @1280×720 stats.board",
-    "rect": "466,60,400×412",
+    "rect": "466,84,400×412",
     "placed": "auto",
     "parked": "charx.companion"
   },
   {
     "at": "open @1280×720 hold.stronghold",
-    "rect": "474,60,406×400",
+    "rect": "464,60,480×390",
     "placed": "auto",
     "parked": "stats.board"
   },
   {
     "at": "open @1280×720 cmp.rules",
-    "rect": "462,60,440×412",
+    "rect": "474,136,422×360",
     "placed": "auto",
     "parked": "hold.stronghold"
   },
   {
     "at": "open @1280×720 recap.session",
-    "rect": "462,60,440×412",
+    "rect": "474,136,401×360",
     "placed": "auto",
     "parked": "cmp.rules"
   },
   {
     "at": "reopen @1280×720 note.history",
-    "rect": "505,60,360×412",
+    "rect": "505,60,360×436",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "reopen @1280×720 dicex.tray",
-    "rect": "474,172,376×300",
+    "rect": "486,60,450×375",
     "placed": "reopened",
     "parked": "note.history"
   },
   {
     "at": "reopen @1280×720 party.board",
-    "rect": "462,60,440×400",
+    "rect": "491,96,340×400",
     "placed": "reopened",
     "parked": "dicex.tray"
   },
   {
     "at": "reopen @1280×720 cmp.compendium",
-    "rect": "462,60,440×420",
+    "rect": "474,96,326×400",
     "placed": "reopened",
     "parked": "party.board"
   },
   {
     "at": "reopen @1280×720 shell.prefs",
-    "rect": "505,134,360×338",
+    "rect": "505,106,360×390",
     "placed": "reopened",
     "parked": "cmp.compendium"
   },
   {
     "at": "reopen @1280×720 charx.companion",
-    "rect": "505,60,320×360",
+    "rect": "505,136,320×360",
     "placed": "reopened",
     "parked": "shell.prefs"
   },
   {
     "at": "reopen @1280×720 stats.board",
-    "rect": "466,60,400×412",
+    "rect": "466,84,400×412",
     "placed": "reopened",
     "parked": "charx.companion"
   },
   {
     "at": "reopen @1280×720 hold.stronghold",
-    "rect": "474,60,406×400",
+    "rect": "464,60,480×390",
     "placed": "reopened",
     "parked": "stats.board"
   },
   {
     "at": "reopen @1280×720 cmp.rules",
-    "rect": "462,60,440×412",
+    "rect": "474,136,422×360",
     "placed": "reopened",
     "parked": "hold.stronghold"
   },
   {
     "at": "reopen @1280×720 recap.session",
-    "rect": "462,60,440×412",
+    "rect": "474,136,401×360",
     "placed": "reopened",
     "parked": "cmp.rules"
   },
   {
     "at": "protected @1280×720 note.history",
-    "rect": "505,60,360×412",
+    "rect": "505,60,360×436",
     "placed": "stored",
     "parked": ""
   },
   {
     "at": "protected @1280×720 char.sheet",
-    "rect": "948,60,320×338",
+    "rect": "948,60,320×390",
     "placed": "stored",
     "parked": ""
   }

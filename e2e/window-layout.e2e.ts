@@ -50,12 +50,12 @@ function pairwiseDisjoint(boxes: Box[]): string[] {
   return out;
 }
 
-/** FR-SHELL-57: a PC footprint's margin; placement's edge gap and the launcher's clearance. */
+/** FR-SHELL-57: a PC footprint's margin; placement's edge gap and the bottom clearance (K5: 12). */
 const PC_MARGIN = 4;
 const EDGE_GAP = 12;
 const RAIL_CLEAR = 68;
 const TOP_BAR_H = 48;
-const LAUNCHER_CLEAR = 64;
+const LAUNCHER_CLEAR = 12;
 
 /**
  * A spot (8-px grid over the usable area right of the rail) for `win`'s size that is clear of
@@ -76,7 +76,7 @@ function pcFreeSpot(
   });
   const others = windows.filter((o) => o.kind !== win.kind).map(grow);
   const right = vp.width - EDGE_GAP - win.w;
-  const bottom = vp.height - EDGE_GAP - LAUNCHER_CLEAR - win.h;
+  const bottom = vp.height - LAUNCHER_CLEAR - win.h;
   for (let y = TOP_BAR_H + EDGE_GAP; y <= bottom; y += 8) {
     for (let x = RAIL_CLEAR; x <= right; x += 8) {
       const r = { kind: win.kind, x, y, w: win.w, h: win.h };
