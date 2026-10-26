@@ -10,6 +10,8 @@ phase: post-mvp
 
 > First theme: **Gilt & Stone**, the BG2/NWN-inspired skin. Source of truth for its look: the kit page [gilt-stone.html](../../design/art/kit/gilt-stone.html) (open it in a browser), with the concept rounds in [art/prompts](../../design/art/prompts/). Mechanism: [ADR-0069](../../architecture/adr/0069-theme-switch.md).
 
+> **Kit parity (DM, 2026-10-26, [#355](../../decisions-log.md)).** Decided: **Gilt & Stone is the default theme** for a browser with no stored choice (OQ-THEME-03 → B, after the T2 walkthrough), and the original look is renamed **Simple Dark** in the UI (stored value `default` keeps meaning Simple Dark; slice T3 `fix/theme-default`). Where this spec says "Default" for the original look, read "Simple Dark". The goal is now parity with the kit page's mockup: the layout changes that a stylesheet cannot make are specified in [kit-parity](kit-parity.md) (markup for every theme; ADR-0069 unchanged).
+
 ## 1. Summary
 
 - A **theme** is a named look for the whole client. Each person picks one per browser in **Preferences**. Two themes: **Default** (today's shadcn look) and **Gilt & Stone**.
