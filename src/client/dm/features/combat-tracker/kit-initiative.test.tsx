@@ -229,22 +229,23 @@ describe("FR-KIT-25 hp line", () => {
     expect(tailText(null, null)).toBe("AC —");
   });
 
-  test("FR-KIT-25 tail folds: when the line can't hold the bar at its fixed 120-px track (K9), its numbers, the other parts and the tail", () => {
+  test("FR-KIT-25 tail folds: when the line can't hold the bar (K9: its fixed track + numbers), the other parts and the tail", () => {
     // bar 120 + 8 + "38 / 44" 40 = 168; "+5" 14; tail 92; gaps 2 × 6.
-    const w = { numbers: 40, others: [14], tail: 92 };
+    const w = { bar: 168, others: [14], tail: 92 };
     expect(tailFolds({ ...w, line: 286 })).toBe(false);
     expect(tailFolds({ ...w, line: 285 })).toBe(true);
-    expect(tailFolds({ line: 100, numbers: null, others: [], tail: 92 })).toBe(false);
+    expect(tailFolds({ line: 100, bar: null, others: [], tail: 92 })).toBe(false);
   });
 
-  test("FR-KIT-25 hp line (K9, K6 gap 3): every row's bar on the kit's fixed 120-px track, cur / max in a column, the AC / moved tail a right-aligned column", () => {
+  test("FR-KIT-25 hp line (K9, K6 gap 3): every row's bar on one fixed track (the kit's 120 px, less when the line's container can't hold it), cur / max in a column, the AC / moved tail a right-aligned column", () => {
     const html = dm(kitStore(1, { goblin: { hpCurrent: 3 } }));
     // (Mira's figures live on her character record, not in this fixture: no bar.)
     for (const id of ["goblin", "wolf"]) {
       const row = rowHtml(html, "cbt-init-row", id);
       const hp = row.slice(row.indexOf('data-testid="cbt-init-row-hp"'));
       expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
-      expect(hp).toMatch(/data-slot="kit-hpbar-track" class="[^"]*w-\[120px\]/);
+      expect(hp).toContain("w-[clamp(24px,calc(100cqw-7ch-2rem),120px)] flex-none");
+      expect(row).toMatch(/data-stats-line="true" class="@container /);
       expect(hp).not.toMatch(/data-slot="kit-hpbar-track" class="[^"]*flex-1/);
       expect(hp).toContain("min-w-[7ch]");
       expect(row).toMatch(/data-tail="true"[^>]*class="ml-auto shrink-0"/);

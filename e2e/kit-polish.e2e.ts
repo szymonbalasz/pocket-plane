@@ -21,7 +21,8 @@ test("FR-KIT-25 FR-KIT-21 FR-KIT-55 FR-KIT-57 FR-KIT-103 fixed HP track, pending
   await live(dm);
   const init = await openWindow(dm, "cbt.initiative");
 
-  // FR-KIT-25 (K6 gap 3): the bars sit on the 120-px track; none is wider, rows line up.
+  // FR-KIT-25 (K6 gap 3): the bars sit on one track width (≤ the kit's 120 px; the HP line's
+  // container leaves room for "cur / max" and a temp slot), so rows with and without temp HP line up.
   const tracks = init.locator(
     '[data-testid="cbt-init-row-hp"][data-track="fixed"] [data-slot="kit-hpbar-track"]',
   );
@@ -29,8 +30,10 @@ test("FR-KIT-25 FR-KIT-21 FR-KIT-55 FR-KIT-57 FR-KIT-103 fixed HP track, pending
   const widths = await tracks.evaluateAll((els) =>
     els.map((e) => Math.round(e.getBoundingClientRect().width)),
   );
-  expect(widths.filter((w) => w === 120).length).toBeGreaterThanOrEqual(2);
+  const common = Math.max(...widths.map((w) => widths.filter((x) => x === w).length));
+  expect(common).toBeGreaterThanOrEqual(Math.min(widths.length, 4));
   expect(Math.max(...widths)).toBeLessThanOrEqual(120);
+  expect(Math.min(...widths)).toBeGreaterThanOrEqual(60);
   const lefts = await tracks.evaluateAll((els) =>
     els.map((e) => Math.round(e.getBoundingClientRect().left)),
   );

@@ -1,8 +1,8 @@
 // Kit part: the HP bar (kit-parity FR-KIT-05): a thin bar plus "cur / max" when the numbers are
 // known, else the health band word alone (a monster for players: never a bar length, FR-KIT-26).
 // Colours are the meaning tokens `hp.*`, not themed (FR-THEME-09); a theme styles the track
-// through `data-slot="kit-hpbar"` (ADR-0069). K9: `track="fixed"` draws the kit's 120-px track
-// (Initiative), so bars line up row to row; it shrinks only when the line can't hold it.
+// through `data-slot="kit-hpbar"` (ADR-0069). K9: `track="fixed"` draws one track width for every
+// row of a list (Initiative), the kit's 120 px when the line holds it, so bars line up.
 import { healthBand } from "@shared/combat-tracker/rules";
 import type { HealthBand } from "@shared/entities/schemas";
 import type * as React from "react";
@@ -36,6 +36,13 @@ export function hpFill(cur: number, max: number): number {
 /** The kit's fixed track width (`.bar` in the 340-px Initiative), px. */
 export const HP_TRACK_PX = 120;
 
+/**
+ * K9: the fixed track's width: 120 px, less when the HP line (the caller's `@container`, the same
+ * width on every row) can't hold it beside "cur / max" (7ch) and a temp "+N" slot; never under
+ * 24 px. Without a container it is 120 px.
+ */
+const FIXED_TRACK = "w-[clamp(24px,calc(100cqw-7ch-2rem),120px)] flex-none";
+
 export function hpBarMode(
   cur: number | null | undefined,
   max: number | null | undefined,
@@ -62,8 +69,8 @@ export function HpBar({
   /** Show "cur / max" after the bar. */
   numbers?: boolean;
   /**
-   * `fill` takes the line's room; `fixed` = `HP_TRACK_PX` when the line holds it, else the track
-   * shrinks (to 24 px) before the line's other parts wrap.
+   * `fill` takes the line's room; `fixed` = `HP_TRACK_PX`, or the room the caller's `@container`
+   * line leaves (the same on every row), so bars line up.
    */
   track?: "fill" | "fixed";
   "data-testid"?: string;
@@ -91,13 +98,7 @@ export function HpBar({
       data-slot="kit-hpbar"
       data-band={b}
       data-track={track}
-      className={cn(
-        "flex min-w-0 items-center gap-2",
-        // Fixed: takes the line's free room up to its own content (the 120-px track), so it never
-        // pushes the line's other parts onto a second line; the track gives way first.
-        track === "fixed" && "min-w-[calc(2rem+7ch)] max-w-fit flex-[1_1_0%]",
-        className,
-      )}
+      className={cn("flex min-w-0 items-center gap-2", track === "fixed" && "flex-none", className)}
       {...props}
     >
       <span
@@ -105,7 +106,7 @@ export function HpBar({
         data-slot="kit-hpbar-track"
         className={cn(
           "h-[5px] min-w-6 overflow-hidden rounded-[1px] bg-muted",
-          track === "fixed" ? "w-[120px] shrink grow-0" : "flex-1",
+          track === "fixed" ? FIXED_TRACK : "flex-1",
         )}
       >
         <span

@@ -192,7 +192,8 @@ function PlayerRowMain({
         )}
         <div
           data-stats-line
-          className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden"
+          // K9: a size container, so the HP bar's fixed track is one width on every row.
+          className="@container mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden"
         >
           <PlayerHp c={c} own={own} />
           {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down. */}

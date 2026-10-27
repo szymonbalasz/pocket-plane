@@ -35,7 +35,7 @@ import {
   saveBonus,
 } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
-import { HP_TRACK_PX, HpBar } from "@ui/components/kit/hp-bar";
+import { HpBar } from "@ui/components/kit/hp-bar";
 import { Button } from "@ui/components/ui/button";
 import {
   DropdownMenu,
@@ -599,23 +599,19 @@ const STATS_GAP = 6;
 
 /**
  * FR-KIT-25 (OQ-KIT-07 A): the AC / moved tail folds into the row Tooltip when the HP line can't
- * hold the bar at its fixed track (K9, the kit's 120 px, so bars line up), its numbers, the other
- * parts and the tail. Natural widths only
+ * hold the bar (K9: its fixed track, one width for every row, and its numbers), the other parts
+ * and the tail. Natural widths only
  * (a folded tail is measured out of the flow), so it never flips back and forth; re-measured on
  * resize and when the row changes.
  */
 export function tailFolds(widths: {
   line: number;
-  /** The HP bar's "cur / max" (the track counts at `HP_TRACK_PX`). */
-  numbers: number | null;
+  /** The HP bar's width: its fixed track (never squeezed) + "cur / max"; null = no bar. */
+  bar: number | null;
   others: readonly number[];
   tail: number;
 }): boolean {
-  const parts = [
-    ...(widths.numbers === null ? [] : [HP_TRACK_PX + 8 + widths.numbers]),
-    ...widths.others,
-    widths.tail,
-  ];
+  const parts = [...(widths.bar === null ? [] : [widths.bar]), ...widths.others, widths.tail];
   const need = parts.reduce((a, w) => a + w, 0) + Math.max(0, parts.length - 1) * STATS_GAP;
   return need > widths.line + 0.5;
 }
@@ -630,7 +626,6 @@ function useTailFold(rowRef: RefObject<HTMLElement | null>, deps: unknown): bool
       const tail = stats.querySelector<HTMLElement>(":scope > [data-tail]");
       if (!tail || stats.clientWidth === 0) return;
       const bar = stats.querySelector<HTMLElement>(':scope > [data-slot="kit-hpbar"]');
-      const numbers = bar?.lastElementChild as HTMLElement | null | undefined;
       const others = [...stats.children]
         .filter((k): k is HTMLElement => k !== tail && k !== bar && k instanceof HTMLElement)
         .map((k) => k.offsetWidth)
@@ -638,7 +633,7 @@ function useTailFold(rowRef: RefObject<HTMLElement | null>, deps: unknown): bool
       setFolded(
         tailFolds({
           line: stats.clientWidth,
-          numbers: bar ? (numbers?.offsetWidth ?? 0) : null,
+          bar: bar ? bar.offsetWidth : null,
           others,
           tail: tail.offsetWidth,
         }),
@@ -866,7 +861,8 @@ function RowMain({
             (FR-CBTX-57): still too narrow, whole parts wrap onto a second line. */}
         <div
           data-stats-line
-          className="relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+          // K9: a size container, so the HP bar's fixed track is one width on every row.
+          className="@container relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
         >
           {hp ? (
             <HpBar
