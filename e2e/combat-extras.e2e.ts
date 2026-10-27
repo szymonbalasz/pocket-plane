@@ -130,7 +130,7 @@ test("FR-CBTX-17 FR-CBTX-18 FR-CBTX-28 FR-CBTX-29 bar + icons for both; concentr
   await expect(popup).toHaveCount(0);
   await expect(
     init.locator(`[data-testid="cbt-init-row-hp"][data-record-id="${mira}"]`),
-  ).toHaveText("HP 9/12");
+  ).toHaveText("9 / 12");
 
   const toast = player
     .getByTestId("note-toast")

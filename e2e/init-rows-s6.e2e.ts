@@ -10,6 +10,7 @@
 // below-fold.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { launcherButton, openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -188,7 +189,7 @@ test("FR-CBT-125 FR-CBTX-57 FR-CBTX-58 F10 Initiative rows: nothing below '↓ N
   expect(v.more).toBe(v.below);
 
   // End the Ambush; Start "Escort to the Ford": the hidden Ally (c10).
-  await init.getByTestId("cbt-init-end").click();
+  await initMenu(dm, init, "cbt-init-end");
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(dm.getByTestId("cbt-init-end-confirm")).toHaveCount(0);
   // On Goblin Ambush (as in sim-9): the friendly slot binds the "Goblin Lurker" token.

@@ -7,6 +7,7 @@
 // End (FR-CBTX-50). Rules and edge cases: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { konvaNodes } from "./support/konva";
 import { panMap } from "./support/map";
 import { showToPlayers } from "./support/scenes";
@@ -668,7 +669,7 @@ test("FR-CBTX-50 a PC at 0 HP keeps the Down X and its death badge after End, fo
       .poll(async () => (await konvaNodes(page, "cbt-token-down", thornToken)).length)
       .toBe(1);
   }
-  await init.getByTestId("cbt-init-end").click();
+  await initMenu(dm, init, "cbt-init-end");
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(dm.getByTestId("cbt-init-end-confirm")).toHaveCount(0);
   for (const page of [dm, player]) {
