@@ -160,6 +160,23 @@ test("FR-CHARX-114 FR-KIT-76 FR-KIT-13 K13 round 3: wide sheet boxes, narrow nit
     .boundingBox();
   const attacks = await boxes.locator('[data-value="attacks"]').boundingBox();
   expect((attacks?.y ?? 0) > (passives?.y ?? 0)).toBe(true);
+  // The boxes span both columns (kit wide sheet): from the abilities' left edge to the passives'
+  // right edge, below the lower of the two columns.
+  const ability = await win.getByTestId("char-sheet-ability").last().boundingBox();
+  expect(Math.abs((attacks?.x ?? 0) - (ability?.x ?? 0))).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(
+      (attacks?.x ?? 0) + (attacks?.width ?? 0) - (passives?.x ?? 0) - (passives?.width ?? 0),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(attacks?.y ?? 0).toBeGreaterThan((ability?.y ?? 0) + (ability?.height ?? 0));
+  // Kit rows: small stone buttons left under the numbers; slots "1st" ◆◇ "1 / 2".
+  const atk = boxes.locator('[data-testid="charx-roll-attack"]').first();
+  expect(Math.round((await atk.boundingBox())?.height ?? 0)).toBe(24);
+  expect(Math.abs(((await atk.boundingBox())?.x ?? 0) - (attacks?.x ?? 0))).toBeLessThan(16);
+  await expect(boxes.locator('[data-testid="charx-slot-count"][data-value="1"]')).toHaveText(
+    "1 / 2",
+  );
   expect(
     await win.getByTestId("charx-content").evaluate((c) => c.scrollWidth - c.clientWidth),
   ).toBe(0);

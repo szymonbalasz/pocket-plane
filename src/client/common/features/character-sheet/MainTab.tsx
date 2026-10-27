@@ -7,7 +7,7 @@
 // the Skills box and the passive boxes (FR-CHARX-110/111); main sections. Two columns once the
 // sheet is ≥ 560 px wide (FR-CHARX-112); every derived number has its breakdown Tooltip
 // (FR-CHARX-113). No attack row while narrow (FR-CHARX-44); once wide, the kit's Attacks, Spells
-// and Limited uses boxes under the passives (K13, DM #363). The DM's public switches sit in the
+// and Limited uses boxes across both columns under them (K13, DM #363). The DM's public switches sit in the
 // header's Public rolls menu (K11, `./PublicMenu`). Edit mode: identity, scores, proficiencies, stats and
 // overrides in place (FR-CHARX-27, -116).
 
@@ -1033,15 +1033,10 @@ export function MainTab() {
       <SensesLine />
       <Columns>
         <AbilitiesBlock />
-        {wide ? (
-          <div className="flex min-w-0 flex-col gap-2.5">
-            <SkillsBlock />
-            <WideActionBoxes />
-          </div>
-        ) : (
-          <SkillsBlock />
-        )}
+        <SkillsBlock />
       </Columns>
+      {/* K13: the kit's wide sheet: the action boxes span both columns, under them. */}
+      {wide && <WideActionBoxes />}
       {!ctx.readOnly && (
         <SheetSlotView slot="main" creatureId={ctx.creature.id} client={ctx.client} kind={kind} />
       )}

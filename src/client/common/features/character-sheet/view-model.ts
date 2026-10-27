@@ -466,6 +466,12 @@ export function slotPips(
   })).filter((p) => p.max > 0);
 }
 
+/** K13: a spell level as the kit's slot label ("1st", "2nd", "3rd", "4th" … "9th"). */
+export const levelOrdinal = (level: number | string): string => {
+  const n = Number(level);
+  return `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
+};
+
 /** Hit dice per die size with levels (FR-CHARX-05); none without classes. */
 export function hitDicePips(
   stats: { classes?: readonly ClassRow[] },

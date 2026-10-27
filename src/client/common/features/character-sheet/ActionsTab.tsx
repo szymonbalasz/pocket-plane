@@ -17,9 +17,10 @@ import {
 import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Badge, Input } from "../../components/ui/primitives";
+import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
-import { Box } from "./boxes";
+import { BOX_LABEL, Box } from "./boxes";
 import { SheetRoll } from "./CharacterSheet";
 import {
   IntField,
@@ -47,6 +48,7 @@ import {
   canAddExtraPart,
   type ExtraPartDraft,
   extraPart,
+  levelOrdinal,
   MAGIC_OPTIONS,
   pipDelta,
   type RowRollButton,
@@ -109,8 +111,10 @@ function RowButtons({
   overrides: PublicOverrides;
 }) {
   const scope = useSheetScope();
+  // K13: on the wide Main, the kit's row (`.arow-btns`): small stone buttons, left under the line.
+  const kit = scope === "main";
   return (
-    <div className="flex justify-end gap-1.5">
+    <div className={kit ? "mt-[5px] flex flex-wrap gap-[5px]" : "flex justify-end gap-1.5"}>
       {buttons.map((b) => (
         <SheetRoll
           key={b.kind}
@@ -121,6 +125,7 @@ function RowButtons({
           data-testid={b.testId}
           data-record-id={rowId}
           data-scope={scope}
+          {...(kit && { variant: "outline" as const, className: KIT_BUTTON })}
         >
           {b.label}
         </SheetRoll>
@@ -130,6 +135,11 @@ function RowButtons({
 }
 
 type PutAttack = (patch: Partial<Attack>) => Promise<unknown>;
+
+/** K13: the kit's small stone button (`.btn.sm`: 24 px, 9-px sides, 13-px type). */
+const KIT_BUTTON = "h-6 px-[9px] text-[13px]";
+/** K13: the kit's action row (`.arow`): 7-px rows, no rule under the last. */
+const KIT_ROW = "flex flex-col border-b py-[7px] last:border-b-0";
 
 /** FR-CHARX-56: the Magic Select (none, +1 … +3); `data-value` = the stored bonus. */
 function MagicSelect({ a, put }: { a: Attack; put: PutAttack }) {
@@ -322,6 +332,32 @@ function ExtraParts({ a, put }: { a: Attack; put: PutAttack }) {
 /** FR-CHARX-56: view mode: name + "+1" Badge, then "+8 · 2d6+5 slashing + 2d6 fire". */
 function AttackLine({ a }: { a: Attack }) {
   const v = attackRowView(a);
+  const parts = v.parts.map((p, i) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: parts are positional.
+    <span key={i} className="whitespace-nowrap">
+      {i > 0 ? " " : ""}
+      {p}
+    </span>
+  ));
+  if (useSheetScope() === "main") {
+    // K13 (kit `.arow-top` / `.arow-line`): the name bold, its chip (the magic "+1") at the
+    // right of the name line; the numbers line muted under it.
+    return (
+      <div className="flex flex-col">
+        <span className="flex items-baseline justify-between gap-2">
+          <span className="min-w-0 truncate text-[15px] font-bold">{v.name}</span>
+          {v.badge && (
+            <Badge data-testid="charx-attack-bonus" data-value={a.bonus} variant="outline">
+              {v.badge}
+            </Badge>
+          )}
+        </span>
+        <span data-testid="charx-attack-numbers" className="text-sm text-muted-foreground">
+          {parts}
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col text-sm">
       <span className="flex items-center gap-1.5">
@@ -333,13 +369,7 @@ function AttackLine({ a }: { a: Attack }) {
         )}
       </span>
       <span data-testid="charx-attack-numbers" className="text-muted-foreground">
-        {v.parts.map((p, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: parts are positional.
-          <span key={i} className="whitespace-nowrap">
-            {i > 0 ? " " : ""}
-            {p}
-          </span>
-        ))}
+        {parts}
       </span>
     </div>
   );
@@ -421,7 +451,7 @@ function AttackRow({
       data-testid="charx-attack"
       data-record-id={a.id}
       data-scope={scope}
-      className="flex flex-col gap-1 border-b py-1.5"
+      className={scope === "main" ? KIT_ROW : "flex flex-col gap-1 border-b py-1.5"}
     >
       {e ? (
         <AttackEditFields
@@ -507,6 +537,8 @@ function SlotPips() {
       }),
     );
   if (pips.length === 0) return null;
+  if (scope === "main")
+    return <KitSlots pips={pips} counters={counters} busy={busy.busy} use={use} />;
   return (
     <div className="flex flex-col gap-0.5">
       {pips.map((p) => (
@@ -544,6 +576,71 @@ function SlotPips() {
             </button>
           )}
         </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * K13 (kit `.slots`): the wide Main's slots on one wrapping line: "1st" in label size, the slots
+ * as diamonds (filled = used, as the Actions tab's pips; same IDs, clicks and Reset), then
+ * "used / max".
+ */
+function KitSlots({
+  pips,
+  counters,
+  busy,
+  use,
+}: {
+  pips: ReturnType<typeof slotPips>;
+  counters: boolean;
+  busy: boolean;
+  use(level: string, op: object): void;
+}) {
+  const live = useSync((s) => s.state === "live");
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+      {pips.map((p) => (
+        <span key={p.level} className="flex items-center gap-1.5">
+          <span className={cn(BOX_LABEL, "normal-case")}>{levelOrdinal(p.level)}</span>
+          <span className="flex gap-1.5 px-0.5">
+            {Array.from({ length: p.max }, (_, i) => (
+              <button
+                // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
+                key={i}
+                type="button"
+                data-testid="charx-slot"
+                data-scope="main"
+                data-value={p.level}
+                data-used={p.used}
+                aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                disabled={!live || busy || !counters}
+                data-slot="sheet-pip"
+                className={cn(
+                  "size-3 rounded-[1px] border border-foreground/60 [transform:rotate(45deg)]",
+                  i < p.used && "bg-foreground",
+                )}
+                onClick={(e) => use(p.level, { delta: pipDelta(e.shiftKey) })}
+              />
+            ))}
+          </span>
+          <span data-testid="charx-slot-count" data-value={p.level} className="tabular-nums">
+            {p.used} / {p.max}
+          </span>
+          {counters && p.used > 0 && (
+            <button
+              type="button"
+              data-testid="charx-resource-reset"
+              data-scope="main"
+              data-value={`slot.${p.level}`}
+              disabled={!live || busy}
+              className="text-[10px] text-muted-foreground underline"
+              onClick={() => use(p.level, { reset: true })}
+            >
+              Reset
+            </button>
+          )}
+        </span>
       ))}
     </div>
   );
@@ -746,13 +843,15 @@ function SpellRowView({
       data-testid="charx-spell"
       data-record-id={s.id}
       data-scope={scope}
-      className="flex flex-col gap-1 border-b py-1.5"
+      className={scope === "main" ? KIT_ROW : "flex flex-col gap-1 border-b py-1.5"}
     >
       {e ? (
         <SpellEditor s={s} index={index} count={count} />
       ) : (
         <div className="flex items-baseline justify-between gap-2 text-sm">
-          <span className="min-w-0 truncate">{s.name}</span>
+          <span className={cn("min-w-0 truncate", scope === "main" && "text-[15px] font-bold")}>
+            {s.name}
+          </span>
           <span className="text-[10px] text-muted-foreground">{marks(s)}</span>
         </div>
       )}

@@ -40,6 +40,7 @@ import {
   breakdownText,
   compactFullPx,
   isWideSheet,
+  levelOrdinal,
   type PinnedPart,
   pinnedPart,
   type SeenFull,
@@ -576,6 +577,40 @@ describe("K13 wide Main (DM #363)", () => {
       expect(narrow).not.toContain("data-scope");
       expect(narrow).not.toContain('data-testid="charx-attack"');
     }
+  });
+
+  test("FR-CHARX-114 K13 wide Main: the boxes span both columns, after the abilities + Skills grid (kit wide sheet)", () => {
+    const wide = wideMain();
+    const columns = elementAt(wide, `class="${COLUMNS}"`);
+    expect(columns).toContain('data-value="passives"');
+    expect(columns).not.toContain("charx-main-actions");
+    expect(at(wide, 'data-testid="charx-main-actions"')).toBeGreaterThan(
+      at(wide, `class="${COLUMNS}"`) + columns.length - 1,
+    );
+  });
+
+  test("FR-CHARX-114 K13 wide Main kit rows: name bold with its chip right, numbers under it, small stone buttons left; slots as diamonds with 'used / max'", () => {
+    const wide = wideMain({ client: "dm" });
+    const row = elementAt(wide, 'data-testid="charx-attack" data-record-id="lb" data-scope="main"');
+    expect(row).toContain("py-[7px] last:border-b-0");
+    expect(row).toContain('<span class="min-w-0 truncate text-[15px] font-bold">Longbow</span>');
+    expect(row).toContain('class="mt-[5px] flex flex-wrap gap-[5px]"');
+    expect(row).not.toContain("justify-end");
+    const btn = /<button[^>]*data-testid="charx-roll-attack"[^>]*>/.exec(row)?.[0] ?? "";
+    expect(btn).toContain('data-variant="outline"');
+    expect(btn).toContain("h-6 px-[9px] text-[13px]");
+    expect(at(row, "charx-attack-numbers")).toBeLessThan(at(row, "charx-roll-attack"));
+    const spells = box(wide, "spells");
+    expect(text(spells)).toContain("1st0 / 4");
+    expect(text(spells)).toContain("2nd0 / 2");
+    const pip = /<button[^>]*data-testid="charx-slot"[^>]*>/.exec(spells)?.[0] ?? "";
+    expect(pip).toContain("[transform:rotate(45deg)]");
+    expect(pip).toContain('data-scope="main"');
+    expect([1, 2, 3, 4, 9].map(levelOrdinal)).toEqual(["1st", "2nd", "3rd", "4th", "9th"]);
+    // The Actions tab keeps its rows: buttons right, round pips, "Level 1".
+    const actions = render(<ActionsTab />, { client: "dm" });
+    expect(actions).toContain('class="flex justify-end gap-1.5"');
+    expect(text(box(actions, "spells"))).toContain("Level 1");
   });
 
   test("FR-CHARX-114 K13 wide Main: the DM's Attack / Damage switches in its Attacks box (scoped); players none", () => {
