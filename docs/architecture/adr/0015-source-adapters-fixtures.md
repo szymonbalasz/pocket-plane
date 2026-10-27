@@ -45,7 +45,7 @@ graph LR
 | AI paste ("bits and bobs found online") | Post-MVP | **Not a pipeline adapter**: prefills the form, DM saves a custom. Time-saver only |
 | Homebrew files | Post-MVP (tier A) | Formats TBD |
 | Griffon's Saddlebag items | Post-MVP (tier B) | Partial mechanics |
-| 5etools | Separate project (tier C) | DM has prior import script (to Obsidian) as reference |
+| 5etools | Separate project (tier C) | User-supplied files only; nothing non-SRD bundled |
 | Existing characters | Way post-MVP | Once-off scripts, not an adapter |
 
 ## Open
