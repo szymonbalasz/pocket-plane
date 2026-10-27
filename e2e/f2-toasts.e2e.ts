@@ -9,6 +9,7 @@
 // Placement rules: bun test (`keep-out-primary.test.ts`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSelect } from "./support/select";
 import { openWindow } from "./support/shell";
 
 interface Box {
@@ -121,7 +122,7 @@ async function sendCards(dm: Page, n: number, tag: string) {
 async function sendRequest(requests: Locator, roll: string) {
   const fold = requests.getByTestId("dicex-request-fold");
   if ((await fold.getAttribute("data-state")) !== "open") await fold.click();
-  await requests.getByTestId("dicex-request-roll").selectOption({ label: roll });
+  await pickSelect(requests, "dicex-request-roll", { label: roll });
   // Short timeouts: a toast over the composer fails here, not at the test's 60 s.
   await requests.getByTestId("dicex-request-all").click({ timeout: 5_000 });
   await requests.getByTestId("dicex-request-send").click({ timeout: 5_000 });

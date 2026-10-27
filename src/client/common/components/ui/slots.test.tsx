@@ -106,7 +106,19 @@ function selectTree() {
       <o.SelectTrigger>
         <o.SelectValue />
       </o.SelectTrigger>
-      <Unportal C={o.SelectContent} p={{ children: <o.SelectItem value="a">A</o.SelectItem> }} />
+      <Unportal
+        C={o.SelectContent}
+        p={{
+          children: (
+            <>
+              <o.SelectItem value="a">A</o.SelectItem>
+              <o.SelectGroup>
+                <o.SelectLabel>G</o.SelectLabel>
+              </o.SelectGroup>
+            </>
+          ),
+        }}
+      />
     </o.Select>
   );
 }
@@ -284,6 +296,8 @@ const MODULES: Record<string, { mod: Record<string, unknown>; spec: Spec }> = {
         SelectValue: { render: selectTree, slots: ["select-value"] },
         SelectContent: { render: selectTree, slots: ["select-content"] },
         SelectItem: { render: selectTree, slots: ["select-item", "select-item-indicator"] },
+        SelectGroup: { render: selectTree, slots: ["select-group"] },
+        SelectLabel: { render: selectTree, slots: ["select-label"] },
         TooltipContent: { render: tooltipTree, slots: ["tooltip-content"] },
       },
       noElement: {

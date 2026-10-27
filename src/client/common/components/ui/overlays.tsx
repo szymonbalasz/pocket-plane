@@ -235,6 +235,21 @@ export function SelectContent({
   );
 }
 
+/** K10: a section of a Select's items (Radix's group); its heading is `SelectLabel`. */
+export function SelectGroup(props: React.ComponentProps<typeof S.Group>) {
+  return <S.Group data-slot="select-group" {...props} />;
+}
+/** K10: a section heading inside a Select, the menu label's look (`dropdown-menu-label`). */
+export function SelectLabel({ className, ...props }: React.ComponentProps<typeof S.Label>) {
+  return (
+    <S.Label
+      data-slot="select-label"
+      className={cn("px-2 py-1.5 text-xs font-medium text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}
+
 export function SelectItem({ className, children, ...props }: React.ComponentProps<typeof S.Item>) {
   return (
     <S.Item

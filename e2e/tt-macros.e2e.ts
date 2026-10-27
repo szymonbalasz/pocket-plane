@@ -5,6 +5,7 @@
 // unseen by player-2.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSelect } from "./support/select";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (p: Page) =>
@@ -70,7 +71,7 @@ test("FR-DICEX-66 FR-DICEX-68 FR-DICEX-69 FR-DICEX-70 tray macros per player; a 
   await tray.getByTestId("dicex-tray-palette").first().click(); // a fresh free request
   await tray.getByTestId("dicex-tray-expression").fill("1d20+2");
   await tray.getByTestId("dicex-tray-options").click();
-  await tray.getByTestId("dicex-tray-actor").selectOption({ label: "Mira" });
+  await pickSelect(tray, "dicex-tray-actor", { label: "Mira" });
   await tray.getByTestId("dicex-tray-save-macro").click();
   const form = p1.getByTestId("dicex-macro-form");
   await expect(form.getByTestId("dicex-macro-expression")).toHaveValue("1d20+2");
