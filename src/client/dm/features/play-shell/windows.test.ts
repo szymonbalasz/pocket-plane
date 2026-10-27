@@ -667,9 +667,9 @@ test('FR-SHELL-08 FR-SHELL-56 FR-SHELL-146 user opens keep a clear stored rect (
   }
 });
 
-test("FR-SHELL-42 DM handout viewer and Preferences (FR-SHELL-71) register restoreOpen: false; nothing else does", () => {
+test("FR-SHELL-42 DM handout viewer, Preferences (FR-SHELL-71) and the stat block (FR-KIT-100) register restoreOpen: false; nothing else does", () => {
   const off = dmWindows.defs.filter((d) => d.restoreOpen === false).map((d) => d.kind);
-  expect(off).toEqual(["party.handout", "shell.prefs"]);
+  expect(off).toEqual(["party.handout", "shell.prefs", "ent.statblock"]);
 });
 
 test("FR-SHELL-43 dm launcher, test-mode kinds included, at 1280 / 1440 / 1600 wide: every button inside the viewport with 8 px gutters or in the overflow menu; icon-only before any overflow; open windows stay in the bar", () => {
@@ -917,6 +917,7 @@ const GOLDEN_KINDS = [
   "hold.stronghold", // RS2 (S4, FR-SHELL-171): appended, goldens regenerated
   "cmp.rules", // SP2 (seams S4, FR-CMP-63; min 340×320): appended, goldens regenerated
   "recap.session", // SP3 (S4, FR-RECAP-10): appended, goldens regenerated
+  "ent.statblock", // kit-parity K7 (§7.3, FR-KIT-100): appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

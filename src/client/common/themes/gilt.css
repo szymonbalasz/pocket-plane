@@ -1727,3 +1727,19 @@
     border-color: var(--frame-rule);
   }
 }
+/* KIT: stat block (kit-parity K7, §6.11: the DM `ent.statblock` window, the kit's "Goblin" card;
+   its card parts are the library block's) ─────────────────────────────────────────────────── */
+/* Attack rows (the kit's `.atk`): a soft rule between rows (a shadow, no layout); the line muted. */
+:root[data-theme="gilt"] [data-slot="statblock-attack"] + [data-slot="statblock-attack"] {
+  box-shadow: inset 0 1px 0 var(--gs-rule-soft);
+}
+/* The ability grid's Check / Save buttons read as the kit's muted modifiers; gold on hover (the
+   ghost button's accent tokens, so utilities keep the colour order). */
+:root[data-theme="gilt"] [data-slot="statblock-abilities"] [data-slot="button"] {
+  --accent: transparent;
+  --accent-foreground: var(--gold);
+}
+/* Section heads (Traits, Actions): a soft rule in place of the plain border. */
+:root[data-theme="gilt"] [data-slot="statblock-section"] {
+  border-color: var(--gs-rule-soft);
+}

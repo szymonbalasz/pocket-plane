@@ -1,39 +1,16 @@
-// DM token menu "Stat block" (FR-CMP-22, registry FR-MAP-29) on monster tokens: an imported
-// definition → `cmp.compendium` on its entry; a custom (campaign) definition → its NPC sheet.
-// Players get no token menu.
-import { ENTITY_TYPE } from "@shared/entities/schemas";
-import type { TokenRecord } from "@shared/scenes-map/schemas";
+// DM token menu "Stat block" (FR-CMP-22, registry FR-MAP-29) on monster tokens, imported or
+// custom. Kit parity K7 (FR-KIT-101, amends FR-CMP-22): it opens the rollable stat-block window
+// `ent.statblock`, bound to the token's combatant in a running fight; the window's footer links
+// on to the compendium entry (imported) or the NPC sheet (custom). Players get no token menu.
 import { DropdownMenuItem } from "@ui/components/ui/menus";
-import { openSheetFor } from "@ui/features/character-sheet/selection";
-import { CHAR_SHEET_KIND } from "@ui/features/character-sheet/window";
-import { CMP_KIND, statBlockRoute } from "@ui/features/compendium/logic";
-import { openDefinition } from "@ui/features/compendium/nav";
-import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
-import { useRecords } from "@ui/sync/store";
 import { BookOpenIcon } from "lucide-react";
-import { useMemo } from "react";
+import { isMonsterToken, useOpenTokenStatBlock } from "../entities/statblock/openers";
 import type { TokenMenuEntry, TokenMenuItemProps } from "../scenes-map/token-menu";
 
-/** Monster tokens: no character behind them (FR-MAP-50 `characterId`). */
-export const isMonsterToken = (t: Pick<TokenRecord, "characterId">) => t.characterId === null;
-
 function StatBlockItem({ token }: TokenMenuItemProps) {
-  const openWindow = useOpenWindow();
-  const entities = useRecords<{ id: string }>(ENTITY_TYPE);
-  const campaignIds = useMemo(() => new Set(entities.map((e) => e.id)), [entities]);
+  const open = useOpenTokenStatBlock();
   return (
-    <DropdownMenuItem
-      data-testid="cmp-token-menu-statblock"
-      onSelect={() => {
-        if (statBlockRoute(token.definitionId, campaignIds) === "sheet") {
-          openSheetFor(token.definitionId, "monster");
-          openWindow(CHAR_SHEET_KIND);
-        } else {
-          openDefinition(token.definitionId);
-          openWindow(CMP_KIND);
-        }
-      }}
-    >
+    <DropdownMenuItem data-testid="cmp-token-menu-statblock" onSelect={() => open(token)}>
       <BookOpenIcon /> Stat block
     </DropdownMenuItem>
   );

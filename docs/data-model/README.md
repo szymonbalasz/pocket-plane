@@ -2701,3 +2701,10 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-55 �
 - **Derived (client, not stored):** `relativeTime(createdAt, now)` and `leadName(text, playerName)` (FR-KIT-56); the toast lead from `byPlayerId` → the held `player` record's name + `colorKeyOf` colour (FR-KIT-55); `dmTurnCardFor(frame, store)` = "‹name›'s turn" of the frame's `encounter.turnCombatantId` (FR-KIT-59); `toHitOutcome(natural)` (FR-KIT-63).
 - **Client memory (not stored):** `ToastState.turn` `{text, seq, remaining}`: the DM's turn card, 4 s, lost on reload (FR-KIT-59).
 - **Fixtures:** units `kit-notices-applied`, `kit-notices` (existing record types); bundle `kit-notices`.
+## 139. Sprint 13: stat-block window (K7)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-100 – -107). **Built by `build/kit-statblock`**. Protocol side: [protocol §175](../protocol/README.md#175-sprint-13-stat-block-window-k7). **No table, column, record type or wire field.**
+
+- **Client-only state:** the stat-block window's `StatBlockTarget {definitionId, combatantId?, entryId?}` in memory (`useStatBlockTarget`); lost on reload (`restoreOpen: false`).
+- **Derived (client, not stored):** the binding (`boundCombatant`: the target's combatant while active, not removed, in the started encounter); the type line (`typeLine`); the plain roll expressions (`plainAttackExpressions`: to-hit, damage parts joined).
+- **Fixtures:** bundle `kit-parity` = `theme-gilt` + `kit-log-rolls` (K1) + `combat-hit`, `combat-pending`, `cbtx-effects`, `cbtx-temp` (K2) + `cmp-srd-mini`, `cp-srd`, `pet-owlbear` (K4) + `kit-notices-applied`, `kit-notices` (K3); existing units only, one comment per track. CON-44 (measured): DM 51 751 B, P1 24 296 B, P2 20 519 B.

@@ -18,6 +18,7 @@ import { requestsWindow } from "./features/dice-extras/requests-window";
 import { dmTrayWindow } from "./features/dice-extras/tray-window";
 import { dmDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { creaturesWindow } from "./features/entities/creatures-window";
+import { statBlockWindow } from "./features/entities/statblock/window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
 import { dmPartyBoardWindow } from "./features/party-board/board-window";
 import { dmHandoutWindow } from "./features/party-board/handout-window";
@@ -48,6 +49,7 @@ const windows: WindowDef[] = [
   strongholdWindow, // hold.stronghold, no launcher (strongholds, FR-SHELL-170)
   dmRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
   recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
+  statBlockWindow, // ent.statblock "Stat block" (kit-parity K7, FR-KIT-100)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);

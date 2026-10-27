@@ -71,6 +71,7 @@ import kitInitiative from "./kit-initiative";
 import kitLibrary from "./kit-library";
 import kitLog from "./kit-log";
 import kitNotices from "./kit-notices";
+import kitParity from "./kit-parity";
 import lateDamage from "./late-damage";
 import logNoteColours from "./log-note-colours";
 import lootSubtractE2e from "./loot-subtract-e2e";
@@ -327,4 +328,7 @@ export const bundles: readonly Bundle[] = [
   // Sprint 13 K4 (build/kit-library): compendium, Party status, Creatures, sheet header walkthrough
   // + kit-library e2e
   kitLibrary,
+  // Sprint 13 K7 (build/kit-statblock): the kit-parity world (K6 parity walkthrough, K7
+  // walkthrough + kit-statblock e2e)
+  kitParity,
 ];

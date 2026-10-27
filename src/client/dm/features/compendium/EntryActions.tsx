@@ -20,6 +20,8 @@ import { backToList } from "@ui/features/compendium/nav";
 import { CopyIcon, CopyPlusIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { StatBlockTarget } from "../entities/statblock/logic";
+import { OpenAtTable } from "../entities/statblock/openers";
 import { AddToParty } from "./AddToParty";
 import { hasAddToParty } from "./add-to-party";
 import { DeriveDialog } from "./DeriveDialog";
@@ -65,7 +67,16 @@ function ConfirmDelete({
 
 const iconButton = "h-7 px-2 text-xs";
 
-export function EntryActions({ api, data }: { api: Api; data: EntryResponse }) {
+export function EntryActions({
+  api,
+  data,
+  openAtTable,
+}: {
+  api: Api;
+  data: EntryResponse;
+  /** FR-KIT-101 (K7): opens the stat block window (the DM window passes `useOpenStatBlock`). */
+  openAtTable?: (target: StatBlockTarget) => void;
+}) {
   const live = useLive();
   const [mode, setMode] = useState<FormMode | null>(null);
   const [deriving, setDeriving] = useState(false);
@@ -76,6 +87,10 @@ export function EntryActions({ api, data }: { api: Api; data: EntryResponse }) {
     if (!data.definition) return null;
     return (
       <>
+        {/* FR-KIT-101 (K7): the rollable stat block window on this monster. */}
+        {openAtTable && (
+          <OpenAtTable definitionId={data.definition.id} entryId={e.id} open={openAtTable} />
+        )}
         <Button
           variant="outline"
           size="sm"

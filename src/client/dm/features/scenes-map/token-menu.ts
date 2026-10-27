@@ -7,6 +7,7 @@ import { cbtxTokenMenu } from "../combat-extras/token-menu-entries";
 import { combatTokenMenu } from "../combat-tracker/token-menu-entries";
 import { cmpTokenMenu } from "../compendium/token-menu-entries";
 import { modTokenMenu } from "../effect-modifiers/token-menu-entries";
+import { statBlockDoubleClick } from "../entities/statblock/openers";
 import { entTokenMenu } from "../entities/token-menu-entries";
 import { fogTokenMenu } from "../fog-of-war/token-menu-entries";
 import { scenesMapTokenMenu } from "./token-menu-entries";
@@ -56,6 +57,7 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
 /** Token double-click: the first available entry by order runs. Append your feature's line. */
 export const tokenDoubleClick: readonly TokenDoubleClick[] = [
   companionDoubleClick, // character-sheet-full: an owned non-PC token → companion card (FR-MAP-77)
+  statBlockDoubleClick, // kit-parity K7: a monster token → the stat block (FR-KIT-101)
 ];
 
 export function menuFor(

@@ -9,10 +9,12 @@ import { compendiumWindowBase } from "@ui/features/compendium/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
 import { loadChunk } from "@ui/lib/lazy-chunk";
 import { useEffect, useState } from "react";
+import { useOpenStatBlock } from "../entities/statblock/store";
 import { EntryActions, NewHomebrew } from "./EntryActions";
 import { ImportPanel } from "./ImportPanel";
 
 function DmCompendium() {
+  const openStatBlock = useOpenStatBlock();
   const [api, setApi] = useState<Api | null>(null);
   useEffect(() => {
     let live = true;
@@ -32,7 +34,7 @@ function DmCompendium() {
       viewer="dm"
       top={<ImportPanel api={api} />}
       toolbar={<NewHomebrew api={api} />}
-      entryActions={(data) => <EntryActions api={api} data={data} />}
+      entryActions={(data) => <EntryActions api={api} data={data} openAtTable={openStatBlock} />}
     />
   );
 }
