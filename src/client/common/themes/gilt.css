@@ -1442,6 +1442,8 @@
     [data-slot="kit-result"] {
     border-color: var(--frame-rule);
     color: var(--muted-foreground);
+  }
+}
 
 /* KIT: initiative (kit-parity K2, §6.3: turn gem, large number, status icons, header, footer) ── */
 /* The turn gem is markup now (`init-turn`, every theme): the gem gradient + glow on it, and the
