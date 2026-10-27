@@ -1,15 +1,17 @@
-// Main tab (CHARX §7), laid out as a printed sheet (§6.2): labelled boxes (FR-CHARX-105); the
-// stat row with the Armor Class shield, Hit Points, Speed, Initiative (the box is the Initiative
-// button, FR-CHAR-24) and Proficiency (FR-CHARX-106); the HP control row (FR-CHARX-107); the
-// vitals box (hit dice + `vitals` sections) and the Senses line (FR-CHARX-108); ability blocks
-// (the modifier is the Check button, the Save line inside, FR-CHARX-109); the Skills box and the
-// passive boxes (FR-CHARX-110/111); main sections. Two columns once the sheet is ≥ 560 px wide
-// (FR-CHARX-112); every derived number has its breakdown Tooltip (FR-CHARX-113). No attack row
-// (FR-CHARX-44). Edit mode: identity, scores, proficiencies, stats and overrides in place
-// (FR-CHARX-27, -116).
+// Main tab (CHARX §7), laid out as a printed sheet (§6.2) and sized as the kit's "Character
+// sheet" section (K11): labelled boxes (FR-CHARX-105); the stat row with the Armor Class shield,
+// Hit Points (current / max, the bar, the Temp column), Speed, Initiative (the box is the
+// Initiative button, FR-CHAR-24) and Proficiency (FR-CHARX-106); the compact HP control row
+// under it (FR-CHARX-107); the vitals line (hit dice + `vitals` sections) and the Senses line
+// (FR-CHARX-108); ability blocks (the modifier is the Check button, the Save inside, FR-CHARX-109);
+// the Skills box and the passive boxes (FR-CHARX-110/111); main sections. Two columns once the
+// sheet is ≥ 560 px wide (FR-CHARX-112); every derived number has its breakdown Tooltip
+// (FR-CHARX-113). No attack row (FR-CHARX-44). The DM's public switches sit in the header's
+// Public rolls menu (K11, `./PublicMenu`). Edit mode: identity, scores, proficiencies, stats and
+// overrides in place (FR-CHARX-27, -116).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
-import { hpState, isDown, parseHpAmount, signed, speedText } from "@shared/character-sheet/logic";
+import { hpState, isDown, parseHpAmount, signed } from "@shared/character-sheet/logic";
 import { CHAR_ADJUST_HP } from "@shared/character-sheet/schemas";
 import { CHARX_INTENTS } from "@shared/character-sheet/sheet";
 import {
@@ -32,7 +34,7 @@ import { Checkbox } from "../../components/ui/controls";
 import { Badge, Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
-import { BOX_LABEL, BOX_VALUE, Box, D20Glyph, ShieldOutline } from "./boxes";
+import { BOX_LABEL, BOX_UNIT, BOX_VALUE, Box, D20Glyph, ShieldOutline, WideLabel } from "./boxes";
 import { BreakdownTip } from "./breakdown";
 import { RoutedRoll, SheetRoll } from "./CharacterSheet";
 import {
@@ -45,7 +47,7 @@ import {
   useBusy,
 } from "./fields";
 import { rollRoutes } from "./roll-routes";
-import { type PublicOverrides, PublicSwitch, usePublicOverrides } from "./rolls";
+import { useSheetOverrides } from "./rolls";
 import { rollActionView, routeFor } from "./routing";
 import { SensesLine } from "./Senses";
 import { SheetSlotView } from "./SheetSections";
@@ -61,20 +63,20 @@ import {
   withSkill,
 } from "./view-model";
 
-const HP_CLASS = { full: "text-hp-full", bloodied: "text-hp-bloodied", down: "text-hp-down" };
 const HP_BAR = { full: "bg-hp-full", bloodied: "bg-hp-bloodied", down: "bg-hp-down" };
 
 /**
  * FR-CHARX-112 / -118: the layout follows the sheet's own width (`@container/sheet` on the sheet
  * body, outside the tab content's scrollbar, so a scrollbar never flips it): wide at ≥ 560 px;
  * the ability grid keeps cells ≥ 80 px (3 columns from 268 px, 2 below, e.g. a 280 px window).
+ * Gaps as the kit: 6 px narrow, 8 px wide (stat row, abilities), 10 / 12 px between blocks.
  */
 export const STAT_GRID =
-  "grid grid-cols-[64px_repeat(3,minmax(0,1fr))] gap-1.5 @min-[560px]/sheet:grid-cols-[96px_minmax(0,1.8fr)_repeat(3,minmax(0,1fr))]";
+  "grid grid-cols-[64px_repeat(3,minmax(0,1fr))] gap-1.5 @min-[560px]/sheet:grid-cols-[96px_minmax(0,1.8fr)_repeat(3,minmax(0,1fr))] @min-[560px]/sheet:gap-2";
 export const COLUMNS =
-  "flex flex-col gap-3 @min-[560px]/sheet:grid @min-[560px]/sheet:grid-cols-[200px_minmax(0,1fr)] @min-[560px]/sheet:items-start";
+  "flex flex-col gap-2.5 @min-[560px]/sheet:grid @min-[560px]/sheet:grid-cols-[200px_minmax(0,1fr)] @min-[560px]/sheet:items-start @min-[560px]/sheet:gap-3";
 export const ABILITY_GRID =
-  "grid grid-cols-2 gap-1.5 @min-[268px]/sheet:grid-cols-3 @min-[560px]/sheet:grid-cols-1";
+  "grid grid-cols-2 gap-1.5 @min-[268px]/sheet:grid-cols-3 @min-[560px]/sheet:grid-cols-1 @min-[560px]/sheet:gap-2";
 
 /** FR-CHARX-111: the passive boxes' narrow labels; the full name is in the Tooltip. */
 const PASSIVE_SHORT: Readonly<Record<PassiveSkill, string>> = {
@@ -82,6 +84,9 @@ const PASSIVE_SHORT: Readonly<Record<PassiveSkill, string>> = {
   investigation: "Invest.",
   insight: "Insight",
 };
+
+/** K11: the kit's small stone button (`.btn.sm`), for the compact HP control. */
+const SMALL = "h-7 px-2.5 text-[13px]";
 
 /** `char.edit` of one key; returns the intent promise (fields handle failure). */
 function useEdit() {
@@ -96,7 +101,10 @@ function ArmorClass() {
   const edit = useEdit();
   const e = ctx.editing && ctx.canEdit;
   const value = (
-    <span data-testid="char-sheet-ac" className={BOX_VALUE}>
+    <span
+      data-testid="char-sheet-ac"
+      className="text-[26px] font-bold tabular-nums leading-none @min-[560px]/sheet:text-[36px]"
+    >
       {e ? (
         <IntField
           path="ac"
@@ -119,9 +127,11 @@ function ArmorClass() {
       data-slot="sheet-shield"
       className="relative row-span-2 grid min-h-16 place-items-center text-border @min-[560px]/sheet:row-span-1"
     >
-      <ShieldOutline className="size-full max-h-24" />
+      <ShieldOutline className="size-full max-h-[86px] @min-[560px]/sheet:max-h-[104px]" />
       <div className="absolute inset-0 flex flex-col items-center justify-center pb-1.5 text-foreground">
-        <span className={BOX_LABEL}>AC</span>
+        <span className={BOX_LABEL}>
+          <WideLabel short="AC" full="Armor Class" />
+        </span>
         {e ? value : <BreakdownTip okey="ac">{value}</BreakdownTip>}
       </div>
     </div>
@@ -129,32 +139,46 @@ function ArmorClass() {
 }
 
 /**
- * FR-CHARX-106: Hit Points: `current / max`, the HP bar, "Down" at 0 and a read-only "Temp N"
- * while temp HP > 0 (OQ-CHARX-47; its control stays in the vitals box). NPC sheets: HP max.
+ * FR-CHARX-106 (kit `.hpbox`): Hit Points: the label across the top; `current / max` with the
+ * max as a small unit and "Down" at 0; the HP bar under it; the Temp column on the right (K11,
+ * amends OQ-CHARX-47: always there for a character, the `hp` sections, i.e. combat-extras' temp
+ * HP control, laid over it). NPC sheets: HP max only.
  */
 function HitPoints() {
   const ctx = useSheet();
   const edit = useEdit();
+  const store = useSync((st) => st.store);
   const s = ctx.stats;
   const c = ctx.creature;
   const hp = c.kind === "character" ? c.hpCurrent : null;
   const temp = c.kind === "character" ? (c.tempHp ?? 0) : 0;
   const e = ctx.editing && ctx.canEdit;
   const state = hp === null ? null : hpState(hp, s.hpMax);
+  const hpSections =
+    hp === null || ctx.readOnly
+      ? []
+      : sectionsFor(sheetSections, {
+          slot: "hp",
+          client: ctx.client,
+          kind: c.kind,
+          store,
+          creatureId: c.id,
+        });
   return (
-    <Box
-      box="hp"
-      label={hp === null ? "HP max" : "Hit Points"}
-      className="col-span-3 justify-center @min-[560px]/sheet:col-span-1"
+    <div
+      data-testid="charx-box"
+      data-value="hp"
+      data-slot="sheet-box"
+      className="col-span-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2.5 gap-y-1 rounded-md border bg-card px-2.5 pt-[5px] pb-2 @min-[560px]/sheet:col-span-1"
     >
-      <span className="flex flex-wrap items-center justify-center gap-x-1.5">
+      <span className={cn(BOX_LABEL, "col-span-2 truncate text-center")}>
+        {hp === null ? "HP max" : "Hit Points"}
+      </span>
+      <span className="col-start-1 flex min-w-0 flex-wrap items-baseline gap-x-1.5">
         {hp !== null && state && (
-          <span
-            data-testid="char-sheet-hp"
-            data-state={state}
-            className={cn(BOX_VALUE, HP_CLASS[state])}
-          >
-            {hp} / {s.hpMax}
+          <span data-testid="char-sheet-hp" data-state={state} className={BOX_VALUE}>
+            {hp}
+            <span className={BOX_UNIT}> / {s.hpMax}</span>
           </span>
         )}
         {e ? (
@@ -174,29 +198,42 @@ function HitPoints() {
           )
         )}
         {hp !== null && isDown(hp) && (
-          <Badge data-testid="char-sheet-down" className="bg-hp-down text-hp-down-foreground">
+          <Badge
+            data-testid="char-sheet-down"
+            className="self-center bg-hp-down text-hp-down-foreground"
+          >
             Down
           </Badge>
         )}
-        {temp > 0 && (
-          <span
-            data-testid="charx-hp-temp"
-            data-value={temp}
-            className="text-xs text-muted-foreground tabular-nums"
-          >
-            Temp {temp}
-          </span>
-        )}
       </span>
+      {hp !== null && (
+        <span
+          data-testid="charx-hp-temp"
+          data-value={temp}
+          className="relative col-start-2 row-span-2 row-start-2 flex flex-col items-center justify-center self-stretch rounded-sm border-l pl-2.5"
+        >
+          <span className={cn(BOX_LABEL, "text-[11px]")}>Temp</span>
+          <span className="text-xl font-bold tabular-nums leading-tight">{temp}</span>
+          {hpSections.length > 0 && (
+            <SheetSlotView
+              slot="hp"
+              creatureId={c.id}
+              client={ctx.client}
+              kind={c.kind}
+              className="contents"
+            />
+          )}
+        </span>
+      )}
       {hp !== null && state && (
-        <span className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+        <span className="col-start-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
           <span
             className={cn("block h-full", HP_BAR[state])}
             style={{ width: `${Math.max(0, Math.min(100, (hp / s.hpMax) * 100))}%` }}
           />
         </span>
       )}
-    </Box>
+    </div>
   );
 }
 
@@ -204,6 +241,7 @@ function Speed() {
   const ctx = useSheet();
   const edit = useEdit();
   const e = ctx.editing && ctx.canEdit;
+  const speed = ctx.stats.speed;
   return (
     <Box box="speed" label="Speed">
       <span data-testid="char-sheet-speed" className={BOX_VALUE}>
@@ -211,7 +249,7 @@ function Speed() {
           <IntField
             path="speed"
             label="Speed"
-            value={ctx.stats.speed ?? null}
+            value={speed ?? null}
             min={0}
             max={200}
             optional
@@ -221,23 +259,31 @@ function Speed() {
               return edit("speed", v);
             }}
           />
+        ) : speed === undefined ? (
+          "—"
         ) : (
-          speedText(ctx.stats.speed)
+          <>
+            {speed}
+            <span className={BOX_UNIT}> ft</span>
+          </>
         )}
       </span>
     </Box>
   );
 }
 
+const INIT_LABEL = <WideLabel short="Init" full="Initiative" />;
+
 /**
  * FR-CHARX-106: the Initiative box is the Initiative button whenever FR-CHAR-24 shows it (routed
  * like the MVP sheet, FR-CHAR-16); otherwise a plain box ("Initiative set" under the value while
  * combat hides the button). Edit mode: the bonus input in the box.
  */
-function Initiative({ overrides }: { overrides: PublicOverrides }) {
+function Initiative() {
   const ctx = useSheet();
   const edit = useEdit();
   const store = useSync((s) => s.store);
+  const overrides = useSheetOverrides();
   const s = ctx.stats;
   const claim = routeFor(rollRoutes, store, ctx.creature.id, "initiative");
   const value = (
@@ -259,14 +305,14 @@ function Initiative({ overrides }: { overrides: PublicOverrides }) {
   );
   if (ctx.editing && ctx.canEdit) {
     return (
-      <Box box="init" label="Init">
+      <Box box="init" label={INIT_LABEL}>
         {value}
       </Box>
     );
   }
   if (rollActionView(claim, "initiative") !== "button") {
     return (
-      <Box box="init" label="Init">
+      <Box box="init" label={INIT_LABEL}>
         <BreakdownTip okey="init">{value}</BreakdownTip>
         <RoutedRoll kind="initiative" title="Initiative">
           Initiative
@@ -285,9 +331,9 @@ function Initiative({ overrides }: { overrides: PublicOverrides }) {
         data-slot="sheet-roll"
         variant="ghost"
         aria-label={`Initiative ${signed(s.initBonus)}`}
-        className="size-full min-h-12 flex-col gap-0 px-1 py-1"
+        className="size-full min-h-12 flex-col gap-0 px-1 pt-[5px] pb-1.5"
       >
-        <span className={BOX_LABEL}>Init</span>
+        <span className={BOX_LABEL}>{INIT_LABEL}</span>
         {value}
       </RoutedRoll>
     </Box>
@@ -300,7 +346,15 @@ function Proficiency() {
   return (
     <Box box="prof">
       <span data-testid="char-sheet-prof" className="flex flex-col items-center">
-        <span className={BOX_LABEL}>Prof</span>{" "}
+        {/* "Prof" stays the text (FR-CHAR-22's "Prof +2", CHAR e2e); the wide sheet completes
+            the word with a drawn suffix. */}
+        <span className={BOX_LABEL}>
+          Prof
+          <span
+            aria-hidden
+            className="hidden @min-[560px]/sheet:inline @min-[560px]/sheet:after:content-['iciency']"
+          />
+        </span>{" "}
         <span data-testid="charx-prof" className={BOX_VALUE}>
           <OverrideControl okey="proficiency" breakdown>
             {signed(proficiencyBonus(ctx.stats))}
@@ -312,19 +366,22 @@ function Proficiency() {
 }
 
 /** FR-CHARX-106: narrow, AC tall on the left, HP across the top, the rest below; wide, one row. */
-function StatRow({ overrides }: { overrides: PublicOverrides }) {
+function StatRow() {
   return (
     <div className={STAT_GRID}>
       <ArmorClass />
       <HitPoints />
       <Speed />
-      <Initiative overrides={overrides} />
+      <Initiative />
       <Proficiency />
     </div>
   );
 }
 
-/** FR-CHAR-11: amount 1–999 + Damage / Heal; characters, owner or DM (also locked). */
+/**
+ * FR-CHAR-11 / FR-CHARX-107: amount 1–999 + Damage / Heal, a compact row under the stat row
+ * (OQ-CHARX-48 A; K11: small field and small buttons); characters, owner or DM (also locked).
+ */
 function HpControl() {
   const ctx = useSheet();
   const live = useSync((s) => s.state === "live");
@@ -343,13 +400,13 @@ function HpControl() {
     );
   };
   return (
-    <div className="flex items-center gap-2">
+    <div data-testid="charx-hp-control" className="flex items-center gap-1.5">
       <Input
         data-testid="char-sheet-hp-input"
         aria-label="HP amount"
         inputMode="numeric"
-        placeholder="Amount"
-        className="h-8 w-20"
+        placeholder="HP"
+        className="h-7 w-16 px-2 text-sm"
         value={raw}
         disabled={!live}
         aria-invalid={raw.trim() !== "" && amount === null}
@@ -359,6 +416,7 @@ function HpControl() {
         data-testid="char-sheet-hp-damage"
         size="sm"
         variant="destructive"
+        className={SMALL}
         disabled={disabled}
         onClick={() => send(-1)}
       >
@@ -368,6 +426,7 @@ function HpControl() {
         data-testid="char-sheet-hp-heal"
         size="sm"
         variant="outline"
+        className={SMALL}
         disabled={disabled}
         onClick={() => send(1)}
       >
@@ -378,33 +437,9 @@ function HpControl() {
 }
 
 /**
- * FR-CHARX-107: the HP control stays a row under the stat row (OQ-CHARX-48); the DM's Initiative
- * public switch sits at its end (FR-CHAR-24: none while the button is hidden).
+ * Hit dice (FR-CHARX-17), the kit's vitals group "Hit Dice 3 / 5 d10": the count left is the
+ * button (click = use, Shift+click = restore); Reset after it while any is used.
  */
-function ControlRow({ overrides }: { overrides: PublicOverrides }) {
-  const ctx = useSheet();
-  const store = useSync((s) => s.store);
-  const claim = routeFor(rollRoutes, store, ctx.creature.id, "initiative");
-  const showInit =
-    !(ctx.editing && ctx.canEdit) && rollActionView(claim, "initiative") === "button";
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-2 empty:hidden">
-      <HpControl />
-      {showInit && (
-        <span className="ml-auto">
-          <PublicSwitch
-            category="initiative"
-            label="Public"
-            testId="char-sheet-public-init"
-            overrides={overrides}
-          />
-        </span>
-      )}
-    </div>
-  );
-}
-
-/** Hit dice pips (FR-CHARX-17): click = use, Shift+click = restore; Reset. */
 function HitDice() {
   const ctx = useSheet();
   const live = useSync((s) => s.state === "live");
@@ -418,8 +453,8 @@ function HitDice() {
       intents.send(CHARX_INTENTS.useResource, { characterId: ctx.creature.id, resource, ...op }),
     );
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs">
-      <span className={BOX_LABEL}>Hit dice</span>
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+      <span className={BOX_LABEL}>Hit Dice</span>
       {pips.map((p) => (
         <span key={p.die} className="flex items-center gap-1">
           <button
@@ -429,18 +464,19 @@ function HitDice() {
             data-used={p.used}
             aria-label={`Hit dice ${p.die}: ${p.used} of ${p.max} used`}
             disabled={!live || busy.busy || !ctx.canCount}
-            className="rounded border px-1.5 py-0.5 tabular-nums hover:bg-muted disabled:opacity-50"
+            className="rounded-sm px-0.5 text-lg font-bold tabular-nums text-foreground hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
             onClick={(e) => use({ hitDie: p.die }, { delta: pipDelta(e.shiftKey) })}
           >
-            {p.die} {p.max - p.used}/{p.max}
+            {p.max - p.used} / {p.max}
           </button>
+          <span>{p.die}</span>
           {p.used > 0 && ctx.canCount && (
             <button
               type="button"
               data-testid="charx-resource-reset"
               data-value={`hitDie.${p.die}`}
               disabled={!live || busy.busy}
-              className="text-[10px] text-muted-foreground underline"
+              className="text-xs text-muted-foreground underline"
               onClick={() => use({ hitDie: p.die }, { reset: true })}
             >
               Reset
@@ -448,13 +484,13 @@ function HitDice() {
           )}
         </span>
       ))}
-    </div>
+    </span>
   );
 }
 
 /**
- * FR-CHARX-108: hit dice and the `vitals` sections (temp HP, death saves, §7.1) in one box; left
- * out when the sheet has neither (FR-CHARX-116: NPC sheets).
+ * FR-CHARX-108 (kit `.vitals`): one quiet line: hit dice, then the `vitals` sections (death saves,
+ * §7.1); left out when the sheet has neither (FR-CHARX-116: NPC sheets).
  */
 function VitalsBox() {
   const ctx = useSheet();
@@ -472,7 +508,11 @@ function VitalsBox() {
       });
   if (!dice && sections.length === 0) return null;
   return (
-    <Box box="vitals" list className="gap-1.5">
+    <Box
+      box="vitals"
+      list
+      className="flex-row flex-wrap items-center gap-x-4 gap-y-1.5 px-2.5 py-1.5"
+    >
       <HitDice />
       {sections.length > 0 && (
         <SheetSlotView
@@ -480,7 +520,7 @@ function VitalsBox() {
           creatureId={c.id}
           client={ctx.client}
           kind={c.kind}
-          className="flex flex-col gap-1.5"
+          className="contents"
         />
       )}
     </Box>
@@ -651,30 +691,34 @@ function ClassesEditor() {
   );
 }
 
-/** A proficiency dot (saves, skills); `double` = expertise. */
+/** A proficiency dot (kit `.prof`, 11 px; saves, skills); `double` = expertise, a ringed dot. */
 function ProfDot({ on, double = false }: { on: boolean; double?: boolean }) {
   return (
-    <span data-slot="sheet-pip" className="flex gap-px">
-      <span
-        className={cn(
-          "size-1.5 rounded-full border border-foreground/60",
-          on ? "bg-foreground" : "bg-transparent",
-        )}
-      />
-      {double && <span className="size-1.5 rounded-full bg-foreground" />}
-    </span>
+    <span
+      data-slot="sheet-pip"
+      data-on={on ? "true" : "false"}
+      data-double={double ? "true" : undefined}
+      className={cn(
+        "inline-block size-[11px] shrink-0 rounded-full border-[1.5px] border-foreground/60",
+        on ? "bg-foreground" : "bg-transparent",
+        double && "ring-[1.5px] ring-foreground/60 ring-offset-2 ring-offset-card",
+      )}
+    />
   );
 }
 
 /**
- * FR-CHARX-109 (FR-CHAR-22's behaviour): name; the large signed modifier is the Check button; the
- * score in a pill; the Save line (proficiency dot, "Save", the save as the Save button).
+ * FR-CHARX-109 (FR-CHAR-22's behaviour; kit `.ab`): the label on top; the large signed modifier
+ * is the Check button; the score in a pill under it; the Save (proficiency dot, the save as the
+ * Save button) under them in the narrow sheet, its own ruled column on the right ("Save" between
+ * dot and box) once the sheet is wide.
  */
-function AbilityBlock({ a, overrides }: { a: Ability; overrides: PublicOverrides }) {
+function AbilityBlock({ a }: { a: Ability }) {
   const ctx = useSheet();
   const edit = useEdit();
   const live = useSync((s) => s.state === "live");
   const busy = useBusy();
+  const overrides = useSheetOverrides();
   const s = ctx.stats;
   const e = ctx.editing && ctx.canEdit;
   const scores = s.abilities;
@@ -692,13 +736,13 @@ function AbilityBlock({ a, overrides }: { a: Ability; overrides: PublicOverrides
       data-testid="char-sheet-ability"
       data-value={a}
       data-slot="sheet-ability"
-      className="flex min-w-0 flex-col items-center gap-0.5 rounded-md border bg-card px-1 pt-1 pb-1.5 text-center"
+      className="flex min-w-0 flex-col items-center gap-0.5 rounded-md border bg-card px-1 pt-[5px] pb-1.5 text-center @min-[560px]/sheet:grid @min-[560px]/sheet:grid-cols-[minmax(0,1fr)_70px] @min-[560px]/sheet:gap-y-0.5 @min-[560px]/sheet:px-1.5"
     >
-      <span className={BOX_LABEL}>
+      <span className={cn(BOX_LABEL, "@min-[560px]/sheet:col-span-2")}>
         <span className="@min-[560px]/sheet:hidden">{a.toUpperCase()}</span>
         <span className="hidden @min-[560px]/sheet:inline">{ABILITY_NAMES[a]}</span>
       </span>
-      <span className="flex items-center gap-0.5">
+      <span className="flex items-center justify-center gap-0.5 @min-[560px]/sheet:col-start-1">
         <SheetRoll
           kind="check"
           rollRef={{ ability: a }}
@@ -709,7 +753,7 @@ function AbilityBlock({ a, overrides }: { a: Ability; overrides: PublicOverrides
           data-value={a}
           data-slot="sheet-roll"
           variant="ghost"
-          className="h-8 px-1.5 text-xl font-semibold tabular-nums"
+          className="h-8 px-1.5 text-2xl font-bold tabular-nums @min-[560px]/sheet:h-11 @min-[560px]/sheet:text-[34px]"
           aria-label={`${ABILITY_NAMES[a]} check ${signed(check)}`}
         >
           <OverrideMark okey={`check.${a}`}>
@@ -720,26 +764,28 @@ function AbilityBlock({ a, overrides }: { a: Ability; overrides: PublicOverrides
         </SheetRoll>
         <OverrideEdit okey={`check.${a}`} />
       </span>
-      {e ? (
-        <IntField
-          path={`abilities.${a}`}
-          label={ABILITY_NAMES[a]}
-          value={scores[a]}
-          min={1}
-          max={30}
-          inputClassName="w-10"
-          commit={(v) => edit("abilities", { ...scores, [a]: v })}
-        />
-      ) : (
-        <span
-          data-testid="char-sheet-ability-score"
-          data-value={a}
-          className="rounded-full border px-2 text-xs text-muted-foreground tabular-nums"
-        >
-          {scores[a]}
-        </span>
-      )}
-      <span className="flex flex-wrap items-center justify-center gap-1 text-[10px] text-muted-foreground">
+      <span className="flex justify-center @min-[560px]/sheet:col-start-1">
+        {e ? (
+          <IntField
+            path={`abilities.${a}`}
+            label={ABILITY_NAMES[a]}
+            value={scores[a]}
+            min={1}
+            max={30}
+            inputClassName="w-10"
+            commit={(v) => edit("abilities", { ...scores, [a]: v })}
+          />
+        ) : (
+          <span
+            data-testid="char-sheet-ability-score"
+            data-value={a}
+            className="min-w-[38px] rounded-full border px-2 text-sm text-muted-foreground tabular-nums"
+          >
+            {scores[a]}
+          </span>
+        )}
+      </span>
+      <span className="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-[13px] text-muted-foreground @min-[560px]/sheet:col-start-2 @min-[560px]/sheet:row-span-2 @min-[560px]/sheet:row-start-2 @min-[560px]/sheet:mt-0 @min-[560px]/sheet:flex-col @min-[560px]/sheet:gap-0.5 @min-[560px]/sheet:self-stretch @min-[560px]/sheet:border-l">
         {e && (
           <Checkbox
             data-testid="charx-field"
@@ -754,10 +800,11 @@ function AbilityBlock({ a, overrides }: { a: Ability; overrides: PublicOverrides
           data-testid="char-sheet-save-prof"
           data-value={a}
           data-proficient={proficient ? "true" : "false"}
+          className="flex"
         >
           <ProfDot on={proficient} />
         </span>
-        Save
+        <span className="sr-only @min-[560px]/sheet:not-sr-only">Save</span>
         <SheetRoll
           kind="save"
           rollRef={{ ability: a }}
@@ -767,7 +814,7 @@ function AbilityBlock({ a, overrides }: { a: Ability; overrides: PublicOverrides
           data-testid="char-sheet-roll-save"
           data-value={a}
           data-slot="sheet-roll"
-          className="h-6 px-1.5 text-xs tabular-nums"
+          className="h-6 px-1.5 text-[15px] font-bold tabular-nums"
           aria-label={`${ABILITY_NAMES[a]} save ${signed(save)}`}
         >
           <OverrideMark okey={`save.${a}`}>{signed(save)}</OverrideMark>
@@ -778,12 +825,11 @@ function AbilityBlock({ a, overrides }: { a: Ability; overrides: PublicOverrides
   );
 }
 
-/** FR-CHAR-22 / FR-CHARX-109: the six ability blocks; the DM's public switches above them. */
+/** FR-CHAR-22 / FR-CHARX-109: the six ability blocks (the DM's switches: the header menu). */
 function AbilitiesBlock() {
   const ctx = useSheet();
   const edit = useEdit();
   const live = useSync((s) => s.state === "live");
-  const overrides = usePublicOverrides();
   const busy = useBusy();
   const e = ctx.editing && ctx.canEdit;
   if (!ctx.stats.abilities) {
@@ -812,61 +858,44 @@ function AbilitiesBlock() {
     );
   }
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      {ctx.client === "dm" && !ctx.npc && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <PublicSwitch
-            category="ability-check"
-            label="Checks"
-            testId="char-sheet-public-check"
-            overrides={overrides}
-          />
-          <PublicSwitch
-            category="saving-throw"
-            label="Saves"
-            testId="char-sheet-public-save"
-            overrides={overrides}
-          />
-        </div>
-      )}
-      <div className={ABILITY_GRID}>
-        {ABILITIES.map((a) => (
-          <AbilityBlock key={a} a={a} overrides={overrides} />
-        ))}
-      </div>
+    <div className={ABILITY_GRID}>
+      {ABILITIES.map((a) => (
+        <AbilityBlock key={a} a={a} />
+      ))}
     </div>
   );
 }
 
 /**
- * FR-CHARX-110 / -111: the Skills box (18 rows, alphabetical: dot / double dot, name, ability
- * tag, bonus = roll button with a d20 glyph; proficient rows tinted), then the passive boxes.
+ * FR-CHARX-110 / -111 (kit `.skillbox`, `.sk`, `.passives`): the Skills box, its label centred
+ * over a rule, 18 rows in body type, alphabetical: the proficiency dot (ringed for expertise),
+ * name, the muted ability tag, the bonus as a boxed roll button with the d20; proficient rows
+ * tinted. Then the passive boxes.
  */
 function SkillsBlock() {
   const ctx = useSheet();
   const edit = useEdit();
   const live = useSync((s) => s.state === "live");
-  const overrides = usePublicOverrides();
+  const overrides = useSheetOverrides();
   const busy = useBusy();
   const rows = skillRows(ctx.stats);
   if (!rows) return null;
   const e = ctx.editing && ctx.canEdit;
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <Box
-        box="skills"
-        list
-        label="Skills"
-        aside={
-          <PublicSwitch
-            category="skill-check"
-            label="Public"
-            testId="charx-public-skill"
-            overrides={overrides}
-          />
-        }
+    <div className="flex min-w-0 flex-col gap-2.5">
+      <div
+        data-testid="charx-box"
+        data-value="skills"
+        data-slot="sheet-box"
+        className="flex min-w-0 flex-col rounded-md border bg-card"
       >
-        <div className="flex flex-col">
+        <span
+          data-slot="sheet-box-rule"
+          className={cn(BOX_LABEL, "border-b px-2.5 pt-1.5 pb-1 text-center")}
+        >
+          Skills
+        </span>
+        <div className="flex flex-col py-0.5">
           {rows.map((r) => (
             <div
               key={r.skill}
@@ -875,7 +904,7 @@ function SkillsBlock() {
               data-proficiency={r.proficiency ?? "none"}
               data-slot="sheet-skill-row"
               className={cn(
-                "flex items-center gap-1.5 rounded-sm px-0.5 text-xs",
+                "flex min-h-7 items-center gap-2 py-0.5 pr-2 pl-2.5 text-[15px]",
                 r.proficiency && "bg-muted/60",
               )}
             >
@@ -885,7 +914,7 @@ function SkillsBlock() {
                 data-value={`skills.${r.skill}`}
                 aria-label={`${r.name} proficiency: ${r.proficiency ?? "none"}`}
                 disabled={!e || !live || busy.busy}
-                className="flex w-4 shrink-0 justify-center disabled:cursor-default"
+                className="flex w-3 shrink-0 justify-center disabled:cursor-default"
                 onClick={() =>
                   busy.run(() => {
                     const next = withSkill(
@@ -900,7 +929,9 @@ function SkillsBlock() {
                 <ProfDot on={r.proficiency !== null} double={r.proficiency === "expertise"} />
               </button>
               <span className="min-w-0 flex-1 truncate">{r.name}</span>
-              <span className="w-7 shrink-0 text-[10px] text-muted-foreground">{r.abbr}</span>
+              <span className="w-[34px] shrink-0 text-xs tracking-wide text-muted-foreground">
+                {r.abbr}
+              </span>
               <SheetRoll
                 kind="skill"
                 rollRef={{ skill: r.skill }}
@@ -910,7 +941,7 @@ function SkillsBlock() {
                 data-testid="charx-roll-skill"
                 data-value={r.skill}
                 data-slot="sheet-roll"
-                className="h-5 min-w-12 justify-between gap-1 px-1.5 text-xs"
+                className="h-6 min-w-[54px] justify-between gap-1 px-1.5 text-base font-bold"
                 aria-label={`${r.name} ${signed(r.bonus)}`}
               >
                 <D20Glyph className="text-muted-foreground" />
@@ -928,19 +959,19 @@ function SkillsBlock() {
             </div>
           ))}
         </div>
-      </Box>
+      </div>
       <div data-testid="charx-box" data-value="passives" className="grid grid-cols-3 gap-1.5">
         {passives(ctx.stats).map((p) => (
           <div
             key={p.skill}
             data-slot="sheet-box"
-            className="flex min-w-0 flex-col items-center rounded-md border bg-card px-1 pt-1 pb-1.5 text-center"
+            className="flex min-w-0 flex-col items-center rounded-md border bg-card px-1 pt-[5px] pb-1.5 text-center"
           >
             <span className={cn(BOX_LABEL, "max-w-full truncate")}>
               <span className="@min-[560px]/sheet:hidden">{PASSIVE_SHORT[p.skill]}</span>
               <span className="hidden @min-[560px]/sheet:inline">{p.name}</span>
             </span>
-            <span className={BOX_VALUE}>
+            <span className="text-[22px] font-bold tabular-nums leading-[1.15] @min-[560px]/sheet:text-[28px]">
               <OverrideControl okey={`passive.${p.skill}`} breakdown>
                 <span data-testid="charx-passive" data-value={p.skill} className="tabular-nums">
                   {p.value}
@@ -961,14 +992,12 @@ function Columns({ children }: { children: ReactNode }) {
 
 export function MainTab() {
   const ctx = useSheet();
-  // Initiative's DM public override: the switch (control row) and the button (stat row).
-  const initOverrides = usePublicOverrides();
   const kind = ctx.creature.kind;
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       {ctx.editing && ctx.canEdit && <IdentityEditor />}
-      <StatRow overrides={initOverrides} />
-      <ControlRow overrides={initOverrides} />
+      <StatRow />
+      <HpControl />
       <VitalsBox />
       <SensesLine />
       <Columns>

@@ -5,7 +5,11 @@
 import type { RecordStore } from "@shared/protocol/store";
 import type { ComponentType } from "react";
 
-export type SheetSlot = "header" | "vitals" | "main" | "tab";
+/**
+ * `hp` (K11): the Hit Points box's Temp column (combat-extras' temp HP control is laid over it);
+ * `vitals`: the vitals line under the stat row.
+ */
+export type SheetSlot = "header" | "hp" | "vitals" | "main" | "tab";
 export type SheetClient = "dm" | "player";
 export type SheetCreatureKind = "character" | "monster";
 

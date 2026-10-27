@@ -56,7 +56,7 @@ export function SheetSlotView({
   sections = sheetSections,
   className,
 }: {
-  slot: "header" | "vitals" | "main";
+  slot: "header" | "hp" | "vitals" | "main";
   creatureId: string;
   client: SheetClient;
   kind: SheetCreatureKind;

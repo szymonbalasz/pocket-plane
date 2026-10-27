@@ -1,4 +1,4 @@
-// combat-extras' character sheet sections (FR-CBTX-41, CBTX §7.1): `cbtx.temp-hp` (vitals),
+// combat-extras' character sheet sections (FR-CBTX-41, CBTX §7.1): `cbtx.temp-hp` (hp, K11),
 // `cbtx.death-saves` (vitals, while `deathState != null`), `cbtx.effects` (header). Both clients,
 // characters only. They read only the store and send only CBTX intents; registered in
 // character-sheet-full's `sheetSections` registry (D/S seam). Also `EffectsLine`, the read-only
@@ -9,6 +9,7 @@ import type { RecordStore } from "@shared/protocol/store";
 import { BrainIcon, DicesIcon, EllipsisIcon, TrashIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  Tooltip,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
@@ -53,60 +55,80 @@ function useMayAct(creatureId: string): boolean {
   });
 }
 
-/** `cbtx.temp-hp`: Temp HP next to HP; number + Set; "doesn't stack" hint (FR-CBTX-14). */
+/** The temp HP rule, in the trigger's Tooltip (K11: no sentence under the control). */
+export const TEMP_HP_HINT = "Temp HP is lost first · doesn't stack — keep the higher";
+
+/**
+ * `cbtx.temp-hp` (FR-CBTX-14), slot `hp`: the sheet's Hit Points box shows "Temp N"; this lays a
+ * transparent button over that column (owner, DM) that opens a small popover: number + Set
+ * (K11, kit parity: the control left its own row). Others: nothing (the box shows the value).
+ */
 export function TempHpSection({ creatureId }: SectionProps) {
   const temp = useSync((s) => characterOf(s.store, creatureId)?.tempHp);
   const may = useMayAct(creatureId);
   const { send, disabled } = useCbtIntent();
   const [value, setValue] = useState("");
-  if (temp === undefined) return null;
+  const [open, setOpen] = useState(false);
+  if (temp === undefined || !may) return null;
   const n = Number(value);
   const valid = value.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 999;
   return (
-    <div data-testid="cbtx-sheet-temp" className="flex flex-col gap-1">
-      <div className="flex items-center gap-2 text-sm">
-        <span className="text-muted-foreground">Temp HP</span>
-        <span data-testid="cbtx-temp-value" data-value={temp} className="font-medium tabular-nums">
-          {temp}
-        </span>
-        {may && (
-          <form
-            className="ml-auto flex items-center gap-1"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!valid) return;
-              const r = await send(CBTX_INTENTS.setTempHp, {
-                target: { characterId: creatureId },
-                value: n,
-              });
-              if (r !== undefined) setValue("");
-            }}
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip content={TEMP_HP_HINT}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            data-testid="cbtx-temp-open"
+            aria-label={`Temp HP ${temp}: set`}
+            className="absolute inset-0 rounded-sm hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+        </PopoverTrigger>
+      </Tooltip>
+      <PopoverContent data-testid="cbtx-sheet-temp" align="end" className="w-auto p-2">
+        <form
+          className="flex items-center gap-1.5"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!valid) return;
+            const r = await send(CBTX_INTENTS.setTempHp, {
+              target: { characterId: creatureId },
+              value: n,
+            });
+            if (r !== undefined) {
+              setValue("");
+              setOpen(false);
+            }
+          }}
+        >
+          <span className="text-sm text-muted-foreground">Temp HP</span>
+          <span
+            data-testid="cbtx-temp-value"
+            data-value={temp}
+            className="text-sm font-medium tabular-nums"
           >
-            <Input
-              data-testid="cbtx-temp-input"
-              aria-label="Temp HP"
-              inputMode="numeric"
-              className="h-7 w-16"
-              placeholder={String(temp)}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-            />
-            <Button
-              type="submit"
-              size="sm"
-              data-testid="cbtx-temp-save"
-              className="h-7"
-              disabled={disabled || !valid}
-            >
-              Set
-            </Button>
-          </form>
-        )}
-      </div>
-      {may && (
-        <p className="text-xs text-muted-foreground">Temp HP doesn't stack — keep the higher</p>
-      )}
-    </div>
+            {temp}
+          </span>
+          <Input
+            data-testid="cbtx-temp-input"
+            aria-label="Temp HP"
+            inputMode="numeric"
+            className="h-7 w-16"
+            placeholder={String(temp)}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+          <Button
+            type="submit"
+            size="sm"
+            data-testid="cbtx-temp-save"
+            className="h-7"
+            disabled={disabled || !valid}
+          >
+            Set
+          </Button>
+        </form>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -165,6 +187,10 @@ export function DeathSavesSection({ creatureId }: SectionProps) {
     void send(CBTX_INTENTS.setDeathSaves, { characterId: creatureId, successes, failures });
   return (
     <div data-testid="cbtx-sheet-death" className="flex flex-wrap items-center gap-2 text-sm">
+      {/* K11: a group of the sheet's vitals line, labelled as the kit ("Death Saves ○○○ ○○○"). */}
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Death Saves
+      </span>
       <DeathBadge state={state} testId="cbtx-death-state" />
       {counters && (
         <>
@@ -385,7 +411,8 @@ export function EffectsLine({
 /** The three registry entries (FR-CBTX-41); not locked by the sheet lock (play state). */
 export const cbtxTempHpSection: SheetSection = {
   id: "cbtx.temp-hp",
-  slot: "vitals",
+  // K11 (kit parity): over the Hit Points box's Temp column, not a vitals row.
+  slot: "hp",
   order: 50,
   kinds: ["character"],
   component: TempHpSection,

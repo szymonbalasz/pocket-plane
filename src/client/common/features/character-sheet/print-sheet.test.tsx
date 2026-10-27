@@ -30,6 +30,7 @@ import { ShellProvider } from "../play-shell/ShellContext";
 import { ActionsTab } from "./ActionsTab";
 import { ABILITY_GRID, COLUMNS, MainTab, STAT_GRID } from "./MainTab";
 import { FeaturesTab } from "./MoreTabs";
+import { PublicRolls, PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
 import { ROLL_HINT, rollHint } from "./rolls";
 import type { RollRoute } from "./routing";
@@ -222,8 +223,11 @@ describe("FR-CHARX-105 boxes", () => {
     // Small-caps label on the top edge, the value large inside.
     const speed = box(html, "speed");
     expect(text(speed)).toBe("Speed35 ft");
-    expect(speed).toContain("uppercase tracking-wide");
-    expect(speed).toContain("text-lg font-semibold");
+    expect(speed).toContain("text-xs font-medium uppercase tracking-wide");
+    // K11: the kit's 26-px value (34 px wide), the unit small beside it.
+    expect(speed).toContain("text-[26px] font-bold");
+    expect(speed).toContain("@min-[560px]/sheet:text-[34px]");
+    expect(speed).toMatch(/35<span class="[^"]*text-\[0\.55em\][^"]*"> ft<\/span>/);
     expect(text(box(html, "hp"))).toStartWith("Hit Points");
   });
 });
@@ -240,18 +244,20 @@ describe("FR-CHARX-106 stat row", () => {
       /<svg viewBox="0 0 100 112" aria-hidden="true"[^>]*>.*stroke="currentColor"/,
     );
     expect(ac).toContain("row-span-2");
-    expect(text(ac)).toBe("AC16");
-    // HP: current / max, the bar; across the top when narrow.
+    // K11: "AC" narrow, "Armor Class" once wide (both in the markup).
+    expect(text(ac)).toBe("ACArmor Class16");
+    // HP: current / max (max as the small unit), the bar, the Temp column; across the top when
+    // narrow.
     const hp = box(html, "hp");
     expect(hp).toContain('data-testid="char-sheet-hp" data-state="full"');
-    expect(text(hp)).toBe("Hit Points38 / 44");
+    expect(text(hp)).toBe("Hit Points38 / 44Temp0");
     expect(hp).toContain('class="block h-full bg-hp-full" style="width:86.36363636363636%"');
     expect(hp).toContain("col-span-3");
     // The Initiative box is the Initiative button; the value sits on it.
     const init = box(html, "init");
     expect(init).toMatch(/<button[^>]*data-testid="char-sheet-roll-init"/);
     expect(init).toContain('data-testid="char-sheet-init"');
-    expect(text(init)).toBe("Init+4");
+    expect(text(init)).toBe("InitInitiative+4");
     // "Prof +N" in its own box, not above the abilities.
     expect(text(box(html, "prof"))).toBe("Prof +3");
     expect(at(html, 'data-testid="char-sheet-prof"')).toBeLessThan(
@@ -260,12 +266,16 @@ describe("FR-CHARX-106 stat row", () => {
     expect(box(html, "prof")).toContain('data-testid="char-sheet-prof"');
   });
 
-  test("FR-CHARX-106 stat row: read-only Temp N when temp HP > 0; Down at 0", () => {
-    expect(render(<MainTab />)).not.toContain("charx-hp-temp");
+  test("FR-CHARX-106 stat row: the Temp column in the Hit Points box (K11: always, kit); Down at 0", () => {
+    expect(render(<MainTab />)).toContain('data-testid="charx-hp-temp" data-value="0"');
     const temp = box(render(<MainTab />, { temp: 5 }), "hp");
     expect(temp).toContain('data-testid="charx-hp-temp" data-value="5"');
-    expect(text(temp)).toContain("Temp 5");
-    expect(temp).not.toMatch(/<input|<button/);
+    expect(text(temp)).toEndWith("Temp5");
+    // The control is combat-extras' `hp` section (laid over the column), no field in the box.
+    expect(temp).not.toMatch(/<input/);
+    expect(temp).toContain('data-testid="charx-section" data-record-id="cbtx.temp-hp"');
+    // NPC sheets: no Temp column.
+    expect(render(<MainTab />, { client: "dm", npc: true })).not.toContain("charx-hp-temp");
     const down = box(render(<MainTab />, { hp: 0 }), "hp");
     expect(down).toContain('data-testid="char-sheet-down"');
     expect(down).toContain('data-state="down"');
@@ -284,8 +294,8 @@ describe("FR-CHARX-106 stat row", () => {
       const init = box(html, "init");
       expect(init).not.toContain("char-sheet-roll-init");
       expect(init).toContain('data-testid="char-sheet-init-locked"');
-      expect(text(init)).toBe("Init+4Initiative set");
-      expect(html).not.toContain("char-sheet-public-init");
+      expect(text(init)).toBe("InitInitiative+4Initiative set");
+      expect(render(<PublicRolls />, { client: "dm" })).not.toContain("char-sheet-public-init");
     } finally {
       testRoutes.shift();
     }
@@ -305,21 +315,28 @@ describe("FR-CHARX-107 hp control", () => {
       for (const id of ["char-sheet-hp-damage", "char-sheet-hp-heal"]) {
         expect(html).toContain(`data-testid="${id}"`);
       }
+      // K11: compact, a small field and the kit's small buttons; nothing else on the row.
+      const row2 = elementAt(html, 'data-testid="charx-hp-control"');
+      expect(row2).toContain("h-7 w-16");
+      expect(row2.match(/<button/g)).toHaveLength(2);
     }
-    // The DM's Initiative public switch at the end of that row.
-    const dm = render(<MainTab />, { client: "dm" });
-    expect(at(dm, 'data-testid="char-sheet-public-init"')).toBeGreaterThan(
-      at(dm, 'data-testid="char-sheet-hp-heal"'),
+    // The DM's Initiative public switch is in the header's Public rolls menu (K11), not here.
+    expect(render(<MainTab />, { client: "dm" })).not.toContain("char-sheet-public-init");
+    expect(render(<PublicRolls />, { client: "dm" })).toContain(
+      'data-testid="char-sheet-public-init"',
     );
   });
 });
 
 describe("FR-CHARX-108 vitals box", () => {
-  test("FR-CHARX-108 vitals box: hit dice + vitals sections in one box; Senses under it, centred", () => {
+  test("FR-CHARX-108 vitals box: hit dice + vitals sections on one quiet line; Senses under it, centred", () => {
     const html = render(<MainTab />);
     const vitals = box(html, "vitals");
     expect(vitals).toContain('data-testid="charx-hitdie" data-value="d10"');
-    expect(vitals).toContain('data-testid="charx-section" data-record-id="cbtx.temp-hp"');
+    // K11 (kit `.vitals`): one wrapping row, "Hit Dice 5 / 5 d10"; temp HP moved to the HP box.
+    expect(vitals).toContain("flex-row flex-wrap");
+    expect(text(vitals)).toBe("Hit Dice5 / 5d10");
+    expect(vitals).not.toContain("cbtx.temp-hp");
     expect(at(html, 'data-testid="charx-senses"')).toBeGreaterThan(
       at(html, 'data-testid="charx-box" data-value="vitals"'),
     );
@@ -342,28 +359,43 @@ describe("FR-CHARX-109 ability block", () => {
     ].map((m) => dex.indexOf(m));
     expect(order.every((i) => i > -1)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // K11: the kit's 24-px modifier (34 px wide), the save in a ruled column once wide.
     expect(dex).toMatch(
-      /<button [^>]*class="[^"]*text-xl[^"]*"[^>]*data-testid="char-sheet-roll-check"[^>]*>.*\+4/,
+      /<button [^>]*class="[^"]*text-2xl[^"]*"[^>]*data-testid="char-sheet-roll-check"[^>]*>.*\+4/,
     );
+    expect(dex).toContain("@min-[560px]/sheet:grid-cols-[minmax(0,1fr)_70px]");
+    expect(dex).toContain("@min-[560px]/sheet:border-l");
     expect(text(dex)).toBe("DEXDexterity+418Save+7");
     expect(text(ability(html, "cha"))).toBe("CHACharisma−18Save−1");
     expect(ability(html, "cha")).toContain('data-proficient="false"');
     // Narrow 3 × 2 (2 columns below 268 px), wide one column.
     expect(html).toContain(`class="${ABILITY_GRID}"`);
     expect(ABILITY_GRID).toBe(
-      "grid grid-cols-2 gap-1.5 @min-[268px]/sheet:grid-cols-3 @min-[560px]/sheet:grid-cols-1",
+      "grid grid-cols-2 gap-1.5 @min-[268px]/sheet:grid-cols-3 @min-[560px]/sheet:grid-cols-1 @min-[560px]/sheet:gap-2",
     );
   });
 
-  test("FR-CHARX-109 ability block: the DM's public switches stay above the blocks; players none", () => {
+  test("FR-CHARX-109 ability block: the DM's public switches are in the header's Public rolls menu (K11), no row above the blocks; players none", () => {
     const dm = render(<MainTab />, { client: "dm" });
-    for (const id of ["char-sheet-public-check", "char-sheet-public-save"]) {
-      expect(at(dm, `data-testid="${id}"`)).toBeGreaterThan(-1);
-      expect(at(dm, `data-testid="${id}"`)).toBeLessThan(
-        at(dm, 'data-testid="char-sheet-ability"'),
-      );
+    expect(dm).not.toContain("char-sheet-public-check");
+    const menu = render(<PublicRolls />, { client: "dm" });
+    expect(
+      [...menu.matchAll(/data-testid="(char-sheet-public-[a-z]+|charx-public-skill)"/g)].map(
+        (m) => m[1],
+      ),
+    ).toEqual([
+      "char-sheet-public-init",
+      "char-sheet-public-check",
+      "char-sheet-public-save",
+      "charx-public-skill",
+    ]);
+    expect(render(<PublicRollsMenu />, { client: "dm" })).toContain(
+      'data-testid="charx-public-menu"',
+    );
+    for (const o of [{ client: "player" as const }, { client: "dm" as const, npc: true }]) {
+      expect(render(<PublicRollsMenu />, o)).toBe("");
+      expect(render(<PublicRolls />, o)).not.toContain("char-sheet-public-check");
     }
-    expect(render(<MainTab />)).not.toContain("char-sheet-public-check");
   });
 });
 
@@ -380,9 +412,13 @@ describe("FR-CHARX-110 skills box", () => {
     expect(skills).toMatch(
       /data-value="stealth" data-proficiency="expertise" data-slot="sheet-skill-row" class="[^"]*bg-muted\/60/,
     );
+    // K11: kit rows in 15-px body type, the dot ringed for expertise, the bonus a boxed button.
     expect(skills).toMatch(
-      /data-value="arcana" data-proficiency="none" data-slot="sheet-skill-row" class="[^"]*px-0.5 text-xs"/,
+      /data-value="arcana" data-proficiency="none" data-slot="sheet-skill-row" class="[^"]*min-h-7 [^"]*text-\[15px\]"/,
     );
+    expect(skills).toMatch(/data-value="stealth"[^>]*>.*?data-on="true" data-double="true"/);
+    expect(skills).toMatch(/data-value="arcana"[^>]*>.*?data-on="false"/);
+    expect(skills).not.toContain("charx-public-skill");
     expect(skills).toMatch(
       /data-testid="charx-roll-skill" data-value="stealth"[^>]*><svg viewBox="0 0 24 24"/,
     );
@@ -593,6 +629,7 @@ describe("FR-CHARX-116 edit and NPC", () => {
       "charx-hitdie",
       "charx-section",
       "char-sheet-hp-input",
+      "charx-hp-temp",
       "char-sheet-public-check",
     ]) {
       expect(html).not.toContain(`data-testid="${id}"`);
@@ -604,6 +641,8 @@ describe("FR-CHARX-116 edit and NPC", () => {
 describe("FR-CHARX-117 ids kept", () => {
   test("FR-CHARX-117 ids kept: every existing Main ID still renders, with its record keys", () => {
     const html = render(<MainTab />, { client: "dm" });
+    // K11: the DM's public switches render in the header's Public rolls menu.
+    const both = html + render(<PublicRolls />, { client: "dm" });
     for (const id of [
       "char-sheet-ac",
       "char-sheet-hp",
@@ -622,7 +661,7 @@ describe("FR-CHARX-117 ids kept", () => {
       "charx-senses",
       "charx-public-skill",
     ]) {
-      expect(html).toContain(`data-testid="${id}"`);
+      expect(both).toContain(`data-testid="${id}"`);
     }
     for (const id of [
       "char-sheet-ability",
@@ -640,6 +679,143 @@ describe("FR-CHARX-117 ids kept", () => {
     expect(html.match(/data-testid="charx-passive" data-value="/g)).toHaveLength(3);
     // "Prof +2" text of FR-CHAR-22's header element, now in its box (CHAR e2e unchanged).
     expect(text(elementAt(html, 'data-testid="charx-box" data-value="prof"'))).toBe("Prof +3");
+  });
+});
+
+/** A whole sheet (header + Main) for one viewer state (K11). */
+function stateHtml(o: {
+  client: "dm" | "player";
+  npc?: boolean;
+  locked?: boolean;
+  editing?: boolean;
+  part?: PinnedPart;
+}) {
+  const g = globalThis as { document?: unknown };
+  g.document = { title: "", hidden: false };
+  const row = {
+    id: "mira",
+    entityId: "mira",
+    campaignId: "c1",
+    ownerPlayerId: "p1",
+    ...defaultSheetData(),
+    locked: o.locked ?? false,
+  } as unknown as CreatureSheetRecord;
+  try {
+    return renderToStaticMarkup(
+      <SyncContext.Provider value={syncOf(o.client)}>
+        <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+          <ShellProvider registry={createWindowRegistry(o.client, [])}>
+            <SheetView
+              creature={creatureOf({ npc: o.npc })}
+              row={o.npc ? undefined : row}
+              client={o.client}
+              playerId={o.client === "dm" ? null : "p1"}
+              ownerName="Player 1"
+              picker={<select data-testid="char-sheet-picker" />}
+              startEditing={o.editing ?? false}
+              initialPinnedPart={o.part ?? "full"}
+            />
+          </ShellProvider>
+        </TooltipProvider>
+      </SyncContext.Provider>,
+    );
+  } finally {
+    delete g.document;
+  }
+}
+
+/** Main's blocks in order: the first `charx-box` keys and the HP control's place. */
+function mainOrder(html: string) {
+  const main = html.slice(html.indexOf('data-testid="charx-content"'));
+  return {
+    first: boxes(main).slice(0, 5),
+    controlAfterStats:
+      !main.includes("char-sheet-hp-input") ||
+      (at(main, 'data-testid="char-sheet-hp-input"') > at(main, `class="${STAT_GRID}"`) &&
+        at(main, 'data-testid="char-sheet-hp-input"') > at(main, 'data-value="prof"')),
+    statGridFirst: at(main, `class="${STAT_GRID}"`),
+  };
+}
+
+describe("FR-CHARX-106 stat row in every viewer state (K11)", () => {
+  const STATS = ["ac", "hp", "speed", "init", "prof"];
+
+  test("FR-CHARX-106 stat row first on Main for the owner, the DM, a locked sheet, edit mode and an NPC sheet; the HP control under it", () => {
+    for (const o of [
+      { client: "player" as const },
+      { client: "dm" as const },
+      { client: "player" as const, locked: true },
+      { client: "dm" as const, locked: true },
+      { client: "player" as const, editing: true },
+      { client: "dm" as const, npc: true },
+      { client: "dm" as const, part: "compact" as const },
+    ]) {
+      const html = stateHtml(o);
+      const m = mainOrder(html);
+      expect({ o, first: m.first }).toEqual({ o, first: STATS });
+      expect({ o, control: m.controlAfterStats }).toEqual({ o, control: true });
+    }
+    // The owner and the DM both get the HP control (also locked, FR-CHARX-12); NPCs none.
+    expect(stateHtml({ client: "player", locked: true })).toContain("char-sheet-hp-input");
+    expect(stateHtml({ client: "dm" })).toContain("char-sheet-hp-input");
+    expect(stateHtml({ client: "dm", npc: true })).not.toContain("char-sheet-hp-input");
+  });
+
+  test("FR-CHARX-106 stat row first in a started fight (In combat badge, Initiative set)", () => {
+    testRoutes.unshift({
+      name: "test",
+      claim: (_s, _id, kind) =>
+        kind === "initiative"
+          ? { badge: "In combat", hidden: true, send: () => Promise.resolve() }
+          : null,
+    });
+    try {
+      for (const client of ["dm", "player"] as const) {
+        const html = stateHtml({ client });
+        expect(html).toContain('data-testid="char-sheet-combat"');
+        expect(mainOrder(html).first).toEqual(STATS);
+        expect(box(html, "init")).toContain('data-testid="char-sheet-init-locked"');
+        // FR-CHAR-24: no Initiative switch in the DM's menu while the button is hidden.
+        expect(html).not.toContain("char-sheet-public-init");
+      }
+    } finally {
+      testRoutes.shift();
+    }
+  });
+
+  test("FR-KIT-85 K11 header: Lock and Edit as small buttons top-right, the DM's Public rolls menu beside them; the locked chip for the player; no boxed picker", () => {
+    const dm = stateHtml({ client: "dm", locked: true });
+    const actions = elementAt(dm, 'data-testid="charx-header-actions"');
+    for (const id of ["charx-lock-toggle", "charx-edit-toggle", "charx-public-menu"]) {
+      expect(actions).toContain(`data-testid="${id}"`);
+    }
+    expect(actions).toContain("Unlock");
+    const player = stateHtml({ client: "player", locked: true });
+    expect(player).toContain('data-testid="charx-locked"');
+    expect(player).not.toContain("charx-edit-toggle");
+    expect(player).not.toContain("charx-public-menu");
+    // The picker is always laid over the name (transparent), never a box of its own.
+    for (const html of [dm, stateHtml({ client: "dm", part: "compact" })]) {
+      const picker = html.indexOf('data-testid="char-sheet-picker"');
+      expect(picker).toBeGreaterThan(html.indexOf('data-testid="charx-name-picker"'));
+      expect(picker).toBeLessThan(html.indexOf('data-testid="charx-content"'));
+    }
+  });
+
+  test("FR-CHARX-108 K11 vitals: hit dice and the death saves on one line; temp HP and its hint sentence are gone from the vitals", () => {
+    const html = render(<MainTab />, { hp: 0 });
+    const vitals = box(html, "vitals");
+    expect(text(vitals)).toStartWith("Hit Dice");
+    expect(vitals).not.toContain("doesn't stack");
+    expect(html).not.toContain("doesn't stack");
+  });
+
+  test("FR-CHARX-110 K11 body type: no shrunken 10 / 12-px text on Main's rows (skills 15 px, values 26 px, labels 12 px)", () => {
+    const html = render(<MainTab />);
+    expect(html).not.toContain("text-[10px]");
+    expect(elementAt(html, 'data-testid="charx-skill" data-value="stealth"')).toContain(
+      "text-[15px]",
+    );
   });
 });
 
