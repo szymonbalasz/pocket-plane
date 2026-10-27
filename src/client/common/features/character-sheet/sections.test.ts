@@ -28,7 +28,7 @@ describe("FR-CHARX-34 sheet sections", () => {
     // Append-only registry: other features add lines (e.g. `mod.effects`).
     const lines = sheetSections.map((x) => [x.id, x.slot]);
     for (const line of [
-      ["cbtx.temp-hp", "vitals"],
+      ["cbtx.temp-hp", "hp"], // K11: over the Hit Points box's Temp column
       ["cbtx.death-saves", "vitals"],
       ["cbtx.effects", "header"],
     ]) {

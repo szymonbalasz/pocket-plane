@@ -13,13 +13,31 @@ export function Breakdown({ okey, text }: { okey: BreakdownKey; text: string }) 
   );
 }
 
-/** A number that isn't a roll button (AC, an initiative without its button): its breakdown on hover / focus. */
-export function BreakdownTip({ okey, children }: { okey: BreakdownKey; children: ReactNode }) {
+/**
+ * A number that isn't a roll button (AC, an initiative without its button): its breakdown on
+ * hover / focus; `note` ends the Tooltip ("Initiative set").
+ */
+export function BreakdownTip({
+  okey,
+  note,
+  children,
+}: {
+  okey: BreakdownKey;
+  note?: string;
+  children: ReactNode;
+}) {
   const ctx = useSheet();
   const text = breakdownText(ctx.stats, okey);
   if (!text) return <>{children}</>;
   return (
-    <Tooltip content={<Breakdown okey={okey} text={text} />}>
+    <Tooltip
+      content={
+        <>
+          <Breakdown okey={okey} text={text} />
+          {note && ` · ${note}`}
+        </>
+      }
+    >
       <span className="inline-flex items-center">{children}</span>
     </Tooltip>
   );

@@ -80,8 +80,10 @@ test("FR-CAMP-21 FR-CAMP-22 party lines: values, live edit, click opens the shee
 
   // P3 glitch 5: temp HP shows on the party line only while > 0.
   await expect(cell(thornId, "temp")).toHaveCount(0);
-  await sheet.getByTestId("cbtx-temp-input").fill("5");
-  await sheet.getByTestId("cbtx-temp-save").click();
+  // K11: the temp HP control opens from the Hit Points box's Temp column.
+  await sheet.getByTestId("cbtx-temp-open").click();
+  await sheet.page().getByTestId("cbtx-temp-input").fill("5");
+  await sheet.page().getByTestId("cbtx-temp-save").click();
   await expect(cell(thornId, "temp")).toHaveText("+5 temp");
 
   // Players: no Players window in the launcher.

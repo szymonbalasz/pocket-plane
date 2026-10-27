@@ -135,7 +135,7 @@ test("FR-KIT-76 FR-KIT-77 FR-KIT-82 FR-KIT-83 FR-KIT-85 kit library: compendium 
   expect(Math.round(derive?.height ?? 0)).toBe(24);
   await npc.screenshot({ path: test.info().outputPath("app-npc-sheet-gilt.png") });
 
-  // FR-KIT-85: player-1's sheet header, the square framed portrait at 56 px.
+  // FR-KIT-85: player-1's sheet header, the square framed portrait (K11: the kit's 64 px).
   const p1 = await rolePage(browser);
   await p1.setViewportSize({ width: 1440, height: 900 });
   await p1.goto(link("Player 1"));
@@ -143,7 +143,7 @@ test("FR-KIT-76 FR-KIT-77 FR-KIT-82 FR-KIT-83 FR-KIT-85 kit library: compendium 
   const sheet = await openWindow(p1, "char.sheet");
   await expect(sheet.getByTestId("char-sheet-name")).toHaveText("Mira");
   const box = await sheet.getByTestId("char-sheet-portrait").boundingBox();
-  expect([Math.round(box?.width ?? 0), Math.round(box?.height ?? 0)]).toEqual([56, 56]);
+  expect([Math.round(box?.width ?? 0), Math.round(box?.height ?? 0)]).toEqual([64, 64]);
   await expect(sheet.getByTestId("charx-edit-toggle")).toBeVisible();
   await sheet.screenshot({ path: test.info().outputPath("app-sheet-gilt.png") });
 

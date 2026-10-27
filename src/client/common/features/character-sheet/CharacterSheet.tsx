@@ -101,7 +101,8 @@ export function RoutedRoll({
   const view = rollActionView(claim, kind);
   if (view === "locked") {
     return (
-      <span data-testid="char-sheet-init-locked" className="text-xs text-muted-foreground">
+      // K11: screen-reader text; the Initiative box's Tooltip says it (no caption).
+      <span data-testid="char-sheet-init-locked" className="sr-only">
         Initiative set
       </span>
     );
