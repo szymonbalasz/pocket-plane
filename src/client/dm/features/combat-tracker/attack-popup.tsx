@@ -144,7 +144,7 @@ const MULTS: DamageMultiplier[] = ["normal", "half", "none", "double"];
 const CARD_LINE = "flex min-h-9 items-center gap-2";
 /** FR-KIT-63: an input drawn as a Result box (`data-slot="kit-result"`, number centred, large). */
 const RESULT_INPUT =
-  "h-8 w-16 shrink-0 px-1 text-center text-lg font-semibold leading-none tabular-nums";
+  "h-8 w-16 shrink-0 px-1 text-center text-xl font-semibold leading-none tabular-nums";
 /** FR-KIT-63: the Result box's outcome colours (meaning tokens, FR-THEME-09) on an input. */
 const OUTCOME_INPUT: Partial<Record<ResultOutcome, string>> = {
   crit: "border-hp-full/60 text-hp-full",

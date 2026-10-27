@@ -113,7 +113,7 @@ export function ToastText({
           <Render notification={n} />
         ) : lead ? (
           <>
-            <b className="font-semibold">{lead}</b>
+            <b className="font-medium">{lead}</b>
             {rest}
           </>
         ) : (
@@ -133,12 +133,7 @@ export function NoteTime({ iso }: { iso: string }) {
     return () => clearInterval(h);
   }, []);
   return (
-    <time
-      data-testid="note-time"
-      dateTime={iso}
-      title={timeOf(iso).full}
-      className="block text-xs text-muted-foreground"
-    >
+    <time data-testid="note-time" dateTime={iso} className="block text-xs text-muted-foreground">
       {relativeTime(iso, now)}
     </time>
   );

@@ -1521,10 +1521,11 @@
 }
 
 /* KIT: notices (kit-parity K3, §6.5–6.6: toast cards, turn card, damage card, player card) ───── */
-/* Toast card (the kit's `.toast`): the bold causer in the name weight, the action a small stone. */
-:root[data-theme="gilt"] [data-slot="toast-text"] b {
-  font-weight: 500;
-  color: var(--gold);
+/* Toast card (the kit's `.toast`): the causer's name in gold. */
+@layer base {
+  :root[data-theme="gilt"] [data-slot="toast-text"] b {
+    color: var(--gold);
+  }
 }
 /* The alert toasts' close and the damage card's Later are the red gem, as the notes' close. */
 :root[data-theme="gilt"] [data-testid="ui-toast-close"],
@@ -1574,9 +1575,6 @@
 }
 :root[data-theme="gilt"] [data-slot="turn-card"] > span:not([data-slot]) {
   font-family: var(--font-title);
-  font-size: 18px;
-  font-weight: 400;
-  letter-spacing: 0.04em;
   text-shadow: 0 1px 0 #000;
 }
 :root[data-theme="gilt"] [data-slot="turn-card-gem"] {
@@ -1626,9 +1624,8 @@
     transparent
   );
 }
-/* Result lines (the kit's `.dc-line .res`): the boxed value at 22 px in the number face. */
+/* Result lines (the kit's `.dc-line .res`): the boxed value flat, no field shadow. */
 :root[data-theme="gilt"] [data-slot="card-line"] input[data-slot="kit-result"] {
-  font-size: 22px;
   box-shadow: none;
 }
 /* Target chips (the kit's `.tgt`): a pill on the dark chip fill. */

@@ -189,7 +189,7 @@ describe("FR-KIT-56 text block", () => {
   test("FR-KIT-56 text block: line 1 the text with the causing player's name in bold when it starts it; line 2 the relative time", () => {
     const card = toastOf(stackHtml("dm", withNotes(request)), "n1");
     expect(card).toContain(
-      '<div data-testid="note-text"><b class="font-semibold">Player 1</b> wants to add Longsword +1 to Mira&#x27;s sheet</div>',
+      '<div data-testid="note-text"><b class="font-medium">Player 1</b> wants to add Longsword +1 to Mira&#x27;s sheet</div>',
     );
     expect(card).toMatch(
       /<time data-testid="note-time" datetime="2026-10-20T10:00:00.000Z"[^>]*>[^<]+<\/time>/i,

@@ -88,7 +88,7 @@ export function TurnCard({ text }: { text: ReactNode }) {
         data-slot="turn-card-gem"
         className="size-2 shrink-0 rotate-45 bg-primary"
       />
-      <span className="min-w-0 truncate text-base font-semibold">{text}</span>
+      <span className="min-w-0 truncate text-lg">{text}</span>
       <span
         aria-hidden
         data-slot="turn-card-gem"
