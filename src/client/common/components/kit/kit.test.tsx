@@ -202,7 +202,9 @@ describe("FR-KIT-05 hp bar (K9)", () => {
   test("FR-KIT-05 hp bar (K9, K6 gap 3): track fixed → the kit's 120-px track and a cur / max column; the default fills the line", () => {
     const fixed = html(<HpBar cur={7} max={7} track="fixed" />);
     expect(attrs(fixed, "kit-hpbar").get("data-track")).toBe("fixed");
-    expect(fixed).toMatch(/data-slot="kit-hpbar-track" class="[^"]*shrink grow-0 basis-\[120px\]/);
+    // It takes the line's free room up to its content, so the line's other parts never wrap for it.
+    expect(attrs(fixed, "kit-hpbar").get("class")).toContain("max-w-fit flex-[1_1_0%]");
+    expect(fixed).toMatch(/data-slot="kit-hpbar-track" class="[^"]*w-\[120px\] shrink grow-0/);
     expect(fixed).toContain("min-w-[7ch]");
     const fill = html(<HpBar cur={7} max={7} />);
     expect(attrs(fill, "kit-hpbar").get("data-track")).toBe("fill");

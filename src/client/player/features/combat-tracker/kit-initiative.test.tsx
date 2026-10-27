@@ -63,7 +63,7 @@ describe("FR-KIT-26 player hp", () => {
     for (const id of ["mira", "thorn", "owlbear"]) {
       const row = rowHtml(html, "cbt-init-row", id);
       expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
-      expect(row).toMatch(/data-slot="kit-hpbar-track" class="[^"]*basis-\[120px\]/);
+      expect(row).toMatch(/data-slot="kit-hpbar-track" class="[^"]*w-\[120px\]/);
     }
   });
 });

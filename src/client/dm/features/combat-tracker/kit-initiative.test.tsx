@@ -244,7 +244,7 @@ describe("FR-KIT-25 hp line", () => {
       const row = rowHtml(html, "cbt-init-row", id);
       const hp = row.slice(row.indexOf('data-testid="cbt-init-row-hp"'));
       expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
-      expect(hp).toMatch(/data-slot="kit-hpbar-track" class="[^"]*basis-\[120px\]/);
+      expect(hp).toMatch(/data-slot="kit-hpbar-track" class="[^"]*w-\[120px\]/);
       expect(hp).not.toMatch(/data-slot="kit-hpbar-track" class="[^"]*flex-1/);
       expect(hp).toContain("min-w-[7ch]");
       expect(row).toMatch(/data-tail="true"[^>]*class="ml-auto shrink-0"/);

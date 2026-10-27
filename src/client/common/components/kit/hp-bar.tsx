@@ -61,7 +61,10 @@ export function HpBar({
   band?: HealthBand | null;
   /** Show "cur / max" after the bar. */
   numbers?: boolean;
-  /** `fill` takes the line's room; `fixed` = `HP_TRACK_PX` (shrinks only when the line is narrower). */
+  /**
+   * `fill` takes the line's room; `fixed` = `HP_TRACK_PX` when the line holds it, else the track
+   * shrinks (to 24 px) before the line's other parts wrap.
+   */
   track?: "fill" | "fixed";
   "data-testid"?: string;
 } & Omit<React.ComponentProps<"span">, "children">) {
@@ -88,7 +91,13 @@ export function HpBar({
       data-slot="kit-hpbar"
       data-band={b}
       data-track={track}
-      className={cn("flex min-w-0 items-center gap-2", className)}
+      className={cn(
+        "flex min-w-0 items-center gap-2",
+        // Fixed: takes the line's free room up to its own content (the 120-px track), so it never
+        // pushes the line's other parts onto a second line; the track gives way first.
+        track === "fixed" && "min-w-[calc(2rem+7ch)] max-w-fit flex-[1_1_0%]",
+        className,
+      )}
       {...props}
     >
       <span
@@ -96,7 +105,7 @@ export function HpBar({
         data-slot="kit-hpbar-track"
         className={cn(
           "h-[5px] min-w-6 overflow-hidden rounded-[1px] bg-muted",
-          track === "fixed" ? "shrink grow-0 basis-[120px]" : "flex-1",
+          track === "fixed" ? "w-[120px] shrink grow-0" : "flex-1",
         )}
       >
         <span
