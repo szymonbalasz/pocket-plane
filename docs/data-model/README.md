@@ -2686,3 +2686,11 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-24 �
 
 - **Derived (client, not stored):** `medallionColour(store, combatant)` = `CREATURE_COLORS[token.creatureType]` of the combatant's token the viewer holds, else null (muted); `tailText(ac, moved)`, `tailFolds(widths)` (DM); `pcHp(character)` = `{hpCurrent, hpMax ?? statBlock.hpMax}` from the character the player holds (own: full; others: ADR-0063's whitelist).
 - **Fixtures:** bundle `kit-initiative` (existing units only).
+
+## 137. Sprint 13: notices and the damage card (K3)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-55 – -66). **Built by `build/kit-notices`**. Protocol side: [protocol §173](../protocol/README.md#173-sprint-13-notices-and-the-damage-card-on-the-kit-grid-k3). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `relativeTime(createdAt, now)` and `leadName(text, playerName)` (FR-KIT-56); the toast lead from `byPlayerId` → the held `player` record's name + `colorKeyOf` colour (FR-KIT-55); `dmTurnCardFor(frame, store)` = "‹name›'s turn" of the frame's `encounter.turnCombatantId` (FR-KIT-59); `toHitOutcome(natural)` (FR-KIT-63).
+- **Client memory (not stored):** `ToastState.turn` `{text, seq, remaining}`: the DM's turn card, 4 s, lost on reload (FR-KIT-59).
+- **Fixtures:** units `kit-notices-applied`, `kit-notices` (existing record types); bundle `kit-notices`.
