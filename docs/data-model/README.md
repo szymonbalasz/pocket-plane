@@ -2714,3 +2714,10 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (K6 gaps 3, 
 
 - **Derived (client, not stored):** the Medallion's `data-tone="neutral"` (no colour, no portrait); the tail fold at the fixed 120-px track (`tailFolds`).
 - **Fixtures:** bundle `kit-parity` appends `dicex-request-open` (K9: player-1's pending Perception prompt for the toast and Notifications walkthrough); existing unit. CON-44 (measured): DM 54 180 B, P1 25 087 B, P2 21 312 B.
+
+## 141. Sprint 13: kit round 3, wide sheet, compendium rows, top bar (K13)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (round-2 gaps 3, 4, 5, 9 and §5; DM #363). **Built by `build/kit-round3-sheet`**. Protocol side: [protocol §178](../protocol/README.md#178-sprint-13-kit-round-3-wide-sheet-compendium-rows-top-bar-k13). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** the sheet's `wide` (`isWideSheet(clientWidth, paddingX)`: the body's content width ≥ `SHEET_WIDE_PX` 560, as its `@container/sheet` query; `SheetWide` context) and the tab strip's `fadeOf({prev, next})` (`start` \| `end` \| `both`).
+- **Fixtures:** unit `kit-mira-spells` (character-sheet-full; requires `char-mira-full`): Mira's spellcasting WIS with two 1st-level slots, one used (`char.useResource`), and Hunter's Mark (level 1, concentration, 1d6 force). Bundle `kit-round3` = `theme-gilt` + `kit-mira-spells` + `cbtx-effects` + `cmp-srd-mini` + `cp-srd` + `pet-owlbear` + `dicex-request-open`; bundle `kit-parity` appends `kit-mira-spells` (K13 comment). CON-44 (measured): `kit-round3` DM 38 745 B, P1 17 712 B, P2 15 070 B; `kit-parity` DM 54 495 B, P1 25 402 B, P2 21 312 B (+315 B for the DM and Mira's owner, 0 B for player-2).
