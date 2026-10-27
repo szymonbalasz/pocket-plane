@@ -68,6 +68,7 @@ import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
 import kitInitiative from "./kit-initiative";
+import kitLibrary from "./kit-library";
 import kitLog from "./kit-log";
 import kitNotices from "./kit-notices";
 import lateDamage from "./late-damage";
@@ -323,4 +324,7 @@ export const bundles: readonly Bundle[] = [
   kitLog,
   // Sprint 13 K3 (build/kit-notices): notices + damage card walkthrough + kit-notices e2e
   kitNotices,
+  // Sprint 13 K4 (build/kit-library): compendium, Party status, Creatures, sheet header walkthrough
+  // + kit-library e2e
+  kitLibrary,
 ];

@@ -4,6 +4,8 @@
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
+  type CreatureType,
+  creatureTypeOf,
   type DefinitionRecord,
   definitionOrder,
   type EntityKind,
@@ -22,6 +24,8 @@ export interface CreatureRow {
   kind: EntityKind;
   name: string;
   portraitAssetId: string | null;
+  /** FR-KIT-84: a monster's creature type (its medallion colour); null for characters / untyped. */
+  creatureType: CreatureType | null;
   /** Imported (global) definitions are read-only (FR-ENT-05). */
   readOnly: boolean;
   /** Source badge: `SRD` (imported), `Custom` (monster), owner name (character). */
@@ -82,6 +86,7 @@ export function creatureRows(
         kind: d.kind,
         name: d.name,
         portraitAssetId: d.portraitAssetId,
+        creatureType: d.kind === "monster" ? creatureTypeOf(d) : null,
         readOnly,
         badge: readOnly
           ? badgeLabel(d.source ?? "")

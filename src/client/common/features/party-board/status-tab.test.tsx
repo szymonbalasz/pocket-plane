@@ -6,6 +6,8 @@
 // a draft PC: "Other companions"). Layout (FR-PARTY-58, -63): `e2e/useful-size.e2e.ts`; clicks and
 // live updates: `e2e/cb-party.e2e.ts`, `e2e/party-manager.e2e.ts`.
 import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { You } from "@shared/protocol/frames";
 import { lazyAfterSnapshot } from "@shared/protocol/lazy";
 import { emptyStore } from "@shared/protocol/store";
@@ -22,6 +24,7 @@ import {
   OTHER_COMPANIONS,
   type PartySummary,
   partySummary,
+  pcLine,
   type SummaryInput,
   summaryHpValue,
   summaryTip,
@@ -628,5 +631,125 @@ describe("Party status companions (FR-PARTY-61)", () => {
     expect(html).not.toContain("party-companion-other");
     expect(html).not.toContain("Summons show in Initiative");
     expect(html).not.toContain("No companions");
+  });
+});
+
+// ---------- kit parity K4 (§6.9) ----------
+
+/** The markup of the element with this test id and record id, up to its closing `</li>`. */
+const rowOf = (html: string, testId: string, id: string) => {
+  const at = html.indexOf(`data-testid="${testId}" data-record-id="${id}"`);
+  const start = html.lastIndexOf("<", at);
+  return html.slice(start, html.indexOf("</li>", at));
+};
+const textOf = (html: string) => html.replace(/<[^>]+>/g, "");
+
+describe("FR-KIT-82 party card", () => {
+  test("FR-KIT-82 party card: medallion on the player colour (no colour dot), name, AC mini shield; the level / class / species line; HP bar + cur / max, temp; all attributes kept", () => {
+    const html = render(P2, inputs.p2);
+    const thorn = rowOf(html, "party-summary-row", "thorn");
+    expect(thorn).toContain('data-slot="party-card"');
+    expect(thorn).toContain('data-own="true" data-turn="true" data-can-open="true"');
+    expect(thorn).toMatch(/grid-cols-\[34px_minmax\(0,1fr\)_auto\]/);
+    // Line 1: medallion (lg, P2's colour, initial) → name → AC shield, in that order.
+    const med = thorn.slice(thorn.indexOf('data-testid="party-summary-medallion"'));
+    expect(med).toMatch(
+      /^data-testid="party-summary-medallion" data-slot="kit-medallion" data-size="lg"/,
+    );
+    expect(med).toMatch(/background-color:#56b4e9[^>]*>T</);
+    expect(thorn).not.toContain('rounded-full" style'); // the separate colour dot is gone
+    const order = ["party-summary-medallion", "party-summary-name", "party-summary-ac"].map((id) =>
+      thorn.indexOf(`data-testid="${id}"`),
+    );
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(thorn).toContain('aria-label="Armor Class 15"');
+    expect(thorn).toContain('data-slot="party-card-ac"');
+    // Line 2: the level line from the record.
+    expect(thorn).toMatch(/data-testid="party-summary-line"[^>]*>Level 3 Fighter</);
+    // Line 3: the kit HP bar inside party-summary-hp (data-value kept), then temp.
+    expect(thorn).toMatch(
+      /data-testid="party-summary-hp" data-value="10\/10"[^>]*><span data-testid="kit-hpbar" data-slot="kit-hpbar" data-band="healthy"/,
+    );
+    expect(textOf(thorn)).toContain("10 / 10+5");
+    expect(thorn.indexOf("party-summary-temp")).toBeGreaterThan(thorn.indexOf("party-summary-hp"));
+  });
+
+  test("FR-KIT-82 level line: 'Level 5 Fighter · Human'; species left out when absent", () => {
+    expect(pcLine({ level: 5, className: "Fighter", species: "Human" })).toBe(
+      "Level 5 Fighter · Human",
+    );
+    expect(pcLine({ level: 3, className: "Fighter", species: null })).toBe("Level 3 Fighter");
+    expect(pcLine({ level: 1, className: "", species: " " })).toBe("Level 1");
+    const withSpecies = {
+      ...inputs.p1,
+      entities: inputs.p1.entities.map((e) =>
+        (e as { id?: string }).id === "mira"
+          ? { ...mira, statBlock: { ...mira.statBlock, species: "Wood Elf" } }
+          : e,
+      ),
+    };
+    const html = render(P1, withSpecies);
+    expect(rowOf(html, "party-summary-row", "mira")).toMatch(
+      /data-testid="party-summary-line"[^>]*>Level 3 Fighter · Wood Elf</,
+    );
+  });
+
+  test("FR-KIT-82 the card opens the sheet on click / Enter as before (own row only for a player)", () => {
+    const html = render(P1, inputs.p1);
+    expect(rowOf(html, "party-summary-row", "mira")).toContain('data-can-open="true"');
+    expect(rowOf(html, "party-summary-row", "thorn")).toContain('data-can-open="false"');
+  });
+});
+
+describe("FR-KIT-83 companion row", () => {
+  test("FR-KIT-83 companion row keeps one line (K4 walkthrough): a long name truncates, the full name in its Tooltip; the base name gives way first; no wrapping", () => {
+    const long = "Grey Wolf with a really long companion name";
+    const input = {
+      ...inputs.p1,
+      entities: inputs.p1.entities.map((e) =>
+        (e as { id?: string }).id === "owl" ? { ...(e as object), name: long } : e,
+      ),
+    };
+    const owl = rowOf(render(P1, input), "party-companion-row", "owl");
+    expect(owl).toMatch(
+      new RegExp(
+        `<span class="min-w-0 truncate" data-testid="party-companion-name"[^>]*data-tip=""[^>]*>${long}</span>`,
+      ),
+    );
+    expect(owl).not.toContain("flex-wrap");
+    expect(owl).not.toContain("break-words");
+    expect(owl).toContain('class="flex min-w-0 flex-1 items-center gap-x-1.5"');
+  });
+
+  test("FR-KIT-83 companion row: one line with a small medallion (portrait else initial), all row parts kept", () => {
+    const html = render(P1, inputs.p1);
+    const owl = rowOf(html, "party-companion-row", "owl");
+    expect(owl).toMatch(
+      /data-testid="party-companion-medallion" data-slot="kit-medallion" data-size="sm"/,
+    );
+    expect(owl).toContain(">O</span>");
+    expect(owl).toContain("min-h-[22px]");
+    for (const id of ["party-companion-name", "party-companion-hp", "party-companion-card"])
+      expect(owl).toContain(`data-testid="${id}"`);
+  });
+});
+
+describe("FR-KIT-04 party: no new fields for players", () => {
+  test("FR-KIT-04 player rows show no new fields: another player's PC shows only the whitelist (ADR-0063); a band-only companion never gets a bar", () => {
+    const html = render(P2, inputs.p2);
+    const mira = rowOf(html, "party-summary-row", "mira");
+    // Everything shown comes from the redacted record: name, level line, HP, AC.
+    expect(textOf(mira)).toBe("MMiraLevel 3 Fighter1612 / 12");
+    const owl = rowOf(html, "party-companion-row", "owl");
+    expect(owl).not.toContain("kit-hpbar");
+    expect(owl).toContain('data-testid="party-companion-band"');
+  });
+});
+
+describe("FR-KIT-01 same DOM per theme (party)", () => {
+  test("FR-KIT-01 same DOM per theme: Party status reads no theme, so both themes get one markup (the cards' look is gilt.css on `party-card*`)", () => {
+    expect(render(DM, inputs.dm)).toBe(render(DM, inputs.dm));
+    for (const f of ["StatusTab.tsx", "Companions.tsx"])
+      expect(readFileSync(join(import.meta.dir, f), "utf8")).not.toMatch(/data-theme|useTheme/);
   });
 });

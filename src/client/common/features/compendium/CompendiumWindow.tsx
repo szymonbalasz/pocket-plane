@@ -156,35 +156,80 @@ function rowProps(r: EntrySummary, viewer: Role) {
         }
       : undefined,
     onClick: () => (isEntryless(r) ? openDefinition(r.definitionId as string) : openEntry(r.id)),
-    className: cn(
-      "flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-      drag && "cursor-grab active:cursor-grabbing",
-    ),
+    className: cn(ROW, drag && "cursor-grab active:cursor-grabbing"),
   };
 }
 
+/**
+ * FR-KIT-76 (OQ-KIT-05 A): the results as a table, Name · Details · Source, from today's fields.
+ * Each row is one grid line on the shared columns (a 40-px row, today's height ± 4 px); the rows
+ * stay buttons, so drag, click and keyboard are unchanged.
+ */
+const COLS = "grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_4.5rem] items-center gap-x-2";
+const ROW = cn(
+  COLS,
+  "min-h-10 w-full px-2 py-1 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+);
+/** Zebra rows: every other row of the table body (group members keep their group's stripe). */
+const ZEBRA = "[&>li:nth-child(even)]:bg-muted/40";
+
+/** The sticky header row; the columns are read by sight (each row's button names its entry). */
+export function TableHead() {
+  return (
+    <div
+      aria-hidden
+      data-testid="cmp-table-head"
+      data-slot="cmp-table-head"
+      className={cn(
+        COLS,
+        "sticky top-0 z-10 border-b bg-background px-2 py-1 text-xs font-semibold text-muted-foreground",
+      )}
+    >
+      <span>Name</span>
+      <span>Details</span>
+      <span>Source</span>
+    </div>
+  );
+}
+
 const SourceBadge = ({ label }: { label: string }) => (
-  <Badge variant="outline" className="shrink-0 px-1.5 text-[10px]">
+  <Badge variant="outline" className="max-w-full justify-self-start truncate px-1.5 text-[10px]">
     {badgeLabel(label)}
   </Badge>
 );
 
-function ResultRow({ r, viewer }: { r: EntrySummary; viewer: Role }) {
+/**
+ * Name and Details cells: the name in name type (a group's chevron before it); the details line
+ * (`r.line`) right after it.
+ */
+function Cells({ r, lead }: { r: EntrySummary; lead?: ReactNode }) {
+  return (
+    <>
+      <span
+        className="flex min-w-0 items-center gap-1 font-medium"
+        data-testid="cmp-result-name"
+        data-slot="cmp-row-name"
+      >
+        {lead}
+        <span className="truncate">{r.name}</span>
+      </span>
+      <span className="truncate text-xs text-muted-foreground tabular-nums">{r.line}</span>
+    </>
+  );
+}
+
+export function ResultRow({ r, viewer }: { r: EntrySummary; viewer: Role }) {
   return (
     <li>
       <button
         type="button"
         data-testid="cmp-result"
+        data-slot="cmp-row"
         data-record-id={r.id}
         data-value={r.kind}
         {...rowProps(r, viewer)}
       >
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium" data-testid="cmp-result-name">
-            {r.name}
-          </span>
-          <span className="block truncate text-xs text-muted-foreground">{r.line}</span>
-        </span>
+        <Cells r={r} />
         <SourceBadge label={r.sourceLabel} />
       </button>
     </li>
@@ -210,6 +255,7 @@ export function GroupRow({
     <li>
       <div
         data-testid="cmp-result"
+        data-slot="cmp-row"
         data-record-id={r.id}
         data-value={r.kind}
         data-group-count={r.group?.count}
@@ -220,15 +266,9 @@ export function GroupRow({
           data-record-id={r.id}
           aria-expanded={expanded}
           onClick={() => toggleGroup(r.id)}
-          className="flex w-full items-center gap-2 rounded-sm px-2 py-1 text-left hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={ROW}
         >
-          <Chevron className="size-3.5 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium" data-testid="cmp-result-name">
-              {r.name}
-            </span>
-            <span className="block truncate text-xs text-muted-foreground">{r.line}</span>
-          </span>
+          <Cells r={r} lead={<Chevron className="size-3.5 shrink-0 text-muted-foreground" />} />
           <SourceBadge label={r.sourceLabel} />
         </button>
       </div>
@@ -262,7 +302,7 @@ export function GroupMembers({
     );
   }
   return (
-    <ul className="space-y-0.5 pl-6" data-testid="cmp-group-members" data-record-id={group.id}>
+    <ul data-testid="cmp-group-members" data-record-id={group.id}>
       {members.members.map((m) => (
         <li key={m.id}>
           <button
@@ -270,9 +310,11 @@ export function GroupMembers({
             data-testid="cmp-group-member"
             data-record-id={m.id}
             data-value={m.kind}
+            data-slot="cmp-row"
             {...rowProps(m, viewer)}
           >
-            <span className="min-w-0 flex-1 truncate text-sm">{m.line || m.name}</span>
+            {/* The member's own line, indented under its group's name, over Name + Details. */}
+            <span className="col-span-2 truncate pl-5">{m.line || m.name}</span>
             <SourceBadge label={m.sourceLabel} />
           </button>
         </li>
@@ -357,8 +399,9 @@ function ResultsList({ api, viewer }: { api: Api; viewer: Role }) {
     );
   }
   return (
-    <div data-testid="cmp-results" data-state={res.state}>
-      <ul className="space-y-0.5 p-1">
+    <div data-testid="cmp-results" data-slot="cmp-table" data-state={res.state}>
+      <TableHead />
+      <ul className={ZEBRA}>
         {res.results.map((r) =>
           r.group ? (
             <LiveGroupRow key={r.id} api={api} r={r} q={shownQ} viewer={viewer} />

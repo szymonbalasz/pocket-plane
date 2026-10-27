@@ -7,10 +7,12 @@
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { SearchResponse } from "@shared/compendium/rest";
 import {
+  type CreatureType,
   DEFINITION_DRAG_MIME,
   type DefinitionDragData,
   ENTITY_TYPE,
 } from "@shared/entities/schemas";
+import { Medallion } from "@ui/components/kit/medallion";
 import { Button } from "@ui/components/ui/button";
 import { Tooltip } from "@ui/components/ui/overlays";
 import {
@@ -23,14 +25,15 @@ import {
   TableRow,
 } from "@ui/components/ui/primitives";
 import { Tabs, TabsList, TabsTrigger } from "@ui/components/ui/tabs";
-import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
+import { useColorOf } from "@ui/features/campaign-management/colors";
 import { CreditsLink } from "@ui/features/compendium/credits";
 import { useDefinitions } from "@ui/features/compendium/definitions";
 import { lazyApi, searchCompendium, useCompendiumSearch } from "@ui/features/compendium/search";
 import { defineWindow } from "@ui/features/play-shell/registry";
+import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
-import { LockIcon, PawPrintIcon, UserIcon } from "lucide-react";
+import { LockIcon, PawPrintIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { actionsOf, type CreatureAction, creatureActions } from "./creature-actions";
 import {
@@ -52,15 +55,28 @@ const TAB_LABEL: Record<CreatureTab, string> = {
   monster: "Monsters",
 };
 
-function Portrait({ row }: { row: CreatureRow }) {
-  if (row.portraitAssetId) {
-    return <AssetImg id={row.portraitAssetId} file="thumb" alt="" className="size-8 rounded-sm" />;
-  }
-  const Icon = row.kind === "character" ? UserIcon : PawPrintIcon;
+/** FR-KIT-84: a `creature.<type>` meaning colour (FR-ENT-28; not themed, FR-THEME-09). */
+export const creatureColour = (t: CreatureType) => `var(--creature-${t}, ${CREATURE_COLORS[t]})`;
+
+/**
+ * FR-KIT-84: the row's medallion: the portrait, else the initial on the creature-type colour
+ * (monsters) or the owner's colour (characters); neutral when neither is known.
+ */
+function RowMedallion({ row }: { row: CreatureRow }) {
+  const colorOf = useColorOf();
+  const d = row.definition;
+  const colour =
+    d.kind === "character"
+      ? colorOf({ role: "player", playerId: d.ownerPlayerId })
+      : row.creatureType && creatureColour(row.creatureType);
   return (
-    <div className="flex size-8 items-center justify-center rounded-sm bg-muted text-muted-foreground">
-      <Icon className="size-4" />
-    </div>
+    <Medallion
+      size="lg"
+      name={row.name}
+      imageAssetId={row.portraitAssetId}
+      colour={colour}
+      data-testid="ent-list-row-medallion"
+    />
   );
 }
 
@@ -82,8 +98,8 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
       }}
       className="cursor-grab active:cursor-grabbing"
     >
-      <TableCell className="w-10 p-1.5">
-        <Portrait row={row} />
+      <TableCell className="w-12 p-1.5">
+        <RowMedallion row={row} />
       </TableCell>
       {/* Name column takes the free width (w-full + max-w-0: truncate inside a table) but never
           less than NAME_MIN (the inner min width raises the cell's min-content width), so row

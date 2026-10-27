@@ -41,7 +41,7 @@ test("FR-SHELL-156 Party Manager registered (DM): title / label Party Manager, o
     sizeRow: { default: all(600, 560), useful: all(440, 400), min: { w: 340, h: 360 } },
     sets: ["D1", "D2", "D3"],
   });
-  expect(r.sizeRow?.criterion).toContain("every PC row and its companion rows whole");
+  expect(r.sizeRow?.criterion).toContain("2 PC cards + their companion rows whole");
   for (const { vp, rect } of managerOpenRects(registry)) {
     const [w, h] = vp.split("×").map(Number) as [number, number];
     expect({

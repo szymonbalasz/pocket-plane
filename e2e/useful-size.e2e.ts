@@ -36,14 +36,16 @@ interface Case {
 
 /**
  * PM2 (FR-SHELL-156, FR-PARTY-63; review-b ruling 16): Party Manager on its Party status tab at
- * the useful size: every PC row of `cb-party-six`'s party and every companion row under them
- * whole, names and figures uncut; the labels Party status, Handouts, Inventory, Loot whole.
+ * the useful size; since kit parity K4 (FR-KIT-82) the PCs are ≈ 66-px cards: the first 2 cards of
+ * `cb-party-six`'s party and the 5 companion rows under them whole (7 rows; §7.3 says "3 cards",
+ * which a party with companions can't meet at 400 high), names and figures uncut on every whole
+ * row; the labels Party status, Handouts, Inventory, Loot whole.
  */
 const PARTY_MANAGER: Case = {
   kind: "party.board",
   useful: { w: 440, h: 400 },
-  criterion: "Party status: every PC row and its companion rows whole + 4 tab labels whole",
-  check: "all",
+  criterion: "Party status: 2 PC cards + their 5 companion rows whole + 4 tab labels whole",
+  check: 7,
   rows: '[data-testid="party-summary-row"], [data-testid="party-companion-row"]',
   uncut: [
     "party-summary-name",
@@ -211,7 +213,8 @@ const measure = (win: Locator, c?: Pick<Case, "rows" | "uncut" | "clip">) =>
         return x.height > 0 && x.top >= b.top - 0.5 && x.bottom <= b.bottom + 0.5;
       });
       const cut: string[] = [];
-      for (const r of rows) {
+      // Parts are checked on the whole rows (a row past the fold is cut by the scroll, not cut).
+      for (const r of whole) {
         const rr = r.getBoundingClientRect();
         for (const id of uncut) {
           for (const el of r.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)) {
