@@ -634,19 +634,16 @@ export function settleStack(
     now: number;
     /**
      * K12 (walkthrough 5, one move per change): the layout (windows, tool bars, dialogs, popups)
-     * changed and hasn't held still for `REFOLD_QUIET_MS` yet. The drawn stack holds where it is,
-     * with no fold step, until it has (at most `SETTLE_HOLD_MS`), then moves once.
+     * changed and hasn't held still for `REFOLD_QUIET_MS` yet. No fold step until it has: the
+     * stack re-places at once for its current toasts (FR-NOTE-51) and folds only once the layout
+     * is quiet (was: folded to the summary at once, a far spot, then unfolded 250 ms later).
      */
     changing?: boolean;
   },
 ): StackSettle {
-  if (o.changing && s.drawn !== null) {
-    const since = s.heldSince ?? o.now;
-    if (o.now - since < SETTLE_HOLD_MS)
-      return s.hold && s.heldSince === since ? s : { ...s, hold: true, heldSince: since };
-  }
-  const fold = foldCap(s.fold, o);
-  const stepping = o.stackH > 0 && o.need && fold.cap > o.min && fold.foldedAt === o.stackH;
+  const fold = o.changing ? s.fold : foldCap(s.fold, o);
+  const stepping =
+    !o.changing && o.stackH > 0 && o.need && fold.cap > o.min && fold.foldedAt === o.stackH;
   const fresh = s.heldSince === null || o.now - s.heldSince < SETTLE_HOLD_MS;
   const hold = stepping && s.drawn !== null && fresh;
   const drawn = hold ? s.drawn : { left: o.spot.left, top: o.spot.top };

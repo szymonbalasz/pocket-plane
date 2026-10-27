@@ -139,7 +139,7 @@ describe("FR-CBT-118 DM rows", () => {
     const childNames = new Set(
       [
         ...html.matchAll(
-          /data-child="true"[^>]*><span data-testid="cbt-init-row-name" data-value="([^"]+)"/g,
+          /data-child="true"[^>]*><span data-name-head="true"[^>]*><span data-testid="cbt-init-row-name" data-value="([^"]+)"/g,
         ),
       ].map((m) => m[1]),
     );

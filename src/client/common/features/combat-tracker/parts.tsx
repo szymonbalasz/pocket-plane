@@ -136,7 +136,8 @@ export function ChildMedallion({
   return (
     <span
       data-slot="init-child-medallion"
-      className="flex w-[34px] shrink-0 justify-end @max-[22rem]/init:w-7"
+      // K12 re-test: on the name's line (the row's first), however many lines the row has.
+      className="flex w-[34px] shrink-0 justify-end self-start @max-[22rem]/init:w-7"
     >
       <CombatantMedallion c={c} size="sm" />
     </span>
@@ -161,10 +162,11 @@ export const CHILD_ROW = {
 export const LINE_TRACK = { "--hp-track": "40px" } as CSSProperties;
 
 /**
- * K12 re-test (walkthrough 4): a child row's name line: one line, the name truncated with its
- * full text in a Tooltip, the marks and the side chips (owner dot, Ally) kept whole beside it, so
- * the medallion stays on the name's line (a long name wrapped to three lines, the medallion on
- * the second). Same test ID and `data-value` as `NameLine`'s.
+ * K12 re-test (walkthrough 4): a child row's name line: the name never wraps (a long name
+ * wrapped to three lines, the medallion on the second): it truncates with its full text in a
+ * Tooltip only when it and its marks don't fit the whole line; the side chips (owner dot, Ally)
+ * stay whole beside it, or on the next line when there's no room. Same test ID and `data-value`
+ * as `NameLine`'s. The medallion sits on this line (`ChildMedallion`).
  */
 export function ChildNameLine({
   name,
@@ -180,14 +182,24 @@ export function ChildNameLine({
   side?: ReactNode;
 }) {
   return (
-    <div data-name-line data-child className="flex min-w-0 items-center gap-1">
-      <Tooltip content={name}>
-        <span data-testid={testId} data-value={name} className={cn("min-w-0 truncate", className)}>
-          {name}
+    <div
+      data-name-line
+      data-child
+      className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
+    >
+      <span data-name-head className="flex min-w-0 max-w-full items-center gap-1">
+        <Tooltip content={name}>
+          <span
+            data-testid={testId}
+            data-value={name}
+            className={cn("min-w-0 truncate", className)}
+          >
+            {name}
+          </span>
+        </Tooltip>
+        <span data-name-marks className="flex shrink-0 items-center gap-1 empty:hidden">
+          {marks}
         </span>
-      </Tooltip>
-      <span data-name-marks className="flex shrink-0 items-center gap-1 empty:hidden">
-        {marks}
       </span>
       <span data-name-side className="flex shrink-0 items-center empty:hidden">
         {side}

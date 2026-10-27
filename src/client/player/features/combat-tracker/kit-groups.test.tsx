@@ -27,7 +27,7 @@ describe("FR-KIT-29 companion groups (K12)", () => {
       expect(li(owl)).toMatch(/ -mt-1 [^"]*\brounded-t-none\b/);
       expect(li(mira)).toContain("rounded-b-none");
       expect(owl).toMatch(
-        /data-slot="init-child-medallion" class="[^"]*w-\[34px\][^"]*"><span[^>]*data-size="sm"/,
+        /data-slot="init-child-medallion" class="[^"]*w-\[34px\][^"]*self-start[^"]*"><span[^>]*data-size="sm"/,
       );
       // Under its owner the owner chip is the colour dot only (the name in its Tooltip and for
       // screen readers): medallion · name · bar.
@@ -37,7 +37,7 @@ describe("FR-KIT-29 companion groups (K12)", () => {
       // K12 re-test: one name line (truncated, full name in its Tooltip), marks and side chips
       // whole beside it, so the medallion stays on the name's line.
       expect(owl).toMatch(
-        /<div data-name-line="true" data-child="true" class="flex min-w-0 items-center gap-1"><span data-testid="cbt-init-row-name" data-value="Owlbear" class="min-w-0 truncate[^"]*" data-state="closed"/,
+        /<div data-name-line="true" data-child="true" class="flex min-w-0 flex-wrap[^"]*"><span data-name-head="true" class="flex min-w-0 max-w-full[^"]*"><span data-testid="cbt-init-row-name" data-value="Owlbear" class="min-w-0 truncate[^"]*" data-state="closed"/,
       );
       // A row that isn't a child keeps the lg medallion and its own rounded card.
       const goblin = rowHtml(html, "cbt-init-row", "goblin");

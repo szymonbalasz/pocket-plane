@@ -104,15 +104,25 @@ test("FR-CBTX-52 FR-CBTX-53 trigger chips and the token icon follow the state, D
     await idByName(init, "Brakka"),
   ];
 
-  // Mira's feature trigger shows its uses left (1 of 2) for the DM and her owner.
+  // Mira's feature trigger for the DM and her owner. K12 re-test (kit parity, one status piece):
+  // Mira concentrates, so her status cell shows the concentration and the trigger rides in "+N"
+  // (named with its state line); the chip itself (uses left: 1 of 2) shows once it is the cell's
+  // only piece.
+  const miraMore = (scope: Locator) =>
+    scope
+      .locator(`[data-testid="cbt-init-row"][data-record-id="${mira}"]`)
+      .locator('button[aria-label^="More effects:"]');
   for (const scope of [init, init1]) {
     const sf = chips(scope, mira);
-    await expect(sf).toHaveCount(1);
-    await expect(sf).toHaveAttribute("data-state", "uses");
-    await expect(sf).toHaveAttribute("data-value", "1");
-    await expect(sf).toContainText("Searing Strike");
+    if ((await sf.count()) === 1) {
+      await expect(sf).toHaveAttribute("data-state", "uses");
+      await expect(sf).toHaveAttribute("data-value", "1");
+      await expect(sf).toContainText("Searing Strike");
+    } else await expect(miraMore(scope)).toHaveAttribute("aria-label", /Searing Strike — /);
   }
   await expect(chips(init2, mira)).toHaveCount(0);
+  if ((await miraMore(init2).count()) > 0)
+    await expect(miraMore(init2)).not.toHaveAttribute("aria-label", /Searing Strike/);
   // Thorn's Sneak Attack: the DM and player-2, not player-1.
   await expect(chips(init, thorn)).toHaveCount(1);
   await expect(chips(init2, thorn)).toHaveCount(1);
