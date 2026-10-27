@@ -22,3 +22,4 @@ Each slice: build → kit-vs-app walkthrough → gates → merge. K6 compares ev
 |---|---|
 | 2026-10-26 | Spec merged (complete, #356), ADR-0070 accepted. K0 started |
 | 2026-10-27 | **K0 merged**: kit parts (Medallion, Result box, HP bar), variants as data, every dialog with a title bar and centred close gem (walkthrough 3/5 → re-test 4/5 → fixed). K5 building |
+| 2026-10-27 | **K5 merged**: launcher in the top bar (DM #358: all window buttons as icons), kit top-bar zones, work area to the bottom edge, taller Game log, layouts regenerated once (walkthrough 7/8, pre-existing grip issue BL-133; 13 e2e expectations updated to the new geometry; BL-134 Fit follow-up). K1 + K2 started |
