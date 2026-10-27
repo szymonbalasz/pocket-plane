@@ -27,3 +27,4 @@ Each slice: build → kit-vs-app walkthrough → gates → merge. K6 compares ev
 | 2026-10-27 | **K2 merged**: Initiative as the kit card (walkthrough 5/6 → re-test PASS: companions in the owner's turn no longer widen the column). K4 walkthrough; K3 started |
 | 2026-10-27 | **K4 merged**: compendium table + stat block card, Party status cards, Creatures medallions, sheet header (walkthrough 5/7 → re-test 7/7). K7 started |
 | 2026-10-27 | **K3 merged**: notices as kit cards, DM turn card, damage card as a kit window (walkthrough 6/7; the alert fallback is the same on main, BL-130). Only K7 and K6 left |
+| 2026-10-27 | **K7 merged**: the DM stat-block window (kit Goblin card; opened from Initiative, tokens, the compendium and a palette command; out-of-fight rolls always DM-only after a walkthrough leak, #359). All build slices on main. **K6 parity walkthrough** started |
