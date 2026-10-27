@@ -34,5 +34,8 @@ export default defineBundle({
     // Perception request (DC hidden), so player-1 loads with the roll-request toast (Roll + Decline)
     // and the Notifications windows hold a pending prompt beside the history.
     "dicex-request-open",
+    // K13 (round 3: the wide sheet's Spells box): Mira's spell slots (1 of 2 used) and Hunter's
+    // Mark; Limited uses is her Second Wind (char-mira-full).
+    "kit-mira-spells",
   ],
 });

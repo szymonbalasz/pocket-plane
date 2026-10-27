@@ -72,6 +72,7 @@ import kitLibrary from "./kit-library";
 import kitLog from "./kit-log";
 import kitNotices from "./kit-notices";
 import kitParity from "./kit-parity";
+import kitRound3 from "./kit-round3";
 import lateDamage from "./late-damage";
 import logNoteColours from "./log-note-colours";
 import lootSubtractE2e from "./loot-subtract-e2e";
@@ -331,4 +332,7 @@ export const bundles: readonly Bundle[] = [
   // Sprint 13 K7 (build/kit-statblock): the kit-parity world (K6 parity walkthrough, K7
   // walkthrough + kit-statblock e2e)
   kitParity,
+  // Sprint 13 K13 (build/kit-round3-sheet): wide sheet, compendium rows, top bar walkthrough +
+  // kit-round3 e2e
+  kitRound3,
 ];
