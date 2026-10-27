@@ -34,7 +34,7 @@ import { PublicRolls, PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
 import { ROLL_HINT, rollHint } from "./rolls";
 import type { RollRoute } from "./routing";
-import { SheetView } from "./SheetView";
+import { DERIVE_HINT, SheetView } from "./SheetView";
 import { SheetContext, type SheetCtx } from "./sheet-context";
 import {
   breakdownText,
@@ -293,7 +293,8 @@ describe("FR-CHARX-106 stat row", () => {
       const html = render(<MainTab />, { client: "dm" });
       const init = box(html, "init");
       expect(init).not.toContain("char-sheet-roll-init");
-      expect(init).toContain('data-testid="char-sheet-init-locked"');
+      // K11 walkthrough: screen-reader text, no caption (the value's Tooltip says it).
+      expect(init).toContain('data-testid="char-sheet-init-locked" class="sr-only"');
       expect(text(init)).toBe("InitInitiative+4Initiative set");
       expect(render(<PublicRolls />, { client: "dm" })).not.toContain("char-sheet-public-init");
     } finally {
@@ -689,6 +690,8 @@ function stateHtml(o: {
   locked?: boolean;
   editing?: boolean;
   part?: PinnedPart;
+  /** An imported definition (read-only NPC sheet, FR-CHARX-31). */
+  imported?: boolean;
 }) {
   const g = globalThis as { document?: unknown };
   g.document = { title: "", hidden: false };
@@ -706,7 +709,15 @@ function stateHtml(o: {
         <TooltipProvider delayDuration={0} skipDelayDuration={0}>
           <ShellProvider registry={createWindowRegistry(o.client, [])}>
             <SheetView
-              creature={creatureOf({ npc: o.npc })}
+              creature={
+                o.imported
+                  ? ({
+                      ...creatureOf({ npc: true }),
+                      name: "Goblin",
+                      campaignId: null,
+                    } as unknown as DefinitionRecord)
+                  : creatureOf({ npc: o.npc })
+              }
               row={o.npc ? undefined : row}
               client={o.client}
               playerId={o.client === "dm" ? null : "p1"}
@@ -816,6 +827,72 @@ describe("FR-CHARX-106 stat row in every viewer state (K11)", () => {
     expect(elementAt(html, 'data-testid="charx-skill" data-value="stealth"')).toContain(
       "text-[15px]",
     );
+  });
+});
+
+describe("K11 walkthrough fixes", () => {
+  test("FR-KIT-85 imported NPC header: Derive to customise is a 24-px icon button (label in aria-label + Tooltip), so the name keeps its column; names never break mid-word", () => {
+    const html = stateHtml({ client: "dm", imported: true });
+    const derive = elementAt(html, 'data-testid="charx-header-actions"');
+    const tag = derive.slice(
+      derive.indexOf("<button"),
+      derive.indexOf(">", derive.indexOf("<button")) + 1,
+    );
+    expect(tag).toContain('data-testid="charx-derive"');
+    expect(tag).toContain("h-6 text-[13px] w-6 px-0");
+    expect(tag).toContain(`aria-label="${DERIVE_HINT}"`);
+    expect(text(derive)).toBe("");
+    expect(html).toContain('data-testid="charx-readonly"');
+    expect(html).toContain("line-clamp-2 min-w-0 break-normal text-balance");
+    expect(html).not.toContain("break-words");
+  });
+
+  test("FR-KIT-85 level line wraps between parts, never right after a '·' (each later part keeps its '·')", () => {
+    const html = stateHtml({ client: "dm", npc: true });
+    const line = `<span ${html.slice(
+      html.indexOf('data-testid="char-sheet-level"'),
+      html.indexOf('data-testid="charx-header-actions"'),
+    )}`;
+    expect(text(line).replace(/<div $/, "")).toBe("CR 1 · 200 XP");
+    expect(line).toContain('<span class="whitespace-nowrap">· 200 XP</span>');
+    // Every "·" opens an unbreakable part.
+    expect(line.match(/·/g)?.length).toBe(line.match(/whitespace-nowrap">·/g)?.length);
+  });
+
+  test("FR-CHARX-106 custom NPC boxes: HP max is a plain box (value under its label, as Speed); the Initiative button's label and value start at the top as Speed / Prof", () => {
+    const html = render(<MainTab />, { client: "dm", npc: true });
+    const hp = box(html, "hp");
+    expect(hp).toMatch(
+      /^<div data-testid="charx-box" data-value="hp" data-slot="sheet-box" class="[^"]*items-center[^"]*text-center/,
+    );
+    expect(hp).not.toContain("charx-hp-temp");
+    expect(text(hp)).toBe("HP max21");
+    expect(box(render(<MainTab />), "init")).toContain("flex-col justify-start");
+  });
+
+  test("FR-CHARX-107 a disabled Damage reads quiet (outline), the destructive look only while it can be pressed", () => {
+    const html = render(<MainTab />);
+    const damage = html.slice(
+      html.lastIndexOf("<button", html.indexOf('data-testid="char-sheet-hp-damage"')),
+    );
+    expect(damage.slice(0, damage.indexOf(">"))).toContain('data-variant="outline"');
+    expect(damage.slice(0, damage.indexOf(">"))).toContain('disabled=""');
+  });
+
+  test("FR-KIT-85 chips line: the header sections and their chip rows flatten into one wrapping line (the effects menu never alone on a row)", () => {
+    const html = stateHtml({ client: "player" });
+    const chips = html.slice(html.indexOf('data-testid="charx-header-chips"'));
+    const cls = chips.slice(
+      chips.indexOf('class="'),
+      chips.indexOf('"', chips.indexOf('class="') + 7),
+    );
+    for (const c of [
+      "flex-wrap",
+      "[&amp;_[data-testid=charx-section]]:contents",
+      "[&amp;_[data-testid=cbtx-sheet-effects]]:contents",
+      "[&amp;_[data-chip-row]]:contents",
+    ])
+      expect(cls).toContain(c);
   });
 });
 

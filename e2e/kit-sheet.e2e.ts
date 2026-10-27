@@ -143,3 +143,54 @@ test("FR-CHARX-106 FR-CHARX-107 FR-KIT-85 kit sheet: stat row first for DM (in c
   await shoot(sheet, "app-player-wide");
   await p1.context().close();
 });
+
+test("FR-KIT-85 FR-CHARX-115 K11 walkthrough fixes: imported NPC name keeps its column, kit tab arrows, 280-px chips line", async ({
+  browser,
+}) => {
+  const { secret, recordId } = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+
+  // The SRD Goblin's read-only sheet at 320: Derive is a 24-px icon button, the name one line.
+  const creatures = await openWindow(dm, "ent.creatures");
+  await creatures.getByTestId("ent-list-search").fill("goblin");
+  await creatures
+    .getByTestId("ent-list-row")
+    .filter({ has: dm.getByTestId("ent-list-row-lock") })
+    .filter({ has: dm.getByTestId("ent-list-row-name").getByText("Goblin", { exact: true }) })
+    .first()
+    .getByTestId("charx-open-sheet")
+    .click();
+  const win = await openWindow(dm, "char.sheet");
+  await expect(win.getByTestId("char-sheet-name")).toHaveText("Goblin");
+  expect(await win.boundingBox()).toMatchObject({ width: 320 });
+  const derive = await win.getByTestId("charx-derive").boundingBox();
+  expect([Math.round(derive?.width ?? 0), Math.round(derive?.height ?? 0)]).toEqual([24, 24]);
+  const lines = (id: string) =>
+    win.getByTestId(id).evaluate((e) => {
+      const r = e.getBoundingClientRect();
+      return Math.round(r.height / Number.parseFloat(getComputedStyle(e).lineHeight));
+    });
+  expect(await lines("char-sheet-name")).toBe(1);
+  expect(await lines("char-sheet-level")).toBe(1);
+  await shoot(win, "app-imported-goblin-default");
+
+  // Mira mid-fight at 320: both tab arrows drawn, the earlier one disabled at the start.
+  await win.getByTestId("char-sheet-picker").selectOption(recordId("char-mira", "entity"));
+  await expect(win.getByTestId("charx-tabs-prev")).toBeVisible();
+  await expect(win.getByTestId("charx-tabs-prev")).toBeDisabled();
+  await expect(win.getByTestId("charx-tabs-next")).toBeEnabled();
+
+  // At the 280 minimum: the effects menu shares its line with a chip.
+  await resizeTo(dm, win, 280, 440);
+  const menu = await win.getByTestId("cbtx-sheet-effects-menu").boundingBox();
+  const chipTops = await win
+    .locator('[data-testid="charx-header-chips"] [data-testid="cbtx-sheet-effect"]')
+    .evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [r.top, r.bottom]));
+  const mid = (menu?.y ?? 0) + (menu?.height ?? 0) / 2;
+  expect(chipTops.some(([top, bottom]) => (top ?? 0) <= mid && mid <= (bottom ?? 0))).toBe(true);
+  await shoot(win, "app-dm-280");
+  await dm.context().close();
+});

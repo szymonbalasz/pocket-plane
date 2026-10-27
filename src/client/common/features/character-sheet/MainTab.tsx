@@ -154,16 +154,35 @@ function HitPoints() {
   const temp = c.kind === "character" ? (c.tempHp ?? 0) : 0;
   const e = ctx.editing && ctx.canEdit;
   const state = hp === null ? null : hpState(hp, s.hpMax);
-  const hpSections =
-    hp === null || ctx.readOnly
-      ? []
-      : sectionsFor(sheetSections, {
-          slot: "hp",
-          client: ctx.client,
-          kind: c.kind,
-          store,
-          creatureId: c.id,
-        });
+  if (hp === null) {
+    return (
+      <Box box="hp" label="HP max" className="col-span-3 @min-[560px]/sheet:col-span-1">
+        <span data-testid="char-sheet-hp" className={BOX_VALUE}>
+          {e ? (
+            <IntField
+              path="hpMax"
+              label="HP max"
+              value={s.hpMax}
+              min={1}
+              max={999}
+              commit={(v) => edit("hpMax", v)}
+            />
+          ) : (
+            s.hpMax
+          )}
+        </span>
+      </Box>
+    );
+  }
+  const hpSections = ctx.readOnly
+    ? []
+    : sectionsFor(sheetSections, {
+        slot: "hp",
+        client: ctx.client,
+        kind: c.kind,
+        store,
+        creatureId: c.id,
+      });
   return (
     <div
       data-testid="charx-box"
@@ -273,6 +292,7 @@ function Speed() {
 }
 
 const INIT_LABEL = <WideLabel short="Init" full="Initiative" />;
+const INIT_SET = "Initiative set";
 
 /**
  * FR-CHARX-106: the Initiative box is the Initiative button whenever FR-CHAR-24 shows it (routed
@@ -312,8 +332,15 @@ function Initiative() {
   }
   if (rollActionView(claim, "initiative") !== "button") {
     return (
+      // K11: no "Initiative set" caption (it wrapped at 280 px); it ends the value's Tooltip and
+      // stays as screen-reader text (`char-sheet-init-locked`).
       <Box box="init" label={INIT_LABEL}>
-        <BreakdownTip okey="init">{value}</BreakdownTip>
+        <BreakdownTip
+          okey="init"
+          note={rollActionView(claim, "initiative") === "locked" ? INIT_SET : undefined}
+        >
+          {value}
+        </BreakdownTip>
         <RoutedRoll kind="initiative" title="Initiative">
           Initiative
         </RoutedRoll>
@@ -331,7 +358,7 @@ function Initiative() {
         data-slot="sheet-roll"
         variant="ghost"
         aria-label={`Initiative ${signed(s.initBonus)}`}
-        className="size-full min-h-12 flex-col gap-0 px-1 pt-[5px] pb-1.5"
+        className="size-full min-h-12 flex-col justify-start gap-0 px-1 pt-[5px] pb-1.5"
       >
         <span className={BOX_LABEL}>{INIT_LABEL}</span>
         {value}
@@ -415,7 +442,8 @@ function HpControl() {
       <Button
         data-testid="char-sheet-hp-damage"
         size="sm"
-        variant="destructive"
+        // K11: a disabled Damage reads quiet (not the strong red) in every theme.
+        variant={disabled ? "outline" : "destructive"}
         className={SMALL}
         disabled={disabled}
         onClick={() => send(-1)}

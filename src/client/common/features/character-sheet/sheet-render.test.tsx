@@ -340,8 +340,9 @@ describe("FR-CHARX-48 pinned header", () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(picker).toContain("[&amp;&gt;select]:opacity-0");
     expect(tagOf(html, "char-sheet-name")).toContain('data-slot="sheet-name"');
+    // K11 walkthrough: whole words, balanced lines; the chevron follows the last word.
     expect(html).toMatch(
-      /data-testid="char-sheet-name"[^>]*><span class="line-clamp-2 min-w-0 break-words">Mira<\/span>/,
+      /data-testid="char-sheet-name"[^>]*><span class="line-clamp-2 min-w-0 break-normal text-balance">Mira<svg[^>]*lucide-chevron-down/,
     );
     // K11: the kit's name type size (21 px, 32 px wide).
     expect(tagOf(html, "char-sheet-name")).toContain("text-[21px] font-bold");
@@ -374,7 +375,8 @@ describe("FR-CHARX-48 pinned header", () => {
     const html = sheetHtml("full");
     // The Tooltip trigger is the picker wrapper (it carries the select); the name clamps at 2 lines.
     expect(tagOf(html, "charx-name-picker")).toContain("data-tip");
-    expect(html).toMatch(/<span class="line-clamp-2 min-w-0 break-words">Mira<\/span>/);
+    expect(html).toMatch(/<span class="line-clamp-2 min-w-0 break-normal text-balance">Mira</);
+    expect(html).not.toContain("break-words");
     // K11: portrait, name column, actions in a grid; the actions stack in a column when narrow
     // (the name keeps the middle), a row once wide.
     expect(html).toContain(

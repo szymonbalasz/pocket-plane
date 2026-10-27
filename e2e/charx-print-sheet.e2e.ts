@@ -96,8 +96,9 @@ test("FR-CHARX-105 FR-CHARX-106 FR-CHARX-109 FR-CHARX-112 FR-CHARX-113 FR-CHARX-
   const strip = win.getByRole("tablist");
   const scroller = strip.locator("xpath=..");
   await expect(win.getByTestId("charx-tabs-next")).toBeVisible();
-  // K11: the slot stays (no shift while scrolling), the arrow hidden while nothing is before.
-  await expect(win.getByTestId("charx-tabs-prev")).toBeHidden();
+  // K11: both arrows drawn as the kit's, the one with nothing before it disabled.
+  await expect(win.getByTestId("charx-tabs-prev")).toBeVisible();
+  await expect(win.getByTestId("charx-tabs-prev")).toBeDisabled();
   const s = await strip.boundingBox();
   await p1.mouse.move((s?.x ?? 0) + 40, (s?.y ?? 0) + (s?.height ?? 0) / 2);
   await p1.mouse.wheel(0, 200);

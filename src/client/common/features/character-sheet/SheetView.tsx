@@ -8,7 +8,13 @@ import { levelLine } from "@shared/character-sheet/logic";
 import { CHARX_INTENTS, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import { isLoaded, type LoadedSet } from "@shared/protocol/lazy";
-import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, LockIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CopyPlusIcon,
+  LockIcon,
+} from "lucide-react";
 import {
   type CSSProperties,
   type ReactNode,
@@ -57,6 +63,8 @@ const NOTHING_LOADED: LoadedSet = { types: [], ids: {} };
 
 /** Creatures window kind (entities): "Derive to customise" opens it (FR-CHARX-31). */
 const CREATURES_KIND = "ent.creatures";
+/** The read-only sheet's Derive button: its label, in the Tooltip (K11). */
+export const DERIVE_HINT = "Derive to customise";
 export const CREATE_HINT = "Fill in class, ability scores, AC and HP. Your DM approves the sheet.";
 
 /**
@@ -162,15 +170,20 @@ function HeaderActions({
       <PublicRollsMenu className={cn(SMALL, "w-6 px-0")} />
       <div className="flex flex-col items-end gap-1 @min-[560px]/sheet:flex-row @min-[560px]/sheet:items-center @min-[560px]/sheet:gap-1.5">
         {ctx.readOnly && (
-          <Button
-            size="sm"
-            className={SMALL}
-            variant="outline"
-            data-testid="charx-derive"
-            onClick={() => openWindow(CREATURES_KIND)}
-          >
-            Derive to customise
-          </Button>
+          // K11 walkthrough F1: a 24-px icon button (the label in its Tooltip), so an imported
+          // NPC's name keeps the header's middle column at 320 px.
+          <Tooltip content={DERIVE_HINT}>
+            <Button
+              size="sm"
+              className={cn(SMALL, "w-6 px-0")}
+              variant="outline"
+              data-testid="charx-derive"
+              aria-label={DERIVE_HINT}
+              onClick={() => openWindow(CREATURES_KIND)}
+            >
+              <CopyPlusIcon className="size-3.5" />
+            </Button>
+          </Tooltip>
         )}
         {isDm && character && ctx.sheet.status === "draft" && (
           <Button
@@ -230,13 +243,12 @@ function HeaderActions({
  * draws the `header` sections' effect chips the same size, every theme alike.
  */
 const CHIP = "w-fit rounded-full px-2.5 py-0.5 text-[13px] font-normal leading-tight";
-// The `header` sections' wrappers flatten into the line (`contents`), and their chip rows wrap,
-// so a long chip ("Concentrating: Bless 10r") takes a line of its own instead of running out of
-// the window; a chip longer than the line truncates.
+// The `header` sections' wrappers and chip rows flatten into the line (`contents`): every chip
+// and the effects menu wrap as one line (K11 walkthrough: the menu alone on a row at 280 px); a
+// chip longer than the line truncates.
 const CHIPS_LINE = cn(
   "flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1",
-  "[&_[data-testid=charx-section]]:min-w-0 [&_[data-testid=charx-section]]:max-w-full",
-  "[&_[data-testid=cbtx-sheet-effects]]:flex-wrap [&_[data-chip-row]]:flex-wrap [&_[data-chip-row]]:gap-x-1.5 [&_[data-chip-row]]:gap-y-1",
+  "[&_[data-testid=charx-section]]:contents [&_[data-testid=cbtx-sheet-effects]]:contents [&_[data-chip-row]]:contents",
   "[&_[data-testid=cbtx-sheet-effects-menu]]:size-6",
   "[&_[data-testid=cbtx-sheet-effect]]:max-w-full [&_[data-testid=cbtx-sheet-effect]]:rounded-full [&_[data-testid=cbtx-sheet-effect]]:px-2 [&_[data-testid=cbtx-sheet-effect]]:py-0.5 [&_[data-testid=cbtx-sheet-effect]]:text-[13px]",
 );
@@ -303,7 +315,17 @@ function SheetName({ picker }: { picker: ReactNode }) {
           className="size-3.5 shrink-0"
         />
       )}
-      <span className="line-clamp-2 min-w-0 break-words">{ctx.creature.name}</span>
+      {/* K11 walkthrough: whole words only (never "Go / b…"), lines balanced as the kit's
+          `.cname`; the picker's chevron follows the last word, not the column's edge. */}
+      <span className="line-clamp-2 min-w-0 break-normal text-balance">
+        {ctx.creature.name}
+        {picker && (
+          <ChevronDownIcon
+            aria-hidden
+            className="ml-1 inline size-4 align-middle text-muted-foreground"
+          />
+        )}
+      </span>
     </span>
   );
   if (!picker) return <Tooltip content={ctx.creature.name}>{name}</Tooltip>;
@@ -311,10 +333,9 @@ function SheetName({ picker }: { picker: ReactNode }) {
     <Tooltip content={ctx.creature.name}>
       <span
         data-testid="charx-name-picker"
-        className="relative flex min-w-0 max-w-full items-center gap-1 self-start rounded-sm has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring"
+        className="relative flex min-w-0 max-w-full items-center self-start rounded-sm has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring"
       >
         {name}
-        <ChevronDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         <span className="absolute inset-0 [&>select]:size-full [&>select]:max-w-none [&>select]:cursor-pointer [&>select]:opacity-0">
           {picker}
         </span>
@@ -374,9 +395,13 @@ function NameRow({
           data-testid="char-sheet-level"
           className="text-sm text-muted-foreground @min-[560px]/sheet:text-base"
         >
-          {sub}
-          {species ? ` · ${species}` : ""}
-          {background && <span className="hidden @min-[560px]/sheet:inline"> · {background}</span>}
+          <LevelParts parts={[...sub.split(" · "), ...(species ? [species] : [])]} />
+          {background && (
+            <span className="hidden @min-[560px]/sheet:inline">
+              {" "}
+              <span className="whitespace-nowrap">· {background}</span>
+            </span>
+          )}
         </span>
       </div>
       <div data-testid="charx-header-actions" className="ml-auto shrink-0">
@@ -386,6 +411,23 @@ function NameRow({
         <ChipsLine className="col-span-3 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2 @min-[560px]/sheet:row-start-2 @min-[560px]/sheet:-mt-1" />
       )}
     </div>
+  );
+}
+
+/**
+ * The level line's parts ("Level 1 Fighter", "Human"; "CR 1/4", "50 XP"): a later part keeps its
+ * "·" and its words together, so the line wraps between parts, never right after a "·" (K11).
+ */
+function LevelParts({ parts }: { parts: readonly string[] }) {
+  return parts.map((p, i) =>
+    i === 0 ? (
+      <span key={p}>{p}</span>
+    ) : (
+      <span key={p}>
+        {" "}
+        <span className="whitespace-nowrap">· {p}</span>
+      </span>
+    ),
   );
 }
 
@@ -416,8 +458,8 @@ const TAB = "h-auto px-2.5 pt-[5px] pb-2 text-[15px] leading-[1.2]";
  * FR-CHARX-115: the tab strip scrolls sideways only (the active marker sits inside the tab): the
  * wheel turns into sideways scroll, arrows (the kit's ‹ ›) show at an end with hidden tabs, a
  * thin scrollbar stays. The arrows sit beside the strip, never over a tab. K11: while the strip
- * overflows both arrow slots stay in the layout (an end with nothing hidden keeps an invisible,
- * disabled arrow), so scrolling never shifts the tabs under the pointer.
+ * overflows both arrows are drawn, as the kit's, the one at an end with nothing hidden disabled;
+ * scrolling never shifts the tabs under the pointer.
  */
 function TabStrip({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -459,13 +501,8 @@ function TabStrip({ children }: { children: ReactNode }) {
       type="button"
       data-testid={dir < 0 ? "charx-tabs-prev" : "charx-tabs-next"}
       aria-label={dir < 0 ? "Earlier tabs" : "More tabs"}
-      aria-hidden={shown ? undefined : true}
-      tabIndex={shown ? undefined : -1}
       disabled={!shown}
-      className={cn(
-        "mb-1.5 flex w-[22px] shrink-0 items-center justify-center rounded-[3px] border text-muted-foreground hover:bg-accent hover:text-foreground",
-        !shown && "invisible",
-      )}
+      className="mb-1.5 flex w-[22px] shrink-0 items-center justify-center rounded-[3px] border text-muted-foreground enabled:hover:bg-accent enabled:hover:text-foreground disabled:opacity-40"
       onClick={() => step(dir)}
     >
       {dir < 0 ? (
