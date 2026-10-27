@@ -14,6 +14,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as button from "./button";
 import * as controls from "./controls";
+import { POPOVER_LAYER, POPOVER_Z } from "./layers";
 import * as menus from "./menus";
 import * as overlays from "./overlays";
 import * as primitives from "./primitives";
@@ -502,5 +503,36 @@ describe("ADR-0069 data-slot on every components/ui part (ADR-0069)", () => {
 
   test("ADR-0069 a caller's data-slot still wins on an Input (dice tray slots)", () => {
     expect(slots(html(<primitives.Input data-slot="2" />))).toEqual(["2"]);
+  });
+});
+
+describe("K10 popover layer (components/ui/layers.ts)", () => {
+  /** The class list of the element carrying `data-slot="<slot>"`. */
+  const classOf = (markup: string, slot: string) =>
+    (
+      new RegExp(`<[^>]*data-slot="${slot}"[^>]*>`)
+        .exec(markup)?.[0]
+        .match(/class="([^"]*)"/)?.[1] ?? ""
+    ).split(" ");
+  test("K10 popover layer: Popover (both), DropdownMenu, Select lists and Tooltips draw at POPOVER_Z, above the toast stack; dialogs stay at z-50 (under the toasts, FR-NOTE-50)", () => {
+    expect(POPOVER_LAYER).toBe(`z-[${POPOVER_Z}]`);
+    const parts: [string, string][] = [
+      [html(popoverTree(controls)), "popover-content"],
+      [html(popoverTree(menus)), "popover-content"],
+      [html(menuTree(menus)), "dropdown-menu-content"],
+      [html(selectTree()), "select-content"],
+      [html(tooltipTree()), "tooltip-content"],
+    ];
+    for (const [markup, slot] of parts) {
+      const cls = classOf(markup, slot);
+      expect([slot, cls.includes(POPOVER_LAYER), cls.includes("z-50")]).toEqual([
+        slot,
+        true,
+        false,
+      ]);
+    }
+    const dialog = html(dialogTree());
+    for (const slot of ["dialog-overlay", "dialog-content"])
+      expect([slot, classOf(dialog, slot).includes("z-50")]).toEqual([slot, true]);
   });
 });

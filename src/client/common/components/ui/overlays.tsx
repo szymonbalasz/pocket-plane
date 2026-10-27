@@ -3,6 +3,7 @@ import { CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
 import { Dialog as D, Select as S, Tooltip as T } from "radix-ui";
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { POPOVER_LAYER } from "./layers";
 import { enrollTrigger, TIP_ATTR } from "./roving";
 
 // ---- Dialog ----
@@ -224,7 +225,8 @@ export function SelectContent({
         data-slot="select-content"
         position="popper"
         className={cn(
-          "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md",
+          POPOVER_LAYER,
+          "relative max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md",
           className,
         )}
         {...props}
@@ -558,7 +560,10 @@ export function TooltipContent({ children }: { children: React.ReactNode }) {
         data-slot="tooltip-content"
         data-testid="ui-tooltip"
         sideOffset={4}
-        className="z-50 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground"
+        className={cn(
+          POPOVER_LAYER,
+          "rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground",
+        )}
       >
         {children}
       </T.Content>

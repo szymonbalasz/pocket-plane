@@ -11,6 +11,7 @@ import type { NotificationRecord } from "@shared/notifications/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
+import { POPOVER_Z } from "../../components/ui/layers";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { PRESENT_POPUP_Z } from "../party-board/present-logic";
@@ -285,6 +286,11 @@ describe("FR-NOTE-50 toast policy (layer)", () => {
     expect(TOAST_STACK_Z).toBeGreaterThan(100);
     expect(TOAST_STACK_Z).toBeLessThan(OVERLAY_LAYER_Z); // a blocksInput overlay sits above
     expect(TOAST_STACK_Z).toBeLessThan(PRESENT_POPUP_Z);
+    // K10: open popovers, menus, Select lists and tooltips draw over the stack, under the
+    // overlay layer (the palette, the pause card) and the present popup.
+    expect(POPOVER_Z).toBeGreaterThan(TOAST_STACK_Z);
+    expect(POPOVER_Z).toBeLessThan(OVERLAY_LAYER_Z);
+    expect(POPOVER_Z).toBeLessThan(PRESENT_POPUP_Z);
     const tag = stackTag("dm");
     expect(tag).toContain(`z-index:${TOAST_STACK_Z}`);
     expect(tag).not.toContain("z-40");

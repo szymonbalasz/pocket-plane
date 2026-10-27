@@ -1,7 +1,8 @@
 // The play page frame (FR-SHELL-01/02/05). Stacking, bottom → top:
 // base layer (z-0) < windows (z-10) < chrome: top bar (with the launcher, FR-KIT-14), tool rail (z-20)
-// < reconnect banner (z-30) < dialogs, menus, tooltips (z-50, portalled) < alert flash (z-100,
-// portalled, FR-SHELL-22) < overlay layer (FR-SHELL-112 (2), -135) < dice layer.
+// < reconnect banner (z-30) < dialogs (z-50, portalled) < alert flash (z-100, portalled,
+// FR-SHELL-22) < toast stack (900) < popovers, menus, Select lists, tooltips (`POPOVER_Z` 950,
+// portalled; `components/ui/layers.ts`) < overlay layer (FR-SHELL-112 (2), -135) < dice layer.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ConnectionIndicator, ReconnectBanner } from "../live-sync/ConnectionStatus";
 import { AlertFlash } from "./AlertLayer";
