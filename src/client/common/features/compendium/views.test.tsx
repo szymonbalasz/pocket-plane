@@ -381,7 +381,7 @@ describe("FR-KIT-76 compendium table", () => {
     expect(html).toMatch(
       /<span class="truncate text-muted-foreground \[font-variant-numeric:tabular-nums\]">/,
     );
-    expect(html).not.toMatch(/class="[^"]*tabular-nums(?!\])/);
+    expect(html).not.toMatch(/class="[^"]*\btabular-nums\b(?!\])/);
     expect(html).not.toContain("text-xs text-muted-foreground");
     // Gilt & Stone: the name in body type, not the name face (K13 block after K4's).
     const gilt = readFileSync(join(import.meta.dir, "../../themes/gilt.css"), "utf8");
