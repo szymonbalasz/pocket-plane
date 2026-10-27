@@ -862,7 +862,12 @@ function RowMain({
             side={
               <>
                 {companion && (
-                  <OwnerChip c={c} ownerName={ownerName ?? ""} testId="cbt-init-row-owner" />
+                  <OwnerChip
+                    c={c}
+                    ownerName={ownerName ?? ""}
+                    testId="cbt-init-row-owner"
+                    compact={indent}
+                  />
                 )}
                 <SideChip c={c} testId="cbt-init-row-ally" />
               </>

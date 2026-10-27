@@ -186,7 +186,14 @@ function PlayerRowMain({
             // its owner's row).
             side={
               <>
-                {companion && <OwnerChip c={c} ownerName={ownerName} testId="cbt-init-row-owner" />}
+                {companion && (
+                  <OwnerChip
+                    c={c}
+                    ownerName={ownerName}
+                    testId="cbt-init-row-owner"
+                    compact={child}
+                  />
+                )}
                 <SideChip c={c} testId="cbt-init-row-ally" />
               </>
             }

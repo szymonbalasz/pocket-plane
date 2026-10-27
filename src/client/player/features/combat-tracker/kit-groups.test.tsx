@@ -29,6 +29,11 @@ describe("FR-KIT-29 companion groups (K12)", () => {
       expect(owl).toMatch(
         /data-slot="init-child-medallion" class="[^"]*w-\[34px\][^"]*"><span[^>]*data-size="sm"/,
       );
+      // Under its owner the owner chip is the colour dot only (the name in its Tooltip and for
+      // screen readers): medallion · name · bar.
+      expect(owl).toMatch(
+        /<span data-testid="cbt-init-row-owner" data-record-id="owlbear" data-value="ch-mira" data-compact="true"[^>]*><span aria-hidden="true"[^>]*style="background-color:#e69f00"><\/span><span class="sr-only">Mira<\/span>/,
+      );
       // A row that isn't a child keeps the lg medallion and its own rounded card.
       const goblin = rowHtml(html, "cbt-init-row", "goblin");
       expect(goblin).not.toContain("init-child-medallion");
