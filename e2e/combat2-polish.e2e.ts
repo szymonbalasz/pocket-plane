@@ -7,6 +7,7 @@
 // End (FR-CBTX-50). Rules and edge cases: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu, statusEffect } from "./support/initiative";
 import { konvaNodes } from "./support/konva";
 import { panMap } from "./support/map";
 import { showToPlayers } from "./support/scenes";
@@ -89,8 +90,8 @@ test("FR-CBTX-46 FR-CBT-78 FR-NOTE-27 FR-CBT-79 FR-NOTE-30 chips fit; temp HP pr
   const thorn = await idByName(init, "Thorn");
   const goblin = await idByName(init, "Goblin");
 
-  // G1 (FR-CBTX-46): compact labels; at the default width Mira's concentration "Bless" and
-  // "Bless 10r" show without "+N" (DM), Goblin's chips likewise.
+  // G1 (FR-CBTX-46, now FR-KIT-28): the status cell shows Mira's concentration "Bless" as its
+  // icon + "10r" (label for screen readers), never folded; her other effects are in "+N".
   const chips = (scope: Locator, id: string) =>
     row(scope, id).locator('[data-testid="cbtx-init-row-effect"]:visible');
   // Sprint 7 (FR-CBTX-59): the concentration chip carries its rounds ("10r"), whole or icon-only
@@ -99,13 +100,13 @@ test("FR-CBTX-46 FR-CBT-78 FR-NOTE-27 FR-CBT-79 FR-NOTE-30 chips fit; temp HP pr
     row(init, mira).locator('[data-testid="cbtx-init-row-effect"][data-value="concentration"]'),
   ).toHaveText(/^Bless ?10r$/);
   for (const scope of [init, pinit]) {
-    await expect(row(scope, mira).getByTestId("cbtx-init-row-effect-more")).toHaveCount(0);
+    await expect(row(scope, mira).getByTestId("cbtx-init-row-effect-more")).toHaveCount(1);
   }
-  expect(await chips(init, mira).count()).toBeGreaterThanOrEqual(2);
+  expect(await chips(init, mira).count()).toBe(1);
   const widths = await chips(init, mira).evaluateAll((els) =>
     els.map((e) => e.getBoundingClientRect().width),
   );
-  for (const w of widths) expect(w).toBeLessThanOrEqual(96.5);
+  for (const w of widths) expect(w).toBeLessThanOrEqual(48.5);
 
   // G5 (FR-CBT-78): Goblin → Thorn (temp 5), damage 3: "Thorn 10 (+5) → 10 (+2)"; Dismiss-free:
   // close with Later.
@@ -309,7 +310,7 @@ test("FR-CBTX-46 P3 glitch 6: '+N' lists the hidden effects (hover and click) on
       .click();
     await dm.keyboard.press("Escape");
     await expect(
-      row(init, mira).locator(`[data-testid="cbtx-init-row-effect"][data-value="${condition}"]`),
+      statusEffect(row(init, mira), condition, condition[0]?.toUpperCase() + condition.slice(1)),
     ).toHaveCount(1);
   }
   for (const [page, scope] of [
@@ -318,22 +319,22 @@ test("FR-CBTX-46 P3 glitch 6: '+N' lists the hidden effects (hover and click) on
   ] as const) {
     const more = row(scope, mira).getByTestId("cbtx-init-row-effect-more");
     await expect(more).toBeVisible();
+    // The player's copy may land a moment after the DM's.
+    await expect
+      .poll(async () => Number(await more.getAttribute("data-value")))
+      .toBeGreaterThanOrEqual(3);
     const n = Number(await more.getAttribute("data-value"));
-    // The hidden chips are the invisible ones, in order.
-    const hidden = await row(scope, mira)
+    // FR-KIT-28: the folded chips aren't drawn; "+N" lists exactly the effects not shown.
+    const shown = await row(scope, mira)
       .locator('[data-testid="cbtx-init-row-effect"]')
-      .evaluateAll((els) =>
-        els
-          .filter((e) => e.closest("[data-chip]")?.getAttribute("aria-hidden") === "true")
-          .map((e) => e.getAttribute("data-record-id")),
-      );
-    expect(hidden.length).toBe(n);
+      .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
     await more.click();
     const items = page.getByTestId("cbtx-init-row-effect-more-item");
     await expect(items).toHaveCount(n);
-    expect(
-      await items.evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id"))),
-    ).toEqual(hidden);
+    const listed = await items.evaluateAll((els) =>
+      els.map((e) => e.getAttribute("data-record-id")),
+    );
+    expect(listed.filter((id) => shown.includes(id))).toEqual([]);
     if (page === dm) {
       // DM: each hidden effect keeps its chip menu (Edit… / End).
       await items.first().hover();
@@ -351,7 +352,11 @@ test("FR-CBTX-46 P3 glitch 6: '+N' lists the hidden effects (hover and click) on
       .click();
     await dm.keyboard.press("Escape");
   }
-  await expect(row(init, mira).getByTestId("cbtx-init-row-effect-more")).toHaveCount(0);
+  for (const condition of ["blinded", "deafened", "poisoned"]) {
+    await expect(
+      statusEffect(row(init, mira), condition, condition[0]?.toUpperCase() + condition.slice(1)),
+    ).toHaveCount(0);
+  }
   await player.context().close();
   await dm.context().close();
 });
@@ -668,7 +673,7 @@ test("FR-CBTX-50 a PC at 0 HP keeps the Down X and its death badge after End, fo
       .poll(async () => (await konvaNodes(page, "cbt-token-down", thornToken)).length)
       .toBe(1);
   }
-  await init.getByTestId("cbt-init-end").click();
+  await initMenu(dm, init, "cbt-init-end");
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(dm.getByTestId("cbt-init-end-confirm")).toHaveCount(0);
   for (const page of [dm, player]) {

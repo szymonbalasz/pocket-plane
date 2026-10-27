@@ -6,6 +6,7 @@
 // manager, windows tests). The AoE panel vs Initiative check waits for the tool-bar push (W3).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { konvaNodes } from "./support/konva";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -253,7 +254,7 @@ test("FR-SHELL-50 player-1 at 1280×800: Reset layout, then the DM ends the Ambu
   await live(dm);
   const init = shellWindow(dm, "cbt.initiative");
   await expect(init).toBeVisible();
-  await init.getByTestId("cbt-init-end").click();
+  await initMenu(dm, init, "cbt-init-end");
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(init.getByTestId("cbt-init-row")).toHaveCount(0);
   const enc = await openWindow(dm, "cbt.encounters");
@@ -275,7 +276,7 @@ test("FR-SHELL-50 player-1 at 1280×800: Reset layout, then the DM ends the Ambu
 
   // Leave the shared server as found: end Crypt.
   const dmInit = shellWindow(dm, "cbt.initiative");
-  await dmInit.getByTestId("cbt-init-end").click();
+  await initMenu(dm, dmInit, "cbt-init-end");
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(dmInit.getByTestId("cbt-init-row")).toHaveCount(0);
   for (const page of [p1, dm]) await page.context().close();

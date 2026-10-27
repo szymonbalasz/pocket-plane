@@ -6,6 +6,7 @@
 // (`placer.test.ts`, the session-replay harness).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
@@ -101,7 +102,7 @@ test("FR-SHELL-99 FR-SHELL-103 FR-SHELL-107 FR-SHELL-110 window frame (DM): zone
     await resizeTo(dm, 1280, 720);
     expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 508, w: 690, h: 200 });
     const init = shellWindow(dm, "cbt.initiative");
-    await init.getByTestId("cbt-init-end").click();
+    await initMenu(dm, init, "cbt-init-end");
     await dm.getByTestId("cbt-init-end-confirm").click();
     await expect(launcherButton(dm, "cbt.initiative")).not.toHaveAttribute("data-state", "open");
     const enc = await openWindow(dm, "cbt.encounters");

@@ -1444,3 +1444,78 @@
     color: var(--muted-foreground);
   }
 }
+
+/* KIT: initiative (kit-parity K2, §6.3: turn gem, large number, status icons, header, footer) ── */
+/* The turn gem is markup now (`init-turn`, every theme): the gem gradient + glow on it, and the
+   row's own pseudo-element gem (above) steps aside so the row shows one. */
+:root[data-theme="gilt"] [data-slot="init-turn"] {
+  background-image: radial-gradient(
+    circle at 35% 30%,
+    var(--gem-hi),
+    var(--gem) 45%,
+    var(--gem-deep)
+  );
+  box-shadow:
+    0 0 0 1px var(--frame-rule-strong),
+    0 0 6px rgb(255 80 60 / 0.6);
+}
+:root[data-theme="gilt"] [data-testid="cbt-init-row"][data-turn="true"]::before {
+  display: none;
+}
+/* The large bare initiative (the kit's `.init`): cream in the number face, a hard shadow; its
+   field shows only on hover / focus, as in Simple Dark. */
+:root[data-theme="gilt"] [data-slot="init-number"] [data-testid="cbt-init-row-init"],
+:root[data-theme="gilt"] [data-slot="init-number"][data-testid="cbt-init-row-init"] {
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"]
+  [data-slot="init-number"]
+  [data-testid="cbt-init-row-init"][data-missing="false"]:not(:hover, :focus-visible) {
+  background-color: transparent;
+  box-shadow: none;
+}
+/* Status icons (the kit's `.cond`): bare gold icons, no chip; concentration in the kit's blue;
+   a secret effect keeps its dashed rule; "+N" keeps the chip. */
+:root[data-theme="gilt"] [data-slot="init-status"] {
+  --gs-conc: #5b9be0;
+}
+:root[data-theme="gilt"] [data-slot="init-status"] [data-chip] [data-slot="badge"],
+:root[data-theme="gilt"] [data-slot="init-status"] [data-chip-conc] [data-slot="badge"],
+:root[data-theme="gilt"] [data-slot="init-status"] [data-trigger] [data-slot="badge"] {
+  box-shadow: none;
+  background-image: none;
+}
+/* The header's round line (the kit's `.round`). */
+:root[data-theme="gilt"] [data-slot="init-header"] [data-testid="cbt-init-round"] {
+  text-shadow: 0 1px 0 #000;
+}
+/* Footer: a gold hairline above Prev / Undo / Next turn (the kit's window rule). */
+:root[data-theme="gilt"] [data-slot="init-footer"] {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgb(176 138 74 / 0.45) 20%,
+    rgb(176 138 74 / 0.45) 80%,
+    transparent
+  );
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="init-number"] [data-testid="cbt-init-row-init"],
+  :root[data-theme="gilt"] [data-slot="init-number"][data-testid="cbt-init-row-init"] {
+    color: var(--foreground);
+  }
+  :root[data-theme="gilt"] [data-slot="init-status"] [data-chip] [data-slot="badge"],
+  :root[data-theme="gilt"] [data-slot="init-status"] [data-trigger] [data-slot="badge"] {
+    border-color: transparent;
+    color: var(--gold);
+  }
+  :root[data-theme="gilt"] [data-slot="init-status"] [data-chip-conc] [data-slot="badge"] {
+    border-color: transparent;
+    color: var(--gs-conc);
+  }
+  :root[data-theme="gilt"] [data-slot="init-status"] [data-slot="badge"][data-secret="true"] {
+    border-color: var(--frame-rule);
+  }
+}

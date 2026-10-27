@@ -22,7 +22,10 @@ describe("FR-CBT-119 player rows", () => {
   test("FR-CBT-119 player rows: player-1 sees its companions' HP '45 / 59' and the card icon; the owner chip and mode icon", () => {
     const html = as("p1");
     const owl = rowHtml(html, "cbt-init-row", "owlbear");
-    expect(owl).toMatch(/data-testid="cbt-init-row-hp" data-record-id="owlbear"[^>]*>45 \/ 59</);
+    // FR-KIT-26: the HP bar carries the ID; its numbers follow the track.
+    expect(owl).toMatch(
+      /data-testid="cbt-init-row-hp"[^>]*data-record-id="owlbear"[^>]*>.*?<span[^>]*>45 \/ 59</,
+    );
     expect(owl).not.toContain('data-testid="cbt-init-row-band"');
     expect(owl).toMatch(/data-testid="cbt-init-row-card" data-record-id="owlbear"/);
     expect(owl).toMatch(

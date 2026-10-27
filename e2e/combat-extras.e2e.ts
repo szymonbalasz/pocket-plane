@@ -5,6 +5,7 @@
 // undo, crash-resume: bun test (combat-extras *.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { statusEffect } from "./support/initiative";
 import { konvaNodes } from "./support/konva";
 import { showToPlayers } from "./support/scenes";
 import { openWindow } from "./support/shell";
@@ -130,7 +131,7 @@ test("FR-CBTX-17 FR-CBTX-18 FR-CBTX-28 FR-CBTX-29 bar + icons for both; concentr
   await expect(popup).toHaveCount(0);
   await expect(
     init.locator(`[data-testid="cbt-init-row-hp"][data-record-id="${mira}"]`),
-  ).toHaveText("HP 9/12");
+  ).toHaveText("9 / 12");
 
   const toast = player
     .getByTestId("note-toast")
@@ -189,9 +190,8 @@ test("walkthrough fixes: row names stay distinct (chips collapse first), Conditi
     await dm
       .locator('[data-testid="cbtx-init-row-conditions-option"][data-value="frightened"]')
       .click();
-    await expect(
-      row(id).locator('[data-testid="cbtx-init-row-effect"][data-value="frightened"]'),
-    ).toHaveCount(1);
+    // FR-KIT-28: in the status cell, as its icon or named by "+N".
+    await expect(statusEffect(row(id), "frightened", "Frightened")).toHaveCount(1);
   }
   const fit = await init.evaluate((w) => {
     const rows = [
@@ -250,9 +250,7 @@ test("walkthrough fixes: row names stay distinct (chips collapse first), Conditi
   );
   await stunned.hover();
   await stunned.click();
-  await expect(
-    row(goblin).locator('[data-testid="cbtx-init-row-effect"][data-value="stunned"]'),
-  ).toHaveCount(1);
+  await expect(statusEffect(row(goblin), "stunned", "Stunned")).toHaveCount(1);
 
   // §7.1: player-2's own sheet → effects menu → Concentrate… opens a dialog; Thorn concentrates.
   const player = await rolePage(browser);

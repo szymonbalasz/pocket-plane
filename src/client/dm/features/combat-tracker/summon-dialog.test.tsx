@@ -16,7 +16,7 @@ import {
 } from "@ui/features/combat-tracker/companions-fixture";
 import { dmNotificationViews } from "../../notification-views";
 import { dismissReasonOf, PRESS_NEXT_HINT } from "./companion-menu";
-import { dmInitiativeWindow } from "./initiative-window";
+import { dmInitiativeWindow, INIT_MENU } from "./initiative-window";
 import { cardSummonsLeft } from "./summon-card-view";
 import { concentrationOf, SummonBody, summonInput, summonOwners } from "./summon-dialog";
 
@@ -53,10 +53,11 @@ const dialog = (store: RecordStore, preset: string | null) =>
   );
 
 describe("FR-CBT-118 Summon… dialog", () => {
-  test("FR-CBT-118 DM rows: the header Summon… button; the dialog's lookup, count, owner preset, three modes, HP, Hidden; no concentration tick unless the owner concentrates", () => {
+  test("FR-CBT-118 DM rows: the header Summon… (in the window menu since FR-KIT-20); the dialog's lookup, count, owner preset, three modes, HP, Hidden; no concentration tick unless the owner concentrates", () => {
     expect(renderWith(companionStore("dm"), <Body kind="cbt.initiative" instance="" />)).toContain(
-      'data-testid="cbt-init-summon"',
+      'data-testid="cbt-init-menu"',
     );
+    expect(INIT_MENU.some((i) => "testId" in i && i.testId === "cbt-init-summon")).toBe(true);
     const html = dialog(companionStore("dm"), "ch-mira");
     for (const id of ["lookup", "count", "hp", "hidden", "submit"]) {
       expect(html).toContain(`data-testid="cbt-summon-${id}`);

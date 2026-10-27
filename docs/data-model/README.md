@@ -2679,3 +2679,10 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #3
 
 - **Derived (client, not stored):** `rowAction(entry)` → `{actor, text}`, `resultOutcome(item, category)`, `rowResults(entry)` (one `{rollId, label, total, outcome}` per run), `rowBadges(segments)`, `copyText(segments)` (`@shared/dice-roll-log/row`); `rowTime(at)` "HH:MM" local (`logic.ts`).
 - **Fixtures:** unit `kit-log-rolls` (player-1 rolls as Mira, physical: "Longbow attack" 1d20+9 natural 20 = 29, "Longbow damage" 2d8+4 = 16, "Healing Word" 1d4+3 seeded); bundle `kit-log` = `theme-gilt` + `kit-log-rolls`. CON-44 (measured): DM 32 142 B, P1 16 266 B, P2 14 763 B (`theme-gilt` 30 164 / 14 339 / 12 836).
+
+## 136. Sprint 13: Initiative rows (K2)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-24 – -26). **Built by `build/kit-initiative`**. Protocol side: [protocol §172](../protocol/README.md#172-sprint-13-initiative-rows-on-the-kit-grid-k2). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `medallionColour(store, combatant)` = `CREATURE_COLORS[token.creatureType]` of the combatant's token the viewer holds, else null (muted); `tailText(ac, moved)`, `tailFolds(widths)` (DM); `pcHp(character)` = `{hpCurrent, hpMax ?? statBlock.hpMax}` from the character the player holds (own: full; others: ADR-0063's whitelist).
+- **Fixtures:** bundle `kit-initiative` (existing units only).

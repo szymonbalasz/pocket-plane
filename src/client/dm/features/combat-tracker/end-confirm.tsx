@@ -1,6 +1,7 @@
 // DM Start / End wiring shared by Encounters and Initiative: the End confirm's copy with the
 // summon-token and charmed lines (FR-CBT-144) and the pending-card count (FR-CBT-59), and the windows that follow this tab's own Start / End
-// (FR-CBT-60). Logic in `./start-end`.
+// (FR-CBT-60). Logic in `./start-end`. Kit parity FR-KIT-72: the buttons read Keep fighting / End
+// encounter.
 import {
   COMBATANT_TYPE,
   type CombatantRecord,
@@ -8,6 +9,7 @@ import {
 } from "@shared/combat-tracker/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
+import { Button } from "@ui/components/ui/button";
 import { DialogDescription } from "@ui/components/ui/overlays";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
 import { afterLayoutFrame } from "@ui/features/play-shell/content-heights";
@@ -64,6 +66,36 @@ export function EndConfirmDescription({
         {endPendingText(n)}
       </span>
     </DialogDescription>
+  );
+}
+
+export const END_KEEP_LABEL = "Keep fighting";
+export const END_CONFIRM_LABEL = "End encounter";
+
+/**
+ * FR-KIT-72: the End confirm's buttons (Initiative and Encounters): **Keep fighting** (outline,
+ * closes) and **End encounter** (destructive, `testId` = `cbt-init-end-confirm` / `cbt-enc-…`).
+ */
+export function EndConfirmButtons({
+  testId,
+  disabled,
+  onKeep,
+  onEnd,
+}: {
+  testId: "cbt-init-end-confirm" | "cbt-enc-end-confirm";
+  disabled: boolean;
+  onKeep(): void;
+  onEnd(): void;
+}) {
+  return (
+    <>
+      <Button variant="outline" onClick={onKeep}>
+        {END_KEEP_LABEL}
+      </Button>
+      <Button variant="destructive" data-testid={testId} disabled={disabled} onClick={onEnd}>
+        {END_CONFIRM_LABEL}
+      </Button>
+    </>
   );
 }
 
