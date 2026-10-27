@@ -221,3 +221,42 @@ describe("FR-NOTE-77 BL-118 fold before the first paint", () => {
     expect(after).toEqual([`520,100,${heightOf(1)}`]);
   });
 });
+
+describe("K12 one move per change (walkthrough 5)", () => {
+  test("FR-NOTE-77 K12 one move per change: while the layout changes the drawn stack holds with no fold step; once quiet it moves once, unfolded when that fits", () => {
+    // Encounters opens over the drawn stack: unmeasured, its spot covers content (`need`), the
+    // fold would step to the summary (208, 100 far left), then unfold 250 ms later (560, 301).
+    let s: StackSettle = { ...UNSETTLED, drawn: { left: 560, top: 100 } };
+    const covered = { need: true, min: 0, stackH: 264, shown: 3, spot: { left: 560, top: 140 } };
+    s = settleStack(s, { ...covered, now: 0, changing: true });
+    expect(s).toMatchObject({ hold: true, drawn: { left: 560, top: 100 }, heldSince: 0 });
+    expect(s.fold).toEqual(UNSETTLED.fold);
+    // Still changing a frame later: the same state back (no fold step, no re-render loop).
+    expect(settleStack(s, { ...covered, now: 16, changing: true })).toBe(s);
+    // Quiet (the runtime refolds): measured, the full stack fits on the empty body → one move.
+    s = settleStack(s, {
+      need: false,
+      min: 0,
+      stackH: 264,
+      shown: 3,
+      spot: { left: 560, top: 301 },
+      now: 260,
+    });
+    expect(s).toMatchObject({ hold: false, drawn: { left: 560, top: 301 } });
+    expect(s.fold).toEqual(UNSETTLED.fold);
+  });
+
+  test("FR-NOTE-77 K12 a change that never quiets (a window dragged) holds at most the hold time, then follows", () => {
+    let s: StackSettle = { ...UNSETTLED, drawn: { left: 560, top: 100 } };
+    const o = { need: false, min: 0, stackH: 58, shown: 0, spot: { left: 600, top: 100 } };
+    s = settleStack(s, { ...o, now: 0, changing: true });
+    expect(s.hold).toBe(true);
+    s = settleStack(s, { ...o, now: 400, changing: true });
+    expect(s).toMatchObject({ hold: false, drawn: { left: 600, top: 100 } });
+    // Nothing drawn yet (the first show): no hold.
+    expect(settleStack(UNSETTLED, { ...o, now: 0, changing: true }).drawn).toEqual({
+      left: 600,
+      top: 100,
+    });
+  });
+});

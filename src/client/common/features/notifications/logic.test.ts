@@ -21,6 +21,7 @@ import {
 import { createSeenStore } from "./seen";
 import {
   addNote,
+  closeCardToast,
   closeToast,
   createToastMemory,
   hideNote,
@@ -536,5 +537,29 @@ describe("unread (FR-NOTE-18)", () => {
     broken.set("k", 4);
     expect(broken.get("k")).toBe(4);
     expect(warnings).toHaveLength(1);
+  });
+});
+
+describe("K12 a closed card counts in the summary (walkthrough 3, FR-NOTE-15)", () => {
+  test("FR-NOTE-15 K12 closing card toasts with ✕ recounts a showing summary at once (N + cards drawn = Pending); no summary showing → none added", () => {
+    const old = pendingFor("dm");
+    const cards = [pendingFor("dm"), pendingFor("dm"), pendingFor("dm")];
+    const st = store(DM, [old, ...cards], 1);
+    let s = setSummary(initialToasts(0), 1, 0);
+    for (const c of cards) s = addNote(s, c, 0);
+    const summaryCount = (x: typeof s) => x.toasts.find((t) => t.kind === "summary")?.count ?? null;
+    const drawn = (x: typeof s) => x.toasts.filter((t) => t.kind === "note").length;
+    expect([summaryCount(s), drawn(s)]).toEqual([1, 3]);
+    for (const [i, c] of cards.entries()) {
+      const key = s.toasts.find((t) => t.kind === "note" && t.notificationId === c.id)?.key ?? "";
+      s = closeCardToast(s, key, st, 1);
+      expect(summaryCount(s)).toBe(2 + i);
+      expect((summaryCount(s) ?? 0) + drawn(s)).toBe(4);
+    }
+    // No summary: closing a card adds none.
+    let t = addNote(initialToasts(0), cards[0] as NotificationRecord, 0);
+    const key = t.toasts[0]?.key ?? "";
+    t = closeCardToast(t, key, st, 1);
+    expect(t.toasts).toHaveLength(0);
   });
 });

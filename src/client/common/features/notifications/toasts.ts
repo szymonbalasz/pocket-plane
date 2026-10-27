@@ -314,6 +314,21 @@ export function untoastedPending(s: ToastState, store: RecordStore): number {
 }
 
 /**
+ * K12 (walkthrough 3, FR-NOTE-15): the user closed a card toast (✕): it has no toast now, so a
+ * summary that shows counts it at once (N + the cards drawn = Pending (n)); no summary showing →
+ * none is added (the user closed the stack's toasts).
+ */
+export function closeCardToast(
+  s: ToastState,
+  key: string,
+  store: RecordStore,
+  now: number,
+  waitingOf: WaitingCount = NONE,
+): ToastState {
+  return pruneToasts(closeToast(s, key, now), store, now, waitingOf);
+}
+
+/**
  * Keeps toasts in line with the store: a pending toast whose notification left `pending` (or
  * is gone) disappears; the summary follows the current count of pending-for-me rows without a
  * toast of their own.
@@ -617,8 +632,19 @@ export function settleStack(
     shown: number;
     spot: { left: number; top: number };
     now: number;
+    /**
+     * K12 (walkthrough 5, one move per change): the layout (windows, tool bars, dialogs, popups)
+     * changed and hasn't held still for `REFOLD_QUIET_MS` yet. The drawn stack holds where it is,
+     * with no fold step, until it has (at most `SETTLE_HOLD_MS`), then moves once.
+     */
+    changing?: boolean;
   },
 ): StackSettle {
+  if (o.changing && s.drawn !== null) {
+    const since = s.heldSince ?? o.now;
+    if (o.now - since < SETTLE_HOLD_MS)
+      return s.hold && s.heldSince === since ? s : { ...s, hold: true, heldSince: since };
+  }
   const fold = foldCap(s.fold, o);
   const stepping = o.stackH > 0 && o.need && fold.cap > o.min && fold.foldedAt === o.stackH;
   const fresh = s.heldSince === null || o.now - s.heldSince < SETTLE_HOLD_MS;
