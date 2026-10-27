@@ -165,6 +165,13 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
       min: s(300, 320),
       criterion: "composer folded + a 6-row card",
     },
+    // Kit parity K7 (§7.3, FR-KIT-100): the stat block, opened from its openers; useful = minOpenH.
+    "ent.statblock": {
+      default: all(300, 440),
+      useful: all(300, 360),
+      min: s(280, 240),
+      criterion: "name, type line, core row, abilities, 2 attack rows with their buttons",
+    },
   },
   player: {
     "cbt.initiative": {

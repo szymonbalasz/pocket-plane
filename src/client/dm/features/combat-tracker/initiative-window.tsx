@@ -26,8 +26,6 @@ import {
   type TurnResult,
   type UndoResult,
 } from "@shared/combat-tracker/schemas";
-import type { RollMode } from "@shared/dice-roll-log/schemas";
-import type { RollSubject } from "@shared/effect-modifiers/schemas";
 import {
   ABILITIES,
   ABILITY_NAMES,
@@ -149,7 +147,14 @@ import {
 } from "../combat-extras/row";
 import { CbtxRuntime } from "../combat-extras/runtime";
 import { useCbtxDialogs } from "../combat-extras/store";
-import { type AttackAction, attackChoices, attackRolls, attackSummary } from "./attack-choices";
+import { StatBlockMenuItem } from "../entities/statblock/openers";
+import {
+  type AttackAction,
+  attackChoices,
+  attackRolls,
+  attackSubjects,
+  attackSummary,
+} from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { CompanionCardButton, CompanionMenu } from "./companion-menu";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
@@ -273,34 +278,6 @@ const ATTACK_ACTIONS = [
   { value: "toHit", label: "Attack" },
   { value: "damage", label: "Damage" },
 ] as const satisfies readonly { value: AttackAction; label: string }[];
-
-/**
- * FR-MOD-15, -27: the preview subjects of an attack row's action, as `cbt.attack` /
- * `cbt.rollDamage` roll them: the to-hit, then the card's damage (`card: true`; Damage alone
- * reads the pending to-hit card's mode); an extra damage part has none (FR-CHARX-55).
- */
-function attackSubjects(
-  combatantId: string,
-  row: string,
-  action: AttackAction,
-  cardMode: RollMode | undefined,
-  extraParts: number,
-): (RollSubject | null)[] {
-  const base = { creature: { combatantId }, via: "weapon" as const, row: row.slice(0, 60) };
-  const hit: RollSubject = { ...base, roll: "attack" };
-  const damage: RollSubject = {
-    ...base,
-    roll: "damage",
-    card: true,
-    ...(action === "damage" && cardMode ? { toHitMode: cardMode } : {}),
-  };
-  const extra = Array<null>(extraParts).fill(null);
-  return action === "toHit"
-    ? [hit]
-    : action === "damage"
-      ? [damage, ...extra]
-      : [hit, damage, ...extra];
-}
 
 /**
  * Attack ▸ (FR-CBT-16, FR-CBT-74, N7): every attack the definition can name (OQ-CHARX-12) with
@@ -969,6 +946,8 @@ function RowMain({
             <DropdownMenuItem data-testid="cbt-init-row-hp-adjust" onSelect={() => openHp(c.id)}>
               <HeartPulseIcon /> Damage / heal…
             </DropdownMenuItem>
+            {/* FR-KIT-29, -101 (K7): monster rows open the stat block, bound to the row. */}
+            <StatBlockMenuItem c={c} />
             <DropdownMenuSeparator />
             <SideMenu c={c} testId="cbt-init-row-side" />
             {/* FR-CBT-118 (sprint 6): owner, turn mode, release, turn hostile, dismiss. */}

@@ -2,6 +2,8 @@
 // `cbt.attack` can name, and what one action of it rolls (FR-CBT-74, -81, -83). Pure.
 import { attackRollSpecs } from "@shared/character-sheet/logic";
 import { critExpression } from "@shared/combat-tracker/rules";
+import type { RollMode } from "@shared/dice-roll-log/schemas";
+import type { RollSubject } from "@shared/effect-modifiers/schemas";
 import type { Attack } from "@shared/entities/schemas";
 import { attackRowView } from "@ui/features/character-sheet/view-model";
 import { slotLabelsOf } from "@ui/features/dice-roll-log/logic";
@@ -68,4 +70,32 @@ export function attackRolls(attack: Attack, action: AttackAction): AttackRolls {
   return action === "damage"
     ? { expressions: damage, critExpressions, extraParts, slotLabels }
     : { expressions: [hit, ...damage], critExpressions, extraParts, slotLabels };
+}
+
+/**
+ * FR-MOD-15, -27: the preview subjects of an attack row's action, as `cbt.attack` /
+ * `cbt.rollDamage` roll them: the to-hit, then the card's damage (`card: true`; Damage alone
+ * reads the pending to-hit card's mode); an extra damage part has none (FR-CHARX-55).
+ */
+export function attackSubjects(
+  combatantId: string,
+  row: string,
+  action: AttackAction,
+  cardMode: RollMode | undefined,
+  extraParts: number,
+): (RollSubject | null)[] {
+  const base = { creature: { combatantId }, via: "weapon" as const, row: row.slice(0, 60) };
+  const hit: RollSubject = { ...base, roll: "attack" };
+  const damage: RollSubject = {
+    ...base,
+    roll: "damage",
+    card: true,
+    ...(action === "damage" && cardMode ? { toHitMode: cardMode } : {}),
+  };
+  const extra = Array<null>(extraParts).fill(null);
+  return action === "toHit"
+    ? [hit]
+    : action === "damage"
+      ? [damage, ...extra]
+      : [hit, damage, ...extra];
 }
