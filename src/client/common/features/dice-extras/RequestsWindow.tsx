@@ -19,7 +19,16 @@ import { ChevronDownIcon, ChevronUpIcon, EyeIcon, EyeOffIcon } from "lucide-reac
 import { useMemo, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Checkbox, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
-import { Tooltip } from "../../components/ui/overlays";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+  Tooltip,
+} from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
@@ -36,8 +45,8 @@ import {
   targetText,
 } from "./request-logic";
 
-const SELECT =
-  "h-7 min-w-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
+/** K10 (K6 gap 8): the Roll Select's trigger, as small as the native select was. */
+const SELECT = "h-7 min-w-0 gap-1 px-1.5 py-0 text-xs [&>span]:truncate";
 
 const MODES: readonly [RollMode, string][] = [
   ["disadvantage", "Dis"],
@@ -107,25 +116,38 @@ function Composer() {
       }}
     >
       <div className="flex flex-wrap items-center gap-1.5">
-        <select
-          data-testid="dicex-request-roll"
-          aria-label="Roll"
-          className={cn(SELECT, "max-w-40")}
+        {/* K10 (K6 gap 8): the shared Select; the trigger keeps the test ID and carries the value
+            (`data-value`), each item `dicex-request-roll-option` + `data-value`. */}
+        <Select
           value={f.choice}
-          onChange={(e) =>
-            setF({ ...f, choice: e.target.value, results: resultsPreset(e.target.value, isPublic) })
-          }
+          onValueChange={(v) => setF({ ...f, choice: v, results: resultsPreset(v, isPublic) })}
         >
-          {(["Skills", "Saves", "Checks", "Other"] as const).map((g) => (
-            <optgroup key={g} label={g}>
-              {ROLL_CHOICES.filter((c) => c.group === g).map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          <SelectTrigger
+            data-testid="dicex-request-roll"
+            data-value={f.choice}
+            aria-label="Roll"
+            className={cn(SELECT, "max-w-40")}
+          >
+            <SelectValue>{ROLL_CHOICES.find((c) => c.value === f.choice)?.label}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {(["Skills", "Saves", "Checks", "Other"] as const).map((g) => (
+              <SelectGroup key={g}>
+                <SelectLabel>{g}</SelectLabel>
+                {ROLL_CHOICES.filter((c) => c.group === g).map((c) => (
+                  <SelectItem
+                    key={c.value}
+                    value={c.value}
+                    data-testid="dicex-request-roll-option"
+                    data-value={c.value}
+                  >
+                    {c.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
         {f.choice === "custom" && (
           <Input
             data-testid="dicex-request-expression"

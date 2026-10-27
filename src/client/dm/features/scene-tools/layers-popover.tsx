@@ -9,6 +9,7 @@ import { Tooltip } from "@ui/components/ui/overlays";
 import { Label } from "@ui/components/ui/primitives";
 import { browserLayerMemory, layerSwitches } from "@ui/features/scene-tools/layer-switches";
 import { type LayerToggle, layerToggles, toggleOn } from "@ui/features/scenes-map/layers";
+import { RAIL_TOOL } from "@ui/features/scenes-map/ToolRail";
 import { useLayerToggles } from "@ui/features/scenes-map/tool-store";
 import { loadChunk } from "@ui/lib/lazy-chunk";
 import { cn } from "@ui/lib/utils";
@@ -66,12 +67,12 @@ export function ScnLayersPopover() {
           <Button
             size="icon"
             variant="ghost"
-            className={cn("relative size-9", open && "bg-accent")}
+            className={cn("relative", RAIL_TOOL, open && "bg-accent")}
             aria-label="Layers"
             data-testid="map-tool-layers"
             data-some-off={anyOff ? "true" : "false"}
           >
-            <LayersIcon className="size-4" />
+            <LayersIcon />
             {anyOff && (
               <span
                 aria-hidden

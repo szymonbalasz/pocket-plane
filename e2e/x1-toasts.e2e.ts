@@ -9,6 +9,7 @@
 // Rules: bun test (`settle.test.ts`, `keep-out-primary.test.ts`, combat-tracker `pending.test.ts`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSelect } from "./support/select";
 import { openWindow } from "./support/shell";
 
 interface Box {
@@ -315,7 +316,7 @@ test("BL-120 FR-NOTE-15 FR-CBT-79 sim-15 c07: a card put off with Later counts i
 async function sendRequest(requests: Locator, roll: string) {
   const fold = requests.getByTestId("dicex-request-fold");
   if ((await fold.getAttribute("data-state")) !== "open") await fold.click();
-  await requests.getByTestId("dicex-request-roll").selectOption({ label: roll });
+  await pickSelect(requests, "dicex-request-roll", { label: roll });
   await requests.getByTestId("dicex-request-all").click({ timeout: 5_000 });
   await requests.getByTestId("dicex-request-send").click({ timeout: 5_000 });
 }

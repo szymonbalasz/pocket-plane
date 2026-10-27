@@ -83,6 +83,13 @@ function RowMedallion({ row }: { row: CreatureRow }) {
 /** The name line's least width (6rem): every row's name stays readable beside its actions. */
 export const NAME_MIN = "min-w-24";
 const BADGE = "shrink-0 px-1.5 py-0 text-[11px]";
+/**
+ * K10 (K6 §5): the row's actions (each feature's, `creatureActions`) as one even row of 24 px
+ * icon buttons, so the name keeps the width to sit on one line (FR-ENT-42 still wraps a longer
+ * one onto a second, never an ellipsis).
+ */
+const ROW_ACTIONS =
+  "flex items-center justify-end gap-0.5 [&_[data-slot=button]]:size-6 [&_[data-slot=button]_svg]:size-3.5";
 
 function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof actionsOf>["row"] }) {
   return (
@@ -165,9 +172,11 @@ function Row({ row, actions }: { row: CreatureRow; actions: ReturnType<typeof ac
       </TableCell>
       {actions.length > 0 && (
         <TableCell className="w-px whitespace-nowrap p-1.5">
-          {actions.map((a) => (
-            <a.component key={a.id} row={row} />
-          ))}
+          <div data-slot="creature-actions" className={ROW_ACTIONS}>
+            {actions.map((a) => (
+              <a.component key={a.id} row={row} />
+            ))}
+          </div>
         </TableCell>
       )}
     </TableRow>

@@ -44,6 +44,9 @@ export const NOT_LIVE_HINT = "Off while reconnecting";
  */
 export const TOOL_PANEL_Z = 5;
 
+/** K10 (K6 gap 12): a rail button, the kit's 38 px tool square with a 20 px icon (every theme). */
+export const RAIL_TOOL = "size-[38px] [&_svg]:size-5";
+
 /** The panel's spot in `host` coordinates: beside the rail, 8 px right of it, top-aligned. */
 export function panelSpot(
   rail: { top: number; right: number },
@@ -222,6 +225,7 @@ export function ToolRail({
               aria-label={t.label}
               data-testid={`map-tool-${t.tool}`}
               disabled={off}
+              className={RAIL_TOOL}
             >
               <t.icon />
             </ToggleGroupItem>
@@ -245,6 +249,7 @@ export function ToolRail({
               aria-label={t.label}
               data-testid={`map-tool-${t.id}`}
               disabled={off}
+              className={RAIL_TOOL}
             >
               <Icon />
             </ToggleGroupItem>
@@ -266,12 +271,12 @@ export function ToolRail({
         <Button
           size="icon"
           variant="ghost"
-          className="size-9"
+          className={RAIL_TOOL}
           aria-label="Fit"
           data-testid="map-tool-fit"
           onClick={requestFit}
         >
-          <ScanIcon className="size-4" />
+          <ScanIcon />
         </Button>
       </Tooltip>
       {children}
