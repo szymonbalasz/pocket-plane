@@ -344,7 +344,7 @@ describe("FR-DICEX-47 popup size", () => {
     expect(attr(html, "dicex-popup", "data-scale")).toBe("1.4");
     // Numbers, name line and total bigger (14 → 20 px; markers 12 → 17), the die 62 px.
     expect(html).toMatch(/data-testid="dicex-popup-row"[^>]*class="[^"]*text-xl/);
-    expect(html).toMatch(/data-testid="dicex-popup-total" class="[^"]*text-xl/);
+    expect(html).toMatch(/data-testid="dicex-popup-total"[^>]*class="[^"]*text-xl/);
     expect(html).toMatch(/<svg viewBox="0 0 100 100" width="62" height="62"/);
     expect(html).toMatch(/data-face="1"[^>]*style="[^"]*font-size:28.52px/);
     expect(html).toMatch(/class="[^"]*size-7"[^>]*data-testid="dicex-popup-close"/);
@@ -353,7 +353,7 @@ describe("FR-DICEX-47 popup size", () => {
     expect(small).toContain(
       "width:320px;max-height:190px;gap:8px;padding-block:9px;padding-inline:11px",
     );
-    expect(small).toMatch(/data-testid="dicex-popup-total" class="[^"]*text-sm/);
+    expect(small).toMatch(/data-testid="dicex-popup-total"[^>]*class="[^"]*text-sm/);
     setViewport(1280, 720);
   });
 
