@@ -6,7 +6,8 @@
 // show (info held back first, then alerts); the rest count as "+N more". Client memory only.
 // *(Sprint 9)* FR-NOTE-72: while this client's Notifications window is open, cards and the summary
 // fold into it (`visibleToasts(…, folded)`), and come back silently when it closes (`unfold`).
-// FR-NOTE-73: each callout show has a page-wide `seq` (its node's key).
+// FR-NOTE-73: each callout show has a page-wide `seq` (its node's key). Kit parity K3
+// (FR-KIT-59, OQ-KIT-03 A): the DM's turn card, first in the stack for 4 s (`showTurnCard`).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import {
   type NotificationToastClass,
@@ -77,9 +78,19 @@ export interface Callout {
   remaining: number;
 }
 
+/** FR-KIT-59 (OQ-KIT-03 A): the DM's turn card ("Mira's turn"); a newer one replaces it. */
+export interface TurnCardToast {
+  text: string;
+  /** This show's page-wide counter (a fresh node per show). */
+  seq: number;
+  remaining: number;
+}
+
 export interface ToastState {
   /** Insertion order, oldest first. */
   toasts: Toast[];
+  /** FR-KIT-59: the turn card showing, first in the stack, outside the count of 3. */
+  turn?: TurnCardToast | null;
   /** FR-NOTE-50: the callout showing, outside the count of 3. Optional: absent = none. */
   callout?: Callout | null;
   /**
@@ -112,10 +123,12 @@ export function advance(s: ToastState, now: number): ToastState {
   const toasts = s.toasts
     .map((t) => (t.sticky ? t : { ...t, remaining: t.remaining - dt }))
     .filter((t) => t.sticky || t.remaining > 0);
-  if (!s.callout) return { ...s, toasts, runningSince: now };
-  const left = s.callout.remaining - dt;
-  const callout = left > 0 ? { ...s.callout, remaining: left } : null;
-  return { ...s, toasts, callout, runningSince: now };
+  const tick = <T extends { remaining: number }>(x: T): T | null =>
+    x.remaining - dt > 0 ? { ...x, remaining: x.remaining - dt } : null;
+  const next: ToastState = { ...s, toasts, runningSince: now };
+  if (s.callout) next.callout = tick(s.callout);
+  if (s.turn) next.turn = tick(s.turn);
+  return next;
 }
 
 function withPause(s: ToastState, patch: Partial<ToastState>, now: number): ToastState {
@@ -267,10 +280,21 @@ export function releaseHidden(
   return setSummary(next, untoastedPending(next, store), now, waitingOf(store));
 }
 
-/** Clears every toast and the callout (campaign switch). */
+/** Clears every toast, the callout and the turn card (campaign switch). */
 export function clearToasts(s: ToastState, now: number): ToastState {
   const ran = advance(s, now);
-  return ran.callout ? { ...ran, toasts: [], callout: null } : { ...ran, toasts: [] };
+  const next: ToastState = { ...ran, toasts: [] };
+  if (ran.callout) next.callout = null;
+  if (ran.turn) next.turn = null;
+  return next;
+}
+
+/** FR-KIT-59: how long the DM's turn card shows (OQ-KIT-03 A: 4 s; paused like the others). */
+export const TURN_CARD_MS = 4000;
+
+/** FR-KIT-59: shows the DM's turn card; one showing is replaced (a new node, its own 4 s). */
+export function setTurnCard(s: ToastState, text: string, now: number, seq = 0): ToastState {
+  return { ...advance(s, now), turn: { text, seq, remaining: TURN_CARD_MS } };
 }
 
 /**
@@ -470,10 +494,11 @@ export function visibleToasts(
 export const moreInSummary = (shown: readonly Toast[], more: number): boolean =>
   more > 0 && shown.length === 1 && shown[0]?.kind === "summary";
 
-/** Milliseconds until the next timed toast (alert, info, callout) ends; null if none or paused. */
+/** Milliseconds until the next timed toast (alert, info, callout, turn card) ends; null if none or paused. */
 export function nextExpiry(s: ToastState): number | null {
   if (s.runningSince === null) return null;
   let min: number | null = s.callout ? s.callout.remaining : null;
+  if (s.turn && (min === null || s.turn.remaining < min)) min = s.turn.remaining;
   for (const t of s.toasts) if (!t.sticky && (min === null || t.remaining < min)) min = t.remaining;
   return min;
 }
@@ -614,3 +639,18 @@ export const refold = (s: StackSettle): StackSettle =>
   s.fold.cap === MAX_VISIBLE && s.fold.foldedAt === null
     ? s
     : { ...s, fold: { cap: MAX_VISIBLE, foldedAt: null } };
+
+/** FR-KIT-59: the page-wide turn card show counter. */
+let turnSeq = 0;
+
+/**
+ * FR-KIT-59 (OQ-KIT-03 A): shows the DM's turn card first in this page's stack for 4 s. Client
+ * memory only, from live frames (the caller's rule); dropped under the pause card, as a callout.
+ */
+export function showTurnCard(text: string): void {
+  if (pauseGate.paused()) return;
+  const now = Date.now();
+  turnSeq += 1;
+  const seq = turnSeq;
+  for (const m of memories) m.setState((x) => ({ toasts: setTurnCard(x.toasts, text, now, seq) }));
+}

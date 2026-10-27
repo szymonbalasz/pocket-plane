@@ -268,3 +268,30 @@ export function rejectMessage(err: unknown): string {
   if (e && e.code === "conflict") return "No longer pending";
   return typeof e?.message === "string" && e.message ? e.message : "Action failed";
 }
+
+/**
+ * FR-KIT-56: a toast's small second line, from `createdAt`: "just now" under a minute, then
+ * "N min ago", "N h ago", "N d ago". A future or unreadable stamp reads "just now".
+ */
+export function relativeTime(iso: string, now: number): string {
+  const at = Date.parse(iso);
+  const s = Number.isNaN(at) ? 0 : Math.floor((now - at) / 1000);
+  if (s < 60) return "just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} h ago`;
+  return `${Math.floor(h / 24)} d ago`;
+}
+
+/**
+ * FR-KIT-56: the text split where the causing player's name starts it ("**Player 1** wants to
+ * add …"); `lead` is null when the text doesn't start with the name.
+ */
+export function leadName(text: string, name: string | null): { lead: string | null; rest: string } {
+  if (!name || !text.startsWith(name)) return { lead: null, rest: text };
+  const next = text.charAt(name.length);
+  // A whole word only ("Mira" never bolds "Miranda …").
+  if (next && /[\p{L}\p{N}]/u.test(next)) return { lead: null, rest: text };
+  return { lead: name, rest: text.slice(name.length) };
+}

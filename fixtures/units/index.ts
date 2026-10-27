@@ -99,6 +99,8 @@ import gemsHidden from "./gems/gems-hidden";
 import gemsOn from "./gems/gems-on";
 import gemsRolls from "./gems/gems-rolls";
 import syncProbes from "./live-sync/sync-probes";
+import kitNotices from "./notifications/kit-notices";
+import kitNoticesApplied from "./notifications/kit-notices-applied";
 import noteColours from "./notifications/note-colours";
 import notificationsTest from "./notifications/notifications-test";
 import handoutAttachment from "./party-board/handout-attachment";
@@ -301,4 +303,8 @@ export const units: readonly Fixture[] = [
   themeRound3,
   // Sprint 13 K1 (build/kit-log): the kit's Game log rows (crit attack, damage, heal) as Mira
   kitLogRolls,
+  // Sprint 13 K3 (build/kit-notices): the kit's DM stack (a player's request, a pending card) and
+  // the player's applied card
+  kitNoticesApplied,
+  kitNotices,
 ];

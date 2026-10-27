@@ -1,7 +1,8 @@
 // FR-CBT-130 (sprint 7): the card-action slot (`card-actions.ts` registry) as one row
 // (`cbt-card-actions` + `data-record-id` = the card id); nothing rendered when no action is
 // available, so a card without actions looks as before. FR-CBT-131: maxed dice as chips with a
-// small "max" Badge (`cbt-card-die-max`, Tooltip "Set to max").
+// small "max" Badge (`cbt-card-die-max`, Tooltip "Set to max"); each part's total as a Result box
+// (kit parity FR-KIT-66).
 import {
   type CardPartRef,
   type DamageCardPayload,
@@ -9,6 +10,7 @@ import {
 } from "@shared/combat-tracker/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { Fragment, useContext, useMemo } from "react";
+import { ResultBox } from "../../components/kit/result-box";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { SyncContext, useSync } from "../../sync/store";
@@ -114,6 +116,8 @@ export function MaxedDamage({ p }: { p: DamageCardPayload }) {
         <span key={String(x.part)} className="inline-flex items-center gap-1">
           {x.type && <span className="text-muted-foreground">{x.type}</span>}
           <PartDice part={x.part} dice={x.roll.dice} maxed={x.roll.maxed} />
+          {/* FR-KIT-66: the part's total as a Result box. */}
+          <ResultBox value={x.roll.total} outcome="damage" size="sm" />
         </span>
       ))}
     </span>

@@ -2693,3 +2693,11 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #3
 
 - **Derived (client, not stored):** `pcLine(c)` "Level 5 Fighter · Human" (`party-board/summary-logic.ts`, from the character record or the other-player whitelist's `level` / `className` / `species`; species left out when absent) → `SummaryPc.line`; `CreatureRow.creatureType` (`creatureTypeOf`, monsters only) → the Creatures medallion colour `var(--creature-<type>, <hex>)`.
 - **Fixtures:** bundle `kit-library` = `theme-gilt` + `cmp-srd-mini` + `cp-srd` + `pet-owlbear` (existing units). CON-44 (measured): DM 31 064 B, P1 15 165 B, P2 12 836 B.
+
+## 138. Sprint 13: notices and the damage card (K3)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-55 – -66). **Built by `build/kit-notices`**. Protocol side: [protocol §174](../protocol/README.md#174-sprint-13-notices-and-the-damage-card-on-the-kit-grid-k3). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `relativeTime(createdAt, now)` and `leadName(text, playerName)` (FR-KIT-56); the toast lead from `byPlayerId` → the held `player` record's name + `colorKeyOf` colour (FR-KIT-55); `dmTurnCardFor(frame, store)` = "‹name›'s turn" of the frame's `encounter.turnCombatantId` (FR-KIT-59); `toHitOutcome(natural)` (FR-KIT-63).
+- **Client memory (not stored):** `ToastState.turn` `{text, seq, remaining}`: the DM's turn card, 4 s, lost on reload (FR-KIT-59).
+- **Fixtures:** units `kit-notices-applied`, `kit-notices` (existing record types); bundle `kit-notices`.

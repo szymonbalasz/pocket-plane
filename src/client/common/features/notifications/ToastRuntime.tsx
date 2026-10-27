@@ -18,11 +18,13 @@
 // the summary. *(Sprint 11, F2)* BL-115: the stack settles: a layout change refolds once it held
 // still, the stack holds its drawn spot while the fold steps, tokens are read as footprints.
 // FR-NOTE-78 (BL-108): off windows' headings and first records first; off the damage-card popup.
+// *(Kit parity K3)* FR-KIT-55–59: card rows (lead · text block · actions · close), the summary in
+// the same row, "+N more" as a pill, the DM's turn card first in the stack.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { toastClassOf } from "@shared/notifications/toast-class";
 import { recordsOf } from "@shared/protocol/store";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
-import { XIcon } from "lucide-react";
+import { ListTodoIcon, XIcon } from "lucide-react";
 import {
   useCallback,
   useContext,
@@ -48,7 +50,7 @@ import {
   reportShownStack,
 } from "../play-shell/toast-region";
 import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
-import { AlertToast, useAlertToasts } from "./alert-toasts";
+import { AlertToast, TurnCard, useAlertToasts } from "./alert-toasts";
 import { useDialogRects, usePopupIds, usePopupRects } from "./dialog-rects";
 import { dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
 import {
@@ -62,7 +64,16 @@ import {
   waitingForPlayers,
 } from "./logic";
 import type { NoteClient } from "./note-client";
-import { NoteBody, NoteStripe, useNoteActions, useNoteStripe } from "./parts";
+import {
+  CloseGem,
+  NoteStripe,
+  TOAST_CARD,
+  ToastLead,
+  ToastText,
+  useCauserName,
+  useNoteActions,
+  useNoteStripe,
+} from "./parts";
 import { useStackHeight } from "./stack-height";
 import { useHistoryOpen, useStackInputs } from "./stack-inputs";
 import {
@@ -118,45 +129,42 @@ function NoteToast({
     ? actionButton(n, { role: you.role, playerId: you.playerId }, live, views.get(n.kind))
     : "none";
   const stripe = useNoteStripe(n);
+  const name = useCauserName(n);
+  // FR-KIT-55: medallion or icon · text block · actions · close; the stripe stays the left edge.
   return (
     <div
       role="status"
       data-testid="note-toast"
+      data-slot="toast-card"
       data-record-id={n.id}
       data-state={n.state}
       data-sticky={t.sticky}
       data-class={classOfToast(t)}
       {...stripe.attrs}
-      className="pointer-events-auto relative flex flex-col gap-2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg"
+      className={TOAST_CARD}
     >
       <NoteStripe color={stripe.color} />
-      <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <NoteBody n={n} views={views} />
-        </div>
-        <button
-          type="button"
-          data-testid="note-toast-close"
-          aria-label="Close"
-          className="rounded-sm text-muted-foreground hover:text-foreground"
-          onClick={onClose}
-        >
-          <XIcon className="size-4" />
-        </button>
+      <ToastLead name={name} color={stripe.color} icon={views.get(n.kind)?.icon} />
+      {/* FR-KIT-57: the action sits right of the text; it wraps below only when too narrow. */}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
+        <ToastText n={n} views={views} name={name} />
+        {mode !== "none" && (
+          <div data-slot="toast-actions" className="ml-auto flex shrink-0 gap-1.5">
+            <Button
+              size="sm"
+              className="h-7 px-2.5"
+              data-testid="note-toast-action"
+              disabled={mode === "disabled" || actions.busy.has(n.id)}
+              onClick={(e) =>
+                void actions.run(n, originOf("toast", e.currentTarget.closest(TOAST_SELECTOR)))
+              }
+            >
+              {n.actionLabel}
+            </Button>
+          </div>
+        )}
       </div>
-      {mode !== "none" && (
-        <Button
-          size="sm"
-          className="self-end"
-          data-testid="note-toast-action"
-          disabled={mode === "disabled" || actions.busy.has(n.id)}
-          onClick={(e) =>
-            void actions.run(n, originOf("toast", e.currentTarget.closest(TOAST_SELECTOR)))
-          }
-        >
-          {n.actionLabel}
-        </Button>
-      )}
+      <CloseGem testId="note-toast-close" onClose={onClose} />
     </div>
   );
 }
@@ -397,6 +405,7 @@ export function ToastRuntime({
   const stackRef = useRef<HTMLElement>(null);
   const showing =
     !!state.callout ||
+    !!state.turn ||
     state.toasts.some((t) => !folded || (t.kind !== "summary" && classOfToast(t) !== "card"));
   const { initiative, windows: windowRects, hard, rows: firstRows } = useStackInputs(isDm, showing);
   // Walkthrough T4, FR-NOTE-76: an open modal dialog keeps the DM stack off it like Initiative.
@@ -537,14 +546,15 @@ export function ToastRuntime({
   const openHistory = () => openWindow(HISTORY_KIND);
   // FR-NOTE-78 (walkthrough F2 1b, 2a): folded to the summary alone, "+N more" sits in its row.
   const inRow = moreInSummary(shown, more);
+  // FR-KIT-58: "+N more" is a centred pill (in the summary's row when folded to it).
   const moreButton = (
     <button
       type="button"
       data-testid="note-toast-more"
       data-in-summary={inRow}
       className={cn(
-        "pointer-events-auto rounded-md border bg-popover px-2 py-1 text-xs text-popover-foreground",
-        inRow ? "shrink-0" : "self-end shadow",
+        "pointer-events-auto rounded-full border bg-popover px-3 py-0.5 text-xs text-muted-foreground",
+        inRow ? "shrink-0" : "self-center shadow",
       )}
       onClick={openHistory}
     >
@@ -577,6 +587,8 @@ export function ToastRuntime({
       onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >
+      {/* FR-KIT-59 (OQ-KIT-03 A): the DM's turn card heads the stack (home first). */}
+      {state.turn && <TurnCard key={`turn:${state.turn.seq}`} text={state.turn.text} />}
       {shown.map((t) => {
         if (t.kind === "summary") {
           return (
@@ -584,32 +596,36 @@ export function ToastRuntime({
               key={SUMMARY_KEY}
               role="status"
               data-testid="note-toast-pending-summary"
+              data-slot="toast-card"
               // BL-120: with the cards folded into it (`inSummary`).
               data-count={t.count + inSummary}
               data-waiting={t.waiting ?? 0}
-              className="pointer-events-auto flex items-center gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
+              // FR-KIT-60: the summary keeps its 58-px row (FR-NOTE-78's folded stack height; the
+              // roll popups and the Fit read the stack rect).
+              className={cn(TOAST_CARD, "py-3")}
             >
-              <span className="flex-1">{summaryText(t.count + inSummary, t.waiting)}</span>
-              {inRow && moreButton}
-              <Button
-                size="sm"
-                data-testid="note-toast-open"
-                onClick={() => {
-                  openHistory();
-                  dispatch((s, now) => closeToast(s, SUMMARY_KEY, now));
-                }}
-              >
-                Open
-              </Button>
-              <button
-                type="button"
-                data-testid="note-toast-close"
-                aria-label="Close"
-                className="rounded-sm text-muted-foreground hover:text-foreground"
-                onClick={() => dispatch((s, now) => closeToast(s, SUMMARY_KEY, now))}
-              >
-                <XIcon className="size-4" />
-              </button>
+              {/* FR-KIT-58: the card row: icon · text · actions · close. */}
+              <ToastLead icon={ListTodoIcon} />
+              <span data-slot="toast-text" className="min-w-0 flex-1">
+                {summaryText(t.count + inSummary, t.waiting)}
+              </span>
+              <span data-slot="toast-actions" className="flex shrink-0 items-center gap-1.5">
+                {inRow && moreButton}
+                <Button
+                  size="sm"
+                  data-testid="note-toast-open"
+                  onClick={() => {
+                    openHistory();
+                    dispatch((s, now) => closeToast(s, SUMMARY_KEY, now));
+                  }}
+                >
+                  Open
+                </Button>
+              </span>
+              <CloseGem
+                testId="note-toast-close"
+                onClose={() => dispatch((s, now) => closeToast(s, SUMMARY_KEY, now))}
+              />
             </div>
           );
         }

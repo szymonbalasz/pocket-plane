@@ -15,6 +15,9 @@
 // per extra part with its own multiplier, preset from the target's defenses for that part's type.
 // Sprint 7 (FR-CBT-130, -131): the card-action slot above the targets (gems' Combat gem) and a
 // "max" Badge on maxed dice; a maxed card refreshes like a late roll (FR-CBT-132: typed kept).
+// Kit parity K3 (FR-KIT-62–65): a window-style title bar whose gem is Later, "To hit" / "Damage,
+// <type>" lines ending in Result-box-styled inputs, one compact line per target (Medallion + name ·
+// AC chip, Hit, multiplier, preview; Remove on hover), footer Dismiss · card actions · Apply.
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
@@ -35,6 +38,8 @@ import { modSegments } from "@shared/effect-modifiers/line";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { Medallion } from "@ui/components/kit/medallion";
+import type { ResultOutcome } from "@ui/components/kit/result-box";
 import { Button } from "@ui/components/ui/button";
 import {
   Popover,
@@ -43,8 +48,10 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@ui/components/ui/controls";
+import { Tooltip } from "@ui/components/ui/overlays";
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
 import { CardActions, PartDice } from "@ui/features/combat-tracker/card-actions-row";
+import { medallionColour } from "@ui/features/combat-tracker/parts";
 import {
   toastIntentError,
   useCbtIntent,
@@ -59,6 +66,7 @@ import {
   TOP_BAR_H,
   type Viewport,
 } from "@ui/features/play-shell/geometry";
+import { cn } from "@ui/lib/utils";
 import { IntentRejected } from "@ui/sync/connection";
 import { useRecords, useSync } from "@ui/sync/store";
 import { EyeOffIcon, XIcon } from "lucide-react";
@@ -131,6 +139,25 @@ import {
 } from "./targets";
 
 const MULTS: DamageMultiplier[] = ["normal", "half", "none", "double"];
+
+/** FR-KIT-63: a result line: the label (with its small dice) left, the boxed value right. */
+const CARD_LINE = "flex min-h-9 items-center gap-2";
+/** FR-KIT-63: an input drawn as a Result box (`data-slot="kit-result"`, number centred, large). */
+const RESULT_INPUT =
+  "h-8 w-16 shrink-0 px-1 text-center text-xl font-semibold leading-none tabular-nums";
+/** FR-KIT-63: the Result box's outcome colours (meaning tokens, FR-THEME-09) on an input. */
+const OUTCOME_INPUT: Partial<Record<ResultOutcome, string>> = {
+  crit: "border-hp-full/60 text-hp-full",
+  fumble: "text-muted-foreground",
+  damage: "border-destructive/60 text-destructive",
+};
+/** FR-KIT-64: Remove shows on the row's hover / focus, always without hover (FR-KIT-03). */
+const ROW_HOVER =
+  "opacity-0 transition-opacity focus-visible:opacity-100 group-hover/target:opacity-100 group-focus-within/target:opacity-100 [@media(hover:none)]:opacity-100";
+
+/** FR-KIT-63: the to-hit box's outcome: natural 20 → crit, natural 1 → fumble, else plain. */
+export const toHitOutcome = (natural: number | null): ResultOutcome =>
+  natural === 20 ? "crit" : natural === 1 ? "fumble" : "plain";
 
 /**
  * Current / max / temp HP the DM sees: monsters on the combatant, PCs on the character (temp HP:
@@ -333,7 +360,7 @@ function DamageField({
   part: number | "base";
   value: FieldDraft | undefined;
   rolled: number | null | undefined;
-  className: string;
+  className?: string;
   placeholder?: string;
   onEdit(next: FieldDraft): void;
 }) {
@@ -345,8 +372,10 @@ function DamageField({
         data-testid={testId}
         {...(part === "base" ? {} : { "data-value": part })}
         data-typed={isTyped(value) ? "true" : undefined}
+        data-slot="kit-result"
+        data-outcome="damage"
         inputMode="numeric"
-        className={className}
+        className={cn(RESULT_INPUT, OUTCOME_INPUT.damage, className)}
         placeholder={placeholder}
         value={fieldValue(value, rolled)}
         onFocus={() => onEdit(focusField(value, rolled))}
@@ -375,6 +404,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
   const rulings = useRecords<HitRulingRecord>(HIT_RULING_TYPE);
   const encounter = useStartedEncounter();
   const selection = useMapSelection();
+  const store = useSync((s) => s.store);
   // FR-CBT-90: the DM's edits live per card in popup-store (kept across Later, another card, a
   // reconnect; lost on reload). Untouched fields follow the card, so a late roll fills them.
   const draft = useCombatDialogs((s) => s.drafts[card.id]) ?? NO_DRAFT;
@@ -623,53 +653,70 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
-      {/* FR-CBT-76: the header drags the popup (handled by the panel). */}
-      <div data-testid="cbt-popup-drag" className="-mx-3 -mt-3 cursor-move select-none px-3 pt-3">
-        <div className="flex items-center gap-1.5">
-          <h2 className="min-w-0 truncate text-sm font-semibold">
-            {p.attackerName} — {p.attackName}
-          </h2>
-          {/* FR-CBT-89: the step marker sits beside the heading (the heading stays the name). */}
-          {ruling ? (
-            <Badge
-              variant="secondary"
-              data-testid="cbt-popup-step"
-              data-value={step}
-              className="shrink-0"
-            >
-              Hit applied
-            </Badge>
-          ) : (
-            // A damage-only card has no to-hit (§7): its header says what it shows.
-            <span data-testid="cbt-popup-step" data-value={step} className="sr-only">
-              {shape === "damage" ? "Damage only, no to-hit" : "To-hit step"}
-            </span>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {p.mode !== "normal" ? `${p.mode} · ` : ""}
-          {p.crit ? "Critical! " : ""}
-          {card.text}
-        </p>
+      {/* FR-CBT-76: the header drags the popup (handled by the panel). FR-KIT-62: a window title
+          bar; its gem is Later (keeps the card pending), so the footer has no Later. */}
+      <div
+        data-testid="cbt-popup-drag"
+        data-slot="card-bar"
+        className="-mx-3 -mt-3 flex h-8 shrink-0 cursor-move select-none items-center gap-1.5 border-b bg-muted/40 pr-1 pl-3"
+      >
+        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {p.attackerName} — {p.attackName}
+        </h2>
+        {/* FR-CBT-89: the step marker sits beside the heading (the heading stays the name). */}
+        {ruling ? (
+          <Badge
+            variant="secondary"
+            data-testid="cbt-popup-step"
+            data-value={step}
+            className="shrink-0"
+          >
+            Hit applied
+          </Badge>
+        ) : (
+          // A damage-only card has no to-hit (§7): its header says what it shows.
+          <span data-testid="cbt-popup-step" data-value={step} className="sr-only">
+            {shape === "damage" ? "Damage only, no to-hit" : "To-hit step"}
+          </span>
+        )}
+        <Tooltip content="Later: keep the card pending">
+          <button
+            type="button"
+            data-testid="cbt-popup-later"
+            aria-label="Later"
+            className="shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            onClick={close}
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        </Tooltip>
       </div>
-      <div className={shape === "damage" ? "grid gap-2" : "grid grid-cols-2 gap-2"}>
+      <p className="-mt-1 text-xs text-muted-foreground">
+        {p.mode !== "normal" ? `${p.mode} · ` : ""}
+        {p.crit ? "Critical! " : ""}
+        {card.text}
+      </p>
+      {/* FR-KIT-63: result lines, each ending in a boxed value. */}
+      <div className="flex flex-col">
         {p.toHit && ruling && (
           // FR-CBT-89: the ruled to-hit, read-only.
-          <div className="grid content-start gap-1">
-            <span className="text-xs font-medium">To hit</span>
+          <div data-slot="card-line" className={CARD_LINE}>
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-sm">
+              To hit
+              {natural !== null && (
+                <span data-testid="cbt-popup-natural" data-value={natural} className="text-xs">
+                  natural {natural}
+                </span>
+              )}
+            </span>
             <span data-testid="cbt-popup-tohit-ruled" className="text-sm tabular-nums">
               {ruling.toHitTotal} · hit applied
             </span>
-            {natural !== null && (
-              <span data-testid="cbt-popup-natural" data-value={natural} className="text-xs">
-                natural {natural}
-              </span>
-            )}
           </div>
         )}
         {p.toHit && !ruling && (
-          <div className="grid gap-1">
-            <Label htmlFor="cbt-popup-tohit" className="flex-wrap text-xs">
+          <div data-slot="card-line" className={CARD_LINE}>
+            <Label htmlFor="cbt-popup-tohit" className="min-w-0 flex-1 flex-wrap text-sm">
               To hit <Dice dice={p.toHit.dice} /> {p.toHit.constant >= 0 ? "+" : "−"}
               {Math.abs(p.toHit.constant)}
               {/* effect-modifiers (FR-MOD-20): the card's parts, already in its total. */}
@@ -694,16 +741,18 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
             <Input
               id="cbt-popup-tohit"
               data-testid="cbt-popup-tohit"
+              data-slot="kit-result"
+              data-outcome={toHitOutcome(rolledNatural)}
               inputMode="numeric"
-              className="h-8"
+              className={cn(RESULT_INPUT, OUTCOME_INPUT[toHitOutcome(rolledNatural)])}
               value={toHit}
               onChange={(e) => edit(() => ({ toHit: typeField(e.target.value) }))}
             />
           </div>
         )}
-        <div className="grid gap-1">
-          <Label htmlFor="cbt-popup-damage" className="flex-wrap text-xs">
-            Damage{" "}
+        <div data-slot="card-line" className={CARD_LINE}>
+          <Label htmlFor="cbt-popup-damage" className="min-w-0 flex-1 flex-wrap text-sm">
+            Damage{p.damageType ? `, ${p.damageType}` : ""}{" "}
             {p.damage ? (
               <>
                 <DamageDice part="base" dice={p.damage.dice} maxed={p.damage.maxed} />{" "}
@@ -732,7 +781,6 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                 Waiting for damage
               </span>
             )}
-            {p.damageType ? ` ${p.damageType}` : ""}
             {extraParts.length > 0 && (
               // FR-CBT-82: "15 slashing + 8 fire".
               <span className="font-normal text-muted-foreground">
@@ -743,34 +791,38 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
               <Badge variant="secondary">edited</Badge>
             )}
           </Label>
-          <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
             <DamageField
               id="cbt-popup-damage"
               testId="cbt-popup-damage"
               part="base"
               value={draft.damage}
               rolled={p.damage?.total}
-              className="h-8"
               placeholder={p.damage ? undefined : "Total"}
               onEdit={(next) => edit(() => ({ damage: next }))}
             />
           </div>
-          {extraParts.map((x, i) => (
-            // FR-CBT-82: each extra part's total, editable like the base part's.
-            // biome-ignore lint/suspicious/noArrayIndexKey: parts are the card's, in order
-            <div key={i} className="flex items-center gap-1.5">
-              <Label htmlFor={`cbt-popup-damage-part-${i + 1}`} className="w-14 text-xs">
-                + {x.type}
-              </Label>
+        </div>
+        {extraParts.map((x, i) => (
+          // FR-CBT-82: each extra part's total, editable like the base part's.
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts are the card's, in order
+          <div key={i} data-slot="card-line" className={CARD_LINE}>
+            <Label
+              htmlFor={`cbt-popup-damage-part-${i + 1}`}
+              className="min-w-0 flex-1 flex-wrap text-sm"
+            >
+              + {x.type}
               {/* FR-CBT-131: a maxed extra part shows its dice with the "max" Badge. */}
               {x.maxed && <DamageDice part={i} dice={x.dice} maxed={x.maxed} />}
+            </Label>
+            <div className="flex shrink-0 items-center gap-1.5">
               <DamageField
                 id={`cbt-popup-damage-part-${i + 1}`}
                 testId="cbt-popup-damage-part"
                 part={i + 1}
                 value={draft.extra[i]}
                 rolled={x.total}
-                className="h-7"
+                className="h-7 w-14 text-base"
                 onEdit={(next) =>
                   edit((d) => {
                     const extra = [...d.extra];
@@ -781,22 +833,20 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                 }
               />
             </div>
-          ))}
-          {unused && (
-            // FR-CBT-92: the owner's later rolls, not used.
-            <p data-testid="cbt-popup-unused" className="text-xs text-muted-foreground">
-              {unused}
-            </p>
-          )}
-          {p.saveDc && (
-            <p className="text-xs text-muted-foreground">
-              DC {p.saveDc.dc} {p.saveDc.ability.toUpperCase()} · Half on a successful save
-            </p>
-          )}
-        </div>
+          </div>
+        ))}
+        {unused && (
+          // FR-CBT-92: the owner's later rolls, not used.
+          <p data-testid="cbt-popup-unused" className="text-xs text-muted-foreground">
+            {unused}
+          </p>
+        )}
+        {p.saveDc && (
+          <p className="text-xs text-muted-foreground">
+            DC {p.saveDc.dc} {p.saveDc.ability.toUpperCase()} · Half on a successful save
+          </p>
+        )}
       </div>
-      {/* FR-CBT-130 (sprint 7): the card-action slot (gems' Combat gem); none → nothing. */}
-      <CardActions card={card} client="dm" />
       <section aria-label="Targets" className="flex min-h-0 flex-col gap-1.5">
         <div className="flex items-baseline justify-between">
           <h3 className="text-xs font-medium text-muted-foreground">Targets ({rows.length})</h3>
@@ -820,20 +870,36 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                 data-testid="cbt-popup-target-row"
                 data-record-id={x.c.id}
                 data-source={x.source}
-                className="flex flex-col gap-1 rounded-md border px-2 py-1"
+                data-slot="card-target"
+                className="group/target flex flex-col gap-1 rounded-md border px-1.5 py-1"
               >
-                <div className="flex items-center gap-1.5 text-sm">
-                  <span className="min-w-0 flex-1 truncate font-medium" title={x.c.name}>
-                    {x.c.name}
-                  </span>
-                  {x.c.hidden && (
-                    <EyeOffIcon
-                      className="size-3.5 shrink-0 text-muted-foreground"
-                      aria-label="Hidden"
+                {/* FR-KIT-64: one compact line; it wraps only when the window is too narrow. */}
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+                  <span
+                    data-slot="card-target-chip"
+                    className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5"
+                  >
+                    <Medallion
+                      name={x.c.name}
+                      imageAssetId={x.c.imageAssetId}
+                      colour={medallionColour(store, x.c)}
+                      size="sm"
                     />
-                  )}
-                  {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
-                  <AcCell combatantId={x.c.id} facts={x.facts} damageOnly={shape === "damage"} />
+                    <span className="min-w-0 truncate font-medium" title={x.c.name}>
+                      {x.c.name}
+                    </span>
+                    {x.c.hidden && (
+                      <EyeOffIcon
+                        className="size-3.5 shrink-0 text-muted-foreground"
+                        aria-label="Hidden"
+                      />
+                    )}
+                    <span aria-hidden className="text-muted-foreground">
+                      ·
+                    </span>
+                    {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
+                    <AcCell combatantId={x.c.id} facts={x.facts} damageOnly={shape === "damage"} />
+                  </span>
                   {!ruling && (
                     <Button
                       size="sm"
@@ -858,23 +924,6 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                       natural {x.contra.natural}
                     </span>
                   )}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6"
-                    data-testid={ruling ? "cbt-popup-row-drop" : "cbt-popup-target-remove"}
-                    data-record-id={x.c.id}
-                    aria-label={`${ruling ? "Drop" : "Remove"} ${x.c.name}`}
-                    onClick={() => remove(x.c)}
-                  >
-                    <XIcon className="size-3.5" />
-                  </Button>
-                </div>
-                {x.contra && (
-                  // FR-CBT-57/58: a ruling against a natural roll is public.
-                  <p className="text-xs text-hp-bloodied">{x.contra.hint}</p>
-                )}
-                <div className="flex items-center gap-2">
                   <ToggleGroup
                     type="single"
                     data-testid="cbt-popup-target-mult"
@@ -907,7 +956,22 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                         ? previewText(x.c.name, x.hp, x.raw)
                         : `${x.c.name}: ${x.raw}`}
                   </span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className={cn("size-6", ROW_HOVER)}
+                    data-testid={ruling ? "cbt-popup-row-drop" : "cbt-popup-target-remove"}
+                    data-record-id={x.c.id}
+                    aria-label={`${ruling ? "Drop" : "Remove"} ${x.c.name}`}
+                    onClick={() => remove(x.c)}
+                  >
+                    <XIcon className="size-3.5" />
+                  </Button>
                 </div>
+                {x.contra && (
+                  // FR-CBT-57/58: a ruling against a natural roll is public.
+                  <p className="text-xs text-hp-bloodied">{x.contra.hint}</p>
+                )}
                 {x.hit && extraParts.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {extraParts.map((part, i) => (
@@ -957,7 +1021,8 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
           {note}
         </p>
       )}
-      <div className="flex justify-end gap-2">
+      {/* FR-KIT-65: Dismiss left, the card actions in the middle, Apply (primary) right. */}
+      <div data-slot="card-footer" className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"
           variant="ghost"
@@ -967,9 +1032,10 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
         >
           Dismiss
         </Button>
-        <Button size="sm" variant="outline" data-testid="cbt-popup-later" onClick={close}>
-          Later
-        </Button>
+        <div className="flex min-w-0 flex-1 justify-center">
+          {/* FR-CBT-130 (sprint 7): the card-action slot (gems' Combat gem); none → nothing. */}
+          <CardActions card={card} client="dm" />
+        </div>
         {action === "apply-hit" ? (
           <Button
             size="sm"
@@ -1098,7 +1164,8 @@ function PopupPanel({
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = ref.current;
     const handle = (e.target as Element).closest('[data-testid="cbt-popup-drag"]');
-    if (e.button !== 0 || !el || !handle) return;
+    // FR-KIT-62: the bar's gem (Later) is a button, not a grip.
+    if (e.button !== 0 || !el || !handle || (e.target as Element).closest("button")) return;
     e.preventDefault();
     const r = el.getBoundingClientRect();
     const start = { x: r.left, y: r.top, w: r.width, h: r.height };

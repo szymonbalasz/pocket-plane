@@ -4,7 +4,8 @@
 // reaches its owner, so its turn has a null player copy (#141). A dying own PC: "Your turn —
 // Mira (death save)" (FR-CBTX-38). Sprint 6 (FR-CBT-115): also a companion this player owns
 // (`ownerPlayerId`), "Owlbear (Mira)"; the owner PC's own alert names its `in-owner-turn`
-// companions, "Brakka + Drake Companion, Fire Elemental 2".
+// companions, "Brakka + Drake Companion, Fire Elemental 2". Kit parity K3 (FR-KIT-59, OQ-KIT-03
+// A): the DM's turn card text, "Mira's turn", from the same live frames (`dmTurnCardFor`).
 import { COMBATANT_TYPE, type CombatantView, ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { TurnChanged } from "@shared/events/combat-tracker";
@@ -61,4 +62,21 @@ function ownerName(store: RecordStore, characterId: string): string {
   const pc = rows.find((r) => r.kind === "pc" && r.entityId === characterId);
   const ch = store.records[ENTITY_TYPE]?.[characterId] as { name?: string } | undefined;
   return pc?.name ?? ch?.name ?? "?";
+}
+
+/**
+ * FR-KIT-59 (OQ-KIT-03 A): the DM's turn card for a live `TurnChanged` frame: "‹name›'s turn" for
+ * the combatant whose turn it now is (the DM sees every combatant); null for players, other causes
+ * or no current turn. `store` = the store after the frame was applied.
+ */
+export function dmTurnCardFor(
+  frame: Pick<EventFrame, "cause" | "changes">,
+  store: RecordStore,
+): string | null {
+  if (frame.cause.name !== TurnChanged.type || store.you?.role !== "dm") return null;
+  const enc = frame.changes.find((c) => c.type === ENCOUNTER_TYPE && c.op === "upsert");
+  const turnId = (enc?.data as { turnCombatantId?: string | null } | undefined)?.turnCombatantId;
+  if (!turnId) return null;
+  const c = store.records[COMBATANT_TYPE]?.[turnId] as CombatantView | undefined;
+  return c ? `${c.name}'s turn` : null;
 }
