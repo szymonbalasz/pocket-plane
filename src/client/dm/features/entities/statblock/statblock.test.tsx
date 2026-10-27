@@ -269,7 +269,7 @@ describe("FR-KIT-103 card", () => {
     expect(str).toMatch(
       /class="[^"]*h-4[^"]*text-\[11px\][^"]*"[^>]*data-testid="ent-statblock-roll-save"/,
     );
-    expect(html).toMatch(/data-slot="statblock-abilities" class="[^"]*gap-x-1\.5[^"]*py-1\b/);
+    expect(html).toMatch(/data-slot="statblock-abilities" class="[^"]*gap-x-1\.5[^"]*py-0\.5/);
     expect(html).toMatch(/data-slot="statblock" class="[^"]*space-y-1"/);
   });
 

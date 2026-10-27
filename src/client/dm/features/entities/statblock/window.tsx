@@ -393,7 +393,7 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
           testId="ent-statblock-abilities"
           cellTestId="ent-statblock-ability"
           inlineMod
-          className="gap-x-1.5 gap-y-0 py-1"
+          className="gap-x-1.5 gap-y-0 py-0.5"
           mod={(a, text) => (
             <AbilityRoll ctx={ctx} kind="check" ability={a} bonus={checkBonus(sb, a) ?? 0}>
               {checkBonus(sb, a) === null ? text : signed(checkBonus(sb, a) ?? 0)}
@@ -527,7 +527,7 @@ function StatBlockBody() {
     : { definitionId: def.id, name: def.name };
   const data = entry.state === "ready" ? entry.data : null;
   return (
-    <div className="h-full overflow-auto px-2 pt-1.5 pb-2">
+    <div className="h-full overflow-auto px-2 pt-1 pb-2">
       <StatBlockView
         def={def}
         combatant={combatant}
