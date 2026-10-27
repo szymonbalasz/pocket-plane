@@ -356,9 +356,10 @@ describe("surface (FR-SHELL-181, -195, -196)", () => {
       expect(PALETTE_BUTTON_W).toBe(40);
       // Last item: right next to the identity chip.
       expect(items.at(-1)?.id).toBe("palette");
-      // The fixed items of the right cluster at 1280: DM Pause 128 + 40, players 40.
+      // The fixed items of the right cluster at 1280: DM Pause 40 (an icon button, kit-parity
+      // K10) + 40, players 40.
       const fixed = items.reduce((s, t) => s + topBarItemWidth(t, { w: 1280, h: 720 }), 0);
-      expect(fixed).toBe(client === "dm" ? 168 : 40);
+      expect(fixed).toBe(client === "dm" ? 80 : 40);
     }
     expect(paletteTip(false)).toBe("Search and commands (Ctrl+K)");
     expect(paletteTip(true)).toBe("Search and commands (⌘K)");

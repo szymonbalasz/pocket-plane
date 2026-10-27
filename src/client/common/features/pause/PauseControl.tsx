@@ -1,8 +1,8 @@
 // The DM's Pause control (FR-SHELL-129): a top-bar item (lazy chunk; `top-bar.tsx`). Running:
 // "Pause" → Popover (message, image, back in none / 5 / 10 / 15 / 30 min) → `camp.pause`. Paused:
 // "Paused · m:ss" → the same Popover with Update, Resume and Preview (the card in a non-blocking
-// Dialog). 96 px running, 128 px paused, icon-only 40 px below 1280 px wide (the countdown in its
-// Tooltip). Disabled unless `live`. The draft lives in `pp.pause.v1.<campaignId>` (this browser).
+// Dialog). An icon button like search (kit-parity K10), on while paused; the label and countdown in
+// its Tooltip. Disabled unless `live`. The draft lives in `pp.pause.v1.<campaignId>` (this browser).
 import {
   BACK_IN_MINUTES,
   type BackInMin,
@@ -28,13 +28,12 @@ import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
 import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
 import { intentErrorText } from "../character-sheet/routing";
-import { useViewport } from "../play-shell/hooks";
 import {
   controlLabel,
-  controlWidth,
   type DraftStorage,
   type PauseDraft,
   pauseOf,
+  pauseSlotWidth,
   readDraft,
   writeDraft,
 } from "./logic";
@@ -93,7 +92,6 @@ export default function PauseControl() {
   const live = useSync((s) => s.state === "live");
   const campaignId = useSync((s) => s.store.you?.campaignId ?? null);
   const connection = useSync((s) => s.connection);
-  const vp = useViewport();
   const now = useNow(pause?.backAt != null);
   const [open, setOpen] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -143,35 +141,30 @@ export default function PauseControl() {
   };
 
   const paused = pause !== null;
-  const width = controlWidth(paused, vp.w);
   const label = controlLabel(pause, now);
-  const iconOnly = width === 40;
-  const trigger = (
-    <Button
-      variant={paused ? "secondary" : "outline"}
-      size="sm"
-      data-testid="ui-pause-open"
-      data-state={paused ? "paused" : "running"}
-      aria-label={label}
-      disabled={!live}
-      className="justify-center px-2 tabular-nums"
-      style={{ width }}
-    >
-      <CoffeeIcon aria-hidden className="size-4" />
-      {!iconOnly && <span className="truncate">{label}</span>}
-    </Button>
-  );
 
   return (
     <div className="flex w-full justify-end">
       <Popover open={open && live} onOpenChange={onOpenChange}>
-        {iconOnly ? (
-          <Tooltip content={label}>
-            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-          </Tooltip>
-        ) : (
-          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-        )}
+        <Tooltip content={label}>
+          <PopoverTrigger asChild>
+            {/* K10 (K6 gap 11): the search button's look; paused = on (secondary). The label
+                stays in the text for screen readers and text queries. */}
+            <Button
+              variant={paused ? "secondary" : "ghost"}
+              size="icon"
+              data-testid="ui-pause-open"
+              data-state={paused ? "paused" : "running"}
+              aria-label={label}
+              disabled={!live}
+              className="h-8"
+              style={{ width: pauseSlotWidth }}
+            >
+              <CoffeeIcon aria-hidden className="size-4" />
+              <span className="sr-only">{label}</span>
+            </Button>
+          </PopoverTrigger>
+        </Tooltip>
         <PopoverContent
           align="end"
           className="w-80"

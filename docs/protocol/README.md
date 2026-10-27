@@ -4081,7 +4081,27 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#611-stat-block-window-dm-only-
 - **Fixtures:** bundle `kit-parity` (data model §139).
 - **CON-44:** 0 B.
 
-## 176. Sprint 13: kit polish: Initiative bars and pending lines, medallion fill, toasts, Notifications cards, stat-block labels (K9)
+## 176. Sprint 13: chrome + controls polish (K10)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#610-geometry-and-walkthrough) (K10 note; K6 gaps 5, 8, 11, 12 and §5; #360). **Built by `build/kit-polish-chrome`**: client only; no record type, intent, event or wire change.
+
+| Part | Contract | FR |
+|---|---|---|
+| Window title (gilt) | `@font-face "Gilt Window Title"` = the title face's file with `size-adjust: 121.43%` (17 / 14); `ui-window-title` uses it first. The bar stays `h-8 text-sm` (rects unchanged) | FR-KIT-07, FR-THEME-05 |
+| Tool rail (`ToolRail.tsx` `RAIL_TOOL`) | `size-[38px] [&_svg]:size-5` on every rail tool, Fit, Layers (`layers-popover.tsx`), Grid and Lock (`DmTools.tsx`). Rail 48 px wide, right edge 56 ≤ `RAIL_CLEAR` − 12 | FR-KIT-92 |
+| Pause control (`pause/PauseControl.tsx`, `logic.ts`) | `pauseSlotWidth` = 40 (all widths; `controlWidth` removed). Button `ui-pause-open` `size="icon"`, `ghost` running / `secondary` paused, `data-state` `running` \| `paused` kept; label in Tooltip, `aria-label` and `sr-only` | FR-KIT-10, FR-SHELL-129 |
+| Shared Select (`overlays.tsx`) | New `SelectGroup` (`select-group`) and `SelectLabel` (`select-label`, the menu label's look) | FR-KIT-06, -07 |
+| Former native selects | `dicex-request-roll` (grouped), `dicex-tray-category`, `dicex-tray-actor` (roller = `""`, item value `actorItemValue`), `dicex-macro-category`, `rem-editor-roll-category`: trigger = test ID + `data-value`; items `<id>-option` + `data-value`. E2E helper `e2e/support/select.ts` `pickSelect(scope, id, {value} \| {label})` | FR-KIT-02, -03 |
+| Players (`PlayersPanel.tsx`) | Party line: `Stat` groups (label `data-slot="party-line-label"` + value, whole on wrap), `gap-x-2.5`, no "·" (the gems tail keeps its own). Loopback warning: default `Alert` + `TriangleAlertIcon` (`text-warning`); `camp-players-loopback-warning`, `camp-players-base-url` kept | FR-KIT-02 |
+| Creatures (`creatures-window.tsx`, `character-sheet/sheet-action.tsx`) | Actions cell wraps the registry's actions in `data-slot="creature-actions"` (24 px icon buttons, 14 px icons). `charx-open-sheet`: icon button, Tooltip "Sheet", `aria-label` "Sheet of <name>". Names keep FR-ENT-42 | FR-KIT-84 |
+| Popover layer (`components/ui/layers.ts`) | `POPOVER_Z` = 950 (`POPOVER_LAYER` `z-[950]`) on PopoverContent (both), DropdownMenu content / sub-content, SelectContent, TooltipContent and the launcher's ⋯ menu: above `TOAST_STACK_Z` 900, below `OVERLAY_LAYER_Z` 1000 and `PRESENT_POPUP_Z`. Dialogs stay z-50 (FR-NOTE-50) | FR-NOTE-50 |
+| `gilt.css` block `/* KIT: chrome + controls */` | Title face; `select-label` gold label type; checkbox 2 px well; Preferences `h3` gold label type; `camp-color-sv` gold double rule (+ focus outline), `camp-color-preview` chips ruled; `party-line-label` dim gold label type. No geometry | FR-KIT-07, OQ-KIT-10 |
+
+- **Tests:** `themes/kit-chrome.test.ts` (FR-KIT-07 window titles, FR-KIT-92 tool rail, FR-KIT-03 no native select), `pause/pause.test.tsx` (FR-SHELL-129 / FR-KIT-10 icon button), `dice-extras/requests.test.tsx` (FR-KIT-02 Roll Select), `dm/.../campaign-management/players-panel.test.tsx` (party line, warning), `dm/features/entities/pets-ui.test.tsx` (FR-KIT-84 row actions), `components/ui/slots.test.tsx` (select-group, -label; K10 popover layer), `notifications/toast-runtime.test.tsx` (FR-NOTE-50 layer order).
+- **Fixtures:** none new (no record type; the areas are in `kit-parity`).
+- **CON-44:** 0 B.
+
+## 177. Sprint 13: kit polish: Initiative bars and pending lines, medallion fill, toasts, Notifications cards, stat-block labels (K9)
 
 From [kit-parity](../specs/post-mvp/kit-parity.md#63-initiative-dm-and-player) FR-KIT-05, -21, -25, -26, -55, -57, -103 after the K6 parity walkthrough (gaps 3, 4, 6, 9, 13 and the Notifications window; #360). **Built by `build/kit-polish-init`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Window sizes unchanged. Data side: [data model §140](../data-model/README.md#140-sprint-13-kit-polish-k9).
 

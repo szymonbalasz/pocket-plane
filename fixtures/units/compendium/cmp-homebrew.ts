@@ -79,7 +79,7 @@ export default defineFixture({
         name: "Divine Fury",
         facets: { className: "Barbarian", level: 3 },
         body: {
-          text: "While you're raging, the first creature you hit on each of your turns with a weapon attack takes extra radiant damage: 1d6 + half your barbarian level.",
+          text: "Homebrew test feature (own words): in a rage, your first weapon hit each turn adds 1d6 + half your barbarian level radiant damage.",
           preset: DIVINE_FURY_RULE,
         },
       },

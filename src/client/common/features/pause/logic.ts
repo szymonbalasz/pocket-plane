@@ -49,16 +49,10 @@ export function controlLabel(pause: CampaignPause | null, nowMs: number): string
 }
 
 /**
- * FR-SHELL-129: the control's top-bar slot: 128 px (its widest state) from 1280 wide, else 40
- * (icon-only); the button inside is `controlWidth`.
+ * FR-SHELL-129, kit-parity K10 (K6 gap 11): the control's top-bar slot and button, px: an icon
+ * button like search at every width, its label ("Pause", "Paused Â· m:ss") in the Tooltip.
  */
-export const pauseSlotWidth = (viewport: { w: number }): number => (viewport.w < 1280 ? 40 : 128);
-
-/** FR-SHELL-129: the control's width, px: 96 running, 128 paused, 40 icon-only below 1280 wide. */
-export function controlWidth(paused: boolean, viewportW: number): number {
-  if (viewportW < 1280) return 40;
-  return paused ? 128 : 96;
-}
+export const pauseSlotWidth = 40;
 
 /** The resume sound (FR-SHELL-127): one, by priority turn > request > resume. */
 export type ResumeSound = "turn" | "request" | "resume";

@@ -3,6 +3,7 @@ import { CheckIcon } from "lucide-react";
 import { Checkbox as C, Popover as P, Switch as S, ToggleGroup as T } from "radix-ui";
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { POPOVER_LAYER } from "./layers";
 import { OVERLAY_OPEN_ATTR } from "./overlays";
 
 // ---- Popover ----
@@ -100,7 +101,8 @@ export function PopoverContent({
         align={align}
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none",
+          POPOVER_LAYER,
+          "w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none",
           className,
         )}
         onOpenAutoFocus={(e) => {

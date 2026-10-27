@@ -6,6 +6,7 @@
 // from the Popover (the card + the `pause` sound, Chime).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSelect } from "./support/select";
 import { openWindow } from "./support/shell";
 
 /** Is `testId`'s element under an `inert` ancestor (the block of FR-SHELL-112 (2))? */
@@ -160,7 +161,7 @@ test("FR-SHELL-125 FR-SHELL-128 FR-SHELL-129 FR-SHELL-136 FR-DICEX-90 pause card
   const requests = await openWindow(dm, "dicex.requests");
   const fold = requests.getByTestId("dicex-request-fold");
   if ((await fold.getAttribute("data-state")) !== "open") await fold.click();
-  await requests.getByTestId("dicex-request-roll").selectOption("custom");
+  await pickSelect(requests, "dicex-request-roll", { value: "custom" });
   await requests.getByTestId("dicex-request-expression").fill("1d20");
   await requests.getByTestId("dicex-request-label").fill("Paused check");
   await requests.locator(`[data-testid="dicex-request-target"][data-record-id="${mira}"]`).click();

@@ -7,6 +7,7 @@ import { EllipsisIcon } from "lucide-react";
 import { DropdownMenu as M } from "radix-ui";
 import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
+import { POPOVER_LAYER } from "../../components/ui/layers";
 import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
@@ -256,7 +257,10 @@ export function Launcher({
           <M.Content
             side="bottom"
             sideOffset={6}
-            className="z-50 min-w-40 rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md"
+            className={cn(
+              POPOVER_LAYER,
+              "min-w-40 rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md",
+            )}
           >
             {overflow.map((d) => {
               const l = d.launcher;

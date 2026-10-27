@@ -30,8 +30,8 @@ import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { cn } from "@ui/lib/utils";
 import { onlineDot } from "@ui/sync/presence";
 import { usePresence, useRecords, useSync } from "@ui/sync/store";
-import { CopyIcon } from "lucide-react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { CopyIcon, TriangleAlertIcon } from "lucide-react";
+import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CampaignOptions } from "./CampaignOptions";
 import { NameDialog } from "./NameDialog";
@@ -70,17 +70,34 @@ function usePlayerLinks(players: PlayerRecord[]) {
   return data;
 }
 
-/** FR-CAMP-21/22: one compact line; the whole line opens the DM's sheet on it. */
+/**
+ * K10 (K6 §5): a stat on the party line, "AC 16": its label muted (label type in a theme), kept
+ * whole when the line wraps.
+ */
+function Stat({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="whitespace-nowrap">
+      <span data-slot="party-line-label" className="text-muted-foreground">
+        {label}
+      </span>{" "}
+      {children}
+    </span>
+  );
+}
+
+/**
+ * FR-CAMP-21/22: one compact line; the whole line opens the DM's sheet on it. K10 (K6 §5): the
+ * stats spaced apart, no "·" between them.
+ */
 function CharacterLine({ line }: { line: PartyLine }) {
   const openWindow = useOpenWindow();
   const temp = tempText(line.temp);
-  const label = "text-muted-foreground";
   return (
     <button
       type="button"
       data-testid="camp-player-char"
       data-record-id={line.id}
-      className="flex w-full flex-wrap items-center gap-x-1.5 rounded-sm px-1 py-0.5 text-left text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex w-full flex-wrap items-center gap-x-2.5 rounded-sm px-1 py-0.5 text-left text-xs hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       onClick={() => openPartyLine(line.id, openWindow)}
     >
       <span className="max-w-32 truncate font-medium" title={line.name}>
@@ -90,28 +107,22 @@ function CharacterLine({ line }: { line: PartyLine }) {
         <Badge
           data-testid="camp-player-char-draft"
           variant="outline"
-          className="h-4 px-1 text-[10px]"
+          className="-ml-1 h-4 px-1 text-[10px]"
         >
           Draft
         </Badge>
       )}
-      <span className={label}>·</span>
-      <span>
-        <span className={label}>Lvl </span>
+      <Stat label="Lvl">
         <span data-testid="camp-player-char-level" className="tabular-nums">
           {line.level ?? "—"}
         </span>
-      </span>
-      <span className={label}>·</span>
-      <span>
-        <span className={label}>AC </span>
+      </Stat>
+      <Stat label="AC">
         <span data-testid="camp-player-char-ac" className="tabular-nums">
           {line.ac ?? "—"}
         </span>
-      </span>
-      <span className={label}>·</span>
-      <span>
-        <span className={label}>HP </span>
+      </Stat>
+      <Stat label="HP">
         <span
           data-testid="camp-player-char-hp"
           data-down={line.down}
@@ -126,13 +137,11 @@ function CharacterLine({ line }: { line: PartyLine }) {
             {temp}
           </span>
         )}
-      </span>
+      </Stat>
       {line.passives.map((p) => (
-        <Fragment key={p.skill}>
-          <span className={label}>·</span>
-          <Tooltip content={passiveTitle(p)}>
-            <span>
-              <span className={label}>{p.short} </span>
+        <Tooltip key={p.skill} content={passiveTitle(p)}>
+          <span>
+            <Stat label={p.short}>
               <span
                 data-testid={`camp-player-char-${p.short.toLowerCase()}`}
                 data-overridden={p.overridden}
@@ -140,9 +149,9 @@ function CharacterLine({ line }: { line: PartyLine }) {
               >
                 {p.value ?? "—"}
               </span>
-            </span>
-          </Tooltip>
-        </Fragment>
+            </Stat>
+          </span>
+        </Tooltip>
       ))}
       <PartyLineGems characterId={line.id} />
     </button>
@@ -340,13 +349,17 @@ export function PlayersPanel() {
           </p>
         )}
         {isLoopbackUrl(base) ? (
+          // K10 (K6 §5): the kit's alert (a ruled box, body text), the warning colour on its icon
+          // only.
           <Alert
-            variant="warning"
             data-testid="camp-players-loopback-warning"
-            className="px-2 py-1 text-xs"
+            className="flex items-start gap-1.5 px-2 py-1 text-xs"
           >
-            Links use <span data-testid="camp-players-base-url">{base}</span>: this computer only.
-            Set PP_PUBLIC_BASE_URL to your tunnel URL for players elsewhere.
+            <TriangleAlertIcon aria-hidden className="mt-px size-3.5 shrink-0 text-warning" />
+            <span>
+              Links use <span data-testid="camp-players-base-url">{base}</span>: this computer only.
+              Set PP_PUBLIC_BASE_URL to your tunnel URL for players elsewhere.
+            </span>
           </Alert>
         ) : (
           <p className="text-xs text-muted-foreground">
