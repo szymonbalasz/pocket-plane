@@ -44,7 +44,9 @@ describe("FR-CBT-119 player rows", () => {
       expect(brakka).toContain(`data-testid="cbt-init-companion" data-record-id="${id}"`);
       expect(brakka).toMatch(new RegExp(`data-testid="cbt-init-row-card" data-record-id="${id}"`));
     }
-    expect(brakka).toMatch(/data-testid="cbt-init-row-hp" data-record-id="drake"[^>]*>22 \/ 22</);
+    expect(brakka).toMatch(
+      /data-testid="cbt-init-row-hp"[^>]*data-record-id="drake"[^>]*>.*?<span[^>]*>22 \/ 22</,
+    );
     // Thorn's own-initiative summon (another player's): a band, the owner chip, no icon.
     const fe3 = rowHtml(html, "cbt-init-row", "fe3");
     expect(fe3).toMatch(/data-testid="cbt-init-row-band"[^>]*data-value="healthy"/);
@@ -160,7 +162,9 @@ describe("FR-CBT-142 compact companion line (players)", () => {
   test("FR-CBT-142 compact companion line: owner (player-1) — name, '22 / 22', AC from its card, chips slot, card icon; no ⋯", () => {
     const drake = lineOf(as("p1"), "drake");
     expect(drake).toContain(">Drake Companion<");
-    expect(drake).toMatch(/data-testid="cbt-init-row-hp" data-record-id="drake"[^>]*>22 \/ 22</);
+    expect(drake).toMatch(
+      /data-testid="cbt-init-row-hp"[^>]*data-record-id="drake"[^>]*>.*?<span[^>]*>22 \/ 22</,
+    );
     expect(drake).toMatch(/data-testid="cbt-init-row-ac" data-record-id="drake"[^>]*>AC 13</);
     expect(drake).toMatch(/data-testid="cbt-init-row-card" data-record-id="drake"/);
     expect(drake).not.toContain("cbt-init-companion-menu");

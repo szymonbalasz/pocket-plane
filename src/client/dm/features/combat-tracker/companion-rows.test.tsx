@@ -101,7 +101,9 @@ describe("FR-CBT-118 DM rows", () => {
     );
     const own = drake.slice(0, drake.indexOf('data-record-id="fe2"'));
     expect(own).toContain(">Drake Companion<");
-    expect(own).toMatch(/data-testid="cbt-init-row-hp" data-record-id="drake">22 \/ 22</);
+    expect(own).toMatch(
+      /data-testid="cbt-init-row-hp"[^>]*data-record-id="drake"[^>]*>.*?<span[^>]*>22 \/ 22</,
+    );
     expect(own).toMatch(/data-testid="cbt-init-row-ac" data-record-id="drake">AC [^<]+</);
     expect(own).toContain('data-testid="cbt-init-row-card"');
     expect(own).toMatch(/data-testid="cbt-init-companion-menu" data-record-id="drake"/);

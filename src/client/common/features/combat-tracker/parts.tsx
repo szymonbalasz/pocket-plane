@@ -9,7 +9,7 @@ import type { RecordStore } from "@shared/protocol/store";
 import { initials } from "@shared/scenes-map/geometry";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { HandshakeIcon, SwordsIcon } from "lucide-react";
-import { type RefObject, useLayoutEffect, useState } from "react";
+import { type CSSProperties, type RefObject, useLayoutEffect, useState } from "react";
 import { HP_TRACK_PX } from "../../components/kit/hp-bar";
 import { Medallion, type MedallionSize } from "../../components/kit/medallion";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
@@ -115,6 +115,52 @@ export function CombatantMedallion({
       className={size === "lg" ? NARROW_LG : undefined}
     />
   );
+}
+
+/**
+ * K12 (round-2 gap 6): a companion's child row (an `after-owner` row, an in-turn line) under its
+ * owner: the `sm` medallion at the end of an `lg` medallion's slot, so the child's name and bar
+ * start in the owner's name column. No nested card: the row's classes (`CHILD_ROW`).
+ */
+export function ChildMedallion({
+  c,
+}: {
+  c: { name: string; imageAssetId?: string | null; tokenId?: string | null };
+}) {
+  return (
+    <span
+      data-slot="init-child-medallion"
+      className="flex w-[34px] shrink-0 justify-end @max-[22rem]/init:w-7"
+    >
+      <CombatantMedallion c={c} size="sm" />
+    </span>
+  );
+}
+
+/**
+ * K12 (round-2 gap 6): the owner and its `after-owner` child read as one block: the child sits
+ * flush under the owner (the list's `gap-1` closed, the shared edge square), no indent, no rule.
+ */
+export const CHILD_ROW = {
+  /** On the owner row while its next row is its child. */
+  owner: "rounded-b-none",
+  /** On the child row. */
+  child: "-mt-1 rounded-t-none",
+} as const;
+
+/**
+ * K12: an in-turn companion line's HP bar track (`--hp-track` on its wrapper): short and fixed,
+ * so the one-row line (FR-CBT-142) keeps its room and the lines' bars line up.
+ */
+export const LINE_TRACK = { "--hp-track": "40px" } as CSSProperties;
+
+/** K12: whether `layout[i]`'s next row is its own child (an `after-owner` row ranked by it). */
+export function childBelow(
+  layout: readonly { c: { id: string }; owner: { id: string } | null; indent: boolean }[],
+  i: number,
+): boolean {
+  const next = layout[i + 1];
+  return Boolean(next?.indent && next.owner?.id === layout[i]?.c.id);
 }
 
 export const InitiativeIcon = SwordsIcon;

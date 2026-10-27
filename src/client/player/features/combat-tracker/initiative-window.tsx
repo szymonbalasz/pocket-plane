@@ -40,8 +40,12 @@ import {
 } from "@ui/features/combat-tracker/companions";
 import {
   BandBadge,
+  CHILD_ROW,
+  ChildMedallion,
   CombatantMedallion,
+  childBelow,
   HP_STACK,
+  LINE_TRACK,
   SideChip,
   TurnMarker,
   useListHpTrack,
@@ -132,11 +136,14 @@ function PlayerRowMain({
   ownerName,
   round,
   me,
+  child,
 }: {
   c: CombatantView;
   ownerName: string;
   round: number;
   me: string | null;
+  /** K12: a child row under its owner (`sm` medallion in the owner's slot). */
+  child: boolean;
 }) {
   const store = useSync((s) => s.store);
   const openCard = useOpenCompanionCard();
@@ -156,7 +163,7 @@ function PlayerRowMain({
       className={cn("relative flex items-center gap-1.5", HP_STACK.main, own && "cursor-pointer")}
       onClick={own ? () => openCard(c.id) : undefined}
     >
-      <CombatantMedallion c={c} />
+      {child ? <ChildMedallion c={c} /> : <CombatantMedallion c={c} />}
       <div className={cn("flex min-w-0 flex-1 flex-col", HP_STACK.block)}>
         {/* FR-CBTX-57: the name is never cut; the side chip takes a second line first. K9 R1:
             in its own box, so a stacked list keeps it on the medallion's line. */}
@@ -293,8 +300,8 @@ function PlayerCompanionLine({
       className={cn("flex min-w-0 items-center gap-1.5", own && "cursor-pointer")}
       onClick={own ? () => openCard(c.id) : undefined}
     >
-      {/* FR-KIT-29 / -30: the grid at medallion `sm`. */}
-      <CombatantMedallion c={c} size="sm" />
+      {/* FR-KIT-29 / -30: the grid at medallion `sm`; K12: in the owner's medallion slot. */}
+      <ChildMedallion c={c} />
       <div className="min-w-0 flex-1">
         <NameLine
           name={c.name}
@@ -314,8 +321,22 @@ function PlayerCompanionLine({
                 data-stats-line
                 className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
               >
-                <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
-                  {c.hpCurrent ?? "—"} / {c.hpMax ?? "—"}
+                {/* K12: the kit's bar on the list's track (wrapped: the list measures its rows'
+                    tracks only), a short one so the line stays one row (FR-CBT-142). */}
+                <span className="flex shrink-0" style={LINE_TRACK}>
+                  {c.hpCurrent != null && c.hpMax != null ? (
+                    <HpBar
+                      cur={c.hpCurrent}
+                      max={c.hpMax}
+                      track="fixed"
+                      data-testid="cbt-init-row-hp"
+                      data-record-id={c.id}
+                    />
+                  ) : (
+                    <span data-testid="cbt-init-row-hp" data-record-id={c.id}>
+                      — / —
+                    </span>
+                  )}
                 </span>
                 {temp > 0 && (
                   <span
@@ -364,6 +385,7 @@ export function PlayerRow({
   lines,
   ownerName,
   indent,
+  childBelow = false,
   turn,
   round,
   me,
@@ -372,6 +394,8 @@ export function PlayerRow({
   lines: readonly CombatantView[];
   ownerName: string;
   indent: boolean;
+  /** K12: the next row is this row's child (the shared edge square). */
+  childBelow?: boolean;
   turn: boolean;
   round: number;
   me: string | null;
@@ -387,18 +411,15 @@ export function PlayerRow({
       className={cn(
         "relative flex shrink-0 flex-col gap-1 rounded-md px-2 py-1",
         turn && "bg-accent",
-        indent && "ml-3",
+        indent && CHILD_ROW.child,
+        childBelow && CHILD_ROW.owner,
       )}
     >
       <TurnMarker active={turn} />
-      <PlayerRowMain c={c} ownerName={ownerName} round={round} me={me} />
+      <PlayerRowMain c={c} ownerName={ownerName} round={round} me={me} child={indent} />
+      {/* K12 (round-2 gap 6): flat lines under the owner's name column, no nested rule. */}
       {lines.map((l) => (
-        <div
-          key={l.id}
-          data-testid="cbt-init-companion"
-          data-record-id={l.id}
-          className="border-l border-border/60 pl-1"
-        >
+        <div key={l.id} data-testid="cbt-init-companion" data-record-id={l.id}>
           <PlayerCompanionLine c={l} ownerName={c.name} round={round} me={me} />
         </div>
       ))}
@@ -471,13 +492,14 @@ function PlayerInitiativeBody() {
           HP_STACK.list,
         )}
       >
-        {layout.map(({ c, lines, owner, indent }) => (
+        {layout.map(({ c, lines, owner, indent }, i) => (
           <PlayerRow
             key={c.id}
             c={c}
             lines={lines}
             ownerName={owner?.name ?? ownerNameOf(c)}
             indent={indent}
+            childBelow={childBelow(layout, i)}
             turn={enc.playerTurnCombatantId === c.id}
             round={enc.round}
             me={me}
