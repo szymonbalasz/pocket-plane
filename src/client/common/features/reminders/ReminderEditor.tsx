@@ -59,8 +59,8 @@ export const CHANGED_ELSEWHERE = "Changed in another tab";
 const NO_HOLD = "none";
 const WHOLE = "whole";
 const SELECT = "h-8 min-w-0 w-full";
-const NATIVE_SELECT =
-  "h-7 min-w-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
+/** K10 (K6 gap 8): a roll's Category Select, as small as the native select was. */
+const SMALL_SELECT = "h-7 w-28 min-w-0 shrink-0 gap-1 px-1.5 py-0 text-xs [&>span]:truncate";
 
 /** The DM's stronghold link: Stronghold Select, then Facility Select or "Whole stronghold". */
 function LinkFields({
@@ -275,20 +275,32 @@ export function ReminderEditor({
                     value={r.expression}
                     onChange={(e) => setRoll(i, { expression: e.target.value })}
                   />
-                  <select
-                    data-testid="rem-editor-roll-category"
-                    data-index={i}
-                    aria-label="Category"
-                    className={NATIVE_SELECT}
+                  <Select
                     value={r.category}
-                    onChange={(e) => setRoll(i, { category: e.target.value as RollCategory })}
+                    onValueChange={(v) => setRoll(i, { category: v as RollCategory })}
                   >
-                    {ROLL_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORY_LABEL[c]}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      data-testid="rem-editor-roll-category"
+                      data-index={i}
+                      data-value={r.category}
+                      aria-label="Category"
+                      className={SMALL_SELECT}
+                    >
+                      <SelectValue>{CATEGORY_LABEL[r.category]}</SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLL_CATEGORIES.map((c) => (
+                        <SelectItem
+                          key={c}
+                          value={c}
+                          data-testid="rem-editor-roll-category-option"
+                          data-value={c}
+                        >
+                          {CATEGORY_LABEL[c]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     type="button"
                     data-testid="rem-editor-roll-remove"
