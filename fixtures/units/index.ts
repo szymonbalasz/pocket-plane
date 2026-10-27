@@ -39,6 +39,7 @@ import encounter1 from "./combat-tracker/encounter-1";
 import f3DownCompanions from "./combat-tracker/f3-down-companions";
 import fuHurtGoblins from "./combat-tracker/fu-hurt-goblins";
 import goblin2 from "./combat-tracker/goblin-2";
+import kitGroups from "./combat-tracker/kit-groups";
 import lateHitRuled from "./combat-tracker/late-hit-ruled";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import trailMoves from "./combat-tracker/trail-moves";
@@ -307,4 +308,6 @@ export const units: readonly Fixture[] = [
   // the player's applied card
   kitNoticesApplied,
   kitNotices,
+  // Sprint 13 K12 (build/kit-round3-combat): Mira's in-turn and Thorn's after-owner Fire Elementals
+  kitGroups,
 ];
