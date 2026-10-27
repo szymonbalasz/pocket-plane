@@ -1,8 +1,8 @@
 // Kit part: the HP bar (kit-parity FR-KIT-05): a thin bar plus "cur / max" when the numbers are
 // known, else the health band word alone (a monster for players: never a bar length, FR-KIT-26).
 // Colours are the meaning tokens `hp.*`, not themed (FR-THEME-09); a theme styles the track
-// through `data-slot="kit-hpbar"` (ADR-0069). K9: `track="fixed"` draws one track width for every
-// row of a list (Initiative), the kit's 120 px when the line holds it, so bars line up.
+// through `data-slot="kit-hpbar"` (ADR-0069). K9: `track="fixed"` draws the list's one track width
+// (`--hp-track`, set by the list from its narrowest row; the kit's 120 px at most), so bars line up.
 import { healthBand } from "@shared/combat-tracker/rules";
 import type { HealthBand } from "@shared/entities/schemas";
 import type * as React from "react";
@@ -37,11 +37,11 @@ export function hpFill(cur: number, max: number): number {
 export const HP_TRACK_PX = 120;
 
 /**
- * K9: the fixed track's width: 120 px, less when the HP line (the caller's `@container`, the same
- * width on every row) can't hold it beside "cur / max" (7ch) and a temp "+N" slot; never under
- * 24 px. Without a container it is 120 px.
+ * K9: the fixed track's width: the list's `--hp-track` (one value for every row, measured by the
+ * list, `useListHpTrack`), else 120 px. A row narrower than that (only below the list's readable
+ * minimum) shrinks its own track rather than overflow.
  */
-const FIXED_TRACK = "w-[clamp(24px,calc(100cqw-7ch-2rem),120px)] flex-none";
+const FIXED_TRACK = "w-[var(--hp-track,120px)] shrink";
 
 export function hpBarMode(
   cur: number | null | undefined,
@@ -68,10 +68,7 @@ export function HpBar({
   band?: HealthBand | null;
   /** Show "cur / max" after the bar. */
   numbers?: boolean;
-  /**
-   * `fill` takes the line's room; `fixed` = `HP_TRACK_PX`, or the room the caller's `@container`
-   * line leaves (the same on every row), so bars line up.
-   */
+  /** `fill` takes the line's room; `fixed` = the list's `--hp-track` (≤ `HP_TRACK_PX`). */
   track?: "fill" | "fixed";
   "data-testid"?: string;
 } & Omit<React.ComponentProps<"span">, "children">) {
@@ -98,7 +95,7 @@ export function HpBar({
       data-slot="kit-hpbar"
       data-band={b}
       data-track={track}
-      className={cn("flex min-w-0 items-center gap-2", track === "fixed" && "flex-none", className)}
+      className={cn("flex min-w-0 items-center gap-2", className)}
       {...props}
     >
       <span

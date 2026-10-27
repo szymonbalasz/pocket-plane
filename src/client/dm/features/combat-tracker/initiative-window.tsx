@@ -71,6 +71,7 @@ import {
   CombatantMedallion,
   SideChip,
   TurnMarker,
+  useListHpTrack,
 } from "@ui/features/combat-tracker/parts";
 import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
@@ -861,8 +862,7 @@ function RowMain({
             (FR-CBTX-57): still too narrow, whole parts wrap onto a second line. */}
         <div
           data-stats-line
-          // K9: a size container, so the HP bar's fixed track is one width on every row.
-          className="@container relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+          className="relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
         >
           {hp ? (
             <HpBar
@@ -889,6 +889,8 @@ function RowMain({
             // pinned right so it adds no scroll width.
             className={cn("ml-auto shrink-0", folded && "invisible absolute top-0 right-0")}
             aria-hidden={folded || undefined}
+            // K9 (walkthrough F1 note): folded, its Moved Tooltip trigger leaves the tab order.
+            inert={folded || undefined}
           >
             AC {ac ?? "—"}
             {moved && (
@@ -1620,6 +1622,8 @@ function DmInitiativeBody() {
   const { send, disabled } = useCbtIntent();
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // K9 (walkthrough F1): one HP track width for the whole list.
+  useListHpTrack(listRef);
   const wrapRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLButtonElement>(null);
   const active = useMemo(() => rows.filter((c) => !c.removed), [rows]);

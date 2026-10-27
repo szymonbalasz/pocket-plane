@@ -199,11 +199,10 @@ describe("FR-KIT-05 medallion (K9)", () => {
 });
 
 describe("FR-KIT-05 hp bar (K9)", () => {
-  test("FR-KIT-05 hp bar (K9, K6 gap 3): track fixed → one track width (120 px, less when the caller's container line can't hold it beside the numbers and a temp slot) and a cur / max column; the default fills the line", () => {
+  test("FR-KIT-05 hp bar (K9, K6 gap 3): track fixed → the list's one track width (--hp-track, else 120 px) and a cur / max column; the default fills the line", () => {
     const fixed = html(<HpBar cur={7} max={7} track="fixed" />);
     expect(attrs(fixed, "kit-hpbar").get("data-track")).toBe("fixed");
-    expect(attrs(fixed, "kit-hpbar").get("class")).toContain("flex-none");
-    expect(fixed).toContain("w-[clamp(24px,calc(100cqw-7ch-2rem),120px)] flex-none");
+    expect(fixed).toContain("w-[var(--hp-track,120px)] shrink");
     expect(fixed).toContain("min-w-[7ch]");
     const fill = html(<HpBar cur={7} max={7} />);
     expect(attrs(fill, "kit-hpbar").get("data-track")).toBe("fill");

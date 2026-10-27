@@ -9,7 +9,8 @@ import type { RecordStore } from "@shared/protocol/store";
 import { initials } from "@shared/scenes-map/geometry";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { HandshakeIcon, SwordsIcon } from "lucide-react";
-import { useState } from "react";
+import { type RefObject, useLayoutEffect, useState } from "react";
+import { HP_TRACK_PX } from "../../components/kit/hp-bar";
 import { Medallion, type MedallionSize } from "../../components/kit/medallion";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
@@ -117,6 +118,104 @@ export function CombatantMedallion({
 }
 
 export const InitiativeIcon = SwordsIcon;
+
+/** K9 (walkthrough F1): the shortest HP track an Initiative list draws, px (a readable bar). */
+export const HP_TRACK_MIN = 36;
+
+/**
+ * K9: the room a row's HP line leaves its track: the line's width less the bar's own rest (its
+ * gap and "cur / max"), the line's other parts (temp "+N", card, Down / death) and their gaps. The
+ * AC / moved tail doesn't count: it folds into the row Tooltip when it doesn't fit (FR-KIT-25).
+ */
+export function trackRoom(w: {
+  line: number;
+  barRest: number;
+  others: readonly number[];
+  gap: number;
+}): number {
+  return w.line - w.barRest - w.others.reduce((a, x) => a + x + w.gap, 0);
+}
+
+/**
+ * K9: ONE track width per Initiative list: the narrowest row's room, at most the kit's 120 px,
+ * never under `HP_TRACK_MIN`. No row measured → 120.
+ */
+export function listTrack(rooms: readonly number[]): number {
+  const r = rooms.filter((x) => Number.isFinite(x));
+  if (r.length === 0) return HP_TRACK_PX;
+  return Math.floor(Math.max(HP_TRACK_MIN, Math.min(HP_TRACK_PX, ...r)));
+}
+
+/** The HP line's gap (`gap-x-1.5`). */
+const LINE_GAP = 6;
+
+/** K9: one row's track room, measured on its `data-stats-line` (null: no fixed bar). */
+function measureRoom(line: HTMLElement): number | null {
+  const bar = line.querySelector<HTMLElement>(
+    ':scope > [data-slot="kit-hpbar"][data-track="fixed"]',
+  );
+  const track = bar?.querySelector<HTMLElement>('[data-slot="kit-hpbar-track"]');
+  if (!bar || !track || line.clientWidth === 0) return null;
+  const others = [...line.children]
+    .filter(
+      (k): k is HTMLElement =>
+        k instanceof HTMLElement && k !== bar && !k.hasAttribute("data-tail"),
+    )
+    .map((k) => k.offsetWidth)
+    .filter((w) => w > 0);
+  return trackRoom({
+    line: line.clientWidth,
+    barRest: bar.offsetWidth - track.offsetWidth,
+    others,
+    gap: LINE_GAP,
+  });
+}
+
+/**
+ * K9 (walkthrough F1): sets `--hp-track` on the Initiative list to `listTrack` of its rows' rooms,
+ * so every row's bar is the same length at every width. Re-measured when the list or a row's HP
+ * line resizes and when rows or their parts change. Measures widths only, never the track, so it
+ * settles in one pass.
+ */
+export function useListHpTrack(listRef: RefObject<HTMLElement | null>): void {
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    let frame = 0;
+    const lines = () => [...list.querySelectorAll<HTMLElement>("[data-stats-line]")];
+    const measure = () => {
+      frame = 0;
+      const rooms = lines()
+        .map(measureRoom)
+        .filter((r): r is number => r !== null);
+      list.style.setProperty("--hp-track", `${listTrack(rooms)}px`);
+    };
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => schedule());
+    const observeLines = () => {
+      ro?.disconnect();
+      ro?.observe(list);
+      for (const l of lines()) ro?.observe(l);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    const mo =
+      typeof MutationObserver === "undefined"
+        ? null
+        : new MutationObserver(() => {
+            observeLines();
+            schedule();
+          });
+    mo?.observe(list, { childList: true, subtree: true, characterData: true });
+    observeLines();
+    measure();
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      ro?.disconnect();
+      mo?.disconnect();
+    };
+  }, [listRef]);
+}
 
 /**
  * FR-CBT-104 (#252): "Ally" (lucide `handshake`) on a monster set to ally, "Enemy" on a PC set to

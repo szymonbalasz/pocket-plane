@@ -58,13 +58,12 @@ describe("FR-KIT-26 player hp", () => {
     }
   });
 
-  test("FR-KIT-26 player hp (K9, K6 gap 3): bars with numbers sit on one fixed track (≤ the kit's 120 px), so they line up", () => {
+  test("FR-KIT-26 player hp (K9, K6 gap 3): bars with numbers sit on the list's one fixed track (≤ the kit's 120 px), so they line up", () => {
     const html = player();
     for (const id of ["mira", "thorn", "owlbear"]) {
       const row = rowHtml(html, "cbt-init-row", id);
       expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
-      expect(row).toContain("w-[clamp(24px,calc(100cqw-7ch-2rem),120px)] flex-none");
-      expect(row).toMatch(/data-stats-line="true" class="@container /);
+      expect(row).toContain("w-[var(--hp-track,120px)] shrink");
     }
   });
 });

@@ -3,8 +3,12 @@
 // effects added; the tail fold is pure (`tailFolds`). Hover, widths and the theme's look in a
 // browser: e2e/kit-initiative.e2e.ts and the K2 walkthrough.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import type { RecordStore } from "@shared/protocol/store";
+import { HP_TRACK_PX } from "@ui/components/kit/hp-bar";
+import { statusShown } from "@ui/features/combat-extras/parts";
 import { companionLayout } from "@ui/features/combat-tracker/companions";
 import {
   companionStore,
@@ -12,7 +16,12 @@ import {
   renderWith,
   rowHtml,
 } from "@ui/features/combat-tracker/companions-fixture";
-import { medallionColour } from "@ui/features/combat-tracker/parts";
+import {
+  HP_TRACK_MIN,
+  listTrack,
+  medallionColour,
+  trackRoom,
+} from "@ui/features/combat-tracker/parts";
 import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
 import { END_CONFIRM_LABEL, END_KEEP_LABEL, EndConfirmButtons } from "./end-confirm";
 import {
@@ -237,15 +246,79 @@ describe("FR-KIT-25 hp line", () => {
     expect(tailFolds({ line: 100, bar: null, others: [], tail: 92 })).toBe(false);
   });
 
-  test("FR-KIT-25 hp line (K9, K6 gap 3): every row's bar on one fixed track (the kit's 120 px, less when the line's container can't hold it), cur / max in a column, the AC / moved tail a right-aligned column", () => {
+  test("FR-KIT-25 one track per list (K9 walkthrough F1) at 400 / 320 / 280 with chips: every row's room is measured, the list draws the narrowest, ≤ 120 px, ≥ the readable minimum", () => {
+    // Rooms = line − bar rest ("cur / max" 8 + 42) − other parts (+ 6 px gaps). The lines differ
+    // per row by their status chips (none / prone / concentration + "+1") and temp "+N".
+    const row = (line: number, others: number[] = []) =>
+      trackRoom({ line, barRest: 50, others, gap: 6 });
+    expect(row(160, [13])).toBe(91);
+    // DM 400 (Simple and busy rows): one width, the narrowest row's.
+    const w400 = [row(160), row(156), row(160, [13]), row(160), row(160, [13]), row(160)];
+    expect(listTrack(w400)).toBe(91);
+    // DM 320: narrow-list chips are icon-only, so the busy rows still leave a readable bar.
+    const w320 = [row(142), row(98), row(122, [13]), row(120), row(98, [13])];
+    expect(listTrack(w320)).toBe(HP_TRACK_MIN);
+    expect(listTrack([row(142), row(98), row(122)])).toBe(48);
+    // Player 280: Mira's concentration + "+1" + trigger icons.
+    expect(listTrack([row(114), row(90), row(130)])).toBe(40);
+    // Wide (600): capped at the kit's 120; nothing measured (static render) → 120.
+    expect(listTrack([row(300), row(280, [13])])).toBe(HP_TRACK_PX);
+    expect(listTrack([])).toBe(HP_TRACK_PX);
+    // Never under the readable minimum.
+    expect(listTrack([row(60)])).toBe(HP_TRACK_MIN);
+  });
+
+  test("FR-KIT-25 one track per list (K9 walkthrough F1): both lists set it (useListHpTrack); the fixed track reads it; narrow-list chips drop their rounds into the Tooltip; a folded tail is inert", () => {
+    const src = (f: string) => readFileSync(join(import.meta.dir, f), "utf8");
+    expect(src("initiative-window.tsx")).toContain("useListHpTrack(listRef);");
+    expect(src("../../../player/features/combat-tracker/initiative-window.tsx")).toContain(
+      "useListHpTrack(listRef);",
+    );
+    expect(src("initiative-window.tsx")).toContain("inert={folded || undefined}");
+    const html = dm(kitStore(1, { goblin: { hpCurrent: 3 } }));
+    const goblin = rowHtml(html, "cbt-init-row", "goblin");
+    expect(goblin).toContain("w-[var(--hp-track,120px)] shrink");
+    expect(goblin).toMatch(
+      /data-slot="init-status" class="[^"]*@max-\[20rem\]\/init:\[&amp;_\[data-rounds\]\]:hidden/,
+    );
+    // A timed concentration's "4r" sits in a data-rounds span (hidden in a narrow list, kept in
+    // its Tooltip).
+    const base = kitStore();
+    const timed = {
+      ...base,
+      records: {
+        ...base.records,
+        effect: {
+          ...base.records.effect,
+          conc: { ...(base.records.effect?.conc as object), endsRound: 5 },
+        },
+      },
+    } as RecordStore;
+    expect(rowHtml(dm(timed), "cbt-init-row", "mira")).toMatch(
+      /<span data-rounds="true" class="shrink-0">4r<\/span>/,
+    );
+  });
+
+  test("FR-KIT-28 status icons (K9 walkthrough F1): in a narrow list two or more effects fold into one +N chip (concentration never folds); wide lists keep the first effect", () => {
+    expect(statusShown(0, 2, false)).toBe(1);
+    expect(statusShown(0, 2, true)).toBe(0);
+    expect(statusShown(0, 1, true)).toBe(1);
+    expect(statusShown(1, 2, false)).toBe(0);
+    expect(statusShown(0, 0, true)).toBe(0);
+    // The static render (no list measured) is the wide look: the Goblin's prone shows, Hex in +1.
+    const goblin = rowHtml(dm(), "cbt-init-row", "goblin");
+    expect(goblin).toContain('data-testid="cbtx-init-row-effect" data-record-id="prone"');
+    expect(goblin).toMatch(/data-testid="cbtx-init-row-effect-more" data-value="1"/);
+  });
+
+  test("FR-KIT-25 hp line (K9, K6 gap 3): every row's bar on the list's one fixed track, cur / max in a column, the AC / moved tail a right-aligned column", () => {
     const html = dm(kitStore(1, { goblin: { hpCurrent: 3 } }));
     // (Mira's figures live on her character record, not in this fixture: no bar.)
     for (const id of ["goblin", "wolf"]) {
       const row = rowHtml(html, "cbt-init-row", id);
       const hp = row.slice(row.indexOf('data-testid="cbt-init-row-hp"'));
       expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
-      expect(hp).toContain("w-[clamp(24px,calc(100cqw-7ch-2rem),120px)] flex-none");
-      expect(row).toMatch(/data-stats-line="true" class="@container /);
+      expect(hp).toContain("w-[var(--hp-track,120px)] shrink");
       expect(hp).not.toMatch(/data-slot="kit-hpbar-track" class="[^"]*flex-1/);
       expect(hp).toContain("min-w-[7ch]");
       expect(row).toMatch(/data-tail="true"[^>]*class="ml-auto shrink-0"/);

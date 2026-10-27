@@ -43,6 +43,7 @@ import {
   CombatantMedallion,
   SideChip,
   TurnMarker,
+  useListHpTrack,
 } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
@@ -192,8 +193,7 @@ function PlayerRowMain({
         )}
         <div
           data-stats-line
-          // K9: a size container, so the HP bar's fixed track is one width on every row.
-          className="@container mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden"
+          className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden"
         >
           <PlayerHp c={c} own={own} />
           {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down. */}
@@ -409,6 +409,8 @@ function PlayerInitiativeBody() {
   useTriggerWords();
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  // K9 (walkthrough F1): one HP track width for the whole list.
+  useListHpTrack(listRef);
   const footerRef = useRef<HTMLButtonElement>(null);
   const ids = rows.map((c) => c.id);
   // FR-CBT-77 (G4): new rows (Start, reveal) scroll into view; "↓ N more" below the fold.
