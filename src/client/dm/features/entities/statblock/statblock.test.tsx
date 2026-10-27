@@ -252,12 +252,25 @@ describe("FR-KIT-103 card", () => {
     expect(html).toMatch(/data-testid="ent-statblock-attack" data-record-id="a-scim"/);
     // The kit's attack row: the name, then the muted line on its own, then the buttons.
     expect(html).toMatch(
-      /data-slot="statblock-entry-name"[^>]*>Scimitar<\/div><div class="text-muted-foreground"><span data-testid="ent-statblock-attack-line"[^>]*>\+4 · 1d6\+2 slashing<\/span><\/div><div class="mt-1.5[^"]*"><button[^>]*data-testid="ent-statblock-roll-attack"/,
+      /data-slot="statblock-entry-name"[^>]*>Scimitar<\/div><div class="text-muted-foreground"><span data-testid="ent-statblock-attack-line"[^>]*>\+4 · 1d6\+2 slashing<\/span><\/div><div class="[^"]*\bmt-1\b[^"]*"><button[^>]*data-testid="ent-statblock-roll-attack"/,
     );
     for (const id of ["attack", "damage", "both"]) {
       expect(count(html, `data-testid="ent-statblock-roll-${id}"`)).toBe(2);
     }
     expect(html).toContain('data-slot="statblock-attack"');
+  });
+
+  test("FR-KIT-103 card compact for §7.3's useful 300 × 360 (walkthrough F2): the modifier (Check) beside the score as the kit's “8 −1”, a small Save line with column spacing, tighter gaps", () => {
+    const html = card({});
+    const str = html.slice(html.indexOf('data-testid="ent-statblock-ability" data-value="str"'));
+    expect(str).toMatch(
+      /<span class="flex items-baseline justify-center gap-1"><b data-slot="statblock-score"[^>]*>8<\/b><button[^>]*data-testid="ent-statblock-roll-check"/,
+    );
+    expect(str).toMatch(
+      /class="[^"]*h-4[^"]*text-\[11px\][^"]*"[^>]*data-testid="ent-statblock-roll-save"/,
+    );
+    expect(html).toMatch(/data-slot="statblock-abilities" class="[^"]*gap-x-1\.5[^"]*py-1\b/);
+    expect(html).toMatch(/data-slot="statblock" class="[^"]*space-y-1"/);
   });
 
   test("FR-KIT-103 card: with the compendium entry, the full type line and the traits / other actions as collapsible sections (the attacks keep their rows)", () => {
@@ -352,7 +365,7 @@ describe("FR-KIT-105 attack routing", () => {
     ).toMatchObject({ manual });
   });
 
-  test("FR-KIT-105 attack routing (stub send): definition → plain dice.roll as the creature, labelled; Attack + damage = to-hit then damage (two entries, no card); never a new intent", () => {
+  test("FR-KIT-105 attack routing (stub send): definition → plain dice.roll as the creature, labelled, always `public: false` (ADR-0024 ruling: DM-only even with the DM's switch or preset on); Attack + damage = to-hit then damage (two entries, no card); never a new intent", () => {
     const both = attackSends(plain, SCIMITAR, "a-scim", "both", {
       mode: "disadvantage",
       manual: [{ diceTotal: 9 }, { diceTotal: 5 }],
@@ -368,7 +381,7 @@ describe("FR-KIT-105 attack routing", () => {
           label: "Goblin — Scimitar attack",
           actor: { entityId: "d-goblin" },
           manual: { diceTotal: 9 },
-          public: true,
+          public: false,
         },
       },
       {
@@ -380,7 +393,7 @@ describe("FR-KIT-105 attack routing", () => {
           label: "Goblin — Scimitar damage",
           actor: { entityId: "d-goblin" },
           manual: { diceTotal: 5 },
-          public: true,
+          public: false,
         },
       },
     ]);
@@ -420,6 +433,7 @@ describe("FR-KIT-106 ability rolls", () => {
         category: "ability-check",
         label: "Goblin — Strength check",
         actor: { entityId: "d-goblin" },
+        public: false,
       },
     });
     expect(abilitySend(plain, "save", "dex", 4, { mode: "normal" }).payload).toMatchObject({

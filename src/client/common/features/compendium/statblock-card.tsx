@@ -85,7 +85,8 @@ export function StatBlockCore({
 
 /**
  * The six-column ability grid: label, score, signed modifier. `mod` replaces a modifier (K7: its
- * Check button), `below` adds a line under it (K7: "Save +n").
+ * Check button), `below` adds a line under it (K7: "Save +n"). `inlineMod`: the modifier beside
+ * the score, as the kit's "8 −1" (K7's compact grid); `className` adds to the grid's.
  */
 export function StatBlockAbilities({
   abilities,
@@ -93,33 +94,50 @@ export function StatBlockAbilities({
   cellTestId,
   mod,
   below,
+  inlineMod = false,
+  className,
 }: {
   abilities: Readonly<Record<Ability, number>>;
   testId: string;
   cellTestId: string;
   mod?: (a: Ability, text: string) => ReactNode;
   below?: (a: Ability) => ReactNode;
+  inlineMod?: boolean;
+  className?: string;
 }) {
   return (
     <div
       data-testid={testId}
       data-slot="statblock-abilities"
-      className="grid grid-cols-6 gap-1 border-y py-1.5 text-center"
+      className={cn("grid grid-cols-6 gap-1 border-y py-1.5 text-center", className)}
     >
       {ABILITIES.map((a) => {
         const text = signed(abilityMod(abilities[a]));
+        const score = (
+          <b data-slot="statblock-score" className="font-bold tabular-nums">
+            {abilities[a]}
+          </b>
+        );
+        const modifier = mod ? (
+          mod(a, text)
+        ) : (
+          <small className="text-xs text-muted-foreground tabular-nums">{text}</small>
+        );
         return (
-          <div key={a} data-testid={cellTestId} data-value={a} className="flex flex-col">
+          <div key={a} data-testid={cellTestId} data-value={a} className="flex min-w-0 flex-col">
             <span className="text-xs">
               <StatLabel>{ABILITY_SHORT[a]}</StatLabel>
             </span>
-            <b data-slot="statblock-score" className="font-bold tabular-nums">
-              {abilities[a]}
-            </b>
-            {mod ? (
-              mod(a, text)
+            {inlineMod ? (
+              <span className="flex items-baseline justify-center gap-1">
+                {score}
+                {modifier}
+              </span>
             ) : (
-              <small className="text-xs text-muted-foreground tabular-nums">{text}</small>
+              <>
+                {score}
+                {modifier}
+              </>
             )}
             {below?.(a)}
           </div>
@@ -138,12 +156,15 @@ export function StatBlockEntry({
   name,
   children,
   actions,
+  actionsClassName,
   slot = "statblock-entry",
   ...props
 }: {
   name: ReactNode;
   children?: ReactNode;
   actions?: ReactNode;
+  /** Adds to the actions row's classes (K7: a tighter gap at the useful size). */
+  actionsClassName?: string;
   slot?: "statblock-entry" | "statblock-attack";
 } & Record<`data-${string}`, string | undefined>) {
   return (
@@ -152,7 +173,9 @@ export function StatBlockEntry({
         {name}
       </div>
       {children && <div className="text-muted-foreground">{children}</div>}
-      {actions && <div className="mt-1.5 flex flex-wrap gap-1.5">{actions}</div>}
+      {actions && (
+        <div className={cn("mt-1.5 flex flex-wrap gap-1.5", actionsClassName)}>{actions}</div>
+      )}
     </div>
   );
 }

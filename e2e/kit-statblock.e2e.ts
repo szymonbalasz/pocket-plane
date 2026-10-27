@@ -59,19 +59,47 @@ test("FR-KIT-101 FR-KIT-103 FR-KIT-105 FR-KIT-107 Initiative ⋯ → Stat block 
   // Evidence for the walkthrough's kit pair (the default theme, Gilt & Stone).
   await sb.screenshot({ path: testInfo.outputPath("app-statblock-gilt.png") });
 
-  // §7.3 useful size: name, type line, core row, abilities and the attack row's buttons whole.
+  // §7.3 useful size (walkthrough F2): on the Elite (hidden, 2 attacks), name, type line, core
+  // row, abilities and both attack rows with their buttons whole at 300 × 360, unscrolled.
+  const elite = init.locator('[data-testid="cbt-init-row"]', {
+    has: dm.locator('[data-testid="cbt-init-row-name"][data-value^="Elite"]'),
+  });
+  await elite.hover();
+  await elite.getByTestId("cbt-init-row-menu").first().click();
+  await dm.getByTestId("cbt-init-row-statblock").click();
+  await expect(sb.getByTestId("ent-statblock-name")).toHaveText(/^Elite/);
+  await expect(sb.getByTestId("ent-statblock-attack")).toHaveCount(2);
   await resizeTo(dm, sb, 300, 360);
-  const body = await sb.getByTestId("ui-window-body").boundingBox();
-  const last = sb.getByTestId("ent-statblock-attack").last();
-  const both = await last.getByTestId("ent-statblock-roll-both").boundingBox();
+  const bodyEl = sb.getByTestId("ui-window-body");
+  const body = await bodyEl.boundingBox();
+  const fits = async (id: string) => {
+    const b = await sb.getByTestId(id).last().boundingBox();
+    return (b?.y ?? 0) + (b?.height ?? 0) <= (body?.y ?? 0) + (body?.height ?? 0) + 0.5;
+  };
+  const both = await sb
+    .getByTestId("ent-statblock-attack")
+    .last()
+    .getByTestId("ent-statblock-roll-both")
+    .boundingBox();
   console.log(
-    `useful-size ent.statblock: body ${JSON.stringify(body)} last both ${JSON.stringify(both)}`,
+    `useful-size ent.statblock: body ${JSON.stringify(body)} 2nd both ${JSON.stringify(both)}`,
   );
+  for (const id of ["ent-statblock-type", "ent-statblock-core", "ent-statblock-abilities"]) {
+    expect({ id, fits: await fits(id) }).toEqual({ id, fits: true });
+  }
   expect((both?.y ?? 0) + (both?.height ?? 0)).toBeLessThanOrEqual(
     (body?.y ?? 0) + (body?.height ?? 0) + 0.5,
   );
+  // Nothing hidden behind a scroll: the content's own scroll box sits at the top.
+  const scroller = sb.locator('[data-testid="ent-statblock"]').locator("xpath=..");
+  expect(await scroller.evaluate((e) => e.scrollTop)).toBe(0);
+  await sb.screenshot({ path: testInfo.outputPath("app-statblock-useful-elite.png") });
 
   // FR-KIT-105: Attack + damage (bound) → cbt.attack → the damage card in the DM popup.
+  await goblin.hover();
+  await goblin.getByTestId("cbt-init-row-menu").first().click();
+  await dm.getByTestId("cbt-init-row-statblock").click();
+  await expect(sb.getByTestId("ent-statblock-name")).toHaveText("Goblin");
   await sb.getByTestId("ent-statblock-roll-both").first().click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();

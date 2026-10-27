@@ -76,7 +76,12 @@ export function plainAttackExpressions(attack: Attack): { hit: string; damage: s
 
 const pub = (r: RollRequest) => (r.public !== undefined ? { public: r.public } : {});
 
-/** A plain `dice.roll` as the definition (FR-DICE-10 actor: the DM may roll as any creature). */
+/**
+ * A plain `dice.roll` as the definition (FR-DICE-10 actor: the DM may roll as any creature).
+ * Always `public: false` (K7 walkthrough F1 ruling 2026-10-27, ADR-0024 / FR-CHARX-22 over
+ * FR-KIT-105): the definition's name could leak a hidden or renamed creature; the DM's category
+ * presets don't apply here.
+ */
 function plainRoll(
   as: Extract<RollAs, { definitionId: string }>,
   expression: string,
@@ -96,7 +101,7 @@ function plainRoll(
       label,
       actor: { entityId: as.definitionId },
       ...(manual ? { manual } : {}),
-      ...pub(r),
+      public: false,
     },
   };
 }

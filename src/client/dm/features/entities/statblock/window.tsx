@@ -242,7 +242,13 @@ function AbilityRoll({
       type="button"
       size="sm"
       variant="ghost"
-      className="h-5 min-w-0 px-0.5 text-xs text-muted-foreground tabular-nums"
+      // Compact (walkthrough F2): two attack rows with buttons fit 300 × 360; the Save labels are
+      // a size smaller, so the six never touch (Simple Dark, step 8).
+      className={
+        kind === "check"
+          ? "h-5 min-w-0 px-0.5 text-xs text-muted-foreground tabular-nums"
+          : "h-4 min-w-0 px-0 text-[11px] leading-4 text-muted-foreground tabular-nums"
+      }
       data-testid={`ent-statblock-roll-${kind}`}
       data-value={ability}
       disabled={ctx.disabled}
@@ -326,7 +332,9 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
   const choices = attackChoices(sb.attacks);
   const attackNames = new Set(sb.attacks.map((a) => a.name.toLowerCase()));
   return (
-    <StatBlockCard data-testid="ent-statblock" data-record-id={def.id}>
+    // §7.3 useful 300 × 360 (walkthrough F2): name, type line, core row, abilities and two attack
+    // rows with their buttons fit; hence the tighter gaps, the inline modifiers, the small Save row.
+    <StatBlockCard data-testid="ent-statblock" data-record-id={def.id} className="space-y-1">
       <header>
         <div className="flex items-center gap-2">
           <h2
@@ -384,6 +392,8 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
           abilities={sb.abilities}
           testId="ent-statblock-abilities"
           cellTestId="ent-statblock-ability"
+          inlineMod
+          className="gap-x-1.5 gap-y-0 py-1"
           mod={(a, text) => (
             <AbilityRoll ctx={ctx} kind="check" ability={a} bonus={checkBonus(sb, a) ?? 0}>
               {checkBonus(sb, a) === null ? text : signed(checkBonus(sb, a) ?? 0)}
@@ -411,6 +421,7 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
             // The kit's `.atk` (orchestrator ruling, K7): the name, then the muted
             // "+4 · 1d6+2 slashing" line, then the buttons.
             name={attack.name}
+            actionsClassName="mt-1"
             actions={
               rollable
                 ? ATTACK_BUTTONS.map((b) => (
@@ -428,7 +439,7 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
                 : undefined
             }
           >
-            <span data-testid="ent-statblock-attack-line" className="tabular-nums">
+            <span data-testid="ent-statblock-attack-line" className="text-xs tabular-nums">
               {attackSummary(attack)}
             </span>
           </StatBlockEntry>
@@ -516,7 +527,7 @@ function StatBlockBody() {
     : { definitionId: def.id, name: def.name };
   const data = entry.state === "ready" ? entry.data : null;
   return (
-    <div className="h-full overflow-auto p-2">
+    <div className="h-full overflow-auto px-2 pt-1.5 pb-2">
       <StatBlockView
         def={def}
         combatant={combatant}
