@@ -193,11 +193,11 @@ test("FR-SHELL-53 FR-SHELL-51 live resize: the DM's never-resized Game log follo
   await live(dm);
   await resetLayout(dm);
   const log = shellWindow(dm, "dice.log");
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
   await dm.setViewportSize({ width: 1280, height: 720 });
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 508, w: 690, h: 200 });
   expect(overlaps(await box(log), await box(shellWindow(dm, "cbt.initiative")))).toBe(false);
   await dm.setViewportSize({ width: 1440, height: 900 });
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
   await dm.context().close();
 });

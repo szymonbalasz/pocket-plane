@@ -53,8 +53,9 @@ const openWindows = (page: Page) =>
 
 /** The Game log's zone per viewport (play-shell §7 sprint-5 table). */
 const LOG_ZONE: Record<string, Box> = {
-  "1280x720": { x: 68, y: 484, w: 690, h: 160 },
-  "1440x900": { x: 68, y: 584, w: 1150, h: 240 },
+  // K5 (play-shell §7 sprint-5 table): 12 px above the bottom edge, 40 px taller.
+  "1280x720": { x: 68, y: 508, w: 690, h: 200 },
+  "1440x900": { x: 68, y: 608, w: 1150, h: 280 },
 };
 
 /**
@@ -92,13 +93,13 @@ test("FR-SHELL-99 FR-SHELL-103 FR-SHELL-107 FR-SHELL-110 window frame (DM): zone
   await test.step("F0: the zones at 1440×900 (Initiative 1028, 60; Game log 1150 × 240)", async () => {
     const init = await openWindow(dm, "cbt.initiative");
     expect(await rect(init)).toMatchObject({ x: 1028, y: 60, w: 400 });
-    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
     await expect(shellWindow(dm, "dice.log")).toHaveAttribute("data-placed", "zone");
   });
 
   await test.step("F2: 1280×720, End → Start 'Escort to the Ford': Initiative in its zone (868, 60), the Game log 690 × 160", async () => {
     await resizeTo(dm, 1280, 720);
-    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 508, w: 690, h: 200 });
     const init = shellWindow(dm, "cbt.initiative");
     await init.getByTestId("cbt-init-end").click();
     await dm.getByTestId("cbt-init-end-confirm").click();
@@ -137,11 +138,11 @@ test("FR-SHELL-99 FR-SHELL-103 FR-SHELL-107 FR-SHELL-110 window frame (DM): zone
   await test.step("F4: 1440 → 1280×720 → 1440: the Game log 1150 × 240 again (BL-60), Initiative in its zone", async () => {
     await resizeTo(dm, 1440, 900);
     const before = await openWindows(dm);
-    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
     await resizeTo(dm, 1280, 720);
-    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 508, w: 690, h: 200 });
     await resizeTo(dm, 1440, 900);
-    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
     expect(await rect(shellWindow(dm, "cbt.initiative"))).toMatchObject({ x: 1028, y: 60 });
     const after = await openWindows(dm);
     const at = (list: typeof before) =>
@@ -156,7 +157,7 @@ test("FR-SHELL-99 FR-SHELL-103 FR-SHELL-107 FR-SHELL-110 window frame (DM): zone
     await dm.reload();
     await live(dm);
     await expect(shellWindow(dm, "dice.log")).toHaveAttribute("data-placed", "zone");
-    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+    expect(await rect(shellWindow(dm, "dice.log"))).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
     const after = await openWindows(dm);
     expect(after.map((w) => w.kind).sort()).toEqual(before.map((w) => w.kind).sort());
   });

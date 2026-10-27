@@ -119,7 +119,7 @@ test("FR-SHELL-102 FR-MAP-113 H2 FAIL 5 DM resize round trip: 1280×720, Reset l
   await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
   const log = shellWindow(dm, "dice.log");
   await dm.setViewportSize({ width: 1280, height: 720 });
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 508, w: 690, h: 200 });
   await dm.getByTestId("ui-launcher-menu").click();
   await dm.getByTestId("ui-launcher-reset").click();
   await expect(shellWindow(dm, "map.scenes")).toHaveCount(0);
@@ -129,12 +129,12 @@ test("FR-SHELL-102 FR-MAP-113 H2 FAIL 5 DM resize round trip: 1280×720, Reset l
   const cell = await canvas.getAttribute("data-cell-px");
 
   await dm.setViewportSize({ width: 1440, height: 900 });
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
   await expect(canvas).toHaveAttribute("data-fit-visible", "all");
   await expect(canvas).toHaveAttribute("data-fit-floor", "false");
 
   await dm.setViewportSize({ width: 1280, height: 720 });
-  await expect.poll(() => box(log)).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  await expect.poll(() => box(log)).toEqual({ x: 68, y: 508, w: 690, h: 200 });
   await expect.poll(() => box(board)).toEqual(before);
   await expect(canvas).toHaveAttribute("data-fit-visible", "all");
   await expect(canvas).toHaveAttribute("data-cell-px", cell ?? "");

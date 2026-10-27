@@ -1,5 +1,6 @@
 // e2e-bundle: f1-frame-e2e
-// Sprint 11 F1 (session-sim-14 glitch 4, d10 / d11, BL-109): a player at 1280×720 out of a fight
+// Sprint 11 F1 (session-sim-14 glitch 4, d10 / d11, BL-109): a player at 1280×720 (K5: 1240×720,
+// where the band holds 828 px as before the toast corner moved; `f1-frame.test.ts` likewise) out of a fight
 // with Recap + Stats open opens Rules → one window put away (Recap, the least recently used),
 // Stats moved aside at its size (L3r), Rules + Stats open side by side; closing Rules brings Stats
 // back. No scene, so geometry alone (`f1-frame-e2e` = `base`). The ladder in detail: bun test
@@ -33,12 +34,12 @@ async function box(l: Locator): Promise<Box> {
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5 && a.y < b.y + b.h - 0.5 && b.y < a.y + a.h - 0.5;
 
-test("FR-SHELL-97 FR-SHELL-102 BL-109 player 1280×720 out of a fight: Recap + Stats open → Rules puts away one window (Recap) and moves Stats aside; Rules + Stats open, no overlap; closing Rules brings Stats back", async ({
+test("FR-SHELL-97 FR-SHELL-102 BL-109 player 1240×720 (K5; d10: 1280×720) out of a fight: Recap + Stats open → Rules puts away one window (Recap) and moves Stats aside; Rules + Stats open, no overlap; closing Rules brings Stats back", async ({
   browser,
 }) => {
   const { link } = e2eEnv();
   const p1 = await rolePage(browser);
-  await p1.setViewportSize({ width: 1280, height: 720 });
+  await p1.setViewportSize({ width: 1240, height: 720 });
   await p1.goto(link("Player 1"));
   await live(p1);
   // Recap from the palette (no launcher entry, FR-RECAP-28), then Stats beside it (d10).

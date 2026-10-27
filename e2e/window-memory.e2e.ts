@@ -77,7 +77,8 @@ async function resizeTo(page: Page, win: Locator, w: number, h: number) {
 async function viewport(page: Page, width: number, height: number) {
   await page.setViewportSize({ width, height });
   const zone =
-    width >= 1440 ? { x: 68, y: 584, w: 1150, h: 240 } : { x: 68, y: 484, w: 690, h: 160 };
+    // K5 (play-shell §7 sprint-5 table).
+    width >= 1440 ? { x: 68, y: 608, w: 1150, h: 280 } : { x: 68, y: 508, w: 690, h: 200 };
   await expect.poll(() => box(shellWindow(page, "dice.log"))).toEqual(zone);
 }
 
@@ -196,9 +197,9 @@ test("FR-SHELL-144 FR-SHELL-146 FR-SHELL-147 FR-SHELL-150 FR-SHELL-151 FR-SHELL-
       .poll(() => box(shellWindow(dm, "dice.log")))
       .toEqual({
         x: 68,
-        y: 584,
+        y: 608,
         w: 1150,
-        h: 240,
+        h: 280,
       });
     expect((await openWindows(dm)).some((w) => w.remembered)).toBe(false);
     await openWindow(dm, "cmp.compendium");
