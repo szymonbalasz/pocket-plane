@@ -30,9 +30,17 @@ import {
   TextField,
   useBusy,
 } from "./fields";
-import { type PublicOverrides, PublicSwitch, usePublicOverrides } from "./rolls";
+import { LimitedUsesBox } from "./MoreTabs";
+import { type PublicOverrides, PublicSwitch, usePublicOverrides, useSheetOverrides } from "./rolls";
 import { AddRow, RowTools, useRows } from "./rows";
-import { notationContext, useSheet, useSheetIntents } from "./sheet-context";
+import {
+  notationContext,
+  SheetContext,
+  SheetScope,
+  useSheet,
+  useSheetIntents,
+  useSheetScope,
+} from "./sheet-context";
 import {
   attackButtons,
   attackRowView,
@@ -100,6 +108,7 @@ function RowButtons({
   rowId: string | undefined;
   overrides: PublicOverrides;
 }) {
+  const scope = useSheetScope();
   return (
     <div className="flex justify-end gap-1.5">
       {buttons.map((b) => (
@@ -111,6 +120,7 @@ function RowButtons({
           overrides={overrides}
           data-testid={b.testId}
           data-record-id={rowId}
+          data-scope={scope}
         >
           {b.label}
         </SheetRoll>
@@ -403,12 +413,14 @@ function AttackRow({
   overrides: PublicOverrides;
 }) {
   const ctx = useSheet();
+  const scope = useSheetScope();
   const e = ctx.editing && ctx.canEdit;
   const ref = a.id ? { attackId: a.id } : {};
   return (
     <div
       data-testid="charx-attack"
       data-record-id={a.id}
+      data-scope={scope}
       className="flex flex-col gap-1 border-b py-1.5"
     >
       {e ? (
@@ -483,6 +495,7 @@ function SlotPips() {
   const live = useSync((s) => s.state === "live");
   const intents = useSheetIntents();
   const busy = useBusy();
+  const scope = useSheetScope();
   const pips = slotPips(ctx.stats, ctx.sheet);
   const counters = ctx.creature.kind === "character" && ctx.canCount;
   const use = (level: string, op: object) =>
@@ -506,6 +519,7 @@ function SlotPips() {
                 key={i}
                 type="button"
                 data-testid="charx-slot"
+                data-scope={scope}
                 data-value={p.level}
                 data-used={p.used}
                 aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
@@ -520,6 +534,7 @@ function SlotPips() {
             <button
               type="button"
               data-testid="charx-resource-reset"
+              data-scope={scope}
               data-value={`slot.${p.level}`}
               disabled={!live || busy.busy}
               className="text-[10px] text-muted-foreground underline"
@@ -724,11 +739,13 @@ function SpellRowView({
   overrides: PublicOverrides;
 }) {
   const ctx = useSheet();
+  const scope = useSheetScope();
   const e = ctx.editing && ctx.canEdit;
   return (
     <div
       data-testid="charx-spell"
       data-record-id={s.id}
+      data-scope={scope}
       className="flex flex-col gap-1 border-b py-1.5"
     >
       {e ? (
@@ -812,5 +829,32 @@ export function ActionsTab() {
       <AttacksBlock overrides={overrides} />
       <SpellsBox overrides={overrides} />
     </div>
+  );
+}
+
+/**
+ * K13 (DM #363, the kit's wide sheet): Main's Attacks, Spells (header and slot pips) and Limited
+ * uses boxes under the passives once the sheet is wide. The Actions / Features rows and buttons
+ * in view mode (rows are edited on their own tabs); the DM's Attack / Damage switches use the
+ * sheet's shared overrides (the header's Public rolls menu's); every repeated test ID carries
+ * `data-scope="main"`. The Actions tab is unchanged.
+ */
+export function WideActionBoxes() {
+  const ctx = useSheet();
+  const overrides = useSheetOverrides();
+  return (
+    <SheetContext.Provider value={{ ...ctx, editing: false }}>
+      <SheetScope.Provider value="main">
+        <div
+          data-testid="charx-main-actions"
+          data-scope="main"
+          className="flex min-w-0 flex-col gap-2.5"
+        >
+          <AttacksBlock overrides={overrides} />
+          <SpellsBox overrides={overrides} />
+          <LimitedUsesBox />
+        </div>
+      </SheetScope.Provider>
+    </SheetContext.Provider>
   );
 }

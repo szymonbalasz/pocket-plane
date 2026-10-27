@@ -34,6 +34,17 @@ export interface SheetCtx {
 
 export const SheetContext = createContext<SheetCtx | null>(null);
 
+/**
+ * K13 (DM #363): where a repeated sheet part renders. `main` = the wide Main's Attacks / Spells /
+ * Limited uses boxes, the same rows and controls as Actions / Features; their test IDs carry
+ * `data-scope="main"` so a selector stays unambiguous. Elsewhere none (no attribute).
+ */
+export const SheetScope = createContext<"main" | undefined>(undefined);
+export const useSheetScope = () => useContext(SheetScope);
+
+/** K13: the sheet body is wide (≥ 560 px, FR-CHARX-112's switch), measured by the sheet view. */
+export const SheetWide = createContext(false);
+
 export function useSheet(): SheetCtx {
   const c = useContext(SheetContext);
   if (!c) throw new Error("useSheet outside a sheet");

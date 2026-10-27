@@ -18,6 +18,7 @@ import {
 import {
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -44,13 +45,14 @@ import { SheetOverridesProvider, usePublicOverrides } from "./rolls";
 import { sheetBadge } from "./routing";
 import { SectionView, SheetSlotView } from "./SheetSections";
 import { sectionCount, sectionsFor } from "./sections";
-import { SheetContext, type SheetCtx, useSheet, useSheetIntents } from "./sheet-context";
+import { SheetContext, type SheetCtx, SheetWide, useSheet, useSheetIntents } from "./sheet-context";
 import { sheetSections } from "./sheet-sections";
 import {
   canEdit,
   canUseCounters,
   compactFullPx,
   crLine,
+  isWideSheet,
   type PinnedPart,
   pinnedPart,
   type SeenFull,
@@ -621,6 +623,28 @@ function usePinnedHeader(initial: PinnedPart) {
   return { bodyRef, headerRef, restRef, part };
 }
 
+/**
+ * K13 (DM #363): whether the sheet body is wide, as its container query (`@min-[560px]/sheet`)
+ * sees it, so Main mounts the wide-only boxes there only (the narrow sheet's DOM unchanged).
+ */
+function useSheetWide(ref: RefObject<HTMLDivElement | null>, initial: boolean): boolean {
+  const [wide, setWide] = useState(initial);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      const padding = Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
+      setWide(isWideSheet(el.clientWidth, padding || 0));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return wide;
+}
+
 export function SheetView({
   creature,
   row,
@@ -630,6 +654,7 @@ export function SheetView({
   picker,
   startEditing,
   initialPinnedPart = "full",
+  initialWide = false,
 }: {
   creature: DefinitionRecord;
   row: CreatureSheetRecord | undefined;
@@ -641,6 +666,8 @@ export function SheetView({
   startEditing: boolean;
   /** FR-CHARX-48 part before the first measurement (static renders); measuring decides. */
   initialPinnedPart?: PinnedPart;
+  /** K13: wide before the first measurement (static renders); measuring decides. */
+  initialWide?: boolean;
 }) {
   const store = useSync((s) => s.store);
   // A store without lazy state (static test stores) has nothing loaded.
@@ -693,6 +720,7 @@ export function SheetView({
   const current = tabs.some(([v]) => v === tab) ? tab : "main";
   const { bodyRef, headerRef, restRef, part } = usePinnedHeader(initialPinnedPart);
   const compact = part === "compact";
+  const wide = useSheetWide(bodyRef, initialWide);
   const chipsHost = useChipsHost();
   // K11: one set of DM public overrides for the header's Public rolls menu and Main's rolls.
   const overrides = usePublicOverrides();
@@ -790,7 +818,9 @@ export function SheetView({
                 </div>
               )}
               <TabsContent value="main">
-                <MainTab />
+                <SheetWide.Provider value={wide}>
+                  <MainTab />
+                </SheetWide.Provider>
               </TabsContent>
               <TabsContent value="actions">
                 <ActionsTab />

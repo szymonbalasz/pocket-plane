@@ -11,6 +11,7 @@ import {
 } from "@shared/character-sheet/sheet";
 import { WALLET_TYPE, type WalletRecord } from "@shared/party-loot/schemas";
 import { useState } from "react";
+import { Tooltip } from "../../components/ui/overlays";
 import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
 import { useOpenPartyTab } from "../party-board/open-tab";
@@ -18,7 +19,7 @@ import { Box } from "./boxes";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
 import { OverspendPopover, OverspentTip } from "./overspend";
 import { AddRow, RowTools, useRows } from "./rows";
-import { notationContext, useSheet, useSheetIntents } from "./sheet-context";
+import { notationContext, useSheet, useSheetIntents, useSheetScope } from "./sheet-context";
 import { pipDelta, usesLeftText, walletLine } from "./view-model";
 
 const clean = (row: Record<string, unknown>) => {
@@ -32,6 +33,7 @@ function FeatureUses({ f }: { f: FeatureRow }) {
   const intents = useSheetIntents();
   const busy = useBusy();
   const [ask, setAsk] = useState(false);
+  const scope = useSheetScope();
   if (!f.usesMax) return null;
   const counters = ctx.creature.kind === "character" && ctx.canCount;
   // FR-CHARX-58: uses left may go below zero (to −9); spending past zero asks first.
@@ -65,6 +67,7 @@ function FeatureUses({ f }: { f: FeatureRow }) {
               type="button"
               data-testid="charx-feature-use"
               data-record-id={f.id}
+              data-scope={scope}
               data-used={f.used}
               data-left={left}
               aria-label={`${f.name}: ${f.used} of ${f.usesMax} used`}
@@ -85,6 +88,7 @@ function FeatureUses({ f }: { f: FeatureRow }) {
         <span
           data-testid="charx-feature-left"
           data-record-id={f.id}
+          data-scope={scope}
           data-value={left}
           className={`text-[10px] tabular-nums ${left < 0 ? "text-hp-down" : "text-muted-foreground"}`}
         >
@@ -96,6 +100,7 @@ function FeatureUses({ f }: { f: FeatureRow }) {
         <button
           type="button"
           data-testid="charx-resource-reset"
+          data-scope={scope}
           data-value={`feature.${f.id}`}
           disabled={!live || busy.busy}
           className="text-[10px] text-muted-foreground underline"
@@ -208,6 +213,44 @@ export function FeaturesTab() {
           row={{ name: "New feature" }}
         />
       )}
+    </Box>
+  );
+}
+
+/**
+ * K13 (DM #363, kit "Limited uses"): on the wide Main, the features with uses as counters: the
+ * name and the pips + count (the Features tab's, `charx-feature` rows with `data-scope="main"`),
+ * the text's first line under them, the whole text in its Tooltip. None with uses → no box.
+ */
+export function LimitedUsesBox() {
+  const ctx = useSheet();
+  const scope = useSheetScope();
+  const list = ctx.sheet.features.filter((f) => f.usesMax);
+  if (list.length === 0) return null;
+  return (
+    <Box box="uses" list label="Limited uses">
+      {list.map((f) => {
+        const line = f.text.split("\n")[0]?.trim() ?? "";
+        return (
+          <div
+            key={f.id}
+            data-testid="charx-feature"
+            data-record-id={f.id}
+            data-scope={scope}
+            className="flex flex-col gap-0.5 border-b py-1.5 last:border-b-0"
+          >
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
+              <span className="min-w-0 truncate text-sm font-medium">{f.name}</span>
+              <FeatureUses f={f} />
+            </div>
+            {line && (
+              <Tooltip content={f.text}>
+                <p className="truncate text-xs text-muted-foreground">{line}</p>
+              </Tooltip>
+            )}
+          </div>
+        );
+      })}
     </Box>
   );
 }

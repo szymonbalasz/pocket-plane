@@ -35,10 +35,11 @@ import { rollRoutes } from "./roll-routes";
 import { ROLL_HINT, rollHint } from "./rolls";
 import type { RollRoute } from "./routing";
 import { DERIVE_HINT, SheetView } from "./SheetView";
-import { SheetContext, type SheetCtx } from "./sheet-context";
+import { SheetContext, type SheetCtx, SheetWide } from "./sheet-context";
 import {
   breakdownText,
   compactFullPx,
+  isWideSheet,
   type PinnedPart,
   pinnedPart,
   type SeenFull,
@@ -91,6 +92,7 @@ type Opts = {
   hp?: number;
   temp?: number;
   stats?: unknown;
+  wide?: boolean;
 };
 
 function creatureOf(o: Opts): DefinitionRecord {
@@ -169,6 +171,7 @@ function sheetHtml(o: Opts = {}) {
               ownerName="Player 1"
               picker={null}
               startEditing={false}
+              initialWide={o.wide}
             />
           </ShellProvider>
         </TooltipProvider>
@@ -534,6 +537,77 @@ describe("FR-CHARX-114 action boxes", () => {
     expect(box(actions, "attacks")).toContain(
       'data-testid="charx-roll-attack-damage" data-record-id="lb"',
     );
+  });
+});
+
+describe("K13 wide Main (DM #363)", () => {
+  const wideMain = (o: Opts = {}) =>
+    render(
+      <SheetWide.Provider value>
+        <MainTab />
+      </SheetWide.Provider>,
+      o,
+    );
+  const scoped = (html: string, id: string) =>
+    html.match(new RegExp(`data-testid="${id}"[^>]*data-scope="main"`, "g"))?.length ?? 0;
+
+  test("FR-CHARX-114 K13 wide Main: Attacks, Spells (slot pips), Limited uses boxes under the passives; narrow unchanged", () => {
+    for (const client of ["player", "dm"] as const) {
+      const narrow = render(<MainTab />, { client });
+      const wide = wideMain({ client });
+      expect(boxes(wide)).toEqual([...boxes(narrow), "attacks", "spells", "uses"]);
+      expect(at(wide, 'data-value="attacks"')).toBeGreaterThan(at(wide, 'data-value="passives"'));
+      // The Actions / Features rows and buttons, each repeated test ID scoped to Main.
+      expect(box(wide, "attacks")).toContain(
+        'data-testid="charx-attack" data-record-id="lb" data-scope="main"',
+      );
+      expect(scoped(wide, "charx-roll-attack-damage")).toBe(1);
+      expect(scoped(wide, "charx-slot")).toBe(6); // 4 level-1 + 2 level-2 pips
+      expect(box(wide, "spells")).toContain('data-testid="charx-spellcasting"');
+      expect(box(wide, "spells")).toContain('data-testid="charx-spell" data-record-id="hm"');
+      const uses = box(wide, "uses");
+      expect(text(uses)).toStartWith("Limited usesFavored Enemy");
+      expect(scoped(uses, "charx-feature-use")).toBe(3);
+      expect(uses).toContain('data-testid="charx-feature-left" data-record-id="fe"');
+      for (const key of ["attacks", "spells", "uses"]) {
+        expect(box(wide, key)).toContain(`data-value="${key}" data-scope="main"`);
+      }
+      // Narrow: no action box, no scope (FR-CHARX-44 holds there).
+      expect(narrow).not.toContain("data-scope");
+      expect(narrow).not.toContain('data-testid="charx-attack"');
+    }
+  });
+
+  test("FR-CHARX-114 K13 wide Main: the DM's Attack / Damage switches in its Attacks box (scoped); players none", () => {
+    expect(scoped(wideMain({ client: "dm" }), "charx-public-attack")).toBe(1);
+    expect(scoped(wideMain({ client: "dm" }), "charx-public-damage")).toBe(1);
+    expect(wideMain({ client: "player" })).not.toContain("charx-public-attack");
+  });
+
+  test("FR-CHARX-114 K13 wide Main: rows stay in view mode while editing (rows are edited on Actions / Features)", () => {
+    const html = elementAt(wideMain({ editing: true }), 'data-testid="charx-main-actions"');
+    for (const id of [
+      "charx-row-add",
+      "charx-row-delete",
+      "charx-attack-extra-add",
+      "charx-field",
+    ]) {
+      expect(html).not.toContain(`data-testid="${id}"`);
+    }
+    expect(html).toContain('data-testid="charx-roll-attack"');
+  });
+
+  test("FR-CHARX-114 K13 Actions and Features tabs unchanged: no scope", () => {
+    expect(render(<ActionsTab />, { client: "dm" })).not.toContain("data-scope");
+    expect(render(<FeaturesTab />)).not.toContain("data-scope");
+  });
+
+  test("FR-CHARX-112 K13 the sheet view mounts the wide boxes only when wide (container width less padding ≥ 560)", () => {
+    expect(isWideSheet(568, 8)).toBe(true);
+    expect(isWideSheet(567, 8)).toBe(false);
+    expect(isWideSheet(0, 0)).toBe(false);
+    expect(sheetHtml({ wide: true })).toContain('data-testid="charx-main-actions"');
+    expect(sheetHtml()).not.toContain('data-testid="charx-main-actions"');
   });
 });
 

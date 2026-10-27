@@ -6,8 +6,9 @@
 // (FR-CHARX-108); ability blocks (the modifier is the Check button, the Save inside, FR-CHARX-109);
 // the Skills box and the passive boxes (FR-CHARX-110/111); main sections. Two columns once the
 // sheet is ≥ 560 px wide (FR-CHARX-112); every derived number has its breakdown Tooltip
-// (FR-CHARX-113). No attack row (FR-CHARX-44). The DM's public switches sit in the header's
-// Public rolls menu (K11, `./PublicMenu`). Edit mode: identity, scores, proficiencies, stats and
+// (FR-CHARX-113). No attack row while narrow (FR-CHARX-44); once wide, the kit's Attacks, Spells
+// and Limited uses boxes under the passives (K13, DM #363). The DM's public switches sit in the
+// header's Public rolls menu (K11, `./PublicMenu`). Edit mode: identity, scores, proficiencies, stats and
 // overrides in place (FR-CHARX-27, -116).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
@@ -28,12 +29,13 @@ import {
   saveBonus,
 } from "@shared/entities/schemas";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/controls";
 import { Badge, Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
+import { WideActionBoxes } from "./ActionsTab";
 import { BOX_LABEL, BOX_UNIT, BOX_VALUE, Box, D20Glyph, ShieldOutline, WideLabel } from "./boxes";
 import { BreakdownTip } from "./breakdown";
 import { RoutedRoll, SheetRoll } from "./CharacterSheet";
@@ -52,7 +54,7 @@ import { rollActionView, routeFor } from "./routing";
 import { SensesLine } from "./Senses";
 import { SheetSlotView } from "./SheetSections";
 import { sectionsFor } from "./sections";
-import { useSheet, useSheetIntents } from "./sheet-context";
+import { SheetWide, useSheet, useSheetIntents } from "./sheet-context";
 import { sheetSections } from "./sheet-sections";
 import {
   hitDicePips,
@@ -1020,6 +1022,7 @@ function Columns({ children }: { children: ReactNode }) {
 
 export function MainTab() {
   const ctx = useSheet();
+  const wide = useContext(SheetWide);
   const kind = ctx.creature.kind;
   return (
     <div className="flex flex-col gap-2.5">
@@ -1030,7 +1033,14 @@ export function MainTab() {
       <SensesLine />
       <Columns>
         <AbilitiesBlock />
-        <SkillsBlock />
+        {wide ? (
+          <div className="flex min-w-0 flex-col gap-2.5">
+            <SkillsBlock />
+            <WideActionBoxes />
+          </div>
+        ) : (
+          <SkillsBlock />
+        )}
       </Columns>
       {!ctx.readOnly && (
         <SheetSlotView slot="main" creatureId={ctx.creature.id} client={ctx.client} kind={kind} />
