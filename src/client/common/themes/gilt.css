@@ -1773,3 +1773,77 @@
 :root[data-theme="gilt"] [data-slot="log-row"] [data-slot="kit-result"][data-outcome="damage"] {
   border-color: var(--gs-danger-rule);
 }
+
+/* KIT: sheet (kit-parity K11, DM #361: the character sheet as the kit's "Character sheet" section;
+   the layout itself is markup for every theme, this block only paints) ──────────────────────── */
+/* Portrait: a deep fill of the owner's colour (the kit's `.portrait`), a cream serif initial and
+   the gold rule; without a player colour, the kit's humanoid blue. */
+:root[data-theme="gilt"] [data-testid="char-sheet-portrait"] {
+  border-color: var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-slot="sheet-portrait-initial"] {
+  background-image: radial-gradient(
+    circle at 40% 35%,
+    color-mix(in oklab, var(--portrait, #355f9e) 72%, #000),
+    color-mix(in oklab, var(--portrait, #355f9e) 48%, #000) 60%,
+    color-mix(in oklab, var(--portrait, #355f9e) 26%, #000)
+  );
+  --portrait-ink: var(--gs-label-glow);
+  font-family: var(--font-num);
+  text-shadow: 0 1px 2px #000;
+}
+:root[data-theme="gilt"] [data-slot="sheet-portrait-initial"][data-colour="none"] {
+  background-image: radial-gradient(circle at 40% 35%, #3f6db0, #355f9e 60%, #1d3459);
+}
+/* Chips line: the badges and the effect chips as the kit's `.chip` (dark pill, gold-deep rule,
+   cream text, gold icon). */
+:root[data-theme="gilt"]
+:is(
+  [data-slot="sheet-chip"],
+  [data-testid="charx-header-chips"] [data-testid="cbtx-sheet-effect"]
+) {
+  border-color: var(--frame-rule);
+  background-color: var(--gs-chip);
+}
+@layer base {
+  :root[data-theme="gilt"]
+    [data-testid="charx-header-chips"]
+    [data-testid="cbtx-sheet-effect"]
+    svg {
+    color: var(--gold);
+  }
+}
+/* Hit Points: the Temp column's rule; the Skills label's rule (the kit's `#2b261c`, `#262219`). */
+:root[data-theme="gilt"] [data-testid="charx-hp-temp"] {
+  border-color: #2b261c;
+}
+:root[data-theme="gilt"] [data-slot="sheet-box-rule"] {
+  border-color: var(--gs-rule-soft);
+}
+/* Proficiency dots (the kit's `.prof`): a muted ring; on, a gold bead; expertise ringed. */
+:root[data-theme="gilt"] span[data-slot="sheet-pip"] {
+  border-color: #8a7a5c;
+}
+:root[data-theme="gilt"] span[data-slot="sheet-pip"][data-on="true"] {
+  border-color: var(--frame-rule-strong);
+  background-image: radial-gradient(
+    circle at 35% 30%,
+    #fff1c6,
+    var(--gold) 45%,
+    var(--frame-rule-strong)
+  );
+}
+/* Hit dice counts and the sheet's large values in the number face. */
+:root[data-theme="gilt"] [data-testid="charx-hitdie"] {
+  font-family: var(--font-num);
+}
+/* The sheet's tabs (the kit's `.tab`): gold-brown at rest, the active one in a gold-deep box. */
+:root[data-theme="gilt"] [data-slot="sheet-tabs"] [data-slot="tabs-trigger"] {
+  color: var(--gs-tab);
+}
+:root[data-theme="gilt"] [data-slot="sheet-tabs"] [data-slot="tabs-trigger"]:hover {
+  color: var(--gold);
+}
+:root[data-theme="gilt"] [data-slot="sheet-tabs"] [data-slot="tabs-trigger"][data-state="active"] {
+  color: var(--gs-label-on);
+}
