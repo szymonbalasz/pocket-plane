@@ -21,6 +21,7 @@ import { dmTurnCardFor, turnAlertFor } from "../combat-tracker/turn-alert";
 import { createWindowRegistry, type ShellClient } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { AlertToast, TURN_ALERT_TOAST_ID } from "./alert-toasts";
+import { HistoryBody } from "./HistoryWindow";
 import { leadName, NOTIFICATION_TYPE, relativeTime } from "./logic";
 import type { NoteClient } from "./note-client";
 import { ToastRuntime } from "./ToastRuntime";
@@ -363,5 +364,91 @@ describe("FR-KIT-01 / -04 / -07 (notices)", () => {
     const other = stackHtml("player", withNotes(stranger), undefined, [stranger]);
     expect(other).toContain("note-toast-icon");
     expect(other).not.toContain("kit-medallion");
+  });
+});
+
+/** The Notifications window body for `client` over `rows` (static render). */
+function historyHtml(client: ShellClient, rows: readonly NotificationRecord[]) {
+  const store = storeFor(client, {}, rows);
+  const sync = createStore<SyncState>()(
+    () =>
+      ({
+        state: "live",
+        store,
+        everLive: true,
+        connection: { onEvent: () => () => {}, sendIntent: () => Promise.resolve({}) },
+      }) as unknown as SyncState,
+  );
+  const note = { setHistoryOpen: () => {}, markSeen: () => {} } as unknown as NoteClient;
+  const g = globalThis as { document?: unknown; getComputedStyle?: unknown };
+  g.document = { title: "", hidden: false, documentElement: {} };
+  g.getComputedStyle = () => ({ getPropertyValue: () => "" });
+  try {
+    return renderToStaticMarkup(
+      <SyncContext.Provider value={sync}>
+        <ShellProvider registry={createWindowRegistry(client, [])}>
+          <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+            <HistoryBody views={views} note={note} />
+          </TooltipProvider>
+        </ShellProvider>
+      </SyncContext.Provider>,
+    );
+  } finally {
+    delete g.document;
+    delete g.getComputedStyle;
+  }
+}
+/** A Notifications row's markup (up to the next row). */
+const rowOf = (html: string, id: string) => {
+  const at = html.indexOf(`data-record-id="${id}"`, html.indexOf('data-testid="note-history-row"'));
+  const start = html.lastIndexOf("<li", at);
+  const next = html.indexOf('data-testid="note-history-row"', at);
+  return html.slice(start, next < 0 ? undefined : html.lastIndexOf("<li", next));
+};
+
+describe("FR-KIT-55 Notifications window cards (K9, K6 §5)", () => {
+  const closed: NotificationRecord = { ...system, id: "n3", state: "resolved" };
+  test("FR-KIT-55 card row (K9): pending and history rows are kit toast cards: the causer's medallion or the kind's icon, the text (causer bold), the meta line; IDs kept", () => {
+    const html = historyHtml("dm", [request, closed]);
+    const pending = rowOf(html, "n1");
+    expect(pending).toMatch(
+      /^<li data-testid="note-history-row" data-record-id="n1" data-state="pending" data-slot="toast-card"/,
+    );
+    const order = [
+      'data-testid="note-stripe"',
+      'data-testid="kit-medallion"',
+      'data-testid="note-text"',
+      'data-testid="note-history-audience"',
+      'data-testid="note-history-action"',
+      'data-testid="note-history-dismiss"',
+    ].map((id) => pending.indexOf(id));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(pending).toContain('<b class="font-medium">Player 1</b>');
+    expect(pending).toContain('data-slot="toast-text"');
+    // Pending keeps its accent border (Simple Dark); a theme paints the card frame.
+    expect(pending).toContain("border-primary");
+    const done = rowOf(html, "n3");
+    expect(done).toContain('data-slot="toast-card"');
+    expect(done).toContain('data-testid="note-toast-icon"');
+    expect(done).not.toContain("kit-medallion");
+  });
+
+  test("FR-KIT-07 slots present (K9): the Pending / History headings carry note-heading (label type under a theme), styled by gilt.css's K9 block", () => {
+    const mine = {
+      ...request,
+      audience: "player" as const,
+      audiencePlayerId: "p1",
+      actionRole: "player" as const,
+      actionPlayerId: "p1",
+    };
+    const html = historyHtml("player", [mine, { ...closed, audience: "all" as const }]);
+    expect(html.split('data-slot="note-heading"').length - 1).toBe(2);
+    expect(html).toMatch(/data-slot="note-heading"[^>]*>Pending</);
+    expect(html).toMatch(/data-slot="note-heading"[^>]*>History</);
+    const css = readFileSync(join(import.meta.dir, "../../themes/gilt.css"), "utf8");
+    const block = css.slice(css.indexOf("/* KIT: polish (kit-parity K9"));
+    expect(block).toContain('[data-slot="note-heading"]');
+    expect(block).toContain('[data-testid="note-history-row"]');
   });
 });

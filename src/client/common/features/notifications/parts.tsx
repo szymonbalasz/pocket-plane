@@ -19,21 +19,6 @@ import type {
   NotificationViews,
 } from "./views";
 
-/** Icon + text (rendered as text, never HTML: FR-NOTE-21) or the kind's renderer (FR-NOTE-19). */
-export function NoteBody({ n, views }: { n: NotificationRecord; views: NotificationViews }) {
-  const view = views.get(n.kind);
-  const Icon = view?.icon ?? BellIcon;
-  const Render = view?.render;
-  return (
-    <div className="flex min-w-0 items-start gap-2">
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 break-words text-sm" data-testid="note-text">
-        {Render ? <Render notification={n} /> : n.text}
-      </div>
-    </div>
-  );
-}
-
 /**
  * FR-KIT-55: the toast card's row (`data-slot="toast-card"`): lead · text block · actions · close,
  * centred on one line; Simple Dark's popover surface, a theme frames the slot.
@@ -104,23 +89,44 @@ export function ToastText({
   views: NotificationViews;
   name: string | null;
 }) {
+  return (
+    <div data-slot="toast-text" className="min-w-0 flex-[1_1_9rem] break-words text-sm">
+      <NoteLine n={n} views={views} name={name} />
+      <NoteTime iso={n.createdAt} />
+    </div>
+  );
+}
+
+/**
+ * FR-KIT-56 line 1 (`note-text`), also a Notifications row's (K9): the kind's renderer as it is,
+ * else the text (rendered as text, never HTML: FR-NOTE-21) with the causing player's name in bold
+ * when it starts it.
+ */
+export function NoteLine({
+  n,
+  views,
+  name,
+  className,
+}: {
+  n: NotificationRecord;
+  views: NotificationViews;
+  name: string | null;
+  className?: string;
+}) {
   const Render = views.get(n.kind)?.render;
   const { lead, rest } = leadName(n.text, name);
   return (
-    <div data-slot="toast-text" className="min-w-0 flex-[1_1_9rem] break-words text-sm">
-      <div data-testid="note-text">
-        {Render ? (
-          <Render notification={n} />
-        ) : lead ? (
-          <>
-            <b className="font-medium">{lead}</b>
-            {rest}
-          </>
-        ) : (
-          n.text
-        )}
-      </div>
-      <NoteTime iso={n.createdAt} />
+    <div data-testid="note-text" className={className}>
+      {Render ? (
+        <Render notification={n} />
+      ) : lead ? (
+        <>
+          <b className="font-medium">{lead}</b>
+          {rest}
+        </>
+      ) : (
+        n.text
+      )}
     </div>
   );
 }
