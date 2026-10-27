@@ -111,9 +111,7 @@ test("FR-CBTX-46 FR-CBT-78 FR-NOTE-27 FR-CBT-79 FR-NOTE-30 chips fit; temp HP pr
   // G5 (FR-CBT-78): Goblin → Thorn (temp 5), damage 3: "Thorn 10 (+5) → 10 (+2)"; Dismiss-free:
   // close with Later.
   const g5 = await attack(dm, init, goblin, thorn, 3);
-  await expect(g5.trow.getByTestId("cbt-popup-target-preview")).toHaveText(
-    "Thorn 10 (+5) → 10 (+2)",
-  );
+  await expect(g5.trow.getByTestId("cbt-popup-target-preview")).toHaveText("10 (+5) → 10 (+2)");
   await g5.popup.getByTestId("cbt-popup-later").click();
   await expect(g5.popup).toHaveCount(0);
   // The Damage / heal dialog header reads the temp HP too.

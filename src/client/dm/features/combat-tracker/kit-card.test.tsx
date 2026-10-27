@@ -15,7 +15,7 @@ import { SyncContext, type SyncState } from "@ui/sync/store";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
-import { PopupBody, toHitOutcome } from "./attack-popup";
+import { applyLabel, PopupBody, toHitOutcome } from "./attack-popup";
 import { emptyDraft, useCombatDialogs } from "./popup-store";
 
 const GOBLIN = {
@@ -94,10 +94,10 @@ describe("FR-KIT-63 result lines", () => {
   test("FR-KIT-63 result lines: 'To hit' and 'Damage, <type>' lines end in Result-box inputs (to-hit outcome by natural, damage → damage); dice stay small in the label", () => {
     const html = render(DM_CARD);
     expect(html).toMatch(
-      /<div data-slot="card-line"[^>]*><label[^>]*for="cbt-popup-tohit">To hit <span class="font-mono text-xs[\s\S]*?<\/label><input data-slot="kit-result"[^>]*data-testid="cbt-popup-tohit" data-outcome="plain"/,
+      /<div data-slot="card-line"[^>]*><label data-slot="card-label"[^>]*for="cbt-popup-tohit"><span><strong[^>]*>Brakka<\/strong> · Flame Tongue greatsword attack<\/span> <span class="font-mono text-xs[\s\S]*?<\/label><input data-slot="kit-result"[^>]*data-testid="cbt-popup-tohit" data-outcome="plain"/,
     );
     expect(html).toMatch(
-      /<div data-slot="card-line"[^>]*><label[^>]*for="cbt-popup-damage">Damage, slashing <span class="font-mono[\s\S]*?<\/label><div[^>]*><input data-slot="kit-result"[^>]*data-testid="cbt-popup-damage" data-outcome="damage"/,
+      /<div data-slot="card-line"[^>]*><label data-slot="card-label"[^>]*for="cbt-popup-damage">Damage, slashing <span class="font-mono[\s\S]*?<\/label><div[^>]*><input data-slot="kit-result"[^>]*data-testid="cbt-popup-damage" data-outcome="damage"/,
     );
     // The extra part's line ends in its own box.
     expect(html).toMatch(
@@ -140,8 +140,8 @@ describe("FR-KIT-64 target rows", () => {
     ].map((id) => at(first, id));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    // The whole first line is one flex-wrap row (one line at 440, wraps only when narrower).
-    expect(first).toMatch(/^[\s\S]*?<div class="flex flex-wrap items-center/);
+    // K8: the whole first line is one row that never wraps (a long name truncates in its chip).
+    expect(first).toMatch(/^[\s\S]*?<div class="flex items-center gap-1.5 text-sm">/);
     // Remove: a hover / focus group (always shown without hover, FR-KIT-03).
     expect(first).toMatch(
       /class="[^"]*opacity-0[^"]*group-hover\/target:opacity-100[^"]*group-focus-within\/target:opacity-100[^"]*\[@media\(hover:none\)\]:opacity-100[^"]*" data-testid="cbt-popup-target-remove"/,
@@ -164,6 +164,63 @@ describe("FR-KIT-65 footer", () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(foot).toMatch(/data-variant="ghost"[^>]*data-testid="cbt-popup-dismiss"/);
     expect(foot).toMatch(/data-variant="default"[^>]*data-testid="cbt-popup-apply"/);
+  });
+});
+
+describe("K8 damage card polish (K6 gap 7)", () => {
+  const row = (html: string) =>
+    html.slice(
+      at(html, 'data-testid="cbt-popup-target-row" data-record-id="cb-gob"'),
+      at(html, 'data-testid="cbt-popup-target-part"'),
+    );
+
+  test("FR-KIT-63 result lines (K8): no summary line under the bar; labels in body type ('Brakka · Flame Tongue greatsword attack', `card-label`, not `label`); the mode as 'adv' after the dice", () => {
+    const html = render(DM_CARD);
+    expect(html).not.toContain(DM_CARD.text);
+    const labels = [...html.matchAll(/<label[^>]*for="cbt-popup-[^"]*"[^>]*>/g)].map((m) => m[0]);
+    expect(labels).toHaveLength(3); // to hit, damage, the fire part
+    for (const l of labels) {
+      expect(l).toContain('data-slot="card-label"');
+      expect(l).toContain("font-normal");
+    }
+    expect(html).not.toContain('data-testid="cbt-popup-mode"');
+    const adv = render(cardNote(flameCard({ mode: "advantage" }), { audience: "dm" }));
+    expect(adv).toMatch(/data-testid="cbt-popup-mode" data-value="advantage"[^>]*> adv</);
+  });
+
+  test("FR-KIT-63 result lines (K8): the damage box has a neutral border and a red number; the to-hit box neutral", () => {
+    const html = render(DM_CARD);
+    const tag = (id: string) => new RegExp(`<input[^>]*data-testid="${id}"[^>]*>`).exec(html)?.[0];
+    expect(tag("cbt-popup-damage")).toContain("text-destructive");
+    // (The field's own `aria-invalid:border-destructive` is a state, not the box's border.)
+    expect(tag("cbt-popup-damage")).not.toMatch(/\sborder-destructive/);
+    expect(tag("cbt-popup-damage-part")).not.toMatch(/\sborder-destructive/);
+    expect(tag("cbt-popup-tohit")).not.toMatch(/\sborder-(destructive|hp-)/);
+  });
+
+  test("FR-KIT-64 target rows (K8): one line 'Goblin · AC n' + Hit + multiplier + the preview without the name; Remove's slot takes no room until hover / focus", () => {
+    const first = row(render(DM_CARD));
+    expect(first).toContain('data-testid="mod-popup-ac"');
+    expect(first).not.toContain("vs AC");
+    expect(first).toMatch(/data-testid="mod-popup-ac"[^>]*>AC /);
+    expect(first).toMatch(/data-testid="cbt-popup-target-preview"[^>]*>7 → \d+</);
+    expect(first).toMatch(/^[^>]*><div class="flex items-center gap-1.5 text-sm">/);
+    expect(first).toMatch(
+      /<span class="flex w-0 shrink-0 overflow-hidden group-hover\/target:w-6 group-focus-within\/target:w-6 \[@media\(hover:none\)\]:w-6"><button[^>]*data-testid="cbt-popup-target-remove"/,
+    );
+  });
+
+  test("FR-KIT-65 footer (K8): Apply shows the card's damage ('Apply 23' = 15 + 8 fire) while a row is a Hit", () => {
+    expect(applyLabel(15, [8], [true])).toBe("Apply 23");
+    expect(applyLabel(15, [], [false, true])).toBe("Apply 15");
+    expect(applyLabel(15, [8], [false])).toBe("Apply");
+    expect(applyLabel(null, [], [true])).toBe("Apply");
+    expect(applyLabel(9, [], [])).toBe("Apply");
+    const html = render(DM_CARD);
+    const hit = /data-testid="cbt-popup-target-hit"[^>]*data-value="(hit|miss)"/.exec(html)?.[1];
+    expect(html).toMatch(
+      new RegExp(`data-testid="cbt-popup-apply"[^>]*>${hit === "hit" ? "Apply 23" : "Apply"}<`),
+    );
   });
 });
 
