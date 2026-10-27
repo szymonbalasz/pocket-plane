@@ -2,6 +2,8 @@
 // over a fake sync store (no DOM in bun test), the click / reset / storage rules through the
 // real shell and alert controllers on in-memory storage.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { layoutKey } from "@shared/play-shell/layout";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -306,6 +308,32 @@ describe("kit-parity top bar", () => {
       const nav = tagOf(html, "ui-launcher");
       expect(nav).not.toMatch(/\b(absolute|bottom-3|shadow-lg|bg-background\/85)\b/);
     }
+  });
+
+  test("FR-KIT-13 K13 identity chip: the kit's framed stone chip (outline, 30 px, 14-px body text), the dot, the name and the gear inside", () => {
+    const dm = render("dm", <IdentityChip client="dm" />);
+    const chip = tagOf(dm, "ui-prefs-open");
+    expect(chip).toContain('data-variant="outline"');
+    expect(chip).toContain("h-[30px] gap-[7px] px-2.5 text-sm font-normal");
+    const inner = dm.slice(dm.indexOf('data-testid="ui-prefs-open"'));
+    const order = ["ui-prefs-chip-dot", ">DM<", "lucide-settings"].map((x) => inner.indexOf(x));
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  test("FR-KIT-13 K13 status: plain muted 13-px text as the kit's `.live` (no pill frame); the red-gem unread badge slot", () => {
+    const status = tagOf(bar("dm"), "ui-topbar-status");
+    expect(status).toContain("text-[13px]");
+    expect(status).toContain("text-muted-foreground");
+    for (const pill of ["rounded-full", "border", "px-2.5", "h-6"])
+      expect(status).not.toContain(pill);
+    // The badge keeps its count and test ID; a theme draws it from its slot (Gilt & Stone: a gem).
+    const src = readFileSync(join(import.meta.dir, "Launcher.tsx"), "utf8");
+    expect(src).toMatch(/-launcher-badge`\}\s+data-count=\{badge\}\s+data-slot="launcher-badge"/);
+    const gilt = readFileSync(join(import.meta.dir, "../../themes/gilt.css"), "utf8");
+    const block = gilt.slice(gilt.indexOf("/* KIT: round 3"));
+    expect(block).toContain('[data-slot="launcher-badge"]::before');
+    expect(block).toMatch(/rotate: 45deg;[\s\S]*var\(--gem\)/);
   });
 });
 

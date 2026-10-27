@@ -214,6 +214,7 @@ export function Launcher({
                 <span
                   data-testid={`${d.kind.split(".")[0]}-launcher-badge`}
                   data-count={badge}
+                  data-slot="launcher-badge"
                   className="absolute -top-1 -right-1 min-w-4 rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground"
                 >
                   {badge}

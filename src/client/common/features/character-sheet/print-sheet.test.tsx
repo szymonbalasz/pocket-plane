@@ -34,11 +34,13 @@ import { PublicRolls, PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
 import { ROLL_HINT, rollHint } from "./rolls";
 import type { RollRoute } from "./routing";
-import { DERIVE_HINT, SheetView } from "./SheetView";
-import { SheetContext, type SheetCtx } from "./sheet-context";
+import { DERIVE_HINT, fadeOf, SheetView } from "./SheetView";
+import { SheetContext, type SheetCtx, SheetWide } from "./sheet-context";
 import {
   breakdownText,
   compactFullPx,
+  isWideSheet,
+  levelOrdinal,
   type PinnedPart,
   pinnedPart,
   type SeenFull,
@@ -91,6 +93,7 @@ type Opts = {
   hp?: number;
   temp?: number;
   stats?: unknown;
+  wide?: boolean;
 };
 
 function creatureOf(o: Opts): DefinitionRecord {
@@ -169,6 +172,7 @@ function sheetHtml(o: Opts = {}) {
               ownerName="Player 1"
               picker={null}
               startEditing={false}
+              initialWide={o.wide}
             />
           </ShellProvider>
         </TooltipProvider>
@@ -537,6 +541,139 @@ describe("FR-CHARX-114 action boxes", () => {
   });
 });
 
+describe("K13 wide Main (DM #363)", () => {
+  const wideMain = (o: Opts = {}) =>
+    render(
+      <SheetWide.Provider value>
+        <MainTab />
+      </SheetWide.Provider>,
+      o,
+    );
+  const scoped = (html: string, id: string) =>
+    html.match(new RegExp(`data-testid="${id}"[^>]*data-scope="main"`, "g"))?.length ?? 0;
+
+  test("FR-CHARX-114 K13 wide Main: Attacks, Spells (slot pips), Limited uses boxes under the passives; narrow unchanged", () => {
+    for (const client of ["player", "dm"] as const) {
+      const narrow = render(<MainTab />, { client });
+      const wide = wideMain({ client });
+      expect(boxes(wide)).toEqual([...boxes(narrow), "attacks", "spells", "uses"]);
+      expect(at(wide, 'data-value="attacks"')).toBeGreaterThan(at(wide, 'data-value="passives"'));
+      // The Actions / Features rows and buttons, each repeated test ID scoped to Main.
+      expect(box(wide, "attacks")).toContain(
+        'data-testid="charx-attack" data-record-id="lb" data-scope="main"',
+      );
+      expect(scoped(wide, "charx-roll-attack-damage")).toBe(1);
+      expect(scoped(wide, "charx-slot")).toBe(6); // 4 level-1 + 2 level-2 pips
+      expect(box(wide, "spells")).toContain('data-testid="charx-spellcasting"');
+      expect(box(wide, "spells")).toContain('data-testid="charx-spell" data-record-id="hm"');
+      const uses = box(wide, "uses");
+      expect(text(uses)).toStartWith("Limited usesFavored Enemy");
+      expect(scoped(uses, "charx-feature-use")).toBe(3);
+      expect(uses).toContain('data-testid="charx-feature-left" data-record-id="fe"');
+      for (const key of ["attacks", "spells", "uses"]) {
+        expect(box(wide, key)).toContain(`data-value="${key}" data-scope="main"`);
+      }
+      // Narrow: no action box, no scope (FR-CHARX-44 holds there).
+      expect(narrow).not.toContain("data-scope");
+      expect(narrow).not.toContain('data-testid="charx-attack"');
+    }
+  });
+
+  test("FR-CHARX-114 K13 wide Main: the boxes span both columns, after the abilities + Skills grid (kit wide sheet)", () => {
+    const wide = wideMain();
+    const columns = elementAt(wide, `class="${COLUMNS}"`);
+    expect(columns).toContain('data-value="passives"');
+    expect(columns).not.toContain("charx-main-actions");
+    expect(at(wide, 'data-testid="charx-main-actions"')).toBeGreaterThan(
+      at(wide, `class="${COLUMNS}"`) + columns.length - 1,
+    );
+  });
+
+  test("FR-CHARX-114 K13 wide Main kit rows: name bold with its chip right, numbers under it, small stone buttons left; slots as diamonds with 'used / max'", () => {
+    const wide = wideMain({ client: "dm" });
+    const row = elementAt(wide, 'data-testid="charx-attack" data-record-id="lb" data-scope="main"');
+    expect(row).toContain("py-[7px] last:border-b-0");
+    expect(row).toContain('<span class="min-w-0 truncate text-[15px] font-bold">Longbow</span>');
+    expect(row).toContain('class="mt-[5px] flex flex-wrap gap-[5px]"');
+    expect(row).not.toContain("justify-end");
+    const btn = /<button[^>]*data-testid="charx-roll-attack"[^>]*>/.exec(row)?.[0] ?? "";
+    expect(btn).toContain('data-variant="outline"');
+    expect(btn).toContain("h-6 px-[9px] text-[13px]");
+    expect(at(row, "charx-attack-numbers")).toBeLessThan(at(row, "charx-roll-attack"));
+    const spells = box(wide, "spells");
+    expect(text(spells)).toContain("1st0 / 4");
+    expect(text(spells)).toContain("2nd0 / 2");
+    const pip = /<button[^>]*data-testid="charx-slot"[^>]*>/.exec(spells)?.[0] ?? "";
+    expect(pip).toContain("[transform:rotate(45deg)]");
+    expect(pip).toContain('data-scope="main"');
+    expect([1, 2, 3, 4, 9].map(levelOrdinal)).toEqual(["1st", "2nd", "3rd", "4th", "9th"]);
+    // The Actions tab keeps its rows: buttons right, round pips, "Level 1".
+    const actions = render(<ActionsTab />, { client: "dm" });
+    expect(actions).toContain('class="flex justify-end gap-1.5"');
+    expect(text(box(actions, "spells"))).toContain("Level 1");
+  });
+
+  test("FR-CHARX-114 K13 wide Main: the DM's Attack / Damage switches in its Attacks box (scoped); players none", () => {
+    expect(scoped(wideMain({ client: "dm" }), "charx-public-attack")).toBe(1);
+    expect(scoped(wideMain({ client: "dm" }), "charx-public-damage")).toBe(1);
+    expect(wideMain({ client: "player" })).not.toContain("charx-public-attack");
+  });
+
+  test("FR-CHARX-114 K13 wide Main: rows stay in view mode while editing (rows are edited on Actions / Features)", () => {
+    const html = elementAt(wideMain({ editing: true }), 'data-testid="charx-main-actions"');
+    for (const id of [
+      "charx-row-add",
+      "charx-row-delete",
+      "charx-attack-extra-add",
+      "charx-field",
+    ]) {
+      expect(html).not.toContain(`data-testid="${id}"`);
+    }
+    expect(html).toContain('data-testid="charx-roll-attack"');
+  });
+
+  test("FR-CHARX-114 K13 Actions and Features tabs unchanged: no scope", () => {
+    expect(render(<ActionsTab />, { client: "dm" })).not.toContain("data-scope");
+    expect(render(<FeaturesTab />)).not.toContain("data-scope");
+  });
+
+  test("FR-CHARX-112 K13 the sheet view mounts the wide boxes only when wide (container width less padding ≥ 560)", () => {
+    expect(isWideSheet(568, 8)).toBe(true);
+    expect(isWideSheet(567, 8)).toBe(false);
+    expect(isWideSheet(0, 0)).toBe(false);
+    expect(sheetHtml({ wide: true })).toContain('data-testid="charx-main-actions"');
+    expect(sheetHtml()).not.toContain('data-testid="charx-main-actions"');
+  });
+});
+
+describe("K13 narrow sheet (round-2 gap 9)", () => {
+  test("FR-CHARX-115 K13 tab strip: an end with hidden tabs fades (a 28-px mask) instead of cutting a word; none without overflow", () => {
+    expect(fadeOf({ prev: false, next: false })).toBeUndefined();
+    expect(fadeOf({ prev: false, next: true })).toBe("end");
+    expect(fadeOf({ prev: true, next: true })).toBe("both");
+    expect(fadeOf({ prev: true, next: false })).toBe("start");
+    const strip = elementAt(sheetHtml(), 'data-slot="sheet-tabs"');
+    expect(strip).toContain(
+      "data-[fade=end]:[mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)]",
+    );
+    expect(strip).toContain("data-[fade=start]:[mask-image:");
+    expect(strip).toContain("data-[fade=both]:[mask-image:");
+    // Not measured in a static render: no fade yet.
+    expect(strip).not.toContain("data-fade=");
+  });
+
+  test("FR-KIT-85 K13 level line: one unit beside the actions (floated top-right in the name column) when it fits there, else under them at full width", () => {
+    const html = sheetHtml();
+    const at2 = (id: string) => html.indexOf(`data-testid="${id}"`);
+    expect(html).toMatch(/data-testid="charx-header-actions" class="float-right ml-3 shrink-0"/);
+    expect(at2("charx-header-actions")).toBeLessThan(at2("char-sheet-name"));
+    expect(html).toMatch(
+      /data-testid="char-sheet-level" class="mt-1 inline-block max-w-full align-top text-sm/,
+    );
+    expect(text(elementAt(html, 'data-testid="charx-header-actions"'))).toBe("Edit");
+  });
+});
+
 describe("FR-CHARX-115 tab strip", () => {
   test("FR-CHARX-115 tab strip: arrows at an end with hidden tabs; the wheel scrolls sideways", () => {
     expect(tabArrows(0, 300, 300)).toEqual({ prev: false, next: false });
@@ -555,7 +692,7 @@ describe("FR-CHARX-115 tab strip", () => {
     const html = sheetHtml();
     const strip = elementAt(html, 'data-slot="sheet-tabs"');
     expect(strip).toContain(
-      'class="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]"',
+      'class="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin] ',
     );
     expect(strip).toContain('role="tablist"');
     // Not measured in a static render: no arrows yet.
@@ -849,11 +986,10 @@ describe("K11 walkthrough fixes", () => {
 
   test("FR-KIT-85 level line wraps between parts, never right after a '·' (each later part keeps its '·')", () => {
     const html = stateHtml({ client: "dm", npc: true });
-    const line = `<span ${html.slice(
-      html.indexOf('data-testid="char-sheet-level"'),
-      html.indexOf('data-testid="charx-header-actions"'),
-    )}`;
-    expect(text(line).replace(/<div $/, "")).toBe("CR 1 · 200 XP");
+    const from = html.indexOf('data-testid="char-sheet-level"');
+    // The level line closes the name column (K13: the actions float before the name).
+    const line = `<span ${html.slice(from, html.indexOf("</span></div>", from))}`;
+    expect(text(line)).toBe("CR 1 · 200 XP");
     expect(line).toContain('<span class="whitespace-nowrap">· 200 XP</span>');
     // Every "·" opens an unbreakable part.
     expect(line.match(/·/g)?.length).toBe(line.match(/whitespace-nowrap">·/g)?.length);
@@ -893,6 +1029,20 @@ describe("K11 walkthrough fixes", () => {
       "[&amp;_[data-chip-row]]:contents",
     ])
       expect(cls).toContain(c);
+  });
+
+  test("FR-KIT-85 K13 chips line: the effects menu last, beside the last chip; it takes no room of its own (never alone on a row), the line keeps 26 px for it", () => {
+    const html = stateHtml({ client: "player" });
+    const chips = html.slice(html.indexOf('data-testid="charx-header-chips"'));
+    const cls = chips.slice(
+      chips.indexOf('class="'),
+      chips.indexOf('"', chips.indexOf('class="') + 7),
+    );
+    const menu = "[&amp;_[data-testid=cbtx-sheet-effects-menu]]";
+    // 24-px button − 4 (drawn in) − 26 (cancelled) + the 6-px gap = 0 px on the line.
+    for (const c of [`${menu}:order-last`, `${menu}:-ml-1`, `${menu}:-mr-[26px]`, `${menu}:size-6`])
+      expect(cls).toContain(c);
+    expect(cls).toContain("has-[[data-testid=cbtx-sheet-effects-menu]]:pr-[26px]");
   });
 });
 

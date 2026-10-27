@@ -349,7 +349,7 @@ describe("FR-KIT-76 compendium table", () => {
     expect(row).toContain('data-slot="cmp-row"');
     expect(row).toContain('data-record-id="e-gob" data-value="monster"');
     expect(row).toMatch(/grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.25fr\)_4\.5rem\]/);
-    expect(row).toContain("min-h-10"); // today's two-line row height ± 4 px (§7.3)
+    expect(row).toContain("min-h-[30px]"); // K13 (DM #363): the kit's 30-px row
     expect(row).toContain("hover:bg-accent");
     expect(row).toContain('draggable="true"');
     // The details line is the name cell's next sibling (small-copy-s7 reads it so), then the chip.
@@ -364,6 +364,35 @@ describe("FR-KIT-76 compendium table", () => {
     const src = readFileSync(join(import.meta.dir, "CompendiumWindow.tsx"), "utf8");
     expect(src).toContain("[&>li:nth-child(even)]:bg-muted/40");
     expect(src).toMatch(/data-testid="cmp-results" data-slot="cmp-table"/);
+  });
+
+  test("FR-KIT-76 K13 kit rows (DM #363): 30 px, every cell in body type (tabular figures without the number-face class), the name its weight only; a long name's whole text in its Tooltip", () => {
+    const LONG: EntrySummary = { ...GOB_ROW, name: "Ability Score Improvement (Fighter)" };
+    const html = render("dm", <ResultRow r={LONG} viewer="dm" />);
+    const row = tagOf(html, "cmp-result");
+    expect(row).toContain("min-h-[30px]");
+    expect(row).toContain("py-[5px]");
+    expect(row).not.toContain("min-h-10");
+    const name = html.slice(html.indexOf('data-testid="cmp-result-name"'));
+    expect(name).toMatch(/^data-testid="cmp-result-name" data-slot="cmp-row-name"/);
+    expect(tagOf(html, "cmp-result-name")).toContain("font-medium");
+    // The Tooltip trigger is the row itself (its only Tab stop; walkthrough step 4); no focusable
+    // or tip-enrolled part inside it.
+    expect(name).toContain('<span class="truncate">Ability Score');
+    expect(row).toContain("data-tip");
+    expect(html.match(/data-tip/g)?.length).toBe(1);
+    expect(html).not.toContain("tabindex");
+    expect(html).toMatch(
+      /<span class="truncate text-muted-foreground \[font-variant-numeric:tabular-nums\]">/,
+    );
+    expect(html).not.toMatch(/class="[^"]*\btabular-nums\b(?!\])/);
+    expect(html).not.toContain("text-xs text-muted-foreground");
+    // Gilt & Stone: the name in body type, not the name face (K13 block after K4's).
+    const gilt = readFileSync(join(import.meta.dir, "../../themes/gilt.css"), "utf8");
+    const k13 = gilt.slice(gilt.indexOf("/* KIT: round 3"));
+    expect(k13).toMatch(
+      /\[data-slot="cmp-row-name"\] \{\s+color: var\(--foreground\);\s+font-family: var\(--font-body\);/,
+    );
   });
 
   test("FR-KIT-76 group rows: an expandable table row (chevron + name, the count line in Details); members indented on the same grid", () => {

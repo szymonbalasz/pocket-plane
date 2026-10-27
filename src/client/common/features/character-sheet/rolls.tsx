@@ -38,7 +38,7 @@ import {
   type SheetRollRef,
   sendSheetRoll,
 } from "./routing";
-import { useSheet } from "./sheet-context";
+import { useSheet, useSheetScope } from "./sheet-context";
 import { type BreakdownKey, breakdownText } from "./view-model";
 
 /** Sheet roll buttons' tooltip; `RollButton` adds "Alt: adjust in tray" (FR-DICEX-51). */
@@ -107,6 +107,7 @@ export function PublicSwitch({
   const live = useSync((s) => s.state === "live");
   const settings = useRecords<GameLogSettingsRecord>(GAME_LOG_SETTINGS_TYPE)[0];
   const uid = useId();
+  const scope = useSheetScope();
   if (ctx.client !== "dm" || ctx.npc) return null;
   const preset = settings ? categoryPublic(settings, category) : false;
   return (
@@ -114,6 +115,7 @@ export function PublicSwitch({
       <Switch
         id={uid}
         data-testid={testId}
+        data-scope={scope}
         aria-label={`${label} public`}
         checked={overrides.get(category) ?? preset}
         disabled={!live}

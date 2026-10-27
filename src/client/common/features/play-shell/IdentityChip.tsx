@@ -51,15 +51,18 @@ export interface ChipViewProps {
   onClick?: () => void;
 }
 
-/** The chip as drawn: dot, name, the players' muted / locked glyph, settings icon. */
+/**
+ * The chip as drawn: dot, name, the players' muted / locked glyph, settings icon. K13 (DM #363):
+ * a framed stone chip with the gear inside, as the kit's `.ident` (30 px, 14-px body type).
+ */
 export function ChipView({ name, color, state, sound, onClick }: ChipViewProps) {
   const SoundIcon = sound === "muted" || sound === "locked" ? SOUND_ICON[sound] : null;
   return (
     <Tooltip content={chipTip(sound)}>
       <Button
-        variant="ghost"
+        variant="outline"
         size="sm"
-        className="h-8 gap-1.5 px-2"
+        className="h-[30px] gap-[7px] px-2.5 text-sm font-normal"
         data-testid="ui-prefs-open"
         data-state={state}
         data-sound-state={sound ?? undefined}

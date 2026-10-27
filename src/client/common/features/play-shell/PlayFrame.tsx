@@ -198,11 +198,12 @@ export function PlayFrame({ client, topLeft, topStatus, topEnd, base, toolRail }
           />
         </div>
         <div data-testid="ui-topbar-right" className="flex shrink-0 items-center gap-2">
-          {/* FR-KIT-13: one status pill, the connection state then (DM) presence. */}
+          {/* FR-KIT-13: one status group, the connection state then (DM) presence; K13 (DM
+              #363): plain muted text as the kit's `.live` ("● Live · 3 players"), no pill. */}
           <div
             data-testid="ui-topbar-status"
             data-slot="topbar-status"
-            className="inline-flex h-6 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium whitespace-nowrap"
+            className="inline-flex shrink-0 items-center gap-1.5 text-[13px] whitespace-nowrap text-muted-foreground"
           >
             <ConnectionIndicator />
             {topStatus}
