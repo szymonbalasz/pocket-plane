@@ -399,6 +399,10 @@ function dmStackSpotOnly(
   if (clear && beside)
     return homeDistance(vp, width, beside) < homeDistance(vp, width, clear) ? beside : clear;
   if (clear ?? beside) return (clear ?? beside) as Spot;
+  // 2b. DM #364 (amends #288): no clear spot within the half-width slide → a slide further left,
+  // still on no window, PC, card target or keep-out (the rail kept clear).
+  const far = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs, true);
+  if (far && fits(far) && lefts.every((l) => l !== far.left)) return far;
   // 1b. No clear spot: over the empty body below a window's content (pass 1, nearest home).
   if (content) return content;
   // 3. Over a body, in the column: the first rows kept (FR-NOTE-75), then ruling B, then the
@@ -483,14 +487,18 @@ const headingsUnder = (r: Rect, windows: readonly StackWindow[]) =>
 const homeDistance = (vp: Viewport, width: number, p: Spot) =>
   Math.abs(p.left - Math.round((vp.w - width) / 2)) + (p.top - DM_TOAST_TOP);
 
-/** FR-NOTE-77: how far the stack may slide sideways from home: half its width (it stays in its band). */
+/**
+ * FR-NOTE-77: how far the stack may slide right of home: half its width (it stays in its band).
+ * Left of home no cap since DM #364 (a spot on no window and no PC beats one over a window).
+ */
 export const MAX_SLIDE = STACK_W / 2;
 
 /**
  * FR-NOTE-77 (walkthrough H3 1b, 4; amends FR-NOTE-70): when no spot in the column clears the
  * windows' content, a spot beside a window, Initiative or a tool bar (12 px gap, ≥ 80 px from the
- * left like the shift, inside the viewport) at most `MAX_SLIDE` from home (half the stack still
- * over its home column: never the rail or the map's edge, sim-9 a01, BL-83) that covers no
+ * left like the shift, inside the viewport) at most `MAX_SLIDE` right of home (half the stack still
+ * over its home column: never the rail or the map's edge, sim-9 a01, BL-83; with `farLeft`, DM
+ * #364, any distance left of home, still ≥ 80 px from the left) that covers no
  * window, no PC token (`pcs`, + 4 px), no card target and no hard keep-out; nearest the home
  * spot. Null → none.
  */
@@ -504,6 +512,8 @@ function besideSpot(
   blockers: readonly Rect[],
   avoid: readonly TokenBox[],
   pcs: readonly Rect[],
+  /** DM #364: no cap left of home (only once no spot within the cap is clear). */
+  farLeft = false,
 ): Spot | null {
   const home = Math.round((vp.w - width) / 2);
   const edges = [...windows, ...(initiative ? [initiative] : []), ...hard];
@@ -512,7 +522,13 @@ function besideSpot(
       edges.flatMap((w) => [w.x - EDGE_GAP - width, w.x + w.w + EDGE_GAP]).map(Math.round),
     ),
   ].filter(
-    (l) => l >= MIN_SHIFT_LEFT && l + width <= vp.w - EDGE_GAP && Math.abs(l - home) <= width / 2,
+    // DM #364 (amends #288): `farLeft` lifts the cap left of home (the spot below still covers
+    // no window, PC, card target or keep-out, and keeps the rail clear).
+    (l) =>
+      l >= MIN_SHIFT_LEFT &&
+      l + width <= vp.w - EDGE_GAP &&
+      l - home <= MAX_SLIDE &&
+      (farLeft || home - l <= MAX_SLIDE),
   );
   if (lefts.length === 0) return null;
   const maxTop = vp.h - LAUNCHER_CLEAR - stackH;

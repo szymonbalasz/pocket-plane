@@ -8,6 +8,7 @@ import {
   STACK_W,
   type StackWindow,
 } from "./keep-out";
+import { cappedPlacement, cappedSpot, noFarSlide } from "./keep-out-capped";
 
 describe("FR-NOTE-32 toast keep-out", () => {
   const top = 48 + 12 + 32 + 8;
@@ -170,8 +171,9 @@ describe("FR-NOTE-32 sim-6 glitch 3: toasts keep off open windows' bodies", () =
 // Sprint 6 (sim-9 a01, b01; OQ-NOTE-25 A, #288).
 type Box = { x: number; y: number; w: number; h: number };
 /**
- * FR-NOTE-77: a left outside the column lefts is a slide: within half the stack's width of home,
- * ≥ 80 px, and its spot covers no window (and Initiative + 12 px).
+ * FR-NOTE-77: a left outside the column lefts is a slide: at most half the stack's width right of
+ * home (left of home any distance, DM #364), ≥ 80 px, and its spot covers no window (and
+ * Initiative + 12 px).
  */
 const slideOk = (
   p: { left: number; top: number },
@@ -179,7 +181,7 @@ const slideOk = (
   home: number,
   boxes: readonly (Box | null)[],
 ) =>
-  Math.abs(p.left - home) <= STACK_W / 2 &&
+  p.left - home <= STACK_W / 2 &&
   p.left >= 80 &&
   boxes.every((b) => b === null || !hit(rectOf(p, h), b));
 const hit = (a: Box, b: Box) =>
@@ -219,17 +221,17 @@ describe("FR-NOTE-42 stack stays home", () => {
     const windows = [LOG, COMPENDIUM, PARTY];
     // Party's body under the home and the Game log below it: no body-clear spot in the column →
     // home, nearest the home row, `covers` > 0 (the runtime folds; never beside Party).
-    const at = dmStackSpot(vp, INIT, 57, STACK_W, [GOBLIN_2], windows);
+    const at = cappedSpot(vp, INIT, 57, STACK_W, [GOBLIN_2], windows);
     expect(at).toMatchObject({ left: 560, top: 60 + 72 + 8 }); // below Party's first row (B)
     expect(at.covers).toBeGreaterThan(0);
     expect(hit(rectOf(at, 57), DRAGON)).toBe(false);
     expect(hit(rectOf(at, 57), { ...PARTY, h: 32 })).toBe(false);
     // Without the Game log below it: below Party's body, still at the home (down before aside).
-    const down = dmStackPlacement(vp, INIT, 57, STACK_W, [GOBLIN_2], [COMPENDIUM, PARTY]);
+    const down = cappedPlacement(vp, INIT, 57, STACK_W, [GOBLIN_2], [COMPENDIUM, PARTY]);
     expect(down).toEqual({ left: 560, top: 60 + 512 + 8 });
     // Two cards (300 high) fit nowhere clear: home, on Party's body (`covers` > 0: the runtime
     // folds a toast into "+N more" first).
-    const tall = dmStackSpot(vp, INIT, 300, STACK_W, [GOBLIN_2], windows);
+    const tall = cappedSpot(vp, INIT, 300, STACK_W, [GOBLIN_2], windows);
     expect(tall.covers).toBeGreaterThan(0);
   });
 
@@ -497,13 +499,13 @@ describe("FR-NOTE-42 windows in the home band (walkthrough WF4)", () => {
   const log = { x: 68, y: 608, w: 1150, h: 280 };
 
   test("FR-NOTE-42 home band: the stack never covers a window under the home spot while a body-clear spot exists (below it); none → home, folded, never beside it (FR-NOTE-70)", () => {
-    const at = dmStackSpot(vp, init, 57, STACK_W, [], [stats, log]);
+    const at = cappedSpot(vp, init, 57, STACK_W, [], [stats, log]);
     expect(at.covers).toBe(0);
     expect(hit(rectOf(at, 57), stats)).toBe(false);
     expect(at).toMatchObject({ left: 560, top: 60 + 412 + 8 }); // down first (FR-NOTE-42)
     // Taller (2 cards): nothing below fits above the Game log → home, nearest the home row,
     // `covers` > 0 (the runtime folds), never beside Stats.
-    const two = dmStackSpot(vp, init, 190, STACK_W, [], [stats, log]);
+    const two = cappedSpot(vp, init, 190, STACK_W, [], [stats, log]);
     expect(two).toMatchObject({ left: 560, top: 60 + 72 + 8 }); // below Stats' first row (B)
     expect(two.covers).toBeGreaterThan(0);
   });
@@ -643,14 +645,14 @@ describe("FR-NOTE-53 every window's first row (sprint 9 ruling B)", () => {
     const log = { x: 68, y: 608, w: 1150, h: 280 };
     const tabs = { x: 555, y: 60 + 32, w: 400, h: 40 };
     for (const h of [190, 330]) {
-      const at = dmStackSpot(vp, init, h, STACK_W, [], [stats, log]);
+      const at = cappedSpot(vp, init, h, STACK_W, [], [stats, log]);
       expect(at).toMatchObject({ left: 560, top: 60 + 72 + 8 });
       expect(hit(rectOf(at, h), tabs)).toBe(false);
     }
     // A stack too tall to clear any window's first 40 px (it must sit by 136): the title bars
     // alone decide, nearest home (FR-NOTE-71 as before).
     const low = { x: 500, y: 100, w: 440, h: 600 };
-    expect(dmStackSpot(vp, init, 752, STACK_W, [], [low])).toMatchObject({ left: 560, top: 136 });
+    expect(cappedSpot(vp, init, 752, STACK_W, [], [low])).toMatchObject({ left: 560, top: 136 });
   });
 });
 
@@ -763,7 +765,7 @@ describe("FR-NOTE-75 keep off window bodies' first rows", () => {
     // Tabs (two rows) and search to 363, the first rule card to 452, the footer to 558.
     const rules = { x: 430, y: 212, w: 440, h: 360, used: 558 };
     const rows = [{ x: 430, y: 212, bottom: 452 }, logRow];
-    const at = dmStackSpot(vp, init, 119, STACK_W, [], [log, rules], [], rows);
+    const at = cappedSpot(vp, init, 119, STACK_W, [], [log, rules], [], rows);
     expect(at).toMatchObject({ left: 560, top: 452 + 8 });
     expect(hit(rectOf(at, 119), { ...rules, h: 452 - 212 })).toBe(false);
     expect(hit(rectOf(at, 119), log)).toBe(false);
@@ -830,11 +832,11 @@ describe("FR-NOTE-77 a clear spot beside a window beats the first rows", () => {
     const search = { x: 451, y: 333, w: 398, h: 30 };
     // Summary + 1 card + "+2 more" (186): left of Rules is 462 px from home (never, #288), right
     // of it is Initiative: on Rules' body, so the runtime folds.
-    const unfolded = dmStackSpot(vp, init, 186, STACK_W, [], [log, rules], [], [], [], pcs);
+    const unfolded = cappedSpot(vp, init, 186, STACK_W, [], [log, rules], [], [], [], pcs);
     expect(unfolded.covers).toBeGreaterThan(0);
     expect(unfolded.left).toBe(560);
     // Folded to the summary + "+3 more" (91): home, above Rules' title bar.
-    const at = dmStackSpot(vp, init, 91, STACK_W, [], [log, rules], [], [], [], pcs);
+    const at = cappedSpot(vp, init, 91, STACK_W, [], [log, rules], [], [], [], pcs);
     expect(at).toMatchObject({ left: 560, top: 100, covers: 0 });
     for (const part of [{ ...rules, h: 32 }, tabs, search])
       expect(hit(rectOf(at, 91), part)).toBe(false);
@@ -1068,7 +1070,7 @@ describe("FR-NOTE-77 the summary alone takes a card stack's spots", () => {
       { x: 366, y: 286, w: 52, h: 54 },
       { x: 414, y: 286, w: 52, h: 54 },
     ];
-    const at = dmStackSpot(small, init720, 92, STACK_W, [], [log720, requests], [], [], [], pcs);
+    const at = cappedSpot(small, init720, 92, STACK_W, [], [log720, requests], [], [], [], pcs);
     expect(at).toMatchObject({ left: 480, top: 404 + 8, covers: 0 });
     expect(onLog(at, 92)).toBe(false);
   });
@@ -1100,9 +1102,9 @@ describe("FR-NOTE-77 K12 a spot on no window beats a window's empty body", () =>
     expect(hit(rectOf(at, 58), log)).toBe(false);
   });
 
-  test("FR-NOTE-77 K12 no clear spot (Party Manager at 544, 60, 472 × 536, down to the Game log): the existing pass-1 spot on its empty body, no fold", () => {
+  test("FR-NOTE-77 K12 no clear spot (Party Manager at 544, 60, 472 × 536, down to the Game log; a PC left of the column blocks #364's slide): the existing pass-1 spot on its empty body, no fold", () => {
     const party = { x: 544, y: 60, w: 472, h: 536, used: 331 };
-    const at = dmStackSpot(vp, init, 58, STACK_W, [], [log, party], [], []);
+    const at = cappedSpot(vp, init, 58, STACK_W, [], [log, party], [], []);
     expect(at).toMatchObject({ left: 560, top: 331 + 8, covers: 0 });
   });
 
@@ -1119,5 +1121,58 @@ describe("FR-NOTE-77 K12 a spot on no window beats a window's empty body", () =>
       left: 560,
       top: 168,
     });
+  });
+});
+
+// DM #364 (amends #288): the stack may slide further left than half its width when that spot
+// covers no window and no PC token (K6b parity run, 1440×900, bundle `kit-parity`, the 58-px
+// summary; Thorn's and Mira's tokens as drawn + 4 px).
+describe("FR-NOTE-77 #364 a slide further left onto no window and no PC", () => {
+  const vp = { w: 1440, h: 900 };
+  const init = { x: 1028, y: 60, w: 400, h: 536 };
+  const log = { ...LOG, used: LOG.y + LOG.h, head: LOG.y + 60 };
+  const pcs = [
+    { x: 414, y: 353, w: 58, h: 66 },
+    { x: 470, y: 353, w: 60, h: 66 },
+  ];
+  const clearOf = (at: { left: number; top: number }, boxes: readonly Box[]) =>
+    boxes.every((b) => !hit(rectOf(at, 58), b));
+
+  const cases: [string, StackWindow, number][] = [
+    ["Party Manager at 544, 60 (472 × 536)", { x: 544, y: 60, w: 472, h: 536, used: 331 }, 212],
+    ["Encounters at 540, 60 (440 × 512)", { x: 540, y: 60, w: 440, h: 512, used: 175 }, 208],
+    ["Preferences at 656, 60 (360 × 536)", { x: 656, y: 60, w: 360, h: 536, used: 596 }, 324],
+  ];
+  for (const [name, win, left] of cases) {
+    test(`FR-NOTE-77 #364 ${name}: the summary slides left of it onto the map (12 px gap), off every window and PC; no fold`, () => {
+      const at = dmStackSpot(vp, init, 58, STACK_W, [], [log, win], [], [], [], pcs);
+      expect(at).toMatchObject({ left, top: 100, covers: 0 });
+      expect(left).toBe(win.x - 12 - STACK_W);
+      expect(560 - left).toBeGreaterThan(STACK_W / 2);
+      expect(clearOf(at, [win, log, init, ...pcs])).toBe(true);
+    });
+  }
+
+  test("FR-NOTE-77 #364 PCs on every such spot → the existing rules (Party Manager: its empty body, 560, 339); one PC → the next clear spot down", () => {
+    const party = { x: 544, y: 60, w: 472, h: 536, used: 331 };
+    const crowd = { ...noFarSlide(vp), y: 60, h: 540 };
+    const at = dmStackSpot(vp, init, 58, STACK_W, [], [log, party], [], [], [], [...pcs, crowd]);
+    expect(at).toMatchObject({ left: 560, top: 339 });
+    const mira = { x: 300, y: 90, w: 58, h: 66 };
+    const below = dmStackSpot(vp, init, 58, STACK_W, [], [log, party], [], [], [], [...pcs, mira]);
+    expect(below).toMatchObject({ left: 212, top: 90 + 66 + 12, covers: 0 });
+  });
+
+  test("FR-NOTE-77 #364 a clear spot within the cap still wins (Scenes at 400, 222: beside it at 672, 100, not far left)", () => {
+    const scenes = { x: 400, y: 222, w: 260, h: 400, used: 376 };
+    const at = dmStackSpot(vp, init, 206, STACK_W, [], [log, scenes], [], [], [], pcs);
+    expect(at).toMatchObject({ left: 672, top: 100 });
+  });
+
+  test("FR-NOTE-77 #364 sim-9 a01 (Compendium + Party): left of Party at 244, 100, never x 68, off the Dragon and the rail", () => {
+    const at = dmStackSpot(vp, INIT, 57, STACK_W, [GOBLIN_2], [LOG, COMPENDIUM, PARTY]);
+    expect(at).toMatchObject({ left: PARTY.x - 12 - STACK_W, top: 100, covers: 0 });
+    expect(at.left).toBeGreaterThanOrEqual(80);
+    expect(clearOf(at, [DRAGON, COMPENDIUM, PARTY, LOG])).toBe(true);
   });
 });

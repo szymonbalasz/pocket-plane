@@ -100,9 +100,16 @@ test("FR-NOTE-42 FR-NOTE-43 F5 DM at 1440×900, then 1280×720: with the pending
     // FR-NOTE-42: never x 68 (b01: 68..388 × 100..157); FR-NOTE-70 (sprint 9, retires WF4's
     // "beside it"): at its home column, never on the pushed Scenes' title bar + first 40 px
     // (FR-NOTE-44); on its body only when no spot in the column clears it (then folded).
+    // DM #364: or, when the column holds no clear spot, a slide left of home onto no window.
     const home = Math.round((size.width - 320) / 2);
     await expect.poll(async () => overlaps(await box(stack), await strip(scenes))).toBe(false);
-    expect(Math.round((await box(stack)).x)).toBe(home);
+    const x = Math.round((await box(stack)).x);
+    if (x !== home) {
+      expect(x).toBeLessThan(home);
+      expect(x).toBeGreaterThanOrEqual(80);
+      for (const w of await dm.locator('[data-testid="ui-window"][data-state="open"]').all())
+        expect(overlaps(await box(stack), await box(w))).toBe(false);
+    }
     // FR-NOTE-43: off the bar; all 16 Fog bar controls hit at their centre.
     expect(overlaps(await box(stack), await box(panel))).toBe(false);
     const fog = await blocked(dm, 'button[data-testid^="fog-"]');
