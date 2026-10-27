@@ -18,6 +18,7 @@ import {
 import {
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -44,13 +45,14 @@ import { SheetOverridesProvider, usePublicOverrides } from "./rolls";
 import { sheetBadge } from "./routing";
 import { SectionView, SheetSlotView } from "./SheetSections";
 import { sectionCount, sectionsFor } from "./sections";
-import { SheetContext, type SheetCtx, useSheet, useSheetIntents } from "./sheet-context";
+import { SheetContext, type SheetCtx, SheetWide, useSheet, useSheetIntents } from "./sheet-context";
 import { sheetSections } from "./sheet-sections";
 import {
   canEdit,
   canUseCounters,
   compactFullPx,
   crLine,
+  isWideSheet,
   type PinnedPart,
   pinnedPart,
   type SeenFull,
@@ -246,9 +248,14 @@ function HeaderActions({
 const CHIP = "w-fit rounded-full px-2.5 py-0.5 text-[13px] font-normal leading-tight";
 // The `header` sections' wrappers and chip rows flatten into the line (`contents`): every chip
 // and the effects menu wrap as one line (K11 walkthrough: the menu alone on a row at 280 px); a
-// chip longer than the line truncates.
+// chip longer than the line truncates. K13 (round-2 gap 9): the effects menu comes last, beside the
+// last chip: the line keeps 26 px for it at its end and the menu takes no room of its own (its
+// margins cancel its width and the chip gap), so it never wraps alone; drawn 4 px in, its glyph
+// sits a chip gap from the chip.
 const CHIPS_LINE = cn(
   "flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1",
+  "has-[[data-testid=cbtx-sheet-effects-menu]]:pr-[26px]",
+  "[&_[data-testid=cbtx-sheet-effects-menu]]:order-last [&_[data-testid=cbtx-sheet-effects-menu]]:-ml-1 [&_[data-testid=cbtx-sheet-effects-menu]]:-mr-[26px]",
   "[&_[data-testid=charx-section]]:contents [&_[data-testid=cbtx-sheet-effects]]:contents [&_[data-chip-row]]:contents",
   "[&_[data-testid=cbtx-sheet-effects-menu]]:size-6",
   "[&_[data-testid=cbtx-sheet-effect]]:max-w-full [&_[data-testid=cbtx-sheet-effect]]:rounded-full [&_[data-testid=cbtx-sheet-effect]]:px-2 [&_[data-testid=cbtx-sheet-effect]]:py-0.5 [&_[data-testid=cbtx-sheet-effect]]:text-[13px]",
@@ -334,7 +341,7 @@ function SheetName({ picker }: { picker: ReactNode }) {
     <Tooltip content={ctx.creature.name}>
       <span
         data-testid="charx-name-picker"
-        className="relative flex min-w-0 max-w-full items-center self-start rounded-sm has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring"
+        className="relative flex w-fit min-w-0 max-w-full items-center self-start rounded-sm has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring"
       >
         {name}
         <span className="absolute inset-0 [&>select]:size-full [&>select]:max-w-none [&>select]:cursor-pointer [&>select]:opacity-0">
@@ -381,10 +388,14 @@ function NameRow({
   const species = "species" in s && s.species ? s.species : null;
   const background = c.kind === "character" ? ctx.sheet.background.trim() : "";
   return (
-    // A grid: portrait, the name column, the actions. The chips line spans the row under them in
-    // the narrow sheet (room for "Concentrating: Bless 10r" beside "In combat", so the header
-    // stays pinned at 320 px), and sits under the name once wide (the kit's enlarged sheet).
-    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5">
+    // A grid: the portrait, then the name column with the actions floated top-right in it. The
+    // chips line spans the row under them in the narrow sheet (room for "Concentrating: Bless
+    // 10r" beside "In combat", so the header stays pinned at 320 px), and sits under the name once
+    // wide (the kit's enlarged sheet). K13: the level line is one unit that sits beside the
+    // actions when it fits there, else under them at the column's full width ("Level 1 Fighter ·
+    // Human" on one line, never a lone "· Human"); a line longer than the column wraps between
+    // parts.
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5">
       <Portrait
         id={c.portraitAssetId}
         name={c.name}
@@ -392,11 +403,14 @@ function NameRow({
         large
         className={full ? "@min-[560px]/sheet:row-span-2" : undefined}
       />
-      <div className="flex min-w-0 flex-col gap-1">
+      <div className="min-w-0">
+        <div data-testid="charx-header-actions" className="float-right ml-3 shrink-0">
+          <HeaderActions editing={editing} setEditing={setEditing} />
+        </div>
         <SheetName picker={picker} />
         <span
           data-testid="char-sheet-level"
-          className="text-sm text-muted-foreground @min-[560px]/sheet:text-base"
+          className="mt-1 inline-block max-w-full align-top text-sm text-muted-foreground @min-[560px]/sheet:text-base"
         >
           <LevelParts parts={[...sub.split(" · "), ...(species ? [species] : [])]} />
           {background && (
@@ -407,13 +421,10 @@ function NameRow({
           )}
         </span>
       </div>
-      <div data-testid="charx-header-actions" className="ml-auto shrink-0">
-        <HeaderActions editing={editing} setEditing={setEditing} />
-      </div>
       {full && (
         <ChipsSlot
           host={chipsHost}
-          className="col-span-3 min-w-0 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2 @min-[560px]/sheet:row-start-2 @min-[560px]/sheet:-mt-1"
+          className="col-span-2 min-w-0 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2 @min-[560px]/sheet:row-start-2 @min-[560px]/sheet:-mt-1"
         />
       )}
     </div>
@@ -491,6 +502,20 @@ function useChipsHost(): HTMLDivElement | null {
   return host;
 }
 
+/** K13: which ends of the tab strip fade (an end with hidden tabs); none without overflow. */
+export function fadeOf(a: { prev: boolean; next: boolean }): "start" | "end" | "both" | undefined {
+  if (a.prev && a.next) return "both";
+  if (a.next) return "end";
+  return a.prev ? "start" : undefined;
+}
+
+/** K13: the fade, a 28-px mask at each end with hidden tabs. */
+const TAB_FADE = cn(
+  "data-[fade=end]:[mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)]",
+  "data-[fade=start]:[mask-image:linear-gradient(to_left,#000_calc(100%-28px),transparent)]",
+  "data-[fade=both]:[mask-image:linear-gradient(to_right,transparent,#000_28px,#000_calc(100%-28px),transparent)]",
+);
+
 /** K11: the kit's tab (`.tab`): label type 15 px, roomy, the active marker inside it. */
 const TAB = "h-auto px-2.5 pt-[5px] pb-2 text-[15px] leading-[1.2]";
 
@@ -555,9 +580,15 @@ function TabStrip({ children }: { children: ReactNode }) {
   return (
     <div data-slot="sheet-tabs" className="flex shrink-0 items-stretch gap-1">
       {arrows.overflow && arrow(-1, arrows.prev)}
+      {/* K13 (round-2 gap 9): an end with hidden tabs fades out (a mask, paint only) instead of
+          cutting a word ("Inv") at the strip's edge. */}
       <div
         ref={ref}
-        className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]"
+        data-fade={fadeOf(arrows)}
+        className={cn(
+          "min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]",
+          TAB_FADE,
+        )}
       >
         {children}
       </div>
@@ -621,6 +652,28 @@ function usePinnedHeader(initial: PinnedPart) {
   return { bodyRef, headerRef, restRef, part };
 }
 
+/**
+ * K13 (DM #363): whether the sheet body is wide, as its container query (`@min-[560px]/sheet`)
+ * sees it, so Main mounts the wide-only boxes there only (the narrow sheet's DOM unchanged).
+ */
+function useSheetWide(ref: RefObject<HTMLDivElement | null>, initial: boolean): boolean {
+  const [wide, setWide] = useState(initial);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const measure = () => {
+      const cs = getComputedStyle(el);
+      const padding = Number.parseFloat(cs.paddingLeft) + Number.parseFloat(cs.paddingRight);
+      setWide(isWideSheet(el.clientWidth, padding || 0));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return wide;
+}
+
 export function SheetView({
   creature,
   row,
@@ -630,6 +683,7 @@ export function SheetView({
   picker,
   startEditing,
   initialPinnedPart = "full",
+  initialWide = false,
 }: {
   creature: DefinitionRecord;
   row: CreatureSheetRecord | undefined;
@@ -641,6 +695,8 @@ export function SheetView({
   startEditing: boolean;
   /** FR-CHARX-48 part before the first measurement (static renders); measuring decides. */
   initialPinnedPart?: PinnedPart;
+  /** K13: wide before the first measurement (static renders); measuring decides. */
+  initialWide?: boolean;
 }) {
   const store = useSync((s) => s.store);
   // A store without lazy state (static test stores) has nothing loaded.
@@ -693,6 +749,7 @@ export function SheetView({
   const current = tabs.some(([v]) => v === tab) ? tab : "main";
   const { bodyRef, headerRef, restRef, part } = usePinnedHeader(initialPinnedPart);
   const compact = part === "compact";
+  const wide = useSheetWide(bodyRef, initialWide);
   const chipsHost = useChipsHost();
   // K11: one set of DM public overrides for the header's Public rolls menu and Main's rolls.
   const overrides = usePublicOverrides();
@@ -790,7 +847,9 @@ export function SheetView({
                 </div>
               )}
               <TabsContent value="main">
-                <MainTab />
+                <SheetWide.Provider value={wide}>
+                  <MainTab />
+                </SheetWide.Provider>
               </TabsContent>
               <TabsContent value="actions">
                 <ActionsTab />

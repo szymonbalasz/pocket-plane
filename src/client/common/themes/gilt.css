@@ -1996,6 +1996,57 @@
 :root[data-theme="gilt"] [data-slot="sheet-tabs"] [data-slot="tabs-trigger"][data-state="active"] {
   color: var(--gs-label-on);
 }
+
+/* KIT: round 3 (kit-parity K13, DM #363: the wide sheet's action boxes, compendium rows, top bar;
+   layout is markup for every theme, this block only paints) ─────────────────────────────────── */
+/* Compendium rows (the kit's `.tbl td`): every cell in body type, the name keeps its weight only
+   (no name type, no gold). */
+@layer base {
+  :root[data-theme="gilt"] [data-slot="cmp-row-name"] {
+    color: var(--foreground);
+    font-family: var(--font-body);
+  }
+  /* The identity chip (the kit's `.ident`): a stone chip in body type, cream; the gear dim gold. */
+  :root[data-theme="gilt"] [data-slot="button"][data-testid="ui-prefs-open"] {
+    color: var(--foreground);
+    font-family: var(--font-body);
+  }
+  :root[data-theme="gilt"] [data-testid="ui-prefs-open"] svg {
+    color: var(--frame-rule-strong);
+  }
+}
+/* The status group as the kit's `.live`: plain muted text, no well (K5's pill paint undone). */
+:root[data-theme="gilt"] [data-slot="topbar-status"] {
+  background-image: none;
+  box-shadow: none;
+}
+/* The unread badge: the red gem (the kit's `--gem` diamond in a gold-mid rule), its count in gem
+   ink on it (the badge's utility colour retinted). */
+:root[data-theme="gilt"] [data-slot="launcher-badge"] {
+  --primary-foreground: var(--gs-gem-ink);
+  isolation: isolate;
+  background: none;
+  text-shadow: 0 1px 1px #000;
+}
+:root[data-theme="gilt"] [data-slot="launcher-badge"]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: -1;
+  width: 13px;
+  height: 13px;
+  translate: -50% -50%;
+  rotate: 45deg;
+  border: 1px solid var(--frame-rule-strong);
+  background-image: radial-gradient(
+    circle at 35% 30%,
+    var(--gem-hi),
+    var(--gem) 45%,
+    var(--gem-deep)
+  );
+  box-shadow: 0 1px 2px #000;
+}
 /* KIT: round 3 combat (kit-parity K12, DM #363, round-2 gaps 1, 2, 6, 8, 10: the Game log's box
    column, Initiative companion groups, the damage card's hit box, Notifications cards) ──────── */
 /* Initiative: an `after-owner` child sits flush under its owner (markup closes the gap); the two

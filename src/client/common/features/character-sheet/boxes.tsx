@@ -4,6 +4,7 @@
 // follow the kit's "Character sheet" section (K11): 12-px labels, 26-px values (34 px wide).
 import type { ReactNode } from "react";
 import { cn } from "../../lib/utils";
+import { useSheetScope } from "./sheet-context";
 
 /** FR-CHARX-117: `charx-box` `data-value` keys. */
 export type BoxKey =
@@ -17,7 +18,8 @@ export type BoxKey =
   | "passives"
   | "attacks"
   | "spells"
-  | "features";
+  | "features"
+  | "uses";
 
 /** Small-caps box label on the box's top edge (the kit's 12-px label line). */
 export const BOX_LABEL = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
@@ -41,10 +43,12 @@ export function Box({
   className?: string;
   children: ReactNode;
 }) {
+  const scope = useSheetScope();
   return (
     <div
       data-testid="charx-box"
       data-value={box}
+      data-scope={scope}
       data-slot="sheet-box"
       className={cn(
         "flex min-w-0 flex-col rounded-md border bg-card",

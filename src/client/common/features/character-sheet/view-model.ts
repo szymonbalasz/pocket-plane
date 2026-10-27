@@ -466,6 +466,12 @@ export function slotPips(
   })).filter((p) => p.max > 0);
 }
 
+/** K13: a spell level as the kit's slot label ("1st", "2nd", "3rd", "4th" … "9th"). */
+export const levelOrdinal = (level: number | string): string => {
+  const n = Number(level);
+  return `${n}${n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th"}`;
+};
+
 /** Hit dice per die size with levels (FR-CHARX-05); none without classes. */
 export function hitDicePips(
   stats: { classes?: readonly ClassRow[] },
@@ -514,6 +520,16 @@ export function compactFullPx(sumPx: number, seen: SeenFull | null, width: numbe
 }
 
 /** A pip click (CHARX §7): click = use one, Shift+click = restore one. */
+/** FR-CHARX-112: the sheet's container width from which it is wide (`@min-[560px]/sheet`). */
+export const SHEET_WIDE_PX = 560;
+
+/**
+ * K13 (DM #363): wide as the container query sees it: the sheet body's client width less its
+ * padding (the `@container/sheet` content box). Not measured yet (0) → narrow.
+ */
+export const isWideSheet = (clientWidth: number, paddingX: number): boolean =>
+  clientWidth - paddingX >= SHEET_WIDE_PX;
+
 export const pipDelta = (shiftKey: boolean) => (shiftKey ? -1 : 1);
 
 /** FR-CHARX-58: a feature's uses left of max, "2 / 3 left", "−1 / 3 left" below zero. */

@@ -39,7 +39,9 @@ describe("kit-parity bundle (kit parity §13)", () => {
     const db = r.openDb();
     cleanups.unshift(() => closeDb(db));
     expect(r.manifest.status).toBe("complete");
-    expect(r.manifest.fixtures.slice(-11)).toEqual([
+    const fx = r.manifest.fixtures;
+    const k1 = fx.indexOf("kit-log-rolls");
+    expect(fx.slice(k1, k1 + 11)).toEqual([
       "kit-log-rolls",
       "combat-hit",
       "combat-pending",
@@ -52,6 +54,8 @@ describe("kit-parity bundle (kit parity §13)", () => {
       "kit-notices",
       "dicex-request-open",
     ]);
+    // K13: the wide sheet's Spells box (Mira's slots + Hunter's Mark).
+    expect(fx).toContain("kit-mira-spells");
     const enc = db.select().from(encounter).where(eq(encounter.status, "started")).get();
     expect(enc?.round).toBe(3);
     const rows = db

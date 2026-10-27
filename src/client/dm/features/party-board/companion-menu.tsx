@@ -53,13 +53,14 @@ import {
 } from "../entities/pet-logic";
 import { type PetChange, petRest } from "../entities/pet-rest";
 
+/** K13 (round-2 §5): the kit's small button (`.btn.sm`: 24 px, 9-px sides, 13-px type), whole. */
 function NewPet({ disabled }: { disabled: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button
         size="sm"
-        className="h-6 px-2 text-xs"
+        className="h-6 shrink-0 gap-1.5 px-[9px] text-[13px]"
         data-testid="party-companion-new"
         disabled={disabled}
         onClick={() => setOpen(true)}

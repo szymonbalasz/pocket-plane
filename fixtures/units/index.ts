@@ -19,6 +19,7 @@ import visionSenses from "./character-sheet/vision-senses";
 import charMiraFull from "./character-sheet-full/char-mira-full";
 import charMiraLocked from "./character-sheet-full/char-mira-locked";
 import charSela from "./character-sheet-full/char-sela";
+import kitMiraSpells from "./character-sheet-full/kit-mira-spells";
 import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
 import cbFogGoblin from "./combat-extras/cb-fog-goblin";
 import cbParty from "./combat-extras/cb-party";
@@ -308,6 +309,8 @@ export const units: readonly Fixture[] = [
   // the player's applied card
   kitNoticesApplied,
   kitNotices,
+  // Sprint 13 K13 (build/kit-round3-sheet): Mira's spell slots + Hunter's Mark for the wide sheet
+  kitMiraSpells,
   // Sprint 13 K12 (build/kit-round3-combat): Mira's in-turn and Thorn's after-owner Fire Elementals
   kitGroups,
 ];
