@@ -229,12 +229,69 @@ describe("FR-KIT-25 hp line", () => {
     expect(tailText(null, null)).toBe("AC —");
   });
 
-  test("FR-KIT-25 tail folds: when the line can't hold the bar at 24 px, its numbers, the other parts and the tail", () => {
-    // bar 24 + 8 + "38 / 44" 40 = 72; "+5" 14; tail 92; gaps 2 × 6.
+  test("FR-KIT-25 tail folds: when the line can't hold the bar at its fixed 120-px track (K9), its numbers, the other parts and the tail", () => {
+    // bar 120 + 8 + "38 / 44" 40 = 168; "+5" 14; tail 92; gaps 2 × 6.
     const w = { numbers: 40, others: [14], tail: 92 };
-    expect(tailFolds({ ...w, line: 190 })).toBe(false);
-    expect(tailFolds({ ...w, line: 189 })).toBe(true);
+    expect(tailFolds({ ...w, line: 286 })).toBe(false);
+    expect(tailFolds({ ...w, line: 285 })).toBe(true);
     expect(tailFolds({ line: 100, numbers: null, others: [], tail: 92 })).toBe(false);
+  });
+
+  test("FR-KIT-25 hp line (K9, K6 gap 3): every row's bar on the kit's fixed 120-px track, cur / max in a column, the AC / moved tail a right-aligned column", () => {
+    const html = dm(kitStore(1, { goblin: { hpCurrent: 3 } }));
+    // (Mira's figures live on her character record, not in this fixture: no bar.)
+    for (const id of ["goblin", "wolf"]) {
+      const row = rowHtml(html, "cbt-init-row", id);
+      const hp = row.slice(row.indexOf('data-testid="cbt-init-row-hp"'));
+      expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
+      expect(hp).toMatch(/data-slot="kit-hpbar-track" class="[^"]*basis-\[120px\]/);
+      expect(hp).not.toMatch(/data-slot="kit-hpbar-track" class="[^"]*flex-1/);
+      expect(hp).toContain("min-w-[7ch]");
+      expect(row).toMatch(/data-tail="true"[^>]*class="ml-auto shrink-0"/);
+    }
+  });
+});
+
+describe("FR-KIT-21 pending list", () => {
+  test("FR-KIT-21 pending list (K9, K6 gap 4): each card is one compact line in body type with a muted icon (no stone button), the same IDs and box as the other kinds", () => {
+    const store = kitStore();
+    const card = {
+      id: "n-card",
+      seq: 1,
+      campaignId: "c1",
+      kind: "damage-card",
+      state: "pending",
+      text: "Mira: 21 to hit, 8 piercing",
+      actionRole: "dm",
+      actionLabel: "Apply",
+      payload: {
+        encounterId: "e1",
+        attackerId: "mira",
+        attackerName: "Mira",
+        attackName: "Longbow",
+        damageType: "piercing",
+        mode: "normal",
+        crit: false,
+        toHit: null,
+        damage: null,
+      },
+    };
+    const html = dm({
+      ...store,
+      records: { ...store.records, notification: { "n-card": card } },
+    } as RecordStore);
+    const list = html.slice(html.indexOf('data-testid="cbt-init-pending-list"'));
+    expect(list).toContain('data-slot="init-pending-heading"');
+    const line = tag(list, "cbt-init-card", "n-card");
+    expect(line).toMatch(/^<button type="button"/);
+    expect(line).toContain('data-slot="init-pending"');
+    expect(line).not.toContain('data-slot="button"');
+    expect(line).not.toContain("data-variant");
+    expect(line).toContain("h-8");
+    expect(line).toContain("text-sm");
+    expect(list).toMatch(
+      /data-testid="cbt-init-card"[^>]*>[\s\S]*?text-muted-foreground[\s\S]*?Mira: 21 to hit/,
+    );
   });
 });
 

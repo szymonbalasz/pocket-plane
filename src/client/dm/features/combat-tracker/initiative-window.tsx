@@ -35,7 +35,7 @@ import {
   saveBonus,
 } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
-import { HpBar } from "@ui/components/kit/hp-bar";
+import { HP_TRACK_PX, HpBar } from "@ui/components/kit/hp-bar";
 import { Button } from "@ui/components/ui/button";
 import {
   DropdownMenu,
@@ -594,25 +594,25 @@ export function tailText(ac: number | null, moved: string | null): string {
   return [`AC ${ac ?? "—"}`, ...(moved ? [`moved ${moved}`] : [])].join(" · ");
 }
 
-/** The gap of the HP line (`gap-1.5`) and the HP bar's track at its narrowest (`min-w-6`). */
+/** The gap of the HP line (`gap-1.5`). */
 const STATS_GAP = 6;
-const TRACK_MIN = 24;
 
 /**
  * FR-KIT-25 (OQ-KIT-07 A): the AC / moved tail folds into the row Tooltip when the HP line can't
- * hold the bar at its narrowest, its numbers, the other parts and the tail. Natural widths only
+ * hold the bar at its fixed track (K9, the kit's 120 px, so bars line up), its numbers, the other
+ * parts and the tail. Natural widths only
  * (a folded tail is measured out of the flow), so it never flips back and forth; re-measured on
  * resize and when the row changes.
  */
 export function tailFolds(widths: {
   line: number;
-  /** The HP bar's "cur / max" (the track counts at `TRACK_MIN`). */
+  /** The HP bar's "cur / max" (the track counts at `HP_TRACK_PX`). */
   numbers: number | null;
   others: readonly number[];
   tail: number;
 }): boolean {
   const parts = [
-    ...(widths.numbers === null ? [] : [TRACK_MIN + 8 + widths.numbers]),
+    ...(widths.numbers === null ? [] : [HP_TRACK_PX + 8 + widths.numbers]),
     ...widths.others,
     widths.tail,
   ];
@@ -872,9 +872,9 @@ function RowMain({
             <HpBar
               cur={hp.cur}
               max={hp.max}
+              track="fixed"
               data-testid="cbt-init-row-hp"
               data-record-id={c.id}
-              className="min-w-fit flex-1"
             />
           ) : (
             <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
@@ -889,8 +889,9 @@ function RowMain({
           <span
             data-tail
             data-folded={folded}
-            // Folded: measured out of the flow, pinned right so it adds no scroll width.
-            className={cn("shrink-0", folded && "invisible absolute top-0 right-0")}
+            // K9: a right-aligned muted column, so rows line up. Folded: measured out of the flow,
+            // pinned right so it adds no scroll width.
+            className={cn("ml-auto shrink-0", folded && "invisible absolute top-0 right-0")}
             aria-hidden={folded || undefined}
           >
             AC {ac ?? "—"}
@@ -1198,6 +1199,12 @@ function AbilityAnchors({ check, save }: { check: RollControl; save: RollControl
 }
 
 /**
+ * FR-KIT-21 (K9, K6 gap 4): a Pending row is one compact line in body type with a muted icon, the
+ * same box for both kinds (`data-slot="init-pending"`), never a stone button.
+ */
+const PENDING_LINE = "flex h-8 w-full items-center gap-1.5 rounded-md border px-2 text-sm";
+
+/**
  * FR-CBT-79 (G9): one Pending row per linked notification. A damage card opens the popup; another
  * kind shows its text ("Waiting for Mira: …" when a player owns it) and the DM's action (the
  * view's `onAction`, as in Notifications).
@@ -1219,17 +1226,21 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
       <li>
         {/* P3 glitch 10: the full text on hover when the row cuts it. */}
         <Tooltip content={row.text}>
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             data-testid="cbt-init-card"
+            data-slot="init-pending"
             data-record-id={n.id}
             data-step={row.step}
-            className="w-full justify-start truncate"
+            className={cn(
+              PENDING_LINE,
+              "text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+            )}
             onClick={() => openCard(n.id)}
           >
-            <SwordIcon className="size-3.5" /> <span className="min-w-0 truncate">{row.text}</span>
-          </Button>
+            <SwordIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="min-w-0 flex-1 truncate">{row.text}</span>
+          </button>
         </Tooltip>
       </li>
     );
@@ -1241,7 +1252,8 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
       data-testid="cbt-init-pending"
       data-record-id={n.id}
       data-kind={n.kind}
-      className="flex h-8 items-center gap-1.5 rounded-md border px-2 text-sm"
+      data-slot="init-pending"
+      className={PENDING_LINE}
     >
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
       <span
@@ -1276,7 +1288,12 @@ function PendingCards({ cards }: { cards: NotificationRecord[] }) {
   if (cards.length === 0) return null;
   return (
     <section aria-label="Pending actions" data-testid="cbt-init-pending-list" className="shrink-0">
-      <h3 className="mb-1 text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
+      <h3
+        data-slot="init-pending-heading"
+        className="mb-1 text-xs font-medium text-muted-foreground"
+      >
+        Pending ({cards.length})
+      </h3>
       {/* FR-CBT-77 (G4): at most 3 rows, then its own scroll, so cards never push the rows away. */}
       <ul className="flex max-h-[104px] flex-col gap-1 overflow-y-auto">
         {cards.map((n) => (

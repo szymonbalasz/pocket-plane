@@ -84,6 +84,7 @@ export function pcHp(ch: unknown): { cur: number; max: number } | null {
  * FR-KIT-26: the HP line's bar. PCs (character record) and the player's own companions
  * (FR-CBT-116: only the owner holds their numbers) show `HpBar` + "cur / max"; a monster or
  * another player's companion shows its band word only (`cbt-init-row-band`), never a bar length.
+ * K9: the kit's fixed track, so bars line up row to row.
  */
 function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
   // The record itself (a stable snapshot); the figures derive from it.
@@ -95,9 +96,9 @@ function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
       <HpBar
         cur={c.hpCurrent}
         max={c.hpMax}
+        track="fixed"
         data-testid="cbt-init-row-hp"
         data-record-id={c.id}
-        className="min-w-fit flex-1"
       />
     );
   }
@@ -106,9 +107,9 @@ function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
       <HpBar
         cur={hp.cur}
         max={hp.max}
+        track="fixed"
         data-testid="cbt-init-row-hp"
         data-record-id={c.id}
-        className="min-w-fit flex-1"
       />
     );
   }

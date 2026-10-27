@@ -57,6 +57,15 @@ describe("FR-KIT-26 player hp", () => {
       expect(row).not.toContain('data-testid="cbt-init-row-hp"');
     }
   });
+
+  test("FR-KIT-26 player hp (K9, K6 gap 3): bars with numbers sit on the kit's fixed 120-px track, so they line up", () => {
+    const html = player();
+    for (const id of ["mira", "thorn", "owlbear"]) {
+      const row = rowHtml(html, "cbt-init-row", id);
+      expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
+      expect(row).toMatch(/data-slot="kit-hpbar-track" class="[^"]*basis-\[120px\]/);
+    }
+  });
 });
 
 describe("FR-KIT-30 player rows", () => {
