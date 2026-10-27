@@ -49,12 +49,13 @@ beforeEach(() => {
 });
 
 describe("FR-CBT-130 card actions (DM popup)", () => {
-  test("FR-CBT-130 card actions: the slot sits under the card summary, above the targets; none available → no row", () => {
+  test("FR-CBT-130 card actions: the slot sits in the footer between Dismiss and Apply (FR-KIT-65); none available → no row", () => {
     const note = cardNote(flameCard(), { audience: "dm", audiencePlayerId: null });
     const html = render(note);
     const slot = html.indexOf('data-testid="cbt-card-actions"');
-    expect(slot).toBeGreaterThan(html.indexOf('id="cbt-popup-damage"'));
-    expect(slot).toBeLessThan(html.indexOf('aria-label="Targets"'));
+    expect(slot).toBeGreaterThan(html.indexOf('data-testid="cbt-popup-dismiss"'));
+    expect(slot).toBeGreaterThan(html.indexOf('aria-label="Targets"'));
+    expect(slot).toBeLessThan(html.indexOf('data-testid="cbt-popup-apply'));
     expect(html).toContain('data-testid="gem-combat" data-record-id="n1"');
     // Gems off / no gem → the popup has no slot row at all.
     for (const off of [render(note, { on: false }), render(note, { combat: 0 })]) {

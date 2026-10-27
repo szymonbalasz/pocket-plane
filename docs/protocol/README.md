@@ -4036,9 +4036,30 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#68-compendium-and-stat-block) 
 - **Fixtures:** bundle `kit-library` (data model §136).
 - **CON-44:** 0 B.
 
-## 174. Sprint 13: stat-block window (K7)
+## 174. Sprint 13: notices and the damage card on the kit grid (K3)
 
-From [kit-parity](../specs/post-mvp/kit-parity.md#611-stat-block-window-dm-only-oq-kit-04-b) §6.11 FR-KIT-100 – -107 (OQ-KIT-04 B; DM #355, #356). **Built by `build/kit-statblock`**: client only, DM only; no record type, intent, event, signal or wire field (0 bytes on the wire). Data side: [data model §138](../data-model/README.md#138-sprint-13-stat-block-window-k7).
+From [kit-parity](../specs/post-mvp/kit-parity.md#65-notices-toasts-turn-card-damage-card-toast) FR-KIT-55 – -66 (DM #355, #356; OQ-KIT-03 A, -11 A). **Built by `build/kit-notices`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Stack width (320), placement, fold, timers and the popup (440, drag, placement) unchanged. Data side: [data model §138](../data-model/README.md#138-sprint-13-notices-and-the-damage-card-k3).
+
+| Part | Contract | FR |
+|---|---|---|
+| Toast card (`note-toast`, the alert toasts `ui-toast` / `ui-alert-toast`; `toast-card`) | One row, centred: lead · `toast-text` · `toast-actions` · close. Lead = `Medallion` `md` (the initial of the `byPlayerId` player the client holds, on `colorKeyOf`'s colour), else the kind's view icon (alerts: the `toast()` type's icon) in a 28-px box (`note-toast-icon`). The stripe `note-stripe` stays the left edge. Close (`note-toast-close`, `ui-toast-close`) last | FR-KIT-55 |
+| Text block (`toast-text`) | Line 1 `note-text`: a plain text starting with the causer's name (whole word, `leadName`) renders it in `<b>`; a kind's renderer as it is. Line 2 `note-time` (`<time dateTime>`): `relativeTime(createdAt, now)` "just now" (< 1 min, also a future stamp) / "N min ago" / "N h ago" / "N d ago", re-read every 30 s | FR-KIT-56 |
+| Action (`toast-actions`) | `note-toast-action` / `ui-toast-action` (small, `h-7`) in one `flex-wrap` group with the text block (basis 9 rem): right of the text, below it only when the card is too narrow | FR-KIT-57 |
+| Summary `note-toast-pending-summary` | The same row: `ListTodo` icon · count text · (`note-toast-more` when folded to it) `note-toast-open` · close; it keeps its 58-px height (`py-3`, Open `h-8`: the roll popups and the Fit read the stack rect, FR-KIT-60). `note-toast-more` is a centred pill (`rounded-full`, `self-center`) | FR-KIT-58 |
+| Turn card `cbt-turn-card` (`turn-card`, gems `turn-card-gem`) | Centred text between two gem diamonds, no close. **Player:** the turn alert's Toast (`TURN_ALERT_TOAST_ID` = `alert:cbt.turn`, FR-SHELL-22) inside its `ui-alert-toast` element (`display: contents`, same `data-class` / `data-type`); text "Your turn — Mira" unchanged, times out as today. **DM (OQ-KIT-03 A):** `TurnAlertRuntime` (mounted by the DM's `cbt.initiative` companion too) maps each live `TurnChanged` frame through `dmTurnCardFor` → "‹name›'s turn" (the frame's `encounter.turnCombatantId`) → `showTurnCard`: `ToastState.turn` `{text, seq, remaining}`, first in the stack, outside the count of 3, 4 s (`TURN_CARD_MS`, paused with the stack), a new one replaces it, cleared on a campaign switch; dropped under the pause card; never from a snapshot | FR-KIT-59 |
+| Damage card bar (`cbt-popup-drag`, `card-bar`) | Window title bar (`h-8`, rule under): `h2` "{attacker} — {attack}", `cbt-popup-step`, and the gem `cbt-popup-later` (aria "Later", Tooltip; same action: closes, card stays pending). The drag ignores the bar's buttons. The card line (mode, crit, text) under the bar | FR-KIT-62 |
+| Result lines (`card-line`) | "To hit [dice] ±n" / "Damage, ‹type› [dice] ±n" / "+ ‹part›" labels (dice small), each ending in its input drawn as a Result box: `data-slot="kit-result"`, `data-outcome` (to hit: `toHitOutcome` natural 20 → `crit`, 1 → `fumble`, else `plain`; damage and parts → `damage`), `text-xl` centred. Ruled to-hit, waiting, crit-changed, "rolled N", unused and save lines unchanged | FR-KIT-63 |
+| Target row (`cbt-popup-target-row`, `card-target`, `group/target`) | One `flex-wrap` line: chip `card-target-chip` (`Medallion` `sm` via `medallionColour` · name · hidden icon · "·" · `mod-popup-ac`), `cbt-popup-target-hit`, natural note, `cbt-popup-target-mult` (labels unchanged), `cbt-popup-target-preview` (right), `cbt-popup-target-remove` / `cbt-popup-row-drop` (opacity 0 until row hover / focus-within, own focus or `(hover: none)`). Part chips and `popupParts` chips on the lines below; per-target multipliers kept (OQ-KIT-11 A) | FR-KIT-64 |
+| Footer (`card-footer`) | `cbt-popup-dismiss` (ghost) left; the card-action slot `cbt-card-actions` centred (moved from above the targets); `cbt-popup-apply` / `cbt-popup-apply-hit` (primary) right | FR-KIT-65 |
+| Player card view | `cbt-card-outcome` resolved: each hit's `applied` as `ResultBox` `sm` (`damage`) inside the same text ("Hit Goblin 2: **7** (half) · Miss Wolf" = `resolutionText`); pending / dismissed text unchanged. `cbt-card-maxed`: each maxed part's total as `ResultBox` `sm` after its dice | FR-KIT-66 |
+| `gilt.css` block `/* KIT: notices */` | Causer name gold; `ui-toast-close` and `cbt-popup-later` the red gem; turn card framed like a toast, title face, gem gradients; "+N more" pill rule; card bar as a window title band (inside the 4-px frame) with its gold rule; result inputs flat; target rows panel-lo, chips on the kit's chip fill; a gold hairline above the footer (pseudo-element). No size, spacing or font metric (FR-THEME-05) | FR-KIT-07, OQ-KIT-10 |
+
+- **Tests:** `common/features/notifications/kit-notices.test.tsx` (FR-KIT-55 ×2, -56 ×2, -57, -58, -59 ×3, -60, -01, -07, -04), `dm/features/combat-tracker/kit-card.test.tsx` (FR-KIT-62, -63, -64, -65, -01, -03, -07), `player/features/combat-tracker/kit-card-view.test.tsx` (FR-KIT-66 ×2, -04), `fixtures/bundles/kit-notices.fixtures.test.ts`; `dm/features/combat-tracker/card-actions.test.tsx` FR-CBT-130 now asserts the slot in the footer. e2e `kit-notices.e2e.ts`.
+- **Fixtures:** bundle `kit-notices` = `theme-gilt` + `kit-notices-applied` (as `player-1`, Mira's crossbow 14 / 5 → the DM applies 7 on Goblin 2) + `kit-notices` (as `player-2`, draft "Bram" → the DM's pending request; as `player-1`, Mira's crossbow 17 / 6 → a pending card).
+- **CON-44:** 0 B (bundle: DM 38,022 B, P1 19,416 B, P2 16,465 B).
+## 175. Sprint 13: stat-block window (K7)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#611-stat-block-window-dm-only-oq-kit-04-b) §6.11 FR-KIT-100 – -107 (OQ-KIT-04 B; DM #355, #356). **Built by `build/kit-statblock`**: client only, DM only; no record type, intent, event, signal or wire field (0 bytes on the wire). Data side: [data model §139](../data-model/README.md#139-sprint-13-stat-block-window-k7).
 
 | Part | Contract | FR |
 |---|---|---|
@@ -4054,5 +4075,5 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#611-stat-block-window-dm-only-
 
 - **Players:** no window type, launcher entry, token menu or compendium opener; the player bundle holds no `statblock` module (`FR-KIT-107` boundary test). Nothing new reaches any client.
 - **Tests:** `dm/features/entities/statblock/statblock.test.tsx` (`FR-KIT-100` – `-107`), `dm/features/play-shell/windows.test.ts` (goldens, `FR-SHELL-42` restoreOpen list), `party-board/manager-window.test.ts` (`FR-SHELL-161` threshold 1545); bundle test `kit-parity.fixtures.test.ts`; e2e `kit-statblock.e2e.ts`.
-- **Fixtures:** bundle `kit-parity` (data model §138).
+- **Fixtures:** bundle `kit-parity` (data model §139).
 - **CON-44:** 0 B.

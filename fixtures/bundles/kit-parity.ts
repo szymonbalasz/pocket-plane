@@ -26,6 +26,9 @@ export default defineBundle({
     "pet-owlbear",
     // K7 (stat block window): the Goblin combatant (theme-gilt) opens bound from Initiative ⋯ or
     // its token; the compendium's Goblin (cmp-srd-mini) opens with "Open at the table". No unit.
-    // K3 (notices): appends its `kit-notices` units here (a player's request card) once on main.
+    // K3 (notices, damage card): Mira's crossbow card applied on Goblin 2 (the player card
+    // view); Player 2's draft "Bram" (the DM's request card) and Mira's pending crossbow card.
+    "kit-notices-applied",
+    "kit-notices",
   ],
 });

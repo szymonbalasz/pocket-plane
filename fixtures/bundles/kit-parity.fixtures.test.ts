@@ -39,7 +39,7 @@ describe("kit-parity bundle (kit parity §13)", () => {
     const db = r.openDb();
     cleanups.unshift(() => closeDb(db));
     expect(r.manifest.status).toBe("complete");
-    expect(r.manifest.fixtures.slice(-8)).toEqual([
+    expect(r.manifest.fixtures.slice(-10)).toEqual([
       "kit-log-rolls",
       "combat-hit",
       "combat-pending",
@@ -48,6 +48,8 @@ describe("kit-parity bundle (kit parity §13)", () => {
       "cmp-srd-mini",
       "cp-srd",
       "pet-owlbear",
+      "kit-notices-applied",
+      "kit-notices",
     ]);
     const enc = db.select().from(encounter).where(eq(encounter.status, "started")).get();
     expect(enc?.round).toBe(3);
