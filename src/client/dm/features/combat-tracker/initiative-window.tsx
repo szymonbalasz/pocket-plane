@@ -83,6 +83,7 @@ import {
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
+import { TurnAlertRuntime } from "@ui/features/combat-tracker/turn-alert-runtime";
 import {
   ENCOUNTERS_KIND,
   INITIATIVE_KIND,
@@ -1758,6 +1759,8 @@ function CombatDialogs() {
       <HpDialog />
       <SummonDialog />
       <CbtxRuntime />
+      {/* FR-KIT-59 (OQ-KIT-03 A): the DM's turn card. */}
+      <TurnAlertRuntime />
     </>
   );
 }

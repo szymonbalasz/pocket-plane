@@ -1,15 +1,17 @@
 // Shared pieces of rows and toasts: body (icon + text or the kind's renderer), action runner,
-// the causer's colour stripe (FR-NOTE-39, -41).
+// the causer's colour stripe (FR-NOTE-39, -41). Kit parity K3 (FR-KIT-55, -56): the toast card's
+// lead (the causing player's Medallion, else the kind's icon) and its two-line text block.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
-import { BellIcon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { BellIcon, XIcon } from "lucide-react";
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { MEDALLION_PX, Medallion } from "../../components/kit/medallion";
 import { useRecords, useSync } from "../../sync/store";
 import { colorHex } from "../campaign-management/colors";
 import { useColorKeyOf } from "../dice-roll-log/name-color";
 import { useOpenWindow } from "../play-shell/ShellContext";
-import { byAttr, causerOf, rejectMessage } from "./logic";
+import { byAttr, causerOf, leadName, rejectMessage, relativeTime } from "./logic";
 import { hideToast } from "./toasts";
 import type {
   NotificationActionContext,
@@ -29,6 +31,116 @@ export function NoteBody({ n, views }: { n: NotificationRecord; views: Notificat
         {Render ? <Render notification={n} /> : n.text}
       </div>
     </div>
+  );
+}
+
+/**
+ * FR-KIT-55: the toast card's row (`data-slot="toast-card"`): lead · text block · actions · close,
+ * centred on one line; Simple Dark's popover surface, a theme frames the slot.
+ */
+export const TOAST_CARD =
+  "pointer-events-auto relative flex items-center gap-2.5 rounded-lg border bg-popover py-2 pr-2.5 pl-3 text-sm text-popover-foreground shadow-lg";
+
+/** FR-KIT-57: a toast's close, the gem in a theme (styled by its test ID). */
+export function CloseGem({ testId, onClose }: { testId: string; onClose: () => void }) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      aria-label="Close"
+      className="shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
+      onClick={onClose}
+    >
+      <XIcon className="size-4" />
+    </button>
+  );
+}
+
+/**
+ * FR-KIT-55: a toast card's lead, the size of a `md` Medallion (28 px): the causing player's
+ * initial on their colour, else the kind's icon (`icon`, default the bell). Decorative.
+ */
+export function ToastLead({
+  name,
+  color,
+  icon: Icon = BellIcon,
+}: {
+  /** The causing player's name; null → the icon. */
+  name?: string | null;
+  /** Their palette key (`useNoteStripe`); null → neutral. */
+  color?: string | null;
+  icon?: ComponentType<{ className?: string }> | undefined;
+}) {
+  if (name) return <Medallion name={name} colour={color ? colorHex(color) : null} size="md" />;
+  return (
+    <span
+      aria-hidden
+      data-testid="note-toast-icon"
+      className="inline-flex shrink-0 items-center justify-center text-muted-foreground"
+      style={{ width: MEDALLION_PX.md, height: MEDALLION_PX.md }}
+    >
+      <Icon className="size-4" />
+    </span>
+  );
+}
+
+/** FR-KIT-55: the name of the player who caused a row, when it is a player the client holds. */
+export function useCauserName(n: NotificationRecord): string | null {
+  const players = useRecords<PlayerRecord>("player");
+  if (n.byRole !== "player" || !n.byPlayerId) return null;
+  return players.find((p) => p.id === n.byPlayerId)?.name ?? null;
+}
+
+/**
+ * FR-KIT-56: the card's text block: line 1 the text (`note-text`; the causing player's name in
+ * bold when it starts a plain text; a kind's renderer as it is), line 2 the relative time.
+ */
+export function ToastText({
+  n,
+  views,
+  name,
+}: {
+  n: NotificationRecord;
+  views: NotificationViews;
+  name: string | null;
+}) {
+  const Render = views.get(n.kind)?.render;
+  const { lead, rest } = leadName(n.text, name);
+  return (
+    <div data-slot="toast-text" className="min-w-0 flex-[1_1_9rem] break-words text-sm">
+      <div data-testid="note-text">
+        {Render ? (
+          <Render notification={n} />
+        ) : lead ? (
+          <>
+            <b className="font-semibold">{lead}</b>
+            {rest}
+          </>
+        ) : (
+          n.text
+        )}
+      </div>
+      <NoteTime iso={n.createdAt} />
+    </div>
+  );
+}
+
+/** FR-KIT-56: "just now", "2 min ago", … (`note-time`), re-read every 30 s while shown. */
+export function NoteTime({ iso }: { iso: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const h = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(h);
+  }, []);
+  return (
+    <time
+      data-testid="note-time"
+      dateTime={iso}
+      title={timeOf(iso).full}
+      className="block text-xs text-muted-foreground"
+    >
+      {relativeTime(iso, now)}
+    </time>
   );
 }
 
