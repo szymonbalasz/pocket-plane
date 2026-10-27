@@ -8,7 +8,13 @@ import { join } from "node:path";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { HP_TRACK_PX } from "@ui/components/kit/hp-bar";
-import { statusShown } from "@ui/features/combat-extras/parts";
+import { TooltipProvider } from "@ui/components/ui/overlays";
+import {
+  EffectChips,
+  StatusCell,
+  statusPieces,
+  statusShown,
+} from "@ui/features/combat-extras/parts";
 import { companionLayout } from "@ui/features/combat-tracker/companions";
 import {
   companionStore,
@@ -27,6 +33,7 @@ import {
   trackRoom,
 } from "@ui/features/combat-tracker/parts";
 import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
+import { renderToStaticMarkup } from "react-dom/server";
 import { END_CONFIRM_LABEL, END_KEEP_LABEL, EndConfirmButtons } from "./end-confirm";
 import {
   dmInitiativeWindow,
@@ -512,6 +519,75 @@ describe("FR-KIT-28 status icons", () => {
     expect(tag(mira, "cbtx-init-row-effect-more")).toContain('data-value="1"');
     // No effects → no status box content.
     expect(rowHtml(html, "cbt-init-row", "thorn")).toMatch(/data-slot="init-status"[^>]*><\/span>/);
+  });
+  test("FR-KIT-28 status icons (K12 re-test, orchestrator ruling; FR-CBTX-54 note): one fixed 56-px column; up to two icon pieces (concentration and triggers first, then one effect), the rest in '+N'; with two pieces or a '+N' the rounds drop into the Tooltip", () => {
+    expect(statusPieces(1, 1, 1, false)).toEqual({ conc: 1, triggers: 1, effects: 0 });
+    expect(statusPieces(0, 3, 1, false)).toEqual({ conc: 0, triggers: 2, effects: 0 });
+    expect(statusPieces(0, 1, 2, false)).toEqual({ conc: 0, triggers: 1, effects: 1 });
+    expect(statusPieces(1, 0, 2, false)).toEqual({ conc: 1, triggers: 0, effects: 0 });
+    expect(statusPieces(0, 0, 2, false)).toEqual({ conc: 0, triggers: 0, effects: 1 });
+    expect(statusPieces(0, 0, 0, false)).toEqual({ conc: 0, triggers: 0, effects: 0 });
+    // A narrow list (its cell as wide as its chips) as before: no trigger or concentration folds.
+    expect(statusPieces(1, 3, 2, true)).toEqual({ conc: 1, triggers: 3, effects: 0 });
+    const html = dm();
+    for (const id of ["goblin", "mira", "thorn"]) {
+      const cell = /<span data-slot="init-status"[^>]*>/.exec(
+        rowHtml(html, "cbt-init-row", id),
+      )?.[0];
+      expect(cell).toMatch(/class="flex w-14 shrink-0 /);
+      expect(cell).not.toContain("min-w-14");
+    }
+    const mira = fromSlot(rowHtml(html, "cbt-init-row", "mira"), "init-status");
+    expect(mira).toMatch(
+      /data-status="true" data-more="true" class="[^"]*\[&amp;_\[data-rounds\]\]:hidden/,
+    );
+    // Two triggers + an effect: both triggers show, the effect folds into "+1" on the second
+    // one's corner (no width); a third trigger would fold too, named by its state line.
+    const trig = (id: string, name: string) => ({
+      id,
+      triggerId: id,
+      name,
+      uses: null,
+      state: "ready" as const,
+      muted: false,
+      down: false,
+      tooltip: "Ready",
+    });
+    const cell = renderToStaticMarkup(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <StatusCell>
+          <EffectChips
+            effects={[effect("p", { kind: "condition", condition: "prone" }) as never]}
+            triggers={[trig("t1", "Divine Fury"), trig("t2", "Searing Strike")]}
+            round={1}
+            testId="cbtx-init-row-effect"
+          />
+        </StatusCell>
+      </TooltipProvider>,
+    );
+    expect(cell.match(/data-testid="cbtx-trigger-chip"/g)).toHaveLength(2);
+    expect(cell).toMatch(
+      /data-status-last="true" class="relative flex shrink-0">[\s\S]*Searing Strike[\s\S]*<span class="absolute -top-2 -right-2 flex">/,
+    );
+    expect(cell).toMatch(/data-testid="cbtx-init-row-effect-more" data-value="1"/);
+    expect(cell).toMatch(/aria-label="More effects: Prone"/);
+    expect(cell).toMatch(
+      /data-status="true" data-more="true" class="[^"]*\[&amp;_\[data-rounds\]\]:hidden/,
+    );
+    const three = renderToStaticMarkup(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <StatusCell>
+          <EffectChips
+            effects={[]}
+            triggers={[trig("t1", "Divine Fury"), trig("t2", "Searing Strike"), trig("t3", "Hex")]}
+            round={1}
+            testId="cbtx-init-row-effect"
+          />
+        </StatusCell>
+      </TooltipProvider>,
+    );
+    expect(three.match(/data-testid="cbtx-trigger-chip"/g)).toHaveLength(2);
+    expect(three).toMatch(/aria-label="More effects: Hex — ready"/);
   });
 });
 

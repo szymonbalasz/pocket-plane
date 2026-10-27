@@ -149,20 +149,21 @@ describe("FR-DICE-68 entry actions", () => {
 
   test("FR-DICE-68 entry actions: empty registry → no action markup; a test action on its lines only, hidden until hover / focus", () => {
     const none = render([OLD, NEW]);
-    expect(none).not.toContain("dice-log-action");
+    // (By test ID: the chip slot's class names the confirm, `group-has-[…confirm]`.)
+    expect(none).not.toContain('data-testid="dice-log-action');
     const [old, next] = rows(render([OLD, NEW], [test1]));
-    expect(old).not.toContain("dice-log-action");
+    expect(old).not.toContain('data-testid="dice-log-action');
     expect(next).toMatch(
       /data-testid="dice-log-action" data-value="test.star" data-record-id="e2" aria-label="Star it"/,
     );
     expect(next).toMatch(
       /data-testid="dice-log-actions" class="[^"]*opacity-0[^"]*group-hover\/entry:opacity-100/,
     );
-    // The row is the hover group; FR-KIT-40: the actions end it, after the result boxes (the
-    // category moved into the Tooltip, FR-KIT-45).
+    // The row is the hover group; FR-KIT-40 (K12): the actions lead the right column, before
+    // the time and the result boxes, so rows with and without actions keep the boxes aligned.
     expect(next).toContain("group/entry");
-    expect(next?.indexOf("dice-log-actions")).toBeGreaterThan(
-      next?.indexOf("dice-log-entry-total") ?? Number.POSITIVE_INFINITY,
+    expect(next?.indexOf("dice-log-actions")).toBeLessThan(
+      next?.indexOf("dice-log-entry-total") ?? Number.NEGATIVE_INFINITY,
     );
   });
 
@@ -177,7 +178,7 @@ describe("FR-DICE-68 entry actions", () => {
       "test.second",
     ]);
     expect(actionsFor([gated], off, NEW)).toEqual([]);
-    expect(rows(render([NEW], [gated], off))[0]).not.toContain("dice-log-action");
+    expect(rows(render([NEW], [gated], off))[0]).not.toContain('data-testid="dice-log-action');
   });
 });
 

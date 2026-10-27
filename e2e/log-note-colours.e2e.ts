@@ -172,8 +172,10 @@ test("FR-NOTE-39 FR-NOTE-40 toasts and history rows striped in the causer's colo
   const row = win.getByTestId("note-history-row").filter({ hasText: "Apply 3 damage?" });
   await expect(row).toHaveAttribute("data-state", "pending");
   await expect(row).toHaveAttribute("data-color", k);
-  await expect(row.getByTestId("note-stripe")).toHaveCSS("background-color", HEX[k]);
-  // B's own row of it: the same stripe.
+  // K12 (kit round 3): the window row has no stripe; its medallion carries the causer's colour.
+  await expect(row.getByTestId("note-stripe")).toHaveCount(0);
+  await expect(row.getByTestId("kit-medallion")).toHaveCSS("background-color", HEX[k]);
+  // B's own row of it: the same colour.
   const prow = pwin.getByTestId("note-history-row").filter({ hasText: "Apply 3 damage?" });
   await expect(prow).toHaveAttribute("data-color", k);
 

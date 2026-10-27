@@ -5,6 +5,7 @@
 // `popups`) to show where the stack sat.
 import { describe, expect, test } from "bun:test";
 import { dmStackSpot, STACK_W, type StackWindow } from "./keep-out";
+import { cappedSpot } from "./keep-out-capped";
 
 type Box = { x: number; y: number; w: number; h: number };
 
@@ -89,10 +90,10 @@ describe("FR-NOTE-78 keep off windows' primary content", () => {
     // that token, 286, is where sim-14 drew the summary).
     const avoid = [{ x: 495, y: 355, w: 44, h: 44 }];
     // The repro: the fewest controls alone put it on the Insight card.
-    const before = dmStackSpot(small, init720, SUMMARY_H, STACK_W, avoid, [log720, old(requests)]);
+    const before = cappedSpot(small, init720, SUMMARY_H, STACK_W, avoid, [log720, old(requests)]);
     expect(before).toMatchObject({ left: 480, top: 286 });
     expect(hits(stack(before, SUMMARY_H), insight)).toBe(true);
-    const at = dmStackSpot(small, init720, SUMMARY_H, STACK_W, avoid, [log720, requests]);
+    const at = cappedSpot(small, init720, SUMMARY_H, STACK_W, avoid, [log720, requests]);
     expect(at).toMatchObject({ left: 480, top: 374 });
     const r = stack(at, SUMMARY_H);
     for (const p of [newRequest, insight, ...(log720.logRows ?? [])])
@@ -108,10 +109,10 @@ describe("FR-NOTE-78 keep off windows' primary content", () => {
     // The Perception card's title line ("Perception · public · 3 / 3"), inside its p-2.
     const heading = { x: 526, y: 381, w: 316, h: 19 };
     // The repro (sim-15 c01: 480, 373): on the heading.
-    const before = dmStackSpot(small, init720, SUMMARY_H, STACK_W, avoid, [log720, requests]);
+    const before = cappedSpot(small, init720, SUMMARY_H, STACK_W, avoid, [log720, requests]);
     expect(before).toMatchObject({ left: 480, top: 374 });
     expect(hits(stack(before, SUMMARY_H), heading)).toBe(true);
-    const at = dmStackSpot(small, init720, SUMMARY_H, STACK_W, avoid, [
+    const at = cappedSpot(small, init720, SUMMARY_H, STACK_W, avoid, [
       log720,
       { ...requests, headings: [heading] },
     ]);
@@ -183,9 +184,9 @@ describe("FR-NOTE-78 keep off windows' primary content", () => {
       ],
     };
     // The repro: on Mira's and Thorn's wallets (no control there).
-    const before = dmStackSpot(vp, init, SUMMARY_H, STACK_W, [], [log, old(pm)]);
+    const before = cappedSpot(vp, init, SUMMARY_H, STACK_W, [], [log, old(pm)]);
     expect(wallets.some((w) => hits(stack(before, SUMMARY_H), w))).toBe(true);
-    const at = dmStackSpot(vp, init, SUMMARY_H, STACK_W, [], [log, pm]);
+    const at = cappedSpot(vp, init, SUMMARY_H, STACK_W, [], [log, pm]);
     // K5: the 280-px Game log has room between its first row and its newest entries: the summary
     // sits over older entries there (as F2 2a's), before the free row right of 'Party pot' (140).
     expect(at).toMatchObject({ left: 560, top: 688 });
@@ -406,11 +407,11 @@ describe("FR-NOTE-78 walkthrough F2 1b / 2a: live cards folded into the summary"
     };
     // The repro: summary + "+2 more" below it (92 px) → on the composer (480, 175). K5: the
     // 200-px Game log leaves room for 92 px below the Insight card too, off the composer.
-    const before = dmStackSpot(small, init720, FOLDED_OLD_H, STACK_W, [], [log, requests]);
+    const before = cappedSpot(small, init720, FOLDED_OLD_H, STACK_W, [], [log, requests]);
     expect(before).toMatchObject({ left: 480, top: 405 });
     expect(composer.some((c) => hits(stack(before, FOLDED_OLD_H), c))).toBe(false);
     // The pill in the summary's row: 1a's spot.
-    const at = dmStackSpot(small, init720, FOLDED_H, STACK_W, [], [log, requests]);
+    const at = cappedSpot(small, init720, FOLDED_H, STACK_W, [], [log, requests]);
     expect(at).toMatchObject({ left: 480, top: 405 });
     const r = stack(at, FOLDED_H);
     for (const p of [newRequest, insight, ...composer, ...(log.logRows ?? [])])
@@ -418,7 +419,7 @@ describe("FR-NOTE-78 walkthrough F2 1b / 2a: live cards folded into the summary"
     // BL-119: with the Perception card's heading measured, it moves off the heading too. K5: below
     // it (440), above the 200-px Game log (before: no spot cleared it, it kept 405).
     const heading = { x: 526, y: 412, w: 316, h: 20 };
-    const withHeading = dmStackSpot(
+    const withHeading = cappedSpot(
       small,
       init720,
       FOLDED_H,
@@ -490,12 +491,12 @@ describe("FR-NOTE-78 walkthrough F2 1b / 2a: live cards folded into the summary"
     };
     // The repro: 92 px reached the Game log's newest row from 624, so it took "Add loot" (560,
     // 333). K5: the 280-px log has room for 92 px over its older entries, off "Add loot".
-    const before = dmStackSpot(vp, init, FOLDED_OLD_H, STACK_W, [], [log, pm]);
+    const before = cappedSpot(vp, init, FOLDED_OLD_H, STACK_W, [], [log, pm]);
     expect(before).toMatchObject({ left: 560, top: 648 });
     expect(addLoot.some((c) => hits(stack(before, FOLDED_OLD_H), c))).toBe(false);
     // The pill in the summary's row: 2b's spot (accepted); K5: lower, over the 280-px log's older
     // entries.
-    const at = dmStackSpot(vp, init, FOLDED_H, STACK_W, [], [log, pm]);
+    const at = cappedSpot(vp, init, FOLDED_H, STACK_W, [], [log, pm]);
     expect(at).toMatchObject({ left: 560, top: 688 });
     const r = stack(at, FOLDED_H);
     for (const p of [...wallets, ...headings, ...(pm.controls ?? []), ...(log.logRows ?? [])])

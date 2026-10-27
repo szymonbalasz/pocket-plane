@@ -77,6 +77,16 @@ export function ToastLead({
   );
 }
 
+/**
+ * K12 (round-2 minor): the card's lead name: the causing player (`useCauserName`), else "DM" for
+ * a DM-sent card, so it shows the DM's medallion on the DM's colour instead of the kind's icon.
+ * The text's bold name stays the player's only (FR-KIT-56).
+ */
+export function useMedallionName(n: NotificationRecord): string | null {
+  const player = useCauserName(n);
+  return player ?? (n.byRole === "dm" ? "DM" : null);
+}
+
 /** FR-KIT-55: the name of the player who caused a row, when it is a player the client holds. */
 export function useCauserName(n: NotificationRecord): string | null {
   const players = useRecords<PlayerRecord>("player");

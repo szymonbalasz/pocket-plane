@@ -337,16 +337,18 @@ test("BL-119 FR-NOTE-78 sim-15 c01 DM 1280×720: Roll requests at 504, 60 with t
   const cards = requests.getByTestId("dicex-request-card");
   const before = await cards.count();
   // sim-15 c01: both requests answered (the DM rolls for the missing PCs): cards without buttons.
+  // The DM's own roll popups (6 s, over the windows by design, #348) closed. DM #364: the summary
+  // may sit left of Roll requests, and the popup column under it reaches the composer.
+  const closePopup = dm.locator(
+    '[data-testid="dicex-popup"]:not([data-state="closing"]) [data-testid="dicex-popup-close"]',
+  );
   for (const [i, roll] of ["Perception", "Insight"].entries()) {
+    while ((await closePopup.count()) > 0) await closePopup.first().click();
     await sendRequest(requests, roll);
     await expect(cards).toHaveCount(before + i + 1);
     await cards.first().getByTestId("dicex-request-missing").click();
     await expect(cards.first()).not.toHaveAttribute("data-state", "open");
   }
-  // The DM's own roll popups (6 s, over the windows by design, #348) closed.
-  const closePopup = dm.locator(
-    '[data-testid="dicex-popup"]:not([data-state="closing"]) [data-testid="dicex-popup-close"]',
-  );
   while ((await closePopup.count()) > 0) await closePopup.first().click();
   await expect(dm.getByTestId("dicex-popup")).toHaveCount(0);
   await settled(dm);

@@ -167,7 +167,8 @@ export function DmPrompt({ notification: n }: { notification: NotificationRecord
           type="button"
           data-testid="dicex-prompt-open-requests"
           size="sm"
-          variant="ghost"
+          // K12 (round-2 gap 10): a small stone button (the kit's `.btn.sm`), not a text link.
+          variant="outline"
           className="h-6 px-1.5 text-xs"
           onClick={() => open(DICEX_REQUESTS_KIND)}
         >

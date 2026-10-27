@@ -63,6 +63,15 @@ test("FR-KIT-40 FR-KIT-41 FR-KIT-43 FR-KIT-44 FR-KIT-45 kit log rows: medallion,
   expect(total).toBeLessThanOrEqual(15);
   await expect(await entryDice(mine)).toHaveCount(2);
 
+  // K12 (round-2 gap 1): the time and the boxes keep one column down the list, rows with and
+  // without the "physical" chip alike (the bar's roll has none; Mira's attack has one).
+  expect(await mine.getByTestId("dice-log-entry-manual").count()).toBe(0);
+  const edges = async (r: Locator) => ({
+    time: Math.round((await r.getByTestId("dice-log-entry-time").boundingBox())?.x ?? -1),
+    box: Math.round((await r.getByTestId("dice-log-entry-total").last().boundingBox())?.x ?? -1),
+  });
+  expect(await edges(mine)).toEqual(await edges(attack));
+
   // Player-1: Mira's rows, the DM's hidden roll never.
   const p1 = await rolePage(browser);
   await p1.goto(link("Player 1"));

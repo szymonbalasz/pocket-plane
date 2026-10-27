@@ -221,3 +221,24 @@ describe("FR-NOTE-77 BL-118 fold before the first paint", () => {
     expect(after).toEqual([`520,100,${heightOf(1)}`]);
   });
 });
+
+describe("K12 one move per change (walkthrough 5)", () => {
+  test("FR-NOTE-77 K12 one move per change: while the layout changes no fold step: the stack re-places at once for its current toasts; once quiet the fold may step", () => {
+    // Encounters opens: unmeasured, the spot covers content (`need`); the fold would step to the
+    // summary (a far spot), then unfold 250 ms later (the walkthrough's two hops).
+    let s: StackSettle = { ...UNSETTLED, drawn: { left: 560, top: 100 } };
+    const covered = { need: true, min: 0, stackH: 264, shown: 3, spot: { left: 560, top: 301 } };
+    s = settleStack(s, { ...covered, now: 0, changing: true });
+    expect(s).toMatchObject({ hold: false, drawn: { left: 560, top: 301 } });
+    expect(s.fold).toEqual(UNSETTLED.fold);
+    // Still changing a frame later: the same state back (no fold step, no re-render loop).
+    expect(settleStack(s, { ...covered, now: 16, changing: true })).toBe(s);
+    // Quiet and measured: the full stack fits the empty body → no step, no second move.
+    const quiet = settleStack(s, { ...covered, need: false, now: 260 });
+    expect(quiet).toMatchObject({ hold: false, drawn: { left: 560, top: 301 } });
+    expect(quiet.fold).toEqual(UNSETTLED.fold);
+    // Quiet and still covering: now the fold steps (held where drawn).
+    const step = settleStack(s, { ...covered, now: 260 });
+    expect(step.fold.cap).toBeLessThan(UNSETTLED.fold.cap);
+  });
+});

@@ -101,7 +101,9 @@ describe("FR-CBT-118 DM rows", () => {
     );
     const own = drake.slice(0, drake.indexOf('data-record-id="fe2"'));
     expect(own).toContain(">Drake Companion<");
-    expect(own).toMatch(/data-testid="cbt-init-row-hp" data-record-id="drake">22 \/ 22</);
+    expect(own).toMatch(
+      /data-testid="cbt-init-row-hp"[^>]*data-record-id="drake"[^>]*>.*?<span[^>]*>22 \/ 22</,
+    );
     expect(own).toMatch(/data-testid="cbt-init-row-ac" data-record-id="drake">AC [^<]+</);
     expect(own).toContain('data-testid="cbt-init-row-card"');
     expect(own).toMatch(/data-testid="cbt-init-companion-menu" data-record-id="drake"/);
@@ -132,7 +134,21 @@ describe("FR-CBT-118 DM rows", () => {
       (m) => m[0],
     );
     expect(names.length).toBe(DM_ROWS.length);
-    for (const n of names) expect(n).not.toContain("truncate");
+    // K12 re-test (walkthrough 4, amends FR-CBTX-57 for child rows): an after-owner child's name
+    // is one line, truncated with its full text in a Tooltip; every other name stays whole.
+    const childNames = new Set(
+      [
+        ...html.matchAll(
+          /data-child="true"[^>]*><span data-name-head="true"[^>]*><span data-testid="cbt-init-row-name" data-value="([^"]+)"/g,
+        ),
+      ].map((m) => m[1]),
+    );
+    expect([...childNames]).toEqual(["Owlbear"]);
+    for (const n of names) {
+      const v = /data-value="([^"]+)"/.exec(n)?.[1] ?? "";
+      if (childNames.has(v)) expect(n).toMatch(/truncate[^"]*" data-state="closed"/);
+      else expect(n).not.toContain("truncate");
+    }
     // FR-CBT-125: lines are inside a `cbt-init-row` (the list viewport clips and counts rows).
     const lists = html.slice(html.indexOf('data-testid="cbt-init-list"'));
     for (const id of ["drake", "fe2", "wolfpet"]) {

@@ -154,6 +154,19 @@ export function autoscrollStep(y: number, top: number, bottom: number): number {
 }
 
 /**
+ * The autoscroll zone's top: the list's top, below its first child only when that child is a
+ * sticky column header. K12 fix (cb-reorder): since FR-KIT-23 dropped the "Combatant / Init"
+ * strip the first child is the rows' frame; its full height put the zone's top below the list,
+ * so every drag scrolled the list up and a drop landed blocks away from the pointer.
+ */
+export function autoscrollTop(
+  listTop: number,
+  first: { offsetHeight: number; position: string } | null,
+): number {
+  return listTop + (first?.position === "sticky" ? first.offsetHeight : 0);
+}
+
+/**
  * FR-CBTX-63: Move up / down, one block per step: up → anchor = the block two above (top when
  * one above), down → the block below. Null = disabled (an end, an attached row, a spot the
  * server would refuse).

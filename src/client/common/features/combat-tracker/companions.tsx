@@ -128,14 +128,40 @@ export function OwnerChip({
   c,
   ownerName,
   testId,
+  compact = false,
 }: {
   c: { id: string; ownerCharacterId?: string | null; ownerPlayerId?: string | null };
   ownerName: string;
   testId: string;
+  /**
+   * K12 (kit round 3, gap 6): a child row flush under its owner shows only the colour dot (the
+   * name in its Tooltip and for screen readers), so the row stays medallion · name · bar.
+   */
+  compact?: boolean;
 }) {
   const colorOf = useColorOf();
   if (!c.ownerCharacterId) return null;
   const color = c.ownerPlayerId ? colorOf({ role: "player", playerId: c.ownerPlayerId }) : null;
+  if (compact) {
+    return (
+      <Tooltip content={`Owner: ${ownerName}`}>
+        <span
+          data-testid={testId}
+          data-record-id={c.id}
+          data-value={c.ownerCharacterId}
+          data-compact
+          className="mr-1 flex size-4 shrink-0 items-center justify-center last:mr-0"
+        >
+          <span
+            aria-hidden
+            className="size-2 shrink-0 rounded-full bg-muted-foreground"
+            style={color ? { backgroundColor: color } : undefined}
+          />
+          <span className="sr-only">{ownerName}</span>
+        </span>
+      </Tooltip>
+    );
+  }
   return (
     <Badge
       variant="outline"

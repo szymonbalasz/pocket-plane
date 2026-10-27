@@ -9,7 +9,13 @@ import type { RecordStore } from "@shared/protocol/store";
 import { initials } from "@shared/scenes-map/geometry";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { HandshakeIcon, SwordsIcon } from "lucide-react";
-import { type RefObject, useLayoutEffect, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { HP_TRACK_PX } from "../../components/kit/hp-bar";
 import { Medallion, type MedallionSize } from "../../components/kit/medallion";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
@@ -115,6 +121,100 @@ export function CombatantMedallion({
       className={size === "lg" ? NARROW_LG : undefined}
     />
   );
+}
+
+/**
+ * K12 (round-2 gap 6): a companion's child row (an `after-owner` row, an in-turn line) under its
+ * owner: the `sm` medallion at the end of an `lg` medallion's slot, so the child's name and bar
+ * start in the owner's name column. No nested card: the row's classes (`CHILD_ROW`).
+ */
+export function ChildMedallion({
+  c,
+}: {
+  c: { name: string; imageAssetId?: string | null; tokenId?: string | null };
+}) {
+  return (
+    <span
+      data-slot="init-child-medallion"
+      // K12 re-test: on the name's line (the row's first), however many lines the row has.
+      className="flex w-[34px] shrink-0 justify-end self-start @max-[22rem]/init:w-7"
+    >
+      <CombatantMedallion c={c} size="sm" />
+    </span>
+  );
+}
+
+/**
+ * K12 (round-2 gap 6): the owner and its `after-owner` child read as one block: the child sits
+ * flush under the owner (the list's `gap-1` closed, the shared edge square), no indent, no rule.
+ */
+export const CHILD_ROW = {
+  /** On the owner row while its next row is its child. */
+  owner: "rounded-b-none",
+  /** On the child row. */
+  child: "-mt-1 rounded-t-none",
+} as const;
+
+/**
+ * K12: an in-turn companion line's HP bar track (`--hp-track` on its wrapper): short and fixed,
+ * so the one-row line (FR-CBT-142) keeps its room and the lines' bars line up.
+ */
+export const LINE_TRACK = { "--hp-track": "40px" } as CSSProperties;
+
+/**
+ * K12 re-test (walkthrough 4): a child row's name line: the name never wraps (a long name
+ * wrapped to three lines, the medallion on the second): it truncates with its full text in a
+ * Tooltip only when it and its marks don't fit the whole line; the side chips (owner dot, Ally)
+ * stay whole beside it, or on the next line when there's no room. Same test ID and `data-value`
+ * as `NameLine`'s. The medallion sits on this line (`ChildMedallion`).
+ */
+export function ChildNameLine({
+  name,
+  testId,
+  className,
+  marks,
+  side,
+}: {
+  name: string;
+  testId: string;
+  className?: string;
+  marks?: ReactNode;
+  side?: ReactNode;
+}) {
+  return (
+    <div
+      data-name-line
+      data-child
+      className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
+    >
+      <span data-name-head className="flex min-w-0 max-w-full items-center gap-1">
+        <Tooltip content={name}>
+          <span
+            data-testid={testId}
+            data-value={name}
+            className={cn("min-w-0 truncate", className)}
+          >
+            {name}
+          </span>
+        </Tooltip>
+        <span data-name-marks className="flex shrink-0 items-center gap-1 empty:hidden">
+          {marks}
+        </span>
+      </span>
+      <span data-name-side className="flex shrink-0 items-center empty:hidden">
+        {side}
+      </span>
+    </div>
+  );
+}
+
+/** K12: whether `layout[i]`'s next row is its own child (an `after-owner` row ranked by it). */
+export function childBelow(
+  layout: readonly { c: { id: string }; owner: { id: string } | null; indent: boolean }[],
+  i: number,
+): boolean {
+  const next = layout[i + 1];
+  return Boolean(next?.indent && next.owner?.id === layout[i]?.c.id);
 }
 
 export const InitiativeIcon = SwordsIcon;

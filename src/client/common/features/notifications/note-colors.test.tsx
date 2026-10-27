@@ -176,13 +176,16 @@ function boxes(html: string, testId: "note-toast" | "note-history-row") {
   return out;
 }
 const attr = (tag: string, name: string) => new RegExp(` ${name}="([^"]*)"`).exec(tag)?.[1];
+/** K12: the lead medallion's colour (the window rows' causer colour, no stripe there). */
+const medallionOf = (body: string) =>
+  /data-testid="kit-medallion"[^>]*style="background-color:([^";]+)/.exec(body)?.[1] ?? null;
 const stripeOf = (body: string) =>
   /<span aria-hidden="true" data-testid="note-stripe"[^>]*style="background-color:([^"]+)"/.exec(
     body,
   )?.[1] ?? null;
 
 describe("FR-NOTE-39 accent stripe", () => {
-  test("FR-NOTE-39 accent stripe: toast and row in the causer's colour; null stamp none; pending border kept", () => {
+  test("FR-NOTE-39 accent stripe: toast and row in the causer's colour (K12: the window row through its medallion, no stripe); null stamp none; pending border kept", () => {
     const store = storeOf(ALL);
     for (const part of ["toasts", "history"] as const) {
       const b = boxes(render(store, part), part === "toasts" ? "note-toast" : "note-history-row");
@@ -190,18 +193,22 @@ describe("FR-NOTE-39 accent stripe", () => {
       const card = b.get("n1");
       expect(attr(card?.tag ?? "", "data-by")).toBe(P1);
       expect(attr(card?.tag ?? "", "data-color")).toBe("jade");
-      expect(stripeOf(card?.body ?? "")).toBe(PLAYER_COLORS.jade);
+      const colourOf = part === "toasts" ? stripeOf : medallionOf;
+      expect(colourOf(card?.body ?? "")).toBe(PLAYER_COLORS.jade);
+      if (part === "history") expect(card?.body).not.toContain("note-stripe");
       const info = b.get("n2");
       expect(attr(info?.tag ?? "", "data-by")).toBe("dm");
       expect(attr(info?.tag ?? "", "data-color")).toBe("amber");
-      expect(stripeOf(info?.body ?? "")).toBe(PLAYER_COLORS.amber);
+      // K12: a DM-sent card leads with the DM's medallion (toast and row).
+      expect(medallionOf(info?.body ?? "")).toBe(PLAYER_COLORS.amber);
+      expect(colourOf(info?.body ?? "")).toBe(PLAYER_COLORS.amber);
       const old = b.get("n3");
       expect(attr(old?.tag ?? "", "data-by")).toBeUndefined();
       expect(attr(old?.tag ?? "", "data-color")).toBeUndefined();
       expect(old?.body).not.toContain("note-stripe");
-      // The stripe sits inside the box (relative parent), 3 px wide.
+      // The toast's stripe sits inside the box (relative parent), 3 px wide.
       expect(card?.tag).toContain("relative");
-      expect(card?.body).toContain("w-[3px]");
+      if (part === "toasts") expect(card?.body).toContain("w-[3px]");
       if (part === "history") expect(card?.tag).toContain("border-primary");
     }
   });
@@ -254,8 +261,9 @@ describe("FR-NOTE-41 old rows", () => {
     const next = storeOf(ALL, { p1: "rose", dm: "yellow" });
     for (const part of ["toasts", "history"] as const) {
       b = boxes(render(next, part), part === "toasts" ? "note-toast" : "note-history-row");
-      expect(stripeOf(b.get("n1")?.body ?? "")).toBe(PLAYER_COLORS.rose);
-      expect(stripeOf(b.get("n2")?.body ?? "")).toBe(PLAYER_COLORS.yellow);
+      const colourOf = part === "toasts" ? stripeOf : medallionOf;
+      expect(colourOf(b.get("n1")?.body ?? "")).toBe(PLAYER_COLORS.rose);
+      expect(colourOf(b.get("n2")?.body ?? "")).toBe(PLAYER_COLORS.yellow);
     }
   });
 });

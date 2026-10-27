@@ -69,8 +69,8 @@ import {
 import { cn } from "@ui/lib/utils";
 import { IntentRejected } from "@ui/sync/connection";
 import { useRecords, useSync } from "@ui/sync/store";
-import { EyeOffIcon, XIcon } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { EyeOffIcon, PlusIcon, XIcon } from "lucide-react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LinkHintNote } from "../combat-extras/link-hint";
 import {
   AcCell,
@@ -149,10 +149,12 @@ const RESULT_INPUT =
  * FR-KIT-63: the Result box's outcome colours (meaning tokens, FR-THEME-09) on an input. K8 (K6
  * gap 7): the damage box keeps a neutral border, only its number is red (the kit's `.res.dmg`).
  */
-const OUTCOME_INPUT: Partial<Record<ResultOutcome, string>> = {
+const OUTCOME_INPUT: Partial<Record<CardOutcome, string>> = {
   crit: "border-hp-full/60 text-hp-full",
   fumble: "text-muted-foreground",
   damage: "text-destructive",
+  // K12 (round-2 gap 8): the kit's green to-hit once it hits; the border stays neutral (as damage).
+  hit: "text-hp-full",
 };
 /** FR-KIT-63 (K8): a result line's label in body type, not label type (`card-label`). */
 const CARD_LABEL = "min-w-0 flex-1 flex-wrap text-sm font-normal";
@@ -181,6 +183,18 @@ export function applyLabel(
 /** FR-KIT-63: the to-hit box's outcome: natural 20 → crit, natural 1 → fumble, else plain. */
 export const toHitOutcome = (natural: number | null): ResultOutcome =>
   natural === 20 ? "crit" : natural === 1 ? "fumble" : "plain";
+
+/** K12: the card's box outcomes: the Result box's plus `hit` (a to-hit every target row hits). */
+export type CardOutcome = ResultOutcome | "hit";
+
+/**
+ * K12 (round-2 gap 8): the to-hit box on the card: FR-KIT-63's natural outcome, else `hit` while
+ * there is a target row and every one is a Hit (the kit's green 29), else plain.
+ */
+export function cardToHitOutcome(natural: number | null, hits: readonly boolean[]): CardOutcome {
+  const o = toHitOutcome(natural);
+  return o === "plain" && hits.length > 0 && hits.every(Boolean) ? "hit" : o;
+}
 
 /**
  * Current / max / temp HP the DM sees: monsters on the combatant, PCs on the character (temp HP:
@@ -230,28 +244,121 @@ function DamageDice({
   return maxed ? <PartDice part={part} dice={dice} maxed={maxed} /> : <Dice dice={dice} />;
 }
 
+/** The chip's gap (`gap-1.5`) and the target line's, px. */
+const CHIP_GAP = 6;
+
+/**
+ * K12 re-test (walkthrough 4): "Name · AC n" in a target row. The name takes the line's free
+ * width: when it would truncate, the " · AC n" part steps aside (`data-ac-folded`; still in the
+ * DOM) and comes back once the line has room for it again
+ * (measured from the line's slack, so it never flips back and forth); only a name longer than
+ * that truncates. Folded, the chip's Tooltip reads "Name · AC n".
+ */
+function TargetChip({ name, tip, children }: { name: string; tip: string; children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const acWidth = useRef(0);
+  const [folded, setFolded] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure for a new name, and re-attach once the Tooltip wraps or unwraps the chip
+  useLayoutEffect(() => {
+    const chip = ref.current;
+    const line = chip?.parentElement;
+    if (!chip || !line) return;
+    const measure = () => {
+      const nameEl = chip.querySelector<HTMLElement>("[data-target-name]");
+      const ac = chip.querySelector<HTMLElement>("[data-target-ac]");
+      if (!nameEl || !ac || line.clientWidth === 0) return;
+      setFolded((was) => {
+        if (!was) {
+          acWidth.current = ac.offsetWidth;
+          return nameEl.scrollWidth > nameEl.clientWidth + 0.5;
+        }
+        const kids = [...line.children].filter((k): k is HTMLElement => k instanceof HTMLElement);
+        const used = kids.reduce((a, k) => a + k.offsetWidth, 0) + CHIP_GAP * (kids.length - 1);
+        const need = nameEl.scrollWidth - nameEl.clientWidth + acWidth.current + CHIP_GAP;
+        return line.clientWidth - used < need;
+      });
+    };
+    measure();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(line);
+    ro?.observe(chip);
+    return () => ro?.disconnect();
+  }, [name, folded]);
+  const chip = (
+    <span
+      ref={ref}
+      data-slot="card-target-chip"
+      data-ac-folded={folded || undefined}
+      className="inline-flex min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5 data-[ac-folded]:[&_[data-target-ac]]:hidden"
+    >
+      {children}
+    </span>
+  );
+  return folded ? <Tooltip content={tip}>{chip}</Tooltip> : chip;
+}
+
 /** "Add target" Combobox over every eligible combatant not yet in the list (incl. hidden). */
 function AddTarget({
   options,
   onPick,
   disabled,
+  collapsed,
 }: {
   options: CombatantView[];
   onPick(c: CombatantView): void;
   disabled: boolean;
+  /**
+   * K12 (round-2 gap 8): the card has a target, so the field hides behind a small "+" (which takes
+   * `cbt-popup-target-add`: a click opens the field with its list, as a click on the field did).
+   */
+  collapsed: boolean;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const shown = options.filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase()));
-  const pick = (c: CombatantView) => {
-    onPick(c);
+  const close = () => {
     setQ("");
     setOpen(false);
+    setExpanded(false);
   };
+  const pick = (c: CombatantView) => {
+    onPick(c);
+    close();
+  };
+  if (collapsed && !expanded) {
+    return (
+      <Tooltip content="Add target">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-6 self-start"
+          data-testid="cbt-popup-target-add"
+          aria-label="Add target"
+          disabled={disabled}
+          onClick={() => {
+            setExpanded(true);
+            setOpen(true);
+          }}
+        >
+          <PlusIcon className="size-3.5" />
+        </Button>
+      </Tooltip>
+    );
+  }
   return (
-    <Popover open={open && !disabled} onOpenChange={setOpen}>
+    <Popover
+      open={open && !disabled}
+      onOpenChange={(o) => {
+        // Closed (outside click, focus away, Esc): the "+" again while the card has a target.
+        if (o) setOpen(true);
+        else close();
+      }}
+    >
       <PopoverAnchor asChild>
         <Input
+          // Opened from the "+": the field takes the focus for typing.
+          autoFocus={collapsed}
           data-testid="cbt-popup-target-add"
           role="combobox"
           aria-expanded={open}
@@ -269,7 +376,7 @@ function AddTarget({
             if (e.key === "Enter" && shown[0]) pick(shown[0]);
             if (e.key === "Escape" && open) {
               e.stopPropagation();
-              setOpen(false);
+              close();
             }
           }}
         />
@@ -564,6 +671,10 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
     const extra = x.hit ? partPreviewExtra(popupParts, draft.parts, view, views, p) : 0;
     return { ...x, view, raw: x.raw === null ? null : x.raw + extra };
   });
+  const toHitBox = cardToHitOutcome(
+    rolledNatural,
+    rows.map((x) => x.hit),
+  );
   const ready = applyReady(
     rows.map((x) => x.hit),
     damageTotal,
@@ -777,9 +888,9 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
               id="cbt-popup-tohit"
               data-testid="cbt-popup-tohit"
               data-slot="kit-result"
-              data-outcome={toHitOutcome(rolledNatural)}
+              data-outcome={toHitBox}
               inputMode="numeric"
-              className={cn(RESULT_INPUT, OUTCOME_INPUT[toHitOutcome(rolledNatural)])}
+              className={cn(RESULT_INPUT, OUTCOME_INPUT[toHitBox])}
               value={toHit}
               onChange={(e) => edit(() => ({ toHit: typeField(e.target.value) }))}
             />
@@ -912,9 +1023,9 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                 {/* FR-KIT-64: one compact line; K8 (K6 gap 7): it never wraps, a long name
                     truncates in its chip. */}
                 <div className="flex items-center gap-1.5 text-sm">
-                  <span
-                    data-slot="card-target-chip"
-                    className="inline-flex min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5"
+                  <TargetChip
+                    name={x.c.name}
+                    tip={`${x.c.name} · AC ${x.facts.ac?.value ?? x.ac ?? "—"}`}
                   >
                     <Medallion
                       name={x.c.name}
@@ -922,7 +1033,11 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                       colour={medallionColour(store, x.c)}
                       size="sm"
                     />
-                    <span className="min-w-0 truncate font-medium" title={x.c.name}>
+                    <span
+                      data-target-name
+                      className="min-w-0 truncate font-medium"
+                      title={x.c.name}
+                    >
                       {x.c.name}
                     </span>
                     {x.c.hidden && (
@@ -931,15 +1046,16 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                         aria-label="Hidden"
                       />
                     )}
-                    <span aria-hidden className="text-muted-foreground">
-                      ·
-                    </span>
                     {/* K8 (K6 gap 7): the kit's "Goblin · AC 15", on every card (the Hit toggle
-                        beside it says the comparison; FR-CBT-72's damage-only text). */}
-                    <span className="shrink-0">
+                        beside it says the comparison; FR-CBT-72's damage-only text). K12
+                        re-test: it steps aside (TargetChip) before the name truncates. */}
+                    <span data-target-ac className="flex shrink-0 items-center gap-1.5">
+                      <span aria-hidden className="text-muted-foreground">
+                        ·
+                      </span>
                       <AcCell combatantId={x.c.id} facts={x.facts} damageOnly />
                     </span>
-                  </span>
+                  </TargetChip>
                   {!ruling && (
                     <Button
                       size="sm"
@@ -1052,7 +1168,14 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
           </ul>
         )}
         {/* FR-CBT-89: the damage step adds no target. */}
-        {!ruling && <AddTarget options={addable} onPick={add} disabled={disabled} />}
+        {!ruling && (
+          <AddTarget
+            options={addable}
+            onPick={add}
+            disabled={disabled}
+            collapsed={rows.length > 0}
+          />
+        )}
       </section>
       {list.tooMany && (
         <p data-testid="cbt-popup-max-targets" className="text-xs text-destructive">

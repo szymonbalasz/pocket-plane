@@ -15,7 +15,7 @@ import { SyncContext, type SyncState } from "@ui/sync/store";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
-import { applyLabel, PopupBody, toHitOutcome } from "./attack-popup";
+import { applyLabel, cardToHitOutcome, PopupBody, toHitOutcome } from "./attack-popup";
 import { emptyDraft, useCombatDialogs } from "./popup-store";
 
 const GOBLIN = {
@@ -94,7 +94,7 @@ describe("FR-KIT-63 result lines", () => {
   test("FR-KIT-63 result lines: 'To hit' and 'Damage, <type>' lines end in Result-box inputs (to-hit outcome by natural, damage → damage); dice stay small in the label", () => {
     const html = render(DM_CARD);
     expect(html).toMatch(
-      /<div data-slot="card-line"[^>]*><label data-slot="card-label"[^>]*for="cbt-popup-tohit"><span><strong[^>]*>Brakka<\/strong> · Flame Tongue greatsword attack<\/span> <span class="font-mono text-xs[\s\S]*?<\/label><input data-slot="kit-result"[^>]*data-testid="cbt-popup-tohit" data-outcome="plain"/,
+      /<div data-slot="card-line"[^>]*><label data-slot="card-label"[^>]*for="cbt-popup-tohit"><span><strong[^>]*>Brakka<\/strong> · Flame Tongue greatsword attack<\/span> <span class="font-mono text-xs[\s\S]*?<\/label><input data-slot="kit-result"[^>]*data-testid="cbt-popup-tohit" data-outcome="hit"/,
     );
     expect(html).toMatch(
       /<div data-slot="card-line"[^>]*><label data-slot="card-label"[^>]*for="cbt-popup-damage">Damage, slashing <span class="font-mono[\s\S]*?<\/label><div[^>]*><input data-slot="kit-result"[^>]*data-testid="cbt-popup-damage" data-outcome="damage"/,
@@ -188,7 +188,7 @@ describe("K8 damage card polish (K6 gap 7)", () => {
     expect(adv).toMatch(/data-testid="cbt-popup-mode" data-value="advantage"[^>]*> adv</);
   });
 
-  test("FR-KIT-63 result lines (K8): the damage box has a neutral border and a red number; the to-hit box neutral", () => {
+  test("FR-KIT-63 result lines (K8): the damage box has a neutral border and a red number; the to-hit box's border neutral", () => {
     const html = render(DM_CARD);
     const tag = (id: string) => new RegExp(`<input[^>]*data-testid="${id}"[^>]*>`).exec(html)?.[0];
     expect(tag("cbt-popup-damage")).toContain("text-destructive");
@@ -267,5 +267,60 @@ describe("FR-KIT-01 / -03 / -07 (damage card)", () => {
     for (const slot of ["card-bar", "card-line", "card-target", "card-footer", "kit-result"]) {
       expect(html).toContain(`data-slot="${slot}"`);
     }
+  });
+});
+
+describe("K12 damage card (round-2 gap 8)", () => {
+  test("FR-KIT-63 result lines (K12): the to-hit box takes `hit` (the kit's green number, neutral border) while every target row is a Hit; a Miss row or no target → plain; naturals keep crit / fumble", () => {
+    expect(cardToHitOutcome(14, [true])).toBe("hit");
+    expect(cardToHitOutcome(14, [true, true])).toBe("hit");
+    expect(cardToHitOutcome(14, [true, false])).toBe("plain");
+    expect(cardToHitOutcome(14, [])).toBe("plain");
+    expect(cardToHitOutcome(20, [true])).toBe("crit");
+    expect(cardToHitOutcome(1, [false])).toBe("fumble");
+    const tag = (html: string) =>
+      /<input[^>]*data-testid="cbt-popup-tohit"[^>]*>/.exec(html)?.[0] ?? "";
+    const hit = tag(render(DM_CARD));
+    expect(hit).toContain('data-outcome="hit"');
+    expect(hit).toContain("text-hp-full");
+    expect(hit).not.toMatch(/\sborder-hp-/);
+    initial.drafts = {
+      n1: {
+        ...emptyDraft(),
+        added: [GOBLIN.id],
+        per: { [GOBLIN.id]: { hit: false, mult: "normal" } },
+      },
+    };
+    const miss = tag(render(DM_CARD));
+    expect(miss).toContain('data-outcome="plain"');
+    expect(miss).not.toContain("text-hp-full");
+  });
+
+  test("FR-KIT-64 target rows (K12): with a target, 'Add target…' hides behind a small '+' that keeps `cbt-popup-target-add`; with none, the field shows", () => {
+    const withTarget = render(DM_CARD);
+    const add = /<(\w+)[^>]*data-testid="cbt-popup-target-add"[^>]*>/.exec(withTarget);
+    expect(add?.[1]).toBe("button");
+    expect(add?.[0]).toContain('aria-label="Add target"');
+    expect(withTarget).not.toContain('placeholder="Add target…"');
+    expect(withTarget.split('data-testid="cbt-popup-target-add"').length - 1).toBe(1);
+    initial.drafts = { n1: emptyDraft() };
+    const none = render(DM_CARD);
+    expect(none).not.toContain('data-testid="cbt-popup-target-row"');
+    expect(none).toMatch(
+      /<input[^>]*data-testid="cbt-popup-target-add"[^>]*placeholder="Add target…"/,
+    );
+  });
+
+  test("FR-KIT-64 target rows (K12 re-test): the name takes the free width: ' · AC n' is one part (`data-target-ac`) that steps aside (`data-ac-folded`) before the name truncates", () => {
+    const html = render(DM_CARD);
+    const chip = /<span data-slot="card-target-chip"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(chip).toContain("data-[ac-folded]:[&amp;_[data-target-ac]]:hidden");
+    expect(chip).not.toContain("data-ac-folded=");
+    expect(html).toMatch(
+      /<span data-target-name="true" class="min-w-0 truncate font-medium" title="Goblin">Goblin<\/span><span data-target-ac="true" class="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" class="text-muted-foreground">·<\/span>/,
+    );
+    const src = readFileSync(join(import.meta.dir, "attack-popup.tsx"), "utf8");
+    // Unfolds only when the line's slack holds the AC part again (no flip-flop).
+    expect(src).toContain("return line.clientWidth - used < need;");
   });
 });

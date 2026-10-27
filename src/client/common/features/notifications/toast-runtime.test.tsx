@@ -356,12 +356,13 @@ describe("FR-NOTE-72 an open Notifications window", () => {
     const shifted = box(stackTag("dm"));
     expect(clear(shifted, notes)).toBe(true);
     expect(shifted.x).toBe(592 - 12 - 320);
-    // No room left of it: below it.
+    // No room left of it: K12 (kit round 3) the clear spot nearest home, beside it over the map
+    // (before: below it, 60 + 480 + 12).
     const wide = { ...notes, x: 300 };
     stubInputs = { initiative, windows: [{ ...wide, blocks: true }], hard: [], rows: [] };
     const below = box(stackTag("dm"));
     expect(clear(below, wide)).toBe(true);
-    expect(below).toMatchObject({ x: 560, y: 60 + 480 + 12 });
+    expect(below).toMatchObject({ x: 300 + 360 + 12, y: 100 });
   });
 
   test("FR-NOTE-72 cards fold into an open Notifications window: card and summary toasts gone while it is open; info and the callout stay; both clients", () => {

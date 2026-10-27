@@ -71,6 +71,7 @@ import {
   ToastLead,
   ToastText,
   useCauserName,
+  useMedallionName,
   useNoteActions,
   useNoteStripe,
 } from "./parts";
@@ -82,6 +83,7 @@ import {
   type ClassOf,
   classOfToast,
   clearCallout,
+  closeCardToast,
   closeToast,
   moreInSummary,
   nextExpiry,
@@ -130,6 +132,7 @@ function NoteToast({
     : "none";
   const stripe = useNoteStripe(n);
   const name = useCauserName(n);
+  const lead = useMedallionName(n);
   // FR-KIT-55: medallion or icon · text block · actions · close; the stripe stays the left edge.
   return (
     <div
@@ -144,7 +147,7 @@ function NoteToast({
       className={TOAST_CARD}
     >
       <NoteStripe color={stripe.color} />
-      <ToastLead name={name} color={stripe.color} icon={views.get(n.kind)?.icon} />
+      <ToastLead name={lead} color={stripe.color} icon={views.get(n.kind)?.icon} />
       {/* FR-KIT-57: the action sits right of the text; it wraps below only when too narrow. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
         <ToastText n={n} views={views} name={name} />
@@ -492,15 +495,19 @@ export function ToastRuntime({
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: start over on a new count or room
   useLayoutEffect(() => setSettle(refold), [count, room]);
-  const placedKey = useRef(placeKey);
+  // K12 (walkthrough 5): while the layout changes the drawn stack holds (`changing`), then the
+  // fold starts over and the stack moves once (was: fold to the summary at once, unfold 250 ms
+  // later: two hops when a window opened).
+  const [placedKey, setPlacedKey] = useState(placeKey);
+  const changing = placedKey !== placeKey;
   useEffect(() => {
-    if (placedKey.current === placeKey) return;
+    if (!changing) return;
     const t = setTimeout(() => {
-      placedKey.current = placeKey;
+      setPlacedKey(placeKey);
       setSettle(refold);
     }, REFOLD_QUIET_MS);
     return () => clearTimeout(t);
-  }, [placeKey]);
+  }, [placeKey, changing]);
   // Walkthrough WF4: likewise while the DM stack can only sit on a window's body (its controls).
   // FR-NOTE-77: down to no card at all while the summary shows (its Open stays one click away);
   // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
@@ -520,8 +527,10 @@ export function ToastRuntime({
     const need = stackH > room || covers;
     const spot = { left: at.left, top: at.top };
     const now = performance.now();
-    setSettle((s) => settleStack(s, { need, min: minCap, stackH, shown: foldable, spot, now }));
-  }, [stackH, room, covers, minCap, foldable, at.left, at.top, holdOver]);
+    setSettle((s) =>
+      settleStack(s, { need, min: minCap, stackH, shown: foldable, spot, now, changing }),
+    );
+  }, [stackH, room, covers, minCap, foldable, at.left, at.top, holdOver, changing]);
   // FR-NOTE-70: the drawn spot (`data-left` / `data-top`, the style and the FR-SHELL-59 report).
   const pos = settle.hold && settle.drawn ? settle.drawn : { left: at.left, top: at.top };
   // BL-118: the fold is done: no hold, and no step due on this height (`foldCap`).
@@ -649,7 +658,15 @@ export function ToastRuntime({
             n={n}
             views={views}
             actions={actions}
-            onClose={() => dispatch((s, now) => closeToast(s, t.key, now))}
+            // K12 (walkthrough 3, FR-NOTE-15): a closed card counts in a showing summary at once.
+            onClose={() => {
+              const store = sync?.getState().store;
+              dispatch((s, now) =>
+                store
+                  ? closeCardToast(s, t.key, store, now, (st) => waitingForPlayers(st, views))
+                  : closeToast(s, t.key, now),
+              );
+            }}
           />
         );
       })}

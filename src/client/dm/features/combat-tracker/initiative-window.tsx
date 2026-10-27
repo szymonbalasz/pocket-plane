@@ -68,9 +68,14 @@ import {
 } from "@ui/features/combat-tracker/companions";
 import {
   BandBadge,
+  CHILD_ROW,
+  ChildMedallion,
+  ChildNameLine,
   CombatantMedallion,
+  childBelow,
   contentWidth,
   HP_STACK,
+  LINE_TRACK,
   SideChip,
   TurnMarker,
   useListHpTrack,
@@ -688,8 +693,9 @@ function OwnerInitCell({
         data-record-id={c.id}
         data-missing="false"
         data-value={owner?.initiative ?? ""}
+        // K12 (round-2 gap 6): right-aligned in the init column, as the large numbers above.
         className={cn(
-          "shrink-0 text-center text-xs text-muted-foreground tabular-nums",
+          "shrink-0 pr-[3px] text-right text-sm text-muted-foreground tabular-nums",
           INIT_W[wide ? "wide" : "narrow"],
         )}
       >
@@ -732,8 +738,10 @@ interface RowProps {
   ownerName?: string;
   /** `in-owner-turn` companions shown as lines inside this row (FR-CBT-107). */
   lines?: CombatantView[];
-  /** Ranked by its owner: indented one step under it. */
+  /** Ranked by its owner: a child row under it (K12: flush, `sm` medallion, no indent). */
   indent?: boolean;
+  /** K12: the next row is this row's child (the shared edge square). */
+  childBelow?: boolean;
 }
 
 /**
@@ -749,7 +757,8 @@ function RowMain({
   wideInit,
   owner,
   ownerName,
-}: Omit<RowProps, "lines" | "indent">) {
+  indent,
+}: Omit<RowProps, "lines" | "childBelow">) {
   const { send, disabled } = useCbtIntent();
   const openHp = useCombatDialogs((s) => s.openHp);
   const openSummon = useSummonDialog((s) => s.openFor);
@@ -782,6 +791,8 @@ function RowMain({
   );
   const companion = isCompanion(c) && c.turnMode;
   const byOwner = actsWithOwner(c, owner);
+  // K12 re-test: a child row's name is one truncated line (Tooltip), the medallion beside it.
+  const Line = indent ? ChildNameLine : NameLine;
   // FR-KIT-25: a folded tail rides in the row Tooltip, on the name. K9 R1: the name line's own
   // box, so a stacked list keeps it on the medallion's line.
   const nameTip = (line: ReactNode) =>
@@ -807,12 +818,12 @@ function RowMain({
       <span className="absolute inset-y-0 left-0 w-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-data-[lifted]/row:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
         <Grip c={c} />
       </span>
-      <CombatantMedallion c={c} />
+      {indent ? <ChildMedallion c={c} /> : <CombatantMedallion c={c} />}
       <div className={cn("min-w-0 flex-1", HP_STACK.block)}>
         {/* The name is never cut (FR-CBTX-57): the side chip takes a second line first, a name
             wider than the line wraps. */}
         {nameTip(
-          <NameLine
+          <Line
             name={c.name}
             testId="cbt-init-row-name"
             className="text-sm font-medium"
@@ -854,7 +865,12 @@ function RowMain({
             side={
               <>
                 {companion && (
-                  <OwnerChip c={c} ownerName={ownerName ?? ""} testId="cbt-init-row-owner" />
+                  <OwnerChip
+                    c={c}
+                    ownerName={ownerName ?? ""}
+                    testId="cbt-init-row-owner"
+                    compact={indent}
+                  />
                 )}
                 <SideChip c={c} testId="cbt-init-row-ally" />
               </>
@@ -1029,8 +1045,8 @@ function CompanionLine({
         skipped && "opacity-50",
       )}
     >
-      {/* FR-KIT-29: the grid at medallion `sm`. */}
-      <CombatantMedallion c={c} size="sm" />
+      {/* FR-KIT-29: the grid at medallion `sm`; K12: in the owner's medallion slot. */}
+      <ChildMedallion c={c} />
       <div className="min-w-0 flex-1">
         <NameLine
           name={c.name}
@@ -1063,8 +1079,22 @@ function CompanionLine({
               data-stats-line
               className="flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
             >
-              <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
-                {hp ? `${hp.cur} / ${hp.max}` : "—"}
+              {/* K12: the kit's bar on the list's track (wrapped: the list measures its rows'
+                  tracks only), a short one so the line stays one row (FR-CBT-142). */}
+              <span className="flex shrink-0" style={LINE_TRACK}>
+                {hp ? (
+                  <HpBar
+                    cur={hp.cur}
+                    max={hp.max}
+                    track="fixed"
+                    data-testid="cbt-init-row-hp"
+                    data-record-id={c.id}
+                  />
+                ) : (
+                  <span data-testid="cbt-init-row-hp" data-record-id={c.id}>
+                    —
+                  </span>
+                )}
               </span>
               <RowTemp c={c} />
               <span className="shrink-0" data-testid="cbt-init-row-ac" data-record-id={c.id}>
@@ -1150,7 +1180,7 @@ function CompanionLine({
  * indented under its owner, an owner's `in-owner-turn` companions are lines inside its row
  * (`cbt-init-companion`), each one row with its own HP, AC, chips, card and ⋯ (FR-CBT-142).
  */
-export function Row({ lines = [], indent = false, ...p }: RowProps) {
+export function Row({ lines = [], indent = false, childBelow = false, ...p }: RowProps) {
   const { c, turn, defs } = p;
   const dead = useDeadPc(c);
   const skipped = (c.kind === "monster" && !c.removed && c.hpCurrent === 0) || dead;
@@ -1167,18 +1197,19 @@ export function Row({ lines = [], indent = false, ...p }: RowProps) {
         // FR-CBTX-62: the dragged block lifts (`data-lifted`, set by the drag).
         "group/row relative flex flex-col gap-1 rounded-md px-2 py-1 data-[lifted]:z-20 data-[lifted]:bg-card data-[lifted]:shadow-md data-[lifted]:ring-1 data-[lifted]:ring-border",
         turn && "bg-accent",
-        indent && "ml-3",
+        indent && CHILD_ROW.child,
+        childBelow && CHILD_ROW.owner,
       )}
     >
       <TurnMarker active={turn} />
-      <RowMain {...p} />
+      <RowMain {...p} indent={indent} />
+      {/* K12 (round-2 gap 6): flat lines under the owner's name column, no nested rule. */}
       {lines.map((l) => (
         <div
           key={l.id}
           data-testid="cbt-init-companion"
           data-record-id={l.id}
           data-hidden={l.hidden === true}
-          className="border-l border-border/60 pl-1"
         >
           <CompanionLine
             c={l}
@@ -1683,7 +1714,7 @@ function DmInitiativeBody() {
           {/* The drop line's frame (FR-CBTX-62); rows measure their spots from it. */}
           <div ref={wrapRef} className="relative" data-dragging={reorder.drag?.id}>
             <ul className="flex flex-col gap-1">
-              {layout.map(({ c, lines, owner, indent }) => (
+              {layout.map(({ c, lines, owner, indent }, i) => (
                 <Row
                   key={c.id}
                   c={c}
@@ -1696,6 +1727,7 @@ function DmInitiativeBody() {
                   ownerName={owner?.name ?? ownerNameOf(c)}
                   lines={lines}
                   indent={indent}
+                  childBelow={childBelow(layout, i)}
                 />
               ))}
             </ul>

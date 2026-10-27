@@ -356,8 +356,9 @@ function dmStackSpotOnly(
       const pass = fits(p) ? level(p) : null;
       if (pass === null) continue;
       const body = coveredArea(at(p), windows) > 0;
-      // Pass 1 (content-clear): nearest home, the least token area first (empty body below a
-      // window's content is as good as the map, re-test 3 O2); later passes: FR-NOTE-71.
+      // Pass 1 (content-clear): K12 (kit round 3, DM #363): a spot over no window at all first
+      // (FR-NOTE-71's body-clear rank; re-test 3 O2's "empty body is as good as the map" only
+      // among the rest), then nearest home, the least token area first; later passes: FR-NOTE-71.
       const r = at(p);
       const key =
         pass === 0
@@ -366,6 +367,7 @@ function dmStackSpotOnly(
               controlsUnder(r, windows),
               headingsUnder(r, windows),
               0,
+              body ? 1 : 0,
               coveredArea(r, avoid),
             ]
           : [
@@ -384,12 +386,25 @@ function dmStackSpotOnly(
     }
     return best;
   };
-  // 1. FR-NOTE-75: in the column, clear of every window's drawn content.
+  // 1. FR-NOTE-75: in the column, clear of every window's drawn content. K12 (kit round 3, DM
+  // #363: toasts off windows where a clear spot exists): a spot over no window wins outright;
+  // one over a window's empty body waits for the slide.
   const content = pick(spotsAt(topsIn(0), lefts), (p) => (clearIn(0, p) ? 0 : null));
-  if (content) return content;
+  const clear = content && coveredArea(at(content), windows) === 0 ? content : null;
   // 2. FR-NOTE-77: beside a window, clear of every window, the PCs and the cards' targets.
-  const beside = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs);
-  if (beside && fits(beside) && lefts.every((l) => l !== beside.left)) return beside;
+  const found = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs);
+  const beside = found && fits(found) && lefts.every((l) => l !== found.left) ? found : null;
+  // K12: both clear → the nearer home (`besideSpot`'s measure), so a summary and a card stack
+  // that both fit beside a window take the same spot (re-test 3 O2), not one far down the column.
+  if (clear && beside)
+    return homeDistance(vp, width, beside) < homeDistance(vp, width, clear) ? beside : clear;
+  if (clear ?? beside) return (clear ?? beside) as Spot;
+  // 2b. DM #364 (amends #288): no clear spot within the half-width slide → a slide further left,
+  // still on no window, PC, card target or keep-out (the rail kept clear).
+  const far = besideSpot(vp, width, stackH, windows, initiative, hard, blockers, avoid, pcs, true);
+  if (far && fits(far) && lefts.every((l) => l !== far.left)) return far;
+  // 1b. No clear spot: over the empty body below a window's content (pass 1, nearest home).
+  if (content) return content;
   // 3. Over a body, in the column: the first rows kept (FR-NOTE-75), then ruling B, then the
   // title bars; the fewest controls covered first (FR-NOTE-77).
   // A spot counts for a pass only at that pass's own tops (8 px below its strips).
@@ -468,14 +483,22 @@ const controlsUnder = (r: Rect, windows: readonly StackWindow[]) =>
 const headingsUnder = (r: Rect, windows: readonly StackWindow[]) =>
   partsUnder(r, windows, (w) => [w.headings]);
 
-/** FR-NOTE-77: how far the stack may slide sideways from home: half its width (it stays in its band). */
+/** FR-NOTE-77: a spot's distance from home (the home row, centred): sideways + down, px. */
+const homeDistance = (vp: Viewport, width: number, p: Spot) =>
+  Math.abs(p.left - Math.round((vp.w - width) / 2)) + (p.top - DM_TOAST_TOP);
+
+/**
+ * FR-NOTE-77: how far the stack may slide right of home: half its width (it stays in its band).
+ * Left of home no cap since DM #364 (a spot on no window and no PC beats one over a window).
+ */
 export const MAX_SLIDE = STACK_W / 2;
 
 /**
  * FR-NOTE-77 (walkthrough H3 1b, 4; amends FR-NOTE-70): when no spot in the column clears the
  * windows' content, a spot beside a window, Initiative or a tool bar (12 px gap, ≥ 80 px from the
- * left like the shift, inside the viewport) at most `MAX_SLIDE` from home (half the stack still
- * over its home column: never the rail or the map's edge, sim-9 a01, BL-83) that covers no
+ * left like the shift, inside the viewport) at most `MAX_SLIDE` right of home (half the stack still
+ * over its home column: never the rail or the map's edge, sim-9 a01, BL-83; with `farLeft`, DM
+ * #364, any distance left of home, still ≥ 80 px from the left) that covers no
  * window, no PC token (`pcs`, + 4 px), no card target and no hard keep-out; nearest the home
  * spot. Null → none.
  */
@@ -489,6 +512,8 @@ function besideSpot(
   blockers: readonly Rect[],
   avoid: readonly TokenBox[],
   pcs: readonly Rect[],
+  /** DM #364: no cap left of home (only once no spot within the cap is clear). */
+  farLeft = false,
 ): Spot | null {
   const home = Math.round((vp.w - width) / 2);
   const edges = [...windows, ...(initiative ? [initiative] : []), ...hard];
@@ -497,7 +522,13 @@ function besideSpot(
       edges.flatMap((w) => [w.x - EDGE_GAP - width, w.x + w.w + EDGE_GAP]).map(Math.round),
     ),
   ].filter(
-    (l) => l >= MIN_SHIFT_LEFT && l + width <= vp.w - EDGE_GAP && Math.abs(l - home) <= width / 2,
+    // DM #364 (amends #288): `farLeft` lifts the cap left of home (the spot below still covers
+    // no window, PC, card target or keep-out, and keeps the rail clear).
+    (l) =>
+      l >= MIN_SHIFT_LEFT &&
+      l + width <= vp.w - EDGE_GAP &&
+      l - home <= MAX_SLIDE &&
+      (farLeft || home - l <= MAX_SLIDE),
   );
   if (lefts.length === 0) return null;
   const maxTop = vp.h - LAUNCHER_CLEAR - stackH;
@@ -517,7 +548,7 @@ function besideSpot(
       const r = { x: left, y: top, w: width, h: stackH };
       if (blockers.some((b) => hits(r, b, EDGE_GAP))) continue;
       if ([...windows, ...hard, ...pcs, ...avoid].some((b) => hits(r, b, 0))) continue;
-      const d = Math.abs(left - home) + (top - DM_TOAST_TOP);
+      const d = homeDistance(vp, width, { left, top });
       if (d < bestD) {
         best = { left, top };
         bestD = d;

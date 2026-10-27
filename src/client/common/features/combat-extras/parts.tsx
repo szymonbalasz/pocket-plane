@@ -113,7 +113,9 @@ export function StatusCell({ children }: { children: ReactNode }) {
       data-narrow={narrow || undefined}
       // K9 (walkthrough F1): in a narrow list (DM 320, player 280) the chips go icon-only (the
       // rounds / uses stay in their Tooltip), so the HP bars keep a readable shared length.
-      className="flex min-w-14 shrink-0 items-center @max-[22rem]/init:min-w-0 @max-[22rem]/init:empty:hidden @max-[22rem]/init:[&_[data-rounds]]:hidden"
+      // K12 re-test (walkthrough 4): one fixed 56-px column (it holds one piece + "+N"), so the
+      // initiative numbers line up on every row.
+      className="flex w-14 shrink-0 items-center @max-[22rem]/init:w-auto @max-[22rem]/init:empty:hidden @max-[22rem]/init:[&_[data-rounds]]:hidden"
     >
       <InStatusCell.Provider value={true}>
         <NarrowList.Provider value={narrow}>{children}</NarrowList.Provider>
@@ -615,11 +617,38 @@ export function statusShown(conc: number, fx: number, narrow: boolean): number {
   return narrow && fx > 1 ? 0 : 1;
 }
 
+/** K12 re-test (orchestrator ruling): the fixed status column holds two icon pieces. */
+export const STATUS_PIECES = 2;
+
+/**
+ * K12 re-test (orchestrator ruling; FR-CBTX-54 note): the status cell's shown pieces. Wide: up to
+ * `STATUS_PIECES` icons: concentration and the triggers first (concentration + the first trigger,
+ * or two triggers), then, with no concentration, the first effect if a place is left (as
+ * FR-KIT-28's one effect); the other effects and a third piece go into "+N". A narrow list (its cell as wide as its chips) as before: every
+ * concentration and trigger chip, `statusShown`'s effect.
+ */
+export function statusPieces(
+  conc: number,
+  triggers: number,
+  fx: number,
+  narrow: boolean,
+): { conc: number; triggers: number; effects: number } {
+  if (narrow) return { conc, triggers, effects: statusShown(conc, fx, true) };
+  const c = Math.min(conc, STATUS_PIECES);
+  const t = Math.min(triggers, STATUS_PIECES - c);
+  // FR-KIT-28: beside a concentration every effect goes into "+N", as before.
+  return { conc: c, triggers: t, effects: c > 0 ? 0 : Math.min(fx, STATUS_PIECES - t, 1) };
+}
+
 /**
  * FR-KIT-28: the status cell's chips, icons with rounds (the label in the Tooltip). Concentration
  * comes first and never folds (FR-CBTX-59), so with one every other effect goes into "+N"; else
  * the first effect shows and the rest fold. Chip menus (Edit… / End), the concentration menu and
- * "+N"'s list are today's. Trigger chips never fold (FR-CBTX-54): icons after "+N".
+ * "+N"'s list are today's. K12 re-test (orchestrator ruling, FR-CBTX-54 note): the fixed cell
+ * shows up to two icon pieces side by side (`statusPieces`), the rest in "+N" (a third trigger in
+ * its menu with its state line). With two pieces or a "+N" the pieces drop their rounds / uses
+ * (kept in their Tooltips), and beside two pieces "+N" rides on the second one's corner, so the
+ * cell keeps its 56-px column.
  */
 function StatusChips({
   effects,
@@ -635,32 +664,63 @@ function StatusChips({
   const fx = ordered.filter((e) => e.kind !== "concentration");
   const narrow = useContext(NarrowList);
   if (ordered.length === 0 && triggers.length === 0) return null;
-  const shown = fx.slice(0, statusShown(conc.length, fx.length, narrow));
-  const folded = fx.slice(shown.length);
+  const pick = statusPieces(conc.length, triggers.length, fx.length, narrow);
+  const shownConc = conc.slice(0, pick.conc);
+  const shownTriggers = triggers.slice(0, pick.triggers);
+  const shown = fx.slice(0, pick.effects);
+  const folded = [...conc.slice(pick.conc), ...fx.slice(pick.effects)];
+  const foldedTriggers = triggers.slice(pick.triggers);
+  const more = folded.length + foldedTriggers.length > 0;
+  const pieces = shownConc.length + shownTriggers.length + shown.length;
+  // Narrow: the cell is as wide as its chips (as before). Wide: the fixed column.
+  const tight = !narrow && (more || pieces > 1);
+  const moreChip = more && (
+    <MoreChip hidden={folded} triggers={foldedTriggers} round={round} testId={testId} menu={menu} />
+  );
+  const corner = !narrow && more && pieces > 1;
+  const parts: ReactNode[] = [
+    ...shownConc.map((e) => (
+      <span key={`c:${e.id}`} data-chip-conc className="flex shrink-0">
+        <ConcChip e={e} round={round} testId={testId} compact icon onEdit={onEditConcentration} />
+      </span>
+    )),
+    ...shownTriggers.map((t) => (
+      <span key={`t:${t.id}`} data-trigger className="flex shrink-0">
+        <TriggerChipView t={t} icon />
+      </span>
+    )),
+    ...shown.map((e) => (
+      <span key={e.id} data-chip className="flex shrink-0">
+        <MenuChip e={e} round={round} menu={menu}>
+          <EffectChip e={e} round={round} testId={testId} compact icon />
+        </MenuChip>
+      </span>
+    )),
+  ];
   return (
     <div
       data-chip-row
       data-status
-      className={cn("flex shrink-0 flex-nowrap items-center gap-0.5", className)}
+      data-more={more || undefined}
+      className={cn(
+        "flex shrink-0 flex-nowrap items-center gap-0.5",
+        tight && "[&_[data-rounds]]:hidden",
+        className,
+      )}
     >
-      {conc.map((e) => (
-        <span key={`c:${e.id}`} data-chip-conc className="flex shrink-0">
-          <ConcChip e={e} round={round} testId={testId} compact icon onEdit={onEditConcentration} />
-        </span>
-      ))}
-      {shown.map((e) => (
-        <span key={e.id} data-chip className="flex shrink-0">
-          <MenuChip e={e} round={round} menu={menu}>
-            <EffectChip e={e} round={round} testId={testId} compact icon />
-          </MenuChip>
-        </span>
-      ))}
-      {folded.length > 0 && <MoreChip hidden={folded} round={round} testId={testId} menu={menu} />}
-      {triggers.map((t) => (
-        <span key={`t:${t.id}`} data-trigger className="flex shrink-0">
-          <TriggerChipView t={t} icon />
-        </span>
-      ))}
+      {corner
+        ? parts.map((part, i) =>
+            i < parts.length - 1 ? (
+              part
+            ) : (
+              <span key="last" data-status-last className="relative flex shrink-0">
+                {part}
+                <span className="absolute -top-2 -right-2 flex">{moreChip}</span>
+              </span>
+            ),
+          )
+        : parts}
+      {!corner && moreChip}
     </div>
   );
 }
@@ -792,18 +852,25 @@ function LineChips({
  */
 function MoreChip({
   hidden,
+  triggers = [],
   round,
   testId,
   left,
   menu,
 }: {
   hidden: readonly EffectView[];
+  /** K12 re-test: the status cell's folded trigger chips (their state line in the menu). */
+  triggers?: readonly TriggerChip[];
   round: number | null;
   testId: string;
   left?: number;
   menu?: (e: EffectView) => ReactNode;
 }) {
-  const names = hidden.map((e) => chipText(e, round)).join(", ");
+  const names = [
+    ...hidden.map((e) => chipText(e, round)),
+    ...triggers.map((t) => triggerLine(t)),
+  ].join(", ");
+  const n = hidden.length + triggers.length;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -817,10 +884,10 @@ function MoreChip({
             <Badge
               variant="secondary"
               data-testid={`${testId}-more`}
-              data-value={hidden.length}
+              data-value={n}
               className="px-1 py-0 text-[11px]"
             >
-              +{hidden.length}
+              +{n}
             </Badge>
           </Tooltip>
         </button>
@@ -848,6 +915,17 @@ function MoreChip({
             </DropdownMenuItem>
           );
         })}
+        {triggers.map((t) => (
+          <DropdownMenuItem
+            key={`t:${t.id}`}
+            data-testid={`${testId}-more-item`}
+            data-record-id={t.id}
+            data-kind="trigger"
+          >
+            <ZapIcon className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{triggerLine(t)}</span>
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
