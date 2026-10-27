@@ -600,7 +600,9 @@ export function ToastRuntime({
               // BL-120: with the cards folded into it (`inSummary`).
               data-count={t.count + inSummary}
               data-waiting={t.waiting ?? 0}
-              className={TOAST_CARD}
+              // FR-KIT-60: the summary keeps its 58-px row (FR-NOTE-78's folded stack height; the
+              // roll popups and the Fit read the stack rect).
+              className={cn(TOAST_CARD, "py-3")}
             >
               {/* FR-KIT-58: the card row: icon · text · actions · close. */}
               <ToastLead icon={ListTodoIcon} />
@@ -611,7 +613,6 @@ export function ToastRuntime({
                 {inRow && moreButton}
                 <Button
                   size="sm"
-                  className="h-7 px-2.5"
                   data-testid="note-toast-open"
                   onClick={() => {
                     openHistory();
