@@ -250,7 +250,10 @@ describe("FR-KIT-103 card", () => {
     expect(text(html)).toContain("Save +4");
     expect(count(html, 'data-testid="ent-statblock-attack"')).toBe(2);
     expect(html).toMatch(/data-testid="ent-statblock-attack" data-record-id="a-scim"/);
-    expect(text(html)).toContain("+4 · 1d6+2 slashing");
+    // The kit's attack row: the name, then the muted line on its own, then the buttons.
+    expect(html).toMatch(
+      /data-slot="statblock-entry-name"[^>]*>Scimitar<\/div><div class="text-muted-foreground"><span data-testid="ent-statblock-attack-line"[^>]*>\+4 · 1d6\+2 slashing<\/span><\/div><div class="mt-1.5[^"]*"><button[^>]*data-testid="ent-statblock-roll-attack"/,
+    );
     for (const id of ["attack", "damage", "both"]) {
       expect(count(html, `data-testid="ent-statblock-roll-${id}"`)).toBe(2);
     }

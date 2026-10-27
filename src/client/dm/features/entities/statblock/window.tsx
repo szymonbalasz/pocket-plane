@@ -347,6 +347,8 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
             </Badge>
           )}
         </div>
+        {/* As available (orchestrator ruling, 2026-10-27): a fight's copy has no entry, so no
+            subtype / alignment ("Small humanoid"); the compendium's adds them. */}
         <StatBlockTypeLine testId="ent-statblock-type">
           {typeLine({
             size: facets?.size ?? sb.size,
@@ -406,19 +408,9 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
             slot="statblock-attack"
             data-testid="ent-statblock-attack"
             data-record-id={attack.id ?? ""}
-            // §7.3: the numbers ride on the name line (wrapping when long), so two attack rows
-            // with their buttons fit the useful 300 × 360.
-            name={
-              <>
-                {attack.name}{" "}
-                <span
-                  data-testid="ent-statblock-attack-line"
-                  className="font-normal text-muted-foreground tabular-nums"
-                >
-                  · {attackSummary(attack)}
-                </span>
-              </>
-            }
+            // The kit's `.atk` (orchestrator ruling, K7): the name, then the muted
+            // "+4 · 1d6+2 slashing" line, then the buttons.
+            name={attack.name}
             actions={
               rollable
                 ? ATTACK_BUTTONS.map((b) => (
@@ -435,7 +427,11 @@ export function StatBlockView({ def, combatant, hp, ac, entry, ctx, footer }: St
                   ))
                 : undefined
             }
-          />
+          >
+            <span data-testid="ent-statblock-attack-line" className="tabular-nums">
+              {attackSummary(attack)}
+            </span>
+          </StatBlockEntry>
         );
       })}
       {body && <Sections body={body} definitionId={def.id} attackNames={attackNames} />}
