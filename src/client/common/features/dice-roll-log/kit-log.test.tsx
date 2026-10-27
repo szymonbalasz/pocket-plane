@@ -140,7 +140,7 @@ const tag = (body: string, id: string) =>
 afterEach(() => landing.api.setState({ holding: new Map() }));
 
 describe("FR-KIT-40 row grid", () => {
-  test("FR-KIT-40 row grid: one 40-px row, medallion · what · time · boxes · chips · actions, attributes kept", () => {
+  test("FR-KIT-40 row grid: one 40-px row, medallion · what · actions · time · boxes · chips, attributes kept", () => {
     const r = row(render([entry(), damage]), "e2");
     expect(r.li).toContain('data-slot="log-row"');
     expect(r.li).toMatch(/class="[^"]*\bgrid\b[^"]*\bh-10\b/);
@@ -165,6 +165,33 @@ describe("FR-KIT-40 row grid", () => {
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     // The category chip moved into the Tooltip (FR-KIT-45).
     expect(r.body).not.toContain(">Damage<");
+  });
+
+  test("FR-KIT-40 row grid (K12, round-2 gap 1): time, boxes and chips in one fixed right column; a ghost two boxes and a 'physical' chip wide holds each slot from 360 px", () => {
+    const html = render([entry(), damage]);
+    for (const id of ["e1", "e2"]) {
+      const body = row(html, id).body;
+      const results = /<span data-slot="log-results"[^>]*>/.exec(body)?.[0] ?? "";
+      const chips = /<span data-slot="log-chips"[^>]*>/.exec(body)?.[0] ?? "";
+      expect(results).toContain("inline-grid");
+      expect(results).toContain("justify-end");
+      expect(chips).toContain("inline-grid");
+      // The ghosts: invisible, aria-hidden, only from a 360-px row (as the time).
+      const ghosts = [...body.matchAll(/<span aria-hidden="true" data-ghost="" class="([^"]*)">/g)];
+      expect(ghosts).toHaveLength(2);
+      for (const g of ghosts) expect(g[1]).toMatch(/invisible hidden.*@min-\[360px\]\/log:flex/);
+      expect(body.match(/data-testid="dice-log-ghost"/g)).toHaveLength(2);
+      expect(body).toMatch(/data-ghost=""[^>]*><span[^>]*>physical</);
+      // The time leads the right column, after the actions (which show on some rows only).
+      expect(at(body, "dice-log-entry-time")).toBeLessThan(body.indexOf('data-slot="log-results"'));
+      expect(body.indexOf('data-slot="log-results"')).toBeLessThan(
+        body.indexOf('data-slot="log-chips"'),
+      );
+    }
+    // The row without a chip (e1) still has the chip slot; its only chip is the ghost's.
+    expect(row(html, "e1").body).not.toContain("dice-log-entry-manual");
+    // The kit's 15-px row text.
+    expect(tag(row(html, "e1").body, "dice-log-entry-text")).toContain("text-[15px]");
   });
 
   test("FR-KIT-40 row grid: the DM's hidden icon sits before the name; undone and rerolled stay struck, the rerolled button kept", () => {
@@ -538,6 +565,11 @@ describe("FR-KIT-04 player rows show no new fields", () => {
       const r = row(html, e.id);
       const visible = r.body
         .replace(/<span data-line="true" class="sr-only">[^<]*<\/span>/, "")
+        // K12: the slots' ghosts are invisible and aria-hidden (width only).
+        .replace(
+          /<span aria-hidden="true" data-ghost=""[^>]*>(<span[^>]*>[^<]*<\/span>)+<\/span>/g,
+          "",
+        )
         .replace(/<[^>]+>/g, " ");
       const allowed = `${copyText(formatEntry(e).segments)} · ${rowTime(e.at)}`;
       for (const word of visible.split(/\s+/).filter(Boolean))

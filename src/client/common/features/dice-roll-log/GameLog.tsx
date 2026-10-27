@@ -282,6 +282,42 @@ function MoreResults({ rest, landed }: { rest: readonly RowResult[]; landed: boo
   );
 }
 
+/** A row's chip ("physical", "undone"): small outline Badge. */
+function ChipBadge(props: ComponentProps<typeof Badge>) {
+  return <Badge variant="outline" className="shrink-0 px-1 py-0 text-[10px]" {...props} />;
+}
+
+/**
+ * K12: a slot at least as wide as `ghost` (an invisible copy in the same grid cell, from a 360-px
+ * row; below it the row keeps every pixel for the text), so the column after it lines up.
+ */
+function FixedSlot({
+  slot,
+  ghost,
+  className,
+  children,
+}: {
+  slot: string;
+  ghost: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <span data-slot={slot} className={cn("inline-grid shrink-0 items-center", className)}>
+      <span
+        aria-hidden
+        data-ghost=""
+        className="invisible hidden items-center gap-1.5 [grid-area:1/1] @min-[360px]/log:flex"
+      >
+        {ghost}
+      </span>
+      <span className="flex items-center gap-1.5 [grid-area:1/1] [justify-content:inherit]">
+        {children}
+      </span>
+    </span>
+  );
+}
+
 function Entry({
   e,
   isDm,
@@ -359,7 +395,8 @@ function Entry({
             data-testid="dice-log-entry-text"
             data-slot="log-what"
             aria-hidden
-            className={cn("min-w-0 flex-1 truncate", struck)}
+            // The kit's 15 px (`.what`) in the 40-px row (K12).
+            className={cn("min-w-0 flex-1 truncate text-[15px]", struck)}
           >
             {row.actor !== null && (
               <>
@@ -377,7 +414,12 @@ function Entry({
           </span>
         </Tooltip>
       </div>
+      {/* K12 (round-2 gap 1): time, boxes and chips sit in one fixed right column on every row.
+          The actions lead the group (they show on some rows only); the box and chip slots keep
+          a ghost's width (two boxes, the "physical" chip, in the theme's own type) from 360 px,
+          so rows with and without a chip or a second box align. */}
       <div className="flex shrink-0 items-center gap-1.5">
+        <EntryActions e={e} actions={actions} />
         {/* FR-KIT-43: hidden while the row is < 360 px wide (the list is the container). */}
         <time
           data-testid="dice-log-entry-time"
@@ -388,54 +430,68 @@ function Entry({
         >
           {rowTime(e.at)}
         </time>
-        {results.slice(0, ROW_RESULTS_MAX).map((r) => (
-          <ResultBox
-            key={r.key}
-            data-testid="dice-log-entry-total"
-            // K8: a combat line's numbers have no roll record.
-            data-record-id={r.rollId ?? undefined}
-            data-landing
-            value={r.total}
-            outcome={r.outcome}
-            held={!landed}
-            tip={details}
-            className={struck}
-          />
-        ))}
-        {results.length > ROW_RESULTS_MAX && (
-          <MoreResults rest={results.slice(ROW_RESULTS_MAX)} landed={landed} />
-        )}
+        <FixedSlot
+          slot="log-results"
+          ghost={
+            <>
+              <ResultBox value="00" data-testid="dice-log-ghost" />
+              <ResultBox value="00" data-testid="dice-log-ghost" />
+            </>
+          }
+          className="justify-end"
+        >
+          {results.slice(0, ROW_RESULTS_MAX).map((r) => (
+            <ResultBox
+              key={r.key}
+              data-testid="dice-log-entry-total"
+              // K8: a combat line's numbers have no roll record.
+              data-record-id={r.rollId ?? undefined}
+              data-landing
+              value={r.total}
+              outcome={r.outcome}
+              held={!landed}
+              tip={details}
+              className={struck}
+            />
+          ))}
+          {results.length > ROW_RESULTS_MAX && (
+            <MoreResults rest={results.slice(ROW_RESULTS_MAX)} landed={landed} />
+          )}
+        </FixedSlot>
         {/* FR-KIT-44: "physical" (and "undone") after the boxes. An open entry-action confirm
             takes their room (FR-GEM-44: it stays inside the row at the 300-px minimum); the
             words stay in the Tooltip's line. */}
-        {rowBadges(segments).map((b) => (
-          <Badge
-            key={b}
-            aria-hidden
-            variant="outline"
-            data-testid={b === "physical" ? "dice-log-entry-manual" : undefined}
-            className="shrink-0 px-1 py-0 text-[10px] group-has-[[data-testid=dice-log-action-confirm]]/entry:hidden"
-          >
-            {b}
-          </Badge>
-        ))}
-        {rerolled && (
-          <Tooltip content="Rerolled: show the new roll">
-            <button
-              type="button"
-              data-testid="dice-log-rerolled"
-              data-record-id={rerolled}
-              aria-label="Rerolled: show the new roll"
-              className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => focusLogEntry(rerolled)}
+        <FixedSlot
+          slot="log-chips"
+          ghost={<ChipBadge>physical</ChipBadge>}
+          className="group-has-[[data-testid=dice-log-action-confirm]]/entry:hidden"
+        >
+          {rowBadges(segments).map((b) => (
+            <ChipBadge
+              key={b}
+              aria-hidden
+              data-testid={b === "physical" ? "dice-log-entry-manual" : undefined}
             >
-              <Badge variant="outline" className="px-1 py-0 text-[10px] text-muted-foreground">
-                rerolled
-              </Badge>
-            </button>
-          </Tooltip>
-        )}
-        <EntryActions e={e} actions={actions} />
+              {b}
+            </ChipBadge>
+          ))}
+          {rerolled && (
+            <Tooltip content="Rerolled: show the new roll">
+              <button
+                type="button"
+                data-testid="dice-log-rerolled"
+                data-record-id={rerolled}
+                aria-label="Rerolled: show the new roll"
+                className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                onClick={() => focusLogEntry(rerolled)}
+              >
+                <Badge variant="outline" className="px-1 py-0 text-[10px] text-muted-foreground">
+                  rerolled
+                </Badge>
+              </button>
+            </Tooltip>
+          )}
+        </FixedSlot>
       </div>
     </li>
   );
