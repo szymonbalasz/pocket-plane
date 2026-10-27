@@ -2672,3 +2672,10 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #3
 
 - **Derived (client, not stored):** `medallionOf(name, imageAssetId?, colour?)` → `{letter, imageAssetId, colour}`; `medallionInk(colour)`; `hpFill(cur, max)` (0–100 %) and `hpBarMode` (`bar` \| `band` \| none); the HP bar's band = the given band, else `healthBand(cur, max)` (FR-CBT-26).
 - **Fixtures:** none.
+
+## 135. Sprint 13: Initiative rows (K2)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-24 – -26). **Built by `build/kit-initiative`**. Protocol side: [protocol §171](../protocol/README.md#171-sprint-13-initiative-rows-on-the-kit-grid-k2). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `medallionColour(store, combatant)` = `CREATURE_COLORS[token.creatureType]` of the combatant's token the viewer holds, else null (muted); `tailText(ac, moved)`, `tailFolds(widths)` (DM); `pcHp(character)` = `{hpCurrent, hpMax ?? statBlock.hpMax}` from the character the player holds (own: full; others: ADR-0063's whitelist).
+- **Fixtures:** bundle `kit-initiative` (existing units only).
