@@ -34,7 +34,7 @@ import { PublicRolls, PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
 import { ROLL_HINT, rollHint } from "./rolls";
 import type { RollRoute } from "./routing";
-import { DERIVE_HINT, SheetView } from "./SheetView";
+import { DERIVE_HINT, fadeOf, SheetView } from "./SheetView";
 import { SheetContext, type SheetCtx, SheetWide } from "./sheet-context";
 import {
   breakdownText,
@@ -611,6 +611,34 @@ describe("K13 wide Main (DM #363)", () => {
   });
 });
 
+describe("K13 narrow sheet (round-2 gap 9)", () => {
+  test("FR-CHARX-115 K13 tab strip: an end with hidden tabs fades (a 28-px mask) instead of cutting a word; none without overflow", () => {
+    expect(fadeOf({ prev: false, next: false })).toBeUndefined();
+    expect(fadeOf({ prev: false, next: true })).toBe("end");
+    expect(fadeOf({ prev: true, next: true })).toBe("both");
+    expect(fadeOf({ prev: true, next: false })).toBe("start");
+    const strip = elementAt(sheetHtml(), 'data-slot="sheet-tabs"');
+    expect(strip).toContain(
+      "data-[fade=end]:[mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)]",
+    );
+    expect(strip).toContain("data-[fade=start]:[mask-image:");
+    expect(strip).toContain("data-[fade=both]:[mask-image:");
+    // Not measured in a static render: no fade yet.
+    expect(strip).not.toContain("data-fade=");
+  });
+
+  test("FR-KIT-85 K13 level line: one unit beside the actions (floated top-right in the name column) when it fits there, else under them at full width", () => {
+    const html = sheetHtml();
+    const at2 = (id: string) => html.indexOf(`data-testid="${id}"`);
+    expect(html).toMatch(/data-testid="charx-header-actions" class="float-right ml-3 shrink-0"/);
+    expect(at2("charx-header-actions")).toBeLessThan(at2("char-sheet-name"));
+    expect(html).toMatch(
+      /data-testid="char-sheet-level" class="mt-1 inline-block max-w-full align-top text-sm/,
+    );
+    expect(text(elementAt(html, 'data-testid="charx-header-actions"'))).toBe("Edit");
+  });
+});
+
 describe("FR-CHARX-115 tab strip", () => {
   test("FR-CHARX-115 tab strip: arrows at an end with hidden tabs; the wheel scrolls sideways", () => {
     expect(tabArrows(0, 300, 300)).toEqual({ prev: false, next: false });
@@ -629,7 +657,7 @@ describe("FR-CHARX-115 tab strip", () => {
     const html = sheetHtml();
     const strip = elementAt(html, 'data-slot="sheet-tabs"');
     expect(strip).toContain(
-      'class="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]"',
+      'class="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin] ',
     );
     expect(strip).toContain('role="tablist"');
     // Not measured in a static render: no arrows yet.
@@ -923,11 +951,10 @@ describe("K11 walkthrough fixes", () => {
 
   test("FR-KIT-85 level line wraps between parts, never right after a '·' (each later part keeps its '·')", () => {
     const html = stateHtml({ client: "dm", npc: true });
-    const line = `<span ${html.slice(
-      html.indexOf('data-testid="char-sheet-level"'),
-      html.indexOf('data-testid="charx-header-actions"'),
-    )}`;
-    expect(text(line).replace(/<div $/, "")).toBe("CR 1 · 200 XP");
+    const from = html.indexOf('data-testid="char-sheet-level"');
+    // The level line closes the name column (K13: the actions float before the name).
+    const line = `<span ${html.slice(from, html.indexOf("</span></div>", from))}`;
+    expect(text(line)).toBe("CR 1 · 200 XP");
     expect(line).toContain('<span class="whitespace-nowrap">· 200 XP</span>');
     // Every "·" opens an unbreakable part.
     expect(line.match(/·/g)?.length).toBe(line.match(/whitespace-nowrap">·/g)?.length);
@@ -967,6 +994,20 @@ describe("K11 walkthrough fixes", () => {
       "[&amp;_[data-chip-row]]:contents",
     ])
       expect(cls).toContain(c);
+  });
+
+  test("FR-KIT-85 K13 chips line: the effects menu last, beside the last chip; it takes no room of its own (never alone on a row), the line keeps 26 px for it", () => {
+    const html = stateHtml({ client: "player" });
+    const chips = html.slice(html.indexOf('data-testid="charx-header-chips"'));
+    const cls = chips.slice(
+      chips.indexOf('class="'),
+      chips.indexOf('"', chips.indexOf('class="') + 7),
+    );
+    const menu = "[&amp;_[data-testid=cbtx-sheet-effects-menu]]";
+    // 24-px button − 4 (drawn in) − 26 (cancelled) + the 6-px gap = 0 px on the line.
+    for (const c of [`${menu}:order-last`, `${menu}:-ml-1`, `${menu}:-mr-[26px]`, `${menu}:size-6`])
+      expect(cls).toContain(c);
+    expect(cls).toContain("has-[[data-testid=cbtx-sheet-effects-menu]]:pr-[26px]");
   });
 });
 

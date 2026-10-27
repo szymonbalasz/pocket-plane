@@ -347,20 +347,20 @@ describe("FR-CHARX-48 pinned header", () => {
     // K11: the kit's name type size (21 px, 32 px wide).
     expect(tagOf(html, "char-sheet-name")).toContain("text-[21px] font-bold");
     expect(tagOf(html, "char-sheet-name")).toContain("@min-[560px]/sheet:text-[32px]");
-    // Level line, chips line (badges), Edit after them on the same top row; the old row is gone.
+    // Level line, chips line (badges), Edit on the same top row; the old row is gone.
     const at = (id: string) => html.indexOf(`data-testid="${id}"`);
     expect(at("char-sheet-level")).toBeGreaterThan(at("char-sheet-name"));
-    // K11: the actions top-right of the name column, then the chips line (under the row when
-    // narrow, under the name when wide); badges as kit chips.
-    expect(at("charx-edit-toggle")).toBeGreaterThan(at("char-sheet-level"));
-    expect(at("charx-header-chips")).toBeGreaterThan(at("charx-edit-toggle"));
+    // K11: the actions top-right of the name column (K13: floated, so first in it), then the
+    // chips line (under the row when narrow, under the name when wide); badges as kit chips.
+    expect(at("charx-edit-toggle")).toBeLessThan(at("char-sheet-name"));
+    expect(at("charx-header-chips")).toBeGreaterThan(at("char-sheet-level"));
     expect(at("charx-draft")).toBeGreaterThan(at("charx-header-chips"));
     expect(tagOf(html, "charx-draft")).toContain('data-slot="sheet-chip"');
     expect(tagOf(html, "charx-draft")).toContain("rounded-full px-2.5 py-0.5 text-[13px]");
     // The chips line's slot (K11 gates: the line is portalled into it in the browser, so a pinned
     // part switch never remounts the header sections).
     expect(tagOf(html, "charx-chips-slot")).toContain(
-      "col-span-3 min-w-0 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2",
+      "col-span-2 min-w-0 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2",
     );
     expect(html).not.toContain("charx-header-line");
   });
@@ -379,12 +379,12 @@ describe("FR-CHARX-48 pinned header", () => {
     expect(tagOf(html, "charx-name-picker")).toContain("data-tip");
     expect(html).toMatch(/<span class="line-clamp-2 min-w-0 break-normal text-balance">Mira</);
     expect(html).not.toContain("break-words");
-    // K11: portrait, name column, actions in a grid; the actions stack in a column when narrow
-    // (the name keeps the middle), a row once wide.
+    // K11: portrait and name column in a grid; the actions (K13: floated top-right in the name
+    // column) stack in a column when narrow (the name keeps its room), a row once wide.
     expect(html).toContain(
-      'class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5"',
+      'class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-1.5"',
     );
-    expect(tagOf(html, "charx-header-actions")).toContain("ml-auto shrink-0");
+    expect(tagOf(html, "charx-header-actions")).toContain("float-right ml-3 shrink-0");
     const actions = html.slice(html.indexOf('data-testid="charx-header-actions"'));
     expect(actions).toContain("flex flex-col items-end gap-1 @min-[560px]/sheet:flex-row");
   });
