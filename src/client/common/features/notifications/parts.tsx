@@ -4,7 +4,15 @@
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { BellIcon, XIcon } from "lucide-react";
-import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentType,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { MEDALLION_PX, Medallion } from "../../components/kit/medallion";
 import { useRecords, useSync } from "../../sync/store";
@@ -89,12 +97,34 @@ export function ToastText({
   views: NotificationViews;
   name: string | null;
 }) {
+  // K9: a kind that places the time itself (`timeInBody`) gets it through `ToastTime`.
+  if (views.get(n.kind)?.timeInBody) {
+    return (
+      <div data-slot="toast-text" className="min-w-0 flex-[1_1_9rem] break-words text-sm">
+        <ToastTimeContext.Provider value={n.createdAt}>
+          <NoteLine n={n} views={views} name={name} />
+        </ToastTimeContext.Provider>
+      </div>
+    );
+  }
   return (
     <div data-slot="toast-text" className="min-w-0 flex-[1_1_9rem] break-words text-sm">
       <NoteLine n={n} views={views} name={name} />
       <NoteTime iso={n.createdAt} />
     </div>
   );
+}
+
+/** K9: the toast card's `createdAt` for a `timeInBody` kind's renderer; null outside a toast. */
+const ToastTimeContext = createContext<string | null>(null);
+
+/**
+ * K9: the toast card's time line (`note-time`) where a `timeInBody` kind's renderer puts it;
+ * nothing outside a toast card (a Notifications row shows its own time).
+ */
+export function ToastTime() {
+  const iso = useContext(ToastTimeContext);
+  return iso ? <NoteTime iso={iso} /> : null;
 }
 
 /**

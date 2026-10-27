@@ -24,6 +24,7 @@ import { AlertToast, TURN_ALERT_TOAST_ID } from "./alert-toasts";
 import { HistoryBody } from "./HistoryWindow";
 import { leadName, NOTIFICATION_TYPE, relativeTime } from "./logic";
 import type { NoteClient } from "./note-client";
+import { ToastText, ToastTime } from "./parts";
 import { ToastRuntime } from "./ToastRuntime";
 import {
   addNote,
@@ -405,6 +406,33 @@ const rowOf = (html: string, id: string) => {
   const next = html.indexOf('data-testid="note-history-row"', at);
   return html.slice(start, next < 0 ? undefined : html.lastIndexOf("<li", next));
 };
+
+describe("FR-KIT-56 text block (K9 timeInBody)", () => {
+  test("FR-KIT-56 text block (K9): a timeInBody kind places the card's time line inside its renderer (ToastTime), once; elsewhere ToastTime renders nothing", () => {
+    const Body = ({ notification: n }: { notification: NotificationRecord }) => (
+      <span data-testid="body">
+        <span>{n.text}</span>
+        <ToastTime />
+        <button type="button">Act</button>
+      </span>
+    );
+    const v = createNotificationViews([
+      { kind: "test", icon: BellIcon, genericResolve: true },
+      { kind: "timed", icon: BellIcon, render: Body, timeInBody: true },
+    ]);
+    const timed = { ...system, id: "n9", kind: "timed", text: "DM: Perception · Mira" };
+    const html = renderToStaticMarkup(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <ToastText n={timed} views={v} name={null} />
+      </TooltipProvider>,
+    );
+    expect(html.split('data-testid="note-time"').length - 1).toBe(1);
+    expect(html).toMatch(
+      /data-testid="note-text"><span data-testid="body"><span>DM: Perception · Mira<\/span><time data-testid="note-time"[^>]*>[^<]*<\/time><button/,
+    );
+    expect(renderToStaticMarkup(<ToastTime />)).toBe("");
+  });
+});
 
 describe("FR-KIT-55 Notifications window cards (K9, K6 §5)", () => {
   const closed: NotificationRecord = { ...system, id: "n3", state: "resolved" };

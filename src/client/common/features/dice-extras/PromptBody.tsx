@@ -6,9 +6,10 @@
 // toast (player-owned action), no token cue, no action. A small lazy chunk preloaded at idle
 // (`PromptViews.tsx` holds the view defs, DICEX §12 initial budget). Sprint 11 (BL-112): an answer
 // staged in the tray puts the tray back as it was before the stage once the prompt is spent.
-// Kit parity K9 (K6 gap 9): the player's card reads as the kit toast: Roll + Decline right of the
-// text (wrapping below only when narrow), so the card's time line sits under the text; Decline
-// is a small stone button.
+// Kit parity K9 (K6 gap 9, walkthrough): the player's card reads as the kit toast: the text on
+// its own line (never cut short by the buttons), then the card's time line and Roll + Decline on
+// the line under it (`ToastTime`; a Notifications row has its own time); Decline a small stone
+// button.
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { DICEX_REQUEST_INTENTS, REQUEST_CATEGORY } from "@shared/dice-extras/request-names";
 import { type CharacterStatBlock, ENTITY_TYPE } from "@shared/entities/schemas";
@@ -18,6 +19,7 @@ import { Button } from "../../components/ui/button";
 import { useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
 import { RollButton, type RollRequest, useRollControl } from "../dice-roll-log/roll-control";
+import { ToastTime } from "../notifications/parts";
 import { TOAST_STACK_Z } from "../notifications/ToastRuntime";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import {
@@ -138,7 +140,8 @@ export function PlayerPrompt({ notification: n }: { notification: NotificationRe
       data-state={n.state}
       className="flex flex-wrap items-center gap-x-2 gap-y-1.5"
     >
-      <span className="min-w-0 flex-[1_1_5rem]">{n.text}</span>
+      <span className="min-w-0 basis-full">{n.text}</span>
+      <ToastTime />
       {p && mine && <PromptActions n={n} p={p} />}
       <span className="basis-full empty:hidden">
         <Outcome n={n} />

@@ -28,6 +28,11 @@ export interface NotificationView {
   icon: ComponentType<{ className?: string }>;
   /** Row / toast body; default: the notification's text. Renders text, never HTML. */
   render?: ComponentType<{ notification: NotificationRecord }>;
+  /**
+   * K9 (FR-KIT-56 / -57): the toast card's time line goes inside `render` (where it places
+   * `ToastTime`, e.g. beside its own actions) rather than under it.
+   */
+  timeInBody?: true;
   /** Action click (FR-NOTE-16); a returned promise that rejects is toasted (FR-NOTE-20). */
   onAction?: (n: NotificationRecord, ctx: NotificationActionContext) => unknown;
   /** No `onAction`: the button sends `note.resolve` (server kind is `genericResolve`). */
