@@ -243,9 +243,9 @@ test("FR-DICEX-29 FR-DICEX-30 FR-DICEX-31 sheet notation: Mira's 'Notation test'
   await expect(tray.getByTestId("dicex-tray-die")).toHaveAttribute("data-faces", "12");
   await expect(tray.getByTestId("dicex-tray-constant")).toHaveValue("5");
   await tray.getByTestId("dicex-tray-options").click();
-  await expect(tray.getByTestId("dicex-tray-actor").locator("option:checked")).toHaveText("Mira");
+  await expect(tray.getByTestId("dicex-tray-actor")).toHaveText("Mira");
   await expect(tray.getByTestId("dicex-tray-label")).toHaveValue("Notation test");
-  await expect(tray.getByTestId("dicex-tray-category")).toHaveValue("other");
+  await expect(tray.getByTestId("dicex-tray-category")).toHaveAttribute("data-value", "other");
 
   // FR-DICEX-31: a plain `dice.roll` line as Mira ("Mira — Notation test: d12 + 5 = …").
   await tray.getByTestId("dicex-tray-roll").click();

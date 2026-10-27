@@ -41,8 +41,10 @@ import {
 import {
   BandBadge,
   CombatantMedallion,
+  HP_STACK,
   SideChip,
   TurnMarker,
+  useListHpTrack,
 } from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
@@ -84,6 +86,7 @@ export function pcHp(ch: unknown): { cur: number; max: number } | null {
  * FR-KIT-26: the HP line's bar. PCs (character record) and the player's own companions
  * (FR-CBT-116: only the owner holds their numbers) show `HpBar` + "cur / max"; a monster or
  * another player's companion shows its band word only (`cbt-init-row-band`), never a bar length.
+ * K9: the kit's fixed track, so bars line up row to row.
  */
 function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
   // The record itself (a stable snapshot); the figures derive from it.
@@ -95,9 +98,9 @@ function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
       <HpBar
         cur={c.hpCurrent}
         max={c.hpMax}
+        track="fixed"
         data-testid="cbt-init-row-hp"
         data-record-id={c.id}
-        className="min-w-fit flex-1"
       />
     );
   }
@@ -106,9 +109,9 @@ function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
       <HpBar
         cur={hp.cur}
         max={hp.max}
+        track="fixed"
         data-testid="cbt-init-row-hp"
         data-record-id={c.id}
-        className="min-w-fit flex-1"
       />
     );
   }
@@ -150,48 +153,54 @@ function PlayerRowMain({
     // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer shortcut; the card icon is the keyboard path
     <div
       data-row-main
-      className={cn("relative flex items-center gap-1.5", own && "cursor-pointer")}
+      className={cn("relative flex items-center gap-1.5", HP_STACK.main, own && "cursor-pointer")}
       onClick={own ? () => openCard(c.id) : undefined}
     >
       <CombatantMedallion c={c} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* FR-CBTX-57: the name is never cut; the side chip takes a second line first. */}
-        <NameLine
-          name={c.name}
-          testId="cbt-init-row-name"
-          className="text-sm font-medium"
-          marks={
-            companion && (
-              <ModeIcon
-                id={c.id}
-                mode={c.turnMode ?? "after-owner"}
-                ownerName={ownerName}
-                testId="cbt-init-row-mode"
-              />
-            )
-          }
-          // FR-CBT-104: never folds. Sprint 6: the owner chip with it (FR-CBT-119; a line sits in
-          // its owner's row).
-          side={
-            <>
-              {companion && <OwnerChip c={c} ownerName={ownerName} testId="cbt-init-row-owner" />}
-              <SideChip c={c} testId="cbt-init-row-ally" />
-            </>
-          }
-        />
+      <div className={cn("flex min-w-0 flex-1 flex-col", HP_STACK.block)}>
+        {/* FR-CBTX-57: the name is never cut; the side chip takes a second line first. K9 R1:
+            in its own box, so a stacked list keeps it on the medallion's line. */}
+        <div className={HP_STACK.name}>
+          <NameLine
+            name={c.name}
+            testId="cbt-init-row-name"
+            className="text-sm font-medium"
+            marks={
+              companion && (
+                <ModeIcon
+                  id={c.id}
+                  mode={c.turnMode ?? "after-owner"}
+                  ownerName={ownerName}
+                  testId="cbt-init-row-mode"
+                />
+              )
+            }
+            // FR-CBT-104: never folds. Sprint 6: the owner chip with it (FR-CBT-119; a line sits in
+            // its owner's row).
+            side={
+              <>
+                {companion && <OwnerChip c={c} ownerName={ownerName} testId="cbt-init-row-owner" />}
+                <SideChip c={c} testId="cbt-init-row-ally" />
+              </>
+            }
+          />
+        </div>
         {/* FR-CBT-107 (walkthrough fix): an `after-owner` row says whose turn it follows. */}
         {companion && c.turnMode === "after-owner" && (
           <span
             data-testid="cbt-init-row-after"
             data-record-id={c.id}
-            className="text-xs text-muted-foreground"
+            className={cn("text-xs text-muted-foreground", HP_STACK.line)}
           >
             {modeLabel("after-owner", ownerName)}
           </span>
         )}
         <div
           data-stats-line
-          className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden"
+          className={cn(
+            "mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden",
+            HP_STACK.line,
+          )}
         >
           <PlayerHp c={c} own={own} />
           {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down. */}
@@ -407,6 +416,8 @@ function PlayerInitiativeBody() {
   useTriggerWords();
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  // K9 (walkthrough F1): one HP track width for the whole list.
+  useListHpTrack(listRef);
   const footerRef = useRef<HTMLButtonElement>(null);
   const ids = rows.map((c) => c.id);
   // FR-CBT-77 (G4): new rows (Start, reveal) scroll into view; "↓ N more" below the fold.
@@ -455,7 +466,10 @@ function PlayerInitiativeBody() {
       <ul
         ref={listRef}
         data-testid="cbt-init-list"
-        className="@container/init -mx-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2"
+        className={cn(
+          "@container/init -mx-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2",
+          HP_STACK.list,
+        )}
       >
         {layout.map(({ c, lines, owner, indent }) => (
           <PlayerRow

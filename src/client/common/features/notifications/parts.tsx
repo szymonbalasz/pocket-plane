@@ -4,7 +4,15 @@
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { BellIcon, XIcon } from "lucide-react";
-import { type ComponentType, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type ComponentType,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { MEDALLION_PX, Medallion } from "../../components/kit/medallion";
 import { useRecords, useSync } from "../../sync/store";
@@ -18,21 +26,6 @@ import type {
   NotificationActionOrigin,
   NotificationViews,
 } from "./views";
-
-/** Icon + text (rendered as text, never HTML: FR-NOTE-21) or the kind's renderer (FR-NOTE-19). */
-export function NoteBody({ n, views }: { n: NotificationRecord; views: NotificationViews }) {
-  const view = views.get(n.kind);
-  const Icon = view?.icon ?? BellIcon;
-  const Render = view?.render;
-  return (
-    <div className="flex min-w-0 items-start gap-2">
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-      <div className="min-w-0 break-words text-sm" data-testid="note-text">
-        {Render ? <Render notification={n} /> : n.text}
-      </div>
-    </div>
-  );
-}
 
 /**
  * FR-KIT-55: the toast card's row (`data-slot="toast-card"`): lead · text block · actions · close,
@@ -104,23 +97,66 @@ export function ToastText({
   views: NotificationViews;
   name: string | null;
 }) {
+  // K9: a kind that places the time itself (`timeInBody`) gets it through `ToastTime`.
+  if (views.get(n.kind)?.timeInBody) {
+    return (
+      <div data-slot="toast-text" className="min-w-0 flex-[1_1_9rem] break-words text-sm">
+        <ToastTimeContext.Provider value={n.createdAt}>
+          <NoteLine n={n} views={views} name={name} />
+        </ToastTimeContext.Provider>
+      </div>
+    );
+  }
+  return (
+    <div data-slot="toast-text" className="min-w-0 flex-[1_1_9rem] break-words text-sm">
+      <NoteLine n={n} views={views} name={name} />
+      <NoteTime iso={n.createdAt} />
+    </div>
+  );
+}
+
+/** K9: the toast card's `createdAt` for a `timeInBody` kind's renderer; null outside a toast. */
+const ToastTimeContext = createContext<string | null>(null);
+
+/**
+ * K9: the toast card's time line (`note-time`) where a `timeInBody` kind's renderer puts it;
+ * nothing outside a toast card (a Notifications row shows its own time).
+ */
+export function ToastTime() {
+  const iso = useContext(ToastTimeContext);
+  return iso ? <NoteTime iso={iso} /> : null;
+}
+
+/**
+ * FR-KIT-56 line 1 (`note-text`), also a Notifications row's (K9): the kind's renderer as it is,
+ * else the text (rendered as text, never HTML: FR-NOTE-21) with the causing player's name in bold
+ * when it starts it.
+ */
+export function NoteLine({
+  n,
+  views,
+  name,
+  className,
+}: {
+  n: NotificationRecord;
+  views: NotificationViews;
+  name: string | null;
+  className?: string;
+}) {
   const Render = views.get(n.kind)?.render;
   const { lead, rest } = leadName(n.text, name);
   return (
-    <div data-slot="toast-text" className="min-w-0 flex-[1_1_9rem] break-words text-sm">
-      <div data-testid="note-text">
-        {Render ? (
-          <Render notification={n} />
-        ) : lead ? (
-          <>
-            <b className="font-medium">{lead}</b>
-            {rest}
-          </>
-        ) : (
-          n.text
-        )}
-      </div>
-      <NoteTime iso={n.createdAt} />
+    <div data-testid="note-text" className={className}>
+      {Render ? (
+        <Render notification={n} />
+      ) : lead ? (
+        <>
+          <b className="font-medium">{lead}</b>
+          {rest}
+        </>
+      ) : (
+        n.text
+      )}
     </div>
   );
 }

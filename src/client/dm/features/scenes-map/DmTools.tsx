@@ -7,6 +7,7 @@ import { Tooltip } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
 import type { EffectiveGrid } from "@ui/features/scenes-map/canvas-context";
 import { toastReject, useLive, useMapIntent } from "@ui/features/scenes-map/intents";
+import { RAIL_TOOL } from "@ui/features/scenes-map/ToolRail";
 import { cn } from "@ui/lib/utils";
 import { Grid3x3Icon, LockIcon, MinusIcon, PlusIcon, UnlockIcon } from "lucide-react";
 import { useState } from "react";
@@ -116,12 +117,12 @@ export function GridTool({ scene }: { scene: SceneRecord }) {
           <Button
             size="icon"
             variant="ghost"
-            className={cn("size-9", open && "bg-accent")}
+            className={cn(RAIL_TOOL, open && "bg-accent")}
             aria-label="Grid"
             data-testid="map-tool-grid"
             disabled={disabled}
           >
-            <Grid3x3Icon className="size-4" />
+            <Grid3x3Icon />
           </Button>
         </PopoverTrigger>
       </Tooltip>
@@ -229,7 +230,7 @@ export function LockTool({ scene }: { scene: SceneRecord }) {
       <Button
         size="icon"
         variant="ghost"
-        className={cn("size-9", scene.mapLocked && "bg-accent")}
+        className={cn(RAIL_TOOL, scene.mapLocked && "bg-accent")}
         aria-label={scene.mapLocked ? "Unlock map" : "Lock map"}
         aria-pressed={scene.mapLocked}
         data-testid="map-tool-lock"
@@ -241,7 +242,7 @@ export function LockTool({ scene }: { scene: SceneRecord }) {
           )
         }
       >
-        <Icon className="size-4" />
+        <Icon />
       </Button>
     </Tooltip>
   );

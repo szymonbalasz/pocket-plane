@@ -287,6 +287,24 @@ describe("FR-KIT-103 card", () => {
     expect(html).toMatch(/data-slot="statblock" class="[^"]*space-y-1"/);
   });
 
+  test("FR-KIT-103 card (K9, K6 gap 13): ability labels are the cell's first line, so gilt.css draws them as the kit's small-caps gold label type (“Str”)", () => {
+    const html = card({});
+    const str = html.slice(html.indexOf('data-testid="ent-statblock-ability" data-value="str"'));
+    // The label's line is the cell's first child (a block in the column), its first letter the
+    // label's: what the theme's ::first-letter rule needs.
+    expect(str).toMatch(
+      /^data-testid="ent-statblock-ability" data-value="str" class="flex min-w-0 flex-col"><span class="text-xs"><span data-slot="statblock-label"[^>]*>STR</,
+    );
+    const css = readFileSync(join(import.meta.dir, "../../../../common/themes/gilt.css"), "utf8");
+    const k9 = css.slice(css.indexOf("/* KIT: polish (kit-parity K9"));
+    expect(k9).toMatch(
+      /\[data-slot="statblock-abilities"\] \[data-slot="statblock-label"\] \{\s*color: var\(--gold\);\s*font-family: var\(--font-label\);\s*text-transform: lowercase;/,
+    );
+    expect(k9).toMatch(
+      /span:has\(> \[data-slot="statblock-label"\]\)::first-letter \{\s*text-transform: uppercase;/,
+    );
+  });
+
   test("FR-KIT-103 card: with the compendium entry, the full type line and the traits / other actions as collapsible sections (the attacks keep their rows)", () => {
     const html = card({ entry: ENTRY });
     expect(text(html)).toContain("Small humanoid (goblinoid), neutral evil");

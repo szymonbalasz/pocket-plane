@@ -54,13 +54,22 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "../../components/ui/controls";
-import { Tooltip } from "../../components/ui/overlays";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tooltip,
+} from "../../components/ui/overlays";
 import { Input } from "../../components/ui/primitives";
 import { lazyChunk } from "../../lib/lazy-chunk";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
 import {
+  actorItemValue,
+  actorLabel,
   actorOptions,
   actorSelection,
   HELD_TEXT,
@@ -100,8 +109,8 @@ import {
 
 export type TrayState = "idle" | "compose" | "adjust" | "manual" | "rolling" | "result";
 
-const SELECT =
-  "h-7 min-w-0 shrink-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
+/** K10 (K6 gap 8): the options row's Select triggers, as small as the native selects were. */
+const SELECT = "h-7 min-w-0 shrink-0 gap-1 px-1.5 py-0 text-xs [&>span]:truncate";
 
 const MODE_LABEL: Record<RollMode, string> = {
   disadvantage: "Dis",
@@ -800,35 +809,62 @@ export function TrayWindow() {
           </div>
           {free && optionsOpen && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <select
-                data-testid="dicex-tray-category"
-                aria-label="Category"
-                className={cn(SELECT, "max-w-28")}
+              {/* K10 (K6 gap 8): the shared Select, as the roll bar's (K8): the trigger keeps the
+                  test ID and carries the value, each item `…-option` + `data-value`. */}
+              <Select
                 value={free.category}
-                onChange={(e) => update({ category: e.target.value as RollCategory })}
+                onValueChange={(v) => update({ category: v as RollCategory })}
               >
-                {ROLL_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {CATEGORY_LABEL[c]}
-                  </option>
-                ))}
-              </select>
-              <select
-                data-testid="dicex-tray-actor"
-                aria-label="Roll as"
-                className={cn(SELECT, "max-w-28")}
-                value={selected?.value ?? ""}
-                onChange={(e) => {
-                  const a = actorList.find((x) => x.value === e.target.value);
+                <SelectTrigger
+                  data-testid="dicex-tray-category"
+                  data-value={free.category}
+                  aria-label="Category"
+                  className={cn(SELECT, "max-w-28")}
+                >
+                  <SelectValue>{CATEGORY_LABEL[free.category]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLL_CATEGORIES.map((c) => (
+                    <SelectItem
+                      key={c}
+                      value={c}
+                      data-testid="dicex-tray-category-option"
+                      data-value={c}
+                    >
+                      {CATEGORY_LABEL[c]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={actorItemValue(selected?.value ?? "")}
+                onValueChange={(v) => {
+                  const a = actorList.find((x) => actorItemValue(x.value) === v);
                   update({ actor: a?.ref });
                 }}
               >
-                {actorList.map((a) => (
-                  <option key={a.value} value={a.value} disabled={a.stale}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  data-testid="dicex-tray-actor"
+                  data-value={selected?.value ?? ""}
+                  aria-label="Roll as"
+                  className={cn(SELECT, "max-w-28")}
+                >
+                  <SelectValue>{selected ? selected.label : ""}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {actorList.map((a) => (
+                    <SelectItem
+                      key={a.value}
+                      value={actorItemValue(a.value)}
+                      disabled={a.stale}
+                      data-testid="dicex-tray-actor-option"
+                      data-value={a.value}
+                    >
+                      {actorLabel(a)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 data-testid="dicex-tray-label"
                 aria-label="Label"

@@ -13,6 +13,13 @@ import { ArrowDownIcon, ArrowUpIcon, PlusIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/controls";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
@@ -32,8 +39,8 @@ import {
   UNTOUCHED,
 } from "./macro-logic";
 
-const SELECT =
-  "h-7 min-w-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
+/** K10 (K6 gap 8): the Category Select's trigger, as small as the native select was. */
+const SELECT = "h-7 min-w-0 gap-1 px-1.5 py-0 text-xs [&>span]:truncate";
 
 /** The viewer, the macros they see, the creatures and players (names) from the store. */
 export function useMacroData() {
@@ -132,19 +139,31 @@ export function MacroEditor({ draft: initial, onDone }: { draft: MacroDraft; onD
         />
       </Label>
       <div className="flex flex-wrap items-center gap-2">
-        <select
-          data-testid="dicex-macro-category"
-          aria-label="Category"
-          className={SELECT}
+        <Select
           value={d.category}
-          onChange={(e) => setD({ ...d, category: e.target.value as RollCategory })}
+          onValueChange={(v) => setD({ ...d, category: v as RollCategory })}
         >
-          {ROLL_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {CATEGORY_LABEL[c]}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            data-testid="dicex-macro-category"
+            data-value={d.category}
+            aria-label="Category"
+            className={cn(SELECT, "max-w-32")}
+          >
+            <SelectValue>{CATEGORY_LABEL[d.category]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {ROLL_CATEGORIES.map((c) => (
+              <SelectItem
+                key={c}
+                value={c}
+                data-testid="dicex-macro-category-option"
+                data-value={c}
+              >
+                {CATEGORY_LABEL[c]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {offered && (
           <Label className="flex items-center gap-1.5 text-xs">
             <Checkbox

@@ -39,7 +39,7 @@ describe("kit-parity bundle (kit parity §13)", () => {
     const db = r.openDb();
     cleanups.unshift(() => closeDb(db));
     expect(r.manifest.status).toBe("complete");
-    expect(r.manifest.fixtures.slice(-10)).toEqual([
+    expect(r.manifest.fixtures.slice(-11)).toEqual([
       "kit-log-rolls",
       "combat-hit",
       "combat-pending",
@@ -50,6 +50,7 @@ describe("kit-parity bundle (kit parity §13)", () => {
       "pet-owlbear",
       "kit-notices-applied",
       "kit-notices",
+      "dicex-request-open",
     ]);
     const enc = db.select().from(encounter).where(eq(encounter.status, "started")).get();
     expect(enc?.round).toBe(3);
@@ -70,6 +71,14 @@ describe("kit-parity bundle (kit parity §13)", () => {
         .from(notification)
         .all()
         .some((n) => n.state === "pending"),
+    ).toBe(true);
+    // K9: player-1's pending Perception prompt (the roll-request toast with Roll + Decline).
+    expect(
+      db
+        .select()
+        .from(notification)
+        .all()
+        .some((n) => n.kind === "roll-request" && n.state === "pending"),
     ).toBe(true);
     expect(
       db

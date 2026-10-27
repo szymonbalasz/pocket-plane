@@ -10,6 +10,7 @@ import {
 } from "radix-ui";
 import type * as React from "react";
 import { cn } from "../../lib/utils";
+import { POPOVER_LAYER } from "./layers";
 
 // ---- DropdownMenu ----
 export const DropdownMenu = DM.Root;
@@ -21,8 +22,7 @@ export function DropdownMenuRadioGroup(props: React.ComponentProps<typeof DM.Rad
   return <DM.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
 
-const menuSurface =
-  "z-50 min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md";
+const menuSurface = `${POPOVER_LAYER} min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md`;
 const menuItem =
   "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
 
@@ -153,7 +153,8 @@ export function PopoverContent({
         data-slot="popover-content"
         sideOffset={sideOffset}
         className={cn(
-          "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none",
+          POPOVER_LAYER,
+          "w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none",
           className,
         )}
         {...props}

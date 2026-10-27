@@ -3,8 +3,12 @@
 // effects added; the tail fold is pure (`tailFolds`). Hover, widths and the theme's look in a
 // browser: e2e/kit-initiative.e2e.ts and the K2 walkthrough.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import type { RecordStore } from "@shared/protocol/store";
+import { HP_TRACK_PX } from "@ui/components/kit/hp-bar";
+import { statusShown } from "@ui/features/combat-extras/parts";
 import { companionLayout } from "@ui/features/combat-tracker/companions";
 import {
   companionStore,
@@ -12,7 +16,16 @@ import {
   renderWith,
   rowHtml,
 } from "@ui/features/combat-tracker/companions-fixture";
-import { medallionColour } from "@ui/features/combat-tracker/parts";
+import {
+  contentWidth,
+  HP_STACK,
+  HP_TRACK_MIN,
+  listTrack,
+  medallionColour,
+  needsStack,
+  STACK_HYSTERESIS,
+  trackRoom,
+} from "@ui/features/combat-tracker/parts";
 import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
 import { END_CONFIRM_LABEL, END_KEEP_LABEL, EndConfirmButtons } from "./end-confirm";
 import {
@@ -229,12 +242,212 @@ describe("FR-KIT-25 hp line", () => {
     expect(tailText(null, null)).toBe("AC —");
   });
 
-  test("FR-KIT-25 tail folds: when the line can't hold the bar at 24 px, its numbers, the other parts and the tail", () => {
-    // bar 24 + 8 + "38 / 44" 40 = 72; "+5" 14; tail 92; gaps 2 × 6.
-    const w = { numbers: 40, others: [14], tail: 92 };
-    expect(tailFolds({ ...w, line: 190 })).toBe(false);
-    expect(tailFolds({ ...w, line: 189 })).toBe(true);
-    expect(tailFolds({ line: 100, numbers: null, others: [], tail: 92 })).toBe(false);
+  test("FR-KIT-25 tail folds: when the line can't hold the bar (K9: its fixed track + numbers), the other parts and the tail", () => {
+    // bar 120 + 8 + "38 / 44" 40 = 168; "+5" 14; tail 92; gaps 2 × 6.
+    const w = { bar: 168, others: [14], tail: 92 };
+    expect(tailFolds({ ...w, line: 286 })).toBe(false);
+    expect(tailFolds({ ...w, line: 285 })).toBe(true);
+    expect(tailFolds({ line: 100, bar: null, others: [], tail: 92 })).toBe(false);
+  });
+
+  test("FR-KIT-25 one track per list (K9 walkthrough F1) at 400 / 320 / 280 with chips: every row's room is measured, the list draws the narrowest, ≤ 120 px, ≥ the readable minimum", () => {
+    // Rooms = line − bar rest ("cur / max" 8 + 42) − other parts (+ 6 px gaps). The lines differ
+    // per row by their status chips (none / prone / concentration + "+1") and temp "+N".
+    const row = (line: number, others: number[] = []) =>
+      trackRoom({ line, barRest: 50, others, gap: 6 });
+    expect(row(160, [13])).toBe(91);
+    // DM 400 (Simple and busy rows): one width, the narrowest row's.
+    const w400 = [row(160), row(156), row(160, [13]), row(160), row(160, [13]), row(160)];
+    expect(listTrack(w400)).toBe(91);
+    // DM 320: narrow-list chips are icon-only, so the busy rows still leave a readable bar.
+    const w320 = [row(142), row(98), row(122, [13]), row(120), row(98, [13])];
+    expect(listTrack(w320)).toBe(HP_TRACK_MIN);
+    expect(listTrack([row(142), row(98), row(122)])).toBe(48);
+    // Player 280: Mira's concentration + "+1" + trigger icons.
+    expect(listTrack([row(114), row(90), row(130)])).toBe(40);
+    // Wide (600): capped at the kit's 120; nothing measured (static render) → 120.
+    expect(listTrack([row(300), row(280, [13])])).toBe(HP_TRACK_PX);
+    expect(listTrack([])).toBe(HP_TRACK_PX);
+    // Never under the readable minimum.
+    expect(listTrack([row(60)])).toBe(HP_TRACK_MIN);
+  });
+
+  test("FR-KIT-25 one track per list (K9 walkthrough F1): both lists set it (useListHpTrack); the fixed track reads it; narrow-list chips drop their rounds into the Tooltip; a folded tail is inert", () => {
+    const src = (f: string) => readFileSync(join(import.meta.dir, f), "utf8");
+    expect(src("initiative-window.tsx")).toContain("useListHpTrack(listRef);");
+    expect(src("../../../player/features/combat-tracker/initiative-window.tsx")).toContain(
+      "useListHpTrack(listRef);",
+    );
+    expect(src("initiative-window.tsx")).toContain("inert={folded || undefined}");
+    const html = dm(kitStore(1, { goblin: { hpCurrent: 3 } }));
+    const goblin = rowHtml(html, "cbt-init-row", "goblin");
+    expect(goblin).toContain("w-[var(--hp-track,120px)] shrink");
+    expect(goblin).toMatch(
+      /data-slot="init-status" class="[^"]*@max-\[22rem\]\/init:\[&amp;_\[data-rounds\]\]:hidden/,
+    );
+    // A timed concentration's "4r" sits in a data-rounds span (hidden in a narrow list, kept in
+    // its Tooltip).
+    const base = kitStore();
+    const timed = {
+      ...base,
+      records: {
+        ...base.records,
+        effect: {
+          ...base.records.effect,
+          conc: { ...(base.records.effect?.conc as object), endsRound: 5 },
+        },
+      },
+    } as RecordStore;
+    expect(rowHtml(dm(timed), "cbt-init-row", "mira")).toMatch(
+      /<span data-rounds="true" class="shrink-0">4r<\/span>/,
+    );
+  });
+
+  test("FR-KIT-25 one track per list (K9 re-test R1): DM 320 on session-sim-13, Mira's init + concentration + +1 + Searing Strike trigger leave her a 75-px HP line: the list stacks its HP lines (own full-width line under the name) and every bar shares 120 px again", () => {
+    // One-line rows at DM 320: Mira's line 75 px ("12 / 12" + gap = 50) → 25 < the 36 floor;
+    // Thorn's 96 px with temp "+5" (13) → 27; the plain rows ≈ 98–142.
+    const row = (line: number, others: number[] = []) =>
+      trackRoom({ line, barRest: 50, others, gap: 6 });
+    const oneLine = [row(142), row(124), row(75), row(96, [13]), row(98), row(110)];
+    expect(oneLine[2]).toBe(25);
+    expect(needsStack(oneLine)).toBe(true);
+    // Stacked: each HP line spans the row under the name, past the medallion (264 − 34 = 230 px).
+    const stacked = [row(230), row(230), row(230), row(230, [13]), row(230), row(218)];
+    expect(needsStack(stacked)).toBe(false);
+    expect(listTrack(stacked)).toBe(HP_TRACK_PX);
+    // DM 400 / kit-parity at 320 stay on one line (no row under the floor).
+    expect(needsStack([row(160), row(156), row(160, [13])])).toBe(false);
+    expect(needsStack([row(142), row(98), row(122, [13])])).toBe(false);
+    expect(needsStack([])).toBe(false);
+  });
+
+  test("FR-KIT-25 stacking (K9 re-test 2) on session-sim-13 at DM 320 / 340 / 360: one width threshold, rooms measured on the one-line rows the same way at every width (one 22rem narrow breakpoint), a little hysteresis", () => {
+    // One-line rooms grow 1:1 with the list (the narrow variants hold from 320 to ≈ 376): the
+    // busiest row (Mira: init + concentration + "+1" + the Searing Strike trigger) has 25 at 320.
+    const sim13 = (window: number) => {
+      const d = window - 320;
+      return [94 + d, 25 + d, 61 + d, 36 + d, 74 + d, 58 + d, 58 + d, 70 + d, 82 + d, 90 + d];
+    };
+    expect(needsStack(sim13(320))).toBe(true);
+    expect(needsStack(sim13(330))).toBe(true);
+    expect(needsStack(sim13(340))).toBe(false);
+    expect(needsStack(sim13(360))).toBe(false);
+    // Monotonic: stacked for every width under the threshold, one line above it.
+    const stackedAt = [320, 324, 328, 332, 336, 340, 344, 352, 360, 380].map((w) =>
+      needsStack(sim13(w)),
+    );
+    expect(stackedAt.indexOf(false)).toBeGreaterThan(0);
+    expect(stackedAt.slice(stackedAt.indexOf(false)).every((x) => !x)).toBe(true);
+    // Hysteresis: a stacked list widening to 338 (room 43) stays stacked; at 340 (45 ≥ 36 + 8 =
+    // 44) it goes back to one line; a one-line list narrowing to 338 stays one line.
+    expect(STACK_HYSTERESIS).toBe(8);
+    expect(needsStack(sim13(338), true)).toBe(true);
+    expect(needsStack(sim13(340), true)).toBe(false);
+    expect(needsStack(sim13(338), false)).toBe(false);
+  });
+
+  test("FR-KIT-25 tail folds (K9 re-test 2, N1): a stacked HP line is measured on its content box (its indent is padding), so the AC · ft tail folds into the row Tooltip when it doesn't fit", () => {
+    // DM 320 stacked: the line's box is 278 px with a 34-px indent → 244 px of content. Bar 120 +
+    // 8 + "35 / 55" 42 = 170, tail "AC 13 · 0 / 40 ft" 95, one gap: 271.
+    const g = globalThis as { getComputedStyle?: unknown };
+    const had = g.getComputedStyle;
+    g.getComputedStyle = () => ({ paddingLeft: "34px", paddingRight: "0px" });
+    try {
+      const line = contentWidth({ clientWidth: 278 } as HTMLElement);
+      expect(line).toBe(244);
+      expect(tailFolds({ line, bar: 170, others: [], tail: 95 })).toBe(true);
+      // The old reading (the padded box) said it fits, and the tail wrapped under the bar.
+      expect(tailFolds({ line: 278, bar: 170, others: [], tail: 95 })).toBe(false);
+      // A nested ally at 360 (indented row, 240 px of content): folds too.
+      expect(tailFolds({ line: 240, bar: 170, others: [], tail: 95 })).toBe(true);
+    } finally {
+      g.getComputedStyle = had;
+    }
+  });
+
+  test("FR-KIT-25 one track per list (K9 re-test R1): the stacked layout is markup for every theme: the list is group/hp; a row's main line wraps, its name block dissolves, the name keeps its own box, the HP line takes a full-width line under it", () => {
+    const html = dm(kitStore(1, { goblin: { hpCurrent: 3 } }));
+    expect(html).toMatch(/data-testid="cbt-init-list" class="[^"]*group\/hp/);
+    const goblin = rowHtml(html, "cbt-init-row", "goblin");
+    expect(goblin).toContain(HP_STACK.main);
+    expect(goblin).toContain(HP_STACK.block);
+    expect(goblin).toMatch(
+      /<div class="min-w-0 group-data-\[hp-stacked\]\/hp:flex-1"><div data-name-line/,
+    );
+    expect(goblin).toMatch(
+      /data-stats-line="true" class="[^"]*group-data-\[hp-stacked\]\/hp:basis-full/,
+    );
+    // Not stacked until the list measures a row under the floor (the static render measures none).
+    expect(html).not.toContain("data-hp-stacked");
+  });
+
+  test("FR-KIT-28 status icons (K9 walkthrough F1): in a narrow list two or more effects fold into one +N chip (concentration never folds); wide lists keep the first effect", () => {
+    expect(statusShown(0, 2, false)).toBe(1);
+    expect(statusShown(0, 2, true)).toBe(0);
+    expect(statusShown(0, 1, true)).toBe(1);
+    expect(statusShown(1, 2, false)).toBe(0);
+    expect(statusShown(0, 0, true)).toBe(0);
+    // The static render (no list measured) is the wide look: the Goblin's prone shows, Hex in +1.
+    const goblin = rowHtml(dm(), "cbt-init-row", "goblin");
+    expect(goblin).toContain('data-testid="cbtx-init-row-effect" data-record-id="prone"');
+    expect(goblin).toMatch(/data-testid="cbtx-init-row-effect-more" data-value="1"/);
+  });
+
+  test("FR-KIT-25 hp line (K9, K6 gap 3): every row's bar on the list's one fixed track, cur / max in a column, the AC / moved tail a right-aligned column", () => {
+    const html = dm(kitStore(1, { goblin: { hpCurrent: 3 } }));
+    // (Mira's figures live on her character record, not in this fixture: no bar.)
+    for (const id of ["goblin", "wolf"]) {
+      const row = rowHtml(html, "cbt-init-row", id);
+      const hp = row.slice(row.indexOf('data-testid="cbt-init-row-hp"'));
+      expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
+      expect(hp).toContain("w-[var(--hp-track,120px)] shrink");
+      expect(hp).not.toMatch(/data-slot="kit-hpbar-track" class="[^"]*flex-1/);
+      expect(hp).toContain("min-w-[7ch]");
+      expect(row).toMatch(/data-tail="true"[^>]*class="ml-auto shrink-0"/);
+    }
+  });
+});
+
+describe("FR-KIT-21 pending list", () => {
+  test("FR-KIT-21 pending list (K9, K6 gap 4): each card is one compact line in body type with a muted icon (no stone button), the same IDs and box as the other kinds", () => {
+    const store = kitStore();
+    const card = {
+      id: "n-card",
+      seq: 1,
+      campaignId: "c1",
+      kind: "damage-card",
+      state: "pending",
+      text: "Mira: 21 to hit, 8 piercing",
+      actionRole: "dm",
+      actionLabel: "Apply",
+      payload: {
+        encounterId: "e1",
+        attackerId: "mira",
+        attackerName: "Mira",
+        attackName: "Longbow",
+        damageType: "piercing",
+        mode: "normal",
+        crit: false,
+        toHit: null,
+        damage: null,
+      },
+    };
+    const html = dm({
+      ...store,
+      records: { ...store.records, notification: { "n-card": card } },
+    } as RecordStore);
+    const list = html.slice(html.indexOf('data-testid="cbt-init-pending-list"'));
+    expect(list).toContain('data-slot="init-pending-heading"');
+    const line = tag(list, "cbt-init-card", "n-card");
+    expect(line).toMatch(/^<button type="button"/);
+    expect(line).toContain('data-slot="init-pending"');
+    expect(line).not.toContain('data-slot="button"');
+    expect(line).not.toContain("data-variant");
+    expect(line).toContain("h-8");
+    expect(line).toContain("text-sm");
+    expect(list).toMatch(
+      /data-testid="cbt-init-card"[^>]*>[\s\S]*?text-muted-foreground[\s\S]*?Mira: 21 to hit/,
+    );
   });
 });
 

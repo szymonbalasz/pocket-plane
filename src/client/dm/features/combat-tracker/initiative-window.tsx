@@ -69,8 +69,11 @@ import {
 import {
   BandBadge,
   CombatantMedallion,
+  contentWidth,
+  HP_STACK,
   SideChip,
   TurnMarker,
+  useListHpTrack,
 } from "@ui/features/combat-tracker/parts";
 import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
@@ -174,10 +177,10 @@ import { SummonDialog, useSummonDialog } from "./summon-dialog";
 /**
  * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
  * without initiative); else just the number input, so the name line keeps room for chips. On a
- * narrow list (under 20rem, the 320 min) the Roll button is its icon (label for screen readers),
+ * narrow list (under 22rem, from the 320 min) the Roll button is its icon (label for screen readers),
  * so the kit row's HP line keeps its room (FR-KIT-25).
  */
-const INIT_W = { wide: "w-[100px] @max-[20rem]/init:w-[68px]", narrow: "w-9" } as const;
+const INIT_W = { wide: "w-[100px] @max-[22rem]/init:w-[68px]", narrow: "w-9" } as const;
 
 function InitiativeCell({
   c,
@@ -261,12 +264,12 @@ function InitiativeCell({
           data-record-id={c.id}
           size={unset ? "sm" : "icon"}
           variant={unset ? "outline" : "ghost"}
-          className={unset ? "h-7 gap-1 px-2 text-xs @max-[20rem]/init:px-1.5" : "size-7"}
+          className={unset ? "h-7 gap-1 px-2 text-xs @max-[22rem]/init:px-1.5" : "size-7"}
           aria-label={`Roll initiative for ${c.name}`}
           disabled={disabled}
         >
           <DicesIcon className="size-3.5" />
-          {unset && <span className="@max-[20rem]/init:sr-only">Roll</span>}
+          {unset && <span className="@max-[22rem]/init:sr-only">Roll</span>}
         </RollButton>
       )}
     </div>
@@ -594,28 +597,24 @@ export function tailText(ac: number | null, moved: string | null): string {
   return [`AC ${ac ?? "—"}`, ...(moved ? [`moved ${moved}`] : [])].join(" · ");
 }
 
-/** The gap of the HP line (`gap-1.5`) and the HP bar's track at its narrowest (`min-w-6`). */
+/** The gap of the HP line (`gap-1.5`). */
 const STATS_GAP = 6;
-const TRACK_MIN = 24;
 
 /**
  * FR-KIT-25 (OQ-KIT-07 A): the AC / moved tail folds into the row Tooltip when the HP line can't
- * hold the bar at its narrowest, its numbers, the other parts and the tail. Natural widths only
+ * hold the bar (K9: its fixed track, one width for every row, and its numbers), the other parts
+ * and the tail. Natural widths only
  * (a folded tail is measured out of the flow), so it never flips back and forth; re-measured on
  * resize and when the row changes.
  */
 export function tailFolds(widths: {
   line: number;
-  /** The HP bar's "cur / max" (the track counts at `TRACK_MIN`). */
-  numbers: number | null;
+  /** The HP bar's width: its fixed track (never squeezed) + "cur / max"; null = no bar. */
+  bar: number | null;
   others: readonly number[];
   tail: number;
 }): boolean {
-  const parts = [
-    ...(widths.numbers === null ? [] : [TRACK_MIN + 8 + widths.numbers]),
-    ...widths.others,
-    widths.tail,
-  ];
+  const parts = [...(widths.bar === null ? [] : [widths.bar]), ...widths.others, widths.tail];
   const need = parts.reduce((a, w) => a + w, 0) + Math.max(0, parts.length - 1) * STATS_GAP;
   return need > widths.line + 0.5;
 }
@@ -629,16 +628,17 @@ function useTailFold(rowRef: RefObject<HTMLElement | null>, deps: unknown): bool
     const measure = () => {
       const tail = stats.querySelector<HTMLElement>(":scope > [data-tail]");
       if (!tail || stats.clientWidth === 0) return;
+      // The content box: a stacked HP line's indent is padding (K9 re-test 2, N1).
+      const line = contentWidth(stats);
       const bar = stats.querySelector<HTMLElement>(':scope > [data-slot="kit-hpbar"]');
-      const numbers = bar?.lastElementChild as HTMLElement | null | undefined;
       const others = [...stats.children]
         .filter((k): k is HTMLElement => k !== tail && k !== bar && k instanceof HTMLElement)
         .map((k) => k.offsetWidth)
         .filter((w) => w > 0);
       setFolded(
         tailFolds({
-          line: stats.clientWidth,
-          numbers: bar ? (numbers?.offsetWidth ?? 0) : null,
+          line,
+          bar: bar ? bar.offsetWidth : null,
           others,
           tail: tail.offsetWidth,
         }),
@@ -782,14 +782,15 @@ function RowMain({
   );
   const companion = isCompanion(c) && c.turnMode;
   const byOwner = actsWithOwner(c, owner);
-  // FR-KIT-25: a folded tail rides in the row Tooltip, on the name.
+  // FR-KIT-25: a folded tail rides in the row Tooltip, on the name. K9 R1: the name line's own
+  // box, so a stacked list keeps it on the medallion's line.
   const nameTip = (line: ReactNode) =>
     folded ? (
       <Tooltip content={<span data-testid="cbt-init-row-tip">{tail}</span>}>
-        <div className="min-w-0">{line}</div>
+        <div className={HP_STACK.name}>{line}</div>
       </Tooltip>
     ) : (
-      line
+      <div className={HP_STACK.name}>{line}</div>
     );
   return (
     <div
@@ -797,6 +798,7 @@ function RowMain({
       data-row-main
       className={cn(
         "relative flex items-center gap-1.5",
+        HP_STACK.main,
         c.hidden && "opacity-70",
         skipped && "opacity-50",
       )}
@@ -806,7 +808,7 @@ function RowMain({
         <Grip c={c} />
       </span>
       <CombatantMedallion c={c} />
-      <div className="min-w-0 flex-1">
+      <div className={cn("min-w-0 flex-1", HP_STACK.block)}>
         {/* The name is never cut (FR-CBTX-57): the side chip takes a second line first, a name
             wider than the line wraps. */}
         {nameTip(
@@ -866,15 +868,18 @@ function RowMain({
             (FR-CBTX-57): still too narrow, whole parts wrap onto a second line. */}
         <div
           data-stats-line
-          className="relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+          className={cn(
+            "relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums",
+            HP_STACK.line,
+          )}
         >
           {hp ? (
             <HpBar
               cur={hp.cur}
               max={hp.max}
+              track="fixed"
               data-testid="cbt-init-row-hp"
               data-record-id={c.id}
-              className="min-w-fit flex-1"
             />
           ) : (
             <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
@@ -889,9 +894,12 @@ function RowMain({
           <span
             data-tail
             data-folded={folded}
-            // Folded: measured out of the flow, pinned right so it adds no scroll width.
-            className={cn("shrink-0", folded && "invisible absolute top-0 right-0")}
+            // K9: a right-aligned muted column, so rows line up. Folded: measured out of the flow,
+            // pinned right so it adds no scroll width.
+            className={cn("ml-auto shrink-0", folded && "invisible absolute top-0 right-0")}
             aria-hidden={folded || undefined}
+            // K9 (walkthrough F1 note): folded, its Moved Tooltip trigger leaves the tab order.
+            inert={folded || undefined}
           >
             AC {ac ?? "—"}
             {moved && (
@@ -1198,6 +1206,12 @@ function AbilityAnchors({ check, save }: { check: RollControl; save: RollControl
 }
 
 /**
+ * FR-KIT-21 (K9, K6 gap 4): a Pending row is one compact line in body type with a muted icon, the
+ * same box for both kinds (`data-slot="init-pending"`), never a stone button.
+ */
+const PENDING_LINE = "flex h-8 w-full items-center gap-1.5 rounded-md border px-2 text-sm";
+
+/**
  * FR-CBT-79 (G9): one Pending row per linked notification. A damage card opens the popup; another
  * kind shows its text ("Waiting for Mira: …" when a player owns it) and the DM's action (the
  * view's `onAction`, as in Notifications).
@@ -1219,17 +1233,21 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
       <li>
         {/* P3 glitch 10: the full text on hover when the row cuts it. */}
         <Tooltip content={row.text}>
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             data-testid="cbt-init-card"
+            data-slot="init-pending"
             data-record-id={n.id}
             data-step={row.step}
-            className="w-full justify-start truncate"
+            className={cn(
+              PENDING_LINE,
+              "text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
+            )}
             onClick={() => openCard(n.id)}
           >
-            <SwordIcon className="size-3.5" /> <span className="min-w-0 truncate">{row.text}</span>
-          </Button>
+            <SwordIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="min-w-0 flex-1 truncate">{row.text}</span>
+          </button>
         </Tooltip>
       </li>
     );
@@ -1241,7 +1259,8 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
       data-testid="cbt-init-pending"
       data-record-id={n.id}
       data-kind={n.kind}
-      className="flex h-8 items-center gap-1.5 rounded-md border px-2 text-sm"
+      data-slot="init-pending"
+      className={PENDING_LINE}
     >
       <Icon className="size-3.5 shrink-0 text-muted-foreground" />
       <span
@@ -1276,7 +1295,12 @@ function PendingCards({ cards }: { cards: NotificationRecord[] }) {
   if (cards.length === 0) return null;
   return (
     <section aria-label="Pending actions" data-testid="cbt-init-pending-list" className="shrink-0">
-      <h3 className="mb-1 text-xs font-medium text-muted-foreground">Pending ({cards.length})</h3>
+      <h3
+        data-slot="init-pending-heading"
+        className="mb-1 text-xs font-medium text-muted-foreground"
+      >
+        Pending ({cards.length})
+      </h3>
       {/* FR-CBT-77 (G4): at most 3 rows, then its own scroll, so cards never push the rows away. */}
       <ul className="flex max-h-[104px] flex-col gap-1 overflow-y-auto">
         {cards.map((n) => (
@@ -1607,6 +1631,8 @@ function DmInitiativeBody() {
   const { send, disabled } = useCbtIntent();
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  // K9 (walkthrough F1): one HP track width for the whole list.
+  useListHpTrack(listRef);
   const wrapRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLButtonElement>(null);
   const active = useMemo(() => rows.filter((c) => !c.removed), [rows]);
@@ -1651,7 +1677,7 @@ function DmInitiativeBody() {
       <div
         ref={listRef}
         data-testid="cbt-init-list"
-        className="@container/init -mx-2 min-h-0 flex-1 overflow-y-auto px-2"
+        className={cn("@container/init -mx-2 min-h-0 flex-1 overflow-y-auto px-2", HP_STACK.list)}
       >
         <ReorderContext.Provider value={reorder}>
           {/* The drop line's frame (FR-CBTX-62); rows measure their spots from it. */}
