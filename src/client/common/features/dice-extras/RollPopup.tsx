@@ -471,11 +471,14 @@ function Row({ row, e, g }: { row: PopupRow; e: GameLogEntryView | undefined; g:
   const t = textOf(g);
   const keyOf = useColorKeyOf();
   const key = e ? rollerColorKey(keyOf, e) : null;
-  // FR-KIT-49: each item's outcome as its log row's box (FR-KIT-44), by roll id.
+  // FR-KIT-49: each item's outcome as its log row's box (FR-KIT-44), by roll id; K8: an attack
+  // entry's rolls after its to-hit are its damage.
   const outcomes = useMemo(() => {
     const out = new Map<string, RollOutcome>();
     const p = e ? RollEntryPayload.safeParse(e.payload) : null;
-    if (p?.success) for (const i of p.data) out.set(i.rollId, resultOutcome(i, e?.category));
+    const attack = e?.category === "attack";
+    if (p?.success)
+      p.data.forEach((i, k) => out.set(i.rollId, resultOutcome(i, e?.category, attack && k > 0)));
     return out;
   }, [e]);
   return (
