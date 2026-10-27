@@ -69,6 +69,7 @@ import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
 import kitInitiative from "./kit-initiative";
 import kitLog from "./kit-log";
+import kitNotices from "./kit-notices";
 import lateDamage from "./late-damage";
 import logNoteColours from "./log-note-colours";
 import lootSubtractE2e from "./loot-subtract-e2e";
@@ -320,4 +321,6 @@ export const bundles: readonly Bundle[] = [
   kitInitiative,
   // Sprint 13 K1 (build/kit-log): Game log rows walkthrough + kit-log e2e
   kitLog,
+  // Sprint 13 K3 (build/kit-notices): notices + damage card walkthrough + kit-notices e2e
+  kitNotices,
 ];
