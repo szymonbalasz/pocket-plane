@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 13 kit parity, round 2 done (#362):** 15 areas at 3, 4 at 2, screens 3 / 3. **Waiting on the DM:** a third polish round (gaps in `.verify/20261027-k6b-parity/report.md` §3) or call parity and recap (test strategy #354, backlog BL-129–139). No agents running.
+**Phase:** **Sprint 13 kit parity, round 3 (DM #363):** **K12** `build/kit-round3-combat` ∥ **K13** `build/kit-round3-sheet` building; then walkthroughs, gates, K6 round 3, then the sprint 13 recap (test strategy #354). One heavy run at a time (#354).
 
 **Resume (in order, one heavy run at a time, #354):** (1) `gates.sh` on `build-theme-switch` (merge main first: protocol §166 collides with X1's, run `resolve_docs.py` + `fixlinks.py`) → merge T1. (2) Restart a T2 builder in `build-theme-gilt` (brief `.verify/sprint12/briefs/build-th2.md` + `t2-resume.md`): merge main, its e2e, report ready. (3) T2 walkthrough (D1–D4, P1–P2, PS1–PS6 under Gilt & Stone; template to write from `tpl-test-th1.md`) → gates → merge. (4) session-sim-16 in `gates-main`, "Playtest: sprint 12", recap: default theme (OQ-THEME-03), the test-strategy proposal (#354). Briefs + `slices.json` backed up in `.verify/sprint12/` (copy back to `%TEMP%/pocket-plane/` if Storage Sense cleared it). Worktrees on disk: `build-theme-switch` (slot 0), `build-theme-gilt` (slot 2), `gates-main` (slot 5, detached at adc8b0dd); all `.env` have `PP_TEST_SHARDS=3`.
 
