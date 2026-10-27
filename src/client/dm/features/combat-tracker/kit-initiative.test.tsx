@@ -17,9 +17,11 @@ import {
   rowHtml,
 } from "@ui/features/combat-tracker/companions-fixture";
 import {
+  HP_STACK,
   HP_TRACK_MIN,
   listTrack,
   medallionColour,
+  needsStack,
   trackRoom,
 } from "@ui/features/combat-tracker/parts";
 import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
@@ -297,6 +299,40 @@ describe("FR-KIT-25 hp line", () => {
     expect(rowHtml(dm(timed), "cbt-init-row", "mira")).toMatch(
       /<span data-rounds="true" class="shrink-0">4r<\/span>/,
     );
+  });
+
+  test("FR-KIT-25 one track per list (K9 re-test R1): DM 320 on session-sim-13, Mira's init + concentration + +1 + Searing Strike trigger leave her a 75-px HP line: the list stacks its HP lines (own full-width line under the name) and every bar shares 120 px again", () => {
+    // One-line rows at DM 320: Mira's line 75 px ("12 / 12" + gap = 50) → 25 < the 36 floor;
+    // Thorn's 96 px with temp "+5" (13) → 27; the plain rows ≈ 98–142.
+    const row = (line: number, others: number[] = []) =>
+      trackRoom({ line, barRest: 50, others, gap: 6 });
+    const oneLine = [row(142), row(124), row(75), row(96, [13]), row(98), row(110)];
+    expect(oneLine[2]).toBe(25);
+    expect(needsStack(oneLine)).toBe(true);
+    // Stacked: each HP line spans the row under the name, past the medallion (264 − 34 = 230 px).
+    const stacked = [row(230), row(230), row(230), row(230, [13]), row(230), row(218)];
+    expect(needsStack(stacked)).toBe(false);
+    expect(listTrack(stacked)).toBe(HP_TRACK_PX);
+    // DM 400 / kit-parity at 320 stay on one line (no row under the floor).
+    expect(needsStack([row(160), row(156), row(160, [13])])).toBe(false);
+    expect(needsStack([row(142), row(98), row(122, [13])])).toBe(false);
+    expect(needsStack([])).toBe(false);
+  });
+
+  test("FR-KIT-25 one track per list (K9 re-test R1): the stacked layout is markup for every theme: the list is group/hp; a row's main line wraps, its name block dissolves, the name keeps its own box, the HP line takes a full-width line under it", () => {
+    const html = dm(kitStore(1, { goblin: { hpCurrent: 3 } }));
+    expect(html).toMatch(/data-testid="cbt-init-list" class="[^"]*group\/hp/);
+    const goblin = rowHtml(html, "cbt-init-row", "goblin");
+    expect(goblin).toContain(HP_STACK.main);
+    expect(goblin).toContain(HP_STACK.block);
+    expect(goblin).toMatch(
+      /<div class="min-w-0 group-data-\[hp-stacked\]\/hp:flex-1"><div data-name-line/,
+    );
+    expect(goblin).toMatch(
+      /data-stats-line="true" class="[^"]*group-data-\[hp-stacked\]\/hp:basis-full/,
+    );
+    // Not stacked until the list measures a row under the floor (the static render measures none).
+    expect(html).not.toContain("data-hp-stacked");
   });
 
   test("FR-KIT-28 status icons (K9 walkthrough F1): in a narrow list two or more effects fold into one +N chip (concentration never folds); wide lists keep the first effect", () => {

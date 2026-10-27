@@ -64,6 +64,10 @@ describe("FR-KIT-26 player hp", () => {
       const row = rowHtml(html, "cbt-init-row", id);
       expect(tag(row, "cbt-init-row-hp", id)).toContain('data-track="fixed"');
       expect(row).toContain("w-[var(--hp-track,120px)] shrink");
+      // K9 R1: the same stacked layout hooks as the DM's.
+      expect(row).toMatch(
+        /data-stats-line="true" class="[^"]*group-data-\[hp-stacked\]\/hp:basis-full/,
+      );
     }
   });
 });

@@ -69,6 +69,7 @@ import {
 import {
   BandBadge,
   CombatantMedallion,
+  HP_STACK,
   SideChip,
   TurnMarker,
   useListHpTrack,
@@ -778,14 +779,15 @@ function RowMain({
   );
   const companion = isCompanion(c) && c.turnMode;
   const byOwner = actsWithOwner(c, owner);
-  // FR-KIT-25: a folded tail rides in the row Tooltip, on the name.
+  // FR-KIT-25: a folded tail rides in the row Tooltip, on the name. K9 R1: the name line's own
+  // box, so a stacked list keeps it on the medallion's line.
   const nameTip = (line: ReactNode) =>
     folded ? (
       <Tooltip content={<span data-testid="cbt-init-row-tip">{tail}</span>}>
-        <div className="min-w-0">{line}</div>
+        <div className={HP_STACK.name}>{line}</div>
       </Tooltip>
     ) : (
-      line
+      <div className={HP_STACK.name}>{line}</div>
     );
   return (
     <div
@@ -793,6 +795,7 @@ function RowMain({
       data-row-main
       className={cn(
         "relative flex items-center gap-1.5",
+        HP_STACK.main,
         c.hidden && "opacity-70",
         skipped && "opacity-50",
       )}
@@ -802,7 +805,7 @@ function RowMain({
         <Grip c={c} />
       </span>
       <CombatantMedallion c={c} />
-      <div className="min-w-0 flex-1">
+      <div className={cn("min-w-0 flex-1", HP_STACK.block)}>
         {/* The name is never cut (FR-CBTX-57): the side chip takes a second line first, a name
             wider than the line wraps. */}
         {nameTip(
@@ -862,7 +865,10 @@ function RowMain({
             (FR-CBTX-57): still too narrow, whole parts wrap onto a second line. */}
         <div
           data-stats-line
-          className="relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+          className={cn(
+            "relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums",
+            HP_STACK.line,
+          )}
         >
           {hp ? (
             <HpBar
@@ -1668,7 +1674,7 @@ function DmInitiativeBody() {
       <div
         ref={listRef}
         data-testid="cbt-init-list"
-        className="@container/init -mx-2 min-h-0 flex-1 overflow-y-auto px-2"
+        className={cn("@container/init -mx-2 min-h-0 flex-1 overflow-y-auto px-2", HP_STACK.list)}
       >
         <ReorderContext.Provider value={reorder}>
           {/* The drop line's frame (FR-CBTX-62); rows measure their spots from it. */}

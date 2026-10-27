@@ -146,6 +146,30 @@ export function listTrack(rooms: readonly number[]): number {
   return Math.floor(Math.max(HP_TRACK_MIN, Math.min(HP_TRACK_PX, ...r)));
 }
 
+/**
+ * K9 re-test (R1): whether a list stacks its HP lines: some row's room on its name line is under
+ * `HP_TRACK_MIN` (a right column that can't shrink: init + concentration + "+N" + a trigger chip,
+ * which never folds, FR-CBTX-54), so a shared bar there would be unreadable or cut.
+ */
+export function needsStack(rooms: readonly number[]): boolean {
+  return rooms.some((r) => Number.isFinite(r) && r < HP_TRACK_MIN);
+}
+
+/**
+ * K9 re-test (R1): the stacked layout's classes, on markup every theme shares. The list carries
+ * `group/hp` (+ `data-hp-stacked` while stacked, set by `useListHpTrack`); a row's main line wraps,
+ * its name block dissolves (`contents`) so the name line keeps the medallion's line with the init
+ * and chips, and the HP line (and a sub-line under the name) take full-width lines under it,
+ * indented past the medallion (34 + 6 px; 28 + 6 in a narrow list, FR-KIT-24's `md`).
+ */
+export const HP_STACK = {
+  list: "group/hp",
+  main: "group-data-[hp-stacked]/hp:flex-wrap",
+  block: "group-data-[hp-stacked]/hp:contents",
+  name: "min-w-0 group-data-[hp-stacked]/hp:flex-1",
+  line: "group-data-[hp-stacked]/hp:order-last group-data-[hp-stacked]/hp:basis-full group-data-[hp-stacked]/hp:pl-10 group-data-[hp-stacked]/hp:@max-[20rem]/init:pl-[34px]",
+} as const;
+
 /** The HP line's gap (`gap-x-1.5`). */
 const LINE_GAP = 6;
 
@@ -173,9 +197,11 @@ function measureRoom(line: HTMLElement): number | null {
 
 /**
  * K9 (walkthrough F1): sets `--hp-track` on the Initiative list to `listTrack` of its rows' rooms,
- * so every row's bar is the same length at every width. Re-measured when the list or a row's HP
- * line resizes and when rows or their parts change. Measures widths only, never the track, so it
- * settles in one pass.
+ * so every row's bar is the same length at every width. Re-test R1: rooms are first measured on
+ * the one-line rows; if some row's is under the floor (`needsStack`) the list stacks its HP lines
+ * (`data-hp-stacked`, `HP_STACK`) and measures again. Both reads happen in one task (synchronous
+ * layout), so nothing paints in between. Re-measured when the list or a row's HP line resizes and
+ * when rows or their parts change. Measures widths only, never the track, so it settles.
  */
 export function useListHpTrack(listRef: RefObject<HTMLElement | null>): void {
   useLayoutEffect(() => {
@@ -183,12 +209,19 @@ export function useListHpTrack(listRef: RefObject<HTMLElement | null>): void {
     if (!list) return;
     let frame = 0;
     const lines = () => [...list.querySelectorAll<HTMLElement>("[data-stats-line]")];
-    const measure = () => {
-      frame = 0;
-      const rooms = lines()
+    const rooms = () =>
+      lines()
         .map(measureRoom)
         .filter((r): r is number => r !== null);
-      list.style.setProperty("--hp-track", `${listTrack(rooms)}px`);
+    const measure = () => {
+      frame = 0;
+      list.removeAttribute("data-hp-stacked");
+      let r = rooms();
+      if (needsStack(r)) {
+        list.setAttribute("data-hp-stacked", "");
+        r = rooms();
+      }
+      list.style.setProperty("--hp-track", `${listTrack(r)}px`);
     };
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => schedule());
     const observeLines = () => {

@@ -17,6 +17,12 @@ const trackWidths = (win: Locator) =>
     .locator('[data-testid="cbt-init-row-hp"][data-track="fixed"] [data-slot="kit-hpbar-track"]')
     .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
 
+/** K9 re-test R1: every HP line with a bar holds on one line (no temp "+N" wrapped under it). */
+const lineHeights = (win: Locator) =>
+  win
+    .locator('[data-stats-line]:has(> [data-track="fixed"])')
+    .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().height)));
+
 /** K9 walkthrough F1: one track width for the whole list, never under the readable 36 px. */
 async function oneTrack(win: Locator, label: string) {
   await expect
@@ -28,6 +34,7 @@ async function oneTrack(win: Locator, label: string) {
       { message: `${label}: ${JSON.stringify(await trackWidths(win))}` },
     )
     .toBe(true);
+  expect(Math.max(...(await lineHeights(win)))).toBeLessThan(24);
 }
 
 /** Resizes a window by its handle (as useful-size.e2e.ts). */
