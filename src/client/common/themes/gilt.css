@@ -1519,3 +1519,153 @@
     border-color: var(--frame-rule);
   }
 }
+
+/* KIT: notices (kit-parity K3, §6.5–6.6: toast cards, turn card, damage card, player card) ───── */
+/* Toast card (the kit's `.toast`): the bold causer in the name weight, the action a small stone. */
+:root[data-theme="gilt"] [data-slot="toast-text"] b {
+  font-weight: 500;
+  color: var(--gold);
+}
+/* The alert toasts' close and the damage card's Later are the red gem, as the notes' close. */
+:root[data-theme="gilt"] [data-testid="ui-toast-close"],
+:root[data-theme="gilt"] [data-testid="cbt-popup-later"] {
+  border-radius: 50%;
+  opacity: 1;
+  --foreground: var(--gs-gem-ink);
+  --muted-foreground: var(--gs-gem-ink);
+  --accent: var(--gem);
+  background-color: var(--gem);
+  background-image: radial-gradient(
+    circle at 36% 30%,
+    var(--gem-hi) 0 9%,
+    #d42a24 26%,
+    #7a0f12 68%,
+    #3a0507 100%
+  );
+  box-shadow:
+    inset 0 0 0 1.5px var(--frame-rule-strong),
+    0 0 0 1px #000,
+    inset 0 -2px 3px rgb(0 0 0 / 0.55);
+}
+:root[data-theme="gilt"] [data-testid="ui-toast-close"] svg,
+:root[data-theme="gilt"] [data-testid="cbt-popup-later"] svg {
+  transform: scale(0.8);
+  stroke-width: 3;
+}
+:root[data-theme="gilt"] [data-testid="ui-toast-close"]:hover,
+:root[data-theme="gilt"] [data-testid="cbt-popup-later"]:hover {
+  filter: brightness(1.25);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-toast-close"],
+  :root[data-theme="gilt"] [data-testid="cbt-popup-later"] {
+    color: var(--gs-gem-ink);
+  }
+}
+/* Turn card (the kit's `.toast.turn`): the toast frame, gold title type between two gems. */
+:root[data-theme="gilt"] [data-slot="turn-card"] {
+  border-radius: 3px;
+  background-image: var(--panel-grain);
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 0 0 3px #090b0b,
+    inset 0 0 0 4px rgb(176 138 74 / 0.55),
+    0 8px 22px rgb(0 0 0 / 0.65);
+}
+:root[data-theme="gilt"] [data-slot="turn-card"] > span:not([data-slot]) {
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-slot="turn-card-gem"] {
+  background-image: radial-gradient(
+    circle at 35% 30%,
+    var(--gem-hi),
+    var(--gem) 45%,
+    var(--gem-deep)
+  );
+  box-shadow:
+    0 0 0 1px var(--frame-rule-strong),
+    0 0 6px rgb(255 80 60 / 0.55);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="turn-card"] {
+    border-color: #000;
+  }
+  :root[data-theme="gilt"] [data-slot="turn-card"] > span:not([data-slot]) {
+    color: var(--gold);
+  }
+  :root[data-theme="gilt"] [data-testid="note-toast-more"] {
+    border-color: var(--frame-rule);
+    color: var(--muted-foreground);
+  }
+}
+/* Damage card title bar (the kit's `.win-hd`): dark band inside the popup's 4-px frame rules, gold
+   rule under it. */
+:root[data-theme="gilt"] [data-slot="card-bar"] {
+  position: relative;
+  background:
+    linear-gradient(#1c201f, #121615) 4px 4px / calc(100% - 8px) calc(100% - 4px) no-repeat;
+  text-shadow: 0 1px 0 #000;
+}
+:root[data-theme="gilt"] [data-slot="card-bar"]::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -3px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(176 138 74 / 0.6) 20%,
+    rgb(176 138 74 / 0.6) 80%,
+    transparent
+  );
+}
+/* Result lines (the kit's `.dc-line .res`): the boxed value at 22 px in the number face. */
+:root[data-theme="gilt"] [data-slot="card-line"] input[data-slot="kit-result"] {
+  font-size: 22px;
+  box-shadow: none;
+}
+/* Target chips (the kit's `.tgt`): a pill on the dark chip fill. */
+:root[data-theme="gilt"] [data-slot="card-target"] {
+  background-image: linear-gradient(var(--gs-panel-lo), var(--gs-panel-lo));
+}
+:root[data-theme="gilt"] [data-slot="card-target-chip"] {
+  background-image: linear-gradient(#121410, #121410);
+}
+/* Footer: a gold hairline in the gap above Dismiss · actions · Apply (the kit's `.dc-foot`). */
+:root[data-theme="gilt"] [data-slot="card-footer"] {
+  position: relative;
+}
+:root[data-theme="gilt"] [data-slot="card-footer"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(176 138 74 / 0.45) 20%,
+    rgb(176 138 74 / 0.45) 80%,
+    transparent
+  );
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="card-bar"] {
+    border-color: var(--frame-rule);
+  }
+  :root[data-theme="gilt"] [data-slot="card-target"] {
+    border-color: var(--gs-row-rule);
+  }
+  :root[data-theme="gilt"] [data-slot="card-target-chip"] {
+    border-color: var(--frame-rule);
+  }
+}
