@@ -62,7 +62,7 @@ import {
   entryKey,
   setEntrySide,
 } from "./encounter-draft";
-import { EndConfirmDescription, useStartEnd } from "./end-confirm";
+import { EndConfirmButtons, EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { HpSelect, JoinPreviewRow } from "./join-parts";
 import {
   defaultJoiningIds,
@@ -826,21 +826,17 @@ export function Editor({ encounter, back }: { encounter: EncounterRecord; back()
             <EndConfirmDescription encounterId={encounter.id} area="cbt-enc" />
           </DialogHeader>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setEnding(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              data-testid="cbt-enc-end-confirm"
+            {/* FR-KIT-72: Keep fighting / End encounter. */}
+            <EndConfirmButtons
+              testId="cbt-enc-end-confirm"
               disabled={disabled || startEnd.disabled}
-              onClick={async () => {
+              onKeep={() => setEnding(false)}
+              onEnd={async () => {
                 // FR-CBT-60: once acked, this tab's Initiative minimises.
                 const r = await startEnd.end(encounter.id);
                 if (r !== undefined) setEnding(false);
               }}
-            >
-              End
-            </Button>
+            />
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -5,14 +5,15 @@
 // Remove; the side chip), Removed. Sprint 6 (FR-CBT-118): companions' owner chip and mode icon,
 // `after-owner` rows indented under the owner, `in-owner-turn` ones as lines in its row,
 // Companion ▸ in the menus. Sprint 8 (FR-CBTX-62, -63): the grip, drop line and Move up / down
-// (`reorder-drag.tsx`).
+// (`reorder-drag.tsx`). Kit parity (FR-KIT-20–29): a one-line header with the window menu (Add…,
+// Summon…, End encounter…), the turn buttons in a footer, rows on the kit grid (medallion, name +
+// HP bar line with the AC / moved tail, a large bare initiative, a status cell, the hover actions).
 import { signed } from "@shared/character-sheet/logic";
 import { notRestoredText } from "@shared/combat-extras/rules";
 import { isCompanion } from "@shared/combat-tracker/companion";
 import {
   canRollInitiative,
   d20Expression,
-  healthBand,
   showRollMonsters,
   unrolledMonsters,
 } from "@shared/combat-tracker/rules";
@@ -36,6 +37,7 @@ import {
   saveBonus,
 } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
+import { HpBar } from "@ui/components/kit/hp-bar";
 import { Button } from "@ui/components/ui/button";
 import {
   DropdownMenu,
@@ -56,8 +58,8 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Skeleton } from "@ui/components/ui/primitives";
-import { characterOf, deathStateFor, MORE_W } from "@ui/features/combat-extras/logic";
-import { NameLine } from "@ui/features/combat-extras/parts";
+import { characterOf, deathStateFor } from "@ui/features/combat-extras/logic";
+import { NameLine, StatusCell } from "@ui/features/combat-extras/parts";
 import { showStepSkip, stepSkip } from "@ui/features/combat-extras/skip";
 import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
 import {
@@ -66,7 +68,12 @@ import {
   modeLabel,
   OwnerChip,
 } from "@ui/features/combat-tracker/companions";
-import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
+import {
+  BandBadge,
+  CombatantMedallion,
+  SideChip,
+  TurnMarker,
+} from "@ui/features/combat-tracker/parts";
 import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
   startedIn,
@@ -109,7 +116,7 @@ import {
   EllipsisIcon,
   EyeIcon,
   EyeOffIcon,
-  FootprintsIcon,
+  FlagIcon,
   HeartPulseIcon,
   RotateCcwIcon,
   ShieldIcon,
@@ -119,7 +126,15 @@ import {
   UserMinusIcon,
   UserPlusIcon,
 } from "lucide-react";
-import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { dmNotificationViews } from "../../notification-views";
 import {
@@ -138,7 +153,7 @@ import { type AttackAction, attackChoices, attackRolls, attackSummary } from "./
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { CompanionCardButton, CompanionMenu } from "./companion-menu";
 import { useDefinitions, usePendingCards, useUndo } from "./data";
-import { EndConfirmDescription, useStartEnd } from "./end-confirm";
+import { EndConfirmButtons, EndConfirmDescription, useStartEnd } from "./end-confirm";
 import { useHoverSafeSub } from "./hover-sub";
 import { HpDialog } from "./hp-dialog";
 import { damageCardRow, isDamageCard, pendingRowText } from "./pending";
@@ -199,9 +214,11 @@ function InitiativeCell({
   // stays the DM's override in every round.
   const canRoll = canRollInitiative(round, c.initiative);
   // #149: an empty initiative leads with a labelled Roll button; the box is a quiet secondary
-  // way to type a value (reads as a value cell, not a form field).
+  // way to type a value (reads as a value cell, not a form field). FR-KIT-27: a set value is a
+  // large bare number; a click (or Enter) edits it as today (the field shows on hover / focus).
   return (
     <div
+      data-slot="init-number"
       className={cn(
         "flex shrink-0 items-center justify-end gap-0.5",
         INIT_W[wide ? "wide" : "narrow"],
@@ -215,7 +232,10 @@ function InitiativeCell({
           aria-label={`Initiative of ${c.name}`}
           inputMode="numeric"
           placeholder={unset && round >= 1 ? "Set" : "–"}
-          className="h-7 w-9 border-transparent bg-transparent px-1 text-center text-xs tabular-nums shadow-none placeholder:text-muted-foreground/60 hover:border-input focus-visible:border-input"
+          className={cn(
+            "h-7 w-9 border-transparent bg-transparent px-1 text-center text-xs tabular-nums shadow-none placeholder:text-muted-foreground/60 hover:border-input focus-visible:border-input",
+            !unset && "h-8 px-0.5 text-right text-2xl leading-none font-semibold",
+          )}
           disabled={disabled}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -553,9 +573,9 @@ function AbilityMenu({
 }
 
 /**
- * Movement used in the drag label's tone (FR-CBT-39, FR-MAP-37): a footprints icon + "40 / 30 ft"
- * ("40 ft" without speed), labelled "Moved 40 / 30 ft". Compact so the row's name keeps its room.
- * Only for a combatant bound to a token: nothing else can move.
+ * Movement used in the drag label's tone (FR-CBT-39, FR-MAP-37): "40 / 30 ft" ("40 ft" without
+ * speed), labelled "Moved 40 / 30 ft", in the HP line's muted tail (FR-KIT-25). Only for a
+ * combatant bound to a token: nothing else can move.
  */
 const TONE_CLASS = {
   none: "",
@@ -564,24 +584,24 @@ const TONE_CLASS = {
   over: "text-hp-down",
 } as const;
 
+function movedText(c: CombatantView, speed: number | undefined): string {
+  const moved = c.movedFt ?? 0;
+  return speed === undefined ? `${moved} ft` : `${moved} / ${speed} ft`;
+}
+
 function Moved({ c, speed }: { c: CombatantView; speed: number | undefined }) {
   if (c.tokenId === null) return null;
   const moved = c.movedFt ?? 0;
   const tone = speed === undefined ? "none" : movementIndicator(moved, null, speed).tone;
-  const text = speed === undefined ? `${moved} ft` : `${moved} / ${speed} ft`;
+  const text = movedText(c, speed);
   return (
     <Tooltip content={`Moved ${text}`}>
       <span
-        className={cn(
-          "ml-auto flex shrink-0 items-center gap-0.5 pl-1 text-xs whitespace-nowrap text-muted-foreground tabular-nums",
-          TONE_CLASS[tone],
-        )}
+        className={cn("whitespace-nowrap", TONE_CLASS[tone])}
         data-testid="cbt-init-row-moved"
         data-record-id={c.id}
         data-tone={tone}
-        data-name-end
       >
-        <FootprintsIcon className="size-3" aria-hidden />
         <span className="sr-only">Moved </span>
         {text}
       </span>
@@ -589,53 +609,75 @@ function Moved({ c, speed }: { c: CombatantView; speed: number | undefined }) {
   );
 }
 
-const sumWidths = (els: readonly Element[], gap: number) =>
-  els.reduce((w, el) => w + el.getBoundingClientRect().width, 0) +
-  Math.max(0, els.length - 1) * gap;
+/** FR-KIT-25: the tail's text ("AC 16 · moved 0 / 30 ft"), also the row Tooltip once folded. */
+export function tailText(ac: number | null, moved: string | null): string {
+  return [`AC ${ac ?? "—"}`, ...(moved ? [`moved ${moved}`] : [])].join(" · ");
+}
+
+/** The gap of the HP line (`gap-1.5`) and the HP bar's track at its narrowest (`min-w-6`). */
+const STATS_GAP = 6;
+const TRACK_MIN = 24;
 
 /**
- * P3 glitch 10 (names keep priority, #182): the Moved indicator stays on the name line while the
- * full name, its icons, a "+N"'s room (if chips) and Moved fit there; otherwise it moves to the
- * AC / HP line when that line has room for it. Natural widths only, so it never flips back and
- * forth; re-measured on resize and when the row changes.
+ * FR-KIT-25 (OQ-KIT-07 A): the AC / moved tail folds into the row Tooltip when the HP line can't
+ * hold the bar at its narrowest, its numbers, the other parts and the tail. Natural widths only
+ * (a folded tail is measured out of the flow), so it never flips back and forth; re-measured on
+ * resize and when the row changes.
  */
-function useMovedBelow(rowRef: RefObject<HTMLElement | null>, deps: unknown): boolean {
-  const [below, setBelow] = useState(false);
+export function tailFolds(widths: {
+  line: number;
+  /** The HP bar's "cur / max" (the track counts at `TRACK_MIN`). */
+  numbers: number | null;
+  others: readonly number[];
+  tail: number;
+}): boolean {
+  const parts = [
+    ...(widths.numbers === null ? [] : [TRACK_MIN + 8 + widths.numbers]),
+    ...widths.others,
+    widths.tail,
+  ];
+  const need = parts.reduce((a, w) => a + w, 0) + Math.max(0, parts.length - 1) * STATS_GAP;
+  return need > widths.line + 0.5;
+}
+
+function useTailFold(rowRef: RefObject<HTMLElement | null>, deps: unknown): boolean {
+  const [folded, setFolded] = useState(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure when the row changes
   useLayoutEffect(() => {
-    const row = rowRef.current;
-    const line = row?.querySelector<HTMLElement>("[data-name-line]");
-    const stats = row?.querySelector<HTMLElement>("[data-stats-line]");
-    if (!row || !line || !stats) return;
+    const stats = rowRef.current?.querySelector<HTMLElement>("[data-stats-line]");
+    if (!stats) return;
     const measure = () => {
-      const moved = row.querySelector<HTMLElement>('[data-testid="cbt-init-row-moved"]');
-      const name = line.querySelector<HTMLElement>("[data-name-measure]");
-      if (!moved || !name || line.clientWidth === 0) {
-        setBelow(false);
-        return;
-      }
-      // The name's natural width, then its marks and the side chip (NameLine, FR-CBTX-57).
-      const nameW = name.offsetWidth;
-      const others = [
-        ...line.querySelectorAll<HTMLElement>(
-          ":scope > [data-name-head] > [data-name-marks], :scope > [data-name-marks], :scope > [data-name-side]",
-        ),
-      ].filter((k) => k.offsetWidth > 0);
-      const chips = line.querySelector("[data-chip-row]") ? MORE_W : 0;
-      const gap = 4; // gap-1
-      const parts = 2 + others.length + (chips ? 1 : 0);
-      const needLine = nameW + sumWidths(others, 0) + chips + moved.offsetWidth + (parts - 1) * gap;
-      const statsKids = [...stats.children].filter((k) => k !== moved);
-      const needStats = sumWidths(statsKids, 6) + 6 + moved.offsetWidth; // gap-1.5
-      setBelow(needLine > line.clientWidth && needStats <= stats.clientWidth);
+      const tail = stats.querySelector<HTMLElement>(":scope > [data-tail]");
+      if (!tail || stats.clientWidth === 0) return;
+      const bar = stats.querySelector<HTMLElement>(':scope > [data-slot="kit-hpbar"]');
+      const numbers = bar?.lastElementChild as HTMLElement | null | undefined;
+      const others = [...stats.children]
+        .filter((k): k is HTMLElement => k !== tail && k !== bar && k instanceof HTMLElement)
+        .map((k) => k.offsetWidth)
+        .filter((w) => w > 0);
+      setFolded(
+        tailFolds({
+          line: stats.clientWidth,
+          numbers: bar ? (numbers?.offsetWidth ?? 0) : null,
+          others,
+          tail: tail.offsetWidth,
+        }),
+      );
     };
     measure();
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    ro?.observe(line);
+    ro?.observe(stats);
     return () => ro?.disconnect();
   }, [deps]);
-  return below;
+  return folded;
 }
+
+/**
+ * FR-KIT-03, -29: a row's hover group: shown on hover, keyboard focus within, an open menu, the
+ * current-turn row (`group/row` + `data-turn`) and under `(hover: none)`; never moves the layout.
+ */
+const HOVER_GROUP =
+  "flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 group-data-[turn=true]/row:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100";
 
 /**
  * Sprint 6 (FR-CBT-107, -108): a companion acting with its owner shows the owner's number, no
@@ -690,13 +732,13 @@ interface RowProps {
 }
 
 /**
- * One combatant's row content: portrait, name line, AC / HP line, initiative, Attack ▸, menu.
- * (An in-owner-turn companion's line is `CompanionLine`, FR-CBT-142.)
+ * One combatant's row content on the kit grid (FR-KIT-23): medallion, name line, HP line with the
+ * AC / moved tail, initiative, status, the hover group (Attack ▸, menu). The turn marker sits on
+ * the row (`Row`). (An in-owner-turn companion's line is `CompanionLine`, FR-CBT-142.)
  */
 function RowMain({
   c,
   def,
-  turn,
   round,
   defs,
   wideInit,
@@ -726,101 +768,132 @@ function RowMain({
   // muted with a skip icon.
   const skipped = (c.kind === "monster" && !c.removed && c.hpCurrent === 0) || dead;
   const mainRef = useRef<HTMLDivElement>(null);
-  const movedBelow = useMovedBelow(
+  const moved = round >= 1 && c.tokenId !== null ? movedText(c, stats?.speed) : null;
+  const tail = tailText(ac, moved);
+  const temp = hp?.temp ?? 0;
+  const folded = useTailFold(
     mainRef,
-    `${c.name}:${c.movedFt}:${round}:${wideInit}:${skipped}:${c.hidden}:${hp?.cur}:${down}:${hasDeathState}:${c.side}:${c.publicSide}:${c.ownerCharacterId}:${c.turnMode}`,
+    `${tail}:${wideInit}:${hp?.cur}:${hp?.max}:${temp}:${down}:${hasDeathState}:${c.ownerCharacterId}:${c.turnMode}`,
   );
   const companion = isCompanion(c) && c.turnMode;
   const byOwner = companion && c.turnMode !== "own" && owner !== null && owner !== undefined;
+  // FR-KIT-25: a folded tail rides in the row Tooltip, on the name.
+  const nameTip = (line: ReactNode) =>
+    folded ? (
+      <Tooltip content={<span data-testid="cbt-init-row-tip">{tail}</span>}>
+        <div className="min-w-0">{line}</div>
+      </Tooltip>
+    ) : (
+      line
+    );
   return (
     <div
       ref={mainRef}
       data-row-main
       className={cn(
-        "relative flex items-center gap-0.5",
+        "relative flex items-center gap-2",
         c.hidden && "opacity-70",
         skipped && "opacity-50",
       )}
     >
-      <Grip c={c} />
-      <TurnMarker active={turn} />
-      <Portrait name={c.name} imageAssetId={c.imageAssetId} />
+      {/* FR-KIT-23: the grip on hover / focus only, out of the flow (FR-CBTX-62). */}
+      <span className="absolute inset-y-0 left-0 w-0 opacity-0 transition-opacity group-hover/row:opacity-100 group-data-[lifted]/row:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+        <Grip c={c} />
+      </span>
+      <CombatantMedallion c={c} />
       <div className="min-w-0 flex-1">
-        {/* The name is never cut (FR-CBTX-57): the side chip and the chips take a second line
-            first, a name wider than the line wraps. */}
-        <NameLine
-          name={c.name}
-          testId="cbt-init-row-name"
-          className="text-sm font-medium"
-          marks={
-            <>
-              {/* FR-CBT-118 (sprint 6): the mode icon, Tooltip "After Mira". */}
-              {companion && (
-                <ModeIcon
-                  id={c.id}
-                  mode={c.turnMode ?? "after-owner"}
-                  ownerName={ownerName ?? ""}
-                  testId="cbt-init-row-mode"
-                />
-              )}
-              {c.hidden && (
-                <EyeOffIcon
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                  aria-label="Hidden"
-                />
-              )}
-              {skipped && (
-                <Tooltip content={dead ? "Skipped while dead" : "Skipped while down"}>
-                  <span
-                    data-testid="cbt-init-row-skip"
-                    data-record-id={c.id}
-                    className="flex shrink-0 text-muted-foreground"
-                  >
-                    <SkipForwardIcon
-                      className="size-3.5"
-                      aria-label={dead ? "Skipped while dead" : "Skipped while down"}
-                    />
-                  </span>
-                </Tooltip>
-              )}
-            </>
-          }
-          // FR-CBT-104 (#252): the side chip never folds; before the effect chips (FR-CBTX-54).
-          // Sprint 6 (FR-CBT-118): the owner chip with it (a line sits in its owner's row).
-          side={
-            <>
-              {companion && (
-                <OwnerChip c={c} ownerName={ownerName ?? ""} testId="cbt-init-row-owner" />
-              )}
-              <SideChip c={c} testId="cbt-init-row-ally" />
-            </>
-          }
-          // On the name line, right-aligned; below when the name needs the room. From round 1
-          // only: before the first turn nothing has moved in combat (P3 glitch 10, ruling A).
-          end={round >= 1 && !movedBelow && <Moved c={c} speed={stats?.speed} />}
-        >
-          {/* FR-CBTX-33: effect chips, one line ("+N" for the rest). */}
-          <RowEffects c={c} round={round} />
-        </NameLine>
-        {/* Never cut (FR-CBTX-57, F10): whole parts wrap onto a second line when narrow (320 at
-            round 0, Roll buttons in the Init column). */}
+        {/* The name is never cut (FR-CBTX-57): the side chip takes a second line first, a name
+            wider than the line wraps. */}
+        {nameTip(
+          <NameLine
+            name={c.name}
+            testId="cbt-init-row-name"
+            className="text-sm font-medium"
+            marks={
+              <>
+                {/* FR-CBT-118 (sprint 6): the mode icon, Tooltip "After Mira". */}
+                {companion && (
+                  <ModeIcon
+                    id={c.id}
+                    mode={c.turnMode ?? "after-owner"}
+                    ownerName={ownerName ?? ""}
+                    testId="cbt-init-row-mode"
+                  />
+                )}
+                {c.hidden && (
+                  <EyeOffIcon
+                    className="size-3.5 shrink-0 text-muted-foreground"
+                    aria-label="Hidden"
+                  />
+                )}
+                {skipped && (
+                  <Tooltip content={dead ? "Skipped while dead" : "Skipped while down"}>
+                    <span
+                      data-testid="cbt-init-row-skip"
+                      data-record-id={c.id}
+                      className="flex shrink-0 text-muted-foreground"
+                    >
+                      <SkipForwardIcon
+                        className="size-3.5"
+                        aria-label={dead ? "Skipped while dead" : "Skipped while down"}
+                      />
+                    </span>
+                  </Tooltip>
+                )}
+              </>
+            }
+            // FR-CBT-104 (#252): the side chip never folds; before the effect chips (FR-CBTX-54).
+            // Sprint 6 (FR-CBT-118): the owner chip with it (a line sits in its owner's row).
+            side={
+              <>
+                {companion && (
+                  <OwnerChip c={c} ownerName={ownerName ?? ""} testId="cbt-init-row-owner" />
+                )}
+                <SideChip c={c} testId="cbt-init-row-ally" />
+              </>
+            }
+          />,
+        )}
+        {/* FR-KIT-25: HP bar + "cur / max" (its `data-band` is the band, FR-CBT-26), temp "+N",
+            the companion's card, PC Down / death state, then the muted AC / moved tail, which
+            folds into the name's Tooltip when the line can't hold it (moved from round 1 only:
+            before the first turn nothing has moved, P3 glitch 10, ruling A). */}
         <div
           data-stats-line
-          className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+          className="relative mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums"
         >
-          <span className="shrink-0">AC {ac ?? "—"}</span>
-          <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
-            HP {hp ? `${hp.cur}/${hp.max}` : "—"}
-          </span>
+          {hp ? (
+            <HpBar
+              cur={hp.cur}
+              max={hp.max}
+              data-testid="cbt-init-row-hp"
+              data-record-id={c.id}
+              className="min-w-0 flex-1"
+            />
+          ) : (
+            <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
+              —
+            </span>
+          )}
           <RowTemp c={c} />
           {/* FR-CHARX-59 (walkthrough 9): a companion's card, also on its line. */}
           {companion && <CompanionCardButton c={c} />}
-          {c.kind === "monster" && hp && (
-            <BandBadge band={healthBand(hp.cur, hp.max)} testId="cbt-init-row-band" />
-          )}
           {down && !hasDeathState && <BandBadge band="down" testId="cbt-init-row-band" />}
           <RowDeath c={c} />
-          {round >= 1 && movedBelow && <Moved c={c} speed={stats?.speed} />}
+          <span
+            data-tail
+            data-folded={folded}
+            className={cn("shrink-0", folded && "invisible absolute")}
+            aria-hidden={folded || undefined}
+          >
+            AC {ac ?? "—"}
+            {moved && (
+              <>
+                {" · "}
+                <Moved c={c} speed={stats?.speed} />
+              </>
+            )}
+          </span>
         </div>
       </div>
       {byOwner ? (
@@ -828,63 +901,70 @@ function RowMain({
       ) : (
         <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
       )}
-      <AttackButton c={c} def={def} />
+      {/* FR-KIT-28: the status icon(s), "+N" for the rest. */}
+      <StatusCell>
+        <RowEffects c={c} round={round} />
+      </StatusCell>
       {/* Invisible anchors for the physical-dice popovers of Check ▸ / Save ▸, out of the flow
           (no gaps: the name line keeps the room, FR-CBTX-46). */}
       <span className="pointer-events-none absolute top-1/2 right-16 flex size-0">
         <AbilityAnchors check={check.control} save={save.control} />
         {c.kind === "pc" && <DeathSaveAnchor control={deathRoll} />}
       </span>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7"
-            data-testid="cbt-init-row-menu"
-            data-record-id={c.id}
-            aria-label={`More for ${c.name}`}
-          >
-            <EllipsisIcon className="size-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <RowMoveItems c={c} />
-          {hasScores && (
-            <>
-              <AbilityMenu c={c} kind="check" bonus={checkOf} {...check} />
-              <AbilityMenu c={c} kind="save" bonus={saveOf} {...save} />
-              <DropdownMenuSeparator />
-            </>
-          )}
-          <RowMenuItems c={c} deathRoll={deathRoll} />
-          <DropdownMenuItem data-testid="cbt-init-row-hp-adjust" onSelect={() => openHp(c.id)}>
-            <HeartPulseIcon /> Damage / heal…
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <SideMenu c={c} testId="cbt-init-row-side" />
-          {/* FR-CBT-118 (sprint 6): owner, turn mode, release, turn hostile, dismiss. */}
-          <CompanionMenu c={c} testId="cbt-init-row-companion" />
-          {c.kind === "pc" && c.entityId && (
-            <DropdownMenuItem
-              data-testid="cbt-init-row-summon"
+      {/* FR-KIT-29: Attack + ⋯, a hover group. */}
+      <span data-slot="init-actions" className={HOVER_GROUP}>
+        <AttackButton c={c} def={def} />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              data-testid="cbt-init-row-menu"
               data-record-id={c.id}
-              disabled={disabled}
-              onSelect={() => openSummon(c.entityId)}
+              aria-label={`More for ${c.name}`}
             >
-              <SparklesIcon /> Summon for {c.name}…
+              <EllipsisIcon className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <RowMoveItems c={c} />
+            {hasScores && (
+              <>
+                <AbilityMenu c={c} kind="check" bonus={checkOf} {...check} />
+                <AbilityMenu c={c} kind="save" bonus={saveOf} {...save} />
+                <DropdownMenuSeparator />
+              </>
+            )}
+            <RowMenuItems c={c} deathRoll={deathRoll} />
+            <DropdownMenuItem data-testid="cbt-init-row-hp-adjust" onSelect={() => openHp(c.id)}>
+              <HeartPulseIcon /> Damage / heal…
             </DropdownMenuItem>
-          )}
-          <DropdownMenuItem
-            variant="destructive"
-            data-testid="cbt-init-row-remove"
-            disabled={disabled}
-            onSelect={() => void send("cbt.setRemoved", { combatantId: c.id, removed: true })}
-          >
-            <UserMinusIcon /> Remove from combat
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <DropdownMenuSeparator />
+            <SideMenu c={c} testId="cbt-init-row-side" />
+            {/* FR-CBT-118 (sprint 6): owner, turn mode, release, turn hostile, dismiss. */}
+            <CompanionMenu c={c} testId="cbt-init-row-companion" />
+            {c.kind === "pc" && c.entityId && (
+              <DropdownMenuItem
+                data-testid="cbt-init-row-summon"
+                data-record-id={c.id}
+                disabled={disabled}
+                onSelect={() => openSummon(c.entityId)}
+              >
+                <SparklesIcon /> Summon for {c.name}…
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              variant="destructive"
+              data-testid="cbt-init-row-remove"
+              disabled={disabled}
+              onSelect={() => void send("cbt.setRemoved", { combatantId: c.id, removed: true })}
+            >
+              <UserMinusIcon /> Remove from combat
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </span>
     </div>
   );
 }
@@ -927,11 +1007,13 @@ function CompanionLine({
     <div
       data-row-main
       className={cn(
-        "relative flex items-center",
+        "relative flex items-center gap-2",
         c.hidden && "opacity-70",
         skipped && "opacity-50",
       )}
     >
+      {/* FR-KIT-29: the grid at medallion `sm`. */}
+      <CombatantMedallion c={c} size="sm" />
       <div className="min-w-0 flex-1">
         <NameLine
           name={c.name}
@@ -1063,13 +1145,15 @@ export function Row({ lines = [], indent = false, ...p }: RowProps) {
       data-hidden={c.hidden === true}
       data-skipped={skipped}
       data-indent={indent || undefined}
+      data-slot="init-row"
       className={cn(
         // FR-CBTX-62: the dragged block lifts (`data-lifted`, set by the drag).
-        "flex flex-col gap-0.5 rounded-md px-1 py-0.5 data-[lifted]:relative data-[lifted]:z-20 data-[lifted]:bg-card data-[lifted]:shadow-md data-[lifted]:ring-1 data-[lifted]:ring-border",
+        "group/row relative flex flex-col gap-1 rounded-md px-2 py-1 data-[lifted]:z-20 data-[lifted]:bg-card data-[lifted]:shadow-md data-[lifted]:ring-1 data-[lifted]:ring-border",
         turn && "bg-accent",
         indent && "ml-3",
       )}
     >
+      <TurnMarker active={turn} />
       <RowMain {...p} />
       {lines.map((l) => (
         <div
@@ -1194,7 +1278,114 @@ function PendingCards({ cards }: { cards: NotificationRecord[] }) {
   );
 }
 
-function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
+/** FR-KIT-20 (OQ-KIT-08 A): the window menu's items, in order (`cbt-init-menu`). */
+export type InitMenuItem =
+  | { kind: "add" | "summon" | "end"; testId: string; label: string; destructive: boolean }
+  | { kind: "separator" };
+
+export const INIT_MENU: readonly InitMenuItem[] = [
+  { kind: "add", testId: "cbtx-init-add", label: "Add…", destructive: false },
+  { kind: "summon", testId: "cbt-init-summon", label: "Summon…", destructive: false },
+  { kind: "separator" },
+  { kind: "end", testId: "cbt-init-end", label: "End encounter…", destructive: true },
+];
+
+const MENU_ICON = { add: UserPlusIcon, summon: SparklesIcon, end: FlagIcon } as const;
+
+/**
+ * FR-KIT-20: the header, one centred line (the encounter name, muted, then "Round N" with the
+ * number in number type) and the window menu ⋯ on the right: Add… (FR-CBTX-33), Summon…
+ * (FR-CBT-110 / -118), End encounter… (FR-CBT-51, the same confirm as Encounters, FR-KIT-72).
+ */
+function Header({ enc }: { enc: EncounterView }) {
+  const { disabled } = useCbtIntent();
+  const [ending, setEnding] = useState(false);
+  const startEnd = useStartEnd();
+  const openAdd = useCbtxDialogs((s) => s.openAdd);
+  const openSummon = useSummonDialog((s) => s.openFor);
+  const run = { add: openAdd, summon: () => openSummon(), end: () => setEnding(true) } as const;
+  return (
+    <div
+      data-slot="init-header"
+      className="grid shrink-0 grid-cols-[1.75rem_minmax(0,1fr)_1.75rem] items-center gap-1"
+    >
+      <span aria-hidden />
+      <p className="flex min-w-0 items-baseline justify-center gap-1.5 text-sm text-muted-foreground">
+        <span className="min-w-0 truncate" title={enc.name}>
+          {enc.name}
+        </span>
+        <span aria-hidden>·</span>
+        <span data-testid="cbt-init-round" data-value={enc.round} className="shrink-0">
+          {enc.round === 0 ? (
+            "Initiative"
+          ) : (
+            <>
+              Round <span className="font-semibold text-foreground tabular-nums">{enc.round}</span>
+            </>
+          )}
+        </span>
+      </p>
+      {/* Not modal: an item opens a dialog, which takes the focus. */}
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            data-testid="cbt-init-menu"
+            aria-label="Initiative menu"
+          >
+            <EllipsisIcon className="size-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {INIT_MENU.map((item) => {
+            if (item.kind === "separator") return <DropdownMenuSeparator key="separator" />;
+            const Icon = MENU_ICON[item.kind];
+            return (
+              <DropdownMenuItem
+                key={item.kind}
+                data-testid={item.testId}
+                variant={item.destructive ? "destructive" : undefined}
+                disabled={disabled}
+                onSelect={run[item.kind]}
+              >
+                <Icon /> {item.label}
+              </DropdownMenuItem>
+            );
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Dialog open={ending} onOpenChange={setEnding}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>End “{enc.name}”?</DialogTitle>
+            <EndConfirmDescription encounterId={enc.id} area="cbt-init" />
+          </DialogHeader>
+          <DialogFooter>
+            <EndConfirmButtons
+              testId="cbt-init-end-confirm"
+              disabled={disabled || startEnd.disabled}
+              onKeep={() => setEnding(false)}
+              onEnd={async () => {
+                // FR-CBT-60: once acked, this tab's Initiative minimises.
+                const r = await startEnd.end(enc.id);
+                if (r !== undefined) setEnding(false);
+              }}
+            />
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/**
+ * FR-KIT-22: the footer pinned under the list. Round ≥ 1: Prev, Undo (an icon, its Tooltip the
+ * undo text, FR-CBT-35) and Next turn (primary, right). Round 0: Roll monsters (FR-CBT-46, while
+ * shown today), Undo and Start, the start reason (BL-02) above them.
+ */
+function Footer({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   const { send, disabled } = useCbtIntent();
   const undo = useUndo(enc.id);
   const turnArgs = {
@@ -1204,11 +1395,7 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
   };
   const unrolled = unrolledMonsters(rows);
   const undoText = undo?.text ?? "Nothing to undo";
-  const [ending, setEnding] = useState(false);
-  const startEnd = useStartEnd();
   const store = useSync((s) => s.store);
-  const openAdd = useCbtxDialogs((s) => s.openAdd);
-  const openSummon = useSummonDialog((s) => s.openFor);
   const start = useStartRound(enc.round, rows);
   /**
    * FR-CBT-50: skipped names from the order at send time, toasted once the step is acked. A dead
@@ -1236,134 +1423,29 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
       toast(<span data-testid="cbtx-not-restored">{notRestoredText(r.notRestored)}</span>);
     }
   };
+  const undoButton = (
+    <Tooltip content={undoText}>
+      <span>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8"
+          data-testid="cbt-init-undo"
+          aria-label={undoText}
+          disabled={disabled || !undo}
+          onClick={() => void undoNow()}
+        >
+          <RotateCcwIcon className="size-3.5" />
+        </Button>
+      </span>
+    </Tooltip>
+  );
   return (
-    <div className="flex shrink-0 flex-col gap-1.5">
-      <div className="flex items-center gap-2">
-        <span className="truncate text-sm font-semibold" title={enc.name}>
-          {enc.name}
-        </span>
-        <span
-          data-testid="cbt-init-round"
-          data-value={enc.round}
-          className="text-xs text-muted-foreground"
-        >
-          {enc.round === 0 ? "Initiative" : `Round ${enc.round}`}
-        </span>
-        {/* FR-CBT-51 (G6): End from the Initiative header, confirmed as in Encounters. */}
-        <Button
-          size="sm"
-          variant="ghost"
-          data-testid="cbt-init-end"
-          className="ml-auto h-7 shrink-0 px-2 text-xs text-destructive hover:text-destructive"
-          disabled={disabled}
-          onClick={() => setEnding(true)}
-        >
-          End encounter
-        </Button>
-      </div>
-      <Dialog open={ending} onOpenChange={setEnding}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>End “{enc.name}”?</DialogTitle>
-            <EndConfirmDescription encounterId={enc.id} area="cbt-init" />
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setEnding(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              data-testid="cbt-init-end-confirm"
-              disabled={disabled || startEnd.disabled}
-              onClick={async () => {
-                // FR-CBT-60: once acked, this tab's Initiative minimises.
-                const r = await startEnd.end(enc.id);
-                if (r !== undefined) setEnding(false);
-              }}
-            >
-              End
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <div className="flex flex-wrap items-center gap-1">
-        <Button
-          size="sm"
-          variant="outline"
-          data-testid="cbt-init-prev"
-          disabled={disabled || enc.round === 0}
-          onClick={() => void step("prev")}
-        >
-          Prev
-        </Button>
-        {enc.round === 0 ? (
-          <StartButton
-            reason={start.reason}
-            disabled={disabled || start.busy}
-            onClick={() => (start.blocked ? start.pulse() : void step("next", start.send))}
-          />
-        ) : (
-          <Button
-            size="sm"
-            data-testid="cbt-init-next"
-            disabled={disabled}
-            onClick={() => void step("next")}
-          >
-            Next
-          </Button>
-        )}
-        <Tooltip content={undoText}>
-          <span>
-            <Button
-              size="sm"
-              variant="ghost"
-              data-testid="cbt-init-undo"
-              aria-label={undoText}
-              disabled={disabled || !undo}
-              onClick={() => void undoNow()}
-            >
-              <RotateCcwIcon className="size-3.5" /> Undo
-            </Button>
-          </span>
-        </Tooltip>
-        {showRollMonsters(enc.round, unrolled.length) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            data-testid="cbt-init-roll-monsters"
-            disabled={disabled || unrolled.length === 0}
-            onClick={(e) =>
-              void send("cbt.rollInitiative", {
-                combatantIds: unrolled.map((c) => c.id),
-                mode: modeFromKeys(e, "normal"),
-              })
-            }
-          >
-            <DicesIcon className="size-3.5" /> Roll monsters
-          </Button>
-        )}
-        {/* FR-CBTX-33: add combatants mid-fight (picker × quantity). */}
-        <Button
-          size="sm"
-          variant="ghost"
-          data-testid="cbtx-init-add"
-          className="ml-auto"
-          disabled={disabled}
-          onClick={openAdd}
-        >
-          <UserPlusIcon className="size-3.5" /> Add…
-        </Button>
-        {/* FR-CBT-110 / -118 (sprint 6): summon companions for a PC of the fight. */}
-        <Button
-          size="sm"
-          variant="ghost"
-          data-testid="cbt-init-summon"
-          disabled={disabled}
-          onClick={() => openSummon()}
-        >
-          <SparklesIcon className="size-3.5" /> Summon…
-        </Button>
-      </div>
+    <div
+      data-testid="cbt-init-footer"
+      data-slot="init-footer"
+      className="flex shrink-0 flex-col gap-1"
+    >
       {start.reason && (
         <p
           id={START_REASON_ID}
@@ -1377,6 +1459,58 @@ function Header({ enc, rows }: { enc: EncounterView; rows: CombatantView[] }) {
           {start.reason}
         </p>
       )}
+      <div className="flex items-center gap-1">
+        {enc.round === 0 ? (
+          <>
+            {showRollMonsters(enc.round, unrolled.length) && (
+              <Button
+                size="sm"
+                variant="outline"
+                data-testid="cbt-init-roll-monsters"
+                disabled={disabled || unrolled.length === 0}
+                onClick={(e) =>
+                  void send("cbt.rollInitiative", {
+                    combatantIds: unrolled.map((c) => c.id),
+                    mode: modeFromKeys(e, "normal"),
+                  })
+                }
+              >
+                <DicesIcon className="size-3.5" /> Roll monsters
+              </Button>
+            )}
+            {undoButton}
+            <span className="ml-auto">
+              <StartButton
+                reason={start.reason}
+                disabled={disabled || start.busy}
+                onClick={() => (start.blocked ? start.pulse() : void step("next", start.send))}
+              />
+            </span>
+          </>
+        ) : (
+          <>
+            <Button
+              size="sm"
+              variant="ghost"
+              data-testid="cbt-init-prev"
+              disabled={disabled}
+              onClick={() => void step("prev")}
+            >
+              Prev
+            </Button>
+            {undoButton}
+            <Button
+              size="sm"
+              data-testid="cbt-init-next"
+              className="ml-auto"
+              disabled={disabled}
+              onClick={() => void step("next")}
+            >
+              Next turn
+            </Button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -1502,25 +1636,18 @@ function DmInitiativeBody() {
       className="flex h-full min-h-0 flex-col gap-2"
       style={clip === null ? undefined : { maxHeight: clip }}
     >
-      <Header enc={enc} rows={rows} />
+      <Header enc={enc} />
       <PendingCards cards={cards} />
+      {/* FR-KIT-23: no "Combatant / Init" strip; the list's side padding holds the turn gem. */}
       <div
         ref={listRef}
         data-testid="cbt-init-list"
-        className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1"
+        className="-mx-2 min-h-0 flex-1 overflow-y-auto px-2"
       >
-        <div
-          aria-hidden
-          className="sticky top-0 z-10 flex items-center gap-0.5 bg-card px-1 pb-0.5 text-[11px] text-muted-foreground"
-        >
-          <span className="flex-1 pl-[48px]">Combatant</span>
-          <span className={cn("text-center", INIT_W[wideInit ? "wide" : "narrow"])}>Init</span>
-          <span className="w-[58px]" />
-        </div>
         <ReorderContext.Provider value={reorder}>
           {/* The drop line's frame (FR-CBTX-62); rows measure their spots from it. */}
           <div ref={wrapRef} className="relative" data-dragging={reorder.drag?.id}>
-            <ul className="flex flex-col gap-0.5">
+            <ul className="flex flex-col gap-1">
               {layout.map(({ c, lines, owner, indent }) => (
                 <Row
                   key={c.id}
@@ -1549,9 +1676,9 @@ function DmInitiativeBody() {
                 data-testid="cbt-init-row"
                 data-record-id={c.id}
                 data-removed="true"
-                className="flex items-center gap-2 px-1 text-sm text-muted-foreground"
+                className="flex items-center gap-2 px-2 text-sm text-muted-foreground"
               >
-                <Portrait name={c.name} imageAssetId={c.imageAssetId} />
+                <CombatantMedallion c={c} size="sm" />
                 <span className="flex-1 truncate" title={c.name}>
                   {c.name}
                 </span>
@@ -1571,6 +1698,7 @@ function DmInitiativeBody() {
         )}
       </div>
       <MoreFooter footerRef={footerRef} more={fold.more} onClick={fold.scrollToMore} />
+      <Footer enc={enc} rows={rows} />
     </div>
   );
 }
