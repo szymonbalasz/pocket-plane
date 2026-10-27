@@ -1,5 +1,6 @@
 // Kit-parity Game log row (FR-KIT-42, -44, -46): the pure row parts per kind.
 import { describe, expect, test } from "bun:test";
+import { lineText } from "./kind-types";
 import { formatEntry } from "./line";
 import { copyText, resultOutcome, rowAction, rowBadges, rowResults } from "./row";
 import type { RollCategory, RollPayloadItem } from "./schemas";
@@ -23,6 +24,19 @@ const roll = (items: RollPayloadItem[], category: RollCategory = "other", undone
   category,
   undone,
 });
+/** A Goblin's `cbt.attack` outcome line on Mira (hit, 6 slashing; a physical to-hit). */
+const p0 = {
+  targetName: "Mira",
+  attackName: "Scimitar",
+  damageType: "slashing",
+  toHit: { dice: 12, constant: 4, total: 16, natural: 12 },
+  hit: true,
+  damage: 6,
+  multiplier: "normal",
+  crit: false,
+  manual: { toHit: true, damage: false },
+};
+const ATTACK = { kind: "cbt.attack", actorName: "Goblin", payload: p0 };
 
 describe("FR-KIT-42 row action text", () => {
   test("FR-KIT-42 row action text: roll → its labels joined with ' + ', else the expression", () => {
@@ -48,45 +62,54 @@ describe("FR-KIT-42 row action text", () => {
     ];
     expect(rowAction(roll(parts)).text).toBe("Flame Tongue");
     expect(rowResults(roll(parts))).toEqual([
-      { rollId: "r1", label: "Flame Tongue", total: 32, outcome: "damage" },
+      { key: "r1", rollId: "r1", label: "Flame Tongue", total: 32, outcome: "damage" },
     ]);
   });
 
-  test("FR-KIT-42 row action text: cbt.attack and cbt.hp → the line without the actor", () => {
-    const attack = {
-      kind: "cbt.attack",
-      actorName: "Goblin",
-      payload: {
-        targetName: "Mira",
-        attackName: "Scimitar",
-        damageType: "slashing",
-        toHit: { dice: 12, constant: 4, total: 16, natural: 12 },
-        hit: true,
-        damage: 6,
-        multiplier: "normal",
-        crit: false,
-        manual: { toHit: true, damage: false },
-      },
-    };
-    const a = rowAction(attack);
-    expect(a.actor).toBe("Goblin");
-    expect(a.text).toStartWith("attacks Mira: 12 + 4 = 16");
-    expect(a.text).not.toContain("physical"); // a chip after the boxes
-    expect(rowBadges(formatEntry(attack).segments)).toEqual(["physical"]);
-    expect(rowResults(attack)).toEqual([]);
+  test("FR-KIT-42 row action text (K8): cbt.attack → 'Scimitar attack vs Mira', no maths; the to-hit and damage are boxes", () => {
+    const a = rowAction(ATTACK);
+    expect(a).toEqual({ actor: "Goblin", text: "Scimitar attack vs Mira" });
+    expect(rowBadges(formatEntry(ATTACK).segments)).toEqual(["physical"]);
+    expect(rowResults(ATTACK)).toEqual([
+      { key: "hit", rollId: null, label: "To hit", total: 16, outcome: "plain" },
+      { key: "damage", rollId: null, label: "Damage", total: 6, outcome: "damage" },
+    ]);
+    // The maths stays the full line's (Tooltip, copy).
+    expect(lineText(formatEntry(ATTACK).segments)).toStartWith("Goblin attacks Mira: 12 + 4 = 16");
+  });
 
+  test("FR-KIT-42 row action text (K8): cbt.hp → 'Mira takes damage' / 'Mira heals' with the amount boxed; a sourced line 'heals Mira'", () => {
     const hp = {
       kind: "cbt.hp",
       actorName: "DM",
       payload: { targetName: "Mira", kind: "damage", amount: 5 },
     };
-    expect(rowAction(hp)).toEqual({ actor: "DM", text: "Mira takes 5 damage" });
+    expect(rowAction(hp)).toEqual({ actor: "DM", text: "Mira takes damage" });
+    expect(rowResults(hp)).toEqual([
+      { key: "amount", rollId: null, label: "Damage", total: 5, outcome: "damage" },
+    ]);
+    const heal = { ...hp, payload: { targetName: "Mira", kind: "heal", amount: 4 } };
+    expect(rowAction(heal).text).toBe("Mira heals");
+    expect(rowResults(heal)[0]?.outcome).toBe("heal");
     const sourced = {
       ...hp,
       actorName: "Sela",
       payload: { targetName: "Mira", kind: "heal", amount: 8, sourced: true },
     };
-    expect(rowAction(sourced)).toEqual({ actor: "Sela", text: "→ Mira, heal 8" });
+    expect(rowAction(sourced)).toEqual({ actor: "Sela", text: "heals Mira" });
+    expect(rowResults(sourced)[0]).toMatchObject({ total: 8, outcome: "heal" });
+    const overkill = {
+      ...hp,
+      actorName: "Goblin",
+      payload: {
+        targetName: "Mira",
+        kind: "damage",
+        amount: 30,
+        sourced: true,
+        callout: "overkill",
+      },
+    };
+    expect(rowAction(overkill).text).toBe("damages Mira — Overkill!");
   });
 
   test("FR-KIT-42 row action text: gem.* — an award keeps its whole line, a spend drops the actor", () => {
@@ -170,9 +193,77 @@ describe("FR-KIT-44 outcome", () => {
       "attack",
     );
     expect(rowResults(e)).toEqual([
-      { rollId: "r1", label: "Longbow attack", total: 29, outcome: "crit" },
-      { rollId: "r2", label: "Longbow damage", total: 16, outcome: "damage" },
+      { key: "r1", rollId: "r1", label: "Longbow attack", total: 29, outcome: "crit" },
+      { key: "r2", rollId: "r2", label: "Longbow damage", total: 16, outcome: "damage" },
     ]);
+  });
+
+  test("FR-KIT-44 outcome (K8): an attack + damage roll's damage run is `damage` (no part, no category of its own), even a natural 1 / 20 on it; the to-hit keeps its own", () => {
+    const hit = item({ label: "Light crossbow attack", natural: 14, total: 18 });
+    const dmg = item({
+      rollId: "r2",
+      expression: "1d8+2",
+      label: "Light crossbow damage (piercing)",
+      dice: [{ faces: 8, value: 5, kept: true }],
+      constant: 2,
+      total: 7,
+      natural: null,
+    });
+    expect(rowResults(roll([hit, dmg], "attack")).map((r) => r.outcome)).toEqual([
+      "plain",
+      "damage",
+    ]);
+    // A homebrew d20 damage roll is still the damage.
+    const d20 = { ...dmg, expression: "1d20", natural: 20, total: 20 };
+    expect(rowResults(roll([hit, d20], "attack"))[1]?.outcome).toBe("damage");
+    // Not an attack entry: unchanged (two checks stay plain).
+    expect(rowResults(roll([hit, dmg], "other")).map((r) => r.outcome)).toEqual(["plain", "plain"]);
+    expect(resultOutcome({ natural: 20 }, "attack", true)).toBe("damage");
+  });
+
+  test("FR-KIT-44 outcome (K8): cbt.attack boxes: a crit hit `crit`, a miss dim (`fumble`) with no damage box, an Apply hit line no damage box; a damage-only line only the damage", () => {
+    const p = ATTACK.payload;
+    const outcomes = (payload: Record<string, unknown>) =>
+      rowResults({ ...ATTACK, payload: { ...p, ...payload } }).map((r) => [r.key, r.outcome]);
+    expect(outcomes({ crit: true, toHit: { ...p.toHit, natural: 20, total: 24 } })).toEqual([
+      ["hit", "crit"],
+      ["damage", "damage"],
+    ]);
+    expect(outcomes({ hit: false, damage: 0 })).toEqual([["hit", "fumble"]]);
+    // A natural 20 the DM ruled a miss: a miss.
+    expect(outcomes({ hit: false, crit: true, damage: 0 })).toEqual([["hit", "fumble"]]);
+    expect(outcomes({ awaitingDamage: true, damage: 0 })).toEqual([["hit", "plain"]]);
+    expect(outcomes({ toHit: null })).toEqual([["damage", "damage"]]);
+    expect(outcomes({ toHit: null, hit: false, damage: 0 })).toEqual([]);
+    const missText = rowAction({
+      ...ATTACK,
+      payload: { ...p, toHit: null, hit: false, damage: 0 },
+    });
+    expect(missText.text).toBe("Scimitar attack vs Mira — miss");
+  });
+
+  test("FR-KIT-42 row action text (K8): a companion's line names no attack for players ('attacks Mira'); the DM reads it from dmPayload", () => {
+    const { attackName: _n, ...rest } = ATTACK.payload;
+    const player = { ...ATTACK, payload: rest };
+    expect(rowAction(player).text).toBe("attacks Mira");
+    const dm = {
+      ...player,
+      dmPayload: {
+        targetAc: 15,
+        attackName: "Bite",
+        hitComputed: true,
+        toHitRolled: 16,
+        damageRolled: 6,
+        damageTotal: 6,
+        applied: 6,
+        overkill: 0,
+        overrides: { toHit: false, hit: false, damage: false },
+      },
+    };
+    expect(rowAction(dm).text).toBe("Bite attack vs Mira");
+    expect(rowAction({ ...ATTACK, payload: { ...p0, callout: "overkill" } }).text).toBe(
+      "Scimitar attack vs Mira — Overkill!",
+    );
   });
 });
 

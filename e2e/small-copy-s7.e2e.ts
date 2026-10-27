@@ -8,7 +8,7 @@
 // kind-contract).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { entryLine } from "./support/log";
+import { entryLine, pickRollOption } from "./support/log";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -153,9 +153,9 @@ test("FR-DICE-77 FR-DICE-78 the roll bar rolls as the sheet's PC; a manual pick 
   const log = await openWindow(p1, "dice.log");
   const opts = log.getByTestId("dice-roll-options");
   if ((await opts.getAttribute("data-state")) !== "open") await opts.click();
-  await expect(log.getByTestId("dice-roll-actor")).toHaveValue(brakka);
+  await expect(log.getByTestId("dice-roll-actor")).toHaveAttribute("data-value", brakka);
   await sheet.getByTestId("char-sheet-picker").selectOption(mira);
-  await expect(log.getByTestId("dice-roll-actor")).toHaveValue(mira);
+  await expect(log.getByTestId("dice-roll-actor")).toHaveAttribute("data-value", mira);
   const rolled = log.getByTestId("dice-log-entry").filter({ hasText: "— 1d20+2:" });
   const before = await rolled.count();
   await log.getByTestId("dice-roll-expression").fill("1d20+2");
@@ -168,18 +168,16 @@ test("FR-DICE-77 FR-DICE-78 the roll bar rolls as the sheet's PC; a manual pick 
   // A manual pick (Brakka) is kept with the Options state across a reload.
   const options = log.getByTestId("dice-roll-options");
   if ((await options.getAttribute("data-state")) !== "open") await options.click();
-  await expect(log.getByTestId("dice-roll-actor")).toHaveValue(mira);
-  await log.getByTestId("dice-roll-actor").selectOption(brakka);
+  await expect(log.getByTestId("dice-roll-actor")).toHaveAttribute("data-value", mira);
+  await pickRollOption(log, "dice-roll-actor", brakka);
   await p1.reload();
   await live(p1);
   await closePresent(p1);
   const after = await openWindow(p1, "dice.log");
-  await expect(after.getByTestId("dice-roll-actor")).toHaveValue(brakka);
-  await expect(after.getByTestId("dice-roll-actor").locator("option")).toContainText([
-    "Me",
-    "Brakka",
-    "Mira",
-  ]);
+  await expect(after.getByTestId("dice-roll-actor")).toHaveAttribute("data-value", brakka);
+  await after.getByTestId("dice-roll-actor").click();
+  await expect(p1.getByTestId("dice-roll-actor-option")).toHaveText(["Me", "Brakka", "Mira"]);
+  await p1.keyboard.press("Escape");
 
   // FR-DICE-78: the DM's subtracted group closes on its last die with no space before ")".
   const dm = await rolePage(browser);

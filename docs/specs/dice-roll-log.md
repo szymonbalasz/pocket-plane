@@ -17,6 +17,7 @@ phase: post-mvp-9
 > - **Copy (FR-DICE-93, amended by FR-KIT-46):** a selection copies each row's full line, one per line. Screen readers read the full line from the row.
 > - **Row counts (FR-SHELL-35 / FR-DICE-38):** whole rows at the K5 sizes: ≥ 2 at 200 high, DM ≥ 4 at 1150×280, player ≥ 5 at 850×320.
 > - **Test IDs:** new `dice-log-entry-time`, `dice-log-entry-total`, `dice-log-entry-more`, `dice-log-entry-details`, `dice-log-entry-line`. `dice-log-die` lives in the Tooltip line. `dice-log-entry-text` is the row's "Name · action".
+> - **K8 (2026-10-27, `build/kit-polish-log`, #360):** `cbt.attack` / `cbt.hp` rows are short ("Longbow attack vs Goblin", "Goblin takes damage") with their to-hit / damage / amount boxed; an attack roll's damage run is a `damage` box; the roll bar's Category / Roll as are the shared Select (`data-value` on the trigger, `…-option` items). Details: [kit-parity §6.4 K8 note](post-mvp/kit-parity.md#64-game-log-and-roll-popup).
 
 > **Sprint 7, track ST (stats tier A, DM [#311](../decisions-log.md); spec-stats).** [Stats](stats.md) count nat 20s / nat 1s and decide visibility from this spec's facts. **Supersede is GM's** (FR-DICE-62–67; seam S2): the old entry is kept with `supersededBy` and the final roll counts (FR-DICE-67). New **FR-DICE-72** lists only the stats read rules on top of that. New **FR-DICE-73** adds a read-only helper. No schema, record type, window or line change: 0 B. ST0 reads these facts **after GM0** (seam S4).
 

@@ -284,4 +284,36 @@ describe("FR-KIT-49 popup totals", () => {
     );
     expect(rows[1]).toMatch(/data-testid="dicex-popup-total"[^>]*>6<\/span><span[^>]*>physical</);
   });
+
+  test("FR-KIT-49 popup totals (K8): an attack + damage roll's damage total is a `damage` box, as its log row's; the to-hit keeps its own", () => {
+    const roll = (o: Record<string, unknown>) => ({
+      rollId: "r1",
+      expression: "1d20+4",
+      mode: "normal",
+      manual: false,
+      dice: [{ faces: 20, value: 14, kept: true }],
+      constant: 4,
+      total: 18,
+      natural: 14,
+      label: "Light crossbow attack",
+      ...o,
+    });
+    const both = entry({ id: "e3", n: 3, category: "attack" }, [
+      roll({}),
+      roll({
+        rollId: "r2",
+        expression: "1d8+2",
+        dice: [{ faces: 8, value: 5, kept: true }],
+        constant: 2,
+        total: 7,
+        natural: null,
+        label: "Light crossbow damage (piercing)",
+      }),
+    ]);
+    rollPopups.add({ entries: [both], looks: {}, big: null, threeD: false });
+    const outcomes = [
+      ...render().matchAll(/<span[^>]*data-testid="dicex-popup-total"[^>]*data-outcome="(\w+)"/g),
+    ].map((m) => m[1]);
+    expect(outcomes).toEqual(["plain", "damage"]);
+  });
 });

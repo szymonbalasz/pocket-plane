@@ -190,7 +190,8 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await expect(trow(goblin)).toHaveAttribute("data-source", "selection");
   await expect(trow(goblin2)).toHaveAttribute("data-source", "selection");
   await expect.poll(async () => (await targetRings(dm)).length).toBe(2);
-  await expect(trow(goblin)).toContainText("vs AC 15");
+  // Kit parity K8: the target chip reads "Goblin · AC 15".
+  await expect(trow(goblin).getByTestId("mod-popup-ac")).toHaveText("AC 15");
   await popup.getByTestId("cbt-popup-damage").fill("8");
   for (const id of [goblin, goblin2]) {
     const hit = trow(id).getByTestId("cbt-popup-target-hit");
@@ -200,8 +201,9 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   await trow(goblin)
     .locator('[data-testid="cbt-popup-target-mult-option"][data-value="half"]')
     .click();
-  await expect(trow(goblin).getByTestId("cbt-popup-target-preview")).toHaveText("Goblin 7 → 3");
-  await expect(trow(goblin2).getByTestId("cbt-popup-target-preview")).toHaveText("Goblin 2 7 → 0");
+  // K8: the inline preview leaves the name to the chip.
+  await expect(trow(goblin).getByTestId("cbt-popup-target-preview")).toHaveText("7 → 3");
+  await expect(trow(goblin2).getByTestId("cbt-popup-target-preview")).toHaveText("7 → 0");
   await popup.getByTestId("cbt-popup-apply").click();
   await expect(popup).toHaveCount(0);
   await expect.poll(async () => (await targetRings(dm)).length).toBe(0);
