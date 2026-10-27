@@ -2708,3 +2708,9 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-100 
 - **Client-only state:** the stat-block window's `StatBlockTarget {definitionId, combatantId?, entryId?}` in memory (`useStatBlockTarget`); lost on reload (`restoreOpen: false`).
 - **Derived (client, not stored):** the binding (`boundCombatant`: the target's combatant while active, not removed, in the started encounter); the type line (`typeLine`); the plain roll expressions (`plainAttackExpressions`: to-hit, damage parts joined).
 - **Fixtures:** bundle `kit-parity` = `theme-gilt` + `kit-log-rolls` (K1) + `combat-hit`, `combat-pending`, `cbtx-effects`, `cbtx-temp` (K2) + `cmp-srd-mini`, `cp-srd`, `pet-owlbear` (K4) + `kit-notices-applied`, `kit-notices` (K3); existing units only, one comment per track. CON-44 (measured): DM 51 751 B, P1 24 296 B, P2 20 519 B.
+## 140. Sprint 13: kit polish (K9)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (K6 gaps 3, 4, 6, 9, 13 and the Notifications window; #360). **Built by `build/kit-polish-init`**. Protocol side: [protocol §176](../protocol/README.md#176-sprint-13-kit-polish-initiative-bars-and-pending-lines-medallion-fill-toasts-notifications-cards-stat-block-labels-k9). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** the Medallion's `data-tone="neutral"` (no colour, no portrait); the tail fold at the fixed 120-px track (`tailFolds`).
+- **Fixtures:** bundle `kit-parity` appends `dicex-request-open` (K9: player-1's pending Perception prompt for the toast and Notifications walkthrough); existing unit. CON-44 (measured): DM 54 180 B, P1 25 087 B, P2 21 312 B.
