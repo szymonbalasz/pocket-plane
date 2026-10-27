@@ -5,7 +5,7 @@
 // Kit parity K9 (K6 §5): each row is a kit toast card (`data-slot="toast-card"`): the causer's
 // Medallion or the kind's icon as its lead, the text (causer in bold), then the meta line; the
 // section headings carry `note-heading` for the theme's label type. Same lines, so the rows keep
-// their height.
+// their height. K12 (round-2 gap 10): the rows lose the coloured left stripe (the toasts keep it).
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { useContext, useEffect, useLayoutEffect } from "react";
 import { Button } from "../../components/ui/button";
@@ -29,10 +29,10 @@ import {
 import type { NoteClient } from "./note-client";
 import {
   NoteLine,
-  NoteStripe,
   ToastLead,
   timeOf,
   useCauserName,
+  useMedallionName,
   useNoteActions,
   useNoteStripe,
   usePlayerNames,
@@ -99,6 +99,7 @@ function Row({
   const nameOf = usePlayerNames();
   const stripe = useNoteStripe(n);
   const name = useCauserName(n);
+  const lead = useMedallionName(n);
   if (!you) return null;
   const v = { role: you.role, playerId: you.playerId };
   const action = actionButton(n, v, live, views.get(n.kind));
@@ -118,8 +119,9 @@ function Row({
         n.state === "pending" ? "border-primary" : "text-muted-foreground",
       )}
     >
-      <NoteStripe color={stripe.color} />
-      <ToastLead name={name} color={stripe.color} icon={views.get(n.kind)?.icon} />
+      {/* K12 (round-2 gap 10): no coloured left stripe in the window (the kit's cards): the state
+          chip carries the state, the lead medallion the causer's colour (`data-color` kept). */}
+      <ToastLead name={lead} color={stripe.color} icon={views.get(n.kind)?.icon} />
       <div data-slot="toast-text" className="flex min-w-0 flex-1 flex-col gap-1">
         <NoteLine n={n} views={views} name={name} className="break-words text-sm" />
         <div className="flex flex-wrap items-center gap-1.5 text-xs">

@@ -71,6 +71,7 @@ import {
   ToastLead,
   ToastText,
   useCauserName,
+  useMedallionName,
   useNoteActions,
   useNoteStripe,
 } from "./parts";
@@ -130,6 +131,7 @@ function NoteToast({
     : "none";
   const stripe = useNoteStripe(n);
   const name = useCauserName(n);
+  const lead = useMedallionName(n);
   // FR-KIT-55: medallion or icon · text block · actions · close; the stripe stays the left edge.
   return (
     <div
@@ -144,7 +146,7 @@ function NoteToast({
       className={TOAST_CARD}
     >
       <NoteStripe color={stripe.color} />
-      <ToastLead name={name} color={stripe.color} icon={views.get(n.kind)?.icon} />
+      <ToastLead name={lead} color={stripe.color} icon={views.get(n.kind)?.icon} />
       {/* FR-KIT-57: the action sits right of the text; it wraps below only when too narrow. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1.5">
         <ToastText n={n} views={views} name={name} />

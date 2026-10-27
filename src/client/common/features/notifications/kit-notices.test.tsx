@@ -442,8 +442,9 @@ describe("FR-KIT-55 Notifications window cards (K9, K6 §5)", () => {
     expect(pending).toMatch(
       /^<li data-testid="note-history-row" data-record-id="n1" data-state="pending" data-slot="toast-card"/,
     );
+    // K12 (round-2 gap 10): no left stripe in the window (the toasts keep theirs).
+    expect(pending).not.toContain('data-testid="note-stripe"');
     const order = [
-      'data-testid="note-stripe"',
       'data-testid="kit-medallion"',
       'data-testid="note-text"',
       'data-testid="note-history-audience"',
@@ -478,5 +479,44 @@ describe("FR-KIT-55 Notifications window cards (K9, K6 §5)", () => {
     const block = css.slice(css.indexOf("/* KIT: polish (kit-parity K9"));
     expect(block).toContain('[data-slot="note-heading"]');
     expect(block).toContain('[data-testid="note-history-row"]');
+  });
+});
+
+describe("K12 notices (round-2 gap 10, minor)", () => {
+  const dmSent: NotificationRecord = {
+    ...system,
+    id: "n4",
+    text: "The bridge sways",
+    audience: "all",
+    byRole: "dm",
+    byPlayerId: null,
+  };
+  test("FR-KIT-55 card row (K12): a DM-sent toast leads with the DM's medallion on the DM's colour, not the kind's icon; its text bolds no name", () => {
+    const card = toastOf(stackHtml("player", withNotes(dmSent), undefined, [dmSent]), "n4");
+    expect(card).toMatch(/data-slot="kit-medallion" data-size="md"[^>]*>D</);
+    expect(card).toContain(`background-color:${colorHex("#e69f00")}`);
+    expect(card).not.toContain("note-toast-icon");
+    expect(card).not.toContain("<b ");
+    // A system row (no causer) keeps the kind's icon.
+    expect(toastOf(stackHtml("dm", withNotes(system)), "n2")).toContain("note-toast-icon");
+  });
+
+  test("FR-KIT-55 card row (K12): the Notifications window's cards carry no coloured left stripe (the toasts keep it); the causer's colour rides on the medallion, `data-color` kept", () => {
+    const html = historyHtml("dm", [request, dmSent]);
+    for (const id of ["n1", "n4"]) {
+      const row = rowOf(html, id);
+      expect(row).not.toContain('data-testid="note-stripe"');
+      expect(row).toContain("data-color=");
+      expect(row).toContain('data-testid="kit-medallion"');
+    }
+    expect(toastOf(stackHtml("dm", withNotes(request)), "n1")).toContain(
+      'data-testid="note-stripe"',
+    );
+  });
+
+  test("FR-KIT-57 inline action (K12): the DM's 'Open requests' in a roll-request card is a small stone button (outline), not a text link", () => {
+    const src = readFileSync(join(import.meta.dir, "../dice-extras/PromptBody.tsx"), "utf8");
+    const open = src.slice(src.indexOf('data-testid="dicex-prompt-open-requests"'));
+    expect(open.slice(0, open.indexOf(">"))).toMatch(/size="sm"[\s\S]*variant="outline"/);
   });
 });
