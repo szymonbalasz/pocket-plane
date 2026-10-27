@@ -319,6 +319,20 @@ describe("TT2 roll requests (client)", () => {
     expect(resultsPreset("save:dex", (c) => c === "skill-check")).toBe("hidden");
   });
 
+  test("FR-DICEX-86 FR-KIT-02 K10 requests composer: Roll is the shared Select (no native select), its trigger keeps the test ID and carries the value; Show DC is the shared check", () => {
+    const html = render(<RequestsWindow />, DM);
+    // Only Radix's hidden form select, never a shown native one.
+    for (const tag of html.match(/<select[^>]*>/g) ?? [])
+      expect(tag).toContain('aria-hidden="true"');
+    expect(html).toMatch(
+      /<button[^>]*data-slot="select-trigger"[^>]*data-testid="dicex-request-roll"[^>]*data-value="skill:perception"/,
+    );
+    expect(html).toMatch(/data-testid="dicex-request-roll"[\s\S]*?>Perception</);
+    expect(html).toMatch(
+      /<button[^>]*data-slot="checkbox"[^>]*data-testid="dicex-request-dc-shown"/,
+    );
+  });
+
   test("FR-DICEX-86 requests window: the composer opens folded while a request is open; cards open first", () => {
     const open = request("r-open", 2);
     const closed = request("r-closed", 1, { state: "closed" });

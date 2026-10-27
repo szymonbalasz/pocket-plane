@@ -7,6 +7,7 @@ import { CampaignPaused, CampaignResumed } from "@shared/events/campaign-managem
 import { TurnChanged } from "@shared/events/combat-tracker";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
@@ -42,7 +43,7 @@ import {
   resumeCatchUp,
   writeDraft,
 } from "./logic";
-import { pausePayload, previewPause } from "./PauseControl";
+import PauseControl, { pausePayload, previewPause } from "./PauseControl";
 import { PauseOverlay } from "./PauseOverlay";
 import { createPauseRuntime } from "./runtime";
 
@@ -76,7 +77,11 @@ function storeOf(
   };
 }
 
-function render(store: RecordStore, state: SyncState["state"] = "live"): string {
+function render(
+  store: RecordStore,
+  state: SyncState["state"] = "live",
+  node: ReactNode = <PauseOverlay />,
+): string {
   const sync = createStore<SyncState>()(
     () =>
       ({
@@ -100,7 +105,7 @@ function render(store: RecordStore, state: SyncState["state"] = "live"): string 
       <SyncContext.Provider value={sync}>
         <ShellProvider registry={createWindowRegistry("player", [])}>
           <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-            <PauseOverlay />
+            {node}
           </TooltipProvider>
         </ShellProvider>
       </SyncContext.Provider>,
@@ -175,6 +180,24 @@ describe("registration (FR-SHELL-128, -129, -135)", () => {
     // The flash is z-100 (AlertLayer); the toast stack sits below the overlay layer too.
     expect(OVERLAY_LAYER_Z).toBeGreaterThan(100);
     expect(OVERLAY_LAYER_Z + (entry?.layer ?? 0)).toBeLessThan(DICE_LAYER_Z);
+  });
+
+  test("FR-SHELL-129 FR-KIT-10 K10 DM pause control: an icon button like search (40 px, ghost; paused = on), the label in its Tooltip, the name and text kept", () => {
+    const button = (html: string) =>
+      /<button[^>]*data-testid="ui-pause-open"[^>]*>[\s\S]*?<\/button>/.exec(html)?.[0] ?? "";
+    const running = button(render(storeOf({ role: "dm", pause: null }), "live", <PauseControl />));
+    expect(running).toContain('data-variant="ghost"');
+    expect(running).toContain('data-size="icon"');
+    expect(running).toContain('data-state="running"');
+    expect(running).toContain('aria-label="Pause"');
+    expect(running).toContain("width:40px");
+    expect(running).toContain('<span class="sr-only">Pause</span>');
+    const paused = button(
+      render(storeOf({ role: "dm", pause: { ...PAUSE, backAt: null } }), "live", <PauseControl />),
+    );
+    expect(paused).toContain('data-variant="secondary"');
+    expect(paused).toContain('data-state="paused"');
+    expect(paused).toContain('<span class="sr-only">Paused</span>');
   });
 
   test("FR-SHELL-129 DM pause control: top-bar item (DM only, fixed slot), label, widths, payload, preview, draft", () => {
