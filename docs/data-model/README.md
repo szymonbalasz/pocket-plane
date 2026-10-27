@@ -2679,3 +2679,10 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #3
 
 - **Derived (client, not stored):** `rowAction(entry)` → `{actor, text}`, `resultOutcome(item, category)`, `rowResults(entry)` (one `{rollId, label, total, outcome}` per run), `rowBadges(segments)`, `copyText(segments)` (`@shared/dice-roll-log/row`); `rowTime(at)` "HH:MM" local (`logic.ts`).
 - **Fixtures:** unit `kit-log-rolls` (player-1 rolls as Mira, physical: "Longbow attack" 1d20+9 natural 20 = 29, "Longbow damage" 2d8+4 = 16, "Healing Word" 1d4+3 seeded); bundle `kit-log` = `theme-gilt` + `kit-log-rolls`. CON-44 (measured): DM 32 142 B, P1 16 266 B, P2 14 763 B (`theme-gilt` 30 164 / 14 339 / 12 836).
+
+## 136. Sprint 13: compendium, Party status, Creatures, sheet header (K4)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #356). **Built by `build/kit-library`**. Protocol side: [protocol §172](../protocol/README.md#172-sprint-13-compendium-table-stat-block-card-party-cards-creatures-sheet-header-k4). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `pcLine(c)` "Level 5 Fighter · Human" (`party-board/summary-logic.ts`, from the character record or the other-player whitelist's `level` / `className` / `species`; species left out when absent) → `SummaryPc.line`; `CreatureRow.creatureType` (`creatureTypeOf`, monsters only) → the Creatures medallion colour `var(--creature-<type>, <hex>)`.
+- **Fixtures:** bundle `kit-library` = `theme-gilt` + `cmp-srd-mini` + `cp-srd` + `pet-owlbear` (existing units). CON-44 (measured): DM 31 064 B, P1 15 165 B, P2 12 836 B.
