@@ -2686,3 +2686,10 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-24 �
 
 - **Derived (client, not stored):** `medallionColour(store, combatant)` = `CREATURE_COLORS[token.creatureType]` of the combatant's token the viewer holds, else null (muted); `tailText(ac, moved)`, `tailFolds(widths)` (DM); `pcHp(character)` = `{hpCurrent, hpMax ?? statBlock.hpMax}` from the character the player holds (own: full; others: ADR-0063's whitelist).
 - **Fixtures:** bundle `kit-initiative` (existing units only).
+
+## 137. Sprint 13: compendium, Party status, Creatures, sheet header (K4)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #356). **Built by `build/kit-library`**. Protocol side: [protocol §173](../protocol/README.md#173-sprint-13-compendium-table-stat-block-card-party-cards-creatures-sheet-header-k4). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `pcLine(c)` "Level 5 Fighter · Human" (`party-board/summary-logic.ts`, from the character record or the other-player whitelist's `level` / `className` / `species`; species left out when absent) → `SummaryPc.line`; `CreatureRow.creatureType` (`creatureTypeOf`, monsters only) → the Creatures medallion colour `var(--creature-<type>, <hex>)`.
+- **Fixtures:** bundle `kit-library` = `theme-gilt` + `cmp-srd-mini` + `cp-srd` + `pet-owlbear` (existing units). CON-44 (measured): DM 31 064 B, P1 15 165 B, P2 12 836 B.

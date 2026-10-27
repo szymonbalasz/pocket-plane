@@ -2,6 +2,8 @@
 // definition + reference sections), spell, homebrew item, footer + About; FR-CMP-21 the DM's drag
 // handle; FR-CMP-18 the window body's search, Filters and Tabs per role; FR-CMP-35 group rows.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { EntryResponse, EntrySummary } from "@shared/compendium/rest";
 import { emptyStore } from "@shared/protocol/store";
 import type { ReactNode } from "react";
@@ -10,7 +12,7 @@ import { createStore } from "zustand";
 import type { Api } from "../../api";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
-import { CompendiumBody, GroupMembers, GroupRow } from "./CompendiumWindow";
+import { CompendiumBody, GroupMembers, GroupRow, ResultRow, TableHead } from "./CompendiumWindow";
 import type { Role } from "./logic";
 import { resetCmpNav } from "./nav";
 import { EntryView } from "./views";
@@ -178,9 +180,9 @@ describe("FR-CMP-19 entry views", () => {
     expect(html).not.toContain('data-testid="cmp-statblock-reactions"');
     const t = text(html);
     expect(t).toContain("Small humanoid (goblinoid), neutral evil");
-    expect(t).toContain("Armor Class 15 (leather armor, shield)");
-    expect(t).toContain("Hit Points 7 (2d6)");
-    expect(t).toContain("DEX14 (+2)");
+    expect(t).toContain("AC 15 (leather armor, shield)"); // FR-KIT-77 core row
+    expect(t).toContain("HP 7 (2d6)");
+    expect(t).toContain("DEX14+2");
     expect(t).toContain("Senses darkvision 60 ft., passive Perception 9");
     expect(t).toContain("Challenge 1/4 (50 XP)");
     expect(t).toContain("Nimble Escape.");
@@ -315,5 +317,179 @@ describe("FR-CMP-35 group rows", () => {
     expect(render("dm", <CompendiumBody api={{} as Api} viewer="dm" />)).toContain(
       'placeholder="Search: words in any order"',
     );
+  });
+});
+
+// ---------- kit parity K4 (§6.8) ----------
+
+/** The opening tag of the first element with `testId` (attributes in render order). */
+const tagOf = (html: string, testId: string) => {
+  const at = html.indexOf(`data-testid="${testId}"`);
+  return html.slice(html.lastIndexOf("<", at), html.indexOf(">", at) + 1);
+};
+
+describe("FR-KIT-76 compendium table", () => {
+  const GOB_ROW: EntrySummary = {
+    id: "e-gob",
+    kind: "monster",
+    name: "Goblin",
+    sourceLabel: "SRD 5.1",
+    line: "CR 1/4 · Small humanoid",
+    definitionId: "d-gob",
+  };
+
+  test("FR-KIT-76 table rows: sticky header Name · Details · Source; each row one grid line: name, details, source chip; zebra + hover; drag kept (DM monster)", () => {
+    const head = render("dm", <TableHead />);
+    expect(head).toContain('data-slot="cmp-table-head"');
+    expect(head).toContain('aria-hidden="true"');
+    expect(head).toMatch(/sticky top-0/);
+    expect(text(head)).toBe("NameDetailsSource");
+    const dm = render("dm", <ResultRow r={GOB_ROW} viewer="dm" />);
+    const row = tagOf(dm, "cmp-result");
+    expect(row).toContain('data-slot="cmp-row"');
+    expect(row).toContain('data-record-id="e-gob" data-value="monster"');
+    expect(row).toMatch(/grid-cols-\[minmax\(0,1fr\)_minmax\(0,1\.25fr\)_4\.5rem\]/);
+    expect(row).toContain("min-h-10"); // today's two-line row height ± 4 px (§7.3)
+    expect(row).toContain("hover:bg-accent");
+    expect(row).toContain('draggable="true"');
+    // The details line is the name cell's next sibling (small-copy-s7 reads it so), then the chip.
+    expect(dm).toMatch(
+      /data-testid="cmp-result-name"[^>]*><span class="truncate">Goblin<\/span><\/span><span[^>]*tabular-nums[^>]*>CR 1\/4 · Small humanoid<\/span><span data-slot="badge"[^>]*>SRD<\/span>/,
+    );
+    // A player row is no drag source.
+    expect(
+      tagOf(render("player", <ResultRow r={GOB_ROW} viewer="player" />), "cmp-result"),
+    ).toContain('draggable="false"');
+    // Zebra: the list styles every other row; read from the source (static render has no list).
+    const src = readFileSync(join(import.meta.dir, "CompendiumWindow.tsx"), "utf8");
+    expect(src).toContain("[&>li:nth-child(even)]:bg-muted/40");
+    expect(src).toMatch(/data-testid="cmp-results" data-slot="cmp-table"/);
+  });
+
+  test("FR-KIT-76 group rows: an expandable table row (chevron + name, the count line in Details); members indented on the same grid", () => {
+    const ASI: EntrySummary = {
+      id: "asi-barbarian",
+      kind: "feature",
+      name: "Ability Score Improvement",
+      sourceLabel: "SRD 5.1",
+      line: "12 entries · Barbarian, Bard",
+      group: { count: 12 },
+    };
+    const html = render(
+      "dm",
+      <GroupRow r={ASI} expanded>
+        <GroupMembers
+          group={ASI}
+          members={{
+            state: "ready",
+            members: [{ ...ASI, id: "asi-bard", line: "Bard · 4th level", group: undefined }],
+          }}
+          viewer="dm"
+        />
+      </GroupRow>,
+    );
+    expect(tagOf(html, "cmp-result")).toContain('data-group-count="12"');
+    expect(tagOf(html, "cmp-group-toggle")).toContain("grid-cols-");
+    expect(html).toMatch(/data-testid="cmp-result-name"[^>]*><svg/); // chevron before the name
+    expect(text(html)).toContain("12 entries · Barbarian, Bard");
+    expect(tagOf(html, "cmp-group-member")).toContain('data-slot="cmp-row"');
+    expect(html).toMatch(/<span class="col-span-2 truncate pl-5">Bard · 4th level<\/span>/);
+  });
+});
+
+describe("FR-KIT-77 stat block card", () => {
+  test("FR-KIT-77 stat block card: italic type line; one ruled row AC · HP (formula) · Speed; 6-column grid label / score / modifier; sections as name + muted line rows", () => {
+    const html = render("dm", <EntryView data={GOBLIN} viewer="dm" />);
+    expect(html).toContain('data-slot="statblock"');
+    expect(html).toMatch(
+      /<p class="text-sm italic text-muted-foreground">Small humanoid \(goblinoid\), neutral evil<\/p>/,
+    );
+    const core = html.slice(html.indexOf('data-testid="cmp-statblock-core"'));
+    expect(tagOf(html, "cmp-statblock-core")).toContain('data-slot="statblock-core"');
+    expect(tagOf(html, "cmp-statblock-core")).toContain("border-t");
+    expect(text(core.slice(0, core.indexOf('data-testid="cmp-statblock-scores"')))).toMatch(
+      /AC 15 \(leather armor, shield\)HP 7 \(2d6\)Speed 30 ft\./,
+    );
+    expect(tagOf(html, "cmp-statblock-scores")).toContain('data-slot="statblock-abilities"');
+    expect(tagOf(html, "cmp-statblock-scores")).toContain("grid-cols-6");
+    expect(html.match(/data-testid="cmp-statblock-score"/g)).toHaveLength(6);
+    const str = html.slice(html.indexOf(">", html.indexOf('data-value="str"')) + 1);
+    expect(text(str.slice(0, str.indexOf("</div>")))).toBe("STR8−1");
+    // Labels carry the label slot (gilt.css: label type, gold).
+    expect(html.match(/data-slot="statblock-label"/g)?.length).toBeGreaterThanOrEqual(9);
+    // Sections: name + muted line, the dice still clickable.
+    const at = html.indexOf('data-testid="cmp-statblock-section" data-value="Scimitar"');
+    const sec = html.slice(html.lastIndexOf("<", at));
+    expect(tagOf(sec, "cmp-statblock-section")).toContain('data-slot="statblock-entry"');
+    expect(sec).toMatch(
+      /data-slot="statblock-entry-name"[^>]*>Scimitar\.<\/div><div class="text-muted-foreground">/,
+    );
+    expect(html.match(/data-testid="dicex-notation"/g)).toHaveLength(2);
+  });
+
+  test("FR-KIT-77 stat block card is read-only: no roll buttons, no window opener (FR-KIT-101 lands with K7)", () => {
+    const html = render("dm", <EntryView data={GOBLIN} viewer="dm" />);
+    expect(html).not.toContain("ent-statblock");
+    expect(html).not.toContain("statblock-attack");
+  });
+});
+
+describe("FR-KIT-01 same DOM per theme (compendium)", () => {
+  test("FR-KIT-01 same DOM per theme: the table row and the stat block render the same markup under Simple Dark and Gilt & Stone; no theme read", () => {
+    const row: EntrySummary = {
+      id: "e-gob",
+      kind: "monster",
+      name: "Goblin",
+      sourceLabel: "SRD 5.1",
+      line: "CR 1/4 · Small humanoid",
+    };
+    const [a, b] = (["default", "gilt"] as const).map((t) =>
+      render(
+        "dm",
+        <div data-theme={t}>
+          <TableHead />
+          <ResultRow r={row} viewer="dm" />
+          <EntryView data={GOBLIN} viewer="dm" />
+        </div>,
+      ).replace(t, "·"),
+    );
+    expect(a).toBe(b ?? "");
+    for (const f of ["CompendiumWindow.tsx", "views.tsx", "statblock-card.tsx"])
+      expect(readFileSync(join(import.meta.dir, f), "utf8")).not.toMatch(/data-theme|useTheme/);
+  });
+});
+
+describe("FR-KIT-07 slots present (K4)", () => {
+  const GILT = readFileSync(join(import.meta.dir, "../../themes/gilt.css"), "utf8");
+  const KIT = GILT.slice(GILT.indexOf("/* KIT: library"));
+
+  test("FR-KIT-07 slots present: cmp-table, cmp-row, statblock, statblock-core, statblock-abilities (+ party-card, sheet-portrait, sheet-name) styled by gilt.css's one KIT library block", () => {
+    const html =
+      render("dm", <EntryView data={GOBLIN} viewer="dm" />) +
+      render(
+        "dm",
+        <ResultRow
+          r={{ id: "x", kind: "spell", name: "X", sourceLabel: "SRD 5.1", line: "" }}
+          viewer="dm"
+        />,
+      );
+    for (const slot of ["cmp-row", "statblock", "statblock-core", "statblock-abilities"])
+      expect(html).toContain(`data-slot="${slot}"`);
+    expect(readFileSync(join(import.meta.dir, "CompendiumWindow.tsx"), "utf8")).toContain(
+      'data-slot="cmp-table"',
+    );
+    expect(GILT.match(/\/\* KIT: library/g)?.length).toBe(1);
+    for (const slot of [
+      "cmp-table",
+      "cmp-row",
+      "cmp-table-head",
+      "statblock-core",
+      "statblock-abilities",
+      "statblock-label",
+      "party-card",
+      "party-card-ac",
+      "sheet-name",
+    ])
+      expect(KIT).toContain(`[data-slot="${slot}"]`);
   });
 });

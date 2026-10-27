@@ -3,6 +3,8 @@
 // the `POST /api/pets` body, "owl" → Owlbear through the shared matcher) and the creature form's
 // whole `PUT` keeping a pet a pet (FR-ENT-33). The dialog's clicks: e2e/cp-pets.e2e.ts.
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { EntityRecord } from "@shared/entities/schemas";
 import { lazyAfterSnapshot } from "@shared/protocol/lazy";
@@ -270,5 +272,56 @@ describe("FR-ENT-33 the whole PUT keeps a pet a pet", () => {
       companionOf: null,
       turnMode: null,
     });
+  });
+});
+
+// ---------- kit parity K4 (§6.9) ----------
+
+describe("FR-KIT-84 creature medallion", () => {
+  /** The opening tag of a row's medallion. */
+  const medallion = (html: string, id: string) => {
+    const row = html.slice(html.indexOf(`data-testid="ent-list-row" data-record-id="${id}"`));
+    const at = row.indexOf('data-testid="ent-list-row-medallion"');
+    return row.slice(row.lastIndexOf("<", at), row.indexOf("</span>", at) + 7);
+  };
+
+  test("FR-KIT-84 creature medallion: lg; characters on the owner's colour, typed monsters on their creature-type colour, untyped neutral; the initial without a portrait", () => {
+    const typed = { ...monster("gob", "Goblin"), statBlock: { ...block(7), type: "humanoid" } };
+    const html = render([...records, typed]);
+    const mira = medallion(html, "mira");
+    expect(mira).toContain('data-slot="kit-medallion" data-size="lg"');
+    expect(mira).toMatch(/background-color:#19b98a[^>]*>M</);
+    expect(medallion(html, "thorn")).toContain("background-color:#56b4e9");
+    expect(medallion(html, "gob")).toMatch(
+      /background-color:var\(--creature-humanoid, #[0-9a-f]{6}\);color:var\(--creature-glyph, #fff\)[^>]*>G</,
+    );
+    const brute = medallion(html, "brute");
+    expect(brute).not.toContain("background-color");
+    expect(brute).toContain("bg-muted");
+    // The old icon tile is gone; badges and actions keep their place.
+    expect(html).not.toContain("lucide-paw-print");
+    expect(html).toMatch(/data-testid="ent-list-row-pet" data-record-id="owl"[^>]*>Pet of Mira</);
+  });
+
+  test("FR-KIT-84 a portrait wins: the medallion shows the image asset", () => {
+    // `AssetImg` makes an `Image` while rendering; the server render has none.
+    const g = globalThis as { Image?: unknown };
+    const had = "Image" in g;
+    if (!had) g.Image = class {};
+    let html: string;
+    try {
+      html = render([{ ...pc("mira", "Mira", "p1"), portraitAssetId: "a-mira" }]);
+    } finally {
+      if (!had) delete g.Image;
+    }
+    const mira = medallion(html, "mira");
+    expect(mira).toContain("data-image");
+    expect(mira).not.toContain("background-color");
+  });
+
+  test("FR-KIT-01 same DOM per theme: the Creatures rows read no theme", () => {
+    expect(readFileSync(join(import.meta.dir, "creatures-window.tsx"), "utf8")).not.toMatch(
+      /data-theme|useTheme/,
+    );
   });
 });
