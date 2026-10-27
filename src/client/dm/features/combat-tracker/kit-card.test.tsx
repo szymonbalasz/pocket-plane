@@ -210,6 +210,15 @@ describe("K8 damage card polish (K6 gap 7)", () => {
     );
   });
 
+  test("FR-KIT-07 slots present (K8): `card-label` on the result labels, styled by gilt.css's one K8 KIT block (body type, the kit's box rules)", () => {
+    const gilt = readFileSync(join(import.meta.dir, "../../../common/themes/gilt.css"), "utf8");
+    expect(gilt.match(/\/\* KIT: damage card \+ log polish/g)?.length).toBe(1);
+    const block = gilt.slice(gilt.indexOf("/* KIT: damage card + log polish"));
+    expect(block).toContain('[data-slot="card-label"]');
+    expect(block).toContain('input[data-slot="kit-result"][data-outcome="damage"]');
+    expect(render(DM_CARD)).toContain('data-slot="card-label"');
+  });
+
   test("FR-KIT-65 footer (K8): Apply shows the card's damage ('Apply 23' = 15 + 8 fire) while a row is a Hit", () => {
     expect(applyLabel(15, [8], [true])).toBe("Apply 23");
     expect(applyLabel(15, [], [false, true])).toBe("Apply 15");

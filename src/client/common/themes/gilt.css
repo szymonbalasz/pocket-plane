@@ -1743,3 +1743,33 @@
 :root[data-theme="gilt"] [data-slot="statblock-section"] {
   border-color: var(--gs-rule-soft);
 }
+/* KIT: damage card + log polish (kit-parity K8, K6 gaps 1, 2, 7, 8: the damage card's labels and
+   boxes, the log's damage boxes; the roll bar's Selects take the shared Select's look) ─────── */
+/* The damage card's result labels in body type, cream (the kit's `.dc-line`: "Mira · Longbow
+   attack"); the dice after them stay small and muted. */
+:root[data-theme="gilt"] [data-slot="card-label"] {
+  font-family: var(--font-body);
+  text-transform: none;
+}
+/* Its boxes as the kit's `.res`: gold-mid rule (crit keeps its green), the damage box the kit's
+   deep red rule (`.res.dmg`), as the log's damage box. */
+:root[data-theme="gilt"] [data-slot="card-line"] input[data-slot="kit-result"] {
+  border-color: var(--frame-rule-strong);
+  font-family: var(--font-num);
+}
+:root[data-theme="gilt"]
+  [data-slot="card-line"]
+  input[data-slot="kit-result"][data-outcome="damage"] {
+  border-color: var(--gs-danger-rule);
+}
+:root[data-theme="gilt"]
+  [data-slot="card-line"]
+  input[data-slot="kit-result"][data-outcome="crit"] {
+  border-color: var(--hp-full);
+}
+/* The log's damage boxes (now also on combat rows and on an attack's damage roll) take the same
+   deep red rule as the kit's `.res.dmg`, over the meaning utility's bright one; the number stays
+   the meaning red. */
+:root[data-theme="gilt"] [data-slot="log-row"] [data-slot="kit-result"][data-outcome="damage"] {
+  border-color: var(--gs-danger-rule);
+}
