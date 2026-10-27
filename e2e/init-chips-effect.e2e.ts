@@ -85,7 +85,8 @@ test("FR-CBTX-54 W6 trigger chips never fold: 'Rage 10r' + Divine Fury on Brakka
   const compacted: string[] = [];
   for (const [page, min, rageFolds] of [
     [dm, 320, false],
-    [p1, 240, true],
+    // FR-KIT-28: the status cell shows the first effect (Rage) as its icon, never folded.
+    [p1, 240, false],
   ] as const) {
     const init = await openWindow(page, "cbt.initiative");
     const brakka = rowOf(init, await idByName(init, "Brakka"));

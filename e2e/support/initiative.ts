@@ -11,3 +11,12 @@ export async function initMenu(
   await init.getByTestId("cbt-init-menu").click();
   await page.getByTestId(item).click();
 }
+
+/**
+ * FR-KIT-28: an effect in a row's status cell: its icon chip while shown, else the "+N" button
+ * naming it (folded chips are only in "+N"'s list). Exactly one of the two matches.
+ */
+export const statusEffect = (row: Locator, value: string, label: string): Locator =>
+  row.locator(
+    `[data-testid="cbtx-init-row-effect"][data-value="${value}"], button[aria-label^="More effects:"][aria-label*="${label}"]`,
+  );

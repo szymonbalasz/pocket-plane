@@ -156,7 +156,8 @@ test("FR-CBT-125 FR-CBTX-57 FR-CBTX-58 F10 Initiative rows: nothing below '↓ N
 
   // Names whole, Mira's Searing trigger whole at 400; icon-only (or whole) at 320, never cut.
   await expect.poll(() => rowsCut(init)).toEqual([]);
-  await expect(miraChip(init)).toHaveAttribute("data-compact", "false");
+  // FR-KIT-28: in the status cell a trigger chip is always its icon (+ uses).
+  await expect(miraChip(init)).toHaveAttribute("data-compact", "true");
   await toWidth(dm, init, 320);
   await expect.poll(() => rowsCut(init)).toEqual([]);
   const searing = miraChip(init);
@@ -175,8 +176,9 @@ test("FR-CBT-125 FR-CBTX-57 FR-CBTX-58 F10 Initiative rows: nothing below '↓ N
   await expect.poll(() => rowsCut(pInit)).toEqual([]);
   await toWidth(p1, pInit, 240);
   await expect.poll(() => rowsCut(pInit)).toEqual([]);
-  // Its 3 rows fit even at the min height (players never get hidden rows): the same rules, footer
-  // absent.
+  // At the min height the same rules (players never get hidden rows). Kit rows (≈ 46 px,
+  // FR-KIT-23) in the unchanged 200-px min (kit-parity §7.3): the last may sit below the fold,
+  // counted by "↓ N more", and whole once scrolled to.
   await resizeBy(p1, pInit, 0, -400);
   v = await viewport(pInit);
   expect(v).toMatchObject({
@@ -184,9 +186,10 @@ test("FR-CBT-125 FR-CBTX-57 FR-CBTX-58 F10 Initiative rows: nothing below '↓ N
     listClips: true,
     bodyScrolls: false,
     rowUnder: false,
-    lastWhole: true,
   });
   expect(v.more).toBe(v.below);
+  await listToEnd(pInit);
+  await expect.poll(async () => (await viewport(pInit)).lastWhole).toBe(true);
 
   // End the Ambush; Start "Escort to the Ford": the hidden Ally (c10).
   await initMenu(dm, init, "cbt-init-end");
@@ -238,7 +241,8 @@ test("FR-CBT-125 FR-CBTX-57 FR-CBTX-58 F10 Initiative rows: nothing below '↓ N
     await expect(escort.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "0");
     await expect(escort.getByRole("button", { name: /Roll/ }).first()).toBeVisible();
     expect(await rowsCut(escort)).toEqual([]);
-    const bands = escort.getByTestId("cbt-init-row-band");
+    // FR-KIT-25: the DM's band is the HP bar's `data-band` (no band badge on DM rows).
+    const bands = escort.locator('[data-testid="cbt-init-row-hp"][data-band]');
     expect(await bands.count()).toBeGreaterThanOrEqual(3);
     for (const band of await bands.all()) {
       await expect(band).toBeVisible();
