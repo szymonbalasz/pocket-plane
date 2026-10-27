@@ -1444,3 +1444,64 @@
     color: var(--muted-foreground);
   }
 }
+
+/* KIT: library (kit-parity K4, §6.8–6.9: compendium table + stat block card, Party status cards,
+   Creatures medallions, sheet header) ───────────────────────────────────────────────────────── */
+/* Compendium table (the kit's `.tbl`): the head ruled in dim gold, rows ruled by an inset line
+   (no layout), zebra a faint warm wash, the hover a dark gold. */
+:root[data-theme="gilt"] [data-slot="cmp-table-head"] {
+  --muted-foreground: var(--gold);
+  border-color: var(--frame-rule);
+}
+:root[data-theme="gilt"] [data-slot="cmp-row"] {
+  --accent: #1f1a0e;
+  box-shadow: inset 0 -1px 0 #1d1a14;
+}
+:root[data-theme="gilt"] [data-slot="cmp-table"] > ul > li:nth-child(even) {
+  background-color: rgb(255 240 200 / 0.025);
+}
+/* Stat block card (the kit's `.sb-row` / `.sb-abil`): soft rules. */
+:root[data-theme="gilt"] :is([data-slot="statblock-core"], [data-slot="statblock-abilities"]) {
+  border-color: var(--gs-rule-soft);
+}
+/* Party card (the kit's `.card`): a dark gradient in a gold-deep rule, a faint top light; the AC
+   mini shield filled dark with a gold rule. */
+:root[data-theme="gilt"] [data-slot="party-card"] {
+  border-color: var(--frame-rule);
+  background-image: linear-gradient(#141716, #0e1111);
+  box-shadow: inset 0 1px 0 rgb(255 236 190 / 0.05);
+}
+:root[data-theme="gilt"] [data-slot="party-card"]:hover {
+  --accent: var(--gs-highlight);
+}
+:root[data-theme="gilt"] [data-slot="party-card-ac"] {
+  --muted-foreground: var(--frame-rule-strong);
+}
+:root[data-theme="gilt"] [data-slot="party-card-ac"] > svg {
+  fill: #0b0e0e;
+}
+@layer base {
+  /* Labels in label type and gold ("AC", "STR", "Saving Throws"; the kit's `.sb-row b`). */
+  :root[data-theme="gilt"] [data-slot="statblock-label"] {
+    color: var(--gold);
+    font-family: var(--font-label);
+  }
+  :root[data-theme="gilt"] [data-slot="cmp-table-head"] {
+    font-family: var(--font-label);
+  }
+  /* Names in name type, warm gold (the kit's `.cn` / `.cname`). */
+  :root[data-theme="gilt"]
+  :is(
+    [data-slot="cmp-row-name"],
+    [data-slot="statblock-name"],
+    [data-slot="statblock-entry-name"],
+    [data-slot="party-card-name"],
+    [data-slot="sheet-name"]
+  ) {
+    color: var(--gs-label-hover);
+    font-family: var(--font-num);
+  }
+  :root[data-theme="gilt"] :is([data-slot="statblock-score"], [data-slot="party-card-ac"]) {
+    font-family: var(--font-num);
+  }
+}
