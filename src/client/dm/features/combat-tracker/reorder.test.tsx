@@ -16,6 +16,7 @@ import {
   AUTOSCROLL_EDGE,
   AUTOSCROLL_MAX,
   autoscrollStep,
+  autoscrollTop,
   blocksOf,
   crossingHint,
   DRAG_THRESHOLD,
@@ -102,6 +103,16 @@ describe("FR-CBTX-62 drag and drop", () => {
     expect(autoscrollStep(124, 100, 400)).toBe(0);
     expect(autoscrollStep(376, 100, 400)).toBe(0);
     expect(autoscrollStep(390, 100, 400)).toBeGreaterThan(0);
+  });
+
+  test("FR-CBTX-62 drag and drop (K12 fix, cb-reorder): the zone's top is below the list's first child only when it is a sticky header; the rows' frame never pushes it down", () => {
+    expect(autoscrollTop(201, { offsetHeight: 640, position: "relative" })).toBe(201);
+    expect(autoscrollTop(201, { offsetHeight: 24, position: "sticky" })).toBe(225);
+    expect(autoscrollTop(201, null)).toBe(201);
+    // A pointer 98 px below the list's top (cb-reorder's drop above the 12-tie) doesn't scroll.
+    expect(
+      autoscrollStep(299, autoscrollTop(201, { offsetHeight: 640, position: "relative" }), 543),
+    ).toBe(0);
   });
 
   test("FR-CBTX-62 drag and drop: autoscroll is gradual and the same at both edges (walkthrough CB4 / CB8)", () => {

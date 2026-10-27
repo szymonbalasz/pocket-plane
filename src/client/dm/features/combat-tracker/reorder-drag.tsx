@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import {
   autoscrollStep,
+  autoscrollTop,
   type Block,
   blocksOf,
   crossingHint,
@@ -160,11 +161,15 @@ export function useReorder(
         setDrag({ id, slot, y: next ? boundary(next.index) : 0 });
       }
     };
-    // The zone starts below the sticky column header (the list's first child), as at the bottom.
-    const header = list.firstElementChild instanceof HTMLElement ? list.firstElementChild : null;
+    // The zone starts below a sticky column header (none since FR-KIT-23), as at the bottom.
+    const first = list.firstElementChild;
+    const header =
+      first instanceof HTMLElement
+        ? { offsetHeight: first.offsetHeight, position: getComputedStyle(first).position }
+        : null;
     const tick = () => {
       const r = list.getBoundingClientRect();
-      const d = autoscrollStep(y, r.top + (header?.offsetHeight ?? 0), r.bottom);
+      const d = autoscrollStep(y, autoscrollTop(r.top, header), r.bottom);
       if (d !== 0) {
         const was = list.scrollTop;
         list.scrollTop = was + d;
