@@ -1,15 +1,23 @@
 // Small combat UI parts for both clients: portrait / initials, health band badge, turn marker,
 // side chip (FR-CBT-104); the creature lookup (FR-CBT-63) used by the DM's encounter builder and
-// Add dialog.
+// Add dialog. Kit parity (FR-KIT-23, -24): the turn marker is a gem diamond on the row's left
+// edge; an Initiative row's medallion is its portrait, else its initial on its token's
+// creature-type colour.
 import type { CombatantKind, HealthBand, Side } from "@shared/combat-tracker/schemas";
+import { CREATURE_TYPES, type CreatureType } from "@shared/entities/schemas";
+import type { RecordStore } from "@shared/protocol/store";
 import { initials } from "@shared/scenes-map/geometry";
-import { ChevronRightIcon, HandshakeIcon, SwordsIcon } from "lucide-react";
+import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { HandshakeIcon, SwordsIcon } from "lucide-react";
 import { useState } from "react";
+import { Medallion, type MedallionSize } from "../../components/kit/medallion";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
+import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
+import { CREATURE_COLORS } from "../scenes-map/theme";
 import { type LookupRow, lookupMatches, noMatchText } from "./lookup";
 import { otherSide, SIDE_LABEL, sideChip } from "./side";
 
@@ -52,12 +60,46 @@ export function BandBadge({ band, testId }: { band: HealthBand; testId: string }
   );
 }
 
+/**
+ * FR-KIT-23: the current turn's gem diamond on the row's left edge (the row is `relative`); aria
+ * "Current turn". Simple Dark draws it in `primary`; a theme styles `data-slot="init-turn"`.
+ */
 export function TurnMarker({ active }: { active: boolean }) {
+  if (!active) return null;
   return (
-    <span className="flex w-4 shrink-0 justify-center text-primary" aria-hidden={!active}>
-      {active ? <ChevronRightIcon className="size-4" aria-label="Current turn" /> : null}
-    </span>
+    <span
+      role="img"
+      aria-label="Current turn"
+      data-slot="init-turn"
+      className="pointer-events-none absolute top-1/2 left-0 size-2 -translate-x-1/2 -translate-y-1/2 rotate-45 bg-primary"
+    />
   );
+}
+
+const isCreatureType = (t: unknown): t is CreatureType =>
+  (CREATURE_TYPES as readonly unknown[]).includes(t);
+
+/**
+ * FR-KIT-24: the colour behind an Initiative row's initial: its token's creature type
+ * (`creature.*`, meaning colours, FR-THEME-09), else null (the neutral muted colour). Only tokens
+ * the viewer holds, so a player learns nothing new.
+ */
+export function medallionColour(store: RecordStore, c: { tokenId?: string | null }): string | null {
+  const token = c.tokenId ? store.records[TOKEN_TYPE]?.[c.tokenId] : undefined;
+  const type = (token as { creatureType?: unknown } | undefined)?.creatureType;
+  return isCreatureType(type) ? CREATURE_COLORS[type] : null;
+}
+
+/** FR-KIT-24: a combatant's medallion (portrait, else the initial on its token's type colour). */
+export function CombatantMedallion({
+  c,
+  size = "lg",
+}: {
+  c: { name: string; imageAssetId?: string | null; tokenId?: string | null };
+  size?: MedallionSize;
+}) {
+  const colour = useSync((s) => medallionColour(s.store, c));
+  return <Medallion name={c.name} imageAssetId={c.imageAssetId} colour={colour} size={size} />;
 }
 
 export const InitiativeIcon = SwordsIcon;

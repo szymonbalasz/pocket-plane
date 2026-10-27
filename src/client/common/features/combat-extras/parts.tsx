@@ -5,6 +5,8 @@
 // (FR-CBTX-57, -58, BL-43): the name line counts its fixed parts, so the name is never cut; a
 // trigger chip is whole or icon-only. Sprint 7 (FR-CBTX-59–61): a concentration chip is whole or
 // icon-only too, and a click gives the DM and the PC's owner a menu with End concentration.
+// Kit parity (FR-KIT-28): inside an Initiative row's status cell (`StatusCell`) the chips are
+// icons (+ rounds, the label in the Tooltip): the first one, then "+N".
 import { CBTX_INTENTS } from "@shared/combat-extras/intents";
 import { effectName, roundsLeft } from "@shared/combat-extras/rules";
 import type { DeathCounters, EffectView } from "@shared/combat-extras/schemas";
@@ -62,6 +64,22 @@ const GAP = 2;
 
 /** FR-CBTX-57: the chips' room on their row's name line (`NameLine`); null elsewhere. */
 const NameLineRoom = createContext<number | null>(null);
+
+/** FR-KIT-28: chips inside an Initiative row's status cell. */
+const InStatusCell = createContext(false);
+
+/**
+ * FR-KIT-28: an Initiative row's status cell (`init-status`): the `EffectChips` inside draw as
+ * icons (+ rounds; the label in the Tooltip), the first one shown, the rest in "+N"; empty → no
+ * box.
+ */
+export function StatusCell({ children }: { children: ReactNode }) {
+  return (
+    <span data-slot="init-status" className="flex shrink-0 items-center empty:hidden">
+      <InStatusCell.Provider value={true}>{children}</InStatusCell.Provider>
+    </span>
+  );
+}
 
 /** `left`: plain rows' "+N" offset, px. */
 type Fit = { n: number; tier: number; icons: boolean; wrap: boolean; left: number };
@@ -164,6 +182,7 @@ function ChipBadge({
   compact,
   tier = 0,
   natural = false,
+  icon = false,
   style,
   ...trigger
 }: Omit<ComponentProps<"span">, "children"> & {
@@ -173,6 +192,8 @@ function ChipBadge({
   compact: boolean;
   tier?: number;
   natural?: boolean;
+  /** FR-KIT-28: icon + rounds left; the label for screen readers only. */
+  icon?: boolean;
 }) {
   const Icon = EffectIcon(e);
   const t = CHIP_TIERS[tier] ?? CHIP_TIERS[0];
@@ -186,7 +207,8 @@ function ChipBadge({
       data-record-id={testId && e.id}
       data-value={testId && effectValue(e)}
       data-secret={testId && e.secret === true}
-      data-tier={testId && compact ? tier : undefined}
+      data-tier={testId && compact && !icon ? tier : undefined}
+      data-compact={testId && icon ? true : undefined}
       className={cn(
         "shrink-0 gap-0.5 truncate px-1 py-0 text-[11px] font-normal",
         !compact && "max-w-[9rem]",
@@ -196,7 +218,12 @@ function ChipBadge({
       style={compact ? { ...style, maxWidth: natural ? CHIP_MAX_W : t.cap } : style}
     >
       <Icon className="size-3 shrink-0" aria-hidden />
-      {compact ? (
+      {icon ? (
+        <>
+          <span className="sr-only">{label}</span>
+          {rounds !== null && <span className="shrink-0">{rounds}</span>}
+        </>
+      ) : compact ? (
         <>
           <span className="min-w-0 truncate">{label}</span>
           {rounds !== null && (
@@ -224,6 +251,7 @@ export function EffectChip({
   className,
   compact = false,
   tier = 0,
+  icon = false,
 }: {
   e: EffectView;
   round: number | null;
@@ -233,6 +261,8 @@ export function EffectChip({
   compact?: boolean;
   /** BL-08: `CHIP_TIERS` index (compact only). */
   tier?: number;
+  /** FR-KIT-28 (compact only): icon + rounds. */
+  icon?: boolean;
 }) {
   const badge = (
     <ChipBadge
@@ -242,6 +272,7 @@ export function EffectChip({
       className={className}
       compact={compact}
       tier={tier}
+      icon={compact && icon}
     />
   );
   return compact ? <Tooltip content={chipText(e, round)}>{badge}</Tooltip> : badge;
@@ -481,16 +512,7 @@ function ConcMenuChip({ e, round, testId, compact, icon, onEdit }: ConcChipProps
  * folded or cut) and have their own menu (FR-CBTX-60; `onEditConcentration` = the DM's Edit…).
  * `menu(e)` (DM): another effect chip opens a menu with those items.
  */
-export function EffectChips({
-  effects,
-  triggers = [],
-  round,
-  testId,
-  menu,
-  onEditConcentration,
-  className,
-  compact = false,
-}: {
+interface EffectChipsProps {
   effects: readonly EffectView[];
   triggers?: readonly TriggerChip[];
   round: number | null;
@@ -499,7 +521,97 @@ export function EffectChips({
   onEditConcentration?: (e: EffectView) => void;
   className?: string;
   compact?: boolean;
+}
+
+export function EffectChips(p: EffectChipsProps) {
+  const status = useContext(InStatusCell);
+  return status ? <StatusChips {...p} /> : <LineChips {...p} />;
+}
+
+/** An effect chip, or (DM, `menu`) the button that opens its menu (Edit… / End). */
+function MenuChip({
+  e,
+  round,
+  menu,
+  children,
+}: {
+  e: EffectView;
+  round: number | null;
+  menu?: (e: EffectView) => ReactNode;
+  children: ReactNode;
 }) {
+  if (!menu) return children;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="flex rounded-md" aria-label={chipText(e, round)}>
+          {children}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start">{menu(e)}</DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/**
+ * FR-KIT-28: the status cell's chips, icons with rounds (the label in the Tooltip). Concentration
+ * comes first and never folds (FR-CBTX-59), so with one every other effect goes into "+N"; else
+ * the first effect shows and the rest fold. Chip menus (Edit… / End), the concentration menu and
+ * "+N"'s list are today's. Trigger chips never fold (FR-CBTX-54): icons after "+N".
+ */
+function StatusChips({
+  effects,
+  triggers = [],
+  round,
+  testId,
+  menu,
+  onEditConcentration,
+  className,
+}: EffectChipsProps) {
+  const ordered = chipOrder(effects);
+  const conc = ordered.filter((e) => e.kind === "concentration");
+  const fx = ordered.filter((e) => e.kind !== "concentration");
+  if (ordered.length === 0 && triggers.length === 0) return null;
+  const shown = fx.slice(0, conc.length > 0 ? 0 : 1);
+  const folded = fx.slice(shown.length);
+  return (
+    <div
+      data-chip-row
+      data-status
+      className={cn("flex shrink-0 flex-nowrap items-center gap-0.5", className)}
+    >
+      {conc.map((e) => (
+        <span key={`c:${e.id}`} data-chip-conc className="flex shrink-0">
+          <ConcChip e={e} round={round} testId={testId} compact icon onEdit={onEditConcentration} />
+        </span>
+      ))}
+      {shown.map((e) => (
+        <span key={e.id} data-chip className="flex shrink-0">
+          <MenuChip e={e} round={round} menu={menu}>
+            <EffectChip e={e} round={round} testId={testId} compact icon />
+          </MenuChip>
+        </span>
+      ))}
+      {folded.length > 0 && <MoreChip hidden={folded} round={round} testId={testId} menu={menu} />}
+      {triggers.map((t) => (
+        <span key={`t:${t.id}`} data-trigger className="flex shrink-0">
+          <TriggerChipView t={t} icon />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function LineChips({
+  effects,
+  triggers = [],
+  round,
+  testId,
+  menu,
+  onEditConcentration,
+  className,
+  compact = false,
+}: EffectChipsProps) {
   const ordered = chipOrder(effects);
   const conc = ordered.filter((e) => e.kind === "concentration");
   const fx = ordered.filter((e) => e.kind !== "concentration");
@@ -586,18 +698,9 @@ export function EffectChips({
             className={cn("flex shrink-0", hidden && (compact ? "hidden" : "invisible"))}
             aria-hidden={hidden}
           >
-            {menu && !hidden ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className="flex rounded-md" aria-label={chipText(e, round)}>
-                    {chip}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">{menu(e)}</DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              chip
-            )}
+            <MenuChip e={e} round={round} menu={hidden ? undefined : menu}>
+              {chip}
+            </MenuChip>
           </span>
         );
       })}
