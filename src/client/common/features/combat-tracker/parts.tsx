@@ -92,10 +92,10 @@ export function medallionColour(store: RecordStore, c: { tokenId?: string | null
 }
 
 /**
- * A narrow Initiative list (under 20rem, `@container/init`: the DM's 320 min, the player's 280)
+ * A narrow Initiative list (under 22rem, `@container/init`: the DM's 320 min, the player's 280)
  * draws the `lg` medallion at `md`, so the name block keeps its room.
  */
-const NARROW_LG = "@max-[20rem]/init:size-7 @max-[20rem]/init:text-[13px]";
+const NARROW_LG = "@max-[22rem]/init:size-7 @max-[22rem]/init:text-[13px]";
 
 /** FR-KIT-24: a combatant's medallion (portrait, else the initial on its token's type colour). */
 export function CombatantMedallion({
@@ -146,13 +146,30 @@ export function listTrack(rooms: readonly number[]): number {
   return Math.floor(Math.max(HP_TRACK_MIN, Math.min(HP_TRACK_PX, ...r)));
 }
 
+/** K9 re-test 2: a stacked list unstacks only once every one-line room has this much to spare. */
+export const STACK_HYSTERESIS = 8;
+
 /**
- * K9 re-test (R1): whether a list stacks its HP lines: some row's room on its name line is under
+ * K9 re-test (R1): whether a list stacks its HP lines: some row's one-line room is under
  * `HP_TRACK_MIN` (a right column that can't shrink: init + concentration + "+N" + a trigger chip,
- * which never folds, FR-CBTX-54), so a shared bar there would be unreadable or cut.
+ * which never folds, FR-CBTX-54), so a shared bar there would be unreadable or cut. Re-test 2:
+ * the rooms are always the one-line layout's (measured the same way at every width; a row's room
+ * grows steadily with the list's width), and a stacked list stays stacked until every room clears
+ * the floor by `STACK_HYSTERESIS`, so the switch is one width threshold with a little hysteresis.
  */
-export function needsStack(rooms: readonly number[]): boolean {
-  return rooms.some((r) => Number.isFinite(r) && r < HP_TRACK_MIN);
+export function needsStack(rooms: readonly number[], stacked = false): boolean {
+  const floor = HP_TRACK_MIN + (stacked ? STACK_HYSTERESIS : 0);
+  return rooms.some((r) => Number.isFinite(r) && r < floor);
+}
+
+/** An element's content-box width (its `clientWidth` less its side padding), px. */
+export function contentWidth(el: HTMLElement): number {
+  const cs = getComputedStyle(el);
+  return (
+    el.clientWidth -
+    (Number.parseFloat(cs.paddingLeft) || 0) -
+    (Number.parseFloat(cs.paddingRight) || 0)
+  );
 }
 
 /**
@@ -167,7 +184,7 @@ export const HP_STACK = {
   main: "group-data-[hp-stacked]/hp:flex-wrap",
   block: "group-data-[hp-stacked]/hp:contents",
   name: "min-w-0 group-data-[hp-stacked]/hp:flex-1",
-  line: "group-data-[hp-stacked]/hp:order-last group-data-[hp-stacked]/hp:basis-full group-data-[hp-stacked]/hp:pl-10 group-data-[hp-stacked]/hp:@max-[20rem]/init:pl-[34px]",
+  line: "group-data-[hp-stacked]/hp:order-last group-data-[hp-stacked]/hp:basis-full group-data-[hp-stacked]/hp:pl-10 group-data-[hp-stacked]/hp:@max-[22rem]/init:pl-[34px]",
 } as const;
 
 /** The HP line's gap (`gap-x-1.5`). */
@@ -187,8 +204,9 @@ function measureRoom(line: HTMLElement): number | null {
     )
     .map((k) => k.offsetWidth)
     .filter((w) => w > 0);
+  // The content box: a stacked line's indent past the medallion is padding (re-test 2).
   return trackRoom({
-    line: line.clientWidth,
+    line: contentWidth(line),
     barRest: bar.offsetWidth - track.offsetWidth,
     others,
     gap: LINE_GAP,
@@ -215,9 +233,10 @@ export function useListHpTrack(listRef: RefObject<HTMLElement | null>): void {
         .filter((r): r is number => r !== null);
     const measure = () => {
       frame = 0;
+      const was = list.hasAttribute("data-hp-stacked");
       list.removeAttribute("data-hp-stacked");
       let r = rooms();
-      if (needsStack(r)) {
+      if (needsStack(r, was)) {
         list.setAttribute("data-hp-stacked", "");
         r = rooms();
       }

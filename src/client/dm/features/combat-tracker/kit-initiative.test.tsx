@@ -17,11 +17,13 @@ import {
   rowHtml,
 } from "@ui/features/combat-tracker/companions-fixture";
 import {
+  contentWidth,
   HP_STACK,
   HP_TRACK_MIN,
   listTrack,
   medallionColour,
   needsStack,
+  STACK_HYSTERESIS,
   trackRoom,
 } from "@ui/features/combat-tracker/parts";
 import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
@@ -281,7 +283,7 @@ describe("FR-KIT-25 hp line", () => {
     const goblin = rowHtml(html, "cbt-init-row", "goblin");
     expect(goblin).toContain("w-[var(--hp-track,120px)] shrink");
     expect(goblin).toMatch(
-      /data-slot="init-status" class="[^"]*@max-\[20rem\]\/init:\[&amp;_\[data-rounds\]\]:hidden/,
+      /data-slot="init-status" class="[^"]*@max-\[22rem\]\/init:\[&amp;_\[data-rounds\]\]:hidden/,
     );
     // A timed concentration's "4r" sits in a data-rounds span (hidden in a narrow list, kept in
     // its Tooltip).
@@ -317,6 +319,50 @@ describe("FR-KIT-25 hp line", () => {
     expect(needsStack([row(160), row(156), row(160, [13])])).toBe(false);
     expect(needsStack([row(142), row(98), row(122, [13])])).toBe(false);
     expect(needsStack([])).toBe(false);
+  });
+
+  test("FR-KIT-25 stacking (K9 re-test 2) on session-sim-13 at DM 320 / 340 / 360: one width threshold, rooms measured on the one-line rows the same way at every width (one 22rem narrow breakpoint), a little hysteresis", () => {
+    // One-line rooms grow 1:1 with the list (the narrow variants hold from 320 to ≈ 376): the
+    // busiest row (Mira: init + concentration + "+1" + the Searing Strike trigger) has 25 at 320.
+    const sim13 = (window: number) => {
+      const d = window - 320;
+      return [94 + d, 25 + d, 61 + d, 36 + d, 74 + d, 58 + d, 58 + d, 70 + d, 82 + d, 90 + d];
+    };
+    expect(needsStack(sim13(320))).toBe(true);
+    expect(needsStack(sim13(330))).toBe(true);
+    expect(needsStack(sim13(340))).toBe(false);
+    expect(needsStack(sim13(360))).toBe(false);
+    // Monotonic: stacked for every width under the threshold, one line above it.
+    const stackedAt = [320, 324, 328, 332, 336, 340, 344, 352, 360, 380].map((w) =>
+      needsStack(sim13(w)),
+    );
+    expect(stackedAt.indexOf(false)).toBeGreaterThan(0);
+    expect(stackedAt.slice(stackedAt.indexOf(false)).every((x) => !x)).toBe(true);
+    // Hysteresis: a stacked list widening to 338 (room 43) stays stacked; at 340 (45 ≥ 36 + 8 =
+    // 44) it goes back to one line; a one-line list narrowing to 338 stays one line.
+    expect(STACK_HYSTERESIS).toBe(8);
+    expect(needsStack(sim13(338), true)).toBe(true);
+    expect(needsStack(sim13(340), true)).toBe(false);
+    expect(needsStack(sim13(338), false)).toBe(false);
+  });
+
+  test("FR-KIT-25 tail folds (K9 re-test 2, N1): a stacked HP line is measured on its content box (its indent is padding), so the AC · ft tail folds into the row Tooltip when it doesn't fit", () => {
+    // DM 320 stacked: the line's box is 278 px with a 34-px indent → 244 px of content. Bar 120 +
+    // 8 + "35 / 55" 42 = 170, tail "AC 13 · 0 / 40 ft" 95, one gap: 271.
+    const g = globalThis as { getComputedStyle?: unknown };
+    const had = g.getComputedStyle;
+    g.getComputedStyle = () => ({ paddingLeft: "34px", paddingRight: "0px" });
+    try {
+      const line = contentWidth({ clientWidth: 278 } as HTMLElement);
+      expect(line).toBe(244);
+      expect(tailFolds({ line, bar: 170, others: [], tail: 95 })).toBe(true);
+      // The old reading (the padded box) said it fits, and the tail wrapped under the bar.
+      expect(tailFolds({ line: 278, bar: 170, others: [], tail: 95 })).toBe(false);
+      // A nested ally at 360 (indented row, 240 px of content): folds too.
+      expect(tailFolds({ line: 240, bar: 170, others: [], tail: 95 })).toBe(true);
+    } finally {
+      g.getComputedStyle = had;
+    }
   });
 
   test("FR-KIT-25 one track per list (K9 re-test R1): the stacked layout is markup for every theme: the list is group/hp; a row's main line wraps, its name block dissolves, the name keeps its own box, the HP line takes a full-width line under it", () => {

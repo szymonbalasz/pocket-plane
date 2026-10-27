@@ -69,6 +69,7 @@ import {
 import {
   BandBadge,
   CombatantMedallion,
+  contentWidth,
   HP_STACK,
   SideChip,
   TurnMarker,
@@ -176,10 +177,10 @@ import { SummonDialog, useSummonDialog } from "./summon-dialog";
 /**
  * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
  * without initiative); else just the number input, so the name line keeps room for chips. On a
- * narrow list (under 20rem, the 320 min) the Roll button is its icon (label for screen readers),
+ * narrow list (under 22rem, from the 320 min) the Roll button is its icon (label for screen readers),
  * so the kit row's HP line keeps its room (FR-KIT-25).
  */
-const INIT_W = { wide: "w-[100px] @max-[20rem]/init:w-[68px]", narrow: "w-9" } as const;
+const INIT_W = { wide: "w-[100px] @max-[22rem]/init:w-[68px]", narrow: "w-9" } as const;
 
 function InitiativeCell({
   c,
@@ -263,12 +264,12 @@ function InitiativeCell({
           data-record-id={c.id}
           size={unset ? "sm" : "icon"}
           variant={unset ? "outline" : "ghost"}
-          className={unset ? "h-7 gap-1 px-2 text-xs @max-[20rem]/init:px-1.5" : "size-7"}
+          className={unset ? "h-7 gap-1 px-2 text-xs @max-[22rem]/init:px-1.5" : "size-7"}
           aria-label={`Roll initiative for ${c.name}`}
           disabled={disabled}
         >
           <DicesIcon className="size-3.5" />
-          {unset && <span className="@max-[20rem]/init:sr-only">Roll</span>}
+          {unset && <span className="@max-[22rem]/init:sr-only">Roll</span>}
         </RollButton>
       )}
     </div>
@@ -627,6 +628,8 @@ function useTailFold(rowRef: RefObject<HTMLElement | null>, deps: unknown): bool
     const measure = () => {
       const tail = stats.querySelector<HTMLElement>(":scope > [data-tail]");
       if (!tail || stats.clientWidth === 0) return;
+      // The content box: a stacked HP line's indent is padding (K9 re-test 2, N1).
+      const line = contentWidth(stats);
       const bar = stats.querySelector<HTMLElement>(':scope > [data-slot="kit-hpbar"]');
       const others = [...stats.children]
         .filter((k): k is HTMLElement => k !== tail && k !== bar && k instanceof HTMLElement)
@@ -634,7 +637,7 @@ function useTailFold(rowRef: RefObject<HTMLElement | null>, deps: unknown): bool
         .filter((w) => w > 0);
       setFolded(
         tailFolds({
-          line: stats.clientWidth,
+          line,
           bar: bar ? bar.offsetWidth : null,
           others,
           tail: tail.offsetWidth,

@@ -69,15 +69,19 @@ const NameLineRoom = createContext<number | null>(null);
 /** FR-KIT-28: chips inside an Initiative row's status cell. */
 const InStatusCell = createContext(false);
 
-/** K9: the status cell sits in a narrow Initiative list (under 20rem, as `@max-[20rem]/init`). */
+/** K9: the status cell sits in a narrow Initiative list (under 22rem, as `@max-[22rem]/init`). */
 const NarrowList = createContext(false);
 
-/** The `@container/init` breakpoint the narrow list uses, px (20rem). */
-const NARROW_LIST_PX = 320;
+/**
+ * The `@container/init` breakpoint the narrow list uses, px (22rem). K9 re-test 2: one breakpoint
+ * for every narrow variant of the list (chips, medallion, init column), above the band where its
+ * HP lines may stack, so a row's room grows steadily with the width there.
+ */
+const NARROW_LIST_PX = 352;
 
 /**
  * K9 (walkthrough F1): whether the Initiative list around `ref` is narrow (its content box under
- * 20rem: the DM's 320 minimum, the player's 280), re-read when the list resizes.
+ * 22rem: the DM's 320 minimum and up to ≈ 376, the player's 280), re-read when the list resizes.
  */
 function useNarrowList(ref: RefObject<HTMLElement | null>): boolean {
   const [narrow, setNarrow] = useState(false);
@@ -97,7 +101,7 @@ function useNarrowList(ref: RefObject<HTMLElement | null>): boolean {
  * FR-KIT-28: an Initiative row's status cell (`init-status`): the `EffectChips` inside draw as
  * icons (+ rounds; the label in the Tooltip), the first one shown, the rest in "+N". At least
  * 56 px, so the initiative numbers line up down the list (the kit's fixed column); on a narrow
- * list (under 20rem) only as wide as its chips, and an empty one takes no room.
+ * list (under 22rem) only as wide as its chips, and an empty one takes no room.
  */
 export function StatusCell({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLSpanElement>(null);
@@ -109,7 +113,7 @@ export function StatusCell({ children }: { children: ReactNode }) {
       data-narrow={narrow || undefined}
       // K9 (walkthrough F1): in a narrow list (DM 320, player 280) the chips go icon-only (the
       // rounds / uses stay in their Tooltip), so the HP bars keep a readable shared length.
-      className="flex min-w-14 shrink-0 items-center @max-[20rem]/init:min-w-0 @max-[20rem]/init:empty:hidden @max-[20rem]/init:[&_[data-rounds]]:hidden"
+      className="flex min-w-14 shrink-0 items-center @max-[22rem]/init:min-w-0 @max-[22rem]/init:empty:hidden @max-[22rem]/init:[&_[data-rounds]]:hidden"
     >
       <InStatusCell.Provider value={true}>
         <NarrowList.Provider value={narrow}>{children}</NarrowList.Provider>

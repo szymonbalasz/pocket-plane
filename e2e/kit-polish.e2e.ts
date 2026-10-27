@@ -80,6 +80,18 @@ test("FR-KIT-25 FR-KIT-21 FR-KIT-55 FR-KIT-57 FR-KIT-103 fixed HP track, pending
   await expect.poll(async () => Math.round((await init.boundingBox())?.width ?? 0)).toBe(320);
   await oneTrack(init, "DM 320");
   await init.screenshot({ path: testInfo.outputPath("app-initiative-320-k9.png") });
+  // Re-test 2: a sweep 320 → 400: one track and one-line HP lines at each width, and the stacked
+  // layout (if any) only below one threshold (monotonic in width).
+  const list = init.getByTestId("cbt-init-list");
+  const stacked: boolean[] = [];
+  for (const w of [330, 340, 350, 360, 370, 380, 400]) {
+    await resizeTo(dm, init, w, Math.round(box?.height ?? 500));
+    await expect.poll(async () => Math.round((await init.boundingBox())?.width ?? 0)).toBe(w);
+    await oneTrack(init, `DM ${w}`);
+    stacked.push((await list.getAttribute("data-hp-stacked")) !== null);
+  }
+  const firstOneLine = stacked.indexOf(false);
+  expect(firstOneLine >= 0 && stacked.slice(firstOneLine).every((x) => !x)).toBe(true);
 
   // FR-KIT-103 (K6 gap 13): ability labels lower-cased in the small-caps label face, gold.
   const goblin = init.locator('[data-testid="cbt-init-row"]', {
