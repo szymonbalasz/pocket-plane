@@ -128,6 +128,10 @@ describe("FR-PARTY-62 DM companion actions", () => {
     expect(tag(html, "party-companion-new")).toHaveLength(1);
     expect(tag(html, "party-companion-new")[0]).not.toContain(' disabled=""');
     expect(html).toContain("New pet…");
+    // K13 (round-2 §5): the kit's small button, never squeezed (its label whole).
+    expect(tag(html, "party-companion-new")[0]).toContain(
+      "h-6 shrink-0 gap-1.5 px-[9px] text-[13px]",
+    );
     // The header sits above the PC list.
     expect(html.indexOf("party-companion-new")).toBeLessThan(html.indexOf("party-summary"));
     const menus = tag(html, "party-companion-menu");
