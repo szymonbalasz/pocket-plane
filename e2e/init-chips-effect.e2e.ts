@@ -49,16 +49,18 @@ async function shownWhole(chip: Locator) {
 }
 
 /**
- * Brakka's row. K12 re-test (kit parity, amends FR-CBTX-54 in the status cell): the cell shows one
- * piece, the trigger (no concentration), Divine Fury whole as its icon chip; Rage is in "+1".
+ * Brakka's row: Divine Fury whole, never in "+N"; "Rage 10r" whole too unless `rageFolds` (the
+ * player's 240 px min: Rage folds into "+1" after Divine Fury went icon-only).
  */
-async function bothShown(row: Locator) {
+async function bothShown(row: Locator, rageFolds = false) {
   const rage = row.getByTestId("cbtx-init-row-effect").filter({ hasText: "Rage" });
-  await expect(rage).toHaveCount(0);
-  await expect(row.getByRole("button", { name: /^More effects: Rage/ })).toHaveCount(1);
+  if (rageFolds) {
+    await expect(rage).toBeHidden();
+    await expect(row.getByRole("button", { name: /^More effects: Rage/ })).toHaveCount(1);
+  } else await shownWhole(rage);
   const fury = row.getByTestId("cbtx-trigger-chip").filter({ hasText: "Divine Fury" });
   await shownWhole(fury);
-  // "+N" names the folded effect, not the trigger it shows.
+  // "+N" names folded effects only.
   await expect(row.getByRole("button", { name: /^More effects: .*Divine/ })).toHaveCount(0);
   // #182: the name is never cut.
   const name = row.locator("[data-name-base]");
@@ -66,7 +68,7 @@ async function bothShown(row: Locator) {
   return fury;
 }
 
-test("FR-CBTX-54 FR-KIT-28 W6 (K12 re-test) one status piece: Divine Fury shown, 'Rage' in '+1' on Brakka's row at 1440×900 and at 320 wide, DM and player-1", async ({
+test("FR-CBTX-54 W6 trigger chips never fold: 'Rage 10r' + Divine Fury on Brakka's row at 1440×900 and at 320 wide, DM and player-1", async ({
   browser,
 }) => {
   const { secret, link } = e2eEnv();
@@ -81,16 +83,17 @@ test("FR-CBTX-54 FR-KIT-28 W6 (K12 re-test) one status piece: Divine Fury shown,
 
   // The DM's Initiative: 400 → 320 (min); the player's: 280 → 240 (min).
   const compacted: string[] = [];
-  for (const [page, min] of [
-    [dm, 320],
-    [p1, 240],
+  for (const [page, min, rageFolds] of [
+    [dm, 320, false],
+    // FR-KIT-28: the status cell shows the first effect (Rage) as its icon, never folded.
+    [p1, 240, false],
   ] as const) {
     const init = await openWindow(page, "cbt.initiative");
     const brakka = rowOf(init, await idByName(init, "Brakka"));
     const fury = await bothShown(brakka);
     // Narrow: Divine Fury goes icon-only first ("Rage 10r" whole), still shown.
     await toMinWidth(page, init, min);
-    const compact = await bothShown(brakka);
+    const compact = await bothShown(brakka, rageFolds);
     // #182 on every row, hidden ones too (eye-off after the name; W4 walkthrough W6c): no name
     // cut, every trigger chip kept (on the name line or the row's second line).
     await expect
@@ -244,13 +247,10 @@ test("FR-CBTX-55 W8 effect source default: the hidden Wolf's turn → Mira's Eff
   expect(add?.payload.condition).toBe("blinded");
   expect(add?.payload.sourceCombatantId).toBe(mira);
 
-  // B (player-1) gets Blinded on Mira's row: its chip, or (K12 re-test: one status piece) in
-  // the status cell's "+N".
+  // B (player-1) gets Blinded on Mira's row.
   const pinit = await openWindow(p1, "cbt.initiative");
   await expect(
-    rowOf(pinit, mira).locator(
-      '[data-testid="cbtx-init-row-effect"][data-value="blinded"], button[aria-label^="More effects:"][aria-label*="Blinded"]',
-    ),
+    rowOf(pinit, mira).locator('[data-testid="cbtx-init-row-effect"][data-value="blinded"]'),
   ).toHaveCount(1);
 
   for (const page of [p1, dm]) await page.context().close();
