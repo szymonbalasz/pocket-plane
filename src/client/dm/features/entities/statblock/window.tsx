@@ -541,7 +541,11 @@ function StatBlockBody() {
   );
 }
 
-/** FR-KIT-100: DM registry only; closed on reload; launcher "Stat block" after Creatures. */
+/**
+ * FR-KIT-100: DM registry only; closed on reload. No launcher entry (ruling A, 2026-10-27: one
+ * more button overflowed the bar in test mode); the palette's "Stat block" command opens it with
+ * the last creature (`common/features/entities/statblock-palette.ts`).
+ */
 export const statBlockWindow = defineWindow({
   kind: STATBLOCK_KIND,
   title: "Stat block",
@@ -555,6 +559,5 @@ export const statBlockWindow = defineWindow({
   defaultPosition: { anchor: "top-left", dx: 56 },
   defaultOpen: false,
   restoreOpen: false,
-  launcher: { icon: ScrollTextIcon, label: "Stat block", order: 31 },
   component: StatBlockBody,
 });

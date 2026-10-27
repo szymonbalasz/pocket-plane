@@ -13,6 +13,7 @@ import type { RecordStore } from "@shared/protocol/store";
 import type { TokenRecord } from "@shared/scenes-map/schemas";
 import { companionStore, renderWith } from "@ui/features/combat-tracker/companions-fixture";
 import { EntryView } from "@ui/features/compendium/views";
+import { COMMANDS, type CommandCtx } from "@ui/features/play-shell/commands";
 import { doubleClickFor, menuFor } from "../../scenes-map/token-menu";
 import {
   abilitySend,
@@ -134,7 +135,7 @@ const text = (html: string) => html.replace(/<[^>]+>/g, "");
 const count = (html: string, s: string) => html.split(s).length - 1;
 
 describe("FR-KIT-100 statblock registered", () => {
-  test("FR-KIT-100 statblock registered (DM yes, player no): ent.statblock “Stat block”, closed by default and on reload, launcher order 31 after Creatures, 300×440 / useful 300×360 / min 280×240 top-left dx 56", () => {
+  test("FR-KIT-100 statblock registered (DM yes, player no): ent.statblock “Stat block”, closed by default and on reload, no launcher entry (ruling A, 2026-10-27), 300×440 / useful 300×360 / min 280×240 top-left dx 56", () => {
     const def = dmWindows.get(STATBLOCK_KIND);
     expect(def).toMatchObject({
       title: "Stat block",
@@ -147,9 +148,22 @@ describe("FR-KIT-100 statblock registered", () => {
       restoreOpen: false,
     });
     expect(def?.defaultOpen).toBeFalsy();
-    expect(def?.launcher).toMatchObject({ label: "Stat block", order: 31 });
-    expect(dmWindows.get("ent.creatures")?.launcher?.order).toBe(30);
+    expect(def?.launcher).toBeUndefined();
     expect(PLAYER_REGISTRY).not.toMatch(/statblock|statBlock|Stat block/);
+  });
+
+  test("FR-KIT-100 statblock palette command: the DM's “Stat block” opens ent.statblock (the last creature, else the empty state) by user; players never get it", () => {
+    const cmd = COMMANDS.find((c) => c.id === "ent.statblock.open");
+    expect(cmd).toMatchObject({ title: "Stat block", group: "Commands", clients: ["dm"] });
+    const opened: string[] = [];
+    const ctx = {
+      available: new Set([STATBLOCK_KIND]),
+      shell: { openWindow: (k: string) => opened.push(k) },
+    } as unknown as CommandCtx;
+    expect(cmd?.when?.(ctx)).toBe(true);
+    void cmd?.run(ctx);
+    expect(opened).toEqual([STATBLOCK_KIND]);
+    expect(cmd?.when?.({ ...ctx, available: new Set<string>() })).toBe(false);
   });
 });
 
@@ -458,7 +472,8 @@ describe("FR-KIT-107 dm only", () => {
       ...files(join(root, "src/client/common")),
     ];
     const importers = clientFiles.filter((f) =>
-      /from\s+"[^"]*entities\/statblock[^"]*"/.test(readFileSync(f, "utf8")),
+      // The DM module's folder; the palette command (`entities/statblock-palette.ts`) is data.
+      /from\s+"[^"]*entities\/statblock\/[^"]*"/.test(readFileSync(f, "utf8")),
     );
     expect(importers).toEqual([]);
     const wire = [...files(join(root, "src/server")), ...files(join(root, "src/shared"))].filter(

@@ -51,6 +51,8 @@ test("FR-KIT-101 FR-KIT-103 FR-KIT-105 FR-KIT-107 Initiative ⋯ → Stat block 
   // FR-KIT-102 / -103: the one window, titled "Stat block", the Goblin's kit card, bound.
   const sb = shellWindow(dm, "ent.statblock");
   await expect(sb).toHaveAttribute("data-state", "open");
+  // FR-KIT-100 (ruling A): no launcher entry; the palette's "Stat block" opens it.
+  await expect(launcherButton(dm, "ent.statblock")).toHaveCount(0);
   await expect(sb.getByTestId("ent-statblock-name")).toHaveText("Goblin");
   await expect(sb.getByTestId("ent-statblock-combat")).toBeVisible();
   await expect(sb.getByTestId("ent-statblock-type")).toContainText(/Small/);
