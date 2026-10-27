@@ -4019,7 +4019,7 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#63-initiative-dm-and-player) F
 
 ## 173. Sprint 13: compendium table, stat block card, party cards, Creatures, sheet header (K4)
 
-From [kit-parity](../specs/post-mvp/kit-parity.md#68-compendium-and-stat-block) §6.8 – 6.9 FR-KIT-76, -77, -82 – -85 (DM #355, #356; OQ-KIT-05 A). **Built by `build/kit-library`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Data side: [data model §136](../data-model/README.md#136-sprint-13-compendium-party-status-creatures-sheet-header-k4).
+From [kit-parity](../specs/post-mvp/kit-parity.md#68-compendium-and-stat-block) §6.8 – 6.9 FR-KIT-76, -77, -82 – -85 (DM #355, #356; OQ-KIT-05 A). **Built by `build/kit-library`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Data side: [data model §137](../data-model/README.md#137-sprint-13-compendium-party-status-creatures-sheet-header-k4).
 
 | Part | Contract | FR |
 |---|---|---|
