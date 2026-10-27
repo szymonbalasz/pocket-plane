@@ -11,11 +11,14 @@ import { lazyAfterSnapshot } from "@shared/protocol/lazy";
 import { emptyStore } from "@shared/protocol/store";
 import { TooltipProvider } from "@ui/components/ui/overlays";
 import { lookupMatches } from "@ui/features/combat-tracker/lookup";
+import { createWindowRegistry } from "@ui/features/play-shell/registry";
+import { ShellProvider } from "@ui/features/play-shell/ShellContext";
 import { SyncContext, type SyncState } from "@ui/sync/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
+import { sheetCreatureAction } from "../character-sheet/sheet-action";
 import { keptPetFields } from "../combat-tracker/creature-form";
-import { actionsOf, creatureActions } from "./creature-actions";
+import { actionsOf, type CreatureAction, creatureActions } from "./creature-actions";
 import { CreaturesList, NAME_MIN } from "./creatures-window";
 import { creatureRows } from "./list";
 import { petActionLabel, petCreatureAction } from "./pet-action";
@@ -84,7 +87,11 @@ const records = [
   monster("brute", "Goblin Brute"),
 ];
 
-function render(entities: unknown[]) {
+function render(
+  entities: unknown[],
+  actions: readonly CreatureAction[] = [petCreatureAction],
+  shell = false,
+) {
   const store = createStore<SyncState>()(
     () =>
       ({
@@ -105,8 +112,14 @@ function render(entities: unknown[]) {
   return renderToStaticMarkup(
     <SyncContext.Provider value={store}>
       <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-        {/* Only this slice's action: the others need the play-shell. */}
-        <CreaturesList actions={[petCreatureAction]} />
+        {/* The slices' own actions only: Sheet needs the play-shell (`withShell`). */}
+        {shell ? (
+          <ShellProvider registry={createWindowRegistry("dm", [])}>
+            <CreaturesList actions={actions} />
+          </ShellProvider>
+        ) : (
+          <CreaturesList actions={actions} />
+        )}
       </TooltipProvider>
     </SyncContext.Provider>,
   );
@@ -154,6 +167,35 @@ describe("FR-ENT-39 Creatures window", () => {
         expect.arrayContaining(["line-clamp-2", "break-words"]),
       );
       expect(cls).not.toContain("truncate");
+    }
+  });
+
+  test("FR-KIT-84 K10 Creatures row actions: one even row of 24 px icon buttons, Sheet an icon with its Tooltip and name (no text label), the name still wraps whole (FR-ENT-42)", () => {
+    // The shell provider reads the page; faked for this render only.
+    const g = globalThis as { document?: unknown };
+    g.document = { title: "", hidden: false, documentElement: {} };
+    let html = "";
+    try {
+      html = render(records, [sheetCreatureAction, petCreatureAction], true);
+    } finally {
+      delete g.document;
+    }
+    const groups = [...html.matchAll(/<div data-slot="creature-actions" class="([^"]*)">/g)];
+    expect(groups).toHaveLength(records.length);
+    for (const [, cls] of groups)
+      expect((cls ?? "").replaceAll("&amp;", "&").split(" ")).toEqual(
+        expect.arrayContaining([
+          "[&_[data-slot=button]]:size-6",
+          "[&_[data-slot=button]_svg]:size-3.5",
+        ]),
+      );
+    const sheet = [
+      ...html.matchAll(/<button[^>]*data-testid="charx-open-sheet"[^>]*>([\s\S]*?)<\/button>/g),
+    ];
+    expect(sheet).toHaveLength(records.length);
+    for (const [tag, inner] of sheet) {
+      expect(tag).toMatch(/aria-label="Sheet of [^"]+"/);
+      expect(inner).toMatch(/^<svg[\s\S]*<\/svg>$/);
     }
   });
 

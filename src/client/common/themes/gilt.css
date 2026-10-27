@@ -1794,3 +1794,45 @@
     font-family: "Gilt Window Title", var(--font-title);
   }
 }
+/* Select section headings (Roll requests' Skills / Saves / …) as the menu label: label type, gold. */
+:root[data-theme="gilt"] [data-slot="select-label"] {
+  --muted-foreground: var(--gold);
+}
+/* The check box as the kit's `.check input`: a 2-px-round dark well under its gold rule (the gem
+   diamond tick is T2's). */
+:root[data-theme="gilt"] [data-slot="checkbox"] {
+  border-radius: 2px;
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.8);
+}
+/* Preferences: the section headings in label type, gold (the kit's `.lbl`). */
+:root[data-theme="gilt"] [data-testid="ui-prefs-section"] > h3 {
+  --muted-foreground: var(--gold);
+}
+/* The colour picker's field framed like the portrait: a gold rule between two black hairlines; its
+   focus a gold outline (the frame takes the ring's shadow). The preview chips get a thin rule. */
+:root[data-theme="gilt"] [data-testid="camp-color-sv"] {
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 0 2px var(--frame-rule-strong),
+    0 0 0 3px #000;
+}
+:root[data-theme="gilt"] [data-testid="camp-color-sv"]:focus-visible {
+  outline: 1px solid var(--gold);
+  outline-offset: 4px;
+}
+:root[data-theme="gilt"] [data-testid="camp-color-preview"] > * {
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px var(--frame-rule);
+}
+/* Players: the party line's stat labels (Lvl, AC, HP, PP …) in label type, dim gold. */
+:root[data-theme="gilt"] [data-slot="party-line-label"] {
+  --muted-foreground: var(--gs-tab);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="select-label"],
+  :root[data-theme="gilt"] [data-testid="ui-prefs-section"] > h3,
+  :root[data-theme="gilt"] [data-slot="party-line-label"] {
+    font-family: var(--font-label);
+  }
+}
