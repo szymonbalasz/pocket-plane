@@ -357,8 +357,10 @@ describe("FR-CHARX-48 pinned header", () => {
     expect(at("charx-draft")).toBeGreaterThan(at("charx-header-chips"));
     expect(tagOf(html, "charx-draft")).toContain('data-slot="sheet-chip"');
     expect(tagOf(html, "charx-draft")).toContain("rounded-full px-2.5 py-0.5 text-[13px]");
-    expect(tagOf(html, "charx-header-chips")).toContain(
-      "col-span-3 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2",
+    // The chips line's slot (K11 gates: the line is portalled into it in the browser, so a pinned
+    // part switch never remounts the header sections).
+    expect(tagOf(html, "charx-chips-slot")).toContain(
+      "col-span-3 min-w-0 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2",
     );
     expect(html).not.toContain("charx-header-line");
   });

@@ -23,6 +23,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import { medallionInk, medallionOf } from "../../components/kit/medallion";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
@@ -353,11 +354,13 @@ function SheetName({ picker }: { picker: ReactNode }) {
 function NameRow({
   picker,
   full,
+  chipsHost,
   editing,
   setEditing,
 }: {
   picker: ReactNode;
   full: boolean;
+  chipsHost: HTMLDivElement | null;
   editing: boolean;
   setEditing(v: boolean): void;
 }) {
@@ -408,7 +411,10 @@ function NameRow({
         <HeaderActions editing={editing} setEditing={setEditing} />
       </div>
       {full && (
-        <ChipsLine className="col-span-3 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2 @min-[560px]/sheet:row-start-2 @min-[560px]/sheet:-mt-1" />
+        <ChipsSlot
+          host={chipsHost}
+          className="col-span-3 min-w-0 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2 @min-[560px]/sheet:row-start-2 @min-[560px]/sheet:-mt-1"
+        />
       )}
     </div>
   );
@@ -449,6 +455,40 @@ function ChipsLine({ className }: { className?: string }) {
       )}
     </div>
   );
+}
+
+/**
+ * Where the chips line sits: the header (full) or the scrolling header rest (compact). The line
+ * itself is rendered once, through a portal into `host`, and this slot only takes the host node,
+ * so a pinned-part switch never remounts the `header` sections (K11 gates: the gem block's Spend
+ * confirm grew the header, the switch remounted it and the confirm was lost). Without a DOM
+ * (static renders) the line renders in place.
+ */
+function ChipsSlot({ host, className }: { host: HTMLDivElement | null; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const slot = ref.current;
+    if (!host || !slot) return;
+    slot.appendChild(host);
+    return () => {
+      if (host.parentNode === slot) slot.removeChild(host);
+    };
+  }, [host]);
+  return (
+    <div ref={ref} data-testid="charx-chips-slot" className={className}>
+      {host ? null : <ChipsLine />}
+    </div>
+  );
+}
+
+/** A detached node the chips line is portalled into; null without a DOM (static renders). */
+function useChipsHost(): HTMLDivElement | null {
+  const [host] = useState(() =>
+    typeof document !== "undefined" && typeof document.createElement === "function"
+      ? document.createElement("div")
+      : null,
+  );
+  return host;
 }
 
 /** K11: the kit's tab (`.tab`): label type 15 px, roomy, the active marker inside it. */
@@ -653,6 +693,7 @@ export function SheetView({
   const current = tabs.some(([v]) => v === tab) ? tab : "main";
   const { bodyRef, headerRef, restRef, part } = usePinnedHeader(initialPinnedPart);
   const compact = part === "compact";
+  const chipsHost = useChipsHost();
   // K11: one set of DM public overrides for the header's Public rolls menu and Main's rolls.
   const overrides = usePublicOverrides();
   // K11 (DM feedback: "the stat row is missing"): the tabs share one scrolling box, so a tab
@@ -685,6 +726,7 @@ export function SheetView({
             row (with the picker and the actions) + tab strip are pinned; the chips line scrolls
             with the content. Nothing outside the content box may shrink (an overflow-x box would
             collapse to 0 px). */}
+          {chipsHost && createPortal(<ChipsLine />, chipsHost)}
           <Tabs
             value={current}
             onValueChange={openTab}
@@ -701,6 +743,7 @@ export function SheetView({
                 <NameRow
                   picker={picker}
                   full={!compact}
+                  chipsHost={chipsHost}
                   editing={ctx.editing}
                   setEditing={setEditing}
                 />
@@ -742,7 +785,7 @@ export function SheetView({
                   data-testid="charx-header-rest"
                   className="mb-2 flex flex-col gap-1.5"
                 >
-                  <ChipsLine />
+                  <ChipsSlot host={chipsHost} />
                   {hintEl}
                 </div>
               )}
