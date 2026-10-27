@@ -1996,3 +1996,15 @@
 :root[data-theme="gilt"] [data-slot="sheet-tabs"] [data-slot="tabs-trigger"][data-state="active"] {
   color: var(--gs-label-on);
 }
+/* KIT: round 3 combat (kit-parity K12, DM #363, round-2 gaps 1, 2, 6, 8, 10: the Game log's box
+   column, Initiative companion groups, the damage card's hit box, Notifications cards) ──────── */
+/* Initiative: an `after-owner` child sits flush under its owner (markup closes the gap); the two
+   read as one panel, a faint rule between them (the turn wash keeps its own outline). */
+:root[data-theme="gilt"] [data-testid="cbt-init-row"][data-indent="true"]:not([data-turn="true"]) {
+  box-shadow: inset 0 1px 0 rgb(176 138 74 / 0.18);
+}
+/* Damage card: a to-hit every target row hits takes the kit's green box (`.res.crit`, "29"):
+   the meaning green rule over the gold-mid one; the number keeps the meaning utility's green. */
+:root[data-theme="gilt"] [data-slot="card-line"] input[data-slot="kit-result"][data-outcome="hit"] {
+  border-color: var(--hp-full);
+}

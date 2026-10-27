@@ -665,10 +665,12 @@ describe("FR-NOTE-72 an open Notifications window counts like Initiative", () =>
       expect(at).toMatchObject({ left: 592 - 12 - STACK_W, top: 100, covers: 0 });
       expect(hit(rectOf(at, h), notes)).toBe(false);
     }
-    // No room left of it (shift < 80): below it, with the 12 px gap.
+    // No room left of it (shift < 80): K12 (kit round 3) the clear spot nearest home, beside it
+    // (12 px gap, within the half-width slide) over the map, before below it (60 + 480 + 12).
     const wide = { ...notes, x: 300 };
     const at = dmStackSpot(vp, INIT, 57, STACK_W, [], [wide]);
-    expect(at).toMatchObject({ left: 560, top: 60 + 480 + 12 });
+    expect(at).toMatchObject({ left: 300 + 360 + 12, top: 100, covers: 0 });
+    expect(hit(rectOf(at, 57), wide)).toBe(false);
     expect(hit(rectOf(at, 57), wide)).toBe(false);
     // Not marked (any other window): never a shift beside it.
     expect(dmStackLefts(vp, INIT, STACK_W, [{ ...notes, blocks: false }])).toEqual([560]);
@@ -735,24 +737,25 @@ describe("FR-NOTE-75 keep off window bodies' first rows", () => {
     expect(hit(rectOf(at, 173), log720)).toBe(false);
   });
 
-  test("FR-NOTE-75 sim-13 h08 (1440×900, Fog bar, Scenes at 400, 222): below Scenes' rows, off the bar", () => {
+  test("FR-NOTE-75 sim-13 h08 (1440×900, Fog bar, Scenes at 400, 222): K12: beside Scenes over the map (before: below its rows, on its empty body), off the bar", () => {
     const fog = { x: 62, y: 56, w: 470, h: 154 };
     const scenes = { x: 400, y: 222, w: 260, h: 400, used: 376, pushed: false };
     const rows = [{ x: 400, y: 222, bottom: 342 }, logRow];
     const at = dmStackSpot(vp, init, 173, STACK_W, [], [log, scenes], [fog], rows);
-    expect(at).toMatchObject({ left: 560, top: 376 + 8, covers: 0 });
-    expect(hit(rectOf(at, 173), { ...scenes, h: 376 - 222 })).toBe(false);
+    expect(at).toMatchObject({ left: 400 + 260 + 12, top: 100, covers: 0 });
+    expect(hit(rectOf(at, 173), scenes)).toBe(false);
     expect(hit(rectOf(at, 173), fog)).toBe(false);
   });
 
-  test("FR-NOTE-75 sim-13 h09 (1440×900, Notifications open, Scenes at 316, 48): the shift left of Notifications, below Scenes' rows", () => {
+  test("FR-NOTE-75 sim-13 h09 (1440×900, Notifications open, Scenes at 316, 48): the shift left of Notifications; K12: below Scenes, on no window (before: on its empty body below its rows)", () => {
     const scenes = { x: 316, y: 48, w: 260, h: 412, used: 204 };
     const notes = { x: 656, y: 64, w: 360, h: 480, used: 544, blocks: true };
     const rows = [{ x: 316, y: 48, bottom: 168 }, logRow];
     // Two info toasts ("Party loot: …" on two lines, "Goblin Lurker falls").
     const at = dmStackSpot(vp, init, 127, STACK_W, [], [log, scenes, notes], [], rows);
-    expect(at).toMatchObject({ left: 656 - 12 - STACK_W, top: 204 + 8, covers: 0 });
-    expect(hit(rectOf(at, 127), { ...scenes, h: 204 - 48 })).toBe(false);
+    expect(at).toMatchObject({ left: 656 - 12 - STACK_W, top: 48 + 412 + 8, covers: 0 });
+    expect(hit(rectOf(at, 127), scenes)).toBe(false);
+    expect(hit(rectOf(at, 127), log)).toBe(false);
     expect(hit(rectOf(at, 127), notes)).toBe(false);
   });
 
@@ -809,13 +812,14 @@ describe("FR-NOTE-77 a clear spot beside a window beats the first rows", () => {
     { x: 341, y: 334, w: 58, h: 66 },
   ];
 
-  test("FR-NOTE-77 walkthrough H3 1b (1440×900, Fog on, Scenes at 400, 222): K5 (the work area to vh − 12): home, over Scenes' empty body below its rows (pass 1; before: beside Scenes at 672, 100), never over the Town row", () => {
+  test("FR-NOTE-77 walkthrough H3 1b (1440×900, Fog on, Scenes at 400, 222): K12: beside Scenes at 672, 100 again (a spot on no window beats Scenes' empty body; K5 had it home over that body), never over the Town row", () => {
     const fog = { x: 62, y: 56, w: 470, h: 154 };
     const scenes = { x: 400, y: 222, w: 260, h: 410, used: 375, head: 339, pushed: false };
     const town = { x: 413, y: 341, w: 234, h: 34 };
     const rows = [{ x: 400, y: 222, bottom: 339 }];
     const at = dmStackSpot(vp, init, 206, STACK_W, [], [log, scenes], [fog], rows, [], pcs);
-    expect(at).toMatchObject({ left: 560, top: 375 + 8, covers: 0 });
+    expect(at).toMatchObject({ left: 672, top: 100, covers: 0 });
+    expect(hit(rectOf(at, 206), scenes)).toBe(false);
     expect(hit(rectOf(at, 206), town)).toBe(false);
     expect(hit(rectOf(at, 206), fog)).toBe(false);
   });
@@ -1069,14 +1073,51 @@ describe("FR-NOTE-77 the summary alone takes a card stack's spots", () => {
     expect(onLog(at, 92)).toBe(false);
   });
 
-  test("FR-NOTE-77 walkthrough H3 re-test 3, O2 (1440×900, Notifications closed, Scenes 316, 48, summary only) → below Scenes' rows like the card stack, not below the whole window", () => {
+  test("FR-NOTE-77 walkthrough H3 re-test 3, O2 (1440×900, Notifications closed, Scenes 316, 48, summary only) → K12: beside Scenes like the card stack (both on no window), not on its empty body nor far down below it", () => {
     const vp = { w: 1440, h: 900 };
     const scenes = { x: 316, y: 48, w: 260, h: 440, used: 201, head: 167 };
     const log = { ...LOG, used: LOG.y + LOG.h, head: LOG.y + 60 };
     const init = { x: 1028, y: 60, w: 400, h: 512 };
     const summary = dmStackSpot(vp, init, 58, STACK_W, [], [log, scenes], [], []);
     const cards = dmStackSpot(vp, init, 340, STACK_W, [], [log, scenes], [], []);
-    expect(cards).toMatchObject({ left: 560, top: 209 });
-    expect(summary).toMatchObject({ left: 560, top: 209, covers: 0 });
+    expect(cards).toMatchObject({ left: 316 + 260 + 12, top: 100, covers: 0 });
+    expect(summary).toMatchObject({ left: 316 + 260 + 12, top: 100, covers: 0 });
+  });
+});
+
+// K12 (kit round 3, DM #363, round-2 gap 2): the K6b parity run at 1440×900 (bundle
+// `kit-parity`, the "3 pending actions" summary, 58 px; rects as the browser reported them).
+describe("FR-NOTE-77 K12 a spot on no window beats a window's empty body", () => {
+  const vp = { w: 1440, h: 900 };
+  const init = { x: 1028, y: 60, w: 400, h: 536 };
+  const log = { ...LOG, used: LOG.y + LOG.h, head: LOG.y + 60 };
+
+  test("FR-NOTE-77 K12 Roll requests at 656, 60 (360 × 460): the summary below it on the map (before: 560, 251 on its empty body)", () => {
+    const requests = { x: 656, y: 60, w: 360, h: 460, used: 243 };
+    const at = dmStackSpot(vp, init, 58, STACK_W, [], [log, requests], [], []);
+    expect(at).toMatchObject({ left: 560, top: 60 + 460 + 8, covers: 0 });
+    expect(hit(rectOf(at, 58), requests)).toBe(false);
+    expect(hit(rectOf(at, 58), log)).toBe(false);
+  });
+
+  test("FR-NOTE-77 K12 no clear spot (Party Manager at 544, 60, 472 × 536, down to the Game log): the existing pass-1 spot on its empty body, no fold", () => {
+    const party = { x: 544, y: 60, w: 472, h: 536, used: 331 };
+    const at = dmStackSpot(vp, init, 58, STACK_W, [], [log, party], [], []);
+    expect(at).toMatchObject({ left: 560, top: 331 + 8, covers: 0 });
+  });
+
+  test("FR-NOTE-77 K12 both clear: the nearer home of the column's spot and the slide (a short window left of home)", () => {
+    // Scenes 316..576: below it at 560, 496 (396 px from home) vs beside it at 588, 100 (28).
+    const scenes = { x: 316, y: 48, w: 260, h: 440, used: 201, head: 167 };
+    expect(dmStackSpot(vp, init, 58, STACK_W, [], [log, scenes], [], [])).toMatchObject({
+      left: 588,
+      top: 100,
+    });
+    // A window right of home only to y 160: below it in the column (60 px) beats any slide.
+    const low = { x: 700, y: 60, w: 300, h: 100, used: 160 };
+    expect(dmStackSpot(vp, init, 58, STACK_W, [], [log, low], [], [])).toMatchObject({
+      left: 560,
+      top: 168,
+    });
   });
 });
