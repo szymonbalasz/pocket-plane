@@ -6,6 +6,9 @@
 // toast (player-owned action), no token cue, no action. A small lazy chunk preloaded at idle
 // (`PromptViews.tsx` holds the view defs, DICEX §12 initial budget). Sprint 11 (BL-112): an answer
 // staged in the tray puts the tray back as it was before the stage once the prompt is spent.
+// Kit parity K9 (K6 gap 9): the player's card reads as the kit toast: Roll + Decline right of the
+// text (wrapping below only when narrow), so the card's time line sits under the text; Decline
+// is a small stone button.
 import { CREATURE_SHEET_TYPE, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import { DICEX_REQUEST_INTENTS, REQUEST_CATEGORY } from "@shared/dice-extras/request-names";
 import { type CharacterStatBlock, ENTITY_TYPE } from "@shared/entities/schemas";
@@ -85,13 +88,13 @@ function PromptActions({ n, p }: { n: NotificationRecord; p: Payload }) {
   });
   const off = !live || busy;
   return (
-    <span className="flex items-center justify-end gap-1.5">
+    <span className="ml-auto flex shrink-0 items-center justify-end gap-1.5">
       <Button
         type="button"
         data-testid="dicex-prompt-decline"
         data-record-id={n.id}
         size="sm"
-        variant="ghost"
+        variant="outline"
         className="h-7"
         disabled={off}
         onClick={() =>
@@ -133,11 +136,13 @@ export function PlayerPrompt({ notification: n }: { notification: NotificationRe
       data-testid="dicex-prompt"
       data-record-id={n.id}
       data-state={n.state}
-      className="flex flex-col gap-1.5"
+      className="flex flex-wrap items-center gap-x-2 gap-y-1.5"
     >
-      <span>{n.text}</span>
+      <span className="min-w-0 flex-[1_1_5rem]">{n.text}</span>
       {p && mine && <PromptActions n={n} p={p} />}
-      <Outcome n={n} />
+      <span className="basis-full empty:hidden">
+        <Outcome n={n} />
+      </span>
     </span>
   );
 }

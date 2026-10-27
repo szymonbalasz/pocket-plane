@@ -205,6 +205,18 @@ describe("TT2 roll requests (client)", () => {
     expect(html).toContain("DM: Perception · Mira");
   });
 
+  test("FR-KIT-57 inline action (K9, K6 gap 9): the player's Roll + Decline sit right of the text (the card's time line then falls under the text), Decline a small stone button", () => {
+    const html = render(Body(rollRequestPlayerView, prompt()), P1);
+    expect(html).toMatch(/data-testid="dicex-prompt"[^>]*class="flex flex-wrap items-center/);
+    // Text first, then the actions in one right-aligned group, the outcome on its own line.
+    expect(html).toMatch(
+      /<span class="min-w-0 flex-\[1_1_5rem\]">DM: Perception · Mira<\/span><span class="ml-auto flex shrink-0/,
+    );
+    const decline = html.match(/<button[^>]*data-testid="dicex-prompt-decline"[^>]*>/)?.[0] ?? "";
+    expect(decline).toContain('data-variant="outline"');
+    expect(decline).toContain('data-size="sm"');
+  });
+
   test("FR-NOTE-59 prompt view: Roll + Decline only for its owner while pending; resolved rows read the outcome", () => {
     expect(render(Body(rollRequestPlayerView, prompt()), P2)).not.toContain("dicex-prompt-roll");
     const out = (resolution: unknown, state = "resolved") =>
