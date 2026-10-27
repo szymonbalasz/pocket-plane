@@ -41,8 +41,8 @@ test("FR-CMP-18 FR-CMP-19 FR-CMP-20 DM opens Goblin's stat block; player-1 opens
   const entry = win.getByTestId("cmp-entry");
   await expect(entry).toHaveAttribute("data-value", "monster");
   await expect(entry.getByTestId("cmp-statblock-header")).toContainText("Goblin");
-  await expect(entry).toContainText("Armor Class 15");
-  await expect(entry).toContainText("Hit Points 7 (2d6)");
+  await expect(entry).toContainText("AC 15"); // FR-KIT-77 core row
+  await expect(entry).toContainText("HP 7 (2d6)");
   await expect(entry).toContainText("darkvision 60 ft.");
   await expect(entry.getByTestId("cmp-statblock-traits")).toContainText("Nimble Escape");
   await expect(entry.getByTestId("cmp-statblock-actions")).toContainText("Scimitar");

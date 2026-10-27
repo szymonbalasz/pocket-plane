@@ -17,7 +17,6 @@ import {
   type StatBlockSection,
 } from "@shared/compendium/schemas";
 import {
-  ABILITIES,
   DEFINITION_DRAG_MIME,
   type DefinitionDragData,
   type MonsterStatBlock,
@@ -30,17 +29,34 @@ import { Badge } from "../../components/ui/primitives";
 import { AddToSheet } from "./AddToSheet";
 import { AboutDialog } from "./credits";
 import { EntryGallery } from "./gallery";
-import { crText, footerLabel, type Role, scoreText, signed } from "./logic";
+import { crText, footerLabel, type Role, signed } from "./logic";
 import { MarkdownLite, type TextContext } from "./MarkdownLite";
 import { OpenInRules } from "./rules/OpenInRules";
+import {
+  ABILITY_SHORT,
+  StatBlockAbilities,
+  StatBlockCard,
+  StatBlockCore,
+  StatBlockEntry,
+  StatBlockTypeLine,
+  StatLabel,
+} from "./statblock-card";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-const ABILITY_SHORT = { str: "STR", dex: "DEX", con: "CON", int: "INT", wis: "WIS", cha: "CHA" };
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <span className="font-semibold">{label}</span> {children}
+    </div>
+  );
+}
+
+/** A monster fact ("Saving Throws …"): its label is a stat block label (FR-KIT-77). */
+function StatFact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <StatLabel>{label}</StatLabel> {children}
     </div>
   );
 }
@@ -90,16 +106,24 @@ function Sections({
 }) {
   if (sections.length === 0 && !intro) return null;
   return (
-    <section data-testid={testId} className="space-y-1.5">
-      <h3 className="border-b border-primary/40 text-sm font-semibold text-primary">{title}</h3>
+    <section data-testid={testId} className="space-y-1">
+      <h3 className="border-b border-primary/40 text-sm font-semibold text-primary">
+        <StatLabel>{title}</StatLabel>
+      </h3>
       {intro && <MarkdownLite text={intro} context={{ kind: "plain", label: title }} />}
       {sections.map((s, i) => {
         const context: TextContext = { kind: "monster", definitionId, label: s.name };
         return (
-          // biome-ignore lint/suspicious/noArrayIndexKey: sections are positional (names repeat)
-          <div key={i} data-testid="cmp-statblock-section" data-value={s.name}>
-            <MarkdownLite text={`**${s.name}.** ${s.text}`} context={context} />
-          </div>
+          // FR-KIT-77: name + muted line rows (the kit's attack rows, read-only here).
+          <StatBlockEntry
+            // biome-ignore lint/suspicious/noArrayIndexKey: sections are positional (names repeat)
+            key={i}
+            data-testid="cmp-statblock-section"
+            data-value={s.name}
+            name={`${s.name}.`}
+          >
+            <MarkdownLite text={s.text} context={context} />
+          </StatBlockEntry>
         );
       })}
     </section>
@@ -134,60 +158,52 @@ export function StatBlock({
       ? `darkvision ${sb.senses.darkvisionFt} ft.`
       : undefined);
   return (
-    <div className="space-y-2 text-sm">
+    <StatBlockCard>
       <header data-testid="cmp-statblock-header">
-        <h2 className="text-lg font-semibold leading-tight text-primary">{name}</h2>
-        <div className="text-xs italic text-muted-foreground">
+        <h2 data-slot="statblock-name" className="text-lg font-semibold leading-tight text-primary">
+          {name}
+        </h2>
+        <StatBlockTypeLine>
           {kind}
           {meta.alignment ? `, ${meta.alignment}` : ""}
-        </div>
+        </StatBlockTypeLine>
       </header>
-      <Rule />
-      <div data-testid="cmp-statblock-core" className="space-y-0.5">
-        <Fact label="Armor Class">
-          {sb.ac}
-          {meta.armorNote ? ` (${meta.armorNote})` : ""}
-        </Fact>
-        <Fact label="Hit Points">
-          {sb.hpMax}
-          {sb.hpFormula ? ` (${sb.hpFormula})` : ""}
-        </Fact>
-        <Fact label="Speed">
-          {meta.speedText ?? (sb.speed !== undefined ? `${sb.speed} ft.` : "—")}
-        </Fact>
-      </div>
+      <StatBlockCore
+        testId="cmp-statblock-core"
+        ac={sb.ac}
+        acNote={meta.armorNote}
+        hp={
+          <span>
+            <span className="tabular-nums">{sb.hpMax}</span>
+            {sb.hpFormula && <span className="text-muted-foreground"> ({sb.hpFormula})</span>}
+          </span>
+        }
+        speed={meta.speedText ?? (sb.speed !== undefined ? `${sb.speed} ft.` : "—")}
+      />
       {sb.abilities && (
-        <>
-          <Rule />
-          <div data-testid="cmp-statblock-scores" className="grid grid-cols-6 gap-1 text-center">
-            {ABILITIES.map((a) => (
-              <div key={a} data-testid="cmp-statblock-score" data-value={a}>
-                <div className="text-xs font-semibold">{ABILITY_SHORT[a]}</div>
-                <div className="text-xs tabular-nums">
-                  {sb.abilities && scoreText(sb.abilities[a])}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
+        <StatBlockAbilities
+          abilities={sb.abilities}
+          testId="cmp-statblock-scores"
+          cellTestId="cmp-statblock-score"
+        />
       )}
-      <Rule />
       <div data-testid="cmp-statblock-facts" className="space-y-0.5">
-        {saves && <Fact label="Saving Throws">{saves}</Fact>}
-        {meta.skillsText && <Fact label="Skills">{meta.skillsText}</Fact>}
-        {meta.vulnerabilities && <Fact label="Damage Vulnerabilities">{meta.vulnerabilities}</Fact>}
-        {meta.resistances && <Fact label="Damage Resistances">{meta.resistances}</Fact>}
-        {meta.immunities && <Fact label="Damage Immunities">{meta.immunities}</Fact>}
-        {meta.conditionImmunities && (
-          <Fact label="Condition Immunities">{meta.conditionImmunities}</Fact>
+        {saves && <StatFact label="Saving Throws">{saves}</StatFact>}
+        {meta.skillsText && <StatFact label="Skills">{meta.skillsText}</StatFact>}
+        {meta.vulnerabilities && (
+          <StatFact label="Damage Vulnerabilities">{meta.vulnerabilities}</StatFact>
         )}
-        {senses && <Fact label="Senses">{senses}</Fact>}
-        {meta.languages && <Fact label="Languages">{meta.languages}</Fact>}
-        <Fact label="Challenge">{crText(sb.cr)}</Fact>
+        {meta.resistances && <StatFact label="Damage Resistances">{meta.resistances}</StatFact>}
+        {meta.immunities && <StatFact label="Damage Immunities">{meta.immunities}</StatFact>}
+        {meta.conditionImmunities && (
+          <StatFact label="Condition Immunities">{meta.conditionImmunities}</StatFact>
+        )}
+        {senses && <StatFact label="Senses">{senses}</StatFact>}
+        {meta.languages && <StatFact label="Languages">{meta.languages}</StatFact>}
+        <StatFact label="Challenge">{crText(sb.cr)}</StatFact>
       </div>
       {body && (
         <>
-          <Rule />
           <Sections
             title="Traits"
             testId="cmp-statblock-traits"
@@ -223,7 +239,7 @@ export function StatBlock({
           )}
         </>
       )}
-    </div>
+    </StatBlockCard>
   );
 }
 
