@@ -299,6 +299,24 @@ describe("FR-KIT-44 outcome", () => {
     expect(body).not.toContain(">13<");
   });
 
+  test("FR-KIT-44 outcome (K12 re-test): a 3+ result row's '+N' sits on the last box's corner (absolute, inside the box slot), so its slot is two boxes wide like every row", () => {
+    const three = entry({
+      payload: [
+        item(),
+        item({ rollId: "r2", label: "B", natural: 3, total: 12 }),
+        item({ rollId: "r3", label: "C", natural: 4, total: 13 }),
+      ],
+    });
+    const body = row(render([three]), "e1").body;
+    const slot = body.slice(body.indexOf('data-slot="log-results"'));
+    // The slot's own content: box 1, then box 2 wrapped with the "+N" absolutely on its corner.
+    expect(slot).toMatch(
+      /<span class="relative flex shrink-0"><span data-testid="dice-log-entry-total"[^>]*>12<\/span><span class="absolute -top-1.5 -right-1.5"><span data-testid="dice-log-entry-more"/,
+    );
+    // Not a flex item of its own after the boxes.
+    expect(slot).not.toMatch(/>12<\/span><span data-testid="dice-log-entry-more"/);
+  });
+
   test("FR-KIT-44 held: '…' with no outcome, no Tooltip and no number until the landing", () => {
     landing.api.setState({ holding: new Map([["e1", 6000]]) });
     const three = entry({

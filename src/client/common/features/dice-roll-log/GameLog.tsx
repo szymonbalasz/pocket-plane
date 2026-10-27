@@ -259,7 +259,8 @@ function MoreResults({ rest, landed }: { rest: readonly RowResult[]; landed: boo
     <span
       data-testid="dice-log-entry-more"
       tabIndex={landed ? 0 : undefined}
-      className="shrink-0 text-xs text-muted-foreground tabular-nums"
+      data-slot="log-more"
+      className="block shrink-0 rounded-sm border bg-card px-0.5 text-[10px] leading-none text-muted-foreground tabular-nums"
     >
       +{rest.length}
     </span>
@@ -440,23 +441,33 @@ function Entry({
           }
           className="justify-end"
         >
-          {results.slice(0, ROW_RESULTS_MAX).map((r) => (
-            <ResultBox
-              key={r.key}
-              data-testid="dice-log-entry-total"
-              // K8: a combat line's numbers have no roll record.
-              data-record-id={r.rollId ?? undefined}
-              data-landing
-              value={r.total}
-              outcome={r.outcome}
-              held={!landed}
-              tip={details}
-              className={struck}
-            />
-          ))}
-          {results.length > ROW_RESULTS_MAX && (
-            <MoreResults rest={results.slice(ROW_RESULTS_MAX)} landed={landed} />
-          )}
+          {results.slice(0, ROW_RESULTS_MAX).map((r, i) => {
+            const box = (
+              <ResultBox
+                key={r.key}
+                data-testid="dice-log-entry-total"
+                // K8: a combat line's numbers have no roll record.
+                data-record-id={r.rollId ?? undefined}
+                data-landing
+                value={r.total}
+                outcome={r.outcome}
+                held={!landed}
+                tip={details}
+                className={struck}
+              />
+            );
+            // K12 re-test (walkthrough 1): "+N" rides on the last box's corner, inside its slot,
+            // so a 3+ result row keeps the column (was 19 px left).
+            if (i < ROW_RESULTS_MAX - 1 || results.length <= ROW_RESULTS_MAX) return box;
+            return (
+              <span key={r.key} className="relative flex shrink-0">
+                {box}
+                <span className="absolute -top-1.5 -right-1.5">
+                  <MoreResults rest={results.slice(ROW_RESULTS_MAX)} landed={landed} />
+                </span>
+              </span>
+            );
+          })}
         </FixedSlot>
         {/* FR-KIT-44: "physical" (and "undone") after the boxes. An open entry-action confirm
             takes their room (FR-GEM-44: it stays inside the row at the 300-px minimum); the
