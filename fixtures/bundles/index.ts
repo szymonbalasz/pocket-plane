@@ -67,6 +67,7 @@ import holdUiE2e from "./hold-ui-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
+import kitInitiative from "./kit-initiative";
 import lateDamage from "./late-damage";
 import logNoteColours from "./log-note-colours";
 import lootSubtractE2e from "./loot-subtract-e2e";
@@ -314,4 +315,6 @@ export const bundles: readonly Bundle[] = [
   x2SkipE2e,
   // Sprint 12 T2 (build/theme-gilt): Gilt & Stone walkthrough + theme-geometry e2e
   themeGilt,
+  // Sprint 13 K2 (build/kit-initiative): Initiative rows walkthrough + kit-initiative e2e
+  kitInitiative,
 ];
