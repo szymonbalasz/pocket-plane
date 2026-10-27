@@ -1773,3 +1773,24 @@
 :root[data-theme="gilt"] [data-slot="log-row"] [data-slot="kit-result"][data-outcome="damage"] {
   border-color: var(--gs-danger-rule);
 }
+/* KIT: chrome + controls (kit-parity K10, K6 gaps 5, 8, 10, 11, 12 and §5: window titles, the
+   sheet header, Players, Preferences, Creatures) ─────────────────────────────────────────────── */
+/* Window titles at the kit's 17 px (`.win-hd h3`) in the 32 px bar: the title face drawn 17 / 14
+   larger by its own `size-adjust`, so the bar's font size, line height and every rect stay as
+   they are (FR-THEME-05). Same file as the title face: one download, only while gilt is on. */
+@font-face {
+  font-family: "Gilt Window Title";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  size-adjust: 121.43%;
+  src: url("./fonts/im-fell-english-sc-400.latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@layer base {
+  :root[data-theme="gilt"] [data-testid="ui-window-title"] {
+    font-family: "Gilt Window Title", var(--font-title);
+  }
+}
