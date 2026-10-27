@@ -36,17 +36,26 @@ interface Case {
 
 /**
  * PM2 (FR-SHELL-156, FR-PARTY-63; review-b ruling 16): Party Manager on its Party status tab at
- * the useful size; since kit parity K4 (FR-KIT-82, §7.3: "+ 3 cards") 3 PC cards of
- * `cb-party-six`'s party whole, names and figures uncut on every whole card; the labels Party
- * status, Handouts, Inventory, Loot whole.
+ * the useful size; since kit parity K4 (FR-KIT-82) the PCs are ≈ 66-px cards: the first 2 cards of
+ * `cb-party-six`'s party and the 5 companion rows under them whole (7 rows; §7.3 says "3 cards",
+ * which a party with companions can't meet at 400 high), names and figures uncut on every whole
+ * row; the labels Party status, Handouts, Inventory, Loot whole.
  */
 const PARTY_MANAGER: Case = {
   kind: "party.board",
   useful: { w: 440, h: 400 },
-  criterion: "Party status: 3 PC cards whole + 4 tab labels whole",
-  check: 3,
-  rows: '[data-testid="party-summary-row"]',
-  uncut: ["party-summary-name", "party-summary-hp", "party-summary-temp", "party-summary-ac"],
+  criterion: "Party status: 2 PC cards + their 5 companion rows whole + 4 tab labels whole",
+  check: 7,
+  rows: '[data-testid="party-summary-row"], [data-testid="party-companion-row"]',
+  uncut: [
+    "party-summary-name",
+    "party-summary-hp",
+    "party-summary-temp",
+    "party-summary-ac",
+    "party-companion-name",
+    "party-companion-hp",
+    "party-companion-band",
+  ],
   clip: '[data-testid="party-status"] [data-radix-scroll-area-viewport]',
   // PM's four labels (the criterion); RS's Reminders / Strongholds may need the strip to scroll at
   // 440 (FR-PARTY-76: labels never cut, the strip scrolls; checked in \`hold-ui.e2e.ts\`).

@@ -65,7 +65,7 @@ function Ac({ ac }: { ac: number }) {
       data-slot="party-card-ac"
       role="img"
       aria-label={`Armor Class ${ac}`}
-      className="relative grid h-[38px] w-[34px] shrink-0 place-items-center"
+      className="relative grid h-[34px] w-[30px] shrink-0 place-items-center"
     >
       <ShieldIcon
         aria-hidden
@@ -129,7 +129,7 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
         data-can-open={r.canOpen}
         data-slot="party-card"
         className={cn(
-          "grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1 rounded-md border bg-card px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-0.5 rounded-md border bg-card px-3 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring",
           r.canOpen && "cursor-pointer hover:bg-accent/50",
         )}
         onClick={r.canOpen ? () => open(r.id) : undefined}
@@ -150,7 +150,7 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
             <span
               data-testid="party-summary-name"
               data-slot="party-card-name"
-              className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]"
+              className="min-w-0 text-sm font-semibold leading-tight [overflow-wrap:anywhere]"
             >
               {r.name}
             </span>
