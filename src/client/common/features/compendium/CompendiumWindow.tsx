@@ -25,6 +25,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
 } from "../../components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
@@ -162,13 +163,14 @@ function rowProps(r: EntrySummary, viewer: Role) {
 
 /**
  * FR-KIT-76 (OQ-KIT-05 A): the results as a table, Name · Details · Source, from today's fields.
- * Each row is one grid line on the shared columns (a 40-px row, today's height ± 4 px); the rows
- * stay buttons, so drag, click and keyboard are unchanged.
+ * Each row is one grid line on the shared columns, the kit's 30-px row (K13, DM #363: `.tbl td`,
+ * 5 px padding, 14-px body type in every cell); the rows stay buttons, so drag, click and keyboard
+ * are unchanged.
  */
 const COLS = "grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)_4.5rem] items-center gap-x-2";
 const ROW = cn(
   COLS,
-  "min-h-10 w-full px-2 py-1 text-left text-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+  "min-h-[30px] w-full px-2 py-[5px] text-left text-sm leading-[1.3] hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
 );
 /** Zebra rows: every other row of the table body (group members keep their group's stripe). */
 const ZEBRA = "[&>li:nth-child(even)]:bg-muted/40";
@@ -199,8 +201,9 @@ const SourceBadge = ({ label }: { label: string }) => (
 );
 
 /**
- * Name and Details cells: the name in name type (a group's chevron before it); the details line
- * (`r.line`) right after it.
+ * Name and Details cells: the name in body type, its weight only (a group's chevron before it;
+ * a long name truncates, the whole name in its Tooltip); the details line (`r.line`, tabular
+ * figures in body type, K13) right after it.
  */
 function Cells({ r, lead }: { r: EntrySummary; lead?: ReactNode }) {
   return (
@@ -211,9 +214,13 @@ function Cells({ r, lead }: { r: EntrySummary; lead?: ReactNode }) {
         data-slot="cmp-row-name"
       >
         {lead}
-        <span className="truncate">{r.name}</span>
+        <Tooltip content={r.name}>
+          <span className="truncate">{r.name}</span>
+        </Tooltip>
       </span>
-      <span className="truncate text-xs text-muted-foreground tabular-nums">{r.line}</span>
+      <span className="truncate text-muted-foreground [font-variant-numeric:tabular-nums]">
+        {r.line}
+      </span>
     </>
   );
 }
