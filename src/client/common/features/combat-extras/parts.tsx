@@ -70,12 +70,16 @@ const InStatusCell = createContext(false);
 
 /**
  * FR-KIT-28: an Initiative row's status cell (`init-status`): the `EffectChips` inside draw as
- * icons (+ rounds; the label in the Tooltip), the first one shown, the rest in "+N"; empty → no
- * box.
+ * icons (+ rounds; the label in the Tooltip), the first one shown, the rest in "+N". At least
+ * 56 px, so the initiative numbers line up down the list (the kit's fixed column); on a narrow
+ * list (under 20rem) only as wide as its chips, and an empty one takes no room.
  */
 export function StatusCell({ children }: { children: ReactNode }) {
   return (
-    <span data-slot="init-status" className="flex shrink-0 items-center empty:hidden">
+    <span
+      data-slot="init-status"
+      className="flex min-w-14 shrink-0 items-center @max-[20rem]/init:min-w-0 @max-[20rem]/init:empty:hidden"
+    >
       <InStatusCell.Provider value={true}>{children}</InStatusCell.Provider>
     </span>
   );

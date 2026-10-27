@@ -1443,6 +1443,12 @@
 :root[data-theme="gilt"] [data-slot="init-number"][data-testid="cbt-init-row-init"] {
   text-shadow: 0 1px 0 #000;
 }
+:root[data-theme="gilt"]
+  [data-slot="init-number"]
+  [data-testid="cbt-init-row-init"][data-missing="false"]:not(:hover, :focus-visible) {
+  background-color: transparent;
+  box-shadow: none;
+}
 /* Status icons (the kit's `.cond`): bare gold icons, no chip; concentration in the kit's blue;
    a secret effect keeps its dashed rule; "+N" keeps the chip. */
 :root[data-theme="gilt"] [data-slot="init-status"] {
