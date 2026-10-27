@@ -30,5 +30,9 @@ export default defineBundle({
     // view); Player 2's draft "Bram" (the DM's request card) and Mira's pending crossbow card.
     "kit-notices-applied",
     "kit-notices",
+    // K9 (polish: Initiative bars / pending lines, toasts, Notifications window): the DM's open
+    // Perception request (DC hidden), so player-1 loads with the roll-request toast (Roll + Decline)
+    // and the Notifications windows hold a pending prompt beside the history.
+    "dicex-request-open",
   ],
 });
