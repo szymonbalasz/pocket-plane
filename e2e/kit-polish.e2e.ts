@@ -4,12 +4,46 @@
 // the Notifications headings in label type; the stat block's ability labels as small capitals.
 // Player-1: the roll-request toast's Roll + Decline right of its text, Decline a small stone
 // button, the time line under the text.
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+
+/** Each fixed HP track's width in `win`, px (rounded). */
+const trackWidths = (win: Locator) =>
+  win
+    .locator('[data-testid="cbt-init-row-hp"][data-track="fixed"] [data-slot="kit-hpbar-track"]')
+    .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
+
+/** K9 walkthrough F1: one track width for the whole list, never under the readable 36 px. */
+async function oneTrack(win: Locator, label: string) {
+  await expect
+    .poll(
+      async () => {
+        const w = await trackWidths(win);
+        return w.length >= 2 && new Set(w).size === 1 && (w[0] ?? 0) >= 36 && (w[0] ?? 0) <= 120;
+      },
+      { message: `${label}: ${JSON.stringify(await trackWidths(win))}` },
+    )
+    .toBe(true);
+}
+
+/** Resizes a window by its handle (as useful-size.e2e.ts). */
+async function resizeTo(page: Page, win: Locator, w: number, h: number) {
+  const box = await win.boundingBox();
+  const handle = await win.getByTestId("ui-window-resize").boundingBox();
+  if (!box || !handle) throw new Error("window not shown");
+  const x = handle.x + handle.width / 2;
+  const y = handle.y + handle.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 5; i++) {
+    await page.mouse.move(x + ((w - box.width) * i) / 5, y + ((h - box.height) * i) / 5);
+  }
+  await page.mouse.up();
+}
 
 test("FR-KIT-25 FR-KIT-21 FR-KIT-55 FR-KIT-57 FR-KIT-103 fixed HP track, pending lines, Notifications headings, stat-block labels; the player's prompt toast", async ({
   browser,
@@ -21,25 +55,12 @@ test("FR-KIT-25 FR-KIT-21 FR-KIT-55 FR-KIT-57 FR-KIT-103 fixed HP track, pending
   await live(dm);
   const init = await openWindow(dm, "cbt.initiative");
 
-  // FR-KIT-25 (K6 gap 3): the bars sit on one track width (≤ the kit's 120 px; the HP line's
-  // container leaves room for "cur / max" and a temp slot), so rows with and without temp HP line up.
-  const tracks = init.locator(
-    '[data-testid="cbt-init-row-hp"][data-track="fixed"] [data-slot="kit-hpbar-track"]',
-  );
-  await expect.poll(() => tracks.count()).toBeGreaterThanOrEqual(2);
-  const widths = await tracks.evaluateAll((els) =>
-    els.map((e) => Math.round(e.getBoundingClientRect().width)),
-  );
-  const common = Math.max(...widths.map((w) => widths.filter((x) => x === w).length));
-  expect(common).toBeGreaterThanOrEqual(Math.min(widths.length, 4));
-  expect(Math.max(...widths)).toBeLessThanOrEqual(120);
-  expect(Math.min(...widths)).toBeGreaterThanOrEqual(60);
-  const lefts = await tracks.evaluateAll((els) =>
-    els.map((e) => Math.round(e.getBoundingClientRect().left)),
-  );
-  // Top-level rows (not companion lines) start their bars at one x.
-  expect(new Set(lefts).size).toBeLessThanOrEqual(2);
-
+  // FR-KIT-25 (K6 gap 3, walkthrough F1): ONE track width for the list at 400, rows with chips
+  // and temp HP included; at the DM's 320 minimum too (chips icon-only there). A folded tail is
+  // inert (out of the tab order).
+  await oneTrack(init, "DM 400");
+  const folded = init.locator('[data-tail][data-folded="true"]').first();
+  await expect(folded).toHaveAttribute("inert", "");
   // FR-KIT-21 (K6 gap 4): a pending card is one compact line in body type, not a stone button.
   const card = init.getByTestId("cbt-init-card").first();
   await expect(card).toHaveAttribute("data-slot", "init-pending");
@@ -47,6 +68,11 @@ test("FR-KIT-25 FR-KIT-21 FR-KIT-55 FR-KIT-57 FR-KIT-103 fixed HP track, pending
   expect(await card.evaluate((e) => getComputedStyle(e).fontFamily)).toContain("Alegreya Sans");
   expect(await card.evaluate((e) => getComputedStyle(e).textTransform)).toBe("none");
   await init.screenshot({ path: testInfo.outputPath("app-initiative-k9.png") });
+  const box = await init.boundingBox();
+  await resizeTo(dm, init, 320, Math.round(box?.height ?? 500));
+  await expect.poll(async () => Math.round((await init.boundingBox())?.width ?? 0)).toBe(320);
+  await oneTrack(init, "DM 320");
+  await init.screenshot({ path: testInfo.outputPath("app-initiative-320-k9.png") });
 
   // FR-KIT-103 (K6 gap 13): ability labels lower-cased in the small-caps label face, gold.
   const goblin = init.locator('[data-testid="cbt-init-row"]', {
@@ -89,8 +115,17 @@ test("FR-KIT-25 FR-KIT-21 FR-KIT-55 FR-KIT-57 FR-KIT-103 fixed HP track, pending
   const dBox = await decline.boundingBox();
   const time = await toast.getByTestId("note-time").boundingBox();
   if (!text || !dBox || !time) throw new Error("prompt toast not laid out");
-  expect(dBox.x).toBeGreaterThanOrEqual(text.x + text.width - 1);
+  // The text on one line (never cut short by the buttons), the time under it, Decline on the
+  // time's line, right of it.
+  expect(text.height).toBeLessThan(24);
   expect(time.y).toBeGreaterThanOrEqual(text.y + text.height - 1);
   expect(Math.abs(time.x - text.x)).toBeLessThan(2);
+  expect(dBox.x).toBeGreaterThan(time.x + time.width);
+  expect(dBox.y).toBeGreaterThanOrEqual(text.y + text.height - 1);
   await toast.screenshot({ path: testInfo.outputPath("app-prompt-toast-k9.png") });
+
+  // Player-1's Initiative at its 280 default: one track width too.
+  const pInit = await openWindow(p1, "cbt.initiative");
+  await oneTrack(pInit, "player 280");
+  await pInit.screenshot({ path: testInfo.outputPath("app-initiative-player-k9.png") });
 });
