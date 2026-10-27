@@ -3998,7 +3998,7 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#64-game-log-and-roll-popup) §
 
 ## 172. Sprint 13: Initiative rows on the kit grid (K2)
 
-From [kit-parity](../specs/post-mvp/kit-parity.md#63-initiative-dm-and-player) FR-KIT-20 – -31, -72 (DM #355, #356; OQ-KIT-07 A, -08 A). **Built by `build/kit-initiative`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Window sizes unchanged (`cbt.initiative` DM 400×500, player 280×400). Data side: [data model §135](../data-model/README.md#135-sprint-13-initiative-rows-k2).
+From [kit-parity](../specs/post-mvp/kit-parity.md#63-initiative-dm-and-player) FR-KIT-20 – -31, -72 (DM #355, #356; OQ-KIT-07 A, -08 A). **Built by `build/kit-initiative`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Window sizes unchanged (`cbt.initiative` DM 400×500, player 280×400). Data side: [data model §136](../data-model/README.md#136-sprint-13-initiative-rows-k2).
 
 | Part | Contract | FR |
 |---|---|---|
