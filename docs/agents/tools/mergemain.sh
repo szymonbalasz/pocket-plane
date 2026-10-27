@@ -2,7 +2,7 @@
 # usage: mergemain.sh <worktree>  (run after `git -C <worktree> merge main` stops on conflicts)  - finish a `git merge main` in <worktree>: append-only index files keep both sides,
 # protocol / data-model via resolve_docs.py; refuses if any other file is still conflicted. Commits the merge.
 set -uo pipefail
-W=$1; T=/c/Repos/pocket-plane/docs/agents/tools
+W=$1; T=$(cd "$(dirname "$0")" && pwd)
 python - "$W" <<'EOF'
 import sys,re,pathlib,subprocess
 w=pathlib.Path(sys.argv[1])

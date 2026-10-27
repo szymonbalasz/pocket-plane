@@ -3,7 +3,7 @@
 # Inputs copied into the worktree: $SPRINT_VERIFY (default .verify/sprint6) seams.md, rulings-a/b.md (concatenated to rulings.md), gate.md
 set -euo pipefail
 key=$1; base=${3:-main}
-M=/c/Repos/pocket-plane; T=$M/docs/agents/tools; W=/c/Users/<user>/.herdr/worktrees/pocket-plane
+T=$(cd "$(dirname "$0")" && pwd); M=$(cd "$T/../../.." && pwd)
 branch=$(python3 -c "import json,os;print(json.load(open(os.path.join(os.environ['TEMP'],'pocket-plane','slices.json'),encoding='utf-8'))['$key']['branch'])")
 label=${branch#*/}
 if [ "$base" = main ]; then bash $T/mkwt.sh "$branch" "$label" build | tail -1; else
@@ -19,4 +19,4 @@ mkdir -p "$d/.verify"; cp $M/${SPRINT_VERIFY:-.verify/sprint6}/seams.md "$d/.ver
 ws=$(herdr workspace list | jq -r ".result.workspaces[]|select(.label==\"$label\")|.workspace_id" | tr -d '\r' | tail -1)
 r=$(herdr pane list --workspace "$ws" | jq -r '.result.panes[0].pane_id' | tr -d '\r')
 echo "dir=$d ws=$ws"
-bash $T/startagent.sh "$r" "build-$key" "C:/Users/<user>/AppData/Local/Temp/pocket-plane/briefs/build-$key.md" | tail -1
+bash $T/startagent.sh "$r" "build-$key" "$(cygpath -m "$TEMP")/pocket-plane/briefs/build-$key.md" | tail -1
