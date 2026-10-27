@@ -57,10 +57,10 @@ const WIDE = { w: 1440, h: 900 };
 const dm = createWindowRegistry("dm", [
   def("t.log", {
     defaultOpen: true,
-    defaultSize: (vp) => (vp.w >= 1440 ? { w: 1150, h: 240 } : { w: 690, h: 160 }),
+    defaultSize: (vp) => (vp.w >= 1440 ? { w: 1150, h: 280 } : { w: 690, h: 200 }),
     minSize: { w: 300, h: 160 },
     minOpenH: undefined,
-    usefulSize: { w: 460, h: 160 },
+    usefulSize: { w: 460, h: 200 },
     defaultPosition: { anchor: "bottom-left", dx: 56 },
   }),
   def("t.init", {
@@ -173,10 +173,10 @@ describe("one placer (FR-SHELL-95–113)", () => {
       "open:t.small>L1",
     ]);
     // L1 band-capped (BL-104): 440 × 560 doesn't fit above the Game log; its full width at the
-    // band's height (512) does.
+    // band's height (536) does.
     const l1 = plan(base(WIDE), { type: "open", kind: "t.a" }, ctxAt(WIDE));
     expect(l1.log).toEqual(["open:t.a>L1"]);
-    expect(get(l1.windows, "t.a")).toMatchObject({ w: 440, h: 512 });
+    expect(get(l1.windows, "t.a")).toMatchObject({ w: 440, h: 536 });
     // L2: 1000 wide doesn't fit left of Initiative (948 px); down to useful (440 × 400) does.
     const wide = createWindowRegistry("dm", [
       ...dm.defs.filter((d) => d.defaultOpen),
@@ -339,7 +339,7 @@ describe("one placer (FR-SHELL-95–113)", () => {
     expect(rectOf(win("t.a"))).toEqual({ x: 500, y: 70, w: 440, h: 400 });
   });
 
-  test("FR-SHELL-103 resize round trip (BL-60): 1440×900 → 1280×720 → 1440×900 = the start; the Game log 1150×240 again, not stuck at its min", () => {
+  test("FR-SHELL-103 resize round trip (BL-60): 1440×900 → 1280×720 → 1440×900 = the start; the Game log 1150×280 again, not stuck at its min", () => {
     const vp = { current: WIDE };
     const { c, win } = shell(vp);
     c.dispatch({ type: "open", kind: "t.a" }, all);
@@ -352,7 +352,7 @@ describe("one placer (FR-SHELL-95–113)", () => {
     expect(rectOf(win("t.log"))).toEqual(zone(LAPTOP, "t.log"));
     vp.current = WIDE;
     c.dispatch({ type: "viewport" }, all);
-    expect(rectOf(win("t.log"))).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+    expect(rectOf(win("t.log"))).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
     expect(
       JSON.stringify(c.store.getState().windows.map((w) => [w.kind, w.state, rectOf(w)])),
     ).toBe(start);
@@ -400,7 +400,7 @@ describe("one placer (FR-SHELL-95–113)", () => {
         defaultSize: { w: 510, h: 160 },
         minSize: { w: 300, h: 160 },
         minOpenH: undefined,
-        usefulSize: { w: 460, h: 160 },
+        usefulSize: { w: 460, h: 200 },
         defaultPosition: { anchor: "bottom-left", dx: 56 },
       }),
       def("p.sheet", {
@@ -780,7 +780,7 @@ test("FR-SHELL-97 L5 never covers more PC footprint than the window's own rect (
       defaultSize: { w: 510, h: 160 },
       minSize: { w: 300, h: 160 },
       minOpenH: undefined,
-      usefulSize: { w: 460, h: 160 },
+      usefulSize: { w: 460, h: 200 },
       defaultPosition: { anchor: "bottom-left", dx: 56 },
     }),
     def("p.sheet", {

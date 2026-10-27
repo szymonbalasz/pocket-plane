@@ -245,6 +245,70 @@ describe("identity chip", () => {
   });
 });
 
+// Kit-parity §6.2 (K5): the top bar's three zones, the status pill and the launcher in the centre.
+describe("kit-parity top bar", () => {
+  const bar = (client: ShellClient, status?: React.ReactNode) => {
+    const html = render(
+      client,
+      <PlayFrame client={client} topLeft={<span>title</span>} topStatus={status} />,
+    );
+    return /<header[^>]*data-testid="ui-topbar"[\s\S]*?<\/header>/.exec(html)?.[0] ?? "";
+  };
+  const at = (html: string, testId: string) => html.indexOf(`data-testid="${testId}"`);
+
+  test("FR-KIT-10 bar zones: left = the title, centre = the launcher, right = status, items, chip (order kept); same in both clients", () => {
+    for (const client of ["dm", "player"] as const) {
+      const html = bar(client);
+      const order = [
+        "ui-topbar-left",
+        "ui-topbar-centre",
+        "ui-launcher",
+        "ui-topbar-right",
+        "ui-topbar-status",
+        "sync-connection-status",
+        "ui-prefs-open",
+      ].map((id) => at(html, id));
+      expect(order.every((i) => i >= 0)).toBe(true);
+      expect([...order].sort((a, b) => a - b)).toEqual(order);
+      expect(tagOf(html, "ui-topbar")).toContain("height:48px");
+      // The title zone is capped so the launcher keeps room; the right cluster never shrinks.
+      expect(tagOf(html, "ui-topbar-left")).toContain("max-width:30%");
+      expect(tagOf(html, "ui-topbar-right")).toContain("shrink-0");
+      expect(tagOf(html, "ui-topbar-centre")).toContain("flex-1");
+      // The "⋯" menu (Reset layout) always fits: the title shrinks first.
+      expect(tagOf(html, "ui-topbar-centre")).toContain("min-width:66px");
+    }
+  });
+
+  test('FR-KIT-13 status pill: one group (`ui-topbar-status`, slot `topbar-status`): a dot and "Live" (`sync-connection-status`, data-state kept), then the DM\'s presence part', () => {
+    const presence = (
+      <button type="button" data-testid="ui-presence-badge">
+        0/2 online
+      </button>
+    );
+    const html = bar("dm", presence);
+    const pill = /<div[^>]*data-testid="ui-topbar-status"[\s\S]*?<\/div>/.exec(html)?.[0] ?? "";
+    expect(tagOf(html, "ui-topbar-status")).toContain('data-slot="topbar-status"');
+    expect(tagOf(pill, "sync-connection-status")).toContain('data-state="live"');
+    expect(pill.replace(/<[^>]+>/g, "")).toBe("Live0/2 online");
+    expect(at(pill, "sync-connection-status")).toBeLessThan(at(pill, "ui-presence-badge"));
+    // Players: the connection part only.
+    const player = bar("player");
+    expect(player).not.toContain("ui-presence-badge");
+    expect(tagOf(player, "ui-topbar-status")).not.toBe("");
+  });
+
+  test("FR-KIT-14 launcher in the top bar: in the centre zone, not at the bottom; the bar's own frame is gone (no fill, no shadow)", () => {
+    for (const client of ["dm", "player"] as const) {
+      const html = bar(client);
+      const centre = html.slice(at(html, "ui-topbar-centre"), at(html, "ui-topbar-right"));
+      expect(centre).toContain('data-testid="ui-launcher"');
+      const nav = tagOf(html, "ui-launcher");
+      expect(nav).not.toMatch(/\b(absolute|bottom-3|shadow-lg|bg-background\/85)\b/);
+    }
+  });
+});
+
 describe("Preferences window", () => {
   test("FR-SHELL-71 prefs window: shell.prefs, no launcher, restoreOpen false, 360 × 560, minOpenH 400, min 320 × 280, top-right dx 12; a stored-open entry loads closed", () => {
     const def = prefsWindow("player", []);

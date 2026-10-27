@@ -82,12 +82,12 @@ async function expectVisible(page: Page, want: "all" | "pcs", count: number, pcs
   const canvas = page.getByTestId("map-canvas");
   await expect(canvas).toHaveAttribute("data-fit-visible", want);
   const vp = page.viewportSize() ?? { width: 0, height: 0 };
-  const launcher = await page.getByTestId("ui-launcher").boundingBox();
+  // The work area right of the rail: to 12 px above the bottom edge (FR-KIT-14).
   const area = {
     x: RAIL_CLEAR,
     y: TOP_BAR_H,
     w: vp.width - RAIL_CLEAR,
-    h: (launcher?.y ?? vp.height) - TOP_BAR_H,
+    h: vp.height - 12 - TOP_BAR_H,
   };
   const windows = await shownWindows(page);
   const toasts = summaryStrip(vp.width);

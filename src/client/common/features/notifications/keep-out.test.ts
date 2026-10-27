@@ -103,7 +103,7 @@ describe("FR-NOTE-32 toast keep-out", () => {
     ];
     const h = 330;
     const at = dmStackPlacement(vp, init, h, STACK_W, goblins, [logBar]);
-    expect(at.top + h).toBeLessThanOrEqual(720 - 64);
+    expect(at.top + h).toBeLessThanOrEqual(720 - 12);
     expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
     // Taller than any slot: the top row (the runtime collapses toasts into "+N more").
     expect(dmStackPlacement(vp, init, 700, STACK_W, goblins, [logBar]).top).toBe(top);
@@ -142,7 +142,7 @@ describe("FR-NOTE-32 sim-6 glitch 3: toasts keep off open windows' bodies", () =
     for (const w of [notes, log]) expect(over(r, w)).toBe(false);
     for (const t of monsters) expect(over(r, t)).toBe(false);
     expect(at.left + STACK_W + 12).toBeLessThanOrEqual(init.x);
-    expect(at.top + h).toBeLessThanOrEqual(900 - 64);
+    expect(at.top + h).toBeLessThanOrEqual(900 - 12);
   });
 
   test("FR-NOTE-32 toast keep-out: a window under the default spot → below it (FR-NOTE-42: never beside it)", () => {
@@ -198,7 +198,7 @@ const SIZES = [
 ];
 // sim-9 at 1440×900: Initiative and the Game log by default; Compendium and Party from a01.
 const INIT = { x: 1028, y: 60, w: 400, h: 648 };
-const LOG = { x: 68, y: 584, w: 1150, h: 240 };
+const LOG = { x: 68, y: 608, w: 1150, h: 280 };
 const COMPENDIUM = { x: 164, y: 172, w: 344, h: 400 };
 const PARTY = { x: 576, y: 60, w: 440, h: 512 };
 const DRAGON = { x: 70, y: 100, w: 90, h: 90 };
@@ -376,7 +376,7 @@ describe("FR-NOTE-44 never over a pushed window's first row", () => {
   });
 
   test("FR-NOTE-44 no room in the band below the strip → over a body, never over the strip", () => {
-    const tall = 900 - 64 - (60 + 72 + 8) + 1; // taller than the room below the strip
+    const tall = 900 - 12 - (60 + 72 + 8) + 1; // taller than the room below the strip
     const at = dmStackPlacement(vp, INIT, tall, STACK_W, [], [scenes], [FOG_BAR]);
     expect(hit(rectOf(at, tall), strip)).toBe(false);
   });
@@ -384,13 +384,13 @@ describe("FR-NOTE-44 never over a pushed window's first row", () => {
 
 describe("FR-NOTE-44 walkthrough U4 (20261021-fu1-frame): Scenes' first row stays hit-testable", () => {
   // The report's rects at 1440×900: Fog bar 62,56 472×154; Scenes pushed to 546,60 260×360, its
-  // first row "Goblin Ambush · Live" 559,145 198×34; Initiative 1028,60 400×512; Game log 68,584
-  // 1150×240; the stack 320×152 ("2 pending actions" + Brakka's card).
+  // first row "Goblin Ambush · Live" 559,145 198×34; Initiative 1028,60 400×512; Game log 68,608
+  // 1150×280 (K5); the stack 320×152 ("2 pending actions" + Brakka's card).
   const vp = { w: 1440, h: 900 };
   const bar = { x: 62, y: 56, w: 472, h: 154 };
   const scenes = { x: 546, y: 60, w: 260, h: 360 };
   const init = { x: 1028, y: 60, w: 400, h: 512 };
-  const log = { x: 68, y: 584, w: 1150, h: 240 };
+  const log = { x: 68, y: 608, w: 1150, h: 280 };
   const row = { x: 546, y: 60, bottom: 145 + 34 };
   const probe = { x: 658, y: 162 }; // the row's centre (elementFromPoint)
   // The card's target under the lower spots (what made the stack take 140 in the run).
@@ -494,7 +494,7 @@ describe("FR-NOTE-42 windows in the home band (walkthrough WF4)", () => {
   const init = { x: 1028, y: 60, w: 400, h: 500 };
   // DM 1440×900: Stats auto-placed at 555,60 under the home spot; the Game log below.
   const stats = { x: 555, y: 60, w: 400, h: 412 };
-  const log = { x: 68, y: 584, w: 1150, h: 240 };
+  const log = { x: 68, y: 608, w: 1150, h: 280 };
 
   test("FR-NOTE-42 home band: the stack never covers a window under the home spot while a body-clear spot exists (below it); none → home, folded, never beside it (FR-NOTE-70)", () => {
     const at = dmStackSpot(vp, init, 57, STACK_W, [], [stats, log]);
@@ -596,13 +596,13 @@ describe("FR-NOTE-70 stack never leaves its column", () => {
 
 describe("FR-NOTE-71 nearest home, not the least body", () => {
   // WF4 re-test (1440×900): Notifications left of home, Stats in the home band, Initiative right,
-  // the Game log 1150×240 at the bottom (its roll bar is its bottom 48 px).
+  // the Game log 1150×280 at the bottom (its roll bar is its bottom 48 px).
   const vp = { w: 1440, h: 900 };
   const init = { x: 1028, y: 60, w: 400, h: 500 };
   const notes = { x: 68, y: 92, w: 360, h: 478, blocks: true };
   const stats = { x: 555, y: 60, w: 400, h: 412 };
-  const log = { x: 68, y: 584, w: 1150, h: 240 };
-  const rollBar = { x: 68, y: 584 + 240 - 48, w: 1150, h: 48 };
+  const log = { x: 68, y: 608, w: 1150, h: 280 };
+  const rollBar = { x: 68, y: 608 + 280 - 48, w: 1150, h: 48 };
 
   test("FR-NOTE-71 nearest home, not the least body: no body-clear spot → the smallest clear top; the Game log's roll bar is never under the stack", () => {
     for (const h of [150, 190, 375]) {
@@ -640,7 +640,7 @@ describe("FR-NOTE-53 every window's first row (sprint 9 ruling B)", () => {
     // Stats under the home spot, the Game log below: no body-clear spot; the stack goes below
     // Stats' first 40 px of body (its tabs), not right under its title bar.
     const stats = { x: 555, y: 60, w: 400, h: 412 };
-    const log = { x: 68, y: 584, w: 1150, h: 240 };
+    const log = { x: 68, y: 608, w: 1150, h: 280 };
     const tabs = { x: 555, y: 60 + 32, w: 400, h: 40 };
     for (const h of [190, 330]) {
       const at = dmStackSpot(vp, init, h, STACK_W, [], [stats, log]);
@@ -650,7 +650,7 @@ describe("FR-NOTE-53 every window's first row (sprint 9 ruling B)", () => {
     // A stack too tall to clear any window's first 40 px (it must sit by 136): the title bars
     // alone decide, nearest home (FR-NOTE-71 as before).
     const low = { x: 500, y: 100, w: 440, h: 600 };
-    expect(dmStackSpot(vp, init, 700, STACK_W, [], [low])).toMatchObject({ left: 560, top: 136 });
+    expect(dmStackSpot(vp, init, 752, STACK_W, [], [low])).toMatchObject({ left: 560, top: 136 });
   });
 });
 
@@ -692,13 +692,13 @@ describe("FR-NOTE-50 toast policy: dialogs (walkthrough T4)", () => {
 
   test("FR-NOTE-50 toast policy: with a dialog open the stack's room is the larger band above or below it", async () => {
     const { dialogRoom } = await import("./ToastRuntime");
-    const full = 900 - 64 - 100;
+    const full = 900 - 12 - 100;
     expect(dialogRoom(vp, [], full)).toBe(full);
     // FR-NOTE-76: the stack fits left of the dialog (shift 164) → the full column.
     expect(dialogRoom(vp, [dialog], full)).toBe(full);
-    // A wide dialog (shift < 80). Above: 293 − 12 − 100 = 181; below: 900 − 64 − (607 + 12) = 217.
-    expect(dialogRoom(vp, [{ ...dialog, x: 300 }], full)).toBe(217);
-    expect(dialogRoom(vp, [{ x: 300, y: 100, h: 740 }], full)).toBe(0);
+    // A wide dialog (shift < 80). Above: 293 − 12 − 100 = 181; below: 900 − 12 − (607 + 12) = 269.
+    expect(dialogRoom(vp, [{ ...dialog, x: 300 }], full)).toBe(269);
+    expect(dialogRoom(vp, [{ x: 300, y: 100, h: 792 }], full)).toBe(0);
   });
 
   test("FR-NOTE-50 toast policy: only modal dialogs count (the attack popup opens over its toast, FR-CBT-75)", async () => {
@@ -721,12 +721,12 @@ describe("FR-NOTE-75 keep off window bodies' first rows", () => {
   test("FR-NOTE-75 sim-13 h07 (1280×720, Scenes at 400, 112, 5 cards): the stack keeps off Scenes' rows, over its empty body only", () => {
     const small = { w: 1280, h: 720 };
     const init720 = { x: 868, y: 60, w: 400, h: 578 };
-    const log720 = { x: 68, y: 484, w: 688, h: 160, used: 644 };
+    const log720 = { x: 68, y: 508, w: 688, h: 200, used: 708 };
     // New scene row, then "Goblin Ambush" (first row, to 232) and "Town" (to 268).
     const scenes = { x: 400, y: 112, w: 260, h: 410, used: 268 };
     const rows = [
       { x: 400, y: 112, bottom: 232 },
-      { x: 68, y: 484, bottom: 520 },
+      { x: 68, y: 508, bottom: 544 },
     ];
     // One card + "+4 more" + the kill-feed callout, as drawn (h07: 192..365).
     const at = dmStackSpot(small, init720, 173, STACK_W, [], [log720, scenes], [], rows);
@@ -772,7 +772,7 @@ describe("FR-NOTE-76 an open modal dialog counts like Initiative", () => {
     const small = { w: 1280, h: 720 };
     const dialog = { x: 416, y: 94, w: 448, h: 532 };
     const encounters = { x: 68, y: 60, w: 440, h: 410 };
-    const log720 = { x: 68, y: 484, w: 688, h: 160 };
+    const log720 = { x: 68, y: 508, w: 688, h: 200 };
     const init720 = { x: 868, y: 60, w: 400, h: 578 };
     // Windows, Initiative and tool bars under the modal's overlay are inert: only the dialog counts.
     const at = dmStackSpot(small, init720, 57, STACK_W, [], [encounters, log720], [], [], [dialog]);
@@ -809,13 +809,13 @@ describe("FR-NOTE-77 a clear spot beside a window beats the first rows", () => {
     { x: 341, y: 334, w: 58, h: 66 },
   ];
 
-  test("FR-NOTE-77 walkthrough H3 1b (1440×900, Fog on, Scenes at 400, 222): beside Scenes, never over the Town row", () => {
+  test("FR-NOTE-77 walkthrough H3 1b (1440×900, Fog on, Scenes at 400, 222): K5 (the work area to vh − 12): home, over Scenes' empty body below its rows (pass 1; before: beside Scenes at 672, 100), never over the Town row", () => {
     const fog = { x: 62, y: 56, w: 470, h: 154 };
     const scenes = { x: 400, y: 222, w: 260, h: 410, used: 375, head: 339, pushed: false };
     const town = { x: 413, y: 341, w: 234, h: 34 };
     const rows = [{ x: 400, y: 222, bottom: 339 }];
     const at = dmStackSpot(vp, init, 206, STACK_W, [], [log, scenes], [fog], rows, [], pcs);
-    expect(at).toMatchObject({ left: 660 + 12, top: 100, covers: 0 });
+    expect(at).toMatchObject({ left: 560, top: 375 + 8, covers: 0 });
     expect(hit(rectOf(at, 206), town)).toBe(false);
     expect(hit(rectOf(at, 206), fog)).toBe(false);
   });
@@ -840,17 +840,24 @@ describe("FR-NOTE-77 a clear spot beside a window beats the first rows", () => {
 describe("FR-NOTE-77 after a dialog closes: home, or beside the window over it", () => {
   const small = { w: 1280, h: 720 };
   const init = { x: 868, y: 60, w: 400, h: 583 };
-  const log = { x: 68, y: 484, w: 690, h: 160, used: 644, head: 540 };
+  const log = { x: 68, y: 508, w: 690, h: 200, used: 708, head: 564 };
   // The roll bar as drawn: input, Dis / Normal / Adv, hide, Roll, macro, more.
   const logControls = [
-    { x: 81, y: 608, w: 320, h: 28 },
-    { x: 408, y: 608, w: 33, h: 28 },
-    { x: 441, y: 608, w: 56, h: 28 },
-    { x: 497, y: 608, w: 38, h: 28 },
-    { x: 545, y: 610, w: 22, h: 22 },
-    { x: 576, y: 608, w: 48, h: 28 },
-    { x: 632, y: 610, w: 24, h: 24 },
-    { x: 666, y: 610, w: 24, h: 24 },
+    { x: 81, y: 672, w: 320, h: 28 },
+    { x: 408, y: 672, w: 33, h: 28 },
+    { x: 441, y: 672, w: 56, h: 28 },
+    { x: 497, y: 672, w: 38, h: 28 },
+    { x: 545, y: 674, w: 22, h: 22 },
+    { x: 576, y: 672, w: 48, h: 28 },
+    { x: 632, y: 674, w: 24, h: 24 },
+    { x: 666, y: 674, w: 24, h: 24 },
+  ];
+  // K5: the newest entries above the roll bar (the runtime's `logRows`; the 200-px log has room
+  // for a folded stack above its roll bar).
+  const logRows = [
+    { x: 81, y: 598, w: 620, h: 21 },
+    { x: 81, y: 619, w: 620, h: 21 },
+    { x: 81, y: 640, w: 620, h: 21 },
   ];
 
   test("FR-NOTE-77 walkthrough H3 4 (1280×720, Encounters at 68, 60): next to home, off Encounters and never on the Game log", () => {
@@ -858,7 +865,7 @@ describe("FR-NOTE-77 after a dialog closes: home, or beside the window over it",
     const enc = { x: 68, y: 60, w: 440, h: 410, used: 470, head: 248 };
     const rows = [
       { x: 68, y: 60, bottom: 470 },
-      { x: 68, y: 484, bottom: 540 },
+      { x: 68, y: 508, bottom: 564 },
     ];
     for (const h of [57, 186]) {
       const at = dmStackSpot(
@@ -894,7 +901,7 @@ describe("FR-NOTE-77 after a dialog closes: home, or beside the window over it",
       { x: 507, y: 430, w: 66, h: 24 },
     ];
     const enc = { x: 396, y: 60, w: 440, h: 410, used: 470, head: 248, controls };
-    const windows = [{ ...log, controls: logControls }, enc];
+    const windows = [{ ...log, controls: logControls, logRows }, enc];
     // Summary + 1 card (186): on a body, so the runtime folds the cards into "+N more".
     expect(dmStackSpot(small, init, 186, STACK_W, [], windows).covers).toBeGreaterThan(0);
     // Folded (summary + "+2 more", 91): the home row, over the name inputs only.
@@ -913,7 +920,7 @@ describe("FR-NOTE-77 after a dialog closes: home, or beside the window over it",
 describe("FR-NOTE-77 the fold drops only the cards that don't fit", () => {
   const small = { w: 1280, h: 720 };
   const init = { x: 868, y: 60, w: 400, h: 578 };
-  const log = { x: 68, y: 484, w: 690, h: 160, used: 644, head: 540 };
+  const log = { x: 68, y: 508, w: 690, h: 200, used: 708, head: 564 };
 
   /** Runs the runtime's fold to rest; returns the cap and the spot at the last measured height. */
   async function settle(
@@ -969,31 +976,31 @@ describe("FR-NOTE-77 the summary alone takes a card stack's spots", () => {
   const small = { w: 1280, h: 720 };
   const init720 = { x: 868, y: 60, w: 400, h: 583 };
   const rollBar = [
-    { x: 81, y: 608, w: 320, h: 28 },
-    { x: 408, y: 608, w: 33, h: 28 },
-    { x: 441, y: 608, w: 56, h: 28 },
-    { x: 497, y: 608, w: 38, h: 28 },
-    { x: 545, y: 610, w: 22, h: 22 },
-    { x: 576, y: 608, w: 48, h: 28 },
-    { x: 632, y: 610, w: 24, h: 24 },
-    { x: 666, y: 610, w: 24, h: 24 },
+    { x: 81, y: 672, w: 320, h: 28 },
+    { x: 408, y: 672, w: 33, h: 28 },
+    { x: 441, y: 672, w: 56, h: 28 },
+    { x: 497, y: 672, w: 38, h: 28 },
+    { x: 545, y: 674, w: 22, h: 22 },
+    { x: 576, y: 672, w: 48, h: 28 },
+    { x: 632, y: 674, w: 24, h: 24 },
+    { x: 666, y: 674, w: 24, h: 24 },
   ];
   const log720 = {
     x: 68,
-    y: 484,
+    y: 508,
     w: 690,
-    h: 160,
-    used: 644,
-    head: 534,
+    h: 200,
+    used: 708,
+    head: 558,
     controls: rollBar,
     logRows: [
-      { x: 81, y: 534, w: 620, h: 21 },
-      { x: 81, y: 555, w: 620, h: 21 },
-      { x: 81, y: 576, w: 620, h: 21 },
+      { x: 81, y: 598, w: 620, h: 21 },
+      { x: 81, y: 619, w: 620, h: 21 },
+      { x: 81, y: 640, w: 620, h: 21 },
     ],
   };
   const onLog = (p: { left: number; top: number }, h: number) =>
-    hit(rectOf(p, h), { x: 68, y: 484 + 33, w: 690, h: 127 });
+    hit(rectOf(p, h), { x: 68, y: 508 + 33, w: 690, h: 167 });
 
   test("FR-NOTE-77 walkthrough H3 re-test 3, 4 @ 396 (1280×720, Encounters 396, 60 376 wide, reload: summary only) → near home over the fewest Encounters controls, never on the Game log", () => {
     const row = (y: number) => [
@@ -1030,7 +1037,7 @@ describe("FR-NOTE-77 the summary alone takes a card stack's spots", () => {
     }
   });
 
-  test("FR-NOTE-77 walkthrough H3 re-test 3, O3 (1280×720, Roll requests at 496, 60): the summary + '+3 more' at home over the request form, never on the Game log's entries or roll bar", () => {
+  test("FR-NOTE-77 walkthrough H3 re-test 3, O3 (1280×720, Roll requests at 496, 60): K5: the summary + '+3 more' below the request form, over its empty body (before: home over the form), never on the Game log's entries or roll bar", () => {
     const requests = {
       x: 496,
       y: 60,
@@ -1058,7 +1065,7 @@ describe("FR-NOTE-77 the summary alone takes a card stack's spots", () => {
       { x: 414, y: 286, w: 52, h: 54 },
     ];
     const at = dmStackSpot(small, init720, 92, STACK_W, [], [log720, requests], [], [], [], pcs);
-    expect(at).toMatchObject({ left: 480, top: 100 });
+    expect(at).toMatchObject({ left: 480, top: 404 + 8, covers: 0 });
     expect(onLog(at, 92)).toBe(false);
   });
 

@@ -224,7 +224,7 @@ test("FR-CBT-75 FR-CBT-76 FR-NOTE-26 popup opens over its toast, the toast close
   r = await popup.boundingBox();
   const vp = dm.viewportSize() ?? { width: 0, height: 0 };
   expect(Math.round((r?.x ?? 0) + (r?.width ?? 0))).toBe(vp.width);
-  expect(Math.round((r?.y ?? 0) + (r?.height ?? 0))).toBe(vp.height - 64);
+  expect(Math.round((r?.y ?? 0) + (r?.height ?? 0))).toBe(vp.height - 12);
   // Later keeps the card; its toast doesn't come back (FR-NOTE-26).
   await popup.getByTestId("cbt-popup-later").click();
   await expect(popup).toHaveCount(0);
@@ -251,9 +251,9 @@ test("FR-CBT-77 a short window: Initiative grows to the work area, '↓ N more' 
   const n = Number(await more.getAttribute("data-value"));
   expect(n).toBeGreaterThan(0);
   await expect(more).toHaveText(`${n} more`);
-  // Grown to the work area's bottom, 12 px above the launcher strip (FR-SHELL-52).
+  // Grown to the work area's bottom, 12 px above the bottom edge (FR-SHELL-52, FR-KIT-14).
   const box = await init.boundingBox();
-  expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBeGreaterThan(480 - 76 - 4);
+  expect(Math.round((box?.y ?? 0) + (box?.height ?? 0))).toBeGreaterThan(480 - 12 - 4);
   // The count is what is really below the fold (rows not wholly above the footer).
   const below = (win: Locator) =>
     win.evaluate((w) => {
@@ -374,8 +374,8 @@ test("FR-NOTE-14 FR-NOTE-32 P3 E3: at 1280×720 a 4-card toast stack (3 + '+1 mo
   }
   await expect(dm.getByTestId("note-toast-more")).toBeVisible();
   await expect.poll(() => cards.count()).toBeGreaterThanOrEqual(1);
-  // Every toast, its Apply and "+N more" lie inside the viewport, above the launcher bar.
-  const bottom = 720 - 64;
+  // Every toast, its Apply and "+N more" lie inside the viewport, inside the work area.
+  const bottom = 720 - 12;
   const boxes = async () =>
     dm.locator('[data-testid="note-toasts"]').evaluate((el) => {
       const r = el.getBoundingClientRect();
@@ -525,11 +525,11 @@ for (const [width, height] of [
     const p1 = await popup.boundingBox();
     if (!p1) throw new Error("no popup box");
     const size = { w: p1.width, h: p1.height };
-    // FR-CBT-75: the toast's top-left, clamped into the work area (below the top bar, above the
-    // launcher).
+    // FR-CBT-75: the toast's top-left, clamped into the work area (below the top bar, 12 px above
+    // the bottom edge).
     const origin = (b: Box) => ({
       x: Math.max(0, Math.min(b.x, width - size.w)),
-      y: Math.max(48, Math.min(b.y, height - 64 - size.h)),
+      y: Math.max(48, Math.min(b.y, height - 12 - size.h)),
       ...size,
     });
     const atOrigin = origin(first.box);

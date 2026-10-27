@@ -50,12 +50,12 @@ function pairwiseDisjoint(boxes: Box[]): string[] {
   return out;
 }
 
-/** FR-SHELL-57: a PC footprint's margin; placement's edge gap and the launcher's clearance. */
+/** FR-SHELL-57: a PC footprint's margin; placement's edge gap and the bottom clearance (K5: 12). */
 const PC_MARGIN = 4;
 const EDGE_GAP = 12;
 const RAIL_CLEAR = 68;
 const TOP_BAR_H = 48;
-const LAUNCHER_CLEAR = 64;
+const LAUNCHER_CLEAR = 12;
 
 /**
  * A spot (8-px grid over the usable area right of the rail) for `win`'s size that is clear of
@@ -76,7 +76,7 @@ function pcFreeSpot(
   });
   const others = windows.filter((o) => o.kind !== win.kind).map(grow);
   const right = vp.width - EDGE_GAP - win.w;
-  const bottom = vp.height - EDGE_GAP - LAUNCHER_CLEAR - win.h;
+  const bottom = vp.height - LAUNCHER_CLEAR - win.h;
   for (let y = TOP_BAR_H + EDGE_GAP; y <= bottom; y += 8) {
     for (let x = RAIL_CLEAR; x <= right; x += 8) {
       const r = { kind: win.kind, x, y, w: win.w, h: win.h };
@@ -131,9 +131,9 @@ test("FR-SHELL-45 FR-SHELL-47 DM at 1440×900: Compendium, Party, Encounters fro
   const log = await shellWindow(dm, "dice.log").boundingBox();
   expect(log && { x: log.x, y: log.y, w: log.width, h: log.height }).toEqual({
     x: 68,
-    y: 584,
+    y: 608,
     w: 1150,
-    h: 240,
+    h: 280,
   });
 
   for (const kind of ["cmp.compendium", "party.board", "cbt.encounters"]) {
@@ -236,16 +236,16 @@ test("FR-SHELL-50 player-1 at 1280×800: Reset layout, then the DM ends the Ambu
     x: 948,
     y: 60,
     w: 320,
-    h: 418,
+    h: 440,
   });
   const logBox = await shellWindow(p1, "dice.log").boundingBox();
   expect(logBox && { x: logBox.x, y: logBox.y, w: logBox.width, h: logBox.height }).toEqual({
     x: 68,
-    y: 564,
+    y: 588,
     w: 510,
-    h: 160,
+    h: 200,
   });
-  await expect(p1.getByTestId("ui-toast-corner")).toHaveAttribute("data-rect", "908,490,356,238");
+  await expect(p1.getByTestId("ui-toast-corner")).toHaveAttribute("data-rect", "908,542,356,238");
 
   const dm = await rolePage(browser);
   await dm.setViewportSize({ width: 1440, height: 900 });
@@ -271,7 +271,7 @@ test("FR-SHELL-50 player-1 at 1280×800: Reset layout, then the DM ends the Ambu
   }
   const i = boxes.find((b) => b.kind === "cbt.initiative:main") as Box;
   expect(i.x).toBe(68);
-  expect(i.y + i.h).toBeLessThanOrEqual(564 - 12 + 0.5);
+  expect(i.y + i.h).toBeLessThanOrEqual(588 - 12 + 0.5);
 
   // Leave the shared server as found: end Crypt.
   const dmInit = shellWindow(dm, "cbt.initiative");

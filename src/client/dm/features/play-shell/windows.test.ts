@@ -117,7 +117,7 @@ test("FR-SHELL-14 DM default layout, map-first (#162): Initiative top-right, log
     expect(init.y).toBe(TOP_BAR_H + 12);
     expect(init.w).toBeGreaterThanOrEqual(400); // glitch 3: AC / HP labels fit
     expect(log.x).toBe(12 + 56); // left edge, clear of the tool rail
-    expect(log.y + log.h).toBe(viewport.h - 12 - 64);
+    expect(log.y + log.h).toBe(viewport.h - 12); // FR-KIT-14: the work area's bottom
   }
 });
 
@@ -161,30 +161,33 @@ test("FR-SHELL-45 FR-SHELL-46 FR-SHELL-47 sim-8 sequence (DM, Initiative + Game 
   const seq = ["cmp.compendium", "party.board", "cbt.encounters"];
   const wide = launcherSequence(dmWindows, WIDE, seq);
   const [cmp, party, enc] = wide.steps;
-  expect(cmp?.rect).toEqual({ x: 68, y: 60, w: 440, h: 512 }); // minOpenH 400 ≤ the 512 band
-  expect(party?.rect).toEqual({ x: 520, y: 60, w: 440, h: 512 }); // inward, beside Compendium
+  expect(cmp?.rect).toEqual({ x: 68, y: 60, w: 440, h: 536 }); // minOpenH 400 ≤ the 536 band
+  expect(party?.rect).toEqual({ x: 520, y: 60, w: 440, h: 536 }); // inward, beside Compendium
   expect(party?.rect).not.toEqual(cmp?.rect);
-  expect(enc?.parked).toEqual(["cmp.compendium"]);
-  expect(enc?.rect).toEqual({ x: 68, y: 60, w: 440, h: 512 });
+  // K5 (FR-KIT-14): the work area to vh − 12 holds a third: Initiative and the Game log squeezed
+  // to their useful sizes (FR-SHELL-101), Encounters at its useful height bottom-right.
+  expect(enc?.parked).toEqual([]);
+  expect(enc?.rect).toEqual({ x: 988, y: 452, w: 440, h: 436 });
   const laptop = launcherSequence(dmWindows, LAPTOP, seq);
-  expect(laptop.steps[0]?.rect).toEqual({ x: 68, y: 60, w: 440, h: 412 });
+  expect(laptop.steps[0]?.rect).toEqual({ x: 68, y: 60, w: 440, h: 436 });
   expect(laptop.steps[1]?.parked).toEqual(["cmp.compendium"]);
   expect(laptop.steps[2]?.parked).toEqual(["party.board"]);
   // Party Manager opens 600 wide (FR-SHELL-156, BL-106) where it is alone at the left edge.
   const widths = [440, 600, 440];
   laptop.steps.forEach((s, i) => {
-    expect(s.rect).toEqual({ x: 68, y: 60, w: widths[i] as number, h: 412 });
+    expect(s.rect).toEqual({ x: 68, y: 60, w: widths[i] as number, h: 436 });
   });
 });
 
 test("FR-SHELL-47 FR-SHELL-56 screen full (DM): the auto-minimised window is written minimised; a user restore onto its taken spot re-places it, parking the least recently used other window", () => {
-  const seq = ["cmp.compendium", "party.board", "cbt.encounters"];
+  // K5: three fit since the launcher left the bottom; Creatures and Scenes fill the screen.
+  const seq = ["cmp.compendium", "party.board", "cbt.encounters", "ent.creatures", "map.scenes"];
   const { windows } = launcherSequence(dmWindows, WIDE, seq);
   const cmp = windows.find((w) => w.kind === "cmp.compendium");
   expect(cmp?.state).toBe("minimised");
   const ctx = { registry: dmWindows, viewport: WIDE, available: allKinds() };
   const back = reduce(windows, { type: "open", kind: "cmp.compendium" }, ctx);
-  // Its stored spot (68, 60) is Encounters' now: re-placed; Party (lowest z) parked for it.
+  // Its stored spot (68, 60) is Scenes' now: re-placed; Party (lowest z) parked for it.
   expect(back.find((w) => w.kind === "cmp.compendium")?.state).toBe("open");
   expect(back.find((w) => w.kind === "cbt.encounters")?.state).toBe("open");
   expect(back.find((w) => w.kind === "party.board")?.state).toBe("minimised");
@@ -225,20 +228,20 @@ test("FR-SHELL-50 default layouts (DM, token-free): exactly §7's table at 1280�
     [
       LAPTOP,
       { x: 868, y: 60, w: 400, h: 500 },
-      { x: 68, y: 484, w: 690, h: 160 },
+      { x: 68, y: 508, w: 690, h: 200 },
       { x: 462, y: 100 },
     ],
-    [MID, { x: 868, y: 60, w: 400, h: 500 }, { x: 68, y: 564, w: 690, h: 160 }, { x: 462, y: 100 }],
+    [MID, { x: 868, y: 60, w: 400, h: 500 }, { x: 68, y: 588, w: 690, h: 200 }, { x: 462, y: 100 }],
     [
       WIDE,
       { x: 1028, y: 60, w: 400, h: 500 },
-      { x: 68, y: 584, w: 1150, h: 240 },
+      { x: 68, y: 608, w: 1150, h: 280 },
       { x: 542, y: 100 },
     ],
     [
       DESKTOP,
       { x: 1188, y: 60, w: 400, h: 500 },
-      { x: 68, y: 584, w: 1150, h: 240 },
+      { x: 68, y: 608, w: 1150, h: 280 },
       { x: 622, y: 100 },
     ],
   ] as const;
@@ -258,28 +261,32 @@ test("FR-SHELL-51 fitted default (DM): Initiative 400×500 at every reference si
   }
 });
 
-test("FR-DICE-38 Game log width (DM): 690×160 / 690×160 / 1150×240 / 1150×240; min 300×160; previous default 460×240", () => {
+test("FR-DICE-38 FR-KIT-92 Game log size (DM): 690×200 / 690×200 / 1150×280 / 1150×280 (OQ-KIT-02 B: +40); min 300×160; previous defaults 460×240 and the pre-kit 1150×240 / 690×160", () => {
   const log = dmWindows.get("dice.log");
   if (!log) throw new Error("no dice.log");
   const sizes = REFERENCE_VIEWPORTS.map((vp) => defaultSizeAt(log, vp));
   expect(sizes).toEqual([
-    { w: 690, h: 160 },
-    { w: 690, h: 160 },
-    { w: 1150, h: 240 },
-    { w: 1150, h: 240 },
+    { w: 690, h: 200 },
+    { w: 690, h: 200 },
+    { w: 1150, h: 280 },
+    { w: 1150, h: 280 },
   ]);
   expect(log.minSize).toEqual({ w: 300, h: 160 });
-  expect(log.previousDefaults).toEqual([{ w: 460, h: 240 }]);
-  expect(defaultSizeAt(log, { w: 1440, h: 800 })).toEqual({ w: 1150, h: 160 });
+  expect(log.previousDefaults).toEqual([
+    { w: 460, h: 240 },
+    { w: 1150, h: 240 },
+    { w: 690, h: 160 },
+  ]);
+  expect(defaultSizeAt(log, { w: 1440, h: 800 })).toEqual({ w: 1150, h: 200 });
 });
 
-test("FR-SHELL-52 growth cap (DM): Initiative with 900 px of content renders down to 644 / 724 / 572 / 572", () => {
+test("FR-SHELL-52 growth cap (DM): Initiative with 900 px of content renders down to 708 / 788 / 596 / 596", () => {
   const all = allKinds();
   for (const [viewport, bottom] of [
-    [LAPTOP, 644],
-    [MID, 724],
-    [WIDE, 572],
-    [DESKTOP, 572],
+    [LAPTOP, 708],
+    [MID, 788],
+    [WIDE, 596],
+    [DESKTOP, 596],
   ] as const) {
     const layout = defaultLayout(dmWindows, viewport);
     const measured = new Map([["cbt.initiative:main", 900]]);
@@ -288,7 +295,7 @@ test("FR-SHELL-52 growth cap (DM): Initiative with 900 px of content renders dow
     const r = renderedWindowRects(init, dmWindows, all, viewport, measured)[0];
     expect(rects.some((x) => x.y + x.h === bottom)).toBe(true);
     // Alone (no Game log below) it grows to the work area.
-    expect(r && r.y + r.h).toBe(viewport.h - 76);
+    expect(r && r.y + r.h).toBe(viewport.h - 12);
   }
 });
 
@@ -326,19 +333,27 @@ test("FR-SHELL-53 FR-SHELL-100 previous defaults (DM): a stored 460×240 log →
   );
   expect(sprint4.migrated).toBe(true);
   const log = sprint4.windows.find((w) => w.kind === "dice.log");
-  expect(log).toMatchObject({ x: 68, y: 584, w: 1150, h: 240, area: workArea(WIDE) });
+  expect(log).toMatchObject({ x: 68, y: 608, w: 1150, h: 280, area: workArea(WIDE) });
   // Second apply: the stored entry is now the default, nothing to do.
   const again = restoreLayout(dmWindows, JSON.stringify({ windows: sprint4.windows }), WIDE);
   expect(again.migrated).toBeUndefined();
-  // Saved at 1280×720 (690×160 at 68,484), opened at 1440×900: over Initiative there → placed.
+  // Saved at 1280×720 (690×200 at 68,508), opened at 1440×900: over Initiative there → placed.
   const small = restoreLayout(
     dmWindows,
-    entry({ x: 68, y: 484, w: 690, h: 160 }, workArea(LAPTOP)),
+    entry({ x: 68, y: 508, w: 690, h: 200 }, workArea(LAPTOP)),
     WIDE,
   );
-  expect(rectIn(small.windows, "dice.log")).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  expect(rectIn(small.windows, "dice.log")).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
   const back = restoreLayout(dmWindows, JSON.stringify({ windows: small.windows }), LAPTOP);
-  expect(rectIn(back.windows, "dice.log")).toEqual({ x: 68, y: 484, w: 690, h: 160 });
+  expect(rectIn(back.windows, "dice.log")).toEqual({ x: 68, y: 508, w: 690, h: 200 });
+  // K5: a pre-kit layout (690×160 at 68,484 above the old launcher strip) takes the new default.
+  const preKit = restoreLayout(
+    dmWindows,
+    entry({ x: 68, y: 484, w: 690, h: 160 }, { w: 1280, h: 720 - 48 - 64 }),
+    LAPTOP,
+  );
+  expect(preKit.migrated).toBe(true);
+  expect(rectIn(preKit.windows, "dice.log")).toEqual({ x: 68, y: 508, w: 690, h: 200 });
   // Resized by the user (470×240, a user spot: `userSize` inferred, FR-SHELL-100): kept.
   const kept = restoreLayout(
     dmWindows,
@@ -354,13 +369,14 @@ test("FR-SHELL-53 FR-SHELL-100 previous defaults (DM): a stored 460×240 log →
     entry({ x: 68, y: 584, w: 470, h: 240 }, workArea(WIDE)),
     WIDE,
   );
-  expect(rectIn(shell.windows, "dice.log")).toEqual({ x: 68, y: 584, w: 1150, h: 240 });
+  expect(rectIn(shell.windows, "dice.log")).toEqual({ x: 68, y: 608, w: 1150, h: 280 });
 });
 
-test("FR-SHELL-54 DM map-first: battlemap uncovered by the default layout ≥ 55% at 1440×900, ≥ 60% at 1280×720", () => {
+test("FR-SHELL-54 DM map-first: battlemap uncovered by the default layout ≥ 54% at 1440×900, ≥ 59% at 1280×720", () => {
+  // K5 (OQ-KIT-02 B): the Game log 40 px taller covers about 1 point more (55 → 54, 60 → 59).
   for (const [viewport, min] of [
-    [WIDE, 0.55],
-    [LAPTOP, 0.6],
+    [WIDE, 0.54],
+    [LAPTOP, 0.59],
   ] as const) {
     const map = fittedMapRect(BATTLEMAP, viewport);
     const share = uncoveredShare(map, openOnDefaults([], viewport), viewport);
@@ -808,8 +824,8 @@ test("FR-SHELL-56 FR-SHELL-99 FR-SHELL-151 reopen covered vs free spot (DM, prot
   }
 });
 
-test("FR-SHELL-62 layout test cells at the sprint-6 Fit (DM): sim-9's Goblin Ambush with Initiative + Game log, nothing shown → every footprint at 32 / 37 / 42 / 42 px, clear of the windows and the summary strip", () => {
-  const cells = [32, 37, 42, 42];
+test("FR-SHELL-62 layout test cells at the sprint-6 Fit (DM): sim-9's Goblin Ambush with Initiative + Game log, nothing shown → every footprint at 34 / 39 / 45 / 45 px (K5: the work area to vh − 12), clear of the windows and the summary strip", () => {
+  const cells = [34, 39, 45, 45];
   for (const [i, vp] of REFERENCE_VIEWPORTS.entries()) {
     const at = `${vp.w}×${vp.h}`;
     const rects = renderedWindowRects(defaultLayout(dmWindows, vp), dmWindows, allKinds(), vp);

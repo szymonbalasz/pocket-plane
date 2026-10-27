@@ -58,13 +58,13 @@ interface Area {
   bottom: number;
 }
 
-/** Where default-placed windows may go: below the top bar, above the launcher, edge gaps. */
+/** Where default-placed windows may go: below the top bar, edge gaps (bottom: the work area's). */
 export function usableArea(vp: Viewport): Area {
   return {
     left: EDGE_GAP,
     top: TOP_BAR_H + EDGE_GAP,
     right: vp.w - EDGE_GAP,
-    bottom: vp.h - EDGE_GAP - LAUNCHER_CLEAR,
+    bottom: vp.h - LAUNCHER_CLEAR,
   };
 }
 
@@ -295,7 +295,7 @@ export function roomFor(def: Placeable, vp: Viewport, input: PlaceInput = {}): b
   const h = Math.min(Math.max(def.minSize.h, input.floor?.h ?? 0, need), fullH);
   const w = Math.min(Math.max(def.minSize.w, input.floor?.w ?? 0), base.w);
   const minX = Math.max(a.left, RAIL_CLEAR);
-  const blocks = [...(input.windows ?? []).map(plain), ...hard].map((o) => ({
+  const blocks = [...(input.windows ?? []).map(plain), ...hardAtGap(hard, g)].map((o) => ({
     x: o.x - g,
     y: o.y - g,
     w: o.w + 2 * g,
@@ -309,6 +309,17 @@ export function roomFor(def: Placeable, vp: Viewport, input: PlaceInput = {}): b
   );
   for (const x of xs) for (const y of ys) if (!anyHit({ x, y, w, h }, blocks)) return true;
   return false;
+}
+
+/**
+ * Hard regions grown so that `gap` around them is still 12 px: FR-SHELL-98's 4-px retry is a gap
+ * between windows; a tool bar pushes whatever comes within 12 px of it (FR-SHELL-104).
+ */
+function hardAtGap(hard: readonly Rect[], gap: number): Rect[] {
+  const m = Math.max(0, EDGE_GAP - gap);
+  return m === 0
+    ? [...hard]
+    : hard.map((o) => ({ x: o.x - m, y: o.y - m, w: o.w + 2 * m, h: o.h + 2 * m }));
 }
 
 /** Where a window opens by itself (auto placement; rank in the header). */
@@ -335,10 +346,11 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   const openH = def.minOpenH === undefined ? null : Math.max(minH, Math.min(def.minOpenH, fullH));
   // Moved windows stay right of the tool rail (FR-SHELL-109: always 68).
   const minX = Math.max(a.left, RAIL_CLEAR);
-  const blockers: Rect[] = [...windows, ...hard];
-  // "Clear" keeps the 12 px gap to every window and hard region.
+  const blockers: Rect[] = [...windows, ...hardAtGap(hard, g)];
+  // "Clear" keeps the 12 px gap to every window and hard region (FR-SHELL-98's 4-px retry:
+  // windows only).
   const padded = blockers.map((o) => ({ x: o.x - g, y: o.y - g, w: o.w + 2 * g, h: o.h + 2 * g }));
-  const regions: Rect[] = [...windows, ...hard, ...soft];
+  const regions: Rect[] = [...windows, ...hardAtGap(hard, g), ...soft];
   const heights = [fullH, minH, ...(openH === null ? [] : [openH])];
   // Rows come from the min height too when a floor is set (the spots a shrink would use).
   const rowHeights = [...new Set([...heights, Math.min(Math.max(def.minSize.h, need), fullH)])];

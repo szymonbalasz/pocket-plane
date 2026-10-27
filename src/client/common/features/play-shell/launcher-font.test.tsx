@@ -89,8 +89,8 @@ const defs = ["Initiative", "Game log", "Party Manager", "Handouts", "Compendium
 );
 const registry = createWindowRegistry("dm", defs);
 
-/** The launcher's markup at viewport width `w`. */
-function launcherHtml(w = 1280): string {
+/** The launcher's markup at viewport width `w` (and its top-bar zone `room`, FR-KIT-14). */
+function launcherHtml(w = 1280, room?: number): string {
   const store = {
     ...emptyStore(),
     you: { campaignId: "c1", role: "dm", playerId: null },
@@ -102,7 +102,13 @@ function launcherHtml(w = 1280): string {
     <SyncContext.Provider value={sync}>
       <ShellProvider registry={registry}>
         <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-          <Launcher defs={defs} windows={[]} viewport={{ w, h: 720 }} dispatch={() => {}} />
+          <Launcher
+            defs={defs}
+            windows={[]}
+            viewport={{ w, h: 720 }}
+            room={room}
+            dispatch={() => {}}
+          />
         </TooltipProvider>
       </ShellProvider>
     </SyncContext.Provider>,
@@ -119,6 +125,25 @@ function navOf(markup: string): ParentNode {
     },
   } as unknown as ParentNode;
 }
+
+describe("FR-KIT-14 launcher fits its zone", () => {
+  test("FR-KIT-14 FR-SHELL-43 the fit width is the top bar's centre zone, not the viewport: a narrow zone drops labels, then moves buttons into ⋯", () => {
+    const labelled = (html: string) =>
+      (html.match(/data-testid="ui-launcher-button"[^>]*?data-compact="false"/g) ?? []).length;
+    const overflow = (html: string) =>
+      Number(/data-testid="ui-launcher-overflow" data-count="(\d+)"/.exec(html)?.[1] ?? -1);
+    // The whole viewport (no zone measured yet): every label.
+    const wide = launcherHtml(1600);
+    expect(labelled(wide)).toBe(defs.length);
+    expect(overflow(wide)).toBe(0);
+    // The same viewport, a 300-px zone: icon-only buttons, then the menu.
+    const narrow = launcherHtml(1600, 300);
+    expect(narrow).toContain('data-testid="ui-launcher" data-compact="true"');
+    expect(labelled(narrow)).toBeLessThan(defs.length);
+    expect(launcherHtml(1600, 80)).not.toContain('data-testid="ui-launcher-button"');
+    expect(overflow(launcherHtml(1600, 80))).toBe(defs.length);
+  });
+});
 
 describe("FR-THEME-07 launcher measures computed font", () => {
   test("FR-THEME-07 reads weight, size and family off a rendered launcher button", () => {

@@ -7,14 +7,15 @@ import { runScript } from "@ui/features/play-shell/replay";
 
 const { playerWindows } = await import("../../windows");
 
-const VP = { w: 1280, h: 720 };
+/** K5: 1240 wide, where the band holds 828 px as it did at 1280×720 before the toast corner moved. */
+const VP = { w: 1240, h: 720 };
 /** `kind:state:x,y,w×h` of a step's windows. */
 const entry = (windows: string | undefined, kind: string) =>
   (windows ?? "").split(" ").find((e) => e.startsWith(`${kind}:`)) ?? "";
 const at = (run: ReturnType<typeof runScript>, step: string) =>
   run.steps.find((s) => s.step === step)?.windows;
 
-test("FR-SHELL-97 FR-SHELL-102 BL-109 player 1280×720 out of a fight, PCs panned right (d10), Recap + Stats open: opening Rules puts away one window (Recap, least recently used) and moves Stats aside at its size (L3r), Rules at its useful width; closing Rules brings Stats back; reopening Rules puts nothing away", () => {
+test("FR-SHELL-97 FR-SHELL-102 BL-109 player 1240×720 (K5; sim d10: 1280×720) out of a fight, PCs panned right (d10), Recap + Stats open: opening Rules puts away one window (Recap, least recently used) and moves Stats aside at its size (L3r), Rules at its useful width; closing Rules brings Stats back; reopening Rules puts nothing away", () => {
   const run = runScript(playerWindows, "player-1", VP, "ambush", [
     "end",
     { pan: { x: 790, y: 560 } },

@@ -333,7 +333,8 @@ describe("FR-DICEX-47 popup size", () => {
       expect(popupGeomAt(client, { w: 1280, h: 720 })).toBe(POPUP_BIG);
       expect(popupGeomAt(client, { w: 1920, h: 1080 })).toBe(POPUP_BIG);
       expect(popupGeomAt(client, { w: 390, h: 844 })).toBe(POPUP_BASE);
-      expect(popupGeomAt(client, { w: 1280, h: 360 })).toBe(POPUP_BASE);
+      // K5: the player's corner 20 px above the bottom edge: 330 is short for both clients.
+      expect(popupGeomAt(client, { w: 1280, h: 330 })).toBe(POPUP_BASE);
     }
     rollPopups.add({ entries: [nd6(1)], looks: {}, big: null, threeD: false });
     const html = render();
@@ -389,10 +390,11 @@ describe("FR-DICEX-47 popup size", () => {
       const r = popupRegion("dm", noteH, 0);
       return vh - EDGE_GAP - ("top" in r ? r.top : 0);
     };
-    // Full cards (3 rows, 2 lines, 268 px). 1280×720 with a toast: 1 on the player's side (room
-    // 540), 2 on the DM's (560); without a toast 2 each. 1280×800, 1440×900: 2. 1920×1080: all 3.
-    expect([playerRoom(720, toast), dmRoom(720, toast)]).toEqual([540, 560]);
-    expect(popupsThatFit(three, playerRoom(720, toast))).toBe(1);
+    // Full cards (3 rows, 2 lines, 268 px). 1280×720 with a toast: 2 each (room 592 on the
+    // player's side since K5's corner moved down, 560 on the DM's); without a toast 2 each.
+    // 1280×800, 1440×900: 2. 1920×1080: all 3.
+    expect([playerRoom(720, toast), dmRoom(720, toast)]).toEqual([592, 560]);
+    expect(popupsThatFit(three, playerRoom(720, toast))).toBe(2);
     expect(popupsThatFit(three, dmRoom(720, toast))).toBe(2);
     expect(popupsThatFit(three, playerRoom(720, 0))).toBe(2);
     expect(popupsThatFit(three, dmRoom(720, 0))).toBe(2);

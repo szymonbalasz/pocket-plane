@@ -11,8 +11,11 @@ export const TITLE_H = 32;
 export const MIN_VISIBLE_W = 120;
 /** Gap between a default-placed window and the viewport edge / top bar. */
 export const EDGE_GAP = 12;
-/** Strip above the bottom edge kept clear of default-placed windows (the launcher). */
-export const LAUNCHER_CLEAR = 64;
+/**
+ * Strip above the bottom edge kept clear of windows: the 12 px edge gap. The launcher sits in the
+ * top bar (ADR-0070, FR-KIT-14), so the work area runs from the top bar to `vh − 12`.
+ */
+export const LAUNCHER_CLEAR = EDGE_GAP;
 /**
  * Left edge clear of the tool rail (scenes-map's, ≈ 56 px wide) plus a gap: auto placement's
  * `minX`, and where the render clamp keeps windows (FR-SHELL-109, BL-53).
@@ -41,7 +44,7 @@ export function defaultRect(pos: DefaultPosition, size: Size, vp: Viewport): Rec
   const left = EDGE_GAP + dx;
   const right = vp.w - size.w - EDGE_GAP - dx;
   const top = TOP_BAR_H + EDGE_GAP + dy;
-  const bottom = vp.h - size.h - EDGE_GAP - dy - LAUNCHER_CLEAR;
+  const bottom = vp.h - size.h - dy - LAUNCHER_CLEAR;
   const [x, y] =
     pos.anchor === "top-left"
       ? [left, top]
@@ -72,8 +75,8 @@ export function clampRect(r: Rect, vp: Viewport): Rect {
 }
 
 /**
- * Work area size (FR-SHELL-29): the viewport below the top bar and above the launcher's top
- * edge. It starts at (0, TOP_BAR_H).
+ * Work area size (FR-SHELL-29): the viewport below the top bar and above the bottom edge gap
+ * (FR-KIT-14). It starts at (0, TOP_BAR_H).
  */
 export function workArea(vp: Viewport): Viewport {
   return { w: Math.max(1, vp.w), h: Math.max(1, vp.h - TOP_BAR_H - LAUNCHER_CLEAR) };
@@ -189,8 +192,8 @@ export function placedRect(
 
 /**
  * Grow to content (FR-SHELL-39, -52), render-only: `r` (the rendered rect) made as tall as
- * `needed` (the window height its content asks for), never shorter than `r`, capped 12 px before
- * the usable area's edge (above the launcher) and before the first of `caps` (other rendered
+ * `needed` (the window height its content asks for), never shorter than `r`, capped at the work
+ * area's bottom (12 px above the viewport's edge) and 12 px before the first of `caps` (other rendered
  * windows, hard keep-out regions) in its way whose x-range overlaps it. Grows down from its top;
  * `up` (bottom-anchored types) keeps its bottom, grows up.
  */
@@ -210,7 +213,7 @@ export function grownRect(
     const h = Math.max(r.h, Math.min(Math.ceil(needed), bottom - top));
     return { ...r, y: bottom - h, h };
   }
-  let bottom = TOP_BAR_H + workArea(vp).h - EDGE_GAP;
+  let bottom = TOP_BAR_H + workArea(vp).h;
   for (const c of across) if (c.y > r.y) bottom = Math.min(bottom, c.y - EDGE_GAP);
   const h = Math.max(r.h, Math.min(Math.ceil(needed), bottom - r.y));
   return { ...r, h };

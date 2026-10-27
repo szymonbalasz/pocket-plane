@@ -1,7 +1,8 @@
-// Launcher: bottom-centre bar, one button per available window type with a launcher entry, and
-// a trailing "⋯" menu with "Reset layout" (FR-SHELL-09, FR-SHELL-14). It fits the viewport
-// (FR-SHELL-43): icon-only buttons first (keeping the labels that fit, BL-113), then the buttons
-// that still don't fit move into the "⋯" menu (`launcher-fit.ts`).
+// Launcher: in the top bar's centre zone (kit-parity FR-KIT-14, ADR-0070), one button per
+// available window type with a launcher entry, and a trailing "⋯" menu with "Reset layout"
+// (FR-SHELL-09, FR-SHELL-14). It fits its zone (FR-SHELL-43): icon-only buttons first (keeping the
+// labels that fit, BL-113), then the buttons that still don't fit move into the "⋯" menu
+// (`launcher-fit.ts`), which opens downward.
 import { EllipsisIcon } from "lucide-react";
 import { DropdownMenu as M } from "radix-ui";
 import { type RefObject, useLayoutEffect, useRef, useState } from "react";
@@ -128,11 +129,14 @@ export function Launcher({
   defs,
   windows,
   viewport,
+  room = null,
   dispatch,
 }: {
   defs: readonly WindowDef[];
   windows: Windows;
   viewport: Viewport;
+  /** The top bar's centre zone width, px (FR-KIT-14); null: not laid out yet, the viewport's. */
+  room?: number | null;
   dispatch: (a: WindowAction) => void;
 }) {
   const store = useSync((s) => s.store);
@@ -149,17 +153,18 @@ export function Launcher({
     order: d.launcher?.order ?? 0,
     state: launcherState(windows, d.kind),
   }));
-  // Recomputed on viewport resize, availability change and layout restore only (FR-SHELL-43):
-  // opening a window from the menu leaves it there until then. Label widths: measured once each
-  // per font; a new font (FR-THEME-07: theme switch) or new label widths (a web font loaded)
-  // re-fit too.
+  // Recomputed when its zone's width changes (a viewport resize, the title or status changing
+  // width), on availability change and layout restore only (FR-SHELL-43): opening a window from
+  // the menu leaves it there until then. Label widths: measured once each per font; a new font
+  // (FR-THEME-07: theme switch) or new label widths (a web font loaded) re-fit too.
+  const zone = room ?? viewport.w;
   const labels = new Map(entries.map((d) => [d.kind, d.launcher?.label ?? ""]));
-  const fitKey = `${viewport.w}|${layoutKey}|${[...labels].join(",")}|${font}|${widthsGen}`;
+  const fitKey = `${zone}|${layoutKey}|${[...labels].join(",")}|${font}|${widthsGen}`;
   const fitRef = useRef<{ key: string; fit: LauncherFit } | null>(null);
   if (fitRef.current?.key !== fitKey) {
     const fit = fitLauncher(
       items,
-      viewport.w,
+      zone,
       launcherMetrics(labels, (l) => labelWidth(l, font)),
     );
     fitRef.current = { key: fitKey, fit };
@@ -176,7 +181,7 @@ export function Launcher({
       data-compact={fit.compact}
       aria-label="Windows"
       tabIndex={-1}
-      className="outline-none pointer-events-auto absolute bottom-3 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-lg border bg-background/85 p-1 shadow-lg backdrop-blur"
+      className="outline-none pointer-events-auto flex shrink-0 items-center gap-1 rounded-lg border border-transparent p-1"
     >
       {entries.map((d) => {
         const l = d.launcher;
@@ -249,7 +254,7 @@ export function Launcher({
         </span>
         <M.Portal>
           <M.Content
-            side="top"
+            side="bottom"
             sideOffset={6}
             className="z-50 min-w-40 rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-md"
           >

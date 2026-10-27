@@ -31,12 +31,9 @@ if (process.env.UPDATE_FAILING === "1") {
 // height (BL-104) and L3s (BL-99) pass P1 fitted @1600×900 / @1280×800 resize again (RS2's and
 // SP3's exemptions retired): 37 → 31 failing; H2 FAIL 5 (`grown:` returns, the resize fit check):
 // 31 → 30 (P3 fitted @1280×800 resize).
-const EXEMPTIONS = new Map([
-  [
-    "FR-SHELL-115 replay P2 moved @1280×720 memory",
-    "PM1 (approved): inherits the shared open phase's I2 (Compendium / Party Manager on the toast keep-out), as every other P2 moved @1280×720 cell; its memory steps (I9–I13) pass",
-  ],
-]);
+// K5 (the work area to vh − 12, the toast corner 52 px lower): every P1–P3 moved @1280×720 cell
+// passes, PM1's P2 moved @1280×720 memory exemption with them; 29 → 12 failing.
+const EXEMPTIONS = new Map<string, string>();
 
 test("FR-SHELL-160 named exemptions are recorded failing cells", () => {
   for (const name of EXEMPTIONS.keys()) expect(FAILING.has(name)).toBe(true);

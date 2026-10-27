@@ -47,7 +47,7 @@ function shell(vp: { w: number; h: number }, tokens: () => ReturnType<typeof sim
   return { c, fits, ws: () => c.store.getState().windows };
 }
 
-test("FR-SHELL-85 FR-SHELL-100 size table (player, shape only): every registered kind's default, useful (player band 412 / 492 / 472 / 472; the ★ kinds' sprint-8 useful sizes), min size and criterion at the four sizes = §7's table; pending rows skipped until registered", () => {
+test("FR-SHELL-85 FR-SHELL-100 size table (player, shape only): every registered kind's default, useful (player band 436 / 516 / 496 / 496 (K5); the ★ kinds' sprint-8 useful sizes), min size and criterion at the four sizes = §7's table; pending rows skipped until registered", () => {
   expect(
     sizeTableProblems(
       playerWindows,
@@ -81,12 +81,12 @@ test("FR-SHELL-79 FR-SHELL-97 useful size before shrinking (player): note.histor
   expect(rectIn(ws, "charx.companion")).toMatchObject({ w: 320, h: 360 });
 });
 
-test("FR-SHELL-80 reset keeps the zones (player 1280×800, c05): with sim-10's tokens drawn, Reset layout → sheet 948, 60, 320×418, Initiative 68, 60, 280×400, Game log as §7; one Fit requested", () => {
+test("FR-SHELL-80 reset keeps the zones (player 1280×800, c05): with sim-10's tokens drawn, Reset layout → sheet 948, 60, 320×440, Initiative 68, 60, 280×400, Game log as §7; one Fit requested", () => {
   const tokens = fittedFor(defaultLayout(playerWindows, MID), MID);
   const { c, fits, ws } = shell(MID, () => tokens);
   c.dispatch({ type: "open", kind: "cmp.compendium" }, all());
   c.dispatch({ type: "reset" }, all());
-  expect(rectIn(ws(), "char.sheet")).toEqual({ x: 948, y: 60, w: 320, h: 418 });
+  expect(rectIn(ws(), "char.sheet")).toEqual({ x: 948, y: 60, w: 320, h: 440 });
   expect(rectIn(ws(), "cbt.initiative")).toEqual({ x: 68, y: 60, w: 280, h: 400 });
   expect(rectIn(ws(), "dice.log")).toEqual(rectIn(defaultLayout(playerWindows, MID), "dice.log"));
   expect(ws().some((w) => w.kind === "cmp.compendium")).toBe(false);

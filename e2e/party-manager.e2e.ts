@@ -39,7 +39,9 @@ test("FR-PARTY-59 FR-PARTY-60 FR-PARTY-61 Party Manager: launcher label, no Part
   browser,
 }) => {
   const p1 = await player(browser, "Player 1", 1280, 720);
-  await expect(launcherButton(p1, "party.board")).toContainText("Party Manager");
+  // The launcher entry is named "Party Manager"; in the top bar at 1280 it may show as an icon
+  // (FR-SHELL-43, FR-KIT-14, DM #358), its name then in the aria-label and Tooltip.
+  await expect(launcherButton(p1, "party.board")).toHaveAttribute("aria-label", "Party Manager");
   await expect(launcherButton(p1, "party.summary")).toHaveCount(0);
   await expect(shellWindow(p1, "party.summary")).toHaveCount(0);
   const win = await openWindow(p1, "party.board");

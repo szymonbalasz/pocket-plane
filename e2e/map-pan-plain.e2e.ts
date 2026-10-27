@@ -259,7 +259,7 @@ test("FR-MAP-44 BL-01 Fit with the Game log open: the map's top row sits below t
     const cell = Number(await canvas.getAttribute("data-cell-px"));
     // Row 0 on screen: its top edge below the 48 px top bar, the whole row above the dock.
     await expect.poll(async () => (await gridPoint(dm, 0, 0)).y).toBeGreaterThanOrEqual(47.5);
-    expect((await gridPoint(dm, 0, 1)).y).toBeLessThanOrEqual(size.height - 64);
+    expect((await gridPoint(dm, 0, 1)).y).toBeLessThanOrEqual(size.height - 12);
     // FR-MAP-59 (#256): the 48 px floor yields down to 24 px only to keep every token visible ("all").
     const all = (await canvas.getAttribute("data-fit-visible")) === "all";
     expect(cell).toBeGreaterThanOrEqual(all ? 24 : 48);

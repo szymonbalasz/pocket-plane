@@ -40,19 +40,19 @@ const rendered = (ws: Parameters<typeof renderedWindowRects>[0], vp: { w: number
 const fitted = (vp: { w: number; h: number }) =>
   sim10Tokens("dm", vp, rendered(defaultLayout(dmWindows, vp), vp));
 
-test("FR-SHELL-85 FR-SHELL-100 size table (DM, shape only): every registered kind's default, useful (DM band 412 / 492 / 512 / 512; the ★ kinds' sprint-8 useful sizes), min size and criterion at the four sizes = §7's table; pending rows skipped until registered", () => {
+test("FR-SHELL-85 FR-SHELL-100 size table (DM, shape only): every registered kind's default, useful (DM band 436 / 516 / 536 / 536 (K5); the ★ kinds' sprint-8 useful sizes), min size and criterion at the four sizes = §7's table; pending rows skipped until registered", () => {
   expect(
     sizeTableProblems(dmWindows, SIZE_TABLE.dm, BANDS.dm, TEST_KINDS, PENDING_ROWS.dm),
   ).toEqual([]);
 });
 
-test("FR-SHELL-79 useful size before shrinking (DM): note.history at 1280×720 opens 412 high (its minOpenH 480, band-capped), not below", () => {
+test("FR-SHELL-79 useful size before shrinking (DM): note.history at 1280×720 opens 436 high (its minOpenH 480, band-capped), not below", () => {
   const ctx: ManagerContext = { registry: dmWindows, viewport: LAPTOP, available: all() };
   const ws = reduce(defaultLayout(dmWindows, LAPTOP), { type: "open", kind: "note.history" }, ctx);
-  expect(rectIn(ws, "note.history").h).toBe(412);
+  expect(rectIn(ws, "note.history").h).toBe(436);
 });
 
-test("FR-SHELL-80 reset keeps the zones (DM 1440×900): with sim-10's tokens drawn, Reset layout → Initiative 1028, 60, Game log 68, 584 (token-free), one Fit requested", () => {
+test("FR-SHELL-80 reset keeps the zones (DM 1440×900): with sim-10's tokens drawn, Reset layout → Initiative 1028, 60, Game log 68, 608 (token-free), one Fit requested", () => {
   const tokens = fitted(WIDE);
   const storage = createLayoutStorage(() => ({ getItem: () => null, setItem: () => {} }));
   let fits = 0;
@@ -70,7 +70,7 @@ test("FR-SHELL-80 reset keeps the zones (DM 1440×900): with sim-10's tokens dra
   c.dispatch({ type: "reset" }, all());
   const ws = c.store.getState().windows;
   expect(rectIn(ws, "cbt.initiative")).toMatchObject({ x: 1028, y: 60 });
-  expect(rectIn(ws, "dice.log")).toMatchObject({ x: 68, y: 584 });
+  expect(rectIn(ws, "dice.log")).toMatchObject({ x: 68, y: 608 });
   expect(ws).toEqual(defaultLayout(dmWindows, WIDE));
   expect(fits).toBe(1);
 });
@@ -151,7 +151,7 @@ test("FR-SHELL-87 (e) every sim-10 auto placement at the four sizes: launcher ki
   }
 });
 
-test("FR-SHELL-77 DM 1280×720 PCs are player characters, min-size auto-minimise (sim-10 b02, b03; walkthrough U1, #319): Compendium 442,60 346×400; Party 442,60 346×400 auto-minimising Compendium; Encounters 442,60 368×320 auto-minimising Party; every one clear of every PC footprint (Mira, Thorn, Brakka)", () => {
+test("FR-SHELL-77 DM 1280×720 PCs are player characters, auto-minimise (sim-10 b02, b03; walkthrough U1, #319): Compendium 416,60 440×436; Party 400,60 456×400 auto-minimising Compendium; Encounters 416,60 440×436 auto-minimising Party; every one clear of every PC footprint (Mira, Thorn, Brakka)", () => {
   const tokens = fitted(LAPTOP);
   expect(tokens.filter((t) => t.pc).length).toBe(3);
   const log: string[] = [];
@@ -170,12 +170,12 @@ test("FR-SHELL-77 DM 1280×720 PCs are player characters, min-size auto-minimise
     got[kind] = `${r.x},${r.y} ${r.w}×${r.h}`;
     expect({ kind, pcClear: pcClear(r, tokens) }).toEqual({ kind, pcClear: true });
   }
-  // No 440-wide spot is PC-free even on an empty map (U1's report): the min-size step (d) /
-  // look-ahead (d') auto-minimises the previous window for a PC-clear spot below useful size.
+  // One PC-clear spot between the PCs and Initiative (U1's report): each open auto-minimises the
+  // previous window for it. K5 (work area to vh − 12, a larger fit): it holds the useful sizes.
   expect(got).toEqual({
-    "cmp.compendium": "442,60 346×400",
-    "party.board": "442,60 346×400",
-    "cbt.encounters": "442,60 368×320",
+    "cmp.compendium": "416,60 440×436",
+    "party.board": "400,60 456×400",
+    "cbt.encounters": "416,60 440×436",
   });
   expect(log).toEqual(["cmp.compendium>party.board", "party.board>cbt.encounters"]);
 });

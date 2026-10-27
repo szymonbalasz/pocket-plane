@@ -234,9 +234,13 @@ describe("FR-MAP-46 fit floor", () => {
 });
 
 describe("FR-MAP-44 BL-01 fit fills the canvas (session-sim, DM)", () => {
-  /** DM defaults (protocol §24): Game log 460 × 240 bottom-left, Initiative 400 × 500 top-right. */
+  /**
+   * DM defaults (protocol §24): a Game log 460 wide bottom-left, Initiative 400 × 500 top-right.
+   * K5: 280 tall (was 240), so with the work area to vh − 12 the free area is still the strip
+   * right of the log at 1280×720 and the one above it at 1440×900.
+   */
   const gameLog = (vp: { w: number; h: number }) =>
-    defaultRect({ anchor: "bottom-left", dx: 56 }, { w: 460, h: 240 }, vp);
+    defaultRect({ anchor: "bottom-left", dx: 56 }, { w: 460, h: 280 }, vp);
   const initiative = (vp: { w: number; h: number }) =>
     defaultRect({ anchor: "top-right" }, { w: 400, h: 500 }, vp);
   /** Town: Mira (5, 5), Thorn (4, 5); both PCs. Same 1400 × 980 map, 70 px grid. */
@@ -382,9 +386,9 @@ describe("FR-MAP-44 BL-01 fit fills the canvas (session-sim, DM)", () => {
   test("FR-MAP-44 BL-01 FOG step 26 at 1440×900 with the Game log: Goblin Ambush's top row under the top bar, PCs in the free area", () => {
     const { cam, map, view, free, under } = fit(V7_AMBUSH, sim6, [gameLog(sim6)]);
     // The strip above the log sets the scale (was row 0 at y −27.4 … 22.6, under the top bar).
-    expect(free).toEqual({ x: 68, y: 48, w: 1372, h: 536 });
+    expect(free).toEqual({ x: 68, y: 48, w: 1372, h: 560 });
     expect(cam.floor).toBe(false);
-    expect(cam.scale).toBeCloseTo(0.72);
+    expect(cam.scale).toBeCloseTo(0.75); // K5: the 560-px strip (was 0.72 in 536)
     expect(map.h).toBeGreaterThan(free.h);
     expect(map.y).toBe(view.y);
     // Horizontally the map fits: centred in the work area right of the rail, as before.
@@ -454,10 +458,13 @@ describe("FR-MAP-44 BL-01 fit fills the canvas (session-sim, DM)", () => {
       const scene = v7Retest(mira);
       const { cam, map, view, free } = fit(scene, sim6, [gameLog(sim6)]);
       const at = `Mira (${mira.col}, ${mira.row})`;
-      expect(free).toEqual({ x: 68, y: 48, w: 1372, h: 536 });
-      expect({ at, top: map.y, floor: cam.floor }).toEqual({ at, top: view.y, floor });
+      expect(free).toEqual({ x: 68, y: 48, w: 1372, h: 560 });
+      // K5 (the 560-px strip): Mira at (2, 3) zooms out to the 48-px cell, now without the floor
+      // rule (the fit itself lands there).
+      expect({ at, top: map.y }).toEqual({ at, top: view.y });
       expect(70 * cam.scale).toBeGreaterThanOrEqual(FIT_MIN_CELL_PX - 1e-9);
-      if (!floor) expect(cam.scale).toBeLessThan(0.72);
+      if (floor) expect(70 * cam.scale).toBeCloseTo(FIT_MIN_CELL_PX);
+      else expect(cam.scale).toBeLessThan(0.75);
       const pcs = footprintBox(scene.pcs, GRID);
       if (!pcs) throw new Error("no PCs");
       const p = pcsOnScreen(cam, pcs);
@@ -743,10 +750,13 @@ describe("FR-MAP-47 resize refit", () => {
 });
 
 describe("FR-MAP-58 best free rectangle", () => {
-  /** Player defaults (protocol §24) at 1280×800: Game log bottom-left, sheet top-right. */
+  /**
+   * Player defaults (protocol §24) at 1280×800: Game log bottom-left (K5: its bottom at the work
+   * area's, vh − 12), sheet top-right.
+   */
   const vp = { w: 1280, h: 800 };
   const work = workArea(vp);
-  const log = { x: 68, y: 444, w: 340, h: 280 };
+  const log = { x: 68, y: 508, w: 340, h: 280 };
   const sheet = { x: 948, y: 60, w: 320, h: 440 };
   /** Player Initiative where the default layout puts it (top-left, above the log). */
   const initiative = { x: 68, y: 60, w: 280, h: 372 };
@@ -789,7 +799,7 @@ describe("FR-MAP-58 best free rectangle", () => {
   test("FR-MAP-58 best rectangle: the player at 1280×800 with sheet + Game log (sim-7 #3): the strip above the log fits at the larger scale but cuts the top rows, so the strip beside it wins (V7 fit priority)", () => {
     const { area, rect, cam, under, old, byScale } = pick(ambush, PCS, [log, sheet]);
     // By scale alone the strip above the log wins (the whole-map cap, below the floor here)…
-    expect(byScale).toEqual({ x: 68, y: 48, w: 880, h: 396 });
+    expect(byScale).toEqual({ x: 68, y: 48, w: 880, h: 460 });
     const above = fitContent(
       contentBox(ambush, GRID, MAP),
       byScale,
@@ -799,11 +809,12 @@ describe("FR-MAP-58 best free rectangle", () => {
       footprintBox(PCS, GRID),
     );
     expect(above.y).toBeLessThan(48);
-    // … but at the same 48 px cell the 540-px strip right of the log keeps the top row, the PCs
-    // in it and no token centre under a window.
-    expect(rect).toEqual(area);
-    expect(rect).toEqual({ x: 408, y: 48, w: 540, h: 688 });
-    expect(cam).toEqual(old);
+    // … but at the 48 px cell another strip keeps the top row, the PCs in it and no token centre
+    // under a window. K5 (the work area to vh − 12): the one right of the log and below the sheet
+    // (was the 540-px strip right of the log, the free area itself).
+    expect(area).toEqual(byScale);
+    expect(rect).toEqual({ x: 408, y: 500, w: 872, h: 288 });
+    expect(old.y).toBeLessThan(48);
     expect(70 * cam.scale).toBeCloseTo(FIT_MIN_CELL_PX);
     expect(cam.y).toBeGreaterThanOrEqual(48);
     expect(under).toEqual([]);
@@ -833,15 +844,16 @@ describe("FR-MAP-58 best free rectangle", () => {
       tok(4, 10, "large"),
     ];
     const rects = [
-      defaultRect({ anchor: "bottom-left", dx: 56 }, { w: 460, h: 240 }, laptop),
+      // K5: 280 tall (was 240), as `gameLog` above.
+      defaultRect({ anchor: "bottom-left", dx: 56 }, { w: 460, h: 280 }, laptop),
       defaultRect({ anchor: "top-right" }, { w: 400, h: 500 }, laptop),
     ];
     const { rect, cam, under, byScale } = pick(ambush, pcs, rects, laptop);
     // Before: the wide strip above the log won the tie at the floor on area, so the map's top
     // edge sat at y −92 and the Cave Ogre and Crypt Ogre under the Game log.
-    expect(byScale).toEqual({ x: 68, y: 48, w: 800, h: 356 });
+    expect(byScale).toEqual({ x: 68, y: 48, w: 800, h: 380 });
     // Now: the narrower strip between the log and Initiative, same 48 px cell.
-    expect(rect).toEqual({ x: 528, y: 48, w: 340, h: 608 });
+    expect(rect).toEqual({ x: 528, y: 48, w: 340, h: 660 });
     expect(70 * cam.scale).toBeCloseTo(FIT_MIN_CELL_PX);
     expect(cam.y).toBeGreaterThanOrEqual(48);
     const p = footprintBox(pcs, GRID);

@@ -796,13 +796,14 @@ describe("sprint 6: reopen rule (FR-SHELL-56)", () => {
 
 describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", () => {
   // 1280×720: the Game log bottom-left (band 412 above it), Initiative top-right, launcher
-  // windows top-left; `s7.card` declares a useful size (FR-SHELL-79).
+  // windows top-left; `s7.card` declares a useful size (FR-SHELL-79). The log is 224 tall so the
+  // band stays 412 with the work area to vh − 12 (FR-KIT-14).
   const box = { w: 440, h: 400 };
   const TL = { anchor: "top-left", dx: 56 } as const;
   const s7 = createWindowRegistry("dm", [
     def("sv.log", {
       defaultOpen: true,
-      defaultSize: { w: 690, h: 160 },
+      defaultSize: { w: 690, h: 224 },
       minSize: { w: 300, h: 160 },
       defaultPosition: { anchor: "bottom-left", dx: 56 },
     }),
@@ -825,6 +826,8 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
   const small = { w: 1280, h: 720 };
   const kinds = new Set(s7.defs.map((d) => d.kind));
   const pc = (x: number, y: number) => ({ x, y, w: 42, h: 42, pc: true });
+  /** A PC in the strip below Initiative (236 high since FR-KIT-14: room for a min-size window). */
+  const belowInit = pc(1000, 560);
   const rectOf = (r: Rect): Rect => ({ x: r.x, y: r.y, w: r.w, h: r.h });
   const hits = (a: Rect, b: Rect) =>
     a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
@@ -869,7 +872,7 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
 
   test("FR-SHELL-77 the look-ahead fails (no useful-size PC-free spot even with every launcher window gone): nothing is auto-minimised; shrink to a PC-free spot below the useful size, else the least PC area (not PC-clear)", () => {
     // (d') at the min size: a shrunk PC-free spot that needs sv.a gone → sv.a is auto-minimised.
-    const minOnly = [pc(200, 200), pc(660, 240), pc(560, 100), pc(760, 400)];
+    const minOnly = [pc(200, 200), pc(660, 240), pc(560, 100), pc(760, 400), belowInit];
     const viaMin = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(minOnly));
     expect(stateOf(viaMin, "sv.a")).toBe("minimised");
     expect(pcClear(get(viaMin, "sv.b"), minOnly)).toBe(true);
@@ -884,6 +887,7 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
     // clear spot over the least PC area, nothing auto-minimised.
     const spread: PlacementToken[] = [];
     for (let x = 80; x < 860; x += 150) for (let y = 70; y < 480; y += 150) spread.push(pc(x, y));
+    spread.push(belowInit);
     const last = reduce(withA(), { type: "open", kind: "sv.b" }, ctxWith(spread));
     expect(stateOf(last, "sv.a")).toBe("open");
     const lb = get(last, "sv.b");
@@ -909,6 +913,7 @@ describe("sprint 7: auto-minimise instead of covering a PC (FR-SHELL-77–81)", 
     // PCs over the rest of the band.
     const tokens: PlacementToken[] = [];
     for (let x = 80; x < 800; x += 110) for (let y = 70; y < 470; y += 110) tokens.push(pc(x, y));
+    tokens.push(belowInit);
     const log: string[] = [];
     ws = reduce(ws, { type: "open", kind: "sv.init", by: "feature" }, ctxWith(tokens, log));
     expect(stateOf(ws, "sv.a")).toBe("minimised");

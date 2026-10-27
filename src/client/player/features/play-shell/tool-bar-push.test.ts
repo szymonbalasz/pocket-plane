@@ -80,18 +80,18 @@ test("FR-SHELL-104 push (player): a window not overlapping the bar grown by 12 i
   expect(overlaps(rectIn(ws, "cbt.initiative"), grownBy12(near))).toBe(false);
 });
 
-test("FR-SHELL-53 FR-SHELL-99 live viewport change (player): the Game log takes its 1280×720 zone after 1440×900 (850×280 → 510×160)", () => {
+test("FR-SHELL-53 FR-SHELL-99 live viewport change (player): the Game log takes its 1280×720 zone after 1440×900 (850×320 → 510×200)", () => {
   const wide = { w: 1440, h: 900 };
   const small = { w: 1280, h: 720 };
   const start = defaultLayout(playerWindows, wide);
   expect(rectOf(start.find((w) => w.kind === "dice.log") as WindowState)).toMatchObject({
     w: 850,
-    h: 280,
+    h: 320,
   });
   const ws = reduce(start, { type: "viewport" }, { ...ctxAt(small), settledViewport: wide });
   const log = rectIn(ws, "dice.log");
-  expect({ w: log.w, h: log.h }).toEqual({ w: 510, h: 160 });
-  expect(log.y + log.h).toBeLessThanOrEqual(small.h - 64 - 12);
+  expect({ w: log.w, h: log.h }).toEqual({ w: 510, h: 200 });
+  expect(log.y + log.h).toBeLessThanOrEqual(small.h - 12);
   // Unchanged viewport: same array.
   expect(reduce(ws, { type: "viewport" }, { ...ctxAt(small), settledViewport: small })).toBe(ws);
 });

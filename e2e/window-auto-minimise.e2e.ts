@@ -4,7 +4,7 @@
 // Compendium, Party, Encounters at 1440×900 land PC-clear (`data-pc-clear`, checked against the
 // PC footprints); auto-minimised ones carry `data-auto-minimised-for`; reopened at 1280×720, the
 // same (pets and summons aren't PCs). Player 2 (player 1 starts behind a presented handout
-// whose Close is a server write): Reset layout keeps the zones (the sheet 948, 60, 320×418);
+// whose Close is a server write): Reset layout keeps the zones (the sheet 948, 60, 320×440 since K5);
 // Space presses a Tab-focused launcher button with the mouse over the map, and pans after a
 // click (#199). DM Initiative: each row's chips are one tab stop. The rules in detail: bun test
 // (`manager.test.ts`, both `windows-s7.test.ts`, `keys.test.ts`, `overlays.test.ts`).
@@ -123,7 +123,7 @@ test("FR-SHELL-77 auto-minimise instead of covering a PC (DM): Compendium, Party
   }
 });
 
-test("FR-SHELL-80 FR-SHELL-83 player 2 1280×800: Reset layout → the sheet 948, 60, 320×418; Tab to the Party button with the mouse over the map, Space opens it; a click, then Space over the map pans and leaves it alone (#199)", async ({
+test("FR-SHELL-80 FR-SHELL-83 player 2 1280×800: Reset layout → the sheet 948, 60, 320×440 (K5); Tab to the Party button with the mouse over the map, Space opens it; a click, then Space over the map pans and leaves it alone (#199)", async ({
   browser,
 }) => {
   const { link } = e2eEnv();
@@ -139,7 +139,7 @@ test("FR-SHELL-80 FR-SHELL-83 player 2 1280×800: Reset layout → the sheet 948
   const sheet = shellWindow(p1, "char.sheet");
   await expect(sheet).toHaveAttribute("data-placed", "zone"); // FR-SHELL-110 (sprint 8)
   const box = await sheet.boundingBox();
-  expect(box && [box.x, box.y, box.width, box.height].map(Math.round)).toEqual([948, 60, 320, 418]);
+  expect(box && [box.x, box.y, box.width, box.height].map(Math.round)).toEqual([948, 60, 320, 440]);
   await expect(canvas).toHaveAttribute("data-fit-reason", "fit"); // the one Fit after the reset
   const party = shellWindow(p1, "party.board");
   await expect(party).toHaveCount(0);

@@ -6,12 +6,16 @@ import { runScript } from "@ui/features/play-shell/replay";
 
 const { playerWindows } = await import("../../windows");
 
-const LAPTOP = { w: 1280, h: 720 };
+/**
+ * K5: 1240 wide. With the toast corner 52 px lower (FR-KIT-14) the band at 1280×720 runs to the
+ * sheet, and 440 + 400 fit; at 1240 it holds 828 px again, as the sim-13 page did.
+ */
+const LAPTOP = { w: 1240, h: 720 };
 /** `kind:state:x,y,w×h` of a step's windows. */
 const entry = (windows: string | undefined, kind: string) =>
   (windows ?? "").split(" ").find((e) => e.startsWith(`${kind}:`)) ?? "";
 
-test("FR-SHELL-97 FR-SHELL-102 BL-99 players at 1280×720 out of a fight keep Recap and Stats open together where both fit at their useful sizes (sim-13 glitch 3: one put the other away); Recap grows back when Stats closes", () => {
+test("FR-SHELL-97 FR-SHELL-102 BL-99 players at 1240×720 (K5; sim-13: 1280×720) out of a fight keep Recap and Stats open together where both fit at their useful sizes (sim-13 glitch 3: one put the other away); Recap grows back when Stats closes", () => {
   // Out of a fight (no Initiative): 828 px between the rail and the toast corner hold 400 + 400,
   // not 440 + 400; the PCs panned below the free band, right of the Game log.
   const run = runScript(playerWindows, "player-1", LAPTOP, "ambush", [

@@ -26,10 +26,19 @@ export function JoinedHeader({
   campaignName: string;
 }) {
   // FR-CAMP-35: no colour dot here; the identity chip shows the colour (FR-SHELL-70).
+  // Kit-parity FR-KIT-12: the campaign name as the title, then who you play, small and muted.
   return (
-    <p data-testid="camp-player-joined">
-      Playing as <strong data-testid="camp-joined-player-name">{playerName}</strong> in{" "}
-      <strong data-testid="camp-joined-campaign-name">{campaignName}</strong>
+    <p data-testid="camp-player-joined" className="leading-tight">
+      <span
+        data-testid="camp-joined-campaign-name"
+        data-slot="topbar-title"
+        className="text-lg font-semibold"
+      >
+        {campaignName}
+      </span>{" "}
+      <span data-slot="topbar-sub" className="text-xs text-muted-foreground">
+        · playing as <span data-testid="camp-joined-player-name">{playerName}</span>
+      </span>
     </p>
   );
 }

@@ -136,7 +136,8 @@ test("FR-MAP-89 reveal refit with the card open: b07 (1280×800, sheet + compani
     (t) => t.name,
   );
   // Every token clear only with a PC flush against a window (24 px): the PCs keep 4 px
-  // (FR-MAP-93, a hard rule since walkthrough WF3 F9), the least token area stays hidden.
+  // (FR-MAP-93, a hard rule since walkthrough WF3 F9), the least token area stays hidden. K5:
+  // the work area to vh − 12 (the toast corner 52 px lower) leaves room for every token.
   const pcs = ESCORT.filter((t) => t.pc).map(boxOf);
   expect(
     allClear(
@@ -147,7 +148,7 @@ test("FR-MAP-89 reveal refit with the card open: b07 (1280×800, sheet + compani
       4,
     ),
   ).toBe(true);
-  expect(under).toEqual(["Goblin Lurker"]);
+  expect(under).toEqual([]);
   expect(mode).toBe("fitted");
   // A fit run before the restored windows rendered (the old load fit): tokens under the sheet.
   const early = fitScene(ESCORT, AMBUSH_GRID, AMBUSH_MAP, VP, {

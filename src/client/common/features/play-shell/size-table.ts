@@ -102,12 +102,12 @@ const shared: Record<string, SizeRow> = {
   },
 };
 
-/** The Game log's row (both clients): FR-SHELL-100's useful 460 × 160. */
+/** The Game log's row (both clients): FR-SHELL-100's useful 460 × 200 (kit-parity K5). */
 const log = (dflt: Four): SizeRow => ({
   default: dflt,
-  useful: all(460, 160),
+  useful: all(460, 200),
   min: s(300, 160),
-  criterion: "3 one-line entries + roll bar",
+  criterion: "2 entries + roll bar",
   protected: true,
 });
 
@@ -120,11 +120,11 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
       criterion: "header, controls, 4 rows",
       protected: true,
     },
-    "dice.log": log(four(s(690, 160), s(690, 160), s(1150, 240), s(1150, 240))),
+    "dice.log": log(four(s(690, 200), s(690, 200), s(1150, 280), s(1150, 280))),
     ...shared,
     "note.history": {
       default: all(360, 480),
-      useful: four(s(360, 412), s(360, 480), s(360, 480), s(360, 480)),
+      useful: four(s(360, 436), s(360, 480), s(360, 480), s(360, 480)),
       min: s(280, 240),
       criterion: "pending + 3 rows",
     },
@@ -175,17 +175,18 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
       protected: true,
     },
     "char.sheet": {
-      default: four(s(320, 338), s(320, 418), s(320, 440), s(320, 440)),
+      // Fitted 12 px above the toast corner (K5: the corner 52 px lower, FR-KIT-14).
+      default: four(s(320, 390), s(320, 440), s(320, 440), s(320, 440)),
       useful: all(320, 338),
       min: s(280, 320),
       criterion: "header, HP / AC, tabs, 3 attack rows + buttons",
       protected: true,
     },
-    "dice.log": log(four(s(510, 160), s(510, 160), s(850, 280), s(850, 280))),
+    "dice.log": log(four(s(510, 200), s(510, 200), s(850, 320), s(850, 320))),
     ...shared,
     "note.history": {
       default: all(360, 480),
-      useful: four(s(360, 412), s(360, 480), s(360, 472), s(360, 472)),
+      useful: four(s(360, 436), s(360, 480), s(360, 480), s(360, 480)),
       min: s(280, 240),
       criterion: "pending + 3 rows",
     },
@@ -201,10 +202,10 @@ export const PENDING_ROWS: Record<"dm" | "player", Record<string, PendingRow>> =
   player: {},
 };
 
-/** The client's band at the four sizes (FR-SHELL-79). */
+/** The client's band at the four sizes (FR-SHELL-79); K5: +24 (+64 work area, −40 the taller log). */
 export const BANDS: Record<"dm" | "player", readonly number[]> = {
-  dm: [412, 492, 512, 512],
-  player: [412, 492, 472, 472],
+  dm: [436, 516, 536, 536],
+  player: [436, 516, 496, 496],
 };
 
 /** Test-mode window types (FR-SHELL-20): not product windows, no row. */

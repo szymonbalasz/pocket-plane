@@ -1,11 +1,11 @@
-// Launcher fit (FR-SHELL-43, OQ-SHELL-25): the bar never overflows the viewport (8 px gutter each
-// side). Too wide → buttons drop their labels (icon only), highest `order` first, keeping the
+// Launcher fit (FR-SHELL-43, OQ-SHELL-25): the bar never overflows its zone (kit-parity FR-KIT-14:
+// the top bar's centre, between the title and the right cluster; 8 px gutter each side). Too wide → buttons drop their labels (icon only), highest `order` first, keeping the
 // labels that fit (sprint 11 F1, BL-113); every button icon-only and still too wide → buttons move
 // into the trailing "⋯" menu, closed windows first, highest `order` first. Pure; the widths are
 // measured by the caller (`Launcher.tsx`).
 import type { LauncherState } from "./manager";
 
-/** Space kept free between the bar and each viewport edge, px. */
+/** Space kept free between the bar and each edge of its zone, px. */
 export const LAUNCHER_GUTTER = 8;
 
 export interface LauncherItem {
@@ -39,8 +39,14 @@ export interface LauncherFit {
   overflow: string[];
 }
 
+/**
+ * The narrowest zone the launcher needs: the "⋯" trigger alone in its bar, plus the gutters
+ * (FR-KIT-14: the top bar's title shrinks first, so "⋯" and Reset layout stay reachable).
+ */
+export const LAUNCHER_MIN_ZONE = 2 * LAUNCHER_GUTTER + 2 * 4 + 2 * 1 + 40;
+
 // Widths from `Launcher.tsx`'s classes: `size="sm"` button = px-3 (24) + icon 16, label
-// `text-xs` after `gap-1.5`; bar `p-1` + border, buttons `gap-1`.
+// `text-xs` after `gap-1.5`; bar `p-1` + a transparent border, buttons `gap-1`.
 const ICON_BUTTON_W = 40;
 const LABEL_GAP = 6;
 
@@ -72,13 +78,13 @@ export function fittedBarWidth(fit: LauncherFit, m: LauncherMetrics): number {
   );
 }
 
-/** `items` in launcher order; `vpW` = viewport width. */
+/** `items` in launcher order; `zoneW` = the width of the launcher's zone (FR-KIT-14), px. */
 export function fitLauncher(
   items: readonly LauncherItem[],
-  vpW: number,
+  zoneW: number,
   m: LauncherMetrics,
 ): LauncherFit {
-  const room = vpW - 2 * LAUNCHER_GUTTER;
+  const room = zoneW - 2 * LAUNCHER_GUTTER;
   const kinds = items.map((i) => i.kind);
   if (barWidth(kinds.map(m.full), m) <= room) {
     return { compact: false, labelled: kinds, bar: kinds, overflow: [] };

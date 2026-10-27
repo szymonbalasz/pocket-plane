@@ -19,13 +19,13 @@ import {
 } from "./toast-region";
 
 describe("toast region", () => {
-  test("FR-SHELL-01 DM top-centre below the top bar and window title bars, player bottom-right above the launcher", () => {
+  test("FR-SHELL-01 DM top-centre below the top bar and window title bars, player bottom-right, 20 px above the bottom edge", () => {
     // 48 top bar + 12 gap + 32 title bar + 8: a top-anchored window's close button stays clear.
     expect(toastRegion("dm", 0)).toEqual({ position: "top-center", offset: { top: 100 } });
-    // 64 launcher strip + 8: a toast never covers a launcher button.
+    // FR-KIT-14: the 12 px bottom gap + 8 (the launcher sits in the top bar).
     expect(toastRegion("player", 0)).toEqual({
       position: "bottom-right",
-      offset: { right: 16, bottom: 72 },
+      offset: { right: 16, bottom: 20 },
     });
     expect(toastRegion("player", 0).offset.bottom).toBeGreaterThan(LAUNCHER_CLEAR);
   });
@@ -33,20 +33,20 @@ describe("toast region", () => {
   test("FR-SHELL-01 one region: Toasts stack after the notifications stack, never under it", () => {
     // DM: below the 58 px stack (+ 8 gap); player: above it.
     expect(toastRegion("dm", 58).offset).toEqual({ top: 100 + 58 + 8 });
-    expect(toastRegion("player", 58).offset).toEqual({ right: 16, bottom: 72 + 58 + 8 });
+    expect(toastRegion("player", 58).offset).toEqual({ right: 16, bottom: 20 + 58 + 8 });
   });
 });
 
 describe("roll-popup stack (FR-DICEX-39, seams S7)", () => {
   test("FR-DICEX-39 the third stack: players above the notifications + alert stacks, the DM below them; neither moves", () => {
-    expect(popupRegion("player", 0, 0)).toEqual({ right: 16, bottom: 72 });
+    expect(popupRegion("player", 0, 0)).toEqual({ right: 16, bottom: 20 });
     // 58 px of notifications + 8, then 70 px of alerts + 8.
-    expect(popupRegion("player", 58, 70)).toEqual({ right: 16, bottom: 72 + 66 + 78 });
+    expect(popupRegion("player", 58, 70)).toEqual({ right: 16, bottom: 20 + 66 + 78 });
     expect(popupRegion("dm", 0, 0)).toEqual({ top: 100 });
     expect(popupRegion("dm", 58, 0)).toEqual({ top: 100 + 66 });
     expect(popupRegion("dm", 58, 70)).toEqual({ top: 100 + 66 + 78 });
     // The other stacks' offsets don't depend on the popups at all.
-    expect(toastRegion("player", 58).offset).toEqual({ right: 16, bottom: 72 + 66 });
+    expect(toastRegion("player", 58).offset).toEqual({ right: 16, bottom: 20 + 66 });
   });
 
   test("FR-DICEX-39 sonner's collapsed stack height: the front toast + 14 px per toast behind (≤ 3)", () => {
@@ -62,7 +62,7 @@ describe("roll-popup stack (FR-DICEX-39, seams S7)", () => {
 });
 
 describe("toast regions (FR-SHELL-40, -49; seams S2, S7)", () => {
-  test("FR-SHELL-49 toast regions: both boxes 356 × 238 (1 toast + 1 popup + 8), players at (vw − 372, vh − 310), the DM at ((vw − 356) / 2, 100), at the four sizes", () => {
+  test("FR-SHELL-49 toast regions: both boxes 356 × 238 (1 toast + 1 popup + 8), players at (vw − 372, vh − 258), the DM at ((vw − 356) / 2, 100), at the four sizes", () => {
     expect([KEEP_OUT_W, KEEP_OUT_H]).toEqual([356, 40 + ROLL_POPUP_H + 8]);
     const sizes = [
       { w: 1280, h: 720 },
@@ -71,14 +71,14 @@ describe("toast regions (FR-SHELL-40, -49; seams S2, S7)", () => {
       { w: 1600, h: 900 },
     ];
     for (const vp of sizes) {
-      expect(toastKeepOut("player", vp)).toEqual({ x: vp.w - 372, y: vp.h - 310, w: 356, h: 238 });
+      expect(toastKeepOut("player", vp)).toEqual({ x: vp.w - 372, y: vp.h - 258, w: 356, h: 238 });
       expect(toastKeepOut("dm", vp)).toEqual({ x: (vp.w - 356) / 2, y: 100, w: 356, h: 238 });
     }
     // Regions unchanged from sprint 4 (#256, OQ-SHELL-32 C): DM top-centre, players bottom-right;
     // player stack order notifications → alerts → popups (each beyond the one before).
     expect(toastRegion("dm", 0).position).toBe("top-center");
     expect(toastRegion("player", 0).position).toBe("bottom-right");
-    expect(popupRegion("player", 40, 53)).toEqual({ right: 16, bottom: 72 + 48 + 61 });
+    expect(popupRegion("player", 40, 53)).toEqual({ right: 16, bottom: 20 + 48 + 61 });
   });
 
   test("FR-SHELL-40 the box sits where each client's stacks start", () => {
@@ -98,7 +98,7 @@ describe("toast regions (FR-SHELL-40, -49; seams S2, S7)", () => {
       const off = toastRegion("player", 0).offset;
       expect(p.x + p.w).toBe(vp.w - (off.right ?? -1));
       expect(p.y + p.h).toBe(vp.h - (off.bottom ?? -1));
-      expect(p.y + p.h).toBeLessThanOrEqual(vp.h - LAUNCHER_CLEAR); // above the launcher
+      expect(p.y + p.h).toBeLessThanOrEqual(vp.h - LAUNCHER_CLEAR); // inside the work area
     }
   });
 });

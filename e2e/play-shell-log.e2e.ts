@@ -2,8 +2,8 @@
 // FR-SHELL-35 (R3, amends FR-SHELL-28 for `dice.log`), sizes per FR-DICE-38 (sprint 5): at its
 // default size, with the one-row roll bar (FR-DICE-30), the Game log shows ≥ 6 single-line
 // entries fully above the bar, ≥ 4 with Physical dice on (strip shown), at the tall sizes
-// (DM 1150×240, player 850×280 at 1440×900); ≥ 3 / ≥ 2 at 160 high (DM 690×160, player 510×160 at
-// 1280×720). The roll bar is a pinned footer: always fully shown, and only the entry list scrolls.
+// (DM 1150×280, player 850×320 at 1440×900, K5); ≥ 3 / ≥ 2 at 200 high (DM 690×200, player
+// 510×200 at 1280×720). The roll bar is a pinned footer: always fully shown, and only the entry list scrolls.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { shellWindow } from "./support/shell";
@@ -82,14 +82,15 @@ async function expectHistory(log: Locator, min: number) {
 const SIZES = [
   {
     vp: { width: 1280, height: 720 },
-    dm: { w: 690, h: 160 },
-    player: { w: 510, h: 160 },
+    // K5 (play-shell §7 size table, OQ-KIT-02 B): 40 px taller; the minimums stay.
+    dm: { w: 690, h: 200 },
+    player: { w: 510, h: 200 },
     min: [3, 2],
   },
   {
     vp: { width: 1440, height: 900 },
-    dm: { w: 1150, h: 240 },
-    player: { w: 850, h: 280 },
+    dm: { w: 1150, h: 280 },
+    player: { w: 850, h: 320 },
     min: [6, 4],
   },
 ] as const;
@@ -133,7 +134,7 @@ for (const role of ["DM", "player"] as const)
       expect(await clippedRollBar(log, [...ROW_1, "dice-log-physical-off"])).toEqual([]);
 
       // Options open with the strip on: the whole bar (incl. the DM gear) stays in the window at
-      // the tall sizes; at 160 high the body scrolls to it as a last resort (GameLog `min-h-fit`).
+      // the tall sizes; at 200 high the body scrolls to it as a last resort (GameLog `min-h-fit`).
       await log.getByTestId("dice-roll-options").click();
       const row2 = [
         "dice-roll-category",

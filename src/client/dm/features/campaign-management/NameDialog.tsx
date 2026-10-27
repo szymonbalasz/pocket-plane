@@ -20,17 +20,31 @@ interface Props {
   schema: z.ZodType<string>;
   /** Test-id prefix: `<prefix>` trigger, `<prefix>-name`, `<prefix>-submit`, `<prefix>-error`. */
   testId: string;
-  trigger: React.ReactNode;
+  /** Omitted: the caller opens it (`open` / `onOpenChange`, e.g. a menu item, FR-KIT-11). */
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?(open: boolean): void;
   submitLabel: string;
   onSubmit(name: string): Promise<void>;
   disabled?: boolean;
 }
 
 export function NameDialog(p: Props) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = p.open ?? ownOpen;
+  const setOpen = (o: boolean) => (p.open === undefined ? setOwnOpen(o) : p.onOpenChange?.(o));
   const [value, setValue] = useState(p.initial ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Each opening starts from the initial name, however it was opened.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setValue(p.initial ?? "");
+      setError(null);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,19 +65,12 @@ export function NameDialog(p: Props) {
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) {
-          setValue(p.initial ?? "");
-          setError(null);
-        }
-      }}
-    >
-      <DialogTrigger asChild disabled={p.disabled} data-testid={p.testId}>
-        {p.trigger}
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
+      {p.trigger && (
+        <DialogTrigger asChild disabled={p.disabled} data-testid={p.testId}>
+          {p.trigger}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{p.title}</DialogTitle>
