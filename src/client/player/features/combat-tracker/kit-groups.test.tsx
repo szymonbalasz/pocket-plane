@@ -34,6 +34,11 @@ describe("FR-KIT-29 companion groups (K12)", () => {
       expect(owl).toMatch(
         /<span data-testid="cbt-init-row-owner" data-record-id="owlbear" data-value="ch-mira" data-compact="true"[^>]*><span aria-hidden="true"[^>]*style="background-color:#e69f00"><\/span><span class="sr-only">Mira<\/span>/,
       );
+      // K12 re-test: one name line (truncated, full name in its Tooltip), marks and side chips
+      // whole beside it, so the medallion stays on the name's line.
+      expect(owl).toMatch(
+        /<div data-name-line="true" data-child="true" class="flex min-w-0 items-center gap-1"><span data-testid="cbt-init-row-name" data-value="Owlbear" class="min-w-0 truncate[^"]*" data-state="closed"/,
+      );
       // A row that isn't a child keeps the lg medallion and its own rounded card.
       const goblin = rowHtml(html, "cbt-init-row", "goblin");
       expect(goblin).not.toContain("init-child-medallion");

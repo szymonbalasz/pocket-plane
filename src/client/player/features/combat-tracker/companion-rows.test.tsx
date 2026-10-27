@@ -87,7 +87,21 @@ describe("FR-CBT-119 player rows", () => {
       (m) => m[0],
     );
     expect(names.length).toBe(10);
-    for (const n of names) expect(n).not.toContain("truncate");
+    // K12 re-test (walkthrough 4, amends FR-CBTX-57 for child rows): an after-owner child's name
+    // is one line, truncated with its full text in a Tooltip; every other name stays whole.
+    const childNames = new Set(
+      [
+        ...html.matchAll(
+          /data-child="true"[^>]*><span data-testid="cbt-init-row-name" data-value="([^"]+)"/g,
+        ),
+      ].map((m) => m[1]),
+    );
+    expect([...childNames]).toEqual(["Owlbear"]);
+    for (const n of names) {
+      const v = /data-value="([^"]+)"/.exec(n)?.[1] ?? "";
+      if (childNames.has(v)) expect(n).toMatch(/truncate[^"]*" data-state="closed"/);
+      else expect(n).not.toContain("truncate");
+    }
     const thorn = rowHtml(html, "cbt-init-row", "thorn");
     expect(thorn).toContain('data-testid="cbt-init-companion" data-record-id="wolfpet"');
   });

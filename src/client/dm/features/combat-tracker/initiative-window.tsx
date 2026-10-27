@@ -70,6 +70,7 @@ import {
   BandBadge,
   CHILD_ROW,
   ChildMedallion,
+  ChildNameLine,
   CombatantMedallion,
   childBelow,
   contentWidth,
@@ -790,6 +791,8 @@ function RowMain({
   );
   const companion = isCompanion(c) && c.turnMode;
   const byOwner = actsWithOwner(c, owner);
+  // K12 re-test: a child row's name is one truncated line (Tooltip), the medallion beside it.
+  const Line = indent ? ChildNameLine : NameLine;
   // FR-KIT-25: a folded tail rides in the row Tooltip, on the name. K9 R1: the name line's own
   // box, so a stacked list keeps it on the medallion's line.
   const nameTip = (line: ReactNode) =>
@@ -820,7 +823,7 @@ function RowMain({
         {/* The name is never cut (FR-CBTX-57): the side chip takes a second line first, a name
             wider than the line wraps. */}
         {nameTip(
-          <NameLine
+          <Line
             name={c.name}
             testId="cbt-init-row-name"
             className="text-sm font-medium"

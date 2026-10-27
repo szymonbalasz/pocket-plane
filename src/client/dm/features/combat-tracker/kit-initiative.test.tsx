@@ -8,7 +8,13 @@ import { join } from "node:path";
 import type { CombatantView } from "@shared/combat-tracker/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { HP_TRACK_PX } from "@ui/components/kit/hp-bar";
-import { statusShown } from "@ui/features/combat-extras/parts";
+import { TooltipProvider } from "@ui/components/ui/overlays";
+import {
+  EffectChips,
+  StatusCell,
+  statusPieces,
+  statusShown,
+} from "@ui/features/combat-extras/parts";
 import { companionLayout } from "@ui/features/combat-tracker/companions";
 import {
   companionStore,
@@ -27,6 +33,7 @@ import {
   trackRoom,
 } from "@ui/features/combat-tracker/parts";
 import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
+import { renderToStaticMarkup } from "react-dom/server";
 import { END_CONFIRM_LABEL, END_KEEP_LABEL, EndConfirmButtons } from "./end-confirm";
 import {
   dmInitiativeWindow,
@@ -512,6 +519,53 @@ describe("FR-KIT-28 status icons", () => {
     expect(tag(mira, "cbtx-init-row-effect-more")).toContain('data-value="1"');
     // No effects → no status box content.
     expect(rowHtml(html, "cbt-init-row", "thorn")).toMatch(/data-slot="init-status"[^>]*><\/span>/);
+  });
+  test("FR-KIT-28 status icons (K12 re-test, walkthrough 4): one fixed 56-px column; one piece (concentration, else a trigger, else the first effect) + '+N' for the rest, triggers included; beside '+N' the rounds drop into the Tooltip", () => {
+    expect(statusPieces(1, 1, 1, false)).toEqual({ conc: 1, triggers: 0, effects: 0 });
+    expect(statusPieces(0, 2, 1, false)).toEqual({ conc: 0, triggers: 1, effects: 0 });
+    expect(statusPieces(0, 0, 2, false)).toEqual({ conc: 0, triggers: 0, effects: 1 });
+    expect(statusPieces(0, 0, 2, true)).toEqual({ conc: 0, triggers: 0, effects: 0 });
+    expect(statusPieces(0, 0, 0, false)).toEqual({ conc: 0, triggers: 0, effects: 0 });
+    const html = dm();
+    for (const id of ["goblin", "mira", "thorn"]) {
+      const cell = /<span data-slot="init-status"[^>]*>/.exec(
+        rowHtml(html, "cbt-init-row", id),
+      )?.[0];
+      expect(cell).toMatch(/class="flex w-14 shrink-0 /);
+      expect(cell).not.toContain("min-w-14");
+    }
+    const mira = fromSlot(rowHtml(html, "cbt-init-row", "mira"), "init-status");
+    expect(mira).toMatch(
+      /data-status="true" data-more="true" class="[^"]*\[&amp;_\[data-rounds\]\]:hidden/,
+    );
+    // A trigger + an effect: the trigger shows, the effect and a second trigger fold into "+2",
+    // whose accessible name lists the trigger's state line too.
+    const trig = (id: string, name: string) => ({
+      id,
+      triggerId: id,
+      name,
+      uses: null,
+      state: "ready" as const,
+      muted: false,
+      down: false,
+      tooltip: "Ready",
+    });
+    const cell = renderToStaticMarkup(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <StatusCell>
+          <EffectChips
+            effects={[effect("p", { kind: "condition", condition: "prone" }) as never]}
+            triggers={[trig("t1", "Divine Fury"), trig("t2", "Searing Strike")]}
+            round={1}
+            testId="cbtx-init-row-effect"
+          />
+        </StatusCell>
+      </TooltipProvider>,
+    );
+    expect(cell.match(/data-testid="cbtx-trigger-chip"/g)).toHaveLength(1);
+    expect(cell).toContain("Divine Fury");
+    expect(cell).toMatch(/data-testid="cbtx-init-row-effect-more" data-value="2"/);
+    expect(cell).toMatch(/aria-label="More effects: Prone, Searing Strike[^"]*"/);
   });
 });
 

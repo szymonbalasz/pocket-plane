@@ -42,6 +42,7 @@ import {
   BandBadge,
   CHILD_ROW,
   ChildMedallion,
+  ChildNameLine,
   CombatantMedallion,
   childBelow,
   HP_STACK,
@@ -154,6 +155,7 @@ function PlayerRowMain({
   const companion = Boolean(c.ownerCharacterId && c.turnMode);
   // FR-CBT-116: only the owner receives a companion's HP numbers.
   const own = companion && me !== null && c.ownerPlayerId === me;
+  const Line = child ? ChildNameLine : NameLine;
   return (
     // FR-CBT-119: a click on an own companion's row opens its card (the icon is the button).
     // biome-ignore lint/a11y/noStaticElementInteractions: a pointer shortcut; the card icon is the keyboard path
@@ -168,7 +170,8 @@ function PlayerRowMain({
         {/* FR-CBTX-57: the name is never cut; the side chip takes a second line first. K9 R1:
             in its own box, so a stacked list keeps it on the medallion's line. */}
         <div className={HP_STACK.name}>
-          <NameLine
+          {/* K12 re-test: a child row's name is one truncated line (Tooltip). */}
+          <Line
             name={c.name}
             testId="cbt-init-row-name"
             className="text-sm font-medium"

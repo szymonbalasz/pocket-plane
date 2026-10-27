@@ -113,7 +113,9 @@ export function StatusCell({ children }: { children: ReactNode }) {
       data-narrow={narrow || undefined}
       // K9 (walkthrough F1): in a narrow list (DM 320, player 280) the chips go icon-only (the
       // rounds / uses stay in their Tooltip), so the HP bars keep a readable shared length.
-      className="flex min-w-14 shrink-0 items-center @max-[22rem]/init:min-w-0 @max-[22rem]/init:empty:hidden @max-[22rem]/init:[&_[data-rounds]]:hidden"
+      // K12 re-test (walkthrough 4): one fixed 56-px column (it holds one piece + "+N"), so the
+      // initiative numbers line up on every row.
+      className="flex w-14 shrink-0 items-center @max-[22rem]/init:w-auto @max-[22rem]/init:empty:hidden @max-[22rem]/init:[&_[data-rounds]]:hidden"
     >
       <InStatusCell.Provider value={true}>
         <NarrowList.Provider value={narrow}>{children}</NarrowList.Provider>
@@ -616,10 +618,28 @@ export function statusShown(conc: number, fx: number, narrow: boolean): number {
 }
 
 /**
+ * K12 re-test (walkthrough 4): the status cell's one shown piece: a concentration chip, else the
+ * first trigger chip, else `statusShown`'s effect; everything else goes into "+N".
+ */
+export function statusPieces(
+  conc: number,
+  triggers: number,
+  fx: number,
+  narrow: boolean,
+): { conc: number; triggers: number; effects: number } {
+  if (conc > 0) return { conc: 1, triggers: 0, effects: 0 };
+  if (triggers > 0) return { conc: 0, triggers: 1, effects: 0 };
+  return { conc: 0, triggers: 0, effects: statusShown(0, fx, narrow) };
+}
+
+/**
  * FR-KIT-28: the status cell's chips, icons with rounds (the label in the Tooltip). Concentration
  * comes first and never folds (FR-CBTX-59), so with one every other effect goes into "+N"; else
  * the first effect shows and the rest fold. Chip menus (Edit… / End), the concentration menu and
- * "+N"'s list are today's. Trigger chips never fold (FR-CBTX-54): icons after "+N".
+ * "+N"'s list are today's. K12 re-test (walkthrough 4, amends FR-CBTX-54 in the status cell): the
+ * cell shows ONE piece (concentration, else the first trigger, else the first effect) and "+N"
+ * for the rest, triggers included (in "+N"'s menu with their state line); beside "+N" the piece
+ * drops its rounds / uses (kept in its Tooltip), so the cell keeps its fixed column.
  */
 function StatusChips({
   effects,
@@ -635,15 +655,30 @@ function StatusChips({
   const fx = ordered.filter((e) => e.kind !== "concentration");
   const narrow = useContext(NarrowList);
   if (ordered.length === 0 && triggers.length === 0) return null;
-  const shown = fx.slice(0, statusShown(conc.length, fx.length, narrow));
-  const folded = fx.slice(shown.length);
+  const pick = statusPieces(conc.length, triggers.length, fx.length, narrow);
+  const shownConc = conc.slice(0, pick.conc);
+  const shownTriggers = triggers.slice(0, pick.triggers);
+  const shown = fx.slice(0, pick.effects);
+  const folded = [...conc.slice(pick.conc), ...fx.slice(pick.effects)];
+  const foldedTriggers = triggers.slice(pick.triggers);
+  const more = folded.length + foldedTriggers.length > 0;
   return (
     <div
       data-chip-row
       data-status
-      className={cn("flex shrink-0 flex-nowrap items-center gap-0.5", className)}
+      data-more={more || undefined}
+      className={cn(
+        "flex shrink-0 flex-nowrap items-center gap-0.5",
+        more && "[&_[data-rounds]]:hidden",
+        className,
+      )}
     >
-      {conc.map((e) => (
+      {shownTriggers.map((t) => (
+        <span key={`t:${t.id}`} data-trigger className="flex shrink-0">
+          <TriggerChipView t={t} icon />
+        </span>
+      ))}
+      {shownConc.map((e) => (
         <span key={`c:${e.id}`} data-chip-conc className="flex shrink-0">
           <ConcChip e={e} round={round} testId={testId} compact icon onEdit={onEditConcentration} />
         </span>
@@ -655,12 +690,15 @@ function StatusChips({
           </MenuChip>
         </span>
       ))}
-      {folded.length > 0 && <MoreChip hidden={folded} round={round} testId={testId} menu={menu} />}
-      {triggers.map((t) => (
-        <span key={`t:${t.id}`} data-trigger className="flex shrink-0">
-          <TriggerChipView t={t} icon />
-        </span>
-      ))}
+      {more && (
+        <MoreChip
+          hidden={folded}
+          triggers={foldedTriggers}
+          round={round}
+          testId={testId}
+          menu={menu}
+        />
+      )}
     </div>
   );
 }
@@ -792,18 +830,25 @@ function LineChips({
  */
 function MoreChip({
   hidden,
+  triggers = [],
   round,
   testId,
   left,
   menu,
 }: {
   hidden: readonly EffectView[];
+  /** K12 re-test: the status cell's folded trigger chips (their state line in the menu). */
+  triggers?: readonly TriggerChip[];
   round: number | null;
   testId: string;
   left?: number;
   menu?: (e: EffectView) => ReactNode;
 }) {
-  const names = hidden.map((e) => chipText(e, round)).join(", ");
+  const names = [
+    ...hidden.map((e) => chipText(e, round)),
+    ...triggers.map((t) => triggerLine(t)),
+  ].join(", ");
+  const n = hidden.length + triggers.length;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -817,10 +862,10 @@ function MoreChip({
             <Badge
               variant="secondary"
               data-testid={`${testId}-more`}
-              data-value={hidden.length}
+              data-value={n}
               className="px-1 py-0 text-[11px]"
             >
-              +{hidden.length}
+              +{n}
             </Badge>
           </Tooltip>
         </button>
@@ -848,6 +893,17 @@ function MoreChip({
             </DropdownMenuItem>
           );
         })}
+        {triggers.map((t) => (
+          <DropdownMenuItem
+            key={`t:${t.id}`}
+            data-testid={`${testId}-more-item`}
+            data-record-id={t.id}
+            data-kind="trigger"
+          >
+            <ZapIcon className="size-3.5 shrink-0" aria-hidden />
+            <span className="truncate">{triggerLine(t)}</span>
+          </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );

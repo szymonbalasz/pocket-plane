@@ -9,7 +9,13 @@ import type { RecordStore } from "@shared/protocol/store";
 import { initials } from "@shared/scenes-map/geometry";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { HandshakeIcon, SwordsIcon } from "lucide-react";
-import { type CSSProperties, type RefObject, useLayoutEffect, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+  useLayoutEffect,
+  useState,
+} from "react";
 import { HP_TRACK_PX } from "../../components/kit/hp-bar";
 import { Medallion, type MedallionSize } from "../../components/kit/medallion";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
@@ -153,6 +159,42 @@ export const CHILD_ROW = {
  * so the one-row line (FR-CBT-142) keeps its room and the lines' bars line up.
  */
 export const LINE_TRACK = { "--hp-track": "40px" } as CSSProperties;
+
+/**
+ * K12 re-test (walkthrough 4): a child row's name line: one line, the name truncated with its
+ * full text in a Tooltip, the marks and the side chips (owner dot, Ally) kept whole beside it, so
+ * the medallion stays on the name's line (a long name wrapped to three lines, the medallion on
+ * the second). Same test ID and `data-value` as `NameLine`'s.
+ */
+export function ChildNameLine({
+  name,
+  testId,
+  className,
+  marks,
+  side,
+}: {
+  name: string;
+  testId: string;
+  className?: string;
+  marks?: ReactNode;
+  side?: ReactNode;
+}) {
+  return (
+    <div data-name-line data-child className="flex min-w-0 items-center gap-1">
+      <Tooltip content={name}>
+        <span data-testid={testId} data-value={name} className={cn("min-w-0 truncate", className)}>
+          {name}
+        </span>
+      </Tooltip>
+      <span data-name-marks className="flex shrink-0 items-center gap-1 empty:hidden">
+        {marks}
+      </span>
+      <span data-name-side className="flex shrink-0 items-center empty:hidden">
+        {side}
+      </span>
+    </div>
+  );
+}
 
 /** K12: whether `layout[i]`'s next row is its own child (an `after-owner` row ranked by it). */
 export function childBelow(
