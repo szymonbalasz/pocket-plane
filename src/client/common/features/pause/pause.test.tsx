@@ -33,7 +33,6 @@ import { TOP_BAR_ITEMS, topBarItemsFor, topBarItemWidth } from "../play-shell/to
 import { createPauseGate, pauseGate } from "./gate";
 import {
   controlLabel,
-  controlWidth,
   countdownText,
   draftKey,
   EMPTY_DRAFT,
@@ -179,24 +178,20 @@ describe("registration (FR-SHELL-128, -129, -135)", () => {
   });
 
   test("FR-SHELL-129 DM pause control: top-bar item (DM only, fixed slot), label, widths, payload, preview, draft", () => {
-    // The slot: 128 px from 1280 wide (the widest state), 40 below (icon-only).
+    // The slot: 40 px at every width, an icon button like search (kit-parity K10).
     const items = topBarItemsFor("dm", TOP_BAR_ITEMS);
     // SP1's search button (FR-SHELL-195) sits after it, next to the identity chip.
     expect(items.map((t) => t.id)).toEqual(["pause", "palette"]);
     const [item] = items;
     expect(
       [1600, 1280, 1279].map((w) => (item ? topBarItemWidth(item, { w, h: 720 }) : 0)),
-    ).toEqual([128, 128, 40]);
+    ).toEqual([40, 40, 40]);
     expect(topBarItemsFor("player", TOP_BAR_ITEMS).map((t) => t.id)).toEqual(["palette"]);
     // "Pause"; paused "Paused · m:ss"; no back-in "Paused".
     expect(controlLabel(null, T0)).toBe("Pause");
     expect(controlLabel(PAUSE, T0 + 30_000)).toBe("Paused · 9:30");
     expect(controlLabel(PAUSE, T0 + 11 * 60_000)).toBe("Paused · 0:00");
     expect(controlLabel({ ...PAUSE, backAt: null }, T0)).toBe("Paused");
-    // 96 running, 128 paused, 40 icon-only below 1280.
-    expect([controlWidth(false, 1280), controlWidth(true, 1280), controlWidth(true, 1279)]).toEqual(
-      [96, 128, 40],
-    );
     // Update keeps the countdown (`keep` leaves backInMin out); a choice or none is sent.
     const f = { message: "Back soon", imageAssetId: null, backIn: "keep" as const };
     expect(pausePayload(f)).toEqual({ message: "Back soon", imageAssetId: null });
