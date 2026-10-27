@@ -1,7 +1,9 @@
 // Kit part: the Medallion (kit-parity FR-KIT-05, glossary "Medallion"): a round portrait, the image
 // asset's thumbnail if there is one, else the name's first letter on a colour. One markup for
 // every theme (FR-KIT-01); Simple Dark draws it with the plain tokens, a theme styles
-// `data-slot="kit-medallion"` (ADR-0069). Decorative: the name always sits beside it.
+// `data-slot="kit-medallion"` (ADR-0069). Decorative: the name always sits beside it. K9: a letter
+// with no colour carries `data-tone="neutral"`, so a theme fills it (the kit's slate / blue) without
+// structural selectors.
 import { contrastRatio, isHexColor } from "@shared/campaign-management/colors";
 import type * as React from "react";
 import { AssetImg } from "../../features/assets-pipeline/AssetImg";
@@ -69,6 +71,7 @@ export function Medallion({
       data-slot="kit-medallion"
       data-size={size}
       data-image={m.imageAssetId ? "" : undefined}
+      data-tone={!m.colour && !m.imageAssetId ? "neutral" : undefined}
       className={cn(
         "inline-flex shrink-0 select-none items-center justify-center overflow-hidden rounded-full border font-semibold leading-none",
         SIZE[size],
