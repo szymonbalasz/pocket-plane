@@ -61,7 +61,7 @@ DM feedback numbers in brackets ([#243](../decisions-log.md)). "sim-7" = the [se
 
 ## Playtest: sprint 4 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 4) + **Player 2** (another browser: Thorn). Regression run: [session-sim-8 report](../../.verify/20261018-030613-session-sim-8/report.md) (local, gitignored): **16 / 17 PASS** on final `main` (check 3,403, e2e 111), leak scan clean (WS + REST, both players) with party vision, drag sight, secret Blinded, roll popups, trigger state and compendium in play; a hard kill mid-combat kept a pending Flame Tongue crit card with its Divine Fury offer byte-identical (applied once). The one FAIL is the first known gap below.
+Run from the repo root on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 4) + **Player 2** (another browser: Thorn). Regression run: [session-sim-8 report](../../.verify/20261018-030613-session-sim-8/report.md) (local, gitignored): **16 / 17 PASS** on final `main` (check 3,403, e2e 111), leak scan clean (WS + REST, both players) with party vision, drag sight, secret Blinded, roll popups, trigger state and compendium in play; a hard kill mid-combat kept a pending Flame Tongue crit card with its Divine Fury offer byte-identical (applied once). The one FAIL is the first known gap below.
 
 ### Setup
 

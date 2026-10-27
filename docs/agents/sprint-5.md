@@ -65,7 +65,7 @@ DM notes in brackets ([#250](../decisions-log.md)). "sim-8" = the [session-sim-8
 
 ## Check `main` any time (DM)
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). Bundle **`session-sim-9`** = everything through sprint 4 (`session-sim-8`) plus every sprint-5 unit merged so far; it grows as slices land (see Progress).
+Run from the repo root on `main` (PowerShell). Bundle **`session-sim-9`** = everything through sprint 4 (`session-sim-8`) plus every sprint-5 unit merged so far; it grows as slices land (see Progress).
 
 ```powershell
 git pull; bun install
@@ -78,7 +78,7 @@ Open the printed DM URL (paste the secret) and each player link in its own brows
 
 ## Playtest: sprint 5 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 3) + **Player 2** (another browser: Thorn). Regression run: [session-sim-9 report](../../.verify/20261019-211926-session-sim-9/report.md) (local, gitignored): **13 / 17 PASS** on final `main` (check 3,793, e2e 151), leak scan clean (WS + REST, both players) with hit rulings, secret sides, handout presents, attachments, hidden compendium images and colours in play; a hard kill mid-combat kept a ruled card waiting for its damage and a secret side byte-identical (digest equal). The four FAILs are the first known gaps below.
+Run from the repo root on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 3) + **Player 2** (another browser: Thorn). Regression run: [session-sim-9 report](../../.verify/20261019-211926-session-sim-9/report.md) (local, gitignored): **13 / 17 PASS** on final `main` (check 3,793, e2e 151), leak scan clean (WS + REST, both players) with hit rulings, secret sides, handout presents, attachments, hidden compendium images and colours in play; a hard kill mid-combat kept a ruled card waiting for its damage and a secret side byte-identical (digest equal). The four FAILs are the first known gaps below.
 
 ### Setup
 

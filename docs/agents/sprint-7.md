@@ -50,7 +50,7 @@ DM decisions #310 (sprint-6 recap: windows park instead of covering a PC; a char
 
 ## Playtest: sprint 7 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-11 report](../../.verify/20261021-190115-session-sim-11/report.md) (local, gitignored): **15 / 17 PASS** on final `main` (check 4,459, e2e 184 + 1 known flake), leak scan clean (WS + REST + stats answers, both players) with gems on and off, rerolls, maxed dice and stats in play; a hard kill with gems on, a maxed card pending and Stats open restarted byte-identical (digest equal). The two FAILs are the first known gaps below.
+Run from the repo root on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-11 report](../../.verify/20261021-190115-session-sim-11/report.md) (local, gitignored): **15 / 17 PASS** on final `main` (check 4,459, e2e 184 + 1 known flake), leak scan clean (WS + REST + stats answers, both players) with gems on and off, rerolls, maxed dice and stats in play; a hard kill with gems on, a maxed card pending and Stats open restarted byte-identical (digest equal). The two FAILs are the first known gaps below.
 
 ### Setup
 

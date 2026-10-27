@@ -55,7 +55,7 @@ flowchart LR
 
 ## Playtest: sprint 12
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). About 10 minutes. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-16 report](../../.verify/20261026-234022-session-sim-16/report.md) (local): **12 / 13 PASS**.
+Run from the repo root on `main` (PowerShell). About 10 minutes. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-16 report](../../.verify/20261026-234022-session-sim-16/report.md) (local): **12 / 13 PASS**.
 
 ```powershell
 git pull; bun install

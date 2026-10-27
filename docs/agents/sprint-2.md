@@ -139,7 +139,7 @@ Expand the stub. Proposed scope (DM confirms):
 
 ## Playtest: phase 1 fixes
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~40 minutes for part 1, ~15 for part 2. **DM** (normal browser) + **Player 1** (incognito) + **Player 2** (another browser). Regression run: [session-sim-5 report](../../.verify/20261015-162659-session-sim-5/report.md) (local, gitignored): 13 / 13 PASS, leak scan clean, digest identical across a hard kill (#194). Each step names the note (N) or glitch (G) it checks.
+Run from the repo root on `main` (PowerShell). ~40 minutes for part 1, ~15 for part 2. **DM** (normal browser) + **Player 1** (incognito) + **Player 2** (another browser). Regression run: [session-sim-5 report](../../.verify/20261015-162659-session-sim-5/report.md) (local, gitignored): 13 / 13 PASS, leak scan clean, digest identical across a hard kill (#194). Each step names the note (N) or glitch (G) it checks.
 
 ### Setup
 
@@ -209,7 +209,7 @@ bun run fixtures:reset --profile verify
 
 ## Playtest: sprint 2 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~20 minutes per part. **DM** (normal browser) + **Player 1** (incognito, Mira) + **Player 2** (another browser, Thorn). Regression run: [session-sim-6 report](../../.verify/20261015-232530-session-sim-6/report.md) (local, gitignored): 17 / 18 PASS, leak scan clean with fog, walls, props and templates in play; the one FAIL is fixed in `fix/sim6-popup` (#200, popup over its toast; also the concentration row first in Pending and toasts clear of open windows). Phase-1 fixes: see [Playtest: phase 1 fixes](#playtest-phase-1-fixes) above.
+Run from the repo root on `main` (PowerShell). ~20 minutes per part. **DM** (normal browser) + **Player 1** (incognito, Mira) + **Player 2** (another browser, Thorn). Regression run: [session-sim-6 report](../../.verify/20261015-232530-session-sim-6/report.md) (local, gitignored): 17 / 18 PASS, leak scan clean with fog, walls, props and templates in play; the one FAIL is fixed in `fix/sim6-popup` (#200, popup over its toast; also the concentration row first in Pending and toasts clear of open windows). Phase-1 fixes: see [Playtest: phase 1 fixes](#playtest-phase-1-fixes) above.
 
 ### Setup
 

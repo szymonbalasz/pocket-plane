@@ -40,7 +40,7 @@ Evidence: the [session-sim-14 report](../../.verify/20261024-061849-session-sim-
 
 ## Playtest: sprint 11 fixes
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). About 10 minutes. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-15 report](../../.verify/20261024-234809-session-sim-15/report.md) (local, gitignored): **10 / 11 PASS**, leak scan clean, hard kill byte-identical; every sim-14 glitch fixed or by design.
+Run from the repo root on `main` (PowerShell). About 10 minutes. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-15 report](../../.verify/20261024-234809-session-sim-15/report.md) (local, gitignored): **10 / 11 PASS**, leak scan clean, hard kill byte-identical; every sim-14 glitch fixed or by design.
 
 ```powershell
 git pull; bun install

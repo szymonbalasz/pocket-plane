@@ -54,7 +54,7 @@ Dropped as by design: BL-104's "sounds locked until the first click after a load
 
 ## Playtest: sprint 10 fixes
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). About 15 minutes. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-14 report](../../.verify/20261024-061849-session-sim-14/report.md) (local, gitignored): **13 / 13 PASS** on final `main` (check 5,587, e2e 238, bench 41 / 41), leak scan clean for both players, a hard kill mid-fight with a hidden "Add hidden" monster restarted byte-identical. Every sim-13 FAIL and glitch is fixed or ruled by design. New small glitches: BL-107–BL-114 in the [backlog](backlog.md).
+Run from the repo root on `main` (PowerShell). About 15 minutes. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-14 report](../../.verify/20261024-061849-session-sim-14/report.md) (local, gitignored): **13 / 13 PASS** on final `main` (check 5,587, e2e 238, bench 41 / 41), leak scan clean for both players, a hard kill mid-fight with a hidden "Add hidden" monster restarted byte-identical. Every sim-13 FAIL and glitch is fixed or ruled by design. New small glitches: BL-107–BL-114 in the [backlog](backlog.md).
 
 ### Setup
 

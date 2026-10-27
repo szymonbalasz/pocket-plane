@@ -1,6 +1,6 @@
 # Playtest — MVP (Phase 5)
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~30–45 minutes. **DM** (normal browser) + **Player 1 / Mira** (incognito) + **Player 2 / Thorn** (another browser). Acceptance run: [verify-mvp report](../../.verify/20261013-222244-mvp-acceptance/report.md) (local, gitignored) — PLAYTEST READY, #169.
+Run from the repo root on `main` (PowerShell). ~30–45 minutes. **DM** (normal browser) + **Player 1 / Mira** (incognito) + **Player 2 / Thorn** (another browser). Acceptance run: [verify-mvp report](../../.verify/20261013-222244-mvp-acceptance/report.md) (local, gitignored) — PLAYTEST READY, #169.
 
 ## Setup
 

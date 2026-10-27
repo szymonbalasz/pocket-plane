@@ -1,6 +1,6 @@
 # Demo — Scenes (play-shell, assets-pipeline, entities, scenes-map)
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). Takes ~15 minutes. Three browser windows: **DM** (normal), **Player 1** (incognito), **Player 2** (another browser).
+Run from the repo root on `main` (PowerShell). Takes ~15 minutes. Three browser windows: **DM** (normal), **Player 1** (incognito), **Player 2** (another browser).
 
 ## Setup
 

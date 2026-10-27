@@ -52,7 +52,7 @@ DM decision #338 (sprint-8 recap + sprint 9 scope). Process: [orchestrator promp
 
 ## Playtest: sprint 9 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-13 report](../../.verify/20261023-193558-session-sim-13/report.md) (local, gitignored): **14 / 15 PASS** on final `main` (check 5,530, e2e 225, bench 41 / 41; the stale-page step N/A, verified in its branch), leak scan clean for both players, a hard kill mid-fight with a Stronghold window, Party Manager and an open Recap restarted byte-identical. Both sim-12 FAILs (DM toast stack over PCs, no DM callout for hidden kills) are fixed, and so are BL-86–BL-90. The one FAIL and the glitches are the known gaps below.
+Run from the repo root on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-13 report](../../.verify/20261023-193558-session-sim-13/report.md) (local, gitignored): **14 / 15 PASS** on final `main` (check 5,530, e2e 225, bench 41 / 41; the stale-page step N/A, verified in its branch), leak scan clean for both players, a hard kill mid-fight with a Stronghold window, Party Manager and an open Recap restarted byte-identical. Both sim-12 FAILs (DM toast stack over PCs, no DM callout for hidden kills) are fixed, and so are BL-86–BL-90. The one FAIL and the glitches are the known gaps below.
 
 ### Setup
 

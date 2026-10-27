@@ -1,6 +1,6 @@
 # Demo — Skeleton (Foundation build)
 
-Run from `C:\Repos\pocket-plane` after the skeleton merges (PowerShell). Takes ~10 minutes.
+Run from the repo root after the skeleton merges (PowerShell). Takes ~10 minutes.
 
 ## Setup (once)
 

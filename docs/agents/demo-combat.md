@@ -1,6 +1,6 @@
 # Demo — Combat (character-sheet, dice-roll-log, notifications, combat-tracker)
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~20 minutes. **DM** (normal browser) + **Player 1 / Mira** (incognito) + optionally **Player 2 / Thorn** (another browser).
+Run from the repo root on `main` (PowerShell). ~20 minutes. **DM** (normal browser) + **Player 1 / Mira** (incognito) + optionally **Player 2 / Thorn** (another browser).
 
 ## Setup
 

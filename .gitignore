@@ -32,3 +32,7 @@ playwright-report/
 
 # Playwright MCP session artefacts (test agents)
 .playwright-mcp/
+
+# Art working files stay local; only the kit page is published (the theme token test reads it)
+/docs/design/art/*
+!/docs/design/art/kit/

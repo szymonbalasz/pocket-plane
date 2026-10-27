@@ -70,7 +70,7 @@ Expand [character-sheet-full](../specs/character-sheet-full.md) into a full spec
 
 ## Playtest: sprint 1 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~45 minutes for part 1, ~15 each for parts 2 and 3. **DM** (normal browser) + **Player 1** (incognito) + **Player 2** (another browser). Regression run: [session-sim-4 report](../../.verify/20261014-194223-session-sim-4/report.md) (local, gitignored), all steps PASS, #186.
+Run from the repo root on `main` (PowerShell). ~45 minutes for part 1, ~15 each for parts 2 and 3. **DM** (normal browser) + **Player 1** (incognito) + **Player 2** (another browser). Regression run: [session-sim-4 report](../../.verify/20261014-194223-session-sim-4/report.md) (local, gitignored), all steps PASS, #186.
 
 ### Setup
 

@@ -1,6 +1,6 @@
 # Continue: orchestrator session handover
 
-Start your agent CLI (any Herdr agent kind; Claude Code today) in `C:\Repos\pocket-plane` inside Herdr and say:
+Start your agent CLI (any Herdr agent kind; Claude Code today) in the repo root inside Herdr and say:
 
 > Read `docs/agents/continue-session.md` and continue as the orchestrator.
 
@@ -77,7 +77,7 @@ Lessons from sprint 9 (2026-10-22/23), on top of the ones below:
 - A builder's "e2e N passed" can be a partial run: compare with `main`'s count before merging.
 
 Lessons from sprint 8 (2026-10-21/22), on top of the ones below:
-- **Never `cd` into a worktree, not even in a compound command**: the session's primary directory followed it and every later command started there (a no-op "merge" ran inside the branch). Use `git -C` and absolute script paths; a standalone `cd /c/Repos/pocket-plane` in a later call restored it.
+- **Never `cd` into a worktree, not even in a compound command**: the session's primary directory followed it and every later command started there (a no-op "merge" ran inside the branch). Use `git -C` and absolute script paths; a standalone `cd` back to the repo root in a later call restored it.
 - **Generated test data conflicts on almost every merge** (`replay.failing.json`, goldens): never hand-merge them; take main's side and regenerate with `UPDATE_FAILING=1` / `UPDATE_GOLDEN=1` in the branch.
 - `mergemain.sh` keeps both sides only in index / kinds / windows / session-sim files; other "append-only" files (`kinds.ts` lists with a new field, `sheet-sections.ts`, `notification-views.ts`) can merge into broken code: typecheck after every merge, or hand the merge to the builder.
 - Partial walkthroughs early (part 1 before a dependency lands, part 2 after) found real bugs while slots were idle; slices that depend on several branches (the pause screen) merge last and add every cross-slice hook themselves.

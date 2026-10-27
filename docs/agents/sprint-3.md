@@ -55,7 +55,7 @@ DM decisions #201 (fog v2 + dynamic vision), #202 (walls), #203 (sprint 3 scope)
 
 ## Playtest: sprint 3 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 3) + **Player 2** (another browser: Thorn). Regression run: [session-sim-7 report](../../.verify/20261017-005557-session-sim-7/report.md) (local, gitignored): 14 / 15 PASS, leak scan clean (WS + REST, both players) with vision, darkness, Invisible, triggers, handouts and compendium in play; hard kill mid-combat kept a pending Divine Fury card byte-identical. The one FAIL is the first known gap below.
+Run from the repo root on `main` (PowerShell). ~15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira, and Brakka in part 3) + **Player 2** (another browser: Thorn). Regression run: [session-sim-7 report](../../.verify/20261017-005557-session-sim-7/report.md) (local, gitignored): 14 / 15 PASS, leak scan clean (WS + REST, both players) with vision, darkness, Invisible, triggers, handouts and compendium in play; hard kill mid-combat kept a pending Divine Fury card byte-identical. The one FAIL is the first known gap below.
 
 ### Setup
 

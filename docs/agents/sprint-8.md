@@ -56,7 +56,7 @@ DM decisions #333 (sprint-7 recap: a window-frame pass with a stated 1280×720 p
 
 ## Playtest: sprint 8 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-12 report](../../.verify/20261022-194052-session-sim-12/report.md) (local, gitignored): **14 / 16 PASS** on final `main` (check 5,164, e2e 206), leak scan clean for both players, a hard kill while paused with a request open restarted byte-identical. Both sim-11 FAILs (windows on Mira at 1280×720, the players' reveal refit with the companion card) are fixed. The two new FAILs are the first known gaps below.
+Run from the repo root on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-12 report](../../.verify/20261022-194052-session-sim-12/report.md) (local, gitignored): **14 / 16 PASS** on final `main` (check 5,164, e2e 206), leak scan clean for both players, a hard kill while paused with a request open restarted byte-identical. Both sim-11 FAILs (windows on Mira at 1280×720, the players' reveal refit with the companion card) are fixed. The two new FAILs are the first known gaps below.
 
 ### Setup
 

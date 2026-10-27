@@ -64,7 +64,7 @@ bun run start --profile verify
 
 ## Playtest: sprint 6 features
 
-Run from `C:\Repos\pocket-plane` on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-10 report](../../.verify/20261020-181950-session-sim-10/report.md) (local, gitignored): **9 / 11 PASS** on final `main` (check 4,126, e2e 170), leak scan clean (WS + REST, both players) with companions, pets, summons, image tags and Preferences in play; a hard kill mid-combat with two summons, a hurt pet and an open concentration card restarted byte-identical (digest equal). The two FAILs are the first known gaps below.
+Run from the repo root on `main` (PowerShell). ~10–15 minutes per part. **DM** (normal browser) + **Player 1** (incognito: Mira and Brakka) + **Player 2** (another browser: Thorn). Regression run: [session-sim-10 report](../../.verify/20261020-181950-session-sim-10/report.md) (local, gitignored): **9 / 11 PASS** on final `main` (check 4,126, e2e 170), leak scan clean (WS + REST, both players) with companions, pets, summons, image tags and Preferences in play; a hard kill mid-combat with two summons, a hurt pet and an open concentration card restarted byte-identical (digest equal). The two FAILs are the first known gaps below.
 
 ### Setup
 
