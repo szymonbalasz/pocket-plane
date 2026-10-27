@@ -11,6 +11,13 @@ phase: post-mvp-9
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
+> **Sprint 13, slice K1 (kit parity, DM [#355](../decisions-log.md), [#356](../decisions-log.md); built by `build/kit-log`).** [Kit-parity §6.4](post-mvp/kit-parity.md#64-game-log-and-roll-popup) FR-KIT-40–49 amend this spec's line layout. FR-DICE-20's text, kinds and payloads are unchanged.
+> - **Row:** each entry is one 40-px row: medallion · "Name · action" · time · result boxes · chips · actions.
+> - **Details:** the full FR-DICE-20 line, with its FR-DICE-35 chips, the dice and the category, moves into the row's Tooltip.
+> - **Copy (FR-DICE-93, amended by FR-KIT-46):** a selection copies each row's full line, one per line. Screen readers read the full line from the row.
+> - **Row counts (FR-SHELL-35 / FR-DICE-38):** whole rows at the K5 sizes: ≥ 2 at 200 high, DM ≥ 4 at 1150×280, player ≥ 5 at 850×320.
+> - **Test IDs:** new `dice-log-entry-time`, `dice-log-entry-total`, `dice-log-entry-more`, `dice-log-entry-details`, `dice-log-entry-line`. `dice-log-die` lives in the Tooltip line. `dice-log-entry-text` is the row's "Name · action".
+
 > **Sprint 7, track ST (stats tier A, DM [#311](../decisions-log.md); spec-stats).** [Stats](stats.md) count nat 20s / nat 1s and decide visibility from this spec's facts. **Supersede is GM's** (FR-DICE-62–67; seam S2): the old entry is kept with `supersededBy` and the final roll counts (FR-DICE-67). New **FR-DICE-72** lists only the stats read rules on top of that. New **FR-DICE-73** adds a read-only helper. No schema, record type, window or line change: 0 B. ST0 reads these facts **after GM0** (seam S4).
 
 > **Sprint 8, track SB (stats tier B, DM [#334](../decisions-log.md); spec-sb).** The [luck tracker](stats.md#61-tier-b-sprint-8) reads roll facts only. **FR-DICE-89** adds d20 faces (dropped included), `manual` and `n` to the read helper, plus a whole-campaign read. **FR-DICE-90** states the contract any new roll path must keep so luck counts it (dice-extras' macros and roll requests; seam S6: players count public entries only). No schema, record, line or window change: 0 B.
