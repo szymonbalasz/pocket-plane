@@ -8,6 +8,7 @@
 // card or its maxed dice. Rules, levels, leaks, races, crash: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { entryLine } from "./support/log";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -140,7 +141,8 @@ test("FR-GEM-25 FR-GEM-29 FR-GEM-30 FR-GEM-34 FR-CBT-130 FR-CBT-131 P1 maxes Bra
   // The DM's outcome line labels the maxed chip `max` (FR-CBT-131).
   const outcome = line(logs[0] as Locator, /Brakka attacks Goblin: .* 16 slashing/);
   await expect(outcome).toHaveCount(1);
-  await expect(outcome.getByRole("img", { name: "max d6: 6" })).toHaveCount(1);
+  // Kit parity K1 (FR-KIT-45): the chips are in the row's Tooltip line.
+  await expect((await entryLine(outcome)).getByRole("img", { name: "max d6: 6" })).toHaveCount(1);
 
   // A physical total: the DM spends for Brakka in the popup; each die is asked first.
   const second = await attack(p1, [{ diceTotal: 12 }, { diceTotal: 8 }], [{ diceTotal: 9 }]);

@@ -2,10 +2,11 @@
 // Thin die-shape flows (D5; DICEX §13 step 22, DICE §13 sprint 4): A (DM) and B (player-1, Mira)
 // see `rolls-1` with die chips (e4's manual 15 a d20 + "physical"), B never the hidden rolls; B
 // rolls with advantage and `1d8+2d6` → chips in B's look (Crimson) in both logs, the dropped d20
-// struck; B's flat dice (popup chips, D7) draw die shapes. A's log at default size still shows ≥ 6 single-line
-// entries with d20 chips (FR-SHELL-35).
+// struck; B's flat dice (popup chips, D7) draw die shapes. A's log at default size still shows ≥ 4 one-line
+// entries (FR-SHELL-35; kit parity K1: 40-px rows, the chips in each row's Tooltip, FR-KIT-45).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { entryDice } from "./support/log";
 import { openWindow, shellWindow } from "./support/shell";
 
 /** Fixture values (`dicex-looks`, `rolls-1`): the DM's Obsidian body, player-1's Crimson body. */
@@ -16,9 +17,9 @@ const SECRET_LABEL = "DM-SECRET-ROLL";
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 
-/** Each chip of `entry`: the wrapper's data and the inner shape. */
-const chipsOf = (entry: Locator) =>
-  entry.getByTestId("dice-log-die").evaluateAll((els) =>
+/** Each chip of `entry` (in its Tooltip, FR-KIT-45): the wrapper's data and the inner shape. */
+const chipsOf = async (entry: Locator) =>
+  (await entryDice(entry)).evaluateAll((els) =>
     els.map((el) => ({
       faces: el.getAttribute("data-faces"),
       kept: el.getAttribute("data-kept"),
@@ -46,11 +47,11 @@ test("FR-DICE-35 FR-DICE-36 FR-DICEX-42 log die chips: history, adv and mixed di
   // `rolls-1`: the DM sees 4 entries, all with chips; e4 (Mira, manual 15) a d20 + physical.
   await expect(dmLog.getByTestId("dice-log-entry")).toHaveCount(4);
   for (const e of await dmLog.getByTestId("dice-log-entry").all()) {
-    await expect(e.getByTestId("dice-log-die").first()).toBeVisible();
+    await expect((await entryDice(e)).first()).toBeVisible();
   }
   const e4 = dmLog.getByTestId("dice-log-entry").nth(3);
   expect(await chipsOf(e4)).toEqual([{ faces: "20", kept: "true", shape: "d20", fill: DM_BODY }]);
-  await expect(e4.getByTestId("dice-log-die")).toHaveAttribute("data-value", "15");
+  await expect(await entryDice(e4)).toHaveAttribute("data-value", "15");
   await expect(e4.getByTestId("dice-log-entry-manual")).toBeVisible();
   // B: only the public history (e1, e4), never the hidden label.
   await expect(log.getByTestId("dice-log-entry")).toHaveCount(2);
@@ -66,7 +67,7 @@ test("FR-DICE-35 FR-DICE-36 FR-DICEX-42 log die chips: history, adv and mixed di
   const crimson = CRIMSON_BODY;
   for (const l of [log, dmLog]) {
     const adv = lastEntry(l, "(adv)");
-    await expect(adv.getByTestId("dice-log-die")).toHaveCount(2);
+    await expect(await entryDice(adv)).toHaveCount(2);
     const chips = await chipsOf(adv);
     expect(chips.map((c) => [c.shape, c.fill])).toEqual([
       ["d20", crimson],
@@ -75,7 +76,9 @@ test("FR-DICE-35 FR-DICE-36 FR-DICEX-42 log die chips: history, adv and mixed di
     expect(chips.map((c) => c.kept).sort()).toEqual(["false", "true"]);
     // The dropped chip is struck and dimmed.
     await expect(
-      adv.locator('[data-testid="dice-log-die"][data-kept="false"] [data-testid="dicex-die"]'),
+      (await entryDice(adv))
+        .and(adv.page().locator('[data-kept="false"]'))
+        .getByTestId("dicex-die"),
     ).toHaveClass(/opacity-40/);
   }
 
@@ -85,7 +88,7 @@ test("FR-DICE-35 FR-DICE-36 FR-DICEX-42 log die chips: history, adv and mixed di
   await log.getByTestId("dice-roll-expression").press("Enter");
   for (const l of [log, dmLog]) {
     const mixed = lastEntry(l, "1d8+2d6");
-    await expect(mixed.getByTestId("dice-log-die")).toHaveCount(3);
+    await expect(await entryDice(mixed)).toHaveCount(3);
     expect((await chipsOf(mixed)).map((c) => c.shape)).toEqual(["d8", "d6", "d6"]);
   }
 
@@ -118,16 +121,17 @@ const fullyShown = (log: Locator) =>
       const r = e.getBoundingClientRect();
       return r.height > 0 && r.top >= top - 0.5 && r.bottom <= bottom + 0.5;
     });
-    const multiLine = shown.filter((e) => e.getBoundingClientRect().height > 26).length;
+    // Kit parity K1 (FR-KIT-40): a row is one 40-px line.
+    const multiLine = shown.filter((e) => e.getBoundingClientRect().height > 41).length;
     return { count: shown.length, multiLine };
   });
 
-test("FR-DICE-35 FR-SHELL-35 chips fit the line: the DM's log at default size shows ≥ 6 single-line entries", async ({
+test("FR-DICE-35 FR-SHELL-35 FR-KIT-40 rows fit: the DM's log at default size shows ≥ 4 one-line entries", async ({
   browser,
 }) => {
   const { secret } = e2eEnv();
   const dm = await rolePage(browser);
-  // FR-DICE-38: ≥ 6 at the tall default size (1150×240 from 1440×900; 160 high below shows ≥ 3).
+  // FR-DICE-38: the tall default size (1150×280 from 1440×900, K5) holds 4 whole 40-px rows.
   await dm.setViewportSize({ width: 1440, height: 900 });
   await loginDm(dm, secret);
   await live(dm);
@@ -141,8 +145,8 @@ test("FR-DICE-35 FR-SHELL-35 chips fit the line: the DM's log at default size sh
     await log.getByTestId("dice-roll-expression").press("Enter");
     await expect(entries).toHaveCount(n + 1);
   }
-  await expect(entries.last().getByTestId("dice-log-die")).toHaveCount(1);
-  await expect.poll(async () => (await fullyShown(log)).count).toBeGreaterThanOrEqual(6);
+  await expect(await entryDice(entries.last())).toHaveCount(1);
+  await expect.poll(async () => (await fullyShown(log)).count).toBeGreaterThanOrEqual(4);
   expect((await fullyShown(log)).multiLine).toBe(0);
   await dm.context().close();
 });

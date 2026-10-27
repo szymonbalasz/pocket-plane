@@ -59,6 +59,7 @@ import dicexRequestOpen from "./dice-extras/dicex-request-open";
 import f3RequestPerception from "./dice-extras/f3-request-perception";
 import h1RequestInsight from "./dice-extras/h1-request-insight";
 import diceSettings from "./dice-roll-log/dice-settings";
+import kitLogRolls from "./dice-roll-log/kit-log-rolls";
 import logColours from "./dice-roll-log/log-colours";
 import rolls1 from "./dice-roll-log/rolls-1";
 import charBrakka from "./effect-modifiers/char-brakka";
@@ -298,4 +299,6 @@ export const units: readonly Fixture[] = [
   f3RequestPerception,
   // Sprint 12 T2 (build/theme-gilt): combat-1 stepped to round 3 for the Gilt & Stone walkthrough
   themeRound3,
+  // Sprint 13 K1 (build/kit-log): the kit's Game log rows (crit attack, damage, heal) as Mira
+  kitLogRolls,
 ];

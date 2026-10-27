@@ -242,3 +242,46 @@ describe("FR-DICEX-39 roll popup rendering", () => {
     expect(order(render("dm"))).toEqual(["b", "a"]);
   });
 });
+
+describe("FR-KIT-49 popup totals", () => {
+  test("FR-KIT-49 popup totals: each row starts with the actor's medallion (sm); each total is a Result box with the log row's outcome", () => {
+    const dmg = entry({ id: "e2", n: 2, actorName: "Goblin", category: "damage" }, [
+      {
+        rollId: "r2",
+        expression: "1d6+2",
+        mode: "normal",
+        manual: true,
+        dice: [{ faces: 6, value: 4, kept: true }],
+        constant: 2,
+        total: 6,
+        natural: null,
+        label: "Scimitar",
+      },
+    ]);
+    rollPopups.add({ entries: [entry(), dmg], looks: {}, big: null, threeD: false });
+    const html = render();
+    const rows = html.split('data-testid="dicex-popup-row"').slice(1);
+    expect(rows).toHaveLength(2);
+    for (const [r, letter] of [
+      [rows[0], "M"],
+      [rows[1], "G"],
+    ] as const) {
+      expect(r).toMatch(
+        new RegExp(
+          `^[^>]*>(?:(?!dicex-popup-actor).)*data-testid="kit-medallion"[^>]*data-size="sm"[^>]*>${letter}<`,
+        ),
+      );
+    }
+    const box = (r: string | undefined) =>
+      /<span[^>]*data-testid="dicex-popup-total"[^>]*>/.exec(r ?? "")?.[0] ?? "";
+    // Athletics: a natural 20 → crit; Scimitar damage → damage; natural / physical stay text after it.
+    expect(box(rows[0])).toContain('data-slot="kit-result"');
+    expect(box(rows[0])).toContain('data-outcome="crit"');
+    expect(box(rows[0])).toContain('data-size="sm"');
+    expect(box(rows[1])).toContain('data-outcome="damage"');
+    expect(rows[0]).toMatch(
+      /data-testid="dicex-popup-total"[^>]*>25<\/span><span[^>]*>natural 20!</,
+    );
+    expect(rows[1]).toMatch(/data-testid="dicex-popup-total"[^>]*>6<\/span><span[^>]*>physical</);
+  });
+});

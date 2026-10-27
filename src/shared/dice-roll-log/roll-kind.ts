@@ -188,6 +188,23 @@ export function rollBreakdownSegments(r: RollBreakdown): LineSegment[] {
   ];
 }
 
+/** FR-CHARX-55: a part run's name, the base item's label without its " (type)" suffix. */
+function partRunName(base: RollPayloadItem): string {
+  const type = base.part?.type;
+  const suffix = type ? ` (${type})` : "";
+  const label = base.label ?? "Damage";
+  return suffix && label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
+}
+
+/**
+ * A run's name as its line reads it: a lone item's label, else its expression; a part run's
+ * name ("Flame Tongue greatsword damage", FR-CHARX-55).
+ */
+export function runName(parts: readonly RollPayloadItem[]): string {
+  const base = parts[0] as RollPayloadItem;
+  return parts.length === 1 ? (base.label ?? base.expression) : partRunName(base);
+}
+
 /**
  * FR-CHARX-55: a weapon's damage parts as one run: "Flame Tongue greatsword damage: 2d6+5
  * (3 + 5) slashing + 2d6 (2 + 6) fire = 21". The name is the base item's label without its
@@ -199,11 +216,7 @@ export function partRunSegments(
   dm: readonly (RollItemDmMods | undefined)[] = [],
 ): LineSegment[] {
   const base = parts[0] as RollPayloadItem;
-  const type = base.part?.type;
-  const suffix = type ? ` (${type})` : "";
-  const label = base.label ?? "Damage";
-  const name = suffix && label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
-  const out: LineSegment[] = [{ text: name }, { text: ": " }];
+  const out: LineSegment[] = [{ text: partRunName(base) }, { text: ": " }];
   parts.forEach((item, i) => {
     if (i > 0) out.push({ text: " + " });
     out.push({ text: item.expression });
@@ -226,7 +239,7 @@ export function partRunSegments(
  * extra parts after it, every other item alone. Items without `part` are always alone, so old
  * rows group exactly as before.
  */
-function itemRuns(payload: readonly RollPayloadItem[]): number[][] {
+export function itemRuns(payload: readonly RollPayloadItem[]): number[][] {
   const runs: number[][] = [];
   payload.forEach((item, i) => {
     const last = runs[runs.length - 1];

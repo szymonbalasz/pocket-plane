@@ -23,7 +23,7 @@ import {
   logFocus,
   scrollToEntry,
 } from "./focus";
-import { GameLog } from "./GameLog";
+import { EntryDetails, GameLog } from "./GameLog";
 import { heldSegments } from "./logic";
 import { DICE_LOG_KIND } from "./window";
 
@@ -83,7 +83,11 @@ function store(entries: GameLogEntryView[], role: "dm" | "player" = "player"): R
   } as unknown as RecordStore;
 }
 
-function render(entries: GameLogEntryView[], role: "dm" | "player" = "player") {
+function renderWith(
+  el: React.ReactElement,
+  entries: GameLogEntryView[],
+  role: "dm" | "player" = "player",
+) {
   const sync = createStore<SyncState>()(
     () =>
       ({
@@ -97,11 +101,26 @@ function render(entries: GameLogEntryView[], role: "dm" | "player" = "player") {
   return renderToStaticMarkup(
     <SyncContext.Provider value={sync}>
       <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-        <GameLog />
+        {el}
       </TooltipProvider>
     </SyncContext.Provider>,
   );
 }
+
+const render = (entries: GameLogEntryView[], role: "dm" | "player" = "player") =>
+  renderWith(<GameLog />, entries, role);
+
+/** FR-KIT-45: each entry's Tooltip body (rendered on open), in order. */
+const details = (entries: GameLogEntryView[], role: "dm" | "player" = "player") =>
+  renderWith(
+    <div>
+      {entries.map((e) => (
+        <EntryDetails key={e.id} e={e} />
+      ))}
+    </div>,
+    entries,
+    role,
+  );
 
 /** Each `dice-log-die` wrapper with its inner `dicex-die`. */
 const chips = (html: string) =>
@@ -117,8 +136,9 @@ afterEach(() => {
 });
 
 describe("FR-DICE-35 log die chips (GameLog)", () => {
+  // FR-KIT-45: the chips are in the entry Tooltip's line now; the row shows the result boxes.
   test("FR-DICE-35 log die chips: a dice-log-die wrapper per chip with the inner data-shape", () => {
-    const html = render([
+    const html = details([
       entry(),
       entry({
         id: "e2",
@@ -155,25 +175,24 @@ describe("FR-DICE-35 log die chips (GameLog)", () => {
     expect(html).toMatch(/<s data-testid="dice-log-die"[^>]*data-value="4" data-kept="false"/);
     // No element carries two test IDs (review B31): the wrapper and the shape are separate.
     expect(html).not.toMatch(/data-testid="[^"]*"[^>]*data-testid=/);
-    // The line text is still there for copy / screen readers.
     expect(html).toContain("Athletics");
     expect(html).toContain('aria-label="d20: 13"');
   });
 
   test("FR-DICE-35 log die chips: chips in the roller's look (stored row, else the default)", () => {
-    const html = render([
+    const html = details([
       entry(),
       entry({ id: "e2", n: 2, rollerPlayerId: "p2", actorName: "Thorn" }),
       entry({ id: "e3", n: 3, rollerRole: "dm", rollerPlayerId: null, actorName: "Goblin" }),
     ]);
-    const rows = html.split('data-testid="dice-log-entry"').slice(1);
+    const rows = html.split('data-testid="dice-log-entry-details"').slice(1);
     expect(rows[0]).toContain(`fill="${STYLE_LOOK.gold.body}"`); // player-1: stored Gold
     expect(rows[1]).toContain(`fill="${STYLE_LOOK.sapphire.body}"`); // player-2: default
     expect(rows[2]).toContain(`fill="${STYLE_LOOK.obsidian.body}"`); // DM: Obsidian
   });
 
   test("FR-DICE-35 log die chips: a chip fits the line (18 px, centred, no taller line box)", () => {
-    const html = render([entry()]);
+    const html = details([entry()]);
     expect(html).toContain('width="18" height="18"');
     expect(html).toMatch(/data-testid="dice-log-die"[^>]*class="[^"]*-my-0\.5[^"]*align-middle/);
   });
@@ -246,10 +265,11 @@ describe("FR-DICE-93 a log line copies as one line (BL-57)", () => {
       ],
     });
     const entries = [entry(), kh3, d100];
-    const html = render(entries);
+    // FR-KIT-45: the line with its chips is the entry Tooltip's.
+    const html = details(entries);
     // No `<text>` in any svg; no inline-flex on a line, its chips or its badges.
     expect(html).not.toContain("<text");
-    const starts = [...html.matchAll(/<span[^>]*data-testid="dice-log-entry-text"/g)].map(
+    const starts = [...html.matchAll(/<span[^>]*data-testid="dice-log-entry-line"/g)].map(
       (m) => m.index ?? 0,
     );
     expect(starts).toHaveLength(3);
@@ -432,24 +452,32 @@ describe("FR-DICE-40 log line held", () => {
     const held = rowOf(html, "e1");
     expect(held).toContain('data-landed="false"');
     expect(held).toContain('aria-busy="true"');
-    // Two blank chips: shapes in the look, no number, no value; the dropped one still struck.
-    expect(held).not.toMatch(/data-testid="dice-log-die"[^>]*data-value=/);
-    expect(held).toMatch(/<s data-testid="dice-log-die"[^>]*data-kept="false"/);
-    expect(held.match(/data-shape="d20"/g)).toHaveLength(2);
-    expect(held).not.toContain("<text");
-    expect(held).toContain("<span>Athletics</span><span> (…)</span>");
-    expect(held).toContain(">…</strong>");
+    // FR-KIT-44: the row's box reads "…" with no outcome; the screen reader's line is held too.
+    expect(held).toMatch(/data-testid="dice-log-entry-total"[^>]*data-held=""[^>]*>…</);
+    expect(held).not.toMatch(/data-testid="dice-log-entry-total"[^>]*data-outcome/);
+    expect(held).toContain("Mira — Athletics (…): … … + 5 = …");
     expect(held).not.toContain(">18<");
     expect(held).not.toContain("natural");
+
+    // FR-KIT-45: the Tooltip's line: two blank chips in the look, the dropped one still struck.
+    const tip = details([entry()]);
+    expect(tip).not.toMatch(/data-testid="dice-log-die"[^>]*data-value=/);
+    expect(tip).toMatch(/<s data-testid="dice-log-die"[^>]*data-kept="false"/);
+    expect(tip.match(/data-shape="d20"/g)).toHaveLength(2);
+    expect(tip).not.toContain("<text");
+    expect(tip).toContain("<span>Athletics</span><span> (…)</span>");
+    expect(tip).toContain(">…</strong>");
+    expect(tip).not.toContain(">18<");
+    expect(tip).not.toContain("natural");
     // Actor, label and category are not held.
-    expect(held).toContain("Mira");
-    expect(held).toContain("Skill check");
+    expect(tip).toContain("Mira");
+    expect(tip).toContain("Skill check");
 
     const shown = rowOf(html, "e2");
     expect(shown).toContain('data-landed="true"');
     expect(shown).not.toContain("aria-busy");
-    expect(shown).toContain('data-value="13"');
-    expect(shown).toContain(">18</strong>");
+    expect(shown).toMatch(/data-testid="dice-log-entry-total"[^>]*>18</);
+    expect(details([entry({ id: "e2", n: 2 })])).toContain('data-value="13"');
   });
 
   test("FR-DICE-40 at the landing the numbers show (and fade in: each number carries data-landing)", () => {
@@ -458,8 +486,10 @@ describe("FR-DICE-40 log line held", () => {
     landing.api.setState({ holding: new Map() });
     const html = render([entry()]);
     expect(html).toContain('data-landed="true"');
-    expect(html).toMatch(/data-testid="dice-log-die"[^>]*data-value="13"[^>]*data-landing="true"/);
-    expect(html).toContain('<strong data-landing="true" class="font-semibold">18</strong>');
+    expect(html).toMatch(/data-testid="dice-log-entry-total"[^>]*data-landing="true"[^>]*>18</);
+    const tip = details([entry()]);
+    expect(tip).toMatch(/data-testid="dice-log-die"[^>]*data-value="13"[^>]*data-landing="true"/);
+    expect(tip).toContain('<strong data-landing="true" class="font-semibold">18</strong>');
   });
 
   test("FR-DICE-40 render only: lineText and the stored entry unchanged; held segments keep every non-number run", () => {

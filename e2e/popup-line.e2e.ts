@@ -11,6 +11,7 @@
 // rolled again (≤ 3), so a loaded machine can't fail it, and a real layout fault still does.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { entryDice } from "./support/log";
 import { openWindow } from "./support/shell";
 
 // Headless Chromium has WebGL only through SwiftShader, which Chrome gates behind a flag.
@@ -118,7 +119,7 @@ test("FR-DICEX-46 FR-DICEX-47 popup line: 3 dice in one line at 62 px (T5), each
   await expect(log2).toBeVisible();
   const entry = log2.locator(`[data-testid="dice-log-entry"][data-record-id="${twenty}"]`);
   await expect(entry).toHaveAttribute("data-focused", "true");
-  await expect(entry.getByTestId("dice-log-die")).toHaveCount(20);
+  await expect(await entryDice(entry)).toHaveCount(20);
 
   for (const page of [p1, p2]) await page.context().close();
 });

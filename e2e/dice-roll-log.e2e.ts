@@ -4,6 +4,7 @@
 // window, restart: bun test (dice-roll-log sync.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { entryLine } from "./support/log";
 import { openWindow } from "./support/shell";
 
 const entries = (page: Page) => page.getByTestId("dice-log-entry");
@@ -56,7 +57,8 @@ test("FR-DICE-05 FR-DICE-09 FR-DICE-15 player adv roll reaches DM; DM hidden rol
   await expect(entries(dm)).toHaveCount(5);
   await expect(entries(dm).nth(4)).toContainText("Mira");
   await expect(entries(dm).nth(4)).toContainText("(adv)");
-  await expect(entries(dm).nth(4).locator("s")).toHaveCount(1);
+  // The dropped die, struck, in the row's Tooltip line (kit parity K1, FR-KIT-45).
+  await expect((await entryLine(entries(dm).nth(4))).locator("s")).toHaveCount(1);
   await expect(entries(player)).toHaveCount(3);
 
   // DM: hidden roll (eye switched off for this roll) → muted for the DM, absent for players.

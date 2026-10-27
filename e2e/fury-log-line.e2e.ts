@@ -8,6 +8,7 @@
 // `trigger-state.e2e.ts` expects untouched.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { entryDice } from "./support/log";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -20,11 +21,14 @@ async function idByName(scope: Locator, name: string): Promise<string> {
   return (await r.first().getAttribute("data-record-id")) as string;
 }
 
-/** A log line's die chips labelled `label` (the inner shape's accessible name). */
-const chips = (entry: Locator, label: string) =>
-  entry
-    .getByTestId("dice-log-die")
-    .filter({ has: entry.page().locator(`[data-testid="dicex-die"][aria-label^="${label} d6"]`) });
+/**
+ * A log line's die chips labelled `label` (the inner shape's accessible name), from the row's
+ * Tooltip (kit parity K1, FR-KIT-45).
+ */
+const chips = async (entry: Locator, label: string) =>
+  (await entryDice(entry)).filter({
+    has: entry.page().locator(`[data-testid="dicex-die"][aria-label^="${label} d6"]`),
+  });
 
 test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip after '(Divine Fury)' on the outcome line for the player and the DM", async ({
   browser,
@@ -65,7 +69,7 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
   await expect(rollLine).toHaveAttribute("data-landed", "true", { timeout: 10_000 });
   // The dice are real: a natural 20 (5%) doubles the trigger's dice too (FR-CBT-16), 2d6.
   const crit = (await rollLine.textContent())?.includes("natural 20") ?? false;
-  const offered = chips(rollLine, "Divine Fury (on a hit)");
+  const offered = await chips(rollLine, "Divine Fury (on a hit)");
   await expect(offered).toHaveCount(crit ? 2 : 1);
   const dice: number[] = [];
   for (const d of await offered.all()) {
@@ -103,7 +107,7 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
       .getByTestId("dice-log-entry")
       .filter({ hasText: `+ ${n} radiant (Divine Fury)` });
     await expect(outcome).toHaveCount(1);
-    const chip = chips(outcome, "Divine Fury");
+    const chip = await chips(outcome, "Divine Fury");
     await expect(chip).toHaveCount(dice.length);
     for (const [i, die] of dice.entries()) {
       await expect(chip.nth(i)).toHaveAttribute("data-value", String(die));

@@ -158,9 +158,12 @@ describe("FR-DICE-68 entry actions", () => {
     expect(next).toMatch(
       /data-testid="dice-log-actions" class="[^"]*opacity-0[^"]*group-hover\/entry:opacity-100/,
     );
-    // The line is the hover group; the actions sit before the category Badge.
+    // The row is the hover group; FR-KIT-40: the actions end it, after the result boxes (the
+    // category moved into the Tooltip, FR-KIT-45).
     expect(next).toContain("group/entry");
-    expect(next?.indexOf("dice-log-actions")).toBeLessThan(next?.indexOf("Skill check") ?? 0);
+    expect(next?.indexOf("dice-log-actions")).toBeGreaterThan(
+      next?.indexOf("dice-log-entry-total") ?? Number.POSITIVE_INFINITY,
+    );
   });
 
   test("FR-DICE-68 entry actions: `feature` off → hidden; `clients` filters by role; order kept", () => {

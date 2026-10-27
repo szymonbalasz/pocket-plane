@@ -1419,3 +1419,28 @@
     color: var(--destructive);
   }
 }
+
+/* KIT: log (kit-parity K1, §6.4: Game log rows) ──────────────────────────────────────────────── */
+/* The row's rule is T2's inset shadow (no layout): the markup's border stays, unpainted. */
+:root[data-theme="gilt"] [data-slot="log-row"] {
+  border-bottom-color: transparent;
+}
+/* The time dim (re-tinted by token, so a hidden line's colour still wins) and in number type
+   (the kit's `.t`). */
+:root[data-theme="gilt"] [data-slot="log-time"] {
+  --muted-foreground: var(--gs-dim);
+  font-family: var(--font-num);
+}
+@layer base {
+  /* "Name · action": the name cream (or its player colour), the action muted (the kit's `.what`). */
+  :root[data-theme="gilt"] [data-slot="log-what"] {
+    color: var(--foreground);
+  }
+  /* A hidden line's box stays muted, as its text (outcome colours still win). */
+  :root[data-theme="gilt"]
+    [data-slot="log-row"]:has([data-testid="dice-log-entry-hidden"])
+    [data-slot="kit-result"] {
+    border-color: var(--frame-rule);
+    color: var(--muted-foreground);
+  }
+}
