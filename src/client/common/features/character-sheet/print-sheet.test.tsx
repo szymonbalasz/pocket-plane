@@ -459,7 +459,7 @@ describe("FR-CHARX-113 breakdown text", () => {
 
   test("FR-CHARX-113 breakdown text: the roll buttons' Tooltip leads with it (charx-breakdown); string hints unchanged", () => {
     const tip = (node: React.ReactNode) =>
-      renderToStaticMarkup(<>{rollButtonTip({ preview: { ...NO_PREVIEW, text: "" } }, node)}</>);
+      renderToStaticMarkup(rollButtonTip({ preview: { ...NO_PREVIEW, text: "" } }, node));
     const stage = `<span data-testid="dicex-stage-hint">${STAGE_HINT}</span>`;
     // A string hint renders exactly as before the node form existed.
     expect(tip("Shift: advantage")).toBe(`Shift: advantage · ${stage}`);
@@ -471,12 +471,10 @@ describe("FR-CHARX-113 breakdown text", () => {
     // The parts the roll picks up still lead (FR-MOD-27).
     expect(
       renderToStaticMarkup(
-        <>
-          {rollButtonTip(
-            { preview: { ...NO_PREVIEW, text: "Bless +1d4" } },
-            rollHint(mira, "save.dex", undefined),
-          )}
-        </>,
+        rollButtonTip(
+          { preview: { ...NO_PREVIEW, text: "Bless +1d4" } },
+          rollHint(mira, "save.dex", undefined),
+        ),
       ),
     ).toStartWith('Bless +1d4 · <span data-testid="charx-breakdown" data-value="save.dex">');
   });

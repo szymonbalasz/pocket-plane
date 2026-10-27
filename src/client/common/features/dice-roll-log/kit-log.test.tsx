@@ -76,7 +76,7 @@ const damage = entry({
   ],
   rollIds: ["r2"],
 });
-/** The DM's apply line (`cbt.hp`): neutral, no boxes. */
+/** The DM's apply line (`cbt.hp`): neutral; its amount boxed (K8). */
 const hp = entry({
   id: "e3",
   n: 3,
@@ -202,7 +202,8 @@ describe("FR-KIT-42 row action text", () => {
         .exec(row(html, id).body)?.[1]
         ?.replace(/<[^>]+>/g, "");
     expect(what("e1")).toBe("Mira · Longbow attack");
-    expect(what("e3")).toBe("DM · Goblin takes 16 damage");
+    // K8: a combat line reads as a short action; its number is a box.
+    expect(what("e3")).toBe("DM · Goblin takes damage");
     expect(tag(row(html, "e1").body, "dice-log-entry-text")).toContain("truncate");
     expect(tag(row(html, "e1").body, "dice-log-entry-actor")).toContain(
       `color:${colorHex("jade")}`,
@@ -247,8 +248,14 @@ describe("FR-KIT-44 outcome", () => {
     expect(tag(row(html, "e4").body, "dice-log-entry-total")).toContain('data-outcome="heal"');
     const d = row(html, "e2").body;
     expect(at(d, "dice-log-entry-manual")).toBeGreaterThan(at(d, "dice-log-entry-total"));
-    // No box on a line without rolls.
-    expect(render([hp])).not.toContain("dice-log-entry-total");
+    // No box on a line without numbers (a side change).
+    const side = entry({
+      id: "e5",
+      kind: "cbt.side",
+      payload: { targetName: "Wolf", side: "ally" },
+      rollIds: [],
+    });
+    expect(render([side])).not.toContain("dice-log-entry-total");
   });
 
   test("FR-KIT-44 outcome: at most 2 boxes, then '+N'", () => {
@@ -279,6 +286,85 @@ describe("FR-KIT-44 outcome", () => {
     expect(tag(body, "dice-log-entry-more")).not.toContain("tabindex");
     expect(body).not.toMatch(/>(29|12|13)</);
     expect(body).not.toContain("natural");
+  });
+});
+
+describe("K8 combat rows (K6 gaps 1, 2)", () => {
+  /** Mira's Longbow hit on Goblin as the DM sees it (AC in `dmPayload`). */
+  const attack = entry({
+    id: "e6",
+    kind: "cbt.attack",
+    rollerRole: "dm",
+    rollerPlayerId: null,
+    payload: {
+      targetName: "Goblin",
+      attackName: "Longbow",
+      damageType: "piercing",
+      toHit: { dice: 17, constant: 4, total: 21, natural: 17 },
+      hit: true,
+      damage: 8,
+      multiplier: "normal",
+      crit: false,
+    },
+    dmPayload: {
+      targetAc: 15,
+      hitComputed: true,
+      toHitRolled: 21,
+      damageRolled: 8,
+      damageTotal: 8,
+      applied: 8,
+      overkill: 0,
+      overrides: { toHit: false, hit: false, damage: false },
+    },
+    rollIds: [],
+  });
+
+  test("FR-KIT-42 row action text (K8): a cbt.attack row reads 'Mira · Longbow attack vs Goblin' with a to-hit and a damage box; the maths only in the full line", () => {
+    for (const role of ["dm", "player"] as const) {
+      const body = row(render([attack], role), "e6").body;
+      const what = /data-testid="dice-log-entry-text"[^>]*>([\s\S]*?)<\/span><\/span>/
+        .exec(body)?.[1]
+        ?.replace(/<[^>]+>/g, "");
+      expect(what).toBe("Mira · Longbow attack vs Goblin");
+      const boxes = [
+        ...body.matchAll(/<span[^>]*data-testid="dice-log-entry-total"[^>]*>([^<]*)</g),
+      ];
+      expect(boxes.map((m) => m[1])).toEqual(["21", "8"]);
+      expect(boxes[0]?.[0]).toContain('data-outcome="plain"');
+      expect(boxes[1]?.[0]).toContain('data-outcome="damage"');
+      // No roll record behind a combat line's numbers.
+      for (const m of boxes) expect(m[0]).not.toContain("data-record-id");
+    }
+    // FR-KIT-46: the full line stays the screen-reader / copy text (the DM's with its AC).
+    const dm = row(render([attack], "dm"), "e6").body;
+    expect(dm).toContain("Mira attacks Goblin: 17 + 4 = 21 vs AC 15 — hit! 8 piercing damage");
+    // A player's copy of the entry has no `dmPayload` (the server's filter): no AC anywhere.
+    const player = row(render([{ ...attack, dmPayload: null }], "player"), "e6").body;
+    expect(player).toContain("Mira attacks Goblin: 17 + 4 = 21 — DM: hit. 8 piercing damage");
+    expect(player).not.toContain("AC 15");
+  });
+
+  test("FR-KIT-44 outcome (K8): an 'attack + damage' roll row's damage box is red (`damage`)", () => {
+    const both = entry({
+      payload: [
+        item({ natural: 14, total: 18, dice: [{ faces: 20, value: 14, kept: true }] }),
+        item({
+          rollId: "r2",
+          expression: "1d8+2",
+          label: "Longbow damage (piercing)",
+          dice: [{ faces: 8, value: 5, kept: true }],
+          constant: 2,
+          total: 7,
+          natural: null,
+        }),
+      ],
+      rollIds: ["r1", "r2"],
+    });
+    const body = row(render([both]), "e1").body;
+    const tags = [...body.matchAll(/<span[^>]*data-testid="dice-log-entry-total"[^>]*>/g)];
+    expect(tags[0]?.[0]).toContain('data-outcome="plain"');
+    expect(tags[1]?.[0]).toContain('data-outcome="damage"');
+    expect(tags[1]?.[0]).toContain('data-record-id="r2"');
   });
 });
 

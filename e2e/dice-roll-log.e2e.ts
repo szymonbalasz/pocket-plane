@@ -4,7 +4,7 @@
 // window, restart: bun test (dice-roll-log sync.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { entryLine } from "./support/log";
+import { entryLine, pickRollOption } from "./support/log";
 import { openWindow } from "./support/shell";
 
 const entries = (page: Page) => page.getByTestId("dice-log-entry");
@@ -19,7 +19,7 @@ async function openOptions(log: Locator) {
 async function roll(page: Page, expression: string, opts: { category?: string; label?: string }) {
   const log = await openWindow(page, "dice.log");
   if (opts.category || opts.label) await openOptions(log);
-  if (opts.category) await log.getByTestId("dice-roll-category").selectOption(opts.category);
+  if (opts.category) await pickRollOption(log, "dice-roll-category", opts.category);
   if (opts.label) await log.getByTestId("dice-roll-label").fill(opts.label);
   await log.getByTestId("dice-roll-expression").fill(expression);
   return log;
@@ -51,7 +51,7 @@ test("FR-DICE-05 FR-DICE-09 FR-DICE-15 player adv roll reaches DM; DM hidden rol
 
   // Player: as Mira, attack, Shift+Enter → advantage; the DM sees it live.
   const plog = await roll(player, "1d20+4", { category: "attack" });
-  await plog.getByTestId("dice-roll-actor").selectOption(recordId("char-mira", "entity"));
+  await pickRollOption(plog, "dice-roll-actor", recordId("char-mira", "entity"));
   await plog.getByTestId("dice-roll-expression").press("Shift+Enter");
   await expect(plog.getByTestId("dice-roll-expression")).toHaveValue("");
   await expect(entries(dm)).toHaveCount(5);
@@ -88,7 +88,7 @@ test("FR-DICE-05 FR-DICE-09 FR-DICE-15 player adv roll reaches DM; DM hidden rol
   await expect(plog.getByTestId("dice-roll-submit")).toHaveAttribute("data-physical", "true");
   await plog.getByTestId("dice-roll-expression").fill("1d20");
   await plog.getByTestId("dice-roll-submit").getByTestId("dice-physical-marker").waitFor();
-  await plog.getByTestId("dice-roll-category").selectOption("saving-throw");
+  await pickRollOption(plog, "dice-roll-category", "saving-throw");
   await plog.getByTestId("dice-roll-submit").click();
   // The popover says what the roll is for (actor — label or category), not just "1d20".
   await expect(player.getByTestId("dice-manual-label")).toHaveText("Mira — Saving throw");
@@ -146,13 +146,12 @@ test("FR-DICE-30 compact roll bar: one row, Options row, dot, eye preset, stored
   ]) {
     await expect(log.getByTestId(id)).toBeVisible();
   }
-  const category = log.getByTestId("dice-roll-category");
-  await category.selectOption("skill-check");
+  await pickRollOption(log, "dice-roll-category", "skill-check");
   await expect(pub).toHaveAttribute("data-state", "hidden");
   await expect(options).toHaveAttribute("data-dirty", "true");
-  await category.selectOption("damage");
+  await pickRollOption(log, "dice-roll-category", "damage");
   await expect(pub).toHaveAttribute("data-state", "public");
-  await category.selectOption("other");
+  await pickRollOption(log, "dice-roll-category", "other");
   await expect(options).toHaveAttribute("data-dirty", "false");
   await log.getByTestId("dice-roll-label").fill("Stealth");
   await expect(options).toHaveAttribute("data-dirty", "true");

@@ -53,8 +53,10 @@ import {
   EyeOffIcon,
   HandIcon,
 } from "lucide-react";
+import { Select as SelectPrimitive } from "radix-ui";
 import {
   type ClipboardEvent,
+  type ComponentProps,
   type ReactNode,
   useId,
   useLayoutEffect,
@@ -66,7 +68,14 @@ import { Medallion } from "../../components/kit/medallion";
 import { ResultBox } from "../../components/kit/result-box";
 import { Button } from "../../components/ui/button";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
-import { Tooltip } from "../../components/ui/overlays";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tooltip,
+} from "../../components/ui/overlays";
 import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
@@ -81,6 +90,9 @@ import { EntryActions } from "./entry-action-button";
 import { type EntryAction, entryActions } from "./entry-actions";
 import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
 import {
+  actorGroups,
+  actorItemValue,
+  actorLabel,
   actorOptions,
   actorSelection,
   copiedRows,
@@ -98,8 +110,22 @@ import { rollerAttr, rollerColorKey, useColorKeyOf } from "./name-color";
 import { usePhysicalDice, useRollBarActor, useRollOptionsOpen } from "./physical";
 import { RollButton, type RollKeys, useRollControl } from "./roll-control";
 
-const SELECT =
-  "h-7 min-w-0 shrink-0 rounded-md border border-input bg-background px-1.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50";
+/** K8: the roll bar's Select triggers, as small as the native selects were. */
+const SELECT = "h-7 min-w-0 shrink-0 gap-1 px-1.5 py-0 text-xs [&>span]:truncate";
+
+/** K8: a section of the roll-as Select (Radix's group + label; the shared menu label's look). */
+function SelectGroup(props: ComponentProps<typeof SelectPrimitive.Group>) {
+  return <SelectPrimitive.Group data-slot="select-group" {...props} />;
+}
+function SelectLabel(props: ComponentProps<typeof SelectPrimitive.Label>) {
+  return (
+    <SelectPrimitive.Label
+      data-slot="select-label"
+      className="px-2 py-1.5 text-xs font-medium text-muted-foreground"
+      {...props}
+    />
+  );
+}
 
 function Segment({
   s,
@@ -244,7 +270,7 @@ function MoreResults({ rest, landed }: { rest: readonly RowResult[]; landed: boo
       content={
         <div className="flex flex-col gap-0.5">
           {rest.map((r) => (
-            <span key={r.rollId}>
+            <span key={r.key}>
               {r.label}: {r.total}
             </span>
           ))}
@@ -364,9 +390,10 @@ function Entry({
         </time>
         {results.slice(0, ROW_RESULTS_MAX).map((r) => (
           <ResultBox
-            key={r.rollId}
+            key={r.key}
             data-testid="dice-log-entry-total"
-            data-record-id={r.rollId}
+            // K8: a combat line's numbers have no roll record.
+            data-record-id={r.rollId ?? undefined}
             data-landing
             value={r.total}
             outcome={r.outcome}
@@ -794,48 +821,73 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
       {physical && <PhysicalStrip onOff={() => setPhysical(false)} />}
       {optionsOpen && (
         <div id={`${uid}-options`} className="flex flex-wrap items-center gap-1.5">
-          <select
-            data-testid="dice-roll-category"
-            aria-label="Category"
-            className={cn(SELECT, "max-w-28")}
+          {/* K8 (K6 gap 8): the shared Select, not a native one; the trigger keeps the test ID
+              and carries the value (`data-value`), each item `…-option` + `data-value`. */}
+          <Select
             value={category}
             disabled={!live}
-            onChange={(e) => setCategory(e.target.value as RollCategory)}
+            onValueChange={(v) => setCategory(v as RollCategory)}
           >
-            {ROLL_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {CATEGORY_LABEL[c]}
-              </option>
-            ))}
-          </select>
-          <select
-            data-testid="dice-roll-actor"
-            aria-label="Roll as"
-            className={cn(SELECT, "max-w-24")}
-            value={selected?.value ?? ""}
-            disabled={!live}
-            onChange={(e) => setActor(actors.find((a) => a.value === e.target.value) ?? null)}
-          >
-            {actorList
-              .filter((a) => !a.group)
-              .map((a) => (
-                <option key={a.value} value={a.value}>
-                  {a.label}
-                </option>
+            <SelectTrigger
+              data-testid="dice-roll-category"
+              data-value={category}
+              aria-label="Category"
+              className={cn(SELECT, "max-w-28")}
+            >
+              <SelectValue>{CATEGORY_LABEL[category]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {ROLL_CATEGORIES.map((c) => (
+                <SelectItem
+                  key={c}
+                  value={c}
+                  data-testid="dice-roll-category-option"
+                  data-value={c}
+                >
+                  {CATEGORY_LABEL[c]}
+                </SelectItem>
               ))}
-            {(["Characters", "Tokens", "Combatants"] as const).map((g) => {
-              const list = actorList.filter((a) => a.group === g);
-              return list.length === 0 ? null : (
-                <optgroup key={g} label={g}>
-                  {list.map((a) => (
-                    <option key={a.value} value={a.value} disabled={a.stale}>
-                      {a.stale ? `${a.label} (gone)` : a.label}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </select>
+            </SelectContent>
+          </Select>
+          <Select
+            value={actorItemValue(selected?.value ?? "")}
+            disabled={!live}
+            onValueChange={(v) =>
+              setActor(actors.find((a) => actorItemValue(a.value) === v) ?? null)
+            }
+          >
+            <SelectTrigger
+              data-testid="dice-roll-actor"
+              data-value={selected?.value ?? ""}
+              aria-label="Roll as"
+              className={cn(SELECT, "max-w-24")}
+            >
+              <SelectValue>{selected ? actorLabel(selected) : ""}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {actorGroups(actorList).map(({ group, options }) => {
+                const items = options.map((a) => (
+                  <SelectItem
+                    key={a.value}
+                    value={actorItemValue(a.value)}
+                    disabled={a.stale}
+                    data-testid="dice-roll-actor-option"
+                    data-value={a.value}
+                  >
+                    {actorLabel(a)}
+                  </SelectItem>
+                ));
+                return group === null ? (
+                  items
+                ) : (
+                  <SelectGroup key={group}>
+                    <SelectLabel>{group}</SelectLabel>
+                    {items}
+                  </SelectGroup>
+                );
+              })}
+            </SelectContent>
+          </Select>
           <Input
             data-testid="dice-roll-label"
             aria-label="Label"

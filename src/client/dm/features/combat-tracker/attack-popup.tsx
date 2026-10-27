@@ -145,15 +145,38 @@ const CARD_LINE = "flex min-h-9 items-center gap-2";
 /** FR-KIT-63: an input drawn as a Result box (`data-slot="kit-result"`, number centred, large). */
 const RESULT_INPUT =
   "h-8 w-16 shrink-0 px-1 text-center text-xl font-semibold leading-none tabular-nums";
-/** FR-KIT-63: the Result box's outcome colours (meaning tokens, FR-THEME-09) on an input. */
+/**
+ * FR-KIT-63: the Result box's outcome colours (meaning tokens, FR-THEME-09) on an input. K8 (K6
+ * gap 7): the damage box keeps a neutral border, only its number is red (the kit's `.res.dmg`).
+ */
 const OUTCOME_INPUT: Partial<Record<ResultOutcome, string>> = {
   crit: "border-hp-full/60 text-hp-full",
   fumble: "text-muted-foreground",
-  damage: "border-destructive/60 text-destructive",
+  damage: "text-destructive",
 };
+/** FR-KIT-63 (K8): a result line's label in body type, not label type (`card-label`). */
+const CARD_LABEL = "min-w-0 flex-1 flex-wrap text-sm font-normal";
 /** FR-KIT-64: Remove shows on the row's hover / focus, always without hover (FR-KIT-03). */
 const ROW_HOVER =
   "opacity-0 transition-opacity focus-visible:opacity-100 group-hover/target:opacity-100 group-focus-within/target:opacity-100 [@media(hover:none)]:opacity-100";
+/** K8 (K6 gap 7): Remove's slot takes no room until then, so the target row stays one line. */
+const ROW_HOVER_SLOT =
+  "flex w-0 shrink-0 overflow-hidden group-hover/target:w-6 group-focus-within/target:w-6 [@media(hover:none)]:w-6";
+const MODE_SHORT = { advantage: "adv", disadvantage: "dis" } as const;
+
+/**
+ * K8 (K6 gap 7): the kit's "Apply 16": the card's damage (base + extra parts, as shown) while a
+ * row is a Hit; plain "Apply" with no damage yet or every row a Miss. Per-target multipliers and
+ * popup parts stay in each row's preview (OQ-KIT-11 A).
+ */
+export function applyLabel(
+  damage: number | null,
+  extra: readonly number[],
+  hits: readonly boolean[],
+): string {
+  if (damage === null || !hits.some(Boolean)) return "Apply";
+  return `Apply ${extra.reduce((n, x) => n + x, damage)}`;
+}
 
 /** FR-KIT-63: the to-hit box's outcome: natural 20 → crit, natural 1 → fumble, else plain. */
 export const toHitOutcome = (natural: number | null): ResultOutcome =>
@@ -466,6 +489,12 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
   const toHitTotal = ruling?.toHitTotal ?? totalOf(toHit) ?? p.toHit?.total ?? 0;
   const rolledNatural = p.toHit?.natural ?? null;
   const natural = naturalMark(rolledNatural);
+  // K8 (K6 gap 7): the to-hit line's label, the kit's "Mira · Longbow attack".
+  const attackLabel = (
+    <span>
+      <strong className="font-semibold">{p.attackerName}</strong> · {p.attackName} attack
+    </span>
+  );
   // An empty / non-number cell falls back to the roll; none yet → null (FR-CBT-72).
   const damageTotal = totalOf(damage) ?? p.damage?.total ?? null;
   // FR-CBT-82: each extra part's total (an empty / non-number cell falls back to the roll).
@@ -691,18 +720,18 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
           </button>
         </Tooltip>
       </div>
-      <p className="-mt-1 text-xs text-muted-foreground">
-        {p.mode !== "normal" ? `${p.mode} · ` : ""}
-        {p.crit ? "Critical! " : ""}
-        {card.text}
-      </p>
-      {/* FR-KIT-63: result lines, each ending in a boxed value. */}
+      {/* K8 (K6 gap 7): no summary line under the bar (the card's text repeats the lines below;
+          its mode reads "adv" / "dis" after the to-hit dice). FR-KIT-63: result lines, each
+          ending in a boxed value; the to-hit line names "Mira · Shortsword attack" as the kit. */}
       <div className="flex flex-col">
         {p.toHit && ruling && (
           // FR-CBT-89: the ruled to-hit, read-only.
           <div data-slot="card-line" className={CARD_LINE}>
-            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-sm">
-              To hit
+            <span
+              data-slot="card-label"
+              className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-sm"
+            >
+              {attackLabel}
               {natural !== null && (
                 <span data-testid="cbt-popup-natural" data-value={natural} className="text-xs">
                   natural {natural}
@@ -716,9 +745,15 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
         )}
         {p.toHit && !ruling && (
           <div data-slot="card-line" className={CARD_LINE}>
-            <Label htmlFor="cbt-popup-tohit" className="min-w-0 flex-1 flex-wrap text-sm">
-              To hit <Dice dice={p.toHit.dice} /> {p.toHit.constant >= 0 ? "+" : "−"}
+            <Label htmlFor="cbt-popup-tohit" data-slot="card-label" className={CARD_LABEL}>
+              {attackLabel} <Dice dice={p.toHit.dice} /> {p.toHit.constant >= 0 ? "+" : "−"}
               {Math.abs(p.toHit.constant)}
+              {p.mode !== "normal" && (
+                <span data-testid="cbt-popup-mode" data-value={p.mode} className="text-xs">
+                  {" "}
+                  {MODE_SHORT[p.mode]}
+                </span>
+              )}
               {/* effect-modifiers (FR-MOD-20): the card's parts, already in its total. */}
               {p.toHit.mods && lineText(modSegments(p.toHit.mods))}
               {natural !== null && (
@@ -751,7 +786,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
           </div>
         )}
         <div data-slot="card-line" className={CARD_LINE}>
-          <Label htmlFor="cbt-popup-damage" className="min-w-0 flex-1 flex-wrap text-sm">
+          <Label htmlFor="cbt-popup-damage" data-slot="card-label" className={CARD_LABEL}>
             Damage{p.damageType ? `, ${p.damageType}` : ""}{" "}
             {p.damage ? (
               <>
@@ -809,7 +844,8 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
           <div key={i} data-slot="card-line" className={CARD_LINE}>
             <Label
               htmlFor={`cbt-popup-damage-part-${i + 1}`}
-              className="min-w-0 flex-1 flex-wrap text-sm"
+              data-slot="card-label"
+              className={CARD_LABEL}
             >
               + {x.type}
               {/* FR-CBT-131: a maxed extra part shows its dice with the "max" Badge. */}
@@ -873,11 +909,12 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                 data-slot="card-target"
                 className="group/target flex flex-col gap-1 rounded-md border px-1.5 py-1"
               >
-                {/* FR-KIT-64: one compact line; it wraps only when the window is too narrow. */}
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
+                {/* FR-KIT-64: one compact line; K8 (K6 gap 7): it never wraps, a long name
+                    truncates in its chip. */}
+                <div className="flex items-center gap-1.5 text-sm">
                   <span
                     data-slot="card-target-chip"
-                    className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5"
+                    className="inline-flex min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5"
                   >
                     <Medallion
                       name={x.c.name}
@@ -897,14 +934,17 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                     <span aria-hidden className="text-muted-foreground">
                       ·
                     </span>
-                    {/* FR-CBT-72: a damage-only card has no to-hit to compare: AC alone. */}
-                    <AcCell combatantId={x.c.id} facts={x.facts} damageOnly={shape === "damage"} />
+                    {/* K8 (K6 gap 7): the kit's "Goblin · AC 15", on every card (the Hit toggle
+                        beside it says the comparison; FR-CBT-72's damage-only text). */}
+                    <span className="shrink-0">
+                      <AcCell combatantId={x.c.id} facts={x.facts} damageOnly />
+                    </span>
                   </span>
                   {!ruling && (
                     <Button
                       size="sm"
                       variant={x.hit ? "default" : "outline"}
-                      className="h-6 px-2 text-xs"
+                      className="h-6 shrink-0 px-1.5 text-xs"
                       data-testid="cbt-popup-target-hit"
                       data-record-id={x.c.id}
                       data-value={x.hit ? "hit" : "miss"}
@@ -919,7 +959,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                       data-testid="cbt-popup-target-natural"
                       data-record-id={x.c.id}
                       data-value={x.contra.natural}
-                      className="text-xs font-medium text-hp-bloodied"
+                      className="shrink-0 text-xs font-medium text-hp-bloodied"
                     >
                       natural {x.contra.natural}
                     </span>
@@ -929,6 +969,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                     data-testid="cbt-popup-target-mult"
                     data-record-id={x.c.id}
                     data-value={x.mult}
+                    className="shrink-0"
                     value={x.mult}
                     onValueChange={(v) => v && setRow(x.c.id, { mult: v as DamageMultiplier })}
                   >
@@ -936,7 +977,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                       <ToggleGroupItem
                         key={m}
                         value={m}
-                        className="h-6 px-1.5 text-xs"
+                        className="h-6 px-1 text-[11px]"
                         data-testid="cbt-popup-target-mult-option"
                         data-value={m}
                       >
@@ -947,26 +988,29 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                   <span
                     data-testid="cbt-popup-target-preview"
                     data-record-id={x.c.id}
-                    className="ml-auto text-xs tabular-nums"
+                    className="ml-auto shrink-0 text-xs tabular-nums"
                   >
-                    {/* FR-CBT-78 (G5): temp HP absorbs first, "Thorn 10 (+5) → 10 (+2)". */}
+                    {/* FR-CBT-78 (G5): temp HP absorbs first, "10 (+5) → 10 (+2)". K8: the
+                        chip names the target, so the inline preview doesn't. */}
                     {x.raw === null
-                      ? `${x.c.name}: ?`
+                      ? "?"
                       : x.hp
-                        ? previewText(x.c.name, x.hp, x.raw)
-                        : `${x.c.name}: ${x.raw}`}
+                        ? previewText("", x.hp, x.raw).trimStart()
+                        : String(x.raw)}
                   </span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className={cn("size-6", ROW_HOVER)}
-                    data-testid={ruling ? "cbt-popup-row-drop" : "cbt-popup-target-remove"}
-                    data-record-id={x.c.id}
-                    aria-label={`${ruling ? "Drop" : "Remove"} ${x.c.name}`}
-                    onClick={() => remove(x.c)}
-                  >
-                    <XIcon className="size-3.5" />
-                  </Button>
+                  <span className={ROW_HOVER_SLOT}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className={cn("size-6", ROW_HOVER)}
+                      data-testid={ruling ? "cbt-popup-row-drop" : "cbt-popup-target-remove"}
+                      data-record-id={x.c.id}
+                      aria-label={`${ruling ? "Drop" : "Remove"} ${x.c.name}`}
+                      onClick={() => remove(x.c)}
+                    >
+                      <XIcon className="size-3.5" />
+                    </Button>
+                  </span>
                 </div>
                 {x.contra && (
                   // FR-CBT-57/58: a ruling against a natural roll is public.
@@ -1052,7 +1096,11 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
             disabled={disabled || !ready}
             onClick={apply}
           >
-            Apply
+            {applyLabel(
+              damageTotal,
+              extraTotals,
+              rows.map((x) => x.hit),
+            )}
           </Button>
         )}
       </div>
