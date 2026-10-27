@@ -90,6 +90,12 @@ export function medallionColour(store: RecordStore, c: { tokenId?: string | null
   return isCreatureType(type) ? CREATURE_COLORS[type] : null;
 }
 
+/**
+ * A narrow Initiative list (under 20rem, `@container/init`: the DM's 320 min, the player's 280)
+ * draws the `lg` medallion at `md`, so the name block keeps its room.
+ */
+const NARROW_LG = "@max-[20rem]/init:size-7 @max-[20rem]/init:text-[13px]";
+
 /** FR-KIT-24: a combatant's medallion (portrait, else the initial on its token's type colour). */
 export function CombatantMedallion({
   c,
@@ -99,7 +105,15 @@ export function CombatantMedallion({
   size?: MedallionSize;
 }) {
   const colour = useSync((s) => medallionColour(s.store, c));
-  return <Medallion name={c.name} imageAssetId={c.imageAssetId} colour={colour} size={size} />;
+  return (
+    <Medallion
+      name={c.name}
+      imageAssetId={c.imageAssetId}
+      colour={colour}
+      size={size}
+      className={size === "lg" ? NARROW_LG : undefined}
+    />
+  );
 }
 
 export const InitiativeIcon = SwordsIcon;

@@ -97,7 +97,7 @@ function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
         max={c.hpMax}
         data-testid="cbt-init-row-hp"
         data-record-id={c.id}
-        className="min-w-0 flex-1"
+        className="min-w-fit flex-1"
       />
     );
   }
@@ -108,7 +108,7 @@ function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
         max={hp.max}
         data-testid="cbt-init-row-hp"
         data-record-id={c.id}
-        className="min-w-0 flex-1"
+        className="min-w-fit flex-1"
       />
     );
   }
@@ -150,7 +150,7 @@ function PlayerRowMain({
     // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer shortcut; the card icon is the keyboard path
     <div
       data-row-main
-      className={cn("relative flex items-center gap-2", own && "cursor-pointer")}
+      className={cn("relative flex items-center gap-1.5", own && "cursor-pointer")}
       onClick={own ? () => openCard(c.id) : undefined}
     >
       <CombatantMedallion c={c} />
@@ -191,7 +191,7 @@ function PlayerRowMain({
         )}
         <div
           data-stats-line
-          className="mt-0.5 flex min-w-0 items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden"
+          className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden"
         >
           <PlayerHp c={c} own={own} />
           {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down. */}
@@ -281,7 +281,7 @@ function PlayerCompanionLine({
     // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer shortcut; the card icon is the keyboard path
     <div
       data-row-main
-      className={cn("flex min-w-0 items-center gap-2", own && "cursor-pointer")}
+      className={cn("flex min-w-0 items-center gap-1.5", own && "cursor-pointer")}
       onClick={own ? () => openCard(c.id) : undefined}
     >
       {/* FR-KIT-29 / -30: the grid at medallion `sm`. */}
@@ -455,7 +455,7 @@ function PlayerInitiativeBody() {
       <ul
         ref={listRef}
         data-testid="cbt-init-list"
-        className="-mx-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2"
+        className="@container/init -mx-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2"
       >
         {layout.map(({ c, lines, owner, indent }) => (
           <PlayerRow

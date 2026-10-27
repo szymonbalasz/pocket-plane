@@ -167,9 +167,11 @@ import { SummonDialog, useSummonDialog } from "./summon-dialog";
 
 /**
  * FR-CBTX-46 (G1): the Init column is wide while some row can roll (round 0, a late joiner
- * without initiative); else just the number input, so the name line keeps room for chips.
+ * without initiative); else just the number input, so the name line keeps room for chips. On a
+ * narrow list (under 20rem, the 320 min) the Roll button is its icon (label for screen readers),
+ * so the kit row's HP line keeps its room (FR-KIT-25).
  */
-const INIT_W = { wide: "w-[100px]", narrow: "w-9" } as const;
+const INIT_W = { wide: "w-[100px] @max-[20rem]/init:w-[68px]", narrow: "w-9" } as const;
 
 function InitiativeCell({
   c,
@@ -253,12 +255,12 @@ function InitiativeCell({
           data-record-id={c.id}
           size={unset ? "sm" : "icon"}
           variant={unset ? "outline" : "ghost"}
-          className={unset ? "h-7 gap-1 px-2 text-xs" : "size-7"}
+          className={unset ? "h-7 gap-1 px-2 text-xs @max-[20rem]/init:px-1.5" : "size-7"}
           aria-label={`Roll initiative for ${c.name}`}
           disabled={disabled}
         >
           <DicesIcon className="size-3.5" />
-          {unset && "Roll"}
+          {unset && <span className="@max-[20rem]/init:sr-only">Roll</span>}
         </RollButton>
       )}
     </div>
@@ -448,7 +450,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
               data-record-id={c.id}
               size="icon"
               variant="ghost"
-              className="size-7"
+              className="size-6"
               aria-label={`Attack with ${c.name}`}
               disabled={a.disabled}
             >
@@ -676,6 +678,12 @@ function useTailFold(rowRef: RefObject<HTMLElement | null>, deps: unknown): bool
  * FR-KIT-03, -29: a row's hover group: shown on hover, keyboard focus within, an open menu, the
  * current-turn row (`group/row` + `data-turn`) and under `(hover: none)`; never moves the layout.
  */
+/**
+ * A row's ⋯ menu is long (Move, Check ▸ / Save ▸, effects, HP, side, companion, Remove): capped at
+ * the room Radix measures and scrolled, so every item stays reachable on a short viewport.
+ */
+const ROW_MENU = "max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-auto";
+
 const HOVER_GROUP =
   "flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover/row:opacity-100 group-data-[turn=true]/row:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100";
 
@@ -791,7 +799,7 @@ function RowMain({
       ref={mainRef}
       data-row-main
       className={cn(
-        "relative flex items-center gap-2",
+        "relative flex items-center gap-1.5",
         c.hidden && "opacity-70",
         skipped && "opacity-50",
       )}
@@ -857,10 +865,11 @@ function RowMain({
         {/* FR-KIT-25: HP bar + "cur / max" (its `data-band` is the band, FR-CBT-26), temp "+N",
             the companion's card, PC Down / death state, then the muted AC / moved tail, which
             folds into the name's Tooltip when the line can't hold it (moved from round 1 only:
-            before the first turn nothing has moved, P3 glitch 10, ruling A). */}
+            before the first turn nothing has moved, P3 glitch 10, ruling A). Never cut
+            (FR-CBTX-57): still too narrow, whole parts wrap onto a second line. */}
         <div
           data-stats-line
-          className="relative mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-muted-foreground tabular-nums"
+          className="relative mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums"
         >
           {hp ? (
             <HpBar
@@ -868,7 +877,7 @@ function RowMain({
               max={hp.max}
               data-testid="cbt-init-row-hp"
               data-record-id={c.id}
-              className="min-w-0 flex-1"
+              className="min-w-fit flex-1"
             />
           ) : (
             <span className="shrink-0" data-testid="cbt-init-row-hp" data-record-id={c.id}>
@@ -883,7 +892,8 @@ function RowMain({
           <span
             data-tail
             data-folded={folded}
-            className={cn("shrink-0", folded && "invisible absolute")}
+            // Folded: measured out of the flow, pinned right so it adds no scroll width.
+            className={cn("shrink-0", folded && "invisible absolute top-0 right-0")}
             aria-hidden={folded || undefined}
           >
             AC {ac ?? "—"}
@@ -919,7 +929,7 @@ function RowMain({
             <Button
               size="icon"
               variant="ghost"
-              className="size-7"
+              className="size-6"
               data-testid="cbt-init-row-menu"
               data-record-id={c.id}
               aria-label={`More for ${c.name}`}
@@ -927,7 +937,7 @@ function RowMain({
               <EllipsisIcon className="size-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" className={ROW_MENU}>
             <RowMoveItems c={c} />
             {hasScores && (
               <>
@@ -1007,7 +1017,7 @@ function CompanionLine({
     <div
       data-row-main
       className={cn(
-        "relative flex items-center gap-2",
+        "relative flex items-center gap-1.5",
         c.hidden && "opacity-70",
         skipped && "opacity-50",
       )}
@@ -1071,7 +1081,7 @@ function CompanionLine({
                     <EllipsisIcon className="size-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className={ROW_MENU}>
                   <DropdownMenuSub open={attackSub.open} onOpenChange={attackSub.onOpenChange}>
                     <DropdownMenuSubTrigger
                       data-testid="cbt-init-row-attack"
@@ -1642,7 +1652,7 @@ function DmInitiativeBody() {
       <div
         ref={listRef}
         data-testid="cbt-init-list"
-        className="-mx-2 min-h-0 flex-1 overflow-y-auto px-2"
+        className="@container/init -mx-2 min-h-0 flex-1 overflow-y-auto px-2"
       >
         <ReorderContext.Provider value={reorder}>
           {/* The drop line's frame (FR-CBTX-62); rows measure their spots from it. */}
