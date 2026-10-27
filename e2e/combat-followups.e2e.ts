@@ -11,6 +11,7 @@
 // Rules, redaction, crash: bun test (kept-hp, pet-owner, fu-combat-sync, fu-combat-crash).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { konvaNodes, tokenNode } from "./support/konva";
 import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
@@ -140,7 +141,7 @@ test("FR-CBT-141 FR-CBT-142 FR-CBT-143 FR-CBT-144 FR-CBT-145 FR-CBT-146 FR-CBT-1
   });
 
   await test.step("FR-CBT-151 accessible names: the Summon… dialog's turn-mode radios", async () => {
-    await init.getByTestId("cbt-init-summon").click();
+    await initMenu(dm, init, "cbt-init-summon");
     const dialog = dm.getByTestId("cbt-summon");
     for (const name of ["After the owner", "In the owner's turn", "Own initiative"]) {
       await expect(dialog.getByRole("radio", { name })).toBeVisible();
@@ -194,7 +195,7 @@ test("FR-CBT-141 FR-CBT-142 FR-CBT-143 FR-CBT-144 FR-CBT-145 FR-CBT-146 FR-CBT-1
     // cp-combat's three summons' tokens (Mira's, Brakka's, Thorn's Fire Elementals).
     const feTokens = [0, 1, 2].map((i) => recordId("cp-combat", "token", i));
     expect(await tokenNode(dm, feTokens[1] as string)).not.toBeNull();
-    await init.getByTestId("cbt-init-end").click();
+    await initMenu(dm, init, "cbt-init-end");
     const summons = dm.getByTestId("cbt-init-end-summons");
     await expect(summons).toContainText("Summoned creatures' tokens are removed:");
     for (const name of ["Fire Elemental 2", "Fire Elemental 3"]) {
@@ -239,7 +240,7 @@ test("FR-CBT-141 FR-CBT-142 FR-CBT-143 FR-CBT-144 FR-CBT-145 FR-CBT-146 FR-CBT-1
     const g2 = await idOf(escort, "Goblin 2");
     await expect(
       escort.locator(`[data-testid="cbt-init-row-hp"][data-record-id="${g2}"]`),
-    ).toHaveText("HP 4/7");
+    ).toHaveText("4 / 7");
     // FR-MAP-88: both pets' tokens still carry the paw, drawn as its own chip: at Start's refit
     // (34 px cells) the medium drake's label row keeps the paw before the "+N" (FU3).
     for (const page of [dm, p2]) {

@@ -7,6 +7,7 @@
 // hpRules: bun test (combat-tracker charx-routes.test.ts, roll-route.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -124,7 +125,7 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   await popup.getByTestId("cbt-popup-damage").fill("3");
   await popup.getByTestId("cbt-popup-apply").click();
   await expect(popup).toHaveCount(0);
-  await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("HP 4/7");
+  await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("4 / 7");
 
   // OQ-CHARX-12: Elite has two attack rows → Attack ▸ lists both, each with the three actions
   // (FR-CBT-74); Shortbow's Attack + damage → card.
@@ -173,7 +174,7 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
 
   // Leave the shared server as found: dismiss the card, end the encounter.
   await dm.getByTestId("cbt-popup-dismiss").click();
-  await init.getByTestId("cbt-init-end").click();
+  await initMenu(dm, init, "cbt-init-end");
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(init.getByTestId("cbt-init-row")).toHaveCount(0);
 

@@ -10,6 +10,7 @@
 //   standing. Rules: bun test.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 import { closeToasts } from "./support/toasts";
 
@@ -159,7 +160,7 @@ test("FR-STATS-28 FR-STATS-34 FR-STATS-36 FR-STATS-41 FR-CHARX-97 one feed toast
   await test.step("FR-STATS-34 FR-STATS-36 End at 1280×720: the summary opens Stats on that fight with Highlights (DM after Initiative minimises; player-1 with the companion card open)", async () => {
     await openWindow(p1, "charx.companion");
     const init = await openWindow(dm, "cbt.initiative");
-    await init.getByTestId("cbt-init-end").click();
+    await initMenu(dm, init, "cbt-init-end");
     await dm.getByTestId("cbt-init-end-confirm").click();
     await expect(launcherButton(dm, "cbt.initiative")).not.toHaveAttribute("data-state", "open");
     for (const page of [dm, p1, p2]) {

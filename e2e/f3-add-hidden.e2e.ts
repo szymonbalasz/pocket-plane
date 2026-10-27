@@ -5,6 +5,7 @@
 // disabled (OQ-CBTX-22). Nothing is added (the dialog only opens and closes).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -23,7 +24,7 @@ test("FR-CBTX-44 BL-113 Add… opens with Create tokens and Add hidden ticked, e
   const create = dialog.getByTestId("cbtx-add-create-tokens");
   const hidden = dialog.getByTestId("cbtx-add-hidden");
 
-  await init.getByTestId("cbtx-init-add").click();
+  await initMenu(dm, init, "cbtx-init-add");
   await expect(dialog).toBeVisible();
   await expect(create).toHaveAttribute("data-state", "checked");
   await expect(hidden).toHaveAttribute("data-state", "checked");
@@ -41,7 +42,7 @@ test("FR-CBTX-44 BL-113 Add… opens with Create tokens and Add hidden ticked, e
   await expect(dialog).toHaveCount(0);
 
   // … and the next open starts from the defaults again.
-  await init.getByTestId("cbtx-init-add").click();
+  await initMenu(dm, init, "cbtx-init-add");
   await expect(dialog).toBeVisible();
   await expect(create).toHaveAttribute("data-state", "checked");
   await expect(hidden).toHaveAttribute("data-state", "checked");

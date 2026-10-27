@@ -9,6 +9,7 @@
 // crash-resume: bun test (combat-tracker sync.test.ts, feedback.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { initMenu } from "./support/initiative";
 import { konvaNodes, tokenNode } from "./support/konva";
 import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
@@ -212,7 +213,7 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
     "data-value",
     "down",
   );
-  await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("HP 3/7");
+  await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("3 / 7");
   await expect.poll(async () => (await konvaNodes(player, "cbt-token-down")).length).toBe(1);
   // FR-CBT-48: Down is a translucent X centred on Goblin 2's token, for the DM and the player.
   for (const page of [dm, player]) {
@@ -295,7 +296,7 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   // Step 14: End from the Initiative header (FR-CBT-51) → confirm names the reopened card
   // (FR-CBT-59); the dialog closes; the card is dismissed; DM Initiative minimised (FR-CBT-60),
   // empty when reopened; Ended in the list; player Initiative gone.
-  await init.getByTestId("cbt-init-end").click();
+  await initMenu(dm, init, "cbt-init-end");
   await expect(dm.getByTestId("cbt-init-end-pending")).toHaveAttribute("data-value", "1");
   await expect(dm.getByTestId("cbt-init-end-pending")).toHaveText(
     "1 pending card will be dismissed: apply it first if it counts.",
@@ -372,7 +373,7 @@ test("BL-02 Start round 1 shows why it can't start", async ({ browser }) => {
   await init.getByTestId("cbt-init-next").click();
   await expect(init.getByTestId("cbt-init-round")).toHaveAttribute("data-value", "1");
 
-  await init.getByTestId("cbt-init-end").click();
+  await initMenu(dm, init, "cbt-init-end");
   await dm.getByTestId("cbt-init-end-confirm").click();
   await expect(dm.getByTestId("cbt-init-end-confirm")).toHaveCount(0);
   await dm.context().close();

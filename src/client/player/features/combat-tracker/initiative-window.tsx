@@ -6,8 +6,11 @@
 // (own PC with pips, FR-CBTX-34). Removed combatants reach players (FR-CBT-37, map badge) but
 // leave this list. Companion: the turn alert + the concentration roll host (FR-CBTX-37). Sprint 6
 // (FR-CBT-119): companions' owner chip and mode icon for everyone; the owner sees HP numbers and a
-// card icon; in-turn companions are lines in the owner's row.
+// card icon; in-turn companions are lines in the owner's row. Kit parity (FR-KIT-26, -30): a
+// centred "Round N", rows on the kit grid (medallion, name + HP line, large bare initiative,
+// status cell) without grip or actions; PCs' HP from the character the player holds (ADR-0063).
 import type { CombatantView } from "@shared/combat-tracker/schemas";
+import { HpBar } from "@ui/components/kit/hp-bar";
 import { Button } from "@ui/components/ui/button";
 import { Tooltip } from "@ui/components/ui/overlays";
 import { Skeleton } from "@ui/components/ui/primitives";
@@ -20,7 +23,13 @@ import {
   deathStateFor,
   effectsOn,
 } from "@ui/features/combat-extras/logic";
-import { DeathBadge, DeathPips, EffectChips, NameLine } from "@ui/features/combat-extras/parts";
+import {
+  DeathBadge,
+  DeathPips,
+  EffectChips,
+  NameLine,
+  StatusCell,
+} from "@ui/features/combat-extras/parts";
 import { MoreFooter, useBelowFold, useListViewport } from "@ui/features/combat-tracker/below-fold";
 import { useOpenCompanionCard } from "@ui/features/combat-tracker/companion-card-request";
 import {
@@ -29,7 +38,12 @@ import {
   modeLabel,
   OwnerChip,
 } from "@ui/features/combat-tracker/companions";
-import { BandBadge, Portrait, SideChip, TurnMarker } from "@ui/features/combat-tracker/parts";
+import {
+  BandBadge,
+  CombatantMedallion,
+  SideChip,
+  TurnMarker,
+} from "@ui/features/combat-tracker/parts";
 import { startedIn, useCombatants, useStartedEncounter } from "@ui/features/combat-tracker/store";
 import { pcDown } from "@ui/features/combat-tracker/token-overlay";
 import { TurnAlertRuntime } from "@ui/features/combat-tracker/turn-alert-runtime";
@@ -52,21 +66,72 @@ function PlayerCombatRuntime() {
 }
 
 /**
- * One row's content (an in-turn companion's line is `PlayerCompanionLine`): portrait, name line with
- * the side chip and (sprint 6) the owner chip and mode icon, effect chips, death state; band (a
- * monster) or, for the companion's owner, HP "45 / 59" and the card icon (FR-CBT-119); PCs'
- * initiative.
+ * FR-KIT-26: a PC's HP as the player holds its character: the full record (own PC) or the
+ * other-player whitelist (`hpCurrent`, `hpMax`, ADR-0063, as Party status shows them). Null when
+ * not held.
+ */
+export function pcHp(ch: unknown): { cur: number; max: number } | null {
+  const r = ch as
+    | { hpCurrent?: unknown; hpMax?: unknown; statBlock?: { hpMax?: unknown } }
+    | undefined;
+  const max = typeof r?.hpMax === "number" ? r.hpMax : r?.statBlock?.hpMax;
+  return typeof r?.hpCurrent === "number" && typeof max === "number"
+    ? { cur: r.hpCurrent, max }
+    : null;
+}
+
+/**
+ * FR-KIT-26: the HP line's bar. PCs (character record) and the player's own companions
+ * (FR-CBT-116: only the owner holds their numbers) show `HpBar` + "cur / max"; a monster or
+ * another player's companion shows its band word only (`cbt-init-row-band`), never a bar length.
+ */
+function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
+  // The record itself (a stable snapshot); the figures derive from it.
+  const ch = useSync((s) => (c.kind === "pc" ? characterOf(s.store, c.entityId ?? "") : undefined));
+  const hp = pcHp(ch);
+  if (own) {
+    if (c.hpCurrent == null || c.hpMax == null) return null;
+    return (
+      <HpBar
+        cur={c.hpCurrent}
+        max={c.hpMax}
+        data-testid="cbt-init-row-hp"
+        data-record-id={c.id}
+        className="min-w-fit flex-1"
+      />
+    );
+  }
+  if (hp) {
+    return (
+      <HpBar
+        cur={hp.cur}
+        max={hp.max}
+        data-testid="cbt-init-row-hp"
+        data-record-id={c.id}
+        className="min-w-fit flex-1"
+      />
+    );
+  }
+  if (c.kind !== "monster" || !c.band) return null;
+  return (
+    <HpBar band={c.band} data-testid="cbt-init-row-band" data-value={c.band} className="shrink-0" />
+  );
+}
+
+/**
+ * One row's content on the kit grid (FR-KIT-30; an in-turn companion's line is
+ * `PlayerCompanionLine`): medallion, name line with the side chip and (sprint 6) the owner chip
+ * and mode icon, then the HP line (FR-KIT-26) with the death state; PCs' initiative as a large
+ * bare number; the status cell (FR-KIT-28). The companion's owner gets its card icon (FR-CBT-119).
  */
 function PlayerRowMain({
   c,
   ownerName,
-  turn,
   round,
   me,
 }: {
   c: CombatantView;
   ownerName: string;
-  turn: boolean;
   round: number;
   me: string | null;
 }) {
@@ -85,18 +150,16 @@ function PlayerRowMain({
     // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer shortcut; the card icon is the keyboard path
     <div
       data-row-main
-      className={cn("flex items-center gap-1", own && "cursor-pointer")}
+      className={cn("relative flex items-center gap-1.5", own && "cursor-pointer")}
       onClick={own ? () => openCard(c.id) : undefined}
     >
-      <TurnMarker active={turn} />
-      <Portrait name={c.name} imageAssetId={c.imageAssetId} />
+      <CombatantMedallion c={c} />
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* FR-CBTX-46 (P3 glitch 6), FR-CBTX-57: chips get the width left after the full
-            name and the side chip, as on the DM's rows; the name is never cut. */}
+        {/* FR-CBTX-57: the name is never cut; the side chip takes a second line first. */}
         <NameLine
           name={c.name}
           testId="cbt-init-row-name"
-          className="text-sm"
+          className="text-sm font-medium"
           marks={
             companion && (
               <ModeIcon
@@ -107,23 +170,15 @@ function PlayerRowMain({
               />
             )
           }
-          // FR-CBT-104: never folds, before the effect chips (FR-CBTX-54). Sprint 6: the owner
-          // chip with it (FR-CBT-119; a line sits in its owner's row).
+          // FR-CBT-104: never folds. Sprint 6: the owner chip with it (FR-CBT-119; a line sits in
+          // its owner's row).
           side={
             <>
               {companion && <OwnerChip c={c} ownerName={ownerName} testId="cbt-init-row-owner" />}
               <SideChip c={c} testId="cbt-init-row-ally" />
             </>
           }
-        >
-          <EffectChips
-            compact
-            effects={effectsOn(fx, creatureOf(c))}
-            triggers={triggerChipsFor(store, c)}
-            round={round}
-            testId="cbtx-init-row-effect"
-          />
-        </NameLine>
+        />
         {/* FR-CBT-107 (walkthrough fix): an `after-owner` row says whose turn it follows. */}
         {companion && c.turnMode === "after-owner" && (
           <span
@@ -134,38 +189,43 @@ function PlayerRowMain({
             {modeLabel("after-owner", ownerName)}
           </span>
         )}
-        {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down; on
-            its own line under the name. */}
-        {death && (
-          <div className="flex items-center gap-1">
-            {counters && <DeathPips c={counters} />}
-            <DeathBadge state={death} testId="cbtx-init-row-death" />
-          </div>
-        )}
-      </div>
-      {own ? (
-        <span
-          data-testid="cbt-init-row-hp"
-          data-record-id={c.id}
-          className="shrink-0 text-xs whitespace-nowrap text-muted-foreground tabular-nums"
+        <div
+          data-stats-line
+          className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden"
         >
-          {c.hpCurrent ?? "—"} / {c.hpMax ?? "—"}
-        </span>
-      ) : (
-        c.kind === "monster" && c.band && <BandBadge band={c.band} testId="cbt-init-row-band" />
-      )}
-      {own && <OwnCardButton c={c} />}
-      {/* FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`). */}
-      {!death && pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />}
+          <PlayerHp c={c} own={own} />
+          {/* FR-CBTX-34: a PC's death state (own PC with pips) replaces the plain Down. */}
+          {death && (
+            <>
+              {counters && <DeathPips c={counters} />}
+              <DeathBadge state={death} testId="cbtx-init-row-death" />
+            </>
+          )}
+          {/* FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`). */}
+          {!death && pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />}
+          {own && <OwnCardButton c={c} />}
+        </div>
+      </div>
       {c.kind === "pc" && (
         <span
           data-testid="cbt-init-row-init"
           data-record-id={c.id}
-          className="w-8 text-right text-xs tabular-nums text-muted-foreground"
+          data-slot="init-number"
+          className="w-9 shrink-0 text-right text-2xl leading-none font-semibold tabular-nums"
         >
           {c.initiative ?? "—"}
         </span>
       )}
+      {/* FR-KIT-28: the status icon(s), "+N" for the rest; then own PCs' trigger chips. */}
+      <StatusCell>
+        <EffectChips
+          compact
+          effects={effectsOn(fx, creatureOf(c))}
+          triggers={triggerChipsFor(store, c)}
+          round={round}
+          testId="cbtx-init-row-effect"
+        />
+      </StatusCell>
     </div>
   );
 }
@@ -221,9 +281,11 @@ function PlayerCompanionLine({
     // biome-ignore lint/a11y/useKeyWithClickEvents: a pointer shortcut; the card icon is the keyboard path
     <div
       data-row-main
-      className={cn("flex min-w-0 items-center", own && "cursor-pointer")}
+      className={cn("flex min-w-0 items-center gap-1.5", own && "cursor-pointer")}
       onClick={own ? () => openCard(c.id) : undefined}
     >
+      {/* FR-KIT-29 / -30: the grid at medallion `sm`. */}
+      <CombatantMedallion c={c} size="sm" />
       <div className="min-w-0 flex-1">
         <NameLine
           name={c.name}
@@ -312,13 +374,15 @@ export function PlayerRow({
       data-turn={turn}
       data-hidden="false"
       data-indent={indent || undefined}
+      data-slot="init-row"
       className={cn(
-        "flex shrink-0 flex-col gap-0.5 rounded-md px-1 py-0.5",
+        "relative flex shrink-0 flex-col gap-1 rounded-md px-2 py-1",
         turn && "bg-accent",
         indent && "ml-3",
       )}
     >
-      <PlayerRowMain c={c} ownerName={ownerName} turn={turn} round={round} me={me} />
+      <TurnMarker active={turn} />
+      <PlayerRowMain c={c} ownerName={ownerName} round={round} me={me} />
       {lines.map((l) => (
         <div
           key={l.id}
@@ -368,22 +432,30 @@ function PlayerInitiativeBody() {
       className="flex h-full min-h-0 flex-col gap-2"
       style={clip === null ? undefined : { maxHeight: clip }}
     >
-      <span
-        data-testid="cbt-init-round"
-        data-value={enc.round}
-        className="shrink-0 text-sm font-semibold"
-      >
-        {enc.round === 0 ? "Rolling initiative" : `Round ${enc.round}`}
-      </span>
+      {/* FR-KIT-30: a centred "Round N", the number in number type. */}
+      <p data-slot="init-header" className="shrink-0 text-center text-sm text-muted-foreground">
+        <span data-testid="cbt-init-round" data-value={enc.round}>
+          {enc.round === 0 ? (
+            "Rolling initiative"
+          ) : (
+            <>
+              Round <span className="font-semibold text-foreground tabular-nums">{enc.round}</span>
+            </>
+          )}
+        </span>
+      </p>
       {ownWithout && (
-        <p data-testid="cbt-init-hint" className="shrink-0 text-xs text-muted-foreground">
+        <p
+          data-testid="cbt-init-hint"
+          className="shrink-0 text-center text-xs text-muted-foreground"
+        >
           Roll initiative on your sheet
         </p>
       )}
       <ul
         ref={listRef}
         data-testid="cbt-init-list"
-        className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
+        className="@container/init -mx-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto px-2"
       >
         {layout.map(({ c, lines, owner, indent }) => (
           <PlayerRow
