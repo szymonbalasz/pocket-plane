@@ -86,9 +86,9 @@ export function pcHp(ch: unknown): { cur: number; max: number } | null {
  * another player's companion shows its band word only (`cbt-init-row-band`), never a bar length.
  */
 function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
-  const hp = useSync((s) =>
-    c.kind === "pc" ? pcHp(characterOf(s.store, c.entityId ?? "")) : null,
-  );
+  // The record itself (a stable snapshot); the figures derive from it.
+  const ch = useSync((s) => (c.kind === "pc" ? characterOf(s.store, c.entityId ?? "") : undefined));
+  const hp = pcHp(ch);
   if (own) {
     if (c.hpCurrent == null || c.hpMax == null) return null;
     return (
