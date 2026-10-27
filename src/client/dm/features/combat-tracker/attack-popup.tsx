@@ -69,7 +69,7 @@ import {
 import { cn } from "@ui/lib/utils";
 import { IntentRejected } from "@ui/sync/connection";
 import { useRecords, useSync } from "@ui/sync/store";
-import { EyeOffIcon, XIcon } from "lucide-react";
+import { EyeOffIcon, PlusIcon, XIcon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LinkHintNote } from "../combat-extras/link-hint";
 import {
@@ -149,10 +149,12 @@ const RESULT_INPUT =
  * FR-KIT-63: the Result box's outcome colours (meaning tokens, FR-THEME-09) on an input. K8 (K6
  * gap 7): the damage box keeps a neutral border, only its number is red (the kit's `.res.dmg`).
  */
-const OUTCOME_INPUT: Partial<Record<ResultOutcome, string>> = {
+const OUTCOME_INPUT: Partial<Record<CardOutcome, string>> = {
   crit: "border-hp-full/60 text-hp-full",
   fumble: "text-muted-foreground",
   damage: "text-destructive",
+  // K12 (round-2 gap 8): the kit's green to-hit once it hits; the border stays neutral (as damage).
+  hit: "text-hp-full",
 };
 /** FR-KIT-63 (K8): a result line's label in body type, not label type (`card-label`). */
 const CARD_LABEL = "min-w-0 flex-1 flex-wrap text-sm font-normal";
@@ -181,6 +183,18 @@ export function applyLabel(
 /** FR-KIT-63: the to-hit box's outcome: natural 20 → crit, natural 1 → fumble, else plain. */
 export const toHitOutcome = (natural: number | null): ResultOutcome =>
   natural === 20 ? "crit" : natural === 1 ? "fumble" : "plain";
+
+/** K12: the card's box outcomes: the Result box's plus `hit` (a to-hit every target row hits). */
+export type CardOutcome = ResultOutcome | "hit";
+
+/**
+ * K12 (round-2 gap 8): the to-hit box on the card: FR-KIT-63's natural outcome, else `hit` while
+ * there is a target row and every one is a Hit (the kit's green 29), else plain.
+ */
+export function cardToHitOutcome(natural: number | null, hits: readonly boolean[]): CardOutcome {
+  const o = toHitOutcome(natural);
+  return o === "plain" && hits.length > 0 && hits.every(Boolean) ? "hit" : o;
+}
 
 /**
  * Current / max / temp HP the DM sees: monsters on the combatant, PCs on the character (temp HP:
@@ -235,23 +249,63 @@ function AddTarget({
   options,
   onPick,
   disabled,
+  collapsed,
 }: {
   options: CombatantView[];
   onPick(c: CombatantView): void;
   disabled: boolean;
+  /**
+   * K12 (round-2 gap 8): the card has a target, so the field hides behind a small "+" (which takes
+   * `cbt-popup-target-add`: a click opens the field with its list, as a click on the field did).
+   */
+  collapsed: boolean;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const shown = options.filter((c) => c.name.toLowerCase().includes(q.trim().toLowerCase()));
-  const pick = (c: CombatantView) => {
-    onPick(c);
+  const close = () => {
     setQ("");
     setOpen(false);
+    setExpanded(false);
   };
+  const pick = (c: CombatantView) => {
+    onPick(c);
+    close();
+  };
+  if (collapsed && !expanded) {
+    return (
+      <Tooltip content="Add target">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-6 self-start"
+          data-testid="cbt-popup-target-add"
+          aria-label="Add target"
+          disabled={disabled}
+          onClick={() => {
+            setExpanded(true);
+            setOpen(true);
+          }}
+        >
+          <PlusIcon className="size-3.5" />
+        </Button>
+      </Tooltip>
+    );
+  }
   return (
-    <Popover open={open && !disabled} onOpenChange={setOpen}>
+    <Popover
+      open={open && !disabled}
+      onOpenChange={(o) => {
+        // Closed (outside click, focus away, Esc): the "+" again while the card has a target.
+        if (o) setOpen(true);
+        else close();
+      }}
+    >
       <PopoverAnchor asChild>
         <Input
+          // Opened from the "+": the field takes the focus for typing.
+          autoFocus={collapsed}
           data-testid="cbt-popup-target-add"
           role="combobox"
           aria-expanded={open}
@@ -269,7 +323,7 @@ function AddTarget({
             if (e.key === "Enter" && shown[0]) pick(shown[0]);
             if (e.key === "Escape" && open) {
               e.stopPropagation();
-              setOpen(false);
+              close();
             }
           }}
         />
@@ -564,6 +618,10 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
     const extra = x.hit ? partPreviewExtra(popupParts, draft.parts, view, views, p) : 0;
     return { ...x, view, raw: x.raw === null ? null : x.raw + extra };
   });
+  const toHitBox = cardToHitOutcome(
+    rolledNatural,
+    rows.map((x) => x.hit),
+  );
   const ready = applyReady(
     rows.map((x) => x.hit),
     damageTotal,
@@ -777,9 +835,9 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
               id="cbt-popup-tohit"
               data-testid="cbt-popup-tohit"
               data-slot="kit-result"
-              data-outcome={toHitOutcome(rolledNatural)}
+              data-outcome={toHitBox}
               inputMode="numeric"
-              className={cn(RESULT_INPUT, OUTCOME_INPUT[toHitOutcome(rolledNatural)])}
+              className={cn(RESULT_INPUT, OUTCOME_INPUT[toHitBox])}
               value={toHit}
               onChange={(e) => edit(() => ({ toHit: typeField(e.target.value) }))}
             />
@@ -1052,7 +1110,14 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
           </ul>
         )}
         {/* FR-CBT-89: the damage step adds no target. */}
-        {!ruling && <AddTarget options={addable} onPick={add} disabled={disabled} />}
+        {!ruling && (
+          <AddTarget
+            options={addable}
+            onPick={add}
+            disabled={disabled}
+            collapsed={rows.length > 0}
+          />
+        )}
       </section>
       {list.tooMany && (
         <p data-testid="cbt-popup-max-targets" className="text-xs text-destructive">
