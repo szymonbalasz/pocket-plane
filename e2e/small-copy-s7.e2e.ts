@@ -8,6 +8,7 @@
 // kind-contract).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { entryLine } from "./support/log";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -189,8 +190,10 @@ test("FR-DICE-77 FR-DICE-78 the roll bar rolls as the sheet's PC; a manual pick 
   await dlog.getByTestId("dice-roll-expression").press("Enter");
   const line = dlog.getByTestId("dice-log-entry").filter({ hasText: "1d20-3d4" }).last();
   await expect(line).toBeVisible();
-  await expect(line.getByTestId("dice-log-die").first()).toHaveAttribute("data-value", /\d/);
-  const text = (await line.textContent()) ?? "";
+  // Kit parity K1 (FR-KIT-45): the full line with its chips is the row's Tooltip.
+  const full = await entryLine(line);
+  await expect(full.getByTestId("dice-log-die").first()).toHaveAttribute("data-value", /\d/);
+  const text = (await full.textContent()) ?? "";
   expect(text).toMatch(/- \(\d \+ \d \+ \d\) = /);
   for (const bad of ["( ", " )", "  "]) expect(text).not.toContain(bad);
   await expect(shellWindow(dm, "dice.log")).toBeVisible();

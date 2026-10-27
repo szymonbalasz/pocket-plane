@@ -1,9 +1,11 @@
 // e2e-bundle: dice-log
-// FR-SHELL-35 (R3, amends FR-SHELL-28 for `dice.log`), sizes per FR-DICE-38 (sprint 5): at its
-// default size, with the one-row roll bar (FR-DICE-30), the Game log shows ≥ 6 single-line
-// entries fully above the bar, ≥ 4 with Physical dice on (strip shown), at the tall sizes
-// (DM 1150×280, player 850×320 at 1440×900, K5); ≥ 3 / ≥ 2 at 200 high (DM 690×200, player
-// 510×200 at 1280×720). The roll bar is a pinned footer: always fully shown, and only the entry list scrolls.
+// FR-SHELL-35 (R3, amends FR-SHELL-28 for `dice.log`), sizes per FR-DICE-38 (sprint 5) and kit
+// parity §7.3 (K5 sizes, K1's 40-px rows, FR-KIT-40): at its default size, with the one-row roll
+// bar (FR-DICE-30), the Game log shows whole one-line rows above the bar: ≥ 2 at 200 high (DM
+// 690×200, player 510×200 at 1280×720; the useful criterion "2 entries + roll bar", 2.6 rows),
+// ≥ 4 / ≥ 5 at the tall sizes (DM 1150×280, player 850×320 at 1440×900); one fewer with Physical
+// dice on (strip shown).
+// The roll bar is a pinned footer: always fully shown, and only the entry list scrolls.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { shellWindow } from "./support/shell";
@@ -25,7 +27,7 @@ const fullyShown = (log: Locator) =>
       const r = e.getBoundingClientRect();
       return r.height > 0 && r.top >= top - 0.5 && r.bottom <= bottom + 0.5;
     });
-    const multiLine = shown.filter((e) => e.getBoundingClientRect().height > 26).length;
+    const multiLine = shown.filter((e) => e.getBoundingClientRect().height > 41).length;
     return { count: shown.length, multiLine };
   });
 
@@ -82,22 +84,22 @@ async function expectHistory(log: Locator, min: number) {
 const SIZES = [
   {
     vp: { width: 1280, height: 720 },
-    // K5 (play-shell §7 size table, OQ-KIT-02 B): 40 px taller; the minimums stay.
+    // K5 (play-shell §7 size table, OQ-KIT-02 B): 40 px taller for K1's 40-px rows.
     dm: { w: 690, h: 200 },
     player: { w: 510, h: 200 },
-    min: [3, 2],
+    min: { DM: [2, 1], player: [2, 1] },
   },
   {
     vp: { width: 1440, height: 900 },
     dm: { w: 1150, h: 280 },
     player: { w: 850, h: 320 },
-    min: [6, 4],
+    min: { DM: [4, 3], player: [5, 4] },
   },
 ] as const;
 
 for (const role of ["DM", "player"] as const)
   for (const size of SIZES) {
-    const [off, on] = size.min;
+    const [off, on] = size.min[role];
     test(`FR-SHELL-35 FR-DICE-38 ${role} game log at default size at ${size.vp.width}×${size.vp.height}: ≥ ${off} single-line entries, ≥ ${on} with Physical dice on`, async ({
       browser,
     }) => {
