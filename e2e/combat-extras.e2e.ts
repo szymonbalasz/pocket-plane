@@ -259,8 +259,9 @@ test("walkthrough fixes: row names stay distinct (chips collapse first), Conditi
   await player.goto(link("Player 2"));
   await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   const sheet = await openWindow(player, "char.sheet");
-  // P3 glitch 12: the Effects menu sits on the header line with Edit, not on a row of its own.
-  const headerLine = sheet.getByTestId("charx-header-line");
+  // P3 glitch 12 / FR-KIT-85: the Effects menu sits in the pinned header (its chips line), with
+  // Edit top-right, not on a row of its own.
+  const headerLine = sheet.getByTestId("charx-header");
   await expect(headerLine.getByTestId("cbtx-sheet-effects-menu")).toBeVisible();
   await expect(headerLine.getByTestId("charx-edit-toggle")).toBeVisible();
   await sheet.getByTestId("cbtx-sheet-effects-menu").click();

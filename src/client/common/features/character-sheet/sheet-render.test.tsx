@@ -312,6 +312,49 @@ describe("FR-CHARX-48 pinned header", () => {
     );
     expect(html.match(/data-testid="char-sheet-picker"/g)).toHaveLength(1);
   });
+
+  /** The opening tag of the first element with this test id. */
+  const tagOf = (html: string, id: string) => {
+    const at = html.indexOf(`data-testid="${id}"`);
+    return html.slice(html.lastIndexOf("<", at), html.indexOf(">", at) + 1);
+  };
+
+  test("FR-KIT-85 sheet header: square framed 56-px portrait (initial); the name is the picker (select over the name + chevron); level line; chips line; Edit top-right; no header-line row", () => {
+    const html = sheetHtml("full");
+    const portrait = tagOf(html, "char-sheet-portrait");
+    expect(portrait).toContain('data-slot="sheet-portrait"');
+    expect(portrait).toContain("size-14");
+    expect(portrait).toContain("rounded-md border");
+    expect(portrait).not.toContain("rounded-full");
+    expect(html).toMatch(/data-testid="char-sheet-portrait"[^>]*><div[^>]*>M<\/div>/);
+    // The name is the picker: name, chevron, then the select laid over them (transparent).
+    const picker = html.slice(html.indexOf('data-testid="charx-name-picker"'));
+    const order = ["char-sheet-name", "lucide-chevron-down", "char-sheet-picker"].map((x) =>
+      picker.indexOf(x),
+    );
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(picker).toContain("[&amp;&gt;select]:opacity-0");
+    expect(tagOf(html, "char-sheet-name")).toContain('data-slot="sheet-name"');
+    expect(html).toMatch(/data-testid="char-sheet-name"[^>]*><span class="truncate">Mira<\/span>/);
+    // Level line, chips line (badges), Edit after them on the same top row; the old row is gone.
+    const at = (id: string) => html.indexOf(`data-testid="${id}"`);
+    expect(at("char-sheet-level")).toBeGreaterThan(at("char-sheet-name"));
+    expect(at("charx-header-chips")).toBeGreaterThan(at("char-sheet-level"));
+    expect(at("charx-draft")).toBeGreaterThan(at("charx-header-chips"));
+    expect(at("charx-edit-toggle")).toBeGreaterThan(at("charx-draft"));
+    expect(html).not.toContain("charx-header-line");
+  });
+
+  test("FR-KIT-85 compact fallback: the name is plain text; badges and the boxed picker move into charx-header-rest", () => {
+    const html = sheetHtml("compact");
+    expect(html).not.toContain("charx-name-picker");
+    expect(html).not.toContain("charx-header-chips");
+    const rest = html.slice(html.indexOf('data-testid="charx-header-rest"'));
+    expect(rest).toContain('data-testid="charx-draft"');
+    expect(rest).toContain('data-testid="char-sheet-picker"');
+    expect(rest).toContain('data-testid="charx-edit-toggle"');
+  });
 });
 
 describe("FR-CHARX-56 weapon row UI", () => {

@@ -4,18 +4,21 @@
 // small window only the name row + tab strip (FR-CHARX-48). The tab strip scrolls sideways with
 // the wheel and arrows (FR-CHARX-115); the sheet body is the `sheet` container the printed
 // layout switches on (FR-CHARX-112). NPC sheets: CR + XP; imported definitions read-only.
-import { initials, levelLine } from "@shared/character-sheet/logic";
+import { levelLine } from "@shared/character-sheet/logic";
 import { CHARX_INTENTS, type CreatureSheetRecord } from "@shared/character-sheet/sheet";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import { isLoaded, type LoadedSet } from "@shared/protocol/lazy";
-import { ChevronLeftIcon, ChevronRightIcon, LockIcon } from "lucide-react";
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, LockIcon } from "lucide-react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { medallionInk, medallionOf } from "../../components/kit/medallion";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Card } from "../../components/ui/primitives";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
+import { colorHex, colorKeyOf } from "../campaign-management/colors";
 import { useOpenWindow } from "../play-shell/ShellContext";
 import { ActionsTab } from "./ActionsTab";
 import { useBusy } from "./fields";
@@ -47,17 +50,39 @@ const NOTHING_LOADED: LoadedSet = { types: [], ids: {} };
 const CREATURES_KIND = "ent.creatures";
 export const CREATE_HINT = "Fill in class, ability scores, AC and HP. Your DM approves the sheet.";
 
-export function Portrait({ id, name }: { id: string | null; name: string }) {
+/**
+ * FR-KIT-85: the kit's square framed portrait, 56 px: the image, else the name's initial on
+ * `colour` (the owner's player colour) or the neutral muted fill.
+ */
+export function Portrait({
+  id,
+  name,
+  colour = null,
+}: {
+  id: string | null;
+  name: string;
+  colour?: string | null;
+}) {
+  const m = medallionOf(name, id, colour);
   return (
     <div
       data-testid="char-sheet-portrait"
-      className="size-11 shrink-0 overflow-hidden rounded-full"
+      data-slot="sheet-portrait"
+      className="size-14 shrink-0 overflow-hidden rounded-md border"
     >
       {id ? (
-        <AssetImg id={id} file="thumb" alt={name} className="size-full" />
+        <AssetImg id={id} file="thumb" alt={name} className="size-full object-cover" />
       ) : (
-        <div className="flex size-full items-center justify-center bg-muted text-sm font-semibold text-muted-foreground">
-          {initials(name)}
+        <div
+          className={cn(
+            "flex size-full items-center justify-center text-2xl font-semibold",
+            !m.colour && "bg-muted text-muted-foreground",
+          )}
+          style={
+            m.colour ? { backgroundColor: m.colour, color: medallionInk(m.colour) } : undefined
+          }
+        >
+          {m.letter}
         </div>
       )}
     </div>
@@ -182,51 +207,125 @@ function HeaderBadges() {
 }
 
 /**
- * The name row: portrait, name, level line. With the full header pinned (FR-CHARX-48) it also
- * carries the badges and the picker; in the compact fallback those scroll (`HeaderRest`).
+ * FR-KIT-85: the name, in name type. With the full header pinned and a picker to show, the name
+ * **is** the picker: the native select (`char-sheet-picker`) lies over the name and its chevron,
+ * transparent, so a click on the name opens it and the keyboard reaches it as before.
  */
-function NameRow({ picker, full }: { picker: ReactNode; full: boolean }) {
+function SheetName({ picker }: { picker: ReactNode }) {
+  const ctx = useSheet();
+  const name = (
+    <span
+      data-testid="char-sheet-name"
+      data-slot="sheet-name"
+      className="flex min-w-0 items-center gap-1 text-lg font-semibold leading-tight"
+    >
+      {ctx.readOnly && (
+        <LockIcon
+          data-testid="charx-readonly"
+          aria-label="Read-only"
+          className="size-3.5 shrink-0"
+        />
+      )}
+      <span className="truncate">{ctx.creature.name}</span>
+    </span>
+  );
+  if (!picker) return name;
+  return (
+    <span
+      data-testid="charx-name-picker"
+      className="relative flex min-w-0 max-w-full items-center gap-1 self-start rounded-sm has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring"
+    >
+      {name}
+      <ChevronDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+      <span className="absolute inset-0 [&>select]:size-full [&>select]:max-w-none [&>select]:cursor-pointer [&>select]:opacity-0">
+        {picker}
+      </span>
+    </span>
+  );
+}
+
+/**
+ * The header's top (FR-KIT-85, kit "Character sheet"): the square portrait; the name (the picker
+ * when shown), the level line and, pinned in full, the chips line (badges + the `header` sections:
+ * effect chips, the brain menu); Derive / Approve / Lock / Edit top-right. In the compact fallback
+ * (FR-CHARX-48) only portrait, name and level line stay pinned; the rest scrolls (`HeaderRest`).
+ */
+function NameRow({
+  picker,
+  full,
+  editing,
+  setEditing,
+}: {
+  picker: ReactNode;
+  full: boolean;
+  editing: boolean;
+  setEditing(v: boolean): void;
+}) {
   const ctx = useSheet();
   const c = ctx.creature;
   const s = ctx.stats;
+  // The owner's stored colour only: an unknown player stays neutral (no role accent).
+  const players = useSync((st) => st.store.records.player);
+  const key =
+    c.kind === "character"
+      ? colorKeyOf(
+          { you: null, records: { player: players ?? {} } },
+          { role: "player", playerId: c.ownerPlayerId },
+        )
+      : null;
+  const colour = key ? colorHex(key) : null;
   const sub = "cr" in s ? crLine(s.cr) : levelLine(s.level, s.className);
   const species = "species" in s && s.species ? s.species : null;
   return (
     <div className="flex items-start gap-3">
-      <Portrait id={c.portraitAssetId} name={c.name} />
+      <Portrait id={c.portraitAssetId} name={c.name} colour={colour} />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span
-          data-testid="char-sheet-name"
-          className="flex items-center gap-1 truncate font-semibold"
-        >
-          {ctx.readOnly && (
-            <LockIcon data-testid="charx-readonly" aria-label="Read-only" className="size-3.5" />
-          )}
-          {c.name}
-        </span>
+        <SheetName picker={full ? picker : null} />
         <span data-testid="char-sheet-level" className="text-xs text-muted-foreground">
           {sub}
           {species ? ` · ${species}` : ""}
         </span>
-        {full && <HeaderBadges />}
+        {full && <ChipsLine />}
       </div>
-      {full && picker}
+      {full && (
+        <div className="shrink-0">
+          <HeaderActions editing={editing} setEditing={setEditing} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** FR-KIT-85 chips line: the badges, then the `header` sections (effect chips, brain menu). */
+function ChipsLine() {
+  const ctx = useSheet();
+  const c = ctx.creature;
+  return (
+    <div data-testid="charx-header-chips" className="flex min-w-0 flex-wrap items-center gap-1">
+      <HeaderBadges />
+      {!ctx.readOnly && (
+        <SheetSlotView
+          slot="header"
+          creatureId={c.id}
+          client={ctx.client}
+          kind={c.kind}
+          className="flex min-w-0 flex-wrap items-center gap-1"
+        />
+      )}
     </div>
   );
 }
 
 /**
- * The header below the name row: `header` sections and Edit / Approve / Lock on one line; in the
- * compact fallback (FR-CHARX-48) also the badges and the picker, since all of it scrolls then.
+ * The compact fallback's scrolling header rest (FR-CHARX-48): the badges and the picker, then the
+ * `header` sections and Edit / Approve / Lock.
  */
 function HeaderRest({
   picker,
-  compact,
   editing,
   setEditing,
 }: {
   picker: ReactNode;
-  compact: boolean;
   editing: boolean;
   setEditing(v: boolean): void;
 }) {
@@ -234,15 +333,11 @@ function HeaderRest({
   const c = ctx.creature;
   return (
     <>
-      {compact && (
-        <div className="flex items-start justify-between gap-2">
-          <HeaderBadges />
-          {picker}
-        </div>
-      )}
-      {/* P3 glitch 12: the `header` sections (e.g. the Effects chips + menu) share one line with
-          Edit / Approve / Lock instead of a row of their own. */}
-      <div data-testid="charx-header-line" className="flex items-center gap-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <HeaderBadges />
+        {picker}
+      </div>
+      <div className="flex items-center gap-1.5">
         {!ctx.readOnly && (
           <SheetSlotView
             slot="header"
@@ -435,18 +530,13 @@ export function SheetView({
   const current = tabs.some(([v]) => v === tab) ? tab : "main";
   const { bodyRef, headerRef, restRef, part } = usePinnedHeader(initialPinnedPart);
   const compact = part === "compact";
-  const rest = (
-    <>
-      <HeaderRest picker={picker} compact={compact} editing={ctx.editing} setEditing={setEditing} />
-      {hint && ctx.editing && (
-        <p data-testid="charx-create-hint" className="rounded-md bg-muted p-2 text-xs">
-          {CREATE_HINT}{" "}
-          <button type="button" className="underline" onClick={() => setHint(false)}>
-            OK
-          </button>
-        </p>
-      )}
-    </>
+  const hintEl = hint && ctx.editing && (
+    <p data-testid="charx-create-hint" className="rounded-md bg-muted p-2 text-xs">
+      {CREATE_HINT}{" "}
+      <button type="button" className="underline" onClick={() => setHint(false)}>
+        OK
+      </button>
+    </p>
   );
   return (
     <SheetContext.Provider value={ctx}>
@@ -469,8 +559,13 @@ export function SheetView({
             className="flex shrink-0 flex-col gap-2"
           >
             <div className="flex flex-col gap-1.5">
-              <NameRow picker={picker} full={!compact} />
-              {!compact && rest}
+              <NameRow
+                picker={picker}
+                full={!compact}
+                editing={ctx.editing}
+                setEditing={setEditing}
+              />
+              {!compact && hintEl}
             </div>
             <TabStrip>
               <TabsList className="w-max">
@@ -503,7 +598,8 @@ export function SheetView({
                 data-testid="charx-header-rest"
                 className="mb-2 flex flex-col gap-1.5"
               >
-                {rest}
+                <HeaderRest picker={picker} editing={ctx.editing} setEditing={setEditing} />
+                {hintEl}
               </div>
             )}
             <TabsContent value="main">
