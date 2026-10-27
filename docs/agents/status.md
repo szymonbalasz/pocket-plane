@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 13 kit parity** ([sprint-13](sprint-13.md)): **K0, K5 merged** (cb0ab596: launcher in the top bar, all icons #358; layouts regenerated). **K1** `build/kit-log` (build-k1, w7C) ∥ **K2** `build/kit-initiative` (build-k2, w7D) building; then K3 ∥ K4, K7, K6. Max two builders, one heavy run at a time (#354).
+**Phase:** **Sprint 13 kit parity** ([sprint-13](sprint-13.md)): **K0, K5, K1 merged** (9331e78d). **K2** walkthrough running (test-k2, w7D); **K4** `build/kit-library` building (build-k4); then K3 (after K2), K7, K6. Max two builders, one heavy run at a time (#354).
 
 **Resume (in order, one heavy run at a time, #354):** (1) `gates.sh` on `build-theme-switch` (merge main first: protocol §166 collides with X1's, run `resolve_docs.py` + `fixlinks.py`) → merge T1. (2) Restart a T2 builder in `build-theme-gilt` (brief `.verify/sprint12/briefs/build-th2.md` + `t2-resume.md`): merge main, its e2e, report ready. (3) T2 walkthrough (D1–D4, P1–P2, PS1–PS6 under Gilt & Stone; template to write from `tpl-test-th1.md`) → gates → merge. (4) session-sim-16 in `gates-main`, "Playtest: sprint 12", recap: default theme (OQ-THEME-03), the test-strategy proposal (#354). Briefs + `slices.json` backed up in `.verify/sprint12/` (copy back to `%TEMP%/pocket-plane/` if Storage Sense cleared it). Worktrees on disk: `build-theme-switch` (slot 0), `build-theme-gilt` (slot 2), `gates-main` (slot 5, detached at adc8b0dd); all `.env` have `PP_TEST_SHARDS=3`.
 

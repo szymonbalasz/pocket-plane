@@ -50,6 +50,14 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 
 **Idle slots (#204, #205, #286, [orchestrator-prompt §3a](orchestrator-prompt.md#3a-use-idle-slots-backfill)):** the goal is the sprint's milestones. When an agent slot is idle and nothing in the sprint queue can start (DM #286: "pull more stories from the backlog when there are idle agents"), pick one small eligible item from [backlog](backlog.md) without asking (max two at once; sprint work always wins the next slot); stop picking once the last sprint slices are in flight. If nothing fits, ask the DM.
 
+Lessons from sprints 12–13 (2026-10-25/27), on top of the ones below:
+- **Memory (DM #354):** two overlapping `check:full` runs + e2e + walkthrough browsers ran the 64 GB machine out of memory; the session reaped jobs. One heavy run at a time; `PP_TEST_SHARDS=3` in every worktree `.env`; builders can't see each other's runs, so keep at most two builders.
+- **`gilt.css` append blocks conflict at the file end** and both blocks end in the same `  }
+}` lines: git keeps them once, so a naive keep-both drops one block's closing braces (build fails "Missing closing }"). Resolve by taking main's file and appending the branch's `/* KIT: … */` block whole; then `bun run build`.
+- **Herdr workspaces don't survive a machine restart**: recreate with `herdr workspace create --cwd <worktree> --label <slug>`.
+- **A walkthrough that changes the default theme** shakes out text-fit and geometry assumptions across the e2e suite: run the branch's full gates before its walkthrough.
+- Claude Code may show a "Teach auto mode" dialog in an agent pane (status `blocked`): Escape dismisses it.
+
 Lessons from sprint 10 (2026-10-24), on top of the ones below:
 - **Test loop (DM #345):** builders run the tests near their change + one full `check` + their area's e2e specs only; the orchestrator runs the full e2e once, in the branch after merging `main` (`gates.sh`); skip `main`'s gates when `git rev-parse main^{tree}` equals the tested branch's tree (`main` didn't move in between), run them otherwise. T4 `fix/test-speed` adds shards / e2e workers / a slow set (`check:full` in final gates).
 - **A no-gate hardening run works overnight**: four `fix/*` slices from one sim report, rulings logged as they come; ~1 working day end to end. Each walkthrough FAIL went straight back to its builder with the exact repro rects.
