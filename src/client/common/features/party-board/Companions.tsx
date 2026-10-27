@@ -9,6 +9,7 @@ import { IdCardIcon } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 import { Medallion } from "../../components/kit/medallion";
 import { Button } from "../../components/ui/button";
+import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import {
@@ -97,11 +98,14 @@ export function CompanionLine({
         imageAssetId={row.portraitAssetId}
         data-testid="party-companion-medallion"
       />
-      {/* FR-PARTY-46: badges wrap, the name is never cut. */}
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-        <span className="break-words" data-testid="party-companion-name">
-          {row.name}
-        </span>
+      {/* FR-KIT-83 (K4 walkthrough): one line; a long name truncates (the base name first),
+          the full name in its Tooltip; the marks never shrink. */}
+      <div className="flex min-w-0 flex-1 items-center gap-x-1.5">
+        <Tooltip content={row.name}>
+          <span className="min-w-0 truncate" data-testid="party-companion-name">
+            {row.name}
+          </span>
+        </Tooltip>
         {/* FR-PARTY-42: FR-CBT-118's icon; the Tooltip names the mode. */}
         {row.turnMode && (
           <ModeIcon
@@ -112,12 +116,15 @@ export function CompanionLine({
           />
         )}
         {row.inCombat && (
-          <Badge variant="secondary" className="px-1 py-0 text-[10px]">
+          <Badge variant="secondary" className="shrink-0 px-1 py-0 text-[10px]">
             In combat
           </Badge>
         )}
         {base && (
-          <span className="text-[11px] [overflow-wrap:anywhere]" data-testid="party-companion-base">
+          <span
+            className="min-w-0 shrink-[4] truncate text-[11px]"
+            data-testid="party-companion-base"
+          >
             {base}
           </span>
         )}

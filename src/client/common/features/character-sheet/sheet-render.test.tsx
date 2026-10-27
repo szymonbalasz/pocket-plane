@@ -336,7 +336,9 @@ describe("FR-CHARX-48 pinned header", () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(picker).toContain("[&amp;&gt;select]:opacity-0");
     expect(tagOf(html, "char-sheet-name")).toContain('data-slot="sheet-name"');
-    expect(html).toMatch(/data-testid="char-sheet-name"[^>]*><span class="truncate">Mira<\/span>/);
+    expect(html).toMatch(
+      /data-testid="char-sheet-name"[^>]*><span class="line-clamp-2 min-w-0 break-words">Mira<\/span>/,
+    );
     // Level line, chips line (badges), Edit after them on the same top row; the old row is gone.
     const at = (id: string) => html.indexOf(`data-testid="${id}"`);
     expect(at("char-sheet-level")).toBeGreaterThan(at("char-sheet-name"));
@@ -344,6 +346,24 @@ describe("FR-CHARX-48 pinned header", () => {
     expect(at("charx-draft")).toBeGreaterThan(at("charx-header-chips"));
     expect(at("charx-edit-toggle")).toBeGreaterThan(at("charx-draft"));
     expect(html).not.toContain("charx-header-line");
+  });
+
+  test("FR-KIT-85 small header buttons (K4 walkthrough): Edit / Lock / Approve / Derive are the kit's 24-px small buttons", () => {
+    const html = sheetHtml("full");
+    const edit = tagOf(html, "charx-edit-toggle");
+    expect(edit).toContain('data-size="sm"');
+    expect(edit).toContain("h-6 px-2 text-xs");
+    expect(edit).not.toContain("h-8");
+  });
+
+  test("FR-KIT-85 name stays readable (K4 walkthrough: 'G..' at 320 px): it wraps to two lines before truncating, the full name in its Tooltip; the text column keeps 6rem and the actions wrap under the row when they don't fit", () => {
+    const html = sheetHtml("full");
+    // The Tooltip trigger is the picker wrapper (it carries the select); the name clamps at 2 lines.
+    expect(tagOf(html, "charx-name-picker")).toContain("data-tip");
+    expect(html).toMatch(/<span class="line-clamp-2 min-w-0 break-words">Mira<\/span>/);
+    expect(html).toContain('class="flex flex-wrap items-start gap-x-3 gap-y-1.5"');
+    expect(html).toContain('class="flex min-w-24 flex-1 basis-24 flex-col gap-0.5"');
+    expect(tagOf(html, "charx-header-actions")).toContain("ml-auto shrink-0");
   });
 
   test("FR-KIT-85 compact fallback: the name is plain text; badges and the boxed picker move into charx-header-rest", () => {

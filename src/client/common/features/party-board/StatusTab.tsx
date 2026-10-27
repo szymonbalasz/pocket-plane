@@ -291,7 +291,10 @@ export function StatusTab({ dm }: { dm?: CompanionsDmParts }) {
           <dm.header disabled={!live} />
         </div>
       )}
-      <ScrollArea className="min-h-0 flex-1">
+      {/* Radix's viewport wraps the content in a `display: table` box that grows with it; block
+          keeps the rows at the window's width, so a long companion name truncates instead of
+          pushing every card past the edge (K4 walkthrough). */}
+      <ScrollArea className="min-h-0 flex-1 [&_[data-slot=scroll-area-viewport]>div]:!block">
         <div
           data-testid="party-summary"
           data-live={live}
@@ -310,7 +313,7 @@ export function StatusTab({ dm }: { dm?: CompanionsDmParts }) {
               data-chip-row=""
               aria-label="Party"
               onKeyDown={onListKey}
-              className="flex flex-col gap-1.5"
+              className="flex flex-col gap-1"
             >
               {summary.pcs.map((r) => (
                 <li key={r.id}>

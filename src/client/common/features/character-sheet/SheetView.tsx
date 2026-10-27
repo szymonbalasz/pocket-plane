@@ -97,6 +97,9 @@ const TABS = [
   ["notes", "Notes"],
 ] as const;
 
+/** FR-KIT-85: the kit's small stone button (`.btn.sm`: 24 px high, 13 px type). */
+const SMALL = "h-6 px-2 text-xs";
+
 function HeaderActions({
   editing,
   setEditing,
@@ -125,6 +128,7 @@ function HeaderActions({
       {ctx.readOnly && (
         <Button
           size="sm"
+          className={SMALL}
           variant="outline"
           data-testid="charx-derive"
           onClick={() => openWindow(CREATURES_KIND)}
@@ -135,6 +139,7 @@ function HeaderActions({
       {isDm && character && ctx.sheet.status === "draft" && (
         <Button
           size="sm"
+          className={SMALL}
           data-testid="charx-approve"
           disabled={!live || busy.busy}
           onClick={() => busy.run(() => intents.send(CHARX_INTENTS.approve, { characterId: c.id }))}
@@ -145,6 +150,7 @@ function HeaderActions({
       {isDm && character && (
         <Button
           size="sm"
+          className={SMALL}
           variant={ctx.sheet.locked ? "secondary" : "outline"}
           data-testid="charx-lock-toggle"
           data-state={ctx.sheet.locked ? "on" : "off"}
@@ -162,6 +168,7 @@ function HeaderActions({
       {ctx.canEdit && (
         <Button
           size="sm"
+          className={SMALL}
           variant={editing ? "secondary" : "outline"}
           data-testid="charx-edit-toggle"
           data-state={editing ? "on" : "off"}
@@ -226,21 +233,25 @@ function SheetName({ picker }: { picker: ReactNode }) {
           className="size-3.5 shrink-0"
         />
       )}
-      <span className="truncate">{ctx.creature.name}</span>
+      {/* K4 walkthrough: the name wraps to two lines before it truncates; full name in the
+          Tooltip. */}
+      <span className="line-clamp-2 min-w-0 break-words">{ctx.creature.name}</span>
     </span>
   );
-  if (!picker) return name;
+  if (!picker) return <Tooltip content={ctx.creature.name}>{name}</Tooltip>;
   return (
-    <span
-      data-testid="charx-name-picker"
-      className="relative flex min-w-0 max-w-full items-center gap-1 self-start rounded-sm has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring"
-    >
-      {name}
-      <ChevronDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-      <span className="absolute inset-0 [&>select]:size-full [&>select]:max-w-none [&>select]:cursor-pointer [&>select]:opacity-0">
-        {picker}
+    <Tooltip content={ctx.creature.name}>
+      <span
+        data-testid="charx-name-picker"
+        className="relative flex min-w-0 max-w-full items-center gap-1 self-start rounded-sm has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring"
+      >
+        {name}
+        <ChevronDownIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+        <span className="absolute inset-0 [&>select]:size-full [&>select]:max-w-none [&>select]:cursor-pointer [&>select]:opacity-0">
+          {picker}
+        </span>
       </span>
-    </span>
+    </Tooltip>
   );
 }
 
@@ -277,9 +288,11 @@ function NameRow({
   const sub = "cr" in s ? crLine(s.cr) : levelLine(s.level, s.className);
   const species = "species" in s && s.species ? s.species : null;
   return (
-    <div className="flex items-start gap-3">
+    // The text column keeps at least 6rem; actions that don't fit beside it wrap under the row,
+    // right-aligned, so the name always has room (K4 walkthrough: "G.." at 320 px).
+    <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5">
       <Portrait id={c.portraitAssetId} name={c.name} colour={colour} />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div className="flex min-w-24 flex-1 basis-24 flex-col gap-0.5">
         <SheetName picker={full ? picker : null} />
         <span data-testid="char-sheet-level" className="text-xs text-muted-foreground">
           {sub}
@@ -288,7 +301,7 @@ function NameRow({
         {full && <ChipsLine />}
       </div>
       {full && (
-        <div className="shrink-0">
+        <div data-testid="charx-header-actions" className="ml-auto shrink-0">
           <HeaderActions editing={editing} setEditing={setEditing} />
         </div>
       )}

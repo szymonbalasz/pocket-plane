@@ -702,6 +702,25 @@ describe("FR-KIT-82 party card", () => {
 });
 
 describe("FR-KIT-83 companion row", () => {
+  test("FR-KIT-83 companion row keeps one line (K4 walkthrough): a long name truncates, the full name in its Tooltip; the base name gives way first; no wrapping", () => {
+    const long = "Grey Wolf with a really long companion name";
+    const input = {
+      ...inputs.p1,
+      entities: inputs.p1.entities.map((e) =>
+        (e as { id?: string }).id === "owl" ? { ...(e as object), name: long } : e,
+      ),
+    };
+    const owl = rowOf(render(P1, input), "party-companion-row", "owl");
+    expect(owl).toMatch(
+      new RegExp(
+        `<span class="min-w-0 truncate" data-testid="party-companion-name"[^>]*data-tip=""[^>]*>${long}</span>`,
+      ),
+    );
+    expect(owl).not.toContain("flex-wrap");
+    expect(owl).not.toContain("break-words");
+    expect(owl).toContain('class="flex min-w-0 flex-1 items-center gap-x-1.5"');
+  });
+
   test("FR-KIT-83 companion row: one line with a small medallion (portrait else initial), all row parts kept", () => {
     const html = render(P1, inputs.p1);
     const owl = rowOf(html, "party-companion-row", "owl");
