@@ -22,3 +22,15 @@ export async function entryLine(entry: Locator): Promise<Locator> {
 export async function entryDice(entry: Locator): Promise<Locator> {
   return (await entryLine(entry)).getByTestId("dice-log-die");
 }
+
+/**
+ * Kit parity K8: picks `value` in one of the roll bar's shared Selects (`dice-roll-category`,
+ * `dice-roll-actor`): the trigger carries the value in `data-value`, the items (portalled to the
+ * page) are `<id>-option` + `data-value`.
+ */
+export async function pickRollOption(scope: Locator, id: string, value: string): Promise<void> {
+  const trigger = scope.getByTestId(id);
+  await trigger.click();
+  await scope.page().locator(`[data-testid="${id}-option"][data-value="${value}"]`).click();
+  await expect(trigger).toHaveAttribute("data-value", value);
+}

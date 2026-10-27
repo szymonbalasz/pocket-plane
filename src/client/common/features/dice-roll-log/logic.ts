@@ -133,6 +133,29 @@ export function actorSelection(
   return { options: [...actors, stale], selected: stale };
 }
 
+/** K8: the shared Select's item value of the roller (a Radix item can't have the value ""). */
+export const ROLLER_ITEM = "roller";
+export const actorItemValue = (value: string): string => (value === "" ? ROLLER_ITEM : value);
+
+/** An actor option's shown label: a stale pick reads "(gone)" (FR-DICE-34). */
+export const actorLabel = (a: ActorOption): string => (a.stale ? `${a.label} (gone)` : a.label);
+
+export const ACTOR_GROUPS = ["Characters", "Tokens", "Combatants"] as const;
+
+/**
+ * K8 (K6 gap 8): the roll-as Select's sections in order: the ungrouped options (the roller,
+ * "DM" / "Me"), then Characters, Tokens and Combatants, each only when it has options.
+ */
+export function actorGroups(
+  options: readonly ActorOption[],
+): { group: (typeof ACTOR_GROUPS)[number] | null; options: ActorOption[] }[] {
+  const grouped = ACTOR_GROUPS.map((group) => ({
+    group,
+    options: options.filter((a) => a.group === group),
+  })).filter((g) => g.options.length > 0);
+  return [{ group: null, options: options.filter((a) => !a.group) }, ...grouped];
+}
+
 /**
  * FR-DICE-77 (BL-48, amends FR-DICE-30's default; rulings-b #18): a **player's** roll-bar actor
  * when nothing is picked in this page, in order: the stored manual pick (`""` = "Me"; only while

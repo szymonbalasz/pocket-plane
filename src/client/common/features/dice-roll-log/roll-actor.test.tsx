@@ -14,11 +14,15 @@ import { pickerModel, shownSheetId } from "../character-sheet/view-model";
 import { GameLog } from "./GameLog";
 import {
   type ActorOption,
+  actorGroups,
+  actorItemValue,
+  actorLabel,
   actorOptions,
   createFlagStore,
   type FlagBackend,
   optionsKey,
   playerActorPick,
+  ROLLER_ITEM,
 } from "./logic";
 
 const data = new Map<string, string>();
@@ -85,14 +89,17 @@ function render(role: "dm" | "player", entities = ENTITIES) {
   );
 }
 
-/** The roll bar's actor Select: its options and the selected one (Options row open). */
-function actorSelect(html: string) {
-  const select = /<select[^>]*data-testid="dice-roll-actor"[^>]*>([\s\S]*?)<\/select>/.exec(html);
-  const opts = [...(select?.[1] ?? "").matchAll(/<option value="([^"]*)"( selected="")?>([^<]*)/g)];
-  return {
-    labels: opts.map((m) => m[3]),
-    selected: opts.find((m) => m[2])?.[3] ?? opts[0]?.[3],
-  };
+/**
+ * The roll bar's actor Select (K8: the shared Select, Options row open): the selected one from its
+ * trigger (`data-value` + shown label). Its items render only once opened (Radix), so the option
+ * labels come from the same sections the Select lists (`actorGroups`).
+ */
+function actorSelect(html: string, role: "dm" | "player" = "player") {
+  const trigger = /<button[^>]*data-testid="dice-roll-actor"[^>]*>([\s\S]*?)<\/button>/.exec(html);
+  const selected = /data-slot="select-value"[^>]*>([^<]*)</.exec(trigger?.[1] ?? "")?.[1];
+  const you = role === "dm" ? { role: "dm" as const, playerId: null } : P1;
+  const labels = actorGroups(actorOptions(you, ENTITIES)).flatMap((g) => g.options.map(actorLabel));
+  return { labels, selected, value: /data-value="([^"]*)"/.exec(trigger?.[0] ?? "")?.[1] };
 }
 
 const openOptions = (playerId: string | null, actor?: string) => {
@@ -107,6 +114,7 @@ describe("FR-DICE-77 roll as your PC", () => {
     const p1 = actorSelect(render("player"));
     expect(p1.labels).toEqual(["Me", "Brakka", "Mira"]);
     expect(p1.selected).toBe("Mira");
+    expect(p1.value).toBe("mira");
 
     // A manual pick of Brakka, stored with the Options state (same entry), wins after a reload.
     openOptions("p1", "brakka");
@@ -123,7 +131,7 @@ describe("FR-DICE-77 roll as your PC", () => {
     // The DM: unchanged ("DM"), whatever the sheet shows.
     openOptions(null);
     sheetSelection.setState({ selectedId: "mira" });
-    expect(actorSelect(render("dm")).selected).toBe("DM");
+    expect(actorSelect(render("dm"), "dm").selected).toBe("DM");
   });
 
   test("FR-DICE-77 roll as your PC, the sheet's default (walkthrough U17): a fresh browser (no Options / sheet entry, nothing picked), player-1 with Mira and Brakka → the sheet shows Brakka (its first own PC) and the roll bar rolls as Brakka", () => {
@@ -174,5 +182,27 @@ describe("FR-DICE-77 roll as your PC", () => {
     // A broken entry reads as the default.
     data.set(key, "{oops");
     expect([reloaded.read(key), reloaded.readActor(key)]).toEqual([false, null]);
+  });
+});
+
+describe("K8 roll-bar selects (K6 gap 8)", () => {
+  test("FR-KIT-48 roll bar (K8): Category and Roll as are the shared Select (no native <select>), test IDs and values kept; the roller maps to a non-empty item value; sections in order", () => {
+    openOptions(null);
+    const html = render("dm");
+    // (Radix keeps a hidden, aria-hidden form `<select>` beside each trigger.)
+    expect(html).not.toMatch(/<select(?![^>]*aria-hidden="true")/);
+    for (const id of ["dice-roll-category", "dice-roll-actor"]) {
+      const tag = new RegExp(`<button[^>]*data-testid="${id}"[^>]*>`).exec(html)?.[0] ?? "";
+      expect(tag).toContain('data-slot="select-trigger"');
+      expect(tag).toContain('role="combobox"');
+    }
+    expect(html).toMatch(/data-testid="dice-roll-category" data-value="other"/);
+    expect(actorSelect(html, "dm")).toMatchObject({ selected: "DM", value: "" });
+    expect(actorItemValue("")).toBe(ROLLER_ITEM);
+    expect(actorItemValue("mira")).toBe("mira");
+    const dm = actorGroups(actorOptions({ role: "dm", playerId: null }, ENTITIES));
+    expect(dm.map((g) => g.group)).toEqual([null, "Characters"]);
+    expect(dm[0]?.options.map((a) => a.label)).toEqual(["DM"]);
+    expect(actorLabel({ value: "x", label: "Goblin 3", stale: true })).toBe("Goblin 3 (gone)");
   });
 });
