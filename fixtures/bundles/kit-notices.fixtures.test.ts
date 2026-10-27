@@ -1,5 +1,5 @@
 // Bundle `kit-notices` (kit-parity §13, K3): `theme-gilt` + Mira's applied crossbow card and the
-// DM's stack (Player 1's draft request, Mira's pending card). Loads from empty; the cards' states,
+// DM's stack (Player 2's draft request, Mira's pending card). Loads from empty; the cards' states,
 // causers and outcome; CON-44 ceilings with the measured figures printed.
 import { afterAll, describe, expect, test } from "bun:test";
 import { closeDb } from "@server/db/client";
@@ -25,7 +25,7 @@ afterAll(() => {
 });
 
 describe("kit-notices bundle (kit-parity §13)", () => {
-  test("FR-KIT-55 kit-notices loads from empty: Mira's applied card, Player 1's pending request, Mira's pending card", async () => {
+  test("FR-KIT-55 kit-notices loads from empty: Mira's applied card, Player 2's pending request, Mira's pending card", async () => {
     const r = await loadBundle(BUNDLE, { testMode: true });
     cleanups.push(r.cleanup);
     const db = r.openDb();
@@ -40,7 +40,7 @@ describe("kit-notices bundle (kit-parity §13)", () => {
       ["damage-card", "pending", "player"],
     ]);
     // The request's text starts with the causing player's name (bold in the card, FR-KIT-56).
-    expect(kit[1]?.text.startsWith("Player 1")).toBe(true);
+    expect(kit[1]?.text.startsWith("Player 2")).toBe(true);
     const res = kit[0]?.resolution as { targets: Parameters<typeof resolutionText>[0] };
     expect(resolutionText(res.targets)).toBe("Hit Goblin 2: 7");
   }, 60_000);
