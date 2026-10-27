@@ -3,16 +3,25 @@
 // effects added; the tail fold is pure (`tailFolds`). Hover, widths and the theme's look in a
 // browser: e2e/kit-initiative.e2e.ts and the K2 walkthrough.
 import { describe, expect, test } from "bun:test";
+import type { CombatantView } from "@shared/combat-tracker/schemas";
 import type { RecordStore } from "@shared/protocol/store";
+import { companionLayout } from "@ui/features/combat-tracker/companions";
 import {
   companionStore,
+  DM_ROWS,
   renderWith,
   rowHtml,
 } from "@ui/features/combat-tracker/companions-fixture";
 import { medallionColour } from "@ui/features/combat-tracker/parts";
 import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
 import { END_CONFIRM_LABEL, END_KEEP_LABEL, EndConfirmButtons } from "./end-confirm";
-import { dmInitiativeWindow, INIT_MENU, tailFolds, tailText } from "./initiative-window";
+import {
+  dmInitiativeWindow,
+  INIT_MENU,
+  tailFolds,
+  tailText,
+  wideInitColumn,
+} from "./initiative-window";
 
 const Body = dmInitiativeWindow.component;
 
@@ -226,6 +235,32 @@ describe("FR-KIT-25 hp line", () => {
     expect(tailFolds({ ...w, line: 190 })).toBe(false);
     expect(tailFolds({ ...w, line: 189 })).toBe(true);
     expect(tailFolds({ line: 100, numbers: null, others: [], tail: 92 })).toBe(false);
+  });
+});
+
+describe("FR-KIT-25 init column width (K2 walkthrough F1)", () => {
+  test("FR-KIT-25 init column: in-owner's-turn companions (no initiative, no Roll) and companions showing their owner's number never widen it; a listed row that can roll does", () => {
+    // The companions fight in round 1: Drake Companion and Fire Elemental 2 act in Brakka's turn
+    // and the Owlbear after Mira, none with an initiative of its own; every other row has one.
+    const rows = DM_ROWS as unknown as CombatantView[];
+    const layout = (r: CombatantView[]) => companionLayout(r, "position");
+    expect(rows.filter((c) => c.initiative == null).map((c) => c.id)).toEqual(
+      expect.arrayContaining(["drake", "fe2", "owlbear"]),
+    );
+    expect(wideInitColumn(layout(rows), 1)).toBe(false);
+    // A late joiner without initiative shows its Roll button: wide.
+    const late = rows.map((c) => (c.id === "goblin" ? { ...c, initiative: null } : c));
+    expect(wideInitColumn(layout(late), 1)).toBe(true);
+    // Round 0: every row with its own init cell rolls.
+    expect(wideInitColumn(layout(rows), 0)).toBe(true);
+
+    const html = dm();
+    expect(html).not.toContain('data-testid="cbt-init-row-roll"');
+    const cells = [...html.matchAll(/data-slot="init-number" class="([^"]*)"/g)].map((m) => m[1]);
+    expect(cells.length).toBeGreaterThan(0);
+    for (const c of cells) expect(c).not.toContain("w-[100px]");
+    const owl = rowHtml(html, "cbt-init-row", "owlbear");
+    expect(owl).toMatch(/data-testid="cbt-init-row-init"[^>]*class="[^"]*w-9/);
   });
 });
 

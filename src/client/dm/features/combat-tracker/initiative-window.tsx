@@ -722,6 +722,25 @@ function OwnerInitCell({
   );
 }
 
+/** Sprint 6 (FR-CBT-107, -108): a listed companion acting with its owner shows the owner's number. */
+function actsWithOwner(c: CombatantView, owner: CombatantView | null | undefined): boolean {
+  return Boolean(isCompanion(c) && c.turnMode && c.turnMode !== "own" && owner);
+}
+
+/**
+ * FR-CBTX-46 (G1), K2 walkthrough F1: the Init column is wide only while a listed row shows a
+ * Roll button: its own init cell (not its owner's number, not an in-turn companion's line, which
+ * has none) and it can roll (FR-CBT-46). Else every row's HP line keeps the room (FR-KIT-25).
+ */
+export function wideInitColumn(
+  layout: readonly { c: CombatantView; owner: CombatantView | null }[],
+  round: number,
+): boolean {
+  return layout.some(
+    ({ c, owner }) => !actsWithOwner(c, owner) && canRollInitiative(round, c.initiative),
+  );
+}
+
 interface RowProps {
   c: CombatantView;
   def: DefinitionRecord | undefined;
@@ -784,7 +803,7 @@ function RowMain({
     `${tail}:${wideInit}:${hp?.cur}:${hp?.max}:${temp}:${down}:${hasDeathState}:${c.ownerCharacterId}:${c.turnMode}`,
   );
   const companion = isCompanion(c) && c.turnMode;
-  const byOwner = companion && c.turnMode !== "own" && owner !== null && owner !== undefined;
+  const byOwner = actsWithOwner(c, owner);
   // FR-KIT-25: a folded tail rides in the row Tooltip, on the name.
   const nameTip = (line: ReactNode) =>
     folded ? (
@@ -907,7 +926,7 @@ function RowMain({
         </div>
       </div>
       {byOwner ? (
-        <OwnerInitCell c={c} owner={owner} ownerName={ownerName ?? ""} wide={wideInit} />
+        <OwnerInitCell c={c} owner={owner ?? null} ownerName={ownerName ?? ""} wide={wideInit} />
       ) : (
         <InitiativeCell c={c} def={def} round={round} wide={wideInit} />
       )}
@@ -1635,7 +1654,7 @@ function DmInitiativeBody() {
     );
   }
   const removed = rows.filter((c) => c.removed);
-  const wideInit = active.some((c) => canRollInitiative(enc.round, c.initiative));
+  const wideInit = wideInitColumn(layout, enc.round);
   return (
     // Header + pending cards stay put; the rows scroll inside the window (glitch 3), in their
     // own clipping viewport above "↓ N more" (FR-CBT-125).
