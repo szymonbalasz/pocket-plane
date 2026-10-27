@@ -303,11 +303,16 @@ function Entry({
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
       // FR-DICE-37: a focused entry gets the accent ring for 2 s.
       className={cn(
-        "group/entry grid h-10 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-sm border-b border-border/60 px-1 text-sm transition-shadow",
+        "group/entry relative grid h-10 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-sm border-b border-border/60 px-1 text-sm transition-shadow",
         hidden && "text-visibility-hidden",
         focused && "ring-2 ring-ring",
       )}
     >
+      {/* FR-KIT-46: the full line (held: as shown), read aloud first and copied per row; out of
+          the grid (absolute), first so the row's text reads it whole. */}
+      <span data-line className="sr-only">
+        {copyText(shown)}
+      </span>
       {/* FR-KIT-41: the actor's initial on its name colour (FR-DICE-60), else neutral. */}
       {row.actor !== null ? (
         <Medallion name={row.actor} colour={nameColor} size="md" />
@@ -345,10 +350,6 @@ function Entry({
             <span className="text-muted-foreground">{row.text}</span>
           </span>
         </Tooltip>
-        {/* FR-KIT-46: the full line (held: as shown), read aloud and copied per row. */}
-        <span data-line className="sr-only">
-          {copyText(shown)}
-        </span>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
         {/* FR-KIT-43: hidden while the row is < 360 px wide (the list is the container). */}
@@ -377,14 +378,16 @@ function Entry({
         {results.length > ROW_RESULTS_MAX && (
           <MoreResults rest={results.slice(ROW_RESULTS_MAX)} landed={landed} />
         )}
-        {/* FR-KIT-44: "physical" (and "undone") after the boxes. */}
+        {/* FR-KIT-44: "physical" (and "undone") after the boxes. An open entry-action confirm
+            takes their room (FR-GEM-44: it stays inside the row at the 300-px minimum); the
+            words stay in the Tooltip's line. */}
         {rowBadges(segments).map((b) => (
           <Badge
             key={b}
             aria-hidden
             variant="outline"
             data-testid={b === "physical" ? "dice-log-entry-manual" : undefined}
-            className="shrink-0 px-1 py-0 text-[10px]"
+            className="shrink-0 px-1 py-0 text-[10px] group-has-[[data-testid=dice-log-action-confirm]]/entry:hidden"
           >
             {b}
           </Badge>
@@ -472,9 +475,21 @@ function EntryList({
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
     const rows = ev.currentTarget.querySelectorAll<HTMLElement>('[data-testid="dice-log-entry"]');
+    const ranges = Array.from({ length: sel.rangeCount }, (_, i) => sel.getRangeAt(i));
+    // A row the selection overlaps (its end after the row's start, its start before the row's
+    // end): a selection only touching the row's edge doesn't count.
+    const touched = (li: HTMLElement) => {
+      const row = document.createRange();
+      row.selectNodeContents(li);
+      return ranges.some(
+        (s) =>
+          s.compareBoundaryPoints(Range.START_TO_END, row) > 0 &&
+          s.compareBoundaryPoints(Range.END_TO_START, row) < 0,
+      );
+    };
     const text = copiedRows(
       rows,
-      (li) => sel.containsNode(li, true),
+      touched,
       (li) => li.querySelector("[data-line]")?.textContent ?? "",
     );
     if (text === null) return;

@@ -1425,9 +1425,10 @@
 :root[data-theme="gilt"] [data-slot="log-row"] {
   border-bottom-color: transparent;
 }
-/* The time dim and in number type (the kit's `.t`). */
+/* The time dim (re-tinted by token, so a hidden line's colour still wins) and in number type
+   (the kit's `.t`). */
 :root[data-theme="gilt"] [data-slot="log-time"] {
-  color: var(--gs-dim);
+  --muted-foreground: var(--gs-dim);
   font-family: var(--font-num);
 }
 @layer base {
@@ -1439,7 +1440,7 @@
   :root[data-theme="gilt"]
     [data-slot="log-row"]:has([data-testid="dice-log-entry-hidden"])
     [data-slot="kit-result"] {
-    border-color: color-mix(in srgb, currentColor 35%, transparent);
-    color: inherit;
+    border-color: var(--frame-rule);
+    color: var(--muted-foreground);
   }
 }
