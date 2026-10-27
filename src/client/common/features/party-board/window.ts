@@ -16,7 +16,8 @@ export const partyBoardWindowBase = {
   // FR-PARTY-59 / FR-SHELL-156: "Party Manager" (kind, test IDs and tab memory unchanged).
   title: "Party Manager",
   // FR-SHELL-156 (OQ-SHELL-78 A; BL-106, DM #341: 550 → 600), band-capped; useful 440 × 400
-  // (every PC row and its companion rows whole on Party status, measured on `wf-frame-e2e`).
+  // (2 PC cards + their companion rows whole on Party status since kit parity K4, measured on
+  // `wf-frame-e2e`).
   defaultSize: { w: 600, h: 560 },
   usefulSize: { w: 440, h: 400 },
   minSize: { w: 340, h: 360 },

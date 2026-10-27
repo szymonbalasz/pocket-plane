@@ -45,7 +45,7 @@ const shared: Record<string, SizeRow> = {
     useful: all(440, 400),
     min: s(340, 360),
     criterion:
-      "Party status: every PC row and its companion rows whole + labels Party status, Handouts, Inventory, Loot whole",
+      "Party status: 2 PC cards + their companion rows whole + labels Party status, Handouts, Inventory, Loot whole",
   },
   "party.handout": {
     default: all(640, 560),
