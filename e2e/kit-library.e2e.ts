@@ -1,7 +1,7 @@
 // e2e-bundle: kit-library
 // Thin kit-parity K4 flow (§6.8–6.9): the DM's compendium is a table (sticky Name · Details ·
-// Source head, 40-px rows) and the Goblin opens as the kit card (one ruled AC · HP · Speed row, a
-// six-column ability grid); Party status shows kit cards (medallion, level line, AC shield, HP
+// Source head, the kit's 30-px rows since K13) and the Goblin opens as the kit card (one ruled
+// AC · HP · Speed row, a six-column ability grid); Party status shows kit cards (medallion, level line, AC shield, HP
 // bar) with the pet under Mira; player-1's sheet header has the square 56-px portrait. Markup,
 // visibility and every FR detail: bun test (compendium, party-board, entities, character-sheet).
 import { expect, type Locator, type Page, test } from "@playwright/test";
@@ -52,8 +52,9 @@ test("FR-KIT-76 FR-KIT-77 FR-KIT-82 FR-KIT-83 FR-KIT-85 kit library: compendium 
     .first();
   await expect(goblin).toContainText("CR 1/4");
   const h = Math.round((await goblin.boundingBox())?.height ?? 0);
-  expect(h).toBeGreaterThanOrEqual(40);
-  expect(h).toBeLessThanOrEqual(44);
+  // K13 (DM #363): the kit's 30-px rows.
+  expect(h).toBeGreaterThanOrEqual(28);
+  expect(h).toBeLessThanOrEqual(32);
 
   // FR-KIT-77: the card's ruled core row and the ability grid.
   await goblin.click();
