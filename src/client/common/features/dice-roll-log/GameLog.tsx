@@ -244,7 +244,7 @@ function MoreResults({ rest, landed }: { rest: readonly RowResult[]; landed: boo
       content={
         <div className="flex flex-col gap-0.5">
           {rest.map((r) => (
-            <span key={r.rollId}>
+            <span key={r.key}>
               {r.label}: {r.total}
             </span>
           ))}
@@ -364,9 +364,10 @@ function Entry({
         </time>
         {results.slice(0, ROW_RESULTS_MAX).map((r) => (
           <ResultBox
-            key={r.rollId}
+            key={r.key}
             data-testid="dice-log-entry-total"
-            data-record-id={r.rollId}
+            // K8: a combat line's numbers have no roll record.
+            data-record-id={r.rollId ?? undefined}
             data-landing
             value={r.total}
             outcome={r.outcome}
