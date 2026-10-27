@@ -15,7 +15,15 @@ import {
   type RollCategory,
 } from "@shared/dice-roll-log/schemas";
 import { sheetRollSubjects } from "@shared/effect-modifiers/preview";
-import { type ComponentProps, type ReactNode, useId, useMemo, useState } from "react";
+import {
+  type ComponentProps,
+  createContext,
+  type ReactNode,
+  useContext,
+  useId,
+  useMemo,
+  useState,
+} from "react";
 import type { Button } from "../../components/ui/button";
 import { Switch } from "../../components/ui/controls";
 import { useRecords, useSync } from "../../sync/store";
@@ -73,6 +81,16 @@ export function usePublicOverrides() {
 }
 export type PublicOverrides = ReturnType<typeof usePublicOverrides>;
 
+const SheetOverrides = createContext<PublicOverrides | null>(null);
+/** K11: one set of DM public overrides per sheet, shared by the header's Public rolls menu and Main. */
+export const SheetOverridesProvider = SheetOverrides.Provider;
+/** The sheet's shared DM public overrides; outside a provider, this block's own. */
+export function useSheetOverrides(): PublicOverrides {
+  const shared = useContext(SheetOverrides);
+  const own = usePublicOverrides();
+  return shared ?? own;
+}
+
 /** One DM public switch for a category (block header); hidden for players and NPC sheets. */
 export function PublicSwitch({
   category,
@@ -92,7 +110,7 @@ export function PublicSwitch({
   if (ctx.client !== "dm" || ctx.npc) return null;
   const preset = settings ? categoryPublic(settings, category) : false;
   return (
-    <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
       <Switch
         id={uid}
         data-testid={testId}

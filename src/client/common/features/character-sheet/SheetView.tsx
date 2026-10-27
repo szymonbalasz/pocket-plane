@@ -9,7 +9,14 @@ import { CHARX_INTENTS, type CreatureSheetRecord } from "@shared/character-sheet
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import { isLoaded, type LoadedSet } from "@shared/protocol/lazy";
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, LockIcon } from "lucide-react";
-import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { medallionInk, medallionOf } from "../../components/kit/medallion";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
@@ -24,7 +31,9 @@ import { ActionsTab } from "./ActionsTab";
 import { useBusy } from "./fields";
 import { MainTab } from "./MainTab";
 import { FeaturesTab, InventoryTab, NotesTab } from "./MoreTabs";
+import { PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
+import { SheetOverridesProvider, usePublicOverrides } from "./rolls";
 import { sheetBadge } from "./routing";
 import { SectionView, SheetSlotView } from "./SheetSections";
 import { sectionCount, sectionsFor } from "./sections";
@@ -51,36 +60,56 @@ const CREATURES_KIND = "ent.creatures";
 export const CREATE_HINT = "Fill in class, ability scores, AC and HP. Your DM approves the sheet.";
 
 /**
- * FR-KIT-85: the kit's square framed portrait, 56 px: the image, else the name's initial on
- * `colour` (the owner's player colour) or the neutral muted fill.
+ * FR-KIT-85 / K11: the kit's square framed portrait: the image, else the name's initial in name
+ * type on `colour` (the owner's player colour) or the neutral muted fill. `large` = the sheet
+ * header's 64 px (84 px once the sheet is wide, kit `.portrait`); else 56 px (summary cards).
+ * The colour is passed as `--portrait` / `--portrait-ink` so a theme can deepen the fill.
  */
 export function Portrait({
   id,
   name,
   colour = null,
+  large = false,
+  className,
 }: {
   id: string | null;
   name: string;
   colour?: string | null;
+  large?: boolean;
+  className?: string;
 }) {
   const m = medallionOf(name, id, colour);
   return (
     <div
       data-testid="char-sheet-portrait"
       data-slot="sheet-portrait"
-      className="size-14 shrink-0 overflow-hidden rounded-md border"
+      className={cn(
+        "shrink-0 overflow-hidden rounded-md border",
+        large ? "size-16 @min-[560px]/sheet:size-[84px]" : "size-14",
+        className,
+      )}
+      style={
+        m.colour && !id
+          ? ({
+              "--portrait": m.colour,
+              "--portrait-ink": medallionInk(m.colour),
+            } as CSSProperties)
+          : undefined
+      }
     >
       {id ? (
         <AssetImg id={id} file="thumb" alt={name} className="size-full object-cover" />
       ) : (
         <div
+          data-slot="sheet-portrait-initial"
+          data-colour={m.colour ? "player" : "none"}
           className={cn(
-            "flex size-full items-center justify-center text-2xl font-semibold",
-            !m.colour && "bg-muted text-muted-foreground",
+            "flex size-full items-center justify-center font-bold leading-none",
+            large ? "text-[30px] @min-[560px]/sheet:text-[40px]" : "text-2xl",
+            m.colour
+              ? "bg-[var(--portrait)] text-[var(--portrait-ink)]"
+              : "bg-muted text-muted-foreground",
           )}
-          style={
-            m.colour ? { backgroundColor: m.colour, color: medallionInk(m.colour) } : undefined
-          }
         >
           {m.letter}
         </div>
@@ -98,8 +127,12 @@ const TABS = [
 ] as const;
 
 /** FR-KIT-85: the kit's small stone button (`.btn.sm`: 24 px high, 13 px type). */
-const SMALL = "h-6 px-2 text-xs";
+const SMALL = "h-6 px-2 text-[13px]";
 
+/**
+ * FR-KIT-85 / K11: Derive / Approve / Lock / Edit / the DM's Public rolls menu, small, top-right:
+ * a column in the narrow sheet (the name keeps its room beside the portrait), a row once wide.
+ */
 function HeaderActions({
   editing,
   setEditing,
@@ -124,66 +157,91 @@ function HeaderActions({
     }
   };
   return (
-    <div className="flex flex-wrap items-center justify-end gap-1.5">
-      {ctx.readOnly && (
-        <Button
-          size="sm"
-          className={SMALL}
-          variant="outline"
-          data-testid="charx-derive"
-          onClick={() => openWindow(CREATURES_KIND)}
-        >
-          Derive to customise
-        </Button>
-      )}
-      {isDm && character && ctx.sheet.status === "draft" && (
-        <Button
-          size="sm"
-          className={SMALL}
-          data-testid="charx-approve"
-          disabled={!live || busy.busy}
-          onClick={() => busy.run(() => intents.send(CHARX_INTENTS.approve, { characterId: c.id }))}
-        >
-          Approve
-        </Button>
-      )}
-      {isDm && character && (
-        <Button
-          size="sm"
-          className={SMALL}
-          variant={ctx.sheet.locked ? "secondary" : "outline"}
-          data-testid="charx-lock-toggle"
-          data-state={ctx.sheet.locked ? "on" : "off"}
-          aria-pressed={ctx.sheet.locked}
-          disabled={!live || busy.busy}
-          onClick={() =>
-            busy.run(() =>
-              intents.send(CHARX_INTENTS.setLock, { characterId: c.id, locked: !ctx.sheet.locked }),
-            )
-          }
-        >
-          {ctx.sheet.locked ? "Unlock" : "Lock"}
-        </Button>
-      )}
-      {ctx.canEdit && (
-        <Button
-          size="sm"
-          className={SMALL}
-          variant={editing ? "secondary" : "outline"}
-          data-testid="charx-edit-toggle"
-          data-state={editing ? "on" : "off"}
-          aria-pressed={editing}
-          disabled={!live}
-          onClick={toggleEdit}
-        >
-          {editing ? "Done" : "Edit"}
-        </Button>
-      )}
+    // Narrow: the Public rolls menu left of a column of buttons (two rows at most); wide: a row.
+    <div className="flex items-start gap-1 @min-[560px]/sheet:items-center @min-[560px]/sheet:gap-1.5">
+      <PublicRollsMenu className={cn(SMALL, "w-6 px-0")} />
+      <div className="flex flex-col items-end gap-1 @min-[560px]/sheet:flex-row @min-[560px]/sheet:items-center @min-[560px]/sheet:gap-1.5">
+        {ctx.readOnly && (
+          <Button
+            size="sm"
+            className={SMALL}
+            variant="outline"
+            data-testid="charx-derive"
+            onClick={() => openWindow(CREATURES_KIND)}
+          >
+            Derive to customise
+          </Button>
+        )}
+        {isDm && character && ctx.sheet.status === "draft" && (
+          <Button
+            size="sm"
+            className={SMALL}
+            data-testid="charx-approve"
+            disabled={!live || busy.busy}
+            onClick={() =>
+              busy.run(() => intents.send(CHARX_INTENTS.approve, { characterId: c.id }))
+            }
+          >
+            Approve
+          </Button>
+        )}
+        {isDm && character && (
+          <Button
+            size="sm"
+            className={SMALL}
+            variant={ctx.sheet.locked ? "secondary" : "outline"}
+            data-testid="charx-lock-toggle"
+            data-state={ctx.sheet.locked ? "on" : "off"}
+            aria-pressed={ctx.sheet.locked}
+            disabled={!live || busy.busy}
+            onClick={() =>
+              busy.run(() =>
+                intents.send(CHARX_INTENTS.setLock, {
+                  characterId: c.id,
+                  locked: !ctx.sheet.locked,
+                }),
+              )
+            }
+          >
+            {ctx.sheet.locked ? "Unlock" : "Lock"}
+          </Button>
+        )}
+        {ctx.canEdit && (
+          <Button
+            size="sm"
+            className={SMALL}
+            variant={editing ? "secondary" : "outline"}
+            data-testid="charx-edit-toggle"
+            data-state={editing ? "on" : "off"}
+            aria-pressed={editing}
+            disabled={!live}
+            onClick={toggleEdit}
+          >
+            {editing ? "Done" : "Edit"}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
 
-/** "In combat", "Draft", "Locked" badges (FR-CHAR-16, FR-CHARX-26). */
+/**
+ * K11: the kit's chip (`.chip`): a 13-px pill. The sheet's badges use it, and the chips line
+ * draws the `header` sections' effect chips the same size, every theme alike.
+ */
+const CHIP = "w-fit rounded-full px-2.5 py-0.5 text-[13px] font-normal leading-tight";
+// The `header` sections' wrappers flatten into the line (`contents`), and their chip rows wrap,
+// so a long chip ("Concentrating: Bless 10r") takes a line of its own instead of running out of
+// the window; a chip longer than the line truncates.
+const CHIPS_LINE = cn(
+  "flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1",
+  "[&_[data-testid=charx-section]]:min-w-0 [&_[data-testid=charx-section]]:max-w-full",
+  "[&_[data-testid=cbtx-sheet-effects]]:flex-wrap [&_[data-chip-row]]:flex-wrap [&_[data-chip-row]]:gap-x-1.5 [&_[data-chip-row]]:gap-y-1",
+  "[&_[data-testid=cbtx-sheet-effects-menu]]:size-6",
+  "[&_[data-testid=cbtx-sheet-effect]]:max-w-full [&_[data-testid=cbtx-sheet-effect]]:rounded-full [&_[data-testid=cbtx-sheet-effect]]:px-2 [&_[data-testid=cbtx-sheet-effect]]:py-0.5 [&_[data-testid=cbtx-sheet-effect]]:text-[13px]",
+);
+
+/** "In combat", "Draft", "Locked" badges (FR-CHAR-16, FR-CHARX-26), as kit chips. */
 function HeaderBadges() {
   const ctx = useSheet();
   const store = useSync((s) => s.store);
@@ -191,32 +249,44 @@ function HeaderBadges() {
   const combat = c.kind === "character" ? sheetBadge(rollRoutes, store, c.id) : null;
   const showStatus = ctx.client === "dm" || c.kind === "character";
   return (
-    <span className="flex flex-wrap gap-1">
+    <>
       {combat && (
-        <Badge data-testid="char-sheet-combat" className="w-fit">
+        <Badge
+          data-testid="char-sheet-combat"
+          data-slot="sheet-chip"
+          variant="outline"
+          className={CHIP}
+        >
           {combat}
         </Badge>
       )}
       {showStatus && ctx.sheet.status === "draft" && (
-        <Badge data-testid="charx-draft" variant="outline" className="w-fit">
+        <Badge data-testid="charx-draft" data-slot="sheet-chip" variant="outline" className={CHIP}>
           Draft
         </Badge>
       )}
       {showStatus && ctx.sheet.locked && (
         <Tooltip content="Locked by the DM">
-          <Badge data-testid="charx-locked" variant="outline" className="w-fit">
+          <Badge
+            data-testid="charx-locked"
+            data-slot="sheet-chip"
+            variant="outline"
+            className={CHIP}
+          >
             Locked
           </Badge>
         </Tooltip>
       )}
-    </span>
+    </>
   );
 }
 
 /**
- * FR-KIT-85: the name, in name type. With the full header pinned and a picker to show, the name
- * **is** the picker: the native select (`char-sheet-picker`) lies over the name and its chevron,
- * transparent, so a click on the name opens it and the keyboard reaches it as before.
+ * FR-KIT-85: the name in name type (the kit's 21 px, 32 px wide; two lines before it truncates,
+ * the full name in its Tooltip). With a picker to show, the name **is** the picker: the select
+ * (`char-sheet-picker`) lies over the name and its chevron, transparent, so a click on the name
+ * opens it and the keyboard reaches it as before. K11: in the compact fallback too, so no boxed
+ * select shows anywhere.
  */
 function SheetName({ picker }: { picker: ReactNode }) {
   const ctx = useSheet();
@@ -224,7 +294,7 @@ function SheetName({ picker }: { picker: ReactNode }) {
     <span
       data-testid="char-sheet-name"
       data-slot="sheet-name"
-      className="flex min-w-0 items-center gap-1 text-lg font-semibold leading-tight"
+      className="flex min-w-0 items-center gap-1 text-[21px] font-bold leading-[1.1] @min-[560px]/sheet:text-[32px]"
     >
       {ctx.readOnly && (
         <LockIcon
@@ -233,8 +303,6 @@ function SheetName({ picker }: { picker: ReactNode }) {
           className="size-3.5 shrink-0"
         />
       )}
-      {/* K4 walkthrough: the name wraps to two lines before it truncates; full name in the
-          Tooltip. */}
       <span className="line-clamp-2 min-w-0 break-words">{ctx.creature.name}</span>
     </span>
   );
@@ -257,9 +325,9 @@ function SheetName({ picker }: { picker: ReactNode }) {
 
 /**
  * The header's top (FR-KIT-85, kit "Character sheet"): the square portrait; the name (the picker
- * when shown), the level line and, pinned in full, the chips line (badges + the `header` sections:
- * effect chips, the brain menu); Derive / Approve / Lock / Edit top-right. In the compact fallback
- * (FR-CHARX-48) only portrait, name and level line stay pinned; the rest scrolls (`HeaderRest`).
+ * when shown) and the level line ("Level 5 Ranger · Wood Elf", the background too once wide);
+ * pinned in full, the chips line; the small actions top-right, always pinned (K11). The compact
+ * fallback (FR-CHARX-48) only moves the chips line into the scrolling content (`HeaderRest`).
  */
 function NameRow({
   picker,
@@ -287,34 +355,46 @@ function NameRow({
   const colour = key ? colorHex(key) : null;
   const sub = "cr" in s ? crLine(s.cr) : levelLine(s.level, s.className);
   const species = "species" in s && s.species ? s.species : null;
+  const background = c.kind === "character" ? ctx.sheet.background.trim() : "";
   return (
-    // The text column keeps at least 6rem; actions that don't fit beside it wrap under the row,
-    // right-aligned, so the name always has room (K4 walkthrough: "G.." at 320 px).
-    <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5">
-      <Portrait id={c.portraitAssetId} name={c.name} colour={colour} />
-      <div className="flex min-w-24 flex-1 basis-24 flex-col gap-0.5">
-        <SheetName picker={full ? picker : null} />
-        <span data-testid="char-sheet-level" className="text-xs text-muted-foreground">
+    // A grid: portrait, the name column, the actions. The chips line spans the row under them in
+    // the narrow sheet (room for "Concentrating: Bless 10r" beside "In combat", so the header
+    // stays pinned at 320 px), and sits under the name once wide (the kit's enlarged sheet).
+    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5">
+      <Portrait
+        id={c.portraitAssetId}
+        name={c.name}
+        colour={colour}
+        large
+        className={full ? "@min-[560px]/sheet:row-span-2" : undefined}
+      />
+      <div className="flex min-w-0 flex-col gap-1">
+        <SheetName picker={picker} />
+        <span
+          data-testid="char-sheet-level"
+          className="text-sm text-muted-foreground @min-[560px]/sheet:text-base"
+        >
           {sub}
           {species ? ` · ${species}` : ""}
+          {background && <span className="hidden @min-[560px]/sheet:inline"> · {background}</span>}
         </span>
-        {full && <ChipsLine />}
+      </div>
+      <div data-testid="charx-header-actions" className="ml-auto shrink-0">
+        <HeaderActions editing={editing} setEditing={setEditing} />
       </div>
       {full && (
-        <div data-testid="charx-header-actions" className="ml-auto shrink-0">
-          <HeaderActions editing={editing} setEditing={setEditing} />
-        </div>
+        <ChipsLine className="col-span-3 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2 @min-[560px]/sheet:row-start-2 @min-[560px]/sheet:-mt-1" />
       )}
     </div>
   );
 }
 
 /** FR-KIT-85 chips line: the badges, then the `header` sections (effect chips, brain menu). */
-function ChipsLine() {
+function ChipsLine({ className }: { className?: string }) {
   const ctx = useSheet();
   const c = ctx.creature;
   return (
-    <div data-testid="charx-header-chips" className="flex min-w-0 flex-wrap items-center gap-1">
+    <div data-testid="charx-header-chips" className={cn(CHIPS_LINE, className)}>
       <HeaderBadges />
       {!ctx.readOnly && (
         <SheetSlotView
@@ -322,66 +402,37 @@ function ChipsLine() {
           creatureId={c.id}
           client={ctx.client}
           kind={c.kind}
-          className="flex min-w-0 flex-wrap items-center gap-1"
+          className="contents"
         />
       )}
     </div>
   );
 }
 
-/**
- * The compact fallback's scrolling header rest (FR-CHARX-48): the badges and the picker, then the
- * `header` sections and Edit / Approve / Lock.
- */
-function HeaderRest({
-  picker,
-  editing,
-  setEditing,
-}: {
-  picker: ReactNode;
-  editing: boolean;
-  setEditing(v: boolean): void;
-}) {
-  const ctx = useSheet();
-  const c = ctx.creature;
-  return (
-    <>
-      <div className="flex items-start justify-between gap-2">
-        <HeaderBadges />
-        {picker}
-      </div>
-      <div className="flex items-center gap-1.5">
-        {!ctx.readOnly && (
-          <SheetSlotView
-            slot="header"
-            creatureId={c.id}
-            client={ctx.client}
-            kind={c.kind}
-            className="flex min-w-0 flex-1 flex-col gap-1"
-          />
-        )}
-        <div className="ml-auto shrink-0">
-          <HeaderActions editing={editing} setEditing={setEditing} />
-        </div>
-      </div>
-    </>
-  );
-}
+/** K11: the kit's tab (`.tab`): label type 15 px, roomy, the active marker inside it. */
+const TAB = "h-auto px-2.5 pt-[5px] pb-2 text-[15px] leading-[1.2]";
 
 /**
  * FR-CHARX-115: the tab strip scrolls sideways only (the active marker sits inside the tab): the
- * wheel turns into sideways scroll, arrows show at an end with hidden tabs, a thin scrollbar
- * stays. The arrows sit beside the strip, never over a tab.
+ * wheel turns into sideways scroll, arrows (the kit's ‹ ›) show at an end with hidden tabs, a
+ * thin scrollbar stays. The arrows sit beside the strip, never over a tab. K11: while the strip
+ * overflows both arrow slots stay in the layout (an end with nothing hidden keeps an invisible,
+ * disabled arrow), so scrolling never shifts the tabs under the pointer.
  */
 function TabStrip({ children }: { children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [arrows, setArrows] = useState({ prev: false, next: false });
+  const [arrows, setArrows] = useState({ prev: false, next: false, overflow: false });
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     const sync = () => {
-      const next = tabArrows(el.scrollLeft, el.scrollWidth, el.clientWidth);
-      setArrows((a) => (a.prev === next.prev && a.next === next.next ? a : next));
+      const next = {
+        ...tabArrows(el.scrollLeft, el.scrollWidth, el.clientWidth),
+        overflow: el.scrollWidth - el.clientWidth > 1,
+      };
+      setArrows((a) =>
+        a.prev === next.prev && a.next === next.next && a.overflow === next.overflow ? a : next,
+      );
     };
     // React's wheel listener is passive; turning the wheel sideways needs `preventDefault`.
     const wheel = (e: WheelEvent) => {
@@ -403,12 +454,18 @@ function TabStrip({ children }: { children: ReactNode }) {
     };
   }, []);
   const step = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * TAB_ARROW_STEP_PX });
-  const arrow = (dir: 1 | -1) => (
+  const arrow = (dir: 1 | -1, shown: boolean) => (
     <button
       type="button"
       data-testid={dir < 0 ? "charx-tabs-prev" : "charx-tabs-next"}
       aria-label={dir < 0 ? "Earlier tabs" : "More tabs"}
-      className="mb-1.5 flex w-5 shrink-0 items-center justify-center rounded-md border text-muted-foreground hover:bg-accent hover:text-foreground"
+      aria-hidden={shown ? undefined : true}
+      tabIndex={shown ? undefined : -1}
+      disabled={!shown}
+      className={cn(
+        "mb-1.5 flex w-[22px] shrink-0 items-center justify-center rounded-[3px] border text-muted-foreground hover:bg-accent hover:text-foreground",
+        !shown && "invisible",
+      )}
       onClick={() => step(dir)}
     >
       {dir < 0 ? (
@@ -420,14 +477,14 @@ function TabStrip({ children }: { children: ReactNode }) {
   );
   return (
     <div data-slot="sheet-tabs" className="flex shrink-0 items-stretch gap-1">
-      {arrows.prev && arrow(-1)}
+      {arrows.overflow && arrow(-1, arrows.prev)}
       <div
         ref={ref}
         className="min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-1 [scrollbar-width:thin]"
       >
         {children}
       </div>
-      {arrows.next && arrow(1)}
+      {arrows.overflow && arrow(1, arrows.next)}
     </div>
   );
 }
@@ -468,6 +525,22 @@ function usePinnedHeader(initial: PinnedPart) {
     if (rest) ro.observe(rest);
     return () => ro.disconnect();
   }, [part]);
+  // K11: a sheet open at load measures its header in the fallback fonts, wider than the theme's,
+  // and the full height seen then kept it compact for good. Once the fonts are in, measure the
+  // full header again.
+  useEffect(() => {
+    const fonts = typeof document === "undefined" ? undefined : document.fonts;
+    if (!fonts?.ready) return;
+    let on = true;
+    void fonts.ready.then(() => {
+      if (!on) return;
+      seenFull.current = null;
+      setPart("full");
+    });
+    return () => {
+      on = false;
+    };
+  }, []);
   return { bodyRef, headerRef, restRef, part };
 }
 
@@ -543,6 +616,16 @@ export function SheetView({
   const current = tabs.some(([v]) => v === tab) ? tab : "main";
   const { bodyRef, headerRef, restRef, part } = usePinnedHeader(initialPinnedPart);
   const compact = part === "compact";
+  // K11: one set of DM public overrides for the header's Public rolls menu and Main's rolls.
+  const overrides = usePublicOverrides();
+  // K11 (DM feedback: "the stat row is missing"): the tabs share one scrolling box, so a tab
+  // opened after scrolling another one showed its middle (Main from the HP control down). Each
+  // tab now opens at its top.
+  const contentRef = useRef<HTMLDivElement>(null);
+  const openTab = (v: string) => {
+    setTab(v);
+    if (contentRef.current) contentRef.current.scrollTop = 0;
+  };
   const hintEl = hint && ctx.editing && (
     <p data-testid="charx-create-hint" className="rounded-md bg-muted p-2 text-xs">
       {CREATE_HINT}{" "}
@@ -553,91 +636,103 @@ export function SheetView({
   );
   return (
     <SheetContext.Provider value={ctx}>
-      <Card
-        ref={bodyRef}
-        data-testid="char-sheet"
-        data-record-id={creature.id}
-        data-editing={ctx.editing ? "true" : "false"}
-        className="@container/sheet flex h-full flex-col overflow-hidden border-0 bg-transparent p-1 shadow-none"
-      >
-        {/* FR-CHARX-48: the pinned part stays, only the content box scrolls. Compact: the name
-            row + tab strip are pinned; badges, buttons, picker, sections scroll with the content.
-            Nothing outside the content box may shrink (an overflow-x box would collapse to 0 px). */}
-        <Tabs value={current} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-2">
-          <div
-            ref={headerRef}
-            data-testid="charx-header"
-            data-pinned="true"
-            data-pinned-part={part}
-            className="flex shrink-0 flex-col gap-2"
+      <SheetOverridesProvider value={overrides}>
+        <Card
+          ref={bodyRef}
+          data-testid="char-sheet"
+          data-record-id={creature.id}
+          data-editing={ctx.editing ? "true" : "false"}
+          className="@container/sheet flex h-full flex-col overflow-hidden border-0 bg-transparent p-1 shadow-none"
+        >
+          {/* FR-CHARX-48: the pinned part stays, only the content box scrolls. Compact: the name
+            row (with the picker and the actions) + tab strip are pinned; the chips line scrolls
+            with the content. Nothing outside the content box may shrink (an overflow-x box would
+            collapse to 0 px). */}
+          <Tabs
+            value={current}
+            onValueChange={openTab}
+            className="flex min-h-0 flex-1 flex-col gap-2"
           >
-            <div className="flex flex-col gap-1.5">
-              <NameRow
-                picker={picker}
-                full={!compact}
-                editing={ctx.editing}
-                setEditing={setEditing}
-              />
-              {!compact && hintEl}
-            </div>
-            <TabStrip>
-              <TabsList className="w-max">
-                {tabs.map(([v, label]) => {
-                  const n = counts.get(v) ?? null;
-                  return (
-                    <TabsTrigger
-                      key={v}
-                      value={v}
-                      data-testid="charx-tab"
-                      data-value={v}
-                      data-count={n ?? undefined}
-                    >
-                      {label}
-                      {n !== null && (
-                        <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
-                          {n}
-                        </Badge>
-                      )}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </TabStrip>
-          </div>
-          <div data-testid="charx-content" className="min-h-0 flex-1 overflow-y-auto">
-            {compact && (
-              <div
-                ref={restRef}
-                data-testid="charx-header-rest"
-                className="mb-2 flex flex-col gap-1.5"
-              >
-                <HeaderRest picker={picker} editing={ctx.editing} setEditing={setEditing} />
-                {hintEl}
+            <div
+              ref={headerRef}
+              data-testid="charx-header"
+              data-pinned="true"
+              data-pinned-part={part}
+              className="flex shrink-0 flex-col gap-2"
+            >
+              <div className="flex flex-col gap-1.5">
+                <NameRow
+                  picker={picker}
+                  full={!compact}
+                  editing={ctx.editing}
+                  setEditing={setEditing}
+                />
+                {!compact && hintEl}
               </div>
-            )}
-            <TabsContent value="main">
-              <MainTab />
-            </TabsContent>
-            <TabsContent value="actions">
-              <ActionsTab />
-            </TabsContent>
-            <TabsContent value="features">
-              <FeaturesTab />
-            </TabsContent>
-            <TabsContent value="inventory">
-              <InventoryTab />
-            </TabsContent>
-            <TabsContent value="notes">
-              <NotesTab />
-            </TabsContent>
-            {sectionTabs.map((s) => (
-              <TabsContent key={s.id} value={`section:${s.id}`}>
-                <SectionView section={s} creatureId={creature.id} client={client} />
+              <TabStrip>
+                <TabsList className="h-auto w-max p-0">
+                  {tabs.map(([v, label]) => {
+                    const n = counts.get(v) ?? null;
+                    return (
+                      <TabsTrigger
+                        key={v}
+                        value={v}
+                        data-testid="charx-tab"
+                        data-value={v}
+                        data-count={n ?? undefined}
+                        className={TAB}
+                      >
+                        {label}
+                        {n !== null && (
+                          <Badge variant="secondary" className="ml-1 px-1 py-0 text-[10px]">
+                            {n}
+                          </Badge>
+                        )}
+                      </TabsTrigger>
+                    );
+                  })}
+                </TabsList>
+              </TabStrip>
+            </div>
+            <div
+              ref={contentRef}
+              data-testid="charx-content"
+              className="min-h-0 flex-1 overflow-y-auto [overflow-anchor:none]"
+            >
+              {compact && (
+                <div
+                  ref={restRef}
+                  data-testid="charx-header-rest"
+                  className="mb-2 flex flex-col gap-1.5"
+                >
+                  <ChipsLine />
+                  {hintEl}
+                </div>
+              )}
+              <TabsContent value="main">
+                <MainTab />
               </TabsContent>
-            ))}
-          </div>
-        </Tabs>
-      </Card>
+              <TabsContent value="actions">
+                <ActionsTab />
+              </TabsContent>
+              <TabsContent value="features">
+                <FeaturesTab />
+              </TabsContent>
+              <TabsContent value="inventory">
+                <InventoryTab />
+              </TabsContent>
+              <TabsContent value="notes">
+                <NotesTab />
+              </TabsContent>
+              {sectionTabs.map((s) => (
+                <TabsContent key={s.id} value={`section:${s.id}`}>
+                  <SectionView section={s} creatureId={creature.id} client={client} />
+                </TabsContent>
+              ))}
+            </div>
+          </Tabs>
+        </Card>
+      </SheetOverridesProvider>
     </SheetContext.Provider>
   );
 }

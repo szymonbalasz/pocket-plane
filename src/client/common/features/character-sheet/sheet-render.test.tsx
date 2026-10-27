@@ -293,7 +293,7 @@ describe("FR-CHARX-48 pinned header", () => {
     ]);
   });
 
-  test("FR-CHARX-48 compact fallback: only name row + tab strip pinned; badges, buttons, picker scroll", () => {
+  test("FR-CHARX-48 compact fallback: only name row (K11: with the picker and the small buttons) + tab strip pinned; the badges scroll", () => {
     const html = sheetHtml("compact");
     expect(html).toContain(
       'data-testid="charx-header" data-pinned="true" data-pinned-part="compact"',
@@ -302,8 +302,8 @@ describe("FR-CHARX-48 pinned header", () => {
       "pinned",
       "pinned",
       "scrolls",
-      "scrolls",
-      "scrolls",
+      "pinned",
+      "pinned",
       "scrolls",
     ]);
     // The header rest comes first in the content, before the tab content.
@@ -319,14 +319,18 @@ describe("FR-CHARX-48 pinned header", () => {
     return html.slice(html.lastIndexOf("<", at), html.indexOf(">", at) + 1);
   };
 
-  test("FR-KIT-85 sheet header: square framed 56-px portrait (initial); the name is the picker (select over the name + chevron); level line; chips line; Edit top-right; no header-line row", () => {
+  test("FR-KIT-85 sheet header: square framed portrait (initial; K11: the kit's 64 px, 84 px wide); the name is the picker (select over the name + chevron); level line; chips line; Edit top-right; no header-line row", () => {
     const html = sheetHtml("full");
     const portrait = tagOf(html, "char-sheet-portrait");
     expect(portrait).toContain('data-slot="sheet-portrait"');
-    expect(portrait).toContain("size-14");
+    expect(portrait).toContain("size-16 @min-[560px]/sheet:size-[84px]");
     expect(portrait).toContain("rounded-md border");
     expect(portrait).not.toContain("rounded-full");
     expect(html).toMatch(/data-testid="char-sheet-portrait"[^>]*><div[^>]*>M<\/div>/);
+    // The initial in name type size on the owner's colour (a theme deepens `--portrait`).
+    const initial = html.slice(html.indexOf('data-slot="sheet-portrait-initial"'));
+    expect(initial).toStartWith('data-slot="sheet-portrait-initial" data-colour="none"');
+    expect(initial).toContain("text-[30px] @min-[560px]/sheet:text-[40px]");
     // The name is the picker: name, chevron, then the select laid over them (transparent).
     const picker = html.slice(html.indexOf('data-testid="charx-name-picker"'));
     const order = ["char-sheet-name", "lucide-chevron-down", "char-sheet-picker"].map((x) =>
@@ -339,12 +343,22 @@ describe("FR-CHARX-48 pinned header", () => {
     expect(html).toMatch(
       /data-testid="char-sheet-name"[^>]*><span class="line-clamp-2 min-w-0 break-words">Mira<\/span>/,
     );
+    // K11: the kit's name type size (21 px, 32 px wide).
+    expect(tagOf(html, "char-sheet-name")).toContain("text-[21px] font-bold");
+    expect(tagOf(html, "char-sheet-name")).toContain("@min-[560px]/sheet:text-[32px]");
     // Level line, chips line (badges), Edit after them on the same top row; the old row is gone.
     const at = (id: string) => html.indexOf(`data-testid="${id}"`);
     expect(at("char-sheet-level")).toBeGreaterThan(at("char-sheet-name"));
-    expect(at("charx-header-chips")).toBeGreaterThan(at("char-sheet-level"));
+    // K11: the actions top-right of the name column, then the chips line (under the row when
+    // narrow, under the name when wide); badges as kit chips.
+    expect(at("charx-edit-toggle")).toBeGreaterThan(at("char-sheet-level"));
+    expect(at("charx-header-chips")).toBeGreaterThan(at("charx-edit-toggle"));
     expect(at("charx-draft")).toBeGreaterThan(at("charx-header-chips"));
-    expect(at("charx-edit-toggle")).toBeGreaterThan(at("charx-draft"));
+    expect(tagOf(html, "charx-draft")).toContain('data-slot="sheet-chip"');
+    expect(tagOf(html, "charx-draft")).toContain("rounded-full px-2.5 py-0.5 text-[13px]");
+    expect(tagOf(html, "charx-header-chips")).toContain(
+      "col-span-3 @min-[560px]/sheet:col-span-1 @min-[560px]/sheet:col-start-2",
+    );
     expect(html).not.toContain("charx-header-line");
   });
 
@@ -352,7 +366,7 @@ describe("FR-CHARX-48 pinned header", () => {
     const html = sheetHtml("full");
     const edit = tagOf(html, "charx-edit-toggle");
     expect(edit).toContain('data-size="sm"');
-    expect(edit).toContain("h-6 px-2 text-xs");
+    expect(edit).toContain("h-6 px-2 text-[13px]");
     expect(edit).not.toContain("h-8");
   });
 
@@ -361,19 +375,26 @@ describe("FR-CHARX-48 pinned header", () => {
     // The Tooltip trigger is the picker wrapper (it carries the select); the name clamps at 2 lines.
     expect(tagOf(html, "charx-name-picker")).toContain("data-tip");
     expect(html).toMatch(/<span class="line-clamp-2 min-w-0 break-words">Mira<\/span>/);
-    expect(html).toContain('class="flex flex-wrap items-start gap-x-3 gap-y-1.5"');
-    expect(html).toContain('class="flex min-w-24 flex-1 basis-24 flex-col gap-0.5"');
+    // K11: portrait, name column, actions in a grid; the actions stack in a column when narrow
+    // (the name keeps the middle), a row once wide.
+    expect(html).toContain(
+      'class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5"',
+    );
     expect(tagOf(html, "charx-header-actions")).toContain("ml-auto shrink-0");
+    const actions = html.slice(html.indexOf('data-testid="charx-header-actions"'));
+    expect(actions).toContain("flex flex-col items-end gap-1 @min-[560px]/sheet:flex-row");
   });
 
-  test("FR-KIT-85 compact fallback: the name is plain text; badges and the boxed picker move into charx-header-rest", () => {
+  test("FR-KIT-85 compact fallback (K11): the name stays the picker and the small buttons stay top-right; only the chips line moves into charx-header-rest (no boxed select)", () => {
     const html = sheetHtml("compact");
-    expect(html).not.toContain("charx-name-picker");
-    expect(html).not.toContain("charx-header-chips");
     const rest = html.slice(html.indexOf('data-testid="charx-header-rest"'));
+    const pinned = html.slice(0, html.indexOf('data-testid="charx-content"'));
+    expect(pinned).toContain('data-testid="charx-name-picker"');
+    expect(pinned).toContain('data-testid="charx-edit-toggle"');
+    expect(pinned).not.toContain("charx-header-chips");
+    expect(rest).toContain('data-testid="charx-header-chips"');
     expect(rest).toContain('data-testid="charx-draft"');
-    expect(rest).toContain('data-testid="char-sheet-picker"');
-    expect(rest).toContain('data-testid="charx-edit-toggle"');
+    expect(rest).not.toContain("char-sheet-picker");
   });
 });
 
