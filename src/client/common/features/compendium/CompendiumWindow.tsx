@@ -202,8 +202,8 @@ const SourceBadge = ({ label }: { label: string }) => (
 
 /**
  * Name and Details cells: the name in body type, its weight only (a group's chevron before it;
- * a long name truncates, the whole name in its Tooltip); the details line (`r.line`, tabular
- * figures in body type, K13) right after it.
+ * a long name truncates, the whole name in the row's Tooltip, `NameTip`); the details line
+ * (`r.line`, tabular figures in body type, K13) right after it.
  */
 function Cells({ r, lead }: { r: EntrySummary; lead?: ReactNode }) {
   return (
@@ -214,9 +214,7 @@ function Cells({ r, lead }: { r: EntrySummary; lead?: ReactNode }) {
         data-slot="cmp-row-name"
       >
         {lead}
-        <Tooltip content={r.name}>
-          <span className="truncate">{r.name}</span>
-        </Tooltip>
+        <span className="truncate">{r.name}</span>
       </span>
       <span className="truncate text-muted-foreground [font-variant-numeric:tabular-nums]">
         {r.line}
@@ -225,20 +223,31 @@ function Cells({ r, lead }: { r: EntrySummary; lead?: ReactNode }) {
   );
 }
 
+/**
+ * K13 (walkthrough step 4): the whole name in a Tooltip on the row itself, so it opens on the
+ * row's hover or keyboard focus and the row stays its only Tab stop (a trigger inside it would be
+ * a second, focusable span nested in the button).
+ */
+function NameTip({ r, children }: { r: EntrySummary; children: ReactNode }) {
+  return <Tooltip content={r.name}>{children}</Tooltip>;
+}
+
 export function ResultRow({ r, viewer }: { r: EntrySummary; viewer: Role }) {
   return (
     <li>
-      <button
-        type="button"
-        data-testid="cmp-result"
-        data-slot="cmp-row"
-        data-record-id={r.id}
-        data-value={r.kind}
-        {...rowProps(r, viewer)}
-      >
-        <Cells r={r} />
-        <SourceBadge label={r.sourceLabel} />
-      </button>
+      <NameTip r={r}>
+        <button
+          type="button"
+          data-testid="cmp-result"
+          data-slot="cmp-row"
+          data-record-id={r.id}
+          data-value={r.kind}
+          {...rowProps(r, viewer)}
+        >
+          <Cells r={r} />
+          <SourceBadge label={r.sourceLabel} />
+        </button>
+      </NameTip>
     </li>
   );
 }
@@ -267,17 +276,19 @@ export function GroupRow({
         data-value={r.kind}
         data-group-count={r.group?.count}
       >
-        <button
-          type="button"
-          data-testid="cmp-group-toggle"
-          data-record-id={r.id}
-          aria-expanded={expanded}
-          onClick={() => toggleGroup(r.id)}
-          className={ROW}
-        >
-          <Cells r={r} lead={<Chevron className="size-3.5 shrink-0 text-muted-foreground" />} />
-          <SourceBadge label={r.sourceLabel} />
-        </button>
+        <NameTip r={r}>
+          <button
+            type="button"
+            data-testid="cmp-group-toggle"
+            data-record-id={r.id}
+            aria-expanded={expanded}
+            onClick={() => toggleGroup(r.id)}
+            className={ROW}
+          >
+            <Cells r={r} lead={<Chevron className="size-3.5 shrink-0 text-muted-foreground" />} />
+            <SourceBadge label={r.sourceLabel} />
+          </button>
+        </NameTip>
       </div>
       {expanded && children}
     </li>

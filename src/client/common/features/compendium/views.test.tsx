@@ -354,7 +354,7 @@ describe("FR-KIT-76 compendium table", () => {
     expect(row).toContain('draggable="true"');
     // The details line is the name cell's next sibling (small-copy-s7 reads it so), then the chip.
     expect(dm).toMatch(
-      /data-testid="cmp-result-name"[^>]*><span class="truncate" data-state="closed" data-tip="">Goblin<\/span><\/span><span[^>]*tabular-nums[^>]*>CR 1\/4 · Small humanoid<\/span><span data-slot="badge"[^>]*>SRD<\/span>/,
+      /data-testid="cmp-result-name"[^>]*><span class="truncate">Goblin<\/span><\/span><span[^>]*tabular-nums[^>]*>CR 1\/4 · Small humanoid<\/span><span data-slot="badge"[^>]*>SRD<\/span>/,
     );
     // A player row is no drag source.
     expect(
@@ -376,8 +376,12 @@ describe("FR-KIT-76 compendium table", () => {
     const name = html.slice(html.indexOf('data-testid="cmp-result-name"'));
     expect(name).toMatch(/^data-testid="cmp-result-name" data-slot="cmp-row-name"/);
     expect(tagOf(html, "cmp-result-name")).toContain("font-medium");
-    // The Tooltip trigger is the truncating name; its content is the whole name.
-    expect(name).toContain('<span class="truncate" data-state="closed" data-tip="">Ability Score');
+    // The Tooltip trigger is the row itself (its only Tab stop; walkthrough step 4); no focusable
+    // or tip-enrolled part inside it.
+    expect(name).toContain('<span class="truncate">Ability Score');
+    expect(row).toContain("data-tip");
+    expect(html.match(/data-tip/g)?.length).toBe(1);
+    expect(html).not.toContain("tabindex");
     expect(html).toMatch(
       /<span class="truncate text-muted-foreground \[font-variant-numeric:tabular-nums\]">/,
     );

@@ -208,6 +208,18 @@ test("FR-CHARX-114 FR-KIT-76 FR-KIT-13 K13 round 3: wide sheet boxes, narrow nit
   await cmp.getByTestId("cmp-search").fill("");
   await expect(cmp.getByTestId("cmp-result").nth(5)).toBeVisible();
   await shoot(cmp, "app-compendium");
+  // Keyboard (walkthrough step 4): each row is one Tab stop; focus on it shows the whole name.
+  const rows = cmp.locator('[data-testid="cmp-results"] li > :is(button, div > button)');
+  await rows.first().focus();
+  for (let i = 1; i <= 4; i++) {
+    await dm.keyboard.press("Tab");
+    await expect(rows.nth(i)).toBeFocused();
+  }
+  const focusedName = (await rows.nth(4).getByTestId("cmp-result-name").textContent()) ?? "";
+  await expect(dm.getByRole("tooltip").filter({ hasText: focusedName })).toBeVisible();
+  await expect(cmp.locator('[data-testid="cmp-results"] [tabindex="0"]:not(button)')).toHaveCount(
+    0,
+  );
 
   // Party Manager: New pet… whole in its button.
   const board = await openWindow(dm, "party.board");
