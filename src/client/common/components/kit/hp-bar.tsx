@@ -1,7 +1,8 @@
 // Kit part: the HP bar (kit-parity FR-KIT-05): a thin bar plus "cur / max" when the numbers are
 // known, else the health band word alone (a monster for players: never a bar length, FR-KIT-26).
 // Colours are the meaning tokens `hp.*`, not themed (FR-THEME-09); a theme styles the track
-// through `data-slot="kit-hpbar"` (ADR-0069).
+// through `data-slot="kit-hpbar"` (ADR-0069). K9: `track="fixed"` draws the list's one track width
+// (`--hp-track`, set by the list from its narrowest row; the kit's 120 px at most), so bars line up.
 import { healthBand } from "@shared/combat-tracker/rules";
 import type { HealthBand } from "@shared/entities/schemas";
 import type * as React from "react";
@@ -32,6 +33,16 @@ export function hpFill(cur: number, max: number): number {
 }
 
 /** Numbers when both are known (max > 0), else the band alone, else nothing. */
+/** The kit's fixed track width (`.bar` in the 340-px Initiative), px. */
+export const HP_TRACK_PX = 120;
+
+/**
+ * K9: the fixed track's width: the list's `--hp-track` (one value for every row, measured by the
+ * list, `useListHpTrack`), else 120 px. A row narrower than that (only below the list's readable
+ * minimum) shrinks its own track rather than overflow.
+ */
+const FIXED_TRACK = "w-[var(--hp-track,120px)] shrink";
+
 export function hpBarMode(
   cur: number | null | undefined,
   max: number | null | undefined,
@@ -46,6 +57,7 @@ export function HpBar({
   max,
   band,
   numbers = true,
+  track = "fill",
   className,
   "data-testid": testId = "kit-hpbar",
   ...props
@@ -56,6 +68,8 @@ export function HpBar({
   band?: HealthBand | null;
   /** Show "cur / max" after the bar. */
   numbers?: boolean;
+  /** `fill` takes the line's room; `fixed` = the list's `--hp-track` (≤ `HP_TRACK_PX`). */
+  track?: "fill" | "fixed";
   "data-testid"?: string;
 } & Omit<React.ComponentProps<"span">, "children">) {
   const mode = hpBarMode(cur, max, band);
@@ -80,13 +94,17 @@ export function HpBar({
       data-testid={testId}
       data-slot="kit-hpbar"
       data-band={b}
+      data-track={track}
       className={cn("flex min-w-0 items-center gap-2", className)}
       {...props}
     >
       <span
         aria-hidden
         data-slot="kit-hpbar-track"
-        className="h-[5px] min-w-6 flex-1 overflow-hidden rounded-[1px] bg-muted"
+        className={cn(
+          "h-[5px] min-w-6 overflow-hidden rounded-[1px] bg-muted",
+          track === "fixed" ? FIXED_TRACK : "flex-1",
+        )}
       >
         <span
           data-slot="kit-hpbar-fill"
@@ -95,7 +113,13 @@ export function HpBar({
         />
       </span>
       {numbers && (
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+        <span
+          className={cn(
+            "shrink-0 text-xs text-muted-foreground tabular-nums",
+            // Fixed: "cur / max" keeps a column (up to "38 / 44"), so the next part lines up too.
+            track === "fixed" && "min-w-[7ch]",
+          )}
+        >
           {cur} / {max}
         </span>
       )}

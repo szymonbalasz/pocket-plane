@@ -16,6 +16,7 @@ import {
   type ComponentProps,
   createContext,
   type ReactNode,
+  type RefObject,
   useCallback,
   useContext,
   useLayoutEffect,
@@ -68,19 +69,55 @@ const NameLineRoom = createContext<number | null>(null);
 /** FR-KIT-28: chips inside an Initiative row's status cell. */
 const InStatusCell = createContext(false);
 
+/** K9: the status cell sits in a narrow Initiative list (under 22rem, as `@max-[22rem]/init`). */
+const NarrowList = createContext(false);
+
+/**
+ * The `@container/init` breakpoint the narrow list uses, px (22rem). K9 re-test 2: one breakpoint
+ * for every narrow variant of the list (chips, medallion, init column), above the band where its
+ * HP lines may stack, so a row's room grows steadily with the width there.
+ */
+const NARROW_LIST_PX = 352;
+
+/**
+ * K9 (walkthrough F1): whether the Initiative list around `ref` is narrow (its content box under
+ * 22rem: the DM's 320 minimum and up to ≈ 376, the player's 280), re-read when the list resizes.
+ */
+function useNarrowList(ref: RefObject<HTMLElement | null>): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    const list = ref.current?.closest<HTMLElement>('[data-testid="cbt-init-list"]');
+    if (!list || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([e]) => {
+      if (e) setNarrow(e.contentRect.width < NARROW_LIST_PX);
+    });
+    ro.observe(list);
+    return () => ro.disconnect();
+  }, [ref]);
+  return narrow;
+}
+
 /**
  * FR-KIT-28: an Initiative row's status cell (`init-status`): the `EffectChips` inside draw as
  * icons (+ rounds; the label in the Tooltip), the first one shown, the rest in "+N". At least
  * 56 px, so the initiative numbers line up down the list (the kit's fixed column); on a narrow
- * list (under 20rem) only as wide as its chips, and an empty one takes no room.
+ * list (under 22rem) only as wide as its chips, and an empty one takes no room.
  */
 export function StatusCell({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const narrow = useNarrowList(ref);
   return (
     <span
+      ref={ref}
       data-slot="init-status"
-      className="flex min-w-14 shrink-0 items-center @max-[20rem]/init:min-w-0 @max-[20rem]/init:empty:hidden"
+      data-narrow={narrow || undefined}
+      // K9 (walkthrough F1): in a narrow list (DM 320, player 280) the chips go icon-only (the
+      // rounds / uses stay in their Tooltip), so the HP bars keep a readable shared length.
+      className="flex min-w-14 shrink-0 items-center @max-[22rem]/init:min-w-0 @max-[22rem]/init:empty:hidden @max-[22rem]/init:[&_[data-rounds]]:hidden"
     >
-      <InStatusCell.Provider value={true}>{children}</InStatusCell.Provider>
+      <InStatusCell.Provider value={true}>
+        <NarrowList.Provider value={narrow}>{children}</NarrowList.Provider>
+      </InStatusCell.Provider>
     </span>
   );
 }
@@ -225,7 +262,11 @@ function ChipBadge({
       {icon ? (
         <>
           <span className="sr-only">{label}</span>
-          {rounds !== null && <span className="shrink-0">{rounds}</span>}
+          {rounds !== null && (
+            <span data-rounds className="shrink-0">
+              {rounds}
+            </span>
+          )}
         </>
       ) : compact ? (
         <>
@@ -326,7 +367,10 @@ function TriggerChipBadge({
       <ZapIcon className="size-3 shrink-0" aria-hidden />
       {icon ? <span className="sr-only">{t.name}</span> : <span>{t.name}</span>}
       {t.uses && (
-        <span className={cn(!icon && "ml-0.5", "shrink-0", t.down && "text-hp-down")}>
+        <span
+          data-rounds={icon || undefined}
+          className={cn(!icon && "ml-0.5", "shrink-0", t.down && "text-hp-down")}
+        >
           {t.uses.text}
         </span>
       )}
@@ -388,7 +432,11 @@ function ConcBadge({
     >
       <Icon className="size-3 shrink-0" aria-hidden />
       {icon ? <span className="sr-only">{label}</span> : <span>{label}</span>}
-      {rounds !== null && <span className={cn("shrink-0", !icon && "ml-0.5")}>{rounds}r</span>}
+      {rounds !== null && (
+        <span data-rounds={icon || undefined} className={cn("shrink-0", !icon && "ml-0.5")}>
+          {rounds}r
+        </span>
+      )}
       {e.secret && <EyeOffIcon className="size-3 shrink-0" aria-label="Hidden from players" />}
     </Badge>
   );
@@ -558,6 +606,16 @@ function MenuChip({
 }
 
 /**
+ * FR-KIT-28: how many effect chips the status cell shows before "+N": none beside a concentration
+ * chip (it never folds, FR-CBTX-59), else the first. K9 (walkthrough F1): in a narrow list two or
+ * more effects all go into "+N" (one chip), so the row's HP bar keeps the list's shared length.
+ */
+export function statusShown(conc: number, fx: number, narrow: boolean): number {
+  if (conc > 0 || fx === 0) return 0;
+  return narrow && fx > 1 ? 0 : 1;
+}
+
+/**
  * FR-KIT-28: the status cell's chips, icons with rounds (the label in the Tooltip). Concentration
  * comes first and never folds (FR-CBTX-59), so with one every other effect goes into "+N"; else
  * the first effect shows and the rest fold. Chip menus (Edit… / End), the concentration menu and
@@ -575,8 +633,9 @@ function StatusChips({
   const ordered = chipOrder(effects);
   const conc = ordered.filter((e) => e.kind === "concentration");
   const fx = ordered.filter((e) => e.kind !== "concentration");
+  const narrow = useContext(NarrowList);
   if (ordered.length === 0 && triggers.length === 0) return null;
-  const shown = fx.slice(0, conc.length > 0 ? 0 : 1);
+  const shown = fx.slice(0, statusShown(conc.length, fx.length, narrow));
   const folded = fx.slice(shown.length);
   return (
     <div

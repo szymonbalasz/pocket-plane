@@ -205,6 +205,22 @@ describe("TT2 roll requests (client)", () => {
     expect(html).toContain("DM: Perception · Mira");
   });
 
+  test("FR-KIT-57 inline action (K9, K6 gap 9 + walkthrough): the text on its own line, then the card's time line (timeInBody) and Roll + Decline right-aligned; Decline a small stone button", () => {
+    expect(rollRequestPlayerView.timeInBody).toBe(true);
+    expect(rollRequestDmView.timeInBody).toBeUndefined();
+    const html = render(Body(rollRequestPlayerView, prompt()), P1);
+    expect(html).toMatch(/data-testid="dicex-prompt"[^>]*class="flex flex-wrap items-center/);
+    // The text takes the whole first line; outside a toast card there is no time (a Notifications
+    // row shows its own), so the actions follow as one right-aligned group.
+    expect(html).toMatch(
+      /<span class="min-w-0 basis-full">DM: Perception · Mira<\/span><span class="ml-auto flex shrink-0/,
+    );
+    expect(html).not.toContain("note-time");
+    const decline = html.match(/<button[^>]*data-testid="dicex-prompt-decline"[^>]*>/)?.[0] ?? "";
+    expect(decline).toContain('data-variant="outline"');
+    expect(decline).toContain('data-size="sm"');
+  });
+
   test("FR-NOTE-59 prompt view: Roll + Decline only for its owner while pending; resolved rows read the outcome", () => {
     expect(render(Body(rollRequestPlayerView, prompt()), P2)).not.toContain("dicex-prompt-roll");
     const out = (resolution: unknown, state = "resolved") =>

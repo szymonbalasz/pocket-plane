@@ -9,7 +9,8 @@ import type { RecordStore } from "@shared/protocol/store";
 import { initials } from "@shared/scenes-map/geometry";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { HandshakeIcon, SwordsIcon } from "lucide-react";
-import { useState } from "react";
+import { type RefObject, useLayoutEffect, useState } from "react";
+import { HP_TRACK_PX } from "../../components/kit/hp-bar";
 import { Medallion, type MedallionSize } from "../../components/kit/medallion";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
@@ -91,10 +92,10 @@ export function medallionColour(store: RecordStore, c: { tokenId?: string | null
 }
 
 /**
- * A narrow Initiative list (under 20rem, `@container/init`: the DM's 320 min, the player's 280)
+ * A narrow Initiative list (under 22rem, `@container/init`: the DM's 320 min, the player's 280)
  * draws the `lg` medallion at `md`, so the name block keeps its room.
  */
-const NARROW_LG = "@max-[20rem]/init:size-7 @max-[20rem]/init:text-[13px]";
+const NARROW_LG = "@max-[22rem]/init:size-7 @max-[22rem]/init:text-[13px]";
 
 /** FR-KIT-24: a combatant's medallion (portrait, else the initial on its token's type colour). */
 export function CombatantMedallion({
@@ -117,6 +118,156 @@ export function CombatantMedallion({
 }
 
 export const InitiativeIcon = SwordsIcon;
+
+/** K9 (walkthrough F1): the shortest HP track an Initiative list draws, px (a readable bar). */
+export const HP_TRACK_MIN = 36;
+
+/**
+ * K9: the room a row's HP line leaves its track: the line's width less the bar's own rest (its
+ * gap and "cur / max"), the line's other parts (temp "+N", card, Down / death) and their gaps. The
+ * AC / moved tail doesn't count: it folds into the row Tooltip when it doesn't fit (FR-KIT-25).
+ */
+export function trackRoom(w: {
+  line: number;
+  barRest: number;
+  others: readonly number[];
+  gap: number;
+}): number {
+  return w.line - w.barRest - w.others.reduce((a, x) => a + x + w.gap, 0);
+}
+
+/**
+ * K9: ONE track width per Initiative list: the narrowest row's room, at most the kit's 120 px,
+ * never under `HP_TRACK_MIN`. No row measured → 120.
+ */
+export function listTrack(rooms: readonly number[]): number {
+  const r = rooms.filter((x) => Number.isFinite(x));
+  if (r.length === 0) return HP_TRACK_PX;
+  return Math.floor(Math.max(HP_TRACK_MIN, Math.min(HP_TRACK_PX, ...r)));
+}
+
+/** K9 re-test 2: a stacked list unstacks only once every one-line room has this much to spare. */
+export const STACK_HYSTERESIS = 8;
+
+/**
+ * K9 re-test (R1): whether a list stacks its HP lines: some row's one-line room is under
+ * `HP_TRACK_MIN` (a right column that can't shrink: init + concentration + "+N" + a trigger chip,
+ * which never folds, FR-CBTX-54), so a shared bar there would be unreadable or cut. Re-test 2:
+ * the rooms are always the one-line layout's (measured the same way at every width; a row's room
+ * grows steadily with the list's width), and a stacked list stays stacked until every room clears
+ * the floor by `STACK_HYSTERESIS`, so the switch is one width threshold with a little hysteresis.
+ */
+export function needsStack(rooms: readonly number[], stacked = false): boolean {
+  const floor = HP_TRACK_MIN + (stacked ? STACK_HYSTERESIS : 0);
+  return rooms.some((r) => Number.isFinite(r) && r < floor);
+}
+
+/** An element's content-box width (its `clientWidth` less its side padding), px. */
+export function contentWidth(el: HTMLElement): number {
+  const cs = getComputedStyle(el);
+  return (
+    el.clientWidth -
+    (Number.parseFloat(cs.paddingLeft) || 0) -
+    (Number.parseFloat(cs.paddingRight) || 0)
+  );
+}
+
+/**
+ * K9 re-test (R1): the stacked layout's classes, on markup every theme shares. The list carries
+ * `group/hp` (+ `data-hp-stacked` while stacked, set by `useListHpTrack`); a row's main line wraps,
+ * its name block dissolves (`contents`) so the name line keeps the medallion's line with the init
+ * and chips, and the HP line (and a sub-line under the name) take full-width lines under it,
+ * indented past the medallion (34 + 6 px; 28 + 6 in a narrow list, FR-KIT-24's `md`).
+ */
+export const HP_STACK = {
+  list: "group/hp",
+  main: "group-data-[hp-stacked]/hp:flex-wrap",
+  block: "group-data-[hp-stacked]/hp:contents",
+  name: "min-w-0 group-data-[hp-stacked]/hp:flex-1",
+  line: "group-data-[hp-stacked]/hp:order-last group-data-[hp-stacked]/hp:basis-full group-data-[hp-stacked]/hp:pl-10 group-data-[hp-stacked]/hp:@max-[22rem]/init:pl-[34px]",
+} as const;
+
+/** The HP line's gap (`gap-x-1.5`). */
+const LINE_GAP = 6;
+
+/** K9: one row's track room, measured on its `data-stats-line` (null: no fixed bar). */
+function measureRoom(line: HTMLElement): number | null {
+  const bar = line.querySelector<HTMLElement>(
+    ':scope > [data-slot="kit-hpbar"][data-track="fixed"]',
+  );
+  const track = bar?.querySelector<HTMLElement>('[data-slot="kit-hpbar-track"]');
+  if (!bar || !track || line.clientWidth === 0) return null;
+  const others = [...line.children]
+    .filter(
+      (k): k is HTMLElement =>
+        k instanceof HTMLElement && k !== bar && !k.hasAttribute("data-tail"),
+    )
+    .map((k) => k.offsetWidth)
+    .filter((w) => w > 0);
+  // The content box: a stacked line's indent past the medallion is padding (re-test 2).
+  return trackRoom({
+    line: contentWidth(line),
+    barRest: bar.offsetWidth - track.offsetWidth,
+    others,
+    gap: LINE_GAP,
+  });
+}
+
+/**
+ * K9 (walkthrough F1): sets `--hp-track` on the Initiative list to `listTrack` of its rows' rooms,
+ * so every row's bar is the same length at every width. Re-test R1: rooms are first measured on
+ * the one-line rows; if some row's is under the floor (`needsStack`) the list stacks its HP lines
+ * (`data-hp-stacked`, `HP_STACK`) and measures again. Both reads happen in one task (synchronous
+ * layout), so nothing paints in between. Re-measured when the list or a row's HP line resizes and
+ * when rows or their parts change. Measures widths only, never the track, so it settles.
+ */
+export function useListHpTrack(listRef: RefObject<HTMLElement | null>): void {
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    let frame = 0;
+    const lines = () => [...list.querySelectorAll<HTMLElement>("[data-stats-line]")];
+    const rooms = () =>
+      lines()
+        .map(measureRoom)
+        .filter((r): r is number => r !== null);
+    const measure = () => {
+      frame = 0;
+      const was = list.hasAttribute("data-hp-stacked");
+      list.removeAttribute("data-hp-stacked");
+      let r = rooms();
+      if (needsStack(r, was)) {
+        list.setAttribute("data-hp-stacked", "");
+        r = rooms();
+      }
+      list.style.setProperty("--hp-track", `${listTrack(r)}px`);
+    };
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => schedule());
+    const observeLines = () => {
+      ro?.disconnect();
+      ro?.observe(list);
+      for (const l of lines()) ro?.observe(l);
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    const mo =
+      typeof MutationObserver === "undefined"
+        ? null
+        : new MutationObserver(() => {
+            observeLines();
+            schedule();
+          });
+    mo?.observe(list, { childList: true, subtree: true, characterData: true });
+    observeLines();
+    measure();
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      ro?.disconnect();
+      mo?.disconnect();
+    };
+  }, [listRef]);
+}
 
 /**
  * FR-CBT-104 (#252): "Ally" (lucide `handshake`) on a monster set to ally, "Enemy" on a PC set to

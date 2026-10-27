@@ -7,6 +7,7 @@ import type { NotificationRecord } from "@shared/notifications/schemas";
 import { DicesIcon } from "lucide-react";
 import { createElement, Suspense } from "react";
 import { lazyChunk } from "../../lib/lazy-chunk";
+import { ToastTime } from "../notifications/parts";
 import { defineNotificationView, type NotificationView } from "../notifications/views";
 import { createChunkLoader } from "./lazy3d";
 
@@ -26,7 +27,7 @@ const withText = (Inner: Body) =>
   function PromptRow({ notification: n }: { notification: NotificationRecord }) {
     return createElement(
       Suspense,
-      { fallback: createElement("span", null, n.text) },
+      { fallback: createElement("span", null, n.text, createElement(ToastTime)) },
       createElement(Inner, { notification: n }),
     );
   };
@@ -36,6 +37,8 @@ export const rollRequestPlayerView: NotificationView = defineNotificationView({
   kind: ROLL_REQUEST_KIND,
   icon: DicesIcon,
   render: withText(Player),
+  // K9: the toast's time line sits beside Roll + Decline, under the text.
+  timeInBody: true,
   // FR-DICEX-91, FR-NOTE-60: open prompts re-toast silently after a reload / reconnect.
   restoreToast: true,
 });

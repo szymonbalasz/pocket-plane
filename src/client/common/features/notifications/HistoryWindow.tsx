@@ -2,6 +2,10 @@
 // Dismiss; test-mode send form (FR-NOTE-22). Marks notifications seen while open (FR-NOTE-18).
 // *(Sprint 8, WF4)* Compact rows (FR-SHELL-100: pending + 3 rows whole at the useful 360 × 412):
 // the row's time, badges and buttons share one line with small buttons; the test form comes last.
+// Kit parity K9 (K6 §5): each row is a kit toast card (`data-slot="toast-card"`): the causer's
+// Medallion or the kind's icon as its lead, the text (causer in bold), then the meta line; the
+// section headings carry `note-heading` for the theme's label type. Same lines, so the rows keep
+// their height.
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { useContext, useEffect, useLayoutEffect } from "react";
 import { Button } from "../../components/ui/button";
@@ -24,9 +28,11 @@ import {
 } from "./logic";
 import type { NoteClient } from "./note-client";
 import {
-  NoteBody,
+  NoteLine,
   NoteStripe,
+  ToastLead,
   timeOf,
+  useCauserName,
   useNoteActions,
   useNoteStripe,
   usePlayerNames,
@@ -92,6 +98,7 @@ function Row({
   const live = useSync((s) => s.state === "live");
   const nameOf = usePlayerNames();
   const stripe = useNoteStripe(n);
+  const name = useCauserName(n);
   if (!you) return null;
   const v = { role: you.role, playerId: you.playerId };
   const action = actionButton(n, v, live, views.get(n.kind));
@@ -104,52 +111,56 @@ function Row({
       data-testid="note-history-row"
       data-record-id={n.id}
       data-state={n.state}
+      data-slot="toast-card"
       {...stripe.attrs}
       className={cn(
-        "relative flex flex-col gap-1 rounded-md border px-2 py-1.5",
+        "relative flex items-start gap-2 rounded-md border px-2 py-1.5",
         n.state === "pending" ? "border-primary" : "text-muted-foreground",
       )}
     >
       <NoteStripe color={stripe.color} />
-      <NoteBody n={n} views={views} />
-      <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <Tooltip content={time.full}>
-          <time dateTime={n.createdAt} className="text-muted-foreground">
-            {time.short}
-          </time>
-        </Tooltip>
-        {you.role === "dm" && (
-          <Badge variant="outline" className={ROW_BADGE} data-testid="note-history-audience">
-            {audienceLabel(n, nameOf)}
-          </Badge>
-        )}
-        {state && <StateBadge n={n} label={state} />}
-        <div className="ml-auto flex gap-1">
-          {action !== "none" && (
-            <Button
-              size="sm"
-              className={ROW_BUTTON}
-              data-testid="note-history-action"
-              disabled={action === "disabled" || busy}
-              onClick={(e) =>
-                void actions.run(n, originOf("history", e.currentTarget.closest(ROW_SELECTOR)))
-              }
-            >
-              {n.actionLabel}
-            </Button>
+      <ToastLead name={name} color={stripe.color} icon={views.get(n.kind)?.icon} />
+      <div data-slot="toast-text" className="flex min-w-0 flex-1 flex-col gap-1">
+        <NoteLine n={n} views={views} name={name} className="break-words text-sm" />
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <Tooltip content={time.full}>
+            <time dateTime={n.createdAt} className="text-muted-foreground">
+              {time.short}
+            </time>
+          </Tooltip>
+          {you.role === "dm" && (
+            <Badge variant="outline" className={ROW_BADGE} data-testid="note-history-audience">
+              {audienceLabel(n, nameOf)}
+            </Badge>
           )}
-          {dismiss !== "none" && (
-            <Button
-              size="sm"
-              variant="outline"
-              className={ROW_BUTTON}
-              data-testid="note-history-dismiss"
-              disabled={dismiss === "disabled" || busy}
-              onClick={() => void actions.dismiss(n)}
-            >
-              Dismiss
-            </Button>
-          )}
+          {state && <StateBadge n={n} label={state} />}
+          <div className="ml-auto flex gap-1">
+            {action !== "none" && (
+              <Button
+                size="sm"
+                className={ROW_BUTTON}
+                data-testid="note-history-action"
+                disabled={action === "disabled" || busy}
+                onClick={(e) =>
+                  void actions.run(n, originOf("history", e.currentTarget.closest(ROW_SELECTOR)))
+                }
+              >
+                {n.actionLabel}
+              </Button>
+            )}
+            {dismiss !== "none" && (
+              <Button
+                size="sm"
+                variant="outline"
+                className={ROW_BUTTON}
+                data-testid="note-history-dismiss"
+                disabled={dismiss === "disabled" || busy}
+                onClick={() => void actions.dismiss(n)}
+              >
+                Dismiss
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </li>
@@ -172,7 +183,12 @@ function Section({
   if (rows.length === 0) return null;
   return (
     <section aria-label={title} data-testid={testId} className="flex flex-col gap-1">
-      <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</h4>
+      <h4
+        data-slot="note-heading"
+        className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+      >
+        {title}
+      </h4>
       <ul className="flex flex-col gap-1">
         {rows.map((n) => (
           <Row key={n.id} n={n} views={views} actions={actions} />

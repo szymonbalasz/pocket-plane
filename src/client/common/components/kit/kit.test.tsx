@@ -72,6 +72,7 @@ describe("FR-KIT-05 medallion", () => {
     expect(plain.has("style")).toBe(false);
     const img = html(<Medallion name="Mira" imageAssetId="a1" colour="#38bdf8" />);
     expect(attrs(img, "kit-medallion").has("data-image")).toBe(true);
+    expect(attrs(img, "kit-medallion").has("data-tone")).toBe(false);
     expect(attrs(img, "kit-medallion").has("style")).toBe(false);
     expect(text(img)).toBe("");
     // The thumbnail loads through the asset image loader (skeleton until it lands).
@@ -175,6 +176,40 @@ const PARTS: [string, React.ReactElement][] = [
   ["hp bar", <HpBar key="h" cur={38} max={44} />],
   ["band word", <HpBar key="b" band="bloodied" />],
 ];
+
+describe("FR-KIT-05 medallion (K9)", () => {
+  const GILT = readFileSync(join(import.meta.dir, "../../themes/gilt.css"), "utf8");
+  const K9 = GILT.slice(GILT.indexOf("/* KIT: polish (kit-parity K9"));
+
+  test("FR-KIT-05 medallion (K9, K6 gap 6): a letter with no colour is marked neutral; the theme fills it slate-blue with a cream initial inside the gold ring, by local tokens", () => {
+    expect(attrs(html(<Medallion name="Goblin" />), "kit-medallion").get("data-tone")).toBe(
+      "neutral",
+    );
+    expect(
+      attrs(html(<Medallion name="Mira" colour="#38bdf8" />), "kit-medallion").has("data-tone"),
+    ).toBe(false);
+    expect(GILT.match(/\/\* KIT: polish \(kit-parity K9/g)?.length).toBe(1);
+    expect(K9).toMatch(
+      /\[data-slot="kit-medallion"\]\[data-tone="neutral"\] \{\s*--muted: #3a4d6b;\s*--muted-foreground: var\(--foreground\);/,
+    );
+    expect(K9).toMatch(
+      /\[data-slot="kit-medallion"\] \{\s*box-shadow:[^}]*var\(--frame-rule-strong\)/,
+    );
+  });
+});
+
+describe("FR-KIT-05 hp bar (K9)", () => {
+  test("FR-KIT-05 hp bar (K9, K6 gap 3): track fixed → the list's one track width (--hp-track, else 120 px) and a cur / max column; the default fills the line", () => {
+    const fixed = html(<HpBar cur={7} max={7} track="fixed" />);
+    expect(attrs(fixed, "kit-hpbar").get("data-track")).toBe("fixed");
+    expect(fixed).toContain("w-[var(--hp-track,120px)] shrink");
+    expect(fixed).toContain("min-w-[7ch]");
+    const fill = html(<HpBar cur={7} max={7} />);
+    expect(attrs(fill, "kit-hpbar").get("data-track")).toBe("fill");
+    expect(fill).toMatch(/data-slot="kit-hpbar-track" class="[^"]*flex-1/);
+    expect(fill).not.toContain("min-w-[7ch]");
+  });
+});
 
 describe("FR-KIT-01 same DOM per theme", () => {
   test("FR-KIT-01 same DOM per theme: each kit part renders the same markup under Simple Dark and Gilt & Stone", () => {
