@@ -25,3 +25,4 @@ Each slice: build → kit-vs-app walkthrough → gates → merge. K6 compares ev
 | 2026-10-27 | **K5 merged**: launcher in the top bar (DM #358: all window buttons as icons), kit top-bar zones, work area to the bottom edge, taller Game log, layouts regenerated once (walkthrough 7/8, pre-existing grip issue BL-133; 13 e2e expectations updated to the new geometry; BL-134 Fit follow-up). K1 + K2 started |
 | 2026-10-27 | **K1 merged**: Game log as the kit's rows (medallion, name · action, time, result box), copy keeps today's lines, roll popup medallion (walkthrough 8/8). K2 walkthrough; K4 started |
 | 2026-10-27 | **K2 merged**: Initiative as the kit card (walkthrough 5/6 → re-test PASS: companions in the owner's turn no longer widen the column). K4 walkthrough; K3 started |
+| 2026-10-27 | **K4 merged**: compendium table + stat block card, Party status cards, Creatures medallions, sheet header (walkthrough 5/7 → re-test 7/7). K7 started |
