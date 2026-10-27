@@ -477,8 +477,9 @@ function Row({ row, e, g }: { row: PopupRow; e: GameLogEntryView | undefined; g:
     const out = new Map<string, RollOutcome>();
     const p = e ? RollEntryPayload.safeParse(e.payload) : null;
     const attack = e?.category === "attack";
-    if (p?.success)
-      p.data.forEach((i, k) => out.set(i.rollId, resultOutcome(i, e?.category, attack && k > 0)));
+    for (const [k, i] of (p?.success ? p.data : []).entries()) {
+      out.set(i.rollId, resultOutcome(i, e?.category, attack && k > 0));
+    }
     return out;
   }, [e]);
   return (
