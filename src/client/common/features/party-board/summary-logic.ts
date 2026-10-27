@@ -9,6 +9,7 @@
 // holds (FR-PARTY-55): `entity`, `combatant`, `encounter`, `effect`, `creature-sheet`, `token`,
 // `scene`. No React.
 
+import { levelLine } from "@shared/character-sheet/logic";
 import { deathStateOf, effectName } from "@shared/combat-extras/rules";
 import type { EffectView } from "@shared/combat-extras/schemas";
 import { healthBand } from "@shared/combat-tracker/rules";
@@ -35,6 +36,8 @@ export interface SummaryPc {
   name: string;
   portraitAssetId: string | null;
   ownerPlayerId: string;
+  /** FR-KIT-82: "Level 5 Fighter · Human" from the character record (no species: left out). */
+  line: string;
   own: boolean;
   hp: { current: number; max: number };
   temp: number;
@@ -103,6 +106,9 @@ interface PcFigures {
   name: string;
   portraitAssetId: string | null;
   ownerPlayerId: string;
+  level: number;
+  className: string;
+  species: string | null;
   hpCurrent: number;
   hpMax: number;
   tempHp: number;
@@ -122,6 +128,9 @@ function pcFigures(r: unknown): PcFigures | null {
     name: c.name,
     portraitAssetId: c.portraitAssetId,
     ownerPlayerId: c.ownerPlayerId,
+    level: c.statBlock.level,
+    className: c.statBlock.className,
+    species: c.statBlock.species ?? null,
     hpCurrent: c.hpCurrent,
     hpMax: c.statBlock.hpMax,
     tempHp: c.tempHp,
@@ -129,6 +138,10 @@ function pcFigures(r: unknown): PcFigures | null {
     deathState: deathStateOf(c.hpCurrent, c.deathSuccesses, c.deathFailures),
   };
 }
+
+/** FR-KIT-82: the card's second line, "Level 5 Fighter · Human" (the sheet's level line). */
+export const pcLine = (c: { level: number; className: string; species: string | null }) =>
+  [levelLine(c.level, c.className), c.species?.trim() || null].filter(Boolean).join(" · ");
 
 const byName = (a: { name: string; id: string }, b: { name: string; id: string }) =>
   a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
@@ -209,6 +222,7 @@ export function partySummary(input: SummaryInput, viewer: CompanionViewer): Part
       name: c.name,
       portraitAssetId: c.portraitAssetId,
       ownerPlayerId: c.ownerPlayerId,
+      line: pcLine(c),
       own,
       hp: { current: c.hpCurrent, max: c.hpMax },
       temp: c.tempHp,

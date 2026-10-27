@@ -36,23 +36,21 @@ interface Case {
 
 /**
  * PM2 (FR-SHELL-156, FR-PARTY-63; review-b ruling 16): Party Manager on its Party status tab at
- * the useful size: every PC row of `cb-party-six`'s party and every companion row under them
- * whole, names and figures uncut; the labels Party status, Handouts, Inventory, Loot whole.
+ * the useful size; since kit parity K4 (FR-KIT-82, §7.3: "+ 3 cards") 3 PC cards of
+ * `cb-party-six`'s party whole, names and figures uncut on every whole card; the labels Party
+ * status, Handouts, Inventory, Loot whole.
  */
 const PARTY_MANAGER: Case = {
   kind: "party.board",
   useful: { w: 440, h: 400 },
-  criterion: "Party status: every PC row and its companion rows whole + 4 tab labels whole",
-  check: "all",
-  rows: '[data-testid="party-summary-row"], [data-testid="party-companion-row"]',
+  criterion: "Party status: 3 PC cards whole + 4 tab labels whole",
+  check: 3,
+  rows: '[data-testid="party-summary-row"]',
   uncut: [
     "party-summary-name",
     "party-summary-hp",
     "party-summary-temp",
     "party-summary-ac",
-    "party-companion-name",
-    "party-companion-hp",
-    "party-companion-band",
   ],
   clip: '[data-testid="party-status"] [data-radix-scroll-area-viewport]',
   // PM's four labels (the criterion); RS's Reminders / Strongholds may need the strip to scroll at
@@ -211,7 +209,8 @@ const measure = (win: Locator, c?: Pick<Case, "rows" | "uncut" | "clip">) =>
         return x.height > 0 && x.top >= b.top - 0.5 && x.bottom <= b.bottom + 0.5;
       });
       const cut: string[] = [];
-      for (const r of rows) {
+      // Parts are checked on the whole rows (a row past the fold is cut by the scroll, not cut).
+      for (const r of whole) {
         const rr = r.getBoundingClientRect();
         for (const id of uncut) {
           for (const el of r.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`)) {

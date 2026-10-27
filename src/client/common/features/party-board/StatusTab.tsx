@@ -1,7 +1,8 @@
 // Party Manager's **Party status** tab (FR-PARTY-51–56 sprint 8 CB3, FR-PARTY-61, -62 sprint 9
-// PM2), both clients: one dense line per PC (portrait, owner's colour dot + name, HP "38 / 52"
-// with a thin band-tone bar, "+5" temp, shield AC, death / Down Badge, ≤ 4 condition icons + "+N",
-// turn marker; DM: eye-off on a PC hidden from players), each followed, indented, by its
+// PM2), both clients: one card per PC (kit parity FR-KIT-82: the medallion on the owner's colour,
+// name, turn marker, DM eye-off on a PC hidden from players, the AC mini shield; the level / class
+// / species line; the HP bar + "38 / 52", "+5" temp, death / Down Badge, ≤ 4 condition icons +
+// "+N"), each followed, indented, by its
 // companions in the companion row form (`Companions.tsx`; owner and DM: numbers + Card, others:
 // the band; DM: eye-off on a hidden pet, the row menu on pets), then "Other companions" whose
 // owner PC has no row here. DM header: New pet…. No editing of figures. A row the viewer may open
@@ -16,6 +17,8 @@ import { ENTITY_TYPE } from "@shared/entities/schemas";
 import { SCENE_TYPE, TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { ChevronRightIcon, EyeOffIcon, ShieldIcon } from "lucide-react";
 import { type KeyboardEvent, useMemo } from "react";
+import { HpBar } from "../../components/kit/hp-bar";
+import { Medallion } from "../../components/kit/medallion";
 import { Tooltip } from "../../components/ui/overlays";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { cn } from "../../lib/utils";
@@ -27,7 +30,7 @@ import { EffectIcon, effectValue } from "../combat-extras/icons";
 import { DeathBadge } from "../combat-extras/parts";
 import { useDefinitions } from "../compendium/definitions";
 import { useOpenWindow } from "../play-shell/ShellContext";
-import { CompanionLine, type CompanionsDmParts, SmallPortrait } from "./Companions";
+import { CompanionLine, type CompanionsDmParts } from "./Companions";
 import {
   EMPTY_PARTY,
   OTHER_COMPANIONS,
@@ -40,40 +43,36 @@ import {
   summaryTip,
 } from "./summary-logic";
 
-const BAR: Record<HealthBand, string> = {
-  healthy: "bg-hp-full",
-  bloodied: "bg-hp-bloodied",
-  down: "bg-hp-down",
-};
-
-/** "cur / max" over a thin bar in band tone; numbers never cut. */
+/** The kit's HP bar + "cur / max" (FR-KIT-82); numbers never cut. */
 function Hp({ hp, band }: { hp: { current: number; max: number }; band: HealthBand }) {
-  const pct = hp.max > 0 ? Math.min(100, Math.round((100 * hp.current) / hp.max)) : 0;
   return (
     <span
       data-testid="party-summary-hp"
       data-value={summaryHpValue({ hp, band })}
-      className="flex shrink-0 flex-col items-end gap-px"
+      className="flex min-w-16 flex-1 items-center"
     >
-      <span className="whitespace-nowrap tabular-nums">
-        {hp.current} / {hp.max}
-      </span>
-      <span className="h-0.5 w-full overflow-hidden rounded-full bg-accent" aria-hidden>
-        <span className={cn("block h-full", BAR[band])} style={{ width: `${pct}%` }} />
-      </span>
+      <HpBar cur={hp.current} max={hp.max} band={band} className="w-full" />
     </span>
   );
 }
 
+/** The kit's AC mini shield: the number inside a shield outline, right of the name. */
 function Ac({ ac }: { ac: number }) {
   return (
     <span
       data-testid="party-summary-ac"
       data-value={ac}
-      className="flex shrink-0 items-center gap-0.5 whitespace-nowrap tabular-nums"
+      data-slot="party-card-ac"
+      role="img"
+      aria-label={`Armor Class ${ac}`}
+      className="relative grid h-[38px] w-[34px] shrink-0 place-items-center"
     >
-      <ShieldIcon className="size-3 text-muted-foreground" aria-label="AC" />
-      {ac}
+      <ShieldIcon
+        aria-hidden
+        strokeWidth={1.25}
+        className="absolute inset-0 size-full text-muted-foreground"
+      />
+      <span className="relative text-sm font-semibold tabular-nums">{ac}</span>
     </span>
   );
 }
@@ -113,6 +112,11 @@ function Turn({ on }: { on: boolean }) {
   );
 }
 
+/**
+ * FR-KIT-82: the kit's card. Line 1: medallion (portrait, else the initial on the player colour),
+ * name, turn and hidden marks, the AC mini shield; line 2: the level line; line 3: the HP bar,
+ * temp, death badge, effect icons.
+ */
 function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: string) => void }) {
   const color = useColorOf()({ role: "player", playerId: r.ownerPlayerId });
   return (
@@ -123,8 +127,9 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
         data-own={r.own}
         data-turn={r.turn}
         data-can-open={r.canOpen}
+        data-slot="party-card"
         className={cn(
-          "flex flex-wrap items-center gap-x-1.5 rounded-sm px-1 py-px outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "grid grid-cols-[34px_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1 rounded-md border bg-card px-3 py-2 outline-none focus-visible:ring-2 focus-visible:ring-ring",
           r.canOpen && "cursor-pointer hover:bg-accent/50",
         )}
         onClick={r.canOpen ? () => open(r.id) : undefined}
@@ -132,25 +137,36 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
           if (e.key === "Enter" && r.canOpen) open(r.id);
         }}
       >
-        <SmallPortrait name={r.name} id={r.portraitAssetId} />
-        <span className="flex min-w-0 flex-1 basis-16 items-center gap-1">
-          <span
-            className="size-2 shrink-0 rounded-full"
-            style={color ? { backgroundColor: color } : undefined}
-            aria-hidden
-          />
-          {/* FR-PARTY-58: names wrap, never cut. */}
-          <span
-            data-testid="party-summary-name"
-            className="min-w-0 font-medium [overflow-wrap:anywhere]"
-          >
-            {r.name}
+        <Medallion
+          size="lg"
+          name={r.name}
+          imageAssetId={r.portraitAssetId}
+          colour={color}
+          data-testid="party-summary-medallion"
+        />
+        <span className="flex min-w-0 flex-col">
+          <span className="flex min-w-0 items-center gap-1">
+            {/* FR-PARTY-58: names wrap, never cut. */}
+            <span
+              data-testid="party-summary-name"
+              data-slot="party-card-name"
+              className="min-w-0 text-sm font-semibold [overflow-wrap:anywhere]"
+            >
+              {r.name}
+            </span>
+            <Turn on={r.turn} />
+            {r.hidden && <Hidden testId="party-summary-hidden" />}
           </span>
-          <Turn on={r.turn} />
-          {r.hidden && <Hidden testId="party-summary-hidden" />}
+          <span data-testid="party-summary-line" className="truncate text-muted-foreground">
+            {r.line}
+          </span>
         </span>
+        <Ac ac={r.ac} />
         <span
-          className={cn("flex shrink-0 items-center gap-1.5", !live && "text-muted-foreground")}
+          className={cn(
+            "col-span-2 col-start-2 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5",
+            !live && "text-muted-foreground",
+          )}
         >
           <Hp hp={r.hp} band={r.band} />
           {r.temp > 0 && (
@@ -162,10 +178,9 @@ function PcRow({ r, live, open }: { r: SummaryPc; live: boolean; open: (id: stri
               +{r.temp}
             </span>
           )}
-          <Ac ac={r.ac} />
+          {r.deathState && <DeathBadge state={r.deathState} testId="party-summary-death" />}
+          <Icons effects={r.effects} />
         </span>
-        {r.deathState && <DeathBadge state={r.deathState} testId="party-summary-death" />}
-        <Icons effects={r.effects} />
       </li>
     </Tooltip>
   );
@@ -291,11 +306,20 @@ export function StatusTab({ dm }: { dm?: CompanionsDmParts }) {
             </p>
           )}
           {summary.pcs.length > 0 && (
-            <ul data-chip-row="" aria-label="Party" onKeyDown={onListKey}>
+            <ul
+              data-chip-row=""
+              aria-label="Party"
+              onKeyDown={onListKey}
+              className="flex flex-col gap-1.5"
+            >
               {summary.pcs.map((r) => (
                 <li key={r.id}>
                   {/* FR-PARTY-61: the group wraps the PC row and its companions (indented). */}
-                  <ul data-testid="party-companion-group" data-record-id={r.id}>
+                  <ul
+                    data-testid="party-companion-group"
+                    data-record-id={r.id}
+                    className="flex flex-col gap-0.5"
+                  >
                     <PcRow r={r} live={live} open={open} />
                     {r.companions.map((c) => (
                       <Companion

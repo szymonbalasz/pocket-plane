@@ -1,17 +1,16 @@
 // The companion row form (FR-PARTY-42, sprint 6), both clients; since sprint 9 listed under each
 // owner PC in the Party status tab (FR-PARTY-61, `StatusTab.tsx`; the Companions tab is gone).
-// Row: portrait / initials, name, turn mode icon, "In combat", the marks the tab adds (turn,
+// Row: medallion (FR-KIT-83), name, turn mode icon, "In combat", the marks the tab adds (turn,
 // eye-off, condition icons); HP "45 / 59" + bar for the DM and the owner (the combatant's in a
 // fight), a band for others; DM: the base name; Card (DM, owner) opens the companion card. The
 // DM's New pet… and row menu come from the DM client (`dm`, FR-PARTY-62).
 
-import { initials } from "@shared/scenes-map/geometry";
 import { IdCardIcon } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
+import { Medallion } from "../../components/kit/medallion";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
-import { AssetImg } from "../assets-pipeline/AssetImg";
 import {
   COMPANION_CARD_KIND,
   useOpenCompanionCard,
@@ -25,16 +24,6 @@ import { type CompanionRow, hpValue } from "./logic";
 export interface CompanionsDmParts {
   header: ComponentType<{ disabled: boolean }>;
   menu: ComponentType<{ row: CompanionRow; disabled: boolean }>;
-}
-
-/** A 20-px portrait / initials: one dense line per row (FR-PARTY-58, -63). */
-export function SmallPortrait({ name, id }: { name: string; id: string | null }) {
-  if (id) return <AssetImg id={id} file="thumb" alt="" className="size-5 shrink-0 rounded-sm" />;
-  return (
-    <span className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-muted text-[9px] font-semibold text-muted-foreground">
-      {initials(name)}
-    </span>
-  );
 }
 
 const HP_BAR = { healthy: "bg-hp-full", bloodied: "bg-hp-bloodied", down: "bg-hp-down" } as const;
@@ -101,7 +90,13 @@ export function CompanionLine({
       data-in-combat={row.inCombat}
       className="flex min-h-[22px] items-center gap-1.5 pl-4 text-muted-foreground"
     >
-      <SmallPortrait name={row.name} id={row.portraitAssetId} />
+      {/* FR-KIT-83: the kit's small medallion (portrait, else the initial, neutral). */}
+      <Medallion
+        size="sm"
+        name={row.name}
+        imageAssetId={row.portraitAssetId}
+        data-testid="party-companion-medallion"
+      />
       {/* FR-PARTY-46: badges wrap, the name is never cut. */}
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
         <span className="break-words" data-testid="party-companion-name">
