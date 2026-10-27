@@ -1743,3 +1743,89 @@
 :root[data-theme="gilt"] [data-slot="statblock-section"] {
   border-color: var(--gs-rule-soft);
 }
+
+/* KIT: polish (kit-parity K9, after K6: Initiative bars + pending lines, neutral medallions, toast
+   cards, the Notifications window, stat-block ability labels) ───────────────────────────────── */
+/* Medallion (the kit's `.med`, K6 gap 6): the gold ring at the kit's 1.5 px (the 1-px border plus
+   a half-pixel inset), a black hairline outside, a soft shade inside. A letter with no colour
+   (`data-tone="neutral"`) gets the kit's slate-blue fill and a cream serif initial (local tokens,
+   so the muted utilities follow). */
+:root[data-theme="gilt"] [data-slot="kit-medallion"] {
+  box-shadow:
+    0 0 0 1px #000,
+    inset 0 0 0 0.5px var(--frame-rule-strong),
+    inset 0 0 0 2px rgb(0 0 0 / 0.35);
+}
+:root[data-theme="gilt"] [data-slot="kit-medallion"][data-tone="neutral"] {
+  --muted: #3a4d6b;
+  --muted-foreground: var(--foreground);
+  background-image: radial-gradient(circle at 40% 35%, #4d6690, #3a4d6b 60%, #22304a);
+  text-shadow: 0 1px 0 rgb(0 0 0 / 0.6);
+}
+/* Initiative Pending (FR-KIT-21, K6 gap 4): each card a quiet line on the row fill with a soft
+   rule, body type, the icon muted; the heading in label type. */
+:root[data-theme="gilt"] [data-slot="init-pending"] {
+  --accent: var(--gs-highlight);
+  background-image: linear-gradient(var(--gs-panel-lo), var(--gs-panel-lo));
+}
+:root[data-theme="gilt"] button[data-slot="init-pending"]:hover {
+  background-image: linear-gradient(90deg, var(--gs-highlight), var(--gs-panel-lo));
+  box-shadow: inset 2px 0 0 var(--gold);
+}
+:root[data-theme="gilt"] [data-slot="init-pending-heading"] {
+  --muted-foreground: var(--gold);
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="init-pending"] {
+    border-color: var(--gs-rule-soft);
+    font-family: var(--font-body);
+  }
+  :root[data-theme="gilt"] [data-slot="init-pending-heading"] {
+    font-family: var(--font-label);
+  }
+}
+/* Notifications window (K6 §5): each row a kit toast card (the double rule inside a black edge,
+   grain, no drop shadow inside a window); pending rows a brighter inner rule. The border is black
+   over the pending accent utility, which is a state mark, not a meaning colour. */
+:root[data-theme="gilt"] [data-testid="note-history-row"] {
+  border-color: #000;
+  border-radius: 3px;
+  background-image: var(--panel-grain);
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule),
+    inset 0 0 0 3px #090b0b,
+    inset 0 0 0 4px rgb(176 138 74 / 0.3);
+}
+:root[data-theme="gilt"] [data-testid="note-history-row"][data-state="pending"] {
+  box-shadow:
+    inset 0 0 0 1px var(--frame-rule-strong),
+    inset 0 0 0 3px #090b0b,
+    inset 0 0 0 4px rgb(176 138 74 / 0.55),
+    0 2px 8px rgb(0 0 0 / 0.45);
+}
+/* Pending / History headings in label type, gold (the kit's `.lbl`), no capitals forced. */
+:root[data-theme="gilt"] [data-slot="note-heading"] {
+  --muted-foreground: var(--gold);
+  text-transform: none;
+}
+@layer base {
+  :root[data-theme="gilt"] [data-slot="note-heading"] {
+    font-family: var(--font-label);
+  }
+}
+/* Stat-block ability labels (K6 gap 13; the kit's `.sb-abil span`): small capitals in the label
+   face, as "Str": the letters lower-cased so the small-caps face draws them small, the first one
+   kept a capital (the label's cell line is a block, so its first letter is reachable). */
+@layer base {
+  :root[data-theme="gilt"] [data-slot="statblock-abilities"] [data-slot="statblock-label"] {
+    color: var(--gold);
+    font-family: var(--font-label);
+    text-transform: lowercase;
+  }
+}
+:root[data-theme="gilt"]
+  [data-slot="statblock-abilities"]
+  > div
+  > span:has(> [data-slot="statblock-label"])::first-letter {
+  text-transform: uppercase;
+}
