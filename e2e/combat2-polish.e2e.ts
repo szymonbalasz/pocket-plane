@@ -319,12 +319,15 @@ test("FR-CBTX-46 P3 glitch 6: '+N' lists the hidden effects (hover and click) on
   ] as const) {
     const more = row(scope, mira).getByTestId("cbtx-init-row-effect-more");
     await expect(more).toBeVisible();
+    // The player's copy may land a moment after the DM's.
+    await expect
+      .poll(async () => Number(await more.getAttribute("data-value")))
+      .toBeGreaterThanOrEqual(3);
     const n = Number(await more.getAttribute("data-value"));
     // FR-KIT-28: the folded chips aren't drawn; "+N" lists exactly the effects not shown.
     const shown = await row(scope, mira)
       .locator('[data-testid="cbtx-init-row-effect"]')
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
-    expect(n).toBeGreaterThanOrEqual(3);
     await more.click();
     const items = page.getByTestId("cbtx-init-row-effect-more-item");
     await expect(items).toHaveCount(n);
