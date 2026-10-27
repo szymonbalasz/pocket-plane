@@ -1,6 +1,6 @@
 # Pocket Plane
 
-A self-hosted virtual tabletop for one DM and a handful of remote players. D&D 5e (2014 SRD 5.1). It runs on the DM's machine at game time; players join from a browser through a link, with no accounts.
+A self-hosted virtual tabletop for one DM and a handful of remote players. 5E compatible, built on the SRD 5.1 rules. It runs on the DM's machine at game time; players join from a browser through a link, with no accounts.
 
 Built for a single table, not as a product: no signup, no multi-tenant hosting, no support promises. Issues and ideas are welcome, but expect it to follow one group's needs.
 
@@ -39,6 +39,7 @@ bun run start --profile verify
 - The fixture load prints the **DM URL**, the **DM secret** and **player links**, all on `http://127.0.0.1:<port>`.
 - Open the DM URL and paste the secret. Open each player link in a separate browser or a private window.
 - Stop with `Ctrl+C`. Reset the demo any time by re-running the `fixtures:reset-load` line.
+- Demo data is for trying things locally: its player links are predictable, so never expose a demo profile through a tunnel.
 
 ## Running a real game
 
@@ -56,9 +57,9 @@ Then edit `.env`:
 PP_DATA_DIR=data/live
 # Must be empty for real data: "1" lets the fixture tools wipe the folder
 PP_DATA_DISPOSABLE=
-# Pick your own, at least 12 characters. Env only, never stored
-PP_DM_SECRET=choose-a-long-secret
 ```
+
+- Keep the random `PP_DM_SECRET` that `env:init` wrote; it's your DM password. To choose your own, use at least 12 characters and never one copied from a guide.
 
 ### 2. Each game night
 
@@ -140,5 +141,6 @@ Third-party content, each with its own licence and attribution:
 - **SRD 5.1** rules content by Wizards of the Coast, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/): [attribution](src/server/features/compendium/sources/srd-5.1/ATTRIBUTION.md)
 - **Creature icons** from [game-icons.net](https://game-icons.net), [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/): [attribution](src/client/common/features/entities/creature-art/ATTRIBUTION.md)
 - **Theme fonts** from Google Fonts, [SIL OFL 1.1](https://openfontlicense.org): [attribution](src/client/common/themes/fonts/ATTRIBUTION.md)
+- **UI components** adapted from [shadcn/ui](https://ui.shadcn.com), MIT: [notice](THIRD_PARTY_NOTICES.md)
 
 Pocket Plane is unofficial fan content and is not affiliated with or endorsed by Wizards of the Coast.
