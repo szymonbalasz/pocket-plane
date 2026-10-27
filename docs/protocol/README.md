@@ -4038,7 +4038,7 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#68-compendium-and-stat-block) 
 
 ## 174. Sprint 13: notices and the damage card on the kit grid (K3)
 
-From [kit-parity](../specs/post-mvp/kit-parity.md#65-notices-toasts-turn-card-damage-card-toast) FR-KIT-55 – -66 (DM #355, #356; OQ-KIT-03 A, -11 A). **Built by `build/kit-notices`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Stack width (320), placement, fold, timers and the popup (440, drag, placement) unchanged. Data side: [data model §137](../data-model/README.md#137-sprint-13-notices-and-the-damage-card-k3).
+From [kit-parity](../specs/post-mvp/kit-parity.md#65-notices-toasts-turn-card-damage-card-toast) FR-KIT-55 – -66 (DM #355, #356; OQ-KIT-03 A, -11 A). **Built by `build/kit-notices`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Stack width (320), placement, fold, timers and the popup (440, drag, placement) unchanged. Data side: [data model §138](../data-model/README.md#138-sprint-13-notices-and-the-damage-card-k3).
 
 | Part | Contract | FR |
 |---|---|---|
