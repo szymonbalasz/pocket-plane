@@ -46,12 +46,7 @@ const PARTY_MANAGER: Case = {
   criterion: "Party status: 3 PC cards whole + 4 tab labels whole",
   check: 3,
   rows: '[data-testid="party-summary-row"]',
-  uncut: [
-    "party-summary-name",
-    "party-summary-hp",
-    "party-summary-temp",
-    "party-summary-ac",
-  ],
+  uncut: ["party-summary-name", "party-summary-hp", "party-summary-temp", "party-summary-ac"],
   clip: '[data-testid="party-status"] [data-radix-scroll-area-viewport]',
   // PM's four labels (the criterion); RS's Reminders / Strongholds may need the strip to scroll at
   // 440 (FR-PARTY-76: labels never cut, the strip scrolls; checked in \`hold-ui.e2e.ts\`).
