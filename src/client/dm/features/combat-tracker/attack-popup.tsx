@@ -70,7 +70,7 @@ import { cn } from "@ui/lib/utils";
 import { IntentRejected } from "@ui/sync/connection";
 import { useRecords, useSync } from "@ui/sync/store";
 import { EyeOffIcon, PlusIcon, XIcon } from "lucide-react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LinkHintNote } from "../combat-extras/link-hint";
 import {
   AcCell,
@@ -242,6 +242,59 @@ function DamageDice({
   maxed: readonly number[] | undefined;
 }) {
   return maxed ? <PartDice part={part} dice={dice} maxed={maxed} /> : <Dice dice={dice} />;
+}
+
+/** The chip's gap (`gap-1.5`) and the target line's, px. */
+const CHIP_GAP = 6;
+
+/**
+ * K12 re-test (walkthrough 4): "Name · AC n" in a target row. The name takes the line's free
+ * width: when it would truncate, the " · AC n" part steps aside (`data-ac-folded`; still in the
+ * DOM) and comes back once the line has room for it again
+ * (measured from the line's slack, so it never flips back and forth); only a name longer than
+ * that truncates. Folded, the chip's Tooltip reads "Name · AC n".
+ */
+function TargetChip({ name, tip, children }: { name: string; tip: string; children: ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const acWidth = useRef(0);
+  const [folded, setFolded] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-measure for a new name, and re-attach once the Tooltip wraps or unwraps the chip
+  useLayoutEffect(() => {
+    const chip = ref.current;
+    const line = chip?.parentElement;
+    if (!chip || !line) return;
+    const measure = () => {
+      const nameEl = chip.querySelector<HTMLElement>("[data-target-name]");
+      const ac = chip.querySelector<HTMLElement>("[data-target-ac]");
+      if (!nameEl || !ac || line.clientWidth === 0) return;
+      setFolded((was) => {
+        if (!was) {
+          acWidth.current = ac.offsetWidth;
+          return nameEl.scrollWidth > nameEl.clientWidth + 0.5;
+        }
+        const kids = [...line.children].filter((k): k is HTMLElement => k instanceof HTMLElement);
+        const used = kids.reduce((a, k) => a + k.offsetWidth, 0) + CHIP_GAP * (kids.length - 1);
+        const need = nameEl.scrollWidth - nameEl.clientWidth + acWidth.current + CHIP_GAP;
+        return line.clientWidth - used < need;
+      });
+    };
+    measure();
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    ro?.observe(line);
+    ro?.observe(chip);
+    return () => ro?.disconnect();
+  }, [name, folded]);
+  const chip = (
+    <span
+      ref={ref}
+      data-slot="card-target-chip"
+      data-ac-folded={folded || undefined}
+      className="inline-flex min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5 data-[ac-folded]:[&_[data-target-ac]]:hidden"
+    >
+      {children}
+    </span>
+  );
+  return folded ? <Tooltip content={tip}>{chip}</Tooltip> : chip;
 }
 
 /** "Add target" Combobox over every eligible combatant not yet in the list (incl. hidden). */
@@ -970,9 +1023,9 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                 {/* FR-KIT-64: one compact line; K8 (K6 gap 7): it never wraps, a long name
                     truncates in its chip. */}
                 <div className="flex items-center gap-1.5 text-sm">
-                  <span
-                    data-slot="card-target-chip"
-                    className="inline-flex min-w-0 items-center gap-1.5 rounded-full border py-0.5 pr-2 pl-0.5"
+                  <TargetChip
+                    name={x.c.name}
+                    tip={`${x.c.name} · AC ${x.facts.ac?.value ?? x.ac ?? "—"}`}
                   >
                     <Medallion
                       name={x.c.name}
@@ -980,7 +1033,11 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                       colour={medallionColour(store, x.c)}
                       size="sm"
                     />
-                    <span className="min-w-0 truncate font-medium" title={x.c.name}>
+                    <span
+                      data-target-name
+                      className="min-w-0 truncate font-medium"
+                      title={x.c.name}
+                    >
                       {x.c.name}
                     </span>
                     {x.c.hidden && (
@@ -989,15 +1046,16 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                         aria-label="Hidden"
                       />
                     )}
-                    <span aria-hidden className="text-muted-foreground">
-                      ·
-                    </span>
                     {/* K8 (K6 gap 7): the kit's "Goblin · AC 15", on every card (the Hit toggle
-                        beside it says the comparison; FR-CBT-72's damage-only text). */}
-                    <span className="shrink-0">
+                        beside it says the comparison; FR-CBT-72's damage-only text). K12
+                        re-test: it steps aside (TargetChip) before the name truncates. */}
+                    <span data-target-ac className="flex shrink-0 items-center gap-1.5">
+                      <span aria-hidden className="text-muted-foreground">
+                        ·
+                      </span>
                       <AcCell combatantId={x.c.id} facts={x.facts} damageOnly />
                     </span>
-                  </span>
+                  </TargetChip>
                   {!ruling && (
                     <Button
                       size="sm"

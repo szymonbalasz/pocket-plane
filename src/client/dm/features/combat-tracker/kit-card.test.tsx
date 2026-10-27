@@ -310,4 +310,17 @@ describe("K12 damage card (round-2 gap 8)", () => {
       /<input[^>]*data-testid="cbt-popup-target-add"[^>]*placeholder="Add target…"/,
     );
   });
+
+  test("FR-KIT-64 target rows (K12 re-test): the name takes the free width: ' · AC n' is one part (`data-target-ac`) that steps aside (`data-ac-folded`) before the name truncates", () => {
+    const html = render(DM_CARD);
+    const chip = /<span data-slot="card-target-chip"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(chip).toContain("data-[ac-folded]:[&amp;_[data-target-ac]]:hidden");
+    expect(chip).not.toContain("data-ac-folded=");
+    expect(html).toMatch(
+      /<span data-target-name="true" class="min-w-0 truncate font-medium" title="Goblin">Goblin<\/span><span data-target-ac="true" class="flex shrink-0 items-center gap-1.5"><span aria-hidden="true" class="text-muted-foreground">·<\/span>/,
+    );
+    const src = readFileSync(join(import.meta.dir, "attack-popup.tsx"), "utf8");
+    // Unfolds only when the line's slack holds the AC part again (no flip-flop).
+    expect(src).toContain("return line.clientWidth - used < need;");
+  });
 });
