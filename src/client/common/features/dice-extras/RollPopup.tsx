@@ -8,10 +8,14 @@
 // entry (FR-DICE-37). Sprint 5: each row's total waits for its entry's landing ("Rolling…"),
 // chips blank till then (FR-DICEX-49, table E); only the popups that fit the region show
 // (FR-DICEX-47). T5 (DM #347): the whole card × 1.4 (448 × ≤ 268, 62-px cells, bigger text),
-// today's 320 px card only where the viewport can't hold it (`popupGeomAt`).
+// today's 320 px card only where the viewport can't hold it (`popupGeomAt`). Kit parity K1
+// (FR-KIT-49): each row starts with the actor's Medallion and each total is a Result box with
+// the log row's outcome (FR-KIT-44).
 // State and timers live in `popups.ts`; nothing here is stored or sent.
 import { STYLE_LOOK } from "@shared/dice-extras/looks";
 import { isMeshDie, type ThrowDie } from "@shared/dice-extras/throw";
+import { type RollOutcome, resultOutcome } from "@shared/dice-roll-log/row";
+import { type GameLogEntryView, RollEntryPayload } from "@shared/dice-roll-log/schemas";
 import { EyeOffIcon, SettingsIcon, XIcon } from "lucide-react";
 import {
   type RefObject,
@@ -23,14 +27,17 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { Medallion } from "../../components/kit/medallion";
+import { ResultBox } from "../../components/kit/result-box";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
 import { lazyChunk } from "../../lib/lazy-chunk";
 import { cn } from "../../lib/utils";
+import { colorHex } from "../campaign-management/colors";
 import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { focusLogEntry } from "../dice-roll-log/focus";
-import { RollerName } from "../dice-roll-log/name-color";
+import { RollerName, rollerColorKey, useColorKeyOf } from "../dice-roll-log/name-color";
 import { SHOWN_STACK_ID as NOTE_STACK_ID } from "../notifications/ToastRuntime";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
@@ -126,7 +133,7 @@ const TEXT = {
   base: {
     row: "text-sm",
     rolling: "text-xs",
-    total: "text-sm",
+    total: "h-5 min-w-7 text-sm",
     natural: "text-xs",
     badge: "text-[10px]",
     tag: "text-[9px]",
@@ -137,7 +144,7 @@ const TEXT = {
   big: {
     row: "text-xl",
     rolling: "text-[17px]",
-    total: "text-xl",
+    total: "h-7 min-w-10 text-xl",
     natural: "text-[17px]",
     badge: "text-sm",
     tag: "text-[13px]",
@@ -428,14 +435,21 @@ function Pip({
   );
 }
 
-/** One item's total and markers, as the line (FR-DICE-20, -29). */
-function Total({ item, g }: { item: PopupItem; g: PopupGeom }) {
+/**
+ * One item's total and markers, as the line (FR-DICE-20, -29). FR-KIT-49: the total is a Result
+ * box (`sm`) with the log row's outcome (FR-KIT-44); natural, physical and offered stay as text.
+ */
+function Total({ item, g, outcome }: { item: PopupItem; g: PopupGeom; outcome: RollOutcome }) {
   const t = textOf(g);
   return (
-    <span className="flex shrink-0 items-baseline gap-x-1 whitespace-nowrap">
-      <strong data-testid="dicex-popup-total" className={cn("tabular-nums", t.total)}>
-        {item.total}
-      </strong>
+    <span className="flex shrink-0 items-center gap-x-1 whitespace-nowrap">
+      <ResultBox
+        data-testid="dicex-popup-total"
+        size="sm"
+        value={item.total}
+        outcome={outcome}
+        className={t.total}
+      />
       {item.natural && <span className={cn("font-medium", t.natural)}>{item.natural}</span>}
       {item.physical && (
         <span className={cn("rounded border px-1 text-muted-foreground", t.badge)}>physical</span>
@@ -452,9 +466,18 @@ function Total({ item, g }: { item: PopupItem; g: PopupGeom }) {
 const ROLLING_TEXT = "Rolling…";
 
 /** FR-DICEX-40 / -47: actor, label, the row's own total at its right ("Rolling…" till landed). */
-function Row({ row, g }: { row: PopupRow; g: PopupGeom }) {
+function Row({ row, e, g }: { row: PopupRow; e: GameLogEntryView | undefined; g: PopupGeom }) {
   const landed = useLanded(row.entryId);
   const t = textOf(g);
+  const keyOf = useColorKeyOf();
+  const key = e ? rollerColorKey(keyOf, e) : null;
+  // FR-KIT-49: each item's outcome as its log row's box (FR-KIT-44), by roll id.
+  const outcomes = useMemo(() => {
+    const out = new Map<string, RollOutcome>();
+    const p = e ? RollEntryPayload.safeParse(e.payload) : null;
+    if (p?.success) for (const i of p.data) out.set(i.rollId, resultOutcome(i, e?.category));
+    return out;
+  }, [e]);
   return (
     <button
       type="button"
@@ -468,12 +491,16 @@ function Row({ row, g }: { row: PopupRow; g: PopupGeom }) {
       {row.hidden && (
         <EyeOffIcon aria-label="Hidden from players" className={cn("shrink-0", t.icon)} />
       )}
+      {/* FR-KIT-49: the actor's initial on its name colour (FR-KIT-41). */}
+      <Medallion name={row.actor} colour={key ? colorHex(key) : null} size="sm" />
       <RollerName entryId={row.entryId} name={row.actor} />
       <span className="min-w-0 flex-1 truncate text-muted-foreground">
         {row.items.map(popupItemLabel).join(" · ")}
       </span>
       {landed ? (
-        row.items.map((i) => <Total key={i.key} item={i} g={g} />)
+        row.items.map((i) => (
+          <Total key={i.key} item={i} g={g} outcome={outcomes.get(i.key) ?? "plain"} />
+        ))
       ) : (
         <span className={cn("shrink-0 text-muted-foreground", t.rolling)}>{ROLLING_TEXT}</span>
       )}
@@ -569,7 +596,7 @@ function Card({ p, display, g }: { p: RollPopup; display: DisplaySetting; g: Pop
           style={{ maxHeight: ROWS_SHOWN * g.row }}
         >
           {rows.map((r) => (
-            <Row key={r.entryId} row={r} g={g} />
+            <Row key={r.entryId} row={r} e={p.entries.find((x) => x.id === r.entryId)} g={g} />
           ))}
         </div>
         <span className="flex shrink-0 items-center gap-0.5" style={{ height: g.row }}>

@@ -8,6 +8,7 @@
 // once (a snapshot entry is never held). A fresh tray roll after a result keeps no label (BL-18).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, rolePage } from "./support/env";
+import { entryDice } from "./support/log";
 import { openWindow } from "./support/shell";
 
 // Headless Chromium has WebGL only through SwiftShader, which Chrome gates behind a flag.
@@ -99,9 +100,11 @@ test("FR-DICEX-49 FR-DICE-40 a tray roll: the line and the tray total wait for t
   await expect(line).toHaveAttribute("data-landed", "true", { timeout: 10_000 });
   await expect(line).not.toHaveAttribute("aria-busy", "true");
   const id = (await line.getAttribute("data-record-id")) as string;
-  const total = /= (\d+)/.exec((await line.textContent()) ?? "")?.[1];
+  // Kit parity K1 (FR-KIT-44): the row's result box holds the total.
+  const total = (await line.getByTestId("dice-log-entry-total").textContent()) ?? "";
   expect(total).toMatch(/^\d+$/);
-  await expect(line.locator('[data-testid="dice-log-die"][data-value]')).toHaveCount(3);
+  // Kit parity K1 (FR-KIT-45): the chips are in the row's Tooltip.
+  await expect((await entryDice(line)).and(p2.locator("[data-value]"))).toHaveCount(3);
 
   // C's recorder: held with "…" first, then landed with the total. One observer batch shares a
   // time, so the order is read from the times: with 3D, the line lands at the layer's rest.

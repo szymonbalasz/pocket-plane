@@ -3976,7 +3976,27 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#61-cross-cutting) FR-KIT-01, -
 - **Fixtures:** none (no record type; K0's parts are seen in the dialogs of `theme-gilt`).
 - **CON-44:** 0 B.
 
-## 171. Sprint 13: Initiative rows on the kit grid (K2)
+## 171. Sprint 13: Game log rows, roll popup totals (K1)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#64-game-log-and-roll-popup) §6.4 FR-KIT-40 – -49 (DM #355, #356; OQ-KIT-02 B, -06 A). **Built by `build/kit-log`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Data side: [data model §135](../data-model/README.md#135-sprint-13-game-log-rows-k1).
+
+| Part | Contract | FR |
+|---|---|---|
+| Row (`GameLog.tsx` `Entry`) | `dice-log-entry` (every attribute kept) is one 40-px grid line, `data-slot="log-row"`: the full line in an `sr-only` `[data-line]` span (first, out of the grid: screen readers and `textContent` read it as before, held as shown) · `Medallion` `md` (no actor segment → an empty 28-px cell) · hidden icon (DM) + `dice-log-entry-text` (`data-slot="log-what"`, `aria-hidden`, truncated: `dice-log-entry-actor` "Name" + " · " + the action) · `dice-log-entry-time` (`<time>`, `data-slot="log-time"`, hidden below 360 px: `@container/log` on the list) · up to 2 `ResultBox` `md` (`dice-log-entry-total`, `data-record-id` = the run's first roll id, `data-landing`) then `dice-log-entry-more` "+N" · badge chips once each ("physical" = `dice-log-entry-manual`, "undone"; hidden while an entry-action confirm is open) · `dice-log-rerolled` · `dice-log-actions`. Undone / rerolled strike the text and boxes (rerolled dims). The category chip moved into the Tooltip | FR-KIT-40, -41, -43, -44 |
+| `rowAction(entry)` (`@shared/dice-roll-log/row`) | `{actor, text}`: `roll` → its runs' names joined " + " (label, else expression; a weapon part run by its name, `runName`); other kinds → their line without the actor segment and badges, a leading " — " / ": " dropped; actor not first ("DM awards Mira …") → the whole line; no actor segment → `actor: null` | FR-KIT-42 |
+| `resultOutcome(item, category)`, `rowResults(entry)` | natural 20 → `crit`, natural 1 → `fumble` (not on `initiative`, FR-DICE-29); `part` or category `damage` → `damage`; `healing` → `heal`; else `plain`. One result per run (`itemRuns`: a base part + its extra parts sum to one); `[]` for other kinds. `ROW_RESULTS_MAX` 2 | FR-KIT-44 |
+| Entry Tooltip (`EntryDetails`, built on open) | `dice-log-entry-details`: the time (+ " · rerolled"), the dice per roll, the full line with its chips (`dice-log-entry-line`, the `dice-log-die` wrappers live here now), the category. Opened by hovering the row text or focusing / hovering a box (same content). Held: blank chips, "…"; the boxes and "+N" carry no Tooltip | FR-KIT-45 |
+| Copy (`EntryList` `onCopy`) | A selection overlapping rows (strictly: an edge touch doesn't count) copies each row's `[data-line]` text, one per line (= today's line: `copyText`, struck dice and badges as plain words); none overlapped → the browser's copy | FR-KIT-46 |
+| Re-pin (`repinOn`) | A pinned list re-pins on an `<html>` attribute change (`MutationObserver`) and on `document.fonts` `loadingdone`; scrolled up → untouched | FR-KIT-47 |
+| Roll popup (`RollPopup.tsx` `Row`, `Total`) | Each `dicex-popup-row` starts with the actor `Medallion` `sm` on the roller's colour; each `dicex-popup-total` is a `ResultBox` `sm` (base card `h-5 text-sm`, big card `h-7 text-xl`) with `resultOutcome` of its item (from the popup's own entry); natural / physical / offered stay text after it | FR-KIT-49 |
+| `gilt.css` block `/* KIT: log */` | The row's border unpainted (T2's inset rule draws it); the time dim (`--muted-foreground` retint) in the number face; "Name · action" cream; a hidden line's box muted | FR-KIT-07, OQ-KIT-10 |
+| E2E helper (`e2e/support/log.ts`) | `entryLine(row)` hovers the row text and returns its Tooltip's `dice-log-entry-line`; `entryDice(row)` its `dice-log-die` chips | — |
+
+- **Tests:** `shared/dice-roll-log/row.test.ts` (`FR-KIT-42 row action text` ×6, `FR-KIT-44 outcome` ×2, `FR-KIT-46 copy`); `dice-roll-log/kit-log.test.tsx` (`FR-KIT-40 row grid` ×2, `FR-KIT-41 medallion colour`, `FR-KIT-42`, `FR-KIT-43 time`, `FR-KIT-44 outcome` ×2 + held, `FR-KIT-45 tooltip content`, `FR-KIT-46 copy` ×2, `FR-KIT-47 repin on theme` ×2, `FR-KIT-01`, `-03`, `-04`, `-07`); `dice-extras/roll-popup.test.tsx` (`FR-KIT-49 popup totals`); the FR-DICE-35 / -40 / -93 tests read the Tooltip body; e2e `kit-log.e2e.ts` (bundle `kit-log`), and the log specs read chips / lines from the Tooltip (`entryLine`); FR-SHELL-35 counts 40-px rows (≥ 2 at 200 high, DM ≥ 4 / player ≥ 5 at 1440×900).
+- **Fixtures:** unit `kit-log-rolls`, bundle `kit-log` (data model §135).
+- **CON-44:** 0 B.
+
+## 172. Sprint 13: Initiative rows on the kit grid (K2)
 
 From [kit-parity](../specs/post-mvp/kit-parity.md#63-initiative-dm-and-player) FR-KIT-20 – -31, -72 (DM #355, #356; OQ-KIT-07 A, -08 A). **Built by `build/kit-initiative`**: client only; no record type, intent, event, signal or wire field (0 bytes on the wire). Window sizes unchanged (`cbt.initiative` DM 400×500, player 280×400). Data side: [data model §135](../data-model/README.md#135-sprint-13-initiative-rows-k2).
 

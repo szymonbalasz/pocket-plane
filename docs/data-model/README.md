@@ -2673,7 +2673,14 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #3
 - **Derived (client, not stored):** `medallionOf(name, imageAssetId?, colour?)` → `{letter, imageAssetId, colour}`; `medallionInk(colour)`; `hpFill(cur, max)` (0–100 %) and `hpBarMode` (`bar` \| `band` \| none); the HP bar's band = the given band, else `healthBand(cur, max)` (FR-CBT-26).
 - **Fixtures:** none.
 
-## 135. Sprint 13: Initiative rows (K2)
+## 135. Sprint 13: Game log rows (K1)
+
+From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (DM #355, #356). **Built by `build/kit-log`**. Protocol side: [protocol §171](../protocol/README.md#171-sprint-13-game-log-rows-roll-popup-totals-k1). **No table, column, record type or wire field.**
+
+- **Derived (client, not stored):** `rowAction(entry)` → `{actor, text}`, `resultOutcome(item, category)`, `rowResults(entry)` (one `{rollId, label, total, outcome}` per run), `rowBadges(segments)`, `copyText(segments)` (`@shared/dice-roll-log/row`); `rowTime(at)` "HH:MM" local (`logic.ts`).
+- **Fixtures:** unit `kit-log-rolls` (player-1 rolls as Mira, physical: "Longbow attack" 1d20+9 natural 20 = 29, "Longbow damage" 2d8+4 = 16, "Healing Word" 1d4+3 seeded); bundle `kit-log` = `theme-gilt` + `kit-log-rolls`. CON-44 (measured): DM 32 142 B, P1 16 266 B, P2 14 763 B (`theme-gilt` 30 164 / 14 339 / 12 836).
+
+## 136. Sprint 13: Initiative rows (K2)
 
 From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (FR-KIT-24 – -26). **Built by `build/kit-initiative`**. Protocol side: [protocol §171](../protocol/README.md#171-sprint-13-initiative-rows-on-the-kit-grid-k2). **No table, column, record type or wire field.**
 

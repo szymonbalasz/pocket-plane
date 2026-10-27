@@ -1,7 +1,8 @@
 // e2e-bundle: fx-dice-e2e
 // Thin FX2 flows (DICE §13 FX2, sprint 9; GEM FR-GEM-41, -44; DICEX FR-DICEX-94): player-1 (Mira,
-// Brakka). In Chromium a roll line's `innerText` and a selection copy read on one line, equal to
-// the line text (FR-DICE-93, BL-57); a "4d6kh3" line reads "5 3̶ + 6 + 6" (FR-DICE-92, BL-72); at
+// Brakka). In Chromium a roll line's `innerText` (the row's Tooltip, kit parity K1 FR-KIT-45) reads
+// on one line, equal to the line text, and a selection over rows copies each row's line
+// (FR-DICE-93, BL-57; FR-KIT-46); a "4d6kh3" line reads "5 3̶ + 6 + 6" (FR-DICE-92, BL-72); at
 // the log's 300-px minimum the reroll confirm reads "Spend Inspiration?" inside the line
 // (FR-GEM-44); an Inspiration reroll that flips Brakka's crit leaves the new line without its
 // damage part (FR-GEM-41, BL-62); a roll popup closes 6 s after rest under a resting pointer, and
@@ -9,6 +10,7 @@
 // frames, leaks: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, rolePage } from "./support/env";
+import { entryLine } from "./support/log";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -109,24 +111,40 @@ test("FR-DICE-93 FR-DICE-92 FR-GEM-44 FR-GEM-41 a roll line copies as one line; 
   const DM: Cred = { role: "dm", secret };
   const log = await openWindow(p1, "dice.log");
 
-  // FR-DICE-93 (BL-57): innerText and a selection copy, one line each, digit for digit.
-  const perc = line(log, "Mira — Perception: 4 + 3 = 7").getByTestId("dice-log-entry-text");
-  await expect(perc).toHaveCount(1);
+  // FR-DICE-93 (BL-57): innerText one line, digit for digit (the row's Tooltip, FR-KIT-45).
+  const percRow = line(log, "Mira — Perception: 4 + 3 = 7");
+  await expect(percRow).toHaveCount(1);
+  const perc = await entryLine(percRow);
   const text = await perc.evaluate((el) => (el as HTMLElement).innerText);
   // The fixture's rolls are physical: the badge reads as a word after the total.
   expect(text).toBe("Mira — Perception: 4 + 3 = 7 physical");
-  const copied = await perc.evaluate((el) => {
-    const r = document.createRange();
-    r.selectNodeContents(el);
-    const sel = getSelection() as Selection;
-    sel.removeAllRanges();
-    sel.addRange(r);
-    const s = sel.toString();
-    sel.removeAllRanges();
-    return s;
-  });
-  expect(copied).toBe("Mira — Perception: 4 + 3 = 7 physical");
-  const stealth = line(log, "Stealth (adv)").getByTestId("dice-log-entry-text");
+  // FR-KIT-46 (OQ-KIT-06 A): a selection over two rows copies their lines, one each.
+  const stealthRow = line(log, "Stealth (adv)");
+  const copied = await percRow.evaluate(
+    (a, b) => {
+      // From the earlier row to the later one, whichever that is.
+      const after = a.compareDocumentPosition(b as Node) & Node.DOCUMENT_POSITION_FOLLOWING;
+      const [from, to] = after ? [a, b as Element] : [b as Element, a];
+      const r = document.createRange();
+      r.setStartBefore(from);
+      r.setEndAfter(to);
+      const sel = getSelection() as Selection;
+      sel.removeAllRanges();
+      sel.addRange(r);
+      const dt = new DataTransfer();
+      a.dispatchEvent(new ClipboardEvent("copy", { clipboardData: dt, bubbles: true }));
+      sel.removeAllRanges();
+      return dt.getData("text/plain");
+    },
+    await stealthRow.elementHandle(),
+  );
+  const rows = copied.split("\n");
+  // Each touched row once, in log order: the two lines at the ends.
+  expect([rows[0], rows.at(-1)].sort()).toEqual([
+    "Mira — Perception: 4 + 3 = 7 physical",
+    "Mira — Stealth (adv): 6 2 + 5 = 11 physical",
+  ]);
+  const stealth = await entryLine(stealthRow);
   expect(await stealth.evaluate((el) => (el as HTMLElement).innerText)).toBe(
     "Mira — Stealth (adv): 6 2 + 5 = 11 physical",
   );
@@ -138,8 +156,8 @@ test("FR-DICE-93 FR-DICE-92 FR-GEM-44 FR-GEM-41 a roll line copies as one line; 
       payload: `return { expression: "4d6kh3", manual: { diceTotal: 17, dice: [5, 3, 6, 6] } };`,
     },
   ]);
-  const kh3 = line(log, "4d6kh3").getByTestId("dice-log-entry-text");
-  await expect(kh3).toHaveCount(1);
+  await expect(line(log, "4d6kh3")).toHaveCount(1);
+  const kh3 = await entryLine(line(log, "4d6kh3"));
   const kh3Text = await kh3.evaluate((el) => (el as HTMLElement).innerText);
   expect(kh3Text).toMatch(ONE_LINE);
   expect(kh3Text).toMatch(/— 4d6kh3: 5 3 \+ 6 \+ 6 = 17/);
@@ -208,9 +226,7 @@ test("FR-DICE-93 FR-DICE-92 FR-GEM-44 FR-GEM-41 a roll line copies as one line; 
   await expect(old).toHaveAttribute("data-superseded", "true");
   const fresh = line(log, /Brakka — Flame Tongue greatsword.*\(reroll, was/);
   await expect(fresh).toHaveCount(1);
-  const freshText = await fresh
-    .getByTestId("dice-log-entry-text")
-    .evaluate((el) => (el as HTMLElement).innerText);
+  const freshText = await (await entryLine(fresh)).evaluate((el) => (el as HTMLElement).innerText);
   expect(freshText).toMatch(ONE_LINE);
   expect(freshText).toContain("natural 20");
   expect(freshText).not.toMatch(/damage|3 \+ 5/);

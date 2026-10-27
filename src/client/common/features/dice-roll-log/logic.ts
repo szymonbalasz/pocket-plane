@@ -747,3 +747,62 @@ export function keepPinned<T extends ScrollMetrics>(
   ro.observe(content as never);
   return () => ro.disconnect();
 }
+
+/** The part of `MutationObserver` `repinOn` uses (a fake in tests). */
+export type MutationObserverLike = new (
+  cb: () => void,
+) => { observe(target: never, options: { attributes: true }): void; disconnect(): void };
+
+/** The part of `document.fonts` `repinOn` uses. */
+export interface FontsLike {
+  addEventListener(type: "loadingdone", cb: () => void): void;
+  removeEventListener(type: "loadingdone", cb: () => void): void;
+}
+
+/**
+ * FR-KIT-47: a list pinned at the bottom re-pins after an attribute change on `root` (`<html>`:
+ * a theme switch, ADR-0069) and after web fonts load, before a scroll event the new row heights
+ * cause can unpin it. A list scrolled up keeps its position. Returns the disconnect.
+ */
+export function repinOn<T extends ScrollMetrics>(
+  view: T,
+  stick: StickToBottom,
+  root: unknown,
+  Observer: MutationObserverLike,
+  fonts?: FontsLike | null,
+): () => void {
+  const repin = () => {
+    if (!stick.atBottom) return;
+    view.scrollTop = view.scrollHeight;
+    stick.pin();
+  };
+  const mo = new Observer(repin);
+  mo.observe(root as never, { attributes: true });
+  fonts?.addEventListener("loadingdone", repin);
+  return () => {
+    mo.disconnect();
+    fonts?.removeEventListener("loadingdone", repin);
+  };
+}
+
+/** FR-KIT-43: "HH:MM" in local time; "" for a time that doesn't parse. */
+export function rowTime(at: string): string {
+  const d = new Date(at);
+  if (Number.isNaN(d.getTime())) return "";
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${two(d.getHours())}:${two(d.getMinutes())}`;
+}
+
+/**
+ * FR-KIT-46 (OQ-KIT-06 A): the copied text of a selection over the log, one line per row it
+ * touches (`line(row)` = the row's full line); null = no row touched (the browser copies).
+ */
+export function copiedRows<R>(
+  rows: Iterable<R>,
+  touched: (row: R) => boolean,
+  line: (row: R) => string,
+): string | null {
+  const lines: string[] = [];
+  for (const r of rows) if (touched(r)) lines.push(line(r));
+  return lines.length > 0 ? lines.join("\n") : null;
+}

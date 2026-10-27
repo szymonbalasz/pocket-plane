@@ -5,7 +5,10 @@
 // Sprint 5: a line this client's dice haven't landed yet shows blank chips and "…" (FR-DICE-40);
 // a `roll` line's actor name in the roller's player colour (FR-DICE-60, -61). Sprint 7 (GM1): a
 // superseded line is struck through with a "rerolled" Badge that jumps to the new line
-// (FR-DICE-65); entry actions from the registry at the line end (FR-DICE-68).
+// (FR-DICE-65); entry actions from the registry at the line end (FR-DICE-68). Kit parity K1
+// (§6.4): each entry is a 40-px row (medallion · "Name · action" · time · result boxes · chips ·
+// actions, FR-KIT-40–44); the full line with its chips moves into the row's Tooltip (FR-KIT-45);
+// screen readers and a copy read the full line as before (FR-KIT-46).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -21,6 +24,14 @@ import {
   lookOf,
 } from "@shared/dice-extras/looks";
 import { formatEntry } from "@shared/dice-roll-log/line";
+import {
+  copyText,
+  ROW_RESULTS_MAX,
+  type RowResult,
+  rowAction,
+  rowBadges,
+  rowResults,
+} from "@shared/dice-roll-log/row";
 import {
   CATEGORY_LABEL,
   type DiceRollIntent,
@@ -42,7 +53,17 @@ import {
   EyeOffIcon,
   HandIcon,
 } from "lucide-react";
-import { type ReactNode, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type ClipboardEvent,
+  type ReactNode,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Medallion } from "../../components/kit/medallion";
+import { ResultBox } from "../../components/kit/result-box";
 import { Button } from "../../components/ui/button";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
@@ -62,11 +83,14 @@ import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
 import {
   actorOptions,
   actorSelection,
+  copiedRows,
   createStickToBottom,
   heldSegments,
   keepPinned,
   modeFromKeys,
   optionsDirty,
+  repinOn,
+  rowTime,
   type ShownSegment,
   sortEntries,
 } from "./logic";
@@ -140,9 +164,9 @@ function Segment({
       return (
         <Badge
           variant="outline"
-          // FR-DICE-93: inline-level text in the line, not the Badge's `inline-flex`.
+          // FR-DICE-93: inline-level text in the line, not the Badge's `inline-flex`. The row's
+          // chip carries `dice-log-entry-manual` (FR-KIT-44).
           className="inline-block px-1 py-0 text-[10px]"
-          data-testid={s.text === "physical" ? "dice-log-entry-manual" : undefined}
         >
           {s.text}
         </Badge>
@@ -177,33 +201,95 @@ function tooltipOf(e: GameLogEntryView, landed: boolean): ReactNode {
   );
 }
 
+/**
+ * FR-KIT-45: the entry Tooltip, built on open: the time (+ "rerolled"), the dice per roll, the
+ * full line with its chips (FR-DICE-35), then the category. Held (FR-DICE-40): blank chips, "…".
+ */
+export function EntryDetails({ e }: { e: GameLogEntryView }) {
+  const { segments } = useMemo(() => formatEntry(e), [e]);
+  const landed = useLanded(e.id);
+  const shown = useMemo(() => (landed ? segments : heldSegments(segments)), [segments, landed]);
+  const look = useRollerLooks()(e);
+  const color = rollerColorKey(useColorKeyOf(), e);
+  const nameColor = color ? colorHex(color) : null;
+  const line = useLandingFade<HTMLSpanElement>(landed);
+  return (
+    <div data-testid="dice-log-entry-details" className="flex max-w-96 flex-col gap-0.5">
+      {tooltipOf(e, landed)}
+      <span ref={line} data-testid="dice-log-entry-line" className="break-words">
+        {shown.map((s, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and immutable
+          <Segment key={i} s={s} look={look} nameColor={nameColor} />
+        ))}
+      </span>
+      <span>{CATEGORY_LABEL[e.category]}</span>
+    </div>
+  );
+}
+
+/** FR-KIT-44: "+N" for the totals past the first two, listed in its Tooltip once landed. */
+function MoreResults({ rest, landed }: { rest: readonly RowResult[]; landed: boolean }) {
+  const more = (
+    <span
+      data-testid="dice-log-entry-more"
+      tabIndex={landed ? 0 : undefined}
+      className="shrink-0 text-xs text-muted-foreground tabular-nums"
+    >
+      +{rest.length}
+    </span>
+  );
+  if (!landed) return more;
+  return (
+    <Tooltip
+      content={
+        <div className="flex flex-col gap-0.5">
+          {rest.map((r) => (
+            <span key={r.rollId}>
+              {r.label}: {r.total}
+            </span>
+          ))}
+        </div>
+      }
+    >
+      {more}
+    </Tooltip>
+  );
+}
+
 function Entry({
   e,
   isDm,
-  look,
   color,
   focused,
   actions,
 }: {
   e: GameLogEntryView;
   isDm: boolean;
-  look: DiceLook;
   color: string | null;
   focused: boolean;
   actions: readonly EntryAction[];
 }) {
   const { segments } = useMemo(() => formatEntry(e), [e]);
+  const row = useMemo(() => rowAction(e), [e]);
+  const results = useMemo(() => rowResults(e), [e]);
   // FR-DICE-40: only entries this client's live-throw path holds (FR-DICEX-49) wait.
   const landed = useLanded(e.id);
   const shown = useMemo(() => (landed ? segments : heldSegments(segments)), [segments, landed]);
-  const line = useLandingFade<HTMLSpanElement>(landed);
+  // The boxes' numbers fade in at the landing (`data-landing`), as the line's did.
+  const li = useLandingFade<HTMLLIElement>(landed);
   const hidden = isDm && !e.public;
   const nameColor = color ? colorHex(color) : null;
   // FR-DICE-65: an undone line that is also superseded reads "undone" (its badge) only.
   const rerolled = e.supersededBy !== null && !e.undone ? e.supersededBy : null;
+  // FR-DICE-65: struck through, and dimmed when rerolled.
+  const struck = cn((e.undone || rerolled) && "line-through", rerolled && "opacity-60");
+  // An element only: the Tooltip renders it on open (kit-parity §12).
+  const details = <EntryDetails e={e} />;
   return (
     <li
+      ref={li}
       data-testid="dice-log-entry"
+      data-slot="log-row"
       data-record-id={e.id}
       data-color={color ?? undefined}
       data-roller={rollerAttr(e)}
@@ -213,58 +299,117 @@ function Entry({
       data-focused={focused}
       data-landed={landed}
       aria-busy={landed ? undefined : true}
+      // FR-KIT-40: one 40-px line, `medallion · what · time · boxes · chips · actions`.
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
       // FR-DICE-37: a focused entry gets the accent ring for 2 s.
       className={cn(
-        "group/entry flex items-start gap-1.5 rounded-sm py-px text-sm leading-snug transition-shadow",
+        "group/entry relative grid h-10 shrink-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 rounded-sm border-b border-border/60 px-1 text-sm transition-shadow",
         hidden && "text-visibility-hidden",
         focused && "ring-2 ring-ring",
       )}
     >
-      {hidden && (
-        <EyeOffIcon
-          aria-label="Hidden from players"
-          data-testid="dice-log-entry-hidden"
-          className="mt-0.5 size-3.5 shrink-0 text-visibility-hidden"
-        />
+      {/* FR-KIT-46: the full line (held: as shown), read aloud first and copied per row; out of
+          the grid (absolute), first so the row's text reads it whole. */}
+      <span data-line className="sr-only">
+        {copyText(shown)}
+      </span>
+      {/* FR-KIT-41: the actor's initial on its name colour (FR-DICE-60), else neutral. */}
+      {row.actor !== null ? (
+        <Medallion name={row.actor} colour={nameColor} size="md" />
+      ) : (
+        <span aria-hidden className="size-7" />
       )}
-      <Tooltip content={tooltipOf(e, landed)}>
-        <span
-          ref={line}
-          data-testid="dice-log-entry-text"
-          className={cn(
-            "min-w-0 flex-1 break-words",
-            (e.undone || rerolled) && "line-through",
-            // FR-DICE-65: struck through and dimmed, chips included.
-            rerolled && "opacity-60",
-          )}
-        >
-          {shown.map((s, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and immutable
-            <Segment key={i} s={s} look={look} nameColor={nameColor} />
-          ))}
-        </span>
-      </Tooltip>
-      {rerolled && (
-        <Tooltip content="Rerolled: show the new roll">
-          <button
-            type="button"
-            data-testid="dice-log-rerolled"
-            data-record-id={rerolled}
-            aria-label="Rerolled: show the new roll"
-            className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={() => focusLogEntry(rerolled)}
+      <div className="flex min-w-0 items-center gap-1.5">
+        {hidden && (
+          <EyeOffIcon
+            aria-label="Hidden from players"
+            data-testid="dice-log-entry-hidden"
+            className="size-3.5 shrink-0 text-visibility-hidden"
+          />
+        )}
+        <Tooltip content={details}>
+          {/* FR-KIT-42: "Name · action" on one line; screen readers read the full line below. */}
+          <span
+            data-testid="dice-log-entry-text"
+            data-slot="log-what"
+            aria-hidden
+            className={cn("min-w-0 flex-1 truncate", struck)}
           >
-            <Badge variant="outline" className="px-1 py-0 text-[10px] text-muted-foreground">
-              rerolled
-            </Badge>
-          </button>
+            {row.actor !== null && (
+              <>
+                <strong
+                  data-testid="dice-log-entry-actor"
+                  className="font-semibold"
+                  style={nameColor ? { color: nameColor } : undefined}
+                >
+                  {row.actor}
+                </strong>
+                <span className="text-muted-foreground"> · </span>
+              </>
+            )}
+            <span className="text-muted-foreground">{row.text}</span>
+          </span>
         </Tooltip>
-      )}
-      <EntryActions e={e} actions={actions} />
-      <Badge variant="secondary" className="shrink-0 px-1 py-0 text-[10px] text-muted-foreground">
-        {CATEGORY_LABEL[e.category]}
-      </Badge>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5">
+        {/* FR-KIT-43: hidden while the row is < 360 px wide (the list is the container). */}
+        <time
+          data-testid="dice-log-entry-time"
+          data-slot="log-time"
+          dateTime={e.at}
+          aria-hidden
+          className="hidden text-xs text-muted-foreground tabular-nums @min-[360px]/log:inline"
+        >
+          {rowTime(e.at)}
+        </time>
+        {results.slice(0, ROW_RESULTS_MAX).map((r) => (
+          <ResultBox
+            key={r.rollId}
+            data-testid="dice-log-entry-total"
+            data-record-id={r.rollId}
+            data-landing
+            value={r.total}
+            outcome={r.outcome}
+            held={!landed}
+            tip={details}
+            className={struck}
+          />
+        ))}
+        {results.length > ROW_RESULTS_MAX && (
+          <MoreResults rest={results.slice(ROW_RESULTS_MAX)} landed={landed} />
+        )}
+        {/* FR-KIT-44: "physical" (and "undone") after the boxes. An open entry-action confirm
+            takes their room (FR-GEM-44: it stays inside the row at the 300-px minimum); the
+            words stay in the Tooltip's line. */}
+        {rowBadges(segments).map((b) => (
+          <Badge
+            key={b}
+            aria-hidden
+            variant="outline"
+            data-testid={b === "physical" ? "dice-log-entry-manual" : undefined}
+            className="shrink-0 px-1 py-0 text-[10px] group-has-[[data-testid=dice-log-action-confirm]]/entry:hidden"
+          >
+            {b}
+          </Badge>
+        ))}
+        {rerolled && (
+          <Tooltip content="Rerolled: show the new roll">
+            <button
+              type="button"
+              data-testid="dice-log-rerolled"
+              data-record-id={rerolled}
+              aria-label="Rerolled: show the new roll"
+              className="shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => focusLogEntry(rerolled)}
+            >
+              <Badge variant="outline" className="px-1 py-0 text-[10px] text-muted-foreground">
+                rerolled
+              </Badge>
+            </button>
+          </Tooltip>
+        )}
+        <EntryActions e={e} actions={actions} />
+      </div>
     </li>
   );
 }
@@ -285,7 +430,6 @@ function EntryList({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const looks = useRollerLooks();
   const keyOf = useColorKeyOf();
   const focusedId = useLogFocus((s) => s.entryId);
   const focusSeq = useLogFocus((s) => s.seq);
@@ -313,11 +457,45 @@ function EntryList({
     return keepPinned(el, content, stick, ResizeObserver);
   }, [stick]);
 
+  // FR-KIT-47: a theme switch (an `<html>` attribute) or late web fonts re-pin a pinned list.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof MutationObserver === "undefined") return;
+    return repinOn(el, stick, document.documentElement, MutationObserver, document.fonts);
+  }, [stick]);
+
   // FR-DICE-37: scroll the focused entry into view (on a new focus, and when the log mounts).
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per focus request (`focusSeq`)
   useLayoutEffect(() => {
     if (scrollToEntry(ref.current, focusedId)) stick.scrolled(ref.current as HTMLDivElement);
   }, [focusSeq]);
+
+  // FR-KIT-46 (OQ-KIT-06 A): a selection over rows copies each row's full line, one per line.
+  const copyLines = (ev: ClipboardEvent<HTMLDivElement>) => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const rows = ev.currentTarget.querySelectorAll<HTMLElement>('[data-testid="dice-log-entry"]');
+    const ranges = Array.from({ length: sel.rangeCount }, (_, i) => sel.getRangeAt(i));
+    // A row the selection overlaps (its end after the row's start, its start before the row's
+    // end): a selection only touching the row's edge doesn't count.
+    const touched = (li: HTMLElement) => {
+      const row = document.createRange();
+      row.selectNodeContents(li);
+      return ranges.some(
+        (s) =>
+          s.compareBoundaryPoints(Range.START_TO_END, row) > 0 &&
+          s.compareBoundaryPoints(Range.END_TO_START, row) < 0,
+      );
+    };
+    const text = copiedRows(
+      rows,
+      touched,
+      (li) => li.querySelector("[data-line]")?.textContent ?? "",
+    );
+    if (text === null) return;
+    ev.clipboardData.setData("text/plain", text);
+    ev.preventDefault();
+  };
 
   const toBottom = () => {
     const el = ref.current;
@@ -343,14 +521,14 @@ function EntryList({
             setUnseen(0);
           }
         }}
+        onCopy={copyLines}
       >
-        <ul ref={listRef} className="flex flex-col">
+        <ul ref={listRef} className="@container/log flex flex-col">
           {entries.map((e) => (
             <Entry
               key={e.id}
               e={e}
               isDm={isDm}
-              look={looks(e)}
               color={rollerColorKey(keyOf, e)}
               focused={focusedId === e.id}
               actions={actions}
