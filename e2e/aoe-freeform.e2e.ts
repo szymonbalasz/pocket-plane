@@ -224,6 +224,8 @@ test("FR-SCN-43 (#375) snapped origins: cell centre, a Large token's centre, a c
   await mapPoint(p1, 7, 4, { margin: 2 });
   await press(7.3, 4.8, "7,4,1");
   expect((await own())?.origin).toBe("7.5,4.5");
+  // #377: 20 ft from that square by grid distance (5/10/5): 61 squares.
+  expect((await own())?.text).toBe("61 squares");
   await expect.poll(async () => (await dmEph())?.origin).toBe("7.5,4.5");
   expect((await dmEph())?.cells).toBe((await own())?.cells);
 

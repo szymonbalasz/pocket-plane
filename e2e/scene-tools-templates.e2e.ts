@@ -99,34 +99,34 @@ test("FR-SCN-22 / -23 / -25 player places a sphere, the DM sees it live, Keep, r
   await expect.poll(async () => kept(await templates(player))).toEqual([guardians]);
   expect((await templates(player))[0]?.text).toMatch(/^Spirit Guardians · \d+ squares$/);
 
-  // FR-SCN-22: AoE tool, sphere; press in cell (10, 4) (its centre is the origin, #375), drag 2
-  // cells east → radius 10 ft.
+  // FR-SCN-22: AoE tool, sphere; press in cell (10, 4) (its centre is the origin, #375), drag to
+  // 2 cells past the square's edge (the stepped outline follows the pointer, #377) → radius 10 ft.
   await player.getByTestId("map-tool-aoe").click();
   await expect(player.getByTestId("scn-aoe-panel")).toBeVisible();
   await player.getByTestId("scn-aoe-shape-sphere").click();
   await player.getByTestId("scn-aoe-label").fill("Fireball");
   await player.getByTestId("scn-aoe-label").press("Enter");
   const from = await mapToPage(player, 10.5 * 70, 4.5 * 70);
-  const to = await mapToPage(player, 12.5 * 70, 4.5 * 70);
+  const to = await mapToPage(player, 13 * 70, 4.5 * 70);
   await player.mouse.move(from.x, from.y);
   await player.mouse.down();
   for (let i = 1; i <= 5; i++) {
     await player.mouse.move(from.x + ((to.x - from.x) * i) / 5, from.y);
   }
   await player.mouse.up();
-  // FR-SCN-23: the DM sees the ephemeral live, with its squares (radius 10 ft from a cell
-  // centre: the 3 × 3 block, FR-SCN-41).
+  // FR-SCN-23: the DM sees the ephemeral live, with its squares (10 ft from a square by grid
+  // distance: 5 × 5 minus the corners, FR-SCN-41 / #377).
   await expect
     .poll(async () => (await templates(dm)).filter((t) => t.ephemeral).map((t) => t.text))
-    .toEqual(["Fireball · 9 squares"]);
-  expect((await templates(player)).find((t) => t.id === "eph-own")?.cells).toBe(9);
+    .toEqual(["Fireball · 21 squares"]);
+  expect((await templates(player)).find((t) => t.id === "eph-own")?.cells).toBe(21);
 
   // FR-SCN-25: Keep → a kept record for everyone; the ephemeral is gone.
   await player.getByTestId("scn-aoe-keep").click();
   await expect.poll(async () => kept(await templates(dm))).toHaveLength(3);
   await expect.poll(async () => (await templates(dm)).filter((t) => t.ephemeral)).toEqual([]);
   await expect.poll(async () => kept(await templates(player))).toHaveLength(2);
-  const fireball = (await templates(dm)).find((t) => t.text === "Fireball · 9 squares");
+  const fireball = (await templates(dm)).find((t) => t.text === "Fireball · 21 squares");
   expect(fireball?.ephemeral).toBe(false);
 
   // Reload: the kept Fireball is still there for the player; Glyph never reached them.
