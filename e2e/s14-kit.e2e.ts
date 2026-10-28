@@ -5,9 +5,11 @@
 // goes compact (FR-NOTE-79) left of the dialog, off it, and the Name field takes the click.
 // Placement rules: bun test (`keep-out-compact.test.ts`). The DM's sheet (BL-139): the name picker
 // opens the shared Select's menu (Party heading, items by record id); the Actions tab's Attacks
-// box has no public switch, the header's Public rolls menu has Attack and Damage.
+// box has no public switch, the header's Public rolls menu has Attack and Damage. The token menu
+// (BL-141): the token's name heads it.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { konvaNodes } from "./support/konva";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -121,4 +123,35 @@ test("FR-CHAR-02 FR-CHARX-114 BL-139 DM sheet: the name picker is the shared Sel
   await expect(attack).toHaveAttribute("data-state", was === "checked" ? "unchecked" : "checked");
   await dm.keyboard.press("Escape");
   await expect(win.getByTestId("charx-public-menu")).toHaveAttribute("data-on", "true");
+});
+
+test("BL-141 the DM's token menu: the token's name heads it, before its first item", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+  await expect.poll(async () => (await konvaNodes(dm, "map-token")).length).toBeGreaterThan(0);
+  // A token drawn on open map (no window over it).
+  const nodes = await konvaNodes(dm, "map-token");
+  const onMap = await dm.evaluate(
+    (pts) => pts.map((p) => document.elementFromPoint(p.x, p.y)?.tagName === "CANVAS"),
+    nodes.map(({ x, y }) => ({ x, y })),
+  );
+  const t = nodes.find((_, i) => onMap[i]);
+  if (!t) throw new Error("no token on open map");
+  await dm.mouse.click(t.x, t.y, { button: "right" });
+  const menu = dm.getByTestId("map-token-menu");
+  await expect(menu).toHaveAttribute("data-record-id", t.id);
+  const label = menu.getByTestId("map-token-menu-label");
+  await expect(label).toBeVisible();
+  await expect(label).not.toBeEmpty();
+  const first = await menu.evaluate((el) =>
+    el.querySelector("[data-testid]")?.getAttribute("data-testid"),
+  );
+  expect(first).toBe("map-token-menu-label");
+  await dm.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
 });

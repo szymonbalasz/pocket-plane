@@ -670,19 +670,27 @@ function SpellcastingHeader() {
   const e = ctx.editing && ctx.canEdit;
   const atk = spellAttackBonus(ctx.stats);
   const dc = spellSaveDc(ctx.stats);
+  // BL-141 (K6c gap 6): on the wide Main, the kit's order: the pip row, then one muted line
+  // (ability · attack · DC); no "Spellcasting" label under the box's own heading.
+  const kit = useSheetScope() === "main";
   if (!ctx.stats.spellcasting && !e) return null;
+  const line = atk !== null && dc !== null && (
+    <span
+      data-testid="charx-spellcasting"
+      className={kit ? "text-xs text-muted-foreground" : "text-xs"}
+    >
+      {ABILITY_NAMES[ctx.stats.spellcasting?.ability ?? "wis"]} · Spell attack{" "}
+      <OverrideControl okey="spellAttack">{signed(atk)}</OverrideControl> · DC{" "}
+      <OverrideControl okey="spellDc">{dc}</OverrideControl>
+    </span>
+  );
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-muted-foreground">Spellcasting</span>
+      {!kit && <span className="text-xs font-medium text-muted-foreground">Spellcasting</span>}
       {e && <SpellcastingEditor />}
-      {atk !== null && dc !== null && (
-        <span data-testid="charx-spellcasting" className="text-xs">
-          {ABILITY_NAMES[ctx.stats.spellcasting?.ability ?? "wis"]} · Spell attack{" "}
-          <OverrideControl okey="spellAttack">{signed(atk)}</OverrideControl> · DC{" "}
-          <OverrideControl okey="spellDc">{dc}</OverrideControl>
-        </span>
-      )}
+      {!kit && line}
       <SlotPips />
+      {kit && line}
     </div>
   );
 }
@@ -847,14 +855,19 @@ function SpellsBlock({ overrides }: { overrides: PublicOverrides }) {
   const ctx = useSheet();
   const spells = ctx.sheet.spells;
   const e = ctx.editing && ctx.canEdit;
+  // BL-141 (K6c gap 6): the wide Main drops the level heading while only one level shows.
+  const kit = useSheetScope() === "main";
   if (spells.length === 0 && !e) return null;
+  const groups = spellGroups(spells);
   return (
     <div className="flex flex-col gap-1">
-      {spellGroups(spells).map((g) => (
+      {groups.map((g) => (
         <div key={g.level} className="flex flex-col">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {spellLevelLabel(g.level)}
-          </span>
+          {!(kit && groups.length === 1) && (
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              {spellLevelLabel(g.level)}
+            </span>
+          )}
           {g.spells.map((s) => (
             <SpellRowView
               key={s.id}

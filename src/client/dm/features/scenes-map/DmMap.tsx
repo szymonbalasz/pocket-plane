@@ -11,7 +11,12 @@ import {
   type TokenRecord,
 } from "@shared/scenes-map/schemas";
 import { Button } from "@ui/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@ui/components/ui/menus";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@ui/components/ui/menus";
 import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { useBaseKeyDown } from "@ui/features/play-shell/hooks";
 import { BaseEmpty } from "@ui/features/play-shell/PlayFrame";
@@ -212,6 +217,12 @@ export function DmMapBase() {
           data-testid="map-token-menu"
           data-record-id={menuToken?.id}
         >
+          {/* BL-141 (K6c §3, the kit's menu): the token's name heads its menu (label type). */}
+          {menuToken && (
+            <DropdownMenuLabel data-testid="map-token-menu-label" className="max-w-56 truncate">
+              {menuToken.name}
+            </DropdownMenuLabel>
+          )}
           {menuToken &&
             entries.map((e) => (
               <e.Item
