@@ -3,9 +3,16 @@
 import { describe, expect, test } from "bun:test";
 import { CharPutRowIntent, SpellRow } from "@shared/character-sheet/sheet";
 import { DAMAGE_TYPES } from "@shared/entities/schemas";
+import type { ServerSignalFrame } from "@shared/protocol/frames";
 import type { MapRect } from "@shared/scenes-map/geometry";
 import { emanationCells } from "./cells";
-import { HIT_LOOK_KEYS, type HitCue, HitCue as HitCueSchema, hitLooks } from "./cue";
+import {
+  HIT_LOOK_KEYS,
+  type HitCue,
+  HitCue as HitCueSchema,
+  hitLooks,
+  VFX_HIT_SIGNAL,
+} from "./cue";
 import { FX_MAX_BYTES, Fx, FxRecord, SpellRowFx } from "./fx";
 import { fxPresets, presetOf, suggestPreset } from "./presets";
 
@@ -158,7 +165,7 @@ describe("hit looks (FR-VFX-18–21)", () => {
     expect(hitLooks(cue({ kind: "heal", parts: [{ type: null, value: 0 }] }))).toEqual([]);
   });
 
-  test("FR-VFX-21 hit cue schema: ≤ 4 parts, attacker optional, strict, small", () => {
+  test("FR-VFX-21 hit cue schema: ≤ 4 parts, attacker optional, strict", () => {
     const full = cue({
       id: "x".repeat(36),
       targetTokenId: "t".repeat(36),
@@ -171,13 +178,31 @@ describe("hit looks (FR-VFX-18–21)", () => {
       ],
     });
     expect(HitCueSchema.parse(full)).toEqual(full);
-    expect(new TextEncoder().encode(JSON.stringify(full)).length).toBeLessThanOrEqual(400);
     expect(HitCueSchema.safeParse({ ...full, parts: [...full.parts, full.parts[0]] }).success).toBe(
       false,
     );
     expect(HitCueSchema.safeParse({ ...full, hp: 3 }).success).toBe(false);
     const { attackerTokenId: _a, ...noAttacker } = full;
     expect(HitCueSchema.safeParse(noAttacker).success).toBe(true);
+  });
+
+  test("VFX §12 hit cue frame ≤ 320 B per target (orchestrator ruling 2026-10-28; walkthrough S3 measured 307 B)", () => {
+    // S3's shape: the DM applies one typed part; three UUID-length ids (108 chars), max values.
+    const id = "0d2c1e7a-5b3f-4c2e-9a1d-7e6f5a4b3c2d";
+    const frame: ServerSignalFrame = {
+      type: "signal",
+      name: VFX_HIT_SIGNAL,
+      data: cue({
+        id,
+        targetTokenId: id,
+        attackerTokenId: id,
+        parts: [{ type: "bludgeoning", value: 999 }],
+        multiplier: "double",
+        crit: true,
+      }),
+      from: { role: "dm" },
+    };
+    expect(new TextEncoder().encode(JSON.stringify(frame)).length).toBeLessThanOrEqual(320);
   });
 });
 

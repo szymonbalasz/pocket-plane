@@ -198,6 +198,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md). No new
 
 - **Player disconnect / reconnect:** the snapshot carries active effects with `fx`; auras rebuild at their Still frame then animate. Cues sent while away are gone (FR-VFX-22).
 - **DM disconnect / reconnect:** same; players keep their auras.
+- **Hit cue size** *(2026-10-28, orchestrator ruling)*: ≤ 320 B per target frame (measured 307 B); see §12.
 - **Server crash mid-action:** `vfx.cast` and `vfx.setEffectFx` are one transaction each: before commit → nothing; after → effect + `fx` on restart. A cue lost in a crash is never resent. Crash hooks `vfx.cast:before-commit`, `vfx.cast:after-commit`.
 - **Concurrent edits:** two Casts of the same row → one wins, the other gets `conflict` "already active". Cast while the DM ends the concentration → whichever commits last wins; clients follow records.
 - **Concentration ends any way** (End, failed save, incapacitating condition, duration, a new concentration, CBTX FR-CBTX-75) → the effect ends → the aura goes with it, mid-animation, within one frame of the record change.
@@ -211,6 +212,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md). No new
 ## 12. Performance & bandwidth
 
 - **Bandwidth:** `fx` ≤ 200 B per effect (≤ 300 effects per campaign cap → ≤ 60 KB worst, typically < 1 KB). Hit cue ≤ 200 B per target, human-paced. No per-frame traffic.
+  - *(2026-10-28, VFX core walkthrough, orchestrator ruling: no code change)* The hit cue budget is **≤ 320 B per target frame**, not 200 B: its three ids are 108 characters. Measured 307 B for the frame (244 B data) at walkthrough S3 (`.verify/20261028-vfxcore/`); human-paced, negligible. The unit test asserts ≤ 320 B on that frame shape (one typed part, sent by the DM). Measured worst case: 4 typed parts sent by a player (`from` carries a 36-character `playerId`) = 466 B, above the budget; left to the orchestrator.
 - **CPU:** one FX clock and one requestAnimationFrame per client, paused when no aura or look is on screen and when the tab is hidden. Particles are pre-tinted sprites (`drawImage`), no per-particle gradients.
 - **Gate:** DM client at 1280×720, 30 tokens, both auras, one hit look every second: `vfx-over` `frameMs` median ≤ 4 ms on the walkthrough machine, no Konva layer warning (`stage.getLayers().length ≤ 4`).
 - **Snapshot:** CON-44 heavy harness gains `fx` on its 6 concentrations; DM frame stays under 768 KiB.
@@ -226,6 +228,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | E2E (thin) | `// e2e-bundle: spell-fx`: `player-1` presses `vfx-cast` on Spirit Guardians → `vfx-aura` `preset=spirit-guardians` on DM and both players; DM applies the fire card → `vfx-hit` `look=fire` on all three; DM ends the concentration → no `vfx-aura` anywhere. Visual baselines (`visual-kit`): both auras at Still, both themes | `spell-fx` |
 
 **Fixtures:** units `units/spell-fx/sg-row.ts` (Mira's spell row Spirit Guardians, radiant, `fx` set), `units/spell-fx/moil-row.ts` (Thorn's row Shadow of Moil), `units/spell-fx/fire-card.ts` (a pending fire damage card: Mira → Goblin Sneak). Bundle **`spell-fx`** = `map-tools` (Goblin Ambush; Mira `player-1`, Thorn `player-2`, Goblin Sneak) + a started encounter with the three + the units. Names owned by fixtures-adapters.
+
+> Note (2026-10-28, VFX core walkthrough): S5's "cue without `attackerTokenId`" can't be seen through a **hidden** attacker token: FR-CBT-36 makes that outcome line DM-only, so players get no cue at all (nothing leaks). The stripped id shows only when the attacker token is fogged for one player while the line stays public (`cues-sync.test.ts`). A hit applied by hand (`cbt.applyHp`) has no damage type: its cue is untyped (one `untyped` look), so S5's "cold" look needs a card with cold damage.
 
 > Note (2026-10-28, fix/vfx-core): the bundle adds unit `vfx-fight` (Goblin Ambush live; "Spell FX" round 1: Mira 15, Goblin Sneak 12, Thorn 10). Goblin Sneak is a renamed Goblin, so the merged BL-135 roll guard (#367) keeps **its own attack rolls** DM-only: no cue reaches players for them (FR-VFX-21). S6 therefore applies the hit by hand: Apply HP on Thorn, From = Goblin Sneak, public.
 
