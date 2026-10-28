@@ -52,10 +52,11 @@ import {
 import { isPlacementPc, tokenScreenBoxes } from "../play-shell/token-boxes";
 import { AlertToast, TurnCard, useAlertToasts } from "./alert-toasts";
 import { useDialogRects, usePopupIds, usePopupRects } from "./dialog-rects";
-import { dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
+import { COMPACT_W, dmStackSpot, MIN_SHIFT_LEFT, STACK_W } from "./keep-out";
 import {
   actionButton,
   classify,
+  compactSummaryText,
   HISTORY_KIND,
   NOTIFICATION_TYPE,
   type SyncView,
@@ -433,6 +434,21 @@ export function ToastRuntime({
   const frozen = useRef(settled);
   if (!state.hovered) frozen.current = settled;
   const tick = frozen.current;
+  // BL-115: the fold and the spot drawn (`settleStack`): while the fold steps the stack holds
+  // where it was drawn, then moves once.
+  const [settle, setSettle] = useState(UNSETTLED);
+  const cap = settle.fold.cap;
+  const { shown, more, inSummary, callout } = visibleToasts(state, cap, folded, settle.fold.alerts);
+  // FR-NOTE-79 (BL-141): the DM summary alone (no card, info, alert, turn card or callout) may
+  // go compact, the fold's last step; it is placed at its own width.
+  const compactable =
+    isDm &&
+    !state.turn &&
+    !callout &&
+    shown.length === 1 &&
+    shown.every((t) => t.kind === "summary");
+  const compact = compactable && settle.fold.compact === true;
+  const width = compact ? COMPACT_W : STACK_W;
   // biome-ignore lint/correctness/useExhaustiveDependencies: `tick` re-reads the live token boxes
   const at = useMemo(
     () =>
@@ -440,7 +456,7 @@ export function ToastRuntime({
         vp,
         initiative,
         stackH,
-        undefined,
+        width,
         tokenScreenBoxes(avoidKey ? avoidKey.split(",") : [], sync?.getState().store),
         windowRects,
         hard,
@@ -458,6 +474,7 @@ export function ToastRuntime({
       vp,
       initiative,
       stackH,
+      width,
       avoidKey,
       pcKey,
       windowRects,
@@ -477,10 +494,6 @@ export function ToastRuntime({
   const room = isDm
     ? dialogRoom(vp, dialogs, vp.h - LAUNCHER_CLEAR - DM_TOAST_TOP)
     : vp.h - PLAYER_TOAST_BOTTOM - TOP_BAR_H - EDGE_GAP;
-  // BL-115: the fold and the spot drawn (`settleStack`): while the fold steps the stack holds
-  // where it was drawn, then moves once.
-  const [settle, setSettle] = useState(UNSETTLED);
-  const cap = settle.fold.cap;
   const count = state.toasts.length;
   // FR-NOTE-77 (walkthrough H3 re-test): the fold starts over when what places the stack changes
   // (windows moved, a tool bar or dialog shown), not only on a new count or room. BL-115: once
@@ -517,7 +530,6 @@ export function ToastRuntime({
   // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
   const covers = isDm && at.covers > 0;
   const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
-  const { shown, more, inSummary, callout } = visibleToasts(state, cap, folded, settle.fold.alerts);
   const foldable = shown.filter((t) => t.kind !== "summary" && classOfToast(t) !== "alert").length;
   // BL-130 (K3: summary + 3 "Saved …" alerts on a Compendium record): once the cards and info
   // folded, the alerts fold too (oldest first) into "+N more"; one stays when nothing else shows.
@@ -543,6 +555,7 @@ export function ToastRuntime({
         shown: foldable,
         alerts: alertsShown,
         alertMin,
+        compactable,
         spot,
         now,
         changing,
@@ -556,6 +569,7 @@ export function ToastRuntime({
     foldable,
     alertsShown,
     alertMin,
+    compactable,
     at.left,
     at.top,
     holdOver,
@@ -575,6 +589,7 @@ export function ToastRuntime({
         shown: foldable,
         alerts: alertsShown,
         alertMin,
+        compactable,
       }) &&
       settle.fold.foldedAt !== stackH
     );
@@ -635,14 +650,19 @@ export function ToastRuntime({
       data-top={isDm ? pos.top : undefined}
       // BL-118: the fold rests (the FR-SHELL-59 report carries only a resting stack).
       data-settled={isDm ? resting : undefined}
+      // FR-NOTE-79: the summary drawn compact (`COMPACT_W` wide).
+      data-compact={isDm ? compact : undefined}
       // FR-NOTE-50: DOM order = order from home; the players' home is the bottom.
       className={cn(
-        "pointer-events-none fixed flex w-80 gap-2",
+        "pointer-events-none fixed flex",
+        !compact && "w-80",
+        "gap-2",
         isDm ? "flex-col" : "flex-col-reverse",
       )}
       // Player: bottom-right, above the launcher bar (never over its buttons).
       style={{
         zIndex: TOAST_STACK_Z,
+        ...(compact && { width: COMPACT_W }),
         ...(isDm
           ? { left: pos.left, top: pos.top }
           : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }),
@@ -659,6 +679,44 @@ export function ToastRuntime({
       {/* FR-KIT-59 (OQ-KIT-03 A): the DM's turn card heads the stack (home first). */}
       {state.turn && <TurnCard key={`turn:${state.turn.seq}`} text={state.turn.text} />}
       {shown.map((t) => {
+        if (t.kind === "summary" && compact) {
+          // FR-NOTE-79 (BL-141): one short line, the count and Open (the full text in its title;
+          // the Notifications window has the whole list).
+          const n = t.count + inSummary;
+          return (
+            <div
+              key={SUMMARY_KEY}
+              role="status"
+              data-testid="note-toast-pending-summary"
+              data-slot="toast-card"
+              data-compact="true"
+              data-count={n}
+              data-waiting={t.waiting ?? 0}
+              title={summaryText(n, t.waiting)}
+              className={cn(TOAST_CARD, "gap-2 py-1 pl-2.5 pr-2")}
+            >
+              <ListTodoIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+              <span data-slot="toast-text" className="min-w-0 flex-1 truncate">
+                {compactSummaryText(n, t.waiting)}
+              </span>
+              <Button
+                size="sm"
+                className="h-7 shrink-0 px-2"
+                data-testid="note-toast-open"
+                onClick={() => {
+                  openHistory();
+                  dispatch((s, now) => closeToast(s, SUMMARY_KEY, now));
+                }}
+              >
+                Open
+              </Button>
+              <CloseGem
+                testId="note-toast-close"
+                onClose={() => dispatch((s, now) => closeToast(s, SUMMARY_KEY, now))}
+              />
+            </div>
+          );
+        }
         if (t.kind === "summary") {
           return (
             <div
@@ -730,7 +788,7 @@ export function ToastRuntime({
           />
         );
       })}
-      {more > 0 && !inRow && moreButton}
+      {more > 0 && !inRow && !compact && moreButton}
       {callout && (
         <CalloutToast
           key={callout.seq ?? 0}

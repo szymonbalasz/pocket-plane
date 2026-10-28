@@ -606,6 +606,11 @@ export interface FoldState {
   foldedAt: number | null;
   /** BL-130: the alerts kept (`visibleToasts`' `alerts`); absent → every alert shows. */
   alerts?: number;
+  /**
+   * BL-141 (FR-NOTE-79): the DM summary drawn compact (one short line), the fold's last step once
+   * the summary alone still covers a window's content or a modal dialog.
+   */
+  compact?: boolean;
 }
 
 /** A fold step's inputs: what shows at the current cap and how far it may fold. */
@@ -619,15 +624,20 @@ export interface FoldInput {
   alerts?: number;
   /** BL-130: the fewest alerts kept (1 when nothing else shows: no summary, card or info). */
   alertMin?: number;
+  /** FR-NOTE-79: the DM summary shows alone (no card, info, alert, turn card or callout). */
+  compactable?: boolean;
 }
 
 /** BL-130: the alerts showing at `s` (its cap, else as many as `o` shows). */
 const alertsAt = (s: FoldState, o: FoldInput) =>
   Math.min(s.alerts ?? Number.POSITIVE_INFINITY, o.alerts ?? 0);
 
-/** BL-130: whether `foldCap` has a step left at `s` (a card / info, else an alert). */
+/**
+ * BL-130: whether `foldCap` has a step left at `s` (a card / info, else an alert; FR-NOTE-79: then
+ * the compact summary).
+ */
 export const canFold = (s: FoldState, o: FoldInput): boolean =>
-  s.cap > o.min || alertsAt(s, o) > (o.alertMin ?? 0);
+  s.cap > o.min || alertsAt(s, o) > (o.alertMin ?? 0) || (o.compactable === true && !s.compact);
 
 /**
  * P3 E3, walkthrough WF4, FR-NOTE-77: one fold step. While the stack doesn't fit (`need`: taller
@@ -642,6 +652,8 @@ export function foldCap(s: FoldState, o: FoldInput): FoldState {
   if (!o.need || !canFold(s, o)) return s;
   if (s.foldedAt !== null && s.foldedAt === o.stackH) return s;
   const alerts = alertsAt(s, o);
+  // FR-NOTE-79 (BL-141): the summary alone still doesn't fit → it goes compact, one step.
+  if (o.compactable && !s.compact) return { ...s, compact: true, foldedAt: o.stackH };
   // A step folds a shown card / info while one is above `min`; else (BL-130) an alert, the cap
   // dropping to `min` with it (no card is held back by that).
   if ((s.cap > o.min && o.shown > o.min) || alerts <= (o.alertMin ?? 0)) {

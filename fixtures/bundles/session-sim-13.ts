@@ -39,5 +39,7 @@ export default defineBundle({
     // stays in `theme-gilt`)
     // F2 (sprint 14, DM #366): toasts, popups, notifications, BL-130–132 / BL-137 (no unit:
     // client-only; `s14-toasts-e2e` aliases this bundle)
+    // F3 (sprint 14, DM #366): kit nits, the compact summary, BL-138 / BL-139 / BL-141 (no unit:
+    // client-only; `s14-kit-e2e` aliases this bundle)
   ],
 });
