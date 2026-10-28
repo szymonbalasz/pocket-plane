@@ -26,6 +26,7 @@ import {
   SheetRowList,
   SheetStatus,
 } from "@shared/events/character-sheet";
+import { SpellRowFx, SpellRowFxRecord } from "@shared/spell-fx/fx";
 import { z } from "zod";
 
 export const CREATURE_SHEET_TYPE = "creature-sheet";
@@ -81,7 +82,13 @@ function spellRules(
   }
 }
 
-export const SpellRow = z.strictObject({ id: Id, ...spellFields }).superRefine(spellRules);
+/**
+ * spell-fx (FR-VFX-05): the row's optional map effect; stored rows take any preset key (a newer
+ * server's preset still parses), `char.putRow` only catalogue presets with parsed params.
+ */
+export const SpellRow = z
+  .strictObject({ id: Id, ...spellFields, fx: SpellRowFxRecord.optional() })
+  .superRefine(spellRules);
 export type SpellRow = z.infer<typeof SpellRow>;
 export type SpellRowInput = z.input<typeof SpellRow>;
 
@@ -300,7 +307,9 @@ export const CharPutRowIntent = z.discriminatedUnion("list", [
   z.strictObject({
     creatureId: Id,
     list: z.literal("spells"),
-    row: z.strictObject({ id: Id.optional(), ...spellFields }).superRefine(spellRules),
+    row: z
+      .strictObject({ id: Id.optional(), ...spellFields, fx: SpellRowFx.optional() })
+      .superRefine(spellRules),
   }),
   z.strictObject({
     creatureId: Id,

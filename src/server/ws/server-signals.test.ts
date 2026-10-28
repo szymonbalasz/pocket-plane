@@ -107,3 +107,32 @@ test("OQ-FOG-58 an unregistered type or a bad payload sends nothing (logged), th
   expect(await p1.next("reject")).toMatchObject({ code: "unknown_intent" });
   await p2.expectNoFrame(100);
 });
+
+test("ADR-0071 sendServerSignal: every live connection of the campaign (DM too) gets its own payload; null → none; unregistered / invalid → nothing, logged", async () => {
+  const { seed, dm, p1, p1b, p2 } = await setup();
+  const hub = h.s.hub;
+  if (!hub) throw new Error("no hub");
+  const from = { role: "dm" as const };
+  const payload = (tokenId: string) => ({ tokenId, see: [] });
+  hub.sendServerSignal(seed.campaignId, "test.sight", from, (v) =>
+    v.role === "dm" ? payload("dm") : v.playerId === seed.p1.id ? payload("p1") : null,
+  );
+  expect((await dm.next("signal")).data).toEqual(payload("dm"));
+  for (const c of [p1, p1b]) {
+    expect(await c.next("signal")).toEqual({
+      type: "signal",
+      name: "test.sight",
+      data: payload("p1"),
+      from,
+    });
+  }
+  await p2.expectNoFrame(100);
+  const err = spyOn(h.s.log, "error").mockImplementation(() => {});
+  hub.sendServerSignal(seed.campaignId, "test.nope", from, () => payload("x"));
+  hub.sendServerSignal(seed.campaignId, "test.sight", from, () => ({ tokenId: 3 }));
+  hub.sendServerSignal("other-campaign", "test.sight", from, () => payload("x"));
+  for (const c of [dm, p1, p2]) await c.expectNoFrame(100);
+  // One for the unregistered type; one per live connection for the bad payload.
+  expect(err).toHaveBeenCalledTimes(5);
+  err.mockRestore();
+});

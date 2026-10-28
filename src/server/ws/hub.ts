@@ -109,6 +109,18 @@ export interface HubApi {
   resync(selector: ConnSelector): void;
   disconnect(selector: ConnSelector, code: number): void;
   connections(campaignId: string): Readonly<Connection>[];
+  /**
+   * ADR-0071 (spell-fx hit cues): a registered server signal routed per connection. Every live
+   * connection of the campaign (DMs and players, the intent's origin too) gets the payload
+   * `payloadFor` returns for its viewer; null → nothing. Never queued (a connection mid-snapshot
+   * misses it), stored, logged or replayed (FR-VFX-22).
+   */
+  sendServerSignal(
+    campaignId: string,
+    name: string,
+    from: SignalFrom,
+    payloadFor: (v: Viewer) => unknown | null,
+  ): void;
 }
 
 export class Hub implements HubApi {
@@ -240,6 +252,34 @@ export class Hub implements HubApi {
     return [...this.conns.values()].filter(
       (c) => c.campaignId === campaignId && c.phase !== "closed",
     );
+  }
+
+  sendServerSignal(
+    campaignId: string,
+    name: string,
+    from: SignalFrom,
+    payloadFor: (v: Viewer) => unknown | null,
+  ): undefined {
+    const def = this.s.signals.getServer(name);
+    if (!def) {
+      this.s.log.error(`server signal ${name} refused (unregistered)`);
+      return;
+    }
+    for (const c of [...this.conns.values()]) {
+      if (c.phase !== "live" || c.campaignId !== campaignId) continue;
+      let data: unknown;
+      try {
+        const payload = payloadFor(this.viewer(c));
+        if (payload === null) continue;
+        const parsed = def.schema.safeParse(payload);
+        if (!parsed.success) throw new Error(`invalid payload: ${parsed.error.message}`);
+        data = parsed.data;
+      } catch (err) {
+        this.s.log.error(`server signal ${name} failed for ${c.connId}`, err);
+        continue;
+      }
+      this.send(c, { type: "signal", name, data, from });
+    }
   }
 
   /** Clean shutdown: close everything with 1001 (client reconnects with backoff). */
