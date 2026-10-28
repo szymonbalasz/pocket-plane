@@ -66,7 +66,7 @@ describe("FR-DICE-34 roll as a token-less combatant", () => {
     expect(t.err(() => t.rollAs(t.goblin3)).code).toBe("not_found");
   });
 
-  test("FR-DICE-34 visibility unchanged: a hidden combatant's DM-only roll stays DM-only", () => {
+  test("FR-DICE-34 FR-DICE-13 a hidden combatant's roll stays DM-only, a public switch too (#367)", () => {
     const t = setup();
     // Token-less combatants have no token to hide; mark the row hidden as a hidden actor would be.
     t.s.db.update(combatant).set({ hidden: true }).where(eq(combatant.id, t.goblin3)).run();
@@ -80,7 +80,13 @@ describe("FR-DICE-34 roll as a token-less combatant", () => {
     const player = t.entries(t.viewer("player", t.h.p1.id));
     expect(player).toHaveLength(before);
     expect(JSON.stringify(player)).not.toContain("SECRET-GOBLIN");
-    // The DM's public switch (or a public category) decides, as for any DM roll (FR-DICE-13).
+    // Sprint 14 (#367): hidden, even the DM's public switch can't show it (FR-DICE-13 guard).
+    const forced = t.rollAs(t.goblin3, { public: true });
+    expect(t.entries(t.viewer("player", t.h.p1.id)).some((e) => e.id === forced.entryId)).toBe(
+      false,
+    );
+    // Shown again: the public switch decides, as for any DM roll (FR-DICE-13).
+    t.s.db.update(combatant).set({ hidden: false }).where(eq(combatant.id, t.goblin3)).run();
     const shown = t.rollAs(t.goblin3, { public: true });
     const after = t.entries(t.viewer("player", t.h.p1.id));
     expect(after.find((e) => e.id === shown.entryId)?.actorName).toBe("Goblin 3");

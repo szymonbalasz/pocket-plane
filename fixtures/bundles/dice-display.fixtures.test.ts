@@ -80,8 +80,10 @@ describe("dice-display bundle (DICEX §13 sprint 4)", () => {
   test("FR-DICE-35 dice-display log history: rolls-1 lines carry die chips (e4's manual 15 as a d20 + physical)", async () => {
     const { db } = await loaded();
     const rows = entriesOf(db);
+    // e1 (Goblin attack, category public) is DM-only here (#367): the Goblin's tokens sit only on
+    // the unshown "Goblin Ambush" scene, so a roll as the definition would announce them.
     expect(rows.map((e) => [e.n, e.public])).toEqual([
-      [1, true],
+      [1, false],
       [2, false],
       [3, false],
       [4, true],
@@ -132,7 +134,7 @@ describe("dice-display leak smoke (every player)", () => {
       const cid = db.select().from(campaign).where(eq(campaign.active, true)).get()?.id as string;
       const rows = entriesOf(db);
       const hidden = rows.filter((e) => !e.public).map((e) => e.id);
-      expect(hidden).toHaveLength(2);
+      expect(hidden).toHaveLength(3);
       const leaks = [SECRET_LABEL, "Perception", '"dmPayload"', ...hidden];
       for (const name of ["Player 1", "Player 2"]) {
         const pid = db.select().from(player).where(eq(player.name, name)).get()?.id as string;
@@ -147,9 +149,9 @@ describe("dice-display leak smoke (every player)", () => {
             .map(([where]) => `${label} ${name} ${where}: ${s}`),
         );
         expect(found).toEqual([]);
-        // Positive control: the public history arrives (e1 Scimitar, e4 Mira's initiative).
+        // Positive control: the public history arrives (e4 Mira's initiative; e1 is DM-only, #367).
         const all = wire.snapshot + wire.acks;
-        expect(all).toContain("Scimitar");
+        expect(rows.filter((x) => x.public)).toHaveLength(1);
         for (const e of rows.filter((x) => x.public)) expect(all).toContain(e.id);
       }
     } finally {

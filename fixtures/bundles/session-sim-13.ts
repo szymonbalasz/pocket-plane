@@ -37,5 +37,7 @@ export default defineBundle({
     // T1 (sprint 12, DM #353): theme switch (no unit: client-only, browser storage)
     // T2 (sprint 12, DM #353): Gilt & Stone (no unit: client-only; `theme-round-3` steps turns, so it
     // stays in `theme-gilt`)
+    // F4 (sprint 14, DM #367): server roll guard, BL-135 (no unit: a stamp rule, no new record;
+    // walkthrough on `kit-parity` with the Goblin Ambush scene shown)
   ],
 });
