@@ -12,7 +12,7 @@ import { useBaseKeyDown, useViewport } from "./hooks";
 import { IdentityChip } from "./IdentityChip";
 import { keepOutsAttr, useKeepOuts } from "./keep-outs";
 import { SHELL_ZONE_ATTR } from "./keys";
-import { Launcher } from "./Launcher";
+import { Launcher, sansFamily, textWidth } from "./Launcher";
 import { LAUNCHER_MIN_ZONE } from "./launcher-fit";
 import { mountedWindows, topWindow, type WindowAction } from "./manager";
 import { OverlayLayer } from "./OverlayLayer";
@@ -27,6 +27,7 @@ import {
 import { ShellWindow } from "./ShellWindow";
 import { SHELL_TEST_DRAG_MIME, SHELL_TEST_KIND } from "./test-windows";
 import { topBarItemsFor, topBarItemWidth } from "./top-bar-items";
+import { launcherRoom, topBarRuns, truncated } from "./topbar-room";
 
 /**
  * FR-SHELL-95: the `viewport` settle runs this long after the last resize event: before the map's
@@ -65,21 +66,44 @@ export interface PlayFrameProps {
 }
 
 /**
- * The top bar's centre zone width, px (FR-KIT-14): the launcher's fit width, measured; null before
- * it is laid out (the launcher then fits the viewport).
+ * The launcher's fit width, px (FR-KIT-14): the top bar's centre zone, measured, with the title
+ * zone and right cluster counted at their theme-independent widths (BL-136, `launcherRoom`); null
+ * before it is laid out (the launcher then fits the viewport). Measured again when a zone resizes
+ * (a theme or web font changes the text) and when web fonts finish loading.
  */
-function useZoneWidth(ref: React.RefObject<HTMLElement | null>): number | null {
+function useLauncherRoom(centreRef: React.RefObject<HTMLElement | null>): number | null {
   const [w, setW] = useState<number | null>(null);
   useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const measure = () => setW(Math.floor(el.getBoundingClientRect().width));
+    const centre = centreRef.current;
+    const bar = centre?.parentElement;
+    const left = bar?.querySelector<HTMLElement>('[data-testid="ui-topbar-left"]');
+    const right = bar?.querySelector<HTMLElement>('[data-testid="ui-topbar-right"]');
+    if (!centre || !bar || !left || !right) return;
+    const measure = () => {
+      const cs = getComputedStyle(bar);
+      const content =
+        bar.clientWidth - Number.parseFloat(cs.paddingLeft) - Number.parseFloat(cs.paddingRight);
+      const sans = sansFamily();
+      setW(
+        launcherRoom({
+          centre: centre.getBoundingClientRect().width,
+          left: left.getBoundingClientRect().width,
+          leftCap: (content * Number.parseFloat(TOP_TITLE_MAX)) / 100,
+          leftTruncated: truncated(left),
+          leftRuns: topBarRuns(left, textWidth, sans),
+          rightRuns: topBarRuns(right, textWidth, sans),
+        }),
+      );
+    };
     measure();
-    if (typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [ref]);
+    document.fonts?.addEventListener("loadingdone", measure);
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    for (const el of [centre, left, right]) ro?.observe(el);
+    return () => {
+      ro?.disconnect();
+      document.fonts?.removeEventListener("loadingdone", measure);
+    };
+  }, [centreRef]);
   return w;
 }
 
@@ -103,7 +127,7 @@ export function PlayFrame({ client, topLeft, topStatus, topEnd, base, toolRail }
   const testMode = available.has(SHELL_TEST_KIND);
   const lastSound = useAlertState((s) => s.lastSound);
   const centre = useRef<HTMLDivElement | null>(null);
-  const room = useZoneWidth(centre);
+  const room = useLauncherRoom(centre);
   useAppearPlacement(available, dispatch);
   // FR-SHELL-95, -103: while the viewport changes windows only render-fit; one `viewport` settle
   // runs, and writes, after the last resize event. Timed from the event itself (not a render), so

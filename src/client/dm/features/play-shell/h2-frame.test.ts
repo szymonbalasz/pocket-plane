@@ -30,11 +30,11 @@ test("FR-SHELL-156 BL-104 the DM's Party Manager opens at its size row's width w
   expect(run.steps.at(-1)?.fit).toBe("all");
 });
 
-// K5 open issue (kit-parity K5 report): with the work area to vh − 12 the ladder's useful-size
-// spot at 1440×900 (442,196) leaves Fit only the 48-px PCs-only view, so BL-107's rule keeps the
-// target size (600 × 536) and Fit gives `pcs`. Recorded failing until the placer weighs the fit
-// among its useful spots (576,196 keeps `all` at 25 px).
-test.failing("FR-SHELL-156 BL-107 escort at 1440×900: the Party Manager at its useful size, Fit `all` (K5 known failure)", () => {
+// K5 (kit-parity K5 report): with the work area to vh − 12 the ladder's useful-size spot at
+// 1440×900 (442,196) left Fit only the 48-px PCs-only view, so BL-107's rule kept the target size
+// (600 × 536) and Fit gave `pcs`. BL-134 (sprint 14 F1): the useful-size search takes only spots
+// where Fit keeps every token (576,196: `all` at 25 px).
+test("FR-SHELL-156 BL-107 BL-134 escort at 1440×900: the Party Manager at its useful size, Fit `all`", () => {
   const run = runScript(dmWindows, "dm", VP, "escort", [{ open: "party.board" }, "fit"]);
   expect(run.problems).toEqual([]);
   expect(size(run.steps.at(-1)?.windows, "party.board")).toEqual({ w: 440, h: 400 });

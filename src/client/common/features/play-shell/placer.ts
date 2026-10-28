@@ -97,8 +97,8 @@ export type Placed =
  * grew on the way up from that size: back when the viewport is ≤ it again, I7); `at` = the rect the
  * displacement wrote (null: put away);
  * `shrunk`: a launcher window shrunk to its useful size for `window:<kind>` (L3s, BL-99), stored
- * shrunk (a reload keeps the layout it shows); `under`: that shrink, when a later cause displaced
- * the shrunk window (it applies again once the window is back).
+ * shrunk (a reload keeps the layout it shows); `under`: that shrink (or a `grown:` memory), when a
+ * later cause displaced the window (it applies again once the window is back).
  */
 export interface Displacement {
   kind: string;
@@ -427,6 +427,9 @@ const SQUEEZE: Record<"dm" | "player", readonly string[]> = {
   player: ["dice.log", "char.sheet", "cbt.initiative"],
 };
 
+/** BL-134: the best-ranked useful-size spots a keep-fit search dry-fits, at most. */
+const FIT_ALTERNATIVES = 12;
+
 /** FR-SHELL-98: a rung at the 12-px gap, then retried at 4 px. */
 const GAPS = [EDGE_GAP, 4] as const;
 
@@ -586,6 +589,26 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
     if (ctx.dryFit([...others, plainRect(r)], "resize")?.verdict !== "pcs") return true;
     return ctx.dryFit(others, "resize")?.verdict === "pcs";
   };
+  /**
+   * BL-134: `fitKeeps` for one search's candidates (the other windows fixed meanwhile): the
+   * verdict without the window once, each rect's dry fit once.
+   */
+  const fitKeepsAt = (id: string): ((r: Rect) => boolean) | undefined => {
+    const dry = ctx.dryFit;
+    if (!fitted || !dry) return undefined;
+    const others = [...shownMap()].filter(([w]) => idOf(w) !== id).map(([, x]) => plainRect(x));
+    if (dry(others, "resize")?.verdict === "pcs") return undefined;
+    const seen = new Map<string, boolean>();
+    return (r) => {
+      const k = `${r.x},${r.y},${r.w},${r.h}`;
+      let ok = seen.get(k);
+      if (ok === undefined) {
+        ok = dry([...others, plainRect(r)], "resize")?.verdict !== "pcs";
+        seen.set(k, ok);
+      }
+      return ok;
+    };
+  };
   /** Some token footprint under `r` (FR-SHELL-58 (2c): bare footprints). */
   const overTokens = (r: Rect) => tokens.some((t) => overlaps(r, t));
   /** Clear of every other rendered window (no overlap) and hard keep-out. */
@@ -612,12 +635,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   /**
    * Records a displacement's first prior state for `cause` (FR-SHELL-102). An L3s shrink (BL-99)
    * a later cause displaces waits under it: the window comes back shrunk, still shrunk for its
-   * own cause.
+   * own cause. So does a `grown:` memory a tool bar or window displaces (walkthrough F1 5): the
+   * window comes back to its rect when that cause ends, and the way down still restores it.
    */
   const remember = (w: WindowState, cause: string, at: Rect | null) => {
     const id = idOf(w);
     const old = memory.get(id);
-    const under = old?.shrunk && old.cause !== cause ? old : undefined;
+    const waits =
+      old?.shrunk === true ||
+      (old !== undefined && causeGrown(old.cause) !== null && /^(toolbar|window):/.test(cause));
+    const under = old && waits && old.cause !== cause ? old : undefined;
     const prior = under ? undefined : old;
     memory.set(
       id,
@@ -704,6 +731,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       /** The target size capped at this (H2 FAIL 5: the useful size); `exact`: this size only. */
       cap?: Size;
       exact?: boolean;
+      /** BL-134: L1–L2 take only spots where the map keeps its all-tokens fit (`fitKeeps`). */
+      keepFit?: boolean;
     },
   ): Spot | null => {
     const still = o.push === true || o.noYield === true;
@@ -726,9 +755,17 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       ...(o.prev && { prev: o.prev }),
     });
     const accepted = (p: Placement | null) => p?.clear === true && p.pcClear;
+    const keep = o.keepFit ? fitKeepsAt(id) : undefined;
     const tryAt = (more: Partial<PlaceInput>): Placement | null => {
       const base = input();
       for (const gap of GAPS) {
+        if (keep) {
+          // BL-134: the best-ranked accepted spot where the map keeps its all-tokens fit.
+          const p = clearSearch(def, { ...base, ...more, gap, alternatives: FIT_ALTERNATIVES });
+          const hit = p?.alternatives?.find((a) => accepted(a) && keep(a.rect));
+          if (hit) return hit;
+          continue;
+        }
         const p = clearSearch(def, { ...base, ...more, gap });
         if (accepted(p)) return p;
       }
@@ -1078,7 +1115,14 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       // fit (the useful size itself stays the window's, FR-SHELL-79).
       // BL-107: outside a `viewport` settle only where that buys the all-tokens fit (else the
       // target size: a smaller window there frames no more tokens).
-      const small = ladder(id, { ...lo, putAway: false, cap: useful(def, vp, registry) });
+      // BL-134: outside a `viewport` settle (which takes the useful size anyway), among its
+      // useful-size spots (L1–L2) one where Fit still frames every token; none → the ladder at
+      // that cap as before.
+      const cap = useful(def, vp, registry);
+      const keepFit = trigger.type !== "viewport";
+      const small =
+        (keepFit ? ladder(id, { ...lo, putAway: false, cap, keepFit, maxL2: true }) : null) ??
+        ladder(id, { ...lo, putAway: false, cap });
       if (small && (trigger.type === "viewport" || fitKeeps(id, small.rect))) {
         spot = small;
         // Then toward its target from there, as a later grow back would (L1–L2, nearest that
@@ -1091,6 +1135,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       }
     }
     if (o.cause && spot.rung === "L5") {
+      // BL-129: a reload never puts an open window away. The written layout is the settled one
+      // (FR-SHELL-56 (6), overlaps included): one the zones' load pass finds no clear spot for
+      // stays open at its stored rect.
+      if (trigger.type === "load") return;
       // A window displaced for a transient cause is put away itself rather than cover a PC
       // (#310; as a pushed one, OQ-SHELL-61 A); it returns when the cause ends (FR-SHELL-102).
       const cur = get(id) as WindowState;
@@ -1401,7 +1449,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const free = !blocked && !hard.some((k) => overlaps(r, k));
       if (free && (d.userSpot || pcFree(r))) {
         setWin(id, back);
-        // Back at its L3s rect (BL-99): that shrink holds again until its own cause ends.
+        // Back at its L3s rect (BL-99): that shrink holds again until its own cause ends; so
+        // does a `grown:` memory (walkthrough F1 5).
         if (d.under && sameRect(back, d.under.at)) memory.set(id, d.under);
         placed.set(id, "returned");
         pcFlags.set(id, pcFree(r));
@@ -1544,8 +1593,9 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       // its rect from before the cause in this settle: as it was (I7).
       if (squeezedNow(w) || placed.get(id) === "returned") continue;
       // Up: placed at this very size (its `area`), it was shrunk by this size's room, not by a
-      // smaller screen; it stays (I7: a resize down and back restores the layout).
-      if (!freed && w.area?.w === area.w && w.area.h === area.h) continue;
+      // smaller screen; it stays (I7: a resize down and back restores the layout). BL-134: so
+      // does one placed at a bigger size (its room there set it; the trip back up restores it).
+      if (!freed && w.area && w.area.w >= area.w && w.area.h >= area.h) continue;
       const size = targetSize(w, def, vp);
       const fitted = fittedDefaultRect(def, vp, hard, size);
       // Band-capped as L1 (BL-104): a window at its band height is not shrunk.
