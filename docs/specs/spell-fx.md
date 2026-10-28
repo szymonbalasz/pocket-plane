@@ -8,7 +8,7 @@ phase: post-mvp
 
 # Spell FX
 
-> Five-minute read. See [AGENTS.md](../../AGENTS.md). Raised by the DM (2026-10-28): moving map graphics for the party's favourite spells, a subtle look for every hit by damage type, and a way to switch it all off. Cross-cutting choices: [ADR-0071](../architecture/adr/0071-spell-fx.md) (proposed). Every term in *italics* below is a [glossary](../glossary.md#play) term (OQ-VFX-07 A, added at merge).
+> Five-minute read. See [AGENTS.md](../../AGENTS.md). Raised by the DM (2026-10-28): moving map graphics for the party's favourite spells, a subtle look for every hit by damage type, and a way to switch it all off. Cross-cutting choices: [ADR-0071](../architecture/adr/0071-spell-fx.md) (accepted, #373). Every term in *italics* below is a [glossary](../glossary.md#play) term (OQ-VFX-07 A, added at merge).
 
 ## 1. Summary
 

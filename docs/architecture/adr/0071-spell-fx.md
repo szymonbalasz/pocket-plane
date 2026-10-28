@@ -1,6 +1,6 @@
 # 0071 — Spell FX: client-drawn map effects on effect rows, transient hit cues
 
-- Status: proposed (numbered at merge, [#372](../../decisions-log.md)). The DM picked option A for the hit-cue path (OQ-VFX-05, 2026-10-28)
+- Status: accepted (DM, [#373](../../decisions-log.md); numbered at merge, #372). The DM picked option A for the hit-cue path (OQ-VFX-05, 2026-10-28)
 - Date: 2026-10-28
 - Extends: [ADR-0016](0016-domain-events-pending-actions.md) (domain events → listeners → visibility filter → WS), [ADR-0035](0035-combat-rule-hooks.md) (no post-commit listener writes state), [ADR-0033](0033-signal-audience.md) (transient messages routed by audience).
 - Raised by: the DM (2026-10-28): animated Spirit Guardians and Shadow of Moil, hit looks by damage type, a per-player off switch.
