@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 (fix pack + Spell FX, #374) on the CI test loop (#368).** F1, F2, F4 merged. F1, F2, F3, F4 and VFX core merged. VFX build building (last slice). Decisions up to #374. All worktrees linked to workspace wR.
+**Phase:** **Sprint 14 (fix pack + Spell FX, #374) on the CI test loop (#368).** F1, F2, F3, F4 and VFX core merged. VFX build building (last slice). Decisions up to #374. All worktrees linked to workspace wR.
 
 **Resume (in order):**
 1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
