@@ -14,6 +14,7 @@ import { conflict, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { gameLogEntry } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
+import { rollGuarded } from "./roll-guard";
 import { campaignOf, readSettings } from "./settings";
 
 export interface AppendInput {
@@ -76,8 +77,16 @@ function getEntry(tx: Pick<Tx, "select">, campaignId: string, id: string): Entry
  * FR-DICE-13: `public` stamped once, by who rolls. Player → always true. DM (and the fixture
  * loader, which runs as DM) → the override if given, else the category's setting at commit.
  * `forcePrivate` → false for anyone. A copied (reroll) or request (`audience`) stamp wins.
+ * Sprint 14 (#367): a DM entry whose roll was made as a hidden or renamed monster creature →
+ * false, over every stamp (`rollGuarded`).
  */
 function stampPublic(env: CommandEnv, cid: string, input: AppendInput): boolean {
+  const stamped = baseStamp(env, cid, input);
+  if (!stamped || env.actor.role === "player") return stamped;
+  return !rollGuarded(env, cid, input.rollIds, input.encounterId);
+}
+
+function baseStamp(env: CommandEnv, cid: string, input: AppendInput): boolean {
   if (input.copyAudience) return input.copyAudience.public;
   if (input.audience) return input.audience.public;
   if (input.forcePrivate || input.audiencePlayerId) return false;
