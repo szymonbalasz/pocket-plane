@@ -37,7 +37,7 @@ describe("FR-KIT-29 companion groups (K12)", () => {
       // K12 re-test: one name line (truncated, full name in its Tooltip), marks and side chips
       // whole beside it, so the medallion stays on the name's line.
       expect(owl).toMatch(
-        /<div data-name-line="true" data-child="true" class="flex min-w-0 items-center[^"]*"><span data-name-head="true" class="flex min-w-\[3ch\] max-w-full[^"]*"><span data-testid="cbt-init-row-name" data-value="Owlbear" class="min-w-0 truncate[^"]*" data-state="closed"/,
+        /<div data-name-line="true" data-child="true" class="flex min-w-0 flex-wrap[^"]*"><span data-name-head="true" class="flex min-w-0 max-w-full[^"]*"><span data-testid="cbt-init-row-name" data-value="Owlbear" class="min-w-0 truncate[^"]*" data-state="closed"/,
       );
       // A row that isn't a child keeps the lg medallion and its own rounded card.
       const goblin = rowHtml(html, "cbt-init-row", "goblin");
@@ -74,9 +74,8 @@ describe("FR-KIT-29 companion groups (K12)", () => {
 });
 
 describe("FR-KIT-29 BL-141 child rows two lines at most", () => {
-  test("FR-KIT-29 BL-141 child rows: player-1 — Owlbear's name line keeps its chips (no wrap, Ally its icon with a Tooltip); 'After Mira' ends the bar line, no line of its own", () => {
+  test("FR-KIT-29 BL-141 child rows: player-1 — Owlbear's Ally chip is its icon (the word in a Tooltip), so the chips fit beside the name; 'After Mira' ends the bar line, no line of its own", () => {
     const owl = rowHtml(p1(), "cbt-init-row", "owlbear");
-    expect(owl).toMatch(/<div data-name-line="true" data-child="true" class="(?![^"]*flex-wrap)/);
     const ally =
       /<span[^>]*data-testid="cbt-init-row-ally"[^>]*>[\s\S]*?<\/span>/.exec(owl)?.[0] ?? "";
     expect(ally).toContain('data-compact="true"');

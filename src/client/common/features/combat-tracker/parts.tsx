@@ -165,10 +165,10 @@ export const LINE_TRACK = { "--hp-track": "40px" } as CSSProperties;
  * K12 re-test (walkthrough 4): a child row's name line: the name never wraps (a long name
  * wrapped to three lines, the medallion on the second): it truncates with its full text in a
  * Tooltip only when it and its marks don't fit the whole line; the side chips (owner dot, Ally)
- * stay whole beside it. BL-141 (K6c gap 2): always on this line (the name truncates first, never
- * below 3 characters' room), so with the bar line a child row is two lines at most; the Ally chip
- * is its icon there (`SideChip` `compact`). Same test ID and `data-value` as `NameLine`'s. The
- * medallion sits on this line (`ChildMedallion`).
+ * stay whole beside it, or on the next line when there's no room (the name stays whole,
+ * FR-CBTX-57). BL-141 (K6c gap 2): the Ally chip is its icon here (`SideChip` `compact`), so the
+ * chips fit beside a name and the row keeps to two lines (name, bar). Same test ID and
+ * `data-value` as `NameLine`'s. The medallion sits on this line (`ChildMedallion`).
  */
 export function ChildNameLine({
   name,
@@ -184,8 +184,12 @@ export function ChildNameLine({
   side?: ReactNode;
 }) {
   return (
-    <div data-name-line data-child className="flex min-w-0 items-center gap-x-1">
-      <span data-name-head className="flex min-w-[3ch] max-w-full items-center gap-1">
+    <div
+      data-name-line
+      data-child
+      className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
+    >
+      <span data-name-head className="flex min-w-0 max-w-full items-center gap-1">
         <Tooltip content={name}>
           <span
             data-testid={testId}
