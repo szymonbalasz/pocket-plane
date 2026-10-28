@@ -17,13 +17,14 @@ import {
   type TemplateShape,
   type TemplateSignalData,
 } from "@shared/scene-tools/schemas";
-import { contains, snapAngle, snapPoint, templateArea } from "@shared/scenes-map/area";
+import { contains, snapAngle, templateArea } from "@shared/scenes-map/area";
 import type { Grid } from "@shared/scenes-map/geometry";
 import { DRAG_INTERVAL_MS, DRAG_REPEAT_MS, DRAG_TIMEOUT_MS } from "@shared/scenes-map/schemas";
 import { createStore, type StoreApi } from "zustand";
 import type { ReadVar } from "../campaign-management/colors";
 import type { LaserTimers } from "../scenes-map/laser";
 import { type MarkPerson, markColor } from "../scenes-map/mark-colors";
+import { type AoeOrigin, aoeOrigin, type SnapOptions } from "./aoe-snap";
 
 /** FR-SCN-23: like `map.drag` (≤ 20/s, 1 s repeat at rest, 3 s receiver timeout). */
 export const TEMPLATE_INTERVAL_MS = DRAG_INTERVAL_MS;
@@ -91,11 +92,11 @@ export function snapWidth(ft: number): number {
 }
 
 /**
- * FR-SCN-22 / -43: the template a press at `origin` (grid units, already snapped) dragged to map
- * px `at` makes. Cone and line: direction from the drag; cube: its diagonal toward the drag;
- * sphere and cylinder: the radius from the drag (5-ft steps). Snapped to 15° unless `free`
- * (Ctrl, 0.1°). Under half a cell of drag keeps the panel's size and the previous direction
- * (`angle`).
+ * FR-SCN-22 / -43: the template a press at `press` (grid units, raw) with its origin at `origin`
+ * (already snapped, `aoeOrigin`) dragged to map px `at` makes. Cone and line: direction from the
+ * origin to the pointer; cube: its diagonal toward the pointer; sphere and cylinder: the radius
+ * from the origin to the pointer (5-ft steps). Snapped to 15° unless `free` (Ctrl, 0.1°). Under
+ * half a cell of drag from the press keeps the panel's size and the previous direction (`angle`).
  */
 export function gestureTemplate(
   s: AoeSettings,
@@ -104,11 +105,12 @@ export function gestureTemplate(
   g: Grid,
   angle = 0,
   free = false,
+  press: GridPoint = origin,
 ): TemplateView {
   const p = gridPoint(g, at.x, at.y);
   const dx = p.x - origin.x;
   const dy = p.y - origin.y;
-  const dragged = Math.hypot(dx, dy) >= 0.5;
+  const dragged = Math.hypot(p.x - press.x, p.y - press.y) >= 0.5;
   const base: TemplateView = {
     shape: s.shape,
     x: origin.x,
@@ -124,10 +126,6 @@ export function gestureTemplate(
   }
   return { ...base, angle: aimAngle(dx, dy, s.shape, free) };
 }
-
-/** FR-SCN-43: the origin of a press at map px: the nearest vertex, or (Ctrl) 0.01 cell. */
-export const originAt = (g: Grid, x: number, y: number, free = false): GridPoint =>
-  snapPoint(gridPoint(g, x, y), free);
 
 // ---------- handles (FR-SCN-45) ----------
 
@@ -204,12 +202,18 @@ export function endEdit<T extends TemplateGeometry>(t: T, p: GridPoint, free: bo
 }
 
 /**
- * FR-SCN-43 / -45: the origin handle dragged to `p` (grid units): the nearest vertex, or (Ctrl)
- * 0.01 cell; `null` while within `MOVE_MIN` of the press (a click keeps the origin).
+ * FR-SCN-43 / -45 (#375): the origin handle of a `shape` template dragged to `p` (grid units):
+ * snapped as a new placement (`aoeOrigin`: cell centre, token centre, cube vertex; Ctrl 0.01
+ * cell); `null` while within `MOVE_MIN` of the press (a click keeps the origin).
  */
-export function movedOrigin(press: GridPoint, p: GridPoint, free: boolean): GridPoint | null {
+export function movedOrigin(
+  shape: TemplateShape,
+  press: GridPoint,
+  p: GridPoint,
+  o: SnapOptions,
+): AoeOrigin | null {
   if (Math.hypot(p.x - press.x, p.y - press.y) < MOVE_MIN) return null;
-  return snapPoint(p, free);
+  return aoeOrigin(shape, p, o);
 }
 
 export interface TemplateUpdate {

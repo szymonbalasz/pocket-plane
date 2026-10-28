@@ -1,8 +1,10 @@
 // AoE tool (FR-SCN-22–26, -43–45; SCN §7), both clients: a drawing tool in the canvas tool
 // registry. Press and drag: the direction (cone, line, cube diagonal) or the radius (sphere,
 // cylinder); release → this connection's ephemeral template (a new one replaces it; Clear or Esc
-// removes it). Snapped (vertex, 15°) unless Ctrl: origin to 0.01 cell, angle to 0.1°, read on
-// every move, with the "Free" chip at the cursor (FR-SCN-43). Pressing an editable kept
+// removes it). Snapped unless Ctrl (FR-SCN-43, #375: cell centre, a big token's centre for a
+// sphere / cylinder, a vertex for a cube; 15°; the origin cells highlighted while placing): Ctrl
+// frees the origin to 0.01 cell and the angle to 0.1°, read on every move, with the "Free" chip
+// at the cursor. Pressing an editable kept
 // template's origin selects it and drags it; the selected one's end handle re-aims it (cone,
 // line, cube) or resizes it (sphere, cylinder); release sends one `scn.updateTemplate`
 // (FR-SCN-45). The panel: shape, size / width with ±5 nudges, label, Keep, Clear; for a selected
@@ -20,7 +22,6 @@ import {
   type TemplateRecordView,
   type TemplateShape,
 } from "@shared/scene-tools/schemas";
-import { snapPoint } from "@shared/scenes-map/area";
 import {
   CircleIcon,
   CylinderIcon,
@@ -53,6 +54,7 @@ import { useSendSignal, useSync } from "../../sync/store";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
 import { useMapTool } from "../scenes-map/tool-store";
 import type { CanvasToolDef, ToolPointer } from "../scenes-map/tools";
+import { type AoeOrigin, aoeOrigin, mapCells, type SnapOptions } from "./aoe-snap";
 import { bindAoe, cancelAoe, editTemplate, endOwn, keepOwn, showOwn, useAoe } from "./aoe-store";
 import { FreeChip } from "./free-chip";
 import {
@@ -63,6 +65,7 @@ import {
   clearScopeCount,
   clearTitle,
   endEdit,
+  type GridPoint,
   gestureTemplate,
   gridPoint,
   handleAt,
@@ -88,6 +91,29 @@ let last: ToolPointer | null = null;
 
 const keptById = (id: string) => useAoe.getState().editable.find((t) => t.id === id) ?? null;
 
+/** #375: the shown scene's tokens and map cells, Ctrl per event (FR-SCN-43). */
+const snapOptions = (e: ToolPointer): SnapOptions => ({
+  free: e.ctrl,
+  tokens: useAoe.getState().tokens,
+  bounds: mapCells({ ...e.grid, mapWidth: e.scene.mapWidth, mapHeight: e.scene.mapHeight }),
+});
+
+/** The last placement's raw press point: a panel shape change re-snaps the ephemeral's origin. */
+let placed: { press: GridPoint; snap: SnapOptions } | null = null;
+
+/** Shows the placement's ephemeral and highlights its origin cells (#375). */
+function place(e: ToolPointer, press: GridPoint, angle: number): void {
+  const snap = snapOptions(e);
+  const origin = aoeOrigin(useAoe.getState().settings.shape, press, snap);
+  placed = { press, snap };
+  if (!sameCell(useAoe.getState().originCell, origin)) useAoe.setState({ originCell: origin.cell });
+  const { settings } = useAoe.getState();
+  showOwn(e.scene.id, gestureTemplate(settings, origin, e, e.grid, angle, e.ctrl, press));
+}
+
+const sameCell = (a: AoeOrigin["cell"], b: AoeOrigin | null) =>
+  a?.col === b?.cell?.col && a?.row === b?.cell?.row && a?.n === b?.cell?.n;
+
 function down(e: ToolPointer): void {
   bindAoe(e.signal, e.intent);
   last = e;
@@ -110,7 +136,7 @@ function down(e: ToolPointer): void {
   }
   const angle = st.own?.template.angle ?? 0;
   useAoe.setState({ selectedId: null, gesture: { kind: "place", press: p, angle } });
-  showOwn(e.scene.id, gestureTemplate(st.settings, snapPoint(p, e.ctrl), e, e.grid, angle, e.ctrl));
+  place(e, p, angle);
 }
 
 function move(e: ToolPointer): void {
@@ -119,8 +145,15 @@ function move(e: ToolPointer): void {
   if (!g) return;
   const p = gridPoint(e.grid, e.x, e.y);
   if (g.kind === "move") {
-    const at = movedOrigin(g.press, p, e.ctrl);
-    if (at?.x !== g.at?.x || at?.y !== g.at?.y) useAoe.setState({ gesture: { ...g, at } });
+    const kept = keptById(g.id);
+    if (!kept) return;
+    const at = movedOrigin(kept.shape, g.press, p, snapOptions(e));
+    if (at?.x !== g.at?.x || at?.y !== g.at?.y) {
+      useAoe.setState({ gesture: { ...g, at: at && { x: at.x, y: at.y } } });
+    }
+    if (!sameCell(useAoe.getState().originCell, at)) {
+      useAoe.setState({ originCell: at?.cell ?? null });
+    }
     return;
   }
   if (g.kind === "end") {
@@ -132,17 +165,13 @@ function move(e: ToolPointer): void {
     }
     return;
   }
-  const { settings } = useAoe.getState();
-  showOwn(
-    e.scene.id,
-    gestureTemplate(settings, snapPoint(g.press, e.ctrl), e, e.grid, g.angle, e.ctrl),
-  );
+  place(e, g.press, g.angle);
 }
 
 function up(e: ToolPointer): void {
   move(e);
   const g = useAoe.getState().gesture;
-  useAoe.setState({ gesture: null });
+  useAoe.setState({ gesture: null, originCell: null });
   if (!g || g.kind === "place") return;
   const kept = keptById(g.id);
   if (!kept) return;
@@ -167,15 +196,22 @@ export const aoeTool: CanvasToolDef = {
   pointer: { down, move, up, cancel: cancelAoe },
 };
 
-/** A panel change reshapes the ephemeral in place (same origin and angle). */
-function applySettings(patch: Partial<AoeSettings>): void {
+/**
+ * A panel change reshapes the ephemeral in place (same angle; same origin, re-snapped from the
+ * press when the shape changes, #375: a cube's corner on a vertex, the others on a cell centre).
+ */
+export function applySettings(patch: Partial<AoeSettings>): void {
   const settings = { ...useAoe.getState().settings, ...patch };
   useAoe.setState({ settings });
   const own = useAoe.getState().own;
   if (!own) return;
   const t = own.template;
+  const origin =
+    placed && settings.shape !== t.shape ? aoeOrigin(settings.shape, placed.press, placed.snap) : t;
   const next: TemplateView = {
     ...t,
+    x: origin.x,
+    y: origin.y,
     shape: settings.shape,
     size: settings.size,
     width: settings.shape === "line" ? settings.width : null,
@@ -440,7 +476,7 @@ export function AoePanel() {
       <p className="text-muted-foreground text-xs">
         {selected
           ? "Drag the origin to move it, the end handle to aim or resize."
-          : `Drag from a grid point to aim. ${TEMPLATE_SIZE.min}–${TEMPLATE_SIZE.max} ft${shape === "line" ? `, width ${TEMPLATE_WIDTH.min}–${TEMPLATE_WIDTH.max} ft` : ""}.`}
+          : `${shape === "cube" ? "Drag from a grid corner" : "Drag from a square"} to aim. ${TEMPLATE_SIZE.min}–${TEMPLATE_SIZE.max} ft${shape === "line" ? `, width ${TEMPLATE_WIDTH.min}–${TEMPLATE_WIDTH.max} ft` : ""}.`}
       </p>
       <p data-testid="scn-aoe-hint" className="text-muted-foreground text-xs">
         Ctrl: free placement
