@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 (fix pack + Spell FX, #374) on the CI test loop (#368).** F1, F2, F3, F4 and VFX core merged. VFX build building (last slice). Decisions up to #374. All worktrees linked to workspace wR.
+**Phase:** **Sprint 14 (fix pack + Spell FX, #374): all slices MERGED (2026-10-28).** F1–F4, VFX core, VFX build on `main`. No builders running. Next: DM recap (rulings below; spell-fx spec still `in-review`: the DM sets `complete`); sprint gate / playtest script not in this sprint's plan. Decisions up to #374. All worktrees linked to workspace wR.
 
 **Resume (in order):**
 1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
@@ -44,7 +44,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 14 F4 roll guard | merged aa53fa6f | — | **merged** (walkthrough 7/8 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f4{,r}/`; fog-for-one-player leak via the combatant path fixed; CI green after flake re-runs → BL-147, BL-148) | — |
 | Sprint 14 F3 kit nits | merged 9801a94f | — | **merged** (walkthrough 5/6 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f3{,r}/`; 4 baselines refreshed on purpose; protocol §180) | — |
 | Spell FX core (#374) | merged a09fef12 | — | **merged** (raw-intent walkthrough 8/9: cue size → budget 480 B worst case, typical 307 B; CI green; registries recorded in AGENTS §9.9) | — |
-| Spell FX build (#374) | `build/vfx` (w82, slot 0) | build-vfxbuild, test-vfx | ready (CI green b376df4b; OQ-VFX-04 A: frameMs median 1.4-1.5 ms vs 4 ms gate, 4 Konva layers; baselines refreshed: auras + dm/player) → §13 walkthrough running | merge |
+| Spell FX build (#374) | merged 450f4df2 | — | **merged** (§13 walkthrough 12/12 `.verify/sprint14/walkthroughs/20261028-vfx/`; frame median 1.3 ms at 11 tokens; baselines refreshed; BL-151 toast over the sheet's End button) | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
