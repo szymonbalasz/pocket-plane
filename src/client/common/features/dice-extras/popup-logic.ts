@@ -411,8 +411,9 @@ export function dmPopupAt(
 /**
  * FR-DICEX-47 short screens + BL-132 (sim-16 d01: three quick player rolls stacked 448-wide
  * popups over the Game log's title bar): the DM column's room below its top `at`, px: to the
- * viewport's bottom, and no further than `STACK_GAP` above the first window head below the top
- * that the column's width crosses (the oldest popups drop, the newest always shows). Pure.
+ * viewport's bottom, and no further than the top of the first window head below the top that the
+ * column's width crosses (the column may end on its edge, never over it; the oldest popups drop,
+ * the newest always shows). Pure.
  */
 export function popupRoom(
   vpH: number,
@@ -423,7 +424,7 @@ export function popupRoom(
   let bottom = vpH - EDGE_GAP;
   for (const h of heads) {
     if (h.y < at.top || h.x >= at.left + w || h.x + h.w <= at.left) continue;
-    bottom = Math.min(bottom, h.y - STACK_GAP);
+    bottom = Math.min(bottom, h.y);
   }
   return bottom - at.top;
 }

@@ -78,11 +78,11 @@ describe("BL-132 the DM's roll popups keep off window heads where a clear spot i
     expect(before).toEqual({ left: 104, top: 354 });
     expect(hit(column(before, three), { ...LOG, h: 32 })).toBe(true);
     // Now: no spot holds three off the windows or the heads → the column stays and its room ends
-    // 8 px above the log's head: the newest card only (the oldest drop, FR-DICEX-47).
+    // at the log's head: the newest card only (the oldest drop, FR-DICEX-47).
     const at3 = dmPopupAt(vp, start, { w: W, h: three }, clear, windows, heads);
     expect(at3).toEqual(before);
     const room = popupRoom(vp.h, at3, W, heads);
-    expect(room).toBe(608 - 8 - 354);
+    expect(room).toBe(608 - 354);
     expect(popupsThatFit([CARD_H, CARD_H, CARD_H], room)).toBe(1);
     // With one card: off every head (it may sit over Party Manager's empty body).
     const at1 = dmPopupAt(vp, start, { w: W, h: CARD_H }, clear, windows, heads);
