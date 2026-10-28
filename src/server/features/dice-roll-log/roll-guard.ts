@@ -20,8 +20,12 @@
 // Renamed = the name minus a numbering suffix (FR-MAP-16, "Goblin 2") isn't the definition's
 // name; a player-owned companion is never renamed (its owner named it, players know it).
 
-import { baseName } from "@shared/scenes-map/geometry";
-import { TOKEN_NAME_MAX } from "@shared/scenes-map/schemas";
+// The rule itself is shared (`@shared/dice-roll-log/roll-guard`, sprint 14 F3): the DM's roll bar
+// shows the public switch forced off from it (FR-DICE-22). This module is its server world: the
+// campaign's rows, read lazily in the caller's transaction, and per-player fog (`tokenHiddenFor`,
+// `seenBy` is server-only, FR-FOG-44).
+
+import { actorGuarded, type GuardWorld } from "@shared/dice-roll-log/roll-guard";
 import { and, eq, inArray } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
 import { combatant, entity, player, roll, token } from "../../db/schema";
@@ -30,112 +34,74 @@ import { startedEncounter, toCombatantRecord } from "../combat-tracker/rows";
 import { activeSceneOf, toTokenRecord } from "../scenes-map/rows";
 import { tokenHiddenFor } from "../scenes-map/visibility-hooks";
 
+export { numberedFrom } from "@shared/dice-roll-log/roll-guard";
+
 type TokenRow = typeof token.$inferSelect;
 type CombatantRow = typeof combatant.$inferSelect;
 
-/** FR-MAP-16: `name` is `def` or `def` numbered (its base cut to fit 40 code points). */
-export function numberedFrom(name: string, def: string): boolean {
-  if (name === def) return true;
-  const stem = baseName(name);
-  if (stem === name) return false;
-  if (stem === def) return true;
-  const suffix = [...name].length - [...stem].length;
-  return [...def].length + suffix > TOKEN_NAME_MAX && def.startsWith(stem);
-}
-
-interface Scope {
-  env: CommandEnv;
-  cid: string;
-  encounterId: string | null;
-  /** The entry names its encounter: a combat path, whose actor is that fight's combatant. */
-  combatPath: boolean;
-  playerIds: string[] | null;
-  activeSceneId: string | null | undefined;
-}
-
-function playersOf(s: Scope): string[] {
-  s.playerIds ??= s.env.tx
-    .select({ id: player.id })
-    .from(player)
-    .where(eq(player.campaignId, s.cid))
-    .all()
-    .map((p) => p.id);
-  return s.playerIds;
-}
-
-function activeScene(s: Scope): string | null {
-  if (s.activeSceneId === undefined) s.activeSceneId = activeSceneOf(s.env.tx, s.cid)?.id ?? null;
-  return s.activeSceneId;
-}
-
-function tokenGuarded(s: Scope, t: TokenRow, defName: string | null): boolean {
-  if (t.characterId !== null) return false;
-  if (defName !== null && t.ownerPlayerId === null && !numberedFrom(t.name, defName)) return true;
-  // #371: off the shown scene, a token is ignored for hiding (only its name counts).
-  if (t.sceneId !== activeScene(s)) return false;
-  const rec = toTokenRecord(t);
-  return playersOf(s).some((pid) => tokenHiddenFor(rec, pid, s.cid));
-}
-
-/** Hidden (combat's rule, or its token's on the shown scene: fog per player, F4 F1) or renamed. */
-function combatantGuarded(s: Scope, c: CombatantRow, defName: string | null): boolean {
-  if (c.kind !== "monster") return false;
-  if (defName !== null && c.ownerPlayerId === null && !numberedFrom(c.name, defName)) return true;
-  if (combatantVisibility(toCombatantRecord(c)) === "hidden") return true;
-  if (!c.tokenId) return false;
-  const t = s.env.tx.select().from(token).where(eq(token.id, c.tokenId)).get();
-  return t ? tokenGuarded(s, t, defName) : false;
-}
-
-function definitionName(s: Scope, id: string | null): { name: string; monster: boolean } | null {
-  if (!id) return null;
-  const e = s.env.tx
-    .select({ name: entity.name, kind: entity.kind })
-    .from(entity)
-    .where(eq(entity.id, id))
-    .get();
-  return e ? { name: e.name, monster: e.kind === "monster" } : null;
-}
-
-function tokenActorGuarded(s: Scope, tokenId: string): boolean {
-  const t = s.env.tx
-    .select()
-    .from(token)
-    .where(and(eq(token.id, tokenId), eq(token.campaignId, s.cid)))
-    .get();
-  if (!t) return false;
-  return tokenGuarded(s, t, definitionName(s, t.definitionId)?.name ?? null);
-}
-
-function entityActorGuarded(s: Scope, entityId: string, actorName: string): boolean {
-  const def = definitionName(s, entityId);
-  if (!def?.monster) return false;
-  const fighters = s.encounterId
-    ? s.env.tx
+/** The rule's facts from the campaign's rows (each read once, on first use). */
+function rowsWorld(
+  env: CommandEnv,
+  cid: string,
+  encounterId: string | null,
+): GuardWorld<TokenRow, CombatantRow> {
+  let playerIds: string[] | null = null;
+  let activeSceneId: string | null | undefined;
+  const players = () => {
+    playerIds ??= env.tx
+      .select({ id: player.id })
+      .from(player)
+      .where(eq(player.campaignId, cid))
+      .all()
+      .map((p) => p.id);
+    return playerIds;
+  };
+  return {
+    definition(id) {
+      const e = env.tx
+        .select({ name: entity.name, kind: entity.kind })
+        .from(entity)
+        .where(eq(entity.id, id))
+        .get();
+      return e ? { name: e.name, monster: e.kind === "monster" } : null;
+    },
+    combatantsOf(entityId) {
+      return encounterId
+        ? env.tx
+            .select()
+            .from(combatant)
+            .where(and(eq(combatant.encounterId, encounterId), eq(combatant.entityId, entityId)))
+            .all()
+        : [];
+    },
+    tokensOf(entityId) {
+      return env.tx
         .select()
-        .from(combatant)
-        .where(and(eq(combatant.encounterId, s.encounterId), eq(combatant.entityId, entityId)))
-        .all()
-    : [];
-  const named = fighters.filter((c) => c.name === actorName);
-  if (named.length > 0 && (s.combatPath || actorName !== def.name)) {
-    return named.some((c) => combatantGuarded(s, c, def.name));
-  }
-  const tokens = s.env.tx
-    .select()
-    .from(token)
-    .where(and(eq(token.definitionId, entityId), eq(token.campaignId, s.cid)))
-    .all();
-  const namedTokens = tokens.filter((t) => t.name === actorName);
-  if (namedTokens.length > 0 && actorName !== def.name) {
-    return namedTokens.some((t) => tokenGuarded(s, t, def.name));
-  }
-  // A definition roll (or a name no instance carries): any of its creatures.
-  return (
-    !numberedFrom(actorName, def.name) ||
-    fighters.some((c) => combatantGuarded(s, c, def.name)) ||
-    tokens.some((t) => tokenGuarded(s, t, def.name))
-  );
+        .from(token)
+        .where(and(eq(token.definitionId, entityId), eq(token.campaignId, cid)))
+        .all();
+    },
+    token(id) {
+      return (
+        env.tx
+          .select()
+          .from(token)
+          .where(and(eq(token.id, id), eq(token.campaignId, cid)))
+          .get() ?? null
+      );
+    },
+    activeSceneId() {
+      if (activeSceneId === undefined) activeSceneId = activeSceneOf(env.tx, cid)?.id ?? null;
+      return activeSceneId;
+    },
+    tokenHidden(t) {
+      const rec = toTokenRecord(t);
+      return players().some((pid) => tokenHiddenFor(rec, pid, cid));
+    },
+    combatantHidden(c) {
+      return combatantVisibility(toCombatantRecord(c)) === "hidden";
+    },
+  };
 }
 
 /**
@@ -154,21 +120,14 @@ export function rollGuarded(
     .from(roll)
     .where(and(inArray(roll.id, [...rollIds]), eq(roll.campaignId, cid)))
     .all();
-  const s: Scope = {
-    env,
-    cid,
-    encounterId: encounterId ?? startedEncounter(env.tx, cid)?.id ?? null,
-    combatPath: Boolean(encounterId),
-    playerIds: null,
-    activeSceneId: undefined,
-  };
+  const world = rowsWorld(env, cid, encounterId ?? startedEncounter(env.tx, cid)?.id ?? null);
   const seen = new Set<string>();
   for (const a of actors) {
     if (!a.id || (a.kind !== "token" && a.kind !== "entity")) continue;
     const key = `${a.kind}:${a.id}:${a.name}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    if (a.kind === "token" ? tokenActorGuarded(s, a.id) : entityActorGuarded(s, a.id, a.name)) {
+    if (actorGuarded(world, { kind: a.kind, id: a.id, name: a.name }, Boolean(encounterId))) {
       return true;
     }
   }

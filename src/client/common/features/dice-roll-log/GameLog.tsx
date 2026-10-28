@@ -82,6 +82,7 @@ import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useRecords, useSync } from "../../sync/store";
 import { colorHex } from "../campaign-management/colors";
+import { useDefinitions } from "../compendium/definitions";
 import { DieShape } from "../dice-extras/DieShape";
 import { useLanded, useLandingFade } from "../dice-extras/landing";
 import { stageTray, type TrayRequest } from "../dice-extras/store";
@@ -110,9 +111,74 @@ import {
 import { rollerAttr, rollerColorKey, useColorKeyOf } from "./name-color";
 import { usePhysicalDice, useRollBarActor, useRollOptionsOpen } from "./physical";
 import { RollButton, type RollKeys, useRollControl } from "./roll-control";
+import {
+  ROLL_GUARD_HINT,
+  type RollBarGuardInput,
+  rollBarGuarded,
+  rollBarGuardIds,
+} from "./roll-guard";
 
 /** K8: the roll bar's Select triggers, as small as the native selects were. */
 const SELECT = "h-7 min-w-0 shrink-0 gap-1 px-1.5 py-0 text-xs [&>span]:truncate";
+
+/**
+ * FR-DICE-12 / -22: the DM's public eye on the roll bar. Sprint 14 F3: `guarded` (the server's
+ * roll guard will force the roll DM-only, FR-DICE-13) shows it off and disabled, the reason in
+ * its Tooltip (`aria-disabled`, so the Tooltip still opens).
+ */
+function PublicEye({
+  control,
+  live,
+  guarded,
+}: {
+  control: Pick<ReturnType<typeof useRollControl>, "publicValue" | "setPublic">;
+  live: boolean;
+  guarded: boolean;
+}) {
+  const on = control.publicValue && !guarded;
+  const hint = guarded ? ROLL_GUARD_HINT : on ? "Public" : "Hidden";
+  return (
+    <Tooltip content={hint}>
+      <Button
+        type="button"
+        data-testid="dice-roll-public"
+        data-state={on ? "public" : "hidden"}
+        data-guarded={guarded || undefined}
+        aria-label={hint}
+        aria-pressed={on}
+        aria-disabled={guarded || undefined}
+        size="icon"
+        variant="ghost"
+        className={cn(
+          "size-7 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50",
+          !on && "text-visibility-hidden",
+        )}
+        disabled={!live}
+        onClick={() => {
+          if (!guarded) control.setPublic(!control.publicValue);
+        }}
+      >
+        {on ? <EyeIcon className="size-4" /> : <EyeOffIcon className="size-4" />}
+      </Button>
+    </Tooltip>
+  );
+}
+
+/** FR-DICE-22: the eye while a creature is the roll bar's actor (its definition loaded on demand). */
+function GuardedPublicEye({
+  control,
+  live,
+  input,
+}: {
+  control: Pick<ReturnType<typeof useRollControl>, "publicValue" | "setPublic">;
+  live: boolean;
+  input: Omit<RollBarGuardInput, "definitions">;
+}) {
+  const definitions = useDefinitions(rollBarGuardIds(input)).byId;
+  return (
+    <PublicEye control={control} live={live} guarded={rollBarGuarded({ ...input, definitions })} />
+  );
+}
 
 function Segment({
   s,
@@ -701,6 +767,8 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
   // (FR-DICE-34) falls back to the roller.
   const { options: actorList, selected } = actorSelection(actors, actor);
   const actorRef = selected?.ref;
+  // FR-DICE-22 (sprint 14 F3): the inputs of the server's roll guard (FR-DICE-13), for the eye.
+  const guardInput = { ref: actorRef, tokens, combatants, encounters, scenes };
 
   const control = useRollControl({
     expressions: [expression],
@@ -795,28 +863,12 @@ function RollBar({ dmTools }: { dmTools?: ReactNode }) {
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        {control.isDm && (
-          <Tooltip content={control.publicValue ? "Public" : "Hidden"}>
-            <Button
-              type="button"
-              data-testid="dice-roll-public"
-              data-state={control.publicValue ? "public" : "hidden"}
-              aria-label={control.publicValue ? "Public" : "Hidden"}
-              aria-pressed={control.publicValue}
-              size="icon"
-              variant="ghost"
-              className={cn("size-7 shrink-0", !control.publicValue && "text-visibility-hidden")}
-              disabled={!live}
-              onClick={() => control.setPublic(!control.publicValue)}
-            >
-              {control.publicValue ? (
-                <EyeIcon className="size-4" />
-              ) : (
-                <EyeOffIcon className="size-4" />
-              )}
-            </Button>
-          </Tooltip>
-        )}
+        {control.isDm &&
+          (actorRef ? (
+            <GuardedPublicEye control={control} live={live} input={guardInput} />
+          ) : (
+            <PublicEye control={control} live={live} guarded={false} />
+          ))}
         <RollButton
           control={control}
           hint={ROLL_BAR_HINT}

@@ -6,10 +6,13 @@
 // Placement rules: bun test (`keep-out-compact.test.ts`). The DM's sheet (BL-139): the name picker
 // opens the shared Select's menu (Party heading, items by record id); the Actions tab's Attacks
 // box has no public switch, the header's Public rolls menu has Attack and Damage. The token menu
-// (BL-141): the token's name heads it.
+// (BL-141): the token's name heads it. The roll bar (FR-DICE-22): rolling as a monster token the
+// DM just hid, the public eye is off and disabled (the server's roll guard), the roll DM-only.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { pickRollOption } from "./support/log";
+import { showToPlayers } from "./support/scenes";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -154,4 +157,56 @@ test("BL-141 the DM's token menu: the token's name heads it, before its first it
   expect(first).toBe("map-token-menu-label");
   await dm.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
+});
+
+test("FR-DICE-22 FR-DICE-13 the roll bar as a hidden monster token: the public eye is off and disabled with its reason; the roll lands DM-only; as the DM again, the eye is free", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+  // Goblin Ambush shown (its monsters are the roll bar's tokens); Scenes closed again.
+  const scenes = await showToPlayers(dm, "Goblin Ambush");
+  await scenes.getByTestId("ui-window-close").click();
+  const log = await openWindow(dm, "dice.log");
+  const options = log.getByTestId("dice-roll-options");
+  if ((await options.getAttribute("data-state")) !== "open") await options.click();
+  // A monster token of the shown scene (the roll bar lists it) drawn on open map.
+  await log.getByTestId("dice-roll-actor").click();
+  const listed = await dm
+    .locator('[data-testid="dice-roll-actor-option"]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-value") ?? ""));
+  await dm.keyboard.press("Escape");
+  await expect.poll(async () => (await konvaNodes(dm, "map-token")).length).toBeGreaterThan(0);
+  const nodes = (await konvaNodes(dm, "map-token")).filter((n) => listed.includes(n.id));
+  const onMap = await dm.evaluate(
+    (pts) => pts.map((p) => document.elementFromPoint(p.x, p.y)?.tagName === "CANVAS"),
+    nodes.map(({ x, y }) => ({ x, y })),
+  );
+  const t = nodes.find((_, i) => onMap[i]);
+  if (!t) throw new Error("no listed token on open map");
+  await pickRollOption(log, "dice-roll-actor", t.id);
+  const eye = log.getByTestId("dice-roll-public");
+  await expect(eye).not.toHaveAttribute("data-guarded", "true");
+  await dm.mouse.click(t.x, t.y, { button: "right" });
+  await dm.getByTestId("map-token-menu-hide").click();
+  await expect(eye).toHaveAttribute("data-guarded", "true");
+  await expect(eye).toHaveAttribute("aria-disabled", "true");
+  await expect(eye).toHaveAttribute("data-state", "hidden");
+  await expect(eye).toHaveAttribute("aria-label", /hidden from players or renamed/);
+  // A click changes nothing; the roll is DM-only (the server's guard).
+  await eye.click({ force: true });
+  await expect(eye).toHaveAttribute("data-state", "hidden");
+  const entries = log.getByTestId("dice-log-entry");
+  const before = await entries.count();
+  await log.getByTestId("dice-roll-expression").fill("1d4");
+  await log.getByTestId("dice-roll-submit").click();
+  await expect(entries).toHaveCount(before + 1);
+  await expect(entries.last()).toHaveAttribute("data-public", "false");
+  // Rolling as the DM again: the eye is the DM's to set.
+  await pickRollOption(log, "dice-roll-actor", "");
+  await expect(eye).not.toHaveAttribute("data-guarded", "true");
+  await expect(eye).not.toHaveAttribute("aria-disabled", "true");
 });
