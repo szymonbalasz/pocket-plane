@@ -1,6 +1,7 @@
 // e2e-bundle: dice-display
 // Thin die-shape flows (D5; DICEX §13 step 22, DICE §13 sprint 4): A (DM) and B (player-1, Mira)
-// see `rolls-1` with die chips (e4's manual 15 a d20 + "physical"), B never the hidden rolls; B
+// see `rolls-1` with die chips (e4's manual 15 a d20 + "physical"), B never the hidden rolls (e1
+// too, #367); B
 // rolls with advantage and `1d8+2d6` → chips in B's look (Crimson) in both logs, the dropped d20
 // struck; B's flat dice (popup chips, D7) draw die shapes. A's log at default size still shows ≥ 4 one-line
 // entries (FR-SHELL-35; kit parity K1: 40-px rows, the chips in each row's Tooltip, FR-KIT-45).
@@ -53,8 +54,9 @@ test("FR-DICE-35 FR-DICE-36 FR-DICEX-42 log die chips: history, adv and mixed di
   expect(await chipsOf(e4)).toEqual([{ faces: "20", kept: "true", shape: "d20", fill: DM_BODY }]);
   await expect(await entryDice(e4)).toHaveAttribute("data-value", "15");
   await expect(e4.getByTestId("dice-log-entry-manual")).toBeVisible();
-  // B: only the public history (e1, e4), never the hidden label.
-  await expect(log.getByTestId("dice-log-entry")).toHaveCount(2);
+  // B: only the public history (e4; e1 is DM-only here, #367: the Goblin's tokens sit only on
+  // the unshown ambush scene), never the hidden label.
+  await expect(log.getByTestId("dice-log-entry")).toHaveCount(1);
   await expect(log).not.toContainText(SECRET_LABEL);
   expect(await chipsOf(log.getByTestId("dice-log-entry").first())).toEqual([
     { faces: "20", kept: "true", shape: "d20", fill: DM_BODY },
