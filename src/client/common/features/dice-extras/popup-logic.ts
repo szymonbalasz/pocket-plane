@@ -415,6 +415,7 @@ export function dmPopupAt(
  * clear of) also stops at the top of the first window head below it that its width crosses (it
  * may end on the head's edge, never over it; the oldest popups drop, the newest always shows). At
  * home #347's counts stand (the cards overhang the toast region's keep-out box, FR-DICEX-47). Pure.
+ * A nudge that keeps over half the home lane (8 px clear of Initiative at 868, 1280 wide) is home.
  */
 export function popupRoom(
   vpH: number,
@@ -424,7 +425,7 @@ export function popupRoom(
   home: { left: number; top: number },
 ): number {
   let bottom = vpH - EDGE_GAP;
-  const atHome = Math.abs(at.left - home.left) <= 1 && Math.abs(at.top - home.top) <= 1;
+  const atHome = Math.abs(at.left - home.left) < w / 2 && Math.abs(at.top - home.top) <= 1;
   for (const h of atHome ? [] : heads) {
     if (h.y < at.top || h.x >= at.left + w || h.x + h.w <= at.left) continue;
     bottom = Math.min(bottom, h.y);

@@ -116,4 +116,20 @@ describe("BL-132 the DM's roll popups keep off window heads where a clear spot i
     const moved = { left: 100, top: 154 };
     expect(popupsThatFit([card, card, card], popupRoom(small.h, moved, W, heads, home))).toBe(1);
   });
+
+  test("FR-DICEX-47 BL-132 a nudge clear of Initiative stays home (CI popup-line, Linux: Initiative 868, 60, 400 × 500): the column at 408, 154 keeps #347's two cards", () => {
+    const small = { w: 1280, h: 720 };
+    const log = { x: 68, y: 508, w: 690, h: 200 };
+    const test = { x: 948, y: 488, w: 320, h: 220 };
+    const init = { x: 868, y: 60, w: 400, h: 500 };
+    const heads = windowHeads([log, test], [{ x: 68, y: 508, bottom: 564 }]);
+    const clear = dmPopupClear(init, [], [], new Map(), "dicex.popups");
+    const card = popupHeight(1, 2, POPUP_BIG);
+    const start = dmColumnTop(46);
+    const at = dmPopupAt(small, start, { w: W, h: 3 * card + 16 }, clear, [log, test], heads);
+    expect(at).toEqual({ left: 408, top: 154 });
+    const home = { left: Math.round((small.w - W) / 2), top: start };
+    expect(home.left).toBe(416);
+    expect(popupsThatFit([card, card, card], popupRoom(small.h, at, W, heads, home))).toBe(2);
+  });
 });
