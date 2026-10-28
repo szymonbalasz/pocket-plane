@@ -151,6 +151,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-144 | Replay exemption P2 moved @1280×800 memory: a tool-bar push puts Initiative at L4 280 × 248 though the brute oracle finds a PC-clear spot at useful size; check the spot-grid cap / gaps in the push ladder (sprint 14 F1 report) | S | play-shell placer push ladder | none | frame branches | open |
 | BL-145 | Replay exemption P3 fitted @1600×900 resize: Stats, put away at 1280×800, returns at 1440 into the Game log's full zone, so the log's squeeze can't end at 1600; the return path should honour protected zones like FR-SHELL-56 (5) (sprint 14 F1 report) | S | play-shell placer return path | none | frame branches | open |
 | BL-146 | Replay exemptions P1 / P2 / P3 moved @1600×900 resize (3 cells): with a moved camera protected windows load at token-avoiding spots; a resize down sends them to their zones and nothing brings them back on the way up. Pick: a zone round-trip memory for protected windows | M | play-shell placer + window memory | **DM design call** | frame branches | open |
+| BL-147 | CI flake: hovering a Game log row to open its tooltip (`e2e/support/log.ts:22`) fails now and then on CI (3× on `fix/s14-roll-guard`, in `dice-shapes` / dice-display and `dice-log`; each passed on re-run); the in-run retry then sees the first attempt's leftover entry (5 instead of 4). Make the hover wait for the row to settle, and make the retry tolerate its own earlier entry | S | `e2e/support/log.ts`, dice e2e specs | none | — | open |
 
 ## How to add items
 
