@@ -240,6 +240,14 @@ The kit's "Goblin" card as a window you can roll from. The window is new; every 
 
 > **Pick: one reused window** (FR-KIT-102) over one window per creature. It has a single size-table row and a single placement, and the kit shows one card. To compare two creatures, use the compendium.
 
+> **F3 note (2026-10-28, `fix/s14-kit`, sprint 14 fix pack, DM #366; BL-138, BL-139, BL-141 = K6c §3 gaps 1–10 and "also").** Every theme unless stated; Gilt & Stone paints in its `/* KIT: sprint 14 F3 … */` block (no geometry, ADR-0069).
+> - **Notice stack with no clear spot** (gap 1): the compact one-line summary, [FR-NOTE-79](../notifications.md#6-functional-requirements) (pick over docking under the top bar's right: that is Initiative's header).
+> - **Child rows** (gap 2; amends the K12 re-test note's "or on the next line"): an after-owner row is two lines at most: the name line keeps the owner dot and the Ally / Enemy chip (its icon, the word in its Tooltip; the name truncates first); the player's "After Mira" ends the bar line.
+> - **Log to-hit on a hit** (gap 3, amends FR-KIT-44): a `cbt.attack` to-hit that hit (not a crit) is the green box, as the damage card's (K12).
+> - **Wide sheet** (gaps 4, 6): list boxes' labels (Attacks, Spells, Features, Limited uses) are the Skills box's centred heading band; the Attack / Damage switches are in the header's Public rolls menu (BL-139, every tab); the wide Spells box: pip row, then one muted ability · attack · DC line, no "Spellcasting" label, no level heading for a single level. Death-save pips unchanged (ruling kept).
+> - **Compendium** (gap 8, gilt): names regular weight, the head a gold rule on the window surface (no band). **Section labels** (gaps 9, 10): Recap, Party Manager Loot and Roll requests headings carry `section-label` (gilt: Preferences' gold label type). **Menus** ("also"): the token menu is headed by the token's name; shortcut hints only where a shortcut exists (Duplicate's Ctrl+D already shows; no other token action has one).
+> - **Not changed (rulings):** gap 5 (attack property chips): the attack row holds no range or properties, so a chip needs a data-model field (follow-up); gap 7 (stat block 300 × 440): the size table is play-shell's shared file and §7.3's useful 300 × 360 sits above the suggested 320 (follow-up, shared change); damage card 440 vs 330: FR-KIT-66 keeps 440 (the kit's card has target chips and one multiplier row: a redesign, DM call).
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../../design/visual-direction.md): the kit page is binding for Gilt & Stone. Simple Dark uses shadcn tokens only (no new styling).

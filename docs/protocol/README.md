@@ -4139,3 +4139,25 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#69-party-status-creatures-shee
 - **Tests:** `character-sheet/print-sheet.test.tsx` (`FR-CHARX-114 K13 wide Main` ×4, `FR-CHARX-112 K13 …`, `FR-CHARX-115 K13 tab strip`, `FR-KIT-85 K13 level line`, `FR-KIT-85 K13 chips line`), `sheet-render.test.tsx` (header order / grid updated), `compendium/views.test.tsx` (`FR-KIT-76 K13 kit rows`), `play-shell/prefs.test.tsx` (`FR-KIT-13 K13 identity chip`, `FR-KIT-13 K13 status`), `dm/features/party-board/companion-menu.test.tsx`; bundle `kit-round3.fixtures.test.ts`; e2e `kit-round3.e2e.ts` (`kit-round3`); `kit-library.e2e.ts` row height 28–32.
 - **Fixtures:** bundle `kit-round3`; `kit-parity` + `kit-mira-spells` (data model §141).
 - **CON-44:** 0 B on the wire (bundle `kit-parity`: +315 B for the DM and Mira's owner from the fixture's spell row and slots).
+
+## 179. Sprint 14: kit nits, the compact summary (F3)
+
+From BL-138, BL-139, BL-141 (kit parity K6c §3) and the F2 walkthrough side finding (DM #366; dated notes in [notifications](../specs/notifications.md) FR-NOTE-79, [character-sheet](../specs/character-sheet.md) FR-CHAR-02, [character-sheet-full](../specs/character-sheet-full.md) FR-CHARX-114, [kit-parity](../specs/post-mvp/kit-parity.md) F3 note). Client only; no record, event or intent changes.
+
+| Part | Contract | FR |
+|---|---|---|
+| Compact summary (`notifications/ToastRuntime.tsx`, `toasts.ts` `FoldState.compact`, `keep-out.ts` `COMPACT_W` 200) | The fold's last step: the DM summary alone (no card, info, alert, turn card, callout) whose spot still covers window content or a modal dialog is drawn compact (one line, ≤ 40 px: icon · "N pending" / "N waiting" · Open · close; full text in its Tooltip and `aria-label`; no "+N more") and placed by `dmStackSpot` at 200 px. `note-toasts` and `note-toast-pending-summary` carry `data-compact`. Reset with the fold | FR-NOTE-79 |
+| Sheet name picker (`CharacterSheet.tsx`) | The shared Select: trigger `char-sheet-picker` (`data-value` = shown sheet id; over the name in `SheetName`, transparent), items `char-sheet-picker-option` + `data-value` (record id, `__new`) + `data-group` (`own` / `party` / `npc` / `new`), Party a `SelectLabel`. E2E helper `pickSheet` (`e2e/support/sheet.ts`) | FR-CHAR-02 |
+| Public rolls menu (`PublicMenu.tsx`) | Switches Initiative · Checks · Saves · Skills · **Attack** (`charx-public-attack`) · **Damage** (`charx-public-damage`); the Attacks box has none; the Actions tab uses the sheet's shared overrides | FR-CHARX-114 |
+| List box heading (`boxes.tsx` `Box` `list` + `label`) | The label is a centred band across the box (`data-slot="sheet-box-rule"`, the Skills box's), `aside` at its right end | FR-CHARX-114 |
+| Wide Spells box (`ActionsTab.tsx`, scope `main`) | Pip row, then one muted `charx-spellcasting` line; no "Spellcasting" label; no level heading while one level shows. The Actions tab unchanged | FR-CHARX-114 |
+| Game log to-hit (`shared/dice-roll-log/row.ts` `RowResult.hit`, `GameLog.tsx`) | A `cbt.attack` to-hit that hit (not a crit) has `hit: true`: the box gets `data-hit="true"` and the meaning green number | FR-KIT-44 |
+| Section labels | `data-slot="section-label"` on Recap's section `h3`, Party Manager Loot's `SectionTitle`, Roll requests' "New request" | FR-KIT-06 |
+| Token menu (`DmMap.tsx`) | `map-token-menu-label` (the token's name, `DropdownMenuLabel`) heads `map-token-menu` | FR-MAP-18 |
+| Initiative child rows (`combat-tracker/parts.tsx` `ChildNameLine`, `SideChip` `compact`) | The name line never wraps (name truncates, ≥ 3ch); the Ally / Enemy chip is its icon (`data-compact`, `aria-label`, word in the Tooltip); player: `cbt-init-row-after` ends the bar line (`flex-nowrap`) | FR-KIT-29 |
+| Creatures row actions (`combat-tracker/creature-form.tsx`), Players gems tail (`gems/GemCounts.tsx`), roll bar Select parts (`GameLog.tsx`) | `cbt-form-derive` / `cbt-form-edit` in Tooltips ("Derive", "Edit"); `camp-player-char-gems` without the "·"; `GameLog` uses the shared `SelectGroup` / `SelectLabel` | FR-KIT-84, FR-CAMP-43, FR-KIT-06 |
+| `gilt.css` block `/* KIT: sprint 14 F3 … */` | `data-hit` log box: green rule; compendium names and head weight 400, the head on the window surface (no band); `section-label` gold label type. No geometry | FR-THEME-13 |
+
+- **Tests:** `notifications/keep-out-compact.test.ts` (`FR-NOTE-79 …` ×5), `character-sheet/print-sheet.test.tsx` (`FR-CHARX-114 BL-139 …`, `FR-CHARX-114 BL-141 …`), `sheet-render.test.tsx` (`FR-CHARX-41 NPC sheet … BL-139`), `shared/dice-roll-log/row.test.ts` (`FR-KIT-44 BL-141 …`), `player/.../kit-groups.test.tsx` (`FR-KIT-29 BL-141 …`), `entities/pets-ui.test.tsx` (`FR-KIT-84 BL-138 …`), `gems/gems-ui.test.tsx` (`FR-CAMP-43 …`); e2e `s14-kit` (compact summary over the homebrew dialog, sheet picker + menu switches, token menu label), `h3-toasts` re-test 3 (the compact far slide), 21 specs on `pickSheet`.
+- **Fixtures:** bundle `s14-kit-e2e` (alias of `session-sim-13`); no unit.
+- **CON-44:** 0 B (no record or payload change).
