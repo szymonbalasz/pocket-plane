@@ -29,6 +29,7 @@ const menuItem =
 export function DropdownMenuContent({
   className,
   sideOffset = 4,
+  onPointerUpCapture,
   ...props
 }: React.ComponentProps<typeof DM.Content>) {
   return (
@@ -37,6 +38,14 @@ export function DropdownMenuContent({
         data-slot="dropdown-menu-content"
         sideOffset={sideOffset}
         className={cn(menuSurface, className)}
+        // Radix selects an item on any pointer release over it. A menu opened by right-click opens
+        // on the press on Linux / macOS (contextmenu fires on mousedown there), so the same
+        // button's release would pick whatever item landed under the cursor: never select on a
+        // right-button release (preventDefault skips Radix's own pointerup handler).
+        onPointerUpCapture={(e) => {
+          onPointerUpCapture?.(e);
+          if (e.button === 2) e.preventDefault();
+        }}
         {...props}
       />
     </DM.Portal>
