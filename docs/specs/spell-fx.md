@@ -198,7 +198,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md). No new
 
 - **Player disconnect / reconnect:** the snapshot carries active effects with `fx`; auras rebuild at their Still frame then animate. Cues sent while away are gone (FR-VFX-22).
 - **DM disconnect / reconnect:** same; players keep their auras.
-- **Hit cue size** *(2026-10-28, orchestrator ruling)*: ≤ 320 B per target frame (measured 307 B); see §12.
+- **Hit cue size** *(2026-10-28, orchestrator ruling)*: ≤ 480 B per target frame, worst case (typical ~307 B, worst measured 466 B); see §12.
 - **Server crash mid-action:** `vfx.cast` and `vfx.setEffectFx` are one transaction each: before commit → nothing; after → effect + `fx` on restart. A cue lost in a crash is never resent. Crash hooks `vfx.cast:before-commit`, `vfx.cast:after-commit`.
 - **Concurrent edits:** two Casts of the same row → one wins, the other gets `conflict` "already active". Cast while the DM ends the concentration → whichever commits last wins; clients follow records.
 - **Concentration ends any way** (End, failed save, incapacitating condition, duration, a new concentration, CBTX FR-CBTX-75) → the effect ends → the aura goes with it, mid-animation, within one frame of the record change.
@@ -212,7 +212,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md). No new
 ## 12. Performance & bandwidth
 
 - **Bandwidth:** `fx` ≤ 200 B per effect (≤ 300 effects per campaign cap → ≤ 60 KB worst, typically < 1 KB). Hit cue ≤ 200 B per target, human-paced. No per-frame traffic.
-  - *(2026-10-28, VFX core walkthrough, orchestrator ruling: no code change)* The hit cue budget is **≤ 320 B per target frame**, not 200 B: its three ids are 108 characters. Measured 307 B for the frame (244 B data) at walkthrough S3 (`.verify/20261028-vfxcore/`); human-paced, negligible. The unit test asserts ≤ 320 B on that frame shape (one typed part, sent by the DM). Measured worst case: 4 typed parts sent by a player (`from` carries a 36-character `playerId`) = 466 B, above the budget; left to the orchestrator.
+  - *(2026-10-28, VFX core walkthrough, orchestrator rulings: no code change)* The hit cue budget is **≤ 480 B per target frame** (worst case), not 200 B: its three ids are 108 characters. Typical ~307 B (measured at walkthrough S3, 244 B data, `.verify/20261028-vfxcore/`); worst case 466 B (4 typed parts sent by a player, whose `from` carries a 36-character `playerId`). Human-paced, negligible. The unit test asserts the worst case ≤ 480 B.
 - **CPU:** one FX clock and one requestAnimationFrame per client, paused when no aura or look is on screen and when the tab is hidden. Particles are pre-tinted sprites (`drawImage`), no per-particle gradients.
 - **Gate:** DM client at 1280×720, 30 tokens, both auras, one hit look every second: `vfx-over` `frameMs` median ≤ 4 ms on the walkthrough machine, no Konva layer warning (`stage.getLayers().length ≤ 4`).
 - **Snapshot:** CON-44 heavy harness gains `fx` on its 6 concentrations; DM frame stays under 768 KiB.

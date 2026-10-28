@@ -4172,7 +4172,7 @@ From [spell-fx](../specs/spell-fx.md) (VFX, in-review, DM direction #372) and [A
 | `multiplier` | `normal` \| `half` \| `none` \| `double` | Direct HP changes: `normal` |
 | `crit` | boolean | From the outcome line |
 
-- **Size:** ≤ 320 B per target frame (orchestrator ruling 2026-10-28; measured 307 B at the VFX core walkthrough; the worst case, 4 typed parts sent by a player, is 466 B: open, spell-fx §12).
+- **Size:** ≤ 480 B per target frame, worst case (orchestrator ruling 2026-10-28): typical ~307 B (measured at the VFX core walkthrough), worst 466 B (4 typed parts sent by a player).
 - **Source:** listener `spell-fx.hit-cues` on `AttackApplied` / `HpApplied` (after commit; writes nothing, ADR-0035). No cue for a miss (`hit: false`), for `raw` 0 and `applied` 0 unless `multiplier: none` (the glance), for `CombatEntryUndone`, or for sheet HP outside combat.
 - **Routing (per connection, hub `sendServerSignal`):** every **live** connection of the campaign, the origin included. DM: always. Player: only if the token record's own rule gives them the target token now (`hidden`, fog per FR-FOG-11, the scene gate) **and** they receive that apply's outcome line (`game-log-entry`; a DM-only line, the BL-135 roll guard's included, → no cue); `attackerTokenId` stripped unless they also receive the attacker's token. A connection mid-snapshot, offline or reconnecting gets nothing; never queued or replayed (FR-VFX-22).
 - **Hub API** (`src/server/ws/hub.ts`): `sendServerSignal(campaignId, name, from, payloadFor(viewer) → payload | null)` sends a registered server signal (`registerServer`), zod-parsed per receiver (a bad payload → logged, that receiver skipped). The intent-result path (OQ-FOG-58, players only) is unchanged.

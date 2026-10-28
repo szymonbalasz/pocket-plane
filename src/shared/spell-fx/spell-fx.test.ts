@@ -186,8 +186,9 @@ describe("hit looks (FR-VFX-18–21)", () => {
     expect(HitCueSchema.safeParse(noAttacker).success).toBe(true);
   });
 
-  test("VFX §12 hit cue frame ≤ 320 B per target (orchestrator ruling 2026-10-28; walkthrough S3 measured 307 B)", () => {
-    // S3's shape: the DM applies one typed part; three UUID-length ids (108 chars), max values.
+  test("VFX §12 hit cue frame ≤ 480 B per target, worst case (orchestrator ruling 2026-10-28; typical ~307 B)", () => {
+    // Worst case: three UUID-length ids, four typed parts at max values, sent by a player (`from`
+    // carries a UUID-length playerId). Measured 466 B.
     const id = "0d2c1e7a-5b3f-4c2e-9a1d-7e6f5a4b3c2d";
     const frame: ServerSignalFrame = {
       type: "signal",
@@ -196,13 +197,19 @@ describe("hit looks (FR-VFX-18–21)", () => {
         id,
         targetTokenId: id,
         attackerTokenId: id,
-        parts: [{ type: "bludgeoning", value: 999 }],
+        parts: [
+          { type: "bludgeoning", value: 999 },
+          { type: "lightning", value: 999 },
+          { type: "necrotic", value: 999 },
+          { type: "piercing", value: 999 },
+        ],
         multiplier: "double",
         crit: true,
       }),
-      from: { role: "dm" },
+      from: { role: "player", playerId: id },
     };
-    expect(new TextEncoder().encode(JSON.stringify(frame)).length).toBeLessThanOrEqual(320);
+    expect(HitCueSchema.parse(frame.data)).toEqual(frame.data as HitCue);
+    expect(new TextEncoder().encode(JSON.stringify(frame)).length).toBeLessThanOrEqual(480);
   });
 });
 
