@@ -781,9 +781,10 @@ export function RollPopupStack({
     const el = stack.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    // BL-132: the DM column stops above the next window head it would cross.
+    // BL-132: a DM column moved off its home stops at the next window head it would cross.
+    const home = { left: Math.round((vp.w - g.w) / 2), top: start };
     const room = dm
-      ? popupRoom(vp.h, { left: r.left, top: r.top }, r.width, heads)
+      ? popupRoom(vp.h, { left: r.left, top: r.top }, r.width, heads, home)
       : r.bottom - TOP_BAR_H - EDGE_GAP;
     const open = popups.filter((p) => p.state !== "closing");
     const heights = open.map((p) => layoutOf(p, g).h).reverse();

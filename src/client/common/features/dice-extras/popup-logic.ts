@@ -410,19 +410,22 @@ export function dmPopupAt(
 
 /**
  * FR-DICEX-47 short screens + BL-132 (sim-16 d01: three quick player rolls stacked 448-wide
- * popups over the Game log's title bar): the DM column's room below its top `at`, px: to the
- * viewport's bottom, and no further than the top of the first window head below the top that the
- * column's width crosses (the column may end on its edge, never over it; the oldest popups drop,
- * the newest always shows). Pure.
+ * popups from 104, 354 over the Game log's title bar): the DM column's room below its top `at`,
+ * px: to the viewport's bottom; a column moved off its `home` (shifted or dropped by what it keeps
+ * clear of) also stops at the top of the first window head below it that its width crosses (it
+ * may end on the head's edge, never over it; the oldest popups drop, the newest always shows). At
+ * home #347's counts stand (the cards overhang the toast region's keep-out box, FR-DICEX-47). Pure.
  */
 export function popupRoom(
   vpH: number,
   at: { left: number; top: number },
   w: number,
   heads: readonly Rect[],
+  home: { left: number; top: number },
 ): number {
   let bottom = vpH - EDGE_GAP;
-  for (const h of heads) {
+  const atHome = Math.abs(at.left - home.left) <= 1 && Math.abs(at.top - home.top) <= 1;
+  for (const h of atHome ? [] : heads) {
     if (h.y < at.top || h.x >= at.left + w || h.x + h.w <= at.left) continue;
     bottom = Math.min(bottom, h.y);
   }

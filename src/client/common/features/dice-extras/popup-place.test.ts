@@ -32,6 +32,8 @@ const column = (at: { left: number; top: number }, h: number): Rect => ({
 });
 
 const LOG = { x: 68, y: 608, w: 1150, h: 280 };
+/** The DM column's home at 1440 with no toast (centred, below the home row). */
+const HOME = { left: 496, top: 100 };
 /** The Game log's first entry row ends 62 px under its top. */
 const LOG_ROW = { x: 68, y: 608, bottom: 670 };
 
@@ -60,7 +62,7 @@ describe("BL-132 the DM's roll popups keep off window heads where a clear spot i
     const at = dmPopupAt(vp, start, { w: W, h: CARD_H }, [], windows, heads);
     expect(at).toEqual({ left: 496, top: pm.y + pm.h + 12 });
     for (const w of windows) expect(hit(column(at, CARD_H), w)).toBe(false);
-    expect(popupRoom(vp.h, at, W, heads)).toBeGreaterThanOrEqual(CARD_H);
+    expect(popupRoom(vp.h, at, W, heads, HOME)).toBeGreaterThanOrEqual(CARD_H);
   });
 
   test("FR-DICEX-47 BL-132 d01 (3 quick player rolls, toast stack 560, 300 × 246, Party Manager at 424, 60): only the newest popup shows, at 104, 354 above the Game log's head; before: 3 popups down over it", () => {
@@ -81,7 +83,7 @@ describe("BL-132 the DM's roll popups keep off window heads where a clear spot i
     // at the log's head: the newest card only (the oldest drop, FR-DICEX-47).
     const at3 = dmPopupAt(vp, start, { w: W, h: three }, clear, windows, heads);
     expect(at3).toEqual(before);
-    const room = popupRoom(vp.h, at3, W, heads);
+    const room = popupRoom(vp.h, at3, W, heads, { left: 496, top: start });
     expect(room).toBe(608 - 354);
     expect(popupsThatFit([CARD_H, CARD_H, CARD_H], room)).toBe(1);
     // With one card: off every head (it may sit over Party Manager's empty body).
@@ -99,6 +101,19 @@ describe("BL-132 the DM's roll popups keep off window heads where a clear spot i
     const at = dmPopupAt(vp, dmColumnTop(0), { w: W, h: three }, clear, [LOG], heads);
     expect(at).toEqual(dmStackAt(vp, dmColumnTop(0), { w: W, h: three }, clear));
     expect(at).toEqual({ left: 496, top: 100 });
-    expect(popupsThatFit([CARD_H, CARD_H, CARD_H], popupRoom(vp.h, at, W, heads))).toBe(3);
+    expect(popupsThatFit([CARD_H, CARD_H, CARD_H], popupRoom(vp.h, at, W, heads, HOME))).toBe(3);
+  });
+
+  test("FR-DICEX-47 BL-132 at home #347's counts stand: 1280×720 with a toast up, two 206-px cards at 416, 154 though the second reaches the Game log's head (508); moved off home, it stops there", () => {
+    const small = { w: 1280, h: 720 };
+    const log = { x: 68, y: 508, w: 690, h: 200 };
+    const heads = windowHeads([log], [{ x: 68, y: 508, bottom: 564 }]);
+    const home = { left: 416, top: dmColumnTop(46) };
+    expect(home.top).toBe(154);
+    const card = popupHeight(1, 2, POPUP_BIG);
+    expect(card).toBe(206);
+    expect(popupsThatFit([card, card, card], popupRoom(small.h, home, W, heads, home))).toBe(2);
+    const moved = { left: 100, top: 154 };
+    expect(popupsThatFit([card, card, card], popupRoom(small.h, moved, W, heads, home))).toBe(1);
   });
 });
