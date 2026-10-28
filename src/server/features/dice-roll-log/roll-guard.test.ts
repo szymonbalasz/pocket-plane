@@ -1,4 +1,4 @@
-// FR-DICE-13 roll guard (sprint 14 F4, BL-135, DM #367), in-process on combat's ambush: a DM roll
+// FR-DICE-13 roll guard (sprint 14 F4, BL-135, DM #367 / #371), in-process on combat's ambush: a DM roll
 // made as a hidden or renamed monster creature is DM-only on every roll path, whatever the public
 // switch or the category preset; the unchanged public case, characters and players' own rolls
 // keep FR-DICE-13. Each case checks the stamp and every player's snapshot.
@@ -7,7 +7,7 @@ import { CBT_INTENTS } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
 import { MAP_INTENTS } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
-import { combatant, gameLogEntry, scene } from "../../db/schema";
+import { combatant, gameLogEntry, scene, token } from "../../db/schema";
 import type { Viewer } from "../../ws/records";
 import { cbtxSetup } from "../combat-extras/testing";
 import { createEntity } from "../entities/commands";
@@ -118,7 +118,7 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     t.check(t.roll({ tokenId: t.tokens.goblin2 }), true);
   });
 
-  test("FR-DICE-13 hidden creature: a token not on the players' scene is DM-only", () => {
+  test("FR-DICE-13 #371 off the shown scene: a definition roll whose instances sit only on an unshown scene stays public; a hidden or fogged instance on the shown scene makes it DM-only", () => {
     const t = setup();
     const prep = t.run<{ id: string }>(createScene.name, {
       name: "Crypt",
@@ -129,16 +129,57 @@ describe("FR-DICE-13 roll guard (#367)", () => {
       name: "Ghoul",
       statBlock: goblinBlock,
     }).id;
+    const place = (sceneId: string, hidden = false) =>
+      t.run<{ tokenId: string }>(MAP_INTENTS.placeToken, {
+        sceneId,
+        definitionId: ghoulDef,
+        col: 3,
+        row: 3,
+        hidden,
+      }).tokenId;
     // No instance: a definition roll follows the preset (dice-roll-log rolls-1).
     t.check(t.roll({ entityId: ghoulDef }), true);
-    const ghoul = t.run<{ tokenId: string }>(MAP_INTENTS.placeToken, {
-      sceneId: prep,
-      definitionId: ghoulDef,
-      col: 2,
-      row: 2,
-    }).tokenId;
-    t.check(t.roll({ tokenId: ghoul }), false);
+    // Only on the unshown Crypt, shown or hidden there: ignored for hiding (#371), still public.
+    const crypt = place(prep);
+    place(prep, true);
+    t.check(t.roll({ entityId: ghoulDef }), true);
+    t.check(t.roll({ tokenId: crypt }), true);
+    // On the shown scene and hidden → DM-only, a public switch too.
+    const shown = place(t.sceneId, true);
     t.check(t.roll({ entityId: ghoulDef }, { public: true }), false);
+    t.check(t.roll({ tokenId: shown }, { public: true }), false);
+    // Shown but fogged for Player 2 only (seen by Player 1, FR-FOG-11) → DM-only.
+    t.hide(shown, false);
+    t.s.db
+      .update(token)
+      .set({ seenBy: [t.h.p1.id] })
+      .where(eq(token.id, shown))
+      .run();
+    t.check(t.roll({ entityId: ghoulDef }), false);
+    t.check(t.roll({ tokenId: shown }), false);
+    // Seen by both players → public again.
+    t.s.db
+      .update(token)
+      .set({ seenBy: [t.h.p1.id, t.h.p2.id] })
+      .where(eq(token.id, shown))
+      .run();
+    t.check(t.roll({ entityId: ghoulDef }), true);
+    t.check(t.roll({ tokenId: shown }), true);
+  });
+
+  test("FR-DICE-13 #371 no shown scene: the Goblin definition's off-scene tokens don't hide its roll; a hidden combatant still does", () => {
+    const t = cbtxSetup();
+    t.run(SET_CATEGORY_PUBLIC, { category: "attack", public: true });
+    expect(t.s.db.select().from(scene).where(eq(scene.id, t.sceneId)).get()?.active).toBe(false);
+    const roll = (actor: unknown) =>
+      t.run<{ entryId: string }>(ROLL, { expression: "1d20+4", category: "attack", actor }).entryId;
+    const stamp = (id: string) =>
+      t.s.db.select().from(gameLogEntry).where(eq(gameLogEntry.id, id)).get()?.public;
+    expect(stamp(roll({ entityId: t.h.goblinId }))).toBe(true);
+    expect(stamp(roll({ tokenId: t.tokens.goblin }))).toBe(true);
+    // The Wolf's token is hidden off the shown scene (ignored); its combatant is hidden (counts).
+    expect(stamp(roll({ tokenId: t.tokens.wolf }))).toBe(true);
+    expect(stamp(roll({ entityId: t.h.wolfId }))).toBe(false);
   });
 
   test("FR-DICE-13 renamed creature: token, combatant and definition roll are DM-only", () => {

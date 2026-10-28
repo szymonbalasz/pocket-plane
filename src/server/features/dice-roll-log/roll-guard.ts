@@ -1,4 +1,4 @@
-// FR-DICE-13 roll guard (sprint 14 F4, BL-135, DM #367): a DM roll made as a **monster creature**
+// FR-DICE-13 roll guard (sprint 14 F4, BL-135, DM #367 / #371): a DM roll made as a **monster creature**
 // that is hidden from players, or whose name isn't its definition's (renamed), is DM-only,
 // whatever the `public` override, the category preset or a request's public audience says.
 // `gameLog.append` asks it for every DM entry it would stamp public, so every roll path (dice.roll,
@@ -12,8 +12,9 @@
 //   the campaign's tokens of it carrying that name; else, for a definition roll (the stat block,
 //   the NPC sheet), **every** instance: it may be made for any of them (K7 walkthrough F1).
 //
-// Hidden = the existing visibility rules: a combatant per `combatantVisibility`; a token not on
-// the players' active scene, or hidden for any player (`tokenHiddenFor`: `hidden` or fog).
+// Hidden (#371) = the existing visibility rules on the players' shown scene: a combatant per
+// `combatantVisibility`; a token on the active scene hidden for any player (`tokenHiddenFor`:
+// `hidden` or fog). A token on a scene players aren't shown never hides a roll (rolls-1).
 // Renamed = the name minus a numbering suffix (FR-MAP-16, "Goblin 2") isn't the definition's
 // name; a player-owned companion is never renamed (its owner named it, players know it).
 
@@ -66,7 +67,8 @@ function activeScene(s: Scope): string | null {
 function tokenGuarded(s: Scope, t: TokenRow, defName: string | null): boolean {
   if (t.characterId !== null) return false;
   if (defName !== null && t.ownerPlayerId === null && !numberedFrom(t.name, defName)) return true;
-  if (t.sceneId !== activeScene(s)) return true;
+  // #371: off the shown scene, a token is ignored for hiding (only its name counts).
+  if (t.sceneId !== activeScene(s)) return false;
   const rec = toTokenRecord(t);
   return playersOf(s).some((pid) => tokenHiddenFor(rec, pid, s.cid));
 }

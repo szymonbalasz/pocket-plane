@@ -1,4 +1,4 @@
-// FR-DICE-13 roll guard (sprint 14 F4, BL-135, DM #367) over real sockets on `kit-parity`, with
+// FR-DICE-13 roll guard (sprint 14 F4, BL-135, DM #367 / #371) over real sockets on `kit-parity`, with
 // the attack / damage / save presets public and the ambush scene shown: every roll path's DM roll
 // as a hidden, renamed, or hidden and renamed monster reaches no player (live frames, then a
 // reconnect snapshot); the unchanged public case reaches both.
