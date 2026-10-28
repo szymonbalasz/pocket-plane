@@ -2763,7 +2763,7 @@ From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 / -41 (DM [#375](../
 | `aoe-template` record (DM, players) | + `footprint?` 1–4, omitted when null | Not redacted (geometry, like `x`, `y`) |
 
 - **Stored rows:** existing ones get `footprint` null and keep their origin and their squares (exact rule). New snapped origins are cell centres (`c.5`), a big token's centre or (cube) a vertex: all valid under FR-SCN-20's ≤ 2 decimals.
-- **Derived (never stored):** with `footprint`, the squares within its radius by grid distance (5/10/5) of the origin block, the block included (`reachCells`); fog's `fogged` / `seenBy` are derived over those (uncut).
+- **Derived (never stored):** with `footprint`, the squares within its radius by grid distance of the origin block, the block included (`reachCells`), under the campaign's diagonal rule (`map-settings`, FR-SCN-30; #377 ruling); fog's `fogged` / `seenBy` are derived over those (uncut) and re-derived when the rule changes (`scn.setDiagonalRule`, same transaction).
 - **Client only (never stored or sent):** the shown scene's token footprints for the snap (`useAoe.tokens`, written by `TemplatesLayer`), the highlighted origin cells while a press is held (`useAoe.originCell`), the last placement's raw press point (a panel shape change re-snaps from it).
 - **Fixtures:** none new: the e2e uses `map-tools`' Crypt Ogre (Large, (4, 10), `mt-crowd`); `session-sim-13` gets a comment line only.
 - **CON-44 (measured):** +14 B per snapped sphere / cylinder row; heavy DM 697,592 B, players ≤ 266,941 B (protocol §182).
