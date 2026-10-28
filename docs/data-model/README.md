@@ -2737,3 +2737,18 @@ From [spell-fx §8](../specs/spell-fx.md#8-data-model) and [ADR-0071](../archite
 - **Derived (pure, `@shared/spell-fx`):** `suggestPreset(name)` (FR-VFX-04), `hitLooks(cue)` (FR-VFX-19, -20), `emanationCells(footprint, radiusFt, map)` (FR-VFX-24: FR-MAP-22 distance from the nearest footprint cell ≤ radius; footprint and off-map cells excluded).
 - **Persisted runtime state:** only `effect.fx`.
 - **Fixtures:** units `vfx-fight` (Goblin Ambush live; "Spell FX" round 1: Mira 15, Goblin Sneak 12, Thorn 10, each bound to their token; Mira's turn), `sg-row` (Mira a WIS caster + the Spirit Guardians row, radiant), `moil-row` (Thorn a CHA caster + the Shadow of Moil row), `fire-card` (Mira's Fire Bolt row + her pending card, 7 fire, as `player-1`); bundle `spell-fx` = `map-tools` + those four. Not in `session-sim-13` (sheet edits, its own fight).
+
+## 143. Spell FX build: client preference `pp.vfx`, visual-kit auras (VFX build)
+
+From [spell-fx §8](../specs/spell-fx.md#8-data-model). **Built by `build/vfx`.** No new table, column or record type; no wire change. Client side: [protocol §181](../protocol/README.md#181-spell-fx-build-auras-hit-looks-cast-preferences-layers-cells-vfx-build).
+
+| Entity | Field | Type | Default | Visibility | Source |
+|---|---|---|---|---|---|
+| Client prefs | `localStorage` `pp.vfx` | `{level: full \| reduced \| still \| off}` (zod `VfxPrefs`); unreadable → default, blocked storage → memory for the page | Still under `prefers-reduced-motion: reduce`, else Full | This browser only, never sent | FR-VFX-25 |
+| Page memory | lowered tier | `reduced` \| `still` \| null (FR-VFX-27 slow frames) | null | This page only | FR-VFX-27 |
+| Page memory | cells shown | `<effectId>:<tokenId>` set; cleared when the aura ends or the scene changes | empty | This viewer only | FR-VFX-23 |
+
+- **Derived (pure, client `@ui/features/spell-fx`):** `aurasOf(store, tokens, view)` (FR-VFX-11, -12, -17: an aura per active `fx` effect × target token on the shown scene; hidden tokens DM only; cover `eyes` for players who don't own the token, else `half`), `turnStrikes` (FR-VFX-15: the other side's token inside `radius + half its side`), `hitLooks(cue)` played by the engine (FR-VFX-19).
+- **Compendium:** `cmp.addToSheet` fills a spell row's `fx` with `suggestPreset(name)`'s defaults (FR-VFX-04); other rows unchanged.
+- **Fixtures:** unit `vfx-visual-auras` (the DM sets Spirit Guardians on Mira's "Bless" concentration and Shadow of Moil on Thorn's "Marked", existing `cbtx-effects` rows); bundle `visual-kit` gains it. Not in `session-sim-13` (edits existing effects).
+- **CON-44:** no snapshot growth beyond §142 (the build adds no record or field; `visual-kit` carries two `fx` values, ≤ 124 B each).
