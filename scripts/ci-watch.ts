@@ -73,7 +73,9 @@ async function main() {
       gh<Run[]>(["run", "list", "--commit", sha, "--json", fields, "--limit", "50"]),
     );
     if (runs.length === 0 && Date.now() - t0 > APPEAR_MS) {
-      console.log(`ci:watch ${short}: no CI run appeared in ${APPEAR_MS / 60_000} min (pushed?)`);
+      console.log(
+        `ci:watch ${short}: no CI run appeared in ${APPEAR_MS / 60_000} min (not pushed, or a docs-only push: CI skips those)`,
+      );
       process.exit(2);
     }
     if (runs.length > 0 && runs.every((r) => r.status === "completed")) break;
