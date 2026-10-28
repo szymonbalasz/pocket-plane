@@ -152,7 +152,13 @@ function combatResults(entry: EntryLike): RowResult[] | null {
     const out: RowResult[] = [];
     if (p.toHit) {
       const outcome = !p.hit ? "fumble" : p.crit ? "crit" : "plain";
-      const box = { key: "hit", rollId: null, label: "To hit", total: p.toHit.total, outcome };
+      const box: RowResult = {
+        key: "hit",
+        rollId: null,
+        label: "To hit",
+        total: p.toHit.total,
+        outcome,
+      };
       out.push(p.hit && !p.crit ? { ...box, hit: true } : box);
     }
     // FR-CBT-88: an Apply hit line has no damage yet.
