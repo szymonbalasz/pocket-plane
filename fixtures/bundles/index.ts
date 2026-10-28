@@ -138,6 +138,7 @@ import tplMenu from "./tpl-menu";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
+import visualKit from "./visual-kit";
 import wfFrame from "./wf-frame";
 import wfFrameE2e from "./wf-frame-e2e";
 import windowsS5 from "./windows-s5";
@@ -341,4 +342,6 @@ export const bundles: readonly Bundle[] = [
   kitRound3Combat,
   // Sprint 14 F2 (fix/s14-toasts): toasts / popups / notifications e2e alias of session-sim-13
   s14ToastsE2e,
+  // Test infra (fix/test-infra, #368): screenshot baselines (e2e `visual`)
+  visualKit,
 ];

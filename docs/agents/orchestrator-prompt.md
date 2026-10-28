@@ -106,9 +106,9 @@ Read: AGENTS.md (build conventions), docs/specs/<feature>.md (status: complete),
 docs/protocol/README.md, ADR-0016, ADR-0017, and: <relevant ADRs>.
 Rules: tier-S scope only. Every capability is a server command (validated intent → mutate + append to event log
 in one transaction → dispatch domain event → broadcast through the visibility filter). zod at every boundary. No feature logic in clients.
-Work in thin vertical slices. For each slice: write/extend fixtures (command scripts) → server + tests → UI → `bun test` green.
+Work in thin vertical slices. For each slice: write/extend fixtures (command scripts) → server + tests → UI → targeted `bun run check` green → commit → push → `bun run ci:watch` in the background (AGENTS §9.4.1). Never run check:all / check:full / the full e2e locally; CI runs them.
 When a slice is ready for verification, STOP and report "ready for walkthrough: <which>". Don't run long browser sessions yourself.
-Done = all FR-<PREFIX> covered, bun test + typecheck + lint green, thin Playwright E2E green, walkthrough passed,
+Done = all FR-<PREFIX> covered, targeted check + its own e2e spec green, no red CI on the branch, walkthrough passed,
 fixtures added, spec §13 satisfied. Commit per slice.
 Report (≤20 lines): slices done, test status, open issues, questions with suggested picks.
 ```
@@ -192,7 +192,7 @@ We don't spec everything up front. **Each build phase's specs are written, revie
 - For each feature: a `build/<feature>` worktree with `build-<feature>`, plus `test-<feature>` started on request.
   - The loop: build slice → test agent walkthrough → builder fixes → repeat.
 - Merge order follows the [dependency graph](../roadmap.md#dependencies). After each merge, tell the active builders to rebase.
-- Never merge red tests. If two builders need the same shared file (schema, event types, protocol), sequence them, or have one agent make the shared change first on its own branch.
+- Never merge a branch whose CI is already red; don't wait for a running CI either (AGENTS §9.4.1, #368). After each merge push `main` and run `ci:watch` on it in the background; a red `main` is fixed first. If two builders need the same shared file (schema, event types, protocol), sequence them, or have one agent make the shared change first on its own branch.
 - While a phase builds, write the next phase's specs.
 - **Gate (per phase):** demo script for me.
 

@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
-# usage: gates.sh <dir> <tag>  - check:full (check + slow set) + full e2e in <dir>, logs to %TEMP%/pocket-plane/{check,e2e}-<tag>.log, prints a summary
-d=$1; t=$2; L=$TEMP/pocket-plane
+# usage: gates.sh <dir> <tag>  - CI gate (AGENTS §9.4.1, #368): push <dir>'s branch, wait for GitHub CI on its HEAD
+# (bun run ci:watch), log to %TEMP%/pocket-plane/ci-<tag>.log, print the verdict, write gates-<tag>.done.
+# Nothing heavy runs locally. Run it in the background; waitgates.sh <tag> waits for the marker.
+d=$1; t=$2; L=$TEMP/pocket-plane; mkdir -p $L
 rm -f $L/gates-$t.done
-(cd "$d" && bun run check:full > $L/check-$t.log 2>&1); c=$?
-(cd "$d" && bun run e2e > $L/e2e-$t.log 2>&1); e=$?
-echo "$t check=$c e2e=$e"
-grep -E "^ tests: |^check(:full)?: " $L/check-$t.log | tail -2
-grep -E "^  \(fail\) |^  FAIL " $L/check-$t.log | head -5
-grep -E "^  total: " $L/e2e-$t.log
-grep -E "^  FAIL |^         [0-9]+\) " $L/e2e-$t.log | head -8
+(cd "$d" && git push -q origin HEAD 2>&1 && bun run ci:watch) > $L/ci-$t.log 2>&1; c=$?
+echo "$t ci=$c"
+grep -E "^ci:watch|^  |^    |^      " $L/ci-$t.log | head -30
 touch $L/gates-$t.done
 true

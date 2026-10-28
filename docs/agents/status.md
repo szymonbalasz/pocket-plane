@@ -2,11 +2,15 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 fix pack** ([sprint-14](sprint-14.md), DM #366): **F1** `fix/s14-frame` ∥ **F2** `fix/s14-toasts` building; then F3 kit nits; then the test tooling separately. BL-135 waits for a DM rule. One heavy run at a time (#354).
+**Phase:** **Sprint 14 PAUSED by the DM (2026-10-28); test tooling DONE (#368, `fix/test-infra` merged).** No agents running. Sprint 13 done (kit parity #365). Decisions up to #369.
 
-**Resume (in order, one heavy run at a time, #354):** (1) `gates.sh` on `build-theme-switch` (merge main first: protocol §166 collides with X1's, run `resolve_docs.py` + `fixlinks.py`) → merge T1. (2) Restart a T2 builder in `build-theme-gilt` (brief `.verify/sprint12/briefs/build-th2.md` + `t2-resume.md`): merge main, its e2e, report ready. (3) T2 walkthrough (D1–D4, P1–P2, PS1–PS6 under Gilt & Stone; template to write from `tpl-test-th1.md`) → gates → merge. (4) session-sim-16 in `gates-main`, "Playtest: sprint 12", recap: default theme (OQ-THEME-03), the test-strategy proposal (#354). Briefs + `slices.json` backed up in `.verify/sprint12/` (copy back to `%TEMP%/pocket-plane/` if Storage Sense cleared it). Worktrees on disk: `build-theme-switch` (slot 0), `build-theme-gilt` (slot 2), `gates-main` (slot 5, detached at adc8b0dd); all `.env` have `PP_TEST_SHARDS=3`.
+**Resume (in order):**
+1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
+2. **Resume sprint 14 on the new loop** ([sprint-14](sprint-14.md)): parked branches with a `.verify/resume.md` each: **F1** `fix/s14-frame` (worktree fix-s14-frame, slot 0; BL-129, BL-134, BL-136, BL-133 committed, not yet walkthrough-tested) and **F2** `fix/s14-toasts` (worktree fix-s14-toasts; BL-130, BL-132, BL-137, BL-131 committed, not yet walkthrough-tested). Merge main into each (both predate the CI loop: tell the builder AGENTS §9.4.1 replaces the brief's `check:full` / gates steps), targeted `check` + the slice's own e2e specs, push + `ci:watch` in the background, walkthrough, merge (no wait for CI). Then **F4** `fix/s14-roll-guard` (BL-135, DM #367), then **F3** kit nits (BL-138, BL-139, BL-141).
+3. Briefs / slice definitions: `%TEMP%/pocket-plane/slices.json` keys `f14a`, `f14b` (backup with the two briefs in `.verify/sprint14/`); walkthrough templates `%TEMP%/pocket-plane/briefs/tpl-test-*.md`.
 
-**Gates on `main`:** detached worktree (`git worktree add --detach ~/.herdr/worktrees/pocket-plane/gates-main main`, `bun install`, `bun run env:init`, `gates.sh <it> <tag>` = check:full + e2e on 4 workers, ~12 min). Removed at the end of sprint 11. Skip when `main`'s code equals the tested branch (#345).
+
+**Gates on `main`:** GitHub CI (#368). After each merge: push `main`, `bun run ci:watch` in the background; red `main` is fixed first. The local `gates-main` worktree is no longer needed (remove it at the next cleanup).
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -38,7 +42,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
-**Resource rule (#354):** one heavy run at a time (gates / `check:full` / e2e / walkthrough server); `PP_TEST_SHARDS=3` in every worktree `.env` (gates-main too).
+**Resource rule (#354, #368):** heavy test runs happen in CI only; locally targeted `check` / single specs. One heavy local job at a time still holds for walkthrough servers and session-sims; `PP_TEST_SHARDS=3` in every worktree `.env`.
 
 ## Shared-file locks
 
@@ -86,7 +90,6 @@ Sprint 10:
 
 ## Pending DM decisions
 
-- BL-135: the server rule for which definition / hidden-creature rolls may be public (bring with a pick).
 
 - **Next after sprint 12 (DM #354): a new test strategy** before feature work: the loop is too slow / heavy. Bring a proposal at the recap.
 

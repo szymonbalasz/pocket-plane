@@ -155,14 +155,31 @@ test("FR-CBTX-46 FR-CBT-78 FR-NOTE-27 FR-CBT-79 FR-NOTE-30 chips fit; temp HP pr
       timeout: 6000,
     })
     .toBe(0);
-  // The player rolls; the Pending row goes.
+  // The player rolls; the Pending row goes. BL-140: with physical dice (manual 8 + CON 4 = 12 vs
+  // DC 10, as combat-extras.e2e.ts) the save is kept every run: the server's real dice once lost
+  // it, ending Bless, which later tests here need ('+N' below counts on her concentration chip).
+  const plog = await openWindow(player, "dice.log");
+  const options = plog.getByTestId("dice-roll-options");
+  if ((await options.getAttribute("data-state")) !== "open") await options.click();
+  await plog.getByTestId("dice-roll-physical").click();
+  await expect(plog.getByTestId("dice-roll-physical")).toHaveAttribute("data-state", "checked");
   await ptoast.getByTestId("note-toast-action").click();
   await player.getByTestId("cbtx-note-roll").click();
+  await expect(player.getByTestId("dice-manual-label")).toHaveText(
+    "Mira — Concentration save (DC 10)",
+  );
+  await player.getByTestId("dice-manual-total").fill("8");
+  await player.getByTestId("dice-manual-submit").click();
   await expect(pending).toHaveCount(0);
+  await expect(
+    row(init, mira).locator('[data-testid="cbtx-init-row-effect"][data-value="concentration"]'),
+  ).toHaveCount(1);
   // Handled: it leaves the DM's bell (FR-NOTE-24 / -27).
   await expect
     .poll(async () => ((await bell.count()) > 0 ? Number(await bell.textContent()) : 0))
     .toBe(bellWith - 1);
+  // Physical dice off again for the later tests on this server.
+  await plog.getByTestId("dice-log-physical-off").click();
 
   await player.context().close();
   await dm.context().close();

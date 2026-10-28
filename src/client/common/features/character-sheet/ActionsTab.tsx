@@ -33,7 +33,7 @@ import {
 } from "./fields";
 import { LimitedUsesBox } from "./MoreTabs";
 import { type PublicOverrides, PublicSwitch, usePublicOverrides, useSheetOverrides } from "./rolls";
-import { AddRow, RowTools, useRows } from "./rows";
+import { AddRow, RowTools, useRowPut } from "./rows";
 import {
   notationContext,
   SheetContext,
@@ -377,12 +377,7 @@ function AttackLine({ a }: { a: Attack }) {
 
 /** FR-CHARX-56: a row's whole-row put (`char.putRow` with its id); unset keys dropped. */
 export function useAttackPut(a: Attack): PutAttack {
-  const rows = useRows("attacks");
-  return (patch) => {
-    const next: Record<string, unknown> = { ...a, ...patch };
-    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
-    return rows.put(next);
-  };
+  return useRowPut("attacks", a);
 }
 
 /**
@@ -717,14 +712,10 @@ const marks = (s: SpellRow) =>
     .join(" ");
 
 function SpellEditor({ s, index, count }: { s: SpellRow; index: number; count: number }) {
-  const rows = useRows("spells");
-  const put = (patch: Partial<SpellRow>) => {
-    const next: Record<string, unknown> = { ...s, ...patch };
-    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+  const put = useRowPut("spells", s, (next) => {
     if (next.roll !== "save") delete next.saveAbility;
     if (next.roll === "attack") next.effect = "damage";
-    return rows.put(next);
-  };
+  });
   const flag = (k: "prepared" | "concentration" | "ritual", label: string) => (
     <SelectField
       path={`spells.${s.id}.${k}`}
