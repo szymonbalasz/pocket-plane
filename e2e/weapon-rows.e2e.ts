@@ -6,6 +6,7 @@
 // manual counts, mods, leak scan, creature form: bun test (character-sheet, combat-tracker).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -33,7 +34,7 @@ test("FR-CHARX-56 FR-CHARX-55 FR-CHARX-57 Flame Tongue on Pip: edit, view, damag
 
   // Player 1: Pip (no attacks) → Actions → Edit → add an attack row.
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-pip", "entity"));
+  await pickSheet(sheet, recordId("char-pip", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   await sheet.getByTestId("charx-edit-toggle").click();
   await sheet.locator('[data-testid="charx-row-add"][data-value="attacks"]').click();

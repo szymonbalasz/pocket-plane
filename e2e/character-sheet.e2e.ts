@@ -5,6 +5,7 @@
 // Authorize matrix, visibility, leak scan, restart: bun test (character-sheet).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const entries = (page: Page) => page.getByTestId("dice-log-entry");
@@ -81,7 +82,7 @@ test("FR-CHAR-10 FR-CHAR-08 player-1 damages Mira and attacks; DM and player-2 s
     await expect(both).toHaveCount(1);
   }
   // Pip: no speed, no scores → "Speed —", "No ability scores", no Check / Save (FR-CHAR-18/19).
-  await sheet1.getByTestId("char-sheet-picker").selectOption({ label: "Pip" });
+  await pickSheet(sheet1, { label: "Pip" });
   await expect(sheet1.getByTestId("char-sheet-speed")).toHaveText("—");
   await expect(sheet1.getByTestId("char-sheet-abilities-empty")).toHaveText("No ability scores");
   await expect(sheet1.getByTestId("char-sheet-roll-save")).toHaveCount(0);

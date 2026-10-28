@@ -2,7 +2,9 @@
 // fold into one small header menu, beside Lock / Edit, instead of rows above the blocks: the
 // kit's sheet has no switch rows. Same switches, test IDs and per-roll overrides (shared through
 // `SheetOverridesProvider`); none for players or on NPC sheets (FR-CHARX-22). The Initiative
-// switch only while the Initiative button shows (FR-CHAR-24).
+// switch only while the Initiative button shows (FR-CHAR-24). BL-139 (K11 follow-up): the
+// attacks' Attack / Damage switches too (were in the Attacks box header, Actions tab and wide
+// Main), so every DM public switch of the sheet is in this one menu.
 import type { RollCategory } from "@shared/dice-roll-log/schemas";
 import { EyeIcon } from "lucide-react";
 import { Button } from "../../components/ui/button";
@@ -20,6 +22,8 @@ const SWITCHES: readonly (readonly [RollCategory, string, string])[] = [
   ["ability-check", "Checks", "char-sheet-public-check"],
   ["saving-throw", "Saves", "char-sheet-public-save"],
   ["skill-check", "Skills", "charx-public-skill"],
+  ["attack", "Attack", "charx-public-attack"],
+  ["damage", "Damage", "charx-public-damage"],
 ];
 
 export const PUBLIC_MENU_HINT = "Public rolls: show the next roll to the players";

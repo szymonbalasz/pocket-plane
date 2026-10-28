@@ -6,6 +6,7 @@
 // "— DM: hit. … slashing + … fire (half) damage". Rules, leaks, crits: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -35,7 +36,7 @@ test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, f
 
   // Player 1: Brakka's sheet → Actions → Flame Tongue Attack + damage.
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(brakka);
+  await pickSheet(sheet, brakka);
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   await sheet
     .getByTestId("charx-attack")

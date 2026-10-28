@@ -7,6 +7,7 @@
 // no other spec. Writes on every path, visibility and leaks: bun test (effect-modifiers).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -32,7 +33,7 @@ test("FR-MOD-60 FR-MOD-56 FR-MOD-53 Divine Fury's state in the sheet; the tray s
 
   // Player 1: Brakka's sheet → Active effects → Divine Fury needs Rage.
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-brakka", "entity"));
+  await pickSheet(sheet, recordId("char-brakka", "entity"));
   const effectsTab = sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]');
   const actionsTab = sheet.locator('[data-testid="charx-tab"][data-value="actions"]');
   await effectsTab.click();

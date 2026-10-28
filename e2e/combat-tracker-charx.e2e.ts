@@ -8,6 +8,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { initMenu } from "./support/initiative";
+import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -40,13 +41,13 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
 
   // Player 1 makes a draft "Brin" (FR-CHARX-08), then goes back to Mira.
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption({ label: "New character…" });
+  await pickSheet(sheet, { label: "New character…" });
   await p1.getByTestId("charx-create-name").fill("Brin");
   await p1.getByTestId("charx-create-submit").click();
   await expect(sheet.getByTestId("charx-draft")).toBeVisible();
   const brinId = (await sheet.getByTestId("char-sheet").getAttribute("data-record-id")) as string;
   await sheet.getByTestId("charx-edit-toggle").click();
-  await sheet.getByTestId("char-sheet-picker").selectOption(miraId);
+  await pickSheet(sheet, miraId);
   await expect(sheet.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
 
   // DM views Goblin Ambush; a new encounter (whole party) with Goblin + Elite: Brin unticked,

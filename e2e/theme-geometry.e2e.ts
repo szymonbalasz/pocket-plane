@@ -10,6 +10,7 @@
 // browser opens in Gilt & Stone (DM #355). Client-only: no records (CON-44 unchanged).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 import { storedTheme } from "./support/theme";
 
@@ -192,8 +193,7 @@ const logGap = (page: Page) =>
 
 async function pickMira(win: Locator) {
   const miraId = e2eEnv().recordId("char-mira", "entity");
-  const picker = win.getByTestId("char-sheet-picker");
-  if (await picker.count()) await picker.selectOption(miraId);
+  if (await win.getByTestId("char-sheet-picker").count()) await pickSheet(win, miraId);
   await expect(win.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
 }
 

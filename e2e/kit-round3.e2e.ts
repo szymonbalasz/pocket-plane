@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const SHOTS = resolve(".verify/k13-shots");
@@ -108,7 +109,7 @@ test("FR-CHARX-114 FR-KIT-76 FR-KIT-13 K13 round 3: wide sheet boxes, narrow nit
 
   // The sheet at 320: Mira mid-fight.
   const win = await openWindow(dm, "char.sheet");
-  await win.getByTestId("char-sheet-picker").selectOption(miraId);
+  await pickSheet(win, miraId);
   await expect(win.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
   await expect(win.getByTestId("char-sheet-combat")).toBeVisible();
   expect(await win.boundingBox()).toMatchObject({ width: 320, height: 440 });

@@ -9,6 +9,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { entryDice } from "./support/log";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -49,7 +50,7 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
   ).toHaveAttribute("data-turn", "true");
 
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-brakka", "entity"));
+  await pickSheet(sheet, recordId("char-brakka", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]').click();
   const rage = sheet.getByTestId("mod-toggle").first();
   await rage.getByRole("switch").click();

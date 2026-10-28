@@ -9,6 +9,7 @@
 // (`rule-triggers` as `physical-dice-combat`). Form rules, part order, crit merge: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -171,7 +172,7 @@ test("BL-25 FR-MOD-18 FR-DICE-31 physical Flame Tongue crit: the Divine Fury die
 
   // Player 1: Rage on, physical dice on, Flame Tongue (added by the first test) Attack + damage.
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-brakka", "entity"));
+  await pickSheet(sheet, recordId("char-brakka", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]').click();
   const rage = sheet.getByTestId("mod-toggle").first();
   await rage.getByRole("switch").click();

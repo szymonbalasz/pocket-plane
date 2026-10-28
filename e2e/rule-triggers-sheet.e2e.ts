@@ -6,11 +6,12 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { tokenNode } from "./support/konva";
+import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
 async function triggersOn(page: Page, characterId?: string) {
   const sheet = await openWindow(page, "char.sheet");
-  if (characterId) await sheet.getByTestId("char-sheet-picker").selectOption(characterId);
+  if (characterId) await pickSheet(sheet, characterId);
   await sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]').click();
   const block = sheet.getByTestId("mod-triggers-block");
   await expect(block.getByTestId("mod-trigger-loading")).toHaveCount(0);
