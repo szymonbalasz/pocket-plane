@@ -1,7 +1,8 @@
 // Top-bar item registry (FR-SHELL-112 (3), seams S2). APPEND-ONLY (AGENTS §9.9): a feature adds one
 // entry to `TOP_BAR_ITEMS`; nothing else changes here. Items render in `order`, at a fixed width
-// (per viewport: TT4's Pause control is icon-only below 1280 wide), before the identity chip; the top bar stays 48 px (FR-SHELL-70). The launcher-fit rule
-// (FR-SHELL-43) keeps the bar's other content fitting at 1280 wide.
+// (or one per viewport), before the identity chip; the top bar stays 48 px (FR-SHELL-70). The
+// Pause control is a 40-px icon button at every width, its label in the Tooltip (K10). The
+// launcher-fit rule (FR-SHELL-43) keeps the bar's other content fitting at 1280 wide.
 import type { ComponentType } from "react";
 import { pauseSlotWidth } from "../pause/logic";
 import { PauseTopBarItem } from "../pause/top-bar";

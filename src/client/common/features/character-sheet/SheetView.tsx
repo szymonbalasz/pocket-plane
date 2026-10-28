@@ -303,10 +303,10 @@ function HeaderBadges() {
 
 /**
  * FR-KIT-85: the name in name type (the kit's 21 px, 32 px wide; two lines before it truncates,
- * the full name in its Tooltip). With a picker to show, the name **is** the picker: the select
- * (`char-sheet-picker`) lies over the name and its chevron, transparent, so a click on the name
- * opens it and the keyboard reaches it as before. K11: in the compact fallback too, so no boxed
- * select shows anywhere.
+ * the full name in its Tooltip). With a picker to show, the name **is** the picker: the Select's
+ * trigger (`char-sheet-picker`) lies over the name and its chevron, transparent, so a click on the
+ * name opens its list (BL-139: the shared Select's menu) and the keyboard reaches it as before.
+ * K11: in the compact fallback too, so no boxed select shows anywhere.
  */
 function SheetName({ picker }: { picker: ReactNode }) {
   const ctx = useSheet();
@@ -341,10 +341,10 @@ function SheetName({ picker }: { picker: ReactNode }) {
     <Tooltip content={ctx.creature.name}>
       <span
         data-testid="charx-name-picker"
-        className="relative flex w-fit min-w-0 max-w-full items-center self-start rounded-sm has-[select:focus-visible]:ring-2 has-[select:focus-visible]:ring-ring"
+        className="relative flex w-fit min-w-0 max-w-full items-center self-start rounded-sm has-[button:focus-visible]:ring-2 has-[button:focus-visible]:ring-ring"
       >
         {name}
-        <span className="absolute inset-0 [&>select]:size-full [&>select]:max-w-none [&>select]:cursor-pointer [&>select]:opacity-0">
+        <span className="absolute inset-0 [&>button]:size-full [&>button]:max-w-none [&>button]:cursor-pointer [&>button]:opacity-0">
           {picker}
         </span>
       </span>

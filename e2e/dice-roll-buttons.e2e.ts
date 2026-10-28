@@ -10,6 +10,7 @@
 // Wiring per surface and the non-stageable ones: bun test (`stage-hint.test.tsx`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -83,7 +84,7 @@ test("FR-DICE-41 FR-DICEX-51 Flame Tongue: the physical form names each part; Al
   await live(p1);
   await physicalOn(p1);
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-brakka", "entity"));
+  await pickSheet(sheet, recordId("char-brakka", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   const button = sheet
     .getByTestId("charx-attack")
@@ -171,7 +172,7 @@ test("FR-DICEX-51 Alt hint once on every stageable surface; Alt+click on the rol
 
   // B: Mira's sheet death save; the roll bar Roll (2d6 typed).
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-mira", "entity"));
+  await pickSheet(sheet, recordId("char-mira", "entity"));
   expect(await hintedTooltip(p1, sheet.getByTestId("cbtx-death-roll"))).toContain(
     "Alt: adjust in tray",
   );
@@ -191,7 +192,7 @@ test("FR-DICEX-51 Alt hint once on every stageable surface; Alt+click on the rol
   // B, in combat (the sheet attack routes to `cbt.attack`, which doubles on a crit): Brakka's
   // Flame Tongue, physical, d20 = 20 → each part's crit sub-row names its type (FR-DICE-41).
   await physicalOn(p1);
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-brakka", "entity"));
+  await pickSheet(sheet, recordId("char-brakka", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   await sheet
     .getByTestId("charx-attack")

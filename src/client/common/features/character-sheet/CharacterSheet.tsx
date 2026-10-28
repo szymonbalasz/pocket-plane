@@ -12,6 +12,15 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/overlays";
 import { Skeleton } from "../../components/ui/primitives";
 import { useRecords, useSync } from "../../sync/store";
 import { useDefinitions } from "../compendium/definitions";
@@ -197,44 +206,48 @@ export function CharacterSheet() {
     />
   );
   const group = (g: "own" | "party" | "npc") => picker.options.filter((o) => o.group === g);
+  // BL-139 (K11 follow-up): the shared Select, so the list is the kit's menu, not the browser's.
+  // Items: `char-sheet-picker-option` + `data-value` (record id, or "__new") + `data-group`.
+  const item = (o: { id: string; label: string }, g: string) => (
+    <SelectItem
+      key={o.id}
+      value={o.id}
+      data-testid="char-sheet-picker-option"
+      data-value={o.id}
+      data-group={g}
+    >
+      {o.label}
+    </SelectItem>
+  );
   const pickerEl =
     picker.options.length > 1 || picker.canCreate ? (
-      <select
-        data-testid="char-sheet-picker"
-        aria-label="Character"
-        className={`${SELECT} h-8 max-w-36`}
+      <Select
         value={selected?.id ?? ""}
-        onChange={(e) => {
-          if (e.target.value === NEW) setCreating(true);
-          else selectSheet(e.target.value);
+        onValueChange={(v) => {
+          if (v === NEW) setCreating(true);
+          else selectSheet(v);
         }}
       >
-        {!selected && <option value="">—</option>}
-        {group("own").map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-        {group("party").length > 0 && (
-          <optgroup label="Party">
-            {group("party").map((o) => (
-              <option key={o.id} value={o.id} data-testid="charx-picker-party">
-                {o.label}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        {group("npc").map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.label}
-          </option>
-        ))}
-        {picker.canCreate && (
-          <option value={NEW} data-testid="charx-picker-new">
-            New character…
-          </option>
-        )}
-      </select>
+        <SelectTrigger
+          data-testid="char-sheet-picker"
+          data-value={selected?.id ?? ""}
+          aria-label="Character"
+          className={`${SELECT} h-8 max-w-36 gap-1 py-0 [&>span]:truncate`}
+        >
+          <SelectValue placeholder="—" />
+        </SelectTrigger>
+        <SelectContent align="start">
+          {group("own").map((o) => item(o, "own"))}
+          {group("party").length > 0 && (
+            <SelectGroup>
+              <SelectLabel>Party</SelectLabel>
+              {group("party").map((o) => item(o, "party"))}
+            </SelectGroup>
+          )}
+          {group("npc").map((o) => item(o, "npc"))}
+          {picker.canCreate && item({ id: NEW, label: "New character…" }, "new")}
+        </SelectContent>
+      </Select>
     ) : null;
 
   if (!selected) {

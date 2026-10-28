@@ -9,6 +9,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { entryLine, pickRollOption } from "./support/log";
+import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -149,12 +150,12 @@ test("FR-DICE-77 FR-DICE-78 the roll bar rolls as the sheet's PC; a manual pick 
 
   // A fresh browser: the sheet shows its first own PC (Brakka) without a pick; the bar follows.
   const sheet = await openWindow(p1, "char.sheet");
-  await expect(sheet.getByTestId("char-sheet-picker")).toHaveValue(brakka);
+  await expect(sheet.getByTestId("char-sheet-picker")).toHaveAttribute("data-value", brakka);
   const log = await openWindow(p1, "dice.log");
   const opts = log.getByTestId("dice-roll-options");
   if ((await opts.getAttribute("data-state")) !== "open") await opts.click();
   await expect(log.getByTestId("dice-roll-actor")).toHaveAttribute("data-value", brakka);
-  await sheet.getByTestId("char-sheet-picker").selectOption(mira);
+  await pickSheet(sheet, mira);
   await expect(log.getByTestId("dice-roll-actor")).toHaveAttribute("data-value", mira);
   const rolled = log.getByTestId("dice-log-entry").filter({ hasText: "— 1d20+2:" });
   const before = await rolled.count();

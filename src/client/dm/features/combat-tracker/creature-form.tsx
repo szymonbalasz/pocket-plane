@@ -555,31 +555,36 @@ function NewAction() {
 function RowActions({ row }: { row: CreatureRow }) {
   const [mode, setMode] = useState<Mode | null>(null);
   if (row.kind !== "monster") return null;
+  // BL-138: each icon button names itself in a Tooltip, like the row's other actions.
   return (
     <span className="inline-flex">
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-7"
-        data-testid="cbt-form-derive"
-        data-record-id={row.id}
-        aria-label={`Derive from ${row.name}`}
-        onClick={() => setMode({ kind: "derive", base: row.definition })}
-      >
-        <CopyPlusIcon className="size-3.5" />
-      </Button>
-      {!row.readOnly && (
+      <Tooltip content="Derive">
         <Button
           size="icon"
           variant="ghost"
           className="size-7"
-          data-testid="cbt-form-edit"
+          data-testid="cbt-form-derive"
           data-record-id={row.id}
-          aria-label={`Edit ${row.name}`}
-          onClick={() => setMode({ kind: "edit", def: row.definition })}
+          aria-label={`Derive from ${row.name}`}
+          onClick={() => setMode({ kind: "derive", base: row.definition })}
         >
-          <PencilIcon className="size-3.5" />
+          <CopyPlusIcon className="size-3.5" />
         </Button>
+      </Tooltip>
+      {!row.readOnly && (
+        <Tooltip content="Edit">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            data-testid="cbt-form-edit"
+            data-record-id={row.id}
+            aria-label={`Edit ${row.name}`}
+            onClick={() => setMode({ kind: "edit", def: row.definition })}
+          >
+            <PencilIcon className="size-3.5" />
+          </Button>
+        </Tooltip>
       )}
       <FormDialog mode={mode} onClose={() => setMode(null)} />
     </span>

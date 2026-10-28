@@ -222,8 +222,12 @@ test("FR-NOTE-77 H3 re-test 3 DM 1280×720: Encounters at 396, 60 (376 wide), Es
   const offLog = async () => {
     await dm.waitForTimeout(400);
     const s = await box(stack);
-    expect(Math.round(s.x)).toBe(480);
+    // Sprint 14 F3 (FR-NOTE-79): the summary alone over Encounters' body goes compact and takes
+    // the free map left of it (DM #364's far slide), off Encounters and the Game log (was 480,
+    // 100 over Encounters' body between its controls).
+    await expect(summary).toHaveAttribute("data-compact", "true");
     expect(s.y).toBeLessThanOrEqual(140);
+    expect(overlaps(s, await box(enc))).toBe(false);
     expect(overlaps(s, await box(log.getByTestId("ui-window-body")))).toBe(false);
     await clearOf(dm, enc.getByTestId("cbt-enc-entry-dec"));
     await clearOf(dm, enc.getByTestId("cbt-enc-entry-inc"));

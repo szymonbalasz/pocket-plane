@@ -18,6 +18,7 @@ import { createWindowRegistry } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { ActionsTab } from "./ActionsTab";
 import { MainTab } from "./MainTab";
+import { PublicRolls, PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
 import type { RollRoute } from "./routing";
 import { SheetView } from "./SheetView";
@@ -151,15 +152,20 @@ describe("FR-CHARX-41 three attack buttons", () => {
     expect(buttonsOf(html, "charx-spell", "sh")).toEqual([]);
   });
 
-  test("FR-CHARX-41 NPC sheet: the same buttons, no public switch; DM PC sheet has the switches", () => {
+  test("FR-CHARX-41 NPC sheet: the same buttons, no public switch; DM PC sheet has the switches (BL-139: in the header's Public rolls menu)", () => {
     const npc = render(<ActionsTab />, { client: "dm", npc: true });
     expect(buttonsOf(npc, "charx-attack", "a2")).toEqual(ATTACK_ROW);
     expect(npc).not.toContain("charx-public-attack");
     expect(npc).not.toContain("charx-public-damage");
+    expect(render(<PublicRollsMenu />, { client: "dm", npc: true })).toBe("");
+    // BL-139: the tab's Attacks box has no switch; the menu has both.
     const dm = render(<ActionsTab />, { client: "dm" });
-    expect(dm).toContain('data-testid="charx-public-attack"');
-    expect(dm).toContain('data-testid="charx-public-damage"');
+    expect(dm).not.toContain("charx-public-attack");
+    const menu = render(<PublicRolls />, { client: "dm" });
+    expect(menu).toContain('data-testid="charx-public-attack"');
+    expect(menu).toContain('data-testid="charx-public-damage"');
     expect(render(<ActionsTab />)).not.toContain("charx-public-attack");
+    expect(render(<PublicRollsMenu />)).toBe("");
   });
 });
 
@@ -248,7 +254,7 @@ describe("FR-CHARX-48 pinned header", () => {
             client="player"
             playerId="p1"
             ownerName="Player 1"
-            picker={<select data-testid="char-sheet-picker" />}
+            picker={<button type="button" data-testid="char-sheet-picker" />}
             startEditing={false}
             initialPinnedPart={part}
           />
@@ -331,14 +337,15 @@ describe("FR-CHARX-48 pinned header", () => {
     const initial = html.slice(html.indexOf('data-slot="sheet-portrait-initial"'));
     expect(initial).toStartWith('data-slot="sheet-portrait-initial" data-colour="none"');
     expect(initial).toContain("text-[30px] @min-[560px]/sheet:text-[40px]");
-    // The name is the picker: name, chevron, then the select laid over them (transparent).
+    // The name is the picker: name, chevron, then the Select's trigger laid over them (transparent).
     const picker = html.slice(html.indexOf('data-testid="charx-name-picker"'));
     const order = ["char-sheet-name", "lucide-chevron-down", "char-sheet-picker"].map((x) =>
       picker.indexOf(x),
     );
     expect(order.every((i) => i > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
-    expect(picker).toContain("[&amp;&gt;select]:opacity-0");
+    // BL-139: the shared Select's trigger (a button), no native select.
+    expect(picker).toContain("[&amp;&gt;button]:opacity-0");
     expect(tagOf(html, "char-sheet-name")).toContain('data-slot="sheet-name"');
     // K11 walkthrough: whole words, balanced lines; the chevron follows the last word.
     expect(html).toMatch(

@@ -5,6 +5,7 @@
 // flipped full ↔ compact for ever. Now it settles and the sheet renders.
 import { expect, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 test("FR-CHARX-48 FR-CHARX-106 DM sheet of a locked PC in a started fight renders; the pinned part settles", async ({
@@ -20,7 +21,7 @@ test("FR-CHARX-48 FR-CHARX-106 DM sheet of a locked PC in a started fight render
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   const win = await openWindow(dm, "char.sheet");
-  await win.getByTestId("char-sheet-picker").selectOption(recordId("char-mira", "entity"));
+  await pickSheet(win, recordId("char-mira", "entity"));
   await expect(win.getByTestId("char-sheet-combat")).toBeVisible();
   await win.getByTestId("charx-lock-toggle").click();
   await expect(win.getByTestId("charx-locked")).toBeVisible();

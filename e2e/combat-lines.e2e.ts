@@ -7,6 +7,7 @@
 // (FR-CBT-95). Every wording case and old rows: bun test (combat-lines.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -53,7 +54,7 @@ async function rollPhysical(page: Page, first: string) {
 /** A character's attack row on its sheet's Actions tab. */
 async function attackRow(page: Page, characterId: string, name: string) {
   const sheet = await openWindow(page, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(characterId);
+  await pickSheet(sheet, characterId);
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   return sheet.getByTestId("charx-attack").filter({ hasText: name });
 }
@@ -100,7 +101,7 @@ test("FR-CBT-96 FR-MOD-62 FR-CBT-95 combat log wording: Rage once in the DM line
     init.locator(`[data-testid="cbt-init-row"][data-record-id="${brakka}"]`),
   ).toHaveAttribute("data-turn", "true");
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-brakka", "entity"));
+  await pickSheet(sheet, recordId("char-brakka", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]').click();
   const rage = sheet.getByTestId("mod-toggle").first();
   await rage.getByRole("switch").click();

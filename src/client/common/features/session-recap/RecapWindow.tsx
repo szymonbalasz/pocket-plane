@@ -338,7 +338,11 @@ function Section({
       className={cn("flex flex-col gap-1", greyed && "opacity-60")}
     >
       {k === "header" ? null : (
-        <h3 className="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        // BL-141 (K6c gap 9): `section-label`, the label type a theme gives section headings.
+        <h3
+          data-slot="section-label"
+          className="flex items-center gap-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+        >
           {SECTION_TITLE[k]}
           {greyed ? (
             <span className="normal-case tracking-normal">· Hidden from players</span>

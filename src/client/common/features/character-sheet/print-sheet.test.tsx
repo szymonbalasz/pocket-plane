@@ -613,9 +613,45 @@ describe("K13 wide Main (DM #363)", () => {
     expect(text(box(actions, "spells"))).toContain("Level 1");
   });
 
-  test("FR-CHARX-114 K13 wide Main: the DM's Attack / Damage switches in its Attacks box (scoped); players none", () => {
-    expect(scoped(wideMain({ client: "dm" }), "charx-public-attack")).toBe(1);
-    expect(scoped(wideMain({ client: "dm" }), "charx-public-damage")).toBe(1);
+  test("FR-CHARX-114 BL-141 wide Main: list boxes' labels are the heading band; Spells: the pip row, then one muted ability · attack · DC line, no 'Spellcasting' label, no level heading for one level; the Actions tab unchanged", () => {
+    const wide = wideMain({ client: "dm" });
+    for (const key of ["attacks", "spells", "uses"]) {
+      const b = box(wide, key);
+      expect(b).toMatch(/data-slot="sheet-box-rule"[^>]*class="[^"]*justify-center[^"]*border-b/);
+    }
+    const spells = box(wide, "spells");
+    expect(text(spells)).not.toContain("Spellcasting");
+    expect(text(spells)).not.toContain("Level 1");
+    expect(at(spells, 'data-testid="charx-slot"')).toBeLessThan(
+      at(spells, 'data-testid="charx-spellcasting"'),
+    );
+    expect(spells).toMatch(
+      /data-testid="charx-spellcasting" class="text-xs text-muted-foreground"/,
+    );
+    const actions = box(render(<ActionsTab />, { client: "dm" }), "spells");
+    expect(text(actions)).toContain("Spellcasting");
+    expect(text(actions)).toContain("Level 1");
+    expect(at(actions, 'data-testid="charx-spellcasting"')).toBeLessThan(
+      at(actions, 'data-testid="charx-slot"'),
+    );
+  });
+
+  test("FR-CHARX-114 BL-139 wide Main: the DM's Attack / Damage switches in the header's Public rolls menu, after Skills; none in the Attacks box; players none", () => {
+    expect(wideMain({ client: "dm" })).not.toContain("charx-public-attack");
+    expect(wideMain({ client: "dm" })).not.toContain("charx-public-damage");
+    const menu = render(<PublicRolls />, { client: "dm" });
+    expect(
+      [
+        ...menu.matchAll(/data-testid="(char-sheet-public-[a-z]+|charx-public-(?!rolls)[a-z]+)"/g),
+      ].map((m) => m[1]),
+    ).toEqual([
+      "char-sheet-public-init",
+      "char-sheet-public-check",
+      "char-sheet-public-save",
+      "charx-public-skill",
+      "charx-public-attack",
+      "charx-public-damage",
+    ]);
     expect(wideMain({ client: "player" })).not.toContain("charx-public-attack");
   });
 
@@ -859,7 +895,7 @@ function stateHtml(o: {
               client={o.client}
               playerId={o.client === "dm" ? null : "p1"}
               ownerName="Player 1"
-              picker={<select data-testid="char-sheet-picker" />}
+              picker={<button type="button" data-testid="char-sheet-picker" />}
               startEditing={o.editing ?? false}
               initialPinnedPart={o.part ?? "full"}
             />

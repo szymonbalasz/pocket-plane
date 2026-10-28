@@ -7,6 +7,7 @@
 // −1 / 2; Undo → 0 / 2 (exact refund). Floors, conflicts, visibility and leaks: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -37,7 +38,7 @@ test("FR-CHARX-58 FR-MOD-59 uses below zero: Rage anyway → −1 / 3, a pip pas
 
   // Brakka's Features: Rage 0 / 3 left.
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-brakka", "entity"));
+  await pickSheet(sheet, recordId("char-brakka", "entity"));
   await tab(sheet, "features");
   const rageLeft = feature(sheet, "Rage").getByTestId("charx-feature-left");
   await expect(rageLeft).toHaveAttribute("data-value", "0");
@@ -85,7 +86,7 @@ test("FR-CHARX-58 FR-MOD-59 uses below zero: Rage anyway → −1 / 3, a pip pas
   await expect(
     init.locator(`[data-testid="cbt-init-row"][data-record-id="${mira}"]`),
   ).toHaveAttribute("data-turn", "true");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-mira", "entity"));
+  await pickSheet(sheet, recordId("char-mira", "entity"));
   await tab(sheet, "features");
   const strikeLeft = feature(sheet, "Searing Strike").getByTestId("charx-feature-left");
   await expect(strikeLeft).toContainText("1 / 2 left");

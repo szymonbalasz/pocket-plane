@@ -4,6 +4,7 @@
 // player-1 gets the approval toast; player-2 sees Brin's summary card only. Permission matrix, leak scan, merge, crash, restart: bun test (character-sheet).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -83,7 +84,7 @@ test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 FR
 
   // Player 1: New character… → "Brin" → the draft opens in edit mode with the hint.
   const sheet1 = await openWindow(p1, "char.sheet");
-  await sheet1.getByTestId("char-sheet-picker").selectOption({ label: "New character…" });
+  await pickSheet(sheet1, { label: "New character…" });
   await p1.getByTestId("charx-create-name").fill("Brin");
   await p1.getByTestId("charx-create-submit").click();
   await expect(sheet1.getByTestId("char-sheet-name")).toHaveText("Brin");
@@ -142,7 +143,7 @@ test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 FR
 
   // Player 2: Brin in the Party group → summary card only, no sheet, no numbers.
   const sheet2 = await openWindow(p2, "char.sheet");
-  await sheet2.getByTestId("char-sheet-picker").selectOption({ label: "Brin (Player 1)" });
+  await pickSheet(sheet2, { label: "Brin (Player 1)" });
   const summary = sheet2.getByTestId("charx-summary");
   await expect(summary).toHaveAttribute("data-record-id", brinId);
   await expect(summary.getByTestId("charx-summary-level")).toHaveText("Level 1");
@@ -159,7 +160,7 @@ test("FR-CHARX-08 FR-CHARX-21 FR-CHARX-45 FR-CHARX-46 FR-CHARX-10 FR-CHARX-32 FR
 
   // FR-CHARX-47: Player 1 picks Mira (the default would be Brin, first by name); a reload keeps it.
   const miraId = e2eEnv().recordId("char-mira", "entity");
-  await sheet1.getByTestId("char-sheet-picker").selectOption({ label: "Mira · Locked" });
+  await pickSheet(sheet1, { label: "Mira · Locked" });
   await expect(sheet1.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
   await p1.reload();
   await live(p1);

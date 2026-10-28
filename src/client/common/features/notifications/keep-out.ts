@@ -50,6 +50,12 @@ import { coveredArea, type TokenBox } from "../play-shell/token-boxes";
 /** The stack's width, px (`w-80`). */
 export const STACK_W = 320;
 
+/**
+ * FR-NOTE-79 (BL-141): the compact summary's width, px: the fold's last step when the summary
+ * alone covers a window's content or a modal dialog; placed by the same rules at this width.
+ */
+export const COMPACT_W = 200;
+
 /** FR-NOTE-44: body px under a pushed window's title bar kept clear. */
 export const PUSHED_BODY_CLEAR = 40;
 

@@ -130,7 +130,8 @@ export function SectionTitle({
   ...props
 }: { children: string } & React.ComponentProps<"h3">) {
   return (
-    <h3 className="text-xs font-medium text-muted-foreground" {...props}>
+    // BL-141 (K6c gap 10): `section-label`, the label type a theme gives section headings.
+    <h3 data-slot="section-label" className="text-xs font-medium text-muted-foreground" {...props}>
       {children}
     </h3>
   );

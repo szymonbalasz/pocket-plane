@@ -7,6 +7,7 @@
 // late-damage.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -55,7 +56,7 @@ test("FR-CBT-87 FR-CBT-89 FR-CBT-90 Apply hit, then the late Damage fills the op
   const p1Log = await openWindow(p1, "dice.log");
   const p1Lines = p1Log.getByTestId("dice-log-entry");
   const sheet = await openWindow(p1, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(recordId("char-mira", "entity"));
+  await pickSheet(sheet, recordId("char-mira", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   const crossbow = sheet.getByTestId("charx-attack").filter({ hasText: "Light crossbow" });
 

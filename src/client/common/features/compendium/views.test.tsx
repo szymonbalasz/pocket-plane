@@ -341,6 +341,8 @@ describe("FR-KIT-76 compendium table", () => {
   test("FR-KIT-76 table rows: sticky header Name · Details · Source; each row one grid line: name, details, source chip; zebra + hover; drag kept (DM monster)", () => {
     const head = render("dm", <TableHead />);
     expect(head).toContain('data-slot="cmp-table-head"');
+    // BL-141 (K6c gap 8): the head in regular weight (the kit's `.tbl th`).
+    expect(head).toContain("font-normal");
     expect(head).toContain('aria-hidden="true"');
     expect(head).toMatch(/sticky top-0/);
     expect(text(head)).toBe("NameDetailsSource");
@@ -375,7 +377,8 @@ describe("FR-KIT-76 compendium table", () => {
     expect(row).not.toContain("min-h-10");
     const name = html.slice(html.indexOf('data-testid="cmp-result-name"'));
     expect(name).toMatch(/^data-testid="cmp-result-name" data-slot="cmp-row-name"/);
-    expect(tagOf(html, "cmp-result-name")).toContain("font-medium");
+    // BL-141 (K6c gap 8): regular weight, as the kit's `.tbl td`.
+    expect(tagOf(html, "cmp-result-name")).not.toMatch(/font-(medium|semibold|bold)/);
     // The Tooltip trigger is the row itself (its only Tab stop; walkthrough step 4); no focusable
     // or tip-enrolled part inside it.
     expect(name).toContain('<span class="truncate">Ability Score');

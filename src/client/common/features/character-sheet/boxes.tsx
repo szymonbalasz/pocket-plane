@@ -25,8 +25,10 @@ export type BoxKey =
 export const BOX_LABEL = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
 /**
- * FR-CHARX-105: a labelled box. `aside` sits on the label line; `list` boxes (Skills, Attacks,
- * …) put the label left and their rows full width.
+ * FR-CHARX-105: a labelled box. `aside` sits on the label line; `list` boxes (Attacks, Spells,
+ * Features, Limited uses) put their rows full width. BL-141 (K6c gap 4): a list box's label is
+ * the Skills box's heading band (centred over a rule across the box, `sheet-box-rule`), `aside`
+ * at the band's right end.
  */
 export function Box({
   box,
@@ -56,16 +58,29 @@ export function Box({
         className,
       )}
     >
-      {(label || aside) && (
+      {list && label ? (
         <div
+          data-slot="sheet-box-rule"
           className={cn(
-            "flex min-w-0 items-center gap-2 self-stretch",
-            list ? "justify-between" : "justify-center",
+            BOX_LABEL,
+            "relative -mx-2 -mt-1.5 mb-1 flex min-w-0 items-center justify-center border-b px-2.5 pt-1.5 pb-1 text-center",
           )}
         >
-          {label && <span className={cn(BOX_LABEL, "truncate")}>{label}</span>}
-          {aside}
+          <span className="truncate">{label}</span>
+          {aside && <span className="absolute right-2 normal-case tracking-normal">{aside}</span>}
         </div>
+      ) : (
+        (label || aside) && (
+          <div
+            className={cn(
+              "flex min-w-0 items-center gap-2 self-stretch",
+              list ? "justify-between" : "justify-center",
+            )}
+          >
+            {label && <span className={cn(BOX_LABEL, "truncate")}>{label}</span>}
+            {aside}
+          </div>
+        )
       )}
       {children}
     </div>

@@ -7,6 +7,7 @@
 // on); Turn off → every gem surface goes without a reload. Rules, leaks: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -20,7 +21,7 @@ const line = (log: Locator, text: string) =>
 
 async function sheetOn(page: Page, characterId: string): Promise<Locator> {
   const sheet = await openWindow(page, "char.sheet");
-  await sheet.getByTestId("char-sheet-picker").selectOption(characterId);
+  await pickSheet(sheet, characterId);
   return sheet;
 }
 

@@ -72,3 +72,20 @@ describe("FR-KIT-29 companion groups (K12)", () => {
     expect(brakka).not.toContain("22 / 22");
   });
 });
+
+describe("FR-KIT-29 BL-141 child rows two lines at most", () => {
+  test("FR-KIT-29 BL-141 child rows: player-1 — Owlbear's Ally chip is its icon (the word in a Tooltip), so the chips fit beside the name; 'After Mira' ends the bar line, no line of its own", () => {
+    const owl = rowHtml(p1(), "cbt-init-row", "owlbear");
+    const ally =
+      /<span[^>]*data-testid="cbt-init-row-ally"[^>]*>[\s\S]*?<\/span>/.exec(owl)?.[0] ?? "";
+    expect(ally).toContain('data-compact="true"');
+    expect(ally).toContain('aria-label="Ally"');
+    expect(ally).toContain("data-tip");
+    expect(ally).not.toMatch(/>Ally</);
+    // The bar line holds the bar and, at its end, "After Mira"; it doesn't wrap.
+    const stats = /<div data-stats-line="true" class="([^"]*)">([\s\S]*?)<\/div>/.exec(owl);
+    expect(stats?.[1]).toContain("flex-nowrap");
+    expect(stats?.[2]).toContain('data-testid="cbt-init-row-hp"');
+    expect(stats?.[2]).toMatch(/data-testid="cbt-init-row-after"[^>]*>After Mira</);
+  });
+});

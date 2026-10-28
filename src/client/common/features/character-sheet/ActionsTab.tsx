@@ -32,7 +32,7 @@ import {
   useBusy,
 } from "./fields";
 import { LimitedUsesBox } from "./MoreTabs";
-import { type PublicOverrides, PublicSwitch, usePublicOverrides, useSheetOverrides } from "./rolls";
+import { type PublicOverrides, useSheetOverrides } from "./rolls";
 import { AddRow, RowTools, useRowPut } from "./rows";
 import {
   notationContext,
@@ -95,7 +95,8 @@ const typeOptions = [
 /**
  * FR-CHARX-41/43: a row's roll buttons in §6.1 order; each asks the roll routes with its own
  * kind + the row's ref (a hidden claim drops that button only). DM public overrides are the
- * Attacks block's switches (`charx-public-attack` / `-damage`, by the roll's category).
+ * header's Public rolls menu's Attack / Damage switches (`charx-public-attack` / `-damage`, by
+ * the roll's category; BL-139).
  */
 function RowButtons({
   buttons,
@@ -472,27 +473,7 @@ function AttacksBlock({ overrides }: { overrides: PublicOverrides }) {
   const attacks = ctx.stats.attacks;
   const e = ctx.editing && ctx.canEdit;
   return (
-    <Box
-      box="attacks"
-      list
-      label="Attacks"
-      aside={
-        <span className="flex items-center gap-2">
-          <PublicSwitch
-            category="attack"
-            label="Attack"
-            testId="charx-public-attack"
-            overrides={overrides}
-          />
-          <PublicSwitch
-            category="damage"
-            label="Damage"
-            testId="charx-public-damage"
-            overrides={overrides}
-          />
-        </span>
-      }
-    >
+    <Box box="attacks" list label="Attacks">
       {attacks.length === 0 && !e && <p className="text-xs text-muted-foreground">No attacks</p>}
       {attacks.map((a, i) => (
         <AttackRow
@@ -689,19 +670,27 @@ function SpellcastingHeader() {
   const e = ctx.editing && ctx.canEdit;
   const atk = spellAttackBonus(ctx.stats);
   const dc = spellSaveDc(ctx.stats);
+  // BL-141 (K6c gap 6): on the wide Main, the kit's order: the pip row, then one muted line
+  // (ability · attack · DC); no "Spellcasting" label under the box's own heading.
+  const kit = useSheetScope() === "main";
   if (!ctx.stats.spellcasting && !e) return null;
+  const line = atk !== null && dc !== null && (
+    <span
+      data-testid="charx-spellcasting"
+      className={kit ? "text-xs text-muted-foreground" : "text-xs"}
+    >
+      {ABILITY_NAMES[ctx.stats.spellcasting?.ability ?? "wis"]} · Spell attack{" "}
+      <OverrideControl okey="spellAttack">{signed(atk)}</OverrideControl> · DC{" "}
+      <OverrideControl okey="spellDc">{dc}</OverrideControl>
+    </span>
+  );
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-muted-foreground">Spellcasting</span>
+      {!kit && <span className="text-xs font-medium text-muted-foreground">Spellcasting</span>}
       {e && <SpellcastingEditor />}
-      {atk !== null && dc !== null && (
-        <span data-testid="charx-spellcasting" className="text-xs">
-          {ABILITY_NAMES[ctx.stats.spellcasting?.ability ?? "wis"]} · Spell attack{" "}
-          <OverrideControl okey="spellAttack">{signed(atk)}</OverrideControl> · DC{" "}
-          <OverrideControl okey="spellDc">{dc}</OverrideControl>
-        </span>
-      )}
+      {!kit && line}
       <SlotPips />
+      {kit && line}
     </div>
   );
 }
@@ -866,14 +855,19 @@ function SpellsBlock({ overrides }: { overrides: PublicOverrides }) {
   const ctx = useSheet();
   const spells = ctx.sheet.spells;
   const e = ctx.editing && ctx.canEdit;
+  // BL-141 (K6c gap 6): the wide Main drops the level heading while only one level shows.
+  const kit = useSheetScope() === "main";
   if (spells.length === 0 && !e) return null;
+  const groups = spellGroups(spells);
   return (
     <div className="flex flex-col gap-1">
-      {spellGroups(spells).map((g) => (
+      {groups.map((g) => (
         <div key={g.level} className="flex flex-col">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {spellLevelLabel(g.level)}
-          </span>
+          {!(kit && groups.length === 1) && (
+            <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+              {spellLevelLabel(g.level)}
+            </span>
+          )}
           {g.spells.map((s) => (
             <SpellRowView
               key={s.id}
@@ -911,9 +905,9 @@ function SpellsBox({ overrides }: { overrides: PublicOverrides }) {
 }
 
 export function ActionsTab() {
-  // One set of DM public overrides for the tab: the Attacks block's switches apply to every
-  // attack / damage roll on it (FR-CHAR-22's rule; §6.1 "Public").
-  const overrides = usePublicOverrides();
+  // The sheet's DM public overrides (FR-CHAR-22's rule; §6.1 "Public"): BL-139, the header's
+  // Public rolls menu's Attack / Damage switches apply to every attack / damage roll on the tab.
+  const overrides = useSheetOverrides();
   return (
     <div className="flex flex-col gap-2">
       <AttacksBlock overrides={overrides} />
@@ -925,8 +919,8 @@ export function ActionsTab() {
 /**
  * K13 (DM #363, the kit's wide sheet): Main's Attacks, Spells (header and slot pips) and Limited
  * uses boxes under the passives once the sheet is wide. The Actions / Features rows and buttons
- * in view mode (rows are edited on their own tabs); the DM's Attack / Damage switches use the
- * sheet's shared overrides (the header's Public rolls menu's); every repeated test ID carries
+ * in view mode (rows are edited on their own tabs); the DM's Attack / Damage switches are in the
+ * header's Public rolls menu (BL-139), its overrides shared; every repeated test ID carries
  * `data-scope="main"`. The Actions tab is unchanged.
  */
 export function WideActionBoxes() {

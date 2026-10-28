@@ -151,6 +151,14 @@ export function summaryText(n: number, waiting = 0): string {
 }
 
 /**
+ * FR-NOTE-79 (BL-141): the compact summary's one short line: "N pending" (the DM's own), else
+ * "N waiting"; the whole `summaryText` is its Tooltip and label.
+ */
+export function compactSummaryText(n: number, waiting = 0): string {
+  return n > 0 || waiting <= 0 ? `${n} pending` : `${waiting} waiting`;
+}
+
+/**
  * FR-NOTE-18: addressed to this client by the FR-NOTE-13 rule (owner for actions). FR-NOTE-24
  * (#178): an action row counts only while `pending`; applied, dismissed or closed at End leaves
  * the bell, reopened counts again. FR-NOTE-27 (G9): the DM also counts a player-owned pending row

@@ -5,6 +5,7 @@
 // (ability cells ≥ 80 px). Layout only: no new records (CON-44 unchanged).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -56,8 +57,7 @@ test("FR-CHARX-105 FR-CHARX-106 FR-CHARX-109 FR-CHARX-112 FR-CHARX-113 FR-CHARX-
   const win = await openWindow(p1, "char.sheet");
   // Specs sharing the bundle may add characters that sort before Mira: pick her.
   const miraId = recordId("char-mira", "entity");
-  const picker = win.getByTestId("char-sheet-picker");
-  if (await picker.count()) await picker.selectOption(miraId);
+  if (await win.getByTestId("char-sheet-picker").count()) await pickSheet(win, miraId);
   await expect(win.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
   // PS1: the default 320 × 440; every box and the shield show, nothing clipped sideways.
   expect(await win.boundingBox()).toMatchObject({ width: 320, height: 440 });

@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
 const SHOTS = resolve(".verify/k11-shots");
@@ -98,7 +99,7 @@ test("FR-CHARX-106 FR-CHARX-107 FR-KIT-85 kit sheet: stat row first for DM (in c
   await loginDm(dm, secret);
   await live(dm);
   const win = await openWindow(dm, "char.sheet");
-  await win.getByTestId("char-sheet-picker").selectOption(miraId);
+  await pickSheet(win, miraId);
   await expect(win.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
   await expect(win.getByTestId("char-sheet-combat")).toBeVisible();
   expect(await win.boundingBox()).toMatchObject({ width: 320, height: 440 });
@@ -131,8 +132,7 @@ test("FR-CHARX-106 FR-CHARX-107 FR-KIT-85 kit sheet: stat row first for DM (in c
   await p1.goto(link("Player 1"));
   await live(p1);
   const sheet = await openWindow(p1, "char.sheet");
-  const picker = sheet.getByTestId("char-sheet-picker");
-  if (await picker.count()) await picker.selectOption(miraId);
+  if (await sheet.getByTestId("char-sheet-picker").count()) await pickSheet(sheet, miraId);
   await expect(sheet.getByTestId("char-sheet")).toHaveAttribute("data-record-id", miraId);
   await expect(sheet.getByTestId("charx-public-menu")).toHaveCount(0);
   await statRowFirst(sheet);
@@ -178,7 +178,7 @@ test("FR-KIT-85 FR-CHARX-115 K11 walkthrough fixes: imported NPC name keeps its 
   await shoot(win, "app-imported-goblin-default");
 
   // Mira mid-fight at 320: both tab arrows drawn, the earlier one disabled at the start.
-  await win.getByTestId("char-sheet-picker").selectOption(recordId("char-mira", "entity"));
+  await pickSheet(win, recordId("char-mira", "entity"));
   await expect(win.getByTestId("charx-tabs-prev")).toBeVisible();
   await expect(win.getByTestId("charx-tabs-prev")).toBeDisabled();
   await expect(win.getByTestId("charx-tabs-next")).toBeEnabled();

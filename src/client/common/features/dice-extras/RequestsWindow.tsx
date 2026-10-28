@@ -381,7 +381,10 @@ export function RequestsWindow() {
       className="flex h-full min-h-0 flex-col gap-2"
     >
       <div className="flex shrink-0 items-center gap-1">
-        <h3 className="flex-1 text-xs font-medium text-muted-foreground">New request</h3>
+        {/* BL-141 (K6c gap 10): `section-label`, the label type a theme gives section headings. */}
+        <h3 data-slot="section-label" className="flex-1 text-xs font-medium text-muted-foreground">
+          New request
+        </h3>
         <Button
           type="button"
           data-testid="dicex-request-fold"
