@@ -19,3 +19,4 @@ BL-135: decided (#367), slice F4.
 | Date | What |
 |---|---|
 | 2026-10-28 | Planned (DM #366). F1, F2 started |
+| 2026-10-28 | DM #367: BL-135 server roll guard (slice F4). F1 (4 commits) and F2 (8 commits) built, not yet tested; **paused by the DM**: the test tooling gets built first in a new session, then this sprint resumes |
