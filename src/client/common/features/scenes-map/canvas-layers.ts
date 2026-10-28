@@ -10,6 +10,7 @@ import { ScnEditLayer } from "../scene-tools/layers/EditLayer";
 import { ScnPropsLayer } from "../scene-tools/layers/PropsLayer";
 import { ScnStructureLayer } from "../scene-tools/layers/StructureLayer";
 import { ScnTemplatesLayer } from "../scene-tools/layers/TemplatesLayer";
+import { VfxOverLayer, VfxUnderLayer } from "../spell-fx/layers";
 import { LAYER_ORDER, type LayerDef, orderLayers } from "./layers";
 import { GridLayer } from "./layers/GridLayer";
 import { LabelsLayer } from "./layers/LabelsLayer";
@@ -66,4 +67,7 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
     component: FogLayer,
     toggle: FOG_LAYER_SWITCH,
   },
+  // spell-fx (FR-VFX-13): aura under / over passes on `objects`, around the tokens.
+  { id: "vfx-under", order: LAYER_ORDER.vfxUnder, layer: "objects", component: VfxUnderLayer },
+  { id: "vfx-over", order: LAYER_ORDER.vfxOver, layer: "objects", component: VfxOverLayer },
 ]);

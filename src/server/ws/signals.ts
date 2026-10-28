@@ -8,6 +8,9 @@
 // at most `rate.perSecond` frames per receiver and `rate.key` within any second: an excess frame
 // is dropped, never delayed (nothing is held, so none can follow a later event). Registered with
 // `registerServer`; a client sending one gets `unknown_intent`.
+// Per-connection server signals (ADR-0071, spell-fx hit cues): `hub.sendServerSignal` sends a
+// registered server signal to every live connection of a campaign, DMs included, with the payload
+// a feature computes per viewer (null = none); never queued, stored or replayed.
 import type { z } from "zod";
 import type { Db } from "../db/client";
 import type { Role } from "../events/types";

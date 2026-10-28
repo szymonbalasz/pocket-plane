@@ -29,7 +29,7 @@ const C = () => null;
 const ids = (slots: { layers: { id: string }[] }[]) => slots.map((s) => s.layers.map((l) => l.id));
 
 describe("FR-SCN-02/03 canvas layers", () => {
-  test("FR-SCN-02 registered order: map < grid < props < structure < (fog) < templates < tokens < labels < edit < pointers", () => {
+  test("FR-SCN-02 registered order: map < grid < props < structure < (fog) < templates < vfx-under < tokens < vfx-over < labels < edit < pointers", () => {
     expect(canvasLayers.map((l) => [l.id, l.order])).toEqual([
       ["map", 0],
       ["grid", 10],
@@ -37,7 +37,9 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["scn-structure", 26],
       ["fog", 30],
       ["scn-templates", 35],
+      ["vfx-under", 38],
       ["tokens", 40],
+      ["vfx-over", 43],
       ["labels", 45],
       ["scn-edit", 48],
       ["pointers", 50],
@@ -54,7 +56,9 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["scn-props", "scn-structure"],
       ["fog"],
       ["scn-templates"],
+      ["vfx-under"],
       ["tokens"],
+      ["vfx-over"],
       ["labels"],
       ["scn-edit"],
       ["pointers"],
@@ -73,13 +77,13 @@ describe("FR-SCN-02/03 canvas layers", () => {
     expect(named("dm")).toEqual([
       ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
       ["map-layer-fog", ["fog"]],
-      ["map-layer-objects", ["scn-templates", "tokens", "labels"]],
+      ["map-layer-objects", ["scn-templates", "vfx-under", "tokens", "vfx-over", "labels"]],
       ["map-layer-top", ["scn-edit", "pointers"]],
     ]);
     expect(named("player")).toEqual([
       ["map-layer-base", ["map", "grid", "scn-props", "scn-structure"]],
       ["map-layer-fog", ["fog"]],
-      ["map-layer-objects", ["scn-templates", "tokens", "labels"]],
+      ["map-layer-objects", ["scn-templates", "vfx-under", "tokens", "vfx-over", "labels"]],
       ["map-layer-top", ["pointers"]],
     ]);
     // Konva warns above 5; the budget is 4 on both clients, whatever the switches say.
