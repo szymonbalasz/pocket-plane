@@ -71,7 +71,7 @@ describe("FR-KIT-42 row action text", () => {
     expect(a).toEqual({ actor: "Goblin", text: "Scimitar attack vs Mira" });
     expect(rowBadges(formatEntry(ATTACK).segments)).toEqual(["physical"]);
     expect(rowResults(ATTACK)).toEqual([
-      { key: "hit", rollId: null, label: "To hit", total: 16, outcome: "plain" },
+      { key: "hit", rollId: null, label: "To hit", total: 16, outcome: "plain", hit: true },
       { key: "damage", rollId: null, label: "Damage", total: 6, outcome: "damage" },
     ]);
     // The maths stays the full line's (Tooltip, copy).
@@ -240,6 +240,24 @@ describe("FR-KIT-44 outcome", () => {
       payload: { ...p, toHit: null, hit: false, damage: 0 },
     });
     expect(missText.text).toBe("Scimitar attack vs Mira — miss");
+  });
+
+  test("FR-KIT-44 BL-141 outcome: a cbt.attack to-hit that hit (not a crit) is marked `hit` (the kit's green box); a crit, a miss and damage boxes aren't", () => {
+    const p = ATTACK.payload;
+    const hits = (payload: Record<string, unknown>) =>
+      rowResults({ ...ATTACK, payload: { ...p, ...payload } }).map((r) => [r.key, r.hit ?? false]);
+    expect(hits({})).toEqual([
+      ["hit", true],
+      ["damage", false],
+    ]);
+    expect(hits({ awaitingDamage: true, damage: 0 })).toEqual([["hit", true]]);
+    expect(hits({ crit: true, toHit: { ...p.toHit, natural: 20, total: 24 } })[0]).toEqual([
+      "hit",
+      false,
+    ]);
+    expect(hits({ hit: false, damage: 0 })).toEqual([["hit", false]]);
+    // A plain roll's boxes never carry it.
+    expect(rowResults({ ...ATTACK, payload: { ...p } })[0]?.outcome).toBe("plain");
   });
 
   test("FR-KIT-42 row action text (K8): a companion's line names no attack for players ('attacks Mira'); the DM reads it from dmPayload", () => {

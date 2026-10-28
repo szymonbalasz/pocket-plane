@@ -2059,3 +2059,10 @@
 :root[data-theme="gilt"] [data-slot="card-line"] input[data-slot="kit-result"][data-outcome="hit"] {
   border-color: var(--hp-full);
 }
+/* KIT: sprint 14 F3 (kit nits, DM #366, BL-139 / BL-141, K6c §3: the log's hit box, wide-sheet box
+   headings, compendium rows, section labels, menus, the compact summary) ─────────────────────── */
+/* Game log: a `cbt.attack` to-hit that hit takes the kit's green box (`.res.crit`), as the damage
+   card's (K12); the number is the meaning green (markup). */
+:root[data-theme="gilt"] [data-slot="log-row"] [data-slot="kit-result"][data-hit="true"] {
+  border-color: var(--hp-full);
+}

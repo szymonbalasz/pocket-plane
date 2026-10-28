@@ -440,7 +440,9 @@ function Entry({
                 outcome={r.outcome}
                 held={!landed}
                 tip={details}
-                className={struck}
+                // BL-141 (K6c gap 3): a to-hit that hit is the kit's green number, as on the card.
+                data-hit={r.hit && landed ? "true" : undefined}
+                className={cn(r.hit && landed && "text-hp-full", struck)}
               />
             );
             // K12 re-test (walkthrough 1): "+N" rides on the last box's corner, inside its slot,

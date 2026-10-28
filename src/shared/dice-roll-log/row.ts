@@ -131,11 +131,16 @@ export interface RowResult {
   label: string;
   total: number;
   outcome: RollOutcome;
+  /**
+   * BL-141 (K6c gap 3): a `cbt.attack` to-hit that hit (not a crit): the kit's green box, as the
+   * damage card's `hit` (K12). Absent otherwise.
+   */
+  hit?: true;
 }
 
 /**
  * K8 (K6 gap 1): a `cbt.attack` line's to-hit box (`crit` on a critical hit, `fumble` = dim on a
- * miss, else plain) and, once damage landed on a hit, its damage box; a `cbt.hp` line's amount
+ * miss, else plain; BL-141: `hit` marks a plain one that hit) and, once damage landed on a hit, its damage box; a `cbt.hp` line's amount
  * (damage / heal). The words ("hit!", "DM ruled miss", the AC) stay in the Tooltip's line. Null =
  * neither kind.
  */
@@ -147,7 +152,8 @@ function combatResults(entry: EntryLike): RowResult[] | null {
     const out: RowResult[] = [];
     if (p.toHit) {
       const outcome = !p.hit ? "fumble" : p.crit ? "crit" : "plain";
-      out.push({ key: "hit", rollId: null, label: "To hit", total: p.toHit.total, outcome });
+      const box = { key: "hit", rollId: null, label: "To hit", total: p.toHit.total, outcome };
+      out.push(p.hit && !p.crit ? { ...box, hit: true } : box);
     }
     // FR-CBT-88: an Apply hit line has no damage yet.
     if (p.hit && !p.awaitingDamage) {
