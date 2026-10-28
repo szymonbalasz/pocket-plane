@@ -1,0 +1,38 @@
+# Nightly on main: the perf gates (informational: CI machines are noisier than ours) and the
+# non-slow `bun test` set on Windows, where the DM runs the app (file locks, paths, EBUSY guards).
+name: nightly
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PP_SLOT: "0"
+  PP_DATA_DISPOSABLE: "1"
+  PP_DM_SECRET: ci-only-dm-secret
+  FORCE_COLOR: "0"
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: bun run bench
+
+  windows:
+    name: bun test on Windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      PP_TEST_SHARDS: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: bun scripts/check.ts --all --tests-only

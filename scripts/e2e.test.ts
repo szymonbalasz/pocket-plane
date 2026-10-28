@@ -2,7 +2,14 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { bundleOrder, countLine, FAILURE_LINE, groupSpecs, serialBundles } from "./e2e";
+import {
+  bundleOrder,
+  countLine,
+  FAILURE_LINE,
+  groupSpecs,
+  serialBundles,
+  shardBundles,
+} from "./e2e";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -58,6 +65,24 @@ test("e2e runner: bundles start longest first (recorded seconds, then spec count
   ]);
   expect(bundleOrder(groups, {})).toEqual(["b", "a", "c", "d"]);
   expect(bundleOrder(groups, { d: 90, c: 30, gone: 500 })).toEqual(["d", "c", "b", "a"]);
+});
+
+test("e2e runner: --shard=i/n splits bundles into n balanced, disjoint, complete sets", () => {
+  const groups = new Map([
+    ["a", ["e2e/a1.e2e.ts"]],
+    ["b", ["e2e/b1.e2e.ts", "e2e/b2.e2e.ts"]],
+    ["c", ["e2e/c1.e2e.ts"]],
+    ["d", ["e2e/d1.e2e.ts"]],
+    ["e", ["e2e/e1.e2e.ts"]],
+  ]);
+  const times = { a: 100, b: 60, c: 50, d: 40 }; // e: 1 spec → 20 s
+  const shards = [1, 2, 3].map((i) => shardBundles(groups, times, i, 3));
+  expect(shards).toEqual([["a"], ["b", "e"], ["c", "d"]]);
+  expect(shards.flat().sort()).toEqual(["a", "b", "c", "d", "e"]);
+  expect(shardBundles(groups, times, 3, 3)).toEqual(shards[2]!); // same split every call
+  expect(shardBundles(groups, {}, 1, 1)).toEqual(["b", "a", "c", "d", "e"]);
+  expect(shardBundles(groups, times, 1, 9)).toEqual(["a"]);
+  expect(shardBundles(groups, times, 9, 9)).toEqual([]);
 });
 
 test("e2e runner: Playwright list summary lines → passed / failed / flaky / skipped / did not run", () => {

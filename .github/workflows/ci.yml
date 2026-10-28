@@ -1,0 +1,105 @@
+# The full suite on every push (AGENTS §9.4): typecheck + lint + build, every `bun test` file
+# (slow set included) in 6 parts, every e2e bundle in 12 parts. Locally we run only targeted
+# tests (`bun run check`); `bun run ci:watch` reports this run's verdict after a push.
+# Docs-only pushes skip it (but specs and the kit page are read by tests, so they don't).
+name: ci
+
+on:
+  push:
+    paths:
+      - "**"
+      - "!docs/**"
+      - "!*.md"
+      - "docs/specs/**"
+      - "docs/design/art/kit/**"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Test runs build their own config; these satisfy the scripts that read the env.
+  PP_SLOT: "0"
+  PP_DATA_DISPOSABLE: "1"
+  PP_DM_SECRET: ci-only-dm-secret
+  FORCE_COLOR: "0"
+
+jobs:
+  static:
+    name: typecheck + lint + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: typecheck
+        run: bun run typecheck
+      - name: lint
+        run: bun run lint --reporter=github
+      - name: build
+        run: bun run build
+
+  unit:
+    name: unit ${{ matrix.part }}/6
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4, 5, 6]
+    env:
+      PP_TEST_SHARDS: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: bun test (part ${{ matrix.part }})
+        run: bun scripts/check.ts --full --tests-only --shard=${{ matrix.part }}/6
+
+  e2e:
+    name: e2e ${{ matrix.part }}/12
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    env:
+      PP_E2E_WORKERS: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - uses: actions/cache@v4
+        id: pw-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - name: playwright browser
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: bun x playwright install --with-deps chromium
+      - name: playwright system deps
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: bun x playwright install-deps chromium
+      # One retry: a test that passes on it is reported flaky (warning), not failed.
+      - name: e2e (part ${{ matrix.part }})
+        run: bun scripts/e2e.ts --shard=${{ matrix.part }}/12 --retries=1
+      - name: traces of failures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results-${{ matrix.part }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+      # Bundle seconds, merged into scripts/e2e-times.json now and then for the shard balance.
+      - name: bundle times
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-times-${{ matrix.part }}
+          path: data/e2e-times.json
+          retention-days: 7
+          if-no-files-found: ignore

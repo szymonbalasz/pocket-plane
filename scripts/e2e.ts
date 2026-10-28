@@ -12,7 +12,13 @@
 // summary closes the run. The longest bundles (data/e2e-times.json, else most spec files) start
 // first. A bundle with a spec carrying a header line `// e2e-serial: <why>` (timing-sensitive
 // under load) runs after the others, alone.
+//
+// `--shard=<i>/<n>` (CI) runs only the i-th of n bundle sets, balanced by the committed bundle
+// times in scripts/e2e-times.json (else spec count), so every shard computes the same split.
+// `--no-build` reuses an existing `dist/client/` (local re-runs of one spec). On GitHub Actions
+// the summary also goes to the job summary and each failure becomes an error annotation.
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -36,6 +42,11 @@ const SERVER_START_TIMEOUT_MS = 60_000;
 const BUNDLE_LINE = /^\/\/\s*e2e-bundle:\s*([a-z0-9][a-z0-9-]*)\s*$/m;
 const SERIAL_LINE = /^\/\/\s*e2e-serial:\s*\S/m;
 const TIMES_FILE = path.join(WORKTREE_ROOT, "data", "e2e-times.json");
+/** Committed bundle seconds (one bundle alone), the CI shard weights; refreshed from CI runs. */
+const SHARD_TIMES_FILE = path.join(WORKTREE_ROOT, "scripts", "e2e-times.json");
+/** Weight of a bundle with no recorded time, per spec file. */
+const SECS_PER_SPEC = 20;
+const SHARD_ARG = /^--shard=(\d+)\/(\d+)$/;
 
 async function run(cmd: string[], env: Record<string, string | undefined> = process.env) {
   const p = Bun.spawn(cmd, { cwd: WORKTREE_ROOT, env, stdout: "inherit", stderr: "inherit" });
@@ -79,6 +90,29 @@ export function bundleOrder(
     (a, b) =>
       weight(b) - weight(a) || groups.get(b)!.length - groups.get(a)!.length || a.localeCompare(b),
   );
+}
+
+/**
+ * The bundles of shard `i` (1-based) of `n`: longest first, each to the lightest shard, by
+ * `times` (else spec count × SECS_PER_SPEC). Deterministic for the same groups and times.
+ */
+export function shardBundles(
+  groups: Map<string, string[]>,
+  times: Record<string, number>,
+  i: number,
+  n: number,
+): string[] {
+  const weight = (b: string) => times[b] ?? groups.get(b)!.length * SECS_PER_SPEC;
+  const shards = Array.from({ length: n }, () => ({ bundles: [] as string[], t: 0 }));
+  for (const b of bundleOrder(
+    groups,
+    Object.fromEntries([...groups.keys()].map((k) => [k, weight(k)])),
+  )) {
+    const s = shards.reduce((a, c) => (c.t < a.t ? c : a));
+    s.bundles.push(b);
+    s.t += weight(b);
+  }
+  return shards[i - 1]?.bundles ?? [];
 }
 
 export interface Counts {
@@ -211,11 +245,39 @@ async function spawnBundle(
   return { bundle, code: p.exitCode ?? 1, counts, secs: (performance.now() - t0) / 1000, failures };
 }
 
-function readTimes(): Record<string, number> {
+function readTimes(file = TIMES_FILE): Record<string, number> {
   try {
-    return existsSync(TIMES_FILE) ? JSON.parse(readFileSync(TIMES_FILE, "utf8")) : {};
+    return existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
   } catch {
     return {};
+  }
+}
+
+/** GitHub Actions: the summary as markdown in the job summary, failures as annotations. */
+function githubReport(results: BundleResult[], label: string) {
+  const out = process.env.GITHUB_STEP_SUMMARY;
+  if (!process.env.GITHUB_ACTIONS || !out) return;
+  const bad = results.filter((r) => r.code !== 0 || r.counts.flaky > 0);
+  const lines = [`### e2e ${label}`, ""];
+  const sum = (k: keyof Counts) => results.reduce((s, r) => s + r.counts[k], 0);
+  lines.push(
+    `${results.length} bundle(s): ${sum("passed")} passed, ${sum("failed")} failed, ${sum("flaky")} flaky`,
+    "",
+  );
+  for (const r of bad) {
+    lines.push(`- **${r.code !== 0 ? "FAIL" : "flaky"}** \`${r.bundle}\``);
+    for (const f of r.failures) lines.push(`  - \`${f}\``);
+    if (r.code !== 0) {
+      const title = `e2e bundle ${r.bundle} failed`;
+      console.log(`::error title=${title}::${r.failures.join(" | ") || "see the job log"}`);
+    } else {
+      console.log(`::warning title=e2e bundle ${r.bundle} flaky::${r.failures.join(" | ")}`);
+    }
+  }
+  try {
+    appendFileSync(out, `${lines.join("\n")}\n`);
+  } catch {
+    // the summary is a convenience; the log has it all
   }
 }
 
@@ -255,13 +317,32 @@ if (import.meta.main) {
     );
   }
   const filters = args.filter((a) => a.endsWith(".ts"));
-  const pwArgs = args.filter((a) => !a.endsWith(".ts"));
+  const shardArg = args.map((a) => SHARD_ARG.exec(a)).find(Boolean);
+  const noBuild = args.includes("--no-build");
+  const pwArgs = args.filter((a) => !a.endsWith(".ts") && !SHARD_ARG.test(a) && a !== "--no-build");
   const groups = groupSpecs(filters);
   if (groups.size === 0) {
     console.error(`No e2e spec matches ${filters.join(", ")}`);
     process.exit(1);
   }
-  if ((await run(["bun", "x", "vite", "build"])) !== 0) process.exit(1);
+  let label = "";
+  if (shardArg) {
+    const [i, n] = [Number(shardArg[1]), Number(shardArg[2])];
+    if (!(n >= 1 && i >= 1 && i <= n)) {
+      console.error(`Bad --shard=${i}/${n}`);
+      process.exit(1);
+    }
+    const mine = new Set(shardBundles(groups, readTimes(SHARD_TIMES_FILE), i, n));
+    for (const b of [...groups.keys()]) if (!mine.has(b)) groups.delete(b);
+    label = `shard ${i}/${n}`;
+    if (groups.size === 0) {
+      console.log(`=== e2e ${label}: no bundles`);
+      process.exit(0);
+    }
+  }
+  if (noBuild && existsSync(path.join(WORKTREE_ROOT, "dist", "client"))) {
+    console.log("=== e2e: --no-build, reusing dist/client/");
+  } else if ((await run(["bun", "x", "vite", "build"])) !== 0) process.exit(1);
   const workers = Math.min(envCount("PP_E2E_WORKERS", 4), groups.size);
   const times = readTimes();
   const order = bundleOrder(groups, times);
@@ -289,6 +370,7 @@ if (import.meta.main) {
     console.warn(`Could not write ${TIMES_FILE}: ${(err as Error).message}`);
   }
   summary(results, (performance.now() - t0) / 1000);
+  githubReport(results, label);
   const failed = results.filter((r) => r.code !== 0).map((r) => r.bundle);
   if (failed.length > 0) console.error(`\ne2e failed for bundle(s): ${failed.join(", ")}`);
   process.exit(failed.length === 0 ? 0 : 1);
