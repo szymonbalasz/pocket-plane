@@ -251,7 +251,6 @@ export const setConcentration = defineCommand({
   input: SetConcentrationInput,
   roles: ["dm", "player"],
   execute(input, env): EffectIdResult {
-    const cid = campaignOf(env.actor);
     if (env.actor.role === "player" && !("characterId" in input.target)) {
       throw forbidden("Players concentrate on their own character");
     }
