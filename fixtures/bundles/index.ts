@@ -137,6 +137,7 @@ import tplMenu from "./tpl-menu";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
+import visualKit from "./visual-kit";
 import wfFrame from "./wf-frame";
 import wfFrameE2e from "./wf-frame-e2e";
 import windowsS5 from "./windows-s5";
@@ -338,4 +339,6 @@ export const bundles: readonly Bundle[] = [
   kitRound3,
   // Sprint 13 K12 (build/kit-round3-combat): kit-parity + companion groups (K12 walkthrough)
   kitRound3Combat,
+  // Test infra (fix/test-infra, #368): screenshot baselines (e2e `visual`)
+  visualKit,
 ];

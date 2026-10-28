@@ -1,0 +1,35 @@
+# Refresh the screenshot baselines (e2e/visual.e2e.ts) on purpose, for a branch whose look changed
+# by decision: `gh workflow run screenshots.yml --ref <branch>`. Renders on Linux (where CI
+# compares), commits e2e/__screenshots__/ to that branch if anything changed. Review the PNG diff.
+name: screenshots
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PP_SLOT: "0"
+  PP_DATA_DISPOSABLE: "1"
+  PP_DM_SECRET: ci-only-dm-secret
+  FORCE_COLOR: "0"
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - run: bun x playwright install --with-deps chromium
+      - name: render
+        run: bun scripts/e2e.ts e2e/visual.e2e.ts --update-snapshots=all
+      - name: commit
+        run: |
+          git add e2e/__screenshots__
+          if git diff --cached --quiet; then echo "baselines unchanged"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898729+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Screenshot baselines from CI (${GITHUB_SHA::8})"
+          git push

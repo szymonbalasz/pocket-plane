@@ -196,11 +196,14 @@ fixtures/
 | `bun run build` | Vite build of both clients to `dist/client/` | — |
 | `bun run start [--profile p]` | Hono serving `dist/client/`, API and WS on one port | profile port |
 | `bun test` | Unit + integration: commands, zod schemas, domain events + event log, visibility filter (DM vs player), WS hub via real socket, fixture load, import boundaries, guards. Plain `bun test` runs every file, the slow set too | `:memory:` DB, temp asset dir, port 0 |
-| `bun run e2e [spec.ts…]` | Builds once, then Playwright per bundle, thin critical flows only. DM and player in separate browser contexts. Up to `PP_E2E_WORKERS` bundles at once (default 4; `1` = one after another), output prefixed `[bundle]`, a passed / failed / flaky summary per bundle at the end; longest bundles first (`data/e2e-times.json`). A spec header `// e2e-serial: <why>` (timing-sensitive under load) runs its bundle alone after the others; Playwright timeouts 60 s per test, 10 s per `expect` (hang guards) | per bundle: port 0, temp data dir, own server, Playwright output `test-results/<bundle>/` |
+| `bun run e2e [spec.ts…]` | Builds once, then Playwright per bundle, thin critical flows only. DM and player in separate browser contexts. Up to `PP_E2E_WORKERS` bundles at once (default 4; `1` = one after another), output prefixed `[bundle]`, a passed / failed / flaky summary per bundle at the end; longest bundles first (`data/e2e-times.json`). `--no-build` reuses `dist/client/`; `--shard=i/n` runs one of n balanced bundle sets (CI, weights `scripts/e2e-times.json`). A spec header `// e2e-serial: <why>` (timing-sensitive under load) runs its bundle alone after the others; Playwright timeouts 60 s per test, 10 s per `expect` (hang guards) | per bundle: port 0, temp data dir, own server, Playwright output `test-results/<bundle>/` |
 | `bun run typecheck` | `tsc --noEmit`, whole repo | — |
 | `bun run lint` | `biome check` (lint + format) | — |
-| `bun run check` | `typecheck` + `lint` + `bun test` minus the slow set, all at once. Tests split into `PP_TEST_SHARDS` processes (default min(6, cores / 4); `1` = one process), balanced by `scripts/test-times.json`; prints failures with their file. Run before every commit | each shard: own `bun test` process, same preload |
-| `bun run check:full` | `check` + the slow set (`*.slow.test.ts`: heavy harnesses and sweeps). The orchestrator's gates (`gates.sh`) and session-sims; builders touching a slow file run that file | as `check` |
+| `bun run check` | `typecheck` + `lint` + the **targeted** tests, all at once: changed test files, tests in a changed file's folder, then the tests importing a changed file, nearest first, up to `--max` (default 80) files; slow files only if changed or `--slow`. Changes since the merge base with `main` (`--base=<ref>` overrides; `--list` prints the selection). Tests split into `PP_TEST_SHARDS` processes (default min(6, cores / 4)), balanced by `scripts/test-times.json`. Run before every commit and push | each shard: own `bun test` process, same preload |
+| `bun run test:changed` | `check`'s targeted tests only (no typecheck / lint) | as `check` |
+| `bun run check:all` | `typecheck` + `lint` + every test but the slow set. Rarely needed locally: CI runs it on every push | as `check` |
+| `bun run check:full` | `check:all` + the slow set (`*.slow.test.ts`: heavy harnesses and sweeps). CI runs it; locally only to chase a CI failure | as `check` |
+| `bun run ci:watch [sha]` | Waits for the GitHub Actions runs on a pushed commit (default `HEAD`), prints green or the failed jobs with their failing tests; exit 0 green / superseded, 1 failed, 2 none or timeout. Run it **in the background** after each push (§9.4.1) | — |
 | `bun run test:times [filters…]` | Runs each test file in its own process (`PP_TEST_TIMES_JOBS` at once, default 8), rewrites `scripts/test-times.json` (shard weights) and writes `data/test-times.md`, slowest first | as `bun test` |
 | `bun run bench` | Timed perf gates (`*.bench.ts`: fog vision, scene geometry / guard / area, dice settle / notation, compendium search, map fit visibility, window placement, DM snapshot build time, command palette search, session recap compute; harness `src/shared/bench-kit.ts`); `bun test` skips them, a new one is added to the script. Run it alone, before merging vision / fog / geometry perf work | in-process |
 | `bun run state:digest [--profile p]` | Read-only per-table row counts + SHA-256 of the profile's DB (crash walkthroughs compare digests, #163) | profile data |
@@ -209,6 +212,16 @@ fixtures/
 - `scripts/dev.ts` spawns Hono and Vite with `Bun.spawn`, prefixes their output, and stops both when either exits or on Ctrl+C. No `concurrently`.
 - **Test DB schema: template DB.** A `bun test` preload builds one schema DB per run from the Drizzle schema with drizzle-kit push (the same path as dev, [ADR-0001](docs/architecture/adr/0001-tech-stack.md)); each test file opens `:memory:` from its serialized bytes. Why: no migration files during build, so parallel branches can't conflict on a migration journal, and it is fast enough for per-file isolation ([OQ-FIX-08](docs/specs/fixtures-adapters.md#15-open-questions)). `fixtures:reset` also uses push. `drizzle-kit generate` migrations start at release.
 - Tests build config with `parseConfig` (disposable + test mode on); no `.env` needed. Name tests after requirements: `test("FR-CBT-03 applies damage card", …)`.
+
+#### 9.4.1 The test loop: targeted locally, everything in CI
+
+Decided by the DM ([decisions #368](docs/decisions-log.md)). The repo is public on GitHub; Actions minutes are free.
+
+- **CI** ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs on **every push to any branch**: typecheck + lint + build, every `bun test` file (slow set included, 6 parallel jobs) and every e2e bundle (12 parallel jobs, one automatic retry: a pass on retry is reported **flaky**, not failed). A newer push to the same branch cancels the older run. Docs-only pushes skip it (specs and the kit page don't: tests read them). Failing tests show as annotations and in each job's summary. Nightly ([`nightly.yml`](.github/workflows/nightly.yml)): `bench` (informational) and the non-slow tests on Windows.
+- **Locally, run only targeted tests**: `bun run check` (or `test:changed` while iterating), single test files, and `bun run e2e <spec> --no-build` for the spec you are working on. Don't run `check:all`, `check:full` or the full e2e locally; CI does. Exception: reproducing a CI failure, then only the failing files.
+- **Push often, don't wait.** After a push, start `bun run ci:watch` as a background job and keep working. It exits when CI finishes; only a non-zero exit needs attention. Never sleep or poll for CI in the foreground.
+- **Merging doesn't wait for CI** (DM #368): a slice merges once its targeted `check` is green and its walkthrough passed. A red branch CI already reported is fixed before the merge. The orchestrator watches CI on `main` after each merge (`ci:watch` in the background); **red `main` is fixed first**, ahead of new work, on a `fix/ci-<slug>` branch (or reverted if the fix isn't quick).
+- **One heavy local run at a time** still holds for what stays local: walkthrough servers and browsers, session-sims (#354).
 
 ### 9.5 Test IDs
 
@@ -251,7 +264,7 @@ fixtures/
 - [ ] Visibility rule per record type tested for DM and player. Disconnect, reconnect and crash behaviour from the spec tested.
 - [ ] Fixtures + bundle added; `fixtures:reset-load <bundle>` works from empty.
 - [ ] Test IDs on all interactive UI.
-- [ ] `bun run check` and `bun run build` green; thin `bun run e2e` green.
+- [ ] `bun run check` (targeted) green locally, the feature's own e2e spec green (`bun run e2e <spec>`); pushed, and no red CI on the branch (§9.4.1).
 - [ ] Spec §13 walkthrough PASSed by a test agent; evidence path in the report.
 - [ ] Shared files changed only per §9.9. Rebased on `main`. One commit per slice. No `.env`, `data/`, `.verify/`.
 

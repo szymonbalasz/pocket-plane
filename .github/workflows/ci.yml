@@ -94,6 +94,15 @@ jobs:
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
+      # A missing baseline is written by the run (and fails it): download these to adopt them.
+      - name: new screenshot baselines
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots-${{ matrix.part }}
+          path: e2e/__screenshots__/
+          retention-days: 7
+          if-no-files-found: ignore
       # Bundle seconds, merged into scripts/e2e-times.json now and then for the shard balance.
       - name: bundle times
         if: always()
