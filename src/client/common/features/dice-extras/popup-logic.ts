@@ -8,7 +8,7 @@ import type { ThrowDie } from "@shared/dice-extras/throw";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 import type { Rect } from "../play-shell/geometry";
-import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
+import { EDGE_GAP, TITLE_H, TOP_BAR_H } from "../play-shell/geometry";
 import { RAIL_CLEAR } from "../play-shell/placement";
 import type { ShellClient } from "../play-shell/registry";
 import {
@@ -356,4 +356,79 @@ export function dmPopupClear(
  */
 export function shownPopupStack(dm: boolean, rect: Rect | null): Rect | null {
   return dm && rect && rect.w > 0 && rect.h > 0 ? rect : null;
+}
+
+/** BL-132: a window's head kept clear: its title bar and at least 40 px of body. */
+export const HEAD_MIN = TITLE_H + 40;
+/** BL-132: at most this deep (a first record that is a whole panel isn't a head). */
+export const HEAD_MAX = TITLE_H + 120;
+
+/**
+ * BL-132 (sim-16 g01: the DM's tray popup on Party Manager's tabs and pot for ~6 s): each window's
+ * head as the DM popups keep clear of it: title bar, tab strip, search box and first record (the
+ * frame's first-row report, FR-NOTE-44, matched by the window's top-left), `HEAD_MIN`..`HEAD_MAX`
+ * deep. Pure.
+ */
+export function windowHeads(
+  windows: readonly Rect[],
+  rows: readonly { x: number; y: number; bottom: number }[],
+): Rect[] {
+  return windows.map((w) => {
+    const row = rows.find((r) => Math.abs(r.x - w.x) <= 1 && Math.abs(r.y - w.y) <= 1);
+    const deep = row ? row.bottom - w.y : HEAD_MIN;
+    return { ...w, h: Math.min(w.h, Math.max(HEAD_MIN, Math.min(HEAD_MAX, deep))) };
+  });
+}
+
+const overlaps = (a: Rect, b: Rect, gap: number) =>
+  a.x < b.x + b.w + gap && b.x - gap < a.x + a.w && a.y < b.y + b.h + gap && b.y - gap < a.y + a.h;
+
+/**
+ * BL-132: the DM popup column's spot. `dmStackAt` over `clear` (Initiative, dialogs, tool bar,
+ * the toast stack), first also over every other window (a spot on none), else over their heads
+ * (`windowHeads`: off title bars, tab strips and first records); each only where that spot clears
+ * every rect it was given and holds the column above the viewport's bottom. Neither → as before
+ * (the column may cover windows; `popupRoom` then keeps it off the heads below it). Pure.
+ */
+export function dmPopupAt(
+  vp: { w: number; h: number },
+  top: number,
+  size: { w: number; h: number },
+  clear: readonly Rect[],
+  windows: readonly Rect[],
+  heads: readonly Rect[],
+): { left: number; top: number } {
+  for (const extra of [windows, heads]) {
+    const rects = [...clear, ...extra];
+    const at = dmStackAt(vp, top, size, rects);
+    const box = { x: at.left, y: at.top, w: size.w, h: size.h };
+    const fits = at.top + size.h <= vp.h - EDGE_GAP && at.left >= RAIL_CLEAR;
+    if (fits && !rects.some((r) => overlaps(box, r, EDGE_GAP))) return at;
+  }
+  return dmStackAt(vp, top, size, clear);
+}
+
+/**
+ * FR-DICEX-47 short screens + BL-132 (sim-16 d01: three quick player rolls stacked 448-wide
+ * popups from 104, 354 over the Game log's title bar): the DM column's room below its top `at`,
+ * px: to the viewport's bottom; a column moved off its `home` (shifted or dropped by what it keeps
+ * clear of) also stops at the top of the first window head below it that its width crosses (it
+ * may end on the head's edge, never over it; the oldest popups drop, the newest always shows). At
+ * home #347's counts stand (the cards overhang the toast region's keep-out box, FR-DICEX-47). Pure.
+ * A nudge that keeps over half the home lane (8 px clear of Initiative at 868, 1280 wide) is home.
+ */
+export function popupRoom(
+  vpH: number,
+  at: { left: number; top: number },
+  w: number,
+  heads: readonly Rect[],
+  home: { left: number; top: number },
+): number {
+  let bottom = vpH - EDGE_GAP;
+  const atHome = Math.abs(at.left - home.left) < w / 2 && Math.abs(at.top - home.top) <= 1;
+  for (const h of atHome ? [] : heads) {
+    if (h.y < at.top || h.x >= at.left + w || h.x + h.w <= at.left) continue;
+    bottom = Math.min(bottom, h.y);
+  }
+  return bottom - at.top;
 }

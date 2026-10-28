@@ -205,7 +205,7 @@ export function HistoryBody({ views, note }: { views: NotificationViews; note: N
   const everLive = useSync((s) => s.everLive);
   const sync = useContext(SyncContext);
   const actions = useNoteActions(views);
-  const { pending, history } = historySections(store);
+  const { pending, waiting, history } = historySections(store);
   const testMode = isTestMode(store);
 
   // FR-NOTE-18: open → mark seen now (layout effect: the launcher badge clears with this paint).
@@ -243,7 +243,7 @@ export function HistoryBody({ views, note }: { views: NotificationViews; note: N
   }
   return (
     <div className="flex min-h-0 flex-col gap-2" data-testid="note-history">
-      {pending.length === 0 && history.length === 0 ? (
+      {pending.length === 0 && waiting.length === 0 && history.length === 0 ? (
         <p
           data-testid="note-history-empty"
           className="py-6 text-center text-sm text-muted-foreground"
@@ -258,6 +258,14 @@ export function HistoryBody({ views, note }: { views: NotificationViews; note: N
             views={views}
             actions={actions}
             testId="note-history-pending"
+          />
+          {/* BL-137: a player's rows pending on the DM (or another player), not History. */}
+          <Section
+            title="Waiting"
+            rows={waiting}
+            views={views}
+            actions={actions}
+            testId="note-history-waiting"
           />
           <Section
             title="History"

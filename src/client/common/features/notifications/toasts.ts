@@ -141,6 +141,32 @@ export function setHovered(s: ToastState, hovered: boolean, now: number): ToastS
   return withPause(s, { hovered }, now);
 }
 
+/** A pointer point and a rendered box (`getBoundingClientRect()` fits), page px. */
+export interface HoverPoint {
+  x: number;
+  y: number;
+}
+export interface HoverBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * FR-NOTE-14 (sprint 14 F2): no `mouseleave` fires when the hovered toast unmounts or the stack
+ * does, so the hover holds only while the stack shows and the last pointer point is on its box.
+ */
+export function hoverHolds(showing: boolean, box: HoverBox | null, at: HoverPoint | null): boolean {
+  if (!showing || !box || !at) return false;
+  return at.x >= box.left && at.x < box.right && at.y >= box.top && at.y < box.bottom;
+}
+
+/** FR-NOTE-14: a hover that no longer holds (`hoverHolds`) drops; the timers run again. */
+export function dropStaleHover(s: ToastState, holds: boolean, now: number): ToastState {
+  return s.hovered && !holds ? setHovered(s, false, now) : s;
+}
+
 export function setHidden(s: ToastState, hidden: boolean, now: number): ToastState {
   return withPause(s, { hidden }, now);
 }
@@ -471,17 +497,23 @@ const RANK: Record<NotificationToastClass | "summary", number> = {
  * BL-120 (sim-15 glitch 3: "1 pending action +2 more" beside Initiative's "Pending (3)"): while
  * the summary shows, the held-back cards count in it (`inSummary`, added to its count), not in
  * "+N more" (held-back alerts and info only), so each pending action counts once on the stack.
+ * BL-130 (K3 walkthrough: 3 rapid "Saved …" alerts + the summary on a Compendium record's heading
+ * and buttons at DM 1280×720): `alerts` caps the alerts shown, the newest kept; the runtime lowers
+ * it only once every card and info folded and the stack still covers window content or doesn't
+ * fit (`foldCap`), so the held-back alerts join "+N more".
  */
 export function visibleToasts(
   s: ToastState,
   max: number = MAX_VISIBLE,
   folded = false,
+  alerts: number = Number.POSITIVE_INFINITY,
 ): { shown: Toast[]; more: number; inSummary: number; callout: Callout | null } {
   const out = (t: Toast) => folded && (t.kind === "summary" || classOfToast(t) === "card");
   const summary = !folded && s.toasts.some((t) => t.kind === "summary");
   const room = Math.max(summary ? 0 : 1, max);
   const counted = s.toasts.filter((t) => t.kind !== "summary" && !out(t));
-  const kept = new Set<Toast>(counted.filter((t) => classOfToast(t) === "alert"));
+  const allAlerts = counted.filter((t) => classOfToast(t) === "alert");
+  const kept = new Set<Toast>(allAlerts.slice(Math.max(0, allAlerts.length - alerts)));
   // P3 E3: at least one card / info still shows beside the alerts (a pending action stays one
   // click away); FR-NOTE-77: the summary's Open does that at `max` 0.
   const fill = room === 0 ? kept.size : Math.max(room, kept.size + 1);
@@ -572,23 +604,51 @@ export function showCallout(c: CalloutInput): void {
 export interface FoldState {
   cap: number;
   foldedAt: number | null;
+  /** BL-130: the alerts kept (`visibleToasts`' `alerts`); absent → every alert shows. */
+  alerts?: number;
 }
+
+/** A fold step's inputs: what shows at the current cap and how far it may fold. */
+export interface FoldInput {
+  need: boolean;
+  min: number;
+  stackH: number;
+  /** Cards / info shown at this cap. */
+  shown: number;
+  /** BL-130: alerts shown now (absent → 0: alerts never fold). */
+  alerts?: number;
+  /** BL-130: the fewest alerts kept (1 when nothing else shows: no summary, card or info). */
+  alertMin?: number;
+}
+
+/** BL-130: the alerts showing at `s` (its cap, else as many as `o` shows). */
+const alertsAt = (s: FoldState, o: FoldInput) =>
+  Math.min(s.alerts ?? Number.POSITIVE_INFINITY, o.alerts ?? 0);
+
+/** BL-130: whether `foldCap` has a step left at `s` (a card / info, else an alert). */
+export const canFold = (s: FoldState, o: FoldInput): boolean =>
+  s.cap > o.min || alertsAt(s, o) > (o.alertMin ?? 0);
 
 /**
  * P3 E3, walkthrough WF4, FR-NOTE-77: one fold step. While the stack doesn't fit (`need`: taller
  * than the room, or only a spot on window content holds it), one shown card / info (`shown` of
  * them at this cap) folds into "+N more", down to `min`. Walkthrough H3 re-test 1a: the next step
  * waits for the stack's new height (`stackH` ≠ `foldedAt`, measured a frame after the cap
- * changes), so it never folds a card that fits.
+ * changes), so it never folds a card that fits. BL-130: then, while it still doesn't fit, one
+ * alert (the oldest) a step, down to `alertMin`; with no card or info to fold the cap goes straight
+ * to `min` and the first alert folds in the same step.
  */
-export function foldCap(
-  s: FoldState,
-  o: { need: boolean; min: number; stackH: number; shown: number },
-): FoldState {
-  if (!o.need || s.cap <= o.min) return s;
+export function foldCap(s: FoldState, o: FoldInput): FoldState {
+  if (!o.need || !canFold(s, o)) return s;
   if (s.foldedAt !== null && s.foldedAt === o.stackH) return s;
-  const cap = Math.max(o.min, Math.min(s.cap, o.shown) - 1);
-  return cap === s.cap ? s : { cap, foldedAt: o.stackH };
+  const alerts = alertsAt(s, o);
+  // A step folds a shown card / info while one is above `min`; else (BL-130) an alert, the cap
+  // dropping to `min` with it (no card is held back by that).
+  if ((s.cap > o.min && o.shown > o.min) || alerts <= (o.alertMin ?? 0)) {
+    const cap = Math.max(o.min, Math.min(s.cap, o.shown) - 1);
+    return cap === s.cap ? s : { ...s, cap, foldedAt: o.stackH };
+  }
+  return { ...s, cap: Math.min(s.cap, o.min), alerts: alerts - 1, foldedAt: o.stackH };
 }
 
 /** BL-115: how long the drawn spot may hold while the fold steps (a step that never re-measures). */
@@ -625,11 +685,7 @@ export const UNSETTLED: StackSettle = {
  */
 export function settleStack(
   s: StackSettle,
-  o: {
-    need: boolean;
-    min: number;
-    stackH: number;
-    shown: number;
+  o: FoldInput & {
     spot: { left: number; top: number };
     now: number;
     /**
@@ -643,7 +699,7 @@ export function settleStack(
 ): StackSettle {
   const fold = o.changing ? s.fold : foldCap(s.fold, o);
   const stepping =
-    !o.changing && o.stackH > 0 && o.need && fold.cap > o.min && fold.foldedAt === o.stackH;
+    !o.changing && o.stackH > 0 && o.need && canFold(fold, o) && fold.foldedAt === o.stackH;
   const fresh = s.heldSince === null || o.now - s.heldSince < SETTLE_HOLD_MS;
   const hold = stepping && s.drawn !== null && fresh;
   const drawn = hold ? s.drawn : { left: o.spot.left, top: o.spot.top };

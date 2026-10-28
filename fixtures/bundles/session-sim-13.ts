@@ -37,7 +37,9 @@ export default defineBundle({
     // T1 (sprint 12, DM #353): theme switch (no unit: client-only, browser storage)
     // T2 (sprint 12, DM #353): Gilt & Stone (no unit: client-only; `theme-round-3` steps turns, so it
     // stays in `theme-gilt`)
-    // F4 (sprint 14, DM #367): server roll guard, BL-135 (no unit: a stamp rule, no new record;
-    // walkthrough on `kit-parity` with the Goblin Ambush scene shown)
+    // F2 (sprint 14, DM #366): toasts, popups, notifications, BL-130–132 / BL-137 (no unit:
+    // client-only; `s14-toasts-e2e` aliases this bundle)
+    // F4 (sprint 14, DM #367 / #371): server roll guard, BL-135 (no unit: a stamp rule, no new
+    // record; walkthrough on `kit-parity` with the Goblin Ambush scene shown)
   ],
 });
