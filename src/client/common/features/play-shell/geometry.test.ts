@@ -143,6 +143,20 @@ describe("geometry", () => {
     expect(moveRect(r, 0, -500, vp).y).toBe(TOP_BAR_H);
   });
 
+  test("FR-SHELL-10 FR-SHELL-12 BL-133 a drag to the bottom edge stops at the work area's bottom, so the resize grips stay reachable (sim-16 r08: Compendium dropped at 676,368 hung to y 928, its grip off-screen); a window taller than the work area keeps its title bar at the top", () => {
+    const vp9 = { w: 1440, h: 900 };
+    const compendium = { x: 676, y: 300, w: 440, h: 560 };
+    // Was: y 368 (only the title bar clamped on-screen), the bottom at 928.
+    const dropped = moveRect(compendium, 0, 68, vp9);
+    expect(dropped).toEqual({ x: 676, y: 900 - 12 - 560, w: 440, h: 560 });
+    expect(dropped.y + dropped.h).toBe(900 - LAUNCHER_CLEAR);
+    expect(moveRect(compendium, 0, 5000, vp9).y).toBe(328);
+    // Sideways at the bottom: still on the edge, never below it.
+    expect(moveRect(dropped, -300, 40, vp9)).toEqual({ ...dropped, x: 376 });
+    // Taller than the work area (rendered at the viewport's height below the top bar): the top.
+    expect(moveRect({ x: 100, y: 48, w: 400, h: 852 }, 0, 200, vp9).y).toBe(TOP_BAR_H);
+  });
+
   test("FR-SHELL-10 resize: edges and corner, never below min or beyond the viewport", () => {
     const r = { x: 100, y: 100, w: 400, h: 300 };
     const min = { w: 200, h: 150 };

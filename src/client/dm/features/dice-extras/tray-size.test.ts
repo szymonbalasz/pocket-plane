@@ -43,7 +43,7 @@ test("FR-DICEX-96 tray size row (DM): default 450 × 375 (360 × 300 × 1.25), u
   expect(row?.min).toEqual({ w: 300, h: 240 });
 });
 
-test("FR-DICEX-96 tray layout (DM) at 1280×720 and 1440×900: opens beside the Game log and Initiative, no PC covered, at least the useful size; full default at 1440×900", () => {
+test("FR-DICEX-96 tray layout (DM) at 1280×720 and 1440×900: opens beside the Game log and Initiative, no PC covered, at least the useful size; the useful size with Fit `all` at 1440×900 escort", () => {
   for (const vp of [
     { w: 1280, h: 720 },
     { w: 1440, h: 900 },
@@ -66,9 +66,10 @@ test("FR-DICEX-96 tray layout (DM) at 1280×720 and 1440×900: opens beside the 
       expect(tray.w, at).toBeLessThanOrEqual(450);
     }
   }
-  // 1440×900: room for the whole default (sim-14's 360 × 300 spot, now 450 × 375).
+  // 1440×900 escort: the useful 360 × 300 where Fit keeps `all` (BL-134's fit-keeping rule applies to the tray).
   const wide = runScript(dmWindows, "dm", { w: 1440, h: 900 }, "escort", [{ open: KIND }]);
-  expect(rectIn(wide.steps.at(-1)?.windows, KIND)).toMatchObject({ w: 450, h: 375 });
+  expect(rectIn(wide.steps.at(-1)?.windows, KIND)).toMatchObject({ w: 360, h: 300 });
+  expect(wide.steps.at(-1)?.fit).toBe("all");
 });
 
 function shellWith(entry: Record<string, unknown>) {

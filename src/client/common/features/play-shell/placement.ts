@@ -179,7 +179,15 @@ export interface PlaceInput {
   prev?: Rect;
   /** One settle's token grids (FR-SHELL-158), for searches on these same `tokens`. */
   memo?: PlaceMemo;
+  /**
+   * BL-134: also return up to this many of the best-ranked spots (`alternatives`, best first),
+   * one per neighbourhood (`ALT_SPREAD`), so the placer can test each for the map's fit.
+   */
+  alternatives?: number;
 }
+
+/** BL-134: two alternatives of the same size closer than this on both axes are one spot, px. */
+export const ALT_SPREAD = 48;
 
 /**
  * FR-SHELL-158 (BL-82): the token-derived half of the candidate grid, built once per (window
@@ -220,6 +228,8 @@ export interface Placement {
   pcClear: boolean;
   /** An inward column (beside a window, region or token), not the edge one (rank (3), #162). */
   inward?: true;
+  /** BL-134 (`PlaceInput.alternatives`): the best-ranked spots, best first (this one included). */
+  alternatives?: Placement[];
 }
 
 /**
@@ -517,6 +527,29 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   };
 
   let best: { rect: Rect; rank: number[] } | null = null;
+  /** BL-134: the best-ranked spots, one per `ALT_SPREAD` neighbourhood, best first. */
+  const alts = input.alternatives ?? 0;
+  const top: { rect: Rect; rank: number[] }[] | null = alts > 0 ? [] : null;
+  const offer = (rect: Rect, r: number[]) => {
+    if (!top) return;
+    const near = top.findIndex(
+      (t) =>
+        t.rect.w === rect.w &&
+        t.rect.h === rect.h &&
+        Math.abs(t.rect.x - rect.x) < ALT_SPREAD &&
+        Math.abs(t.rect.y - rect.y) < ALT_SPREAD,
+    );
+    if (near >= 0) {
+      if (!lexLess(r, (top[near] as { rank: number[] }).rank)) return;
+      top.splice(near, 1);
+    }
+    let i = top.length;
+    while (i > 0 && lexLess(r, (top[i - 1] as { rank: number[] }).rank)) i--;
+    if (i >= alts) return;
+    top.splice(i, 0, { rect, rank: r });
+    if (top.length > alts) top.pop();
+    best = top[0] ?? null;
+  };
   const seen = new Set<number>();
   const HEAD = 11; // fields of a rank cut short (`rank`)
   let narrowing = false;
@@ -567,12 +600,15 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
       if (seen.has(key + (inward ? 1 : 0))) return;
       seen.add(key + (inward ? 1 : 0));
     }
-    const r = rank(rect, inward, cur, best?.rank);
+    const r = rank(rect, inward, cur, top ? top[alts - 1]?.rank : best?.rank);
     // Narrowed only to be clear: of windows when nothing at full width is (FR-SHELL-47 parks only
     // when no candidate is clear), else of every PC and token too.
     const fits = !narrowing || (r[0] === 0 && (narrowToClear || (r[5] === 0 && r[8] === 0)));
     if (!narrowing && rect.w === w && r[0] === 0) fullClear = true;
-    if (fits && r.length > HEAD && (!best || lexLess(r, best.rank))) best = { rect, rank: r };
+    if (fits && r.length > HEAD) {
+      if (top) offer(rect, r);
+      else if (!best || lexLess(r, best.rank)) best = { rect, rank: r };
+    }
     if (r[5] === 1 && !sweep) for (const s of clearOfPcs(rect)) consider(s, inward, true);
   };
   const done = new Set<string>();
@@ -652,12 +688,13 @@ export function placeWindow(def: Placeable, vp: Viewport, input: PlaceInput = {}
   }
   const chosen = best as { rect: Rect; rank: number[] } | null;
   if (!chosen) return { rect: base, clear: true, pcClear: pcClear(base, input.tokens ?? []) };
-  return {
-    rect: chosen.rect,
-    clear: chosen.rank[0] === 0,
-    pcClear: chosen.rank[5] === 0,
-    ...(chosen.rank[9] === 1 && { inward: true as const }),
-  };
+  const placement = (c: { rect: Rect; rank: number[] }): Placement => ({
+    rect: c.rect,
+    clear: c.rank[0] === 0,
+    pcClear: c.rank[5] === 0,
+    ...(c.rank[9] === 1 && { inward: true as const }),
+  });
+  return { ...placement(chosen), ...(top && { alternatives: top.map(placement) }) };
 }
 
 /** `a` < `b` lexicographically over the first `n` fields (default: all of `a`). */

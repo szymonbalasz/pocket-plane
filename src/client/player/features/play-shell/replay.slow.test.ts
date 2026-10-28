@@ -33,6 +33,8 @@ if (process.env.UPDATE_FAILING === "1") {
 // 31 → 30 (P3 fitted @1280×800 resize).
 // K5 (the work area to vh − 12, the toast corner 52 px lower): every P1–P3 moved @1280×720 cell
 // passes, PM1's P2 moved @1280×720 memory exemption with them; 29 → 12 failing.
+// Sprint 14 F1 (BL-134): K5's P2 fitted @1600×900 push passes (the push path's I7 keeps a zone a
+// drop gave back, FR-SHELL-149 / -159): 11 → 10.
 const EXEMPTIONS = new Map<string, string>();
 
 test("FR-SHELL-160 named exemptions are recorded failing cells", () => {
