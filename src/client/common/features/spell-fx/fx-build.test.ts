@@ -263,29 +263,26 @@ describe("level store and tier drop (FR-VFX-25, -27)", () => {
     };
   };
 
-  test("FR-VFX-25 level store: default Full, reduced motion → Still, invalid → default, pick persists", () => {
+  test("FR-VFX-25 level store: default Full (reduced motion ignored, #376), invalid → default, pick persists", () => {
     const b = backend();
-    expect(createVfxPrefs({ storage: () => b, reducedMotion: () => false }).read().level).toBe(
-      "full",
-    );
-    expect(createVfxPrefs({ storage: () => b, reducedMotion: () => true }).read().level).toBe(
-      "still",
-    );
+    expect(createVfxPrefs({ storage: () => b }).read().level).toBe("full");
+    // The store never asks for the OS setting: with reduced motion on, still Full.
+    const mm = globalThis.matchMedia;
+    globalThis.matchMedia = ((q: string) => ({ matches: q.includes("reduce") })) as never;
+    try {
+      expect(createVfxPrefs({ storage: () => b }).read().level).toBe("full");
+    } finally {
+      globalThis.matchMedia = mm;
+    }
     b.m.set(VFX_PREFS_KEY, '{"level":"loud"}');
-    expect(createVfxPrefs({ storage: () => b, reducedMotion: () => false }).read().level).toBe(
-      "full",
-    );
+    expect(createVfxPrefs({ storage: () => b }).read().level).toBe("full");
     b.m.set(VFX_PREFS_KEY, "not json");
-    expect(createVfxPrefs({ storage: () => b, reducedMotion: () => false }).read().level).toBe(
-      "full",
-    );
-    const p = createVfxPrefs({ storage: () => b, reducedMotion: () => false });
+    expect(createVfxPrefs({ storage: () => b }).read().level).toBe("full");
+    const p = createVfxPrefs({ storage: () => b });
     p.write("off");
     expect(b.m.get(VFX_PREFS_KEY)).toBe('{"level":"off"}');
     // A reload reads it back.
-    expect(createVfxPrefs({ storage: () => b, reducedMotion: () => false }).read().level).toBe(
-      "off",
-    );
+    expect(createVfxPrefs({ storage: () => b }).read().level).toBe("off");
   });
 
   test("FR-VFX-25 storage blocked → the pick is kept in memory for the page", () => {
@@ -293,7 +290,6 @@ describe("level store and tier drop (FR-VFX-25, -27)", () => {
       storage: () => {
         throw new Error("blocked");
       },
-      reducedMotion: () => false,
     });
     expect(p.read().level).toBe("full");
     p.write("reduced");
@@ -317,7 +313,7 @@ describe("level store and tier drop (FR-VFX-25, -27)", () => {
     const fast = new FrameMeter();
     for (let t = 0; t <= 3000; t += 50) fast.push(t, 5);
     expect(fast.slow(3000)).toBe(false);
-    const p = createVfxPrefs({ storage: () => undefined, reducedMotion: () => false });
+    const p = createVfxPrefs({ storage: () => undefined });
     p.lower();
     expect(p.level()).toBe("reduced");
     expect(p.lowered()).toBe("reduced");
