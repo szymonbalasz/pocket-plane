@@ -11,7 +11,9 @@
 // output dir `test-results/<bundle>/`; their output is prefixed `[bundle]` and a per-bundle
 // summary closes the run. The longest bundles (data/e2e-times.json, else most spec files) start
 // first. A bundle with a spec carrying a header line `// e2e-serial: <why>` (timing-sensitive
-// under load) runs after the others, alone.
+// under load) runs after the others, alone; so does a bundle with a spec that needs software
+// WebGL (`--enable-unsafe-swiftshader`: the 3D dice), which starves beside another bundle on a
+// CI machine without a GPU.
 //
 // `--shard=<i>/<n>` (CI) runs only the i-th of n bundle sets, balanced by the committed bundle
 // times in scripts/e2e-times.json (else spec count), so every shard computes the same split.
@@ -41,6 +43,7 @@ const DEFAULT_BUNDLE = "sync-probe";
 const SERVER_START_TIMEOUT_MS = 60_000;
 const BUNDLE_LINE = /^\/\/\s*e2e-bundle:\s*([a-z0-9][a-z0-9-]*)\s*$/m;
 const SERIAL_LINE = /^\/\/\s*e2e-serial:\s*\S/m;
+const SOFTWARE_WEBGL = /--enable-unsafe-swiftshader/;
 const TIMES_FILE = path.join(WORKTREE_ROOT, "data", "e2e-times.json");
 /** Committed bundle seconds (one bundle alone), the CI shard weights; refreshed from CI runs. */
 const SHARD_TIMES_FILE = path.join(WORKTREE_ROOT, "scripts", "e2e-times.json");
@@ -69,11 +72,15 @@ export function groupSpecs(filters: string[], root = WORKTREE_ROOT): Map<string,
   return groups;
 }
 
-/** Bundles with a spec marked `// e2e-serial: <why>`: run alone, after the parallel ones. */
+/**
+ * Bundles with a spec marked `// e2e-serial: <why>` or needing software WebGL: run alone, after
+ * the parallel ones.
+ */
 export function serialBundles(groups: Map<string, string[]>, root = WORKTREE_ROOT): Set<string> {
   const out = new Set<string>();
   for (const [bundle, files] of groups) {
-    if (files.some((f) => SERIAL_LINE.test(readFileSync(path.join(root, f), "utf8")))) {
+    const src = files.map((f) => readFileSync(path.join(root, f), "utf8"));
+    if (src.some((s) => SERIAL_LINE.test(s) || SOFTWARE_WEBGL.test(s))) {
       out.add(bundle);
     }
   }
@@ -234,7 +241,8 @@ async function spawnBundle(
   const tag = prefix ? `[${bundle}] ` : "";
   const onLine = (line: string, err: boolean) => {
     countLine(line, counts);
-    if (FAILURE_LINE.test(line) && !failures.includes(line.trim())) failures.push(line.trim());
+    const head = line.replace(/\s*─+\s*$/, "").trim();
+    if (FAILURE_LINE.test(line) && !failures.includes(head)) failures.push(head);
     (err ? console.error : console.log)(`${tag}${line}`);
   };
   await Promise.all([

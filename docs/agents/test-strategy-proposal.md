@@ -1,5 +1,7 @@
 # Test strategy proposal (DM #354)
 
+> **Status (2026-10-28, #368):** superseded by the GitHub CI loop ([AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci)): CI runs the full suite on every push, so the heavy-run lock (1), branch gates and the impacted-e2e runner (2) are dropped. Kept and built in `fix/test-infra`: one automatic e2e retry reported as flaky (3), screenshot baselines (4, rendered in CI), builders test lightly (5: targeted `bun run check`), the BL-128 / BL-140 flake fixes.
+
 The DM found the test loop too slow and too heavy (sprint 12: overlapping full checks, e2e and walkthrough browsers ran the 64 GB machine out of memory). This proposal is for the sprint-13 recap.
 
 ## What sprints 12–13 cost

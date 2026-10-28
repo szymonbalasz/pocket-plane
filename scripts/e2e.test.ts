@@ -46,14 +46,16 @@ test("e2e runner: specs grouped by their `// e2e-bundle:` line, default sync-pro
   });
 });
 
-test("e2e runner: a bundle with a spec marked `// e2e-serial: <why>` runs alone", () => {
+test("e2e runner: a bundle with a spec marked `// e2e-serial: <why>` or needing software WebGL runs alone", () => {
   const root = tree({
     "e2e/a.e2e.ts": "// e2e-bundle: a\n// e2e-serial: feed batch window under load\n",
     "e2e/a2.e2e.ts": "// e2e-bundle: a\n",
     "e2e/b.e2e.ts": "// e2e-bundle: b\n// e2e-serial:\n",
     "e2e/c.e2e.ts": "// e2e-bundle: c\nconst s = '// e2e-serial: x';\n",
+    "e2e/d.e2e.ts":
+      '// e2e-bundle: d\ntest.use({ launchOptions: { args: ["--enable-unsafe-swiftshader"] } });\n',
   });
-  expect([...serialBundles(groupSpecs([], root), root)]).toEqual(["a"]);
+  expect([...serialBundles(groupSpecs([], root), root)]).toEqual(["a", "d"]);
 });
 
 test("e2e runner: bundles start longest first (recorded seconds, then spec count, then name)", () => {
