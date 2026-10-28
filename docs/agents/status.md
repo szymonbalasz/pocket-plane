@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 fix pack** ([sprint-14](sprint-14.md), DM #366): **F1** `fix/s14-frame` ∥ **F2** `fix/s14-toasts` building; then F3 kit nits; then the test tooling separately. BL-135 waits for a DM rule. One heavy run at a time (#354).
+**Phase:** **Sprint 14 fix pack** ([sprint-14](sprint-14.md), DM #366): **F1** `fix/s14-frame` ∥ **F2** `fix/s14-toasts` building; then F3 kit nits; then the test tooling separately. BL-135 decided (#367) → F4. One heavy run at a time (#354).
 
 **Resume (in order, one heavy run at a time, #354):** (1) `gates.sh` on `build-theme-switch` (merge main first: protocol §166 collides with X1's, run `resolve_docs.py` + `fixlinks.py`) → merge T1. (2) Restart a T2 builder in `build-theme-gilt` (brief `.verify/sprint12/briefs/build-th2.md` + `t2-resume.md`): merge main, its e2e, report ready. (3) T2 walkthrough (D1–D4, P1–P2, PS1–PS6 under Gilt & Stone; template to write from `tpl-test-th1.md`) → gates → merge. (4) session-sim-16 in `gates-main`, "Playtest: sprint 12", recap: default theme (OQ-THEME-03), the test-strategy proposal (#354). Briefs + `slices.json` backed up in `.verify/sprint12/` (copy back to `%TEMP%/pocket-plane/` if Storage Sense cleared it). Worktrees on disk: `build-theme-switch` (slot 0), `build-theme-gilt` (slot 2), `gates-main` (slot 5, detached at adc8b0dd); all `.env` have `PP_TEST_SHARDS=3`.
 
@@ -86,7 +86,6 @@ Sprint 10:
 
 ## Pending DM decisions
 
-- BL-135: the server rule for which definition / hidden-creature rolls may be public (bring with a pick).
 
 - **Next after sprint 12 (DM #354): a new test strategy** before feature work: the loop is too slow / heavy. Bring a proposal at the recap.
 
