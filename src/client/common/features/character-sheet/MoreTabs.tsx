@@ -18,14 +18,9 @@ import { useOpenPartyTab } from "../party-board/open-tab";
 import { Box } from "./boxes";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
 import { OverspendPopover, OverspentTip } from "./overspend";
-import { AddRow, RowTools, useRows } from "./rows";
+import { AddRow, RowTools, useRowPut } from "./rows";
 import { notationContext, useSheet, useSheetIntents, useSheetScope } from "./sheet-context";
 import { pipDelta, usesLeftText, walletLine } from "./view-model";
-
-const clean = (row: Record<string, unknown>) => {
-  for (const k of Object.keys(row)) if (row[k] === undefined) delete row[k];
-  return row;
-};
 
 function FeatureUses({ f }: { f: FeatureRow }) {
   const ctx = useSheet();
@@ -115,9 +110,8 @@ function FeatureUses({ f }: { f: FeatureRow }) {
 
 function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count: number }) {
   const ctx = useSheet();
-  const rows = useRows("features");
   const e = ctx.editing && ctx.canEdit;
-  const put = (patch: Partial<FeatureRow>) => rows.put(clean({ ...f, ...patch }));
+  const put = useRowPut("features", f);
   return (
     <div
       data-testid="charx-feature"
@@ -257,9 +251,8 @@ export function LimitedUsesBox() {
 
 function ItemView({ it, index, count }: { it: ItemRow; index: number; count: number }) {
   const ctx = useSheet();
-  const rows = useRows("items");
   const e = ctx.editing && ctx.canEdit;
-  const put = (patch: Partial<ItemRow>) => rows.put({ ...it, ...patch });
+  const put = useRowPut("items", it);
   return (
     <div
       data-testid="charx-item"

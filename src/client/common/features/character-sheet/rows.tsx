@@ -3,6 +3,7 @@
 import { CHARX_INTENTS } from "@shared/character-sheet/sheet";
 import type { SheetRowList } from "@shared/events/character-sheet";
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useRef } from "react";
 import { Button } from "../../components/ui/button";
 import { useSync } from "../../sync/store";
 import { rowError } from "./edit-model";
@@ -24,6 +25,47 @@ export function useRows(list: SheetRowList) {
     move: (rowId: string, toIndex: number) =>
       intents.send(CHARX_INTENTS.moveRow, { creatureId, list, rowId, toIndex }),
   };
+}
+
+type Send = (row: Record<string, unknown>) => Promise<unknown>;
+
+/**
+ * One row's field edits: each re-puts the whole row with its change, built on the last put still
+ * in flight, else on the row as rendered. Two quick edits (a damage type, then Magic) would
+ * otherwise each carry the row from before the other's echo, and the second drops the first
+ * (CI found it: e2e weapon-rows). `shape` normalises the merged row before it is sent.
+ */
+export function rowPutter(shape?: (next: Record<string, unknown>) => void) {
+  const f: { n: number; row: Record<string, unknown> | null } = { n: 0, row: null };
+  return (send: Send, rendered: object, patch: object): Promise<unknown> => {
+    const next: Record<string, unknown> = { ...(f.n > 0 && f.row ? f.row : rendered), ...patch };
+    for (const k of Object.keys(next)) if (next[k] === undefined) delete next[k];
+    shape?.(next);
+    f.n++;
+    f.row = next;
+    return send(next)
+      .catch((err: unknown) => {
+        // A refused row is no base for the next edit.
+        if (f.row === next) f.row = null;
+        throw err;
+      })
+      .finally(() => {
+        if (--f.n === 0) f.row = null;
+      });
+  };
+}
+
+/** `rowPutter` for one rendered row of `list` (one per row editor). */
+export function useRowPut<R extends object>(
+  list: SheetRowList,
+  row: R,
+  shape?: (next: Record<string, unknown>) => void,
+) {
+  const rows = useRows(list);
+  const putter = useRef<ReturnType<typeof rowPutter> | null>(null);
+  putter.current ??= rowPutter(shape);
+  const put = putter.current;
+  return (patch: Partial<R>) => put(rows.put, row, patch);
 }
 
 /** Delete + move controls of one row (edit mode). */
