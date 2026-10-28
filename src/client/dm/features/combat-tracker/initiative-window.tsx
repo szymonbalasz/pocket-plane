@@ -171,6 +171,7 @@ import { EndConfirmButtons, EndConfirmDescription, useStartEnd } from "./end-con
 import { useHoverSafeSub } from "./hover-sub";
 import { HpDialog } from "./hp-dialog";
 import { damageCardRow, isDamageCard, pendingRowText } from "./pending";
+import { pendingMaxH, useActiveRowScroll, usePendingLines } from "./pending-cap";
 import { useCombatDialogs } from "./popup-store";
 import { DropLine, Grip, ReorderContext, useReorder } from "./reorder-drag";
 import { rollKeys } from "./roll-keys";
@@ -1321,7 +1322,16 @@ function PendingRow({ n, actions }: { n: NotificationRecord; actions: NoteAction
 
 type NoteActions = ReturnType<typeof useNoteActions>;
 
-function PendingCards({ cards }: { cards: NotificationRecord[] }) {
+function PendingCards({
+  cards,
+  lines,
+  listRef,
+}: {
+  cards: NotificationRecord[];
+  /** BL-131: the lines shown (`usePendingLines`); the rest scroll in the block. */
+  lines: number;
+  listRef: RefObject<HTMLUListElement | null>;
+}) {
   const actions = useNoteActions(dmNotificationViews);
   if (cards.length === 0) return null;
   return (
@@ -1332,8 +1342,15 @@ function PendingCards({ cards }: { cards: NotificationRecord[] }) {
       >
         Pending ({cards.length})
       </h3>
-      {/* FR-CBT-77 (G4): at most 3 rows, then its own scroll, so cards never push the rows away. */}
-      <ul className="flex max-h-[104px] flex-col gap-1 overflow-y-auto">
+      {/* FR-CBT-77 (G4): at most 3 rows, then its own scroll, so cards never push the rows away.
+          BL-131: fewer in a short window, so two combatant rows stay in view. */}
+      <ul
+        ref={listRef}
+        data-testid="cbt-init-pending-lines"
+        data-lines={lines}
+        className="flex flex-col gap-1 overflow-y-auto"
+        style={{ maxHeight: pendingMaxH(lines) }}
+      >
         {cards.map((n) => (
           <PendingRow key={n.id} n={n} actions={actions} />
         ))}
@@ -1677,6 +1694,10 @@ function DmInitiativeBody() {
   const fold = useBelowFold(rootRef, footerRef, activeIds, cards.length > 0);
   // FR-CBT-125: the row list clips and scrolls; the footer sits under it.
   const clip = useListViewport(rootRef, listRef, footerRef, [...activeIds, `${cards.length}`]);
+  // BL-131: the Pending block's lines leave two combatant rows; BL-137: the turn's row in view.
+  const pendingRef = useRef<HTMLUListElement>(null);
+  const lines = usePendingLines(pendingRef, listRef, footerRef, cards.length);
+  useActiveRowScroll(listRef, enc?.turnCombatantId);
   if (!everLive) return <Skeleton className="h-24" />;
   if (!enc) {
     return (
@@ -1703,7 +1724,7 @@ function DmInitiativeBody() {
       style={clip === null ? undefined : { maxHeight: clip }}
     >
       <Header enc={enc} />
-      <PendingCards cards={cards} />
+      <PendingCards cards={cards} lines={lines} listRef={pendingRef} />
       {/* FR-KIT-23: no "Combatant / Init" strip; the list's side padding holds the turn gem. */}
       <div
         ref={listRef}
