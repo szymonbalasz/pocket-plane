@@ -60,15 +60,16 @@ const SHARE_MIN = 1e-12;
 
 /**
  * FR-SCN-42: a template's shape in grid units (sizes in ft / 5). A sphere / cylinder with a
- * `footprint` (DM #377) is the stepped outline of its grid-reach squares (`footprintCells`).
+ * `footprint` (DM #377) is the stepped outline of its grid-reach squares (`footprintCells`) under
+ * the campaign's diagonal `rule` (FR-SCN-30; default `5-10-5`).
  */
-export function templateArea(t: TemplateGeometry): AreaShape {
+export function templateArea(t: TemplateGeometry, rule: DiagonalRule = "5-10-5"): AreaShape {
   const L = t.size / FT_PER_CELL;
   const { x, y, angle } = t;
   switch (t.shape) {
     case "sphere":
     case "cylinder":
-      if (t.footprint) return { polygon: runsOutline(footprintCells(t)) };
+      if (t.footprint) return { polygon: runsOutline(footprintCells(t, rule)) };
       return { kind: "circle", x, y, r: L };
     case "cube":
       return { kind: "square", x, y, side: L, angle };
@@ -91,10 +92,11 @@ export interface Block {
 }
 
 /**
- * #377 / FR-VFX-24: the cells whose FR-MAP-22 grid distance (5/10/5) from the nearest cell of
- * block `b` is ≤ `radiusFt`, the block's own cells included; row-major, not cut to any map.
+ * #377 / FR-VFX-24: the cells whose grid distance (FR-SCN-30: the campaign's diagonal `rule`,
+ * `5-10-5` as the ruler's FR-MAP-22 by default, or `5`) from the nearest cell of block `b` is
+ * ≤ `radiusFt`, the block's own cells included; row-major, not cut to any map.
  */
-export function reachCells(b: Block, radiusFt: number): Cell[] {
+export function reachCells(b: Block, radiusFt: number, rule: DiagonalRule = "5-10-5"): Cell[] {
   const reach = Math.floor(radiusFt / FT_PER_CELL);
   const out: Cell[] = [];
   for (let row = b.row - reach; row < b.row + b.side + reach; row++) {
@@ -104,7 +106,11 @@ export function reachCells(b: Block, radiusFt: number): Cell[] {
         col: Math.min(Math.max(col, b.col), b.col + b.side - 1),
         row: Math.min(Math.max(row, b.row), b.row + b.side - 1),
       };
-      if (distanceFt({ col, row }, near) <= radiusFt) out.push([col, row]);
+      const d =
+        rule === "5"
+          ? FT_PER_CELL * Math.max(Math.abs(col - near.col), Math.abs(row - near.row))
+          : distanceFt({ col, row }, near);
+      if (d <= radiusFt) out.push([col, row]);
     }
   }
   return out;
@@ -117,9 +123,9 @@ export function originBlock(t: { x: number; y: number; footprint: number }): Blo
 }
 
 /** #377: a snapped sphere / cylinder's squares: within its radius of its origin block. */
-export function footprintCells(t: TemplateGeometry & { footprint?: number | null }): Cell[] {
+export function footprintCells(t: TemplateGeometry, rule: DiagonalRule = "5-10-5"): Cell[] {
   const n = t.footprint ?? 1;
-  return reachCells(originBlock({ x: t.x, y: t.y, footprint: n }), t.size);
+  return reachCells(originBlock({ x: t.x, y: t.y, footprint: n }), t.size, rule);
 }
 
 /**

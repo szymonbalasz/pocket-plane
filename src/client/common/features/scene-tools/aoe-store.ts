@@ -19,6 +19,7 @@ import type { LayerContextMenu, LayerMenuContext, MenuPoint } from "../scenes-ma
 import { useMapTool } from "../scenes-map/tool-store";
 import type { ToolCancelReason } from "../scenes-map/tools";
 import type { SnapToken } from "./aoe-snap";
+import { diagonalRuleIn } from "./diagonal-rule";
 import {
   type AoeSettings,
   DEFAULT_AOE,
@@ -202,6 +203,7 @@ function menuTemplateAt(p: MenuPoint, ctx: LayerMenuContext): TemplateRecordView
     blind: canvasBlind(ctx.client, ctx.store, ctx.scene.id, ctx.myPlayerId),
     scale: ctx.cam.scale,
     grid: ctx.grid,
+    rule: diagonalRuleIn(ctx.store.records),
   });
 }
 

@@ -9,6 +9,7 @@
 import type { SignalFrom } from "@shared/protocol/frames";
 import type { RecordStore } from "@shared/protocol/store";
 import {
+  type DiagonalRule,
   FT_PER_CELL,
   TEMPLATE_SIZE,
   TEMPLATE_WIDTH,
@@ -362,6 +363,8 @@ export interface TemplateHitOptions {
   /** Camera scale (screen px per map px), for the 6 px tolerance. */
   scale: number;
   grid: Grid;
+  /** #377: the campaign's diagonal rule (a snapped sphere's outline); default `5-10-5`. */
+  rule?: DiagonalRule;
 }
 
 /** Distance (map px) from (x, y) to an outline's edge. */
@@ -398,16 +401,23 @@ export function templateAt<
     if (!canEditTemplate(t, o.client, o.myPlayerId)) continue;
     if (t.hidden && (o.client !== "dm" || o.dmOnlyOff)) continue;
     if (o.blind && (o.myPlayerId === null || t.placedByPlayerId !== o.myPlayerId)) continue;
-    if (isUnder(t, p, g, tol, o.grid)) return t;
+    if (isUnder(t, p, g, tol, o.grid, o.rule ?? "5-10-5")) return t;
   }
   return null;
 }
 
 /** FR-SCN-49 / -52: map point `p` (grid units `g`) inside `t`'s true outline or within `tol` map px. */
-function isUnder(t: TemplateGeometry, p: GridPoint, g: GridPoint, tol: number, grid: Grid) {
+function isUnder(
+  t: TemplateGeometry,
+  p: GridPoint,
+  g: GridPoint,
+  tol: number,
+  grid: Grid,
+  rule: DiagonalRule,
+) {
   return (
-    contains(templateArea(t), g.x, g.y) ||
-    outlineDistance(templateOutline(t, grid), p.x, p.y) <= tol
+    contains(templateArea(t, rule), g.x, g.y) ||
+    outlineDistance(templateOutline(t, grid, rule), p.x, p.y) <= tol
   );
 }
 
@@ -432,6 +442,7 @@ export function templateUnder(
   scale: number,
   grid: Grid,
   pills: Readonly<Record<string, PillRect>> = {},
+  rule: DiagonalRule = "5-10-5",
 ): string | null {
   const g = gridPoint(grid, p.x, p.y);
   const tol = TEMPLATE_HIT_PX / scale;
@@ -439,7 +450,7 @@ export function templateUnder(
     const d = drawn[i] as (typeof drawn)[number];
     const r = pills[d.id];
     if (r && p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height) return d.id;
-    if (isUnder(d.template, p, g, tol, grid)) return d.id;
+    if (isUnder(d.template, p, g, tol, grid, rule)) return d.id;
   }
   return null;
 }
@@ -681,15 +692,22 @@ export type TemplateOutline =
   | { kind: "circle"; x: number; y: number; r: number }
   | { kind: "poly"; points: number[] };
 
-/** The shape's outline in map px (the affected squares are drawn from `templateCells`). */
-export function templateOutline(t: TemplateGeometry, g: Grid): TemplateOutline {
+/**
+ * The shape's outline in map px (the affected squares are drawn from `templateCells`); a snapped
+ * sphere's follows the campaign's diagonal `rule` (#377).
+ */
+export function templateOutline(
+  t: TemplateGeometry,
+  g: Grid,
+  rule: DiagonalRule = "5-10-5",
+): TemplateOutline {
   const cs = g.gridCellSize;
   const ox = g.gridOffsetX + t.x * cs;
   const oy = g.gridOffsetY + t.y * cs;
   const L = (t.size / FT_PER_CELL) * cs;
   if ((t.shape === "sphere" || t.shape === "cylinder") && t.footprint) {
     // #377: the stepped outline of its squares, so the outline and the tint agree.
-    const area = templateArea(t);
+    const area = templateArea(t, rule);
     const pts = "polygon" in area ? area.polygon : [];
     return {
       kind: "poly",

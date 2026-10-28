@@ -170,6 +170,37 @@ function symmetric(t: TemplateGeometry, cc: number, cr: number): boolean {
 }
 
 describe("FR-SCN-41 coverage from a snapped origin (#375, #377)", () => {
+  test("FR-SCN-41 #377 ruling: the campaign's diagonal rule (as the ruler): 10 / 20 ft from a square and from a Large token, sphere and cylinder, under `5-10-5` and `5`", () => {
+    const square = { x: 10.5, y: 6.5, angle: 0, footprint: 1 };
+    const large = { x: 11, y: 7, angle: 0, footprint: 2 };
+    const n = (t: TemplateGeometry, rule: "5-10-5" | "5") =>
+      templateCells(t, MAP, { cut: true, rule }).length;
+    for (const shape of ["sphere", "cylinder"] as const) {
+      // 5/10/5 (the default): corners trimmed.
+      expect(n({ shape, ...square, size: 10 }, "5-10-5")).toBe(21);
+      expect(n({ shape, ...square, size: 20 }, "5-10-5")).toBe(61);
+      expect(n({ shape, ...large, size: 10 }, "5-10-5")).toBe(32);
+      expect(n({ shape, ...large, size: 20 }, "5-10-5")).toBe(80);
+      // 5-ft diagonals: full squares (10 ft = 5 × 5).
+      expect(n({ shape, ...square, size: 10 }, "5")).toBe(25);
+      expect(n({ shape, ...square, size: 20 }, "5")).toBe(81);
+      expect(n({ shape, ...large, size: 10 }, "5")).toBe(36);
+      expect(n({ shape, ...large, size: 20 }, "5")).toBe(100);
+    }
+    const s10 = { shape: "sphere" as const, ...square, size: 10 };
+    expect(cellsAttr(templateCells(s10, MAP, { cut: true, rule: "5" })).split(" ")).toHaveLength(
+      25,
+    );
+    expect(cells(s10)).toEqual(templateCells(s10, MAP, { cut: true, rule: "5-10-5" }));
+    // The outline follows the rule: a plain square under `5`.
+    expect(templateArea(s10, "5")).toEqual({ polygon: [13, 4, 13, 9, 8, 9, 8, 4] });
+    const o = templateOutline(s10, G, "5");
+    expect(o.kind === "poly" && o.points).toEqual([910, 280, 910, 630, 560, 630, 560, 280]);
+    // A Ctrl-free sphere (no footprint) ignores the rule: the exact > 50 % rule.
+    const free = { ...s10, footprint: undefined };
+    expect(n(free, "5")).toBe(n(free, "5-10-5"));
+  });
+
   test("FR-SCN-41 #377 a sphere snapped to a square covers grid distance (5/10/5) ≤ radius: 10 ft = 21 (5 × 5 minus corners), 15 ft = 37, 20 ft = 61; symmetric", () => {
     const s10 = { shape: "sphere" as const, x: 10.5, y: 6.5, size: 10, angle: 0, footprint: 1 };
     expect(cells(s10)).toHaveLength(21);

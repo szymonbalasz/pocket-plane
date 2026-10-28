@@ -22,6 +22,7 @@
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
+  type DiagonalRule,
   SCN_SIGNALS,
   type TemplateRecordView,
   TemplateSignalData,
@@ -48,6 +49,7 @@ import {
 import { useLayerToggles } from "../../scenes-map/tool-store";
 import { snapTokens } from "../aoe-snap";
 import { type AoeGesture, useAoe } from "../aoe-store";
+import { diagonalRuleIn } from "../diagonal-rule";
 import { useTemplateMenuIsland } from "../TemplateMenu";
 import {
   canEditTemplate,
@@ -212,23 +214,26 @@ function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
   const { shape, x, y, size, width, angle, footprint } = t;
   const { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy } = grid;
   const { mapWidth, mapHeight } = scene;
-  // FR-SCN-21: memoised per template / grid change.
+  // #377: a snapped sphere's squares follow the campaign's diagonal rule (FR-SCN-30).
+  const rule = diagonalRuleIn(store.records);
+  // FR-SCN-21: memoised per template / grid / rule change.
   const cells = useMemo(
     () =>
       templateCells(
         { shape, x, y, size, width, angle, footprint },
         { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy, mapWidth, mapHeight },
-        { cut: true },
+        { cut: true, rule },
       ),
-    [shape, x, y, size, width, angle, footprint, cs, gx, gy, mapWidth, mapHeight],
+    [shape, x, y, size, width, angle, footprint, cs, gx, gy, mapWidth, mapHeight, rule],
   );
   const outline = useMemo(
     () =>
       templateOutline(
         { shape, x, y, size, width, angle, footprint },
         { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy },
+        rule,
       ),
-    [shape, x, y, size, width, angle, footprint, cs, gx, gy],
+    [shape, x, y, size, width, angle, footprint, cs, gx, gy, rule],
   );
   const handles = useMemo(() => {
     const h = templateHandles({ shape, x, y, size, width, angle, footprint });
@@ -342,10 +347,11 @@ function useTemplateHover(
   drawn: readonly Drawn[],
   scale: number,
   grid: Grid,
+  rule: DiagonalRule,
 ): string | null {
   const [hovered, setHovered] = useState<string | null>(null);
-  const latest = useRef({ drawn, scale, grid });
-  latest.current = { drawn, scale, grid };
+  const latest = useRef({ drawn, scale, grid, rule });
+  latest.current = { drawn, scale, grid, rule };
   useEffect(() => {
     const group = groupRef.current;
     const stage = group?.getStage();
@@ -358,8 +364,8 @@ function useTemplateHover(
       for (const n of group.find(".scn-template-label")) {
         pills[n.id()] = n.getClientRect({ relativeTo: group });
       }
-      const { drawn: d, scale: s, grid: g } = latest.current;
-      setHovered(templateUnder(at, d, s, g, pills));
+      const { drawn: d, scale: s, grid: g, rule: r } = latest.current;
+      setHovered(templateUnder(at, d, s, g, pills, r));
     };
     const onLeave = () => setHovered(null);
     stage.on("mousemove.scnTemplateHover", onMove);
@@ -464,7 +470,7 @@ export function ScnTemplatesLayer() {
       handle: toolOn,
     });
   }
-  const hovered = useTemplateHover(groupRef, drawn, cam.scale, grid);
+  const hovered = useTemplateHover(groupRef, drawn, cam.scale, grid, diagonalRuleIn(store.records));
   return (
     <Group ref={groupRef} name="scn-templates" listening={false}>
       {drawn.map((d) => (

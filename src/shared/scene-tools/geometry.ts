@@ -273,16 +273,17 @@ const EPS = 1e-9;
  * (drawing, the count; may be empty: "0 squares"); `cut: false` keeps all (fog's `derive` and the
  * DM ephemeral audience, so `fogged` survives a map change) and, for a template that covers no
  * cell, the cell holding its origin (FR-SCN-46). Row-major order. *(DM #377)* A sphere / cylinder
- * with a `footprint` covers the squares within its radius by grid distance (5/10/5) of its origin
- * block instead (`footprintCells`).
+ * with a `footprint` covers the squares within its radius by grid distance (the campaign's
+ * diagonal `rule`, FR-SCN-30) of its origin block instead (`footprintCells`).
  */
 export function templateCells(
   t: TemplateGeometry,
   scene: MapRect,
-  { cut }: { cut: boolean },
+  { cut, rule = "5-10-5" }: { cut: boolean; rule?: DiagonalRule },
 ): Cell[] {
-  // DM #377: a snapped sphere / cylinder: grid reach from its origin block (never empty).
-  const all = t.footprint ? footprintCells(t) : cells(templateArea(t), "half");
+  // DM #377: a snapped sphere / cylinder: grid reach from its origin block under the campaign's
+  // diagonal rule (FR-SCN-30), never empty.
+  const all = t.footprint ? footprintCells(t, rule) : cells(templateArea(t), "half");
   if (cut) return all.filter(([c, r]) => cellOnMap(scene, c, r));
   return all.length > 0 ? all : [[Math.floor(t.x), Math.floor(t.y)]];
 }
