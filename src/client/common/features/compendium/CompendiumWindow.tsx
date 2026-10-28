@@ -184,7 +184,8 @@ export function TableHead() {
       data-slot="cmp-table-head"
       className={cn(
         COLS,
-        "sticky top-0 z-10 border-b bg-background px-2 py-1 text-xs font-semibold text-muted-foreground",
+        // BL-141 (K6c gap 8): regular weight, as the kit's `.tbl th`.
+        "sticky top-0 z-10 border-b bg-background px-2 py-1 text-xs font-normal text-muted-foreground",
       )}
     >
       <span>Name</span>
@@ -201,15 +202,16 @@ const SourceBadge = ({ label }: { label: string }) => (
 );
 
 /**
- * Name and Details cells: the name in body type, its weight only (a group's chevron before it;
- * a long name truncates, the whole name in the row's Tooltip, `NameTip`); the details line
+ * Name and Details cells: the name in body type, regular weight (BL-141, the kit's `.tbl td`; a
+ * group's chevron before it; a long name truncates, the whole name in the row's Tooltip,
+ * `NameTip`); the details line
  * (`r.line`, tabular figures in body type, K13) right after it.
  */
 function Cells({ r, lead }: { r: EntrySummary; lead?: ReactNode }) {
   return (
     <>
       <span
-        className="flex min-w-0 items-center gap-1 font-medium"
+        className="flex min-w-0 items-center gap-1"
         data-testid="cmp-result-name"
         data-slot="cmp-row-name"
       >

@@ -2066,15 +2066,11 @@
 :root[data-theme="gilt"] [data-slot="log-row"] [data-slot="kit-result"][data-hit="true"] {
   border-color: var(--hp-full);
 }
-/* Compendium table (the kit's `.tbl`): names in regular body weight (`td`), the head a gold rule
-   on the window's own surface (`th`: no band), its labels regular weight. */
-:root[data-theme="gilt"] [data-slot="cmp-row-name"] {
-  font-weight: 400;
-}
+/* Compendium table (the kit's `.tbl` `th`): the head a gold rule on the window's own surface, no
+   band (regular weight names and head: markup). */
 :root[data-theme="gilt"] [data-slot="cmp-table-head"] {
   --background: var(--card);
   background-image: var(--panel-grain);
-  font-weight: 400;
 }
 /* Section headings (`section-label`: Recap's Fights / Party / Loot, Party Manager Loot's Party pot /
    Wallets / Add loot, Roll requests' New request) in label type, gold, as Preferences' (K10). */
