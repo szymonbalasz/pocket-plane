@@ -124,6 +124,8 @@ describe("combat-extras over WS", () => {
             "condition",
             "encounterId",
             "endsRound",
+            // spell-fx (VFX §8): the map effect rides the effect's rule.
+            "fx",
             "id",
             "kind",
             "label",
