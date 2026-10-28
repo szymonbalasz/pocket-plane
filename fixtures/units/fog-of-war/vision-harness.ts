@@ -70,8 +70,11 @@ export function tokenRecordsIn(frames: readonly ServerFrame[]): Record<string, u
 
 export type Who = "p1" | "p2";
 
-/** `bundle`: `vision` (default) or `vision-party` (sprint 4, + `vision-invisible`). */
-export async function visionHarness(bundle = "vision") {
+/**
+ * `bundle`: `vision` (default) or `vision-party` (sprint 4, + `vision-invisible`). `fake`: the
+ * server runs on the harness's manual clock + fake timers (`h.timers.advance`), for rate windows.
+ */
+export async function visionHarness(bundle = "vision", opts: { fake?: boolean } = {}) {
   const loaded = await loadBundle(bundle, { dmSecret: TEST_SECRET, testMode: true });
   const db: Db = openFileDb(loaded.config.dbPath);
   const players = db.select().from(player).all();
@@ -86,7 +89,7 @@ export async function visionHarness(bundle = "vision") {
     .all()
     .find((s) => s.name === "Goblin Ambush") as typeof scene.$inferSelect;
   const ambushId = ambush.id;
-  const h: TestServer = await startTestServer({ db, fake: false });
+  const h: TestServer = await startTestServer({ db, fake: opts.fake ?? false });
   const dm = await h.live(DM);
   const cred = (w: Who) => ({
     role: "player" as const,

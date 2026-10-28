@@ -455,10 +455,10 @@ describe("CB0 cbtx.moveCombatant on combat-polish over WS", () => {
     await move("Elite Goblin Warrior", null);
     await move("Goblin", "Wolf"); // fog-hidden
     expect(named(dm, "Elite Goblin Warrior").position).toBe(1);
-    await p1.expectNoFrame(150);
-    await p2.expectNoFrame(150);
-    expect(p1.frames.length).toBe(marks.p1);
-    expect(p2.frames.length).toBe(marks.p2);
+    // Both moves are acked, so anything sent for them precedes each player's pong.
+    for (const c of [p1, p2]) await barrier(c);
+    expect(p1.frames.slice(marks.p1).map((f) => f.type)).toEqual(["pong"]);
+    expect(p2.frames.slice(marks.p2).map((f) => f.type)).toEqual(["pong"]);
     leaks();
   });
 

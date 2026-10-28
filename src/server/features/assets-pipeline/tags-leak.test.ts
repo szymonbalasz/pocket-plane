@@ -116,7 +116,13 @@ describe("FR-ASSET-50 tags DM-only (image-search; player-1, player-2)", () => {
   }
 
   async function expectClean(label: string) {
-    await Bun.sleep(60);
+    // Each step's intent / upload has its answer, so anything it broadcast precedes a pong.
+    await Promise.all(
+      Object.values(players).map(async (c) => {
+        c.send({ type: "ping" });
+        await c.next("pong");
+      }),
+    );
     const words = [...forbidden].map((w) => w.toLowerCase());
     for (const [name, c] of Object.entries(players)) {
       const raw = c.raw().toLowerCase();
