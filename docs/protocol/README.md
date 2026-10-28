@@ -4233,20 +4233,21 @@ From [spell-fx](../specs/spell-fx.md) (VFX, DM #374) on the core of §179. **Bui
 
 ## 182. AoE cell origin (fix/aoe-cell-origin)
 
-From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 as amended by DM [#375](../decisions-log.md). **Built by `fix/aoe-cell-origin`.** **No wire change**: `scn.template`, `scn.placeTemplate` and `scn.updateTemplate` carry the same fields (`x`, `y` in grid units, ≤ 2 decimals; a cell centre is `c.5`); stored rows keep their origin.
+From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 / -41 as amended by DM [#375](../decisions-log.md) and [#377](../decisions-log.md). **Built by `fix/aoe-cell-origin`** (shared change granted: DB schema, scene-tools wire schemas). New optional field **`footprint`** (int 1–4) on `scn.template` place frames, `scn.placeTemplate` (DM and player), `scn.updateTemplate` (`1–4 | null`; absent = unchanged) and the `aoe-template` record (DM and players; omitted when null). Sphere / cylinder only, and `x − n / 2`, `y − n / 2` must be whole (the origin is the block's centre), else `invalid` (zod on place / signal; the server re-checks an update after merging, so moving a footprint template off its block without a new `footprint` → `invalid`). Absent = the exact > 50 % rule (every stored row, Ctrl-free spheres).
 
 | Client action | Origin sent | FR |
 |---|---|---|
-| AoE press (no Ctrl): sphere, cylinder, cone, line | the centre of the cell under the pointer, clamped to the map's cells | FR-SCN-43 |
-| … sphere / cylinder over a token larger than one cell (the shown tokens; the topmost wins) | the token's footprint centre (`col + n / 2`, `row + n / 2`; a vertex for Large / Gargantuan) | FR-SCN-43 |
+| AoE press (no Ctrl): sphere, cylinder, cone, line | the centre of the cell under the pointer, clamped to the map's cells; sphere / cylinder add `footprint: 1` | FR-SCN-43 |
+| … sphere / cylinder over a token larger than one cell (the shown tokens; the topmost wins) | the token's footprint centre (`col + n / 2`, `row + n / 2`; a vertex for Large / Gargantuan), `footprint: n` | FR-SCN-43 |
 | … cube | the nearest vertex, clamped to the map's cells | FR-SCN-43 |
-| Ctrl held | the pointer, 0.01 cell (unchanged) | FR-SCN-43 |
-| Kept template's origin handle drag | the same snap for the template's shape; one `scn.updateTemplate {x, y}` on release | FR-SCN-26, -45 |
+| Ctrl held | the pointer, 0.01 cell (unchanged); no `footprint` | FR-SCN-43 |
+| Kept template's origin handle drag | the same snap for the template's shape; one `scn.updateTemplate {x, y, footprint?}` on release (`footprint: null` when a footprint sphere is moved with Ctrl) | FR-SCN-26, -45 |
 | Panel shape change with an ephemeral shown | the ephemeral re-snapped from its press point | FR-SCN-43 |
 
-- **Helper:** `src/client/common/features/scene-tools/aoe-snap.ts`: `aoeOrigin(shape, p, {free, tokens?, bounds?}) → {x, y, cell}`, `mapCells(mapRect)`, `snapTokens(tokens)`; `templates.ts` `movedOrigin(shape, press, p, opts)`; `gestureTemplate(…, press)` measures "dragged" (≥ ½ cell) from the press.
+- **Squares** (`templateCells`, server and clients, #377): with `footprint`, every cell whose FR-MAP-22 distance (5/10/5) from the nearest cell of the origin block is ≤ `size`, the block included (`reachCells` in `@shared/scenes-map/area`; Spell FX's `emanationCells` now wraps it); otherwise the exact rule. Fog `derive`, the boot re-derive and the `scn.template` DM audience use it unchanged (they pass the record / frame).
+- **Drawing:** a footprint sphere / cylinder's outline is the stepped edge of its squares (`templateArea` → `{polygon}`; hit test and hover use it); its end handle sits on that edge, east of the origin (`x + size / 5 + n / 2`), and a drag measures the radius from the block's edge.
+- **Helper:** `src/client/common/features/scene-tools/aoe-snap.ts`: `aoeOrigin(shape, p, {free, tokens?, bounds?}) → {x, y, cell}`, `footprintOf(shape, origin)`, `mapCells(mapRect)`, `snapTokens(tokens)`; `templates.ts` `movedOrigin(shape, press, p, opts)`; `gestureTemplate(…, press)` measures "dragged" (≥ ½ cell) from the press.
 - **Konva:** `scn-aoe-origin-cell` (in `scn-templates`, AoE tool active, while a placement or an origin move is held): attrs `col`, `row`, `n` (1 = a cell, 2–4 = a token footprint); outline in the placer's colour over the black casing.
 - **DOM:** the AoE panel hint reads "Drag from a square to aim" (cube: "Drag from a grid corner").
-- **Tests:** `scene-tools/aoe-snap.test.ts` (snap: `FR-SCN-43 …` ×4 + `FR-SCN-45 …`; coverage from snapped origins: `FR-SCN-41 …` ×4; through the tool: `FR-SCN-43 …` ×2 + `FR-SCN-22 …`), `aoe-freeform.test.ts` (updated to cell centres); e2e `aoe-freeform` (+ the #375 case), `scene-tools-templates` (Fireball pressed in a cell: 9 squares).
-- **CON-44:** 0 B (no record or payload change).
-
+- **Tests:** `scene-tools/aoe-snap.test.ts` (snap `FR-SCN-43 …` ×4 + `FR-SCN-45 …`; coverage `FR-SCN-41 #377 …` ×3 + cone / line / cube `FR-SCN-41 …` ×2; outline `FR-SCN-20 #377 …`; through the tool `FR-SCN-43 …` ×2 + `FR-SCN-22 …`), `aoe-freeform.test.ts` (`FR-SCN-45 #377 …` moves), shared `schemas.test.ts` (`FR-SCN-20 #377 footprint …`), server `templates.test.ts` (`FR-SCN-41 #377 …`, `FR-SCN-45 #377 …`, `FR-SCN-35 #377 …` fog over the reach cells), `con44.test.ts` (`CON-44 #377 …`); e2e `aoe-freeform` (+ the #375 / #377 case: 61 squares for 20 ft), `scene-tools-templates` (Fireball pressed in a square: 21 squares).
+- **CON-44 (measured):** `,"footprint":N` = **+14 B per snapped sphere / cylinder row** (DM and every player that sees it). Heavy harness at the template cap, 6 round templates snapped: DM 697,508 → 697,592 B (875,272 B left of 1.5 MiB); players 263,686–266,941 B (257,347 B left of 512 KiB).

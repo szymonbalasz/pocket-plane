@@ -2755,9 +2755,15 @@ From [spell-fx §8](../specs/spell-fx.md#8-data-model). **Built by `build/vfx`.*
 
 ## 144. AoE cell origin (fix/aoe-cell-origin)
 
-From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 (DM [#375](../decisions-log.md)). **Built by `fix/aoe-cell-origin`**; no table, column, record type or snapshot change (CON-44: 0 B). Protocol side: [protocol §182](../protocol/README.md#182-aoe-cell-origin-fixaoe-cell-origin).
+From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 / -41 (DM [#375](../decisions-log.md), [#377](../decisions-log.md)). **Built by `fix/aoe-cell-origin`** (shared change granted). Protocol side: [protocol §182](../protocol/README.md#182-aoe-cell-origin-fixaoe-cell-origin).
 
-- **Stored rows:** unchanged; existing origins (vertices, decimals) stay as stored. New snapped origins are cell centres (`c.5`), a big token's centre or (cube) a vertex: all valid under FR-SCN-20's ≤ 2 decimals.
+| Table / record | Change | Notes |
+|---|---|---|
+| `aoe_template` | + `footprint integer` (nullable; push-safe ADD COLUMN) | #377: a snapped sphere / cylinder's origin block, 1–4 cells per side (1 = a square, 2–4 = a Large / Huge / Gargantuan token), centred on `(x, y)`. Null = the exact > 50 % rule |
+| `aoe-template` record (DM, players) | + `footprint?` 1–4, omitted when null | Not redacted (geometry, like `x`, `y`) |
+
+- **Stored rows:** existing ones get `footprint` null and keep their origin and their squares (exact rule). New snapped origins are cell centres (`c.5`), a big token's centre or (cube) a vertex: all valid under FR-SCN-20's ≤ 2 decimals.
+- **Derived (never stored):** with `footprint`, the squares within its radius by grid distance (5/10/5) of the origin block, the block included (`reachCells`); fog's `fogged` / `seenBy` are derived over those (uncut).
 - **Client only (never stored or sent):** the shown scene's token footprints for the snap (`useAoe.tokens`, written by `TemplatesLayer`), the highlighted origin cells while a press is held (`useAoe.originCell`), the last placement's raw press point (a panel shape change re-snaps from it).
-- **Fixtures:** none new: the e2e uses `map-tools`' Crypt Ogre (Large, (4, 10), `mt-crowd`); `session-sim-13` gets a comment line only (client-only).
-
+- **Fixtures:** none new: the e2e uses `map-tools`' Crypt Ogre (Large, (4, 10), `mt-crowd`); `session-sim-13` gets a comment line only.
+- **CON-44 (measured):** +14 B per snapped sphere / cylinder row; heavy DM 697,592 B, players ≤ 266,941 B (protocol §182).
