@@ -16,8 +16,15 @@ afterAll(() => {
   for (const c of cleanups) c();
 }, 60_000); // one temp dir per bundle, removed serially: over the 5 s default while other suites run
 
+// Real loads only (`"verify"`): this file is the suite's "every bundle loads from empty" check,
+// and each load is compared with the bundle's cached snapshot if one exists (a mismatch fails:
+// a nondeterministic fixture or a stale cache), else stored for the fast tests and e2e.
 async function loaded(bundle: string, now?: number) {
-  const r = await loadBundle(bundle, { testMode: true, ...(now !== undefined && { now }) });
+  const r = await loadBundle(bundle, {
+    testMode: true,
+    cache: "verify",
+    ...(now !== undefined && { now }),
+  });
   cleanups.push(r.cleanup);
   const db = r.openDb();
   cleanups.unshift(() => closeDb(db));
@@ -45,7 +52,7 @@ describe("fixture library", () => {
 
   test("FR-FIX-15 bundle contents per FIX §8", async () => {
     const keys = (name: string) =>
-      loadBundle(name, { testMode: true }).then((r) => {
+      loadBundle(name, { testMode: true, cache: "verify" }).then((r) => {
         cleanups.push(r.cleanup);
         return r.manifest.fixtures;
       });
