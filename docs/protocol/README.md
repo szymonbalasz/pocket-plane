@@ -280,6 +280,7 @@ Each lists `changes` (before/after per record; create: before null, delete: afte
 | `EffectUpdated` | CBTX | `{effectId}` | `effect` | yes | no | no | — |
 | `EffectsEnded` | CBTX | `{effectIds, reason}` (`reason` = an `endedReason`) | `effect`s + linked; closed cards follow as `NotificationResolved` | yes | no | no | — |
 | `ConcentrationSet` | CBTX | `{effectId, replacedId?}` | `effect`s | yes | no | no | — |
+| `EffectFxSet` *(spell-fx, built, fix/vfx-core, [§179](#179-spell-fx-core-effectfx-vfxcast-vfxseteffectfx-the-vfxhit-cue-vfx-core))* | VFX | `{effectId}` | `effect` upsert (+ effect-hook rows) | yes | no | no | — (the hit cue `vfx.hit` is a server signal, not an event) |
 | `TempHpSet` | CBTX | `{targetKind: combatant \| character, targetId, before, after}` (0–999) | `combatant` or `entity` | yes | no | no | — |
 | `ConcentrationRolled` | CBTX | `{notificationId, effectId, rollIds, entryId, total, dc, success}` | `game-log-entry`; `effect`s on a fail; then `NotificationResolved` | yes | no | no | — |
 | `DeathSaveRolled` | CBTX | `{characterId, rollIds, entryId, natural, before, after}` (`{successes, failures}` each) | `entity`; `game-log-entry` | yes | no | no | — |
@@ -4139,3 +4140,44 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#69-party-status-creatures-shee
 - **Tests:** `character-sheet/print-sheet.test.tsx` (`FR-CHARX-114 K13 wide Main` ×4, `FR-CHARX-112 K13 …`, `FR-CHARX-115 K13 tab strip`, `FR-KIT-85 K13 level line`, `FR-KIT-85 K13 chips line`), `sheet-render.test.tsx` (header order / grid updated), `compendium/views.test.tsx` (`FR-KIT-76 K13 kit rows`), `play-shell/prefs.test.tsx` (`FR-KIT-13 K13 identity chip`, `FR-KIT-13 K13 status`), `dm/features/party-board/companion-menu.test.tsx`; bundle `kit-round3.fixtures.test.ts`; e2e `kit-round3.e2e.ts` (`kit-round3`); `kit-library.e2e.ts` row height 28–32.
 - **Fixtures:** bundle `kit-round3`; `kit-parity` + `kit-mira-spells` (data model §141).
 - **CON-44:** 0 B on the wire (bundle `kit-parity`: +315 B for the DM and Mira's owner from the fixture's spell row and slots).
+
+## 179. Spell FX core: `effect.fx`, `vfx.cast`, `vfx.setEffectFx`, the `vfx.hit` cue (VFX core)
+
+From [spell-fx](../specs/spell-fx.md) (VFX, in-review, DM direction #372) and [ADR-0071](../architecture/adr/0071-spell-fx.md) (accepted, #373). **Built by `fix/vfx-core`** (DM #374): shared catalogue, schema, commands, the hit cue path and empty registries; no rendering. Data side: [data model §142](../data-model/README.md#142-spell-fx-core-effectfx-spellsfx-vfx-core).
+
+**WS intents**
+
+| Intent | Who | Input → result | Validation / errors | Events |
+|---|---|---|---|---|
+| `vfx.cast` | DM; the owner player | `{creatureId, spellId}` → `{effectId}` | Creature: player → own character only (`not_found`; another's → `forbidden` "Not your character"; a locked sheet is fine, like counters); DM → any character, or a campaign monster with exactly one active combatant in the started encounter (else `conflict` "‹name› is not in the fight" / "Several ‹name› in the fight…"). Row missing → `not_found` "Row was deleted"; no `fx` → `conflict` "No map effect on ‹spell›"; an active effect on the creature with `fx.spellId` = the row → `conflict` "‹spell› is already active"; the row's `fx` re-parsed against the catalogue (`invalid`). Then the `cbtx.setConcentration` path (row `concentration`) or `cbtx.addEffect` custom with no duration (else), label = the spell name cut to 40. Never rolls, spends a slot or changes HP | The effect's own: `ConcentrationSet` (+ the replaced concentration and its links ended) or `EffectsAdded`; the new row carries `fx = {…row.fx, spellId}` |
+| `vfx.setEffectFx` | DM; a player on their own character's non-secret effects | `{effectId, fx: Fx \| null}` → — | Other campaign / ended / (player) not received → `not_found`; another's or a monster's → `forbidden`; `Fx`: catalogue preset, params by its schema (defaults filled), ≤ 200 B (`invalid`). Same value → ack, no event | `EffectFxSet` |
+
+**Domain event**
+
+| Event | Owner | Payload | Changes | Logged | Undoable |
+|---|---|---|---|---|---|
+| `EffectFxSet` | VFX | `{effectId}` | `effect` upsert (+ effect-hook rows) | yes | no |
+
+**Record change:** `effect` (DM) gains `fx: {preset, params, spellId?} | null`; the player redaction (`redactEffect`, FR-CBTX-31) gains `fx` on every effect players receive (not secret, not hidden, not ended). The stored / wire shape accepts any kebab-case preset key (a newer server's preset parses on an older client, which draws nothing); writes accept catalogue presets only.
+
+**Server signal `vfx.hit`** (server-originated, transient: no event of its own, DB row, log, snapshot or `seq`): `signal {name: "vfx.hit", data: HitCue, from}`, `from` = the applying actor.
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | string | The applied `hp_change` row id (one cue per target row; seeds the look) |
+| `targetTokenId` | string | The target combatant's token; a combatant without a token → no cue |
+| `attackerTokenId?` | string | The attacker / From combatant's token, only for a receiver who has that token |
+| `kind` | `damage` \| `heal` | |
+| `parts` | `[{type: damage type \| null, value}]`, ≤ 4 | After the multiplier: the base part (`raw` minus the extra and trigger parts), the extra weapon parts, the trigger parts; the largest four, in that order |
+| `multiplier` | `normal` \| `half` \| `none` \| `double` | Direct HP changes: `normal` |
+| `crit` | boolean | From the outcome line |
+
+- **Source:** listener `spell-fx.hit-cues` on `AttackApplied` / `HpApplied` (after commit; writes nothing, ADR-0035). No cue for a miss (`hit: false`), for `raw` 0 and `applied` 0 unless `multiplier: none` (the glance), for `CombatEntryUndone`, or for sheet HP outside combat.
+- **Routing (per connection, hub `sendServerSignal`):** every **live** connection of the campaign, the origin included. DM: always. Player: only if the token record's own rule gives them the target token now (`hidden`, fog per FR-FOG-11, the scene gate) **and** they receive that apply's outcome line (`game-log-entry`; a DM-only line, the BL-135 roll guard's included, → no cue); `attackerTokenId` stripped unless they also receive the attacker's token. A connection mid-snapshot, offline or reconnecting gets nothing; never queued or replayed (FR-VFX-22).
+- **Hub API** (`src/server/ws/hub.ts`): `sendServerSignal(campaignId, name, from, payloadFor(viewer) → payload | null)` sends a registered server signal (`registerServer`), zod-parsed per receiver (a bad payload → logged, that receiver skipped). The intent-result path (OQ-FOG-58, players only) is unchanged.
+- **Client:** `@ui/features/spell-fx/cues`: `subscribeHitCues(connection, fn)` / `useHitCues(fn)` (zod-parsed; a malformed cue is dropped with a warning). No rendering in this slice.
+
+**Registries** (append-only, AGENTS §9.9, created by this branch): FX presets `src/shared/spell-fx/presets.ts` (`spirit-guardians`, `shadow-of-moil`); client hit looks `src/client/common/features/spell-fx/hit-looks.ts` (type + empty map); character-sheet spell-row actions `src/client/common/features/character-sheet/spell-row-actions.ts` (type + empty list, not yet wired, OQ-VFX-06 A). Canvas layer entries `vfx-under` (38) and `vfx-over` (43) on `objects`, drawing nothing yet (FR-VFX-13).
+
+- **Tests:** `shared/spell-fx/spell-fx.test.ts` (FR-VFX-01–05, -18–21, -24), `server/features/spell-fx/commands.test.ts` (FR-VFX-07, -08, -09, `fx` visibility, crash before / after commit with state digest), `cues-sync.test.ts` (FR-VFX-20–22 over sockets: DM + `player-1` + `player-2`), `con44-fx.test.ts`, `server/ws/server-signals.test.ts` (ADR-0071 `sendServerSignal`), `client/common/features/spell-fx/spell-fx.test.ts`, `fixtures/bundles/spell-fx.fixtures.test.ts`.
+- **CON-44:** heavy harness with worst-case `fx` (Spirit Guardians necrotic 60 ft, UUID `spellId`, 124 B) on its 6 concentrations and its 64 concentration spell rows (75 B each): DM 692,082 → 697,986 B (+5,904: effects +720, sheets +5,184), 88,446 B left of 768 KiB; players +1,044 B, max 263,363 B of 512 KiB.
