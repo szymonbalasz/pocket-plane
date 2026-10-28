@@ -3,7 +3,7 @@
 - Status: accepted (core); details open below. Refined by [ADR-0034](0034-encounter-scoped-notifications.md) and [ADR-0035](0035-combat-rule-hooks.md) (#178)
 - Decided 2026-10-11: damage cards, reminders and prompts are **one concept** (notification, optional action).
 - Date: 2026-10-11
-- Affects: live-sync, combat-tracker, dice-roll-log, party-loot, combat-extras, post-mvp/campaign-manager, post-mvp/agent-api
+- Affects: live-sync, combat-tracker, dice-roll-log, party-loot, combat-extras, post-mvp/campaign-manager, agent-api
 
 ## Context
 

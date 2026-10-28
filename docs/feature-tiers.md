@@ -125,7 +125,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Character trophy case (campaign stats on sheet) | B | [stats](specs/stats.md) | |
 | Dice luck tracker (avg d20, nat 20s/1s) | B | [stats](specs/stats.md) | |
 | Auto session recap from event log | D | — | Automatic recaps stay out; the on-demand recap is tier B ([session-recap](specs/session-recap.md), #339) |
-| Live AI follow-along / summariser | F | — | Distinct from [agent-api](specs/post-mvp/agent-api.md) |
+| Live AI follow-along / summariser | F | — | Distinct from [agent-api](specs/agent-api.md) |
 | Combat rewind / timeline replay | F | — | |
 | External stream / overlay of the log | F | — | Log lives in the game client |
 | **Homebrew gems** (Inspiration, Fortune, Combat, Divine Knowledge, Action): DM awards, player spends; reroll a d20, max damage dice | A | [gems](specs/gems.md) | Max 5 per character, not enforced (#140). MVP dice/combat interfaces allow it |
@@ -154,7 +154,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Griffon's Saddlebag item import (partial mechanics) | B | [compendium](specs/post-mvp/compendium.md) | Fill in mechanics as items get used |
 | 5etools import | C | [compendium-expansion](specs/post-mvp/compendium-expansion.md) | Separate project |
 | Obsidian vault tie-in to notes | C | [obsidian-importer](specs/post-mvp/obsidian-importer.md) | Story/world-building |
-| Agent features (NPC creation, map work, note grooming) | C | [agent-api](specs/post-mvp/agent-api.md) | Keep design SOLID: everything is a server command |
+| Agent features (NPC creation, map work, note grooming) | C | [agent-api](specs/agent-api.md) | Keep design SOLID: everything is a server command |
 | Character builder (players create characters); full editing of PCs and NPCs, players fill in their own sheets | A (design for later, #154) | [levelling](specs/post-mvp/levelling.md) | MVP uses fixture characters; speed, scores and saves come from fixtures / the API until then |
 | Import existing characters | C | — | Once-off scripts, way post-MVP |
 | Session tracking | F | [ADR-0013](architecture/adr/0013-session-journal-scope.md) | Encounters instead |
