@@ -60,7 +60,7 @@ async function run(cmd: string[], env: Record<string, string | undefined> = proc
 export function groupSpecs(filters: string[], root = WORKTREE_ROOT): Map<string, string[]> {
   const files = readdirSync(path.join(root, "e2e"), { recursive: true, encoding: "utf8" })
     .map((f) => `e2e/${f.split(path.sep).join("/")}`)
-    .filter((f) => f.endsWith(".e2e.ts") && !f.startsWith("e2e/support/"))
+    .filter((f) => f.endsWith(".e2e.ts") && !/^e2e\/(support|__screenshots__)\//.test(f))
     .filter((f) => filters.length === 0 || filters.some((x) => f.includes(x.replaceAll("\\", "/"))))
     .sort();
   const groups = new Map<string, string[]>();
