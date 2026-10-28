@@ -18,6 +18,7 @@ import * as partyLoot from "./party-loot";
 import * as reminders from "./reminders";
 import * as sceneTools from "./scene-tools";
 import * as scenesMap from "./scenes-map";
+import * as spellFx from "./spell-fx";
 import * as strongholds from "./strongholds";
 import { type DomainEventDef, isDomainEventDef } from "./types";
 
@@ -55,6 +56,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   // reminders + strongholds (fix/rs-core).
   ...Object.values<unknown>(reminders).filter(isDomainEventDef),
   ...Object.values<unknown>(strongholds).filter(isDomainEventDef),
+  // spell-fx (fix/vfx-core).
+  ...Object.values<unknown>(spellFx).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */

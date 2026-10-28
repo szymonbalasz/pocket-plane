@@ -7,6 +7,7 @@ import {
   PRESET_KEY_MAX,
   playerPresetKey,
 } from "@shared/effect-modifiers/schemas";
+import { FxRecord } from "@shared/spell-fx/fx";
 import { z } from "zod";
 import { Condition, ExhaustionLevel } from "./conditions";
 
@@ -90,6 +91,8 @@ export const EffectRecordShape = z.object({
   modifiers: Modifiers,
   /** Built-in preset key or preset id it was applied from (FR-MOD-09); `custom` only. */
   presetKey: z.string().min(1).max(PRESET_KEY_MAX).nullable(),
+  /** spell-fx (FR-VFX-03, ADR-0071): the map effect drawn while the effect is active, or null. */
+  fx: FxRecord.nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -111,7 +114,7 @@ export type EffectRecord = z.infer<typeof EffectRecordShape>;
 
 /**
  * What a player receives (FR-CBTX-31): no source, anchor or concentration link (they may name
- * hidden creatures), no secret / hidden flags or end facts. FR-MOD-21: `modifiers` and
+ * hidden creatures), no secret / hidden flags or end facts; the map effect `fx` (VFX §8). FR-MOD-21: `modifiers` and
  * `presetKey` only on PC effects (`targetCharacterId` set), `presetKey` built-in keys only.
  */
 export const PlayerEffectRecord = EffectRecordShape.pick({
@@ -125,6 +128,8 @@ export const PlayerEffectRecord = EffectRecordShape.pick({
   encounterId: true,
   endsRound: true,
 }).extend({
+  /** spell-fx (VFX §8): always sent by `redactEffect`; absent = none (older test records). */
+  fx: FxRecord.nullable().optional(),
   modifiers: Modifiers.optional(),
   presetKey: z.enum(BUILTIN_PRESET_KEYS).nullable().optional(),
 });
@@ -147,6 +152,8 @@ export function redactEffect(r: EffectRecord): PlayerEffectRecord {
     targetCharacterId: r.targetCharacterId,
     encounterId: r.encounterId,
     endsRound: r.endsRound,
+    // spell-fx (VFX §8): `fx` rides the effect's rule; every receiver gets it.
+    fx: r.fx,
   };
   // FR-MOD-21 (OQ-MOD-06): PC effects carry modifiers to every player who receives them; no
   // preset id ever reaches a player; monster effects carry neither key.

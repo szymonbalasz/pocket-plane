@@ -48,6 +48,7 @@ import type { SharedWith } from "@shared/party-board/schemas";
 import type { ReminderRoll } from "@shared/reminders/schemas";
 import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
 import type { TokenTrail } from "@shared/scenes-map/schemas";
+import type { FxRecord } from "@shared/spell-fx/fx";
 import type { Facility, Staff } from "@shared/strongholds/schemas";
 import { sql } from "drizzle-orm";
 import {
@@ -1006,6 +1007,8 @@ export const effect = sqliteTable(
     modifiers: text("modifiers", { mode: "json" }).$type<Modifier[]>().notNull().default([]),
     /** Built-in preset key or preset id it was applied from (soft, no FK; FR-MOD-09). */
     presetKey: text("preset_key"),
+    /** spell-fx (FR-VFX-03, ADR-0071): JSON leaf map effect ≤ 200 B, or null (zod `FxRecord`). */
+    fx: text("fx", { mode: "json" }).$type<FxRecord>(),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
