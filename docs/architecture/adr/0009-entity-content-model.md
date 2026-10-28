@@ -2,7 +2,7 @@
 
 - Status: **accepted** (2026-10-11) — definition / instance model, storage option A, derive = fork, PCs follow the same split. Minor rows still open below. Refined by [ADR-0035](0035-combat-rule-hooks.md) (#178): PC play state on the character, effect rows.
 - Date: 2026-10-10
-- Affects: entities, character-sheet, combat-tracker, scenes-map, fixtures-adapters, post-mvp/compendium, combat-extras, post-mvp/world-builder, post-mvp/agent-api, post-mvp/obsidian-importer
+- Affects: entities, character-sheet, combat-tracker, scenes-map, fixtures-adapters, post-mvp/compendium, combat-extras, post-mvp/world-builder, agent-api, post-mvp/obsidian-importer
 - MVP: **blocking** — characters and monsters are entities ([ADR-0014](0014-mvp-scope.md)). World-builder kinds can follow later but the model must accommodate them.
 
 ## Context

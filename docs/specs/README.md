@@ -146,7 +146,7 @@ Stubs only. Not to be claimed during MVP spec phase.
 | [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
 | [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |
 | [Levelling workflows](post-mvp/levelling.md) | LVL | |
-| [Agent / MCP API](post-mvp/agent-api.md) | AGENT | |
+| [Agent / MCP API](agent-api.md) | AGENT | Expanded (#378), in-review; [proposed ADR](../architecture/adr/proposed-agent-mcp-server.md) |
 | [Theme system](post-mvp/theme-system.md) | THEME | Expanded, see [Art track](#art-track-2026-10-25) |
 | [Single executable](post-mvp/single-executable.md) | PKG | |
 | [Obsidian importer](post-mvp/obsidian-importer.md) | OBS | |
