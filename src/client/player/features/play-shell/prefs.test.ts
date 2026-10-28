@@ -48,6 +48,7 @@ test("FR-SHELL-72 sections (player): Your colour, Appearance, Sound, Dice, Stats
     "theme.appearance",
     "shell.sound",
     "dicex.dice",
+    "vfx.level",
     "stats.prefs",
     "shell.keys",
     "shell.layout",

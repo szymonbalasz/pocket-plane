@@ -129,7 +129,8 @@ export const vfxPrefs = (): VfxPrefsStore => {
 /** React: `{chosen, level, lowered}`; re-renders on a pick or a tier drop. */
 export function useVfxLevel(): { chosen: FxLevel; level: FxLevel; lowered: FxLevel | null } {
   const p = vfxPrefs();
-  const chosen = useSyncExternalStore(p.subscribe, () => p.read().level);
-  const lowered = useSyncExternalStore(p.subscribe, p.lowered);
+  const level = () => p.read().level;
+  const chosen = useSyncExternalStore(p.subscribe, level, level);
+  const lowered = useSyncExternalStore(p.subscribe, p.lowered, p.lowered);
   return { chosen, level: effectiveLevel(chosen, lowered), lowered };
 }
