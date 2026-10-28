@@ -146,7 +146,7 @@ Reference [visual-direction](../design/visual-direction.md). FX colours are pres
 - **States:** no token on this scene → nothing on the map, sheet still shows End; disconnected → auras keep animating from the last state, Cast disabled (as every intent button); Off → map plain, sheet unchanged.
 - **DM view:** everything; hidden tokens' auras dimmed; picker on any effect.
 - **Player view:** auras and cues only for tokens they receive; Cast on their own sheet (OQ-VFX-01, decided); Show affected cells on any aura they see.
-- **Test IDs:** `vfx-row-fx` (Select, `data-record-id` = spell id), `vfx-row-fx-variant`, `vfx-row-fx-radius`, `vfx-cast` (`data-record-id` = spell id, `data-state` = `cast` \| `end`), `vfx-effect-fx` (menu item, `data-record-id` = effect id), `vfx-effect-fx-save`, `vfx-pref-level-<full|reduced|still|off>`, `vfx-pref-lowered`, `vfx-token-menu-cells` (`data-record-id` = effect id). Canvas: one non-listening Group per aura `vfx-aura` (id = effect id; attrs `preset`, `tokenId`, `radiusFt`, `level`), per playing look `vfx-hit` (id = cue id; attrs `look`, `tokenId`), `vfx-cells` (id = effect id; attr `count`); `vfx-over` Group attr `frameMs` (median, for walkthroughs).
+- **Test IDs:** `vfx-row-fx` (Select, `data-record-id` = spell id), `vfx-row-fx-variant`, `vfx-row-fx-radius`, `vfx-cast` (`data-record-id` = spell id, `data-state` = `cast` \| `end`), `vfx-effect-fx` (menu item, `data-record-id` = effect id), `vfx-effect-fx-save`, `vfx-pref-level-<full|reduced|still|off>`, `vfx-pref-lowered`, `vfx-token-menu-cells` (`data-record-id` = effect id). Canvas: one non-listening Group per aura `vfx-aura` (id = effect id; attrs `preset`, `tokenId`, `radiusFt`, `level`), per playing look `vfx-hit` (id = cue id; attrs `look`, `tokenId`), `vfx-cells` (id = effect id; attr `count`); `vfx-over-pass` Group attr `frameMs` (the `LAYER_ORDER` entry is `vfx-over`; walkthrough 2026-10-28) (median, for walkthroughs).
 
 ## 8. Data model
 
@@ -214,7 +214,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md). No new
 - **Bandwidth:** `fx` ≤ 200 B per effect (≤ 300 effects per campaign cap → ≤ 60 KB worst, typically < 1 KB). Hit cue ≤ 200 B per target, human-paced. No per-frame traffic.
   - *(2026-10-28, VFX core walkthrough, orchestrator rulings: no code change)* The hit cue budget is **≤ 480 B per target frame** (worst case), not 200 B: its three ids are 108 characters. Typical ~307 B (measured at walkthrough S3, 244 B data, `.verify/20261028-vfxcore/`); worst case 466 B (4 typed parts sent by a player, whose `from` carries a 36-character `playerId`). Human-paced, negligible. The unit test asserts the worst case ≤ 480 B.
 - **CPU:** one FX clock and one requestAnimationFrame per client, paused when no aura or look is on screen and when the tab is hidden. Particles are pre-tinted sprites (`drawImage`), no per-particle gradients.
-- **Gate:** DM client at 1280×720, 30 tokens, both auras, one hit look every second: `vfx-over` `frameMs` median ≤ 4 ms on the walkthrough machine, no Konva layer warning (`stage.getLayers().length ≤ 4`).
+- **Gate:** DM client at 1280×720, 30 tokens, both auras, one hit look every second: `vfx-over-pass` `frameMs` median ≤ 4 ms on the walkthrough machine, no Konva layer warning (`stage.getLayers().length ≤ 4`).
 - **Snapshot:** CON-44 heavy harness gains `fx` on its 6 concentrations; DM frame stays under 768 KiB.
 
 ## 13. Test plan
