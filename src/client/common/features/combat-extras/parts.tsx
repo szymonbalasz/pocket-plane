@@ -40,6 +40,7 @@ import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { useCbtIntent } from "../combat-tracker/store";
 import { type TriggerChip, triggerLine } from "../effect-modifiers/trigger-badges";
+import { useEffectFxDialog } from "../spell-fx/EffectFx";
 import { EffectIcon, effectValue } from "./icons";
 import {
   CHIP_MAX_W,
@@ -486,6 +487,8 @@ function ConcMenuChip({ e, round, testId, compact, icon, onEdit }: ConcChipProps
   const who = concMenuFor(store, e);
   const { send, disabled } = useCbtIntent();
   const [open, setOpen] = useState(false);
+  // FR-VFX-10: Map effect… (DM; the owner, FR-VFX-09: the same viewers as this menu).
+  const fx = useEffectFxDialog();
   const tip = concTooltip(e, round);
   const badge = <ConcBadge e={e} round={round} testId={testId} compact={compact} icon={icon} />;
   if (!who) {
@@ -498,63 +501,67 @@ function ConcMenuChip({ e, round, testId, compact, icon, onEdit }: ConcChipProps
   const left = roundsLeftText(e, round);
   const ends = concEndsWith(store, e);
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="flex min-w-0 rounded-md text-left"
-          aria-label={tip}
-          data-testid="cbtx-conc-chip"
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="flex min-w-0 rounded-md text-left"
+            aria-label={tip}
+            data-testid="cbtx-conc-chip"
+            data-record-id={e.id}
+          >
+            <Tooltip content={tip}>{badge}</Tooltip>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          className="max-w-72"
+          data-testid="cbtx-conc-menu"
           data-record-id={e.id}
         >
-          <Tooltip content={tip}>{badge}</Tooltip>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="max-w-72"
-        data-testid="cbtx-conc-menu"
-        data-record-id={e.id}
-      >
-        <DropdownMenuLabel data-testid="cbtx-conc-title">{effectName(e)}</DropdownMenuLabel>
-        {left && (
-          <p className="px-2 text-xs text-muted-foreground" data-testid="cbtx-conc-rounds">
-            {left}
-          </p>
-        )}
-        {ends.length > 0 && (
-          <p className="px-2 pb-1 text-xs text-muted-foreground" data-testid="cbtx-conc-ends">
-            Ends with it: {ends.join(", ")}
-          </p>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          data-testid="cbtx-conc-end"
-          data-record-id={e.id}
-          disabled={disabled}
-          onSelect={(ev) => {
-            // FR-CBTX-61: the menu closes on ack; a reject keeps it (the toast says why).
-            ev.preventDefault();
-            void send(CBTX_INTENTS.endEffect, { effectId: e.id }).then((r) => {
-              if (r !== undefined) setOpen(false);
-            });
-          }}
-        >
-          <TrashIcon /> End concentration
-        </DropdownMenuItem>
-        {who === "dm" && onEdit && (
+          <DropdownMenuLabel data-testid="cbtx-conc-title">{effectName(e)}</DropdownMenuLabel>
+          {left && (
+            <p className="px-2 text-xs text-muted-foreground" data-testid="cbtx-conc-rounds">
+              {left}
+            </p>
+          )}
+          {ends.length > 0 && (
+            <p className="px-2 pb-1 text-xs text-muted-foreground" data-testid="cbtx-conc-ends">
+              Ends with it: {ends.join(", ")}
+            </p>
+          )}
+          <DropdownMenuSeparator />
           <DropdownMenuItem
-            data-testid="cbtx-conc-edit"
+            variant="destructive"
+            data-testid="cbtx-conc-end"
             data-record-id={e.id}
             disabled={disabled}
-            onSelect={() => onEdit(e)}
+            onSelect={(ev) => {
+              // FR-CBTX-61: the menu closes on ack; a reject keeps it (the toast says why).
+              ev.preventDefault();
+              void send(CBTX_INTENTS.endEffect, { effectId: e.id }).then((r) => {
+                if (r !== undefined) setOpen(false);
+              });
+            }}
           >
-            <PencilIcon /> Edit…
+            <TrashIcon /> End concentration
           </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {who === "dm" && onEdit && (
+            <DropdownMenuItem
+              data-testid="cbtx-conc-edit"
+              data-record-id={e.id}
+              disabled={disabled}
+              onSelect={() => onEdit(e)}
+            >
+              <PencilIcon /> Edit…
+            </DropdownMenuItem>
+          )}
+          {fx.item(e)}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {fx.dialog}
+    </>
   );
 }
 

@@ -15,6 +15,7 @@ import { type ResolvedPreset, resolvePreset } from "@shared/compendium/presets";
 import type { BodyOf, FacetsOf } from "@shared/compendium/schemas";
 import { getTriggerPreset } from "@shared/effect-modifiers/trigger-presets";
 import { RuleTriggerSaved } from "@shared/events/effect-modifiers";
+import { suggestPreset } from "@shared/spell-fx/presets";
 import { and, eq, isNull } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { invalid, notFound } from "../../commands/errors";
@@ -45,6 +46,8 @@ export function sheetRowOf(env: Pick<CommandEnv, "tx">, e: EntryRow): NewSheetRo
             ritual: f.ritual,
             roll: "none",
             effect: "damage",
+            // FR-VFX-04 (spell-fx §14): a spell the catalogue knows gets its map effect.
+            ...suggestedFx(name),
           },
         ],
       };
@@ -67,6 +70,12 @@ export function sheetRowOf(env: Pick<CommandEnv, "tx">, e: EntryRow): NewSheetRo
         { path: ["entryId"], message: "Not a spell, item or feature" },
       ]);
   }
+}
+
+/** FR-VFX-04: `{fx}` with the suggested preset's defaults, or nothing. */
+function suggestedFx(name: string) {
+  const p = suggestPreset(name);
+  return p ? { fx: { preset: p.key, params: p.params.parse({}) } } : {};
 }
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
