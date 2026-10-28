@@ -46,6 +46,8 @@ import {
   CombatantMedallion,
   childBelow,
   HP_STACK,
+  INIT_AFTER,
+  INIT_HP_NUMBERS,
   LINE_TRACK,
   SideChip,
   TurnMarker,
@@ -104,6 +106,7 @@ function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
         cur={c.hpCurrent}
         max={c.hpMax}
         track="fixed"
+        className={INIT_HP_NUMBERS}
         data-testid="cbt-init-row-hp"
         data-record-id={c.id}
       />
@@ -115,6 +118,7 @@ function PlayerHp({ c, own }: { c: CombatantView; own: boolean }) {
         cur={hp.cur}
         max={hp.max}
         track="fixed"
+        className={INIT_HP_NUMBERS}
         data-testid="cbt-init-row-hp"
         data-record-id={c.id}
       />
@@ -228,7 +232,7 @@ function PlayerRowMain({
             <span
               data-testid="cbt-init-row-after"
               data-record-id={c.id}
-              className="min-w-0 truncate"
+              className={cn(INIT_AFTER, "truncate")}
             >
               {modeLabel("after-owner", ownerName)}
             </span>
@@ -342,6 +346,7 @@ function PlayerCompanionLine({
                       cur={c.hpCurrent}
                       max={c.hpMax}
                       track="fixed"
+                      className={INIT_HP_NUMBERS}
                       data-testid="cbt-init-row-hp"
                       data-record-id={c.id}
                     />

@@ -15,6 +15,7 @@ import { pickRollOption } from "./support/log";
 import { showToPlayers } from "./support/scenes";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
+import { storedTheme } from "./support/theme";
 
 interface Box {
   x: number;
@@ -209,4 +210,115 @@ test("FR-DICE-22 FR-DICE-13 the roll bar as a hidden monster token: the public e
   await pickRollOption(log, "dice-roll-actor", "");
   await expect(eye).not.toHaveAttribute("data-guarded", "true");
   await expect(eye).not.toHaveAttribute("aria-disabled", "true");
+});
+
+interface ChildRow {
+  name: string;
+  h: number;
+  track: string;
+  statsRows: number;
+  afterCut: boolean;
+}
+
+/** Child rows (after-owner) of the Initiative window `win`: name, height, stats-line rows, fits. */
+function childRows(win: Locator): Promise<ChildRow[]> {
+  return win.evaluate((w) =>
+    [...w.querySelectorAll<HTMLElement>('[data-testid="cbt-init-row"][data-indent="true"]')].map(
+      (row) => {
+        const name =
+          row.querySelector<HTMLElement>('[data-testid="cbt-init-row-name"]')?.dataset.value ?? "";
+        const stats = row.querySelector<HTMLElement>("[data-stats-line]");
+        // Lines of the stats line: a part starts a new one when it sits below the line before.
+        // The AC / moved tail folds into the row Tooltip when it doesn't fit (FR-KIT-25).
+        const boxes = [...(stats?.children ?? [])]
+          .filter((k) => (k as HTMLElement).offsetWidth > 0 && !k.hasAttribute("data-tail"))
+          .map((k) => k.getBoundingClientRect())
+          .sort((x, y) => x.top - y.top);
+        let lines = 0;
+        let bottom = Number.NEGATIVE_INFINITY;
+        for (const r of boxes) {
+          if (r.top >= bottom - 1) lines++;
+          bottom = Math.max(r.top >= bottom - 1 ? r.bottom : bottom, r.bottom);
+        }
+        const after = row.querySelector<HTMLElement>('[data-testid="cbt-init-row-after"]');
+        const list = row.closest<HTMLElement>('[data-testid="cbt-init-list"]');
+        return {
+          name,
+          h: Math.round(row.getBoundingClientRect().height),
+          track: list ? getComputedStyle(list).getPropertyValue("--hp-track") : "",
+          statsRows: lines,
+          afterCut: after ? after.scrollWidth > after.clientWidth + 0.5 : false,
+        };
+      },
+    ),
+  );
+}
+
+test("FR-KIT-29 BL-141 walkthrough F3 3b: Owlbear and Fire Elemental (102 / 102) child rows fit on two lines with the same height in Simple Dark and Gilt & Stone — DM 1440×900 and player-1's Initiative ('After Mira' whole)", async ({
+  browser,
+}) => {
+  const { secret, link } = e2eEnv();
+  const seen: Record<string, { dm: ChildRow[]; p1: ChildRow[] }> = {};
+  for (const theme of ["default", "gilt"] as const) {
+    const dm = await rolePage(browser);
+    await storedTheme(dm, theme);
+    await dm.setViewportSize({ width: 1440, height: 900 });
+    await loginDm(dm, secret);
+    await live(dm);
+    const init = await openWindow(dm, "cbt.initiative");
+    await expect(
+      init.locator('[data-testid="cbt-init-row"][data-indent="true"]').first(),
+    ).toBeVisible();
+    await dm.evaluate(() => document.fonts.ready);
+    const p1 = await rolePage(browser);
+    await storedTheme(p1, theme);
+    await p1.setViewportSize({ width: 1440, height: 900 });
+    await p1.goto(link("Player 1"));
+    await live(p1);
+    const pInit = await openWindow(p1, "cbt.initiative");
+    await expect(
+      pInit.locator('[data-testid="cbt-init-row"][data-indent="true"]').first(),
+    ).toBeVisible();
+    await p1.evaluate(() => document.fonts.ready);
+    await dm.waitForTimeout(300);
+    const both = { dm: await childRows(init), p1: await childRows(pInit) };
+    seen[theme] = both;
+    for (const r of [...both.dm, ...both.p1]) {
+      expect(r.statsRows, `${theme} ${r.name} stats line`).toBe(1);
+      expect(r.afterCut, `${theme} ${r.name} After cut`).toBe(false);
+    }
+    await dm.context().close();
+    await p1.context().close();
+  }
+  // ADR-0069: the same row heights and the same track in both themes.
+  expect(seen.default).toEqual(seen.gilt);
+  const names = (seen.gilt?.dm ?? []).map((r) => r.name);
+  expect(names).toEqual(expect.arrayContaining(["Owlbear", "Fire Elemental"]));
+});
+
+test("FR-KIT-29 walkthrough F3 3a: DM 1440×900 Gilt — hovering Owlbear's Ally icon (a child row with its tail folded into the row Tooltip) shows 'Ally', not the row's tail", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await storedTheme(dm, "gilt");
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+  const init = await openWindow(dm, "cbt.initiative");
+  const owl = init
+    .locator('[data-testid="cbt-init-row"][data-indent="true"]')
+    .filter({ has: dm.locator('[data-testid="cbt-init-row-name"][data-value="Owlbear"]') });
+  const ally = owl.getByTestId("cbt-init-row-ally");
+  await expect(ally).toHaveAttribute("data-compact", "true");
+  // The row's tail is folded into its Tooltip (the walkthrough's 'AC 13 · moved 0 / 40 ft').
+  await expect(owl.locator('[data-tail][data-folded="true"]')).toHaveCount(1);
+  // Straight onto the icon (the first move lands on it: both Tooltips see it).
+  const a = await ally.boundingBox();
+  if (!a) throw new Error("no box");
+  await dm.mouse.move(0, 0);
+  await dm.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+  const tip = dm.getByTestId("ui-tooltip");
+  await expect(tip).toHaveText("Ally");
+  await expect(tip).toHaveCount(1);
 });

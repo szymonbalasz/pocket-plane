@@ -75,6 +75,7 @@ import {
   childBelow,
   contentWidth,
   HP_STACK,
+  INIT_HP_NUMBERS,
   LINE_TRACK,
   SideChip,
   TurnMarker,
@@ -895,6 +896,7 @@ function RowMain({
               cur={hp.cur}
               max={hp.max}
               track="fixed"
+              className={INIT_HP_NUMBERS}
               data-testid="cbt-init-row-hp"
               data-record-id={c.id}
             />
@@ -1088,6 +1090,7 @@ function CompanionLine({
                     cur={hp.cur}
                     max={hp.max}
                     track="fixed"
+                    className={INIT_HP_NUMBERS}
                     data-testid="cbt-init-row-hp"
                     data-record-id={c.id}
                   />

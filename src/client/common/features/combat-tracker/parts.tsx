@@ -11,6 +11,7 @@ import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { HandshakeIcon, SwordsIcon } from "lucide-react";
 import {
   type CSSProperties,
+  type PointerEvent,
   type ReactNode,
   type RefObject,
   useLayoutEffect,
@@ -162,6 +163,17 @@ export const CHILD_ROW = {
 export const LINE_TRACK = { "--hp-track": "40px" } as CSSProperties;
 
 /**
+ * Sprint 14 F3 (walkthrough F3 3b, ADR-0069: themes never change geometry): an Initiative HP
+ * line's "cur / max" (`HpBar` `track="fixed"`) in a px column that holds "102 / 102" in every
+ * theme's figures (50 px in Simple Dark, 46 in Gilt & Stone), not `7ch` of the theme's font, so
+ * the list's one track (`useListHpTrack`) and every row's fit are the same in every theme.
+ */
+export const INIT_HP_NUMBERS = "[&>span:last-child]:min-w-[52px]";
+
+/** Sprint 14 F3 (walkthrough F3 3b): "After Mira" on a child row's bar line, a px column too. */
+export const INIT_AFTER = "min-w-[56px]";
+
+/**
  * K12 re-test (walkthrough 4): a child row's name line: the name never wraps (a long name
  * wrapped to three lines, the medallion on the second): it truncates with its full text in a
  * Tooltip only when it and its marks don't fit the whole line; the side chips (owner dot, Ally)
@@ -170,6 +182,16 @@ export const LINE_TRACK = { "--hp-track": "40px" } as CSSProperties;
  * chips fit beside a name and the row keeps to two lines (name, bar). Same test ID and
  * `data-value` as `NameLine`'s. The medallion sits on this line (`ChildMedallion`).
  */
+/**
+ * Walkthrough F3 3a: over a mark or chip with its own Tooltip (`data-tip`: the Ally icon, "After
+ * Mira", the owner dot), the pointer's moves stop there, so the row's Tooltip (the folded tail,
+ * FR-KIT-25, on the whole name block) doesn't start and its own wins (it opened last before).
+ */
+export function ownTipWins(e: PointerEvent<HTMLElement>): void {
+  const tip = (e.target as Element).closest("[data-tip]");
+  if (tip && e.currentTarget.contains(tip)) e.stopPropagation();
+}
+
 export function ChildNameLine({
   name,
   testId,
@@ -199,11 +221,19 @@ export function ChildNameLine({
             {name}
           </span>
         </Tooltip>
-        <span data-name-marks className="flex shrink-0 items-center gap-1 empty:hidden">
+        <span
+          data-name-marks
+          className="flex shrink-0 items-center gap-1 empty:hidden"
+          onPointerMove={ownTipWins}
+        >
           {marks}
         </span>
       </span>
-      <span data-name-side className="flex shrink-0 items-center empty:hidden">
+      <span
+        data-name-side
+        className="flex shrink-0 items-center empty:hidden"
+        onPointerMove={ownTipWins}
+      >
         {side}
       </span>
     </div>
@@ -293,6 +323,12 @@ export const HP_STACK = {
 const LINE_GAP = 6;
 
 /** K9: one row's track room, measured on its `data-stats-line` (null: no fixed bar). */
+/**
+ * Walkthrough F3 3b: a part's drawn width rounded **up** (`offsetWidth` rounds 50.4 to 50, and a
+ * line that then fills to the pixel wrapped its last part onto a third line).
+ */
+const width = (el: HTMLElement) => Math.ceil(el.getBoundingClientRect().width);
+
 function measureRoom(line: HTMLElement): number | null {
   const bar = line.querySelector<HTMLElement>(
     ':scope > [data-slot="kit-hpbar"][data-track="fixed"]',
@@ -304,12 +340,12 @@ function measureRoom(line: HTMLElement): number | null {
       (k): k is HTMLElement =>
         k instanceof HTMLElement && k !== bar && !k.hasAttribute("data-tail"),
     )
-    .map((k) => k.offsetWidth)
+    .map(width)
     .filter((w) => w > 0);
   // The content box: a stacked line's indent past the medallion is padding (re-test 2).
   return trackRoom({
     line: contentWidth(line),
-    barRest: bar.offsetWidth - track.offsetWidth,
+    barRest: width(bar) - track.getBoundingClientRect().width,
     others,
     gap: LINE_GAP,
   });
