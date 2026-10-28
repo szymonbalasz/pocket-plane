@@ -146,8 +146,14 @@ describe("FR-SCN-43 snapped unless Ctrl", () => {
 
   test("FR-SCN-43 radius rounds to 5 ft, with or without Ctrl; a cube aims its diagonal", () => {
     useAoe.setState({ settings: { ...DEFAULT_AOE, shape: "sphere", size: 20 } });
-    drag(pt(5, 5), pt(7.3, 5));
-    expect(useAoe.getState().own?.template).toMatchObject({ x: 5.5, y: 5.5, size: 10 });
+    // #377: measured from the origin square's edge (half a cell out), where the outline is.
+    drag(pt(5, 5), pt(8.1, 5.5));
+    expect(useAoe.getState().own?.template).toMatchObject({
+      x: 5.5,
+      y: 5.5,
+      size: 10,
+      footprint: 1,
+    });
     drag(pt(5.03, 5.04, true), pt(8.2, 5.04, true));
     expect(useAoe.getState().own?.template).toMatchObject({ x: 5.03, y: 5.04, size: 15 });
     useAoe.setState({ settings: { ...DEFAULT_AOE, shape: "cube", size: 15 } });
@@ -228,6 +234,20 @@ describe("FR-SCN-45 handles", () => {
     const n = intents.length;
     drag(pt(3, 10.05), pt(3, 10));
     expect(intents).toHaveLength(n);
+  });
+
+  test("FR-SCN-45 #377 moving a kept sphere sends its new origin block; with Ctrl `footprint: null` (the exact rule); a cone sends none", () => {
+    // A sprint-4 sphere stored on a vertex (no footprint) snaps to a square on its first move.
+    useAoe.setState({ editable: [kept({ shape: "sphere", size: 10 })] });
+    drag(pt(2.1, 2.05), pt(4, 2), pt(6.2, 1.1));
+    expect(intents.at(-1)?.input).toEqual({ templateId: "t1", x: 6.5, y: 1.5, footprint: 1 });
+    const snapped = kept({ shape: "sphere", size: 10, x: 6.5, y: 1.5, footprint: 1 });
+    useAoe.setState({ editable: [snapped] });
+    drag(pt(6.5, 1.5), pt(8.37, 3.21, true));
+    expect(intents.at(-1)?.input).toEqual({ templateId: "t1", x: 8.37, y: 3.21, footprint: null });
+    useAoe.setState({ editable: [kept({})] });
+    drag(pt(2.1, 2.05), pt(4, 2), pt(6.2, 1.1));
+    expect(intents.at(-1)?.input).toEqual({ templateId: "t1", x: 6.5, y: 1.5 });
   });
 });
 

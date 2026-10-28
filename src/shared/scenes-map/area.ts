@@ -58,13 +58,17 @@ const SHARE_MIN = 1e-12;
 
 // ---------- template → shape, snapping (FR-SCN-20, -42, -43) ----------
 
-/** FR-SCN-42: a template's shape in grid units (sizes in ft / 5). */
+/**
+ * FR-SCN-42: a template's shape in grid units (sizes in ft / 5). A sphere / cylinder with a
+ * `footprint` (DM #377) is the stepped outline of its grid-reach squares (`footprintCells`).
+ */
 export function templateArea(t: TemplateGeometry): AreaShape {
   const L = t.size / FT_PER_CELL;
   const { x, y, angle } = t;
   switch (t.shape) {
     case "sphere":
     case "cylinder":
+      if (t.footprint) return { polygon: runsOutline(footprintCells(t)) };
       return { kind: "circle", x, y, r: L };
     case "cube":
       return { kind: "square", x, y, side: L, angle };
@@ -75,6 +79,83 @@ export function templateArea(t: TemplateGeometry): AreaShape {
       return { kind: "line", x, y, length: L, width, angle };
     }
   }
+}
+
+// ---------- grid reach (DM #377; FR-VFX-24) ----------
+
+/** A square block of cells: top-left `(col, row)`, `side` cells per side (a token footprint). */
+export interface Block {
+  col: number;
+  row: number;
+  side: number;
+}
+
+/**
+ * #377 / FR-VFX-24: the cells whose FR-MAP-22 grid distance (5/10/5) from the nearest cell of
+ * block `b` is ≤ `radiusFt`, the block's own cells included; row-major, not cut to any map.
+ */
+export function reachCells(b: Block, radiusFt: number): Cell[] {
+  const reach = Math.floor(radiusFt / FT_PER_CELL);
+  const out: Cell[] = [];
+  for (let row = b.row - reach; row < b.row + b.side + reach; row++) {
+    for (let col = b.col - reach; col < b.col + b.side + reach; col++) {
+      // Nearest block cell: clamp into the block.
+      const near = {
+        col: Math.min(Math.max(col, b.col), b.col + b.side - 1),
+        row: Math.min(Math.max(row, b.row), b.row + b.side - 1),
+      };
+      if (distanceFt({ col, row }, near) <= radiusFt) out.push([col, row]);
+    }
+  }
+  return out;
+}
+
+/** #377: a footprint template's origin block: `footprint` cells per side, centred on its origin. */
+export function originBlock(t: { x: number; y: number; footprint: number }): Block {
+  const n = t.footprint;
+  return { col: Math.round(t.x - n / 2) + 0, row: Math.round(t.y - n / 2) + 0, side: n };
+}
+
+/** #377: a snapped sphere / cylinder's squares: within its radius of its origin block. */
+export function footprintCells(t: TemplateGeometry & { footprint?: number | null }): Cell[] {
+  const n = t.footprint ?? 1;
+  return reachCells(originBlock({ x: t.x, y: t.y, footprint: n }), t.size);
+}
+
+/**
+ * The outline `[x, y, …]` (grid units, clockwise on screen) of a cell set whose rows are each
+ * one run and follow each other (a grid-reach set): down the right ends, up the left ends; no
+ * repeated or collinear points.
+ */
+export function runsOutline(set: readonly Cell[]): number[] {
+  const runs = new Map<number, [number, number]>();
+  for (const [c, r] of set) {
+    const run = runs.get(r);
+    runs.set(r, run ? [Math.min(run[0], c), Math.max(run[1], c)] : [c, c]);
+  }
+  const rows = [...runs.keys()].sort((a, b) => a - b);
+  const pts: [number, number][] = [];
+  for (const r of rows) {
+    const [, hi] = runs.get(r) as [number, number];
+    pts.push([hi + 1, r], [hi + 1, r + 1]);
+  }
+  for (const r of rows.reverse()) {
+    const [lo] = runs.get(r) as [number, number];
+    pts.push([lo, r + 1], [lo, r]);
+  }
+  const out: [number, number][] = [];
+  for (const p of pts) {
+    const last = out.at(-1);
+    if (last && last[0] === p[0] && last[1] === p[1]) continue;
+    out.push(p);
+  }
+  // Drop points on a straight run (the closing pair too).
+  const keep = out.filter((p, i) => {
+    const a = out[(i + out.length - 1) % out.length] as [number, number];
+    const b = out[(i + 1) % out.length] as [number, number];
+    return !((a[0] === p[0] && p[0] === b[0]) || (a[1] === p[1] && p[1] === b[1]));
+  });
+  return keep.flat();
 }
 
 const round2 = (v: number) => Math.round(v * 100) / 100 + 0;

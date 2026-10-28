@@ -1,15 +1,26 @@
 // AoE origin snap (FR-SCN-43 as amended by DM #375, FR-SCN-20, -45) and the squares a snapped
-// origin covers (FR-SCN-41, exact rule unchanged): the pure helper, then through the tool's real
-// pointer handlers with fake senders.
+// origin covers (FR-SCN-41: grid distance for a snapped sphere / cylinder, #377; the exact rule
+// otherwise): the pure helper, then through the tool's real pointer handlers with fake senders.
 import { afterEach, describe, expect, test } from "bun:test";
 import { templateCells } from "@shared/scene-tools/geometry";
 import type { TemplateGeometry } from "@shared/scene-tools/schemas";
+import { contains, templateArea } from "@shared/scenes-map/area";
 import type { SceneView } from "@shared/scenes-map/schemas";
+import { emanationCells } from "@shared/spell-fx/cells";
 import type { ToolPointer } from "../scenes-map/tools";
 import { aoeOrigin, mapCells, snapTokens } from "./aoe-snap";
 import { cancelAoe, useAoe } from "./aoe-store";
 import { aoeTool, applySettings } from "./aoe-tool";
-import { cellsAttr, DEFAULT_AOE, movedOrigin } from "./templates";
+import {
+  cellsAttr,
+  DEFAULT_AOE,
+  endEdit,
+  movedOrigin,
+  placeFrame,
+  type TemplateView,
+  templateHandles,
+  templateOutline,
+} from "./templates";
 
 const CS = 70;
 const G = { gridCellSize: CS, gridOffsetX: 0, gridOffsetY: 0 };
@@ -158,34 +169,83 @@ function symmetric(t: TemplateGeometry, cc: number, cr: number): boolean {
   });
 }
 
-describe("FR-SCN-41 coverage from a cell-centre origin (#375)", () => {
-  test("FR-SCN-41 a 10-ft sphere at a cell centre covers the 3 × 3 block; 20 ft: 7 × 7 minus the corners (45); symmetric", () => {
-    const s10 = { shape: "sphere" as const, x: 10.5, y: 6.5, size: 10, angle: 0 };
-    // Radius 2 cells: the ring at distance 2 is under half covered (exact area), so not counted.
-    expect(block(s10, 8, 4, 12, 8)).toEqual([".....", ".###.", ".###.", ".###.", "....."]);
+describe("FR-SCN-41 coverage from a snapped origin (#375, #377)", () => {
+  test("FR-SCN-41 #377 a sphere snapped to a square covers grid distance (5/10/5) ≤ radius: 10 ft = 21 (5 × 5 minus corners), 15 ft = 37, 20 ft = 61; symmetric", () => {
+    const s10 = { shape: "sphere" as const, x: 10.5, y: 6.5, size: 10, angle: 0, footprint: 1 };
+    expect(cells(s10)).toHaveLength(21);
+    expect(block(s10, 7, 3, 13, 9)).toEqual([
+      ".......",
+      "..###..",
+      ".#####.",
+      ".#####.",
+      ".#####.",
+      "..###..",
+      ".......",
+    ]);
     expect(symmetric(s10, 10, 6)).toBe(true);
+    expect(cells({ ...s10, size: 15 })).toHaveLength(37);
     const s20 = { ...s10, size: 20 };
-    expect(cells(s20)).toHaveLength(45);
+    expect(cells(s20)).toHaveLength(61);
     expect(block(s20, 6, 2, 14, 10)).toEqual([
-      ".........",
-      "..#####..",
+      "...###...",
       ".#######.",
       ".#######.",
+      "#########",
+      "#########",
+      "#########",
       ".#######.",
       ".#######.",
-      ".#######.",
-      "..#####..",
-      ".........",
+      "...###...",
     ]);
     expect(symmetric(s20, 10, 6)).toBe(true);
-    // A cylinder covers the same squares; 15 ft: the full 5 × 5.
+    // A cylinder covers the same; = Spell FX's emanation (FR-VFX-24) plus the origin square.
     expect(cells({ ...s20, shape: "cylinder" })).toEqual(cells(s20));
-    expect(block({ ...s10, size: 15 }, 8, 4, 12, 8)).toEqual(Array(5).fill("#####"));
+    const fx = emanationCells({ col: 10, row: 6, side: 1 }, 20, MAP).map(
+      (c) => `${c.col},${c.row}`,
+    );
+    const own = cells(s20).map(([c, r]) => `${c},${r}`);
+    expect(own.filter((k) => k !== "10,6")).toEqual(fx);
   });
 
-  test("FR-SCN-41 a 10-ft sphere at a Large token's centre (a vertex) covers 4 × 4 minus the corners", () => {
-    const t = { shape: "sphere" as const, x: 5, y: 5, size: 10, angle: 0 };
-    expect(block(t, 3, 3, 6, 6)).toEqual([".##.", "####", "####", ".##."]);
+  test("FR-SCN-41 #377 a sphere snapped to a Large (2 × 2) / Huge (3 × 3) token measures from the whole footprint, footprint included", () => {
+    const large = { shape: "sphere" as const, x: 5, y: 5, size: 10, angle: 0, footprint: 2 };
+    expect(block(large, 2, 2, 7, 7)).toEqual([
+      ".####.",
+      "######",
+      "######",
+      "######",
+      "######",
+      ".####.",
+    ]);
+    const huge = { shape: "cylinder" as const, x: 11.5, y: 3.5, size: 5, angle: 0, footprint: 3 };
+    expect(block(huge, 9, 1, 13, 5)).toEqual(Array(5).fill("#####"));
+    expect(cells({ ...huge, size: 10 })).toHaveLength(45);
+  });
+
+  test("FR-SCN-41 #377 cut to the map for drawing, uncut for fog; a Ctrl-free sphere (no footprint) keeps the exact rule", () => {
+    const corner = { shape: "sphere" as const, x: 0.5, y: 0.5, size: 10, angle: 0, footprint: 1 };
+    expect(cells(corner)).toHaveLength(8);
+    expect(templateCells(corner, MAP, { cut: false })).toHaveLength(21);
+    // The same point without a footprint (Ctrl): > 50 % covered, the 3 × 3 block.
+    const free = { shape: "sphere" as const, x: 10.5, y: 6.5, size: 10, angle: 0 };
+    expect(block(free, 8, 4, 12, 8)).toEqual([".....", ".###.", ".###.", ".###.", "....."]);
+    expect(block({ ...free, x: 5, y: 5 }, 3, 3, 6, 6)).toEqual([".##.", "####", "####", ".##."]);
+  });
+
+  test("FR-SCN-20 #377 a snapped sphere's outline is the stepped edge of its squares (hit test and end handle too)", () => {
+    const s10 = { shape: "sphere" as const, x: 10.5, y: 6.5, size: 10, angle: 0, footprint: 1 };
+    const area = templateArea(s10);
+    expect(area).toEqual({
+      polygon: [12, 4, 12, 5, 13, 5, 13, 8, 12, 8, 12, 9, 9, 9, 9, 8, 8, 8, 8, 5, 9, 5, 9, 4],
+    });
+    for (const [c, r] of cells(s10)) expect(contains(area, c + 0.5, r + 0.5)).toBe(true);
+    expect(contains(area, 8.5, 4.5)).toBe(false);
+    const o = templateOutline(s10, G);
+    expect(o.kind === "poly" && o.points.slice(0, 4)).toEqual([840, 280, 840, 350]);
+    // The end handle sits on the stepped edge; dragging it measures the radius from there.
+    expect(templateHandles(s10).end).toEqual({ x: 13, y: 6.5 });
+    expect(endEdit(s10, { x: 14.1, y: 6.5 }, false).size).toBe(15);
+    expect(templateHandles({ ...s10, footprint: undefined }).end).toEqual({ x: 12.5, y: 6.5 });
   });
 
   test("FR-SCN-41 a cone and a line from a cell centre", () => {
@@ -257,18 +317,28 @@ describe("FR-SCN-43 placing (#375)", () => {
     useAoe.setState({ tokens: TOKENS, settings: { ...DEFAULT_AOE, shape: "sphere", size: 20 } });
     P.down(pt(6.2, 1.7));
     expect(useAoe.getState().originCell).toEqual({ col: 6, row: 1, n: 1 });
-    expect(useAoe.getState().own?.template).toMatchObject({ x: 6.5, y: 1.5, size: 20 });
+    expect(useAoe.getState().own?.template).toMatchObject({
+      x: 6.5,
+      y: 1.5,
+      size: 20,
+      footprint: 1,
+    });
     P.move(pt(6.3, 1.9, true));
     expect(useAoe.getState().originCell).toBeNull();
+    expect(useAoe.getState().own?.template.footprint).toBeUndefined();
     P.up(pt(6.3, 1.9));
     expect(useAoe.getState().originCell).toBeNull();
 
-    // Over the Large token: its centre, its 2 × 2 footprint highlighted; drag sets the radius.
+    // Over the Large token: its centre, its 2 × 2 footprint highlighted; the drag sets the radius
+    // from the footprint's edge, so the stepped outline meets the pointer (#377).
     P.down(pt(4.2, 5.7));
     expect(useAoe.getState().originCell).toEqual({ col: 4, row: 4, n: 2 });
-    P.move(pt(7.1, 5.1));
-    expect(useAoe.getState().own?.template).toMatchObject({ x: 5, y: 5, size: 10 });
-    P.up(pt(7.1, 5.1));
+    P.move(pt(8, 5));
+    const t = useAoe.getState().own?.template as TemplateView;
+    expect(t).toMatchObject({ x: 5, y: 5, size: 10, footprint: 2 });
+    // The signal carries it, so receivers compute the same squares.
+    expect(placeFrame("s1", "k", t, false)).toMatchObject({ footprint: 2 });
+    P.up(pt(8, 5));
     expect(useAoe.getState().originCell).toBeNull();
 
     useAoe.setState({ settings: { ...DEFAULT_AOE, shape: "cube", size: 10 } });
@@ -290,13 +360,15 @@ describe("FR-SCN-43 placing (#375)", () => {
     useAoe.setState({ tokens: TOKENS, settings: { ...DEFAULT_AOE, shape: "sphere", size: 20 } });
     P.down(pt(4.2, 4.3));
     P.up(pt(4.2, 4.3));
-    expect(useAoe.getState().own?.template).toMatchObject({ x: 5, y: 5 });
+    expect(useAoe.getState().own?.template).toMatchObject({ x: 5, y: 5, footprint: 2 });
     applySettings({ shape: "cone" });
     expect(useAoe.getState().own?.template).toMatchObject({ shape: "cone", x: 4.5, y: 4.5 });
+    expect(useAoe.getState().own?.template.footprint).toBeUndefined();
     applySettings({ shape: "cube" });
     expect(useAoe.getState().own?.template).toMatchObject({ shape: "cube", x: 4, y: 4 });
     applySettings({ shape: "cylinder" });
-    expect(useAoe.getState().own?.template).toMatchObject({ shape: "cylinder", x: 5, y: 5 });
+    const cyl = useAoe.getState().own?.template;
+    expect(cyl).toMatchObject({ shape: "cylinder", x: 5, y: 5, footprint: 2 });
     // A size change keeps the origin.
     applySettings({ size: 30 });
     expect(useAoe.getState().own?.template).toMatchObject({ x: 5, y: 5, size: 30 });

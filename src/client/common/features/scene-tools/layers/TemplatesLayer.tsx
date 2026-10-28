@@ -209,32 +209,32 @@ function OriginCell() {
 function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
   const { scene, grid, cam, colors, store } = useCanvas();
   const t = d.template;
-  const { shape, x, y, size, width, angle } = t;
+  const { shape, x, y, size, width, angle, footprint } = t;
   const { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy } = grid;
   const { mapWidth, mapHeight } = scene;
   // FR-SCN-21: memoised per template / grid change.
   const cells = useMemo(
     () =>
       templateCells(
-        { shape, x, y, size, width, angle },
+        { shape, x, y, size, width, angle, footprint },
         { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy, mapWidth, mapHeight },
         { cut: true },
       ),
-    [shape, x, y, size, width, angle, cs, gx, gy, mapWidth, mapHeight],
+    [shape, x, y, size, width, angle, footprint, cs, gx, gy, mapWidth, mapHeight],
   );
   const outline = useMemo(
     () =>
       templateOutline(
-        { shape, x, y, size, width, angle },
+        { shape, x, y, size, width, angle, footprint },
         { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy },
       ),
-    [shape, x, y, size, width, angle, cs, gx, gy],
+    [shape, x, y, size, width, angle, footprint, cs, gx, gy],
   );
   const handles = useMemo(() => {
-    const h = templateHandles({ shape, x, y, size, width, angle });
+    const h = templateHandles({ shape, x, y, size, width, angle, footprint });
     const g = { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy };
     return { origin: mapPx(g, h.origin), end: mapPx(g, h.end) };
-  }, [shape, x, y, size, width, angle, cs, gx, gy]);
+  }, [shape, x, y, size, width, angle, footprint, cs, gx, gy]);
   // FR-SCN-47: resolved per draw, so a `player` / `campaign` upsert recolours (OQ-CAMP-21).
   const stroke = templateColor(store, d.who, d.hidden, colors.hidden);
   const ox = gx + x * cs;

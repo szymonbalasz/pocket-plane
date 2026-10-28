@@ -18,6 +18,30 @@ import {
 const sphere = { sceneId: "s", shape: "sphere" as const, x: 3, y: 8, size: 15, angle: 0 };
 
 describe("SCN §9 shapes", () => {
+  test("FR-SCN-20 #377 footprint 1–4: sphere / cylinder only, origin the block's centre; update may send null", () => {
+    const place = (v: object) => PlaceTemplateInput.safeParse({ ...sphere, ...v }).success;
+    const signal = (v: object) =>
+      TemplateSignalData.safeParse({ ...sphere, key: "k", ...v }).success;
+    const player = (v: object) => PlayerPlaceTemplateInput.safeParse({ ...sphere, ...v }).success;
+    for (const check of [place, signal, player]) {
+      expect(check({ x: 3.5, y: 8.5, footprint: 1 })).toBe(true);
+      expect(check({ shape: "cylinder", x: 4, y: 9, footprint: 2 })).toBe(true);
+      expect(check({ x: 4.5, y: 9.5, footprint: 3 })).toBe(true);
+      expect(check({ x: 4, y: 9, footprint: 4 })).toBe(true);
+      expect(check({ x: 3, y: 8, footprint: 1 })).toBe(false);
+      expect(check({ x: 3.5, y: 8.5, footprint: 2 })).toBe(false);
+      expect(check({ x: 3.5, y: 8.5, footprint: 5 })).toBe(false);
+      expect(check({ x: 3.5, y: 8.5, footprint: 0 })).toBe(false);
+      expect(check({ shape: "cone", x: 3.5, y: 8.5, footprint: 1 })).toBe(false);
+      expect(check({ x: 3.5, y: 8.5, footprint: null })).toBe(false);
+    }
+    const update = (v: object) => UpdateTemplateInput.safeParse({ templateId: "t", ...v }).success;
+    expect(update({ footprint: null })).toBe(true);
+    expect(update({ footprint: 3 })).toBe(true);
+    expect(update({ footprint: 5 })).toBe(false);
+    expect(AoeTemplateRecord.shape.footprint.safeParse(undefined).success).toBe(true);
+  });
+
   test("FR-SCN-20 size 5–300 / width 5–60 step 5; angle 0 ≤ a < 360", () => {
     const ok = (v: object) => PlaceTemplateInput.safeParse({ ...sphere, ...v }).success;
     expect(ok({})).toBe(true);

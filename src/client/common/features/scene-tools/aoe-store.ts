@@ -39,7 +39,13 @@ type Intent = (name: string, input: unknown) => Promise<unknown>;
  */
 export type AoeGesture =
   | { kind: "place"; press: GridPoint; angle: number }
-  | { kind: "move"; id: string; press: GridPoint; at: GridPoint | null }
+  | {
+      kind: "move";
+      id: string;
+      press: GridPoint;
+      /** #377: with the moved template's new origin block (null: the exact rule). */
+      at: (GridPoint & { footprint: number | null }) | null;
+    }
   | { kind: "end"; id: string; template: TemplateView };
 
 export interface AoeState {

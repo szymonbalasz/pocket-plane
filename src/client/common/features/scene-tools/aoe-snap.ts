@@ -5,6 +5,8 @@
 // nearest grid vertex (whole cells). Ctrl (`free`): the point itself, to 0.01 cell. Snapped
 // origins stay on the map's cells. One helper for placing, the ephemeral drag signal and kept
 // origin moves (FR-SCN-26, -45); it also names the cells the AoE tool highlights while placing.
+// DM #377: a snapped sphere / cylinder carries that block's side as its `footprint` (its squares
+// are then the grid reach from the block, FR-SCN-41).
 import type { TemplateShape } from "@shared/scene-tools/schemas";
 import { snapPoint } from "@shared/scenes-map/area";
 import { footprint, type MapRect } from "@shared/scenes-map/geometry";
@@ -39,6 +41,10 @@ export interface SnapOptions {
 export interface AoeOrigin extends GridPoint {
   cell: SnapToken | null;
 }
+
+/** #377: a sphere / cylinder snapped to a square or a token: its origin block's side, else none. */
+export const footprintOf = (shape: TemplateShape, o: AoeOrigin): number | undefined =>
+  (shape === "sphere" || shape === "cylinder") && o.cell ? o.cell.n : undefined;
 
 /** Token records → footprints (FR-MAP-14 sizes). */
 export const snapTokens = (

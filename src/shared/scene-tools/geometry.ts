@@ -6,7 +6,7 @@
 // and non-open doors are FOG's sight occluders (FR-SCN-37); door sample points (FR-SCN-36); the
 // first-crossing wall hint for `map.checkMove` (FR-SCN-38). Sprint 4: template cells come from
 // the shared coverage helper `@shared/scenes-map/area` (FR-SCN-41, -42).
-import { cells, templateArea } from "@shared/scenes-map/area";
+import { cells, footprintCells, templateArea } from "@shared/scenes-map/area";
 import { distanceFt as distance5105, type Grid, type MapRect } from "@shared/scenes-map/geometry";
 import {
   type DiagonalRule,
@@ -272,14 +272,17 @@ const EPS = 1e-9;
  * screen angles: 0 = east (+x), 90 = south (+y). `cut: true` keeps cells overlapping the map
  * (drawing, the count; may be empty: "0 squares"); `cut: false` keeps all (fog's `derive` and the
  * DM ephemeral audience, so `fogged` survives a map change) and, for a template that covers no
- * cell, the cell holding its origin (FR-SCN-46). Row-major order.
+ * cell, the cell holding its origin (FR-SCN-46). Row-major order. *(DM #377)* A sphere / cylinder
+ * with a `footprint` covers the squares within its radius by grid distance (5/10/5) of its origin
+ * block instead (`footprintCells`).
  */
 export function templateCells(
   t: TemplateGeometry,
   scene: MapRect,
   { cut }: { cut: boolean },
 ): Cell[] {
-  const all = cells(templateArea(t), "half");
+  // DM #377: a snapped sphere / cylinder: grid reach from its origin block (never empty).
+  const all = t.footprint ? footprintCells(t) : cells(templateArea(t), "half");
   if (cut) return all.filter(([c, r]) => cellOnMap(scene, c, r));
   return all.length > 0 ? all : [[Math.floor(t.x), Math.floor(t.y)]];
 }

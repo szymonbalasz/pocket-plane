@@ -1432,6 +1432,8 @@ export const aoeTemplate = sqliteTable(
     width: integer("width"),
     /** 0 ≤ angle < 360, ≤ 1 decimal (sprint 4, FR-SCN-20). */
     angle: real("angle").notNull(),
+    /** DM #377: a snapped sphere / cylinder's origin block (1–4 cells per side); null = exact rule. */
+    footprint: integer("footprint"),
     label: text("label").notNull().default(""),
     /** Null = DM-placed (fog subject); else the placing player (FR-SCN-25, -27). */
     placedByPlayerId: text("placed_by_player_id").references((): AnySQLiteColumn => player.id),

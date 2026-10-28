@@ -70,6 +70,7 @@ export function toTemplateRecord(r: TemplateRow): AoeTemplateRecord {
     size: r.size,
     width: r.width,
     angle: r.angle,
+    ...(r.footprint !== null ? { footprint: r.footprint } : {}),
     label: r.label,
     placedByPlayerId: r.placedByPlayerId,
     hidden: r.hidden,

@@ -499,3 +499,59 @@ describe("FR-SCN-24 scn.template audience", () => {
     expect(stateDigest(t.s.db.$client).sha256).toBe(digest);
   });
 });
+
+describe("FR-SCN-41 #377 snapped sphere footprint", () => {
+  test("FR-SCN-41 #377 footprint: stored and sent to players when set, absent otherwise; must fit a sphere / cylinder's origin", () => {
+    const t = setup();
+    const snapped = t.place(sphere(t.ambush.id, { x: 3.5, y: 8.5, footprint: 1 }), t.p1);
+    const large = t.place(sphere(t.ambush.id, { shape: "cylinder", x: 5, y: 10, footprint: 2 }));
+    const free = t.place(sphere(t.ambush.id, { x: 3.37, y: 8.5 }));
+    expect(t.tpl(snapped)?.footprint).toBe(1);
+    expect(t.tpl(large)?.footprint).toBe(2);
+    expect(t.tpl(free)).not.toHaveProperty("footprint");
+    const wire = t.h.snapshot(t.h.viewer("player", t.h.p2.id))[AOE_TEMPLATE_TYPE] as object[];
+    expect(wire.find((r) => (r as { id: string }).id === snapped)).toMatchObject({ footprint: 1 });
+    expect(wire.find((r) => (r as { id: string }).id === free)).not.toHaveProperty("footprint");
+    for (const bad of [
+      { shape: "cone", x: 3.5, y: 8.5, footprint: 1 },
+      { x: 3, y: 8, footprint: 1 },
+      { x: 3.5, y: 8.5, footprint: 2 },
+      { x: 3.5, y: 8.5, footprint: 5 },
+    ]) {
+      expect(t.err(() => t.place(sphere(t.ambush.id, bad))).code).toBe("invalid");
+    }
+  });
+
+  test("FR-SCN-45 #377 updates: a move keeps a fitting footprint, refuses one that no longer fits, `null` clears it", () => {
+    const t = setup();
+    const id = t.place(sphere(t.ambush.id, { x: 3.5, y: 8.5, footprint: 1 }), t.p1);
+    t.run(S.updateTemplate, { templateId: id, x: 6.5 }, t.p1);
+    expect(t.tpl(id)).toMatchObject({ x: 6.5, footprint: 1 });
+    expect(t.err(() => t.run(S.updateTemplate, { templateId: id, x: 6 }, t.p1)).code).toBe(
+      "invalid",
+    );
+    t.run(S.updateTemplate, { templateId: id, x: 6.37, footprint: null }, t.p1);
+    expect(t.tpl(id)).toMatchObject({ x: 6.37 });
+    expect(t.tpl(id)).not.toHaveProperty("footprint");
+    t.run(S.updateTemplate, { templateId: id, x: 5, y: 9, footprint: 2 }, t.p1);
+    expect(t.tpl(id)).toMatchObject({ x: 5, y: 9, footprint: 2 });
+    // Only the footprint changing is a change; resending it is not.
+    const log = t.logTypes().length;
+    t.run(S.updateTemplate, { templateId: id, footprint: 2 }, t.p1);
+    expect(t.logTypes()).toHaveLength(log);
+  });
+
+  test("FR-SCN-35 #377 fog derives over the footprint's grid-reach cells (server and signal audience use the same rule)", () => {
+    const t = setup();
+    registerFog(false);
+    // 10 ft from the square (16, 8): exact rule → cols 15–17 (all fogged); grid reach → cols 14–18.
+    const geo = { shape: "sphere" as const, x: 16.5, y: 8.5, size: 10, angle: 0 };
+    expect(t.tpl(t.place({ ...geo, sceneId: t.ambush.id }))?.fogged).toBe(true);
+    const id = t.place({ ...geo, footprint: 1, sceneId: t.ambush.id });
+    expect(t.tpl(id)?.fogged).toBeUndefined();
+    expect(derived.at(-1)?.cells).toEqual(
+      templateCells({ ...geo, footprint: 1 }, t.ambush, { cut: false }),
+    );
+    expect(derived.at(-1)?.cells).toHaveLength(21);
+  });
+});

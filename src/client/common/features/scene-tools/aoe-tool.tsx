@@ -54,7 +54,7 @@ import { useSendSignal, useSync } from "../../sync/store";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
 import { useMapTool } from "../scenes-map/tool-store";
 import type { CanvasToolDef, ToolPointer } from "../scenes-map/tools";
-import { type AoeOrigin, aoeOrigin, mapCells, type SnapOptions } from "./aoe-snap";
+import { type AoeOrigin, aoeOrigin, footprintOf, mapCells, type SnapOptions } from "./aoe-snap";
 import { bindAoe, cancelAoe, editTemplate, endOwn, keepOwn, showOwn, useAoe } from "./aoe-store";
 import { FreeChip } from "./free-chip";
 import {
@@ -108,7 +108,8 @@ function place(e: ToolPointer, press: GridPoint, angle: number): void {
   placed = { press, snap };
   if (!sameCell(useAoe.getState().originCell, origin)) useAoe.setState({ originCell: origin.cell });
   const { settings } = useAoe.getState();
-  showOwn(e.scene.id, gestureTemplate(settings, origin, e, e.grid, angle, e.ctrl, press));
+  const at = { x: origin.x, y: origin.y, footprint: footprintOf(settings.shape, origin) };
+  showOwn(e.scene.id, gestureTemplate(settings, at, e, e.grid, angle, e.ctrl, press));
 }
 
 const sameCell = (a: AoeOrigin["cell"], b: AoeOrigin | null) =>
@@ -149,7 +150,8 @@ function move(e: ToolPointer): void {
     if (!kept) return;
     const at = movedOrigin(kept.shape, g.press, p, snapOptions(e));
     if (at?.x !== g.at?.x || at?.y !== g.at?.y) {
-      useAoe.setState({ gesture: { ...g, at: at && { x: at.x, y: at.y } } });
+      const footprint = at && (footprintOf(kept.shape, at) ?? null);
+      useAoe.setState({ gesture: { ...g, at: at && { x: at.x, y: at.y, footprint } } });
     }
     if (!sameCell(useAoe.getState().originCell, at)) {
       useAoe.setState({ originCell: at?.cell ?? null });
@@ -206,12 +208,18 @@ export function applySettings(patch: Partial<AoeSettings>): void {
   const own = useAoe.getState().own;
   if (!own) return;
   const t = own.template;
-  const origin =
-    placed && settings.shape !== t.shape ? aoeOrigin(settings.shape, placed.press, placed.snap) : t;
+  const snapped =
+    placed && settings.shape !== t.shape
+      ? aoeOrigin(settings.shape, placed.press, placed.snap)
+      : null;
+  const round = settings.shape === "sphere" || settings.shape === "cylinder";
+  const fp = snapped ? footprintOf(settings.shape, snapped) : round ? t.footprint : undefined;
+  const { footprint: _old, ...rest } = t;
   const next: TemplateView = {
-    ...t,
-    x: origin.x,
-    y: origin.y,
+    ...rest,
+    x: snapped?.x ?? t.x,
+    y: snapped?.y ?? t.y,
+    ...(fp ? { footprint: fp } : {}),
     shape: settings.shape,
     size: settings.size,
     width: settings.shape === "line" ? settings.width : null,

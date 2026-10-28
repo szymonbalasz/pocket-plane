@@ -100,7 +100,7 @@ export function snapWidth(ft: number): number {
  */
 export function gestureTemplate(
   s: AoeSettings,
-  origin: GridPoint,
+  origin: GridPoint & { footprint?: number },
   at: GridPoint,
   g: Grid,
   angle = 0,
@@ -118,14 +118,22 @@ export function gestureTemplate(
     size: s.size,
     width: s.shape === "line" ? s.width : null,
     angle,
+    ...(origin.footprint ? { footprint: origin.footprint } : {}),
     label: s.label,
   };
   if (!dragged) return base;
   if (s.shape === "sphere" || s.shape === "cylinder") {
-    return { ...base, size: snapSize(Math.hypot(dx, dy) * FT_PER_CELL), angle: 0 };
+    return { ...base, size: radiusAt(Math.hypot(dx, dy), base), angle: 0 };
   }
   return { ...base, angle: aimAngle(dx, dy, s.shape, free) };
 }
+
+/** #377: half the origin block's side (cells): a snapped sphere's edge lies that much further out. */
+const halfBlock = (t: TemplateGeometry) => (t.footprint ? t.footprint / 2 : 0);
+
+/** FR-SCN-22 / -45: the radius (5-ft steps) whose drawn edge lies `d` cells from the origin. */
+const radiusAt = (d: number, t: TemplateGeometry) =>
+  snapSize(Math.max(0, d - halfBlock(t)) * FT_PER_CELL);
 
 // ---------- handles (FR-SCN-45) ----------
 
@@ -155,7 +163,7 @@ export function templateHandles(t: TemplateGeometry): Record<HandleKind, GridPoi
   const L = t.size / FT_PER_CELL;
   const origin = { x: t.x, y: t.y };
   if (t.shape === "sphere" || t.shape === "cylinder")
-    return { origin, end: { x: t.x + L, y: t.y } };
+    return { origin, end: { x: t.x + L + halfBlock(t), y: t.y } };
   const [ux, uy] = unit(t.angle);
   if (t.shape === "cube") {
     const [nx, ny] = unit(t.angle + 90);
@@ -196,7 +204,7 @@ export function endEdit<T extends TemplateGeometry>(t: T, p: GridPoint, free: bo
   const dy = p.y - t.y;
   if (Math.hypot(dx, dy) < 0.5) return t;
   if (t.shape === "sphere" || t.shape === "cylinder") {
-    return { ...t, size: snapSize(Math.hypot(dx, dy) * FT_PER_CELL) };
+    return { ...t, size: radiusAt(Math.hypot(dx, dy), t) };
   }
   return { ...t, angle: aimAngle(dx, dy, t.shape, free) };
 }
@@ -222,6 +230,8 @@ export interface TemplateUpdate {
   y?: number;
   angle?: number;
   size?: number;
+  /** #377: a new origin block, or null (moved with Ctrl: the exact rule). */
+  footprint?: number | null;
 }
 
 /** FR-SCN-45: release sends one `scn.updateTemplate` with the changed fields, or nothing. */
@@ -234,6 +244,8 @@ export function templateUpdate(
   for (const k of ["x", "y", "angle", "size"] as const) {
     if (after[k] !== before[k]) patch[k] = after[k];
   }
+  const fp = after.footprint ?? null;
+  if (fp !== (before.footprint ?? null)) patch.footprint = fp;
   return Object.keys(patch).length > 1 ? patch : null;
 }
 
@@ -308,6 +320,7 @@ export const keptView = (r: TemplateRecordView): TemplateView => ({
   size: r.size,
   width: r.width,
   angle: r.angle,
+  ...(r.footprint ? { footprint: r.footprint } : {}),
   label: r.label,
 });
 
@@ -493,6 +506,7 @@ export function placeFrame(
     size: t.size,
     ...(t.shape === "line" ? { width: t.width ?? TEMPLATE_WIDTH.default } : {}),
     angle: t.angle,
+    ...(t.footprint ? { footprint: t.footprint } : {}),
     ...(t.label ? { label: t.label } : {}),
     ...(dmOnly ? { dmOnly: true } : {}),
   };
@@ -623,6 +637,7 @@ export function receiveTemplate(
     size: d.size,
     width: d.shape === "line" ? (d.width ?? TEMPLATE_WIDTH.default) : null,
     angle: d.angle,
+    ...(d.footprint ? { footprint: d.footprint } : {}),
     label: d.label ?? "",
   };
   s.setState((st) => ({
@@ -672,6 +687,15 @@ export function templateOutline(t: TemplateGeometry, g: Grid): TemplateOutline {
   const ox = g.gridOffsetX + t.x * cs;
   const oy = g.gridOffsetY + t.y * cs;
   const L = (t.size / FT_PER_CELL) * cs;
+  if ((t.shape === "sphere" || t.shape === "cylinder") && t.footprint) {
+    // #377: the stepped outline of its squares, so the outline and the tint agree.
+    const area = templateArea(t);
+    const pts = "polygon" in area ? area.polygon : [];
+    return {
+      kind: "poly",
+      points: pts.map((v, i) => (i % 2 === 0 ? g.gridOffsetX : g.gridOffsetY) + v * cs),
+    };
+  }
   if (t.shape === "sphere" || t.shape === "cylinder") return { kind: "circle", x: ox, y: oy, r: L };
   if (t.shape === "cube") {
     // FR-SCN-20 (sprint 4): sides along `angle` and `angle + 90°` (0 / 90 / 180 / 270 = SE / SW /
