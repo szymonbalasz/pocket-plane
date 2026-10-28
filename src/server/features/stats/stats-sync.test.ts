@@ -53,7 +53,8 @@ beforeAll(async () => {
       .all()
       .map((c) => [c.name, c.id]),
   );
-  h = await startTestServer({ db, testMode: true, fake: false });
+  // The manual clock (fix/test-hot-files): the rate window passes by advancing it, not by sleeping.
+  h = await startTestServer({ db, testMode: true });
 }, 60_000);
 
 afterAll(async () => {
@@ -133,7 +134,7 @@ async function playerAnswers(c: TestClient) {
   return { fight, fights, sessions, session };
 }
 
-/** Past the per-viewer rate window (FR-STATS-16, -69) between query rounds. */
+/** Past the per-viewer rate window (FR-STATS-16, -69) between query rounds: the clock moves on. */
 const RATE_WINDOW_MS = 1050;
 
 const ackText = (frames: readonly ServerFrame[]) =>
@@ -176,7 +177,7 @@ describe("stats over real sockets (stats)", () => {
     dm.close();
     // FR-STATS-16 hard kill → same results: nothing was stored, the restart recomputes.
     await h.restart();
-    await Bun.sleep(RATE_WINDOW_MS);
+    h.timers.advance(RATE_WINDOW_MS);
     const after = await h.live(P1());
     expect(await playerAnswers(after)).toEqual(first["Player 1"] as never);
     expect(leaksIn(ackText(after.frames), LEAKS)).toEqual([]);
@@ -184,7 +185,7 @@ describe("stats over real sockets (stats)", () => {
   }, 30_000);
 
   test("FR-STATS-16 answered in frame order: an ack after the event frame of the change it counts", async () => {
-    await Bun.sleep(RATE_WINDOW_MS);
+    h.timers.advance(RATE_WINDOW_MS);
     const dm = await h.live(DM);
     const p1 = await h.live(P1());
     const before = PlayerFightResult.parse(

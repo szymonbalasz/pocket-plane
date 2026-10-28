@@ -27,6 +27,7 @@ import {
 } from "../../testing/harness";
 import { leaksIn } from "../combat-tracker/testing";
 import { NOTIFICATION_TYPE } from "../notifications/helpers";
+import { statsMemory } from "./index";
 
 let h: TestServer;
 let db: Db;
@@ -34,6 +35,7 @@ let cleanup: () => void;
 let tokens: Record<string, string>;
 let combatants: Record<string, string>;
 let characters: Record<string, string>;
+let campaignId: string;
 
 beforeAll(async () => {
   const loaded = await loadBundle("stats-b", { testMode: true, dmSecret: TEST_SECRET });
@@ -62,7 +64,9 @@ beforeAll(async () => {
       .filter((e) => e.kind === "character")
       .map((e) => [e.name, e.id]),
   );
-  h = await startTestServer({ db, testMode: true, fake: false });
+  campaignId = db.select().from(encounter).all()[0]?.campaignId as string;
+  // The manual clock (fix/test-hot-files): the rate window passes by advancing it, not by sleeping.
+  h = await startTestServer({ db, testMode: true });
 }, 60_000);
 
 afterAll(async () => {
@@ -126,18 +130,23 @@ const LEAKS = [
   "DM dice",
 ];
 
-/** Past the per-viewer rate window (FR-STATS-16, -69) between query rounds. */
+/** Past the per-viewer rate window (FR-STATS-16, -69) between query rounds: the clock moves on. */
 const RATE_WINDOW_MS = 1050;
+const nextWindow = () => h.timers.advance(RATE_WINDOW_MS);
 
 const ackText = (frames: readonly ServerFrame[]) =>
   JSON.stringify(frames.filter((f) => f.type === "ack"));
 
-/** A campaign answer, re-asked (1 s apart, as the client) while the partials build. */
+/**
+ * A campaign answer, re-asked (1 s apart, as the client) while the partials build: on `pending`
+ * it waits for the background build (ADR-0062 §3), then the next rate window.
+ */
 async function settled<T extends { pending?: true }>(ask: () => Promise<T>): Promise<T> {
   for (let i = 0; i < 10; i++) {
     const r = await ask();
     if (!r.pending) return r;
-    await Bun.sleep(RATE_WINDOW_MS);
+    await statsMemory(h.s).partials.build(campaignId);
+    nextWindow();
   }
   throw new Error("partials never ready");
 }
@@ -162,7 +171,7 @@ async function playerAnswers(c: TestClient, own: string) {
 
 describe("stats tier B over real sockets (stats-b)", () => {
   test("FR-STATS-47 leak scan per player: Highlights, luck and trophies acks, after reconnect and after a hard restart", async () => {
-    await Bun.sleep(RATE_WINDOW_MS);
+    nextWindow();
     const dm = await h.live(DM);
     const dmFight = JSON.stringify(await result(dm, STATS_QUERY_INTENT, { scope: "fight" }));
     expect(dmFight).toContain("Bandit Captain");
@@ -178,13 +187,13 @@ describe("stats tier B over real sockets (stats-b)", () => {
       expect(answers.highlights?.kills.events.map((e) => e.to)).not.toContain("Bandit Captain");
       first[name] = answers;
       c.close();
-      await Bun.sleep(RATE_WINDOW_MS);
+      nextWindow();
       // Reconnect: the same answers, still clean.
       const again = await h.live(cred());
       expect(await playerAnswers(again, characters[own] as string)).toEqual(answers);
       expect(leaksIn(ackText(again.frames), LEAKS)).toEqual([]);
       again.close();
-      await Bun.sleep(RATE_WINDOW_MS);
+      nextWindow();
     }
     // Every player gets the same party numbers.
     expect(first["Player 1"]?.campaign).toEqual(first["Player 2"]?.campaign);
@@ -192,7 +201,7 @@ describe("stats tier B over real sockets (stats-b)", () => {
     dm.close();
     // Hard kill → same numbers: nothing stored; the restart rebuilds the partials.
     await h.restart();
-    await Bun.sleep(RATE_WINDOW_MS);
+    nextWindow();
     const after = await h.live(P1());
     expect(await playerAnswers(after, characters.Mira as string)).toEqual(
       first["Player 1"] as never,
@@ -202,7 +211,7 @@ describe("stats tier B over real sockets (stats-b)", () => {
   }, 60_000);
 
   test("FR-STATS-43 another's trophies over the socket → forbidden", async () => {
-    await Bun.sleep(RATE_WINDOW_MS);
+    nextWindow();
     const p2 = await h.live(P2());
     const r = await reply(p2, STATS_QUERY_INTENT, {
       scope: "trophies",

@@ -26,9 +26,22 @@ export async function openWindow(page: Page, kind: string): Promise<Locator> {
       );
     if (!clicked) {
       await page.getByTestId("ui-launcher-menu").click();
-      await page
-        .locator(`[data-testid="ui-launcher-overflow-item"][data-record-id="${kind}"]`)
-        .click();
+      const item = page.locator(
+        `[data-testid="ui-launcher-overflow-item"][data-record-id="${kind}"]`,
+      );
+      // Fail in seconds with what the bar does show, not at the test's timeout.
+      await item.click({ timeout: 10_000 }).catch(async (err: Error) => {
+        const ids = (testid: string) =>
+          page
+            .locator(`[data-testid="${testid}"]`)
+            .evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
+        const [bar, menu] = await Promise.all([
+          ids("ui-launcher-button"),
+          ids("ui-launcher-overflow-item"),
+        ]);
+        const why = `openWindow(${kind}): not in the launcher. Bar: ${bar.join(", ")}. Menu: ${menu.join(", ") || "(none)"}`;
+        throw new Error(`${why}\n${err.message}`);
+      });
     }
   }
   await win.waitFor({ state: "visible" });

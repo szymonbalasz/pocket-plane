@@ -5,7 +5,12 @@
 // never the DM), the DM drag as the owner, the hint phase after every guard, order against
 // `TokenMoved`, drop-not-delay, drag traffic within FOG §12, and a hard kill mid-drag.
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { answer, visionHarness, visionServices } from "@fixtures/units/fog-of-war/vision-harness";
+import {
+  answer,
+  type VisionHarness,
+  visionHarness,
+  visionServices,
+} from "@fixtures/units/fog-of-war/vision-harness";
 import { FOG_INTENTS as F, FOG_SIGNALS, type FogSightPayload } from "@shared/fog-of-war/schemas";
 import type { ServerFrame } from "@shared/protocol/frames";
 import {
@@ -40,12 +45,24 @@ function sightsOf(frames: readonly Frame[], from = 0): FogSightPayload[] {
     );
 }
 
+/** A ping answered: every frame the server sent this client before it has arrived. */
+async function barrier(c: VisionHarness["dm"]) {
+  c.send({ type: "ping" });
+  await c.next("pong");
+}
+
 async function harness() {
-  const t = await visionHarness("vision-party");
+  // The manual clock (fix/test-hot-files): the hub's per-receiver rate windows (`s.clock`) pass
+  // by advancing it (`window`), never by sleeping.
+  const t = await visionHarness("vision-party", { fake: true });
+  /** Both players have every frame sent so far (the hub sends `fog.sight` right after the ack). */
+  const settle = () => Promise.all([t.c.p1, t.c.p2].map(barrier));
+  /** A fresh rate window per receiver (≥ 1 s on the server's clock). */
+  const window = (ms = 1000) => t.h.timers.advance(ms);
   const check = async (who: "dm" | Who, name: string, col: number, row: number, id?: string) => {
     const c = who === "dm" ? t.dm : t.c[who];
     const a = await t.send(c, I.checkMove, { tokenId: id ?? t.id(name), col, row });
-    await Bun.sleep(20);
+    await settle();
     return a as Extract<Frame, { type: "ack" | "reject" }>;
   };
   const result = (a: Extract<Frame, { type: "ack" | "reject" }>) =>
@@ -53,7 +70,7 @@ async function harness() {
   const sights = (w: Who, from: number) => sightsOf(t.c[w].frames, from);
   const dmSignals = (from: number) => t.dm.frames.slice(from).filter((f) => f.type === "signal");
   const digest = () => stateDigest(t.db.$client).sha256;
-  return { ...t, check, result, sights, dmSignals, digest };
+  return { ...t, settle, window, check, result, sights, dmSignals, digest };
 }
 
 describe("FR-FOG-53 sight preview (party off, then on)", () => {
@@ -110,7 +127,7 @@ describe("FR-FOG-53 sight preview (party off, then on)", () => {
   });
 
   test("FR-FOG-53 DM drag as owner: the DM's checkMove for Thorn (2, 9) → (11, 9) across x = 8 is ok but has no sight hint and P2 gets nothing; → (4, 10) the hint and P2's fog.sight (owner), not P1, not the DM", async () => {
-    await Bun.sleep(1000); // a fresh rate window per receiver
+    t.window(); // a fresh rate window per receiver
     const m = t.mark();
     const dm0 = t.dm.frames.length;
     const east = t.result(await t.check("dm", "Thorn", 11, 9));
@@ -132,7 +149,7 @@ describe("FR-FOG-53 sight preview (party off, then on)", () => {
   });
 
   test("FR-FOG-53 audience: active scene, holders only: a prep-scene DM drag reaches no player; party on, a party-blind party or a player whose store lacks T gets nothing", async () => {
-    await Bun.sleep(1000);
+    t.window();
     await t.ok(t.dm, F.setPartyVision, { on: true });
     const town = t.db
       .select()
@@ -146,9 +163,10 @@ describe("FR-FOG-53 sight preview (party off, then on)", () => {
       await t.check("dm", "Mira", (town?.col ?? 0) + 1, town?.row ?? 0, town?.id),
     );
     expect(sightHint(prep)).toBeDefined();
-    await Bun.sleep(50);
-    expect(t.c.p1.frames.length).toBe(m.p1);
-    expect(t.c.p2.frames.length).toBe(m.p2);
+    // `check` waited on both players' pong: anything sent for the drag has arrived by now.
+    const since = (w: Who) => t.c[w].frames.slice(m[w]).filter((f) => f.type !== "pong");
+    expect(since("p1")).toEqual([]);
+    expect(since("p2")).toEqual([]);
     // A holder set without P2 (party on): P2 is left out (the audience reads `seenBy` + owner).
     const ambushMira = t.db
       .select()
@@ -167,7 +185,7 @@ describe("FR-FOG-53 sight preview (party off, then on)", () => {
     await t.senses("Thorn", { visionFt: 0, darkvisionFt: 60, seesMagicalDarkness: false });
     await t.move(t.dm, "Mira", 12, 9);
     await t.move(t.dm, "Thorn", 11, 9);
-    await Bun.sleep(1000);
+    t.window();
     m = t.mark();
     await t.check("dm", "Thorn", 11, 10);
     await t.check("p1", "Mira", 12, 10);
@@ -185,7 +203,7 @@ describe("FR-FOG-53 sight preview (party off, then on)", () => {
   });
 
   test("FR-FOG-53 hint phase: a refusing guard registered after fog → no fog-sight hint and no fog.sight", async () => {
-    await Bun.sleep(1000);
+    t.window();
     await t.ok(t.dm, F.setPartyVision, { on: true });
     tokenMoveGuards.register("test.refuse-after-fog", () => ({ refuse: "No" }));
     try {
@@ -232,7 +250,9 @@ describe("FR-FOG-53 order, rate and traffic (party on)", () => {
     // Drop now: TokenMoved, then `end`.
     await t.move(t.c.p1, "Mira", 5, 6);
     t.drag(t.c.p1, "Mira", "end");
-    await Bun.sleep(1200); // anything held would have been sent by now
+    // Anything held (on the hub's timers) would have been sent by now.
+    t.window(1200);
+    await t.settle();
     for (const w of ["p2"] as const) {
       const frames = t.c[w].frames.slice(m[w]);
       const moved = frames.findIndex((f) => f.type === "event" && f.cause.name === "TokenMoved");
@@ -247,13 +267,17 @@ describe("FR-FOG-53 order, rate and traffic (party on)", () => {
   });
 
   test("FR-FOG-53 drag traffic: a scripted 30-cell drag in 3 s → map.drag ≤ 20 / s, map.checkMove ≤ 10 / s one in flight, fog.sight ≤ 4 / s per receiver, frame sizes within FOG §12; map.drag keeps its fields", async () => {
-    await Bun.sleep(1000);
+    t.window();
     const m = t.mark();
     const p1 = t.c.p1;
     const mira = t.id("Mira");
     const cells: [number, number][] = [];
     for (let i = 0; i < 30; i++) cells.push([2 + (i % 5), 3 + Math.floor(i / 5)]);
-    const start = Date.now();
+    // The 3 s run on the server's clock (the hub's rate reads it), 10 ms a step; each check is
+    // awaited before the clock moves on (a 0 ms round trip), so the pacing below is exact.
+    const clock = t.h.clock;
+    const start = clock.now();
+    const now = () => clock.now() - start;
     const checkTimes: number[] = [];
     const ackBytes: number[] = [];
     let inFlight = 0;
@@ -263,32 +287,30 @@ describe("FR-FOG-53 order, rate and traffic (party on)", () => {
     let lastDrag = -Infinity;
     const pump = async () => {
       // The client probe's pacing (FR-MAP-39): one in flight, ≥ 100 ms apart, newest cell wins.
-      if (inFlight > 0 || !wanted || Date.now() - lastCheck < 100) return;
+      if (inFlight > 0 || !wanted || now() - lastCheck < 100) return;
       const [col, row] = wanted;
       wanted = null;
       inFlight++;
       maxInFlight = Math.max(maxInFlight, inFlight);
-      lastCheck = Date.now();
-      checkTimes.push(lastCheck - start);
+      lastCheck = now();
+      checkTimes.push(lastCheck);
       const a = await answer(p1, p1.intent(I.checkMove, { tokenId: mira, col, row }));
       ackBytes.push(bytes(a));
       inFlight--;
     };
-    const pending: Promise<void>[] = [];
-    while (Date.now() - start < 3000) {
-      const i = Math.min(29, Math.floor((Date.now() - start) / 100));
+    while (now() < 3000) {
+      const i = Math.min(29, Math.floor(now() / 100));
       const [col, row] = cells[i] as [number, number];
       if (!wanted || wanted[0] !== col || wanted[1] !== row) wanted = [col, row];
-      if (Date.now() - lastDrag >= 50) {
-        lastDrag = Date.now();
+      if (now() - lastDrag >= 50) {
+        lastDrag = now();
         t.drag(p1, "Mira", [col + 0.3, row + 0.2]);
       }
-      pending.push(pump());
-      await Bun.sleep(10);
+      await pump();
+      t.window(10);
     }
-    await Promise.all(pending);
     t.drag(p1, "Mira", "end");
-    await Bun.sleep(200);
+    await t.settle();
     const perSecond = (times: number[], max: number) => {
       for (let t0 = times[0] ?? 0; t0 <= (times.at(-1) ?? 0); t0 += 50) {
         expect(times.filter((x) => x >= t0 && x < t0 + 1000).length).toBeLessThanOrEqual(max);

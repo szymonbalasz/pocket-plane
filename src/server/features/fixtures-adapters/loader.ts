@@ -2,6 +2,8 @@
 // (FR-FIX-01–11, 27, 28; AGENTS §9.3). Loads via server commands, in-process, DM authority.
 // FR-FIX-29 (ADR-0068): a CLI load passes its start (`now`) and every fixture's seeded clock is
 // that instant truncated to the minute; without `now` (bun test, e2e) it is `FIXTURE_INSTANT`.
+// `cache` (./cache.ts): reset-and-load may copy a stored snapshot of the same bundle + options +
+// code instead of replaying the commands; on by default in `loadInProcess` only.
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +11,7 @@ import { playerLinkUrl } from "@shared/campaign-management/schemas";
 import { AssetIngested } from "@shared/events/assets-pipeline";
 import { asc, eq, sql } from "drizzle-orm";
 import { type Clock, fixedClock, seededContext, systemClock } from "../../commands/context";
+import { armedCrashHook } from "../../commands/crash";
 import { CommandError } from "../../commands/errors";
 import { type Config, disposableRoots, localUrl, parseConfig } from "../../config";
 import { closeDb, openFileDb, openMemoryDb } from "../../db/client";
@@ -19,6 +22,21 @@ import { acquireLock } from "../../runtime/lock";
 import { type Manifest, readManifest, writeManifest } from "../../runtime/manifest";
 import { createServices, type Services } from "../../services";
 import { activeCampaign } from "../campaign-management/commands";
+import {
+  type CacheMode,
+  type CacheSettings,
+  cacheSettings,
+  codeKey,
+  type Entry,
+  entryDigest,
+  entryKey,
+  type PlayerRow,
+  readEntry,
+  restoreEntry,
+  type Snapshot,
+  snapshotDigest,
+  writeEntry,
+} from "./cache";
 import type { Fixture, FixtureLibrary, Refs } from "./fixture-types";
 import { validateBatch } from "./import-pipeline";
 
@@ -167,9 +185,8 @@ function removeFile(file: string): void {
   }
 }
 
-async function doReset(config: Config): Promise<void> {
-  mkdirSync(config.dataDir, { recursive: true });
-  writeManifest(config.dataDir, emptyManifest("resetting", systemClock.iso()));
+/** Delete the DB files and the asset dir (FR-FIX-01). */
+function clearData(config: Config): void {
   for (const suffix of ["", "-wal", "-shm", "-journal"]) removeFile(`${config.dbPath}${suffix}`);
   try {
     rmSync(config.assetDir, { recursive: true, force: true });
@@ -178,6 +195,12 @@ async function doReset(config: Config): Promise<void> {
       `Cannot delete ${config.assetDir}: ${(err as Error).message}. Stop the server, then retry.`,
     );
   }
+}
+
+async function doReset(config: Config): Promise<void> {
+  mkdirSync(config.dataDir, { recursive: true });
+  writeManifest(config.dataDir, emptyManifest("resetting", systemClock.iso()));
+  clearData(config);
   const db = openFileDb(config.dbPath);
   try {
     await createSchema(db.$client);
@@ -288,13 +311,43 @@ async function runFixtures(
   return records;
 }
 
+function completeManifest(
+  config: Config,
+  bundle: string,
+  fixtures: string[],
+  records: Manifest["records"],
+  players: PlayerRow[],
+  startedAt: string,
+  started: number,
+): Manifest {
+  const { dmUrl, base } = urls(config);
+  return {
+    status: "complete",
+    bundle,
+    fixtures,
+    records,
+    dmUrl,
+    playerLinks: players.map((p) => ({
+      player: p.name,
+      campaign: p.campaign,
+      url: base ? playerLinkUrl(base, p.token) : `/p/${p.token}`,
+    })),
+    startedAt,
+    durationMs: Math.round(performance.now() - started),
+  };
+}
+
+/** What a load leaves behind, for the bundle snapshot cache. */
+type Captured = Omit<Snapshot, "assetDir">;
+
 async function doLoad(
   config: Config,
   lib: FixtureLibrary,
   bundle: string,
   durable = true,
   opts: Pick<LoaderOptions, "now" | "notice"> = {},
-): Promise<Manifest> {
+  capture = false,
+): Promise<{ manifest: Manifest; captured: Captured | null }> {
   const m = readManifest(config.dataDir);
   if (m?.status !== "empty") {
     throw new FixtureError(
@@ -314,7 +367,8 @@ async function doLoad(
   // One fsync per step commit is most of a load's DB time; a throwaway dir doesn't need it.
   if (!durable) db.$client.run("PRAGMA synchronous = OFF");
   let records: Record<string, Record<string, string[]>>;
-  let playerRows: { name: string; token: string; campaign: string }[];
+  let playerRows: PlayerRow[];
+  let dbBytes: Uint8Array | null = null;
   try {
     const services = createServices({ config, db, log: silentLogger });
     // FR-FIX-29: one instant for the whole load (the offsets between fixture facts kept).
@@ -327,6 +381,8 @@ async function doLoad(
       .innerJoin(campaign, eq(player.campaignId, campaign.id))
       .orderBy(asc(player.createdAt), asc(sql`player.rowid`))
       .all();
+    // From the open connection: the image includes what is still in the WAL.
+    if (capture) dbBytes = db.$client.serialize();
   } catch (err) {
     closeDb(db);
     await doReset(config); // FR-FIX-05: back to empty
@@ -334,23 +390,133 @@ async function doLoad(
   }
   closeDb(db);
 
-  const { dmUrl, base } = urls(config);
-  const manifest: Manifest = {
-    status: "complete",
+  const fixtures = order.map((f) => f.key);
+  const manifest = completeManifest(
+    config,
     bundle,
-    fixtures: order.map((f) => f.key),
+    fixtures,
     records,
-    dmUrl,
-    playerLinks: playerRows.map((p) => ({
-      player: p.name,
-      campaign: p.campaign,
-      url: base ? playerLinkUrl(base, p.token) : `/p/${p.token}`,
-    })),
+    playerRows,
     startedAt,
-    durationMs: Math.round(performance.now() - started),
+    started,
+  );
+  writeManifest(config.dataDir, manifest);
+  const captured: Captured | null = dbBytes && {
+    bundle,
+    fixtures,
+    records,
+    players: playerRows,
+    db: dbBytes,
   };
+  return { manifest, captured };
+}
+
+// ---------- bundle snapshot cache (fix/test-fixture-cache, ./cache.ts) ----------
+
+interface CachePlan {
+  mode: true | "verify";
+  dir: string;
+  code: string;
+  entry: string;
+}
+
+/** Null = no cache for this load: off by option / env, or a crash hook is armed (#163). */
+function cachePlan(
+  config: Config,
+  lib: FixtureLibrary,
+  bundle: string,
+  opts: LoaderOptions,
+): CachePlan | null {
+  const asked = opts.cache ?? false;
+  if (asked === false || armedCrashHook() !== null) return null;
+  const order = resolveBundle(lib, bundle); // its errors are the load's (FR-FIX-04)
+  try {
+    const settings = { ...cacheSettings(), ...opts.cacheSettings };
+    if (!settings.enabled) return null;
+    const mode = settings.verifyAll ? "verify" : asked;
+    return {
+      mode,
+      dir: settings.dir,
+      code: codeKey(config.root, settings),
+      entry: entryKey({
+        bundle,
+        order,
+        testMode: config.testMode,
+        anchor: opts.now === undefined ? null : loadAnchor(opts.now),
+      }),
+    };
+  } catch (err) {
+    opts.notice?.(`Fixture cache off for this load: ${(err as Error).message}`);
+    return null;
+  }
+}
+
+/** A cache hit: copy the snapshot into the cleared data dir (under the loader lock). */
+function restoreSnapshot(
+  config: Config,
+  bundle: string,
+  entry: Entry,
+  opts: LoaderOptions,
+): Manifest {
+  const started = performance.now();
+  const startedAt = systemClock.iso();
+  mkdirSync(config.dataDir, { recursive: true });
+  // As a real load: a crash mid-copy leaves `loading`, which the server refuses (FR-FIX-28).
+  writeManifest(config.dataDir, {
+    ...emptyManifest("loading", startedAt),
+    bundle,
+    fixtures: entry.meta.fixtures,
+  });
+  clearData(config);
+  restoreEntry(entry, config.dbPath, config.assetDir);
+  mkdirSync(config.assetDir, { recursive: true });
+  opts.notice?.(`Fixture cache: bundle "${bundle}" copied from ${entry.dir}`);
+  if (opts.now !== undefined) {
+    opts.notice?.(
+      `Fixture clock: ${fixedClock(loadAnchor(opts.now)).iso()} (load time, FR-FIX-29)`,
+    );
+  }
+  const manifest = completeManifest(
+    config,
+    bundle,
+    entry.meta.fixtures,
+    entry.meta.records,
+    entry.meta.players,
+    startedAt,
+    started,
+  );
   writeManifest(config.dataDir, manifest);
   return manifest;
+}
+
+/** After a real load: store the snapshot, or (`"verify"`) check it against the stored one. */
+function settleSnapshot(
+  plan: CachePlan,
+  config: Config,
+  captured: Captured,
+  notice?: (msg: string) => void,
+): void {
+  const existing = readEntry(plan.dir, plan.code, plan.entry);
+  if (!existing) {
+    const snap = { ...captured, assetDir: config.assetDir };
+    if (writeEntry(plan.dir, plan.code, plan.entry, snap, systemClock.iso())) {
+      notice?.(`Fixture cache: stored bundle "${captured.bundle}" (${plan.code}/${plan.entry})`);
+    }
+    return;
+  }
+  if (plan.mode !== "verify") return;
+  const m = existing.meta;
+  const same =
+    JSON.stringify([m.fixtures, m.records, m.players]) ===
+      JSON.stringify([captured.fixtures, captured.records, captured.players]) &&
+    entryDigest(existing) === snapshotDigest(captured.db, config.assetDir);
+  if (!same) {
+    throw new FixtureError(
+      `Fixture cache mismatch: bundle "${captured.bundle}" loaded now differs from its cached snapshot ` +
+        `${existing.dir} (a nondeterministic fixture, or code the cache key misses).`,
+    );
+  }
+  notice?.(`Fixture cache: verified bundle "${captured.bundle}" against ${existing.dir}`);
 }
 
 // ---------- entry points ----------
@@ -364,6 +530,14 @@ export interface LoaderOptions {
    * minute; absent (bun test, e2e) → `FIXTURE_INSTANT`.
    */
   now?: number;
+  /**
+   * Bundle snapshot cache (`./cache.ts`), `resetAndLoad` only. Default `false` (the CLI, the
+   * loader's own tests): every load runs the commands. Off whatever this says when
+   * `PP_FIXTURE_CACHE=0` or a crash hook is armed (`PP_TEST_CRASH`, #163).
+   */
+  cache?: CacheMode;
+  /** Overrides the env's cache settings (tests). */
+  cacheSettings?: Partial<CacheSettings>;
 }
 
 export async function reset(config: Config, opts: LoaderOptions = {}): Promise<void> {
@@ -385,7 +559,7 @@ export async function load(
   checkGuards(config);
   const lock = acquireLock(config.dataDir, "loader", systemClock.iso(), opts.notice);
   try {
-    return await doLoad(config, lib, bundle, true, opts);
+    return (await doLoad(config, lib, bundle, true, opts)).manifest;
   } finally {
     lock.release();
   }
@@ -398,21 +572,54 @@ export async function resetAndLoad(
   opts: LoaderOptions = {},
 ): Promise<Manifest> {
   checkGuards(config);
+  const plan = cachePlan(config, lib, bundle, opts);
+  const hit = plan?.mode === true ? readEntry(plan.dir, plan.code, plan.entry) : null;
+  if (hit) {
+    const lock = acquireLock(config.dataDir, "loader", systemClock.iso(), opts.notice);
+    try {
+      return restoreSnapshot(config, bundle, hit, opts);
+    } catch (err) {
+      // A vanished or unreadable entry: fall through to the real load (it resets first).
+      opts.notice?.(
+        `Fixture cache: restore of ${hit.dir} failed, loading: ${(err as Error).message}`,
+      );
+    } finally {
+      lock.release();
+    }
+  }
   preflight(lib, bundle, config); // fail before wiping anything
   const lock = acquireLock(config.dataDir, "loader", systemClock.iso(), opts.notice);
   try {
     await doReset(config);
-    return await doLoad(config, lib, bundle, opts.durable, opts);
+    const { manifest, captured } = await doLoad(
+      config,
+      lib,
+      bundle,
+      opts.durable,
+      opts,
+      plan !== null,
+    );
+    if (plan && captured) settleSnapshot(plan, config, captured, opts.notice);
+    return manifest;
   } finally {
     lock.release();
   }
+}
+
+export interface InProcessOptions {
+  testMode?: boolean;
+  dmSecret?: string;
+  now?: number;
+  /** Bundle snapshot cache; default `true` here (see `LoaderOptions.cache`). */
+  cache?: CacheMode;
+  cacheSettings?: Partial<CacheSettings>;
 }
 
 /** FR-FIX-11: own temp data dir flagged disposable, no ports. */
 export async function loadInProcess(
   lib: FixtureLibrary,
   bundle: string,
-  opts: { testMode?: boolean; dmSecret?: string; now?: number } = {},
+  opts: InProcessOptions = {},
 ) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "pp-fixtures-"));
   const config = parseConfig({
@@ -425,6 +632,8 @@ export async function loadInProcess(
   // The temp dir dies with the test: power-loss durability buys nothing here (fix/test-speed).
   const manifest = await resetAndLoad(config, lib, bundle, {
     durable: false,
+    cache: opts.cache ?? true,
+    ...(opts.cacheSettings && { cacheSettings: opts.cacheSettings }),
     ...(opts.now !== undefined && { now: opts.now }),
   });
   return {

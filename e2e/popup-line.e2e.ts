@@ -6,9 +6,11 @@
 // whose click fronts the Game log at the entry with all 20 chips. With others' rolls off, C's
 // popup plays the miniature into its cells and lands only once they rest. Short screens: with a
 // toast up, only the popups that fit the toast region show (the oldest dropped), none past the
-// viewport or over the top bar (1280×1080, 1280×720, 1280×560: 3, 2, 1 of T5's 206-px cards).
+// viewport or over the top bar (1280×1080, 1280×720, 1280×560: 3, 2, 1 of T5's 206-px cards on
+// the DM; the player's region, below the top bar, holds 2 at 560 with one toast).
 // BL-116 (sprint 12): a round whose popup (or toast) ran out of time before the check is void and
-// rolled again (≤ 3), so a loaded machine can't fail it, and a real layout fault still does.
+// rolled again (≤ 3). BL-128: the short-screen rounds run on held page time and flat dice, so
+// neither a loaded machine's timing nor its slow-3D toast changes what a round sees.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { entryDice } from "./support/log";
@@ -29,8 +31,14 @@ const hasWebgl = (page: Page) =>
     return (c.getContext("webgl2") ?? c.getContext("webgl")) !== null;
   });
 
-async function player(browser: Parameters<typeof rolePage>[0], name: string) {
+async function player(
+  browser: Parameters<typeof rolePage>[0],
+  name: string,
+  o: { clock?: boolean } = {},
+) {
   const page = await rolePage(browser);
+  // BL-128: page time Playwright can hold (it flows as usual until `hold`).
+  if (o.clock) await page.clock.install();
   await page.goto(e2eEnv().link(name));
   await live(page);
   return page;
@@ -206,6 +214,46 @@ const watchClosing = (page: Page) =>
       attributeFilter: ["data-state"],
     });
   });
+/**
+ * BL-128: holds `page`'s time (its `page.clock` installed before load): from here no timer of the
+ * page fires and no animation frame runs unless `runFor` steps them, so neither its toasts' nor
+ * its popups' 6 s can run out while a loaded machine is slow. `resume` lets time flow again.
+ */
+async function hold(page: Page) {
+  for (;;) {
+    const now = await page.evaluate(() => Date.now());
+    // Just ahead of the page's own (flowing) time; a load slower than that → read it again.
+    const ok = await page.clock.pauseAt(now + 250).then(
+      () => true,
+      (e: Error) => {
+        if (!/past/.test(e.message)) throw e;
+        return false;
+      },
+    );
+    if (ok) return;
+  }
+}
+
+/** BL-128: on a held page, steps its time 100 ms at a time until every shown popup of `ids` has landed. */
+async function landRound(page: Page, ids: readonly string[]) {
+  await expect(popupOf(page, ids[2] as string)).toBeAttached();
+  const rolling = () =>
+    page.evaluate(
+      (want) =>
+        [...document.querySelectorAll('[data-testid="dicex-popup"][data-record-id]')].filter(
+          (el) =>
+            want.includes(el.getAttribute("data-record-id") ?? "") &&
+            el.getAttribute("data-state") !== "closing" &&
+            el.getAttribute("data-landed") !== "true",
+        ).length,
+      [...ids],
+    );
+  // ≤ 8 s of page time (a popup rests by POPUP_ROLLING_MAX_MS, 6 s, at the latest).
+  for (let step = 0; step < 80 && (await rolling()) > 0; step++) await page.clock.runFor(100);
+  expect(await rolling()).toBe(0);
+  await page.clock.runFor(500);
+}
+
 const closingOf = (page: Page) =>
   page.evaluate(() => [
     ...((window as unknown as { __ppClosing?: Set<string> }).__ppClosing ?? []),
@@ -267,16 +315,30 @@ test("FR-DICEX-47 short screens: with a toast up only the popups that fit show (
   test.setTimeout(150_000);
   const { secret } = e2eEnv();
   const dm = await rolePage(browser);
+  await dm.clock.install(); // BL-128: see `hold`
   await loginDm(dm, secret);
   await live(dm);
-  const p1 = await player(browser, "Player 1");
+  const p1 = await player(browser, "Player 1", { clock: true });
   for (const page of [p1, dm]) await watchClosing(page);
+  // BL-128: flat dice on both clients (a per-device choice, FR-DICEX-32). With 3D, a slow frame
+  // rate (SwiftShader, a loaded machine) switches to flat with a toast (FR-DICEX-23 / -44) at a
+  // moment of its own: that second toast took a slot of the round it landed in (alone it came at
+  // 560 and the player held 1 card; under load earlier, and 720 or 1080 held one card too few).
+  for (const page of [p1, dm]) {
+    const tray = await openWindow(page, "dicex.tray");
+    await tray.getByTestId("dicex-settings-open").click();
+    await page.locator('[data-testid="dicex-settings-display"][data-value="flat"]').click();
+    await page.keyboard.press("Escape");
+    await tray.getByTestId("ui-window-close").click();
+    await expect(tray).toHaveCount(0);
+  }
 
-  // T5: 206-px cards (1 row + 2 lines × 1.4): fewer at once on short screens.
-  for (const [h, fit] of [
-    [1080, 3],
-    [720, 2],
-    [560, 1],
+  // T5: 206-px cards (1 row + 2 lines × 1.4): fewer at once on short screens. With one toast up
+  // the player's column (bottom-anchored, below the top bar) holds 2 at 560, the DM's 1.
+  for (const [h, fits] of [
+    [1080, { p1: 3, dm: 3 }],
+    [720, { p1: 2, dm: 2 }],
+    [560, { p1: 2, dm: 1 }],
   ] as const) {
     for (const page of [p1, dm]) await page.setViewportSize({ width: 1280, height: h });
     for (let attempt = 1; ; attempt++) {
@@ -290,11 +352,20 @@ test("FR-DICEX-47 short screens: with a toast up only the popups that fit show (
           await win.getByTestId("shell-test-alert").dispatchEvent("click");
           await expect(page.getByTestId("ui-alert-toast").first()).toBeVisible({ timeout: 1_000 });
         }).toPass({ timeout: 8_000 });
+        // BL-128: the page's time stops with its toast up; the round runs on state, not time.
+        await hold(page);
       }
       const ids: string[] = [];
       for (let i = 0; i < 3; i++) ids.push(await roll(p1, "10d6"));
-      // Both clients at once: each popup's 6 s run on both.
-      const got = await Promise.all([p1, dm].map((page) => shortScreenRound(page, ids, fit, h)));
+      // Page time steps until the round's popups have landed, then 500 ms for the layout's own
+      // timers (the toast stack's refold / hold, a closing card's fade): the same page time on
+      // any machine, well inside the toasts' 6 s.
+      await Promise.all([p1, dm].map((page) => landRound(page, ids)));
+      const got = await Promise.all([
+        shortScreenRound(p1, ids, fits.p1, h),
+        shortScreenRound(dm, ids, fits.dm, h),
+      ]);
+      for (const page of [p1, dm]) await page.clock.resume();
       if (got.every((v) => v === "ok")) break;
       // Every void round is reported; three in a row fail the test (never a silent pass).
       console.log(`FR-DICEX-47 ${h}: round ${attempt} (p1, dm): ${got.join(" | ")}`);
