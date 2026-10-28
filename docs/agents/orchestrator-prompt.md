@@ -41,9 +41,9 @@ Don't paste these into sub-agents wholesale. Give each agent only the files its 
 
 - Check `HERDR_ENV=1` first. If it isn't set, stop and tell me.
 - Learn the installed CLI from `herdr --help`, `herdr worktree`, `herdr agent` and `herdr pane`. Read IDs from the JSON responses; never guess them.
-- **One task = one worktree = one agent.** Create worktrees with `herdr worktree create --workspace <pocket-plane workspace id> --branch <type>/<slug> --label <slug> --base main --no-focus`.
+- **One task = one worktree = one agent, all in this space.** Parallel work always runs in git worktrees linked to the orchestrator's pocket-plane workspace in Herdr, never in a standalone workspace, another repo or the main checkout. Create worktrees with `herdr worktree create --workspace <pocket-plane workspace id> --branch <type>/<slug> --label <slug> --base main --no-focus`; reattach an existing one (after a restart) with `herdr worktree open --workspace <id> --path <worktree> --label <slug> --no-focus`. Never `herdr workspace create --cwd <worktree>`.
   - **Always pass `--workspace`.** Without it, Herdr resolves the repo from the UI-focused workspace, which may be another project (this once created worktrees in an unrelated repo). Get the ID from `herdr pane current --current` (`workspace_id` of the orchestrator pane) or `herdr worktree list`.
-  - Check the response: `result.workspace.worktree.repo_name` must be `pocket-plane` before starting an agent.
+  - Check the response: `result.workspace.worktree.repo_name` must be `pocket-plane` and `is_linked_worktree` `true` before starting an agent.
   - Cleanup order: close the worktree's panes first, then `herdr worktree remove --workspace <id>` (open shells lock the directory on Windows).
   - Branches: `spec/<feature>`, `build/<feature>`, `fix/<slug>`.
   - Test agents run *inside the builder's worktree*, in their own pane. They don't get their own branch.
