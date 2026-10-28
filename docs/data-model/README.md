@@ -2752,3 +2752,12 @@ From [spell-fx §8](../specs/spell-fx.md#8-data-model). **Built by `build/vfx`.*
 - **Compendium:** `cmp.addToSheet` fills a spell row's `fx` with `suggestPreset(name)`'s defaults (FR-VFX-04); other rows unchanged.
 - **Fixtures:** unit `vfx-visual-auras` (the DM sets Spirit Guardians on Mira's "Bless" concentration and Shadow of Moil on Thorn's "Marked", existing `cbtx-effects` rows); bundle `visual-kit` gains it. Not in `session-sim-13` (edits existing effects).
 - **CON-44:** no snapshot growth beyond §142 (the build adds no record or field; `visual-kit` carries two `fx` values, ≤ 124 B each).
+
+## 144. AoE cell origin (fix/aoe-cell-origin)
+
+From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 (DM [#375](../decisions-log.md)). **Built by `fix/aoe-cell-origin`**; no table, column, record type or snapshot change (CON-44: 0 B). Protocol side: [protocol §182](../protocol/README.md#182-aoe-cell-origin-fixaoe-cell-origin).
+
+- **Stored rows:** unchanged; existing origins (vertices, decimals) stay as stored. New snapped origins are cell centres (`c.5`), a big token's centre or (cube) a vertex: all valid under FR-SCN-20's ≤ 2 decimals.
+- **Client only (never stored or sent):** the shown scene's token footprints for the snap (`useAoe.tokens`, written by `TemplatesLayer`), the highlighted origin cells while a press is held (`useAoe.originCell`), the last placement's raw press point (a panel shape change re-snaps from it).
+- **Fixtures:** none new: the e2e uses `map-tools`' Crypt Ogre (Large, (4, 10), `mt-crowd`); `session-sim-13` gets a comment line only (client-only).
+

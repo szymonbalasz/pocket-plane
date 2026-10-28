@@ -2022,7 +2022,7 @@ Built by `build/aoe-freeform` ([FR-SCN-21, -22, -43, -44, -45](../specs/scene-to
 
 | Client action | Sends | Source |
 |---|---|---|
-| AoE press + drag (both clients) | `scn.template` frames (≤ 20 / s, 1 s repeat): origin = the press point snapped to the nearest vertex, or with Ctrl rounded to 0.01 cell; `angle` = the drag direction (cone, line) or a cube's diagonal − 45°, 15° steps, or 0.1° with Ctrl (Ctrl read on every move and on a Ctrl key press); sphere / cylinder radius from the drag in 5-ft steps | FR-SCN-22, -43 |
+| AoE press + drag (both clients) | `scn.template` frames (≤ 20 / s, 1 s repeat): origin = the press point snapped to the nearest vertex (*#375, [§182](#182-aoe-cell-origin-fixaoe-cell-origin):* a cell centre / big token's centre / cube vertex), or with Ctrl rounded to 0.01 cell; `angle` = the drag direction (cone, line) or a cube's diagonal − 45°, 15° steps, or 0.1° with Ctrl (Ctrl read on every move and on a Ctrl key press); sphere / cylinder radius from the drag in 5-ft steps | FR-SCN-22, -43 |
 | Kept template's origin handle drag (placer, DM) | one `scn.updateTemplate {templateId, x, y}` on release (snapped / Ctrl); a click without a move only selects | FR-SCN-26, -45 |
 | Selected kept template's end handle drag | one `scn.updateTemplate {templateId, angle}` (cone, line; cube: diagonal − 45°) or `{templateId, size}` (sphere, cylinder, 5-ft steps) on release; the drag previews locally only | FR-SCN-45 |
 | DM "Clear templates on this scene" → AlertDialog Confirm | `scn.clearTemplates {sceneId}`, or `{sceneId, players: true}` with "Also players' kept templates" ticked; Cancel / Esc send nothing; Confirm disabled while the scope holds 0 or not live | FR-SCN-44 |
@@ -4230,3 +4230,23 @@ From [spell-fx](../specs/spell-fx.md) (VFX, DM #374) on the core of §179. **Bui
 - **Gate (VFX §12):** headless Chromium on the build machine, DM 1280 × 720, both auras at Full, 30 tokens: `frameMs` median 1.4–1.5 ms (11 tokens: 1.1 ms), `stage.getLayers().length` = 4. Bench `spell-fx/fx.bench.ts` (the FX code alone, 30 tokens, one look / s): median 0.02 ms.
 - **Tests:** `spell-fx/fx-build.test.ts` (FR-VFX-01, -11–19, -22, -23, -25–29), `sheet-fx.test.tsx` (FR-VFX-04–06, -09, -10, -25), server `spell-fx/cmp-add.test.ts` (FR-VFX-04), `fixtures/bundles/visual-kit.fixtures.test.ts`; registry goldens (prefs, Layers toggles, layer menus); e2e `spell-fx` (S1, S4, S11), `visual` (both auras at Still, both themes), `prefs-window`.
 - **CON-44:** 0 B (no record or payload change).
+
+## 182. AoE cell origin (fix/aoe-cell-origin)
+
+From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 as amended by DM [#375](../decisions-log.md). **Built by `fix/aoe-cell-origin`.** **No wire change**: `scn.template`, `scn.placeTemplate` and `scn.updateTemplate` carry the same fields (`x`, `y` in grid units, ≤ 2 decimals; a cell centre is `c.5`); stored rows keep their origin.
+
+| Client action | Origin sent | FR |
+|---|---|---|
+| AoE press (no Ctrl): sphere, cylinder, cone, line | the centre of the cell under the pointer, clamped to the map's cells | FR-SCN-43 |
+| … sphere / cylinder over a token larger than one cell (the shown tokens; the topmost wins) | the token's footprint centre (`col + n / 2`, `row + n / 2`; a vertex for Large / Gargantuan) | FR-SCN-43 |
+| … cube | the nearest vertex, clamped to the map's cells | FR-SCN-43 |
+| Ctrl held | the pointer, 0.01 cell (unchanged) | FR-SCN-43 |
+| Kept template's origin handle drag | the same snap for the template's shape; one `scn.updateTemplate {x, y}` on release | FR-SCN-26, -45 |
+| Panel shape change with an ephemeral shown | the ephemeral re-snapped from its press point | FR-SCN-43 |
+
+- **Helper:** `src/client/common/features/scene-tools/aoe-snap.ts`: `aoeOrigin(shape, p, {free, tokens?, bounds?}) → {x, y, cell}`, `mapCells(mapRect)`, `snapTokens(tokens)`; `templates.ts` `movedOrigin(shape, press, p, opts)`; `gestureTemplate(…, press)` measures "dragged" (≥ ½ cell) from the press.
+- **Konva:** `scn-aoe-origin-cell` (in `scn-templates`, AoE tool active, while a placement or an origin move is held): attrs `col`, `row`, `n` (1 = a cell, 2–4 = a token footprint); outline in the placer's colour over the black casing.
+- **DOM:** the AoE panel hint reads "Drag from a square to aim" (cube: "Drag from a grid corner").
+- **Tests:** `scene-tools/aoe-snap.test.ts` (snap: `FR-SCN-43 …` ×4 + `FR-SCN-45 …`; coverage from snapped origins: `FR-SCN-41 …` ×4; through the tool: `FR-SCN-43 …` ×2 + `FR-SCN-22 …`), `aoe-freeform.test.ts` (updated to cell centres); e2e `aoe-freeform` (+ the #375 case), `scene-tools-templates` (Fireball pressed in a cell: 9 squares).
+- **CON-44:** 0 B (no record or payload change).
+
