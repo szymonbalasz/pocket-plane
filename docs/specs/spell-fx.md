@@ -1,7 +1,7 @@
 ---
 title: Spell FX
 prefix: VFX
-status: draft
+status: in-review
 owner: spec-spell-fx
 phase: post-mvp
 ---
@@ -70,7 +70,7 @@ phase: post-mvp
 | ID | Requirement | Notes |
 |---|---|---|
 | FR-VFX-05 | Spell rows (CHARX `spells[]`) gain optional `fx: {preset, params}`. The row editor shows **Map effect**: None + every preset by label, then the preset's params (Spirit Guardians: Radiant / Necrotic; radius). New row or name change with no `fx` yet → pre-picked by FR-VFX-04 (still saved only with the row). | Additive; seam OQ-VFX-06 |
-| FR-VFX-06 | Spell rows with `fx` show a **Cast** button after the roll buttons, in the view and on Main's Spells box; label **Cast** while no active effect has `fx.spellId` = the row id on that creature, else **End** (sends `cbtx.endEffect`). | Who: OQ-VFX-01 |
+| FR-VFX-06 | Spell rows with `fx` show a **Cast** button after the roll buttons, in the view and on Main's Spells box; label **Cast** while no active effect has `fx.spellId` = the row id on that creature, else **End** (sends `cbtx.endEffect`). | Who: OQ-VFX-01 (decided A) |
 | FR-VFX-07 | `vfx.cast {creatureId, spellId}` → `{effectId}`: row with `concentration` → the same path and rules as `cbtx.setConcentration` (target = the creature, label = the spell name, replaces a current concentration and ends its linked effects); else a `custom` effect, label = spell name, no duration (ended by hand; OQ-VFX-09). Either way `fx = {…row.fx, spellId}`. One transaction, the effect's own events. Row without `fx` → `conflict` "No map effect on ‹spell›"; an active effect from this row → `conflict` "‹spell› is already active". | Works in and out of combat |
 | FR-VFX-08 | Cast never uses a slot, rolls or changes HP (CHARX keeps slot pips by hand). | §4 |
 | FR-VFX-09 | `vfx.setEffectFx {effectId, fx \| null}` sets or clears the map effect on any active effect. DM: any. Player: non-secret effects targeting their own character. Event `EffectFxSet {effectId}`, logged. | Monsters, Bless, by hand |
@@ -145,7 +145,7 @@ Reference [visual-direction](../design/visual-direction.md). FX colours are pres
 - **Preferences:** "Map effects" four-way segmented control with a one-line hint and the slow-frames note.
 - **States:** no token on this scene → nothing on the map, sheet still shows End; disconnected → auras keep animating from the last state, Cast disabled (as every intent button); Off → map plain, sheet unchanged.
 - **DM view:** everything; hidden tokens' auras dimmed; picker on any effect.
-- **Player view:** auras and cues only for tokens they receive; Cast on their own sheet (OQ-VFX-01); Show affected cells on any aura they see.
+- **Player view:** auras and cues only for tokens they receive; Cast on their own sheet (OQ-VFX-01, decided); Show affected cells on any aura they see.
 - **Test IDs:** `vfx-row-fx` (Select, `data-record-id` = spell id), `vfx-row-fx-variant`, `vfx-row-fx-radius`, `vfx-cast` (`data-record-id` = spell id, `data-state` = `cast` \| `end`), `vfx-effect-fx` (menu item, `data-record-id` = effect id), `vfx-effect-fx-save`, `vfx-pref-level-<full|reduced|still|off>`, `vfx-pref-lowered`, `vfx-token-menu-cells` (`data-record-id` = effect id). Canvas: one non-listening Group per aura `vfx-aura` (id = effect id; attrs `preset`, `tokenId`, `radiusFt`, `level`), per playing look `vfx-hit` (id = cue id; attrs `look`, `tokenId`), `vfx-cells` (id = effect id; attr `count`); `vfx-over` Group attr `frameMs` (median, for walkthroughs).
 
 ## 8. Data model
@@ -172,7 +172,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md). No new
 
 | Intent | Who | Validation / ownership |
 |---|---|---|
-| `vfx.cast {creatureId, spellId}` → `{effectId}` | DM; owner player (OQ-VFX-01) | Sheet row exists (`not_found` "Row was deleted"), has `fx` (`conflict`), not already active (`conflict`); then `cbtx.setConcentration` / `cbtx.addEffect` rules (locked sheet: allowed, like counters) |
+| `vfx.cast {creatureId, spellId}` → `{effectId}` | DM; owner player (OQ-VFX-01, decided) | Sheet row exists (`not_found` "Row was deleted"), has `fx` (`conflict`), not already active (`conflict`); then `cbtx.setConcentration` / `cbtx.addEffect` rules (locked sheet: allowed, like counters) |
 | `vfx.setEffectFx {effectId, fx \| null}` | DM; player on own character's non-secret effects | Active effect (`not_found`), FR-VFX-03 (`invalid`), ownership (`forbidden`) |
 
 **WS events (server → client)**
@@ -188,7 +188,7 @@ JSON leaf fields per [ADR-0006](../architecture/adr/0006-persistence.md). No new
 | Action | DM | Player | Server check |
 |---|---|---|---|
 | Set a spell row's map effect | any sheet | own sheet (CHARX row rules) | `char.putRow` |
-| Cast / End from a row | any creature | own character (OQ-VFX-01) | `vfx.cast` owner check; End = `cbtx.endEffect` rules |
+| Cast / End from a row | any creature | own character (OQ-VFX-01, decided) | `vfx.cast` owner check; End = `cbtx.endEffect` rules |
 | Map effect on an effect | any | own character's non-secret effects | `vfx.setEffectFx` |
 | See an aura | always | effect received + token received | effect visibility + token visibility |
 | Receive a hit cue | always | FR-VFX-21 | server, per connection |
@@ -252,8 +252,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | [character-sheet-full](character-sheet-full.md) | `spells[].fx`; row editor picker; Cast / End on rows and Main | OQ-VFX-06 |
 | [scenes-map](scenes-map.md) | `LAYER_ORDER` entries `vfx-under` 38, `vfx-over` 43; token menu entry; drawn token positions incl. drag previews; FR-MAP-108 turn | Registries append-only; `LAYER_ORDER` is a shared edit |
 | [scene-tools](scene-tools.md) | Layers popover switch (registry `toggle`); affected-squares style | Append-only |
-| [combat-tracker](combat-tracker.md) | `AttackApplied` / `HpApplied` per-target facts for cues | OQ-VFX-05 |
-| [live-sync](live-sync.md) | A server-originated transient message routed per connection | OQ-VFX-05 |
+| [combat-tracker](combat-tracker.md) | `AttackApplied` / `HpApplied` per-target facts for cues | OQ-VFX-05 (decided A) |
+| [live-sync](live-sync.md) | A server-originated transient message routed per connection | OQ-VFX-05 (decided A) |
 | [play-shell](play-shell.md) | Preferences sections (FR-SHELL-72) | Append-only |
 | [compendium](compendium.md) | **Add to sheet** fills `fx` through FR-VFX-04 | One line in CMP's add path |
 | [fog-of-war](fog-of-war.md) | Token visibility per player for cue routing | Existing rule |
@@ -264,11 +264,11 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-VFX-01 | Who presses Cast? | **A. the owner player on their sheet, and the DM on any sheet** · B. DM only | yes | §10, CHARX |
+| OQ-VFX-01 | Who presses Cast? | **A. the owner player on their sheet, and the DM on any sheet** · B. DM only. *Decided A (DM, 2026-10-28: "the player presses cast"; the DM keeps their usual reach over every sheet)* | no (decided) | §10, CHARX |
 | OQ-VFX-02 | Does Shadow of Moil's darkness change vision? | **A. looks only; light rules later with the vision work** · B. dims fog vision inside the radius now | no (DM) | FOG |
 | OQ-VFX-03 | Strike and lash moments | **A. automatic, visual only** · B. only on a DM button | no (DM) | FR-VFX-15/16 |
 | OQ-VFX-04 | Redraw of the `objects` layer while FX animate | **A. both passes on `objects`, FX frames capped at 30 fps while an aura or look is on screen; measured by the §12 gate** · B. over pass on `top` at 60 fps (FX may cover labels) · C. ask scenes-map for a fifth Konva layer | no (builder, after the gate) | MAP |
-| OQ-VFX-05 | How a hit cue reaches clients | **A. transient domain event from an after-commit listener on `AttackApplied` / `HpApplied`, filtered per connection by the token's visibility** (proposed ADR) · B. player-safe token ids on the outcome line, cues derived on the client | yes | SYNC, CBT, protocol |
+| OQ-VFX-05 | How a hit cue reaches clients | **A. transient domain event from an after-commit listener on `AttackApplied` / `HpApplied`, filtered per connection by the token's visibility** (proposed ADR) · B. player-safe token ids on the outcome line, cues derived on the client. *Decided A (DM, 2026-10-28)* | no (decided) | SYNC, CBT, protocol |
 | OQ-VFX-06 | How Cast reaches the sheet's spell rows | **A. a new append-only spell-row actions registry in character-sheet (`spell-row-actions.ts`), VFX adds Cast** · B. CHARX's files edited directly in a sequenced slice | no (orchestrator) | CHARX |
 | OQ-VFX-07 | Glossary: *FX preset*, *map effect*, *aura*, *hit look*, *hit cue*, *glance*, "Map effects" (Preferences) | **A. add as written in §1–6** · B. other names | no (integrator) | glossary |
 | OQ-VFX-08 | How much does Moil hide its token? | **A. eyes only for other players; half covered for the DM and the owner** · B. half covered for everyone | no (DM) | FR-VFX-17 |
