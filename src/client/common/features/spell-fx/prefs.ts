@@ -1,6 +1,6 @@
 // Map effects preference (FR-VFX-25–27), per browser, both clients, never sent: one
 // browser-storage entry `pp.vfx` = `{level}`, zod-parsed on read; unreadable → the default
-// (Still under `prefers-reduced-motion: reduce`, else Full), kept in memory when storage is
+// (Full in every browser, OS reduced motion ignored, #376), kept in memory when storage is
 // blocked. Plus the page's slow-frames tier drop (FR-VFX-27): memory only, never below Still.
 import { useSyncExternalStore } from "react";
 import { z } from "zod";
@@ -22,8 +22,8 @@ export type VfxPrefs = z.infer<typeof VfxPrefs>;
 
 export const VFX_PREFS_KEY = "pp.vfx";
 
-/** FR-VFX-25: Still when the OS asks for reduced motion, else Full. */
-export const defaultLevel = (reducedMotion: boolean): FxLevel => (reducedMotion ? "still" : "full");
+/** FR-VFX-25: Full in every browser, whatever the OS reduced-motion setting (#376, as dice, #247). */
+export const DEFAULT_LEVEL: FxLevel = "full";
 
 /** FR-VFX-27: one tier down, Full → Reduced → Still, never to Off. */
 export function lowerTier(level: FxLevel): FxLevel {
@@ -39,7 +39,6 @@ export function effectiveLevel(chosen: FxLevel, lowered: FxLevel | null): FxLeve
 
 export interface VfxPrefsEnv {
   storage(): StorageBackend | undefined;
-  reducedMotion(): boolean;
 }
 
 export function createVfxPrefs(env: VfxPrefsEnv) {
@@ -70,7 +69,7 @@ export function createVfxPrefs(env: VfxPrefsEnv) {
     const parsed = VfxPrefs.safeParse(json);
     cache = {
       raw: r,
-      value: parsed.success ? parsed.data : { level: defaultLevel(env.reducedMotion()) },
+      value: parsed.success ? parsed.data : { level: DEFAULT_LEVEL },
     };
     return cache.value;
   };
@@ -111,17 +110,11 @@ export function createVfxPrefs(env: VfxPrefsEnv) {
 
 export type VfxPrefsStore = ReturnType<typeof createVfxPrefs>;
 
-const reducedMotion = () =>
-  typeof window !== "undefined" &&
-  typeof window.matchMedia === "function" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
 let page: VfxPrefsStore | null = null;
 /** The page's preference over `localStorage` (looked up lazily: access itself can throw). */
 export const vfxPrefs = (): VfxPrefsStore => {
   page ??= createVfxPrefs({
     storage: () => (typeof localStorage === "undefined" ? undefined : localStorage),
-    reducedMotion,
   });
   return page;
 };
