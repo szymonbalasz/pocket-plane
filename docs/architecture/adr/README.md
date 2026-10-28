@@ -76,6 +76,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0068](0068-fixture-load-clock.md) | CLI fixture loads anchor the seeded clock at load time | accepted (#339; amends 0022 for CLI loads) |
 | [0069](0069-theme-switch.md) | Theme switch: one stylesheet per theme keyed on `data-slot`, no theme logic in components, no geometry change | accepted (#351; theme-system OQ-THEME-01 A) |
 | [0070](0070-launcher-in-top-bar.md) | Launcher in the top bar's centre zone; work area to the bottom edge; layouts regenerated once (kit parity) | accepted (#356; kit-parity OQ-KIT-01 A; amends play-shell §7) |
+| [0071](0071-spell-fx.md) | Spell FX: client-drawn map effects on effect rows (`effect.fx`), transient hit cues from an after-commit listener, filtered per connection | accepted (#373; OQ-VFX-05 A by the DM) |
 
 ## Proposing a new ADR
 

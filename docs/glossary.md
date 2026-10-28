@@ -150,6 +150,13 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Condition** | A 5e condition (e.g. prone, poisoned; exhaustion with a level), stored as an Effect on a combatant or character. No mechanics, except incapacitating ones end concentration. | Effect |
 | **Effect** | A row on a creature in play: a condition, a custom label, or a concentration; optional duration in rounds ([combat-extras](specs/combat-extras.md)); custom effects may carry modifiers ([effect-modifiers](specs/effect-modifiers.md)). | Modifier |
 | **Preset** | A named effect template with modifiers (built-in, customised per campaign, or a character's own), e.g. Bless, Rage; trigger presets (Sneak Attack …) create rule triggers ([effect-modifiers](specs/effect-modifiers.md)). | Effect; Dice style |
+| **Map effect** | The animated look (`fx`) a spell row or an effect row can carry; drawn by each client from the effect's state, never sent as frames ([spell-fx](specs/spell-fx.md), ADR-0071). | Effect; Preset |
+| **FX preset** | A named map-effect template with default parameters (Spirit Guardians, Shadow of Moil), picked on a spell row or an effect ([spell-fx](specs/spell-fx.md)). | Preset (effect template) |
+| **Aura** | A map effect drawn around each token that is an active effect's target, for every viewer who receives that token ([spell-fx](specs/spell-fx.md)). | Template (AoE) |
+| **Hit look** | The short animation on a target token for one applied damage type, healing, untyped damage or a glance ([spell-fx](specs/spell-fx.md)). | Hit cue |
+| **Hit cue** | The transient server message after an applied damage or heal that tells clients to play a hit look; never stored, logged or in a snapshot; filtered per connection by token visibility ([spell-fx](specs/spell-fx.md), ADR-0071). | Damage card; Signal |
+| **Glance** | The hit look for damage the target is immune to: a dull ring that stops short ([spell-fx](specs/spell-fx.md)). | Miss |
+| **Map effects** (Preferences) | The per-browser level for map effects and hit looks: Full · Reduced · Still · Off ([spell-fx](specs/spell-fx.md) FR-VFX-25). | Reduced motion (OS) |
 | **Rule trigger** | A data rule on a character or monster definition: event, requires, filters, frequency, effect (e.g. Sneak Attack once per turn); interpreted by built-in code, never user code ([ADR-0043](architecture/adr/0043-rule-triggers.md)). | Rule hook |
 | **Damage part** | One typed term of an attack's damage: the base part or an extra part ([effect-modifiers](specs/effect-modifiers.md)). | Modifier part |
 | **Offered part** | A rule-trigger damage part rolled with the damage and settled at apply; not in the card's total until it lands. | Modifier part |

@@ -132,6 +132,7 @@ DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit pa
 |---|---|---|---|
 | [Theme system](post-mvp/theme-system.md) (Default + Gilt & Stone, per-browser switch in Preferences, bundled fonts) | THEME | complete | spec-theme-system |
 | [Kit parity](post-mvp/kit-parity.md) (the Gilt & Stone mockup: Game log / Initiative rows, top bar with the launcher, notices, damage card, compendium, Party status, stat-block window; ADR-0070) | KIT | complete | spec-kit-parity |
+| [Spell FX](spell-fx.md) (map effects on effect rows: Spirit Guardians, Shadow of Moil; Cast on sheet spell rows; hit looks by damage type; Preferences "Map effects"; DM Layers "Effects"; ADR-0071) | VFX | in-review | spec-spell-fx |
 | [Character sheet full](character-sheet-full.md) (printed sheet layout, both themes, FR-CHARX-105–120; OQ-CHARX-47–50 decided A, #352) | CHARX | complete | spec-charx-print-sheet |
 
 ## Post-MVP

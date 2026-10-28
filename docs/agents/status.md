@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 RESUMED (2026-10-28) on the CI test loop (#368, AGENTS §9.4.1).** F2 merged (6ce69034, main CI green). F1 walkthrough running (`test-s14f1`, port 4103). F4 revising per DM #371. F3 brief ready (`build-f14c.md`, key `f14c`): start after F1 merges (F1 holds the play-shell frame lock). Decisions up to #371. All worktrees are linked to workspace wR (`herdr worktree create/open --workspace wR`).
+**Phase:** **Sprint 14 (fix pack + Spell FX, #374) on the CI test loop (#368).** F1, F2 merged. F4 fixing a walkthrough leak. F3 building. VFX core building (third builder). Decisions up to #374. All worktrees linked to workspace wR.
 
 **Resume (in order):**
 1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
@@ -39,10 +39,12 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 12 T1 theme switch | merged a15785ed | — | **merged** (walkthrough PASS; check:full 5835 + no-copy load timeout, e2e 259 + 3 load flakes: cb-party, dice-extras, popup-line (popup-line again after BL-116), all pass alone) | — |
 | Sprint 12 T3 default theme (#355) | merged fac01c26 | — | **merged** (walkthrough PASS; check:full 5856, e2e 264/264) | — |
 | Sprint 12 T2 Gilt & Stone | merged 1873122d | — | **merged** (walkthrough 11/12 → re-test 13/13; check:full 5852, e2e 264/264) | — |
-| Sprint 14 F1 frame | `fix/s14-frame` (w7W, slot 0) | f14a, test-s14f1 | ready (check 1016 targeted, area e2e 27/27, CI green 91797d5f; player-gilt.png baseline refreshed on purpose) | walkthrough → merge |
+| Sprint 14 F1 frame | merged 2c493f7a | — | **merged** (walkthrough 4/6 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f1{,r}/`; check 1030 targeted, replay 418/418, CI green; player-gilt.png refreshed; tool-bar return after a grow fixed, pre-existing) | — |
 | Sprint 14 F2 toasts | merged 6ce69034 | — | **merged** (walkthrough 9/9 `.verify/sprint14/walkthroughs/20261028-s14f2/`; check 763 targeted, area e2e 19/19, branch + main CI green) | — |
-| Sprint 14 F4 roll guard | `fix/s14-roll-guard` (w7Y, slot 3) | build-f14d | built; revising per #371 (unshown scenes don't count; rolls-1 unchanged) | walkthrough on kit-parity |
-| Sprint 14 F3 kit nits | `fix/s14-kit` | — | brief ready (+ toast over modal Edit dialog from F2's walkthrough, + roll-bar switch from F4) | start after F1 merges |
+| Sprint 14 F4 roll guard | `fix/s14-roll-guard` (w7Y, slot 3) | build-f14d | walkthrough 7/8: fog-for-one-player leak via the combatant path → fixing | re-test → merge |
+| Sprint 14 F3 kit nits | `fix/s14-kit` (w70, slot 0) | build-f14c | building | walkthrough |
+| Spell FX core (#374) | `fix/vfx-core` (w81, slot 2) | build-vfxcore | building (locks: DB schema `effect.fx`, protocol + events, WS hub transient send, scenes-map LAYER_ORDER, creature-sheet spell row schema) | thin raw-intent walkthrough → merge |
+| Spell FX build (#374) | `build/vfx` | — | after F3 + VFX core merge (wires `spell-row-actions.ts`) | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
