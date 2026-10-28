@@ -35,7 +35,7 @@ You are the **orchestrator and integrator** for Pocket Plane. Your role, rules, 
 ## 2. Next, in order
 
 
-**Now: sprint 14 PAUSED.** First build the test tooling (`fix/test-infra`, [proposal](test-strategy-proposal.md), adopted #366); then resume the parked sprint-14 branches F1 / F2, then F4 (BL-135, #367) and F3. Exact steps: status.md **Resume**. *(Done: sprint 13 kit parity, #355–#365.)*
+**Now: resume sprint 14 on the CI test loop.** The test tooling is done and on `main` (#368–#370, [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci)): GitHub CI runs the full suite on every push; locally only targeted `bun run check` and single e2e specs; `bun run ci:watch` in the background after each push; merges don't wait for CI, a red `main` is fixed first. Resume the parked sprint-14 branches F1 / F2, then F4 (BL-135, #367) and F3. Exact steps: status.md **Resume**. *(Done: sprint 13 kit parity, #355–#365.)*
 
 *(Done, #349–#350.)* **Sprint 11, DM decision #349: [sprint-11](sprint-11.md).** Fix track F1 frame + camera (BL-107, BL-109, BL-113 frame items, BL-93), F2 toasts (BL-108, BL-115), F3 combat + dice (BL-110, BL-112, BL-113 Add default), run like sprint 10; the DM's art-pass planning agent works in parallel in docs/design/ only. Then session-sim-15, "Playtest: sprint 11 fixes", pause and recap.
 
