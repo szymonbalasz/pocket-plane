@@ -165,8 +165,10 @@ export const LINE_TRACK = { "--hp-track": "40px" } as CSSProperties;
  * K12 re-test (walkthrough 4): a child row's name line: the name never wraps (a long name
  * wrapped to three lines, the medallion on the second): it truncates with its full text in a
  * Tooltip only when it and its marks don't fit the whole line; the side chips (owner dot, Ally)
- * stay whole beside it, or on the next line when there's no room. Same test ID and `data-value`
- * as `NameLine`'s. The medallion sits on this line (`ChildMedallion`).
+ * stay whole beside it. BL-141 (K6c gap 2): always on this line (the name truncates first, never
+ * below 3 characters' room), so with the bar line a child row is two lines at most; the Ally chip
+ * is its icon there (`SideChip` `compact`). Same test ID and `data-value` as `NameLine`'s. The
+ * medallion sits on this line (`ChildMedallion`).
  */
 export function ChildNameLine({
   name,
@@ -182,12 +184,8 @@ export function ChildNameLine({
   side?: ReactNode;
 }) {
   return (
-    <div
-      data-name-line
-      data-child
-      className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5"
-    >
-      <span data-name-head className="flex min-w-0 max-w-full items-center gap-1">
+    <div data-name-line data-child className="flex min-w-0 items-center gap-x-1">
+      <span data-name-head className="flex min-w-[3ch] max-w-full items-center gap-1">
         <Tooltip content={name}>
           <span
             data-testid={testId}
@@ -377,13 +375,17 @@ export function useListHpTrack(listRef: RefObject<HTMLElement | null>): void {
 export function SideChip({
   c,
   testId,
+  compact = false,
 }: {
   c: { id: string; kind: CombatantKind; side?: Side | null; publicSide?: Side | null };
   testId: string;
+  /** BL-141 (K6c gap 2): the icon alone (a child row's name line), the word in its Tooltip. */
+  compact?: boolean;
 }) {
   const chip = sideChip(c);
   if (!chip) return null;
   const Icon = chip.side === "ally" ? HandshakeIcon : SwordsIcon;
+  const label = SIDE_LABEL[chip.side];
   const badge = (
     <Badge
       variant="outline"
@@ -391,16 +393,22 @@ export function SideChip({
       data-record-id={c.id}
       data-value={chip.side}
       data-secret={chip.secret}
-      className={cn("shrink-0 gap-1 px-1.5 text-[11px]", chip.secret && "border-dashed")}
+      data-compact={compact || undefined}
+      aria-label={compact ? label : undefined}
+      className={cn(
+        "shrink-0 gap-1 text-[11px]",
+        compact ? "px-1" : "px-1.5",
+        chip.secret && "border-dashed",
+      )}
     >
       <Icon className="size-3" aria-hidden />
-      {SIDE_LABEL[chip.side]}
+      {!compact && label}
     </Badge>
   );
-  if (!chip.secret) return badge;
-  return (
-    <Tooltip content={`Secret: players see ${SIDE_LABEL[otherSide(chip.side)]}`}>{badge}</Tooltip>
-  );
+  if (!chip.secret && !compact) return badge;
+  const secret = chip.secret ? `Secret: players see ${SIDE_LABEL[otherSide(chip.side)]}` : null;
+  const tip = compact ? (secret ? `${label} · ${secret}` : label) : secret;
+  return <Tooltip content={tip}>{badge}</Tooltip>;
 }
 
 /**

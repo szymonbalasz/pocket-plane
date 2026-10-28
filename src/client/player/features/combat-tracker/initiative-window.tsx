@@ -197,25 +197,17 @@ function PlayerRowMain({
                     compact={child}
                   />
                 )}
-                <SideChip c={c} testId="cbt-init-row-ally" />
+                <SideChip c={c} testId="cbt-init-row-ally" compact={child} />
               </>
             }
           />
         </div>
-        {/* FR-CBT-107 (walkthrough fix): an `after-owner` row says whose turn it follows. */}
-        {companion && c.turnMode === "after-owner" && (
-          <span
-            data-testid="cbt-init-row-after"
-            data-record-id={c.id}
-            className={cn("text-xs text-muted-foreground", HP_STACK.line)}
-          >
-            {modeLabel("after-owner", ownerName)}
-          </span>
-        )}
+        {/* BL-141 (K6c gap 2): a child row is two lines at most: name, then bar + "After X". */}
         <div
           data-stats-line
           className={cn(
-            "mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden",
+            "mt-0.5 flex min-w-0 items-center gap-x-1.5 gap-y-0.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums empty:hidden",
+            child ? "flex-nowrap" : "flex-wrap",
             HP_STACK.line,
           )}
         >
@@ -230,6 +222,17 @@ function PlayerRowMain({
           {/* FR-CBT-49 (#172): a PC at 0 HP (own HP, else the redacted `down`). */}
           {!death && pcDown(store, c) && <BandBadge band="down" testId="cbt-init-row-band" />}
           {own && <OwnCardButton c={c} />}
+          {/* FR-CBT-107 (walkthrough fix): an `after-owner` row says whose turn it follows;
+              BL-141: at the bar line's end (truncates, never a line of its own). */}
+          {companion && c.turnMode === "after-owner" && (
+            <span
+              data-testid="cbt-init-row-after"
+              data-record-id={c.id}
+              className="min-w-0 truncate"
+            >
+              {modeLabel("after-owner", ownerName)}
+            </span>
+          )}
         </div>
       </div>
       {c.kind === "pc" && (

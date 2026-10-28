@@ -873,7 +873,7 @@ function RowMain({
                     compact={indent}
                   />
                 )}
-                <SideChip c={c} testId="cbt-init-row-ally" />
+                <SideChip c={c} testId="cbt-init-row-ally" compact={indent} />
               </>
             }
           />,
