@@ -37,6 +37,7 @@ import {
 import { createPortal } from "react-dom";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
+import { Tooltip } from "../../components/ui/overlays";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "../play-shell/geometry";
@@ -680,8 +681,8 @@ export function ToastRuntime({
       {state.turn && <TurnCard key={`turn:${state.turn.seq}`} text={state.turn.text} />}
       {shown.map((t) => {
         if (t.kind === "summary" && compact) {
-          // FR-NOTE-79 (BL-141): one short line, the count and Open (the full text in its title;
-          // the Notifications window has the whole list).
+          // FR-NOTE-79 (BL-141): one short line, the count and Open (the full text in its Tooltip
+          // and label; the Notifications window has the whole list).
           const n = t.count + inSummary;
           return (
             <div
@@ -692,13 +693,15 @@ export function ToastRuntime({
               data-compact="true"
               data-count={n}
               data-waiting={t.waiting ?? 0}
-              title={summaryText(n, t.waiting)}
+              aria-label={summaryText(n, t.waiting)}
               className={cn(TOAST_CARD, "gap-2 py-1 pl-2.5 pr-2")}
             >
               <ListTodoIcon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-              <span data-slot="toast-text" className="min-w-0 flex-1 truncate">
-                {compactSummaryText(n, t.waiting)}
-              </span>
+              <Tooltip content={summaryText(n, t.waiting)}>
+                <span data-slot="toast-text" className="min-w-0 flex-1 truncate">
+                  {compactSummaryText(n, t.waiting)}
+                </span>
+              </Tooltip>
               <Button
                 size="sm"
                 className="h-7 shrink-0 px-2"
