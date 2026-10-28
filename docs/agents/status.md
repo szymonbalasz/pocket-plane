@@ -57,6 +57,7 @@ Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL),
 Sprint 14:
 - F1: `tray-size.test.ts` expectation → the tray's useful 360×300 with Fit `all` at DM 1440 escort (the BL-134 rule applies to the tray; 450×375 gave Fit `pcs`). The 6 remaining K5 replay exemptions stay out of F1 (backlog rows after the report; the zone round-trip memory is a DM design question).
 - F2: DM bell = unread pending actions only; a player's not-owned pending rows get their own Waiting section; the popup head limit applies only to a displaced column (#347 counts at home); the stuck-hover toast timer (a 4 s card stayed > 60 s) is fixed in F2.
+- F1 walkthrough step 3: launcher button rects differ between themes by up to 8 px (label text drawn in each theme's font); the labelled set and the fit decision are identical (BL-136 / FR-THEME-07): accepted.
 - F4: definition rolls (stat block, NPC sheet) check every instance; fog counts per player (seen by only some players → DM-only); the roll bar's public switch the server will override → F3.
 
 Sprint 11:
