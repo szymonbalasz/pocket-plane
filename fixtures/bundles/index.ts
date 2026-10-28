@@ -95,6 +95,7 @@ import remindersStrongholds from "./reminders-strongholds";
 import rsE2e from "./rs-e2e";
 import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
+import s14ToastsE2e from "./s14-toasts-e2e";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
@@ -339,6 +340,8 @@ export const bundles: readonly Bundle[] = [
   kitRound3,
   // Sprint 13 K12 (build/kit-round3-combat): kit-parity + companion groups (K12 walkthrough)
   kitRound3Combat,
+  // Sprint 14 F2 (fix/s14-toasts): toasts / popups / notifications e2e alias of session-sim-13
+  s14ToastsE2e,
   // Test infra (fix/test-infra, #368): screenshot baselines (e2e `visual`)
   visualKit,
 ];

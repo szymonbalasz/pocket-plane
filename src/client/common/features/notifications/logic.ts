@@ -155,9 +155,12 @@ export function summaryText(n: number, waiting = 0): string {
  * (#178): an action row counts only while `pending`; applied, dismissed or closed at End leaves
  * the bell, reopened counts again. FR-NOTE-27 (G9): the DM also counts a player-owned pending row
  * (the DM may act on it, FR-NOTE-08); it still doesn't toast for the DM (`toastsFor`).
+ * BL-130 (sim-16 h04: the bell 7 beside Initiative's "Pending (5)", two unread fight summaries):
+ * the DM's bell counts pending actions only, the rows the summary and Pending count (FR-NOTE-15,
+ * -45); an info row doesn't (it toasts; the window lists it). Players unchanged.
  */
 export function addressedForUnread(n: NotificationRecord, v: NoteViewer): boolean {
-  if (n.actionRole === null) return addressedTo(n, v);
+  if (n.actionRole === null) return v.role !== "dm" && addressedTo(n, v);
   if (n.state !== "pending") return false;
   return isActionOwner(n, v) || (v.role === "dm" && n.actionRole === "player");
 }
@@ -202,17 +205,30 @@ export function dismissButton(n: NotificationRecord, v: NoteViewer, live: boolea
   return live ? "enabled" : "disabled";
 }
 
-/** FR-NOTE-17: Pending (DM: all; player: pending they own), then History; newest first. */
+/**
+ * FR-NOTE-17: Pending (DM: all; player: pending they own), then History; newest first. BL-137
+ * (sprint 14, K9: a player's own attack cards listed under History as "Waiting for DM"): a pending
+ * row a player sees but doesn't own is in `waiting` (its own section between them), never in
+ * History, which holds closed and info rows only. The DM has none. The rows are what the player
+ * already receives (FR-NOTE-06): no new data.
+ */
 export function historySections(store: RecordStore): {
   pending: NotificationRecord[];
+  waiting: NotificationRecord[];
   history: NotificationRecord[];
 } {
   const v = viewerOf(store);
   const all = notificationsOf(store).sort((a, b) => b.seq - a.seq);
-  if (!v) return { pending: [], history: [] };
+  if (!v) return { pending: [], waiting: [], history: [] };
   const isPendingRow = (n: NotificationRecord) =>
     n.state === "pending" && (v.role === "dm" || isActionOwner(n, v));
-  return { pending: all.filter(isPendingRow), history: all.filter((n) => !isPendingRow(n)) };
+  // BL-137: a player's row pending on someone else (their attack's card "Waiting for DM").
+  const isWaiting = (n: NotificationRecord) => n.state === "pending" && !isPendingRow(n);
+  return {
+    pending: all.filter(isPendingRow),
+    waiting: all.filter(isWaiting),
+    history: all.filter((n) => n.state !== "pending"),
+  };
 }
 
 type Names = (playerId: string | null) => string;
