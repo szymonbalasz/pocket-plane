@@ -22,6 +22,7 @@ import {
   EffectsEnded,
   EffectUpdated,
 } from "@shared/events/combat-extras";
+import type { z } from "zod";
 import { defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import type { RecordChange } from "../../events/types";
@@ -33,6 +34,7 @@ import {
   type Ended,
   endEffects,
   insertEffect,
+  type NewEffect,
   runEffectHooks,
   updateEffectRow,
 } from "./effects";
@@ -85,80 +87,94 @@ const merge = (a: Ended, b: Ended): Ended => ({
 });
 const none = (): Ended => ({ changes: [], ended: [], concentrationIds: [] });
 
+/** Extra columns a caller stamps on every inserted effect (spell-fx `vfx.cast`: `fx`). */
+export type EffectExtra = Pick<NewEffect, "fx">;
+
+/**
+ * `cbtx.addEffect`'s body (spell-fx `vfx.cast` reuses it in its own transaction, FR-VFX-07):
+ * `extra` columns go on every inserted row.
+ */
+export function addEffects(
+  input: z.output<typeof AddEffectInput>,
+  env: Env,
+  extra: EffectExtra = {},
+): EffectIdsResult {
+  const cid = campaignOf(env.actor);
+  const enc = startedEncounter(env.tx, cid);
+  if (input.durationRounds !== undefined && !enc) throw conflict(DURATION_NEEDS_ENCOUNTER);
+  // Two refs to one creature (a PC's combatant and its character) count once.
+  const seen = new Set<string>();
+  const targets = input.targets
+    .map((r) => resolveTarget(env, r))
+    .filter((t) => !seen.has(targetKey(t)) && seen.add(targetKey(t)));
+  let source: CombatantRecord | null = null;
+  if (input.sourceCombatantId !== undefined) {
+    source = activeCombatant(env, input.sourceCombatantId, { allowRemoved: true }).c;
+  }
+  // FR-CBTX-10: a link needs the source's active concentration.
+  let concentrationId: string | null = null;
+  if (input.linkConcentration && source) {
+    const conc = activeConcentrationOf(env.tx, combatantTargetColumns(source));
+    if (!conc) throw conflict(`${source.name} is not concentrating`);
+    concentrationId = conc.id;
+  }
+  const ids: string[] = [];
+  const changes: RecordChange[] = [];
+  let ended = none();
+  for (const t of targets) {
+    const cols = targetColumns(t);
+    if (input.kind === "condition") {
+      const have = activeEffectsOf(env.tx, cols).find(
+        (e) => e.kind === "condition" && e.condition === input.condition,
+      );
+      if (have) {
+        // FR-CBTX-04: already there → skipped; exhaustion takes the new level.
+        if (input.condition === "exhaustion" && have.level !== (input.level ?? null)) {
+          changes.push(updateEffectRow(env, have, { level: input.level ?? null }));
+          ids.push(have.id);
+        }
+        continue;
+      }
+    }
+    checkLimits(env, cols, 1);
+    const e = insertEffect(env, {
+      kind: input.kind,
+      condition: input.condition ?? null,
+      level: input.level ?? null,
+      label: input.label ?? null,
+      ...cols,
+      encounterId: enc?.id ?? null,
+      sourceCombatantId: source?.id ?? null,
+      sourceName: source?.name ?? null,
+      concentrationId,
+      ...timing(env, enc, t, input.durationRounds, source),
+      secret: input.secret ?? false,
+      hidden: hiddenOf(env.tx, cid, t),
+      ...extra,
+    });
+    changes.push(effectChange(null, e));
+    ids.push(e.id);
+    // FR-CBTX-11: an incapacitating condition ends the target's concentration (+ links).
+    if (input.condition && INCAPACITATING_CONDITIONS.includes(input.condition)) {
+      const conc = activeConcentrationOf(env.tx, cols);
+      if (conc) ended = merge(ended, endEffects(env, [conc], "incapacitated"));
+    }
+  }
+  if (ids.length === 0) return { effectIds: [] };
+  env.emit({
+    type: EffectsAdded.type,
+    campaignId: cid,
+    payload: { effectIds: ids },
+    changes: [...changes, ...ended.changes, ...runEffectHooks(env, enc)],
+  });
+  closeCardsOfEnded(env, ended);
+  return { effectIds: ids };
+}
+
 export const addEffect = defineCommand({
   name: CBTX_INTENTS.addEffect,
   input: AddEffectInput,
-  execute(input, env): EffectIdsResult {
-    const cid = campaignOf(env.actor);
-    const enc = startedEncounter(env.tx, cid);
-    if (input.durationRounds !== undefined && !enc) throw conflict(DURATION_NEEDS_ENCOUNTER);
-    // Two refs to one creature (a PC's combatant and its character) count once.
-    const seen = new Set<string>();
-    const targets = input.targets
-      .map((r) => resolveTarget(env, r))
-      .filter((t) => !seen.has(targetKey(t)) && seen.add(targetKey(t)));
-    let source: CombatantRecord | null = null;
-    if (input.sourceCombatantId !== undefined) {
-      source = activeCombatant(env, input.sourceCombatantId, { allowRemoved: true }).c;
-    }
-    // FR-CBTX-10: a link needs the source's active concentration.
-    let concentrationId: string | null = null;
-    if (input.linkConcentration && source) {
-      const conc = activeConcentrationOf(env.tx, combatantTargetColumns(source));
-      if (!conc) throw conflict(`${source.name} is not concentrating`);
-      concentrationId = conc.id;
-    }
-    const ids: string[] = [];
-    const changes: RecordChange[] = [];
-    let ended = none();
-    for (const t of targets) {
-      const cols = targetColumns(t);
-      if (input.kind === "condition") {
-        const have = activeEffectsOf(env.tx, cols).find(
-          (e) => e.kind === "condition" && e.condition === input.condition,
-        );
-        if (have) {
-          // FR-CBTX-04: already there → skipped; exhaustion takes the new level.
-          if (input.condition === "exhaustion" && have.level !== (input.level ?? null)) {
-            changes.push(updateEffectRow(env, have, { level: input.level ?? null }));
-            ids.push(have.id);
-          }
-          continue;
-        }
-      }
-      checkLimits(env, cols, 1);
-      const e = insertEffect(env, {
-        kind: input.kind,
-        condition: input.condition ?? null,
-        level: input.level ?? null,
-        label: input.label ?? null,
-        ...cols,
-        encounterId: enc?.id ?? null,
-        sourceCombatantId: source?.id ?? null,
-        sourceName: source?.name ?? null,
-        concentrationId,
-        ...timing(env, enc, t, input.durationRounds, source),
-        secret: input.secret ?? false,
-        hidden: hiddenOf(env.tx, cid, t),
-      });
-      changes.push(effectChange(null, e));
-      ids.push(e.id);
-      // FR-CBTX-11: an incapacitating condition ends the target's concentration (+ links).
-      if (input.condition && INCAPACITATING_CONDITIONS.includes(input.condition)) {
-        const conc = activeConcentrationOf(env.tx, cols);
-        if (conc) ended = merge(ended, endEffects(env, [conc], "incapacitated"));
-      }
-    }
-    if (ids.length === 0) return { effectIds: [] };
-    env.emit({
-      type: EffectsAdded.type,
-      campaignId: cid,
-      payload: { effectIds: ids },
-      changes: [...changes, ...ended.changes, ...runEffectHooks(env, enc)],
-    });
-    closeCardsOfEnded(env, ended);
-    return { effectIds: ids };
-  },
+  execute: (input, env): EffectIdsResult => addEffects(input, env),
 });
 
 export const updateEffect = defineCommand({
@@ -246,35 +262,50 @@ export const setConcentration = defineCommand({
     ) {
       throw forbidden("Not your character");
     }
-    const enc = startedEncounter(env.tx, cid);
-    const cols = targetColumns(t);
-    // FR-CBTX-09: one active per creature; the old one ends first (`replaced`, + links).
-    const old = activeConcentrationOf(env.tx, cols);
-    const ended = old ? endEffects(env, [old], "replaced") : none();
-    checkLimits(env, cols, 1);
-    const e = insertEffect(env, {
-      kind: "concentration",
-      condition: null,
-      level: null,
-      label: input.label,
-      ...cols,
-      encounterId: enc?.id ?? null,
-      sourceCombatantId: null,
-      sourceName: null,
-      concentrationId: null,
-      // The concentrating creature is the caster: its own turn anchors the duration (like a
-      // linked effect's source, FR-CBTX-05), else the turn combatant.
-      ...timing(env, enc, t, input.durationRounds, enc ? combatantOf(env.tx, cid, t) : null),
-      secret: false,
-      hidden: hiddenOf(env.tx, cid, t),
-    });
-    env.emit({
-      type: ConcentrationSet.type,
-      campaignId: cid,
-      payload: { effectId: e.id, ...(old ? { replacedId: old.id } : {}) },
-      changes: [...ended.changes, effectChange(null, e), ...runEffectHooks(env, enc)],
-    });
-    closeCardsOfEnded(env, ended);
-    return { effectId: e.id };
+    return concentrateOn(env, t, input);
   },
 });
+
+/**
+ * `cbtx.setConcentration`'s body for a resolved, authorized target (spell-fx `vfx.cast` reuses it
+ * in its own transaction, FR-VFX-07): `extra` columns go on the new concentration.
+ */
+export function concentrateOn(
+  env: Env,
+  t: Target,
+  input: { label: string; durationRounds?: number },
+  extra: EffectExtra = {},
+): EffectIdResult {
+  const cid = campaignOf(env.actor);
+  const enc = startedEncounter(env.tx, cid);
+  const cols = targetColumns(t);
+  // FR-CBTX-09: one active per creature; the old one ends first (`replaced`, + links).
+  const old = activeConcentrationOf(env.tx, cols);
+  const ended = old ? endEffects(env, [old], "replaced") : none();
+  checkLimits(env, cols, 1);
+  const e = insertEffect(env, {
+    kind: "concentration",
+    condition: null,
+    level: null,
+    label: input.label,
+    ...cols,
+    encounterId: enc?.id ?? null,
+    sourceCombatantId: null,
+    sourceName: null,
+    concentrationId: null,
+    // The concentrating creature is the caster: its own turn anchors the duration (like a
+    // linked effect's source, FR-CBTX-05), else the turn combatant.
+    ...timing(env, enc, t, input.durationRounds, enc ? combatantOf(env.tx, cid, t) : null),
+    secret: false,
+    hidden: hiddenOf(env.tx, cid, t),
+    ...extra,
+  });
+  env.emit({
+    type: ConcentrationSet.type,
+    campaignId: cid,
+    payload: { effectId: e.id, ...(old ? { replacedId: old.id } : {}) },
+    changes: [...ended.changes, effectChange(null, e), ...runEffectHooks(env, enc)],
+  });
+  closeCardsOfEnded(env, ended);
+  return { effectId: e.id };
+}

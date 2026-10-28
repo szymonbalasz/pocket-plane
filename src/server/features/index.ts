@@ -22,6 +22,7 @@ import { reminders } from "./reminders";
 import { sceneTools } from "./scene-tools";
 import { scenesMap } from "./scenes-map";
 import { sessionRecap } from "./session-recap";
+import { spellFx } from "./spell-fx";
 import { stats } from "./stats";
 import { strongholds } from "./strongholds";
 
@@ -53,4 +54,6 @@ export const features: readonly Feature[] = [
   strongholds,
   // Sprint 9 track SP (build/sp-recap)
   sessionRecap,
+  // Spell FX core (fix/vfx-core)
+  spellFx,
 ];

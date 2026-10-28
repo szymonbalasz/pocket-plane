@@ -115,6 +115,7 @@ import spS9 from "./sp-s9";
 import spS9E2e from "./sp-s9-e2e";
 import spS9Shared from "./sp-s9-shared";
 import spS9SharedE2e from "./sp-s9-shared-e2e";
+import spellFx from "./spell-fx";
 import stats from "./stats";
 import statsB from "./stats-b";
 import statsBE2e from "./stats-b-e2e";
@@ -344,4 +345,6 @@ export const bundles: readonly Bundle[] = [
   s14ToastsE2e,
   // Test infra (fix/test-infra, #368): screenshot baselines (e2e `visual`)
   visualKit,
+  // Spell FX core (fix/vfx-core): Cast, hit cues and auras walkthrough + spell-fx e2e
+  spellFx,
 ];
