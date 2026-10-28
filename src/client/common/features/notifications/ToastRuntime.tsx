@@ -86,6 +86,9 @@ import {
   clearCallout,
   closeCardToast,
   closeToast,
+  dropStaleHover,
+  type HoverPoint,
+  hoverHolds,
   moreInSummary,
   nextExpiry,
   pruneToasts,
@@ -591,6 +594,18 @@ export function ToastRuntime({
   }, [isDm, pos.left, pos.top, stackH, resting]);
   useEffect(() => () => reportShownStack(SHOWN_STACK_ID, null), []);
 
+  // FR-NOTE-14 (sprint 14 F2): no mouseleave fires when the hovered toast or the whole stack
+  // unmounts; after each change the hover holds only if the last pointer point is still on it.
+  const pointer = useRef<HoverPoint | null>(null);
+  const shownKey = shown.map((t) => t.key).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-check when the drawn toasts change
+  useLayoutEffect(() => {
+    if (!state.hovered) return;
+    const box = stackRef.current?.getBoundingClientRect() ?? null;
+    const holds = hoverHolds(showing, box, pointer.current);
+    if (!holds) dispatch((s, now) => dropStaleHover(s, false, now));
+  }, [state.hovered, showing, shownKey, state.turn?.seq, callout?.seq, more, stackH]);
+
   const openHistory = () => openWindow(HISTORY_KIND);
   // FR-NOTE-78 (walkthrough F2 1b, 2a): folded to the summary alone, "+N more" sits in its row.
   const inRow = moreInSummary(shown, more);
@@ -632,7 +647,13 @@ export function ToastRuntime({
           ? { left: pos.left, top: pos.top }
           : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }),
       }}
-      onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
+      onMouseEnter={(e) => {
+        pointer.current = { x: e.clientX, y: e.clientY };
+        dispatch((s, now) => setHovered(s, true, now));
+      }}
+      onMouseMove={(e) => {
+        pointer.current = { x: e.clientX, y: e.clientY };
+      }}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >
       {/* FR-KIT-59 (OQ-KIT-03 A): the DM's turn card heads the stack (home first). */}

@@ -141,6 +141,32 @@ export function setHovered(s: ToastState, hovered: boolean, now: number): ToastS
   return withPause(s, { hovered }, now);
 }
 
+/** A pointer point and a rendered box (`getBoundingClientRect()` fits), page px. */
+export interface HoverPoint {
+  x: number;
+  y: number;
+}
+export interface HoverBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/**
+ * FR-NOTE-14 (sprint 14 F2): no `mouseleave` fires when the hovered toast unmounts or the stack
+ * does, so the hover holds only while the stack shows and the last pointer point is on its box.
+ */
+export function hoverHolds(showing: boolean, box: HoverBox | null, at: HoverPoint | null): boolean {
+  if (!showing || !box || !at) return false;
+  return at.x >= box.left && at.x < box.right && at.y >= box.top && at.y < box.bottom;
+}
+
+/** FR-NOTE-14: a hover that no longer holds (`hoverHolds`) drops; the timers run again. */
+export function dropStaleHover(s: ToastState, holds: boolean, now: number): ToastState {
+  return s.hovered && !holds ? setHovered(s, false, now) : s;
+}
+
 export function setHidden(s: ToastState, hidden: boolean, now: number): ToastState {
   return withPause(s, { hidden }, now);
 }
