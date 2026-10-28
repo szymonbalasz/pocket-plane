@@ -41,12 +41,17 @@ const SANS = "ui-sans-serif, system-ui, sans-serif";
  * FR-THEME-07's computed button font, which changed with the theme).
  */
 export function launcherFont(): string {
+  return `500 ${LABEL_PX}px ${sansFamily()}`;
+}
+
+/** Simple Dark's text family: `<html>`'s `--font-sans`, else Tailwind's stack (BL-136). */
+export function sansFamily(): string {
   const root = typeof document !== "undefined" ? document.documentElement : undefined;
   const family =
     typeof getComputedStyle === "function" && root
       ? getComputedStyle(root).getPropertyValue("--font-sans").trim()
       : "";
-  return `500 ${LABEL_PX}px ${family || SANS}`;
+  return family || SANS;
 }
 
 /**
@@ -73,6 +78,16 @@ export function labelWidth(label: string, font: string): number {
   const w = Math.ceil(canvas ? canvas.measureText(label).width : label.length * 7) + 1;
   known.set(label, w);
   return w;
+}
+
+/** `text`'s width in `font`, px, measured now (no cache: the top bar's runs, BL-136). */
+export function textWidth(font: string, text: string): number {
+  if (!canvas && typeof document !== "undefined") {
+    canvas = document.createElement("canvas").getContext("2d");
+  }
+  if (!canvas) return text.length * 7;
+  canvas.font = font;
+  return canvas.measureText(text).width;
 }
 
 /** Drops the measured widths. */

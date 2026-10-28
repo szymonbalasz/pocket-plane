@@ -26,10 +26,19 @@ import {
   GILT_LABEL_UPEM,
   giltLabelWidth,
   LAUNCHER_GUTTER,
+  LAUNCHER_MIN_ZONE,
   launcherMetrics,
 } from "./launcher-fit";
 import { createWindowRegistry, defineWindow } from "./registry";
 import { ShellProvider } from "./ShellContext";
+import {
+  ALEGREYA_ADVANCE,
+  ALEGREYA_UPEM,
+  alegreyaWeight,
+  giltTextWidth,
+  launcherRoom,
+  runExtra,
+} from "./topbar-room";
 
 const BODY = "ui-sans-serif, system-ui, sans-serif";
 /** Simple Dark's label font: what the launcher measures under every theme. */
@@ -314,5 +323,153 @@ describe("FR-THEME-07 BL-136 launcher labels fit at one theme-independent width"
     } finally {
       ADVANCE[FIXED] = 7;
     }
+  });
+});
+
+describe("FR-THEME-05 FR-KIT-14 BL-136 the launcher's room is the same under both themes", () => {
+  test("BL-136 the Alegreya Sans tables are the committed fonts' (400, 500, 700, U+0020–U+007E)", () => {
+    for (const w of [400, 500, 700] as const) {
+      const file = fileURLToPath(
+        new URL(`../../themes/fonts/alegreya-sans-${w}.latin.woff2`, import.meta.url),
+      );
+      const font = fontAdvances(file);
+      expect(ALEGREYA_UPEM).toBe(font.upem);
+      expect([...ALEGREYA_ADVANCE[w]]).toEqual(font.adv);
+    }
+    // CSS font matching among 400, 500, 700.
+    expect([300, 400, 450, 500, 600, 700, 900].map(alegreyaWeight)).toEqual([
+      400, 400, 500, 500, 700, 700, 700,
+    ]);
+  });
+
+  test("BL-136 a run's Gilt width: the title face is IM Fell (synthetic bold from 600), the rest Alegreya Sans", () => {
+    const units = [..."Ab"].reduce(
+      (n, c) => n + (GILT_LABEL_ADVANCE[c.charCodeAt(0) - 32] ?? 0),
+      0,
+    );
+    expect(giltTextWidth("Ab", "title", 400, 18)).toBeCloseTo((units * 18) / 2048 + 1);
+    expect(giltTextWidth("Ab", "title", 600, 18)).toBeCloseTo((units * 18) / 2048 + 2 * 0.75 + 1);
+    const body = [..."Ab"].reduce(
+      (n, c) => n + (ALEGREYA_ADVANCE[500][c.charCodeAt(0) - 32] ?? 0),
+      0,
+    );
+    expect(giltTextWidth("Ab", "body", 500, 13)).toBeCloseTo((body * 13) / 1000 + 1);
+  });
+
+  test("FR-THEME-05 FR-KIT-14 BL-136 the same room drawn under Simple Dark and Gilt & Stone: each run at its widest; never wider than the zone drawn", () => {
+    // Player 1's bar at 1440: campaign name (title face, 600 18px), "· playing as Player 1"
+    // (body, 12px), "Live" (body, 13px), the chip's name (body, 14px, max 160).
+    const texts = [
+      { text: "The Sunken Crown", px: 18, weight: 600, face: "title" as const, side: "left" },
+      { text: "· playing as Player 1", px: 12, weight: 400, face: "body" as const, side: "left" },
+      { text: "Live", px: 13, weight: 400, face: "body" as const, side: "right" },
+      { text: "Player 1", px: 14, weight: 400, face: "body" as const, side: "right", cap: 160 },
+    ];
+    // Gilt draws each run a little narrower than our estimate (kerning); Simple Dark's per-glyph
+    // width runs 6–9 px.
+    for (const sd of [6, 7.5, 9]) {
+      const bar = 1416;
+      const draw = (theme: "plain" | "gilt") => {
+        const runs = texts.map((t) => {
+          const plain = t.text.length * sd;
+          const gilt = giltTextWidth(t.text, t.face, t.weight, t.px) - 0.7;
+          return { ...t, plain, current: theme === "plain" ? plain : gilt };
+        });
+        const drawn = (side: string) =>
+          runs
+            .filter((r) => r.side === side)
+            .reduce((s, r) => s + Math.min(r.cap ?? Number.POSITIVE_INFINITY, r.current), 0);
+        const left = 20 + drawn("left");
+        const right = 120 + drawn("right");
+        const centre = bar - left - right;
+        const room = launcherRoom({
+          centre,
+          left,
+          leftCap: bar * 0.3,
+          leftTruncated: false,
+          leftRuns: runs.filter((r) => r.side === "left"),
+          rightRuns: runs.filter((r) => r.side === "right"),
+        });
+        expect(room).toBeLessThanOrEqual(centre);
+        return room;
+      };
+      expect(draw("gilt")).toBe(draw("plain"));
+    }
+  });
+
+  test("FR-KIT-14 BL-136 a title at its 30 % cap in either theme counts at the cap; a run in a capped box counts within its cap", () => {
+    const run = (current: number, plain: number) => ({
+      text: "M".repeat(30), // Gilt: about 531 px
+      px: 18,
+      weight: 600,
+      face: "title" as const,
+      current,
+      plain,
+    });
+    // Simple Dark draws it at 400 (no cut); Gilt needs more than the 420 cap.
+    const plain = launcherRoom({
+      centre: 600,
+      left: 400,
+      leftCap: 420,
+      leftTruncated: false,
+      leftRuns: [run(400, 400)],
+      rightRuns: [],
+    });
+    const gilt = launcherRoom({
+      centre: 580,
+      left: 420,
+      leftCap: 420,
+      leftTruncated: true,
+      leftRuns: [run(430, 400)],
+      rightRuns: [],
+    });
+    expect(plain).toBe(580);
+    expect(gilt).toBe(580);
+    expect(
+      runExtra({
+        text: "Name",
+        px: 14,
+        weight: 400,
+        face: "body",
+        current: 150,
+        plain: 170,
+        cap: 160,
+      }),
+    ).toBe(10);
+    // Never below the "⋯" trigger's zone.
+    expect(
+      launcherRoom({
+        centre: 90,
+        left: 100,
+        leftCap: 300,
+        leftTruncated: false,
+        leftRuns: [run(100, 300)],
+        rightRuns: [],
+      }),
+    ).toBe(LAUNCHER_MIN_ZONE);
+  });
+
+  test("FR-THEME-05 BL-136 gilt.css re-fonts the top bar only as `topBarRuns` assumes: the title zone in --font-title, `topbar-sub` and the chip in --font-body, no size, weight or spacing", () => {
+    const css = readFileSync(
+      fileURLToPath(new URL("../../themes/gilt.css", import.meta.url)),
+      "utf8",
+    ).replace(/\/\*[\s\S]*?\*\//g, "");
+    const found: string[] = [];
+    for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const sel = (m[1] ?? "").replace(/\s+/g, " ").trim();
+      if (!/topbar|ui-prefs-open|sync-connection|presence|identity/.test(sel)) continue;
+      for (const d of (m[2] ?? "").matchAll(
+        /(font[\w-]*|letter-spacing|word-spacing|text-transform)\s*:\s*([^;]+)/g,
+      )) {
+        const target = /ui-topbar-left|topbar-title|topbar-sub|ui-prefs-open/.exec(sel)?.[0] ?? sel;
+        found.push(`${target} ${d[1]}: ${d[2]?.trim()}`);
+      }
+    }
+    expect(found.sort()).toEqual([
+      "topbar-sub font-family: var(--font-body)",
+      "topbar-title font-family: var(--font-title)",
+      "ui-prefs-open font-family: var(--font-body)",
+      "ui-topbar-left font-family: var(--font-title)",
+    ]);
   });
 });
