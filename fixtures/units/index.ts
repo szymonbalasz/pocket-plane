@@ -135,6 +135,7 @@ import fireCard from "./spell-fx/fire-card";
 import moilRow from "./spell-fx/moil-row";
 import sgRow from "./spell-fx/sg-row";
 import vfxFight from "./spell-fx/vfx-fight";
+import vfxVisualAuras from "./spell-fx/vfx-visual-auras";
 import sbFightFacts from "./stats/sb-fight-facts";
 import sbLuckReroll from "./stats/sb-luck-reroll";
 import sbLuckRolls from "./stats/sb-luck-rolls";
@@ -322,4 +323,6 @@ export const units: readonly Fixture[] = [
   sgRow,
   moilRow,
   fireCard,
+  // Spell FX build (build/vfx): both auras on existing effects for the visual baselines
+  vfxVisualAuras,
 ];
