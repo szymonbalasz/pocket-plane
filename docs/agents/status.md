@@ -43,6 +43,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 14 F2 toasts | merged 6ce69034 | — | **merged** (walkthrough 9/9 `.verify/sprint14/walkthroughs/20261028-s14f2/`; check 763 targeted, area e2e 19/19, branch + main CI green) | — |
 | Sprint 14 F4 roll guard | `fix/s14-roll-guard` (w7Y, slot 3) | build-f14d, test-s14f4 | ready per #371 (CI green 772c823d after one flake re-run → BL-147) | walkthrough → merge |
 | Sprint 14 F3 kit nits | `fix/s14-kit` (w70, slot 0) | build-f14c | building | walkthrough |
+| Spell FX (VFX, #372) | — | — | spec in-review, merged 3939d353; ADR-0071 proposed | build slices after sprint 14: VFX core (`fix/vfx-core`: schema `effect.fx` / `spells[].fx` + data model, protocol hit cue + after-commit listener, scenes-map LAYER_ORDER, FX preset / hit look / CHARX spell-row action registries) → VFX build (renderers, Cast, Preferences, Layers, token menu) → §13 walkthrough. Core holds schema + protocol + CHARX locks: not alongside F3 (character-sheet) |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
