@@ -36,6 +36,8 @@ if (process.env.UPDATE_FAILING === "1") {
 // Sprint 11 F1 (BL-93): a return restores the work area its rect was set at, and a viewport grow
 // back skips a window placed at that very size (I7): 7 → 6; SP3's D3 fitted @1600×900 resize
 // passes, its exemption retired. None left.
+// Sprint 14 F1 (BL-134): K5's D3 fitted @1280×800 push passes (the push path's I7 keeps a zone a
+// drop gave back, FR-SHELL-149 / -159): 7 → 6.
 const EXEMPTIONS = new Map<string, string>();
 
 test("FR-SHELL-160 named exemptions are recorded failing cells (DM)", () => {
