@@ -8,7 +8,7 @@ import { CBT_INTENTS } from "@shared/combat-tracker/schemas";
 import type { Credential } from "@shared/protocol/frames";
 import { CampaignResult, type CampaignStats, STATS_QUERY_INTENT } from "@shared/stats/schemas";
 import { closeDb, type Db } from "../../db/client";
-import { combatant, player } from "../../db/schema";
+import { combatant, encounter, player } from "../../db/schema";
 import {
   startTestServer,
   TEST_SECRET,
@@ -16,12 +16,14 @@ import {
   type TestServer,
 } from "../../testing/harness";
 import { leaksIn } from "../combat-tracker/testing";
+import { statsMemory } from "./index";
 
 let h: TestServer;
 let db: Db;
 let cleanup: () => void;
 let tokens: Record<string, string>;
 let combatants: Record<string, string>;
+let campaignId: string;
 
 beforeAll(async () => {
   const loaded = await loadBundle("stats-b", { testMode: true, dmSecret: TEST_SECRET });
@@ -41,7 +43,9 @@ beforeAll(async () => {
       .all()
       .map((c) => [c.name, c.id]),
   );
-  h = await startTestServer({ db, testMode: true, fake: false });
+  campaignId = db.select().from(encounter).all()[0]?.campaignId as string;
+  // The manual clock (fix/test-hot-files): the rate window passes by advancing it, not by sleeping.
+  h = await startTestServer({ db, testMode: true });
 }, 60_000);
 
 afterAll(async () => {
@@ -58,8 +62,9 @@ const DM: Credential = { role: "dm", secret: TEST_SECRET };
 const P1 = (): Credential => ({ role: "player", token: tokens["Player 1"] as string });
 const P2 = (): Credential => ({ role: "player", token: tokens["Player 2"] as string });
 
-/** Past the per-viewer rate window (FR-STATS-16, -69) between rounds. */
+/** Past the per-viewer rate window (FR-STATS-16, -69) between rounds: the server clock moves on. */
 const RATE_WINDOW_MS = 1050;
+const nextWindow = () => h.timers.advance(RATE_WINDOW_MS);
 
 async function result(c: TestClient, name: string, payload: unknown): Promise<unknown> {
   const intentId = c.intent(name, payload);
@@ -72,12 +77,16 @@ async function result(c: TestClient, name: string, payload: unknown): Promise<un
   }
 }
 
-/** The campaign answer, re-asked 1 s apart (as the client) while the partials build. */
+/**
+ * The campaign answer, re-asked 1 s apart (as the client) while the partials build: on `pending`
+ * it waits for the background build (ADR-0062 §3), then the next rate window.
+ */
 async function campaign(c: TestClient): Promise<CampaignStats> {
   for (let i = 0; i < 10; i++) {
     const r = CampaignResult.parse(await result(c, STATS_QUERY_INTENT, { scope: "campaign" }));
     if (!("pending" in r.campaign)) return r.campaign;
-    await Bun.sleep(RATE_WINDOW_MS);
+    await statsMemory(h.s).partials.build(campaignId);
+    nextWindow();
   }
   throw new Error("partials never ready");
 }
@@ -112,7 +121,7 @@ const row = (c: CampaignStats, name: string) => c.rows.find((r) => r.name === na
 
 describe("stats Campaign tab over real sockets (stats-b)", () => {
   test("FR-STATS-86 leak scan per player: the campaign ack live, after reconnect, after a hidden kill and after a hard restart", async () => {
-    await Bun.sleep(RATE_WINDOW_MS);
+    nextWindow();
     const dm = await h.live(DM);
     const dmFirst = await campaign(dm);
     // The DM counts the hidden Captain / Goblin 2 kills, the Elite's hit and the hidden nat 20s.
@@ -133,13 +142,13 @@ describe("stats Campaign tab over real sockets (stats-b)", () => {
       ]);
       first[name] = answer;
       c.close();
-      await Bun.sleep(RATE_WINDOW_MS);
+      nextWindow();
       // Reconnect: the same answer, still clean.
       const again = await h.live(cred());
       expect(await campaign(again)).toEqual(answer);
       expect(leaksIn(acks(again), LEAKS)).toEqual([]);
       again.close();
-      await Bun.sleep(RATE_WINDOW_MS);
+      nextWindow();
     }
     expect(first["Player 1"]).toEqual(first["Player 2"] as CampaignStats);
 
@@ -151,7 +160,7 @@ describe("stats Campaign tab over real sockets (stats-b)", () => {
       public: true,
       sourceId: combatants.Thorn,
     });
-    await Bun.sleep(RATE_WINDOW_MS);
+    nextWindow();
     const dmAfter = await campaign(dm);
     expect([dmAfter.slain, row(dmAfter, "Thorn")?.dealt]).toEqual([
       10,
@@ -167,7 +176,7 @@ describe("stats Campaign tab over real sockets (stats-b)", () => {
 
     // Hard kill → the same numbers: nothing stored; the restart rebuilds the partials.
     await h.restart();
-    await Bun.sleep(RATE_WINDOW_MS);
+    nextWindow();
     const after = await h.live(P2());
     expect(await campaign(after)).toEqual(first["Player 1"] as CampaignStats);
     expect(leaksIn(acks(after), LEAKS)).toEqual([]);

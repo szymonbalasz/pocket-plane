@@ -26,6 +26,8 @@ import { TEST_SECRET } from "../../testing/services";
 import { ROLL } from "../dice-roll-log/commands";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
+/** The server under test (its manual clock paces the stats queries). */
+let server: TestServer;
 
 const barrier = async (c: TestClient) => {
   c.send({ type: "ping" });
@@ -36,11 +38,11 @@ const all = <T>(c: TestClient, type: string) => Object.values(c.store.records[ty
 /**
  * One intent → its ack's result (rejects fail the test). Stats queries keep under the per-viewer
  * rate (FR-STATS-16: ≤ 4 / s; over it a memo answers, possibly an older one), and a `conflict`
- * asks again 1 s later (FR-STATS-69).
+ * asks again 1 s later (FR-STATS-69). Both gaps on the server's manual clock (no real waiting).
  */
 async function ask<R>(c: TestClient, name: string, payload: unknown): Promise<R> {
   for (;;) {
-    if (name === STATS_QUERY_INTENT) await Bun.sleep(260);
+    if (name === STATS_QUERY_INTENT) server.timers.advance(260);
     const id = c.intent(name, payload);
     for (;;) {
       const f = await c.next(undefined, 3000);
@@ -51,7 +53,7 @@ async function ask<R>(c: TestClient, name: string, payload: unknown): Promise<R>
         throw new Error(JSON.stringify(f));
       }
     }
-    await Bun.sleep(1100);
+    server.timers.advance(1100);
   }
 }
 
@@ -89,7 +91,9 @@ describe("BL-121 stats awards over WS (stats)", () => {
         .all()
         .map((r) => [r.name, r.token]),
     );
-    h = await startTestServer({ db, fake: false });
+    // The manual clock (fix/test-hot-files): the rate gaps pass by advancing it, not by sleeping.
+    h = await startTestServer({ db });
+    server = h;
   });
 
   afterAll(async () => {
