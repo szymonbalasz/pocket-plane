@@ -7,14 +7,16 @@
 //
 // The creature a roll is made as, from its `roll` row:
 // - actor `token` → that token.
-// - actor `entity` (a definition id): the entry's (else the started) encounter's combatants of
-//   that entity carrying the roll's actor name (combat paths, `dice.roll {combatantId}`); else
-//   the campaign's tokens of it carrying that name; else, for a definition roll (the stat block,
-//   the NPC sheet), **every** instance: it may be made for any of them (K7 walkthrough F1).
+// - actor `entity` (a definition id): on a combat path (the entry names its encounter) or under a
+//   combatant's own name (`dice.roll {combatantId}`, "Goblin 2"), the encounter's combatants of
+//   that entity carrying the roll's actor name; else the campaign's tokens of it carrying that
+//   name; else, for a definition roll (the stat block, the NPC sheet, a raw `{entityId}`),
+//   **every** instance, combatants and tokens: it may be made for any of them (K7 F1, F4 F1).
 //
 // Hidden (#371) = the existing visibility rules on the players' shown scene: a combatant per
-// `combatantVisibility`; a token on the active scene hidden for any player (`tokenHiddenFor`:
-// `hidden` or fog). A token on a scene players aren't shown never hides a roll (rolls-1).
+// `combatantVisibility`, or its token hidden; a token on the active scene hidden for any player
+// (`tokenHiddenFor`: `hidden` or fog, per player). A token on a scene players aren't shown never
+// hides a roll (rolls-1).
 // Renamed = the name minus a numbering suffix (FR-MAP-16, "Goblin 2") isn't the definition's
 // name; a player-owned companion is never renamed (its owner named it, players know it).
 
@@ -45,6 +47,8 @@ interface Scope {
   env: CommandEnv;
   cid: string;
   encounterId: string | null;
+  /** The entry names its encounter: a combat path, whose actor is that fight's combatant. */
+  combatPath: boolean;
   playerIds: string[] | null;
   activeSceneId: string | null | undefined;
 }
@@ -73,10 +77,14 @@ function tokenGuarded(s: Scope, t: TokenRow, defName: string | null): boolean {
   return playersOf(s).some((pid) => tokenHiddenFor(rec, pid, s.cid));
 }
 
-function combatantGuarded(c: CombatantRow, defName: string | null): boolean {
+/** Hidden (combat's rule, or its token's on the shown scene: fog per player, F4 F1) or renamed. */
+function combatantGuarded(s: Scope, c: CombatantRow, defName: string | null): boolean {
   if (c.kind !== "monster") return false;
   if (defName !== null && c.ownerPlayerId === null && !numberedFrom(c.name, defName)) return true;
-  return combatantVisibility(toCombatantRecord(c)) === "hidden";
+  if (combatantVisibility(toCombatantRecord(c)) === "hidden") return true;
+  if (!c.tokenId) return false;
+  const t = s.env.tx.select().from(token).where(eq(token.id, c.tokenId)).get();
+  return t ? tokenGuarded(s, t, defName) : false;
 }
 
 function definitionName(s: Scope, id: string | null): { name: string; monster: boolean } | null {
@@ -110,7 +118,9 @@ function entityActorGuarded(s: Scope, entityId: string, actorName: string): bool
         .all()
     : [];
   const named = fighters.filter((c) => c.name === actorName);
-  if (named.length > 0) return named.some((c) => combatantGuarded(c, def.name));
+  if (named.length > 0 && (s.combatPath || actorName !== def.name)) {
+    return named.some((c) => combatantGuarded(s, c, def.name));
+  }
   const tokens = s.env.tx
     .select()
     .from(token)
@@ -123,7 +133,7 @@ function entityActorGuarded(s: Scope, entityId: string, actorName: string): bool
   // A definition roll (or a name no instance carries): any of its creatures.
   return (
     !numberedFrom(actorName, def.name) ||
-    fighters.some((c) => combatantGuarded(c, def.name)) ||
+    fighters.some((c) => combatantGuarded(s, c, def.name)) ||
     tokens.some((t) => tokenGuarded(s, t, def.name))
   );
 }
@@ -148,6 +158,7 @@ export function rollGuarded(
     env,
     cid,
     encounterId: encounterId ?? startedEncounter(env.tx, cid)?.id ?? null,
+    combatPath: Boolean(encounterId),
     playerIds: null,
     activeSceneId: undefined,
   };

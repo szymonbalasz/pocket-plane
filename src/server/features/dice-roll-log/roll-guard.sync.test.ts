@@ -87,9 +87,6 @@ describe("FR-DICE-13 roll guard over sockets (kit-parity, #367)", () => {
       true,
       true,
     ]);
-    // Renamed: Goblin 2 → "Big Bob" (shown); both: the hidden Wolf → "Shadow".
-    await send("map.updateToken", { tokenId: goblin2.id, name: "Big Bob" });
-    await send("map.updateToken", { tokenId: wolf.id, name: "Shadow" });
     const fighter = (tokenId: string) =>
       db
         .select()
@@ -131,6 +128,10 @@ describe("FR-DICE-13 roll guard over sockets (kit-parity, #367)", () => {
       await roll("GUARD-PUB-DEF", { entityId: goblin.definitionId }),
       await save(goblinC?.id),
     ];
+    // Renamed (after the shown rolls: a definition roll checks every instance, pick 1): Goblin 2
+    // → "Big Bob" (shown); both: the hidden Wolf → "Shadow".
+    await send("map.updateToken", { tokenId: goblin2.id, name: "Big Bob" });
+    await send("map.updateToken", { tokenId: wolf.id, name: "Shadow" });
     const secret: string[] = [];
     for (const extra of [{}, { public: true }]) {
       // Hidden.
@@ -173,6 +174,114 @@ describe("FR-DICE-13 roll guard over sockets (kit-parity, #367)", () => {
         expect({ who, leak, hit: raw.includes(leak) }).toEqual({ who, leak, hit: false });
       for (const pos of positives)
         expect({ who, pos, hit: raw.includes(pos) }).toEqual({ who, pos, hit: true });
+      c.close();
+    }
+  }, 60_000);
+});
+
+describe("FR-DICE-13 roll guard over sockets: walkthrough F1 (kit-parity, #371)", () => {
+  let h: TestServer;
+  let db: Db;
+  let dir: string;
+  let tokens: Record<string, string>;
+  const p = (name: string) => ({ role: "player" as const, token: tokens[name] as string });
+
+  beforeAll(async () => {
+    const loaded = await loadBundle("kit-parity", { dmSecret: TEST_SECRET, testMode: true });
+    dir = loaded.dir;
+    db = openFileDb(loaded.config.dbPath);
+    tokens = Object.fromEntries(
+      db
+        .select({ name: player.name, token: player.linkToken })
+        .from(player)
+        .all()
+        .map((r) => [r.name, r.token]),
+    );
+    h = await startTestServer({ db, fake: false });
+  });
+
+  afterAll(async () => {
+    await h.stop();
+    closeDb(db);
+    try {
+      rmSync(dir, { recursive: true, force: true });
+    } catch {
+      // Windows may hold the WAL briefly; a leftover temp dir is harmless.
+    }
+  });
+
+  test("FR-DICE-13 #371 the Goblin fogged for Player 2 only (Fog all + a wall on y = 9, x 3–14): its Initiative save and definition attack / damage reach no player (frames, reconnect)", async () => {
+    const dm = await h.live(DM);
+    const send = async (name: string, input: unknown) =>
+      (await ack(dm, dm.intent(name, input))).result as { entryId?: string };
+    for (const category of ["attack", "damage", "saving-throw"]) {
+      await send("dice.setCategoryPublic", { category, public: true });
+    }
+    const ambush = db.select().from(scene).where(eq(scene.name, "Goblin Ambush")).get();
+    await send("map.activateScene", { sceneId: ambush?.id });
+    await send("fog.setAll", { sceneId: ambush?.id, fogged: true });
+    await send("scn.addWalls", { sceneId: ambush?.id, segments: [[3, 9, 14, 9]] });
+    const goblin = db
+      .select()
+      .from(token)
+      .where(and(eq(token.sceneId, ambush?.id ?? ""), eq(token.name, "Goblin")))
+      .get();
+    const ids = Object.fromEntries(
+      db
+        .select({ name: player.name, id: player.id })
+        .from(player)
+        .all()
+        .map((r) => [r.name, r.id]),
+    );
+    // The walkthrough's state: Player 1 sees the Goblin, Player 2 doesn't.
+    expect(goblin?.seenBy).toContain(ids["Player 1"]);
+    expect(goblin?.seenBy).not.toContain(ids["Player 2"]);
+    const goblinC = all<CombatantRecord>(dm, COMBATANT_TYPE).find(
+      (c) => c.tokenId === goblin?.id && !c.removed,
+    );
+    expect(goblinC?.hidden).toBe(false);
+
+    const p1 = await h.live(p("Player 1"));
+    const p2 = await h.live(p("Player 2"));
+    const marks = [p1.raw().length, p2.raw().length];
+    const secret = [
+      (
+        await send("cbt.rollAbility", {
+          combatantId: goblinC?.id,
+          kind: "save",
+          ability: "dex",
+          public: true,
+        })
+      ).entryId as string,
+    ];
+    for (const category of ["attack", "damage"]) {
+      const r = await send("dice.roll", {
+        expression: "1d20+4",
+        category,
+        label: `F1-FOGGED-DEF-${category}`,
+        actor: { entityId: goblin?.definitionId },
+      });
+      secret.push(r.entryId as string);
+    }
+    const dmEntries = all<GameLogEntryRecord>(dm, GAME_LOG_ENTRY_TYPE);
+    expect(secret.map((id) => dmEntries.find((e) => e.id === id)?.public)).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    const leaks = ["F1-FOGGED-DEF", ...secret];
+    for (const [i, c] of [p1, p2].entries()) {
+      await barrier(c);
+      const since = c.raw().slice(marks[i]);
+      for (const leak of leaks)
+        expect({ i, leak, hit: since.includes(leak) }).toEqual({ i, leak, hit: false });
+    }
+    for (const c of [dm, p1, p2]) c.close();
+    for (const who of ["Player 1", "Player 2"]) {
+      const c = await h.live(p(who));
+      const raw = c.raw();
+      for (const leak of leaks)
+        expect({ who, leak, hit: raw.includes(leak) }).toEqual({ who, leak, hit: false });
       c.close();
     }
   }, 60_000);

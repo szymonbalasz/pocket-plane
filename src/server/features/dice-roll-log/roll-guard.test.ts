@@ -5,6 +5,8 @@
 import { describe, expect, test } from "bun:test";
 import { CBT_INTENTS } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryRecord } from "@shared/dice-roll-log/schemas";
+import { FOG_INTENTS } from "@shared/fog-of-war/schemas";
+import { SCN_INTENTS } from "@shared/scene-tools/schemas";
 import { MAP_INTENTS } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { combatant, gameLogEntry, scene, token } from "../../db/schema";
@@ -199,6 +201,33 @@ describe("FR-DICE-13 roll guard (#367)", () => {
     // Renamed back (a numbered name is no rename): public again.
     t.rename(t.tokens.goblin, "Goblin 3");
     t.check(t.roll({ tokenId: t.tokens.goblin }), true);
+  });
+
+  test("FR-DICE-13 #371 walkthrough F1: a fight's Goblin fogged for Player 2 only (Fog all + a wall on y = 9, x 3–14): its combatant save and its definition rolls are DM-only", () => {
+    const t = setup();
+    t.run(FOG_INTENTS.setAll, { sceneId: t.sceneId, fogged: true });
+    t.run(SCN_INTENTS.addWalls, { sceneId: t.sceneId, segments: [[3, 9, 14, 9]] });
+    const seenBy = (id: string) =>
+      t.s.db.select({ s: token.seenBy }).from(token).where(eq(token.id, id)).get()?.s ?? [];
+    // The walkthrough's state: Player 1 still sees the Goblin, Player 2 doesn't; the combatant
+    // stays visible (combat hides it only when no player sees it).
+    expect(seenBy(t.tokens.goblin)).toContain(t.h.p1.id);
+    expect(seenBy(t.tokens.goblin)).not.toContain(t.h.p2.id);
+    const goblin = t.cbt("Goblin");
+    expect(t.s.db.select().from(combatant).where(eq(combatant.id, goblin.id)).get()?.hidden).toBe(
+      false,
+    );
+    for (const extra of [{}, { public: true }]) {
+      t.check(t.roll({ tokenId: t.tokens.goblin }, extra), false);
+      t.check(t.roll({ combatantId: goblin.id }, extra), false);
+      t.check(t.roll({ entityId: t.h.goblinId }, extra), false);
+      t.check(t.roll({ entityId: t.h.goblinId }, { ...extra, category: "damage" }), false);
+    }
+    t.check(t.save(goblin.id, { public: true }), false);
+    // Fog lifted: public again.
+    t.run(FOG_INTENTS.setAll, { sceneId: t.sceneId, fogged: false });
+    t.check(t.save(goblin.id, { public: true }), true);
+    t.check(t.roll({ entityId: t.h.goblinId }), true);
   });
 
   test("FR-DICE-13 hidden and renamed creature: DM-only", () => {
