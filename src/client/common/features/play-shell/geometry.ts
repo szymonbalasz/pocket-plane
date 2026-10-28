@@ -267,9 +267,15 @@ export function windowRects<W extends Rect & Flags & { fixedH?: true | undefined
   );
 }
 
-/** Title-bar drag from `start` (the rendered rect) by (dx, dy); result clamped. */
+/**
+ * Title-bar drag from `start` (the rendered rect) by (dx, dy); result clamped (FR-SHELL-12), and
+ * no lower than the work area's bottom edge, so the bottom resize grips stay reachable (BL-133);
+ * a window taller than the work area keeps its title bar at the top.
+ */
 export function moveRect(start: Rect, dx: number, dy: number, vp: Viewport): Rect {
-  return clampRect({ ...start, x: start.x + dx, y: start.y + dy }, vp);
+  const r = clampRect({ ...start, x: start.x + dx, y: start.y + dy }, vp);
+  const lowest = Math.max(TOP_BAR_H, vp.h - LAUNCHER_CLEAR - r.h);
+  return r.y > lowest ? { ...r, y: lowest } : r;
 }
 
 export type ResizeEdge = "e" | "w" | "s" | "se" | "sw";
