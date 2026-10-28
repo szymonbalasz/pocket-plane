@@ -50,6 +50,37 @@ export const LAUNCHER_MIN_ZONE = 2 * LAUNCHER_GUTTER + 2 * 4 + 2 * 1 + 40;
 const ICON_BUTTON_W = 40;
 const LABEL_GAP = 6;
 
+/** Label type size, px (`LAUNCHER_FONT`: `text-xs`). */
+export const LABEL_PX = 12;
+
+/**
+ * BL-136 (FR-THEME-05): Gilt & Stone's label face (`--font-label`, weight 400), its
+ * advance per character U+0020–U+007E in font units (`GILT_LABEL_UPEM` per em), read off the
+ * committed `themes/fonts/im-fell-english-sc-400.latin.woff2` (test `BL-136 the Gilt label table
+ * is the committed font's`). A table, not a canvas measure: the face downloads only while Gilt &
+ * Stone is on (FR-THEME-16), so a measure would differ by theme.
+ */
+export const GILT_LABEL_UPEM = 2048;
+export const GILT_LABEL_ADVANCE: readonly number[] = [
+  439, 558, 1018, 1644, 1134, 1529, 1536, 558, 532, 526, 1010, 1153, 541, 951, 441, 696, 1004, 753,
+  958, 761, 999, 744, 862, 948, 804, 892, 534, 566, 1116, 931, 1114, 740, 1540, 1380, 1351, 1465,
+  1643, 1418, 1301, 1630, 1756, 880, 831, 1479, 1457, 1926, 1766, 1695, 1184, 1678, 1544, 1050,
+  1495, 1729, 1343, 1957, 1655, 1394, 1456, 866, 589, 915, 964, 966, 1071, 895, 858, 999, 1073, 939,
+  848, 1016, 1189, 625, 612, 1047, 888, 1409, 1150, 1103, 879, 1151, 989, 712, 1049, 1149, 917,
+  1282, 971, 916, 933, 839, 496, 844, 1120,
+];
+
+/**
+ * A label's width in Gilt & Stone's label face, px (no kerning: never narrower than drawn); a
+ * character outside the table counts as the widest one.
+ */
+export function giltLabelWidth(label: string): number {
+  const widest = Math.max(...GILT_LABEL_ADVANCE);
+  let units = 0;
+  for (const ch of label) units += GILT_LABEL_ADVANCE[(ch.codePointAt(0) ?? 0) - 32] ?? widest;
+  return Math.ceil((units * LABEL_PX) / GILT_LABEL_UPEM) + 1;
+}
+
 /** The launcher's metrics, given each kind's label and a label width measure (px). */
 export function launcherMetrics(
   labels: ReadonlyMap<string, string>,

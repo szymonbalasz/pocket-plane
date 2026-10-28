@@ -5,7 +5,7 @@
 // (`launcher-fit.ts`), which opens downward.
 import { EllipsisIcon } from "lucide-react";
 import { DropdownMenu as M } from "radix-ui";
-import { type RefObject, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { POPOVER_LAYER } from "../../components/ui/layers";
 import { Tooltip } from "../../components/ui/overlays";
@@ -15,7 +15,13 @@ import { useActivityDots } from "./activity";
 import { badgeText, useBadgeVersion } from "./badges";
 import type { Viewport } from "./geometry";
 import { SHELL_ZONE_ATTR } from "./keys";
-import { fitLauncher, type LauncherFit, launcherMetrics } from "./launcher-fit";
+import {
+  fitLauncher,
+  giltLabelWidth,
+  LABEL_PX,
+  type LauncherFit,
+  launcherMetrics,
+} from "./launcher-fit";
 import { launcherState, launcherTooltip, type WindowAction, type Windows } from "./manager";
 import type { WindowDef } from "./registry";
 import { useShellState } from "./ShellContext";
@@ -25,30 +31,30 @@ let canvas: CanvasRenderingContext2D | null = null;
 const widths = new Map<string, Map<string, number>>();
 /** Bumped when the widths are dropped, so the bar re-fits. */
 let widthsGen = 0;
-/** The last font read off a rendered launcher button; a remount starts from it. */
-let lastFont: string | null = null;
+
+/** Tailwind's sans stack: `--font-sans` when `<html>` doesn't give it. */
+const SANS = "ui-sans-serif, system-ui, sans-serif";
 
 /**
- * The font launcher labels render in (FR-THEME-07): the computed weight, size and family of a
- * rendered launcher button (`text-xs font-medium`; the label inherits it), so a theme's font is
- * what gets measured. `nav` = the launcher; null before it mounts.
+ * The font Simple Dark draws launcher labels in (`text-xs font-medium`, the Default body family
+ * `--font-sans`), read off `<html>`: the same under every theme (BL-136, FR-THEME-05; amends
+ * FR-THEME-07's computed button font, which changed with the theme).
  */
-export function launcherFont(nav: ParentNode | null): string | null {
-  const button =
-    nav?.querySelector('[data-testid="ui-launcher-button"]') ??
-    nav?.querySelector('[data-testid="ui-launcher-menu"]');
-  if (!button) return null;
-  const s = getComputedStyle(button);
-  return `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`;
+export function launcherFont(): string {
+  const root = typeof document !== "undefined" ? document.documentElement : undefined;
+  const family =
+    typeof getComputedStyle === "function" && root
+      ? getComputedStyle(root).getPropertyValue("--font-sans").trim()
+      : "";
+  return `500 ${LABEL_PX}px ${family || SANS}`;
 }
 
-/** Before the first button renders: today's launcher label font. */
-function fallbackFont(): string {
-  const family =
-    typeof getComputedStyle === "function" && typeof document !== "undefined" && document.body
-      ? getComputedStyle(document.body).fontFamily
-      : "";
-  return `500 12px ${family}`;
+/**
+ * The width the launcher fits a label at, px: the wider of Simple Dark's font (measured) and
+ * Gilt & Stone's label face (its committed table), so both themes get the same bar (BL-136).
+ */
+export function fitLabelWidth(label: string, font: string): number {
+  return Math.max(labelWidth(label, font), giltLabelWidth(label));
 }
 
 /** Rendered width of a launcher label in `font`, px, measured once per font and label. */
@@ -94,32 +100,19 @@ export function remeasureLabelWidths(): boolean {
 }
 
 /**
- * FR-THEME-07: the launcher's label font, read after each mount, when `<html>`'s attributes change
- * (a theme switch) and when web fonts finish loading. A change re-fits before paint.
+ * The launcher's measure font (`launcherFont`), read at mount; labels are measured again when web
+ * fonts finish loading (a re-fit only if a width changed). A theme switch changes nothing (BL-136).
  */
-function useLauncherFont(nav: RefObject<HTMLElement | null>): string {
-  const [font, setFont] = useState(() => lastFont ?? fallbackFont());
+function useLauncherFont(): string {
+  const [font] = useState(launcherFont);
   const [, setLoaded] = useState(0);
   useLayoutEffect(() => {
-    const measure = () => {
-      const f = launcherFont(nav.current);
-      if (f === null) return;
-      lastFont = f;
-      setFont(f);
-    };
-    measure();
-    const observer = new MutationObserver(measure);
-    observer.observe(document.documentElement, { attributes: true });
     const loaded = () => {
       if (remeasureLabelWidths()) setLoaded((n) => n + 1);
-      measure();
     };
     document.fonts?.addEventListener("loadingdone", loaded);
-    return () => {
-      observer.disconnect();
-      document.fonts?.removeEventListener("loadingdone", loaded);
-    };
-  }, [nav]);
+    return () => document.fonts?.removeEventListener("loadingdone", loaded);
+  }, []);
   return font;
 }
 
@@ -144,8 +137,7 @@ export function Launcher({
   const layoutKey = useShellState((s) => s.key);
   useBadgeVersion(); // re-render on `refreshBadges()`
   const dots = useActivityDots(windows);
-  const navRef = useRef<HTMLElement | null>(null);
-  const font = useLauncherFont(navRef);
+  const font = useLauncherFont();
   const entries = defs
     .filter((d) => d.launcher)
     .sort((a, b) => (a.launcher?.order ?? 0) - (b.launcher?.order ?? 0));
@@ -156,8 +148,8 @@ export function Launcher({
   }));
   // Recomputed when its zone's width changes (a viewport resize, the title or status changing
   // width), on availability change and layout restore only (FR-SHELL-43): opening a window from
-  // the menu leaves it there until then. Label widths: measured once each per font; a new font
-  // (FR-THEME-07: theme switch) or new label widths (a web font loaded) re-fit too.
+  // the menu leaves it there until then. Label widths: measured once each (BL-136: the same under
+  // every theme); new label widths (a web font loaded) re-fit too.
   const zone = room ?? viewport.w;
   const labels = new Map(entries.map((d) => [d.kind, d.launcher?.label ?? ""]));
   const fitKey = `${zone}|${layoutKey}|${[...labels].join(",")}|${font}|${widthsGen}`;
@@ -166,7 +158,7 @@ export function Launcher({
     const fit = fitLauncher(
       items,
       zone,
-      launcherMetrics(labels, (l) => labelWidth(l, font)),
+      launcherMetrics(labels, (l) => fitLabelWidth(l, font)),
     );
     fitRef.current = { key: fitKey, fit };
   }
@@ -176,7 +168,6 @@ export function Launcher({
   const overflow = entries.filter((d) => !inBar.has(d.kind));
   return (
     <nav
-      ref={navRef}
       {...{ [SHELL_ZONE_ATTR]: "launcher" }}
       data-testid="ui-launcher"
       data-compact={fit.compact}
