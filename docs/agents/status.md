@@ -45,7 +45,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 14 F3 kit nits | merged 9801a94f | — | **merged** (walkthrough 5/6 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f3{,r}/`; 4 baselines refreshed on purpose; protocol §180) | — |
 | Spell FX core (#374) | merged a09fef12 | — | **merged** (raw-intent walkthrough 8/9: cue size → budget 480 B worst case, typical 307 B; CI green; registries recorded in AGENTS §9.9) | — |
 | Spell FX build (#374) | merged 450f4df2 | — | **merged** (§13 walkthrough 12/12 `.verify/sprint14/walkthroughs/20261028-vfx/`; frame median 1.3 ms at 11 tokens; baselines refreshed; BL-151 toast over the sheet's End button) | — |
-| AoE cell origin (#375, #377) | `fix/aoe-cell-origin` (w84, slot 0) | build-aoecell | reworking for #377; **lock: DB schema (aoe template origin-square count) + protocol scn.template / intents**; driven by the other orchestrator session (pane wR:p13), left to it | walkthrough → merge |
+| AoE cell origin (#375, #377) | merged | — | **merged** (walkthrough 9/9 `.verify/sprint15/walkthroughs/20261028-aoecell/`; +14 B per snapped sphere; schema + protocol lock released) | — |
 | Agent / MCP API spec (#378) | merged to main 3219f89c (`spec/agent-api` worktree kept for revisions) | spec-agent-api (idle) | **at DM gate**: spec in-review (18 + 1 tools, 5 slices), review B1–B5 fixed in rev 1; proposed ADR agent-mcp-server D1–D6 | DM: OQ-AGENT-01 SDK, -11 ADR, -02 drop importer, -08/-09/-12 → apply, set complete, number ADR → build slices |
 | Map effects default Full (#376) | merged | — | **merged** (check + spell-fx / prefs-window e2e green; CI green after a BL-147 re-run) | — |
 

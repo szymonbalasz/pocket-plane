@@ -157,6 +157,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-150 | Attack rows show no property chips (K6c gap 5): attack rows hold no range / properties. Add an optional properties field on attacks, filled from SRD weapons on add, shown as chips in the wide sheet and the stat block | M | character-sheet attack rows, SRD weapons, compendium add | CHARX row note | character-sheet branches | open |
 | BL-151 | A player's sticky pending toast (Thorn's concentration save) covers the sheet's Cast / End button on that player's screen (VFX walkthrough 2026-10-28, `.verify/sprint14/walkthroughs/20261028-vfx/report.md`): the player stack should keep off the sheet's row buttons like FR-NOTE-76..79 do for the DM | S | notifications player stack keep-outs | none | toast branches | open |
 | BL-152 | A viewport resize costs ~0.2 s per page (≈0.7 s at 6× CPU throttle): mostly a whole-frame React re-render plus the settle timer; harmless in play, but CI's software rendering stalls 4–7 s after a resize (BL-148). Memoise the frame so a resize re-renders only what moves | S | play-shell frame render | none | frame branches | open |
+| BL-153 | The AoE "N squares" label can sit under a big token or under the "Free" chip (AoE cell-origin walkthrough, `.verify/sprint15/walkthroughs/20261028-aoecell/`): keep the label clear of tokens and the chip | S | scene-tools AoE tool label | none | — | open |
 
 ## How to add items
 
