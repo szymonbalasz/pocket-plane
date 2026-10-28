@@ -5,6 +5,7 @@ import { colorSection } from "@ui/features/campaign-management/ColorSection";
 import { diceSection } from "@ui/features/dice-extras/DiceSection";
 import { layoutSection, type PrefSection } from "@ui/features/play-shell/PreferencesWindow";
 import { keyboardSection } from "@ui/features/play-shell/palette/KeyboardSection";
+import { vfxPrefSection } from "@ui/features/spell-fx/PrefsSection";
 import { statsPrefSection } from "@ui/features/stats/PrefsSection";
 import { appearanceSection } from "@ui/themes/AppearanceSection";
 import { accountSection } from "./features/campaign-management/AccountSection";
@@ -17,4 +18,5 @@ export const dmPrefSections: readonly PrefSection[] = [
   statsPrefSection, // stats.prefs "Stats", 40 (stats, FR-STATS-30, -34)
   keyboardSection, // shell.keys "Keyboard", 70 (play-shell, FR-SHELL-193)
   appearanceSection, // theme.appearance "Appearance", 15 (theme-system, FR-THEME-02)
+  vfxPrefSection, // vfx.level "Map effects", 35 (spell-fx, FR-VFX-25)
 ];

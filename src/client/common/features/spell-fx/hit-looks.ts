@@ -4,6 +4,7 @@
 // requires every key). A look draws on the `vfx-over` pass within 1.6 × the token's footprint,
 // lasts 0.4–1.4 s, and is subtle: no screen flash, no camera move.
 import type { HitLookKey } from "@shared/spell-fx/cue";
+import { LOOKS } from "./looks";
 
 /** What a look draws from: the target's drawn box, the aim, the cue's PRNG seed and scale. */
 export interface HitLookFrame {
@@ -29,4 +30,21 @@ export interface HitLook {
   draw(ctx: CanvasRenderingContext2D, f: HitLookFrame): void;
 }
 
-export const hitLooks: Partial<Record<HitLookKey, HitLook>> = {};
+export const hitLooks: Partial<Record<HitLookKey, HitLook>> = {
+  acid: LOOKS.acid, // spell-fx build (VFX §7.2)
+  bludgeoning: LOOKS.bludgeoning,
+  cold: LOOKS.cold,
+  fire: LOOKS.fire,
+  force: LOOKS.force,
+  lightning: LOOKS.lightning,
+  necrotic: LOOKS.necrotic,
+  piercing: LOOKS.piercing,
+  poison: LOOKS.poison,
+  psychic: LOOKS.psychic,
+  radiant: LOOKS.radiant,
+  slashing: LOOKS.slashing,
+  thunder: LOOKS.thunder,
+  healing: LOOKS.healing,
+  untyped: LOOKS.untyped,
+  glance: LOOKS.glance,
+};

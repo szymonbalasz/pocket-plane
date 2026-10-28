@@ -10,6 +10,7 @@ import { modTokenMenu } from "../effect-modifiers/token-menu-entries";
 import { statBlockDoubleClick } from "../entities/statblock/openers";
 import { entTokenMenu } from "../entities/token-menu-entries";
 import { fogTokenMenu } from "../fog-of-war/token-menu-entries";
+import { vfxTokenMenu } from "../spell-fx/token-menu-entries";
 import { scenesMapTokenMenu } from "./token-menu-entries";
 
 export interface TokenMenuItemProps {
@@ -52,6 +53,7 @@ export const tokenMenuEntries: readonly TokenMenuEntry[] = [
   ...fogTokenMenu, // fog-of-war: Invisible (FR-FOG-47, #210)
   ...cmpTokenMenu, // compendium: Stat block (FR-CMP-22)
   ...entTokenMenu, // entities: Art ▸ Creature type / Initials (FR-ENT-28)
+  ...vfxTokenMenu, // spell-fx: Show / Hide affected cells (FR-VFX-23)
 ];
 
 /** Token double-click: the first available entry by order runs. Append your feature's line. */
