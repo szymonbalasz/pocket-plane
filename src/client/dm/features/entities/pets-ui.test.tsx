@@ -199,6 +199,23 @@ describe("FR-ENT-39 Creatures window", () => {
     }
   });
 
+  test("FR-KIT-84 BL-138 Creatures Derive / Edit: each icon button carries its Tooltip like Sheet", () => {
+    const g = globalThis as { document?: unknown };
+    g.document = { title: "", hidden: false, documentElement: {} };
+    let html = "";
+    try {
+      html = render(records, creatureActions, true);
+    } finally {
+      delete g.document;
+    }
+    const monsters = records.filter((r) => r.kind === "monster").length;
+    for (const id of ["cbt-form-derive", "cbt-form-edit", "charx-open-sheet"]) {
+      const tags = [...html.matchAll(new RegExp(`<button[^>]*data-testid="${id}"[^>]*>`, "g"))];
+      expect(tags.length).toBeGreaterThanOrEqual(id === "charx-open-sheet" ? 1 : monsters);
+      for (const [tag] of tags) expect(tag).toContain("data-tip");
+    }
+  });
+
   test("FR-ENT-43 no Make pet on a pet: a pet row reads Copy as a new pet…; a monster row Make pet…", () => {
     const html = render(records);
     expect(html).toMatch(

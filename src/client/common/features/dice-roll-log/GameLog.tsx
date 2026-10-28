@@ -53,7 +53,6 @@ import {
   EyeOffIcon,
   HandIcon,
 } from "lucide-react";
-import { Select as SelectPrimitive } from "radix-ui";
 import {
   type ClipboardEvent,
   type ComponentProps,
@@ -71,7 +70,9 @@ import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/contro
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   Tooltip,
@@ -112,20 +113,6 @@ import { RollButton, type RollKeys, useRollControl } from "./roll-control";
 
 /** K8: the roll bar's Select triggers, as small as the native selects were. */
 const SELECT = "h-7 min-w-0 shrink-0 gap-1 px-1.5 py-0 text-xs [&>span]:truncate";
-
-/** K8: a section of the roll-as Select (Radix's group + label; the shared menu label's look). */
-function SelectGroup(props: ComponentProps<typeof SelectPrimitive.Group>) {
-  return <SelectPrimitive.Group data-slot="select-group" {...props} />;
-}
-function SelectLabel(props: ComponentProps<typeof SelectPrimitive.Label>) {
-  return (
-    <SelectPrimitive.Label
-      data-slot="select-label"
-      className="px-2 py-1.5 text-xs font-medium text-muted-foreground"
-      {...props}
-    />
-  );
-}
 
 function Segment({
   s,

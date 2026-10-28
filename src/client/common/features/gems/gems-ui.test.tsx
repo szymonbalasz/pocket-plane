@@ -301,6 +301,9 @@ describe("FR-CAMP-43 party gem counts", () => {
     const six = tag(html, "gem-summary-count", "fortune");
     expect(attr(six, "data-count")).toBe("6");
     expect(attr(six, "class")).toBe(attr(tag(html, "gem-summary-count", "action"), "class"));
+    // BL-138: no "·" before the counts (the line's stats are spaced, K10).
+    expect(html.startsWith("<span")).toBe(true);
+    expect(html).not.toContain("·");
     expect(render(store("dm", false), <PartyLineGems characterId="brakka" />)).toBe("");
     // The feature key the line reads is the registry's.
     expect(GEMS_FEATURE).toBe("gems");

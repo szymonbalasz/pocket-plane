@@ -87,14 +87,12 @@ export function GemCountsRow({
   );
 }
 
-/** FR-CAMP-43: the Players window's party line tail "· ‹counts›" (`camp-player-char-gems`). */
+/**
+ * FR-CAMP-43: the Players window's party line tail, the counts (`camp-player-char-gems`). BL-138:
+ * spaced like the line's stats, no "·" before them (K10).
+ */
 export function PartyLineGems({ characterId }: { characterId: string }) {
   const on = useSync((s) => isFeatureOn(s.store, GEMS_FEATURE));
   if (!on) return null;
-  return (
-    <>
-      <span className="text-muted-foreground">·</span>
-      <GemCountsRow characterId={characterId} testId="camp-player-char-gems" />
-    </>
-  );
+  return <GemCountsRow characterId={characterId} testId="camp-player-char-gems" />;
 }
