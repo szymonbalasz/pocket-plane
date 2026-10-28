@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 PAUSED by the DM (2026-10-28); test tooling DONE (#368, `fix/test-infra` merged).** No agents running. Sprint 13 done (kit parity #365). Decisions up to #369.
+**Phase:** **Sprint 14 RESUMED (2026-10-28) on the CI test loop (#368, AGENTS §9.4.1).** Builders `f14a` (F1, workspace w7W) and `f14b` (F2, workspace w7X) restarted from `.verify/resume.md` with briefs `%TEMP%/pocket-plane/briefs/resume-f14{a,b}.md`. F4 brief ready (`build-f14d.md`, slices.json key `f14d`, start with `SPRINT_VERIFY=.verify/sprint12`). Decisions up to #369.
 
 **Resume (in order):**
 1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
@@ -39,6 +39,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 12 T1 theme switch | merged a15785ed | — | **merged** (walkthrough PASS; check:full 5835 + no-copy load timeout, e2e 259 + 3 load flakes: cb-party, dice-extras, popup-line (popup-line again after BL-116), all pass alone) | — |
 | Sprint 12 T3 default theme (#355) | merged fac01c26 | — | **merged** (walkthrough PASS; check:full 5856, e2e 264/264) | — |
 | Sprint 12 T2 Gilt & Stone | merged 1873122d | — | **merged** (walkthrough 11/12 → re-test 13/13; check:full 5852, e2e 264/264) | — |
+| Sprint 14 F1 frame | `fix/s14-frame` (w7W, slot 0) | f14a | resumed: merge main, tray-size expectation, FR-SHELL-97 note, push + CI | walkthrough |
+| Sprint 14 F2 toasts | `fix/s14-toasts` (w7X, slot 2) | f14b | resumed: merge main, hover-reset fix, push + CI | walkthrough |
+| Sprint 14 F4 roll guard | `fix/s14-roll-guard` | — | brief ready | start when a slot frees |
+| Sprint 14 F3 kit nits | `fix/s14-kit` | — | after F1 + F2 | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
@@ -49,6 +53,10 @@ Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL),
 - `styles.css`, both `index.html`, the dice tray's `data-slot` → `data-die-slot` rename (`roll-control.tsx` attribute lines + 3 tests): **T1** (T0 merged). 
 
 ## Integrator rulings this sprint (tell the DM at the recap)
+
+Sprint 14:
+- F1: `tray-size.test.ts` expectation → the tray's useful 360×300 with Fit `all` at DM 1440 escort (the BL-134 rule applies to the tray; 450×375 gave Fit `pcs`). The 6 remaining K5 replay exemptions stay out of F1 (backlog rows after the report; the zone round-trip memory is a DM design question).
+- F2: DM bell = unread pending actions only; a player's not-owned pending rows get their own Waiting section; the popup head limit applies only to a displaced column (#347 counts at home); the stuck-hover toast timer (a 4 s card stayed > 60 s) is fixed in F2.
 
 Sprint 11:
 - F1 1c fix: a resize up also gives untouched windows their fit-keeping size (returns on the way back); after a reload at the larger size the return to the smaller size is not remembered (accepted). F2 1b / 2a fix: once every card folds, "+N more" joins the summary row (stack stays 58 px).
