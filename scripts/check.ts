@@ -26,6 +26,7 @@ import {
   selectTests,
   sourceFiles,
 } from "./lib/affected";
+import { fixtureCacheEnv } from "./lib/fixture-cache";
 import {
   envCount,
   listTestFiles,
@@ -43,9 +44,19 @@ interface Result {
 }
 
 /** Run `cmd` with its output captured (printed by the caller, so steps don't interleave). */
-async function capture(name: string, cmd: string[]): Promise<Result> {
+async function capture(
+  name: string,
+  cmd: string[],
+  env: Record<string, string | undefined> = process.env,
+): Promise<Result> {
   const t0 = performance.now();
-  const p = Bun.spawn(cmd, { cwd: WORKTREE_ROOT, stdout: "pipe", stderr: "pipe", stdin: "ignore" });
+  const p = Bun.spawn(cmd, {
+    cwd: WORKTREE_ROOT,
+    env,
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin: "ignore",
+  });
   const [out, err, code] = await Promise.all([
     new Response(p.stdout).text(),
     new Response(p.stderr).text(),
@@ -185,6 +196,8 @@ if (import.meta.main) {
         capture("lint", ["bun", "x", "biome", "check", "."]),
       ];
   const nStatic = steps.length;
+  // One code hash for every shard: they all name the same bundle snapshot cache.
+  const testEnv = { ...process.env, ...fixtureCacheEnv() };
   const junit = split.map((_, i) => path.join(tmp, `shard-${i + 1}.xml`));
   split.forEach((list, i) => {
     const reporter = [TEST_TIMEOUT_ARG, "--reporter=junit", `--reporter-outfile=${junit[i]}`];
@@ -196,7 +209,9 @@ if (import.meta.main) {
       : full
         ? []
         : ["--path-ignore-patterns=**/*.slow.test.*"];
-    steps.push(capture(`test ${i + 1}/${split.length}`, ["bun", "test", ...reporter, ...which]));
+    steps.push(
+      capture(`test ${i + 1}/${split.length}`, ["bun", "test", ...reporter, ...which], testEnv),
+    );
   });
   const results = await Promise.all(steps);
 
