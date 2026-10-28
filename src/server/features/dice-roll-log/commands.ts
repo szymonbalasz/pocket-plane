@@ -72,8 +72,8 @@ export function resolveRollActor(
     if (!c?.active || c.removed) throw notFound("Combatant not found");
     return { kind: "entity", id: c.entityId, name: c.name };
   }
-  // Any token of the campaign (any scene); its display name is copied (hidden tokens too:
-  // the DM decides with the per-roll public switch, DICE §11).
+  // Any token of the campaign (any scene); its display name is copied. A hidden or renamed
+  // monster token's entry is DM-only whatever the public switch (#367, `rollGuarded`).
   const t = env.tx
     .select({ name: token.name })
     .from(token)
