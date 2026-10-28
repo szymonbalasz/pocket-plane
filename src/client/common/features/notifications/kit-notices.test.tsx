@@ -520,3 +520,38 @@ describe("K12 notices (round-2 gap 10, minor)", () => {
     expect(open.slice(0, open.indexOf(">"))).toMatch(/size="sm"[\s\S]*variant="outline"/);
   });
 });
+
+describe("BL-137 a player's Notifications: rows waiting on the DM", () => {
+  // K9 walkthrough: Player 1's own attack card (audience Player 1, action owner the DM) was
+  // listed under History as "Waiting for DM".
+  const card: NotificationRecord = {
+    ...request,
+    id: "n5",
+    text: "Mira: 21 to hit, 8 piercing",
+    audience: "player",
+    audiencePlayerId: "p1",
+  };
+  const info: NotificationRecord = { ...system, audience: "all", state: "info" };
+  test("FR-NOTE-17 BL-137 a pending card owned by the DM is in the player's Waiting section, without an action button, not under History; resolved → History", () => {
+    const html = historyHtml("player", [card, info]);
+    const waiting = html.slice(html.indexOf('data-testid="note-history-waiting"'));
+    expect(waiting).toMatch(/data-slot="note-heading"[^>]*>Waiting</);
+    expect(html).not.toContain('data-testid="note-history-pending"');
+    const closed = html.slice(html.indexOf('data-testid="note-history-closed"'));
+    expect(closed).not.toContain('data-record-id="n5"');
+    expect(waiting.slice(0, waiting.indexOf('data-testid="note-history-closed"'))).toContain(
+      'data-record-id="n5"',
+    );
+    expect(rowOf(html, "n5")).not.toContain('data-testid="note-history-action"');
+    const done = { ...card, state: "resolved" as const, closedByRole: "dm" as const };
+    const after = historyHtml("player", [done, info]);
+    expect(after).not.toContain('data-testid="note-history-waiting"');
+    expect(after.slice(after.indexOf('data-testid="note-history-closed"'))).toContain(
+      'data-record-id="n5"',
+    );
+    // The DM lists it under Pending as before; no Waiting section.
+    const dm = historyHtml("dm", [card]);
+    expect(dm).toContain('data-testid="note-history-pending"');
+    expect(dm).not.toContain('data-testid="note-history-waiting"');
+  });
+});

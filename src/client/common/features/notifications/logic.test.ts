@@ -446,10 +446,13 @@ describe("buttons, list, labels (FR-NOTE-16/17/20)", () => {
     const rows = [info, card, ask, done];
     const dm = historySections(store(DM, rows));
     expect(dm.pending.map((n) => n.id)).toEqual([ask.id, card.id]);
+    expect(dm.waiting).toEqual([]);
     expect(dm.history.map((n) => n.id)).toEqual([done.id, info.id]);
     const p1 = historySections(store(P1, rows));
     expect(p1.pending.map((n) => n.id)).toEqual([ask.id]);
-    expect(p1.history.map((n) => n.id)).toEqual([done.id, card.id, info.id]);
+    // BL-137 (sprint 14): the DM-owned card waits in its own section, not History.
+    expect(p1.waiting.map((n) => n.id)).toEqual([card.id]);
+    expect(p1.history.map((n) => n.id)).toEqual([done.id, info.id]);
     const names = (id: string | null) => (id === "p1" ? "Player 1" : "?");
     expect(stateLabel(done, names)).toBe("Resolved by Player 1");
     expect(stateLabel({ ...done, closedByRole: "dm", closedByPlayerId: null }, names)).toBe(
@@ -474,14 +477,26 @@ describe("buttons, list, labels (FR-NOTE-16/17/20)", () => {
 });
 
 describe("unread (FR-NOTE-18)", () => {
+  test("FR-NOTE-15 BL-130 sim-16 h04: the DM's bell counts the pending actions only (5 beside Pending (5)), not two unread fight summaries; a player's bell still counts info rows", () => {
+    const cards = Array.from({ length: 3 }, () =>
+      pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" }),
+    );
+    const own = Array.from({ length: 2 }, () => pendingFor("dm", null, { audience: "dm" }));
+    const summaries = [note({ audience: "dm" }), note({ audience: "all" })];
+    const rows = [...summaries, ...own, ...cards];
+    // sim-16: 7 (5 actions + 2 summaries) beside "Pending (5)".
+    expect(unreadCount(store(DM, rows), 0)).toBe(5);
+    expect(unreadCount(store(P1, rows), 0)).toBe(1);
+  });
+
   test("FR-NOTE-18 unread = addressed rows with seq > last seen; key per campaign and owner", () => {
     const info = note({ audience: "all" });
     const dmOnly = note({ audience: "dm" });
     const ask = pendingFor("player", "p1");
     const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
     const rows = [info, dmOnly, ask, card];
-    // DM: info, dmOnly, card and (FR-NOTE-27) the player-owned `ask`.
-    expect(unreadCount(store(DM, rows), 0)).toBe(4);
+    // DM: card and (FR-NOTE-27) the player-owned `ask`; BL-130 (sprint 14): no info row.
+    expect(unreadCount(store(DM, rows), 0)).toBe(2);
     expect(unreadCount(store(P1, rows), 0)).toBe(2);
     expect(unreadCount(store(P1, rows), ask.seq)).toBe(0);
     expect(unreadCount(store(P2, rows), 0)).toBe(1);
@@ -493,11 +508,12 @@ describe("unread (FR-NOTE-18)", () => {
     const info = note({ audience: "all" });
     const card = pendingFor("dm", null, { audience: "player", audiencePlayerId: "p1" });
     const at = (state: NotificationRecord["state"]) => [info, { ...card, state }];
-    expect(unreadCount(store(DM, at("pending")), 0)).toBe(2);
-    expect(unreadCount(store(DM, at("resolved")), 0)).toBe(1);
-    expect(unreadCount(store(DM, at("dismissed")), 0)).toBe(1);
+    // BL-130 (sprint 14): the DM's bell counts the card only, never the info row.
+    expect(unreadCount(store(DM, at("pending")), 0)).toBe(1);
+    expect(unreadCount(store(DM, at("resolved")), 0)).toBe(0);
+    expect(unreadCount(store(DM, at("dismissed")), 0)).toBe(0);
     // Reopened (undo) → counts again while its seq > last seen.
-    expect(unreadCount(store(DM, at("pending")), 0)).toBe(2);
+    expect(unreadCount(store(DM, at("pending")), 0)).toBe(1);
     expect(unreadCount(store(DM, at("pending")), card.seq)).toBe(0);
     // The info row counts by audience whatever happens to action rows.
     expect(unreadCount(store(P1, at("dismissed")), 0)).toBe(1);

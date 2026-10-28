@@ -81,10 +81,14 @@ import {
   advance,
   type Callout,
   type ClassOf,
+  canFold,
   classOfToast,
   clearCallout,
   closeCardToast,
   closeToast,
+  dropStaleHover,
+  type HoverPoint,
+  hoverHolds,
   moreInSummary,
   nextExpiry,
   pruneToasts,
@@ -513,8 +517,12 @@ export function ToastRuntime({
   // one step per measured height (`foldCap`), so a card that fits the chosen spot stays.
   const covers = isDm && at.covers > 0;
   const minCap = isDm && !folded && state.toasts.some((t) => t.kind === "summary") ? 0 : 1;
-  const { shown, more, inSummary, callout } = visibleToasts(state, cap, folded);
+  const { shown, more, inSummary, callout } = visibleToasts(state, cap, folded, settle.fold.alerts);
   const foldable = shown.filter((t) => t.kind !== "summary" && classOfToast(t) !== "alert").length;
+  // BL-130 (K3: summary + 3 "Saved …" alerts on a Compendium record): once the cards and info
+  // folded, the alerts fold too (oldest first) into "+N more"; one stays when nothing else shows.
+  const alertsShown = shown.filter((t) => classOfToast(t) === "alert").length;
+  const alertMin = minCap === 0 || foldable > 0 ? 0 : 1;
   // BL-115: a hold that never sees a new height ends after `SETTLE_HOLD_MS`.
   const [holdOver, setHoldOver] = useState(0);
   useEffect(() => {
@@ -528,14 +536,48 @@ export function ToastRuntime({
     const spot = { left: at.left, top: at.top };
     const now = performance.now();
     setSettle((s) =>
-      settleStack(s, { need, min: minCap, stackH, shown: foldable, spot, now, changing }),
+      settleStack(s, {
+        need,
+        min: minCap,
+        stackH,
+        shown: foldable,
+        alerts: alertsShown,
+        alertMin,
+        spot,
+        now,
+        changing,
+      }),
     );
-  }, [stackH, room, covers, minCap, foldable, at.left, at.top, holdOver, changing]);
+  }, [
+    stackH,
+    room,
+    covers,
+    minCap,
+    foldable,
+    alertsShown,
+    alertMin,
+    at.left,
+    at.top,
+    holdOver,
+    changing,
+  ]);
   // FR-NOTE-70: the drawn spot (`data-left` / `data-top`, the style and the FR-SHELL-59 report).
   const pos = settle.hold && settle.drawn ? settle.drawn : { left: at.left, top: at.top };
   // BL-118: the fold is done: no hold, and no step due on this height (`foldCap`).
   const resting =
-    !settle.hold && !((stackH > room || covers) && cap > minCap && settle.fold.foldedAt !== stackH);
+    !settle.hold &&
+    !(
+      (stackH > room || covers) &&
+      canFold(settle.fold, {
+        need: true,
+        min: minCap,
+        stackH,
+        shown: foldable,
+        alerts: alertsShown,
+        alertMin,
+      }) &&
+      settle.fold.foldedAt !== stackH
+    );
 
   // FR-SHELL-59: the DM's rendered stack rect for the Fit, null while nothing shows. BL-118: only
   // the resting stack (the roll popups keep clear of it, FR-DICEX-55), never a fold step's.
@@ -551,6 +593,18 @@ export function ToastRuntime({
     reportShownStack(SHOWN_STACK_ID, { x: pos.left, y: pos.top, w, h: stackH });
   }, [isDm, pos.left, pos.top, stackH, resting]);
   useEffect(() => () => reportShownStack(SHOWN_STACK_ID, null), []);
+
+  // FR-NOTE-14 (sprint 14 F2): no mouseleave fires when the hovered toast or the whole stack
+  // unmounts; after each change the hover holds only if the last pointer point is still on it.
+  const pointer = useRef<HoverPoint | null>(null);
+  const shownKey = shown.map((t) => t.key).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-check when the drawn toasts change
+  useLayoutEffect(() => {
+    if (!state.hovered) return;
+    const box = stackRef.current?.getBoundingClientRect() ?? null;
+    const holds = hoverHolds(showing, box, pointer.current);
+    if (!holds) dispatch((s, now) => dropStaleHover(s, false, now));
+  }, [state.hovered, showing, shownKey, state.turn?.seq, callout?.seq, more, stackH]);
 
   const openHistory = () => openWindow(HISTORY_KIND);
   // FR-NOTE-78 (walkthrough F2 1b, 2a): folded to the summary alone, "+N more" sits in its row.
@@ -593,7 +647,13 @@ export function ToastRuntime({
           ? { left: pos.left, top: pos.top }
           : { right: NOTE_EDGE, bottom: PLAYER_TOAST_BOTTOM }),
       }}
-      onMouseEnter={() => dispatch((s, now) => setHovered(s, true, now))}
+      onMouseEnter={(e) => {
+        pointer.current = { x: e.clientX, y: e.clientY };
+        dispatch((s, now) => setHovered(s, true, now));
+      }}
+      onMouseMove={(e) => {
+        pointer.current = { x: e.clientX, y: e.clientY };
+      }}
       onMouseLeave={() => dispatch((s, now) => setHovered(s, false, now))}
     >
       {/* FR-KIT-59 (OQ-KIT-03 A): the DM's turn card heads the stack (home first). */}

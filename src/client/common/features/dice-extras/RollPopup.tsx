@@ -39,6 +39,7 @@ import { INITIATIVE_KIND } from "../combat-tracker/window";
 import { focusLogEntry } from "../dice-roll-log/focus";
 import { RollerName, rollerColorKey, useColorKeyOf } from "../dice-roll-log/name-color";
 import { SHOWN_STACK_ID as NOTE_STACK_ID } from "../notifications/ToastRuntime";
+import { firstRows } from "../play-shell/content-heights";
 import { renderedWindowRects, useContentHeights } from "../play-shell/free-area";
 import { EDGE_GAP, TOP_BAR_H } from "../play-shell/geometry";
 import { useViewport } from "../play-shell/hooks";
@@ -56,8 +57,8 @@ import {
   CELL_LINES,
   cellTag,
   dmColumnTop,
+  dmPopupAt,
   dmPopupClear,
-  dmStackAt,
   linesH,
   type PopupCell,
   type PopupGeom,
@@ -70,10 +71,12 @@ import {
   popupItemLabel,
   popupLine,
   popupOfferText,
+  popupRoom,
   popupRows,
   popupsThatFit,
   ROWS_SHOWN,
   shownPopupStack,
+  windowHeads,
 } from "./popup-logic";
 import {
   CELL_STILL_PAD,
@@ -658,6 +661,25 @@ function useInitiativeRect(dm: boolean): Rect | null {
   }, [dm, windows, registry, available, vp, measured]);
 }
 
+/**
+ * BL-132: the DM's other open windows as rendered (Initiative is in `clear` already) and their
+ * heads (title bar, tabs, first record: `windowHeads`); none for players.
+ */
+function useWindowHeads(dm: boolean): { windows: Rect[]; heads: Rect[] } {
+  const registry = useRegistry();
+  const windows = useShellState((s) => s.windows);
+  const available = useAvailableKinds();
+  const vp = useViewport();
+  // A first-row report renews this Map too (`reportFirstRow`), so `firstRows()` is re-read.
+  const measured = useContentHeights();
+  return useMemo(() => {
+    if (!dm) return { windows: [], heads: [] };
+    const win = windows.filter((w) => w.kind !== INITIATIVE_KIND && w.state === "open");
+    const rects = renderedWindowRects(win, registry, available, vp, measured);
+    return { windows: rects, heads: windowHeads(rects, [...firstRows().values()]) };
+  }, [dm, windows, registry, available, vp, measured]);
+}
+
 /** Rect lists equal to the pixel (the observer re-measures on every style change). */
 const sameRects = (a: readonly Rect[], b: readonly Rect[]) =>
   a.length === b.length &&
@@ -726,6 +748,8 @@ export function RollPopupStack({
   // T5: the big card where the viewport holds it, else today's.
   const g = popupGeomAt(client, vp);
   const initiative = useInitiativeRect(dm);
+  // BL-132: off the other windows where a spot is, else off their heads.
+  const { windows: others, heads } = useWindowHeads(dm);
   const dialogs = useNonModalRects(dm, popups.length > 0 || pending);
   // FR-DICEX-55: the DM stack never covers a tool bar (play-shell's hard keep-outs).
   const keepOuts = useKeepOuts(client);
@@ -750,14 +774,18 @@ export function RollPopupStack({
   // BL-118: from the toast stack's resting report, so the column moves only when a popup arrives
   // or leaves or that stack settles elsewhere, never on a popup's own rolling → rest re-render.
   const start = dmColumnTop(reports.get(NOTE_STACK_ID)?.h ?? 0);
-  const at = dmStackAt(vp, start, { w: g.w, h: box.h }, clear);
+  const at = dmPopupAt(vp, start, { w: g.w, h: box.h }, clear, others, heads);
   // FR-DICEX-47 short screens: only the popups that fit the region (newest first; the oldest
   // drops), never past the viewport's bottom (DM) or over the top bar (players).
   useLayoutEffect(() => {
     const el = stack.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const room = dm ? vp.h - EDGE_GAP - r.top : r.bottom - TOP_BAR_H - EDGE_GAP;
+    // BL-132: a DM column moved off its home stops at the next window head it would cross.
+    const home = { left: Math.round((vp.w - g.w) / 2), top: start };
+    const room = dm
+      ? popupRoom(vp.h, { left: r.left, top: r.top }, r.width, heads, home)
+      : r.bottom - TOP_BAR_H - EDGE_GAP;
     const open = popups.filter((p) => p.state !== "closing");
     const heights = open.map((p) => layoutOf(p, g).h).reverse();
     if (pending) heights.unshift(pendingH(g));
