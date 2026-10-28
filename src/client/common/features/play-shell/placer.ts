@@ -1091,6 +1091,10 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       }
     }
     if (o.cause && spot.rung === "L5") {
+      // BL-129: a reload never puts an open window away. The written layout is the settled one
+      // (FR-SHELL-56 (6), overlaps included): one the zones' load pass finds no clear spot for
+      // stays open at its stored rect.
+      if (trigger.type === "load") return;
       // A window displaced for a transient cause is put away itself rather than cover a PC
       // (#310; as a pushed one, OQ-SHELL-61 A); it returns when the cause ends (FR-SHELL-102).
       const cur = get(id) as WindowState;
