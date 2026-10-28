@@ -54,7 +54,7 @@ Lessons from sprints 12–13 (2026-10-25/27), on top of the ones below:
 - **Memory (DM #354):** two overlapping `check:full` runs + e2e + walkthrough browsers ran the 64 GB machine out of memory; the session reaped jobs. One heavy run at a time; `PP_TEST_SHARDS=3` in every worktree `.env`; builders can't see each other's runs, so keep at most two builders.
 - **`gilt.css` append blocks conflict at the file end** and both blocks end in the same `  }
 }` lines: git keeps them once, so a naive keep-both drops one block's closing braces (build fails "Missing closing }"). Resolve by taking main's file and appending the branch's `/* KIT: … */` block whole; then `bun run build`.
-- **Herdr workspaces don't survive a machine restart**: recreate with `herdr workspace create --cwd <worktree> --label <slug>`.
+- **Herdr workspaces don't survive a machine restart**: reattach each existing worktree to the orchestrator's space with `herdr worktree open --workspace <orchestrator ws> --path <worktree> --label <slug> --no-focus` (§3). Never `herdr workspace create --cwd`: it makes a standalone workspace outside the pocket-plane group.
 - **A walkthrough that changes the default theme** shakes out text-fit and geometry assumptions across the e2e suite: run the branch's full gates before its walkthrough.
 - Claude Code may show a "Teach auto mode" dialog in an agent pane (status `blocked`): Escape dismisses it.
 
@@ -140,6 +140,11 @@ Lessons from sprint 1 (2026-10-14):
 ## 3. Herdr: how to run agents (learned the hard way)
 
 Load the `herdr` skill. Check `HERDR_ENV=1`; if not set, stop and tell the DM. Find your workspace: `herdr pane current --current` → `workspace_id` (was `wR`).
+
+**All parallel work runs in worktrees linked to this space.** Every builder, fix and test agent works in a git worktree that Herdr shows as a linked worktree of the orchestrator's pocket-plane workspace (`<ws>`, from `herdr pane current --current`). Never a standalone workspace (`herdr workspace create`), never another repo, never the main checkout.
+- New branch: `herdr worktree create --workspace <ws> …` (below).
+- Existing worktree (after a restart, or one made with plain `git worktree add`): `herdr worktree open --workspace <ws> --path <worktree> --label <slug> --no-focus`.
+- Check before starting an agent: `herdr worktree list --workspace <ws>` shows the branch with an `open_workspace_id`, and that workspace has `worktree.repo_name == "pocket-plane"` and `is_linked_worktree == true`.
 
 **Create a worktree + agent**
 ```powershell
