@@ -14,7 +14,7 @@ import type { SceneObjectCopies } from "../scenes-map/visibility-hooks";
 import { templateCopies } from "./copies";
 import { toTemplateRecord } from "./rows";
 
-const sameCopies = (
+export const sameCopies = (
   t: { fogged?: boolean; seenBy?: string[] | null },
   c: SceneObjectCopies,
 ): boolean => {

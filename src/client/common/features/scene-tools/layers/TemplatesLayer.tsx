@@ -15,11 +15,14 @@
 // `ephemeral`, `color` (the drawn hex), `by` (player id | `dm`); `map-casing` (id = template id)
 // under the outline; label `scn-template-label` (id = template id; `hovered` = true while
 // hovered) with `scn-template-label-dot`; handles `scn-template-handle-origin` / `-end` (id =
-// template id). Mounts the right-click menu island (FR-SCN-48; the press routing is MapCanvas',
-// FR-MAP-71).
+// template id). While placing or moving an origin (#375), the cells it snaps to (a cell, or a big
+// token's footprint) are outlined in this client's colour over the casing: `scn-aoe-origin-cell`
+// (attrs `col`, `row`, `n`); the layer feeds the shown tokens' footprints to the tool's snap.
+// Mounts the right-click menu island (FR-SCN-48; the press routing is MapCanvas', FR-MAP-71).
 import { templateCells } from "@shared/scene-tools/geometry";
 import {
   AOE_TEMPLATE_TYPE,
+  type DiagonalRule,
   SCN_SIGNALS,
   type TemplateRecordView,
   TemplateSignalData,
@@ -38,12 +41,15 @@ import {
   CASING_NAME,
   casingWidth,
   type MarkPerson,
+  markColor,
   personName,
   placerOf,
   selfOf,
 } from "../../scenes-map/mark-colors";
 import { useLayerToggles } from "../../scenes-map/tool-store";
+import { snapTokens } from "../aoe-snap";
 import { type AoeGesture, useAoe } from "../aoe-store";
+import { diagonalRuleIn } from "../diagonal-rule";
 import { useTemplateMenuIsland } from "../TemplateMenu";
 import {
   canEditTemplate,
@@ -177,35 +183,63 @@ function TemplateLabel({
   );
 }
 
+/** #375: the cells the origin snaps to while placing (a cell, or a big token's footprint). */
+function OriginCell() {
+  const { grid, cam, store, client, myPlayerId } = useCanvas();
+  const cell = useAoe((s) => s.originCell);
+  if (!cell) return null;
+  const { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy } = grid;
+  const rect = {
+    x: gx + cell.col * cs,
+    y: gy + cell.row * cs,
+    width: cell.n * cs,
+    height: cell.n * cs,
+  };
+  const swPx = 2;
+  return (
+    <Group name="scn-aoe-origin-cell" col={cell.col} row={cell.row} n={cell.n} listening={false}>
+      <Rect {...rect} stroke={CASING_COLOR} strokeWidth={casingWidth(swPx, cam.scale)} />
+      <Rect
+        {...rect}
+        stroke={markColor(store, selfOf(client, myPlayerId))}
+        strokeWidth={swPx / cam.scale}
+      />
+    </Group>
+  );
+}
+
 function TemplateNode({ d, hovered }: { d: Drawn; hovered: boolean }) {
   const { scene, grid, cam, colors, store } = useCanvas();
   const t = d.template;
-  const { shape, x, y, size, width, angle } = t;
+  const { shape, x, y, size, width, angle, footprint } = t;
   const { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy } = grid;
   const { mapWidth, mapHeight } = scene;
-  // FR-SCN-21: memoised per template / grid change.
+  // #377: a snapped sphere's squares follow the campaign's diagonal rule (FR-SCN-30).
+  const rule = diagonalRuleIn(store.records);
+  // FR-SCN-21: memoised per template / grid / rule change.
   const cells = useMemo(
     () =>
       templateCells(
-        { shape, x, y, size, width, angle },
+        { shape, x, y, size, width, angle, footprint },
         { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy, mapWidth, mapHeight },
-        { cut: true },
+        { cut: true, rule },
       ),
-    [shape, x, y, size, width, angle, cs, gx, gy, mapWidth, mapHeight],
+    [shape, x, y, size, width, angle, footprint, cs, gx, gy, mapWidth, mapHeight, rule],
   );
   const outline = useMemo(
     () =>
       templateOutline(
-        { shape, x, y, size, width, angle },
+        { shape, x, y, size, width, angle, footprint },
         { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy },
+        rule,
       ),
-    [shape, x, y, size, width, angle, cs, gx, gy],
+    [shape, x, y, size, width, angle, footprint, cs, gx, gy, rule],
   );
   const handles = useMemo(() => {
-    const h = templateHandles({ shape, x, y, size, width, angle });
+    const h = templateHandles({ shape, x, y, size, width, angle, footprint });
     const g = { gridCellSize: cs, gridOffsetX: gx, gridOffsetY: gy };
     return { origin: mapPx(g, h.origin), end: mapPx(g, h.end) };
-  }, [shape, x, y, size, width, angle, cs, gx, gy]);
+  }, [shape, x, y, size, width, angle, footprint, cs, gx, gy]);
   // FR-SCN-47: resolved per draw, so a `player` / `campaign` upsert recolours (OQ-CAMP-21).
   const stroke = templateColor(store, d.who, d.hidden, colors.hidden);
   const ox = gx + x * cs;
@@ -313,10 +347,11 @@ function useTemplateHover(
   drawn: readonly Drawn[],
   scale: number,
   grid: Grid,
+  rule: DiagonalRule,
 ): string | null {
   const [hovered, setHovered] = useState<string | null>(null);
-  const latest = useRef({ drawn, scale, grid });
-  latest.current = { drawn, scale, grid };
+  const latest = useRef({ drawn, scale, grid, rule });
+  latest.current = { drawn, scale, grid, rule };
   useEffect(() => {
     const group = groupRef.current;
     const stage = group?.getStage();
@@ -329,8 +364,8 @@ function useTemplateHover(
       for (const n of group.find(".scn-template-label")) {
         pills[n.id()] = n.getClientRect({ relativeTo: group });
       }
-      const { drawn: d, scale: s, grid: g } = latest.current;
-      setHovered(templateUnder(at, d, s, g, pills));
+      const { drawn: d, scale: s, grid: g, rule: r } = latest.current;
+      setHovered(templateUnder(at, d, s, g, pills, r));
     };
     const onLeave = () => setHovered(null);
     stage.on("mousemove.scnTemplateHover", onMove);
@@ -344,7 +379,7 @@ function useTemplateHover(
 }
 
 export function ScnTemplatesLayer() {
-  const { client, scene, store, myPlayerId, live, activeTool, cam, grid } = useCanvas();
+  const { client, scene, store, myPlayerId, live, activeTool, cam, grid, tokens } = useCanvas();
   const groupRef = useRef<Konva.Group>(null);
   const dmOnlyOff = useLayerToggles((s) => s.off["dm-only"] === true);
   const own = useAoe((s) => s.own);
@@ -366,7 +401,9 @@ export function ScnTemplatesLayer() {
       editable: pickableTemplates(kept, client, myPlayerId, dmOnlyOff),
     });
   }, [kept, scene.id, client, myPlayerId, dmOnlyOff]);
-  useEffect(() => () => useAoe.setState({ editable: [], sceneId: null }), []);
+  useEffect(() => () => useAoe.setState({ editable: [], sceneId: null, tokens: [] }), []);
+  // #375: a sphere / cylinder over a big token snaps to its centre (the shown tokens only).
+  useEffect(() => useAoe.setState({ tokens: snapTokens(tokens) }), [tokens]);
   useTemplateMenuIsland(useContext(SyncContext));
 
   // ---- others' ephemerals (FR-SCN-23) ----
@@ -433,12 +470,13 @@ export function ScnTemplatesLayer() {
       handle: toolOn,
     });
   }
-  const hovered = useTemplateHover(groupRef, drawn, cam.scale, grid);
+  const hovered = useTemplateHover(groupRef, drawn, cam.scale, grid, diagonalRuleIn(store.records));
   return (
     <Group ref={groupRef} name="scn-templates" listening={false}>
       {drawn.map((d) => (
         <TemplateNode key={d.id} d={d} hovered={hovered === d.id} />
       ))}
+      {toolOn && <OriginCell />}
     </Group>
   );
 }

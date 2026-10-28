@@ -256,7 +256,12 @@ describe("FR-SCN-06 / -22 AoE tool registration and Esc", () => {
 
   test("FR-SCN-22 Esc drops a gesture, then the ephemeral, then the selection; else falls through", () => {
     useAoe.setState({
-      gesture: { kind: "move", id: "t1", press: { x: 1, y: 1 }, at: { x: 2, y: 2 } },
+      gesture: {
+        kind: "move",
+        id: "t1",
+        press: { x: 1, y: 1 },
+        at: { x: 2, y: 2, footprint: null },
+      },
       own: { sceneId: "s1", template: T },
       selectedId: "t1",
     });

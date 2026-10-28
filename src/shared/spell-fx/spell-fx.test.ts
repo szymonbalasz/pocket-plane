@@ -256,4 +256,19 @@ describe("affected cells (FR-VFX-24)", () => {
     // 3 × 3 quadrant minus the token, minus (2, 2) at 15 ft.
     expect(cells).toHaveLength(9 - 1 - 1);
   });
+
+  test("FR-VFX-24 #377 ruling: the campaign's diagonal rule, as the ruler: `5` ft diagonals → full squares; `5-10-5` the default", () => {
+    const medium = { col: 10, row: 10, side: 1 };
+    const large = { col: 10, row: 10, side: 2 };
+    // 10 ft: 5 × 5 minus the token; 20 ft: 9 × 9 minus the token (no corner trimmed).
+    expect(emanationCells(medium, 10, map(30, 30), "5")).toHaveLength(25 - 1);
+    expect(emanationCells(medium, 20, map(30, 30), "5")).toHaveLength(81 - 1);
+    expect(emanationCells(large, 10, map(30, 30), "5")).toHaveLength(36 - 4);
+    expect(emanationCells(large, 20, map(30, 30), "5")).toHaveLength(100 - 4);
+    // Default = 5/10/5 (unchanged): 10 ft from a Medium = 21 − 1.
+    expect(emanationCells(medium, 10, map(30, 30))).toEqual(
+      emanationCells(medium, 10, map(30, 30), "5-10-5"),
+    );
+    expect(emanationCells(medium, 10, map(30, 30))).toHaveLength(21 - 1);
+  });
 });

@@ -140,6 +140,39 @@ export const TemplateAngle = z
   .refine(isDec1, "At most 1 decimal");
 /** FR-SCN-20 (sprint 4): a template origin, any point with ≤ 2 decimals. */
 export const TemplateCoord = SegCoord;
+/**
+ * DM #377: a snapped sphere / cylinder's origin block, in cells per side: 1 = the square its
+ * origin is the centre of, 2–4 = a Large / Huge / Gargantuan token's footprint (FR-MAP-14) centred
+ * on the origin. Its squares are those within its radius by grid distance (FR-MAP-22, 5/10/5) of
+ * the block, the block included. Absent = the exact > 50 % rule (FR-SCN-41).
+ */
+export const TemplateFootprint = Int.min(1).max(4);
+
+const isInt = (v: number) => Math.abs(v - Math.round(v)) < 1e-9;
+
+/**
+ * #377: a footprint fits a sphere / cylinder whose origin is the centre of an n × n block of
+ * cells (`x − n / 2`, `y − n / 2` whole); anything else → the issue's message, else null.
+ */
+export function footprintProblem(t: {
+  shape: TemplateShape;
+  x: number;
+  y: number;
+  footprint?: number | null;
+}): string | null {
+  const n = t.footprint;
+  if (n === undefined || n === null) return null;
+  if (t.shape !== "sphere" && t.shape !== "cylinder") return "Sphere or cylinder only";
+  return isInt(t.x - n / 2) && isInt(t.y - n / 2) ? null : "Origin is not the block's centre";
+}
+
+const footprintFits = (
+  t: { shape: TemplateShape; x: number; y: number; footprint?: number | null },
+  ctx: z.RefinementCtx,
+) => {
+  const message = footprintProblem(t);
+  if (message) ctx.addIssue({ code: "custom", path: ["footprint"], message });
+};
 export const TemplateLabel = z.string().max(TEMPLATE_LABEL_MAX);
 
 /** FR-SCN-29 (#145, OQ-SCN-04): 5/10/5 (default) or 5 ft per diagonal step. */
@@ -220,6 +253,8 @@ export const AoeTemplateRecord = z.object({
   width: Int.nullable(),
   /** 0 ≤ angle < 360, ≤ 1 decimal (sprint 4). */
   angle: TemplateAngle,
+  /** #377: the snapped origin block (sphere / cylinder); absent = the exact rule. */
+  footprint: TemplateFootprint.optional(),
   label: z.string(),
   /** Null = DM-placed (a fog subject); a player's are never fog-hidden (FR-SCN-27). */
   placedByPlayerId: z.string().nullable(),
@@ -254,6 +289,8 @@ export interface TemplateGeometry {
   size: number;
   width?: number | null;
   angle: number;
+  /** #377: a snapped sphere / cylinder's origin block (cells per side); absent = exact rule. */
+  footprint?: number | null;
 }
 
 // ---------- WS intent payloads (SCN §9) ----------
@@ -318,17 +355,21 @@ const templateFields = {
   size: TemplateSize,
   width: TemplateWidth.optional(),
   angle: TemplateAngle,
+  /** #377 (sphere / cylinder, the origin the block's centre). */
+  footprint: TemplateFootprint.optional(),
   label: TemplateLabel.optional(),
 };
 /** DM schema: may set `hidden` and `placedByPlayerId` (FR-SCN-25). */
-export const PlaceTemplateInput = z.strictObject({
-  ...templateFields,
-  hidden: z.boolean().optional(),
-  placedByPlayerId: Id.optional(),
-});
+export const PlaceTemplateInput = z
+  .strictObject({
+    ...templateFields,
+    hidden: z.boolean().optional(),
+    placedByPlayerId: Id.optional(),
+  })
+  .superRefine(footprintFits);
 export type PlaceTemplateInput = z.input<typeof PlaceTemplateInput>;
 /** Player schema: neither `hidden` nor `placedByPlayerId` (sending one → `invalid`). */
-export const PlayerPlaceTemplateInput = z.strictObject(templateFields);
+export const PlayerPlaceTemplateInput = z.strictObject(templateFields).superRefine(footprintFits);
 export const UpdateTemplateInput = z.strictObject({
   templateId: Id,
   x: TemplateCoord.optional(),
@@ -336,6 +377,8 @@ export const UpdateTemplateInput = z.strictObject({
   size: TemplateSize.optional(),
   width: TemplateWidth.optional(),
   angle: TemplateAngle.optional(),
+  /** #377: set (a snapped origin move) or `null` (a Ctrl move: the exact rule); absent = kept. */
+  footprint: TemplateFootprint.nullable().optional(),
   label: TemplateLabel.optional(),
   /** DM only. */
   hidden: z.boolean().optional(),
@@ -349,19 +392,23 @@ export const SetDiagonalRuleInput = z.strictObject({ rule: DiagonalRule });
 // ---------- signal `scn.template` (FR-SCN-23) ----------
 
 /** A connection's ephemeral template; `key` = one per sender connection. */
-export const TemplateSignalPlace = z.strictObject({
-  sceneId: Id,
-  key: z.string().min(1).max(64),
-  shape: TemplateShape,
-  x: TemplateCoord,
-  y: TemplateCoord,
-  size: TemplateSize,
-  width: TemplateWidth.optional(),
-  angle: TemplateAngle,
-  label: TemplateLabel.optional(),
-  /** DM only: route to DM tabs (FR-SCN-24). */
-  dmOnly: z.boolean().optional(),
-});
+export const TemplateSignalPlace = z
+  .strictObject({
+    sceneId: Id,
+    key: z.string().min(1).max(64),
+    shape: TemplateShape,
+    x: TemplateCoord,
+    y: TemplateCoord,
+    size: TemplateSize,
+    width: TemplateWidth.optional(),
+    angle: TemplateAngle,
+    /** #377 (sphere / cylinder, the origin the block's centre). */
+    footprint: TemplateFootprint.optional(),
+    label: TemplateLabel.optional(),
+    /** DM only: route to DM tabs (FR-SCN-24). */
+    dmOnly: z.boolean().optional(),
+  })
+  .superRefine(footprintFits);
 /** End frame: no geometry, routes to everyone. */
 export const TemplateSignalEnd = z.strictObject({
   sceneId: Id,

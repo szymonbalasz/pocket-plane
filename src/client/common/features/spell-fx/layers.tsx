@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { Group, Shape } from "react-konva";
 import { useSync } from "../../sync/store";
 import { startedIn } from "../combat-tracker/store";
+import { diagonalRuleIn } from "../scene-tools/diagonal-rule";
 import { withoutDmOnly } from "../scene-tools/layer-switches";
 import { useCanvas } from "../scenes-map/canvas-context";
 import type { LayerContextMenu, LayerToggle } from "../scenes-map/layers";
@@ -93,6 +94,8 @@ export function VfxUnderLayer() {
   const shown = useFxCells((s) => s.shown);
   if (snap.level === "off") return null;
   const rect: MapRect = { ...c.grid, mapWidth: c.scene.mapWidth, mapHeight: c.scene.mapHeight };
+  // #377 ruling: grid distance by the campaign's diagonal rule (FR-SCN-30), as the ruler.
+  const rule = diagonalRuleIn(store.records);
   const colour = markColor(store, selfOf(c.client, c.myPlayerId));
   const cells = specs.filter((s) => shown[s.key] && s.radiusFt !== null);
   return (
@@ -104,6 +107,7 @@ export function VfxUnderLayer() {
               { col: t.col, row: t.row, side: footprint(t.size) },
               s.radiusFt ?? 0,
               rect,
+              rule,
             ).length
           : 0;
         return (
@@ -122,7 +126,12 @@ export function VfxUnderLayer() {
                 const row = Math.round((b.y - c.grid.gridOffsetY) / cs);
                 const side = Math.round(b.size / cs);
                 kctx.beginPath();
-                for (const cell of emanationCells({ col, row, side }, s.radiusFt ?? 0, rect)) {
+                for (const cell of emanationCells(
+                  { col, row, side },
+                  s.radiusFt ?? 0,
+                  rect,
+                  rule,
+                )) {
                   kctx.rect(
                     c.grid.gridOffsetX + cell.col * cs,
                     c.grid.gridOffsetY + cell.row * cs,

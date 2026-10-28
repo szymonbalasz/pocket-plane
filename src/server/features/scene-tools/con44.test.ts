@@ -3,6 +3,7 @@
 // filled to the kept-template cap (20 per scene, 40-char labels, 36-char ids), first with
 // integer origins and 15° angles (sprint 2's wire), then freeform (2-decimal `x`, `y`, 1-decimal
 // `angle`). Copies come from the product path (`templateCopies`). Measured, never a ceiling raise.
+// DM #377: then every sphere / cylinder snapped to a square centre, without and with `footprint`.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
 import {
@@ -36,6 +37,9 @@ describe("CON-44 with kept templates at the cap, freeform (SCN §12 sprint 4)", 
   let base: ViewerSize[];
   let integer: ViewerSize[];
   let freeform: ViewerSize[];
+  let centred: ViewerSize[];
+  let snapped: ViewerSize[];
+  let rounds: string[];
   let sceneId: string;
   let added: string[];
 
@@ -55,6 +59,29 @@ describe("CON-44 with kept templates at the cap, freeform (SCN §12 sprint 4)", 
         size: row.size,
         width: row.width,
         angle: free ? round(((i * 37.3) % 359) + 0.1, 1) : (i * 15) % 360,
+      };
+      db.update(aoeTemplate)
+        .set({ ...g, ...templateCopies(db, s, g, row.placedByPlayerId) })
+        .where(eq(aoeTemplate.id, id))
+        .run();
+    }
+  }
+
+  /** #377: the round templates on square centres (Huge-style `x.5`), with or without footprint. */
+  function setCentred(footprint: boolean) {
+    const db = b.s.db;
+    const s = db.transaction((tx) => readScene(tx, sceneId));
+    for (const [i, id] of rounds.entries()) {
+      const row = db.select().from(aoeTemplate).where(eq(aoeTemplate.id, id)).get();
+      if (!row) throw new Error(id);
+      const g: TemplateGeometry = {
+        shape: row.shape,
+        x: 1.5 + (i % 17),
+        y: 1.5 + (i % 11),
+        size: row.size,
+        width: row.width,
+        angle: 0,
+        footprint: footprint ? 3 : null,
       };
       db.update(aoeTemplate)
         .set({ ...g, ...templateCopies(db, s, g, row.placedByPlayerId) })
@@ -109,6 +136,14 @@ describe("CON-44 with kept templates at the cap, freeform (SCN §12 sprint 4)", 
     integer = snapshotSizes(b.s);
     setGeometry(true);
     freeform = snapshotSizes(b.s);
+    rounds = added.filter((id) => {
+      const shape = db.select().from(aoeTemplate).where(eq(aoeTemplate.id, id)).get()?.shape;
+      return shape === "sphere" || shape === "cylinder";
+    });
+    setCentred(false);
+    centred = snapshotSizes(b.s);
+    setCentred(true);
+    snapped = snapshotSizes(b.s);
   }, 120_000);
 
   afterAll(() => b?.cleanup());
@@ -130,6 +165,22 @@ describe("CON-44 with kept templates at the cap, freeform (SCN §12 sprint 4)", 
     const visible = players.map((p) => p.types[AOE_TEMPLATE_TYPE]?.rows ?? 0);
     console.log(
       `SCN sprint 4 CON-44: heavy DM ${base[0]?.bytes} B → ${dmInt.bytes} B at the cap (integer) → ${dm.bytes} B freeform (+${dm.bytes - dmInt.bytes} B, ${perRow.toFixed(1)} B per freeform row over ${added.length}; ${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1 MiB); players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B (${SNAPSHOT_CEILING.player - Math.max(...players.map((p) => p.bytes))} B left of 512 KiB; visible templates ${Math.min(...visible)}–${Math.max(...visible)}); battle load ack ${load?.bytes} B`,
+    );
+  });
+
+  test("CON-44 #377 footprint: +14 B per snapped sphere / cylinder row (DM and players), still under the ceilings", () => {
+    const [dm, ...players] = snapped as [ViewerSize, ...ViewerSize[]];
+    const [dmBefore, ...playersBefore] = centred as [ViewerSize, ...ViewerSize[]];
+    expect(rounds.length).toBeGreaterThan(0);
+    // `,"footprint":3` on every round row the viewer receives; nothing else changes.
+    expect(dm.bytes - dmBefore.bytes).toBe(14 * rounds.length);
+    expect(dm.bytes).toBeLessThan(SNAPSHOT_CEILING.dm);
+    for (const [i, p] of players.entries()) {
+      expect((p.bytes - (playersBefore[i]?.bytes ?? 0)) % 14).toBe(0);
+      expect(p.bytes).toBeLessThan(SNAPSHOT_CEILING.player);
+    }
+    console.log(
+      `SCN #377 CON-44: ${rounds.length} snapped round templates: heavy DM ${dmBefore.bytes} B → ${dm.bytes} B (+${dm.bytes - dmBefore.bytes} B, 14 B per row; ${SNAPSHOT_CEILING.dm - dm.bytes} B left of the DM ceiling); players ${Math.min(...players.map((p) => p.bytes))}–${Math.max(...players.map((p) => p.bytes))} B (${SNAPSHOT_CEILING.player - Math.max(...players.map((p) => p.bytes))} B left of 512 KiB)`,
     );
   });
 });

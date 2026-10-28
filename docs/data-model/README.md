@@ -2752,3 +2752,18 @@ From [spell-fx §8](../specs/spell-fx.md#8-data-model). **Built by `build/vfx`.*
 - **Compendium:** `cmp.addToSheet` fills a spell row's `fx` with `suggestPreset(name)`'s defaults (FR-VFX-04); other rows unchanged.
 - **Fixtures:** unit `vfx-visual-auras` (the DM sets Spirit Guardians on Mira's "Bless" concentration and Shadow of Moil on Thorn's "Marked", existing `cbtx-effects` rows); bundle `visual-kit` gains it. Not in `session-sim-13` (edits existing effects).
 - **CON-44:** no snapshot growth beyond §142 (the build adds no record or field; `visual-kit` carries two `fx` values, ≤ 124 B each).
+
+## 144. AoE cell origin (fix/aoe-cell-origin)
+
+From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 / -41 (DM [#375](../decisions-log.md), [#377](../decisions-log.md)). **Built by `fix/aoe-cell-origin`** (shared change granted). Protocol side: [protocol §182](../protocol/README.md#182-aoe-cell-origin-fixaoe-cell-origin).
+
+| Table / record | Change | Notes |
+|---|---|---|
+| `aoe_template` | + `footprint integer` (nullable; push-safe ADD COLUMN) | #377: a snapped sphere / cylinder's origin block, 1–4 cells per side (1 = a square, 2–4 = a Large / Huge / Gargantuan token), centred on `(x, y)`. Null = the exact > 50 % rule |
+| `aoe-template` record (DM, players) | + `footprint?` 1–4, omitted when null | Not redacted (geometry, like `x`, `y`) |
+
+- **Stored rows:** existing ones get `footprint` null and keep their origin and their squares (exact rule). New snapped origins are cell centres (`c.5`), a big token's centre or (cube) a vertex: all valid under FR-SCN-20's ≤ 2 decimals.
+- **Derived (never stored):** with `footprint`, the squares within its radius by grid distance of the origin block, the block included (`reachCells`), under the campaign's diagonal rule (`map-settings`, FR-SCN-30; #377 ruling); fog's `fogged` / `seenBy` are derived over those (uncut) and re-derived when the rule changes (`scn.setDiagonalRule`, same transaction).
+- **Client only (never stored or sent):** the shown scene's token footprints for the snap (`useAoe.tokens`, written by `TemplatesLayer`), the highlighted origin cells while a press is held (`useAoe.originCell`), the last placement's raw press point (a panel shape change re-snaps from it).
+- **Fixtures:** none new: the e2e uses `map-tools`' Crypt Ogre (Large, (4, 10), `mt-crowd`); `session-sim-13` gets a comment line only.
+- **CON-44 (measured):** +14 B per snapped sphere / cylinder row; heavy DM 697,592 B, players ≤ 266,941 B (protocol §182).

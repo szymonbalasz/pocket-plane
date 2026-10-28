@@ -47,5 +47,7 @@ export default defineBundle({
     // `vfx-fight` starts its own fight on Goblin Ambush; walkthrough and e2e on `spell-fx`
     // VFX build (sprint 14 + Spell FX, DM #374): no unit: `vfx-visual-auras` edits existing
     // effects (visual-kit's baselines only); walkthrough and e2e on `spell-fx`
+    // AoE cell origin (sprint 15, DM #375): no unit: client-only snap; walkthrough and e2e on
+    // `map-tools` (Crypt Ogre is the Large token)
   ],
 });

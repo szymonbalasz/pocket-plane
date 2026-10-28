@@ -26,7 +26,7 @@ import {
 const CS = 70;
 const G = { gridCellSize: CS, gridOffsetX: 0, gridOffsetY: 0 };
 const MAP = { ...G, mapWidth: 1400, mapHeight: 980 };
-const SCENE = { id: "s1" } as SceneView;
+const SCENE = { id: "s1", mapWidth: MAP.mapWidth, mapHeight: MAP.mapHeight } as SceneView;
 
 const intents: { name: string; input: unknown }[] = [];
 const frames: unknown[] = [];
@@ -89,7 +89,7 @@ afterEach(() => {
 });
 
 describe("FR-SCN-43 snapped unless Ctrl", () => {
-  test("FR-SCN-43 gestures: Ctrl per move (origin 0.01 cell, angle 0.1°), else vertex + 15°; the spec's Ctrl cone = 4 golden squares", async () => {
+  test("FR-SCN-43 gestures: Ctrl per move (origin 0.01 cell, angle 0.1°), else cell centre (#375) + 15°; the spec's Ctrl cone = 4 golden squares", async () => {
     useAoe.setState({
       settings: { ...DEFAULT_AOE, shape: "cone", size: 15, label: "Burning Hands" },
     });
@@ -111,40 +111,60 @@ describe("FR-SCN-43 snapped unless Ctrl", () => {
     await Bun.sleep(60);
     expect(frames.at(-1)).toMatchObject({ x: 3.37, y: 7.64, angle: 37.6, label: "Burning Hands" });
 
-    // No Ctrl: the nearest vertex and 15° steps.
+    // No Ctrl (#375): the centre of the cell under the press, and 15° steps (aimed from it).
     drag(pt(3.37, 7.64), pt(5.75, 9.47));
-    expect(useAoe.getState().own?.template).toMatchObject({ x: 3, y: 8, angle: 30 });
+    expect(useAoe.getState().own?.template).toMatchObject({ x: 3.5, y: 7.5, angle: 45 });
 
     // Ctrl read on every move: pressed without, held from the first move on.
     P.down(pt(3.37, 7.64));
-    expect(useAoe.getState().own?.template).toMatchObject({ x: 3, y: 8 });
+    expect(useAoe.getState().own?.template).toMatchObject({ x: 3.5, y: 7.5 });
     P.move(pt(5.75, 9.47, true));
     expect(useAoe.getState().own?.template).toMatchObject({ x: 3.37, y: 7.64, angle: 37.6 });
     // Released without a move: the gesture re-snaps.
     aoeCtrl(false);
-    expect(useAoe.getState().own?.template).toMatchObject({ x: 3, y: 8, angle: 30 });
+    expect(useAoe.getState().own?.template).toMatchObject({ x: 3.5, y: 7.5, angle: 45 });
     P.up(pt(5.75, 9.47));
   });
 
-  test("FR-SCN-43 a snapped 30-ft line from vertex (10, 7) east = 6 squares (one-side tie rule)", () => {
+  test("FR-SCN-43 a snapped 30-ft line from cell (10, 6)'s centre east = 5 squares; from vertex (10, 7) with Ctrl = 6 (one-side tie rule)", () => {
     useAoe.setState({ settings: { ...DEFAULT_AOE, shape: "line", size: 30 } });
     drag(pt(10.2, 6.9), pt(13, 7.1), pt(16, 7.1));
     const t = useAoe.getState().own?.template;
-    expect(t).toMatchObject({ x: 10, y: 7, angle: 0, width: 5 });
+    expect(t).toMatchObject({ x: 10.5, y: 6.5, angle: 0, width: 5 });
+    // #375: the origin and end cells are half covered on the axis: ties that never count.
     expect(cellsAttr(templateCells(t as NonNullable<typeof t>, MAP, { cut: true }))).toBe(
+      "11,6 12,6 13,6 14,6 15,6",
+    );
+    // The sprint-4 golden (a vertex origin) is still placeable with Ctrl.
+    drag(pt(10, 7, true), pt(16, 7, true));
+    const v = useAoe.getState().own?.template;
+    expect(v).toMatchObject({ x: 10, y: 7, angle: 0 });
+    expect(cellsAttr(templateCells(v as NonNullable<typeof v>, MAP, { cut: true }))).toBe(
       "10,7 11,7 12,7 13,7 14,7 15,7",
     );
   });
 
   test("FR-SCN-43 radius rounds to 5 ft, with or without Ctrl; a cube aims its diagonal", () => {
     useAoe.setState({ settings: { ...DEFAULT_AOE, shape: "sphere", size: 20 } });
-    drag(pt(5, 5), pt(7.3, 5));
-    expect(useAoe.getState().own?.template).toMatchObject({ x: 5, y: 5, size: 10 });
+    // #377: measured from the origin square's edge (half a cell out), where the outline is.
+    drag(pt(5, 5), pt(8.1, 5.5));
+    expect(useAoe.getState().own?.template).toMatchObject({
+      x: 5.5,
+      y: 5.5,
+      size: 10,
+      footprint: 1,
+    });
     drag(pt(5.03, 5.04, true), pt(8.2, 5.04, true));
     expect(useAoe.getState().own?.template).toMatchObject({ x: 5.03, y: 5.04, size: 15 });
     useAoe.setState({ settings: { ...DEFAULT_AOE, shape: "cube", size: 15 } });
-    drag(pt(4, 4), pt(7, 1));
-    expect(useAoe.getState().own?.template).toMatchObject({ shape: "cube", angle: 270 }); // NE
+    drag(pt(4.2, 3.9), pt(7, 1));
+    // #375: a cube's corner stays on the nearest vertex.
+    expect(useAoe.getState().own?.template).toMatchObject({
+      shape: "cube",
+      x: 4,
+      y: 4,
+      angle: 270,
+    }); // NE
     drag(pt(4, 4, true), pt(7, 6, true));
     expect(useAoe.getState().own?.template.angle).toBe(348.7);
   });
@@ -159,14 +179,15 @@ describe("FR-SCN-43 snapped unless Ctrl", () => {
 });
 
 describe("FR-SCN-45 handles", () => {
-  test("FR-SCN-45 handles: origin drag moves (vertex, or 0.01 cell with Ctrl); one update on release; a click only selects", () => {
+  test("FR-SCN-45 handles: origin drag moves (cell centre #375, or 0.01 cell with Ctrl); one update on release; a click only selects", () => {
     useAoe.setState({ editable: [kept({})] });
     drag(pt(2.1, 2.05));
     expect(useAoe.getState().selectedId).toBe("t1");
     expect(intents).toEqual([]);
     drag(pt(2.1, 2.05), pt(3, 2.5), pt(4.4, 3.3));
+    // A stored vertex origin (sprint 4) stays valid; a move snaps it to a cell centre (#375).
     expect(intents).toEqual([
-      { name: "scn.updateTemplate", input: { templateId: "t1", x: 4, y: 3 } },
+      { name: "scn.updateTemplate", input: { templateId: "t1", x: 4.5, y: 3.5 } },
     ]);
     drag(pt(1.95, 2.1), pt(4.43, 3.31, true));
     expect(intents.at(-1)?.input).toEqual({ templateId: "t1", x: 4.43, y: 3.31 });
@@ -213,6 +234,20 @@ describe("FR-SCN-45 handles", () => {
     const n = intents.length;
     drag(pt(3, 10.05), pt(3, 10));
     expect(intents).toHaveLength(n);
+  });
+
+  test("FR-SCN-45 #377 moving a kept sphere sends its new origin block; with Ctrl `footprint: null` (the exact rule); a cone sends none", () => {
+    // A sprint-4 sphere stored on a vertex (no footprint) snaps to a square on its first move.
+    useAoe.setState({ editable: [kept({ shape: "sphere", size: 10 })] });
+    drag(pt(2.1, 2.05), pt(4, 2), pt(6.2, 1.1));
+    expect(intents.at(-1)?.input).toEqual({ templateId: "t1", x: 6.5, y: 1.5, footprint: 1 });
+    const snapped = kept({ shape: "sphere", size: 10, x: 6.5, y: 1.5, footprint: 1 });
+    useAoe.setState({ editable: [snapped] });
+    drag(pt(6.5, 1.5), pt(8.37, 3.21, true));
+    expect(intents.at(-1)?.input).toEqual({ templateId: "t1", x: 8.37, y: 3.21, footprint: null });
+    useAoe.setState({ editable: [kept({})] });
+    drag(pt(2.1, 2.05), pt(4, 2), pt(6.2, 1.1));
+    expect(intents.at(-1)?.input).toEqual({ templateId: "t1", x: 6.5, y: 1.5 });
   });
 });
 

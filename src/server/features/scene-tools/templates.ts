@@ -15,6 +15,7 @@ import {
   AOE_TEMPLATE_TYPE,
   type AoeTemplateRecord,
   ClearTemplatesInput,
+  footprintProblem,
   PlaceTemplateInput,
   SCN_INTENTS,
   TEMPLATE_WIDTH,
@@ -142,6 +143,7 @@ export const placeTemplate = defineCommand({
       size: input.size,
       width: widthFor(input.shape, input.width),
       angle: input.angle,
+      footprint: input.footprint ?? null,
     };
     const copies = templateCopies(tx, s, geometry, placedBy);
     const id = ctx.ids.next();
@@ -158,6 +160,7 @@ export const placeTemplate = defineCommand({
         size: geometry.size,
         width: geometry.width ?? null,
         angle: geometry.angle,
+        footprint: geometry.footprint ?? null,
         label: input.label ?? "",
         placedByPlayerId: placedBy,
         hidden: actor.role === "player" ? false : (input.hidden ?? false),
@@ -195,10 +198,15 @@ export const updateTemplate = defineCommand({
       size: input.size ?? before.size,
       width: widthFor(before.shape, input.width ?? before.width),
       angle: input.angle ?? before.angle,
+      footprint: input.footprint === undefined ? (before.footprint ?? null) : input.footprint,
     };
+    // #377: a kept footprint must still fit the (moved) origin; the client sends a new one.
+    const problem = footprintProblem(geometry);
+    if (problem) throw invalid("Invalid input", [{ path: ["footprint"], message: problem }]);
     const label = input.label ?? before.label;
     const hidden = input.hidden ?? before.hidden;
     const same =
+      geometry.footprint === (before.footprint ?? null) &&
       geometry.x === before.x &&
       geometry.y === before.y &&
       geometry.size === before.size &&
@@ -216,6 +224,7 @@ export const updateTemplate = defineCommand({
         size: geometry.size,
         width: geometry.width ?? null,
         angle: geometry.angle,
+        footprint: geometry.footprint ?? null,
         label,
         hidden,
         ...copies,

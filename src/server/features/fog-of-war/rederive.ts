@@ -57,6 +57,7 @@ import {
 } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import {
+  diagonalRuleOf,
   readProp,
   readStructure,
   readTemplate,
@@ -160,11 +161,13 @@ function rederiveProps(env: SceneHookEnv, st: SceneStatic, now: string, o: Reder
 function rederiveTemplates(env: SceneHookEnv, st: SceneStatic, now: string, o: RederiveOptions) {
   const changes: RecordChange[] = [];
   const s = readScene(env.tx, st.sceneId);
+  // #377: snapped spheres' cells follow the campaign's diagonal rule (FR-SCN-30).
+  const rule = diagonalRuleOf(env.tx, s.campaignId);
   for (const t of sceneTemplates(env.tx, st.sceneId)) {
     const c = subjectCopies(st, {
       type: AOE_TEMPLATE_TYPE,
       sceneId: st.sceneId,
-      cells: templateCells(t, s, { cut: false }),
+      cells: templateCells(t, s, { cut: false, rule }),
       placedByPlayerId: t.placedByPlayerId,
     });
     const foggedFlip = c.fogged !== (t.fogged === true);

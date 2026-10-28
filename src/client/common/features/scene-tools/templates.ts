@@ -9,6 +9,7 @@
 import type { SignalFrom } from "@shared/protocol/frames";
 import type { RecordStore } from "@shared/protocol/store";
 import {
+  type DiagonalRule,
   FT_PER_CELL,
   TEMPLATE_SIZE,
   TEMPLATE_WIDTH,
@@ -17,13 +18,14 @@ import {
   type TemplateShape,
   type TemplateSignalData,
 } from "@shared/scene-tools/schemas";
-import { contains, snapAngle, snapPoint, templateArea } from "@shared/scenes-map/area";
+import { contains, snapAngle, templateArea } from "@shared/scenes-map/area";
 import type { Grid } from "@shared/scenes-map/geometry";
 import { DRAG_INTERVAL_MS, DRAG_REPEAT_MS, DRAG_TIMEOUT_MS } from "@shared/scenes-map/schemas";
 import { createStore, type StoreApi } from "zustand";
 import type { ReadVar } from "../campaign-management/colors";
 import type { LaserTimers } from "../scenes-map/laser";
 import { type MarkPerson, markColor } from "../scenes-map/mark-colors";
+import { type AoeOrigin, aoeOrigin, type SnapOptions } from "./aoe-snap";
 
 /** FR-SCN-23: like `map.drag` (≤ 20/s, 1 s repeat at rest, 3 s receiver timeout). */
 export const TEMPLATE_INTERVAL_MS = DRAG_INTERVAL_MS;
@@ -91,24 +93,25 @@ export function snapWidth(ft: number): number {
 }
 
 /**
- * FR-SCN-22 / -43: the template a press at `origin` (grid units, already snapped) dragged to map
- * px `at` makes. Cone and line: direction from the drag; cube: its diagonal toward the drag;
- * sphere and cylinder: the radius from the drag (5-ft steps). Snapped to 15° unless `free`
- * (Ctrl, 0.1°). Under half a cell of drag keeps the panel's size and the previous direction
- * (`angle`).
+ * FR-SCN-22 / -43: the template a press at `press` (grid units, raw) with its origin at `origin`
+ * (already snapped, `aoeOrigin`) dragged to map px `at` makes. Cone and line: direction from the
+ * origin to the pointer; cube: its diagonal toward the pointer; sphere and cylinder: the radius
+ * from the origin to the pointer (5-ft steps). Snapped to 15° unless `free` (Ctrl, 0.1°). Under
+ * half a cell of drag from the press keeps the panel's size and the previous direction (`angle`).
  */
 export function gestureTemplate(
   s: AoeSettings,
-  origin: GridPoint,
+  origin: GridPoint & { footprint?: number },
   at: GridPoint,
   g: Grid,
   angle = 0,
   free = false,
+  press: GridPoint = origin,
 ): TemplateView {
   const p = gridPoint(g, at.x, at.y);
   const dx = p.x - origin.x;
   const dy = p.y - origin.y;
-  const dragged = Math.hypot(dx, dy) >= 0.5;
+  const dragged = Math.hypot(p.x - press.x, p.y - press.y) >= 0.5;
   const base: TemplateView = {
     shape: s.shape,
     x: origin.x,
@@ -116,18 +119,22 @@ export function gestureTemplate(
     size: s.size,
     width: s.shape === "line" ? s.width : null,
     angle,
+    ...(origin.footprint ? { footprint: origin.footprint } : {}),
     label: s.label,
   };
   if (!dragged) return base;
   if (s.shape === "sphere" || s.shape === "cylinder") {
-    return { ...base, size: snapSize(Math.hypot(dx, dy) * FT_PER_CELL), angle: 0 };
+    return { ...base, size: radiusAt(Math.hypot(dx, dy), base), angle: 0 };
   }
   return { ...base, angle: aimAngle(dx, dy, s.shape, free) };
 }
 
-/** FR-SCN-43: the origin of a press at map px: the nearest vertex, or (Ctrl) 0.01 cell. */
-export const originAt = (g: Grid, x: number, y: number, free = false): GridPoint =>
-  snapPoint(gridPoint(g, x, y), free);
+/** #377: half the origin block's side (cells): a snapped sphere's edge lies that much further out. */
+const halfBlock = (t: TemplateGeometry) => (t.footprint ? t.footprint / 2 : 0);
+
+/** FR-SCN-22 / -45: the radius (5-ft steps) whose drawn edge lies `d` cells from the origin. */
+const radiusAt = (d: number, t: TemplateGeometry) =>
+  snapSize(Math.max(0, d - halfBlock(t)) * FT_PER_CELL);
 
 // ---------- handles (FR-SCN-45) ----------
 
@@ -157,7 +164,7 @@ export function templateHandles(t: TemplateGeometry): Record<HandleKind, GridPoi
   const L = t.size / FT_PER_CELL;
   const origin = { x: t.x, y: t.y };
   if (t.shape === "sphere" || t.shape === "cylinder")
-    return { origin, end: { x: t.x + L, y: t.y } };
+    return { origin, end: { x: t.x + L + halfBlock(t), y: t.y } };
   const [ux, uy] = unit(t.angle);
   if (t.shape === "cube") {
     const [nx, ny] = unit(t.angle + 90);
@@ -198,18 +205,24 @@ export function endEdit<T extends TemplateGeometry>(t: T, p: GridPoint, free: bo
   const dy = p.y - t.y;
   if (Math.hypot(dx, dy) < 0.5) return t;
   if (t.shape === "sphere" || t.shape === "cylinder") {
-    return { ...t, size: snapSize(Math.hypot(dx, dy) * FT_PER_CELL) };
+    return { ...t, size: radiusAt(Math.hypot(dx, dy), t) };
   }
   return { ...t, angle: aimAngle(dx, dy, t.shape, free) };
 }
 
 /**
- * FR-SCN-43 / -45: the origin handle dragged to `p` (grid units): the nearest vertex, or (Ctrl)
- * 0.01 cell; `null` while within `MOVE_MIN` of the press (a click keeps the origin).
+ * FR-SCN-43 / -45 (#375): the origin handle of a `shape` template dragged to `p` (grid units):
+ * snapped as a new placement (`aoeOrigin`: cell centre, token centre, cube vertex; Ctrl 0.01
+ * cell); `null` while within `MOVE_MIN` of the press (a click keeps the origin).
  */
-export function movedOrigin(press: GridPoint, p: GridPoint, free: boolean): GridPoint | null {
+export function movedOrigin(
+  shape: TemplateShape,
+  press: GridPoint,
+  p: GridPoint,
+  o: SnapOptions,
+): AoeOrigin | null {
   if (Math.hypot(p.x - press.x, p.y - press.y) < MOVE_MIN) return null;
-  return snapPoint(p, free);
+  return aoeOrigin(shape, p, o);
 }
 
 export interface TemplateUpdate {
@@ -218,6 +231,8 @@ export interface TemplateUpdate {
   y?: number;
   angle?: number;
   size?: number;
+  /** #377: a new origin block, or null (moved with Ctrl: the exact rule). */
+  footprint?: number | null;
 }
 
 /** FR-SCN-45: release sends one `scn.updateTemplate` with the changed fields, or nothing. */
@@ -230,6 +245,8 @@ export function templateUpdate(
   for (const k of ["x", "y", "angle", "size"] as const) {
     if (after[k] !== before[k]) patch[k] = after[k];
   }
+  const fp = after.footprint ?? null;
+  if (fp !== (before.footprint ?? null)) patch.footprint = fp;
   return Object.keys(patch).length > 1 ? patch : null;
 }
 
@@ -304,6 +321,7 @@ export const keptView = (r: TemplateRecordView): TemplateView => ({
   size: r.size,
   width: r.width,
   angle: r.angle,
+  ...(r.footprint ? { footprint: r.footprint } : {}),
   label: r.label,
 });
 
@@ -345,6 +363,8 @@ export interface TemplateHitOptions {
   /** Camera scale (screen px per map px), for the 6 px tolerance. */
   scale: number;
   grid: Grid;
+  /** #377: the campaign's diagonal rule (a snapped sphere's outline); default `5-10-5`. */
+  rule?: DiagonalRule;
 }
 
 /** Distance (map px) from (x, y) to an outline's edge. */
@@ -381,16 +401,23 @@ export function templateAt<
     if (!canEditTemplate(t, o.client, o.myPlayerId)) continue;
     if (t.hidden && (o.client !== "dm" || o.dmOnlyOff)) continue;
     if (o.blind && (o.myPlayerId === null || t.placedByPlayerId !== o.myPlayerId)) continue;
-    if (isUnder(t, p, g, tol, o.grid)) return t;
+    if (isUnder(t, p, g, tol, o.grid, o.rule ?? "5-10-5")) return t;
   }
   return null;
 }
 
 /** FR-SCN-49 / -52: map point `p` (grid units `g`) inside `t`'s true outline or within `tol` map px. */
-function isUnder(t: TemplateGeometry, p: GridPoint, g: GridPoint, tol: number, grid: Grid) {
+function isUnder(
+  t: TemplateGeometry,
+  p: GridPoint,
+  g: GridPoint,
+  tol: number,
+  grid: Grid,
+  rule: DiagonalRule,
+) {
   return (
-    contains(templateArea(t), g.x, g.y) ||
-    outlineDistance(templateOutline(t, grid), p.x, p.y) <= tol
+    contains(templateArea(t, rule), g.x, g.y) ||
+    outlineDistance(templateOutline(t, grid, rule), p.x, p.y) <= tol
   );
 }
 
@@ -415,6 +442,7 @@ export function templateUnder(
   scale: number,
   grid: Grid,
   pills: Readonly<Record<string, PillRect>> = {},
+  rule: DiagonalRule = "5-10-5",
 ): string | null {
   const g = gridPoint(grid, p.x, p.y);
   const tol = TEMPLATE_HIT_PX / scale;
@@ -422,7 +450,7 @@ export function templateUnder(
     const d = drawn[i] as (typeof drawn)[number];
     const r = pills[d.id];
     if (r && p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height) return d.id;
-    if (isUnder(d.template, p, g, tol, grid)) return d.id;
+    if (isUnder(d.template, p, g, tol, grid, rule)) return d.id;
   }
   return null;
 }
@@ -489,6 +517,7 @@ export function placeFrame(
     size: t.size,
     ...(t.shape === "line" ? { width: t.width ?? TEMPLATE_WIDTH.default } : {}),
     angle: t.angle,
+    ...(t.footprint ? { footprint: t.footprint } : {}),
     ...(t.label ? { label: t.label } : {}),
     ...(dmOnly ? { dmOnly: true } : {}),
   };
@@ -619,6 +648,7 @@ export function receiveTemplate(
     size: d.size,
     width: d.shape === "line" ? (d.width ?? TEMPLATE_WIDTH.default) : null,
     angle: d.angle,
+    ...(d.footprint ? { footprint: d.footprint } : {}),
     label: d.label ?? "",
   };
   s.setState((st) => ({
@@ -662,12 +692,28 @@ export type TemplateOutline =
   | { kind: "circle"; x: number; y: number; r: number }
   | { kind: "poly"; points: number[] };
 
-/** The shape's outline in map px (the affected squares are drawn from `templateCells`). */
-export function templateOutline(t: TemplateGeometry, g: Grid): TemplateOutline {
+/**
+ * The shape's outline in map px (the affected squares are drawn from `templateCells`); a snapped
+ * sphere's follows the campaign's diagonal `rule` (#377).
+ */
+export function templateOutline(
+  t: TemplateGeometry,
+  g: Grid,
+  rule: DiagonalRule = "5-10-5",
+): TemplateOutline {
   const cs = g.gridCellSize;
   const ox = g.gridOffsetX + t.x * cs;
   const oy = g.gridOffsetY + t.y * cs;
   const L = (t.size / FT_PER_CELL) * cs;
+  if ((t.shape === "sphere" || t.shape === "cylinder") && t.footprint) {
+    // #377: the stepped outline of its squares, so the outline and the tint agree.
+    const area = templateArea(t, rule);
+    const pts = "polygon" in area ? area.polygon : [];
+    return {
+      kind: "poly",
+      points: pts.map((v, i) => (i % 2 === 0 ? g.gridOffsetX : g.gridOffsetY) + v * cs),
+    };
+  }
   if (t.shape === "sphere" || t.shape === "cylinder") return { kind: "circle", x: ox, y: oy, r: L };
   if (t.shape === "cube") {
     // FR-SCN-20 (sprint 4): sides along `angle` and `angle + 90°` (0 / 90 / 180 / 270 = SE / SW /
