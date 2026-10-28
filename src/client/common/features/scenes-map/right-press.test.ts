@@ -105,7 +105,10 @@ describe("FR-SCN-51 contextMenu hook", () => {
     expect(asked).toEqual(["switch", "dm-only"]);
   });
 
-  test("FR-SCN-51 contextMenu hook: scn-templates is the only entry with a menu (sprint 5)", () => {
-    expect(canvasLayers.filter((l) => l.contextMenu).map((l) => l.id)).toEqual(["scn-templates"]);
+  test("FR-SCN-51 contextMenu hook: scn-templates and vfx-under (players' affected cells, FR-VFX-23) have a menu", () => {
+    expect(canvasLayers.filter((l) => l.contextMenu).map((l) => l.id)).toEqual([
+      "scn-templates",
+      "vfx-under",
+    ]);
   });
 });

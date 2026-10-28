@@ -33,12 +33,33 @@ async function settled(page: Page) {
 /** Relative times and clocks change with the run's wall clock. */
 const moving = (page: Page): Locator[] => [page.locator("time")];
 
+/**
+ * Spell FX (FR-VFX-25, -14): map effects drawn at Still, whose frame is the same pixels on every
+ * load; at Full the auras move between frames.
+ */
+async function stillEffects(page: Page) {
+  await page.addInitScript(() =>
+    localStorage.setItem("pp.vfx", JSON.stringify({ level: "still" })),
+  );
+}
+
+/** Preset attrs of the `vfx-aura` nodes on the page's map. */
+const auraPresets = (page: Page) =>
+  page.evaluate(() => {
+    type KStage = { find(s: string): { attrs: { preset?: string } }[] };
+    const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+    return (K?.stages ?? [])
+      .flatMap((s) => s.find(".vfx-aura").map((n) => n.attrs.preset ?? ""))
+      .sort();
+  });
+
 for (const theme of THEMES) {
   test(`visual: DM screen, stat block and Party status in ${theme}`, async ({ browser }) => {
     const { secret } = e2eEnv();
     const dm = await rolePage(browser);
     await dm.setViewportSize(SIZE);
     await storedTheme(dm, theme);
+    await stillEffects(dm);
     await loginDm(dm, secret);
     await settled(dm);
     await expect(dm).toHaveScreenshot(`dm-${theme}.png`, { mask: moving(dm) });
@@ -67,6 +88,7 @@ for (const theme of THEMES) {
     const p1 = await rolePage(browser);
     await p1.setViewportSize(SIZE);
     await storedTheme(p1, theme);
+    await stillEffects(p1);
     await p1.goto(link("Player 1"));
     await settled(p1);
     await expect(p1).toHaveScreenshot(`player-${theme}.png`, { mask: moving(p1) });
@@ -75,6 +97,32 @@ for (const theme of THEMES) {
     await expect(sheet.getByTestId("char-sheet-name")).toHaveText("Mira");
     await settled(p1);
     await expect(sheet).toHaveScreenshot(`player-sheet-${theme}.png`);
+    await p1.context().close();
+  });
+
+  test(`visual: both auras at Still (Spirit Guardians, Shadow of Moil) in ${theme}`, async ({
+    browser,
+  }) => {
+    const { secret, link } = e2eEnv();
+    const dm = await rolePage(browser);
+    await dm.setViewportSize(SIZE);
+    await storedTheme(dm, theme);
+    await stillEffects(dm);
+    await loginDm(dm, secret);
+    await settled(dm);
+    await expect.poll(() => auraPresets(dm)).toEqual(["shadow-of-moil", "spirit-guardians"]);
+    // The DM: Moil half covers Thorn (FR-VFX-17).
+    await expect(dm.getByTestId("map-canvas")).toHaveScreenshot(`dm-auras-${theme}.png`);
+    const p1 = await rolePage(browser);
+    await p1.setViewportSize(SIZE);
+    await storedTheme(p1, theme);
+    await stillEffects(p1);
+    await p1.goto(link("Player 1"));
+    await settled(p1);
+    await expect.poll(() => auraPresets(p1)).toEqual(["shadow-of-moil", "spirit-guardians"]);
+    // Player 1 doesn't own Thorn: eyes only.
+    await expect(p1.getByTestId("map-canvas")).toHaveScreenshot(`player-auras-${theme}.png`);
+    await dm.context().close();
     await p1.context().close();
   });
 }

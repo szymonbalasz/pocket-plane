@@ -30,6 +30,7 @@ import { useSync } from "../../sync/store";
 import type { SheetSection } from "../character-sheet/sections";
 import { useCbtIntent, useStartedEncounter } from "../combat-tracker/store";
 import { manualPartsOf, RollButton, useRollControl } from "../dice-roll-log/roll-control";
+import { useEffectFxDialog } from "../spell-fx/EffectFx";
 import {
   activeEffects,
   characterOf,
@@ -255,6 +256,8 @@ export function EffectsSection({ creatureId }: SectionProps) {
   const [duration, setDuration] = useState("");
   const effects = effectsOn(activeEffects(store), { characterId: creatureId });
   const conc = effects.find((e) => e.kind === "concentration");
+  // FR-VFX-10: Map effect… on each chip's menu (DM; the owner on their own character's effects).
+  const fx = useEffectFxDialog();
   const rounds = duration.trim() === "" ? null : Number(duration);
   const valid =
     label.trim().length >= 1 &&
@@ -266,22 +269,28 @@ export function EffectsSection({ creatureId }: SectionProps) {
         round={enc?.round ?? null}
         testId="cbtx-sheet-effect"
         menu={
-          isDm
+          isDm || may
             ? (e) => (
-                <DropdownMenuItem
-                  variant="destructive"
-                  disabled={disabled}
-                  onSelect={() => void send(CBTX_INTENTS.endEffect, { effectId: e.id })}
-                >
-                  <TrashIcon /> End
-                  {roundsLeftText(e, enc?.round ?? null)
-                    ? ` (${roundsLeftText(e, enc?.round ?? null)})`
-                    : ""}
-                </DropdownMenuItem>
+                <>
+                  {isDm && (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      disabled={disabled}
+                      onSelect={() => void send(CBTX_INTENTS.endEffect, { effectId: e.id })}
+                    >
+                      <TrashIcon /> End
+                      {roundsLeftText(e, enc?.round ?? null)
+                        ? ` (${roundsLeftText(e, enc?.round ?? null)})`
+                        : ""}
+                    </DropdownMenuItem>
+                  )}
+                  {fx.item(e)}
+                </>
               )
             : undefined
         }
       />
+      {fx.dialog}
       {may && (
         <>
           <DropdownMenu>

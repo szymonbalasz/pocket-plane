@@ -35,6 +35,7 @@ import {
   useRollControl,
 } from "@ui/features/dice-roll-log/roll-control";
 import { useTriggerChips } from "@ui/features/effect-modifiers/trigger-badges";
+import { useEffectFxDialog } from "@ui/features/spell-fx/EffectFx";
 import { useSync } from "@ui/sync/store";
 import {
   ArrowDownIcon,
@@ -92,36 +93,42 @@ export function RowEffects({ c, round }: { c: CombatantView; round: number }) {
   const { send, disabled } = useCbtIntent();
   const openEffect = useCbtxDialogs((s) => s.openEffect);
   const openConcentration = useCbtxDialogs((s) => s.openConcentration);
+  // FR-VFX-10: Map effect… on each chip's menu.
+  const fx = useEffectFxDialog();
   return (
-    <EffectChips
-      compact
-      effects={effects}
-      triggers={triggers}
-      round={round}
-      testId="cbtx-init-row-effect"
-      // FR-CBTX-60: the concentration chip's menu has the DM's Edit… (today's dialog).
-      onEditConcentration={() => openConcentration(targetOf(c))}
-      menu={(e: EffectView) => (
-        <>
-          <DropdownMenuItem
-            data-testid="cbtx-init-row-effect-edit"
-            data-record-id={e.id}
-            onSelect={() => openEffect([targetOf(c)], e.id)}
-          >
-            <PencilIcon /> Edit…
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            variant="destructive"
-            data-testid="cbtx-init-row-effect-end"
-            data-record-id={e.id}
-            disabled={disabled}
-            onSelect={() => void send(CBTX_INTENTS.endEffect, { effectId: e.id })}
-          >
-            <TrashIcon /> End
-          </DropdownMenuItem>
-        </>
-      )}
-    />
+    <>
+      <EffectChips
+        compact
+        effects={effects}
+        triggers={triggers}
+        round={round}
+        testId="cbtx-init-row-effect"
+        // FR-CBTX-60: the concentration chip's menu has the DM's Edit… (today's dialog).
+        onEditConcentration={() => openConcentration(targetOf(c))}
+        menu={(e: EffectView) => (
+          <>
+            <DropdownMenuItem
+              data-testid="cbtx-init-row-effect-edit"
+              data-record-id={e.id}
+              onSelect={() => openEffect([targetOf(c)], e.id)}
+            >
+              <PencilIcon /> Edit…
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              data-testid="cbtx-init-row-effect-end"
+              data-record-id={e.id}
+              disabled={disabled}
+              onSelect={() => void send(CBTX_INTENTS.endEffect, { effectId: e.id })}
+            >
+              <TrashIcon /> End
+            </DropdownMenuItem>
+            {fx.item(e)}
+          </>
+        )}
+      />
+      {fx.dialog}
+    </>
   );
 }
 

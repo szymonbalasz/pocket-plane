@@ -119,6 +119,7 @@ describe("FR-SCN-02/03 canvas layers", () => {
       ["walls", "Walls & doors", "objects"],
       ["fog", "Fog", "fog"],
       ["templates", "Templates", "objects"],
+      ["vfx", "Effects", "objects"],
     ]);
     // The Fog switch (`show`) never unmounts the fog layer (FR-FOG-20 draws or hides it).
     expect(ids(layerSlots(canvasLayers, "dm", { fog: false })).flat()).toContain("fog");

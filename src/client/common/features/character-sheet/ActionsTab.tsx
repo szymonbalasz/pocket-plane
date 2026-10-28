@@ -20,6 +20,7 @@ import { Badge, Input } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
+import { RowFxPicker, suggestedFx } from "../spell-fx/FxPicker";
 import { BOX_LABEL, Box } from "./boxes";
 import { SheetRoll } from "./CharacterSheet";
 import {
@@ -42,6 +43,7 @@ import {
   useSheetIntents,
   useSheetScope,
 } from "./sheet-context";
+import { spellRowActions } from "./spell-row-actions";
 import {
   attackButtons,
   attackRowView,
@@ -104,12 +106,15 @@ function RowButtons({
   rollRef,
   rowId,
   overrides,
+  children,
 }: {
   buttons: RowRollButton[];
   name: string;
   rollRef: { attackId?: string; spellId?: string };
   rowId: string | undefined;
   overrides: PublicOverrides;
+  /** After the roll buttons: the spell-row actions (OQ-VFX-06 A). */
+  children?: ReactNode;
 }) {
   const scope = useSheetScope();
   // K13: on the wide Main, the kit's row (`.arow-btns`): small stone buttons, left under the line.
@@ -131,6 +136,7 @@ function RowButtons({
           {b.label}
         </SheetRoll>
       ))}
+      {children}
     </div>
   );
 }
@@ -727,7 +733,8 @@ function SpellEditor({ s, index, count }: { s: SpellRow; index: number; count: n
           max={60}
           required
           className="flex-1"
-          commit={(name) => put({ name })}
+          // FR-VFX-05: a name change on a row without a map effect pre-picks one (FR-VFX-04).
+          commit={(name) => put({ name, ...(!s.fx && { fx: suggestedFx(name) ?? undefined }) })}
         />
         <IntField
           path={`spells.${s.id}.level`}
@@ -791,6 +798,7 @@ function SpellEditor({ s, index, count }: { s: SpellRow; index: number; count: n
         {flag("prepared", "Prepared")}
         {flag("concentration", "Conc.")}
         {flag("ritual", "Ritual")}
+        <RowFxPicker row={s} put={put} />
       </div>
       <TextField
         path={`spells.${s.id}.notes`}
@@ -846,9 +854,29 @@ function SpellRowView({
         rollRef={{ spellId: s.id }}
         rowId={s.id}
         overrides={overrides}
-      />
+      >
+        {!e && <SpellRowActions s={s} />}
+      </RowButtons>
     </div>
   );
+}
+
+/** OQ-VFX-06 A: the spell-row actions registry (e.g. spell-fx's Cast / End), in `order`. */
+function SpellRowActions({ s }: { s: SpellRow }) {
+  const ctx = useSheet();
+  const store = useSync((st) => st.store);
+  const kind = ctx.npc ? "monster" : "character";
+  return [...spellRowActions]
+    .sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : 1))
+    .filter(
+      (a) =>
+        (a.clients ?? ["dm", "player"]).includes(ctx.client) &&
+        (a.kinds ?? ["character"]).includes(kind) &&
+        (a.available?.(store, ctx.creature.id, s) ?? true),
+    )
+    .map((a) => (
+      <a.component key={a.id} creatureId={ctx.creature.id} row={s} client={ctx.client} />
+    ));
 }
 
 function SpellsBlock({ overrides }: { overrides: PublicOverrides }) {
