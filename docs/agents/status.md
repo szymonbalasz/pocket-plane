@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 done (all merged, main green).** Now: AoE templates snap to cell centres (DM #375, `fix/aoe-cell-origin`). Open DM recap calls: damage card width, BL-146, spell-fx `complete`, sprint gate. Decisions up to #375. All worktrees linked to workspace wR.
+**Phase:** **Sprint 14 done (all merged, main green).** Now: AoE templates snap to cell centres (DM #375, `fix/aoe-cell-origin`); Map effects default Full (#376, `fix/vfx-default-full`). Open DM recap calls: damage card width, BL-146, spell-fx `complete`, sprint gate. Decisions up to #376. All worktrees linked to workspace wR.
 
 **Resume (in order):**
 1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
@@ -46,6 +46,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Spell FX core (#374) | merged a09fef12 | — | **merged** (raw-intent walkthrough 8/9: cue size → budget 480 B worst case, typical 307 B; CI green; registries recorded in AGENTS §9.9) | — |
 | Spell FX build (#374) | merged 450f4df2 | — | **merged** (§13 walkthrough 12/12 `.verify/sprint14/walkthroughs/20261028-vfx/`; frame median 1.3 ms at 11 tokens; baselines refreshed; BL-151 toast over the sheet's End button) | — |
 | AoE cell origin (#375) | `fix/aoe-cell-origin` (w84, slot 0) | build-aoecell | building | walkthrough → merge |
+| Map effects default Full (#376) | `fix/vfx-default-full` (w85) | build-vfxfull | building (small, no walkthrough) | merge |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
