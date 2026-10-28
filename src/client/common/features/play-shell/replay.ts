@@ -1057,6 +1057,8 @@ export type ScriptStep =
   | { drag: string; rect: Rect; resized?: boolean }
   | { viewport: Viewport }
   | { pan: { x: number; y: number } }
+  /** A map tool bar shown at `rect` (a `push`), or `null`: the bar goes (a `return`). */
+  | { toolbar: Rect | null }
   | "end"
   | "start"
   | "reload"
@@ -1141,6 +1143,16 @@ export function runScript(
     } else if ("pan" in step) {
       panTo(sim, step.pan);
       record(`pan ${step.pan.x},${step.pan.y}`, []);
+    } else if ("toolbar" in step) {
+      if (step.toolbar) {
+        sim.reports.set("map.toolbar", step.toolbar);
+        dispatch(sim, { type: "push", rect: step.toolbar });
+        record("toolbar show", check(sim, before, { push: true }));
+      } else {
+        sim.reports.delete("map.toolbar");
+        dispatch(sim, { type: "return" });
+        record("toolbar hide", check(sim, before));
+      }
     } else if ("open" in step) {
       const beforeTokens = tokensNow(sim);
       userOpen(sim, step.open);

@@ -97,8 +97,8 @@ export type Placed =
  * grew on the way up from that size: back when the viewport is ≤ it again, I7); `at` = the rect the
  * displacement wrote (null: put away);
  * `shrunk`: a launcher window shrunk to its useful size for `window:<kind>` (L3s, BL-99), stored
- * shrunk (a reload keeps the layout it shows); `under`: that shrink, when a later cause displaced
- * the shrunk window (it applies again once the window is back).
+ * shrunk (a reload keeps the layout it shows); `under`: that shrink (or a `grown:` memory), when a
+ * later cause displaced the window (it applies again once the window is back).
  */
 export interface Displacement {
   kind: string;
@@ -635,12 +635,16 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   /**
    * Records a displacement's first prior state for `cause` (FR-SHELL-102). An L3s shrink (BL-99)
    * a later cause displaces waits under it: the window comes back shrunk, still shrunk for its
-   * own cause.
+   * own cause. So does a `grown:` memory a tool bar or window displaces (walkthrough F1 5): the
+   * window comes back to its rect when that cause ends, and the way down still restores it.
    */
   const remember = (w: WindowState, cause: string, at: Rect | null) => {
     const id = idOf(w);
     const old = memory.get(id);
-    const under = old?.shrunk && old.cause !== cause ? old : undefined;
+    const waits =
+      old?.shrunk === true ||
+      (old !== undefined && causeGrown(old.cause) !== null && /^(toolbar|window):/.test(cause));
+    const under = old && waits && old.cause !== cause ? old : undefined;
     const prior = under ? undefined : old;
     memory.set(
       id,
@@ -1445,7 +1449,8 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       const free = !blocked && !hard.some((k) => overlaps(r, k));
       if (free && (d.userSpot || pcFree(r))) {
         setWin(id, back);
-        // Back at its L3s rect (BL-99): that shrink holds again until its own cause ends.
+        // Back at its L3s rect (BL-99): that shrink holds again until its own cause ends; so
+        // does a `grown:` memory (walkthrough F1 5).
         if (d.under && sameRect(back, d.under.at)) memory.set(id, d.under);
         placed.set(id, "returned");
         pcFlags.set(id, pcFree(r));
