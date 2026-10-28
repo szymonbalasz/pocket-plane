@@ -36,6 +36,7 @@ const bless: EffectRecord = {
   endedByHpChangeId: null,
   modifiers: [],
   presetKey: null,
+  fx: null,
   createdAt: "t",
   updatedAt: "t",
 };
@@ -54,6 +55,8 @@ const WHITELIST = [
   "targetCharacterId",
   "encounterId",
   "endsRound",
+  // spell-fx (VFX §8): the map effect rides the effect's rule.
+  "fx",
 ];
 
 const roundTrip = (s: { parse(v: unknown): unknown }, v: unknown) =>

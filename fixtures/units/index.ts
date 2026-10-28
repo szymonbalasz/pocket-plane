@@ -131,6 +131,10 @@ import thornTown from "./scenes-map/thorn-town";
 import town from "./scenes-map/town";
 import recapLootHaul from "./session-recap/recap-loot-haul";
 import recapShareNote from "./session-recap/recap-share-note";
+import fireCard from "./spell-fx/fire-card";
+import moilRow from "./spell-fx/moil-row";
+import sgRow from "./spell-fx/sg-row";
+import vfxFight from "./spell-fx/vfx-fight";
 import sbFightFacts from "./stats/sb-fight-facts";
 import sbLuckReroll from "./stats/sb-luck-reroll";
 import sbLuckRolls from "./stats/sb-luck-rolls";
@@ -313,4 +317,9 @@ export const units: readonly Fixture[] = [
   kitMiraSpells,
   // Sprint 13 K12 (build/kit-round3-combat): Mira's in-turn and Thorn's after-owner Fire Elementals
   kitGroups,
+  // Spell FX core (fix/vfx-core): the fight, Mira's and Thorn's FX spell rows, Mira's fire card
+  vfxFight,
+  sgRow,
+  moilRow,
+  fireCard,
 ];

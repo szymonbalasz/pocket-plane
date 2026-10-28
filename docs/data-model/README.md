@@ -993,6 +993,7 @@ From [effect-modifiers](../specs/effect-modifiers.md#8-data-model) (MOD, `comple
 | Table / leaf | Change | Default (push-safe) | Visibility | Source |
 |---|---|---|---|---|
 | `effect` | + `modifiers` (**JSON leaf** Modifier[] 0–6), `preset_key` (text ≤ 40 \| null: built-in key or preset id, soft) | `[]`, null | DM full; players iff PC effect (`targetCharacterId` set), `presetKey` built-in keys only | [FR-MOD-03](../specs/effect-modifiers.md#6-functional-requirements), [FR-MOD-21](../specs/effect-modifiers.md#6-functional-requirements) |
+| `effect` *(spell-fx, built, fix/vfx-core, [§142](#142-spell-fx-core-effectfx-spellsfx-vfx-core))* | + `fx` (**JSON leaf** `{preset, params, spellId?}` ≤ 200 B \| null) | null | Rides the effect's rule; the player redaction gains `fx` | [FR-VFX-03](../specs/spell-fx.md#61-presets-and-the-map-effect) |
 | `effect_preset` (new, record type `effect-preset`) | see below | — | DM full; player own rows (`ownerPlayerId`) | [FR-MOD-22](../specs/effect-modifiers.md#6-functional-requirements) |
 | `game_log_entry.payload` (`roll` items) | + optional `mods [{label \| null, value, expression?, auto?, rollId?}]`, `modes [label \| null]`; `total` includes the parts | absent; old rows parse | as the payload (labels null for effects players don't receive) | [FR-MOD-19](../specs/effect-modifiers.md#6-functional-requirements) |
 | `game_log_entry.dmPayload` (`roll`) | new: `{items: [{mods: [{effectId, label}], modes?}]}` | null (no parts) | DM only | FR-MOD-19, [FR-DICE-28](../specs/dice-roll-log.md#6-functional-requirements) |
@@ -2721,3 +2722,18 @@ From [kit-parity](../specs/post-mvp/kit-parity.md#8-data-model) §8 (round-2 gap
 
 - **Derived (client, not stored):** the sheet's `wide` (`isWideSheet(clientWidth, paddingX)`: the body's content width ≥ `SHEET_WIDE_PX` 560, as its `@container/sheet` query; `SheetWide` context) and the tab strip's `fadeOf({prev, next})` (`start` \| `end` \| `both`).
 - **Fixtures:** unit `kit-mira-spells` (character-sheet-full; requires `char-mira-full`): Mira's spellcasting WIS with two 1st-level slots, one used (`char.useResource`), and Hunter's Mark (level 1, concentration, 1d6 force). Bundle `kit-round3` = `theme-gilt` + `kit-mira-spells` + `cbtx-effects` + `cmp-srd-mini` + `cp-srd` + `pet-owlbear` + `dicex-request-open`; bundle `kit-parity` appends `kit-mira-spells` (K13 comment). CON-44 (measured): `kit-round3` DM 38 745 B, P1 17 712 B, P2 15 070 B; `kit-parity` DM 54 495 B, P1 25 402 B, P2 21 312 B (+315 B for the DM and Mira's owner, 0 B for player-2).
+
+## 142. Spell FX core: `effect.fx`, `spells[].fx` (VFX core)
+
+From [spell-fx §8](../specs/spell-fx.md#8-data-model) and [ADR-0071](../architecture/adr/0071-spell-fx.md). **Built by `fix/vfx-core`.** No new table or record type. Wire: [protocol §179](../protocol/README.md#179-spell-fx-core-effectfx-vfxcast-vfxseteffectfx-the-vfxhit-cue-vfx-core).
+
+| Entity | Field | Type | Default | Visibility | Source |
+|---|---|---|---|---|---|
+| `effect` | `fx` *(new column, push-safe `ADD COLUMN`)* | **JSON leaf** `{preset, params, spellId?}` \| null, ≤ 200 B (zod `FxRecord`) | null | Rides the effect's rule (FR-CBTX-31): DM full; players on every effect they receive (the redaction gains `fx`) | FR-VFX-03, -07, -09 |
+| `creature-sheet` | `spells[].fx` *(inside the existing JSON leaf)* | `{preset, params}` optional, ≤ 200 B (zod `SpellRowFxRecord`; `char.putRow` takes `SpellRowFx`: catalogue presets, params defaults filled) | absent | As the sheet (DM + owner) | FR-VFX-05 |
+| Hit cue | — | transient server signal `vfx.hit` (`HitCue`) | — | Per connection, protocol §179 | FR-VFX-21 |
+
+- **Relations:** `fx.spellId` → a spell row id in the target creature's sheet (soft: a deleted row leaves the effect running).
+- **Derived (pure, `@shared/spell-fx`):** `suggestPreset(name)` (FR-VFX-04), `hitLooks(cue)` (FR-VFX-19, -20), `emanationCells(footprint, radiusFt, map)` (FR-VFX-24: FR-MAP-22 distance from the nearest footprint cell ≤ radius; footprint and off-map cells excluded).
+- **Persisted runtime state:** only `effect.fx`.
+- **Fixtures:** units `vfx-fight` (Goblin Ambush live; "Spell FX" round 1: Mira 15, Goblin Sneak 12, Thorn 10, each bound to their token; Mira's turn), `sg-row` (Mira a WIS caster + the Spirit Guardians row, radiant), `moil-row` (Thorn a CHA caster + the Shadow of Moil row), `fire-card` (Mira's Fire Bolt row + her pending card, 7 fire, as `player-1`); bundle `spell-fx` = `map-tools` + those four. Not in `session-sim-13` (sheet edits, its own fight).

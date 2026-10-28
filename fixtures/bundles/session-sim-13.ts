@@ -43,5 +43,7 @@ export default defineBundle({
     // client-only; `s14-kit-e2e` aliases this bundle)
     // F4 (sprint 14, DM #367 / #371): server roll guard, BL-135 (no unit: a stamp rule, no new
     // record; walkthrough on `kit-parity` with the Goblin Ambush scene shown)
+    // VFX core (sprint 14 + Spell FX, DM #374): no unit: `sg-row` / `moil-row` change sheets and
+    // `vfx-fight` starts its own fight on Goblin Ambush; walkthrough and e2e on `spell-fx`
   ],
 });
