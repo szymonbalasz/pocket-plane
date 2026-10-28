@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 (fix pack + Spell FX, #374) on the CI test loop (#368).** F1, F2, F4 merged. F3 re-test running. VFX core merged; VFX build starts after F3 merges. Decisions up to #374. All worktrees linked to workspace wR.
+**Phase:** **Sprint 14 (fix pack + Spell FX, #374) on the CI test loop (#368).** F1, F2, F3, F4 and VFX core merged. VFX build building (last slice). Decisions up to #374. All worktrees linked to workspace wR.
 
 **Resume (in order):**
 1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
@@ -42,9 +42,9 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Sprint 14 F1 frame | merged 2c493f7a | — | **merged** (walkthrough 4/6 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f1{,r}/`; check 1030 targeted, replay 418/418, CI green; player-gilt.png refreshed; tool-bar return after a grow fixed, pre-existing) | — |
 | Sprint 14 F2 toasts | merged 6ce69034 | — | **merged** (walkthrough 9/9 `.verify/sprint14/walkthroughs/20261028-s14f2/`; check 763 targeted, area e2e 19/19, branch + main CI green) | — |
 | Sprint 14 F4 roll guard | merged aa53fa6f | — | **merged** (walkthrough 7/8 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f4{,r}/`; fog-for-one-player leak via the combatant path fixed; CI green after flake re-runs → BL-147, BL-148) | — |
-| Sprint 14 F3 kit nits | `fix/s14-kit` (w70, slot 0) | build-f14c, test-s14f3 | walkthrough 5/6 → child-row fix → merged main (protocol §180) → re-test running | merge |
+| Sprint 14 F3 kit nits | merged 9801a94f | — | **merged** (walkthrough 5/6 → re-test 5/5 `.verify/sprint14/walkthroughs/20261028-s14f3{,r}/`; 4 baselines refreshed on purpose; protocol §180) | — |
 | Spell FX core (#374) | merged a09fef12 | — | **merged** (raw-intent walkthrough 8/9: cue size → budget 480 B worst case, typical 307 B; CI green; registries recorded in AGENTS §9.9) | — |
-| Spell FX build (#374) | `build/vfx` | — | brief ready (`build-vfxbuild.md`, key `vfxbuild`) | start when F3 merges |
+| Spell FX build (#374) | `build/vfx` (w82, slot 0) | build-vfxbuild, test-vfx | ready (CI green b376df4b; OQ-VFX-04 A: frameMs median 1.4-1.5 ms vs 4 ms gate, 4 Konva layers; baselines refreshed: auras + dm/player) → §13 walkthrough running | merge |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
@@ -62,6 +62,7 @@ Sprint 14:
 - F1 walkthrough step 3: launcher button rects differ between themes by up to 8 px (label text drawn in each theme's font); the labelled set and the fit decision are identical (BL-136 / FR-THEME-07): accepted.
 - F3: notice stack with no clear spot → compact one-line summary (200 px), placed again (FR-NOTE-79); the roll bar's eye uses the shared roll-guard helper, but per-player fog never reaches the DM client, so a token only some players see is still forced DM-only by the server while the eye stays on (accepted: the server is the guard); stat-block empty space → BL-149, attack property chips → BL-150; damage card stays 440 px (FR-KIT-66) — **raise at recap** (330 needs a card redesign).
 - VFX core: Goblin Sneak (renamed) attacks stay DM-only → no player cue; walkthrough S6 applies the hit by hand. Cast from a monster's sheet with several of its combatants in the fight → conflict (kept). Compendium Add to sheet fills fx in the build slice.
+- VFX build: players open Show / Hide affected cells from the map's right-click menu (no player token menu; FR-VFX-23 note); hit looks stay full at Reduced (FR-VFX-26 cap is per preset).
 - F4: definition rolls (stat block, NPC sheet) check every instance; fog counts per player (seen by only some players → DM-only); the roll bar's public switch the server will override → F3.
 
 Sprint 11:
