@@ -6,13 +6,13 @@
 // than the zone drawn, and the same number under both themes.
 import { GILT_LABEL_ADVANCE, GILT_LABEL_UPEM, LAUNCHER_MIN_ZONE } from "./launcher-fit";
 
-/** Gilt & Stone's face for a top-bar run: `title` (IM Fell English SC) or `body` (Alegreya Sans). */
+/** Gilt & Stone's face for a top-bar run: `title` (`--font-title`) or `body` (`--font-body`). */
 export type GiltFace = "title" | "body";
 
 /**
- * Alegreya Sans (Gilt's `--font-body`) per committed weight (`themes/fonts.css`): advances for
+ * Gilt's `--font-body` face per committed weight (`themes/fonts.css`): advances for
  * U+0020–U+007E in font units, `ALEGREYA_UPEM` per em, read off the committed woff2 files (test
- * `BL-136 the Alegreya Sans tables are the committed fonts'`).
+ * `BL-136 the Gilt body tables are the committed fonts'`).
  */
 export const ALEGREYA_UPEM = 1000;
 export const ALEGREYA_ADVANCE: Readonly<Record<400 | 500 | 700, readonly number[]>> = {
@@ -39,14 +39,14 @@ export const ALEGREYA_ADVANCE: Readonly<Record<400 | 500 | 700, readonly number[
   ],
 };
 
-/** The Alegreya Sans face CSS font matching picks for `weight` among 400, 500, 700. */
+/** The `--font-body` face CSS font matching picks for `weight` among 400, 500, 700. */
 export function alegreyaWeight(weight: number): 400 | 500 | 700 {
   return weight <= 400 ? 400 : weight <= 500 ? 500 : 700;
 }
 
 /**
  * A run's width in its Gilt face, px: no kerning, a character outside the table as the widest,
- * IM Fell's synthetic bold (one face, 400) at `px / 24` more per character from 600, plus 1 px.
+ * the title face's synthetic bold (one face, 400) at `px / 24` more per character from 600, plus 1 px.
  */
 export function giltTextWidth(text: string, face: GiltFace, weight: number, px: number): number {
   const adv = face === "title" ? GILT_LABEL_ADVANCE : ALEGREYA_ADVANCE[alegreyaWeight(weight)];

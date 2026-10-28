@@ -327,7 +327,7 @@ describe("FR-THEME-07 BL-136 launcher labels fit at one theme-independent width"
 });
 
 describe("FR-THEME-05 FR-KIT-14 BL-136 the launcher's room is the same under both themes", () => {
-  test("BL-136 the Alegreya Sans tables are the committed fonts' (400, 500, 700, U+0020–U+007E)", () => {
+  test("BL-136 the Gilt body tables are the committed fonts' (Alegreya Sans 400, 500, 700, U+0020–U+007E)", () => {
     for (const w of [400, 500, 700] as const) {
       const file = fileURLToPath(
         new URL(`../../themes/fonts/alegreya-sans-${w}.latin.woff2`, import.meta.url),
