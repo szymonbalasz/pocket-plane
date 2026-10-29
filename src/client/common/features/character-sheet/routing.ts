@@ -6,7 +6,7 @@ import {
   type SheetRollIntent,
   type SheetRollKind,
 } from "@shared/character-sheet/schemas";
-import type { ManualEntry, ManualPart, RollMode } from "@shared/dice-roll-log/schemas";
+import type { ManualEntry, ManualPart, RollMode, StagedPart } from "@shared/dice-roll-log/schemas";
 import type { Ability, Skill } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import { IntentRejected } from "../../sync/connection";
@@ -14,10 +14,15 @@ import { IntentRejected } from "../../sync/connection";
 /** What the shared roll control hands the sheet (FR-DICE-24). */
 export interface RollRouteInput {
   mode: RollMode;
-  /** One per expression: attack (Attack + damage) 2 (to-hit, damage); toHit, damage, … 1. */
+  /** One per expression (to-hit 1; damage 1 + extra parts; old Attack + damage 2). */
   manual?: ManualEntry[];
   /** FR-MOD-18: physical part groups, one list per `manual` entry (roll control's request). */
   manualParts?: ManualPart[][];
+  /**
+   * FR-CHARX-128 (ADR-0073): the tray's staged parts (Attack / Damage rolled from the tray, edited
+   * or not); absent on Alt+click and request answers. Sent as the intent's `parts`.
+   */
+  parts?: StagedPart[];
   /** DM override only. */
   public?: boolean;
 }
@@ -157,6 +162,7 @@ export function charRollPayload(
   if (r.spellId) p.spellId = r.spellId;
   if (input.manual) p.manual = input.manual;
   if (input.manualParts) p.manualParts = input.manualParts;
+  if (input.parts) p.parts = input.parts;
   if (input.public !== undefined) p.public = input.public;
   return p;
 }

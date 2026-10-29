@@ -4,7 +4,8 @@
 // §6.1), per attack row and per attack or save spell, with the row's `ref`: Attack (`toHit` /
 // `spellToHit`, a spell only with damage) → `cbt.attack {rolls: "toHit"}`; Damage (`damage` /
 // `spellDamage`) → `cbt.rollDamage`; Attack + damage (`attack` / `spellAttack`) → `cbt.attack`.
-// FR-CBT-170 (#385): the tray's staged `parts` ride along on Attack and Damage.
+// FR-CBT-169, -170 (#385): the sheet asks for Attack and Damage only (Attack + damage stays
+// claimed for an old caller); the tray's staged `parts` ride along on both.
 // Healing, checks, saves and skills are never claimed: they stay `char.roll` (FR-CBT-45). A PC
 // hidden from its owner isn't in the player's store, so the sheet falls back to `char.roll`
 // (OQ-CBT-28).
@@ -21,12 +22,7 @@ import {
 import type { StagedPart } from "@shared/dice-roll-log/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import type {
-  RollRoute,
-  RollRouteClaim,
-  RollRouteInput,
-  RollRouteRef,
-} from "../character-sheet/routing";
+import type { RollRoute, RollRouteClaim, RollRouteRef } from "../character-sheet/routing";
 import { startedIn } from "./store";
 
 function combatantOf(store: RecordStore, characterId: string): CombatantView | null {
@@ -141,13 +137,11 @@ const refFields = (ref?: RollRouteRef) => ({
 });
 
 /**
- * FR-CBT-170 (#385): the tray's staged parts, when the roll was staged (`RollRequest.parts`
- * reaches the route as its input; absent on Alt+click and request answers).
+ * FR-CBT-170 (#385): the tray's staged parts, when the roll was staged (`RollRequest.parts` /
+ * `RollRouteInput.parts`; absent on Alt+click and request answers).
  */
-export const partsOf = (input: RollRouteInput): { parts?: StagedPart[] } => {
-  const parts = (input as { parts?: StagedPart[] }).parts;
-  return parts ? { parts } : {};
-};
+export const partsOf = (input: { parts?: StagedPart[] }): { parts?: StagedPart[] } =>
+  input.parts ? { parts: input.parts } : {};
 
 /** Kinds this route claims; per kind, a weapon row (`attackId` / none) or a spell row. */
 const ATTACK_KINDS: Partial<Record<SheetRollKind, "weapon" | "spell">> = {

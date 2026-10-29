@@ -1,4 +1,4 @@
-// Actions tab (CHARX §7): attacks (Attack · Damage · Attack + damage each, §6.1), spellcasting
+// Actions tab (CHARX §7): attacks (Attack · Damage each, §6.1, FR-CHARX-126), spellcasting
 // header (spell attack, DC, slot pips), spells grouped by level with their rolls. The only place
 // attacks are rolled (FR-CHARX-44). Edit mode: rows editable in place.
 import { signed } from "@shared/character-sheet/logic";
@@ -96,10 +96,10 @@ const typeOptions = [
 ];
 
 /**
- * FR-CHARX-41/43: a row's roll buttons in §6.1 order; each asks the roll routes with its own
- * kind + the row's ref (a hidden claim drops that button only). DM public overrides are the
- * header's Public rolls menu's Attack / Damage switches (`charx-public-attack` / `-damage`, by
- * the roll's category; BL-139).
+ * FR-CHARX-126/43: a row's roll buttons in §6.1 order (a click stages the tray, FR-CHARX-127);
+ * each asks the roll routes with its own kind + the row's ref (a hidden claim drops that button
+ * only). DM public overrides are the header's Public rolls menu's Attack / Damage switches
+ * (`charx-public-attack` / `-damage`, by the roll's category; BL-139).
  */
 function RowButtons({
   buttons,

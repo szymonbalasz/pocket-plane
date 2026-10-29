@@ -534,9 +534,9 @@ describe("FR-CHARX-114 action boxes", () => {
     const feats = render(<FeaturesTab />);
     expect(boxes(feats)).toEqual(["features"]);
     expect(box(feats, "features")).toContain('data-testid="charx-feature"');
-    // Rows and buttons unchanged.
+    // Rows and buttons unchanged (FR-CHARX-126: Attack, Damage).
     expect(box(actions, "attacks")).toContain(
-      'data-testid="charx-roll-attack-damage" data-record-id="lb"',
+      'data-testid="charx-roll-damage" data-record-id="lb"',
     );
   });
 });
@@ -562,7 +562,7 @@ describe("K13 wide Main (DM #363)", () => {
       expect(box(wide, "attacks")).toContain(
         'data-testid="charx-attack" data-record-id="lb" data-scope="main"',
       );
-      expect(scoped(wide, "charx-roll-attack-damage")).toBe(1);
+      expect(scoped(wide, "charx-roll-damage")).toBe(1);
       expect(scoped(wide, "charx-slot")).toBe(6); // 4 level-1 + 2 level-2 pips
       expect(box(wide, "spells")).toContain('data-testid="charx-spellcasting"');
       expect(box(wide, "spells")).toContain('data-testid="charx-spell" data-record-id="hm"');

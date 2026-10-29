@@ -16,7 +16,7 @@ import {
   sendSheetRoll,
   sheetBadge,
 } from "./routing";
-import { attackButtons } from "./view-model";
+import { attackButtons, spellButtons } from "./view-model";
 
 const sent: [string, unknown][] = [];
 const send = (name: string, payload: unknown) => {
@@ -302,8 +302,8 @@ describe("FR-CHARX-24 route ref", () => {
   });
 });
 
-describe("FR-CHARX-43 three buttons through the routes", () => {
-  test("FR-CHARX-43 a route claiming only toHit takes Attack; Damage and Attack + damage stay char.roll", async () => {
+describe("FR-CHARX-43 two buttons through the routes", () => {
+  test("FR-CHARX-43 a route claiming only toHit takes Attack; Damage stays char.roll", async () => {
     sent.length = 0;
     const onlyToHit: RollRoute = {
       name: "to-hit",
@@ -323,32 +323,121 @@ describe("FR-CHARX-43 three buttons through the routes", () => {
     expect(sent).toEqual([
       ["cbt.attack", { rolls: "toHit", mode: "normal", attackId: "a2" }],
       ["char.roll", { characterId: "mira", kind: "damage", mode: "normal", attackId: "a2" }],
-      ["char.roll", { characterId: "mira", kind: "attack", mode: "normal", attackId: "a2" }],
     ]);
   });
 
-  test("FR-CHARX-43 FR-CBT-74 combat's route in an encounter claims all three buttons (S1)", () => {
-    const store = {
-      ...emptyStore(),
-      records: {
-        encounter: { e1: { id: "e1", status: "started", round: 1, playerTurnCombatantId: null } },
-        combatant: {
-          cb: { id: "cb", encounterId: "e1", kind: "pc", entityId: "mira", name: "Mira" },
-        },
-        entity: {
-          mira: {
-            id: "mira",
-            statBlock: { attacks: [{ id: "a1", name: "Sword", toHit: 4, damage: "1d6" }] },
-          },
+  /** A started fight with Mira (a sword, Guiding Bolt) as an active combatant. */
+  const fight = {
+    ...emptyStore(),
+    records: {
+      encounter: { e1: { id: "e1", status: "started", round: 1, playerTurnCombatantId: null } },
+      combatant: {
+        cb: { id: "cb", encounterId: "e1", kind: "pc", entityId: "mira", name: "Mira" },
+      },
+      entity: {
+        mira: {
+          id: "mira",
+          statBlock: { attacks: [{ id: "a1", name: "Sword", toHit: 4, damage: "1d6" }] },
         },
       },
-    };
+      "creature-sheet": {
+        mira: {
+          id: "mira",
+          entityId: "mira",
+          spells: [{ id: "gb", name: "Guiding Bolt", level: 1, roll: "attack", damage: "4d6" }],
+        },
+      },
+    },
+  };
+
+  test("FR-CHARX-43 FR-CBT-74 combat's route in an encounter claims both buttons", () => {
     const kinds = (
       buttons: { kind: SheetRollKind }[],
       ref: { attackId?: string; spellId?: string },
-    ) => buttons.map((b) => routeFor(rollRoutes, store, "mira", b.kind, routeRef(ref)) !== null);
-    expect(kinds(attackButtons(), { attackId: "a1" })).toEqual([true, true, true]);
-    expect(sheetBadge(rollRoutes, store, "mira")).toBe("In combat");
+    ) => buttons.map((b) => routeFor(rollRoutes, fight, "mira", b.kind, routeRef(ref)) !== null);
+    expect(kinds(attackButtons(), { attackId: "a1" })).toEqual([true, true]);
+    expect(sheetBadge(rollRoutes, fight, "mira")).toBe("In combat");
+  });
+
+  test("FR-CBT-169 two actions: the sheet's Attack / Damage (weapon and spell rows) route to cbt.attack {rolls: toHit} / cbt.rollDamage with the tray's parts; the route never sends Attack + damage", async () => {
+    sent.length = 0;
+    const rows = [
+      { buttons: attackButtons(), ref: { attackId: "a1" } },
+      {
+        buttons: spellButtons({ roll: "attack", damage: "4d6", effect: "damage" }),
+        ref: { spellId: "gb" },
+      },
+    ];
+    for (const { buttons, ref } of rows) {
+      for (const b of buttons) {
+        const claim = routeFor(rollRoutes, fight, "mira", b.kind, routeRef(ref));
+        expect(claim).not.toBeNull();
+        const parts =
+          b.label === "Attack" ? [{ expression: "1d20+5" }] : [{ expression: "5d6" as const }];
+        await sendSheetRoll(send, claim, "mira", b.kind, { mode: "normal", parts }, ref);
+      }
+    }
+    expect(sent).toEqual([
+      [
+        "cbt.attack",
+        {
+          attackerId: "cb",
+          mode: "normal",
+          rolls: "toHit",
+          attackId: "a1",
+          parts: [{ expression: "1d20+5" }],
+        },
+      ],
+      ["cbt.rollDamage", { attackerId: "cb", attackId: "a1", parts: [{ expression: "5d6" }] }],
+      [
+        "cbt.attack",
+        {
+          attackerId: "cb",
+          mode: "normal",
+          rolls: "toHit",
+          spellId: "gb",
+          parts: [{ expression: "1d20+5" }],
+        },
+      ],
+      ["cbt.rollDamage", { attackerId: "cb", spellId: "gb", parts: [{ expression: "5d6" }] }],
+    ]);
+    // Every cbt.attack is to-hit only (never Attack + damage).
+    for (const [name, payload] of sent) {
+      if (name === "cbt.attack") expect(payload).toMatchObject({ rolls: "toHit" });
+    }
+  });
+});
+
+describe("FR-CHARX-128 staged parts from the client", () => {
+  test("FR-CHARX-128 staged parts reach char.roll out of combat; absent (Alt+click) = none", async () => {
+    sent.length = 0;
+    const parts = [{ expression: "5d6", type: "radiant" as const }];
+    await sendSheetRoll(
+      send,
+      null,
+      "mira",
+      "spellDamage",
+      { mode: "normal", parts },
+      {
+        spellId: "gb",
+      },
+    );
+    await sendSheetRoll(send, null, "mira", "spellDamage", { mode: "normal" }, { spellId: "gb" });
+    expect(sent).toEqual([
+      [
+        "char.roll",
+        { characterId: "mira", kind: "spellDamage", mode: "normal", spellId: "gb", parts },
+      ],
+      ["char.roll", { characterId: "mira", kind: "spellDamage", mode: "normal", spellId: "gb" }],
+    ]);
+    expect(
+      charRollPayload("mira", "toHit", { mode: "advantage", parts: [{ expression: "1d20+7" }] }),
+    ).toEqual({
+      characterId: "mira",
+      kind: "toHit",
+      mode: "advantage",
+      parts: [{ expression: "1d20+7" }],
+    });
   });
 });
 
