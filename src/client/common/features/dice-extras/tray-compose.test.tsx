@@ -8,7 +8,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
-import type { RollControlOptions, RollRequest } from "../dice-roll-log/roll-control";
+import {
+  type RollControl,
+  type RollControlOptions,
+  type RollRequest,
+  useRollControl,
+} from "../dice-roll-log/roll-control";
 import { notationRequest } from "./DiceText";
 import { diceExtras, type TrayRequest } from "./store";
 import {
@@ -114,6 +119,18 @@ describe("FR-DICEX-97 editable adjust", () => {
     expect(tray.expressions).toEqual(["5d6"]);
     tray.onRoll({ mode: "normal" });
     expect(got).toEqual([{ mode: "normal", parts: [{ expression: "5d6", type: "radiant" }] }]);
+    // The tray's own control rolls (never stages again), Shift → advantage.
+    let control: RollControl | null = null;
+    function Probe() {
+      control = useRollControl(tray, { tray: true });
+      return null;
+    }
+    render(<Probe />);
+    (control as RollControl | null)?.roll({ shiftKey: true });
+    expect(got[1]).toEqual({
+      mode: "advantage",
+      parts: [{ expression: "5d6", type: "radiant" }],
+    });
     // The tray shows it editable: the palette, die buttons, a type per group, the constant.
     diceExtras.stage(request);
     const html = render(<TrayWindow />);

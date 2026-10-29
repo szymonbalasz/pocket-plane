@@ -264,8 +264,9 @@ export function useRollControl(
     roll(keys) {
       setError(null);
       const mode = modeFromKeys(keys, options.mode ?? "normal");
-      // FR-DICEX-98: a `purpose` control swaps the two: click stages, Alt rolls at once.
-      if ((keys?.altKey === true) !== stagesOnClick(options)) {
+      // FR-DICEX-98: a `purpose` control swaps the two: click stages, Alt rolls at once. The
+      // tray's own control (already staged) always rolls.
+      if (!host.tray && (keys?.altKey === true) !== stagesOnClick(options)) {
         stageTray({
           kind: "control",
           options,
