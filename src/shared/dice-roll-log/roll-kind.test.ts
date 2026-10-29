@@ -455,3 +455,102 @@ describe("FR-DICE-92 kept dice joined across dropped ones (BL-72)", () => {
     }
   });
 });
+
+describe("FR-DICE-95 purpose in the line", () => {
+  const line = (payload: RollPayloadItem[]) =>
+    lineText(formatEntry({ kind: "roll", actorName: "Player 1", payload }).segments);
+
+  test("FR-DICE-95 purpose line: types follow the values, unlabelled items read attack / damage", () => {
+    const d8 = item({
+      rollId: "a",
+      expression: "1d8",
+      dice: [{ faces: 8, value: 5, kept: true }],
+      constant: 0,
+      total: 5,
+      natural: null,
+      purpose: "damage",
+      part: { type: "slashing", extra: false },
+    });
+    const d6 = item({
+      rollId: "b",
+      expression: "1d6",
+      dice: [{ faces: 6, value: 3, kept: true }],
+      constant: 0,
+      total: 3,
+      natural: null,
+      purpose: "damage",
+      part: { type: "fire", extra: true },
+    });
+    expect(line([d8, d6])).toBe("Player 1 — damage: 1d8 (5) slashing + 1d6 (3) fire = 8");
+    // A lone typed damage item: its type after its value.
+    expect(line([d8])).toBe("Player 1 — damage: 5 slashing = 5");
+    // An attack without a label.
+    expect(line([item({ purpose: "attack" })])).toBe("Player 1 — attack: 12 + 4 = 16");
+    // A sheet row's label already names the type: unchanged.
+    expect(line([{ ...d8, label: "Dagger damage (slashing)" }])).toBe(
+      "Player 1 — Dagger damage (slashing): 5 = 5",
+    );
+    // Old entries (no purpose) render as before.
+    expect(line([item()])).toBe("Player 1 — 1d20+4: 12 + 4 = 16");
+    const { purpose: _p, ...oldBase } = d8;
+    const { purpose: _q, ...oldExtra } = d6;
+    expect(line([oldBase, oldExtra])).toBe(
+      "Player 1 — Damage: 1d8 (5) slashing + 1d6 (3) fire = 8",
+    );
+  });
+
+  test("FR-DICE-95 edited mark: a muted 'edited' after the name, with its Tooltip", () => {
+    const segs = formatEntry({
+      kind: "roll",
+      actorName: "Brakka",
+      payload: [item({ label: "Flame Tongue attack", purpose: "attack", edited: true })],
+    }).segments;
+    expect(lineText(segs)).toBe("Brakka — Flame Tongue attack edited: 12 + 4 = 16");
+    expect(segs.find((s) => s.text === "edited")).toEqual({
+      text: "edited",
+      style: "muted",
+      tip: "Dice changed in the tray",
+    });
+    const run = formatEntry({
+      kind: "roll",
+      actorName: "Brakka",
+      payload: [
+        item({
+          rollId: "a",
+          label: "Flame Tongue damage (slashing)",
+          expression: "2d6+5",
+          dice: [
+            { faces: 6, value: 2, kept: true },
+            { faces: 6, value: 4, kept: true },
+          ],
+          constant: 5,
+          total: 11,
+          natural: null,
+          purpose: "damage",
+          part: { type: "slashing", extra: false },
+        }),
+        item({
+          rollId: "b",
+          label: "Flame Tongue damage (slashing)",
+          expression: "3d6",
+          dice: [
+            { faces: 6, value: 1, kept: true },
+            { faces: 6, value: 1, kept: true },
+            { faces: 6, value: 1, kept: true },
+          ],
+          constant: 0,
+          total: 3,
+          natural: null,
+          purpose: "damage",
+          part: { type: "fire", extra: true },
+          edited: true,
+        }),
+      ],
+    }).segments;
+    expect(lineText(run)).toBe(
+      "Brakka — Flame Tongue damage edited: 2d6+5 (2 + 4) slashing + 3d6 (1 + 1 + 1) fire = 14",
+    );
+    // Unedited: no mark.
+    expect(lineText(rollSegments(item({ purpose: "attack" })))).toBe("attack: 12 + 4 = 16");
+  });
+});

@@ -345,10 +345,11 @@ describe("FR-DICEX-29 DiceText", () => {
     });
   });
 
-  test("FR-DICEX-31 notation always rolls dice.roll with the tray's category", () => {
+  test("FR-DICEX-103 a notation click stages a Plain free request (FR-DICEX-31 retired)", () => {
     stage(notationRequest("1d12+5", { label: "Notation test" }, {}, undefined));
     const req = diceExtras.api.getState().request;
     expect(req?.kind).toBe("free");
+    expect(req?.kind === "free" && req.purpose).toBeUndefined();
   });
 
   test("actor = the creature if the viewer may roll as it (FR-DICE-10), else the default", () => {

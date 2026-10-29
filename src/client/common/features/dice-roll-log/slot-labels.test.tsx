@@ -11,10 +11,22 @@ import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { diceExtras } from "../dice-extras/store";
-import { TrayWindow } from "../dice-extras/TrayWindow";
+import { TrayWindow, trayControlOptions } from "../dice-extras/TrayWindow";
+import {
+  compositionOf,
+  joinDie,
+  partSlotLabels,
+  setGroupType,
+  stagedPartsOf,
+} from "../dice-extras/tray-parts";
 import { NO_PREVIEW } from "../effect-modifiers/roll-preview";
 import { type FormOptions, formEntries, formSlots, type SlotInput, slotLabelsOf } from "./logic";
-import { ManualForm, type RollControl, type RollControlOptions } from "./roll-control";
+import {
+  ManualForm,
+  type RollControl,
+  type RollControlOptions,
+  type RollRequest,
+} from "./roll-control";
 
 function render(node: React.ReactNode) {
   const you = { campaignId: "c1", role: "player", playerId: "p1" };
@@ -206,5 +218,66 @@ describe("FR-DICE-41 damage types in the physical form", () => {
     );
     if (!check.ok) throw new Error("no initiative spec");
     expect(slotLabelsOf(check.specs)).toBeUndefined();
+  });
+});
+
+describe("FR-DICE-98 roll control purpose", () => {
+  test("FR-DICE-98 roll request parts", () => {
+    // A staged Flame Tongue Damage: + a d8 (a new size: the last group's type, fire), switched
+    // to radiant; Roll → `onRoll` gets the three parts.
+    const got: RollRequest[] = [];
+    const options: RollControlOptions = {
+      expressions: ["2d6+5", "2d6"],
+      category: "damage",
+      label: "Brakka — Flame Tongue greatsword damage",
+      purpose: "damage",
+      partTypes: ["slashing", "fire"],
+      slotLabels: ["Slashing", "Fire"],
+      onRoll: (r) => got.push(r),
+    };
+    let comp = compositionOf(options.expressions, "damage", options.partTypes);
+    comp = joinDie(comp, 8, "damage");
+    comp = setGroupType(comp, 2, "radiant");
+    const parts = stagedPartsOf(comp, "damage");
+    expect(parts).toEqual([
+      { expression: "2d6+5", type: "slashing" },
+      { expression: "2d6", type: "fire" },
+      { expression: "1d8", type: "radiant" },
+    ]);
+    const tray = trayControlOptions(
+      { kind: "control", options, mode: "normal", edit: comp },
+      "",
+      "normal",
+      () => {},
+      { purpose: "damage", parts, slotLabels: partSlotLabels(comp, "damage"), crit: false },
+    );
+    // The physical form: one slot per staged part, labelled by its type (FR-DICE-41).
+    expect(tray.expressions).toEqual(["2d6+5", "2d6", "1d8"]);
+    const html = render(<ManualForm control={openControl(tray)} />);
+    expect(texts(html, "dice-manual-slot-label")).toEqual([
+      "Slashing — 2d6+5",
+      "Fire — 2d6",
+      "Radiant — 1d8",
+    ]);
+    tray.onRoll({ mode: "normal", manual: [{ diceTotal: 7 }, { diceTotal: 6 }, { diceTotal: 4 }] });
+    expect(got).toEqual([
+      {
+        mode: "normal",
+        manual: [{ diceTotal: 7 }, { diceTotal: 6 }, { diceTotal: 4 }],
+        parts,
+      },
+    ]);
+    // On a crit the form asks the extra critical dice of the edited parts.
+    const crit = trayControlOptions(
+      { kind: "control", options: { ...options, crit: true }, mode: "normal", edit: comp },
+      "",
+      "normal",
+      () => {},
+      { purpose: "damage", parts, slotLabels: partSlotLabels(comp, "damage"), crit: true },
+    );
+    expect(crit.critExpressions).toEqual(["4d6+5", "4d6", "2d8"]);
+    expect(render(<ManualForm control={openControl(crit)} />)).toContain(
+      "Extra critical dice: 1d8",
+    );
   });
 });

@@ -97,7 +97,7 @@ describe("FR-DICE-94 roll purpose", () => {
     ]);
     // A part run: "Player 1 — damage: 2d6 (…) slashing + 1d8 (…) fire = N".
     expect(t.line(dmg.entryId)).toMatch(
-      /^Player 1 — Damage: 2d6 \(.+\) slashing \+ 1d8 \(.+\) fire = \d+$/,
+      /^Player 1 — damage: 2d6 \(.+\) slashing \+ 1d8 \(.+\) fire = \d+$/,
     );
     const attack = t.diceRoll(
       { purpose: "attack", category: "attack", expression: "1d20+9" },

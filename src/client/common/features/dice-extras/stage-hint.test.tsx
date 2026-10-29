@@ -13,6 +13,7 @@ import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { ROLL_BAR_HINT, rollBarStage } from "../dice-roll-log/GameLog";
 import {
+  ROLL_NOW_HINT,
   type RollControl,
   type RollControlOptions,
   rollButtonTip,
@@ -222,5 +223,50 @@ describe("FR-DICEX-51 Alt hint on every stageable roll surface", () => {
     const html = render(<TrayWindow />);
     expect(html).toContain('data-testid="dicex-tray-state" data-value="compose"');
     expect(html.match(/data-testid="dicex-tray-die"[^>]*data-faces="6"/g)).toHaveLength(2);
+  });
+});
+
+describe("FR-DICEX-98 click stages, Alt rolls (purpose controls)", () => {
+  const options = (rolled: unknown[]): RollControlOptions => ({
+    expressions: ["1d20+9"],
+    category: "attack",
+    label: "Brakka — Flame Tongue attack",
+    purpose: "attack",
+    partTypes: [null],
+    onRoll: (r) => rolled.push(r),
+  });
+
+  test("FR-DICEX-98 click stages attack controls", () => {
+    const rolled: unknown[] = [];
+    const control = captureControl(options(rolled));
+    control.roll({ shiftKey: true });
+    expect(rolled).toEqual([]);
+    const req = diceExtras.api.getState().request;
+    expect(req).toMatchObject({ kind: "control", mode: "advantage" });
+    const html = render(<TrayWindow />);
+    expect(html).toContain('data-testid="dicex-tray-state" data-value="adjust"');
+    // Alt+click rolls at once (no parts: the row's own dice); plain controls keep Alt = stage.
+    diceExtras.clear();
+    control.roll({ altKey: true });
+    expect(rolled).toEqual([{ mode: "normal" }]);
+    expect(diceExtras.api.getState().request).toBeNull();
+    const plain: unknown[] = [];
+    const save = captureControl({ ...options(plain), purpose: undefined });
+    save.roll({});
+    expect(plain).toEqual([{ mode: "normal" }]);
+  });
+
+  test("FR-DICEX-98 roll-now hint", () => {
+    const html = render(
+      rollButtonTip({ preview: NO_PREVIEW, options: { purpose: "damage" } }, "Shift: advantage"),
+    );
+    expect(hints(html)).toBe(1);
+    expect(html).toContain(ROLL_NOW_HINT);
+    expect(html).not.toContain(STAGE_HINT);
+    expect(ROLL_NOW_HINT).toBe("Alt: roll now");
+    // Every other control keeps "Alt: adjust in tray".
+    const plain = render(rollButtonTip({ preview: NO_PREVIEW, options: {} }, "Shift: advantage"));
+    expect(plain).toContain(STAGE_HINT);
+    expect(render(<StageHint now />)).toContain(ROLL_NOW_HINT);
   });
 });

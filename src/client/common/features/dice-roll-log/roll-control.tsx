@@ -8,7 +8,9 @@
 // `options.subject` feeds the preview — the d20 slots follow the expected final mode, and the
 // form asks one labelled group per bonus die / trigger die, sent as `manualParts`. Sprint 5:
 // `RollButton` draws the Alt hint in its own tooltip (FR-DICEX-51) and `slotLabels` names each
-// slot of the form and the tray (FR-DICE-41).
+// slot of the form and the tray (FR-DICE-41). Sprint 15 (#385, FR-DICE-98): a control with a
+// `purpose` (attack / damage) stages on click and rolls at once on Alt+click (FR-DICEX-98); the
+// tray hands its staged dice back as `RollRequest.parts`.
 import {
   CATEGORY_LABEL,
   categoryPublic,
@@ -18,6 +20,8 @@ import {
   type ManualPart,
   type RollCategory,
   type RollMode,
+  type RollPurpose,
+  type StagedPart,
 } from "@shared/dice-roll-log/schemas";
 import type { PreviewGroup } from "@shared/effect-modifiers/preview";
 import { HandIcon } from "lucide-react";
@@ -88,6 +92,12 @@ export interface RollRequest {
    * Only with `manual` and `options.subject`. Single-roll intents send `manualParts[0]`.
    */
   manualParts?: ManualPart[][];
+  /**
+   * FR-DICE-98 (#385, ADR-0073): the tray's staged parts (a `purpose` control rolled from the
+   * tray, edited or not); absent on Alt+click (roll now) and every other control. Callers send
+   * it as the intent's `parts`.
+   */
+  parts?: StagedPart[];
 }
 
 export interface RollControlOptions {
@@ -124,6 +134,17 @@ export interface RollControlOptions {
    * none). Absent = no preview, no `manualParts` (tier 1).
    */
   subject?: SubjectOption;
+  /**
+   * FR-DICE-98 (#385): what the roll is for: `attack` (one expression, its d20 decides the crit)
+   * or `damage` (one expression per part). Set → click stages the tray (editable, FR-DICEX-97)
+   * and Alt+click rolls at once (FR-DICEX-98). Absent = plain: click rolls, Alt stages.
+   */
+  purpose?: RollPurpose;
+  /**
+   * FR-DICE-98: each expression's damage type, parallel to `expressions` (null = untyped, and
+   * for the to-hit); the tray's die groups start with them (FR-DICEX-101 a).
+   */
+  partTypes?: readonly (StagedPart["type"] | null)[];
   onRoll(r: RollRequest): void;
 }
 
@@ -131,25 +152,34 @@ export interface RollControlOptions {
 export interface RollKeys {
   shiftKey?: boolean;
   ctrlKey?: boolean;
-  /** FR-DICEX-06: Alt (Option on macOS) stages the roll in the dice tray instead. */
+  /**
+   * FR-DICEX-06: Alt (Option on macOS) stages the roll in the dice tray instead; on a `purpose`
+   * control it rolls at once (FR-DICEX-98).
+   */
   altKey?: boolean;
 }
 
 /** FR-DICEX-06: tooltip line for stageable roll buttons. */
 export const STAGE_HINT = "Alt: adjust in tray";
+/** FR-DICEX-98: the hint on `purpose` controls (click stages, Alt rolls). */
+export const ROLL_NOW_HINT = "Alt: roll now";
+
+/** FR-DICEX-98 (OQ-DICEX-65 A): a click stages `purpose` controls; Alt+click rolls them. */
+export const stagesOnClick = (o: Pick<RollControlOptions, "purpose">): boolean =>
+  o.purpose !== undefined;
 
 /**
  * FR-DICEX-51: the Alt hint, exactly once on every stageable roll surface (§6.1 table G):
  * `RollButton` draws it in its tooltip; a hidden-anchor roll (DM Initiative menus) in its
  * trigger's tooltip or the open menu. `line`: a muted line of its own (menus).
  */
-export function StageHint({ line = false }: { line?: boolean }) {
+export function StageHint({ line = false, now = false }: { line?: boolean; now?: boolean }) {
   return (
     <span
       data-testid="dicex-stage-hint"
       className={line ? "block px-2 pb-1 text-xs text-muted-foreground" : undefined}
     >
-      {STAGE_HINT}
+      {now ? ROLL_NOW_HINT : STAGE_HINT}
     </span>
   );
 }
@@ -234,7 +264,8 @@ export function useRollControl(
     roll(keys) {
       setError(null);
       const mode = modeFromKeys(keys, options.mode ?? "normal");
-      if (keys?.altKey) {
+      // FR-DICEX-98: a `purpose` control swaps the two: click stages, Alt rolls at once.
+      if ((keys?.altKey === true) !== stagesOnClick(options)) {
         stageTray({
           kind: "control",
           options,
@@ -288,7 +319,12 @@ export const rollTooltip = (control: Pick<RollControl, "preview">, hint: string)
  * `hint`, then the Alt hint, once. A node `hint` (CHARX FR-CHARX-113: the sheet's breakdown with
  * its own test ID) sits where a string hint would.
  */
-export function rollButtonTip(control: Pick<RollControl, "preview">, hint?: ReactNode): ReactNode {
+export function rollButtonTip(
+  control: Pick<RollControl, "preview"> & { options?: Pick<RollControlOptions, "purpose"> },
+  hint?: ReactNode,
+): ReactNode {
+  // FR-DICEX-98: "Alt: roll now" on `purpose` controls.
+  const now = control.options ? stagesOnClick(control.options) : false;
   if (hint !== null && typeof hint === "object") {
     const preview = control.preview.text;
     return (
@@ -296,7 +332,7 @@ export function rollButtonTip(control: Pick<RollControl, "preview">, hint?: Reac
         {preview && `${preview} · `}
         {hint}
         {" · "}
-        <StageHint />
+        <StageHint now={now} />
       </>
     );
   }
@@ -304,7 +340,7 @@ export function rollButtonTip(control: Pick<RollControl, "preview">, hint?: Reac
   return (
     <>
       {lead && `${lead} · `}
-      <StageHint />
+      <StageHint now={now} />
     </>
   );
 }

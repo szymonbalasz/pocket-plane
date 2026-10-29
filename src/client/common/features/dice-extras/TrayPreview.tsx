@@ -8,9 +8,12 @@
 // else "×N" (forced by room), else the area scrolls on its own (`stillSize`).
 // FR-DICEX-96 (DM #343): cells, chips and their numbers scale with the tray (`trayScale`: × 1 at
 // the min, × 1.2 at the useful size, × 1.25 at the default); the steps stay 40 / 28 (`data-cell`).
+// Sprint 15 (#385): an editable `adjust` removes dice too (FR-DICEX-97) except a locked die (the
+// attack's d20, a damage roll's last die: a span with its Tooltip text); a damage roll shows one
+// group per die size and type, led by its type Select (FR-DICEX-101).
 import type { DiceLook } from "@shared/dice-extras/looks";
 import type { RollMode } from "@shared/dice-roll-log/schemas";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
 import { DieShape } from "./DieShape";
 import type { TrayStill } from "./dice3d/index";
@@ -83,6 +86,10 @@ export interface TrayGroup {
   constant: number;
   /** FR-DICE-41: the control's slot label ("Slashing"); absent / null = none. */
   label?: string | null;
+  /** FR-DICEX-101: the group's type Select, in place of the label. */
+  lead?: ReactNode;
+  /** FR-DICEX-97: the term whose die a click may not remove, and why (its Tooltip). */
+  locked?: { term: number; tip: string } | null;
 }
 
 const signed = (n: number) => (n === 0 ? "" : n > 0 ? `+${n}` : `−${-n}`);
@@ -119,6 +126,7 @@ export function TrayDie({
   onRemove,
   cell = 40,
   scale = 1,
+  tip,
 }: {
   die: PreviewDie;
   render: "3d" | "chips";
@@ -128,6 +136,8 @@ export function TrayDie({
   cell?: StillCell;
   /** FR-DICEX-96: the tray's dice scale (× 1 = `cell` px, drawn by the classes). */
   scale?: number;
+  /** FR-DICEX-97: a locked die's reason (no remove), as its title. */
+  tip?: string;
 }) {
   const text = `${die.sign === -1 ? "−" : ""}d${die.faces}`;
   const parts = render === "3d" ? stillParts(die.faces) : null;
@@ -188,6 +198,7 @@ export function TrayDie({
     ...(die.tag && { "data-tag": die.tag }),
     ...(die.group && { "data-group": die.group }),
     "data-value": die.faces,
+    ...(tip && { "data-locked": "true", title: tip }),
   };
   const cls = cn("relative flex items-center justify-center rounded-md", CELL_BOX[cell]);
   return onRemove ? (
@@ -306,7 +317,8 @@ export function TrayPreview({
         n +
         previewDice(x.chips, g).reduce((k, d) => k + (stillParts(d.faces)?.length ?? 1), 0) +
         (x.constant !== 0 ? 1 : 0) +
-        (x.label ? 1 : 0),
+        // A type Select (FR-DICEX-101) takes about two cells.
+        (x.lead ? 2 : x.label ? 1 : 0),
       0,
     ) +
     // An extra's text ("MOD +1d4") takes about two cells.
@@ -388,7 +400,8 @@ export function TrayPreview({
         // biome-ignore lint/suspicious/noArrayIndexKey: one group per expression position
         <span key={i} className="flex flex-wrap items-center gap-1">
           {i > 0 && <span className="px-1 text-muted-foreground">·</span>}
-          {g.label && (
+          {g.lead}
+          {!g.lead && g.label && (
             <span
               data-testid="dicex-tray-group-label"
               data-index={i}
@@ -398,18 +411,22 @@ export function TrayPreview({
               {g.label}
             </span>
           )}
-          {(dice[i] ?? []).map((d, j) => (
-            <TrayDie
-              // biome-ignore lint/suspicious/noArrayIndexKey: one die per position
-              key={j}
-              die={d}
-              render={render}
-              look={look}
-              cell={cell}
-              scale={scale}
-              onRemove={onRemove && !d.tag ? () => onRemove(d.term) : undefined}
-            />
-          ))}
+          {(dice[i] ?? []).map((d, j) => {
+            const tip = g.locked && g.locked.term === d.term ? g.locked.tip : undefined;
+            return (
+              <TrayDie
+                // biome-ignore lint/suspicious/noArrayIndexKey: one die per position
+                key={j}
+                die={d}
+                render={render}
+                look={look}
+                cell={cell}
+                scale={scale}
+                {...(tip ? { tip } : {})}
+                onRemove={onRemove && !d.tag && !tip ? () => onRemove(d.term) : undefined}
+              />
+            );
+          })}
           {g.constant !== 0 && (
             <span
               className="relative font-mono text-sm text-muted-foreground"

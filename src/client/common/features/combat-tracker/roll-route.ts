@@ -4,6 +4,7 @@
 // §6.1), per attack row and per attack or save spell, with the row's `ref`: Attack (`toHit` /
 // `spellToHit`, a spell only with damage) → `cbt.attack {rolls: "toHit"}`; Damage (`damage` /
 // `spellDamage`) → `cbt.rollDamage`; Attack + damage (`attack` / `spellAttack`) → `cbt.attack`.
+// FR-CBT-170 (#385): the tray's staged `parts` ride along on Attack and Damage.
 // Healing, checks, saves and skills are never claimed: they stay `char.roll` (FR-CBT-45). A PC
 // hidden from its owner isn't in the player's store, so the sheet falls back to `char.roll`
 // (OQ-CBT-28).
@@ -17,9 +18,15 @@ import {
   DAMAGE_CARD_KIND,
   DamageCardPayload,
 } from "@shared/combat-tracker/schemas";
+import type { StagedPart } from "@shared/dice-roll-log/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import type { RollRoute, RollRouteClaim, RollRouteRef } from "../character-sheet/routing";
+import type {
+  RollRoute,
+  RollRouteClaim,
+  RollRouteInput,
+  RollRouteRef,
+} from "../character-sheet/routing";
 import { startedIn } from "./store";
 
 function combatantOf(store: RecordStore, characterId: string): CombatantView | null {
@@ -102,12 +109,14 @@ function cardRef(store: RecordStore, characterId: string, ref?: RollRouteRef) {
 
 /**
  * FR-CBT-74: the latest pending to-hit-only card of this attacker's row among `notes` (what
- * `cbt.rollDamage` completes), or null. Used by the sheet route and the DM's Initiative row.
+ * `cbt.rollDamage` completes), or null. Used by the sheet route, the DM's Initiative row and the
+ * tray route. FR-CBT-171 (#385): a card without a row matches any row; `row` null (a rowless
+ * damage roll) matches any card.
  */
 export function pendingToHitCard(
   notes: readonly NotificationRecord[],
   attackerId: string,
-  row: { attackId?: string; spellId?: string },
+  row: { attackId?: string; spellId?: string } | null,
 ): DamageCardPayload | null {
   let best: { seq: number; p: DamageCardPayload } | null = null;
   for (const n of notes) {
@@ -116,19 +125,29 @@ export function pendingToHitCard(
     if (!parsed.success) continue;
     const p = parsed.data;
     if (p.attackerId !== attackerId || p.toHit === null || p.damage !== null) continue;
-    if (p.attackId !== row.attackId || p.spellId !== row.spellId) continue;
+    const rowless = p.attackId === undefined && p.spellId === undefined;
+    if (row && !rowless && (p.attackId !== row.attackId || p.spellId !== row.spellId)) continue;
     if (!best || n.seq > best.seq) best = { seq: n.seq, p };
   }
   return best?.p ?? null;
 }
 
-const notesOf = (store: RecordStore) =>
+export const notesOf = (store: RecordStore) =>
   Object.values(store.records.notification ?? {}) as NotificationRecord[];
 
 const refFields = (ref?: RollRouteRef) => ({
   ...(ref?.attackId !== undefined ? { attackId: ref.attackId } : {}),
   ...(ref?.spellId !== undefined ? { spellId: ref.spellId } : {}),
 });
+
+/**
+ * FR-CBT-170 (#385): the tray's staged parts, when the roll was staged (`RollRequest.parts`
+ * reaches the route as its input; absent on Alt+click and request answers).
+ */
+export const partsOf = (input: RollRouteInput): { parts?: StagedPart[] } => {
+  const parts = (input as { parts?: StagedPart[] }).parts;
+  return parts ? { parts } : {};
+};
 
 /** Kinds this route claims; per kind, a weapon row (`attackId` / none) or a spell row. */
 const ATTACK_KINDS: Partial<Record<SheetRollKind, "weapon" | "spell">> = {
@@ -195,6 +214,7 @@ export const combatRollRoute: RollRoute = {
             attackerId: c.id,
             ...manualFields(input, 1),
             ...refFields(ref),
+            ...partsOf(input),
           }),
       };
       return claim;
@@ -216,6 +236,7 @@ export const combatRollRoute: RollRoute = {
               }
             : manualFields(input, 2)),
           ...refFields(ref),
+          ...(toHitOnly ? partsOf(input) : {}),
         }),
     };
   },
