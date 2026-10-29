@@ -603,7 +603,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 | `ent.creatures` | DM | 340×512 | 340×360 | 300×240 |
 | `map.scenes` | DM | 260×440 | 260×360 | 240×240 |
 | `camp.players` | DM | 400×340 | 400×340 | 360×200 |
-| `char.sheet` | DM | 320×440 | 320×360 | 280×320 |
+| `char.sheet` | DM | 320×440 (680×560 from 1680 px wide, DM 2026-10-29) | 320×360 | 280×320 |
 
 - The default layouts (token-free) are §7's sprint-5 table, unchanged; Reset layout writes them (FR-SHELL-80). ST's `stats.board` (400 × 412, min 320 × 280, seams S5) adds its own row in ST's branch (FR-SHELL-86); FU's tests take any registered kind.
 - **Auto-minimising at 1440×900, DM, Initiative + Game log open, PCs as in sim-10 b03** (expected, FR-SHELL-87 (f) pins the rects): Compendium → the left edge at 440×512 if PC-clear, else beside Initiative; Party → the other side; Encounters → no PC-clear spot at ≥ 440×412 with both open → the look-ahead finds a spot with Compendium gone, so Compendium (lowest z) is auto-minimised and Encounters takes its spot; at 1280×720 one launcher window fits beside Initiative over the 412 band, so each new one auto-minimises the previous one (as sprint 6's sequence, now also when the only clear spot sat on a PC).
