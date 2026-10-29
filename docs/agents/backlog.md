@@ -161,6 +161,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-155 | Tray attacks: a **physical** damage roll with several typed die groups out of combat is sent as one untyped expression (`dice.roll` refuses `parts` + `manual`, #388 / #390): accept manual entries per part so the types survive | S | dice-roll-log `dice.roll` + tray manual form | none | — | open |
 | BL-156 | Tray attacks: `attackItemOf` / `damageItemsOf` exist twice (server `combat-tracker/use-roll.ts` and the client Use-as action, #389): move them to `@shared/combat-tracker` | S | combat-tracker use-roll | none | — | open |
 | BL-157 | Tray attacks: Initiative **Attack ▸** menu items show no hint (no "Alt: roll now"; re-test `.verify/tray-attacks/20261029-235059-tray-buttons-retest/` 12); the Use-roll step opens at the default popup spot, not by its log line (#389) | S | DM combat-tracker attack-choices, use-roll step | none | — | open |
+| BL-158 | Flaky e2e `roll-popup.e2e.ts` FR-DICEX-39 (bundle dice-display): `dicex-throw[data-arena="screen"]` never reaches `data-state="rest"` within 6 s, attempt + retry (`main` 8deecdb9 run 40938952473, `fix/ci-popup-line-tooltip` run 40963946880; re-run green both times): 3D throw under CI load | S | e2e roll-popup | none | — | open |
 
 ## How to add items
 
