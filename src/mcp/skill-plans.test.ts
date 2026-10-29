@@ -25,9 +25,6 @@ type Plan = {
 const example = (file: string): Plan =>
   JSON.parse(readFileSync(path.join(SKILL_DIR, "examples", file), "utf8"));
 
-/** Slice 4 (`build/agent-characters`) tools: named by the skill, registered once it merges. */
-const PENDING_TOOLS = ["character_edit", "character_put_row"];
-
 /**
  * The examples' `"<… id>"` placeholders → compendium monster names to search. The mini SRD set
  * has no Orc: the Hobgoblin stands in (any monster entry is a valid base).
@@ -117,14 +114,13 @@ describe("agent-api content skill", () => {
     expect(front?.[2]).toContain("the DM asks to create or edit Pocket Plane content");
 
     const registered = (await client.listTools()).tools.map((t) => t.name);
-    const known = new Set([...registered, ...PENDING_TOOLS]);
+    const known = new Set(registered);
     const codes = new Set<string>(AgentErrorCode.options);
     const named = [...skillMd.matchAll(/`([a-z]+(?:_[a-z]+)+)\b/g)].map((x) => x[1] as string);
     const unknown = named.filter((n) => !known.has(n) && !codes.has(n));
     expect(unknown).toEqual([]);
     // Every tool and every error code has guidance.
     expect(registered.filter((t) => !named.includes(t))).toEqual([]);
-    expect(PENDING_TOOLS.filter((t) => !named.includes(t))).toEqual([]);
     expect(AgentErrorCode.options.filter((c) => !skillMd.includes(`| \`${c}\` |`))).toEqual([]);
 
     for (const file of ["orc-variants.json", "reddit-item.json"]) {
