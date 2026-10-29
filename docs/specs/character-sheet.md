@@ -95,7 +95,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark, de
 
 | Kind | Clients | Default open | Default geometry | Launcher |
 |---|---|---|---|---|
-| `char.sheet` | DM, player | player **yes**; DM no | player top-right below the top bar (clear of tool rail, `dice.log` bottom-left, toasts); DM right, below `camp.players`; 320×440, min 280×320 | "Sheet" (player), "Sheets" (DM) |
+| `char.sheet` | DM, player | player **yes**; DM no | player top-right below the top bar (clear of tool rail, `dice.log` bottom-left, toasts); DM top-right (beside `cbt.initiative`, its free slot); 320×440, **680×560 (the kit's enlarged, wide layout) at viewports ≥ 1680 px wide** (DM, 2026-10-29), min 280×320 | "Sheet" (player), "Sheets" (DM) |
 
 - **Layout** (one Card): header = portrait Avatar, name, "Level 1 Fighter", "In combat" Badge (FR-CHAR-16; only while combat claims a kind), picker Select. Stat row = AC, HP `12 / 12` (+ "Down" Badge), Speed `30 ft`, Init `+2` with **Initiative** Button. ~~Attack row = "Shortsword +4 · 1d6+2 piercing" with **Attack** Button; hidden if no attack.~~ *(N4: moved to the Actions tab, FR-CHARX-44.)* **Abilities block** (FR-CHAR-22): "Prof +2" in the header; cells e.g. "DEX 14 (+2) · Check +2 · Save +2", proficient saves dotted. HP row = number Input + Damage / Heal Buttons + caption. Default size unchanged; the body scrolls.
 - **Roll buttons** use dice-roll-log's shared roll control (roll mode keys / toggle, physical-dice popover over N expressions, DM public override) with an `onRoll` callback ([FR-DICE-24](dice-roll-log.md#6-functional-requirements)). Results appear in the game log (`dice.log`), not on the sheet.

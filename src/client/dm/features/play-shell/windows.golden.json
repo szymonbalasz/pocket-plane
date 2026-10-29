@@ -229,7 +229,7 @@
   },
   {
     "at": "reopen 1440×900 @1440×900 char.sheet",
-    "rect": "1108,448,320×440",
+    "rect": "1108,444,320×440",
     "placed": "reopened",
     "parked": "ent.creatures"
   },
@@ -331,7 +331,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 char.sheet",
-    "rect": "419,136,320×440",
+    "rect": "419,60,320×440",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -433,7 +433,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 char.sheet",
-    "rect": "442,64,320×440",
+    "rect": "442,60,320×440",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -547,8 +547,8 @@
   },
   {
     "at": "open @1440×900 char.sheet",
-    "rect": "1108,448,320×440",
-    "placed": "default",
+    "rect": "1108,444,320×440",
+    "placed": "auto",
     "parked": "ent.creatures"
   },
   {
@@ -649,7 +649,7 @@
   },
   {
     "at": "reopen @1440×900 char.sheet",
-    "rect": "1108,448,320×440",
+    "rect": "1108,444,320×440",
     "placed": "reopened",
     "parked": "ent.creatures"
   },
@@ -751,7 +751,7 @@
   },
   {
     "at": "reopen 1280×800 @1280×800 char.sheet",
-    "rect": "419,136,320×440",
+    "rect": "419,60,320×440",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -853,7 +853,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 char.sheet",
-    "rect": "442,64,320×440",
+    "rect": "442,60,320×440",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -967,7 +967,7 @@
   },
   {
     "at": "open @1280×800 char.sheet",
-    "rect": "419,136,320×440",
+    "rect": "419,60,320×440",
     "placed": "auto",
     "parked": "note.history"
   },
@@ -1069,7 +1069,7 @@
   },
   {
     "at": "reopen @1280×800 char.sheet",
-    "rect": "419,136,320×440",
+    "rect": "419,60,320×440",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -1171,7 +1171,7 @@
   },
   {
     "at": "reopen 1280×720 @1280×720 char.sheet",
-    "rect": "442,64,320×440",
+    "rect": "442,60,320×440",
     "placed": "reopened",
     "parked": "note.history"
   },
@@ -1285,7 +1285,7 @@
   },
   {
     "at": "open @1280×720 char.sheet",
-    "rect": "442,64,320×440",
+    "rect": "442,60,320×440",
     "placed": "auto",
     "parked": "note.history"
   },
@@ -1387,7 +1387,7 @@
   },
   {
     "at": "reopen @1280×720 char.sheet",
-    "rect": "442,64,320×440",
+    "rect": "442,60,320×440",
     "placed": "reopened",
     "parked": "note.history"
   },
