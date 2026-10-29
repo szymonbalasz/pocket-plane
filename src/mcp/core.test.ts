@@ -301,7 +301,7 @@ describe("FR-AGENT-19 plan_check frame", () => {
 });
 
 describe("FR-AGENT-01 list-tools", () => {
-  test("FR-AGENT-01 FR-AGENT-15 serves exactly the §9 tools; reads read-only, writes not", async () => {
+  test("FR-AGENT-01 FR-AGENT-15 serves exactly the §9 tools; write tools not read-only", async () => {
     const server = createMcpServer({
       caller: new Caller({ dataDir: tmp(), profile: "dev", dmSecret: "x", log: quietLog }),
       log: quietLog,
@@ -311,6 +311,15 @@ describe("FR-AGENT-01 list-tools", () => {
     const [a, b] = InMemoryTransport.createLinkedPair();
     await Promise.all([server.connect(a), client.connect(b)]);
     const { tools } = await client.listTools();
+    const writes = [
+      "creature_create",
+      "creature_derive",
+      "creature_edit",
+      "creature_put_row",
+      "homebrew_create",
+      "homebrew_edit",
+      "homebrew_share",
+    ];
     expect(tools.map((t) => t.name).sort()).toEqual([
       "campaigns_list",
       "character_get",
@@ -323,18 +332,11 @@ describe("FR-AGENT-01 list-tools", () => {
       "creature_get",
       "creature_put_row",
       "creatures_list",
+      "homebrew_create",
+      "homebrew_edit",
+      "homebrew_share",
       "plan_check",
       "players_list",
-    ]);
-    const writes = allTools()
-      .filter((t) => t.write)
-      .map((t) => t.name)
-      .sort();
-    expect(writes).toEqual([
-      "creature_create",
-      "creature_derive",
-      "creature_edit",
-      "creature_put_row",
     ]);
     for (const t of tools) {
       expect(t.annotations?.readOnlyHint).toBe(!writes.includes(t.name));
@@ -346,6 +348,10 @@ describe("FR-AGENT-01 list-tools", () => {
     expect(props("characters_list")).toEqual(["cursor", "q"]);
     expect(props("creature_get")).toEqual(["id"]);
     expect(props("plan_check")).toEqual(["calls"]);
+    // FR-AGENT-25 / -26: PutEntryBody; edit / share by id.
+    expect(props("homebrew_create")).toEqual(["derivedFromId", "entry", "imageAssetIds", "shared"]);
+    expect(props("homebrew_edit")).toEqual(["id", "patch"]);
+    expect(props("homebrew_share")).toEqual(["id", "shared"]);
     // FR-AGENT-12: the strict SearchQuery, no key added.
     expect(props("compendium_search")).toEqual(
       [
@@ -368,6 +374,12 @@ describe("FR-AGENT-01 list-tools", () => {
     );
     expect(props("creature_derive")).toEqual(["baseId", "entryId", "name", "notes", "rows", "set"]);
     expect(props("creature_edit")).toEqual(["id", "set"]);
+    expect(
+      allTools()
+        .filter((t) => t.write)
+        .map((t) => t.name)
+        .sort(),
+    ).toEqual(writes);
     await client.close();
   });
 });

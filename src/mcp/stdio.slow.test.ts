@@ -7,6 +7,7 @@ import path from "node:path";
 import { startTestServer, type TestServer } from "@server/testing/harness";
 import { seedSyncProbe } from "@server/testing/seed";
 import { TEST_SECRET } from "@server/testing/services";
+import { allTools } from "./server";
 
 const ROOT = path.resolve(import.meta.dir, "..", "..");
 let h: TestServer;
@@ -107,7 +108,8 @@ describe("stdio process", () => {
     const result = (id: number) => msgs.find((m) => m.id === id)?.result ?? {};
     const body = (id: number) =>
       JSON.parse((result(id).content as { text: string }[])[0]?.text ?? "null");
-    expect(result(2).tools).toHaveLength(13);
+    // The exact list is core.test.ts's; here the process serves the whole registry.
+    expect(result(2).tools).toHaveLength(allTools().length);
     expect(body(3).campaigns.map((c: { name: string }) => c.name)).toContain("Fixture Campaign");
     expect(body(4).players).toHaveLength(2);
     expect(result(5).isError).toBe(true);
