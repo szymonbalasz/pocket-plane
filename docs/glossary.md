@@ -187,7 +187,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Undo** | Three kinds: **combat** (DM-only, strict LIFO over combat log entries: a compensating event reverses the latest apply and marks its entries undone); **fog** (DM, server-side per-scene stack, 20 steps, survives reload); **scene drawing** (DM, walls / props, client inverse intents, 50 per scene, lost on reload). | — |
 | **Pending action** | A notification whose action (button) is not yet resolved or dismissed (e.g. apply damage, roll a save). | — |
 | **Damage card** | A notification kind (`damage-card`) with an "apply" action, holding an attack's to-hit and damage rolls (from a player or DM roll) that the DM applies to one or more targets picked in the attack popup, each with its own hit / miss and multiplier: normal, half, none, double (#53, #134, #148). | Roll |
-| **Attack + damage** | The sheet button that rolls to-hit and damage as one action; **Attack** rolls to-hit only and **Damage** damage only. In combat, Attack makes a to-hit-only damage card that Damage completes ([ADR-0037](architecture/adr/0037-split-attack-damage.md)). | Damage card |
+| **Attack + damage** | *Retired (#385, [ADR-0073](architecture/adr/0073-tray-attacks.md)).* Was the sheet button that rolled to-hit and damage as one action. **Attack** and **Damage** now open the Dice tray pre-filled; in combat Attack makes a to-hit-only damage card that Damage completes ([ADR-0037](architecture/adr/0037-split-attack-damage.md)). | Damage card, Roll purpose |
 | **HP formula** | Dice expression for a creature's hit points; Average = the stat block's HP max, Rolled = the formula rolled when the creature joins combat ([entities](specs/entities.md)). | — |
 | **Action cue** | A few-second mark on a player's token on the DM's map when that player gets a pending action notification ([notifications](specs/notifications.md)). | Notification |
 | **Attack popup** | The DM's non-modal panel to pick a damage card's targets (map selection or list), check hit vs AC per target, override values and apply. | Damage card |
@@ -203,9 +203,11 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Health band** | healthy / bloodied / down: what players see of a monster's HP instead of numbers. | — |
 | **Log entry** | One game-log line; may join several rolls (e.g. an attack's to-hit and damage). | Roll; event log entry |
 | **Roll mode** | normal / advantage / disadvantage, applied to the d20. | — |
+| **Roll purpose** | Plain, attack or damage, set in the Dice tray before rolling (saved weapons and spells preset it): an attack's d20 decides the crit; a damage roll has a damage type per part. In combat a combatant's attack / damage roll feeds the damage card; the DM can **Use as attack / damage** a logged roll ([ADR-0073](architecture/adr/0073-tray-attacks.md)). | Dice tray, Damage card |
 | **Physical-dice mode** | Per-browser toggle: every roll through the roll control asks for manual entry. | Manual roll |
 | **Manual roll** | A roll entered from physical dice instead of rolled by the server. Logged and marked manual. | — |
-| **Dice tray** | Window to compose or adjust a roll before rolling it; staged rolls and clicked notation land here ([dice-extras](specs/dice-extras.md)). | Roll control |
+| **Dice tray** | Window to compose, adjust or edit a roll before rolling it (sheet Attack / Damage open it pre-filled, [ADR-0073](architecture/adr/0073-tray-attacks.md)); staged rolls and clicked notation land here ([dice-extras](specs/dice-extras.md)). | Roll control |
+| **Die group** | Dice of one size and one damage type in the Dice tray (e.g. 8d6 fire); an added die joins the last group of its size ([ADR-0073](architecture/adr/0073-tray-attacks.md)). | Dice tray, Roll purpose |
 | **Throw** | The animation of one received `roll` entry (or all entries of one frame), on the dice layer, in the zone or in a popup, settling on the server's faces; cosmetic only ([ADR-0044](architecture/adr/0044-3d-dice.md), [ADR-0048](architecture/adr/0048-dice-display.md)). | Roll |
 | **Dice layer** | The full-screen, topmost canvas the dice fly on; takes no input ([ADR-0048](architecture/adr/0048-dice-display.md)). | Canvas layer |
 | **Roll popup** | The card in the toast region that shows a received roll with its dice ([ADR-0048](architecture/adr/0048-dice-display.md)). | Toast |
@@ -216,7 +218,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Player colour** | A person's colour (`#rrggbb`), stored once and derived everywhere (pointer, templates, path, log names); must pass the validity and distance rules ([ADR-0055](architecture/adr/0055-player-colour.md), [ADR-0057](architecture/adr/0057-free-player-colour.md)). | Dice look |
 | **Palette colour** | One of the 8 suggested player colours shown in the picker. | Player colour |
 | **Dice style** | A named starting look (Ivory, Obsidian, …). | Preset (MOD) |
-| **Notation link** | Dice notation in free text (e.g. "1d12 + 5") rendered clickable; stages a plain roll in the tray, never attack / apply. | — |
+| **Notation link** | Dice notation in free text (e.g. "1d12 + 5") rendered clickable; stages a plain roll in the tray; its purpose can be changed there. | — |
 | **Party loot** | Shared, party-visible log of the party's coin and rewards: loot the DM gives, party spending, coin moves between the party pot and wallets, and (sprint 3) party item moves and the DM's split. | Party board |
 | **Party board** | Shared party window: handouts and the party inventory ([party-board](specs/party-board.md)). | Party loot |
 | **Handout** | DM-authored title + text + up to 10 images, shared with everyone or chosen players. | Note |

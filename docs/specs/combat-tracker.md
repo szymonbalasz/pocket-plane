@@ -1,7 +1,7 @@
 ---
 title: Combat tracker
 prefix: CBT
-status: in-review
+status: complete
 owner: spec-cb, spec-sb, spec-tray-attacks
 phase: post-mvp-8
 wave: 3
@@ -11,7 +11,7 @@ wave: 3
 
 > Five-minute read. Bullets over prose. See [AGENTS.md](../../AGENTS.md).
 
-> **Sprint 15 (DM [#385](../decisions-log.md), 2026-10-29; owner spec-tray-attacks; [proposed tray-attacks ADR](../architecture/adr/proposed-tray-attacks.md), refines [ADR-0037](../architecture/adr/0037-split-attack-damage.md)).** Decided, not open: **Attack + damage goes away**; Attack and Damage open the Dice tray pre-filled and editable, then Roll (Alt rolls at once). In combat an attack / damage roll by a combatant feeds the damage card as today: to-hit card, Damage completes it. The intents carry the **staged parts**; server mods and rule hooks still apply on top; a crit doubles every staged die. The DM can **Use as attack / damage** a logged roll (no reroll): a new command builds or completes a card; a roll feeds at most one card; an unknown attacker or an untyped part is picked in the popup. New **FR-CBT-169–177** (§6.8); amended FR-CBT-16, -30, -70, -71, -74, -81, -83, -92 and §6.1. **Build split: [§14.8](#148-build-split-sprint-15-tray-attacks)** (4 slices); walkthrough [§13.8](#138-sprint-15-tray-attacks). Open: [OQ-CBT-103–106](#15-open-questions), none blocking.
+> **Sprint 15 (DM [#385](../decisions-log.md), 2026-10-29; owner spec-tray-attacks; [ADR-0073](../architecture/adr/0073-tray-attacks.md), refines [ADR-0037](../architecture/adr/0037-split-attack-damage.md)).** Decided, not open: **Attack + damage goes away**; Attack and Damage open the Dice tray pre-filled and editable, then Roll (Alt rolls at once). In combat an attack / damage roll by a combatant feeds the damage card as today: to-hit card, Damage completes it. The intents carry the **staged parts**; server mods and rule hooks still apply on top; a crit doubles every staged die. The DM can **Use as attack / damage** a logged roll (no reroll): a new command builds or completes a card; a roll feeds at most one card; an unknown attacker or an untyped part is picked in the popup. New **FR-CBT-169–177** (§6.8); amended FR-CBT-16, -30, -70, -71, -74, -81, -83, -92 and §6.1. **Build split: [§14.8](#148-build-split-sprint-15-tray-attacks)** (4 slices); walkthrough [§13.8](#138-sprint-15-tray-attacks). Open: [OQ-CBT-103–106](#15-open-questions), none blocking.
 
 > **Sprint 8, track CB (combat polish; owner spec-cb; DM [#334](../decisions-log.md)).** Decided, not open: the DM **drags Initiative rows** (the drag and its command: [combat-extras FR-CBTX-62–69](combat-extras.md#6-functional-requirements)), ties and manual order kept per fight, companions follow their turn mode; the **current-turn token** is highlighted for everyone who can see it. This spec adds the order rule with a stored tie order, what keeps a dragged order, the turn pointer during a drag and combat's highlight line ([§6.6](#66-sprint-8-order-turn-and-highlight), FR-CBT-162–168). **For the DM:** [OQ-CBT-99, -100](#15-open-questions); seams with TT and SB: OQ-CBT-101, -102 (closed by seams S9, S8). Test plan and walkthrough: [combat-extras §13.1](combat-extras.md#131-sprint-8-track-cb-reorder-turn-highlight-party-summary); slices there. **Nobody edits `lifecycle.ts`** (seams S8: SB's End summary appends to the `rule-hooks.ts` `ended` hook). SB (stats) edits this spec in parallel with its own range.
 
@@ -510,7 +510,7 @@ Track SB. Formulas and toasts: [stats §6.1](stats.md#61-tier-b-sprint-8).
 
 ### 6.8 Sprint 15: attacks through the tray
 
-DM #385. The shape of `parts` and why: [ADR](../architecture/adr/proposed-tray-attacks.md) decision 1; Use as: decision 2; free rolls: decision 3.
+DM #385. The shape of `parts` and why: [ADR](../architecture/adr/0073-tray-attacks.md) decision 1; Use as: decision 2; free rolls: decision 3.
 
 | ID | Requirement | Notes |
 |---|---|---|
@@ -1115,7 +1115,7 @@ One plan for reorder, turn highlight and party summary: [combat-extras §13.1](c
 
 ### 14.8 Build split (sprint 15, tray attacks)
 
-DM #385, [ADR](../architecture/adr/proposed-tray-attacks.md). Four thin slices; feature-owned files unless marked ★ (AGENTS §9.9).
+DM #385, [ADR](../architecture/adr/0073-tray-attacks.md). Four thin slices; feature-owned files unless marked ★ (AGENTS §9.9).
 
 | Slice | Does (FRs) | Files | Shared (★) | Fixtures / e2e | Walk | After |
 |---|---|---|---|---|---|---|

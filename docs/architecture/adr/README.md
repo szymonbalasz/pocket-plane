@@ -78,6 +78,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0070](0070-launcher-in-top-bar.md) | Launcher in the top bar's centre zone; work area to the bottom edge; layouts regenerated once (kit parity) | accepted (#356; kit-parity OQ-KIT-01 A; amends play-shell §7) |
 | [0071](0071-spell-fx.md) | Spell FX: client-drawn map effects on effect rows (`effect.fx`), transient hit cues from an after-commit listener, filtered per connection | accepted (#373; OQ-VFX-05 A by the DM) |
 | [0072](0072-agent-mcp-server.md) | Agent MCP server: a local stdio DM caller over the existing REST + WS intents, DM secret from `.env`, server found via `server.lock`, code in `src/mcp/`, registered only in the DM's own checkout | accepted (#379; agent-api OQ-AGENT-11) |
+| [0073](0073-tray-attacks.md) | Attack and damage through the Dice tray: the roll intents carry the staged parts (row ref kept, server hooks and crit on top), roll purpose on every roll, DM **Use as attack / damage** from the log (`cbt.useRoll`); refines ADR-0037, retires FR-DICEX-31 | accepted (#385) |
 
 ## Proposing a new ADR
 

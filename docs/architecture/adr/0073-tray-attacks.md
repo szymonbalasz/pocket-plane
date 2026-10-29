@@ -1,6 +1,6 @@
-# proposed — Attack and damage through the Dice tray: the intent carries the staged parts
+# 0073 — Attack and damage through the Dice tray: the intent carries the staged parts
 
-- Status: accepted (DM, [#385](../../decisions-log.md), 2026-10-29; numbered at merge, ADR-0073 reserved). Raised by `spec/tray-attacks`
+- Status: accepted (DM, [#385](../../decisions-log.md), 2026-10-29). Raised by `spec/tray-attacks`
 - Date: 2026-10-29
 - Refines: [ADR-0037](0037-split-attack-damage.md) (split attack / damage: the Attack + damage action goes; cards can also start from a logged roll). Retires [FR-DICEX-31](../../specs/dice-extras.md#6-functional-requirements) ("notation never feeds attack / apply") and #188's third button ([FR-CHARX-41](../../specs/character-sheet-full.md#6-functional-requirements))
 - Consistent with: [ADR-0016](0016-domain-events-pending-actions.md) (one command, one transaction, one event), [ADR-0038](0038-effect-modifiers.md) (roll hooks stay server-side), [ADR-0021](0021-sync-protocol-conventions.md) E (no optimistic intents), #134 / #136 (the DM applies every card), #190 (no crit out of combat)
