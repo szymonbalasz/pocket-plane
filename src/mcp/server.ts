@@ -16,6 +16,7 @@ import { TOOLS, type ToolDef } from "./tools/registry";
 // ---- tool modules (append-only: one import line per slice) ----
 import "./tools/read";
 import "./tools/homebrew";
+import "./tools/character";
 
 export const SERVER_NAME = "pocket-plane";
 export const SERVER_VERSION = "0.1.0";

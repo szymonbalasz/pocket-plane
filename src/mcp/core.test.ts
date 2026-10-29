@@ -311,10 +311,18 @@ describe("FR-AGENT-01 list-tools", () => {
     const [a, b] = InMemoryTransport.createLinkedPair();
     await Promise.all([server.connect(a), client.connect(b)]);
     const { tools } = await client.listTools();
-    const writes = ["homebrew_create", "homebrew_edit", "homebrew_share"];
+    const writes = [
+      "character_edit",
+      "character_put_row",
+      "homebrew_create",
+      "homebrew_edit",
+      "homebrew_share",
+    ];
     expect(tools.map((t) => t.name).sort()).toEqual([
       "campaigns_list",
+      "character_edit",
       "character_get",
+      "character_put_row",
       "characters_list",
       "compendium_get",
       "compendium_search",
@@ -340,6 +348,16 @@ describe("FR-AGENT-01 list-tools", () => {
     expect(props("homebrew_create")).toEqual(["derivedFromId", "entry", "imageAssetIds", "shared"]);
     expect(props("homebrew_edit")).toEqual(["id", "patch"]);
     expect(props("homebrew_share")).toEqual(["id", "shared"]);
+    // FR-AGENT-27 / -28: no owner key; put_row lists as one flat object (no top-level oneOf).
+    expect(props("character_edit")).toEqual(["id", "set"]);
+    const set = tools.find((t) => t.name === "character_edit")?.inputSchema.properties?.set as {
+      properties: Record<string, unknown>;
+    };
+    expect(Object.keys(set.properties)).not.toContain("ownerPlayerId");
+    expect(props("character_put_row")).toEqual(["creatureId", "list", "row"]);
+    expect(
+      Object.keys(tools.find((t) => t.name === "character_put_row")?.inputSchema ?? {}),
+    ).not.toContain("oneOf");
     // FR-AGENT-12: the strict SearchQuery, no key added.
     expect(props("compendium_search")).toEqual(
       [
