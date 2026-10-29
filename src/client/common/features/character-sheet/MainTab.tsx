@@ -27,6 +27,7 @@ import {
   proficiencyBonus,
   SIZES,
   saveBonus,
+  TOKEN_SHAPES,
 } from "@shared/entities/schemas";
 import type { ReactNode } from "react";
 import { useContext, useState } from "react";
@@ -627,19 +628,25 @@ function IdentityEditor() {
   );
 }
 
+const SHAPE_LABEL = { round: "Round", square: "Square", none: "None" } as const;
+
 /**
  * DM only: the one image the sheet header, tokens and Initiative rows show (FR-CHARX-15
- * `portraitAssetId`; copies still on the old portrait follow, FR-CBT-06 / OQ-MAP-14).
+ * `portraitAssetId`; copies still on the old portrait follow, FR-CBT-06 / OQ-MAP-14), and the
+ * default token shape (FR-ENT-22; null = round; placed tokens on the old one follow, FR-MAP-35).
+ * A portrait on a creature with no chosen shape sets `none`: uploaded art brings its own frame.
  */
 export function PortraitEditor() {
   const ctx = useSheet();
   const edit = useEdit();
+  const intents = useSheetIntents();
   const live = useSync((s) => s.state === "live");
   const busy = useBusy();
   const [picking, setPicking] = useState(false);
-  const id = ctx.creature.portraitAssetId;
+  const c = ctx.creature;
+  const id = c.portraitAssetId;
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Portrait</span>
       <Button
         data-testid="charx-portrait-choose"
@@ -669,8 +676,24 @@ export function PortraitEditor() {
         title="Portrait"
         context="portrait"
         initialSelectedId={id}
-        onSelect={(next) => busy.run(() => edit("portraitAssetId", next))}
+        onSelect={(next) =>
+          busy.run(() =>
+            intents.edit(c.id, {
+              portraitAssetId: next,
+              ...(c.tokenShape == null ? { tokenShape: "none" } : {}),
+            }),
+          )
+        }
       />
+      <div className="ml-auto w-28">
+        <SelectField
+          path="tokenShape"
+          label="Token shape"
+          value={c.tokenShape ?? "round"}
+          options={TOKEN_SHAPES.map((v) => ({ value: v, label: SHAPE_LABEL[v] }))}
+          commit={(v) => edit("tokenShape", v)}
+        />
+      </div>
     </div>
   );
 }

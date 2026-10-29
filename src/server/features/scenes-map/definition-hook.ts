@@ -1,7 +1,8 @@
 // FR-MAP-20: token display copies follow a definition edit, inside `entities.update`'s
 // transaction (FR-ENT-19). Size and speed (FR-MAP-36) always follow; the image follows only on
-// tokens still showing the old portrait (#127); `characterId` is re-asserted (FR-MAP-50). Names,
-// shapes (FR-MAP-35) and cells untouched (#126). A size change re-derives `fogged` / `seenBy` for
+// tokens still showing the old portrait (#127), the shape only on tokens still on the old default
+// shape (FR-MAP-35, amended); `characterId` is re-asserted (FR-MAP-50). Names and cells untouched
+// (#126). A size change re-derives `fogged` / `seenBy` for
 // the new footprint (FR-FOG-10) and the token's dependants (`rederive`, FR-FOG-35); a token whose
 // party-level hidden flips runs the token-changed hooks, their rows joining the changes
 // (FR-FOG-13, ADR-0039). No other token-changed hooks run.
@@ -27,6 +28,9 @@ export function refreshTokenCopies(
   const speed = after.statBlock.speed ?? null;
   const speedChanged = (before.statBlock.speed ?? null) !== speed;
   const portraitChanged = before.portraitAssetId !== after.portraitAssetId;
+  // FR-ENT-22: null = round.
+  const oldShape = before.tokenShape ?? "round";
+  const shape = after.tokenShape ?? "round";
   const characterId = characterIdOf(after);
   // FR-ASSET-15: propagated asset copies go through `assets.require` too.
   if (portraitChanged && after.portraitAssetId) requireAsset(env, after.portraitAssetId);
@@ -59,6 +63,7 @@ export function refreshTokenCopies(
     if (portraitChanged && t.imageAssetId === before.portraitAssetId) {
       set.imageAssetId = after.portraitAssetId;
     }
+    if (shape !== oldShape && t.shape === oldShape) set.shape = shape;
     // FR-MAP-50: a definition never changes kind, so this only re-asserts the copy.
     if (t.characterId !== characterId) set.characterId = characterId;
     if (Object.keys(set).length === 0) continue;

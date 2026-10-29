@@ -277,6 +277,7 @@ describe("FR-CHARX-15 char.edit", () => {
       { ownerPlayerId: t.t.p2.id },
       { size: "large" },
       { portraitAssetId: null },
+      { tokenShape: "none" },
     ]) {
       expect(t.fail(() => t.run(I.edit, { creatureId: t.t.miraId, set }, p1)).code).toBe(
         "forbidden",
@@ -365,6 +366,33 @@ describe("FR-CHARX-15 char.edit", () => {
     expect(t.logCount()).toBe(n);
     t.run(I.edit, { creatureId: t.t.miraId, set: { portraitAssetId: null } });
     expect(t.ent(t.t.miraId).portraitAssetId).toBeNull();
+  });
+
+  test("FR-ENT-22 DM token shape from the sheet: stored; tokens on the old default follow, a reshaped one keeps its shape", () => {
+    const t = setup();
+    const sceneId = t.s.db.select().from(scene).where(eq(scene.campaignId, t.t.campaignId)).get()
+      ?.id as string;
+    const place = (row: number) =>
+      t.s.commands.run(
+        placeToken,
+        { sceneId, definitionId: t.t.miraId, col: 2, row },
+        { actor: t.t.dm },
+      ).tokenId;
+    const kept = place(1);
+    const reshaped = place(2);
+    t.s.commands.run("map.updateToken", { tokenId: reshaped, shape: "square" }, { actor: t.t.dm });
+    t.events.length = 0;
+    t.run(I.edit, { creatureId: t.t.miraId, set: { tokenShape: "none" } });
+    expect(t.ent(t.t.miraId).tokenShape).toBe("none");
+    const toks = t.events[0]?.event.changes.filter((c) => c.type === TOKEN_TYPE) ?? [];
+    expect(toks.map((c) => [c.id, (c.after as { shape: string }).shape])).toEqual([[kept, "none"]]);
+    // Back to unset (= round): the followed token returns, the square one stays.
+    t.run(I.edit, { creatureId: t.t.miraId, set: { tokenShape: null } });
+    expect(t.ent(t.t.miraId).tokenShape).toBeNull();
+    const back = t.events.at(-1)?.event.changes.filter((c) => c.type === TOKEN_TYPE) ?? [];
+    expect(back.map((c) => [c.id, (c.after as { shape: string }).shape])).toEqual([
+      [kept, "round"],
+    ]);
   });
 
   test("FR-CHARX-39 rollback: a failing stat-block write leaves the sheet write undone", () => {

@@ -86,6 +86,15 @@ const SHAPE_LABEL: Record<TokenShape | typeof DEFAULT_SHAPE, string> = {
   none: "None",
 };
 
+/** Uploaded art brings its own frame: a portrait on a form with no chosen shape → None. */
+export function withPortrait(f: Fields, portraitAssetId: string): Fields {
+  return {
+    ...f,
+    portraitAssetId,
+    tokenShape: f.tokenShape === DEFAULT_SHAPE ? "none" : f.tokenShape,
+  };
+}
+
 export function initial(mode: Mode): Fields {
   const src = mode.kind === "derive" ? mode.base : mode.kind === "edit" ? mode.def : null;
   const sb = src?.kind === "monster" ? src.statBlock : null;
@@ -519,7 +528,7 @@ export function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
         title="Portrait"
         context="portrait"
         initialSelectedId={f.portraitAssetId}
-        onSelect={(id) => setF((x) => ({ ...x, portraitAssetId: id }))}
+        onSelect={(id) => setF((x) => withPortrait(x, id))}
       />
     </>
   );
