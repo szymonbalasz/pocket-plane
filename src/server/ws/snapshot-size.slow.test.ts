@@ -773,6 +773,61 @@ describe("CON-44 snapshot ceilings (#163)", () => {
       for (const r of typed) restore.run(r.t, r.id);
     });
 
+    // Mutates the scenario (roll payloads), then restores it: after the read-only cases.
+    test("FR-DICE-94, -96, FR-CHARX-130 CON-44 (sprint 15, #385) worst case: every roll item tagged `damage` + `part` + `edited`, every roll entry stamped `usedByCardId`; the stamp adds 0 B for players; ceilings hold", () => {
+      const sql = b.s.db.$client;
+      const rows = sql
+        .query<{ id: string; payload: string; dm: string | null }, []>(
+          "SELECT id, payload, dm_payload AS dm FROM game_log_entry WHERE kind = 'roll'",
+        )
+        .all();
+      expect(rows.length).toBeGreaterThan(0);
+      const before = snapshotSizes(b.s);
+      const set = sql.query("UPDATE game_log_entry SET payload = ?, dm_payload = ? WHERE id = ?");
+      // (1) Item tags at their widest: `purpose: "damage"`, a `part` (base, longest type) where
+      // none, `edited` (FR-DICE-94, FR-CHARX-129, -130). Size probe, not commands.
+      for (const r of rows) {
+        const items = (JSON.parse(r.payload) as Record<string, unknown>[]).map((i) => ({
+          ...i,
+          purpose: "damage",
+          part: i.part ?? { type: "bludgeoning", extra: false },
+          edited: true,
+        }));
+        set.run(JSON.stringify(items), r.dm, r.id);
+      }
+      const tagged = snapshotSizes(b.s);
+      // (2) The DM-only stamp on every roll entry (FR-DICE-96): a UUID card id.
+      for (const r of rows) {
+        const now = sql
+          .query<{ payload: string }, [string]>("SELECT payload FROM game_log_entry WHERE id = ?")
+          .get(r.id);
+        const items = JSON.parse(now?.payload ?? "[]") as unknown[];
+        const dm = r.dm ? JSON.parse(r.dm) : { items: items.map(() => ({ mods: [] })) };
+        const usedByCardId = "00000000-0000-4000-8000-000000000000";
+        set.run(now?.payload ?? "[]", JSON.stringify({ ...dm, usedByCardId }), r.id);
+      }
+      const stamped = snapshotSizes(b.s);
+      expectUnderCeilings(stamped);
+      const players = (v: ViewerSize[]) => v.filter((x) => x.role === "player");
+      // Players never receive `dmPayload`: the stamp adds not one byte (FR-DICE-15, -96).
+      expect(players(stamped).map((p) => p.bytes)).toEqual(players(tagged).map((p) => p.bytes));
+      const grow = (a: ViewerSize[], z: ViewerSize[]) =>
+        z.map((v, i) => v.bytes - (a[i]?.bytes ?? 0));
+      const [tagDm = 0, ...tagPlayers] = grow(before, tagged);
+      const [stampDm = 0] = grow(tagged, stamped);
+      const window = (v: ViewerSize | undefined) => v?.types["game-log-entry"]?.rows ?? 0;
+      // ≈ 50 B a tagged item (`,"purpose":"damage","part":{…},"edited":true`) in the 100-entry
+      // window; the stamp ≈ 55 B an entry (DM only).
+      expect(tagDm).toBeLessThanOrEqual(60 * 20 * window(stamped[0]));
+      expect(stampDm).toBeLessThanOrEqual(80 * window(stamped[0]));
+      const [dm, ...ps] = stamped as [ViewerSize, ...ViewerSize[]];
+      console.log(
+        `TRAY S1 CON-44 (#385): ${rows.length} roll entries, ${window(dm)} in the DM window; item tags DM +${tagDm} B, players +${Math.min(...tagPlayers)}–${Math.max(...tagPlayers)} B; usedByCardId DM +${stampDm} B, players +0 B; heavy DM ${dm.bytes} B (${SNAPSHOT_CEILING.dm - dm.bytes} B left of 1.5 MiB); players max ${Math.max(...ps.map((p) => p.bytes))} B`,
+      );
+      for (const r of rows) set.run(r.payload, r.dm, r.id);
+      expect(snapshotSizes(b.s).map((v) => v.bytes)).toEqual(before.map((v) => v.bytes));
+    });
+
     // Mutates the scenario (adds tokens): keep last.
     test("ADR-0041 a non-active scene at the 200-token cap: its load < 512 KiB; the DM snapshot doesn't grow", () => {
       const dmBefore = snapshotSizes(b.s)[0]?.bytes ?? 0;

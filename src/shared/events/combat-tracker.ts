@@ -122,6 +122,26 @@ export const DamageRolled = defineEvent({
   undoable: false,
 });
 
+/**
+ * `cbt.useRoll` (FR-CBT-173, -175; sprint 15, #385): the used `game-log-entry` (its DM-only
+ * `usedByCardId` stamp, FR-DICE-96) and, when `attached`, the completed card's upsert (BL-92: one
+ * frame); a new card follows as `NotificationCreated`. Not undoable (like rolling it, ADR-0037).
+ */
+export const RollUsed = defineEvent({
+  type: "RollUsed",
+  payload: z
+    .object({
+      entryId: Id,
+      cardId: Id,
+      encounterId: Id,
+      as: z.enum(["attack", "damage"]),
+      attached: z.boolean(),
+    })
+    .strict(),
+  logged: true,
+  undoable: false,
+});
+
 /** `cbt.rollAbility`: one `game-log-entry` (players iff public; hidden combatant never) (FR-CBT-44). */
 export const CombatantRolled = defineEvent({
   type: "CombatantRolled",

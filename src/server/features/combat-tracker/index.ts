@@ -21,6 +21,7 @@ import { bindCombatRuleHooks, CombatRuleHooks, combatRuleHooks } from "./rule-ho
 import { setSideCommand } from "./sides";
 import { summonCommandWith } from "./summon";
 import { turnCommand } from "./turns";
+import { useRollCommand } from "./use-roll";
 
 export const combatTracker: Feature = {
   name: "combat-tracker",
@@ -52,6 +53,8 @@ export const combatTracker: Feature = {
       setCompanionCommand,
       summonCommandWith(hooks),
       dismissCommand,
+      // Sprint 15 (FR-CBT-173, #385): a logged roll used as an attack / damage card.
+      useRollCommand,
     ] as unknown as CommandDef[];
     for (const c of intents) r.command(c, { intent: true });
     for (const t of combatRecordTypes) r.recordType(t);

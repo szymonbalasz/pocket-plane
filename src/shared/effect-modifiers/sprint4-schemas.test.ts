@@ -90,10 +90,11 @@ describe("FR-CBT-81 / -82 / -84 combat parts", () => {
     expect(CardDamage.safeParse({ ...roll, extra: [] }).success).toBe(false);
     expect(CardDamage.safeParse({ ...roll, extra: [{ ...fire, type: null }] }).success).toBe(false);
     const dice = (n: number) => Array.from({ length: n }, () => [6, true]);
-    expect(CardDamage.safeParse({ ...roll, extra: [{ ...fire, dice: dice(12) }] }).success).toBe(
+    // Sprint 15 (FR-CBT-170): staged parts hold 20 dice together, so an extra part ≤ 40 on a crit.
+    expect(CardDamage.safeParse({ ...roll, extra: [{ ...fire, dice: dice(40) }] }).success).toBe(
       true,
     );
-    expect(CardDamage.safeParse({ ...roll, extra: [{ ...fire, dice: dice(13) }] }).success).toBe(
+    expect(CardDamage.safeParse({ ...roll, extra: [{ ...fire, dice: dice(41) }] }).success).toBe(
       false,
     );
     const card = {

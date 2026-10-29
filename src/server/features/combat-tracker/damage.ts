@@ -4,7 +4,15 @@
 // line, card. Sprint 10 (BL-92, protocol gate I15): an updated card rides on `DamageRolled`'s
 // changes (`{emit: false}`), so the action sends one frame. Healing never makes a card (the sheet never routes it). Sprint 5 (FR-CBT-92): the
 // card owner's second roll on a completed pending card makes no card (`unusedRolls`).
-import { characterRolls } from "@shared/character-sheet/logic";
+// Sprint 15 (FR-CBT-170, -171, #385): the tray's staged parts (`parts`) in place of the row's;
+// `rowless` = no sheet row; the pending match also takes a rowless side.
+import {
+  type CharacterRollSpec,
+  characterRolls,
+  rowlessSpecs,
+  specItemFields,
+  stagedSpecs,
+} from "@shared/character-sheet/logic";
 import { withCardIds } from "@shared/combat-tracker/companion";
 import { critExpression } from "@shared/combat-tracker/rules";
 import {
@@ -78,20 +86,27 @@ function damageRow(env: CommandEnv, c: CombatantRecord, ref: RowRef) {
   return { spec, extra, name: a.name, damageType: a.damageType ?? null, saveDc: undefined };
 }
 
-const sameRef = (p: DamageCardPayload, ref: RowRef) =>
-  p.attackId === ref.attackId && p.spellId === ref.spellId;
+const noRow = (r: RowRef) => r.attackId === undefined && r.spellId === undefined;
 
-type PendingCard = { card: NotificationRecord; p: DamageCardPayload };
+/**
+ * FR-CBT-71, -171 (#385): a damage roll of row `ref` (null = rowless) completes card `p` when its
+ * row is the same, or either side has no row.
+ */
+export const rowMatches = (p: DamageCardPayload, ref: RowRef | null) =>
+  ref === null || noRow(p) || (p.attackId === ref.attackId && p.spellId === ref.spellId);
+
+export type PendingCard = { card: NotificationRecord; p: DamageCardPayload };
 
 /**
  * FR-CBT-71: the attacker's latest pending to-hit-only card of this row in the encounter
  * (`toHit`), and FR-CBT-92: the latest pending card of this row whatever its shape (`latest`).
+ * FR-CBT-171: `ref` null = a rowless roll (any row matches; a rowless card matches any row).
  */
-function pendingCards(
+export function pendingCards(
   env: CommandEnv,
   enc: EncounterRecord,
   attackerId: string,
-  ref: RowRef,
+  ref: RowRef | null,
 ): { toHit: PendingCard | null; latest: PendingCard | null } {
   const rows = env.tx
     .select()
@@ -110,7 +125,7 @@ function pendingCards(
     const parsed = DamageCardPayload.safeParse(r.payload);
     if (!parsed.success) continue;
     const p = parsed.data;
-    if (p.encounterId !== enc.id || p.attackerId !== attackerId || !sameRef(p, ref)) continue;
+    if (p.encounterId !== enc.id || p.attackerId !== attackerId || !rowMatches(p, ref)) continue;
     const found = { card: toNotificationRecord(r), p };
     latest ??= found;
     if (p.damage === null && p.toHit !== null) return { toHit: found, latest };
@@ -133,6 +148,18 @@ function unusedTarget(env: CommandEnv, latest: PendingCard | null): PendingCard 
   return owner ? latest : null;
 }
 
+/** FR-CBT-171: a rowless damage roll's "row": the staged parts, named `label` or "Damage". */
+function rowlessRow(parts: NonNullable<RollDamageInput["parts"]>, label: string | undefined) {
+  const [spec, ...extra] = rowlessSpecs("damage", parts, label);
+  return {
+    spec: spec as CharacterRollSpec,
+    extra,
+    name: label || "Damage",
+    damageType: parts[0]?.type ?? null,
+    saveDc: undefined,
+  };
+}
+
 export const rollDamageCommand = defineCommand({
   name: CBT_INTENTS.rollDamage,
   input: RollDamageInput,
@@ -142,12 +169,22 @@ export const rollDamageCommand = defineCommand({
   },
   execute(input, env): RollDamageResult {
     const { c, enc } = activeCombatant(env, input.attackerId, { own: true });
+    // FR-CBT-171: a rowless roll names no row (the schema refuses `attackId` / `spellId`).
+    const rowless = input.rowless === true;
     // Sprint 6 (FR-CBT-114): a player's companion damage names a card row.
-    const asked = attackRefFor(env, c, { attackId: input.attackId, spellId: input.spellId });
-    const row = damageRow(env, c, asked);
-    const ref = cardRowRef(env, c, asked);
+    const asked = rowless
+      ? {}
+      : attackRefFor(env, c, { attackId: input.attackId, spellId: input.spellId });
+    const row = rowless ? rowlessRow(input.parts ?? [], input.label) : damageRow(env, c, asked);
+    // FR-CBT-170: the staged parts replace the row's expressions (part 1 the base, 2–3 extra).
+    if (input.parts && !rowless) {
+      const [base, ...extra] = stagedSpecs([row.spec, ...row.extra], input.parts, row.damageType);
+      row.spec = base as CharacterRollSpec;
+      row.extra = extra;
+    }
+    const ref = rowless ? {} : cardRowRef(env, c, asked);
     checkManualExtra(row.extra, input.manual, input.manualExtra);
-    const cards = pendingCards(env, enc, c.id, ref);
+    const cards = pendingCards(env, enc, c.id, rowless ? null : ref);
     const pending = cards.toHit;
     const unusedOn = pending ? null : unusedTarget(env, cards.latest);
     // A completed card doubles the dice after its natural 20; manual is checked against that.
@@ -172,7 +209,7 @@ export const rollDamageCommand = defineCommand({
         // FR-CBT-92: an unused roll makes no card, so nothing is offered on it.
         card: unusedOn === null,
         ...(pending ? { toHitMode: pending.p.mode } : {}),
-        row: row.name.slice(0, ROLL_ROW_MAX),
+        ...(rowless ? {} : { row: row.name.slice(0, ROLL_ROW_MAX) }),
       },
     });
     const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
@@ -184,16 +221,18 @@ export const rollDamageCommand = defineCommand({
     // it completes a player's card: the owner's rule, so the table sees the damage the player's
     // card now shows. A hidden attacker's line is never public (FR-CBT-24).
     const ownerRule = pending?.card.audience === "player";
+    // FR-CBT-170: a staged base part's type names the card's damage (else the row's / card's).
+    const stagedType = input.parts?.[0]?.type;
     const payload: DamageCardPayload = withCardOffers(
       env,
       pending
-        ? { ...pending.p, damage: card }
+        ? { ...pending.p, damage: card, ...(stagedType ? { damageType: stagedType } : {}) }
         : {
             encounterId: enc.id,
             attackerId: c.id,
             attackerName: c.name,
             attackName: row.name,
-            damageType: row.damageType,
+            damageType: stagedType ?? row.damageType,
             mode: "normal",
             crit: false,
             toHit: null,
@@ -207,11 +246,16 @@ export const rollDamageCommand = defineCommand({
     const rollIds = [damage, ...extra].flatMap((r) => dice.rollIdsOf(r));
     // FR-MOD-69: offered parts read the attack's type when untyped.
     const line = rollLine([damage, ...extra], row.damageType ?? null);
+    // FR-DICE-94 (#385): damage items carry the purpose and `part`; FR-CHARX-130 `edited`.
+    const specs = [row.spec, ...row.extra];
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: row.spec.category,
       actorName: c.name,
-      payload: line.payload,
+      payload: line.payload.map((item, i) => ({
+        ...item,
+        ...specItemFields(specs[i] as CharacterRollSpec, row.damageType ?? null),
+      })),
       dmPayload: line.dmPayload,
       rollIds,
       encounterId: enc.id,

@@ -140,6 +140,7 @@ import themeGilt from "./theme-gilt";
 import toastHomeE2e from "./toast-home-e2e";
 import tokenArtUpdate from "./token-art-update";
 import tplMenu from "./tpl-menu";
+import trayAttacks from "./tray-attacks";
 import usesNegative from "./uses-negative";
 import vision from "./vision";
 import visionParty from "./vision-party";
@@ -359,4 +360,6 @@ export const bundles: readonly Bundle[] = [
   restE2e,
   // Rename / delete an image (fix/image-manage, #386): image-manage e2e
   imageManageE2e,
+  // Tray attacks (fix/tray-core, #385): staged parts, rowless cards, Use as attack / damage
+  trayAttacks,
 ];

@@ -432,7 +432,9 @@ describe("CON-44 with MOD sprint-4 rows (MOD §12 sprint 4, #208)", () => {
       const items = e.payload as RollEntryPayload;
       if (items.length !== 2 || counts.entries >= 30) continue;
       counts.entries++;
-      const dmg = items[1] as Record<string, unknown>;
+      // Sprint 15 (#385): new items carry `purpose` / `part`; the probe's extra rolls are track
+      // R's sprint-4 shape (S1's tags: their own CON-44 row in `ws/snapshot-size.slow.test.ts`).
+      const { purpose: _u, part: _p, edited: _e, ...dmg } = items[1] as Record<string, unknown>;
       const xItem = (i: number) => ({
         ...dmg,
         rollId: uuid(`xe${i}`),

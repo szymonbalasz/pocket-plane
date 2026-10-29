@@ -2,7 +2,12 @@
 // `sheetRoll` for request answers, FR-CHARX-90) and `char.adjustHp`
 // (FR-CHAR-09, FR-CHAR-10). One transaction each: rolls + one log entry + `CharacterRolled`; HP
 // row + `CharacterHpAdjusted`.
-import { characterRolls, sheetAttack } from "@shared/character-sheet/logic";
+import {
+  characterRolls,
+  sheetAttack,
+  specItemFields,
+  stagedSpecs,
+} from "@shared/character-sheet/logic";
 import {
   CHAR_ADJUST_HP,
   CHAR_ROLL,
@@ -122,7 +127,17 @@ export function sheetRoll(
   };
   const res = characterRolls(c.statBlock, sheet, input.kind, ref);
   if (!res.ok) throw res.code === "not_found" ? notFound(res.message) : conflict(res.message);
-  const specs = res.specs;
+  const attack = !isAttackRowKind(input.kind)
+    ? null
+    : input.attackId === undefined
+      ? sheetAttack(c.statBlock)
+      : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
+  const spell = sheet?.spells.find((x) => x.id === input.spellId);
+  const row = attack?.name ?? spell?.name;
+  const rowType = attack ? (attack.damageType ?? null) : (spell?.damageType ?? null);
+  // FR-CHARX-128 (#385): the tray's staged parts replace the row's expressions; the rest (label,
+  // category, subject, mods) stays the row's.
+  const specs = input.parts ? stagedSpecs(res.specs, input.parts, rowType) : res.specs;
   if (input.manual && input.manual.length !== specs.length) {
     throw invalid("Invalid input", [
       { path: ["manual"], message: `Enter ${specs.length} physical rolls for ${input.kind}` },
@@ -130,12 +145,6 @@ export function sheetRoll(
   }
   const ability = ref.ability;
   const actor = { kind: "entity" as const, id: c.id, name: c.name };
-  const attack = !isAttackRowKind(input.kind)
-    ? null
-    : input.attackId === undefined
-      ? sheetAttack(c.statBlock)
-      : (c.statBlock.attacks.find((a) => a.id === input.attackId) ?? null);
-  const row = attack?.name ?? sheet?.spells.find((x) => x.id === input.spellId)?.name;
   const rolls = specs.map((s, i) => {
     // FR-CHARX-55: mods (Rage +2) attach to the base part; an extra part has no subject.
     const subject = s.part?.extra
@@ -162,14 +171,12 @@ export function sheetRoll(
     category: (specs[0] as (typeof specs)[number]).category,
     actorName: c.name,
     // FR-CHARX-55: each damage part of a magic weapon row is its own item, typed (`part`).
-    payload: rolls.map((r, i) => {
-      const part = specs[i]?.part;
-      return {
-        ...dice.rollPayloadItem(r),
-        ...(part ? { part } : {}),
-        ...(opts.answer ? { answer: true } : {}),
-      };
-    }),
+    // FR-CHARX-129, -130 (#385): the purpose, `part` on every damage item, `edited`.
+    payload: rolls.map((r, i) => ({
+      ...dice.rollPayloadItem(r),
+      ...specItemFields(specs[i] as (typeof specs)[number], rowType),
+      ...(opts.answer ? { answer: true } : {}),
+    })),
     dmPayload: dice.rollDmPayload(rolls),
     rollIds,
     // FR-CHARX-22: a definition's name can leak a renamed or hidden creature (ADR-0024).

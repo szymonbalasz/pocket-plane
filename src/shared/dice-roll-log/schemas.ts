@@ -3,7 +3,7 @@
 import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import { ROLL_CATEGORIES, ROLL_MODES, RollCategory, RollMode } from "@shared/events/dice-roll-log";
 import { z } from "zod";
-import { parseExpression } from "./grammar";
+import { diceCount, parseExpression } from "./grammar";
 
 export { ROLL_CATEGORIES, ROLL_MODES, RollCategory, RollMode };
 
@@ -83,16 +83,130 @@ export const DmRollActorRef = z.union([
 ]);
 export type DmRollActorRef = z.infer<typeof DmRollActorRef>;
 
-/** Intent `dice.roll` (FR-DICE-09). `actor.combatantId`: DM only (player → `invalid`). */
-export const DiceRollIntent = z.strictObject({
+/**
+ * #385 (FR-DICE-94, ADR-0073): a roll's purpose; absent = plain. `attack`: its d20 decides the
+ * crit; `damage`: a damage type per part.
+ */
+export const ROLL_PURPOSES = ["attack", "damage"] as const;
+export const RollPurpose = z.enum(ROLL_PURPOSES);
+export type RollPurpose = z.infer<typeof RollPurpose>;
+
+/**
+ * ADR-0073 decision 1: one staged part of an attack or damage roll, as the tray sends it. Damage:
+ * part 1 = the base part (type optional), parts 2–3 = extra parts (type required).
+ */
+export const StagedPart = z.strictObject({
   expression: DiceExpression,
-  mode: RollMode.default("normal"),
-  category: RollCategory.default("other"),
-  label: RollLabel.optional(),
-  actor: DmRollActorRef.optional(),
-  manual: ManualEntry.optional(),
-  public: z.boolean().optional(),
+  type: PartDamageType.optional(),
 });
+export type StagedPart = z.infer<typeof StagedPart>;
+/** ADR-0073: a damage roll's parts (base + 2 extra, FR-CHARX-54) and their dice together. */
+export const STAGED_PARTS_MAX = 3;
+export const STAGED_DICE_MAX = 20;
+export const StagedParts = z.array(StagedPart).min(1).max(STAGED_PARTS_MAX);
+export type StagedParts = z.infer<typeof StagedParts>;
+
+export const ATTACK_NEEDS_D20 = "An attack needs one d20";
+export const EXTRA_PART_TYPE = "Pick a type for each extra part";
+
+/**
+ * ADR-0073 decision 1 (FR-CHARX-128, FR-CBT-170, FR-DICE-94): why staged parts don't fit their
+ * purpose, or null. Attack: exactly 1 part, exactly one `1d20` term, no type. Damage: 1–3 parts,
+ * parts 2–3 typed, Σ dice ≤ 20. Each part's grammar is the schema's (FR-DICE-01).
+ */
+export function stagedPartsIssue(
+  parts: readonly { expression: string; type?: string | undefined }[],
+  purpose: RollPurpose,
+): string | null {
+  if (purpose === "attack") {
+    if (parts.length !== 1) return "An attack has one part";
+    const p = parts[0] as (typeof parts)[number];
+    if (p.type !== undefined) return "An attack has no damage type";
+    return attackExpressionIssue(p.expression);
+  }
+  if (parts.length > STAGED_PARTS_MAX) return `At most ${STAGED_PARTS_MAX} damage parts`;
+  if (parts.some((p, i) => i > 0 && p.type === undefined)) return EXTRA_PART_TYPE;
+  let dice = 0;
+  for (const p of parts) {
+    const r = parseExpression(p.expression);
+    if (!r.ok) return r.message;
+    dice += diceCount(r.value);
+  }
+  return dice > STAGED_DICE_MAX ? `At most ${STAGED_DICE_MAX} damage dice` : null;
+}
+
+/** FR-DICE-94: an attack expression has exactly one `1d20` term (adv / dis come from `mode`). */
+export function attackExpressionIssue(expression: string): string | null {
+  const r = parseExpression(expression);
+  if (!r.ok) return r.message;
+  const d20s = r.value.filter((t) => t.kind === "dice" && t.faces === 20);
+  const one = d20s[0];
+  const ok =
+    d20s.length === 1 &&
+    one?.kind === "dice" &&
+    one.count === 1 &&
+    one.keep === null &&
+    one.sign === 1;
+  return ok ? null : ATTACK_NEEDS_D20;
+}
+
+/** Adds a `stagedPartsIssue` under `path` (a `superRefine` helper). */
+export function checkStagedParts(
+  parts: readonly StagedPart[] | undefined,
+  purpose: RollPurpose,
+  ctx: z.RefinementCtx,
+  path: (string | number)[] = ["parts"],
+): void {
+  if (parts === undefined) return;
+  const message = stagedPartsIssue(parts, purpose);
+  if (message) ctx.addIssue({ code: "custom", path, message });
+}
+
+/**
+ * Intent `dice.roll` (FR-DICE-09). `actor.combatantId`: DM only (player → `invalid`). FR-DICE-94
+ * (#385): `purpose` and, with `purpose: "damage"`, `parts` in place of `expression` (exactly one
+ * of the two); `purpose: "attack"` needs one `1d20` term.
+ */
+export const DiceRollIntent = z
+  .strictObject({
+    expression: DiceExpression.optional(),
+    mode: RollMode.default("normal"),
+    category: RollCategory.default("other"),
+    label: RollLabel.optional(),
+    actor: DmRollActorRef.optional(),
+    manual: ManualEntry.optional(),
+    public: z.boolean().optional(),
+    purpose: RollPurpose.optional(),
+    parts: StagedParts.optional(),
+  })
+  .superRefine((v, ctx) => {
+    if ((v.expression === undefined) === (v.parts === undefined)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["expression"],
+        message: "An expression or parts",
+      });
+      return;
+    }
+    if (v.parts !== undefined) {
+      if (v.purpose !== "damage") {
+        ctx.addIssue({ code: "custom", path: ["parts"], message: "Parts are for damage rolls" });
+        return;
+      }
+      if (v.manual !== undefined) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["manual"],
+          message: "Physical dice: one expression",
+        });
+      }
+      checkStagedParts(v.parts, "damage", ctx);
+    }
+    if (v.purpose === "attack" && v.expression !== undefined) {
+      const message = attackExpressionIssue(v.expression);
+      if (message) ctx.addIssue({ code: "custom", path: ["expression"], message });
+    }
+  });
 export type DiceRollIntent = z.input<typeof DiceRollIntent>;
 
 export const DiceRollResult = z.object({ rollId: z.string(), entryId: z.string() });
@@ -283,6 +397,16 @@ export const RollPayloadItem = z.strictObject({
    * only (the line shows no tag, OQ-DICE-46); the entry is never rerollable (OQ-GEM-20 A).
    */
   answer: z.literal(true).optional(),
+  /**
+   * FR-DICE-94 (#385): the roll's purpose (absent = plain). Written by `dice.roll`, `char.roll`,
+   * `cbt.attack`, `cbt.rollDamage`; damage items also carry `part`. Old entries read as plain.
+   */
+  purpose: RollPurpose.optional(),
+  /**
+   * FR-CHARX-130 (OQ-CHARX-51 A): the staged expression differs from the row's derived one
+   * (normalised): the dice were changed in the tray. Absent = as the row has it.
+   */
+  edited: z.literal(true).optional(),
 });
 export type RollPayloadItem = z.infer<typeof RollPayloadItem>;
 
@@ -304,8 +428,23 @@ export type RollItemDmMods = z.infer<typeof RollItemDmMods>;
 export const RollEntryDmPayload = z.strictObject({
   items: z.array(RollItemDmMods).min(1).max(20),
   notes: z.array(z.string().min(1).max(ROLL_NOTE_MAX)).min(1).max(ROLL_NOTES_MAX).optional(),
+  /**
+   * FR-DICE-96 (#385): the damage card `cbt.useRoll` built or completed from this entry; set
+   * once (`gameLog.markUsed`), never cleared, copied by a reroll. DM only (FR-DICE-15).
+   */
+  usedByCardId: Id.optional(),
 });
 export type RollEntryDmPayload = z.infer<typeof RollEntryDmPayload>;
+
+/**
+ * FR-DICE-96: a roll entry already feeds a card: combat's own lines (`encounterId`, old ones
+ * too) or a used one (`dmPayload.usedByCardId`, DM view only).
+ */
+export function isUsedRoll(e: { encounterId: string | null; dmPayload?: unknown }): boolean {
+  if (e.encounterId !== null) return true;
+  const dm = e.dmPayload as { usedByCardId?: unknown } | null | undefined;
+  return typeof dm?.usedByCardId === "string";
+}
 
 /** `game-log-entry` as the DM receives it (full row). */
 export const GameLogEntryRecord = z.strictObject({

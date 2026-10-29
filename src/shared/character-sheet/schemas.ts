@@ -2,9 +2,12 @@
 // Strict: no expression, bonus or HP field (FR-CHAR-05, FR-CHAR-10, CHAR §11).
 import {
   checkManualParts,
+  checkStagedParts,
   ManualEntry,
   ManualParts,
   RollMode,
+  type RollPurpose,
+  StagedParts,
 } from "@shared/dice-roll-log/schemas";
 import { Ability, EXTRA_DAMAGE_MAX, SkillName } from "@shared/entities/schemas";
 import { z } from "zod";
@@ -46,6 +49,16 @@ export const isAttackRowKind = (k: SheetRollKind): boolean =>
 /** Kinds that need a spell row (`spellId`). */
 export const isSpellRowKind = (k: SheetRollKind): boolean =>
   k === "spellAttack" || k === "spellDamage" || k === "spellToHit";
+
+/**
+ * FR-CHARX-128 (#385): the kinds that take staged `parts`, and their purpose: `toHit` /
+ * `spellToHit` → attack, `damage` / `spellDamage` → damage (healing spells too); else null.
+ */
+export function stagedPurposeOf(k: SheetRollKind): RollPurpose | null {
+  if (k === "toHit" || k === "spellToHit") return "attack";
+  if (k === "damage" || k === "spellDamage") return "damage";
+  return null;
+}
 
 /**
  * FR-CHAR-07, FR-CHAR-21, FR-CHARX-21, FR-CHARX-42: one manual entry per roll — attack 2
@@ -95,9 +108,22 @@ export const SheetRollIntent = z
     /** FR-MOD-18 (tier 2): physical bonus / trigger die groups, one list per `manual` entry. */
     manualParts: z.array(ManualParts).min(1).max(SHEET_MANUAL_MAX).optional(),
     public: z.boolean().optional(),
+    /**
+     * FR-CHARX-128 (#385, ADR-0073): the tray's staged parts, rolled in place of the row's
+     * expressions; `toHit` / `spellToHit` / `damage` / `spellDamage` only. Absent = the row's.
+     */
+    parts: StagedParts.optional(),
   })
   .superRefine((v, ctx) => {
     checkManualParts(v, ctx);
+    if (v.parts !== undefined) {
+      const purpose = stagedPurposeOf(v.kind);
+      if (purpose === null) {
+        ctx.addIssue({ code: "custom", path: ["parts"], message: `No parts for ${v.kind}` });
+      } else {
+        checkStagedParts(v.parts, purpose, ctx);
+      }
+    }
     const n = v.kind === "spellAttack" ? null : MANUAL_COUNT[v.kind];
     const len = v.manual?.length ?? 0;
     if (v.manual && n !== null && (len < n || len > n + extraManual(v.kind))) {

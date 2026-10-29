@@ -193,7 +193,7 @@ describe("FR-CHARX-55 char.roll with weapon parts", () => {
     expect(wrong.code).toBe("invalid");
   });
 
-  test("FR-CHARX-55 rows without the fields roll as before (no part on the entry)", () => {
+  test("FR-CHARX-55 rows without the fields roll as before (no extra parts on the entry)", () => {
     const t = setup();
     const attackId = t.putAttack({
       name: "Greataxe",
@@ -211,7 +211,8 @@ describe("FR-CHARX-55 char.roll with weapon parts", () => {
     t.run("char.roll", { characterId: t.thornId, kind: "attack", attackId: plus }, t.p2);
     expect(rolls(t).map(([e]) => e)).toEqual(["1d20+5", "1d12+3", "1d20+7", "1d8+5"]);
     const items = entry(t, a.entryId)?.payload as RollEntryPayload;
-    expect(items.some((i) => "part" in i)).toBe(false);
+    // FR-CHARX-129 (#385): a single-part damage item carries its `part` (base, the row's type).
+    expect(items.map((i) => i.part ?? null)).toEqual([null, { type: "slashing", extra: false }]);
     expect(lines(t, a.entryId).player).toMatch(
       /^Thorn — Greataxe attack: \d+ \+ 5 = \d+.*; Greataxe damage \(slashing\): \d+ \+ 3 = \d+$/,
     );
