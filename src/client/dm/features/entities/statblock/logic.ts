@@ -3,16 +3,20 @@
 // (FR-KIT-104), and every button sends an existing intent (FR-KIT-105, -106): bound → combat's
 // `cbt.attack` / `cbt.rollDamage` / `cbt.rollAbility` (as the Initiative row's Attack ▸ and
 // Check ▸ / Save ▸); definition → plain `dice.roll`s as the creature. No new intent; 0 B.
-import { attackRollSpecs } from "@shared/character-sheet/logic";
 import { d20Expression } from "@shared/combat-tracker/rules";
 import { CBT_INTENTS, COMBATANT_TYPE, type CombatantView } from "@shared/combat-tracker/schemas";
-import type { DiceRollIntent } from "@shared/dice-roll-log/schemas";
+import { parseExpression, toNotation } from "@shared/dice-roll-log/grammar";
+import type { DiceRollIntent, ManualEntry, StagedPart } from "@shared/dice-roll-log/schemas";
 import { ABILITY_NAMES, type Ability, type Attack } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import { manualFields } from "@ui/features/combat-tracker/roll-route";
 import { startedIn } from "@ui/features/combat-tracker/store";
 import { manualPartsOf, type RollRequest } from "@ui/features/dice-roll-log/roll-control";
-import type { AttackAction } from "../../combat-tracker/attack-choices";
+import {
+  ATTACK_ACTIONS,
+  type AttackAction,
+  attackIntent,
+  attackRolls,
+} from "../../combat-tracker/attack-choices";
 
 /** FR-KIT-100: the window type (DM registry only). */
 export const STATBLOCK_KIND = "ent.statblock";
@@ -54,24 +58,20 @@ export type RollAs =
   | { combatantId: string; name: string }
   | { combatantId?: undefined; definitionId: string; name: string };
 
-/** FR-KIT-105: the three attack buttons (kit order Attack, Damage, Attack + damage). */
-export const ATTACK_BUTTONS = [
-  { action: "toHit", label: "Attack", testId: "ent-statblock-roll-attack" },
-  { action: "damage", label: "Damage", testId: "ent-statblock-roll-damage" },
-  { action: "both", label: "Attack + damage", testId: "ent-statblock-roll-both" },
-] as const satisfies readonly { action: AttackAction; label: string; testId: string }[];
+/** FR-KIT-105 (#385): the two attack buttons (kit order Attack, Damage); Attack + damage is gone. */
+export const ATTACK_BUTTONS = ATTACK_ACTIONS.map((a) => ({
+  action: a.value,
+  label: a.label,
+  testId: a.value === "toHit" ? "ent-statblock-roll-attack" : "ent-statblock-roll-damage",
+}));
 
-/** The attack's to-hit and its damage parts as one expression (`dice.roll` takes one). */
-export function plainAttackExpressions(attack: Attack): { hit: string; damage: string } {
-  const [hit, ...damage] = attackRollSpecs({
-    name: attack.name,
-    toHit: attack.toHit,
-    damage: attack.damage,
-    damageType: attack.damageType ?? null,
-    bonus: attack.bonus ?? 0,
-    extraDamage: attack.extraDamage ?? [],
+/** The row's own parts of an action (an Alt+click, nothing staged): its dice and types. */
+export function rowStagedParts(attack: Attack, action: AttackAction): StagedPart[] {
+  const rolls = attackRolls(attack, action);
+  return rolls.expressions.map((expression, i) => {
+    const type = rolls.partTypes?.[i];
+    return type ? { expression, type } : { expression };
   });
-  return { hit: hit.expression, damage: damage.map((s) => s.expression).join("+") };
 }
 
 const pub = (r: RollRequest) => (r.public !== undefined ? { public: r.public } : {});
@@ -88,15 +88,13 @@ function plainRoll(
   category: DiceRollIntent["category"],
   label: string,
   r: RollRequest,
-  i: number,
-  mode = r.mode,
 ): Send {
-  const manual = r.manual?.[i];
+  const manual = r.manual?.[0];
   return {
     name: "dice.roll",
     payload: {
       expression,
-      mode,
+      mode: r.mode,
       category,
       label,
       actor: { entityId: as.definitionId },
@@ -107,55 +105,76 @@ function plainRoll(
 }
 
 /**
- * FR-KIT-105: what one attack button sends, from the roll control's request. Bound: as the
- * Initiative row's Attack ▸ (FR-CBT-74): Attack → `cbt.attack {rolls: "toHit"}`, Damage →
- * `cbt.rollDamage`, Attack + damage → `cbt.attack`; `attackId` absent = the first attack (a
- * legacy row without id, FR-CHARX-20). Definition: `dice.roll` labelled "<name> — <attack>
- * attack / damage"; Attack + damage = the to-hit roll, then the damage roll (two entries, no card).
+ * FR-KIT-105 (#385): a definition's Attack / Damage as the tray rolls a free one (DICEX
+ * `freeRollIntent`, not imported: it would pull the tray into the DM's first chunk): one
+ * `dice.roll {purpose}` labelled "<name> — <attack> attack / damage", damage as its typed `parts`;
+ * `dice.roll` takes physical dice for one expression only (#388), so physical damage is the
+ * parts' dice as one expression with one entry. The staged parts, else the row's own (Alt+click).
+ * Always `public: false` (as `plainRoll`).
  */
-export function attackSends(
+function plainAttackRoll(
+  as: Extract<RollAs, { definitionId: string }>,
+  attack: Attack,
+  action: AttackAction,
+  r: RollRequest,
+): Send {
+  const purpose = action === "damage" ? "damage" : "attack";
+  const label = `${as.name} — ${attack.name} ${purpose}`;
+  const parts = r.parts ?? rowStagedParts(attack, action);
+  const head = { purpose, category: purpose, label, actor: { entityId: as.definitionId } };
+  if (purpose === "attack") {
+    const manual = r.manual?.[0];
+    const expression = parts[0]?.expression ?? "";
+    return {
+      name: "dice.roll",
+      payload: { expression, mode: r.mode, ...head, ...(manual ? { manual } : {}), public: false },
+    };
+  }
+  const manual = r.manual?.length ? r.manual : null;
+  return {
+    name: "dice.roll",
+    payload: {
+      ...(manual
+        ? { expression: joinedExpression(parts), manual: mergedManual(manual) }
+        : { parts }),
+      mode: "normal",
+      ...head,
+      public: false,
+    },
+  };
+}
+
+/** The parts' terms as one expression. */
+const joinedExpression = (parts: readonly StagedPart[]): string =>
+  toNotation(
+    parts.flatMap((p) => {
+      const t = parseExpression(p.expression);
+      return t.ok ? t.value : [];
+    }),
+  );
+
+/** Physical entries of several parts as one entry (their dice in notation order). */
+function mergedManual(entries: readonly ManualEntry[]): ManualEntry {
+  const diceTotal = entries.reduce((n, e) => n + e.diceTotal, 0);
+  const dice = entries.every((e) => e.dice) ? entries.flatMap((e) => e.dice ?? []) : null;
+  return dice ? { diceTotal, dice } : { diceTotal };
+}
+
+/**
+ * FR-KIT-105: what one attack button sends, from the roll control's request (a click stages the
+ * tray, whose Roll hands back the staged `parts`; Alt+click rolls the row's at once, #385). Bound:
+ * as the Initiative row's Attack ▸ (FR-CBT-74, -169, `attackIntent`). Definition:
+ * `plainAttackRoll` (a labelled line, no card).
+ */
+export function attackSend(
   as: RollAs,
   attack: Attack,
   attackId: string | undefined,
   action: AttackAction,
   r: RollRequest,
-): Send[] {
-  if (as.combatantId !== undefined) {
-    const ref = attackId ? { attackId } : {};
-    const manual = manualFields(r, action === "damage" ? 1 : 2);
-    if (action === "damage") {
-      return [
-        {
-          name: CBT_INTENTS.rollDamage,
-          payload: { attackerId: as.combatantId, ...manual, ...ref },
-        },
-      ];
-    }
-    return [
-      {
-        name: CBT_INTENTS.attack,
-        payload: {
-          attackerId: as.combatantId,
-          mode: r.mode,
-          ...(action === "toHit" ? { rolls: "toHit" } : {}),
-          ...manual,
-          ...ref,
-        },
-      },
-    ];
-  }
-  const x = plainAttackExpressions(attack);
-  const label = (what: string) => `${as.name} — ${attack.name} ${what}`;
-  const hit = plainRoll(as, x.hit, "attack", label("attack"), r, 0);
-  if (action === "toHit") return [hit];
-  const damage = (i: number) => plainRoll(as, x.damage, "damage", label("damage"), r, i, "normal");
-  return action === "damage" ? [damage(0)] : [hit, damage(1)];
-}
-
-/** FR-KIT-105: the control's expressions for a definition's attack button (bound: combat's). */
-export function plainAttackRolls(attack: Attack, action: AttackAction): string[] {
-  const x = plainAttackExpressions(attack);
-  return action === "toHit" ? [x.hit] : action === "damage" ? [x.damage] : [x.hit, x.damage];
+): Send {
+  if (as.combatantId === undefined) return plainAttackRoll(as, attack, action, r);
+  return attackIntent(as.combatantId, attackId, action, r);
 }
 
 export type AbilityKind = "check" | "save";
@@ -192,7 +211,6 @@ export function abilitySend(
     kind === "check" ? "ability-check" : "saving-throw",
     abilityLabel(as.name, kind, ability),
     r,
-    0,
   );
 }
 

@@ -1,7 +1,7 @@
 // Kit parity K7 (§6.11, FR-KIT-100–107): the DM stat-block window. Registration, openers (pure
 // targets, the token registries, the opener's store), the card's static render bound and unbound,
 // the binding fallback, and the routing of every roll button as names + payloads (no new intent).
-// The browser flow (Initiative ⋯ → Stat block → Attack + damage → the popup): kit-statblock.e2e.ts.
+// The browser flow (Initiative ⋯ → Stat block → Attack, Damage → the popup): kit-statblock.e2e.ts.
 import { describe, expect, mock, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -17,7 +17,7 @@ import { COMMANDS, type CommandCtx } from "@ui/features/play-shell/commands";
 import { doubleClickFor, menuFor } from "../../scenes-map/token-menu";
 import {
   abilitySend,
-  attackSends,
+  attackSend,
   boundCombatant,
   EMPTY_TEXT,
   type RollAs,
@@ -268,9 +268,11 @@ describe("FR-KIT-103 card", () => {
     expect(html).toMatch(
       /data-slot="statblock-entry-name"[^>]*>Scimitar<\/div><div class="text-muted-foreground"><span data-testid="ent-statblock-attack-line"[^>]*>\+4 · 1d6\+2 slashing<\/span><\/div><div class="[^"]*\bmt-1\b[^"]*"><button[^>]*data-testid="ent-statblock-roll-attack"/,
     );
-    for (const id of ["attack", "damage", "both"]) {
+    // FR-KIT-105 (#385): two buttons, Attack and Damage; Attack + damage is gone.
+    for (const id of ["attack", "damage"]) {
       expect(count(html, `data-testid="ent-statblock-roll-${id}"`)).toBe(2);
     }
+    expect(html).not.toContain('data-testid="ent-statblock-roll-both"');
     expect(html).toContain('data-slot="statblock-attack"');
   });
 
@@ -375,74 +377,92 @@ describe("FR-KIT-104 binding", () => {
 describe("FR-KIT-105 attack routing", () => {
   const bound: RollAs = { combatantId: "goblin", name: "Goblin" };
   const plain: RollAs = { definitionId: "d-goblin", name: "Goblin" };
-  const names = (s: { name: string }[]) => s.map((x) => x.name);
 
-  test("FR-KIT-105 attack routing (stub send: names + payloads): bound → cbt.attack {rolls: toHit} / cbt.rollDamage / cbt.attack with the attack id", () => {
-    expect(attackSends(bound, SCIMITAR, "a-scim", "toHit", { mode: "advantage" })).toEqual([
-      {
-        name: "cbt.attack",
-        payload: { attackerId: "goblin", mode: "advantage", rolls: "toHit", attackId: "a-scim" },
-      },
-    ]);
-    expect(attackSends(bound, SCIMITAR, "a-scim", "damage", { mode: "normal" })).toEqual([
-      { name: "cbt.rollDamage", payload: { attackerId: "goblin", attackId: "a-scim" } },
-    ]);
-    expect(attackSends(bound, SCIMITAR, undefined, "both", { mode: "normal" })).toEqual([
-      { name: "cbt.attack", payload: { attackerId: "goblin", mode: "normal" } },
-    ]);
-    // Physical dice: the entries as combat takes them (to-hit + base part).
-    const manual = [{ diceTotal: 15 }, { diceTotal: 4 }];
+  test("FR-KIT-105 attack routing (stub send: names + payloads): bound → cbt.attack {rolls: toHit} / cbt.rollDamage with the attack id and the tray's staged parts", () => {
+    expect(attackSend(bound, SCIMITAR, "a-scim", "toHit", { mode: "advantage" })).toEqual({
+      name: "cbt.attack",
+      payload: { attackerId: "goblin", mode: "advantage", rolls: "toHit", attackId: "a-scim" },
+    });
+    expect(attackSend(bound, SCIMITAR, "a-scim", "damage", { mode: "normal" })).toEqual({
+      name: "cbt.rollDamage",
+      payload: { attackerId: "goblin", attackId: "a-scim" },
+    });
+    // Staged in the tray (+ 1d6): the parts ride along; physical entries as combat takes them.
+    const parts = [{ expression: "2d6+2", type: "slashing" as const }];
+    const manual = [{ diceTotal: 7 }];
     expect(
-      attackSends(bound, SCIMITAR, "a-scim", "both", { mode: "normal", manual })[0]?.payload,
-    ).toMatchObject({ manual });
+      attackSend(bound, SCIMITAR, undefined, "damage", { mode: "normal", parts, manual }),
+    ).toEqual({
+      name: "cbt.rollDamage",
+      payload: { attackerId: "goblin", manual: { diceTotal: 7 }, parts },
+    });
+    const hit = [{ expression: "1d20+5" }];
+    expect(attackSend(bound, SCIMITAR, "a-scim", "toHit", { mode: "normal", parts: hit })).toEqual({
+      name: "cbt.attack",
+      payload: {
+        attackerId: "goblin",
+        mode: "normal",
+        rolls: "toHit",
+        attackId: "a-scim",
+        parts: hit,
+      },
+    });
   });
 
-  test("FR-KIT-105 attack routing (stub send): definition → plain dice.roll as the creature, labelled, always `public: false` (ADR-0024 ruling: DM-only even with the DM's switch or preset on); Attack + damage = to-hit then damage (two entries, no card); never a new intent", () => {
-    const both = attackSends(plain, SCIMITAR, "a-scim", "both", {
-      mode: "disadvantage",
-      manual: [{ diceTotal: 9 }, { diceTotal: 5 }],
-      public: true,
-    });
-    expect(both).toEqual([
-      {
-        name: "dice.roll",
-        payload: {
-          expression: "1d20+4",
-          mode: "disadvantage",
-          category: "attack",
-          label: "Goblin — Scimitar attack",
-          actor: { entityId: "d-goblin" },
-          manual: { diceTotal: 9 },
-          public: false,
-        },
-      },
-      {
-        name: "dice.roll",
-        payload: {
-          expression: "1d6+2",
-          mode: "normal",
-          category: "damage",
-          label: "Goblin — Scimitar damage",
-          actor: { entityId: "d-goblin" },
-          manual: { diceTotal: 5 },
-          public: false,
-        },
-      },
-    ]);
-    expect(names(attackSends(plain, SCIMITAR, undefined, "toHit", { mode: "normal" }))).toEqual([
-      "dice.roll",
-    ]);
-    const dmg = attackSends(plain, SCIMITAR, undefined, "damage", { mode: "normal" });
-    expect(dmg.map((s) => s.payload.category)).toEqual(["damage"]);
-    // Extra damage parts ride in the one damage expression.
-    const flame = { ...SCIMITAR, extraDamage: [{ damage: "1d6", type: "fire" as const }] };
+  test("FR-KIT-105 attack routing (stub send): definition → one labelled dice.roll {purpose} as the creature, always `public: false` (ADR-0024 ruling: DM-only even with the DM's switch or preset on); damage as typed parts; never a new intent", () => {
     expect(
-      attackSends(plain, flame, undefined, "damage", { mode: "normal" })[0]?.payload.expression,
-    ).toBe("1d6+2+1d6");
-    const all = ["toHit", "damage", "both"].flatMap((a) =>
-      [bound, plain].flatMap((as) =>
-        names(attackSends(as, SCIMITAR, "a-scim", a as "toHit", { mode: "normal" })),
-      ),
+      attackSend(plain, SCIMITAR, "a-scim", "toHit", {
+        mode: "disadvantage",
+        manual: [{ diceTotal: 9 }],
+        public: true,
+      }),
+    ).toEqual({
+      name: "dice.roll",
+      payload: {
+        expression: "1d20+4",
+        mode: "disadvantage",
+        category: "attack",
+        purpose: "attack",
+        label: "Goblin — Scimitar attack",
+        actor: { entityId: "d-goblin" },
+        manual: { diceTotal: 9 },
+        public: false,
+      },
+    });
+    // Alt+click (nothing staged): the row's own parts, typed.
+    const flame = { ...SCIMITAR, extraDamage: [{ damage: "1d6", type: "fire" as const }] };
+    expect(attackSend(plain, flame, undefined, "damage", { mode: "advantage" })).toEqual({
+      name: "dice.roll",
+      payload: {
+        parts: [
+          { expression: "1d6+2", type: "slashing" },
+          { expression: "1d6", type: "fire" },
+        ],
+        mode: "normal",
+        category: "damage",
+        purpose: "damage",
+        label: "Goblin — Scimitar damage",
+        actor: { entityId: "d-goblin" },
+        public: false,
+      },
+    });
+    // Staged and edited in the tray: those parts; physical dice → one expression (#388).
+    const parts = [
+      { expression: "2d6+2", type: "slashing" as const },
+      { expression: "1d6", type: "fire" as const },
+    ];
+    expect(
+      attackSend(plain, flame, undefined, "damage", { mode: "normal", parts }).payload,
+    ).toMatchObject({ parts });
+    const physical = attackSend(plain, flame, undefined, "damage", {
+      mode: "normal",
+      parts,
+      manual: [{ diceTotal: 6 }, { diceTotal: 2 }],
+    }).payload;
+    expect(physical).toMatchObject({ expression: "2d6+2+1d6", manual: { diceTotal: 8 } });
+    expect(physical).not.toHaveProperty("parts");
+    const all = (["toHit", "damage"] as const).flatMap((a) =>
+      [bound, plain].map((as) => attackSend(as, SCIMITAR, "a-scim", a, { mode: "normal" }).name),
     );
     expect([...new Set(all)].sort()).toEqual(["cbt.attack", "cbt.rollDamage", "dice.roll"]);
   });
