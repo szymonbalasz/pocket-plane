@@ -24,6 +24,7 @@ import { diceServices, seedDice } from "../dice-roll-log/testing";
 import { createEntity } from "../entities/commands";
 import { goblinBlock } from "../entities/testing";
 import { placeToken } from "../scenes-map/commands";
+import { addAsset } from "../scenes-map/testing";
 import { OPEN_DRAFT_MESSAGE } from "./lifecycle";
 import { toSheetRecord } from "./sheet-rows";
 
@@ -335,6 +336,35 @@ describe("FR-CHARX-15 char.edit", () => {
     const tok = ev?.changes.find((c) => c.type === TOKEN_TYPE);
     expect(tok?.id).toBe(tokenId);
     expect(tok?.after).toMatchObject({ size: "large", speed: 25 });
+  });
+
+  test("FR-CHARX-15 DM portrait from the sheet: set, token copy follows, unknown asset → not_found, clear", () => {
+    const t = setup();
+    addAsset(t.s, "art-mira", t.t.campaignId);
+    const sceneId = t.s.db
+      .select()
+      .from(scene)
+      .where(eq(scene.campaignId, t.t.campaignId))
+      .get()?.id;
+    const { tokenId } = t.s.commands.run(
+      placeToken,
+      { sceneId: sceneId as string, definitionId: t.t.miraId, col: 2, row: 2 },
+      { actor: t.t.dm },
+    );
+    t.events.length = 0;
+    t.run(I.edit, { creatureId: t.t.miraId, set: { portraitAssetId: "art-mira" } });
+    expect(t.ent(t.t.miraId).portraitAssetId).toBe("art-mira");
+    const tok = t.events[0]?.event.changes.find((c) => c.type === TOKEN_TYPE);
+    expect(tok?.id).toBe(tokenId);
+    expect(tok?.after).toMatchObject({ imageAssetId: "art-mira" });
+    const n = t.logCount();
+    expect(
+      t.fail(() => t.run(I.edit, { creatureId: t.t.miraId, set: { portraitAssetId: "nope" } }))
+        .code,
+    ).toBe("not_found");
+    expect(t.logCount()).toBe(n);
+    t.run(I.edit, { creatureId: t.t.miraId, set: { portraitAssetId: null } });
+    expect(t.ent(t.t.miraId).portraitAssetId).toBeNull();
   });
 
   test("FR-CHARX-39 rollback: a failing stat-block write leaves the sheet write undone", () => {
