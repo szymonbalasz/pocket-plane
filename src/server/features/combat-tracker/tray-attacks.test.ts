@@ -607,6 +607,7 @@ describe("FR-CBT-176 undo, dismiss", () => {
     const line = lineText(
       formatEntry({ kind: "roll", actorName: entry.actorName, payload: entry.payload }).segments,
     );
-    expect(line).toMatch(/^Player 1 — 1d20\+5: \d+ \+ 5 = \d+$/);
+    // Real dice: a natural 20 / 1 adds its marker.
+    expect(line).toMatch(/^Player 1 — 1d20\+5: \d+ \+ 5 = \d+( — natural (20!|1))?$/);
   });
 });

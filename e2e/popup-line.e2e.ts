@@ -327,7 +327,14 @@ test("FR-DICEX-47 short screens: with a toast up only the popups that fit show (
   for (const page of [p1, dm]) {
     const tray = await openWindow(page, "dicex.tray");
     await tray.getByTestId("dicex-settings-open").click();
-    await page.locator('[data-testid="dicex-settings-display"][data-value="flat"]').click();
+    // The page clock is installed: the gear's "Dice settings" tooltip can stay open over the
+    // Display options and swallow a pointer click. No pointer needed to pick a display.
+    await page
+      .locator('[data-testid="dicex-settings-display"][data-value="flat"]')
+      .dispatchEvent("click");
+    await expect(
+      page.locator('[data-testid="dicex-settings-display"][data-value="flat"]'),
+    ).toHaveAttribute("data-state", "on");
     await page.keyboard.press("Escape");
     await tray.getByTestId("ui-window-close").click();
     await expect(tray).toHaveCount(0);
