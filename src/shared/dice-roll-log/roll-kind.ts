@@ -3,7 +3,9 @@
 // (not on initiative, FR-DICE-29); "physical" for manual rolls. Other kinds may reuse
 // `rollSegments` / `rollBreakdownSegments` for their roll parts (FR-DICE-28). Roll-hook parts
 // (FR-MOD-19/20) follow the constant ("14 + 4 + 3 Bless = 21"); the DM's line names every part
-// from `dmPayload`, players see "(DM)" for parts of effects they don't receive.
+// from `dmPayload`, players see "(DM)" for parts of effects they don't receive. FR-DICE-95
+// (#385): a damage item's type follows its value, an unlabelled attack / damage item reads
+// "attack" / "damage", and an `edited` item gets a muted "edited" after its name.
 import { GEMS_FEATURE } from "@shared/campaign-management/features";
 import { rollOfferSegments } from "@shared/effect-modifiers/combat-parts";
 import { AUTO_PART_TEXT, modeLabels, modSegments, modsTotal } from "@shared/effect-modifiers/line";
@@ -101,6 +103,28 @@ function withConstant(out: LineSegment[], constant: number): LineSegment[] {
   return out;
 }
 
+export const EDITED_TEXT = "edited";
+export const EDITED_TIP = "Dice changed in the tray";
+
+/** FR-DICE-95: the muted "edited" mark after a name, when any of the items was edited. */
+const editedSegments = (items: readonly RollPayloadItem[]): LineSegment[] =>
+  items.some((i) => i.edited)
+    ? [{ text: " " }, { text: EDITED_TEXT, style: "muted", tip: EDITED_TIP }]
+    : [];
+
+/** FR-DICE-95: an item's name: its label, else its purpose ("attack"), else its expression. */
+const itemName = (item: RollPayloadItem): string => item.label ?? item.purpose ?? item.expression;
+
+/**
+ * FR-DICE-95: a lone typed damage item's type after its value ("damage: 5 + 2 slashing = 7"),
+ * unless its label already names it (a sheet row's "Dagger damage (piercing)").
+ */
+function typeSegments(item: RollPayloadItem): LineSegment[] {
+  const type = item.purpose === "damage" ? item.part?.type : null;
+  if (!type || item.label?.endsWith(` (${type})`)) return [];
+  return [{ text: ` ${type}` }];
+}
+
 /** "<dice> + <constants>" of one roll (no total); [] → nothing to show. */
 const termSegments = (item: RollPayloadItem): LineSegment[] =>
   withConstant(diceSegments(item), item.constant);
@@ -113,7 +137,7 @@ export function rollSegments(
   item: RollPayloadItem,
   opts: { category?: RollCategory; dm?: RollItemDmMods | null } = {},
 ): LineSegment[] {
-  const out: LineSegment[] = [{ text: item.label ?? item.expression }];
+  const out: LineSegment[] = [{ text: itemName(item) }, ...editedSegments([item])];
   const mode = item.mode === "advantage" ? "adv" : item.mode === "disadvantage" ? "dis" : null;
   if (mode) {
     const why = item.modes ? `: ${modeLabels(item.modes, opts.dm?.modes)}` : "";
@@ -124,6 +148,7 @@ export function rollSegments(
   out.push({ text: ": " });
   out.push(...termSegments(item));
   out.push(...modSegments(item.mods, opts.dm?.mods));
+  out.push(...typeSegments(item));
   out.push({ text: " = " }, { text: String(item.total), style: "total" });
   // FR-MOD-20 (R7): offered trigger parts, not in the total.
   out.push(...rollOfferSegments(item.offered, opts.dm?.offered));
@@ -192,7 +217,8 @@ export function rollBreakdownSegments(r: RollBreakdown): LineSegment[] {
 function partRunName(base: RollPayloadItem): string {
   const type = base.part?.type;
   const suffix = type ? ` (${type})` : "";
-  const label = base.label ?? "Damage";
+  // FR-DICE-95: an unlabelled tray roll reads "damage"; older rows "Damage".
+  const label = base.label ?? (base.purpose ? base.purpose : "Damage");
   return suffix && label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
 }
 
@@ -202,7 +228,7 @@ function partRunName(base: RollPayloadItem): string {
  */
 export function runName(parts: readonly RollPayloadItem[]): string {
   const base = parts[0] as RollPayloadItem;
-  return parts.length === 1 ? (base.label ?? base.expression) : partRunName(base);
+  return parts.length === 1 ? itemName(base) : partRunName(base);
 }
 
 /**
@@ -216,7 +242,11 @@ export function partRunSegments(
   dm: readonly (RollItemDmMods | undefined)[] = [],
 ): LineSegment[] {
   const base = parts[0] as RollPayloadItem;
-  const out: LineSegment[] = [{ text: partRunName(base) }, { text: ": " }];
+  const out: LineSegment[] = [
+    { text: partRunName(base) },
+    ...editedSegments(parts),
+    { text: ": " },
+  ];
   parts.forEach((item, i) => {
     if (i > 0) out.push({ text: " + " });
     out.push({ text: item.expression });

@@ -8,6 +8,7 @@ import type {
   GameLogEntryView,
   RollCategory,
   RollMode,
+  RollPurpose,
 } from "@shared/dice-roll-log/schemas";
 import { useSyncExternalStore } from "react";
 import { createStore, type StoreApi } from "zustand";
@@ -22,13 +23,16 @@ import {
   REST_NO_POPUP_MS,
   SETTLE_MAX_MS,
 } from "./timing";
+import type { Composition, PartType } from "./tray-parts";
 
 export { PENDING_MS };
 
 /**
  * FR-DICEX-02: one staged request at a time (a new one replaces it). `free` = notation, palette,
  * roll bar; `control` = a roll control's options **verbatim** (Alt+click). `previewMode` = a
- * later spec's pre-roll mode (MOD R2); the tray only renders it (FR-DICEX-08 e).
+ * later spec's pre-roll mode (MOD R2); the tray only renders it (FR-DICEX-08 e). Sprint 15
+ * (#385): a `free` request has a `purpose` (the tray's toggle, FR-DICEX-99) and, for damage, a
+ * type per term; a `purpose` control keeps its edits in `edit` (FR-DICEX-97: no fresh `free`).
  */
 export type TrayRequest =
   | {
@@ -39,8 +43,19 @@ export type TrayRequest =
       label?: string;
       /** `dice.roll` actor (FR-DICE-10, -34). */
       actor?: DmRollActorRef;
+      /** FR-DICEX-99: absent = plain. */
+      purpose?: RollPurpose;
+      /** FR-DICEX-101: damage only, one per term of `expression` (null = untyped / constant). */
+      types?: (PartType | null)[];
     }
-  | { kind: "control"; options: RollControlOptions; mode: RollMode; previewMode?: RollMode };
+  | {
+      kind: "control";
+      options: RollControlOptions;
+      mode: RollMode;
+      previewMode?: RollMode;
+      /** FR-DICEX-97: the edited dice of a `purpose` control; absent = as staged. */
+      edit?: Composition;
+    };
 
 export interface DiceExtrasState {
   request: TrayRequest | null;

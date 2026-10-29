@@ -252,7 +252,14 @@ function Segment({
         </Badge>
       );
     case "muted":
-      return <span className="text-muted-foreground italic">{s.text}</span>;
+      // FR-DICE-95: "edited" carries its own Tooltip text (the shared Tooltip, FR-SHELL-30).
+      return s.tip ? (
+        <Tooltip content={s.tip}>
+          <span className="text-muted-foreground italic">{s.text}</span>
+        </Tooltip>
+      ) : (
+        <span className="text-muted-foreground italic">{s.text}</span>
+      );
     default:
       return <span>{s.text}</span>;
   }

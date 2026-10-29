@@ -28,6 +28,8 @@ export interface LineSegment {
   die?: LineDie;
   /** A number from dice that is not a die (a rolled part's sum): "…" on a held line (FR-DICE-40). */
   numeric?: true;
+  /** FR-DICE-95: the segment's own Tooltip text ("Dice changed in the tray"). */
+  tip?: string;
 }
 
 export interface LineInput<P, D> {

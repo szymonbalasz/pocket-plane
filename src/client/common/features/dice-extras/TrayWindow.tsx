@@ -6,7 +6,12 @@
 // flexible dice area; only the dice area shrinks or scrolls, so Roll stays visible at min size.
 // *(Sprint 8)* FR-DICEX-69, -70: the header's Macros popover (by the gear) and "Save as macro" in
 // the Options row; the list and editor load lazily (`TableTools` chunk).
+// *(Sprint 15, #385)* FR-DICEX-97–104: a `purpose` control is editable in `adjust` (palette, die
+// clicks, the base constant; Roll hands `onRoll` the staged `parts`); a purpose toggle (Plain ·
+// Attack · Damage) in `compose` / `adjust`; damage dice form typed die groups; the crit badge; a
+// free Attack / Damage asks the tray routes first (FR-DICEX-102), else `dice.roll {purpose}`.
 
+import { critExpression } from "@shared/combat-tracker/rules";
 import {
   COMBATANT_TYPE,
   type CombatantRecord,
@@ -14,18 +19,22 @@ import {
   type EncounterRecord,
 } from "@shared/combat-tracker/schemas";
 import { throwDice } from "@shared/dice-extras/throw";
-import { prepareExpression } from "@shared/dice-roll-log/grammar";
+import { parseExpression, prepareExpression, toNotation } from "@shared/dice-roll-log/grammar";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import {
   CATEGORY_LABEL,
   type DiceRollIntent,
   type DmRollActorRef,
   type GameLogEntryView,
+  type ManualEntry,
   ROLL_CATEGORIES,
   type RollCategory,
   type RollMode,
+  type RollPurpose,
+  type StagedPart,
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
+import type { RecordStore } from "@shared/protocol/store";
 import { SCENE_TYPE, type SceneView, TOKEN_TYPE, type TokenView } from "@shared/scenes-map/schemas";
 import {
   BookmarkIcon,
@@ -62,7 +71,7 @@ import {
   SelectValue,
   Tooltip,
 } from "../../components/ui/overlays";
-import { Input } from "../../components/ui/primitives";
+import { Badge, Input } from "../../components/ui/primitives";
 import { Tip } from "../../components/ui/tip";
 import { lazyChunk } from "../../lib/lazy-chunk";
 import { cn } from "../../lib/utils";
@@ -91,22 +100,48 @@ import { SettingsPanel } from "./SettingsPanel";
 import { diceExtras, type TrayRequest, useDiceExtras } from "./store";
 import { type AreaBox, type TrayGroup, TrayPreview } from "./TrayPreview";
 import {
-  addDie,
   chipsOf,
   constantOfTerms,
   editRequest,
-  editStartsFresh,
   notationOf,
   notationScale,
   PALETTE,
   previewMode,
-  removeDie,
   scaledFont,
   scaledPx,
-  setConstant,
   termsOf,
   trayScale,
 } from "./tray-logic";
+import {
+  baseConstant,
+  type Composition,
+  compositionIssue,
+  compositionOf,
+  dropDie,
+  groupRecordId,
+  joinDie,
+  lockedDie,
+  normalize,
+  offersNoType,
+  PART_TYPES,
+  type PartType,
+  partSlotLabels,
+  partsOf,
+  presetActor,
+  retype,
+  setBaseConstant,
+  setGroupType,
+  stagedPartsOf,
+  type TrayPurpose,
+  typeLabel,
+} from "./tray-parts";
+import { trayRoutes } from "./tray-routes";
+import {
+  type TrayRoute,
+  type TrayRouteRequest,
+  type TraySendIntent,
+  trayRouteFor,
+} from "./tray-routing";
 
 export type TrayState = "idle" | "compose" | "adjust" | "manual" | "rolling" | "result";
 
@@ -206,6 +241,25 @@ function errorText(err: unknown): string {
 
 const NO_ROLL: RollControlOptions = { expressions: [], category: "other", onRoll: () => {} };
 
+/** FR-DICEX-97, -99: an attack / damage roll's staged dice, as the tray's control rolls them. */
+export interface StagedRoll {
+  purpose: RollPurpose;
+  parts: StagedPart[];
+  /** FR-DICE-41 (FR-DICEX-101 g): the physical form's slot labels, one per part. */
+  slotLabels: (string | null)[];
+  /** FR-DICEX-100: the server will double every die (the form's extra critical dice). */
+  crit: boolean;
+}
+
+/** The roll control fields of staged parts: one expression per part, crit forms when crit. */
+const stagedFields = (staged: StagedRoll) => ({
+  expressions: staged.parts.map((p) => p.expression),
+  slotLabels: staged.slotLabels,
+  ...(staged.crit
+    ? { crit: true, critExpressions: staged.parts.map((p) => critExpression(p.expression)) }
+    : {}),
+});
+
 /**
  * The options of the tray's one `RollControl`. `control`: the caller's options **verbatim** with
  * the tray's mode; Roll calls the caller's `onRoll` with the very `RollRequest` an immediate roll
@@ -217,9 +271,22 @@ export function trayControlOptions(
   draft: string,
   mode: RollMode,
   sendFree: (r: RollRequest) => void,
+  staged: StagedRoll | null = null,
 ): RollControlOptions {
   if (request?.kind === "control") {
     const { onRoll } = request.options;
+    if (staged) {
+      const { crit: _crit, critExpressions: _critExpressions, ...rest } = request.options;
+      return {
+        ...rest,
+        ...stagedFields(staged),
+        mode,
+        onRoll: (r) => {
+          diceExtras.sent(true);
+          onRoll({ ...r, parts: staged.parts });
+        },
+      };
+    }
     return {
       ...request.options,
       mode,
@@ -230,11 +297,13 @@ export function trayControlOptions(
     };
   }
   if (request?.kind === "free") {
+    const category = staged ? staged.purpose : request.category;
     return {
       expressions: [draft.trim()],
-      category: request.category,
-      label: request.label ?? CATEGORY_LABEL[request.category],
+      category,
+      label: request.label ?? CATEGORY_LABEL[category],
       mode,
+      ...(staged ? stagedFields(staged) : {}),
       onRoll: (r) => {
         diceExtras.sent(true);
         sendFree(r);
@@ -242,6 +311,190 @@ export function trayControlOptions(
     };
   }
   return NO_ROLL;
+}
+
+/** Physical entries of several parts as one entry (their dice in notation order). */
+function mergedManual(entries: readonly ManualEntry[]): ManualEntry {
+  const diceTotal = entries.reduce((n, e) => n + e.diceTotal, 0);
+  const dice = entries.every((e) => e.dice) ? entries.flatMap((e) => e.dice ?? []) : null;
+  return dice ? { diceTotal, dice } : { diceTotal };
+}
+
+/** The parts' terms as one expression. */
+const joinedExpression = (parts: readonly StagedPart[]): string =>
+  toNotation(
+    parts.flatMap((p) => {
+      const r = parseExpression(p.expression);
+      return r.ok ? r.value : [];
+    }),
+  );
+
+/**
+ * FR-DICEX-04, -99: the `dice.roll` of a `free` request: plain = the composed expression as
+ * today; Attack / Damage (unclaimed) = a labelled roll with its `purpose` and category, damage as
+ * its typed `parts`. `dice.roll` takes physical dice for one expression only (#388): a physical
+ * damage roll sends its parts as one untyped expression with one entry.
+ */
+export function freeRollIntent(
+  free: Extract<TrayRequest, { kind: "free" }>,
+  draft: string,
+  r: RollRequest,
+  staged: StagedRoll | null,
+): DiceRollIntent {
+  const intent: DiceRollIntent = { mode: r.mode, category: free.category };
+  if (free.label) intent.label = free.label;
+  if (free.actor) intent.actor = free.actor;
+  if (r.public !== undefined) intent.public = r.public;
+  if (!staged) {
+    intent.expression = draft.trim();
+    if (r.manual?.[0]) intent.manual = r.manual[0];
+    return intent;
+  }
+  intent.purpose = staged.purpose;
+  intent.category = staged.purpose;
+  if (staged.purpose === "attack") {
+    intent.expression = staged.parts[0]?.expression ?? draft.trim();
+    if (r.manual?.[0]) intent.manual = r.manual[0];
+    return intent;
+  }
+  intent.mode = "normal";
+  if (r.manual?.length) {
+    intent.expression = joinedExpression(staged.parts);
+    intent.manual = mergedManual(r.manual);
+  } else {
+    intent.parts = staged.parts;
+  }
+  return intent;
+}
+
+/** FR-DICEX-102: what the tray routes read of a free Attack / Damage request; plain → null. */
+export function routeRequestOf(
+  free: Extract<TrayRequest, { kind: "free" }>,
+  mode: RollMode,
+): TrayRouteRequest | null {
+  if (!free.purpose) return null;
+  return {
+    purpose: free.purpose,
+    mode,
+    ...(free.label ? { label: free.label } : {}),
+    ...(free.actor ? { actor: free.actor } : {}),
+  };
+}
+
+/**
+ * FR-DICEX-99, -102: a `free` roll leaves the tray: an Attack / Damage asks the routes on Roll
+ * and the first claim sends its intent (never `dice.roll`); else `dice.roll` (`freeRollIntent`).
+ */
+export function sendFreeRoll(o: {
+  routes: readonly TrayRoute[];
+  store: RecordStore;
+  free: Extract<TrayRequest, { kind: "free" }>;
+  draft: string;
+  mode: RollMode;
+  roll: RollRequest;
+  staged: StagedRoll | null;
+  send: TraySendIntent;
+}): Promise<unknown> {
+  const request = o.staged ? routeRequestOf(o.free, o.mode) : null;
+  const claim = request ? trayRouteFor(o.routes, o.store, request) : null;
+  if (claim && o.staged) return claim.send(o.send, o.staged.parts, o.roll);
+  return o.send("dice.roll", freeRollIntent(o.free, o.draft, o.roll, o.staged));
+}
+
+const PURPOSES: readonly TrayPurpose[] = ["plain", "attack", "damage"];
+const PURPOSE_LABEL: Record<TrayPurpose, string> = {
+  plain: "Plain",
+  attack: "Attack",
+  damage: "Damage",
+};
+const NO_TYPE = "none";
+export const CRIT_BADGE = "Critical: dice ×2";
+export const CRIT_TIP = "The server doubles every die, added dice too";
+
+/** FR-DICEX-99: the purpose toggle (`compose`, an editable `adjust`). */
+function PurposeToggle({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: TrayPurpose;
+  disabled: boolean;
+  onChange(v: TrayPurpose): void;
+}) {
+  return (
+    <ToggleGroup
+      type="single"
+      data-testid="dicex-tray-purpose"
+      data-value={value}
+      aria-label="Purpose"
+      className="shrink-0"
+      value={value}
+      disabled={disabled}
+      onValueChange={(v) => {
+        if (v) onChange(v as TrayPurpose);
+      }}
+    >
+      {PURPOSES.map((p) => (
+        <ToggleGroupItem
+          key={p}
+          value={p}
+          data-testid="dicex-tray-purpose-option"
+          data-value={p}
+          aria-label={PURPOSE_LABEL[p]}
+          // 26 px + the group's border = the row's 28 px (FR-DICEX-53 budget).
+          className="h-[26px] px-1.5 text-xs"
+        >
+          {PURPOSE_LABEL[p]}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  );
+}
+
+/** FR-DICEX-101: a damage die group's type Select ("No type" only while the base is untyped). */
+function GroupType({
+  comp,
+  term,
+  disabled,
+  onChange,
+}: {
+  comp: Composition;
+  term: number;
+  disabled: boolean;
+  onChange(type: PartType | null): void;
+}) {
+  const value = comp.types[term] ?? null;
+  const t = comp.terms[term];
+  const faces = t?.kind === "dice" ? t.faces : 0;
+  return (
+    <Select
+      value={value ?? NO_TYPE}
+      disabled={disabled}
+      onValueChange={(v) => onChange(v === NO_TYPE ? null : (v as PartType))}
+    >
+      <SelectTrigger
+        data-testid="dicex-tray-group-type"
+        data-record-id={groupRecordId(comp, term)}
+        data-value={value ?? NO_TYPE}
+        aria-label={`Damage type of the d${faces} dice`}
+        className={cn(SELECT, "relative max-w-24")}
+      >
+        <SelectValue>{typeLabel(value)}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {offersNoType(comp) && (
+          <SelectItem value={NO_TYPE} data-testid="dicex-tray-group-type-option" data-value="none">
+            {typeLabel(null)}
+          </SelectItem>
+        )}
+        {PART_TYPES.map((p) => (
+          <SelectItem key={p} value={p} data-testid="dicex-tray-group-type-option" data-value={p}>
+            {typeLabel(p)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 /** Shift / Ctrl held while the tray has focus or the pointer: previews adv / dis (FR-DICEX-08 e). */
@@ -405,6 +658,18 @@ function useActors() {
 
 const refKey = (ref: DmRollActorRef | undefined) => (ref ? JSON.stringify(ref) : "");
 
+/** FR-DICEX-99: a player's own character in the fight, the Attack / Damage actor preset. */
+function useActorPreset(): DmRollActorRef | null {
+  const you = useSync((s) => s.store.you);
+  const entities = useRecords<EntityRecord>(ENTITY_TYPE);
+  const encounters = useRecords<EncounterRecord>(ENCOUNTER_TYPE);
+  const combatants = useRecords<CombatantRecord>(COMBATANT_TYPE);
+  return useMemo(
+    () => presetActor({ you, entities, encounters, combatants }),
+    [you, entities, encounters, combatants],
+  );
+}
+
 export function TrayWindow() {
   const request = useDiceExtras((s) => s.request);
   const staged = useDiceExtras((s) => s.staged);
@@ -441,6 +706,37 @@ export function TrayWindow() {
     lastValid.current = termsOf(expression) ?? [];
   }, [staged]);
 
+  const controlReq = request?.kind === "control" ? request : null;
+  // FR-DICEX-97, -99: what the roll is for; a `purpose` control (and any `free` request) is
+  // editable, every other control stays read-only.
+  const purpose: TrayPurpose = free
+    ? (free.purpose ?? "plain")
+    : (controlReq?.options.purpose ?? "plain");
+  const editable = free !== null || controlReq?.options.purpose !== undefined;
+  const freeTerms = free ? (termsOf(draft) ?? lastValid.current) : [];
+  const comp: Composition = controlReq
+    ? (controlReq.edit ??
+      compositionOf(controlReq.options.expressions, purpose, controlReq.options.partTypes ?? []))
+    : { terms: freeTerms, types: freeTerms.map((_, i) => free?.types?.[i] ?? null) };
+  const preset = useActorPreset();
+  const routeStore = useSync((s) => s.store);
+  // FR-DICEX-102: a free Attack / Damage asks the tray routes (combat claims a combatant's).
+  const routeRequest = free ? routeRequestOf(free, mode) : null;
+  const claim = routeRequest ? trayRouteFor(trayRoutes, routeStore, routeRequest) : null;
+  // FR-DICEX-100: a control's own crit (a damage after a natural 20), or the route's.
+  const crit =
+    purpose === "damage" && (controlReq ? controlReq.options.crit === true : !!claim?.crit);
+  const issue = editable ? compositionIssue(comp, purpose) : null;
+  const stagedRoll: StagedRoll | null =
+    editable && purpose !== "plain"
+      ? {
+          purpose,
+          parts: stagedPartsOf(comp, purpose),
+          slotLabels: partSlotLabels(comp, purpose),
+          crit,
+        }
+      : null;
+
   const update = (patch: Partial<Extract<TrayRequest, { kind: "free" }>>) => {
     const base = free ?? {
       kind: "free" as const,
@@ -452,41 +748,87 @@ export function TrayWindow() {
   };
   /** FR-DICEX-50: `fresh` = after a result: a new roll carries nothing of the old request. */
   const edit = (expression: string, fresh: boolean) => {
-    if (!fresh) return update({ expression });
+    if (!fresh) {
+      // FR-DICEX-101: a typed damage expression keeps each die size's type.
+      const t = purpose === "damage" ? termsOf(expression) : null;
+      return update({ expression, ...(t ? { types: retype(comp, t).types } : {}) });
+    }
     const next = editRequest(free, expression, mode, true);
     diceExtras.api.setState({ request: { kind: "free", ...next }, result: null });
   };
-  const setTerms = (terms: ReturnType<typeof addDie>, fresh = false) => {
-    const expression = notationOf(terms);
-    lastValid.current = terms;
-    setDraft(expression);
+  /** A palette / die / constant / type edit. FR-DICEX-97: a `purpose` control keeps its edits. */
+  const setComp = (next: Composition, fresh = false) => {
     setError(null);
-    edit(expression, fresh);
+    if (controlReq && !fresh) {
+      diceExtras.api.setState({ request: { ...controlReq, edit: next }, result: null });
+      return;
+    }
+    const expression = notationOf(next.terms);
+    lastValid.current = next.terms;
+    setDraft(expression);
+    if (fresh || purpose !== "damage") return edit(expression, fresh);
+    update({ expression, types: next.types });
+  };
+  /**
+   * FR-DICEX-99: the purpose toggle. A `free` request keeps its dice; a control turns into a
+   * `free` request with the same dice and label (table F). A player's Attack / Damage with the
+   * default actor presets their one own character in the fight.
+   */
+  const setPurpose = (v: TrayPurpose) => {
+    if (v === purpose) return;
+    setError(null);
+    const untyped = { terms: comp.terms, types: comp.terms.map(() => null) };
+    const next = v !== "damage" ? untyped : purpose === "damage" ? comp : normalize(untyped);
+    const expression = notationOf(next.terms);
+    const base: Extract<TrayRequest, { kind: "free" }> = free ?? {
+      kind: "free",
+      expression,
+      mode,
+      category: controlReq?.options.category ?? "other",
+      ...(controlReq?.options.label ? { label: controlReq.options.label } : {}),
+    };
+    const actor = base.actor ?? (v !== "plain" ? (preset ?? undefined) : undefined);
+    const { purpose: _p, types: _t, actor: _a, ...rest } = base;
+    diceExtras.api.setState({
+      request: {
+        ...rest,
+        expression,
+        ...(v !== "plain" ? { purpose: v } : {}),
+        ...(v === "damage" ? { types: next.types } : {}),
+        ...(actor ? { actor } : {}),
+      },
+      result: null,
+    });
+    setDraft(expression);
+    lastValid.current = next.terms;
   };
 
   // One RollControl for the staged request: `control` options verbatim (FR-DICEX-08 a) with the
-  // tray's mode; `free` → a `dice.roll` built here (FR-DICEX-04).
+  // tray's mode; `free` → a `dice.roll` built here (FR-DICEX-04), or the claiming tray route's
+  // intent (FR-DICEX-102).
   const sendFree = (r: RollRequest) => {
     if (!free) return;
-    const intent: DiceRollIntent = {
-      expression: draft.trim(),
-      mode: r.mode,
-      category: free.category,
-    };
-    if (free.label) intent.label = free.label;
-    if (free.actor) intent.actor = free.actor;
-    if (r.manual?.[0]) intent.manual = r.manual[0];
-    if (r.public !== undefined) intent.public = r.public;
-    connection.sendIntent("dice.roll", intent).catch((err: unknown) => {
+    const fail = (err: unknown) => {
       diceExtras.failed();
       setError(errorText(err));
-    });
+    };
+    sendFreeRoll({
+      routes: trayRoutes,
+      store: routeStore,
+      free,
+      draft,
+      mode,
+      roll: r,
+      staged: stagedRoll,
+      send: (name, payload) => connection.sendIntent(name, payload),
+    }).catch(fail);
   };
-  const options = trayControlOptions(request, draft, mode, sendFree);
+  const options = trayControlOptions(request, draft, mode, sendFree, stagedRoll);
   const control = useRollControl(options, { tray: request?.kind === "control" });
   const state = trayState({ request, rolling, result, manual: control.manual !== null });
-  // FR-DICEX-50 (table F): an edit after a result, or over a `control` request, starts fresh.
-  const fresh = editStartsFresh(state, request?.kind ?? null);
+  // FR-DICEX-50 (table F): an edit after a result, or over a read-only `control` request, starts
+  // fresh; FR-DICEX-97: a `purpose` control keeps its edits.
+  const fresh = state === "result" || !editable;
   // FR-DICEX-08 e: MOD's preview (FR-MOD-27) combines the tray's mode with the effects (5e);
   // without a subject, the tray's own mode first, else the request's `previewMode`.
   const shownMode = control.preview.active
@@ -496,7 +838,8 @@ export function TrayWindow() {
   const roll = (keys: { shiftKey?: boolean; ctrlKey?: boolean } = {}) => {
     if (!live || !request) return;
     setError(null);
-    if (free) {
+    if (issue) return; // shown inline (FR-DICEX-99, -101 f)
+    if (free && !stagedRoll) {
       const m = modeFromKeys(keys, mode);
       const check = prepareExpression(draft.trim(), m);
       if (!check.ok) {
@@ -516,25 +859,54 @@ export function TrayWindow() {
     }
   };
 
-  const terms = free ? (termsOf(draft) ?? lastValid.current) : [];
-  // FR-DICEX-48: what the dice area previews: `free` = the composed terms; `control` = each
-  // expression's dice (crit per FR-DICE-31), the first with the previewed mode, each group with
-  // its slot label (FR-DICE-41).
-  const groups = useMemo((): TrayGroup[] => {
-    if (request?.kind !== "control") {
-      return [{ chips: chipsOf(terms, shownMode), constant: constantOfTerms(terms) }];
+  const terms = comp.terms;
+  const locked = editable ? lockedDie(comp, purpose) : null;
+  // FR-DICEX-48: what the dice area previews: `free` / an editable control = the composed terms
+  // (damage: one group per die size and type, led by its type Select, FR-DICEX-101; the dice as
+  // entered, FR-DICEX-100); a read-only `control` = each expression's dice (crit per FR-DICE-31),
+  // the first with the previewed mode, each group with its slot label (FR-DICE-41).
+  const groups = ((): TrayGroup[] => {
+    if (controlReq && !editable) {
+      const o = controlReq.options;
+      const exprs = o.crit && o.critExpressions ? o.critExpressions : o.expressions;
+      return exprs.map((x, i) => {
+        const t = termsOf(x) ?? [];
+        return {
+          chips: chipsOf(t, i === 0 ? shownMode : "normal"),
+          constant: constantOfTerms(t),
+          label: o.slotLabels?.[i] ?? null,
+        };
+      });
     }
-    const o = request.options;
-    const exprs = o.crit && o.critExpressions ? o.critExpressions : o.expressions;
-    return exprs.map((x, i) => {
-      const t = termsOf(x) ?? [];
-      return {
-        chips: chipsOf(t, i === 0 ? shownMode : "normal"),
-        constant: constantOfTerms(t),
-        label: o.slotLabels?.[i] ?? null,
-      };
-    });
-  }, [request, terms, shownMode]);
+    if (purpose !== "damage") {
+      const label = controlReq?.options.slotLabels?.[0] ?? null;
+      return [
+        { chips: chipsOf(terms, shownMode), constant: constantOfTerms(terms), label, locked },
+      ];
+    }
+    // A part's constant follows its last group (the base part's is also the constant Input).
+    const constants = new Map(partsOf(comp).map((p) => [p.dice[p.dice.length - 1], p.constant]));
+    const chips = chipsOf(terms, "normal");
+    return terms.flatMap((t, i) =>
+      t.kind !== "dice"
+        ? []
+        : [
+            {
+              chips: chips.filter((c) => c.term === i),
+              constant: constants.get(i) ?? 0,
+              locked,
+              lead: (
+                <GroupType
+                  comp={comp}
+                  term={i}
+                  disabled={state === "rolling"}
+                  onChange={(type) => setComp(setGroupType(comp, i, type))}
+                />
+              ),
+            },
+          ],
+    );
+  })();
   const { options: actorList, selected } = actorSelection(
     actors,
     free?.actor
@@ -567,7 +939,7 @@ export function TrayWindow() {
             {state === "idle" && IDLE_TEXT}
             {state === "compose" &&
               free &&
-              `${who ? `${who} — ` : ""}${free.label ?? CATEGORY_LABEL[free.category]}`}
+              `${who ? `${who} — ` : ""}${free.label ?? CATEGORY_LABEL[free.purpose ?? free.category]}`}
             {state === "adjust" &&
               request?.kind === "control" &&
               (request.options.label ?? CATEGORY_LABEL[request.options.category])}
@@ -585,7 +957,10 @@ export function TrayWindow() {
         <SettingsPopover />
       </div>
 
-      {(state === "idle" || state === "compose" || state === "result") && (
+      {(state === "idle" ||
+        state === "compose" ||
+        state === "result" ||
+        (state === "adjust" && editable)) && (
         <fieldset data-tray-part="palette" className="grid shrink-0 grid-cols-7 gap-1">
           <legend className="sr-only">Add a die</legend>
           {PALETTE.map((f) => (
@@ -598,9 +973,11 @@ export function TrayWindow() {
               data-value={f}
               className="h-7 min-w-0 px-0 font-mono text-xs"
               onClick={() => {
-                // After a result the palette starts a new roll; else it adds to the request.
+                // After a result the palette starts a new roll; else it adds to the request
+                // (FR-DICEX-101: a damage die joins its size's group or starts one).
                 diceExtras.api.setState({ result: null });
-                setTerms(addDie(fresh ? [] : terms, f), fresh);
+                const from = fresh ? { terms: [], types: [] } : comp;
+                setComp(joinDie(from, f, fresh ? "plain" : purpose), fresh);
               }}
             >
               d{f}
@@ -615,12 +992,23 @@ export function TrayWindow() {
         data-testid="dicex-tray-area"
         className="flex min-h-0 flex-1 flex-wrap content-start items-center gap-1 overflow-y-auto overflow-x-hidden py-1.5 pr-1.5"
       >
+        {crit && stagedRoll && (state === "compose" || state === "adjust") && (
+          <Tooltip content={CRIT_TIP}>
+            <Badge data-testid="dicex-tray-crit" variant="secondary" className="shrink-0">
+              {CRIT_BADGE}
+            </Badge>
+          </Tooltip>
+        )}
         {(state === "compose" || state === "adjust" || state === "rolling") && request && (
           <TrayPreview
             request={request}
             groups={groups}
             mode={shownMode}
-            onRemove={state === "compose" ? (term) => setTerms(removeDie(terms, term)) : undefined}
+            onRemove={
+              state === "compose" || (state === "adjust" && editable)
+                ? (term) => setComp(dropDie(comp, term))
+                : undefined
+            }
             dimmed={state === "rolling"}
             area={area}
             scale={scale}
@@ -638,42 +1026,64 @@ export function TrayWindow() {
       </div>
 
       {/* FR-DICEX-50: typing after a result starts a fresh request, as the palette does. */}
-      {(state === "compose" || state === "result") && (
+      {/* FR-DICEX-97, -99: an editable `adjust` has the purpose toggle and the constant only. */}
+      {(state === "compose" || state === "result" || (state === "adjust" && editable)) && (
         <div data-tray-part="expression" className="flex shrink-0 items-center gap-1.5">
-          <Input
-            data-testid="dicex-tray-expression"
-            aria-label="Dice expression"
-            placeholder="1d20+4"
-            className="h-7 min-w-0 flex-1 font-mono text-sm"
-            style={notation}
-            value={draft}
-            onChange={(e) => {
-              const v = e.target.value;
-              setDraft(v);
-              setError(null);
-              const t = termsOf(v);
-              if (t) lastValid.current = t;
-              if (t || fresh) edit(t ? v : "", fresh);
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-              e.preventDefault();
-              roll(e);
-            }}
-          />
+          {state !== "result" && (
+            <PurposeToggle value={purpose} disabled={false} onChange={setPurpose} />
+          )}
+          {state === "adjust" ? (
+            <span className="min-w-0 flex-1" />
+          ) : (
+            <Input
+              data-testid="dicex-tray-expression"
+              aria-label="Dice expression"
+              placeholder="1d20+4"
+              className="h-7 min-w-0 flex-1 font-mono text-sm"
+              style={notation}
+              value={draft}
+              onChange={(e) => {
+                const v = e.target.value;
+                setDraft(v);
+                setError(null);
+                const t = termsOf(v);
+                if (t) lastValid.current = t;
+                if (t || fresh) edit(t ? v : "", fresh);
+              }}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                e.preventDefault();
+                roll(e);
+              }}
+            />
+          )}
           <Input
             data-testid="dicex-tray-constant"
             aria-label="Constant"
             inputMode="numeric"
             className="h-7 w-16 font-mono text-sm"
             style={notation}
-            value={String(constantOfTerms(terms))}
+            value={String(fresh ? constantOfTerms(terms) : baseConstant(comp, purpose))}
             onChange={(e) => {
               const n = Number.parseInt(e.target.value.replace("−", "-"), 10);
-              setTerms(setConstant(terms, Number.isNaN(n) ? 0 : n), fresh);
+              const from = fresh ? { terms, types: terms.map(() => null) } : comp;
+              setComp(
+                setBaseConstant(from, Number.isNaN(n) ? 0 : n, fresh ? "plain" : purpose),
+                fresh,
+              );
             }}
           />
         </div>
+      )}
+      {issue && state !== "result" && (
+        <p
+          data-testid="dicex-tray-issue"
+          role="status"
+          className="shrink-0 truncate text-xs text-destructive"
+          title={issue}
+        >
+          {issue}
+        </p>
       )}
 
       {error && (
@@ -787,7 +1197,9 @@ export function TrayWindow() {
                 data-testid="dicex-tray-roll"
                 size="sm"
                 className="h-7"
-                disabled={!live || !request || state === "rolling" || state === "result"}
+                disabled={
+                  !live || !request || state === "rolling" || state === "result" || issue !== null
+                }
                 onClick={(e) => roll(e)}
               >
                 Roll

@@ -79,7 +79,7 @@ describe("FR-CHARX-128 staged parts", () => {
     expect(item?.label).toBe(was?.label as string);
     expect(item?.label).toBe("Guiding Bolt damage (radiant)");
     expect(item?.dice).toHaveLength(5);
-    expect(t.line(staged.entryId)).toMatch(/^Mira — Guiding Bolt damage \(radiant\): /);
+    expect(t.line(staged.entryId)).toMatch(/^Mira — Guiding Bolt damage \(radiant\) edited: /); // FR-DICE-95
   });
 
   test("FR-CHARX-128 staged parts: healing spells take parts (upcast Cure Wounds); to-hit swaps its d20 expression", () => {
@@ -181,7 +181,7 @@ describe("FR-CHARX-128 staged parts", () => {
       { type: "fire", extra: true },
     ]);
     expect(t.line(r.entryId)).toMatch(
-      /^Thorn — Flame Tongue damage: 2d6\+5\+1d6 \(.+\) \+ 2 Rage slashing \+ 2d6 \(.+\) fire = \d+$/,
+      /^Thorn — Flame Tongue damage edited: 2d6\+5\+1d6 \(.+\) \+ 2 Rage slashing \+ 2d6 \(.+\) fire = \d+$/,
     );
   });
 
