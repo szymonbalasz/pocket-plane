@@ -5,6 +5,7 @@ import {
   CharacterCreated,
   CharacterLockSet,
   CharacterResourceUsed,
+  CharacterRested,
   CharacterRolled,
   CharacterSheetEdited,
 } from "./character-sheet";
@@ -16,6 +17,7 @@ const CHARX_EVENTS = [
   "CharacterLockSet",
   "CharacterSheetEdited",
   "CharacterResourceUsed",
+  "CharacterRested",
 ];
 
 const roundTrip = (s: { parse(v: unknown): unknown }, v: unknown) =>
@@ -76,6 +78,14 @@ describe("CHARX domain events (§9)", () => {
     bad({ hitDie: "d20" });
     bad({ slot: 1, hitDie: "d8" });
     bad({ slot: 1 }, -1);
+  });
+
+  test("FR-CHARX-121 CharacterRested payload round-trips; strict; kind short | long", () => {
+    const p = CharacterRested.payload;
+    roundTrip(p, { characterId: "c1", kind: "long", entryId: "e1" });
+    roundTrip(p, { characterId: "c1", kind: "short", entryId: "e1" });
+    expect(p.safeParse({ characterId: "c1", kind: "nap", entryId: "e1" }).success).toBe(false);
+    expect(p.safeParse({ characterId: "c1", kind: "long" }).success).toBe(false);
   });
 
   test("FR-CHARX-20 CharacterRolled gains skill / damage / spell kinds and skill?, attackId?, spellId?", () => {

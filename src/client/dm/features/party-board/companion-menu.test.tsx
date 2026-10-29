@@ -2,7 +2,8 @@
 // as a static render over a fake sync store: New pet… in the tab's header row, the row menu on
 // pets only (summons have none: Initiative owns them), everything disabled while disconnected;
 // Owner… / Release… locked while the pet is in a fight. The player client passes no DM parts.
-// The menu's dialogs and their `PUT`s: e2e/cp-pets.e2e.ts.
+// The menu's dialogs and their `PUT`s: e2e/cp-pets.e2e.ts. FR-PARTY-79: Rest the party… beside
+// New pet… (the dialog: e2e/charx-rest.e2e.ts).
 import { describe, expect, test } from "bun:test";
 import type { You } from "@shared/protocol/frames";
 import { lazyAfterSnapshot } from "@shared/protocol/lazy";
@@ -19,6 +20,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { PET_OWNER_HINT } from "../combat-tracker/companion-menu";
 import { dmCompanionParts, petMenuLock } from "./companion-menu";
+import { partyMembers, REST_PARTY_LABEL } from "./rest-party";
 
 const DM: You = { campaignId: "c", role: "dm", playerId: null };
 const P1: You = { campaignId: "c", role: "player", playerId: "p1" };
@@ -150,6 +152,29 @@ describe("FR-PARTY-62 DM companion actions", () => {
     // In a fight, Owner… and Release… say why they are disabled.
     expect(petMenuLock({ inCombat: true })).toBe(PET_IN_FIGHT_HINT);
     expect(petMenuLock({ inCombat: false })).toBeNull();
+  });
+});
+
+describe("FR-PARTY-79 rest the party", () => {
+  test("FR-PARTY-79 rest the party: DM header button before New pet…, disabled while disconnected, none for players; the checklist lists the campaign's characters by name", () => {
+    const html = render(DM);
+    const open = tag(html, "party-rest-open");
+    expect(open).toHaveLength(1);
+    expect(open[0]).not.toContain(' disabled=""');
+    expect(html).toContain(REST_PARTY_LABEL);
+    expect(html.indexOf("party-rest-open")).toBeLessThan(html.indexOf("party-companion-new"));
+    expect(tag(render(DM, false), "party-rest-open")[0]).toContain(' disabled=""');
+    expect(render(P1)).not.toContain("party-rest-open");
+    expect(
+      partyMembers([
+        { id: "t", kind: "character", name: "Thorn" },
+        owl,
+        { id: "m", kind: "character", name: "Mira" },
+      ]),
+    ).toEqual([
+      { id: "m", name: "Mira" },
+      { id: "t", name: "Thorn" },
+    ]);
   });
 });
 

@@ -75,6 +75,12 @@ phase: post-mvp-9
 | FR-PARTY-76 | Six tabs at 550 px, never cut | RS2 (e2e) | `FR-PARTY-76 six tabs fit` |
 | FR-PARTY-77 | Inventory shows party rows only | RS3 | `FR-PARTY-77 inventory without Stores rows` |
 
+> **Rest the party (DM request 2026-10-29; fix/rest-buttons).** Decided, not open: Party Manager gets the party entry point to CHARX's rest command ([FR-CHARX-121–125](character-sheet-full.md#6-functional-requirements), OQ-CHARX-08 reopened).
+
+| FR | What | Slice | Named test |
+|---|---|---|---|
+| FR-PARTY-79 | Rest the party… (DM) | fix/rest-buttons | `FR-PARTY-79 rest the party`, e2e `charx-rest.e2e.ts` |
+
 ## 1. Summary
 
 - A **Party** window, both clients, replacing Miro for the table: **handouts** the DM shares with everyone or chosen players, and a **party inventory** that items move in and out of (DM [#203](../decisions-log.md): "party board + handouts"; tier A in [feature tiers §4](../feature-tiers.md#4-notes-handouts-world-and-party)).
@@ -280,6 +286,12 @@ BL-73 (decided): the Party Manager has a **Reminders** tab and a **Strongholds**
 | FR-PARTY-77 | **Inventory = the party's rows only**: the Inventory tab lists `party-item` rows without `strongholdId`; Stores rows show only in their Stronghold window ([FR-LOOT-36](party-loot.md#6-functional-requirements)). Take / Give… and caps unchanged for the party. | |
 | FR-PARTY-78 | **Test IDs**: `party-tab` `data-value="reminders"` / `"strongholds"`; tab content uses REM's `rem-*` and HOLD's `hold-*` IDs. | AGENTS §9.5 |
 
+**Rest the party (DM request 2026-10-29)**
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-PARTY-79 | **Rest the party…** (DM only): a small header button on the Party status tab, before New pet…, disabled while disconnected. Opens a Dialog "Rest the party": **Short rest · Long rest** (CHARX's segmented choice, Short selected), the reset line and the encounter warning ([FR-CHARX-123](character-sheet-full.md#6-functional-requirements)), a **checklist of the campaign's characters** by name, all ticked (a character added while open is ticked), Cancel and the confirm (label = the kind; disabled with none ticked). Confirm → **one** `char.rest {characterIds: ticked, kind}` ([FR-CHARX-121](character-sheet-full.md#6-functional-requirements)); success closes the Dialog (no one rested → Toast "Nothing to reset"); a reject keeps it open with a Toast. Players see the results through normal sync (their sheet, Party status HP). Test IDs: `party-rest-open`, `party-rest-dialog`, `party-rest-kind` (+ `data-value`), `party-rest-text`, `party-rest-warning`, `party-rest-character` (+ `data-record-id`, `data-state` checked / unchecked), `party-rest-cancel`, `party-rest-confirm`. | No new record, field or event of PARTY |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Textarea, Button, Badge, Dialog, RadioGroup, Checkbox, ScrollArea, Toast, Skeleton. Dark only. No custom styling.
@@ -296,7 +308,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Tabs, Input, Texta
 - *(S5)* **Test IDs:** `party-share-present`, `party-share-present-names`, `party-present-open` (row menu / viewer) + `data-record-id`, `party-present-dialog`, `party-present-mode` + `data-value` (`all|players`), `party-present-player` + `data-record-id`, `party-present-submit`, `party-present-error`, `party-present-count` + `data-value` (n), `party-present-close-all`; player popup `party-present-popup` + `data-record-id` (handout id) + `data-present-id`, `party-present-title`, `party-present-image` + `data-record-id` (asset id), `party-present-prev`, `party-present-next`, `party-present-page`, `party-present-body`, `party-present-loading`, `party-present-retry`, `party-present-close`, `party-present-open-board`. Editor: ASSET's `asset-attach*` with `data-owner="party-editor"`, plus `party-editor-duplicate` (seams S5).
 - *(S9)* **Reminders tab:** **DM view:** Party group, then every character (empty ones collapsed), DM-only rows with eye-off, Add everywhere; **player view:** Party + own characters, each with its read-only effects line ([REM §7](reminders.md#7-uiux-notes)). **Strongholds tab:** DM: every stronghold, "DM only" Badges, New stronghold; players: shown strongholds only, the tab absent while there are none ([HOLD §7](strongholds.md#7-uiux-notes)).
 - *(S8)* **Party status** (`party.summary`): a dense list, one line per PC (portrait, name + colour dot, HP "38 / 52" with a thin band-tone bar, "+5" temp, shield "15", death / Down Badge, condition icons), companions indented under their owner in muted type. **Player view:** own PCs on top in full; other PCs with the figures OQ-PARTY-30 picks; companions per ADR-0056 (own numbers, others a band). **DM view:** every PC, hidden ones with eye-off. A small turn marker on the PC whose turn it is. No editing in the window (HP stays on the sheet / Initiative / token). Test IDs: `party-summary` (list), `party-summary-row` (+ `data-record-id`), `party-summary-hp` (`data-value` = "cur/max" or band), `party-summary-temp`, `party-summary-ac`, `party-summary-companion` (+ `data-record-id`), `party-summary-empty`.
-- *(S9)* **Party Manager** (no new styling; shadcn Tabs, as today): title "Party Manager"; tab strip **Party status · Handouts · Inventory · Loot**. Party status tab: a header row (DM: "New pet…" at the right), then the PC list; under each PC row its companions, indented one step, in muted type (the Companions tab's row form); "Other companions" last if any. At 550 px everything is one line per row. **Per-tab views** (unchanged, FR-PARTY-65):
+- *(S9)* **Party Manager** (no new styling; shadcn Tabs, as today): title "Party Manager"; tab strip **Party status · Handouts · Inventory · Loot**. Party status tab: a header row (DM: "Rest the party…" and "New pet…" at the right, FR-PARTY-79), then the PC list; under each PC row its companions, indented one step, in muted type (the Companions tab's row form); "Other companions" last if any. At 550 px everything is one line per row. **Per-tab views** (unchanged, FR-PARTY-65):
 
 | Tab | DM | Player |
 |---|---|---|

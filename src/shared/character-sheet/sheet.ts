@@ -21,6 +21,7 @@ import {
   SpellLevelKey,
 } from "@shared/entities/schemas";
 import {
+  RestKind,
   type SHEET_EDIT_FIELDS,
   SheetResource,
   SheetRowList,
@@ -99,13 +100,14 @@ const FEATURE_USES_MAX = 20;
  */
 export const FEATURE_OVERSPEND_MAX = 9;
 const FEATURE_USED_MAX = FEATURE_USES_MAX + FEATURE_OVERSPEND_MAX;
+
 const featureFields = {
   name: rowName(60),
   source: text(40).default(""),
   text: text(600).default(""),
   usesMax: int(1, FEATURE_USES_MAX).optional(),
-  /** Label only: no rest buttons (OQ-CHARX-08). */
-  reset: z.enum(["short", "long"]).optional(),
+  /** The rest that resets `used` (`char.rest`, FR-CHARX-122; OQ-CHARX-08 reopened). */
+  reset: RestKind.optional(),
 };
 
 export const FeatureRow = z
@@ -222,6 +224,7 @@ export const CHARX_INTENTS = {
   deleteRow: "char.deleteRow",
   moveRow: "char.moveRow",
   useResource: "char.useResource",
+  rest: "char.rest",
 } as const;
 
 /** `char.create` (FR-CHARX-08). Player: `{name}` only; DM: `ownerPlayerId` required. */
@@ -362,3 +365,20 @@ export const CharUseResourceIntent = z
 export type CharUseResourceIntent = z.input<typeof CharUseResourceIntent>;
 export const CharUseResourceResult = z.object({ before: z.int(), after: z.int() });
 export type CharUseResourceResult = z.infer<typeof CharUseResourceResult>;
+
+/** FR-CHARX-121: the party's ticked characters at once (Party Manager) or one (the sheet). */
+export const REST_CHARACTERS_MAX = 20;
+
+/** `char.rest` (FR-CHARX-121, DM): 1–20 distinct characters, one rest kind. */
+export const CharRestIntent = z.strictObject({
+  characterIds: z
+    .array(Id)
+    .min(1)
+    .max(REST_CHARACTERS_MAX)
+    .refine((ids) => new Set(ids).size === ids.length, { message: "Characters must be distinct" }),
+  kind: RestKind,
+});
+export type CharRestIntent = z.input<typeof CharRestIntent>;
+/** The characters something changed for (one `CharacterRested` each), in the sent order. */
+export const CharRestResult = z.object({ rested: z.array(z.string()) });
+export type CharRestResult = z.infer<typeof CharRestResult>;

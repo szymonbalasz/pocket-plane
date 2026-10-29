@@ -134,6 +134,11 @@ export const SheetResource = z.union([
 ]);
 export type SheetResource = z.infer<typeof SheetResource>;
 
+/** A rest (`char.rest`, FR-CHARX-121) and the rest a feature row's uses come back on. */
+export const REST_KINDS = ["short", "long"] as const;
+export const RestKind = z.enum(REST_KINDS);
+export type RestKind = z.infer<typeof RestKind>;
+
 /** `char.create` (FR-CHARX-08): changes = `entity` + `creature-sheet` upserts. */
 export const CharacterCreated = defineEvent({
   type: "CharacterCreated",
@@ -193,6 +198,17 @@ export const CharacterResourceUsed = defineEvent({
     before: z.number().int().min(0),
     after: z.number().int().min(0),
   }),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * `char.rest` (FR-CHARX-121), one per character something changed for: changes = its
+ * `creature-sheet` and / or `entity` upserts + its `char.rest` `game-log-entry` (`entryId`).
+ */
+export const CharacterRested = defineEvent({
+  type: "CharacterRested",
+  payload: z.strictObject({ characterId: Id, kind: RestKind, entryId: Id }),
   logged: true,
   undoable: false,
 });
