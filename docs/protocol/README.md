@@ -276,6 +276,7 @@ Each lists `changes` (before/after per record; create: before null, delete: afte
 | `CharacterLockSet` | CHARX | `{characterId, locked}` | `creature-sheet` upsert | yes | no | no | — |
 | `CharacterSheetEdited` | CHARX | `{creatureId, op: set \| putRow \| deleteRow \| moveRow, fields?, list?, rowId?}` (keys and ids, never values) | `entity` and / or `creature-sheet` + hook-changed instances | yes | no | no | — |
 | `CharacterResourceUsed` | CHARX | `{characterId, resource: {slot} \| {hitDie} \| {feature}, before, after}` | `creature-sheet` upsert | yes | no | no | — |
+| `CharacterRested` | CHARX | `{characterId, kind: short \| long, entryId}`, one per changed character ([§183](#183-rest-buttons-fixrest-buttons)) | `creature-sheet` and / or `entity` upsert + `char.rest` `game-log-entry` | yes | no | no | — |
 | `EffectsAdded` | CBTX | `{effectIds}` | `effect` creates; concentration + linked ended by an incapacitating condition | yes | no | no | — |
 | `EffectUpdated` | CBTX | `{effectId}` | `effect` | yes | no | no | — |
 | `EffectsEnded` | CBTX | `{effectIds, reason}` (`reason` = an `endedReason`) | `effect`s + linked; closed cards follow as `NotificationResolved` | yes | no | no | — |
@@ -948,7 +949,7 @@ From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`
 | `creature-sheet` | **built**: table; record type + zod record `CreatureSheetRecord` (`@shared/character-sheet/sheet`), the row + `id` (= `entityId`) | DM full; owner (row's `ownerPlayerId` copy) full; others hidden | [FR-CHARX-36](../specs/character-sheet-full.md#6-functional-requirements) |
 | `entity` | redaction **built**: other players get the one whitelist `id, kind, name, portraitAssetId, ownerPlayerId, down, level, className, species` + `deathState` (*built, fix/cbtx-core*, [§32](#32-sprint-1-combat-extras)) + `hpCurrent, hpMax, tempHp, ac` (*sprint 8, built, build/cb-party*, [ADR-0063](../architecture/adr/0063-party-hp-visibility.md)); a key whose value is `undefined` is left out | FR-ENT-15 + whitelist | [FR-CHARX-35](../specs/character-sheet-full.md#6-functional-requirements) |
 
-**WS intents** (default deny; none optimistic) **built** (strict zod in `@shared/character-sheet/sheet` and `schemas`; names `CHARX_INTENTS`): `char.create`, `char.approve`, `char.setLock`, `char.edit`, `char.putRow` / `char.deleteRow` / `char.moveRow`, `char.useResource`, `char.roll` gains `skill?`, `attackId?`, `spellId?` and the new kinds. Payloads, roles and results: [CHARX §9](../specs/character-sheet-full.md#9-api--events). `char.edit` `set` keys = `SHEET_EDIT_FIELDS`; row lists = `SHEET_ROW_LISTS`; counters = `SheetResource` (all **built**, `src/shared/events/character-sheet.ts`).
+**WS intents** (default deny; none optimistic) **built** (strict zod in `@shared/character-sheet/sheet` and `schemas`; names `CHARX_INTENTS`): `char.create`, `char.approve`, `char.setLock`, `char.edit`, `char.putRow` / `char.deleteRow` / `char.moveRow`, `char.useResource`, *(rest buttons, [§183](#183-rest-buttons-fixrest-buttons))* `char.rest`, `char.roll` gains `skill?`, `attackId?`, `spellId?` and the new kinds. Payloads, roles and results: [CHARX §9](../specs/character-sheet-full.md#9-api--events). `char.edit` `set` keys = `SHEET_EDIT_FIELDS`; row lists = `SHEET_ROW_LISTS`; counters = `SheetResource` (all **built**, `src/shared/events/character-sheet.ts`).
 
 **Domain events**: [§8](#8-domain-events) rows; `CharacterRolled` amendment in [§22](#22-combat-domain-events). Schemas and emitters **built**. All logged, none undoable ([FR-CHARX-19](../specs/character-sheet-full.md#6-functional-requirements)).
 
@@ -4252,3 +4253,18 @@ From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 / -41 as amended by 
 - **DOM:** the AoE panel hint reads "Drag from a square to aim" (cube: "Drag from a grid corner").
 - **Tests:** `scene-tools/aoe-snap.test.ts` (snap `FR-SCN-43 …` ×4 + `FR-SCN-45 …`; coverage `FR-SCN-41 #377 …` ×3 + cone / line / cube `FR-SCN-41 …` ×2; outline `FR-SCN-20 #377 …`; through the tool `FR-SCN-43 …` ×2 + `FR-SCN-22 …`), `aoe-freeform.test.ts` (`FR-SCN-45 #377 …` moves), shared `schemas.test.ts` (`FR-SCN-20 #377 footprint …`), server `templates.test.ts` (`FR-SCN-41 #377 …`, `FR-SCN-45 #377 …`, `FR-SCN-35 #377 …` fog over the reach cells, `FR-SCN-41 #377 the server derives … a rule change re-derives …`), `con44.test.ts` (`CON-44 #377 …`); both rules: `aoe-snap.test.ts` `FR-SCN-41 #377 ruling …` (10 / 20 ft, square and Large, sphere and cylinder), `spell-fx.test.ts` `FR-VFX-24 #377 ruling …`; e2e `aoe-freeform` (+ the #375 / #377 case: 61 squares for 20 ft), `scene-tools-templates` (Fireball pressed in a square: 21 squares).
 - **CON-44 (measured):** `,"footprint":N` = **+14 B per snapped sphere / cylinder row** (DM and every player that sees it). Heavy harness at the template cap, 6 round templates snapped: DM 697,508 → 697,592 B (875,272 B left of 1.5 MiB); players 263,686–266,941 B (257,347 B left of 512 KiB).
+
+## 183. Rest buttons (fix/rest-buttons)
+
+From [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-121–125 and [party-board](../specs/party-board.md#6-functional-requirements) FR-PARTY-79 (DM request 2026-10-29; OQ-CHARX-08 reopened). **Built by `fix/rest-buttons`.**
+
+| Item | Shape | Rule | FR |
+|---|---|---|---|
+| Intent `char.rest {characterIds, kind}` *(new, DM)* | `characterIds` 1–20 distinct ids, `kind` `short` \| `long` (`CharRestIntent`, `@shared/character-sheet/sheet`); result `{rested: string[]}` | All checked first (unknown / other campaign → `not_found`, imported → `forbidden`, monster → `invalid`); player → `forbidden`. One transaction | FR-CHARX-121 |
+| Event `CharacterRested {characterId, kind, entryId}` *(new)* | one per character something changed for, sent order | changes: `creature-sheet` and / or `entity` (`hpCurrent`, `tempHp`, `deathSuccesses`, `deathFailures`) upserts + the line; nothing changed → no event | FR-CHARX-121 |
+| Log kind `char.rest {characterId, kind}` *(new, `src/shared/character-sheet/rest-kind.ts`)* | "Mira takes a long rest" | not public; `audiencePlayerId` = the owner (DM + owner), unowned → DM only | FR-CHARX-124 |
+
+- **Rules** (`restOutcome`, `@shared/character-sheet/rest`): short → `features[].used = 0` where `reset: short`; long → HP `hpMax`, temp HP 0, death saves 0 / 0, `slotsUsed = {}`, `used = 0` where `reset` is set, hit dice back `max(1, ⌊Σ class levels / 2⌋)`, largest die first. Conditions / effects untouched.
+- **Registry lines** (append-only): log-entry kind `char.rest` in `src/shared/dice-roll-log/kinds.ts`; fixture unit `rest-spent`, bundle `rest-e2e`.
+- **Client:** sheet `charx-rest*` (DM, characters), Party Manager `party-rest-*` (DM); both send `char.rest`.
+- **CON-44:** 0 B snapshot growth (no new field); a rest's event carries the same upserts as counter clicks + one log line per character.

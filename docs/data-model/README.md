@@ -927,7 +927,7 @@ From [character-sheet-full](../specs/character-sheet-full.md) (CHARX, `complete`
 | background, alignment | text 0–40, default "" | | CHARX §8.2 |
 | proficiencyNotes | **JSON leaf** `{armor, weapons, tools, languages}` ≤ 200 each | Display only | CHARX §8.2 |
 | spells | **JSON leaf** 0–40 rows `{id, name, level 0–9, prepared, concentration, ritual, roll none\|attack\|save, saveAbility?, damage?, effect damage\|healing, damageType?, notes}` | `saveAbility` iff `roll: save`; `roll: attack` ⇒ `effect: damage` | CHARX §8.2 |
-| features | **JSON leaf** 0–30 rows `{id, name, source, text ≤ 600, usesMax? 1–20, used, reset? short\|long}` | `reset` is a label | CHARX §8.2 |
+| features | **JSON leaf** 0–30 rows `{id, name, source, text ≤ 600, usesMax? 1–20, used, reset? short\|long}` | `reset`: the rest that sets `used` to 0 (`char.rest`, [§145](#145-rest-buttons-fixrest-buttons)) | CHARX §8.2 |
 | items | **JSON leaf** 0–80 rows `{id, name, qty 0–9999, equipped, notes ≤ 120}` | No weight | CHARX §8.2 |
 | notes | text ≤ 4000, default "" | Rendered as text | CHARX §8.2 |
 | slotsUsed, hitDiceUsed | **JSON leaf** `{1…9: int}`, `{d6…d12: int}` | ≤ slot max / levels with that die; lowering a max clamps `used` in the same tx | [FR-CHARX-17](../specs/character-sheet-full.md#6-functional-requirements) |
@@ -1299,7 +1299,7 @@ From [effect-modifiers](../specs/effect-modifiers.md#82-records) tier 3 (MOD, `c
 |---|---|---|---|
 | `effect_preset.uses_feature_id` | Set by `mod.putPreset` (character presets): soft id of a `creature_sheet.features` row with `usesMax`; kept when the row is later deleted or its uses cleared (broken link, toggles without uses) | as the row (owner + DM, FR-MOD-22) | [FR-MOD-12](../specs/effect-modifiers.md#6-functional-requirements) |
 | `effect_preset.origin_key` | Written by the sheet's "Start from ▸" create (built-in key) | as the row | FR-MOD-36 |
-| `creature_sheet.features[].used` (**JSON leaf**) | +1 per `mod.toggle` on with a live link (not with `force`); −1 by `refundFeatureUse` (R4's undo); reset only by the Features tab's Reset (`char.useResource`) | as the sheet (owner + DM) | FR-MOD-12, -41 |
+| `creature_sheet.features[].used` (**JSON leaf**) | +1 per `mod.toggle` on with a live link (not with `force`); −1 by `refundFeatureUse` (R4's undo); reset by the Features tab's Reset (`char.useResource`) and a rest (`char.rest`, §145) | as the sheet (owner + DM) | FR-MOD-12, -41 |
 
 - **Derived** (pure, `@shared/effect-modifiers/rules`): `presetUses(preset, features)` → `null` (no link) \| `{state: "broken"}` \| `{state: "ok", featureId, name, left, max}`; `hasUses(row)`.
 - **Fixtures**: none added (Brakka's "Rage" feature row + linked preset are R5's `char-brakka` / `trg-brakka`). **Snapshot size** (CON-44): no new rows or fields; `uses_feature_id` was already in every preset row (R0 measured at max).
@@ -2767,3 +2767,16 @@ From [scene-tools](../specs/scene-tools.md) FR-SCN-43 / -20 / -41 (DM [#375](../
 - **Client only (never stored or sent):** the shown scene's token footprints for the snap (`useAoe.tokens`, written by `TemplatesLayer`), the highlighted origin cells while a press is held (`useAoe.originCell`), the last placement's raw press point (a panel shape change re-snaps from it).
 - **Fixtures:** none new: the e2e uses `map-tools`' Crypt Ogre (Large, (4, 10), `mt-crowd`); `session-sim-13` gets a comment line only.
 - **CON-44 (measured):** +14 B per snapped sphere / cylinder row; heavy DM 697,592 B, players ≤ 266,941 B (protocol §182).
+
+## 145. Rest buttons (fix/rest-buttons)
+
+From [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-121–124 (DM request 2026-10-29). **No new table, column or record type.** `char.rest` ([protocol §183](../protocol/README.md#183-rest-buttons-fixrest-buttons)) writes existing fields in one transaction:
+
+| Field | Short rest | Long rest |
+|---|---|---|
+| `creature_sheet.features[].used` | 0 where `reset: short` | 0 where `reset` is set |
+| `creature_sheet.slotsUsed` | — | `{}` |
+| `creature_sheet.hitDiceUsed` | — | up to `max(1, ⌊Σ class levels / 2⌋)` dice back, largest die first |
+| `entity.hpCurrent`, `tempHp`, `deathSuccesses`, `deathFailures` | — | `hpMax`, 0, 0, 0 (the only HP store; PC combatants read it) |
+
+- New `game_log_entry` kind `char.rest` (payload `{characterId, kind}`), not public, `audiencePlayerId` = the owner.

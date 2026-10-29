@@ -986,6 +986,19 @@ describe("FR-CHARX-106 stat row in every viewer state (K11)", () => {
     }
   });
 
+  test("FR-CHARX-123 sheet Rest: a 24-px icon button beside the Public rolls menu on the DM's character sheets only", () => {
+    const actions = elementAt(stateHtml({ client: "dm" }), 'data-testid="charx-header-actions"');
+    const rest = actions.slice(
+      actions.indexOf("<button", actions.indexOf('data-testid="charx-public-menu"') + 1),
+    );
+    expect(rest).toContain('data-testid="charx-rest"');
+    expect(rest).toContain('aria-label="Rest"');
+    expect(rest).toContain("w-6 px-0");
+    expect(stateHtml({ client: "player" })).not.toContain("charx-rest");
+    expect(stateHtml({ client: "dm", npc: true })).not.toContain("charx-rest");
+    expect(stateHtml({ client: "dm", imported: true })).not.toContain("charx-rest");
+  });
+
   test("FR-CHARX-108 K11 vitals: hit dice and the death saves on one line; temp HP and its hint sentence are gone from the vitals", () => {
     const html = render(<MainTab />, { hp: 0 });
     const vitals = box(html, "vitals");

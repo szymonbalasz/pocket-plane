@@ -95,6 +95,8 @@ const SAMPLES: Record<string, { payload: unknown; dmPayload: unknown | null }> =
     payload: { characterId: "c1", gem: "inspiration", count: 1, target: null },
     dmPayload: { target: { kind: "entry", id: "e1", label: S, from: N } },
   },
+  // FR-CHARX-124: the rest line names the kind only.
+  "char.rest": { payload: { characterId: "c1", kind: "long" }, dmPayload: null },
 };
 
 describe("FR-DICE-28 kind contract", () => {

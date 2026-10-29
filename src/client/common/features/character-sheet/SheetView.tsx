@@ -41,6 +41,7 @@ import { useBusy } from "./fields";
 import { MainTab } from "./MainTab";
 import { FeaturesTab, InventoryTab, NotesTab } from "./MoreTabs";
 import { PublicRollsMenu } from "./PublicMenu";
+import { SheetRestButton } from "./rest";
 import { rollRoutes } from "./roll-routes";
 import { SheetOverridesProvider, usePublicOverrides } from "./rolls";
 import { sheetBadge } from "./routing";
@@ -142,8 +143,9 @@ const TABS = [
 const SMALL = "h-6 px-2 text-[13px]";
 
 /**
- * FR-KIT-85 / K11: Derive / Approve / Lock / Edit / the DM's Public rolls menu, small, top-right:
- * a column in the narrow sheet (the name keeps its room beside the portrait), a row once wide.
+ * FR-KIT-85 / K11: Derive / Approve / Lock / Edit / the DM's Public rolls menu and Rest
+ * (FR-CHARX-123), small, top-right: a column in the narrow sheet (the name keeps its room beside
+ * the portrait), a row once wide.
  */
 function HeaderActions({
   editing,
@@ -169,9 +171,13 @@ function HeaderActions({
     }
   };
   return (
-    // Narrow: the Public rolls menu left of a column of buttons (two rows at most); wide: a row.
+    // Narrow: the Public rolls menu over Rest, left of a column of buttons (two rows at most);
+    // wide: a row.
     <div className="flex items-start gap-1 @min-[560px]/sheet:items-center @min-[560px]/sheet:gap-1.5">
-      <PublicRollsMenu className={cn(SMALL, "w-6 px-0")} />
+      <div className="flex flex-col gap-1 @min-[560px]/sheet:flex-row @min-[560px]/sheet:gap-1.5">
+        <PublicRollsMenu className={cn(SMALL, "w-6 px-0")} />
+        <SheetRestButton className={cn(SMALL, "w-6 px-0")} />
+      </div>
       <div className="flex flex-col items-end gap-1 @min-[560px]/sheet:flex-row @min-[560px]/sheet:items-center @min-[560px]/sheet:gap-1.5">
         {ctx.readOnly && (
           // K11 walkthrough F1: a 24-px icon button (the label in its Tooltip), so an imported

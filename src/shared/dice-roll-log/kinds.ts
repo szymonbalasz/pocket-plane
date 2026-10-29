@@ -1,6 +1,7 @@
 // Log-entry kind registry (FR-DICE-18, protocol §26). APPEND-ONLY (AGENTS §9.9): a feature adds
 // one import and one line in the list for each of its kinds; nothing else changes here.
 
+import { charRestLogKind } from "../character-sheet/rest-kind";
 import { companionLogKind } from "../combat-tracker/companion-kind";
 import { attackLogKind, hpLogKind } from "../combat-tracker/log-kinds";
 import { sideLogKind } from "../combat-tracker/side-kind";
@@ -16,6 +17,7 @@ const kinds: AnyLogKind[] = [
   companionLogKind, // cbt.companion (combat-tracker, FR-CBT-122)
   gemAwardKind, // gem.award (gems, FR-GEM-09; feature `gems`)
   gemSpendKind, // gem.spend (gems, FR-GEM-12; feature `gems`)
+  charRestLogKind, // char.rest (character-sheet-full, FR-CHARX-124)
 ];
 
 const byKind = new Map<string, AnyLogKind>();

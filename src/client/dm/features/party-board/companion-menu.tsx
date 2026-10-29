@@ -1,5 +1,6 @@
 // DM parts of the companion rows (FR-PARTY-43, sprint 6; in Party Manager's Party status tab since
-// sprint 9, FR-PARTY-62): header **New pet…** (entities' dialog, FR-ENT-32) and the pet row menu: Rename, Turn mode ▸, Owner…, Open NPC sheet (FR-CHARX-31),
+// sprint 9, FR-PARTY-62): header **Rest the party…** (FR-PARTY-79, `./rest-party`) and **New
+// pet…** (entities' dialog, FR-ENT-32) and the pet row menu: Rename, Turn mode ▸, Owner…, Open NPC sheet (FR-CHARX-31),
 // Release… (confirm → `PUT` with `companionOf: null`, FR-ENT-33). Rename, mode and owner send the
 // whole `PUT` with the loaded fields. While the pet is in a fight Owner… and Release… are disabled
 // ("Dismiss it from the fight first"). A reject shows inline; a lost request → Toast.
@@ -53,6 +54,7 @@ import {
   TURN_MODE_LABEL,
 } from "../entities/pet-logic";
 import { type PetChange, petRest } from "../entities/pet-rest";
+import { RestPartyButton } from "./rest-party";
 
 /** K13 (round-2 §5): the kit's small button (`.btn.sm`: 24 px, 9-px sides, 13-px type), whole. */
 function NewPet({ disabled }: { disabled: boolean }) {
@@ -349,5 +351,15 @@ function ReleaseForm({ row, put, done }: { row: CompanionRow; put: Put; done(): 
   );
 }
 
+/** The Party status header: Rest the party… (FR-PARTY-79), then New pet…. */
+function StatusHeader({ disabled }: { disabled: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <RestPartyButton disabled={disabled} />
+      <NewPet disabled={disabled} />
+    </div>
+  );
+}
+
 /** Passed to the shared `PartyBoard` by the DM's `party.board` window. */
-export const dmCompanionParts: CompanionsDmParts = { header: NewPet, menu: RowMenu };
+export const dmCompanionParts: CompanionsDmParts = { header: StatusHeader, menu: RowMenu };

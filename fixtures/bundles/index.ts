@@ -93,6 +93,7 @@ import prefsS6 from "./prefs-s6";
 import prefsS6E2e from "./prefs-s6-e2e";
 import remUiE2e from "./rem-ui-e2e";
 import remindersStrongholds from "./reminders-strongholds";
+import restE2e from "./rest-e2e";
 import rsE2e from "./rs-e2e";
 import ruleTriggers from "./rule-triggers";
 import rulesEffects from "./rules-effects";
@@ -353,4 +354,6 @@ export const bundles: readonly Bundle[] = [
   spellFx,
   // Agent / MCP API (build/agent-core): read tools, plan_check, mcp:call walkthroughs
   agentApi,
+  // Rest buttons (fix/rest-buttons): char.rest e2e
+  restE2e,
 ];

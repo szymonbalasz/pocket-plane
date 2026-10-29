@@ -21,6 +21,7 @@ import charMiraLocked from "./character-sheet-full/char-mira-locked";
 import charSela from "./character-sheet-full/char-sela";
 import kitMiraSpells from "./character-sheet-full/kit-mira-spells";
 import npcEliteSheet from "./character-sheet-full/npc-elite-sheet";
+import restSpent from "./character-sheet-full/rest-spent";
 import cbFogGoblin from "./combat-extras/cb-fog-goblin";
 import cbParty from "./combat-extras/cb-party";
 import cbPartySix from "./combat-extras/cb-party-six";
@@ -325,4 +326,6 @@ export const units: readonly Fixture[] = [
   fireCard,
   // Spell FX build (build/vfx): both auras on existing effects for the visual baselines
   vfxVisualAuras,
+  // Rest buttons (fix/rest-buttons): Mira's spent slot, uses, hit die and HP
+  restSpent,
 ];

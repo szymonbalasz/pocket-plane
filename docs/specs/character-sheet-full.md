@@ -67,7 +67,7 @@ Scope accepted by the DM (#178), including the items beyond sprint-1's first pro
 ## 4. Non-goals
 
 - Guided builder, level-up, class / species data, multiclass slot tables → [levelling](post-mvp/levelling.md). Spell / item lookup → [compendium](post-mvp/compendium.md).
-- Encumbrance / weight (tier C). Rest buttons (tier C, OQ-CHARX-08). Inspiration (tier D), D&D Beyond import (tier F).
+- Encumbrance / weight (tier C). Inspiration (tier D), D&D Beyond import (tier F). *(Rest buttons are in since the DM's request of 2026-10-29: FR-CHARX-121–125, OQ-CHARX-08.)*
 - Temp HP, death saves, conditions, concentration tracking: data, rules, commands, events → [combat-extras](combat-extras.md). This spec only gives them a place on the sheet (§7.1).
 - Currency as a sheet field: coin is [party-loot](party-loot.md)'s wallet (derived). Party inventory → [party-board](post-mvp/party-board.md).
 - Undo of sheet edits ([ADR-0016](../architecture/adr/0016-domain-events-pending-actions.md): combat-only). Deleting characters (FR-ENT-14 stands, OQ-CHARX-17).
@@ -220,6 +220,16 @@ Terms: **creature** = a `character` or a custom `monster` definition; **NPC shee
 | FR-CHARX-103 | **Loading**: the tab loads `reminder` lazily when first shown ([FR-REM-14](reminders.md#6-functional-requirements)); skeleton, Retry; reloads after a snapshot. The count Badge shows once loaded (no load just for the count). | 0 B |
 | FR-CHARX-104 | **Test IDs**: `charx-section` `data-record-id="rem.reminders"`; REM's `rem-*` inside (`rem-group` `data-record-id` = the character id, then `party`); `rem-sheet-open-party` (the link); `charx-tab` `data-value="section:rem.reminders"` + `data-count`. | AGENTS §9.5 |
 
+**Rest buttons (DM request 2026-10-29; OQ-CHARX-08 reopened)**
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-CHARX-121 | **`char.rest {characterIds, kind}`** (DM only; 1–20 distinct characters; `kind` `short` \| `long`): one command, **one transaction** for every listed character; all are checked first (unknown / other campaign → `not_found`, imported → `forbidden`, a monster / NPC definition → `invalid` "No counters on NPC definitions", as `char.useResource`), so a refusal writes nothing. **Short rest:** feature rows with `reset: short` → `used 0`, also from below zero (FR-CHARX-58). Nothing else; hit dice are spent by hand (FR-CHARX-17 counters). **Long rest:** HP → `hpMax`, temp HP → 0, death saves → 0 / 0 (the `entity` play columns, FR-CBTX-14/19), every slot `used 0`, rows with `reset` short or long → `used 0`, hit dice per FR-CHARX-122. **Never touched:** conditions, effects, concentration, rows without `reset`. Allowed during an encounter. Per character something changed for: its `creature-sheet` and / or `entity` upsert, a `char.rest` log line (FR-CHARX-124) and one `CharacterRested`; nothing to change → no write, line or event. Result `{rested}` = those characters' ids, in the sent order. | `restOutcome` (`@shared/character-sheet/rest`) |
+| FR-CHARX-122 | **Hit dice back on a long rest:** up to `max(1, ⌊total level / 2⌋)` spent dice, total level = Σ class levels; **largest die first** (d12, d10, d8, d6). `used` is clamped to the class levels first. | e.g. Fighter 3 d10 + Wizard 2 d6, 3 d10 + 2 d6 spent → 2 back: d10 1, d6 2 |
+| FR-CHARX-123 | **Sheet Rest (DM):** a 24-px icon button **Rest** (tent icon, Tooltip "Rest") beside the Public rolls menu on the DM's sheet of a **character** (not on NPC / imported sheets, not for players; drafts and locked sheets included). Opens a Popover: **Short rest · Long rest** (segmented, Short first and selected), one muted line of what it resets, the warning **"An encounter is running."** while an encounter is started, Cancel and the confirm (label = the kind). Confirm → `char.rest` for this character; a result with no one rested → Toast "Nothing to reset"; a reject → FR-CHARX-38's Toast. No `window.confirm`. | visual-direction: kit small button, Popover |
+| FR-CHARX-124 | **Log line** `char.rest` (log-entry kind, payload `{characterId, kind}`): "Mira takes a long rest", actor = the character. Not public: `audiencePlayerId` = the owner, so the DM and the owner receive it, the same people who receive the sheet change; an unowned character → DM only. | FR-DICE-15 |
+| FR-CHARX-125 | **Test IDs:** `charx-rest` (trigger), `charx-rest-popover`, `charx-rest-kind` (+ `data-value` = `short` \| `long`, `data-state` on / off), `charx-rest-text`, `charx-rest-warning`, `charx-rest-cancel`, `charx-rest-confirm`. Party Manager's entry point: [FR-PARTY-79](party-board.md#6-functional-requirements). | AGENTS §9.5 |
+
 ### 6.1 N7 sheet buttons
 
 DM-specified (#188): a third button **Attack + damage**, and the three behave the same everywhere. P2b owns where they show, labels, the out-of-combat roll and test IDs; P2a ([combat-tracker](combat-tracker.md)) owns what each does when routed into combat (settled S1, FR-CHARX-43).
@@ -358,7 +368,7 @@ interface SheetSection {
 | background, alignment | text 0–40 each | |
 | proficiencyNotes | **JSON leaf** `{armor, weapons, tools, languages}` text ≤ 200 each | Display only |
 | spells | **JSON leaf**, 0–40 × `{id, name 1–60, level 0–9, prepared, concentration, ritual, roll: none\|attack\|save, saveAbility?, damage?, effect: damage\|healing, damageType?, notes ≤ 200}` | `damage` = entities' grammar; `saveAbility` iff `roll: save`; `roll: attack` ⇒ `effect: damage` |
-| features | **JSON leaf**, 0–30 × `{id, name 1–60, source ≤ 40, text ≤ 600, usesMax? 1–20, used, reset?: short\|long}` | `reset` is a label only (no rest buttons). *Sprint 4:* `used` int 0 … `usesMax + 9` (was ≤ `usesMax`; FR-CHARX-58) |
+| features | **JSON leaf**, 0–30 × `{id, name 1–60, source ≤ 40, text ≤ 600, usesMax? 1–20, used, reset?: short\|long}` | `reset`: the rest that sets `used` back to 0 (`char.rest`, FR-CHARX-121). *Sprint 4:* `used` int 0 … `usesMax + 9` (was ≤ `usesMax`; FR-CHARX-58) |
 | items | **JSON leaf**, 0–80 × `{id, name 1–60, qty 0–9999, equipped, notes ≤ 120}` | No weight |
 | notes | text ≤ 4000 | Rendered as text |
 | slotsUsed | **JSON leaf** `{1…9: int}` | ≤ slot max |
@@ -385,6 +395,7 @@ interface SheetSection {
 | `char.putRow {creatureId, list, row}` / `char.deleteRow {…, rowId}` / `char.moveRow {…, rowId, toIndex}` | DM, player (own, unlocked) | FR-CHARX-16; *(sprint 4)* attack rows per FR-CHARX-54 | `{rowId}` / `{}` / `{}` |
 | `char.useResource {characterId, resource, delta?, reset?}` | DM, player (own; locked ok) | FR-CHARX-17; exactly one of `delta`, `reset`; *(sprint 4)* feature rows clamp to `usesMax + 9` (FR-CHARX-58) | `{before, after}` |
 | `char.roll {…, skill?, attackId?, spellId?}` | DM, player | FR-CHARX-20–22; *(N7)* kinds `toHit`, `spellToHit` (FR-CHARX-42) | `{rollIds, entryId}` |
+| `char.rest {characterIds, kind}` *(rest buttons)* | DM | FR-CHARX-121; 1–20 distinct ids, `kind` `short` \| `long`; player → `forbidden` | `{rested}` |
 
 **Record types**
 
@@ -404,6 +415,7 @@ interface SheetSection {
 | `CharacterLockSet` | `{characterId, locked}` | `creature-sheet` → DM, owner | yes | no |
 | `CharacterSheetEdited` | `{creatureId, op: set \| putRow \| deleteRow \| moveRow, fields?, list?, rowId?}` (keys and ids, never values) | `entity` and / or `creature-sheet` + hook-changed instances (tokens, combatants) → each by its own rule | yes | no |
 | `CharacterResourceUsed` | `{characterId, resource, before, after}` | `creature-sheet` → DM, owner | yes | no |
+| `CharacterRested` *(rest buttons)* | `{characterId, kind, entryId}`, one per changed character | `creature-sheet` → DM, owner; `entity` → DM, owner full, others the whitelist (HP, temp HP; FR-CHARX-35); `char.rest` `game-log-entry` → DM, owner (FR-CHARX-124) | yes | no |
 | `CharacterRolled` (CHAR) | gains `skill?`, `attackId?`, `spellId?`; `kind` gains the new kinds *(N7: + `toHit`, `spellToHit`)* | `game-log-entry` per FR-DICE-13/15 | yes | no |
 
 **Sprint 2 (G8):** `char.create` by a player also lists the `charx-draft` `notification` upsert and emits `NotificationCreated` after `CharacterCreated`; `char.approve` of a draft lists the resolved `charx-draft` row(s) (`NotificationResolved`) and the new `charx-approved` row (`NotificationCreated`), after `CharacterApproved`. Same transaction each.
@@ -429,6 +441,7 @@ interface SheetSection {
 | Approval card (G8) | sees | sees (own) | ✗ | FR-NOTE-06; FR-CHARX-46 |
 | Edit fields and rows | any character, custom NPC | own, **unless locked** | ✗ | FR-CHARX-15/16/18 |
 | Counters, current HP | any character | own, also locked | ✗ | FR-CHARX-17, FR-CHAR-09 |
+| Rest (short / long) | any characters, also locked / draft | ✗ (sees the result) | ✗ (sees the whitelisted HP) | FR-CHARX-121 |
 | Roll | any character (public override); any definition (always DM-only) | own; always public | ✗ | FR-CHAR-09/17, FR-CHARX-22 |
 | Edit `size`, portrait | ✓ | ✗ | ✗ | FR-CHARX-15, §9 |
 | Edit senses *(sprint 3)* | any character, custom NPC | own, **unless locked** | ✗ (never sees them) | FR-CHARX-49 / -51 |
@@ -454,6 +467,8 @@ interface SheetSection {
 - **Sprint 2 (N7):** `toHit` on a row deleted meanwhile → `not_found` Toast (as other rolls). Physical dice: Attack and Damage ask for one entry, Attack + damage for two. Damage ignores Shift / Ctrl (no d20; FR-DICE-04 would refuse it). Picker memory (FR-CHARX-47): the stored character lost eligibility (reassigned, other campaign) → default, entry overwritten at the next change.
 - **Sprint 6 (companion card):** *player disconnect / reconnect:* the card re-renders from the snapshot (pet row, combatant `card` / HP); a Roll in flight is never resent (FR-CBT-29), a lost `pet.adjustHp` → Toast (not idempotent). *DM disconnect:* the owner's rolls still make cards (pending). *Server crash:* nothing card-side is stored; restart → same card. *Concurrency:* the DM edits the pet's stat block while the card is open → the card follows on the upsert (owner full row; combatant `card` via the hook, FR-CBT-117); a roll in flight uses the committed row (FR-CHARX-55's rule). *Companion leaves while open* (Dismiss, hostile, hidden, released, owner reassigned) → FR-CHARX-68's message. *Invalid input:* a player's `char.roll` on another's pet or a non-pet monster → `not_found`; `cbt.attack` as another's companion → `forbidden`.
 
+- **Rest buttons:** *disconnect / reconnect:* the Rest controls disable; a lost `char.rest` → FR-CHARX-38's Toast ("check the sheet"); the snapshot shows whether it committed. *Server crash:* one transaction, so all ticked characters rested or none. *During an encounter:* allowed, the confirm warns; HP lives only on the `entity` (PC combatants read it), so the Initiative rows follow. *A character at 0 HP or dead* (3 failures): a long rest still sets HP to max and clears the death saves; the DM unticks them if the table rules say otherwise. *A character added or deleted while the dialog is open:* added → listed and ticked; deleted → `not_found`, nothing written.
+
 ## 12. Performance & bandwidth
 
 - Sprint 6 (measured, throwaway heavy-harness probe; totals in [CBT §12](combat-tracker.md#12-performance--bandwidth)): the card adds **0 B** of its own (it reads existing rows); its data is the combatant `card` copy, **2,038 B** at 8 max-length attacks (818 B at 3), and the owner's full pet rows (2,896 B max). The window is client code only.
@@ -465,6 +480,7 @@ interface SheetSection {
 - Sprint 3: `senses` on all 19 heavy-harness DM entity rows = **+1,349 B** (measured, FOG §12 probe; seams re-run: 21 stat-block rows, +1,491 B); a player gets only their own characters'. A senses edit's event adds FOG's re-derive rows (≈ 2–5 KB to the owner, FOG §12). *(#208)* DM ceiling now 1 MiB. *(#210)* `seesInvisible` adds ≈ 22 B to a stat-block row that sets it (absent = false, omitted); not re-measured.
 - Sprint 4 (measured, [MOD §12](effect-modifiers.md#12-performance--bandwidth)): `bonus` + 2 max extra parts = +110 B per attack row (typical +57 B); heavy DM +7,590 B (69 rows), a player +440 … +660 B. Feature `used` below zero: 0 B (same field).
 - Sprint 2: G8 adds ≤ 2 small `notification` rows (< 0.5 KB) per character's lifetime; pending `charx-draft` rows are pinned in the DM snapshot until approved or dismissed (a handful; CON-44 unaffected). `toHit` = one roll, one entry.
+- *(Rest buttons)* No new field: a rest sends the same `creature-sheet` / `entity` upserts as counter clicks, plus one small log line per character.
 - *(Sprint 7, GM)* The gem block adds **0 B** to `entity` and `creature-sheet` (FR-CHARX-75); `character-gems` rows are measured in [gems §12](gems.md#12-performance--bandwidth) (8 rows ≈ 2.2 KB per viewer, 0 B while off).
 
 ## 13. Test plan
@@ -520,6 +536,8 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 **Sprint 8 (track SB):** bundle `stats-b` ([stats §13.1](stats.md#131-sprint-8-tier-b), walkthrough step 8). DOM tests (in-code store, mocked ack): `FR-CHARX-97 trophies tab` (tab listed last on Mira's sheet for the DM and Player 1; absent on Player 2's summary card of Mira and on an imported sheet), `FR-CHARX-98 trophies layout` (grid, records with details, "—" for 0, DM footnote only for the DM, 1 column at 320 px). Integration `FR-CHARX-99 trophies never on summary cards` (Player 2's frames and acks hold no trophy values for Mira; a raw intent → `forbidden`).
 
 **Sprint 7 (track GM):** bundles `gems`, `gems-hidden` ([gems §13](gems.md#13-test-plan)). DOM tests (in-code store): `FR-CHARX-71 gem section off / on` (no `campaign.features` → no `gem-block`, sheet DOM byte-identical to sprint 6; on → block in the header after the effect chips; NPC sheet / companion card → absent); `FR-CHARX-72 owner / DM controls` (owner: Spend menu, no ±; DM: ± and Spend; locked sheet → still enabled; not `live` → disabled; `FR-GEM-08 max 5 label shown, no over-limit styling at 6`); `FR-CHARX-73 summary counts` (another player's view of Mira: counts row, no menu; under OQ-GEM-01 B → absent). Walkthrough: [gems §13](gems.md#13-test-plan) steps 2, 3, 9, 10.
+
+**Rest buttons (FR-CHARX-121–125, FR-PARTY-79):** fixture `rest-spent` (Mira on top of `kit-mira-spells`: Second Wind 0 / 1 short, Lucky 1 / 3 long, 1 d10 hit die spent, HP 7 / 12; Thorn 3 / 10 from `char-wounds`), bundle `rest-e2e` (`character-sheet-full` + both). Server tests (`rest.test.ts`): `FR-CHARX-121 short rest resets only short-rest feature uses (also below zero)`, `FR-CHARX-122 long rest: HP max, temp 0, death saves cleared, slots, short + long features, hit dice`, `FR-CHARX-122 hit dice regain: min 1 at level 1, rounding down, multiclass largest first`, `FR-CHARX-121 nothing to change → no write, no line, no event`, `FR-CHARX-121 party rest: one transaction, one event per changed character, sent order`, `FR-CHARX-121 monsters and NPC definitions refused; players refused`, `FR-CHARX-124 visibility: …` (line and sheet → DM + owner; others the whitelisted entity). Pure: `FR-CHARX-122 hit dice regain: max(1, ⌊level / 2⌋), largest die first, clamped`, `FR-CHARX-124 char.rest line`. DOM: `FR-CHARX-123 sheet Rest` (DM character sheets only). E2E `e2e/charx-rest.e2e.ts`: sheet short rest, then Party Manager long rest, checked on the DM's sheet and Party status and on Player 1's sheet. Walkthrough: open Mira's sheet as DM → Rest → Short rest (Second Wind back, Lucky not); start an encounter, Rest the party… shows the warning; Long rest → both sheets and Party status full; Player 1's log shows "Mira takes a long rest", Player 2's doesn't.
 
 **Printed sheet (§6.2):** bundle `character-sheet-full` (Mira full, Sela draft, Elite Goblin NPC sheet); no new fixtures (layout only). DOM tests named per §6.2's Test column; `FR-CHARX-117 ids kept` = the existing sheet tests pass unchanged. `FR-CHARX-113 breakdown text` is a pure function over the view model (Stealth with expertise, an overridden passive, a save without proficiency). E2E `charx-print-sheet.e2e.ts`: Main at 320 × 440 and 280 px (no horizontal overflow), resize to 600 px → wide layout, tab arrows at 320. **Walkthrough PS1–PS6** (DM + `player-1`, both themes once [theme-system](post-mvp/theme-system.md) T1 lands): PS1 player opens Mira's sheet at default size, boxes and shield shown, nothing clipped; PS2 click the DEX modifier → a Dexterity check in the log, click Save → a save; PS3 hover / focus Stealth → "Stealth +… · DEX … · expertise …"; PS4 wheel over the tab strip → it scrolls sideways, arrows show; PS5 resize to 600 px → wide layout, back to 320 → narrow; PS6 DM opens the Elite Goblin NPC sheet → same boxes, no hit dice or death saves.
 
@@ -618,7 +636,7 @@ Per AGENTS §9.9; the orchestrator routes each. Shared-branch-first changes mark
 | OQ-CHARX-05 | What other players see | **Decided #178 (G6, with OQ-CBTX-09):** one whitelist: name, portrait, owner, Down, level, class, species, `deathState` | — | entities, combat-extras |
 | OQ-CHARX-06 | What an "NPC sheet" is | **Decided #178:** the sheet opened by the DM on a custom creature definition (no new kind) | — | entities, glossary |
 | OQ-CHARX-07 | Multiclassing | **Decided #178:** the model supports class rows; basic list UI | — | levelling |
-| OQ-CHARX-08 | Rest buttons (tier C) | **Decided #178:** out; manual counters + per-block Reset | — | — |
+| OQ-CHARX-08 | Rest buttons (tier C) | ~~Decided #178: out; manual counters + per-block Reset~~ → **Decided: rest buttons in, DM request 2026-10-29** (FR-CHARX-121–125; Party Manager FR-PARTY-79). Integrator rulings: short = short-rest feature uses only; long = HP, temp HP, death saves, slots, all feature uses, half the hit dice (largest first); conditions / effects untouched; allowed in combat with a warning | — | party-board |
 | OQ-CHARX-09 | Casting uses a slot? | **Decided #178:** no; pips ticked by hand | — | — |
 | OQ-CHARX-10 | Seam with combat-extras; CON save for concentration | **Decided (D/S seam):** `sheet-sections.ts` per §7.1; CBTX registers `cbtx.temp-hp`, `cbtx.death-saves` (`vitals`), `cbtx.effects` (`header`); concentration uses `saveBonus(stats, "con")` from `fix/charx-core`, overrides honoured | — | combat-extras |
 | OQ-CHARX-11 | Sheet Damage vs temp HP | **Decided (D/S seam):** the sheet keeps `char.adjustHp`; CBTX wires it through `hpRules.apply`; CHARX models no temp HP, death-save or condition fields | — | character-sheet, combat-extras |
@@ -681,7 +699,7 @@ OQ-CHARX-04 and 18 are retired (merged into FR-CHARX-12 and FR-CHARX-33 while dr
 - *(Sprint 9)* Reminders on other players' summary cards (BL-73: players see their own characters'); an effects line inside the Reminders tab (the header chips already show it).
 
 - *(Sprint 8)* Trophies on other players' summary cards (OQ-STATS-23 B); editing or resetting trophies.
-- See §4. Levelling, builder, compendium lookups, rests, encumbrance, rest-time hit-die healing; temp HP / death saves / conditions data (combat-extras); party HP / AC view (tier B, play-shell); several sheet windows at once; DM-only notes on a PC; gems ([gems](gems.md)).
+- See §4. Levelling, builder, compendium lookups, encumbrance, rest-time hit-die healing (hit dice are spent by hand; a long rest only gives spent dice back, FR-CHARX-122); temp HP / death saves / conditions data (combat-extras); party HP / AC view (tier B, play-shell); several sheet windows at once; DM-only notes on a PC; gems ([gems](gems.md)).
 - *(Sprint 4)* Extra damage parts on spell rows; weapon properties (finesse, heavy, versatile) and a "magical" flag; mapping compendium weapons into attack rows (OQ-CHARX-28); counters below zero for slots and hit dice.
 - *(Sprint 6)* A sheet for companions: abilities, skills, saves, spells, features, notes or editing on the card (OQ-CHARX-34); companion rolls other than its attacks for the owner (the DM rolls them from the row).
 - A spell row's `concentration` mark does not start CBTX concentration; the player uses CBTX's "Concentrate…" in the effects chip row (§7.1).
