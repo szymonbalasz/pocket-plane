@@ -2780,3 +2780,15 @@ From [character-sheet-full](../specs/character-sheet-full.md#6-functional-requir
 | `entity.hpCurrent`, `tempHp`, `deathSuccesses`, `deathFailures` | — | `hpMax`, 0, 0, 0 (the only HP store; PC combatants read it) |
 
 - New `game_log_entry` kind `char.rest` (payload `{characterId, kind}`), not public, `audiencePlayerId` = the owner.
+
+## 146. Rename and delete an image (fix/image-manage)
+
+From [assets-pipeline](../specs/assets-pipeline.md#65-rename-and-delete-an-image-386) FR-ASSET-62–66 (DM decision #386). **No new table, column or record type.** `assets.rename` / `assets.delete` ([protocol §184](../protocol/README.md#184-rename-and-delete-an-image-fiximage-manage)):
+
+| Write | Rule |
+|---|---|
+| `asset.name` | `assets.rename`: FR-ASSET-08's rule (1–80) |
+| `asset` row delete | `assets.delete`, only when no holder uses it (below); its files go at the next start's sweep (FR-ASSET-07) |
+| `combatant.image_asset_id` → null | `assets.delete`: combatants of **ended** encounters only (history, not synced), same transaction |
+
+- **Holders checked** (derived "in use", never stored): `scene.map_asset_id`, `prop.asset_id`, `token.image_asset_id`, `entity.portrait_asset_id`, `combatant.image_asset_id` (encounter not ended), `handout.image_asset_ids`, `compendium_entry.image_asset_ids` (JSON leaves, `json_each`), `campaign.pause.imageAssetId`. An asset ID belongs to one campaign, so holders are matched by the ID alone.

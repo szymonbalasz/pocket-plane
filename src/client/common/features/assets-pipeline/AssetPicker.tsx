@@ -3,7 +3,7 @@
 // attach control's "From library" (FR-ASSET-23) and the test-mode `asset.test` window. In `@ui`
 // since S5; uploads go through the client's uploader context (FR-ASSET-27). S6 (FR-ASSET-44–48):
 // search (shared matcher over name + tags), tag chips, the selected image's tag editor and Manage
-// tags; `context` tags uploads. Search and filter work on the store while disconnected; tag
+// tags; `context` tags uploads. #386: Rename / Delete the selected image (FR-ASSET-66). Search and filter work on the store while disconnected; tag
 // editing needs `live`. Both reset each time the picker mounts (opens). BL-49: the header counts
 // the library's images and warns from ASSET_LIBRARY_WARN_AT on (the DM snapshot's ceiling, CON-44).
 import { type AssetRecord, pickerOrder } from "@shared/assets-pipeline/schemas";
@@ -32,6 +32,7 @@ import { SearchIcon, UploadIcon, XIcon } from "lucide-react";
 import { type Ref, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Tip } from "../../components/ui/tip";
+import { ImageActions } from "./ImageActions";
 import { ManageTags } from "./tags/ManageTags";
 import { TagChipRow } from "./tags/TagChipRow";
 import { TagEditor } from "./tags/TagEditor";
@@ -289,7 +290,13 @@ export function AssetPicker({
       )}
       {selectedAsset && (
         // Keyed: a typed tag or an error never carries over to another image.
-        <TagEditor key={selectedAsset.id} asset={selectedAsset} chips={chips} live={live} />
+        <TagEditor
+          key={selectedAsset.id}
+          asset={selectedAsset}
+          chips={chips}
+          live={live}
+          actions={<ImageActions asset={selectedAsset} live={live} />}
+        />
       )}
 
       {upload.phase === "sending" && (
