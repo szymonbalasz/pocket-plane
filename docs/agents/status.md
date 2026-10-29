@@ -47,8 +47,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Spell FX build (#374) | merged 450f4df2 | — | **merged** (§13 walkthrough 12/12 `.verify/sprint14/walkthroughs/20261028-vfx/`; frame median 1.3 ms at 11 tokens; baselines refreshed; BL-151 toast over the sheet's End button) | — |
 | AoE cell origin (#375, #377) | merged | — | **merged** (walkthrough 9/9 `.verify/sprint15/walkthroughs/20261028-aoecell/`; +14 B per snapped sphere; schema + protocol lock released) | — |
 | Agent / MCP API spec (#378, #379) | merged | — | **complete** (DM gate #379: SDK yes, ADR-0072 accepted, paste-JSON importer dropped) | — |
-| Agent API slice 1: core + read tools + `plan_check` frame + `mcp:call` + bundle `agent-api` | `build/agent-core` (w87, slot 0) | build-agent-core | building; **locks: package.json, bun.lock, tsconfig.json, biome.json, src/boundaries.test.ts** | merge (no walkthrough) → orchestrator adds AGENTS §9.1 / §9.4 rows |
-| Agent API slices 2–5 | — | — | queued. Plan: 2 custom creatures (`build/agent-creatures`, then walkthrough B: stopped server refused) ∥ 3 homebrew (`build/agent-homebrew`; own tool files, append-only tool registry) → 4 character sheets + e2e + walkthrough A (MCP edit live in a player's browser) → 5 skill `.claude/skills/pocket-plane-content/` | after slice 1 merges |
+| Agent API slice 1: core + read tools + `plan_check` frame + `mcp:call` + bundle `agent-api` | merged f7b9382c | — | **merged** (FR-AGENT-01–19 tested, targeted check 113 green, branch CI green; SDK 1.32.1; AGENTS §9.1 / §9.4 rows added; tooling lock released) | DM: `claude mcp add --scope local pocket-plane -- bun run mcp` in the main checkout |
+| Agent API slice 2: custom creature tools (+ crash slow tests) | `build/agent-creatures` (w88, slot 0) | build-agent-creatures | building | walkthrough B (stopped server refused) → merge |
+| Agent API slice 3: homebrew tools | `build/agent-homebrew` (w89, slot 2) | build-agent-homebrew | building | merge (no walkthrough; A covers share) |
+| Agent API slices 4–5 | — | — | queued: 4 character sheets + e2e + walkthrough A (MCP edit live in a player's browser) → 5 skill `.claude/skills/pocket-plane-content/` | after 2 + 3 merge |
 | Map effects default Full (#376) | merged | — | **merged** (check + spell-fx / prefs-window e2e green; CI green after a BL-147 re-run) | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
@@ -57,7 +59,6 @@ Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL),
 
 ## Shared-file locks
 
-- `package.json`, `bun.lock`, `tsconfig.json`, `biome.json`, `src/boundaries.test.ts`: **build/agent-core** (Agent API slice 1: MCP SDK, `@mcp/*` alias, boundary area `mcp`).
 
 - `styles.css`, both `index.html`, the dice tray's `data-slot` → `data-die-slot` rename (`roll-control.tsx` attribute lines + 3 tests): **T1** (T0 merged). 
 
