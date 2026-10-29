@@ -95,19 +95,12 @@ describe("CON-44 with FOG v2 (FOG §12, #208)", () => {
       .set({ shapes, darkness: darkness.map((d) => ({ ...d, seenBy: ids })) })
       .where(eq(sceneFog.sceneId, battle))
       .run();
+    // Remember explored areas is on by default (#383): the load may already have grown a row.
     for (const p of players) {
+      const heavy = { col0: 0, row0: 0, cols: 20, rows: 14, runs: memory(280, 35), updatedAt: AT };
       db.insert(fogExplored)
-        .values({
-          sceneId: battle,
-          playerId: p.id,
-          campaignId: cid,
-          col0: 0,
-          row0: 0,
-          cols: 20,
-          rows: 14,
-          runs: memory(280, 35),
-          updatedAt: AT,
-        })
+        .values({ sceneId: battle, playerId: p.id, campaignId: cid, ...heavy })
+        .onConflictDoUpdate({ target: [fogExplored.sceneId, fogExplored.playerId], set: heavy })
         .run();
     }
   }, 60_000);

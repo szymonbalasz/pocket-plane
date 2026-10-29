@@ -4,6 +4,7 @@
 // Pause control is a 40-px icon button at every width, its label in the Tooltip (K10). The
 // launcher-fit rule (FR-SHELL-43) keeps the bar's other content fitting at 1280 wide.
 import type { ComponentType } from "react";
+import { VIEW_AS_TOP_W, ViewAsTopBarItem } from "../fog-of-war/ViewAsSelect";
 import { pauseSlotWidth } from "../pause/logic";
 import { PauseTopBarItem } from "../pause/top-bar";
 import type { Viewport } from "./geometry";
@@ -24,6 +25,8 @@ export interface TopBarItem {
 export const TOP_BAR_ITEMS: readonly TopBarItem[] = [
   // TT4 (FR-SHELL-129): the DM's Pause control.
   { id: "pause", clients: ["dm"], width: pauseSlotWidth, order: 10, Component: PauseTopBarItem },
+  // #383 (FR-FOG-60): the DM's View as, a copy of the fog bar's, right of Pause.
+  { id: "view-as", clients: ["dm"], width: VIEW_AS_TOP_W, order: 20, Component: ViewAsTopBarItem },
   // SP1 (FR-SHELL-195): the palette's search button, next to the identity chip.
   {
     id: "palette",

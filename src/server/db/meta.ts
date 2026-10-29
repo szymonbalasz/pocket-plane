@@ -14,8 +14,12 @@ const DB_ID = "db-id";
  */
 export const VISION_MODEL_KEY = "fog-vision-model";
 export const VISION_MODEL = 2;
+/** FR-FOG-29 (#383): Remember explored areas on by default; 1 = existing scenes switched on. */
+export const EXPLORED_DEFAULT_KEY = "fog-explored-default";
+export const EXPLORED_DEFAULT = 1;
 export const FRESH_DB_META: readonly (readonly [key: string, value: string])[] = [
   [VISION_MODEL_KEY, String(VISION_MODEL)],
+  [EXPLORED_DEFAULT_KEY, String(EXPLORED_DEFAULT)],
 ];
 
 /** This DB's id; created (and committed) on first call. */

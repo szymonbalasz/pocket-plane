@@ -12,7 +12,6 @@
 // home spot (FR-MAP-60), takes its max width from there and wraps by control group
 // (`fog-bar-group`); the "No vision set" hint hangs under its last row, inside the panel's rect.
 
-import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
   FOG_INTENTS,
   FOG_TYPE,
@@ -25,14 +24,12 @@ import {
   type FogUndoInput,
 } from "@shared/fog-of-war/schemas";
 import type { FogLayerShape } from "@shared/fog-of-war/shapes";
-import { VIEW_AS_PARTY } from "@shared/protocol/scene-window";
 import {
   BrushIcon,
   CircleIcon,
   CloudFogIcon,
   EraserIcon,
   EyeIcon,
-  Loader2Icon,
   MapIcon,
   MoonIcon,
   PentagonIcon,
@@ -59,14 +56,9 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Tooltip,
 } from "../../components/ui/overlays";
-import { SyncContext, useRecords, useSync } from "../../sync/store";
+import { SyncContext, useSync } from "../../sync/store";
 import { useDefinitions } from "../compendium/definitions";
 import { useBaseKeyDown } from "../play-shell/hooks";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
@@ -84,7 +76,7 @@ import {
   setFogRejectHandler,
   useFogTool,
 } from "./store";
-import { setViewAs, useViewAs, VIEW_AS_DM, VIEW_AS_PARTY_LABEL } from "./view-as";
+import { ViewAsSelect } from "./ViewAsSelect";
 
 const SHAPE_NAMES = {
   rect: "rectangle",
@@ -315,63 +307,6 @@ function Confirm({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/**
- * FR-FOG-17 / -43: View as Select (Players + "DM"; sprint 4 + "Party vision", also while party
- * vision is off, OQ-FOG-55). Picking one loads its rows on the viewed scene (the fog layer keeps
- * the pair); a spinner shows until the ack.
- */
-function ViewAsSelect({ disabled }: { disabled: boolean }) {
-  const players = useRecords<PlayerRecord>("player");
-  const sorted = useMemo(
-    () => [...players].sort((a, b) => a.name.localeCompare(b.name)),
-    [players],
-  );
-  const playerId = useViewAs((s) => s.playerId);
-  const loading = useSync((s) => s.viewAs.loading !== null);
-  const value = playerId ?? VIEW_AS_DM;
-  return (
-    <Select value={value} onValueChange={(v) => setViewAs(v === VIEW_AS_DM ? null : v)}>
-      {/* The Tooltip sits on a wrapper: its `data-state` would overwrite the Select's. */}
-      <Tooltip content="View as — the scene as that player sees it">
-        <span className="inline-flex">
-          <SelectTrigger
-            aria-label="View as"
-            data-testid="fog-view-as"
-            data-value={value}
-            data-loading={loading || undefined}
-            disabled={disabled}
-            className="h-8 min-w-28"
-          >
-            {loading ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : (
-              <EyeIcon className="size-4" />
-            )}
-            <SelectValue />
-          </SelectTrigger>
-        </span>
-      </Tooltip>
-      <SelectContent>
-        <SelectItem value={VIEW_AS_DM} data-testid="fog-view-as-option" data-value={VIEW_AS_DM}>
-          DM
-        </SelectItem>
-        {sorted.map((p) => (
-          <SelectItem key={p.id} value={p.id} data-testid="fog-view-as-option" data-value={p.id}>
-            {p.name}
-          </SelectItem>
-        ))}
-        <SelectItem
-          value={VIEW_AS_PARTY}
-          data-testid="fog-view-as-option"
-          data-value={VIEW_AS_PARTY}
-        >
-          {VIEW_AS_PARTY_LABEL}
-        </SelectItem>
-      </SelectContent>
-    </Select>
   );
 }
 
@@ -630,7 +565,7 @@ export function FogBar() {
         </Group>
         <Group id="vision" sep>
           <PartyVisionSwitch disabled={off} />
-          <ViewAsSelect disabled={off} />
+          <ViewAsSelect disabled={off} testId="fog-view-as" className="h-8 min-w-28" />
         </Group>
         <Confirm
           open={confirming === "fog-all"}
