@@ -829,3 +829,19 @@ export function copiedRows<R>(
   for (const r of rows) if (touched(r)) lines.push(line(r));
   return lines.length > 0 ? lines.join("\n") : null;
 }
+
+/**
+ * A log row's portrait: the player character named `actorName` (names are unique per campaign,
+ * case-insensitive, FR-ENT-08), from records this client already holds (players get every
+ * character's portrait, ADR-0024). Monsters, the DM and renamed characters keep the initial.
+ */
+export function characterPortraits(
+  entities: readonly Pick<EntityRecord, "kind" | "name" | "portraitAssetId">[],
+): ReadonlyMap<string, string> {
+  const out = new Map<string, string>();
+  for (const e of entities) {
+    if (e.kind === "character" && e.portraitAssetId)
+      out.set(e.name.toLowerCase(), e.portraitAssetId);
+  }
+  return out;
+}
