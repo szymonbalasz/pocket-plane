@@ -36,6 +36,7 @@ import { Badge, Input } from "../../components/ui/primitives";
 import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
+import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
 import { WideActionBoxes } from "./ActionsTab";
 import { BOX_LABEL, BOX_UNIT, BOX_VALUE, Box, D20Glyph, ShieldOutline, WideLabel } from "./boxes";
 import { BreakdownTip } from "./breakdown";
@@ -620,7 +621,56 @@ function IdentityEditor() {
           />
         )}
       </div>
+      {isDm && <PortraitEditor />}
       {"level" in s && <ClassesEditor />}
+    </div>
+  );
+}
+
+/**
+ * DM only: the one image the sheet header, tokens and Initiative rows show (FR-CHARX-15
+ * `portraitAssetId`; copies still on the old portrait follow, FR-CBT-06 / OQ-MAP-14).
+ */
+export function PortraitEditor() {
+  const ctx = useSheet();
+  const edit = useEdit();
+  const live = useSync((s) => s.state === "live");
+  const busy = useBusy();
+  const [picking, setPicking] = useState(false);
+  const id = ctx.creature.portraitAssetId;
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Portrait</span>
+      <Button
+        data-testid="charx-portrait-choose"
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!live || busy.busy}
+        onClick={() => setPicking(true)}
+      >
+        {id ? "Change…" : "Choose…"}
+      </Button>
+      {id && (
+        <Button
+          data-testid="charx-portrait-remove"
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={!live || busy.busy}
+          onClick={() => busy.run(() => edit("portraitAssetId", null))}
+        >
+          Remove
+        </Button>
+      )}
+      <AssetPickerDialog
+        open={picking}
+        onOpenChange={setPicking}
+        title="Portrait"
+        context="portrait"
+        initialSelectedId={id}
+        onSelect={(next) => busy.run(() => edit("portraitAssetId", next))}
+      />
     </div>
   );
 }
