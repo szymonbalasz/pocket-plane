@@ -40,7 +40,9 @@ describe("CON-44 with weapon part markers (FR-CHARX-55)", () => {
     n = entries.length;
     const grow = (withPart: boolean) => {
       for (const e of entries) {
-        const [hit, dmg] = e.payload as RollEntryPayload;
+        // FR-CHARX-129 (#385): new damage items carry `part` already; measure without it.
+        const [hit, parted] = e.payload as RollEntryPayload;
+        const { part: _part, ...dmg } = parted as NonNullable<typeof parted>;
         const label = String(dmg?.label).slice(0, 48);
         const xItem = (i: number) => ({
           ...dmg,

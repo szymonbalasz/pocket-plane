@@ -1,6 +1,13 @@
 // character-sheet derived values (CHAR §8): never stored. Pure; the server builds rolls with
 // `characterRolls` (FR-CHAR-05) and combat-tracker reuses it; clients format with the rest.
-import { LABEL_MAX, type RollCategory } from "@shared/dice-roll-log/schemas";
+import { parseExpression, toNotation } from "@shared/dice-roll-log/grammar";
+import {
+  LABEL_MAX,
+  type RollCategory,
+  type RollPurpose,
+  type StagedPart,
+} from "@shared/dice-roll-log/schemas";
+import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import {
   ABILITIES,
   ABILITY_NAMES,
@@ -305,6 +312,120 @@ function sheetRolls(
       return ok([spec(s.damage, category, label, false)]);
     }
   }
+}
+
+/** FR-CHARX-130: a staged part's spec; `edited` = its dice differ from the row's. */
+export type StagedSpec = CharacterRollSpec & { edited?: true };
+
+/** An expression in normal form (`toNotation`), so "1d6 + 2" and "1d6+2" compare equal. */
+function normalForm(expression: string): string {
+  const r = parseExpression(expression);
+  return r.ok ? toNotation(r.value) : expression;
+}
+
+/** A free-text damage type as a part's type (FR-CHARX-55); not one of the part types → null. */
+export function partTypeOf(type: string | null | undefined): PartDamageType | null {
+  const t = PartDamageType.safeParse(type);
+  return t.success ? t.data : null;
+}
+
+/** "Flame Tongue greatsword damage (slashing)" → "Flame Tongue greatsword damage". */
+function labelStem(label: string, type: string | null | undefined): string {
+  const suffix = type ? ` (${type})` : "";
+  return suffix && label.endsWith(suffix) ? label.slice(0, -suffix.length) : label;
+}
+
+/**
+ * ADR-0073 decision 1 (FR-CHARX-128, FR-CBT-170): the row's specs with each expression replaced
+ * by the staged part's; label, category and the d20 flag stay the row's, so the caller's subject
+ * (mods on the to-hit and the base part, none on extra parts) and crit doubling work unchanged.
+ * To-hit: one spec. Damage: part 1 = the base spec (type: the part's, else the row's), parts 2–3
+ * = extra specs (the row's extra part at that index, else a new one labelled with the part's
+ * type); a row's extra part without a staged part is left out. Every damage spec carries `part`
+ * (FR-CHARX-129). `edited` when a part's dice differ from the row's (normalised) or the row has
+ * no such part (FR-CHARX-130). `rowType`: the row's damage type (a single-part row's specs carry
+ * none).
+ */
+export function stagedSpecs(
+  rowSpecs: readonly CharacterRollSpec[],
+  parts: readonly StagedPart[],
+  rowType: string | null = null,
+): StagedSpec[] {
+  const first = rowSpecs[0];
+  if (!first) return [];
+  const edited = (p: StagedPart, row: CharacterRollSpec | undefined) =>
+    row && normalForm(row.expression) === normalForm(p.expression) ? {} : { edited: true as const };
+  const p0 = parts[0] as StagedPart;
+  if (first.d20) return [{ ...first, expression: p0.expression, ...edited(p0, first) }];
+  const base = rowSpecs.find((s) => !s.part?.extra) ?? first;
+  const extras = rowSpecs.filter((s) => s.part?.extra === true);
+  const baseRowType = base.part ? base.part.type : partTypeOf(rowType);
+  const baseType = p0.type ?? baseRowType;
+  const typed = base.category === "damage" || parts.length > 1;
+  const stem = labelStem(base.label, base.part ? base.part.type : rowType);
+  return parts.map((p, i): StagedSpec => {
+    if (i === 0) {
+      return {
+        ...base,
+        expression: p.expression,
+        ...(typed ? { part: { type: baseType, extra: false } } : {}),
+        ...edited(p, base),
+      };
+    }
+    const row = extras[i - 1];
+    const type = p.type ?? null;
+    return {
+      expression: p.expression,
+      category: base.category,
+      label: row && row.part?.type === type ? row.label : fitLabel(`${stem} (${type})`),
+      d20: false,
+      part: { type, extra: true },
+      ...edited(p, row),
+    };
+  });
+}
+
+/**
+ * FR-CBT-171 (#385): a rowless combat roll's specs: to-hit "Attack" or the damage parts
+ * "Damage" (the label when given), part 1 untyped allowed, parts 2–3 extra.
+ */
+export function rowlessSpecs(
+  purpose: RollPurpose,
+  parts: readonly StagedPart[],
+  label?: string,
+): CharacterRollSpec[] {
+  if (purpose === "attack") {
+    const p = parts[0] as StagedPart;
+    return [{ expression: p.expression, category: "attack", label: label || "Attack", d20: true }];
+  }
+  return parts.map((p, i) => ({
+    expression: p.expression,
+    category: "damage",
+    label: fitLabel(label || "Damage"),
+    d20: false,
+    part: { type: p.type ?? null, extra: i > 0 },
+  }));
+}
+
+/**
+ * FR-DICE-94, FR-CHARX-129 (#385): what a sheet or combat roll adds to its payload item: the
+ * purpose (`attack` for the to-hit, `damage` for damage and healing), `part` on every damage
+ * item (a single-part row's: the row's type, `rowType`), `edited` (FR-CHARX-130).
+ */
+export function specItemFields(
+  s: StagedSpec,
+  rowType: string | null = null,
+): { purpose?: RollPurpose; part?: NonNullable<CharacterRollSpec["part"]>; edited?: true } {
+  const purpose: RollPurpose | null =
+    s.category === "attack" && s.d20
+      ? "attack"
+      : s.category === "damage" || s.category === "healing"
+        ? "damage"
+        : null;
+  if (!purpose) return {};
+  const part =
+    s.part ?? (s.category === "damage" ? { type: partTypeOf(rowType), extra: false } : undefined);
+  return { purpose, ...(part ? { part } : {}), ...(s.edited ? { edited: true } : {}) };
 }
 
 /**

@@ -3,11 +3,15 @@
 import { DeathCounters, TempHp } from "@shared/combat-extras/schemas";
 import {
   checkManualParts,
+  checkStagedParts,
   ManualEntry,
   ManualParts,
   ManualPartsPerRoll,
+  RollLabel,
   RollMode,
   RollModPart,
+  STAGED_DICE_MAX,
+  StagedParts,
 } from "@shared/dice-roll-log/schemas";
 import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import {
@@ -75,6 +79,8 @@ export const CBT_INTENTS = {
   summon: "cbt.summon",
   /** FR-CBT-112 (sprint 6): a companion leaves the fight (summon: token deleted; pet: HP kept). */
   dismiss: "cbt.dismiss",
+  /** FR-CBT-173 (sprint 15, #385): the DM builds or completes a card from a logged roll. */
+  useRoll: "cbt.useRoll",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -455,8 +461,11 @@ export const CardTriggerPart = z.strictObject({
 });
 export type CardTriggerPart = z.infer<typeof CardTriggerPart>;
 
-/** FR-CBT-83: an extra part's dice per roll: 6 (FR-CHARX-54), doubled on a crit. */
-export const CARD_EXTRA_DICE_MAX = 12;
+/**
+ * FR-CBT-83: an extra part's dice per roll, doubled on a crit. Sprint 15 (FR-CBT-170): staged
+ * parts hold up to 20 dice together (ADR-0073), so one extra part may carry 40 on a crit.
+ */
+export const CARD_EXTRA_DICE_MAX = 2 * STAGED_DICE_MAX;
 
 /**
  * FR-CBT-81 (sprint 4): one extra weapon damage part of the card's damage, its own roll row in
@@ -706,6 +715,26 @@ const checkManualExtra = (v: { manual?: unknown; manualExtra?: unknown }, ctx: z
   }
 };
 
+/**
+ * FR-CBT-171 (#385): a rowless roll (the tray's free Attack / Damage) needs `parts` and names no
+ * row; `label` only with `rowless`.
+ */
+const checkRowless = (
+  v: { parts?: unknown; rowless?: boolean; label?: string; attackId?: string; spellId?: string },
+  ctx: z.RefinementCtx,
+) => {
+  if (v.rowless) {
+    if (v.parts === undefined) {
+      ctx.addIssue({ code: "custom", path: ["parts"], message: "A rowless roll needs parts" });
+    }
+    if (v.attackId !== undefined || v.spellId !== undefined) {
+      ctx.addIssue({ code: "custom", path: ["rowless"], message: "A rowless roll names no row" });
+    }
+  } else if (v.label !== undefined) {
+    ctx.addIssue({ code: "custom", path: ["label"], message: "A label only on a rowless roll" });
+  }
+};
+
 export const AttackInput = z
   .strictObject({
     attackerId: Id,
@@ -728,7 +757,21 @@ export const AttackInput = z
      * one entry); absent = `both`.
      */
     rolls: AttackRolls.optional(),
+    /**
+     * FR-CBT-170 (#385, ADR-0073): the tray's staged to-hit (one part, one `1d20`), rolled in
+     * place of the row's; `rolls: "toHit"` only. Absent = the row's.
+     */
+    parts: StagedParts.optional(),
+    /** FR-CBT-171: no sheet row (needs `parts`); the card's `attackName` = `label` or "Attack". */
+    rowless: z.literal(true).optional(),
+    label: RollLabel.optional(),
   })
+  .refine((v) => v.parts === undefined || v.rolls === "toHit", {
+    path: ["parts"],
+    message: "Staged parts roll the to-hit only",
+  })
+  .superRefine((v, ctx) => checkStagedParts(v.parts, "attack", ctx))
+  .superRefine(checkRowless)
   .refine((v) => v.attackId === undefined || v.spellId === undefined, {
     path: ["spellId"],
     message: "Either an attack or a spell",
@@ -765,11 +808,21 @@ export const RollDamageInput = z
     manualExtra: ManualExtra.optional(),
     attackId: Id.optional(),
     spellId: Id.optional(),
+    /**
+     * FR-CBT-170 (#385, ADR-0073): the tray's staged damage parts (1–3; parts 2–3 typed; Σ ≤ 20
+     * dice), rolled in place of the row's. Absent = the row's.
+     */
+    parts: StagedParts.optional(),
+    /** FR-CBT-171: no sheet row (needs `parts`); the card's `attackName` = `label` or "Damage". */
+    rowless: z.literal(true).optional(),
+    label: RollLabel.optional(),
   })
   .refine((v) => v.attackId === undefined || v.spellId === undefined, {
     path: ["spellId"],
     message: "Either an attack or a spell",
   })
+  .superRefine((v, ctx) => checkStagedParts(v.parts, "damage", ctx))
+  .superRefine(checkRowless)
   .superRefine(checkManualParts)
   .superRefine(checkManualExtra);
 export type RollDamageInput = z.input<typeof RollDamageInput>;
@@ -782,6 +835,36 @@ export const RollDamageResult = z.object({
   unused: z.literal(true).optional(),
 });
 export type RollDamageResult = z.infer<typeof RollDamageResult>;
+
+/** FR-CBT-173 (#385): what a logged roll is used as. */
+export const USE_ROLL_AS = ["attack", "damage"] as const;
+export const UseRollAs = z.enum(USE_ROLL_AS);
+export type UseRollAs = z.infer<typeof UseRollAs>;
+
+/**
+ * `cbt.useRoll` (FR-CBT-173, DM only; ADR-0073 decision 2): builds (`attack`) or builds /
+ * completes (`damage`) a damage card from a logged `roll` entry's rolls, no reroll. `types`: one
+ * per damage item, set only for untyped items (null = keep untyped; the base part may stay so).
+ */
+export const UseRollInput = z
+  .strictObject({
+    entryId: Id,
+    as: UseRollAs,
+    attackerId: Id,
+    types: z
+      .array(PartDamageType.nullable())
+      .min(1)
+      .max(1 + EXTRA_DAMAGE_MAX)
+      .optional(),
+  })
+  .refine((v) => v.as === "damage" || v.types === undefined, {
+    path: ["types"],
+    message: "Types are for damage",
+  });
+export type UseRollInput = z.input<typeof UseRollInput>;
+/** `attached` = completed the attacker's pending to-hit-only card, else a new card. */
+export const UseRollResult = z.object({ cardId: z.string(), attached: z.boolean() });
+export type UseRollResult = z.infer<typeof UseRollResult>;
 /**
  * effect-modifiers (FR-MOD-38, -40): the DM's assignment of one offered part to this target.
  * `value` = the DM's edit (absent = as rolled), `multiplier` = the part's own (absent = the

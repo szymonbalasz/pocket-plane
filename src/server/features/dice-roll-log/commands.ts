@@ -96,29 +96,42 @@ export const rollCommand = defineCommand({
   execute(input, env): DiceRollResult {
     const cid = campaignOf(env.actor);
     const actor = resolveRollActor(env, input.actor);
-    const r = evaluate(env, {
-      expression: input.expression,
-      mode: input.mode,
-      category: input.category,
-      label: input.label ?? null,
-      actor,
-      manual: input.manual,
-      source: "dice",
-    });
+    // FR-DICE-94 (#385): damage `parts` → one roll per part, one entry (FR-DICE-26); a plain
+    // `expression` is one part. Attack / damage: the purpose and (damage) `part` on each item.
+    const parts = input.parts ?? [{ expression: input.expression as string }];
+    const rolls = parts.map((p, i) => ({
+      part: p,
+      extra: i > 0,
+      roll: evaluate(env, {
+        expression: p.expression,
+        mode: i === 0 ? input.mode : "normal",
+        category: input.category,
+        label: input.label ?? null,
+        actor,
+        manual: input.manual,
+        source: "dice",
+      }),
+    }));
+    const purpose = input.purpose;
     const change = append(env, {
       kind: ROLL_KIND,
       category: input.category,
       actorName: actor.name,
-      payload: [rollPayloadItem(r)],
-      rollIds: [r.id],
+      payload: rolls.map(({ part, extra, roll }) => ({
+        ...rollPayloadItem(roll),
+        ...(purpose ? { purpose } : {}),
+        ...(purpose === "damage" ? { part: { type: part.type ?? null, extra } } : {}),
+      })),
+      rollIds: rolls.map((r) => r.roll.id),
       public: input.public,
     });
+    const rollIds = rolls.map((r) => r.roll.id);
     env.emit({
       type: DiceRolled.type,
       campaignId: cid,
-      payload: { entryId: change.id, rollIds: [r.id] },
+      payload: { entryId: change.id, rollIds },
       changes: [change],
     });
-    return { rollId: r.id, entryId: change.id };
+    return { rollId: rollIds[0] as string, entryId: change.id };
   },
 });

@@ -3,7 +3,15 @@
 // the DM picks it in the attack popup (#134). FR-CHARX-24 (OQ-CBT-47): `attackId?` / `spellId?`
 // name the sheet row, resolved by CHARX's `sheetAttack`; neither = the first attack. FR-CBT-70
 // (N7): `rolls: "toHit"` rolls the d20 only, a to-hit-only card that `cbt.rollDamage` completes.
-import { attackRollSpecs } from "@shared/character-sheet/logic";
+// Sprint 15 (FR-CBT-170, -171, #385): the tray's staged to-hit (`parts`) in place of the row's;
+// `rowless` = no sheet row (the card names `label` or "Attack").
+import {
+  attackRollSpecs,
+  type CharacterRollSpec,
+  rowlessSpecs,
+  specItemFields,
+  stagedSpecs,
+} from "@shared/character-sheet/logic";
 import { critExpression } from "@shared/combat-tracker/rules";
 import {
   AttackInput,
@@ -68,20 +76,34 @@ export const attackCommand = defineCommand({
   },
   execute(input, env): AttackResult {
     const { c, enc } = activeCombatant(env, input.attackerId, { own: true });
+    // FR-CBT-171: a rowless to-hit names no row (the schema refuses `attackId` / `spellId`).
+    const rowless = input.rowless === true;
     // The attacker's own definition only: a row of another creature is `not_found` here.
     // Sprint 6 (FR-CBT-114): a player's companion attack names a card row.
-    const ref = attackRefFor(env, c, { attackId: input.attackId, spellId: input.spellId });
-    const attack = combatantAttack(env, c, ref);
+    const ref = rowless
+      ? {}
+      : attackRefFor(env, c, { attackId: input.attackId, spellId: input.spellId });
+    const row = rowless ? null : combatantAttack(env, c, ref);
+    const attack = row ?? { name: input.label || "Attack", damageType: null };
     // FR-CHARX-55: to-hit and the base part carry `bonus`; FR-CBT-81: the extra parts follow.
-    const [hitSpec, dmgSpec, ...extraSpecs] = attackRollSpecs(attack);
+    // FR-CBT-170: staged parts (to-hit only) replace the row's to-hit expression.
+    const rowSpecs: CharacterRollSpec[] = row
+      ? attackRollSpecs(row)
+      : rowlessSpecs("attack", input.parts ?? [], input.label);
+    const [rowHit, dmgSpec, ...extraSpecs] = rowSpecs as [
+      CharacterRollSpec,
+      CharacterRollSpec,
+      ...CharacterRollSpec[],
+    ];
+    const hitSpec = input.parts && row ? (stagedSpecs([rowHit], input.parts)[0] ?? rowHit) : rowHit;
     const actor = { kind: "entity" as const, id: c.entityId, name: c.name };
     const toHitOnly = input.rolls === "toHit";
     if (!toHitOnly) checkManualExtra(extraSpecs, input.manual, input.manualExtra);
     // FR-MOD-15: who rolls (a PC combatant = its character), weapon or spell row.
     const creature = c.kind === "pc" ? { characterId: c.entityId } : { combatantId: c.id };
     const via = input.spellId !== undefined ? ("spell" as const) : ("weapon" as const);
-    // FR-MOD-13 (#209): the row's name, read by `row` filters.
-    const row = attack.name.slice(0, ROLL_ROW_MAX);
+    // FR-MOD-13 (#209): the row's name, read by `row` filters; a rowless roll has none.
+    const rowName = row ? { row: row.name.slice(0, ROLL_ROW_MAX) } : {};
     // Every roll of the command goes through here (one place for later roll options).
     const rollOf = (
       spec: typeof hitSpec,
@@ -104,7 +126,7 @@ export const attackCommand = defineCommand({
         // FR-MOD-18: the physical part groups of this roll (one list per `manual` entry).
         ...(input.manualParts?.[i] ? { manualParts: input.manualParts[i] } : {}),
         source: "cbt",
-        subject: { creature, via, row, ...subject },
+        subject: { creature, via, ...rowName, ...subject },
       });
     const toHit = rollOf(hitSpec, hitSpec.expression, 0, { roll: "attack" });
     // FR-CBT-16 / -17: natural 20 → damage dice doubled; manual damage is checked against it.
@@ -141,7 +163,7 @@ export const attackCommand = defineCommand({
         damage: damage
           ? { ...withCardMods(cardRollOf(damage), damage), ...cardExtraOf(extraSpecs, extra) }
           : null,
-        ...cardRowRef(env, c, ref),
+        ...(rowless ? {} : cardRowRef(env, c, ref)),
       },
       damage,
     );
@@ -154,11 +176,16 @@ export const attackCommand = defineCommand({
     // FR-CBT-70: a to-hit-only attack's line holds the to-hit roll alone.
     // FR-MOD-69: offered parts read the attack's type when untyped.
     const line = rollLine(rolls, attack.damageType ?? null);
+    // FR-DICE-94 (#385): the to-hit's purpose `attack`; damage items `damage` + `part`.
+    const specs = [hitSpec, dmgSpec, ...extraSpecs];
     const entry = gameLog.append(env, {
       kind: ROLL_KIND,
       category: "attack",
       actorName: c.name,
-      payload: line.payload,
+      payload: line.payload.map((item, i) => ({
+        ...item,
+        ...specItemFields(specs[i] as CharacterRollSpec, attack.damageType ?? null),
+      })),
       dmPayload: line.dmPayload,
       rollIds,
       encounterId: enc.id,
