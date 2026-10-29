@@ -22,7 +22,8 @@
       "@ui/*": ["./src/client/common/*"],
       "@dm/*": ["./src/client/dm/*"],
       "@player/*": ["./src/client/player/*"],
-      "@fixtures/*": ["./fixtures/*"]
+      "@fixtures/*": ["./fixtures/*"],
+      "@mcp/*": ["./src/mcp/*"]
     }
   },
   "include": ["src", "fixtures", "e2e", "scripts", "*.ts"],
