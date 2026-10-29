@@ -26,8 +26,9 @@ test("FR-KIT-40 FR-KIT-41 FR-KIT-43 FR-KIT-44 FR-KIT-45 kit log rows: medallion,
   // Mira's Longbow attack (player-1, physical natural 20): a crit box of 29.
   const attack = row(log, "Longbow attack");
   await expect(attack.getByTestId("dice-log-entry-text")).toHaveText("Mira · Longbow attack");
-  await expect(attack.getByTestId("kit-medallion")).toHaveText("M");
-  await expect(attack.getByTestId("kit-medallion")).toHaveAttribute("style", /background-color/);
+  // FR-KIT-41: Mira has no portrait, but her visible token's image matches by name.
+  await expect(attack.getByTestId("kit-medallion")).toHaveAttribute("data-image", "");
+  await expect(attack.getByTestId("kit-medallion")).toHaveText("");
   const crit = attack.getByTestId("dice-log-entry-total");
   await expect(crit).toHaveText("29");
   await expect(crit).toHaveAttribute("data-outcome", "crit");

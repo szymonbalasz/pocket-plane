@@ -830,18 +830,29 @@ export function copiedRows<R>(
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
+type Named = { name: string; imageAssetId?: string | null };
+
 /**
- * A log row's portrait: the player character named `actorName` (names are unique per campaign,
- * case-insensitive, FR-ENT-08), from records this client already holds (players get every
- * character's portrait, ADR-0024). Monsters, the DM and renamed characters keep the initial.
+ * A log row's portrait by `actorName` (case-insensitive), from records this client already holds,
+ * so a player learns no image they couldn't see (ADR-0023, -0024): the player character of that
+ * name (names unique per campaign, FR-ENT-08; players get every character's portrait), else a
+ * combatant, else a token of that name (each only when visible to this viewer), else a monster
+ * definition (the DM's client). Nothing matching (the DM, a hidden creature, a renamed one) keeps
+ * the initial.
  */
-export function characterPortraits(
-  entities: readonly Pick<EntityRecord, "kind" | "name" | "portraitAssetId">[],
-): ReadonlyMap<string, string> {
+export function actorPortraits(records: {
+  entities: readonly Pick<EntityRecord, "kind" | "name" | "portraitAssetId">[];
+  combatants: readonly Named[];
+  tokens: readonly Named[];
+}): ReadonlyMap<string, string> {
   const out = new Map<string, string>();
-  for (const e of entities) {
-    if (e.kind === "character" && e.portraitAssetId)
-      out.set(e.name.toLowerCase(), e.portraitAssetId);
-  }
+  const put = (name: string, id: string | null | undefined) => {
+    if (id) out.set(name.toLowerCase(), id);
+  };
+  // Lowest precedence first; later sets win.
+  for (const e of records.entities) if (e.kind === "monster") put(e.name, e.portraitAssetId);
+  for (const t of records.tokens) put(t.name, t.imageAssetId);
+  for (const c of records.combatants) put(c.name, c.imageAssetId);
+  for (const e of records.entities) if (e.kind === "character") put(e.name, e.portraitAssetId);
   return out;
 }
