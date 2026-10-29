@@ -1,5 +1,6 @@
 // Bundle registry. Append-only (AGENTS §9.9): add your own lines.
 import type { Bundle } from "@server/features/fixtures-adapters/fixture-types";
+import agentApi from "./agent-api";
 import alertSounds from "./alert-sounds";
 import alertSoundsE2e from "./alert-sounds-e2e";
 import assetAccess from "./asset-access";
@@ -350,4 +351,6 @@ export const bundles: readonly Bundle[] = [
   visualKit,
   // Spell FX core (fix/vfx-core): Cast, hit cues and auras walkthrough + spell-fx e2e
   spellFx,
+  // Agent / MCP API (build/agent-core): read tools, plan_check, mcp:call walkthroughs
+  agentApi,
 ];

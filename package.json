@@ -22,9 +22,12 @@
     "fixtures:reset": "bun scripts/fixtures.ts reset",
     "fixtures:load": "bun scripts/fixtures.ts load",
     "fixtures:reset-load": "bun scripts/fixtures.ts reset-load",
-    "state:digest": "bun scripts/state-digest.ts"
+    "state:digest": "bun scripts/state-digest.ts",
+    "mcp": "bun src/mcp/index.ts",
+    "mcp:call": "bun scripts/mcp-call.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
     "cannon-es": "~0.20.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

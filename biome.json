@@ -116,6 +116,37 @@
       }
     },
     {
+      "includes": ["src/mcp/**", "!**/*.test.ts"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": [
+                      "@server/*",
+                      "!@server/config",
+                      "!@server/runtime/lock",
+                      "!@server/app",
+                      "@ui/*",
+                      "@dm/*",
+                      "@player/*",
+                      "@fixtures/*",
+                      "bun:sqlite",
+                      "drizzle-*"
+                    ],
+                    "message": "The MCP server imports only @shared, @server/config, @server/runtime/lock and type AppType; it never opens the DB (ADR-0072 D5)."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/shared/**"],
       "linter": {
         "rules": {
