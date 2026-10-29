@@ -140,7 +140,9 @@ test("FR-GEM-19 FR-GEM-33 FR-DICE-65 FR-DICE-68 FR-GEM-05 P1 rerolls Perception 
     await expect(line(log, old)).toHaveCount(0);
     await expect(line(log, "spends an Inspiration gem")).toHaveCount(0);
     await expect(line(log, "(reroll, was")).toHaveCount(0);
-    await expect(log.locator(`[data-record-id="${freshId}"]`)).toHaveCount(1);
+    await expect(
+      log.locator(`[data-testid="dice-log-entry"][data-record-id="${freshId}"]`),
+    ).toHaveCount(1);
   }
   // On: back.
   await setGems(dm, secret, true);

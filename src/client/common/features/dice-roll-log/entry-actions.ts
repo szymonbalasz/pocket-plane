@@ -14,6 +14,7 @@ import type { You } from "@shared/protocol/frames";
 import type { RecordStore } from "@shared/protocol/store";
 import type { LucideIcon } from "lucide-react";
 import { isFeatureOn } from "../campaign-management/use-feature";
+import { useAsAttackAction, useAsDamageAction } from "../combat-tracker/use-roll-action";
 import { gemRerollAction } from "../gems/reroll-action";
 
 /**
@@ -55,6 +56,8 @@ export interface EntryAction {
 
 export const entryActions: readonly EntryAction[] = [
   gemRerollAction, // gem.reroll (gems, FR-GEM-33; feature `gems`)
+  useAsAttackAction, // cbt.useAsAttack (combat, FR-DICE-97; DM only)
+  useAsDamageAction, // cbt.useAsDamage (combat, FR-DICE-97; DM only)
 ];
 
 /** FR-DICE-68: the actions a line shows for this viewer, in `order`. */

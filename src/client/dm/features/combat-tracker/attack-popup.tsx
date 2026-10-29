@@ -18,12 +18,16 @@
 // Kit parity K3 (FR-KIT-62–65): a window-style title bar whose gem is Later, "To hit" / "Damage,
 // <type>" lines ending in Result-box-styled inputs, one compact line per target (Medallion + name ·
 // AC chip, Hit, multiplier, preview; Remove on hover), footer Dismiss · card actions · Apply.
+// Sprint 15 (FR-CBT-174, -176; #385): the "Use roll" step before a card made from a logged roll
+// (Attacker, a Type per untyped damage roll, Make card / Cancel), in the same panel; a crit card
+// completed from a logged roll says its dice weren't doubled (OQ-CBT-104 A).
 
 import { naturalMark } from "@shared/combat-tracker/log-kinds";
 import { MULTIPLIER_LABEL, rawDamage } from "@shared/combat-tracker/rules";
 import {
   APPLY_TARGETS_MAX,
   type CardPartRef,
+  CBT_INTENTS,
   type CombatantView,
   CRIT_CHANGED_TEXT,
   critChanged,
@@ -32,9 +36,17 @@ import {
   HIT_RULING_TYPE,
   type HitRulingRecord,
   partRollIdsOf,
+  type UseRollResult,
 } from "@shared/combat-tracker/schemas";
 import { lineText } from "@shared/dice-roll-log/kind-types";
+import { formatEntry } from "@shared/dice-roll-log/line";
+import {
+  GAME_LOG_ENTRY_TYPE,
+  type GameLogEntryView,
+  isUsedRoll,
+} from "@shared/dice-roll-log/schemas";
 import { modSegments } from "@shared/effect-modifiers/line";
+import { PartDamageType } from "@shared/effect-modifiers/schemas";
 import type { DefinitionRecord } from "@shared/entities/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { TOKEN_TYPE } from "@shared/scenes-map/schemas";
@@ -48,7 +60,14 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@ui/components/ui/controls";
-import { Tooltip } from "@ui/components/ui/overlays";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tooltip,
+} from "@ui/components/ui/overlays";
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
 import { Tip } from "@ui/components/ui/tip";
 import { CardActions, PartDice } from "@ui/features/combat-tracker/card-actions-row";
@@ -60,6 +79,13 @@ import {
   useStartedEncounter,
 } from "@ui/features/combat-tracker/store";
 import { useTargetingAttacker } from "@ui/features/combat-tracker/token-overlay";
+import {
+  damageItemsOf,
+  entryItems,
+  fightersOf,
+  intentForRoll,
+  type UseRollType,
+} from "@ui/features/combat-tracker/use-roll-action";
 import { hideToast } from "@ui/features/notifications/toasts";
 import {
   EDGE_GAP,
@@ -122,6 +148,7 @@ import {
   emptyDraft,
   type PerTarget,
   type PopupOrigin,
+  type UseRollStep,
   useCombatDialogs,
 } from "./popup-store";
 import {
@@ -526,6 +553,24 @@ function DamageField({
   );
 }
 
+/** OQ-CBT-104 A: a crit card's damage came from a logged roll (Use as damage): not doubled. */
+export const USED_CRIT_HINT = "Critical: these dice weren't doubled";
+
+/** OQ-CBT-104 A: the card is a crit whose damage roll is a log entry this card used. */
+export function usedCritDamage(
+  cardId: string,
+  p: Pick<DamageCardPayload, "crit" | "damage">,
+  entries: readonly GameLogEntryView[],
+): boolean {
+  const rollId = p.damage?.rollId;
+  if (!p.crit || !rollId) return false;
+  return entries.some(
+    (e) =>
+      (e.dmPayload as { usedByCardId?: unknown } | null | undefined)?.usedByCardId === cardId &&
+      e.rollIds.includes(rollId),
+  );
+}
+
 export function PopupBody({ card, close }: { card: NotificationRecord; close(): void }) {
   const payload = useMemo(() => DamageCardPayload.safeParse(card.payload), [card.payload]);
   const p = payload.success ? payload.data : null;
@@ -536,6 +581,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
   const encounter = useStartedEncounter();
   const selection = useMapSelection();
   const store = useSync((s) => s.store);
+  const entries = useRecords<GameLogEntryView>(GAME_LOG_ENTRY_TYPE);
   // FR-CBT-90: the DM's edits live per card in popup-store (kept across Later, another card, a
   // reconnect; lost on reload). Untouched fields follow the card, so a late roll fills them.
   const draft = useCombatDialogs((s) => s.drafts[card.id]) ?? NO_DRAFT;
@@ -690,6 +736,7 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
   });
   const turn = encounter ? turnKey(encounter) : null;
   const note = lateNote({ seq: card.seq, p }, resolvedCards, turn);
+  const usedCrit = usedCritDamage(card.id, p, entries);
   const unused = unusedText(p);
   const setRow = (id: string, patch: Partial<PerTarget>) => {
     const mult = rows.find((x) => x.c.id === id)?.mult ?? "normal";
@@ -1191,6 +1238,11 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
           {note}
         </p>
       )}
+      {usedCrit && (
+        <p data-testid="cbt-popup-used-crit" className="text-xs text-muted-foreground">
+          {USED_CRIT_HINT}
+        </p>
+      )}
       {/* FR-KIT-65: Dismiss left, the card actions in the middle, Apply (primary) right. */}
       <div data-slot="card-footer" className="flex flex-wrap items-center gap-2">
         <Button
@@ -1274,6 +1326,8 @@ export function AttackPopup() {
   const origin = useCombatDialogs((s) => s.origin);
   const openSeq = useCombatDialogs((s) => s.openSeq);
   const close = useCombatDialogs((s) => s.closeCard);
+  const step = useCombatDialogs((s) => s.step);
+  const closeStep = useCombatDialogs((s) => s.closeStep);
   const notes = useRecords<NotificationRecord>("notification");
   const card = cardId ? notes.find((n) => n.id === cardId) : undefined;
   const resolved = card !== undefined && card.state !== "pending";
@@ -1281,11 +1335,20 @@ export function AttackPopup() {
   useEffect(() => {
     if (resolved) close();
   }, [resolved, close]);
-  if (card?.state !== "pending") return null;
+  if (card?.state !== "pending") {
+    // FR-CBT-174: the "Use roll" step, before any card.
+    if (!step) return null;
+    return (
+      <PopupFrame key={`step:${openSeq}`} tiers={NO_TIERS} origin={null} close={closeStep}>
+        <UseRollStepBody step={step} close={closeStep} />
+      </PopupFrame>
+    );
+  }
   return <PopupPanel key={`${card.id}:${openSeq}`} card={card} origin={origin} close={close} />;
 }
 
 const viewport = (): Viewport => ({ w: window.innerWidth, h: window.innerHeight });
+const NO_TIERS: string[][] = [];
 
 function PopupPanel({
   card,
@@ -1297,6 +1360,29 @@ function PopupPanel({
   close(): void;
 }) {
   const tiers = useOpenTiers(card);
+  // Item 11: a card's toast never shows while its popup is open (FR-CBT-75, FR-NOTE-26).
+  useEffect(() => hideToast(card.id), [card.id]);
+  return (
+    <PopupFrame tiers={tiers} origin={origin} close={close} recordId={card.id}>
+      <PopupBody card={card} close={close} />
+    </PopupFrame>
+  );
+}
+
+/** The popup's panel: placed once per open, re-clamped, dragged by its header, Esc closes. */
+function PopupFrame({
+  tiers,
+  origin,
+  close,
+  recordId,
+  children,
+}: {
+  tiers: string[][];
+  origin: PopupOrigin | null;
+  close(): void;
+  recordId?: string;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   // Top-left once placed (FR-CBT-55/56, over its notification FR-CBT-75) or dragged (FR-CBT-76);
   // null before the first layout. Client memory until the popup closes.
@@ -1304,9 +1390,6 @@ function PopupPanel({
   const [side, setSide] = useState<Placement["side"] | null>(null);
   const posRef = useRef(pos);
   posRef.current = pos;
-
-  // Item 11: a card's toast never shows while its popup is open (FR-CBT-75, FR-NOTE-26).
-  useEffect(() => hideToast(card.id), [card.id]);
 
   // FR-CBT-55/56/75: placed once the panel's size is known (before paint); re-clamped when the
   // panel or the viewport changes size, so it stays in the work area.
@@ -1370,7 +1453,7 @@ function PopupPanel({
       aria-modal="false"
       aria-label="Attack"
       data-testid="cbt-popup"
-      data-record-id={card.id}
+      data-record-id={recordId}
       data-side={side ?? undefined}
       // At `pos` (placed / dragged); hidden for the first, measuring layout only.
       style={
@@ -1388,7 +1471,194 @@ function PopupPanel({
         }
       }}
     >
-      <PopupBody card={card} close={close} />
+      {children}
+    </div>
+  );
+}
+
+const NO_TYPE = "none";
+const STEP_SELECT = "h-8 min-w-0 flex-1 text-sm";
+
+/**
+ * FR-CBT-174: the step's Make card is ready: an attacker still in the fight, and every extra
+ * damage roll (items 2–3) typed, its own or picked (the first may stay untyped).
+ */
+export function stepReady(
+  step: UseRollStep,
+  entry: GameLogEntryView,
+  fighterIds: readonly string[],
+): boolean {
+  if (step.attackerId === null || !fighterIds.includes(step.attackerId)) return false;
+  if (step.as === "attack") return true;
+  return damageItemsOf(entryItems(entry)).every(
+    (item, i) => i === 0 || (item.part?.type ?? step.types[item.rollId]) !== undefined,
+  );
+}
+
+/**
+ * FR-CBT-174 / -176: the "Use roll" step. The roll's line, the Attacker (active combatants in
+ * initiative order, preset when resolved), a Type per untyped damage roll, Make card / Cancel.
+ * Nothing is written before Make card; the picks live in popup-store (kept across a reconnect),
+ * Make card is disabled while not live, and an in-flight `cbt.useRoll` is never resent. The line
+ * used, undone or rerolled meanwhile → the step closes.
+ */
+export function UseRollStepBody({ step, close }: { step: UseRollStep; close(): void }) {
+  const entry = useRecords<GameLogEntryView>(GAME_LOG_ENTRY_TYPE).find(
+    (e) => e.id === step.entryId,
+  );
+  const store = useSync((s) => s.store);
+  const fighters = useMemo(() => fightersOf(store), [store]);
+  const editStep = useCombatDialogs((s) => s.editStep);
+  const { send, disabled } = useCbtIntent();
+  const gone =
+    entry !== undefined && (entry.undone || entry.supersededBy !== null || isUsedRoll(entry));
+  useEffect(() => {
+    if (gone) close();
+  }, [gone, close]);
+
+  const items = entry && step.as === "damage" ? damageItemsOf(entryItems(entry)) : [];
+  const ready =
+    entry !== undefined &&
+    stepReady(
+      step,
+      entry,
+      fighters.map((c) => c.id),
+    );
+  const attacker = fighters.find((c) => c.id === step.attackerId);
+  const make = async () => {
+    if (!entry || step.attackerId === null) return;
+    const r = await send<UseRollResult>(
+      CBT_INTENTS.useRoll,
+      intentForRoll(entry, step.as, step.attackerId, step.types),
+    );
+    if (r) useCombatDialogs.getState().openCard(r.cardId);
+  };
+  const title = step.as === "attack" ? "Use as attack" : "Use as damage";
+
+  return (
+    <div className="flex min-h-0 flex-col gap-3" data-testid="cbt-popup-use" data-value={step.as}>
+      <div
+        data-testid="cbt-popup-drag"
+        data-slot="card-bar"
+        className="-mx-3 -mt-3 flex h-8 shrink-0 cursor-move select-none items-center gap-1.5 border-b bg-muted/40 pr-1 pl-3"
+      >
+        <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{title}</h2>
+        <Badge
+          variant="secondary"
+          data-testid="cbt-popup-step"
+          data-value="use-roll"
+          className="shrink-0"
+        >
+          Use roll
+        </Badge>
+      </div>
+      <p
+        data-testid="cbt-popup-use-line"
+        data-record-id={step.entryId}
+        className="text-sm text-muted-foreground"
+      >
+        {entry ? lineText(formatEntry(entry).segments) : "Roll not in the log"}
+      </p>
+      <div className={CARD_LINE}>
+        <Label htmlFor="cbt-popup-use-attacker" className="w-20 shrink-0 text-sm font-normal">
+          Attacker
+        </Label>
+        <Select
+          value={attacker ? attacker.id : ""}
+          onValueChange={(v) => editStep({ attackerId: v })}
+        >
+          <SelectTrigger
+            id="cbt-popup-use-attacker"
+            data-testid="cbt-popup-use-attacker"
+            data-value={attacker?.id ?? ""}
+            aria-label="Attacker"
+            className={STEP_SELECT}
+          >
+            <SelectValue placeholder="Pick the attacker">{attacker?.name}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {fighters.map((c) => (
+              <SelectItem
+                key={c.id}
+                value={c.id}
+                data-testid="cbt-popup-use-attacker-option"
+                data-value={c.id}
+              >
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {items.map((item, i) => {
+        if ((item.part?.type ?? null) !== null) return null;
+        const picked = step.types[item.rollId];
+        const id = `cbt-popup-use-type-${item.rollId}`;
+        return (
+          <div key={item.rollId} className={CARD_LINE}>
+            <Label htmlFor={id} className="w-20 shrink-0 text-sm font-normal">
+              Type, <span className="font-mono text-xs">{item.expression}</span>
+            </Label>
+            <Select
+              value={picked ?? NO_TYPE}
+              onValueChange={(v) => {
+                const { [item.rollId]: _, ...rest } = step.types;
+                editStep({
+                  types: v === NO_TYPE ? rest : { ...rest, [item.rollId]: v as UseRollType },
+                });
+              }}
+            >
+              <SelectTrigger
+                id={id}
+                data-testid="cbt-popup-use-type"
+                data-record-id={item.rollId}
+                data-value={picked ?? (i === 0 ? NO_TYPE : "")}
+                aria-label={`Type of ${item.expression}`}
+                className={STEP_SELECT}
+              >
+                <SelectValue placeholder="Pick a type">
+                  {picked ?? (i === 0 ? "No type" : undefined)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {/* FR-CBT-81: only the base part may stay untyped. */}
+                {i === 0 && (
+                  <SelectItem
+                    value={NO_TYPE}
+                    data-testid="cbt-popup-use-type-option"
+                    data-value={NO_TYPE}
+                  >
+                    No type
+                  </SelectItem>
+                )}
+                {PartDamageType.options.map((t) => (
+                  <SelectItem
+                    key={t}
+                    value={t}
+                    data-testid="cbt-popup-use-type-option"
+                    data-value={t}
+                  >
+                    {t}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      })}
+      <div data-slot="card-footer" className="flex flex-wrap items-center justify-between gap-2">
+        <Button size="sm" variant="ghost" data-testid="cbt-popup-use-cancel" onClick={close}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          data-testid="cbt-popup-use-confirm"
+          disabled={disabled || !ready}
+          onClick={make}
+        >
+          Make card
+        </Button>
+      </div>
     </div>
   );
 }
