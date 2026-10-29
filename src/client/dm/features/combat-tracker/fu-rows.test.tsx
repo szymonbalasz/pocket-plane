@@ -208,8 +208,9 @@ describe("FR-CBT-146 / -147 / -149 encounter editor", () => {
     }
     // The row wraps; the controls are one group pushed right (same line when room, else below).
     for (const t of tags(html, "cbt-enc-entry")) expect(t).toContain("flex-wrap");
+    // (A disabled stepper sits in its Tooltip's wrapper span.)
     expect(html).toMatch(
-      /class="ml-auto flex shrink-0 items-center gap-2"><button[^>]*data-testid="cbt-enc-entry-dec"/,
+      /class="ml-auto flex shrink-0 items-center gap-2">(<span class="inline-flex"[^>]*>)?<button[^>]*data-testid="cbt-enc-entry-dec"/,
     );
   });
 

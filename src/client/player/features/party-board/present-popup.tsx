@@ -10,6 +10,7 @@ import { HANDOUT_PRESENT_TYPE, type HandoutPresentRecord } from "@shared/party-b
 import { Button } from "@ui/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@ui/components/ui/overlays";
 import { Skeleton } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { DiceText } from "@ui/features/dice-extras/DiceText";
 import { NOTIFICATION_TYPE } from "@ui/features/notifications/logic";
@@ -215,31 +216,35 @@ function Images({ ids, title }: { ids: readonly string[]; title: string }) {
       </div>
       {n > 1 && (
         <div className="flex items-center gap-2 text-sm">
-          <Button
-            size="icon"
-            variant="outline"
-            className="size-8"
-            aria-label="Previous image"
-            data-testid="party-present-prev"
-            disabled={at === 0}
-            onClick={() => setI(stepPage(at, -1, n))}
-          >
-            <ChevronLeftIcon className="size-4" />
-          </Button>
+          <Tip content="Previous image" off={at === 0}>
+            <Button
+              size="icon"
+              variant="outline"
+              className="size-8"
+              aria-label="Previous image"
+              data-testid="party-present-prev"
+              disabled={at === 0}
+              onClick={() => setI(stepPage(at, -1, n))}
+            >
+              <ChevronLeftIcon className="size-4" />
+            </Button>
+          </Tip>
           <span data-testid="party-present-page" className="tabular-nums text-muted-foreground">
             {pageText(at, n)}
           </span>
-          <Button
-            size="icon"
-            variant="outline"
-            className="size-8"
-            aria-label="Next image"
-            data-testid="party-present-next"
-            disabled={at === n - 1}
-            onClick={() => setI(stepPage(at, 1, n))}
-          >
-            <ChevronRightIcon className="size-4" />
-          </Button>
+          <Tip content="Next image" off={at === n - 1}>
+            <Button
+              size="icon"
+              variant="outline"
+              className="size-8"
+              aria-label="Next image"
+              data-testid="party-present-next"
+              disabled={at === n - 1}
+              onClick={() => setI(stepPage(at, 1, n))}
+            >
+              <ChevronRightIcon className="size-4" />
+            </Button>
+          </Tip>
         </div>
       )}
     </div>

@@ -9,6 +9,7 @@ import { HANDOUT_IMAGES_MAX, HANDOUT_TITLE_MAX } from "@shared/party-board/schem
 import { Button } from "@ui/components/ui/button";
 import { Input, Label } from "@ui/components/ui/primitives";
 import { ScrollArea } from "@ui/components/ui/scroll-area";
+import { Tip } from "@ui/components/ui/tip";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { ImageAttach } from "@ui/features/assets-pipeline/attach/ImageAttach";
 import { Textarea } from "@ui/features/party-board/controls";
@@ -124,41 +125,49 @@ export function HandoutEditor({ stored, onSaved, onCancel }: EditorProps) {
                 >
                   <AssetImg id={id} file="thumb" alt={`Image ${i + 1}`} className="size-16" />
                   <span className="flex gap-0.5">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-6"
-                      aria-label="Move left"
-                      data-testid="party-editor-image-left"
-                      disabled={i === 0}
-                      onClick={() => set({ imageAssetIds: moveImage(draft.imageAssetIds, i, -1) })}
-                    >
-                      <ArrowLeftIcon className="size-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-6"
-                      aria-label="Remove image"
-                      data-testid="party-editor-image-remove"
-                      onClick={() => set({ imageAssetIds: removeImage(draft.imageAssetIds, i) })}
-                    >
-                      <XIcon className="size-3.5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      className="size-6"
-                      aria-label="Move right"
-                      data-testid="party-editor-image-right"
-                      disabled={i === draft.imageAssetIds.length - 1}
-                      onClick={() => set({ imageAssetIds: moveImage(draft.imageAssetIds, i, 1) })}
-                    >
-                      <ArrowRightIcon className="size-3.5" />
-                    </Button>
+                    <Tip content="Move left" off={i === 0}>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="size-6"
+                        aria-label="Move left"
+                        data-testid="party-editor-image-left"
+                        disabled={i === 0}
+                        onClick={() =>
+                          set({ imageAssetIds: moveImage(draft.imageAssetIds, i, -1) })
+                        }
+                      >
+                        <ArrowLeftIcon className="size-3.5" />
+                      </Button>
+                    </Tip>
+                    <Tip content="Remove image">
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="size-6"
+                        aria-label="Remove image"
+                        data-testid="party-editor-image-remove"
+                        onClick={() => set({ imageAssetIds: removeImage(draft.imageAssetIds, i) })}
+                      >
+                        <XIcon className="size-3.5" />
+                      </Button>
+                    </Tip>
+                    <Tip content="Move right" off={i === draft.imageAssetIds.length - 1}>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="size-6"
+                        aria-label="Move right"
+                        data-testid="party-editor-image-right"
+                        disabled={i === draft.imageAssetIds.length - 1}
+                        onClick={() => set({ imageAssetIds: moveImage(draft.imageAssetIds, i, 1) })}
+                      >
+                        <ArrowRightIcon className="size-3.5" />
+                      </Button>
+                    </Tip>
                   </span>
                 </li>
               ))}

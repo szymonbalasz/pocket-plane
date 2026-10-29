@@ -11,6 +11,7 @@ import { Badge, Input } from "@ui/components/ui/primitives";
 import { cn } from "@ui/lib/utils";
 import { XIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { Tip } from "../../../components/ui/tip";
 import { addTagPlan, imageFull, removeTag } from "./editor-logic";
 import { RECONNECTING, useTagIntent } from "./intent";
 
@@ -71,17 +72,19 @@ export function TagEditor({
           >
             {t}
             <Live why={live ? null : RECONNECTING}>
-              <button
-                type="button"
-                aria-label={`Remove tag ${t}`}
-                data-testid="asset-tags-remove"
-                data-tag={tagKey(t)}
-                disabled={off}
-                className="rounded-sm p-0.5 hover:bg-accent disabled:opacity-50"
-                onClick={() => void setTags(removeTag(asset.tags, tagKey(t)))}
-              >
-                <XIcon className="size-3" />
-              </button>
+              <Tip content={`Remove tag ${t}`} off={off}>
+                <button
+                  type="button"
+                  aria-label={`Remove tag ${t}`}
+                  data-testid="asset-tags-remove"
+                  data-tag={tagKey(t)}
+                  disabled={off}
+                  className="rounded-sm p-0.5 hover:bg-accent disabled:opacity-50"
+                  onClick={() => void setTags(removeTag(asset.tags, tagKey(t)))}
+                >
+                  <XIcon className="size-3" />
+                </button>
+              </Tip>
             </Live>
           </Badge>
         ))}

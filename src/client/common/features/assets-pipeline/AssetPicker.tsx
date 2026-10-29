@@ -31,6 +31,7 @@ import { useRecords, useSync } from "@ui/sync/store";
 import { SearchIcon, UploadIcon, XIcon } from "lucide-react";
 import { type Ref, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Tip } from "../../components/ui/tip";
 import { ManageTags } from "./tags/ManageTags";
 import { TagChipRow } from "./tags/TagChipRow";
 import { TagEditor } from "./tags/TagEditor";
@@ -265,18 +266,20 @@ export function AssetPicker({
             onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
           />
           {query !== "" && (
-            <button
-              type="button"
-              aria-label="Clear search"
-              data-testid="asset-picker-search-clear"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent"
-              onClick={() => {
-                setQuery("");
-                search.current?.focus();
-              }}
-            >
-              <XIcon className="size-4" />
-            </button>
+            <Tip content="Clear search">
+              <button
+                type="button"
+                aria-label="Clear search"
+                data-testid="asset-picker-search-clear"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent"
+                onClick={() => {
+                  setQuery("");
+                  search.current?.focus();
+                }}
+              >
+                <XIcon className="size-4" />
+              </button>
+            </Tip>
           )}
         </div>
         <ManageTags chips={chips} live={live} />

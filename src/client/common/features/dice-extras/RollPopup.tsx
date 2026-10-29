@@ -32,6 +32,7 @@ import { ResultBox } from "../../components/kit/result-box";
 import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
+import { Tip } from "../../components/ui/tip";
 import { lazyChunk } from "../../lib/lazy-chunk";
 import { cn } from "../../lib/utils";
 import { colorHex } from "../campaign-management/colors";
@@ -395,27 +396,29 @@ function Pip({
       className="relative shrink-0"
       style={{ width: line.w, height: line.h + g.tag }}
     >
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label="Show in the Game log"
-        className="absolute top-0 left-0 block"
-        style={{ width: line.w, height: line.h }}
-        onClick={() => focusLogEntry(p.id)}
-      >
-        {mini.length > 0 && <Miniature p={p} cells={mini} card={card} display={display} g={g} />}
-        {line.cells.map((c) => (
-          <Cell
-            key={c.die.key}
-            p={p}
-            cell={c}
-            draw={drawOf(c.die)}
-            held={holding.has(c.die.entryId)}
-            shown={shown}
-            g={g}
-          />
-        ))}
-      </button>
+      <Tip content="Show in the Game log">
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Show in the Game log"
+          className="absolute top-0 left-0 block"
+          style={{ width: line.w, height: line.h }}
+          onClick={() => focusLogEntry(p.id)}
+        >
+          {mini.length > 0 && <Miniature p={p} cells={mini} card={card} display={display} g={g} />}
+          {line.cells.map((c) => (
+            <Cell
+              key={c.die.key}
+              p={p}
+              cell={c}
+              draw={drawOf(c.die)}
+              held={holding.has(c.die.entryId)}
+              shown={shown}
+              g={g}
+            />
+          ))}
+        </button>
+      </Tip>
       {more && (
         <button
           type="button"
@@ -520,17 +523,19 @@ function Gear({ g }: { g: PopupGeom }) {
   const t = textOf(g);
   return (
     <Popover onOpenChange={(o) => !o && setPane("settings")}>
-      <PopoverTrigger asChild>
-        <Button
-          data-testid="dicex-popup-settings"
-          size="icon"
-          variant="ghost"
-          className={cn("shrink-0", t.button)}
-          aria-label="Dice settings"
-        >
-          <SettingsIcon className={t.icon} />
-        </Button>
-      </PopoverTrigger>
+      <Tip content="Dice settings">
+        <PopoverTrigger asChild>
+          <Button
+            data-testid="dicex-popup-settings"
+            size="icon"
+            variant="ghost"
+            className={cn("shrink-0", t.button)}
+            aria-label="Dice settings"
+          >
+            <SettingsIcon className={t.icon} />
+          </Button>
+        </PopoverTrigger>
+      </Tip>
       <PopoverContent
         align="end"
         className={cn("flex flex-col gap-3", pane === "look" ? "w-72" : "w-80")}
@@ -608,16 +613,18 @@ function Card({ p, display, g }: { p: RollPopup; display: DisplaySetting; g: Pop
         </div>
         <span className="flex shrink-0 items-center gap-0.5" style={{ height: g.row }}>
           <Gear g={g} />
-          <Button
-            data-testid="dicex-popup-close"
-            size="icon"
-            variant="ghost"
-            className={cn("shrink-0", t.button)}
-            aria-label="Close"
-            onClick={() => rollPopups.close(p.id)}
-          >
-            <XIcon className={t.icon} />
-          </Button>
+          <Tip content="Close">
+            <Button
+              data-testid="dicex-popup-close"
+              size="icon"
+              variant="ghost"
+              className={cn("shrink-0", t.button)}
+              aria-label="Close"
+              onClick={() => rollPopups.close(p.id)}
+            >
+              <XIcon className={t.icon} />
+            </Button>
+          </Tip>
         </span>
       </header>
       {line.lines > 0 && <Pip p={p} line={line} card={card} display={display} g={g} />}

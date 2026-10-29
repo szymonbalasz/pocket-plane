@@ -23,6 +23,7 @@ import {
 } from "../../components/ui/menus";
 import { Badge, Input, Skeleton } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { Tip } from "../../components/ui/tip";
 import { useLazyRecords, useRecords, useSync } from "../../sync/store";
 import { DeleteDialog, RenameDialog } from "./dialogs";
 import { byName, stateSummary } from "./logic";
@@ -83,20 +84,22 @@ function RowMenu({ row }: { row: StrongholdIndexRecord }) {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="size-7 shrink-0"
-            aria-label={`${row.name} menu`}
-            data-testid="hold-row-menu"
-            data-record-id={row.id}
-            disabled={!live}
-          >
-            <EllipsisIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
+        <Tip content={`${row.name} menu`} off={!live}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="size-7 shrink-0"
+              aria-label={`${row.name} menu`}
+              data-testid="hold-row-menu"
+              data-record-id={row.id}
+              disabled={!live}
+            >
+              <EllipsisIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+        </Tip>
         <DropdownMenuContent align="end">
           <DropdownMenuItem data-testid="hold-rename" onSelect={() => setRenaming(true)}>
             Rename…

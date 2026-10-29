@@ -38,6 +38,7 @@ import { createPortal } from "react-dom";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { SyncContext, useSync } from "../../sync/store";
 import { EDGE_GAP, LAUNCHER_CLEAR, TOP_BAR_H } from "../play-shell/geometry";
@@ -268,15 +269,17 @@ export function CalloutToast({ c, onClose }: { c: Callout; onClose: () => void }
       className="pointer-events-auto flex items-start gap-2 rounded-lg border bg-popover p-3 text-sm text-popover-foreground shadow-lg"
     >
       <div className="min-w-0 flex-1">{c.content}</div>
-      <button
-        type="button"
-        data-testid="note-callout-close"
-        aria-label="Close"
-        className="rounded-sm text-muted-foreground hover:text-foreground"
-        onClick={onClose}
-      >
-        <XIcon className="size-4" />
-      </button>
+      <Tip content="Close">
+        <button
+          type="button"
+          data-testid="note-callout-close"
+          aria-label="Close"
+          className="rounded-sm text-muted-foreground hover:text-foreground"
+          onClick={onClose}
+        >
+          <XIcon className="size-4" />
+        </button>
+      </Tip>
     </div>
   );
 }

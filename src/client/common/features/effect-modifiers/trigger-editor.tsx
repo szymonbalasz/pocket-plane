@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { useSync } from "../../sync/store";
 import { presetsIn, useModIntent } from "./store";
 import {
@@ -554,17 +555,19 @@ export function TriggerForm({ start, onDone }: { start: TriggerEditorStart; onDo
                 marks={options.marks}
                 onChange={(g) => setFilter(i, g)}
               />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="ml-auto size-7"
-                data-testid="mod-trig-editor-filter-remove"
-                aria-label="Remove condition"
-                onClick={() => set({ when: d.when.filter((_, j) => j !== i) })}
-              >
-                <XIcon className="size-3.5" />
-              </Button>
+              <Tip content="Remove condition">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="ml-auto size-7"
+                  data-testid="mod-trig-editor-filter-remove"
+                  aria-label="Remove condition"
+                  onClick={() => set({ when: d.when.filter((_, j) => j !== i) })}
+                >
+                  <XIcon className="size-3.5" />
+                </Button>
+              </Tip>
             </div>
           ))}
           {d.when.length < TRIGGER_FILTERS_MAX && (

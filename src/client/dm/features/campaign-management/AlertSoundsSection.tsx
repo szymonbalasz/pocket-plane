@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@ui/components/ui/overlays";
+import { Tip } from "@ui/components/ui/tip";
 import { uploadBody } from "@ui/features/assets-pipeline/upload";
 import { intentErrorText } from "@ui/features/character-sheet/routing";
 import type { SoundOutcome } from "@ui/features/play-shell/audio";
@@ -158,17 +159,21 @@ function SoundRow({
             ))}
           </SelectContent>
         </Select>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8"
-          aria-label={`Test ${ALERT_LABELS[alert]} sound`}
-          data-testid="camp-sound-test"
-          data-outcome={outcome ?? undefined}
-          onClick={() => void props.onPreview(alert, value).then((o) => setOutcome(o ?? "silent"))}
-        >
-          <PlayIcon className="size-3.5" />
-        </Button>
+        <Tip content={`Test ${ALERT_LABELS[alert]} sound`}>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8"
+            aria-label={`Test ${ALERT_LABELS[alert]} sound`}
+            data-testid="camp-sound-test"
+            data-outcome={outcome ?? undefined}
+            onClick={() =>
+              void props.onPreview(alert, value).then((o) => setOutcome(o ?? "silent"))
+            }
+          >
+            <PlayIcon className="size-3.5" />
+          </Button>
+        </Tip>
       </div>
       {error && (
         <p data-testid="camp-sound-error" role="alert" className="text-xs text-destructive">

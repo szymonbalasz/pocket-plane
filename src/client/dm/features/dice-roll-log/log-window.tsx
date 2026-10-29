@@ -8,6 +8,7 @@ import {
 } from "@shared/dice-roll-log/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Checkbox, Popover, PopoverContent, PopoverTrigger } from "@ui/components/ui/controls";
+import { Tip } from "@ui/components/ui/tip";
 import { GameLog } from "@ui/features/dice-roll-log/GameLog";
 import { diceLogWindowBase, LOG_USEFUL, logSize } from "@ui/features/dice-roll-log/window";
 import { defineWindow } from "@ui/features/play-shell/registry";
@@ -22,17 +23,19 @@ function SettingsPopover() {
   const connection = useSync((s) => s.connection);
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          data-testid="dice-settings-open"
-          size="icon"
-          variant="ghost"
-          className="size-7"
-          aria-label="Public log settings"
-        >
-          <SettingsIcon className="size-4" />
-        </Button>
-      </PopoverTrigger>
+      <Tip content="Public log settings">
+        <PopoverTrigger asChild>
+          <Button
+            data-testid="dice-settings-open"
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            aria-label="Public log settings"
+          >
+            <SettingsIcon className="size-4" />
+          </Button>
+        </PopoverTrigger>
+      </Tip>
       <PopoverContent align="end" side="top" className="w-60">
         <p className="mb-1 text-sm font-medium">Players see my rolls of</p>
         <p className="mb-3 text-xs text-muted-foreground">

@@ -12,6 +12,7 @@ import {
 import { WALLET_TYPE, type WalletRecord } from "@shared/party-loot/schemas";
 import { useState } from "react";
 import { Tooltip } from "../../components/ui/overlays";
+import { Tip } from "../../components/ui/tip";
 import { useRecords, useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
 import { useOpenPartyTab } from "../party-board/open-tab";
@@ -56,25 +57,30 @@ function FeatureUses({ f }: { f: FeatureRow }) {
       >
         <span className="flex items-center gap-1">
           {Array.from({ length: f.usesMax }, (_, i) => (
-            <button
+            <Tip
               // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
               key={i}
-              type="button"
-              data-testid="charx-feature-use"
-              data-record-id={f.id}
-              data-scope={scope}
-              data-used={f.used}
-              data-left={left}
-              aria-label={`${f.name}: ${f.used} of ${f.usesMax} used`}
-              data-slot="sheet-pip"
-              disabled={!live || busy.busy || !counters}
-              className={`size-3 rounded-full border border-foreground/60 ${i < f.used ? (left < 0 ? "bg-hp-down" : "bg-foreground") : ""}`}
-              onClick={(e) => {
-                const delta = pipDelta(e.shiftKey);
-                if (delta > 0 && left <= 0) setAsk(true);
-                else use({ delta });
-              }}
-            />
+              content={`${f.name}: ${f.used} of ${f.usesMax} used`}
+              off={!live || busy.busy || !counters}
+            >
+              <button
+                type="button"
+                data-testid="charx-feature-use"
+                data-record-id={f.id}
+                data-scope={scope}
+                data-used={f.used}
+                data-left={left}
+                aria-label={`${f.name}: ${f.used} of ${f.usesMax} used`}
+                data-slot="sheet-pip"
+                disabled={!live || busy.busy || !counters}
+                className={`size-3 rounded-full border border-foreground/60 ${i < f.used ? (left < 0 ? "bg-hp-down" : "bg-foreground") : ""}`}
+                onClick={(e) => {
+                  const delta = pipDelta(e.shiftKey);
+                  if (delta > 0 && left <= 0) setAsk(true);
+                  else use({ delta });
+                }}
+              />
+            </Tip>
           ))}
         </span>
       </OverspendPopover>

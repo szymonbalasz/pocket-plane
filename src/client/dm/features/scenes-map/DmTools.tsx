@@ -5,6 +5,7 @@ import { Button } from "@ui/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger, Slider, Switch } from "@ui/components/ui/menus";
 import { Tooltip } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import type { EffectiveGrid } from "@ui/features/scenes-map/canvas-context";
 import { toastReject, useLive, useMapIntent } from "@ui/features/scenes-map/intents";
 import { RAIL_TOOL } from "@ui/features/scenes-map/ToolRail";
@@ -43,16 +44,18 @@ function NumberField({
         {label}
       </Label>
       <div className="flex items-center gap-1">
-        <Button
-          size="icon"
-          variant="outline"
-          className="size-7"
-          aria-label={`${label} −${step}`}
-          data-testid={`${id}-dec`}
-          onClick={() => onChange(round2(value - step))}
-        >
-          <MinusIcon className="size-3" />
-        </Button>
+        <Tip content={`${label} −${step}`}>
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-7"
+            aria-label={`${label} −${step}`}
+            data-testid={`${id}-dec`}
+            onClick={() => onChange(round2(value - step))}
+          >
+            <MinusIcon className="size-3" />
+          </Button>
+        </Tip>
         <Input
           id={id}
           data-testid={id}
@@ -62,16 +65,18 @@ function NumberField({
           value={Number.isFinite(value) ? value : ""}
           onChange={(e) => onChange(e.target.value === "" ? Number.NaN : Number(e.target.value))}
         />
-        <Button
-          size="icon"
-          variant="outline"
-          className="size-7"
-          aria-label={`${label} +${step}`}
-          data-testid={`${id}-inc`}
-          onClick={() => onChange(round2(value + step))}
-        >
-          <PlusIcon className="size-3" />
-        </Button>
+        <Tip content={`${label} +${step}`}>
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-7"
+            aria-label={`${label} +${step}`}
+            data-testid={`${id}-inc`}
+            onClick={() => onChange(round2(value + step))}
+          >
+            <PlusIcon className="size-3" />
+          </Button>
+        </Tip>
       </div>
     </div>
   );

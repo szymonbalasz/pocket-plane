@@ -29,6 +29,7 @@ import {
 } from "../../components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { CreditsLink } from "./credits";
 import { useDefinitions } from "./definitions";
@@ -79,20 +80,22 @@ function FiltersPopover({ tab, filters }: { tab: CmpTab; filters: Filters }) {
   const count = activeFilterCount(tab, filters);
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 shrink-0 px-2"
-          data-testid="cmp-filters"
-          data-value={count}
-          disabled={fields.length === 0}
-          aria-label="Filters"
-        >
-          <FilterIcon className="size-3.5" />
-          {count > 0 && <span className="tabular-nums">{count}</span>}
-        </Button>
-      </PopoverTrigger>
+      <Tip content="Filters" off={fields.length === 0}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 shrink-0 px-2"
+            data-testid="cmp-filters"
+            data-value={count}
+            disabled={fields.length === 0}
+            aria-label="Filters"
+          >
+            <FilterIcon className="size-3.5" />
+            {count > 0 && <span className="tabular-nums">{count}</span>}
+          </Button>
+        </PopoverTrigger>
+      </Tip>
       <PopoverContent align="end" className="w-64 space-y-2 p-3" data-testid="cmp-filters-panel">
         {fields.map((f) => {
           const value = filters[f.key] ?? "";

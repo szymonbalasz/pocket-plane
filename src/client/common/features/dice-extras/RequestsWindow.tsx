@@ -30,6 +30,7 @@ import {
   Tooltip,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
@@ -385,23 +386,25 @@ export function RequestsWindow() {
         <h3 data-slot="section-label" className="flex-1 text-xs font-medium text-muted-foreground">
           New request
         </h3>
-        <Button
-          type="button"
-          data-testid="dicex-request-fold"
-          data-state={composing ? "open" : "closed"}
-          aria-label={composing ? "Fold the composer" : "New request"}
-          aria-expanded={composing}
-          size="icon"
-          variant="ghost"
-          className="size-6"
-          onClick={() => setComposing(!composing)}
-        >
-          {composing ? (
-            <ChevronUpIcon className="size-4" />
-          ) : (
-            <ChevronDownIcon className="size-4" />
-          )}
-        </Button>
+        <Tip content={composing ? "Fold the composer" : "New request"}>
+          <Button
+            type="button"
+            data-testid="dicex-request-fold"
+            data-state={composing ? "open" : "closed"}
+            aria-label={composing ? "Fold the composer" : "New request"}
+            aria-expanded={composing}
+            size="icon"
+            variant="ghost"
+            className="size-6"
+            onClick={() => setComposing(!composing)}
+          >
+            {composing ? (
+              <ChevronUpIcon className="size-4" />
+            ) : (
+              <ChevronDownIcon className="size-4" />
+            )}
+          </Button>
+        </Tip>
       </div>
       {composing && (
         <div className="shrink-0">

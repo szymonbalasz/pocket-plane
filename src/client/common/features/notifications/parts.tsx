@@ -15,6 +15,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 import { MEDALLION_PX, Medallion } from "../../components/kit/medallion";
+import { Tip } from "../../components/ui/tip";
 import { useRecords, useSync } from "../../sync/store";
 import { colorHex } from "../campaign-management/colors";
 import { useColorKeyOf } from "../dice-roll-log/name-color";
@@ -37,15 +38,17 @@ export const TOAST_CARD =
 /** FR-KIT-57: a toast's close, the gem in a theme (styled by its test ID). */
 export function CloseGem({ testId, onClose }: { testId: string; onClose: () => void }) {
   return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-label="Close"
-      className="shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
-      onClick={onClose}
-    >
-      <XIcon className="size-4" />
-    </button>
+    <Tip content="Close">
+      <button
+        type="button"
+        data-testid={testId}
+        aria-label="Close"
+        className="shrink-0 rounded-sm text-muted-foreground hover:text-foreground"
+        onClick={onClose}
+      >
+        <XIcon className="size-4" />
+      </button>
+    </Tip>
   );
 }
 

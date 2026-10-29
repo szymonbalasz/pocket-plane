@@ -5,6 +5,7 @@ import type { SheetRowList } from "@shared/events/character-sheet";
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useRef } from "react";
 import { Button } from "../../components/ui/button";
+import { Tip } from "../../components/ui/tip";
 import { useSync } from "../../sync/store";
 import { rowError } from "./edit-model";
 import { useBusy } from "./fields";
@@ -86,45 +87,51 @@ export function RowTools({
   const off = !live || busy.busy || rowId === undefined;
   return (
     <span className="flex shrink-0 items-center">
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
-        data-testid="charx-row-move"
-        data-value={list}
-        data-record-id={rowId}
-        aria-label="Move up"
-        disabled={off || index === 0}
-        onClick={() => rowId && busy.run(() => rows.move(rowId, index - 1))}
-      >
-        <ChevronUpIcon className="size-3" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
-        data-testid="charx-row-move-down"
-        data-value={list}
-        data-record-id={rowId}
-        aria-label="Move down"
-        disabled={off || index >= count - 1}
-        onClick={() => rowId && busy.run(() => rows.move(rowId, index + 1))}
-      >
-        <ChevronDownIcon className="size-3" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
-        data-testid="charx-row-delete"
-        data-value={list}
-        data-record-id={rowId}
-        aria-label="Delete row"
-        disabled={off}
-        onClick={() => rowId && busy.run(() => rows.remove(rowId))}
-      >
-        <Trash2Icon className="size-3" />
-      </Button>
+      <Tip content="Move up" off={off || index === 0}>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-6"
+          data-testid="charx-row-move"
+          data-value={list}
+          data-record-id={rowId}
+          aria-label="Move up"
+          disabled={off || index === 0}
+          onClick={() => rowId && busy.run(() => rows.move(rowId, index - 1))}
+        >
+          <ChevronUpIcon className="size-3" />
+        </Button>
+      </Tip>
+      <Tip content="Move down" off={off || index >= count - 1}>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-6"
+          data-testid="charx-row-move-down"
+          data-value={list}
+          data-record-id={rowId}
+          aria-label="Move down"
+          disabled={off || index >= count - 1}
+          onClick={() => rowId && busy.run(() => rows.move(rowId, index + 1))}
+        >
+          <ChevronDownIcon className="size-3" />
+        </Button>
+      </Tip>
+      <Tip content="Delete row" off={off}>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-6"
+          data-testid="charx-row-delete"
+          data-value={list}
+          data-record-id={rowId}
+          aria-label="Delete row"
+          disabled={off}
+          onClick={() => rowId && busy.run(() => rows.remove(rowId))}
+        >
+          <Trash2Icon className="size-3" />
+        </Button>
+      </Tip>
     </span>
   );
 }

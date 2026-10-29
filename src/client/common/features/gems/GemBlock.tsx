@@ -20,6 +20,7 @@ import {
   PopoverTrigger,
 } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { intentErrorText } from "../character-sheet/routing";
@@ -121,18 +122,20 @@ function DmChip({
       >
         <GemIcon gem={chip.gem} />
         <span className="text-sm font-medium">{chip.name}</span>
-        <Button
-          size="icon"
-          variant="outline"
-          className="size-7"
-          data-testid="gem-remove"
-          data-value={chip.gem}
-          aria-label={`Remove a ${chip.name} gem`}
-          disabled={disabled || count <= 0}
-          onClick={() => adjust(chip.gem, -1)}
-        >
-          <MinusIcon className="size-3.5" />
-        </Button>
+        <Tip content={`Remove a ${chip.name} gem`} off={disabled || count <= 0}>
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-7"
+            data-testid="gem-remove"
+            data-value={chip.gem}
+            aria-label={`Remove a ${chip.name} gem`}
+            disabled={disabled || count <= 0}
+            onClick={() => adjust(chip.gem, -1)}
+          >
+            <MinusIcon className="size-3.5" />
+          </Button>
+        </Tip>
         <span
           data-testid="gem-adjust-count"
           data-value={chip.gem}
@@ -141,18 +144,20 @@ function DmChip({
         >
           {count}
         </span>
-        <Button
-          size="icon"
-          variant="outline"
-          className="size-7"
-          data-testid="gem-award"
-          data-value={chip.gem}
-          aria-label={`Award a ${chip.name} gem`}
-          disabled={disabled}
-          onClick={() => adjust(chip.gem, 1)}
-        >
-          <PlusIcon className="size-3.5" />
-        </Button>
+        <Tip content={`Award a ${chip.name} gem`} off={disabled}>
+          <Button
+            size="icon"
+            variant="outline"
+            className="size-7"
+            data-testid="gem-award"
+            data-value={chip.gem}
+            aria-label={`Award a ${chip.name} gem`}
+            disabled={disabled}
+            onClick={() => adjust(chip.gem, 1)}
+          >
+            <PlusIcon className="size-3.5" />
+          </Button>
+        </Tip>
       </PopoverContent>
     </Popover>
   );
@@ -226,27 +231,31 @@ function SpendConfirm({
       className="inline-flex items-center gap-1 text-xs"
     >
       {choice.ask}
-      <Button
-        size="icon"
-        variant="outline"
-        className="size-6"
-        data-testid="gem-spend-confirm"
-        aria-label="Spend"
-        disabled={disabled}
-        onClick={onConfirm}
-      >
-        <CheckIcon className="size-3.5" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
-        data-testid="gem-spend-cancel"
-        aria-label="Cancel"
-        onClick={onCancel}
-      >
-        <XIcon className="size-3.5" />
-      </Button>
+      <Tip content="Spend" off={disabled}>
+        <Button
+          size="icon"
+          variant="outline"
+          className="size-6"
+          data-testid="gem-spend-confirm"
+          aria-label="Spend"
+          disabled={disabled}
+          onClick={onConfirm}
+        >
+          <CheckIcon className="size-3.5" />
+        </Button>
+      </Tip>
+      <Tip content="Cancel">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-6"
+          data-testid="gem-spend-cancel"
+          aria-label="Cancel"
+          onClick={onCancel}
+        >
+          <XIcon className="size-3.5" />
+        </Button>
+      </Tip>
     </span>
   );
 }

@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@ui/components/ui/menus";
+import { Tip } from "@ui/components/ui/tip";
 import { timeOf } from "@ui/features/notifications/parts";
 import { PartyBoard } from "@ui/features/party-board/Board";
 import {
@@ -83,17 +84,19 @@ function RowMenu({ h }: { h: HandoutRecord }) {
         </span>
       )}
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7 shrink-0"
-            aria-label={`Actions for ${h.title}`}
-            data-testid="party-handout-menu"
-          >
-            <EllipsisVerticalIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
+        <Tip content={`Actions for ${h.title}`}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 shrink-0"
+              aria-label={`Actions for ${h.title}`}
+              data-testid="party-handout-menu"
+            >
+              <EllipsisVerticalIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+        </Tip>
         <DropdownMenuContent align="end">
           <DropdownMenuItem
             data-testid="party-handout-edit"

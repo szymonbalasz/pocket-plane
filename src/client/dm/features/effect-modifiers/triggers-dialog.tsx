@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@ui/components/ui/overlays";
+import { Tip } from "@ui/components/ui/tip";
 import { useDefinitions } from "@ui/features/compendium/definitions";
 import type { TriggerOwnerRef } from "@ui/features/effect-modifiers/trigger-owner";
 import {
@@ -91,17 +92,19 @@ function TriggersRowAction({ row }: { row: CreatureRow }) {
   if (row.kind !== "monster") return null;
   return (
     <>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
-        data-testid="mod-creature-triggers"
-        data-record-id={row.id}
-        aria-label={`Rule triggers of ${row.name}`}
-        onClick={() => setOpen(true)}
-      >
-        <ZapIcon className="size-3.5" />
-      </Button>
+      <Tip content={`Rule triggers of ${row.name}`}>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-6"
+          data-testid="mod-creature-triggers"
+          data-record-id={row.id}
+          aria-label={`Rule triggers of ${row.name}`}
+          onClick={() => setOpen(true)}
+        >
+          <ZapIcon className="size-3.5" />
+        </Button>
+      </Tip>
       {open && (
         <RuleTriggersDialog
           owner={{ kind: "definition", id: row.id }}

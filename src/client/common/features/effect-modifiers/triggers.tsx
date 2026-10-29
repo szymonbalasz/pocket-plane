@@ -48,6 +48,7 @@ import {
 } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useLazyRecords, useSync } from "../../sync/store";
 import { useModIntent } from "./store";
@@ -196,30 +197,34 @@ function TriggerRow({
       </div>
       {may && (
         <>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-6"
-            data-testid="mod-trigger-edit"
-            data-record-id={t.id}
-            aria-label={`Edit ${t.name}`}
-            disabled={!live}
-            onClick={onEdit}
-          >
-            <PencilIcon className="size-3.5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-6"
-            data-testid="mod-trigger-delete"
-            data-record-id={t.id}
-            aria-label={`Delete ${t.name}`}
-            disabled={disabled}
-            onClick={() => void send(TRIGGER_INTENTS.deleteTrigger, { triggerId: t.id })}
-          >
-            <TrashIcon className="size-3.5" />
-          </Button>
+          <Tip content={`Edit ${t.name}`} off={!live}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              data-testid="mod-trigger-edit"
+              data-record-id={t.id}
+              aria-label={`Edit ${t.name}`}
+              disabled={!live}
+              onClick={onEdit}
+            >
+              <PencilIcon className="size-3.5" />
+            </Button>
+          </Tip>
+          <Tip content={`Delete ${t.name}`} off={disabled}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              data-testid="mod-trigger-delete"
+              data-record-id={t.id}
+              aria-label={`Delete ${t.name}`}
+              disabled={disabled}
+              onClick={() => void send(TRIGGER_INTENTS.deleteTrigger, { triggerId: t.id })}
+            >
+              <TrashIcon className="size-3.5" />
+            </Button>
+          </Tip>
         </>
       )}
     </div>

@@ -33,6 +33,7 @@ import { useContext, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/controls";
 import { Badge, Input } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
 import { WideActionBoxes } from "./ActionsTab";
@@ -487,18 +488,23 @@ function HitDice() {
       <span className={BOX_LABEL}>Hit Dice</span>
       {pips.map((p) => (
         <span key={p.die} className="flex items-center gap-1">
-          <button
-            type="button"
-            data-testid="charx-hitdie"
-            data-value={p.die}
-            data-used={p.used}
-            aria-label={`Hit dice ${p.die}: ${p.used} of ${p.max} used`}
-            disabled={!live || busy.busy || !ctx.canCount}
-            className="rounded-sm px-0.5 text-lg font-bold tabular-nums text-foreground hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
-            onClick={(e) => use({ hitDie: p.die }, { delta: pipDelta(e.shiftKey) })}
+          <Tip
+            content={`Hit dice ${p.die}: ${p.used} of ${p.max} used`}
+            off={!live || busy.busy || !ctx.canCount}
           >
-            {p.max - p.used} / {p.max}
-          </button>
+            <button
+              type="button"
+              data-testid="charx-hitdie"
+              data-value={p.die}
+              data-used={p.used}
+              aria-label={`Hit dice ${p.die}: ${p.used} of ${p.max} used`}
+              disabled={!live || busy.busy || !ctx.canCount}
+              className="rounded-sm px-0.5 text-lg font-bold tabular-nums text-foreground hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
+              onClick={(e) => use({ hitDie: p.die }, { delta: pipDelta(e.shiftKey) })}
+            >
+              {p.max - p.used} / {p.max}
+            </button>
+          </Tip>
           <span>{p.die}</span>
           {p.used > 0 && ctx.canCount && (
             <button
@@ -682,17 +688,19 @@ function ClassesEditor() {
             options={HIT_DICE.map((d) => ({ value: d, label: d }))}
             commit={(v) => edit("classes", row(i, { hitDie: v ?? "d8" }))}
           />
-          <Button
-            size="sm"
-            variant="ghost"
-            data-testid="charx-row-delete"
-            data-value="classes"
-            aria-label={`Remove ${r.name}`}
-            disabled={!live || busy.busy}
-            onClick={() => setRows(rows.filter((_, j) => j !== i))}
-          >
-            ×
-          </Button>
+          <Tip content={`Remove ${r.name}`} off={!live || busy.busy}>
+            <Button
+              size="sm"
+              variant="ghost"
+              data-testid="charx-row-delete"
+              data-value="classes"
+              aria-label={`Remove ${r.name}`}
+              disabled={!live || busy.busy}
+              onClick={() => setRows(rows.filter((_, j) => j !== i))}
+            >
+              ×
+            </Button>
+          </Tip>
         </div>
       ))}
       {rows.length < 4 && (
@@ -938,26 +946,31 @@ function SkillsBlock() {
                 r.proficiency && "bg-muted/60",
               )}
             >
-              <button
-                type="button"
-                data-testid="charx-field"
-                data-value={`skills.${r.skill}`}
-                aria-label={`${r.name} proficiency: ${r.proficiency ?? "none"}`}
-                disabled={!e || !live || busy.busy}
-                className="flex w-3 shrink-0 justify-center disabled:cursor-default"
-                onClick={() =>
-                  busy.run(() => {
-                    const next = withSkill(
-                      ctx.stats.skills,
-                      r.skill,
-                      nextProficiency(r.proficiency),
-                    );
-                    return edit("skills", Object.keys(next).length ? next : null);
-                  })
-                }
+              <Tip
+                content={`${r.name} proficiency: ${r.proficiency ?? "none"}`}
+                off={!e || !live || busy.busy}
               >
-                <ProfDot on={r.proficiency !== null} double={r.proficiency === "expertise"} />
-              </button>
+                <button
+                  type="button"
+                  data-testid="charx-field"
+                  data-value={`skills.${r.skill}`}
+                  aria-label={`${r.name} proficiency: ${r.proficiency ?? "none"}`}
+                  disabled={!e || !live || busy.busy}
+                  className="flex w-3 shrink-0 justify-center disabled:cursor-default"
+                  onClick={() =>
+                    busy.run(() => {
+                      const next = withSkill(
+                        ctx.stats.skills,
+                        r.skill,
+                        nextProficiency(r.proficiency),
+                      );
+                      return edit("skills", Object.keys(next).length ? next : null);
+                    })
+                  }
+                >
+                  <ProfDot on={r.proficiency !== null} double={r.proficiency === "expertise"} />
+                </button>
+              </Tip>
               <span className="min-w-0 flex-1 truncate">{r.name}</span>
               <span className="w-[34px] shrink-0 text-xs tracking-wide text-muted-foreground">
                 {r.abbr}

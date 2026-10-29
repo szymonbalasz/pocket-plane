@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { useStore } from "zustand";
 import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useSync } from "../../sync/store";
@@ -109,22 +110,26 @@ function EntryActionButton({
             <CheckIcon className="size-3.5" />
           </RollButton>
         ) : (
-          <Button type="button" {...yes} onClick={() => go()}>
-            <CheckIcon className="size-3.5" />
-          </Button>
+          <Tip content={yes["aria-label"]} off={disabled}>
+            <Button type="button" {...yes} onClick={() => go()}>
+              <CheckIcon className="size-3.5" />
+            </Button>
+          </Tip>
         )}
-        <Button
-          type="button"
-          data-testid="dice-log-action-no"
-          {...ids}
-          aria-label={`${action.label}: no`}
-          size="icon"
-          variant="ghost"
-          className={ACTION_BUTTON}
-          onClick={() => confirm.cancel()}
-        >
-          <XIcon className="size-3.5" />
-        </Button>
+        <Tip content={`${action.label}: no`}>
+          <Button
+            type="button"
+            data-testid="dice-log-action-no"
+            {...ids}
+            aria-label={`${action.label}: no`}
+            size="icon"
+            variant="ghost"
+            className={ACTION_BUTTON}
+            onClick={() => confirm.cancel()}
+          >
+            <XIcon className="size-3.5" />
+          </Button>
+        </Tip>
       </span>
     );
   }

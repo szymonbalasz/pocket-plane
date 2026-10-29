@@ -25,6 +25,7 @@ import {
   Tooltip,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import type { SheetSection } from "../character-sheet/sections";
@@ -213,11 +214,13 @@ export function DeathSavesSection({ creatureId }: SectionProps) {
       )}
       {isDm && counters && (
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" variant="ghost" className="size-7" aria-label="Death saves">
-              <EllipsisIcon className="size-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
+          <Tip content="Death saves">
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" variant="ghost" className="size-7" aria-label="Death saves">
+                <EllipsisIcon className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+          </Tip>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
               data-testid="cbtx-death-stabilise"
@@ -294,17 +297,19 @@ export function EffectsSection({ creatureId }: SectionProps) {
       {may && (
         <>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7 shrink-0"
-                data-testid="cbtx-sheet-effects-menu"
-                aria-label="Effects"
-              >
-                <BrainIcon className="size-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tip content="Effects">
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7 shrink-0"
+                  data-testid="cbtx-sheet-effects-menu"
+                  aria-label="Effects"
+                >
+                  <BrainIcon className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tip>
             <DropdownMenuContent align="end">
               {/* A Dialog, not a popover: the menu's focus return would dismiss a popover at once. */}
               <DropdownMenuItem data-testid="cbtx-sheet-concentrate" onSelect={() => setOpen(true)}>

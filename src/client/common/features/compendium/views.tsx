@@ -26,6 +26,7 @@ import { GripVerticalIcon, InfoIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { AddToSheet } from "./AddToSheet";
 import { AboutDialog } from "./credits";
 import { EntryGallery } from "./gallery";
@@ -68,21 +69,23 @@ function Rule() {
 /** DM: drag a monster onto the map (`{definitionId}`, FR-CMP-21 / FR-MAP-13). */
 export function DragHandle({ definitionId, name }: { definitionId: string; name: string }) {
   return (
-    <button
-      type="button"
-      draggable
-      data-testid="cmp-drag-handle"
-      data-record-id={definitionId}
-      aria-label={`Drag ${name} onto the map`}
-      className="inline-flex cursor-grab items-center rounded p-0.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
-      onDragStart={(e) => {
-        const data: DefinitionDragData = { definitionId };
-        e.dataTransfer.setData(DEFINITION_DRAG_MIME, JSON.stringify(data));
-        e.dataTransfer.effectAllowed = "copy";
-      }}
-    >
-      <GripVerticalIcon className="size-4" />
-    </button>
+    <Tip content={`Drag ${name} onto the map`}>
+      <button
+        type="button"
+        draggable
+        data-testid="cmp-drag-handle"
+        data-record-id={definitionId}
+        aria-label={`Drag ${name} onto the map`}
+        className="inline-flex cursor-grab items-center rounded p-0.5 text-muted-foreground hover:bg-accent active:cursor-grabbing"
+        onDragStart={(e) => {
+          const data: DefinitionDragData = { definitionId };
+          e.dataTransfer.setData(DEFINITION_DRAG_MIME, JSON.stringify(data));
+          e.dataTransfer.effectAllowed = "copy";
+        }}
+      >
+        <GripVerticalIcon className="size-4" />
+      </button>
+    </Tip>
   );
 }
 

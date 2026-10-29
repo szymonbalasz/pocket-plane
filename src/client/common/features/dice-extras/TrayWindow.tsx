@@ -63,6 +63,7 @@ import {
   Tooltip,
 } from "../../components/ui/overlays";
 import { Input } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { lazyChunk } from "../../lib/lazy-chunk";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
@@ -270,17 +271,19 @@ function SettingsPopover() {
   const [pane, setPane] = useState<"settings" | "look">("settings");
   return (
     <Popover onOpenChange={(o) => !o && setPane("settings")}>
-      <PopoverTrigger asChild>
-        <Button
-          data-testid="dicex-settings-open"
-          size="icon"
-          variant="ghost"
-          className="size-6 shrink-0"
-          aria-label="Dice settings"
-        >
-          <SettingsIcon className="size-4" />
-        </Button>
-      </PopoverTrigger>
+      <Tip content="Dice settings">
+        <PopoverTrigger asChild>
+          <Button
+            data-testid="dicex-settings-open"
+            size="icon"
+            variant="ghost"
+            className="size-6 shrink-0"
+            aria-label="Dice settings"
+          >
+            <SettingsIcon className="size-4" />
+          </Button>
+        </PopoverTrigger>
+      </Tip>
       <PopoverContent
         align="end"
         side="bottom"
@@ -314,17 +317,19 @@ function MacrosPopover({
 }) {
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          data-testid="dicex-tray-macros"
-          size="icon"
-          variant="ghost"
-          className="size-6 shrink-0"
-          aria-label="Macros"
-        >
-          <BookmarkIcon className="size-4" />
-        </Button>
-      </PopoverTrigger>
+      <Tip content="Macros">
+        <PopoverTrigger asChild>
+          <Button
+            data-testid="dicex-tray-macros"
+            size="icon"
+            variant="ghost"
+            className="size-6 shrink-0"
+            aria-label="Macros"
+          >
+            <BookmarkIcon className="size-4" />
+          </Button>
+        </PopoverTrigger>
+      </Tip>
       <PopoverContent align="end" side="bottom" className="max-h-96 w-80 overflow-y-auto">
         <Suspense fallback={null}>
           {open && (
@@ -789,22 +794,24 @@ export function TrayWindow() {
               </Button>
             )}
             {free && (
-              <Button
-                type="button"
-                data-testid="dicex-tray-options"
-                aria-label="Roll options"
-                aria-expanded={optionsOpen}
-                size="icon"
-                variant="ghost"
-                className="size-7 shrink-0"
-                onClick={() => setOptionsOpen(!optionsOpen)}
-              >
-                {optionsOpen ? (
-                  <ChevronUpIcon className="size-4" />
-                ) : (
-                  <ChevronDownIcon className="size-4" />
-                )}
-              </Button>
+              <Tip content="Roll options">
+                <Button
+                  type="button"
+                  data-testid="dicex-tray-options"
+                  aria-label="Roll options"
+                  aria-expanded={optionsOpen}
+                  size="icon"
+                  variant="ghost"
+                  className="size-7 shrink-0"
+                  onClick={() => setOptionsOpen(!optionsOpen)}
+                >
+                  {optionsOpen ? (
+                    <ChevronUpIcon className="size-4" />
+                  ) : (
+                    <ChevronDownIcon className="size-4" />
+                  )}
+                </Button>
+              </Tip>
             )}
           </div>
           {free && optionsOpen && (

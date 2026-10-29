@@ -29,6 +29,7 @@ import {
 import { Input, Label } from "@ui/components/ui/primitives";
 import { PencilIcon, TagsIcon, Trash2Icon } from "lucide-react";
 import { type FormEvent, Fragment, useState } from "react";
+import { Tip } from "../../../components/ui/tip";
 import { RECONNECTING, useTagIntent } from "./intent";
 import { Live } from "./TagEditor";
 
@@ -40,19 +41,21 @@ export function ManageTags({ chips, live }: { chips: TagChips; live: boolean }) 
     <>
       <DropdownMenu>
         <Live why={live ? null : RECONNECTING}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="size-8 shrink-0"
-              aria-label="Manage tags"
-              data-testid="asset-tags-manage"
-              disabled={!live}
-            >
-              <TagsIcon className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
+          <Tip content="Manage tags" off={!live}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="size-8 shrink-0"
+                aria-label="Manage tags"
+                data-testid="asset-tags-manage"
+                disabled={!live}
+              >
+                <TagsIcon className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+          </Tip>
         </Live>
         <DropdownMenuContent align="end" className="max-h-80 overflow-y-auto">
           {chips.tags.length === 0 && <DropdownMenuItem disabled>No tags yet</DropdownMenuItem>}

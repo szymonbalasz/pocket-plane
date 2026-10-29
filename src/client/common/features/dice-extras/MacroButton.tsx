@@ -6,6 +6,7 @@
 import type { RollMacroRecord } from "@shared/dice-extras/macros";
 import { PencilIcon } from "lucide-react";
 import { Button } from "../../components/ui/button";
+import { Tip } from "../../components/ui/tip";
 import { useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
@@ -72,18 +73,20 @@ export function MacroRow({
         </span>
       )}
       {onEdit && canEditMacro(m, viewer) && (
-        <Button
-          type="button"
-          data-testid="dicex-macro-edit"
-          data-record-id={m.id}
-          aria-label={`Edit ${m.name}`}
-          size="icon"
-          variant="ghost"
-          className="size-7 shrink-0"
-          onClick={() => onEdit(m)}
-        >
-          <PencilIcon className="size-3.5" />
-        </Button>
+        <Tip content={`Edit ${m.name}`}>
+          <Button
+            type="button"
+            data-testid="dicex-macro-edit"
+            data-record-id={m.id}
+            aria-label={`Edit ${m.name}`}
+            size="icon"
+            variant="ghost"
+            className="size-7 shrink-0"
+            onClick={() => onEdit(m)}
+          >
+            <PencilIcon className="size-3.5" />
+          </Button>
+        </Tip>
       )}
     </li>
   );

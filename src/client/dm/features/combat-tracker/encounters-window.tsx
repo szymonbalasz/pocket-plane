@@ -30,6 +30,7 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Badge, Card, Input, Label, Skeleton } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import type { LookupRow } from "@ui/features/combat-tracker/lookup";
 import { CreatureLookup } from "@ui/features/combat-tracker/parts";
 import { useCbtIntent } from "@ui/features/combat-tracker/store";
@@ -588,16 +589,18 @@ export function Editor({ encounter, back }: { encounter: EncounterRecord; back()
       data-record-id={encounter.id}
     >
       <div className="flex shrink-0 items-center gap-2">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8 shrink-0"
-          aria-label="Back"
-          data-testid="cbt-enc-editor-back"
-          onClick={back}
-        >
-          <ArrowLeftIcon className="size-4" />
-        </Button>
+        <Tip content="Back">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8 shrink-0"
+            aria-label="Back"
+            data-testid="cbt-enc-editor-back"
+            onClick={back}
+          >
+            <ArrowLeftIcon className="size-4" />
+          </Button>
+        </Tip>
         <Input
           data-testid="cbt-enc-name"
           aria-label="Encounter name"
@@ -641,31 +644,35 @@ export function Editor({ encounter, back }: { encounter: EncounterRecord; back()
                   cr={d?.kind === "monster" ? d.statBlock.cr : "?"}
                 />
                 <span className={ENTRY_CONTROLS}>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7"
-                    data-testid="cbt-enc-entry-dec"
-                    data-record-id={e.definitionId}
-                    aria-label="One fewer"
-                    disabled={readOnly}
-                    onClick={() => setQty(key, e.quantity - 1)}
-                  >
-                    <MinusIcon className="size-3.5" />
-                  </Button>
+                  <Tip content="One fewer" off={readOnly}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      data-testid="cbt-enc-entry-dec"
+                      data-record-id={e.definitionId}
+                      aria-label="One fewer"
+                      disabled={readOnly}
+                      onClick={() => setQty(key, e.quantity - 1)}
+                    >
+                      <MinusIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
                   <span className="w-5 text-center tabular-nums">{e.quantity}</span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7"
-                    data-testid="cbt-enc-entry-inc"
-                    data-record-id={e.definitionId}
-                    aria-label="One more"
-                    disabled={readOnly || e.quantity >= QUANTITY_MAX}
-                    onClick={() => setQty(key, e.quantity + 1)}
-                  >
-                    <PlusIcon className="size-3.5" />
-                  </Button>
+                  <Tip content="One more" off={readOnly || e.quantity >= QUANTITY_MAX}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      data-testid="cbt-enc-entry-inc"
+                      data-record-id={e.definitionId}
+                      aria-label="One more"
+                      disabled={readOnly || e.quantity >= QUANTITY_MAX}
+                      onClick={() => setQty(key, e.quantity + 1)}
+                    >
+                      <PlusIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
                   <HpSelect
                     value={e.hpMode}
                     hasFormula={d?.kind === "monster" && Boolean(d.statBlock.hpFormula)}
@@ -699,18 +706,20 @@ export function Editor({ encounter, back }: { encounter: EncounterRecord; back()
                       />
                     </span>
                   </Tooltip>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7"
-                    data-testid="cbt-enc-entry-remove"
-                    data-record-id={e.definitionId}
-                    aria-label="Remove"
-                    disabled={readOnly}
-                    onClick={() => setQty(key, 0)}
-                  >
-                    <Trash2Icon className="size-3.5" />
-                  </Button>
+                  <Tip content="Remove" off={readOnly}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      data-testid="cbt-enc-entry-remove"
+                      data-record-id={e.definitionId}
+                      aria-label="Remove"
+                      disabled={readOnly}
+                      onClick={() => setQty(key, 0)}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                    </Button>
+                  </Tip>
                 </span>
               </li>
             );

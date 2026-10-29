@@ -56,6 +56,7 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Skeleton } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import { characterOf, deathStateFor } from "@ui/features/combat-extras/logic";
 import { NameLine, StatusCell } from "@ui/features/combat-extras/parts";
 import { showStepSkip, stepSkip } from "@ui/features/combat-extras/skip";
@@ -949,18 +950,20 @@ function RowMain({
       <span data-slot="init-actions" className={HOVER_GROUP}>
         <AttackButton c={c} def={def} />
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6"
-              data-testid="cbt-init-row-menu"
-              data-record-id={c.id}
-              aria-label={`More for ${c.name}`}
-            >
-              <EllipsisIcon className="size-3.5" />
-            </Button>
-          </DropdownMenuTrigger>
+          <Tip content={`More for ${c.name}`}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-6"
+                data-testid="cbt-init-row-menu"
+                data-record-id={c.id}
+                aria-label={`More for ${c.name}`}
+              >
+                <EllipsisIcon className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+          </Tip>
           <DropdownMenuContent align="end" className={ROW_MENU}>
             <RowMoveItems c={c} />
             {hasScores && (
@@ -1110,18 +1113,20 @@ function CompanionLine({
             <span data-name-end className="ml-auto flex shrink-0 items-center">
               <CompanionCardButton c={c} />
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6"
-                    data-testid="cbt-init-companion-menu"
-                    data-record-id={c.id}
-                    aria-label={`More for ${c.name}`}
-                  >
-                    <EllipsisIcon className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
+                <Tip content={`More for ${c.name}`}>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-6"
+                      data-testid="cbt-init-companion-menu"
+                      data-record-id={c.id}
+                      aria-label={`More for ${c.name}`}
+                    >
+                      <EllipsisIcon className="size-3.5" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </Tip>
                 <DropdownMenuContent align="end" className={ROW_MENU}>
                   <DropdownMenuSub open={attackSub.open} onOpenChange={attackSub.onOpenChange}>
                     <DropdownMenuSubTrigger
@@ -1411,17 +1416,19 @@ function Header({ enc }: { enc: EncounterView }) {
       </p>
       {/* Not modal: an item opens a dialog, which takes the focus. */}
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7"
-            data-testid="cbt-init-menu"
-            aria-label="Initiative menu"
-          >
-            <EllipsisIcon className="size-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
+        <Tip content="Initiative menu">
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              data-testid="cbt-init-menu"
+              aria-label="Initiative menu"
+            >
+              <EllipsisIcon className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+        </Tip>
         <DropdownMenuContent align="end">
           {INIT_MENU.map((item) => {
             if (item.kind === "separator") return <DropdownMenuSeparator key="separator" />;

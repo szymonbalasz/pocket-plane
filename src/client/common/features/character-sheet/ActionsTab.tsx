@@ -17,6 +17,7 @@ import {
 import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Badge, Input } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { DiceText } from "../dice-extras/DiceText";
@@ -275,20 +276,22 @@ function ExtraPartRow({
           </option>
         ))}
       </select>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-6"
-        data-testid="charx-attack-extra-delete"
-        data-value={index}
-        aria-label="Remove damage type"
-        disabled={!live || busy.busy}
-        onClick={() =>
-          part ? busy.run(() => commit(parts.filter((_, j) => j !== index))) : onDone?.()
-        }
-      >
-        ×
-      </Button>
+      <Tip content="Remove damage type" off={!live || busy.busy}>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-6"
+          data-testid="charx-attack-extra-delete"
+          data-value={index}
+          aria-label="Remove damage type"
+          disabled={!live || busy.busy}
+          onClick={() =>
+            part ? busy.run(() => commit(parts.filter((_, j) => j !== index))) : onDone?.()
+          }
+        >
+          ×
+        </Button>
+      </Tip>
     </div>
   );
 }
@@ -528,20 +531,25 @@ function SlotPips() {
           <span className="w-12 text-muted-foreground">Level {p.level}</span>
           <span className="flex gap-0.5">
             {Array.from({ length: p.max }, (_, i) => (
-              <button
+              <Tip
                 // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
                 key={i}
-                type="button"
-                data-testid="charx-slot"
-                data-scope={scope}
-                data-value={p.level}
-                data-used={p.used}
-                aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
-                disabled={!live || busy.busy || !counters}
-                data-slot="sheet-pip"
-                className={`size-3 rounded-full border border-foreground/60 ${i < p.used ? "bg-foreground" : ""}`}
-                onClick={(e) => use(p.level, { delta: pipDelta(e.shiftKey) })}
-              />
+                content={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                off={!live || busy.busy || !counters}
+              >
+                <button
+                  type="button"
+                  data-testid="charx-slot"
+                  data-scope={scope}
+                  data-value={p.level}
+                  data-used={p.used}
+                  aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                  disabled={!live || busy.busy || !counters}
+                  data-slot="sheet-pip"
+                  className={`size-3 rounded-full border border-foreground/60 ${i < p.used ? "bg-foreground" : ""}`}
+                  onClick={(e) => use(p.level, { delta: pipDelta(e.shiftKey) })}
+                />
+              </Tip>
             ))}
           </span>
           {counters && p.used > 0 && (
@@ -587,23 +595,28 @@ function KitSlots({
           <span className={cn(BOX_LABEL, "normal-case")}>{levelOrdinal(p.level)}</span>
           <span className="flex gap-1.5 px-0.5">
             {Array.from({ length: p.max }, (_, i) => (
-              <button
+              <Tip
                 // biome-ignore lint/suspicious/noArrayIndexKey: pips are positional.
                 key={i}
-                type="button"
-                data-testid="charx-slot"
-                data-scope="main"
-                data-value={p.level}
-                data-used={p.used}
-                aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
-                disabled={!live || busy || !counters}
-                data-slot="sheet-pip"
-                className={cn(
-                  "size-3 rounded-[1px] border border-foreground/60 [transform:rotate(45deg)]",
-                  i < p.used && "bg-foreground",
-                )}
-                onClick={(e) => use(p.level, { delta: pipDelta(e.shiftKey) })}
-              />
+                content={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                off={!live || busy || !counters}
+              >
+                <button
+                  type="button"
+                  data-testid="charx-slot"
+                  data-scope="main"
+                  data-value={p.level}
+                  data-used={p.used}
+                  aria-label={`Level ${p.level} slots: ${p.used} of ${p.max} used`}
+                  disabled={!live || busy || !counters}
+                  data-slot="sheet-pip"
+                  className={cn(
+                    "size-3 rounded-[1px] border border-foreground/60 [transform:rotate(45deg)]",
+                    i < p.used && "bg-foreground",
+                  )}
+                  onClick={(e) => use(p.level, { delta: pipDelta(e.shiftKey) })}
+                />
+              </Tip>
             ))}
           </span>
           <span data-testid="charx-slot-count" data-value={p.level} className="tabular-nums">

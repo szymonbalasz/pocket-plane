@@ -15,6 +15,7 @@ import {
   DialogTitle,
   Tooltip,
 } from "@ui/components/ui/overlays";
+import { Tip } from "@ui/components/ui/tip";
 import { useLive } from "@ui/features/combat-tracker/store";
 import { backToList } from "@ui/features/compendium/nav";
 import { CopyIcon, CopyPlusIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -142,17 +143,19 @@ export function EntryActions({
           >
             <PencilIcon className="size-3.5" /> Edit
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={iconButton}
-            data-testid="cmp-delete"
-            aria-label={`Delete ${e.name}`}
-            disabled={!live}
-            onClick={() => setConfirming(true)}
-          >
-            <Trash2Icon className="size-3.5" />
-          </Button>
+          <Tip content={`Delete ${e.name}`} off={!live}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={iconButton}
+              data-testid="cmp-delete"
+              aria-label={`Delete ${e.name}`}
+              disabled={!live}
+              onClick={() => setConfirming(true)}
+            >
+              <Trash2Icon className="size-3.5" />
+            </Button>
+          </Tip>
           <ConfirmDelete
             name={e.name}
             open={confirming}

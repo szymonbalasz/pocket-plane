@@ -16,6 +16,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import { Input } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useSync } from "../../sync/store";
@@ -172,20 +173,21 @@ function ColourField({
         aria-label={`${label} colours`}
       >
         {LOOK_PALETTE.map((c) => (
-          <button
-            key={c}
-            type="button"
-            data-testid={`dicex-look-${part}-swatch`}
-            data-value={c}
-            aria-label={c}
-            aria-pressed={current === c}
-            onClick={() => onChange(c)}
-            className={cn(
-              "aspect-square rounded-sm border border-border",
-              current === c && "ring-2 ring-ring ring-offset-1 ring-offset-popover",
-            )}
-            style={{ backgroundColor: c }}
-          />
+          <Tip key={c} content={c}>
+            <button
+              type="button"
+              data-testid={`dicex-look-${part}-swatch`}
+              data-value={c}
+              aria-label={c}
+              aria-pressed={current === c}
+              onClick={() => onChange(c)}
+              className={cn(
+                "aspect-square rounded-sm border border-border",
+                current === c && "ring-2 ring-ring ring-offset-1 ring-offset-popover",
+              )}
+              style={{ backgroundColor: c }}
+            />
+          </Tip>
         ))}
       </fieldset>
     </div>
@@ -225,16 +227,18 @@ export function LookEditor({ onBack }: { onBack(): void }) {
   return (
     <div data-testid="dicex-look" className="flex flex-col gap-3">
       <div className="flex items-center gap-1">
-        <Button
-          data-testid="dicex-look-back"
-          size="icon"
-          variant="ghost"
-          className="size-6"
-          aria-label="Back to dice settings"
-          onClick={onBack}
-        >
-          <ChevronLeftIcon className="size-4" />
-        </Button>
+        <Tip content="Back to dice settings">
+          <Button
+            data-testid="dicex-look-back"
+            size="icon"
+            variant="ghost"
+            className="size-6"
+            aria-label="Back to dice settings"
+            onClick={onBack}
+          >
+            <ChevronLeftIcon className="size-4" />
+          </Button>
+        </Tip>
         <p className="text-sm font-medium">Dice look</p>
       </div>
       <fieldset className="m-0 grid grid-cols-4 gap-1 border-0 p-0" aria-label="Dice style">
