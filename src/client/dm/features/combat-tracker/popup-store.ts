@@ -2,8 +2,14 @@
 // from) and the damage / heal dialog (combatant id). The popup's dragged position lives in its own
 // state (lost on close, FR-CBT-76). Sprint 5 (FR-CBT-90, -93): the popup's edits are kept per card
 // here until reload (across Later, another card, a reconnect), and the cards this client saw
-// resolved, for the late note.
+// resolved, for the late note. Sprint 15 (FR-CBT-174, -176): the popup's "Use roll" step and its
+// picks, kept in memory until it closes (across a reconnect); opening a card ends it.
 import type { DamageMultiplier } from "@shared/combat-tracker/schemas";
+import {
+  type UseRollStepRequest,
+  type UseRollType,
+  useUseRollRequest,
+} from "@ui/features/combat-tracker/use-roll-action";
 import { create } from "zustand";
 import { setMapSelection } from "../scenes-map/selection";
 import { blurField, type FieldDraft, type ResolvedCard } from "./late-fill";
@@ -49,6 +55,11 @@ export const emptyDraft = (): CardDraft => ({
   dropped: [],
 });
 
+/** FR-CBT-174: the "Use roll" step: the request plus the DM's picks (`types`: roll id → type). */
+export interface UseRollStep extends UseRollStepRequest {
+  types: Record<string, UseRollType>;
+}
+
 /** FR-CBT-93 (b): cards this client saw resolved, newest last; a few turns' worth. */
 const RESOLVED_KEEP = 40;
 
@@ -63,6 +74,11 @@ interface CombatDialogs {
   closeCard(): void;
   openHp(combatantId: string): void;
   closeHp(): void;
+  /** FR-CBT-174: the popup's "Use roll" step (no card yet); null = none. */
+  step: UseRollStep | null;
+  openStep(request: UseRollStepRequest): void;
+  editStep(patch: Partial<Pick<UseRollStep, "attackerId" | "types">>): void;
+  closeStep(): void;
   drafts: Record<string, CardDraft>;
   /** Patch one card's draft (created untouched on first use). */
   editDraft(cardId: string, patch: (d: CardDraft) => Partial<CardDraft>): void;
@@ -82,7 +98,7 @@ export const useCombatDialogs = create<CombatDialogs>((set, get) => ({
   openCard: (cardId, origin = null) => {
     // Another card over an open popup: that popup closes, and so do its targets (below).
     if (get().cardId !== null) setMapSelection([]);
-    set((s) => ({ cardId, origin, openSeq: s.openSeq + 1 }));
+    set((s) => ({ cardId, origin, openSeq: s.openSeq + 1, step: null }));
   },
   // FR-CBT-54 (sim-5 glitch 1): the popup's selection rows are the map selection, so every close
   // (Apply, Dismiss, Later, Esc, the card resolved elsewhere) clears it: the next card's popup
@@ -93,6 +109,19 @@ export const useCombatDialogs = create<CombatDialogs>((set, get) => ({
   },
   openHp: (hpCombatantId) => set({ hpCombatantId }),
   closeHp: () => set({ hpCombatantId: null }),
+  step: null,
+  // The step replaces an open card's popup (one popup at a time).
+  openStep: (request) => {
+    if (get().cardId !== null) setMapSelection([]);
+    set((s) => ({
+      step: { ...request, types: {} },
+      cardId: null,
+      origin: null,
+      openSeq: s.openSeq + 1,
+    }));
+  },
+  editStep: (patch) => set((s) => (s.step ? { step: { ...s.step, ...patch } } : s)),
+  closeStep: () => set({ step: null }),
   drafts: {},
   editDraft: (cardId, patch) =>
     set((s) => {
@@ -118,3 +147,11 @@ export const useCombatDialogs = create<CombatDialogs>((set, get) => ({
       resolved: [...s.resolved.filter((r) => r.cardId !== card.cardId), card].slice(-RESOLVED_KEEP),
     })),
 }));
+
+// FR-CBT-174: the log's Use-as actions (`@ui`) ask; this client's popup opens the card or the step.
+useUseRollRequest.subscribe((s, prev) => {
+  if (s.n === prev.n || !s.open) return;
+  const dialogs = useCombatDialogs.getState();
+  if ("cardId" in s.open) dialogs.openCard(s.open.cardId);
+  else dialogs.openStep(s.open.step);
+});
