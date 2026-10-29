@@ -45,6 +45,7 @@ import kitGroups from "./combat-tracker/kit-groups";
 import lateHitRuled from "./combat-tracker/late-hit-ruled";
 import thornBattlemap from "./combat-tracker/thorn-battlemap";
 import trailMoves from "./combat-tracker/trail-moves";
+import trayLogRolls from "./combat-tracker/tray-log-rolls";
 import cmpGoblinUntyped from "./compendium/cmp-goblin-untyped";
 import cmpHomebrew from "./compendium/cmp-homebrew";
 import cmpHomebrewSecond from "./compendium/cmp-homebrew-second";
@@ -328,4 +329,6 @@ export const units: readonly Fixture[] = [
   vfxVisualAuras,
   // Rest buttons (fix/rest-buttons): Mira's spent slot, uses, hit die and HP
   restSpent,
+  // Tray attacks (fix/tray-core, #385): three unused plain log lines for Use as attack / damage
+  trayLogRolls,
 ];
