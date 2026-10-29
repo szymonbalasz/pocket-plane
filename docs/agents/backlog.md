@@ -163,3 +163,4 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 
 - Glitches from walkthroughs and session-sims that are not fixed in their branch go here with the evidence path.
 - Mark `picked (<branch>, <date>)` when started, `done (#<decision>)` when merged. Keep the table short; move done rows out at sprint end.
+| BL-154 | A colour-picker test with a fixed 500 ms bound failed once on CI (531 ms, `build/agent-skill` first push 2026-10-29; re-run green, `main` green at the same base): move the bound to `bun run bench` or widen it (fixed-ms checks belong in bench, BL-51) | S | colour-picker test | none | — | open |
