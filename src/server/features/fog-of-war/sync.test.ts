@@ -114,7 +114,7 @@ describe("fog bundle over WS", () => {
         runs: "",
         shapes: [],
         darkness: [],
-        explored: false,
+        explored: true,
       },
     });
     // Player refused on every fog intent.
@@ -154,7 +154,7 @@ describe("fog bundle over WS", () => {
         runs: (fogOf(dm, ambushId) as FogRecord).runs,
         shapes: (fogOf(dm, ambushId) as FogRecord).shapes,
         darkness: [],
-        explored: false,
+        explored: true,
       });
       const raw = c.raw();
       expect(raw).not.toContain("Goblin Lurker");

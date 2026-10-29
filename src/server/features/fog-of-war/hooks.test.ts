@@ -255,7 +255,7 @@ describe("FR-FOG-02 / -23 lifecycle (fog's lines)", () => {
       runs: "",
       shapes: [],
       darkness: [],
-      explored: false,
+      explored: true,
       undo: null,
     });
     const ev = t.lastEvent();

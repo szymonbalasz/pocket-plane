@@ -138,7 +138,7 @@ describe("FR-FOG-06 fog.setAll", () => {
       runs: "",
       shapes: [],
       darkness: [],
-      explored: false,
+      explored: true,
       undo: { n: 1, editId, kind: "fog-all" },
     });
     expect(t.stack()).toEqual([

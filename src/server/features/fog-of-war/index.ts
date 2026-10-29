@@ -3,11 +3,13 @@
 // clear, `fog.setExplored` / `fog.forgetExplored`, `fog.setInvisible`, `fog.setPartyVision`
 // (FOG §9). Its lines in scenes-map's `visibility-hooks.ts` / `scene-hooks.ts` and
 // campaign-management's `player-hooks.ts` live in `hooks.ts`. FR-FOG-40: the per-player copies
-// are backfilled before the server listens, then the vision-model upgrade runs (sprint 4).
+// are backfilled before the server listens, then the vision-model upgrade runs (sprint 4), then
+// FR-FOG-29's Remember-explored-on upgrade (#383).
 import { realContext } from "../../commands/context";
 import type { Feature } from "../../services";
 import { backfillSeenBy } from "./backfill";
 import { fogCommands } from "./commands";
+import { upgradeExploredDefault } from "./explored-default";
 import { fogExploredRecordType, fogRecordType, visionRecordType } from "./records";
 import { fogSettingsRecordType } from "./settings";
 import { setFogLogger } from "./sight";
@@ -44,6 +46,10 @@ export const fogOfWar: Feature = {
     r.onStart("fog-of-war.vision-model-upgrade", (s) => {
       const n = upgradeVisionModel(s.db, realContext(s.clock));
       if (n > 0) s.log.info(`fog: vision model upgraded; re-derived ${n} scene(s) (FR-FOG-40)`);
+    });
+    r.onStart("fog-of-war.explored-default-upgrade", (s) => {
+      const n = upgradeExploredDefault(s.db);
+      if (n > 0) s.log.info(`fog: Remember explored areas switched on for ${n} scene(s) (#383)`);
     });
   },
 };

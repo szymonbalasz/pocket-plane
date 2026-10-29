@@ -55,7 +55,7 @@ export const fogSceneHook: SceneHook = {
         runs: "",
         shapes: [],
         darkness: [],
-        explored: false,
+        explored: true, // #383: Remember explored areas on by default (FR-FOG-29)
         updatedAt: ctx.clock.iso(),
       })
       .run();

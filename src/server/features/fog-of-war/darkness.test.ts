@@ -10,11 +10,13 @@ import { MAP_INTENTS as I, type SceneRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { armCrashHook } from "../../commands/crash";
 import { stateDigest } from "../../db/digest";
-import { fogExplored, sceneFog, sceneFogEdit, token } from "../../db/schema";
+import { EXPLORED_DEFAULT, EXPLORED_DEFAULT_KEY } from "../../db/meta";
+import { dbMeta, fogExplored, sceneFog, sceneFogEdit, token } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import { MAP_REST as R } from "../scenes-map/commands";
 import { scenesSetup } from "../scenes-map/testing";
 import { DARKNESS_NOT_FOUND, FOG_TOO_MANY_DARKNESS, fogUndoStack } from "./commands";
+import { exploredDefaultOf, upgradeExploredDefault } from "./explored-default";
 import { dmFogRecord, readFogRecord } from "./rows";
 
 afterEach(() => armCrashHook(null));
@@ -347,23 +349,54 @@ describe("FR-FOG-44 darkness filter (static part)", () => {
 });
 
 describe("FR-FOG-29 Explored memory setting", () => {
-  test("FR-FOG-29 default off; fog.setExplored on / off → FogExploredSet with the fog row; same value → no-op; not in the undo stack", () => {
+  test("FR-FOG-29 default on; fog.setExplored off / on → FogExploredSet with the fog row; same value → no-op; not in the undo stack", () => {
     const t = setup();
-    expect(t.fog()?.explored).toBe(false);
-    const depth = t.stack().length;
-    t.cmd(F.setExplored, { on: true });
+    // #383: a new scene starts with Remember explored areas on.
     expect(t.fog()?.explored).toBe(true);
+    const depth = t.stack().length;
+    t.cmd(F.setExplored, { on: false });
+    expect(t.fog()?.explored).toBe(false);
     expect(t.lastEvent()).toMatchObject({
       type: "FogExploredSet",
-      payload: { sceneId: t.ambush.id, on: true },
+      payload: { sceneId: t.ambush.id, on: false },
     });
     expect(t.lastEvent()?.changes.map((c) => c.type)).toEqual(["fog"]);
     const n = t.events.length;
-    t.cmd(F.setExplored, { on: true });
-    expect(t.events.length).toBe(n);
     t.cmd(F.setExplored, { on: false });
-    expect(t.fog()?.explored).toBe(false);
+    expect(t.events.length).toBe(n);
+    t.cmd(F.setExplored, { on: true });
+    expect(t.fog()?.explored).toBe(true);
     expect(t.stack().length).toBe(depth);
+  });
+
+  test("FR-FOG-29 default on: a new scene's fog row and a duplicate of an off scene keep their setting", () => {
+    const t = setup();
+    const made = t.run<SceneRecord>(R.createScene, { name: "Cellar", mapAssetId: "map-battle" });
+    expect(readFogRecord(t.s.db, made.id)?.explored).toBe(true);
+    t.cmd(F.setExplored, { on: false });
+    const copy = t.run<SceneRecord>(R.duplicateScene, { id: t.ambush.id });
+    expect(readFogRecord(t.s.db, copy.id)?.explored).toBe(false);
+  });
+
+  test("FR-FOG-29 boot upgrade: a DB from before #383 switches every scene on once, no event; a fresh DB is stamped; rerun no-op", () => {
+    const t = setup();
+    // A DB created from scratch already has the version: nothing to do.
+    expect(exploredDefaultOf(t.s.db)).toBe(EXPLORED_DEFAULT);
+    expect(upgradeExploredDefault(t.s.db)).toBe(0);
+    // Before #383: every row off, no version.
+    t.s.db.update(sceneFog).set({ explored: false }).run();
+    t.s.db.delete(dbMeta).where(eq(dbMeta.key, EXPLORED_DEFAULT_KEY)).run();
+    expect(exploredDefaultOf(t.s.db)).toBe(0);
+    const rows = t.s.db.select().from(sceneFog).all().length;
+    const n = t.events.length;
+    expect(upgradeExploredDefault(t.s.db)).toBe(rows);
+    expect(t.s.db.select().from(sceneFog).all().every((r) => r.explored)).toBe(true);
+    expect(exploredDefaultOf(t.s.db)).toBe(EXPLORED_DEFAULT);
+    expect(t.events.length).toBe(n);
+    // Rerun, even after the DM switched a scene off again: nothing.
+    t.cmd(F.setExplored, { on: false });
+    expect(upgradeExploredDefault(t.s.db)).toBe(0);
+    expect(t.fog()?.explored).toBe(false);
   });
 });
 

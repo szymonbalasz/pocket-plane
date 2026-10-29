@@ -131,14 +131,14 @@ function currentRow(tx: Tx, log: Logger, sceneId: string): FogRow {
   return row ?? CLEAR_ROW;
 }
 
-/** Shapes, darkness and the Explored setting stored now (no row: none, off). */
+/** Shapes, darkness and the Explored setting stored now (no row: none, on as a new row, #383). */
 function layers(env: Pick<CommandEnv, "tx">, sceneId: string) {
   const r = env.tx
     .select({ shapes: sceneFog.shapes, darkness: sceneFog.darkness, explored: sceneFog.explored })
     .from(sceneFog)
     .where(eq(sceneFog.sceneId, sceneId))
     .get();
-  return { shapes: r?.shapes ?? [], darkness: r?.darkness ?? [], explored: r?.explored ?? false };
+  return { shapes: r?.shapes ?? [], darkness: r?.darkness ?? [], explored: r?.explored ?? true };
 }
 
 type RowExtra = Partial<Pick<typeof sceneFog.$inferInsert, "shapes" | "darkness" | "explored">>;
@@ -157,7 +157,8 @@ function writeRow(env: CommandEnv, s: SceneRecord, r: FogRow, extra: RowExtra = 
   };
   env.tx
     .insert(sceneFog)
-    .values({ sceneId: s.id, campaignId: s.campaignId, ...values })
+    // A new row starts with Remember explored areas on (FR-FOG-29, #383).
+    .values({ sceneId: s.id, campaignId: s.campaignId, explored: true, ...values })
     .onConflictDoUpdate({
       target: sceneFog.sceneId,
       set: { ...values, rev: sql`${sceneFog.rev} + 1` },
