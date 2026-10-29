@@ -37,7 +37,7 @@ function render(state: "live" | "offline", loading = false): string {
 const trigger = (html: string) =>
   html.match(/<button[^>]*data-testid="fog-view-as-top"[^>]*>/)?.[0];
 
-test("FR-FOG-60 top-bar View as: DM only, fixed slot right of Pause, disabled while not live, spinner while loading", () => {
+test("FR-FOG-60 top-bar View as: DM only, 40-px icon slot right of Pause, disabled while not live, spinner while loading", () => {
   const dm = topBarItemsFor("dm", TOP_BAR_ITEMS);
   expect(dm.map((t) => t.id)).toEqual(["pause", "view-as", "palette"]);
   const item = dm.find((t) => t.id === "view-as");
@@ -50,6 +50,9 @@ test("FR-FOG-60 top-bar View as: DM only, fixed slot right of Pause, disabled wh
   const off = trigger(render("live"));
   expect(off).toContain('data-value="dm"');
   expect(off).not.toContain(' disabled=""');
+  // An icon button like Pause: not highlighted on "DM"; the Tooltip names the view.
+  expect(VIEW_AS_TOP_W).toBe(40);
+  expect(off).toContain('data-on="false"');
   expect(trigger(render("offline"))).toContain(' disabled=""');
   expect(trigger(render("live", true))).toContain("data-loading");
 });

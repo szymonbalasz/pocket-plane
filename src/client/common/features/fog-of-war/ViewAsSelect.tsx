@@ -1,7 +1,9 @@
 // The DM's View as Select (FR-FOG-17 / -43): "DM", the players, "Party vision"; a spinner while the
 // load is in flight. One pick (`useViewAs`) behind two copies: the fog bar's (`fog-view-as`) and,
 // #383, the top bar's (`fog-view-as-top`, FR-FOG-60), so the DM checks a player's or the party's
-// view without the Fog tool.
+// view without the Fog tool. The top bar's is an icon button (40 px, Pause's size: a wider one
+// pushes launcher buttons into the overflow menu at 1280): highlighted while a player or Party is
+// picked, its Tooltip naming the view.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import { VIEW_AS_PARTY } from "@shared/protocol/scene-window";
 import { EyeIcon, Loader2Icon } from "lucide-react";
@@ -14,21 +16,27 @@ import {
   SelectValue,
   Tooltip,
 } from "../../components/ui/overlays";
+import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
 import { useLive } from "../scenes-map/intents";
 import { setViewAs, useViewAs, VIEW_AS_DM, VIEW_AS_PARTY_LABEL } from "./view-as";
 
 /** The top-bar item's width, px (FR-SHELL-112 (3): fixed). */
-export const VIEW_AS_TOP_W = 150;
+export const VIEW_AS_TOP_W = 40;
+
+const TIP = "View as — the scene as that player sees it";
 
 export function ViewAsSelect({
   disabled,
   testId,
   className,
+  compact = false,
 }: {
   disabled: boolean;
   testId: string;
   className: string;
+  /** Icon only (the top bar): the picked view in the Tooltip, highlighted unless "DM". */
+  compact?: boolean;
 }) {
   const players = useRecords<PlayerRecord>("player");
   const sorted = useMemo(
@@ -38,25 +46,43 @@ export function ViewAsSelect({
   const playerId = useViewAs((s) => s.playerId);
   const loading = useSync((s) => s.viewAs.loading !== null);
   const value = playerId ?? VIEW_AS_DM;
+  const on = playerId !== null;
+  const name =
+    playerId === VIEW_AS_PARTY
+      ? VIEW_AS_PARTY_LABEL
+      : (sorted.find((p) => p.id === playerId)?.name ?? "DM");
   return (
     <Select value={value} onValueChange={(v) => setViewAs(v === VIEW_AS_DM ? null : v)}>
       {/* The Tooltip sits on a wrapper: its `data-state` would overwrite the Select's. */}
-      <Tooltip content="View as — the scene as that player sees it">
+      <Tooltip content={compact ? `View as: ${name}` : TIP}>
         <span className="inline-flex min-w-0">
           <SelectTrigger
             aria-label="View as"
             data-testid={testId}
             data-value={value}
             data-loading={loading || undefined}
+            data-on={compact ? on : undefined}
             disabled={disabled}
-            className={className}
+            className={cn(
+              className,
+              // Pause's look: ghost; on = secondary. No chevron.
+              compact &&
+                "min-w-0 justify-center gap-0 border-0 px-0 hover:bg-accent [&>svg:last-child]:hidden",
+              compact && on && "bg-secondary text-secondary-foreground",
+            )}
           >
             {loading ? (
               <Loader2Icon className="size-4 animate-spin" />
             ) : (
               <EyeIcon className="size-4" />
             )}
-            <SelectValue />
+            {compact ? (
+              <span className="sr-only">
+                <SelectValue />
+              </span>
+            ) : (
+              <SelectValue />
+            )}
           </SelectTrigger>
         </span>
       </Tooltip>
@@ -84,5 +110,5 @@ export function ViewAsSelect({
 /** FR-FOG-60 (#383): the top bar's copy (DM), disabled while not live. */
 export function ViewAsTopBarItem() {
   const live = useLive();
-  return <ViewAsSelect disabled={!live} testId="fog-view-as-top" className="h-8 w-full min-w-0" />;
+  return <ViewAsSelect disabled={!live} testId="fog-view-as-top" className="h-8 w-10" compact />;
 }
