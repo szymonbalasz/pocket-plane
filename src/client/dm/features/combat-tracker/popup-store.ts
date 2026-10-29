@@ -10,6 +10,7 @@ import {
   type UseRollType,
   useUseRollRequest,
 } from "@ui/features/combat-tracker/use-roll-action";
+import { diceExtras } from "@ui/features/dice-extras/store";
 import { create } from "zustand";
 import { setMapSelection } from "../scenes-map/selection";
 import { blurField, type FieldDraft, type ResolvedCard } from "./late-fill";
@@ -147,6 +148,18 @@ export const useCombatDialogs = create<CombatDialogs>((set, get) => ({
       resolved: [...s.resolved.filter((r) => r.cardId !== card.cardId), card].slice(-RESOLVED_KEEP),
     })),
 }));
+
+// FR-CBT-169 (#385, T9 walkthrough): anything staged in the Dice tray (any source: sheet rows,
+// Initiative Attack ▸, the stat block, notation, prompts) puts the open popup aside as Later does
+// (the card stays pending, its draft kept; a Use roll step closes too): the popup is fixed above
+// every shell window, so the tray's Roll would sit under it. The roll's card reopens it
+// (`openCard` from the caller or `useUseRollRequest`).
+diceExtras.api.subscribe((s, prev) => {
+  if (s.staged === prev.staged) return;
+  const dialogs = useCombatDialogs.getState();
+  if (dialogs.cardId !== null) dialogs.closeCard();
+  if (dialogs.step !== null) dialogs.closeStep();
+});
 
 // FR-CBT-174: the log's Use-as actions (`@ui`) ask; this client's popup opens the card or the step.
 useUseRollRequest.subscribe((s, prev) => {

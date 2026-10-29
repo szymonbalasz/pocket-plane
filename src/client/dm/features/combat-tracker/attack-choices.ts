@@ -1,7 +1,6 @@
 // DM Initiative row attack picker (OQ-CHARX-12, FR-CHARX-24): which of a definition's attacks
-// `cbt.attack` can name, and what one action of it rolls (FR-CBT-74, -81, -83). Pure, but for
-// `trayAside` (the popup store). Sprint 15 (FR-CBT-169): two actions, Attack and Damage, whose
-// controls stage the Dice tray on click.
+// `cbt.attack` can name, and what one action of it rolls (FR-CBT-74, -81, -83). Pure. Sprint 15
+// (FR-CBT-169): two actions, Attack and Damage, whose controls stage the Dice tray on click.
 import { attackRollSpecs } from "@shared/character-sheet/logic";
 import { rowPartTypes } from "@shared/character-sheet/rolls";
 import { critExpression } from "@shared/combat-tracker/rules";
@@ -13,7 +12,6 @@ import { attackRowView } from "@ui/features/character-sheet/view-model";
 import { manualFields, partsOf } from "@ui/features/combat-tracker/roll-route";
 import { slotLabelsOf } from "@ui/features/dice-roll-log/logic";
 import type { RollControlOptions, RollRequest } from "@ui/features/dice-roll-log/roll-control";
-import { useCombatDialogs } from "./popup-store";
 
 /**
  * Attack ▸'s second line, as the sheet and the companion card show the row (walkthrough fix):
@@ -110,19 +108,6 @@ export function attackSubjects(
     ...(cardMode ? { toHitMode: cardMode } : {}),
   };
   return action === "toHit" ? [hit] : [damage, ...Array<null>(extraParts).fill(null)];
-}
-
-/**
- * FR-CBT-169 (T9 walkthrough): an attack staged in the Dice tray while the damage-card popup is
- * open: the popup (fixed above every shell window) steps aside as **Later** does (the card stays
- * pending, its draft kept; a Use roll step closes too), so the tray's Roll is clickable; the
- * tray's Roll reopens the popup on its card. An Alt+click (rolls at once) leaves it.
- */
-export function trayAside(keys: { altKey?: boolean }): void {
-  if (keys.altKey === true) return;
-  const dialogs = useCombatDialogs.getState();
-  if (dialogs.cardId !== null) dialogs.closeCard();
-  if (dialogs.step !== null) dialogs.closeStep();
 }
 
 /** An attack rolled in a fight: the attacker and the pending to-hit card Damage completes. */

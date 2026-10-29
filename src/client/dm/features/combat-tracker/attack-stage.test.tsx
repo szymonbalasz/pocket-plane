@@ -10,7 +10,9 @@ import type { DamageCardPayload } from "@shared/combat-tracker/schemas";
 import type { Attack } from "@shared/entities/schemas";
 import { emptyStore } from "@shared/protocol/store";
 import { TooltipProvider } from "@ui/components/ui/overlays";
-import { diceExtras } from "@ui/features/dice-extras/store";
+import { showStagedCard } from "@ui/features/combat-tracker/roll-route";
+import { useUseRollRequest } from "@ui/features/combat-tracker/use-roll-action";
+import { diceExtras, stageTray } from "@ui/features/dice-extras/store";
 import {
   type RollControl,
   type RollRequest,
@@ -19,7 +21,7 @@ import {
 import { SyncContext, type SyncState } from "@ui/sync/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
-import { ATTACK_ACTIONS, attackControlOptions, attackIntent, trayAside } from "./attack-choices";
+import { ATTACK_ACTIONS, attackControlOptions, attackIntent } from "./attack-choices";
 import { useCombatDialogs } from "./popup-store";
 
 const SCIMITAR: Attack = {
@@ -147,19 +149,41 @@ describe("FR-CBT-169 Attack ▸ two actions", () => {
 });
 
 describe("FR-CBT-169 staging over the damage-card popup (T9)", () => {
-  test("FR-CBT-169 a staged attack puts the open damage-card popup aside (as Later: the draft kept); Alt+click leaves it", () => {
+  const free = { kind: "free", expression: "1d6", mode: "normal", category: "other" } as const;
+
+  test("FR-CBT-169 anything staged in the Dice tray puts the open damage-card popup aside (as Later: the draft kept) and closes a Use roll step", () => {
     const dialogs = useCombatDialogs.getState();
     dialogs.openCard("n1");
     dialogs.editDraft("n1", () => ({ damage: { text: "7" } }));
-    trayAside({ altKey: true });
-    expect(useCombatDialogs.getState().cardId).toBe("n1");
-    trayAside({ altKey: false });
+    stageTray(free);
     expect(useCombatDialogs.getState().cardId).toBeNull();
     expect(useCombatDialogs.getState().drafts.n1).toMatchObject({ damage: { text: "7" } });
-    // A Use roll step (also above the windows) closes too.
+    // A control (sheet row, Attack ▸) the same; and the Use roll step.
     dialogs.openStep({ entryId: "e1", as: "damage", attackerId: null });
-    trayAside({});
+    stageTray({
+      kind: "control",
+      mode: "normal",
+      options: { expressions: ["1d20+4"], category: "attack", purpose: "attack", onRoll() {} },
+    });
     expect(useCombatDialogs.getState().step).toBeNull();
+    // Nothing open: staging changes nothing.
+    stageTray(free);
+    expect(useCombatDialogs.getState().cardId).toBeNull();
     useCombatDialogs.getState().dropDraft("n1");
+    diceExtras.clear();
+  });
+
+  test("FR-CBT-169 the staged roll's card reopens the popup (sheet rows, companion card: showStagedCard); an Alt+click roll (no parts) doesn't", async () => {
+    const n = useUseRollRequest.getState().n;
+    await showStagedCard({}, Promise.resolve({ cardId: "n-alt" }));
+    expect(useUseRollRequest.getState().n).toBe(n);
+    expect(useCombatDialogs.getState().cardId).toBeNull();
+    const res = await showStagedCard(
+      { parts: [{ expression: "1d20+5" }] },
+      Promise.resolve({ cardId: "n2" }),
+    );
+    expect(res).toEqual({ cardId: "n2" });
+    expect(useCombatDialogs.getState().cardId).toBe("n2");
+    useCombatDialogs.getState().closeCard();
   });
 });

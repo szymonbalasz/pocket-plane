@@ -109,10 +109,10 @@ test("FR-CHARX-126 FR-CHARX-127 FR-CBT-169 sheet Attack / Damage stage the tray 
   for (const page of [p1, dm]) await page.context().close();
 });
 
-test("FR-CBT-169 T9 DM Attack ▸: Alt+click → a card at once; a click stages the tray over the open popup (it steps aside) → Roll → the new card's popup", async ({
+test("FR-CBT-169 T9 DM Attack ▸: Alt+click → a card at once; a click stages the tray over the open popup (it steps aside) → Roll → the new card's popup; the same from a sheet row", async ({
   browser,
 }) => {
-  const { secret } = e2eEnv();
+  const { secret, recordId } = e2eEnv();
   const dm = await rolePage(browser);
   await loginDm(dm, secret);
   await live(dm);
@@ -157,8 +157,28 @@ test("FR-CBT-169 T9 DM Attack ▸: Alt+click → a card at once; a click stages 
   const second = (await fresh()).find((x) => x !== first) as string;
   await expect(popup).toHaveAttribute("data-record-id", second);
 
+  // Any staging (here the DM's own sheet row, Brakka's Flame Tongue) puts the popup aside too;
+  // the tray's Roll reopens it on the roll's card.
+  const sheet = await openWindow(dm, "char.sheet");
+  await pickSheet(sheet, recordId("char-brakka", "entity"));
+  await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
+  await expect(popup).toHaveAttribute("data-record-id", second);
+  await sheet
+    .getByTestId("charx-attack")
+    .filter({ hasText: "Flame Tongue" })
+    .getByTestId("charx-roll-attack")
+    .click();
+  await expect(tray.getByTestId("dicex-tray-state")).toContainText(
+    "Brakka — Flame Tongue greatsword attack",
+  );
+  await expect(popup).toHaveCount(0);
+  await tray.getByTestId("dicex-tray-roll").click();
+  await expect.poll(fresh).toHaveLength(3);
+  const third = (await fresh()).find((x) => x !== first && x !== second) as string;
+  await expect(popup).toHaveAttribute("data-record-id", third);
+
   // Leave the bundle's server as found.
-  for (const id of [second, first] as string[]) {
+  for (const id of [third, second, first] as string[]) {
     const card = init.locator(`[data-testid="cbt-init-card"][data-record-id="${id}"]`);
     const shown = (await popup.count()) > 0 ? await popup.getAttribute("data-record-id") : null;
     if (shown !== id) await card.click();

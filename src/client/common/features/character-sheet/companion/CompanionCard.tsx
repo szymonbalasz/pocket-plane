@@ -31,6 +31,7 @@ import { AssetImg } from "../../assets-pipeline/AssetImg";
 import { activeEffects, effectsOn } from "../../combat-extras/logic";
 import { EffectChips } from "../../combat-extras/parts";
 import { useCompanionCardRequest } from "../../combat-tracker/companion-card-request";
+import { showStagedCard } from "../../combat-tracker/roll-route";
 import { SIDE_LABEL } from "../../combat-tracker/side";
 import { useCbtIntent, useCombatants, useStartedEncounter } from "../../combat-tracker/store";
 import { slotLabelsOf } from "../../dice-roll-log/logic";
@@ -392,7 +393,8 @@ function CardRoll({
     ...cardCritOptions(target, row, kind, notes),
     onRoll(r) {
       const intent = cardRollIntent(target, row.id, kind, r);
-      busy.run(() => connection.sendIntent(intent.name, intent.payload));
+      // FR-CBT-169: a staged roll's card reopens the DM's popup (it stepped aside on stage).
+      busy.run(() => showStagedCard(r, connection.sendIntent(intent.name, intent.payload)));
     },
   });
   return (

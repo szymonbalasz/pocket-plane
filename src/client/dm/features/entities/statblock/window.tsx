@@ -52,7 +52,6 @@ import {
   attackChoices,
   attackControlOptions,
   attackSummary,
-  trayAside,
 } from "../../combat-tracker/attack-choices";
 import { acOf, hpOf } from "../../combat-tracker/attack-popup";
 import { useCombatDialogs } from "../../combat-tracker/popup-store";
@@ -185,8 +184,6 @@ function AttackRoll({
       data-record-id={rowId ?? ""}
       data-value={action}
       disabled={ctx.disabled}
-      // T9: a click stages the tray; an open damage-card popup steps aside (it covers the tray).
-      onClick={(e) => trayAside(e)}
     >
       {label}
     </RollButton>
