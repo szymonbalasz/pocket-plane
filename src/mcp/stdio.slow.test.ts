@@ -107,7 +107,7 @@ describe("stdio process", () => {
     const result = (id: number) => msgs.find((m) => m.id === id)?.result ?? {};
     const body = (id: number) =>
       JSON.parse((result(id).content as { text: string }[])[0]?.text ?? "null");
-    expect(result(2).tools).toHaveLength(9);
+    expect(result(2).tools).toHaveLength(13);
     expect(body(3).campaigns.map((c: { name: string }) => c.name)).toContain("Fixture Campaign");
     expect(body(4).players).toHaveLength(2);
     expect(result(5).isError).toBe(true);

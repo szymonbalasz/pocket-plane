@@ -301,7 +301,7 @@ describe("FR-AGENT-19 plan_check frame", () => {
 });
 
 describe("FR-AGENT-01 list-tools", () => {
-  test("FR-AGENT-01 FR-AGENT-15 serves exactly the slice-1 §9 tools, all read-only", async () => {
+  test("FR-AGENT-01 FR-AGENT-15 serves exactly the §9 tools; reads read-only, writes not", async () => {
     const server = createMcpServer({
       caller: new Caller({ dataDir: tmp(), profile: "dev", dmSecret: "x", log: quietLog }),
       log: quietLog,
@@ -317,13 +317,27 @@ describe("FR-AGENT-01 list-tools", () => {
       "characters_list",
       "compendium_get",
       "compendium_search",
+      "creature_create",
+      "creature_derive",
+      "creature_edit",
       "creature_get",
+      "creature_put_row",
       "creatures_list",
       "plan_check",
       "players_list",
     ]);
+    const writes = allTools()
+      .filter((t) => t.write)
+      .map((t) => t.name)
+      .sort();
+    expect(writes).toEqual([
+      "creature_create",
+      "creature_derive",
+      "creature_edit",
+      "creature_put_row",
+    ]);
     for (const t of tools) {
-      expect(t.annotations?.readOnlyHint).toBe(true);
+      expect(t.annotations?.readOnlyHint).toBe(!writes.includes(t.name));
       expect(t.inputSchema.type).toBe("object");
       expect(t.description?.length ?? 0).toBeGreaterThan(20);
     }
@@ -352,7 +366,8 @@ describe("FR-AGENT-01 list-tools", () => {
         "type",
       ].sort(),
     );
-    expect(allTools().filter((t) => t.write)).toEqual([]);
+    expect(props("creature_derive")).toEqual(["baseId", "entryId", "name", "notes", "rows", "set"]);
+    expect(props("creature_edit")).toEqual(["id", "set"]);
     await client.close();
   });
 });

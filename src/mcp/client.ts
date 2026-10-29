@@ -67,7 +67,10 @@ export interface WsSession {
   snapshot: SnapshotFrame;
   /** The snapshot's campaign: WS results name it (FR-AGENT-10). */
   campaign: { id: string; name: string };
-  /** The snapshot's rows of `type`, each parsed with its `@shared` schema. */
+  /**
+   * The snapshot's rows of `type` plus every change since, each parsed with its `@shared`
+   * schema. An intent's own changes are in once it resolves (events before the ack, FR-SYNC-14).
+   */
   records<S extends z.ZodType>(type: string, schema: S): z.output<S>[];
   /** An allow-listed intent; resolves with the ack's `result`, throws on a reject. */
   intent(name: AllowedIntent, payload: unknown): Promise<unknown>;
@@ -203,7 +206,7 @@ export class Caller {
       const session: WsSession = {
         snapshot,
         campaign: { id: snapshot.you.campaignId, name: campaign?.name ?? "" },
-        records: (type, schema) => parseRows(snapshot.records[type] ?? [], schema, type),
+        records: (type, schema) => parseRows(conn.rows(type), schema, type),
         intent,
         async load(type, schema, ids) {
           const result = LoadResult.safeParse(
@@ -247,6 +250,8 @@ class WsConn {
   private closedCode: number | null = null;
   private wasOpen = false;
   private wake: (() => void) | null = null;
+  /** The snapshot's records by type and id, kept current by event frames, in frame order. */
+  private readonly live = new Map<string, Map<string, unknown>>();
   private readonly openP: Promise<"open" | "refused">;
 
   constructor(
@@ -268,7 +273,10 @@ class WsConn {
     this.ws.addEventListener("message", (e) => {
       try {
         const f = ServerFrame.safeParse(JSON.parse(String(e.data)));
-        if (f.success) this.frames.push(f.data);
+        if (f.success) {
+          this.track(f.data);
+          this.frames.push(f.data);
+        }
       } catch {
         // Not JSON: not a frame this client knows; ignored like an unknown frame type.
       }
@@ -279,6 +287,25 @@ class WsConn {
   /** `refused`: closed before it opened (FR-AGENT-05); `timeout`: no answer (FR-AGENT-06). */
   opened(): Promise<"open" | "refused" | "timeout"> {
     return Promise.race([this.openP, Bun.sleep(this.timeoutMs).then(() => "timeout" as const)]);
+  }
+
+  private track(f: ServerFrame) {
+    const byId = (rows: unknown[]) =>
+      new Map(rows.map((r) => [String((r as { id?: unknown } | null)?.id), r]));
+    if (f.type === "snapshot") {
+      for (const [type, rows] of Object.entries(f.records)) this.live.set(type, byId(rows));
+    } else if (f.type === "event") {
+      for (const c of f.changes) {
+        const rows = this.live.get(c.type) ?? new Map<string, unknown>();
+        this.live.set(c.type, rows);
+        if (c.op === "delete") rows.delete(c.id);
+        else if (c.data !== undefined) rows.set(c.id, c.data);
+      }
+    }
+  }
+
+  rows(type: string): unknown[] {
+    return [...(this.live.get(type)?.values() ?? [])];
   }
 
   send(frame: unknown) {
