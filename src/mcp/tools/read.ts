@@ -116,7 +116,8 @@ const charactersList = defineTool({
 const characterGet = defineTool({
   name: "character_get",
   description:
-    "A player character's full record (stat block) and character sheet (rows, notes), DM view.",
+    "A player character's full record (stat block) and character sheet (rows, notes), DM view. " +
+    "`sheet: null` = no sheet row yet (empty, unlocked).",
   input: IdInput,
   write: false,
   run: ({ caller }, { id }) =>
