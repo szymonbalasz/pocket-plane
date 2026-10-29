@@ -42,8 +42,10 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
+import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { AssetPickerDialog } from "@ui/features/assets-pipeline/AssetPicker";
 import { creatureTypeLabel } from "@ui/features/entities/art";
+import { cn } from "@ui/lib/utils";
 import { CopyPlusIcon, PencilIcon, PlusIcon } from "lucide-react";
 import { useState } from "react";
 import type { CreatureAction } from "../entities/creature-actions";
@@ -93,6 +95,40 @@ export function withPortrait(f: Fields, portraitAssetId: string): Fields {
     portraitAssetId,
     tokenShape: f.tokenShape === DEFAULT_SHAPE ? "none" : f.tokenShape,
   };
+}
+
+/**
+ * The portrait as its new tokens draw it (FR-MAP-35): round = circular crop + ring (Default =
+ * round), square = cover-fitted with a square border, none = contain-fitted, no border.
+ */
+export function PortraitPreview({
+  id,
+  shape,
+  name,
+}: {
+  id: string;
+  shape: Fields["tokenShape"];
+  name: string;
+}) {
+  const drawn = shape === DEFAULT_SHAPE ? "round" : shape;
+  return (
+    <div
+      data-testid="cbt-form-portrait-preview"
+      data-shape={drawn}
+      className={cn(
+        "size-9 shrink-0 overflow-hidden",
+        drawn === "round" && "rounded-full border-2",
+        drawn === "square" && "rounded-sm border-2",
+      )}
+    >
+      <AssetImg
+        id={id}
+        file="thumb"
+        alt={name ? `${name} portrait` : "Portrait"}
+        className={cn("size-full", drawn === "none" ? "object-contain" : "object-cover")}
+      />
+    </div>
+  );
 }
 
 export function initial(mode: Mode): Fields {
@@ -416,17 +452,22 @@ export function CreatureForm({ mode, close }: { mode: Mode; close(): void }) {
           </Select>
         </Field>
         <Field id="portrait" label="Portrait">
-          <Button
-            id="cbt-form-portrait"
-            // FR-CBT-151 (sim-10 small copy).
-            data-testid="cbt-form-portrait"
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setPicking(true)}
-          >
-            {f.portraitAssetId ? "Change…" : "Choose…"}
-          </Button>
+          <div className="flex items-center gap-2">
+            {f.portraitAssetId && (
+              <PortraitPreview id={f.portraitAssetId} shape={f.tokenShape} name={f.name} />
+            )}
+            <Button
+              id="cbt-form-portrait"
+              // FR-CBT-151 (sim-10 small copy).
+              data-testid="cbt-form-portrait"
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPicking(true)}
+            >
+              {f.portraitAssetId ? "Change…" : "Choose…"}
+            </Button>
+          </div>
         </Field>
         <div className="col-span-2 grid grid-cols-2 gap-3 rounded-md border p-2">
           <p className="col-span-2 text-xs text-muted-foreground">Attack (optional)</p>
