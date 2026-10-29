@@ -17,6 +17,7 @@ import { colorHex } from "../campaign-management/colors";
 import { landing } from "../dice-extras/landing";
 import { EntryDetails, GameLog } from "./GameLog";
 import {
+  actorPortraits,
   copiedRows,
   createStickToBottom,
   type FontsLike,
@@ -224,24 +225,58 @@ describe("FR-KIT-41 medallion colour", () => {
   });
 });
 
-describe("FR-KIT-41 character portrait", () => {
+describe("FR-KIT-41 actor portrait", () => {
   stubImageForFile();
-  test("FR-KIT-41 character portrait: a character's roll shows its portrait (both clients); a monster of the same name, the DM and a character without one keep the initial", () => {
-    const entity = {
-      mira: { id: "mira", kind: "character", name: "Mira", portraitAssetId: "art-mira" },
-      dm: { id: "gob", kind: "monster", name: "DM", portraitAssetId: "art-gob" },
-    };
-    for (const role of ["player", "dm"] as const) {
-      const html = render([entry(), hp], role, undefined, { entity });
-      const mira = row(html, "e1").body;
-      expect(tag(mira, "kit-medallion")).toContain("data-image");
-      expect(mira).not.toMatch(/data-testid="kit-medallion"[^>]*>M</);
-      expect(tag(row(html, "e3").body, "kit-medallion")).not.toContain("data-image");
-    }
-    const plain = render([entry()], "player", undefined, {
-      entity: { mira: { ...entity.mira, portraitAssetId: null } },
-    });
-    expect(row(plain, "e1").body).toMatch(/data-testid="kit-medallion"[^>]*>M</);
+  const mira = { id: "mira", kind: "character", name: "Mira", portraitAssetId: "art-mira" };
+  const thug = { id: "thug", kind: "monster", name: "Wererat Thug", portraitAssetId: "art-thug" };
+  const dmRoll = (id: string, n: number, actorName: string) =>
+    entry({ id, n, rollerRole: "dm", rollerPlayerId: null, actorName });
+  const log = [
+    entry(),
+    hp,
+    dmRoll("e4", 4, "Goblin 2"),
+    dmRoll("e5", 5, "Wolf"),
+    dmRoll("e6", 6, "Wererat Thug"),
+  ];
+  const visible = {
+    combatant: { g2: { id: "g2", name: "Goblin 2", imageAssetId: "art-goblin" } },
+    token: { w: { id: "w", name: "Wolf", imageAssetId: "art-wolf" } },
+  };
+  const image = (html: string, id: string) =>
+    tag(row(html, id).body, "kit-medallion").includes("data-image");
+
+  test("FR-KIT-41 actor portrait: a character's portrait, a visible combatant's or token's image (both clients), a monster definition's on the DM's; else the initial", () => {
+    // A player holds characters and what they can see; never monster definitions.
+    const player = render(log, "player", undefined, { entity: { mira }, ...visible });
+    for (const id of ["e1", "e4", "e5"]) expect(image(player, id)).toBe(true);
+    for (const id of ["e3", "e6"]) expect(image(player, id)).toBe(false);
+    expect(row(player, "e6").body).toMatch(/data-testid="kit-medallion"[^>]*>W</);
+    const dm = render(log, "dm", undefined, { entity: { mira, thug }, ...visible });
+    for (const id of ["e1", "e4", "e5", "e6"]) expect(image(dm, id)).toBe(true);
+    expect(image(dm, "e3")).toBe(false);
+  });
+
+  test("FR-KIT-41 actor portrait precedence: character over combatant over token over definition; no image → the initial", () => {
+    expect(
+      [
+        ...actorPortraits({
+          entities: [
+            { kind: "monster", name: "Mira", portraitAssetId: "def" },
+            { kind: "character", name: "Mira", portraitAssetId: "pc" },
+            { kind: "monster", name: "Goblin", portraitAssetId: "def-gob" },
+            { kind: "character", name: "Sela", portraitAssetId: null },
+          ],
+          combatants: [{ name: "goblin", imageAssetId: "cbt-gob" }],
+          tokens: [
+            { name: "GOBLIN", imageAssetId: "tok-gob" },
+            { name: "Sela", imageAssetId: null },
+          ],
+        }),
+      ].sort(),
+    ).toEqual([
+      ["goblin", "cbt-gob"],
+      ["mira", "pc"],
+    ]);
   });
 });
 

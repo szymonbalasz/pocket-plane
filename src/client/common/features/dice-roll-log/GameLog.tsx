@@ -96,8 +96,8 @@ import {
   actorItemValue,
   actorLabel,
   actorOptions,
+  actorPortraits,
   actorSelection,
-  characterPortraits,
   copiedRows,
   createStickToBottom,
   heldSegments,
@@ -384,7 +384,7 @@ function Entry({
   e: GameLogEntryView;
   isDm: boolean;
   color: string | null;
-  /** The rolling character's portrait (`characterPortraits`); null = the initial. */
+  /** The actor's portrait (`actorPortraits`); null = the initial. */
   portrait: string | null;
   focused: boolean;
   actions: readonly EntryAction[];
@@ -433,8 +433,8 @@ function Entry({
       <span data-line className="sr-only">
         {copyText(shown)}
       </span>
-      {/* FR-KIT-41: a character's portrait, else the actor's initial on its name colour
-          (FR-DICE-60), else neutral. */}
+      {/* FR-KIT-41: the actor's portrait, else its initial on its name colour (FR-DICE-60),
+          else neutral. */}
       {row.actor !== null ? (
         <Medallion name={row.actor} imageAssetId={portrait} colour={nameColor} size="md" />
       ) : (
@@ -586,7 +586,12 @@ function EntryList({
   const listRef = useRef<HTMLUListElement>(null);
   const keyOf = useColorKeyOf();
   const entities = useRecords<EntityRecord>(ENTITY_TYPE);
-  const portraits = useMemo(() => characterPortraits(entities), [entities]);
+  const combatants = useRecords<CombatantRecord>(COMBATANT_TYPE);
+  const tokens = useRecords<TokenView>(TOKEN_TYPE);
+  const portraits = useMemo(
+    () => actorPortraits({ entities, combatants, tokens }),
+    [entities, combatants, tokens],
+  );
   const focusedId = useLogFocus((s) => s.entryId);
   const focusSeq = useLogFocus((s) => s.seq);
   const [stick] = useState(createStickToBottom);
