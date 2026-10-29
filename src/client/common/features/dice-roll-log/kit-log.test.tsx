@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
+import { stubImageForFile } from "../assets-pipeline/picker-test-kit";
 import { colorHex } from "../campaign-management/colors";
 import { landing } from "../dice-extras/landing";
 import { EntryDetails, GameLog } from "./GameLog";
@@ -93,6 +94,7 @@ function render(
   entries: GameLogEntryView[],
   role: "dm" | "player" = "player",
   node?: React.ReactNode,
+  extra: Record<string, unknown> = {},
 ) {
   const store = {
     ...emptyStore(),
@@ -101,6 +103,7 @@ function render(
       [GAME_LOG_ENTRY_TYPE]: Object.fromEntries(entries.map((e) => [e.id, e])),
       campaign: { c1: { id: "c1", name: "C", dmColor: "amber" } },
       player: { p1: { id: "p1", campaignId: "c1", name: "Player 1", color: "jade" } },
+      ...extra,
     },
   } as unknown as RecordStore;
   const sync = createStore<SyncState>()(
@@ -218,6 +221,27 @@ describe("FR-KIT-41 medallion colour", () => {
     expect(dm).toContain("bg-muted");
     expect(dm).not.toContain("style=");
     expect(dm).toContain('data-size="md"');
+  });
+});
+
+describe("FR-KIT-41 character portrait", () => {
+  stubImageForFile();
+  test("FR-KIT-41 character portrait: a character's roll shows its portrait (both clients); a monster of the same name, the DM and a character without one keep the initial", () => {
+    const entity = {
+      mira: { id: "mira", kind: "character", name: "Mira", portraitAssetId: "art-mira" },
+      dm: { id: "gob", kind: "monster", name: "DM", portraitAssetId: "art-gob" },
+    };
+    for (const role of ["player", "dm"] as const) {
+      const html = render([entry(), hp], role, undefined, { entity });
+      const mira = row(html, "e1").body;
+      expect(tag(mira, "kit-medallion")).toContain("data-image");
+      expect(mira).not.toMatch(/data-testid="kit-medallion"[^>]*>M</);
+      expect(tag(row(html, "e3").body, "kit-medallion")).not.toContain("data-image");
+    }
+    const plain = render([entry()], "player", undefined, {
+      entity: { mira: { ...entity.mira, portraitAssetId: null } },
+    });
+    expect(row(plain, "e1").body).toMatch(/data-testid="kit-medallion"[^>]*>M</);
   });
 });
 
