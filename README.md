@@ -50,28 +50,22 @@ bun install
 bun run env:init
 ```
 
-Then edit `.env`:
-
-```ini
-# Keep your campaign apart from demo and test data
-PP_DATA_DIR=data/live
-# Must be empty for real data: "1" lets the fixture tools wipe the folder
-PP_DATA_DISPOSABLE=
-```
-
-- Keep the random `PP_DM_SECRET` that `env:init` wrote; it's your DM password. To choose your own, use at least 12 characters and never one copied from a guide.
+- Keep the random `PP_DM_SECRET` that `env:init` wrote to `.env`; it's your DM password. To choose your own, use at least 12 characters and never one copied from a guide.
+- Optional, in `.env`: `PP_PLAY_BACKUP_DIR` to send backups somewhere else (a synced folder such as OneDrive is fine for backups), `PP_PLAY_DATA_DIR` to keep the live data somewhere other than the default, `PP_PLAY_PORT` for another port. See [Configuration](#configuration).
 
 ### 2. Each game night
 
 ```bash
-bun run build
-bun run start
+bun run play
 ```
 
-- The server prints the DM URL. Open it, enter the DM secret.
+- `play` keeps your campaign **outside the repo**, in your per-user data folder (Windows `%LOCALAPPDATA%\PocketPlane`, macOS `~/Library/Application Support/PocketPlane`, Linux `~/.local/share/pocket-plane`), apart from demo and test data. The fixture tools can never wipe it.
+- On each start it backs up the database and images first (newest 10 kept), builds the client, then starts the server on port 4090. If the backup fails, it doesn't start and says why.
+- Open the DM URL it prints and enter the DM secret.
 - First run: create a campaign, then add your players. Each player gets a private link; use **Copy link** in the player list and send it to them.
-- The database is created and upgraded automatically on start.
+- The database is created and upgraded automatically on start (with a `.pre-push-….bak` copy before any upgrade).
 - `Ctrl+C` stops the server. State is saved as you play, so a crash or restart loses nothing; everyone reconnects on their own.
+- Don't put the live data folder in OneDrive, Dropbox or similar: syncing the database while the server writes to it can lock or damage it. Point `PP_PLAY_BACKUP_DIR` there instead.
 
 ### 3. Let remote players in
 
@@ -88,7 +82,17 @@ cloudflared tunnel --url http://127.0.0.1:<port>
 
 ### Your data
 
-Everything lives in `PP_DATA_DIR`: the SQLite database (`pocket-plane.db`) and uploaded images (`assets/`). Back up that folder. `data/` is git-ignored.
+Everything lives in the play data folder: the SQLite database (`pocket-plane.db`) and uploaded images (`assets/`). `play` backs both up on every start into `PP_PLAY_BACKUP_DIR` (default `<play folder>/backups`). To restore, stop the server and copy a backup `.db` over `pocket-plane.db`. Demo and test data live in the repo's git-ignored `data/` folder instead.
+
+### 4. Optional: edit content with Claude Code (MCP)
+
+Pocket Plane ships an MCP server so Claude Code can create creatures, homebrew and character sheets in your running game ([agent-api](docs/specs/agent-api.md)). It goes through the server's normal commands (checked, logged, live for players) and only works while the server runs. Register it once, from this folder:
+
+```bash
+claude mcp add --scope local pocket-plane -- bun run mcp:play
+```
+
+Restart Claude Code (or `/mcp` → reconnect) after pulling a new version. For testing on demo data, add a second one: `claude mcp add --scope local pocket-plane-test -- bun run mcp --profile verify`.
 
 ## Configuration
 
@@ -97,8 +101,11 @@ All settings live in `.env` (see [`.env.example`](.env.example)). The ones you'r
 | Variable | Default | Meaning |
 |---|---|---|
 | `PP_DM_SECRET` | required | DM password, min 12 characters |
-| `PP_DATA_DIR` | `data/<profile>` | Where the database and assets live |
-| `PP_DATA_DISPOSABLE` | empty | `1` only for test data that may be wiped |
+| `PP_PLAY_DATA_DIR` | per-user data folder | Live data for `bun run play`; refused inside the repo or the temp folder |
+| `PP_PLAY_BACKUP_DIR` | `<play folder>/backups` | Where `play` writes its start-up backups |
+| `PP_PLAY_PORT` | `4090` | Port for `bun run play` |
+| `PP_DATA_DIR` | `data/<profile>` | Demo / test data folder for `start`, `dev` and the fixture tools |
+| `PP_DATA_DISPOSABLE` | `1` from `env:init` | `1` lets the fixture tools wipe the demo / test folder; `play` always turns it off |
 | `PP_PUBLIC_BASE_URL` | empty | Base for player links, e.g. your tunnel URL |
 | `PP_SLOT` | set by `env:init` | Port slot: ports start at `4100 + 10 × slot` |
 | `PP_PORT` | from slot | Fixed server port instead of the slot |
@@ -110,8 +117,8 @@ All settings live in `.env` (see [`.env.example`](.env.example)). The ones you'r
 | Command | Does |
 |---|---|
 | `bun run dev` | Server with watch + Vite with hot reload; DM URL is the Vite port |
-| `bun run check` | Typecheck, lint and tests; run before every commit |
-| `bun run check:full` | `check` plus the slow test set |
+| `bun run check` | Typecheck, lint and the tests near your changes; run before every commit (CI runs everything on each push) |
+| `bun run check:full` | Every test incl. the slow set (CI runs it; locally only to chase a CI failure) |
 | `bun run e2e` | Builds, then Playwright end-to-end flows |
 | `bun run fixtures:reset-load <bundle>` | Reset the dev data and load a fixture bundle (bundles: `fixtures/bundles/`) |
 | `bun run lint:fix` | Apply Biome formatting and safe fixes |
