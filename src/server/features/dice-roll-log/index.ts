@@ -5,7 +5,7 @@
 import type { Feature } from "../../services";
 import { rollCommand } from "./commands";
 import { evaluate, rollDmPayload, rollIdsOf, rollPayloadItem } from "./evaluate";
-import { append, markUndone, supersede } from "./game-log";
+import { append, markUndone, markUsed, supersede } from "./game-log";
 import { gameLogEntryType, gameLogSettingsType } from "./records";
 import { reroll } from "./reroll";
 import { setCategoryPublic } from "./settings";
@@ -32,9 +32,9 @@ export const dice = { evaluate, rollPayloadItem, rollDmPayload, rollIdsOf, rerol
 
 /**
  * `gameLog.append(env, …)` / `gameLog.markUndone(env, id)` / `gameLog.supersede(env, old, new)`
- * → `RecordChange`; no event.
+ * / `gameLog.markUsed(env, id, cardId)` (FR-DICE-96) → `RecordChange`; no event.
  */
-export const gameLog = { append, markUndone, supersede } as const;
+export const gameLog = { append, markUndone, supersede, markUsed } as const;
 
 export const diceRollLog: Feature = {
   name: "dice-roll-log",

@@ -2,11 +2,14 @@
 // the caller's transaction, no events; they return the `game-log-entry` change for the caller's
 // event.
 import { getLogKind } from "@shared/dice-roll-log/kinds";
+import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import {
   categoryPublic,
   GAME_LOG_ENTRY_TYPE,
   type GameLogEntryRecord,
   type RollCategory,
+  RollEntryDmPayload,
+  RollEntryPayload,
 } from "@shared/dice-roll-log/schemas";
 import { and, eq, max } from "drizzle-orm";
 import type { CommandEnv } from "../../commands/commands";
@@ -189,4 +192,30 @@ export function markUndone(env: CommandEnv, entryId: string): RecordChange {
   env.tx.update(gameLogEntry).set({ undone: true }).where(eq(gameLogEntry.id, entryId)).run();
   const after = toEntryRecord(getEntry(env.tx, cid, entryId) as EntryRow);
   return { type: GAME_LOG_ENTRY_TYPE, id: entryId, before: toEntryRecord(row), after };
+}
+
+/** FR-DICE-96: `markUsed`'s refusal for an entry already stamped. */
+export const ALREADY_USED = "Already used by a card";
+
+/**
+ * FR-DICE-96 (#385): stamps a `roll` entry's DM-only `dmPayload.usedByCardId` once, in the
+ * caller's transaction (combat's `cbt.useRoll`); already stamped → `conflict`. An entry without a
+ * `dmPayload` gets one with empty names per item. Never cleared; no event (the caller emits).
+ */
+export function markUsed(env: CommandEnv, entryId: string, cardId: string): RecordChange {
+  const cid = campaignOf(env.actor);
+  const row = getEntry(env.tx, cid, entryId);
+  if (!row) throw notFound("Log entry not found");
+  if (row.kind !== ROLL_KIND) throw new Error(`gameLog.markUsed: entry ${entryId} is no roll`);
+  const before = toEntryRecord(row);
+  const items = RollEntryPayload.parse(row.payload);
+  const dm: RollEntryDmPayload =
+    row.dmPayload === null
+      ? { items: items.map(() => ({ mods: [] })) }
+      : RollEntryDmPayload.parse(row.dmPayload);
+  if (dm.usedByCardId !== undefined) throw conflict(ALREADY_USED);
+  const dmPayload = RollEntryDmPayload.parse({ ...dm, usedByCardId: cardId });
+  env.tx.update(gameLogEntry).set({ dmPayload }).where(eq(gameLogEntry.id, entryId)).run();
+  const after = toEntryRecord(getEntry(env.tx, cid, entryId) as EntryRow);
+  return { type: GAME_LOG_ENTRY_TYPE, id: entryId, before, after };
 }
