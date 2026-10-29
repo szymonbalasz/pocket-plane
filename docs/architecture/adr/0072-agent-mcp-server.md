@@ -89,3 +89,7 @@
 - The DM secret stays in `.env`, only travels over loopback, and never appears in any output (spec FR-AGENT-03). The DB, assets and server stay on the DM's machine. Tool results go to the model provider, as in any Claude Code session (spec OQ-AGENT-12).
 - The agent's writes carry DM authority and look like form writes in the event log (no marker; spec OQ-AGENT-09).
 - Later agent features (notes, maps) add tools on the same frame; any new server capability is still specced as a normal command first.
+
+## Notes
+
+- 2026-10-29 (integrator, slice 1 merge): `@modelcontextprotocol/sdk` pinned at exactly 1.32.1 (one zod, 4.x). `src/mcp`'s own `*.test.ts` may also import the server test harness and `@fixtures` (integration tests on a real in-process server); production `src/mcp` code keeps the D5 rules. There is no `campaign_get` tool; `campaigns_list` covers it (spec §9).

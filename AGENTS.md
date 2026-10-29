@@ -103,12 +103,14 @@ One package, no workspaces ([ADR-0002](docs/architecture/adr/0002-single-package
 | `src/client/player/` | `@player/*` | Player client: `index.html`, `main.tsx`, `features/<feature>/` | `@shared`, `@ui` |
 | `fixtures/` | `@fixtures/*` | Fixture library, TypeScript modules ([§9.3](#93-fixtures)) | `@server`, `@shared` |
 | `e2e/` | — | Playwright specs; `e2e/support/` helpers | anything |
+| `src/mcp/` | `@mcp/*` | MCP server ([ADR-0072](docs/architecture/adr/0072-agent-mcp-server.md)): stdio entry `index.ts`, `server.ts` (tool list), `tools/` (`registry.ts` + one module per tool group), `client.ts` (REST + WS caller), `lock.ts`, `errors.ts`, `plan.ts` | `@shared`; `@server/config` and `@server/runtime/lock` only; `import type { AppType } from "@server/app"` |
 | `scripts/` | — | Bun scripts behind `bun run` ([§9.4](#94-commands-and-scripts)) | anything |
 
 - **Import boundaries**, enforced by a `bun test` boundary test and Biome restricted imports:
   - `@ui` must not import `@dm` or `@player`. `@dm` and `@player` must not import each other.
   - Clients (`@ui`, `@dm`, `@player`) may only `import type { AppType } from "@server/app"` (Hono RPC, erased at build). Nothing else from `@server`. The player bundle therefore never contains DM or server code.
 - Two Vite entry points: `src/client/dm/index.html`, `src/client/player/index.html`. Build output `dist/client/`, served by Hono. URL routes per [campaign-management](docs/specs/campaign-management.md): DM `/`, player `/p/<token>`, REST `/api/*` *(proposed; [OQ-CAMP-15](docs/specs/campaign-management.md#15-open-questions) open)*.
+- Only `scripts/mcp-call.ts` and `src/mcp`'s own tests import `@mcp`; those tests may also use the server test harness and `@fixtures` (ADR-0072 note).
 - Feature code lives in its own `features/<feature>/` folders. Tests sit next to code as `*.test.ts`.
 - Only `src/server/config.ts` reads `process.env`; it parses it with zod and exports a `parseConfig(env)` that tests call directly.
 
@@ -207,6 +209,8 @@ fixtures/
 | `bun run test:times [filters…]` | Runs each test file in its own process (`PP_TEST_TIMES_JOBS` at once, default 8), rewrites `scripts/test-times.json` (shard weights) and writes `data/test-times.md`, slowest first | as `bun test` |
 | `bun run bench` | Timed perf gates (`*.bench.ts`: fog vision, scene geometry / guard / area, dice settle / notation, compendium search, map fit visibility, window placement, DM snapshot build time, command palette search, session recap compute; harness `src/shared/bench-kit.ts`); `bun test` skips them, a new one is added to the script. Run it alone, before merging vision / fog / geometry perf work | in-process |
 | `bun run state:digest [--profile p]` | Read-only per-table row counts + SHA-256 of the profile's DB (crash walkthroughs compare digests, #163) | profile data |
+| `bun run mcp [--profile p]` | Stdio MCP server for Claude Code ([ADR-0072](docs/architecture/adr/0072-agent-mcp-server.md)): DM tools over the running server, found via `$PP_DATA_DIR/server.lock`; stdout carries MCP messages only. Registered only in the DM's own checkout (`claude mcp add --scope local`) | profile data dir, reads the lock only |
+| `bun run mcp:call <tool> '<json>' [--profile p]` | Spawns the stdio server, calls one tool, prints the result; exit 1 on a tool error, 2 on a usage error (walkthroughs, scripts) | as `mcp` |
 
 - **Portable scripts** (Windows + POSIX): `package.json` scripts call only `bun scripts/<x>.ts` or binaries installed as dependencies (`tsc`, `biome`, `vite`, `playwright`). No `VAR=x cmd`, `rm -rf`, shell globs or `&&` chains; put logic in a Bun script.
 - `scripts/dev.ts` spawns Hono and Vite with `Bun.spawn`, prefixes their output, and stops both when either exits or on Ctrl+C. No `concurrently`.
