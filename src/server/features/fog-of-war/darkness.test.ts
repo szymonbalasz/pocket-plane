@@ -387,10 +387,10 @@ describe("FR-FOG-29 Explored memory setting", () => {
     t.s.db.update(sceneFog).set({ explored: false }).run();
     t.s.db.delete(dbMeta).where(eq(dbMeta.key, EXPLORED_DEFAULT_KEY)).run();
     expect(exploredDefaultOf(t.s.db)).toBe(0);
-    const rows = t.s.db.select().from(sceneFog).all().length;
+    const rows = () => t.s.db.select().from(sceneFog).all();
     const n = t.events.length;
-    expect(upgradeExploredDefault(t.s.db)).toBe(rows);
-    expect(t.s.db.select().from(sceneFog).all().every((r) => r.explored)).toBe(true);
+    expect(upgradeExploredDefault(t.s.db)).toBe(rows().length);
+    expect(rows().every((r) => r.explored)).toBe(true);
     expect(exploredDefaultOf(t.s.db)).toBe(EXPLORED_DEFAULT);
     expect(t.events.length).toBe(n);
     // Rerun, even after the DM switched a scene off again: nothing.

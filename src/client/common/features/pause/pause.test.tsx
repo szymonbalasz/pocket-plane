@@ -203,8 +203,8 @@ describe("registration (FR-SHELL-128, -129, -135)", () => {
   test("FR-SHELL-129 DM pause control: top-bar item (DM only, fixed slot), label, widths, payload, preview, draft", () => {
     // The slot: 40 px at every width, an icon button like search (kit-parity K10).
     const items = topBarItemsFor("dm", TOP_BAR_ITEMS);
-    // SP1's search button (FR-SHELL-195) sits after it, next to the identity chip.
-    expect(items.map((t) => t.id)).toEqual(["pause", "palette"]);
+    // #383's View as (FR-FOG-60) and SP1's search button (FR-SHELL-195) sit after it.
+    expect(items.map((t) => t.id)).toEqual(["pause", "view-as", "palette"]);
     const [item] = items;
     expect(
       [1600, 1280, 1279].map((w) => (item ? topBarItemWidth(item, { w, h: 720 }) : 0)),

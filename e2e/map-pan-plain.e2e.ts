@@ -139,6 +139,30 @@ test("FR-FOG-20 plain map + Layers Fog switch; FR-MAP-12 middle pan under Fog (d
   await expect(dm.getByTestId("scn-layer-toggle-fog")).toHaveAttribute("data-state", "unchecked");
   await dm.keyboard.press("Escape");
   await expect.poll(() => attrOf(dm, "fog-layer", "visible")).toBe(false);
+  // #383 (FR-FOG-60 / -20): the top bar's View as → a player, Fog tool closed: only their view
+  // over the plain map (no DM fog mask); the fog bar's Select shows the same pick; "DM" → plain.
+  const top = dm.getByTestId("fog-view-as-top");
+  await top.click();
+  const option = dm.locator(
+    '[data-testid="fog-view-as-option"]:not([data-value="dm"]):not([data-value="party"])',
+  );
+  const pid = (await option.first().getAttribute("data-value")) as string;
+  await option.first().click();
+  await expect(top).toHaveAttribute("data-value", pid);
+  await expect(top).not.toHaveAttribute("data-loading", /.*/);
+  await expect.poll(() => attrOf(dm, "fog-view-as", "player")).toBe(pid);
+  await expect.poll(() => attrOf(dm, "fog-layer", "mode")).toBe("view-as");
+  expect(await attrOf(dm, "fog-layer", "visible")).toBe(true);
+  expect(await konvaNodes(dm, "fog-mask")).toHaveLength(0);
+  await dm.getByTestId("map-tool-fog").click();
+  await expect.poll(() => attrOf(dm, "fog-layer", "mode")).toBe("full");
+  await expect(dm.getByTestId("fog-view-as")).toHaveAttribute("data-value", pid);
+  await dm.getByTestId("map-tool-select").click();
+  await top.click();
+  await dm.locator('[data-testid="fog-view-as-option"][data-value="dm"]').click();
+  await expect(top).toHaveAttribute("data-value", "dm");
+  await expect.poll(() => attrOf(dm, "fog-layer", "visible")).toBe(false);
+  await expect.poll(() => attrOf(dm, "fog-layer", "mode")).toBe("hidden");
 
   // FR-MAP-12: Fog + Polygon with 2 vertices placed; a middle drag pans, the draft keeps them.
   await watchMiddlePresses(dm);

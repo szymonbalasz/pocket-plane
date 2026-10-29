@@ -150,6 +150,7 @@ function render(client: ShellClient, node: React.ReactNode) {
         store: storeFor(client),
         notLiveSince: null,
         everLive: true,
+        viewAs: { loading: null }, // the DM top bar's View as (#383)
         connection: { onEvent: () => () => {}, sendIntent: () => Promise.resolve({}) },
       }) as unknown as SyncState,
   );

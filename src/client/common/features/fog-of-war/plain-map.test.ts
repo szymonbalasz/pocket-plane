@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { createLayerMemory, layerSwitches } from "../scene-tools/layer-switches";
 import { canvasLayers } from "../scenes-map/canvas-layers";
 import { layerSlots, layerToggles, toggleOn } from "../scenes-map/layers";
-import { FOG_LAYER_SWITCH, fogLayerShown } from "./plain-map";
+import { FOG_LAYER_SWITCH, fogLayerMode, fogLayerShown } from "./plain-map";
 
 describe("FR-FOG-20 DM plain map", () => {
   test("FR-FOG-20 DM layer hidden outside the Fog tool (and shown with the Layers switch on)", () => {
@@ -19,6 +19,16 @@ describe("FR-FOG-20 DM plain map", () => {
     // Players always draw their fog, whatever a stale DM store would say.
     expect(fogLayerShown("player", false, {})).toBe(true);
     expect(fogLayerShown("player", false, { fog: true })).toBe(true);
+  });
+
+  test('FR-FOG-20 View as outside the tool (#383): a loaded player / Party draws alone; "DM" stays plain', () => {
+    expect(fogLayerMode("dm", false, {}, false)).toBe("hidden");
+    expect(fogLayerMode("dm", false, {}, true)).toBe("view-as");
+    // The Fog tool or the Layers switch: the full DM layer, View as on top as before.
+    expect(fogLayerMode("dm", true, {}, true)).toBe("full");
+    expect(fogLayerMode("dm", false, { fog: false }, true)).toBe("full");
+    expect(fogLayerMode("dm", true, {}, false)).toBe("full");
+    expect(fogLayerMode("player", false, {}, false)).toBe("full");
   });
 
   test("FR-FOG-20 the Fog switch: registered on the fog entry, off by default, never unmounts the layer", () => {

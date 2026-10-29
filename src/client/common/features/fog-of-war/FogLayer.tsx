@@ -10,7 +10,9 @@
 // and the shown scene the fog bar acts on. Non-drawing markers `fog-vision` / `fog-explored`
 // (attr `player`) carry the drawn rows: the player's own, the DM's View-as pair. Sprint 4: the
 // DM's layer draws only with the Fog tool or the Layers "Fog" switch on (`fog-layer` attr
-// `visible`, `plain-map.ts`); the View-as pick and its rows stay loaded meanwhile. Sight preview
+// `visible`, `plain-map.ts`); the View-as pick and its rows stay loaded meanwhile, and (#383) a
+// loaded player / Party pair draws alone over the plain map (attr `mode` = `view-as`: no DM fog,
+// explored or darkness; the top bar's View as, FR-FOG-60). Sight preview
 // while dragging (FR-FOG-54, `sight-preview.ts`): the drawn `vision` takes the dragged source's
 // previewed polygons; the `fog-vision` marker then carries them and attr `preview` (token ids).
 // The brush's stroke drafts and cursor: `BrushNodes.tsx` (FR-FOG-55).
@@ -39,7 +41,7 @@ import { BrushNodes } from "./BrushNodes";
 import { type FogDraft, type GestureState, radiusLabel } from "./gesture";
 import { greyCopy } from "./grey-map";
 import { partyView, unionMemoryRuns } from "./party-view";
-import { fogLayerShown } from "./plain-map";
+import { fogLayerMode } from "./plain-map";
 import {
   DM_DARKNESS_FALLBACK,
   FOG_ALPHA,
@@ -443,7 +445,9 @@ export function FogLayer() {
   const drafting = toolOn && gesture.draft !== null;
   // FR-FOG-20 (sprint 4): the plain battlemap for the DM outside the Fog tool.
   const off = useLayerToggles((s) => s.off);
-  const shown = fogLayerShown(client, toolOn, off);
+  const mode = fogLayerMode(client, toolOn, off, pair !== null);
+  // #383: outside the Fog tool, View as draws only its render (no DM fog / darkness).
+  const dmLayers = mode !== "view-as";
   const vision = drawn?.vision ?? null;
   // FR-FOG-21 (sprint 4): the darkvision ring's greyscale map copy (players and View as only).
   const mapImage = useAssetImage(viewer === null ? null : scene.mapAssetId, "display").image;
@@ -461,23 +465,25 @@ export function FogLayer() {
   };
   const exploredCells = memory.reduce((n, r) => n + r[2] / gridCellSize, 0);
   return (
-    <Group name="fog-layer" listening={false} visible={shown}>
+    <Group name="fog-layer" listening={false} visible={mode !== "hidden"} mode={mode}>
       {rec && (
         <Group clipX={0} clipY={0} clipWidth={mapWidth} clipHeight={mapHeight}>
-          <Shape
-            name="fog-mask"
-            fog-alpha={paints.fog.alpha}
-            shapes={stats.shapes}
-            darkness={stats.darkness}
-            fogged-cells={stats.fogged}
-            explored-cells={stats.explored}
-            perfectDrawEnabled={false}
-            sceneFunc={(kctx) => {
-              const ctx = kctx._context as unknown as PaintCtx;
-              if (client === "player") paintPlayerView(ctx, view(rec), map, paints, gridLines);
-              else paintFog(ctx, rec, map, client, paints, hairline);
-            }}
-          />
+          {dmLayers && (
+            <Shape
+              name="fog-mask"
+              fog-alpha={paints.fog.alpha}
+              shapes={stats.shapes}
+              darkness={stats.darkness}
+              fogged-cells={stats.fogged}
+              explored-cells={stats.explored}
+              perfectDrawEnabled={false}
+              sceneFunc={(kctx) => {
+                const ctx = kctx._context as unknown as PaintCtx;
+                if (client === "player") paintPlayerView(ctx, view(rec), map, paints, gridLines);
+                else paintFog(ctx, rec, map, client, paints, hairline);
+              }}
+            />
+          )}
           {client === "dm" && pair && (
             // FR-FOG-20: View as P, P's render (FR-FOG-21) at 70 % over the DM view.
             <Shape
@@ -491,7 +497,7 @@ export function FogLayer() {
               }
             />
           )}
-          {client === "dm" && (
+          {client === "dm" && dmLayers && (
             <DmDarkness
               darkness={rec.darkness ?? []}
               gesture={toolOn ? gesture : { ...gesture, selected: null, move: null }}
