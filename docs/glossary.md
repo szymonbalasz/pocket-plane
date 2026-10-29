@@ -36,6 +36,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Sheet lock** | DM switch on a character: only the DM edits its sheet data; counters and play state stay usable by the owner. | — |
 | **Sheet section** | A block another feature registers into the character sheet (slot header / vitals / main / tab) through the append-only `sheetSections` registry. | Window |
 | **NPC sheet** | The character sheet opened by the DM on a custom creature definition for full editing. | `npc` entity kind |
+| **Custom creature** | A custom monster definition together with its NPC sheet; what the MCP server's `creature_*` tools create, derive and edit ([agent-api](specs/agent-api.md)). | `npc` entity kind; imported definition |
+| **Mount** | Two custom creatures, rider and mount, linked by a "Mount: …" / "Rider: …" line in each one's notes; no link record ([agent-api](specs/agent-api.md)). | Companion |
 | **Compendium** | Global library of rules content (monsters, spells, items, conditions, class features) from bundled sources or homebrew; read on demand, never in the snapshot ([compendium](specs/compendium.md), [ADR-0046](architecture/adr/0046-compendium-scope.md)). | Entity |
 | **Compendium entry** | One record in the compendium. | Entity |
 | **Search group** | Compendium entries with the same kind, name and source, shown as one expandable search row ([compendium](specs/compendium.md)). | — |
@@ -260,6 +262,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Event** (WS event) | Server-to-client message carrying the filtered record changes (one or more records) of one domain event; produced after the visibility filter. |
 | **Record change** | One record's change inside a domain event (before/after); sent to clients as `upsert` or `delete` after filtering. |
 | **Visibility filter** | Server-side rule deciding which events/fields each client receives. |
+| **MCP server** | The local stdio process (`bun run mcp`) that gives Claude Code DM tools over the running server; just another DM caller of the existing routes and intents, never the database ([ADR-0072](architecture/adr/0072-agent-mcp-server.md)). |
 | **Snapshot** | Full filtered state sent by the server after `hello` and on resync. |
 | **Resync** | Replacing a client's whole state with a fresh snapshot (client request, sequence gap or active-scene switch). |
 | **Signal** | Transient client-to-clients message (ping, laser, drag preview). Not a domain event: no DB write, event log or snapshot; still filtered (a signal type's audience may limit it to the DM, [ADR-0033](architecture/adr/0033-signal-audience.md)). |

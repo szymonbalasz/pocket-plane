@@ -1,6 +1,6 @@
-# proposed — Agent MCP server: a local DM caller over stdio
+# 0072 — Agent MCP server: a local DM caller over stdio
 
-- Status: proposed (spec-agent-api; DM track [#378](../../decisions-log.md))
+- Status: accepted (DM, [#379](../../decisions-log.md); numbered at merge). Picks D1–D6 as written
 - Date: 2026-10-28
 - Amends: none. Builds on [ADR-0003](0003-local-hosting.md), [ADR-0004](0004-tenancy-auth-permissions.md), [ADR-0005](0005-server-authoritative-sync.md), [ADR-0006](0006-persistence.md), [ADR-0016](0016-domain-events-pending-actions.md), [ADR-0019](0019-auth-credentials.md), [ADR-0024](0024-definition-visibility.md)
 - Affects: [agent-api](../../specs/agent-api.md); AGENTS §9.1 (new area), §9.4 (scripts); tooling `package.json`, `tsconfig.json`, `biome.json`, `src/boundaries.test.ts`

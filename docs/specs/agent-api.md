@@ -1,14 +1,14 @@
 ---
 title: Agent / MCP API
 prefix: AGENT
-status: in-review
+status: complete
 owner: spec-agent-api
 phase: post-mvp
 ---
 
 # Agent / MCP API
 
-> Decisions [#378](../decisions-log.md) are binding. Architecture: [proposed ADR agent-mcp-server](../architecture/adr/proposed-agent-mcp-server.md) (D1–D6).
+> Decisions [#378](../decisions-log.md) are binding. Architecture: [ADR-0072](../architecture/adr/0072-agent-mcp-server.md) (D1–D6).
 
 ## 1. Summary
 
@@ -228,6 +228,8 @@ Walkthrough ids come from `characters_list` / `creatures_list` / `compendium_sea
 | 5 Skill | `.claude/skills/pocket-plane-content/{SKILL.md,examples/}`, `src/mcp/skill-plans.test.ts` |
 
 ## 15. Open questions
+
+**All decided** at the DM gate ([#379](../decisions-log.md)): every bold pick holds (OQ-AGENT-01, -02, -08, -09, -11, -12 by the DM; -03 to -07 and -10 by the integrator).
 
 | ID | Question | Options (pick **bold**) | Blocking? | Affects |
 |---|---|---|---|---|

@@ -77,6 +77,7 @@ One ADR per decision area. Accepted ADRs are binding; change them only via a sup
 | [0069](0069-theme-switch.md) | Theme switch: one stylesheet per theme keyed on `data-slot`, no theme logic in components, no geometry change | accepted (#351; theme-system OQ-THEME-01 A) |
 | [0070](0070-launcher-in-top-bar.md) | Launcher in the top bar's centre zone; work area to the bottom edge; layouts regenerated once (kit parity) | accepted (#356; kit-parity OQ-KIT-01 A; amends play-shell §7) |
 | [0071](0071-spell-fx.md) | Spell FX: client-drawn map effects on effect rows (`effect.fx`), transient hit cues from an after-commit listener, filtered per connection | accepted (#373; OQ-VFX-05 A by the DM) |
+| [0072](0072-agent-mcp-server.md) | Agent MCP server: a local stdio DM caller over the existing REST + WS intents, DM secret from `.env`, server found via `server.lock`, code in `src/mcp/`, registered only in the DM's own checkout | accepted (#379; agent-api OQ-AGENT-11) |
 
 ## Proposing a new ADR
 
