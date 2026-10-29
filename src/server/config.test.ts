@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import os from "node:os";
 import path from "node:path";
-import { ConfigError, formatCrashSpec, parseConfig, profileArg } from "./config";
+import {
+  ConfigError,
+  formatCrashSpec,
+  PLAY_DEFAULT_PORT,
+  parseConfig,
+  profileArg,
+  resolvePlayDirs,
+} from "./config";
 
 const SECRET = "a-dm-secret-123";
 const root = path.join(os.tmpdir(), "pp-config-test");
@@ -99,5 +106,98 @@ describe("parseConfig", () => {
   test("profileArg reads --profile", () => {
     expect(profileArg(["bun", "x", "--profile", "verify"])).toBe("verify");
     expect(profileArg(["bun", "x"])).toBeUndefined();
+  });
+});
+
+describe("resolvePlayDirs (#382)", () => {
+  const W = (p: string) => path.win32.join(p);
+  const win = {
+    platform: "win32" as const,
+    home: W("C:/Users/dm"),
+    tmp: W("C:/Users/dm/AppData/Local/Temp"),
+    root: W("C:/src/pocket-plane"),
+  };
+  const linux = {
+    platform: "linux" as const,
+    home: "/home/dm",
+    tmp: "/tmp",
+    root: "/src/pocket-plane",
+  };
+  const mac = {
+    platform: "darwin" as const,
+    home: "/Users/dm",
+    tmp: "/var/folders/xy/T",
+    root: "/src/pocket-plane",
+  };
+
+  test("#382 OS per-user defaults, backups under the play dir, port 4090", () => {
+    const w = resolvePlayDirs({ LOCALAPPDATA: W("C:/Users/dm/AppData/Local") }, win);
+    expect(w.dataDir).toBe(W("C:/Users/dm/AppData/Local/PocketPlane"));
+    expect(w.backupDir).toBe(W("C:/Users/dm/AppData/Local/PocketPlane/backups"));
+    expect(w.port).toBe(PLAY_DEFAULT_PORT);
+    expect(PLAY_DEFAULT_PORT).toBe(4090);
+    // No LOCALAPPDATA: the same folder from the home dir.
+    expect(resolvePlayDirs({}, win).dataDir).toBe(W("C:/Users/dm/AppData/Local/PocketPlane"));
+    expect(resolvePlayDirs({}, mac).dataDir).toBe(
+      "/Users/dm/Library/Application Support/PocketPlane",
+    );
+    expect(resolvePlayDirs({}, linux).dataDir).toBe("/home/dm/.local/share/pocket-plane");
+    expect(resolvePlayDirs({ XDG_DATA_HOME: "/data/xdg" }, linux).dataDir).toBe(
+      "/data/xdg/pocket-plane",
+    );
+    // A relative XDG_DATA_HOME is invalid per the XDG spec: ignored.
+    expect(resolvePlayDirs({ XDG_DATA_HOME: "rel" }, linux).dataDir).toBe(
+      "/home/dm/.local/share/pocket-plane",
+    );
+  });
+
+  test("#382 PP_PLAY_DATA_DIR / PP_PLAY_BACKUP_DIR / PP_PLAY_PORT override", () => {
+    const d = resolvePlayDirs(
+      {
+        PP_PLAY_DATA_DIR: "/srv/campaigns",
+        PP_PLAY_BACKUP_DIR: "/cloud/pp-backups",
+        PP_PLAY_PORT: "4095",
+      },
+      linux,
+    );
+    expect(d).toEqual({ dataDir: "/srv/campaigns", backupDir: "/cloud/pp-backups", port: 4095 });
+    // Relative overrides resolve from the checkout root, like every PP_* path.
+    expect(resolvePlayDirs({ PP_PLAY_DATA_DIR: "../play" }, linux).dataDir).toBe("/src/play");
+    expect(resolvePlayDirs({ PP_PLAY_DATA_DIR: "  " }, linux).dataDir).toBe(
+      "/home/dm/.local/share/pocket-plane",
+    );
+    expect(() => resolvePlayDirs({ PP_PLAY_PORT: "nope" }, linux)).toThrow(/PP_PLAY_PORT/);
+    expect(() => resolvePlayDirs({ PP_PLAY_PORT: "70000" }, linux)).toThrow(ConfigError);
+  });
+
+  test("#382 refuses a play dir anywhere inside the checkout or under the OS temp dir", () => {
+    for (const dir of [
+      "data",
+      "data/dev",
+      ".",
+      "campaigns",
+      "/src/pocket-plane",
+      "/src/pocket-plane/data/play",
+      "/src/pocket-plane/src/x",
+    ]) {
+      expect(() => resolvePlayDirs({ PP_PLAY_DATA_DIR: dir }, linux)).toThrow(
+        /inside the checkout/,
+      );
+    }
+    for (const dir of ["/tmp", "/tmp/pp"]) {
+      expect(() => resolvePlayDirs({ PP_PLAY_DATA_DIR: dir }, linux)).toThrow(/temp dir/);
+    }
+    // Windows compares case-insensitively.
+    expect(() =>
+      resolvePlayDirs({ PP_PLAY_DATA_DIR: W("c:/users/DM/appdata/local/temp/x") }, win),
+    ).toThrow(/temp dir/);
+    expect(() => resolvePlayDirs({ PP_PLAY_DATA_DIR: W("C:/SRC/Pocket-Plane/x") }, win)).toThrow(
+      /inside the checkout/,
+    );
+    // Siblings with a shared prefix are fine.
+    expect(resolvePlayDirs({ PP_PLAY_DATA_DIR: "/tmpx/pp" }, linux).dataDir).toBe("/tmpx/pp");
+    expect(resolvePlayDirs({ PP_PLAY_DATA_DIR: "/src/pocket-plane-play" }, linux).dataDir).toBe(
+      "/src/pocket-plane-play",
+    );
   });
 });

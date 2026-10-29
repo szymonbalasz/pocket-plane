@@ -133,6 +133,9 @@ Implements [ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md). Val
 | `PP_DM_SECRET` | **required** | DM secret, min 12 chars, env only, never stored ([OQ-CAMP-03](docs/specs/campaign-management.md#15-open-questions)). Server refuses to start without it. `env:init` writes a random dev value |
 | `PP_PUBLIC_BASE_URL` | unset | Base for player links ([OQ-CAMP-07](docs/specs/campaign-management.md#15-open-questions)). Unset → DM client's origin + warning (pick; OQ-CAMP-07 open) |
 | `PP_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
+| `PP_PLAY_DATA_DIR` | OS per-user dir | `bun run play` data root (#382). Default Windows `%LOCALAPPDATA%/PocketPlane`, macOS `~/Library/Application Support/PocketPlane`, else `$XDG_DATA_HOME/pocket-plane` or `~/.local/share/pocket-plane`. Refused anywhere inside the checkout or under the OS temp dir. Relative paths resolve from the worktree root (so `../<name>` = a sibling folder) |
+| `PP_PLAY_BACKUP_DIR` | `<play dir>/backups` | Start-up backups of `play`: DB copies `pocket-plane-<yyyymmdd-hhmmss>.db` (newest 10) + `assets/` mirror (add / update only) |
+| `PP_PLAY_PORT` | `4090` | `play` port, outside the slot range 4100–4599 |
 
 - **No `PP_TUNNEL`.** The DM runs cloudflared against `PP_PORT` and sets `PP_PUBLIC_BASE_URL` to the tunnel URL; that is ADR-0008's "tunnel on/off".
 - **Ports**: `base = 4100 + 10 × PP_SLOT` (4100–4599).
@@ -151,6 +154,17 @@ Implements [ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md). Val
 - **Slot claim** (`bun run env:init`): keeps an existing `.env`. Otherwise picks the lowest slot not claimed in any other worktree's `.env` (via `git worktree list`) whose ports pass a **test bind** on `PP_HOST` (catches Windows reserved ranges), then writes `.env`. Holds a lock file in the git common dir while picking. The orchestrator runs it when creating a `build/*` or `fix/*` worktree, any location (incl. `~/.herdr/worktrees/<repo>/<branch-slug>`).
 - **Server lock**: on start the server writes `$PP_DATA_DIR/server.lock` (PID, port) and removes it on clean exit. A lock whose PID is alive → second server and `fixtures:*` refuse. PID dead → stale lock removed with a warning. E2E reads the actual port from it. The loader holds the same lock (owner `loader`); the server refuses to start while it is live, or while the load manifest is `resetting`/`loading` ([FR-FIX-27/28](docs/specs/fixtures-adapters.md#6-functional-requirements)).
 - Builder and test agent share a worktree but not a profile, so a walkthrough never resets the builder's DB.
+
+**Running a real campaign** (`bun run play`, #382)
+
+- Live data lives **outside the repo** (`play` refuses a folder anywhere inside the checkout, or under the OS temp dir), in `PP_PLAY_DATA_DIR` (default above), never in a synced folder (OneDrive, Dropbox…): SQLite WAL + sync gives conflict copies and locks. Backups (`PP_PLAY_BACKUP_DIR`) may point into one.
+- `play` refuses `PP_TEST_MODE` / `PP_TEST_CRASH`, runs with `PP_DATA_DISPOSABLE` off (fixtures refuse the dir), builds the client, backs up (refuses to start if that fails, unless `--no-backup`; `--no-build` skips the build), then starts the same server as `start` on `PP_PLAY_PORT`. Prints the DM URL, data dir and backup dir, never the secret. The DM secret stays in the gitignored `.env`.
+- MCP for the real campaign, registered once in the DM's checkout; a second server for fixtures:
+
+```sh
+claude mcp add --scope local pocket-plane -- bun run mcp:play
+claude mcp add --scope local pocket-plane-test -- bun run mcp --profile verify
+```
 
 ### 9.3 Fixtures
 
@@ -197,6 +211,7 @@ fixtures/
 | `bun run dev [--profile p]` | Hono (watch) + Vite; logs to stdout and `$PP_DATA_DIR/server.log` | profile ports |
 | `bun run build` | Vite build of both clients to `dist/client/` | — |
 | `bun run start [--profile p]` | Hono serving `dist/client/`, API and WS on one port | profile port |
+| `bun run play [--no-build] [--no-backup]` | Real campaign (#382): checks, backs up the DB + assets, builds, starts the `start` server on the play dir (§9.2 *Running a real campaign*) | `PP_PLAY_DATA_DIR`, `PP_PLAY_PORT` |
 | `bun test` | Unit + integration: commands, zod schemas, domain events + event log, visibility filter (DM vs player), WS hub via real socket, fixture load, import boundaries, guards. Plain `bun test` runs every file, the slow set too | `:memory:` DB, temp asset dir, port 0 |
 | `bun run e2e [spec.ts…]` | Builds once, then Playwright per bundle, thin critical flows only. DM and player in separate browser contexts. Up to `PP_E2E_WORKERS` bundles at once (default 4; `1` = one after another), output prefixed `[bundle]`, a passed / failed / flaky summary per bundle at the end; longest bundles first (`data/e2e-times.json`). `--no-build` reuses `dist/client/`; `--shard=i/n` runs one of n balanced bundle sets (CI, weights `scripts/e2e-times.json`). A spec header `// e2e-serial: <why>` (timing-sensitive under load) runs its bundle alone after the others; Playwright timeouts 60 s per test, 10 s per `expect` (hang guards) | per bundle: port 0, temp data dir, own server, Playwright output `test-results/<bundle>/` |
 | `bun run typecheck` | `tsc --noEmit`, whole repo | — |
@@ -210,7 +225,8 @@ fixtures/
 | `bun run bench` | Timed perf gates (`*.bench.ts`: fog vision, scene geometry / guard / area, dice settle / notation, compendium search, map fit visibility, window placement, DM snapshot build time, command palette search, session recap compute; harness `src/shared/bench-kit.ts`); `bun test` skips them, a new one is added to the script. Run it alone, before merging vision / fog / geometry perf work | in-process |
 | `bun run state:digest [--profile p]` | Read-only per-table row counts + SHA-256 of the profile's DB (crash walkthroughs compare digests, #163) | profile data |
 | `bun run mcp [--profile p]` | Stdio MCP server for Claude Code ([ADR-0072](docs/architecture/adr/0072-agent-mcp-server.md)): DM tools over the running server, found via `$PP_DATA_DIR/server.lock`; stdout carries MCP messages only. Registered only in the DM's own checkout (`claude mcp add --scope local`) | profile data dir, reads the lock only |
-| `bun run mcp:call <tool> '<json>' [--profile p]` | Spawns the stdio server, calls one tool, prints the result; exit 1 on a tool error, 2 on a usage error (walkthroughs, scripts) | as `mcp` |
+| `bun run mcp:play` | `bun run mcp --play`: the MCP server pointed at the play dir's `server.lock` (#382); `--play` with `--profile` is a usage error | play data dir, reads the lock only |
+| `bun run mcp:call <tool> '<json>' [--profile p \| --play]` | Spawns the stdio server, calls one tool, prints the result; exit 1 on a tool error, 2 on a usage error (walkthroughs, scripts). `--play` targets the play dir; with `--profile` it is a usage error | as `mcp` |
 
 - **Portable scripts** (Windows + POSIX): `package.json` scripts call only `bun scripts/<x>.ts` or binaries installed as dependencies (`tsc`, `biome`, `vite`, `playwright`). No `VAR=x cmd`, `rm -rf`, shell globs or `&&` chains; put logic in a Bun script.
 - `scripts/dev.ts` spawns Hono and Vite with `Bun.spawn`, prefixes their output, and stops both when either exits or on Ctrl+C. No `concurrently`.

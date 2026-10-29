@@ -38,10 +38,13 @@ export class AgentError extends Error {
 
 // ---- messages: one sentence + the next step (AGENT §7) ----
 
+/** `profile` is the target label: a profile name, or `"play"` for `--play` (#382). */
 export const notRunning = (profile: string) =>
   new AgentError(
     "server_not_running",
-    `Pocket Plane isn't running (profile ${profile}). Start the server (\`bun run start\` or \`bun run dev\`).`,
+    profile === "play"
+      ? "Pocket Plane isn't running (play folder). Start the server (`bun run play`)."
+      : `Pocket Plane isn't running (profile ${profile}). Start the server (\`bun run start\` or \`bun run dev\`).`,
   );
 
 export const busy = (why: "fixture load running" | "server starting") =>

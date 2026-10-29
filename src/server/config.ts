@@ -218,3 +218,94 @@ export function localUrl(host: string, p: number): string {
   const h = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
   return `http://${h.includes(":") ? `[${h}]` : h}:${p}`;
 }
+
+// ---------- real campaigns: `bun run play` (#382) ----------
+
+/** Default `bun run play` port: outside the worktree slot range 4100-4599 (AGENTS §9.2). */
+export const PLAY_DEFAULT_PORT = 4090;
+
+export interface PlayDirs {
+  /** Live data root (DB, assets, server.lock): outside the checkout and the OS temp dir. */
+  dataDir: string;
+  /** `PP_PLAY_BACKUP_DIR`, default `<dataDir>/backups`. */
+  backupDir: string;
+  port: number;
+}
+
+export interface PlayResolveOptions {
+  platform?: NodeJS.Platform;
+  home?: string;
+  tmp?: string;
+  /** Checkout root: relative overrides resolve from here; anything inside it is refused. */
+  root?: string;
+}
+
+/** The OS per-user data location for real campaigns (#382). */
+export function defaultPlayDataDir(
+  env: Record<string, string | undefined>,
+  platform: NodeJS.Platform,
+  home: string,
+): string {
+  const p = platform === "win32" ? path.win32 : path.posix;
+  const set = (v: string | undefined) => (v && p.isAbsolute(v) ? v : undefined);
+  if (platform === "win32") {
+    return p.join(set(env.LOCALAPPDATA) ?? p.join(home, "AppData", "Local"), "PocketPlane");
+  }
+  if (platform === "darwin") return p.join(home, "Library", "Application Support", "PocketPlane");
+  return p.join(set(env.XDG_DATA_HOME) ?? p.join(home, ".local", "share"), "pocket-plane");
+}
+
+/** `child` is `parent` or inside it (case-insensitive on Windows). */
+export function isWithin(
+  child: string,
+  parent: string,
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  const p = platform === "win32" ? path.win32 : path.posix;
+  const norm = (v: string) => (platform === "win32" ? p.resolve(v).toLowerCase() : p.resolve(v));
+  const rel = p.relative(norm(parent), norm(child));
+  return rel === "" || (!rel.startsWith("..") && !p.isAbsolute(rel));
+}
+
+/**
+ * Pure play-dir resolver shared by `bun run play`, `mcp --play` and `mcp:call --play` (#382):
+ * `PP_PLAY_DATA_DIR`, else the OS default. Throws ConfigError for a dir inside the checkout
+ * (a public repo; its data/ is disposable) or the OS temp dir.
+ */
+export function resolvePlayDirs(
+  env: Record<string, string | undefined>,
+  opts: PlayResolveOptions = {},
+): PlayDirs {
+  const platform = opts.platform ?? process.platform;
+  const p = platform === "win32" ? path.win32 : path.posix;
+  const root = opts.root ?? WORKTREE_ROOT;
+  const tmp = opts.tmp ?? os.tmpdir();
+  const value = (k: string) => {
+    const v = env[k]?.trim();
+    return v ? v : undefined;
+  };
+  const resolve = (v: string) => (p.isAbsolute(v) ? p.normalize(v) : p.resolve(root, v));
+
+  const override = value("PP_PLAY_DATA_DIR");
+  const dataDir = override
+    ? resolve(override)
+    : defaultPlayDataDir(env, platform, opts.home ?? os.homedir());
+  for (const [label, refused, why] of [
+    ["inside the checkout", root, "live campaign data must stay out of the repo"],
+    ["under the OS temp dir", tmp, "it may be wiped"],
+  ] as const) {
+    if (isWithin(dataDir, refused, platform)) {
+      throw new ConfigError(
+        `Refusing: play data dir ${dataDir} is ${label} (${refused}): ${why}. Set PP_PLAY_DATA_DIR to a folder outside it. Nothing changed.`,
+      );
+    }
+  }
+
+  const backup = value("PP_PLAY_BACKUP_DIR");
+  const rawPort = value("PP_PLAY_PORT");
+  const port = rawPort === undefined ? PLAY_DEFAULT_PORT : Number(rawPort);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new ConfigError(`PP_PLAY_PORT "${rawPort}" is not a port (0-65535).`);
+  }
+  return { dataDir, backupDir: backup ? resolve(backup) : p.join(dataDir, "backups"), port };
+}
