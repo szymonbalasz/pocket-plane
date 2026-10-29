@@ -1,8 +1,8 @@
 ---
 title: Character sheet (full)
 prefix: CHARX
-status: complete
-owner: spec-wf, spec-sb, spec-tt, spec-rs, spec-charx-print-sheet
+status: claimed
+owner: spec-wf, spec-sb, spec-tt, spec-rs, spec-charx-print-sheet, spec-tray-attacks
 phase: post-mvp-9
 ---
 

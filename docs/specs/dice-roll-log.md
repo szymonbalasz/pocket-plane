@@ -1,8 +1,8 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: complete
-owner: spec-sb, spec-tt, spec-fx
+status: claimed
+owner: spec-sb, spec-tt, spec-fx, spec-tray-attacks
 wave: 2
 phase: post-mvp-9
 ---
