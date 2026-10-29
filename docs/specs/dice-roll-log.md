@@ -433,7 +433,7 @@ Walkthrough: [gems §13](gems.md#13-test-plan) steps 4, 11, 12.
 | 9 | B reloads with step 3's card pending; then hard kill + restart | Line and card consistent after the reload; `state:digest` equal after the restart |
 | 10 | Leak scan C | No Brakka card, no `dmPayload`; award lines public only |
 
-**Sprint 15 (#385, tray attacks):** bundle `tray-attacks` and walkthrough T1–T14: [CBT §13.8](combat-tracker.md#138-sprint-15-tray-attacks) (DICE steps T6, T10–T13). Named tests: `FR-DICE-94 dice.roll purpose and parts`, `FR-DICE-94 purpose validation`, `FR-DICE-95 purpose line`, `FR-DICE-95 edited mark`, `FR-DICE-96 used stamp`, `FR-DICE-96 stamp never reaches players` (leak scan: no `usedByCardId` in player frames), `FR-DICE-96 reroll keeps the stamp`, `FR-DICE-97 use-as availability`, `FR-DICE-98 roll request parts`.
+**Sprint 15 (#385, tray attacks):** bundle `tray-attacks` and walkthrough T1–T14: [CBT §13.8](combat-tracker.md#138-sprint-15-tray-attacks) (DICE steps T2, T7, T10–T14). Named tests: `FR-DICE-94 dice.roll purpose and parts`, `FR-DICE-94 purpose validation`, `FR-DICE-95 purpose line`, `FR-DICE-95 edited mark`, `FR-DICE-96 used stamp`, `FR-DICE-96 stamp never reaches players` (leak scan: no `usedByCardId` in player frames), `FR-DICE-96 reroll keeps the stamp`, `FR-DICE-97 use-as availability`, `FR-DICE-98 roll request parts`.
 
 ## 14. Dependencies
 
