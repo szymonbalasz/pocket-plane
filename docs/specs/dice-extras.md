@@ -1,7 +1,7 @@
 ---
 title: Dice extras
 prefix: DICEX
-status: claimed
+status: in-review
 owner: spec-tt, spec-fx, spec-tray-attacks
 phase: post-mvp-9
 ---

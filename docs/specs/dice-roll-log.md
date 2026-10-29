@@ -1,7 +1,7 @@
 ---
 title: Dice and game log
 prefix: DICE
-status: claimed
+status: in-review
 owner: spec-sb, spec-tt, spec-fx, spec-tray-attacks
 wave: 2
 phase: post-mvp-9
