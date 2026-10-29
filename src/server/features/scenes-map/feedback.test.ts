@@ -92,7 +92,7 @@ describe("scenes-map feedback: shape + speed copies", () => {
     ).toBe("invalid");
   });
 
-  test("FR-MAP-36 / -20 definition edit refreshes speed, never shape", () => {
+  test("FR-MAP-36 / -20 / -35 definition edit refreshes speed; shape only on tokens still on the old default", () => {
     const t = setup();
     const s = t.newScene();
     const ogreId = t.caveOgre();
@@ -104,7 +104,7 @@ describe("scenes-map feedback: shape + speed copies", () => {
       statBlock: { ...wolfBlock, size: "large", speed: 30 },
       tokenShape: "round",
     });
-    expect(t.tokenRow(a.id)).toMatchObject({ speed: 30, shape: "none" });
+    expect(t.tokenRow(a.id)).toMatchObject({ speed: 30, shape: "round" });
     expect(t.tokenRow(b.id)).toMatchObject({ speed: 30, shape: "square" });
     const ev = t.lastEvent();
     expect(ev?.type).toBe("EntityUpdated");

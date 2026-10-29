@@ -19,6 +19,7 @@ import {
   Speed,
   Spellcasting,
   SpellLevelKey,
+  TokenShape,
 } from "@shared/entities/schemas";
 import {
   RestKind,
@@ -272,6 +273,8 @@ export const CharEditSet = z.strictObject({
   portraitAssetId: Id.nullable().optional(),
   /** FR-CHARX-49: whole object; absent `seesInvisible` = the stored value (FR-CHARX-53). */
   senses: Senses.optional(),
+  /** Default shape for new tokens (FR-ENT-22); null = round. */
+  tokenShape: TokenShape.nullable().optional(),
 });
 export type CharEditSet = z.input<typeof CharEditSet>;
 
@@ -288,10 +291,10 @@ export const CharEditIntent = z.strictObject({
 export type CharEditIntent = z.input<typeof CharEditIntent>;
 
 /** Keys of `set` that live where: entity columns, `creature-sheet`, else the stat block. */
-export const ENTITY_FIELDS = ["name", "ownerPlayerId", "portraitAssetId"] as const;
+export const ENTITY_FIELDS = ["name", "ownerPlayerId", "portraitAssetId", "tokenShape"] as const;
 export const SHEET_FIELDS = ["background", "alignment", "proficiencyNotes", "notes"] as const;
 /** DM only (CHARX §9): player → `forbidden`. */
-export const DM_ONLY_FIELDS = ["ownerPlayerId", "size", "portraitAssetId"] as const;
+export const DM_ONLY_FIELDS = ["ownerPlayerId", "size", "portraitAssetId", "tokenShape"] as const;
 /** Character-only keys; a monster `set` with them → `invalid`. */
 export const CHARACTER_ONLY_FIELDS = [
   "classes",

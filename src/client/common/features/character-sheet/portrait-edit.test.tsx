@@ -25,7 +25,11 @@ const stats = CharacterStatBlock.parse({
   className: "Fighter",
 });
 
-type Opts = { client: "dm" | "player"; portrait?: string | null };
+type Opts = {
+  client: "dm" | "player";
+  portrait?: string | null;
+  tokenShape?: "round" | "square" | "none" | null;
+};
 
 function setup(o: Opts) {
   const creature = {
@@ -35,6 +39,7 @@ function setup(o: Opts) {
     campaignId: "c1",
     ownerPlayerId: "p1",
     portraitAssetId: o.portrait ?? null,
+    tokenShape: o.tokenShape ?? null,
     statBlock: stats,
   } as unknown as DefinitionRecord;
   const sheet = defaultSheetData();
@@ -132,8 +137,8 @@ describe("sheet portrait (FR-CHARX-15, DM only)", () => {
     expect(html).not.toContain("charx-portrait-");
   });
 
-  test("FR-CHARX-15 picking an image sends char.edit portraitAssetId (portrait picker)", () => {
-    const { tree, sent } = editorTree({ client: "dm" });
+  test("FR-CHARX-15 picking an image sends char.edit portraitAssetId (portrait picker); a chosen shape is kept", () => {
+    const { tree, sent } = editorTree({ client: "dm", tokenShape: "round" });
     const props = propsOf<{ context: string; onSelect(id: string): void }>(
       find(tree, (e) => e.type === AssetPickerDialog),
     );
@@ -142,6 +147,35 @@ describe("sheet portrait (FR-CHARX-15, DM only)", () => {
     expect(sent).toEqual([
       { name: "char.edit", payload: { creatureId: "mira", set: { portraitAssetId: "img-2" } } },
     ]);
+  });
+
+  test("FR-ENT-22 a portrait on a creature with no shape also sets tokenShape none (one edit)", () => {
+    const { tree, sent } = editorTree({ client: "dm" });
+    propsOf<{ onSelect(id: string): void }>(
+      find(tree, (e) => e.type === AssetPickerDialog),
+    ).onSelect("img-2");
+    expect(sent).toEqual([
+      {
+        name: "char.edit",
+        payload: { creatureId: "mira", set: { portraitAssetId: "img-2", tokenShape: "none" } },
+      },
+    ]);
+  });
+
+  test("FR-ENT-22 token shape Select: Round / Square / None, unset shows Round; DM only", () => {
+    const shapeTag = (html: string) =>
+      html.match(/<select[^>]*data-value="tokenShape"[^>]*>[\s\S]*?<\/select>/)?.[0] ?? "";
+    const unset = shapeTag(setup({ client: "dm" }).wrap(<MainTab />));
+    expect(unset).toContain('aria-label="Token shape"');
+    expect([...unset.matchAll(/<option[^>]*>([^<]+)</g)].map((m) => m[1])).toEqual([
+      "Round",
+      "Square",
+      "None",
+    ]);
+    expect(unset).toMatch(/<option value="round" selected="">/);
+    const none = shapeTag(setup({ client: "dm", tokenShape: "none" }).wrap(<MainTab />));
+    expect(none).toMatch(/<option value="none" selected="">/);
+    expect(setup({ client: "player" }).wrap(<MainTab />)).not.toContain('data-value="tokenShape"');
   });
 
   test("FR-CHARX-15 Remove sends char.edit portraitAssetId null", () => {

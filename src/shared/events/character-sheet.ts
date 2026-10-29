@@ -117,6 +117,7 @@ export const SHEET_EDIT_FIELDS = [
   "size",
   "portraitAssetId",
   "senses",
+  "tokenShape",
 ] as const;
 export const SheetEditField = z.enum(SHEET_EDIT_FIELDS);
 export type SheetEditField = z.infer<typeof SheetEditField>;

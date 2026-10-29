@@ -29,6 +29,7 @@ import {
   kindRegistry,
   type Senses,
   type StatBlock,
+  type TokenShape,
   withAttackIds,
 } from "@shared/entities/schemas";
 import {
@@ -58,6 +59,7 @@ type EntityPatch = {
   name?: string;
   ownerPlayerId?: string;
   portraitAssetId?: string | null;
+  tokenShape?: TokenShape | null;
   statBlock: Record<string, unknown>;
   hpCurrent?: number;
 };
@@ -82,7 +84,7 @@ function writeEntity(
       name: patch.name ?? c.name,
       portraitAssetId:
         patch.portraitAssetId === undefined ? c.portraitAssetId : patch.portraitAssetId,
-      tokenShape: c.tokenShape,
+      tokenShape: patch.tokenShape === undefined ? c.tokenShape : patch.tokenShape,
       statBlock: patch.statBlock,
       ...(c.kind === "character" ? { ownerPlayerId: patch.ownerPlayerId ?? c.ownerPlayerId } : {}),
       // FR-ENT-33 (sprint 6): the whole replace keeps a pet a pet.
@@ -197,6 +199,7 @@ export function charEditCommand(hooks: DefinitionHooks) {
         name: c.name,
         ownerPlayerId: c.ownerPlayerId,
         portraitAssetId: c.portraitAssetId,
+        tokenShape: c.tokenShape,
       };
       const sheetValues = (sheetBefore ?? newSheet(env, c)) as unknown as Record<string, unknown>;
       const changed = keys.filter((k) => {
@@ -238,6 +241,9 @@ export function charEditCommand(hooks: DefinitionHooks) {
             ...(typeof set.ownerPlayerId === "string" ? { ownerPlayerId: set.ownerPlayerId } : {}),
             ...(keys.includes("portraitAssetId")
               ? { portraitAssetId: set.portraitAssetId as string | null }
+              : {}),
+            ...(keys.includes("tokenShape")
+              ? { tokenShape: set.tokenShape as TokenShape | null }
               : {}),
             statBlock: withAttackIds(block as { attacks: Attack[] }, nextId(env)),
             ...(hpCurrent !== undefined ? { hpCurrent } : {}),

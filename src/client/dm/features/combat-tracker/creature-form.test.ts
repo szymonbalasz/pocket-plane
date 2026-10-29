@@ -3,7 +3,7 @@
 // FR-CBT-43 (sprint 4, C-art): the Type select (FR-ENT-26), prefilled on Derive / Edit.
 import { describe, expect, test } from "bun:test";
 import { type DefinitionRecord, MonsterStatBlock } from "@shared/entities/schemas";
-import { type Fields, formStatBlock, initial } from "./creature-form";
+import { type Fields, formStatBlock, initial, withPortrait } from "./creature-form";
 
 const fields = (o: Partial<Fields> = {}): Fields => ({
   name: "Elite Goblin Warrior",
@@ -93,5 +93,17 @@ describe("FR-CBT-43 creature form Type", () => {
     expect(pick({ type: "__none__" }, typed)).toBeUndefined();
     expect(pick({}, typed)).toBe("humanoid");
     expect(pick({}, null)).toBeUndefined();
+  });
+});
+
+describe("FR-ENT-22 portrait sets the default token shape", () => {
+  test("FR-ENT-22 a portrait on a form with Default shape → None; a chosen shape is kept", () => {
+    expect(withPortrait(fields(), "art-1")).toMatchObject({
+      portraitAssetId: "art-1",
+      tokenShape: "none",
+    });
+    for (const tokenShape of ["round", "square", "none"] as const) {
+      expect(withPortrait(fields({ tokenShape }), "art-1").tokenShape).toBe(tokenShape);
+    }
   });
 });
