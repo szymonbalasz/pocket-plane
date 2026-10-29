@@ -170,9 +170,19 @@ describe("resolvePlayDirs (#382)", () => {
     expect(() => resolvePlayDirs({ PP_PLAY_PORT: "70000" }, linux)).toThrow(ConfigError);
   });
 
-  test("#382 refuses a play dir under the checkout's data/ or the OS temp dir", () => {
-    for (const dir of ["data", "data/dev", "/src/pocket-plane/data/play"]) {
-      expect(() => resolvePlayDirs({ PP_PLAY_DATA_DIR: dir }, linux)).toThrow(/data\/ folder/);
+  test("#382 refuses a play dir anywhere inside the checkout or under the OS temp dir", () => {
+    for (const dir of [
+      "data",
+      "data/dev",
+      ".",
+      "campaigns",
+      "/src/pocket-plane",
+      "/src/pocket-plane/data/play",
+      "/src/pocket-plane/src/x",
+    ]) {
+      expect(() => resolvePlayDirs({ PP_PLAY_DATA_DIR: dir }, linux)).toThrow(
+        /inside the checkout/,
+      );
     }
     for (const dir of ["/tmp", "/tmp/pp"]) {
       expect(() => resolvePlayDirs({ PP_PLAY_DATA_DIR: dir }, linux)).toThrow(/temp dir/);
@@ -181,13 +191,13 @@ describe("resolvePlayDirs (#382)", () => {
     expect(() =>
       resolvePlayDirs({ PP_PLAY_DATA_DIR: W("c:/users/DM/appdata/local/temp/x") }, win),
     ).toThrow(/temp dir/);
-    expect(() => resolvePlayDirs({ PP_PLAY_DATA_DIR: W("C:/SRC/pocket-plane/Data") }, win)).toThrow(
-      /data\/ folder/,
+    expect(() => resolvePlayDirs({ PP_PLAY_DATA_DIR: W("C:/SRC/Pocket-Plane/x") }, win)).toThrow(
+      /inside the checkout/,
     );
     // Siblings with a shared prefix are fine.
     expect(resolvePlayDirs({ PP_PLAY_DATA_DIR: "/tmpx/pp" }, linux).dataDir).toBe("/tmpx/pp");
-    expect(resolvePlayDirs({ PP_PLAY_DATA_DIR: "/src/pocket-plane/database" }, linux).dataDir).toBe(
-      "/src/pocket-plane/database",
+    expect(resolvePlayDirs({ PP_PLAY_DATA_DIR: "/src/pocket-plane-play" }, linux).dataDir).toBe(
+      "/src/pocket-plane-play",
     );
   });
 });

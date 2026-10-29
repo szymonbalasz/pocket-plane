@@ -225,7 +225,7 @@ export function localUrl(host: string, p: number): string {
 export const PLAY_DEFAULT_PORT = 4090;
 
 export interface PlayDirs {
-  /** Live data root (DB, assets, server.lock): outside the checkout's data/ and the OS temp dir. */
+  /** Live data root (DB, assets, server.lock): outside the checkout and the OS temp dir. */
   dataDir: string;
   /** `PP_PLAY_BACKUP_DIR`, default `<dataDir>/backups`. */
   backupDir: string;
@@ -236,7 +236,7 @@ export interface PlayResolveOptions {
   platform?: NodeJS.Platform;
   home?: string;
   tmp?: string;
-  /** Checkout root: relative overrides resolve from here; `<root>/data` is refused. */
+  /** Checkout root: relative overrides resolve from here; anything inside it is refused. */
   root?: string;
 }
 
@@ -269,8 +269,8 @@ export function isWithin(
 
 /**
  * Pure play-dir resolver shared by `bun run play`, `mcp --play` and `mcp:call --play` (#382):
- * `PP_PLAY_DATA_DIR`, else the OS default. Throws ConfigError for a dir under `<root>/data/`
- * or the OS temp dir (those are disposable: fixtures may wipe them).
+ * `PP_PLAY_DATA_DIR`, else the OS default. Throws ConfigError for a dir inside the checkout
+ * (a public repo; its data/ is disposable) or the OS temp dir.
  */
 export function resolvePlayDirs(
   env: Record<string, string | undefined>,
@@ -290,13 +290,13 @@ export function resolvePlayDirs(
   const dataDir = override
     ? resolve(override)
     : defaultPlayDataDir(env, platform, opts.home ?? os.homedir());
-  for (const [label, refused] of [
-    ["the checkout's data/ folder", p.join(root, "data")],
-    ["the OS temp dir", tmp],
+  for (const [label, refused, why] of [
+    ["inside the checkout", root, "live campaign data must stay out of the repo"],
+    ["under the OS temp dir", tmp, "it may be wiped"],
   ] as const) {
     if (isWithin(dataDir, refused, platform)) {
       throw new ConfigError(
-        `Refusing: play data dir ${dataDir} is under ${label} (${refused}), which fixtures and tests may wipe. Set PP_PLAY_DATA_DIR to a folder outside it. Nothing changed.`,
+        `Refusing: play data dir ${dataDir} is ${label} (${refused}): ${why}. Set PP_PLAY_DATA_DIR to a folder outside it. Nothing changed.`,
       );
     }
   }

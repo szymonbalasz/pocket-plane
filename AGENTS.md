@@ -133,7 +133,7 @@ Implements [ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md). Val
 | `PP_DM_SECRET` | **required** | DM secret, min 12 chars, env only, never stored ([OQ-CAMP-03](docs/specs/campaign-management.md#15-open-questions)). Server refuses to start without it. `env:init` writes a random dev value |
 | `PP_PUBLIC_BASE_URL` | unset | Base for player links ([OQ-CAMP-07](docs/specs/campaign-management.md#15-open-questions)). Unset → DM client's origin + warning (pick; OQ-CAMP-07 open) |
 | `PP_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
-| `PP_PLAY_DATA_DIR` | OS per-user dir | `bun run play` data root (#382). Default Windows `%LOCALAPPDATA%/PocketPlane`, macOS `~/Library/Application Support/PocketPlane`, else `$XDG_DATA_HOME/pocket-plane` or `~/.local/share/pocket-plane`. Refused under `<checkout>/data/` or the OS temp dir. Relative paths resolve from the worktree root |
+| `PP_PLAY_DATA_DIR` | OS per-user dir | `bun run play` data root (#382). Default Windows `%LOCALAPPDATA%/PocketPlane`, macOS `~/Library/Application Support/PocketPlane`, else `$XDG_DATA_HOME/pocket-plane` or `~/.local/share/pocket-plane`. Refused anywhere inside the checkout or under the OS temp dir. Relative paths resolve from the worktree root (so `../<name>` = a sibling folder) |
 | `PP_PLAY_BACKUP_DIR` | `<play dir>/backups` | Start-up backups of `play`: DB copies `pocket-plane-<yyyymmdd-hhmmss>.db` (newest 10) + `assets/` mirror (add / update only) |
 | `PP_PLAY_PORT` | `4090` | `play` port, outside the slot range 4100–4599 |
 
@@ -157,7 +157,7 @@ Implements [ADR-0008](docs/architecture/adr/0008-parallel-dev-isolation.md). Val
 
 **Running a real campaign** (`bun run play`, #382)
 
-- Live data lives **outside the repo**, in `PP_PLAY_DATA_DIR` (default above), never in a synced folder (OneDrive, Dropbox…): SQLite WAL + sync gives conflict copies and locks. Backups (`PP_PLAY_BACKUP_DIR`) may point into one.
+- Live data lives **outside the repo** (`play` refuses a folder anywhere inside the checkout, or under the OS temp dir), in `PP_PLAY_DATA_DIR` (default above), never in a synced folder (OneDrive, Dropbox…): SQLite WAL + sync gives conflict copies and locks. Backups (`PP_PLAY_BACKUP_DIR`) may point into one.
 - `play` refuses `PP_TEST_MODE` / `PP_TEST_CRASH`, runs with `PP_DATA_DISPOSABLE` off (fixtures refuse the dir), builds the client, backs up (refuses to start if that fails, unless `--no-backup`; `--no-build` skips the build), then starts the same server as `start` on `PP_PLAY_PORT`. Prints the DM URL, data dir and backup dir, never the secret. The DM secret stays in the gitignored `.env`.
 - MCP for the real campaign, registered once in the DM's checkout; a second server for fixtures:
 
