@@ -15,6 +15,7 @@ import { planCheckTool } from "./plan";
 import { TOOLS, type ToolDef } from "./tools/registry";
 // ---- tool modules (append-only: one import line per slice) ----
 import "./tools/read";
+import "./tools/creature";
 import "./tools/homebrew";
 import "./tools/character";
 

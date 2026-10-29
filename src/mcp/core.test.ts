@@ -314,6 +314,10 @@ describe("FR-AGENT-01 list-tools", () => {
     const writes = [
       "character_edit",
       "character_put_row",
+      "creature_create",
+      "creature_derive",
+      "creature_edit",
+      "creature_put_row",
       "homebrew_create",
       "homebrew_edit",
       "homebrew_share",
@@ -326,7 +330,11 @@ describe("FR-AGENT-01 list-tools", () => {
       "characters_list",
       "compendium_get",
       "compendium_search",
+      "creature_create",
+      "creature_derive",
+      "creature_edit",
       "creature_get",
+      "creature_put_row",
       "creatures_list",
       "homebrew_create",
       "homebrew_edit",
@@ -378,6 +386,8 @@ describe("FR-AGENT-01 list-tools", () => {
         "type",
       ].sort(),
     );
+    expect(props("creature_derive")).toEqual(["baseId", "entryId", "name", "notes", "rows", "set"]);
+    expect(props("creature_edit")).toEqual(["id", "set"]);
     expect(
       allTools()
         .filter((t) => t.write)

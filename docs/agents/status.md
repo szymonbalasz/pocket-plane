@@ -48,9 +48,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | AoE cell origin (#375, #377) | merged | — | **merged** (walkthrough 9/9 `.verify/sprint15/walkthroughs/20261028-aoecell/`; +14 B per snapped sphere; schema + protocol lock released) | — |
 | Agent / MCP API spec (#378, #379) | merged | — | **complete** (DM gate #379: SDK yes, ADR-0072 accepted, paste-JSON importer dropped) | — |
 | Agent API slice 1: core + read tools + `plan_check` frame + `mcp:call` + bundle `agent-api` | merged f7b9382c | — | **merged** (FR-AGENT-01–19 tested, targeted check 113 green, branch CI green; SDK 1.32.1; AGENTS §9.1 / §9.4 rows added; tooling lock released) | DM: `claude mcp add --scope local pocket-plane -- bun run mcp` in the main checkout |
-| Agent API slice 2: custom creature tools (+ crash slow tests) | `build/agent-creatures` (w88, slot 0) | build-agent-creatures | building | walkthrough B (stopped server refused) → merge |
-| Agent API slice 3: homebrew tools | `build/agent-homebrew` (w89, slot 2) | build-agent-homebrew | building | merge (no walkthrough; A covers share) |
-| Agent API slices 4–5 | — | — | queued: 4 character sheets + e2e + walkthrough A (MCP edit live in a player's browser) → 5 skill `.claude/skills/pocket-plane-content/` | after 2 + 3 merge |
+| Agent API slice 2: custom creature tools (+ crash slow tests) | merged 467db37a | — | **merged** (walkthrough B 15/15 `.verify/agent-api/walkthroughs/20261029-agent-b/`; check 69 targeted green, branch CI green) | — |
+| Agent API slice 3: homebrew tools | merged f0d6cd3b | — | **merged** (FR-AGENT-25/26, 10 tests, check green; homebrew monsters refused up front → creature tools; patch merges facets / body, null removes) | — |
+| Agent API slice 4: character sheet tools + e2e `agent-api` | `build/agent-characters` (w8A, slot 2) | build-agent-characters | building | walkthrough A (MCP edit live in a player's browser) after slice 2 merges → merge |
+| Agent API slice 5: skill `.claude/skills/pocket-plane-content/` | `build/agent-skill` (w8B, slot 0) | build-agent-skill | building (∥ slice 4) | review → merge |
 | Map effects default Full (#376) | merged | — | **merged** (check + spell-fx / prefs-window e2e green; CI green after a BL-147 re-run) | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
