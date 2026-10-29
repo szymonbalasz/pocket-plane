@@ -92,9 +92,10 @@ test("FR-DICE-41 FR-DICEX-51 FR-CHARX-127 Flame Tongue: the physical form names 
     .getByTestId("charx-attack")
     .filter({ hasText: "Flame Tongue" })
     .getByTestId("charx-roll-damage");
-  expect(await hintedTooltip(p1, button)).toContain(
-    "Shift: advantage · Ctrl: disadvantage · Alt: roll now",
-  );
+  // FR-CHARX-127: Damage ignores Shift / Ctrl; its hint is "Alt: roll now" alone.
+  const tip = await hintedTooltip(p1, button);
+  expect(tip).toContain("Alt: roll now");
+  expect(tip).not.toContain("Shift");
 
   await rollNow(button);
   const form = manualForm(p1);

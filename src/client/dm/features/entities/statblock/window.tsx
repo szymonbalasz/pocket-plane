@@ -52,6 +52,7 @@ import {
   attackChoices,
   attackControlOptions,
   attackSummary,
+  trayAside,
 } from "../../combat-tracker/attack-choices";
 import { acOf, hpOf } from "../../combat-tracker/attack-popup";
 import { useCombatDialogs } from "../../combat-tracker/popup-store";
@@ -170,7 +171,12 @@ function AttackRoll({
   return (
     <RollButton
       control={control}
-      hint={bound ? "Combat roll · Shift: advantage · Ctrl: disadvantage" : undefined}
+      // FR-CHARX-127: Damage ignores Shift / Ctrl (its hint ends in "Alt: roll now" alone).
+      hint={
+        bound
+          ? `Combat roll${action === "damage" ? "" : " · Shift: advantage · Ctrl: disadvantage"}`
+          : undefined
+      }
       type="button"
       size="sm"
       variant="outline"
@@ -179,6 +185,8 @@ function AttackRoll({
       data-record-id={rowId ?? ""}
       data-value={action}
       disabled={ctx.disabled}
+      // T9: a click stages the tray; an open damage-card popup steps aside (it covers the tray).
+      onClick={(e) => trayAside(e)}
     >
       {label}
     </RollButton>

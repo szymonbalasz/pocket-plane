@@ -19,7 +19,8 @@ import {
 import { SyncContext, type SyncState } from "@ui/sync/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
-import { ATTACK_ACTIONS, attackControlOptions, attackIntent } from "./attack-choices";
+import { ATTACK_ACTIONS, attackControlOptions, attackIntent, trayAside } from "./attack-choices";
+import { useCombatDialogs } from "./popup-store";
 
 const SCIMITAR: Attack = {
   id: "a-scim",
@@ -142,5 +143,23 @@ describe("FR-CBT-169 Attack ▸ two actions", () => {
     expect(definition).not.toHaveProperty("subject");
     expect(definition).not.toHaveProperty("critExpressions");
     expect(definition.purpose).toBe("damage");
+  });
+});
+
+describe("FR-CBT-169 staging over the damage-card popup (T9)", () => {
+  test("FR-CBT-169 a staged attack puts the open damage-card popup aside (as Later: the draft kept); Alt+click leaves it", () => {
+    const dialogs = useCombatDialogs.getState();
+    dialogs.openCard("n1");
+    dialogs.editDraft("n1", () => ({ damage: { text: "7" } }));
+    trayAside({ altKey: true });
+    expect(useCombatDialogs.getState().cardId).toBe("n1");
+    trayAside({ altKey: false });
+    expect(useCombatDialogs.getState().cardId).toBeNull();
+    expect(useCombatDialogs.getState().drafts.n1).toMatchObject({ damage: { text: "7" } });
+    // A Use roll step (also above the windows) closes too.
+    dialogs.openStep({ entryId: "e1", as: "damage", attackerId: null });
+    trayAside({});
+    expect(useCombatDialogs.getState().step).toBeNull();
+    useCombatDialogs.getState().dropDraft("n1");
   });
 });

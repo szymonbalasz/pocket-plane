@@ -29,7 +29,7 @@ import { ActionsTab } from "./ActionsTab";
 import { MainTab } from "./MainTab";
 import { PublicRolls, PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
-import { useSheetRollControl } from "./rolls";
+import { ROLL_HINT, rollHint, takesModeKeys, useSheetRollControl } from "./rolls";
 import type { RollRoute, SheetRollRef } from "./routing";
 import { SheetView } from "./SheetView";
 import type { SheetCtx } from "./sheet-context";
@@ -636,5 +636,26 @@ describe("FR-CHARX-132 disconnect", () => {
     expect(html).toMatch(/<button[^>]*data-testid="dicex-tray-roll"[^>]*disabled=""/);
     expect(controlOf(staged()).options.label).toBe("Mira — Light crossbow damage");
     expect(sent).toEqual([]);
+  });
+});
+
+describe("FR-CHARX-127 Damage hint", () => {
+  test("FR-CHARX-127 Damage hint: Damage / Healing ignore Shift / Ctrl, so their hint reads 'Alt: roll now' alone; Attack keeps the mode keys", () => {
+    const text = (node: React.ReactNode) => renderToStaticMarkup(node).replace(/<[^>]+>/g, "");
+    const damage = sheetControl("damage", { attackId: "a2" }, "Light crossbow damage");
+    expect(
+      text(rollButtonTip(damage, rollHint(stats, undefined, undefined, takesModeKeys("damage")))),
+    ).toBe(ROLL_NOW_HINT);
+    const healing = sheetControl("spellDamage", { spellId: "cw" }, "Cure Wounds healing");
+    expect(takesModeKeys("spellDamage")).toBe(false);
+    expect(text(rollButtonTip(healing, rollHint(stats, undefined, undefined, false)))).toBe(
+      ROLL_NOW_HINT,
+    );
+    const attack = sheetControl("toHit", { attackId: "a2" }, "Light crossbow attack");
+    expect(
+      text(rollButtonTip(attack, rollHint(stats, undefined, undefined, takesModeKeys("toHit")))),
+    ).toBe(`${ROLL_HINT} · ${ROLL_NOW_HINT}`);
+    expect(takesModeKeys("check")).toBe(true);
+    diceExtras.clear();
   });
 });

@@ -53,24 +53,31 @@ export const ROLL_HINT = "Shift: advantage · Ctrl: disadvantage";
 
 /**
  * FR-CHARX-113: a sheet roll button's hint: the breakdown of its number (when the sheet derives
- * one), else the caller's text; then the mode keys. `RollButton` adds the Alt hint.
+ * one), else the caller's text; then the mode keys, unless the roll ignores them (`modes` false:
+ * Damage / Healing, FR-CHARX-127). `RollButton` adds the Alt hint.
  */
 export function rollHint(
   stats: Parameters<typeof breakdownText>[0],
   breakdown: BreakdownKey | undefined,
   hint: string | undefined,
+  modes = true,
 ): ReactNode {
+  const keys = modes ? ` · ${ROLL_HINT}` : "";
   const text = breakdown ? breakdownText(stats, breakdown) : null;
   if (text && breakdown) {
     return (
       <>
         <Breakdown okey={breakdown} text={text} />
-        {` · ${ROLL_HINT}`}
+        {keys}
       </>
     );
   }
-  return hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT;
+  if (hint) return `${hint}${keys}`;
+  return modes ? ROLL_HINT : undefined;
 }
+
+/** FR-CHARX-127: Shift / Ctrl preset the mode of a d20 roll; Damage / Healing ignore them. */
+export const takesModeKeys = (kind: SheetRollKind): boolean => stagedPurposeOf(kind) !== "damage";
 
 /** DM per-roll public override per category; absent = the category's setting. */
 export function usePublicOverrides() {

@@ -166,6 +166,7 @@ import {
   attackControlOptions,
   attackIntent,
   attackSummary,
+  trayAside,
 } from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
 import { CompanionCardButton, CompanionMenu } from "./companion-menu";
@@ -329,7 +330,10 @@ function useAttackPick(c: CombatantView, def: DefinitionRecord | undefined) {
   const n = pick?.n;
   // biome-ignore lint/correctness/useExhaustiveDependencies: roll once per pick (n), with the control of that render
   useEffect(() => {
-    if (pick) control.roll(pick.keys);
+    if (!pick) return;
+    // T9: a click stages the tray; an open damage-card popup steps aside (it covers the tray).
+    trayAside(pick.keys);
+    control.roll(pick.keys);
   }, [n]);
   const keys = useRef<RollKeys>({});
   const choose = (index: number, a: AttackAction) => {

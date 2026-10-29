@@ -108,3 +108,63 @@ test("FR-CHARX-126 FR-CHARX-127 FR-CBT-169 sheet Attack / Damage stage the tray 
   }
   for (const page of [p1, dm]) await page.context().close();
 });
+
+test("FR-CBT-169 T9 DM Attack ▸: Alt+click → a card at once; a click stages the tray over the open popup (it steps aside) → Roll → the new card's popup", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const init = await openWindow(dm, "cbt.initiative");
+  const cards = init.getByTestId("cbt-init-card");
+  const cardIds = () =>
+    cards.evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
+  const before = new Set(await cardIds());
+  const fresh = async () => (await cardIds()).filter((id) => id !== null && !before.has(id));
+  const goblin = (await init
+    .locator('[data-testid="cbt-init-row"]')
+    .filter({ has: dm.locator('[data-testid="cbt-init-row-name"][data-value="Goblin"]') })
+    .first()
+    .getAttribute("data-record-id")) as string;
+  const option = (value: "toHit" | "damage") =>
+    dm.locator(
+      `[data-testid="cbt-init-row-attack-option"][data-record-id="${goblin}"][data-value="${value}"]`,
+    );
+  const menu = () =>
+    init.locator(`[data-testid="cbt-init-row-attack"][data-record-id="${goblin}"]`).click();
+
+  // Alt+click Attack: a card at once, its popup open.
+  await menu();
+  await expect(option("toHit")).toHaveCount(1);
+  await expect(option("damage")).toHaveCount(1);
+  await rollNow(option("toHit"));
+  const popup = dm.getByTestId("cbt-popup");
+  await expect(popup).toBeVisible();
+  await expect.poll(fresh).toHaveLength(1);
+  const [first] = await fresh();
+  await expect(popup).toHaveAttribute("data-record-id", first as string);
+
+  // A click stages the tray; the popup steps aside (Later), the tray's Roll is clickable.
+  await menu();
+  await option("toHit").click();
+  const tray = shellWindow(dm, "dicex.tray");
+  await expect(tray.getByTestId("dicex-tray-state")).toHaveAttribute("data-value", "adjust");
+  await expect(tray.getByTestId("dicex-tray-state")).toContainText("Goblin — Scimitar attack");
+  await expect(popup).toHaveCount(0);
+  await tray.getByTestId("dicex-tray-roll").click();
+  await expect.poll(fresh).toHaveLength(2);
+  const second = (await fresh()).find((x) => x !== first) as string;
+  await expect(popup).toHaveAttribute("data-record-id", second);
+
+  // Leave the bundle's server as found.
+  for (const id of [second, first] as string[]) {
+    const card = init.locator(`[data-testid="cbt-init-card"][data-record-id="${id}"]`);
+    const shown = (await popup.count()) > 0 ? await popup.getAttribute("data-record-id") : null;
+    if (shown !== id) await card.click();
+    await expect(popup).toHaveAttribute("data-record-id", id);
+    await popup.getByTestId("cbt-popup-dismiss").click();
+    await expect(card).toHaveCount(0);
+  }
+  await dm.context().close();
+});

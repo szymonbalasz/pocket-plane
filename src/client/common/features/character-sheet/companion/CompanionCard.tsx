@@ -398,7 +398,8 @@ function CardRoll({
   return (
     <RollButton
       control={control}
-      hint={ROLL_HINT}
+      // FR-CHARX-127: Damage ignores Shift / Ctrl; its hint is "Alt: roll now" alone.
+      hint={kind === "toHit" ? ROLL_HINT : undefined}
       type="button"
       size="sm"
       variant="secondary"
