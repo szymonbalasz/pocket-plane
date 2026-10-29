@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 CLOSED (DM #381, 2026-10-29).** Everything merged, `main` green, no agents running. Also done: Agent / MCP API track (#378–#380, other session; DM: register the MCP server once), AoE cell origin (#375, #377), Map effects default Full (#376). **Now: tray attacks (#385)**: spec `spec/tray-attacks` (agent `spec-tray-attacks`, workspace w8G), then `fix/tray-*` build slices. Sprint 15 planning after (candidates below). Decisions up to #381. All worktrees linked to workspace wR.
+**Phase:** **Sprint 14 CLOSED (DM #381, 2026-10-29).** Everything merged, `main` green, no agents running. Also done: Agent / MCP API track (#378–#380, other session; DM: register the MCP server once), AoE cell origin (#375, #377), Map effects default Full (#376). **Now: tray attacks (#385)**: spec merged (ADR-0073); build slices `fix/tray-core` → `fix/tray-compose` → `fix/tray-buttons`, `fix/tray-use-roll` ∥ after core (CBT §14.8). Locks: `src/shared/events/`, `src/shared/protocol/`, `snapshot-size.test.ts`, bundle registry → `fix/tray-core`. Sprint 15 planning after (candidates below). Decisions up to #381. All worktrees linked to workspace wR.
 
 **Resume (in order):**
 1. Sprint 15 planning with the DM. Candidates (backlog, open): window frame BL-146 (decided #381: zone round-trip memory) with BL-143–145 (the replay exemptions) and BL-124 / BL-152 (grips, resize cost); toasts BL-151 (player toast over the sheet's End button); kit look BL-125 / BL-126 / BL-127 (Gilt & Stone Game log and Initiative rows, `data-variant`), BL-149 / BL-150 (stat block height, attack property chips); AoE label BL-153; CI flakes BL-147, BL-154; small BL-123, BL-142.
@@ -50,7 +50,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Agent API slice 3: homebrew tools | merged f0d6cd3b | — | **merged** (FR-AGENT-25/26, 10 tests, check green; homebrew monsters refused up front → creature tools; patch merges facets / body, null removes) | — |
 | Agent API slice 4: character sheet tools + e2e `agent-api` | merged 748ded0a | — | **merged** (walkthrough A 8/8 `.verify/agent-api/walkthroughs/20261029-agent-a/`: player-1 live ~0.4 s, player-2 whitelist only, pet keeps owner; `creature_put_row` listed as a flat object + a guard that no tool schema has a top-level oneOf / anyOf (Anthropic tool rule)) | — |
 | Agent API slice 5: skill `.claude/skills/pocket-plane-content/` | merged c30abd1d | — | **merged** (example plans tested; every named tool registered) | DM: register the MCP server once (#380) |
-| Tray attacks spec (#385): ADR + CHARX / DICEX / DICE / CBT amendments + build split | spec/tray-attacks (w8G) | spec-tray-attacks | writing | integrator review → merge → build slices |
+| Tray attacks spec (#385) | merged f1629f45 | — | **merged** (ADR-0073; CHARX / DICEX / DICE / CBT amended, CBT §14.8 split; OQ-CBT-104–106, OQ-DICEX-65/66, OQ-CHARX-51 picks A as integrator rulings) | — |
+| Tray S1 server core | fix/tray-core (w8K) | build-tray-core | building | walkthrough R1 → merge; then S2 + S4 in parallel |
+| Tray S2 tray compose | — | — | waits on S1 | then S3 |
+| Tray S3 two buttons everywhere | — | — | waits on S2 | — |
+| Tray S4 Use as from the log | — | — | waits on S1 (∥ S2 / S3) | — |
 | Map effects default Full (#376) | merged | — | **merged** (check + spell-fx / prefs-window e2e green; CI green after a BL-147 re-run) | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
