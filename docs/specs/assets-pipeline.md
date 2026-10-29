@@ -38,6 +38,8 @@ phase: post-mvp-8
 | FR-ASSET-35, -37 | *(C)* Entry images as asset references; stale IDs dropped at the compendium read | C5 core ([CMP §14](compendium.md#14-dependencies)) | CMP `FR-CMP-46 assets.require refusal`, `FR-CMP-47 asset deleted` |
 | FR-ASSET-36, -38 | *(C)* REST-body exception (ADR, #256); leak property over REST incl. ETag | C5 core | `FR-ASSET-36 leak property over REST` |
 
+> **Rename and delete an image (DM [#386](../decisions-log.md), 2026-10-29; decides OQ-ASSET-05 and OQ-ASSET-19).** The DM renames and deletes images from the picker. **Delete only an unused image** (OQ-ASSET-05 A): while a scene map, prop, token, portrait, running combatant, handout, compendium entry or the pause card holds it, `assets.delete` is refused and the reject names the uses. Deleting the row is also the revoke: its URLs answer 404 at once. New FR-ASSET-62–66 ([§6.5](#65-rename-and-delete-an-image-386)); no new column or record type.
+
 > **Sprint 8, track TT (DM [#334](../decisions-log.md)).** DM-added alert sounds are audio assets (ADR-0030, ADR-0023 capability IDs): MP3 / OGG / WAV ≤ 512 KB, ≤ 5 s, hand-rolled probe (**no dependency**), lazy DM-only `audio-asset` (0 B in snapshots). FR-ASSET-52–61 (§6.4); `audio-chime` joins session-sim-12; tests, walkthrough T13–T14: [dice-extras §13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-ASSET-27–30.
 
 ## 1. Summary
@@ -66,7 +68,7 @@ phase: post-mvp-8
 ## 4. Non-goals
 
 - Preload, load progress, player-ready (ADR-0003's "preloaded" is deferred by [ADR-0014](../architecture/adr/0014-mvp-scope.md): assume immediate load). Preloading an inactive scene would reveal its IDs early; it needs a player-visible preload grant (post-MVP, [scene-tools](scene-tools.md)).
-- Token art library / standalone image browser (tier A). Player uploads (OQ-ASSET-02). Rename, delete, replace, revoke an asset (OQ-ASSET-05). Image editing. Audio beyond short alert sounds (§6.4) / video ([ADR-0007](../architecture/adr/0007-product-scope.md)). Cloud storage, CDN.
+- Token art library / standalone image browser (tier A). Player uploads (OQ-ASSET-02). Replace an asset's bytes; revoke (re-key) an image that is still in use (OQ-ASSET-05; *#386: rename and delete an unused image are in, §6.5*). Deleting or renaming a sound. Image editing. Audio beyond short alert sounds (§6.4) / video ([ADR-0007](../architecture/adr/0007-product-scope.md)). Cloud storage, CDN.
 
 ## 5. User stories
 
@@ -158,6 +160,16 @@ The picks below are OQ-ASSET-21–26 as decided at sprint-6 gate 1 (#288: every 
 | FR-ASSET-60 | **Fields**: `name` as images; `listed` / `tags` ignored for audio; the attach control stays images only. Test `FR-ASSET-60 audio fields`. | |
 | FR-ASSET-61 | **CON-44** (measured): 0 B in snapshots; `sync.load` of 50 = 13,833 B; one `GET` per pick per page. Edges as images; MIME headers ignored (sniff only). | #256 |
 
+### 6.5 Rename and delete an image (#386)
+
+| ID | Requirement | Notes |
+|---|---|---|
+| FR-ASSET-62 | **Rename** `assets.rename {assetId, name}` (DM intent): FR-ASSET-08's name rule (control chars removed, trimmed, 1–80) else `invalid`; an image of `actor.campaignId` (listed or attachment) else `not_found` (a sound too, FR-ASSET-60). Same name → `ack`, no event. Event `AssetRenamed {assetId, name}`, logged, not undoable; `asset` upsert (DM) if listed. Holders read the name from the record, so nothing else changes. | #386 |
+| FR-ASSET-63 | **Delete** `assets.delete {assetId}` (DM intent): same `not_found` rule. Unused (FR-ASSET-64) → in one transaction: combatants of **ended** encounters holding it lose the image (null; not synced), the row goes. Event `AssetDeleted {assetId, name}`, logged, not undoable; `asset` delete (DM) if listed. Its URLs answer the common 404 at once (FR-ASSET-13, the row lookup): delete is the revoke. Files stay until the next start's sweep (FR-ASSET-07), which keeps a hash another row still holds. | OQ-ASSET-05 A |
+| FR-ASSET-64 | **In use = refused** (OQ-ASSET-05 A, OQ-ASSET-19): `Scene.mapAssetId`, `Prop.assetId`, `Token.imageAssetId`, `Entity.portraitAssetId`, `Combatant.imageAssetId` (encounter not ended), `Handout.imageAssetIds`, `CompendiumEntry.imageAssetIds`, `Campaign.pause.imageAssetId`. Any → `conflict` "In use: ‹name› (‹kind›), … and ‹n› more. Change those first." (first 5 named; kind order as listed, by name within a kind; a prop's name = its scene's; the pause card unnamed), nothing written. Checked inside the command's transaction, so a use added meanwhile can't slip past. | `assetUses` |
+| FR-ASSET-65 | **Attachments and shared bytes**: an attachment deletes like a listed image, with no record change (only the log row). The same bytes in another campaign are another row: their files survive the sweep. | |
+| FR-ASSET-66 | **Picker** (DM, `live` only): beside the selected image's name in the tag row, two ghost icon Buttons **Rename image** (pencil) and **Delete image** (trash), Tooltips. Rename… → Dialog with the name Input → `assets.rename`; Delete… → Dialog "Delete ‹name›? Its links stop working. This can't be undone." + destructive Delete → `assets.delete`. A reject (in use, invalid name, connection lost) shows inline in the Dialog; the Dialog stays. After a delete the tile and the tag row go. Not live → disabled with "Reconnecting…". The forms never submit a host form (New scene). | |
+
 ## 7. UI/UX notes
 
 Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, Alert, Toast, Tooltip; dark only. Test IDs per [AGENTS §9.5](../../AGENTS.md#95-test-ids).
@@ -170,6 +182,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - *(S5)* **Test IDs:** `asset-attach` + `data-owner` + `data-state` (`idle|uploading|processing|error`), `asset-attach-upload`, `asset-attach-file-input`, `asset-attach-library`, `asset-attach-hint`, `asset-attach-drop` (outline marker on the drop target while dragging), `asset-attach-progress` + `data-value` (pct), `asset-attach-error` + `data-value` (file name). `asset.test`: `asset-attach-result` + `data-record-id` per added id.
 - *(S6)* **Picker layout** (FR-ASSET-45–47; same in the Dialog and inline in New scene): row 1 toolbar (Upload, hint, Select) as today; row 2 **search** Input (search icon, clear ×) + **Manage tags** (ghost icon Button, DropdownMenu); row 3 **tag chips** (shadcn Badge as toggle buttons, `secondary` = off, `default` = on, "Tokens 12"), wrapping; row 4 the selected image's **tag editor** ("Tags:" + removable Badges + "Add tag" Input with a suggestion Popover), only when an image is selected; then the thumbnail grid, the only part that scrolls. The Dialog keeps `max-w-2xl`, `max-h-[80vh]`: at 1280 × 720 rows 1–4 take ≈ 150 px and ≥ 2 grid rows stay visible. Thumbnail tiles show the name; a Tooltip adds size, MB and the tags. Disconnected: tag editing and Manage tags disabled with a Tooltip ("Reconnecting…"); search and filter keep working on the store. Styling per [visual-direction](../design/visual-direction.md), no custom styles. Pickers are Dialogs (or inline in a Dialog), not play-shell windows: no placement or default size from [play-shell](play-shell.md) (settled by seams S3).
 - *(S6)* **Test IDs:** `asset-picker-search`, `asset-picker-search-clear`, `asset-picker-no-match` (+ `asset-picker-search-all`), `asset-picker-tag-chip` + `data-tag` (folded) + `data-state` (`on|off`) (All = `data-tag="all"`, Untagged = `data-tag="untagged"`), `asset-picker-item` gains `data-tags` (folded, space-separated), `asset-tags-editor` + `data-record-id`, `asset-tags-chip` + `data-tag`, `asset-tags-remove` + `data-tag`, `asset-tags-add` (Input), `asset-tags-suggestion` + `data-tag`, `asset-tags-manage`, `asset-tags-rename` / `asset-tags-delete` + `data-tag`, `asset-tags-confirm`, `asset-tags-error`. `asset-picker` gains `data-context`. *(IM-2 build, integrator)* Also: `asset-picker-selected`, `asset-picker-no-match-clear`, `asset-tags-rename-to`, `asset-tags-prompt`, `asset-tags-dialog`.
+- *(#386)* **Test IDs:** `asset-rename` / `asset-delete` + `data-record-id` (the tag row's buttons), `asset-manage-dialog`, `asset-rename-name` (Input), `asset-delete-prompt`, `asset-manage-confirm`, `asset-manage-error`.
 
 ## 8. Data model
 
@@ -188,6 +201,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - **Relations:** Campaign 1—* Asset. Asset-ID fields: `Scene.mapAssetId`, `Token.imageAssetId` ([scenes-map](scenes-map.md)), `Entity.portraitAssetId` ([entities](entities.md)): many records → one asset, same campaign only (FR-ASSET-15). Imported (global) definitions carry no asset in MVP. *(S5, track C: + `CompendiumEntry.imageAssetIds`, JSON leaf 0–4, homebrew only, [compendium §8](compendium.md#8-data-model); imported entries none.)*
 - **Derived values:** `thumb` size. **Persisted runtime state:** none beyond rows and files. No JSON leaf fields; files are not records.
 - *(S5)* Asset-ID fields that may hold attachments: `Handout.imageAssetIds` ([party-board](party-board.md#8-data-model)), compendium entry images (track C). Any asset-ID field accepts both kinds (`assets.require` doesn't look at `listed`). Index unchanged (`listed` filters the per-campaign provider query).
+- *(#386)* No new field. `assets.rename` writes `name`; `assets.delete` removes the row (combatants of ended encounters lose the image first, FR-ASSET-63). "In use" is derived (FR-ASSET-64), never stored.
 - *(S6)* **Tags** are values, not records: no tag table. The campaign's tag set = the distinct folded tags over its assets (server: all rows, for FR-ASSET-39's cap and spelling; client: the listed `asset` records, for the chips). Built-ins (`IMAGE_TAGS`) and context tags (`IMAGE_CONTEXT_TAG`) are constants in `@shared/assets-pipeline`. **Derived:** chip counts, Untagged, the match tier (FR-ASSET-44). Index unchanged (rename / delete scan the campaign's rows: ≤ a few thousand).
 
 ## 9. API & events
@@ -206,6 +220,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | `assets.setTags {assetId, tags}` | DM | FR-ASSET-39 rules; asset in `ctx.campaignId` else `not_found` | `ack` |
 | `assets.renameTag {from, to}` | DM | `from` held in the campaign else `not_found`; built-in `from` → `invalid`; `to` per FR-ASSET-39 | `{changed}` |
 | `assets.deleteTag {tag}` | DM | held in the campaign else `not_found` | `{changed}` |
+| *(#386)* `assets.rename {assetId, name}` | DM | image in `ctx.campaignId` else `not_found`; name per FR-ASSET-08 | `ack` |
+| *(#386)* `assets.delete {assetId}` | DM | image in `ctx.campaignId` else `not_found`; in use → `conflict` naming the uses (FR-ASSET-64) | `ack` |
 
 **Record types and events** (generic record changes `{type, id, op, data}` + `cause`, [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md))
 
@@ -221,9 +237,12 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | *(S6)* `AssetIngested` + `tags` | as S5 | yes | no | no |
 | *(S6)* `AssetTagsSet {assetId, tags}` (setTags; re-upload adding a context tag) | `asset` upsert if listed; attachment → none | yes | no | no |
 | *(S6)* `AssetTagRenamed {from, to, assetIds}` / `AssetTagDeleted {tag, assetIds}` | one `asset` upsert per changed listed asset | yes | no | no |
+| *(#386)* `AssetRenamed {assetId, name}` | `asset` upsert if listed | yes | no | no |
+| *(#386)* `AssetDeleted {assetId, name}` | `asset` delete if listed | yes | no | no |
 
 - `existing` outcome emits nothing *(S5: except FR-ASSET-26's listing)*. **Server API for other specs:** `assets.require(ctx, id)` (FR-ASSET-15).
 - *(S5)* Visibility per event: `asset` changes reach DM connections only (player `hidden`); players get at most an empty-change frame. **Client API for other specs:** `ImageAttach` + `AttachUploaderProvider` (FR-ASSET-20, -27).
+- *(#386)* Visibility: `AssetRenamed` / `AssetDeleted` change only `asset` records → **DM connections only**; players get nothing (no name, no ID). A refused delete writes nothing and emits nothing.
 - *(S6)* Visibility per event: all three tag events change only `asset` records → **DM connections only**; players get at most an empty-change frame (no tag, no ID). The backfill (FR-ASSET-49) emits nothing. **Client API for other specs:** the `context` prop (FR-ASSET-48); **shared API:** `matchImages` (`@shared/assets-pipeline/search.ts`), the matcher itself is `@shared/search/match.ts` ([FR-CMP-54](compendium.md#6-functional-requirements)).
 
 ## 10. Permissions
@@ -239,6 +258,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | *(S5)* Receive entry image IDs over REST | ✓ own campaign's entries | entries `entryVisibleTo` allows | FR-ASSET-36 |
 | *(S6)* See / search / filter tags | ✓ | ✗ (OQ-ASSET-25) | `asset` visibility = DM only |
 | *(S6)* Set an image's tags; rename / merge / delete a tag | ✓ | ✗ | default-DM commands (FR-ASSET-42, -43) |
+| *(#386)* Rename / delete an image | ✓ (delete: unused only) | ✗ | default-DM commands (FR-ASSET-62–64) |
 
 ## 11. Edge cases & failure modes
 
@@ -251,7 +271,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - *(S5)* **Clipboard quirks:** a copied image from a browser carries `text/html` but no plain text → uploads; from a word processor, plain text + a picture → text only (FR-ASSET-22); a `.gif` / HEIC on the clipboard → "Unsupported file type" (OQ-ASSET-11); several images → queued in order.
 - *(S5, track C)* **Compendium entry images:** share = the player's next fetch returns the IDs; unshare / image removed = the next fetch omits them, IDs already learned keep working (as any hide). A forged `PUT` naming another campaign's asset → `not_found` (FR-ASSET-35). REST has no reconnect step; a player's reconnect snapshot never holds entry image IDs. Crash: `cmp.putEntry` is one transaction; an upload that finished before it stays an unreferenced attachment.
 - *(S6)* **Tags, DM disconnect / reconnect:** search and filter keep working on the store; tag edits are disabled until `live` (a lost `setTags` intent → Toast "Connection lost — check the tags"); the reconnect snapshot carries current tags. **Players:** unaffected (no tag ever reaches them). **Server crash:** each tag command is one transaction (all assets renamed or none); the backfill is one transaction with its marker and re-runs on the next start only if it never committed; since ingest writes `[]`, a restart after any upload changes nothing (review #10). **Concurrent edits:** two DM tabs set tags on one image → last write wins, both see the upsert; a rename while the other tab's editor is open → the editor shows the new tags. **Cap:** an upload whose tag would make 9 on the image or a 45th DM tag in the campaign → that tag dropped, the upload kept, `droppedTags` + Toast (FR-ASSET-41); a rename can't push a campaign past 50 (rename never adds a tag); a new tag beyond 50 through `setTags` → `conflict`. **Hostile input:** tag names are plain text (rendered as text, never HTML), zod-validated, never used as paths.
-- **Invalid / malicious input:** guessing a 128-bit ID is infeasible; leaked IDs work until revoke exists (post-MVP, OQ-ASSET-05); `id` and `file` zod-validated, never used as paths; decompression bombs stopped by the pixel limit; SVG never served; renamed `.png` text file → 415. Seeded fixture IDs are predictable: fixture data is never tunnelled ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)).
+- *(#386)* **Rename / delete:** DM disconnect → the buttons are disabled until `live`; a lost intent → "Not saved: the connection dropped. Try again." in the Dialog; the reconnect snapshot carries the name, or no record after a delete. **Server crash:** each command is one transaction (renamed or not; deleted or not); after a committed delete the files go at the next start (FR-ASSET-07), before it nothing changed. **Concurrent edits:** a token picks the image while the other tab deletes it → whichever commits first wins: the delete is refused, or the pick gets `not_found` (`assets.require`). A host whose selected image was just deleted sees it vanish from the picker. **Players:** unaffected; an image a player already loaded stays in that browser's cache, but its URL 404s on the next fetch. Event-log rows keep the old asset ID (history, never served).
+- **Invalid / malicious input:** guessing a 128-bit ID is infeasible; leaked IDs work until the image is deleted (#386; re-keying an image still in use is post-MVP, OQ-ASSET-05); `id` and `file` zod-validated, never used as paths; decompression bombs stopped by the pixel limit; SVG never served; renamed `.png` text file → 415. Seeded fixture IDs are predictable: fixture data is never tunnelled ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)).
 
 ## 12. Performance & bandwidth
 
@@ -309,6 +330,9 @@ Isolated per worktree: `bun test` uses `:memory:` DB + temp asset dir per file; 
 | Unit | Format sniffing; SVG size rules; size maths (no upscale, aspect); name rules; headers; picker order with equal `createdAt`; identical 404 body across denial causes | In-code |
 | Integration | Created / existing; cross-campaign rows share files, IDs differ; 413/415/422 write nothing; SVG external `href` not fetched; injected crash after files → no row, swept at start; one log entry per `created`; determinism; IDs 128-bit from `ctx.tokens`; `asset` never in player frames; inactive / other-campaign / unknown ID / `original` → 404; 304 only when servable; POST 401 / 429. **Leak property:** with a test-only record type (visible / hidden / redacted without the ID / scene-scoped), after any change sequence every asset ID found by string scan in a player's frames is in a record that player may see | `asset-library` + test type |
 | E2E (thin) | DM uploads via the `asset.test` picker, item appears; unknown ID → 404 | `asset-library`, test mode |
+| *(#386)* Integration (server) | **`FR-ASSET-62 rename`** (DM upsert, logged; same name → ack, no event; bad name → `invalid`; players nothing) and `FR-ASSET-62 rename: … not_found; a player → forbidden` (`manage.test.ts`); **`FR-ASSET-63 delete unused`** (asset delete, logged, URLs 404 at once, files swept at the next start, players nothing); **`FR-ASSET-65 delete`** (attachment: log only; another campaign's copy keeps its files); **`FR-ASSET-64 in use`** over `image-search` (`manage-uses.test.ts`: scene map, prop, token, handout, compendium entry, running combatant, portrait, pause card each refuse, named, nothing written); `FR-ASSET-63 an ended encounter's combatants don't count` | own server; bundle `image-search` |
+| *(#386)* Unit | `FR-ASSET-64 in use message` (`@shared/assets-pipeline/manage.test.ts`: 5 named + "and n more", pause card unnamed); `FR-ASSET-66 image actions` (`image-actions.test.tsx`: buttons for the selected image only, disabled when not live, the prompt) | in-code |
+| *(#386)* E2E | `e2e/image-manage.e2e.ts`: New scene picker → rename Misc Sketch → delete it (tile gone, New scene not submitted) → delete the Town map → refused, "Town (scene map)" shown | bundle **`image-manage-e2e`** (= `image-search`; own bundle: it deletes images) |
 
 **Browser walkthrough A** (assets build done = A + the leak-property test) — `asset-library`, verify profile, `PP_TEST_MODE=1`. Contexts **A** DM, **B** `player-1`. IDs from the load manifest; "direct fetch" = request from B's page.
 
@@ -378,6 +402,19 @@ Isolated per worktree as above (`bun test`: `:memory:` + temp asset dir; walkthr
 | IM11 | A: reload; then hard-kill and restart the server | Same tags and counts; search reset on open; thumbnails render |
 | IM12 | Stop the server with A's picker open; type `wolf`; restart | Search still filters; tag editor and Manage disabled ("Reconnecting…"); enabled again when `live` |
 
+### 13.2 Rename and delete an image (#386)
+
+Tests and the e2e: §13 rows marked *(#386)*. **Browser walkthrough IMD** — bundle `image-manage-e2e`, verify profile. Contexts **A** DM, **B** `player-1`.
+
+| # | Step | Expected |
+|---|---|---|
+| IMD1 | A: Scenes → New scene; search "misc", select Misc Sketch | Pencil and trash beside "Selected: Misc Sketch", Tooltips "Rename image" / "Delete image" |
+| IMD2 | A: Rename image → "Old Sketch" → Rename | Dialog closes; tile and selected line read "Old Sketch"; New scene not submitted |
+| IMD3 | A: Delete image → prompt → Delete | "Delete Old Sketch? Its links stop working. This can't be undone."; tile gone, tag row gone |
+| IMD4 | A: select the Town map → Delete image → Delete | Inline "In use: Town (scene map). Change those first."; Dialog stays; tile kept |
+| IMD5 | A: open a token's Image… picker, select any unused image → Delete image while B watches | Tile gone for A; B's frames carry no asset change, no name; B's map unchanged |
+| IMD6 | Stop and restart the server; A reopens a picker | Old Sketch still gone; Town and every other image render |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -425,7 +462,7 @@ Isolated per worktree as above (`bun test`: `:memory:` + temp asset dir; walkthr
 | OQ-ASSET-02 | Player uploads (e.g. own portrait)? | **No in MVP: not tier S; revisit with character builder** / portrait only (ownership rule + quota) | no · owner: spec-assets-pipeline | character-sheet |
 | OQ-ASSET-03 | Derivative set | **`thumb` ≤ 512 + `display` ≤ 4096, WebP; original never served** / original + thumb (originals over tunnel) / on-demand sizes (cache complexity) | no · owner: spec-assets-pipeline | scenes-map |
 | OQ-ASSET-04 | Asset scope | **Row per campaign, files shared by hash** / global library (contradicts ADR-0004) | no · owner: spec-assets-pipeline | campaign-management |
-| OQ-ASSET-05 | Delete / revoke | **No delete or revoke in MVP; orphan files swept at start; with the tier-A library: delete unreferenced assets, re-key a leaked ID** / ref-counted auto delete (surprising loss) | no · owner: spec-assets-pipeline | scenes-map |
+| OQ-ASSET-05 | Delete / revoke | **Decided (#386): A. Delete only an unused image; the reject names the uses; delete = revoke (URLs 404); files swept at start (FR-ASSET-62–66).** Options were: **A. only unused, uses named** / B. delete anyway and clear the uses (silent loss; a scene can't lose its map) / C. hide instead (no space freed). Re-keying an image still in use stays post-MVP | — · decided (#386) | scenes-map |
 | OQ-ASSET-06 | Upload limits and formats | **25 MB, 50 MP, PNG / JPEG / WebP / SVG** (covers real battlemaps) / higher (slower ingest) | no · owner: DM | — |
 | OQ-ASSET-07 | Grid calibration pixel space | **`display` pixels; asset exposes display size** (what players render; OQ-MAP-15 agrees) / original pixels + scale | no · owner: scenes-map | scenes-map |
 | OQ-ASSET-08 | Where can the DM open the picker outside scene / token / portrait flows? | **Test-mode-only window `asset.test` (like `shell.test`, FR-SHELL-23)** (no product scope; walkthrough A runs before scenes-map) / DM window `asset.images` (≈ tier-A library) / host flows only | no · owner: spec-assets-pipeline | play-shell |
@@ -439,7 +476,7 @@ Isolated per worktree as above (`bun test`: `:memory:` + temp asset dir; walkthr
 | OQ-ASSET-16 | Glossary | **Add "Attachment": an asset uploaded or pasted into a form, not listed in the asset library; "Asset library": the DM's listed assets (the picker)**; amend "Asset" (handout and compendium images). Settled by seams S12 (integrator, gate merge) | no · settled | glossary |
 | OQ-ASSET-17 | *(S5, track C)* Compendium entries travel over REST, but FR-ASSET-12 / ADR-0023 say a player learns asset IDs only through the filtered sync. How do entry image IDs reach players? | **Decided (#256): A, allow them in compendium REST bodies only after `entryVisibleTo` (FR-ASSET-36)**, via the [ADR](../architecture/adr/0054-compendium-rest-asset-ids.md) amending ADR-0023's Secrecy rule (accepted; the integrator numbers it at merge). Rejected: ~~B lazy record type `cmp-entry-images`~~, ~~C credentialed image route~~ | — | ADR-0023, compendium |
 | OQ-ASSET-18 | *(S5, track C)* **Seam with track P's `ImageAttach`** (FR-ASSET-20–27, P's OQ-ASSET-15) | **Settled by seams S5:** no new prop; C passes `max` 4, `count`, `owner = "cmp-form"`, `disabled` while saving; `pasteTarget` / `dropTarget` may point **inside a portal** (the form's Dialog content: the listener attaches to the ref's element; P1 tests it in a Dialog); **dedupe is the caller's** (the control may return an ID C already holds → "Already in this entry"; no `heldIds` prop); entry images are attachments (`listed=false`), checked by `cmp.putEntry` with `assets.require`; C's fixture uses P's `ingestStep(file, {listed: false})`; C5 UI starts after P1, P4 and C5 core merge. Rejected: a `heldIds` prop | no (settled S5) | compendium |
-| OQ-ASSET-19 | *(S5, track C)* Future asset delete / revoke (OQ-ASSET-05) and entry images | **When delete lands: "unreferenced" also checks `compendium_entry.image_asset_ids` (and `Handout.imageAssetIds`); until then readers drop missing IDs (FR-ASSET-37)** / cascade: deleting an asset strips it from entries (silent content loss) | no · owner: spec-assets-pipeline | compendium, party-board |
+| OQ-ASSET-19 | *(S5, track C)* Future asset delete / revoke (OQ-ASSET-05) and entry images | **Decided (#386): "unused" checks `compendium_entry.image_asset_ids` and `Handout.imageAssetIds` too (FR-ASSET-64); readers still drop missing IDs (FR-ASSET-37)** / cascade: deleting an asset strips it from entries (silent content loss) | — · decided (#386) | compendium, party-board |
 | OQ-ASSET-20 | *(S5, track C)* Glossary | **Amend "Asset reference": "A record field, or a compendium entry field, holding an asset ID … a player learns the ID only if they can see the field (sync) or read the entry (REST, ADR-0023 as amended)"; add "Entry image": an image slot on a homebrew compendium entry; the first is the main image** — settled S12 (integrator applies at the gate merge) | no (settled S12) | glossary |
 | OQ-ASSET-21 | *(S6, DM)* **The tag list** (FR-ASSET-40) | **Decided (#288): A: built-ins Tokens, Portraits, Maps, Handouts, Props, Items + an Untagged filter chip (no Other tag).** Options were: **A Tokens, Portraits, Maps, Handouts, Props, Items + an "Untagged" filter chip instead of an "Other" tag** (each upload context has its tag; "Other" says nothing "no tag" doesn't) / B the brief's seven incl. Other (familiar; Other competes with real tags) / C four: Tokens, Maps, Handouts, Props (fewer chips; portraits and item art mix with tokens / props) | — · decided (#288) | party-board, compendium, entities |
 | OQ-ASSET-22 | *(S6, DM)* **(a) Fixed list or DM-defined tags; (b) one or many tags per image** (FR-ASSET-39, -40) | **Decided (#288): (a) C: built-in tags (fixed, auto-tagging, not renamable) + the DM's own free tags; (b) many, ≤ 8 per image.** Options were: (a) A fixed list only (simplest, no management UI; no "Dungeon", "Act 2") / B free tags, the list only as suggestions (flexible; renaming "Tokens" fights auto-tagging, which writes "Tokens" again) / **C built-in tags (fixed names, used by auto-tagging, can't be renamed) + the DM's own free tags (rename / merge / delete)** (one extra rule; auto-tags always land in the same chip). (b) one tag per image (a plain category, one chip each, simplest editor; Elite Goblin can't be both Tokens and Portraits, a Goblin Totem not both Props and Items, a re-upload in a new context must replace or skip) / **many, ≤ 8 per image** (an image shows under every chip that fits; slightly busier editor) (review #22) | — · decided (#288) | — |

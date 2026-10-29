@@ -19,10 +19,13 @@ export function TagEditor({
   asset,
   chips,
   live,
+  actions,
 }: {
   asset: AssetRecord;
   chips: TagChips;
   live: boolean;
+  /** #386: Rename / Delete beside the name (FR-ASSET-66). */
+  actions?: ReactNode;
 }) {
   const { busy, error, setError, send } = useTagIntent();
   const [q, setQ] = useState("");
@@ -60,8 +63,9 @@ export function TagEditor({
           <span data-testid="asset-picker-selected" className="text-foreground">
             {asset.name}
           </span>
-          {" · "}Tags:
         </span>
+        {actions}
+        <span className="text-muted-foreground">· Tags:</span>
         {asset.tags.map((t) => (
           <Badge
             key={tagKey(t)}

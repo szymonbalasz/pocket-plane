@@ -4268,3 +4268,21 @@ From [character-sheet-full](../specs/character-sheet-full.md#6-functional-requir
 - **Registry lines** (append-only): log-entry kind `char.rest` in `src/shared/dice-roll-log/kinds.ts`; fixture unit `rest-spent`, bundle `rest-e2e`.
 - **Client:** sheet `charx-rest*` (DM, characters), Party Manager `party-rest-*` (DM); both send `char.rest`.
 - **CON-44:** 0 B snapshot growth (no new field); a rest's event carries the same upserts as counter clicks + one log line per character.
+
+## 184. Rename and delete an image (fix/image-manage)
+
+From [assets-pipeline](../specs/assets-pipeline.md#65-rename-and-delete-an-image-386) FR-ASSET-62–66 (DM decision #386; OQ-ASSET-05 A, OQ-ASSET-19). **Built by `fix/image-manage`.**
+
+| Item | Shape | Rule | FR |
+|---|---|---|---|
+| Intent `assets.rename {assetId, name}` *(new, DM)* | `RenameAssetIntent` (`@shared/assets-pipeline/manage`); `name` = `AssetName` (FR-ASSET-08); result none (`ack`) | Image of `actor.campaignId` (listed or attachment) else `not_found` (a sound too). Same name → `ack`, no event, no log row | FR-ASSET-62 |
+| Intent `assets.delete {assetId}` *(new, DM)* | `DeleteAssetIntent`; result none (`ack`) | Same `not_found` rule. In use → `conflict` `inUseMessage(uses)`: "In use: ‹name› (‹kind›), … and ‹n› more. Change those first.", nothing written. Else ended-encounter combatants' `imageAssetId` → null, row deleted, one transaction | FR-ASSET-63, -64 |
+| Uses (`assetUses`, server) | kinds in order: `scene map`, `prop` (name = its scene; one per scene), `token`, `portrait` (entity), `combatant` (encounter not ended), `handout`, `compendium entry`, `pause card` (unnamed) | By name within a kind; first 5 named (`USES_SHOWN`) | FR-ASSET-64 |
+| Event `AssetRenamed {assetId, name}` *(new)* | Logged, not undoable | `asset` upsert if listed; an attachment has no change | FR-ASSET-62 |
+| Event `AssetDeleted {assetId, name}` *(new)* | Logged, not undoable | `asset` delete if listed; an attachment has no change (no frame, log row only) | FR-ASSET-63, -65 |
+| Serving | `GET /api/assets/:id/:file` | The row is gone → the common 404 at once. Files stay until the start sweep (FR-ASSET-07), which keeps a hash another row holds | FR-ASSET-63 |
+
+- **Visibility:** both events change only `asset` (audience DM) → DM connections only; players get nothing.
+- **Registry lines** (append-only): bundle `image-manage-e2e` in `fixtures/bundles/index.ts`. No new record type, log-entry kind or hook.
+- **Client:** picker tag row `asset-rename` / `asset-delete` + `data-record-id`, Dialog `asset-manage-dialog` (`asset-rename-name`, `asset-delete-prompt`, `asset-manage-confirm`, `asset-manage-error`).
+- **CON-44:** 0 B snapshot growth (no new field); a delete shrinks the DM snapshot by the image's record.

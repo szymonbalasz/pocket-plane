@@ -59,3 +59,23 @@ export const AssetTagDeleted = defineEvent({
   logged: true,
   undoable: false,
 });
+
+/** FR-ASSET-62 `assets.rename` (#386): the image's name now. `asset` upsert (DM) if listed. */
+export const AssetRenamed = defineEvent({
+  type: "AssetRenamed",
+  payload: z.object({ assetId: z.string(), name: z.string() }).strict(),
+  logged: true,
+  undoable: false,
+});
+
+/**
+ * FR-ASSET-63 `assets.delete` (#386): the row is gone, so its URLs answer 404 at once; the files
+ * go at the next start's sweep (FR-ASSET-07) unless another campaign holds the same bytes.
+ * `asset` delete (DM) if listed.
+ */
+export const AssetDeleted = defineEvent({
+  type: "AssetDeleted",
+  payload: z.object({ assetId: z.string(), name: z.string() }).strict(),
+  logged: true,
+  undoable: false,
+});

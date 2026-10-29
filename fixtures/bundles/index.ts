@@ -65,6 +65,7 @@ import h4RulesE2e from "./h4-rules-e2e";
 import h4StoresE2e from "./h4-stores-e2e";
 import holdStoresE2e from "./hold-stores-e2e";
 import holdUiE2e from "./hold-ui-e2e";
+import imageManageE2e from "./image-manage-e2e";
 import imageSearch from "./image-search";
 import initChipsEffect from "./init-chips-effect";
 import initRowsE2e from "./init-rows-e2e";
@@ -356,4 +357,6 @@ export const bundles: readonly Bundle[] = [
   agentApi,
   // Rest buttons (fix/rest-buttons): char.rest e2e
   restE2e,
+  // Rename / delete an image (fix/image-manage, #386): image-manage e2e
+  imageManageE2e,
 ];

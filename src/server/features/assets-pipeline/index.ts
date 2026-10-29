@@ -2,6 +2,7 @@ import { realContext } from "../../commands/context";
 import type { Feature } from "../../services";
 import { backfillAssetTags } from "./backfill";
 import { ingestCommand } from "./commands";
+import { deleteAsset, renameAsset } from "./manage";
 import { assetRecordType, audioAssetRecordType } from "./records";
 import { AssetStore, bindAssetStore } from "./store";
 import { deleteTag, renameTag, setTags } from "./tags";
@@ -17,6 +18,9 @@ export const assetsPipeline: Feature = {
     r.command(setTags, { intent: true });
     r.command(renameTag, { intent: true });
     r.command(deleteTag, { intent: true });
+    // #386: DM-only rename / delete an image (FR-ASSET-62–64).
+    r.command(renameAsset, { intent: true });
+    r.command(deleteAsset, { intent: true });
     r.recordType(assetRecordType);
     // *(Sprint 8, TT0)* sounds: lazy DM-only type (FR-ASSET-57); probe, upload and serve are TT3.
     r.recordType(audioAssetRecordType);
