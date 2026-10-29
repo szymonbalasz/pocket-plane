@@ -1,18 +1,25 @@
-// `bun run mcp:call <tool> '<json>' [--profile p]` (AGENT §2, ADR-0072 D5): spawns the stdio MCP
-// server, calls one tool over real stdio, prints the result. Exit 1 on a tool error, 2 on usage.
+// `bun run mcp:call <tool> '<json>' [--profile p | --play]` (AGENT §2, ADR-0072 D5; `--play`
+// #382): spawns the stdio MCP server, calls one tool over real stdio, prints the result. Exit 1
+// on a tool error, 2 on usage.
 import path from "node:path";
+import { type McpTarget, parseTargetArgs, targetArgs, UsageError } from "@mcp/args";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 const ROOT = path.resolve(import.meta.dir, "..");
-const USAGE = "usage: bun run mcp:call <tool> '<json>' [--profile dev|verify]";
+const USAGE = "usage: bun run mcp:call <tool> '<json>' [--profile dev|verify | --play]";
 
-const argv = process.argv.slice(2);
-const pi = argv.indexOf("--profile");
-const profile = pi === -1 ? undefined : argv[pi + 1];
-const positional = argv.filter((_, i) => pi === -1 || (i !== pi && i !== pi + 1));
+let target: McpTarget;
+let positional: string[];
+try {
+  ({ target, rest: positional } = parseTargetArgs(process.argv.slice(2)));
+} catch (err) {
+  console.error(`mcp:call: ${err instanceof UsageError ? err.message : String(err)}`);
+  console.error(USAGE);
+  process.exit(2);
+}
 const [tool, json = "{}"] = positional;
-if (!tool || (pi !== -1 && !profile)) {
+if (!tool) {
   console.error(USAGE);
   process.exit(2);
 }
@@ -31,7 +38,7 @@ const env = Object.fromEntries(
 );
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [path.join(ROOT, "src/mcp/index.ts"), ...(profile ? ["--profile", profile] : [])],
+  args: [path.join(ROOT, "src/mcp/index.ts"), ...targetArgs(target)],
   env,
   cwd: ROOT,
   stderr: "inherit",
