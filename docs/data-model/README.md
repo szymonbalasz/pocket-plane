@@ -2780,3 +2780,17 @@ From [character-sheet-full](../specs/character-sheet-full.md#6-functional-requir
 | `entity.hpCurrent`, `tempHp`, `deathSuccesses`, `deathFailures` | — | `hpMax`, 0, 0, 0 (the only HP store; PC combatants read it) |
 
 - New `game_log_entry` kind `char.rest` (payload `{characterId, kind}`), not public, `audiencePlayerId` = the owner.
+
+## 146. Tray attacks core (fix/tray-core)
+
+From [ADR-0073](../architecture/adr/0073-tray-attacks.md) and DM [#385](../decisions-log.md): [dice-roll-log](../specs/dice-roll-log.md#6-functional-requirements) FR-DICE-94, -96, [character-sheet-full](../specs/character-sheet-full.md#6-functional-requirements) FR-CHARX-128–130, [combat-tracker](../specs/combat-tracker.md#68-sprint-15-attacks-through-the-tray) FR-CBT-170–176. **Built by `fix/tray-core`** (slice S1). **No new table, column or record type**; JSON leaves only, old rows parse. Protocol side: [protocol §184](../protocol/README.md#184-tray-attacks-core-fixtray-core).
+
+| Table / record | Change | Notes |
+|---|---|---|
+| `game_log_entry.payload` (kind `roll`), each item | + `purpose?` `attack` \| `damage` (absent = plain); `part {type, extra}` now on **every** damage item (single-part rolls too; healing items carry `purpose` only); + `edited?: true` | Player-safe (FR-DICE-15: the item's audience). Written by `dice.roll`, `char.roll`, `cbt.attack`, `cbt.rollDamage` on new entries |
+| `game_log_entry.dmPayload` (kind `roll`) | + `usedByCardId?` (card id); an entry without a `dmPayload` gets `{items: [{mods: []} per item], usedByCardId}` | DM only. Set once by `gameLog.markUsed` (`cbt.useRoll`), never cleared; a reroll copies it (the old `dmPayload` is copied) |
+| `notification.payload` (kind `damage-card`) | `damage.extra[].dice` cap 12 → **40** (`CARD_EXTRA_DICE_MAX` = 2 × 20 staged dice) | No other card change. A card from `cbt.useRoll` or a rowless roll has no `attackId` / `spellId` |
+
+- **Derived (never stored):** `isUsedRoll(entry)` (`@shared/dice-roll-log/schemas`) = `encounterId` set **or** `dmPayload.usedByCardId` set (players' copy: `encounterId` only). Staged specs (`stagedSpecs`, `rowlessSpecs`, `@shared/character-sheet/logic`) and the item fields (`specItemFields`): from the intent, at roll time.
+- **Fixtures:** unit `tray-log-rolls` (three plain lines: the DM's hidden "2d6", Player 1's "1d20+5" as Mira and "1d8+1d6" as themselves), bundle `tray-attacks` = `rules-effects` + `kit-mira-spells` + `tray-log-rolls`.
+- **CON-44 (measured, heavy harness, every roll item at its widest tags and every roll entry stamped):** item tags DM +5,240 B, players +2,160 B; `usedByCardId` DM +5,470 B, players +0 B; heavy DM 706,680 B, players ≤ 267,388 B (protocol §184).
