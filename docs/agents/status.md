@@ -2,15 +2,13 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 done (all merged, main green).** Now: AoE templates snap to cell centres (DM #375, `fix/aoe-cell-origin`, other session); **Agent / MCP API track done (#378–#380)**; Map effects default Full merged (#376). Open DM recap calls: damage card width, BL-146, spell-fx `complete`, sprint gate. Decisions up to #380. All worktrees linked to workspace wR.
+**Phase:** **Sprint 14 CLOSED (DM #381, 2026-10-29).** Everything merged, `main` green, no agents running. Also done: Agent / MCP API track (#378–#380, other session; DM: register the MCP server once), AoE cell origin (#375, #377), Map effects default Full (#376). **Next: plan sprint 15 with the DM** (candidates below). Decisions up to #381. All worktrees linked to workspace wR.
 
 **Resume (in order):**
-1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
-2. **Resume sprint 14 on the new loop** ([sprint-14](sprint-14.md)): parked branches with a `.verify/resume.md` each: **F1** `fix/s14-frame` (worktree fix-s14-frame, slot 0; BL-129, BL-134, BL-136, BL-133 committed, not yet walkthrough-tested) and **F2** `fix/s14-toasts` (worktree fix-s14-toasts; BL-130, BL-132, BL-137, BL-131 committed, not yet walkthrough-tested). Merge main into each (both predate the CI loop: tell the builder AGENTS §9.4.1 replaces the brief's `check:full` / gates steps), targeted `check` + the slice's own e2e specs, push + `ci:watch` in the background, walkthrough, merge (no wait for CI). Then **F4** `fix/s14-roll-guard` (BL-135, DM #367), then **F3** kit nits (BL-138, BL-139, BL-141).
-3. Briefs / slice definitions: `%TEMP%/pocket-plane/slices.json` keys `f14a`, `f14b` (backup with the two briefs in `.verify/sprint14/`); walkthrough templates `%TEMP%/pocket-plane/briefs/tpl-test-*.md`.
+1. Sprint 15 planning with the DM. Candidates (backlog, open): window frame BL-146 (decided #381: zone round-trip memory) with BL-143–145 (the replay exemptions) and BL-124 / BL-152 (grips, resize cost); toasts BL-151 (player toast over the sheet's End button); kit look BL-125 / BL-126 / BL-127 (Gilt & Stone Game log and Initiative rows, `data-variant`), BL-149 / BL-150 (stat block height, attack property chips); AoE label BL-153; CI flakes BL-147, BL-154; small BL-123, BL-142.
+2. Slice definitions live in `%TEMP%/pocket-plane/slices.json` (backup `.verify/sprint14/slices.json`); `mkbuild.py` briefs carry the CI loop (AGENTS §9.4.1); walkthrough templates `%TEMP%/pocket-plane/briefs/tpl-test-*.md` (sprint 14: `tpl-test-s14f{1,2,3,4}`, `-vfxcore`, `-vfx`, `-aoecell`).
 
-
-**Gates on `main`:** GitHub CI (#368). After each merge: push `main`, `bun run ci:watch` in the background; red `main` is fixed first. The local `gates-main` worktree is no longer needed (remove it at the next cleanup).
+**Gates on `main`:** GitHub CI (#368). After each merge: push `main`, `bun run ci:watch` in the background; red `main` is fixed first. (`gates-main` removed.)
 
 **Herdr:** orchestrator workspace `wR`. Agents: `--kind claude -- --permission-mode auto` (+ `--strict-mcp-config` except test agents).
 
@@ -65,7 +63,7 @@ Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL),
 
 ## Integrator rulings this sprint (tell the DM at the recap)
 
-Sprint 14:
+Sprint 14 (reported, accepted at the recap #381):
 - F1: `tray-size.test.ts` expectation → the tray's useful 360×300 with Fit `all` at DM 1440 escort (the BL-134 rule applies to the tray; 450×375 gave Fit `pcs`). The 6 remaining K5 replay exemptions stay out of F1 (backlog rows after the report; the zone round-trip memory is a DM design question).
 - F2: DM bell = unread pending actions only; a player's not-owned pending rows get their own Waiting section; the popup head limit applies only to a displaced column (#347 counts at home); the stuck-hover toast timer (a 4 s card stayed > 60 s) is fixed in F2.
 - F1 walkthrough step 3: launcher button rects differ between themes by up to 8 px (label text drawn in each theme's font); the labelled set and the fit decision are identical (BL-136 / FR-THEME-07): accepted.
@@ -116,7 +114,6 @@ Sprint 10:
 ## Pending DM decisions
 
 
-- **Next after sprint 12 (DM #354): a new test strategy** before feature work: the loop is too slow / heavy. Bring a proposal at the recap.
 
 - Default theme decided (#355: Gilt & Stone; old look = Simple Dark). Kit-parity spec: review its open questions when it's in review.
 

@@ -24,3 +24,5 @@ BL-135: decided (#367), slice F4.
 | 2026-10-28 | DM #367: BL-135 server roll guard (slice F4). F1 (4 commits) and F2 (8 commits) built, not yet tested; **paused by the DM**: the test tooling gets built first in a new session, then this sprint resumes |
 | 2026-10-28 | Resumed on the CI test loop (#368). F2 merged (9/9), F1 merged (4/6 → 5/5), F4 merged per #371 (7/8 → 5/5), F3 merged (5/6 → 5/5) |
 | 2026-10-28 | DM #372–#374: Spell FX spec merged, ADR-0071 accepted, pulled into the sprint. VFX core merged (raw-intent walkthrough 8/9, cue budget 480 B), VFX build merged (§13 walkthrough 12/12). **All slices merged.** Evidence `.verify/sprint14/walkthroughs/` |
+| 2026-10-28 | DM #375–#377: AoE templates snap to cell centres, snapped spheres cover by the campaign's grid distance (walkthrough 9/9); Map effects default Full. Red `main` once (CI paint stall after a resize → `fix/ci-launcher`, BL-148 closed) |
+| 2026-10-29 | **Closed (DM #381):** recap calls taken (damage card 440, BL-146 yes, spell-fx complete), no sprint gate |

@@ -1,7 +1,7 @@
 ---
 title: Spell FX
 prefix: VFX
-status: in-review
+status: complete
 owner: spec-spell-fx
 phase: post-mvp
 ---
