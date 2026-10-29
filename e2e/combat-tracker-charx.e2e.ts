@@ -8,6 +8,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { initMenu } from "./support/initiative";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -106,14 +107,16 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
     )
     .toEqual([]);
 
-  // Mira's Light crossbow (2nd attack) from the Actions tab: Attack + damage → cbt.attack → the
-  // DM's card (Attack is to-hit only since N7, FR-CHARX-41).
+  // Mira's Light crossbow (2nd attack) from the Actions tab: Attack → cbt.attack, Damage
+  // completes the DM's card (Alt+click: at once, #385).
   await expect(sheet.getByTestId("char-sheet-combat")).toBeVisible();
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   const crossbow = sheet.getByTestId("charx-attack").filter({ hasText: "Light crossbow" });
-  await crossbow.getByTestId("charx-roll-attack-damage").click();
+  await rollNow(crossbow.getByTestId("charx-roll-attack"));
   const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
+  await rollNow(crossbow.getByTestId("charx-roll-damage"));
+  await expect(card).toContainText(/to hit.*, \d+ piercing/);
   await card.click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup.getByRole("heading", { level: 2 })).toHaveText("Mira — Light crossbow");
@@ -128,15 +131,15 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   await expect(popup).toHaveCount(0);
   await expect(row(init, goblin).getByTestId("cbt-init-row-hp")).toHaveText("4 / 7");
 
-  // OQ-CHARX-12: Elite has two attack rows → Attack ▸ lists both, each with the three actions
-  // (FR-CBT-74); Shortbow's Attack + damage → card.
+  // OQ-CHARX-12: Elite has two attack rows → Attack ▸ lists both, each with the two actions
+  // (FR-CBT-169); Shortbow's Attack (Alt: at once) → card.
   const elite = await idByName(init, "Elite Goblin Warrior");
   await row(init, elite).getByTestId("cbt-init-row-attack").click();
   const options = dm.locator(
-    `[data-testid="cbt-init-row-attack-option"][data-record-id="${elite}"][data-value="both"]`,
+    `[data-testid="cbt-init-row-attack-option"][data-record-id="${elite}"][data-value="toHit"]`,
   );
   await expect(options).toHaveCount(2);
-  await options.filter({ hasText: "Shortbow" }).click();
+  await rollNow(options.filter({ hasText: "Shortbow" }));
   await expect(dm.getByTestId("cbt-popup").getByRole("heading", { level: 2 })).toHaveText(
     "Elite Goblin Warrior — Shortbow",
   );
@@ -155,14 +158,14 @@ test("FR-CHARX-24 FR-CHARX-11 OQ-CHARX-12 sheet attack 2 → card → apply; DM 
   await expect(popup).toHaveCount(0);
 
   // FR-CBT-74: Attack ▸ Shortbow "Attack" → a to-hit-only card ("Waiting for damage"); Later;
-  // "Damage" completes it (the same card, damage filled).
+  // "Damage" completes it (the same card, damage filled). Alt+click: at once (FR-CBT-169).
   const option = async (value: string) => {
     await row(init, elite).getByTestId("cbt-init-row-attack").click();
     const bow = dm
       .locator(`[data-testid="cbt-init-row-attack-option"][data-record-id="${elite}"]`)
       .and(dm.locator(`[data-value="${value}"]`));
     const bowId = await options.filter({ hasText: "Shortbow" }).getAttribute("data-attack-id");
-    await bow.and(dm.locator(`[data-attack-id="${bowId}"]`)).click();
+    await rollNow(bow.and(dm.locator(`[data-attack-id="${bowId}"]`)));
   };
   await option("toHit");
   await expect(popup.getByTestId("cbt-popup-waiting-damage")).toBeVisible();

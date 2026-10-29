@@ -6,6 +6,7 @@
 // manual counts, mods, leak scan, creature form: bun test (character-sheet, combat-tracker).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -77,10 +78,10 @@ test("FR-CHARX-56 FR-CHARX-55 FR-CHARX-57 Flame Tongue on Pip: edit, view, damag
   );
   await expect(row.getByTestId("charx-attack-bonus")).toHaveText("+1");
 
-  // Damage → one public line with both parts, typed, one total.
+  // Damage (Alt+click: at once, #385) → one public line with both parts, typed, one total.
   const dmLog = await openWindow(dm, "dice.log");
   const p1Log = await openWindow(p1, "dice.log");
-  await row.getByTestId("charx-roll-damage").click();
+  await rollNow(row.getByTestId("charx-roll-damage"));
   for (const log of [dmLog, p1Log]) {
     const line = log.getByTestId("dice-log-entry").filter({ hasText: "Flame Tongue" });
     await expect(line).toHaveCount(1);

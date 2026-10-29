@@ -10,6 +10,7 @@ import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { initMenu, statusEffect } from "./support/initiative";
 import { konvaNodes } from "./support/konva";
 import { panMap } from "./support/map";
+import { rollNow } from "./support/rolls";
 import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 import { closeToasts } from "./support/toasts";
@@ -58,15 +59,28 @@ async function viewAmbush(dm: Page, player: Page, ambush: string) {
 
 /** DM row Attack → popup; one target, Hit, damage total; returns the popup (not applied). */
 async function attack(dm: Page, init: Locator, attackerId: string, targetId: string, dmg: number) {
-  // Attack ▸ → the first attack's Attack + damage (FR-CBT-74).
-  await init.locator(`[data-testid="cbt-init-row-attack"][data-record-id="${attackerId}"]`).click();
-  await dm
-    .locator(
-      `[data-testid="cbt-init-row-attack-option"][data-record-id="${attackerId}"][data-value="both"]`,
-    )
-    .click();
+  // Attack ▸ → the first attack's Attack, Later, then its Damage completes the card (FR-CBT-74,
+  // -169; Alt+click: at once).
+  const action = async (value: "toHit" | "damage") => {
+    await init
+      .locator(`[data-testid="cbt-init-row-attack"][data-record-id="${attackerId}"]`)
+      .click();
+    await rollNow(
+      dm
+        .locator(
+          `[data-testid="cbt-init-row-attack-option"][data-record-id="${attackerId}"][data-value="${value}"]`,
+        )
+        .first(),
+    );
+  };
   const popup = dm.getByTestId("cbt-popup");
+  await action("toHit");
+  await expect(popup.getByTestId("cbt-popup-waiting-damage")).toBeVisible();
+  await popup.getByTestId("cbt-popup-later").click();
+  await expect(popup).toHaveCount(0);
+  await action("damage");
   await expect(popup).toBeVisible();
+  await expect(popup.getByTestId("cbt-popup-waiting-damage")).toHaveCount(0);
   await popup.getByTestId("cbt-popup-target-add").click();
   await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${targetId}"]`).click();
   const trow = popup.locator(`[data-testid="cbt-popup-target-row"][data-record-id="${targetId}"]`);
@@ -194,10 +208,10 @@ test("FR-CBT-75 FR-CBT-76 FR-NOTE-26 popup opens over its toast, the toast close
   // BL-01: Fit puts the map's top rows under the top-centre toasts; pan the monsters out of the
   // popup's way (the covered case is the sim-6 N8 test below).
   await panMap(dm, 0, 420);
-  // Player-1: sheet Attack + damage → a damage card to the DM (sticky toast).
+  // Player-1: sheet Attack (Alt+click: at once) → a damage card to the DM (sticky toast).
   const sheet = await openWindow(player, "char.sheet");
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
-  await sheet.getByTestId("charx-roll-attack-damage").first().click();
+  await rollNow(sheet.getByTestId("charx-roll-attack").first());
   const toast = dm.getByTestId("note-toast").filter({ has: dm.getByTestId("note-toast-action") });
   await expect(toast).toHaveCount(1);
   const cardId = (await toast.getAttribute("data-record-id")) as string;
@@ -389,7 +403,7 @@ test("FR-NOTE-14 FR-NOTE-32 P3 E3: at 1280×720 a 4-card toast stack (3 + '+1 mo
   await expect(init).toBeVisible();
   const before = await init.getByTestId("cbt-init-card").count();
   for (let i = 1; i <= 4; i++) {
-    await sheet.getByTestId("charx-roll-attack-damage").first().click();
+    await rollNow(sheet.getByTestId("charx-roll-attack").first());
     await expect(init.getByTestId("cbt-init-card")).toHaveCount(before + i);
   }
   await expect(dm.getByTestId("note-toast-more")).toBeVisible();
@@ -538,7 +552,7 @@ for (const [width, height] of [
     const popup = dm.getByTestId("cbt-popup");
 
     // 1. A card toast: the popup opens with its top-left on the toast's, unless that covers a monster.
-    await sheet.getByTestId("charx-roll-attack-damage").first().click();
+    await rollNow(sheet.getByTestId("charx-roll-attack").first());
     const first = await settledToast(dm, known);
     await first.toast.getByTestId("note-toast-action").click();
     await expect(popup).toHaveAttribute("data-record-id", first.id);
@@ -646,7 +660,7 @@ for (const [width, height] of [
           return t ? Math.abs(t.x + t.w / 2 - tx) < 4 && Math.abs(t.y + t.h / 2 - ty) < 4 : false;
         })
         .toBe(true);
-      await sheet.getByTestId("charx-roll-attack-damage").first().click();
+      await rollNow(sheet.getByTestId("charx-roll-attack").first());
       card = await settledToast(dm, known);
       const over = origin(card.box);
       blocked = (await monsters()).some((t) => overlaps(over, t));

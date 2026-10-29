@@ -1,12 +1,14 @@
 // e2e-bundle: session-sim-7
 // Thin trigger-state flow (MOD §13.1 steps 1–5, S4-3; FR-MOD-53–56, -60): player-1's Brakka →
 // Active effects: Divine Fury "Not in effect — needs Rage"; Rage on → "On Brakka's turn" (the
-// Wolf's turn); DM Next → "Ready"; Alt+click Greataxe Attack + damage → the tray offers "Divine
-// Fury (on a hit)" → Roll → the DM applies it to Goblin → "Used this turn"; a second Alt+click
-// the same turn → no Divine Fury in the tray (sim-7 glitch 11). Own server: `session-sim-7` has
+// Wolf's turn); DM Next → "Ready"; Greataxe Attack (Alt+click: at once), then a click on Damage
+// stages it (#385) → the tray offers "Divine Fury (on a hit)" → Roll → the DM applies it to Goblin
+// → "Used this turn"; Damage staged again the same turn → no Divine Fury in the tray (sim-7
+// glitch 11). Own server: `session-sim-7` has
 // no other spec. Writes on every path, visibility and leaks: bun test (effect-modifiers).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -58,13 +60,14 @@ test("FR-MOD-60 FR-MOD-56 FR-MOD-53 Divine Fury's state in the sheet; the tray s
   await expect(state).toHaveAttribute("data-state", "ready");
   await expect(state).toHaveText("Ready");
 
-  // Alt+click Greataxe Attack + damage → the tray offers Divine Fury's die → Roll.
+  // Greataxe Attack at once; Damage staged → the tray offers Divine Fury's die → Roll.
   await actionsTab.click();
-  const greataxe = sheet
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Greataxe" })
-    .getByTestId("charx-roll-attack-damage");
-  await greataxe.click({ modifiers: ["Alt"] });
+  const row = sheet.getByTestId("charx-attack").filter({ hasText: "Greataxe" });
+  const greataxe = row.getByTestId("charx-roll-damage");
+  const card = init.getByTestId("cbt-init-card");
+  await rollNow(row.getByTestId("charx-roll-attack"));
+  await expect(card).toHaveCount(1);
+  await greataxe.click();
   const tray = shellWindow(p1, "dicex.tray");
   await expect(tray.getByTestId("dicex-tray-state")).toHaveAttribute("data-value", "adjust");
   const fury = tray.getByTestId("dicex-tray-extra").filter({ hasText: "Divine Fury (on a hit)" });
@@ -72,8 +75,7 @@ test("FR-MOD-60 FR-MOD-56 FR-MOD-53 Divine Fury's state in the sheet; the tray s
   await tray.getByTestId("dicex-tray-roll").click();
 
   // DM: the card → Goblin, Hit, the Divine Fury chip ticked → Apply.
-  const card = init.getByTestId("cbt-init-card");
-  await expect(card).toHaveCount(1);
+  await expect(card).toContainText(/to hit.*, \d+ /);
   await card.click();
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
@@ -92,7 +94,7 @@ test("FR-MOD-60 FR-MOD-56 FR-MOD-53 Divine Fury's state in the sheet; the tray s
   await expect(state).toHaveAttribute("data-state", "used");
   await expect(state).toHaveText("Used this turn");
   await actionsTab.click();
-  await greataxe.click({ modifiers: ["Alt"] });
+  await greataxe.click();
   await expect(tray.getByTestId("dicex-tray-state")).toHaveAttribute("data-value", "adjust");
   await expect(tray.locator('[data-testid="dicex-tray-die"][data-faces="12"]')).toHaveCount(1);
   await expect(tray.getByText("Divine Fury")).toHaveCount(0);

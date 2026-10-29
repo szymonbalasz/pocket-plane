@@ -153,9 +153,9 @@ test("FR-CHARX-114 FR-KIT-76 FR-KIT-13 K13 round 3: wide sheet boxes, narrow nit
       boxes.locator(`[data-testid="charx-box"][data-value="${key}"][data-scope="main"]`),
     ).toBeVisible();
   await expect(boxes.locator('[data-testid="charx-slot"][data-scope="main"]')).toHaveCount(2);
-  await expect(
-    boxes.locator('[data-testid="charx-roll-attack-damage"][data-scope="main"]'),
-  ).toHaveCount(2);
+  await expect(boxes.locator('[data-testid="charx-roll-damage"][data-scope="main"]')).toHaveCount(
+    2,
+  );
   const passives = await win
     .locator('[data-testid="charx-box"][data-value="passives"]')
     .boundingBox();

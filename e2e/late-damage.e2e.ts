@@ -7,6 +7,7 @@
 // late-damage.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -78,7 +79,7 @@ test("FR-CBT-87 FR-CBT-89 FR-CBT-90 Apply hit, then the late Damage fills the op
   await expect(popup.getByTestId("cbt-popup-target-add")).toHaveCount(0);
   await expect(popup.getByTestId("cbt-popup-apply")).toBeDisabled();
   // player-1's Damage joins the open popup.
-  await crossbow.getByTestId("charx-roll-damage").click();
+  await rollNow(crossbow.getByTestId("charx-roll-damage"));
   await rollPhysical(p1, "5");
   await expect(popup.getByTestId("cbt-popup-waiting")).toHaveCount(0);
   await expect(popup.getByTestId("cbt-popup-damage")).toHaveValue("7");
@@ -88,7 +89,7 @@ test("FR-CBT-87 FR-CBT-89 FR-CBT-90 Apply hit, then the late Damage fills the op
 
   /** player-1's to-hit (physical d20 `d20`), then the DM opens its card and targets `target`. */
   const attack = async (d20: string, target: string, text: string) => {
-    await crossbow.getByTestId("charx-roll-attack").click();
+    await rollNow(crossbow.getByTestId("charx-roll-attack"));
     await rollPhysical(p1, d20);
     const card = init.getByTestId("cbt-init-card").filter({ hasText: text });
     await expect(card).toHaveCount(1);
@@ -104,7 +105,7 @@ test("FR-CBT-87 FR-CBT-89 FR-CBT-90 Apply hit, then the late Damage fills the op
     await expect(popup.getByTestId("cbt-popup-step")).toHaveAttribute("data-value", "damage");
     await expect(p1Lines.last()).toContainText(players);
     await expect(popup.getByTestId("cbt-popup-waiting")).toBeVisible();
-    await crossbow.getByTestId("charx-roll-damage").click();
+    await rollNow(crossbow.getByTestId("charx-roll-damage"));
     await rollPhysical(p1, "4");
     await expect(popup.getByTestId("cbt-popup-waiting")).toHaveCount(0);
     await expect(popup.getByTestId("cbt-popup-damage")).not.toHaveValue("");

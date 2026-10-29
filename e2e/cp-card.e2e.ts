@@ -2,7 +2,7 @@
 // Sprint 6 CP4 (CBT §13.3 S5 card part, thin): DM, player-1 (Mira) and player-2 (Thorn) at
 // 1440×900. Goblin 2 is Mira's companion in the running fight (`cp-ally`). Player-1's launcher
 // has "Companions"; the card reads "Goblin 2 · Mira's summon · Acts after Mira", In combat, its
-// Scimitar row with Attack / Damage / Attack + damage (FR-CHARX-59, -62, -64). Attack + damage
+// Scimitar row with Attack / Damage (FR-CHARX-59, -62, -64, -131). Attack (Alt+click: at once)
 // sends `cbt.attack` as the companion: the DM's Initiative gets a "Goblin 2" card; the roll line
 // is in player-1's log, not player-2's (FR-CBT-114, ADR-0056). Player-2 has no Companions entry
 // (FR-CHARX-67). The DM opens the card from Goblin 2's card icon (FR-CHARX-59, walkthrough 9);
@@ -10,6 +10,7 @@
 // walkthrough 19). Picker, edits, HP states, leaks: bun test (companion tests).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 const row = (scope: Locator, id: string) =>
@@ -55,7 +56,7 @@ test("FR-CHARX-59 FR-CHARX-64 FR-CHARX-67 FR-CHARX-68 companions-ally: the owner
   await expect(root.getByTestId("charx-companion-edit")).toHaveCount(0); // a summon
   const scimitar = root.getByTestId("charx-companion-attack").filter({ hasText: "Scimitar" });
   await expect(scimitar).toContainText("Scimitar · +4 · 1d6+2 slashing");
-  await expect(scimitar.getByTestId("charx-companion-roll")).toHaveCount(3);
+  await expect(scimitar.getByTestId("charx-companion-roll")).toHaveCount(2);
 
   // The DM's Initiative and both players' logs before the roll.
   const init = shellWindow(dm, "cbt.initiative");
@@ -67,8 +68,8 @@ test("FR-CHARX-59 FR-CHARX-64 FR-CHARX-67 FR-CHARX-68 companions-ally: the owner
   const p1Before = await entriesBy(p1, "Goblin 2").count();
   const p2Before = await entriesBy(p2, "Goblin 2").count();
 
-  // Attack + damage → cbt.attack as the companion (FR-CHARX-64, FR-CBT-114).
-  await scimitar.locator('[data-testid="charx-companion-roll"][data-value="attack"]').click();
+  // Attack → cbt.attack as the companion (FR-CHARX-64, -131, FR-CBT-114).
+  await rollNow(scimitar.locator('[data-testid="charx-companion-roll"][data-value="toHit"]'));
   await expect(goblinCards).toHaveCount(cardsBefore + 1);
   await expect(entriesBy(p1, "Goblin 2")).toHaveCount(p1Before + 1);
   // The roll line is DM + owner only: player-2's log is unchanged once player-1 has it.

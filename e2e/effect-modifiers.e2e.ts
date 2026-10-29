@@ -6,6 +6,7 @@
 import { expect, type Locator, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { tokenNode } from "./support/konva";
+import { rollNow } from "./support/rolls";
 import { openWindow } from "./support/shell";
 
 async function idByName(scope: Locator, name: string): Promise<string> {
@@ -44,11 +45,13 @@ test("FR-MOD-15 FR-MOD-16 FR-MOD-20 FR-MOD-28 sheet attack with Bless → line +
   // Mira's Shortsword Attack (to-hit only in combat, FR-CHARX-41) → cbt.attack with Bless.
   const init = await openWindow(dm, "cbt.initiative");
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
-  await sheet
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Shortsword" })
-    .getByTestId("charx-roll-attack")
-    .click();
+  // Alt+click: at once (a click stages the Dice tray, #385).
+  await rollNow(
+    sheet
+      .getByTestId("charx-attack")
+      .filter({ hasText: "Shortsword" })
+      .getByTestId("charx-roll-attack"),
+  );
   const lineOf = async (page: typeof dm) => {
     const log = await openWindow(page, "dice.log");
     const entry = log.getByTestId("dice-log-entry").filter({ hasText: "Bless" }).last();

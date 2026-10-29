@@ -8,6 +8,7 @@
 // combat-tracker `pending-cap.test.ts`, server `waiting-leak.test.ts`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -68,14 +69,14 @@ test("BL-137 BL-131 FR-NOTE-17 FR-CBT-77: Player 1's card waits under Waiting; I
     await present.getByTestId("party-present-close").click();
   }
 
-  // Two "Attack + damage" cards from Player 1's sheet: pending on the DM.
+  // Two "Attack" cards from Player 1's sheet (Alt+click: at once, #385): pending on the DM.
   const init = await openWindow(dm, "cbt.initiative");
   const cards = init.getByTestId("cbt-init-card");
   const before = await cards.count();
   const sheet = await openWindow(player, "char.sheet");
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   for (let i = 1; i <= 2; i++) {
-    await sheet.getByTestId("charx-roll-attack-damage").first().click();
+    await rollNow(sheet.getByTestId("charx-roll-attack").first());
     await expect(cards).toHaveCount(before + i);
   }
   await player.getByTestId("ui-window-close").first().click();

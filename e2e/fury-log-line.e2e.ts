@@ -1,6 +1,6 @@
 // e2e-bundle: fury-log-line
 // Thin Divine Fury dice flow (S4-5; MOD §13.1 step 4, FR-MOD-57): DM Next → Brakka's turn;
-// player-1 turns Rage on and rolls Greataxe Attack + damage → the damage roll line shows the
+// player-1 turns Rage on and rolls Greataxe Attack, then Damage → the damage roll line shows the
 // offered d6 dashed ("Divine Fury (on a hit)"); the DM applies to Mira (visible) with the chip → the
 // outcome line "+ N radiant (Divine Fury)" then its d6 chip for the player and the DM. Sources,
 // monster triggers, DM edits, leaks: bun test (effect-modifiers). Own bundle (`session-sim-7` as
@@ -9,6 +9,7 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { entryDice } from "./support/log";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -56,11 +57,13 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
   await rage.getByRole("switch").click();
   await expect(rage).toHaveAttribute("data-state", "on");
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
-  await sheet
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Greataxe" })
-    .getByTestId("charx-roll-attack-damage")
-    .click();
+  // Attack, then Damage completes the card (Alt+click: at once, #385).
+  const greataxe = sheet.getByTestId("charx-attack").filter({ hasText: "Greataxe" });
+  const card = init.getByTestId("cbt-init-card");
+  await rollNow(greataxe.getByTestId("charx-roll-attack"));
+  await expect(card).toHaveCount(1);
+  await rollNow(greataxe.getByTestId("charx-roll-damage"));
+  await expect(card).toContainText(/to hit.*, \d+ /);
 
   // The damage roll line: the offered d6 dashed (offered, not struck), for the player.
   const p1Log = await openWindow(p1, "dice.log");
@@ -69,7 +72,7 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
   // FR-DICE-40: the numbers show once this client's dice land.
   await expect(rollLine).toHaveAttribute("data-landed", "true", { timeout: 10_000 });
   // The dice are real: a natural 20 (5%) doubles the trigger's dice too (FR-CBT-16), 2d6.
-  const crit = (await rollLine.textContent())?.includes("natural 20") ?? false;
+  const crit = (await card.textContent())?.includes("natural 20") ?? false;
   const offered = await chips(rollLine, "Divine Fury (on a hit)");
   await expect(offered).toHaveCount(crit ? 2 : 1);
   const dice: number[] = [];
@@ -84,7 +87,6 @@ test("FR-MOD-57 Divine Fury's d6: offered (dashed) on the roll line, a chip afte
   // Brakka is Barbarian 5: 1d6 + 2 (2d6 + 2 on a crit).
   const n = dice.reduce((a, b) => a + b, 0) + 2;
 
-  const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
   await card.click();
   const popup = dm.getByTestId("cbt-popup");

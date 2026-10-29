@@ -7,6 +7,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { statusEffect } from "./support/initiative";
 import { konvaNodes } from "./support/konva";
+import { rollNow } from "./support/rolls";
 import { showToPlayers } from "./support/scenes";
 import { openWindow } from "./support/shell";
 
@@ -111,15 +112,24 @@ test("FR-CBTX-17 FR-CBTX-18 FR-CBTX-28 FR-CBTX-29 bar + icons for both; concentr
   await expect(plog.getByTestId("dice-roll-physical")).toHaveAttribute("data-state", "checked");
 
   // Goblin attacks Mira: hit, damage total 3 → Mira 9 / 12, card DC 10 to player-1.
-  // Attack ▸ → the first attack's Attack + damage (FR-CBT-74).
-  await init.locator(`[data-testid="cbt-init-row-attack"][data-record-id="${goblin}"]`).click();
-  await dm
-    .locator(
-      `[data-testid="cbt-init-row-attack-option"][data-record-id="${goblin}"][data-value="both"]`,
-    )
-    .click();
+  // Attack ▸ → the first attack's Attack, Later, then its Damage completes the card (FR-CBT-74,
+  // -169; Alt+click: at once).
+  const action = async (value: "toHit" | "damage") => {
+    await init.locator(`[data-testid="cbt-init-row-attack"][data-record-id="${goblin}"]`).click();
+    await rollNow(
+      dm.locator(
+        `[data-testid="cbt-init-row-attack-option"][data-record-id="${goblin}"][data-value="${value}"]`,
+      ),
+    );
+  };
   const popup = dm.getByTestId("cbt-popup");
+  await action("toHit");
+  await expect(popup.getByTestId("cbt-popup-waiting-damage")).toBeVisible();
+  await popup.getByTestId("cbt-popup-later").click();
+  await expect(popup).toHaveCount(0);
+  await action("damage");
   await expect(popup).toBeVisible();
+  await expect(popup.getByTestId("cbt-popup-waiting-damage")).toHaveCount(0);
   await popup.getByTestId("cbt-popup-target-add").click();
   await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${mira}"]`).click();
   const trow = popup.locator(`[data-testid="cbt-popup-target-row"][data-record-id="${mira}"]`);

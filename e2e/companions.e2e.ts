@@ -9,6 +9,7 @@
 // summon-crash).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -87,8 +88,9 @@ test("FR-CBT-110 FR-CBT-112 FR-CBT-114 FR-CBT-118 companions-e2e: Summon for Mir
   await expect(row(i2, fe).getByTestId("cbt-init-row-card")).toHaveCount(0);
   await expect(row(i2, fe).getByTestId("cbt-init-row-owner")).toHaveText("Mira");
 
-  // C6: player-1 opens its card from the row's icon; Touch "Attack + damage" → a player card in
-  // the DM's Initiative (FR-CBT-114, FR-CHARX-64); the DM targets the Goblin and applies.
+  // C6: player-1 opens its card from the row's icon; Touch "Attack", then "Damage" (Alt+click: at
+  // once, FR-CHARX-131) → a player card in the DM's Initiative (FR-CBT-114, FR-CHARX-64); the DM
+  // targets the Goblin and applies.
   await row(i1, fe).getByTestId("cbt-init-row-card").click();
   const card = shellWindow(p1, "charx.companion");
   await expect(card.getByTestId("charx-companion-name")).toHaveText("Fire Elemental");
@@ -98,9 +100,12 @@ test("FR-CBT-110 FR-CBT-112 FR-CBT-114 FR-CBT-118 companions-e2e: Summon for Mir
   const name = card.getByTestId("charx-companion-name");
   expect(await name.evaluate((n) => n.scrollWidth <= n.clientWidth + 0.5)).toBe(true);
   const touch = card.getByTestId("charx-companion-attack").filter({ hasText: "Touch" });
-  await touch.locator('[data-testid="charx-companion-roll"][data-value="attack"]').click();
+  await expect(touch.getByTestId("charx-companion-roll")).toHaveCount(2);
+  await rollNow(touch.locator('[data-testid="charx-companion-roll"][data-value="toHit"]'));
   const pending = init.getByTestId("cbt-init-card").filter({ hasText: "Fire Elemental" });
   await expect(pending).toHaveCount(1);
+  await rollNow(touch.locator('[data-testid="charx-companion-roll"][data-value="damage"]'));
+  await expect(pending).toContainText(/to hit.*, \d+ fire/);
   await pending.click();
   const popup = dm.getByTestId("cbt-popup");
   const goblin = await idByName(init, "Goblin");

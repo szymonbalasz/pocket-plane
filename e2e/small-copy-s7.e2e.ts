@@ -107,7 +107,7 @@ test("FR-CHARX-82 FR-PARTY-50 FR-LOOT-29 player-1: the Owlbear's attack buttons 
   await expect(rows.first()).toBeVisible();
   for (const i of [0, 1]) {
     const buttons = rows.nth(i).getByTestId("charx-companion-roll");
-    await expect(buttons).toHaveCount(3);
+    await expect(buttons).toHaveCount(2);
     for (const b of await buttons.all()) {
       expect(inside((await b.boundingBox()) as Box, rect)).toBe(true);
     }
