@@ -13,7 +13,7 @@ import { Caller } from "./client";
 import { AgentError, rejectError, restError, scrub, toToolError } from "./errors";
 import { findServer, type LockReader } from "./lock";
 import { checkPlan, type PlanWorld } from "./plan";
-import { allTools, createMcpServer } from "./server";
+import { allTools, createMcpServer, listing } from "./server";
 import { LIST_PAGE, page } from "./tools/read";
 import { defineTool, TOOLS } from "./tools/registry";
 
@@ -300,7 +300,20 @@ describe("FR-AGENT-19 plan_check frame", () => {
   });
 });
 
+/** Not allowed at the top of a tool's `input_schema` (Anthropic tool use). */
+const COMBINATORS = ["oneOf", "anyOf", "allOf", "not"];
+
 describe("FR-AGENT-01 list-tools", () => {
+  test("FR-AGENT-01 every listed inputSchema is an object at the top level, no oneOf / anyOf / allOf / not", () => {
+    const listed = allTools().map(listing);
+    expect(listed.length).toBeGreaterThan(15);
+    for (const t of listed) {
+      expect({ tool: t.name, type: t.inputSchema.type }).toEqual({ tool: t.name, type: "object" });
+      const top = Object.keys(t.inputSchema).filter((k) => COMBINATORS.includes(k));
+      expect({ tool: t.name, top }).toEqual({ tool: t.name, top: [] });
+    }
+  });
+
   test("FR-AGENT-01 FR-AGENT-15 serves exactly the §9 tools; write tools not read-only", async () => {
     const server = createMcpServer({
       caller: new Caller({ dataDir: tmp(), profile: "dev", dmSecret: "x", log: quietLog }),
@@ -312,6 +325,8 @@ describe("FR-AGENT-01 list-tools", () => {
     await Promise.all([server.connect(a), client.connect(b)]);
     const { tools } = await client.listTools();
     const writes = [
+      "character_edit",
+      "character_put_row",
       "creature_create",
       "creature_derive",
       "creature_edit",
@@ -322,7 +337,9 @@ describe("FR-AGENT-01 list-tools", () => {
     ];
     expect(tools.map((t) => t.name).sort()).toEqual([
       "campaigns_list",
+      "character_edit",
       "character_get",
+      "character_put_row",
       "characters_list",
       "compendium_get",
       "compendium_search",
@@ -352,6 +369,14 @@ describe("FR-AGENT-01 list-tools", () => {
     expect(props("homebrew_create")).toEqual(["derivedFromId", "entry", "imageAssetIds", "shared"]);
     expect(props("homebrew_edit")).toEqual(["id", "patch"]);
     expect(props("homebrew_share")).toEqual(["id", "shared"]);
+    // FR-AGENT-27 / -28: no owner key; put_row lists as one flat object (no top-level oneOf).
+    expect(props("character_edit")).toEqual(["id", "set"]);
+    const set = tools.find((t) => t.name === "character_edit")?.inputSchema.properties?.set as {
+      properties: Record<string, unknown>;
+    };
+    expect(Object.keys(set.properties)).not.toContain("ownerPlayerId");
+    expect(props("character_put_row")).toEqual(["creatureId", "list", "row"]);
+    expect(props("creature_put_row")).toEqual(["creatureId", "list", "row"]);
     // FR-AGENT-12: the strict SearchQuery, no key added.
     expect(props("compendium_search")).toEqual(
       [

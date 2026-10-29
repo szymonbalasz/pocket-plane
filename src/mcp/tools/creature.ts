@@ -34,6 +34,7 @@ import { z } from "zod";
 import type { WsSession } from "../client";
 import { AgentError, type ToolError, toToolError } from "../errors";
 import type { PlanContext } from "../plan";
+import { PutRowInput } from "./character";
 import { defineTool, registerTools } from "./registry";
 
 const RecordId = z.string().min(1).max(64);
@@ -555,7 +556,7 @@ const creaturePutRow = defineTool({
   description:
     "Add (no row `id`) or replace (with the row's `id`) one row on a custom creature's NPC " +
     "sheet: list attacks, spells, features (text ≤ 600) or items.",
-  input: CharPutRowIntent,
+  input: PutRowInput,
   write: true,
   run: ({ caller }, input) =>
     caller.ws({ write: true }, async (s) => {
