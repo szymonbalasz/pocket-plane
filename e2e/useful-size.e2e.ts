@@ -347,7 +347,7 @@ async function openAt(page: Page, kind: string, w: number, h: number): Promise<L
   return win;
 }
 
-test("FR-CHARX-83 card useful criterion: at exactly 320 × 360 the Owlbear (Beak, Claws) and the Drake (Bite) show the header, the stats line and their attack rows with all three buttons, no scrolling", async ({
+test("FR-CHARX-83 card useful criterion: at exactly 320 × 360 the Owlbear (Beak, Claws) and the Drake (Bite) show the header, the stats line and their attack rows with both buttons (Attack, Damage), no scrolling", async ({
   browser,
 }) => {
   const p1 = await playerPage(browser);
@@ -373,7 +373,7 @@ test("FR-CHARX-83 card useful criterion: at exactly 320 × 360 the Owlbear (Beak
     for (const a of attacks) {
       const row = card.getByTestId("charx-companion-attack").filter({ hasText: a });
       const rolls = row.getByTestId("charx-companion-roll");
-      await expect(rolls).toHaveCount(3);
+      await expect(rolls).toHaveCount(2);
       for (const r of await rolls.all()) expect(await inside(r), `${name} ${a} button`).toBe(true);
     }
   }

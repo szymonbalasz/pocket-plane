@@ -1,12 +1,16 @@
 // Sheet roll controls (FR-CHARX-23): every rollable number is a shared roll control (FR-DICE-24)
 // over the specs the server will build (`characterRolls`, same data); the buttons themselves
 // are in `./CharacterSheet`. DM public switches: one per category in each block header
-// (FR-CHAR-22's rule); NPC sheets have none (FR-CHARX-22).
+// (FR-CHAR-22's rule); NPC sheets have none (FR-CHARX-22). Sprint 15 (#385, FR-CHARX-127): a
+// row's Attack / Damage control has a `purpose`, so a click stages the Dice tray (editable) and
+// Alt+click rolls at once; the tray's staged `parts` reach `char.roll` or the route's intent.
 import { characterRolls, resolveSheetAttack } from "@shared/character-sheet/logic";
+import { rowPartTypes } from "@shared/character-sheet/rolls";
 import {
   isAttackRowKind,
   isSpellRowKind,
   type SheetRollKind,
+  stagedPurposeOf,
 } from "@shared/character-sheet/schemas";
 import {
   categoryPublic,
@@ -41,29 +45,39 @@ import {
 import { useSheet, useSheetScope } from "./sheet-context";
 import { type BreakdownKey, breakdownText } from "./view-model";
 
-/** Sheet roll buttons' tooltip; `RollButton` adds "Alt: adjust in tray" (FR-DICEX-51). */
+/**
+ * Sheet roll buttons' tooltip; `RollButton` adds "Alt: adjust in tray" (FR-DICEX-51), or "Alt:
+ * roll now" on Attack / Damage (FR-DICEX-98).
+ */
 export const ROLL_HINT = "Shift: advantage · Ctrl: disadvantage";
 
 /**
  * FR-CHARX-113: a sheet roll button's hint: the breakdown of its number (when the sheet derives
- * one), else the caller's text; then the mode keys. `RollButton` adds the Alt hint.
+ * one), else the caller's text; then the mode keys, unless the roll ignores them (`modes` false:
+ * Damage / Healing, FR-CHARX-127). `RollButton` adds the Alt hint.
  */
 export function rollHint(
   stats: Parameters<typeof breakdownText>[0],
   breakdown: BreakdownKey | undefined,
   hint: string | undefined,
+  modes = true,
 ): ReactNode {
+  const keys = modes ? ` · ${ROLL_HINT}` : "";
   const text = breakdown ? breakdownText(stats, breakdown) : null;
   if (text && breakdown) {
     return (
       <>
         <Breakdown okey={breakdown} text={text} />
-        {` · ${ROLL_HINT}`}
+        {keys}
       </>
     );
   }
-  return hint ? `${hint} · ${ROLL_HINT}` : ROLL_HINT;
+  if (hint) return `${hint}${keys}`;
+  return modes ? ROLL_HINT : undefined;
 }
+
+/** FR-CHARX-127: Shift / Ctrl preset the mode of a d20 roll; Damage / Healing ignore them. */
+export const takesModeKeys = (kind: SheetRollKind): boolean => stagedPurposeOf(kind) !== "damage";
 
 /** DM per-roll public override per category; absent = the category's setting. */
 export function usePublicOverrides() {
@@ -162,15 +176,21 @@ export function useSheetRollControl({
   // FR-MOD-15, -27: the effect-modifier preview's subjects, as the server derives them; a
   // definition (NPC sheet) roll has none.
   const attackRow = isAttackRowKind(kind)
-    ? resolveSheetAttack(ctx.stats, ctx.row ?? null, {})
+    ? resolveSheetAttack(ctx.stats, ctx.row ?? null, { attackId: rollRef.attackId })
     : null;
-  const row = isSpellRowKind(kind)
-    ? ctx.row?.spells.find((s) => s.id === rollRef.spellId)?.name
-    : rollRef.attackId !== undefined
-      ? ctx.stats.attacks?.find((a) => a.id === rollRef.attackId)?.name
-      : attackRow?.ok
-        ? attackRow.attack.name
-        : undefined;
+  const spellRow = isSpellRowKind(kind)
+    ? ctx.row?.spells.find((s) => s.id === rollRef.spellId)
+    : undefined;
+  const row = spellRow ? spellRow.name : attackRow?.ok ? attackRow.attack.name : undefined;
+  // FR-CHARX-127: Attack / Damage (and Healing) stage the tray pre-filled: purpose, a damage type
+  // per expression; every other kind is plain (click rolls).
+  const purpose = stagedPurposeOf(kind) ?? undefined;
+  const rowType = spellRow
+    ? spellRow.damageType
+    : attackRow?.ok
+      ? attackRow.attack.damageType
+      : null;
+  const partTypes = purpose === "damage" ? rowPartTypes(specs, rowType) : undefined;
   // FR-CHARX-55: an extra damage part has no subject (mods attach to the base part), as on the
   // server; "part" maps to none.
   const categories = specs.map((s) => (s.part?.extra ? "part" : s.category)).join(",");
@@ -207,6 +227,8 @@ export function useSheetRollControl({
     // FR-DICE-41: "To hit", "Slashing", "Fire" in the physical form and the tray.
     ...(slotLabels ? { slotLabels } : {}),
     ...(subject ? { subject } : {}),
+    ...(purpose ? { purpose } : {}),
+    ...(partTypes ? { partTypes } : {}),
     // FR-CBT-74: a routed Damage after a natural 20 opens with the extra critical dice.
     ...claimRollOptions(claim),
     onRoll(r) {

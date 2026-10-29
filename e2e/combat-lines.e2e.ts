@@ -7,6 +7,7 @@
 // (FR-CBT-95). Every wording case and old rows: bun test (combat-lines.test.ts).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -108,13 +109,13 @@ test("FR-CBT-96 FR-MOD-62 FR-CBT-95 combat log wording: Rage once in the DM line
   await p1.getByTestId("mod-toggle-overspend-confirm").click();
   await expect(rage).toHaveAttribute("data-state", "on");
   const flameTongue = await attackRow(p1, recordId("char-brakka", "entity"), "Flame Tongue");
-  await flameTongue.getByTestId("charx-roll-attack").click();
+  await rollNow(flameTongue.getByTestId("charx-roll-attack"));
   await rollPhysical(p1, "15");
   const brakkaRow = await openCard(/Brakka/, goblin);
   await expect(brakkaRow.getByTestId("cbt-popup-target-hit")).toHaveAttribute("data-value", "hit");
   await popup.getByTestId("cbt-popup-apply-hit").click();
   await expect(popup.getByTestId("cbt-popup-step")).toHaveAttribute("data-value", "damage");
-  await flameTongue.getByTestId("charx-roll-damage").click();
+  await rollNow(flameTongue.getByTestId("charx-roll-damage"));
   await rollPhysical(p1, "7");
   await expect(popup.getByTestId("cbt-popup-waiting")).toHaveCount(0);
   await expect(popup.getByTestId("mod-popup-part")).toHaveAttribute("data-state", "on");
@@ -131,12 +132,17 @@ test("FR-CBT-96 FR-MOD-62 FR-CBT-95 combat log wording: Rage once in the DM line
     );
   }
 
-  // L13: Thorn's Dagger Attack + damage without advantage: Sneak Attack offered unticked (soft
+  // L13: Thorn's Dagger Attack, then Damage, without advantage: Sneak Attack offered unticked (soft
   // mode, FR-MOD-39); the popup says it won't land ("Not applied: …", BL-45); the DM's Include
   // ticks it on Goblin 2 → typed on the line.
   const dagger = await attackRow(p2, recordId("char-thorn", "entity"), "Dagger");
-  await dagger.getByTestId("charx-roll-attack-damage").click();
+  await rollNow(dagger.getByTestId("charx-roll-attack"));
   await rollPhysical(p2, "15");
+  await expect(
+    init.getByTestId("cbt-init-card").filter({ hasText: /Thorn: \d+ to hit/ }),
+  ).toHaveCount(1);
+  await rollNow(dagger.getByTestId("charx-roll-damage"));
+  await rollPhysical(p2, "1");
   const thornRow = await openCard(/Thorn/, goblin2);
   const hit = thornRow.getByTestId("cbt-popup-target-hit");
   if ((await hit.getAttribute("data-value")) === "miss") await hit.click();
@@ -166,7 +172,12 @@ test("FR-CBT-96 FR-MOD-62 FR-CBT-95 combat log wording: Rage once in the DM line
   // L14: Mira's crossbow rolls a natural 1 (a computed miss); the DM sets Hit and applies. A
   // ruling against a natural roll is public (FR-CBT-58, -95).
   const crossbow = await attackRow(p1, recordId("char-mira", "entity"), "Light crossbow");
-  await crossbow.getByTestId("charx-roll-attack-damage").click();
+  await rollNow(crossbow.getByTestId("charx-roll-attack"));
+  await rollPhysical(p1, "1");
+  await expect(
+    init.getByTestId("cbt-init-card").filter({ hasText: /Mira: \d+ to hit \(natural 1\)/ }),
+  ).toHaveCount(1);
+  await rollNow(crossbow.getByTestId("charx-roll-damage"));
   await rollPhysical(p1, "1");
   const miraRow = await openCard(/Mira: \d+ to hit \(natural 1\), \d+ piercing/, goblin);
   const miraHit = miraRow.getByTestId("cbt-popup-target-hit");

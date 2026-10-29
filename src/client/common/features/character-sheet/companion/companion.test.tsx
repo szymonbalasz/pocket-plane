@@ -526,8 +526,8 @@ function EditingCard({ pet }: { pet: CompanionEntityLike }) {
   );
 }
 
-describe("FR-CHARX-64 card rolls", () => {
-  test("FR-CHARX-64 card rolls: in a fight Attack / Damage / Attack + damage send cbt.attack {rolls: toHit} / cbt.rollDamage / cbt.attack as the companion with the row's attackId; out of a fight a pet's char.roll", () => {
+describe("FR-CHARX-131 companion two buttons", () => {
+  test("FR-CHARX-131 companion two buttons: in a fight Attack / Damage send cbt.attack {rolls: toHit} / cbt.rollDamage as the companion with the row's attackId and the tray's parts; out of a fight a pet's char.roll toHit / damage; no Attack + damage", () => {
     const fight = { combatantId: "c-owl" };
     const input = { mode: "advantage" as const };
     expect(cardRollIntent(fight, "claws", "toHit", input)).toEqual({
@@ -538,17 +538,17 @@ describe("FR-CHARX-64 card rolls", () => {
       name: "cbt.rollDamage",
       payload: { attackerId: "c-owl", attackId: "claws" },
     });
-    expect(cardRollIntent(fight, "claws", "attack", { mode: "normal" })).toEqual({
-      name: "cbt.attack",
-      payload: { attackerId: "c-owl", attackId: "claws", mode: "normal" },
+    // Staged in the tray (#385): the parts ride along; physical entries as combat takes them.
+    const parts = [{ expression: "3d8+5", type: "slashing" as const }];
+    const manual = [{ dice: [3, 4, 5] }] as never;
+    expect(cardRollIntent(fight, "claws", "damage", { mode: "normal", parts, manual })).toEqual({
+      name: "cbt.rollDamage",
+      payload: { attackerId: "c-owl", attackId: "claws", manual: { dice: [3, 4, 5] }, parts },
     });
-    // Physical dice: to-hit + damage entries split as combat takes them.
-    const manual = [{ dice: [12] }, { dice: [3, 4] }] as never;
+    const hit = [{ expression: "1d20+8" }];
     expect(
-      cardRollIntent(fight, "claws", "attack", { mode: "normal", manual }).payload,
-    ).toMatchObject({
-      manual: [{ dice: [12] }, { dice: [3, 4] }],
-    });
+      cardRollIntent(fight, "claws", "toHit", { mode: "normal", parts: hit }).payload,
+    ).toMatchObject({ rolls: "toHit", parts: hit });
     // Out of a fight: char.roll with the pet as the creature; never `public`.
     expect(
       cardRollIntent({ petId: "owl" }, "claws", "toHit", { mode: "normal", public: true }),
@@ -556,6 +556,9 @@ describe("FR-CHARX-64 card rolls", () => {
       name: CHAR_ROLL,
       payload: { characterId: "owl", kind: "toHit", mode: "normal", attackId: "claws" },
     });
+    expect(
+      cardRollIntent({ petId: "owl" }, "claws", "damage", { mode: "normal", parts }).payload,
+    ).toEqual({ characterId: "owl", kind: "damage", mode: "normal", attackId: "claws", parts });
     // The roll control's specs: bonus folded, damage parts after the to-hit.
     const claws = owlCard.attacks[1];
     if (!claws) throw new Error("no claws");
@@ -593,19 +596,21 @@ describe("FR-CHARX-64 card rolls", () => {
     });
     expect(cardCritOptions({ petId: "owl" }, claws, "damage", [])).toEqual({});
     expect(cardCritOptions(fight, claws, "toHit", [])).toEqual({});
-    expect(cardCritOptions(fight, claws, "attack", [])).toEqual({ critExpressions: ["4d8+5"] });
+    expect(cardCritOptions(fight, claws, "damage", [])).toEqual({});
     expect(cardCritOptions(fight, claws, "damage", [pending(20) as never])).toEqual({
       critExpressions: ["4d8+5"],
       crit: true,
     });
     expect(cardCritOptions(fight, claws, "damage", [pending(12) as never])).toEqual({});
-    // The rows render the three buttons, enabled while live, disabled offline.
+    // The rows render the two buttons, enabled while live, disabled offline.
     const html = render(
       storeOf(P1, { entities: [mira, owlPet], combatants: [owlC] }),
       <CompanionCard />,
     );
-    expect(count(html, "charx-companion-roll")).toBe(6);
-    for (const kind of ["toHit", "damage", "attack"]) {
+    expect(count(html, "charx-companion-roll")).toBe(4);
+    expect(html).not.toContain('data-testid="charx-companion-roll" data-value="attack"');
+    expect(html).not.toContain("Attack + damage");
+    for (const kind of ["toHit", "damage"]) {
       expect(tagOf(html, "charx-companion-roll", ` data-value="${kind}"`)).toSatisfy(
         (t: string) => !isDisabled(t),
       );
@@ -619,7 +624,7 @@ describe("FR-CHARX-64 card rolls", () => {
     // A summon out of a fight never exists; a summon in a fight rolls as its combatant.
     selectCompanion("c-fe");
     const fe = render(storeOf(P1, { entities: [mira], combatants: [feC] }), <CompanionCard />);
-    expect(tagOf(fe, "charx-companion-roll", ' data-value="attack"')).toContain(
+    expect(tagOf(fe, "charx-companion-roll", ' data-value="damage"')).toContain(
       'data-record-id="touch-card"',
     );
   });

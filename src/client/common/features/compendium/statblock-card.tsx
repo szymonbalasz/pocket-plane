@@ -149,7 +149,7 @@ export function StatBlockAbilities({
 
 /**
  * An entry row: the name, then its muted line (a trait's or action's text); `actions` under it
- * (K7: Attack / Damage / Attack + damage). `slot` = `statblock-entry`, or `statblock-attack` for
+ * (K7: Attack / Damage; #385 retired Attack + damage). `slot` = `statblock-entry`, or `statblock-attack` for
  * a rollable attack row.
  */
 export function StatBlockEntry({

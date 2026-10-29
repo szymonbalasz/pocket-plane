@@ -1,14 +1,16 @@
 // e2e-bundle: physical-dice-combat
 // Physical dice in combat (BL-19, BL-25; FR-CBT-74, -81, -83, FR-MOD-18, FR-DICE-31): the DM,
-// physical dice on, rolls from the Initiative row's Attack ▸ → the entry form opens (it closed
-// at once before) and Roll sends the entries: Goblin's Scimitar, then Brakka's Flame Tongue with
-// one entry per part (card "12 slashing + 5 fire"); Check ▸ opens its form too. Player-1,
-// physical dice on, on Brakka's turn with Rage: Flame Tongue Attack + damage, natural 20 → the
+// physical dice on, rolls from the Initiative row's Attack ▸ (Alt+click: at once, #385) → the
+// entry form opens (it closed at once before) and Roll sends the entries: Goblin's Scimitar, then
+// Brakka's Flame Tongue Damage with one entry per part (card "12 slashing + 5 fire"); Check ▸
+// opens its form too. Player-1, physical dice on, on Brakka's turn with Rage: Flame Tongue Attack
+// (natural 20), then Damage → the
 // Divine Fury group sits after the fire part, asks its die plus its extra critical die, and the
 // typed values make the offer (no "rolled for you"); the DM applies it to Goblin. Own bundle
 // (`rule-triggers` as `physical-dice-combat`). Form rules, part order, crit merge: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -68,15 +70,29 @@ async function fillBonusDice(form: Locator) {
   for (const input of await groups.all()) await input.fill("1");
 }
 
-/** The DM's Attack ▸ → Attack + damage of the attack named `attack` on row `id`. */
-async function attackBoth(dm: Page, init: Locator, id: string, attack: string) {
+/**
+ * The DM's Attack ▸ → Attack or Damage (Alt+click: at once) of the attack named `attack` on row
+ * `id` (the Damage item sits beside the attack's name item).
+ */
+async function attackAction(
+  dm: Page,
+  init: Locator,
+  id: string,
+  attack: string,
+  value: "toHit" | "damage",
+) {
   await init.locator(`[data-testid="cbt-init-row-attack"][data-record-id="${id}"]`).click();
-  await dm
+  const name = dm
     .locator(
-      `[data-testid="cbt-init-row-attack-option"][data-record-id="${id}"][data-value="both"]`,
+      `[data-testid="cbt-init-row-attack-option"][data-record-id="${id}"][data-value="toHit"]`,
     )
-    .filter({ hasText: attack })
-    .click();
+    .filter({ hasText: attack });
+  const attackId = await name.getAttribute("data-attack-id");
+  await rollNow(
+    dm.locator(
+      `[data-testid="cbt-init-row-attack-option"][data-record-id="${id}"][data-value="${value}"][data-attack-id="${attackId}"]`,
+    ),
+  );
 }
 
 test("BL-19 FR-CBT-74 FR-CBT-81 DM physical Attack ▸ from the Initiative row: the form opens, Roll sends one entry per part", async ({
@@ -105,32 +121,53 @@ test("BL-19 FR-CBT-74 FR-CBT-81 DM physical Attack ▸ from the Initiative row: 
   const form = manualForm(dm);
   const popup = dm.getByTestId("cbt-popup");
 
-  // Goblin: Attack ▸ → Attack + damage (plain click) → the form; Roll → the card's popup.
-  await attackBoth(dm, init, goblin, "Scimitar");
+  // Goblin: Attack ▸ → Attack → the form; Roll → the card's popup; Later; Damage → its form →
+  // the same card.
+  await attackAction(dm, init, goblin, "Scimitar", "toHit");
   await expect(form.getByTestId("dice-manual-label")).toHaveText("Goblin — Scimitar attack");
   await form.locator('[data-testid="dice-manual-total"][data-value="0"]').fill("11");
-  await form.locator('[data-testid="dice-manual-total"][data-value="1"]').fill("3");
   await fillBonusDice(form);
   await form.getByTestId("dice-manual-submit").click();
   await expect(form).toHaveCount(0);
   await expect(popup).toBeVisible();
+  await popup.getByTestId("cbt-popup-later").click();
+  await expect(popup).toHaveCount(0);
+  await attackAction(dm, init, goblin, "Scimitar", "damage");
+  await expect(form.getByTestId("dice-manual-label")).toHaveText("Goblin — Scimitar damage");
+  await form.locator('[data-testid="dice-manual-total"][data-value="0"]').fill("3");
+  await fillBonusDice(form);
+  await form.getByTestId("dice-manual-submit").click();
+  await expect(form).toHaveCount(0);
+  await expect(popup).toBeVisible();
+  await expect(popup.getByTestId("cbt-popup-waiting-damage")).toHaveCount(0);
   await popup.getByTestId("cbt-popup-dismiss").click();
   await expect(popup).toHaveCount(0);
 
   // Brakka's Flame Tongue: to-hit and base carry the +1, the fire part is its own entry.
-  await attackBoth(dm, init, brakka, "Flame Tongue");
+  const card = init.getByTestId("cbt-init-card");
+  await attackAction(dm, init, brakka, "Flame Tongue", "toHit");
   await expect(form.getByTestId("dice-manual-label")).toHaveText(
     "Brakka — Flame Tongue greatsword attack",
   );
-  await expect(form.locator("code")).toHaveText(["1d20+8", "2d6+5", "2d6"]);
+  await expect(form.locator("code")).toHaveText(["1d20+8"]);
   await form.locator('[data-testid="dice-manual-total"][data-value="0"]').fill("10");
-  await form.locator('[data-testid="dice-manual-total"][data-value="1"]').fill("7");
-  await form.locator('[data-testid="dice-manual-total"][data-value="2"]').fill("5");
   await fillBonusDice(form);
   await form.getByTestId("dice-manual-submit").click();
   await expect(form).toHaveCount(0);
   await expect(popup).toBeVisible();
-  const card = init.getByTestId("cbt-init-card");
+  await popup.getByTestId("cbt-popup-later").click();
+  await expect(card).toHaveCount(1);
+  await attackAction(dm, init, brakka, "Flame Tongue", "damage");
+  await expect(form.getByTestId("dice-manual-label")).toHaveText(
+    "Brakka — Flame Tongue greatsword damage",
+  );
+  await expect(form.locator("code")).toHaveText(["2d6+5", "2d6"]);
+  await form.locator('[data-testid="dice-manual-total"][data-value="0"]').fill("7");
+  await form.locator('[data-testid="dice-manual-total"][data-value="1"]').fill("5");
+  await fillBonusDice(form);
+  await form.getByTestId("dice-manual-submit").click();
+  await expect(form).toHaveCount(0);
+  await expect(popup).toBeVisible();
   await expect(card).toHaveCount(1);
   await expect(card).toContainText("18 to hit, 12 slashing + 5 fire");
   await popup.getByTestId("cbt-popup-dismiss").click();
@@ -170,7 +207,8 @@ test("BL-25 FR-MOD-18 FR-DICE-31 physical Flame Tongue crit: the Divine Fury die
     init.locator(`[data-testid="cbt-init-row"][data-record-id="${brakka}"]`),
   ).toHaveAttribute("data-turn", "true");
 
-  // Player 1: Rage on, physical dice on, Flame Tongue (added by the first test) Attack + damage.
+  // Player 1: Rage on, physical dice on, Flame Tongue (added by the first test) Attack, natural
+  // 20 (Alt+click: at once, #385).
   const sheet = await openWindow(p1, "char.sheet");
   await pickSheet(sheet, recordId("char-brakka", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="section:mod.effects"]').click();
@@ -179,14 +217,25 @@ test("BL-25 FR-MOD-18 FR-DICE-31 physical Flame Tongue crit: the Divine Fury die
   await expect(rage).toHaveAttribute("data-state", "on");
   await physicalOn(p1);
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
-  await sheet
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Flame Tongue" })
-    .getByTestId("charx-roll-attack-damage")
-    .click();
+  const flame = sheet.getByTestId("charx-attack").filter({ hasText: "Flame Tongue" });
+  const p1Log = await openWindow(p1, "dice.log");
+  const lines = await p1Log.getByTestId("dice-log-entry").count();
+  await rollNow(flame.getByTestId("charx-roll-attack"));
   const form = manualForm(p1);
   await expect(form.getByTestId("dice-manual-label")).toHaveText(
-    "Brakka — Flame Tongue greatsword attack + damage",
+    "Brakka — Flame Tongue greatsword attack",
+  );
+  await form.locator('[data-testid="dice-manual-total"][data-value="0"]').fill("20");
+  await form.getByTestId("dice-manual-submit").click();
+  await expect(form).toHaveCount(0);
+  // The card reaches player-1 with its log line: Damage then knows the crit (FR-CBT-74).
+  await expect(p1Log.getByTestId("dice-log-entry")).toHaveCount(lines + 1);
+  await expect(init.getByTestId("cbt-init-card")).toContainText("natural 20");
+
+  // Damage: every part gets its extra critical dice, Divine Fury too; its group comes last.
+  await rollNow(flame.getByTestId("charx-roll-damage"));
+  await expect(form.getByTestId("dice-manual-label")).toHaveText(
+    "Brakka — Flame Tongue greatsword damage",
   );
   const fury = form.locator('[data-testid="mod-tray-group"][data-value^="t:"]');
   await expect(fury).toHaveCount(1);
@@ -195,8 +244,6 @@ test("BL-25 FR-MOD-18 FR-DICE-31 physical Flame Tongue crit: the Divine Fury die
   );
   await expect(form).not.toContainText("optional");
 
-  // Natural 20: every part gets its extra critical dice, Divine Fury too; its group comes last.
-  await form.locator('[data-testid="dice-manual-total"][data-value="0"]').fill("20");
   await expect(form.getByTestId("dice-manual-crit")).toHaveCount(2);
   await expect(fury.getByTestId("mod-tray-group-crit-label")).toHaveText(
     "Extra critical dice: 1d6",
@@ -207,8 +254,8 @@ test("BL-25 FR-MOD-18 FR-DICE-31 physical Flame Tongue crit: the Divine Fury die
   });
   expect(order.fury).toBeGreaterThan(order.fire);
   for (const [i, base, extra] of [
-    [1, "7", "6"],
-    [2, "5", "4"],
+    [0, "7", "6"],
+    [1, "5", "4"],
   ] as const) {
     await form.locator(`[data-testid="dice-manual-total"][data-value="${i}"]`).fill(base);
     await form.locator(`[data-testid="dice-manual-crit-total"][data-value="${i}"]`).fill(extra);

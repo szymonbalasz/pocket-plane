@@ -617,14 +617,14 @@ Per [visual-direction](../design/visual-direction.md): shadcn defaults, dark onl
 | `cbt.initiative` ★ | DM | 400×500 | **400×380** | header, controls, 4 rows | 320×240 |
 | `dice.log` ★ | DM / player | ~~690×160 / 510×160~~ 690×200 / 510×200 *(K5)* | ~~460×160~~ **460×200** *(K5, OQ-KIT-02 B)* | ~~3 one-line entries~~ 2 entries + roll bar | 300×160 |
 | `cbt.initiative` ★ | player | 280×400 | **280×320** | header + 4 rows | 240×200 |
-| `char.sheet` ★ | player | 320×338 | **320×338** | header, HP / AC, tabs, 3 attack rows + buttons | 280×320 |
+| `char.sheet` ★ | player | 320×338 | **320×338** | header, HP / AC, tabs, 3 attack rows + buttons (2 each, #385) | 280×320 |
 | `cmp.compendium` | both | 440×412 | 440×400 | search, filters, 5 rows | 320×360 |
 | `party.board` | both | 440×412 | 440×400 | tab labels whole + 4 rows | 340×360 |
 | `party.handout` | both | 640×412 | 640×400 | title + 300 px body | 360×320 |
 | `note.history` | both | 360×412 | 360×412 | pending + 3 rows (integrator, WF4: handout rows take three lines; 412 is the band maximum) | 280×240 |
 | `shell.prefs` | both | 360×412 | 360×400 | first 2 sections | 320×280 |
 | `dicex.tray` | both | 360×300 *(sprint 10 T1, DM #343: ~~504×420~~; T5, 2026-10-24, DM #347: **450×375**; FR-DICEX-96)* | 360×300 | dice, notation, Roll | 300×240 |
-| `charx.companion` | both | 320×360 | 320×360 | header, stats, 2 attacks + 3 buttons | 280×240 |
+| `charx.companion` | both | 320×360 | 320×360 | header, stats, 2 attacks + 2 buttons (#385) | 280×240 |
 | `stats.board` | both | 400×412 | 400×360 | 5 rows names whole, **or** 2 award cards, **or** the first 4 Highlights lines (S5) | 320×280 |
 | `cbt.encounters` | DM | 440×412 | 440×412 | 4 entries + Save / Start | 360×320 |
 | `ent.creatures` | DM | 340×412 | 340×360 | search + 6 rows | 300×240 |

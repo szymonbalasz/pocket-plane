@@ -187,6 +187,9 @@ Measured 2026-10-20 (throwaway probe, `session-sim` + `buildRealisticHeavy`; del
 
 ## 13. Test plan
 
+> *Sprint 15 (DM [#385](../decisions-log.md), [ADR-0073](../architecture/adr/0073-tray-attacks.md)):* **Attack + damage** is retired. In the steps below read it as **Attack**, then **Damage**: a click opens the Dice tray pre-filled (Roll there), **Alt+click** rolls at once (physical-dice steps: Alt+click). Expected results are unchanged.
+
+
 Per [ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md) / [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md); `:memory:` + seeded dice.
 
 | Fixture | Contents |

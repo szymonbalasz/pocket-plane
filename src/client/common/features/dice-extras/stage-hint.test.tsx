@@ -160,7 +160,8 @@ describe("FR-DICEX-51 Alt hint on every stageable roll surface", () => {
       expect.stringContaining("hint={`Roll initiative: d20"),
     ]);
     expect(initButtons.filter((t) => t.includes("hint={false}"))).toHaveLength(3);
-    expect(init).toContain("Attack ▸ · Shift: advantage · Ctrl: disadvantage · <StageHint />");
+    // FR-CBT-169: Attack ▸ stages on click, so its hint is "Alt: roll now" (FR-DICEX-98).
+    expect(init).toContain("Attack ▸ · Shift: advantage · Ctrl: disadvantage · <StageHint now />");
     expect(count(init, "<StageHint")).toBe(2);
     expect(count(init, "<StageHint line />")).toBe(1);
     expect(init).toMatch(/function AbilityMenu[\s\S]*<StageHint line \/>[\s\S]*function /);

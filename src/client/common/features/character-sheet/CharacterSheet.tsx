@@ -28,7 +28,7 @@ import { RollButton } from "../dice-roll-log/roll-control";
 import { CreateCharacterDialog } from "./CreateCharacter";
 import { SELECT } from "./fields";
 import { rollRoutes } from "./roll-routes";
-import { rollHint, type SheetRollProps, useSheetRollControl } from "./rolls";
+import { rollHint, type SheetRollProps, takesModeKeys, useSheetRollControl } from "./rolls";
 import { rollActionView, routeFor, routeRef } from "./routing";
 import { SheetView } from "./SheetView";
 import { SummaryCard } from "./SummaryCard";
@@ -79,7 +79,7 @@ export function SheetRoll({
   return (
     <RollButton
       control={control}
-      hint={rollHint(ctx.stats, breakdown, hint)}
+      hint={rollHint(ctx.stats, breakdown, hint, takesModeKeys(kind))}
       type="button"
       size="sm"
       variant="secondary"

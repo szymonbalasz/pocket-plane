@@ -365,10 +365,6 @@ export interface RowRollButton {
 }
 
 /**
- * FR-CHARX-41 (§6.1): every attack row shows Attack (to-hit only), Damage, Attack + damage, in
- * that order. The same on DM and player, PC and NPC sheets.
- */
-/**
  * FR-CHARX-56: an attack row in view mode: name + "+1" Badge (bonus > 0); numbers with the bonus
  * folded in, one chunk per part so the line wraps between parts ("+8 · 2d6+5 slashing",
  * "+ 2d6 fire").
@@ -424,17 +420,20 @@ export function extraPart(d: ExtraPartDraft): { part: ExtraDamage } | { error: s
   return { part: ExtraDamage.parse({ damage, type: d.type }) };
 }
 
+/**
+ * FR-CHARX-126 (§6.1, #385): every attack row shows Attack (to-hit only) and Damage, in that
+ * order; Attack + damage is gone. The same on DM and player, PC and NPC sheets.
+ */
 export function attackButtons(): RowRollButton[] {
   return [
     { kind: "toHit", label: "Attack", testId: "charx-roll-attack" },
     { kind: "damage", label: "Damage", testId: "charx-roll-damage" },
-    { kind: "attack", label: "Attack + damage", testId: "charx-roll-attack-damage" },
   ];
 }
 
 /**
- * FR-CHARX-41 (§6.1) for a spell row: Attack iff `roll: attack`; Damage ("Healing" for
- * `effect: healing`) iff it has damage (any `roll`); Attack + damage iff both. Same order.
+ * FR-CHARX-126 (§6.1) for a spell row: Attack iff `roll: attack`; Damage ("Healing" for
+ * `effect: healing`) iff it has damage (any `roll`). Same order.
  */
 export function spellButtons(s: Pick<SpellRow, "roll" | "damage" | "effect">): RowRollButton[] {
   const attack = s.roll === "attack";
@@ -443,13 +442,6 @@ export function spellButtons(s: Pick<SpellRow, "roll" | "damage" | "effect">): R
   if (s.damage) {
     const label = s.effect === "healing" ? "Healing" : "Damage";
     out.push({ kind: "spellDamage", label, testId: "charx-roll-spell-damage" });
-  }
-  if (attack && s.damage) {
-    out.push({
-      kind: "spellAttack",
-      label: "Attack + damage",
-      testId: "charx-roll-spell-attack-damage",
-    });
   }
   return out;
 }

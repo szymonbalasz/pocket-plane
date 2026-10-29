@@ -7,6 +7,7 @@
 // −1 / 2; Undo → 0 / 2 (exact refund). Floors, conflicts, visibility and leaks: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -91,17 +92,17 @@ test("FR-CHARX-58 FR-MOD-59 uses below zero: Rage anyway → −1 / 3, a pip pas
   const strikeLeft = feature(sheet, "Searing Strike").getByTestId("charx-feature-left");
   await expect(strikeLeft).toContainText("1 / 2 left");
 
-  // Two Light crossbow Attack + damage before the DM applies either: both cards offer it.
+  // Two Light crossbow Attacks, each completed by its Damage (Alt+click: at once, #385), before
+  // the DM applies either: both cards offer it.
   await tab(sheet, "actions");
-  const crossbow = sheet
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Light crossbow" })
-    .getByTestId("charx-roll-attack-damage");
-  await crossbow.click();
+  const crossbow = sheet.getByTestId("charx-attack").filter({ hasText: "Light crossbow" });
   const cards = init.getByTestId("cbt-init-card");
-  await expect(cards).toHaveCount(1);
-  await crossbow.click();
-  await expect(cards).toHaveCount(2);
+  for (const n of [1, 2]) {
+    await rollNow(crossbow.getByTestId("charx-roll-attack"));
+    await expect(cards).toHaveCount(n);
+    await rollNow(crossbow.getByTestId("charx-roll-damage"));
+    await expect(cards.filter({ hasText: /to hit.*, \d+ / })).toHaveCount(n);
+  }
 
   const popup = dm.getByTestId("cbt-popup");
   /** Opens the first pending card, targets `name` as a Hit with the chip on; returns the row. */

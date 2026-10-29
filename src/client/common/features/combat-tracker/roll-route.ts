@@ -4,7 +4,8 @@
 // §6.1), per attack row and per attack or save spell, with the row's `ref`: Attack (`toHit` /
 // `spellToHit`, a spell only with damage) → `cbt.attack {rolls: "toHit"}`; Damage (`damage` /
 // `spellDamage`) → `cbt.rollDamage`; Attack + damage (`attack` / `spellAttack`) → `cbt.attack`.
-// FR-CBT-170 (#385): the tray's staged `parts` ride along on Attack and Damage.
+// FR-CBT-169, -170 (#385): the sheet asks for Attack and Damage only (Attack + damage stays
+// claimed for an old caller); the tray's staged `parts` ride along on both.
 // Healing, checks, saves and skills are never claimed: they stay `char.roll` (FR-CBT-45). A PC
 // hidden from its owner isn't in the player's store, so the sheet falls back to `char.roll`
 // (OQ-CBT-28).
@@ -21,13 +22,9 @@ import {
 import type { StagedPart } from "@shared/dice-roll-log/schemas";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import type {
-  RollRoute,
-  RollRouteClaim,
-  RollRouteInput,
-  RollRouteRef,
-} from "../character-sheet/routing";
+import type { RollRoute, RollRouteClaim, RollRouteRef } from "../character-sheet/routing";
 import { startedIn } from "./store";
+import { useUseRollRequest } from "./use-roll-action";
 
 function combatantOf(store: RecordStore, characterId: string): CombatantView | null {
   const enc = startedIn(store);
@@ -141,13 +138,25 @@ const refFields = (ref?: RollRouteRef) => ({
 });
 
 /**
- * FR-CBT-170 (#385): the tray's staged parts, when the roll was staged (`RollRequest.parts`
- * reaches the route as its input; absent on Alt+click and request answers).
+ * FR-CBT-170 (#385): the tray's staged parts, when the roll was staged (`RollRequest.parts` /
+ * `RollRouteInput.parts`; absent on Alt+click and request answers).
  */
-export const partsOf = (input: RollRouteInput): { parts?: StagedPart[] } => {
-  const parts = (input as { parts?: StagedPart[] }).parts;
-  return parts ? { parts } : {};
-};
+export const partsOf = (input: { parts?: StagedPart[] }): { parts?: StagedPart[] } =>
+  input.parts ? { parts: input.parts } : {};
+
+/**
+ * FR-CBT-169 (#385): a roll from the Dice tray (staged `parts`) that made or completed a card:
+ * the DM's popup opens on it (it stepped aside when the roll was staged, `popup-store.ts`), as
+ * Initiative's Attack ▸ does. Only the DM client listens; an Alt+click roll (no `parts`) keeps
+ * today's toast.
+ */
+export function showStagedCard<T>(input: { parts?: StagedPart[] }, sent: Promise<T>): Promise<T> {
+  return sent.then((res) => {
+    const cardId = (res as { cardId?: unknown } | null | undefined)?.cardId;
+    if (input.parts && typeof cardId === "string") useUseRollRequest.getState().request({ cardId });
+    return res;
+  });
+}
 
 /** Kinds this route claims; per kind, a weapon row (`attackId` / none) or a spell row. */
 const ATTACK_KINDS: Partial<Record<SheetRollKind, "weapon" | "spell">> = {
@@ -210,12 +219,15 @@ export const combatRollRoute: RollRoute = {
         // FR-MOD-27: the damage completes this card (its to-hit mode) or makes a damage-only one.
         card: card ? { toHitMode: card.mode } : {},
         send: (sendIntent, input) =>
-          sendIntent("cbt.rollDamage", {
-            attackerId: c.id,
-            ...manualFields(input, 1),
-            ...refFields(ref),
-            ...partsOf(input),
-          }),
+          showStagedCard(
+            input,
+            sendIntent("cbt.rollDamage", {
+              attackerId: c.id,
+              ...manualFields(input, 1),
+              ...refFields(ref),
+              ...partsOf(input),
+            }),
+          ),
       };
       return claim;
     }
@@ -225,19 +237,22 @@ export const combatRollRoute: RollRoute = {
       ...(critExpressions && !toHitOnly ? { critExpressions } : {}),
       card: {},
       send: (sendIntent, input) =>
-        sendIntent("cbt.attack", {
-          attackerId: c.id,
-          mode: input.mode,
-          ...(toHitOnly ? { rolls: "toHit" } : {}),
-          ...(toHitOnly
-            ? {
-                ...(input.manual ? { manual: input.manual } : {}),
-                ...(input.manualParts ? { manualParts: input.manualParts } : {}),
-              }
-            : manualFields(input, 2)),
-          ...refFields(ref),
-          ...(toHitOnly ? partsOf(input) : {}),
-        }),
+        showStagedCard(
+          input,
+          sendIntent("cbt.attack", {
+            attackerId: c.id,
+            mode: input.mode,
+            ...(toHitOnly ? { rolls: "toHit" } : {}),
+            ...(toHitOnly
+              ? {
+                  ...(input.manual ? { manual: input.manual } : {}),
+                  ...(input.manualParts ? { manualParts: input.manualParts } : {}),
+                }
+              : manualFields(input, 2)),
+            ...refFields(ref),
+            ...(toHitOnly ? partsOf(input) : {}),
+          }),
+        ),
     };
   },
 };

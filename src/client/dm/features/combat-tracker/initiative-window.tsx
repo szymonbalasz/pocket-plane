@@ -82,7 +82,7 @@ import {
   TurnMarker,
   useListHpTrack,
 } from "@ui/features/combat-tracker/parts";
-import { manualFields, pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
+import { pendingToHitCard } from "@ui/features/combat-tracker/roll-route";
 import {
   startedIn,
   toastIntentError,
@@ -160,10 +160,11 @@ import { CbtxRuntime } from "../combat-extras/runtime";
 import { useCbtxDialogs } from "../combat-extras/store";
 import { StatBlockMenuItem } from "../entities/statblock/openers";
 import {
+  ATTACK_ACTIONS,
   type AttackAction,
   attackChoices,
-  attackRolls,
-  attackSubjects,
+  attackControlOptions,
+  attackIntent,
   attackSummary,
 } from "./attack-choices";
 import { AttackPopup, acOf, hpOf } from "./attack-popup";
@@ -284,23 +285,16 @@ function InitiativeCell({
   );
 }
 
-/** The three N7 actions (FR-CBT-74), in menu order; a click on the attack's name = `both`. */
-const ATTACK_ACTIONS = [
-  { value: "both", label: "Attack + damage" },
-  { value: "toHit", label: "Attack" },
-  { value: "damage", label: "Damage" },
-] as const satisfies readonly { value: AttackAction; label: string }[];
-
 /**
- * Attack ▸ (FR-CBT-16, FR-CBT-74, N7): every attack the definition can name (OQ-CHARX-12) with
- * the same three actions as the sheet: Attack + damage (`cbt.attack`), Attack (`cbt.attack
- * {rolls: "toHit"}`), Damage (`cbt.rollDamage`; after a natural 20 on that row's pending to-hit
- * card the roll control opens critical). The pick rolls through one control once it has
- * re-rendered with that attack and action (as Check ▸ / Save ▸); the result's card opens.
- * Physical dice (BL-19): one entry per part as the server rolls them (FR-CBT-81), the extra
- * parts sent as `manualExtra`. The pick state lives with the row (`useAttackPick`), outside the
- * menu, so the roll still runs once the menu has closed (sprint 7: the companion line's ⋯ holds
- * Attack ▸ as a submenu, FR-CBT-142).
+ * Attack ▸ (FR-CBT-16, FR-CBT-74, -169): every attack the definition can name (OQ-CHARX-12) with
+ * the sheet's two actions: Attack (`cbt.attack {rolls: "toHit"}`), Damage (`cbt.rollDamage`;
+ * after a natural 20 on that row's pending to-hit card the roll control opens critical). The pick
+ * goes through one control once it has re-rendered with that attack and action (as Check ▸ /
+ * Save ▸): a click stages the Dice tray pre-filled, Alt+click rolls at once (#385); the tray's
+ * staged `parts` ride along and the result's card opens. Physical dice (BL-19): one entry per
+ * part as the server rolls them (FR-CBT-81), the extra parts sent as `manualExtra`. The pick state
+ * lives with the row (`useAttackPick`), outside the menu, so the roll still runs once the menu has
+ * closed (sprint 7: the companion line's ⋯ holds Attack ▸ as a submenu, FR-CBT-142).
  */
 function useAttackPick(c: CombatantView, def: DefinitionRecord | undefined) {
   const { send, disabled } = useCbtIntent();
@@ -315,46 +309,20 @@ function useAttackPick(c: CombatantView, def: DefinitionRecord | undefined) {
     n: number;
   } | null>(null);
   const chosen = choices[pick?.index ?? 0];
-  const action = pick?.action ?? "both";
+  const action = pick?.action ?? "toHit";
   const attack = chosen?.attack;
   // One attack: no id, the server's first attack (FR-CHARX-20 back-compat).
   const attackId = choices.length > 1 ? chosen?.attackId : undefined;
   // The row a card of this attack names (FR-CBT-71): its id, else the first attack's.
   const rowId = chosen?.attackId ?? attacks[0]?.id;
   const card = pendingToHitCard(notes, c.id, rowId === undefined ? {} : { attackId: rowId });
-  const crit = action === "damage" && card?.toHit?.natural === 20;
-  const rolls = attack ? attackRolls(attack, action) : null;
   const control = useRollControl({
-    expressions: rolls?.expressions ?? ["1d20"],
-    critExpressions: rolls?.critExpressions,
-    // FR-DICE-41: "To hit", "Slashing", "Fire" in the physical form and the tray.
-    slotLabels: rolls?.slotLabels,
-    crit,
-    category: action === "damage" ? "damage" : "attack",
-    label: attack
-      ? `${c.name} — ${attack.name} ${action === "damage" ? "damage" : "attack"}`
-      : undefined,
-    ...(attack && rolls
-      ? { subject: attackSubjects(c.id, attack.name, action, card?.mode, rolls.extraParts) }
-      : {}),
+    ...(attack
+      ? attackControlOptions(c.name, attack, action, { combatantId: c.id, card })
+      : { expressions: ["1d20"], category: "attack" }),
     onRoll: async (r) => {
-      const ref = attackId ? { attackId } : {};
-      // `cbt.rollDamage` takes one entry, `cbt.attack` a list (to-hit [+ base]); then the parts.
-      const manual = manualFields(r, action === "damage" ? 1 : 2);
-      const res =
-        action === "damage"
-          ? await send<{ cardId: string }>("cbt.rollDamage", {
-              attackerId: c.id,
-              ...manual,
-              ...ref,
-            })
-          : await send<{ cardId: string }>("cbt.attack", {
-              attackerId: c.id,
-              mode: r.mode,
-              ...(action === "toHit" ? { rolls: "toHit" } : {}),
-              ...manual,
-              ...ref,
-            });
+      const intent = attackIntent(c.id, attackId, action, r);
+      const res = await send<{ cardId: string }>(intent.name, intent.payload);
       if (res) openCard(res.cardId);
     },
   });
@@ -373,7 +341,7 @@ function useAttackPick(c: CombatantView, def: DefinitionRecord | undefined) {
 }
 type AttackPick = ReturnType<typeof useAttackPick>;
 
-/** Attack ▸'s items: per attack, Attack + damage / Attack / Damage. */
+/** Attack ▸'s items: per attack, its name (= Attack) and Damage. */
 function AttackItems({ c, a }: { c: CombatantView; a: AttackPick }) {
   return a.choices.map((ch, i) => (
     <div key={ch.attackId ?? `first-${i}`} className="flex items-center gap-0.5">
@@ -384,13 +352,13 @@ function AttackItems({ c, a }: { c: CombatantView; a: AttackPick }) {
           data-record-id={c.id}
           data-value={x.value}
           data-attack-id={ch.attackId ?? ""}
-          className={x.value === "both" ? "min-w-0 flex-1 gap-2" : "px-1.5 text-xs"}
+          className={x.value === "toHit" ? "min-w-0 flex-1 gap-2" : "px-1.5 text-xs"}
           onPointerDown={(e) => {
             a.keys.current = rollKeys(e);
           }}
           onSelect={() => a.choose(i, x.value)}
         >
-          {x.value === "both" ? (
+          {x.value === "toHit" ? (
             <>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate">{ch.attack.name}</span>
@@ -426,7 +394,7 @@ function AttackButton({ c, def }: { c: CombatantView; def: DefinitionRecord | un
           content={
             attack ? (
               <>
-                Attack ▸ · Shift: advantage · Ctrl: disadvantage · <StageHint />
+                Attack ▸ · Shift: advantage · Ctrl: disadvantage · <StageHint now />
               </>
             ) : (
               "No weapon attack"

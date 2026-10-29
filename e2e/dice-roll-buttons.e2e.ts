@@ -1,15 +1,17 @@
 // e2e-bundle: dice-polish
 // Thin roll-button flows (D9; DICEX §13 sprint 5 walkthrough 34, 36). B (player-1), physical dice
-// on: Brakka's Flame Tongue Attack + damage → the form heads its slots "To hit — 1d20+8",
-// "Slashing — 2d6+5", "Fire — 2d6", and Alt+click on the same button stages the same labelled
-// groups in the tray (FR-DICE-41). Then the Alt hint, exactly once per open surface
+// on: Brakka's Flame Tongue Damage, Alt+click (at once, #385) → the form heads its slots
+// "Slashing — 2d6+5", "Fire — 2d6", and a click on the same button stages the same typed groups in
+// the tray (FR-DICE-41, FR-CHARX-127). Then the Alt hint, exactly once per open surface
 // (FR-DICEX-51): A's Initiative row initiative, Attack ▸ trigger tooltip, open Check ▸ / Save ▸
 // submenus, Mira's death-save item; B's sheet death save and roll bar Roll; B's Alt+click on the
-// roll bar's Roll stages `2d6` (OQ-DICEX-45 A). Last, in combat (only `cbt.attack` doubles on a
-// crit; `char.roll` has no crit form), a natural 20 adds "(slashing)" / "(fire)" crit sub-rows.
+// roll bar's Roll stages `2d6` (OQ-DICEX-45 A). Last, in combat (only combat doubles on a crit;
+// `char.roll` has no crit form), a natural 20 Attack, then Damage adds "(slashing)" / "(fire)"
+// crit sub-rows.
 // Wiring per surface and the non-stageable ones: bun test (`stage-hint.test.tsx`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -75,7 +77,7 @@ async function idByName(scope: Locator, name: string): Promise<string> {
   return (await r.first().getAttribute("data-record-id")) as string;
 }
 
-test("FR-DICE-41 FR-DICEX-51 Flame Tongue: the physical form names each part; Alt+click stages the same labelled groups", async ({
+test("FR-DICE-41 FR-DICEX-51 FR-CHARX-127 Flame Tongue: the physical form names each part; a click stages the same typed groups", async ({
   browser,
 }) => {
   const { link, recordId } = e2eEnv();
@@ -89,31 +91,32 @@ test("FR-DICE-41 FR-DICEX-51 Flame Tongue: the physical form names each part; Al
   const button = sheet
     .getByTestId("charx-attack")
     .filter({ hasText: "Flame Tongue" })
-    .getByTestId("charx-roll-attack-damage");
-  expect(await hintedTooltip(p1, button)).toContain(
-    "Shift: advantage · Ctrl: disadvantage · Alt: adjust in tray",
-  );
+    .getByTestId("charx-roll-damage");
+  // FR-CHARX-127: Damage ignores Shift / Ctrl; its hint is "Alt: roll now" alone.
+  const tip = await hintedTooltip(p1, button);
+  expect(tip).toContain("Alt: roll now");
+  expect(tip).not.toContain("Shift");
 
-  await button.click();
+  await rollNow(button);
   const form = manualForm(p1);
   await expect(form.getByTestId("dice-manual-slot-label")).toHaveText([
-    "To hit — 1d20+8",
     "Slashing — 2d6+5",
     "Fire — 2d6",
   ]);
   await form.getByRole("button", { name: "Cancel" }).click();
   await expect(form).toHaveCount(0);
 
-  // Alt+click the same button: staged, not rolled; the tray's groups carry the same labels.
-  await button.click({ modifiers: ["Alt"] });
+  // A click on the same button: staged, not rolled; the tray's groups carry the same types.
+  await button.click();
   await expect(form).toHaveCount(0);
   const tray = shellWindow(p1, "dicex.tray");
   await expect(tray.getByTestId("dicex-tray-state")).toHaveAttribute("data-value", "adjust");
-  await expect(tray.getByTestId("dicex-tray-group-label")).toHaveText([
-    "To hit",
-    "Slashing",
-    "Fire",
-  ]);
+  await expect(tray.getByTestId("dicex-tray-group-type")).toHaveCount(2);
+  for (const type of ["slashing", "fire"]) {
+    await expect(
+      tray.locator(`[data-testid="dicex-tray-group-type"][data-value="${type}"]`),
+    ).toHaveCount(1);
+  }
   await p1.context().close();
 });
 
@@ -150,7 +153,7 @@ test("FR-DICEX-51 Alt hint once on every stageable surface; Alt+click on the rol
   );
   const attack = init.locator(`[data-testid="cbt-init-row-attack"][data-record-id="${goblin}"]`);
   expect(await hintedTooltip(dm, attack)).toBe(
-    "Attack ▸ · Shift: advantage · Ctrl: disadvantage · Alt: adjust in tray",
+    "Attack ▸ · Shift: advantage · Ctrl: disadvantage · Alt: roll now",
   );
 
   // A: the open Check ▸ / Save ▸ submenus, Mira's death-save item: one line each.
@@ -189,28 +192,42 @@ test("FR-DICEX-51 Alt hint once on every stageable surface; Alt+click on the rol
   await expect(tray.locator('[data-testid="dicex-tray-die"][data-faces="6"]')).toHaveCount(2);
   await expect(log.getByTestId("dice-log-entry")).toHaveCount(before); // staged, not rolled
 
-  // B, in combat (the sheet attack routes to `cbt.attack`, which doubles on a crit): Brakka's
-  // Flame Tongue, physical, d20 = 20 → each part's crit sub-row names its type (FR-DICE-41).
+  // B, in combat (the sheet attack routes to `cbt.attack`; combat doubles on a crit): Brakka's
+  // Flame Tongue Attack, physical, d20 = 20; then Damage → each part's crit sub-row names its type
+  // (FR-DICE-41, FR-CBT-74).
   await physicalOn(p1);
   await pickSheet(sheet, recordId("char-brakka", "entity"));
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
-  await sheet
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Flame Tongue" })
-    .getByTestId("charx-roll-attack-damage")
-    .click();
+  const flame = sheet.getByTestId("charx-attack").filter({ hasText: "Flame Tongue" });
+  const lines = await log.getByTestId("dice-log-entry").count();
+  await rollNow(flame.getByTestId("charx-roll-attack"));
   const form = manualForm(p1);
+  await expect(form.getByTestId("dice-manual-label")).toHaveText(
+    "Brakka — Flame Tongue greatsword attack",
+  );
+  await form.locator('[data-testid="dice-manual-total"][data-value="0"]').fill("20");
+  await form.getByTestId("dice-manual-submit").click();
+  await expect(form).toHaveCount(0);
+  const card = init
+    .getByTestId("cbt-init-card")
+    .filter({ hasText: /Brakka: \d+ to hit \(natural 20\)/ });
+  await expect(card).toHaveCount(1);
+  // The card reaches B in the same frame as its log line: Damage then knows the crit (FR-CBT-74).
+  await expect(log.getByTestId("dice-log-entry")).toHaveCount(lines + 1);
+  await rollNow(flame.getByTestId("charx-roll-damage"));
   await expect(form.getByTestId("dice-manual-slot-label")).toHaveText([
-    "To hit — 1d20+8",
     "Slashing — 2d6+5",
     "Fire — 2d6",
   ]);
-  await form.locator('[data-testid="dice-manual-total"][data-value="0"]').fill("20");
   await expect(form.getByTestId("dice-manual-crit-label")).toHaveText([
     "Extra critical dice: 2d6 (slashing)",
     "Extra critical dice: 2d6 (fire)",
   ]);
   await form.getByRole("button", { name: "Cancel" }).click();
+  // Leave the bundle's server as found: the DM dismisses the to-hit card.
+  await card.click();
+  await dm.getByTestId("cbt-popup-dismiss").click();
+  await expect(card).toHaveCount(0);
 
   await dm.context().close();
   await p1.context().close();

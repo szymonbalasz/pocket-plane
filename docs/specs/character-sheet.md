@@ -174,6 +174,9 @@ No new entity, table or migration; the ability fields are entities' (JSON leaf, 
 
 ## 13. Test plan
 
+> *Sprint 15 (DM [#385](../decisions-log.md), [ADR-0073](../architecture/adr/0073-tray-attacks.md)):* **Attack + damage** is retired. In the steps below read it as **Attack**, then **Damage**: a click opens the Dice tray pre-filled (Roll there), **Alt+click** rolls at once (physical-dice steps: Alt+click). Expected results are unchanged.
+
+
 Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolation.md)): `bun test` on `:memory:` DB, port 0; walkthrough on the `verify` profile ([AGENTS §9.6](../../AGENTS.md#96-browser-verification-test-agents)); loop per [ADR-0017](../architecture/adr/0017-agent-verification-fixture-library.md). Tests named after FRs. Seeded `ctx.dice` (#137) in `bun test`; the running server uses real dice.
 
 **Fixtures** (setups run as DM, FR-FIX-13; names per [fixtures-adapters §8](fixtures-adapters.md#8-data-model))

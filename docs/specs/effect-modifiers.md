@@ -160,7 +160,7 @@ sequenceDiagram
   participant S as Server
   participant D as DM popup
   B->>S: mod.toggle Rage on (spends 1 of 3 uses)
-  B->>S: Attack + damage (cbt.attack)
+  B->>S: Attack, then Damage (cbt.attack toHit, cbt.rollDamage; #385)
   S->>S: rollHooks: Rage +2 part; Divine Fury requires Rage ✓, via weapon ✓, own turn ✓, window t:2:brakka free ✓ → roll 1d6 (+2), offered row
   S-->>D: card "17 to hit, 12 slashing (+ 6 radiant Divine Fury on a hit)"
   D->>S: applyCard Goblin hit, triggers [Divine Fury]
@@ -608,6 +608,9 @@ export const applyHooks: readonly ApplyHook[] = [/* mod */];
 - **Sprint 5:** MOD adds no record, field or snapshot bytes: FR-MOD-62 changes line text only (a type word per trigger part, ≤ 12 B per part in rendered text, nothing stored); FR-MOD-63 reuses the card's offers. Track R's measured figures (hit ruling, unused rolls, trails): [CBT §12](combat-tracker.md#12-performance--bandwidth).
 
 ## 13. Test plan
+
+> *Sprint 15 (DM [#385](../decisions-log.md), [ADR-0073](../architecture/adr/0073-tray-attacks.md)):* **Attack + damage** is retired. In the steps below read it as **Attack**, then **Damage**: a click opens the Dice tray pre-filled (Roll there), **Alt+click** rolls at once (physical-dice steps: Alt+click). Expected results are unchanged.
+
 
 > **Sprint 5:** fixtures (`late-hit-ruled`, `trail-moves`), bundle **`late-damage`**, named tests `FR-MOD-62 damage types on trigger parts`, `FR-MOD-63 offers on a late roll` and the walkthrough (L12, L13) are in [CBT §13.1](combat-tracker.md#131-sprint-5-track-r-cbt-mod-map).
 

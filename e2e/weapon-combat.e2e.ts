@@ -1,11 +1,12 @@
 // e2e-bundle: rules-effects
 // Thin weapon-parts flow in combat (S4-1b; MOD §13.1 steps 3–4, FR-CBT-81, -82, -84, -85): the
 // bundle gives Brakka a Flame Tongue greatsword +1 (`2d6+4` slashing + `2d6` fire) and Fire Ward
-// on Goblin; player-1 rolls Flame Tongue Attack + damage → the card lists both parts; the DM's
+// on Goblin; player-1 rolls Flame Tongue Attack, then Damage → the card lists both parts; the DM's
 // popup shows the fire chip preset "Half (Fire Ward)" on Goblin → Apply → the players' line reads
 // "— DM: hit. … slashing + … fire (half) damage". Rules, leaks, crits: bun test.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -34,18 +35,17 @@ test("FR-CBT-81 FR-CBT-82 FR-CBT-84 FR-CBT-85 Flame Tongue: parts on the card, f
   const goblin = await idByName(init, "Goblin");
   const brakka = recordId("char-brakka", "entity");
 
-  // Player 1: Brakka's sheet → Actions → Flame Tongue Attack + damage.
+  // Player 1: Brakka's sheet → Actions → Flame Tongue Attack, then Damage (Alt+click: at once).
   const sheet = await openWindow(p1, "char.sheet");
   await pickSheet(sheet, brakka);
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
-  await sheet
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Flame Tongue" })
-    .getByTestId("charx-roll-attack-damage")
-    .click();
+  const flame = sheet.getByTestId("charx-attack").filter({ hasText: "Flame Tongue" });
+  const card = init.getByTestId("cbt-init-card");
+  await rollNow(flame.getByTestId("charx-roll-attack"));
+  await expect(card).toHaveCount(1);
+  await rollNow(flame.getByTestId("charx-roll-damage"));
 
   // DM: the pending card lists both parts; the popup's fire chip on Goblin presets Half.
-  const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
   await expect(card).toContainText(/\d+ slashing \+ \d+ fire/);
   // The d20 is real: the card marks a natural 1 / 20 (FR-CBT-57), which sets the players' words.

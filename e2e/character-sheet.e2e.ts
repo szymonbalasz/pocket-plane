@@ -1,10 +1,12 @@
 // e2e-bundle: character-sheet
 // Thin character-sheet flows (CHAR §13 E2E): player-1 damages Mira from the sheet → the DM's
 // sheet shows 9 / 12; on the Actions tab (N4) player-1 rolls Shortsword Attack (to-hit only),
-// Damage, Attack + damage (one line with both; N7) → lines in dice.log for the DM and player-2.
+// Damage (Alt+click: at once), then Damage again through the Dice tray (a click stages it,
+// #385; no Attack + damage) → lines in dice.log for the DM and player-2.
 // Authorize matrix, visibility, leak scan, restart: bun test (character-sheet).
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow } from "./support/shell";
 
@@ -51,8 +53,9 @@ test("FR-CHAR-10 FR-CHAR-08 player-1 damages Mira and attacks; DM and player-2 s
   await expect(sheet1.getByTestId("char-sheet-hp")).toHaveText("9 / 12");
   await expect(dmSheet.getByTestId("char-sheet-hp")).toHaveText("9 / 12");
 
-  // Actions tab, Shortsword (FR-CHARX-41): Attack → to-hit only; Damage → damage only;
-  // Attack + damage → one line with both rolls. Each for the DM and player-2.
+  // Actions tab, Shortsword (FR-CHARX-126): Attack → to-hit only; Damage → damage only (both
+  // Alt+click: at once); a click stages the tray, its Roll → the damage line. Each for the DM and
+  // player-2.
   await openWindow(dm, "dice.log");
   await openWindow(p2, "dice.log");
   await expect(entries(dm)).toHaveCount(0);
@@ -64,7 +67,7 @@ test("FR-CHAR-10 FR-CHAR-08 player-1 damages Mira and attacks; DM and player-2 s
     ["charx-roll-damage", "Shortsword damage (piercing)", "Shortsword attack"],
   ] as const;
   for (const [i, [testId, has, hasNot]] of steps.entries()) {
-    await sword.getByTestId(testId).click();
+    await rollNow(sword.getByTestId(testId));
     for (const page of [dm, p2]) {
       await expect(entries(page)).toHaveCount(i + 1);
       const line = entries(page).filter({ hasText: has });
@@ -73,13 +76,13 @@ test("FR-CHAR-10 FR-CHAR-08 player-1 damages Mira and attacks; DM and player-2 s
       await expect(line).not.toContainText(hasNot);
     }
   }
-  await sword.getByTestId("charx-roll-attack-damage").click();
+  await expect(sword.getByTestId("charx-roll-attack-damage")).toHaveCount(0);
+  await sword.getByTestId("charx-roll-damage").click();
+  await expect(entries(dm)).toHaveCount(2);
+  await p1.getByTestId("dicex-tray-roll").click();
   for (const page of [dm, p2]) {
     await expect(entries(page)).toHaveCount(3);
-    const both = entries(page)
-      .filter({ hasText: "Shortsword attack" })
-      .filter({ hasText: "Shortsword damage (piercing)" });
-    await expect(both).toHaveCount(1);
+    await expect(entries(page).filter({ hasText: "Shortsword damage (piercing)" })).toHaveCount(2);
   }
   // Pip: no speed, no scores → "Speed —", "No ability scores", no Check / Save (FR-CHAR-18/19).
   await pickSheet(sheet1, { label: "Pip" });

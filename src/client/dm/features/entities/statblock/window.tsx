@@ -50,8 +50,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   type AttackAction,
   attackChoices,
-  attackRolls,
-  attackSubjects,
+  attackControlOptions,
   attackSummary,
 } from "../../combat-tracker/attack-choices";
 import { acOf, hpOf } from "../../combat-tracker/attack-popup";
@@ -61,10 +60,9 @@ import {
   ATTACK_BUTTONS,
   abilityLabel,
   abilitySend,
-  attackSends,
+  attackSend,
   boundCombatant,
   EMPTY_TEXT,
-  plainAttackRolls,
   type RollAs,
   type Send,
   STATBLOCK_KIND,
@@ -113,19 +111,6 @@ function useStatBlockEntry(def: DefinitionRecord | undefined, entryId: string | 
   return read.key === key ? read.read : { state: "none" as const };
 }
 
-/** One intent after another (definition Attack + damage: to-hit, then damage). */
-async function sendAll(
-  send: (name: string, payload: unknown) => Promise<unknown>,
-  sends: readonly Send[],
-): Promise<unknown> {
-  let last: unknown;
-  for (const s of sends) {
-    last = await send(s.name, s.payload);
-    if (last === undefined) return undefined;
-  }
-  return last;
-}
-
 interface RollCtx {
   as: RollAs;
   send: ReturnType<typeof useCbtIntent>["send"];
@@ -133,10 +118,11 @@ interface RollCtx {
 }
 
 /**
- * FR-KIT-105: one attack button through the shared roll control (Shift / Ctrl, Alt to stage,
- * physical dice, the DM public switch per category). Bound: combat's rolls and preview subjects,
- * a Damage after a natural 20 on this row's pending to-hit card opens critical (FR-CBT-74), the
- * card opens in the DM popup. Definition: plain rolls.
+ * FR-KIT-105: one attack button through the shared roll control (Shift / Ctrl, physical dice):
+ * a click stages the Dice tray pre-filled (purpose, a type per part), Alt+click rolls at once
+ * (#385). Bound: combat's rolls and preview subjects, a Damage after a natural 20 on this row's
+ * pending to-hit card opens critical (FR-CBT-74), the card opens in the DM popup. Definition:
+ * plain rolls.
  */
 function AttackRoll({
   ctx,
@@ -160,31 +146,19 @@ function AttackRoll({
   const openCard = useCombatDialogs((s) => s.openCard);
   const openWindow = useOpenWindow();
   const bound = as.combatantId !== undefined;
-  const rolls = attackRolls(attack, action);
   const card =
     as.combatantId !== undefined
       ? pendingToHitCard(notes, as.combatantId, rowId === undefined ? {} : { attackId: rowId })
       : null;
   const control = useRollControl({
-    expressions: bound ? rolls.expressions : plainAttackRolls(attack, action),
-    category: action === "damage" ? "damage" : "attack",
-    label: `${as.name} — ${attack.name} ${action === "damage" ? "damage" : "attack"}`,
-    ...(bound
-      ? {
-          critExpressions: rolls.critExpressions,
-          slotLabels: rolls.slotLabels,
-          crit: action === "damage" && card?.toHit?.natural === 20,
-          subject: attackSubjects(
-            as.combatantId as string,
-            attack.name,
-            action,
-            card?.mode,
-            rolls.extraParts,
-          ),
-        }
-      : {}),
+    ...attackControlOptions(
+      as.name,
+      attack,
+      action,
+      as.combatantId !== undefined ? { combatantId: as.combatantId, card } : undefined,
+    ),
     onRoll: (r) => {
-      void sendAll(ctx.send, attackSends(as, attack, attackId, action, r)).then((res) => {
+      void ctx.send(...sendArgs(attackSend(as, attack, attackId, action, r))).then((res) => {
         const cardId = (res as { cardId?: string } | null | undefined)?.cardId;
         if (!bound || !cardId) return;
         // The popup lives with the Initiative window (as the companion card's dialogs).
@@ -196,7 +170,12 @@ function AttackRoll({
   return (
     <RollButton
       control={control}
-      hint={bound ? "Combat roll · Shift: advantage · Ctrl: disadvantage" : undefined}
+      // FR-CHARX-127: Damage ignores Shift / Ctrl (its hint ends in "Alt: roll now" alone).
+      hint={
+        bound
+          ? `Combat roll${action === "damage" ? "" : " · Shift: advantage · Ctrl: disadvantage"}`
+          : undefined
+      }
       type="button"
       size="sm"
       variant="outline"

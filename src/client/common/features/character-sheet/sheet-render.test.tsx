@@ -1,8 +1,9 @@
-// Sheet rendering (CHARX §13 unit, sprint 2): the three attack buttons per row and spell form
-// (FR-CHARX-41), routing per button (FR-CHARX-43), Main without attacks (FR-CHARX-44), pinned
-// header (FR-CHARX-48). Static server render over a fake sync store (no encounter, so combat's
+// Sheet rendering (CHARX §13 unit, sprint 2): the attack buttons per row and spell form
+// (FR-CHARX-41; sprint 15 two buttons, FR-CHARX-126), routing per button (FR-CHARX-43), Main
+// without attacks (FR-CHARX-44), pinned header (FR-CHARX-48); sprint 15: a click stages the
+// Dice tray, Alt+click rolls (FR-CHARX-127), staging offline (FR-CHARX-132). Static server render over a fake sync store (no encounter, so combat's
 // route never claims).
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import {
   type CreatureSheetRecord,
   defaultSheetData,
@@ -14,13 +15,22 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
+import { diceExtras, type TrayRequest } from "../dice-extras/store";
+import { TrayWindow } from "../dice-extras/TrayWindow";
+import {
+  ROLL_NOW_HINT,
+  type RollControl,
+  rollButtonTip,
+  STAGE_HINT,
+} from "../dice-roll-log/roll-control";
 import { createWindowRegistry } from "../play-shell/registry";
 import { ShellProvider } from "../play-shell/ShellContext";
 import { ActionsTab } from "./ActionsTab";
 import { MainTab } from "./MainTab";
 import { PublicRolls, PublicRollsMenu } from "./PublicMenu";
 import { rollRoutes } from "./roll-routes";
-import type { RollRoute } from "./routing";
+import { ROLL_HINT, rollHint, takesModeKeys, useSheetRollControl } from "./rolls";
+import type { RollRoute, SheetRollRef } from "./routing";
 import { SheetView } from "./SheetView";
 import type { SheetCtx } from "./sheet-context";
 import { SheetContext } from "./sheet-context";
@@ -58,6 +68,10 @@ type RenderOpts = {
   /** Replaces the attack rows (FR-CHARX-56). */
   attacks?: unknown[];
   editing?: boolean;
+  /** Intents the sheet sends (name, payload). */
+  sent?: [string, unknown][];
+  /** Sync state; default live. */
+  state?: "live" | "reconnecting";
 };
 
 function ctxCreature(o: RenderOpts = {}): DefinitionRecord {
@@ -95,11 +109,16 @@ function render(node: React.ReactNode, o: RenderOpts = {}) {
   const sync = createStore<SyncState>()(
     () =>
       ({
-        state: "live",
+        state: o.state ?? "live",
         store: { ...emptyStore(), you },
         notLiveSince: null,
         everLive: true,
-        connection: { sendIntent: () => Promise.resolve({}) },
+        connection: {
+          sendIntent: (name: string, payload: unknown) => {
+            o.sent?.push([name, payload]);
+            return Promise.resolve({});
+          },
+        },
       }) as unknown as SyncState,
   );
   return renderToStaticMarkup(
@@ -126,33 +145,34 @@ function buttonsOf(html: string, rowTestId: string, rowId: string): [string, str
 const ATTACK_ROW: [string, string][] = [
   ["charx-roll-attack", "Attack"],
   ["charx-roll-damage", "Damage"],
-  ["charx-roll-attack-damage", "Attack + damage"],
 ];
 
-describe("FR-CHARX-41 three attack buttons", () => {
-  test("FR-CHARX-41 every attack row: Attack · Damage · Attack + damage, in order, with the row id", () => {
+describe("FR-CHARX-126 two attack buttons", () => {
+  test("FR-CHARX-126 two attack buttons: every attack row Attack · Damage, in order, with the row id; no *-attack-damage ID", () => {
     for (const client of ["player", "dm"] as const) {
       const html = render(<ActionsTab />, { client });
       expect(buttonsOf(html, "charx-attack", "a1")).toEqual(ATTACK_ROW);
       expect(buttonsOf(html, "charx-attack", "a2")).toEqual(ATTACK_ROW);
-      expect(html).toContain('data-testid="charx-roll-attack-damage" data-record-id="a2"');
+      expect(html).toContain('data-testid="charx-roll-damage" data-record-id="a2"');
+      expect(html).not.toContain("attack-damage");
+      expect(html).not.toContain("Attack + damage");
     }
   });
 
-  test("FR-CHARX-41 spell forms: attack + damage all three; attack only Attack; save / healing Damage / Healing only", () => {
+  test("FR-CHARX-126 two attack buttons, spell forms: attack + damage Attack, Damage; attack only Attack; save / healing Damage / Healing only", () => {
     const html = render(<ActionsTab />);
     expect(buttonsOf(html, "charx-spell", "gb")).toEqual([
       ["charx-roll-spell-attack", "Attack"],
       ["charx-roll-spell-damage", "Damage"],
-      ["charx-roll-spell-attack-damage", "Attack + damage"],
     ]);
     expect(buttonsOf(html, "charx-spell", "ray")).toEqual([["charx-roll-spell-attack", "Attack"]]);
     expect(buttonsOf(html, "charx-spell", "sf")).toEqual([["charx-roll-spell-damage", "Damage"]]);
     expect(buttonsOf(html, "charx-spell", "cw")).toEqual([["charx-roll-spell-damage", "Healing"]]);
     expect(buttonsOf(html, "charx-spell", "sh")).toEqual([]);
+    expect(html).not.toContain("charx-roll-spell-attack-damage");
   });
 
-  test("FR-CHARX-41 NPC sheet: the same buttons, no public switch; DM PC sheet has the switches (BL-139: in the header's Public rolls menu)", () => {
+  test("FR-CHARX-126 NPC sheet: the same two buttons, no public switch; DM PC sheet has the switches (BL-139: in the header's Public rolls menu)", () => {
     const npc = render(<ActionsTab />, { client: "dm", npc: true });
     expect(buttonsOf(npc, "charx-attack", "a2")).toEqual(ATTACK_ROW);
     expect(npc).not.toContain("charx-public-attack");
@@ -185,12 +205,15 @@ describe("FR-CHARX-43 routing per button", () => {
       const html = render(<ActionsTab />);
       expect(buttonsOf(html, "charx-attack", "a2")).toEqual(ATTACK_ROW.slice(1));
       expect(buttonsOf(html, "charx-attack", "a1")).toEqual(ATTACK_ROW);
-      for (const kind of ["toHit", "damage", "attack"]) {
+      for (const kind of ["toHit", "damage"]) {
         expect(asked).toContainEqual([kind, { attackId: "a2" }]);
       }
-      for (const kind of ["spellToHit", "spellDamage", "spellAttack"]) {
+      for (const kind of ["spellToHit", "spellDamage"]) {
         expect(asked).toContainEqual([kind, { spellId: "gb" }]);
       }
+      // FR-CHARX-126: Attack + damage is never asked for.
+      expect(asked.map(([k]) => k)).not.toContain("attack");
+      expect(asked.map(([k]) => k)).not.toContain("spellAttack");
     } finally {
       testRoutes.shift();
     }
@@ -216,7 +239,7 @@ describe("FR-CHARX-44 attacks on the Actions tab only", () => {
   test("FR-CHARX-44 Actions lists every attack, legacy rows (no id) included", () => {
     const html = render(<ActionsTab />, { legacy: true });
     expect(html.match(/data-testid="charx-attack"/g)).toHaveLength(2);
-    expect(html.match(/data-testid="charx-roll-attack-damage"/g)).toHaveLength(2);
+    expect(html.match(/data-testid="charx-roll-damage"/g)).toHaveLength(2);
     expect(html).toContain("Light crossbow");
   });
 });
@@ -479,5 +502,160 @@ describe("FR-CHARX-56 weapon row UI", () => {
       expect(addButton(full)).toContain('disabled=""');
       expect(rowHtml(html, "a1")).not.toContain('data-testid="charx-attack-extra" ');
     }
+  });
+});
+
+/** The shared roll control of one sheet roll, as `SheetRoll` builds it (no route claims). */
+function sheetControl(
+  kind: Parameters<typeof useSheetRollControl>[0]["kind"],
+  rollRef: SheetRollRef,
+  title: string,
+  o: RenderOpts = {},
+): RollControl {
+  let control: RollControl | null = null;
+  function Probe() {
+    control = useSheetRollControl({ kind, rollRef, title, claim: null }).control;
+    return null;
+  }
+  render(<Probe />, o);
+  if (!control) throw new Error("no control");
+  return control;
+}
+
+const staged = () => diceExtras.api.getState().request;
+const controlOf = (r: TrayRequest | null) => {
+  if (r?.kind !== "control") throw new Error("no staged control");
+  return r;
+};
+
+describe("FR-CHARX-127 click stages, Alt rolls", () => {
+  afterEach(() => diceExtras.clear());
+
+  test("FR-CHARX-127 click stages, Alt rolls: click → a tray request (dice, purpose, types, label), no intent; Shift → advantage; Alt+click → one char.roll, no tray; the tray's Roll sends the staged parts", () => {
+    const sent: [string, unknown][] = [];
+    const attack = sheetControl("toHit", { attackId: "a2" }, "Light crossbow attack", { sent });
+    attack.roll({});
+    expect(sent).toEqual([]);
+    const req = controlOf(staged());
+    expect(req.mode).toBe("normal");
+    expect(req.options).toMatchObject({
+      expressions: ["1d20+4"],
+      category: "attack",
+      label: "Mira — Light crossbow attack",
+      purpose: "attack",
+    });
+    attack.roll({ shiftKey: true });
+    expect(controlOf(staged()).mode).toBe("advantage");
+    diceExtras.clear();
+    // Alt+click: the old one-click roll, nothing staged.
+    attack.roll({ altKey: true });
+    expect(staged()).toBeNull();
+    expect(sent).toEqual([
+      ["char.roll", { characterId: "mira", kind: "toHit", mode: "normal", attackId: "a2" }],
+    ]);
+    // Damage: the row's dice with its type; the tray's Roll hands back the edited parts.
+    sent.length = 0;
+    const damage = sheetControl("damage", { attackId: "a2" }, "Light crossbow damage", { sent });
+    damage.roll({});
+    const dmg = controlOf(staged());
+    expect(dmg.options).toMatchObject({
+      expressions: ["1d8+2"],
+      purpose: "damage",
+      partTypes: ["piercing"],
+      label: "Mira — Light crossbow damage",
+    });
+    dmg.options.onRoll({ mode: "normal", parts: [{ expression: "1d8+1d6+2", type: "piercing" }] });
+    expect(sent).toEqual([
+      [
+        "char.roll",
+        {
+          characterId: "mira",
+          kind: "damage",
+          mode: "normal",
+          attackId: "a2",
+          parts: [{ expression: "1d8+1d6+2", type: "piercing" }],
+        },
+      ],
+    ]);
+    // Spell rows: Attack and Damage / Healing stage too (Healing untyped).
+    for (const [kind, spellId, purpose] of [
+      ["spellToHit", "gb", "attack"],
+      ["spellDamage", "gb", "damage"],
+      ["spellDamage", "cw", "damage"],
+    ] as const) {
+      diceExtras.clear();
+      sheetControl(kind, { spellId }, "x").roll({});
+      expect(controlOf(staged()).options.purpose).toBe(purpose);
+    }
+    expect(controlOf(staged()).options.partTypes).toEqual([null]);
+    // The buttons' hint: "Alt: roll now"; other sheet rolls keep click = roll, Alt = stage.
+    const tip = renderToStaticMarkup(rollButtonTip(attack));
+    expect(tip).toContain(ROLL_NOW_HINT);
+    sent.length = 0;
+    diceExtras.clear();
+    const check = sheetControl("check", { ability: "dex" }, "Dexterity check", { sent });
+    expect(check.options.purpose).toBeUndefined();
+    expect(renderToStaticMarkup(rollButtonTip(check))).toContain(STAGE_HINT);
+    check.roll({});
+    expect(staged()).toBeNull();
+    expect(sent.map(([n]) => n)).toEqual(["char.roll"]);
+  });
+
+  test("FR-CHARX-127 a row with extra parts stages one die group type per part (Flame Tongue: slashing, fire)", () => {
+    const attacks = [
+      {
+        id: "ft",
+        name: "Flame Tongue greatsword",
+        toHit: 7,
+        damage: "2d6+4",
+        damageType: "slashing",
+        bonus: 1,
+        extraDamage: [{ damage: "2d6", type: "fire" }],
+      },
+    ];
+    sheetControl("damage", { attackId: "ft" }, "Flame Tongue greatsword damage", {
+      attacks,
+    }).roll({});
+    expect(controlOf(staged()).options).toMatchObject({
+      expressions: ["2d6+5", "2d6"],
+      partTypes: ["slashing", "fire"],
+      purpose: "damage",
+    });
+    diceExtras.clear();
+  });
+});
+
+describe("FR-CHARX-132 disconnect", () => {
+  afterEach(() => diceExtras.clear());
+
+  test("FR-CHARX-132 staged roll offline: not live → staging works, the tray's Roll is disabled, the request is kept; nothing sent", () => {
+    const sent: [string, unknown][] = [];
+    const o = { sent, state: "reconnecting" as const };
+    sheetControl("damage", { attackId: "a2" }, "Light crossbow damage", o).roll({});
+    const html = render(<TrayWindow />, o);
+    expect(html).toMatch(/<button[^>]*data-testid="dicex-tray-roll"[^>]*disabled=""/);
+    expect(controlOf(staged()).options.label).toBe("Mira — Light crossbow damage");
+    expect(sent).toEqual([]);
+  });
+});
+
+describe("FR-CHARX-127 Damage hint", () => {
+  test("FR-CHARX-127 Damage hint: Damage / Healing ignore Shift / Ctrl, so their hint reads 'Alt: roll now' alone; Attack keeps the mode keys", () => {
+    const text = (node: React.ReactNode) => renderToStaticMarkup(node).replace(/<[^>]+>/g, "");
+    const damage = sheetControl("damage", { attackId: "a2" }, "Light crossbow damage");
+    expect(
+      text(rollButtonTip(damage, rollHint(stats, undefined, undefined, takesModeKeys("damage")))),
+    ).toBe(ROLL_NOW_HINT);
+    const healing = sheetControl("spellDamage", { spellId: "cw" }, "Cure Wounds healing");
+    expect(takesModeKeys("spellDamage")).toBe(false);
+    expect(text(rollButtonTip(healing, rollHint(stats, undefined, undefined, false)))).toBe(
+      ROLL_NOW_HINT,
+    );
+    const attack = sheetControl("toHit", { attackId: "a2" }, "Light crossbow attack");
+    expect(
+      text(rollButtonTip(attack, rollHint(stats, undefined, undefined, takesModeKeys("toHit")))),
+    ).toBe(`${ROLL_HINT} · ${ROLL_NOW_HINT}`);
+    expect(takesModeKeys("check")).toBe(true);
+    diceExtras.clear();
   });
 });

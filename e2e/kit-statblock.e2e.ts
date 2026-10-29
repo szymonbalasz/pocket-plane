@@ -2,10 +2,11 @@
 // Kit parity K7 (kit-parity §6.11, §13): the DM stat-block window at 1440×900. Initiative ⋯ on the
 // Goblin's row → Stat block: the window opens bound (In combat chip, kit card), at its useful
 // size 300 × 360 the core row, abilities and the attack row's buttons show without scrolling;
-// Attack + damage → the damage card opens in the DM popup. Player-1 has no stat block launcher
+// Attack (Alt+click: at once, #385) → the damage card opens in the DM popup. Player-1 has no stat block launcher
 // or window (FR-KIT-107).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -32,7 +33,7 @@ async function resizeTo(page: Page, win: Locator, w: number, h: number) {
     .toEqual([w, h]);
 }
 
-test("FR-KIT-101 FR-KIT-103 FR-KIT-105 FR-KIT-107 Initiative ⋯ → Stat block (bound) → Attack + damage → the damage popup; the player has no stat block", async ({
+test("FR-KIT-101 FR-KIT-103 FR-KIT-105 FR-KIT-107 Initiative ⋯ → Stat block (bound) → Attack → the damage popup; the player has no stat block", async ({
   browser,
 }, testInfo) => {
   const { secret, link } = e2eEnv();
@@ -82,13 +83,15 @@ test("FR-KIT-101 FR-KIT-103 FR-KIT-105 FR-KIT-107 Initiative ⋯ → Stat block 
     const b = await sb.getByTestId(id).last().boundingBox();
     return (b?.y ?? 0) + (b?.height ?? 0) <= (body?.y ?? 0) + (body?.height ?? 0) + 0.5;
   };
+  // FR-KIT-105 (#385): two buttons; the 2nd row's last (Damage) shows.
+  await expect(sb.getByTestId("ent-statblock-roll-both")).toHaveCount(0);
   const both = await sb
     .getByTestId("ent-statblock-attack")
     .last()
-    .getByTestId("ent-statblock-roll-both")
+    .getByTestId("ent-statblock-roll-damage")
     .boundingBox();
   console.log(
-    `useful-size ent.statblock: scroll box ${JSON.stringify(body)} 2nd both ${JSON.stringify(both)}`,
+    `useful-size ent.statblock: scroll box ${JSON.stringify(body)} 2nd damage ${JSON.stringify(both)}`,
   );
   for (const id of ["ent-statblock-type", "ent-statblock-core", "ent-statblock-abilities"]) {
     expect({ id, fits: await fits(id) }).toEqual({ id, fits: true });
@@ -100,12 +103,12 @@ test("FR-KIT-101 FR-KIT-103 FR-KIT-105 FR-KIT-107 Initiative ⋯ → Stat block 
   expect(await scroller.evaluate((e) => e.scrollTop)).toBe(0);
   await sb.screenshot({ path: testInfo.outputPath("app-statblock-useful-elite.png") });
 
-  // FR-KIT-105: Attack + damage (bound) → cbt.attack → the damage card in the DM popup.
+  // FR-KIT-105: Attack (bound; Alt+click: at once) → cbt.attack → the damage card in the DM popup.
   await goblin.hover();
   await goblin.getByTestId("cbt-init-row-menu").first().click();
   await dm.getByTestId("cbt-init-row-statblock").click();
   await expect(sb.getByTestId("ent-statblock-name")).toHaveText("Goblin");
-  await sb.getByTestId("ent-statblock-roll-both").first().click();
+  await rollNow(sb.getByTestId("ent-statblock-roll-attack").first());
   const popup = dm.getByTestId("cbt-popup");
   await expect(popup).toBeVisible();
   await expect(popup.getByTestId("cbt-popup-drag")).toContainText("Goblin");

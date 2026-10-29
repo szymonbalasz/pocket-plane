@@ -1,11 +1,12 @@
 // e2e-bundle: kit-notices
 // Kit parity K3 (kit-parity §6.5–6.6, §13): the notices and the damage card at 1440×900. Player-1
-// rolls Attack + damage from the sheet → the DM's card toast: Medallion lead, text block with the
+// rolls Attack (Alt+click: at once) from the sheet → the DM's card toast: Medallion lead, text block with the
 // relative time, the action inline. Its action opens the popup: title bar with the Later gem,
 // Result-box lines, a compact target row; Apply resolves it and player-1's Notifications row shows
 // the damage in a Result box. The DM's Next turn shows the turn card first in the stack.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -25,12 +26,15 @@ test("FR-KIT-55 FR-KIT-57 FR-KIT-62 FR-KIT-64 FR-KIT-66 FR-KIT-59 card toast inl
   await p1.goto(link("Player 1"));
   await live(p1);
 
-  // Player-1: sheet Attack + damage → a damage card toast on the DM's stack.
+  // Player-1: sheet Attack, then Damage (Alt+click: at once) → a damage card toast on the DM's
+  // stack.
   const sheet = await openWindow(p1, "char.sheet");
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
-  await sheet.getByTestId("charx-roll-attack-damage").first().click();
+  await rollNow(sheet.getByTestId("charx-roll-attack").first());
   const toast = dm.getByTestId("note-toast").filter({ has: dm.getByTestId("note-toast-action") });
   await expect(toast).toHaveCount(1);
+  await rollNow(sheet.getByTestId("charx-roll-damage").first());
+  await expect(toast).toContainText(/to hit.*, \d+ /);
   const cardId = (await toast.getAttribute("data-record-id")) as string;
 
   // FR-KIT-55 / -56: the causing player's medallion, the text, "just now" under it.

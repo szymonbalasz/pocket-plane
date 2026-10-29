@@ -11,6 +11,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { initMenu } from "./support/initiative";
 import { konvaNodes, tokenNode } from "./support/konva";
+import { rollNow } from "./support/rolls";
 import { showToPlayers } from "./support/scenes";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
@@ -162,15 +163,15 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   // Step 6–7: Mira attacks from the sheet → card pending for the DM. In the non-modal popup the
   // DM adds Goblin and Goblin 2 (tokens on the viewed scene → selected, target rings); Goblin
   // hit, 8 damage, Half → 7 → 3; Goblin 2 hit, Normal → 7 → 0 (bands for the player).
-  // Attacks live on the Actions tab (FR-CHARX-44); Attack + damage → cbt.attack (FR-CHARX-43).
+  // Attacks live on the Actions tab (FR-CHARX-44); Attack, then Damage completes the card
+  // (Alt+click: at once, #385).
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
-  await sheet
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Shortsword" })
-    .getByTestId("charx-roll-attack-damage")
-    .click();
+  const sword = sheet.getByTestId("charx-attack").filter({ hasText: "Shortsword" });
+  await rollNow(sword.getByTestId("charx-roll-attack"));
   const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
+  await rollNow(sword.getByTestId("charx-roll-damage"));
+  await expect(card).toContainText(/to hit.*, \d+ piercing/);
   // #149: the DM's sticky card toast sits top-centre, clear of the Initiative rows.
   await expect(dm.getByTestId("note-toasts")).toHaveAttribute("data-placement", "top-center");
   await card.click();
@@ -263,14 +264,14 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   // that card: the same toast's text gains the damage (no second toast). The DM opens it from the
   // toast → popup over it, toast gone; Goblin hit; Apply.
   const shortsword = sheet.getByTestId("charx-attack").filter({ hasText: "Shortsword" });
-  await shortsword.getByTestId("charx-roll-attack").click();
+  await rollNow(shortsword.getByTestId("charx-roll-attack"));
   // A natural 1 / 20 puts " (natural N)" between "to hit" and the attack name (FR-CBT-70).
   const splitToast = dm.getByTestId("note-toast").filter({
     hasText: /Mira: \d+ to hit(?: \(natural (?:1|20)\))? \(Shortsword\)/,
   });
   await expect(splitToast).toHaveCount(1);
   const splitId = (await splitToast.getAttribute("data-record-id")) as string;
-  await shortsword.getByTestId("charx-roll-damage").click();
+  await rollNow(shortsword.getByTestId("charx-roll-damage"));
   const sameToast = dm.locator(`[data-testid="note-toast"][data-record-id="${splitId}"]`);
   await expect(sameToast).toContainText(/Mira: \d+ to hit(?: \(natural \d+\))?, \d+ piercing/);
   await expect(dm.getByTestId("note-toast").filter({ hasText: "Mira:" })).toHaveCount(1);

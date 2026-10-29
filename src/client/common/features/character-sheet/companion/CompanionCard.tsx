@@ -7,7 +7,7 @@
 // stats line ("HP 45 / 59 · AC 15 · 40 ft · Large monstrosity", the HP control / Edit at its
 // right end), then the attack rows; conditions after the attacks, "Open NPC sheet" last.
 import { hpState, initials, parseHpAmount, speedText } from "@shared/character-sheet/logic";
-import { COMPANION_ROLL_BUTTONS, type PetRollKind } from "@shared/character-sheet/rolls";
+import { COMPANION_ROLL_BUTTONS, type CompanionRollKind } from "@shared/character-sheet/rolls";
 import { defaultSheetData } from "@shared/character-sheet/sheet";
 import { CBT_INTENTS, type CombatantView } from "@shared/combat-tracker/schemas";
 import {
@@ -31,6 +31,7 @@ import { AssetImg } from "../../assets-pipeline/AssetImg";
 import { activeEffects, effectsOn } from "../../combat-extras/logic";
 import { EffectChips } from "../../combat-extras/parts";
 import { useCompanionCardRequest } from "../../combat-tracker/companion-card-request";
+import { showStagedCard } from "../../combat-tracker/roll-route";
 import { SIDE_LABEL } from "../../combat-tracker/side";
 import { useCbtIntent, useCombatants, useStartedEncounter } from "../../combat-tracker/store";
 import { slotLabelsOf } from "../../dice-roll-log/logic";
@@ -61,7 +62,13 @@ import {
   shownEntry,
   sizeTypeText,
 } from "./picker";
-import { type CardRollTarget, cardCritOptions, cardRollIntent, cardRowSpecs } from "./rolls";
+import {
+  type CardRollTarget,
+  cardCritOptions,
+  cardRollIntent,
+  cardRowPartTypes,
+  cardRowSpecs,
+} from "./rolls";
 import { COMPANION_KIND } from "./window";
 
 /** FR-ENT-36 (entities, CP1): a pet's kept HP out of a fight; the card's ± sends it. */
@@ -352,7 +359,10 @@ function EditStats({ e, petId }: { e: CompanionEntry; petId: string }) {
   );
 }
 
-/** FR-CHARX-64: one of a card row's three buttons (shared roll control: Shift / Ctrl, physical). */
+/**
+ * FR-CHARX-64, -131: one of a card row's two buttons (shared roll control: Shift / Ctrl,
+ * physical); a click stages the tray pre-filled, Alt+click rolls at once (#385).
+ */
 function CardRoll({
   e,
   target,
@@ -364,7 +374,7 @@ function CardRoll({
   e: CompanionEntry;
   target: CardRollTarget;
   row: CompanionCardAttack;
-  kind: PetRollKind;
+  kind: CompanionRollKind;
   label: string;
   live: boolean;
 }) {
@@ -378,16 +388,20 @@ function CardRoll({
     category: specs[0]?.category ?? "other",
     label: `${e.name} — ${row.name} ${label.toLowerCase()}`,
     ...(slotLabels ? { slotLabels } : {}),
+    purpose: kind === "toHit" ? "attack" : "damage",
+    ...(kind === "damage" ? { partTypes: cardRowPartTypes(row) } : {}),
     ...cardCritOptions(target, row, kind, notes),
     onRoll(r) {
       const intent = cardRollIntent(target, row.id, kind, r);
-      busy.run(() => connection.sendIntent(intent.name, intent.payload));
+      // FR-CBT-169: a staged roll's card reopens the DM's popup (it stepped aside on stage).
+      busy.run(() => showStagedCard(r, connection.sendIntent(intent.name, intent.payload)));
     },
   });
   return (
     <RollButton
       control={control}
-      hint={ROLL_HINT}
+      // FR-CHARX-127: Damage ignores Shift / Ctrl; its hint is "Alt: roll now" alone.
+      hint={kind === "toHit" ? ROLL_HINT : undefined}
       type="button"
       size="sm"
       variant="secondary"
@@ -425,7 +439,7 @@ function DeleteRow({ rowId, live }: { rowId: string | undefined; live: boolean }
   );
 }
 
-/** FR-CHARX-64: "Claws · +7 · 2d8+5 slashing" + Attack / Damage / Attack + damage per row. */
+/** FR-CHARX-64, -131: "Claws · +7 · 2d8+5 slashing" + Attack / Damage per row. */
 function Attacks({
   e,
   pet,

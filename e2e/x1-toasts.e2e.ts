@@ -1,7 +1,7 @@
 // e2e-bundle: x1-toasts-e2e
 // Thin X1 flows (sprint 12, BL-118 / BL-119 / BL-120) on session-sim-13 (sim-12's pending cards:
 // the DM's "N pending actions" summary, a started fight). sim-15 FAIL c: DM 1440×900 (and
-// 1280×720), Reset, Party Manager at 424, 60, Player 1 "Attack + damage" → the DM stack is drawn
+// 1280×720), Reset, Party Manager at 424, 60, Player 1 "Attack" (Alt+click) → the DM stack is drawn
 // in one state per arriving card and the open roll popup moves at most once (frame-by-frame rAF
 // samples). sim-15 glitch 2: 1280×720, Roll requests at 504, 60 → the stack keeps off every
 // request card's heading. sim-15 glitch 3: a card put off with "Later" counts in the summary;
@@ -9,6 +9,7 @@
 // Rules: bun test (`settle.test.ts`, `keep-out-primary.test.ts`, combat-tracker `pending.test.ts`).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSelect } from "./support/select";
 import { openWindow } from "./support/shell";
 
@@ -195,7 +196,7 @@ for (const [width, height] of [
     for (let i = 0; i < 2; i++) {
       const before = await pendingCount(init);
       await startSampling(dm);
-      await sheet.getByTestId("charx-roll-attack-damage").first().click();
+      await rollNow(sheet.getByTestId("charx-roll-attack").first());
       await expect.poll(() => pendingCount(init)).toBe(before + 1);
       // The dice land and the popup's rows fill in; the fold has long settled.
       // The dice land and the popups rest (X1 walkthrough 1: the column moved at its rest, 2.2 s
@@ -282,7 +283,7 @@ test("BL-120 FR-NOTE-15 FR-CBT-79 sim-15 c07: a card put off with Later counts i
   // sim-12's DM rows outside the fight count in the summary only: the difference stays.
   const base = (await onStack()) - before;
   for (let i = 1; i <= 2; i++) {
-    await sheet.getByTestId("charx-roll-attack-damage").first().click();
+    await rollNow(sheet.getByTestId("charx-roll-attack").first());
     await expect.poll(() => pendingCount(init)).toBe(before + i);
   }
   await settled(dm);

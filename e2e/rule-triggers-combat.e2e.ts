@@ -1,11 +1,12 @@
 // e2e-bundle: rule-triggers
 // Thin Divine Fury flow in combat (MOD §13 E2E, R7): DM Next → Brakka's turn; player-1 turns
-// Rage on and rolls Greataxe Attack + damage → the card shows the offer ("+ N radiant Divine Fury
+// Rage on and rolls Greataxe Attack, then Damage → the card shows the offer ("+ N radiant Divine Fury
 // on a hit") for both; the DM's popup has the chip ticked on Goblin → Apply → the line "+ N
 // radiant (Divine Fury)" for both; a second attack the same turn → no offer. Settle rules,
 // charges, undo, leaks: bun test (effect-modifiers).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { rollNow } from "./support/rolls";
 import { pickSheet } from "./support/sheet";
 import { openWindow, shellWindow } from "./support/shell";
 
@@ -46,10 +47,18 @@ test("FR-MOD-48 FR-MOD-39 FR-MOD-38 Divine Fury: offered on the card, chip on Go
   await rage.getByRole("switch").click();
   await expect(rage).toHaveAttribute("data-state", "on");
 
-  // Greataxe Attack + damage → the card with the offer, for the player and the DM.
+  // Greataxe Attack, then Damage (Alt+click: at once, #385) → the card with the offer, for the
+  // player and the DM.
   await sheet.locator('[data-testid="charx-tab"][data-value="actions"]').click();
   const greataxe = sheet.getByTestId("charx-attack").filter({ hasText: "Greataxe" });
-  await greataxe.getByTestId("charx-roll-attack-damage").click();
+  const card = init.getByTestId("cbt-init-card");
+  const attackThenDamage = async () => {
+    await rollNow(greataxe.getByTestId("charx-roll-attack"));
+    await expect(card).toHaveCount(1);
+    await rollNow(greataxe.getByTestId("charx-roll-damage"));
+    await expect(card).toContainText(/to hit.*, \d+ /);
+  };
+  await attackThenDamage();
   // The player's own card (no toast for their own roll): Notifications history.
   const history = await openWindow(p1, "note.history");
   const offer = history.getByTestId("mod-card-offer");
@@ -60,7 +69,6 @@ test("FR-MOD-48 FR-MOD-39 FR-MOD-38 Divine Fury: offered on the card, chip on Go
   // FR-SHELL-40 ruling: at 1280×800 Notifications auto-places over the sheet; park it.
   await history.getByTestId("ui-window-minimise").click();
 
-  const card = init.getByTestId("cbt-init-card");
   await expect(card).toHaveCount(1);
   await card.click();
   const popup = dm.getByTestId("cbt-popup");
@@ -86,12 +94,8 @@ test("FR-MOD-48 FR-MOD-39 FR-MOD-38 Divine Fury: offered on the card, chip on Go
   }
 
   // Second attack, same turn: no offer.
-  await shellWindow(p1, "char.sheet")
-    .getByTestId("charx-attack")
-    .filter({ hasText: "Greataxe" })
-    .getByTestId("charx-roll-attack-damage")
-    .click();
-  await expect(card).toHaveCount(1);
+  await expect(shellWindow(p1, "char.sheet")).toBeVisible();
+  await attackThenDamage();
   await card.click();
   await expect(popup).toBeVisible();
   await popup.getByTestId("cbt-popup-target-add").click();
