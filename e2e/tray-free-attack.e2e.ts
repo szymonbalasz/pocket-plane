@@ -30,7 +30,17 @@ test("FR-CBT-172 FR-DICEX-99 FR-DICEX-101 free Attack then Damage as Brakka → 
   await live(p1);
   const brakka = recordId("char-brakka", "entity");
   const init = await openWindow(dm, "cbt.initiative");
-  await expect(init.getByTestId("cbt-init-card")).toHaveCount(0);
+  const p1Log = await openWindow(p1, "dice.log");
+  // A retry reuses the bundle's server: count only what this attempt adds.
+  const cards = init.getByTestId("cbt-init-card");
+  const cardIds = () =>
+    cards.evaluateAll((els) => els.map((e) => e.getAttribute("data-record-id")));
+  const before = new Set(await cardIds());
+  const lines = (re: RegExp) => p1Log.getByTestId("dice-log-entry").filter({ hasText: re });
+  const ATTACK_LINE = /Brakka — attack: /i;
+  const DAMAGE_LINE = /Brakka — damage: \d+( \+ \d+)+ slashing/i;
+  const attacks = await lines(ATTACK_LINE).count();
+  const damages = await lines(DAMAGE_LINE).count();
 
   // T1: d20, constant 9, purpose Attack, as Brakka (two own PCs fight: no preset), Roll.
   const tray = await openWindow(p1, "dicex.tray");
@@ -42,15 +52,15 @@ test("FR-CBT-172 FR-DICEX-99 FR-DICEX-101 free Attack then Damage as Brakka → 
   await expect(tray.getByTestId("dicex-tray-state")).toContainText("Brakka — Attack");
   await tray.getByTestId("dicex-tray-roll").click();
 
-  const card = init.getByTestId("cbt-init-card");
-  await expect(card).toHaveCount(1);
-  await expect(card).toContainText(/Brakka: \d+ to hit \(Attack\)/);
-  const p1Log = await openWindow(p1, "dice.log");
-  await expect(
-    p1Log.getByTestId("dice-log-entry").filter({ hasText: /Brakka — attack: /i }),
-  ).toHaveCount(1);
+  // The d20 is real: the card may mark a natural 1 / 20 (FR-CBT-57).
+  await expect.poll(async () => (await cardIds()).filter((id) => !before.has(id))).toHaveLength(1);
+  const id = (await cardIds()).find((x) => !before.has(x)) as string;
+  const card = init.locator(`[data-testid="cbt-init-card"][data-record-id="${id}"]`);
+  await expect(card).toContainText(/Brakka: \d+ to hit (\(natural (1|20)\) )?\(Attack\)/);
+  await expect(lines(ATTACK_LINE)).toHaveCount(attacks + 1);
 
-  // T2: a fresh 2d6, Damage, type slashing, as Brakka → completes the card (rowless match).
+  // T2: a fresh 2d6, Damage, type slashing, as Brakka → completes that card (rowless match; a
+  // natural 20 doubles the dice).
   await tray.locator('[data-testid="dicex-tray-palette"][data-value="6"]').click();
   await tray.locator('[data-testid="dicex-tray-palette"][data-value="6"]').click();
   await tray.locator('[data-testid="dicex-tray-purpose-option"][data-value="damage"]').click();
@@ -62,11 +72,7 @@ test("FR-CBT-172 FR-DICEX-99 FR-DICEX-101 free Attack then Damage as Brakka → 
   await rollAs(tray, brakka);
   await tray.getByTestId("dicex-tray-roll").click();
 
-  await expect(card).toHaveCount(1);
   await expect(card).toContainText(/\d+ slashing/);
-  await expect(
-    p1Log
-      .getByTestId("dice-log-entry")
-      .filter({ hasText: /Brakka — damage: \d+ \+ \d+ slashing/i }),
-  ).toHaveCount(1);
+  expect((await cardIds()).filter((x) => !before.has(x))).toEqual([id]);
+  await expect(lines(DAMAGE_LINE)).toHaveCount(damages + 1);
 });
