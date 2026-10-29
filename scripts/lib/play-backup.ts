@@ -29,6 +29,16 @@ export interface BackupResult {
   assets: { copied: number; unchanged: number };
 }
 
+/** `mkdirSync` recursive, but an existing directory is fine: Bun throws EEXIST on one that is a
+ *  reparse point (a OneDrive folder), where Node returns. */
+export function ensureDir(dir: string): void {
+  try {
+    mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST" || !statSync(dir).isDirectory()) throw err;
+  }
+}
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** `pocket-plane-<yyyymmdd-hhmmss>.db`, local time. */
@@ -48,7 +58,7 @@ export function backupPlayData(opts: {
   const { dbPath, assetDir, backupDir } = opts;
   const keep = opts.keep ?? BACKUP_KEEP;
   try {
-    mkdirSync(backupDir, { recursive: true });
+    ensureDir(backupDir);
     const db = existsSync(dbPath) ? copyDb(dbPath, backupDir, opts.now ?? new Date()) : null;
     const pruned = db ? prune(backupDir, keep) : [];
     const assets = mirrorAssets(assetDir, path.join(backupDir, "assets"));
@@ -122,7 +132,7 @@ export function mirrorAssets(from: string, to: string): { copied: number; unchan
         out.unchanged++;
         continue;
       }
-      mkdirSync(path.dirname(dst), { recursive: true });
+      ensureDir(path.dirname(dst));
       copyFileSync(src, `${dst}.partial`);
       renameSync(`${dst}.partial`, dst);
       utimesSync(dst, s.atime, s.mtime);
