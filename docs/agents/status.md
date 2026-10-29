@@ -2,7 +2,7 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 done (all merged, main green).** Now: AoE templates snap to cell centres (DM #375, `fix/aoe-cell-origin`, other session); **new track: Agent / MCP API spec phase (#378)**; Map effects default Full merged (#376). Open DM recap calls: damage card width, BL-146, spell-fx `complete`, sprint gate. Decisions up to #378. All worktrees linked to workspace wR.
+**Phase:** **Sprint 14 done (all merged, main green).** Now: AoE templates snap to cell centres (DM #375, `fix/aoe-cell-origin`, other session); **Agent / MCP API track done (#378–#380)**; Map effects default Full merged (#376). Open DM recap calls: damage card width, BL-146, spell-fx `complete`, sprint gate. Decisions up to #380. All worktrees linked to workspace wR.
 
 **Resume (in order):**
 1. ~~Build the test tooling~~ **done (#368, #369):** GitHub CI on every push (`.github/workflows/ci.yml`: unit 6 parts, e2e 12 shards with one retry → flaky, ~3.5 min), nightly bench + Windows, screenshot baselines (`e2e/visual.e2e.ts`, refresh via `screenshots.yml`), targeted local `bun run check`, `bun run ci:watch` in the background after each push, fixture bundle snapshot cache, hot-file speed-ups, BL-128 / BL-140 fixed. Rules: [AGENTS §9.4.1](../../AGENTS.md#941-the-test-loop-targeted-locally-everything-in-ci). `gates.sh` now pushes + waits for CI (nothing heavy locally).
@@ -51,7 +51,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Agent API slice 2: custom creature tools (+ crash slow tests) | merged 467db37a | — | **merged** (walkthrough B 15/15 `.verify/agent-api/walkthroughs/20261029-agent-b/`; check 69 targeted green, branch CI green) | — |
 | Agent API slice 3: homebrew tools | merged f0d6cd3b | — | **merged** (FR-AGENT-25/26, 10 tests, check green; homebrew monsters refused up front → creature tools; patch merges facets / body, null removes) | — |
 | Agent API slice 4: character sheet tools + e2e `agent-api` | merged 748ded0a | — | **merged** (walkthrough A 8/8 `.verify/agent-api/walkthroughs/20261029-agent-a/`: player-1 live ~0.4 s, player-2 whitelist only, pet keeps owner; `creature_put_row` listed as a flat object + a guard that no tool schema has a top-level oneOf / anyOf (Anthropic tool rule)) | — |
-| Agent API slice 5: skill `.claude/skills/pocket-plane-content/` | `build/agent-skill` (w8B, slot 0) | build-agent-skill | reviewed by the orchestrator (SKILL.md ~1,400 words; orc variants + mount + Reddit item examples, plan_check tests); dropping the pending-tools list after slice 4 | merge → DM report + setup step |
+| Agent API slice 5: skill `.claude/skills/pocket-plane-content/` | merged c30abd1d | — | **merged** (example plans tested; every named tool registered) | DM: register the MCP server once (#380) |
 | Map effects default Full (#376) | merged | — | **merged** (check + spell-fx / prefs-window e2e green; CI green after a BL-147 re-run) | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
