@@ -42,6 +42,7 @@ import {
 } from "../../components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useHasType, useRecords, useSync } from "../../sync/store";
 import { timeOf } from "../notifications/parts";
@@ -708,17 +709,19 @@ function EntryRow({
         </span>
         <Time iso={entry.createdAt} />
         {onEdit && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-6"
-            aria-label="Edit"
-            data-testid="loot-entry-edit"
-            disabled={!canEdit}
-            onClick={onEdit}
-          >
-            <PencilIcon className="size-3.5" />
-          </Button>
+          <Tip content="Edit" off={!canEdit}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              aria-label="Edit"
+              data-testid="loot-entry-edit"
+              disabled={!canEdit}
+              onClick={onEdit}
+            >
+              <PencilIcon className="size-3.5" />
+            </Button>
+          </Tip>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-1">

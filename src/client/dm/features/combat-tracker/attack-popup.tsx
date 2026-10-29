@@ -50,6 +50,7 @@ import {
 } from "@ui/components/ui/controls";
 import { Tooltip } from "@ui/components/ui/overlays";
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import { CardActions, PartDice } from "@ui/features/combat-tracker/card-actions-row";
 import { medallionColour } from "@ui/features/combat-tracker/parts";
 import {
@@ -1115,17 +1116,19 @@ export function PopupBody({ card, close }: { card: NotificationRecord; close(): 
                         : String(x.raw)}
                   </span>
                   <span className={ROW_HOVER_SLOT}>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className={cn("size-6", ROW_HOVER)}
-                      data-testid={ruling ? "cbt-popup-row-drop" : "cbt-popup-target-remove"}
-                      data-record-id={x.c.id}
-                      aria-label={`${ruling ? "Drop" : "Remove"} ${x.c.name}`}
-                      onClick={() => remove(x.c)}
-                    >
-                      <XIcon className="size-3.5" />
-                    </Button>
+                    <Tip content={`${ruling ? "Drop" : "Remove"} ${x.c.name}`}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className={cn("size-6", ROW_HOVER)}
+                        data-testid={ruling ? "cbt-popup-row-drop" : "cbt-popup-target-remove"}
+                        data-record-id={x.c.id}
+                        aria-label={`${ruling ? "Drop" : "Remove"} ${x.c.name}`}
+                        onClick={() => remove(x.c)}
+                      >
+                        <XIcon className="size-3.5" />
+                      </Button>
+                    </Tip>
                   </span>
                 </div>
                 {x.contra && (

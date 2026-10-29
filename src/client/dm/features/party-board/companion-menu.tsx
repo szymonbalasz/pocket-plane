@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import { openSheetFor } from "@ui/features/character-sheet/selection";
 import { CHAR_SHEET_KIND } from "@ui/features/character-sheet/window";
 import type { CompanionsDmParts } from "@ui/features/party-board/Companions";
@@ -121,19 +122,21 @@ function RowMenu({ row, disabled }: { row: CompanionRow; disabled: boolean }) {
         </span>
       )}
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-5 shrink-0"
-            aria-label={`Actions for ${row.name}`}
-            data-testid="party-companion-menu"
-            data-record-id={row.id}
-            data-locked={fight !== null}
-          >
-            <EllipsisVerticalIcon className="size-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
+        <Tip content={`Actions for ${row.name}`}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-5 shrink-0"
+              aria-label={`Actions for ${row.name}`}
+              data-testid="party-companion-menu"
+              data-record-id={row.id}
+              data-locked={fight !== null}
+            >
+              <EllipsisVerticalIcon className="size-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+        </Tip>
         <DropdownMenuContent align="end">
           <DropdownMenuItem
             data-testid="party-companion-rename"

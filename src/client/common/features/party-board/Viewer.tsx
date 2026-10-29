@@ -13,6 +13,7 @@ import { type ReactNode, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Skeleton } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { type LazyRecords, useLazyRecords } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
@@ -72,22 +73,24 @@ export function useHandout(handoutId: string) {
 function HandoutImage({ id, title, index }: { id: string; title: string; index: number }) {
   const [full, setFull] = useState(false);
   return (
-    <button
-      type="button"
-      data-testid="party-handout-image"
-      data-record-id={id}
-      data-zoom={full ? "full" : "fit"}
-      aria-label={full ? "Fit image to width" : "Show image at 100 %"}
-      className={cn("block shrink-0 overflow-auto rounded-md", full ? "max-w-none" : "w-full")}
-      onClick={() => setFull((f) => !f)}
-    >
-      <AssetImg
-        id={id}
-        file="display"
-        alt={`${title} — image ${index + 1}`}
-        className={full ? "max-w-none" : "h-auto min-h-24 w-full"}
-      />
-    </button>
+    <Tip content={full ? "Fit image to width" : "Show image at 100 %"}>
+      <button
+        type="button"
+        data-testid="party-handout-image"
+        data-record-id={id}
+        data-zoom={full ? "full" : "fit"}
+        aria-label={full ? "Fit image to width" : "Show image at 100 %"}
+        className={cn("block shrink-0 overflow-auto rounded-md", full ? "max-w-none" : "w-full")}
+        onClick={() => setFull((f) => !f)}
+      >
+        <AssetImg
+          id={id}
+          file="display"
+          alt={`${title} — image ${index + 1}`}
+          className={full ? "max-w-none" : "h-auto min-h-24 w-full"}
+        />
+      </button>
+    </Tip>
   );
 }
 

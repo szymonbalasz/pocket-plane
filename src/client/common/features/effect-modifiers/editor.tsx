@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "../../components/ui/overlays";
 import { Input } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { modifiersText, modifierText } from "./describe";
 import {
   DRAFT_KINDS,
@@ -184,18 +185,20 @@ function Row({
             </SelectContent>
           </Select>
         )}
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="ml-auto size-7"
-          data-testid="mod-editor-remove"
-          aria-label="Remove modifier"
-          disabled={disabled}
-          onClick={onRemove}
-        >
-          <XIcon className="size-3.5" />
-        </Button>
+        <Tip content="Remove modifier" off={disabled}>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="ml-auto size-7"
+            data-testid="mod-editor-remove"
+            aria-label="Remove modifier"
+            disabled={disabled}
+            onClick={onRemove}
+          >
+            <XIcon className="size-3.5" />
+          </Button>
+        </Tip>
       </div>
       {takesRoll(d.kind) && takesAbilities(d.roll) && (
         <ToggleGroup

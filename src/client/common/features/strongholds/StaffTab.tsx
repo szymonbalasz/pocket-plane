@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import {
   CHANGED_ELSEWHERE,
   isDmOnly,
@@ -275,50 +276,58 @@ function StaffRow({
           </div>
         ) : (
           <div className="flex shrink-0 items-center">
-            <Button
-              size="icon"
-              variant="ghost"
-              className={icon}
-              aria-label={`Move ${m.name} up`}
-              data-testid="hold-staff-up"
-              disabled={!live || index === 0 || intent.busy}
-              onClick={() => moveTo(index - 1)}
-            >
-              <ArrowUpIcon className="size-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className={icon}
-              aria-label={`Move ${m.name} down`}
-              data-testid="hold-staff-down"
-              disabled={!live || index === count - 1 || intent.busy}
-              onClick={() => moveTo(index + 1)}
-            >
-              <ArrowDownIcon className="size-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className={icon}
-              aria-label={`Edit ${m.name}`}
-              data-testid="hold-staff-edit"
-              disabled={!live}
-              onClick={() => onEdit(m)}
-            >
-              <PencilIcon className="size-3.5" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className={icon}
-              aria-label={`Remove ${m.name}`}
-              data-testid="hold-staff-remove"
-              disabled={!live}
-              onClick={() => setConfirming(true)}
-            >
-              <Trash2Icon className="size-3.5" />
-            </Button>
+            <Tip content={`Move ${m.name} up`} off={!live || index === 0 || intent.busy}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={icon}
+                aria-label={`Move ${m.name} up`}
+                data-testid="hold-staff-up"
+                disabled={!live || index === 0 || intent.busy}
+                onClick={() => moveTo(index - 1)}
+              >
+                <ArrowUpIcon className="size-3.5" />
+              </Button>
+            </Tip>
+            <Tip content={`Move ${m.name} down`} off={!live || index === count - 1 || intent.busy}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={icon}
+                aria-label={`Move ${m.name} down`}
+                data-testid="hold-staff-down"
+                disabled={!live || index === count - 1 || intent.busy}
+                onClick={() => moveTo(index + 1)}
+              >
+                <ArrowDownIcon className="size-3.5" />
+              </Button>
+            </Tip>
+            <Tip content={`Edit ${m.name}`} off={!live}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={icon}
+                aria-label={`Edit ${m.name}`}
+                data-testid="hold-staff-edit"
+                disabled={!live}
+                onClick={() => onEdit(m)}
+              >
+                <PencilIcon className="size-3.5" />
+              </Button>
+            </Tip>
+            <Tip content={`Remove ${m.name}`} off={!live}>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={icon}
+                aria-label={`Remove ${m.name}`}
+                data-testid="hold-staff-remove"
+                disabled={!live}
+                onClick={() => setConfirming(true)}
+              >
+                <Trash2Icon className="size-3.5" />
+              </Button>
+            </Tip>
           </div>
         ))}
     </li>

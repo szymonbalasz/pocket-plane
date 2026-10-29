@@ -8,6 +8,7 @@ import { Button } from "../../components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
 import { Input } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { IntentRejected } from "../../sync/connection";
 import { useSync } from "../../sync/store";
@@ -332,18 +333,20 @@ function OverridePopover({ okey }: { okey: OverrideKey }) {
         }
       }}
     >
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          data-testid="charx-override"
-          data-value={okey}
-          aria-label={`Override ${okey}`}
-          disabled={!live}
-          className="rounded px-0.5 text-[9px] text-muted-foreground hover:text-foreground"
-        >
-          ±
-        </button>
-      </PopoverTrigger>
+      <Tip content={`Override ${okey}`} off={!live}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            data-testid="charx-override"
+            data-value={okey}
+            aria-label={`Override ${okey}`}
+            disabled={!live}
+            className="rounded px-0.5 text-[9px] text-muted-foreground hover:text-foreground"
+          >
+            ±
+          </button>
+        </PopoverTrigger>
+      </Tip>
       <PopoverContent className="flex w-56 flex-col gap-2 p-2">
         <span className="text-xs font-medium">Override</span>
         <Input

@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/menus";
 import { Badge } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
@@ -165,20 +166,22 @@ function FacilityRow({
         {f.incomeDice !== null && <IncomeButton f={{ ...f, incomeDice: f.incomeDice }} />}
         {parts.dm && (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="size-6 shrink-0"
-                aria-label={`${f.name} menu`}
-                data-testid="hold-facility-menu"
-                data-record-id={f.id}
-                disabled={!live}
-              >
-                <EllipsisIcon className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
+            <Tip content={`${f.name} menu`} off={!live}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="size-6 shrink-0"
+                  aria-label={`${f.name} menu`}
+                  data-testid="hold-facility-menu"
+                  data-record-id={f.id}
+                  disabled={!live}
+                >
+                  <EllipsisIcon className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+            </Tip>
             <DropdownMenuContent align="end">
               <DropdownMenuItem data-testid="hold-facility-edit" onSelect={() => onEdit(f)}>
                 Edit…

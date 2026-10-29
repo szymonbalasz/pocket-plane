@@ -30,6 +30,7 @@ import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
 import { ScrollArea } from "../../components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Tip } from "../../components/ui/tip";
 import { useLazyRecords, useRecords, useSync } from "../../sync/store";
 import { useOpenPartyTab } from "../party-board/open-tab";
 import type { WindowProps } from "../play-shell/registry";
@@ -187,19 +188,21 @@ function DmHeader({ hold }: { hold: StrongholdRecord }) {
         </Label>
       </div>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="size-7 shrink-0"
-            aria-label={`${hold.name} menu`}
-            data-testid="hold-menu"
-            disabled={!live}
-          >
-            <EllipsisIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
+        <Tip content={`${hold.name} menu`} off={!live}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="size-7 shrink-0"
+              aria-label={`${hold.name} menu`}
+              data-testid="hold-menu"
+              disabled={!live}
+            >
+              <EllipsisIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+        </Tip>
         <DropdownMenuContent align="end">
           <DropdownMenuItem data-testid="hold-rename" onSelect={() => setRenaming(true)}>
             Rename…

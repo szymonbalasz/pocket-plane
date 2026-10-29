@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { ToggleTip } from "../../components/ui/toggle-tip";
 import { useSendSignal, useSync } from "../../sync/store";
 import { toastReject, useLive, useMapIntent } from "../scenes-map/intents";
@@ -254,16 +255,18 @@ function FtField({
       <Label htmlFor={id} className="w-12 text-xs">
         {label}
       </Label>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-7"
-        aria-label={`${label} −5 ft`}
-        data-testid={`${id}-dec`}
-        onClick={() => commit(value - 5)}
-      >
-        <MinusIcon className="size-3" />
-      </Button>
+      <Tip content={`${label} −5 ft`}>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          aria-label={`${label} −5 ft`}
+          data-testid={`${id}-dec`}
+          onClick={() => commit(value - 5)}
+        >
+          <MinusIcon className="size-3" />
+        </Button>
+      </Tip>
       <Input
         id={id}
         data-testid={id}
@@ -278,16 +281,18 @@ function FtField({
           if (e.key === "Enter") commit(Number(draft));
         }}
       />
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-7"
-        aria-label={`${label} +5 ft`}
-        data-testid={`${id}-inc`}
-        onClick={() => commit(value + 5)}
-      >
-        <PlusIcon className="size-3" />
-      </Button>
+      <Tip content={`${label} +5 ft`}>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          aria-label={`${label} +5 ft`}
+          data-testid={`${id}-inc`}
+          onClick={() => commit(value + 5)}
+        >
+          <PlusIcon className="size-3" />
+        </Button>
+      </Tip>
       <span className="text-muted-foreground text-xs">ft</span>
     </div>
   );
@@ -388,26 +393,30 @@ export function AoePanel() {
           <div className="flex flex-wrap gap-1">
             {shape !== "sphere" && shape !== "cylinder" && (
               <>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-8"
-                  aria-label={`Rotate −${step}°`}
-                  data-testid="scn-aoe-rotate-ccw"
-                  onClick={() => rotate(-step)}
-                >
-                  <RotateCcwIcon className="size-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-8"
-                  aria-label={`Rotate +${step}°`}
-                  data-testid="scn-aoe-rotate-cw"
-                  onClick={() => rotate(step)}
-                >
-                  <RotateCwIcon className="size-4" />
-                </Button>
+                <Tip content={`Rotate −${step}°`}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    aria-label={`Rotate −${step}°`}
+                    data-testid="scn-aoe-rotate-ccw"
+                    onClick={() => rotate(-step)}
+                  >
+                    <RotateCcwIcon className="size-4" />
+                  </Button>
+                </Tip>
+                <Tip content={`Rotate +${step}°`}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-8"
+                    aria-label={`Rotate +${step}°`}
+                    data-testid="scn-aoe-rotate-cw"
+                    onClick={() => rotate(step)}
+                  >
+                    <RotateCwIcon className="size-4" />
+                  </Button>
+                </Tip>
               </>
             )}
             {isDm && (

@@ -30,6 +30,7 @@ import { Button } from "../../components/ui/button";
 import { Tooltip } from "../../components/ui/overlays";
 import { Badge, Card } from "../../components/ui/primitives";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
@@ -562,20 +563,22 @@ function TabStrip({ children }: { children: ReactNode }) {
   }, []);
   const step = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * TAB_ARROW_STEP_PX });
   const arrow = (dir: 1 | -1, shown: boolean) => (
-    <button
-      type="button"
-      data-testid={dir < 0 ? "charx-tabs-prev" : "charx-tabs-next"}
-      aria-label={dir < 0 ? "Earlier tabs" : "More tabs"}
-      disabled={!shown}
-      className="mb-1.5 flex w-[22px] shrink-0 items-center justify-center rounded-[3px] border text-muted-foreground enabled:hover:bg-accent enabled:hover:text-foreground disabled:opacity-40"
-      onClick={() => step(dir)}
-    >
-      {dir < 0 ? (
-        <ChevronLeftIcon className="size-3.5" />
-      ) : (
-        <ChevronRightIcon className="size-3.5" />
-      )}
-    </button>
+    <Tip content={dir < 0 ? "Earlier tabs" : "More tabs"} off={!shown}>
+      <button
+        type="button"
+        data-testid={dir < 0 ? "charx-tabs-prev" : "charx-tabs-next"}
+        aria-label={dir < 0 ? "Earlier tabs" : "More tabs"}
+        disabled={!shown}
+        className="mb-1.5 flex w-[22px] shrink-0 items-center justify-center rounded-[3px] border text-muted-foreground enabled:hover:bg-accent enabled:hover:text-foreground disabled:opacity-40"
+        onClick={() => step(dir)}
+      >
+        {dir < 0 ? (
+          <ChevronLeftIcon className="size-3.5" />
+        ) : (
+          <ChevronRightIcon className="size-3.5" />
+        )}
+      </button>
+    </Tip>
   );
   return (
     <div data-slot="sheet-tabs" className="flex shrink-0 items-stretch gap-1">

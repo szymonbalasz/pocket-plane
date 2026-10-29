@@ -3,12 +3,14 @@
 // (FR-SHELL-09, FR-SHELL-14). It fits its zone (FR-SHELL-43): icon-only buttons first (keeping the
 // labels that fit, BL-113), then the buttons that still don't fit move into the "⋯" menu
 // (`launcher-fit.ts`), which opens downward.
+
 import { EllipsisIcon } from "lucide-react";
 import { DropdownMenu as M } from "radix-ui";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { POPOVER_LAYER } from "../../components/ui/layers";
 import { Tooltip } from "../../components/ui/overlays";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { useActivityDots } from "./activity";
@@ -245,17 +247,21 @@ export function Launcher({
           data-count={overflow.length}
           className="relative inline-flex"
         >
-          <M.Trigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={LAUNCHER_FONT}
-              data-testid="ui-launcher-menu"
-              aria-label={overflow.length > 0 ? `More windows (${overflow.length})` : "Layout menu"}
-            >
-              <EllipsisIcon className="size-4" />
-            </Button>
-          </M.Trigger>
+          <Tip content={overflow.length > 0 ? `More windows (${overflow.length})` : "Layout menu"}>
+            <M.Trigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={LAUNCHER_FONT}
+                data-testid="ui-launcher-menu"
+                aria-label={
+                  overflow.length > 0 ? `More windows (${overflow.length})` : "Layout menu"
+                }
+              >
+                <EllipsisIcon className="size-4" />
+              </Button>
+            </M.Trigger>
+          </Tip>
           {overflow.some((d) => dots.has(d.kind)) && (
             <span className="pointer-events-none absolute -top-0.5 -left-0.5 size-2 rounded-full bg-warning" />
           )}

@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@ui/components/ui/overlays";
 import { Badge } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import { modifiersText } from "@ui/features/effect-modifiers/describe";
 import { blankPreset, PresetDialog, type PresetDraft } from "@ui/features/effect-modifiers/dialogs";
 import { useModIntent, usePresets } from "@ui/features/effect-modifiers/store";
@@ -58,41 +59,47 @@ function Row({ c, onEdit }: { c: PresetChoice; onEdit(): void }) {
           {c.preset.note ? ` · ${c.preset.note}` : ""}
         </div>
       </div>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-7"
-        data-testid="mod-presets-edit"
-        aria-label={`Edit ${c.preset.name}`}
-        onClick={onEdit}
-      >
-        <PencilIcon className="size-3.5" />
-      </Button>
-      {c.source === "customised" && (
+      <Tip content={`Edit ${c.preset.name}`}>
         <Button
           size="icon"
           variant="ghost"
           className="size-7"
-          data-testid="mod-presets-reset"
-          aria-label={`Reset ${c.preset.name} to the built-in`}
-          disabled={disabled}
-          onClick={remove}
+          data-testid="mod-presets-edit"
+          aria-label={`Edit ${c.preset.name}`}
+          onClick={onEdit}
         >
-          <RotateCcwIcon className="size-3.5" />
+          <PencilIcon className="size-3.5" />
         </Button>
+      </Tip>
+      {c.source === "customised" && (
+        <Tip content={`Reset ${c.preset.name} to the built-in`} off={disabled}>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            data-testid="mod-presets-reset"
+            aria-label={`Reset ${c.preset.name} to the built-in`}
+            disabled={disabled}
+            onClick={remove}
+          >
+            <RotateCcwIcon className="size-3.5" />
+          </Button>
+        </Tip>
       )}
       {c.source === "campaign" && (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-7"
-          data-testid="mod-presets-delete"
-          aria-label={`Delete ${c.preset.name}`}
-          disabled={disabled}
-          onClick={remove}
-        >
-          <TrashIcon className="size-3.5" />
-        </Button>
+        <Tip content={`Delete ${c.preset.name}`} off={disabled}>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            data-testid="mod-presets-delete"
+            aria-label={`Delete ${c.preset.name}`}
+            disabled={disabled}
+            onClick={remove}
+          >
+            <TrashIcon className="size-3.5" />
+          </Button>
+        </Tip>
       )}
     </div>
   );

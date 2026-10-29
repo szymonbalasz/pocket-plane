@@ -12,6 +12,7 @@ import { XIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import type { CardAction, CardClient } from "../combat-tracker/card-actions";
@@ -194,17 +195,19 @@ function CombatGemPicker({ card, close }: { card: NotificationRecord; close(): v
         >
           Spend ({picked.length}/{limit})
         </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          data-testid="gem-combat-cancel"
-          aria-label="Cancel"
-          className="size-6"
-          onClick={close}
-        >
-          <XIcon className="size-3.5" />
-        </Button>
+        <Tip content="Cancel">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            data-testid="gem-combat-cancel"
+            aria-label="Cancel"
+            className="size-6"
+            onClick={close}
+          >
+            <XIcon className="size-3.5" />
+          </Button>
+        </Tip>
         {next && <span className="text-xs text-muted-foreground">{next}</span>}
       </div>
       {error && (

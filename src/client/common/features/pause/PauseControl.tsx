@@ -24,6 +24,7 @@ import {
 } from "../../components/ui/menus";
 import { Tooltip } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
 import { AssetPickerDialog } from "../assets-pipeline/AssetPicker";
@@ -215,16 +216,18 @@ export default function PauseControl() {
                 {form.imageAssetId ? "Change image…" : "Choose image…"}
               </Button>
               {form.imageAssetId && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Remove image"
-                  data-testid="ui-pause-image-clear"
-                  onClick={() => edit({ imageAssetId: null })}
-                >
-                  <XIcon aria-hidden className="size-4" />
-                </Button>
+                <Tip content="Remove image">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Remove image"
+                    data-testid="ui-pause-image-clear"
+                    onClick={() => edit({ imageAssetId: null })}
+                  >
+                    <XIcon aria-hidden className="size-4" />
+                  </Button>
+                </Tip>
               )}
             </div>
             <div className="flex flex-col gap-1.5">

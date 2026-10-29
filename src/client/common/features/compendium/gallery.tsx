@@ -2,10 +2,12 @@
 // width, ≤ 240 px high) under the entry header, then the others as 64 px `thumb` tiles; a click
 // opens the lightbox (`display`, 90 vw × 80 vh) with Prev / Next (wrapping) and "n / N". States
 // per FR-ASSET-16 via `AssetImg`. Viewers get exactly the IDs the entry read delivered (FR-CMP-48).
+
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "../../components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../../components/ui/overlays";
+import { Tip } from "../../components/ui/tip";
 import { AssetImg } from "../assets-pipeline/AssetImg";
 
 /** `i + by` wrapped into `0…n-1`. */
@@ -73,41 +75,44 @@ export function EntryGallery({ ids, name }: { ids: readonly string[]; name: stri
   if (main === undefined) return null;
   return (
     <div data-testid="cmp-entry-images" data-value={ids.length} className="space-y-1.5">
-      <button
-        type="button"
-        data-testid="cmp-entry-image-main"
-        data-record-id={main}
-        aria-label={`${name}: open image 1`}
-        className="block w-full cursor-zoom-in"
-        onClick={() => setOpen(0)}
-      >
-        <AssetImg
-          id={main}
-          file="thumb"
-          alt={`${name}, image 1`}
-          className="max-h-60 min-h-16 w-full rounded-md"
-        />
-      </button>
+      <Tip content={`${name}: open image 1`}>
+        <button
+          type="button"
+          data-testid="cmp-entry-image-main"
+          data-record-id={main}
+          aria-label={`${name}: open image 1`}
+          className="block w-full cursor-zoom-in"
+          onClick={() => setOpen(0)}
+        >
+          <AssetImg
+            id={main}
+            file="thumb"
+            alt={`${name}, image 1`}
+            className="max-h-60 min-h-16 w-full rounded-md"
+          />
+        </button>
+      </Tip>
       {rest.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {rest.map((id, i) => (
-            <button
-              key={id}
-              type="button"
-              data-testid="cmp-entry-image"
-              data-record-id={id}
-              data-value={i + 2}
-              aria-label={`${name}: open image ${i + 2}`}
-              className="cursor-zoom-in"
-              onClick={() => setOpen(i + 1)}
-            >
-              <AssetImg
-                id={id}
-                file="thumb"
-                alt={`${name}, image ${i + 2}`}
-                className="size-16 rounded"
-              />
-            </button>
+            <Tip key={id} content={`${name}: open image ${i + 2}`}>
+              <button
+                type="button"
+                data-testid="cmp-entry-image"
+                data-record-id={id}
+                data-value={i + 2}
+                aria-label={`${name}: open image ${i + 2}`}
+                className="cursor-zoom-in"
+                onClick={() => setOpen(i + 1)}
+              >
+                <AssetImg
+                  id={id}
+                  file="thumb"
+                  alt={`${name}, image ${i + 2}`}
+                  className="size-16 rounded"
+                />
+              </button>
+            </Tip>
           ))}
         </div>
       )}

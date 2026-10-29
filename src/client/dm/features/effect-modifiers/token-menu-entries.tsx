@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@ui/components/ui/overlays";
+import { Tip } from "@ui/components/ui/tip";
 import { activeEffects, creatureOf, effectsOn } from "@ui/features/combat-extras/logic";
 import { modifiersText } from "@ui/features/effect-modifiers/describe";
 import { EffectModifiersDialog } from "@ui/features/effect-modifiers/dialogs";
@@ -138,27 +139,31 @@ function ModifiersDialog({ token, close }: TokenMenuDialogProps) {
                       {modifiersText(e.modifiers) || "No modifiers"}
                     </div>
                   </div>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7"
-                    data-testid="mod-active-edit"
-                    aria-label={`Modifiers of ${effectName(e)}`}
-                    onClick={() => setEditing(e)}
-                  >
-                    <SlidersHorizontalIcon className="size-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7"
-                    data-testid="mod-active-end"
-                    aria-label={`End ${effectName(e)}`}
-                    disabled={disabled}
-                    onClick={() => void send(CBTX_INTENTS.endEffect, { effectId: e.id })}
-                  >
-                    <TrashIcon className="size-3.5" />
-                  </Button>
+                  <Tip content={`Modifiers of ${effectName(e)}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      data-testid="mod-active-edit"
+                      aria-label={`Modifiers of ${effectName(e)}`}
+                      onClick={() => setEditing(e)}
+                    >
+                      <SlidersHorizontalIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
+                  <Tip content={`End ${effectName(e)}`} off={disabled}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      data-testid="mod-active-end"
+                      aria-label={`End ${effectName(e)}`}
+                      disabled={disabled}
+                      onClick={() => void send(CBTX_INTENTS.endEffect, { effectId: e.id })}
+                    >
+                      <TrashIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
                 </div>
               ))}
             </div>

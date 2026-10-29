@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@ui/components/ui/overlays";
 import { Label } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import { CreatureLookup } from "@ui/features/combat-tracker/parts";
 import {
   useCbtIntent,
@@ -215,16 +216,18 @@ export function AddForm() {
               <span className="flex-1 truncate">{r.name}</span>
               {r.kind === "monster" && (
                 <>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7"
-                    aria-label="One fewer"
-                    disabled={r.qty <= 1}
-                    onClick={() => setRow(r.id, (x) => ({ ...x, qty: x.qty - 1 }))}
-                  >
-                    <MinusIcon className="size-3.5" />
-                  </Button>
+                  <Tip content="One fewer" off={r.qty <= 1}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      aria-label="One fewer"
+                      disabled={r.qty <= 1}
+                      onClick={() => setRow(r.id, (x) => ({ ...x, qty: x.qty - 1 }))}
+                    >
+                      <MinusIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
                   <span
                     data-testid="cbtx-add-qty"
                     data-record-id={r.id}
@@ -233,16 +236,18 @@ export function AddForm() {
                   >
                     {r.qty}
                   </span>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7"
-                    aria-label="One more"
-                    disabled={r.qty >= ADD_INSTANCES_MAX}
-                    onClick={() => setRow(r.id, (x) => ({ ...x, qty: x.qty + 1 }))}
-                  >
-                    <PlusIcon className="size-3.5" />
-                  </Button>
+                  <Tip content="One more" off={r.qty >= ADD_INSTANCES_MAX}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      aria-label="One more"
+                      disabled={r.qty >= ADD_INSTANCES_MAX}
+                      onClick={() => setRow(r.id, (x) => ({ ...x, qty: x.qty + 1 }))}
+                    >
+                      <PlusIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
                   <HpSelect
                     value={r.hpMode}
                     hasFormula={Boolean(defs.get(r.id)?.statBlock.hpFormula)}
@@ -253,17 +258,19 @@ export function AddForm() {
                   />
                 </>
               )}
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-7"
-                data-testid="cbtx-add-remove"
-                data-record-id={r.id}
-                aria-label={`Remove ${r.name}`}
-                onClick={() => setRow(r.id, () => null)}
-              >
-                <Trash2Icon className="size-3.5" />
-              </Button>
+              <Tip content={`Remove ${r.name}`}>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-7"
+                  data-testid="cbtx-add-remove"
+                  data-record-id={r.id}
+                  aria-label={`Remove ${r.name}`}
+                  onClick={() => setRow(r.id, () => null)}
+                >
+                  <Trash2Icon className="size-3.5" />
+                </Button>
+              </Tip>
             </li>
           ))}
         </ul>

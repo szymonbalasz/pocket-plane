@@ -37,6 +37,7 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "@ui/components/ui/primitives";
+import { Tip } from "@ui/components/ui/tip";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { AssetPicker } from "@ui/features/assets-pipeline/AssetPicker";
 import { defineWindow } from "@ui/features/play-shell/registry";
@@ -142,18 +143,20 @@ function SceneRow({
         </span>
       )}
       <DropdownMenu>
-        <DropdownMenuTrigger asChild disabled={!live}>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7"
-            aria-label={`Actions for ${scene.name}`}
-            data-testid="map-scene-menu"
-            disabled={!live}
-          >
-            <MoreHorizontalIcon className="size-4" />
-          </Button>
-        </DropdownMenuTrigger>
+        <Tip content={`Actions for ${scene.name}`} off={!live}>
+          <DropdownMenuTrigger asChild disabled={!live}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              aria-label={`Actions for ${scene.name}`}
+              data-testid="map-scene-menu"
+              disabled={!live}
+            >
+              <MoreHorizontalIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+        </Tip>
         <DropdownMenuContent align="end">
           {!scene.active && (
             <>
@@ -425,18 +428,20 @@ export function ScenesBody() {
                       </span>
                     </CollapsibleTrigger>
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild disabled={!live}>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-7"
-                          aria-label={`Actions for ${entry.folder.name}`}
-                          data-testid="map-folder-menu"
-                          disabled={!live}
-                        >
-                          <MoreHorizontalIcon className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                      <Tip content={`Actions for ${entry.folder.name}`} off={!live}>
+                        <DropdownMenuTrigger asChild disabled={!live}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
+                            aria-label={`Actions for ${entry.folder.name}`}
+                            data-testid="map-folder-menu"
+                            disabled={!live}
+                          >
+                            <MoreHorizontalIcon className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </Tip>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           data-testid="map-folder-menu-rename"

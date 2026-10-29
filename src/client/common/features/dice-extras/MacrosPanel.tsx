@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
@@ -183,42 +184,46 @@ export function MacroEditor({ draft: initial, onDone }: { draft: MacroDraft; onD
       <div className="flex items-center gap-1">
         {row && (
           <>
-            <Button
-              type="button"
-              data-testid="dicex-macro-up"
-              aria-label="Move up"
-              size="icon"
-              variant="ghost"
-              className="size-7"
-              disabled={off || row.order === 0}
-              onClick={() =>
-                void send(
-                  DICEX_MACRO_INTENTS.moveMacro,
-                  { id: row.id, index: row.order - 1 },
-                  false,
-                )
-              }
-            >
-              <ArrowUpIcon className="size-4" />
-            </Button>
-            <Button
-              type="button"
-              data-testid="dicex-macro-down"
-              aria-label="Move down"
-              size="icon"
-              variant="ghost"
-              className="size-7"
-              disabled={off || row.order >= list.length - 1}
-              onClick={() =>
-                void send(
-                  DICEX_MACRO_INTENTS.moveMacro,
-                  { id: row.id, index: row.order + 1 },
-                  false,
-                )
-              }
-            >
-              <ArrowDownIcon className="size-4" />
-            </Button>
+            <Tip content="Move up" off={off || row.order === 0}>
+              <Button
+                type="button"
+                data-testid="dicex-macro-up"
+                aria-label="Move up"
+                size="icon"
+                variant="ghost"
+                className="size-7"
+                disabled={off || row.order === 0}
+                onClick={() =>
+                  void send(
+                    DICEX_MACRO_INTENTS.moveMacro,
+                    { id: row.id, index: row.order - 1 },
+                    false,
+                  )
+                }
+              >
+                <ArrowUpIcon className="size-4" />
+              </Button>
+            </Tip>
+            <Tip content="Move down" off={off || row.order >= list.length - 1}>
+              <Button
+                type="button"
+                data-testid="dicex-macro-down"
+                aria-label="Move down"
+                size="icon"
+                variant="ghost"
+                className="size-7"
+                disabled={off || row.order >= list.length - 1}
+                onClick={() =>
+                  void send(
+                    DICEX_MACRO_INTENTS.moveMacro,
+                    { id: row.id, index: row.order + 1 },
+                    false,
+                  )
+                }
+              >
+                <ArrowDownIcon className="size-4" />
+              </Button>
+            </Tip>
             {confirm ? (
               <Button
                 type="button"

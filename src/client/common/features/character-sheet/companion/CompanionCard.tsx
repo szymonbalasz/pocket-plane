@@ -24,6 +24,7 @@ import { useStore } from "zustand";
 import { Button } from "../../../components/ui/button";
 import { Tooltip } from "../../../components/ui/overlays";
 import { Badge, Input, Skeleton } from "../../../components/ui/primitives";
+import { Tip } from "../../../components/ui/tip";
 import { cn } from "../../../lib/utils";
 import { useRecords, useSync } from "../../../sync/store";
 import { AssetImg } from "../../assets-pipeline/AssetImg";
@@ -406,19 +407,21 @@ function DeleteRow({ rowId, live }: { rowId: string | undefined; live: boolean }
   const rows = useRows("attacks");
   const busy = useBusy();
   return (
-    <Button
-      size="icon"
-      variant="ghost"
-      className="size-6"
-      data-testid="charx-row-delete"
-      data-value="attacks"
-      data-record-id={rowId}
-      aria-label="Delete row"
-      disabled={!live || busy.busy || rowId === undefined}
-      onClick={() => rowId && busy.run(() => rows.remove(rowId))}
-    >
-      <Trash2Icon className="size-3" />
-    </Button>
+    <Tip content="Delete row" off={!live || busy.busy || rowId === undefined}>
+      <Button
+        size="icon"
+        variant="ghost"
+        className="size-6"
+        data-testid="charx-row-delete"
+        data-value="attacks"
+        data-record-id={rowId}
+        aria-label="Delete row"
+        disabled={!live || busy.busy || rowId === undefined}
+        onClick={() => rowId && busy.run(() => rows.remove(rowId))}
+      >
+        <Trash2Icon className="size-3" />
+      </Button>
+    </Tip>
   );
 }
 

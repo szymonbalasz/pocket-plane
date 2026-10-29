@@ -48,6 +48,7 @@ import {
   DropdownMenuTrigger,
   Switch,
 } from "../../components/ui/menus";
+import { Tip } from "../../components/ui/tip";
 import { useSync } from "../../sync/store";
 import { OverspendPopover, OverspentTip } from "../character-sheet/overspend";
 import type { SheetSection } from "../character-sheet/sections";
@@ -142,30 +143,34 @@ function ActiveRow({
         )}
       </div>
       {isDm && e.kind === "custom" && (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-6"
-          data-testid="mod-active-edit"
-          aria-label={`Modifiers of ${effectName(e)}`}
-          disabled={disabled}
-          onClick={onEdit}
-        >
-          <SlidersHorizontalIcon className="size-3.5" />
-        </Button>
+        <Tip content={`Modifiers of ${effectName(e)}`} off={disabled}>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-6"
+            data-testid="mod-active-edit"
+            aria-label={`Modifiers of ${effectName(e)}`}
+            disabled={disabled}
+            onClick={onEdit}
+          >
+            <SlidersHorizontalIcon className="size-3.5" />
+          </Button>
+        </Tip>
       )}
       {(isDm || ownConcentration) && (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-6"
-          data-testid="mod-active-end"
-          aria-label={`End ${effectName(e)}`}
-          disabled={disabled}
-          onClick={() => void send(CBTX_INTENTS.endEffect, { effectId: e.id })}
-        >
-          <TrashIcon className="size-3.5" />
-        </Button>
+        <Tip content={`End ${effectName(e)}`} off={disabled}>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-6"
+            data-testid="mod-active-end"
+            aria-label={`End ${effectName(e)}`}
+            disabled={disabled}
+            onClick={() => void send(CBTX_INTENTS.endEffect, { effectId: e.id })}
+          >
+            <TrashIcon className="size-3.5" />
+          </Button>
+        </Tip>
       )}
     </div>
   );
@@ -371,27 +376,31 @@ export function ActiveEffectsSection({
               <span className="min-w-0 flex-1 truncate">{p.name}</span>
               {mayEditPresets && (
                 <>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6"
-                    data-testid="mod-preset-edit"
-                    aria-label={`Edit ${p.name}`}
-                    onClick={() => setForm({ start: draftFromRow(p), title: `Edit ${p.name}` })}
-                  >
-                    <PencilIcon className="size-3.5" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6"
-                    data-testid="mod-preset-delete"
-                    aria-label={`Delete ${p.name}`}
-                    disabled={disabled}
-                    onClick={() => void send(MOD_INTENTS.deletePreset, { presetId: p.id })}
-                  >
-                    <TrashIcon className="size-3.5" />
-                  </Button>
+                  <Tip content={`Edit ${p.name}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-6"
+                      data-testid="mod-preset-edit"
+                      aria-label={`Edit ${p.name}`}
+                      onClick={() => setForm({ start: draftFromRow(p), title: `Edit ${p.name}` })}
+                    >
+                      <PencilIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
+                  <Tip content={`Delete ${p.name}`} off={disabled}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-6"
+                      data-testid="mod-preset-delete"
+                      aria-label={`Delete ${p.name}`}
+                      disabled={disabled}
+                      onClick={() => void send(MOD_INTENTS.deletePreset, { presetId: p.id })}
+                    >
+                      <TrashIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
                 </>
               )}
             </div>

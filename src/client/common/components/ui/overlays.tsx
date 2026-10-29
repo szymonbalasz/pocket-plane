@@ -473,7 +473,8 @@ export function Tooltip({
   content: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const group = React.useContext(TooltipGroupContext) ?? fallbackGroup;
+  const provided = React.useContext(TooltipGroupContext);
+  const group = provided ?? fallbackGroup;
   const [trigger, setTrigger] = React.useState<HTMLElement | null>(null);
   const triggerRef = React.useRef<HTMLElement | null>(null);
   triggerRef.current = trigger;
@@ -522,7 +523,7 @@ export function Tooltip({
     });
     return () => observer.disconnect();
   }, [trigger, ctl]);
-  return (
+  const root = (
     <T.Root
       open={open}
       onOpenChange={(o) => {
@@ -550,6 +551,9 @@ export function Tooltip({
       <TooltipContent>{content}</TooltipContent>
     </T.Root>
   );
+  // Outside a `TooltipProvider` (a part rendered on its own, e.g. in a unit test) Radix still
+  // needs its provider; the timing then comes from `fallbackGroup`.
+  return provided ? root : <T.Provider disableHoverableContent>{root}</T.Provider>;
 }
 
 /** The hint's bubble, inside `Tooltip`'s root (its own part so a theme can style it, ADR-0069). */

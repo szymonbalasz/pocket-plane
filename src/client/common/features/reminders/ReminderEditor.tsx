@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from "../../components/ui/overlays";
 import { Input, Label } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { IntentRejected } from "../../sync/connection";
 import { useLazyRecords, useRecords, useSync } from "../../sync/store";
 import { Textarea } from "../party-board/controls";
@@ -301,18 +302,20 @@ export function ReminderEditor({
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button
-                    type="button"
-                    data-testid="rem-editor-roll-remove"
-                    data-index={i}
-                    aria-label="Remove roll"
-                    size="icon"
-                    variant="ghost"
-                    className="size-7"
-                    onClick={() => set({ rolls: d.rolls.filter((_, j) => j !== i) })}
-                  >
-                    <XIcon className="size-3.5" />
-                  </Button>
+                  <Tip content="Remove roll">
+                    <Button
+                      type="button"
+                      data-testid="rem-editor-roll-remove"
+                      data-index={i}
+                      aria-label="Remove roll"
+                      size="icon"
+                      variant="ghost"
+                      className="size-7"
+                      onClick={() => set({ rolls: d.rolls.filter((_, j) => j !== i) })}
+                    >
+                      <XIcon className="size-3.5" />
+                    </Button>
+                  </Tip>
                   {bad && <span className="w-full text-xs text-destructive">{bad}</span>}
                 </div>
               );

@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "../../components/ui/menus";
 import { Badge } from "../../components/ui/primitives";
+import { Tip } from "../../components/ui/tip";
 import { useSync } from "../../sync/store";
 import { toastIntentError } from "../combat-tracker/store";
 import { RollButton, useRollControl } from "../dice-roll-log/roll-control";
@@ -148,19 +149,21 @@ export function ReminderRow({
             </span>
           ) : (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  data-testid="rem-row-menu"
-                  aria-label="Reminder actions"
-                  size="icon"
-                  variant="ghost"
-                  className="size-7 shrink-0"
-                  disabled={!live}
-                >
-                  <EllipsisIcon className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
+              <Tip content="Reminder actions" off={!live}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    data-testid="rem-row-menu"
+                    aria-label="Reminder actions"
+                    size="icon"
+                    variant="ghost"
+                    className="size-7 shrink-0"
+                    disabled={!live}
+                  >
+                    <EllipsisIcon className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </Tip>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem data-testid="rem-row-edit" onSelect={() => onEdit(r)}>
                   <PencilIcon /> Edit
@@ -182,15 +185,17 @@ export function ReminderRow({
           className="flex min-w-0 items-center gap-1 text-xs break-words text-muted-foreground"
         >
           {r.strongholdId && onOpenLink && (
-            <button
-              type="button"
-              data-testid="rem-row-link"
-              aria-label="Open the stronghold"
-              className="shrink-0 rounded-sm hover:text-foreground"
-              onClick={() => r.strongholdId && onOpenLink(r.strongholdId)}
-            >
-              <CastleIcon className="size-3.5" />
-            </button>
+            <Tip content="Open the stronghold">
+              <button
+                type="button"
+                data-testid="rem-row-link"
+                aria-label="Open the stronghold"
+                className="shrink-0 rounded-sm hover:text-foreground"
+                onClick={() => r.strongholdId && onOpenLink(r.strongholdId)}
+              >
+                <CastleIcon className="size-3.5" />
+              </button>
+            </Tip>
           )}
           <span className="min-w-0">{r.source}</span>
         </p>
