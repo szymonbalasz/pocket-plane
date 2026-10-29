@@ -18,6 +18,34 @@ const live = (page: Page) =>
 const row = (scope: Locator, id: string) =>
   scope.locator(`[data-testid="cbt-init-row"][data-record-id="${id}"]`);
 
+/**
+ * Opens row `id`'s ⋯ menu once the row is in view and still. Scrolling the last row in (monster
+ * initiatives are rolled at Start, so any row can be last) hides "↓ N more" (FR-CBT-125): the
+ * list grows and every row shifts down a frame later. A press mid-shift opened the menu above
+ * the button and released on its bottom item, Remove (CI run 40905126947).
+ */
+async function openRowMenu(init: Locator, id: string) {
+  const menu = row(init, id).getByTestId("cbt-init-row-menu").first();
+  await menu.scrollIntoViewIfNeeded();
+  await expect
+    .poll(() =>
+      menu.evaluate(
+        (el) =>
+          new Promise<boolean>((done) => {
+            const box = JSON.stringify(el.getBoundingClientRect());
+            let frames = 3;
+            const tick = () => {
+              if (--frames > 0) requestAnimationFrame(tick);
+              else done(JSON.stringify(el.getBoundingClientRect()) === box);
+            };
+            requestAnimationFrame(tick);
+          }),
+      ),
+    )
+    .toBe(true);
+  await menu.click();
+}
+
 /** The combatant id of the row named `name`. */
 /** Drags the window's resize corner by (dx, dy); the shell clamps to the min size. */
 async function resizeBy(page: Page, win: Locator, dx: number, dy: number) {
@@ -220,7 +248,7 @@ test("FR-CBT-109 FR-CBT-115 FR-CBT-118 FR-CBT-119 companions-start: Start with p
 
   // S3: Owlbear → Companion ▸ Own initiative: ranked by its own number; then back under Mira.
   const setMode = async (mode: string) => {
-    await row(init, owlbear).getByTestId("cbt-init-row-menu").first().click();
+    await openRowMenu(init, owlbear);
     await dm.getByTestId("cbt-init-row-companion").click();
     await dm.locator(`[data-testid="cbt-companion-mode"][data-value="${mode}"]`).click();
     await expect(row(init, owlbear).getByTestId("cbt-init-row-mode")).toHaveAttribute(
@@ -245,7 +273,7 @@ test("FR-CBT-109 FR-CBT-115 FR-CBT-118 FR-CBT-119 companions-start: Start with p
   // player-1 sees its HP); then Turn hostile: owner chip gone for the DM and player-1.
   const goblin = await idByName(init, "Goblin");
   const companionMenu = async () => {
-    await row(init, goblin).getByTestId("cbt-init-row-menu").first().click();
+    await openRowMenu(init, goblin);
     await dm.getByTestId("cbt-init-row-companion").click();
   };
   await companionMenu();

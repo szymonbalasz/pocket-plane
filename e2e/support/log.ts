@@ -14,12 +14,18 @@ const openTip = (entry: Locator) =>
  * Hovers `entry`'s text and returns its Tooltip's full line (chips, totals, markers). Waits for
  * the row to land first (FR-DICE-40): the roller's own roll popup opens while the line is held
  * and closes a Tooltip opened before it (FR-SHELL-31), which left the helper reading no chips.
+ * Re-hovers (pointer off, then on) until the Tooltip is open: a Radix `tooltip.open` document
+ * event landing just after it opened (Radix's own delayed-open timer, or any trigger's focus)
+ * closes it, and a resting pointer never reopens it (CI run 40905126947).
  */
 export async function entryLine(entry: Locator): Promise<Locator> {
   await expect(entry).toHaveAttribute("data-landed", "true", { timeout: 15_000 });
-  await entry.getByTestId("dice-log-entry-text").hover();
   const tip = openTip(entry);
-  await expect(tip).toBeVisible();
+  await expect(async () => {
+    await entry.page().mouse.move(0, 0);
+    await entry.getByTestId("dice-log-entry-text").hover();
+    await expect(tip).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 10_000 });
   return tip.getByTestId("dice-log-entry-line");
 }
 
