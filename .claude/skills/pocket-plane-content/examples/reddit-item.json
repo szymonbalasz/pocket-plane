@@ -1,0 +1,20 @@
+{
+  "calls": [
+    {
+      "tool": "homebrew_create",
+      "input": {
+        "entry": {
+          "kind": "item",
+          "name": "Tankard of Bottomless Courage",
+          "facets": { "category": "magic", "rarity": "uncommon", "attunement": false },
+          "body": {
+            "typeLine": "Wondrous item",
+            "weight": "1 lb.",
+            "text": "This dented pewter tankard refills with ale at dawn. As a bonus action, you can drink from it to gain 1d4 + 1 temporary hit points and advantage on your next saving throw against being frightened. Once used, it can't be used this way again until the next dawn."
+          }
+        },
+        "shared": false
+      }
+    }
+  ]
+}

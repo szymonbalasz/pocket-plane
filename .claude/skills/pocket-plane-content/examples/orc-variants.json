@@ -1,0 +1,77 @@
+{
+  "calls": [
+    {
+      "tool": "creature_derive",
+      "input": {
+        "entryId": "<Orc entry id>",
+        "name": "Orc Shieldbearer",
+        "set": {
+          "ac": 15,
+          "attacks": [
+            { "name": "Mace", "toHit": 5, "damage": "1d6+3", "damageType": "bludgeoning" },
+            { "name": "Javelin", "toHit": 5, "damage": "1d6+3", "damageType": "piercing" }
+          ]
+        },
+        "rows": [
+          {
+            "list": "features",
+            "row": {
+              "name": "Shield Bash",
+              "text": "Bonus action: one creature within 5 ft. makes a DC 13 Strength save or is knocked prone."
+            }
+          }
+        ],
+        "notes": "Variant of Orc: shield and mace."
+      }
+    },
+    {
+      "tool": "creature_derive",
+      "input": {
+        "entryId": "<Orc entry id>",
+        "name": "Orc Spear Runner",
+        "set": {
+          "speed": 40,
+          "attacks": [
+            { "name": "Spear", "toHit": 5, "damage": "1d6+3", "damageType": "piercing" },
+            { "name": "Javelin", "toHit": 5, "damage": "1d6+3", "damageType": "piercing" }
+          ]
+        },
+        "rows": [
+          {
+            "list": "features",
+            "row": {
+              "name": "Fleet",
+              "text": "Moving at least 20 ft. straight toward a target before a Spear hit adds 1d6 damage."
+            }
+          }
+        ],
+        "notes": "Variant of Orc: spear, runs fast."
+      }
+    },
+    {
+      "tool": "creature_derive",
+      "input": {
+        "entryId": "<Orc entry id>",
+        "name": "Orc Wolf Rider",
+        "rows": [
+          {
+            "list": "features",
+            "row": {
+              "name": "Mounted Raider",
+              "text": "While mounted, advantage on melee attacks against unmounted creatures smaller than its mount."
+            }
+          }
+        ],
+        "notes": "Variant of Orc: rides a wolf.\nMount: Orc Wolf Rider's Wolf"
+      }
+    },
+    {
+      "tool": "creature_derive",
+      "input": {
+        "entryId": "<Wolf entry id>",
+        "name": "Orc Wolf Rider's Wolf",
+        "notes": "Rider: Orc Wolf Rider"
+      }
+    }
+  ]
+}
