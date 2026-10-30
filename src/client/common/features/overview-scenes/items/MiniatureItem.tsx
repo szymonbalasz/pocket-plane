@@ -1,6 +1,8 @@
 // A miniature (FR-OVW-34, -36): its image by shape as a battle token (round, square, none), token
-// art with no image, its name centred under it in the label text style. A miniature is no token
-// (ADR-0075 Decision 5): nothing of a token's state is drawn.
+// art with no image, its name centred under it in the label text style, whole and on one line: no
+// `width` on the Text, because Konva cuts a `wrap="none"` line at it (FR-OVW-36). A miniature is no token
+// (ADR-0075 Decision 5): nothing of a token's state is drawn. A style preview (FR-OVW-36) re-renders
+// only the miniatures it touches.
 import { initials } from "@shared/scenes-map/geometry";
 import { useMemo } from "react";
 import { Circle, Group, Image, Rect, Text } from "react-konva";
@@ -9,6 +11,7 @@ import { containRect, coverCrop, initialsBackdropOf } from "../../scenes-map/sha
 import { TOKEN_INSET } from "../../scenes-map/token-decor";
 import { fontStack, MINIATURE_SIDE_DEFAULT, miniatureLayout, nameStyleOf } from "../item-layout";
 import { measureText } from "../label-fonts";
+import { patchedStyleOf, useStylePreview } from "../label-style";
 import { useOverviewCanvas } from "../overview-canvas-context";
 import { HIDDEN_OPACITY, HiddenMark } from "./HiddenMark";
 import type { ItemViewProps } from "./item-view";
@@ -63,7 +66,12 @@ function Body({ item, side }: { item: ItemViewProps["item"]; side: number }) {
 
 export function MiniatureItem({ item, scale, fontRev }: ItemViewProps) {
   const side = item.w ?? MINIATURE_SIDE_DEFAULT;
-  const style = nameStyleOf(item);
+  const patch = useStylePreview((s) => (s.preview?.ids.includes(item.id) ? s.preview.patch : null));
+  const { kind, style: stored } = item;
+  const style = useMemo(
+    () => nameStyleOf({ style: patch ? patchedStyleOf({ kind, style: stored }, patch) : stored }),
+    [kind, stored, patch],
+  );
   const name = item.text ?? "";
   // biome-ignore lint/correctness/useExhaustiveDependencies: `fontRev`: the same name measures anew once its font has loaded.
   const layout = useMemo(
@@ -79,9 +87,8 @@ export function MiniatureItem({ item, scale, fontRev }: ItemViewProps) {
             key={fontRev}
             name="ovw-miniature-name"
             text={name}
+            x={layout.nameX}
             y={layout.nameY}
-            width={side}
-            align="center"
             wrap="none"
             lineHeight={1}
             fontFamily={fontStack(style.font)}

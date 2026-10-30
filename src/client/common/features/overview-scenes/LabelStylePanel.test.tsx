@@ -2,13 +2,19 @@
 // live; the text half alone for a miniature's name; the label's preview; where the field sits. A
 // static render reads a zustand store's initial state, so what a live preview draws: the e2e.
 import { describe, expect, test } from "bun:test";
-import { LABEL_STYLE_DEFAULT, type LabelStyle } from "@shared/overview-scenes/schemas";
+import {
+  LABEL_STYLE_DEFAULT,
+  type LabelStyle,
+  MINIATURE_STYLE_DEFAULT,
+} from "@shared/overview-scenes/schemas";
 import { emptyStore } from "@shared/protocol/store";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { SyncContext, type SyncState } from "../../sync/store";
 import type { CanvasColors } from "../scenes-map/theme";
 import type { OverviewItemView } from "./item-layout";
+import { ITEM_KIND_DEFS } from "./items/kinds";
+import { SelectedMiniaturesPanel } from "./items/MiniatureStylePanel";
 import { LabelFieldOverlay, labelFieldSpot } from "./LabelFieldOverlay";
 import {
   LabelStylePreview,
@@ -83,6 +89,50 @@ const CONTROLS = [
   "ovw-style-dot-stroke-color",
   "ovw-style-dot-stroke-width",
 ];
+
+describe("FR-OVW-36 a miniature's name style", () => {
+  const mini = (id: string, over: Partial<OverviewItemView> = {}): OverviewItemView => ({
+    ...label(id),
+    kind: "miniature",
+    w: 64,
+    h: 64,
+    text: "Mira",
+    style: MINIATURE_STYLE_DEFAULT,
+    shape: "round",
+    ...over,
+  });
+
+  test("FR-OVW-36 a miniature's name style panel: the text fields, no dot, for one or many", () => {
+    expect(ITEM_KIND_DEFS.miniature.stylePanel).toBe(SelectedMiniaturesPanel);
+    const html = render(<SelectedMiniaturesPanel items={[mini("a"), mini("b")]} />);
+    expect(tagOf(html, "ovw-miniature-style-panel")).toContain('data-count="2"');
+    for (const id of CONTROLS.slice(0, 5)) expect(html).toContain(`data-testid="${id}"`);
+    expect(html).not.toContain("ovw-style-dot");
+    expect(html).not.toContain("data-mixed");
+    expect(tagOf(html, "ovw-style-size-input")).toContain('value="14"');
+  });
+
+  test("FR-OVW-36 mixed miniatures show Mixed; a linked one has the panel too; off while not live", () => {
+    const fell = { ...MINIATURE_STYLE_DEFAULT, font: "fell", size: 40 } as const;
+    const html = render(
+      <SelectedMiniaturesPanel items={[mini("a"), mini("b", { style: fell, characterId: "c" })]} />,
+    );
+    expect(tagOf(html, "ovw-style-font")).toContain("data-mixed");
+    expect(tagOf(html, "ovw-style-size-input")).toContain('placeholder="Mixed"');
+    expect(tagOf(html, "ovw-style-color")).not.toContain("data-mixed");
+    const off = render(<SelectedMiniaturesPanel items={[mini("a")]} />, "reconnecting");
+    expect(tagOf(off, "ovw-style-color")).toContain("disabled");
+  });
+
+  test("FR-OVW-36 selecting a miniature brings the Select tool's panel", () => {
+    const state = {
+      ...initialEditor,
+      items: [mini("m")],
+      selection: { sceneId: null, tokenIds: ["m"] },
+    };
+    expect(selectionHasStylePanel(state)).toBe(true);
+  });
+});
 
 describe("FR-OVW-28 the style panel", () => {
   test("FR-OVW-28 beside the Label tool: every control, the preview, Add hidden, nothing mixed", () => {

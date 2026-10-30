@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
-import { asset, overview, overviewItem, scene } from "@server/db/schema";
+import { asset, entity, overview, overviewItem, player, scene } from "@server/db/schema";
+import { newMiniatureStyle } from "@shared/overview-scenes/schemas";
 import { asc } from "drizzle-orm";
 import { loadBundle } from "../../index";
 
@@ -18,7 +19,7 @@ afterAll(() => {
 });
 
 describe("overview-scenes fixtures (FR-OVW-46)", () => {
-  test("overview-scenes loads from empty: Sword Coast shown, Phandalin, the crowd; same IDs twice", async () => {
+  test("overview-scenes loads from empty: Sword Coast shown with the party, Phandalin; same IDs twice", async () => {
     const load = async () => {
       const r = await loadBundle("overview-scenes");
       dirs.push(r.dir);
@@ -29,25 +30,24 @@ describe("overview-scenes fixtures (FR-OVW-46)", () => {
         assets: db.select().from(asset).orderBy(asc(asset.seq)).all(),
         overviews: db.select().from(overview).orderBy(asc(overview.seq)).all(),
         items: db.select().from(overviewItem).orderBy(asc(overviewItem.seq)).all(),
+        characters: db.select().from(entity).all(),
+        players: db.select().from(player).all(),
       };
       closeDb(db);
       return out;
     };
     const a = await load();
-    expect(a.manifest.slice(-3)).toEqual(["ovw-sword-coast", "ovw-phandalin", "ovw-crowd"]);
+    expect(a.manifest.slice(-2)).toEqual(["ovw-sword-coast", "ovw-phandalin"]);
     expect(a.manifest).toContain("player-1");
     expect(a.manifest).toContain("player-2");
     expect(a.overviews.map((o) => [o.name, o.active])).toEqual([
       ["Sword Coast", true],
       ["Phandalin", false],
-      ["Crowded Coast", false],
     ]);
     // One thing shown: the battle scenes all went off.
     expect(a.scenes.filter((s) => s.active)).toEqual([]);
 
-    const [coast, phandalin, crowd] = a.overviews.map((o) =>
-      a.items.filter((i) => i.overviewId === o.id),
-    );
+    const [coast, phandalin] = a.overviews.map((o) => a.items.filter((i) => i.overviewId === o.id));
     const assetName = (id: string | null) => a.assets.find((x) => x.id === id)?.name;
 
     // Sword Coast: locked map, three styled labels (one hidden), a hidden scroll.
@@ -70,10 +70,25 @@ describe("overview-scenes fixtures (FR-OVW-46)", () => {
     expect(phandalin?.length).toBe(1);
     expect(assetName(phandalin?.[0]?.assetId ?? null)).toBe("town");
 
-    // The crowd: the cap, 200 of them labels.
-    expect(crowd?.length).toBe(300);
-    expect(crowd?.filter((i) => i.kind === "label").length).toBe(200);
-    expect(crowd?.filter((i) => i.kind === "image").length).toBe(100);
+    // FR-OVW-31, -33: the party's miniatures, linked, each with its player, not on the Phandalin one.
+    const playerOf = (id: string | null) => a.players.find((p) => p.id === id)?.name;
+    const characterOf = (id: string | null) => a.characters.find((c) => c.id === id)?.name;
+    const minis = coast?.filter((i) => i.kind === "miniature") ?? [];
+    expect(
+      minis.map((m) => [m.text, characterOf(m.characterId), playerOf(m.ownerPlayerId)]),
+    ).toEqual([
+      ["Mira", "Mira", "Player 1"],
+      ["Thorn", "Thorn", "Player 2"],
+    ]);
+    for (const m of minis) {
+      expect(m).toMatchObject({
+        w: 160,
+        h: 160,
+        hidden: false,
+        locked: false,
+        style: newMiniatureStyle(160),
+      });
+    }
 
     // Deterministic: same IDs and positions on a second load.
     const b = await load();
@@ -81,5 +96,31 @@ describe("overview-scenes fixtures (FR-OVW-46)", () => {
     expect(b.items.map((i) => [i.id, i.x, i.y, i.z])).toEqual(
       a.items.map((i) => [i.id, i.x, i.y, i.z]),
     );
+  }, 120_000);
+
+  test("overview-crowd loads from empty: `overview-scenes` + the crowd at the cap", async () => {
+    const r = await loadBundle("overview-crowd");
+    dirs.push(r.dir);
+    expect(r.manifest.fixtures.slice(-3)).toEqual([
+      "ovw-sword-coast",
+      "ovw-phandalin",
+      "ovw-crowd",
+    ]);
+    const db = r.openDb();
+    const crowd = db
+      .select()
+      .from(overview)
+      .all()
+      .find((o) => o.name === "Crowded Coast");
+    const items = db
+      .select()
+      .from(overviewItem)
+      .all()
+      .filter((i) => i.overviewId === crowd?.id);
+    closeDb(db);
+    expect(crowd?.active).toBe(false);
+    expect(items.length).toBe(300);
+    expect(items.filter((i) => i.kind === "label").length).toBe(200);
+    expect(items.filter((i) => i.kind === "image").length).toBe(100);
   }, 120_000);
 });

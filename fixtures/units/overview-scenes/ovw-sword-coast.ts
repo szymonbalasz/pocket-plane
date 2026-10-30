@@ -1,7 +1,12 @@
 import { ingestStep } from "@server/features/assets-pipeline/fixtures";
 import { defineFixture, type Refs, step } from "@server/features/fixtures-adapters/fixture-types";
 import { createOverview, showOverview } from "@server/features/overview-scenes/commands";
-import { placeImage, placeLabel, updateItems } from "@server/features/overview-scenes/items";
+import {
+  addParty,
+  placeImage,
+  placeLabel,
+  updateItems,
+} from "@server/features/overview-scenes/items";
 import { LABEL_STYLE_DEFAULT, OVERVIEW_TYPE } from "@shared/overview-scenes/schemas";
 
 /** Item index in `ovw-sword-coast`, in placement order. */
@@ -11,6 +16,8 @@ export const SWORD_COAST = {
   phandalin: 2,
   cragmaw: 3,
   scroll: 4,
+  mira: 5,
+  thorn: 6,
 } as const;
 
 const coast = (r: Refs) => r.id("ovw-sword-coast", OVERVIEW_TYPE);
@@ -34,13 +41,14 @@ const NO_DOT_ALEGREYA = {
 
 /**
  * FR-OVW-46 `ovw-sword-coast`, **shown** (takes the active scene off): a locked map from
- * `map-large` (display 4096 × 2731), three styled labels (Cragmaw Castle hidden) and a hidden
- * scroll. The party miniatures come with `ovw.addParty` (miniatures slice).
+ * `map-large` (display 4096 × 2731), three styled labels (Cragmaw Castle hidden), a hidden scroll
+ * and the party's miniatures (Mira: `player-1`, Thorn: `player-2`), off to the south-east so a press
+ * on the middle of the map still lands on the map.
  */
 export default defineFixture({
   key: "ovw-sword-coast",
   kind: "setup",
-  requires: ["image-large"],
+  requires: ["image-large", "char-mira", "char-thorn"],
   ownerSpec: "overview-scenes",
   assets: ["props/scroll.svg"],
   steps: [
@@ -89,6 +97,7 @@ export default defineFixture({
       overviewId: coast(r),
       items: [{ itemId: r.id("ovw-sword-coast", "overview-item", SWORD_COAST.map), locked: true }],
     })),
+    step(addParty, (r) => ({ overviewId: coast(r), x: 3100, y: 2200, size: 160 })),
     step(showOverview, (r) => ({ overviewId: coast(r) })),
   ],
 });

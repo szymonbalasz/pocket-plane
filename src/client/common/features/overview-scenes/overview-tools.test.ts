@@ -21,6 +21,7 @@ const pointer = (over: Partial<OverviewPointer>): OverviewPointer => ({
   clicks: 1,
   client: "dm",
   overviewId: "ovw-1",
+  myPlayerId: null,
   item: null,
   live: true,
   signalsLive: true,
@@ -44,15 +45,19 @@ describe("FR-OVW-13 tools", () => {
     }
   });
 
-  test("FR-OVW-13 Select, Add image and Label on the DM's rail; a player gets neither add tool", () => {
+  test("FR-OVW-13 Select, Add image, Label, Add party and Add miniature on the DM's rail; a player gets no add tool", () => {
     expect(overviewToolsFor("dm").map((t) => t.id)).toEqual([
       "select",
       "add-image",
       "label",
+      "add-party",
+      "add-miniature",
       "ping",
     ]);
     expect(activeOverviewTool("label", "dm").edits).toBe(true);
     expect(activeOverviewTool("label", "player").id).toBe(SELECT_TOOL_ID);
+    expect(activeOverviewTool("add-party", "player").id).toBe(SELECT_TOOL_ID);
+    expect(activeOverviewTool("add-miniature", "player").id).toBe(SELECT_TOOL_ID);
     expect(overviewToolsFor("player").map((t) => t.id)).toEqual(["select", "ping"]);
     expect(activeOverviewTool("add-image", "dm").edits).toBe(true);
     // A player has no such tool: back to Select.

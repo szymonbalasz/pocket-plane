@@ -10,6 +10,7 @@ import {
 import { IntentRejected } from "@ui/sync/connection";
 import { toast } from "sonner";
 import type { OverviewItemView } from "./item-layout";
+import type { ItemMenuAction } from "./items/item-kind";
 import { ITEM_KIND_DEFS } from "./items/kinds";
 import {
   cleanLabelText,
@@ -35,6 +36,7 @@ const pointer = (over: Partial<OverviewPointer> = {}): OverviewPointer => ({
   clicks: 1,
   client: "dm",
   overviewId: "o",
+  myPlayerId: null,
   item: null,
   live: true,
   signalsLive: true,
@@ -213,9 +215,9 @@ describe("FR-OVW-26 text", () => {
   });
 
   test("FR-OVW-26 Edit text: the menu entry opens the field; only a change is sent", async () => {
-    const entry = ITEM_KIND_DEFS.label.menu.find((m) => m.id === "edit-text");
+    const entry = ITEM_KIND_DEFS.label.menu.find((m) => m.id === "edit-text") as ItemMenuAction;
     const none = mock(() => Promise.resolve());
-    entry?.run(label, none);
+    entry.run(label, none);
     expect(field()).toMatchObject({ itemId: "l1", text: "Thundertree", x: 10, y: 20 });
     const send = mock((_: string, _i: unknown) => Promise.resolve());
     await submitLabelField(send, opts);

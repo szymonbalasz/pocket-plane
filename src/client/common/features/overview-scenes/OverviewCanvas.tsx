@@ -3,11 +3,12 @@
 // overview's ID as `sceneId` (FR-OVW-13), and the seam for the editing slices: every stage pointer
 // event goes to the active tool of `overview-tools.ts`. `MapCanvas` is not involved: no grid,
 // tokens, fog, walls or templates. No feature logic: the server decides.
+import { ItemDragData, OVW_SIGNALS } from "@shared/overview-scenes/schemas";
 import { LaserData, MAP_SIGNALS, PingData } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
 import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Group, Layer, Stage } from "react-konva";
-import { SyncContext, useSendSignal, useSignal, useSync } from "../../sync/store";
+import { SyncContext, useEventFrame, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { useFreeArea } from "../play-shell/free-area";
 import { isKeyboardFocus, spaceAction, trackFocusModality } from "../play-shell/keys";
 import {
@@ -21,13 +22,14 @@ import {
   zoomAt,
 } from "../scenes-map/camera";
 import { CanvasContext, type CanvasContextValue } from "../scenes-map/canvas-context";
+import { clearPreviews, prunePreviews } from "../scenes-map/drag-preview";
 import { useLive, useMapIntent } from "../scenes-map/intents";
 import { LaserSender } from "../scenes-map/laser";
 import type { CanvasClient } from "../scenes-map/layers";
 import { PointersLayer } from "../scenes-map/layers/PointersLayer";
 import { selfOf } from "../scenes-map/mark-colors";
 import { createMiddlePan, type MiddlePan } from "../scenes-map/middle-pan";
-import { signalForShownScene } from "../scenes-map/overlay";
+import { isSnapshotStore, signalForShownScene } from "../scenes-map/overlay";
 import {
   addPing,
   addTrailPoints,
@@ -49,6 +51,7 @@ import {
   type OverviewCanvasContextValue,
   useOverviewTool,
 } from "./overview-canvas-context";
+import { itemIdsOf, itemPreviews, receiveItemDrag } from "./overview-drag";
 import { drawnGesture, previewOf, publishItems, useOverviewEditor } from "./overview-editor";
 import { activeOverviewTool, type OverviewPointer } from "./overview-tools";
 import { SelectionLayer } from "./SelectionLayer";
@@ -286,6 +289,30 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
     );
   });
 
+  // ---- FR-OVW-37: others' drags; dropped on a change of the item, a snapshot or 3 s of silence ----
+  useSignal(OVW_SIGNALS.drag, (s) => {
+    const d = ItemDragData.safeParse(s.data);
+    if (!d.success) return;
+    const held = new Set(itemsRef.current.map((i) => i.id));
+    const g = useOverviewEditor.getState().gesture;
+    const dragging = g?.kind === "move" ? g.ids : [];
+    const view = { overviewId, holds: (id: string) => held.has(id), dragging };
+    receiveItemDrag(d.data, view, performance.now());
+  });
+  useEventFrame((f) => clearPreviews(itemPreviews, itemIdsOf(f.changes)));
+  const prevStore = useRef(store);
+  useEffect(() => {
+    if (isSnapshotStore(prevStore.current, store)) clearPreviews(itemPreviews);
+    prevStore.current = store;
+  }, [store]);
+  useEffect(() => {
+    const id = setInterval(() => prunePreviews(itemPreviews, performance.now()), 250);
+    return () => {
+      clearInterval(id);
+      clearPreviews(itemPreviews);
+    };
+  }, []);
+
   // ---- pointer gestures ----
   const laser = useRef<LaserSender | null>(null);
   const startLaser = (points: readonly { x: number; y: number }[]) => {
@@ -322,6 +349,7 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
       clicks: evt.detail,
       client,
       overviewId,
+      myPlayerId,
       item: (id && itemsRef.current.find((i) => i.id === id)) || null,
       live: liveRef.current,
       signalsLive: signalsLiveRef.current,

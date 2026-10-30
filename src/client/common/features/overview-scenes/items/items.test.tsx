@@ -11,7 +11,7 @@ import type { OverviewItemView } from "../item-layout";
 import { OverviewCanvasContext } from "../overview-canvas-context";
 import type { ItemPreview } from "../overview-editor";
 import { hiddenMarkAt } from "./HiddenMark";
-import { ItemNode } from "./ItemNode";
+import { drawnItem, ItemNode } from "./ItemNode";
 
 const colors = {
   muted: "muted",
@@ -61,6 +61,10 @@ function draw(item: OverviewItemView, client: "dm" | "player" = "dm", preview?: 
     </SyncContext.Provider>,
   );
 }
+
+/** Konva's `width`, not `stroke-width`. */
+const hasWidth = (html: string, name: string) =>
+  /\swidth="/.test(html.match(new RegExp(`<[^>]*name="${name}"[^>]*>`))?.[0] ?? "");
 
 const nodeAttr = (html: string, name: string, attr: string) =>
   html
@@ -130,12 +134,59 @@ describe("item drawings", () => {
     const round = draw(mini);
     expect(nodeAttr(round, "ovw-miniature-art", "text")).toBe("MV");
     expect(nodeAttr(round, "ovw-miniature-name", "text")).toBe("Mira Vale");
-    expect(nodeAttr(round, "ovw-miniature-name", "width")).toBe("64");
+    expect(hasWidth(round, "ovw-miniature-name")).toBe(false);
     expect(nodeAttr(round, "ovw-miniature-name", "font-size")).toBe("14");
     expect(round).toContain("<Circle");
     expect(draw({ ...mini, shape: "square" })).not.toContain("<Circle");
     // No name (FR-OVW-32): no name node.
     expect(draw({ ...mini, text: "" })).not.toContain("ovw-miniature-name");
+  });
+
+  test("FR-OVW-36 a name wider than the miniature is drawn whole, centred; linked or not", () => {
+    const mini: OverviewItemView = {
+      ...base,
+      kind: "miniature",
+      w: 64,
+      h: 64,
+      text: "Neverwinter Merchant Guild",
+      style: null,
+      shape: "round",
+    };
+    for (const item of [mini, { ...mini, characterId: "char-1" }]) {
+      const html = draw(item);
+      expect(nodeAttr(html, "ovw-miniature-name", "text")).toBe("Neverwinter Merchant Guild");
+      // No width to cut the line at, one line, its middle on the miniature's (a static render's
+      // measure: half the size per character, 182 units here).
+      expect(hasWidth(html, "ovw-miniature-name")).toBe(false);
+      expect(nodeAttr(html, "ovw-miniature-name", "wrap")).toBe("none");
+      expect(nodeAttr(html, "ovw-miniature-name", "x")).toBe(String((64 - 182) / 2));
+    }
+  });
+
+  test("FR-OVW-36 a miniature's name is drawn with the label text style fields", () => {
+    const html = draw({
+      ...base,
+      kind: "miniature",
+      w: 64,
+      h: 64,
+      text: "Mira",
+      shape: "round",
+      style: { font: "fell", size: 30, color: "#112233", strokeColor: "#445566", strokeWidth: 3 },
+    });
+    expect(nodeAttr(html, "ovw-miniature-name", "font-family")).toContain("IM Fell English");
+    expect(nodeAttr(html, "ovw-miniature-name", "font-size")).toBe("30");
+    expect(nodeAttr(html, "ovw-miniature-name", "fill")).toBe("#112233");
+    expect(nodeAttr(html, "ovw-miniature-name", "stroke")).toBe("#445566");
+    expect(nodeAttr(html, "ovw-miniature-name", "stroke-width")).toBe("3");
+    // Under the miniature: its top past the side.
+    expect(Number(nodeAttr(html, "ovw-miniature-name", "y"))).toBeGreaterThan(64);
+  });
+
+  test("FR-OVW-37 another client's drag draws the item there; this client's own wins", () => {
+    const remote = { x: 700, y: 800 };
+    expect(drawnItem(base, remote, undefined)).toMatchObject(remote);
+    expect(drawnItem(base, remote, { x: 1, y: 2 })).toMatchObject({ x: 1, y: 2 });
+    expect(drawnItem(base, undefined, undefined)).toBe(base);
   });
 
   test("OVW §7 an image still loading: the tile at its w × h; a hidden one the hidden mark", () => {

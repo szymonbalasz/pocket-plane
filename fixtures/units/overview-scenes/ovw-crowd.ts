@@ -13,7 +13,8 @@ const IMAGES = [IMG.town, IMG.battlemap, IMG.goblin, IMG.wolf, IMG.elite] as con
 
 /**
  * FR-OVW-46 `ovw-crowd`, not shown: the feature's cap of 300 items, 200 stroked labels and 100
- * images (OVW §12: walkthrough step 12 only). Miniatures come with their slice.
+ * images (OVW §12: walkthrough step 12 only). In bundle `overview-crowd`, not `overview-scenes`:
+ * it would put that load over the FR-FIX-10 budget.
  */
 export default defineFixture({
   key: "ovw-crowd",

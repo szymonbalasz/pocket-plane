@@ -37,13 +37,14 @@ export interface OverviewFit extends Camera {
 }
 
 /**
- * FR-OVW-12: `box` as large as fits, centred, in the candidate free rectangle (FR-SHELL-44, clear
- * of windows and the toast obstacles) that takes it largest. No candidate: the work area right of
- * the rail, as the map's fit. No items: origin at 100 %.
+ * FR-OVW-12: `box` as large as fits, centred, in the candidate free rectangle (FR-SHELL-44) clear of
+ * windows that takes it largest. Windows only, unlike the battle map's fit: the map is the point
+ * here, and a toast only passes over it, so no room is kept for one that isn't showing. No candidate:
+ * the work area right of the rail. No items: origin at 100 %.
  */
 export function fitOverview(box: Box | null, view: Size, room: FitRoom): OverviewFit {
   if (!box) return { x: 0, y: 0, scale: 1, rect: null };
-  const areas = room.areas.length > 0 ? room.areas : room.windowsOnly;
+  const areas = room.windowsOnly;
   const rect = bestFreeRect(box, areas, areas[0] ?? railArea(view), box, workArea(view));
   const inner = fitCamera(box, rect, FIT_MARGIN);
   return {

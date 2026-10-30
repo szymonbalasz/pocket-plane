@@ -1,4 +1,4 @@
-// Item commands (OVW §6.3–6.5, §9; protocol §190). DM-only WS intents, except `ovw.moveItems`
+// Item commands (OVW §6.3–6.6, §9; protocol §190). DM-only WS intents, except `ovw.moveItems`
 // (FR-OVW-35). Each is one transaction, all or nothing, with one event. The server checks bounds
 // only; keeping an image's shape is the client's job (FR-OVW-24). IDs and time from ctx.
 import {
@@ -8,6 +8,8 @@ import {
   OverviewItemsUpdated,
 } from "@shared/events/overview-scenes";
 import {
+  AddPartyInput,
+  type AddPartyResult,
   DUPLICATE_OFFSET,
   type DuplicateItemsResult,
   ITEMS_PER_CAMPAIGN_MAX,
@@ -21,11 +23,14 @@ import {
   MiniatureStyle,
   MoveItemsInput,
   miniatureNameFits,
+  miniatureNameOf,
+  newMiniatureStyle,
   OVW_INTENTS,
   type OverviewItemRecord,
   PlaceImageInput,
   type PlaceItemResult,
   PlaceLabelInput,
+  PlaceMiniatureInput,
   POSITION_MAX,
   type StackMove,
   UpdateItemsInput,
@@ -33,9 +38,10 @@ import {
 import { and, eq } from "drizzle-orm";
 import { type CommandEnv, defineCommand } from "../../commands/commands";
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
-import { overviewItem, overviewItemSeqNext } from "../../db/schema";
+import { entity, overviewItem, overviewItemSeqNext, player } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
+import { partyOf } from "../combat-tracker/lifecycle";
 import { campaignOf } from "../scenes-map/rows";
 import { countItems, getOverview, itemChange, itemsOf, readItem } from "./rows";
 
@@ -165,6 +171,121 @@ export const placeLabel = defineCommand({
   },
 });
 
+/** §9: a miniature's owner is a player of the campaign. */
+function assertOwner(env: CommandEnv, cid: string, ownerPlayerId: string) {
+  const row = env.tx
+    .select({ id: player.id })
+    .from(player)
+    .where(and(eq(player.id, ownerPlayerId), eq(player.campaignId, cid)))
+    .get();
+  if (!row) {
+    throw invalid("Invalid input", [
+      { path: ["ownerPlayerId"], message: "Not a player of this campaign" },
+    ]);
+  }
+}
+
+/** FR-OVW-32: for NPCs, ships, a "The Party" marker. No character link. */
+export const placeMiniature = defineCommand({
+  name: OVW_INTENTS.placeMiniature,
+  input: PlaceMiniatureInput,
+  execute(input, env): PlaceItemResult {
+    const cid = campaignOf(env.actor);
+    const { id: overviewId } = getOverview(env.tx, cid, input.overviewId);
+    const assetId = requireAsset(env, input.assetId).id;
+    if (input.ownerPlayerId !== undefined) assertOwner(env, cid, input.ownerPlayerId);
+    assertCaps(env, cid, overviewId, 1);
+    const after = insertItem(env, cid, {
+      overviewId,
+      kind: "miniature",
+      z: nextZ(itemsOf(env.tx, overviewId), "miniature"),
+      x: input.x,
+      y: input.y,
+      w: input.size,
+      h: input.size,
+      hidden: input.hidden ?? false,
+      assetId,
+      text: input.text || null,
+      style: newMiniatureStyle(input.size),
+      ownerPlayerId: input.ownerPlayerId ?? null,
+      shape: "round",
+    });
+    env.emit({
+      type: OverviewItemsPlaced.type,
+      campaignId: cid,
+      payload: { overviewId, itemIds: [after.id] },
+      changes: [itemChange(null, after)],
+    });
+    return { itemId: after.id };
+  },
+});
+
+const clampPosition = (v: number) =>
+  Math.min(POSITION_MAX, Math.max(-POSITION_MAX, Math.round(v * 100) / 100));
+
+/**
+ * FR-OVW-31: the top-left of member `n` of `count`, in a row centred on `x, y`, a quarter of a side
+ * between neighbours.
+ */
+function rowSpot(n: number, count: number, x: number, y: number, size: number) {
+  const step = size * 1.25;
+  return {
+    x: clampPosition(x + (n - (count - 1) / 2) * step - size / 2),
+    y: clampPosition(y - size / 2),
+  };
+}
+
+/**
+ * FR-OVW-31, -33: one linked miniature per party character (the list Start uses) not yet on this
+ * overview, all or nothing. None missing → no event; the ack's empty list says so.
+ */
+export const addParty = defineCommand({
+  name: OVW_INTENTS.addParty,
+  input: AddPartyInput,
+  execute(input, env): AddPartyResult {
+    const { tx } = env;
+    const cid = campaignOf(env.actor);
+    const { id: overviewId } = getOverview(tx, cid, input.overviewId);
+    const items = itemsOf(tx, overviewId);
+    const here = new Set(items.map((i) => i.characterId));
+    const missing = partyOf(env, cid, null).filter((c) => !here.has(c.id));
+    if (missing.length === 0) return { itemIds: [] };
+    assertCaps(env, cid, overviewId, missing.length);
+    const z = nextZ(items, "miniature");
+    const changes = missing.map((c, n) => {
+      const def = tx
+        .select({ ownerPlayerId: entity.ownerPlayerId, tokenShape: entity.tokenShape })
+        .from(entity)
+        .where(eq(entity.id, c.id))
+        .get();
+      const after = insertItem(env, cid, {
+        overviewId,
+        kind: "miniature",
+        z: z + n,
+        ...rowSpot(n, missing.length, input.x, input.y, input.size),
+        w: input.size,
+        h: input.size,
+        hidden: input.hidden ?? false,
+        assetId: c.portraitAssetId ? requireAsset(env, c.portraitAssetId).id : null,
+        text: miniatureNameOf(c.name),
+        style: newMiniatureStyle(input.size),
+        characterId: c.id,
+        ownerPlayerId: def?.ownerPlayerId ?? null,
+        shape: def?.tokenShape ?? "round",
+      });
+      return itemChange(null, after);
+    });
+    const itemIds = changes.map((c) => c.id);
+    env.emit({
+      type: OverviewItemsPlaced.type,
+      campaignId: cid,
+      payload: { overviewId, itemIds },
+      changes,
+    });
+    return { itemIds };
+  },
+});
+
 // ---------- update ----------
 
 const refuse = (field: string, kind: ItemKind) =>
@@ -177,6 +298,8 @@ function assertPatchFits(item: OverviewItemRecord, p: ItemPatch) {
   if (kind === "label" && p.assetId !== undefined) throw refuse("assetId", kind);
   if (kind === "image" && p.text !== undefined) throw refuse("text", kind);
   if (kind === "image" && p.style !== undefined) throw refuse("style", kind);
+  if (kind !== "miniature" && p.shape !== undefined) throw refuse("shape", kind);
+  if (kind !== "miniature" && p.ownerPlayerId !== undefined) throw refuse("ownerPlayerId", kind);
   if (kind === "label") {
     if (p.text !== undefined && !labelTextFits(p.text)) {
       throw invalid("Invalid input", [{ path: ["text"], message: "1–80 characters" }]);
@@ -205,8 +328,9 @@ function assertPatchFits(item: OverviewItemRecord, p: ItemPatch) {
         ]);
       }
     }
-    // FR-OVW-33: a linked miniature's name and image are the character's.
-    if (item.characterId !== null && (p.text !== undefined || p.assetId !== undefined)) {
+    // FR-OVW-33: a linked miniature's name, image and owner are the character's.
+    const followed = [p.text, p.assetId, p.ownerPlayerId].some((v) => v !== undefined);
+    if (item.characterId !== null && followed) {
       throw conflict("This miniature follows its character");
     }
   }
@@ -244,7 +368,7 @@ function stackedZ(
 
 /**
  * FR-OVW-21 Hide / Reveal, Lock / Unlock, To front / To back; FR-OVW-23 resize and Image…;
- * FR-OVW-26, -28 text and style. 1–50 items on one overview, all or nothing. Moving or resizing a
+ * FR-OVW-26, -28 text and style; FR-OVW-32, -34 shape and owner. 1–50 items on one overview, all or nothing. Moving or resizing a
  * locked item → `conflict`. Nothing changes → no event.
  */
 export const updateItems = defineCommand({
@@ -283,6 +407,11 @@ export const updateItems = defineCommand({
       if (p.style !== undefined && !Bun.deepEquals(p.style, b.style)) set.style = p.style;
       if (p.assetId !== undefined && p.assetId !== b.assetId) {
         set.assetId = requireAsset(env, p.assetId).id;
+      }
+      if (p.shape !== undefined && p.shape !== b.shape) set.shape = p.shape;
+      if (p.ownerPlayerId !== undefined && p.ownerPlayerId !== b.ownerPlayerId) {
+        if (p.ownerPlayerId !== null) assertOwner(env, cid, p.ownerPlayerId);
+        set.ownerPlayerId = p.ownerPlayerId;
       }
       if (Object.keys(set).length === 0) return;
       tx.update(overviewItem)

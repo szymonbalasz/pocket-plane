@@ -1,5 +1,5 @@
-// The DM's editing surfaces beside the overview canvas (FR-OVW-16, -21–23): the item menu, the keys,
-// the delete confirm and the asset picker. Menus act on the selection if the item is in it. Editing
+// The DM's editing surfaces beside the overview canvas (FR-OVW-16, -21–23, -32): the item menu, the
+// keys, the delete confirm and the asset picker. Menus act on the selection if the item is in it. Editing
 // is off while not live (FR-OVW-47). Keys inside windows never reach here (FR-SHELL-13).
 import type { AssetRecord } from "@shared/assets-pipeline/schemas";
 import {
@@ -47,6 +47,8 @@ import {
 import type { OverviewItemView } from "./item-layout";
 import type { ItemSend } from "./items/item-kind";
 import { ITEM_KIND_DEFS } from "./items/kinds";
+import { MiniatureNameDialog } from "./items/MiniatureMenu";
+import { placeMiniatureFrom, updateMiniature } from "./miniature-actions";
 import { dispatchItemSelection, selectedItems, useOverviewEditor } from "./overview-editor";
 
 export const LOCKED_NOT_DELETED = "Locked — unlock it first";
@@ -142,16 +144,20 @@ function ItemMenu({ send, live }: { send: ItemSend; live: boolean }) {
             >
               <CopyIcon /> Duplicate
             </DropdownMenuItem>
-            {own.map((entry) => (
-              <DropdownMenuItem
-                key={entry.id}
-                data-testid={`ovw-item-menu-${entry.id}`}
-                disabled={entry.disabled?.(item)}
-                onSelect={act(async (_, one) => entry.run(one, send))}
-              >
-                <entry.icon /> {entry.label}
-              </DropdownMenuItem>
-            ))}
+            {own.map((entry) =>
+              "Sub" in entry ? (
+                <entry.Sub key={entry.id} item={item} send={send} />
+              ) : (
+                <DropdownMenuItem
+                  key={entry.id}
+                  data-testid={`ovw-item-menu-${entry.id}`}
+                  disabled={entry.disabled?.(item)}
+                  onSelect={act(async (_, one) => entry.run(one, send))}
+                >
+                  <entry.icon /> {entry.label}
+                </DropdownMenuItem>
+              ),
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               data-testid="ovw-item-menu-delete"
@@ -208,18 +214,29 @@ function ImagePicker({ send }: { send: ItemSend }) {
       onOpenChange={(o) => {
         if (!o) useOverviewEditor.setState({ picking: null });
       }}
-      title={picking.kind === "place" ? "Add an image" : "Change image"}
-      context="map"
+      title={
+        picking.kind === "place"
+          ? "Add an image"
+          : picking.kind === "miniature"
+            ? "Add a miniature"
+            : "Change image"
+      }
+      context={picking.kind === "miniature" || target?.kind === "miniature" ? "token" : "map"}
       initialSelectedId={target?.assetId ?? null}
       onSelect={(id) => {
         const asset = assets.find((a) => a.id === id);
         if (!asset) return;
+        const hidden = useAddHidden.getState().on;
         const sent =
           picking.kind === "place"
-            ? placeImageFrom(send, overviewId, asset, useAddHidden.getState().on)
-            : target
-              ? swapImage(send, target, asset)
-              : Promise.resolve();
+            ? placeImageFrom(send, overviewId, asset, hidden)
+            : picking.kind === "miniature"
+              ? placeMiniatureFrom(send, overviewId, asset.id, picking, hidden)
+              : target?.kind === "miniature"
+                ? updateMiniature(send, target, { assetId: asset.id })
+                : target
+                  ? swapImage(send, target, asset)
+                  : Promise.resolve();
         sent.catch(toastReject);
       }}
     />
@@ -235,6 +252,7 @@ export function OverviewEditorHost() {
       <ItemMenu send={send} live={live} />
       <DeleteConfirm send={send} />
       <ImagePicker send={send} />
+      <MiniatureNameDialog send={send} />
     </>
   );
 }

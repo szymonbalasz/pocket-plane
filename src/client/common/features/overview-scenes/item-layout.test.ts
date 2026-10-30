@@ -120,6 +120,30 @@ describe("FR-OVW-36 miniature name", () => {
     expect(l.box.y).toBe(0);
   });
 
+  test("FR-OVW-36 a name wider than its miniature: centred on the measured width, the box around it", () => {
+    const style = { ...MINIATURE_NAME_DEFAULT, strokeWidth: 4 };
+    const wide = miniatureLayout(64, "Neverwinter Merchant Guild", style, 300);
+    // Its middle is the miniature's middle.
+    expect(wide.nameX).toBe(-118);
+    expect(wide.nameX + 300 / 2).toBe(64 / 2);
+    // The box holds the text and its stroke, both ways, so selection, hits and Fit follow.
+    expect(wide.box.w).toBe(304);
+    expect(wide.box.x).toBe(-120);
+    expect(wide.box.x + wide.box.w / 2).toBe(64 / 2);
+    // Narrower than the miniature: centred too, the box is the miniature's width.
+    const narrow = miniatureLayout(64, "Mira", style, 20);
+    expect(narrow.nameX).toBe(22);
+    expect(narrow.box).toMatchObject({ x: 0, w: 64 });
+    // `itemBox`, which the selection outline and Fit read, is the same at the item's place.
+    const measured = () => 300;
+    const box = itemBox(
+      item({ kind: "miniature", x: 5, y: 6, w: 64, h: 64, text: "A long name", style }),
+      measured,
+    );
+    expect(box.x).toBe(5 - 120);
+    expect(box.w).toBe(304);
+  });
+
   test("FR-OVW-32 no name: just the square", () => {
     expect(miniatureLayout(64, "", MINIATURE_NAME_DEFAULT, 0).box).toEqual({
       x: 0,

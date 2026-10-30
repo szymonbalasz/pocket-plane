@@ -4,34 +4,13 @@
 // Gilt & Stone must not regress without someone deciding so. Baselines are Linux (CI) renders, so
 // the spec runs only on Linux; refresh them on purpose with the `screenshots` workflow
 // (`gh workflow run screenshots.yml --ref <branch>`), which commits the new renders to the branch.
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { openWindow } from "./support/shell";
 import { storedTheme } from "./support/theme";
+import { moving, SIZE, settled, THEMES } from "./support/visual";
 
 test.skip(process.platform !== "linux", "baselines are Linux renders (CI)");
-
-const THEMES = ["default", "gilt"] as const;
-const SIZE = { width: 1440, height: 900 };
-
-/** Live, fonts loaded, and no layout change for a few frames (refits, toast settle). */
-async function settled(page: Page) {
-  await expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
-  await page.evaluate(() => document.fonts.ready.then(() => undefined));
-  await expect
-    .poll(
-      async () => {
-        const a = await page.evaluate(() => document.body.innerHTML.length);
-        await page.waitForTimeout(400);
-        return a === (await page.evaluate(() => document.body.innerHTML.length));
-      },
-      { timeout: 10_000 },
-    )
-    .toBe(true);
-}
-
-/** Relative times and clocks change with the run's wall clock. */
-const moving = (page: Page): Locator[] => [page.locator("time")];
 
 /**
  * Spell FX (FR-VFX-25, -14): map effects drawn at Still, whose frame is the same pixels on every

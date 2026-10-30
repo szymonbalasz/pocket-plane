@@ -40,6 +40,7 @@ const pointer = (over: Partial<OverviewPointer> = {}): OverviewPointer => ({
   clicks: 1,
   client: "dm",
   overviewId: "o",
+  myPlayerId: null,
   item: null,
   live: true,
   signalsLive: true,
@@ -291,5 +292,160 @@ describe("FR-OVW-23 handles", () => {
     expect(useOverviewEditor.getState().cursor).toBe("nesw-resize");
     tool.move?.(at(150, 125));
     expect(useOverviewEditor.getState().cursor).toBeNull();
+  });
+});
+
+describe("FR-OVW-35 a player's press", () => {
+  const own = item("own", { kind: "miniature", ownerPlayerId: "p1", locked: undefined });
+  const theirs = item("theirs", { kind: "miniature", ownerPlayerId: "p2", locked: undefined });
+  const nobodys = item("nobody", { kind: "miniature", locked: undefined });
+  const mine = (x: number, y: number, over: Partial<OverviewPointer> = {}) =>
+    at(x, y, { client: "player", myPlayerId: "p1", ...over });
+
+  beforeEach(() => {
+    useOverviewEditor.setState(initialEditor, true);
+    publishItems("o", [own, theirs, nobodys]);
+  });
+
+  test("FR-OVW-35 own miniature drags, one intent on drop, no selection or menu", async () => {
+    const intent = mock((_: string, __: unknown) => Promise.resolve());
+    const hold = mock(() => {});
+    tool.down?.(mine(100, 100, { item: own, holdPan: hold }));
+    expect(hold).toHaveBeenCalled();
+    expect(selection()).toEqual([]);
+    tool.move?.(mine(150, 130, { item: own }));
+    const g = gesture();
+    expect(previewOf(g?.kind === "move" ? g : null, own)).toEqual({ x: 150, y: 130 });
+    tool.up?.(mine(150, 130, { item: own, intent }));
+    expect(intent).toHaveBeenCalledWith("ovw.moveItems", {
+      overviewId: "o",
+      moves: [{ itemId: "own", x: 150, y: 130 }],
+    });
+    expect(selection()).toEqual([]);
+    expect(tool.menu?.(mine(100, 100, { item: own }))).toBe(false);
+    await flush();
+    expect(gesture()).toBeNull();
+  });
+
+  test("FR-OVW-35 a click without a drag does nothing: no intent, no selection", () => {
+    const intent = mock(() => Promise.resolve());
+    tool.down?.(mine(100, 100, { item: own }));
+    tool.up?.(mine(100, 100, { item: own, intent }));
+    expect(intent).not.toHaveBeenCalled();
+    expect(selection()).toEqual([]);
+    expect(gesture()).toBeNull();
+  });
+
+  test("FR-OVW-35 anything else still pans: another's, nobody's, a label, empty canvas", () => {
+    const label = item("l", { kind: "label", w: null, h: null, locked: undefined });
+    for (const target of [theirs, nobodys, label, a, null]) {
+      const hold = mock(() => {});
+      tool.down?.(mine(100, 100, { item: target, holdPan: hold }));
+      expect(hold).not.toHaveBeenCalled();
+      expect(gesture()).toBeNull();
+    }
+  });
+
+  test("FR-OVW-47 not live: a press pans; a drag cut short snaps back, unsent", () => {
+    const intent = mock(() => Promise.resolve());
+    tool.down?.(mine(100, 100, { item: own, live: false }));
+    expect(gesture()).toBeNull();
+    tool.down?.(mine(100, 100, { item: own }));
+    tool.move?.(mine(150, 130, { item: own }));
+    tool.cancel?.("live");
+    expect(gesture()).toBeNull();
+    tool.up?.(mine(150, 130, { intent, live: false }));
+    expect(intent).not.toHaveBeenCalled();
+  });
+
+  test("FR-OVW-35 a refused drop snaps back and toasts", async () => {
+    const shown = mock((_: string) => "");
+    const real = toast.error;
+    toast.error = shown as unknown as typeof toast.error;
+    try {
+      tool.down?.(mine(100, 100, { item: own }));
+      tool.move?.(mine(150, 130, { item: own }));
+      const intent = () => Promise.reject(new IntentRejected("not_found", "Item not found"));
+      tool.up?.(mine(150, 130, { item: own, intent }));
+      await flush();
+      expect(gesture()).toBeNull();
+      expect(shown).toHaveBeenCalled();
+    } finally {
+      toast.error = real;
+    }
+  });
+
+  test("the grab cursor is over their own miniature only", () => {
+    tool.move?.(mine(100, 100, { item: own }));
+    expect(useOverviewEditor.getState().cursor).toBe("grab");
+    tool.move?.(mine(100, 100, { item: theirs }));
+    expect(useOverviewEditor.getState().cursor).toBeNull();
+  });
+});
+
+describe("FR-OVW-37 preview frames", () => {
+  const frames = () => {
+    const sent: { name: string; data: Record<string, unknown> }[] = [];
+    const signal = (name: string, data: unknown) =>
+      sent.push({ name, data: data as Record<string, unknown> });
+    return { sent, signal };
+  };
+
+  test("FR-OVW-37 a DM group drag: frames for every moved item; on drop the intent, then `end`", () => {
+    const { sent, signal } = frames();
+    const order: string[] = [];
+    const intent = (name: string) => {
+      order.push(name);
+      return Promise.resolve();
+    };
+    select("a", "b");
+    tool.down?.(at(150, 120, { item: a, signal }));
+    tool.move?.(at(160, 130, { item: a, signal }));
+    expect(sent[0]).toEqual({
+      name: "ovw.drag",
+      data: {
+        overviewId: "o",
+        moves: [
+          { itemId: "a", x: 110, y: 110 },
+          { itemId: "b", x: 410, y: 110 },
+        ],
+      },
+    });
+    tool.up?.(
+      at(160, 130, {
+        item: a,
+        signal: (n, d) => signal(n, d),
+        intent: intent as OverviewPointer["intent"],
+      }),
+    );
+    expect(order).toEqual(["ovw.moveItems"]);
+    expect(sent.at(-1)?.data).toEqual({ overviewId: "o", itemIds: ["a", "b"], end: true });
+  });
+
+  test("FR-OVW-37 a click sends no frame; Esc sends `end`, no intent", () => {
+    const { sent, signal } = frames();
+    tool.down?.(at(150, 120, { item: a, signal }));
+    tool.up?.(at(150, 120, { item: a, signal }));
+    expect(sent).toEqual([]);
+
+    tool.down?.(at(150, 120, { item: a, signal }));
+    tool.move?.(at(170, 140, { item: a, signal }));
+    expect(tool.cancel?.("escape")).toBe(true);
+    expect(sent.at(-1)?.data).toEqual({ overviewId: "o", itemIds: ["a"], end: true });
+  });
+
+  test("FR-OVW-37 a player's drag: one item in the frame", () => {
+    const { sent, signal } = frames();
+    const own = item("own", { kind: "miniature", ownerPlayerId: "p1" });
+    publishItems("o", [own]);
+    const p = (x: number, y: number) =>
+      at(x, y, { client: "player", myPlayerId: "p1", item: own, signal });
+    tool.down?.(p(100, 100));
+    tool.move?.(p(130, 100));
+    expect(sent[0]?.data).toEqual({
+      overviewId: "o",
+      moves: [{ itemId: "own", x: 130, y: 100 }],
+    });
+    tool.cancel?.("escape");
   });
 });

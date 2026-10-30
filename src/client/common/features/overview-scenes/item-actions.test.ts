@@ -16,6 +16,7 @@ import {
   swapImage,
 } from "./item-actions";
 import { itemBands, type OverviewItemView } from "./item-layout";
+import type { ItemMenuAction } from "./items/item-kind";
 import { ITEM_KIND_DEFS } from "./items/kinds";
 import { itemKey, LOCKED_NOT_DELETED } from "./OverviewEditorHost";
 import { SELECT_TOOL_ID, useOverviewTool } from "./overview-canvas-context";
@@ -236,10 +237,10 @@ describe("FR-OVW-21 menu and keys", () => {
   });
 
   test("FR-OVW-23 Image… is off on a locked image, and asks for the picker", () => {
-    const entry = ITEM_KIND_DEFS.image.menu.find((e) => e.id === "image");
-    expect(entry?.disabled?.(map)).toBe(true);
-    expect(entry?.disabled?.(a)).toBe(false);
-    entry?.run(a, sender());
+    const entry = ITEM_KIND_DEFS.image.menu.find((e) => e.id === "image") as ItemMenuAction;
+    expect(entry.disabled?.(map)).toBe(true);
+    expect(entry.disabled?.(a)).toBe(false);
+    entry.run(a, sender());
     expect(useOverviewEditor.getState().picking).toEqual({ kind: "image", itemId: "a" });
   });
 });

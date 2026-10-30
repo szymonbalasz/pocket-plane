@@ -19,7 +19,11 @@ export const OVW_INTENTS = {
   moveItems: "ovw.moveItems",
   duplicateItems: "ovw.duplicateItems",
   deleteItems: "ovw.deleteItems",
+  placeMiniature: "ovw.placeMiniature",
+  addParty: "ovw.addParty",
 } as const;
+
+export const OVW_SIGNALS = { drag: "ovw.drag" } as const;
 
 // ---------- limits (OQ-OVW-02, FR-OVW-01, -15, -17, -23, -26, -27, -32, -34) ----------
 
@@ -34,6 +38,8 @@ export const POSITION_MAX = 16384;
 export const IMAGE_SIDE = { min: 8, max: 16384 } as const;
 /** FR-OVW-34: a miniature's side (square). */
 export const MINIATURE_SIDE = { min: 8, max: 4096 } as const;
+/** FR-OVW-34: a new miniature's side on the placer's screen, in px (`size` = this ÷ zoom). */
+export const MINIATURE_SCREEN_PX = 64;
 /** FR-OVW-26. */
 export const LABEL_TEXT_MAX = 80;
 /** FR-OVW-32. */
@@ -117,6 +123,28 @@ export const LABEL_STYLE_DEFAULT: LabelStyle = {
   dot: { on: true, size: 12, color: "#ffffff", strokeColor: "#000000", strokeWidth: 2 },
 };
 
+/** FR-OVW-36 default: the label text style at size 14. */
+export const MINIATURE_STYLE_DEFAULT: MiniatureStyle = {
+  font: LABEL_STYLE_DEFAULT.font,
+  size: 14,
+  color: LABEL_STYLE_DEFAULT.color,
+  strokeColor: LABEL_STYLE_DEFAULT.strokeColor,
+  strokeWidth: LABEL_STYLE_DEFAULT.strokeWidth,
+};
+
+/**
+ * FR-OVW-36: a new miniature's name style. `size` = 64 ÷ the placer's zoom (FR-OVW-34), so the name
+ * starts 14 px on that screen too: 14 ÷ zoom, inside the font's bounds.
+ */
+export function newMiniatureStyle(size: number): MiniatureStyle {
+  const name =
+    Math.round(((MINIATURE_STYLE_DEFAULT.size * size) / MINIATURE_SCREEN_PX) * 100) / 100;
+  return {
+    ...MINIATURE_STYLE_DEFAULT,
+    size: Math.min(FONT_SIZE.max, Math.max(FONT_SIZE.min, name)),
+  };
+}
+
 // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the rule (FR-OVW-26).
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
 
@@ -134,6 +162,14 @@ export const miniatureNameFits = (s: string) => nameLength(s) <= MINIATURE_NAME_
 export const LabelText = ItemText.refine(labelTextFits, {
   message: `Text must be 1–${LABEL_TEXT_MAX} characters`,
 });
+
+export const MiniatureName = ItemText.refine(miniatureNameFits, {
+  message: `Name must be at most ${MINIATURE_NAME_MAX} characters`,
+});
+
+/** FR-OVW-33: a character's name as a miniature's: cut to 40 code points (entities allow 60). */
+export const miniatureNameOf = (name: string) =>
+  [...name].slice(0, MINIATURE_NAME_MAX).join("").trim();
 
 // ---------- records (OVW §8) ----------
 
@@ -239,6 +275,36 @@ export const PlaceLabelInput = z.strictObject({
 });
 export type PlaceLabelInput = z.input<typeof PlaceLabelInput>;
 
+/** FR-OVW-34: the square's side, 2 decimals. */
+const MiniatureSize = z
+  .number()
+  .min(MINIATURE_SIDE.min)
+  .max(MINIATURE_SIDE.max)
+  .refine(isDec2, { message: "At most 2 decimals" });
+
+/** FR-OVW-32. */
+export const PlaceMiniatureInput = z.strictObject({
+  overviewId: Id,
+  assetId: Id,
+  x: Position,
+  y: Position,
+  size: MiniatureSize,
+  text: MiniatureName.optional(),
+  ownerPlayerId: Id.optional(),
+  hidden: z.boolean().optional(),
+});
+export type PlaceMiniatureInput = z.input<typeof PlaceMiniatureInput>;
+
+/** FR-OVW-31: `x, y` = the row's centre; `hidden`: the panel's Add hidden (FR-OVW-20). */
+export const AddPartyInput = z.strictObject({
+  overviewId: Id,
+  x: Position,
+  y: Position,
+  size: MiniatureSize,
+  hidden: z.boolean().optional(),
+});
+export type AddPartyInput = z.input<typeof AddPartyInput>;
+
 /** 1–50 of `schema`, no item twice (FR-OVW-17, §9). */
 const groupOf = <S extends z.ZodType>(schema: S, key: (t: z.output<S>) => string) =>
   z
@@ -266,6 +332,10 @@ export const ItemPatch = z.strictObject({
   text: ItemText.optional(),
   style: ItemStyle.optional(),
   assetId: Id.optional(),
+  /** FR-OVW-34, miniatures only. */
+  shape: MiniatureShape.optional(),
+  /** FR-OVW-32, unlinked miniatures only; null = nobody. */
+  ownerPlayerId: Id.nullable().optional(),
 });
 export type ItemPatch = z.output<typeof ItemPatch>;
 
@@ -275,12 +345,21 @@ export const UpdateItemsInput = z.strictObject({
 });
 export type UpdateItemsInput = z.input<typeof UpdateItemsInput>;
 
+const ItemMoves = groupOf(
+  z.strictObject({ itemId: Id, x: Position, y: Position }),
+  (m) => m.itemId,
+);
+
 /** FR-OVW-17. */
-export const MoveItemsInput = z.strictObject({
-  overviewId: Id,
-  moves: groupOf(z.strictObject({ itemId: Id, x: Position, y: Position }), (m) => m.itemId),
-});
+export const MoveItemsInput = z.strictObject({ overviewId: Id, moves: ItemMoves });
 export type MoveItemsInput = z.input<typeof MoveItemsInput>;
+
+/** FR-OVW-37 `ovw.drag`: where the dragged items are drawn, or `end: true` on drop / cancel. */
+export const ItemDragData = z.union([
+  z.strictObject({ overviewId: Id, moves: ItemMoves }),
+  z.strictObject({ overviewId: Id, itemIds: groupOf(Id, (id) => id), end: z.literal(true) }),
+]);
+export type ItemDragData = z.infer<typeof ItemDragData>;
 
 export const ItemIdsInput = z.strictObject({
   overviewId: Id,
@@ -291,6 +370,10 @@ export type ItemIdsInput = z.input<typeof ItemIdsInput>;
 /** `ovw.placeImage` / `ovw.placeLabel` result. */
 export interface PlaceItemResult {
   itemId: string;
+}
+/** `ovw.addParty` result: the new miniatures; empty = everyone is already here (FR-OVW-31). */
+export interface AddPartyResult {
+  itemIds: string[];
 }
 /** `ovw.duplicateItems` result: the copies, in the given order. */
 export interface DuplicateItemsResult {

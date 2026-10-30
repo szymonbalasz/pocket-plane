@@ -7,7 +7,7 @@ import type { OverviewItemView } from "../item-layout";
 export type ItemSend = (name: string, input: unknown) => Promise<unknown>;
 
 /** A kind's own menu entry, shown when the menu acts on this one item alone. */
-export interface ItemMenuEntry {
+export interface ItemMenuAction {
   /** The test ID's end: `ovw-item-menu-<id>`. */
   id: string;
   label: string;
@@ -16,6 +16,19 @@ export interface ItemMenuEntry {
   /** A returned promise's rejection is toasted. */
   run(item: OverviewItemView, send: ItemSend): unknown;
 }
+
+export interface ItemMenuSubProps {
+  item: OverviewItemView;
+  send: ItemSend;
+}
+
+/** An entry that draws itself: a submenu of choices (FR-OVW-34's Shape). */
+export interface ItemMenuSub {
+  id: string;
+  Sub: ComponentType<ItemMenuSubProps>;
+}
+
+export type ItemMenuEntry = ItemMenuAction | ItemMenuSub;
 
 export interface ItemKindDef {
   /** Corner handles keep the shape, each side in these units; null = no handles. */
