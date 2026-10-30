@@ -1,6 +1,7 @@
 // Throws from received `roll` entries (FR-DICEX-13, -14; ADR-0044). Pure: one throw = the `roll`
 // entries of one live frame, dice in `n` order. Reads `payload` only, never `dmPayload`
 // (FR-DICEX-12): what a client throws is exactly what its log already shows.
+import { labelAfterActor } from "@shared/dice-roll-log/actor-label";
 import { z } from "zod";
 
 /** FR-DICEX-14: the faces that get a 3D mesh; d100 = two d10 (tens + units). */
@@ -232,7 +233,7 @@ export function throwDice(entries: readonly ThrowEntry[]): DiceThrow | null {
     for (const raw of items) {
       const item = Item.safeParse(raw);
       if (!item.success) continue;
-      label ??= item.data.label ?? item.data.expression;
+      label ??= labelAfterActor(item.data.label ?? item.data.expression, e.actorName);
       totals.push(item.data.total);
       for (const d of itemDice(item.data)) {
         all.push({ ...d, key: `${e.id}:${all.length}`, entryId: e.id });

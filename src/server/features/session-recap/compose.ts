@@ -4,6 +4,7 @@
 //
 // Split for the memo (FR-RECAP-29): `recapBody` (fights, party, loot, rolls, awards) is memoised;
 // the header (the viewer's clipped span) and `shared` are read per query outside it.
+import { labelAfterActor } from "@shared/dice-roll-log/actor-label";
 import {
   DmRecap,
   OMITTABLE_SECTIONS,
@@ -254,7 +255,8 @@ function notableRolls(
         id: entryIds.get(x.n) ?? x.rollId,
         name: ch && x.actorKind === "entity" ? ch.name : x.actorName,
         natural: x.natural as 20 | 1,
-        label: (labels.get(x.rollId) ?? "").slice(0, 120),
+        // BL-162: the roll's stored actor name, the one its label was written with.
+        label: labelAfterActor(labels.get(x.rollId) ?? "", x.actorName).slice(0, 120),
         ...(r.viewer.role === "dm" ? { hidden: !x.public } : {}),
       };
     }),

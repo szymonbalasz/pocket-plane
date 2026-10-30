@@ -662,3 +662,16 @@ describe("FR-DICEX-55 BL-118 the DM popup column moves once per real change", ()
     expect(dmColumnTop(0)).toBe(100);
   });
 });
+
+describe("BL-162 the popup names the roller once", () => {
+  test("BL-162 a stat block's label: the medallion's name, then the label without it; others whole", () => {
+    const [row] = popupRows([
+      entry({ actorName: "Goblin" }, [
+        item({ label: "Goblin — Hooked Blade attack" }),
+        item({ rollId: "r2", label: "Goblin Boss — Bite" }),
+      ]),
+    ]);
+    expect(row?.actor).toBe("Goblin");
+    expect(row?.items.map((i) => i.label)).toEqual(["Hooked Blade attack", "Goblin Boss — Bite"]);
+  });
+});

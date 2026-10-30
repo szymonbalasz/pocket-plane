@@ -19,7 +19,7 @@ import {
   SessionRecapPayload,
 } from "@shared/session-recap/schemas";
 import { and, eq } from "drizzle-orm";
-import { eventLog, gameLogEntry, notification } from "../../db/schema";
+import { eventLog, gameLogEntry, notification, roll } from "../../db/schema";
 import { SET_FEATURE_INTENT } from "../campaign-management/features";
 import { createEncounter } from "../combat-tracker/encounters";
 import { applyHp } from "../combat-tracker/hp";
@@ -455,5 +455,23 @@ describe("FR-RECAP-20–23 share", () => {
       .where(and(eq(notification.kind, SESSION_RECAP_KIND)))
       .get();
     expect(Buffer.byteLength(JSON.stringify(row?.payload))).toBeLessThanOrEqual(2048);
+  });
+});
+
+describe("BL-162 notable rolls name the roller once", () => {
+  test("BL-162 a label opening with the actor's name: the row's label without it; another stays", () => {
+    const t = recapSetup();
+    const named = t.roll("Thorn", 20);
+    const other = t.roll("Thorn", 1);
+    const label = (rollId: string, text: string) =>
+      t.s.db.update(roll).set({ label: text }).where(eq(roll.id, rollId)).run();
+    label(named.rollId, "Thorn — Longsword attack");
+    label(other.rollId, "Wolf — Bite attack");
+    t.gate().bump(t.h.campaignId);
+    const rows = (t.recap() as DmRecap).rolls.rows;
+    expect(rows.map((r) => [r.name, r.label]).sort()).toEqual([
+      ["Thorn", "Longsword attack"],
+      ["Thorn", "Wolf — Bite attack"],
+    ]);
   });
 });
