@@ -73,7 +73,7 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Miniature** | An overview item: a picture with a name that a player may own and move. No creature, vision, HP or initiative behind it; a party miniature links to its character for name, art and owner only. | Token |
 | **Active scene** | The scene currently shown to players. While an overview is shown there is none; the sync layer's active-scene resolver then returns the overview's ID ([ADR-0075](architecture/adr/0075-overview-scenes.md)). | — |
 | **Viewed scene** | The scene the DM's canvas shows: any scene, client-only; defaults to the active scene (decisions #122). | Active scene |
-| **Scene folder** | DM-only, one-level grouping of scenes in the scene list. Never sent to players. | — |
+| **Scene folder** | DM-only grouping of scenes in the scene list, nesting up to 5 levels. Never sent to players. | — |
 | **Grid calibration** | Setting cell size/offset so the grid aligns with the map image. | — |
 | **Token** | A movable piece on a scene: an instance of a creature definition, optionally bound to a combatant. | Combatant |
 | **Token owner** | The one player (or none) who may move a token. Defaults from the character's owner; the DM reassigns it (decisions #124). A companion's token follows its owner ([ADR-0056](architecture/adr/0056-companion-visibility.md)). | Character's owner |

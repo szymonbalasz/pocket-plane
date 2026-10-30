@@ -110,6 +110,7 @@ import s14ToastsE2e from "./s14-toasts-e2e";
 import sceneTools from "./scene-tools";
 import sceneToolsProps from "./scene-tools-props";
 import scenes from "./scenes";
+import scenesList from "./scenes-list";
 import sessionSim from "./session-sim";
 import sessionSim7 from "./session-sim-7";
 import sessionSim8 from "./session-sim-8";
@@ -383,4 +384,6 @@ export const bundles: readonly Bundle[] = [
   overviewVisual,
   // Compendium expansion panel (build/cmpx-panel): 5etools import walkthrough + e2e
   cmpx5etools,
+  // Scenes window list (fix/scenes-window-qol): `scenes` in its own server
+  scenesList,
 ];

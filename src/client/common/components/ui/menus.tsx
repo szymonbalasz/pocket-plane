@@ -11,6 +11,7 @@ import {
 import type * as React from "react";
 import { cn } from "../../lib/utils";
 import { POPOVER_LAYER } from "./layers";
+import { menuItem, menuSurface } from "./menu-styles";
 
 // ---- DropdownMenu ----
 export const DropdownMenu = DM.Root;
@@ -21,10 +22,6 @@ export const DropdownMenuSub = DM.Sub;
 export function DropdownMenuRadioGroup(props: React.ComponentProps<typeof DM.RadioGroup>) {
   return <DM.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />;
 }
-
-const menuSurface = `${POPOVER_LAYER} min-w-[10rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md`;
-const menuItem =
-  "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0";
 
 export function DropdownMenuContent({
   className,

@@ -1,6 +1,10 @@
 // DM REST calls for scenes and folders (MAP §9) via the Hono RPC client. The session module is
 // imported lazily: it reads localStorage at load (keeps window registries importable in tests).
-import type { SceneFolderResponse, SceneResponse } from "@shared/scenes-map/schemas";
+import type {
+  MoveListEntryBody,
+  SceneFolderResponse,
+  SceneResponse,
+} from "@shared/scenes-map/schemas";
 import { loadChunk } from "@ui/lib/lazy-chunk";
 
 async function session() {
@@ -25,9 +29,15 @@ export const scenesRest = {
     const { api, dmCall } = await session();
     return dmCall<null>(api.api.scenes[":id"].$delete({ param: { id } }));
   },
-  async createFolder(name: string) {
+  async createFolder(name: string, parentId: string | null = null) {
     const { api, dmCall } = await session();
-    return dmCall<SceneFolderResponse>(api.api["scene-folders"].$post({ json: { name } }));
+    return dmCall<SceneFolderResponse>(
+      api.api["scene-folders"].$post({ json: { name, parentId } }),
+    );
+  },
+  async moveListEntry(body: MoveListEntryBody) {
+    const { api, dmCall } = await session();
+    return dmCall<null>(api.api["scene-list"].move.$post({ json: body }));
   },
   async renameFolder(id: string, name: string) {
     const { api, dmCall } = await session();

@@ -16,6 +16,7 @@ import {
   deleteTokenCommand,
   duplicateScene,
   duplicateToken,
+  moveListEntry,
   moveTokenCommand,
   patchScene,
   placeToken,
@@ -45,6 +46,7 @@ export const scenesMap: Feature = {
       createFolder,
       renameFolder,
       deleteFolder,
+      moveListEntry,
     ] as unknown as CommandDef[];
     for (const c of rest) r.command(c);
     // WS intents (protocol §13).

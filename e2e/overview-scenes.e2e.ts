@@ -8,7 +8,7 @@
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
-import { sceneRow, showToPlayers } from "./support/scenes";
+import { confirmShow, sceneRow, showToPlayers } from "./support/scenes";
 import { openWindow } from "./support/shell";
 
 const live = (page: Page) =>
@@ -70,8 +70,8 @@ test("FR-OVW-09 FR-OVW-10 FR-OVW-14 DM shows, player follows; a battle scene and
   await expect(row(coast).getByTestId("ovw-scene-live")).toHaveCount(0);
 
   // FR-OVW-05: and back. The DM keeps viewing Town until they open the overview.
-  await row(coast).hover();
   await row(coast).getByTestId("ovw-scene-show").click();
+  await confirmShow(dm);
   await expect(row(coast).getByTestId("ovw-scene-live")).toBeVisible();
   await expect(player.getByTestId("ovw-canvas")).toHaveAttribute("data-overview-id", coast);
   await expect
@@ -538,6 +538,7 @@ test("FR-OVW-14 New offers Overview; an empty one says so and Fit goes to the or
   ).toBeVisible();
   await renamed.getByTestId("ovw-scene-menu").click();
   await dm.getByTestId("ovw-scene-menu-delete").click();
+  await dm.getByTestId("map-scene-delete-confirm").click();
   await expect(renamed).toHaveCount(0);
   // Back to the default: the shown overview.
   await expect(dm.getByTestId("ovw-canvas-empty")).toHaveCount(0);

@@ -1,7 +1,9 @@
 // REST for scenes and scene folders (MAP §9, protocol §13), DM only. Mounted at /api. No GET:
 // the snapshot carries the records.
 import {
+  CreateFolderBody,
   CreateSceneBody,
+  MoveListEntryBody,
   PatchSceneBody,
   SceneFolderBody,
   type SceneFolderRecord,
@@ -66,7 +68,15 @@ export function sceneRoutes(s: Services) {
         return errorResponse(c, err, s);
       }
     })
-    .post("/scene-folders", dmOnly(s), dmCampaign(s), jsonBody(SceneFolderBody), (c) => {
+    .post("/scene-list/move", dmOnly(s), dmCampaign(s), jsonBody(MoveListEntryBody), (c) => {
+      try {
+        run(MAP_REST.moveListEntry, c.req.valid("json"), c.get("campaignId"));
+        return c.body(null, 204);
+      } catch (err) {
+        return errorResponse(c, err, s);
+      }
+    })
+    .post("/scene-folders", dmOnly(s), dmCampaign(s), jsonBody(CreateFolderBody), (c) => {
       try {
         const sceneFolder = run<SceneFolderRecord>(
           MAP_REST.createFolder,

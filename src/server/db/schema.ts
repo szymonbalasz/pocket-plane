@@ -314,7 +314,7 @@ export const creatureSheet = sqliteTable(
 // Scenes (scenes-map, data model §12–§13). `seq` = insertion order, DB-assigned (CON-20).
 // ---------------------------------------------------------------------------------------------
 
-/** Scene folder: one level (FR-MAP-02). */
+/** Scene folder: nests up to `FOLDER_DEPTH_MAX` levels (FR-MAP-02). */
 export const sceneFolder = sqliteTable(
   "scene_folder",
   {
@@ -322,6 +322,14 @@ export const sceneFolder = sqliteTable(
     campaignId: text("campaign_id")
       .notNull()
       .references((): AnySQLiteColumn => campaign.id),
+    /**
+     * Null = root. A folder delete moves its contents up to this parent first. Checked by the
+     * commands, no FK: push can't add one to an existing table (ALTER), and would rebuild it on
+     * every boot trying.
+     */
+    parentId: text("parent_id"),
+    /** Order among its siblings (FR-MAP-116): 0 = never arranged, by name. */
+    position: integer("position").notNull().default(0),
     seq: integer("seq").notNull(),
     name: text("name").notNull(),
     createdAt: text("created_at").notNull(),
@@ -341,8 +349,10 @@ export const scene = sqliteTable(
     campaignId: text("campaign_id")
       .notNull()
       .references((): AnySQLiteColumn => campaign.id),
-    /** Null = root. Folder delete moves its scenes to the root first (same transaction). */
+    /** Null = root. Folder delete moves its scenes up a level first (same transaction). */
     folderId: text("folder_id").references((): AnySQLiteColumn => sceneFolder.id),
+    /** Order among its siblings (FR-MAP-116): 0 = never arranged, by name. */
+    position: integer("position").notNull().default(0),
     seq: integer("seq").notNull(),
     name: text("name").notNull(),
     mapAssetId: text("map_asset_id")
@@ -376,8 +386,10 @@ export const overview = sqliteTable(
     campaignId: text("campaign_id")
       .notNull()
       .references((): AnySQLiteColumn => campaign.id),
-    /** Null = root. A folder delete moves its overviews to the root (same transaction). */
+    /** Null = root. A folder delete moves its overviews up a level (same transaction). */
     folderId: text("folder_id").references((): AnySQLiteColumn => sceneFolder.id),
+    /** Order among its siblings (FR-MAP-116): 0 = never arranged, by name. */
+    position: integer("position").notNull().default(0),
     seq: integer("seq").notNull(),
     name: text("name").notNull(),
     active: integer("active", { mode: "boolean" }).notNull().default(false),

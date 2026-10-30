@@ -14,6 +14,7 @@ const scene = (id: string, active: boolean): SceneRecord => ({
   id,
   campaignId: "c",
   folderId: "f",
+  position: 7,
   seq: 1,
   name: "Goblin Ambush",
   mapAssetId: "map",
@@ -61,6 +62,8 @@ const token = (
 const folder: SceneFolderRecord = {
   id: "f",
   campaignId: "c",
+  parentId: null,
+  position: 2,
   seq: 1,
   name: "Act 1",
   createdAt: "t",
@@ -120,6 +123,10 @@ const v = (role: "dm" | "player", playerId: string | null = null): Viewer => ({
 const dm = v("dm");
 const owner = v("player", "p1");
 const other = v("player", "p2");
+
+test("FR-MAP-116 the list's order never reaches a player", () => {
+  expect(redactScene(scene("s", true))).not.toHaveProperty("position");
+});
 
 describe("FR-MAP-26 visibility matrix", () => {
   test("scene: DM full; players redacted on the active scene, hidden elsewhere", () => {

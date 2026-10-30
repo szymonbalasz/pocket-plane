@@ -8,17 +8,24 @@ export const sceneRow = (page: Page, sceneName: string): Locator =>
     .getByTestId("map-scene-row")
     .filter({ has: page.getByTestId("map-scene-row-name").getByText(sceneName, { exact: true }) });
 
+/** FR-MAP-119: answers the open "Show to players?" dialog with yes. */
+export async function confirmShow(page: Page): Promise<void> {
+  const dialog = page.getByTestId("map-scene-show-dialog");
+  await dialog.getByTestId("map-scene-show-confirm").click();
+  await expect(dialog).toHaveCount(0);
+}
+
 /**
  * FR-MAP-51: shows `sceneName` to players from the Scenes window (opened if needed and left
- * open): hover its row, click the row's Show button, wait for "Live". Already live → no click.
- * Doesn't change the DM's viewed scene.
+ * open): click the row's Show button, confirm (FR-MAP-119), wait for "Live". Already live → no
+ * click. Doesn't change the DM's viewed scene.
  */
 export async function showToPlayers(page: Page, sceneName: string): Promise<Locator> {
   const win = await openWindow(page, "map.scenes");
   const row = sceneRow(page, sceneName);
   if ((await row.getByTestId("map-scene-live").count()) === 0) {
-    await row.hover();
     await row.getByTestId("map-scene-show").click();
+    await confirmShow(page);
   }
   await expect(row.getByTestId("map-scene-live")).toBeVisible();
   return win;
