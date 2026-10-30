@@ -18,7 +18,8 @@ test.skip(process.platform !== "linux", "baselines are Linux renders (CI)");
  */
 async function overviewDrawn(page: Page, items: number) {
   await settled(page);
-  const close = page.getByTestId("ui-window-close");
+  // A window not on screen (minimised, say) keeps its close button in the page, unclickable.
+  const close = page.locator('[data-testid="ui-window-close"]:visible');
   for (let open = await close.count(); open > 0; open--) {
     await close.first().click();
     await expect(close).toHaveCount(open - 1);
