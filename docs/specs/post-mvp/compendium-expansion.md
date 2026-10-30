@@ -69,7 +69,7 @@ All writes as compendium (one transaction, event-log entry, domain event; ids / 
 | FR-CMPX-05 | **Copies.** `_copy` (with `_mod`: `replaceArr`, `appendArr`, `prependArr`, `insertArr`, `removeArr`, `replaceTxt`, `setProp`, `scalarAddProp`, `scalarMultProp`, `addSpells`) resolved before mapping, recursively, across books. An unknown mode or missing base → that record skipped with a warning. | 1,124 of 3,808 monsters are copies |
 | FR-CMPX-06 | **Text.** 5etools `entries` → markdown-lite (FR-CMP-26): strings → paragraphs; named `entries` → `**Name.** text`; `list` → `- ` items; `table` → pipe table; `inset` / `quote` → `> ` quote; anything else → its plain text, warning. Tags: `{@hit n}` → "+n", `{@damage x}` / `{@dice x}` → "x" (clickable via `DiceText`), `{@dc n}` → "DC n", `{@atk mw}` → "*Melee Weapon Attack:*" (and `rw`, `ms`, `rs`, combos), `{@h}` → "*Hit:* ", `{@recharge n}` → "(Recharge n–6)", every other tag → its display text (last `\|` part, else first). Output is text, never HTML or links. | Monster tag census: 31 kinds, top 10 = 95 % |
 | FR-CMPX-07 | **Monster → entry + definition** (FR-CMP-03, -05 contract): size, AC, HP + formula, speed, scores, saves, CR, `type` (object → its `type`), darkvision; **attacks** from actions with `{@atk}` + `{@hit}` + first `{@damage}` (type from the text after it). Second damage dice stay in the text with a warning (OQ-CMPX-03 A). Spellcasting → a trait "Spellcasting" (header, then "At will: …", "1/day each: …", "1st level (4 slots): …"); legendary → `legendary`; mythic, lair actions, regional effects (legendary group) → one trait each. Over-limit lists / texts clipped with a warning (FR-CMP-01 caps). | 4,211 attack actions; 1,382 with > 1 damage tag |
-| FR-CMPX-08 | **Monster without a numeric HP or AC** (42 special HP, 20 AC): the entry is imported, **no creature definition** (not draggable, no lookup row); its view's **Derive…** opens the creature form from the entry text with HP / AC empty. ([OQ-CMPX-02](#15-open-questions) A) | 62 monsters |
+| FR-CMPX-08 | **Monster without a numeric HP or AC** (42 special HP, 20 AC): the entry is imported, **no creature definition** (the pipeline's monster `definition` becomes optional, `definitionId` null; panel slice, #396) (not draggable, no lookup row); its view's **Derive…** opens the creature form from the entry text with HP / AC empty. ([OQ-CMPX-02](#15-open-questions) A) | 62 monsters |
 | FR-CMPX-09 | **Spell** → `spell`: level, school, components, material, duration, range, casting time, `text`, `higherLevel` (`entriesHigherLevel`), concentration, ritual; classes from `spells/sources.json`, SRD twelve only, others dropped with a warning ([OQ-CMPX-06](#15-open-questions) A). | 525 spells |
 | FR-CMPX-10 | **Item** → `item`: `items.json` + base items + generic variants ("+1 Weapon", not expanded); item groups → one entry each. Category from the type code (melee / ranged → weapon; LA / MA / HA / S → armor; magic when `rarity` ∉ none / unknown; else gear), rarity, attunement (`reqAttune`), cost, weight, damage, properties, AC. | 1,640 + 124 + 129 + 72; largest 34 KB raw |
 | FR-CMPX-11 | **Keys.** `sourceKey` = `<kind>/<slug(name)>` within the book source (`5et-mm` + `monster/goblin`); the monster's definition uses the same pair. A duplicate key in one book → the record skipped with a warning. | Measured 0 duplicate monster names per book |
@@ -120,7 +120,7 @@ Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 
 - **Relations:** book source 1—* entry; monster entry 1—0..1 definition (FR-CMPX-08); entry *—* replaced entries (by ref, no FK); campaign 1—* imported art *—1 asset.
 - **Imported art** is server-only: not a record type, never sent; tokens carry the asset ID as today.
-- **Derived:** the hidden set (FR-CMPX-14) and the inherited preset (FR-CMPX-15), at index build; book list and counts (folder read, cached per process until the version changes).
+- **Derived:** the hidden set (FR-CMPX-14) at index build (a self-ref or cycle stays visible); the inherited preset (FR-CMPX-15) per read, along replace chains, falling back to a built-in preset listing a replaced ref even when that entry isn't imported *(core, #396)*; book list and counts (folder read, cached per process until the version changes).
 - **Persisted runtime state:** none. Additive columns and one new table; existing rows need no backfill.
 
 ## 9. API & events
@@ -131,7 +131,8 @@ Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 |---|---|---|---|
 | GET | `/api/compendium/sources` | DM | + `fiveEtools {state, version?, books[{key, name, abbr, counts, importedVersion?}]}` |
 | POST | `/api/compendium/import` | DM | Unchanged body `{source}`; accepts `5et-*` keys |
-| GET | `/api/compendium/search`, `/entries/:id` | DM, player | Unchanged; hidden set applied (FR-CMPX-14) |
+| GET | `/api/compendium/search` | DM, player | Hidden set applied (FR-CMPX-14). *(core, #396)* New query `definitionId` (with `kind=monster` only, else `invalid`): also lists that definition's entry when hidden, so a token's **Stat block** (FR-CMP-22) still finds it |
+| GET | `/api/compendium/entries/:id` | DM, player | Hidden entries still readable. *(core, #396)* + `inheritedPreset?` (FR-CMPX-15: the preset name taken from a replaced entry) |
 
 **WS intents:** none new. **WS events:** none new. `EntityImported` / `ImportedEntityUpdated` / `CompendiumImported` as FR-CMP-08 (definitions: DM only; `CompendiumImported`: DM only).
 
@@ -164,7 +165,7 @@ Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 | Art (X3) | One ingest per campaign per monster; placement → art for the DM ≤ 1 s (logged); players load it like any token image |
 | Entries if every book is imported | ≈ 3,800 monsters + 525 spells + ≈ 1,960 items ≈ 6,300 (SRD today: 1,288) |
 | Import | MM target ≤ 2 s; all books ≤ 15 s (logged; test on fixtures fails above 10 s per book) |
-| Search | ≤ 5 ms p95 over SRD + 6,300 (FR-CMPX-22); 0.96 ms today on SRD |
+| Search | ≤ 5 ms p95 over SRD + 6,300 (FR-CMPX-22); 0.96 ms today on SRD. *Measured (core, #396): 7,619 rows, 1,100 hidden, index build 585 ms; worst p95 DM 9.33 ms ("goblin", pessimistic synthetic text), players ≤ 2.02 ms; accepted under the 50 ms fail line, matcher speed-up → backlog* |
 | Snapshot | 0 B (FR-CMPX-21) |
 | Players / tunnel | Unchanged: one entry per read, `ETag` / `304` |
 
