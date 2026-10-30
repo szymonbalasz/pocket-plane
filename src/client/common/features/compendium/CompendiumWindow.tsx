@@ -28,6 +28,7 @@ import {
   Tooltip,
 } from "../../components/ui/overlays";
 import { Badge, Input, Label, Skeleton } from "../../components/ui/primitives";
+import { SearchInput } from "../../components/ui/search-input";
 import { Tabs, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Tip } from "../../components/ui/tip";
 import { cn } from "../../lib/utils";
@@ -637,7 +638,7 @@ export function CompendiumBody({
       {top}
       <div className={cn("flex min-h-0 flex-1 flex-col", !listing && "hidden")}>
         <div className="flex items-center gap-1.5 px-2 pt-2">
-          <Input
+          <SearchInput
             className="h-8"
             placeholder="Search: words in any order"
             aria-label="Search the compendium"
@@ -645,6 +646,7 @@ export function CompendiumBody({
             maxLength={100}
             value={q}
             onChange={(e) => setQuery(e.target.value)}
+            onClear={() => setQuery("")}
           />
           <FiltersPopover tab={shownTab} filters={filters} />
           {toolbar}

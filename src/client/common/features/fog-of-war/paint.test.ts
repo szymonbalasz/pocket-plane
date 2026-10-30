@@ -4,9 +4,8 @@
 // statically clear (never over Fog or Explored), the `fog-mask` attrs, DM darkness hatching, the
 // `fog-vision` / `fog-explored` markers.
 import { describe, expect, test } from "bun:test";
-import { encodeRuns } from "@shared/fog-of-war/mask";
 import type { DarknessShape, FogLayerShape } from "@shared/fog-of-war/shapes";
-import { EdgePixel, Raster } from "./paint-raster";
+import { cellSquares, EdgePixel, Raster } from "./paint-raster";
 import {
   FOG_ALPHA,
   type FogPaints,
@@ -94,7 +93,7 @@ describe("FR-FOG-20/21 painter", () => {
         test(`FR-FOG-37 ${client}: Fog over explored memory at coverage ${c}`, () => {
           const px = new EdgePixel(c, true);
           const rec = { ...fogged, shapes: [fogCircle] };
-          paintFog(px, rec, map, client, paints(client), 0, [[0, 0, 100, 60]]);
+          paintFog(px, rec, map, client, paints(client), 0, [[[[0, 0, 10, 0, 10, 6, 0, 6]]]]);
           expect(px.alpha).toBeCloseTo(a.explored, 6);
         });
       }
@@ -104,11 +103,29 @@ describe("FR-FOG-20/21 painter", () => {
   test("FR-FOG-37 memory cells draw Explored and the rest Fog, in the base and in a fog shape", () => {
     const r = new Raster(100, 60);
     const rec = { ...fogged, shapes: [{ op: "fog", rect: [0, 3, 10, 6] } as FogLayerShape] };
-    paintFog(r, rec, map, "player", paints("player"), 0, [[0, 0, 40, 60]]);
+    paintFog(r, rec, map, "player", paints("player"), 0, [[[[0, 0, 4, 0, 4, 6, 0, 6]]]]);
     expect(cell(r, 1, 1)).toEqual({ label: "E", alpha: 0.6 }); // base, memory
     expect(cell(r, 6, 1)).toEqual({ label: "F", alpha: 1 }); // base
     expect(cell(r, 1, 4)).toEqual({ label: "E", alpha: 0.6 }); // shape, memory
     expect(cell(r, 6, 4)).toEqual({ label: "F", alpha: 1 }); // shape
+  });
+
+  test("FR-FOG-37 an explored shape's hole stays Fog; another player's shape over the hole draws Explored (View as Party)", () => {
+    const ring: number[][] = [
+      [0, 0, 6, 0, 6, 6, 0, 6],
+      [2, 2, 2, 4, 4, 4, 4, 2],
+    ];
+    const one = new Raster(100, 60);
+    paintFog(one, fogged, map, "player", paints("player"), 0, [[ring]]);
+    expect(label(one, 1, 1)).toBe("E");
+    expect(label(one, 3, 3)).toBe("F"); // the hole
+    expect(label(one, 8, 3)).toBe("F");
+    const two = new Raster(100, 60);
+    paintFog(two, fogged, map, "player", paints("player"), 0, [[ring], cellSquares([[3, 3]])]);
+    expect(label(two, 3, 3)).toBe("E");
+    expect(label(two, 1, 1)).toBe("E");
+    expect(label(two, 2, 3)).toBe("F"); // still in the first hole, not in the second shape
+    expect(label(two, 8, 3)).toBe("F");
   });
 
   test("FR-FOG-21 player: Fog opaque, Explored dims; darkness only where statically clear, never over Fog or Explored", () => {
@@ -167,9 +184,6 @@ describe("FR-FOG-20/21 painter", () => {
   });
 
   test("FOG §7 fog-vision / fog-explored markers: the player's own rows only", () => {
-    const m = new Uint8Array(6).fill(0);
-    m[1] = 1;
-    m[4] = 1;
     const records = {
       vision: {
         "s:p1": {
@@ -187,8 +201,10 @@ describe("FR-FOG-20/21 painter", () => {
           id: "s:p1",
           sceneId: "s",
           playerId: "p1",
-          box: [0, 0, 3, 2],
-          runs: encodeRuns(m, "clear"),
+          shape: cellSquares([
+            [1, 0],
+            [1, 1],
+          ]),
         },
       },
     };

@@ -12,19 +12,18 @@
 // Blind (FR-FOG-36): the whole map dark (`fog.darkness`) with the grid lines redrawn on top, in a
 // light colour when the scene's grid colour would vanish into the dark (the default is black).
 // Polygons are wound one way before they are clipped as a union (nonzero). DOM-free.
-import { exploredMask } from "@shared/fog-of-war/explored";
-import type { FogBox } from "@shared/fog-of-war/schemas";
+import type { ExploredShape } from "@shared/fog-of-war/schemas";
 import type { MapRect } from "@shared/scenes-map/geometry";
 import {
   FOG_COLOR_FALLBACK,
   type FogPaints,
   type FogRecordLike,
-  type FogRun,
   type GridPx,
   type Paint,
   type PaintCtx,
   paintFog,
   shapePath,
+  signedArea,
 } from "./render";
 
 /** The fields of a `vision` record the view reads. */
@@ -58,44 +57,6 @@ export interface GridLines {
   opacity: number;
   /** Line width in map px (1 screen px). */
   width: number;
-}
-
-/** FR-FOG-37: a `fog-explored` row's cells as row runs in map px (the memory the view draws). */
-export function memoryRuns(row: { box: FogBox; runs: string } | null, g: GridPx): FogRun[] {
-  if (row === null) return [];
-  const mask = exploredMask(row);
-  const [col0, row0, cols, rows] = mask.box;
-  const cs = g.gridCellSize;
-  const out: FogRun[] = [];
-  for (let r = 0; r < rows; r++) {
-    let start = -1;
-    for (let c = 0; c <= cols; c++) {
-      const on = c < cols && mask.cells[r * cols + c] === 1;
-      if (on && start < 0) start = c;
-      if (!on && start >= 0) {
-        out.push([
-          g.gridOffsetX + (col0 + start) * cs,
-          g.gridOffsetY + (row0 + r) * cs,
-          (c - start) * cs,
-          cs,
-        ]);
-        start = -1;
-      }
-    }
-  }
-  return out;
-}
-
-/** Signed area of a flat polygon (any consistent unit). */
-function signedArea(flat: readonly number[]): number {
-  let a = 0;
-  const n = flat.length >> 1;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    a +=
-      (flat[2 * j] as number) * (flat[2 * i + 1] as number) -
-      (flat[2 * i] as number) * (flat[2 * j + 1] as number);
-  }
-  return a / 2;
 }
 
 /** Adds a sight polygon (grid units → map px), always wound the same way (nonzero union). */
@@ -192,8 +153,8 @@ export function paintBlind(ctx: PaintCtx, m: MapRect, paint: Paint, grid?: GridL
 export interface ViewInput {
   /** The viewer's `fog` record (players: redacted, darkness filtered, FR-FOG-44). */
   fog: FogRecordLike & { explored?: boolean };
-  /** The viewer's `fog-explored` row as map px runs (`memoryRuns`); drawn only while `explored`. */
-  memory: readonly FogRun[];
+  /** The drawn `fog-explored` rows' shapes; drawn only while `explored`. */
+  memory: readonly ExploredShape[];
   /** The viewer's `vision` record; null = no source on the scene (static fog only). */
   vision: VisionLike | null;
   /** FR-FOG-21 (sprint 4): the map image's greyscale copy (map px), once ready; else the tint only. */
@@ -209,7 +170,7 @@ function paintRing(
   input: ViewInput,
   m: MapRect,
   paints: ViewPaints,
-  memory: readonly FogRun[],
+  memory: readonly ExploredShape[],
 ) {
   const fog = { ...input.fog, darkness: [] };
   const grey = input.grey;

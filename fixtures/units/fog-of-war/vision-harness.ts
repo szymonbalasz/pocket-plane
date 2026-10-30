@@ -11,6 +11,7 @@ import { startTestServer, type TestClient, type TestServer } from "@server/testi
 import { createTestServices, TEST_SECRET } from "@server/testing/services";
 import type { Viewer } from "@server/ws/records";
 import { convergence, leakScan } from "@server/ws/testing/convergence";
+import { shapeHolds } from "@shared/fog-of-war/explored";
 import {
   FOG_INTENTS as F,
   FOG_EXPLORED_TYPE,
@@ -282,23 +283,9 @@ export async function visionHarness(bundle = "vision", opts: { fake?: boolean } 
 
 export type VisionHarness = Awaited<ReturnType<typeof visionHarness>>;
 
-/** Is cell (col, row) in an explored-memory row? */
+/** Is cell (col, row)'s centre in an explored-memory row? */
 export function explores(r: FogExploredRecord | undefined, col: number, row: number): boolean {
-  if (!r) return false;
-  const [c0, r0, cols, rows] = r.box;
-  const c = col - c0;
-  const rr = row - r0;
-  if (c < 0 || rr < 0 || c >= cols || rr >= rows) return false;
-  let at = 0;
-  let v = 1;
-  const want = rr * cols + c;
-  for (const part of r.runs === "" ? [] : r.runs.split(",")) {
-    const len = Number.parseInt(part, 36);
-    if (want < at + len) return v === 1;
-    at += len;
-    v = 1 - v;
-  }
-  return false;
+  return r !== undefined && shapeHolds(r.shape, col + 0.5, row + 0.5);
 }
 
 /**

@@ -20,7 +20,8 @@ import {
   SelectValue,
   Tooltip,
 } from "../../../components/ui/overlays";
-import { Badge, Input, Skeleton } from "../../../components/ui/primitives";
+import { Badge, Skeleton } from "../../../components/ui/primitives";
+import { SearchInput } from "../../../components/ui/search-input";
 import { Tabs, TabsList, TabsTrigger } from "../../../components/ui/tabs";
 import { cn } from "../../../lib/utils";
 import { useSync } from "../../../sync/store";
@@ -567,7 +568,7 @@ export function RulesBody({
     >
       <div className="space-y-1.5 px-2 pt-2">
         <PagePicker page={page} narrow={narrow} />
-        <Input
+        <SearchInput
           className="h-8"
           placeholder="Search the rules"
           aria-label="Search the rules"
@@ -575,6 +576,7 @@ export function RulesBody({
           maxLength={100}
           value={q}
           onChange={(e) => setRulesQuery(e.target.value)}
+          onClear={() => setRulesQuery("")}
         />
       </div>
       <div
