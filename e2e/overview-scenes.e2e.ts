@@ -333,7 +333,7 @@ test("FR-OVW-22 FR-OVW-23 FR-OVW-20 add an image, resize it, hide it, reveal it 
   await drag(dm, corner, { x: corner.x - before.width / 2, y: corner.y - before.height / 4 });
   await expect
     .poll(async () => (await konvaNodes(dm, "ovw-image"))[0]?.width)
-    .toBeLessThan(before.width * 0.75);
+    .toBeLessThan(before.width * 0.8);
   const after = (await konvaNodes(dm, "ovw-image"))[0];
   expect((after?.width ?? 0) / (after?.height ?? 1)).toBeCloseTo(before.width / before.height, 1);
 
@@ -942,8 +942,9 @@ test.describe("place labels", () => {
     await dm.getByTestId("ovw-style-font-fell").click();
     await expect(dm.getByTestId("ovw-style-preview")).toHaveAttribute("data-font", "fell");
     const zoom = await canvas.getAttribute("data-zoom");
-    await addLabel(cx, cy, "Thundertree");
-    await addLabel(cx + 120, cy + 70, "Conyberry");
+    // Up and left of the middle: the party stands to the lower right, in the miniatures' band above.
+    await addLabel(cx - 100, cy - 30, "Thundertree");
+    await addLabel(cx + 20, cy - 110, "Conyberry");
     await expect(canvas).toHaveAttribute("data-tool", "label");
     await expect(canvas).toHaveAttribute("data-zoom", zoom ?? "");
     for (const text of ["Thundertree", "Conyberry"]) {

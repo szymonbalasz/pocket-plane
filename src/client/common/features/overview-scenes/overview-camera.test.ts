@@ -1,6 +1,8 @@
 // FR-OVW-12 Fit (OVW §13 unit): every item the viewer has, in the free area, with the map's helpers.
 import { describe, expect, test } from "bun:test";
+import { fitRooms, railArea } from "../play-shell/free-area";
 import { TOP_BAR_H } from "../play-shell/geometry";
+import { keepOuts } from "../play-shell/keep-outs";
 import { RAIL_CLEAR } from "../play-shell/placement";
 import type { FitRoom } from "../scenes-map/camera";
 import { FIT_MARGIN, ZOOM_MAX, ZOOM_MIN } from "../scenes-map/camera";
@@ -78,6 +80,37 @@ describe("FR-OVW-12 fit", () => {
     const f = fitOverview(itemsBox([image(0, 0, 100, 100)], measure), view, roomOf());
     expect(f.rect?.x).toBe(RAIL_CLEAR);
     expect(f.rect?.y).toBe(TOP_BAR_H);
+  });
+
+  test("FR-OVW-12 fit reads windows only: no room kept for a toast, a window still avoided", () => {
+    const box = itemsBox([image(0, 0, 4096, 2731)], measure);
+    const clear = { x: 60, y: 48, w: 1380, h: 852 };
+    // `areas` as the toast obstacles leave them: a column kept free on the right.
+    const toasts = [{ x: 60, y: 48, w: 1000, h: 852 }];
+    const f = fitOverview(box, view, { areas: toasts, obstacles: [], windowsOnly: [clear] });
+    expect(f.rect).toEqual(clear);
+    expect(f.scale).toBeCloseTo((clear.h - 2 * FIT_MARGIN) / 2731, 6);
+
+    // With a window open it keeps clear of that window, whatever `areas` says.
+    const beside = { x: 60, y: 48, w: 1000, h: 500 };
+    const open = fitOverview(box, view, { areas: toasts, obstacles: [], windowsOnly: [beside] });
+    expect(open.rect).toEqual(beside);
+
+    // No window-free rectangle: the work area right of the rail, not `areas`.
+    const none = fitOverview(box, view, { areas: toasts, obstacles: [], windowsOnly: [] });
+    expect(none.rect?.x).toBe(RAIL_CLEAR);
+    expect(none.rect?.y).toBe(TOP_BAR_H);
+    expect(none.rect?.w).toBe(view.w - RAIL_CLEAR);
+  });
+
+  test("FR-OVW-12 fit with no window open, on either client: the whole area right of the rail", () => {
+    const box = itemsBox([image(0, 0, 4096, 2731)], measure);
+    for (const client of ["player", "dm"] as const) {
+      const { room } = fitRooms(client, [], keepOuts(client, view), view, null);
+      // The toast obstacles do cut the room the battle map's fit reads.
+      expect(room.areas).not.toContainEqual(railArea(view));
+      expect(fitOverview(box, view, room).rect).toEqual(railArea(view));
+    }
   });
 
   test("FR-OVW-11 the fit stays in the zoom range, 10–400 %", () => {
