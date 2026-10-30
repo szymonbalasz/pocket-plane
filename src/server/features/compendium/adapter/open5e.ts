@@ -67,7 +67,8 @@ export type AdapterRecord =
       kind: "monster";
       sourceKey: string;
       data: EntryDraftOf<"monster">;
-      definition: MonsterDefinition;
+      /** FR-CMPX-08: absent = the entry only (no numeric HP or AC); `definitionId` stays null. */
+      definition?: MonsterDefinition;
       /** FR-CMPX-23: the token file, relative to the source's folder. */
       artPath?: string | null;
       /** FR-CMPX-13: `<source>:<sourceKey>` refs of the entries this one replaces. */
@@ -93,6 +94,15 @@ export interface AdapterResult {
   /** Non-`wotc-srd` records (and archetypes) skipped. */
   skipped: number;
   counts: Record<CompendiumKind, number>;
+}
+
+/** Open5e's monsters always have the numbers: each carries its definition (FR-CMP-03). */
+export type Open5eRecord =
+  | (Extract<AdapterRecord, { kind: "monster" }> & { definition: MonsterDefinition })
+  | Exclude<AdapterRecord, { kind: "monster" }>;
+
+export interface Open5eResult extends Omit<AdapterResult, "records"> {
+  records: Open5eRecord[];
 }
 
 // ---------- raw Open5e shapes (only the fields we read) ----------
@@ -723,7 +733,7 @@ const MAPPERS: Record<Open5eEndpoint, (c: Run, raw: unknown, i: number) => void>
   sections: rules,
 };
 
-export function adaptOpen5e(responses: Open5eResponses): AdapterResult {
+export function adaptOpen5e(responses: Open5eResponses): Open5eResult {
   const c = new Run();
   for (const endpoint of OPEN5E_ENDPOINTS) {
     for (const [i, raw] of (responses[endpoint] ?? []).entries()) {
@@ -739,5 +749,6 @@ export function adaptOpen5e(responses: Open5eResponses): AdapterResult {
   });
   const counts = { monster: 0, spell: 0, item: 0, condition: 0, feature: 0, rule: 0 };
   for (const r of records) counts[r.kind]++;
-  return { records, warnings: c.warnings, skipped: c.skipped, counts };
+  // Every monster mapper above writes a definition: the SRD always has the numbers.
+  return { records: records as Open5eRecord[], warnings: c.warnings, skipped: c.skipped, counts };
 }

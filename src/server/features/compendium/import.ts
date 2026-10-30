@@ -3,6 +3,7 @@
 // `(source, sourceKey)` → per record created | updated | existing. Any error → nothing written,
 // every issue returned. Changed definitions run entities' hooks (FR-CMP-08). Then one
 // `CompendiumImported`, only if something was written. No route here (C3 adds it).
+import { BOOK_SOURCE_PREFIX } from "@shared/compendium/match";
 import { COMPENDIUM_KINDS, CompendiumKind, SourceKey } from "@shared/compendium/schemas";
 import { CompendiumImported, type ImportCounts } from "@shared/events/compendium";
 import { eq } from "drizzle-orm";
@@ -29,14 +30,26 @@ import {
   OPEN5E_ENDPOINTS,
 } from "./adapter/open5e";
 import { importKindOf } from "./entries";
-import { BUNDLED_SOURCE_KEYS, bundledSource } from "./sources";
+import { BUNDLED_SOURCE_KEYS, type BundledSourceKey, bundledSource } from "./sources";
+import { fiveEtoolsBook } from "./sources/five-etools";
 
 export const IMPORT = "cmp.import";
 export const IMPORT_RECORDED = "cmp.importRecorded";
 /** FR-CMP-07: the one-transaction write pauses every command, combat included. */
 export const END_COMBAT_FIRST = "End combat first";
 
-export const ImportInput = z.strictObject({ source: z.enum(BUNDLED_SOURCE_KEYS) });
+const isBundledKey = (s: string): s is BundledSourceKey =>
+  (BUNDLED_SOURCE_KEYS as readonly string[]).includes(s);
+
+export const ImportInput = z.strictObject({
+  source: z
+    .string()
+    .min(1)
+    .max(64)
+    .refine((s) => isBundledKey(s) || s.startsWith(BOOK_SOURCE_PREFIX), "Unknown source"),
+  /** One Import / Update of several books: all of them adapt from one folder read (#397). */
+  run: z.string().min(1).max(64).optional(),
+});
 
 /** A hand-made record (fixtures, tests); `data`, `definition` and the links are validated with the batch. */
 const RecordedRecord = z.strictObject({
@@ -93,7 +106,7 @@ function toBatch(source: SourceDescriptor, adapted: AdapterResult): ImportBatch 
         ...(artPath != null ? { artPath } : {}),
       };
       const entry = { kind: importKindOf(r.kind), sourceKey: r.sourceKey, data };
-      return r.kind === "monster"
+      return r.kind === "monster" && r.definition
         ? [{ kind: "monster", sourceKey: r.sourceKey, data: r.definition }, entry]
         : [entry];
     }),
@@ -176,16 +189,22 @@ export function runImport(
   return { source: source.key, version, counts, warnings: adapted.warnings, changed };
 }
 
-/** `cmp.import {source}` (DM): a bundled source by key; refused while an encounter is started. */
-export function importCommand(reg: ImportRegistry) {
+/**
+ * `cmp.import {source, run?}` (DM): a bundled source or a book of the folder by key (FR-CMPX-02,
+ * one transaction per book, FR-CMPX-12); refused while an encounter is started.
+ */
+export function importCommand(reg: ImportRegistry, fiveEtoolsDir: string | null) {
   return defineCommand({
     name: IMPORT,
     input: ImportInput,
-    execute({ source }, env): ImportResult {
+    execute({ source, run }, env): ImportResult {
       const active = activeCampaign(env.tx);
       if (active && startedEncounter(env.tx, active.id)) throw conflict(END_COMBAT_FIRST);
-      const { bundled, adapted } = bundledSource(source);
-      return runImport(reg, env, { source: bundled.source, version: bundled.version, adapted });
+      if (isBundledKey(source)) {
+        const { bundled, adapted } = bundledSource(source);
+        return runImport(reg, env, { source: bundled.source, version: bundled.version, adapted });
+      }
+      return runImport(reg, env, fiveEtoolsBook(fiveEtoolsDir, source, run));
     },
   });
 }

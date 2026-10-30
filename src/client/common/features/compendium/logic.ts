@@ -1,5 +1,6 @@
 // Compendium window logic (FR-CMP-18–22), pure: tabs per role, Filters fields, search params,
 // labels, stat block numbers, the notation category of monster text, Stat block routing.
+import { bookAbbr } from "@shared/compendium/match";
 import { FILTER_KEYS, type FilterKey } from "@shared/compendium/rest";
 import {
   type CompendiumKind,
@@ -115,10 +116,13 @@ export function emptyText(q: string, unfiltered: boolean, role: Role): string {
 export const activeFilterCount = (tab: CmpTab, filters: Filters) =>
   tab === "all" ? 0 : Object.keys(searchParams("", tab, filters)).length - 1;
 
-/** Result Badge (CMP §7): `SRD` for SRD sources, else the label (`Homebrew`, `Fixture`, …). */
+/**
+ * Result Badge (CMP §7): `SRD` for SRD sources, a book's abbreviation for its source key (the
+ * Creatures window's rows, FR-CMPX-16), else the label (`Homebrew`, `Fixture`, …).
+ */
 export const badgeLabel = (sourceLabel: string) => {
   const name = sourceName(sourceLabel);
-  return /^SRD\b/.test(name) ? "SRD" : name;
+  return /^SRD\b/.test(name) ? "SRD" : (bookAbbr(name) ?? name);
 };
 
 /** Display names of source keys without a `compendium_source` row (entryless definitions). */
@@ -130,14 +134,15 @@ export function sourceName(source: string): string {
 }
 
 /**
- * FR-CMP-19 footer: imported "SRD 5.1 · CC BY 4.0"; homebrew "Homebrew" (+ "Shared" / "DM only"
- * for the DM).
+ * FR-CMP-19 footer: imported "SRD 5.1 · CC BY 4.0"; a book "Monster Manual (MM)", no licence line
+ * (FR-CMPX-18); homebrew "Homebrew" (+ "Shared" / "DM only" for the DM).
  */
 export function footerLabel(
-  source: { name: string; licence: string } | null,
+  source: { name: string; licence: string; abbr?: string | undefined } | null,
   shared: boolean,
   role: Role,
 ): string {
+  if (source?.abbr) return `${source.name} (${source.abbr})`;
   if (source) return `${source.name} · ${source.licence}`;
   if (role !== "dm") return "Homebrew";
   return `Homebrew · ${shared ? "Shared" : "DM only"}`;

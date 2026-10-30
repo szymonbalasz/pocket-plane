@@ -13,13 +13,13 @@ import {
 } from "@shared/compendium/schemas";
 import { EntityName, MonsterStatBlock } from "@shared/entities/schemas";
 import { z } from "zod";
+import type { AdapterRecord } from "../open5e";
 import {
   ADAPTER_VERSION_5ET,
   adaptBook,
   adaptBookData,
   bookVersion,
   describeBooks,
-  type FiveEtoolsRecord,
   FolderError,
   listBooks,
   srdIndexOf,
@@ -34,12 +34,12 @@ const allExist = () => true;
 const tb1 = adaptBook(DIR, "TB1", { exists: allExist });
 const tb2 = adaptBook(DIR, "TB2", { exists: allExist });
 
-const rec = (key: string, list: readonly FiveEtoolsRecord[] = tb1.records) => {
+const rec = (key: string, list: readonly AdapterRecord[] = tb1.records) => {
   const r = list.find((x) => x.sourceKey === key);
   if (!r) throw new Error(`No record ${key}`);
   return r;
 };
-const monster = (key: string, list?: readonly FiveEtoolsRecord[]) => {
+const monster = (key: string, list?: readonly AdapterRecord[]) => {
   const r = rec(key, list);
   if (r.kind !== "monster") throw new Error(`${key} is not a monster`);
   return r;
@@ -49,7 +49,7 @@ const spell = (key: string) => {
   if (r.data.kind !== "spell") throw new Error(`${key} is not a spell`);
   return r.data;
 };
-const item = (key: string, list?: readonly FiveEtoolsRecord[]) => {
+const item = (key: string, list?: readonly AdapterRecord[]) => {
   const r = rec(key, list);
   if (r.data.kind !== "item") throw new Error(`${key} is not an item`);
   return r.data;
@@ -255,13 +255,13 @@ describe("FR-CMPX-05 copies", () => {
     });
     return { r, copy: monster("monster/copy", r.records) };
   };
-  const actionNames = (m: FiveEtoolsRecord) =>
+  const actionNames = (m: AdapterRecord) =>
     m.kind === "monster" ? m.data.body.actions.map((a) => a.name) : [];
-  const dataOf = (m: FiveEtoolsRecord) => {
+  const dataOf = (m: AdapterRecord) => {
     if (m.kind !== "monster") throw new Error("not a monster");
     return m.data;
   };
-  const traitText = (m: FiveEtoolsRecord, name: string) =>
+  const traitText = (m: AdapterRecord, name: string) =>
     dataOf(m).body.traits.find((t) => t.name === name)?.text ?? "";
 
   test("FR-CMPX-05 replaceArr", () => {
@@ -832,6 +832,17 @@ describe("FR-CMPX-07 monster → entry + definition", () => {
 });
 
 describe("FR-CMPX-08 no numeric HP or AC", () => {
+  test("FR-CMPX-07 an attack's name is the action's alone: the creature's name is the roller's to add", () => {
+    const goblin = monster("monster/goblin").definition?.statBlock;
+    expect(goblin?.attacks.map((a) => a.name)).toContain("Hooked Blade");
+    for (const r of [...tb1.records, ...tb2.records]) {
+      if (r.kind !== "monster") continue;
+      for (const a of r.definition?.statBlock.attacks ?? []) {
+        expect(a.name.startsWith(`${r.data.name} `)).toBe(false);
+      }
+    }
+  });
+
   test("FR-CMPX-08 special HP → entry only, no definition", () => {
     const m = monster("monster/wobbling-fenwisp");
     expect(m.definition).toBeUndefined();

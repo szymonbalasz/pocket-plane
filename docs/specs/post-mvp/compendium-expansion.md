@@ -99,7 +99,7 @@ All writes as compendium (one transaction, event-log entry, domain event; ids / 
 
 Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 
-- **Import panel** (DM, Compendium window): SRD section as today, then **5etools**: status line, version, a search Input, a scrollable Checkbox list (book name, muted "MM · 450 monsters · 0 spells · 0 items", Badge "Imported" / "Update"), footer **Import selected** (disabled with none checked) and **Update all**. Progress replaces the footer while running.
+- **Import panel** (DM, Compendium window): SRD section as today, then **5etools**: status line, version, **Import selected** (disabled with none checked) and **Update all** in its header; a Collapsible **Books (N)**, folded by default once any book is imported and again after a run with no failed book, holding a search Input, **Select all** / **Select none** (the filtered rows) and a short scrollable Checkbox list (book name, muted "MM · 450 monsters · 0 spells · 0 items", Badge "Imported" / "Update"). Progress shows while running. At the default window size with 106 books: ≥ 9 result rows folded, ≥ 4 open (re-test: 4½) *(walkthrough fix, #398)*.
 - **Results / views:** source Badge = book abbreviation ("MM", "XGE"); otherwise as compendium §7.
 - **States:** not configured / not found (FR-CMPX-17); importing (buttons disabled, progress); error Toast per failed book, others kept; disconnected: REST only, writes need `live` (FR-CMP §7).
 - **DM view:** everything above. **Player view:** no panel; book entries appear in search with their badges (no monsters).
@@ -129,8 +129,9 @@ Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/api/compendium/sources` | DM | + `fiveEtools {state, version?, books[{key, name, abbr, counts, importedVersion?}]}` |
-| POST | `/api/compendium/import` | DM | Unchanged body `{source}`; accepts `5et-*` keys |
+| GET | `/api/compendium/sources` | DM | + `fiveEtools {state, version? (hash, FR-CMPX-03), release? (shown version), path?, issues?, books[{key, name, abbr, counts, importedVersion?, importedAt?}]}` *(panel, #398)* |
+| POST | `/api/compendium/import` | DM | Body `{source, run?, last?}`; accepts `5et-*` keys. *(#398)* `run`: an id shared by the books of one Import / Update run, so the folder is read once (kept until `last: true` or 60 s idle); `last: true` ends the run (run log line) |
+| GET | `/api/compendium/credits` | DM, player | *(#398)* The imported sources for About (books, SRD, token-art line); not paged |
 | GET | `/api/compendium/search` | DM, player | Hidden set applied (FR-CMPX-14). *(core, #396)* New query `definitionId` (with `kind=monster` only, else `invalid`): also lists that definition's entry when hidden, so a token's **Stat block** (FR-CMP-22) still finds it |
 | GET | `/api/compendium/entries/:id` | DM, player | Hidden entries still readable. *(core, #396)* + `inheritedPreset?` (FR-CMPX-15: the preset name taken from a replaced entry) |
 
@@ -164,7 +165,7 @@ Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 | Folder | `data/` 90 MB; read per import ≈ 13 MB; tokens 3,857 files, 559 MB, ≈ 100 KB each (X3 copies only placed monsters) |
 | Art (X3) | One ingest per campaign per monster; placement → art for the DM ≤ 1 s (logged); players load it like any token image |
 | Entries if every book is imported | ≈ 3,800 monsters + 525 spells + ≈ 1,960 items ≈ 6,300 (SRD today: 1,288) |
-| Import | MM target ≤ 2 s; all books ≤ 15 s (logged; test on fixtures fails above 10 s per book). *Probe (#397): read 124 ms, adapt MM 52 ms, all 106 books 1.25 s; writes not yet measured* |
+| Import | *(#398, measured on the DM's folder and accepted)* MM 4–6 s; all 106 books 67 s (per-book median 0.37 s, longest 3.5 s; players' REST p95 0.4 s during the run); unchanged re-import of all 5.1 s. One server-log line per book (counts, warnings, ms) and one per run. Fixture test fails above 10 s per book. Original targets were MM ≤ 2 s, all ≤ 15 s |
 | Search | ≤ 5 ms p95 over SRD + 6,300 (FR-CMPX-22); 0.96 ms today on SRD. *Measured (core, #396): 7,619 rows, 1,100 hidden, index build 585 ms; worst p95 DM 9.33 ms ("goblin", pessimistic synthetic text), players ≤ 2.02 ms; accepted under the 50 ms fail line, matcher speed-up → backlog* |
 | Snapshot | 0 B (FR-CMPX-21) |
 | Players / tunnel | Unchanged: one entry per read, `ETag` / `304` |

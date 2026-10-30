@@ -3,14 +3,17 @@
 // same answer as an unknown id, before any conditional check. Image IDs (FR-CMP-47, -48) only
 // after it, stale ones dropped (FR-ASSET-37); the ETag hashes them, never carries them.
 import { createHash } from "node:crypto";
+import { sourceRank } from "@shared/compendium/match";
 import { resolvePreset } from "@shared/compendium/presets";
-import type { EntryResponse } from "@shared/compendium/rest";
+import type { CreditsResponse, EntryResponse, SourceAttribution } from "@shared/compendium/rest";
 import { CompendiumEntry } from "@shared/compendium/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { asset, compendiumEntry, compendiumSource, entity } from "../../db/schema";
 import { toImportedRecord } from "../entities/rows";
 import { inheritedPreset } from "./entries";
+import { searchIndex } from "./search-index";
+import { type BookAbbrOf, bookAbbrOf } from "./sources/five-etools";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
 
 export interface EntryRead {
@@ -53,7 +56,47 @@ function liveImageIds(db: Db, campaignId: string | null, ids: readonly string[])
   return ids.filter((x) => live.has(x));
 }
 
-export function readEntry(db: Db, id: string, v: EntryViewer): EntryRead | null {
+type SourceRow = typeof compendiumSource.$inferSelect;
+
+function attributionOf(src: SourceRow, abbrOf: BookAbbrOf): SourceAttribution {
+  const abbr = abbrOf(src.key, src.name);
+  return {
+    key: src.key,
+    name: src.name,
+    licence: src.licence,
+    attribution: src.attribution,
+    url: src.url,
+    version: src.version,
+    ...(abbr !== undefined ? { abbr } : {}),
+  };
+}
+
+/**
+ * FR-CMPX-18 (FR-CMP-19's About): the source of every entry this viewer may read, by rank then
+ * name. Replaced entries still count: they stay readable, so their source stays credited.
+ */
+export function readCredits(db: Db, v: EntryViewer, abbrOf: BookAbbrOf): CreditsResponse {
+  const keys = new Set<string>();
+  for (const row of searchIndex(db).rows) {
+    if (row.source !== null && !row.entryless && entryVisibleTo(row, v)) keys.add(row.source);
+  }
+  const rows = keys.size
+    ? db
+        .select()
+        .from(compendiumSource)
+        .where(inArray(compendiumSource.key, [...keys]))
+        .all()
+    : [];
+  rows.sort((a, b) => sourceRank(a.key) - sourceRank(b.key) || a.name.localeCompare(b.name));
+  return { sources: rows.map((r) => attributionOf(r, abbrOf)) };
+}
+
+export function readEntry(
+  db: Db,
+  id: string,
+  v: EntryViewer,
+  abbrOf: BookAbbrOf = bookAbbrOf(null),
+): EntryRead | null {
   const row = db.select().from(compendiumEntry).where(eq(compendiumEntry.id, id)).get();
   if (!row || !entryVisibleTo(row, v)) return null;
   const imageAssetIds = liveImageIds(db, row.campaignId, row.imageAssetIds);
@@ -80,19 +123,8 @@ export function readEntry(db: Db, id: string, v: EntryViewer): EntryRead | null 
     row.source === null
       ? undefined
       : db.select().from(compendiumSource).where(eq(compendiumSource.key, row.source)).get();
-  const body: EntryResponse = {
-    entry,
-    source: src
-      ? {
-          key: src.key,
-          name: src.name,
-          licence: src.licence,
-          attribution: src.attribution,
-          url: src.url,
-          version: src.version,
-        }
-      : null,
-  };
+  const source = src ? attributionOf(src, abbrOf) : null;
+  const body: EntryResponse = { entry, source };
   // FR-CMPX-15: importing another source can change it, so it is part of the ETag.
   const inherited = resolvePreset(row) ? null : inheritedPreset(db, row);
   if (inherited) body.inheritedPreset = inherited.name;
@@ -113,6 +145,7 @@ export function readEntry(db: Db, id: string, v: EntryViewer): EntryRead | null 
       defUpdatedAt,
       imageAssetIds.join(","),
       ...(inherited ? [inherited.name] : []),
+      ...(source?.abbr ? [source.abbr] : []),
     ]),
   };
 }
