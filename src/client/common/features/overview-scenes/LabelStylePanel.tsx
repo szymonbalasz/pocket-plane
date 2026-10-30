@@ -48,7 +48,7 @@ const FONT_NAMES: Readonly<Record<LabelFontKey, string>> = {
 /** The order the panel offers them: the default first. */
 const FONT_ORDER = ["garamond", "fell", "alegreya"] as const satisfies readonly LabelFontKey[];
 
-const PANEL =
+export const PANEL =
   "flex w-64 flex-col gap-2 rounded-md border bg-background/95 p-2 text-sm shadow-sm backdrop-blur";
 const ROW = "grid grid-cols-[4.5rem_1fr_3rem] items-center gap-2";
 

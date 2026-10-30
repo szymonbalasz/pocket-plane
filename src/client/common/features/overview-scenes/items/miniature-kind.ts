@@ -1,11 +1,12 @@
-// A miniature when edited (FR-OVW-32–34): square, so its corner handles keep the shape too. Name,
+// A miniature when edited (FR-OVW-32–34, -36): square, so its corner handles keep the shape too. Name,
 // Image… and Owner are off on a linked miniature: those are the character's (FR-OVW-33). Unlike an
-// image's, Image… changes no size, so a lock doesn't stop it.
+// image's, Image… changes no size, so a lock doesn't stop it. Selected, it has the name's style panel.
 import { MINIATURE_SIDE } from "@shared/overview-scenes/schemas";
 import { ImageIcon, PencilIcon } from "lucide-react";
 import { useOverviewEditor } from "../overview-editor";
 import type { ItemKindDef } from "./item-kind";
 import { OwnerSub, ShapeSub } from "./MiniatureMenu";
+import { SelectedMiniaturesPanel } from "./MiniatureStylePanel";
 
 const linked = (item: { characterId: string | null }) => item.characterId !== null;
 
@@ -29,4 +30,5 @@ export const miniatureKind: ItemKindDef = {
     { id: "shape", Sub: ShapeSub },
     { id: "owner", Sub: OwnerSub },
   ],
+  stylePanel: SelectedMiniaturesPanel,
 };
