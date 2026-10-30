@@ -1,0 +1,13 @@
+{
+  "legendaryGroup": [
+    {
+      "name": "Cindermaw Tyrant",
+      "source": "TB1",
+      "lairActions": [
+        "On initiative count 20 the tyrant picks one:",
+        { "type": "list", "items": ["Vents open underfoot.", "Ash blots out the light."] }
+      ],
+      "regionalEffects": ["Springs near the lair run warm."]
+    }
+  ]
+}

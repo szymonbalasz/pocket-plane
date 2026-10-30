@@ -1,0 +1,238 @@
+{
+  "monster": [
+    {
+      "name": "Goblin",
+      "source": "TB1",
+      "srd": true,
+      "size": ["S"],
+      "type": { "type": "humanoid", "tags": ["goblinoid"] },
+      "alignment": ["N", "E"],
+      "ac": [{ "ac": 14, "from": ["{@item reedweave armor|TB1}"] }],
+      "hp": { "average": 9, "formula": "2d6 + 2" },
+      "speed": { "walk": 30 },
+      "str": 9,
+      "dex": 15,
+      "con": 12,
+      "int": 10,
+      "wis": 8,
+      "cha": 9,
+      "skill": { "stealth": "+6" },
+      "senses": ["darkvision 60 ft."],
+      "passive": 9,
+      "languages": ["Common"],
+      "cr": "1/4",
+      "trait": [
+        {
+          "name": "Slippery Retreat",
+          "entries": ["The goblin ducks out of reach as soon as a fight turns sour."]
+        }
+      ],
+      "action": [
+        {
+          "name": "Hooked Blade",
+          "entries": [
+            "{@atk mw} {@hit 4} to hit, reach 5 ft., one target. {@h}5 ({@damage 1d6 + 2}) slashing damage."
+          ]
+        },
+        {
+          "name": "Whittled Bow",
+          "entries": [
+            "{@atk rw} {@hit 4} to hit, range 80/320 ft., one target. {@h}5 ({@damage 1d6 + 2}) piercing damage plus 2 ({@damage 1d4}) poison damage."
+          ]
+        }
+      ],
+      "hasToken": true
+    },
+    {
+      "name": "Goblin Sapper",
+      "source": "TB1",
+      "_copy": {
+        "name": "Goblin",
+        "source": "TB1",
+        "_mod": {
+          "*": {
+            "mode": "replaceTxt",
+            "replace": "the goblin",
+            "with": "the sapper",
+            "flags": "i"
+          },
+          "action": {
+            "mode": "appendArr",
+            "items": {
+              "name": "Satchel Charge",
+              "entries": [
+                "A thrown bundle bursts; each creature nearby makes a {@dc 12} Dexterity save, taking {@damage 2d6} fire damage on a failure."
+              ]
+            }
+          }
+        }
+      },
+      "hp": { "average": 13, "formula": "3d6 + 3" },
+      "cr": "1/2",
+      "hasToken": true
+    },
+    {
+      "name": "Goblin Cinderborn",
+      "source": "TB1",
+      "_copy": {
+        "name": "Goblin",
+        "source": "TB1",
+        "_templates": [{ "name": "Cinderborn", "source": "TB1" }]
+      },
+      "hasToken": true
+    },
+    {
+      "name": "Gnasher",
+      "source": "TB1",
+      "size": ["M"],
+      "type": "beast",
+      "alignment": ["U"],
+      "ac": [11],
+      "hp": { "average": 22, "formula": "4d8 + 4" },
+      "speed": { "walk": 40, "swim": { "number": 20, "condition": "in shallows" } },
+      "str": 14,
+      "dex": 12,
+      "con": 13,
+      "int": 2,
+      "wis": 10,
+      "cha": 5,
+      "passive": 10,
+      "cr": "1",
+      "action": [
+        {
+          "name": "Grinding Bite",
+          "entries": [
+            "{@atk mw} {@hit 4} to hit, reach 5 ft., one target. {@h}7 ({@damage 1d10 + 2}) piercing damage."
+          ]
+        }
+      ],
+      "reprintedAs": ["Gnasher|TB2"],
+      "hasToken": true
+    },
+    {
+      "name": "Wobbling Fénwisp",
+      "source": "TB1",
+      "size": ["T"],
+      "type": "fey",
+      "alignment": ["C", "N"],
+      "ac": [12],
+      "hp": { "special": "as many as the summoner's level" },
+      "speed": { "fly": 30, "canHover": true },
+      "str": 2,
+      "dex": 16,
+      "con": 10,
+      "int": 6,
+      "wis": 12,
+      "cha": 14,
+      "passive": 11,
+      "cr": "1/8",
+      "trait": [
+        {
+          "name": "Drifting Glow",
+          "entries": ["It sheds a dim light that bobs out of step with its body."]
+        }
+      ],
+      "hasToken": true
+    },
+    {
+      "name": "Hedge Thaumaturge",
+      "source": "TB1",
+      "size": ["M"],
+      "type": { "type": "humanoid", "tags": [{ "tag": "human", "prefix": "wandering" }] },
+      "alignment": ["A"],
+      "ac": [10, { "ac": 13, "condition": "with {@spell lantern hex|TB1}" }],
+      "hp": { "average": 27, "formula": "6d8" },
+      "speed": { "walk": 30 },
+      "str": 9,
+      "dex": 10,
+      "con": 10,
+      "int": 16,
+      "wis": 12,
+      "cha": 11,
+      "save": { "int": "+5", "wis": "+3" },
+      "passive": 11,
+      "languages": ["Common", "Sylvan"],
+      "cr": "2",
+      "spellcasting": [
+        {
+          "name": "Spellcasting",
+          "type": "spellcasting",
+          "ability": "int",
+          "headerEntries": [
+            "The thaumaturge casts from a much-mended notebook (spell save {@dc 13})."
+          ],
+          "will": ["{@spell glimmer dust|TB1}"],
+          "daily": { "1e": ["{@spell quarry sign|TB1}", "{@spell salt ward|TB2}"] },
+          "spells": {
+            "0": { "spells": ["{@spell glimmer dust|TB1}"] },
+            "1": { "slots": 4, "spells": ["{@spell lantern hex|TB1}"] }
+          },
+          "footerEntries": ["The notebook smells faintly of rain."]
+        }
+      ],
+      "action": [
+        {
+          "name": "Walking Staff",
+          "entries": [
+            "{@atk mw} {@hit 1} to hit, reach 5 ft., one target. {@h}3 ({@damage 1d6}) bludgeoning damage."
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cindermaw Tyrant",
+      "source": "TB1",
+      "size": ["G"],
+      "type": "dragon",
+      "alignment": ["L", "E"],
+      "ac": [{ "ac": 19, "from": ["natural armor"] }],
+      "hp": { "average": 136, "formula": "16d10 + 48" },
+      "speed": { "walk": 40, "fly": 80 },
+      "str": 23,
+      "dex": 10,
+      "con": 17,
+      "int": 12,
+      "wis": 13,
+      "cha": 15,
+      "save": { "dex": "+5" },
+      "resist": [
+        "cold",
+        { "resist": ["bludgeoning", "piercing"], "note": "from mundane sources", "cond": true }
+      ],
+      "immune": ["fire"],
+      "conditionImmune": ["charmed"],
+      "senses": ["blindsight 30 ft.", "darkvision 240 ft."],
+      "passive": 11,
+      "languages": ["Draconic"],
+      "cr": { "cr": "12", "lair": "13" },
+      "trait": [{ "name": "Ash Hide", "entries": ["Soot falls from it with each step."] }],
+      "action": [
+        {
+          "name": "Furnace Jaws",
+          "entries": [
+            "{@atk mw} {@hit 10} to hit, reach 10 ft., one target. {@h}17 ({@damage 2d10 + 6}) fire damage."
+          ]
+        },
+        {
+          "name": "Cinder Gout {@recharge 5}",
+          "entries": [
+            "Each creature in a line makes a {@dc 16} Dexterity save, taking {@damage 8d6} fire damage on a failure, half on a success."
+          ]
+        }
+      ],
+      "legendary": [
+        { "name": "Stoke", "entries": ["The tyrant fans its own coals."] },
+        {
+          "name": "Crush",
+          "entries": [
+            "It moves up to half its speed, shouldering aside anything {@condition prone||lying down}."
+          ]
+        }
+      ],
+      "legendaryGroup": { "name": "Cindermaw Tyrant", "source": "TB1" },
+      "mythicHeader": ["When reduced to half its hit points the coals roar back."],
+      "mythic": [{ "name": "Flare", "entries": ["A wave of heat rolls out."] }],
+      "hasToken": true
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "spell": [
+    {
+      "name": "Quarry Sign",
+      "source": "TB1",
+      "srd": "Hunter's Mark",
+      "level": 1,
+      "school": "D",
+      "time": [{ "number": 1, "unit": "bonus" }],
+      "range": { "type": "point", "distance": { "type": "feet", "amount": 90 } },
+      "components": { "v": true },
+      "duration": [
+        { "type": "timed", "duration": { "type": "hour", "amount": 1 }, "concentration": true }
+      ],
+      "entries": [
+        "You chalk an unseen sign on one creature you can see. Your weapon hits on it deal an extra {@damage 1d6} damage."
+      ],
+      "entriesHigherLevel": [
+        {
+          "type": "entries",
+          "name": "At Higher Levels",
+          "entries": ["The sign lasts longer at {@scaledice 1d6|1-9|1d6} levels."]
+        }
+      ]
+    },
+    {
+      "name": "Lantern Hex",
+      "source": "TB1",
+      "level": 2,
+      "school": "V",
+      "time": [
+        { "number": 1, "unit": "action" },
+        { "number": 1, "unit": "reaction", "condition": "which you take when a light goes out" }
+      ],
+      "range": { "type": "radius", "distance": { "type": "feet", "amount": 15 } },
+      "components": { "v": true, "s": true, "m": { "text": "a snuffed candle", "cost": 10 } },
+      "duration": [{ "type": "instant" }],
+      "meta": { "ritual": true },
+      "entries": [
+        "Every lantern nearby flares.",
+        {
+          "type": "table",
+          "caption": "Flare",
+          "colLabels": ["d4", "Result"],
+          "rows": [
+            [{ "roll": { "min": 1, "max": 2 } }, "Dim | flickering"],
+            [{ "type": "cell", "roll": { "exact": 3 } }, "Bright"]
+          ]
+        },
+        { "type": "inset", "name": "Lamp Lore", "entries": ["Old lamps remember."] }
+      ]
+    },
+    {
+      "name": "Glimmer Dust",
+      "source": "TB1",
+      "level": 0,
+      "school": "T",
+      "time": [{ "number": 1, "unit": "action" }],
+      "range": { "type": "point", "distance": { "type": "touch" } },
+      "components": { "s": true, "m": "a pinch of mica" },
+      "duration": [
+        { "type": "timed", "duration": { "type": "minute", "amount": 10, "upTo": true } }
+      ],
+      "entries": ["A target object sparkles."]
+    }
+  ]
+}

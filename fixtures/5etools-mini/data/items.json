@@ -1,0 +1,75 @@
+{
+  "item": [
+    {
+      "name": "Lantern of Quiet Hours",
+      "source": "TB1",
+      "rarity": "uncommon",
+      "wondrous": true,
+      "reqAttune": true,
+      "weight": 2,
+      "entries": ["While lit, footsteps make no sound within {@dice 2d6} feet."]
+    },
+    {
+      "name": "Greater Lantern of Quiet Hours",
+      "source": "TB1",
+      "_copy": {
+        "name": "Lantern of Quiet Hours",
+        "source": "TB1",
+        "_mod": {
+          "entries": {
+            "mode": "insertArr",
+            "index": 1,
+            "items": "Its light cannot be seen from outside."
+          }
+        }
+      },
+      "rarity": "rare"
+    },
+    {
+      "name": "Ashen Thornpike",
+      "source": "TB1",
+      "baseItem": "Thornpike|TB1",
+      "rarity": "rare",
+      "reqAttune": "by a ranger",
+      "entries": ["Hits leave a smear of ash."]
+    },
+    {
+      "name": "Mantle of Emberward",
+      "source": "TB1",
+      "rarity": "rare",
+      "wondrous": true,
+      "reqAttune": "optional",
+      "resist": ["fire"],
+      "entries": ["{#itemEntry Warding Mantle|TB1}"]
+    },
+    {
+      "name": "Old Spyglass",
+      "source": "TB1",
+      "type": "G",
+      "rarity": "none",
+      "value": 150,
+      "weight": 1,
+      "reprintedAs": ["Old Spyglass|TB2"],
+      "entries": ["Slightly bent."]
+    },
+    {
+      "name": "Old Spyglass",
+      "source": "TB2",
+      "type": "G",
+      "rarity": "none",
+      "value": 120,
+      "weight": 1,
+      "entries": ["Straightened at last."]
+    }
+  ],
+  "itemGroup": [
+    {
+      "name": "Tideglass Charm",
+      "source": "TB1",
+      "rarity": "uncommon",
+      "wondrous": true,
+      "items": ["Tideglass Charm (Gull)|TB1", "Tideglass Charm (Crab)|TB1"],
+      "entries": ["A bead of sea-worn glass on a cord."]
+    }
+  ]
+}
