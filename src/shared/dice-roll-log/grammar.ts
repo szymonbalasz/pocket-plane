@@ -112,6 +112,29 @@ export function applyMode(terms: readonly Term[], mode: RollMode): GrammarResult
   return limit ? fail(limit) : { ok: true, value: out };
 }
 
+/**
+ * FR-DICE-104: FR-DICE-04 undone: the expression as asked, from a stored roll expression and its
+ * mode (the first `2d20kh1` / `2d20kl1` term back to `1d20`). Normal, or no such term: unchanged.
+ */
+export function baseExpression(expression: string, mode: RollMode): string {
+  if (mode === "normal") return expression;
+  const parsed = parseExpression(expression);
+  if (!parsed.ok) return expression;
+  const which = mode === "advantage" ? "h" : "l";
+  const i = parsed.value.findIndex(
+    (t) =>
+      t.kind === "dice" &&
+      t.count === 2 &&
+      t.faces === 20 &&
+      t.keep?.which === which &&
+      t.keep.n === 1,
+  );
+  if (i < 0) return expression;
+  const terms = [...parsed.value];
+  terms[i] = { ...(terms[i] as DiceTerm), count: 1, keep: null };
+  return toNotation(terms);
+}
+
 /** Parse + mode in one step: the final terms a roll uses. */
 export function prepareExpression(raw: string, mode: RollMode): GrammarResult<Term[]> {
   const parsed = parseExpression(raw);

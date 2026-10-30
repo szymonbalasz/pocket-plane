@@ -520,9 +520,9 @@ test("FR-SHELL-40 toast keep-out: player Initiative stays off the bottom-right b
   }
 });
 
-test("FR-SHELL-42 player handout viewer and Preferences (FR-SHELL-71) register restoreOpen: false; nothing else does", () => {
+test("FR-SHELL-42 player handout viewer, Preferences (FR-SHELL-71) and Roll details (FR-DICE-106) register restoreOpen: false; nothing else does", () => {
   const off = playerWindows.defs.filter((d) => d.restoreOpen === false).map((d) => d.kind);
-  expect(off).toEqual(["party.handout", "shell.prefs"]);
+  expect(off).toEqual(["party.handout", "shell.prefs", "dice.details"]);
 });
 
 test("FR-SHELL-44 freeAreas: the player 1280×800 default layout yields both the strip above the Game log and the one right of it", () => {
@@ -729,6 +729,7 @@ const GOLDEN_KINDS = [
   "hold.stronghold", // RS2 (S4, FR-SHELL-171): appended, goldens regenerated
   "cmp.rules", // SP2 (seams S4, FR-CMP-63; min 340×320): appended, goldens regenerated
   "recap.session", // SP3 (S4, FR-RECAP-10): appended, goldens regenerated
+  "dice.details", // FR-DICE-106: appended, goldens regenerated
 ];
 
 /** Every non-default kind, test-mode ones and the handout viewer included (FR-SHELL-61 (3)). */

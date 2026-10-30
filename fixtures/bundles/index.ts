@@ -32,6 +32,7 @@ import cpTokens from "./cp-tokens";
 import diceDisplay from "./dice-display";
 import diceExtras from "./dice-extras";
 import diceLog from "./dice-log";
+import diceLogMenuE2e from "./dice-log-menu-e2e";
 import dicePolish from "./dice-polish";
 import effectModifiers from "./effect-modifiers";
 import entities from "./entities";
@@ -386,4 +387,6 @@ export const bundles: readonly Bundle[] = [
   cmpx5etools,
   // Scenes window list (fix/scenes-window-qol): `scenes` in its own server
   scenesList,
+  // Game log menu and details (build/log-menu)
+  diceLogMenuE2e,
 ];

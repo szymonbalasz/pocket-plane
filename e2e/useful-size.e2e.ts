@@ -120,6 +120,13 @@ const DM: Case[] = [
     check: 5,
   },
   {
+    kind: "dice.details",
+    useful: { w: 400, h: 360 },
+    // Nothing picked: the empty state, body unscrolled (FR-DICE-109).
+    criterion: "a roll's dice and total, or the empty state",
+    check: "body",
+  },
+  {
     kind: "dicex.requests",
     useful: { w: 360, h: 400 },
     // wf-frame-e2e has no request: the composer and the empty list, body unscrolled.

@@ -13,6 +13,7 @@ import { playerInitiativeWindow } from "./features/combat-tracker/initiative-win
 import { playerCompendiumWindow } from "./features/compendium/compendium-window";
 import { playerRulesWindow } from "./features/compendium/rules-window";
 import { playerTrayWindow } from "./features/dice-extras/tray-window";
+import { playerDiceDetailsWindow } from "./features/dice-roll-log/details-window";
 import { playerDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { notificationsHistoryWindow } from "./features/notifications/history-window";
 import { playerPartyBoardWindow } from "./features/party-board/board-window";
@@ -36,6 +37,7 @@ const windows: WindowDef[] = [
   strongholdWindow, // hold.stronghold, no launcher (strongholds, FR-SHELL-170)
   playerRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
   recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
+  playerDiceDetailsWindow, // dice.details, no launcher (dice-roll-log, FR-DICE-106)
 ];
 
 export const playerWindows = createWindowRegistry("player", windows);

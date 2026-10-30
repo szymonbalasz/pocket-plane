@@ -60,7 +60,7 @@ function groupSegments(dice: readonly RunDie[], out: LineSegment[]): void {
 }
 
 /** Dice values of one roll, grouped per dice term in notation order. */
-function diceSegments(item: RollPayloadItem): LineSegment[] {
+export function diceSegments(item: RollPayloadItem): LineSegment[] {
   const parsed = parseExpression(item.expression);
   const allNull = item.dice.length > 0 && item.dice.every((d) => d.value === null);
   if (allNull || !parsed.ok) {

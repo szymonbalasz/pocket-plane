@@ -8,6 +8,7 @@ import {
   GAME_LOG_ENTRY_TYPE,
   type GameLogEntryRecord,
   REVEAL_GUARDED,
+  SET_ENTRY_HIDDEN,
   SetEntryHiddenIntent,
   seenByPlayers,
 } from "@shared/dice-roll-log/schemas";
@@ -20,7 +21,7 @@ import { readEntry, toEntryRecord } from "./game-log";
 import { rollGuarded } from "./roll-guard";
 import { campaignOf } from "./settings";
 
-export const SET_ENTRY_HIDDEN = "dice.setEntryHidden";
+export { SET_ENTRY_HIDDEN };
 
 /** The line's next stamp: hide keeps the old one in `hiddenFrom`, reveal brings it back. */
 function nextStamp(e: GameLogEntryRecord, hidden: boolean) {

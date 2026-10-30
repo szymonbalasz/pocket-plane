@@ -227,6 +227,8 @@ export const SetEntryHiddenIntent = z.strictObject({
 });
 export type SetEntryHiddenIntent = z.infer<typeof SetEntryHiddenIntent>;
 
+export const SET_ENTRY_HIDDEN = "dice.setEntryHidden";
+
 /** FR-DICE-100: the `conflict` a reveal gets when it would make a guarded roll public. */
 export const REVEAL_GUARDED = "This roll was made as a hidden or renamed creature";
 

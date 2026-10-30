@@ -60,6 +60,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "open @1600×900 dice.details",
+    "rect": "682,60,420×360",
+    "placed": "auto",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen @1600×900 note.history",
     "rect": "774,76,360×480",
     "placed": "stored",
@@ -118,6 +124,12 @@
     "rect": "590,472,440×416",
     "placed": "reopened",
     "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen @1600×900 dice.details",
+    "rect": "682,60,420×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
   },
   {
     "at": "reopen 1440×900 @1440×900 note.history",
@@ -180,6 +192,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "reopen 1440×900 @1440×900 dice.details",
+    "rect": "540,60,420×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen 1280×800 @1280×800 note.history",
     "rect": "479,83,360×480",
     "placed": "reopened",
@@ -240,6 +258,12 @@
     "parked": "cmp.rules"
   },
   {
+    "at": "reopen 1280×800 @1280×800 dice.details",
+    "rect": "450,60,420×520",
+    "placed": "reopened",
+    "parked": "recap.session"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×436",
     "placed": "reopened",
@@ -298,6 +322,12 @@
     "rect": "474,136,401×360",
     "placed": "reopened",
     "parked": "cmp.rules"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dice.details",
+    "rect": "470,84,420×412",
+    "placed": "reopened",
+    "parked": "recap.session"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -372,6 +402,12 @@
     "parked": "hold.stronghold"
   },
   {
+    "at": "open @1440×900 dice.details",
+    "rect": "540,60,420×360",
+    "placed": "auto",
+    "parked": "cmp.rules"
+  },
+  {
     "at": "reopen @1440×900 note.history",
     "rect": "604,76,360×480",
     "placed": "stored",
@@ -430,6 +466,12 @@
     "rect": "540,456,400×432",
     "placed": "reopened",
     "parked": "hold.stronghold"
+  },
+  {
+    "at": "reopen @1440×900 dice.details",
+    "rect": "540,60,420×360",
+    "placed": "reopened",
+    "parked": "cmp.rules"
   },
   {
     "at": "reopen 1280×800 @1280×800 note.history",
@@ -492,6 +534,12 @@
     "parked": "cmp.rules"
   },
   {
+    "at": "reopen 1280×800 @1280×800 dice.details",
+    "rect": "450,60,420×520",
+    "placed": "reopened",
+    "parked": "recap.session"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×436",
     "placed": "reopened",
@@ -550,6 +598,12 @@
     "rect": "474,136,401×360",
     "placed": "reopened",
     "parked": "cmp.rules"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dice.details",
+    "rect": "470,84,420×412",
+    "placed": "reopened",
+    "parked": "recap.session"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -624,6 +678,12 @@
     "parked": "cmp.rules"
   },
   {
+    "at": "open @1280×800 dice.details",
+    "rect": "450,60,420×520",
+    "placed": "auto",
+    "parked": "recap.session"
+  },
+  {
     "at": "reopen @1280×800 note.history",
     "rect": "479,83,360×480",
     "placed": "stored",
@@ -684,6 +744,12 @@
     "parked": "cmp.rules"
   },
   {
+    "at": "reopen @1280×800 dice.details",
+    "rect": "450,60,420×520",
+    "placed": "reopened",
+    "parked": "recap.session"
+  },
+  {
     "at": "reopen 1280×720 @1280×720 note.history",
     "rect": "505,60,360×436",
     "placed": "reopened",
@@ -742,6 +808,12 @@
     "rect": "474,136,401×360",
     "placed": "reopened",
     "parked": "cmp.rules"
+  },
+  {
+    "at": "reopen 1280×720 @1280×720 dice.details",
+    "rect": "470,84,420×412",
+    "placed": "reopened",
+    "parked": "recap.session"
   },
   {
     "at": "protected @1280×720 note.history",
@@ -816,6 +888,12 @@
     "parked": "cmp.rules"
   },
   {
+    "at": "open @1280×720 dice.details",
+    "rect": "470,84,420×412",
+    "placed": "auto",
+    "parked": "recap.session"
+  },
+  {
     "at": "reopen @1280×720 note.history",
     "rect": "505,60,360×436",
     "placed": "stored",
@@ -874,6 +952,12 @@
     "rect": "474,136,401×360",
     "placed": "reopened",
     "parked": "cmp.rules"
+  },
+  {
+    "at": "reopen @1280×720 dice.details",
+    "rect": "470,84,420×412",
+    "placed": "reopened",
+    "parked": "recap.session"
   },
   {
     "at": "protected @1280×720 note.history",

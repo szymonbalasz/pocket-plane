@@ -17,6 +17,7 @@ import { dmCompendiumWindow } from "./features/compendium/compendium-window";
 import { dmRulesWindow } from "./features/compendium/rules-window";
 import { requestsWindow } from "./features/dice-extras/requests-window";
 import { dmTrayWindow } from "./features/dice-extras/tray-window";
+import { dmDiceDetailsWindow } from "./features/dice-roll-log/details-window";
 import { dmDiceLogWindow } from "./features/dice-roll-log/log-window";
 import { creaturesWindow } from "./features/entities/creatures-window";
 import { statBlockWindow } from "./features/entities/statblock/window";
@@ -50,6 +51,7 @@ const windows: WindowDef[] = [
   strongholdWindow, // hold.stronghold, no launcher (strongholds, FR-SHELL-170)
   dmRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
   recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
+  dmDiceDetailsWindow, // dice.details, no launcher (dice-roll-log, FR-DICE-106)
   statBlockWindow, // ent.statblock "Stat block" (kit-parity K7, FR-KIT-100)
   assetsWindow, // asset.library "Assets" (assets-pipeline, FR-ASSET-69; #394)
 ];

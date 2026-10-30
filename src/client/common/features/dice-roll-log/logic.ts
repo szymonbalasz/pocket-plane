@@ -830,6 +830,38 @@ export function copiedRows<R>(
   return lines.length > 0 ? lines.join("\n") : null;
 }
 
+/** FR-DICE-103: the creature a log line is by. */
+export interface ActorCreature {
+  id: string;
+  kind: "character" | "monster";
+}
+
+/**
+ * FR-DICE-103: the one creature an actor name stands for (the DM client): the definitions named so
+ * and those behind tokens and combatants named so ("Goblin 2"), the same case-insensitive match as
+ * `actorPortraits`. None, or more than one → null.
+ */
+export function actorCreature(
+  name: string,
+  records: {
+    entities: readonly Pick<EntityRecord, "id" | "kind" | "name">[];
+    combatants: readonly { name: string; entityId: string }[];
+    tokens: readonly { name: string; definitionId?: string }[];
+  },
+): ActorCreature | null {
+  const key = name.toLowerCase();
+  const ids = new Set<string>();
+  for (const e of records.entities) if (e.name.toLowerCase() === key) ids.add(e.id);
+  for (const c of records.combatants) if (c.name.toLowerCase() === key) ids.add(c.entityId);
+  for (const t of records.tokens) {
+    if (t.definitionId && t.name.toLowerCase() === key) ids.add(t.definitionId);
+  }
+  if (ids.size !== 1) return null;
+  const [id] = ids;
+  const e = records.entities.find((x) => x.id === id);
+  return e && (e.kind === "character" || e.kind === "monster") ? { id: e.id, kind: e.kind } : null;
+}
+
 type Named = { name: string; imageAssetId?: string | null };
 
 /**

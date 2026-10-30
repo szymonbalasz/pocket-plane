@@ -8,7 +8,8 @@
 // (FR-DICE-65); entry actions from the registry at the line end (FR-DICE-68). Kit parity K1
 // (§6.4): each entry is a 40-px row (medallion · "Name · action" · time · result boxes · chips ·
 // actions, FR-KIT-40–44); the full line with its chips moves into the row's Tooltip (FR-KIT-45);
-// screen readers and a copy read the full line as before (FR-KIT-46).
+// screen readers and a copy read the full line as before (FR-KIT-46). FR-DICE-103: a right-click
+// on a row opens its menu; a double-click (and the menu) its details window (FR-DICE-106).
 
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import {
@@ -40,7 +41,6 @@ import {
   type GameLogEntryView,
   ROLL_CATEGORIES,
   type RollCategory,
-  RollEntryPayload,
   type RollMode,
 } from "@shared/dice-roll-log/schemas";
 import { ENTITY_TYPE, type EntityRecord } from "@shared/entities/schemas";
@@ -56,6 +56,7 @@ import {
 import {
   type ClipboardEvent,
   type ComponentProps,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
   useId,
   useLayoutEffect,
@@ -66,8 +67,19 @@ import {
 import { Medallion } from "../../components/kit/medallion";
 import { ResultBox } from "../../components/kit/result-box";
 import { Button } from "../../components/ui/button";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+} from "../../components/ui/context-menu";
 import { Switch, ToggleGroup, ToggleGroupItem } from "../../components/ui/controls";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Select,
   SelectContent,
   SelectGroup,
@@ -88,8 +100,10 @@ import { useLanded, useLandingFade } from "../dice-extras/landing";
 import { stageTray, type TrayRequest } from "../dice-extras/store";
 import { DICEX_REQUESTS_KIND } from "../dice-extras/window-kind";
 import { useOpenWindow } from "../play-shell/ShellContext";
+import { openRollDetails } from "./details";
 import { EntryActions } from "./entry-action-button";
 import { type EntryAction, entryActions } from "./entry-actions";
+import { EntryMenuItems, sendEntryHidden } from "./entry-menu";
 import { focusLogEntry, scrollToEntry, useLogFocus } from "./focus";
 import {
   actorGroups,
@@ -181,7 +195,7 @@ function GuardedPublicEye({
   );
 }
 
-function Segment({
+export function Segment({
   s,
   look,
   nameColor,
@@ -265,32 +279,10 @@ function Segment({
   }
 }
 
-/** FR-DICE-40: a held line's Tooltip leaves out the dice until the landing. */
-function tooltipOf(e: GameLogEntryView, landed: boolean): ReactNode {
-  const time = new Date(e.at).toLocaleTimeString();
-  const rolls = landed ? RollEntryPayload.safeParse(e.payload) : null;
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span>
-        {time}
-        {/* FR-DICE-65: the Tooltip keeps the full line + "rerolled". */}
-        {e.supersededBy !== null && !e.undone ? " · rerolled" : ""}
-      </span>
-      {rolls?.success &&
-        rolls.data.map((r) => (
-          <span key={r.rollId}>
-            {r.expression}: [
-            {r.dice.map((d) => `${d.value ?? "?"}${d.kept ? "" : " dropped"}`).join(", ")}]
-            {r.constant !== 0 ? ` ${r.constant > 0 ? "+" : "-"} ${Math.abs(r.constant)}` : ""}
-          </span>
-        ))}
-    </div>
-  );
-}
-
 /**
- * FR-KIT-45: the entry Tooltip, built on open: the time (+ "rerolled"), the dice per roll, the
- * full line with its chips (FR-DICE-35), then the category. Held (FR-DICE-40): blank chips, "…".
+ * FR-KIT-45, FR-DICE-110: the entry Tooltip, built on open: the time (+ "rerolled"), then the full
+ * line with its chips (FR-DICE-35). The dice per roll and the category moved to the details
+ * window. Held (FR-DICE-40): blank chips, "…".
  */
 export function EntryDetails({ e }: { e: GameLogEntryView }) {
   const { segments } = useMemo(() => formatEntry(e), [e]);
@@ -302,14 +294,17 @@ export function EntryDetails({ e }: { e: GameLogEntryView }) {
   const line = useLandingFade<HTMLSpanElement>(landed);
   return (
     <div data-testid="dice-log-entry-details" className="flex max-w-96 flex-col gap-0.5">
-      {tooltipOf(e, landed)}
+      <span>
+        {new Date(e.at).toLocaleTimeString()}
+        {/* FR-DICE-65: the Tooltip keeps the full line + "rerolled". */}
+        {e.supersededBy !== null && !e.undone ? " · rerolled" : ""}
+      </span>
       <span ref={line} data-testid="dice-log-entry-line" className="break-words">
         {shown.map((s, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: segments are positional and immutable
           <Segment key={i} s={s} look={look} nameColor={nameColor} />
         ))}
       </span>
-      <span>{CATEGORY_LABEL[e.category]}</span>
     </div>
   );
 }
@@ -343,6 +338,11 @@ function MoreResults({ rest, landed }: { rest: readonly RowResult[]; landed: boo
     </Tooltip>
   );
 }
+
+/** What a double-click on a row leaves to itself (the row's controls, an open confirm). */
+const ROW_CONTROL = "button, a, input, [role='button'], [data-testid='dice-log-action-confirm']";
+const onRowControl = (ev: ReactMouseEvent) =>
+  ev.target instanceof Element && ev.target.closest(ROW_CONTROL) !== null;
 
 /** A row's chip ("physical", "undone"): small outline Badge. */
 function ChipBadge(props: ComponentProps<typeof Badge>) {
@@ -387,9 +387,12 @@ function Entry({
   portrait,
   focused,
   actions,
+  onGuarded,
 }: {
   e: GameLogEntryView;
   isDm: boolean;
+  /** FR-DICE-100: a reveal the server refused as guarded: ask the DM. */
+  onGuarded: (entryId: string) => void;
   color: string | null;
   /** The actor's portrait (`actorPortraits`); null = the initial. */
   portrait: string | null;
@@ -412,7 +415,11 @@ function Entry({
   const struck = cn((e.undone || rerolled) && "line-through", rerolled && "opacity-60");
   // An element only: the Tooltip renders it on open (kit-parity §12).
   const details = <EntryDetails e={e} />;
-  return (
+  // FR-DICE-105: a registry action picked in the menu reaches the row's own Button only after the
+  // menu closed, so its confirm opens on the row and the menu's focus return can't touch it.
+  const pendingAction = useRef<string | null>(null);
+  const [actionRequest, setActionRequest] = useState<string | null>(null);
+  const rowEl = (
     <li
       ref={li}
       data-testid="dice-log-entry"
@@ -426,6 +433,13 @@ function Entry({
       data-focused={focused}
       data-landed={landed}
       aria-busy={landed ? undefined : true}
+      // FR-DICE-106: a double-click opens the details and selects no text.
+      onMouseDown={(ev) => {
+        if (ev.detail > 1 && !onRowControl(ev)) ev.preventDefault();
+      }}
+      onDoubleClick={(ev) => {
+        if (!onRowControl(ev)) openRollDetails(e.id);
+      }}
       // FR-KIT-40: one 40-px line, `medallion · what · time · boxes · chips · actions`.
       // visibility.hidden token (visual-direction): hidden entries muted with an eye-off marker.
       // FR-DICE-37: a focused entry gets the accent ring for 2 s.
@@ -485,7 +499,12 @@ function Entry({
           a ghost's width (two boxes, the "physical" chip, in the theme's own type) from 360 px,
           so rows with and without a chip or a second box align. */}
       <div className="flex shrink-0 items-center gap-1.5">
-        <EntryActions e={e} actions={actions} />
+        <EntryActions
+          e={e}
+          actions={actions}
+          request={actionRequest}
+          onRequestDone={() => setActionRequest(null)}
+        />
         {/* FR-KIT-43: hidden while the row is < 360 px wide (the list is the container). */}
         <time
           data-testid="dice-log-entry-time"
@@ -573,6 +592,72 @@ function Entry({
       </div>
     </li>
   );
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{rowEl}</ContextMenuTrigger>
+      <ContextMenuContent
+        data-testid="dice-log-menu"
+        data-record-id={e.id}
+        onCloseAutoFocus={(ev) => {
+          const action = pendingAction.current;
+          if (action === null) return;
+          pendingAction.current = null;
+          ev.preventDefault();
+          setActionRequest(action);
+        }}
+      >
+        <EntryMenuItems
+          e={e}
+          isDm={isDm}
+          landed={landed}
+          actions={actions}
+          onAction={(id) => {
+            pendingAction.current = id;
+          }}
+          onGuarded={onGuarded}
+        />
+      </ContextMenuContent>
+    </ContextMenu>
+  );
+}
+
+/** FR-DICE-100: the DM's yes to revealing a roll made as a hidden or renamed creature. */
+function RevealGuardDialog({ entryId, onClose }: { entryId: string | null; onClose: () => void }) {
+  const connection = useSync((s) => s.connection);
+  const live = useSync((s) => s.state === "live");
+  return (
+    <Dialog
+      open={entryId !== null}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <DialogContent data-testid="dice-log-reveal-dialog">
+        <DialogHeader>
+          <DialogTitle>Reveal this roll?</DialogTitle>
+          <DialogDescription>
+            It was made as a creature that is hidden from players or renamed. Players will see its
+            name and dice.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button data-testid="dice-log-reveal-cancel" variant="ghost" onClick={onClose}>
+            Keep hidden
+          </Button>
+          <Button
+            data-testid="dice-log-reveal-confirm"
+            disabled={!live}
+            onClick={() => {
+              if (entryId !== null) void sendEntryHidden(connection, entryId, false, onClose, true);
+              onClose();
+            }}
+          >
+            Reveal
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 /**
@@ -604,6 +689,7 @@ function EntryList({
   const [stick] = useState(createStickToBottom);
   const seen = useRef<number>(0);
   const [unseen, setUnseen] = useState(0);
+  const [guarded, setGuarded] = useState<string | null>(null);
   const lastN = entries.at(-1)?.n ?? 0;
 
   useLayoutEffect(() => {
@@ -701,6 +787,7 @@ function EntryList({
               portrait={portraits.get(e.actorName.toLowerCase()) ?? null}
               focused={focusedId === e.id}
               actions={actions}
+              onGuarded={setGuarded}
             />
           ))}
         </ul>
@@ -715,6 +802,7 @@ function EntryList({
           {unseen} new
         </button>
       )}
+      {isDm && <RevealGuardDialog entryId={guarded} onClose={() => setGuarded(null)} />}
     </div>
   );
 }
@@ -1096,7 +1184,7 @@ function PhysicalStrip({ onOff }: { onOff: () => void }) {
 }
 
 /** FR-DICE-35: chips in the roller's look (FR-DICEX-20): their `dice-look` row, else the default. */
-function useRollerLooks(): (e: GameLogEntryView) => DiceLook {
+export function useRollerLooks(): (e: GameLogEntryView) => DiceLook {
   const rows = useRecords<DiceLookRecord>(DICE_LOOK_TYPE);
   const players = useRecords<PlayerRecord>("player");
   return useMemo(() => {
