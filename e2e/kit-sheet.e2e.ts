@@ -155,6 +155,7 @@ test("FR-KIT-85 FR-CHARX-115 K11 walkthrough fixes: imported NPC name keeps its 
 
   // The SRD Goblin's read-only sheet at 320: Derive is a 24-px icon button, the name one line.
   const creatures = await openWindow(dm, "ent.creatures");
+  await creatures.getByTestId("ent-list-custom-only").click(); // on by default: show the SRD rows
   await creatures.getByTestId("ent-list-search").fill("goblin");
   await creatures
     .getByTestId("ent-list-row")

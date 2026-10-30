@@ -4,6 +4,7 @@
 // (`useDefinitions`). Rows are HTML5 drag sources for the canvas (FR-MAP-13), data unchanged.
 // Footer **Credits** opens the About dialog with the token art credits (FR-ENT-29). Pets carry a
 // "Pet of Mira" Badge (FR-ENT-39); a dropped pet row places a token owned by its player (FR-MAP-74).
+// "Custom only" (on by default, per browser) skips the imported search: the campaign's own rows.
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { SearchResponse } from "@shared/compendium/rest";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@shared/entities/schemas";
 import { Medallion } from "@ui/components/kit/medallion";
 import { Button } from "@ui/components/ui/button";
+import { Switch } from "@ui/components/ui/controls";
 import { Tooltip } from "@ui/components/ui/overlays";
 import {
   Badge,
@@ -34,8 +36,9 @@ import { CREATURE_COLORS } from "@ui/features/scenes-map/theme";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
 import { LockIcon, PawPrintIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { actionsOf, type CreatureAction, creatureActions } from "./creature-actions";
+import { useCustomOnly } from "./custom-only";
 import {
   CREATURE_TABS,
   type CreatureRow,
@@ -217,7 +220,9 @@ export function CreaturesList({
   const everLive = useSync((s) => s.everLive);
   const [tab, setTab] = useState<CreatureTab>("all");
   const [q, setQ] = useState("");
-  const imported = useImportedMonsters(q, tab !== "character");
+  const [customOnly, setCustomOnly] = useCustomOnly();
+  const customOnlyId = useId();
+  const imported = useImportedMonsters(q, tab !== "character" && !customOnly);
   // Imported rows need their definitions (CR, portrait, actions); derived customs their base's name.
   const ids = useMemo(() => {
     const out = new Set(imported.results.flatMap((r) => (r.definitionId ? [r.definitionId] : [])));
@@ -259,13 +264,26 @@ export function CreaturesList({
           ))}
         </div>
       </div>
-      <Input
-        data-testid="ent-list-search"
-        aria-label="Search creatures"
-        placeholder="Search creatures…"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
+      <div className="flex items-center gap-2">
+        <Input
+          data-testid="ent-list-search"
+          aria-label="Search creatures"
+          placeholder="Search creatures…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <Tooltip content="Hide imported (SRD) monsters">
+          <span className="flex shrink-0 items-center gap-1.5 text-xs">
+            <Switch
+              id={customOnlyId}
+              data-testid="ent-list-custom-only"
+              checked={customOnly}
+              onCheckedChange={setCustomOnly}
+            />
+            <label htmlFor={customOnlyId}>Custom only</label>
+          </span>
+        </Tooltip>
+      </div>
       {!everLive ? (
         <div className="flex flex-col gap-2" data-testid="ent-list-loading">
           {[0, 1, 2].map((i) => (
@@ -274,7 +292,11 @@ export function CreaturesList({
         </div>
       ) : rows.length === 0 ? (
         <p data-testid="ent-list-empty" className="py-6 text-center text-sm text-muted-foreground">
-          {q.trim() === "" ? "No creatures yet" : `No creature matches ‘${q.trim()}’`}
+          {q.trim() !== ""
+            ? `No creature matches ‘${q.trim()}’`
+            : customOnly
+              ? "No custom creatures yet"
+              : "No creatures yet"}
         </p>
       ) : (
         <Table>
