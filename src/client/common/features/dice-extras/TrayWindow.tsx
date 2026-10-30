@@ -19,6 +19,7 @@ import {
   type EncounterRecord,
 } from "@shared/combat-tracker/schemas";
 import { throwDice } from "@shared/dice-extras/throw";
+import { labelAfterActor } from "@shared/dice-roll-log/actor-label";
 import { parseExpression, prepareExpression, toNotation } from "@shared/dice-roll-log/grammar";
 import { formatEntry } from "@shared/dice-roll-log/line";
 import {
@@ -915,6 +916,8 @@ export function TrayWindow() {
   );
   // The header names a picked actor only (FR-DICEX-50: a fresh request reads "Other").
   const who = free?.actor ? selected?.label : undefined;
+  // BL-162: a control's label carried over by the purpose toggle already opens with the actor.
+  const freeLabel = free?.label && who ? labelAfterActor(free.label, who) : free?.label;
 
   return (
     <section
@@ -939,7 +942,7 @@ export function TrayWindow() {
             {state === "idle" && IDLE_TEXT}
             {state === "compose" &&
               free &&
-              `${who ? `${who} — ` : ""}${free.label ?? CATEGORY_LABEL[free.purpose ?? free.category]}`}
+              `${who ? `${who} — ` : ""}${freeLabel ?? CATEGORY_LABEL[free.purpose ?? free.category]}`}
             {state === "adjust" &&
               request?.kind === "control" &&
               (request.options.label ?? CATEGORY_LABEL[request.options.category])}
