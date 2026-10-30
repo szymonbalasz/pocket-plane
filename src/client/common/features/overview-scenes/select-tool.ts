@@ -113,8 +113,10 @@ export const selectPointer: OverviewPointerHandlers = {
       setGesture({ kind: "box", itemId: item?.id ?? null, screen: e.screen, start, at: start });
       return;
     }
-    const onDouble = item && e.clicks === 2 ? ITEM_KIND_DEFS[item.kind].doubleClick : undefined;
+    const onDouble =
+      item && e.clicks === 2 && e.live ? ITEM_KIND_DEFS[item.kind].doubleClick : undefined;
     if (item && onDouble) {
+      e.holdPan();
       setGesture(null);
       onDouble(item);
       return;

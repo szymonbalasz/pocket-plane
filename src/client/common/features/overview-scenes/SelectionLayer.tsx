@@ -6,6 +6,7 @@ import { handlePoint, ITEM_HANDLES, sideBox } from "./item-edit";
 import { itemBox, type OverviewItemView } from "./item-layout";
 import { ITEM_KIND_DEFS } from "./items/kinds";
 import { measureText } from "./label-fonts";
+import { useStylePreview, withStylePreview } from "./label-style";
 import { useOverviewCanvas } from "./overview-canvas-context";
 import { drawnGesture, previewOf, useOverviewEditor } from "./overview-editor";
 
@@ -17,12 +18,13 @@ export function SelectionLayer() {
   const items = useOverviewEditor((s) => s.items);
   const scale = useOverviewEditor((s) => s.view.scale);
   const gesture = useOverviewEditor((s) => s.gesture);
+  const stylePreview = useStylePreview((s) => s.preview);
   useOverviewEditor((s) => s.fontRev);
   const drawn = drawnGesture({ gesture });
   const px = 1 / scale;
   const selected = ids.flatMap((id): OverviewItemView[] => {
     const item = items.find((i) => i.id === id);
-    return item ? [{ ...item, ...previewOf(drawn, item) }] : [];
+    return item ? [withStylePreview({ ...item, ...previewOf(drawn, item) }, stylePreview)] : [];
   });
   const sole = selected.length === 1 ? selected[0] : undefined;
   const handles = sole && !sole.locked && ITEM_KIND_DEFS[sole.kind].resize ? sole : undefined;
