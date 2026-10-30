@@ -133,6 +133,8 @@ export function matchingRows(
   const skipRules = query.kind === undefined && words.length === 0;
   const ruleNamesOnly = query.kind === undefined;
   for (const row of idx.rows) {
+    // FR-CMPX-14: a replaced entry is found only by asking for its definition (a token's entry).
+    if (row.hidden && (!query.definitionId || row.definitionId !== query.definitionId)) continue;
     if (query.kind !== undefined && row.kind !== query.kind) continue;
     if (skipRules && row.kind === "rule") continue;
     // Entry-less definitions: DM only (they are global monsters, so `entryVisibleTo` agrees).
@@ -179,6 +181,27 @@ export function groupLine(members: readonly IndexRow[]): string {
   return `${line}…`;
 }
 
+/**
+ * The first `n` of `items` by a total order, the rest unsorted: a common word matches nearly every
+ * row, and sorting 7,000 hits takes ≈ 2 ms of FR-CMPX-22's 5.
+ */
+function firstInOrder<T>(items: readonly T[], n: number, compare: (a: T, b: T) => number): T[] {
+  const out: T[] = [];
+  for (const x of items) {
+    if (out.length === n && compare(x, out[n - 1] as T) >= 0) continue;
+    let lo = 0;
+    let hi = out.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (compare(x, out[mid] as T) < 0) hi = mid;
+      else lo = mid + 1;
+    }
+    out.splice(lo, 0, x);
+    if (out.length > n) out.pop();
+  }
+  return out;
+}
+
 /** `pageSize`: tests only (FR-CMP-35 paging across a group); the route always pages by 50. */
 export function searchEntries(
   db: Db,
@@ -210,9 +233,9 @@ export function searchEntries(
     else if (g.every((m) => m === h || compare(h.key, m.key) < 0))
       items.push({ best: h, group: g });
   }
-  items.sort((a, b) => compare(a.best.key, b.best.key));
   const rest = after ? items.filter((x) => compare(x.best.key, after) > 0) : items;
-  const page = rest.slice(0, pageSize);
+  const top = firstInOrder(rest, pageSize + 1, (a, b) => compare(a.best.key, b.best.key));
+  const page = top.slice(0, pageSize);
   const last = page.at(-1);
   return {
     results: page.map(({ best, group }) => {
@@ -224,7 +247,7 @@ export function searchEntries(
         group: { count: group.length },
       };
     }),
-    nextCursor: rest.length > pageSize && last ? encodeCursor(last.best.key) : null,
+    nextCursor: top.length > pageSize && last ? encodeCursor(last.best.key) : null,
   };
 }
 
@@ -235,7 +258,9 @@ export function searchEntries(
 function sameAsPage(db: Db, v: EntryViewer, id: string, q: string | undefined): SearchPage {
   const idx = searchIndex(db);
   const row = idx.byId.get(id);
-  if (!row || row.entryless || !entryVisibleTo(row, v)) return { results: [], nextCursor: null };
+  if (!row || row.entryless || row.hidden || !entryVisibleTo(row, v)) {
+    return { results: [], nextCursor: null };
+  }
   const words = queryWords(q ?? "");
   const members = (idx.groups.get(row.groupKey) ?? []).filter(
     (m) => entryVisibleTo(m, v) && rowTier(m, words) !== null,

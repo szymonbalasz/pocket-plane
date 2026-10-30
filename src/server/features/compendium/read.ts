@@ -3,12 +3,14 @@
 // same answer as an unknown id, before any conditional check. Image IDs (FR-CMP-47, -48) only
 // after it, stale ones dropped (FR-ASSET-37); the ETag hashes them, never carries them.
 import { createHash } from "node:crypto";
+import { resolvePreset } from "@shared/compendium/presets";
 import type { EntryResponse } from "@shared/compendium/rest";
 import { CompendiumEntry } from "@shared/compendium/schemas";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { asset, compendiumEntry, compendiumSource, entity } from "../../db/schema";
 import { toImportedRecord } from "../entities/rows";
+import { inheritedPreset } from "./entries";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
 
 export interface EntryRead {
@@ -91,6 +93,9 @@ export function readEntry(db: Db, id: string, v: EntryViewer): EntryRead | null 
         }
       : null,
   };
+  // FR-CMPX-15: importing another source can change it, so it is part of the ETag.
+  const inherited = resolvePreset(row) ? null : inheritedPreset(db, row);
+  if (inherited) body.inheritedPreset = inherited.name;
   let defUpdatedAt: string | undefined;
   if (row.kind === "monster" && row.definitionId !== null) {
     const def = db.select().from(entity).where(eq(entity.id, row.definitionId)).get();
@@ -102,6 +107,12 @@ export function readEntry(db: Db, id: string, v: EntryViewer): EntryRead | null 
   }
   return {
     body,
-    etag: entryEtag([row.updatedAt, src?.version, defUpdatedAt, imageAssetIds.join(",")]),
+    etag: entryEtag([
+      row.updatedAt,
+      src?.version,
+      defUpdatedAt,
+      imageAssetIds.join(","),
+      ...(inherited ? [inherited.name] : []),
+    ]),
   };
 }

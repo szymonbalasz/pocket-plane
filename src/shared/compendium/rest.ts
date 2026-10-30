@@ -58,6 +58,8 @@ export const SearchQuery = z
     kind: CompendiumKind.optional(),
     cursor: z.string().min(1).max(CURSOR_MAX).optional(),
     sameAs: z.string().min(1).max(64).optional(),
+    /** FR-CMPX-14: also lists this definition's entry when it is hidden (token → entry, FR-CMP-22). */
+    definitionId: z.string().min(1).max(64).optional(),
     crMin: Cr.optional(),
     crMax: Cr.optional(),
     type: z.string().min(1).max(40).optional(),
@@ -81,6 +83,9 @@ export const SearchQuery = z
         c.addIssue({ code: "custom", path: [k], message: "sameAs takes only q" });
       }
       return;
+    }
+    if (q.definitionId !== undefined && q.kind !== "monster") {
+      c.addIssue({ code: "custom", path: ["definitionId"], message: "Monsters only" });
     }
     const allowed: readonly string[] = q.kind === undefined ? [] : FILTER_KEYS[q.kind];
     for (const k of ALL_FILTER_KEYS) {
@@ -144,5 +149,7 @@ export const EntryResponse = z.strictObject({
   entry: CompendiumEntry,
   source: SourceAttribution.nullable(),
   definition: EntryDefinition.optional(),
+  /** FR-CMPX-15: the name of the preset this entry takes from one it replaces (no preset of its own). */
+  inheritedPreset: z.string().min(1).max(NAME_MAX).optional(),
 });
 export type EntryResponse = z.infer<typeof EntryResponse>;

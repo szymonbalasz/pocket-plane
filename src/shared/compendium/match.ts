@@ -6,6 +6,16 @@ export const BUNDLED_SOURCE_KEYS = ["srd-5.1"] as const;
 /** Source of fixture-only imported definitions (disposable data, AGENTS §9.3). */
 export const FIXTURE_SOURCE = "fixture";
 
+/** FR-CMPX-02: a 5etools book's source key is `5et-<abbr lower>`. */
+export const BOOK_SOURCE_PREFIX = "5et-";
+
+/** FR-CMPX-16: a book source's abbreviation (`5et-mm` → `MM`); null for any other source. */
+export function bookAbbr(source: string | null): string | null {
+  return source?.startsWith(BOOK_SOURCE_PREFIX)
+    ? source.slice(BOOK_SOURCE_PREFIX.length).toUpperCase()
+    : null;
+}
+
 export type SourceRank = 0 | 1 | 2 | 3;
 
 /**

@@ -1,7 +1,8 @@
 // FR-CMP-29 preset resolution (seams S5), one pure fn for the server (Add to sheet) and the view
 // ("Preset: ‹name›"). Trigger presets only: a feature's `presetKey` (a MOD built-in trigger key),
 // else its inline `preset` (a `TriggerRule`), else the built-in trigger listing its `featureKey`.
-// Spells resolve by built-in only. Effect presets (e.g. `rage`) never resolve here.
+// Spells resolve by built-in only. Effect presets (e.g. `rage`) never resolve here. An entry with
+// none of its own inherits from what it replaces (FR-CMPX-15, server: `inheritedPreset`).
 import {
   getTriggerPreset,
   triggerPresetForFeature,
@@ -23,6 +24,12 @@ export type ResolvedPreset =
   | { via: "presetKey" | "builtin"; name: string; from: { presetKey: string } }
   | { via: "preset"; name: string; from: { name: string; rule: TriggerRule } };
 
+/** The built-in trigger listing a feature key (`<source>:<sourceKey>`), if any. */
+export function builtinPreset(key: string): ResolvedPreset | null {
+  const p = triggerPresetForFeature(key);
+  return p ? { via: "builtin", name: p.name, from: { presetKey: p.key } } : null;
+}
+
 export function resolvePreset(e: PresetSource): ResolvedPreset | null {
   if (e.kind !== "feature" && e.kind !== "spell") return null;
   if (e.kind === "feature") {
@@ -36,6 +43,5 @@ export function resolvePreset(e: PresetSource): ResolvedPreset | null {
       return { via: "preset", name: e.name, from: { name: e.name, rule: b.preset } };
     }
   }
-  const p = triggerPresetForFeature(featureKey(e));
-  return p ? { via: "builtin", name: p.name, from: { presetKey: p.key } } : null;
+  return builtinPreset(featureKey(e));
 }

@@ -24,7 +24,7 @@ import { editableCreature } from "../character-sheet/access";
 import { insertSheetRows, type NewSheetRows } from "../character-sheet/row-insert";
 import { addTriggerFromPreset } from "../effect-modifiers";
 import { sourceLabelOf } from "./derive";
-import { type EntryRow, getEntry } from "./entries";
+import { type EntryRow, getEntry, inheritedPreset } from "./entries";
 import { campaignOf } from "./homebrew";
 import { entryVisibleTo } from "./visibility";
 
@@ -121,7 +121,7 @@ export const addToSheet = defineCommand({
     if (creature.kind !== "character") throw notFound("Character not found");
     const { rowIds } = insertSheetRows(env, characterId, add);
     const result: AddToSheetResult = { list: add.list, rowId: rowIds[0] as string };
-    const preset = resolvePreset(e);
+    const preset = resolvePreset(e) ?? inheritedPreset(env.tx, e);
     if (preset && hasTriggerFor(env, characterId, preset)) {
       result.triggerSkipped = true;
     } else if (preset) {

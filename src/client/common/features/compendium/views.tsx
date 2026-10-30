@@ -374,13 +374,13 @@ export function Attribution({
   );
 }
 
-/** FR-CMP-29: the trigger preset Add to sheet also adds. */
-function PresetLine({ e }: { e: CompendiumEntry }) {
-  const p = resolvePreset(e);
-  if (!p) return null;
+/** FR-CMP-29 / FR-CMPX-15: the trigger preset Add to sheet also adds. */
+function PresetLine({ e, inherited }: { e: CompendiumEntry; inherited?: string | undefined }) {
+  const name = resolvePreset(e)?.name ?? inherited;
+  if (!name) return null;
   return (
     <p className="text-xs text-muted-foreground" data-testid="cmp-preset">
-      <span className="font-semibold">Preset:</span> {p.name}
+      <span className="font-semibold">Preset:</span> {name}
     </p>
   );
 }
@@ -436,7 +436,7 @@ export function EntryView({
         </div>
       )}
       {view}
-      <PresetLine e={e} />
+      <PresetLine e={e} inherited={data.inheritedPreset} />
       <Attribution source={data.source} entry={e} viewer={viewer} />
     </article>
   );

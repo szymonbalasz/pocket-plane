@@ -1510,6 +1510,10 @@ export const compendiumEntry = sqliteTable(
       .$type<string[]>()
       .notNull()
       .default([]),
+    /** FR-CMPX-13: `<source>:<sourceKey>` refs this imported entry replaces; no FK. */
+    replaces: text("replaces", { mode: "json" }).$type<string[]>().notNull().default([]),
+    /** FR-CMPX-23: imported monsters' folder-relative token file; never sent. */
+    artPath: text("art_path"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     importedAt: text("imported_at"),
@@ -1524,6 +1528,27 @@ export const compendiumEntry = sqliteTable(
     index("compendium_entry_kind_name").on(t.kind, t.nameKey),
     index("compendium_entry_campaign").on(t.campaignId),
   ],
+);
+
+/**
+ * Imported art (compendium-expansion §8, FR-CMPX-24; per campaign, server-only, not a record
+ * type): the asset holding a monster's token file in this campaign. A deleted asset takes its
+ * row with it, so the next placement ingests again.
+ */
+export const importedArt = sqliteTable(
+  "imported_art",
+  {
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    source: text("source").notNull(),
+    sourceKey: text("source_key").notNull(),
+    assetId: text("asset_id")
+      .notNull()
+      .references((): AnySQLiteColumn => asset.id, { onDelete: "cascade" }),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.campaignId, t.source, t.sourceKey] })],
 );
 
 /**
@@ -1749,6 +1774,7 @@ export const schema = {
   mapSettings,
   compendiumSource,
   compendiumEntry,
+  importedArt,
   diceLook,
   characterGems,
   rollMacro,

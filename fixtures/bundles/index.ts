@@ -14,6 +14,7 @@ import cbTurnRingE2e from "./cb-turn-ring-e2e";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import cmpImages from "./cmp-images";
+import cmpxCore from "./cmpx-core";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
 import combatPolish from "./combat-polish";
@@ -365,4 +366,6 @@ export const bundles: readonly Bundle[] = [
   trayAttacks,
   // Assets window (fix/assets-window, #394): assets-window e2e
   assetsWindowE2e,
+  // Compendium expansion core (fix/cmpx-core): replaced entries, preset inheritance
+  cmpxCore,
 ];

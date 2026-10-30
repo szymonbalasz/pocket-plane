@@ -3,7 +3,7 @@
 // `(source, sourceKey)` → per record created | updated | existing. Any error → nothing written,
 // every issue returned. Changed definitions run entities' hooks (FR-CMP-08). Then one
 // `CompendiumImported`, only if something was written. No route here (C3 adds it).
-import { COMPENDIUM_KINDS, type CompendiumKind } from "@shared/compendium/schemas";
+import { COMPENDIUM_KINDS, CompendiumKind, SourceKey } from "@shared/compendium/schemas";
 import { CompendiumImported, type ImportCounts } from "@shared/events/compendium";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -22,6 +22,7 @@ import {
   upsertBatch,
 } from "../fixtures-adapters/import-pipeline";
 import {
+  type AdapterRecord,
   type AdapterResult,
   type AdapterWarning,
   adaptOpen5e,
@@ -37,12 +38,29 @@ export const END_COMBAT_FIRST = "End combat first";
 
 export const ImportInput = z.strictObject({ source: z.enum(BUNDLED_SOURCE_KEYS) });
 
-/** Internal twin (fixtures, tests): a source descriptor + version + recorded responses. */
-export const ImportRecordedInput = z.strictObject({
-  source: SourceDescriptor,
-  version: z.string().min(1).max(128),
-  responses: z.partialRecord(z.enum(OPEN5E_ENDPOINTS), z.array(z.unknown()).readonly()),
+/** A hand-made record (fixtures, tests); `data`, `definition` and the links are validated with the batch. */
+const RecordedRecord = z.strictObject({
+  kind: CompendiumKind,
+  sourceKey: SourceKey,
+  data: z.unknown(),
+  definition: z.unknown().optional(),
+  artPath: z.string().nullable().optional(),
+  replaces: z.array(z.string()).optional(),
 });
+
+const RecordedBase = { source: SourceDescriptor, version: z.string().min(1).max(128) };
+
+/**
+ * Internal twin (fixtures, tests): a source descriptor + version + recorded Open5e responses, or
+ * adapter records as they are (a user-supplied source's shape, ADR-0074).
+ */
+export const ImportRecordedInput = z.union([
+  z.strictObject({
+    ...RecordedBase,
+    responses: z.partialRecord(z.enum(OPEN5E_ENDPOINTS), z.array(z.unknown()).readonly()),
+  }),
+  z.strictObject({ ...RecordedBase, records: z.array(RecordedRecord).readonly() }),
+]);
 
 export interface ImportResult {
   source: string;
@@ -60,12 +78,21 @@ const zeroCounts = (): ImportCounts =>
 
 const RANK: Record<ImportOutcomeKind, number> = { existing: 0, updated: 1, created: 2 };
 
-/** The adapter's records as one batch: a monster is its definition, then its entry (FR-CMP-03). */
+/**
+ * The adapter's records as one batch: a monster is its definition, then its entry (FR-CMP-03). An
+ * entry's `replaces` / `artPath` travel with its data (entries.ts validates and stores them).
+ */
 function toBatch(source: SourceDescriptor, adapted: AdapterResult): ImportBatch {
   return {
     source,
     records: adapted.records.flatMap((r) => {
-      const entry = { kind: importKindOf(r.kind), sourceKey: r.sourceKey, data: r.data };
+      const artPath = r.kind === "monster" ? r.artPath : null;
+      const data = {
+        ...r.data,
+        ...(r.replaces?.length ? { replaces: r.replaces } : {}),
+        ...(artPath != null ? { artPath } : {}),
+      };
+      const entry = { kind: importKindOf(r.kind), sourceKey: r.sourceKey, data };
       return r.kind === "monster"
         ? [{ kind: "monster", sourceKey: r.sourceKey, data: r.definition }, entry]
         : [entry];
@@ -83,6 +110,14 @@ function countOutcomes(adapted: AdapterResult, outcomes: ImportOutcome[]): Impor
   const counts = zeroCounts();
   for (const r of adapted.records) counts[r.kind][best.get(r.sourceKey) ?? "existing"]++;
   return counts;
+}
+
+/** Hand-made records as an adapter's result: the batch's validation is what checks them. */
+function recordedResult(records: readonly unknown[]): AdapterResult {
+  const typed = records as AdapterRecord[];
+  const counts = Object.fromEntries(COMPENDIUM_KINDS.map((k) => [k, 0])) as AdapterResult["counts"];
+  for (const r of typed) counts[r.kind]++;
+  return { records: typed, warnings: [], skipped: 0, counts };
 }
 
 export function runImport(
@@ -160,8 +195,11 @@ export function importRecordedCommand(reg: ImportRegistry) {
   return defineCommand({
     name: IMPORT_RECORDED,
     input: ImportRecordedInput,
-    execute({ source, version, responses }, env): ImportResult {
-      return runImport(reg, env, { source, version, adapted: adaptOpen5e(responses) });
+    execute(input, env): ImportResult {
+      const { source, version } = input;
+      const adapted =
+        "responses" in input ? adaptOpen5e(input.responses) : recordedResult(input.records);
+      return runImport(reg, env, { source, version, adapted });
     },
   });
 }

@@ -1,12 +1,16 @@
 // `compendium_entry` rows (CMP §8): derived columns, the import pipeline's store for the
 // compendium kinds (OQ-CMP-17, ADR-0046 "Pipeline"), reads. Entries are not a record type: no
 // changes, no WS (CON-44); imported entries carry the source key, attribution lives on the source.
+import { builtinPreset, type ResolvedPreset, resolvePreset } from "@shared/compendium/presets";
 import {
+  ArtPath,
   COMPENDIUM_KINDS,
   type CompendiumKind,
   EntryDraft,
   entryLine,
   entryNameKey,
+  REPLACES_MAX,
+  ReplacedRef,
 } from "@shared/compendium/schemas";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
@@ -66,6 +70,38 @@ function definitionIdOf(tx: Tx, source: string, sourceKey: string): string {
   return row.id;
 }
 
+/**
+ * What the pipeline validates, hashes and hands to the store for one imported entry: the draft,
+ * plus `replaces` / `artPath` only when set, so an entry without them keeps its stored hash.
+ */
+export type EntryImportData = EntryDraft & { replaces?: string[]; artPath?: string };
+
+const EntryLinks = z.object({
+  replaces: z.array(ReplacedRef).max(REPLACES_MAX).optional(),
+  artPath: ArtPath.optional(),
+});
+
+function entryImportSchema(k: CompendiumKind): z.ZodType<EntryImportData> {
+  return z.unknown().transform((raw, c): EntryImportData => {
+    const { replaces, artPath, ...rest } = (raw ?? {}) as Record<string, unknown>;
+    const links = EntryLinks.safeParse({ replaces, artPath });
+    const draft = EntryDraft.safeParse(rest);
+    for (const i of [...(links.error?.issues ?? []), ...(draft.error?.issues ?? [])]) {
+      c.addIssue({ code: "custom", path: i.path, message: i.message });
+    }
+    if (draft.data && draft.data.kind !== k) {
+      c.addIssue({ code: "custom", path: ["kind"], message: `Expected a ${k} entry` });
+    }
+    if (!links.data || !draft.data) return z.NEVER;
+    const refs = [...new Set(links.data.replaces ?? [])].sort();
+    return {
+      ...draft.data,
+      ...(refs.length > 0 ? { replaces: refs } : {}),
+      ...(links.data.artPath !== undefined ? { artPath: links.data.artPath } : {}),
+    };
+  });
+}
+
 /** Imported entries (FR-CMP-02, -07): upsert by `(source, sourceKey)`; never emits. */
 export const entryImportStore: ImportStore = {
   name: "compendium",
@@ -78,12 +114,14 @@ export const entryImportStore: ImportStore = {
     return row ?? null;
   },
   insert({ tx }, r) {
-    const d = r.data as EntryDraft;
+    const { replaces = [], artPath = null, ...d } = r.data as EntryImportData;
     tx.insert(compendiumEntry)
       .values({
         id: r.id,
         campaignId: null,
-        ...derivedColumns(d),
+        ...derivedColumns(d as EntryDraft),
+        replaces,
+        artPath,
         source: r.source,
         sourceKey: r.sourceKey,
         dataHash: r.dataHash,
@@ -97,10 +135,12 @@ export const entryImportStore: ImportStore = {
       .run();
   },
   update({ tx }, id, r) {
-    const d = r.data as EntryDraft;
+    const { replaces = [], artPath = null, ...d } = r.data as EntryImportData;
     tx.update(compendiumEntry)
       .set({
-        ...derivedColumns(d),
+        ...derivedColumns(d as EntryDraft),
+        replaces,
+        artPath,
         dataHash: r.dataHash,
         updatedAt: r.importedAt,
         importedAt: r.importedAt,
@@ -114,10 +154,7 @@ export const entryImportStore: ImportStore = {
 export function entryImportKinds(): ImportKind[] {
   return COMPENDIUM_KINDS.map((k) => ({
     kind: importKindOf(k),
-    schema: EntryDraft.refine((d) => d.kind === k, {
-      message: `Expected a ${k} entry`,
-      path: ["kind"],
-    }) as z.ZodType,
+    schema: entryImportSchema(k),
     store: entryImportStore,
   }));
 }
@@ -128,6 +165,36 @@ export function registerEntryImport(reg: ImportRegistry): void {
 
 export function getEntry(tx: Tx, id: string): EntryRow | undefined {
   return tx.select().from(compendiumEntry).where(eq(compendiumEntry.id, id)).get();
+}
+
+/**
+ * FR-CMPX-15: an entry with no preset of its own takes the preset of an entry it replaces, nearest
+ * first, along `replaces` chains. A ref whose entry isn't imported still finds the built-in that
+ * lists it (the PHB's Hunter's Mark with no SRD imported). Derived at each read, never stored.
+ */
+export function inheritedPreset(tx: Pick<Tx, "select">, e: EntryRow): ResolvedPreset | null {
+  if (e.kind !== "feature" && e.kind !== "spell") return null;
+  const seen = new Set<string>();
+  const todo = [...e.replaces];
+  for (const ref of todo) {
+    if (seen.has(ref)) continue;
+    seen.add(ref);
+    const i = ref.indexOf(":");
+    const row = tx
+      .select()
+      .from(compendiumEntry)
+      .where(
+        and(
+          eq(compendiumEntry.source, ref.slice(0, i)),
+          eq(compendiumEntry.sourceKey, ref.slice(i + 1)),
+        ),
+      )
+      .get();
+    const preset = row ? resolvePreset(row) : builtinPreset(ref);
+    if (preset) return preset;
+    if (row) todo.push(...row.replaces);
+  }
+  return null;
 }
 
 export const EntryId = z.string().min(1).max(64);
