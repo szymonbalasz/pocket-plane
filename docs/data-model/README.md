@@ -1330,11 +1330,12 @@ From [compendium](../specs/compendium.md#8-data-model) (CMP, `complete`; gate 1 
 | line | text ≤ 80 | `entryLine`, derived at write | CMP §8 |
 | facets, body | **JSON leaves** | Per kind (`kindRegistry`, `@shared/compendium/schemas`); facets + body ≤ 32 KB | FR-CMP-01 |
 | searchText | text | Lower-case name + line + body strings (not `preset` / `presetKey`), `*` / `\|` dropped | FR-CMP-10 |
-| dataHash | text | SHA-256 of the sorted-key JSON of the entry draft: upsert change detection | FR-CMP-07 |
+| dataHash | text | SHA-256 of the sorted-key JSON of the entry draft (+ `replaces` / `artPath` when set, [§149](#149-compendium-expansion-core-replaced-entries-art-path-imported-art-fixcmpx-core)): upsert change detection | FR-CMP-07, FR-CMPX-13 |
 | definitionId | ID → Entity \| null | Monster entries: the imported creature definition with the same `(source, sourceKey)` | FR-CMP-03 |
 | shared | bool, default false | Homebrew only | FR-CMP-24 |
 | derivedFromId | ID \| null | Informational, no FK | CMP §8 |
 | imageAssetIds *(S5, [§68](#68-sprint-5-compendium-entry-images-c5-core))* | **JSON leaf** 0–4 asset IDs, default `[]` | Homebrew only; unique; slot order, first = main | FR-CMP-45 |
+| replaces, artPath *([§149](#149-compendium-expansion-core-replaced-entries-art-path-imported-art-fixcmpx-core))* | **JSON leaf** `string[]` default `[]`, text \| null | Imported only; never sent | FR-CMPX-13, -23 |
 | createdAt, updatedAt, importedAt | timestamp ×2, timestamp \| null | `importedAt` on imported rows only | CMP §8 |
 
 Indexes: unique `compendium_entry_source_key` (`source`, `source_key`); unique `compendium_entry_campaign_kind_name` (`campaign_id`, `kind`, `name_key`) where `campaign_id is not null`; `compendium_entry_kind_name`, `compendium_entry_campaign`.
@@ -2812,3 +2813,20 @@ From [ADR-0073](../architecture/adr/0073-tray-attacks.md) and DM [#385](../decis
 From [assets-pipeline](../specs/assets-pipeline.md#65-rename-and-delete-an-image-386) FR-ASSET-67–70 (DM decision #394). **No new table, column or record type.** `assets.rename` / `assets.delete` ([protocol §189](../protocol/README.md#189-assets-window-rename-and-delete-sounds-fixassets-window)) now also write `asset` rows of kind `audio` (name; row delete).
 
 - **Holder of a sound** (derived, never stored): `campaign.alert_sounds` values (JSON leaf, `AlertKey` → asset ID). A picked sound can't be deleted; deleting an unpicked one frees a slot under the 50-sound cap (FR-ASSET-58).
+
+## 149. Compendium expansion core: replaced entries, art path, imported art (fix/cmpx-core)
+
+From [compendium-expansion](../specs/post-mvp/compendium-expansion.md#8-data-model) FR-CMPX-13–16, -23, -24 ([ADR-0074](../architecture/adr/0074-user-supplied-sources.md), #395). Additive (drizzle push): existing rows need no backfill and keep their `data_hash`. No record type, no WS.
+
+| Field | Type | Default | Rule | Source |
+|---|---|---|---|---|
+| `compendium_entry.replaces` | **JSON leaf** `string[]`, refs `<source>:<sourceKey>`, ≤ 20, sorted, no FK | `[]` | Imported only (homebrew always `[]`). Set by the adapter; never sent | FR-CMPX-13 |
+| `compendium_entry.art_path` | text \| null | null | Imported monsters: token file relative to the source's folder; `isValidArtPath` at write and before every read. Never sent | FR-CMPX-23 |
+| `imported_art.campaign_id`, `source`, `source_key` | ID → Campaign, text, text | — | PK; one row per monster whose art this campaign has | FR-CMPX-24 |
+| `imported_art.asset_id` | ID → Asset | — | **Asset reference**, same campaign; `ON DELETE CASCADE`: a deleted asset drops the row, the next placement ingests again | FR-CMPX-24 |
+| `imported_art.created_at` | timestamp | — | `ctx.clock` | FR-CMPX-24 |
+
+- **`data_hash`:** the sorted-key JSON of the entry draft, plus `replaces` / `artPath` only when set: an entry without them hashes as before; a change to either → `updated`.
+- **`imported_art`** is server-only, not a record type, never sent; X3 writes it, this slice only creates the table.
+- **Derived (never stored):** `hidden` on search index rows (FR-CMPX-14): the entry is referenced by an imported entry's `replaces`, unless the ref lies on a cycle (malformed data); hidden rows stay in the index for by-id reads and Rules pages, out of search, default lists, groups and `sameAs`. Inherited preset (FR-CMPX-15): resolved per read along `replaces` chains; only its name goes on the wire (`EntryResponse.inheritedPreset`), and it is part of the ETag.
+- **Fixtures:** unit `cmpx-books` (two hand-made books `5et-tb1`, `5et-tb2`; invented content), bundle `cmpx-core` = `base` + `player-2` + `char-mira` + `cmp-srd-mini-s3` + `cmpx-books`.
