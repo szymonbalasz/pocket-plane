@@ -1,9 +1,10 @@
 // Test-only software rasteriser standing in for the canvas (`PaintCtx`): pixel centres,
-// source-over / destination-out / source-in / source-atop, nested clips, nonzero (≈ "inside any
-// subpath", for subpaths wound one way) and even-odd fill rules. A pixel keeps the label and alpha
-// of the last paint on it (no blending), so tests read what a pixel ends up showing; `drawImage`
-// paints the label `img:<image>` and a later `source-atop` paint keeps it as `img` (what lies
-// under the tint). Used by `paint.test.ts`, `vision.test.ts`.
+// source-over / lighter / destination-out / source-in / source-atop, nested clips, nonzero
+// (≈ "inside any subpath", for subpaths wound one way) and even-odd fill rules. A pixel keeps the
+// label and alpha of the last paint on it (no blending), so tests read what a pixel ends up
+// showing; `drawImage` paints the label `img:<image>` and a later `source-atop` paint keeps it as
+// `img` (what lies under the tint). `EdgePixel`: the antialiased edge the raster can't show. Used
+// by `paint.test.ts`, `vision.test.ts`.
 import type { PaintCtx } from "./render";
 
 type Rule = "nonzero" | "evenodd";
@@ -131,6 +132,65 @@ export class Raster implements PaintCtx {
   }
   at(x: number, y: number): Px {
     return this.px[Math.floor(y) * this.w + Math.floor(x)] as Px;
+  }
+}
+
+/**
+ * One pixel on the edge of the circles painted over it, blended like a canvas: a path with an arc
+ * covers it by `coverage`, a path of rects wholly. It lies inside or outside the explored-memory
+ * rects, which is what a clip of rects (nonzero) or of the map + those rects (even-odd) tests.
+ */
+export class EdgePixel implements PaintCtx {
+  globalCompositeOperation = "source-over";
+  globalAlpha = 1;
+  fillStyle: unknown = "#000";
+  strokeStyle: unknown = "#000";
+  lineWidth = 1;
+  alpha = 0;
+  private hasArc = false;
+  private clipped = 1;
+  private stack: { gco: string; alpha: number; clipped: number }[] = [];
+  constructor(
+    readonly coverage: number,
+    readonly inMemory = false,
+  ) {}
+  save() {
+    this.stack.push({
+      gco: this.globalCompositeOperation,
+      alpha: this.globalAlpha,
+      clipped: this.clipped,
+    });
+  }
+  restore() {
+    const s = this.stack.pop();
+    if (!s) return;
+    this.globalCompositeOperation = s.gco;
+    this.globalAlpha = s.alpha;
+    this.clipped = s.clipped;
+  }
+  beginPath() {
+    this.hasArc = false;
+  }
+  rect() {}
+  arc() {
+    this.hasArc = true;
+  }
+  moveTo() {}
+  lineTo() {}
+  closePath() {}
+  stroke() {}
+  clip(rule: Rule = "nonzero") {
+    if (this.hasArc) this.clipped *= this.coverage;
+    else if (rule === "evenodd") this.clipped *= this.inMemory ? 0 : 1;
+    else this.clipped *= this.inMemory ? 1 : 0;
+  }
+  fill() {
+    const c = (this.hasArc ? this.coverage : 1) * this.clipped;
+    const src = this.globalAlpha * c;
+    const a = this.alpha;
+    if (this.globalCompositeOperation === "destination-out") this.alpha = a * (1 - c);
+    else if (this.globalCompositeOperation === "lighter") this.alpha = Math.min(1, a + src);
+    else this.alpha = a + src - a * src;
   }
 }
 

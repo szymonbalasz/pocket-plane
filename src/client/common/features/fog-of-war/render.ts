@@ -1,9 +1,10 @@
 // Fog render (FR-FOG-20/21), static (V1): the base mask (re-based to the scene's current box:
 // cells keep their index, cells outside the stored box take `fill`) painted, then every fog shape
-// in list order over it (painter: each shape first erases what is under it, then paints its own
-// state), all inside one Konva shape on the fog layer.
-// - DM: Fog ≈ 50 %, Explored ≈ 25 %, shape edges hairline; darkness is drawn by its own hatched
-//   nodes on top.
+// in list order over it (painter: each shape first erases what is under it, then adds its own
+// state, so an antialiased edge between two equal states leaves no seam), all inside one Konva
+// shape on the fog layer.
+// - DM: Fog ≈ 50 %, Explored ≈ 25 %, shape edges hairline (not brush shapes); darkness is drawn by
+//   its own hatched nodes on top.
 // - Player: Fog opaque, Explored dims the map; darkness draws opaque only where the point is
 //   statically clear (never over Fog or Explored): painted first, erased under base fog and under
 //   each fog / explored shape, re-painted inside each reveal shape; explored memory turns Fog
@@ -249,26 +250,50 @@ function erase(ctx: PaintCtx, draw: () => void, rule?: "nonzero" | "evenodd") {
 }
 
 /**
- * FR-FOG-37 (V3): inside `clip`, the player's explored-memory cells turn Fog into Explored (the
- * caller clips to where Fog was just painted).
+ * The second half of a replace, after `erase` of the same path: an edge pixel of coverage c keeps
+ * `(1 - c)` of what was there and gains `c` of the paint. `source-over` here would leave a seam
+ * wherever the shape's state equals what lies under it (Fog over Fog: alpha 0.75 at c = 0.5).
  */
-function fogToMemory(
+function addFill(ctx: PaintCtx, p: Paint, draw: () => void, rule?: "nonzero" | "evenodd") {
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = p.alpha;
+  ctx.fillStyle = p.color;
+  ctx.beginPath();
+  draw();
+  ctx.fill(rule);
+}
+
+/**
+ * Adds Fog in an erased path; FR-FOG-37 (V3): the player's explored-memory cells add Explored
+ * instead, in one pass (Fog painted first and turned into Explored would leave a seam).
+ */
+function addFog(
   ctx: PaintCtx,
   paints: FogPaints,
+  m: MapRect,
   memory: readonly FogRun[],
-  clip: () => void,
+  draw: () => void,
   rule?: "nonzero" | "evenodd",
 ) {
-  if (memory.length === 0) return;
+  if (memory.length === 0) {
+    addFill(ctx, paints.fog, draw, rule);
+    return;
+  }
   const cells = () => {
     for (const [x, y, w, h] of memory) ctx.rect(x, y, w, h);
   };
   ctx.save();
   ctx.beginPath();
-  clip();
-  ctx.clip(rule);
-  erase(ctx, cells);
-  fillWith(ctx, paints.explored, cells);
+  ctx.rect(0, 0, m.mapWidth, m.mapHeight);
+  cells();
+  ctx.clip("evenodd");
+  addFill(ctx, paints.fog, draw, rule);
+  ctx.restore();
+  ctx.save();
+  ctx.beginPath();
+  cells();
+  ctx.clip();
+  addFill(ctx, paints.explored, draw, rule);
   ctx.restore();
 }
 
@@ -297,16 +322,13 @@ export function paintFog(
   ctx.save();
   darknessFill();
   if (darkness.length > 0) erase(ctx, baseRuns);
-  fillWith(ctx, paints.fog, baseRuns);
-  if (base.length > 0) fogToMemory(ctx, paints, memory, baseRuns);
+  if (base.length > 0) addFog(ctx, paints, m, memory, baseRuns);
   for (const s of shapes as readonly FogLayerShape[]) {
     const path = () => shapePath(ctx, s, m);
     const rule = shapeRule(s);
     erase(ctx, path, rule);
-    if (s.op === "fog") {
-      fillWith(ctx, paints.fog, path, rule);
-      fogToMemory(ctx, paints, memory, path, rule);
-    } else if (s.op === "explored") fillWith(ctx, paints.explored, path, rule);
+    if (s.op === "fog") addFog(ctx, paints, m, memory, path, rule);
+    else if (s.op === "explored") addFill(ctx, paints.explored, path, rule);
     else if (darkness.length > 0) {
       ctx.save();
       ctx.beginPath();
@@ -316,14 +338,16 @@ export function paintFog(
       ctx.restore();
     }
   }
-  // FR-FOG-20: the DM sees every shape's edge as a hairline.
-  if (client === "dm" && hairline > 0 && shapes.length > 0) {
+  // FR-FOG-20: the DM sees every shape's edge as a hairline. Not a brush shape's: its path is a
+  // union of circles, quads or cells, and stroking that draws all of them across the stroke.
+  const edged = shapes.filter((s) => !isBrush(s));
+  if (client === "dm" && hairline > 0 && edged.length > 0) {
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = Math.min(1, paints.fog.alpha + 0.2);
     ctx.strokeStyle = paints.fog.color;
     ctx.lineWidth = hairline;
     ctx.beginPath();
-    for (const s of shapes) shapePath(ctx, s, m);
+    for (const s of edged) shapePath(ctx, s, m);
     ctx.stroke();
   }
   ctx.restore();
