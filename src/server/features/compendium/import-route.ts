@@ -1,8 +1,10 @@
 // Compendium import REST (CMP §9, FR-CMP-20; C3). Mounted at /api, DM only (DM secret; a player
-// credential → 401). `GET /compendium/sources`: bundled sources vs the stored rows (import panel,
-// **Update** when the versions differ). `POST /compendium/import {source}`: `cmp.import`, a
-// bundled source key only (never data); refused while an encounter is started ("End combat first").
+// credential → 401). `GET /compendium/sources`: bundled sources and the 5etools folder's books vs
+// the stored rows (import panel, **Update** when the versions differ). `POST /compendium/import
+// {source, run?}`: `cmp.import`, a source key only (never data or a path); refused while an
+// encounter is started ("End combat first").
 import {
+  type FiveEtoolsStatus,
   ImportRequest,
   type ImportResponse,
   type SourcesResponse,
@@ -23,9 +25,44 @@ import type { Services } from "../../services";
 import { noCache } from "./auth";
 import { IMPORT, type ImportResult } from "./import";
 import { BUNDLED_SOURCE_KEYS, bundledSource } from "./sources";
+import { fiveEtoolsFolder } from "./sources/five-etools";
+
+/**FR-CMPX-17, spec §9: the folder's books against the stored source rows. */
+function fiveEtoolsStatus(s: Services): FiveEtoolsStatus {
+  const folder = fiveEtoolsFolder(s.config.fiveEtoolsDir);
+  if (folder.state === "not-configured") return { state: folder.state, books: [] };
+  if (folder.state === "not-found") {
+    return {
+      state: folder.state,
+      path: folder.path,
+      ...(folder.issues ? { issues: folder.issues } : {}),
+      books: [],
+    };
+  }
+  const stored = new Map(
+    s.db
+      .select()
+      .from(compendiumSource)
+      .all()
+      .map((r) => [r.key, r]),
+  );
+  return {
+    state: folder.state,
+    release: folder.release,
+    version: folder.version,
+    books: folder.books.map((b) => {
+      const row = stored.get(b.key);
+      return {
+        ...b,
+        ...(row ? { importedVersion: row.version, importedAt: row.importedAt } : {}),
+      };
+    }),
+  };
+}
 
 export function sourceStatuses(s: Services): SourcesResponse {
   return {
+    fiveEtools: fiveEtoolsStatus(s),
     sources: BUNDLED_SOURCE_KEYS.map((key) => {
       const { bundled } = bundledSource(key);
       const row = s.db.select().from(compendiumSource).where(eq(compendiumSource.key, key)).get();

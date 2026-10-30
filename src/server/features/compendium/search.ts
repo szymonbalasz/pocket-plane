@@ -17,6 +17,7 @@ import { z } from "zod";
 import { invalid } from "../../commands/errors";
 import type { Db } from "../../db/client";
 import { type IndexRow, type SearchIndex, searchIndex } from "./search-index";
+import { type BookAbbrOf, bookAbbrOf } from "./sources/five-etools";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
 
 // ---------- cursor ----------
@@ -147,14 +148,18 @@ export function matchingRows(
   return hits;
 }
 
-function summaryOf(idx: SearchIndex, row: IndexRow): EntrySummary {
+function summaryOf(idx: SearchIndex, row: IndexRow, abbrOf: BookAbbrOf): EntrySummary {
+  const sourceLabel =
+    row.source === null ? HOMEBREW_LABEL : (idx.labels.get(row.source) ?? row.source);
   const s: EntrySummary = {
     id: row.id,
     kind: row.kind,
     name: row.name,
-    sourceLabel: row.source === null ? HOMEBREW_LABEL : (idx.labels.get(row.source) ?? row.source),
+    sourceLabel,
     line: row.line,
   };
+  const abbr = row.source === null ? undefined : abbrOf(row.source, sourceLabel);
+  if (abbr !== undefined) s.sourceAbbr = abbr;
   if (row.definitionId !== null) s.definitionId = row.definitionId;
   return s;
 }
@@ -208,8 +213,9 @@ export function searchEntries(
   v: EntryViewer,
   query: SearchQuery,
   pageSize = SEARCH_PAGE,
+  abbrOf: BookAbbrOf = bookAbbrOf(null),
 ): SearchPage {
-  if (query.sameAs !== undefined) return sameAsPage(db, v, query.sameAs, query.q);
+  if (query.sameAs !== undefined) return sameAsPage(db, v, query.sameAs, query.q, abbrOf);
   const after = query.cursor === undefined ? null : decodeCursor(query.cursor);
   // A player never sees monsters (FR-CMP-14): an empty page without a read.
   if (v.role === "player" && query.kind === "monster") return { results: [], nextCursor: null };
@@ -239,7 +245,7 @@ export function searchEntries(
   const last = page.at(-1);
   return {
     results: page.map(({ best, group }) => {
-      const s = summaryOf(idx, best.row);
+      const s = summaryOf(idx, best.row, abbrOf);
       if (group === null) return s;
       return {
         ...s,
@@ -255,7 +261,13 @@ export function searchEntries(
  * FR-CMP-35 `sameAs`: the visible members of `id`'s group that match `q` (empty: all), by line,
  * then id; ≤ 50. Unknown, not visible or entry-less id → an empty page (no existence oracle).
  */
-function sameAsPage(db: Db, v: EntryViewer, id: string, q: string | undefined): SearchPage {
+function sameAsPage(
+  db: Db,
+  v: EntryViewer,
+  id: string,
+  q: string | undefined,
+  abbrOf: BookAbbrOf,
+): SearchPage {
   const idx = searchIndex(db);
   const row = idx.byId.get(id);
   if (!row || row.entryless || row.hidden || !entryVisibleTo(row, v)) {
@@ -266,5 +278,8 @@ function sameAsPage(db: Db, v: EntryViewer, id: string, q: string | undefined): 
     (m) => entryVisibleTo(m, v) && rowTier(m, words) !== null,
   );
   members.sort((a, b) => cmpStr(a.line, b.line) || cmpStr(a.id, b.id));
-  return { results: members.slice(0, SEARCH_PAGE).map((m) => summaryOf(idx, m)), nextCursor: null };
+  return {
+    results: members.slice(0, SEARCH_PAGE).map((m) => summaryOf(idx, m, abbrOf)),
+    nextCursor: null,
+  };
 }

@@ -4,8 +4,14 @@ import { ImportCounts } from "@shared/events/compendium";
 import { z } from "zod";
 import { type CompendiumKind, CompendiumSource } from "./schemas";
 
-/** `POST /api/compendium/import` body: a bundled source key, never data (OQ-CMP-17). */
-export const ImportRequest = z.strictObject({ source: z.string().min(1).max(64) });
+/**
+ * `POST /api/compendium/import` body: a source key, never data or a path (OQ-CMP-17, FR-CMPX-02).
+ * `run`: the same value on each book of one Import / Update, which adapts from one folder read.
+ */
+export const ImportRequest = z.strictObject({
+  source: z.string().min(1).max(64),
+  run: z.string().min(1).max(64).optional(),
+});
 export type ImportRequest = z.infer<typeof ImportRequest>;
 
 export const ImportWarning = z.strictObject({
@@ -33,8 +39,39 @@ export const SourceStatus = z.strictObject({
 });
 export type SourceStatus = z.infer<typeof SourceStatus>;
 
+/** One book of the 5etools folder (FR-CMPX-02); `imported*`: its stored source row. */
+export const BookStatus = z.strictObject({
+  key: z.string().min(1).max(64),
+  name: z.string().min(1),
+  abbr: z.string().min(1),
+  counts: z.strictObject({
+    monster: z.number().int().min(0),
+    spell: z.number().int().min(0),
+    item: z.number().int().min(0),
+  }),
+  importedVersion: z.string().min(1).optional(),
+  importedAt: z.string().min(1).optional(),
+});
+export type BookStatus = z.infer<typeof BookStatus>;
+
+/** FR-CMPX-17, spec §9: the DM's 5etools folder. `path`, `issues`: only for `not-found`. */
+export const FiveEtoolsStatus = z.strictObject({
+  state: z.enum(["not-configured", "not-found", "ready"]),
+  path: z.string().optional(),
+  issues: z.array(z.string()).optional(),
+  /** The release, as shown ("1.217.1"). */
+  release: z.string().optional(),
+  /** FR-CMPX-03: differs from a book's `importedVersion` → **Update**. */
+  version: z.string().optional(),
+  books: z.array(BookStatus),
+});
+export type FiveEtoolsStatus = z.infer<typeof FiveEtoolsStatus>;
+
 /** `GET /api/compendium/sources` (DM). */
-export const SourcesResponse = z.strictObject({ sources: z.array(SourceStatus) });
+export const SourcesResponse = z.strictObject({
+  sources: z.array(SourceStatus),
+  fiveEtools: FiveEtoolsStatus,
+});
 export type SourcesResponse = z.infer<typeof SourcesResponse>;
 
 /** Entries of the last import, all kinds (panel status "SRD 5.1 · N entries"). */
@@ -54,6 +91,40 @@ export function importSummary(counts: ImportCounts): string {
   }
   const n = (v: number) => v.toLocaleString("en-US");
   return `${n(created)} new · ${n(updated)} updated · ${n(existing)} unchanged`;
+}
+
+/** FR-CMPX-19: a book's `data-state` in the 5etools list. */
+export function bookPanelState(
+  b: Pick<BookStatus, "importedVersion">,
+  version: string | undefined,
+): "new" | "imported" | "outdated" {
+  if (b.importedVersion === undefined) return "new";
+  return b.importedVersion === version ? "imported" : "outdated";
+}
+
+/** FR-CMPX-17 Toast after a run: totals over its books, then the warning count. */
+export function booksSummary(results: readonly ImportResponse[]): string {
+  let existing = 0;
+  let created = 0;
+  let updated = 0;
+  let warnings = 0;
+  for (const r of results) {
+    warnings += r.warnings.length;
+    for (const c of Object.values(r.counts)) {
+      created += c.created;
+      updated += c.updated;
+      existing += c.existing;
+    }
+  }
+  const changed = created + updated;
+  const n = (v: number) => v.toLocaleString("en-US");
+  const books = `${results.length} ${results.length === 1 ? "book" : "books"}`;
+  const totals =
+    changed === 0
+      ? `0 changed · ${n(existing)} unchanged`
+      : `${n(created)} new · ${n(updated)} updated · ${n(existing)} unchanged`;
+  const warned = `${n(warnings)} ${warnings === 1 ? "warning" : "warnings"}`;
+  return `${books}: ${totals} · ${warned}`;
 }
 
 /** The import panel's state for one source (FR-CMP-20). */

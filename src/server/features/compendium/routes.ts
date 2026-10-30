@@ -1,15 +1,16 @@
 // Compendium REST reads (CMP §9, FR-CMP-10–14, -65). Mounted at /api. Order per request: Cache-Control
 // wrapper → auth (route-local, FR-CMP-13) → query validation → visibility → If-None-Match.
-import { SearchQuery } from "@shared/compendium/rest";
+import { SEARCH_PAGE, SearchQuery } from "@shared/compendium/rest";
 import { Hono } from "hono";
 import { validator } from "hono/validator";
 import { zodIssues } from "../../commands/errors";
 import { errorBody, errorResponse } from "../../http";
 import type { Services } from "../../services";
 import { type CompendiumEnv, compendiumAuth, noCache } from "./auth";
-import { etagMatches, readEntry } from "./read";
+import { etagMatches, readCredits, readEntry } from "./read";
 import { readRulesIndex, readRulesPage } from "./rules";
 import { searchEntries } from "./search";
+import { bookAbbrOf } from "./sources/five-etools";
 
 const searchQuery = validator("query", (value, c) => {
   const r = SearchQuery.safeParse(value);
@@ -18,19 +19,35 @@ const searchQuery = validator("query", (value, c) => {
 });
 
 export function compendiumRoutes(s: Services) {
+  const abbrOf = bookAbbrOf(s.config.fiveEtoolsDir);
   return (
     new Hono<CompendiumEnv>()
       .use("/compendium/*", noCache, compendiumAuth(s))
       .get("/compendium/search", searchQuery, (c) => {
         try {
-          return c.json(searchEntries(s.db, c.get("viewer"), c.req.valid("query")), 200);
+          const page = searchEntries(
+            s.db,
+            c.get("viewer"),
+            c.req.valid("query"),
+            SEARCH_PAGE,
+            abbrOf,
+          );
+          return c.json(page, 200);
+        } catch (err) {
+          return errorResponse(c, err, s);
+        }
+      })
+      // FR-CMPX-18: About lists every imported book, however far down the search pages it sits.
+      .get("/compendium/credits", (c) => {
+        try {
+          return c.json(readCredits(s.db, c.get("viewer"), abbrOf), 200);
         } catch (err) {
           return errorResponse(c, err, s);
         }
       })
       .get("/compendium/entries/:id", (c) => {
         try {
-          const read = readEntry(s.db, c.req.param("id"), c.get("viewer"));
+          const read = readEntry(s.db, c.req.param("id"), c.get("viewer"), abbrOf);
           if (!read) return c.json(errorBody("not_found", "Entry not found"), 404);
           c.header("ETag", read.etag);
           if (etagMatches(c.req.header("if-none-match"), read.etag)) return c.body(null, 304);
