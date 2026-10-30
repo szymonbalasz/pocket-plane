@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
 import {
+  type AddPartyResult,
   OVW_INTENTS as I,
   LABEL_STYLE_DEFAULT,
   OVERVIEW_ITEM_TYPE,
@@ -553,6 +554,99 @@ describe("overview scenes over WS (overview-scenes)", () => {
     await ok(dm, I.update, { overviewId: phandalin, name: "Phandalin" });
     for (const c of [dm, p1, again]) c.close();
   }, 30_000);
+
+  test("FR-OVW-40 leak scan over miniatures: a hidden one, its art, name and drag frames; a party on an overview not shown", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(pc("Player 1"));
+    const p2 = await h.live(pc("Player 2"));
+    const coast = ov["Sword Coast"] as string;
+    const phandalin = ov["Phandalin"] as string;
+    const drag = (overviewId: string, itemIds: string[]) => {
+      const moves = itemIds.map((itemId) => ({ itemId, x: 11, y: 22 }));
+      dm.send({ type: "signal", name: OVW_SIGNALS.drag, data: { overviewId, moves } });
+      dm.send({ type: "signal", name: OVW_SIGNALS.drag, data: { overviewId, itemIds, end: true } });
+    };
+
+    // Placed hidden, with a picture only a hidden item uses, then edited and dragged, alone and in a
+    // group with a visible one.
+    const spy = await ok<{ itemId: string }>(dm, I.placeMiniature, {
+      overviewId: coast,
+      assetId: scrollAsset,
+      x: 5,
+      y: 5,
+      size: 64,
+      text: "Secret Spy",
+      ownerPlayerId: playerIds["Player 1"],
+      hidden: true,
+    });
+    await ok(dm, I.updateItems, {
+      overviewId: coast,
+      items: [{ itemId: spy.itemId, text: "Secret Spy Two", shape: "square" }],
+    });
+    drag(coast, [spy.itemId]);
+    drag(coast, [it.neverwinter as string, spy.itemId]);
+
+    // A party on an overview not shown: added, moved, dragged. Nothing at all.
+    const party = await ok<AddPartyResult>(dm, I.addParty, {
+      overviewId: phandalin,
+      x: 0,
+      y: 0,
+      size: 64,
+    });
+    expect(party.itemIds.length).toBe(2);
+    drag(phandalin, party.itemIds);
+    await ok(dm, I.moveItems, {
+      overviewId: phandalin,
+      moves: party.itemIds.map((itemId) => ({ itemId, x: 9, y: 9 })),
+    });
+
+    const hiddenThings = [spy.itemId, "Secret Spy", ...party.itemIds];
+    const clean = async (c: TestClient) => {
+      await barrier(c);
+      expect(leaks(c)).toEqual([]);
+      expect(leakScan(h.s, c)).toEqual([]);
+      for (const s of hiddenThings) expect(c.raw()).not.toContain(s);
+    };
+    for (const c of [p1, p2]) await clean(c);
+    // A player's own hidden miniature looks unknown, and tells them nothing.
+    expect(
+      await intent(p1, I.moveItems, {
+        overviewId: coast,
+        moves: [{ itemId: spy.itemId, x: 1, y: 1 }],
+      }),
+    ).toMatchObject({ code: "not_found" });
+
+    // A reconnect brings no more.
+    const fresh = await h.live(pc("Player 1"));
+    await clean(fresh);
+
+    // Revealed: it arrives whole, and only now its picture.
+    await ok(dm, I.updateItems, {
+      overviewId: coast,
+      items: [{ itemId: spy.itemId, hidden: false }],
+    });
+    await barrier(p2);
+    expect(p2.store.records[OVERVIEW_ITEM_TYPE]?.[spy.itemId]).toMatchObject({
+      text: "Secret Spy Two",
+      assetId: scrollAsset,
+    });
+    // Hidden again, its asset and record go; a later frame stays with the DM.
+    await ok(dm, I.updateItems, {
+      overviewId: coast,
+      items: [{ itemId: spy.itemId, hidden: true }],
+    });
+    await barrier(p2);
+    expect(p2.store.records[OVERVIEW_ITEM_TYPE]?.[spy.itemId]).toBeUndefined();
+    const before = p2.frames.length;
+    drag(coast, [spy.itemId]);
+    await barrier(dm);
+    await barrier(p2);
+    expect(p2.frames.slice(before).filter((f) => f.type === "signal")).toEqual([]);
+
+    await ok(dm, I.deleteItems, { overviewId: coast, itemIds: [spy.itemId] });
+    await ok(dm, I.deleteItems, { overviewId: phandalin, itemIds: party.itemIds });
+    for (const c of [dm, p1, p2, fresh]) c.close();
+  });
 
   test("FR-OVW-41 Show removes the battle scene's rows from players and the reverse, by resync", async () => {
     const dm = await h.live(DM);

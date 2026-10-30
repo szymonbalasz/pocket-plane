@@ -34,8 +34,11 @@ export type ItemGesture =
     }
   | { kind: "resize"; itemId: string; handle: ItemHandle; from: Box; box: Box; sending: boolean };
 
-/** What the DM's asset picker is open for: a placement, or an image's Image… (FR-OVW-22, -23). */
-export type ItemPick = { kind: "place" } | { kind: "image"; itemId: string };
+/** What the DM's asset picker is open for: a placement, or an item's Image… (FR-OVW-22, -23, -32). */
+export type ItemPick =
+  | { kind: "place" }
+  | { kind: "miniature"; text: string; ownerPlayerId: string | null }
+  | { kind: "image"; itemId: string };
 
 export interface OverviewEditorState {
   overviewId: string | null;
@@ -47,6 +50,8 @@ export interface OverviewEditorState {
   cursor: string | null;
   menu: { itemId: string; at: Point } | null;
   picking: ItemPick | null;
+  /** FR-OVW-32: the miniature whose Name dialog is open. */
+  naming: string | null;
   /** FR-OVW-21: the items a confirm is open for. */
   confirmDelete: readonly string[] | null;
   /** FR-OVW-22: this overview's first image is on its way; the camera fits when it lands. */
@@ -64,6 +69,7 @@ export const initialEditor: OverviewEditorState = {
   cursor: null,
   menu: null,
   picking: null,
+  naming: null,
   confirmDelete: null,
   fitOnArrival: null,
   view: { x: 0, y: 0, scale: 1, w: 0, h: 0 },

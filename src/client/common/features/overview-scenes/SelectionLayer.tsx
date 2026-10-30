@@ -2,11 +2,13 @@
 // if locked), corner handles on a lone resizable one, the box in progress. Screen-sized, so it reads
 // the camera; never takes a hit, the Select tool works out handles itself. `name` = test ID.
 import { Group, Rect } from "react-konva";
+import { useStore } from "zustand";
 import { handlePoint, ITEM_HANDLES, sideBox } from "./item-edit";
 import { itemBox, type OverviewItemView } from "./item-layout";
 import { ITEM_KIND_DEFS } from "./items/kinds";
 import { measureText } from "./label-fonts";
 import { useOverviewCanvas } from "./overview-canvas-context";
+import { itemPreviews } from "./overview-drag";
 import { drawnGesture, previewOf, useOverviewEditor } from "./overview-editor";
 
 const HANDLE_PX = 10;
@@ -18,11 +20,14 @@ export function SelectionLayer() {
   const scale = useOverviewEditor((s) => s.view.scale);
   const gesture = useOverviewEditor((s) => s.gesture);
   useOverviewEditor((s) => s.fontRev);
+  const remote = useStore(itemPreviews, (s) => s.previews);
   const drawn = drawnGesture({ gesture });
   const px = 1 / scale;
   const selected = ids.flatMap((id): OverviewItemView[] => {
     const item = items.find((i) => i.id === id);
-    return item ? [{ ...item, ...previewOf(drawn, item) }] : [];
+    if (!item) return [];
+    const r = remote[id];
+    return [{ ...item, ...(r ? { x: r.x, y: r.y } : {}), ...previewOf(drawn, item) }];
   });
   const sole = selected.length === 1 ? selected[0] : undefined;
   const handles = sole && !sole.locked && ITEM_KIND_DEFS[sole.kind].resize ? sole : undefined;

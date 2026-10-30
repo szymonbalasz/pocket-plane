@@ -5,9 +5,17 @@
 // the canvas, e.g. FR-OVW-25's field); `panel` shows beside the rail (FR-MAP-60). The handlers are
 // DOM-free, so they run under `bun test`.
 import { MAP_SIGNALS } from "@shared/scenes-map/schemas";
-import { ImagePlusIcon, MousePointer2Icon, RadarIcon } from "lucide-react";
+import {
+  ImagePlusIcon,
+  MousePointer2Icon,
+  RadarIcon,
+  UserRoundPlusIcon,
+  UsersRoundIcon,
+} from "lucide-react";
 import type { CanvasClient } from "../scenes-map/layers";
 import { AddImagePanel } from "./AddImagePanel";
+import { AddMiniaturePanel } from "./AddMiniaturePanel";
+import { AddPartyPanel } from "./AddPartyPanel";
 import type { OverviewItemView } from "./item-layout";
 import { SELECT_TOOL_ID } from "./overview-canvas-context";
 import { selectPointer } from "./select-tool";
@@ -28,6 +36,8 @@ export interface OverviewPointer {
   clicks: number;
   client: CanvasClient;
   overviewId: string;
+  /** This player; null on the DM's client. */
+  myPlayerId: string | null;
   /** The topmost item under the pointer; null on empty canvas. */
   item: OverviewItemView | null;
   /** FR-OVW-47: editing is off while not live; a tool checks this (selection still works). */
@@ -93,7 +103,7 @@ const selectTool: OverviewToolDef = {
   order: 0,
   hint: {
     dm: "Click, Ctrl/Shift+click or Ctrl/Shift+drag to select; drag items, pan the map",
-    player: "Drag to pan the map",
+    player: "Drag your miniature to move it; drag anywhere else to pan the map",
   },
   pans: true,
   pointer: selectPointer,
@@ -110,6 +120,32 @@ const addImageTool: OverviewToolDef = {
   pans: true,
   edits: true,
   panel: AddImagePanel,
+};
+
+/** FR-OVW-31: the panel's button adds who's missing; the canvas still pans under it. */
+const addPartyTool: OverviewToolDef = {
+  id: "add-party",
+  label: "Add party",
+  icon: UsersRoundIcon,
+  clients: ["dm"],
+  order: 30,
+  hint: { dm: "Place every party character who isn't on this overview yet" },
+  pans: true,
+  edits: true,
+  panel: AddPartyPanel,
+};
+
+/** FR-OVW-32: for NPCs, ships, a "The Party" marker; the panel's button opens the picker. */
+const addMiniatureTool: OverviewToolDef = {
+  id: "add-miniature",
+  label: "Add miniature",
+  icon: UserRoundPlusIcon,
+  clients: ["dm"],
+  order: 40,
+  hint: { dm: "Place a miniature: an NPC, a ship, a marker" },
+  pans: true,
+  edits: true,
+  panel: AddMiniaturePanel,
 };
 
 /** FR-OVW-13: `map.ping` / `map.pull` with the overview's ID as `sceneId`. Shift = pull, DM only. */
@@ -152,6 +188,8 @@ export function orderOverviewTools(tools: readonly OverviewToolDef[]): OverviewT
 export const overviewTools: readonly OverviewToolDef[] = orderOverviewTools([
   selectTool,
   addImageTool,
+  addPartyTool,
+  addMiniatureTool,
   pingTool,
 ]);
 

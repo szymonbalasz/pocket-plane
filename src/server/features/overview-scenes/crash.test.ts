@@ -1,5 +1,5 @@
-// FR-OVW-48 (OVW §13, #163 seam) on `overview-scenes`: a Show and a group move are one transaction
-// each: before-commit → nothing written (state digest equal after a restart); after-commit → all
+// FR-OVW-48 (OVW §13, #163 seam) on `overview-scenes`: a Show, an Add party and a group move are one
+// transaction each: before-commit → nothing written (state digest equal after a restart); after-commit → all
 // of it, never half. The cache rebuilds from the DB at boot.
 import { describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
@@ -114,6 +114,37 @@ describe("FR-OVW-48 crash (PP_TEST_CRASH seams)", () => {
           expect(x.db.select().from(scene).where(eq(scene.id, town)).get()?.active).toBe(false);
           expect(shownCount(x.db)).toBe(1);
           expect(x.s.records.activeSceneOf(actor.campaignId)).toBe(coast);
+        },
+      );
+    } finally {
+      try {
+        loaded.cleanup();
+      } catch {
+        // Windows may hold the temp dir a moment longer; the OS cleans it up.
+      }
+    }
+  }, 60_000);
+
+  test("FR-OVW-48 crash on an Add party: the whole party or nobody", async () => {
+    const loaded = await loadBundle("overview-scenes", { testMode: true });
+    try {
+      const b = await boot(loaded.openDb);
+      const actor = actorOf(b.db);
+      const target = named(b.db, "Phandalin").id;
+      b.close();
+      const input = { overviewId: target, x: 100, y: 100, size: 64 };
+      await crashBoth(
+        loaded.openDb,
+        OVW_INTENTS.addParty,
+        (x) => x.s.commands.run(OVW_INTENTS.addParty, input, { actor }),
+        (x) => {
+          const minis = x.db
+            .select()
+            .from(overviewItem)
+            .where(eq(overviewItem.overviewId, target))
+            .all()
+            .filter((i) => i.kind === "miniature");
+          expect(minis.map((m) => m.text)).toEqual(["Mira", "Thorn"]);
         },
       );
     } finally {

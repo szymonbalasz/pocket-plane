@@ -11,7 +11,7 @@ import type { OverviewItemView } from "../item-layout";
 import { OverviewCanvasContext } from "../overview-canvas-context";
 import type { ItemPreview } from "../overview-editor";
 import { hiddenMarkAt } from "./HiddenMark";
-import { ItemNode } from "./ItemNode";
+import { drawnItem, ItemNode } from "./ItemNode";
 
 const colors = {
   muted: "muted",
@@ -136,6 +136,32 @@ describe("item drawings", () => {
     expect(draw({ ...mini, shape: "square" })).not.toContain("<Circle");
     // No name (FR-OVW-32): no name node.
     expect(draw({ ...mini, text: "" })).not.toContain("ovw-miniature-name");
+  });
+
+  test("FR-OVW-36 a miniature's name is drawn with the label text style fields", () => {
+    const html = draw({
+      ...base,
+      kind: "miniature",
+      w: 64,
+      h: 64,
+      text: "Mira",
+      shape: "round",
+      style: { font: "fell", size: 30, color: "#112233", strokeColor: "#445566", strokeWidth: 3 },
+    });
+    expect(nodeAttr(html, "ovw-miniature-name", "font-family")).toContain("IM Fell English");
+    expect(nodeAttr(html, "ovw-miniature-name", "font-size")).toBe("30");
+    expect(nodeAttr(html, "ovw-miniature-name", "fill")).toBe("#112233");
+    expect(nodeAttr(html, "ovw-miniature-name", "stroke")).toBe("#445566");
+    expect(nodeAttr(html, "ovw-miniature-name", "stroke-width")).toBe("3");
+    // Under the miniature: its top past the side.
+    expect(Number(nodeAttr(html, "ovw-miniature-name", "y"))).toBeGreaterThan(64);
+  });
+
+  test("FR-OVW-37 another client's drag draws the item there; this client's own wins", () => {
+    const remote = { x: 700, y: 800 };
+    expect(drawnItem(base, remote, undefined)).toMatchObject(remote);
+    expect(drawnItem(base, remote, { x: 1, y: 2 })).toMatchObject({ x: 1, y: 2 });
+    expect(drawnItem(base, undefined, undefined)).toBe(base);
   });
 
   test("OVW §7 an image still loading: the tile at its w × h; a hidden one the hidden mark", () => {
