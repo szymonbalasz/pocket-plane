@@ -1,0 +1,10 @@
+{
+  "TB1": {
+    "Quarry Sign": { "class": [{ "name": "Ranger", "source": "TB1" }] },
+    "Lantern Hex": {
+      "class": [{ "name": "Wizard", "source": "TB1" }, { "name": "Artificer", "source": "TB1" }],
+      "classVariant": [{ "name": "Bard", "source": "TB1", "definedInSource": "TB2" }]
+    }
+  },
+  "TB2": { "Salt Ward": { "class": [{ "name": "Cleric", "source": "TB1" }] } }
+}

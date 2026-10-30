@@ -1,0 +1,23 @@
+{
+  "monsterTemplate": [
+    {
+      "name": "Cinderborn",
+      "source": "TB1",
+      "apply": {
+        "_root": { "int": 5 },
+        "_mod": {
+          "trait": {
+            "mode": "appendArr",
+            "items": {
+              "name": "Ember Blood",
+              "entries": [
+                "<$title_short_name$> burns from within; a creature touching it makes a {@dc <$spell_dc__con$>} Constitution save."
+              ]
+            }
+          },
+          "_": { "mode": "addSenses", "senses": { "type": "blindsight", "range": 10 } }
+        }
+      }
+    }
+  ]
+}

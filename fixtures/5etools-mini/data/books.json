@@ -1,0 +1,6 @@
+{
+  "book": [
+    { "name": "Test Book One", "id": "TB1", "source": "TB1", "group": "core" },
+    { "name": "Test Book Two", "id": "TB2", "source": "TB2", "group": "supplement" }
+  ]
+}
