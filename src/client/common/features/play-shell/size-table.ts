@@ -172,6 +172,13 @@ export const SIZE_TABLE: Record<"dm" | "player", Record<string, SizeRow>> = {
       min: s(280, 240),
       criterion: "name, type line, core row, abilities, 2 attack rows with their buttons",
     },
+    // #394 (FR-ASSET-69): Assets, as the Compendium (opens 400 high at 1280×720).
+    "asset.library": {
+      default: all(440, 560),
+      useful: all(440, 400),
+      min: s(320, 280),
+      criterion: "tabs, toolbar, search, tag chips, a row of thumbnails",
+    },
   },
   player: {
     "cbt.initiative": {

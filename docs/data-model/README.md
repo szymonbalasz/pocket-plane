@@ -2806,3 +2806,9 @@ From [ADR-0073](../architecture/adr/0073-tray-attacks.md) and DM [#385](../decis
 - **Derived (never stored):** `isUsedRoll(entry)` (`@shared/dice-roll-log/schemas`) = `encounterId` set **or** `dmPayload.usedByCardId` set (players' copy: `encounterId` only). Staged specs (`stagedSpecs`, `rowlessSpecs`, `@shared/character-sheet/logic`) and the item fields (`specItemFields`): from the intent, at roll time.
 - **Fixtures:** unit `tray-log-rolls` (three plain lines: the DM's hidden "2d6", Player 1's "1d20+5" as Mira and "1d8+1d6" as themselves), bundle `tray-attacks` = `rules-effects` + `kit-mira-spells` + `tray-log-rolls`.
 - **CON-44 (measured, heavy harness, every roll item at its widest tags and every roll entry stamped):** item tags DM +5,240 B, players +2,160 B; `usedByCardId` DM +5,470 B, players +0 B; heavy DM 706,680 B, players ≤ 267,388 B (protocol §184).
+
+## 148. Assets window; rename and delete sounds (fix/assets-window)
+
+From [assets-pipeline](../specs/assets-pipeline.md#65-rename-and-delete-an-image-386) FR-ASSET-67–70 (DM decision #394). **No new table, column or record type.** `assets.rename` / `assets.delete` ([protocol §189](../protocol/README.md#189-assets-window-rename-and-delete-sounds-fixassets-window)) now also write `asset` rows of kind `audio` (name; row delete).
+
+- **Holder of a sound** (derived, never stored): `campaign.alert_sounds` values (JSON leaf, `AlertKey` → asset ID). A picked sound can't be deleted; deleting an unpicked one frees a slot under the 50-sound cap (FR-ASSET-58).

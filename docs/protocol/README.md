@@ -4356,3 +4356,19 @@ From [ADR-0073](../architecture/adr/0073-tray-attacks.md) and DM [#385](../decis
 
 - **Unchanged:** checks, saves, skills, initiative and every other roll button (click rolls, Alt stages); request answers (no `parts`).
 - **Tests:** `character-sheet/sheet-render.test.tsx` (FR-CHARX-126 ×3, -127 ×2, -132), `character-sheet/routing.test.ts` (FR-CBT-169 two actions, FR-CHARX-128 staged parts from the client), `companion/companion.test.tsx` (FR-CHARX-131), `dm/features/combat-tracker/attack-stage.test.tsx` (FR-CBT-169 ×2), `attack-choices.test.ts`, `entities/statblock/statblock.test.tsx` (FR-KIT-105 ×2); e2e `tray-attacks.e2e.ts` (bundle `tray-attacks`); e2e helper `e2e/support/rolls.ts` `rollNow` (Alt+click).
+
+## 189. Assets window; rename and delete sounds (fix/assets-window)
+
+From [assets-pipeline](../specs/assets-pipeline.md#65-rename-and-delete-an-image-386) FR-ASSET-67–70 (DM decision #394; OQ-ASSET-24 C, OQ-ASSET-30 reversed). **Built by `fix/assets-window`.**
+
+| Item | Shape | Rule | FR |
+|---|---|---|---|
+| Intent `assets.uses {assetId}` *(new, DM)* | `AssetUsesIntent` (`@shared/assets-pipeline/manage`); result `{uses: AssetUse[]}` | An image or sound of `actor.campaignId` else `not_found`; player → `forbidden`. Reads only: no event, no log row | FR-ASSET-68 |
+| `assets.rename` / `assets.delete` *(changed)* | as §184 | Accept a sound (`kind` `audio`) too. A sound's use: kind `alert sound`, name = the alert's label (`ALERT_SOUND_NAMES`: Your turn, Roll request, Pause, Resume) for each `campaign.alertSounds` key picking it | FR-ASSET-67 |
+| `AssetRenamed` / `AssetDeleted` of a sound | as §184 | `audio-asset` upsert / delete (audience DM, lazy) in place of `asset` | FR-ASSET-67 |
+| Window `asset.library` *(new; `@dm/features/assets-pipeline/assets-window`, DM registry line)* | "Assets", launcher order 67 (after Rules), DM only | top-left `dx` 56, 440×560, min 320×280, useful 440×400, `minOpenH` 400; not protected, parkable | FR-ASSET-69 |
+
+- **Registry lines** (append-only): `src/client/dm/windows.ts` (`assetsWindow`), `size-table.ts` DM row `asset.library`, bundle `assets-window-e2e` in `fixtures/bundles/index.ts`; `useful-size.e2e.ts` DM case. Goldens unchanged (the kind is checked by the window contract, FR-SHELL-61).
+- **Picker** (`AssetPicker`): `onSelect` optional (none → no Select button); `onOpen(id)` on double-click when there's no `onSelect`; `selectedExtra(asset)` under the tag row. `ImageActions` takes `noun` (`image` | `sound`).
+- **Visibility:** unchanged: `asset` and `audio-asset` reach DM connections only; `assets.uses` answers its sender only.
+- **CON-44:** 0 B snapshot growth. The Sounds tab loads `audio-asset` lazily (≤ 50 rows, ≈ 14 KB).

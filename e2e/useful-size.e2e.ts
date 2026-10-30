@@ -126,6 +126,14 @@ const DM: Case[] = [
     criterion: "composer folded + a 6-row card",
     check: "body",
   },
+  {
+    kind: "asset.library",
+    useful: { w: 440, h: 400 },
+    // #394 (FR-ASSET-69): a row of 3 thumbnails whole under tabs, toolbar, search and chips.
+    criterion: "tabs, toolbar, search, tag chips, a row of thumbnails",
+    check: 3,
+    rows: '[data-testid="asset-picker-item"]',
+  },
 ];
 const PLAYER: Case[] = [
   { kind: "cbt.initiative", useful: { w: 280, h: 320 }, criterion: "header + 4 rows", check: 4 },

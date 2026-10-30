@@ -40,6 +40,8 @@ phase: post-mvp-8
 
 > **Rename and delete an image (DM [#386](../decisions-log.md), 2026-10-29; decides OQ-ASSET-05 and OQ-ASSET-19).** The DM renames and deletes images from the picker. **Delete only an unused image** (OQ-ASSET-05 A): while a scene map, prop, token, portrait, running combatant, handout, compendium entry or the pause card holds it, `assets.delete` is refused and the reject names the uses. Deleting the row is also the revoke: its URLs answer 404 at once. New FR-ASSET-62–66 ([§6.5](#65-rename-and-delete-an-image-386)); no new column or record type.
 
+> **Assets window; rename and delete sounds (DM [#394](../decisions-log.md), 2026-10-30; decides OQ-ASSET-24 C, reverses OQ-ASSET-30).** A DM launcher window **Assets** (`asset.library`) opens the library without a host form: tab **Images** (the one picker without Select, a "Used in" line, double-click → full-size preview) and tab **Sounds** (play, rename, delete, upload). Sounds get rename and delete under the image rule: only when no alert picks them. New intent `assets.uses`. FR-ASSET-67–70 ([§6.5](#65-rename-and-delete-an-image-386)); no new column or record type.
+
 > **Sprint 8, track TT (DM [#334](../decisions-log.md)).** DM-added alert sounds are audio assets (ADR-0030, ADR-0023 capability IDs): MP3 / OGG / WAV ≤ 512 KB, ≤ 5 s, hand-rolled probe (**no dependency**), lazy DM-only `audio-asset` (0 B in snapshots). FR-ASSET-52–61 (§6.4); `audio-chime` joins session-sim-12; tests, walkthrough T13–T14: [dice-extras §13](dice-extras.md#13-test-plan). Decided at gate 1 (#335): OQ-ASSET-27–30.
 
 ## 1. Summary
@@ -68,7 +70,7 @@ phase: post-mvp-8
 ## 4. Non-goals
 
 - Preload, load progress, player-ready (ADR-0003's "preloaded" is deferred by [ADR-0014](../architecture/adr/0014-mvp-scope.md): assume immediate load). Preloading an inactive scene would reveal its IDs early; it needs a player-visible preload grant (post-MVP, [scene-tools](scene-tools.md)).
-- Token art library / standalone image browser (tier A). Player uploads (OQ-ASSET-02). Replace an asset's bytes; revoke (re-key) an image that is still in use (OQ-ASSET-05; *#386: rename and delete an unused image are in, §6.5*). Deleting or renaming a sound. Image editing. Audio beyond short alert sounds (§6.4) / video ([ADR-0007](../architecture/adr/0007-product-scope.md)). Cloud storage, CDN.
+- Player uploads (OQ-ASSET-02). Replace an asset's bytes; revoke (re-key) an asset that is still in use (OQ-ASSET-05). *(#386, #394: rename and delete an unused image or sound and the Assets window are in, §6.5.)* Image editing. Audio beyond short alert sounds (§6.4) / video ([ADR-0007](../architecture/adr/0007-product-scope.md)). Cloud storage, CDN.
 
 ## 5. User stories
 
@@ -155,7 +157,7 @@ The picks below are OQ-ASSET-21–26 as decided at sprint-6 gate 1 (#288: every 
 | FR-ASSET-55 | **Dedupe** by hash as images. Test `FR-ASSET-55 audio dedupe`. | |
 | FR-ASSET-56 | **Serve** `GET /api/assets/:id/audio`: the original, `Content-Type` = mime, `private, max-age=31536000, immutable`, ETag, iff in the active campaign and audio; any mismatch → the common 404. Test `FR-ASSET-56 audio serve`. | ADR-0023 |
 | FR-ASSET-57 | **Sync**: audio rows never in `asset` (pickers and snapshots unchanged); type **`audio-asset`** `{id, campaignId, seq, name, mime, bytes, durationMs, createdAt}`, `lazy: "all"` (ADR-0045), DM only. Players learn an audio ID only as a pick in `campaign.alertSounds`. Test `FR-ASSET-57 audio visibility`. | |
-| FR-ASSET-58 | **Cap** 50 sounds per campaign → `409` "Sound library full (50)"; no delete. Test `FR-ASSET-58 library cap`. | OQ-ASSET-30 |
+| FR-ASSET-58 | **Cap** 50 sounds per campaign → `409` "Sound library full (50)"; *(#394)* deleting an unpicked sound frees a slot (FR-ASSET-67). Test `FR-ASSET-58 library cap`. | OQ-ASSET-30 |
 | FR-ASSET-59 | **`assets.require(ctx, id, {kind?})`**, default `image`; a wrong kind → `invalid`. Test `FR-ASSET-59 require kind`. | |
 | FR-ASSET-60 | **Fields**: `name` as images; `listed` / `tags` ignored for audio; the attach control stays images only. Test `FR-ASSET-60 audio fields`. | |
 | FR-ASSET-61 | **CON-44** (measured): 0 B in snapshots; `sync.load` of 50 = 13,833 B; one `GET` per pick per page. Edges as images; MIME headers ignored (sniff only). | #256 |
@@ -169,6 +171,10 @@ The picks below are OQ-ASSET-21–26 as decided at sprint-6 gate 1 (#288: every 
 | FR-ASSET-64 | **In use = refused** (OQ-ASSET-05 A, OQ-ASSET-19): `Scene.mapAssetId`, `Prop.assetId`, `Token.imageAssetId`, `Entity.portraitAssetId`, `Combatant.imageAssetId` (encounter not ended), `Handout.imageAssetIds`, `CompendiumEntry.imageAssetIds`, `Campaign.pause.imageAssetId`. Any → `conflict` "In use: ‹name› (‹kind›), … and ‹n› more. Change those first." (first 5 named; kind order as listed, by name within a kind; a prop's name = its scene's; the pause card unnamed), nothing written. Checked inside the command's transaction, so a use added meanwhile can't slip past. | `assetUses` |
 | FR-ASSET-65 | **Attachments and shared bytes**: an attachment deletes like a listed image, with no record change (only the log row). The same bytes in another campaign are another row: their files survive the sweep. | |
 | FR-ASSET-66 | **Picker** (DM, `live` only): beside the selected image's name in the tag row, two ghost icon Buttons **Rename image** (pencil) and **Delete image** (trash), Tooltips. Rename… → Dialog with the name Input → `assets.rename`; Delete… → Dialog "Delete ‹name›? Its links stop working. This can't be undone." + destructive Delete → `assets.delete`. A reject (in use, invalid name, connection lost) shows inline in the Dialog; the Dialog stays. After a delete the tile and the tag row go. Not live → disabled with "Reconnecting…". The forms never submit a host form (New scene). | |
+| FR-ASSET-67 | *(#394)* **Sounds**: `assets.rename` / `assets.delete` take a sound too (FR-ASSET-62, -63 rules). Its one holder: `Campaign.alertSounds` (a key picking it) → `conflict` "In use: Your turn (alert sound), … Change those first." (alert names as Campaign options labels them). Changes: `audio-asset` upsert / delete (DM; lazy, FR-ASSET-57). A delete frees a slot under the cap (FR-ASSET-58). | reverses OQ-ASSET-30 |
+| FR-ASSET-68 | *(#394)* **`assets.uses {assetId}`** (DM intent, reads only): an image or sound of `ctx.campaignId` else `not_found` → `{uses}` (FR-ASSET-64's list, all of it, same order). No event, no log row. | "Used in" |
+| FR-ASSET-69 | *(#394)* **Assets window** `asset.library` "Assets" (DM only; launcher "Assets" after Rules, image-stack icon): 440 × 560, min 320 × 280, useful 440 × 400, opens 400 high where 560 doesn't fit; top-left beside the rail; closed by default. Tabs **Images** · **Sounds**. **Images** = the picker (FR-ASSET-17, -45–47, -66) with **no Select button**; under the selected image's tag row a **Used in** line (`assets.uses`, asked again when the selection or its record changes): "Used in: Town (scene map), …" or "Not used anywhere: it can be deleted."; **double-click** a tile → full-size preview Dialog (`display`, ≤ 90 % of the screen, title = name). | OQ-ASSET-24 C |
+| FR-ASSET-70 | *(#394)* **Sounds tab**: the lazy `audio-asset` library (loaded on open, Retry on error), newest first; a row per sound: ▶ Play (plays it at once, the DM's own mute / volume apply), name, "0.4 s · Alert: Roll request, Pause" (the campaign's picks), Rename / Delete as FR-ASSET-66 (`noun` sound). **Upload** (MP3 / OGG / WAV, FR-ASSET-52 limits; refusals inline). Empty: "No sounds yet. Upload a short alert sound." Campaign options keeps its picks and its own upload. | |
 
 ## 7. UI/UX notes
 
@@ -183,6 +189,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 - *(S6)* **Picker layout** (FR-ASSET-45–47; same in the Dialog and inline in New scene): row 1 toolbar (Upload, hint, Select) as today; row 2 **search** Input (search icon, clear ×) + **Manage tags** (ghost icon Button, DropdownMenu); row 3 **tag chips** (shadcn Badge as toggle buttons, `secondary` = off, `default` = on, "Tokens 12"), wrapping; row 4 the selected image's **tag editor** ("Tags:" + removable Badges + "Add tag" Input with a suggestion Popover), only when an image is selected; then the thumbnail grid, the only part that scrolls. The Dialog keeps `max-w-2xl`, `max-h-[80vh]`: at 1280 × 720 rows 1–4 take ≈ 150 px and ≥ 2 grid rows stay visible. Thumbnail tiles show the name; a Tooltip adds size, MB and the tags. Disconnected: tag editing and Manage tags disabled with a Tooltip ("Reconnecting…"); search and filter keep working on the store. Styling per [visual-direction](../design/visual-direction.md), no custom styles. Pickers are Dialogs (or inline in a Dialog), not play-shell windows: no placement or default size from [play-shell](play-shell.md) (settled by seams S3).
 - *(S6)* **Test IDs:** `asset-picker-search`, `asset-picker-search-clear`, `asset-picker-no-match` (+ `asset-picker-search-all`), `asset-picker-tag-chip` + `data-tag` (folded) + `data-state` (`on|off`) (All = `data-tag="all"`, Untagged = `data-tag="untagged"`), `asset-picker-item` gains `data-tags` (folded, space-separated), `asset-tags-editor` + `data-record-id`, `asset-tags-chip` + `data-tag`, `asset-tags-remove` + `data-tag`, `asset-tags-add` (Input), `asset-tags-suggestion` + `data-tag`, `asset-tags-manage`, `asset-tags-rename` / `asset-tags-delete` + `data-tag`, `asset-tags-confirm`, `asset-tags-error`. `asset-picker` gains `data-context`. *(IM-2 build, integrator)* Also: `asset-picker-selected`, `asset-picker-no-match-clear`, `asset-tags-rename-to`, `asset-tags-prompt`, `asset-tags-dialog`.
 - *(#386)* **Test IDs:** `asset-rename` / `asset-delete` + `data-record-id` (the tag row's buttons), `asset-manage-dialog`, `asset-rename-name` (Input), `asset-delete-prompt`, `asset-manage-confirm`, `asset-manage-error`.
+- *(#394)* **Test IDs:** Assets window `asset-lib`, `asset-lib-tab` + `data-value` (`images|sounds`), `asset-lib-used` + `data-record-id` + `data-state` (`loading|ready|error`), `asset-lib-preview` + `data-record-id`, `asset-lib-sound` + `data-record-id`, `asset-lib-sound-play`, `asset-lib-sound-name`, `asset-lib-sound-used`, `asset-lib-sound-upload`, `asset-lib-sound-file`, `asset-lib-sound-error`, `asset-lib-sounds-empty`. The picker hosted there has no `asset-picker-select`.
 
 ## 8. Data model
 
@@ -222,6 +229,8 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | `assets.deleteTag {tag}` | DM | held in the campaign else `not_found` | `{changed}` |
 | *(#386)* `assets.rename {assetId, name}` | DM | image in `ctx.campaignId` else `not_found`; name per FR-ASSET-08 | `ack` |
 | *(#386)* `assets.delete {assetId}` | DM | image in `ctx.campaignId` else `not_found`; in use → `conflict` naming the uses (FR-ASSET-64) | `ack` |
+| *(#394)* `assets.uses {assetId}` | DM | image or sound in `ctx.campaignId` else `not_found`; reads only | `{uses}` |
+| *(#394)* `assets.rename` / `assets.delete` | DM | as above, a sound too (FR-ASSET-67) | `ack` |
 
 **Record types and events** (generic record changes `{type, id, op, data}` + `cause`, [ADR-0021](../architecture/adr/0021-sync-protocol-conventions.md))
 
@@ -239,10 +248,11 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | *(S6)* `AssetTagRenamed {from, to, assetIds}` / `AssetTagDeleted {tag, assetIds}` | one `asset` upsert per changed listed asset | yes | no | no |
 | *(#386)* `AssetRenamed {assetId, name}` | `asset` upsert if listed | yes | no | no |
 | *(#386)* `AssetDeleted {assetId, name}` | `asset` delete if listed | yes | no | no |
+| *(#394)* `AssetRenamed` / `AssetDeleted` of a sound | `audio-asset` upsert / delete (DM) | yes | no | no |
 
 - `existing` outcome emits nothing *(S5: except FR-ASSET-26's listing)*. **Server API for other specs:** `assets.require(ctx, id)` (FR-ASSET-15).
 - *(S5)* Visibility per event: `asset` changes reach DM connections only (player `hidden`); players get at most an empty-change frame. **Client API for other specs:** `ImageAttach` + `AttachUploaderProvider` (FR-ASSET-20, -27).
-- *(#386)* Visibility: `AssetRenamed` / `AssetDeleted` change only `asset` records → **DM connections only**; players get nothing (no name, no ID). A refused delete writes nothing and emits nothing.
+- *(#386)* Visibility: `AssetRenamed` / `AssetDeleted` change only `asset` records → **DM connections only**; players get nothing (no name, no ID). A refused delete writes nothing and emits nothing. *(#394)* A sound's changes are `audio-asset` (audience DM): DM only too; `assets.uses` answers only its sender.
 - *(S6)* Visibility per event: all three tag events change only `asset` records → **DM connections only**; players get at most an empty-change frame (no tag, no ID). The backfill (FR-ASSET-49) emits nothing. **Client API for other specs:** the `context` prop (FR-ASSET-48); **shared API:** `matchImages` (`@shared/assets-pipeline/search.ts`), the matcher itself is `@shared/search/match.ts` ([FR-CMP-54](compendium.md#6-functional-requirements)).
 
 ## 10. Permissions
@@ -259,6 +269,7 @@ Per [visual-direction](../design/visual-direction.md): shadcn Dialog, Progress, 
 | *(S6)* See / search / filter tags | ✓ | ✗ (OQ-ASSET-25) | `asset` visibility = DM only |
 | *(S6)* Set an image's tags; rename / merge / delete a tag | ✓ | ✗ | default-DM commands (FR-ASSET-42, -43) |
 | *(#386)* Rename / delete an image | ✓ (delete: unused only) | ✗ | default-DM commands (FR-ASSET-62–64) |
+| *(#394)* Assets window; rename / delete a sound; ask an asset's uses | ✓ | ✗ (no window, `forbidden`) | DM-only window; default-DM commands (FR-ASSET-67–69) |
 
 ## 11. Edge cases & failure modes
 
@@ -415,6 +426,14 @@ Tests and the e2e: §13 rows marked *(#386)*. **Browser walkthrough IMD** — bu
 | IMD5 | A: open a token's Image… picker, select any unused image → Delete image while B watches | Tile gone for A; B's frames carry no asset change, no name; B's map unchanged |
 | IMD6 | Stop and restart the server; A reopens a picker | Old Sketch still gone; Town and every other image render |
 
+### 13.3 Assets window; sounds (#394)
+
+| Level | What | Fixtures |
+|---|---|---|
+| Integration (server) | `FR-ASSET-67 sounds` (`manage.test.ts`: rename → `audio-asset` upsert; picked for two alerts → `conflict` naming both, `assets.uses` lists them; unpicked → `audio-asset` delete, URL 404, players nothing); `FR-ASSET-68 uses` (unused → `[]`, no event, no log row; other campaign / unknown → `not_found`; player → `forbidden`) | own server |
+| Unit (client) | `FR-ASSET-69 registered (DM)`, `FR-ASSET-69 library picker` (no Select, the extra line), `FR-ASSET-69 used-in text; FR-ASSET-70 …` (`assets-window.test.tsx`); window contract and size table (`windows.test.ts`, `windows-s7.test.ts`) | in-code |
+| E2E | `e2e/assets-window.e2e.ts`: launcher → Images: Town "Used in: Town (scene map)", double-click → preview; Sounds: Chime "Alert: …Pause", Delete refused naming the alerts; upload Bell → rename Door Bell → delete. `useful-size.e2e.ts` gains the `asset.library` case | bundle **`assets-window-e2e`** (= `alert-sounds`; own bundle: it uploads and deletes) |
+
 ## 14. Dependencies
 
 | On | What we need | Status |
@@ -481,7 +500,7 @@ Tests and the e2e: §13 rows marked *(#386)*. **Browser walkthrough IMD** — bu
 | OQ-ASSET-21 | *(S6, DM)* **The tag list** (FR-ASSET-40) | **Decided (#288): A: built-ins Tokens, Portraits, Maps, Handouts, Props, Items + an Untagged filter chip (no Other tag).** Options were: **A Tokens, Portraits, Maps, Handouts, Props, Items + an "Untagged" filter chip instead of an "Other" tag** (each upload context has its tag; "Other" says nothing "no tag" doesn't) / B the brief's seven incl. Other (familiar; Other competes with real tags) / C four: Tokens, Maps, Handouts, Props (fewer chips; portraits and item art mix with tokens / props) | — · decided (#288) | party-board, compendium, entities |
 | OQ-ASSET-22 | *(S6, DM)* **(a) Fixed list or DM-defined tags; (b) one or many tags per image** (FR-ASSET-39, -40) | **Decided (#288): (a) C: built-in tags (fixed, auto-tagging, not renamable) + the DM's own free tags; (b) many, ≤ 8 per image.** Options were: (a) A fixed list only (simplest, no management UI; no "Dungeon", "Act 2") / B free tags, the list only as suggestions (flexible; renaming "Tokens" fights auto-tagging, which writes "Tokens" again) / **C built-in tags (fixed names, used by auto-tagging, can't be renamed) + the DM's own free tags (rename / merge / delete)** (one extra rule; auto-tags always land in the same chip). (b) one tag per image (a plain category, one chip each, simplest editor; Elite Goblin can't be both Tokens and Portraits, a Goblin Totem not both Props and Items, a re-upload in a new context must replace or skip) / **many, ≤ 8 per image** (an image shows under every chip that fits; slightly busier editor) (review #22) | — · decided (#288) | — |
 | OQ-ASSET-23 | *(S6, DM)* **Auto-tagging rules** (FR-ASSET-41, -48) | **Decided (#288): A: one tag per upload context; a re-upload adds the context tag; picking never tags; pickers open on All.** Options were: **A one tag per upload context (token → Tokens, portrait → Portraits, New scene → Maps, prop → Props, handout editor → Handouts, compendium item → Items, other compendium kinds → none); re-uploading an existing image adds the context tag; picking an image never tags; pickers open on All** / B as A, but pickers open filtered on their context tag (fewer clicks; hides untagged and mis-tagged images until "All") / C as A + tag on selection (using an image as a map tags it Maps: the library tags itself, but every pick may write) | — · decided (#288) | scenes-map, scene-tools, entities, party-board, compendium |
-| OQ-ASSET-24 | *(S6, DM)* **Tag management** (FR-ASSET-43, -47) | **Decided (#288): A: per-image tag editor + Manage tags (Rename merges, Delete) in the picker.** Options were: **A in the picker: per-image tag editor + Manage tags (Rename, which merges into an existing tag; Delete from all images)** / B per-image editing only (a typo tag disappears once no image holds it; no bulk fix) / C A + a separate DM "Images" window for library upkeep (more room; a new shell window for WF to place, beyond this sprint) | — · decided (#288) | play-shell (C only) |
+| OQ-ASSET-24 | *(S6, DM)* **Tag management** (FR-ASSET-43, -47) | **Decided (#288): A: per-image tag editor + Manage tags (Rename merges, Delete) in the picker.** Options were: **A in the picker: per-image tag editor + Manage tags (Rename, which merges into an existing tag; Delete from all images)** / B per-image editing only (a typo tag disappears once no image holds it; no bulk fix) / C A + a separate DM "Images" window for library upkeep (more room; a new shell window for WF to place, beyond this sprint) | — · decided (#288); *C added by #394 (the Assets window, FR-ASSET-69)* | play-shell (C only) |
 | OQ-ASSET-25 | *(S6, DM)* **Players and tags** | **Decided (#288): A: no; tags stay on the DM-only asset record, no player picker.** Options were: **A no: tags stay on the DM-only `asset` record; the player client has no image picker today** (no leak surface; ADR-0023 unchanged) / B players see the tags of images they already hold (a player-visible field on each referencing record; no player screen uses it) / C a player picker for their own portrait (needs player uploads, OQ-ASSET-02 / -14: out) | — · decided (#288) | character-sheet-full |
 | OQ-ASSET-26 | *(S6, DM)* **Existing untagged images** (FR-ASSET-49) | **Decided (#288): A: guess once from current use (marker, once per DB); unused → Untagged.** Options were: **A guess once at the first start from current use (scene map → Maps, token → Tokens, portrait → Portraits, prop → Props, handout → Handouts, compendium item → Items); unused → Untagged** (filters useful on day one; a reused image may get two tags) / B all Untagged (no surprises; the DM tags by hand) / C all tagged "Other" (needs OQ-ASSET-21 B) | — · decided (#288) | — |
 
@@ -492,7 +511,7 @@ Tests and the e2e: §13 rows marked *(#386)*. **Browser walkthrough IMD** — bu
 | OQ-ASSET-27 | Formats | **Decided (#335): A.** Options: **A. MP3, OGG, WAV** (OGG falls back to the ping on older Safari) / B. MP3 only / C. + M4A, WebM | no (decided) | FR-ASSET-52 |
 | OQ-ASSET-28 | Limits | **Decided (#335): A.** Options: **A. ≤ 512 KB, ≤ 5 s**: a short UI sound, cheap on a tunnel / B. 1 MB, 10 s / C. 256 KB, 3 s | no (decided) | FR-ASSET-52 |
 | OQ-ASSET-29 | Length check | **Decided (#335): A.** Options: **A. Server, hand-rolled probe, no dependency** / B. Only the DM's browser (bypassable) / C. `music-metadata` (MIT, a new dependency; not installed or measured) | no (decided) | FR-ASSET-53 |
-| OQ-ASSET-30 | Delete a sound? | **Decided (#335): A.** Options: **A. No, as images; cap 50** / B. Delete an unpicked one | no (decided) | FR-ASSET-58 |
+| OQ-ASSET-30 | Delete a sound? | **Decided (#335): A**, **reversed by #394: B-like: rename and delete an unpicked sound (FR-ASSET-67).** Options were: A. No, as images; cap 50 / B. Delete an unpicked one | no (decided) | FR-ASSET-58, -67 |
 
 - *(Sprint 8)* Slices: columns, lazy type, `require` kind TT0; probe, serve, `audio-chime` TT3 ([dice-extras §14](dice-extras.md#14-dependencies)). `ffprobe` rejected (external binary).
 
