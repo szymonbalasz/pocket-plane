@@ -151,6 +151,11 @@ test("FR-CMPX-17 FR-CMPX-14 FR-CMPX-16 import both books, 'goblin' → one TB1 r
   const books = win.getByTestId("cmpx-book");
   await expect(books).toHaveCount(106);
   await expect(win.getByTestId("cmpx-import")).toBeDisabled();
+  // FR-KIT-108: the × brings every book back.
+  await win.getByTestId("cmpx-book-search").fill("test book");
+  await expect(books).toHaveCount(2);
+  await win.getByTestId("cmpx-book-search-clear").click();
+  await expect(books).toHaveCount(106);
   await win.getByTestId("cmpx-book-search").fill("test book");
   await expect(books).toHaveCount(2);
   await win.getByTestId("cmpx-select-all").click();

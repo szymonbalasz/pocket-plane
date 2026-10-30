@@ -25,15 +25,15 @@ import {
   DialogTitle,
   Tooltip,
 } from "@ui/components/ui/overlays";
-import { Alert, Input, Skeleton } from "@ui/components/ui/primitives";
+import { Alert, Skeleton } from "@ui/components/ui/primitives";
 import { Progress } from "@ui/components/ui/progress";
+import { SearchInput } from "@ui/components/ui/search-input";
 import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
-import { SearchIcon, UploadIcon, XIcon } from "lucide-react";
+import { SearchIcon, UploadIcon } from "lucide-react";
 import { type ReactNode, type Ref, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Tip } from "../../components/ui/tip";
 import { ImageActions } from "./ImageActions";
 import { ManageTags } from "./tags/ManageTags";
 import { TagChipRow } from "./tags/TagChipRow";
@@ -264,34 +264,19 @@ export function AssetPicker({
       <div className="flex items-center gap-1">
         <div className="relative flex-1">
           <SearchIcon className="pointer-events-none absolute left-2 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+          <SearchInput
             ref={setSearchEl}
             aria-label="Search images"
             placeholder="Search images"
             data-testid="asset-picker-search"
             autoComplete="off"
             value={query}
-            className="h-8 pl-8 pr-8"
+            className="h-8 pl-8"
             onChange={(e) => setQuery(e.target.value)}
+            onClear={() => setQuery("")}
             // Filtering is live: Enter never submits a host form (New scene).
             onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
           />
-          {query !== "" && (
-            <Tip content="Clear search">
-              <button
-                type="button"
-                aria-label="Clear search"
-                data-testid="asset-picker-search-clear"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent"
-                onClick={() => {
-                  setQuery("");
-                  search.current?.focus();
-                }}
-              >
-                <XIcon className="size-4" />
-              </button>
-            </Tip>
-          )}
         </div>
         <ManageTags chips={chips} live={live} />
       </div>

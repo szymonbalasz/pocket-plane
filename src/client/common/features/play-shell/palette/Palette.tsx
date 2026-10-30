@@ -15,6 +15,7 @@ import {
 import { Dialog as D } from "radix-ui";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../../components/ui/button";
+import { ClearSearchButton } from "../../../components/ui/search-input";
 import { cn } from "../../../lib/utils";
 import type { PaletteEnv } from "./context";
 import { isMac } from "./context";
@@ -267,6 +268,7 @@ export function Palette({ env }: { env: PaletteEnv }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new query highlights the first row
   useEffect(() => setActive(0), [input]);
   const at = Math.min(active, Math.max(rows.length - 1, 0));
+  const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     listRef.current
@@ -295,31 +297,43 @@ export function Palette({ env }: { env: PaletteEnv }) {
         onCloseAutoFocus={returnFocus}
       >
         <D.Title className="sr-only">Search and commands</D.Title>
-        <input
-          data-testid="ui-palette-input"
-          role="combobox"
-          aria-expanded
-          aria-controls={listId}
-          aria-activedescendant={rows.length > 0 ? `${listId}-${at}` : undefined}
-          aria-label="Search windows, commands, characters, rules and the compendium"
-          placeholder="Search, or > for commands, @ for characters"
-          autoComplete="off"
-          spellCheck={false}
-          className="h-11 w-full border-b bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-              e.preventDefault();
-              const n = rows.length;
-              if (n > 0) setActive((at + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
-            } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              const row = rows[at];
-              if (row) pick(row);
-            }
-          }}
-        />
+        <div className="relative">
+          <input
+            ref={inputRef}
+            data-testid="ui-palette-input"
+            role="combobox"
+            aria-expanded
+            aria-controls={listId}
+            aria-activedescendant={rows.length > 0 ? `${listId}-${at}` : undefined}
+            aria-label="Search windows, commands, characters, rules and the compendium"
+            placeholder="Search, or > for commands, @ for characters"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-11 w-full border-b bg-transparent pr-8 pl-3 text-sm outline-none placeholder:text-muted-foreground"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                const n = rows.length;
+                if (n > 0) setActive((at + (e.key === "ArrowDown" ? 1 : n - 1)) % n);
+              } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                const row = rows[at];
+                if (row) pick(row);
+              }
+            }}
+          />
+          {input !== "" && (
+            <ClearSearchButton
+              testId="ui-palette-input-clear"
+              onClear={() => {
+                setInput("");
+                inputRef.current?.focus();
+              }}
+            />
+          )}
+        </div>
         <div ref={listRef}>
           <PaletteList
             sections={sections}

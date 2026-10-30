@@ -16,8 +16,9 @@ import { type Api, ApiError, call } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
 import { Checkbox } from "@ui/components/ui/controls";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ui/components/ui/menus";
-import { Badge, Input } from "@ui/components/ui/primitives";
+import { Badge } from "@ui/components/ui/primitives";
 import { Progress } from "@ui/components/ui/progress";
+import { SearchInput } from "@ui/components/ui/search-input";
 import { refetch } from "@ui/features/compendium/nav";
 import { cn } from "@ui/lib/utils";
 import { useSync } from "@ui/sync/store";
@@ -195,13 +196,15 @@ function BookList({
       </div>
       <CollapsibleContent className="space-y-1">
         <div className="flex items-center gap-1">
-          <Input
-            className="h-7 min-w-0 flex-1 text-xs"
+          <SearchInput
+            wrapperClassName="flex-1"
+            className="h-7 text-xs"
             placeholder="Search books"
             aria-label="Search books"
             data-testid="cmpx-book-search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            onClear={() => setQ("")}
           />
           <Button
             size="sm"

@@ -19,13 +19,13 @@ import { Switch } from "@ui/components/ui/controls";
 import { Tooltip } from "@ui/components/ui/overlays";
 import {
   Badge,
-  Input,
   Skeleton,
   Table,
   TableBody,
   TableCell,
   TableRow,
 } from "@ui/components/ui/primitives";
+import { SearchInput } from "@ui/components/ui/search-input";
 import { Tabs, TabsList, TabsTrigger } from "@ui/components/ui/tabs";
 import { useColorOf } from "@ui/features/campaign-management/colors";
 import { CreditsLink } from "@ui/features/compendium/credits";
@@ -265,12 +265,13 @@ export function CreaturesList({
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Input
+        <SearchInput
           data-testid="ent-list-search"
           aria-label="Search creatures"
           placeholder="Search creatures…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          onClear={() => setQ("")}
         />
         <Tooltip content="Hide imported (SRD) monsters">
           <span className="flex shrink-0 items-center gap-1.5 text-xs">

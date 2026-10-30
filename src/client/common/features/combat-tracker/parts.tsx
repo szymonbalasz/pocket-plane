@@ -21,7 +21,8 @@ import { HP_TRACK_PX } from "../../components/kit/hp-bar";
 import { Medallion, type MedallionSize } from "../../components/kit/medallion";
 import { Popover, PopoverAnchor, PopoverContent } from "../../components/ui/controls";
 import { Tooltip } from "../../components/ui/overlays";
-import { Badge, Input } from "../../components/ui/primitives";
+import { Badge } from "../../components/ui/primitives";
+import { SearchInput } from "../../components/ui/search-input";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
 import { AssetImg } from "../assets-pipeline/AssetImg";
@@ -490,7 +491,7 @@ export function CreatureLookup({
   return (
     <Popover open={open} onOpenChange={(o) => !o && setDismissed(true)}>
       <PopoverAnchor asChild>
-        <Input
+        <SearchInput
           data-testid={testId}
           role="combobox"
           aria-expanded={open}
@@ -501,6 +502,11 @@ export function CreatureLookup({
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
+            setActive(0);
+            setDismissed(false);
+          }}
+          onClear={() => {
+            setQ("");
             setActive(0);
             setDismissed(false);
           }}

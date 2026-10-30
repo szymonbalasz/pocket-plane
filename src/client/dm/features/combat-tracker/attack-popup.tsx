@@ -69,6 +69,7 @@ import {
   Tooltip,
 } from "@ui/components/ui/overlays";
 import { Badge, Input, Label } from "@ui/components/ui/primitives";
+import { SearchInput } from "@ui/components/ui/search-input";
 import { Tip } from "@ui/components/ui/tip";
 import { CardActions, PartDice } from "@ui/features/combat-tracker/card-actions-row";
 import { medallionColour } from "@ui/features/combat-tracker/parts";
@@ -384,7 +385,7 @@ function AddTarget({
       }}
     >
       <PopoverAnchor asChild>
-        <Input
+        <SearchInput
           // Opened from the "+": the field takes the focus for typing.
           autoFocus={collapsed}
           data-testid="cbt-popup-target-add"
@@ -400,6 +401,7 @@ function AddTarget({
             setQ(e.target.value);
             setOpen(true);
           }}
+          onClear={() => setQ("")}
           onKeyDown={(e) => {
             if (e.key === "Enter" && shown[0]) pick(shown[0]);
             if (e.key === "Escape" && open) {
@@ -414,6 +416,11 @@ function AddTarget({
         className="max-h-56 w-[var(--radix-popover-trigger-width)] overflow-auto p-1"
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          // A click in the field or on its × keeps the list (and, in the field, the typed text).
+          const el = e.target as HTMLElement | null;
+          if (el?.closest?.('[data-testid^="cbt-popup-target-add"]')) e.preventDefault();
+        }}
       >
         {shown.length === 0 ? (
           <p className="p-2 text-sm text-muted-foreground">No combatant matches</p>
