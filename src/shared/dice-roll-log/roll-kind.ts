@@ -9,6 +9,7 @@
 import { GEMS_FEATURE } from "@shared/campaign-management/features";
 import { rollOfferSegments } from "@shared/effect-modifiers/combat-parts";
 import { AUTO_PART_TEXT, modeLabels, modSegments, modsTotal } from "@shared/effect-modifiers/line";
+import { labelAfterActor } from "./actor-label";
 import { diceTerms, parseExpression } from "./grammar";
 import {
   defineLogKind,
@@ -280,6 +281,13 @@ export function itemRuns(payload: readonly RollPayloadItem[]): number[][] {
   return runs;
 }
 
+/** BL-162: the items as a line that names the actor reads them (no repeated name in a label). */
+export const itemsAfterActor = (
+  items: readonly RollPayloadItem[],
+  actorName: string,
+): RollPayloadItem[] =>
+  items.map((i) => (i.label ? { ...i, label: labelAfterActor(i.label, actorName) } : i));
+
 /**
  * FR-DICE-69, FR-GEM-05 (OQ-GEM-21 B): gems' rerolls on `roll` entries. While gems are off, a
  * superseded entry is hidden and every payload item loses `replaces`: only final rolls show.
@@ -305,17 +313,18 @@ export const rollKind = defineLogKind({
   dmPayload: RollEntryDmPayload,
   formatLine({ actorName, payload, dmPayload, category }) {
     const out: LineSegment[] = [{ text: actorName, style: "actor" }, { text: " — " }];
-    itemRuns(payload).forEach((run, r) => {
+    const items = itemsAfterActor(payload, actorName);
+    itemRuns(items).forEach((run, r) => {
       if (r > 0) out.push({ text: "; " });
       const i = run[0] as number;
       if (run.length === 1) {
         out.push(
-          ...rollSegments(payload[i] as RollPayloadItem, { category, dm: dmPayload?.items[i] }),
+          ...rollSegments(items[i] as RollPayloadItem, { category, dm: dmPayload?.items[i] }),
         );
       } else {
         out.push(
           ...partRunSegments(
-            run.map((j) => payload[j] as RollPayloadItem),
+            run.map((j) => items[j] as RollPayloadItem),
             run.map((j) => dmPayload?.items[j]),
           ),
         );

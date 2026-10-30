@@ -102,6 +102,17 @@ afterEach(() => {
   landing.api.setState({ holding: new Map() });
 });
 
+describe("BL-162 tray header", () => {
+  test("BL-162 tray header: a free request's label opening with its actor names it once; others whole", () => {
+    const stage = (label: string) =>
+      diceExtras.stage(notationRequest("1d12+5", { label }, {}, { entityId: "mira" }));
+    stage("Mira — Longbow attack");
+    expect(header(render())).toEqual(["compose", "Mira — Longbow attack"]);
+    stage("Wolf — Bite");
+    expect(header(render())).toEqual(["compose", "Mira — Wolf — Bite"]);
+  });
+});
+
 describe("FR-DICEX-50 label reset", () => {
   test("FR-DICEX-50 label reset: notation → result → palette d6 → no label / actor, category other, header 'Other'", () => {
     diceExtras.stage(NOTATION);
