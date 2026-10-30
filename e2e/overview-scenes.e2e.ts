@@ -2,7 +2,8 @@
 // Thin overview flows (OVW §13 E2E), DM + player-1 in separate contexts: the DM shows, the player
 // follows and gets no hidden item; left-drag on the locked map pans, Fit frames; the Scenes window's
 // one list; a battle scene and back; Encounters Start off on an overview, with its hint; ping with
-// the overview's ID; a new overview is empty. Editing, label and miniature flows: their slices.
+// the overview's ID; a new overview is empty; add an image, resize, hide, reveal seen by the player,
+// group move, lock then pan, delete asks. Label and miniature flows: their slices.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes } from "./support/konva";
@@ -12,6 +13,8 @@ import { openWindow } from "./support/shell";
 const live = (page: Page) =>
   expect(page.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
 const itemIds = async (page: Page) => (await konvaNodes(page, "ovw-item")).map((n) => n.id).sort();
+const sceneRowOf = (page: Page, id: string) =>
+  page.locator(`[data-testid="ovw-scene-row"][data-record-id="${id}"]`);
 
 test("FR-OVW-09 FR-OVW-10 FR-OVW-14 DM shows, player follows; a battle scene and back", async ({
   browser,
@@ -258,6 +261,232 @@ test("FR-OVW-47 not live: pan, zoom and Fit still work; ping and laser are off",
   expect(await konvaNodes(player, "map-ping")).toHaveLength(0);
 
   await player.context().close();
+});
+
+/** The stage pointer on a canvas node's centre. */
+const centre = async (page: Page, name: string, id?: string) => {
+  const [n] = await konvaNodes(page, name, id);
+  if (!n) throw new Error(`no node ${name}`);
+  return { x: n.x, y: n.y };
+};
+const drag = async (
+  page: Page,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  modifier?: "Control",
+) => {
+  await page.mouse.move(from.x, from.y);
+  if (modifier) await page.keyboard.down(modifier);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 5 });
+  await page.mouse.up();
+  if (modifier) await page.keyboard.up(modifier);
+};
+
+test("FR-OVW-22 FR-OVW-23 FR-OVW-20 add an image, resize it, hide it, reveal it to the player", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const coast = recordId("ovw-sword-coast", "overview");
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const player = await rolePage(browser);
+  await player.goto(link("Player 1"));
+  await live(player);
+  await expect.poll(() => itemIds(player)).toHaveLength(3);
+
+  // On a new, empty overview: its display size, and the camera fits.
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes.getByTestId("map-scene-new").click();
+  await dm.getByTestId("ovw-scene-new").click();
+  await dm.getByTestId("ovw-scene-new-form-name").fill("Luskan");
+  await dm.getByTestId("ovw-scene-new-form-submit").click();
+  const canvas = dm.getByTestId("ovw-canvas");
+  await expect(dm.getByTestId("ovw-canvas-empty")).toBeVisible();
+  const placeImage = async () => {
+    await dm.getByTestId("ovw-tool-add-image").click();
+    await dm.getByTestId("ovw-add-image-choose").click();
+    const picker = dm.getByTestId("asset-picker");
+    await picker.getByTestId("asset-picker-item").first().click();
+    await picker.getByTestId("asset-picker-select").click();
+  };
+  await placeImage();
+  await expect.poll(() => itemIds(dm)).toHaveLength(1);
+  await expect(dm.getByTestId("ovw-canvas-empty")).toHaveCount(0);
+  await expect(canvas).toHaveAttribute("data-camera", "fitted");
+  await expect(canvas).not.toHaveAttribute("data-fit-rect", "");
+  // Back on Select, with the new image selected: its handles show.
+  await expect(canvas).toHaveAttribute("data-tool", "select");
+  const [first] = await itemIds(dm);
+  await expect.poll(async () => (await konvaNodes(dm, "ovw-handle-se")).length).toBe(1);
+
+  // A corner keeps its shape.
+  const before = (await konvaNodes(dm, "ovw-image"))[0];
+  if (!before) throw new Error("no image");
+  const corner = await centre(dm, "ovw-handle-se", first);
+  await drag(dm, corner, { x: corner.x - before.width / 2, y: corner.y - before.height / 4 });
+  await expect
+    .poll(async () => (await konvaNodes(dm, "ovw-image"))[0]?.width)
+    .toBeLessThan(before.width * 0.75);
+  const after = (await konvaNodes(dm, "ovw-image"))[0];
+  expect((after?.width ?? 0) / (after?.height ?? 1)).toBeCloseTo(before.width / before.height, 1);
+
+  // A second image lands in the view's centre without moving the camera, Add hidden remembered.
+  const camera = await canvas.getAttribute("data-zoom");
+  await dm.getByTestId("ovw-tool-add-image").click();
+  await dm.getByTestId("ovw-add-hidden").click();
+  await dm.getByTestId("ovw-add-image-choose").click();
+  await dm.getByTestId("asset-picker-item").first().click();
+  await dm.getByTestId("asset-picker-select").click();
+  await expect.poll(() => itemIds(dm)).toHaveLength(2);
+  await expect(canvas).toHaveAttribute("data-zoom", camera ?? "");
+  await expect.poll(async () => (await konvaNodes(dm, "ovw-item-hidden")).length).toBe(1);
+  await dm.reload();
+  await live(dm);
+  await dm.getByTestId("ovw-tool-add-image").click();
+  await expect(dm.getByTestId("ovw-add-hidden")).toHaveAttribute("data-state", "checked");
+  await dm.getByTestId("ovw-add-hidden").click();
+  await dm.getByTestId("ovw-tool-select").click();
+
+  // Back on the shown overview: right-click the hidden scroll, Reveal: the player gets it.
+  await sceneRowOf(dm, coast).getByTestId("ovw-scene-row-name").click();
+  await expect(canvas).toHaveAttribute("data-overview-id", coast);
+  await expect.poll(() => itemIds(dm)).toHaveLength(5);
+  const scroll = recordId("ovw-sword-coast", "overview-item", 4);
+  await expect(dm.getByTestId("ovw-tool-fit")).toBeVisible();
+  const at = await centre(dm, "ovw-item", scroll);
+  await dm.mouse.click(at.x, at.y, { button: "right" });
+  const menu = dm.getByTestId("ovw-item-menu");
+  await expect(menu).toHaveAttribute("data-record-id", scroll);
+  await expect(menu.getByTestId("ovw-item-menu-hide")).toHaveText("Reveal");
+  await menu.getByTestId("ovw-item-menu-hide").click();
+  await expect.poll(() => itemIds(player)).toContain(scroll);
+
+  // … and Hide takes it away again.
+  await dm.mouse.click(at.x, at.y, { button: "right" });
+  await expect(menu.getByTestId("ovw-item-menu-hide")).toHaveText("Hide");
+  await menu.getByTestId("ovw-item-menu-hide").click();
+  await expect.poll(() => itemIds(player)).not.toContain(scroll);
+
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-OVW-18 FR-OVW-16 FR-OVW-21 box, group move on every client, lock then pan, delete asks", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const label = (i: number) => recordId("ovw-sword-coast", "overview-item", i);
+  const [neverwinter, phandalin] = [label(1), label(2)];
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const player = await rolePage(browser);
+  await player.goto(link("Player 1"));
+  await live(player);
+  await expect.poll(() => itemIds(player)).toHaveLength(3);
+  await expect.poll(() => itemIds(dm)).toHaveLength(5);
+  const canvas = dm.getByTestId("ovw-canvas");
+  await expect(canvas).toHaveAttribute("data-camera", "fitted");
+
+  // A Ctrl-drag over the locked map is a box; the map itself stays out of it.
+  const a = await centre(dm, "ovw-item", neverwinter);
+  const b = await centre(dm, "ovw-item", phandalin);
+  const left = Math.min(a.x, b.x) - 40;
+  const right = Math.max(a.x, b.x) + 200;
+  const top = Math.min(a.y, b.y) - 30;
+  const bottom = Math.max(a.y, b.y) + 30;
+  await drag(dm, { x: left, y: top }, { x: right, y: bottom }, "Control");
+  const selected = async () => (await konvaNodes(dm, "ovw-item-selected")).map((n) => n.id).sort();
+  await expect.poll(selected).toEqual(expect.arrayContaining([neverwinter, phandalin]));
+  expect(await selected()).not.toContain(label(0));
+
+  // A label's own box: at fit zoom its dot is under 2 px, too small to press.
+  const boxOf = (id: string) => centre(dm, "ovw-item-selected", id);
+
+  // A drag of either moves every selected one, on the player's client too.
+  const a2 = await boxOf(neverwinter);
+  const b2 = await boxOf(phandalin);
+  const playerBefore = await centre(player, "ovw-item", phandalin);
+  await drag(dm, a2, { x: a2.x + 60, y: a2.y + 40 });
+  await expect
+    .poll(async () => (await centre(player, "ovw-item", phandalin)).x)
+    .toBeGreaterThan(playerBefore.x + 10);
+  // Within a pixel or two: the browser's mouse events carry whole pixels.
+  expect(Math.abs((await boxOf(phandalin)).x - (b2.x + 60))).toBeLessThan(2);
+  expect(Math.abs((await boxOf(neverwinter)).x - (a2.x + 60))).toBeLessThan(2);
+
+  // Locked (the menu acts on the selection): a left-drag pans, the items stay on the map.
+  const moved = await boxOf(phandalin);
+  const menu = dm.getByTestId("ovw-item-menu");
+  await dm.mouse.click(moved.x, moved.y, { button: "right" });
+  await menu.getByTestId("ovw-item-menu-lock").click();
+  await expect.poll(async () => (await konvaNodes(dm, "ovw-item", phandalin)).length).toBe(1);
+  await expect(menu).toHaveCount(0);
+  const stageX = () =>
+    dm.evaluate(() => {
+      type KStage = { x(): number };
+      return (window as unknown as { Konva: { stages: KStage[] } }).Konva.stages[0]?.x() ?? 0;
+    });
+  await expect
+    .poll(() =>
+      dm.evaluate(
+        (id) =>
+          (
+            window as unknown as {
+              Konva: { stages: { findOne(s: string): { attrs: { locked?: boolean } } }[] };
+            }
+          ).Konva.stages[0]?.findOne(`#${id}`).attrs.locked,
+        phandalin,
+      ),
+    )
+    .toBe(true);
+  const panFrom = await stageX();
+  await drag(dm, moved, { x: moved.x + 50, y: moved.y + 30 });
+  await expect(canvas).toHaveAttribute("data-camera", "moved");
+  expect(Math.abs((await stageX()) - (panFrom + 50))).toBeLessThan(2);
+  const here = await boxOf(phandalin);
+  expect(Math.abs(here.x - (moved.x + 50))).toBeLessThan(2);
+
+  // The Delete key leaves locked items; the menu's Lock is a toggle, so unlock them.
+  await canvas.focus();
+  await dm.keyboard.press("Delete");
+  await expect(dm.getByText("Locked — unlock it first").first()).toBeVisible();
+  await expect.poll(() => itemIds(dm)).toHaveLength(5);
+  await dm.mouse.click(here.x, here.y, { button: "right" });
+  await menu.getByTestId("ovw-item-menu-lock").click();
+  await expect(menu).toHaveCount(0);
+
+  // Deleting more than one asks first.
+  await canvas.focus();
+  await dm.keyboard.press("Delete");
+  const dialog = dm.getByTestId("ovw-delete-dialog");
+  await expect(dialog).toBeVisible();
+  await dialog.getByTestId("ovw-delete-cancel").click();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => itemIds(dm)).toHaveLength(5);
+
+  // A click on one of a group narrows to it. Ctrl-D copies it and selects the copy; Delete, alone,
+  // goes at once.
+  await dm.mouse.click(here.x, here.y);
+  await expect.poll(selected).toEqual([phandalin]);
+  await canvas.focus();
+  await dm.keyboard.press("Control+d");
+  await expect.poll(() => itemIds(dm)).toHaveLength(6);
+  await expect.poll(selected).not.toEqual([phandalin]);
+  await dm.keyboard.press("Delete");
+  await expect.poll(() => itemIds(dm)).toHaveLength(5);
+
+  // Esc clears.
+  await dm.mouse.click(here.x, here.y);
+  await expect.poll(selected).toEqual([phandalin]);
+  await canvas.focus();
+  await dm.keyboard.press("Escape");
+  await expect.poll(selected).toEqual([]);
+
+  await player.context().close();
+  await dm.context().close();
 });
 
 test("FR-OVW-14 New offers Overview; an empty one says so and Fit goes to the origin at 100 %", async ({
