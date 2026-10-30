@@ -130,4 +130,21 @@ describe("FR-CMP-28 Add to sheet (client)", () => {
     expect(html.replace(/<[^>]+>/g, "")).toContain("Preset: Sneak Attack");
     expect(render("player", RAGE)).not.toContain("cmp-preset");
   });
+
+  test("FR-CMPX-15 the Preset line shows the server's inherited name; an own preset wins", () => {
+    const text = (data: EntryResponse) => render("player", data).replace(/<[^>]+>/g, "");
+    const book = entry({
+      id: "e-book",
+      kind: "spell",
+      source: "5et-tb1",
+      sourceKey: "spell/hunters-mark",
+      name: "Hunter's Mark",
+      line: "Level 1 divination",
+      facets: { level: 1, school: "divination", classes: [], concentration: true, ritual: false },
+      body: { castingTime: "a", range: "b", components: "V", duration: "c", text: "t" },
+    });
+    expect(render("player", book)).not.toContain("cmp-preset");
+    expect(text({ ...book, inheritedPreset: "Marked" })).toContain("Preset: Marked");
+    expect(text({ ...SNEAK, inheritedPreset: "Other" })).toContain("Preset: Sneak Attack");
+  });
 });

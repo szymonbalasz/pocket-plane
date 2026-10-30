@@ -202,7 +202,7 @@ export function useDefinitionEntry(
       return;
     }
     let live = true;
-    searchCompendium(source(api), { q: name, kind: "monster" }).then(
+    searchCompendium(source(api), { q: name, kind: "monster", definitionId }).then(
       (page) =>
         live && setOut({ state: "ready", entryId: entryForDefinition(definitionId, page.results) }),
       (err: unknown) => live && setOut({ state: "error", error: readError(err) }),

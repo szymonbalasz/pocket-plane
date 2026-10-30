@@ -92,11 +92,12 @@ function useStatBlockEntry(def: DefinitionRecord | undefined, entryId: string | 
     let live = true;
     (async () => {
       const a = await resolveApi(api);
+      const definitionId = key.split(":")[0] as string;
       const id =
         entryId ??
         entryForDefinition(
-          key.split(":")[0] as string,
-          (await searchCompendium(api, { q: name, kind: "monster" })).results,
+          definitionId,
+          (await searchCompendium(api, { q: name, kind: "monster", definitionId })).results,
         );
       const data = id ? await fetchEntry(a, id) : null;
       if (live) setRead({ key, read: data ? { state: "ready", data } : { state: "none" } });

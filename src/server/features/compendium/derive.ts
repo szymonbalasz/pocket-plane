@@ -10,6 +10,7 @@ import {
   ROW_SOURCE_MAX,
   ROW_TEXT_MAX,
 } from "@shared/compendium/homebrew";
+import { bookAbbr } from "@shared/compendium/match";
 import type { BodyOf, StatBlockSection } from "@shared/compendium/schemas";
 import type { EntityRecord } from "@shared/entities/schemas";
 import { EntityCreated } from "@shared/events/entities";
@@ -26,9 +27,11 @@ import { campaignOf } from "./homebrew";
 export const DERIVE_MONSTER = "cmp.deriveMonster";
 const ENTRY_NOT_FOUND = "Entry not found";
 
-/** Imported: the source's name ("SRD 5.1"); homebrew: "Homebrew". */
+/** A book: its abbreviation ("MM", FR-CMPX-16); other imported: the source's name ("SRD 5.1"); homebrew: "Homebrew". */
 export function sourceLabelOf(tx: Tx, source: string | null): string {
   if (source === null) return "Homebrew";
+  const abbr = bookAbbr(source);
+  if (abbr !== null) return clip(abbr, ROW_SOURCE_MAX);
   const row = tx
     .select({ name: compendiumSource.name })
     .from(compendiumSource)

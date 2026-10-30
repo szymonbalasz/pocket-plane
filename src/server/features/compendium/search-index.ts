@@ -3,7 +3,8 @@
 // the first search after start (per DB), dropped by a listener on the five compendium / imported-
 // definition events and rebuilt at the next search, so a search never answers from rows older
 // than the last commit. Derived, never persisted, never sent. Replaces the `instr` scan and the
-// entry-less `LEFT JOIN` (≈ 50 ms on the DM's every search).
+// entry-less `LEFT JOIN` (≈ 50 ms on the DM's every search). Replaced entries (FR-CMPX-14) are
+// derived here too, so import order doesn't matter: flagged `hidden`, out of `groups`.
 import { type SourceRank, sourceRank } from "@shared/compendium/match";
 import { type CompendiumKind, monsterLine } from "@shared/compendium/schemas";
 import { MonsterStatBlock } from "@shared/entities/schemas";
@@ -40,6 +41,8 @@ export interface IndexRow {
   textWords: readonly string[];
   /** FR-CMP-35 duplicate group: kind + folded name + source (homebrew: its campaign). */
   groupKey: string;
+  /** FR-CMPX-14: another imported entry replaces this one: no search, list, group or lookup. */
+  hidden: boolean;
 }
 
 export interface SearchIndex {
@@ -69,9 +72,33 @@ const groupKeyOf = (
   campaignId: string | null,
 ) => JSON.stringify([kind, folded, source ?? `campaign:${campaignId ?? ""}`]);
 
+/**
+ * FR-CMPX-14: every ref some entry replaces, except refs on a cycle (malformed data: a self-ref,
+ * two books replacing each other), which stay visible rather than vanish together.
+ */
+function hiddenRefs(edges: ReadonlyMap<string, readonly string[]>): Set<string> {
+  const reachesItself = (start: string) => {
+    const seen = new Set<string>();
+    const todo = [...(edges.get(start) ?? [])];
+    for (let r = todo.pop(); r !== undefined; r = todo.pop()) {
+      if (r === start) return true;
+      if (seen.has(r)) continue;
+      seen.add(r);
+      todo.push(...(edges.get(r) ?? []));
+    }
+    return false;
+  };
+  const hidden = new Set<string>();
+  for (const refs of edges.values()) {
+    for (const r of refs) if (!reachesItself(r)) hidden.add(r);
+  }
+  return hidden;
+}
+
 export function buildSearchIndex(db: Db): SearchIndex {
   const rows: IndexRow[] = [];
   const linked = new Set<string>();
+  const edges = new Map<string, readonly string[]>();
   for (const r of db
     .select({
       id: compendiumEntry.id,
@@ -85,10 +112,12 @@ export function buildSearchIndex(db: Db): SearchIndex {
       definitionId: compendiumEntry.definitionId,
       shared: compendiumEntry.shared,
       searchText: compendiumEntry.searchText,
+      replaces: compendiumEntry.replaces,
     })
     .from(compendiumEntry)
     .all()) {
     if (r.definitionId !== null) linked.add(r.definitionId);
+    if (r.replaces.length > 0) edges.set(`${r.source}:${r.sourceKey}`, r.replaces);
     const folded = foldName(r.name);
     rows.push({
       id: r.id,
@@ -106,6 +135,7 @@ export function buildSearchIndex(db: Db): SearchIndex {
       folded,
       textWords: textWordsOf(r.searchText),
       groupKey: groupKeyOf(r.kind, folded.folded, r.source, r.campaignId),
+      hidden: false,
     });
   }
   for (const d of db
@@ -141,10 +171,16 @@ export function buildSearchIndex(db: Db): SearchIndex {
       folded,
       textWords: [],
       groupKey: `definition:${d.id}`,
+      hidden: false,
     });
   }
+  const hidden = hiddenRefs(edges);
   const groups = new Map<string, IndexRow[]>();
   for (const r of rows) {
+    if (r.sourceKey !== null && hidden.has(`${r.source}:${r.sourceKey}`)) {
+      r.hidden = true;
+      continue;
+    }
     if (r.entryless) continue;
     const g = groups.get(r.groupKey);
     if (g) g.push(r);
