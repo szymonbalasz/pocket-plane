@@ -17,7 +17,7 @@ import { hc } from "hono/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { deriveStatBlock, entryOnlyBase, initialDerive } from "./derive-form";
-import { BOOKS_CONFIRM, bookLine, FiveEtoolsPanel } from "./FiveEtoolsPanel";
+import { BOOKS_CONFIRM, bookLine, FiveEtoolsPanel, RunProgress } from "./FiveEtoolsPanel";
 import { filterBooks, importBooks, updatableBooks } from "./five-etools";
 
 const api = hc<AppType>("http://127.0.0.1:1") as Api;
@@ -110,6 +110,15 @@ describe("FR-CMPX-17 panel states", () => {
     expect(html).not.toMatch(/<button[^>]*data-testid="cmpx-update-all"[^>]*disabled/);
     const current = render({ ...READY, books: READY.books.slice(0, 1) });
     expect(current).toMatch(/<button[^>]*data-testid="cmpx-update-all"[^>]*disabled/);
+  });
+
+  test("FR-CMPX-17 FR-CMPX-19 progress: Book i / N", () => {
+    const html = renderToStaticMarkup(<RunProgress index={2} total={5} />).replaceAll(
+      "<!-- -->",
+      "",
+    );
+    expect(html).toContain('data-testid="cmpx-progress"');
+    expect(text(html)).toContain("Book 2 / 5");
   });
 
   test("FR-CMPX-17 confirm text; the book line: abbr · counts · imported ‹date›", () => {

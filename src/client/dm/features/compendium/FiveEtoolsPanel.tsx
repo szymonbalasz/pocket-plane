@@ -77,6 +77,18 @@ function BookRow({
   );
 }
 
+/** FR-CMPX-17: replaces the footer while a run is going. */
+export function RunProgress({ index, total }: { index: number; total: number }) {
+  return (
+    <div className="space-y-1" data-testid="cmpx-progress" aria-live="polite">
+      <p className="text-xs text-muted-foreground">
+        Book {index} / {total}
+      </p>
+      <Progress value={((index - 1) / total) * 100} />
+    </div>
+  );
+}
+
 function BookList({ api, status, reload }: { api: Api; status: FiveEtoolsStatus; reload(): void }) {
   const live = useSync((st) => st.state === "live");
   const [q, setQ] = useState("");
@@ -142,12 +154,7 @@ function BookList({ api, status, reload }: { api: Api; status: FiveEtoolsStatus;
         ))}
       </div>
       {progress ? (
-        <div className="space-y-1" data-testid="cmpx-progress" aria-live="polite">
-          <p className="text-xs text-muted-foreground">
-            Book {progress.index} / {progress.total}
-          </p>
-          <Progress value={((progress.index - 1) / progress.total) * 100} />
-        </div>
+        <RunProgress index={progress.index} total={progress.total} />
       ) : (
         <div className="flex justify-end gap-1.5">
           <Button
