@@ -4,7 +4,7 @@
 // the imported sources on open (read on demand, FR-CMP-23): every book, FR-CMPX-18, however many
 // there are. With nothing imported only the token art shows.
 
-import { BUNDLED_SOURCE_KEYS } from "@shared/compendium/match";
+import { BUNDLED_SOURCE_KEYS, bookAbbr } from "@shared/compendium/match";
 import { CreditsResponse, type SourceAttribution } from "@shared/compendium/rest";
 import { RULES_CHANGE_NOTE } from "@shared/compendium/rules";
 import { CREATURE_TYPES } from "@shared/entities/schemas";
@@ -29,19 +29,27 @@ import {
 } from "../entities/creature-art/credits";
 import { type ApiSource, resolveApi } from "./search";
 
-/** The imported sources' attributions, read on demand; [] when nothing is imported. */
-export async function fetchCreditSources(source: ApiSource): Promise<SourceAttribution[]> {
+/** The imported sources' attributions, read on demand; none when nothing is imported. */
+export async function fetchCredits(source: ApiSource): Promise<CreditsResponse> {
   const api = await resolveApi(source);
-  return CreditsResponse.parse(await call<unknown>(api.api.compendium.credits.$get())).sources;
+  return CreditsResponse.parse(await call<unknown>(api.api.compendium.credits.$get()));
 }
 
 const AUTHORS = [...new Set(CREATURE_TYPES.map((t) => TOKEN_ART_CREDITS[t].author))];
 
+/** FR-CMPX-29: shown once any book is imported. */
+export const BOOK_ART_CREDIT = "Token art: © Wizards of the Coast, from your own 5etools files";
+
 /** FR-ENT-29: the 14 icons, their authors, CC BY 3.0, game-icons.net. */
-export function TokenArtCredits() {
+export function TokenArtCredits({ books = false }: { books?: boolean }) {
   return (
     <section className="space-y-1.5" data-testid="cmp-about-token-art">
       <h3 className="text-sm font-semibold">Token art</h3>
+      {books && (
+        <p className="text-xs text-muted-foreground" data-testid="cmpx-about-token-art">
+          {BOOK_ART_CREDIT}
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">
         Creature-type icons by {AUTHORS.join(" and ")} from{" "}
         <a className="underline" href={TOKEN_ART_SITE_URL} target="_blank" rel="noreferrer">
@@ -89,14 +97,23 @@ function SourceSection({ source }: { source: SourceAttribution }) {
   );
 }
 
-/** The dialog's body: each source's attribution, then the token art credits. */
-export function AboutBody({ sources }: { sources: readonly SourceAttribution[] }) {
+/**
+ * The dialog's body: each source's attribution, then the token art credits. `bookArt`: the credits
+ * route's (FR-CMPX-29); an About opened on one entry, without it, goes by that entry's source.
+ */
+export function AboutBody({
+  sources,
+  bookArt = sources.some((s) => bookAbbr(s.key) !== null),
+}: {
+  sources: readonly SourceAttribution[];
+  bookArt?: boolean;
+}) {
   return (
     <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
       {sources.map((s) => (
         <SourceSection key={s.key} source={s} />
       ))}
-      <TokenArtCredits />
+      <TokenArtCredits books={bookArt} />
     </div>
   );
 }
@@ -105,10 +122,12 @@ export function AboutDialog({
   open,
   onOpenChange,
   sources,
+  bookArt,
 }: {
   open: boolean;
   onOpenChange(open: boolean): void;
   sources: readonly SourceAttribution[];
+  bookArt?: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -117,7 +136,7 @@ export function AboutDialog({
           <DialogTitle>About</DialogTitle>
           <DialogDescription>Content licences and credits</DialogDescription>
         </DialogHeader>
-        <AboutBody sources={sources} />
+        <AboutBody sources={sources} {...(bookArt !== undefined ? { bookArt } : {})} />
       </DialogContent>
     </Dialog>
   );
@@ -126,12 +145,12 @@ export function AboutDialog({
 /** The footer **Credits** link: opens the About dialog with the imported sources read on open. */
 export function CreditsLink({ api, testId }: { api: ApiSource; testId: string }) {
   const [open, setOpen] = useState(false);
-  const [sources, setSources] = useState<SourceAttribution[]>([]);
+  const [credits, setCredits] = useState<CreditsResponse>({ sources: [], bookArt: false });
   useEffect(() => {
     if (!open) return;
     let live = true;
-    fetchCreditSources(api).then(
-      (s) => live && setSources(s),
+    fetchCredits(api).then(
+      (c) => live && setCredits(c),
       () => {},
     );
     return () => {
@@ -149,7 +168,12 @@ export function CreditsLink({ api, testId }: { api: ApiSource; testId: string })
       >
         <InfoIcon className="size-3.5" /> Credits
       </Button>
-      <AboutDialog open={open} onOpenChange={setOpen} sources={sources} />
+      <AboutDialog
+        open={open}
+        onOpenChange={setOpen}
+        sources={credits.sources}
+        bookArt={credits.bookArt}
+      />
     </>
   );
 }

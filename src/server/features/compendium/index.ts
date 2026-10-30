@@ -8,6 +8,7 @@ import { deriveMonster } from "./derive";
 import { registerEntryImport } from "./entries";
 import { deleteEntry, putEntry } from "./homebrew";
 import { importCommand, importRecordedCommand } from "./import";
+import { applyImportedArt, importedArtOf } from "./imported-art";
 import { searchIndexListener } from "./search-index";
 
 export const compendium: Feature = {
@@ -22,5 +23,10 @@ export const compendium: Feature = {
     r.command(deriveMonster);
     r.command(addToSheet, { intent: true });
     r.listener("compendium.searchIndex", searchIndexListener(s.db));
+    // FR-CMPX-24: a placed 5etools monster's token art.
+    r.command(applyImportedArt);
+    const art = importedArtOf(s);
+    r.listener("compendium.imported-art", art.onEvent);
+    r.onStart("compendium.imported-art", () => art.arm());
   },
 };

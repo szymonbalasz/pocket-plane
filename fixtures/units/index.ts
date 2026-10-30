@@ -56,6 +56,7 @@ import cmpSearchHomebrew from "./compendium/cmp-search-homebrew";
 import cmpSrdFull from "./compendium/cmp-srd-full";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
 import cmpSrdMiniS3 from "./compendium/cmp-srd-mini-s3";
+import cmpxArtBatch from "./compendium/cmpx-art";
 import cmpxBooks from "./compendium/cmpx-books";
 import dicexLooks from "./dice-extras/dicex-looks";
 import dicexMacros from "./dice-extras/dicex-macros";
@@ -337,6 +338,8 @@ export const units: readonly Fixture[] = [
   trayLogRolls,
   // Compendium expansion core (fix/cmpx-core): two hand-made books
   cmpxBooks,
+  // Compendium expansion token art (build/cmpx-art): a small book with art paths
+  cmpxArtBatch,
   // Overview scenes core (fix/ovw-core)
   ovwSwordCoast,
   ovwPhandalin,

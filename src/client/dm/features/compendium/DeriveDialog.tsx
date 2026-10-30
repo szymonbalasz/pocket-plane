@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@ui/components/ui/overlays";
 import { Input, Label } from "@ui/components/ui/primitives";
+import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { openSheetFor } from "@ui/features/character-sheet/selection";
 import { CHAR_SHEET_KIND } from "@ui/features/character-sheet/window";
 import { useLive } from "@ui/features/combat-tracker/store";
@@ -47,13 +48,53 @@ function Field({ id, label, children }: { id: string; label: string; children: R
   );
 }
 
+/** FR-CMPX-28: the prefilled portrait (the campaign's imported art). */
+export function DerivePortrait({
+  id,
+  name,
+  onRemove,
+}: {
+  id: string;
+  name: string;
+  onRemove(): void;
+}) {
+  return (
+    <div
+      className="col-span-2 flex items-center gap-2"
+      data-testid="cmp-derive-portrait"
+      data-value={id}
+    >
+      <div className="size-9 shrink-0 overflow-hidden rounded-full border-2">
+        <AssetImg
+          id={id}
+          file="thumb"
+          alt={name ? `${name} portrait` : "Portrait"}
+          className="size-full object-cover"
+        />
+      </div>
+      <span className="text-xs text-muted-foreground">Portrait from its token art</span>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="ml-auto h-6 px-1.5 text-xs"
+        data-testid="cmp-derive-portrait-remove"
+        onClick={onRemove}
+      >
+        Remove
+      </Button>
+    </div>
+  );
+}
+
 function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close(): void }) {
   // FR-CMPX-08: no definition → the entry's size / type / CR, HP and AC left for the DM.
   const definition = data.definition ?? entryOnlyBase(data.entry.facets as MonsterFacets);
+  const art = data.importedArtAssetId ?? null;
   const [f, setF] = useState<DeriveFields>(() =>
     data.definition
-      ? initialDerive(data.entry.name, definition)
-      : { ...initialDerive(data.entry.name, definition), ac: "", hpMax: "" },
+      ? initialDerive(data.entry.name, definition, art)
+      : { ...initialDerive(data.entry.name, definition, art), ac: "", hpMax: "" },
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -85,7 +126,12 @@ function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close
     try {
       const { entity } = await deriveMonster(api, {
         entryId: data.entry.id,
-        entity: { kind: "monster", name: f.name.trim(), statBlock: block.value },
+        entity: {
+          kind: "monster",
+          name: f.name.trim(),
+          portraitAssetId: f.portraitAssetId,
+          statBlock: block.value,
+        },
         copyText: f.copyText,
       });
       close();
@@ -188,6 +234,13 @@ function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close
         <p className="col-span-2 text-xs text-muted-foreground">
           Attacks, ability scores, saves and senses are copied from {data.entry.name}.
         </p>
+        {f.portraitAssetId && (
+          <DerivePortrait
+            id={f.portraitAssetId}
+            name={f.name}
+            onRemove={() => setF((x) => ({ ...x, portraitAssetId: null }))}
+          />
+        )}
         <div className="col-span-2 flex items-center gap-2">
           <Switch
             id="cmp-derive-copy-text"

@@ -15,6 +15,7 @@ import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import cmpImages from "./cmp-images";
 import cmpx5etools from "./cmpx-5etools";
+import cmpxArt from "./cmpx-art";
 import cmpxCore from "./cmpx-core";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
@@ -370,6 +371,8 @@ export const bundles: readonly Bundle[] = [
   assetsWindowE2e,
   // Compendium expansion core (fix/cmpx-core): replaced entries, preset inheritance
   cmpxCore,
+  // Compendium expansion token art (build/cmpx-art): imported batch with art paths
+  cmpxArt,
   // Overview scenes core (fix/ovw-core): overviews, items, one shown
   overviewScenes,
   // Compendium expansion panel (build/cmpx-panel): 5etools import walkthrough + e2e

@@ -3,15 +3,16 @@
 // same answer as an unknown id, before any conditional check. Image IDs (FR-CMP-47, -48) only
 // after it, stale ones dropped (FR-ASSET-37); the ETag hashes them, never carries them.
 import { createHash } from "node:crypto";
-import { sourceRank } from "@shared/compendium/match";
+import { BOOK_SOURCE_PREFIX, sourceRank } from "@shared/compendium/match";
 import { resolvePreset } from "@shared/compendium/presets";
 import type { CreditsResponse, EntryResponse, SourceAttribution } from "@shared/compendium/rest";
 import { CompendiumEntry } from "@shared/compendium/schemas";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, like } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { asset, compendiumEntry, compendiumSource, entity } from "../../db/schema";
 import { toImportedRecord } from "../entities/rows";
 import { inheritedPreset } from "./entries";
+import { importedArtAsset } from "./imported-art-lookup";
 import { searchIndex } from "./search-index";
 import { type BookAbbrOf, bookAbbrOf } from "./sources/five-etools";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
@@ -88,7 +89,12 @@ export function readCredits(db: Db, v: EntryViewer, abbrOf: BookAbbrOf): Credits
         .all()
     : [];
   rows.sort((a, b) => sourceRank(a.key) - sourceRank(b.key) || a.name.localeCompare(b.name));
-  return { sources: rows.map((r) => attributionOf(r, abbrOf)) };
+  const book = db
+    .select({ key: compendiumSource.key })
+    .from(compendiumSource)
+    .where(like(compendiumSource.key, `${BOOK_SOURCE_PREFIX}%`))
+    .get();
+  return { sources: rows.map((r) => attributionOf(r, abbrOf)), bookArt: book !== undefined };
 }
 
 export function readEntry(
@@ -128,6 +134,12 @@ export function readEntry(
   // FR-CMPX-15: importing another source can change it, so it is part of the ETag.
   const inherited = resolvePreset(row) ? null : inheritedPreset(db, row);
   if (inherited) body.inheritedPreset = inherited.name;
+  // FR-CMPX-28: changes when the first placement ingests, so it is part of the ETag.
+  const art =
+    v.role === "dm" && v.campaignId !== null && row.source !== null && row.sourceKey !== null
+      ? importedArtAsset(db, v.campaignId, row.source, row.sourceKey)
+      : null;
+  if (art) body.importedArtAssetId = art;
   let defUpdatedAt: string | undefined;
   if (row.kind === "monster" && row.definitionId !== null) {
     const def = db.select().from(entity).where(eq(entity.id, row.definitionId)).get();
@@ -145,6 +157,7 @@ export function readEntry(
       defUpdatedAt,
       imageAssetIds.join(","),
       ...(inherited ? [inherited.name] : []),
+      ...(art ? [art] : []),
       ...(source?.abbr ? [source.abbr] : []),
     ]),
   };

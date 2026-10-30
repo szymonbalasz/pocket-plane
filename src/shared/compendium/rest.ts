@@ -142,7 +142,14 @@ export const SourceAttribution = CompendiumSource.pick({
 export type SourceAttribution = z.infer<typeof SourceAttribution>;
 
 /** `GET /api/compendium/credits`: every imported source the viewer reads an entry of (FR-CMPX-18). */
-export const CreditsResponse = z.strictObject({ sources: z.array(SourceAttribution) });
+export const CreditsResponse = z.strictObject({
+  sources: z.array(SourceAttribution),
+  /**
+   * FR-CMPX-29: any book is imported, also one this viewer can't read: a monsters-only book is in
+   * no player's `sources`, but its art is on their tokens.
+   */
+  bookArt: z.boolean(),
+});
 export type CreditsResponse = z.infer<typeof CreditsResponse>;
 
 /** A monster entry's playable stat block (its imported definition, FR-CMP-03 / -12). */
@@ -160,5 +167,7 @@ export const EntryResponse = z.strictObject({
   definition: EntryDefinition.optional(),
   /** FR-CMPX-15: the name of the preset this entry takes from one it replaces (no preset of its own). */
   inheritedPreset: z.string().min(1).max(NAME_MAX).optional(),
+  /** FR-CMPX-28: DM only, the campaign's imported art for this monster (Derive's portrait). */
+  importedArtAssetId: z.string().min(1).optional(),
 });
 export type EntryResponse = z.infer<typeof EntryResponse>;

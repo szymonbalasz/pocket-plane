@@ -13,7 +13,7 @@ import type { Api } from "../../api";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { CompendiumBody } from "./CompendiumWindow";
-import { AboutBody, fetchCreditSources } from "./credits";
+import { AboutBody, fetchCredits } from "./credits";
 import type { Role } from "./logic";
 import { resetCmpNav } from "./nav";
 import { eagerApi } from "./search";
@@ -83,6 +83,18 @@ describe("FR-ENT-29 licence credits", () => {
     expect(html.indexOf("cmp-about-source")).toBeLessThan(html.indexOf("cmp-about-token-art"));
   });
 
+  test("FR-CMPX-29 About adds the 5etools token art line once any book is imported", () => {
+    const line = "Token art: © Wizards of the Coast, from your own 5etools files";
+    expect(text(render("dm", <AboutBody sources={[]} />))).not.toContain(line);
+    expect(text(render("dm", <AboutBody sources={[SRD]} />))).not.toContain(line);
+    const html = render("dm", <AboutBody sources={[SRD]} bookArt />);
+    expect(html).toContain('data-testid="cmpx-about-token-art"');
+    expect(text(html)).toContain(line);
+    expect(html.indexOf("cmp-about-token-art")).toBeLessThan(html.indexOf("cmpx-about-token-art"));
+    // An entry's own About (no route read): its source is the book.
+    expect(text(render("dm", <AboutBody sources={[{ ...SRD, key: "5et-mm" }]} />))).toContain(line);
+  });
+
   test("FR-CMP-19 FR-CMPX-18 Credits reads the sources from one call: every book, no search or entry reads", async () => {
     const urls: URL[] = [];
     const book: SourceAttribution = {
@@ -97,10 +109,10 @@ describe("FR-ENT-29 licence credits", () => {
     const fetch = (async (input: RequestInfo | URL) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
       urls.push(url);
-      return Response.json({ sources: [SRD, book] });
+      return Response.json({ sources: [SRD, book], bookArt: true });
     }) as typeof globalThis.fetch;
     const api = hc<AppType>("http://127.0.0.1:1", { fetch }) as Api;
-    expect(await fetchCreditSources(eagerApi(api))).toEqual([SRD, book]);
+    expect(await fetchCredits(eagerApi(api))).toEqual({ sources: [SRD, book], bookArt: true });
     expect(urls.map((u) => u.pathname)).toEqual(["/api/compendium/credits"]);
   });
 

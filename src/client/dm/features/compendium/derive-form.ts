@@ -16,11 +16,14 @@ export interface DeriveFields {
   initBonus: string;
   speed: string;
   copyText: boolean;
+  /** FR-CMPX-28: prefilled with the campaign's imported art; the DM may remove it. */
+  portraitAssetId: string | null;
 }
 
 export function initialDerive(
   entryName: string,
   d: Pick<EntryDefinition, "statBlock">,
+  importedArtAssetId: string | null = null,
 ): DeriveFields {
   const sb = d.statBlock;
   return {
@@ -33,6 +36,7 @@ export function initialDerive(
     initBonus: String(sb.initBonus),
     speed: sb.speed === undefined ? "" : String(sb.speed),
     copyText: true,
+    portraitAssetId: importedArtAssetId,
   };
 }
 
