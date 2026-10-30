@@ -666,7 +666,7 @@ test.describe("miniatures", () => {
   test("FR-OVW-32 Add miniature: name and owner from the panel, then the picker", async ({
     browser,
   }) => {
-    const { secret, link } = e2eEnv();
+    const { secret, link, recordId } = e2eEnv();
     const dm = await rolePage(browser);
     await loginDm(dm, secret);
     await live(dm);
@@ -675,6 +675,7 @@ test.describe("miniatures", () => {
     await live(player);
     await expect.poll(() => itemIds(dm)).toHaveLength(7);
     await expect.poll(() => itemIds(player)).toHaveLength(5);
+    const known = await itemIds(player);
 
     await dm.getByTestId("ovw-tool-add-miniature").click();
     await dm.getByTestId("ovw-add-miniature-name").fill("The Ship");
@@ -699,6 +700,31 @@ test.describe("miniatures", () => {
     await expect
       .poll(async () => (await konvaNodes(player, "ovw-miniature-name")).map((n) => n.text))
       .toContain("The Galley");
+
+    // Shape and Owner from their submenus: Player 1 can now drag it.
+    await dm.mouse.click(selected.x, selected.y - selected.height / 4, { button: "right" });
+    await menu.getByTestId("ovw-item-menu-owner").click();
+    const ownerId = recordId("player-1", "player");
+    await dm.locator(`[data-testid="ovw-item-owner-option"][data-record-id="${ownerId}"]`).click();
+    await expect(menu).toHaveCount(0);
+    await dm.mouse.click(selected.x, selected.y - selected.height / 4, { button: "right" });
+    await menu.getByTestId("ovw-item-menu-shape").click();
+    await dm.locator('[data-testid="ovw-item-shape-option"][data-value="square"]').click();
+    await expect(menu).toHaveCount(0);
+    const ship = (await itemIds(player)).find((id) => !known.includes(id));
+    if (!ship) throw new Error("no new miniature");
+    const [shipNode] = await konvaNodes(player, "ovw-item", ship);
+    const [onDm] = await konvaNodes(dm, "ovw-item", ship);
+    if (!shipNode || !onDm) throw new Error("no node");
+    const y = shipNode.y - shipNode.height / 4;
+    await player.mouse.move(shipNode.x, y);
+    await player.mouse.down();
+    await player.mouse.move(shipNode.x + 30, y + 30, { steps: 4 });
+    await player.mouse.up();
+    await expect(player.getByTestId("ovw-canvas")).toHaveAttribute("data-camera", "fitted");
+    await expect
+      .poll(async () => (await konvaNodes(dm, "ovw-item", ship))[0]?.x)
+      .toBeGreaterThan(onDm.x + 5);
 
     await player.context().close();
     await dm.context().close();
