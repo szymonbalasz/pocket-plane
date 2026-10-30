@@ -370,11 +370,8 @@ export const bundles: readonly Bundle[] = [
   assetsWindowE2e,
   // Compendium expansion core (fix/cmpx-core): replaced entries, preset inheritance
   cmpxCore,
-<<<<<<< HEAD
   // Overview scenes core (fix/ovw-core): overviews, items, one shown
   overviewScenes,
-=======
   // Compendium expansion panel (build/cmpx-panel): 5etools import walkthrough + e2e
   cmpx5etools,
->>>>>>> origin/build/cmpx-panel
 ];
