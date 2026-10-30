@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { encodeRuns } from "@shared/fog-of-war/mask";
 import type { DarknessShape, FogLayerShape } from "@shared/fog-of-war/shapes";
-import { Raster } from "./paint-raster";
+import { EdgePixel, Raster } from "./paint-raster";
 import {
   FOG_ALPHA,
   type FogPaints,
@@ -57,6 +57,58 @@ describe("FR-FOG-20/21 painter", () => {
     const player = new Raster(100, 60);
     paintFog(player, { ...fogged, shapes }, map, "player", paints("player"), 1);
     expect(player.strokes).toBe(0);
+  });
+
+  test("FR-FOG-20 a brush shape draws no hairline: its path is a union of circles, quads or cells", () => {
+    const brush: FogLayerShape[] = [
+      { op: "fog", stroke: [2, 1, 1, 8, 4] },
+      { op: "reveal", cells: { box: [0, 0, 2, 1], runs: "1,1" } },
+    ];
+    const r = new Raster(100, 60);
+    paintFog(r, { ...fogged, shapes: brush }, map, "dm", paints("dm"), 1);
+    expect(r.strokes).toBe(0);
+    const mixed = new Raster(100, 60);
+    const rect: FogLayerShape = { op: "fog", rect: [0, 0, 2, 2] };
+    paintFog(mixed, { ...fogged, shapes: [...brush, rect] }, map, "dm", paints("dm"), 1);
+    expect(mixed.strokes).toBe(1);
+  });
+
+  describe("FR-FOG-20/21 no seam on an edge between equal states", () => {
+    const fogCircle: FogLayerShape = { op: "fog", circle: [3, 3, 2] };
+    const exploredCircle: FogLayerShape = { op: "explored", circle: [3, 3, 2] };
+    const exploredAll: FogLayerShape = { op: "explored", rect: [0, 0, 10, 6] };
+    for (const client of ["dm", "player"] as const) {
+      const a = FOG_ALPHA[client];
+      for (const c of [0.25, 0.5, 0.75]) {
+        test(`FR-FOG-20/21 ${client}: Fog over Fog at coverage ${c}`, () => {
+          const px = new EdgePixel(c);
+          paintFog(px, { ...fogged, shapes: [fogCircle] }, map, client, paints(client));
+          expect(px.alpha).toBeCloseTo(a.fog, 6);
+        });
+        test(`FR-FOG-20/21 ${client}: Explored over Explored at coverage ${c}`, () => {
+          const px = new EdgePixel(c);
+          const rec = { ...fogged, shapes: [exploredAll, exploredCircle] };
+          paintFog(px, rec, map, client, paints(client));
+          expect(px.alpha).toBeCloseTo(a.explored, 6);
+        });
+        test(`FR-FOG-37 ${client}: Fog over explored memory at coverage ${c}`, () => {
+          const px = new EdgePixel(c, true);
+          const rec = { ...fogged, shapes: [fogCircle] };
+          paintFog(px, rec, map, client, paints(client), 0, [[0, 0, 100, 60]]);
+          expect(px.alpha).toBeCloseTo(a.explored, 6);
+        });
+      }
+    }
+  });
+
+  test("FR-FOG-37 memory cells draw Explored and the rest Fog, in the base and in a fog shape", () => {
+    const r = new Raster(100, 60);
+    const rec = { ...fogged, shapes: [{ op: "fog", rect: [0, 3, 10, 6] } as FogLayerShape] };
+    paintFog(r, rec, map, "player", paints("player"), 0, [[0, 0, 40, 60]]);
+    expect(cell(r, 1, 1)).toEqual({ label: "E", alpha: 0.6 }); // base, memory
+    expect(cell(r, 6, 1)).toEqual({ label: "F", alpha: 1 }); // base
+    expect(cell(r, 1, 4)).toEqual({ label: "E", alpha: 0.6 }); // shape, memory
+    expect(cell(r, 6, 4)).toEqual({ label: "F", alpha: 1 }); // shape
   });
 
   test("FR-FOG-21 player: Fog opaque, Explored dims; darkness only where statically clear, never over Fog or Explored", () => {
