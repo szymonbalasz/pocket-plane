@@ -3,6 +3,7 @@
 // /api/compendium/derive-monster` (one transaction server side). Server errors inline; on save a
 // Toast offers the new NPC's sheet.
 import type { EntryResponse } from "@shared/compendium/rest";
+import type { BodyOf } from "@shared/compendium/schemas";
 import { CR_VALUES, SIZES, xpForCr } from "@shared/entities/schemas";
 import { type Api, ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
@@ -87,9 +88,11 @@ export function DerivePortrait({
   );
 }
 
-function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close(): void }) {
+export function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close(): void }) {
   // FR-CMPX-08: no definition → the entry's size / type / CR, HP and AC left for the DM.
   const definition = data.definition ?? entryOnlyBase(data.entry.facets as MonsterFacets);
+  // BL-161: what the entry says about the HP they have to fill in.
+  const hpText = data.definition ? undefined : (data.entry.body as BodyOf<"monster">).meta.hpText;
   const art = data.importedArtAssetId ?? null;
   const [f, setF] = useState<DeriveFields>(() =>
     data.definition
@@ -103,7 +106,7 @@ function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close
   const set = (k: keyof DeriveFields) => (e: { target: { value: string } }) =>
     setF((x) => ({ ...x, [k]: e.target.value }));
   const average = formulaAverage(f.hpFormula);
-  const num = (k: keyof DeriveFields, label: string) => (
+  const num = (k: keyof DeriveFields, label: string, hint?: ReactNode) => (
     <Field id={k} label={label}>
       <Input
         id={`cmp-derive-${k}`}
@@ -112,6 +115,7 @@ function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close
         value={f[k] as string}
         onChange={set(k)}
       />
+      {hint}
     </Field>
   );
 
@@ -205,7 +209,15 @@ function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close
           </Select>
         </Field>
         {num("ac", "AC")}
-        {num("hpMax", "HP max")}
+        {num(
+          "hpMax",
+          "HP max",
+          hpText && (
+            <span data-testid="cmp-derive-hp-hint" className="text-xs text-muted-foreground">
+              {hpText}
+            </span>
+          ),
+        )}
         <Field id="hpFormula" label="HP formula">
           <Input
             id="cmp-derive-hpFormula"

@@ -432,7 +432,7 @@ function monster(c: Run, raw: unknown, i: number) {
   const skillsText = Object.entries(m.skills ?? {})
     .map(([k, v]) => `${cap(k.replace(/_/g, " "))} ${signed(v)}`)
     .join(", ");
-  const metaRaw: Record<keyof MonsterMeta, string | undefined> = {
+  const metaRaw: Record<Exclude<keyof MonsterMeta, "hpText">, string | undefined> = {
     subtype: nonEmpty(m.subtype),
     alignment: nonEmpty(m.alignment),
     armorNote: nonEmpty(m.armor_desc),
