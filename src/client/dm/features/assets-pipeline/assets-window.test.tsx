@@ -19,14 +19,14 @@ const lib = sampleLibrary();
 const elite = sampleNamed(lib, "Elite Goblin");
 
 describe("Assets window (FR-ASSET-69, -70)", () => {
-  test("FR-ASSET-69 registered (DM): asset.library 'Assets', launcher 'Assets' after Rules, closed by default", () => {
+  test("FR-ASSET-69 registered (DM): asset.library 'Assets', launcher 'Assets' after Notifications (first into ⋯, never the bell), closed by default", () => {
     const def = dmWindows.get(ASSETS_KIND);
     expect(def?.title).toBe("Assets");
     expect(def?.clients).toEqual(["dm"]);
     expect(def?.defaultOpen).toBe(false);
     expect(def?.launcher?.label).toBe("Assets");
-    const rules = dmWindows.get("cmp.rules")?.launcher?.order ?? 0;
-    expect(def?.launcher?.order).toBeGreaterThan(rules);
+    const bell = dmWindows.get("note.history")?.launcher?.order ?? 0;
+    expect(def?.launcher?.order).toBeGreaterThan(bell);
   });
 
   test("FR-ASSET-69 library picker: no Select button; the selected image gets the extra line", () => {

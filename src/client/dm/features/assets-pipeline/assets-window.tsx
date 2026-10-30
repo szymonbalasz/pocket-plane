@@ -280,7 +280,7 @@ function AssetsWindow() {
   );
 }
 
-/** FR-ASSET-69: an ordinary DM launcher window beside the Compendium and Rules. */
+/** FR-ASSET-69: an ordinary DM launcher window, last in the bar. */
 export const assetsWindow = defineWindow({
   kind: ASSETS_KIND,
   title: "Assets",
@@ -292,6 +292,7 @@ export const assetsWindow = defineWindow({
   minOpenH: 400,
   defaultPosition: { anchor: "top-left", dx: 56 },
   defaultOpen: false,
-  launcher: { icon: ImagesIcon, label: "Assets", order: 67 },
+  // After Notifications: on a narrow bar it is the one that moves into "⋯", never the bell.
+  launcher: { icon: ImagesIcon, label: "Assets", order: 85 },
   component: AssetsWindow,
 });
