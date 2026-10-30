@@ -59,6 +59,9 @@ test("FR-MOD-49 FR-MOD-47 FR-MOD-28 Triggers blocks per player; DM entries for m
   await loginDm(dm, secret);
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   const creatures = await openWindow(dm, "ent.creatures");
+  const customOnly = creatures.getByTestId("ent-list-custom-only");
+  await customOnly.click(); // on by default: show the imported Wolf
+  await expect(customOnly).toHaveAttribute("data-state", "unchecked");
   const dialog = dm.getByTestId("mod-triggers-dialog");
   for (const [id, name, value] of [
     [recordId("enemy-custom", "entity"), "Martial Advantage", "2d6"],
