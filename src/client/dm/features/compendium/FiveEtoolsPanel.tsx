@@ -1,5 +1,7 @@
-// FR-CMPX-17 DM import panel, 5etools section: the folder's state, then its books (search,
-// checkbox per book, counts, "imported ‹date›" or **Update**), **Import selected** / **Update all**
+// FR-CMPX-17 DM import panel, 5etools section: the folder's state, then its books, collapsed once
+// any is imported (a Collapsible "Books (N)": the results keep their room): search, Select all /
+// none over what it shows, checkbox per book, counts, "imported ‹date›" or **Update**;
+// **Import selected** / **Update all**
 // → confirm → one `POST /api/compendium/import` per book, one after another (FR-CMPX-12): progress
 // "Book i / N", then a Toast with the totals and warning count, an error Toast per failed book.
 // Disabled while running or not live.
@@ -13,14 +15,22 @@ import {
 import { type Api, ApiError, call } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
 import { Checkbox } from "@ui/components/ui/controls";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@ui/components/ui/menus";
 import { Badge, Input } from "@ui/components/ui/primitives";
 import { Progress } from "@ui/components/ui/progress";
 import { refetch } from "@ui/features/compendium/nav";
+import { cn } from "@ui/lib/utils";
 import { useSync } from "@ui/sync/store";
-import { DownloadIcon, RefreshCwIcon } from "lucide-react";
+import { ChevronDownIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { filterBooks, importBooks, updatableBooks } from "./five-etools";
+import {
+  booksOpenByDefault,
+  filterBooks,
+  importBooks,
+  selectBooks,
+  updatableBooks,
+} from "./five-etools";
 import { ConfirmImport, importedDay } from "./ImportConfirm";
 
 export const BOOKS_CONFIRM = "Players will pause for a few seconds per book";
@@ -89,8 +99,19 @@ export function RunProgress({ index, total }: { index: number; total: number }) 
   );
 }
 
-function BookList({ api, status, reload }: { api: Api; status: FiveEtoolsStatus; reload(): void }) {
+function BookList({
+  api,
+  status,
+  reload,
+  initialOpen,
+}: {
+  api: Api;
+  status: FiveEtoolsStatus;
+  reload(): void;
+  initialOpen: boolean;
+}) {
   const live = useSync((st) => st.state === "live");
+  const [open, setOpen] = useState(initialOpen);
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [pending, setPending] = useState<{
@@ -100,15 +121,20 @@ function BookList({ api, status, reload }: { api: Api; status: FiveEtoolsStatus;
   const [progress, setProgress] = useState<{ index: number; total: number } | null>(null);
   const updatable = updatableBooks(status);
   const chosen = status.books.filter((b) => selected.has(b.key));
+  const shown = filterBooks(status.books, q);
   const running = progress !== null;
 
   const start = async (books: readonly BookStatus[]) => {
     setProgress({ index: 1, total: books.length });
     const { done, failed } = await importBooks(
       books,
-      async (key, run) =>
+      async (key, run, last) =>
         ImportResponse.parse(
-          await call<unknown>(api.api.compendium.import.$post({ json: { source: key, run } })),
+          await call<unknown>(
+            api.api.compendium.import.$post({
+              json: { source: key, run, ...(last ? { last: true as const } : {}) },
+            }),
+          ),
         ),
       (index) => setProgress({ index, total: books.length }),
     );
@@ -120,53 +146,32 @@ function BookList({ api, status, reload }: { api: Api; status: FiveEtoolsStatus;
     if (done.length > 0) toast.success(booksSummary(done));
     setProgress(null);
     setSelected(new Set());
+    // Done with the list: the results need the room (a failed book keeps it open to retry).
+    if (failed.length === 0) setOpen(false);
     reload();
     if (done.length > 0) refetch(); // FR-CMP-23: the DM's own writes refetch at once.
   };
 
   return (
-    <>
-      <Input
-        className="h-7 text-xs"
-        placeholder="Search books"
-        aria-label="Search books"
-        data-testid="cmpx-book-search"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-      />
-      <div className="max-h-40 overflow-y-auto">
-        {filterBooks(status.books, q).map((b) => (
-          <BookRow
-            key={b.key}
-            book={b}
-            version={status.version}
-            checked={selected.has(b.key)}
-            disabled={running}
-            onChange={(on) =>
-              setSelected((s) => {
-                const next = new Set(s);
-                if (on) next.add(b.key);
-                else next.delete(b.key);
-                return next;
-              })
-            }
+    <Collapsible open={open} onOpenChange={setOpen} className="space-y-1">
+      <div className="flex items-center gap-2">
+        <CollapsibleTrigger
+          data-testid="cmpx-books-toggle"
+          className="flex min-w-0 flex-1 items-center gap-1 text-left text-xs font-medium"
+        >
+          <ChevronDownIcon
+            className={cn("size-3.5 shrink-0 transition-transform", !open && "-rotate-90")}
           />
-        ))}
-      </div>
-      {progress ? (
-        <RunProgress index={progress.index} total={progress.total} />
-      ) : (
-        <div className="flex justify-end gap-1.5">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 px-2"
-            data-testid="cmpx-update-all"
-            disabled={updatable.length === 0 || !live}
-            onClick={() => setPending({ books: updatable, action: "Update" })}
+          <span className="shrink-0">Books ({status.books.length})</span>
+          <span
+            className="truncate font-normal text-muted-foreground"
+            data-testid="cmpx-status"
+            data-state={status.state}
           >
-            <RefreshCwIcon className="size-3.5" /> Update all
-          </Button>
+            {statusText(status)}
+          </span>
+        </CollapsibleTrigger>
+        {open && !running && (
           <Button
             size="sm"
             className="h-7 px-2"
@@ -176,8 +181,63 @@ function BookList({ api, status, reload }: { api: Api; status: FiveEtoolsStatus;
           >
             <DownloadIcon className="size-3.5" /> Import selected
           </Button>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 px-2"
+          data-testid="cmpx-update-all"
+          disabled={updatable.length === 0 || !live || running}
+          onClick={() => setPending({ books: updatable, action: "Update" })}
+        >
+          <RefreshCwIcon className="size-3.5" /> Update all
+        </Button>
+      </div>
+      <CollapsibleContent className="space-y-1">
+        <div className="flex items-center gap-1">
+          <Input
+            className="h-7 min-w-0 flex-1 text-xs"
+            placeholder="Search books"
+            aria-label="Search books"
+            data-testid="cmpx-book-search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            data-testid="cmpx-select-all"
+            disabled={running}
+            onClick={() => setSelected((sel) => selectBooks(sel, shown, true))}
+          >
+            Select all
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs"
+            data-testid="cmpx-select-none"
+            disabled={running}
+            onClick={() => setSelected((sel) => selectBooks(sel, shown, false))}
+          >
+            Select none
+          </Button>
         </div>
-      )}
+        <div className="max-h-24 overflow-y-auto">
+          {shown.map((b) => (
+            <BookRow
+              key={b.key}
+              book={b}
+              version={status.version}
+              checked={selected.has(b.key)}
+              disabled={running}
+              onChange={(on) => setSelected((sel) => selectBooks(sel, [b], on))}
+            />
+          ))}
+        </div>
+      </CollapsibleContent>
+      {progress && <RunProgress index={progress.index} total={progress.total} />}
       <ConfirmImport
         open={pending !== null}
         onOpenChange={(o) => !o && setPending(null)}
@@ -188,7 +248,7 @@ function BookList({ api, status, reload }: { api: Api; status: FiveEtoolsStatus;
           if (pending) void start(pending.books);
         }}
       />
-    </>
+    </Collapsible>
   );
 }
 
@@ -201,31 +261,37 @@ export function FiveEtoolsPanel({
   api,
   status,
   reload,
+  initialOpen = booksOpenByDefault(status),
 }: {
   api: Api;
   status: FiveEtoolsStatus;
   reload(): void;
+  /** Default: open until any book is imported. */
+  initialOpen?: boolean;
 }) {
   return (
     <section className="space-y-1" data-testid="cmpx-panel">
-      <div
-        className="text-xs text-muted-foreground"
-        data-testid="cmpx-status"
-        data-state={status.state}
-      >
-        <p>{statusText(status)}</p>
-        {status.state === "not-found" && (
-          <>
-            <p className="break-all">{status.path}</p>
-            {status.issues?.map((i) => (
-              <p key={i} className="text-destructive">
-                {i}
-              </p>
-            ))}
-          </>
-        )}
-      </div>
-      {status.state === "ready" && <BookList api={api} status={status} reload={reload} />}
+      {status.state === "ready" ? (
+        <BookList api={api} status={status} reload={reload} initialOpen={initialOpen} />
+      ) : (
+        <div
+          className="text-xs text-muted-foreground"
+          data-testid="cmpx-status"
+          data-state={status.state}
+        >
+          <p>{statusText(status)}</p>
+          {status.state === "not-found" && (
+            <>
+              <p className="break-all">{status.path}</p>
+              {status.issues?.map((i) => (
+                <p key={i} className="text-destructive">
+                  {i}
+                </p>
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </section>
   );
 }

@@ -98,7 +98,7 @@ Pocket Plane can read the books you pick from your own copy of 5etools. Nothing 
    PP_5ETOOLS_DIR=D:/5etools-2014
    ```
 
-4. Open **Compendium**. In the import panel's 5etools section, tick the books you want and click **Import selected**. Players pause for a few seconds per book; it's refused during combat.
+4. Open **Compendium**. In the import panel's **Books** list, tick the books you want (**Select all** / **Select none** act on what the search shows) and click **Import selected**. Players pause for a few seconds per book; it's refused during combat. Once a book is imported the list stays folded: click **Books** to open it.
 
 - "goblin" now finds one Goblin: an imported entry that is also in the SRD, or reprinted in another book you imported, hides the other from search. Old tokens and sheets keep working.
 - New release: extract it over the same folder, reopen the Compendium, then click **Update all**.

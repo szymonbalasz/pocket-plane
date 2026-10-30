@@ -18,7 +18,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
 import { deriveStatBlock, entryOnlyBase, initialDerive } from "./derive-form";
 import { BOOKS_CONFIRM, bookLine, FiveEtoolsPanel, RunProgress } from "./FiveEtoolsPanel";
-import { filterBooks, importBooks, updatableBooks } from "./five-etools";
+import {
+  booksOpenByDefault,
+  filterBooks,
+  importBooks,
+  selectBooks,
+  updatableBooks,
+} from "./five-etools";
 
 const api = hc<AppType>("http://127.0.0.1:1") as Api;
 
@@ -50,11 +56,11 @@ const store = createStore<SyncState>()(
     }) as unknown as SyncState,
 );
 
-const render = (status: FiveEtoolsStatus) =>
+const render = (status: FiveEtoolsStatus, initialOpen = true) =>
   renderToStaticMarkup(
     <SyncContext.Provider value={store}>
       <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-        <FiveEtoolsPanel api={api} status={status} reload={() => {}} />
+        <FiveEtoolsPanel api={api} status={status} reload={() => {}} initialOpen={initialOpen} />
       </TooltipProvider>
     </SyncContext.Provider>,
   ).replaceAll("<!-- -->", "");
@@ -136,6 +142,31 @@ describe("FR-CMPX-17 panel states", () => {
     expect(updatableBooks(READY).map((b) => b.abbr)).toEqual(["VGM"]);
   });
 
+  test("FR-CMPX-17 Books (N) header: collapsed once any book is imported, the list hidden, status and Update all still there", () => {
+    expect(booksOpenByDefault(READY)).toBe(false);
+    expect(booksOpenByDefault({ ...READY, books: [book("XGE", "Xanathar's Guide")] })).toBe(true);
+    const html = render(READY, false);
+    expect(text(html)).toContain("Books (3)");
+    expect(text(html)).toContain("5etools 1.217.1");
+    expect(html).toContain('data-testid="cmpx-books-toggle"');
+    expect(html).toContain('data-testid="cmpx-update-all"');
+    for (const id of ["cmpx-book", "cmpx-book-search", "cmpx-select-all", "cmpx-import"]) {
+      expect(html).not.toContain(`data-testid="${id}"`);
+    }
+    // Expanded: the search box, Select all / none.
+    const opened = render(READY, true);
+    for (const id of ["cmpx-book-search", "cmpx-select-all", "cmpx-select-none", "cmpx-import"]) {
+      expect(opened).toContain(`data-testid="${id}"`);
+    }
+  });
+
+  test("FR-CMPX-17 Select all / Select none act on the filtered list only", () => {
+    const shown = filterBooks(READY.books, "guide");
+    const all = selectBooks(new Set(["5et-mm"]), shown, true);
+    expect([...all].sort()).toEqual(["5et-mm", "5et-vgm", "5et-xge"]);
+    expect([...selectBooks(all, shown, false)]).toEqual(["5et-mm"]);
+  });
+
   test("FR-CMPX-17 search: name or abbreviation, any case", () => {
     expect(filterBooks(READY.books, "guide").map((b) => b.abbr)).toEqual(["VGM", "XGE"]);
     expect(filterBooks(READY.books, "mm").map((b) => b.abbr)).toEqual(["MM"]);
@@ -163,14 +194,16 @@ const answer = (source: string, created: number, existing = 0, warnings = 0): Im
 });
 
 describe("FR-CMPX-12 FR-CMPX-17 the run", () => {
-  test("FR-CMPX-12 one after another, the same run id, progress per book", async () => {
+  test("FR-CMPX-12 one after another, the same run id, progress per book, only the last book says so", async () => {
     const order: string[] = [];
+    const lasts: boolean[] = [];
     const steps: number[] = [];
     let inFlight = 0;
     const runs = new Set<string>();
     const r = await importBooks(
       READY.books,
-      async (key, run) => {
+      async (key, run, last) => {
+        lasts.push(last);
         inFlight++;
         expect(inFlight).toBe(1);
         runs.add(run);
@@ -183,6 +216,7 @@ describe("FR-CMPX-12 FR-CMPX-17 the run", () => {
     );
     expect(order).toEqual(["5et-mm", "5et-vgm", "5et-xge"]);
     expect(steps).toEqual([1, 2, 3]);
+    expect(lasts).toEqual([false, false, true]);
     expect(runs.size).toBe(1);
     expect(r.done).toHaveLength(3);
     expect(r.failed).toEqual([]);

@@ -20,6 +20,24 @@ export function filterBooks(books: readonly BookStatus[], q: string): readonly B
 export const updatableBooks = (s: FiveEtoolsStatus): readonly BookStatus[] =>
   s.books.filter((b) => bookPanelState(b, s.version) === "outdated");
 
+/** Once any book is imported the list stays out of the results' way (the DM opens it). */
+export const booksOpenByDefault = (s: FiveEtoolsStatus) =>
+  !s.books.some((b) => b.importedVersion !== undefined);
+
+/** Select all / Select none act on the books the search left showing, no others. */
+export function selectBooks(
+  selected: ReadonlySet<string>,
+  shown: readonly BookStatus[],
+  on: boolean,
+): ReadonlySet<string> {
+  const next = new Set(selected);
+  for (const b of shown) {
+    if (on) next.add(b.key);
+    else next.delete(b.key);
+  }
+  return next;
+}
+
 export interface BooksResult {
   done: ImportResponse[];
   failed: { book: BookStatus; error: unknown }[];
@@ -32,7 +50,7 @@ export const newRunId = () =>
 /** FR-CMPX-12: never in parallel, one command and one transaction per book. */
 export async function importBooks(
   books: readonly BookStatus[],
-  post: (key: string, run: string) => Promise<ImportResponse>,
+  post: (key: string, run: string, last: boolean) => Promise<ImportResponse>,
   onBook: (index: number) => void,
   run = newRunId(),
 ): Promise<BooksResult> {
@@ -40,7 +58,7 @@ export async function importBooks(
   for (const [i, book] of books.entries()) {
     onBook(i + 1);
     try {
-      out.done.push(await post(book.key, run));
+      out.done.push(await post(book.key, run, i === books.length - 1));
     } catch (error) {
       out.failed.push({ book, error });
     }
