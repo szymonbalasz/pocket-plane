@@ -166,7 +166,7 @@ Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 | Art (X3) | One ingest per campaign per monster; placement → art for the DM ≤ 1 s (logged); players load it like any token image |
 | Entries if every book is imported | ≈ 3,800 monsters + 525 spells + ≈ 1,960 items ≈ 6,300 (SRD today: 1,288) |
 | Import | *(#400, measured on the DM's folder and accepted)* MM 4–6 s; all 106 books 67 s (per-book median 0.37 s, longest 3.5 s; players' REST p95 0.4 s during the run); unchanged re-import of all 5.1 s. One server-log line per book (counts, warnings, ms) and one per run. Fixture test fails above 10 s per book. Original targets were MM ≤ 2 s, all ≤ 15 s |
-| Search | ≤ 5 ms p95 over SRD + 6,300 (FR-CMPX-22); 0.96 ms today on SRD. *Measured (core, #396): 7,619 rows, 1,100 hidden, index build 585 ms; worst p95 DM 9.33 ms ("goblin", pessimistic synthetic text), players ≤ 2.02 ms; accepted under the 50 ms fail line, matcher speed-up → backlog* |
+| Search | ≤ 5 ms p95 over SRD + 6,300 (FR-CMPX-22); 0.96 ms today on SRD. *Measured (core, #396): 7,619 rows, 1,100 hidden, index build 585 ms; worst p95 DM 9.33 ms ("goblin", pessimistic synthetic text), players ≤ 2.02 ms. BL-160 (inverted word index): DM worst p95 2.58 ms, players 0.82 ms, index build 465 ms* |
 | Snapshot | 0 B (FR-CMPX-21) |
 | Players / tunnel | Unchanged: one entry per read, `ETag` / `304` |
 
