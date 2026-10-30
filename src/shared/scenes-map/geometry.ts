@@ -140,16 +140,34 @@ export function copyName(name: string, max = 60): string {
 }
 
 /**
- * FR-MAP-17: the copy goes to `col + footprint` same row if valid, else `col − footprint`,
- * else the source cell.
+ * FR-MAP-17 (BL-163): the copy goes to `col + footprint` same row if valid, else `col − footprint`,
+ * else the nearest valid cell by rings around the source (Chebyshev distance 1, 2, …, each ring top
+ * to bottom, left to right), else the source cell. Valid = the whole footprint inside the map and
+ * overlapping none of `tokens`: every token on the scene, hidden ones and the source included.
  */
 export function duplicateCell(
   m: MapRect,
-  t: { col: number; row: number; size: TokenSize },
+  t: Placed,
+  tokens: readonly Placed[],
 ): { col: number; row: number } {
   const n = footprint(t.size);
+  const valid = (col: number, row: number) =>
+    insideMap(m, col, row, t.size) &&
+    !tokens.some((o) => {
+      const side = footprint(o.size);
+      return col < o.col + side && o.col < col + n && row < o.row + side && o.row < row + n;
+    });
   for (const col of [t.col + n, t.col - n]) {
-    if (overlapsMap(m, col, t.row, t.size)) return { col, row: t.row };
+    if (valid(col, t.row)) return { col, row: t.row };
+  }
+  const maxR = maxRing(m, t);
+  for (let r = 1; r <= maxR; r++) {
+    for (let row = t.row - r; row <= t.row + r; row++) {
+      const step = row === t.row - r || row === t.row + r ? 1 : 2 * r;
+      for (let col = t.col - r; col <= t.col + r; col += step) {
+        if (valid(col, row)) return { col, row };
+      }
+    }
   }
   return { col: t.col, row: t.row };
 }
@@ -163,6 +181,13 @@ export function insideMap(m: MapRect, col: number, row: number, size: TokenSize)
 }
 
 type Placed = Cell & { size: TokenSize };
+
+/** The square ring around `at` that reaches every cell of the map (± 1 for offsets). */
+function maxRing(m: MapRect, at: Cell): number {
+  const cols = Math.ceil(m.mapWidth / m.gridCellSize) + 1;
+  const rows = Math.ceil(m.mapHeight / m.gridCellSize) + 1;
+  return Math.max(Math.abs(at.col) + cols, Math.abs(at.row) + rows);
+}
 
 /**
  * FR-MAP-48: up to `n` top-left cells nearest `at` (FR-MAP-22 distance, ties by row then col)
@@ -190,10 +215,7 @@ export function freeCellsNear(
     }
     return true;
   };
-  // Cell index bounds of the map (± 1 for offsets); cells outside never fit.
-  const cols = Math.ceil(m.mapWidth / m.gridCellSize) + 1;
-  const rows = Math.ceil(m.mapHeight / m.gridCellSize) + 1;
-  const maxR = Math.max(Math.abs(at.col) + cols, Math.abs(at.row) + rows);
+  const maxR = maxRing(m, at);
   const out: Cell[] = [];
   const take = (cells: (Cell & { d: number })[]) => {
     for (const c of cells) {

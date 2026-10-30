@@ -9,13 +9,18 @@ import {
   type FiveEtoolsStatus,
   type ImportResponse,
 } from "@shared/compendium/import";
+import type { EntryResponse } from "@shared/compendium/rest";
+import { applySnapshot } from "@shared/protocol/store";
 import type { Api } from "@ui/api";
-import { TooltipProvider } from "@ui/components/ui/overlays";
+import { Dialog, TooltipProvider } from "@ui/components/ui/overlays";
 import { badgeLabel, footerLabel } from "@ui/features/compendium/logic";
+import { createWindowRegistry } from "@ui/features/play-shell/registry";
+import { ShellProvider } from "@ui/features/play-shell/ShellContext";
 import { SyncContext, type SyncState } from "@ui/sync/store";
 import { hc } from "hono/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createStore } from "zustand";
+import { DeriveForm } from "./DeriveDialog";
 import { deriveStatBlock, entryOnlyBase, initialDerive } from "./derive-form";
 import { BOOKS_CONFIRM, bookLine, FiveEtoolsPanel, RunProgress } from "./FiveEtoolsPanel";
 import {
@@ -281,5 +286,80 @@ describe("FR-CMPX-08 Derive form", () => {
 
   test("FR-CMPX-08 a facet type outside the creature types is dropped, not refused", () => {
     expect(entryOnlyBase({ ...facets, type: "swarm" }).statBlock.type).toBeUndefined();
+  });
+
+  const liveStore = createStore<SyncState>()(
+    () =>
+      ({
+        state: "live",
+        store: applySnapshot({
+          type: "snapshot",
+          seq: 0,
+          you: { campaignId: "c1", role: "dm", playerId: null },
+          records: {},
+        }),
+        presence: {},
+      }) as unknown as SyncState,
+  );
+
+  // The shell reads the page while rendering; the server render has none. Stubs for this render.
+  const withPage = (render: () => string) => {
+    const g = globalThis as { window?: unknown; document?: unknown; localStorage?: unknown };
+    g.window = {
+      location: { origin: "http://127.0.0.1:4100" },
+      innerWidth: 1440,
+      innerHeight: 900,
+    };
+    g.document = { title: "", hidden: false, documentElement: {} };
+    g.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
+    try {
+      return render();
+    } finally {
+      delete g.window;
+      delete g.document;
+      delete g.localStorage;
+    }
+  };
+
+  const renderForm = (data: Pick<EntryResponse, "definition">, hpText?: string) =>
+    withPage(() =>
+      renderToStaticMarkup(
+        <SyncContext.Provider value={liveStore}>
+          <ShellProvider registry={createWindowRegistry("dm", [])}>
+            <Dialog open>
+              <DeriveForm
+                api={api}
+                close={() => {}}
+                data={
+                  {
+                    ...data,
+                    source: null,
+                    entry: {
+                      id: "e-wisp",
+                      name: "Wobbling Fénwisp",
+                      facets,
+                      body: { meta: hpText ? { hpText } : {} },
+                    },
+                  } as unknown as EntryResponse
+                }
+              />
+            </Dialog>
+          </ShellProvider>
+        </SyncContext.Provider>,
+      ),
+    );
+
+  test("BL-161 FR-CMPX-08 an entry-only monster's HP text is the hint beside the empty HP max", () => {
+    const html = renderForm({}, "as many as the summoner's level");
+    const field = /data-field="hpMax">(.*?)<\/div>/.exec(html)?.[1] ?? "";
+    expect(field).toContain('value=""');
+    expect(field).toContain('data-testid="cmp-derive-hp-hint"');
+    expect(field).toContain("as many as the summoner&#x27;s level");
+  });
+
+  test("BL-161 no HP text or a definition → no hint", () => {
+    expect(renderForm({})).not.toContain("cmp-derive-hp-hint");
+    const definition = { id: "d1", name: "Wisp", statBlock: entryOnlyBase(facets).statBlock };
+    expect(renderForm({ definition }, "stale words")).not.toContain("cmp-derive-hp-hint");
   });
 });

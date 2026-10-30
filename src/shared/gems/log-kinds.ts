@@ -3,6 +3,7 @@
 // character; lines are public (OQ-GEM-02 A, OQ-GEM-10 A).
 import { GEMS_FEATURE } from "@shared/campaign-management/features";
 import { MAX_DICE_PICKS } from "@shared/combat-tracker/schemas";
+import { labelAfterActor } from "@shared/dice-roll-log/actor-label";
 import { defineLogKind, type LineSegment } from "@shared/dice-roll-log/kind-types";
 import { LABEL_MAX } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
@@ -141,7 +142,7 @@ export const gemSpendKind = defineLogKind<GemSpendPayload, GemSpendDmPayload>({
     const detail = dmPayload?.target ? dmPayload : p;
     const target = detail.target;
     const purpose = target
-      ? targetText(target, detail.dice)
+      ? targetText({ ...target, label: labelAfterActor(target.label, actorName) }, detail.dice)
       : target === null
         ? null
         : spendPurpose(p);

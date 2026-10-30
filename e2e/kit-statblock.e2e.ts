@@ -6,6 +6,7 @@
 // or window (FR-KIT-107).
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
+import { entryLine } from "./support/log";
 import { rollNow } from "./support/rolls";
 import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
@@ -123,4 +124,47 @@ test("FR-KIT-101 FR-KIT-103 FR-KIT-105 FR-KIT-107 Initiative ⋯ → Stat block 
   await expect(p1.getByTestId("cmp-statblock-open")).toHaveCount(0);
   await dm.context().close();
   await p1.context().close();
+});
+
+test("BL-162 a definition's stat block attack: the log names the Goblin once, row and full line", async ({
+  browser,
+}) => {
+  const { secret } = e2eEnv();
+  const dm = await rolePage(browser);
+  await dm.setViewportSize({ width: 1440, height: 900 });
+  await loginDm(dm, secret);
+  await live(dm);
+
+  // Open at the table from the compendium: the definition, no fight (`plainAttackRoll`).
+  const cmp = await openWindow(dm, "cmp.compendium");
+  await cmp.getByTestId("cmp-search").fill("goblin");
+  await cmp
+    .getByTestId("cmp-result")
+    .filter({ has: dm.getByTestId("cmp-result-name").getByText("Goblin", { exact: true }) })
+    .first()
+    .click();
+  await cmp.getByTestId("cmp-statblock-open").click();
+  const sb = shellWindow(dm, "ent.statblock");
+  await expect(sb.getByTestId("ent-statblock-name")).toHaveText("Goblin");
+  await expect(sb.getByTestId("ent-statblock-combat")).toHaveCount(0);
+  await rollNow(
+    sb
+      .getByTestId("ent-statblock-attack")
+      .filter({ hasText: "Scimitar" })
+      .getByTestId("ent-statblock-roll-attack"),
+  );
+
+  const log = await openWindow(dm, "dice.log");
+  const row = log
+    .getByTestId("dice-log-entry")
+    .filter({
+      has: dm.locator('[data-testid="dice-log-entry-text"]', {
+        hasText: /^Goblin · Scimitar attack$/,
+      }),
+    })
+    .last();
+  await expect(row).toBeVisible();
+  const line = await entryLine(row);
+  await expect(line).toContainText(/^Goblin — Scimitar attack: /);
+  await dm.context().close();
 });

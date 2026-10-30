@@ -9,6 +9,7 @@ import {
   HIT_RULING_TYPE,
   type HitRulingRecord,
 } from "@shared/combat-tracker/schemas";
+import { labelAfterActor } from "@shared/dice-roll-log/actor-label";
 import { inRerollWindow, rerollableRoll } from "@shared/dice-roll-log/reroll";
 import {
   GAME_LOG_ENTRY_TYPE,
@@ -127,7 +128,7 @@ export const gemRerollAction: EntryAction = {
       expression: "1d20",
       mode: item.mode,
       category: entry.category,
-      label: `${entry.actorName} — ${item.label ?? item.expression} (reroll)`,
+      label: `${entry.actorName} — ${labelAfterActor(item.label ?? item.expression, entry.actorName)} (reroll)`,
     };
   },
   run(entry, { store, send, manual }) {

@@ -5,6 +5,7 @@
 // keep-clear of Initiative and the open combat popup. T5 (DM #347): the whole card × 1.4
 // (`POPUP_BIG`), today's 320 px card (`POPUP_BASE`) only where the viewport can't hold it.
 import type { ThrowDie } from "@shared/dice-extras/throw";
+import { labelAfterActor } from "@shared/dice-roll-log/actor-label";
 import type { GameLogEntryView } from "@shared/dice-roll-log/schemas";
 import { z } from "zod";
 import type { Rect } from "../play-shell/geometry";
@@ -233,7 +234,7 @@ export function popupRows(entries: readonly GameLogEntryView[]): PopupRow[] {
         const key = i.rollId ?? `${items.length}`;
         items.push({
           key,
-          label: i.label ?? i.expression,
+          label: labelAfterActor(i.label ?? i.expression, e.actorName),
           total: i.total,
           mode: MODE[i.mode as keyof typeof MODE] ?? null,
           natural: nat === 20 ? "natural 20!" : nat === 1 ? "natural 1" : null,

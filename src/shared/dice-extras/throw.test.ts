@@ -320,3 +320,12 @@ describe("FR-DICEX-13 throwDice", () => {
     expect(throwDice([hidden])?.seedId).toBe("e1");
   });
 });
+
+describe("BL-162 the caption names the roller once", () => {
+  test("BL-162 a label opening with the roller's name: the label without it; others whole", () => {
+    const named = (label: string) =>
+      throwDice([entry(1, [item({ label })], { actorName: "Goblin" })])?.label;
+    expect(named("Goblin — Hooked Blade attack")).toBe("Hooked Blade attack");
+    expect(named("Goblin Boss — Bite")).toBe("Goblin Boss — Bite");
+  });
+});

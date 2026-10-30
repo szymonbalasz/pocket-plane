@@ -123,12 +123,93 @@ describe("scenes-map geometry", () => {
     expect([...copyName("x".repeat(60))].length).toBe(60);
   });
 
-  test("FR-MAP-17 duplicate placement: right, else left, else the source cell", () => {
-    expect(duplicateCell(map, { col: 12, row: 6, size: "small" })).toEqual({ col: 13, row: 6 });
-    expect(duplicateCell(map, { col: 19, row: 6, size: "medium" })).toEqual({ col: 18, row: 6 });
-    expect(duplicateCell(map, { col: 9, row: 10, size: "large" })).toEqual({ col: 11, row: 10 });
-    const tiny = { ...map, mapWidth: 70, mapHeight: 70 };
-    expect(duplicateCell(tiny, { col: 0, row: 0, size: "medium" })).toEqual({ col: 0, row: 0 });
+  describe("FR-MAP-17 duplicate placement (BL-163)", () => {
+    type Size = Parameters<typeof footprint>[0];
+    const at = (col: number, row: number, size: Size = "medium") => ({ col, row, size });
+    /** The cell for a copy of `t`; the scene holds `t` and `others`. */
+    const copyOf = (t: ReturnType<typeof at>, others: ReturnType<typeof at>[] = [], m = map) =>
+      duplicateCell(m, t, [t, ...others]);
+    /** Every cell of a Chebyshev ring around (col, row), top to bottom, left to right. */
+    const ring = (col: number, row: number, r: number) => {
+      const out: ReturnType<typeof at>[] = [];
+      for (let y = row - r; y <= row + r; y++) {
+        for (let x = col - r; x <= col + r; x++) {
+          if (Math.max(Math.abs(x - col), Math.abs(y - row)) === r) out.push(at(x, y));
+        }
+      }
+      return out;
+    };
+
+    test("BL-163 free right cell, else left, on an empty map", () => {
+      expect(copyOf(at(12, 6, "small"))).toEqual({ col: 13, row: 6 });
+      expect(copyOf(at(19, 6))).toEqual({ col: 18, row: 6 });
+      expect(copyOf(at(9, 10, "large"))).toEqual({ col: 11, row: 10 });
+    });
+
+    test("BL-163 right occupied → left; another token's whole footprint counts", () => {
+      expect(copyOf(at(5, 5), [at(6, 5)])).toEqual({ col: 4, row: 5 });
+      expect(copyOf(at(6, 5), [at(7, 4, "large")])).toEqual({ col: 5, row: 5 });
+    });
+
+    test("BL-163 both occupied → ring 1, top to bottom, left to right", () => {
+      const blocked = [at(6, 5), at(4, 5)];
+      for (const cell of [
+        { col: 4, row: 4 },
+        { col: 5, row: 4 },
+        { col: 6, row: 4 },
+        { col: 4, row: 6 },
+        { col: 5, row: 6 },
+        { col: 6, row: 6 },
+      ]) {
+        expect(copyOf(at(5, 5), blocked)).toEqual(cell);
+        blocked.push(at(cell.col, cell.row));
+      }
+    });
+
+    test("BL-163 crowded → ring 2, then ring 3, in order", () => {
+      const r1 = ring(5, 5, 1);
+      const r2 = ring(5, 5, 2);
+      expect(copyOf(at(5, 5), r1)).toEqual({ col: 3, row: 3 });
+      expect(copyOf(at(5, 5), [...r1, at(3, 3)])).toEqual({ col: 4, row: 3 });
+      // Row 4 of ring 2 has only its two ends.
+      expect(copyOf(at(5, 5), [...r1, ...r2.slice(0, 5)])).toEqual({ col: 3, row: 4 });
+      expect(copyOf(at(5, 5), [...r1, ...r2.slice(0, 6)])).toEqual({ col: 7, row: 4 });
+      expect(copyOf(at(5, 5), [...r1, ...r2])).toEqual({ col: 2, row: 2 });
+    });
+
+    test("BL-163 full map → the source cell; a map too small for the footprint too", () => {
+      const small = { ...map, mapWidth: 210, mapHeight: 140 }; // 3 × 2 cells
+      const all = [at(0, 0), at(1, 0), at(2, 0), at(0, 1), at(2, 1)];
+      expect(copyOf(at(1, 1), all, small)).toEqual({ col: 1, row: 1 });
+      const tiny = { ...map, mapWidth: 70, mapHeight: 70 };
+      expect(copyOf(at(0, 0), [], tiny)).toEqual({ col: 0, row: 0 });
+      expect(copyOf(at(0, 0, "huge"), [], small)).toEqual({ col: 0, row: 0 });
+    });
+
+    test("BL-163 Large+: the copy's whole footprint must be free and inside the map", () => {
+      const ogre = at(5, 5, "large");
+      expect(copyOf(ogre)).toEqual({ col: 7, row: 5 });
+      // Only the copy's lower-right cell is covered.
+      expect(copyOf(ogre, [at(8, 6)])).toEqual({ col: 3, row: 5 });
+      // Ring 1 always overlaps the source; ring 2 starts at the top-left.
+      expect(copyOf(ogre, [at(8, 6), at(3, 6)])).toEqual({ col: 3, row: 3 });
+      expect(copyOf(ogre, [at(8, 6), at(3, 6), at(4, 4)])).toEqual({ col: 5, row: 3 });
+      const huge = at(5, 5, "huge");
+      expect(copyOf(huge)).toEqual({ col: 8, row: 5 });
+      expect(copyOf(huge, [at(10, 7)])).toEqual({ col: 2, row: 5 });
+    });
+
+    test("BL-163 map edge: never hangs off the map", () => {
+      // A Large copy at col + 2 = 19 would hang over the right edge (20 columns).
+      expect(copyOf(at(17, 5, "large"))).toEqual({ col: 15, row: 5 });
+      // Corner, left occupied: rows and columns outside the map are skipped.
+      expect(copyOf(at(19, 0), [at(18, 0)])).toEqual({ col: 18, row: 1 });
+      expect(copyOf(at(0, 13), [at(1, 13)])).toEqual({ col: 0, row: 12 });
+      // The left cell of col 0 is off the map; rings stay on it.
+      expect(copyOf(at(0, 0), [at(1, 0)])).toEqual({ col: 0, row: 1 });
+      // Offset grid: column −1 only pokes into the map, so it is not "inside".
+      expect(copyOf(at(0, 0), [at(1, 0)], cellar)).toEqual({ col: 0, row: 1 });
+    });
   });
 
   test("FR-MAP-02 list order: folders then root scenes, name ci, tiebreak seq (equal createdAt)", () => {

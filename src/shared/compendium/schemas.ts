@@ -90,6 +90,8 @@ export const MonsterMeta = z.strictObject({
   subtype: metaText,
   alignment: metaText,
   armorNote: metaText,
+  /** BL-161: an entry-only monster's HP in words; a definition's HP is in the creature core. */
+  hpText: metaText,
   speedText: metaText,
   savesText: metaText,
   skillsText: metaText,

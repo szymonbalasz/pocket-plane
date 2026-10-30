@@ -171,7 +171,7 @@ const render = (role: Role, node: ReactNode) =>
 const text = (html: string) => html.replace(/<[^>]+>/g, "");
 
 describe("FR-CMPX-08 entry-only monster view", () => {
-  test("FR-CMPX-08 shows the AC line the entry has; no stat block core, no drag handle", () => {
+  const renderWisp = (meta: { armorNote?: string; hpText?: string; speedText?: string }) => {
     const data: EntryResponse = {
       entry: {
         id: "e-wisp",
@@ -183,7 +183,7 @@ describe("FR-CMPX-08 entry-only monster view", () => {
         line: "",
         facets: { cr: "1/8", type: "fey", size: "tiny" },
         body: {
-          meta: { armorNote: "12", speedText: "fly 30 ft." },
+          meta,
           traits: [{ name: "Drifting Glow", text: "It glows." }],
           actions: [],
           bonusActions: [],
@@ -206,11 +206,25 @@ describe("FR-CMPX-08 entry-only monster view", () => {
         </SyncContext.Provider>
       </TooltipProvider>,
     ).replaceAll("<!-- -->", "");
-    const words = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    return { html, words: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ") };
+  };
+
+  test("FR-CMPX-08 shows the AC line the entry has; no stat block core, no drag handle", () => {
+    const { html, words } = renderWisp({ armorNote: "12", speedText: "fly 30 ft." });
     expect(words).toContain("Armor Class 12");
     expect(words).toContain("Drifting Glow");
+    expect(words).not.toContain("Hit Points");
     expect(html).not.toContain("cmp-statblock-core");
     expect(html).not.toContain("cmp-drag-handle");
+  });
+
+  test("BL-161 shows the HP text in a row like the AC line, between AC and Speed", () => {
+    const { words } = renderWisp({
+      armorNote: "12",
+      hpText: "as many as the summoner's level",
+      speedText: "fly 30 ft.",
+    });
+    expect(words).toContain("Armor Class 12 Hit Points as many as the summoner&#x27;s level Speed");
   });
 });
 

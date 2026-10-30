@@ -169,6 +169,14 @@ describe("FR-GEM-33 log action available", () => {
     expect(inRerollWindow(1, 101)).toBe(false);
   });
 
+  test("BL-162 physical reroll form: a label opening with the actor names it once; others whole", () => {
+    const form = (label: string | null) =>
+      gemRerollAction.roll?.(entry({ payload: [item({ label })] }))?.label;
+    expect(form("Mira — Longbow attack")).toBe("Mira — Longbow attack (reroll)");
+    expect(form("Wolf — Bite")).toBe("Mira — Wolf — Bite (reroll)");
+    expect(form(null)).toBe("Mira — 1d20+3 (reroll)");
+  });
+
   test("FR-GEM-21 physical reroll: the action rolls the line's d20 in its mode and sends `manual` when typed", async () => {
     expect(gemRerollAction.roll?.(entry())).toEqual({
       expression: "1d20",

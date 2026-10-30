@@ -673,3 +673,21 @@ describe("FR-KIT-07 slots present", () => {
       expect(KIT).toContain(`[data-slot="${slot}"]`);
   });
 });
+
+describe("BL-162 a stat block's roll in the log", () => {
+  test("BL-162 DOM: the row reads 'Goblin · Hooked Blade attack', its full line names the Goblin once", () => {
+    const e = entry({
+      id: "g1",
+      rollerRole: "dm",
+      rollerPlayerId: null,
+      actorName: "Goblin",
+      payload: [item({ label: "Goblin — Hooked Blade attack" })],
+    });
+    const { body } = row(render([e], "dm"), "g1");
+    expect(body).toContain(">Hooked Blade attack</span>");
+    expect(body).not.toContain("Goblin — Goblin");
+    expect(/<span data-line="true" class="sr-only">([^<]*)</.exec(body)?.[1]).toBe(
+      "Goblin — Hooked Blade attack: 20 + 9 = 29 — natural 20!",
+    );
+  });
+});
