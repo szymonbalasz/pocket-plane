@@ -318,6 +318,7 @@ test("BL-06 new scene dialog shows the chosen map's name", async ({ browser }) =
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   const scenes = await openWindow(dm, "map.scenes");
   await scenes.getByTestId("map-scene-new").click();
+  await scenes.page().getByTestId("map-scene-new-battle").click();
   const dialog = dm.getByRole("dialog", { name: "New scene" });
   await expect(dialog.getByText("none chosen")).toBeVisible();
   await expect(dialog.getByTestId("map-scene-new-map-name")).toHaveCount(0);
@@ -330,5 +331,51 @@ test("BL-06 new scene dialog shows the chosen map's name", async ({ browser }) =
   await expect(dialog.getByText("none chosen")).toHaveCount(0);
   await dm.keyboard.press("Escape"); // cancel: no scene created
   await expect(dialog).toHaveCount(0);
+  await dm.context().close();
+});
+
+test("BL-163 FR-MAP-17 Ctrl-D: the copy takes a free cell and stays selected", async ({
+  browser,
+}) => {
+  const { secret, recordId } = e2eEnv();
+  const goblin = recordId("battlemap", "token", 1);
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  // Goblin Ambush shown by the tests above; shown here when run alone.
+  const scenes = await showToPlayers(dm, "Goblin Ambush");
+  await scenes.getByTestId("ui-window-close").click();
+  await expect(scenes).toBeHidden();
+  await shellWindow(dm, "dice.log").getByTestId("ui-window-minimise").click();
+  await expect.poll(() => tokenNode(dm, goblin)).not.toBeNull();
+
+  const selectGoblin = async () => {
+    const g = (await tokenNode(dm, goblin))!;
+    await dm.mouse.click(g.x, g.y);
+    await expect.poll(() => selectedIds(dm)).toEqual([goblin]);
+  };
+  /** Ctrl-D, then the selected token: the copy, wherever it landed. */
+  const duplicateSelected = async (from: string) => {
+    await dm.keyboard.press("Control+d");
+    await expect.poll(async () => (await selectedIds(dm))[0] !== from).toBe(true);
+    const ids = await selectedIds(dm);
+    expect(ids).toHaveLength(1);
+    return ids[0] as string;
+  };
+
+  // Goblin (12, 6): the first copy goes right and is selected, so the next goes right of it.
+  await selectGoblin();
+  const first = await duplicateSelected(goblin);
+  await expect.poll(() => cellOf(dm, first)).toEqual({ col: 13, row: 6 });
+  const second = await duplicateSelected(first);
+  await expect.poll(() => cellOf(dm, second)).toEqual({ col: 14, row: 6 });
+  // Right now occupied → left, then ring 1.
+  await selectGoblin();
+  const left = await duplicateSelected(goblin);
+  await expect.poll(() => cellOf(dm, left)).toEqual({ col: 11, row: 6 });
+  await selectGoblin();
+  const ring = await duplicateSelected(goblin);
+  await expect.poll(() => cellOf(dm, ring)).toEqual({ col: 11, row: 5 });
+
   await dm.context().close();
 });

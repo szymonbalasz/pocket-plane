@@ -427,11 +427,26 @@ function entryOnlyArmor(m: Raw): string | undefined {
   return note ? `${ac}; ${note}` : String(ac);
 }
 
+/**
+ * BL-161: likewise its HP, as plain text: the special text, or, when something else kept it from
+ * being a creature (its AC), the number and formula the core would have shown.
+ */
+function entryOnlyHp(m: Raw): string | undefined {
+  if (!isRaw(m.hp)) return undefined;
+  const special = asStr(m.hp.special);
+  if (special) return renderTags(special).replace(/\*/g, "").trim();
+  const average = asNum(m.hp.average);
+  if (average === undefined) return undefined;
+  const formula = asStr(m.hp.formula);
+  return formula ? `${average} (${formula})` : String(average);
+}
+
 function metaOf(c: Run, key: string, m: Raw, entryOnly: boolean): MonsterMeta {
   const raw: Record<keyof MonsterMeta, string | undefined> = {
     subtype: subtypeText(m),
     alignment: alignmentText(m),
     armorNote: entryOnly ? entryOnlyArmor(m) : armorNote(m),
+    hpText: entryOnly ? entryOnlyHp(m) : undefined,
     speedText: speedText(m.speed),
     savesText: signedMap(m.save),
     skillsText: signedMap(m.skill),

@@ -24,3 +24,7 @@ export function startReason(
   const more = missing.length > MAX_NAMES ? ` +${missing.length - MAX_NAMES}` : "";
   return `${missing.length} without initiative: ${names}${more}`;
 }
+
+/** FR-OVW-43: Start uses the viewed scene (FR-CBT-07), so it is off while an overview is viewed. */
+export const startOffHint = (overviewViewed: boolean): string | null =>
+  overviewViewed ? "Open a battle scene first" : null;

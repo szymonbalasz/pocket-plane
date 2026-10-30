@@ -143,6 +143,19 @@ describe("scenes-map feedback: shape + speed copies", () => {
     ).toBe("invalid");
   });
 
+  test("BL-163 a Large copy needs its whole footprint free; ring 1 always overlaps the source", () => {
+    const t = setup();
+    const s = t.newScene();
+    const dup = (tokenId: string) => t.run<{ tokenId: string }>(I.duplicateToken, { tokenId });
+    const ogre = t.place(s.id, t.caveOgre(), 9, 10);
+    const right = dup(ogre.id);
+    expect(t.tokenRow(right.tokenId)).toMatchObject({ col: 11, row: 10, size: "large" });
+    // Left is blocked at its lower-left cell only.
+    t.place(s.id, t.h.goblinId, 7, 11);
+    const ring = dup(ogre.id);
+    expect(t.tokenRow(ring.tokenId)).toMatchObject({ col: 7, row: 8, size: "large" });
+  });
+
   test("FR-MAP-17 / -04 duplicate token and scene copy shape and speed", () => {
     const t = setup();
     const s = t.newScene();

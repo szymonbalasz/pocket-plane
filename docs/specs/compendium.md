@@ -270,7 +270,7 @@ Per [visual-direction](../design/visual-direction.md), shadcn/ui only.
 
 | Kind | Facets | Body |
 |---|---|---|
-| monster | `cr`, `type`, `size` | `meta {subtype?, alignment?, armorNote?, speedText?, savesText?, skillsText?, vulnerabilities?, resistances?, immunities?, conditionImmunities?, senses?, languages?}` (text ≤ 200 each); `traits`, `actions`, `bonusActions`, `reactions` 0–40 × `{name ≤ 80, text ≤ 4,000}`; `legendary? {intro, actions[]}` |
+| monster | `cr`, `type`, `size` | `meta {subtype?, alignment?, armorNote?, speedText?, savesText?, skillsText?, vulnerabilities?, resistances?, immunities?, conditionImmunities?, senses?, languages?, hpText?}` (text ≤ 200 each; `hpText` *(BL-161)*: 5etools entry-only monsters' HP text); `traits`, `actions`, `bonusActions`, `reactions` 0–40 × `{name ≤ 80, text ≤ 4,000}`; `legendary? {intro, actions[]}` |
 | spell | `level` 0–9, `school`, `classes[]`, `concentration`, `ritual` | `castingTime`, `range`, `components`, `material?` (≤ 1,000 chars, #213), `duration`, `text`, `higherLevel?` |
 | item | `category` weapon \| armor \| gear \| magic, `rarity?`, `attunement` | `typeLine`, `cost?`, `weight?`, `damage?`, `properties?`, `ac?`, `text` |
 | condition | — | `text` |

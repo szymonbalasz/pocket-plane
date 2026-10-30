@@ -856,6 +856,45 @@ describe("FR-CMPX-08 no numeric HP or AC", () => {
   test("FR-CMPX-08 special AC → entry only, no definition", () => {
     expect(monster("monster/mirrored-husk", tb2.records).definition).toBeUndefined();
   });
+  const onlyMeta = (hp: unknown, ac: unknown = [10]) => {
+    const r = adaptBookData(
+      emptyData({
+        monsters: [{ name: "Odd", source: "TB1", size: ["M"], type: "beast", ac, hp, cr: "1" }],
+      }),
+      "TB1",
+      { exists: allExist, srd: new Map() },
+    );
+    const m = monster("monster/odd", r.records);
+    if (m.data.kind !== "monster") throw new Error("no");
+    return { meta: m.data.body.meta, warnings: r.warnings };
+  };
+  test("BL-161 FR-CMPX-08 special HP → `hpText`, the source's words", () => {
+    const m = monster("monster/wobbling-fenwisp");
+    if (m.data.kind !== "monster") throw new Error("no");
+    expect(m.data.body.meta.hpText).toBe("as many as the summoner's level");
+  });
+  test("BL-161 FR-CMPX-06 `hpText` is plain text: tags rendered, no markdown", () => {
+    const { meta } = onlyMeta({ special: "{@dice 1d4} × the {@b summoner's} {@h}level" });
+    expect(meta.hpText).toBe("1d4 × the summoner's Hit: level");
+  });
+  test("BL-161 FR-CMPX-08 entry only for its AC → `hpText` keeps the number and formula", () => {
+    const m = monster("monster/mirrored-husk", tb2.records);
+    if (m.data.kind !== "monster") throw new Error("no");
+    expect(m.data.body.meta.hpText).toBe("18 (4d8)");
+    expect(onlyMeta({ average: 18 }, [{ special: "varies" }]).meta.hpText).toBe("18");
+  });
+  test("BL-161 a creature's HP stays in the core: no `hpText`, even with its formula dropped", () => {
+    const g = monster("monster/goblin");
+    if (g.data.kind !== "monster") throw new Error("no");
+    expect(g.data.body.meta.hpText).toBeUndefined();
+    expect(onlyMeta({ average: 99, formula: "1d4" }).meta.hpText).toBeUndefined();
+  });
+  test("BL-161 `hpText` over the cap clips with a warning; no HP at all → none", () => {
+    const { meta, warnings } = onlyMeta({ special: "h".repeat(300) });
+    expect(meta.hpText?.length).toBe(200);
+    expect(warnings.map((w) => w.field)).toContain("body.meta.hpText");
+    expect(onlyMeta(undefined).meta.hpText).toBeUndefined();
+  });
   test("FR-CMPX-08 AC over the creature core's cap → entry only, not lost", () => {
     const r = adaptBookData(
       emptyData({

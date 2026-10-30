@@ -19,7 +19,7 @@ import {
 import { cn } from "../../lib/utils";
 import { useRecords, useSync } from "../../sync/store";
 import { useLive } from "../scenes-map/intents";
-import { setViewAs, useViewAs, VIEW_AS_DM, VIEW_AS_PARTY_LABEL } from "./view-as";
+import { setViewAs, useViewAs, useViewAsOff, VIEW_AS_DM, VIEW_AS_PARTY_LABEL } from "./view-as";
 
 /** The top-bar item's width, px (FR-SHELL-112 (3): fixed). */
 export const VIEW_AS_TOP_W = 40;
@@ -107,8 +107,20 @@ export function ViewAsSelect({
   );
 }
 
-/** FR-FOG-60 (#383): the top bar's copy (DM), disabled while not live. */
+/** FR-FOG-60 (#383): off while not live; FR-OVW-10: off while the DM views an overview. */
+export const viewAsTopDisabled = (live: boolean, overviewViewed: boolean) =>
+  !live || overviewViewed;
+
+/** FR-FOG-60 (#383): the top bar's copy (DM). */
 export function ViewAsTopBarItem() {
   const live = useLive();
-  return <ViewAsSelect disabled={!live} testId="fog-view-as-top" className="h-8 w-10" compact />;
+  const off = useViewAsOff((s) => s.off);
+  return (
+    <ViewAsSelect
+      disabled={viewAsTopDisabled(live, off)}
+      testId="fog-view-as-top"
+      className="h-8 w-10"
+      compact
+    />
+  );
 }

@@ -23,6 +23,7 @@ test("FR-ASSET-66 FR-ASSET-62 FR-ASSET-63 FR-ASSET-64 rename and delete an unuse
 
   const scenes = await openWindow(dm, "map.scenes");
   await scenes.getByTestId("map-scene-new").click();
+  await scenes.page().getByTestId("map-scene-new-battle").click();
   const dialog = dm.getByRole("dialog", { name: "New scene" });
   const picker = dialog.getByTestId("asset-picker");
   const item = (id: string) =>
