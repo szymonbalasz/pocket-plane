@@ -724,4 +724,47 @@ test.describe("place labels", () => {
     await player.context().close();
     await dm.context().close();
   });
+
+  test("FR-OVW-25 Esc cancels only from the field; an open palette takes its Esc first", async ({
+    browser,
+  }) => {
+    const { secret } = e2eEnv();
+    const dm = await rolePage(browser);
+    await loginDm(dm, secret);
+    await live(dm);
+    await expect.poll(() => itemIds(dm)).not.toHaveLength(0);
+    const canvas = dm.getByTestId("ovw-canvas");
+    await expect(canvas).toHaveAttribute("data-camera", "fitted");
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("no canvas box");
+    const input = dm.getByTestId("ovw-label-input");
+
+    await dm.getByTestId("ovw-tool-label").click();
+    await dm.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(input).toBeFocused();
+    await dm.keyboard.type("Conyberry");
+
+    // The palette's Esc closes the palette; the field keeps its text, and focus comes back to it.
+    await dm.keyboard.press("Control+k");
+    const palette = dm.getByTestId("ui-palette");
+    await expect(palette).toBeVisible();
+    await dm.keyboard.press("Escape");
+    await expect(palette).toHaveCount(0);
+    await expect(input).toHaveValue("Conyberry");
+    await expect(input).toBeFocused();
+
+    // From the Game log's dice input too.
+    await dm.getByTestId("dice-roll-expression").click();
+    await dm.keyboard.press("Escape");
+    await expect(input).toHaveValue("Conyberry");
+
+    // In the field it cancels, sends nothing, and the tool stays on.
+    await input.click();
+    await dm.keyboard.press("Escape");
+    await expect(input).toHaveCount(0);
+    await expect(canvas).toHaveAttribute("data-tool", "label");
+    expect(await texts(dm)).not.toContain("Conyberry");
+
+    await dm.context().close();
+  });
 });

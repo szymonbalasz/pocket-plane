@@ -84,6 +84,7 @@ export function LabelFieldOverlay() {
         }}
         onKeyDown={(e) => {
           if (e.key === "Escape") {
+            e.stopPropagation();
             closeLabelField();
           } else if (e.key === "Enter" && !e.nativeEvent.isComposing) {
             e.preventDefault();

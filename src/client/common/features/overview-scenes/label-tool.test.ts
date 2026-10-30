@@ -13,6 +13,7 @@ import type { OverviewItemView } from "./item-layout";
 import { ITEM_KIND_DEFS } from "./items/kinds";
 import {
   cleanLabelText,
+  closeLabelField,
   openLabelEdit,
   setLabelFieldText,
   submitLabelField,
@@ -109,10 +110,12 @@ describe("FR-OVW-25 the Label tool", () => {
     expect(send.mock.lastCall?.[1]).toMatchObject({ hidden: true });
   });
 
-  test("FR-OVW-25 Esc cancels and stops there; with no field it goes on", () => {
+  test("FR-OVW-25 Esc outside the field keeps it and its text, and goes on to whoever has focus", () => {
     click();
-    expect(tool.cancel?.("escape")).toBe(true);
-    expect(field()).toBeNull();
+    setLabelFieldText("Conyberry");
+    expect(tool.cancel?.("escape")).toBe(false);
+    expect(field()?.text).toBe("Conyberry");
+    closeLabelField();
     expect(tool.cancel?.("escape")).toBe(false);
   });
 

@@ -119,12 +119,13 @@ export const labelPointer: OverviewPointerHandlers = {
       },
     });
   },
-  /** OVW §11: leaving `live` keeps the field; Esc and a tool switch drop it. */
+  /**
+   * OVW §11: leaving `live` keeps the field; a tool switch drops it. Esc is the input's own: from
+   * anywhere else (the palette, the Game log's dice input) it isn't for the field, and goes on.
+   */
   cancel(reason) {
     press = null;
-    if (reason === "live") return false;
-    const open = useLabelField.getState().field !== null;
-    closeLabelField();
-    return reason === "escape" && open;
+    if (reason === "tool") closeLabelField();
+    return false;
   },
 };
