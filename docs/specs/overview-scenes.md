@@ -1,7 +1,7 @@
 ---
 title: Overview scenes
 prefix: OVW
-status: draft
+status: in-review
 owner: spec-overview-scenes
 phase: post-mvp
 ---
