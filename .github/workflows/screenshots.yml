@@ -1,4 +1,4 @@
-# Refresh the screenshot baselines (e2e/visual.e2e.ts) on purpose, for a branch whose look changed
+# Refresh the screenshot baselines (e2e/visual.e2e.ts, e2e/visual-overview.e2e.ts) on purpose, for a branch whose look changed
 # by decision: `gh workflow run screenshots.yml --ref <branch>`. Renders on Linux (where CI
 # compares), commits e2e/__screenshots__/ to that branch if anything changed. Review the PNG diff.
 name: screenshots
@@ -24,7 +24,7 @@ jobs:
       - uses: ./.github/actions/setup
       - run: bun x playwright install --with-deps chromium
       - name: render
-        run: bun scripts/e2e.ts e2e/visual.e2e.ts --update-snapshots=all
+        run: bun scripts/e2e.ts e2e/visual.e2e.ts e2e/visual-overview.e2e.ts --update-snapshots=all
       - name: commit
         run: |
           git add e2e/__screenshots__

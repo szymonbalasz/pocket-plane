@@ -1,5 +1,6 @@
 // A miniature (FR-OVW-34, -36): its image by shape as a battle token (round, square, none), token
-// art with no image, its name centred under it in the label text style. A miniature is no token
+// art with no image, its name centred under it in the label text style, whole and on one line: no
+// `width` on the Text, because Konva cuts a `wrap="none"` line at it (FR-OVW-36). A miniature is no token
 // (ADR-0075 Decision 5): nothing of a token's state is drawn. A style preview (FR-OVW-36) re-renders
 // only the miniatures it touches.
 import { initials } from "@shared/scenes-map/geometry";
@@ -86,9 +87,8 @@ export function MiniatureItem({ item, scale, fontRev }: ItemViewProps) {
             key={fontRev}
             name="ovw-miniature-name"
             text={name}
+            x={layout.nameX}
             y={layout.nameY}
-            width={side}
-            align="center"
             wrap="none"
             lineHeight={1}
             fontFamily={fontStack(style.font)}

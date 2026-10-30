@@ -91,7 +91,9 @@ export function labelLayout(style: LabelStyle, textW: number): LabelLayout {
 
 export interface MiniatureLayout {
   side: number;
-  /** The name's top, relative to `y`; centred under the miniature (FR-OVW-36). */
+  /** The name's left, relative to `x`: centred on the miniature, however wide (FR-OVW-36). */
+  nameX: number;
+  /** The name's top, relative to `y`. */
   nameY: number;
   /** Everything drawn, relative to `x, y`. */
   box: Box;
@@ -104,10 +106,11 @@ export function miniatureLayout(
   textW: number,
 ): MiniatureLayout {
   const nameY = side + style.size / 8;
-  if (name === "") return { side, nameY, box: { x: 0, y: 0, w: side, h: side } };
+  if (name === "") return { side, nameX: 0, nameY, box: { x: 0, y: 0, w: side, h: side } };
   const w = Math.max(side, textW + style.strokeWidth);
   return {
     side,
+    nameX: (side - textW) / 2,
     nameY,
     box: { x: (side - w) / 2, y: 0, w, h: nameY + style.size + style.strokeWidth / 2 },
   };

@@ -62,6 +62,10 @@ function draw(item: OverviewItemView, client: "dm" | "player" = "dm", preview?: 
   );
 }
 
+/** Konva's `width`, not `stroke-width`. */
+const hasWidth = (html: string, name: string) =>
+  /\swidth="/.test(html.match(new RegExp(`<[^>]*name="${name}"[^>]*>`))?.[0] ?? "");
+
 const nodeAttr = (html: string, name: string, attr: string) =>
   html
     .match(new RegExp(`<[^>]*name="${name}"[^>]*>`))?.[0]
@@ -130,12 +134,33 @@ describe("item drawings", () => {
     const round = draw(mini);
     expect(nodeAttr(round, "ovw-miniature-art", "text")).toBe("MV");
     expect(nodeAttr(round, "ovw-miniature-name", "text")).toBe("Mira Vale");
-    expect(nodeAttr(round, "ovw-miniature-name", "width")).toBe("64");
+    expect(hasWidth(round, "ovw-miniature-name")).toBe(false);
     expect(nodeAttr(round, "ovw-miniature-name", "font-size")).toBe("14");
     expect(round).toContain("<Circle");
     expect(draw({ ...mini, shape: "square" })).not.toContain("<Circle");
     // No name (FR-OVW-32): no name node.
     expect(draw({ ...mini, text: "" })).not.toContain("ovw-miniature-name");
+  });
+
+  test("FR-OVW-36 a name wider than the miniature is drawn whole, centred; linked or not", () => {
+    const mini: OverviewItemView = {
+      ...base,
+      kind: "miniature",
+      w: 64,
+      h: 64,
+      text: "Neverwinter Merchant Guild",
+      style: null,
+      shape: "round",
+    };
+    for (const item of [mini, { ...mini, characterId: "char-1" }]) {
+      const html = draw(item);
+      expect(nodeAttr(html, "ovw-miniature-name", "text")).toBe("Neverwinter Merchant Guild");
+      // No width to cut the line at, one line, its middle on the miniature's (a static render's
+      // measure: half the size per character, 182 units here).
+      expect(hasWidth(html, "ovw-miniature-name")).toBe(false);
+      expect(nodeAttr(html, "ovw-miniature-name", "wrap")).toBe("none");
+      expect(nodeAttr(html, "ovw-miniature-name", "x")).toBe(String((64 - 182) / 2));
+    }
   });
 
   test("FR-OVW-36 a miniature's name is drawn with the label text style fields", () => {

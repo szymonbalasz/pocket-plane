@@ -786,6 +786,89 @@ test("FR-OVW-36 a selected miniature's name: the text style panel, no dot; the p
   await dm.context().close();
 });
 
+test("FR-OVW-36 a name wider than its miniature is drawn whole, centred, and its box follows; linked too", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const thorn = recordId("ovw-sword-coast", "overview-item", 6);
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await live(dm);
+  const player = await rolePage(browser);
+  await player.goto(link("Player 1"));
+  await live(player);
+  await expect.poll(() => itemIds(player)).toHaveLength(5);
+  const canvas = dm.getByTestId("ovw-canvas");
+  await expect(canvas).toHaveAttribute("data-camera", "fitted");
+  /** What Konva really draws of a name: its lines after any cut, and the measured width. */
+  const lines = (page: Page, text: string) =>
+    page.evaluate((t) => {
+      type KText = { text(): string; textArr: { text: string }[]; getTextWidth(): number };
+      type KStage = { find(s: string): KText[] };
+      const stage = (window as unknown as { Konva: { stages: KStage[] } }).Konva.stages[0];
+      const node = stage?.find(".ovw-miniature-name").find((n) => n.text() === t);
+      return node ? node.textArr.map((l) => l.text) : null;
+    }, text);
+  const nameRect = async (page: Page, text: string) => {
+    const node = (await konvaNodes(page, "ovw-miniature-name")).find((n) => n.text === text);
+    if (!node) throw new Error(`no name ${text}`);
+    return node;
+  };
+
+  // A linked miniature at a large name size: on one line, whole, on the DM's and the player's.
+  const [art] = await konvaNodes(dm, "ovw-item", thorn);
+  if (!art) throw new Error("no miniature");
+  await dm.mouse.click(art.x, art.y);
+  const panel = dm.getByTestId("ovw-miniature-style-panel");
+  await expect(panel).toHaveAttribute("data-count", "1");
+  const size = panel.getByTestId("ovw-style-size-input");
+  const before = await size.inputValue();
+  await size.fill("310");
+  await size.press("Enter");
+  await expect.poll(() => lines(player, "Thorn")).toEqual(["Thorn"]);
+  expect(await lines(dm, "Thorn")).toEqual(["Thorn"]);
+
+  // Centred on the miniature; the outline holds all of it.
+  await expect.poll(async () => (await nameRect(dm, "Thorn")).width).toBeGreaterThan(art.width);
+  const name = await nameRect(dm, "Thorn");
+  const [circle] = await konvaNodes(dm, "ovw-item", thorn);
+  expect(Math.abs(name.x - (circle?.x ?? 0))).toBeLessThan(2);
+  const [outline] = await konvaNodes(dm, "ovw-item-selected", thorn);
+  expect(outline?.width ?? 0).toBeGreaterThanOrEqual(name.width);
+  expect(Math.abs((outline?.x ?? 0) - name.x)).toBeLessThan(2);
+
+  // The hit box follows: a click on the name's far end, past the miniature's side, selects it.
+  await canvas.focus();
+  await dm.keyboard.press("Escape");
+  await expect.poll(async () => (await konvaNodes(dm, "ovw-item-selected")).length).toBe(0);
+  await dm.mouse.click(name.x + name.width / 2 - 3, name.y);
+  await expect.poll(async () => (await konvaNodes(dm, "ovw-item-selected"))[0]?.id).toBe(thorn);
+  await size.fill(before);
+  await size.press("Enter");
+  await expect.poll(async () => (await nameRect(player, "Thorn")).width).toBeLessThan(name.width);
+
+  // F1's repro: the long name at the default size, on every client.
+  const long = "Neverwinter Merchant Guild";
+  await dm.getByTestId("ovw-tool-add-miniature").click();
+  await dm.getByTestId("ovw-add-miniature-name").fill(long);
+  await dm.getByTestId("ovw-add-miniature-choose").click();
+  const picker = dm.getByTestId("asset-picker");
+  await picker.getByTestId("asset-picker-item").first().click();
+  await picker.getByTestId("asset-picker-select").click();
+  await expect.poll(() => lines(player, long)).toEqual([long]);
+  expect(await lines(dm, long)).toEqual([long]);
+
+  // One server per bundle: the tests after this one count the Sword Coast's items.
+  const [outlined] = await konvaNodes(dm, "ovw-item-selected");
+  if (!outlined) throw new Error("nothing selected");
+  await canvas.focus();
+  await dm.keyboard.press("Delete");
+  await expect.poll(() => itemIds(player)).toHaveLength(5);
+
+  await player.context().close();
+  await dm.context().close();
+});
+
 // FR-OVW-25–30, OVW §13 walkthrough steps 4–5: names in one go, the style panel, the player's view.
 test.describe("place labels", () => {
   const labelNode = async (page: Page, text: string) => {
