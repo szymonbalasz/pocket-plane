@@ -324,6 +324,38 @@ describe("scenes-map commands", () => {
     expect(t.lastEvent()?.type).toBe("TokenDuplicated");
   });
 
+  test("BL-163 duplicate lands on a free cell: right, left, ring; hidden tokens and the source count", () => {
+    const t = setup();
+    const s = t.newScene();
+    const dup = (tokenId: string) => t.run<{ tokenId: string }>(I.duplicateToken, { tokenId });
+    const goblin = t.place(s.id, t.h.goblinId, 5, 5);
+    const right = dup(goblin.id);
+    expect(t.tokenRow(right.tokenId)).toMatchObject({ col: 6, row: 5, name: "Goblin 2" });
+    t.run(I.deleteToken, { tokenId: right.tokenId });
+    // A hidden token blocks the right cell.
+    t.place(s.id, t.h.wolfId, 6, 5, { hidden: true });
+    const left = dup(goblin.id);
+    expect(t.tokenRow(left.tokenId)).toMatchObject({ col: 4, row: 5, name: "Goblin 2" });
+    // Both occupied → ring 1. The command returns the copy (the client selects it, FR-MAP-17).
+    const ring = dup(goblin.id);
+    expect(ring.tokenId).not.toBe(goblin.id);
+    expect(t.tokenRow(ring.tokenId)).toMatchObject({ col: 4, row: 4, name: "Goblin 3" });
+    expect(t.lastEvent()).toMatchObject({
+      type: "TokenDuplicated",
+      payload: { tokenId: ring.tokenId, sourceTokenId: goblin.id },
+    });
+  });
+
+  test("BL-163 duplicate on a full map stays on the source cell", () => {
+    const t = setup();
+    addAsset(t.s, "map-closet", t.h.campaignId, { w: 140, h: 70 }); // 2 × 1 cells
+    const s = t.newScene("Closet", "map-closet");
+    const goblin = t.place(s.id, t.h.goblinId, 0, 0);
+    t.place(s.id, t.h.wolfId, 1, 0);
+    const { tokenId } = t.run<{ tokenId: string }>(I.duplicateToken, { tokenId: goblin.id });
+    expect(t.tokenRow(tokenId)).toMatchObject({ col: 0, row: 0, name: "Goblin 2" });
+  });
+
   test("FR-MAP-04 duplicate scene: inactive copy with every token, hidden flags, new IDs + seq", () => {
     const t = setup();
     const f = t.run<SceneFolderRecord>(R.createFolder, { name: "Act 1" });
