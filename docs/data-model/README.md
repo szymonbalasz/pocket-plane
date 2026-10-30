@@ -2830,3 +2830,44 @@ From [compendium-expansion](../specs/post-mvp/compendium-expansion.md#8-data-mod
 - **`imported_art`** is server-only, not a record type, never sent; X3 writes it, this slice only creates the table.
 - **Derived (never stored):** `hidden` on search index rows (FR-CMPX-14): the entry is referenced by an imported entry's `replaces`, unless the ref lies on a cycle (malformed data); hidden rows stay in the index for by-id reads and Rules pages, out of search, default lists, groups and `sameAs`. Inherited preset (FR-CMPX-15): resolved per read along `replaces` chains; only its name goes on the wire (`EntryResponse.inheritedPreset`), and it is part of the ETag.
 - **Fixtures:** unit `cmpx-books` (two hand-made books `5et-tb1`, `5et-tb2`; invented content), bundle `cmpx-core` = `base` + `player-2` + `char-mira` + `cmp-srd-mini-s3` + `cmpx-books`.
+
+## 150. Overview scenes core (fix/ovw-core)
+
+From [overview-scenes](../specs/overview-scenes.md#8-data-model) ([ADR-0075](../architecture/adr/0075-overview-scenes.md), #398). Two new tables; no existing table changes. Wire shapes and rules: [protocol §190](../protocol/README.md#190-overview-scenes-core-fixovw-core).
+
+### Overview (`overview`, record type `overview`) — owner [overview-scenes](../specs/overview-scenes.md#8-data-model)
+
+| Field | Type | Default | Rule | Source |
+|---|---|---|---|---|
+| `id`, `campaign_id` | ID, ID → Campaign | — | IDs from the same generator as scenes, never colliding | FR-OVW-01 |
+| `folder_id` | ID → SceneFolder \| null | null | A folder delete moves its overviews to the root | FR-OVW-02 |
+| `seq` | int | — | Unique (`overview_seq`), `overviewSeqNext` | CON-20 |
+| `name` | text 1–60 | — | As a scene's name, not unique | FR-OVW-01 |
+| `active` | bool | false | Partial unique index per campaign (`overview_one_active`). With `scene.active`, at most one per campaign, kept by the commands | FR-OVW-05, -06 |
+| `created_at`, `updated_at` | ISO | — | `ctx.clock` | |
+
+### Overview item (`overview_item`, record type `overview-item`) — owner overview-scenes
+
+| Field | Type | Default | Rule | Source |
+|---|---|---|---|---|
+| `id`, `campaign_id` | ID, ID → Campaign | — | | |
+| `overview_id` | ID → Overview | — | `ON DELETE CASCADE` | FR-OVW-04 |
+| `seq`, `z` | int, int | —, 0 | `seq` unique (`overview_item_seq`). Draw order: band (images < labels < miniatures), `z`, `seq` (`compareItems`) | FR-OVW-19 |
+| `kind` | `image` \| `label` \| `miniature` | — | | FR-OVW-22, -25, -31 |
+| `x`, `y` | real | — | ±16384, 2 dp | FR-OVW-15 |
+| `w`, `h` | real \| null | null | Null on labels. Image 8–16384; miniature square 8–4096 | FR-OVW-23, -34 |
+| `hidden`, `locked` | bool | false | `locked` DM only | FR-OVW-20, -39 |
+| `asset_id` | ID → Asset \| null | null | **Asset reference**; required on images; blocks the asset's delete (use kind `overview image`) | FR-OVW-45 |
+| `text` | text \| null | null | Label 1–80; miniature name 0–40 | FR-OVW-26, -32 |
+| `style` | **JSON leaf** \| null | null | `LabelStyle`; miniature `MiniatureStyle` (no `dot`) | FR-OVW-27, -36 |
+| `character_id` | ID → Entity \| null | null | Miniature link. Characters can't be deleted today (FR-ENT-14); should that change, the delete path must handle these | FR-OVW-33 |
+| `owner_player_id` | ID → Player \| null | null | Miniature only | FR-OVW-35 |
+| `shape` | `round` \| `square` \| `none` \| null | null | Miniature only | FR-OVW-34 |
+| `created_at`, `updated_at` | ISO | — | `ctx.clock` | |
+
+Indexes: `overview_item_overview`, `overview_item_campaign`, `overview_item_asset`.
+
+- **Caps:** ≤ 50 overviews, ≤ 300 items per overview, ≤ 3,000 per campaign (OQ-OVW-02).
+- **Visibility-relevant:** `overview.active` (scene gate through the resolver), `overview_item.hidden`. `locked` and the timestamps never reach a player.
+- **Derived (never stored):** a label's box and the party's missing list (clients and the miniatures slice).
+- **Not stored:** selection, last label style, Add hidden, camera, drag previews.

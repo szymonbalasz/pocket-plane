@@ -16,6 +16,7 @@ import { fogOfWar } from "./fog-of-war";
 import { gems } from "./gems";
 import { liveSync } from "./live-sync";
 import { notifications } from "./notifications";
+import { overviewScenes } from "./overview-scenes";
 import { partyBoard } from "./party-board";
 import { partyLootFeature } from "./party-loot";
 import { reminders } from "./reminders";
@@ -56,4 +57,6 @@ export const features: readonly Feature[] = [
   sessionRecap,
   // Spell FX core (fix/vfx-core)
   spellFx,
+  // Overview scenes core (fix/ovw-core)
+  overviewScenes,
 ];

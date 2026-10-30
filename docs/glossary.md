@@ -67,7 +67,11 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | Term | Meaning | Not to be confused with |
 |---|---|---|
 | **Scene** | A map plus its grid, tokens, fog and scene-tool records (structure, props, templates). Players view the active scene. | Session |
-| **Active scene** | The scene currently shown to players. | — |
+| **Overview** | The second kind of scene, for the zoomed-out parts of the game (a region, a city): an empty canvas of images, place labels and miniatures, placed anywhere; no grid, fog, walls or combat ([overview-scenes](specs/overview-scenes.md)). | Battle scene (the map-and-grid kind) |
+| **Overview item** | One thing on an overview: an image, a place label or a miniature. | Prop, Token |
+| **Place label** | An overview item: one line of text with an optional dot, each with its own colour and stroke; shrinks with the map. | Token label |
+| **Miniature** | An overview item: a picture with a name that a player may own and move. No creature, vision, HP or initiative behind it; a party miniature links to its character for name, art and owner only. | Token |
+| **Active scene** | The scene currently shown to players. While an overview is shown there is none; the sync layer's active-scene resolver then returns the overview's ID ([ADR-0075](architecture/adr/0075-overview-scenes.md)). | — |
 | **Viewed scene** | The scene the DM's canvas shows: any scene, client-only; defaults to the active scene (decisions #122). | Active scene |
 | **Scene folder** | DM-only, one-level grouping of scenes in the scene list. Never sent to players. | — |
 | **Grid calibration** | Setting cell size/offset so the grid aligns with the map image. | — |

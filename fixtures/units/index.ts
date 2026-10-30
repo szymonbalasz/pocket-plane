@@ -109,6 +109,9 @@ import kitNotices from "./notifications/kit-notices";
 import kitNoticesApplied from "./notifications/kit-notices-applied";
 import noteColours from "./notifications/note-colours";
 import notificationsTest from "./notifications/notifications-test";
+import ovwCrowd from "./overview-scenes/ovw-crowd";
+import ovwPhandalin from "./overview-scenes/ovw-phandalin";
+import ovwSwordCoast from "./overview-scenes/ovw-sword-coast";
 import handoutAttachment from "./party-board/handout-attachment";
 import handoutImages from "./party-board/handout-images";
 import handoutPresent1 from "./party-board/handout-present-1";
@@ -337,4 +340,8 @@ export const units: readonly Fixture[] = [
   cmpxBooks,
   // Compendium expansion token art (build/cmpx-art): a small book with art paths
   cmpxArtBatch,
+  // Overview scenes core (fix/ovw-core)
+  ovwSwordCoast,
+  ovwPhandalin,
+  ovwCrowd,
 ];

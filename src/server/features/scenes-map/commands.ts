@@ -53,6 +53,7 @@ import { type CommandEnv, defineCommand, IdSchema } from "../../commands/command
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import {
+  overview,
   player,
   scene,
   sceneFolder,
@@ -65,6 +66,7 @@ import type { Actor, RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { importedArtOfDefinition } from "../compendium/imported-art-lookup";
 import { resolveDefinition } from "../entities/commands";
+import { overviewChange, readOverview } from "../overview-scenes/rows";
 import { characterIdOf } from "./character-copy";
 import { tokenMoveGuards } from "./move-guards";
 import {
@@ -415,7 +417,7 @@ export const renameFolder = defineCommand({
   },
 });
 
-/** Folder delete moves its scenes to the root in the same transaction. */
+/** Folder delete moves its scenes and overviews (FR-OVW-02) to the root in the same transaction. */
 export const deleteFolder = defineCommand({
   name: MAP_REST.deleteFolder,
   input: z.strictObject({ id: IdSchema }),
@@ -431,6 +433,19 @@ export const deleteFolder = defineCommand({
         .where(eq(scene.id, sid))
         .run();
       changes.push(sceneChange(b, readScene(tx, sid)));
+    }
+    const overviews = tx
+      .select({ id: overview.id })
+      .from(overview)
+      .where(eq(overview.folderId, id))
+      .all();
+    for (const { id: oid } of overviews) {
+      const b = readOverview(tx, oid);
+      tx.update(overview)
+        .set({ folderId: null, updatedAt: ctx.clock.iso() })
+        .where(eq(overview.id, oid))
+        .run();
+      changes.push(overviewChange(b, readOverview(tx, oid)));
     }
     tx.delete(sceneFolder).where(eq(sceneFolder.id, id)).run();
     emit({

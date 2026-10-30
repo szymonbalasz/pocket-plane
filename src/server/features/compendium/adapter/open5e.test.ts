@@ -9,12 +9,12 @@ import {
   Senses,
 } from "@shared/entities/schemas";
 import { loadSrd51 } from "../sources/srd-5.1";
-import { ADAPTER_VERSION, type AdapterRecord, type AdapterResult, adaptOpen5e } from "./open5e";
+import { ADAPTER_VERSION, adaptOpen5e, type Open5eRecord, type Open5eResult } from "./open5e";
 import { toMarkdownLite } from "./text";
 import { sourceVersion } from "./version";
 
 const realFetch = globalThis.fetch;
-let result: AdapterResult;
+let result: Open5eResult;
 let adaptMs = 0;
 
 beforeAll(() => {
@@ -56,7 +56,7 @@ describe("FR-CMP-05 adapter", () => {
 
   test("322 / 322 SRD monsters map to the creature core", () => {
     const monsters = result.records.filter(
-      (r): r is Extract<AdapterRecord, { kind: "monster" }> => r.kind === "monster",
+      (r): r is Extract<Open5eRecord, { kind: "monster" }> => r.kind === "monster",
     );
     expect(monsters).toHaveLength(322);
     for (const m of monsters) {

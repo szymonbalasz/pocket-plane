@@ -170,6 +170,50 @@ const render = (role: Role, node: ReactNode) =>
 
 const text = (html: string) => html.replace(/<[^>]+>/g, "");
 
+describe("FR-CMPX-08 entry-only monster view", () => {
+  test("FR-CMPX-08 shows the AC line the entry has; no stat block core, no drag handle", () => {
+    const data: EntryResponse = {
+      entry: {
+        id: "e-wisp",
+        campaignId: null,
+        kind: "monster",
+        source: "5et-tb1",
+        sourceKey: "monster/wobbling-fenwisp",
+        name: "Wobbling Fénwisp",
+        line: "",
+        facets: { cr: "1/8", type: "fey", size: "tiny" },
+        body: {
+          meta: { armorNote: "12", speedText: "fly 30 ft." },
+          traits: [{ name: "Drifting Glow", text: "It glows." }],
+          actions: [],
+          bonusActions: [],
+          reactions: [],
+        },
+        definitionId: null,
+        shared: false,
+        derivedFromId: null,
+        imageAssetIds: [],
+        createdAt: "t",
+        updatedAt: "t",
+        importedAt: "t",
+      },
+      source: null,
+    };
+    const html = renderToStaticMarkup(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <SyncContext.Provider value={store("dm")}>
+          <EntryView data={data} viewer="dm" />
+        </SyncContext.Provider>
+      </TooltipProvider>,
+    ).replaceAll("<!-- -->", "");
+    const words = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+    expect(words).toContain("Armor Class 12");
+    expect(words).toContain("Drifting Glow");
+    expect(html).not.toContain("cmp-statblock-core");
+    expect(html).not.toContain("cmp-drag-handle");
+  });
+});
+
 describe("FR-CMP-19 entry views", () => {
   test("FR-CMP-19 monster stat block: header, AC 15, HP 7 (2d6), scores, darkvision 60 ft., Nimble Escape, Scimitar, Shortbow; footer + About", () => {
     const html = render("dm", <EntryView data={GOBLIN} viewer="dm" />);

@@ -26,6 +26,7 @@ import {
   scene,
   token,
 } from "../../db/schema";
+import { openTestDb } from "../../db/testing";
 import { readEventLog } from "../../events/log";
 import type { Actor, DispatchedEvent } from "../../events/types";
 import { type Logger, silentLogger } from "../../log";
@@ -40,7 +41,8 @@ import { createEncounter } from "../combat-tracker/encounters";
 import { startCommand } from "../combat-tracker/lifecycle";
 import { DERIVE_MONSTER } from "./derive";
 import { APPLY_IMPORTED_ART, artFileOf, IMPORTED_ART_TAG, importedArtOf } from "./imported-art";
-import { readEntry } from "./read";
+import { readCredits, readEntry } from "./read";
+import { bookAbbrOf } from "./sources/five-etools";
 
 const safeRm = (dir: string) => {
   try {
@@ -681,6 +683,23 @@ describe("FR-CMPX-27 visibility, over real sockets", () => {
       await h.stop();
     }
   }, 30_000);
+});
+
+describe("FR-CMPX-29 credits", () => {
+  test("FR-CMPX-29 bookArt: on with any book, also one the player can't read; off with none", () => {
+    const t = fresh();
+    const pid = t.db.select().from(player).get()?.id as string;
+    const abbrOf = bookAbbrOf(null);
+    const pl = { role: "player", campaignId: t.cid, playerId: pid } as const;
+    // The batch's book has monsters only: not in the player's sources, its art on their tokens.
+    const asPlayer = readCredits(t.db, pl, abbrOf);
+    expect(asPlayer.sources.map((s) => s.key)).not.toContain(TB1_SOURCE);
+    expect(asPlayer.bookArt).toBe(true);
+    const asDm = readCredits(t.db, { role: "dm", campaignId: t.cid, playerId: null }, abbrOf);
+    expect(asDm.sources.map((s) => s.key)).toContain(TB1_SOURCE);
+    expect(asDm.bookArt).toBe(true);
+    expect(readCredits(openTestDb(), pl, abbrOf).bookArt).toBe(false);
+  });
 });
 
 describe("FR-CMPX-28 Derive", () => {

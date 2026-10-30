@@ -18,6 +18,7 @@ DM's ranking of features seen in Roll20, Foundry, Owlbear Rodeo etc. Source of t
 | Feature | Tier | Spec | Notes |
 |---|---|---|---|
 | Snap tokens to grid | S | [scenes-map](specs/scenes-map.md) | |
+| Overview scenes: free canvas of images, place labels and miniatures for zoomed-out play | S (#398) | [overview-scenes](specs/overview-scenes.md) | |
 | Token sizes (Large/Huge span squares) | S | [scenes-map](specs/scenes-map.md) | |
 | Ping: flash a spot; DM pulls everyone's view there | S | [scenes-map](specs/scenes-map.md) | |
 | **Laser pointer** on right-click drag (unless on a token), Owlbear-style | S | [scenes-map](specs/scenes-map.md) | Added by DM |

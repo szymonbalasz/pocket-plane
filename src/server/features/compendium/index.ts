@@ -16,7 +16,7 @@ export const compendium: Feature = {
   register(r) {
     const s = r.services;
     registerEntryImport(s.imports);
-    r.command(importCommand(s.imports));
+    r.command(importCommand(s.imports, s.config.fiveEtoolsDir));
     r.command(importRecordedCommand(s.imports));
     r.command(putEntry);
     r.command(deleteEntry);

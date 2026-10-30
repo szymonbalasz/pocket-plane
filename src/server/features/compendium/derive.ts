@@ -72,7 +72,7 @@ export const deriveMonster = defineCommand({
     const cid = campaignOf(env);
     const e = getEntry(env.tx, entryId);
     if (!e || (e.campaignId !== null && e.campaignId !== cid)) throw notFound(ENTRY_NOT_FOUND);
-    if (e.kind !== "monster" || e.definitionId === null) {
+    if (e.kind !== "monster") {
       throw invalid("Only monster entries derive a creature", [
         { path: ["entryId"], message: "Not a monster entry" },
       ]);
@@ -80,7 +80,8 @@ export const deriveMonster = defineCommand({
     const { record, change } = createIn(env, {
       ...body,
       kind: "monster",
-      derivedFromId: e.definitionId,
+      // FR-CMPX-08: an entry-only monster has no definition to derive from; the form filled it in.
+      ...(e.definitionId === null ? {} : { derivedFromId: e.definitionId }),
     });
     env.emit({
       type: EntityCreated.type,

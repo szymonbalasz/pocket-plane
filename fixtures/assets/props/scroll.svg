@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="384" viewBox="0 0 256 384">
+  <title>scroll</title>
+  <!-- Fixture "scroll" (overview-scenes §6.9): a quest scroll, taller than wide, so a crop shows.
+       Parchment, dark rollers, a red seal and a few inked lines. -->
+  <rect x="36" y="28" width="184" height="328" fill="#e8d9b0" stroke="#8a6d3b" stroke-width="6"/>
+  <rect x="16" y="12" width="224" height="30" rx="15" fill="#6b3f1d"/>
+  <rect x="16" y="342" width="224" height="30" rx="15" fill="#6b3f1d"/>
+  <path d="M64 88 H192 M64 124 H192 M64 160 H172 M64 196 H192 M64 232 H150" stroke="#3b2a14" stroke-width="8"/>
+  <circle cx="168" cy="292" r="26" fill="#a3201d" stroke="#5e1110" stroke-width="5"/>
+</svg>

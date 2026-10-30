@@ -14,6 +14,7 @@ import cbTurnRingE2e from "./cb-turn-ring-e2e";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import cmpImages from "./cmp-images";
+import cmpx5etools from "./cmpx-5etools";
 import cmpxArt from "./cmpx-art";
 import cmpxCore from "./cmpx-core";
 import combat from "./combat";
@@ -85,6 +86,7 @@ import lootSubtractE2e from "./loot-subtract-e2e";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
+import overviewScenes from "./overview-scenes";
 import partyBoard from "./party-board";
 import partyCmp from "./party-cmp";
 import partyLoot from "./party-loot";
@@ -371,4 +373,8 @@ export const bundles: readonly Bundle[] = [
   cmpxCore,
   // Compendium expansion token art (build/cmpx-art): imported batch with art paths
   cmpxArt,
+  // Overview scenes core (fix/ovw-core): overviews, items, one shown
+  overviewScenes,
+  // Compendium expansion panel (build/cmpx-panel): 5etools import walkthrough + e2e
+  cmpx5etools,
 ];

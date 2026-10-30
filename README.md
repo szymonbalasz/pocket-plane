@@ -10,7 +10,7 @@ Built for a single table, not as a product: no signup, no multi-tenant hosting, 
 - **Combat**: encounters, initiative, damage cards (players roll, the DM applies with hit / miss and half / double), conditions and effects, undo.
 - **Character sheets**: full 5e sheets for PCs and NPCs, rolls straight from the sheet.
 - **Dice**: game log, 3D dice, physical-dice entry, DM-hidden rolls.
-- **Compendium**: SRD 5.1 monsters, spells and items, imported once and searchable.
+- **Compendium**: SRD 5.1 monsters, spells and items, imported once and searchable. Optionally import your own 5etools books (monsters, spells, items); an entry that duplicates an SRD one hides it from search.
 - **Party**: shared loot and coin, handouts, notifications, session recap and stats.
 - **Live sync**: everything is server-authoritative over one WebSocket; players only ever receive what they're allowed to see. Survives reconnects and server restarts.
 
@@ -80,11 +80,36 @@ cloudflared tunnel --url http://127.0.0.1:<port>
 - Copy the player links again: quick-tunnel URLs change each time, but the links' tokens stay valid, so only the host part changes. A named Cloudflare tunnel keeps one URL.
 - Unset `PP_PUBLIC_BASE_URL` → player links use the address the DM opened, which only works on your own machine.
 
+### 4. Optional: import your 5etools books
+
+Pocket Plane can read the books you pick from your own copy of 5etools. Nothing is downloaded for you or copied into the repo.
+
+1. Download the **2014** build with images from [get.5e.tools](https://get.5e.tools): `5etools-2014-w-img-<version>.tar.xz`. The `2.x` builds are 2024 rules and won't work.
+2. Extract it once, **outside the repo** (use 7-Zip if Windows `tar` complains). The folder must contain `data/` and `img/`:
+
+   ```bash
+   mkdir D:/5etools-2014
+   tar -xf 5etools-2014-w-img-<version>.tar.xz -C D:/5etools-2014
+   ```
+
+3. Point `.env` at it and restart `play`:
+
+   ```bash
+   PP_5ETOOLS_DIR=D:/5etools-2014
+   ```
+
+4. Open **Compendium**. In the import panel's **Books** list, tick the books you want (**Select all** / **Select none** act on what the search shows) and click **Import selected**. Players pause for a few seconds per book; it's refused during combat. Once a book is imported the list stays folded: click **Books** to open it.
+
+- "goblin" now finds one Goblin: an imported entry that is also in the SRD, or reprinted in another book you imported, hides the other from search. Old tokens and sheets keep working.
+- New release: extract it over the same folder, reopen the Compendium, then click **Update all**.
+- Token art is copied into a campaign the first time a monster is placed.
+- Not yet: classes, races and feats; removing an imported book.
+
 ### Your data
 
 Everything lives in the play data folder: the SQLite database (`pocket-plane.db`) and uploaded images (`assets/`). `play` backs both up on every start into `PP_PLAY_BACKUP_DIR` (default `<play folder>/backups`). To restore, stop the server and copy a backup `.db` over `pocket-plane.db`. Demo and test data live in the repo's git-ignored `data/` folder instead.
 
-### 4. Optional: edit content with Claude Code (MCP)
+### 5. Optional: edit content with Claude Code (MCP)
 
 Pocket Plane ships an MCP server so Claude Code can create creatures, homebrew and character sheets in your running game ([agent-api](docs/specs/agent-api.md)). It goes through the server's normal commands (checked, logged, live for players) and only works while the server runs. Register it once, from this folder:
 
@@ -107,6 +132,7 @@ All settings live in `.env` (see [`.env.example`](.env.example)). The ones you'r
 | `PP_DATA_DIR` | `data/<profile>` | Demo / test data folder for `start`, `dev` and the fixture tools |
 | `PP_DATA_DISPOSABLE` | `1` from `env:init` | `1` lets the fixture tools wipe the demo / test folder; `play` always turns it off |
 | `PP_PUBLIC_BASE_URL` | empty | Base for player links, e.g. your tunnel URL |
+| `PP_5ETOOLS_DIR` | empty | Your extracted 5etools folder (read-only), for importing books; absolute or relative to the repo |
 | `PP_SLOT` | set by `env:init` | Port slot: ports start at `4100 + 10 × slot` |
 | `PP_PORT` | from slot | Fixed server port instead of the slot |
 | `PP_HOST` | `127.0.0.1` | Bind address |
@@ -149,5 +175,7 @@ Third-party content, each with its own licence and attribution:
 - **Creature icons** from [game-icons.net](https://game-icons.net), [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/): [attribution](src/client/common/features/entities/creature-art/ATTRIBUTION.md)
 - **Theme fonts** from Google Fonts, [SIL OFL 1.1](https://openfontlicense.org): [attribution](src/client/common/themes/fonts/ATTRIBUTION.md)
 - **UI components** adapted from [shadcn/ui](https://ui.shadcn.com), MIT: [notice](THIRD_PARTY_NOTICES.md)
+
+5etools content is never bundled or committed: it is read from your own files, for private use at your table.
 
 Pocket Plane is unofficial fan content and is not affiliated with or endorsed by Wizards of the Coast.

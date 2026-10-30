@@ -250,7 +250,7 @@ export function ResultRow({ r, viewer }: { r: EntrySummary; viewer: Role }) {
           {...rowProps(r, viewer)}
         >
           <Cells r={r} />
-          <SourceBadge label={r.sourceLabel} />
+          <SourceBadge label={r.sourceAbbr ?? r.sourceLabel} />
         </button>
       </NameTip>
     </li>
@@ -291,7 +291,7 @@ export function GroupRow({
             className={ROW}
           >
             <Cells r={r} lead={<Chevron className="size-3.5 shrink-0 text-muted-foreground" />} />
-            <SourceBadge label={r.sourceLabel} />
+            <SourceBadge label={r.sourceAbbr ?? r.sourceLabel} />
           </button>
         </NameTip>
       </div>
@@ -338,7 +338,7 @@ export function GroupMembers({
           >
             {/* The member's own line, indented under its group's name, over Name + Details. */}
             <span className="col-span-2 truncate pl-5">{m.line || m.name}</span>
-            <SourceBadge label={m.sourceLabel} />
+            <SourceBadge label={m.sourceAbbr ?? m.sourceLabel} />
           </button>
         </li>
       ))}
