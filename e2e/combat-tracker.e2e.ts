@@ -182,6 +182,12 @@ test("FR-CBT-07 FR-CBT-33 FR-CBT-34 FR-CBT-35 FR-CBT-38 start, sheet rolls, mult
   // FR-CBT-56: no rows; Mira's likely targets (the monsters) are right of centre → left edge.
   await expect(popup).toHaveAttribute("data-side", "left");
   await expect(popup.getByTestId("cbt-popup-target-row")).toHaveCount(0);
+  // FR-KIT-108: the × empties the Add target field and keeps its list open.
+  await popup.getByTestId("cbt-popup-target-add").fill("no such target");
+  await expect(dm.getByTestId("cbt-popup-target-option")).toHaveCount(0);
+  await popup.getByTestId("cbt-popup-target-add-clear").click();
+  await expect(popup.getByTestId("cbt-popup-target-add")).toHaveValue("");
+  await expect(dm.getByTestId("cbt-popup-target-option").first()).toBeVisible();
   for (const id of [goblin, goblin2]) {
     await popup.getByTestId("cbt-popup-target-add").click();
     await dm.locator(`[data-testid="cbt-popup-target-option"][data-value="${id}"]`).click();
