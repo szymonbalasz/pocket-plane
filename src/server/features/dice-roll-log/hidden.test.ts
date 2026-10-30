@@ -8,6 +8,11 @@ import {
   REVEAL_GUARDED,
 } from "@shared/dice-roll-log/schemas";
 import { GEM_SPEND_INTENT } from "@shared/gems/schemas";
+import {
+  DmRecapResult,
+  PlayerRecapResult,
+  RECAP_QUERY_INTENT,
+} from "@shared/session-recap/schemas";
 import { SessionsResult, STATS_QUERY_INTENT } from "@shared/stats/schemas";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -262,6 +267,27 @@ describe("FR-DICE-102 the reads on top follow a hide at once", () => {
     expect(sessions(x.t.dm)).toBe(1);
     x.hide(entryId, false);
     expect(sessions(x.t.p1Actor)).toBe(1);
+  });
+
+  test("FR-DICE-102 session recap: a hidden natural 20 leaves the players' notable rolls at once; the DM's keeps it, marked hidden", () => {
+    const x = setup();
+    const actor = { entityId: x.t.miraId };
+    x.roll({ actor }, x.t.p1Actor);
+    const { entryId } = x.roll(
+      { actor, expression: "1d20", manual: { diceTotal: 20 } },
+      x.t.p1Actor,
+    );
+    // Each player its own rate window (FR-RECAP-29: at most 2 answers a second per actor).
+    const playerRows = (actor: Actor = x.t.p1Actor) =>
+      PlayerRecapResult.parse(x.run(RECAP_QUERY_INTENT, {}, actor)).recap?.rolls?.rows ?? [];
+    const dmRows = () => DmRecapResult.parse(x.run(RECAP_QUERY_INTENT, {})).recap?.rolls.rows ?? [];
+    expect(playerRows().map((r) => r.natural)).toEqual([20]);
+    expect(dmRows().map((r) => r.hidden)).toEqual([false]);
+    x.hide(entryId);
+    expect(playerRows()).toEqual([]);
+    expect(dmRows().map((r) => r.hidden)).toEqual([true]);
+    x.hide(entryId, false);
+    expect(playerRows(x.t.p2Actor).map((r) => r.natural)).toEqual([20]);
   });
 
   test("FR-DICE-102 gem reroll: a hidden line is not_found for the player, as one they never got", () => {
