@@ -17,8 +17,11 @@
 //
 // `--shard=<i>/<n>` (CI) runs only the i-th of n bundle sets, balanced by the committed bundle
 // times in scripts/e2e-times.json (else spec count), so every shard computes the same split.
-// `--no-build` reuses an existing `dist/client/` (local re-runs of one spec). On GitHub Actions
-// the summary also goes to the job summary and each failure becomes an error annotation.
+// `--no-build` reuses an existing `dist/client/` (local re-runs of one spec). `--retries=<n>`
+// (CI: 1) reruns a bundle's failed tests on a new server with the bundle freshly loaded, never
+// on the first attempt's data: a pass there counts as flaky, a fail as failed (Playwright's own
+// retries stay 0). On GitHub Actions the summary also goes to the job summary, each failure
+// becomes an error annotation and each flaky bundle a warning.
 import {
   appendFileSync,
   existsSync,
@@ -145,9 +148,21 @@ export function countLine(line: string, c: Counts): boolean {
   return true;
 }
 
-/** One bundle in this process: load, serve, Playwright (output dir `test-results/<bundle>/`). */
-async function runBundle(bundle: string, files: string[], pwArgs: string[]): Promise<number> {
-  console.log(`\n=== e2e bundle "${bundle}": ${files.join(", ")}`);
+/** `--retries=<n>`: fresh-server retries of a bundle's failed tests (Playwright's own stay 0). */
+export const RETRIES_ARG = /^--retries=(\d+)$/;
+/** The line a bundle child prints before each retry; counts after it belong to that retry. */
+export const RETRY_LINE = /^=== e2e retry \d+\/\d+ /;
+
+/**
+ * One attempt of a bundle: load it into a fresh temp dir, serve it, run Playwright with output
+ * dir `out` (relative to the worktree).
+ */
+async function attempt(
+  bundle: string,
+  files: string[],
+  pwArgs: string[],
+  out: string,
+): Promise<number> {
   const dir = mkdtempSync(path.join(os.tmpdir(), "pp-e2e-"));
   const secret = `e2e-${crypto.randomUUID()}`;
   const env: Record<string, string | undefined> = {
@@ -184,9 +199,7 @@ async function runBundle(bundle: string, files: string[], pwArgs: string[]): Pro
         `Server did not start within ${SERVER_START_TIMEOUT_MS / 1000} s (no port in server.lock)`,
       );
     }
-    // Own output dir per bundle: parallel runs never share traces or `.last-run.json`.
-    const output = `--output=${path.join("test-results", bundle)}`;
-    return await run(["bun", "x", "playwright", "test", output, ...files, ...pwArgs], {
+    return await run(["bun", "x", "playwright", "test", `--output=${out}`, ...files, ...pwArgs], {
       ...process.env,
       E2E_BASE_URL: `http://127.0.0.1:${port}`,
       E2E_DM_SECRET: secret,
@@ -210,12 +223,63 @@ async function runBundle(bundle: string, files: string[], pwArgs: string[]): Pro
   }
 }
 
+/**
+ * One bundle in this process (output dir `test-results/<bundle>/`). Failed tests are retried up
+ * to `retries` times, each on a new server with the bundle freshly loaded (a retry must not see
+ * the first attempt's data), via Playwright `--last-failed`; retry k writes to
+ * `test-results/<bundle>/retry-<k>/`, so the first attempt's traces stay.
+ */
+async function runBundle(
+  bundle: string,
+  files: string[],
+  pwArgs: string[],
+  retries: number,
+): Promise<number> {
+  console.log(`\n=== e2e bundle "${bundle}": ${files.join(", ")}`);
+  // Own output dir per bundle: parallel runs never share traces or `.last-run.json`.
+  const out = path.join("test-results", bundle);
+  const lastRun = path.join(WORKTREE_ROOT, out, ".last-run.json");
+  rmSync(lastRun, { force: true });
+  let code = await attempt(bundle, files, pwArgs, out);
+  for (let k = 1; k <= retries && code !== 0; k++) {
+    console.log(`=== e2e retry ${k}/${retries} of "${bundle}": failed tests on a fresh server`);
+    // No `.last-run.json` (Playwright never ran, e.g. the server did not start): all tests.
+    const only = existsSync(lastRun) ? ["--last-failed", `--last-failed-file=${lastRun}`] : [];
+    code = await attempt(bundle, files, [...pwArgs, ...only], path.join(out, `retry-${k}`));
+  }
+  return code;
+}
+
+/**
+ * A bundle's counts from its attempts (first run, then retries of the failed tests): a test
+ * that failed and passed on a retry is flaky; one still failing on the last attempt failed.
+ */
+export function mergeAttempts(attempts: Counts[]): Counts {
+  const [first, ...retries] = attempts;
+  if (!first) return { passed: 0, failed: 0, flaky: 0, skipped: 0, notRun: 0 };
+  const last = retries.at(-1);
+  if (!last) return { ...first };
+  const recovered = retries.reduce((s, c) => s + c.passed, 0);
+  // A retry also runs the first attempt's "did not run" tests: their pass is not a flake.
+  const flaky = Math.min(recovered, first.failed);
+  return {
+    passed: first.passed + recovered - flaky,
+    failed: last.failed,
+    flaky: first.flaky + flaky,
+    skipped: attempts.reduce((s, c) => s + c.skipped, 0),
+    notRun: last.notRun,
+  };
+}
+
 interface BundleResult {
   bundle: string;
   code: number;
   counts: Counts;
   secs: number;
-  /** Playwright's numbered failure headers ("1) e2e\x.e2e.ts:12:3 › …"). */
+  /**
+   * Playwright's numbered failure headers ("1) e2e\x.e2e.ts:12:3 › …"): of the last attempt
+   * when the bundle failed, else of the first (the flaky tests).
+   */
   failures: string[];
 }
 
@@ -236,13 +300,22 @@ async function spawnBundle(
     stdout: "pipe",
     stderr: "pipe",
   });
-  const counts: Counts = { passed: 0, failed: 0, flaky: 0, skipped: 0, notRun: 0 };
-  const failures: string[] = [];
+  // Per attempt (the first run, then each fresh-server retry): counts and failure headers.
+  const attempts: { counts: Counts; failures: string[] }[] = [];
+  const next = () => {
+    attempts.push({
+      counts: { passed: 0, failed: 0, flaky: 0, skipped: 0, notRun: 0 },
+      failures: [],
+    });
+    return attempts.at(-1)!;
+  };
+  let cur = next();
   const tag = prefix ? `[${bundle}] ` : "";
   const onLine = (line: string, err: boolean) => {
-    countLine(line, counts);
+    if (RETRY_LINE.test(line)) cur = next();
+    countLine(line, cur.counts);
     const head = line.replace(/\s*─+\s*$/, "").trim();
-    if (FAILURE_LINE.test(line) && !failures.includes(head)) failures.push(head);
+    if (FAILURE_LINE.test(line) && !cur.failures.includes(head)) cur.failures.push(head);
     (err ? console.error : console.log)(`${tag}${line}`);
   };
   await Promise.all([
@@ -250,7 +323,14 @@ async function spawnBundle(
     forwardLines(p.stderr, (l) => onLine(l, true)),
     p.exited,
   ]);
-  return { bundle, code: p.exitCode ?? 1, counts, secs: (performance.now() - t0) / 1000, failures };
+  const code = p.exitCode ?? 1;
+  return {
+    bundle,
+    code,
+    counts: mergeAttempts(attempts.map((a) => a.counts)),
+    secs: (performance.now() - t0) / 1000,
+    failures: (code !== 0 ? attempts.at(-1)! : attempts[0]!).failures,
+  };
 }
 
 function readTimes(file = TIMES_FILE): Record<string, number> {
@@ -316,11 +396,13 @@ if (import.meta.main) {
   // Child mode: one bundle, the parent already built and grouped.
   if (args[0] === "--bundle") {
     const [, bundle, ...rest] = args;
+    const retries = Number(rest.map((a) => RETRIES_ARG.exec(a)).find(Boolean)?.[1] ?? 0);
     process.exit(
       await runBundle(
         bundle!,
         rest.filter((a) => a.endsWith(".ts")),
-        rest.filter((a) => !a.endsWith(".ts")),
+        rest.filter((a) => !a.endsWith(".ts") && !RETRIES_ARG.test(a)),
+        retries,
       ),
     );
   }
