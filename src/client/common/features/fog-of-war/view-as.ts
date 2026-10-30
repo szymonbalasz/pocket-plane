@@ -39,6 +39,16 @@ interface ViewAsState {
 
 export const useViewAs = create<ViewAsState>(() => ({ playerId: null, loaded: null }));
 
+/**
+ * FR-OVW-10: the DM views an overview, so there is no scene to view as a player. The DM map sets
+ * it; the top bar's View as reads it. The pick stays for the next battle scene.
+ */
+export const useViewAsOff = create<{ off: boolean }>(() => ({ off: false }));
+
+export function setViewAsOff(off: boolean): void {
+  useViewAsOff.setState({ off });
+}
+
 /** The Select's value for "DM" (`fog-view-as` `data-value`). */
 export const VIEW_AS_DM = "dm";
 /** FR-FOG-43 (sprint 4): the Select's "Party vision" entry (value `VIEW_AS_PARTY`). */

@@ -1,15 +1,8 @@
 // DM base layer (viewed scene, FR-MAP-08), selection + box select + targeting (FR-MAP-31–33),
 // token menu host (FR-MAP-18/29), definition drops (FR-MAP-13), Ctrl-D (FR-MAP-17), the DM
 // tool rail extras (grid, lock) and the "Not shown to players" button (FR-MAP-51).
-import {
-  MAP_INTENTS,
-  SCENE_FOLDER_TYPE,
-  SCENE_TYPE,
-  type SceneFolderRecord,
-  type SceneRecord,
-  TOKEN_TYPE,
-  type TokenRecord,
-} from "@shared/scenes-map/schemas";
+import { OVERVIEW_ITEM_TYPE, type OverviewItemRecord } from "@shared/overview-scenes/schemas";
+import { MAP_INTENTS, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import { Button } from "@ui/components/ui/button";
 import {
   DropdownMenu,
@@ -17,6 +10,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@ui/components/ui/menus";
+import { setViewAsOff } from "@ui/features/fog-of-war/view-as";
+import { LazyOverviewCanvas } from "@ui/features/overview-scenes/LazyOverviewCanvas";
+import { OverviewToolRail } from "@ui/features/overview-scenes/OverviewToolRail";
 import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
 import { useBaseKeyDown } from "@ui/features/play-shell/hooks";
 import { BaseEmpty } from "@ui/features/play-shell/PlayFrame";
@@ -41,21 +37,7 @@ import {
   useTargeting,
 } from "./selection";
 import { doubleClickFor, menuFor, tokenDoubleClick } from "./token-menu";
-import { useDmMap, viewedScene } from "./view-state";
-
-/** The DM's viewed scene, resolved against the store (FR-MAP-08). */
-export function useViewedScene(): { viewed: SceneRecord | null; active: SceneRecord | null } {
-  const scenes = useRecords<SceneRecord>(SCENE_TYPE);
-  const folders = useRecords<SceneFolderRecord>(SCENE_FOLDER_TYPE);
-  const requested = useDmMap((s) => s.viewedSceneId);
-  return useMemo(
-    () => ({
-      viewed: viewedScene(scenes, folders, requested),
-      active: scenes.find((s) => s.active) ?? null,
-    }),
-    [scenes, folders, requested],
-  );
-}
+import { useDmMap, useViewedScene } from "./view-state";
 
 type Open = { tokenId: string; at: { x: number; y: number } } | null;
 
@@ -83,10 +65,16 @@ function NotShownButton({ sceneId }: { sceneId: string }) {
 }
 
 export function DmMapBase() {
-  const { viewed, active } = useViewedScene();
-  // ADR-0041: viewing a scene other than the snapshot's active one loads its tokens first.
-  const loaded = useSceneLoaded(viewed?.id ?? null);
+  const { viewed, active, overview } = useViewedScene();
+  // ADR-0041: viewing a scene other than the snapshot's active one loads its tokens first. An
+  // overview's items too: after a Show the DM gets none by frame until they are loaded.
+  const loaded = useSceneLoaded(overview?.id ?? viewed?.id ?? null);
   const tokens = useRecords<TokenRecord>(TOKEN_TYPE);
+  const allItems = useRecords<OverviewItemRecord>(OVERVIEW_ITEM_TYPE);
+  const items = useMemo(
+    () => (overview ? allItems.filter((i) => i.overviewId === overview.id) : []),
+    [allItems, overview],
+  );
   const selection = useMapSelection();
   const targeting = useTargeting();
   const draft = useDmMap((s) => s.gridDraft);
@@ -116,6 +104,12 @@ export function DmMapBase() {
   // the store or the scene drop out (also after a reconnect snapshot).
   const viewedId = viewed?.id ?? null;
   useEffect(() => dispatchSelection({ type: "scene", sceneId: viewedId }), [viewedId]);
+  // FR-OVW-10: the top bar's View as sits outside this seam's readers; it reads this flag.
+  const overviewViewed = overview !== null;
+  useEffect(() => {
+    setViewAsOff(overviewViewed);
+    return () => setViewAsOff(false);
+  }, [overviewViewed]);
   useEffect(() => {
     dispatchSelection({ type: "prune", present: new Set(onScene.map((t) => t.id)) });
   }, [onScene]);
@@ -139,6 +133,25 @@ export function DmMapBase() {
     );
   });
 
+  if (overview) {
+    return (
+      <>
+        <LazyOverviewCanvas
+          client="dm"
+          overviewId={overview.id}
+          items={items}
+          loading={!loaded}
+          myPlayerId={null}
+          signalsOn={overview.active}
+        />
+        {!overview.active && (
+          <div className="absolute left-1/2 -translate-x-1/2" style={{ top: TOP_BAR_H + 8 }}>
+            <NotShownButton sceneId={overview.id} />
+          </div>
+        )}
+      </>
+    );
+  }
   if (!viewed) return <BaseEmpty client="dm" />;
   const notShown = active?.id !== viewed.id;
   const menuToken = byId(menu?.tokenId);
@@ -242,8 +255,9 @@ export function DmMapBase() {
 }
 
 export function DmMapToolRail() {
-  const { viewed, active } = useViewedScene();
+  const { viewed, active, overview } = useViewedScene();
   const targeting = useTargeting();
+  if (overview) return <OverviewToolRail client="dm" signalsOff={!overview.active} />;
   return (
     <ToolRail
       pingHint="Click to ping, Shift+click to pull everyone's view, right-drag for the laser"

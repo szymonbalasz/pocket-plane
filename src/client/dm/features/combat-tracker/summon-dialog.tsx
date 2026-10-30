@@ -14,7 +14,7 @@ import {
 } from "@shared/combat-tracker/schemas";
 import { TURN_MODES, type TurnMode } from "@shared/entities/schemas";
 import type { RecordStore } from "@shared/protocol/store";
-import type { SceneFolderRecord, SceneRecord } from "@shared/scenes-map/schemas";
+import type { SceneRecord } from "@shared/scenes-map/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Checkbox, ToggleGroup, ToggleGroupItem } from "@ui/components/ui/controls";
 import {
@@ -47,7 +47,7 @@ import { useRecords, useSync } from "@ui/sync/store";
 import { useMemo, useState } from "react";
 import { create } from "zustand";
 import { creatureRows } from "../entities/list";
-import { useDmMap, viewedScene } from "../scenes-map/view-state";
+import { useViewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
 import { HpSelect } from "./join-parts";
 import { freeAreaCell } from "./place-at";
@@ -152,12 +152,7 @@ export function SummonBody({
   const entities = useRecords<{ id: string; companionOf?: string | null }>("entity");
   const players = useRecords<PlayerRecord>("player");
   const scenes = useRecords<SceneRecord>("scene");
-  const folders = useRecords<SceneFolderRecord>("scene-folder");
-  const viewed = viewedScene(
-    scenes,
-    folders,
-    useDmMap((s) => s.viewedSceneId),
-  );
+  const { viewed } = useViewedScene();
   const owners = useMemo(
     () => summonOwners(rows, store.records.entity),
     [rows, store.records.entity],

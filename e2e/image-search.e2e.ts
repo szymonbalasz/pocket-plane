@@ -151,6 +151,7 @@ test("FR-MAP-86 FR-ASSET-47 New scene: the name keeps focus; add a tag, Rename m
 
   const scenes = await openWindow(dm, "map.scenes");
   await scenes.getByTestId("map-scene-new").click();
+  await scenes.page().getByTestId("map-scene-new-battle").click();
   const dialog = dm.getByRole("dialog", { name: "New scene" });
   await expect(dialog.getByTestId("map-scene-new-name")).toBeFocused();
   const picker = dialog.getByTestId("asset-picker");

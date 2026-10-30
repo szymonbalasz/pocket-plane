@@ -1,8 +1,10 @@
 // `map.scenes` (MAP §7): folders + scenes in list order (FR-MAP-02), "Live" on the active scene,
 // click views a scene (FR-MAP-08), row menus (rename, duplicate, move, delete), new scene / folder,
 // "Show to players" on non-active rows (FR-MAP-51, `map.activateScene`). REST for list CRUD
-// (ADR-0021 D). Actions disabled while not live; viewing always works.
+// (ADR-0021 D). Actions disabled while not live; viewing always works. Overviews sit in the same
+// list and folders (FR-OVW-14, `OverviewRow`); New offers Battle scene or Overview.
 import type { AssetRecord } from "@shared/assets-pipeline/schemas";
+import { OVERVIEW_TYPE, OVW_INTENTS, type OverviewRecord } from "@shared/overview-scenes/schemas";
 import { sceneList } from "@shared/scenes-map/geometry";
 import {
   FolderName,
@@ -46,11 +48,13 @@ import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
 import {
   CastIcon,
+  ChevronDownIcon,
   ChevronRightIcon,
   CopyIcon,
   FolderIcon,
   FolderInputIcon,
   FolderPlusIcon,
+  GlobeIcon,
   MapIcon,
   MoreHorizontalIcon,
   PencilIcon,
@@ -59,9 +63,10 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { OverviewRow } from "../overview-scenes/OverviewRow";
 import { NameFormDialog } from "./NameFormDialog";
 import { scenesRest } from "./rest";
-import { useDmMap, viewedScene } from "./view-state";
+import { useDmMap, useViewedScene } from "./view-state";
 
 export const SCENES_KIND = "map.scenes";
 
@@ -69,7 +74,31 @@ const fail = (err: unknown) => {
   toast.error(err instanceof Error ? err.message : "Something went wrong");
 };
 
-type Rename = { kind: "scene" | "folder"; id: string; name: string } | null;
+type Rename = { kind: "scene" | "folder" | "overview"; id: string; name: string } | null;
+
+/** One row of the merged list: a battle scene's or an overview's (FR-OVW-14). */
+type ListRow =
+  | { name: string; seq: number; folderId: string | null; scene: SceneRecord; overview?: undefined }
+  | {
+      name: string;
+      seq: number;
+      folderId: string | null;
+      overview: OverviewRecord;
+      scene?: undefined;
+    };
+
+/** FR-MAP-51: the canvas badge asked for this row (window just opened or fronted). */
+function useRowFocus(id: string) {
+  const focus = useDmMap((s) => s.rowFocus === id);
+  const rowButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!focus) return;
+    useDmMap.getState().focusRow(null);
+    rowButton.current?.scrollIntoView({ block: "nearest" });
+    rowButton.current?.focus({ preventScroll: true });
+  }, [focus]);
+  return rowButton;
+}
 
 function SceneRow({
   scene,
@@ -87,15 +116,7 @@ function SceneRow({
   const view = useDmMap((s) => s.view);
   const send = useMapIntent();
   const show = () => send(MAP_INTENTS.activateScene, { sceneId: scene.id }).catch(toastReject);
-  // FR-MAP-51: the canvas badge asked for this row (window just opened or fronted).
-  const focus = useDmMap((s) => s.rowFocus === scene.id);
-  const rowButton = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!focus) return;
-    useDmMap.getState().focusRow(null);
-    rowButton.current?.scrollIntoView({ block: "nearest" });
-    rowButton.current?.focus({ preventScroll: true });
-  }, [focus]);
+  const rowButton = useRowFocus(scene.id);
   return (
     <li
       data-testid="map-scene-row"
@@ -226,6 +247,47 @@ function SceneRow({
   );
 }
 
+/** FR-OVW-14: the row of one list entry, a battle scene's or an overview's. */
+function ListRowView({
+  row,
+  folders,
+  viewedId,
+  live,
+  onRename,
+}: {
+  row: ListRow;
+  folders: SceneFolderRecord[];
+  viewedId: string | null;
+  live: boolean;
+  onRename(r: Rename): void;
+}) {
+  if (row.overview) {
+    const { overview } = row;
+    return (
+      <OverviewListRow
+        overview={overview}
+        folders={folders}
+        viewed={overview.id === viewedId}
+        live={live}
+        onRename={() => onRename({ kind: "overview", id: overview.id, name: overview.name })}
+      />
+    );
+  }
+  return (
+    <SceneRow
+      scene={row.scene}
+      folders={folders}
+      viewed={row.scene.id === viewedId}
+      live={live}
+      onRename={onRename}
+    />
+  );
+}
+
+function OverviewListRow(props: Omit<React.ComponentProps<typeof OverviewRow>, "rowRef">) {
+  return <OverviewRow {...props} rowRef={useRowFocus(props.overview.id)} />;
+}
+
 export function NewSceneDialog({
   open,
   onOpenChange,
@@ -341,19 +403,41 @@ export function NewSceneDialog({
 export function ScenesBody() {
   const scenes = useRecords<SceneRecord>(SCENE_TYPE);
   const folders = useRecords<SceneFolderRecord>(SCENE_FOLDER_TYPE);
+  const overviews = useRecords<OverviewRecord>(OVERVIEW_TYPE);
   const everLive = useSync((s) => s.everLive);
   const live = useLive();
-  const requested = useDmMap((s) => s.viewedSceneId);
-  const viewedId = viewedScene(scenes, folders, requested)?.id ?? null;
-  const list = useMemo(() => sceneList(folders, scenes), [folders, scenes]);
+  const viewedNow = useViewedScene();
+  const viewedId = viewedNow.overview?.id ?? viewedNow.viewed?.id ?? null;
+  const view = useDmMap((s) => s.view);
+  const send = useMapIntent();
+  const list = useMemo(() => {
+    const rows: ListRow[] = [
+      ...scenes.map((scene) => ({
+        name: scene.name,
+        seq: scene.seq,
+        folderId: scene.folderId,
+        scene,
+      })),
+      ...overviews.map((overview) => ({
+        name: overview.name,
+        seq: overview.seq,
+        folderId: overview.folderId,
+        overview,
+      })),
+    ];
+    return sceneList(folders, rows);
+  }, [folders, scenes, overviews]);
   const sortedFolders = useMemo(() => list.flatMap((e) => (e.folder ? [e.folder] : [])), [list]);
   const [newScene, setNewScene] = useState(false);
+  const [newOverview, setNewOverview] = useState(false);
   const [newFolder, setNewFolder] = useState(false);
   const [rename, setRename] = useState<Rename>(null);
   const [closed, setClosed] = useState<Set<string>>(new Set());
   // FR-MAP-51: a row asked for focus inside a collapsed folder → expand it so the row renders.
   const rowFocus = useDmMap((s) => s.rowFocus);
-  const focusFolder = scenes.find((s) => s.id === rowFocus)?.folderId ?? null;
+  const focusFolder =
+    (scenes.find((s) => s.id === rowFocus) ?? overviews.find((o) => o.id === rowFocus))?.folderId ??
+    null;
   useEffect(() => {
     if (focusFolder === null) return;
     setClosed((c) => {
@@ -367,14 +451,21 @@ export function ScenesBody() {
   return (
     <section aria-label="Scenes" data-testid="map-scenes" className="flex min-h-0 flex-col gap-2">
       <div className="flex items-center gap-1">
-        <Button
-          size="sm"
-          data-testid="map-scene-new"
-          disabled={!live}
-          onClick={() => setNewScene(true)}
-        >
-          <PlusIcon className="size-4" /> New scene
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild disabled={!live}>
+            <Button size="sm" data-testid="map-scene-new" disabled={!live}>
+              <PlusIcon className="size-4" /> New <ChevronDownIcon className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem data-testid="map-scene-new-battle" onSelect={() => setNewScene(true)}>
+              <MapIcon /> Battle scene…
+            </DropdownMenuItem>
+            <DropdownMenuItem data-testid="ovw-scene-new" onSelect={() => setNewOverview(true)}>
+              <GlobeIcon /> Overview…
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           size="sm"
           variant="secondary"
@@ -391,7 +482,7 @@ export function ScenesBody() {
             <Skeleton key={i} className="h-8" />
           ))}
         </div>
-      ) : scenes.length === 0 && folders.length === 0 ? (
+      ) : scenes.length === 0 && overviews.length === 0 && folders.length === 0 ? (
         <p
           data-testid="map-scenes-empty"
           className="py-6 text-center text-sm text-muted-foreground"
@@ -469,12 +560,12 @@ export function ScenesBody() {
                   </div>
                   <CollapsibleContent>
                     <ul className="ml-4 flex flex-col gap-0.5">
-                      {entry.scenes.map((s) => (
-                        <SceneRow
-                          key={s.id}
-                          scene={s}
+                      {entry.scenes.map((r) => (
+                        <ListRowView
+                          key={r.scene?.id ?? r.overview?.id}
+                          row={r}
                           folders={sortedFolders}
-                          viewed={s.id === viewedId}
+                          viewedId={viewedId}
                           live={live}
                           onRename={setRename}
                         />
@@ -484,12 +575,12 @@ export function ScenesBody() {
                 </Collapsible>
               </li>
             ) : (
-              entry.scenes.map((s) => (
-                <SceneRow
-                  key={s.id}
-                  scene={s}
+              entry.scenes.map((r) => (
+                <ListRowView
+                  key={r.scene?.id ?? r.overview?.id}
+                  row={r}
                   folders={sortedFolders}
-                  viewed={s.id === viewedId}
+                  viewedId={viewedId}
                   live={live}
                   onRename={setRename}
                 />
@@ -499,6 +590,18 @@ export function ScenesBody() {
         </ul>
       )}
       <NewSceneDialog open={newScene} onOpenChange={setNewScene} />
+      <NameFormDialog
+        open={newOverview}
+        onOpenChange={setNewOverview}
+        title="New overview"
+        schema={SceneName}
+        testId="ovw-scene-new-form"
+        submitLabel="Create"
+        onSubmit={async (name) => {
+          const r = (await send(OVW_INTENTS.create, { name })) as { overviewId: string };
+          view(r.overviewId);
+        }}
+      />
       <NameFormDialog
         open={newFolder}
         onOpenChange={setNewFolder}
@@ -511,14 +614,22 @@ export function ScenesBody() {
       <NameFormDialog
         open={rename !== null}
         onOpenChange={(o) => !o && setRename(null)}
-        title={rename?.kind === "folder" ? "Rename folder" : "Rename scene"}
+        title={
+          rename?.kind === "folder"
+            ? "Rename folder"
+            : rename?.kind === "overview"
+              ? "Rename overview"
+              : "Rename scene"
+        }
         initial={rename?.name}
         schema={rename?.kind === "folder" ? FolderName : SceneName}
         testId="map-rename"
         onSubmit={(name) =>
           rename?.kind === "folder"
             ? scenesRest.renameFolder(rename.id, name)
-            : scenesRest.patchScene(rename?.id as string, { name })
+            : rename?.kind === "overview"
+              ? send(OVW_INTENTS.update, { overviewId: rename.id, name })
+              : scenesRest.patchScene(rename?.id as string, { name })
         }
       />
     </section>

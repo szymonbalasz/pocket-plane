@@ -318,6 +318,7 @@ test("BL-06 new scene dialog shows the chosen map's name", async ({ browser }) =
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   const scenes = await openWindow(dm, "map.scenes");
   await scenes.getByTestId("map-scene-new").click();
+  await scenes.page().getByTestId("map-scene-new-battle").click();
   const dialog = dm.getByRole("dialog", { name: "New scene" });
   await expect(dialog.getByText("none chosen")).toBeVisible();
   await expect(dialog.getByTestId("map-scene-new-map-name")).toHaveCount(0);

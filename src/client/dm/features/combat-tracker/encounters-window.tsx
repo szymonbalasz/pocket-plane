@@ -16,7 +16,7 @@ import {
   QUANTITY_MAX,
 } from "@shared/combat-tracker/schemas";
 import { entityNameKey, type MonsterRecord } from "@shared/entities/schemas";
-import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
+import type { TokenRecord } from "@shared/scenes-map/schemas";
 import { ApiError } from "@ui/api";
 import { Button } from "@ui/components/ui/button";
 import { Checkbox, Switch } from "@ui/components/ui/controls";
@@ -53,7 +53,7 @@ import {
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { creatureRows } from "../entities/list";
-import { useDmMap, viewedScene } from "../scenes-map/view-state";
+import { useViewedScene } from "../scenes-map/view-state";
 import { useDefinitions } from "./data";
 import {
   addPick,
@@ -80,6 +80,7 @@ import { partyMembers, toggleParty } from "./party";
 import { freeAreaCell } from "./place-at";
 import { combatRest } from "./rest";
 import { START_KEPT_NOTE, startKeptNoteShown } from "./start-end";
+import { startOffHint } from "./start-reason";
 
 /** The DM REST client, imported lazily (the session reads localStorage at import). */
 const api = lazyApi(() => import("../campaign-management/session").then((m) => m.api));
@@ -154,11 +155,8 @@ function useDraftIds(): ReadonlySet<string> {
  * by default). No scene viewed (or not loaded yet) → the planned party.
  */
 function useStartScenePcIds(): ((partyIds: readonly string[]) => string[]) | null {
-  const scenes = useRecords<SceneRecord>("scene");
-  const folders = useRecords<SceneFolderRecord>("scene-folder");
   const tokens = useRecords<TokenRecord>("token");
-  const requested = useDmMap((s) => s.viewedSceneId);
-  const scene = viewedScene(scenes, folders, requested);
+  const { viewed: scene } = useViewedScene();
   // ADR-0041: as the Start dialog, only a loaded scene's tokens say who is on it.
   const loaded = useSceneLoaded(scene?.id ?? null);
   if (!scene || !loaded) return null;
@@ -294,11 +292,8 @@ function StartDialog({
   open: boolean;
   onOpenChange(o: boolean): void;
 }) {
-  const scenes = useRecords<SceneRecord>("scene");
-  const folders = useRecords<SceneFolderRecord>("scene-folder");
   const tokens = useRecords<TokenRecord>("token");
-  const requested = useDmMap((s) => s.viewedSceneId);
-  const scene = viewedScene(scenes, folders, requested);
+  const { viewed: scene } = useViewedScene();
   // ADR-0041: binding preview and "Not on this map" read the viewed scene's tokens.
   const sceneLoaded = useSceneLoaded(scene?.id ?? null);
   const defs = useDefinitions(draft.entries.map((e) => e.definitionId));
@@ -540,6 +535,7 @@ export function Editor({ encounter, back }: { encounter: EncounterRecord; back()
   const [starting, setStarting] = useState(false);
   const [ending, setEnding] = useState(false);
   const startEnd = useStartEnd();
+  const startOff = startOffHint(useViewedScene().overview !== null);
   const dirty = useRef(false);
   const planned = encounter.status === "planned";
   const readOnly = !planned || !live;
@@ -796,7 +792,11 @@ export function Editor({ encounter, back }: { encounter: EncounterRecord; back()
       >
         {planned && (
           <>
-            <Button data-testid="cbt-enc-start" disabled={!live} onClick={() => setStarting(true)}>
+            <Button
+              data-testid="cbt-enc-start"
+              disabled={!live || startOff !== null}
+              onClick={() => setStarting(true)}
+            >
               <SwordsIcon className="size-4" /> Start
             </Button>
             <Button
@@ -807,6 +807,11 @@ export function Editor({ encounter, back }: { encounter: EncounterRecord; back()
             >
               Delete
             </Button>
+            {startOff && (
+              <span className="text-xs text-muted-foreground" data-testid="cbt-enc-start-hint">
+                {startOff}
+              </span>
+            )}
           </>
         )}
         {encounter.status === "started" && (
