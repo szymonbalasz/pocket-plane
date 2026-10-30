@@ -389,7 +389,7 @@ describe("compendium search S4 (C-search)", () => {
     for (const row of sample) {
       for (const q of queries) {
         const words = queryWords(q);
-        const server = rowTier(row, words);
+        const server = rowTier(idx, row, words);
         const client: number | null = nameTier(row.name, words);
         const expected: number | null = server !== null && server <= 3 ? server : null;
         expect({ name: row.name, q, client }).toEqual({ name: row.name, q, client: expected });

@@ -12,11 +12,26 @@ import {
 } from "@shared/compendium/rest";
 import { LINE_MAX } from "@shared/compendium/schemas";
 import { CR_VALUES } from "@shared/entities/schemas";
-import { nameTier, queryWords, type SearchTier, searchTier } from "@shared/search/match";
+import {
+  compileQuery,
+  NO_TEXT,
+  queryTier,
+  queryWords,
+  type SearchTier,
+} from "@shared/search/match";
+import { textMasks } from "@shared/search/text-index";
 import { z } from "zod";
 import { invalid } from "../../commands/errors";
 import type { Db } from "../../db/client";
-import { type IndexRow, type SearchIndex, searchIndex } from "./search-index";
+import {
+  cmpStr,
+  compareByName,
+  compareRanked,
+  type IndexRow,
+  keyOf,
+  type SearchIndex,
+  searchIndex,
+} from "./search-index";
 import { type BookAbbrOf, bookAbbrOf } from "./sources/five-etools";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
 
@@ -46,18 +61,6 @@ export function decodeCursor(s: string): CursorKey {
   const r = CursorKey.safeParse(parsed);
   if (!r.success) throw invalid("Invalid input", [{ path: ["cursor"], message: "Bad cursor" }]);
   return r.data;
-}
-
-const cmpStr = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
-
-/** FR-CMP-33 order: tier, source rank, shorter folded name, folded name, id. */
-function compareRanked(a: CursorKey, b: CursorKey): number {
-  return a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || cmpStr(a[3], b[3]) || cmpStr(a[4], b[4]);
-}
-
-/** FR-CMP-36 default list (empty `q`): folded name, then source rank, then id. */
-function compareByName(a: CursorKey, b: CursorKey): number {
-  return cmpStr(a[3], b[3]) || a[1] - b[1] || cmpStr(a[4], b[4]);
 }
 
 // ---------- filters (FR-CMP-11) ----------
@@ -96,29 +99,39 @@ export interface SearchPage {
   nextCursor: string | null;
 }
 
-/** A matching row with its tier and tuple. */
+/** A matching row with its tier and its place in the page order (`compareRanked` / `compareByName`). */
 export interface Hit {
   row: IndexRow;
   tier: SearchTier;
-  key: CursorKey;
+  order: number;
 }
 
 /**
- * FR-CMP-33 tier of one index row for `words`; empty `words` → 0 (the default list). Entry-less
- * definitions match on the name only (tiers 0–3).
+ * FR-CMP-33 tier of index rows for `words`, one query's text lookups prepared once; empty `words`
+ * → 0 (the default list). `namesOnly`: tiers 0–3 only. Entry-less definitions have no text.
  */
-export function rowTier(row: IndexRow, words: readonly string[]): SearchTier | null {
-  if (words.length === 0) return 0;
-  return row.entryless ? nameTier(row.folded, words) : searchTier(row.folded, row.textWords, words);
+export function rowMatcher(
+  idx: SearchIndex,
+  words: readonly string[],
+): (row: IndexRow, namesOnly?: boolean) => SearchTier | null {
+  if (words.length === 0) return () => 0;
+  const q = compileQuery(words);
+  const masks = textMasks(idx.text, q, idx.rows.length);
+  let pos = 0;
+  const inText = (word: number) => masks[word]?.[pos] === 1;
+  return (row, namesOnly = false) => {
+    pos = row.pos;
+    return queryTier(row.folded, q, namesOnly ? NO_TEXT : inText);
+  };
 }
 
-const keyOf = (row: IndexRow, tier: SearchTier): CursorKey => [
-  tier,
-  row.rank,
-  Math.min(row.folded.folded.length, 200),
-  row.folded.folded.slice(0, 200),
-  row.id,
-];
+export function rowTier(
+  idx: SearchIndex,
+  row: IndexRow,
+  words: readonly string[],
+): SearchTier | null {
+  return rowMatcher(idx, words)(row);
+}
 
 /** Visible rows matching kind, filters and words (FR-CMP-14 / -11 / -33), unsorted. */
 export function matchingRows(
@@ -133,6 +146,9 @@ export function matchingRows(
   // text that mentions it; `kind=rule` (the Rules window) matches their text too.
   const skipRules = query.kind === undefined && words.length === 0;
   const ruleNamesOnly = query.kind === undefined;
+  const tierOf = rowMatcher(idx, words);
+  const byName = words.length === 0;
+  const tierStep = idx.rows.length;
   for (const row of idx.rows) {
     // FR-CMPX-14: a replaced entry is found only by asking for its definition (a token's entry).
     if (row.hidden && (!query.definitionId || row.definitionId !== query.definitionId)) continue;
@@ -141,9 +157,9 @@ export function matchingRows(
     // Entry-less definitions: DM only (they are global monsters, so `entryVisibleTo` agrees).
     if (row.entryless && v.role !== "dm") continue;
     if (!entryVisibleTo(row, v) || !matchesFilters(row.facets, query)) continue;
-    const tier =
-      ruleNamesOnly && row.kind === "rule" ? nameTier(row.folded, words) : rowTier(row, words);
-    if (tier !== null) hits.push({ row, tier, key: keyOf(row, tier) });
+    const tier = tierOf(row, ruleNamesOnly && row.kind === "rule");
+    if (tier === null) continue;
+    hits.push({ row, tier, order: byName ? row.nameOrder : tier * tierStep + row.rankedOrder });
   }
   return hits;
 }
@@ -225,35 +241,30 @@ export function searchEntries(
   const hits = matchingRows(idx, v, query, words);
 
   // FR-CMP-35: matching visible members per group; ≥ 2 collapse into the best member's row.
-  const members = new Map<string, Hit[]>();
-  for (const h of hits) {
-    if (h.row.entryless) continue;
-    const g = members.get(h.row.groupKey);
-    if (g) g.push(h);
-    else members.set(h.row.groupKey, [h]);
-  }
-  const items: { best: Hit; group: Hit[] | null }[] = [];
-  for (const h of hits) {
-    const g = h.row.entryless ? undefined : members.get(h.row.groupKey);
-    if (!g || g.length === 1) items.push({ best: h, group: null });
-    else if (g.every((m) => m === h || compare(h.key, m.key) < 0))
-      items.push({ best: h, group: g });
-  }
-  const rest = after ? items.filter((x) => compare(x.best.key, after) > 0) : items;
-  const top = firstInOrder(rest, pageSize + 1, (a, b) => compare(a.best.key, b.best.key));
+  const counts = new Int32Array(idx.groupCount);
+  const bestOf = new Int32Array(idx.groupCount);
+  hits.forEach((h, i) => {
+    const g = h.row.groupId;
+    if (g < 0) return;
+    if (counts[g] === 0 || h.order < (hits[bestOf[g] as number] as Hit).order) bestOf[g] = i;
+    counts[g] = (counts[g] as number) + 1;
+  });
+  const items = hits.filter((h, i) => h.row.groupId < 0 || bestOf[h.row.groupId] === i);
+  const rest = after ? items.filter((h) => compare(keyOf(h.row, h.tier), after) > 0) : items;
+  const top = firstInOrder(rest, pageSize + 1, (a, b) => a.order - b.order);
   const page = top.slice(0, pageSize);
   const last = page.at(-1);
+  const collapsed = (h: Hit) => h.row.groupId >= 0 && (counts[h.row.groupId] as number) > 1;
+  const members = new Map(page.filter(collapsed).map((h) => [h.row.groupId, [] as IndexRow[]]));
+  if (members.size > 0) for (const h of hits) members.get(h.row.groupId)?.push(h.row);
   return {
-    results: page.map(({ best, group }) => {
-      const s = summaryOf(idx, best.row, abbrOf);
-      if (group === null) return s;
-      return {
-        ...s,
-        line: groupLine(group.map((m) => m.row)),
-        group: { count: group.length },
-      };
+    results: page.map((h) => {
+      const s = summaryOf(idx, h.row, abbrOf);
+      const group = members.get(h.row.groupId);
+      if (group === undefined) return s;
+      return { ...s, line: groupLine(group), group: { count: group.length } };
     }),
-    nextCursor: top.length > pageSize && last ? encodeCursor(last.best.key) : null,
+    nextCursor: top.length > pageSize && last ? encodeCursor(keyOf(last.row, last.tier)) : null,
   };
 }
 
@@ -274,8 +285,9 @@ function sameAsPage(
     return { results: [], nextCursor: null };
   }
   const words = queryWords(q ?? "");
+  const tierOf = rowMatcher(idx, words);
   const members = (idx.groups.get(row.groupKey) ?? []).filter(
-    (m) => entryVisibleTo(m, v) && rowTier(m, words) !== null,
+    (m) => entryVisibleTo(m, v) && tierOf(m) !== null,
   );
   members.sort((a, b) => cmpStr(a.line, b.line) || cmpStr(a.id, b.id));
   return {

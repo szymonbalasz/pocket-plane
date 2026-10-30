@@ -53,14 +53,29 @@ export type SearchTier = NameTier | 4 | 5;
 
 type WordHit = "start" | "inside" | null;
 
-function nameHit(n: FoldedName, w: string): WordHit {
-  const forms = wordForms(w);
-  if (n.words.some((nw) => forms.some((f) => nw.startsWith(f)))) return "start";
-  return forms.some((f) => n.folded.includes(f)) ? "inside" : null;
+/** A query's words with what matching each row needs, prepared once per search. */
+export interface CompiledQuery {
+  words: readonly string[];
+  /** FR-CMP-32 query phrase (tiers 0–1). */
+  phrase: string;
+  /** Each word's `wordForms`. */
+  forms: readonly (readonly string[])[];
+}
+
+export function compileQuery(words: readonly string[]): CompiledQuery {
+  return { words, phrase: words.join(" "), forms: words.map(wordForms) };
+}
+
+function nameHit(n: FoldedName, forms: readonly string[]): WordHit {
+  for (const nw of n.words) {
+    for (const f of forms) if (nw.startsWith(f)) return "start";
+  }
+  for (const f of forms) if (n.folded.includes(f)) return "inside";
+  return null;
 }
 
 /** First index in sorted `words` that is ≥ `w` (binary search). */
-function lowerBound(words: readonly string[], w: string): number {
+export function lowerBound(words: readonly string[], w: string): number {
   let lo = 0;
   let hi = words.length;
   while (lo < hi) {
@@ -71,28 +86,41 @@ function lowerBound(words: readonly string[], w: string): number {
   return lo;
 }
 
-/** A word of the **sorted** `textWords` starts with `w` (or its plural fallback). */
-function textHit(textWords: readonly string[], w: string): boolean {
-  if (w.length < TEXT_MATCH_MIN) return false;
-  return wordForms(w).some((f) => textWords[lowerBound(textWords, f)]?.startsWith(f) === true);
-}
-
 /** Sorted unique folded words of a text, as `searchTier` reads them. */
 export function textWordsOf(text: string): string[] {
   const f = fold(text);
   return f === "" ? [] : [...new Set(f.split(" "))].sort();
 }
 
-function tierOfName(
-  n: FoldedName,
-  words: readonly string[],
-  hits: readonly WordHit[],
-): NameTier | null {
-  const phrase = words.join(" ");
-  if (n.folded === phrase) return 0;
-  if (n.folded.startsWith(phrase)) return 1;
-  if (hits.every((h) => h === "start")) return 2;
-  return hits.every((h) => h !== null) ? 3 : null;
+/** `queryTier`'s `inText` for a name-only match. */
+export const NO_TEXT = (_word: number): boolean => false;
+
+/**
+ * FR-CMP-33: the tier of a name for a compiled query, or null when a word matches neither name nor
+ * text. `inText(i)`: the text has `q.words[i]` (asked only of words the name lacks). No words → null.
+ */
+export function queryTier(
+  name: FoldedName,
+  q: CompiledQuery,
+  inText: (word: number) => boolean,
+): SearchTier | null {
+  const n = q.forms.length;
+  if (n === 0) return null;
+  let inName = 0;
+  let allStart = true;
+  for (let i = 0; i < n; i++) {
+    const hit = nameHit(name, q.forms[i] as readonly string[]);
+    if (hit === null) {
+      if (!inText(i)) return null;
+    } else {
+      inName++;
+      if (hit === "inside") allStart = false;
+    }
+  }
+  if (inName < n) return inName > 0 ? 4 : 5;
+  if (name.folded === q.phrase) return 0;
+  if (name.folded.startsWith(q.phrase)) return 1;
+  return allStart ? 2 : 3;
 }
 
 /**
@@ -102,11 +130,8 @@ function tierOfName(
 export function nameTier(name: string | FoldedName, words: readonly string[]): NameTier | null {
   if (words.length === 0) return null;
   const n = typeof name === "string" ? foldName(name) : name;
-  return tierOfName(
-    n,
-    words,
-    words.map((w) => nameHit(n, w)),
-  );
+  // Without text the tier is a name tier.
+  return queryTier(n, compileQuery(words), NO_TEXT) as NameTier | null;
 }
 
 /**
@@ -119,9 +144,11 @@ export function searchTier(
   textWords: readonly string[],
   words: readonly string[],
 ): SearchTier | null {
-  if (words.length === 0) return null;
-  const hits = words.map((w) => nameHit(name, w));
-  if (hits.every((h) => h !== null)) return tierOfName(name, words, hits);
-  if (!words.every((w, i) => hits[i] !== null || textHit(textWords, w))) return null;
-  return hits.some((h) => h !== null) ? 4 : 5;
+  const q = compileQuery(words);
+  return queryTier(name, q, (i) => {
+    if ((words[i] as string).length < TEXT_MATCH_MIN) return false;
+    return (q.forms[i] as readonly string[]).some(
+      (f) => textWords[lowerBound(textWords, f)]?.startsWith(f) === true,
+    );
+  });
 }

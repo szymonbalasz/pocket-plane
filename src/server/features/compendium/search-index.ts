@@ -4,7 +4,9 @@
 // definition events and rebuilt at the next search, so a search never answers from rows older
 // than the last commit. Derived, never persisted, never sent. Replaces the `instr` scan and the
 // entry-less `LEFT JOIN` (≈ 50 ms on the DM's every search). Replaced entries (FR-CMPX-14) are
-// derived here too, so import order doesn't matter: flagged `hidden`, out of `groups`.
+// derived here too, so import order doesn't matter: flagged `hidden`, out of `groups`. BL-160: the
+// text words are an inverted index, and the FR-CMP-33 / -36 row orders and groups are integers, so
+// a search over every book compares numbers, not strings.
 import { type SourceRank, sourceRank } from "@shared/compendium/match";
 import { type CompendiumKind, monsterLine } from "@shared/compendium/schemas";
 import { MonsterStatBlock } from "@shared/entities/schemas";
@@ -14,13 +16,16 @@ import {
   CompendiumImported,
 } from "@shared/events/compendium";
 import { EntityImported, ImportedEntityUpdated } from "@shared/events/entities";
-import { type FoldedName, foldName, textWordsOf } from "@shared/search/match";
+import { type FoldedName, foldName } from "@shared/search/match";
+import { buildTextIndex, type TextIndex } from "@shared/search/text-index";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "../../db/client";
 import { compendiumEntry, compendiumSource, entity } from "../../db/schema";
 import type { Listener } from "../../events/bus";
 
 export interface IndexRow {
+  /** Position in `SearchIndex.rows`; an entry's document in `SearchIndex.text`. */
+  pos: number;
   id: string;
   kind: CompendiumKind;
   campaignId: string | null;
@@ -37,16 +42,23 @@ export interface IndexRow {
   /** Imported definition without an entry (FR-CMP-17): DM only, name tiers only, never grouped. */
   entryless: boolean;
   folded: FoldedName;
-  /** Sorted unique folded words of `searchText` (name + line + body); empty when entry-less. */
-  textWords: readonly string[];
   /** FR-CMP-35 duplicate group: kind + folded name + source (homebrew: its campaign). */
   groupKey: string;
+  /** `groupKey` as a number below `SearchIndex.groupCount`, hidden rows too; entry-less: −1. */
+  groupId: number;
+  /** Place of this row's `OrderKey` by `compareRanked`, within a tier (equal keys: equal). */
+  rankedOrder: number;
+  /** Place of this row's `OrderKey` by `compareByName`. */
+  nameOrder: number;
   /** FR-CMPX-14: another imported entry replaces this one: no search, list, group or lookup. */
   hidden: boolean;
 }
 
 export interface SearchIndex {
   rows: readonly IndexRow[];
+  /** Folded words of `searchText` (name + line + body) per entry; entry-less rows have none. */
+  text: TextIndex;
+  groupCount: number;
   byId: ReadonlyMap<string, IndexRow>;
   /** Group key → its rows (entries only). */
   groups: ReadonlyMap<string, readonly IndexRow[]>;
@@ -64,6 +76,43 @@ export const INDEX_EVENTS: readonly string[] = [
 ];
 
 const indexes = new WeakMap<Db, SearchIndex>();
+
+/** FR-CMP-33 keyset: `[tier, sourceRank, folded name length, folded name, id]`. */
+export type OrderKey = [number, number, number, string, string];
+
+export const keyOf = (row: IndexRow, tier: number): OrderKey => [
+  tier,
+  row.rank,
+  Math.min(row.folded.folded.length, 200),
+  row.folded.folded.slice(0, 200),
+  row.id,
+];
+
+export const cmpStr = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** FR-CMP-33 order: tier, source rank, shorter folded name, folded name, id. */
+export function compareRanked(a: OrderKey, b: OrderKey): number {
+  return a[0] - b[0] || a[1] - b[1] || a[2] - b[2] || cmpStr(a[3], b[3]) || cmpStr(a[4], b[4]);
+}
+
+/** FR-CMP-36 default list (empty `q`): folded name, then source rank, then id. */
+export function compareByName(a: OrderKey, b: OrderKey): number {
+  return cmpStr(a[3], b[3]) || a[1] - b[1] || cmpStr(a[4], b[4]);
+}
+
+/** Each key's place by `compare`; equal keys share one. */
+function placesBy(keys: readonly OrderKey[], compare: typeof compareRanked): Int32Array {
+  const sorted = keys
+    .map((_, i) => i)
+    .sort((a, b) => compare(keys[a] as OrderKey, keys[b] as OrderKey));
+  const places = new Int32Array(keys.length);
+  sorted.forEach((k, i) => {
+    const prev = sorted[i - 1];
+    const tied = prev !== undefined && compare(keys[prev] as OrderKey, keys[k] as OrderKey) === 0;
+    places[k] = tied ? (places[prev] as number) : i;
+  });
+  return places;
+}
 
 const groupKeyOf = (
   kind: string,
@@ -99,6 +148,7 @@ export function buildSearchIndex(db: Db): SearchIndex {
   const rows: IndexRow[] = [];
   const linked = new Set<string>();
   const edges = new Map<string, readonly string[]>();
+  const texts: string[] = [];
   for (const r of db
     .select({
       id: compendiumEntry.id,
@@ -119,7 +169,9 @@ export function buildSearchIndex(db: Db): SearchIndex {
     if (r.definitionId !== null) linked.add(r.definitionId);
     if (r.replaces.length > 0) edges.set(`${r.source}:${r.sourceKey}`, r.replaces);
     const folded = foldName(r.name);
+    texts.push(r.searchText);
     rows.push({
+      pos: rows.length,
       id: r.id,
       kind: r.kind,
       campaignId: r.campaignId,
@@ -133,8 +185,10 @@ export function buildSearchIndex(db: Db): SearchIndex {
       definitionId: r.kind === "monster" ? r.definitionId : null,
       entryless: false,
       folded,
-      textWords: textWordsOf(r.searchText),
       groupKey: groupKeyOf(r.kind, folded.folded, r.source, r.campaignId),
+      groupId: -1,
+      rankedOrder: 0,
+      nameOrder: 0,
       hidden: false,
     });
   }
@@ -154,6 +208,7 @@ export function buildSearchIndex(db: Db): SearchIndex {
     const source = d.source ?? "";
     const folded = foldName(d.name);
     rows.push({
+      pos: rows.length,
       id: d.id,
       kind: "monster",
       campaignId: null,
@@ -169,14 +224,22 @@ export function buildSearchIndex(db: Db): SearchIndex {
       definitionId: d.id,
       entryless: true,
       folded,
-      textWords: [],
       groupKey: `definition:${d.id}`,
+      groupId: -1,
+      rankedOrder: 0,
+      nameOrder: 0,
       hidden: false,
     });
   }
   const hidden = hiddenRefs(edges);
   const groups = new Map<string, IndexRow[]>();
+  const groupIds = new Map<string, number>();
   for (const r of rows) {
+    if (!r.entryless) {
+      const id = groupIds.get(r.groupKey) ?? groupIds.size;
+      groupIds.set(r.groupKey, id);
+      r.groupId = id;
+    }
     if (r.sourceKey !== null && hidden.has(`${r.source}:${r.sourceKey}`)) {
       r.hidden = true;
       continue;
@@ -186,6 +249,13 @@ export function buildSearchIndex(db: Db): SearchIndex {
     if (g) g.push(r);
     else groups.set(r.groupKey, [r]);
   }
+  const keys = rows.map((r) => keyOf(r, 0));
+  const ranked = placesBy(keys, compareRanked);
+  const byName = placesBy(keys, compareByName);
+  for (const r of rows) {
+    r.rankedOrder = ranked[r.pos] as number;
+    r.nameOrder = byName[r.pos] as number;
+  }
   const labels = new Map(
     db
       .select({ key: compendiumSource.key, name: compendiumSource.name })
@@ -193,7 +263,14 @@ export function buildSearchIndex(db: Db): SearchIndex {
       .all()
       .map((s) => [s.key, s.name]),
   );
-  return { rows, byId: new Map(rows.map((r) => [r.id, r])), groups, labels };
+  return {
+    rows,
+    text: buildTextIndex(texts),
+    groupCount: groupIds.size,
+    byId: new Map(rows.map((r) => [r.id, r])),
+    groups,
+    labels,
+  };
 }
 
 /** The DB's index, built now if dropped or never built. */
