@@ -10,7 +10,7 @@ import {
   CBTX_INTENTS,
 } from "@shared/combat-extras/intents";
 import type { HpMode } from "@shared/combat-tracker/schemas";
-import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
+import type { SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
 import { Button } from "@ui/components/ui/button";
 import { Checkbox } from "@ui/components/ui/controls";
 import {
@@ -39,7 +39,7 @@ import { HpSelect, JoinPreviewRow } from "../combat-tracker/join-parts";
 import { addOptionsState, type JoinSlot, previewJoin } from "../combat-tracker/join-preview";
 import { freeAreaCell } from "../combat-tracker/place-at";
 import { creatureRows } from "../entities/list";
-import { useDmMap, viewedScene } from "../scenes-map/view-state";
+import { useViewedScene } from "../scenes-map/view-state";
 import { useCbtxDialogs } from "./store";
 
 /** The DM REST client, imported lazily (the session reads localStorage at import). */
@@ -132,9 +132,7 @@ export function AddForm() {
   const players = useRecords<PlayerRecord>("player");
   const tokens = useRecords<TokenRecord>("token");
   const scenes = useRecords<SceneRecord>("scene");
-  const folders = useRecords<SceneFolderRecord>("scene-folder");
-  const requested = useDmMap((s) => s.viewedSceneId);
-  const viewed = viewedScene(scenes, folders, requested);
+  const { viewed } = useViewedScene();
   const free = useFreeArea();
   // Store rows: customs + characters not in combat; imported monsters come from the server
   // search (FR-CMP-17), merged by `useCreatureLookup`.

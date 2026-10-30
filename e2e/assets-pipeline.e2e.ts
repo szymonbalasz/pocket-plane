@@ -50,6 +50,7 @@ test("FR-ASSET-17 picker in the New scene form: Upload and Use as map don't subm
   await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
   const scenes = await openWindow(dm, "map.scenes");
   await scenes.getByTestId("map-scene-new").click();
+  await scenes.page().getByTestId("map-scene-new-battle").click();
   const dialog = dm.getByRole("dialog", { name: "New scene" });
   const picker = dialog.getByTestId("asset-picker");
   const chooser = dm.waitForEvent("filechooser");

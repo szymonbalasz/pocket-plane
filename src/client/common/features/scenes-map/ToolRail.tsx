@@ -66,7 +66,7 @@ const sameRect = (a: Rect, b: Rect) => a.x === b.x && a.y === b.y && a.w === b.w
  * is pressed again (`reselect`, FR-SHELL-105), pushes windows off it through the placer
  * (FR-SHELL-104); never on window changes. Outside a play page (no host) it renders inline.
  */
-function ToolPanel({
+export function ToolPanel({
   rail,
   id,
   reselect,
