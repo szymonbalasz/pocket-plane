@@ -85,11 +85,13 @@ export function EntryActions({
   const e = data.entry;
 
   if (e.kind === "monster") {
-    if (!data.definition) return null;
+    // A homebrew monster entry has no creature to derive from; an imported one without a definition
+    // (FR-CMPX-08) gets its numbers typed into the form.
+    if (!data.definition && !isReadOnlyEntry(e)) return null;
     return (
       <>
         {/* FR-KIT-101 (K7): the rollable stat block window on this monster. */}
-        {openAtTable && (
+        {openAtTable && data.definition && (
           <OpenAtTable definitionId={data.definition.id} entryId={e.id} open={openAtTable} />
         )}
         <Button

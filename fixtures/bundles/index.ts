@@ -14,6 +14,7 @@ import cbTurnRingE2e from "./cb-turn-ring-e2e";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import cmpImages from "./cmp-images";
+import cmpx5etools from "./cmpx-5etools";
 import cmpxCore from "./cmpx-core";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
@@ -371,4 +372,6 @@ export const bundles: readonly Bundle[] = [
   cmpxCore,
   // Overview scenes core (fix/ovw-core): overviews, items, one shown
   overviewScenes,
+  // Compendium expansion panel (build/cmpx-panel): 5etools import walkthrough + e2e
+  cmpx5etools,
 ];

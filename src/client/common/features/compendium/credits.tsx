@@ -1,21 +1,16 @@
 // FR-CMP-19 (S4) / FR-ENT-29: the About dialog (an imported source's full attribution + the
 // "Token art" credits) and the **Credits** footer link that opens it from the Compendium list
 // view (both clients, also with nothing imported) and the DM's Creatures window. Credits reads
-// the imported sources on open: the first search page of each kind, then one entry per source
-// label for its attribution (read on demand, FR-CMP-23); entry-less definitions (GET would 404)
-// and homebrew are skipped. With nothing imported only the token art shows.
+// the imported sources on open (read on demand, FR-CMP-23): every book, FR-CMPX-18, however many
+// there are. With nothing imported only the token art shows.
 
 import { BUNDLED_SOURCE_KEYS } from "@shared/compendium/match";
-import {
-  HOMEBREW_LABEL,
-  type SearchResponse,
-  type SourceAttribution,
-} from "@shared/compendium/rest";
+import { CreditsResponse, type SourceAttribution } from "@shared/compendium/rest";
 import { RULES_CHANGE_NOTE } from "@shared/compendium/rules";
-import { COMPENDIUM_KINDS } from "@shared/compendium/schemas";
 import { CREATURE_TYPES } from "@shared/entities/schemas";
 import { InfoIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { call } from "../../api";
 import { Button } from "../../components/ui/button";
 import {
   Dialog,
@@ -32,34 +27,12 @@ import {
   TOKEN_ART_SITE,
   TOKEN_ART_SITE_URL,
 } from "../entities/creature-art/credits";
-import { fetchEntry } from "./fetch";
-import { isEntryless } from "./logic";
-import { type ApiSource, resolveApi, searchCompendium } from "./search";
-
-/**
- * One readable entry id per imported source label on search pages: homebrew has no attribution,
- * an entry-less definition (e.g. the `fixture` Goblin) has no entry to read.
- */
-export function sourceProbes(pages: readonly SearchResponse[]): string[] {
-  const byLabel = new Map<string, string>();
-  for (const r of pages.flatMap((p) => p.results)) {
-    if (r.sourceLabel !== HOMEBREW_LABEL && !isEntryless(r) && !byLabel.has(r.sourceLabel)) {
-      byLabel.set(r.sourceLabel, r.id);
-    }
-  }
-  return [...byLabel.values()];
-}
+import { type ApiSource, resolveApi } from "./search";
 
 /** The imported sources' attributions, read on demand; [] when nothing is imported. */
 export async function fetchCreditSources(source: ApiSource): Promise<SourceAttribution[]> {
-  const pages = await Promise.all(
-    COMPENDIUM_KINDS.map((kind) => searchCompendium(source, { kind })),
-  );
   const api = await resolveApi(source);
-  const entries = await Promise.all(sourceProbes(pages).map((id) => fetchEntry(api, id)));
-  const out = new Map<string, SourceAttribution>();
-  for (const e of entries) if (e.source) out.set(e.source.key, e.source);
-  return [...out.values()];
+  return CreditsResponse.parse(await call<unknown>(api.api.compendium.credits.$get())).sources;
 }
 
 const AUTHORS = [...new Set(CREATURE_TYPES.map((t) => TOKEN_ART_CREDITS[t].author))];

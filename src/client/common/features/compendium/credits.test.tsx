@@ -3,12 +3,7 @@
 // Lorc / Delapouite, CC BY 3.0, game-icons.net) and how Credits finds the imported sources.
 import { describe, expect, test } from "bun:test";
 import type { AppType } from "@server/app";
-import type {
-  EntryResponse,
-  EntrySummary,
-  SearchResponse,
-  SourceAttribution,
-} from "@shared/compendium/rest";
+import type { SourceAttribution } from "@shared/compendium/rest";
 import { emptyStore } from "@shared/protocol/store";
 import { hc } from "hono/client";
 import type { ReactNode } from "react";
@@ -18,7 +13,7 @@ import type { Api } from "../../api";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { CompendiumBody } from "./CompendiumWindow";
-import { AboutBody, fetchCreditSources, sourceProbes } from "./credits";
+import { AboutBody, fetchCreditSources } from "./credits";
 import type { Role } from "./logic";
 import { resetCmpNav } from "./nav";
 import { eagerApi } from "./search";
@@ -44,45 +39,6 @@ function store(role: Role) {
       }) as unknown as SyncState,
   );
 }
-
-const row = (
-  id: string,
-  sourceLabel: string,
-  kind: EntrySummary["kind"] = "spell",
-): EntrySummary => ({
-  id,
-  kind,
-  name: id,
-  sourceLabel,
-  line: "",
-});
-/** An entry-less imported definition's row: `id = definitionId` (its entry GET would 404). */
-const entryless = (id: string, sourceLabel: string): EntrySummary => ({
-  ...row(id, sourceLabel, "monster"),
-  definitionId: id,
-});
-
-const BLINDED: EntryResponse = {
-  entry: {
-    id: "e-gob",
-    campaignId: null,
-    kind: "condition",
-    source: "srd-5.1",
-    sourceKey: "condition/blinded",
-    name: "Blinded",
-    line: "",
-    facets: {},
-    body: { text: "A blinded creature can't see." },
-    definitionId: null,
-    shared: false,
-    derivedFromId: null,
-    imageAssetIds: [],
-    createdAt: "t",
-    updatedAt: "t",
-    importedAt: "t",
-  },
-  source: SRD,
-};
 
 const render = (role: Role, node: ReactNode) =>
   renderToStaticMarkup(
@@ -127,58 +83,46 @@ describe("FR-ENT-29 licence credits", () => {
     expect(html.indexOf("cmp-about-source")).toBeLessThan(html.indexOf("cmp-about-token-art"));
   });
 
-  test("FR-CMP-19 Credits reads one entry per imported source label; homebrew and entry-less rows have none", () => {
-    const page: SearchResponse = {
-      results: [row("h1", "Homebrew"), row("a", "SRD 5.1"), row("b", "SRD 5.1"), row("c", "X")],
-      nextCursor: null,
-    };
-    expect(sourceProbes([page])).toEqual(["a", "c"]);
-    expect(sourceProbes([{ results: [row("h1", "Homebrew")], nextCursor: null }])).toEqual([]);
-    // An entry-less definition (id = definitionId) first: skipped, the next row of its label probes.
-    const fixtureFirst: SearchResponse = {
-      results: [entryless("d-fx", "fixture"), row("e-srd", "SRD 5.1"), row("d-fx2", "fixture")],
-      nextCursor: null,
-    };
-    expect(sourceProbes([fixtureFirst])).toEqual(["e-srd", "d-fx2"]);
-    expect(sourceProbes([{ results: [entryless("d-fx", "fixture")], nextCursor: null }])).toEqual(
-      [],
-    );
-    // Labels are collected across pages, first readable row wins.
-    expect(sourceProbes([fixtureFirst, page])).toEqual(["e-srd", "d-fx2", "c"]);
-  });
-
-  test("FR-CMP-19 Credits with a fixture entry first: SRD attribution shown, no entry-less GET", async () => {
+  test("FR-CMP-19 FR-CMPX-18 Credits reads the sources from one call: every book, no search or entry reads", async () => {
     const urls: URL[] = [];
-    const pages: Record<string, EntrySummary[]> = {
-      monster: [entryless("d-fx", "fixture"), row("e-gob", "SRD 5.1", "monster")],
-      condition: [row("h-cond", "Homebrew", "condition"), row("e-blind", "SRD 5.1", "condition")],
+    const book: SourceAttribution = {
+      key: "5et-mm",
+      name: "Monster Manual",
+      licence: "User-supplied (5etools)",
+      attribution: "Monster Manual — © Wizards of the Coast.",
+      url: null,
+      version: "v",
+      abbr: "MM",
     };
     const fetch = (async (input: RequestInfo | URL) => {
       const url = new URL(input instanceof Request ? input.url : String(input));
       urls.push(url);
-      if (url.pathname === "/api/compendium/search") {
-        const kind = url.searchParams.get("kind") ?? "";
-        return Response.json({ results: pages[kind] ?? [], nextCursor: null });
-      }
-      if (url.pathname === "/api/compendium/entries/e-gob") return Response.json(BLINDED);
-      return Response.json(
-        { error: { code: "not_found", message: "Entry not found" } },
-        { status: 404 },
-      );
+      return Response.json({ sources: [SRD, book] });
     }) as typeof globalThis.fetch;
     const api = hc<AppType>("http://127.0.0.1:1", { fetch }) as Api;
-    expect(await fetchCreditSources(eagerApi(api))).toEqual([SRD]);
-    const searches = urls.filter((u) => u.pathname === "/api/compendium/search");
-    expect(searches.map((u) => u.searchParams.get("kind"))).toEqual([
-      "monster",
-      "spell",
-      "item",
-      "condition",
-      "feature",
-      "rule",
-    ]);
-    // One entry per source label, never the entry-less fixture row or homebrew.
-    expect(urls.filter((u) => u.pathname.startsWith("/api/compendium/entries/"))).toHaveLength(1);
-    expect(urls.map((u) => u.pathname)).not.toContain("/api/compendium/entries/d-fx");
+    expect(await fetchCreditSources(eagerApi(api))).toEqual([SRD, book]);
+    expect(urls.map((u) => u.pathname)).toEqual(["/api/compendium/credits"]);
+  });
+
+  test("FR-CMPX-18 About lists a book's credit", () => {
+    const html = render(
+      "dm",
+      <AboutBody
+        sources={[
+          {
+            ...SRD,
+            key: "5et-mm",
+            name: "Monster Manual",
+            licence: "User-supplied (5etools)",
+            attribution:
+              "Monster Manual — © Wizards of the Coast. Read from your own 5etools files for use at your table.",
+            url: null,
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain('data-testid="cmp-about-source" data-record-id="5et-mm"');
+    expect(text(html)).toContain("Read from your own 5etools files for use at your table.");
+    expect(html).not.toContain("cmp-about-rules");
   });
 });

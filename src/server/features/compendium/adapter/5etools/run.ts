@@ -7,20 +7,9 @@ import {
   EntryDraft,
   SourceKey,
 } from "@shared/compendium/schemas";
-import type { AdapterRecord, AdapterResult, MonsterDefinition } from "../open5e";
+import type { AdapterRecord, AdapterResult } from "../open5e";
 
-/**
- * Core's `AdapterRecord`, except that a monster without a numeric HP or AC has no `definition`
- * (FR-CMPX-08). The panel slice makes `definition` optional in the pipeline; then this is
- * `AdapterRecord` itself.
- */
-export type FiveEtoolsRecord =
-  | (Omit<Extract<AdapterRecord, { kind: "monster" }>, "definition"> & {
-      definition?: MonsterDefinition;
-    })
-  | Exclude<AdapterRecord, { kind: "monster" }>;
-
-export type FiveEtoolsResult = Omit<AdapterResult, "records"> & { records: FiveEtoolsRecord[] };
+export type FiveEtoolsResult = AdapterResult;
 
 const jsonBytes = (v: unknown) => new TextEncoder().encode(JSON.stringify(v)).length;
 
@@ -60,7 +49,7 @@ export const clipTo = (s: string, max: number) =>
   s.length <= max ? s : `${s.slice(0, Math.max(0, max - 1))}…`;
 
 export class Run {
-  records: FiveEtoolsRecord[] = [];
+  records: AdapterRecord[] = [];
   warnings: AdapterResult["warnings"] = [];
   skipped = 0;
   private seen = new Set<string>();
@@ -82,7 +71,7 @@ export class Run {
   }
 
   /** FR-CMP-01's 32 KB: the longest text is clipped until the entry fits. */
-  private fitEntry(rec: FiveEtoolsRecord) {
+  private fitEntry(rec: AdapterRecord) {
     const d = rec.data;
     for (let i = 0; i < 200; i++) {
       const over = jsonBytes({ facets: d.facets, body: d.body }) - ENTRY_MAX_BYTES;
@@ -96,7 +85,7 @@ export class Run {
   }
 
   /** FR-CMPX-11: one key per book; zod on everything that goes out. */
-  push(rec: FiveEtoolsRecord) {
+  push(rec: AdapterRecord) {
     if (!SourceKey.safeParse(rec.sourceKey).success) {
       return this.skip(rec.sourceKey, "sourceKey", "Name gives no usable key");
     }

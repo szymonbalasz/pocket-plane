@@ -112,6 +112,8 @@ export const EntrySummary = z.strictObject({
   name: EntryName,
   /** Imported: the source's name (e.g. "SRD 5.1"); homebrew: "Homebrew". */
   sourceLabel: z.string().min(1).max(NAME_MAX),
+  /** FR-CMPX-16: a book's abbreviation, the row's badge. */
+  sourceAbbr: z.string().min(1).max(NAME_MAX).optional(),
   line: z.string().max(LINE_MAX),
   definitionId: z.string().min(1).max(64).optional(),
   group: SummaryGroup.optional(),
@@ -133,8 +135,15 @@ export const SourceAttribution = CompendiumSource.pick({
   attribution: true,
   url: true,
   version: true,
+}).extend({
+  /** FR-CMPX-16: a book's abbreviation ("MM"); entry footer "‹Book› (‹abbr›)", FR-CMPX-18. */
+  abbr: z.string().min(1).max(NAME_MAX).optional(),
 });
 export type SourceAttribution = z.infer<typeof SourceAttribution>;
+
+/** `GET /api/compendium/credits`: every imported source the viewer reads an entry of (FR-CMPX-18). */
+export const CreditsResponse = z.strictObject({ sources: z.array(SourceAttribution) });
+export type CreditsResponse = z.infer<typeof CreditsResponse>;
 
 /** A monster entry's playable stat block (its imported definition, FR-CMP-03 / -12). */
 export const EntryDefinition = z.strictObject({

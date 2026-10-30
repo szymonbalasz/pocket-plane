@@ -59,15 +59,17 @@ export function derivedColumns(d: EntryDraft) {
   };
 }
 
-/** FR-CMP-03: the monster entry's definition = the imported `entity` with the same provenance. */
-function definitionIdOf(tx: Tx, source: string, sourceKey: string): string {
+/**
+ * FR-CMP-03: the monster entry's definition = the imported `entity` with the same provenance;
+ * null for an entry-only monster (FR-CMPX-08).
+ */
+function definitionIdOf(tx: Tx, source: string, sourceKey: string): string | null {
   const row = tx
     .select({ id: entity.id })
     .from(entity)
     .where(and(eq(entity.source, source), eq(entity.sourceKey, sourceKey)))
     .get();
-  if (!row) throw new Error(`compendium: no imported definition for ${source}:${sourceKey}`);
-  return row.id;
+  return row?.id ?? null;
 }
 
 /**
@@ -142,6 +144,10 @@ export const entryImportStore: ImportStore = {
         replaces,
         artPath,
         dataHash: r.dataHash,
+        // FR-CMPX-08: a later release can give an entry-only monster its numbers.
+        ...(d.kind === "monster"
+          ? { definitionId: definitionIdOf(tx, r.source, r.sourceKey) }
+          : {}),
         updatedAt: r.importedAt,
         importedAt: r.importedAt,
       })
