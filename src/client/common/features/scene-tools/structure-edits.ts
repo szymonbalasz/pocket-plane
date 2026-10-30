@@ -33,7 +33,10 @@ export async function addWallsEdit(
   return ns;
 }
 
-/** FR-SCN-08 Door: two clicks → one closed door. Undo removes it. */
+/**
+ * FR-SCN-08 Door: two clicks → one closed door. Undo removes it. FR-SCN-56: a door that replaced
+ * wall gets that wall back first, so the scene is never open between the two steps.
+ */
 export async function addDoorEdit(
   send: Send,
   sceneId: string,
@@ -41,11 +44,21 @@ export async function addDoorEdit(
   state: DoorState = DOOR_CLOSED,
   undo: UndoStore = scnUndo,
 ): Promise<number> {
-  const { n } = AddDoorResult.parse(await send(SCN_INTENTS.addDoor, { sceneId, segment, state }));
-  recordUndo(
-    { sceneId, steps: [{ name: SCN_INTENTS.removeSegments, input: { sceneId, ns: [n] } }] },
-    undo,
-  );
+  const {
+    n,
+    replaced = [],
+    pieces = [],
+  } = AddDoorResult.parse(await send(SCN_INTENTS.addDoor, { sceneId, segment, state }));
+  const steps: UndoStep[] = [];
+  if (replaced.length > 0) {
+    steps.push({
+      name: SCN_INTENTS.addWalls,
+      input: { sceneId, segments: replaced.map((w) => [w[1], w[2], w[3], w[4]]) },
+      recreates: { ns: replaced.map((w) => w[0]) },
+    });
+  }
+  steps.push({ name: SCN_INTENTS.removeSegments, input: { sceneId, ns: [n, ...pieces] } });
+  recordUndo({ sceneId, steps }, undo);
   return n;
 }
 

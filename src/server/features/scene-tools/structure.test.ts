@@ -4,6 +4,7 @@
 // only (locked as closed) and only the cause name.
 import { afterEach, describe, expect, test } from "bun:test";
 import {
+  type AddDoorResult,
   type PlayerSceneStructureRecord,
   SCN_INTENTS as S,
   SCENE_STRUCTURE_TYPE,
@@ -38,7 +39,7 @@ function setup() {
   const addWalls = (segments: Segment[], actor = t.h.dm, sceneId = sid) =>
     t.run<{ ns: number[] }>(S.addWalls, { sceneId, segments }, actor);
   const addDoor = (segment: Segment, state?: 0 | 1 | 2) =>
-    t.run<{ n: number }>(S.addDoor, {
+    t.run<AddDoorResult>(S.addDoor, {
       sceneId: sid,
       segment,
       ...(state !== undefined ? { state } : {}),
@@ -166,20 +167,100 @@ describe("FR-SCN-08 / -36 scn.addDoor", () => {
     expect(t.lastEvent()?.payload).toEqual({ sceneId: t.sid, op: "addDoor", ns: [3] });
   });
 
-  test("FR-SCN-07 a door on an existing wall or door → conflict", () => {
+  test("FR-SCN-07 a door on an existing door → conflict", () => {
     const t = setup();
-    t.addWalls([[8, 0, 8, 5]]);
     t.addDoor([8, 5, 8, 6]);
-    for (const seg of [
-      [8, 5, 8, 0],
-      [8, 6, 8, 5],
-    ] as Segment[]) {
-      expect(t.err(() => t.addDoor(seg))).toMatchObject({
-        code: "conflict",
-        message: SEGMENT_TAKEN_MESSAGE,
-      });
-    }
+    expect(t.err(() => t.addDoor([8, 6, 8, 5]))).toMatchObject({
+      code: "conflict",
+      message: SEGMENT_TAKEN_MESSAGE,
+    });
     expect(t.err(() => t.addDoor([8, 7, 8, 7])).code).toBe("invalid");
+  });
+
+  test("FR-SCN-56 a door mid-wall replaces that section: two pieces, one event, ack for undo", () => {
+    const t = setup();
+    t.addWalls([
+      [8, 0, 8, 10],
+      [0, 0, 8, 0],
+    ]);
+    const log = readEventLog(t.s.db).length;
+    const n0 = t.events.length;
+    expect(t.addDoor([8, 4, 8, 5])).toEqual({
+      n: 3,
+      replaced: [[1, 8, 0, 8, 10]],
+      pieces: [4, 5],
+    });
+    expect(t.structure()).toMatchObject({
+      nextN: 6,
+      walls: [
+        [2, 0, 0, 8, 0],
+        [4, 8, 0, 8, 4],
+        [5, 8, 5, 8, 10],
+      ],
+      doors: [[3, 8, 4, 8, 5, 1, 0]],
+    });
+    expect(t.events.length).toBe(n0 + 1);
+    expect(readEventLog(t.s.db).length).toBe(log + 1);
+    expect(t.lastEvent()?.payload).toEqual({ sceneId: t.sid, op: "addDoor", ns: [3, 1, 4, 5] });
+  });
+
+  test("FR-SCN-56 a door over a whole wall, either direction, replaces it; over several walls replaces each", () => {
+    const t = setup();
+    t.addWalls([[8, 5, 8, 6]]);
+    expect(t.addDoor([8, 6, 8, 5])).toEqual({ n: 2, replaced: [[1, 8, 5, 8, 6]], pieces: [] });
+    expect(t.structure()?.walls).toEqual([]);
+    t.addWalls([
+      [2, 0, 2, 3],
+      [2, 3, 2, 6],
+      [2, 6, 2, 9],
+    ]);
+    expect(t.addDoor([2, 2, 2, 7]).n).toBe(6);
+    expect(t.structure()?.walls).toEqual([
+      [7, 2, 0, 2, 2],
+      [8, 2, 7, 2, 9],
+    ]);
+  });
+
+  test("FR-SCN-56 a door fitted into a gap leaves the walls as they are", () => {
+    const t = setup();
+    t.addWalls([
+      [8, 0, 8, 5],
+      [8, 6, 8, 11],
+    ]);
+    const walls = t.structure()?.walls;
+    expect(t.addDoor([8, 5, 8, 6])).toEqual({ n: 3 });
+    expect(t.structure()?.walls).toEqual(walls as Wall[]);
+  });
+
+  test("FR-SCN-56 a piece that already exists isn't drawn twice", () => {
+    const t = setup();
+    t.addWalls([
+      [8, 0, 8, 10],
+      [8, 0, 8, 4],
+    ]);
+    // Both lie under the door and both leave [8, 0, 8, 3].
+    expect(t.addDoor([8, 3, 8, 5]).n).toBe(3);
+    expect(t.structure()?.walls.map((w) => w.slice(1))).toEqual([
+      [8, 0, 8, 3],
+      [8, 5, 8, 10],
+    ]);
+  });
+
+  test("FR-SCN-56 / -07 the cap counts the extra piece; refused → nothing written", () => {
+    const t = setup();
+    const walls = Array.from(
+      { length: SEGMENTS_MAX - 2 },
+      (_, i): Wall => [i + 2, 100 + i, 0, 100 + i, 1],
+    );
+    t.writeStructure(t.sid, [[1, 8, 0, 8, 10], ...walls], []);
+    const before = t.structure();
+    // Mid-wall: − 1 wall, + 2 pieces, + 1 door → one over the cap.
+    expect(t.err(() => t.addDoor([8, 4, 8, 5])).message).toBe(SEGMENT_CAP_MESSAGE);
+    expect(t.structure()).toEqual(before);
+    // At the wall's end: − 1, + 1, + 1 → exactly the cap.
+    t.addDoor([8, 0, 8, 1]);
+    const st = t.structure();
+    expect((st?.walls.length ?? 0) + (st?.doors.length ?? 0)).toBe(SEGMENTS_MAX);
   });
 
   test("FR-SCN-36 scn.addDoor sets f via derive before the write: 1 iff every doorCells cell is fogged", () => {

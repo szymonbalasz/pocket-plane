@@ -4,7 +4,12 @@
 // one transaction: the row + one event-log entry → `StructureEdited` (one name for every op, so
 // players can't tell a lock from a wall edit). A change that changes nothing writes nothing.
 import { StructureEdited } from "@shared/events/scene-tools";
-import { segmentKey, segmentOf, segmentProblem } from "@shared/scene-tools/geometry";
+import {
+  segmentKey,
+  segmentOf,
+  segmentProblem,
+  wallLeftByDoor,
+} from "@shared/scene-tools/geometry";
 import {
   AddDoorInput,
   type AddDoorResult,
@@ -31,7 +36,7 @@ import { doorCopies } from "./copies";
 import { readStructure } from "./rows";
 
 export const SEGMENT_CAP_MESSAGE = `A scene holds at most ${SEGMENTS_MAX} walls and doors`;
-export const SEGMENT_TAKEN_MESSAGE = "A wall or door is already there";
+export const SEGMENT_TAKEN_MESSAGE = "A door is already there";
 
 type Op = "addWalls" | "addDoor" | "removeSegments" | "setDoor";
 
@@ -156,8 +161,39 @@ export const addWalls = defineCommand({
 });
 
 /**
+ * FR-SCN-56: takes the wall under `door` out of `st.walls` and appends what is left of it as new
+ * segments. Returns the walls as they were and the new pieces' `n`s.
+ */
+function carveWalls(st: Structure, door: Segment): { replaced: Wall[]; pieces: number[] } {
+  const replaced: Wall[] = [];
+  const left: Segment[] = [];
+  const kept: Wall[] = [];
+  for (const w of st.walls) {
+    const pieces = wallLeftByDoor(door, segmentOf(w));
+    if (pieces === null) {
+      kept.push(w);
+      continue;
+    }
+    replaced.push(w);
+    left.push(...pieces);
+  }
+  st.walls = kept;
+  const keys = keysOf(st);
+  const pieces: number[] = [];
+  for (const seg of left) {
+    const key = segmentKey(seg);
+    if (keys.has(key)) continue;
+    const n = st.nextN++;
+    st.walls.push([n, ...seg]);
+    keys.set(key, n);
+    pieces.push(n);
+  }
+  return { replaced, pieces };
+}
+
+/**
  * FR-SCN-08 / -36: one door (default closed); its fog flag `f` and `doorSeen` entry from
- * `derive` before the write.
+ * `derive` before the write. FR-SCN-56: it replaces the wall under it.
  */
 export const addDoor = defineCommand({
   name: SCN_INTENTS.addDoor,
@@ -165,14 +201,18 @@ export const addDoor = defineCommand({
   execute({ sceneId, segment, state }, env): AddDoorResult {
     const st = load(env, sceneId);
     checkSegment(st.scene, segment, ["segment"]);
-    if (keysOf(st).has(segmentKey(segment))) throw conflict(SEGMENT_TAKEN_MESSAGE);
+    const key = segmentKey(segment);
+    if (st.doors.some((d) => segmentKey(segmentOf(d)) === key)) {
+      throw conflict(SEGMENT_TAKEN_MESSAGE);
+    }
     const n = st.nextN++;
     const { f, seenBy } = doorCopies(env.tx, st.scene.id, segment);
+    const { replaced, pieces } = carveWalls(st, segment);
     st.doors.push([n, ...segment, state ?? DOOR_CLOSED, f]);
     if (st.doorSeen !== null && seenBy !== null) st.doorSeen[String(n)] = seenBy;
     checkCap(st);
-    commit(env, st, "addDoor", [n]);
-    return { n };
+    commit(env, st, "addDoor", [n, ...replaced.map((w) => w[0]), ...pieces]);
+    return replaced.length > 0 ? { n, replaced, pieces } : { n };
   },
 });
 

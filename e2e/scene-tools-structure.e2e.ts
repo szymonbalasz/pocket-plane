@@ -5,7 +5,7 @@
 // (players see it closed throughout); the Structure tool draws a wall and Undo removes it.
 // Sprint 3 (SCN S1-S4): Ctrl free points + the "Free" chip, the endpoint magnet closing a gap with
 // a door, the player's red wall hint while dragging (map.checkMove), the DM's red crossed
-// segments; players never get walls.
+// segments; players never get walls. FR-SCN-56: a door drawn on a wall replaces that section.
 import { expect, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
 import { konvaNodes, tokenNode } from "./support/konva";
@@ -388,6 +388,86 @@ test("FR-SCN-08 / -38 / -13 freeform walls + magnet door, player wall hint befor
   // Leak strings: players never get walls.
   const raw = frames.join("\n");
   expect(raw).not.toContain('"walls"');
+
+  // Leave the bundle as loaded: Town shown.
+  await dm.getByTestId("map-tool-select").click();
+  const again = await openWindow(dm, "map.scenes");
+  await again
+    .locator(`[data-testid="map-scene-row"][data-record-id="${town}"] button`)
+    .first()
+    .click();
+  await showToPlayers(dm, "Town");
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", town);
+
+  await player.context().close();
+  await dm.context().close();
+});
+
+test("FR-SCN-56 a door drawn on a wall replaces that section: closed blocks, open passes, Undo restores (DM + player-1)", async ({
+  browser,
+}) => {
+  const { secret, link, recordId } = e2eEnv();
+  const ambush = recordId("battlemap", "scene");
+  const town = recordId("town", "scene");
+  const mira = recordId("battlemap", "token", 0);
+
+  const dm = await rolePage(browser);
+  await loginDm(dm, secret);
+  await expect(dm.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  const scenes = await openWindow(dm, "map.scenes");
+  await scenes
+    .locator(`[data-testid="map-scene-row"][data-record-id="${ambush}"] button`)
+    .first()
+    .click();
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect(dm.getByTestId("map-canvas")).toHaveAttribute("data-loading", "false");
+  await showToPlayers(dm, "Goblin Ambush");
+  await shellWindow(dm, "map.scenes").getByTestId("ui-window-close").click();
+  await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(3);
+
+  const player = await rolePage(browser);
+  const frames: string[] = [];
+  player.on("websocket", (ws) => ws.on("framereceived", (f) => frames.push(String(f.payload))));
+  await player.goto(link("Player 1"));
+  await expect(player.getByTestId("sync-connection-status")).toHaveAttribute("data-state", "live");
+  await expect(player.getByTestId("map-canvas")).toHaveAttribute("data-scene-id", ambush);
+  await expect.poll(() => tokenNode(player, mira)).not.toBeNull();
+  await expect.poll(() => cellOf(player, mira)).toEqual({ col: 2, row: 7 });
+
+  // Door mode, two clicks on the x = 8 wall (y 6–11): one wall becomes two pieces and a door.
+  await dm.getByTestId("map-tool-structure").click();
+  await dm.getByTestId("scn-structure-mode-door").click();
+  for (const y of [7, 8]) {
+    const p = await mapToPage(dm, 8 * 70, y * 70);
+    await dm.mouse.click(p.x, p.y);
+  }
+  await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(4);
+  const door = (await konvaNodes(dm, "scn-door")).at(-1) as { x: number; y: number; id: string };
+
+  // Closed: the player's move is refused.
+  await dragTo(player, mira, 10, 7);
+  await expect(player.getByText("Blocked by a wall or door")).toBeVisible();
+  await expect.poll(() => cellOf(dm, mira)).toEqual({ col: 2, row: 7 });
+
+  // Open: the same move passes (the wall under it used to keep blocking), and back.
+  await dm.getByTestId("map-tool-select").click();
+  await dm.mouse.dblclick(door.x, door.y);
+  await expect.poll(() => attr(dm, "scn-door", door.id, "state")).toBe("open");
+  await dragTo(player, mira, 10, 7);
+  await expect.poll(() => cellOf(dm, mira)).toEqual({ col: 10, row: 7 });
+  await dragTo(player, mira, 2, 7);
+  await expect.poll(() => cellOf(dm, mira)).toEqual({ col: 2, row: 7 });
+
+  // Undo ×2 (open, door): the whole wall is back and the door is gone.
+  await dm.getByTestId("map-tool-structure").click();
+  await dm.getByTestId("scn-undo").click();
+  await expect.poll(() => attr(dm, "scn-door", door.id, "state")).toBe("closed");
+  await dm.getByTestId("scn-undo").click();
+  await expect.poll(() => attr(dm, "scn-walls", null, "count")).toBe(3);
+  await expect.poll(async () => (await konvaNodes(dm, "scn-door", door.id)).length).toBe(0);
+
+  // Leak strings: players never get walls.
+  expect(frames.join("\n")).not.toContain('"walls"');
 
   // Leave the bundle as loaded: Town shown.
   await dm.getByTestId("map-tool-select").click();

@@ -318,8 +318,15 @@ export const RemoveSegmentsInput = z.strictObject({
  */
 export const AddWallsResult = z.object({ ns: z.array(SegmentN) });
 export type AddWallsResult = z.infer<typeof AddWallsResult>;
-/** `scn.addDoor` ack. */
-export const AddDoorResult = z.object({ n: SegmentN });
+/**
+ * `scn.addDoor` ack. FR-SCN-56, only when the door replaced wall: the walls as they were and the
+ * `n`s of the pieces left of them, for undo.
+ */
+export const AddDoorResult = z.object({
+  n: SegmentN,
+  replaced: z.array(Wall).optional(),
+  pieces: z.array(SegmentN).optional(),
+});
 export type AddDoorResult = z.infer<typeof AddDoorResult>;
 
 export const PlacePropInput = z.strictObject({
