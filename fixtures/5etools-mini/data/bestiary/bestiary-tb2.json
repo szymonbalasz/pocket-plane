@@ -1,0 +1,70 @@
+{
+  "monster": [
+    {
+      "name": "Gnasher",
+      "source": "TB2",
+      "size": ["M"],
+      "type": "beast",
+      "alignment": ["U"],
+      "ac": [12],
+      "hp": { "average": 27, "formula": "5d8 + 5" },
+      "speed": { "walk": 40 },
+      "str": 15,
+      "dex": 12,
+      "con": 13,
+      "int": 2,
+      "wis": 10,
+      "cha": 5,
+      "passive": 10,
+      "cr": "2",
+      "action": [
+        {
+          "name": "Grinding Bite",
+          "entries": [
+            "{@atk mw} {@hit 5} to hit, reach 5 ft., one target. {@h}8 ({@damage 1d10 + 3}) piercing damage."
+          ]
+        }
+      ],
+      "hasToken": true
+    },
+    {
+      "name": "Gnasher Whelp",
+      "source": "TB2",
+      "token": { "name": "Gnasher", "source": "TB1" },
+      "size": ["S"],
+      "type": "beast",
+      "alignment": ["U"],
+      "ac": [10],
+      "hp": { "average": 5, "formula": "1d8 + 1" },
+      "speed": { "walk": 30 },
+      "str": 8,
+      "dex": 12,
+      "con": 12,
+      "int": 2,
+      "wis": 10,
+      "cha": 5,
+      "passive": 10,
+      "cr": "1/8",
+      "hasToken": true
+    },
+    {
+      "name": "Mirrored Husk",
+      "source": "TB2",
+      "size": ["M"],
+      "type": "construct",
+      "alignment": ["U"],
+      "ac": [{ "special": "the AC of whoever looks at it" }],
+      "hp": { "average": 18, "formula": "4d8" },
+      "speed": { "walk": 20 },
+      "str": 10,
+      "dex": 10,
+      "con": 10,
+      "int": 3,
+      "wis": 10,
+      "cha": 1,
+      "passive": 10,
+      "cr": "1",
+      "hasToken": true
+    }
+  ]
+}

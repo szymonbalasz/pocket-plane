@@ -1,0 +1,15 @@
+{
+  "spell": [
+    {
+      "name": "Salt Ward",
+      "source": "TB2",
+      "level": 3,
+      "school": "A",
+      "time": [{ "number": 10, "unit": "minute" }],
+      "range": { "type": "point", "distance": { "type": "self" } },
+      "components": { "v": true, "s": true },
+      "duration": [{ "type": "permanent", "ends": ["dispel", "trigger"] }],
+      "entries": ["A line of salt keeps out one kind of creature."]
+    }
+  ]
+}

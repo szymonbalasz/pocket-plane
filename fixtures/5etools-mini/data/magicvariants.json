@@ -1,0 +1,18 @@
+{
+  "magicvariant": [
+    {
+      "name": "Etched Weapon",
+      "type": "GV|TB1",
+      "requires": [{ "weapon": true }],
+      "inherits": {
+        "namePrefix": "Etched ",
+        "source": "TB1",
+        "rarity": "uncommon",
+        "bonusWeapon": "+1",
+        "entries": [
+          "You have a {=bonusWeapon} bonus to attack and damage rolls with this {=baseName/l}."
+        ]
+      }
+    }
+  ]
+}
