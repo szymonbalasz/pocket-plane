@@ -33,7 +33,7 @@ export { tokenPath } from "./art";
 export { FolderError } from "./read";
 export type { FiveEtoolsResult } from "./run";
 
-export const ADAPTER_VERSION_5ET = "1";
+export const ADAPTER_VERSION_5ET = "2";
 export const SRD_SOURCE_KEY = "srd-5.1";
 
 type BookKind = Extract<CompendiumKind, "monster" | "spell" | "item">;

@@ -6,11 +6,13 @@ import { type CompendiumKind, CompendiumSource } from "./schemas";
 
 /**
  * `POST /api/compendium/import` body: a source key, never data or a path (OQ-CMP-17, FR-CMPX-02).
- * `run`: the same value on each book of one Import / Update, which adapts from one folder read.
+ * `run`: the same value on each book of one Import / Update, which adapts from one folder read;
+ * `last` on its last book ends the run (the server's log line, the read dropped).
  */
 export const ImportRequest = z.strictObject({
   source: z.string().min(1).max(64),
   run: z.string().min(1).max(64).optional(),
+  last: z.literal(true).optional(),
 });
 export type ImportRequest = z.infer<typeof ImportRequest>;
 

@@ -24,8 +24,9 @@ import {
 import type { Services } from "../../services";
 import { noCache } from "./auth";
 import { IMPORT, type ImportResult } from "./import";
+import { ImportLog } from "./import-log";
 import { BUNDLED_SOURCE_KEYS, bundledSource } from "./sources";
-import { fiveEtoolsFolder } from "./sources/five-etools";
+import { endFolderRun, fiveEtoolsFolder } from "./sources/five-etools";
 
 /**FR-CMPX-17, spec §9: the folder's books against the stored source rows. */
 function fiveEtoolsStatus(s: Services): FiveEtoolsStatus {
@@ -80,6 +81,7 @@ export function sourceStatuses(s: Services): SourcesResponse {
 }
 
 export function compendiumImportRoutes(s: Services) {
+  const log = new ImportLog(() => s.log);
   return (
     new Hono<DmCampaignEnv>()
       // FR-CMP-12: Cache-Control on every compendium answer (also when mounted on its own).
@@ -92,10 +94,14 @@ export function compendiumImportRoutes(s: Services) {
         }
       })
       .post("/compendium/import", dmOnly(s), dmCampaign(s), jsonBody(ImportRequest), (c) => {
+        const { last, ...input } = c.req.valid("json");
+        const started = performance.now();
+        const ms = () => performance.now() - started;
         try {
-          const r = s.commands.run(IMPORT, c.req.valid("json"), {
+          const r = s.commands.run(IMPORT, input, {
             actor: dmActor(c.get("campaignId")),
           }) as ImportResult;
+          log.book(r, input.run, ms());
           const body: ImportResponse = {
             source: r.source,
             version: r.version,
@@ -104,7 +110,14 @@ export function compendiumImportRoutes(s: Services) {
           };
           return c.json(body, 200);
         } catch (err) {
+          const message = err instanceof Error ? err.message : "Import failed";
+          log.failed(input.source, input.run, message, ms());
           return errorResponse(c, err, s);
+        } finally {
+          if (last && input.run !== undefined) {
+            log.end(input.run);
+            endFolderRun(input.run);
+          }
         }
       })
   );

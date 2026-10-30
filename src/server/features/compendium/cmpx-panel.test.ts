@@ -378,7 +378,78 @@ describe("FR-CMPX-12 import per book", () => {
   });
 });
 
+describe("§12 import logged", () => {
+  function logged(t: ReturnType<typeof fresh>) {
+    const lines: string[] = [];
+    const push = (m: string) => {
+      lines.push(m);
+    };
+    t.s.log = { debug: () => {}, info: push, warn: push, error: push };
+    return lines;
+  }
+  const BOOK_LINE =
+    /^compendium import 5et-tb1: \d+ created, 0 updated, 0 existing, \d+ warnings, \d+ ms$/;
+  const RUN_LINE =
+    /^compendium import run: 2 books, 0 failed, \d+ created, 0 updated, 0 existing, \d+ warnings, \d+ ms$/;
+
+  test("§12 one info line per book, one per run when the client's last book arrives", async () => {
+    const t = fresh();
+    const lines = logged(t);
+    await t.post({ source: TB1, run: "logged" });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(BOOK_LINE);
+    await t.post({ source: TB2, run: "logged", last: true });
+    expect(lines).toHaveLength(3);
+    expect(lines[1]).toMatch(/^compendium import 5et-tb2: /);
+    expect(lines[2]).toMatch(RUN_LINE);
+    // The counts add up: the run's created = the books'.
+    const created = (l: string | undefined) => Number(/(\d+) created/.exec(l ?? "")?.[1]);
+    expect(created(lines[2])).toBe(created(lines[0]) + created(lines[1]));
+  });
+
+  test("§12 a failed book: a warn line and counted as failed; no run id → the book line only", async () => {
+    const t = fresh();
+    const lines = logged(t);
+    await t.post({ source: "5et-nope", run: "bad", last: true });
+    expect(lines[0]).toMatch(/^compendium import 5et-nope failed: .*\d+ ms$/);
+    expect(lines[1]).toMatch(/^compendium import run: 1 book, 1 failed, 0 created/);
+    lines.length = 0;
+    await t.post({ source: TB1 });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(BOOK_LINE);
+  });
+
+  test("§12 a new run closes an abandoned one (the DM reloaded mid-run): 'unfinished'", async () => {
+    const t = fresh();
+    const lines = logged(t);
+    await t.post({ source: TB1, run: "reloaded" });
+    await t.post({ source: TB2, run: "again", last: true });
+    expect(lines[1]).toMatch(/^compendium import run: 1 book, .*, unfinished$/);
+    expect(lines[2]).toMatch(/^compendium import 5et-tb2: /);
+    expect(lines[3]).not.toContain("unfinished");
+  });
+
+  test("§12 #397 the last book drops the run's read: the same id afterwards reads the folder again", async () => {
+    const dir = copyFolder();
+    const t = fresh(dir);
+    await t.post({ source: TB1, run: "ended", last: true });
+    bumpRelease(dir, "7.7.7");
+    expect(t.run({ source: TB2, run: "ended" }).version).toBe(bookVersion("7.7.7"));
+  });
+});
+
 describe("FR-CMPX-08 entry-only monsters", () => {
+  test("FR-CMPX-08 the AC the file has is on the entry: a number, or the special text; a definition's stays in its core", () => {
+    const t = fresh();
+    t.run({ source: TB1, run: "ac" });
+    t.run({ source: TB2, run: "ac" });
+    const meta = (source: string, key: string) =>
+      (t.entry(source, key)?.body as { meta: { armorNote?: string } } | undefined)?.meta.armorNote;
+    expect(meta(TB1, "monster/wobbling-fenwisp")).toBe("12");
+    expect(meta(TB2, "monster/mirrored-husk")).toBe("the AC of whoever looks at it");
+    expect(meta(TB1, "monster/goblin")).toBe("reedweave armor");
+  });
+
   test("FR-CMPX-08 the pipeline stores the entry with definitionId null and no creature; a sibling keeps its own", () => {
     const t = fresh();
     t.run({ source: TB1 });

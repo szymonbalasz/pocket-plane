@@ -832,6 +832,17 @@ describe("FR-CMPX-07 monster → entry + definition", () => {
 });
 
 describe("FR-CMPX-08 no numeric HP or AC", () => {
+  test("FR-CMPX-07 an attack's name is the action's alone: the creature's name is the roller's to add", () => {
+    const goblin = monster("monster/goblin").definition?.statBlock;
+    expect(goblin?.attacks.map((a) => a.name)).toContain("Hooked Blade");
+    for (const r of [...tb1.records, ...tb2.records]) {
+      if (r.kind !== "monster") continue;
+      for (const a of r.definition?.statBlock.attacks ?? []) {
+        expect(a.name.startsWith(`${r.data.name} `)).toBe(false);
+      }
+    }
+  });
+
   test("FR-CMPX-08 special HP → entry only, no definition", () => {
     const m = monster("monster/wobbling-fenwisp");
     expect(m.definition).toBeUndefined();

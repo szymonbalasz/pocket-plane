@@ -92,13 +92,18 @@ interface FolderRead {
   books: ReturnType<typeof describeBooks>;
 }
 
-/** Parsed per run and dropped after (FR-CMPX-04): no client says when it ended, so a timer does. */
-const RUN_IDLE_MS = 60_000;
+/** Parsed per run and dropped after (FR-CMPX-04): at its last book, or idle if that never comes. */
+export const RUN_IDLE_MS = 60_000;
 let open: { dir: string; run: string; read: FolderRead; timer: Timer } | null = null;
 
 function dropRun() {
   if (open) clearTimeout(open.timer);
   open = null;
+}
+
+/** The client's last book of `run`: its read isn't needed any more. */
+export function endFolderRun(run: string) {
+  if (open?.run === run) dropRun();
 }
 
 function readBooks(dir: string): FolderRead {

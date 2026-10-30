@@ -416,11 +416,22 @@ function sensesText(m: Raw) {
   return senses.join(", ") || undefined;
 }
 
-function metaOf(c: Run, key: string, m: Raw): MonsterMeta {
+/**
+ * FR-CMPX-08: an entry-only monster has no creature core to show its AC, so its number leads the
+ * note ("12", "12; natural armor"); a definition's number is in the core.
+ */
+function entryOnlyArmor(m: Raw): string | undefined {
+  const ac = acOf(m);
+  const note = armorNote(m);
+  if (ac === undefined) return note;
+  return note ? `${ac}; ${note}` : String(ac);
+}
+
+function metaOf(c: Run, key: string, m: Raw, entryOnly: boolean): MonsterMeta {
   const raw: Record<keyof MonsterMeta, string | undefined> = {
     subtype: subtypeText(m),
     alignment: alignmentText(m),
-    armorNote: armorNote(m),
+    armorNote: entryOnly ? entryOnlyArmor(m) : armorNote(m),
     speedText: speedText(m.speed),
     savesText: signedMap(m.save),
     skillsText: signedMap(m.skill),
@@ -535,6 +546,7 @@ export function mapMonster(c: Run, m: Raw, env: MonsterEnv) {
     entriesToMarkdown(m.legendaryHeader, warn) || `Can take ${count} legendary actions.`;
 
   const replaces = env.replaces("monster", m);
+  const definition = definitionOf(c, key, rawName, statBlock);
   c.push({
     kind: "monster",
     sourceKey: key,
@@ -547,7 +559,7 @@ export function mapMonster(c: Run, m: Raw, env: MonsterEnv) {
         size: size as MonsterStatBlock["size"],
       },
       body: {
-        meta: metaOf(c, key, m),
+        meta: metaOf(c, key, m, !("definition" in definition)),
         traits: capBlocks(c, key, "traits", traits),
         actions: capBlocks(c, key, "actions", sections(c, key, "actions", m.action, warn)),
         bonusActions: capBlocks(c, key, "bonusActions", sections(c, key, "bonus", m.bonus, warn)),
@@ -562,7 +574,7 @@ export function mapMonster(c: Run, m: Raw, env: MonsterEnv) {
           : {}),
       },
     },
-    ...definitionOf(c, key, rawName, statBlock),
+    ...definition,
     artPath: artPathOf(c, key, m, env.exists),
     ...(replaces.length > 0 ? { replaces } : {}),
   });
