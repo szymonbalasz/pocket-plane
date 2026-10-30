@@ -1,14 +1,14 @@
 ---
 title: Compendium expansion
 prefix: CMPX
-status: draft
+status: complete
 owner: spec-compendium-expansion
 phase: post-mvp
 ---
 
 # Compendium expansion: 5etools import
 
-> **Guideline:** five-minute read. Builds on [compendium](../compendium.md) (FR-CMP-*); everything not restated here works as there. Measured figures come from the DM's local 5etools package (2014 build `1.217.1`, 2026-05-24), read by a throwaway probe outside the repo; no 5etools text is quoted or committed. DM picks so far (2026-10-30): 2014 build, global library, SRD duplicates hidden behind the 5etools copy, no classes.
+> **Guideline:** five-minute read. Builds on [compendium](../compendium.md) (FR-CMP-*); everything not restated here works as there. Measured figures come from the DM's local 5etools package (2014 build `1.217.1`, 2026-05-24), read by a throwaway probe outside the repo; no 5etools text is quoted or committed. Decided by the DM (2026-10-30, [#395](../../decisions-log.md)): 2014 build, global library, SRD duplicates hidden behind the 5etools copy, no classes, every open question at its pick ([ADR-0074](../../architecture/adr/0074-user-supplied-sources.md)).
 
 ## 1. Summary
 
@@ -19,10 +19,10 @@ phase: post-mvp
 
 ## 2. Scope
 
-- **X1 core:** config, folder reader, 5etools adapter (monsters, spells, items), per-book sources, import / update, supersede rule, fixtures.
+- **X1 core:** config, folder reader, 5etools adapter (monsters, spells, items), per-book sources, import / update, replace rule, fixtures.
 - **X2 panel:** the DM import panel lists the folder's books; import / update per book; About credits.
-- **X3 token art** *(later slice)*: 5etools token images for imported monsters ([OQ-CMPX-01](#15-open-questions)).
-- *(proposed)* A local probe script reporting mapping warnings over the real folder (dev aid, never in CI).
+- **X3 token art:** a 5etools monster's token image is copied into the campaign's assets the first time it is placed, then reused ([OQ-CMPX-01](#15-open-questions) A).
+- A local probe script `bun scripts/cmpx-probe.ts` reporting mapping counts and warnings over the real folder (dev aid, never in CI, prints no entry text).
 
 ## 3. Goals
 
@@ -49,6 +49,7 @@ phase: post-mvp
 - As the DM, I want "goblin" to show the Monster Manual Goblin only, and the Monsters of the Multiverse version of a Volo's creature only.
 - As the DM, I want to drag a Mind Flayer onto the map and roll its Mind Blast from the stat block.
 - As the DM, I want to download the next 5etools release, extract it over the folder, and click Update.
+- As the DM, I want a placed Beholder to show the Beholder's token art, not a glyph.
 
 **Player**
 - As a player, I want to look up a Xanathar's spell and add it to my sheet.
@@ -67,24 +68,32 @@ All writes as compendium (one transaction, event-log entry, domain event; ids / 
 | FR-CMPX-04 | **Read only what's needed:** bestiary (all files, for cross-book `_copy`), `legendarygroups.json`, the spells files + `spells/sources.json`, `items.json`, `items-base.json`, `magicvariants.json`. Parsed per import, dropped after. | ≈ 13 MB of 90 MB |
 | FR-CMPX-05 | **Copies.** `_copy` (with `_mod`: `replaceArr`, `appendArr`, `prependArr`, `insertArr`, `removeArr`, `replaceTxt`, `setProp`, `scalarAddProp`, `scalarMultProp`, `addSpells`) resolved before mapping, recursively, across books. An unknown mode or missing base → that record skipped with a warning. | 1,124 of 3,808 monsters are copies |
 | FR-CMPX-06 | **Text.** 5etools `entries` → markdown-lite (FR-CMP-26): strings → paragraphs; named `entries` → `**Name.** text`; `list` → `- ` items; `table` → pipe table; `inset` / `quote` → `> ` quote; anything else → its plain text, warning. Tags: `{@hit n}` → "+n", `{@damage x}` / `{@dice x}` → "x" (clickable via `DiceText`), `{@dc n}` → "DC n", `{@atk mw}` → "*Melee Weapon Attack:*" (and `rw`, `ms`, `rs`, combos), `{@h}` → "*Hit:* ", `{@recharge n}` → "(Recharge n–6)", every other tag → its display text (last `\|` part, else first). Output is text, never HTML or links. | Monster tag census: 31 kinds, top 10 = 95 % |
-| FR-CMPX-07 | **Monster → entry + definition** (FR-CMP-03, -05 contract): size, AC, HP + formula, speed, scores, saves, CR, `type` (object → its `type`), darkvision; **attacks** from actions with `{@atk}` + `{@hit}` + first `{@damage}` (type from the text after it). Second damage dice stay in the text with a warning ([OQ-CMPX-03](#15-open-questions)). Spellcasting → a trait "Spellcasting" (header, then "At will: …", "1/day each: …", "1st level (4 slots): …"); legendary → `legendary`; mythic, lair actions, regional effects (legendary group) → one trait each. Over-limit lists / texts clipped with a warning (FR-CMP-01 caps). | 4,211 attack actions; 1,382 with > 1 damage tag |
-| FR-CMPX-08 | **Monster without a numeric HP or AC** (42 special HP, 20 AC): the entry is imported, **no creature definition** (not draggable, no lookup row); its view's **Derive…** opens the creature form from the entry text with HP / AC empty. *(pick, [OQ-CMPX-02](#15-open-questions))* | 62 monsters |
-| FR-CMPX-09 | **Spell** → `spell`: level, school, components, material, duration, range, casting time, `text`, `higherLevel` (`entriesHigherLevel`), concentration, ritual; classes from `spells/sources.json`, SRD twelve only, others dropped with a warning *(pick, [OQ-CMPX-06](#15-open-questions))*. | 525 spells |
+| FR-CMPX-07 | **Monster → entry + definition** (FR-CMP-03, -05 contract): size, AC, HP + formula, speed, scores, saves, CR, `type` (object → its `type`), darkvision; **attacks** from actions with `{@atk}` + `{@hit}` + first `{@damage}` (type from the text after it). Second damage dice stay in the text with a warning (OQ-CMPX-03 A). Spellcasting → a trait "Spellcasting" (header, then "At will: …", "1/day each: …", "1st level (4 slots): …"); legendary → `legendary`; mythic, lair actions, regional effects (legendary group) → one trait each. Over-limit lists / texts clipped with a warning (FR-CMP-01 caps). | 4,211 attack actions; 1,382 with > 1 damage tag |
+| FR-CMPX-08 | **Monster without a numeric HP or AC** (42 special HP, 20 AC): the entry is imported, **no creature definition** (not draggable, no lookup row); its view's **Derive…** opens the creature form from the entry text with HP / AC empty. ([OQ-CMPX-02](#15-open-questions) A) | 62 monsters |
+| FR-CMPX-09 | **Spell** → `spell`: level, school, components, material, duration, range, casting time, `text`, `higherLevel` (`entriesHigherLevel`), concentration, ritual; classes from `spells/sources.json`, SRD twelve only, others dropped with a warning ([OQ-CMPX-06](#15-open-questions) A). | 525 spells |
 | FR-CMPX-10 | **Item** → `item`: `items.json` + base items + generic variants ("+1 Weapon", not expanded); item groups → one entry each. Category from the type code (melee / ranged → weapon; LA / MA / HA / S → armor; magic when `rarity` ∉ none / unknown; else gear), rarity, attunement (`reqAttune`), cost, weight, damage, properties, AC. | 1,640 + 124 + 129 + 72; largest 34 KB raw |
 | FR-CMPX-11 | **Keys.** `sourceKey` = `<kind>/<slug(name)>` within the book source (`5et-mm` + `monster/goblin`); the monster's definition uses the same pair. A duplicate key in one book → the record skipped with a warning. | Measured 0 duplicate monster names per book |
-| FR-CMPX-12 | **Import** = FR-CMP-07 per book: `cmp.import {source: "5et-mm"}`; the panel's Import of N books runs N commands **one after another, one transaction each** *(pick, [OQ-CMPX-09](#15-open-questions))*; refused while an encounter is started. Outcomes `created` / `updated` / `existing`; events and logging as FR-CMP-08. Re-import never touches homebrew, clones, customs or sheets (FR-CMP-09). | |
-| FR-CMPX-13 | **Supersede.** An imported entry may list `supersedes`: entries it replaces, as `<source>:<sourceKey>` refs, set by the adapter. (a) `srd: true` / `srd: "<SRD name>"` → the `srd-5.1` entry of that kind and name. (b) An older entry whose `reprintedAs` names this one (e.g. Volo's → MPMM) → that entry. | 323 monsters, 319 spells, 493 items carry `srd`; 275 monsters `reprintedAs` |
-| FR-CMPX-14 | **Hidden, not gone.** In the search index (FR-CMP-34), an entry referenced by any **imported** entry's `supersedes` is left out of search, the default list, groups, lookups (FR-CMP-17) and the Creatures window, for DM and players. `GET /entries/:id`, `sync.load` of its definition, existing tokens, encounters, derived customs and Rules pages (FR-CMP-64) still resolve it. Derived each index build, so import order doesn't matter. | DM pick (b) |
-| FR-CMPX-15 | **Presets follow.** FR-CMP-29's preset resolution: an entry with no preset of its own takes the preset of an entry it supersedes ("Hunter's Mark" from the PHB → `hunters-mark`). | Seam with effect-modifiers |
+| FR-CMPX-12 | **Import** = FR-CMP-07 per book: `cmp.import {source: "5et-mm"}`; the panel's Import of N books runs N commands **one after another, one transaction each** ([OQ-CMPX-07](#15-open-questions) A); refused while an encounter is started. Outcomes `created` / `updated` / `existing`; events and logging as FR-CMP-08. Re-import never touches homebrew, clones, customs or sheets (FR-CMP-09). | |
+| FR-CMPX-13 | **Replace.** An imported entry may list `replaces`: entries it replaces, as `<source>:<sourceKey>` refs, set by the adapter. (a) `srd: true` / `srd: "<SRD name>"` → the `srd-5.1` entry of that kind and name. (b) An older entry whose `reprintedAs` names this one (e.g. Volo's → MPMM) → that entry. | 323 monsters, 319 spells, 493 items carry `srd`; 275 monsters `reprintedAs` |
+| FR-CMPX-14 | **Hidden, not gone.** In the search index (FR-CMP-34), an entry referenced by any **imported** entry's `replaces` is left out of search, the default list, groups, lookups (FR-CMP-17) and the Creatures window, for DM and players. `GET /entries/:id`, `sync.load` of its definition, existing tokens, encounters, derived customs and Rules pages (FR-CMP-64) still resolve it. Derived each index build, so import order doesn't matter. | DM pick (b) |
+| FR-CMPX-15 | **Presets follow.** FR-CMP-29's preset resolution: an entry with no preset of its own takes the preset of an entry it replaces ("Hunter's Mark" from the PHB → `hunters-mark`). | Seam with effect-modifiers |
 | FR-CMPX-16 | **Rank.** Book sources rank 2 (FR-CMP-38: other imported). Source label = book name; badge = abbreviation. Derive's copied rows and Add to sheet's feature `source` use the abbreviation. | |
 | **X2 panel** | | |
 | FR-CMPX-17 | DM import panel gains a **5etools** section: `not-configured` → "Set PP_5ETOOLS_DIR in .env to your extracted 5etools folder"; `not-found` → that plus the resolved path; else the 5etools version and a book list (search box, checkbox per book, monster / spell / item counts, "imported ‹date›" or **Update**). **Import selected** / **Update all** → confirm "Players will pause for a few seconds per book" → progress "Book i / N" → Toast with totals and warning count. | FR-CMP-20 |
 | FR-CMPX-18 | **Credits.** FR-CMP-19's About dialog lists each imported book: "‹Book› — © Wizards of the Coast. Read from your own 5etools files for use at your table." Entry footer: "‹Book› (‹abbr›)", no licence line. | |
 | FR-CMPX-19 | **Test IDs:** `cmpx-panel`, `cmpx-status` (+ `data-state` `not-configured` \| `not-found` \| `ready`), `cmpx-book` (+ `data-value` = source key, `data-state` `new` \| `imported` \| `outdated`), `cmpx-book-check`, `cmpx-book-search`, `cmpx-import`, `cmpx-update-all`, `cmpx-progress`. | AGENTS §9.5 |
 | **Cross-cutting** | | |
-| FR-CMPX-20 | **Never committed:** no 5etools text, name list or image in the repo, fixtures included. Fixtures are invented creatures, spells and items **in 5etools format** (FR-CMPX-26). | Public repo; ADR-0015 |
+| FR-CMPX-20 | **Never committed:** no 5etools text, name list or image in the repo, fixtures included. Fixtures are invented creatures, spells and items **in 5etools format** (§13). | Public repo; ADR-0015 |
 | FR-CMPX-21 | **0 B snapshot** (FR-CMP-30): the CON-44 test imports the fixture books and asserts no growth for any viewer. | |
 | FR-CMPX-22 | **Search cost:** the FR-CMP-34 bench re-runs on a synthetic index of SRD + 6,300 rows (all books); gate ≤ 5 ms p95, test fails above 50 ms. | §12 |
+| **X3 token art** | | |
+| FR-CMPX-23 | **Art path.** The adapter sets a monster entry's `artPath`: the token file per 5etools' own token rule (`img/bestiary/tokens/<SOURCE>/<name>.webp`, the monster's `token {name, source}` override first, `_copy` resolved), kept only if that file exists at import, else null with a warning. Valid path: relative, starts `img/`, ≤ 200 chars, no `..`, no backslash, no drive or leading `/`; checked at write and again before every read. Part of the entry's `dataHash`. | `hasToken` on 3,808 / 3,808; 3,857 files |
+| FR-CMPX-24 | **First placement.** `map.placeToken` of an imported definition whose entry has an `artPath`, with no `imageAssetId` given: the campaign's **imported art** row for `(source, sourceKey)` exists (and its asset still does) → the token gets that `imageAssetId` in the same command. Otherwise the token is placed as today (type glyph), and after commit a listener ingests the file through the assets pipeline into the campaign (tag "Tokens", name = monster name), writes the imported-art row, and sets `imageAssetId` on every token of that definition in the campaign that still has none: one internal command, logged, normal token events. One ingest per (campaign, monster) in flight; later placements wait for it or reuse it. | OQ-CMPX-01 A |
+| FR-CMPX-25 | **Never overrides the DM.** A token placed with an image, or given one later (token menu, FR-ENT-27 Art), is never changed by FR-CMPX-24. Duplicating a token copies its image as today. | |
+| FR-CMPX-26 | **Failure:** folder unset or missing, file gone, or ingest error → no imported-art row, glyph stays, one warning line in the server log; the next placement tries again. No error reaches the DM's placement. | |
+| FR-CMPX-27 | **Visibility unchanged:** the art is an ordinary campaign asset on a token field; players get it only with tokens they may see (FR-ENT-30, [ADR-0023](../../architecture/adr/0023-asset-access-by-capability-id.md)). | |
+| FR-CMPX-28 | **Derive:** Derive… on a 5etools monster prefills the custom's portrait with the campaign's imported art when it exists; otherwise none. | FR-CMP-27 |
+| FR-CMPX-29 | **Credits:** About (FR-CMPX-18) adds "Token art: © Wizards of the Coast, from your own 5etools files" once any book is imported. | |
 
 ## 7. UI/UX notes
 
@@ -102,12 +111,17 @@ Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 | Compendium source | key | text | `5et-<abbr>` |
 | | name, licence, attribution, url | text | Book name; licence "User-supplied (5etools)"; url null |
 | | version | text | FR-CMPX-03 |
-| Compendium entry | supersedes *(new)* | **JSON leaf** `string[]` (`<source>:<sourceKey>`), default `[]` | Imported only; not part of `dataHash`'s body hash but stored with it (changes count as `updated`) |
+| Compendium entry | replaces *(new)* | **JSON leaf** `string[]` (`<source>:<sourceKey>`), default `[]` | Imported only; not part of `dataHash`'s body hash but stored with it (changes count as `updated`) |
+| | artPath *(new)* | text \| null | Imported 5etools monsters only (FR-CMPX-23) |
 | Entity (imported definition) | source, sourceKey | text | Book source + `monster/<slug>` |
+| **Imported art** *(new, per campaign)* | campaignId, source, sourceKey | ID → Campaign, text, text | PK; one row per monster whose art this campaign has |
+| | assetId | ID → Asset | **Asset reference**, same campaign |
+| | createdAt | timestamp | `ctx.clock` |
 
-- **Relations:** book source 1—* entry; monster entry 1—0..1 definition (FR-CMPX-08); entry *—* superseded entries (by ref, no FK).
+- **Relations:** book source 1—* entry; monster entry 1—0..1 definition (FR-CMPX-08); entry *—* replaced entries (by ref, no FK); campaign 1—* imported art *—1 asset.
+- **Imported art** is server-only: not a record type, never sent; tokens carry the asset ID as today.
 - **Derived:** the hidden set (FR-CMPX-14) and the inherited preset (FR-CMPX-15), at index build; book list and counts (folder read, cached per process until the version changes).
-- **Persisted runtime state:** none. Additive column; existing rows need no backfill.
+- **Persisted runtime state:** none. Additive columns and one new table; existing rows need no backfill.
 
 ## 9. API & events
 
@@ -137,14 +151,17 @@ Per [visual-direction](../../design/visual-direction.md), shadcn/ui only.
 - **Server crash mid-import:** the running book rolls back; books committed before it stay; re-running imports the rest (`existing` for done ones).
 - **Folder changed while running:** each book reads its files once at its start; a later book may see the new release, and the panel then shows **Update** for the earlier ones.
 - **Invalid / malicious input:** files are untrusted data: JSON parse only, zod on every mapped record, caps from FR-CMP-01, text never rendered as HTML, links dropped. A malformed file fails that book with issues, nothing written for it.
-- **SRD not imported:** `supersedes` refs point at nothing; nothing hidden.
-- **5etools book removed from a later release:** its entries stay (FR-CMP-09; removal: [OQ-CMPX-04](#15-open-questions)).
+- **SRD not imported:** `replaces` refs point at nothing; nothing hidden.
+- **5etools book removed from a later release:** its entries stay (FR-CMP-09; removal later, OQ-CMPX-04).
+- **Art ingest crash (X3):** before the imported-art row commits → no row, the next placement retries (an orphan asset may remain, harmless); after → tokens get the image on the follow-up command or the next placement.
+- **Two placements of a new monster at once (X3):** one ingest; both tokens get the same asset.
 
 ## 12. Performance & bandwidth
 
 | What | Figure |
 |---|---|
-| Folder | `data/` 90 MB; read per import ≈ 13 MB; tokens 3,857 files, 559 MB (X3 only) |
+| Folder | `data/` 90 MB; read per import ≈ 13 MB; tokens 3,857 files, 559 MB, ≈ 100 KB each (X3 copies only placed monsters) |
+| Art (X3) | One ingest per campaign per monster; placement → art for the DM ≤ 1 s (logged); players load it like any token image |
 | Entries if every book is imported | ≈ 3,800 monsters + 525 spells + ≈ 1,960 items ≈ 6,300 (SRD today: 1,288) |
 | Import | MM target ≤ 2 s; all books ≤ 15 s (logged; test on fixtures fails above 10 s per book) |
 | Search | ≤ 5 ms p95 over SRD + 6,300 (FR-CMPX-22); 0.96 ms today on SRD |
@@ -157,45 +174,45 @@ Isolated per worktree ([ADR-0008](../../architecture/adr/0008-parallel-dev-isola
 
 | Level | What | Fixtures |
 |---|---|---|
-| Unit | `_copy` / `_mod` modes; tag rendering table; entries → markdown-lite; monster / spell / item mapping incl. FR-CMPX-08; key slugs and duplicates; `supersedes` from `srd` and `reprintedAs`; book list labels | `fixtures/5etools-mini/` |
+| Unit | `_copy` / `_mod` modes; tag rendering table; entries → markdown-lite; monster / spell / item mapping incl. FR-CMPX-08; key slugs and duplicates; `replaces` from `srd` and `reprintedAs`; book list labels | `fixtures/5etools-mini/` |
 | Integration | Import two books: counts, warnings, idempotent re-import (0 writes); Update after a fake version bump; hidden set for DM and player (search, lookups, Creatures, `sameAs`) while `GET` still works; preset inheritance + Add to sheet; per-book transaction on `PP_TEST_CRASH=cmp.import:before-commit`; config states; path never from client; CON-44 0 B; search bench | `5etools-mini` + `cmp-srd-mini-s3` |
-| E2E (thin) | DM imports both fixture books, "goblin" → one row badged TB1, drag to map; player sees the TB1 spell, no monsters | bundle `cmpx-5etools` |
+| Integration (X3) | art path rule incl. override and missing file; path validation (`..`, absolute, backslash) at write and read; first placement ingests once, second reuses; concurrent placements → one asset; DM image never replaced; unset folder → glyph + log warning; crash `assets.ingest:after-files`; player sees art only on visible tokens; Derive portrait | `5etools-mini` (own-made token images) |
+| E2E (thin) | DM imports both fixture books, "goblin" → one row badged TB1, drag to map, token shows its art; player sees the TB1 spell, no monsters | bundle `cmpx-5etools` |
 
-- **Fixture folder** `fixtures/5etools-mini/` (invented content, 5etools layout): books `TB1`, `TB2` in `books.json`; `changelog.json` `ver` `0.0.1`; bestiary: a "Goblin" with `srd: true` (own stats and words), a `_copy` variant, a "Gnasher" in TB1 `reprintedAs` TB2, a special-HP monster, a spellcaster, a legendary creature with a group; one spell with `srd: "Hunter's Mark"`; a weapon, a magic item, a generic variant.
+- **Fixture folder** `fixtures/5etools-mini/` (invented content, 5etools layout): books `TB1`, `TB2` in `books.json`; `changelog.json` `ver` `0.0.1`; bestiary: a "Goblin" with `srd: true` (own stats and words), a `_copy` variant, a "Gnasher" in TB1 `reprintedAs` TB2, a special-HP monster, a spellcaster, a legendary creature with a group; one spell with `srd: "Hunter's Mark"`; a weapon, a magic item, a generic variant; `img/bestiary/tokens/TB1/*.webp` own-made images (tiny, generated from a committed SVG or drawn for the repo), one monster without its file.
 - **Bundle `cmpx-5etools`** = `base` + `cmp-srd-mini-s3`; the walkthrough sets `PP_5ETOOLS_DIR=fixtures/5etools-mini`.
 
-**Browser walkthrough:** bundle `cmpx-5etools` → DM: Compendium → panel `ready`, two books → import both → "goblin" gives one TB1 Goblin → stat block attack rolls → drag to map; "gnasher" gives TB2 only; Derive… on the special-HP monster opens the form with HP empty; re-import → "0 changed" → player: TB1 spell found, Add to sheet adds the Hunter's Mark trigger; Monsters tab absent; search "goblin" empty.
+**Browser walkthrough:** bundle `cmpx-5etools` → DM: Compendium → panel `ready`, two books → import both → "goblin" gives one TB1 Goblin → stat block attack rolls → drag to map; "gnasher" gives TB2 only; Derive… on the special-HP monster opens the form with HP empty; the placed Goblin shows its token art, a second Goblin reuses it (Assets window: one Goblin image); re-import → "0 changed" → player: the Goblin token's art visible when not hidden; TB1 spell found, Add to sheet adds the Hunter's Mark trigger; Monsters tab absent; search "goblin" empty.
 
 ## 14. Dependencies
 
 | On | What we need | Status |
 |---|---|---|
-| [compendium](../compendium.md) | Import pipeline, index, visibility, panel; amendments FR-CMP-04 (book sources), -06 (non-bundled source), -29 (FR-CMPX-15), -34 (hidden set), -38 (rank) | complete; amendments via proposed ADR |
+| [compendium](../compendium.md) | Import pipeline, index, visibility, panel; amendments FR-CMP-04 (book sources), -06 (non-bundled source), -29 (FR-CMPX-15), -34 (hidden set), -38 (rank) | complete; amended by ADR-0074 |
 | Server config (`config.ts`), `.env.example`, AGENTS §9.2 | `PP_5ETOOLS_DIR` | Shared files: orchestrator |
-| DB schema, data-model docs | `compendium_entry.supersedes` | Shared files: orchestrator |
+| DB schema, data-model docs | `compendium_entry.replaces`, `.artPath`; table `imported_art` | Shared files: orchestrator (slice `fix/cmpx-core`) |
+| [scenes-map](../scenes-map.md), [assets-pipeline](../assets-pipeline.md) | `map.placeToken` seam for FR-CMPX-24; asset ingest from a server file | complete |
 | [entities](../entities.md) | Definition contract; token art (X3) | complete |
 | [effect-modifiers](../effect-modifiers.md) | Preset lookup by `featureKey` (FR-CMPX-15) | complete |
-| [proposed ADR](../../architecture/adr/proposed-user-supplied-sources.md) | User-supplied folder sources + supersede rule | proposed |
+| [ADR-0074](../../architecture/adr/0074-user-supplied-sources.md) | User-supplied folder sources + replace rule | accepted (#395) |
 
 ## 15. Open questions
 
-**Bold** option = suggested pick (not decided).
+All decided by the DM, 2026-10-30 ([#395](../../decisions-log.md)): the **bold** option.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-CMPX-01 | Token art for 5etools monsters (X3): imported definitions are global, assets are per campaign ([ADR-0023](../../architecture/adr/0023-asset-access-by-capability-id.md)) | **A: copy the token into the campaign's asset store on first placement, reused after** · B: global art route (amends ADR-0023) · C: type glyphs only | no (X3 only) | entities, scenes-map, assets-pipeline |
-| OQ-CMPX-02 | Monsters with no numeric HP / AC (62) | **A: entry only, Derive fills in** · B: placeholder HP / AC with a warning | no | FR-CMPX-08 |
-| OQ-CMPX-03 | Second damage dice in attacks (1,382 of 4,211) | **A: first damage only, rest in text (as SRD)** · B: extra damage parts in the creature core | no | entities, combat |
-| OQ-CMPX-04 | Removing an imported book | **A: later** · B: now (delete entries, keep definitions in use) | no | FR-CMP-09, §4 |
-| OQ-CMPX-05 | Monster lore (fluff text) | **A: later** · B: now, as a `lore` text in the monster body | no | compendium §8.1 |
-| OQ-CMPX-06 | Spell classes outside the SRD twelve (Artificer) | **A: drop with a warning for now** · B: widen the `classes` facet | no | compendium FR-CMP-11 |
-| OQ-CMPX-07 | One transaction per book or one for all | **A: per book** (short pauses, partial success) · B: all at once | no | FR-CMPX-12 |
-| OQ-CMPX-08 | Glossary: **Book** (a 5etools source abbreviation, one compendium source), **Superseded entry** | **Add both** | no | glossary |
-
-Owner of non-blocking questions: the DM at the spec gate.
+| OQ-CMPX-01 | Token art for 5etools monsters (X3): imported definitions are global, assets are per campaign ([ADR-0023](../../architecture/adr/0023-asset-access-by-capability-id.md)) | **A: copy the token into the campaign's asset store on first placement, reused after** · B: global art route (amends ADR-0023) · C: type glyphs only | decided | entities, scenes-map, assets-pipeline |
+| OQ-CMPX-02 | Monsters with no numeric HP / AC (62) | **A: entry only, Derive fills in** · B: placeholder HP / AC with a warning | decided | FR-CMPX-08 |
+| OQ-CMPX-03 | Second damage dice in attacks (1,382 of 4,211) | **A: first damage only, rest in text (as SRD)** · B: extra damage parts in the creature core | decided | entities, combat |
+| OQ-CMPX-04 | Removing an imported book | **A: later** · B: now (delete entries, keep definitions in use) | decided | FR-CMP-09, §4 |
+| OQ-CMPX-05 | Monster lore (fluff text) | **A: later** · B: now, as a `lore` text in the monster body | decided | compendium §8.1 |
+| OQ-CMPX-06 | Spell classes outside the SRD twelve (Artificer) | **A: drop with a warning for now** · B: widen the `classes` facet | decided | compendium FR-CMP-11 |
+| OQ-CMPX-07 | One transaction per book or one for all | **A: per book** (short pauses, partial success) · B: all at once | decided | FR-CMPX-12 |
+| OQ-CMPX-08 | Glossary: **Book** (a 5etools source abbreviation, one compendium source), **Replaced entry** | **Add both** | decided (added) | glossary |
 
 ## 16. Out of scope
 
 - Classes and character options → [levelling](levelling.md); 2024 rules; lore, conditions, rules text (§4).
-- Token art until OQ-CMPX-01 is decided (slice X3).
+- Removing a book (OQ-CMPX-04), monster lore (OQ-CMPX-05), extra damage parts (OQ-CMPX-03), Artificer spell lists (OQ-CMPX-06): later.
 - Other third-party formats (Griffon's Saddlebag, homebrew files) → their own adapters ([ADR-0015](../../architecture/adr/0015-source-adapters-fixtures.md)).
