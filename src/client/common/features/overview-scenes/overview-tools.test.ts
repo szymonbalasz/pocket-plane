@@ -45,14 +45,19 @@ describe("FR-OVW-13 tools", () => {
     }
   });
 
-  test("FR-OVW-13 Select and Add image on the DM's rail; a player gets no Add image", () => {
+  test("FR-OVW-13 Select, Add image, Label, Add party and Add miniature on the DM's rail; a player gets no add tool", () => {
     expect(overviewToolsFor("dm").map((t) => t.id)).toEqual([
       "select",
       "add-image",
+      "label",
       "add-party",
       "add-miniature",
       "ping",
     ]);
+    expect(activeOverviewTool("label", "dm").edits).toBe(true);
+    expect(activeOverviewTool("label", "player").id).toBe(SELECT_TOOL_ID);
+    expect(activeOverviewTool("add-party", "player").id).toBe(SELECT_TOOL_ID);
+    expect(activeOverviewTool("add-miniature", "player").id).toBe(SELECT_TOOL_ID);
     expect(overviewToolsFor("player").map((t) => t.id)).toEqual(["select", "ping"]);
     expect(activeOverviewTool("add-image", "dm").edits).toBe(true);
     // A player has no such tool: back to Select.

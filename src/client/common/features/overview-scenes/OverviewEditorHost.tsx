@@ -103,7 +103,13 @@ function ItemMenu({ send, live }: { send: ItemSend; live: boolean }) {
           style={{ left: menu?.at.x ?? 0, top: menu?.at.y ?? 0 }}
         />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" data-testid="ovw-item-menu" data-record-id={item?.id}>
+      <DropdownMenuContent
+        align="start"
+        data-testid="ovw-item-menu"
+        data-record-id={item?.id}
+        // Its trigger is only an anchor; Edit text's field must keep the focus it takes.
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         {item && (
           <>
             <DropdownMenuItem

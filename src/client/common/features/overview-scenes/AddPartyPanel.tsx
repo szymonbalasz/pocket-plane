@@ -26,7 +26,7 @@ export function AddPartyPanel() {
       >
         Add party
       </Button>
-      <AddHiddenSwitch />
+      <AddHiddenSwitch disabled={!live} />
     </div>
   );
 }

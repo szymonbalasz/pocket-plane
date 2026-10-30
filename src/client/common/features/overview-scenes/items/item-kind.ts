@@ -35,4 +35,6 @@ export interface ItemKindDef {
   resize: { min: number; max: number } | null;
   menu: readonly ItemMenuEntry[];
   doubleClick?(item: OverviewItemView): void;
+  /** Beside the Select tool while items of this kind are selected (FR-OVW-28, -36). */
+  stylePanel?: ComponentType<{ items: readonly OverviewItemView[] }>;
 }

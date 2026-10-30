@@ -74,7 +74,7 @@ export function AddMiniaturePanel() {
           </SelectContent>
         </Select>
       </div>
-      <AddHiddenSwitch />
+      <AddHiddenSwitch disabled={!live} />
       <Button
         size="sm"
         variant="outline"
