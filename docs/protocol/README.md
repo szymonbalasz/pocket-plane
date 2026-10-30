@@ -1180,7 +1180,7 @@ From [scene-tools](../specs/scene-tools.md) (SCN, `complete`; DM gate 2, #196; [
 | Intent | Who | Input → ack | Rules | Event |
 |---|---|---|---|---|
 | `scn.addWalls` | DM | `{sceneId, segments [x1, y1, x2, y2][] 1–200}` → `{ns}` | One `n` per input segment, in order; a segment identical (either direction) to one already there or earlier in the batch gets that `n` (no new segment). Length 0 / outside the vertex range ± 1 → `invalid` (issue path `["segments", i]`). > 2,000 segments per scene → `conflict`. Nothing new → no write, no event | `StructureEdited` `addWalls`, `ns` = the new ones |
-| `scn.addDoor` | DM | `{sceneId, segment, state?}` (default closed) → `{n}` | Identical to an existing wall or door → `conflict` "A wall or door is already there"; cap and bounds as above; `f` from `doorFogFlag` (`deriveSceneObject`) **before** the write | `addDoor`, `[n]` |
+| `scn.addDoor` | DM | `{sceneId, segment, state?}` (default closed) → `{n, replaced?, pieces?}` | Identical to an existing door → `conflict` "A door is already there". Replaces any wall under it (FR-SCN-56): `replaced` = those walls as they were, `pieces` = the `n`s of what is left, both only when wall was replaced; cap and bounds as above; `f` from `doorFogFlag` (`deriveSceneObject`) **before** the write | `addDoor`, `[n, ...replaced, ...pieces]` |
 | `scn.setDoor` | DM | `{sceneId, n, state}` | `n` not a door (unknown or a wall) → `not_found`; `f` kept; same state → nothing | `setDoor`, `[n]` |
 | `scn.removeSegments` | DM | `{sceneId, ns 1–500}` | Every `n` must exist (wall or door), else `not_found` and nothing removed; `n`s are never reused | `removeSegments`, `ns` |
 

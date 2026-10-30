@@ -2,7 +2,7 @@
 // erase, Undo, Undo"), a rejected inverse drops its entry, per scene, cap 50 — against a fake
 // server with the structure commands' semantics (acks `{ns}` aligned / `{n}`, not_found).
 import { describe, expect, test } from "bun:test";
-import { segmentKey } from "@shared/scene-tools/geometry";
+import { segmentKey, wallLeftByDoor } from "@shared/scene-tools/geometry";
 import {
   DOOR_CLOSED,
   type Door,
@@ -55,14 +55,29 @@ function fakeServer(sceneId = "s1") {
     }
     if (name === S.addDoor) {
       const seg = input.segment as Segment;
-      if (keys().has(segmentKey(seg)))
-        throw new IntentRejected("conflict", "A wall or door is already there");
+      const key = segmentKey(seg);
+      if (rec.doors.some((d) => segmentKey([d[1], d[2], d[3], d[4]]) === key))
+        throw new IntentRejected("conflict", "A door is already there");
       const n = rec.nextN;
-      bump({
-        doors: [...rec.doors, [n, ...seg, (input.state as DoorState) ?? DOOR_CLOSED, 0] as Door],
-        nextN: n + 1,
+      let nextN = n + 1;
+      const replaced: Wall[] = [];
+      const pieces: number[] = [];
+      const walls = rec.walls.flatMap((w): Wall[] => {
+        const left = wallLeftByDoor(seg, [w[1], w[2], w[3], w[4]]);
+        if (left === null) return [w];
+        replaced.push(w);
+        return left.map((s): Wall => {
+          const p = nextN++;
+          pieces.push(p);
+          return [p, ...s];
+        });
       });
-      return { n };
+      bump({
+        walls,
+        doors: [...rec.doors, [n, ...seg, (input.state as DoorState) ?? DOOR_CLOSED, 0] as Door],
+        nextN,
+      });
+      return replaced.length > 0 ? { n, replaced, pieces } : { n };
     }
     if (name === S.setDoor) {
       const d = rec.doors.find((x) => x[0] === input.n);
@@ -125,6 +140,42 @@ describe("FR-SCN-15 undo", () => {
     expect(rejects).toEqual([]);
     expect(f.rec()).toMatchObject({ walls: [], doors: [] });
     expect(await undoLast(f.send, "s1", () => {}, u)).toBe("empty");
+  });
+
+  test("FR-SCN-56 undo of a door over a wall: the wall comes back first, then the door and pieces go", async () => {
+    const f = fakeServer();
+    const u = createUndoStore();
+    await addWallsEdit(f.send, "s1", f.view(), [[8, 0, 8, 10]], u);
+    const n = await addDoorEdit(f.send, "s1", [8, 4, 8, 5], DOOR_CLOSED, u);
+    expect(f.rec().walls.map((w) => w[0])).toEqual([3, 4]);
+    f.sent.length = 0;
+    expect(await undoLast(f.send, "s1", () => {}, u)).toBe("undone");
+    expect(f.sent.map((s) => s.split(" ")[0])).toEqual([S.addWalls, S.removeSegments]);
+    expect(f.sent[1]).toContain(`"ns":[${n},3,4]`);
+    expect(f.rec().doors).toEqual([]);
+    expect(f.rec().walls).toEqual([[5, 8, 0, 8, 10]]);
+    // The older entry (the wall's own add) follows the wall's new `n`.
+    expect(u.getState().stacks.s1?.map((e) => e.steps[0]?.input)).toEqual([
+      { sceneId: "s1", ns: [5] },
+    ]);
+    expect(await undoLast(f.send, "s1", () => {}, u)).toBe("undone");
+    expect(f.rec()).toMatchObject({ walls: [], doors: [] });
+  });
+
+  test("FR-SCN-56 door over a wall, erase the door, Undo, Undo → the door, then the whole wall", async () => {
+    const f = fakeServer();
+    const u = createUndoStore();
+    await addWallsEdit(f.send, "s1", f.view(), [[8, 0, 8, 10]], u);
+    const n = await addDoorEdit(f.send, "s1", [8, 4, 8, 5], DOOR_CLOSED, u);
+    await removeEdit(f.send, "s1", f.view(), [n], u);
+    expect(f.rec().doors).toEqual([]);
+    expect(f.rec().walls).toHaveLength(2);
+    expect(await undoLast(f.send, "s1", () => {}, u)).toBe("undone");
+    expect(f.rec().doors).toHaveLength(1);
+    expect(f.rec().walls).toHaveLength(2);
+    expect(await undoLast(f.send, "s1", () => {}, u)).toBe("undone");
+    expect(f.rec().doors).toEqual([]);
+    expect(f.rec().walls.map((w) => w.slice(1))).toEqual([[8, 0, 8, 10]]);
   });
 
   test("FR-SCN-15 remap: door, open, erase, Undo, Undo → the door comes back (new n), then closes again", async () => {

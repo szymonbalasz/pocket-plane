@@ -67,15 +67,19 @@ export function segmentKey([x1, y1, x2, y2]: Segment): string {
 /** FR-SCN-07 (sprint 3): a segment is at least 0.05 cell long. */
 export const SEGMENT_MIN_LENGTH = 0.05;
 
+function tooShort([x1, y1, x2, y2]: Segment): boolean {
+  const dx = Math.round((x2 - x1) * 100);
+  const dy = Math.round((y2 - y1) * 100);
+  return dx * dx + dy * dy < (SEGMENT_MIN_LENGTH * 100) ** 2;
+}
+
 /**
  * Why a segment is refused, or null: shorter than 0.05 cell, or an endpoint outside the vertex
  * range ± 1. Exact on ≤ 2-decimal points (1/100-cell integers).
  */
 export function segmentProblem(seg: Segment, m: MapRect): "length" | "bounds" | null {
   const [x1, y1, x2, y2] = seg;
-  const dx = Math.round((x2 - x1) * 100);
-  const dy = Math.round((y2 - y1) * 100);
-  if (dx * dx + dy * dy < (SEGMENT_MIN_LENGTH * 100) ** 2) return "length";
+  if (tooShort(seg)) return "length";
   const r = vertexRange(m);
   const inX = (x: number) => x >= r.x0 - 1 && x <= r.x1 + 1;
   const inY = (y: number) => y >= r.y0 - 1 && y <= r.y1 + 1;
@@ -84,6 +88,49 @@ export function segmentProblem(seg: Segment, m: MapRect): "length" | "bounds" | 
 
 /** The segment of a wall or door tuple. */
 export const segmentOf = (s: Wall | Door): Segment => [s[1], s[2], s[3], s[4]];
+
+/** FR-SCN-56: a wall this close to a door (cells) lies under it; hand-placed points wobble. */
+export const DOOR_ON_WALL_CELLS = 0.2;
+/** FR-SCN-56: the sine of the steepest angle (30°) a wall under a door may make with it. */
+const DOOR_ON_WALL_SINE = 0.5;
+/** Float slack on the 0.05-cell overlap: a door of exactly that length still counts. */
+const OVERLAP_SLACK = 1e-9;
+
+/**
+ * FR-SCN-56: what stays of `wall` once `door` replaces the part under it, or null if the wall
+ * isn't under the door: it runs along the door (≤ 30°), within `DOOR_ON_WALL_CELLS` of it, and
+ * they share at least 0.05 cell of the door's length. A wall that only touches a door's end, or
+ * meets it at a corner, stays whole. Each piece left ends **exactly on the door's endpoint**, so
+ * no sight gets through the joint and points keep ≤ 2 decimals. A piece under 0.05 cell is dropped.
+ */
+export function wallLeftByDoor(door: Segment, wall: Segment): Segment[] | null {
+  const [ax, ay, bx, by] = door;
+  const length = Math.hypot(bx - ax, by - ay);
+  const ux = (bx - ax) / length;
+  const uy = (by - ay) / length;
+  const along = (x: number, y: number) => (x - ax) * ux + (y - ay) * uy;
+  const off = (x: number, y: number) => (y - ay) * ux - (x - ax) * uy;
+  const [wx1, wy1, wx2, wy2] = wall;
+  // The wall's ends in door order: `p` nearer the door's start.
+  const forward = along(wx1, wy1) <= along(wx2, wy2);
+  const [px, py, qx, qy] = forward ? [wx1, wy1, wx2, wy2] : [wx2, wy2, wx1, wy1];
+  const sp = along(px, py);
+  const sq = along(qx, qy);
+  const dp = off(px, py);
+  const dq = off(qx, qy);
+  if (Math.abs(dq - dp) > DOOR_ON_WALL_SINE * Math.hypot(qx - px, qy - py)) return null;
+  const from = Math.max(sp, 0);
+  const to = Math.min(sq, length);
+  if (to - from < SEGMENT_MIN_LENGTH - OVERLAP_SLACK) return null;
+  const offAt = (s: number) => dp + ((dq - dp) * (s - sp)) / (sq - sp);
+  if (Math.abs(offAt(from)) > DOOR_ON_WALL_CELLS || Math.abs(offAt(to)) > DOOR_ON_WALL_CELLS) {
+    return null;
+  }
+  const left: Segment[] = [];
+  if (sp < 0) left.push([px, py, ax, ay]);
+  if (sq > length) left.push([bx, by, qx, qy]);
+  return left.filter((s) => !tooShort(s));
+}
 
 type P = readonly [number, number];
 

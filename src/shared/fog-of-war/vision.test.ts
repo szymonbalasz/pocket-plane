@@ -3,6 +3,7 @@
 // Goblin Ambush walls (`scn-walls`): x = 8 for y 0–5, 6–11, 12–14; d1 (8, 5)–(8, 6); d2
 // (8, 11)–(8, 12); `vision-crypt`'s freeform wall [4.5, 3.25, 6.75, 5.5].
 import { describe, expect, test } from "bun:test";
+import { wallLeftByDoor } from "@shared/scene-tools/geometry";
 import { uniformMask } from "./mask";
 import type { ShapeLike } from "./shapes";
 import {
@@ -51,6 +52,32 @@ function rng(seed: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+
+describe("FR-SCN-56 sight through a door over a wall", () => {
+  // A hand-drawn wall (points off the grid), a door placed on it slightly off the line.
+  const WALL: Seg = [7.01, 5, 14.01, 5.02];
+  const DOOR: Seg = [9.02, 5.12, 10.02, 4.95];
+  const pieces = wallLeftByDoor([...DOOR], [...WALL]) as Seg[];
+  const eye = { x: 9.5, y: 8 };
+  const sees = (occluders: Seg[], x: number, y: number) =>
+    pointInPolygon(sightPolygon(eye, 40, occluders) as number[], x, y);
+
+  test("FR-SCN-56 open door: sight passes through it, not through the wall beside it", () => {
+    expect(pieces).toHaveLength(2);
+    expect(sees(pieces, 9.5, 2)).toBe(true);
+    expect(sees(pieces, 13.5, 2)).toBe(false);
+    // The wall left under the door blocked sight, open or not.
+    expect(sees([WALL], 9.5, 2)).toBe(false);
+  });
+
+  test("FR-SCN-56 closed door: nothing leaks past the joints, from any angle", () => {
+    const closed = [...pieces, DOOR];
+    for (let i = 0; i <= 40; i++) {
+      const p = sightPolygon({ x: 7.5 + i * 0.15, y: 8 }, 40, closed) as number[];
+      for (let j = 0; j <= 40; j++) expect(pointInPolygon(p, 8 + j * 0.1, 2)).toBe(false);
+    }
+  });
+});
 
 describe("FR-FOG-33 sightPolygon goldens", () => {
   test("FR-FOG-33 empty room = the 64-gon bound", () => {

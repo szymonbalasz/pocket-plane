@@ -20,6 +20,7 @@ import {
   vertexRange,
   vertexToPx,
   wallHint,
+  wallLeftByDoor,
 } from "./geometry";
 import type { Door, TemplateGeometry, Wall } from "./schemas";
 
@@ -91,6 +92,60 @@ describe("FR-SCN-10 blocking", () => {
   });
 
   // SCN §12 benchmark (2,000 segments, p95 ≤ 1 ms per move): ./geometry.bench.ts.
+});
+
+describe("FR-SCN-56 wallLeftByDoor", () => {
+  test("FR-SCN-56 a door mid-wall leaves two pieces, each ending exactly on the door", () => {
+    expect(wallLeftByDoor([8, 4, 8, 5], [8, 0, 8, 10])).toEqual([
+      [8, 0, 8, 4],
+      [8, 5, 8, 10],
+    ]);
+    // Either direction, door or wall.
+    expect(wallLeftByDoor([8, 5, 8, 4], [8, 10, 8, 0])).toEqual([
+      [8, 10, 8, 5],
+      [8, 4, 8, 0],
+    ]);
+  });
+
+  test("FR-SCN-56 a door at a wall's end leaves one piece; a door as long or longer leaves none", () => {
+    expect(wallLeftByDoor([8, 0, 8, 1], [8, 0, 8, 10])).toEqual([[8, 1, 8, 10]]);
+    expect(wallLeftByDoor([8, 0, 8, 10], [8, 0, 8, 10])).toEqual([]);
+    expect(wallLeftByDoor([8, -1, 8, 11], [8, 0, 8, 10])).toEqual([]);
+    // Overlapping one end only: the rest stays, the door's overhang adds nothing.
+    expect(wallLeftByDoor([8, 9, 8, 12], [8, 0, 8, 10])).toEqual([[8, 0, 8, 9]]);
+  });
+
+  test("FR-SCN-56 hand-placed points: a slightly off wall still counts, and pieces join the door", () => {
+    expect(wallLeftByDoor([9, 5, 10, 5], [7.01, 5, 14.01, 5.02])).toEqual([
+      [7.01, 5, 9, 5],
+      [10, 5, 14.01, 5.02],
+    ]);
+    expect(wallLeftByDoor([9.02, 5.15, 10, 5.12], [7, 5, 14, 5])).toEqual([
+      [7, 5, 9.02, 5.15],
+      [10, 5.12, 14, 5],
+    ]);
+  });
+
+  test("FR-SCN-56 not under the door: too far off, too steep, crossing, or only touching an end", () => {
+    // Parallel, 0.3 cell off.
+    expect(wallLeftByDoor([8, 4, 8, 5], [8.3, 0, 8.3, 10])).toBeNull();
+    // Crossing at a right angle; a corner stub steeper than 30°.
+    expect(wallLeftByDoor([8, 4, 8, 5], [6, 4.5, 10, 4.5])).toBeNull();
+    expect(wallLeftByDoor([0, 0, 2, 0], [0, 0, 0.15, 0.15])).toBeNull();
+    // A door fitted into a gap only touches the walls either side.
+    expect(wallLeftByDoor([8, 5, 8, 6], [8, 0, 8, 5])).toBeNull();
+    expect(wallLeftByDoor([8, 5, 8, 6], [8, 6, 8, 11])).toBeNull();
+    // Beyond the door along its line; less than 0.05 cell of overlap.
+    expect(wallLeftByDoor([8, 5, 8, 6], [8, 7, 8, 9])).toBeNull();
+    expect(wallLeftByDoor([8, 5, 8, 6], [8, 0, 8, 5.04])).toBeNull();
+    // A gap door on hand-drawn walls: touches both, replaces neither.
+    expect(wallLeftByDoor([5.99, 2.5, 7.05, 2.52], [3.51, 2.49, 5.99, 2.5])).toBeNull();
+    expect(wallLeftByDoor([5.99, 2.5, 7.05, 2.52], [7.05, 2.52, 7.01, 5])).toBeNull();
+  });
+
+  test("FR-SCN-56 a piece under 0.05 cell is dropped", () => {
+    expect(wallLeftByDoor([8, 0.04, 8, 2], [8, 0, 8, 3])).toEqual([[8, 2, 8, 3]]);
+  });
 });
 
 describe("FR-SCN-07 segments", () => {

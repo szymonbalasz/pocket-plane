@@ -4,7 +4,7 @@
 // reads the committed structure at drop (cached by rev). Benchmark (≤ 1 ms p95 per move at 2,000):
 // ./guard.bench.ts.
 import { afterEach, describe, expect, test } from "bun:test";
-import { SCN_INTENTS as S } from "@shared/scene-tools/schemas";
+import { SCN_INTENTS as S, type Wall } from "@shared/scene-tools/schemas";
 import { MAP_INTENTS as I, type TokenRecord } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
 import { combatant, token } from "../../db/schema";
@@ -16,6 +16,7 @@ import { readToken } from "../scenes-map/rows";
 import { tokenHooks } from "../scenes-map/token-hooks";
 import { visibilityHooks } from "../scenes-map/visibility-hooks";
 import { scnWallGuard, WALL_BLOCKED } from "./guard";
+import { readStructure } from "./rows";
 import { AMBUSH_DOORS, AMBUSH_WALLS, scnSetup } from "./testing";
 
 afterEach(() => {
@@ -46,6 +47,27 @@ function setup() {
   };
   return { ...t, sid, mira, goblin, p1, move, at, blocked };
 }
+
+describe("FR-SCN-56 a door over a wall", () => {
+  test("FR-SCN-56 a player's move: blocked while closed, passes once open, blocked beside the door", () => {
+    const t = setup();
+    // On scn-walls' x = 8 wall for y 6–11, across Mira's row 7.
+    const { n, replaced } = t.run<{ n: number; replaced?: Wall[] }>(S.addDoor, {
+      sceneId: t.sid,
+      segment: [8, 7, 8, 8],
+    });
+    expect(replaced?.map((w) => w.slice(1))).toEqual([[8, 6, 8, 11]]);
+    expect(readStructure(t.s.db, t.sid)?.walls.map((w) => w.slice(1))).toContainEqual([
+      8, 8, 8, 11,
+    ]);
+    t.blocked(() => t.move(t.mira, 10, 7));
+    t.run(S.setDoor, { sceneId: t.sid, n, state: 0 });
+    t.move(t.mira, 10, 7);
+    expect(t.at(t.mira)).toEqual([10, 7]);
+    // Back across lower down: still wall.
+    t.blocked(() => t.move(t.mira, 2, 9));
+  });
+});
 
 describe("FR-SCN-11 wall guard on map.moveToken", () => {
   test("FR-SCN-11 player-1 Mira (2, 7) → (10, 7) across the wall: conflict; nothing written, logged or emitted", () => {
