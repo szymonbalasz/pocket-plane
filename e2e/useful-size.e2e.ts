@@ -8,7 +8,7 @@
 // (FR-CHARX-83: Owlbear and Drake at exactly 320 × 360) have their own tests below.
 import { expect, type Locator, type Page, test } from "@playwright/test";
 import { e2eEnv, loginDm, rolePage } from "./support/env";
-import { launcherButton, shellWindow } from "./support/shell";
+import { launcherButton, openWindow, shellWindow } from "./support/shell";
 
 interface Case {
   kind: string;
@@ -125,6 +125,14 @@ const DM: Case[] = [
     // wf-frame-e2e has no request: the composer and the empty list, body unscrolled.
     criterion: "composer folded + a 6-row card",
     check: "body",
+  },
+  {
+    kind: "asset.library",
+    useful: { w: 440, h: 400 },
+    // #394 (FR-ASSET-69): a row of 3 thumbnails whole under tabs, toolbar, search and chips.
+    criterion: "tabs, toolbar, search, tag chips, a row of thumbnails",
+    check: 3,
+    rows: '[data-testid="asset-picker-item"]',
   },
 ];
 const PLAYER: Case[] = [
@@ -246,7 +254,8 @@ async function checkClient(page: Page, cases: readonly Case[]) {
     if (c.skip) continue;
     await test.step(`${c.kind} at ${c.useful.w} × ${c.useful.h}: ${c.criterion}`, async () => {
       const win = shellWindow(page, c.kind);
-      if (!(await win.isVisible())) await launcherButton(page, c.kind).click();
+      // Through "⋯" if the bar moved it there (#394: Assets at 1280 × 720).
+      await openWindow(page, c.kind);
       await expect(win).toHaveAttribute("data-state", "open");
       await resizeTo(page, win, c.useful.w, c.useful.h);
       const m = await measure(win, c);

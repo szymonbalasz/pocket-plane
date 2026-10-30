@@ -1,9 +1,13 @@
-// Rename and delete an image (ASSET §6.6, FR-ASSET-62–66; decision #386): DM-only intents
-// `assets.rename` / `assets.delete`. Delete only an unused image (OQ-ASSET-05 A): every holder of
-// an asset ID is checked in the command's transaction (FR-ASSET-64).
+// Rename and delete an image or a sound (ASSET §6.5, FR-ASSET-62–68; decisions #386, #394):
+// DM-only intents `assets.rename` / `assets.delete` / `assets.uses`. Delete only an unused asset
+// (OQ-ASSET-05 A): every holder of an asset ID is checked in the command's transaction (FR-ASSET-64).
+import { AUDIO_ASSET_TYPE } from "@shared/assets-pipeline/audio";
 import {
+  ALERT_SOUND_NAMES,
   ASSET_MANAGE_INTENTS,
   type AssetUse,
+  AssetUsesIntent,
+  type AssetUsesResult,
   DeleteAssetIntent,
   inUseMessage,
   RenameAssetIntent,
@@ -26,19 +30,17 @@ import {
   token,
 } from "../../db/schema";
 import type { Actor, RecordChange } from "../../events/types";
-import { toAssetRecord } from "./records";
+import { toAssetRecord, toAudioAssetRecord } from "./records";
 
 type AssetRow = typeof asset.$inferSelect;
 
-function imageOf(tx: Tx, actor: Actor, assetId: string): AssetRow {
+/** An image or a sound of the actor's campaign (FR-ASSET-67: sounds too, #394). */
+function assetOf(tx: Pick<Tx, "select">, actor: Actor, assetId: string): AssetRow {
   if (!actor.campaignId) throw conflict("No active campaign");
-  // A sound answers as an unknown asset (FR-ASSET-60): no rename or delete for sounds.
   const row = tx
     .select()
     .from(asset)
-    .where(
-      and(eq(asset.id, assetId), eq(asset.campaignId, actor.campaignId), eq(asset.kind, "image")),
-    )
+    .where(and(eq(asset.id, assetId), eq(asset.campaignId, actor.campaignId)))
     .get();
   if (!row) throw notFound("Asset not found");
   return row;
@@ -50,7 +52,8 @@ const holds = (column: unknown, id: string) =>
 /**
  * FR-ASSET-64: everything that uses the image, in ASSET_USE_KINDS order, by name within a kind.
  * An asset ID belongs to one campaign, so the holders are found by the ID alone. Combatants of an
- * ended encounter don't count (history; FR-ASSET-63 clears their image).
+ * ended encounter don't count (history; FR-ASSET-63 clears their image). *(#394)* A sound's only
+ * holder: the campaign's alert picks (FR-ASSET-67).
  */
 export function assetUses(tx: Pick<Tx, "select">, assetId: string): AssetUse[] {
   const names = (rows: { name: string }[]) => rows.map((r) => r.name);
@@ -110,6 +113,15 @@ export function assetUses(tx: Pick<Tx, "select">, assetId: string): AssetUse[] {
       ),
     )
     .all();
+  const alerts = tx
+    .select({ picks: campaign.alertSounds })
+    .from(campaign)
+    .all()
+    .flatMap((c) =>
+      Object.entries(c.picks)
+        .filter(([, pick]) => pick === assetId)
+        .map(([key]) => ALERT_SOUND_NAMES[key as keyof typeof ALERT_SOUND_NAMES] ?? key),
+    );
   return [
     ...of("scene map", names(scenes)),
     // Several props of one scene: one use.
@@ -120,11 +132,27 @@ export function assetUses(tx: Pick<Tx, "select">, assetId: string): AssetUse[] {
     ...of("handout", names(handouts)),
     ...of("compendium entry", names(entries)),
     ...paused.map((): AssetUse => ({ kind: "pause card", name: null })),
+    ...of("alert sound", alerts),
   ];
 }
 
-const deleteChange = (row: AssetRow): RecordChange[] =>
-  row.listed ? [{ type: "asset", id: row.id, before: toAssetRecord(row), after: null }] : [];
+/** The row's record change (DM): a listed image → `asset`, a sound → `audio-asset` (lazy). */
+function change(before: AssetRow, after: AssetRow | null): RecordChange[] {
+  if (before.kind === "audio") {
+    const b = toAudioAssetRecord(before);
+    return [
+      {
+        type: AUDIO_ASSET_TYPE,
+        id: before.id,
+        before: b,
+        after: after && toAudioAssetRecord(after),
+      },
+    ];
+  }
+  if (!before.listed) return [];
+  const b = toAssetRecord(before);
+  return [{ type: "asset", id: before.id, before: b, after: after && toAssetRecord(after) }];
+}
 
 /**
  * FR-ASSET-62 `assets.rename {assetId, name}`: FR-ASSET-08's name rule; the same name → `ack`, no
@@ -134,17 +162,14 @@ export const renameAsset = defineCommand({
   name: ASSET_MANAGE_INTENTS.rename,
   input: RenameAssetIntent,
   execute({ assetId, name }, { tx, actor, emit }): void {
-    const row = imageOf(tx, actor, assetId);
+    const row = assetOf(tx, actor, assetId);
     if (row.name === name) return;
     tx.update(asset).set({ name }).where(eq(asset.id, assetId)).run();
-    const after = { ...row, name };
     emit({
       type: AssetRenamed.type,
       campaignId: row.campaignId,
       payload: { assetId, name },
-      changes: after.listed
-        ? [{ type: "asset", id: assetId, before: toAssetRecord(row), after: toAssetRecord(after) }]
-        : [],
+      changes: change(row, { ...row, name }),
     });
   },
 });
@@ -158,7 +183,7 @@ export const deleteAsset = defineCommand({
   name: ASSET_MANAGE_INTENTS.delete,
   input: DeleteAssetIntent,
   execute({ assetId }, { tx, actor, emit }): void {
-    const row = imageOf(tx, actor, assetId);
+    const row = assetOf(tx, actor, assetId);
     const uses = assetUses(tx, assetId);
     if (uses.length > 0) throw conflict(inUseMessage(uses));
     // Ended encounters aren't synced (combat-tracker snapshot: the started one only): no change.
@@ -171,7 +196,17 @@ export const deleteAsset = defineCommand({
       type: AssetDeleted.type,
       campaignId: row.campaignId,
       payload: { assetId, name: row.name },
-      changes: deleteChange(row),
+      changes: change(row, null),
     });
+  },
+});
+
+/** FR-ASSET-68 `assets.uses {assetId}` (#394): the Assets window's "Used in" line. Reads only. */
+export const assetUsesQuery = defineCommand({
+  name: ASSET_MANAGE_INTENTS.uses,
+  input: AssetUsesIntent,
+  execute({ assetId }, { tx, actor }): AssetUsesResult {
+    assetOf(tx, actor, assetId);
+    return { uses: assetUses(tx, assetId) };
   },
 });

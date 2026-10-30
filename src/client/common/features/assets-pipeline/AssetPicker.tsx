@@ -6,6 +6,8 @@
 // tags; `context` tags uploads. #386: Rename / Delete the selected image (FR-ASSET-66). Search and filter work on the store while disconnected; tag
 // editing needs `live`. Both reset each time the picker mounts (opens). BL-49: the header counts
 // the library's images and warns from ASSET_LIBRARY_WARN_AT on (the DM snapshot's ceiling, CON-44).
+// *(#394)* The Assets window hosts it with no `onSelect` (no Select button): double-click calls
+// `onOpen` (full-size preview) and `selectedExtra` adds the "Used in" line (FR-ASSET-69).
 import { type AssetRecord, pickerOrder } from "@shared/assets-pipeline/schemas";
 import {
   ALL_IMAGES,
@@ -29,7 +31,7 @@ import { AssetImg } from "@ui/features/assets-pipeline/AssetImg";
 import { cn } from "@ui/lib/utils";
 import { useRecords, useSync } from "@ui/sync/store";
 import { SearchIcon, UploadIcon, XIcon } from "lucide-react";
-import { type Ref, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, type Ref, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Tip } from "../../components/ui/tip";
 import { ImageActions } from "./ImageActions";
@@ -47,8 +49,12 @@ type Upload =
 const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
 export interface AssetPickerProps {
-  /** Called by "Select" with the chosen asset ID. */
-  onSelect(assetId: string): void;
+  /** Called by "Select" with the chosen asset ID. None (the Assets window): no Select button. */
+  onSelect?(assetId: string): void;
+  /** *(#394)* Double-click when there is no `onSelect` (the Assets window's preview). */
+  onOpen?(assetId: string): void;
+  /** *(#394)* Under the selected image's tag row (the Assets window's "Used in"). */
+  selectedExtra?(asset: AssetRecord): ReactNode;
   initialSelectedId?: string | null;
   selectLabel?: string;
   className?: string;
@@ -84,6 +90,8 @@ export const noMatchText = (q: string, tag: string | null) =>
 
 export function AssetPicker({
   onSelect,
+  onOpen,
+  selectedExtra,
   initialSelectedId = null,
   selectLabel = "Select",
   className,
@@ -233,16 +241,18 @@ export function AssetPicker({
           </span>
         )}
         {/* type="button": hosts embed the picker in their own form (New scene, MAP §7). */}
-        <Button
-          type="button"
-          size="sm"
-          className={cn(!everLive && "ml-auto")}
-          data-testid="asset-picker-select"
-          disabled={selectedAsset === null}
-          onClick={() => selected && onSelect(selected)}
-        >
-          {selectLabel}
-        </Button>
+        {onSelect && (
+          <Button
+            type="button"
+            size="sm"
+            className={cn(!everLive && "ml-auto")}
+            data-testid="asset-picker-select"
+            disabled={selectedAsset === null}
+            onClick={() => selected && onSelect(selected)}
+          >
+            {selectLabel}
+          </Button>
+        )}
       </div>
 
       {sizeWarning && (
@@ -298,6 +308,7 @@ export function AssetPicker({
           actions={<ImageActions asset={selectedAsset} live={live} />}
         />
       )}
+      {selectedAsset && selectedExtra?.(selectedAsset)}
 
       {upload.phase === "sending" && (
         <div data-testid="asset-upload-progress" className="flex items-center gap-2 text-xs">
@@ -373,7 +384,7 @@ export function AssetPicker({
                   aria-pressed={selected === a.id}
                   data-selected={selected === a.id || undefined}
                   onClick={() => setSelected(a.id)}
-                  onDoubleClick={() => onSelect(a.id)}
+                  onDoubleClick={() => (onSelect ? onSelect(a.id) : onOpen?.(a.id))}
                   className={cn(
                     "flex w-full flex-col gap-1 rounded-md border p-1 text-left hover:bg-accent",
                     selected === a.id && "border-primary ring-2 ring-primary",
@@ -425,7 +436,7 @@ export function AssetPickerDialog({
           // ≥ 2 grid rows at 1280 × 720 under the four picker rows (ASSET §7).
           className="max-h-[calc(80vh-6rem)]"
           onSelect={(id) => {
-            picker.onSelect(id);
+            picker.onSelect?.(id);
             onOpenChange(false);
           }}
         />

@@ -5,6 +5,7 @@ import alertSounds from "./alert-sounds";
 import alertSoundsE2e from "./alert-sounds-e2e";
 import assetAccess from "./asset-access";
 import assetLibrary from "./asset-library";
+import assetsWindowE2e from "./assets-window-e2e";
 import base from "./base";
 import campaignSwitch from "./campaign-switch";
 import cbPartyE2e from "./cb-party-e2e";
@@ -362,4 +363,6 @@ export const bundles: readonly Bundle[] = [
   imageManageE2e,
   // Tray attacks (fix/tray-core, #385): staged parts, rowless cards, Use as attack / damage
   trayAttacks,
+  // Assets window (fix/assets-window, #394): assets-window e2e
+  assetsWindowE2e,
 ];

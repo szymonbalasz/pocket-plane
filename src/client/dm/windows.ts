@@ -8,6 +8,7 @@ import { recapWindow } from "@ui/features/session-recap/window";
 import { statsWindow } from "@ui/features/stats/window";
 import { strongholdWindow } from "@ui/features/strongholds/window";
 import { assetTestWindow } from "./features/assets-pipeline/asset-test-window";
+import { assetsWindow } from "./features/assets-pipeline/assets-window";
 import { dmCompanionWindow } from "./features/character-sheet/companion-window";
 import { dmCharSheetWindow } from "./features/character-sheet/sheet-window";
 import { encountersWindow } from "./features/combat-tracker/encounters-window";
@@ -50,6 +51,7 @@ const windows: WindowDef[] = [
   dmRulesWindow, // cmp.rules (compendium, FR-CMP-63; sprint 9 SP2, seams S4)
   recapWindow, // recap.session, no launcher (session-recap, FR-RECAP-10)
   statBlockWindow, // ent.statblock "Stat block" (kit-parity K7, FR-KIT-100)
+  assetsWindow, // asset.library "Assets" (assets-pipeline, FR-ASSET-69; #394)
 ];
 
 export const dmWindows = createWindowRegistry("dm", windows);
