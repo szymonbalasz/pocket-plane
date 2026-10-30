@@ -171,10 +171,91 @@ test("FR-OVW-11 FR-OVW-12 FR-OVW-13 pan on the locked map, wheel, Fit, ping with
   await dm.mouse.click(cx, cy);
   await expect.poll(async () => (await konvaNodes(player, "map-ping")).length).toBeGreaterThan(0);
   await expect.poll(async () => (await konvaNodes(dm, "map-ping")).length).toBeGreaterThan(0);
+
+  // FR-OVW-13: Shift + ping pulls the player's view: their camera has moved, the zoom hasn't.
+  const playerCanvas = player.getByTestId("ovw-canvas");
+  const playerZoom = await playerCanvas.getAttribute("data-zoom");
+  await expect(playerCanvas).toHaveAttribute("data-camera", "fitted");
+  await dm.keyboard.down("Shift");
+  await dm.mouse.click(cx + 120, cy);
+  await dm.keyboard.up("Shift");
+  await expect(playerCanvas).toHaveAttribute("data-camera", "moved");
+  await expect(playerCanvas).toHaveAttribute("data-zoom", playerZoom ?? "");
+
+  // FR-OVW-13: a right-drag is the laser, on the player's canvas too.
   await dm.getByTestId("ovw-tool-select").click();
+  await dm.mouse.move(cx, cy);
+  await dm.mouse.down({ button: "right" });
+  await dm.mouse.move(cx + 40, cy + 20, { steps: 6 });
+  await expect.poll(async () => (await konvaNodes(player, "map-laser")).length).toBeGreaterThan(0);
+  await dm.mouse.up({ button: "right" });
+
+  // FR-OVW-23: the image is drawn whole, in its own shape.
+  const [map] = await konvaNodes(dm, "ovw-image");
+  expect((map?.width ?? 0) / (map?.height ?? 1)).toBeCloseTo(4096 / 2731, 2);
 
   await player.context().close();
   await dm.context().close();
+});
+
+test("FR-OVW-47 not live: pan, zoom and Fit still work; ping and laser are off", async ({
+  browser,
+}) => {
+  const { link } = e2eEnv();
+  const player = await rolePage(browser);
+  // The socket goes through a route that can cut it and then hold it down (as K11).
+  let hold = false;
+  const cut: (() => Promise<void>)[] = [];
+  await player.routeWebSocket(/\/ws/, (ws) => {
+    if (hold) return;
+    const server = ws.connectToServer();
+    ws.onMessage((m) => server.send(m));
+    server.onMessage((m) => ws.send(m));
+    cut.push(async () => {
+      await ws.close({ code: 4000, reason: "cut" });
+      await server.close();
+    });
+  });
+  await player.goto(link("Player 1"));
+  await live(player);
+  await expect.poll(() => itemIds(player)).toHaveLength(3);
+  const canvas = player.getByTestId("ovw-canvas");
+  await expect(canvas).toHaveAttribute("data-camera", "fitted");
+  const fitted = await canvas.getAttribute("data-zoom");
+
+  hold = true;
+  for (const c of cut) await c();
+  await expect(player.getByTestId("sync-connection-status")).not.toHaveAttribute(
+    "data-state",
+    "live",
+  );
+  // The picture stays; the camera is the viewer's own.
+  expect(await itemIds(player)).toHaveLength(3);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("no canvas box");
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await player.mouse.move(cx, cy);
+  await player.mouse.down();
+  await player.mouse.move(cx + 50, cy, { steps: 3 });
+  await player.mouse.up();
+  await expect(canvas).toHaveAttribute("data-camera", "moved");
+  await player.mouse.wheel(0, 200);
+  await expect.poll(() => canvas.getAttribute("data-zoom")).not.toBe(fitted);
+  await player.getByTestId("ovw-tool-fit").click();
+  await expect(canvas).toHaveAttribute("data-zoom", fitted ?? "");
+
+  // No laser and no ping leave a client that isn't live.
+  await player.mouse.move(cx, cy);
+  await player.mouse.down({ button: "right" });
+  await player.mouse.move(cx + 30, cy, { steps: 3 });
+  expect(await konvaNodes(player, "map-laser")).toHaveLength(0);
+  await player.mouse.up({ button: "right" });
+  await player.getByTestId("ovw-tool-ping").click();
+  await player.mouse.click(cx, cy);
+  expect(await konvaNodes(player, "map-ping")).toHaveLength(0);
+
+  await player.context().close();
 });
 
 test("FR-OVW-14 New offers Overview; an empty one says so and Fit goes to the origin at 100 %", async ({

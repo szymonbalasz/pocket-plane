@@ -10,7 +10,8 @@ let context: CanvasRenderingContext2D | null = null;
 
 /** The text's width in units; before a font has loaded, its fallback's. */
 export const measureText: MeasureText = (text, style) => {
-  context ??= document.createElement("canvas").getContext("2d");
+  if (typeof document !== "undefined")
+    context ??= document.createElement("canvas").getContext("2d");
   if (!context) return text.length * style.size * 0.5;
   context.font = fontSpec(style.font, style.size);
   return context.measureText(text).width;
