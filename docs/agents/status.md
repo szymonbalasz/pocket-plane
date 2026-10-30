@@ -2,11 +2,11 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **Sprint 14 CLOSED (DM #381, 2026-10-29).** Everything merged, `main` green, no agents running. Also done: Agent / MCP API track (#378–#380, other session; DM: register the MCP server once), AoE cell origin (#375, #377), Map effects default Full (#376). **Done: tray attacks (#385–#391)**: spec merged (ADR-0073); build slices `fix/tray-core` → `fix/tray-compose` → `fix/tray-buttons`, `fix/tray-use-roll` ∥ after core (CBT §14.8). No locks. Evidence `.verify/tray-attacks/`. Sprint 15 planning after (candidates below). Decisions up to #381. All worktrees linked to workspace wR.
+**Phase:** **5etools import (#395, 2026-10-30)** — spec [compendium-expansion](../specs/post-mvp/compendium-expansion.md) complete, ADR-0074 accepted. Wave 1: `fix/cmpx-core` ∥ `build/cmpx-adapter`. Wave 2 (after both merge): `build/cmpx-panel` ∥ `build/cmpx-art` (merge panel first). Sprint 15 planning (candidates: BL-146 with BL-143–145, BL-124 / BL-152, BL-151, BL-125–127, BL-149 / BL-150, BL-153, BL-154, BL-123, BL-142) after. Note: the main checkout is on `fix/creatures-custom-only` with uncommitted work (another session); integrate via worktrees, don't touch it.
 
-**Resume (in order):**
-1. Sprint 15 planning with the DM. Candidates (backlog, open): window frame BL-146 (decided #381: zone round-trip memory) with BL-143–145 (the replay exemptions) and BL-124 / BL-152 (grips, resize cost); toasts BL-151 (player toast over the sheet's End button); kit look BL-125 / BL-126 / BL-127 (Gilt & Stone Game log and Initiative rows, `data-variant`), BL-149 / BL-150 (stat block height, attack property chips); AoE label BL-153; CI flakes BL-147, BL-154; small BL-123, BL-142.
-2. Slice definitions live in `%TEMP%/pocket-plane/slices.json` (backup `.verify/sprint14/slices.json`); `mkbuild.py` briefs carry the CI loop (AGENTS §9.4.1); walkthrough templates `%TEMP%/pocket-plane/briefs/tpl-test-*.md` (sprint 14: `tpl-test-s14f{1,2,3,4}`, `-vfxcore`, `-vfx`, `-aoecell`).
+**Shared-file locks:** `fix/cmpx-core` holds `src/server/db/`, `src/server/config.ts`, `.env.example`, AGENTS.md §9.2, `docs/data-model/`. `build/cmpx-adapter` adds new files only (`src/server/features/compendium/adapter/5etools/`, `fixtures/5etools-mini/`, `scripts/cmpx-probe.ts`).
+
+**Briefs:** `%TEMP%/pocket-plane/briefs/{build,test}-cmpx-*.md`.
 
 **Gates on `main`:** GitHub CI (#368). After each merge: push `main`, `bun run ci:watch` in the background; red `main` is fixed first. (`gates-main` removed.)
 
@@ -56,6 +56,11 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Tray S3 two buttons everywhere | merged (#391) | — | **merged** (T5–T9, T14 PASS + re-test 4/4; CI 19/19) | — |
 | Tray S4 Use as from the log | merged a0f776fc | — | **merged** (T10–T13 PASS; CI 19/19; #389) | — |
 | Map effects default Full (#376) | merged | — | **merged** (check + spell-fx / prefs-window e2e green; CI green after a BL-147 re-run) | — |
+| 5etools spec (#395) | merged | — | **complete** (ADR-0074; OQ-CMPX-01–08 all A) | — |
+| CMPX core: config, schema, replaced entries, presets, bench | `fix/cmpx-core` | build-cmpx-core | building | walkthrough after wave 2 |
+| CMPX adapter: 5etools reader + mapping + fixtures `5etools-mini` + probe | `build/cmpx-adapter` | build-cmpx-adapter | building | — |
+| CMPX panel: import wiring, panel, bundle `cmpx-5etools`, e2e | `build/cmpx-panel` | — | waits on wave 1 | walkthrough X1+X2 |
+| CMPX art: token art on first placement | `build/cmpx-art` | — | waits on wave 1 | walkthrough X3 |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 

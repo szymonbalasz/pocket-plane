@@ -42,6 +42,8 @@ Canonical terms. Use these exactly. To add or change a term, raise `Glossary: �
 | **Compendium entry** | One record in the compendium. | Entity |
 | **Search group** | Compendium entries with the same kind, name and source, shown as one expandable search row ([compendium](specs/compendium.md)). | — |
 | **Source** | Origin of imported data (e.g. fixtures, Open5e, 5etools JSON, homebrew), with licence/provenance. | Asset |
+| **Book** | One 5etools source (a book or adventure abbreviation, e.g. MM), imported as one compendium source `5et-<abbr>` ([compendium-expansion](specs/post-mvp/compendium-expansion.md)). | Source |
+| **Replaced entry** | An imported compendium entry that another imported entry `replaces` (its SRD copy, or a reprint's original): hidden from search, still readable by id ([ADR-0074](architecture/adr/0074-user-supplied-sources.md)). | Superseded entry |
 | **Source rank** | Order of sources on equal search tiers: own, bundled, other imported, fixture ([compendium](specs/compendium.md)). | — |
 | **Adapter** | Bespoke code for one source that turns its data into normalised records for the import pipeline ([ADR-0015](architecture/adr/0015-source-adapters-fixtures.md)). | Import pipeline |
 | **Import pipeline** | Fixed core: validate normalised records → upsert by (source, sourceKey) → provenance. Fed by adapters. | Adapter |

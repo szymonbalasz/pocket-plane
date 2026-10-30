@@ -68,6 +68,8 @@ phase: post-mvp-9
 | FR-CMP-68 | Attribution + "split into cards" note | `FR-CMP-68 attribution` |
 | FR-CMP-71–75 | 0 B, import / search cost, states, test IDs | `FR-CMP-71 CON-44 rules 0 B` |
 
+> **Amended by [ADR-0074](../architecture/adr/0074-user-supplied-sources.md) (#395, [compendium-expansion](post-mvp/compendium-expansion.md)):** user-supplied 5etools book sources besides bundled `srd-5.1` (FR-CMP-04, -06), replaced entries hidden from search (FR-CMP-34, -35, -36, -17) and their presets inherited (FR-CMP-29).
+
 ## 1. Summary
 
 - A searchable library of SRD 5.1 rules content (**monsters, spells, items, conditions, class features**), imported offline from data bundled in the repo, plus per-campaign **homebrew**. DM decision [#203](../decisions-log.md); system = 5e 2014 SRD ([#23](../decisions-log.md)).

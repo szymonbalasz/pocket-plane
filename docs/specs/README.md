@@ -144,7 +144,7 @@ Stubs only. Not to be claimed during MVP spec phase.
 | [World builder](post-mvp/world-builder.md) | WORLD | Incl. location ↔ scenes |
 | [Dice extras](post-mvp/dice-extras.md) | DICEX | Whispers only (the rest is in [dice-extras](dice-extras.md)) |
 | [Campaign manager](post-mvp/campaign-manager.md) | CMGR | |
-| [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | |
+| [Compendium expansion](post-mvp/compendium-expansion.md) | CMPX | 5etools import: books, replaced entries, token art; complete (#395), [ADR-0074](../architecture/adr/0074-user-supplied-sources.md) |
 | [Levelling workflows](post-mvp/levelling.md) | LVL | |
 | [Agent / MCP API](agent-api.md) | AGENT | Expanded (#378), complete (#379); [ADR-0072](../architecture/adr/0072-agent-mcp-server.md) |
 | [Theme system](post-mvp/theme-system.md) | THEME | Expanded, see [Art track](#art-track-2026-10-25) |
