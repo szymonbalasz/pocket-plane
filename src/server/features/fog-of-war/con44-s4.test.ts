@@ -3,14 +3,13 @@
 // walls on a 120 × 120 map, every source at its own origin) with 12 and 24 sources on the scene
 // (12 count, FR-FOG-52). Bounds: DM < 1 MiB, players < 512 KiB (#208, never raised); a player's
 // own `vision` ≤ 48 KiB; a player's whole `vision` type (own + shared) ≤ 192 KiB; the View as
-// Party ack at caps (12 sources + 6 memory rows at the run cap) ≤ 192 KiB. Figures logged.
+// Party ack at caps (12 sources + 6 memory rows at the vertex cap) ≤ 640 KiB. Figures logged.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
-import { encodeRuns } from "@shared/fog-of-war/mask";
 import {
+  EXPLORED_VERTICES_MAX,
   FOG_INTENTS as F,
   FOG_EXPLORED_TYPE,
-  FOG_RUNS_MAX,
   FOG_SETTINGS_TYPE,
   VISION_TYPE,
   type VisionRecord,
@@ -34,10 +33,11 @@ import {
   snapshotFrames,
   snapshotSizes,
 } from "../../ws/testing/snapshot-size";
+import { ringShape } from "./testing";
 
 const OWN_VISION_MAX = 48 * 1024;
 const VISION_TYPE_MAX = 192 * 1024;
-const PARTY_ACK_MAX = 192 * 1024;
+const PARTY_ACK_MAX = 640 * 1024;
 const AT = "2026-01-01T00:00:00.000Z";
 
 /** One player's own `vision` bytes in a snapshot frame. */
@@ -188,29 +188,21 @@ describe("CON-44 sprint 4 (FOG §12, #208): 999 ft default and party vision", ()
     run(F.setPartyVision, { on: false });
     const own = measure();
     expect(own.own).toBeLessThanOrEqual(OWN_VISION_MAX);
-    // View as Party: 12 sources + every player's memory at the run cap.
+    // View as Party: 12 sources + every player's memory at the vertex cap.
     run(F.setPartyVision, { on: true });
-    const cells = 120 * 120;
-    const a = new Uint8Array(cells);
-    const step = Math.max(1, Math.floor(cells / FOG_RUNS_MAX));
-    for (let i = 0; i < cells; i++) a[i] = Math.floor(i / step) % 2;
-    const runs = encodeRuns(a, "fog");
+    const shape = ringShape(EXPLORED_VERTICES_MAX);
     for (const p of players) {
       db.insert(fogExplored)
         .values({
           sceneId: battle.id,
           playerId: p.id,
           campaignId: cid,
-          col0: 0,
-          row0: 0,
-          cols: 120,
-          rows: 120,
-          runs,
+          shape,
           updatedAt: AT,
         })
         .onConflictDoUpdate({
           target: [fogExplored.sceneId, fogExplored.playerId],
-          set: { cols: 120, rows: 120, runs },
+          set: { shape },
         })
         .run();
     }

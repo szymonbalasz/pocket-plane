@@ -8,6 +8,19 @@ import { sceneFog } from "../../db/schema";
  * A scene as created before this build: no `fog` row, every cell clear (FR-FOG-01). Fog's own
  * command / hook tests start from it; new scenes get a fully fogged row (FR-FOG-02).
  */
+/** An explored shape of one ring with `vertices` vertices (FR-FOG-37), for the size bounds. */
+export function ringShape(vertices: number): number[][][] {
+  const flat: number[] = [];
+  for (let i = 0; i < vertices; i++) {
+    const a = (2 * Math.PI * i) / vertices;
+    flat.push(
+      Math.round((60 + 50 * Math.cos(a)) * 100) / 100,
+      Math.round((60 + 50 * Math.sin(a)) * 100) / 100,
+    );
+  }
+  return [[flat]];
+}
+
 export function dropFogRow(db: Pick<Db, "delete">, sceneId: string): void {
   db.delete(sceneFog).where(eq(sceneFog.sceneId, sceneId)).run();
 }

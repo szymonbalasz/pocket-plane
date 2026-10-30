@@ -37,6 +37,7 @@
     "hono": "^4.13.13",
     "konva": "^10.7.1",
     "lucide-react": "^1.55.0",
+    "polygon-clipping": "0.15.7",
     "radix-ui": "^1.8.0",
     "random-js": "2.1.0",
     "react": "^19.3.0",

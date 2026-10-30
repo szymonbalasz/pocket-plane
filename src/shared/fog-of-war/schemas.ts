@@ -146,13 +146,21 @@ export type PlayerFogRecord = z.infer<typeof PlayerFogRecord>;
 /** Wire id of a per-(scene, player) row: `sceneId:playerId` (FR-FOG-37 / -39). */
 export const scenePlayerId = (sceneId: string, playerId: string) => `${sceneId}:${playerId}`;
 
-/** `fog-explored` (FR-FOG-37): the player's explored cells; full to that player only. */
+/**
+ * FR-FOG-37 (ADR-0076): what a player has seen, exactly: polygons → rings (outline, then holes) →
+ * flat `[x, y, …]` in grid units, 2 decimals, no closing vertex.
+ */
+export const ExploredShape = z.array(z.array(z.array(z.number())));
+export type ExploredShape = z.infer<typeof ExploredShape>;
+/** FR-FOG-37: over this many vertices the memory stops growing. */
+export const EXPLORED_VERTICES_MAX = 5000;
+
+/** `fog-explored` (FR-FOG-37): the player's explored shape; full to that player only. */
 export const FogExploredRecord = z.object({
   id: z.string(),
   sceneId: z.string(),
   playerId: z.string(),
-  box: FogBox,
-  runs: z.string(),
+  shape: ExploredShape,
 });
 export type FogExploredRecord = z.infer<typeof FogExploredRecord>;
 

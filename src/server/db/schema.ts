@@ -37,6 +37,7 @@ import {
 import { DAMAGE_MULTIPLIERS } from "@shared/events/combat-tracker";
 import { ROLL_CATEGORIES, ROLL_MODES } from "@shared/events/dice-roll-log";
 import { ENDPOINT_KINDS, LOOT_ENTRY_KINDS } from "@shared/events/party-loot";
+import type { ExploredShape } from "@shared/fog-of-war/schemas";
 import {
   type DoorSeen,
   FOG_EDIT_KINDS,
@@ -1385,10 +1386,37 @@ export const sceneFogEdit = sqliteTable(
 export const sceneFogEditSeqNext = sql<number>`(select coalesce(max(${sceneFogEdit.seq}), 0) + 1 from ${sceneFogEdit})`;
 
 /**
- * Explored memory (FR-FOG-37): one row per (scene, player), cells as box + runs (FR-FOG-04
- * codec), never shrinks. Wire id `sceneId:playerId`. Cascades with its scene and its player.
+ * Explored memory (FR-FOG-37, ADR-0076): one row per (scene, player), one exact shape in grid
+ * units, never shrinks. Wire id `sceneId:playerId`. Cascades with its scene and its player.
  */
 export const fogExplored = sqliteTable(
+  "fog_explored_shape",
+  {
+    sceneId: text("scene_id")
+      .notNull()
+      .references((): AnySQLiteColumn => scene.id, { onDelete: "cascade" }),
+    playerId: text("player_id")
+      .notNull()
+      .references((): AnySQLiteColumn => player.id, { onDelete: "cascade" }),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    shape: text("shape", { mode: "json" }).$type<ExploredShape>().notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sceneId, t.playerId] }),
+    index("fog_explored_shape_campaign").on(t.campaignId),
+    index("fog_explored_shape_player").on(t.playerId),
+  ],
+);
+
+/**
+ * The per-cell explored memory before ADR-0076 (box + runs, FR-FOG-04 codec): rows are converted
+ * into `fogExplored` and deleted at start (`explored-shape-upgrade.ts`). Nothing else reads it;
+ * the table goes away at the first release migration.
+ */
+export const legacyFogExplored = sqliteTable(
   "fog_explored",
   {
     sceneId: text("scene_id")
@@ -1851,6 +1879,7 @@ export const schema = {
   sceneFog,
   sceneFogEdit,
   fogExplored,
+  legacyFogExplored,
   fogSettings,
   sceneStructure,
   prop,

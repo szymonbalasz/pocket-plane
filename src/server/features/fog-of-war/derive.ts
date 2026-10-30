@@ -12,8 +12,9 @@
 // party's (`partyVision`: every player's polygons; party-blind = every player with sources is
 // blind), written into `seenBy` here, so visibility fns still read only record + viewer. Pure
 // apart from the reads.
-import { exploredMask } from "@shared/fog-of-war/explored";
+import { shapeHolds } from "@shared/fog-of-war/explored";
 import { type FogMask as Mask, maskOf } from "@shared/fog-of-war/mask";
+import type { ExploredShape } from "@shared/fog-of-war/schemas";
 import type { FogLayerShape } from "@shared/fog-of-war/shapes";
 import { type Box, type DarknessRow, shapeBox } from "@shared/fog-of-war/shapes";
 import {
@@ -225,23 +226,11 @@ export function sameSeenBy(a: readonly string[] | null | undefined, b: readonly 
   return b.every((p) => s.has(p));
 }
 
-/** Each player's explored memory on a scene (FR-FOG-37; cell 1 = explored). */
-export function loadMemory(read: SceneRead, sceneId: string): Map<string, Mask> {
+/** Each player's explored memory on a scene (FR-FOG-37). */
+export function loadMemory(read: SceneRead, sceneId: string): Map<string, ExploredShape> {
   const rows = read.select().from(fogExplored).where(eq(fogExplored.sceneId, sceneId)).all();
-  return new Map(
-    rows.map((r) => [
-      r.playerId,
-      exploredMask({ box: [r.col0, r.row0, r.cols, r.rows], runs: r.runs }),
-    ]),
-  );
+  return new Map(rows.map((r) => [r.playerId, r.shape]));
 }
-
-const memoryHas = (m: Mask, col: number, row: number) => {
-  const [col0, row0, cols, rows] = m.box;
-  const c = col - col0;
-  const r = row - row0;
-  return c >= 0 && r >= 0 && c < cols && r < rows && m.cells[r * cols + c] === 1;
-};
 
 /** Does a flat polygon meet a box (boundary-inclusive)? A vertex in it, a corner in the polygon, or an edge across it. */
 export function polygonMeetsBox(flat: readonly number[], [x0, y0, x1, y1]: Box): boolean {
@@ -309,7 +298,7 @@ function segmentMeetsBox([ax, ay]: [number, number], [bx, by]: [number, number],
 export function darknessSeenBy(
   st: SceneStatic,
   d: DarknessRow,
-  memory: ReadonlyMap<string, Mask>,
+  memory: ReadonlyMap<string, ExploredShape>,
 ): string[] {
   const box = shapeBox(d);
   const [x0, y0, x1, y1] = box;
@@ -327,7 +316,9 @@ export function darknessSeenBy(
     for (let c = c0; c <= c1; c++) {
       if (samplePoint(st.layer, c + 0.5, r + 0.5).state !== "fog") return [...st.players];
       for (const p of remembered) {
-        if (!seen.has(p) && memoryHas(memory.get(p) as Mask, c, r)) seen.add(p);
+        if (!seen.has(p) && shapeHolds(memory.get(p) as ExploredShape, c + 0.5, r + 0.5)) {
+          seen.add(p);
+        }
       }
     }
   }

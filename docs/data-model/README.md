@@ -1131,7 +1131,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG, `complete`; spri
 |---|---|---|---|---|
 | `scene_fog` | + `shapes` (JSON `{op, rect \| polygon \| circle}[]` ≤ 100), `darkness` (JSON `{id, rect \| polygon \| circle, seenBy?}[]` ≤ 20), `explored` (bool), `rev` (int, + 1 per fog write), `visionStale` (bool) | `[]`, `[]`, false, 0, false | DM: shapes, darkness **without** `seenBy`, `explored`; players: shapes, darkness with the viewer in `seenBy`, `explored`; `rev`, `visionStale` server only | [FR-FOG-26–29](../specs/fog-of-war.md#6-functional-requirements), -35, -38, -44 |
 | `scene_fog_edit` | + `prevShapes`, `prevDarkness` (JSON, nullable); `kind` + `reveal-shape`, `fog-shape`, `explored-shape`, `darkness-place`, `darkness-move`, `darkness-remove`, `darkness-clear` | null (pre-v2 rows: undo → shapes `[]`, darkness unchanged) | DM: depth + latest kind on `fog` | FR-FOG-07 |
-| `fog_explored` (new, record type `fog-explored`) | see below | no row = nothing explored | the row's player only; DM on demand (View as) | [FR-FOG-37](../specs/fog-of-war.md#6-functional-requirements), -43 |
+| `fog_explored_shape` (new, record type `fog-explored`) | see below | no row = nothing explored | the row's player only; DM on demand (View as) | [FR-FOG-37](../specs/fog-of-war.md#6-functional-requirements), -43 |
 | `token`, `prop`, `aoe_template` | + `seen_by` (JSON player ids, nullable) | null = pre-v2: **hidden for every player** until the boot backfill (fail closed) | **server only**: no wire carries it (`dmRedact` / `redact` strip it) | [FR-FOG-10](../specs/fog-of-war.md#6-functional-requirements), -40 |
 | `token` | + `invisible` (bool, #210) | false | DM wire only when true; players never get the key | [FR-FOG-45](../specs/fog-of-war.md#6-functional-requirements) |
 | `scene_structure` | + `door_seen` (JSON `{<n>: playerId[]}`, nullable) | null = pre-v2: no door for any player until the backfill | server only | [FR-SCN-36](../specs/scene-tools.md#6-functional-requirements) |
@@ -1139,12 +1139,12 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG, `complete`; spri
 | `entity.statBlock.senses` (JSON leaf, both kinds) | `{visionFt, darkvisionFt: int 0–120 step 5, seesMagicalDarkness: bool, seesInvisible?: bool}` (zod in V0; `char.edit` key **built** in V5, [protocol §39](../protocol/README.md#39-sprint-3-sheet-senses-v5); `seesInvisible` stored only when true) | absent = 0, 0, false, false | not on the other-players whitelist (DM + owner only) | [FR-CHARX-49 / -53](../specs/character-sheet-full.md#6-functional-requirements) |
 | `vision` (record type, **derived**, no table) | `{id = sceneId:playerId, sceneId, playerId, blind, see, dark, inv?}` | none in V0 (no source) | that player only; DM on demand (View as) | [FR-FOG-39](../specs/fog-of-war.md#6-functional-requirements) |
 
-### Explored memory (`fog_explored`, record type `fog-explored`) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
+### Explored memory (`fog_explored_shape`, record type `fog-explored`, [ADR-0076](../architecture/adr/0076-explored-memory-shapes.md)) — owner [fog-of-war](../specs/fog-of-war.md#8-data-model)
 
 | Field | Type | Rule | Source |
 |---|---|---|---|
 | sceneId + playerId (PK), campaignId | ID → Scene (`ON DELETE CASCADE`), ID → Player (`ON DELETE CASCADE`), ID → Campaign | One row per (scene, player); wire `id` = `sceneId:playerId` | FOG §8 |
-| col0, row0, cols, rows; runs | int ×4; text | FR-FOG-04 codec; never shrinks; > 2,000 runs → stops growing (V2 writes it) | FR-FOG-37 |
+| shape | JSON | Polygons → rings (outline, then holes) → flat `[x, y, …]`, grid units, 2 decimals; never shrinks; ≥ 5,000 vertices → stops growing. The old `fog_explored` (box + runs) is emptied at start and dropped at release | FR-FOG-37 |
 | updatedAt | timestamp | `ctx.clock` | FOG §8 |
 
 - **Per-player copies** (FR-FOG-10 / -34, V0 static): a subject's sample points (token / prop / template: footprint cell centres, templates uncut; door: FR-SCN-36's points = `doorCells` centres on integer doors, 2 per cell-length piece on freeform ones) are tested once against the static state (base mask, then shapes in order; boundary-inclusive) and darkness. `seenBy` = every player of the campaign iff a point is statically clear and outside darkness, else `[]`; owned token = every player (owner + party); unowned **invisible** token = `[]`; a player-placed template is no fog subject (every player). `fogged` = seen by nobody (players exist) or statically hidden (no players); an owned token's `fogged` = statically hidden (sprint 2's value). Doors: `doorSeen[n]` likewise, `f = 1` iff seen by nobody.
@@ -1228,7 +1228,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V1). *
 | `scene_fog.darkness` | darkness intents, `fog.undo`; `seenBy` by every scene re-derive | ≤ 20; ids from `ctx.ids`; serialized DM row ≤ 16 KiB; `seenBy` (V1, static) = every player when some cell centre inside the shape's bounding box is statically clear or explored, plus each player with an explored-memory cell there; else `[]`. Sight polygons join in V2. A scene duplicate re-derives the copy's `seenBy` (no memory there) | FR-FOG-28, -30, -44 |
 | `scene_fog.explored` | `fog.setExplored` | default false; not in the undo stack | FR-FOG-29 |
 | `scene_fog_edit` | every undoable fog command | kinds per protocol §42; `prevShapes` / `prevDarkness` = the row before (darkness with its `seenBy`, re-derived on restore) | FR-FOG-07 |
-| `fog_explored` | `fog.forgetExplored` (delete all rows of the scene) | runs decode as "1 = explored" (`@shared/fog-of-war/explored`, corrupt → nothing explored); growth lands in V2 | FR-FOG-31, -37 |
+| `fog_explored_shape` | `fog.forgetExplored` (delete all rows of the scene) | read through `@shared/fog-of-war/explored` | FR-FOG-31, -37 |
 
 - **Derived (V1):** static state with shapes (`samplePoint` on a prepared layer, once per point per re-derive), darkness containment, darkness `seenBy` (static part). Client: draft, Ctrl "free" flag, darkness selection and drag offset.
 - **CON-44:** unchanged (no new record type or field; V0's measured `fog` row at 12 typical shapes + 2 darkness shapes stands, §26).
@@ -1372,7 +1372,7 @@ From [fog-of-war](../specs/fog-of-war.md#8-data-model) v2 (FOG §14 slice V2). *
 | `token.invisible` | `fog.setInvisible` (DM); `map.duplicateToken` copies it; placement false | bool; DM wire only, never a player's | FR-FOG-45 |
 | `scene_fog.darkness[].seenBy` | every re-derive | + the players whose sight polygons meet the shape's bounding box (V1's static part kept) | FR-FOG-44 |
 | `scene_fog.visionStale` | senses edit / player add → true on non-active scenes with a fog row; the activation re-derive and any full scene re-derive → false | — | FR-FOG-35 |
-| `fog_explored` (one row per scene × player) | every re-derive on the **active** scene with `explored` on, for the players it lists | the stored cells OR the cells whose centre lies in one of P's polygons (`see` or `dark`); box = the scene's fog box (rebased); never shrinks; > 2,000 runs → not written (`warn`) | FR-FOG-37 |
+| `fog_explored_shape` (one row per scene × player) | every re-derive on the **active** scene with `explored` on, for the players it lists, when a polygon adds real ground | the stored shape plus what P's polygons (`see` or `dark`) add; never shrinks; ≥ 5,000 vertices → not written (`warn`) | FR-FOG-37 |
 
 - **Sources** (FR-FOG-32): tokens with `ownerPlayerId` of a campaign player, not `hidden`; per player oldest `seq` first, ≤ 4 (more → `warn`, ignored); senses = the definition's `statBlock.senses` (absent = 0); origin = footprint centre.
 - **Derived** (not stored): each player's sight (`see` / `dark` polygons, `blind`, `inv`), the `vision` record; the vision cache (server memory, per connection, LRU 256, written after commit).

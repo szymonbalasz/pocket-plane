@@ -120,8 +120,7 @@ export function toExploredRecord(r: ExploredRow): FogExploredRecord {
     id: scenePlayerId(r.sceneId, r.playerId),
     sceneId: r.sceneId,
     playerId: r.playerId,
-    box: [r.col0, r.row0, r.cols, r.rows],
-    runs: r.runs,
+    shape: r.shape,
   };
 }
 
