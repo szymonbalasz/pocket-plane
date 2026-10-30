@@ -162,6 +162,7 @@ DM decisions [#204](../decisions-log.md), [#205](../decisions-log.md): the sprin
 | BL-156 | Tray attacks: `attackItemOf` / `damageItemsOf` exist twice (server `combat-tracker/use-roll.ts` and the client Use-as action, #389): move them to `@shared/combat-tracker` | S | combat-tracker use-roll | none | — | open |
 | BL-157 | Tray attacks: Initiative **Attack ▸** menu items show no hint (no "Alt: roll now"; re-test `.verify/tray-attacks/20261029-235059-tray-buttons-retest/` 12); the Use-roll step opens at the default popup spot, not by its log line (#389) | S | DM combat-tracker attack-choices, use-roll step | none | — | open |
 | BL-158 | Flaky e2e `roll-popup.e2e.ts` FR-DICEX-39 (bundle dice-display): `dicex-throw[data-arena="screen"]` never reaches `data-state="rest"` within 6 s, attempt + retry (`main` 8deecdb9 run 40938952473, `fix/ci-popup-line-tooltip` run 40963946880; re-run green both times): 3D throw under CI load | S | e2e roll-popup | none | — | open |
+| BL-159 | Unit test `roll-popup.test.tsx` FR-DICEX-49 fails inside its `bun run check` shard (17 files) but passes alone, on `main` too (seen on `fix/tooltip-stray-close`, 2026-10-30): state leaking between test files in one `bun test` process; find the leaking file and reset it | S | `roll-popup.test.tsx`, test preload | none | — | open |
 
 ## How to add items
 
