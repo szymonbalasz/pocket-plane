@@ -404,7 +404,8 @@ describe("FR-THEME-16 fonts", () => {
     for (const [t, v] of guard) {
       expect({ t, web: FAMILIES.some((f) => v.includes(f)) }).toEqual({ t, web: false });
     }
-    // No other client file names a theme font family (it would download it under Default).
+    // No other client file names a theme font family (it would download it under Default). The one
+    // exception is FR-OVW-30: a label names its font, which loads only when a label uses it.
     const files = (dir: string): string[] =>
       readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
         e.isDirectory()
@@ -420,6 +421,7 @@ describe("FR-THEME-16 fonts", () => {
       })
       .map((f) => relative(ROOT, f).replaceAll("\\", "/"));
     expect(naming.sort()).toEqual([
+      "src/client/common/features/overview-scenes/item-layout.ts",
       "src/client/common/styles.css",
       "src/client/common/themes/fonts.css",
     ]);
