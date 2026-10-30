@@ -250,6 +250,25 @@ export const SourceKey = z
   .max(200)
   .regex(/^(monster|spell|item|condition|feature|rule)\/[a-z0-9-]+(?:\/[a-z0-9-]+)*$/);
 
+/** FR-CMPX-13: `<source>:<sourceKey>` of an entry an imported entry replaces. */
+export const REPLACES_MAX = 20;
+export const ReplacedRef = z
+  .string()
+  .max(265)
+  .refine((r) => {
+    const i = r.indexOf(":");
+    return i >= 1 && i <= 64 && SourceKey.safeParse(r.slice(i + 1)).success;
+  }, "Expected <source>:<kind>/<slug>");
+
+/**
+ * FR-CMPX-23: a token file relative to the 5etools folder. Starting `img/` also rules out a drive
+ * and a leading `/`. Checked at write and again before every read.
+ */
+export const ART_PATH_MAX = 200;
+export const isValidArtPath = (p: string): boolean =>
+  p.length <= ART_PATH_MAX && p.startsWith("img/") && !p.includes("..") && !p.includes("\\");
+export const ArtPath = z.string().refine(isValidArtPath, "Not a valid art path");
+
 /** `compendium_source` (global, FR-CMP-04). */
 export const CompendiumSource = z.strictObject({
   key: z.string().min(1).max(64),

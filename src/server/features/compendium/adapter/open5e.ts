@@ -68,8 +68,17 @@ export type AdapterRecord =
       sourceKey: string;
       data: EntryDraftOf<"monster">;
       definition: MonsterDefinition;
+      /** FR-CMPX-23: the token file, relative to the source's folder. */
+      artPath?: string | null;
+      /** FR-CMPX-13: `<source>:<sourceKey>` refs of the entries this one replaces. */
+      replaces?: string[];
     }
-  | { kind: Exclude<CompendiumKind, "monster">; sourceKey: string; data: EntryDraft };
+  | {
+      kind: Exclude<CompendiumKind, "monster">;
+      sourceKey: string;
+      data: EntryDraft;
+      replaces?: string[];
+    };
 
 export interface AdapterWarning {
   /** `<kind>/<slug>` when known, else `<endpoint>#<index>`. */

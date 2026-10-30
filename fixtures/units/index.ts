@@ -56,6 +56,7 @@ import cmpSearchHomebrew from "./compendium/cmp-search-homebrew";
 import cmpSrdFull from "./compendium/cmp-srd-full";
 import cmpSrdMini from "./compendium/cmp-srd-mini";
 import cmpSrdMiniS3 from "./compendium/cmp-srd-mini-s3";
+import cmpxBooks from "./compendium/cmpx-books";
 import dicexLooks from "./dice-extras/dicex-looks";
 import dicexMacros from "./dice-extras/dicex-macros";
 import dicexNotationText from "./dice-extras/dicex-notation-text";
@@ -331,4 +332,6 @@ export const units: readonly Fixture[] = [
   restSpent,
   // Tray attacks (fix/tray-core, #385): three unused plain log lines for Use as attack / damage
   trayLogRolls,
+  // Compendium expansion core (fix/cmpx-core): two hand-made books
+  cmpxBooks,
 ];
