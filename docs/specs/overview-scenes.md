@@ -1,14 +1,14 @@
 ---
 title: Overview scenes
 prefix: OVW
-status: in-review
+status: complete
 owner: spec-overview-scenes
 phase: post-mvp
 ---
 
 # Overview scenes
 
-> Five-minute read: §1–§5 and the table below; §6 onward is the reference for builders. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Scope as the DM set it on 2026-10-30. Cross-cutting design: [proposed ADR](../architecture/adr/proposed-overview-scenes.md).
+> Five-minute read: §1–§5 and the table below; §6 onward is the reference for builders. Bullets over prose. See [AGENTS.md](../../AGENTS.md). Scope as the DM set it on 2026-10-30; complete (decisions [#398](../decisions-log.md)). Cross-cutting design: [ADR-0075](../architecture/adr/0075-overview-scenes.md).
 
 ### At a glance
 
@@ -69,7 +69,7 @@ phase: post-mvp
 
 ## 6. Functional requirements
 
-Campaign = `env.actor.campaignId`; IDs and time from `env.ctx` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). Every command is one transaction with its event-log row, except moves (FR-OVW-17). **Units**: 1 unit = 1 px at 100 % zoom. Numbers marked *(proposed)* are picks for review ([OQ-OVW-02](#15-open-questions)).
+Campaign = `env.actor.campaignId`; IDs and time from `env.ctx` ([ADR-0022](../architecture/adr/0022-deterministic-seams.md)). Every command is one transaction with its event-log row, except moves (FR-OVW-17). **Units**: 1 unit = 1 px at 100 % zoom. Numbers marked *(proposed)* are decided ([OQ-OVW-02](#15-open-questions)); measure at build.
 
 ### 6.1 Overview records and Show
 
@@ -292,7 +292,7 @@ Evidence under `.verify/<run-id>/`. Teardown: stop, `bun run fixtures:reset --pr
 | [assets-pipeline](assets-pipeline.md) | `assets.require`, picker, use kinds | Built; one kind added |
 | [entities](entities.md) | Definition-changed hook registry, `petPresent` | Built; one line each |
 | [combat-tracker](combat-tracker.md) | `partyOf`; Start reads the viewed scene | Built; no change |
-| [Proposed ADR](../architecture/adr/proposed-overview-scenes.md) | Decisions 1–5 | Needs acceptance |
+| [ADR-0075](../architecture/adr/0075-overview-scenes.md) | Decisions 1–5 | Accepted (#398) |
 
 **Build split:** worktrees from `origin/main`, one after the other up to Images; Labels and Miniatures may run in parallel.
 
@@ -308,15 +308,15 @@ A slice merges after its targeted `bun run check` and its own walkthrough steps 
 
 ## 15. Open questions
 
-**Bold** option = suggested pick (not decided). Owner of every non-blocking row: the DM, at spec review.
+All decided at spec review ([#398](../decisions-log.md)): every bold pick accepted.
 
 | ID | Question | Options (pick marked) | Blocking? | Affects |
 |---|---|---|---|---|
-| OQ-OVW-01 | Accept the [proposed ADR](../architecture/adr/proposed-overview-scenes.md)? | **Accept** / change a decision | yes | All |
-| OQ-OVW-02 | Caps: 50 overviews per campaign, 300 items per overview, 3,000 per campaign, 50 per group action | **As written** / other numbers | no | §6, §12 |
-| OQ-OVW-03 | Glossary: add **Overview**, **Overview item**, **Place label**, **Miniature**; **Scene** and **Active scene** gain a note that an overview can be what's shown | **Add** / other names | no | Glossary, integrator |
-| OQ-OVW-04 | Label text always right of the dot. Later a left or below option? | **Right only for now** / add now | no | FR-OVW-29 |
-| OQ-OVW-05 | Picker context for overview images: existing `map` tags new uploads "Maps", scrolls included | **`map`** / new "Overviews" tag | no | FR-OVW-22, assets-pipeline |
+| OQ-OVW-01 | Accept the [ADR](../architecture/adr/0075-overview-scenes.md)? | **Accept** / change a decision | decided | All |
+| OQ-OVW-02 | Caps: 50 overviews per campaign, 300 items per overview, 3,000 per campaign, 50 per group action | **As written** / other numbers | decided | §6, §12 |
+| OQ-OVW-03 | Glossary: add **Overview**, **Overview item**, **Place label**, **Miniature**; **Scene** and **Active scene** gain a note that an overview can be what's shown | **Add** / other names | decided | Glossary, integrator |
+| OQ-OVW-04 | Label text always right of the dot. Later a left or below option? | **Right only for now** / add now | decided | FR-OVW-29 |
+| OQ-OVW-05 | Picker context for overview images: existing `map` tags new uploads "Maps", scrolls included | **`map`** / new "Overviews" tag | decided | FR-OVW-22, assets-pipeline |
 
 ## 16. Out of scope
 

@@ -1,6 +1,6 @@
-# Proposed — Overview scenes: a second kind of scene on its own tables and canvas
+# 0075 — Overview scenes: a second kind of scene on its own tables and canvas
 
-- Status: proposed. Raised by `spec/overview-scenes`; the DM picked the approach on 2026-10-30, acceptance is at spec review
+- Status: accepted (DM, [#398](../../decisions-log.md), 2026-10-30). Raised by `spec/overview-scenes`
 - Date: 2026-10-30
 - Refines: [ADR-0041](0041-active-scene-window.md) (the DM's scene window also covers overviews), [ADR-0039](0039-fog-visibility.md) (`sceneHooks` gains a member)
 - Consistent with: [ADR-0016](0016-domain-events-pending-actions.md) (one command, one transaction, one event), [ADR-0021](0021-sync-protocol-conventions.md) (no optimistic intents), [ADR-0023](0023-asset-access-by-capability-id.md) (asset IDs reach a player only on a visible record), [ADR-0026](0026-signal-routing.md) (signals)

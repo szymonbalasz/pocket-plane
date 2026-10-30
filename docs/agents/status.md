@@ -4,6 +4,8 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 **Phase:** **5etools import (#395, 2026-10-30)** — spec [compendium-expansion](../specs/post-mvp/compendium-expansion.md) complete, ADR-0074 accepted. Wave 1: `fix/cmpx-core` ∥ `build/cmpx-adapter`. Wave 2 (after both merge): `build/cmpx-panel` ∥ `build/cmpx-art` (merge panel first). Sprint 15 planning (candidates: BL-146 with BL-143–145, BL-124 / BL-152, BL-151, BL-125–127, BL-149 / BL-150, BL-153, BL-154, BL-123, BL-142) after. Note: the main checkout is on `fix/creatures-custom-only` with uncommitted work (another session); integrate via worktrees, don't touch it.
 
+**Overview scenes (#398, 2026-10-30; separate session from the 5etools track, same `main`):** spec [overview-scenes](../specs/overview-scenes.md) complete, ADR-0075 accepted. Order: `fix/ovw-core` → `build/ovw-canvas` → `build/ovw-images` → `build/ovw-labels` ∥ `build/ovw-minis`. Briefs `%TEMP%/pocket-plane/briefs/{build,test}-ovw-*.md`. `fix/ovw-core` holds `src/server/db/`, `src/shared/events/`, `active-scene.ts`, `scene-hooks.ts`, `docs/data-model/`, `docs/protocol/`.
+
 **Shared-file locks:** `fix/cmpx-core` holds `src/server/db/`, `src/server/config.ts`, `.env.example`, AGENTS.md §9.2, `docs/data-model/`. `build/cmpx-adapter` adds new files only (`src/server/features/compendium/adapter/5etools/`, `fixtures/5etools-mini/`, `scripts/cmpx-probe.ts`).
 
 **Briefs:** `%TEMP%/pocket-plane/briefs/{build,test}-cmpx-*.md`.

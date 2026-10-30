@@ -135,6 +135,12 @@ DM picks #351 (ADR-0069), #355–#356 (Gilt & Stone default, Simple Dark; kit pa
 | [Spell FX](spell-fx.md) (map effects on effect rows: Spirit Guardians, Shadow of Moil; Cast on sheet spell rows; hit looks by damage type; Preferences "Map effects"; DM Layers "Effects"; ADR-0071) | VFX | complete | spec-spell-fx |
 | [Character sheet full](character-sheet-full.md) (printed sheet layout, both themes, FR-CHARX-105–120; OQ-CHARX-47–50 decided A, #352) | CHARX | complete | spec-charx-print-sheet |
 
+## Overview scenes (2026-10-30)
+
+| Spec | Prefix | Status | Owner |
+|---|---|---|---|
+| [Overview scenes](overview-scenes.md) | OVW | complete (#398), [ADR-0075](../architecture/adr/0075-overview-scenes.md) | spec-overview-scenes |
+
 ## Post-MVP
 
 Stubs only. Not to be claimed during MVP spec phase.
