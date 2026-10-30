@@ -37,6 +37,7 @@ const EnvSchema = z.object({
   PP_TEST_CRASH: optionalString,
   PP_DM_SECRET: z.string().optional(),
   PP_PUBLIC_BASE_URL: optionalString.pipe(z.url().optional()),
+  PP_5ETOOLS_DIR: optionalString,
   PP_LOG_LEVEL: z.preprocess(
     (v) => (v === "" ? undefined : v),
     z.enum(["debug", "info", "warn", "error"]).default("info"),
@@ -62,6 +63,8 @@ export interface Config {
   /** Never log, store or send. Empty string only when `requireSecret: false`. */
   dmSecret: string;
   publicBaseUrl: string | null;
+  /** The DM's extracted 5etools folder (FR-CMPX-01, read-only); null = not configured. */
+  fiveEtoolsDir: string | null;
   logLevel: LogLevel;
 }
 
@@ -190,6 +193,7 @@ export function parseConfig(
     testCrash,
     dmSecret,
     publicBaseUrl: e.PP_PUBLIC_BASE_URL ?? null,
+    fiveEtoolsDir: e.PP_5ETOOLS_DIR ? resolve(e.PP_5ETOOLS_DIR) : null,
     logLevel: e.PP_LOG_LEVEL,
   };
 }

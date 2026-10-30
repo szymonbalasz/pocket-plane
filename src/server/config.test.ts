@@ -109,6 +109,19 @@ describe("parseConfig", () => {
   });
 });
 
+describe("PP_5ETOOLS_DIR", () => {
+  test("FR-CMPX-01 unset or blank → null; absolute kept; relative resolves from the worktree root", () => {
+    expect(parseConfig({}).fiveEtoolsDir).toBeNull();
+    expect(parseConfig({ PP_5ETOOLS_DIR: "  " }).fiveEtoolsDir).toBeNull();
+    const abs = path.resolve(os.tmpdir(), "5etools");
+    expect(parseConfig({ PP_5ETOOLS_DIR: abs }).fiveEtoolsDir).toBe(abs);
+    const root = path.resolve(os.tmpdir(), "worktree");
+    expect(parseConfig({ PP_5ETOOLS_DIR: "../5etools" }, { root }).fiveEtoolsDir).toBe(
+      path.resolve(root, "../5etools"),
+    );
+  });
+});
+
 describe("resolvePlayDirs (#382)", () => {
   const W = (p: string) => path.win32.join(p);
   const win = {
