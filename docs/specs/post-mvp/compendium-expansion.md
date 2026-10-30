@@ -1,8 +1,8 @@
 ---
 title: Compendium expansion
 prefix: CMPX
-status: stub
-owner: —
+status: claimed
+owner: spec-compendium-expansion
 phase: post-mvp
 ---
 
