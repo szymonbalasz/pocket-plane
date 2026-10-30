@@ -23,6 +23,7 @@ import {
   DAMAGE_RE,
   DAMAGE_TYPES,
   ENTITY_NAME_MAX,
+  EntityName,
   MonsterStatBlock,
   type Senses,
   Senses as SensesSchema,
@@ -494,6 +495,15 @@ function artPathOf(c: Run, key: string, m: Raw, exists: (p: string) => boolean) 
   return null;
 }
 
+/** No stat block, or a name entities refuse → no `definition`: one bad row must not fail the book. */
+function definitionOf(c: Run, key: string, rawName: string, statBlock: MonsterStatBlock | null) {
+  if (!statBlock) return {};
+  const name = c.clip(key, "definition.name", rawName, ENTITY_NAME_MAX);
+  if (EntityName.safeParse(name).success) return { definition: { name, statBlock } };
+  c.warn(key, "definition.name", "Name doesn't fit a creature; entry only");
+  return {};
+}
+
 export function mapMonster(c: Run, m: Raw, env: MonsterEnv) {
   const rawName = nameOf(m).trim();
   const key = `monster/${slugify(rawName)}`;
@@ -551,9 +561,7 @@ export function mapMonster(c: Run, m: Raw, env: MonsterEnv) {
           : {}),
       },
     },
-    definition: statBlock
-      ? { name: c.clip(key, "definition.name", rawName, ENTITY_NAME_MAX), statBlock }
-      : null,
+    ...definitionOf(c, key, rawName, statBlock),
     artPath: artPathOf(c, key, m, env.exists),
     ...(replaces.length > 0 ? { replaces } : {}),
   });

@@ -829,7 +829,7 @@ describe("FR-CMPX-07 monster → entry + definition", () => {
 describe("FR-CMPX-08 no numeric HP or AC", () => {
   test("FR-CMPX-08 special HP → entry only, no definition", () => {
     const m = monster("monster/wobbling-fenwisp");
-    expect(m.definition).toBeNull();
+    expect(m.definition).toBeUndefined();
     expect(m.data.name).toBe("Wobbling Fénwisp");
     expect(warningsOf("monster/wobbling-fenwisp")).toContainEqual({
       sourceKey: "monster/wobbling-fenwisp",
@@ -838,7 +838,7 @@ describe("FR-CMPX-08 no numeric HP or AC", () => {
     });
   });
   test("FR-CMPX-08 special AC → entry only, no definition", () => {
-    expect(monster("monster/mirrored-husk", tb2.records).definition).toBeNull();
+    expect(monster("monster/mirrored-husk", tb2.records).definition).toBeUndefined();
   });
   test("FR-CMPX-08 AC over the creature core's cap → entry only, not lost", () => {
     const r = adaptBookData(
@@ -858,7 +858,7 @@ describe("FR-CMPX-08 no numeric HP or AC", () => {
       "TB1",
       { exists: allExist, srd: new Map() },
     );
-    expect(monster("monster/wall", r.records).definition).toBeNull();
+    expect(monster("monster/wall", r.records).definition).toBeUndefined();
     expect(r.counts.monster).toBe(1);
   });
 });
@@ -1102,6 +1102,42 @@ describe("FR-CMPX-13 replaces", () => {
     expect(rec("monster/gnasher", tb2.records).replaces).toEqual(["5et-tb1:monster/gnasher"]);
     expect(rec("monster/gnasher").replaces).toBeUndefined();
     expect(rec("item/old-spyglass", tb2.records).replaces).toEqual(["5et-tb1:item/old-spyglass"]);
+  });
+  test("FR-CMPX-13 more than 20 refs → clipped to 20 with a warning; the record stays", () => {
+    const r = adaptBookData(
+      emptyData({
+        monsters: [
+          ...Array.from({ length: 25 }, (_, i) => ({
+            name: `Old ${i}`,
+            source: "TB1",
+            reprintedAs: ["Newer|TB2"],
+          })),
+          { name: "Newer", source: "TB2" },
+        ],
+      }),
+      "TB2",
+      { exists: allExist, srd: new Map() },
+    );
+    expect(r.records[0]?.replaces).toHaveLength(20);
+    expect(r.warnings).toContainEqual({
+      sourceKey: "monster/newer",
+      field: "replaces",
+      message: "More than 20 refs; clipped",
+    });
+  });
+  test("FR-CMPX-13 an older entry with no usable key gives no ref (a bad ref would fail the book)", () => {
+    const r = adaptBookData(
+      emptyData({
+        monsters: [
+          { name: "???", source: "TB1", reprintedAs: ["Newer|TB2"] },
+          { name: "Newer", source: "TB2" },
+        ],
+      }),
+      "TB2",
+      { exists: allExist, srd: new Map() },
+    );
+    expect(r.records[0]?.replaces).toBeUndefined();
+    expect(r.warnings.map((w) => w.message)).toContain("Older entry gives no usable ref; dropped");
   });
   test("FR-CMPX-13 a copy that preserves `reprintedAs` counts, from any book", () => {
     const r = adaptBookData(

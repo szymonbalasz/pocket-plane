@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { type CompendiumKind, entryNameKey, NAME_MAX } from "@shared/compendium/schemas";
+import { type CompendiumKind, entryNameKey, NAME_MAX, SourceKey } from "@shared/compendium/schemas";
 import { bundledSource } from "../../sources";
 import { slugify } from "../text";
 import { type CopyResult, resolveCopies } from "./copy";
@@ -29,6 +29,7 @@ export type { FiveEtoolsRecord, FiveEtoolsResult } from "./run";
 
 export const ADAPTER_VERSION_5ET = "1";
 export const SRD_SOURCE_KEY = "srd-5.1";
+const REPLACES_MAX = 20;
 
 type BookKind = Extract<CompendiumKind, "monster" | "spell" | "item">;
 
@@ -186,6 +187,19 @@ function reprintIndex(kind: BookKind, all: readonly Raw[]) {
   return out;
 }
 
+/** The import refuses a whole book over a bad ref or more than 20: dropped or clipped here. */
+function fitRefs(c: Run, key: string, refs: readonly string[]) {
+  const unique = [...new Set(refs)].filter((ref) => {
+    const at = ref.indexOf(":");
+    const ok = at >= 1 && at <= 64 && SourceKey.safeParse(ref.slice(at + 1)).success;
+    if (!ok) c.warn(key, "replaces", "Older entry gives no usable ref; dropped");
+    return ok;
+  });
+  if (unique.length <= REPLACES_MAX) return unique;
+  c.warn(key, "replaces", `More than ${REPLACES_MAX} refs; clipped`);
+  return unique.slice(0, REPLACES_MAX);
+}
+
 function replacer(c: Run, kind: BookKind, all: readonly Raw[], srd: SrdIndex) {
   const reprints = reprintIndex(kind, all);
   return (_kind: BookKind, r: Raw): string[] => {
@@ -196,7 +210,7 @@ function replacer(c: Run, kind: BookKind, all: readonly Raw[], srd: SrdIndex) {
       if (key) refs.push(`${SRD_SOURCE_KEY}:${key}`);
       else c.warn(`${kind}/${slugify(nameOf(r))}`, "replaces", "SRD entry not found; no ref");
     }
-    return [...new Set(refs)];
+    return fitRefs(c, `${kind}/${slugify(nameOf(r))}`, refs);
   };
 }
 

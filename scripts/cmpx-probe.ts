@@ -53,7 +53,7 @@ for (const b of books) {
   for (const rec of r.records) {
     if (rec.replaces?.length) totals.replaces++;
     if (rec.kind !== "monster") continue;
-    if (rec.definition === null) totals.entryOnly++;
+    if (!rec.definition) totals.entryOnly++;
     if (rec.artPath) totals.art++;
     else totals.noArt++;
   }
