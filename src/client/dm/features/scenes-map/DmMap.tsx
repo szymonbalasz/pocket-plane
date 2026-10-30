@@ -10,6 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@ui/components/ui/menus";
+import { setViewAsOff } from "@ui/features/fog-of-war/view-as";
 import { LazyOverviewCanvas } from "@ui/features/overview-scenes/LazyOverviewCanvas";
 import { OverviewToolRail } from "@ui/features/overview-scenes/OverviewToolRail";
 import { TOP_BAR_H } from "@ui/features/play-shell/geometry";
@@ -103,6 +104,12 @@ export function DmMapBase() {
   // the store or the scene drop out (also after a reconnect snapshot).
   const viewedId = viewed?.id ?? null;
   useEffect(() => dispatchSelection({ type: "scene", sceneId: viewedId }), [viewedId]);
+  // FR-OVW-10: the top bar's View as sits outside this seam's readers; it reads this flag.
+  const overviewViewed = overview !== null;
+  useEffect(() => {
+    setViewAsOff(overviewViewed);
+    return () => setViewAsOff(false);
+  }, [overviewViewed]);
   useEffect(() => {
     dispatchSelection({ type: "prune", present: new Set(onScene.map((t) => t.id)) });
   }, [onScene]);

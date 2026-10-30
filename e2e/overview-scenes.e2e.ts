@@ -101,6 +101,7 @@ test("FR-OVW-10 FR-OVW-43 a viewed overview not shown: badge, ping off, Start of
   await expect.poll(() => itemIds(dm)).toHaveLength(1);
   await expect(dm.getByTestId("map-not-shown-badge")).toBeVisible();
   await expect(dm.getByTestId("ovw-tool-ping")).toBeDisabled();
+  await expect(dm.getByTestId("fog-view-as-top")).toBeDisabled();
   await expect(player.getByTestId("ovw-canvas")).toHaveAttribute("data-overview-id", coast);
 
   // FR-OVW-43: Start off, with the hint; back on on a battle scene that isn't shown.
@@ -112,6 +113,7 @@ test("FR-OVW-10 FR-OVW-43 a viewed overview not shown: badge, ping off, Start of
   await expect(dm.getByTestId("map-canvas")).toBeVisible();
   await expect(enc.getByTestId("cbt-enc-start")).toBeEnabled();
   await expect(enc.getByTestId("cbt-enc-start-hint")).toHaveCount(0);
+  await expect(dm.getByTestId("fog-view-as-top")).toBeEnabled();
 
   await player.context().close();
   await dm.context().close();

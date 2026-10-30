@@ -9,7 +9,8 @@ import { createStore } from "zustand";
 import { TooltipProvider } from "../../components/ui/overlays";
 import { SyncContext, type SyncState } from "../../sync/store";
 import { TOP_BAR_ITEMS, topBarItemsFor, topBarItemWidth } from "../play-shell/top-bar-items";
-import { VIEW_AS_TOP_W, ViewAsTopBarItem } from "./ViewAsSelect";
+import { VIEW_AS_TOP_W, ViewAsTopBarItem, viewAsTopDisabled } from "./ViewAsSelect";
+import { setViewAs, setViewAsOff, useViewAs, useViewAsOff } from "./view-as";
 
 function render(state: "live" | "offline", loading = false): string {
   const you = { campaignId: "c1", role: "dm", playerId: null };
@@ -55,4 +56,24 @@ test("FR-FOG-60 top-bar View as: DM only, 40-px icon slot right of Pause, disabl
   expect(off).toContain('data-on="false"');
   expect(trigger(render("offline"))).toContain(' disabled=""');
   expect(trigger(render("live", true))).toContain("data-loading");
+});
+
+// A server render only sees a zustand store's initial state, so the rule and the flag are tested
+// here; the DM map setting it and the control going off: `e2e/overview-scenes.e2e.ts`.
+test("FR-OVW-10 top-bar View as is off while an overview is viewed; the pick stays for the next scene", () => {
+  expect(viewAsTopDisabled(true, false)).toBe(false);
+  expect(viewAsTopDisabled(true, true)).toBe(true);
+  expect(viewAsTopDisabled(false, false)).toBe(true);
+  setViewAs("p1");
+  setViewAsOff(true);
+  try {
+    expect(useViewAsOff.getState().off).toBe(true);
+    expect(useViewAs.getState().playerId).toBe("p1");
+    setViewAsOff(false);
+    expect(useViewAsOff.getState().off).toBe(false);
+    expect(useViewAs.getState().playerId).toBe("p1");
+  } finally {
+    setViewAsOff(false);
+    setViewAs(null);
+  }
 });
