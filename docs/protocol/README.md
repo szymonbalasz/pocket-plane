@@ -1239,7 +1239,7 @@ From [fog-of-war](../specs/fog-of-war.md) v2 (FOG, `complete`; gate 1 #207, #208
 | Type | Scope | DM wire | Player visibility | Snapshot |
 |---|---|---|---|---|
 | `fog` | scene, `sceneOf = id`, **`dmWindow: "active-scene"`** (OQ-FOG-30 B) | `{id, campaignId, fill, box, runs, shapes, darkness, explored, undo}` (darkness without `seenBy`) | redacted `{id, fill, box, runs, shapes, darkness, explored}`; darkness = shapes with the viewer in `seenBy` (FR-FOG-44) | DM: active scene (+ `sync.loadScene`); player: active scene |
-| `fog-explored` | scene, **`dmWindow: "view-as"`** | `{id, sceneId, playerId, box, runs}` | redacted (same fields) iff `playerId = viewer`, else hidden | player: own rows; DM: none (View-as load). V0: no writer |
+| `fog-explored` | scene, **`dmWindow: "view-as"`** | `{id, sceneId, playerId, shape}` ([ADR-0076](../architecture/adr/0076-explored-memory-shapes.md)) | redacted (same fields) iff `playerId = viewer`, else hidden | player: own rows; DM: none (View-as load). V0: no writer |
 | `vision` | scene, **`dmWindow: "view-as"`**, `derived` | `{id, sceneId, playerId, blind, see, dark, inv?}` | own row only | V0: none (no source; V2 computes) |
 | `token`, `scene-prop`, `aoe-template`, `scene-structure` | unchanged | never `seenBy` / `doorSeen`; token `invisible: true` only when true (DM) | `hidden` or fog-hidden **for that player** (`fogHidden(type, record, playerId)`: not in `seenBy` and not their own token; `seenBy` null → hidden); doors iff the viewer is in `doorSeen[n]`; never `seenBy`, `doorSeen`, `invisible` | unchanged |
 
@@ -1492,7 +1492,7 @@ One transaction: the token's `invisible` + its `derive`d `fogged` / `seenBy` (`u
 | `map.setGrid`; `fog.setInvisible` | None beyond the write (`fog.setInvisible`: that token's `derive`) |
 
 - **Order** in a re-derive: `fog` (darkness `seenBy`, FR-FOG-44), `vision`, `fog-explored`, tokens, props, templates, `scene-structure` (doors), token-hook rows.
-- **Explored memory** grows only on the **active** scene with Explored on, for the players a re-derive lists (never on a prep scene, so View-as testing grows nothing); box = the scene's fog box; > 2,000 runs → stops growing (`warn`).
+- **Explored memory** grows only on the **active** scene with Explored on, for the players a re-derive lists (never on a prep scene, so View-as testing grows nothing), and only when a polygon adds real ground; ≥ 5,000 vertices → stops growing (`warn`).
 - **Darkness filter** (FR-FOG-44): `seenBy` adds the players whose sight polygons meet the shape's bounding box. A darkness edit, a move or a memory change reaches a player as a `fog` upsert only when their filtered list changed.
 - **Combat** (FR-FOG-14): `TokenPlacer` lists each placed token's `dependants` after its create (combat-tracker `join.ts`, #216); no other combat change.
 - **Signals** (FR-FOG-15): `map.drag` position frames → the DM + the players in the stored token's `seenBy` (owner included) who also see the token at the previewed cell on the cached polygons (an unowned invisible token: Sees-invisible polygons only); `end` frames → the stored token's seers. DM `scn.template` → the players who see an uncut cell (via `derive`).

@@ -4,7 +4,6 @@
 // record and every memory row), the grey darkvision ring (FR-FOG-21) and the Party vision Switch
 // (FR-FOG-49).
 import { describe, expect, test } from "bun:test";
-import { encodeRuns } from "@shared/fog-of-war/mask";
 import {
   FOG_EXPLORED_TYPE,
   FOG_INTENTS,
@@ -23,11 +22,11 @@ import { FogBlindChip } from "./BlindChip";
 import { blindReasonOf, isBlind } from "./blind";
 import { saturation } from "./grey-map";
 import { PARTY_VISION_TIP, PartyVisionSwitch } from "./PartyVisionSwitch";
-import { Raster } from "./paint-raster";
-import { BLIND_TEXTS, partyView, partyVisionOn, unionMemoryRuns } from "./party-view";
+import { cellSquares, Raster } from "./paint-raster";
+import { BLIND_TEXTS, partyView, partyVisionOn } from "./party-view";
 import { FOG_ALPHA } from "./render";
 import { visionOf } from "./view-as";
-import { memoryRuns, paintPlayerView, VISION_ALPHA, type ViewPaints } from "./vision-render";
+import { paintPlayerView, VISION_ALPHA, type ViewPaints } from "./vision-render";
 
 const rect = (x0: number, y0: number, x1: number, y1: number) => [x0, y0, x1, y0, x1, y1, x0, y1];
 const vis = (playerId: string, v: Partial<VisionRecord> = {}): VisionRecord => ({
@@ -40,17 +39,12 @@ const vis = (playerId: string, v: Partial<VisionRecord> = {}): VisionRecord => (
   src: [],
   ...v,
 });
-const memRow = (playerId: string, cells: [number, number][]): FogExploredRecord => {
-  const m = new Uint8Array(60);
-  for (const [c, r] of cells) m[r * 10 + c] = 1;
-  return {
-    id: `s:${playerId}`,
-    sceneId: "s",
-    playerId,
-    box: [0, 0, 10, 6],
-    runs: encodeRuns(m, "clear"),
-  };
-};
+const memRow = (playerId: string, cells: [number, number][]): FogExploredRecord => ({
+  id: `s:${playerId}`,
+  sceneId: "s",
+  playerId,
+  shape: cellSquares(cells),
+});
 function records(
   visions: VisionRecord[],
   party = false,
@@ -159,23 +153,11 @@ describe("FR-FOG-43 View as Party (V10)", () => {
     expect(v.vision?.src).toEqual(["mira", "thorn"]);
     expect(v.shared).toEqual(["p1", "p2"]);
     expect(v.explored.map((r) => r.playerId)).toEqual(["p1", "p2"]);
-    const g = { gridCellSize: 10, gridOffsetX: 0, gridOffsetY: 0 };
-    expect(unionMemoryRuns(v.explored, g)).toEqual([[10, 10, 20, 10]]);
+    expect(v.explored.map((r) => r.shape)).toEqual([cellSquares([[1, 1]]), cellSquares([[2, 1]])]);
     // View as P1 with party vision on: every record, own memory only.
     const asP1 = partyView(records([p1, p2], true, rows), "s", "p1");
     expect(asP1.shared).toEqual(["p2"]);
     expect(asP1.explored.map((r) => r.playerId)).toEqual(["p1"]);
-  });
-
-  test("FR-FOG-37 one row's union runs = that row's runs", () => {
-    const g = { gridCellSize: 10, gridOffsetX: 0, gridOffsetY: 0 };
-    const row = memRow("p1", [
-      [5, 1],
-      [6, 1],
-      [0, 2],
-      [1, 5],
-    ]);
-    expect(unionMemoryRuns([row], g)).toEqual(memoryRuns(row, g));
   });
 });
 

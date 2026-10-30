@@ -274,7 +274,7 @@ Decided by the DM ([decisions #368](docs/decisions-log.md)). The repo is public 
 
 ### 9.7 Tooling, lint and typecheck
 
-- Decided by the DM ([decisions #110](docs/decisions-log.md)): TypeScript `tsc --noEmit`, Biome (lint + format), Playwright MCP for test agents, committed SVG fixture images rasterised with `sharp`.
+- Decided by the DM ([decisions #110](docs/decisions-log.md)): TypeScript `tsc --noEmit`, Biome (lint + format), Playwright MCP for test agents, committed SVG fixture images rasterised with `sharp`. `polygon-clipping`: server only, explored memory only ([ADR-0076](docs/architecture/adr/0076-explored-memory-shapes.md)).
 - TypeScript `strict`; one `tsconfig.json` with the §9.1 aliases (Vite and Bun read the same paths).
 - No `any`, `@ts-ignore` or Biome suppressions without a one-line reason comment.
 - zod is the source of truth for boundary types: `z.infer`, no hand-written duplicates.

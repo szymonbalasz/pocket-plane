@@ -13,7 +13,6 @@
 // reason `unknown`, is a non-source for the party, as the server treats them, FR-FOG-48).
 // The chip reason (FR-FOG-21): darkness / `blinded` / `unknown` (the own record's, else unknown).
 // DOM-free.
-import { exploredMask } from "@shared/fog-of-war/explored";
 import {
   type BlindReason,
   FOG_EXPLORED_TYPE,
@@ -25,7 +24,6 @@ import {
 } from "@shared/fog-of-war/schemas";
 import { VIEW_AS_PARTY } from "@shared/protocol/scene-window";
 import type { RecordStore } from "@shared/protocol/store";
-import type { FogRun, GridPx } from "./render";
 import { type OwnedPreview, previewVision } from "./sight-preview";
 
 type Records = RecordStore["records"];
@@ -150,43 +148,6 @@ export function partyView(
     preview: [...applied].sort(),
     explored: asParty ? memory : memory.filter((r) => r.playerId === viewer),
   };
-}
-
-/** FR-FOG-37 / -43: the drawn memory rows' cells as row runs in map px (their union). */
-export function unionMemoryRuns(rows: readonly FogExploredRecord[], g: GridPx): FogRun[] {
-  const byRow = new Map<number, Set<number>>();
-  for (const row of rows) {
-    const mask = exploredMask(row);
-    const [col0, row0, cols, rs] = mask.box;
-    for (let r = 0; r < rs; r++) {
-      for (let c = 0; c < cols; c++) {
-        if (mask.cells[r * cols + c] !== 1) continue;
-        let set = byRow.get(row0 + r);
-        if (!set) {
-          set = new Set();
-          byRow.set(row0 + r, set);
-        }
-        set.add(col0 + c);
-      }
-    }
-  }
-  const cs = g.gridCellSize;
-  const out: FogRun[] = [];
-  for (const r of [...byRow.keys()].sort((a, b) => a - b)) {
-    const cols = [...(byRow.get(r) as Set<number>)].sort((a, b) => a - b);
-    let start = cols[0] as number;
-    let prev = start;
-    for (const c of [...cols.slice(1), Number.NaN]) {
-      if (c === prev + 1) {
-        prev = c;
-        continue;
-      }
-      out.push([g.gridOffsetX + start * cs, g.gridOffsetY + r * cs, (prev - start + 1) * cs, cs]);
-      start = c;
-      prev = c;
-    }
-  }
-  return out;
 }
 
 /** The chip's text per reason (FOG §7). */

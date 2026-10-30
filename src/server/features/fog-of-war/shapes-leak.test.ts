@@ -7,7 +7,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { loadBundle } from "@fixtures/index";
-import { encodeRuns } from "@shared/fog-of-war/mask";
 import {
   FOG_INTENTS as F,
   FOG_EXPLORED_TYPE,
@@ -201,18 +200,14 @@ describe("FOG §13 V1 leak walkthrough: shapes + darkness (player-1, player-2)",
   });
 
   test("FR-FOG-44 a cell of player-1's explored memory in the box → the shape reaches player-1 only", async () => {
-    const m = new Uint8Array(20 * 14);
-    m[11 * 20 + 18] = 1; // cell (18, 11)
+    // Cell (18, 11).
+    const shape = [[[18, 11, 19, 11, 19, 12, 18, 12]]];
     db.insert(fogExplored)
       .values({
         sceneId: ambushId,
         playerId: playerIds["Player 1"] as string,
         campaignId,
-        col0: 0,
-        row0: 0,
-        cols: 20,
-        rows: 14,
-        runs: encodeRuns(m, "clear"),
+        shape,
         updatedAt: AT,
       })
       .run();

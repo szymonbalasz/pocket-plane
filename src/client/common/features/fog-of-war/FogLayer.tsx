@@ -22,6 +22,7 @@
 // marker then carries the union and attrs `src` (token ids) and `shared` (the other players).
 // The darkvision ring draws the map's greyscale copy (`grey-map.ts`; marker `fog-darkvision-grey`,
 // attr `on` = the copy is drawn in a ring).
+import { shapeArea } from "@shared/fog-of-war/explored";
 import { FOG_SIGNALS, FOG_TYPE, FogSightPayload, VISION_TYPE } from "@shared/fog-of-war/schemas";
 import type { DarknessShape } from "@shared/fog-of-war/shapes";
 import { samePair, VIEW_AS_PARTY, type ViewAsPair } from "@shared/protocol/scene-window";
@@ -40,7 +41,7 @@ import { useLayerToggles } from "../scenes-map/tool-store";
 import { BrushNodes } from "./BrushNodes";
 import { type FogDraft, type GestureState, radiusLabel } from "./gesture";
 import { greyCopy } from "./grey-map";
-import { partyView, unionMemoryRuns } from "./party-view";
+import { partyView } from "./party-view";
 import { fogLayerMode } from "./plain-map";
 import {
   DM_DARKNESS_FALLBACK,
@@ -413,7 +414,7 @@ export function FogLayer() {
     () => (viewer === null ? null : partyView(store.records, scene.id, viewer, previews)),
     [store.records, scene.id, viewer, previews],
   );
-  const memory = useMemo(() => unionMemoryRuns(drawn?.explored ?? [], map), [drawn, map]);
+  const memory = useMemo(() => (drawn?.explored ?? []).map((r) => r.shape), [drawn]);
   const paints = useMemo(() => paintsFor(client), [client]);
   const playerPaints = useMemo(() => paintsFor("player"), []);
   const gridLines: GridLines = {
@@ -463,7 +464,7 @@ export function FogLayer() {
     shared: drawn?.shared ?? [],
     ...(drawn && drawn.preview.length > 0 ? { preview: drawn.preview.join(",") } : {}),
   };
-  const exploredCells = memory.reduce((n, r) => n + r[2] / gridCellSize, 0);
+  const exploredCells = memory.reduce((n, s) => n + shapeArea(s), 0);
   return (
     <Group name="fog-layer" listening={false} visible={mode !== "hidden"} mode={mode}>
       {rec && (

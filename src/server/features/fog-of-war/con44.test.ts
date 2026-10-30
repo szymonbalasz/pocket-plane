@@ -2,13 +2,17 @@
 // 512 KiB, no headroom guard): the realistic-heavy harness with FOG v2 rows on the active battle
 // scene (12 typical fog shapes, 2 darkness shapes, each player's explored memory). DM: only the
 // active scene's `fog` row (`dmWindow`), no `view-as` rows; players: their own `fog` / memory.
-// Per-type bounds: DM `fog` ≤ 16 KiB, a player's `vision` ≤ 48 KiB and `fog-explored` ≤ 6 KiB,
-// the View-as ack at caps ≤ 48 KiB. V2: the same with real sight (senses on, 300 walls, one player
+// Per-type bounds: DM `fog` ≤ 16 KiB, a player's `vision` ≤ 48 KiB and `fog-explored` ≤ 8 KiB,
+// the View-as ack at caps ≤ 128 KiB. V2: the same with real sight (senses on, 300 walls, one player
 // at 4 sources of r 24), and a move's server time at those caps (logged).
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { loadBundle } from "@fixtures/index";
-import { encodeRuns } from "@shared/fog-of-war/mask";
-import { FOG_EXPLORED_TYPE, FOG_RUNS_MAX, FOG_TYPE, VISION_TYPE } from "@shared/fog-of-war/schemas";
+import {
+  EXPLORED_VERTICES_MAX,
+  FOG_EXPLORED_TYPE,
+  FOG_TYPE,
+  VISION_TYPE,
+} from "@shared/fog-of-war/schemas";
 import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
 import { MAP_INTENTS, TOKEN_TYPE } from "@shared/scenes-map/schemas";
 import { and, eq } from "drizzle-orm";
@@ -29,13 +33,14 @@ import {
   snapshotFrames,
   snapshotSizes,
 } from "../../ws/testing/snapshot-size";
+import { ringShape } from "./testing";
 
 /** FR-FOG-27: the serialized row ≤ 16 KiB. */
 const FOG_ROW_MAX = 16 * 1024;
 /** FOG §13 CON-44 row: per-player bounds. */
 const VISION_MAX = 48 * 1024;
-const EXPLORED_MAX = 6 * 1024;
-const VIEW_AS_ACK_MAX = 48 * 1024;
+const EXPLORED_MAX = 8 * 1024;
+const VIEW_AS_ACK_MAX = 128 * 1024;
 const AT = "2026-01-01T00:00:00.000Z";
 
 /** FOG §12's typical scene: 5 rects, 5 ten-vertex polygons, 2 circles (freeform), 2 darkness. */
@@ -68,14 +73,6 @@ function typicalShapes(): { shapes: FogLayerShape[]; darkness: DarknessRow[] } {
   };
 }
 
-/** Explored memory: a 20 × 14 box with alternating runs (≈ 35 runs) or at the run cap. */
-function memory(cells: number, runs: number) {
-  const a = new Uint8Array(cells);
-  const step = Math.max(1, Math.floor(cells / runs));
-  for (let i = 0; i < cells; i++) a[i] = Math.floor(i / step) % 2;
-  return encodeRuns(a, "fog");
-}
-
 describe("CON-44 with FOG v2 (FOG §12, #208)", () => {
   let b: Awaited<ReturnType<typeof servicesFromBundle>>;
   beforeAll(async () => {
@@ -97,7 +94,8 @@ describe("CON-44 with FOG v2 (FOG §12, #208)", () => {
       .run();
     // Remember explored areas is on by default (#383): the load may already have grown a row.
     for (const p of players) {
-      const heavy = { col0: 0, row0: 0, cols: 20, rows: 14, runs: memory(280, 35), updatedAt: AT };
+      // A walked 40 × 40 map held 500 vertices at most (ADR-0076).
+      const heavy = { shape: ringShape(500), updatedAt: AT };
       db.insert(fogExplored)
         .values({ sceneId: battle, playerId: p.id, campaignId: cid, ...heavy })
         .onConflictDoUpdate({ target: [fogExplored.sceneId, fogExplored.playerId], set: heavy })
@@ -128,12 +126,12 @@ describe("CON-44 with FOG v2 (FOG §12, #208)", () => {
     );
   });
 
-  test("FR-FOG-43 the View-as ack at caps (memory at the 2,000-run cap) ≤ 48 KiB", () => {
+  test("FR-FOG-43 the View-as ack at caps (memory at the vertex cap) ≤ 128 KiB", () => {
     const db = b.s.db;
     const p = db.select().from(fogExplored).all()[0];
     if (!p) throw new Error("no memory row");
     db.update(fogExplored)
-      .set({ cols: 400, rows: 400, runs: memory(160_000, FOG_RUNS_MAX) })
+      .set({ shape: ringShape(EXPLORED_VERTICES_MAX) })
       .where(and(eq(fogExplored.sceneId, p.sceneId), eq(fogExplored.playerId, p.playerId)))
       .run();
     const dm = snapshotFrames(b.s)[0]?.viewer;
@@ -147,7 +145,7 @@ describe("CON-44 with FOG v2 (FOG §12, #208)", () => {
     expect(ack[FOG_EXPLORED_TYPE]).toHaveLength(1);
     const bytes = Buffer.byteLength(JSON.stringify({ records: ack }), "utf8");
     expect(bytes).toBeLessThanOrEqual(VIEW_AS_ACK_MAX);
-    console.log(`FOG CON-44 (V0): View-as ack with memory at the run cap ${bytes} B`);
+    console.log(`FOG CON-44 (V0): View-as ack with memory at the vertex cap ${bytes} B`);
   });
 
   test("FR-FOG-25 heavy: the revealed battle scene's tokens reach every player; no player token row is fogged unless owned", () => {
@@ -251,9 +249,9 @@ describe("CON-44 with FOG v2 (FOG §12, #208)", () => {
     const visionBytes = mine?.types[VISION_TYPE]?.bytes ?? Infinity;
     expect(visionBytes).toBeLessThanOrEqual(VISION_MAX);
     for (const p of players) expect(p.bytes).toBeLessThan(SNAPSHOT_CEILING.player);
-    // The View-as ack with that player's memory at the run cap.
+    // The View-as ack with that player's memory at the vertex cap.
     db.update(fogExplored)
-      .set({ cols: 400, rows: 400, runs: memory(160_000, FOG_RUNS_MAX) })
+      .set({ shape: ringShape(EXPLORED_VERTICES_MAX) })
       .where(and(eq(fogExplored.sceneId, battle.id), eq(fogExplored.playerId, owner)))
       .run();
     const dmViewer = frames[0]?.viewer;
