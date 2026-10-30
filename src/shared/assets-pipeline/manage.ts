@@ -1,11 +1,13 @@
-// Rename and delete an image (ASSET §6.6, FR-ASSET-62–66; decision #386): DM-only WS intents.
-// Delete refuses while anything uses the image (OQ-ASSET-05 A); the reject names the uses.
+// Rename and delete an image or a sound (ASSET §6.5, FR-ASSET-62–68; decisions #386, #394):
+// DM-only WS intents. Delete refuses while anything uses the asset (OQ-ASSET-05 A); the reject
+// names the uses. `assets.uses` lists them for the Assets window.
 import { z } from "zod";
 import { AssetName } from "./schemas";
 
 export const ASSET_MANAGE_INTENTS = {
   rename: "assets.rename",
   delete: "assets.delete",
+  uses: "assets.uses",
 } as const;
 
 const Id = z.string().min(1).max(64);
@@ -18,7 +20,11 @@ export type RenameAssetIntent = z.input<typeof RenameAssetIntent>;
 export const DeleteAssetIntent = z.strictObject({ assetId: Id });
 export type DeleteAssetIntent = z.input<typeof DeleteAssetIntent>;
 
-/** FR-ASSET-64: what can hold an image, in the order the reject lists them. */
+/** FR-ASSET-68 (#394): the "Used in" line's question. */
+export const AssetUsesIntent = z.strictObject({ assetId: Id });
+export type AssetUsesIntent = z.input<typeof AssetUsesIntent>;
+
+/** FR-ASSET-64: what can hold an asset, in the order the reject lists them. */
 export const ASSET_USE_KINDS = [
   "scene map",
   "prop",
@@ -28,6 +34,7 @@ export const ASSET_USE_KINDS = [
   "handout",
   "compendium entry",
   "pause card",
+  "alert sound", // #394: a sound picked for an alert (FR-ASSET-67)
 ] as const;
 export type AssetUseKind = (typeof ASSET_USE_KINDS)[number];
 
@@ -36,6 +43,19 @@ export interface AssetUse {
   /** The holder's name (a prop: its scene's name; the pause card: none). */
   name: string | null;
 }
+
+/** FR-ASSET-68 result. */
+export interface AssetUsesResult {
+  uses: AssetUse[];
+}
+
+/** FR-ASSET-67: an alert's name in a use ("Your turn (alert sound)"), as the client labels it. */
+export const ALERT_SOUND_NAMES = {
+  turn: "Your turn",
+  request: "Roll request",
+  pause: "Pause",
+  resume: "Resume",
+} as const;
 
 /** FR-ASSET-64: uses named in the reject; the rest are counted. */
 export const USES_SHOWN = 5;

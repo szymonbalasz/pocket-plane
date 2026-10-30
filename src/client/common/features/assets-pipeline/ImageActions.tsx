@@ -1,9 +1,10 @@
 // Rename / delete the selected image (FR-ASSET-66, #386): two ghost icon Buttons beside its name
 // in the picker's tag row. Rename… → Dialog with the name → `assets.rename`; Delete… → "Delete
 // ‹name›? …" → `assets.delete`. A reject shows inline in the Dialog (in use: the server names the
-// uses, FR-ASSET-64). Disabled with "Reconnecting…" while not live.
+// uses, FR-ASSET-64). Disabled with "Reconnecting…" while not live. *(#394)* The Assets window's
+// Sounds rows use it too (`noun` "sound", FR-ASSET-70).
 import { ASSET_MANAGE_INTENTS } from "@shared/assets-pipeline/manage";
-import { AssetName, type AssetRecord } from "@shared/assets-pipeline/schemas";
+import { AssetName } from "@shared/assets-pipeline/schemas";
 import { Button } from "@ui/components/ui/button";
 import {
   Dialog,
@@ -21,15 +22,26 @@ import { RECONNECTING, useTagIntent } from "./tags/intent";
 import { Live } from "./tags/TagEditor";
 
 type Mode = "rename" | "delete";
+type Noun = "image" | "sound";
+/** What the buttons act on: an image's or a sound's record. */
+type Named = { id: string; name: string };
 
 /** FR-ASSET-66: the delete prompt. */
 export const deleteImagePrompt = (name: string) =>
   `Delete ${name}? Its links stop working. This can't be undone.`;
 
-export function ImageActions({ asset, live }: { asset: AssetRecord; live: boolean }) {
+export function ImageActions({
+  asset,
+  live,
+  noun = "image",
+}: {
+  asset: Named;
+  live: boolean;
+  noun?: Noun;
+}) {
   const [mode, setMode] = useState<Mode | null>(null);
   const button = (m: Mode) => {
-    const label = m === "rename" ? "Rename image" : "Delete image";
+    const label = m === "rename" ? `Rename ${noun}` : `Delete ${noun}`;
     const Icon = m === "rename" ? PencilIcon : Trash2Icon;
     return (
       <Live why={live ? null : RECONNECTING}>
@@ -58,7 +70,13 @@ export function ImageActions({ asset, live }: { asset: AssetRecord; live: boolea
       <Dialog open={mode !== null} onOpenChange={(o) => !o && setMode(null)}>
         <DialogContent data-testid="asset-manage-dialog" aria-describedby={undefined}>
           {mode && (
-            <ImageChange mode={mode} asset={asset} live={live} close={() => setMode(null)} />
+            <ImageChange
+              mode={mode}
+              asset={asset}
+              noun={noun}
+              live={live}
+              close={() => setMode(null)}
+            />
           )}
         </DialogContent>
       </Dialog>
@@ -69,11 +87,13 @@ export function ImageActions({ asset, live }: { asset: AssetRecord; live: boolea
 function ImageChange({
   mode,
   asset,
+  noun,
   live,
   close,
 }: {
   mode: Mode;
-  asset: AssetRecord;
+  asset: Named;
+  noun: Noun;
   live: boolean;
   close(): void;
 }) {
@@ -98,7 +118,7 @@ function ImageChange({
   return (
     <form className="flex flex-col gap-3" onSubmit={submit}>
       <DialogHeader>
-        <DialogTitle>{mode === "rename" ? "Rename image" : "Delete image"}</DialogTitle>
+        <DialogTitle>{mode === "rename" ? `Rename ${noun}` : `Delete ${noun}`}</DialogTitle>
         {mode === "delete" && (
           <DialogDescription data-testid="asset-delete-prompt">
             {deleteImagePrompt(asset.name)}
