@@ -132,6 +132,19 @@ export const MINIATURE_STYLE_DEFAULT: MiniatureStyle = {
   strokeWidth: LABEL_STYLE_DEFAULT.strokeWidth,
 };
 
+/**
+ * FR-OVW-36: a new miniature's name style. `size` = 64 ÷ the placer's zoom (FR-OVW-34), so the name
+ * starts 14 px on that screen too: 14 ÷ zoom, inside the font's bounds.
+ */
+export function newMiniatureStyle(size: number): MiniatureStyle {
+  const name =
+    Math.round(((MINIATURE_STYLE_DEFAULT.size * size) / MINIATURE_SCREEN_PX) * 100) / 100;
+  return {
+    ...MINIATURE_STYLE_DEFAULT,
+    size: Math.min(FONT_SIZE.max, Math.max(FONT_SIZE.min, name)),
+  };
+}
+
 // biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control characters is the rule (FR-OVW-26).
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
 

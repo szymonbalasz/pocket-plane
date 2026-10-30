@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { closeDb } from "@server/db/client";
 import { asset, entity, overview, overviewItem, player, scene } from "@server/db/schema";
-import { MINIATURE_STYLE_DEFAULT } from "@shared/overview-scenes/schemas";
+import { newMiniatureStyle } from "@shared/overview-scenes/schemas";
 import { asc } from "drizzle-orm";
 import { loadBundle } from "../../index";
 
@@ -86,7 +86,7 @@ describe("overview-scenes fixtures (FR-OVW-46)", () => {
         h: 160,
         hidden: false,
         locked: false,
-        style: MINIATURE_STYLE_DEFAULT,
+        style: newMiniatureStyle(160),
       });
     }
 

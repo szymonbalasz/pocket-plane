@@ -1,6 +1,6 @@
 // FR-OVW-31, -32, -34: what the miniature tools send and what comes after; the kind's menu.
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { OVW_INTENTS } from "@shared/overview-scenes/schemas";
+import { newMiniatureStyle, OVW_INTENTS } from "@shared/overview-scenes/schemas";
 import { toast } from "sonner";
 import { resizeKeepingShape, sideBox } from "./item-edit";
 import type { OverviewItemView } from "./item-layout";
@@ -70,6 +70,14 @@ describe("FR-OVW-34 size from zoom", () => {
     expect([big.w, big.h]).toEqual([4096, 4096]);
     const small = resizeKeepingShape(from, "nw", { x: 500, y: 500 }, bounds);
     expect([small.w, small.h]).toEqual([8, 8]);
+  });
+
+  test("FR-OVW-36 the name starts at 14 px on the placer's screen, inside 8–512", () => {
+    expect(newMiniatureStyle(miniatureSizeAt(1)).size).toBe(14);
+    expect(newMiniatureStyle(miniatureSizeAt(0.5)).size).toBe(28);
+    expect(newMiniatureStyle(miniatureSizeAt(0.3)).size).toBe(46.67);
+    expect(newMiniatureStyle(miniatureSizeAt(0.1)).size).toBe(140);
+    expect(newMiniatureStyle(miniatureSizeAt(4)).size).toBe(8);
   });
 
   test("the view's centre, in units", () => {

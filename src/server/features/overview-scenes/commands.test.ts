@@ -8,6 +8,7 @@ import {
   ITEMS_PER_CAMPAIGN_MAX,
   ITEMS_PER_OVERVIEW_MAX,
   LABEL_STYLE_DEFAULT,
+  newMiniatureStyle,
   OVERVIEW_ITEM_TYPE,
   OVERVIEW_TYPE,
   OVERVIEWS_PER_CAMPAIGN_MAX,
@@ -899,7 +900,7 @@ describe("FR-OVW-31–34 miniatures", () => {
       w: 100,
       h: 100,
       hidden: false,
-      style: MINIATURE_STYLE,
+      style: newMiniatureStyle(100),
     });
     expect(b).toMatchObject({
       text: "Thorn",
@@ -1112,6 +1113,33 @@ describe("FR-OVW-31–34 miniatures", () => {
     expect(t.code(() => size(4097, 4097))).toBe("invalid");
     expect(t.code(() => size(7, 7))).toBe("invalid");
     expect(t.code(() => size(100, 200))).toBe("invalid");
+  });
+
+  test("FR-OVW-36 a new miniature's name starts at 14 ÷ the placer's zoom, inside 8–512", () => {
+    const t = party();
+    const nameSize = (id: string) => (t.item(id).style as { size: number }).size;
+    const place = (size: number) =>
+      t.run<{ itemId: string }>(I.placeMiniature, {
+        overviewId: t.id,
+        assetId: "map-town",
+        x: 0,
+        y: 0,
+        size,
+      }).itemId;
+    // size = 64 ÷ zoom: 100 % → 14, 30 % → 46.67, 400 % → 3.5, so the floor; a huge one, the ceiling.
+    expect(nameSize(place(64))).toBe(14);
+    expect(nameSize(place(213.33))).toBe(46.67);
+    expect(nameSize(place(16))).toBe(8);
+    expect(nameSize(place(4096))).toBe(512);
+    // The rest of the default style stays; Add party takes the same rule.
+    const [mira] = t.add(t.id, { size: 213.33 }).itemIds;
+    expect(t.item(mira as string).style).toEqual({ ...MINIATURE_STYLE, size: 46.67 });
+    // Resizing later leaves the name alone.
+    t.run(I.updateItems, {
+      overviewId: t.id,
+      items: [{ itemId: mira as string, w: 64, h: 64 }],
+    });
+    expect(nameSize(mira as string)).toBe(46.67);
   });
 
   test("FR-OVW-38 miniatures stay where they are; Add party on the next overview adds who's missing", () => {
