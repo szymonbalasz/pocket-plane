@@ -12,9 +12,18 @@ import { moving, SIZE, settled, THEMES } from "./support/visual";
 
 test.skip(process.platform !== "linux", "baselines are Linux renders (CI)");
 
-/** The first Fit done, the images drawn and the label fonts in: the canvas gets no more redraws. */
+/**
+ * Windows closed and fitted again, so the map fills the screen and a label is more than a few pixels;
+ * the images drawn and the label fonts in: the canvas gets no more redraws.
+ */
 async function overviewDrawn(page: Page, items: number) {
   await settled(page);
+  const close = page.getByTestId("ui-window-close");
+  for (let open = await close.count(); open > 0; open--) {
+    await close.first().click();
+    await expect(close).toHaveCount(open - 1);
+  }
+  await page.getByTestId("ovw-tool-fit").click();
   await expect(page.getByTestId("ovw-canvas")).toHaveAttribute("data-camera", "fitted");
   await expect.poll(async () => (await konvaNodes(page, "ovw-item")).length).toBe(items);
   await expect.poll(async () => (await konvaNodes(page, "ovw-image")).length).toBeGreaterThan(0);
@@ -29,6 +38,12 @@ async function overviewDrawn(page: Page, items: number) {
   await settled(page);
 }
 
+/**
+ * Tighter than the config's 0.2 % (2,592 px), which one small label could hide in. Safe: the workflow's
+ * re-render left the existing baselines byte for byte, so these renders repeat exactly.
+ */
+const TOLERANCE = { maxDiffPixels: 100 };
+
 for (const theme of THEMES) {
   test(`visual: Sword Coast as the DM and as a player in ${theme}`, async ({ browser }) => {
     const { secret, link } = e2eEnv();
@@ -37,14 +52,17 @@ for (const theme of THEMES) {
     await storedTheme(dm, theme);
     await loginDm(dm, secret);
     await overviewDrawn(dm, 7);
-    await expect(dm).toHaveScreenshot(`ovw-dm-${theme}.png`, { mask: moving(dm) });
+    await expect(dm).toHaveScreenshot(`ovw-dm-${theme}.png`, { ...TOLERANCE, mask: moving(dm) });
 
     const player = await rolePage(browser);
     await player.setViewportSize(SIZE);
     await storedTheme(player, theme);
     await player.goto(link("Player 1"));
     await overviewDrawn(player, 5);
-    await expect(player).toHaveScreenshot(`ovw-player-${theme}.png`, { mask: moving(player) });
+    await expect(player).toHaveScreenshot(`ovw-player-${theme}.png`, {
+      ...TOLERANCE,
+      mask: moving(player),
+    });
 
     await player.context().close();
     await dm.context().close();
