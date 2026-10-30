@@ -86,6 +86,7 @@ import lootSubtractE2e from "./loot-subtract-e2e";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
+import overviewCrowd from "./overview-crowd";
 import overviewScenes from "./overview-scenes";
 import partyBoard from "./party-board";
 import partyCmp from "./party-cmp";
@@ -375,6 +376,8 @@ export const bundles: readonly Bundle[] = [
   cmpxArt,
   // Overview scenes core (fix/ovw-core): overviews, items, one shown
   overviewScenes,
+  // Overview scenes miniatures (build/ovw-minis): the 300-item crowd, walkthrough step 12
+  overviewCrowd,
   // Compendium expansion panel (build/cmpx-panel): 5etools import walkthrough + e2e
   cmpx5etools,
 ];

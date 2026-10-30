@@ -1,11 +1,10 @@
-// Test support for overview scenes. `insertMiniature` is the test-only path until the miniatures
-// slice brings `ovw.placeMiniature` and `ovw.addParty`; no fixture uses it.
-import { LABEL_STYLE_DEFAULT, type MiniatureStyle } from "@shared/overview-scenes/schemas";
+// Test support for overview scenes. `insertMiniature` sets up a state in one call (any owner, hidden,
+// locked, no image); no fixture uses it.
+import { MINIATURE_STYLE_DEFAULT, type MiniatureStyle } from "@shared/overview-scenes/schemas";
 import type { Db } from "../../db/client";
 import { overviewItem, overviewItemSeqNext } from "../../db/schema";
 
-const { dot: _dot, ...text } = LABEL_STYLE_DEFAULT;
-export const MINIATURE_STYLE: MiniatureStyle = { ...text, size: 14 };
+export const MINIATURE_STYLE: MiniatureStyle = MINIATURE_STYLE_DEFAULT;
 
 export function insertMiniature(
   db: Db,

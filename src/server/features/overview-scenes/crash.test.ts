@@ -126,7 +126,7 @@ describe("FR-OVW-48 crash (PP_TEST_CRASH seams)", () => {
   }, 60_000);
 
   test("FR-OVW-48 crash on a group move: every item moved or none", async () => {
-    const loaded = await loadBundle("overview-scenes", { testMode: true });
+    const loaded = await loadBundle("overview-crowd", { testMode: true });
     try {
       const b = await boot(loaded.openDb);
       const actor = actorOf(b.db);

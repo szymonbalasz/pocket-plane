@@ -8,17 +8,20 @@ import {
   LABEL_STYLE_DEFAULT,
   OVERVIEW_ITEM_TYPE,
   OVERVIEW_TYPE,
+  OVW_SIGNALS,
   type OverviewItemRecord,
   type OverviewRecord,
   type PlayerOverviewItemRecord,
 } from "@shared/overview-scenes/schemas";
 import { MAP_INTENTS, SCENE_TYPE, TOKEN_TYPE } from "@shared/scenes-map/schemas";
+import { eq } from "drizzle-orm";
 import { closeDb, type Db, openFileDb } from "../../db/client";
-import { asset, overview, overviewItem, player, scene } from "../../db/schema";
+import { asset, entity, overview, overviewItem, player, scene } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import { startTestServer, type TestClient, type TestServer } from "../../testing/harness";
 import { TEST_SECRET } from "../../testing/services";
 import { convergence, leakScan } from "../../ws/testing/convergence";
+import { UPDATE as ENTITY_UPDATE } from "../entities/commands";
 import { insertMiniature } from "./testing";
 
 const DM = { role: "dm" as const, secret: TEST_SECRET };
@@ -83,7 +86,7 @@ describe("overview scenes over WS (overview-scenes)", () => {
   const leaks = (c: TestClient) => secrets().filter((s) => c.raw().includes(s));
 
   beforeAll(async () => {
-    const loaded = await loadBundle("overview-scenes", { dmSecret: TEST_SECRET, testMode: true });
+    const loaded = await loadBundle("overview-crowd", { dmSecret: TEST_SECRET, testMode: true });
     dir = loaded.dir;
     db = openFileDb(loaded.config.dbPath);
     const players = db.select().from(player).all();
@@ -98,6 +101,8 @@ describe("overview scenes over WS (overview-scenes)", () => {
       if (i.overviewId !== ov["Sword Coast"]) continue;
       if (i.text === "Cragmaw Castle") it.cragmaw = i.id;
       if (i.text === "Neverwinter") it.neverwinter = i.id;
+      if (i.text === "Mira") it.mira = i.id;
+      if (i.text === "Thorn") it.thorn = i.id;
       if (i.kind === "image" && i.locked) it.map = i.id;
       if (i.kind === "image" && i.hidden) {
         it.scroll = i.id;
@@ -109,7 +114,7 @@ describe("overview scenes over WS (overview-scenes)", () => {
       .from(scene)
       .all()
       .find((s) => s.name === "Town")?.id as string;
-    // Test-only path until the miniatures slice (`ovw.placeMiniature`, `ovw.addParty`).
+    // Owners and flags the fixture's party doesn't have.
     const coast = ov["Sword Coast"] as string;
     const mini = (id: string, over: object = {}) =>
       insertMiniature(db, { id, campaignId, overviewId: coast, ...over });
@@ -142,8 +147,8 @@ describe("overview scenes over WS (overview-scenes)", () => {
     expect([...new Set(items<OverviewItemRecord>(dm).map((i) => i.overviewId))]).toEqual([
       ov["Sword Coast"] as string,
     ]);
-    // Three miniatures (test path) + map, three labels, scroll.
-    expect(items(dm).length).toBe(8);
+    // The party, three miniatures (test path), map, three labels, scroll.
+    expect(items(dm).length).toBe(10);
     expect(items<OverviewItemRecord>(dm).find((i) => i.id === it.map)).toMatchObject({
       locked: true,
     });
@@ -158,7 +163,7 @@ describe("overview scenes over WS (overview-scenes)", () => {
     expect(overviews(p1)).toEqual([{ id: ov["Sword Coast"], campaignId, active: true } as never]);
     const held = items(p1);
     expect(held.map((i) => i.id).sort()).toEqual(
-      [it.map, it.neverwinter, it.ownMini, it.otherMini]
+      [it.map, it.neverwinter, it.mira, it.thorn, it.ownMini, it.otherMini]
         .concat(
           db
             .select()
@@ -256,6 +261,183 @@ describe("overview scenes over WS (overview-scenes)", () => {
     expect(await move("nope")).toMatchObject({ code: "not_found" });
     expect(await move(it.map as string)).toMatchObject({ code: "forbidden" });
     for (const c of [dm, p1, p2]) c.close();
+  });
+
+  test("FR-OVW-37 drag routing: hidden or not shown → other DM tabs only; FR-OVW-35 rejects; no DB, log or seq", async () => {
+    const dm = await h.live(DM);
+    const dm2 = await h.live(DM);
+    const p1 = await h.live(pc("Player 1"));
+    const p2 = await h.live(pc("Player 2"));
+    const all = [dm, dm2, p1, p2];
+    const mark = new Map(all.map((c) => [c, c.frames.length]));
+    const since = (c: TestClient) => c.frames.slice(mark.get(c));
+    const heard = (c: TestClient) =>
+      since(c).flatMap((f) =>
+        f.type === "signal" && f.name === OVW_SIGNALS.drag
+          ? [
+              "end" in (f.data as object)
+                ? `end:${(f.data as { itemIds: string[] }).itemIds.join()}`
+                : (f.data as { moves: { itemId: string }[] }).moves.map((m) => m.itemId).join(),
+            ]
+          : [],
+      );
+    const rejects = (c: TestClient) =>
+      since(c).flatMap((f) => (f.type === "reject" ? [f.code as string] : []));
+    const rows = db.select().from(overviewItem).all();
+    const logged = readEventLog(db).length;
+    const seqs = all.map((c) => c.store.seq);
+
+    const coast = ov["Sword Coast"] as string;
+    const phandalin = ov["Phandalin"] as string;
+    const drag = (c: TestClient, ids: string[], overviewId = coast) =>
+      c.send({
+        type: "signal",
+        name: OVW_SIGNALS.drag,
+        data: { overviewId, moves: ids.map((itemId) => ({ itemId, x: 101.5, y: 202 })) },
+      });
+    const end = (c: TestClient, ids: string[], overviewId = coast) =>
+      c.send({
+        type: "signal",
+        name: OVW_SIGNALS.drag,
+        data: { overviewId, itemIds: ids, end: true },
+      });
+    const own = it.ownMini as string;
+    const other = it.otherMini as string;
+    const hidden = it.hiddenMini as string;
+    const map = it.map as string;
+    const neverwinter = it.neverwinter as string;
+    const secret = it.cragmaw as string;
+    const off = it.phandalinMap as string;
+
+    // DM: a visible group → everyone; any hidden item in the frame, or not shown → the DM's tab only.
+    drag(dm, [neverwinter, own]);
+    end(dm, [neverwinter, own]);
+    drag(dm, [neverwinter, secret]);
+    end(dm, [neverwinter, secret]);
+    drag(dm, [hidden]);
+    drag(dm, [off], phandalin);
+    // Unknown, or on another overview → `not_found`, nobody hears it.
+    drag(dm, ["nope"]);
+    drag(dm, [neverwinter], phandalin);
+    // Player: own → everyone, others included; the rest refused, unknown and hidden alike.
+    drag(p1, [own]);
+    end(p1, [own]);
+    drag(p1, [other]);
+    drag(p1, [map]);
+    drag(p1, [hidden]);
+    drag(p1, [secret]);
+    drag(p1, ["nope"]);
+    drag(p1, [own], phandalin);
+    drag(p1, [off], phandalin);
+    drag(p1, [own, other]);
+    end(p1, [other]);
+    for (const c of all) await barrier(c);
+
+    const shared = [`${neverwinter},${own}`, `end:${neverwinter},${own}`];
+    const fromP1 = [own, `end:${own}`];
+    expect(heard(dm2)).toEqual([
+      ...shared,
+      `${neverwinter},${secret}`,
+      `end:${neverwinter},${secret}`,
+      hidden,
+      off,
+      ...fromP1,
+    ]);
+    expect(heard(dm)).toEqual(fromP1);
+    expect(heard(p1)).toEqual(shared);
+    expect(heard(p2)).toEqual([...shared, ...fromP1]);
+    const sent = since(dm2).find(
+      (f) => f.type === "signal" && "moves" in (f.data as object) && f.from.role === "player",
+    );
+    expect(sent).toMatchObject({ from: { role: "player", playerId: playerIds["Player 1"] } });
+    expect(rejects(dm)).toEqual(["not_found", "not_found"]);
+    expect(rejects(p1)).toEqual([
+      "forbidden",
+      "forbidden",
+      "not_found",
+      "not_found",
+      "not_found",
+      "not_found",
+      "not_found",
+      "invalid",
+      "forbidden",
+    ]);
+    for (const c of [dm2, p2]) expect(rejects(c)).toEqual([]);
+
+    // FR-OVW-40: the leak scan over drag frames: nothing hidden, not shown or unknown to a player.
+    for (const c of [p1, p2]) {
+      expect(leaks(c)).toEqual([]);
+      expect(leakScan(h.s, c)).toEqual([]);
+    }
+
+    // No DB write, log row or `seq`.
+    expect(db.select().from(overviewItem).all()).toEqual(rows);
+    expect(readEventLog(db).length).toBe(logged);
+    expect(all.map((c) => c.store.seq)).toEqual(seqs);
+    for (const c of all) c.close();
+  });
+
+  test("FR-OVW-35 a locked miniature's frames are refused: its drop would be", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(pc("Player 1"));
+    const coast = ov["Sword Coast"] as string;
+    const itemId = it.ownMini as string;
+    const moved = { overviewId: coast, moves: [{ itemId, x: 5, y: 5 }] };
+    await ok(dm, I.updateItems, { overviewId: coast, items: [{ itemId, locked: true }] });
+    const mark = dm.frames.length;
+    p1.send({ type: "signal", name: OVW_SIGNALS.drag, data: moved });
+    await barrier(p1);
+    await barrier(dm);
+    expect(p1.frames.at(-2)).toMatchObject({ type: "reject", code: "forbidden" });
+    expect(dm.frames.slice(mark).filter((f) => f.type === "signal")).toEqual([]);
+    expect(await intent(p1, I.moveItems, moved)).toMatchObject({ code: "conflict" });
+    await ok(dm, I.updateItems, { overviewId: coast, items: [{ itemId, locked: false }] });
+    for (const c of [dm, p1]) c.close();
+  });
+
+  test("FR-OVW-33 a character edit reaches players on the visible miniature, not on a hidden one", async () => {
+    const dm = await h.live(DM);
+    const p1 = await h.live(pc("Player 1"));
+    const coast = ov["Sword Coast"] as string;
+    const row = db
+      .select()
+      .from(overviewItem)
+      .all()
+      .find((i) => i.overviewId === coast && i.text === "Mira");
+    const id = row?.id as string;
+    const def = db
+      .select()
+      .from(entity)
+      .where(eq(entity.id, row?.characterId as string))
+      .get();
+    // `entities.update` is REST, not a WS intent; its event reaches the sockets the same way.
+    const update = async (name: string) => {
+      h.s.commands.run(
+        ENTITY_UPDATE,
+        { ...body, name },
+        { actor: { role: "dm", playerId: null, campaignId } },
+      );
+      await barrier(p1);
+    };
+    const body = {
+      id: def?.id,
+      portraitAssetId: def?.portraitAssetId,
+      statBlock: def?.statBlock,
+      ownerPlayerId: def?.ownerPlayerId,
+    };
+    await update("Mira Renamed");
+    expect(p1.store.records[OVERVIEW_ITEM_TYPE]?.[id]).toMatchObject({ text: "Mira Renamed" });
+
+    // Hidden: the same edit tells the player nothing.
+    await ok(dm, I.updateItems, { overviewId: coast, items: [{ itemId: id, hidden: true }] });
+    await barrier(p1);
+    expect(p1.store.records[OVERVIEW_ITEM_TYPE]?.[id]).toBeUndefined();
+    await update("Mira Unseen");
+    expect(p1.store.records[OVERVIEW_ITEM_TYPE]?.[id]).toBeUndefined();
+
+    await update("Mira");
+    await ok(dm, I.updateItems, { overviewId: coast, items: [{ itemId: id, hidden: false }] });
+    for (const c of [dm, p1]) c.close();
   });
 
   test("FR-OVW-40 leak scan over snapshot, frames, loads, before and after a reveal, a Show and a reconnect", async () => {

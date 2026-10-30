@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { ASSET_MANAGE_INTENTS, inUseMessage } from "@shared/assets-pipeline/manage";
 import {
+  type AddPartyResult,
   OVW_INTENTS as I,
   ITEMS_PER_CAMPAIGN_MAX,
   ITEMS_PER_OVERVIEW_MAX,
@@ -15,11 +16,14 @@ import {
 } from "@shared/overview-scenes/schemas";
 import { MAP_INTENTS } from "@shared/scenes-map/schemas";
 import { eq } from "drizzle-orm";
-import { overview, overviewItem, overviewItemSeqNext, scene } from "../../db/schema";
+import { entity, overview, overviewItem, overviewItemSeqNext, scene } from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import { silentLogger } from "../../log";
 import { createServices } from "../../services";
 import { createTestServices } from "../../testing/services";
+import { createEntity, UPDATE } from "../entities/commands";
+import { definitionHooksOf } from "../entities/definition-hooks";
+import { miraBlock } from "../entities/testing";
 import { sceneCampaignOf } from "../scenes-map/active-scene";
 import { MAP_REST } from "../scenes-map/commands";
 import { activeSceneOf } from "../scenes-map/rows";
@@ -852,6 +856,278 @@ describe("FR-OVW-15–27 items", () => {
       type: "OverviewItemsDeleted",
       payload: { overviewId: id, itemIds: [a] },
     });
+  });
+});
+
+describe("FR-OVW-31–34 miniatures", () => {
+  function party() {
+    const t = setup();
+    const id = t.create();
+    const add = (overviewId = id, over: object = {}) =>
+      t.run<AddPartyResult>(I.addParty, { overviewId, x: 1000, y: 500, size: 100, ...over });
+    /** `entities.update` replaces the whole body. */
+    const update = (patch: object) =>
+      t.run(UPDATE, {
+        id: t.miraId,
+        name: "Mira",
+        ownerPlayerId: t.h.p1.id,
+        portraitAssetId: "art-mira",
+        statBlock: miraBlock,
+        ...patch,
+      });
+    const count = (overviewId: string) =>
+      t.s.db.select().from(overviewItem).where(eq(overviewItem.overviewId, overviewId)).all()
+        .length;
+    return { ...t, id, add, update, count };
+  }
+
+  test("FR-OVW-31 add party", () => {
+    const t = party();
+    t.update({ tokenShape: "square" });
+
+    const first = t.add();
+    expect(first.itemIds.length).toBe(2);
+    const [a, b] = first.itemIds.map(t.item) as [OverviewItemRecord, OverviewItemRecord];
+    // In `partyOf`'s order; name, image and owner from the character; the name's default style.
+    expect(a).toMatchObject({
+      kind: "miniature",
+      text: "Mira",
+      characterId: t.miraId,
+      ownerPlayerId: t.h.p1.id,
+      assetId: "art-mira",
+      shape: "square",
+      w: 100,
+      h: 100,
+      hidden: false,
+      style: MINIATURE_STYLE,
+    });
+    expect(b).toMatchObject({
+      text: "Thorn",
+      characterId: t.thornId,
+      ownerPlayerId: t.h.p2.id,
+      assetId: null,
+      shape: "round",
+    });
+    // A row around x, y.
+    expect(a.y).toBe(450);
+    expect(b.y).toBe(450);
+    expect((a.x + b.x + 100) / 2).toBe(1000);
+    expect(b.x - a.x).toBe(125);
+    expect(b.z).toBeGreaterThan(a.z);
+
+    // Twice: no duplicates, no event, the ack says so.
+    const dispatched = t.events.length;
+    expect(t.add().itemIds).toEqual([]);
+    expect(t.events.length).toBe(dispatched);
+    expect(t.count(t.id)).toBe(2);
+
+    // A new character: only they are missing. A deleted miniature comes back.
+    t.run(createEntity.name, {
+      kind: "character",
+      name: "Ana",
+      ownerPlayerId: t.h.p2.id,
+      statBlock: miraBlock,
+    });
+    expect(t.add().itemIds.map((i) => t.item(i).text)).toEqual(["Ana"]);
+    t.run(I.deleteItems, { overviewId: t.id, itemIds: [a.id] });
+    expect(t.add().itemIds.map((i) => t.item(i).text)).toEqual(["Mira"]);
+    expect(t.count(t.id)).toBe(3);
+  });
+
+  test("FR-OVW-31 hidden with Add hidden; caps all or nothing; DM only; a character with no owner", () => {
+    const t = party();
+    expect(t.add(t.id, { hidden: true }).itemIds.map((i) => t.item(i).hidden)).toEqual([
+      true,
+      true,
+    ]);
+
+    const full = t.create("Full");
+    for (let i = 0; i < ITEMS_PER_OVERVIEW_MAX - 1; i++) {
+      insertMiniature(t.s.db, { id: `m${i}`, campaignId: t.cid, overviewId: full });
+    }
+    expect(t.code(() => t.add(full))).toBe("conflict");
+    expect(t.count(full)).toBe(ITEMS_PER_OVERVIEW_MAX - 1);
+
+    expect(t.code(() => t.add("nope"))).toBe("not_found");
+    const input = { overviewId: t.id, x: 0, y: 0, size: 64 };
+    expect(t.code(() => t.run(I.addParty, input, t.player(t.h.p1)))).toBe("forbidden");
+
+    // §11: its miniature has no owner.
+    t.s.db.update(entity).set({ ownerPlayerId: null }).where(eq(entity.id, t.thornId)).run();
+    const next = t.create("Next");
+    const thorn = t.add(next).itemIds.map(t.item)[1];
+    expect(thorn).toMatchObject({ text: "Thorn", ownerPlayerId: null });
+  });
+
+  test("FR-OVW-32 add miniature: name and owner optional, no link", () => {
+    const t = party();
+    const place = (over: object = {}) =>
+      t.run<{ itemId: string }>(I.placeMiniature, {
+        overviewId: t.id,
+        assetId: "map-town",
+        x: 10,
+        y: 20,
+        size: 64,
+        ...over,
+      }).itemId;
+    expect(t.item(place())).toMatchObject({
+      kind: "miniature",
+      assetId: "map-town",
+      x: 10,
+      y: 20,
+      w: 64,
+      h: 64,
+      text: null,
+      ownerPlayerId: null,
+      characterId: null,
+      hidden: false,
+      shape: "round",
+      style: MINIATURE_STYLE,
+    });
+    expect(
+      t.item(place({ text: "  The Party ", ownerPlayerId: t.h.p1.id, hidden: true })),
+    ).toMatchObject({ text: "The Party", ownerPlayerId: t.h.p1.id, hidden: true });
+    expect(t.item(place({ text: "" })).text).toBeNull();
+
+    expect(t.code(() => place({ text: "x".repeat(41) }))).toBe("invalid");
+    expect(t.code(() => place({ ownerPlayerId: "nobody" }))).toBe("invalid");
+    expect(t.code(() => place({ assetId: "nope" }))).toBe("not_found");
+    expect(t.code(() => place({ overviewId: "nope" }))).toBe("not_found");
+    const input = { overviewId: t.id, assetId: "map-town", x: 0, y: 0, size: 64 };
+    expect(t.code(() => t.run(I.placeMiniature, input, t.player(t.h.p1)))).toBe("forbidden");
+  });
+
+  test("FR-OVW-33 name, art and owner follow, in the update's event", () => {
+    const t = party();
+    const here = t.add().itemIds[0] as string;
+    const next = t.create("Phandalin");
+    const there = t.add(next).itemIds[0] as string;
+    t.run(I.moveItems, { overviewId: t.id, moves: [{ itemId: here, x: 7, y: 8 }] });
+
+    t.update({ name: "Mira the Bold", ownerPlayerId: t.h.p2.id, portraitAssetId: "map-battle" });
+    for (const id of [here, there]) {
+      expect(t.item(id)).toMatchObject({
+        text: "Mira the Bold",
+        ownerPlayerId: t.h.p2.id,
+        assetId: "map-battle",
+      });
+    }
+    const last = t.events.at(-1)?.event;
+    expect(last?.type).toBe("EntityUpdated");
+    expect(last?.changes.map((c) => c.id)).toEqual(expect.arrayContaining([here, there]));
+    // Where it stands and how big it is stay.
+    expect(t.item(here)).toMatchObject({ x: 7, y: 8, w: 100 });
+
+    // No art → token art; a name past 40 is cut (entities allow 60).
+    t.update({ portraitAssetId: null, name: "x".repeat(60) });
+    expect(t.item(here)).toMatchObject({ assetId: null, text: "x".repeat(40) });
+
+    // An unlinked copy doesn't follow.
+    const copy = t.run<{ itemIds: string[] }>(I.duplicateItems, {
+      overviewId: t.id,
+      itemIds: [here],
+    }).itemIds[0] as string;
+    t.update({ name: "Mira" });
+    expect(t.item(here).text).toBe("Mira");
+    expect(t.item(copy).text).toBe("x".repeat(40));
+  });
+
+  test("FR-OVW-33 an edit that fails later in the update leaves the miniature as it was", () => {
+    const t = party();
+    const id = t.add().itemIds[0] as string;
+    definitionHooksOf(t.s).register("test.throw", () => {
+      throw new Error("boom");
+    });
+    expect(() => t.update({ name: "Renamed" })).toThrow();
+    expect(t.item(id).text).toBe("Mira");
+  });
+
+  test("FR-OVW-33 Name, Image and Owner refused when linked; Shape and handles aren't", () => {
+    const t = party();
+    const id = t.add().itemIds[0] as string;
+    const patch = (over: object) =>
+      t.run(I.updateItems, { overviewId: t.id, items: [{ itemId: id, ...over }] });
+    expect(t.code(() => patch({ text: "Other" }))).toBe("conflict");
+    expect(t.code(() => patch({ assetId: "map-town" }))).toBe("conflict");
+    expect(t.code(() => patch({ ownerPlayerId: t.h.p2.id }))).toBe("conflict");
+    expect(t.code(() => patch({ ownerPlayerId: null }))).toBe("conflict");
+    patch({ shape: "none", w: 200, h: 200 });
+    expect(t.item(id)).toMatchObject({ shape: "none", w: 200, h: 200, text: "Mira" });
+  });
+
+  test("FR-OVW-32 FR-OVW-34 an unlinked miniature takes a name, image, shape and owner", () => {
+    const t = party();
+    const id = t.run<{ itemId: string }>(I.placeMiniature, {
+      overviewId: t.id,
+      assetId: "map-town",
+      x: 0,
+      y: 0,
+      size: 64,
+    }).itemId;
+    const patch = (over: object) =>
+      t.run(I.updateItems, { overviewId: t.id, items: [{ itemId: id, ...over }] });
+    patch({ text: "Ship", assetId: "map-battle", shape: "square", ownerPlayerId: t.h.p2.id });
+    expect(t.item(id)).toMatchObject({
+      text: "Ship",
+      assetId: "map-battle",
+      shape: "square",
+      ownerPlayerId: t.h.p2.id,
+    });
+    patch({ ownerPlayerId: null, text: "" });
+    expect(t.item(id)).toMatchObject({ ownerPlayerId: null, text: "" });
+    expect(t.code(() => patch({ ownerPlayerId: "nobody" }))).toBe("invalid");
+    expect(t.code(() => patch({ shape: "hexagon" }))).toBe("invalid");
+
+    // Shape and owner only on a miniature.
+    const label = t.label(t.id);
+    for (const over of [{ shape: "round" }, { ownerPlayerId: null }]) {
+      expect(
+        t.code(() =>
+          t.run(I.updateItems, { overviewId: t.id, items: [{ itemId: label, ...over }] }),
+        ),
+      ).toBe("invalid");
+    }
+  });
+
+  test("FR-OVW-34 size bounds: 8–4096 and square", () => {
+    const t = party();
+    const place = (size: number) =>
+      t.run<{ itemId: string }>(I.placeMiniature, {
+        overviewId: t.id,
+        assetId: "map-town",
+        x: 0,
+        y: 0,
+        size,
+      }).itemId;
+    const id = place(8);
+    expect(t.item(place(4096)).w).toBe(4096);
+    for (const size of [7.99, 4096.01, 64.123]) expect(t.code(() => place(size))).toBe("invalid");
+    expect(t.code(() => t.add(t.id, { size: 7 }))).toBe("invalid");
+    expect(t.code(() => t.add(t.id, { size: 5000 }))).toBe("invalid");
+
+    const size = (w: number, h: number) =>
+      t.run(I.updateItems, { overviewId: t.id, items: [{ itemId: id, w, h }] });
+    size(4096, 4096);
+    expect(t.item(id)).toMatchObject({ w: 4096, h: 4096 });
+    expect(t.code(() => size(4097, 4097))).toBe("invalid");
+    expect(t.code(() => size(7, 7))).toBe("invalid");
+    expect(t.code(() => size(100, 200))).toBe("invalid");
+  });
+
+  test("FR-OVW-38 miniatures stay where they are; Add party on the next overview adds who's missing", () => {
+    const t = party();
+    const here = t.add().itemIds[0] as string;
+    t.run(I.show, { overviewId: t.id });
+    const at = t.item(here);
+    const next = t.create("Phandalin");
+    t.run(I.show, { overviewId: next });
+    expect(t.item(here)).toMatchObject({ overviewId: t.id, x: at.x, y: at.y });
+    const there = t.add(next).itemIds[0] as string;
+    expect(there).not.toBe(here);
+    expect(t.item(there).overviewId).toBe(next);
+    expect(t.count(t.id)).toBe(2);
+    t.run(I.show, { overviewId: t.id });
+    expect(t.add().itemIds).toEqual([]);
   });
 });
 

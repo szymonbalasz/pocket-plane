@@ -8,6 +8,8 @@ import {
   LABEL_FONTS,
   LABEL_STYLE_DEFAULT,
   type LabelStyle,
+  MINIATURE_SCREEN_PX,
+  MINIATURE_STYLE_DEFAULT,
   type MiniatureStyle,
   type PlayerOverviewItemRecord,
 } from "@shared/overview-scenes/schemas";
@@ -30,17 +32,11 @@ export const fontStack = (font: LabelFontKey) => `"${LABEL_FONT_FAMILY[font]}", 
 
 export type MeasureText = (text: string, style: { font: LabelFontKey; size: number }) => number;
 
-/** FR-OVW-36 default: the label text style at size 14. */
-export const MINIATURE_NAME_DEFAULT: MiniatureStyle = {
-  font: LABEL_STYLE_DEFAULT.font,
-  size: 14,
-  color: LABEL_STYLE_DEFAULT.color,
-  strokeColor: LABEL_STYLE_DEFAULT.strokeColor,
-  strokeWidth: LABEL_STYLE_DEFAULT.strokeWidth,
-};
+/** FR-OVW-36 default. */
+export const MINIATURE_NAME_DEFAULT: MiniatureStyle = MINIATURE_STYLE_DEFAULT;
 
 /** FR-OVW-34: a miniature's side before anything has sized it. */
-export const MINIATURE_SIDE_DEFAULT = 64;
+export const MINIATURE_SIDE_DEFAULT = MINIATURE_SCREEN_PX;
 
 export const labelStyleOf = (item: Pick<OverviewItemView, "style">): LabelStyle =>
   item.style && "dot" in item.style ? item.style : LABEL_STYLE_DEFAULT;

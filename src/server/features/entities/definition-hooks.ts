@@ -13,6 +13,7 @@ import { combatantDefinitionHook } from "../combat-tracker/hooks";
 import { macroOwnerHook } from "../dice-extras/owner-hook";
 import { presetOwnerHook } from "../effect-modifiers/definition-hook";
 import { fogSensesHook } from "../fog-of-war/lifecycle";
+import { miniatureCharacterHook } from "../overview-scenes/character-link";
 import { reminderOwnerHook } from "../reminders/owner-hook";
 import { refreshTokenCopies } from "../scenes-map/definition-hook";
 import { fillTokenCreatureType } from "./creature-type-fill";
@@ -43,6 +44,7 @@ export const definitionChangedHooks: readonly HookRegistration[] = [
   { name: "entities.pet-owner-copies", hook: petOwnerCopiesHook }, // pets + companions follow the owner (FR-ENT-34)
   { name: "dice-extras.owner-change", hook: macroOwnerHook }, // DICEX macros move, open targets missed (FR-DICEX-65)
   { name: "reminders.owner-copy", hook: reminderOwnerHook }, // REM owner copy follows the PC (FR-REM-05)
+  { name: "overview-scenes.character-link", hook: miniatureCharacterHook }, // OVW miniature name, art, owner follow (FR-OVW-33)
 ];
 
 /** Per-server hook list, seeded from the registry; tests may add hooks via `register`. */
