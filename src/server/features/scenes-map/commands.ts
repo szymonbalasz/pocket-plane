@@ -818,8 +818,8 @@ export function setTokenHiddenCommand(hooks: TokenHooks) {
 
 /**
  * FR-MAP-17: same definition, image, size, shape, `creatureType`, speed, owner, hidden flag, `invisible`
- * (FR-FOG-45); numbered name; at `col + footprint` same row if valid, else `col − footprint`,
- * else the source cell; `fogged` / `seenBy` derived at that cell (FR-FOG-10).
+ * (FR-FOG-45); numbered name; at `duplicateCell` (free of other tokens, BL-163); `fogged` / `seenBy`
+ * derived at that cell (FR-FOG-10).
  */
 export const duplicateToken = defineCommand({
   name: MAP_INTENTS.duplicateToken,
@@ -831,7 +831,7 @@ export const duplicateToken = defineCommand({
     const s = findScene(tx, cid, src.sceneId) as SceneRecord;
     resolveDefinition(env, src.definitionId);
     assertCaps(tx, cid, s.id, 1);
-    const cell = duplicateCell(s, src);
+    const cell = duplicateCell(s, src, sceneTokens(tx, s.id));
     const after = insertToken(env, {
       campaignId: cid,
       sceneId: s.id,
