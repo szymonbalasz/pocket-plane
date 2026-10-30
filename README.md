@@ -7,6 +7,7 @@ Built for a single table, not as a product: no signup, no multi-tenant hosting, 
 ## What it does
 
 - **Scenes and map**: battlemaps, tokens, grid, walls, fog of war and per-token vision, ruler, ping, AoE templates, props.
+- **Overviews**: a free canvas for the zoomed-out parts of the game, with no grid: map images, place labels with a dot, quest scrolls and party miniatures placed anywhere; hide and reveal them as the party explores.
 - **Combat**: encounters, initiative, damage cards (players roll, the DM applies with hit / miss and half / double), conditions and effects, undo.
 - **Character sheets**: full 5e sheets for PCs and NPCs, rolls straight from the sheet.
 - **Dice**: game log, 3D dice, physical-dice entry, DM-hidden rolls.

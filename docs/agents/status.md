@@ -4,7 +4,7 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 
 **5etools import (#395–#397, #400, #401): DONE 2026-10-30.** Spec + ADR-0074; core, adapter, panel, token art merged; walkthroughs 27/31 → re-test, 14/14; README how-to. Follow-ups BL-160–163. Sprint 15 planning after (candidates: BL-146 with BL-143–145, BL-124 / BL-152, BL-151, BL-125–127, BL-149 / BL-150, BL-153, BL-154, BL-123, BL-142).
 
-**Overview scenes (#398, 2026-10-30; separate session from the 5etools track, same `main`):** spec [overview-scenes](../specs/overview-scenes.md) complete, ADR-0075 accepted. Order: `fix/ovw-core` → `build/ovw-canvas` → `build/ovw-images` → `build/ovw-labels` ∥ `build/ovw-minis`. Briefs `%TEMP%/pocket-plane/briefs/{build,test}-ovw-*.md`. `fix/ovw-core` holds `src/server/db/`, `src/shared/events/`, `active-scene.ts`, `scene-hooks.ts`, `docs/data-model/`, `docs/protocol/`.
+**Overview scenes (#398, 2026-10-30): all five slices merged (#406), no locks held.** Evidence `.verify/overview/walkthroughs/` in the main checkout. Follow-ups BL-164, BL-165, BL-166.
 
 **Shared-file locks (5etools):** none (all released).
 

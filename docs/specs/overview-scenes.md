@@ -37,7 +37,7 @@ phase: post-mvp
 - A new canvas for both clients with pan, zoom, Fit, ping, laser and pull.
 - Editing: select, group move, resize, stack, lock, hide and reveal, duplicate, delete.
 - Place labels with text and dot styling. Miniatures with **Add party**, **Add miniature** and player moves.
-- Fixtures and bundle `overview-scenes`.
+- Fixtures and bundles `overview-scenes`, `overview-crowd`, `overview-visual`.
 
 ## 3. Goals
 
@@ -91,7 +91,7 @@ Campaign = `env.actor.campaignId`; IDs and time from `env.ctx` ([ADR-0022](../ar
 | FR-OVW-09 | **Player base:** the shown overview, else today's `PlayerMapBase`. A new `OverviewCanvas`, lazily loaded; `MapCanvas` is not changed. | ADR Decision 4 |
 | FR-OVW-10 | **DM view order:** a requested overview, a requested scene, the shown overview, the active scene, the first scene in list order, the shell's empty state. While an overview is viewed, every reader of the viewed scene gets null, so battle tools, Encounters Start, creature drops and View as switch off through `view-state.ts`. A viewed overview that isn't shown gets the "Not shown to players" badge, and ping, laser and pull are off, as [FR-MAP-08](scenes-map.md#6-functional-requirements). | |
 | FR-OVW-11 | Pan and zoom as [FR-MAP-12](scenes-map.md#6-functional-requirements): wheel about the pointer, 10–400 %, per client, never sent. Left-drag on empty canvas or on an item the user can't move pans; middle-drag always pans. | |
-| FR-OVW-12 | **Fit** frames every item the viewer has inside the free area (the part no window covers). Runs when an overview first opens on a client and on the Fit button; adding or moving items never moves the camera. No items → origin at 100 %. | |
+| FR-OVW-12 | **Fit** frames every item the viewer has inside the free area (the part no window covers; no room is kept for toasts, #406). Runs when an overview first opens on a client and on the Fit button; adding or moving items never moves the camera. No items → origin at 100 %. | |
 | FR-OVW-13 | **Tools:** Select, Add image, Label, Add party, Add miniature (DM); ping and laser (both); Fit, Pull (as battle scenes). No grid, ruler, walls, fog or templates. Ping, laser and pull reuse their signals with the overview's ID as `sceneId`. | |
 | FR-OVW-14 | **Scenes window:** overviews sit in the same list and folders as scenes, with an Overview mark. **New** offers Battle scene or Overview. Row actions: Show, Rename, Duplicate, Move, Delete. Clicking a row views it. Players get no list. | FR-MAP-51 |
 
@@ -135,7 +135,7 @@ Campaign = `env.actor.campaignId`; IDs and time from `env.ctx` ([ADR-0022](../ar
 | FR-OVW-33 | **Character link:** a party miniature keeps `characterId`. Through a definition-changed hook, a change to the character's name, art or owner follows in the same transaction. **Name and Image… are off on a linked miniature.** | Unlike tokens ([#126](../decisions-log.md)): DM's choice |
 | FR-OVW-34 | **Size and look:** starts 64 px on screen at the placer's zoom (`size` = 64 ÷ zoom), then handles, 8–4096 units, square. Shape round, square or none, as [FR-MAP-35](scenes-map.md#6-functional-requirements). No image → token art, as battle tokens. Shrinks with the map. | |
 | FR-OVW-35 | **Who moves:** a player may move a miniature iff `ownerPlayerId` is theirs, it isn't hidden and its overview is shown. Hidden, on an overview not shown or unknown → `not_found`; visible but not theirs → `forbidden`. Moves only. The DM moves any. | As [FR-MAP-21](scenes-map.md#6-functional-requirements) |
-| FR-OVW-36 | **Name:** under the miniature, centred, drawn with the label text style fields (`font`, `size`, `color`, `strokeColor`, `strokeWidth`). Same style panel, without the dot. Default size 14. | |
+| FR-OVW-36 | **Name:** under the miniature, centred, drawn with the label text style fields (`font`, `size`, `color`, `strokeColor`, `strokeWidth`). Same style panel, without the dot. Default size = 14 ÷ the placer's zoom, clamped 8–512 (#406). Drawn whole however wide. | |
 | FR-OVW-37 | **Live drag:** signal `ovw.drag {overviewId, moves ≤ 50} \| {overviewId, itemIds, end}`, at most one frame per 50 ms, as [FR-MAP-39](scenes-map.md#6-functional-requirements). No DB, log or `seq`. Audience hook: a player sender per FR-OVW-35; a frame holding any hidden item, or on an overview not shown, goes to the DM only. | ADR-0026 |
 | FR-OVW-38 | **Between overviews:** miniatures stay where they are. **Add party** on the next overview adds who's missing. | |
 
@@ -160,7 +160,7 @@ Campaign = `env.actor.campaignId`; IDs and time from `env.ctx` ([ADR-0022](../ar
 
 | ID | Requirement | Notes |
 |---|---|---|
-| FR-OVW-46 | Fixture units `fixtures/units/overview-scenes/`: `ovw-sword-coast` (shown; locked map from `map-large.svg`, three styled labels, one hidden; hidden scroll; party miniatures), `ovw-phandalin` (not shown; `town.svg`), `ovw-crowd` (not shown; 300 items, 200 of them labels; walkthrough step 12 only). Bundle `overview-scenes` = `scenes` + those, with `player-1` and `player-2`. | [§9.3](../../AGENTS.md#93-fixtures) |
+| FR-OVW-46 | Fixture units `fixtures/units/overview-scenes/`: `ovw-sword-coast` (shown; locked map from `map-large.svg`, three styled labels, one hidden; hidden scroll; party miniatures), `ovw-phandalin` (not shown; `town.svg`), `ovw-crowd` (not shown; 300 items, 200 of them labels; walkthrough step 12 only). Bundle `overview-scenes` = `scenes` + the first two, with `player-1` and `player-2`; `overview-crowd` = that + `ovw-crowd`; `overview-visual` = `overview-scenes`, for the screenshots (#406). | [§9.3](../../AGENTS.md#93-fixtures) |
 | FR-OVW-47 | **Reconnect:** the snapshot carries the shown overview and its items; a drag in progress on the dropped connection snaps back, unsent. A preview from a dropped sender ends as `map.drag` does. While not `live`, editing is off; pan, zoom, selection and viewing still work, as [FR-MAP-28](scenes-map.md#6-functional-requirements). | |
 | FR-OVW-48 | **Crash:** each command is one transaction, so nothing or everything of a Show, a group move or an Add party survives. After a restart the cache rebuilds from the DB. Previews are never stored. | |
 
@@ -263,7 +263,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 |---|---|---|
 | Unit | Input bounds, style zod, band order, Fit box, DM view order, label layout, miniature size from zoom | — |
 | Integration | Show both ways; resolver and `activeSceneOf` values; visibility per record DM vs player; `FR-OVW-40 leak scan` over snapshot, frames, loads and drags; a fight, a pet and a roll with an overview shown; group move all-or-nothing; Add party twice; character edit follows; `FR-OVW-08 CON-44`; crash at `ovw.show:before-commit` and `after-commit` (`PP_TEST_CRASH`) | `overview-scenes` |
-| E2E (thin) | `e2e/overview-scenes.e2e.ts`: DM shows, player follows; reveal; label added and styled; player drags own, not another's; Show a battle scene and back; Start off on an overview. `e2e/visual.e2e.ts` gains overview shots | `overview-scenes` |
+| E2E (thin) | `e2e/overview-scenes.e2e.ts`: DM shows, player follows; reveal; label added and styled; player drags own, not another's; Show a battle scene and back; Start off on an overview. `e2e/visual-overview.e2e.ts` holds the overview shots | `overview-scenes` |
 
 **Browser walkthrough** (test agent; `pw-dm` = A, `pw-player-1` = B, `pw-player-2` = C): `bun run build`, `bun run fixtures:reset-load overview-scenes --profile verify`, `bun run start --profile verify`.
 
@@ -280,7 +280,7 @@ Isolated per worktree ([ADR-0008](../architecture/adr/0008-parallel-dev-isolatio
 | 9 | A: Phandalin row → view, not shown | Badge; ping off; Encounters Start off with the hint; B unchanged |
 | 10 | A: Add party on Phandalin, again | Party placed; second press toasts "Everyone is already here" |
 | 11 | A: Show a battle scene, start a fight, Show Sword Coast | Players follow each time; fight continues in Initiative; rolls work |
-| 12 | A: load 300 items (fixture `ovw-crowd`), pan and zoom; B reconnects | Smooth; B has the same picture, no hidden item in its records |
+| 12 | A: `fixtures:reset-load overview-crowd`, pan and zoom; B reconnects | Smooth; B has the same picture, no hidden item in its records |
 
 Evidence under `.verify/<run-id>/`. Teardown: stop, `bun run fixtures:reset --profile verify`.
 
