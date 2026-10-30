@@ -24,7 +24,10 @@ async function overviewDrawn(page: Page, items: number) {
     await close.first().click();
     await expect(close).toHaveCount(open - 1);
   }
+  // The free area follows the closed windows a moment later; the pointer leaves, so no hover shows.
+  await settled(page);
   await page.getByTestId("ovw-tool-fit").click();
+  await page.mouse.move(SIZE.width / 2, 2);
   await expect(page.getByTestId("ovw-canvas")).toHaveAttribute("data-camera", "fitted");
   await expect.poll(async () => (await konvaNodes(page, "ovw-item")).length).toBe(items);
   await expect.poll(async () => (await konvaNodes(page, "ovw-image")).length).toBeGreaterThan(0);
