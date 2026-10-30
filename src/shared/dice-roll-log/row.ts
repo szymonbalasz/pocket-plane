@@ -12,7 +12,7 @@ import { LOG_KIND_ATTACK, LOG_KIND_HP } from "@shared/combat-tracker/schemas";
 import type { RollCategory } from "@shared/events/dice-roll-log";
 import type { LineSegment } from "./kind-types";
 import { type EntryLike, formatEntry } from "./line";
-import { itemRuns, ROLL_KIND, runName } from "./roll-kind";
+import { itemRuns, itemsAfterActor, ROLL_KIND, runName } from "./roll-kind";
 import { RollEntryPayload, type RollPayloadItem } from "./schemas";
 
 /** A Result box's outcome (FR-KIT-05); the kit part's `ResultOutcome`. */
@@ -85,7 +85,7 @@ export function rowAction(entry: EntryLike): RowAction {
   if (entry.kind === ROLL_KIND) {
     const p = RollEntryPayload.safeParse(entry.payload);
     if (p.success) {
-      const items = p.data;
+      const items = itemsAfterActor(p.data, entry.actorName);
       const names = itemRuns(items).map((run) =>
         runName(run.map((i) => items[i] as RollPayloadItem)),
       );
@@ -194,7 +194,7 @@ export function rowResults(entry: EntryLike): RowResult[] {
   if (entry.kind !== ROLL_KIND) return [];
   const p = RollEntryPayload.safeParse(entry.payload);
   if (!p.success) return [];
-  const items = p.data;
+  const items = itemsAfterActor(p.data, entry.actorName);
   return itemRuns(items).map((run, k) => {
     const parts = run.map((i) => items[i] as RollPayloadItem);
     const base = parts[0] as RollPayloadItem;

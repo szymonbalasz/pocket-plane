@@ -554,3 +554,65 @@ describe("FR-DICE-95 purpose in the line", () => {
     expect(lineText(rollSegments(item({ purpose: "attack" })))).toBe("attack: 12 + 4 = 16");
   });
 });
+
+describe("BL-162 the line names the actor once", () => {
+  const text = (actorName: string, payload: RollPayloadItem[], category?: "attack") =>
+    lineText(formatEntry({ kind: "roll", actorName, payload, category }).segments);
+
+  test("BL-162 a label opening with the actor: 'Goblin — Hooked Blade attack', not twice", () => {
+    expect(text("Goblin", [item({ label: "Goblin — Hooked Blade attack" })])).toBe(
+      "Goblin — Hooked Blade attack: 12 + 4 = 16",
+    );
+    // Stat block checks build their labels the same way.
+    expect(text("Goblin", [item({ label: "goblin — Dexterity save" })])).toBe(
+      "Goblin — Dexterity save: 12 + 4 = 16",
+    );
+  });
+
+  test("BL-162 the actor stays its own styled segment; the stored payload is untouched", () => {
+    const payload = [item({ label: "Goblin — Hooked Blade attack" })];
+    const segs = formatEntry({ kind: "roll", actorName: "Goblin", payload }).segments;
+    expect(segs[0]).toEqual({ text: "Goblin", style: "actor" });
+    expect(payload[0]?.label).toBe("Goblin — Hooked Blade attack");
+  });
+
+  test("BL-162 an unrelated label and an actor named like a part of it keep the whole label", () => {
+    expect(text("Mira", [item({ label: "Perception" })])).toBe("Mira — Perception: 12 + 4 = 16");
+    expect(text("Mira", [item({ label: "Wolf — Bite attack" })])).toBe(
+      "Mira — Wolf — Bite attack: 12 + 4 = 16",
+    );
+    expect(text("Goblin", [item({ label: "Goblin Boss — Bite" })])).toBe(
+      "Goblin — Goblin Boss — Bite: 12 + 4 = 16",
+    );
+  });
+
+  test("BL-162 no label: the purpose, else the expression, as before", () => {
+    expect(text("Goblin", [item()])).toBe("Goblin — 1d20+4: 12 + 4 = 16");
+    expect(text("Goblin", [item({ purpose: "attack" })])).toBe("Goblin — attack: 12 + 4 = 16");
+  });
+
+  test("BL-162 every run of the line and a typed damage run lose the name", () => {
+    const d6 = (type: "slashing" | "fire", extra: boolean, rollId: string) =>
+      item({
+        rollId,
+        label: `Goblin — Hooked Blade damage (${type})`,
+        expression: "1d6",
+        dice: [{ faces: 6, value: 3, kept: true }],
+        constant: 0,
+        total: 3,
+        natural: null,
+        purpose: "damage",
+        part: { type, extra },
+      });
+    expect(
+      text(
+        "Goblin",
+        [item({ label: "Goblin — Hooked Blade attack" }), d6("slashing", false, "r2")],
+        "attack",
+      ),
+    ).toBe("Goblin — Hooked Blade attack: 12 + 4 = 16; Hooked Blade damage (slashing): 3 = 3");
+    expect(text("Goblin", [d6("slashing", false, "r2"), d6("fire", true, "r3")])).toBe(
+      "Goblin — Hooked Blade damage: 1d6 (3) slashing + 1d6 (3) fire = 6",
+    );
+  });
+});

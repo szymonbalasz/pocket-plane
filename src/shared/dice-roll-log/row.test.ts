@@ -310,3 +310,40 @@ describe("FR-KIT-46 copy", () => {
     expect(copyText(segments)).toBe("Mira — Athletics (adv): 13 4 + 5 = 18 physical");
   });
 });
+
+describe("BL-162 the row names the actor once", () => {
+  const goblin = (items: RollPayloadItem[]) => ({ ...roll(items), actorName: "Goblin" });
+  const blade = item({ label: "Goblin — Hooked Blade attack" });
+
+  test("BL-162 'Goblin · Hooked Blade attack': the actor, then the label without the name", () => {
+    expect(rowAction(goblin([blade]))).toEqual({ actor: "Goblin", text: "Hooked Blade attack" });
+  });
+
+  test("BL-162 a result's name (the '+N' Tooltip) and the row's other labels keep their text", () => {
+    expect(rowResults(goblin([blade]))[0]?.label).toBe("Hooked Blade attack");
+    expect(rowAction(goblin([item({ label: "Goblin Boss — Bite" })])).text).toBe(
+      "Goblin Boss — Bite",
+    );
+    expect(rowResults(goblin([item()]))[0]?.label).toBe("1d20+4");
+  });
+
+  test("BL-162 a reroll's gem line reads the target without the spender's name", () => {
+    const spend = {
+      kind: "gem.spend",
+      actorName: "Mira",
+      payload: {
+        characterId: "c1",
+        gem: "inspiration",
+        count: 1,
+        target: { kind: "entry", id: "e1", label: "Mira — Longbow attack", from: 4 },
+      },
+    };
+    expect(rowAction(spend).text).toBe("spends an Inspiration gem — rerolls Longbow attack (4)");
+    const { target } = spend.payload;
+    const other = {
+      ...spend,
+      payload: { ...spend.payload, target: { ...target, label: "Wolf — Bite" } },
+    };
+    expect(rowAction(other).text).toBe("spends an Inspiration gem — rerolls Wolf — Bite (4)");
+  });
+});
