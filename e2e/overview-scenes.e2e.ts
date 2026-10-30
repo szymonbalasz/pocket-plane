@@ -539,3 +539,232 @@ test("FR-OVW-14 New offers Overview; an empty one says so and Fit goes to the or
 
   await dm.context().close();
 });
+
+// FR-OVW-25–30, OVW §13 walkthrough steps 4–5: names in one go, the style panel, the player's view.
+test.describe("place labels", () => {
+  const labelNode = async (page: Page, text: string) => {
+    const nodes = await konvaNodes(page, "ovw-label-text");
+    const node = nodes.find((n) => n.text === text);
+    if (!node) throw new Error(`no label ${text}`);
+    return node;
+  };
+  /** What a label draws, by its text; null until it's there. */
+  const drawn = (page: Page, text: string) =>
+    page.evaluate((t) => {
+      type KNode = {
+        text(): string;
+        fontFamily(): string;
+        fontSize(): number;
+        strokeWidth(): number;
+        fill(): string;
+        parent: { findOne(s: string): KNode | undefined };
+      };
+      type KStage = { find(s: string): KNode[] };
+      const stage = (window as unknown as { Konva: { stages: KStage[] } }).Konva.stages[0];
+      const node = stage?.find(".ovw-label-text").find((n) => n.text() === t);
+      if (!node) return null;
+      return {
+        font: node.fontFamily(),
+        size: node.fontSize(),
+        strokeWidth: node.strokeWidth(),
+        color: node.fill(),
+        dot: node.parent.findOne(".ovw-label-dot")?.fill() ?? null,
+      };
+    }, text);
+  const texts = async (page: Page) => (await konvaNodes(page, "ovw-label-text")).map((n) => n.text);
+
+  test("FR-OVW-25 FR-OVW-26 FR-OVW-28 add with Enter, a second in the same style, restyle both, the player sees it", async ({
+    browser,
+  }) => {
+    const { secret, link } = e2eEnv();
+    const dm = await rolePage(browser);
+    let restyles = 0;
+    dm.on("websocket", (ws) => {
+      ws.on("framesent", (f) => {
+        if (String(f.payload).includes("ovw.updateItems")) restyles++;
+      });
+    });
+    await loginDm(dm, secret);
+    await live(dm);
+    const player = await rolePage(browser);
+    await player.goto(link("Player 1"));
+    await live(player);
+    await expect.poll(() => itemIds(player)).toHaveLength(3);
+    await expect.poll(() => itemIds(dm)).toHaveLength(5);
+    const canvas = dm.getByTestId("ovw-canvas");
+    await expect(canvas).toHaveAttribute("data-camera", "fitted");
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("no canvas box");
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+    const input = dm.getByTestId("ovw-label-input");
+    const addLabel = async (x: number, y: number, text: string) => {
+      await dm.mouse.click(x, y);
+      await expect(input).toBeFocused();
+      await dm.keyboard.type(text);
+      await dm.keyboard.press("Enter");
+      await expect(input).toHaveCount(0);
+      await expect.poll(() => texts(player)).toContain(text);
+    };
+
+    // The tool's panel sets the next label's style; the first takes it, the second the same.
+    await dm.getByTestId("ovw-tool-label").click();
+    await expect(canvas).toHaveAttribute("data-tool", "label");
+    await dm.getByTestId("ovw-style-font-fell").click();
+    await expect(dm.getByTestId("ovw-style-preview")).toHaveAttribute("data-font", "fell");
+    const zoom = await canvas.getAttribute("data-zoom");
+    await addLabel(cx, cy, "Thundertree");
+    await addLabel(cx + 120, cy + 70, "Conyberry");
+    await expect(canvas).toHaveAttribute("data-tool", "label");
+    await expect(canvas).toHaveAttribute("data-zoom", zoom ?? "");
+    for (const text of ["Thundertree", "Conyberry"]) {
+      expect((await drawn(player, text))?.font).toContain("IM Fell English SC");
+    }
+    // FR-OVW-30: the face has loaded, on a client that had never drawn it.
+    await expect
+      .poll(() => player.evaluate(() => document.fonts.check('16px "IM Fell English SC"')))
+      .toBe(true);
+
+    // Esc cancels; the tool stays on.
+    await dm.mouse.click(cx - 120, cy);
+    await expect(input).toBeFocused();
+    await dm.keyboard.type("Nowhere");
+    await dm.keyboard.press("Escape");
+    await expect(input).toHaveCount(0);
+    await expect(canvas).toHaveAttribute("data-tool", "label");
+    expect(await texts(dm)).not.toContain("Nowhere");
+
+    // Both selected: one panel, for both.
+    await dm.getByTestId("ovw-tool-select").click();
+    await expect(dm.getByTestId("ovw-style-panel")).toHaveCount(0);
+    const a = await labelNode(dm, "Thundertree");
+    const b = await labelNode(dm, "Conyberry");
+    await dm.mouse.click(a.x, a.y);
+    await dm.keyboard.down("Control");
+    await dm.mouse.click(b.x, b.y);
+    await dm.keyboard.up("Control");
+    const panel = dm.getByTestId("ovw-style-panel");
+    await expect(panel).toHaveAttribute("data-count", "2");
+
+    await panel.getByTestId("ovw-style-dot-color").fill("#ff0000");
+    await panel.getByTestId("ovw-style-font-alegreya").click();
+    await expect.poll(async () => (await drawn(player, "Conyberry"))?.dot).toBe("#ff0000");
+    await expect
+      .poll(async () => (await drawn(player, "Thundertree"))?.font)
+      .toContain("Alegreya Sans");
+    await expect.poll(() => restyles).toBe(2);
+
+    // FR-OVW-28 one commit: a slider's drag draws on the DM's canvas only, its release sends one.
+    const before = (await drawn(dm, "Thundertree"))?.size ?? 0;
+    const slider = await panel.getByTestId("ovw-style-size").boundingBox();
+    if (!slider) throw new Error("no size slider");
+    const sliderY = slider.y + slider.height / 2;
+    await dm.mouse.move(slider.x + slider.width * 0.3, sliderY);
+    await dm.mouse.down();
+    await dm.mouse.move(slider.x + slider.width * 0.5, sliderY, { steps: 8 });
+    await expect.poll(async () => (await drawn(dm, "Conyberry"))?.size).toBeGreaterThan(before);
+    expect(restyles).toBe(2);
+    expect((await drawn(player, "Thundertree"))?.size).toBe(before);
+    await dm.mouse.up();
+    const size = (await drawn(dm, "Thundertree"))?.size ?? 0;
+    await expect.poll(() => restyles).toBe(3);
+    await expect.poll(async () => (await drawn(player, "Conyberry"))?.size).toBe(size);
+    await expect.poll(async () => (await drawn(player, "Thundertree"))?.size).toBe(size);
+
+    // FR-OVW-28 mixed selection: one back to Garamond; together the font shows mixed, and a change
+    // to the stroke leaves each its own font.
+    const c = await labelNode(dm, "Conyberry");
+    await dm.mouse.click(c.x, c.y);
+    await expect(panel).toHaveAttribute("data-count", "1");
+    await panel.getByTestId("ovw-style-font-garamond").click();
+    await expect.poll(async () => (await drawn(player, "Conyberry"))?.font).toContain("Garamond");
+    const t = await labelNode(dm, "Thundertree");
+    await dm.keyboard.down("Control");
+    await dm.mouse.click(t.x, t.y);
+    await dm.keyboard.up("Control");
+    await expect(panel).toHaveAttribute("data-count", "2");
+    await expect(panel.getByTestId("ovw-style-font")).toHaveAttribute("data-mixed", "true");
+    await panel.getByTestId("ovw-style-stroke-width-input").fill("5");
+    await panel.getByTestId("ovw-style-stroke-width-input").press("Enter");
+    await expect.poll(async () => (await drawn(player, "Conyberry"))?.strokeWidth).toBe(5);
+    await expect.poll(async () => (await drawn(player, "Thundertree"))?.strokeWidth).toBe(5);
+    expect((await drawn(player, "Conyberry"))?.font).toContain("Garamond");
+    expect((await drawn(player, "Thundertree"))?.font).toContain("Alegreya Sans");
+
+    // FR-OVW-26: a double-click edits the text, already selected to type over; so does the menu.
+    await canvas.focus();
+    await dm.keyboard.press("Escape");
+    const named = await labelNode(dm, "Thundertree");
+    await dm.mouse.dblclick(named.x, named.y);
+    await expect(input).toBeFocused();
+    await dm.keyboard.type("Thundertree Ruins");
+    await dm.keyboard.press("Enter");
+    await expect.poll(() => texts(player)).toContain("Thundertree Ruins");
+    const other = await labelNode(dm, "Conyberry");
+    await dm.mouse.click(other.x, other.y, { button: "right" });
+    await dm.getByTestId("ovw-item-menu-edit-text").click();
+    await expect(input).toBeFocused();
+    await dm.keyboard.type("Conyberry Pass");
+    await dm.keyboard.press("Enter");
+    await expect.poll(() => texts(player)).toContain("Conyberry Pass");
+
+    // FR-OVW-28 last style: the reload keeps what was last used, and the next label takes it.
+    await dm.reload();
+    await live(dm);
+    await expect.poll(() => itemIds(dm)).toHaveLength(7);
+    await dm.getByTestId("ovw-tool-label").click();
+    await expect(dm.getByTestId("ovw-style-preview")).toHaveAttribute("data-font", "garamond");
+    await expect(dm.getByTestId("ovw-style-stroke-width-input")).toHaveValue("5");
+    await addLabel(cx - 150, cy - 80, "Leilon");
+    const leilon = await drawn(player, "Leilon");
+    expect(leilon?.dot).toBe("#ff0000");
+    expect(leilon?.strokeWidth).toBe(5);
+    expect(leilon?.size).toBe(size);
+
+    await player.context().close();
+    await dm.context().close();
+  });
+
+  test("FR-OVW-25 Esc cancels only from the field; an open palette takes its Esc first", async ({
+    browser,
+  }) => {
+    const { secret } = e2eEnv();
+    const dm = await rolePage(browser);
+    await loginDm(dm, secret);
+    await live(dm);
+    await expect.poll(() => itemIds(dm)).not.toHaveLength(0);
+    const canvas = dm.getByTestId("ovw-canvas");
+    await expect(canvas).toHaveAttribute("data-camera", "fitted");
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error("no canvas box");
+    const input = dm.getByTestId("ovw-label-input");
+
+    await dm.getByTestId("ovw-tool-label").click();
+    await dm.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(input).toBeFocused();
+    await dm.keyboard.type("Conyberry");
+
+    // The palette's Esc closes the palette; the field keeps its text, and focus comes back to it.
+    await dm.keyboard.press("Control+k");
+    const palette = dm.getByTestId("ui-palette");
+    await expect(palette).toBeVisible();
+    await dm.keyboard.press("Escape");
+    await expect(palette).toHaveCount(0);
+    await expect(input).toHaveValue("Conyberry");
+    await expect(input).toBeFocused();
+
+    // From the Game log's dice input too.
+    await dm.getByTestId("dice-roll-expression").click();
+    await dm.keyboard.press("Escape");
+    await expect(input).toHaveValue("Conyberry");
+
+    // In the field it cancels, sends nothing, and the tool stays on.
+    await input.click();
+    await dm.keyboard.press("Escape");
+    await expect(input).toHaveCount(0);
+    await expect(canvas).toHaveAttribute("data-tool", "label");
+    expect(await texts(dm)).not.toContain("Conyberry");
+
+    await dm.context().close();
+  });
+});

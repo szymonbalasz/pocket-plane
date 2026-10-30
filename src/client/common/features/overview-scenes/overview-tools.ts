@@ -5,11 +5,16 @@
 // the canvas, e.g. FR-OVW-25's field); `panel` shows beside the rail (FR-MAP-60). The handlers are
 // DOM-free, so they run under `bun test`.
 import { MAP_SIGNALS } from "@shared/scenes-map/schemas";
-import { ImagePlusIcon, MousePointer2Icon, RadarIcon } from "lucide-react";
+import { ImagePlusIcon, MapPinIcon, MousePointer2Icon, RadarIcon } from "lucide-react";
 import type { CanvasClient } from "../scenes-map/layers";
 import { AddImagePanel } from "./AddImagePanel";
 import type { OverviewItemView } from "./item-layout";
+import { LabelFieldOverlay } from "./LabelFieldOverlay";
+import { LabelToolPanel } from "./LabelStylePanel";
+import { labelPointer } from "./label-tool";
 import { SELECT_TOOL_ID } from "./overview-canvas-context";
+import type { OverviewEditorState } from "./overview-editor";
+import { SelectionStylePanel, selectionHasStylePanel } from "./SelectionStylePanel";
 import { selectPointer } from "./select-tool";
 
 export { SELECT_TOOL_ID };
@@ -81,6 +86,8 @@ export interface OverviewToolDef {
   cursor?: string;
   pointer?: OverviewPointerHandlers;
   panel?: () => unknown;
+  /** The panel shows only while this holds (default: always). */
+  panelWhen?(editor: OverviewEditorState): boolean;
   layer?: () => unknown;
   overlay?: () => unknown;
 }
@@ -97,6 +104,9 @@ const selectTool: OverviewToolDef = {
   },
   pans: true,
   pointer: selectPointer,
+  panel: SelectionStylePanel,
+  panelWhen: selectionHasStylePanel,
+  overlay: LabelFieldOverlay,
 };
 
 /** FR-OVW-22: the panel's button opens the picker; the canvas still pans under it. */
@@ -110,6 +120,22 @@ const addImageTool: OverviewToolDef = {
   pans: true,
   edits: true,
   panel: AddImagePanel,
+};
+
+/** FR-OVW-25: click, type, Enter; the tool stays on. A drag still pans. */
+const labelTool: OverviewToolDef = {
+  id: "label",
+  label: "Label",
+  icon: MapPinIcon,
+  clients: ["dm"],
+  order: 20,
+  hint: { dm: "Click the map, type a name, press Enter" },
+  pans: true,
+  edits: true,
+  cursor: "crosshair",
+  pointer: labelPointer,
+  panel: LabelToolPanel,
+  overlay: LabelFieldOverlay,
 };
 
 /** FR-OVW-13: `map.ping` / `map.pull` with the overview's ID as `sceneId`. Shift = pull, DM only. */
@@ -152,6 +178,7 @@ export function orderOverviewTools(tools: readonly OverviewToolDef[]): OverviewT
 export const overviewTools: readonly OverviewToolDef[] = orderOverviewTools([
   selectTool,
   addImageTool,
+  labelTool,
   pingTool,
 ]);
 

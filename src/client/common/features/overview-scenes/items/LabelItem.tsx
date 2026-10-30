@@ -1,14 +1,18 @@
 // A place label (FR-OVW-27, -29, -30): the dot at `x, y`, the text right of it, stroked behind the
 // fill, all in units so they shrink with the map. `fontRev` re-creates the text when a font lands.
+// A style preview (FR-OVW-28) re-renders only the labels it touches.
 import { useMemo } from "react";
 import { Circle, Group, Text } from "react-konva";
 import { fontStack, labelLayout, labelStyleOf } from "../item-layout";
 import { measureText } from "../label-fonts";
+import { patchLabelStyle, useStylePreview } from "../label-style";
 import { HIDDEN_OPACITY, HiddenMark } from "./HiddenMark";
 import type { ItemViewProps } from "./item-view";
 
 export function LabelItem({ item, scale, fontRev }: ItemViewProps) {
-  const style = labelStyleOf(item);
+  const patch = useStylePreview((s) => (s.preview?.ids.includes(item.id) ? s.preview.patch : null));
+  const stored = labelStyleOf(item);
+  const style = useMemo(() => (patch ? patchLabelStyle(stored, patch) : stored), [stored, patch]);
   const text = item.text ?? "";
   // biome-ignore lint/correctness/useExhaustiveDependencies: `fontRev`: the same text measures anew once its font has loaded.
   const layout = useMemo(

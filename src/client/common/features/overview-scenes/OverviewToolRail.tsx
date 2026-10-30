@@ -11,6 +11,7 @@ import type { CanvasClient } from "../scenes-map/layers";
 import { NOT_LIVE_HINT, RAIL_TOOL, SIGNALS_OFF_HINT, ToolPanel } from "../scenes-map/ToolRail";
 import { useMapFit } from "../scenes-map/tool-store";
 import { useOverviewTool } from "./overview-canvas-context";
+import { useOverviewEditor } from "./overview-editor";
 import { activeOverviewTool, overviewToolsFor, SELECT_TOOL_ID } from "./overview-tools";
 
 export function OverviewToolRail({
@@ -33,6 +34,7 @@ export function OverviewToolRail({
   // FR-SHELL-105: pressing the active tool again (the group reports "") re-pushes its panel.
   const [reselect, setReselect] = useState(0);
   const Panel = current.panel as React.ComponentType | undefined;
+  const panelOn = useOverviewEditor((s) => current.panelWhen?.(s) ?? true);
   return (
     <div
       ref={railRef}
@@ -89,7 +91,7 @@ export function OverviewToolRail({
           <ScanIcon />
         </Button>
       </Tooltip>
-      {Panel && (
+      {Panel && panelOn && (
         <ToolPanel rail={railRef} id={`ovw-${current.id}`} reselect={reselect}>
           <Panel />
         </ToolPanel>
