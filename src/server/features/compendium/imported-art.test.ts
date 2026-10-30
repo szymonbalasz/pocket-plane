@@ -312,6 +312,20 @@ describe("FR-CMPX-24 first placement, then reuse", () => {
   });
 });
 
+describe("FR-CMPX-24 only a running server ingests", () => {
+  test("FR-CMPX-24 not armed (the fixture loader runs no start hooks): a placement starts nothing", async () => {
+    const { log, warnings } = capture();
+    const s = createServices({ config: configFor(folder), db: openMemoryDb(bytes), log });
+    const t = handles(s, warnings);
+    const tok = t.place();
+    await t.art.settled();
+    expect(t.imageOf(tok)).toBeNull();
+    expect(t.rows()).toEqual([]);
+    expect(t.artAssets()).toEqual([]);
+    expect(warnings).toEqual([]);
+  });
+});
+
 describe("FR-CMPX-25 never overrides the DM", () => {
   test("FR-CMPX-25 placed with an image: kept, nothing ingested", async () => {
     const t = fresh();
