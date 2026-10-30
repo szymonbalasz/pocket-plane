@@ -4,6 +4,7 @@
 // nothing here aggregates a fact.
 import { ENCOUNTER_TYPE } from "@shared/combat-tracker/schemas";
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
+import { LogEntryHiddenSet } from "@shared/events/dice-roll-log";
 import { NotificationCreated } from "@shared/events/notifications";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import type { EventFrame } from "@shared/protocol/frames";
@@ -61,6 +62,8 @@ export function refreshes(
   frame: Frame,
   view: { tab: StatsTab; pickedFight: string | null },
 ): boolean {
+  // FR-DICE-102: a hidden line reaches players as a delete, so no upsert would say so.
+  if (frame.cause.name === LogEntryHiddenSet.type) return true;
   const entries = logUpserts(frame);
   if (view.tab === "session" || view.tab === "campaign") return entries.length > 0;
   if (view.tab === "luck") return entries.some((e) => e.rollIds.length > 0);

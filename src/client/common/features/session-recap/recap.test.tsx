@@ -147,6 +147,15 @@ describe("FR-RECAP-06 live refresh", () => {
     expect(refreshes(log, false)).toBe(false);
   });
 
+  test("FR-DICE-102 a hide re-queries the newest session, though a player's frame holds only a delete", () => {
+    const hide = frame(
+      [{ type: GAME_LOG_ENTRY_TYPE, id: "e", op: "delete" }] as EventFrame["changes"],
+      "LogEntryHiddenSet",
+    );
+    expect(refreshes(hide, true)).toBe(true);
+    expect(refreshes(hide, false)).toBe(false);
+  });
+
   test("FR-RECAP-06 trailing 1 s; minimised asks nothing, showing again asks once", async () => {
     const h = harness();
     h.q.set({});

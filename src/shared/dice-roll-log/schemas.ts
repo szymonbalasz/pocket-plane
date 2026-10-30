@@ -219,6 +219,17 @@ export const SetCategoryPublicIntent = z.strictObject({
 });
 export type SetCategoryPublicIntent = z.infer<typeof SetCategoryPublicIntent>;
 
+/** Intent `dice.setEntryHidden` (FR-DICE-99); `confirmGuarded`: the DM's yes to REVEAL_GUARDED. */
+export const SetEntryHiddenIntent = z.strictObject({
+  entryId: Id,
+  hidden: z.boolean(),
+  confirmGuarded: z.literal(true).optional(),
+});
+export type SetEntryHiddenIntent = z.infer<typeof SetEntryHiddenIntent>;
+
+/** FR-DICE-100: the `conflict` a reveal gets when it would make a guarded roll public. */
+export const REVEAL_GUARDED = "This roll was made as a hidden or renamed creature";
+
 /** One stored die (#140): every die incl. dropped; `value` null only for manual totals. */
 export const DieResult = z.strictObject({
   faces: z.int().min(2).max(1000),
@@ -446,6 +457,13 @@ export function isUsedRoll(e: { encounterId: string | null; dmPayload?: unknown 
   return typeof dm?.usedByCardId === "string";
 }
 
+/** FR-DICE-100: an entry's audience, as stamped (FR-DICE-13). */
+export const EntryStamp = z.strictObject({
+  public: z.boolean(),
+  audiencePlayerId: z.string().nullable(),
+});
+export type EntryStamp = z.infer<typeof EntryStamp>;
+
 /** `game-log-entry` as the DM receives it (full row). */
 export const GameLogEntryRecord = z.strictObject({
   id: Id,
@@ -469,18 +487,30 @@ export const GameLogEntryRecord = z.strictObject({
    */
   audiencePlayerId: z.string().nullable().default(null),
   supersededBy: z.string().nullable(),
+  /**
+   * FR-DICE-100: the audience the DM hid this line from (`dice.setEntryHidden`), restored by a
+   * reveal; null = not hidden by hand. DM only. Old rows: null.
+   */
+  hiddenFrom: EntryStamp.nullable().default(null),
 });
 export type GameLogEntryRecord = z.infer<typeof GameLogEntryRecord>;
 
-/** FR-DICE-15: what a player receives (no `dmPayload` key). */
-export const RedactedGameLogEntry = GameLogEntryRecord.omit({ dmPayload: true });
+/** FR-DICE-15, -100: what a player receives (no `dmPayload` or `hiddenFrom` key). */
+export const RedactedGameLogEntry = GameLogEntryRecord.omit({ dmPayload: true, hiddenFrom: true });
 export type RedactedGameLogEntry = z.infer<typeof RedactedGameLogEntry>;
 
 /** An entry as either client holds it. */
 export type GameLogEntryView = Omit<RedactedGameLogEntry, "audiencePlayerId"> & {
   audiencePlayerId?: string | null;
   dmPayload?: unknown;
+  hiddenFrom?: EntryStamp | null;
 };
+
+/** FR-DICE-99: can any player see this line today? ("Hide" when yes, "Reveal" when no.) */
+export const seenByPlayers = (e: {
+  public: boolean;
+  audiencePlayerId?: string | null | undefined;
+}): boolean => e.public || (e.audiencePlayerId ?? null) !== null;
 
 /** `game-log-settings` (DM only). */
 export const GameLogSettingsRecord = z.strictObject({

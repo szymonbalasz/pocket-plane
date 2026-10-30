@@ -2,6 +2,7 @@
 // re-query, the live share open, section states, labels and the Markdown copy. The numbers are
 // always the server's (`recap.query`'s ack): nothing here aggregates a fact.
 import { GAME_LOG_ENTRY_TYPE } from "@shared/dice-roll-log/schemas";
+import { LogEntryHiddenSet } from "@shared/events/dice-roll-log";
 import { NotificationCreated } from "@shared/events/notifications";
 import type { NotificationRecord } from "@shared/notifications/schemas";
 import { COINS_DISPLAY, LOOT_ENTRY_TYPE } from "@shared/party-loot/schemas";
@@ -42,9 +43,11 @@ type Frame = Pick<EventFrame, "cause" | "changes">;
  */
 export const refreshes = (frame: Frame, newest: boolean): boolean =>
   newest &&
-  frame.changes.some(
-    (c) => (c.type === GAME_LOG_ENTRY_TYPE || c.type === LOOT_ENTRY_TYPE) && c.op === "upsert",
-  );
+  // FR-DICE-102: a hidden line reaches players as a delete, so no upsert would say so.
+  (frame.cause.name === LogEntryHiddenSet.type ||
+    frame.changes.some(
+      (c) => (c.type === GAME_LOG_ENTRY_TYPE || c.type === LOOT_ENTRY_TYPE) && c.op === "upsert",
+    ));
 
 /**
  * FR-RECAP-11: the picker's sessions, newest first: stats' list, plus the shown session while the

@@ -172,7 +172,11 @@ export function reroll(env: CommandEnv, input: RerollInput): RerollResult {
     dmPayload: others ? keptDmPayload(old.dmPayload, slots) : old.dmPayload,
     rollIds: others ? [...others.rollIds] : old.rollIds.map((id) => (id === row.id ? next.id : id)),
     encounterId: old.encounterId,
-    copyAudience: { public: old.public, audiencePlayerId: old.audiencePlayerId },
+    copyAudience: {
+      public: old.public,
+      audiencePlayerId: old.audiencePlayerId,
+      hiddenFrom: old.hiddenFrom,
+    },
   });
   const superseded = supersede(env, old.id, entry.id);
   return { roll: next, item, was: oldItem.total, entry, superseded };

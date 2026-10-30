@@ -128,6 +128,19 @@ test("newRollEntries reads the applied entry and skips old n", () => {
   expect(newRollEntries(frame, prior, next).map((e) => e.n)).toEqual([6]);
 });
 
+test("FR-DICE-102 a revealed line never throws, even above this client's high-water mark", () => {
+  const prior = { you: null, seq: 1, records: { "game-log-entry": { e5: entry(5) } } };
+  const next = {
+    you: null,
+    seq: 2,
+    records: { "game-log-entry": { e5: entry(5), e6: entry(6) } },
+  };
+  const changes = [{ type: "game-log-entry", id: "e6", op: "upsert" as const }];
+  const frame = (name: string) => ({ cause: { name }, changes });
+  expect(newRollEntries(frame("LogEntryHiddenSet"), prior, next)).toEqual([]);
+  expect(newRollEntries(frame("DiceRolled"), prior, next).map((e) => e.n)).toEqual([6]);
+});
+
 test("FR-DICEX-09 isOwn: rollerRole / rollerPlayerId = this client", () => {
   const dm = { campaignId: "c", role: "dm" as const, playerId: null };
   const p1 = { campaignId: "c", role: "player" as const, playerId: "p1" };

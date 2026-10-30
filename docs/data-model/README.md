@@ -688,7 +688,7 @@ erDiagram
 | n | int | Per-campaign counter, max + 1 in the transaction; unique `(campaignId, n)`; the [ADR-0022](../architecture/adr/0022-deterministic-seams.md) tiebreak and the window's `orderBy` | [FR-DICE-17](../specs/dice-roll-log.md#6-functional-requirements) |
 | kind | text | Registered in `src/shared/dice-roll-log/kinds.ts`: DICE `roll`; CBT `cbt.attack`, `cbt.hp`. Unregistered on write → `internal` | [FR-DICE-18](../specs/dice-roll-log.md#6-functional-requirements), [FR-CBT-24](../specs/combat-tracker.md#6-functional-requirements) |
 | category | enum | One category per entry; a multi-roll action uses the action's (attack) | [FR-DICE-26](../specs/dice-roll-log.md#6-functional-requirements), gate I4 |
-| public | bool | **Stamped once** at creation by who rolls: player → true; DM → override, else the category setting at commit; combat: false if attacker or target hidden; *(built, build/combat-playtest)* a DM-sent `cbt.attack`'s roll entry always false ([FR-CBT-52](../specs/combat-tracker.md#6-functional-requirements)); *(sprint 14 F4, #367 / #371)* a DM entry with a roll made as a hidden or renamed monster creature always false (roll guard, FR-DICE-13). Never changed in MVP | [FR-DICE-13](../specs/dice-roll-log.md#6-functional-requirements), FR-CBT-24, #73, #139 P8 |
+| public | bool | *(Overridden only by the DM's `dice.setEntryHidden`, [FR-DICE-99](../specs/dice-roll-log.md#6-functional-requirements).)* **Stamped once** at creation by who rolls: player → true; DM → override, else the category setting at commit; combat: false if attacker or target hidden; *(built, build/combat-playtest)* a DM-sent `cbt.attack`'s roll entry always false ([FR-CBT-52](../specs/combat-tracker.md#6-functional-requirements)); *(sprint 14 F4, #367 / #371)* a DM entry with a roll made as a hidden or renamed monster creature always false (roll guard, FR-DICE-13). Never changed in MVP | [FR-DICE-13](../specs/dice-roll-log.md#6-functional-requirements), FR-CBT-24, #73, #139 P8 |
 | undone | bool | Set only by `gameLog.markUndone` (combat undo) | FR-DICE-19, [FR-CBT-25](../specs/combat-tracker.md#6-functional-requirements) |
 | rollerRole, rollerPlayerId, actorName | as Roll | | DICE §8 |
 | payload | **JSON leaf** per kind | Player-safe. `roll`: `{rollId, expression, mode, manual, dice, constant, total, natural, label}[]` (1–20); *(sprint 2, built, fix/mod-core)* + optional `mods`, `modes`, [§23](#23-sprint-2-effect-modifiers-tier-1) | DICE §8 |
@@ -696,6 +696,7 @@ erDiagram
 | rollIds | **JSON leaf** ID[] | The action's rolls; an attack = one entry, two rolls | FR-DICE-26, [FR-CHAR-08](../specs/character-sheet.md#6-functional-requirements) |
 | encounterId | ID → Encounter \| null | Set by combat-tracker | FR-CBT-24 |
 | supersededBy | ID \| null | Reserved for gem rerolls; null in MVP | #140 |
+| hiddenFrom | **JSON leaf** `{public, audiencePlayerId}` \| null | The stamp the DM's hide replaced, restored by a reveal; null = not hidden by hand. DM only: stripped for players. Copied by a reroll. Nullable column, old rows null | [FR-DICE-100](../specs/dice-roll-log.md#6-functional-requirements) |
 
 - Rows kept forever (~1 KB/roll); snapshots bounded by the window ([§18](#18-combat-constraints-not-in-db-derived-visibility-fields)). No edit or delete command ([DICE §10](../specs/dice-roll-log.md#10-permissions)).
 

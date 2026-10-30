@@ -571,7 +571,7 @@ export const gameLogEntry = sqliteTable(
     at: text("at").notNull(),
     kind: text("kind").notNull(),
     category: text("category", { enum: ROLL_CATEGORIES }).notNull(),
-    /** Stamped once at creation (FR-DICE-13). */
+    /** Stamped at creation (FR-DICE-13); the DM's hide / reveal overrides it (FR-DICE-99). */
     public: integer("public", { mode: "boolean" }).notNull(),
     undone: integer("undone", { mode: "boolean" }).notNull().default(false),
     rollerRole: text("roller_role", { enum: ROLE }).notNull(),
@@ -592,6 +592,8 @@ export const gameLogEntry = sqliteTable(
     audiencePlayerId: text("audience_player_id"),
     /** Reserved for gems (#140); null in MVP. */
     supersededBy: text("superseded_by"),
+    /** FR-DICE-100: JSON leaf `{public, audiencePlayerId}`, the stamp a hide replaced; DM only. */
+    hiddenFrom: text("hidden_from", { mode: "json" }),
   },
   (t) => [uniqueIndex("game_log_entry_campaign_n").on(t.campaignId, t.n)],
 );

@@ -2,6 +2,7 @@
 // the highest `n` this client had before the frame (set by each snapshot, raised per frame).
 // Snapshots, resyncs and undo upserts (old `n`) never throw. No new event, signal or record.
 import { GAME_LOG_ENTRY_TYPE, type GameLogEntryView } from "@shared/dice-roll-log/schemas";
+import { LogEntryHiddenSet } from "@shared/events/dice-roll-log";
 import type { EventFrame, You } from "@shared/protocol/frames";
 import { type RecordStore, recordsOf } from "@shared/protocol/store";
 import { useContext, useEffect, useRef } from "react";
@@ -19,10 +20,12 @@ export function maxEntryN(store: RecordStore): number {
  * (`prior`): its highest `n` is the high-water mark.
  */
 export function newRollEntries(
-  frame: Pick<EventFrame, "changes">,
+  frame: Pick<EventFrame, "changes"> & Partial<Pick<EventFrame, "cause">>,
   prior: RecordStore,
   next: RecordStore,
 ): GameLogEntryView[] {
+  // FR-DICE-102: a revealed line is old news, even above this client's high-water mark.
+  if (frame.cause?.name === LogEntryHiddenSet.type) return [];
   const hw = maxEntryN(prior);
   const byId = next.records[GAME_LOG_ENTRY_TYPE] ?? {};
   const out: GameLogEntryView[] = [];

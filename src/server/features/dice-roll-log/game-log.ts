@@ -5,6 +5,7 @@ import { getLogKind } from "@shared/dice-roll-log/kinds";
 import { ROLL_KIND } from "@shared/dice-roll-log/roll-kind";
 import {
   categoryPublic,
+  type EntryStamp,
   GAME_LOG_ENTRY_TYPE,
   type GameLogEntryRecord,
   type RollCategory,
@@ -42,9 +43,14 @@ export interface AppendInput {
   audiencePlayerId?: string | null;
   /**
    * Sprint 7 (FR-DICE-62): a reroll's entry copies the old entry's audience as stamped (never
-   * re-stamped, ADR-0056); wins over every other stamp.
+   * re-stamped, ADR-0056); wins over every other stamp. FR-DICE-101: a hidden line's `hiddenFrom`
+   * comes along, so a reveal restores the same audience on both lines.
    */
-  copyAudience?: { public: boolean; audiencePlayerId: string | null };
+  copyAudience?: {
+    public: boolean;
+    audiencePlayerId: string | null;
+    hiddenFrom: EntryStamp | null;
+  };
   /**
    * Sprint 8 (FR-DICE-79, -83; ADR-0061): a roll-request answer's audience, stamped by the server
    * from the request, never from an intent field (a player-sent `public` stays `forbidden`):
@@ -65,6 +71,7 @@ export function toEntryRecord(row: EntryRow): GameLogEntryRecord {
     ...row,
     dmPayload: row.dmPayload ?? null,
     rollIds: row.rollIds as string[],
+    hiddenFrom: (row.hiddenFrom as EntryStamp | null) ?? null,
   };
 }
 
@@ -145,6 +152,7 @@ export function append(env: CommandEnv, input: AppendInput): RecordChange {
       encounterId: input.encounterId ?? null,
       audiencePlayerId: audiencePlayerOf(input),
       supersededBy: null,
+      hiddenFrom: input.copyAudience?.hiddenFrom ?? null,
     })
     .run();
   const after = toEntryRecord(getEntry(env.tx, cid, id) as EntryRow);
