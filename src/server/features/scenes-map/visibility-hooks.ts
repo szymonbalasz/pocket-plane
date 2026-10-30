@@ -22,6 +22,7 @@ import type { CommandEnv } from "../../commands/commands";
 import type { Db } from "../../db/client";
 import type { RecordChange } from "../../events/types";
 import type { Viewer } from "../../ws/records";
+import { importedArtVisibilityHook } from "../compendium/imported-art-hook";
 import { petPresenceVisibilityHook } from "../entities/pet-presence";
 import { fogVisibilityHook } from "../fog-of-war/hooks";
 
@@ -73,6 +74,7 @@ export interface SceneVisibilityHook {
 export const sceneVisibilityHooks: readonly SceneVisibilityHook[] = [
   fogVisibilityHook, // fog-of-war (FR-FOG-10 derive, -11 / -12 hides, -15 dragAudience, -35 rederive)
   petPresenceVisibilityHook, // entities: a pet token's write re-derives `petPresent` (FR-ENT-37)
+  importedArtVisibilityHook, // compendium: a placed monster reuses the campaign's art (FR-CMPX-24)
 ];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */

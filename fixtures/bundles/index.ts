@@ -14,6 +14,7 @@ import cbTurnRingE2e from "./cb-turn-ring-e2e";
 import characterSheet from "./character-sheet";
 import characterSheetFull from "./character-sheet-full";
 import cmpImages from "./cmp-images";
+import cmpxArt from "./cmpx-art";
 import cmpxCore from "./cmpx-core";
 import combat from "./combat";
 import combatExtras from "./combat-extras";
@@ -368,4 +369,6 @@ export const bundles: readonly Bundle[] = [
   assetsWindowE2e,
   // Compendium expansion core (fix/cmpx-core): replaced entries, preset inheritance
   cmpxCore,
+  // Compendium expansion token art (build/cmpx-art): imported batch with art paths
+  cmpxArt,
 ];

@@ -151,5 +151,7 @@ export const EntryResponse = z.strictObject({
   definition: EntryDefinition.optional(),
   /** FR-CMPX-15: the name of the preset this entry takes from one it replaces (no preset of its own). */
   inheritedPreset: z.string().min(1).max(NAME_MAX).optional(),
+  /** FR-CMPX-28: DM only, the campaign's imported art for this monster (Derive's portrait). */
+  importedArtAssetId: z.string().min(1).optional(),
 });
 export type EntryResponse = z.infer<typeof EntryResponse>;

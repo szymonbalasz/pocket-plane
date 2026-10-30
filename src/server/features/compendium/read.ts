@@ -11,6 +11,7 @@ import type { Db } from "../../db/client";
 import { asset, compendiumEntry, compendiumSource, entity } from "../../db/schema";
 import { toImportedRecord } from "../entities/rows";
 import { inheritedPreset } from "./entries";
+import { importedArtAsset } from "./imported-art-hook";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
 
 export interface EntryRead {
@@ -96,6 +97,12 @@ export function readEntry(db: Db, id: string, v: EntryViewer): EntryRead | null 
   // FR-CMPX-15: importing another source can change it, so it is part of the ETag.
   const inherited = resolvePreset(row) ? null : inheritedPreset(db, row);
   if (inherited) body.inheritedPreset = inherited.name;
+  // FR-CMPX-28: changes when the first placement ingests, so it is part of the ETag.
+  const art =
+    v.role === "dm" && v.campaignId !== null && row.source !== null && row.sourceKey !== null
+      ? importedArtAsset(db, v.campaignId, row.source, row.sourceKey)
+      : null;
+  if (art) body.importedArtAssetId = art;
   let defUpdatedAt: string | undefined;
   if (row.kind === "monster" && row.definitionId !== null) {
     const def = db.select().from(entity).where(eq(entity.id, row.definitionId)).get();
@@ -113,6 +120,7 @@ export function readEntry(db: Db, id: string, v: EntryViewer): EntryRead | null 
       defUpdatedAt,
       imageAssetIds.join(","),
       ...(inherited ? [inherited.name] : []),
+      ...(art ? [art] : []),
     ]),
   };
 }
