@@ -122,6 +122,24 @@ describe("FR-OVW-28 the style panel", () => {
     expect(tagOf(html, "ovw-style-dot")).toContain("disabled");
   });
 
+  test("FR-OVW-47 the Label tool's panel: every control off while not live, on while live", () => {
+    const off = render(<LabelToolPanel />, "reconnecting");
+    const ids = [
+      ...CONTROLS.filter((id) => id !== "ovw-style-font"),
+      "ovw-style-font-fell",
+      "ovw-style-size-input",
+      "ovw-style-stroke-width-input",
+      "ovw-style-dot-size-input",
+      "ovw-style-dot-stroke-width-input",
+      "ovw-add-hidden",
+    ];
+    const isOff = (html: string, id: string) =>
+      / disabled=""|data-disabled=""/.test(tagOf(html, id));
+    for (const id of ids) expect([id, isOff(off, id)]).toEqual([id, true]);
+    const on = render(<LabelToolPanel />);
+    for (const id of ids) expect([id, isOff(on, id)]).toEqual([id, false]);
+  });
+
   test("FR-OVW-36 the text half alone, for a miniature's name: no dot", () => {
     const html = render(
       <LabelTextStyleControls

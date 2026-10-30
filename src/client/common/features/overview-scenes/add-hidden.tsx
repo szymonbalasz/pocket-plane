@@ -39,7 +39,7 @@ export const useAddHidden = create<{ on: boolean; set(on: boolean): void }>((set
   },
 }));
 
-export function AddHiddenSwitch() {
+export function AddHiddenSwitch({ disabled }: { disabled?: boolean }) {
   const on = useAddHidden((s) => s.on);
   const setOn = useAddHidden((s) => s.set);
   return (
@@ -47,6 +47,7 @@ export function AddHiddenSwitch() {
       <Switch
         id="ovw-add-hidden"
         data-testid="ovw-add-hidden"
+        disabled={disabled}
         checked={on}
         onCheckedChange={setOn}
       />

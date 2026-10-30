@@ -390,6 +390,7 @@ const useCampaignId = () => useSync((s) => s.store.you?.campaignId) ?? "";
 /** Beside the Label tool: no settings to open, it just sets what the next label takes. */
 export function LabelToolPanel() {
   const campaignId = useCampaignId();
+  const live = useLive();
   const stored = useLastLabelStyle((s) => s.byCampaign[campaignId]);
   const [patch, setPatch] = useState<LabelStylePatch | null>(null);
   const last = stored ?? lastLabelStyle(campaignId);
@@ -401,13 +402,15 @@ export function LabelToolPanel() {
       <LabelStylePreview style={style} />
       <LabelStyleControls
         styles={[style]}
+        disabled={!live}
         onPreview={setPatch}
         onCommit={(p) => {
-          rememberLabelStyle(campaignId, p);
+          // FR-OVW-47: a picker still open or a drag still held when the connection went.
+          if (live) rememberLabelStyle(campaignId, p);
           setPatch(null);
         }}
       />
-      <AddHiddenSwitch />
+      <AddHiddenSwitch disabled={!live} />
     </div>
   );
 }
