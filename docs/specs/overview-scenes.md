@@ -76,7 +76,7 @@ Campaign = `env.actor.campaignId`; IDs and time from `env.ctx` ([ADR-0022](../ar
 | ID | Requirement | Notes |
 |---|---|---|
 | FR-OVW-01 | `ovw.create {name, folderId?}`: name as [FR-MAP-01](scenes-map.md#6-functional-requirements) (trimmed, 1–60, no control chars, not unique). No map, grid or fog. Not shown. ≤ 50 per campaign *(proposed)*, else `conflict`. | |
-| FR-OVW-02 | `ovw.update {overviewId, name?, folderId?}`: rename, move to a folder or the root. Folders are the existing scene folders; a folder delete moves its overviews to the root, as it does scenes ([FR-MAP-02](scenes-map.md#6-functional-requirements)). | |
+| FR-OVW-02 | `ovw.update {overviewId, name?, folderId?}`: rename, move to a folder or the root. Folders are the existing scene folders; a folder delete moves its overviews up a level, as it does scenes ([FR-MAP-02](scenes-map.md#6-functional-requirements)). | |
 | FR-OVW-03 | `ovw.duplicate {overviewId}`: "‹name› (copy)" cut to 60, same folder, not shown, every item copied with new IDs. | |
 | FR-OVW-04 | `ovw.delete {overviewId}`: items go with it. A shown overview → `conflict` "Show something else first". | As [FR-MAP-05](scenes-map.md#6-functional-requirements) |
 | FR-OVW-05 | `ovw.show {overviewId}`, one transaction: the active scene (if any) off, the shown overview (if any) off, target on, `sceneHooks.deactivated` for the scene that went off. Already shown → no event. Event `OverviewShown`; the cache refreshes before listeners run; every player of the campaign resyncs. | ADR Decision 3 |

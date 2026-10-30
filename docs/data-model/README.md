@@ -381,7 +381,8 @@ All rows per campaign; no JSON leaves; timestamps `ctx.clock` ([MAP §8](../spec
 | Field | Type | Rule | Source |
 |---|---|---|---|
 | id, campaignId | ID, ID → Campaign | `ctx.ids`; `ctx.campaignId` at authentication | [FR-MAP-27](../specs/scenes-map.md#6-functional-requirements), MAP §9 |
-| folderId | ID → SceneFolder \| null | Null = root; folder delete → root in the same transaction | [FR-MAP-02](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-03](../specs/scenes-map.md#6-functional-requirements) |
+| folderId | ID → SceneFolder \| null | Null = root; folder delete → its parent in the same transaction | [FR-MAP-02](../specs/scenes-map.md#6-functional-requirements), [FR-MAP-03](../specs/scenes-map.md#6-functional-requirements) |
+| position | int, default 0 | Order in its level; 0 = never arranged; never sent to players | [FR-MAP-116](../specs/scenes-map.md#6-functional-requirements) |
 | seq | int | Insertion order; list tiebreak | FR-MAP-02, [CON-20](#8-conflicts-log) |
 | name | text 1–60 | Trimmed, no control chars, **not** unique | [FR-MAP-01](../specs/scenes-map.md#6-functional-requirements) |
 | mapAssetId | ID → Asset | Asset reference (`assets.require`) | FR-MAP-01, [FR-MAP-09](../specs/scenes-map.md#6-functional-requirements) |
@@ -398,7 +399,9 @@ All rows per campaign; no JSON leaves; timestamps `ctx.clock` ([MAP §8](../spec
 
 | Field | Type | Rule | Source |
 |---|---|---|---|
-| id, campaignId, seq | ID, ID → Campaign, int | One level, no parent | [FR-MAP-02](../specs/scenes-map.md#6-functional-requirements) *(proposed, OQ-MAP-19)* |
+| id, campaignId, seq | ID, ID → Campaign, int | | [FR-MAP-02](../specs/scenes-map.md#6-functional-requirements) *(proposed, OQ-MAP-19)* |
+| parentId | ID → SceneFolder \| null | Null = root; up to 5 levels, never into itself or a descendant | FR-MAP-02 |
+| position | int, default 0 | As Scene | [FR-MAP-116](../specs/scenes-map.md#6-functional-requirements) |
 | name | text 1–40 | | FR-MAP-02 |
 | createdAt, updatedAt | timestamp | | MAP §8 |
 
@@ -485,7 +488,7 @@ An instance of a creature definition: own name, read-only display copies, play s
 | Asset | — (players: always hidden) | `hash` (no field in the record type) |
 | Entity | `kind`, `ownerPlayerId` vs `ctx.playerId`; `hpCurrent` (→ `down`) | Players: monster rows; other characters' stat block + `hpCurrent` (only derived `down`; *(sprint 1, built)* plus `level`, `className`, `species` from the whitelist) |
 | Imported entity | — (players: always hidden) | — |
-| Scene | `id` vs active scene (scope gate) | Players: `name`, `folderId`, `mapLocked`, `seq` |
+| Scene | `id` vs active scene (scope gate) | Players: `name`, `folderId`, `position`, `mapLocked`, `seq` |
 | Scene folder | — (players: always hidden) | — |
 | Token | `hidden`; `sceneId` vs active scene (scope gate; *(built)* also the DM snapshot window, [ADR-0041](../architecture/adr/0041-active-scene-window.md)); `ownerPlayerId` vs `ctx.playerId` (→ `speed`) | Players: `definitionId`; `speed` unless they own the token |
 
@@ -2840,7 +2843,8 @@ From [overview-scenes](../specs/overview-scenes.md#8-data-model) ([ADR-0075](../
 | Field | Type | Default | Rule | Source |
 |---|---|---|---|---|
 | `id`, `campaign_id` | ID, ID → Campaign | — | IDs from the same generator as scenes, never colliding | FR-OVW-01 |
-| `folder_id` | ID → SceneFolder \| null | null | A folder delete moves its overviews to the root | FR-OVW-02 |
+| `folder_id` | ID → SceneFolder \| null | null | A folder delete moves its overviews up a level | FR-OVW-02 |
+| `position` | int | 0 | As Scene; not sent to players | FR-MAP-116 |
 | `seq` | int | — | Unique (`overview_seq`), `overviewSeqNext` | CON-20 |
 | `name` | text 1–60 | — | As a scene's name, not unique | FR-OVW-01 |
 | `active` | bool | false | Partial unique index per campaign (`overview_one_active`). With `scene.active`, at most one per campaign, kept by the commands | FR-OVW-05, -06 |

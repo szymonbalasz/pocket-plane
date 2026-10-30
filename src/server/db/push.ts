@@ -178,20 +178,25 @@ export function dropDuplicateIndexCreates(stmts: readonly string[]): string[] {
  * drizzle-kit 0.31 reads a falsy default (`DEFAULT 0`) as "no default" when a not-null column
  * is added to a non-empty table: it warns and empties the table first (`delete from t;`). Drops
  * those truncates in place (`applyStatements` runs this array) when the column's ADD carries a DEFAULT.
- * Returns the warnings that are real.
+ * One column name may be added to several tables in a push (`position`, FR-MAP-116), and a warning
+ * doesn't name its table: each warning accounts for one such table that has a truncate. A warning
+ * left over is real (a table adding that name with no default). Returns the warnings that are real.
  */
-function dropFalseTruncates(stmts: string[], warnings: string[]): string[] {
-  const addedWithDefault = new Map<string, string>();
+export function dropFalseTruncates(stmts: string[], warnings: string[]): string[] {
+  const addedWithDefault = new Map<string, string[]>();
   for (const s of stmts) {
     const m = /^ALTER TABLE `(\w+)` ADD `(\w+)` .* DEFAULT .* NOT NULL;$/.exec(s);
-    if (m?.[1] && m[2]) addedWithDefault.set(m[2], m[1]);
+    if (!m?.[1] || !m[2]) continue;
+    if (stmts.includes(`delete from ${m[1]};`)) {
+      addedWithDefault.set(m[2], [...(addedWithDefault.get(m[2]) ?? []), m[1]]);
+    }
   }
   const truncates = new Set<string>();
   const real = warnings.filter((w) => {
     // biome-ignore lint/suspicious/noControlCharactersInRegex: drizzle-kit underlines names with ANSI codes.
     const plain = w.replace(/\u001b\[\d+m/g, "");
     const col = /add not-null (\S+) column without default value,/.exec(plain)?.[1];
-    const table = col ? addedWithDefault.get(col) : undefined;
+    const table = col ? addedWithDefault.get(col)?.shift() : undefined;
     if (table) truncates.add(`delete from ${table};`);
     return !table;
   });

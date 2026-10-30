@@ -24,8 +24,13 @@ export const SceneDeleted = logged("SceneDeleted", scenePayload);
 
 export const SceneFolderCreated = logged("SceneFolderCreated", folderPayload);
 export const SceneFolderRenamed = logged("SceneFolderRenamed", folderPayload);
-/** Changes include the scenes moved to the root. */
+/** Changes include the scenes, overviews and folders moved up a level. */
 export const SceneFolderDeleted = logged("SceneFolderDeleted", folderPayload);
+/** POST /api/scene-list/move; changes include every sibling renumbered (FR-MAP-116). */
+export const SceneListMoved = logged(
+  "SceneListMoved",
+  z.object({ kind: z.enum(["scene", "overview", "folder"]), id: z.string() }).strict(),
+);
 
 /** `map.activateScene`: both scene upserts; players are resynced after commit (FR-MAP-06). */
 export const SceneActivated = logged(

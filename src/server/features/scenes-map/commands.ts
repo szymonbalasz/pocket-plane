@@ -10,6 +10,7 @@ import {
   SceneFolderCreated,
   SceneFolderDeleted,
   SceneFolderRenamed,
+  SceneListMoved,
   SceneUpdated,
   TokenDeleted,
   TokenDuplicated,
@@ -21,16 +22,22 @@ import {
 } from "@shared/events/scenes-map";
 import { copyName, duplicateCell, numberedName, overlapsMap } from "@shared/scenes-map/geometry";
 import {
+  canMoveFolder,
+  canNestIn,
+  FOLDER_DEPTH_MAX,
+  folderSubtree,
+} from "@shared/scenes-map/list-tree";
+import {
   ActivateSceneInput,
   CheckMoveInput,
   type CheckMoveResult,
+  CreateFolderBody,
   CreateSceneBody,
   GRID_DEFAULTS,
   MAP_INTENTS,
+  MoveListEntryBody,
   MoveTokenInput,
   PlaceTokenInput,
-  SCENE_FOLDER_TYPE,
-  SCENE_TYPE,
   SceneFolderBody,
   type SceneFolderRecord,
   SceneName,
@@ -53,7 +60,6 @@ import { type CommandEnv, defineCommand, IdSchema } from "../../commands/command
 import { conflict, forbidden, invalid, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import {
-  overview,
   player,
   scene,
   sceneFolder,
@@ -66,20 +72,24 @@ import type { Actor, RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
 import { importedArtOfDefinition } from "../compendium/imported-art-lookup";
 import { resolveDefinition } from "../entities/commands";
-import { overviewChange, readOverview } from "../overview-scenes/rows";
+import { getOverview } from "../overview-scenes/rows";
 import { characterIdOf } from "./character-copy";
+import { entriesIn, nextPosition, placeEntries } from "./list-order";
 import { tokenMoveGuards } from "./move-guards";
 import {
   activeSceneOf,
   campaignOf,
   countTokens,
   findScene,
+  folderChange,
+  folderRecords,
   getFolder,
   getScene,
   getToken,
   readFolder,
   readScene,
   readToken,
+  sceneChange,
   sceneTokens,
 } from "./rows";
 import { lifecycleHooks } from "./scene-hooks";
@@ -96,25 +106,11 @@ export const MAP_REST = {
   createFolder: "map.createFolder",
   renameFolder: "map.renameFolder",
   deleteFolder: "map.deleteFolder",
+  moveListEntry: "map.moveListEntry",
 } as const;
 
-const sceneChange = (before: SceneRecord | null, after: SceneRecord | null): RecordChange => ({
-  type: SCENE_TYPE,
-  id: (after ?? before)?.id as string,
-  before,
-  after,
-});
 const tokenChange = (before: TokenRecord | null, after: TokenRecord | null): RecordChange => ({
   type: TOKEN_TYPE,
-  id: (after ?? before)?.id as string,
-  before,
-  after,
-});
-const folderChange = (
-  before: SceneFolderRecord | null,
-  after: SceneFolderRecord | null,
-): RecordChange => ({
-  type: SCENE_FOLDER_TYPE,
   id: (after ?? before)?.id as string,
   before,
   after,
@@ -176,6 +172,7 @@ export const createScene = defineCommand({
         id,
         campaignId: cid,
         folderId,
+        position: nextPosition(tx, cid, folderId),
         seq: sceneSeqNext,
         name: input.name,
         mapAssetId: map.id,
@@ -255,8 +252,9 @@ export const patchScene = defineCommand({
     const before = getScene(env.tx, cid, input.id);
     const set: Partial<typeof scene.$inferInsert> = {};
     if (input.name !== undefined) set.name = input.name;
-    if (input.folderId !== undefined) {
+    if (input.folderId !== undefined && input.folderId !== before.folderId) {
       set.folderId = input.folderId === null ? null : getFolder(env.tx, cid, input.folderId).id;
+      set.position = nextPosition(env.tx, cid, set.folderId);
     }
     return updateScene(env, before, set);
   },
@@ -285,6 +283,7 @@ export const duplicateScene = defineCommand({
       .values({
         ...rest,
         id,
+        position: nextPosition(tx, cid, src.folderId),
         seq: sceneSeqNext,
         name: copyName(src.name),
         active: false,
@@ -368,17 +367,23 @@ export function deleteSceneCommand(hooks: TokenHooks) {
 
 // ---------- folders (REST, FR-MAP-02) ----------
 
+const TOO_DEEP = `Folders nest at most ${FOLDER_DEPTH_MAX} levels`;
+
 export const createFolder = defineCommand({
   name: MAP_REST.createFolder,
-  input: SceneFolderBody,
-  execute({ name }, { tx, ctx, actor, emit }): SceneFolderRecord {
+  input: CreateFolderBody,
+  execute({ name, parentId }, { tx, ctx, actor, emit }): SceneFolderRecord {
     const cid = campaignOf(actor);
+    const parent = parentId ? getFolder(tx, cid, parentId).id : null;
+    if (!canNestIn(folderRecords(tx, cid), parent)) throw conflict(TOO_DEEP);
     const id = ctx.ids.next();
     const now = ctx.clock.iso();
     tx.insert(sceneFolder)
       .values({
         id,
         campaignId: cid,
+        parentId: parent,
+        position: nextPosition(tx, cid, parent),
         seq: sceneFolderSeqNext,
         name,
         createdAt: now,
@@ -417,42 +422,71 @@ export const renameFolder = defineCommand({
   },
 });
 
-/** Folder delete moves its scenes and overviews (FR-OVW-02) to the root in the same transaction. */
+/**
+ * FR-MAP-02: a folder delete moves its contents (scenes, overviews per FR-OVW-02, subfolders) up to
+ * its parent, in its place, in the same transaction.
+ */
 export const deleteFolder = defineCommand({
   name: MAP_REST.deleteFolder,
   input: z.strictObject({ id: IdSchema }),
-  execute({ id }, { tx, ctx, actor, emit }): void {
+  execute({ id }, env): void {
+    const { tx, actor, emit } = env;
     const cid = campaignOf(actor);
     const before = getFolder(tx, cid, id);
-    const moved = tx.select({ id: scene.id }).from(scene).where(eq(scene.folderId, id)).all();
-    const changes: RecordChange[] = [];
-    for (const { id: sid } of moved) {
-      const b = readScene(tx, sid);
-      tx.update(scene)
-        .set({ folderId: null, updatedAt: ctx.clock.iso() })
-        .where(eq(scene.id, sid))
-        .run();
-      changes.push(sceneChange(b, readScene(tx, sid)));
-    }
-    const overviews = tx
-      .select({ id: overview.id })
-      .from(overview)
-      .where(eq(overview.folderId, id))
-      .all();
-    for (const { id: oid } of overviews) {
-      const b = readOverview(tx, oid);
-      tx.update(overview)
-        .set({ folderId: null, updatedAt: ctx.clock.iso() })
-        .where(eq(overview.id, oid))
-        .run();
-      changes.push(overviewChange(b, readOverview(tx, oid)));
-    }
+    const contents = entriesIn(tx, cid, id);
+    const level = entriesIn(tx, cid, before.parentId).flatMap((e) =>
+      e.id === id ? contents : [e],
+    );
+    const arranged = level.some((e) => e.position !== 0);
+    const changes = placeEntries(env, level, before.parentId, arranged);
     tx.delete(sceneFolder).where(eq(sceneFolder.id, id)).run();
     emit({
       type: SceneFolderDeleted.type,
       campaignId: cid,
       payload: { folderId: id },
       changes: [...changes, folderChange(before, null)],
+    });
+  },
+});
+
+/**
+ * FR-MAP-116: moves a scene, overview or folder into `parentId` before `beforeId`, and numbers that
+ * level. The spot it already holds → no event. FR-MAP-02: a folder never goes into itself or below
+ * the depth cap.
+ */
+export const moveListEntry = defineCommand({
+  name: MAP_REST.moveListEntry,
+  input: MoveListEntryBody,
+  execute({ kind, id, parentId, beforeId }, env): void {
+    const { tx, actor, emit } = env;
+    const cid = campaignOf(actor);
+    const from =
+      kind === "scene"
+        ? getScene(tx, cid, id).folderId
+        : kind === "overview"
+          ? getOverview(tx, cid, id).folderId
+          : getFolder(tx, cid, id).parentId;
+    if (parentId !== null) getFolder(tx, cid, parentId);
+    if (kind === "folder") {
+      const folders = folderRecords(tx, cid);
+      if (parentId !== null && folderSubtree(folders, id).has(parentId)) {
+        throw conflict("A folder can't go inside itself");
+      }
+      if (!canMoveFolder(folders, id, parentId)) throw conflict(TOO_DEEP);
+    }
+    const moved = entriesIn(tx, cid, from).find((e) => e.id === id);
+    if (!moved) throw notFound("Entry not found");
+    const target = entriesIn(tx, cid, parentId);
+    const others = target.filter((e) => e.id !== id);
+    const at = beforeId === null ? others.length : others.findIndex((e) => e.id === beforeId);
+    if (at < 0) throw conflict("The scene list changed; try again");
+    const level = [...others.slice(0, at), moved, ...others.slice(at)];
+    if (from === parentId && level.every((e, i) => e.id === target[i]?.id)) return;
+    emit({
+      type: SceneListMoved.type,
+      campaignId: cid,
+      payload: { kind, id },
+      changes: placeEntries(env, level, parentId, true),
     });
   },
 });

@@ -1,7 +1,7 @@
 // DM client-only map state (FR-MAP-08, -10, -51; FR-OVW-10): viewed scene or overview, grid preview,
 // Scenes row focus. Selection: `./selection`.
 import { OVERVIEW_TYPE, type OverviewRecord } from "@shared/overview-scenes/schemas";
-import { sceneOrder } from "@shared/scenes-map/geometry";
+import { sceneOrder } from "@shared/scenes-map/list-tree";
 import {
   SCENE_FOLDER_TYPE,
   SCENE_TYPE,

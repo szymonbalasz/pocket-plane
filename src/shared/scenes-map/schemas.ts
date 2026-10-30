@@ -158,6 +158,7 @@ export const SceneRecord = z.object({
   id: z.string(),
   campaignId: z.string(),
   folderId: z.string().nullable(),
+  position: z.number().int(),
   seq: z.number().int(),
   name: z.string(),
   mapAssetId: z.string(),
@@ -171,7 +172,7 @@ export const SceneRecord = z.object({
 });
 export type SceneRecord = z.infer<typeof SceneRecord>;
 
-/** What a player receives of the active scene: no name, folder, lock or `seq` (OQ-MAP-17). */
+/** What a player receives of the active scene: no name, folder, order, lock or `seq` (OQ-MAP-17). */
 export const PlayerSceneRecord = z.object({
   id: z.string(),
   mapAssetId: z.string(),
@@ -189,6 +190,8 @@ export type SceneView = PlayerSceneRecord & Partial<SceneRecord>;
 export const SceneFolderRecord = z.object({
   id: z.string(),
   campaignId: z.string(),
+  parentId: z.string().nullable(),
+  position: z.number().int(),
   seq: z.number().int(),
   name: z.string(),
   createdAt: z.string(),
@@ -361,8 +364,29 @@ export const PatchSceneBody = z
   });
 export type PatchSceneBody = z.input<typeof PatchSceneBody>;
 
+/** PATCH /api/scene-folders/:id: rename. */
 export const SceneFolderBody = z.strictObject({ name: FolderName });
 export type SceneFolderBody = z.input<typeof SceneFolderBody>;
+
+/** POST /api/scene-folders: `parentId` null or absent = root (FR-MAP-02). */
+export const CreateFolderBody = z.strictObject({
+  name: FolderName,
+  parentId: Id.nullable().optional(),
+});
+export type CreateFolderBody = z.input<typeof CreateFolderBody>;
+
+/** An entry of the Scenes list (FR-MAP-116). */
+export const ListEntryKind = z.enum(["scene", "overview", "folder"]);
+export type ListEntryKind = z.infer<typeof ListEntryKind>;
+
+/** POST /api/scene-list/move: into `parentId` (null = root), before `beforeId` (null = last). */
+export const MoveListEntryBody = z.strictObject({
+  kind: ListEntryKind,
+  id: Id,
+  parentId: Id.nullable(),
+  beforeId: Id.nullable(),
+});
+export type MoveListEntryBody = z.input<typeof MoveListEntryBody>;
 
 export const SceneResponse = z.object({ scene: SceneRecord });
 export type SceneResponse = z.infer<typeof SceneResponse>;

@@ -13,10 +13,9 @@ import {
   numberedName,
   overlapsMap,
   pxToCell,
-  sceneList,
-  sceneOrder,
   tokenDrawOrder,
 } from "./geometry";
+import { sceneOrder, sceneTree } from "./list-tree";
 
 const map = { mapWidth: 1400, mapHeight: 980, gridCellSize: 70, gridOffsetX: 0, gridOffsetY: 0 };
 const cellar = {
@@ -224,11 +223,15 @@ describe("scenes-map geometry", () => {
       { id: "s4", name: "cellar", seq: 4, folderId: null },
       { id: "s5", name: "Orphan", seq: 5, folderId: "gone" },
     ];
-    const list = sceneList(folders, scenes);
-    expect(list.map((e) => [e.folder?.id ?? null, e.scenes.map((s) => s.id)])).toEqual([
+    const ids = (
+      nodes: ReturnType<typeof sceneTree<(typeof folders)[number], (typeof scenes)[number]>>,
+    ): unknown[] => nodes.map((n) => (n.folder ? [n.folder.id, ids(n.children)] : n.item?.id));
+    expect(ids(sceneTree(folders, scenes))).toEqual([
       ["f1", ["s2", "s1"]],
       ["f2", []],
-      [null, ["s3", "s4", "s5"]],
+      "s3",
+      "s4",
+      "s5",
     ]);
     expect(sceneOrder(folders, scenes)[0]?.id).toBe("s2");
     expect(byNameThenSeq({ name: "a", seq: 2 }, { name: "A", seq: 1 })).toBeGreaterThan(0);

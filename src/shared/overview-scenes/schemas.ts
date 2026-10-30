@@ -177,6 +177,7 @@ export const OverviewRecord = z.object({
   id: z.string(),
   campaignId: z.string(),
   folderId: z.string().nullable(),
+  position: z.number().int(),
   seq: z.number().int(),
   name: z.string(),
   active: z.boolean(),

@@ -1,14 +1,39 @@
 // Row ↔ record mapping and lookups for scenes-map. Rows and DM records have the same fields.
-import type { SceneFolderRecord, SceneRecord, TokenRecord } from "@shared/scenes-map/schemas";
+import {
+  SCENE_FOLDER_TYPE,
+  SCENE_TYPE,
+  type SceneFolderRecord,
+  type SceneRecord,
+  type TokenRecord,
+} from "@shared/scenes-map/schemas";
 import { and, asc, count, eq } from "drizzle-orm";
 import { conflict, notFound } from "../../commands/errors";
 import type { Tx } from "../../db/client";
 import { scene, sceneFolder, token } from "../../db/schema";
-import type { Actor } from "../../events/types";
+import type { Actor, RecordChange } from "../../events/types";
 
 type SceneRow = typeof scene.$inferSelect;
 type TokenRow = typeof token.$inferSelect;
 type FolderRow = typeof sceneFolder.$inferSelect;
+
+export const sceneChange = (
+  before: SceneRecord | null,
+  after: SceneRecord | null,
+): RecordChange => ({
+  type: SCENE_TYPE,
+  id: (after ?? before)?.id as string,
+  before,
+  after,
+});
+export const folderChange = (
+  before: SceneFolderRecord | null,
+  after: SceneFolderRecord | null,
+): RecordChange => ({
+  type: SCENE_FOLDER_TYPE,
+  id: (after ?? before)?.id as string,
+  before,
+  after,
+});
 
 export const toSceneRecord = (r: SceneRow): SceneRecord => ({ ...r });
 /**
@@ -66,6 +91,16 @@ export function getFolder(tx: Tx, cid: string, id: string): SceneFolderRecord {
     .get();
   if (!r) throw notFound("Folder not found");
   return toFolderRecord(r);
+}
+
+/** Every folder of the campaign (FR-MAP-02's depth and cycle checks). */
+export function folderRecords(tx: Tx, cid: string): SceneFolderRecord[] {
+  return tx
+    .select()
+    .from(sceneFolder)
+    .where(eq(sceneFolder.campaignId, cid))
+    .all()
+    .map(toFolderRecord);
 }
 
 export function readScene(tx: Tx, id: string): SceneRecord {

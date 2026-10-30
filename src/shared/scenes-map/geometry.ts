@@ -261,40 +261,6 @@ export function byNameThenSeq(
   return a.seq - b.seq;
 }
 
-export interface SceneListEntry<F, S> {
-  folder: F | null;
-  scenes: S[];
-}
-
-/**
- * FR-MAP-02 list order: folders (each with its scenes), then root scenes; each by name
- * (case-insensitive), tiebreak `seq`. A scene whose folder is unknown sits at the root.
- */
-export function sceneList<
-  F extends { id: string; name: string; seq: number },
-  S extends { name: string; seq: number; folderId: string | null },
->(folders: readonly F[], scenes: readonly S[]): SceneListEntry<F, S>[] {
-  const sortedScenes = [...scenes].sort(byNameThenSeq);
-  const known = new Set(folders.map((f) => f.id));
-  const out: SceneListEntry<F, S>[] = [...folders].sort(byNameThenSeq).map((f) => ({
-    folder: f,
-    scenes: sortedScenes.filter((s) => s.folderId === f.id),
-  }));
-  out.push({
-    folder: null,
-    scenes: sortedScenes.filter((s) => s.folderId === null || !known.has(s.folderId)),
-  });
-  return out;
-}
-
-/** Flattened list order (FR-MAP-08 default: the first scene). */
-export function sceneOrder<
-  F extends { id: string; name: string; seq: number },
-  S extends { name: string; seq: number; folderId: string | null },
->(folders: readonly F[], scenes: readonly S[]): S[] {
-  return sceneList(folders, scenes).flatMap((e) => e.scenes);
-}
-
 /** Canvas draw order (MAP §7): larger tokens below smaller, then by `seq`. */
 export function tokenDrawOrder(
   a: { size: TokenSize; seq: number },

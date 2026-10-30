@@ -28,6 +28,7 @@ import {
   scene,
 } from "../../db/schema";
 import type { RecordChange } from "../../events/types";
+import { nextPosition } from "../scenes-map/list-order";
 import { activeSceneOf, campaignOf, getFolder, readScene } from "../scenes-map/rows";
 import { lifecycleHooks } from "../scenes-map/scene-hooks";
 import {
@@ -62,6 +63,7 @@ export const createOverview = defineCommand({
         id,
         campaignId: cid,
         folderId,
+        position: nextPosition(tx, cid, folderId),
         seq: overviewSeqNext,
         name: input.name,
         active: false,
@@ -90,6 +92,7 @@ export const updateOverview = defineCommand({
     if (input.name !== undefined && input.name !== before.name) set.name = input.name;
     if (input.folderId !== undefined && input.folderId !== before.folderId) {
       set.folderId = input.folderId === null ? null : getFolder(tx, cid, input.folderId).id;
+      set.position = nextPosition(tx, cid, set.folderId);
     }
     if (Object.keys(set).length === 0) return;
     tx.update(overview)
@@ -124,6 +127,7 @@ export const duplicateOverview = defineCommand({
         id,
         campaignId: cid,
         folderId: src.folderId,
+        position: nextPosition(tx, cid, src.folderId),
         seq: overviewSeqNext,
         name: copyName(src.name),
         active: false,
