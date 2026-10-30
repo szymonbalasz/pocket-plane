@@ -386,6 +386,7 @@ describe("FR-AGENT-01 list-tools", () => {
         "crMax",
         "crMin",
         "cursor",
+        "definitionId",
         "kind",
         "level",
         "q",
