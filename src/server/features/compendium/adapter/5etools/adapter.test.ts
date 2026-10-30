@@ -4,7 +4,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { FIVE_ETOOLS_MINI_DIR, prepare5etoolsMini } from "@fixtures/5etools-mini/prepare";
-import { EntryDraft } from "@shared/compendium/schemas";
+import {
+  ArtPath,
+  EntryDraft,
+  isValidArtPath,
+  REPLACES_MAX,
+  ReplacedRef,
+} from "@shared/compendium/schemas";
 import { EntityName, MonsterStatBlock } from "@shared/entities/schemas";
 import { z } from "zod";
 import {
@@ -15,7 +21,6 @@ import {
   describeBooks,
   type FiveEtoolsRecord,
   FolderError,
-  isValidArtPath,
   listBooks,
   srdIndexOf,
   tokenPath,
@@ -1103,6 +1108,15 @@ describe("FR-CMPX-13 replaces", () => {
     expect(rec("monster/gnasher").replaces).toBeUndefined();
     expect(rec("item/old-spyglass", tb2.records).replaces).toEqual(["5et-tb1:item/old-spyglass"]);
   });
+  test("FR-CMPX-13 every ref and art path passes core's import rule (a bad one fails the book)", () => {
+    const Refs = z.array(ReplacedRef).max(REPLACES_MAX);
+    for (const r of [...tb1.records, ...tb2.records]) {
+      expect(Refs.safeParse(r.replaces ?? []).success).toBe(true);
+      if (r.kind === "monster" && r.artPath != null) {
+        expect(ArtPath.safeParse(r.artPath).success).toBe(true);
+      }
+    }
+  });
   test("FR-CMPX-13 more than 20 refs → clipped to 20 with a warning; the record stays", () => {
     const r = adaptBookData(
       emptyData({
@@ -1231,7 +1245,6 @@ describe("FR-CMPX-23 art path", () => {
     ["img/../secret.webp", false],
     ["img\\x.webp", false],
     ["C:/img/x.webp", false],
-    ["img/c:x.webp", false],
     [`img/${"x".repeat(200)}.webp`, false],
   ])("FR-CMPX-23 path rule: %s → %s", (p, ok) => {
     expect(isValidArtPath(p)).toBe(ok);

@@ -5,6 +5,7 @@ import {
   BLOCK_NAME_MAX,
   BLOCK_TEXT_MAX,
   BLOCKS_MAX,
+  isValidArtPath,
   META_TEXT_MAX,
   type MonsterMeta,
   NAME_MAX,
@@ -30,7 +31,7 @@ import {
   type SIZES,
 } from "@shared/entities/schemas";
 import { slugify } from "../text";
-import { isValidArtPath, tokenPath } from "./art";
+import { tokenPath } from "./art";
 import { asNum, asStr, isRaw, nameOf, type Raw, rawList, refKey, strings } from "./raw";
 import type { Run } from "./run";
 import { entriesToMarkdown, rawStrings, renderTags, type Warn } from "./text";

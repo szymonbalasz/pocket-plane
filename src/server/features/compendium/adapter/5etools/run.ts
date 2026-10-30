@@ -10,16 +10,15 @@ import {
 import type { AdapterRecord, AdapterResult, MonsterDefinition } from "../open5e";
 
 /**
- * Record contract (fixed, FR-CMPX-13 / -23): `replaces` on any record, `artPath` on monsters. A
- * monster without a numeric HP or AC has no `definition` (FR-CMPX-08).
+ * Core's `AdapterRecord`, except that a monster without a numeric HP or AC has no `definition`
+ * (FR-CMPX-08). The panel slice makes `definition` optional in the pipeline; then this is
+ * `AdapterRecord` itself.
  */
 export type FiveEtoolsRecord =
   | (Omit<Extract<AdapterRecord, { kind: "monster" }>, "definition"> & {
       definition?: MonsterDefinition;
-      artPath: string | null;
-      replaces?: string[];
     })
-  | (Exclude<AdapterRecord, { kind: "monster" }> & { replaces?: string[] });
+  | Exclude<AdapterRecord, { kind: "monster" }>;
 
 export type FiveEtoolsResult = Omit<AdapterResult, "records"> & { records: FiveEtoolsRecord[] };
 

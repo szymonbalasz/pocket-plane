@@ -1,20 +1,6 @@
-// FR-CMPX-23: a monster's token file per 5etools' own rule. The path rule is the one the art
-// listener checks again before reading (X3).
+// FR-CMPX-23: a monster's token file per 5etools' own rule (`isValidArtPath` in
+// `@shared/compendium/schemas` is checked by the caller).
 import { asStr, isRaw, nameOf, type Raw, sourceOf } from "./raw";
-
-export const ART_PATH_MAX = 200;
-
-/** Relative, under `img/`, ≤ 200, no `..`, no backslash, no drive, no leading `/`. */
-export function isValidArtPath(p: string): boolean {
-  return (
-    p.length <= ART_PATH_MAX &&
-    p.startsWith("img/") &&
-    !p.includes("..") &&
-    !p.includes("\\") &&
-    !p.includes(":") &&
-    !p.includes("\0")
-  );
-}
 
 /** 5etools' token file name: ASCII letters, no double quotes. */
 export const tokenFileName = (name: string) =>
