@@ -10,6 +10,7 @@ import type { Feature } from "../../services";
 import { backfillSeenBy } from "./backfill";
 import { fogCommands } from "./commands";
 import { upgradeExploredDefault } from "./explored-default";
+import { upgradeExploredShapes } from "./explored-shape-upgrade";
 import { fogExploredRecordType, fogRecordType, visionRecordType } from "./records";
 import { fogSettingsRecordType } from "./settings";
 import { setFogLogger } from "./sight";
@@ -50,6 +51,10 @@ export const fogOfWar: Feature = {
     r.onStart("fog-of-war.explored-default-upgrade", (s) => {
       const n = upgradeExploredDefault(s.db);
       if (n > 0) s.log.info(`fog: Remember explored areas switched on for ${n} scene(s) (#383)`);
+    });
+    r.onStart("fog-of-war.explored-shape-upgrade", (s) => {
+      const n = upgradeExploredShapes(s.db);
+      if (n > 0) s.log.info(`fog: explored memory converted to shapes on ${n} row(s) (ADR-0076)`);
     });
   },
 };

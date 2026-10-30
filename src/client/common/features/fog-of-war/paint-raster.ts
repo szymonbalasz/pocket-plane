@@ -1,6 +1,7 @@
 // Test-only software rasteriser standing in for the canvas (`PaintCtx`): pixel centres,
 // source-over / lighter / destination-out / source-in / source-atop, nested clips, nonzero
-// (≈ "inside any subpath", for subpaths wound one way) and even-odd fill rules. A pixel keeps the
+// (a polygon counts by its winding: a hole wound against its outline cuts it) and even-odd fill
+// rules. A pixel keeps the
 // label and alpha of the last paint on it (no blending), so tests read what a pixel ends up
 // showing; `drawImage` paints the label `img:<image>` and a later `source-atop` paint keeps it as
 // `img` (what lies under the tint). `EdgePixel`: the antialiased edge the raster can't show. Used
@@ -135,10 +136,14 @@ export class Raster implements PaintCtx {
   }
 }
 
+/** Whole cells as an explored shape, one square piece per cell. */
+export const cellSquares = (cells: readonly (readonly [number, number])[]): number[][][] =>
+  cells.map(([c, r]) => [[c, r, c + 1, r, c + 1, r + 1, c, r + 1]]);
+
 /**
  * One pixel on the edge of the circles painted over it, blended like a canvas: a path with an arc
- * covers it by `coverage`, a path of rects wholly. It lies inside or outside the explored-memory
- * rects, which is what a clip of rects (nonzero) or of the map + those rects (even-odd) tests.
+ * covers it by `coverage`, any other wholly. It lies inside or outside the explored shapes, which is
+ * what a clip of those shapes (nonzero) or of the map + a shape (even-odd) tests.
  */
 export class EdgePixel implements PaintCtx {
   globalCompositeOperation = "source-over";
@@ -207,8 +212,18 @@ function inside(subs: Sub[], x: number, y: number, rule: Rule): boolean {
         const [xj, yj] = s.pts[j] as [number, number];
         if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
       }
-      if (c) n++;
+      if (c) n += rule === "nonzero" && winding(s.pts) < 0 ? -1 : 1;
     }
   }
-  return rule === "evenodd" ? n % 2 === 1 : n > 0;
+  return rule === "evenodd" ? n % 2 === 1 : n !== 0;
+}
+
+function winding(pts: [number, number][]): number {
+  let a = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i] as [number, number];
+    const [xj, yj] = pts[j] as [number, number];
+    a += xj * yi - xi * yj;
+  }
+  return a;
 }

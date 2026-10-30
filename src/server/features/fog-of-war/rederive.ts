@@ -13,24 +13,13 @@
 // party's sight (`derive.ts`), every player's memory grows from the changed players' polygons,
 // and `vision` records carry `shared` (a switch lists every record with its new flag).
 
-import { exploredMask } from "@shared/fog-of-war/explored";
-import {
-  encodeRuns,
-  type FogMask,
-  fogBox,
-  rebase,
-  runCount,
-  uniformMask,
-} from "@shared/fog-of-war/mask";
 import {
   FOG_EXPLORED_TYPE,
-  FOG_RUNS_MAX,
   FOG_TYPE,
   scenePlayerId,
   VISION_TYPE,
 } from "@shared/fog-of-war/schemas";
 import type { DarknessRow } from "@shared/fog-of-war/shapes";
-import { polygonCells } from "@shared/fog-of-war/vision";
 import {
   doorCells,
   doorSamplePoints,
@@ -76,6 +65,7 @@ import {
   sameSeenBy,
   subjectCopies,
 } from "./derive";
+import { growMemory } from "./memory-shape";
 import { readExploredRecord, readFogRecord, type ServerVisionRecord, toVisionRecord } from "./rows";
 import { type FogVision, fogLog, isSource, type SourceLike } from "./sight";
 import { type VisionEntry, visionCache } from "./vision-cache";
@@ -264,107 +254,44 @@ export function mergeChanges(list: readonly RecordChange[]): RecordChange[] {
   });
 }
 
-/** The box cells (row-major indices) whose centre lies in one of the polygons, rasterised once. */
-export function polygonsCells(
-  polys: readonly (readonly number[])[],
-  box: [number, number, number, number],
-): Set<number> {
-  const [col0, row0, cols, rows] = box;
-  const out = new Set<number>();
-  for (const poly of polys) {
-    polygonCells(poly, (c, r) => {
-      const cc = c - col0;
-      const rr = r - row0;
-      if (cc < 0 || rr < 0 || cc >= cols || rr >= rows) return;
-      out.add(rr * cols + cc);
-    });
-  }
-  return out;
-}
-
 /**
- * FR-FOG-37 (pure): a memory mask over `box` plus the given cells (`polygonsCells`). Null =
- * nothing new; `{full}` = over 2,000 runs (the memory stops growing).
- */
-export function growMemoryCells(
-  prev: FogMask,
-  cells: ReadonlySet<number>,
-  box: [number, number, number, number],
-): { mask: FogMask; runs: string } | { full: true } | null {
-  const mask = rebase(prev, box);
-  let grew = prev.box.some((v, i) => v !== box[i]);
-  for (const k of cells) {
-    if (mask.cells[k] === 0) {
-      mask.cells[k] = 1;
-      grew = true;
-    }
-  }
-  if (!grew) return null;
-  const runs = encodeRuns(mask.cells, "clear");
-  return runCount(runs) > FOG_RUNS_MAX ? { full: true } : { mask, runs };
-}
-
-/** FR-FOG-37 (pure): a memory mask over `box` plus every cell whose centre lies in a polygon. */
-export function growMemory(
-  prev: FogMask,
-  polys: readonly (readonly number[])[],
-  box: [number, number, number, number],
-): { mask: FogMask; runs: string } | { full: true } | null {
-  return growMemoryCells(prev, polygonsCells(polys, box), box);
-}
-
-/**
- * FR-FOG-37: on the active scene with Explored on, every cell whose centre lies in one of P's
- * polygons becomes explored for P (one row per player, never shrinks; box = the scene's fog box,
- * FR-FOG-03). Full → a `warn`, the row stays. Party vision on (OQ-FOG-47): every player's row
- * grows from the polygons of the players whose sight changed (`only`; the others' cells are
- * already in every row), rasterised once; a listed player without a row yet (a new player)
+ * FR-FOG-37: on the active scene with Explored on, what P's polygons add joins P's shape (one row
+ * per player, never shrinks, ADR-0076). Full → a `warn`, the row stays. Party vision on
+ * (OQ-FOG-47): every player's row grows from the polygons of the players whose sight changed
+ * (`only`; the others' are already in every row); a listed player without a row yet (a new player)
  * grows from the whole party's sight.
  */
-function rederiveMemory(
-  env: SceneHookEnv,
-  st: SceneStatic,
-  box: [number, number, number, number],
-  only?: readonly string[],
-) {
+function rederiveMemory(env: SceneHookEnv, st: SceneStatic, only?: readonly string[]) {
   const changes: RecordChange[] = [];
-  const [col0, row0, cols, rows] = box;
   const changed = [...(st.sight ?? [])].filter(([p]) => !only || only.includes(p));
-  const grows: [string, ReadonlySet<number>][] = [];
+  const grows: [string, readonly (readonly number[])[]][] = [];
   if (st.party === true) {
     if (st.partySight?.blind === true) return changes;
     const polysOf = (list: typeof changed) =>
       list.flatMap(([, s]) => s.vision.polys.map((x) => x.poly));
-    const cells = polygonsCells(polysOf(changed), box);
-    let all: Set<number> | null = null;
+    const polys = polysOf(changed);
+    let all: (readonly number[])[] | null = null;
     for (const p of st.players) {
       if (only?.includes(p) && !readExploredRecord(env.tx, st.sceneId, p)) {
-        all ??= polygonsCells(polysOf([...(st.sight ?? [])]), box);
+        all ??= polysOf([...(st.sight ?? [])]);
         grows.push([p, all]);
-      } else if (cells.size > 0) grows.push([p, cells]);
+      } else if (polys.length > 0) grows.push([p, polys]);
     }
   } else {
     for (const [p, sight] of changed) {
       if (sight.vision.polys.length === 0) continue;
-      grows.push([
-        p,
-        polygonsCells(
-          sight.vision.polys.map((x) => x.poly),
-          box,
-        ),
-      ]);
+      grows.push([p, sight.vision.polys.map((x) => x.poly)]);
     }
   }
-  for (const [p, cells] of grows) {
+  for (const [p, polys] of grows) {
     const before = readExploredRecord(env.tx, st.sceneId, p);
-    const prev = before ? exploredMask(before) : uniformMask("clear", box);
-    const next = growMemoryCells(prev, cells, box);
+    const next = growMemory(before?.shape ?? [], polys);
     if (next === null) continue;
     if ("full" in next) {
       fogLog().warn(`fog: explored memory of ${p} on scene ${st.sceneId} is full; not growing`);
       continue;
     }
-    const values = { col0, row0, cols, rows, runs: next.runs, updatedAt: env.ctx.clock.iso() };
+    const values = { shape: next.shape, updatedAt: env.ctx.clock.iso() };
     env.tx
       .insert(fogExplored)
       .values({ sceneId: st.sceneId, playerId: p, campaignId: st.campaignId, ...values })
@@ -480,7 +407,7 @@ export function rederiveScene(
     env.tx.update(sceneFog).set({ visionStale: false }).where(eq(sceneFog.sceneId, sceneId)).run();
   }
   const explored = !o.migration && sc.active && row?.on === true;
-  const memory = explored ? rederiveMemory(env, st, fogBox(sc), memoryOnly) : [];
+  const memory = explored ? rederiveMemory(env, st, memoryOnly) : [];
   const darkness = rederiveDarkness(env, st);
   const tokens = rederiveTokens(env, st, now, o);
   return mergeChanges([

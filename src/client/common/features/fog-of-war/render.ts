@@ -15,9 +15,10 @@
 // DOM-free (a minimal 2D-context interface) so it runs under `bun test`.
 
 import { decodeCells } from "@shared/fog-of-war/brush";
-import { exploredMask } from "@shared/fog-of-war/explored";
+import { shapeArea } from "@shared/fog-of-war/explored";
 import { type FogRow, fogBox, maskOf, rebase } from "@shared/fog-of-war/mask";
 import {
+  type ExploredShape,
   FOG_EXPLORED_TYPE,
   type FogBox,
   type FogExploredRecord,
@@ -202,6 +203,41 @@ export function shapePath(ctx: PaintCtx, s: LayerShapeLike, g: GridPx, dx = 0, d
   ctx.closePath();
 }
 
+/** Signed area of a flat polygon (any consistent unit). */
+export function signedArea(flat: readonly number[]): number {
+  let a = 0;
+  const n = flat.length >> 1;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    a +=
+      (flat[2 * j] as number) * (flat[2 * i + 1] as number) -
+      (flat[2 * i] as number) * (flat[2 * j + 1] as number);
+  }
+  return a / 2;
+}
+
+/**
+ * FR-FOG-37: adds an explored shape's rings (grid units → map px), outlines wound one way and holes
+ * the other, so several players' shapes in one path fill as their union under the nonzero rule.
+ */
+export function memoryPath(ctx: PaintCtx, shape: ExploredShape, g: GridPx): void {
+  const cs = g.gridCellSize;
+  for (const rings of shape) {
+    rings.forEach((flat, r) => {
+      const n = flat.length >> 1;
+      if (n < 3) return;
+      const forward = signedArea(flat) >= 0 === (r === 0);
+      for (let k = 0; k < n; k++) {
+        const i = forward ? k : n - 1 - k;
+        const x = g.gridOffsetX + (flat[2 * i] as number) * cs;
+        const y = g.gridOffsetY + (flat[2 * i + 1] as number) * cs;
+        if (k === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+    });
+  }
+}
+
 /** One paint: a colour and its alpha. */
 export interface Paint {
   color: string;
@@ -264,14 +300,14 @@ function addFill(ctx: PaintCtx, p: Paint, draw: () => void, rule?: "nonzero" | "
 }
 
 /**
- * Adds Fog in an erased path; FR-FOG-37 (V3): the player's explored-memory cells add Explored
+ * Adds Fog in an erased path; FR-FOG-37 (V3): inside the drawn explored shapes it adds Explored
  * instead, in one pass (Fog painted first and turned into Explored would leave a seam).
  */
 function addFog(
   ctx: PaintCtx,
   paints: FogPaints,
   m: MapRect,
-  memory: readonly FogRun[],
+  memory: readonly ExploredShape[],
   draw: () => void,
   rule?: "nonzero" | "evenodd",
 ) {
@@ -279,19 +315,18 @@ function addFog(
     addFill(ctx, paints.fog, draw, rule);
     return;
   }
-  const cells = () => {
-    for (const [x, y, w, h] of memory) ctx.rect(x, y, w, h);
-  };
   ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, m.mapWidth, m.mapHeight);
-  cells();
-  ctx.clip("evenodd");
+  for (const shape of memory) {
+    ctx.beginPath();
+    ctx.rect(0, 0, m.mapWidth, m.mapHeight);
+    memoryPath(ctx, shape, m);
+    ctx.clip("evenodd");
+  }
   addFill(ctx, paints.fog, draw, rule);
   ctx.restore();
   ctx.save();
   ctx.beginPath();
-  cells();
+  for (const shape of memory) memoryPath(ctx, shape, m);
   ctx.clip();
   addFill(ctx, paints.explored, draw, rule);
   ctx.restore();
@@ -299,7 +334,7 @@ function addFog(
 
 /**
  * FR-FOG-20/21: the static fog of one record, painter order (see the header). `memory` = the
- * player's explored-memory cells (map px runs, FR-FOG-37): Fog there draws as Explored.
+ * drawn explored shapes (one per row, FR-FOG-37): Fog there draws as Explored.
  */
 export function paintFog(
   ctx: PaintCtx,
@@ -308,7 +343,7 @@ export function paintFog(
   client: CanvasClient,
   paints: FogPaints,
   hairline = 0,
-  memory: readonly FogRun[] = [],
+  memory: readonly ExploredShape[] = [],
 ): void {
   const base = fogRuns(rec, m).runs;
   const shapes = rec.shapes ?? [];
@@ -435,6 +470,6 @@ export function ownFogRows(
           dark: v.dark,
         }
       : null,
-    explored: e ? { cells: exploredMask(e).cells.reduce((n, c) => n + c, 0) } : null,
+    explored: e ? { cells: shapeArea(e.shape) } : null,
   };
 }

@@ -3,7 +3,6 @@
 // the `vision` bundle with in-process services (Goblin Ambush active).
 import { afterEach, describe, expect, test } from "bun:test";
 import { type VisionServices, visionServices } from "@fixtures/units/fog-of-war/vision-harness";
-import { uniformMask } from "@shared/fog-of-war/mask";
 import { FOG_INTENTS as F, FOG_EXPLORED_TYPE, VISION_TYPE } from "@shared/fog-of-war/schemas";
 import { SCN_INTENTS } from "@shared/scene-tools/schemas";
 import { MAP_INTENTS as I } from "@shared/scenes-map/schemas";
@@ -18,7 +17,6 @@ import { TokenPlacer } from "../combat-tracker/join";
 import { resolveDefinition } from "../entities/commands";
 import { MAP_REST as R } from "../scenes-map/commands";
 import { readScene } from "../scenes-map/rows";
-import { growMemory } from "./rederive";
 import { setFogLogger, sightsComputed } from "./sight";
 import { clearVisionCache } from "./vision-cache";
 
@@ -282,22 +280,6 @@ describe("FR-FOG-37 explored memory", () => {
     t.run(I.moveToken, { tokenId: t.tokenRow("Mira").id, col: 3, row: 7 });
     expect(t.changesOf()).toContain("vision:p1");
     expect(rows()).toBe(n);
-  });
-
-  test("FR-FOG-37 memory union never shrinks; over 2,000 runs it stops growing", () => {
-    const box: [number, number, number, number] = [0, 0, 100, 100];
-    const empty = uniformMask("clear", box);
-    const square = [10, 10, 12, 10, 12, 12, 10, 12];
-    const once = growMemory(empty, [square], box);
-    expect(once).not.toBeNull();
-    const twice = growMemory(once && "mask" in once ? once.mask : empty, [square], box);
-    expect(twice).toBeNull(); // nothing new
-    // A checkerboard: 5,000 runs → full.
-    const board = uniformMask("clear", box);
-    for (let i = 0; i < 5000; i++) board.cells[2 * i] = 1;
-    expect(growMemory(board, [[50.2, 50.2, 52.8, 50.2, 52.8, 52.8, 50.2, 52.8]], box)).toEqual({
-      full: true,
-    });
   });
 });
 

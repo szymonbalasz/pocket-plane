@@ -346,7 +346,7 @@ describe("FR-FOG-37 party memory (OQ-FOG-47)", () => {
     const cell = (p: string, col: number, r: number) => {
       const m = row(p);
       if (!m) return false;
-      return explores({ box: [m.col0, m.row0, m.cols, m.rows], runs: m.runs } as never, col, r);
+      return explores({ shape: m.shape } as never, col, r);
     };
     expect(cell(t.pid.p1, 5, 12)).toBe(true);
     expect(cell(t.pid.p2, 5, 12)).toBe(true);

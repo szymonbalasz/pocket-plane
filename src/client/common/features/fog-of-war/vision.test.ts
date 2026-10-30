@@ -4,7 +4,6 @@
 // as (FR-FOG-20 / -43: the shown pair, P's rows, dimming by FR-FOG-34 on P's polygons) and the
 // Invisible render (FR-FOG-47: faded + badge, View as dims by `vision.inv`).
 import { afterEach, describe, expect, test } from "bun:test";
-import { encodeRuns } from "@shared/fog-of-war/mask";
 import type { FogRecord, VisionRecord } from "@shared/fog-of-war/schemas";
 import type { FogLayerShape } from "@shared/fog-of-war/shapes";
 import { emptyStore, type RecordStore } from "@shared/protocol/store";
@@ -13,7 +12,7 @@ import { decorateToken } from "../scenes-map/decorations";
 import { tokenOverlays } from "../scenes-map/token-overlays";
 import { BLIND_TEXT, blindStore, canvasBlind, isBlind } from "./blind";
 import { NO_VISION_PREFIX, noVisionDefinitionIds, noVisionNames } from "./no-vision";
-import { Raster } from "./paint-raster";
+import { cellSquares, Raster } from "./paint-raster";
 import { FOG_ALPHA, type PaintCtx } from "./render";
 import { FOG_BADGE, fogTokenOverlay, INVISIBLE_BADGE } from "./token-overlay";
 import { pairRows, shownPair, useViewAs, viewAsSees, visionOf } from "./view-as";
@@ -21,7 +20,6 @@ import {
   BLIND_GRID_MIN_CONTRAST,
   blindGridColor,
   luminance,
-  memoryRuns,
   paintPlayerView,
   polygonPath,
   VIEW_AS_OPACITY,
@@ -61,13 +59,6 @@ function view(
   return r;
 }
 
-/** A `fog-explored` row over the 10 × 6 box with the given cells explored. */
-function memoryRow(cells: [number, number][]) {
-  const m = new Uint8Array(60);
-  for (const [c, r] of cells) m[r * 10 + c] = 1;
-  return { box: [0, 0, 10, 6] as [number, number, number, number], runs: encodeRuns(m, "clear") };
-}
-
 describe("FR-FOG-21 player render (V3)", () => {
   test("FR-FOG-21 in sight: clear; unseen Fog opaque; no vision record = the static fog", () => {
     const fog = { ...fogAll, runs: "" };
@@ -101,20 +92,14 @@ describe("FR-FOG-21 player render (V3)", () => {
       { op: "fog", rect: [0, 4, 2, 6] },
     ];
     const fog = { ...fogAll, runs: "", shapes, explored: true };
-    const mem = memoryRuns(
-      memoryRow([
+    const mem = [
+      cellSquares([
         [5, 1],
         [6, 1],
         [0, 2],
         [1, 5],
       ]),
-      map,
-    );
-    expect(mem).toEqual([
-      [50, 10, 20, 10],
-      [0, 20, 10, 10],
-      [10, 50, 10, 10],
-    ]);
+    ];
     const r = view(fog, null, mem);
     expect(px(r, 5, 1)).toEqual({ label: "E", alpha: FOG_ALPHA.player.explored }); // base fog
     expect(label(r, 7, 1)).toBe("F"); // not remembered

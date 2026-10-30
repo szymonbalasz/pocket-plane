@@ -3,6 +3,7 @@
 // (FR-FOG-29 / -31), static derive with darkness (FR-FOG-34) and the static darkness filter
 // (FR-FOG-44). Each command: rows + undo + log + one event, IDs from ctx, rollback → nothing.
 import { afterEach, describe, expect, test } from "bun:test";
+import { shapeHolds } from "@shared/fog-of-war/explored";
 import { encodeRuns } from "@shared/fog-of-war/mask";
 import { FOG_INTENTS as F, FOG_EXPLORED_TYPE, type FogRecord } from "@shared/fog-of-war/schemas";
 import { DARKNESS_MAX } from "@shared/fog-of-war/shapes";
@@ -11,12 +12,20 @@ import { eq } from "drizzle-orm";
 import { armCrashHook } from "../../commands/crash";
 import { stateDigest } from "../../db/digest";
 import { EXPLORED_DEFAULT, EXPLORED_DEFAULT_KEY } from "../../db/meta";
-import { dbMeta, fogExplored, sceneFog, sceneFogEdit, token } from "../../db/schema";
+import {
+  dbMeta,
+  fogExplored,
+  legacyFogExplored,
+  sceneFog,
+  sceneFogEdit,
+  token,
+} from "../../db/schema";
 import { readEventLog } from "../../events/log";
 import { MAP_REST as R } from "../scenes-map/commands";
 import { scenesSetup } from "../scenes-map/testing";
 import { DARKNESS_NOT_FOUND, FOG_TOO_MANY_DARKNESS, fogUndoStack } from "./commands";
 import { exploredDefaultOf, upgradeExploredDefault } from "./explored-default";
+import { upgradeExploredShapes } from "./explored-shape-upgrade";
 import { dmFogRecord, readFogRecord } from "./rows";
 
 afterEach(() => armCrashHook(null));
@@ -306,12 +315,12 @@ describe("FR-FOG-44 darkness filter (static part)", () => {
     expect(last?.darkness.at(-1)?.seenBy).toEqual(players);
   });
 
-  test("FR-FOG-44 a player's explored memory cell in the box → that player only; Forget explored drops it (fog row + fog-explored deletes in ExploredForgotten)", () => {
+  test("ADR-0076 at start an old per-cell row becomes a shape and is deleted, once; a row already converted stays", () => {
     const t = setup();
     const m = new Uint8Array(20 * 14);
-    m[11 * 20 + 17] = 1; // cell (17, 11) explored for player 1
+    m[11 * 20 + 17] = 1; // cell (17, 11)
     t.s.db
-      .insert(fogExplored)
+      .insert(legacyFogExplored)
       .values({
         sceneId: t.ambush.id,
         playerId: t.h.p1.id,
@@ -321,6 +330,30 @@ describe("FR-FOG-44 darkness filter (static part)", () => {
         cols: 20,
         rows: 14,
         runs: encodeRuns(m, "clear"),
+        updatedAt: AT,
+      })
+      .run();
+    expect(upgradeExploredShapes(t.s.db)).toBe(1);
+    expect(t.s.db.select().from(legacyFogExplored).all()).toEqual([]);
+    const row = t.s.db.select().from(fogExplored).all();
+    expect(row.map((r) => r.playerId)).toEqual([t.h.p1.id]);
+    expect(shapeHolds(row[0]?.shape ?? [], 17.5, 11.5)).toBe(true);
+    expect(shapeHolds(row[0]?.shape ?? [], 18.5, 11.5)).toBe(false);
+    expect(upgradeExploredShapes(t.s.db)).toBe(0);
+    expect(t.s.db.select().from(fogExplored).all()).toEqual(row);
+  });
+
+  test("FR-FOG-44 a player's explored memory cell in the box → that player only; Forget explored drops it (fog row + fog-explored deletes in ExploredForgotten)", () => {
+    const t = setup();
+    // Cell (17, 11) explored for player 1.
+    const shape = [[[17, 11, 18, 11, 18, 12, 17, 12]]];
+    t.s.db
+      .insert(fogExplored)
+      .values({
+        sceneId: t.ambush.id,
+        playerId: t.h.p1.id,
+        campaignId: t.h.campaignId,
+        shape,
         updatedAt: AT,
       })
       .run();
