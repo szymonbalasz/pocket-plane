@@ -299,6 +299,7 @@ function EntryOnlyStatBlock({
       </header>
       <div data-testid="cmp-statblock-facts" className="space-y-0.5">
         {meta.armorNote && <StatFact label="Armor Class">{meta.armorNote}</StatFact>}
+        {meta.hpText && <StatFact label="Hit Points">{meta.hpText}</StatFact>}
         {meta.speedText && <StatFact label="Speed">{meta.speedText}</StatFact>}
         <MonsterFacts meta={meta} saves={meta.savesText} senses={meta.senses} cr={facets.cr} />
       </div>
