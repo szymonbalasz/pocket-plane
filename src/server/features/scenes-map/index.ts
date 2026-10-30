@@ -1,3 +1,4 @@
+import { OverviewShown } from "@shared/events/overview-scenes";
 import { SceneActivated } from "@shared/events/scenes-map";
 import { DragData, LaserData, MAP_SIGNALS, PingData, PullData } from "@shared/scenes-map/schemas";
 import type { CommandDef } from "../../commands/commands";
@@ -89,7 +90,7 @@ export const scenesMap: Feature = {
     s.records.provideSceneCampaign((sceneId) => sceneCampaignOf(s.db, sceneId));
     r.afterCommit("scenes-map.active-scene", (e) => cache.onCommit(e));
     r.listener("scenes-map.activation-resync", (e) => {
-      if (e.event.type !== SceneActivated.type) return;
+      if (e.event.type !== SceneActivated.type && e.event.type !== OverviewShown.type) return;
       s.hub?.resync((c) => c.role === "player" && c.campaignId === e.event.campaignId);
     });
   },

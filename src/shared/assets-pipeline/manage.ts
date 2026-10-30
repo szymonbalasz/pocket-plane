@@ -28,6 +28,7 @@ export type AssetUsesIntent = z.input<typeof AssetUsesIntent>;
 export const ASSET_USE_KINDS = [
   "scene map",
   "prop",
+  "overview image", // FR-OVW-45: an overview item's `assetId`
   "token",
   "portrait",
   "combatant",

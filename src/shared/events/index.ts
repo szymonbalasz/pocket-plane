@@ -13,6 +13,7 @@ import * as fogOfWar from "./fog-of-war";
 import * as gems from "./gems";
 import * as liveSync from "./live-sync";
 import * as notifications from "./notifications";
+import * as overviewScenes from "./overview-scenes";
 import * as partyBoard from "./party-board";
 import * as partyLoot from "./party-loot";
 import * as reminders from "./reminders";
@@ -58,6 +59,8 @@ export const domainEvents: readonly DomainEventDef[] = [
   ...Object.values<unknown>(strongholds).filter(isDomainEventDef),
   // spell-fx (fix/vfx-core).
   ...Object.values<unknown>(spellFx).filter(isDomainEventDef),
+  // overview scenes (fix/ovw-core).
+  ...Object.values<unknown>(overviewScenes).filter(isDomainEventDef),
 ];
 
 /** `cause.name` of presence changes (not a domain event, CON-07). */
