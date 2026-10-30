@@ -250,7 +250,7 @@ None is undoable.
 
 ## 12. Performance & bandwidth
 
-- Item row ≈ 500 B with style *(estimate; measure at build)*: 300 items ≈ 150 KB, in the DM snapshot only for the shown overview, and in place of the battle scene's tokens and props. Overview rows ≈ 200 B each, ≤ 50 ≈ 10 KB. Test `FR-OVW-08 CON-44` measures both against the [CON-44](../protocol/README.md#11-conflicts-log) ceilings (DM 768 KiB, players 512 KiB).
+- Item row: label 594 B, image 436 B, widest 684 B (measured): 300 items ≈ 165 KB, in the DM snapshot only for the shown overview, and in place of the battle scene's tokens and props. Overview rows ≈ 200 B each, ≤ 50 ≈ 10 KB. Test `FR-OVW-08 CON-44` measures both against the [CON-44](../protocol/README.md#11-conflicts-log) ceilings (DM 1.5 MiB since #256, players 512 KiB; measured at 300 items: DM 185 KB, player 137 KB).
 - A drag frame ≤ 50 × ≈ 60 B, ≤ 20 per second, DM group drags only at that size; a player's frame ≈ 100 B.
 - Images are the existing `display` files (long edge ≤ 4096 px), served with the existing cache. A region map over the tunnel costs what a battle map costs.
 - Canvas: pan and zoom stay smooth at 300 items with 200 stroked labels. Checked in walkthrough step 12; if not, cache the static items in one Konva layer, as the map does.
