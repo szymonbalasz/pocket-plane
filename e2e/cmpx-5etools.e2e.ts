@@ -14,6 +14,7 @@ import { promisify } from "node:util";
 import { type Browser, expect, type Page, test } from "@playwright/test";
 import { loginDm } from "./support/env";
 import { konvaNodes } from "./support/konva";
+import { mapPoint } from "./support/map";
 import { openWindow } from "./support/shell";
 
 const run = promisify(execFile);
@@ -67,7 +68,7 @@ test.beforeAll(async () => {
       // Not written yet.
     }
   }
-  const manifest = JSON.parse(readFileSync(path.join(dir, "manifest.json"), "utf8"));
+  const manifest = JSON.parse(readFileSync(path.join(dir, "load-manifest.json"), "utf8"));
   playerLink = manifest.playerLinks.find((l: { player: string }) => l.player === "Player 1").url;
 });
 
@@ -126,7 +127,10 @@ test("FR-CMPX-17 FR-CMPX-14 FR-CMPX-16 import both books, 'goblin' → one TB1 r
   const canvas = dm.getByTestId("map-canvas");
   await expect(canvas).toHaveAttribute("data-loading", "false");
   const before = (await konvaNodes(dm, "map-token")).length;
-  await goblin.dragTo(canvas, { targetPosition: { x: 80, y: 300 } });
+  const to = await mapPoint(dm, 7, 5);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error("No map canvas");
+  await goblin.dragTo(canvas, { targetPosition: { x: to.x - box.x, y: to.y - box.y } });
   await expect.poll(async () => (await konvaNodes(dm, "map-token")).length).toBe(before + 1);
 
   // Player: the TB1 spell with its badge; no Monsters tab, "goblin" finds nothing.
