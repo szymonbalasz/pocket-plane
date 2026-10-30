@@ -2,11 +2,11 @@
 
 Scratch, overwritten as things change. Not history ([orchestrator prompt §4](orchestrator-prompt.md#4-context-management)).
 
-**Phase:** **5etools import (#395, 2026-10-30)** — spec [compendium-expansion](../specs/post-mvp/compendium-expansion.md) complete, ADR-0074 accepted. Wave 1: `fix/cmpx-core` ∥ `build/cmpx-adapter`. Wave 2 (after both merge): `build/cmpx-panel` ∥ `build/cmpx-art` (merge panel first). Sprint 15 planning (candidates: BL-146 with BL-143–145, BL-124 / BL-152, BL-151, BL-125–127, BL-149 / BL-150, BL-153, BL-154, BL-123, BL-142) after. Note: the main checkout is on `fix/creatures-custom-only` with uncommitted work (another session); integrate via worktrees, don't touch it.
+**5etools import (#395–#397, #400, #401): DONE 2026-10-30.** Spec + ADR-0074; core, adapter, panel, token art merged; walkthroughs 27/31 → re-test, 14/14; README how-to. Follow-ups BL-160–163. Sprint 15 planning after (candidates: BL-146 with BL-143–145, BL-124 / BL-152, BL-151, BL-125–127, BL-149 / BL-150, BL-153, BL-154, BL-123, BL-142).
 
 **Overview scenes (#398, 2026-10-30; separate session from the 5etools track, same `main`):** spec [overview-scenes](../specs/overview-scenes.md) complete, ADR-0075 accepted. Order: `fix/ovw-core` → `build/ovw-canvas` → `build/ovw-images` → `build/ovw-labels` ∥ `build/ovw-minis`. Briefs `%TEMP%/pocket-plane/briefs/{build,test}-ovw-*.md`. `fix/ovw-core` holds `src/server/db/`, `src/shared/events/`, `active-scene.ts`, `scene-hooks.ts`, `docs/data-model/`, `docs/protocol/`.
 
-**Shared-file locks:** `fix/cmpx-core` holds `src/server/db/`, `src/server/config.ts`, `.env.example`, AGENTS.md §9.2, `docs/data-model/`. `build/cmpx-adapter` adds new files only (`src/server/features/compendium/adapter/5etools/`, `fixtures/5etools-mini/`, `scripts/cmpx-probe.ts`).
+**Shared-file locks (5etools):** none (all released).
 
 **Briefs:** `%TEMP%/pocket-plane/briefs/{build,test}-cmpx-*.md`.
 
@@ -59,10 +59,10 @@ Scratch, overwritten as things change. Not history ([orchestrator prompt §4](or
 | Tray S4 Use as from the log | merged a0f776fc | — | **merged** (T10–T13 PASS; CI 19/19; #389) | — |
 | Map effects default Full (#376) | merged | — | **merged** (check + spell-fx / prefs-window e2e green; CI green after a BL-147 re-run) | — |
 | 5etools spec (#395) | merged | — | **complete** (ADR-0074; OQ-CMPX-01–08 all A) | — |
-| CMPX core: config, schema, replaced entries, presets, bench | `fix/cmpx-core` | build-cmpx-core | building | walkthrough after wave 2 |
-| CMPX adapter: 5etools reader + mapping + fixtures `5etools-mini` + probe | `build/cmpx-adapter` | build-cmpx-adapter | building | — |
-| CMPX panel: import wiring, panel, bundle `cmpx-5etools`, e2e | `build/cmpx-panel` | — | waits on wave 1 | walkthrough X1+X2 |
-| CMPX art: token art on first placement | `build/cmpx-art` | — | waits on wave 1 | walkthrough X3 |
+| CMPX core: config, schema, replaced entries, presets, bench | merged | — | **merged** (#396) | — |
+| CMPX adapter: 5etools reader + mapping + fixtures `5etools-mini` + probe | merged | — | **merged** (#397; probe: 106 books) | — |
+| CMPX panel: import wiring, panel, bundle `cmpx-5etools`, e2e, README | merged | — | **merged** (#400; walkthrough 27/31 → re-test 6/7 accepted) | — |
+| CMPX art: token art on first placement | merged | — | **merged** (#401; walkthrough 14/14) | — |
 
 Backlog after sim-15: BL-118 (toast + popup flicker on each new card, the FAIL), BL-119, BL-120, BL-122, BL-123 (small); BL-121 needs a DM call (extend BL-111 to every award); BL-116 flakes; BL-93 (27 player cells).
 
