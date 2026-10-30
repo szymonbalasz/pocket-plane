@@ -7,6 +7,9 @@ import {
   countLine,
   FAILURE_LINE,
   groupSpecs,
+  mergeAttempts,
+  RETRIES_ARG,
+  RETRY_LINE,
   serialBundles,
   shardBundles,
 } from "./e2e";
@@ -108,6 +111,32 @@ test("e2e runner: Playwright list summary lines → passed / failed / flaky / sk
     "  ok  1 e2e\\a.e2e.ts:12:1 › FR-ASSET-17 picker (1.0s)",
   ];
   expect(failures.filter((l) => FAILURE_LINE.test(l)).length).toBe(2);
+});
+
+test("e2e runner: --retries=n reruns failed tests fresh; a pass on retry is flaky, a fail failed", () => {
+  const c = (passed: number, failed: number, notRun = 0, skipped = 0) => ({
+    passed,
+    failed,
+    flaky: 0,
+    skipped,
+    notRun,
+  });
+  // No retry: the first attempt as is.
+  expect(mergeAttempts([c(5, 0, 0, 1)])).toEqual(c(5, 0, 0, 1));
+  // One failed, passes on the fresh retry: flaky.
+  expect(mergeAttempts([c(5, 1)])).toEqual(c(5, 1));
+  expect(mergeAttempts([c(5, 1), c(1, 0)])).toEqual({ ...c(5, 0), flaky: 1 });
+  // Fails again: failed, not flaky.
+  expect(mergeAttempts([c(5, 1), c(0, 1)])).toEqual(c(5, 1));
+  // A serial group: one failed, two did not run; all three pass on the retry, one is flaky.
+  expect(mergeAttempts([c(3, 1, 2), c(3, 0)])).toEqual({ ...c(5, 0), flaky: 1 });
+  // Two retries: fails, then passes.
+  expect(mergeAttempts([c(5, 1), c(0, 1), c(1, 0)])).toEqual({ ...c(5, 0), flaky: 1 });
+  expect(RETRY_LINE.test('=== e2e retry 1/1 of "cp-turns": failed tests on a fresh server')).toBe(
+    true,
+  );
+  expect(RETRY_LINE.test("  ✓  1 e2e/x.e2e.ts:3:1 › === e2e retry 1/1 in a title")).toBe(false);
+  expect(RETRIES_ARG.exec("--retries=1")?.[1]).toBe("1");
 });
 
 test("e2e runner: the repo's specs all resolve to registered bundles", async () => {
