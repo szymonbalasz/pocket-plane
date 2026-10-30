@@ -84,6 +84,7 @@ import lootSubtractE2e from "./loot-subtract-e2e";
 import mapTools from "./map-tools";
 import midCombat from "./mid-combat";
 import notifications from "./notifications";
+import overviewScenes from "./overview-scenes";
 import partyBoard from "./party-board";
 import partyCmp from "./party-cmp";
 import partyLoot from "./party-loot";
@@ -368,4 +369,6 @@ export const bundles: readonly Bundle[] = [
   assetsWindowE2e,
   // Compendium expansion core (fix/cmpx-core): replaced entries, preset inheritance
   cmpxCore,
+  // Overview scenes core (fix/ovw-core): overviews, items, one shown
+  overviewScenes,
 ];

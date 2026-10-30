@@ -173,6 +173,7 @@ describe("FR-FOG-24 registries (fog's server lines only)", () => {
       "fog-of-war.fog-row",
       "scene-tools.scene-rows",
       "entities.pet-presence",
+      "overview-scenes.one-shown",
     ]);
     const [fogLine] = sceneHooks;
     expect([

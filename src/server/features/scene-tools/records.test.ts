@@ -107,7 +107,9 @@ describe("FR-SCN-32 DM window (ADR-0041)", () => {
     const t = setup();
     t.run(I.activateScene, { sceneId: t.ambush.id });
     const load = t.s.records.loadScene(t.src, t.dm, t.cellar.id);
-    expect(Object.keys(load).sort()).toEqual([...SCN_TYPES, "fog", "token"].sort());
+    expect(Object.keys(load).sort()).toEqual(
+      [...SCN_TYPES, "fog", "overview-item", "token"].sort(),
+    );
     expect(load[SCENE_STRUCTURE_TYPE]).toEqual([wire(t.c.structure)]);
     expect((load[SCENE_PROP_TYPE] as { id: string }[]).map((p) => p.id)).toEqual([
       "c-barrel",

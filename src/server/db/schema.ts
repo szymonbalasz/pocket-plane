@@ -44,6 +44,7 @@ import {
   type FogBaseState,
 } from "@shared/fog-of-war/schemas";
 import type { DarknessRow, FogLayerShape } from "@shared/fog-of-war/shapes";
+import type { ItemKind, ItemStyle, MiniatureShape } from "@shared/overview-scenes/schemas";
 import type { SharedWith } from "@shared/party-board/schemas";
 import type { ReminderRoll } from "@shared/reminders/schemas";
 import { DIAGONAL_RULES, type Door, TEMPLATE_SHAPES, type Wall } from "@shared/scene-tools/schemas";
@@ -367,6 +368,75 @@ export const scene = sqliteTable(
   ],
 );
 
+/** Overview: a second kind of scene (ADR-0075); ≤ 1 shown per campaign, ≤ 50 per campaign (OVW §8). */
+export const overview = sqliteTable(
+  "overview",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    /** Null = root. A folder delete moves its overviews to the root (same transaction). */
+    folderId: text("folder_id").references((): AnySQLiteColumn => sceneFolder.id),
+    seq: integer("seq").notNull(),
+    name: text("name").notNull(),
+    active: integer("active", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("overview_seq").on(t.seq),
+    uniqueIndex("overview_one_active").on(t.campaignId).where(sql`active = 1`),
+    index("overview_campaign").on(t.campaignId),
+  ],
+);
+
+/** Image, place label or miniature on an overview (OVW §8); ≤ 300 per overview, 3,000 per campaign. */
+export const overviewItem = sqliteTable(
+  "overview_item",
+  {
+    id: text("id").primaryKey(),
+    campaignId: text("campaign_id")
+      .notNull()
+      .references((): AnySQLiteColumn => campaign.id),
+    overviewId: text("overview_id")
+      .notNull()
+      .references((): AnySQLiteColumn => overview.id, { onDelete: "cascade" }),
+    seq: integer("seq").notNull(),
+    z: integer("z").notNull().default(0),
+    /** `image` | `label` | `miniature`. */
+    kind: text("kind").$type<ItemKind>().notNull(),
+    x: real("x").notNull(),
+    y: real("y").notNull(),
+    /** Null on labels. */
+    w: real("w"),
+    h: real("h"),
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    /** DM only (FR-OVW-39). */
+    locked: integer("locked", { mode: "boolean" }).notNull().default(false),
+    /** Asset reference; required on images (FR-OVW-45: blocks the asset's delete). */
+    assetId: text("asset_id").references((): AnySQLiteColumn => asset.id),
+    /** Label text or miniature name. */
+    text: text("text"),
+    /** **JSON leaf** FR-OVW-27; a miniature's has no `dot`. */
+    style: text("style", { mode: "json" }).$type<ItemStyle>(),
+    /** Miniature link (FR-OVW-33). */
+    characterId: text("character_id").references((): AnySQLiteColumn => entity.id),
+    /** Miniature only (FR-OVW-35). */
+    ownerPlayerId: text("owner_player_id").references((): AnySQLiteColumn => player.id),
+    /** Miniature only. */
+    shape: text("shape").$type<MiniatureShape>(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (t) => [
+    uniqueIndex("overview_item_seq").on(t.seq),
+    index("overview_item_overview").on(t.overviewId),
+    index("overview_item_campaign").on(t.campaignId),
+    index("overview_item_asset").on(t.assetId),
+  ],
+);
+
 /** Token: instance of a creature definition on a scene (FR-MAP-13–21, ADR-0024). */
 export const token = sqliteTable(
   "token",
@@ -426,6 +496,8 @@ export const token = sqliteTable(
 );
 
 /** CON-20: `seq` values for scene inserts, computed by the DB inside the insert's transaction. */
+export const overviewSeqNext = sql<number>`(select coalesce(max(${overview.seq}), 0) + 1 from ${overview})`;
+export const overviewItemSeqNext = sql<number>`(select coalesce(max(${overviewItem.seq}), 0) + 1 from ${overviewItem})`;
 export const sceneFolderSeqNext = sql<number>`(select coalesce(max(${sceneFolder.seq}), 0) + 1 from ${sceneFolder})`;
 export const sceneSeqNext = sql<number>`(select coalesce(max(${scene.seq}), 0) + 1 from ${scene})`;
 export const tokenSeqNext = sql<number>`(select coalesce(max(${token.seq}), 0) + 1 from ${token})`;
@@ -1781,4 +1853,6 @@ export const schema = {
   rollRequest,
   reminder,
   stronghold,
+  overview,
+  overviewItem,
 };

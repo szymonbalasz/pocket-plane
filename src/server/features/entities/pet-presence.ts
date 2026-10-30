@@ -125,10 +125,14 @@ export const petPresenceVisibilityHook: SceneVisibilityHook = {
   },
 };
 
-/** Scene lifecycle hook line (FR-ENT-37): a scene switch or the active scene's delete. */
+/**
+ * Scene lifecycle hook line (FR-ENT-37): a scene switch, the active scene's delete, or the scene
+ * going off for an overview (FR-OVW-44).
+ */
 export const petPresenceSceneHook: SceneHook = {
   name: "entities.pet-presence",
   activated: (env, s) => syncPetPresence(env, s.campaignId),
   deleting: (env, s) =>
     s.active ? syncPetPresence(env, s.campaignId, { excludeSceneId: s.id }) : [],
+  deactivated: (env, s) => syncPetPresence(env, s.campaignId),
 };

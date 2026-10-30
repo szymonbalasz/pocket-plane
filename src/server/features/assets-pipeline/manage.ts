@@ -25,6 +25,8 @@ import {
   encounter,
   entity,
   handout,
+  overview,
+  overviewItem,
   prop,
   scene,
   token,
@@ -71,6 +73,14 @@ export function assetUses(tx: Pick<Tx, "select">, assetId: string): AssetUse[] {
     .innerJoin(scene, eq(prop.sceneId, scene.id))
     .where(eq(prop.assetId, assetId))
     .orderBy(asc(scene.name))
+    .all();
+  // FR-OVW-45: every kind of overview item holding the image.
+  const overviewImages = tx
+    .select({ name: overview.name })
+    .from(overviewItem)
+    .innerJoin(overview, eq(overviewItem.overviewId, overview.id))
+    .where(eq(overviewItem.assetId, assetId))
+    .orderBy(asc(overview.name))
     .all();
   const tokens = tx
     .select({ name: token.name })
@@ -126,6 +136,8 @@ export function assetUses(tx: Pick<Tx, "select">, assetId: string): AssetUse[] {
     ...of("scene map", names(scenes)),
     // Several props of one scene: one use.
     ...of("prop", [...new Set(names(props))]),
+    // Several items of one overview: one use.
+    ...of("overview image", [...new Set(names(overviewImages))]),
     ...of("token", names(tokens)),
     ...of("portrait", names(portraits)),
     ...of("combatant", names(combatants)),

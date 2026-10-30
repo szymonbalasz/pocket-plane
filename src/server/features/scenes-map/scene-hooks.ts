@@ -13,12 +13,16 @@
 // - `mapChanged(env, scene)` (sprint 4, review A8): `map.setGrid` / `map.setSceneMap`, after the
 //   scene row is written, only when the map rectangle moved (map size, cell size or offsets) →
 //   `SceneUpdated` (fog re-derives the scene: the map edges bound sight, FR-FOG-33).
+// - `deactivated(env, scene)` (ADR-0075, FR-OVW-44): `ovw.show`, after the scene went off and the
+//   overview came on, only when a scene went off → `OverviewShown`. `map.activateScene` doesn't
+//   run it: `activated` covers a switch.
 // Hooks write through `env.tx` only and never emit. No line registered → no behaviour change.
 import type { SceneRecord } from "@shared/scenes-map/schemas";
 import type { CommandEnv } from "../../commands/commands";
 import type { RecordChange } from "../../events/types";
 import { petPresenceSceneHook } from "../entities/pet-presence";
 import { fogSceneHook } from "../fog-of-war/lifecycle";
+import { overviewSceneHook } from "../overview-scenes/lifecycle";
 import { scnSceneHook } from "../scene-tools/lifecycle";
 
 export type SceneHookEnv = Pick<CommandEnv, "tx" | "ctx" | "actor">;
@@ -31,13 +35,15 @@ export interface SceneHook {
   deleting?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
   activated?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
   mapChanged?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
+  deactivated?(env: SceneHookEnv, scene: SceneRecord): RecordChange[];
 }
 
 /** The registry. Append your feature's line; order = run order. */
 export const sceneHooks: readonly SceneHook[] = [
   fogSceneHook, // fog-of-war (FR-FOG-02 created / duplicated, -23 deleting, -35 activated, -33 mapChanged)
   scnSceneHook, // scene-tools (FR-SCN-31)
-  petPresenceSceneHook, // entities: scene switch / active-scene delete re-derive `petPresent` (FR-ENT-37)
+  petPresenceSceneHook, // entities: scene switch / active-scene delete / scene off re-derive `petPresent` (FR-ENT-37, FR-OVW-44)
+  overviewSceneHook, // overview scenes: a scene coming on takes a shown overview off (FR-OVW-06)
 ];
 
 /** Live hook list, seeded from the registry; tests may add hooks via `register`. */
@@ -78,6 +84,10 @@ export class SceneHooks {
 
   mapChanged(env: SceneHookEnv, scene: SceneRecord): RecordChange[] {
     return this.list.flatMap((h) => h.mapChanged?.(env, scene) ?? []);
+  }
+
+  deactivated(env: SceneHookEnv, scene: SceneRecord): RecordChange[] {
+    return this.list.flatMap((h) => h.deactivated?.(env, scene) ?? []);
   }
 }
 
