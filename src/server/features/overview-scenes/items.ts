@@ -192,10 +192,14 @@ function assertPatchFits(item: OverviewItemRecord, p: ItemPatch) {
     if (p.style !== undefined && !MiniatureStyle.safeParse(p.style).success) {
       throw invalid("Invalid input", [{ path: ["style"], message: "A miniature has no dot" }]);
     }
-    const side = p.w ?? p.h;
-    if (side !== undefined) {
-      const square = (p.w ?? side) === (p.h ?? side);
-      if (!square || side < MINIATURE_SIDE.min || side > MINIATURE_SIDE.max) {
+    if (p.w !== undefined || p.h !== undefined) {
+      const side = p.w ?? item.w;
+      if (
+        side === null ||
+        side !== (p.h ?? item.h) ||
+        side < MINIATURE_SIDE.min ||
+        side > MINIATURE_SIDE.max
+      ) {
         throw invalid("Invalid input", [
           { path: ["w"], message: `Square, ${MINIATURE_SIDE.min}–${MINIATURE_SIDE.max} units` },
         ]);

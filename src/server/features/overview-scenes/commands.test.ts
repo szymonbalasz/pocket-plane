@@ -817,6 +817,8 @@ describe("FR-OVW-15–27 items", () => {
     expect(t.item("free")).toMatchObject({ w: 128, h: 128 });
     for (const bad of [
       { w: 128, h: 64 },
+      { w: 64 },
+      { h: 64 },
       { w: 4097, h: 4097 },
       { w: 7, h: 7 },
     ]) {
