@@ -5,9 +5,14 @@
 // the canvas, e.g. FR-OVW-25's field); `panel` shows beside the rail (FR-MAP-60). The handlers are
 // DOM-free, so they run under `bun test`.
 import { MAP_SIGNALS } from "@shared/scenes-map/schemas";
-import { MousePointer2Icon, RadarIcon } from "lucide-react";
+import { ImagePlusIcon, MousePointer2Icon, RadarIcon } from "lucide-react";
 import type { CanvasClient } from "../scenes-map/layers";
+import { AddImagePanel } from "./AddImagePanel";
 import type { OverviewItemView } from "./item-layout";
+import { SELECT_TOOL_ID } from "./overview-canvas-context";
+import { selectPointer } from "./select-tool";
+
+export { SELECT_TOOL_ID };
 
 /** One stage pointer event, as the active overview tool receives it. */
 export interface OverviewPointer {
@@ -80,16 +85,31 @@ export interface OverviewToolDef {
   overlay?: () => unknown;
 }
 
-export const SELECT_TOOL_ID = "select";
-
 const selectTool: OverviewToolDef = {
   id: SELECT_TOOL_ID,
   label: "Select",
   icon: MousePointer2Icon,
   clients: ["dm", "player"],
   order: 0,
-  hint: { dm: "Drag to pan the map", player: "Drag to pan the map" },
+  hint: {
+    dm: "Click, Ctrl/Shift+click or Ctrl/Shift+drag to select; drag items, pan the map",
+    player: "Drag to pan the map",
+  },
   pans: true,
+  pointer: selectPointer,
+};
+
+/** FR-OVW-22: the panel's button opens the picker; the canvas still pans under it. */
+const addImageTool: OverviewToolDef = {
+  id: "add-image",
+  label: "Add image",
+  icon: ImagePlusIcon,
+  clients: ["dm"],
+  order: 10,
+  hint: { dm: "Place an image: a map, a scroll, a portrait" },
+  pans: true,
+  edits: true,
+  panel: AddImagePanel,
 };
 
 /** FR-OVW-13: `map.ping` / `map.pull` with the overview's ID as `sceneId`. Shift = pull, DM only. */
@@ -129,7 +149,11 @@ export function orderOverviewTools(tools: readonly OverviewToolDef[]): OverviewT
   return [...tools].sort((a, b) => a.order - b.order);
 }
 
-export const overviewTools: readonly OverviewToolDef[] = orderOverviewTools([selectTool, pingTool]);
+export const overviewTools: readonly OverviewToolDef[] = orderOverviewTools([
+  selectTool,
+  addImageTool,
+  pingTool,
+]);
 
 export const overviewToolsFor = (client: CanvasClient) =>
   overviewTools.filter((t) => t.clients.includes(client));

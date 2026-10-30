@@ -4,7 +4,8 @@ import { createContext, useContext } from "react";
 import { create } from "zustand";
 import type { CanvasClient } from "../scenes-map/layers";
 import type { CanvasColors } from "../scenes-map/theme";
-import { SELECT_TOOL_ID } from "./overview-tools";
+
+export const SELECT_TOOL_ID = "select";
 
 /** Apart from the battle scene's tool: leaving an overview hands the DM their tool back. */
 export const useOverviewTool = create<{ tool: string; setTool(t: string): void }>((set) => ({

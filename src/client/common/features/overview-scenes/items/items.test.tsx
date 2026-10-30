@@ -9,6 +9,8 @@ import { createStore } from "zustand";
 import type { CanvasColors } from "../../scenes-map/theme";
 import type { OverviewItemView } from "../item-layout";
 import { OverviewCanvasContext } from "../overview-canvas-context";
+import type { ItemPreview } from "../overview-editor";
+import { hiddenMarkAt } from "./HiddenMark";
 import { ItemNode } from "./ItemNode";
 
 const colors = {
@@ -40,7 +42,7 @@ const base: OverviewItemView = {
   shape: null,
 };
 
-function draw(item: OverviewItemView, client: "dm" | "player" = "dm") {
+function draw(item: OverviewItemView, client: "dm" | "player" = "dm", preview?: ItemPreview) {
   const sync = createStore<SyncState>()(
     () =>
       ({
@@ -54,7 +56,7 @@ function draw(item: OverviewItemView, client: "dm" | "player" = "dm") {
       <OverviewCanvasContext.Provider
         value={{ client, overviewId: "o", colors, live: true, myPlayerId: null }}
       >
-        <ItemNode item={item} scale={2} fontRev={0} />
+        <ItemNode item={item} preview={preview} scale={2} fontRev={0} />
       </OverviewCanvasContext.Provider>
     </SyncContext.Provider>,
   );
@@ -95,6 +97,24 @@ describe("item drawings", () => {
     const html = draw({ ...base, hidden: true });
     expect(html).toContain('name="ovw-item-hidden"');
     expect(html).toContain("hidden-colour");
+  });
+
+  test("FR-OVW-20 the eye-off mark sits outside the box, whatever the zoom", () => {
+    const short = { x: 10, y: 10, w: 40, h: 12 };
+    for (const scale of [0.1, 1, 4]) {
+      const px = 1 / scale;
+      // Its 16 px disc ends above the box's top edge.
+      expect(hiddenMarkAt(short, px).y + 8 * px).toBeLessThan(short.y);
+    }
+  });
+
+  test("FR-OVW-18 FR-OVW-23 a preview draws the item there; else the record's place", () => {
+    const image: OverviewItemView = { ...base, kind: "image", w: 300, h: 200, text: null };
+    const html = draw(image, "dm", { x: 50, y: 60, w: 600, h: 400 });
+    expect(nodeAttr(html, "ovw-item", "x")).toBe("50");
+    expect(nodeAttr(html, "ovw-item", "y")).toBe("60");
+    expect(html).toContain('width="600"');
+    expect(nodeAttr(draw(image), "ovw-item", "x")).toBe("12");
   });
 
   test("FR-OVW-34 FR-OVW-36 a miniature with no image: token art by shape, name under it", () => {

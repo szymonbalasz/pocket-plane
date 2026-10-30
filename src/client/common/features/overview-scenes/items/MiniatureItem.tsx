@@ -2,9 +2,9 @@
 // art with no image, its name centred under it in the label text style. A miniature is no token
 // (ADR-0075 Decision 5): nothing of a token's state is drawn.
 import { initials } from "@shared/scenes-map/geometry";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Circle, Group, Image, Rect, Text } from "react-konva";
-import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
+import { useAssetImage } from "../../assets-pipeline/useAssetImage";
 import { containRect, coverCrop, initialsBackdropOf } from "../../scenes-map/shape";
 import { TOKEN_INSET } from "../../scenes-map/token-decor";
 import { fontStack, MINIATURE_SIDE_DEFAULT, miniatureLayout, nameStyleOf } from "../item-layout";
@@ -16,9 +16,6 @@ import type { ItemViewProps } from "./item-view";
 function Body({ item, side }: { item: ItemViewProps["item"]; side: number }) {
   const { colors } = useOverviewCanvas();
   const img = useAssetImage(item.assetId, "display");
-  useEffect(() => {
-    if (item.assetId) retryAssetImage(item.assetId, "display");
-  }, [item]);
   const shape = item.shape ?? "round";
   const image = img.image;
   const r = side / 2;

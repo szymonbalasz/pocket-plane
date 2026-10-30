@@ -5,7 +5,7 @@
 // tokens, fog, walls or templates. No feature logic: the server decides.
 import { LaserData, MAP_SIGNALS, PingData } from "@shared/scenes-map/schemas";
 import type Konva from "konva";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Group, Layer, Stage } from "react-konva";
 import { SyncContext, useSendSignal, useSignal, useSync } from "../../sync/store";
 import { useFreeArea } from "../play-shell/free-area";
@@ -42,13 +42,16 @@ import { useMapFit, useMapTool } from "../scenes-map/tool-store";
 import { fontsIn, itemBands, type OverviewItemView } from "./item-layout";
 import { ItemNode } from "./items/ItemNode";
 import { measureText, useLabelFonts } from "./label-fonts";
+import { OverviewEditorHost } from "./OverviewEditorHost";
 import { fitOverview, itemsBox, rememberCamera, rememberedCamera } from "./overview-camera";
 import {
   OverviewCanvasContext,
   type OverviewCanvasContextValue,
   useOverviewTool,
 } from "./overview-canvas-context";
+import { drawnGesture, previewOf, publishItems, useOverviewEditor } from "./overview-editor";
 import { activeOverviewTool, type OverviewPointer } from "./overview-tools";
+import { SelectionLayer } from "./SelectionLayer";
 
 export interface OverviewCanvasProps {
   client: CanvasClient;
@@ -120,6 +123,8 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
   itemsRef.current = items;
   // The tool panel reads the mounted canvas's client from the map's store.
   useEffect(() => useMapTool.setState({ client }), [client]);
+  // Before paint: what the Select tool hits, and a just-gone item's selection, never lag a frame.
+  useLayoutEffect(() => publishItems(overviewId, items), [overviewId, items]);
 
   // ---- tools (FR-OVW-13) ----
   const toolId = useOverviewTool((s) => s.tool);
@@ -177,6 +182,15 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
   useEffect(() => {
     if (framed.current) rememberCamera(overviewId, cam);
   }, [overviewId, cam]);
+  useLayoutEffect(() => {
+    useOverviewEditor.setState({ view: { ...cam, w: size.w, h: size.h } });
+  }, [cam, size]);
+  // FR-OVW-22: an empty overview's first image: the camera fits once it has landed.
+  useEffect(() => {
+    if (items.length === 0 || useOverviewEditor.getState().fitOnArrival !== overviewId) return;
+    useOverviewEditor.setState({ fitOnArrival: null });
+    fitNow.current();
+  }, [items, overviewId]);
   useEffect(
     () =>
       useMapFit.subscribe((s, prev) => {
@@ -315,7 +329,16 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
       intent: sendIntent,
       signal: sendSignal,
       markPing: (x, y) => addPing(pointers, x, y, self, performance.now(), true),
-      holdPan: () => stage.draggable(false),
+      holdPan: () => {
+        stage.draggable(false);
+        // Konva fires a snapshot of its listeners: a drag listener behind this handler (re-added on
+        // the last release) still runs and arms a drag. Off once more after the dispatch disarms it.
+        queueMicrotask(() => {
+          if (stage.draggable()) return;
+          stage.draggable(true);
+          stage.draggable(false);
+        });
+      },
     };
   };
   useEffect(() => {
@@ -341,14 +364,29 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
         right.open();
       }
     };
+    // A press follows the pointer over windows too; over the canvas Konva's own event brings it.
+    const move = (e: PointerEvent) => {
+      if (!toolPress.current || box.current?.contains(e.target as Node)) return;
+      const tp = pointerOf.current(e);
+      if (tp) toolRef.current.pointer?.move?.(tp);
+    };
     window.addEventListener("pointerup", up);
-    return () => window.removeEventListener("pointerup", up);
+    window.addEventListener("pointermove", move);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointermove", move);
+    };
   }, [pointers, self]);
+  /** A press given up: its `holdPan` ends here, as no release will reach the tool. */
+  const dropPress = useRef(() => {
+    toolPress.current = false;
+    stageRef.current?.draggable(stagePansRef.current);
+  });
   // Esc goes to the tool first; it stops there only if a gesture was dropped.
   useEffect(() => {
     const on = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
-      toolPress.current = false;
+      dropPress.current();
       if (toolRef.current.pointer?.cancel?.("escape") === true) e.stopPropagation();
     };
     window.addEventListener("keydown", on, true);
@@ -357,14 +395,14 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
   // A gesture in progress is dropped on a tool switch, on leaving `live` and on unmount.
   useEffect(
     () => () => {
-      toolPress.current = false;
+      dropPress.current();
       tool.pointer?.cancel?.("tool");
     },
     [tool],
   );
   useEffect(() => {
     if (live) return;
-    toolPress.current = false;
+    dropPress.current();
     toolRef.current.pointer?.cancel?.("live");
     laser.current = null;
     rightRef.current = null;
@@ -451,7 +489,10 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
 
   // ---- drawing ----
   const fontRev = useLabelFonts(useMemo(() => fontsIn(items), [items]));
+  useEffect(() => useOverviewEditor.setState({ fontRev }), [fontRev]);
   const bands = useMemo(() => itemBands(items), [items]);
+  const gesture = useOverviewEditor(drawnGesture);
+  const editorCursor = useOverviewEditor((s) => s.cursor);
   const context = useMemo<OverviewCanvasContextValue>(
     () => ({ client, overviewId, colors, live, myPlayerId }),
     [client, overviewId, colors, live, myPlayerId],
@@ -469,7 +510,13 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
   const band = (list: readonly OverviewItemView[], name: string) => (
     <Group name={name}>
       {list.map((item) => (
-        <ItemNode key={item.id} item={item} scale={item.hidden ? cam.scale : 1} fontRev={fontRev} />
+        <ItemNode
+          key={item.id}
+          item={item}
+          preview={previewOf(gesture, item)}
+          scale={item.hidden ? cam.scale : 1}
+          fontRev={fontRev}
+        />
       ))}
     </Group>
   );
@@ -477,100 +524,106 @@ export function OverviewCanvas(props: OverviewCanvasProps) {
   const ToolOverlay = tool.overlay as React.ComponentType | undefined;
 
   return (
-    <div
-      ref={box}
-      data-testid="ovw-canvas"
-      role="application"
-      aria-label="Overview canvas"
-      // FR-SHELL-83: a press on the canvas takes focus off the last control clicked.
-      tabIndex={-1}
-      onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
-      onPointerEnter={() => {
-        overCanvas.current = true;
-      }}
-      onPointerLeave={() => {
-        overCanvas.current = false;
-      }}
-      onContextMenu={(e) => e.preventDefault()}
-      data-overview-id={overviewId}
-      data-tool={tool.id}
-      data-space-pan={space}
-      data-panning={panning ? "middle" : undefined}
-      data-camera={cameraMode}
-      data-zoom={Math.round(cam.scale * 100)}
-      data-fit-rect={fitRect}
-      data-loading={loading}
-      className="absolute inset-0 outline-none"
-      style={{
-        cursor: panning
-          ? "grabbing"
-          : space
-            ? "grab"
-            : (tool.cursor ?? (tool.pans ? undefined : "crosshair")),
-      }}
-    >
-      {size.w > 0 && (
-        <Stage
-          ref={stageRef}
-          width={size.w}
-          height={size.h}
-          x={cam.x}
-          y={cam.y}
-          scaleX={cam.scale}
-          scaleY={cam.scale}
-          draggable={stagePans}
-          onDragEnd={(e) => {
-            const stage = stageRef.current;
-            if (!stage || e.target !== stage) return;
-            setCam((c) => ({ ...c, x: stage.x(), y: stage.y() }));
-            onCamera("pan");
-          }}
-          onWheel={onWheel}
-          onMouseDown={onMouseDown}
-          onMouseMove={onMouseMove}
-        >
-          <SyncContext.Provider value={syncStore}>
-            <OverviewCanvasContext.Provider value={context}>
-              {/* OVW §12: the marks' 20 frames/s never redraw the items' layer. */}
-              <Layer name="ovw-layer-items">
-                {band(bands.image, "ovw-band-image")}
-                {band(bands.label, "ovw-band-label")}
-                {band(bands.miniature, "ovw-band-miniature")}
-              </Layer>
-              <Layer name="ovw-layer-top">
-                {ToolLayer && <ToolLayer />}
-                <CanvasContext.Provider value={marks}>
-                  <PointersLayer />
-                </CanvasContext.Provider>
-              </Layer>
-            </OverviewCanvasContext.Provider>
-          </SyncContext.Provider>
-        </Stage>
-      )}
-      {ToolOverlay && (
-        <OverviewCanvasContext.Provider value={context}>
-          <ToolOverlay />
-        </OverviewCanvasContext.Provider>
-      )}
-      {/* OVW §7: "Add an image to begin" for the DM; a plain canvas for players. */}
-      {client === "dm" && !loading && items.length === 0 && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <p data-testid="ovw-canvas-empty" className="text-sm text-muted-foreground">
-            Add an image to begin
-          </p>
-        </div>
-      )}
-      {loading && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <span
-            data-testid="ovw-scene-loading"
-            role="status"
-            className="rounded-md bg-background/90 px-3 py-1.5 text-sm text-muted-foreground shadow-sm"
+    <>
+      <div
+        ref={box}
+        data-testid="ovw-canvas"
+        role="application"
+        aria-label="Overview canvas"
+        // FR-SHELL-83: a press on the canvas takes focus off the last control clicked.
+        tabIndex={-1}
+        onPointerDown={(e) => e.currentTarget.focus({ preventScroll: true })}
+        onPointerEnter={() => {
+          overCanvas.current = true;
+        }}
+        onPointerLeave={() => {
+          overCanvas.current = false;
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        data-overview-id={overviewId}
+        data-tool={tool.id}
+        data-space-pan={space}
+        data-panning={panning ? "middle" : undefined}
+        data-camera={cameraMode}
+        data-zoom={Math.round(cam.scale * 100)}
+        data-fit-rect={fitRect}
+        data-loading={loading}
+        className="absolute inset-0 outline-none"
+        style={{
+          cursor: panning
+            ? "grabbing"
+            : space
+              ? "grab"
+              : (editorCursor ?? tool.cursor ?? (tool.pans ? undefined : "crosshair")),
+        }}
+      >
+        {size.w > 0 && (
+          <Stage
+            ref={stageRef}
+            width={size.w}
+            height={size.h}
+            x={cam.x}
+            y={cam.y}
+            scaleX={cam.scale}
+            scaleY={cam.scale}
+            draggable={stagePans}
+            onDragEnd={(e) => {
+              const stage = stageRef.current;
+              if (!stage || e.target !== stage) return;
+              setCam((c) => ({ ...c, x: stage.x(), y: stage.y() }));
+              onCamera("pan");
+            }}
+            onWheel={onWheel}
+            onMouseDown={onMouseDown}
+            onMouseMove={onMouseMove}
           >
-            Loading scene…
-          </span>
-        </div>
-      )}
-    </div>
+            <SyncContext.Provider value={syncStore}>
+              <OverviewCanvasContext.Provider value={context}>
+                {/* OVW §12: the marks' 20 frames/s never redraw the items' layer. */}
+                <Layer name="ovw-layer-items">
+                  {band(bands.image, "ovw-band-image")}
+                  {band(bands.label, "ovw-band-label")}
+                  {band(bands.miniature, "ovw-band-miniature")}
+                </Layer>
+                <Layer name="ovw-layer-top">
+                  {client === "dm" && <SelectionLayer />}
+                  {ToolLayer && <ToolLayer />}
+                  <CanvasContext.Provider value={marks}>
+                    <PointersLayer />
+                  </CanvasContext.Provider>
+                </Layer>
+              </OverviewCanvasContext.Provider>
+            </SyncContext.Provider>
+          </Stage>
+        )}
+        {ToolOverlay && (
+          <OverviewCanvasContext.Provider value={context}>
+            <ToolOverlay />
+          </OverviewCanvasContext.Provider>
+        )}
+        {/* OVW §7: "Add an image to begin" for the DM; a plain canvas for players. */}
+        {client === "dm" && !loading && items.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <p data-testid="ovw-canvas-empty" className="text-sm text-muted-foreground">
+              Add an image to begin
+            </p>
+          </div>
+        )}
+        {loading && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span
+              data-testid="ovw-scene-loading"
+              role="status"
+              className="rounded-md bg-background/90 px-3 py-1.5 text-sm text-muted-foreground shadow-sm"
+            >
+              Loading scene…
+            </span>
+          </div>
+        )}
+      </div>
+      {/* Outside the box: React bubbles a menu's press through its portal, and the box's focus on
+          press would dismiss the menu before the entry's click. */}
+      {client === "dm" && <OverviewEditorHost />}
+    </>
   );
 }
