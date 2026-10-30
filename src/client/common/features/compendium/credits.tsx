@@ -5,7 +5,7 @@
 // label for its attribution (read on demand, FR-CMP-23); entry-less definitions (GET would 404)
 // and homebrew are skipped. With nothing imported only the token art shows.
 
-import { BUNDLED_SOURCE_KEYS } from "@shared/compendium/match";
+import { BUNDLED_SOURCE_KEYS, bookAbbr } from "@shared/compendium/match";
 import {
   HOMEBREW_LABEL,
   type SearchResponse,
@@ -64,11 +64,19 @@ export async function fetchCreditSources(source: ApiSource): Promise<SourceAttri
 
 const AUTHORS = [...new Set(CREATURE_TYPES.map((t) => TOKEN_ART_CREDITS[t].author))];
 
+/** FR-CMPX-29: shown once any book is imported. */
+export const BOOK_ART_CREDIT = "Token art: © Wizards of the Coast, from your own 5etools files";
+
 /** FR-ENT-29: the 14 icons, their authors, CC BY 3.0, game-icons.net. */
-export function TokenArtCredits() {
+export function TokenArtCredits({ books = false }: { books?: boolean }) {
   return (
     <section className="space-y-1.5" data-testid="cmp-about-token-art">
       <h3 className="text-sm font-semibold">Token art</h3>
+      {books && (
+        <p className="text-xs text-muted-foreground" data-testid="cmpx-about-token-art">
+          {BOOK_ART_CREDIT}
+        </p>
+      )}
       <p className="text-xs text-muted-foreground">
         Creature-type icons by {AUTHORS.join(" and ")} from{" "}
         <a className="underline" href={TOKEN_ART_SITE_URL} target="_blank" rel="noreferrer">
@@ -123,7 +131,7 @@ export function AboutBody({ sources }: { sources: readonly SourceAttribution[] }
       {sources.map((s) => (
         <SourceSection key={s.key} source={s} />
       ))}
-      <TokenArtCredits />
+      <TokenArtCredits books={sources.some((s) => bookAbbr(s.key) !== null)} />
     </div>
   );
 }

@@ -127,6 +127,24 @@ describe("FR-ENT-29 licence credits", () => {
     expect(html.indexOf("cmp-about-source")).toBeLessThan(html.indexOf("cmp-about-token-art"));
   });
 
+  test("FR-CMPX-29 About adds the 5etools token art line once any book is imported", () => {
+    const book: SourceAttribution = {
+      key: "5et-mm",
+      name: "Monster Manual",
+      licence: "User-supplied (5etools)",
+      attribution: "Read from your own 5etools files.",
+      url: null,
+      version: "v1",
+    };
+    const line = "Token art: © Wizards of the Coast, from your own 5etools files";
+    expect(text(render("dm", <AboutBody sources={[]} />))).not.toContain(line);
+    expect(text(render("dm", <AboutBody sources={[SRD]} />))).not.toContain(line);
+    const html = render("dm", <AboutBody sources={[SRD, book]} />);
+    expect(html).toContain('data-testid="cmpx-about-token-art"');
+    expect(text(html)).toContain(line);
+    expect(html.indexOf("cmp-about-token-art")).toBeLessThan(html.indexOf("cmpx-about-token-art"));
+  });
+
   test("FR-CMP-19 Credits reads one entry per imported source label; homebrew and entry-less rows have none", () => {
     const page: SearchResponse = {
       results: [row("h1", "Homebrew"), row("a", "SRD 5.1"), row("b", "SRD 5.1"), row("c", "X")],
