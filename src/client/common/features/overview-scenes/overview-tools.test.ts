@@ -44,6 +44,14 @@ describe("FR-OVW-13 tools", () => {
     }
   });
 
+  test("FR-OVW-13 Select and Add image on the DM's rail; a player gets no Add image", () => {
+    expect(overviewToolsFor("dm").map((t) => t.id)).toEqual(["select", "add-image", "ping"]);
+    expect(overviewToolsFor("player").map((t) => t.id)).toEqual(["select", "ping"]);
+    expect(activeOverviewTool("add-image", "dm").edits).toBe(true);
+    // A player has no such tool: back to Select.
+    expect(activeOverviewTool("add-image", "player").id).toBe(SELECT_TOOL_ID);
+  });
+
   test("FR-OVW-11 Select pans with a left-drag; Ping doesn't", () => {
     expect(activeOverviewTool(SELECT_TOOL_ID, "dm").pans).toBe(true);
     expect(activeOverviewTool("ping", "dm").pans).toBeUndefined();

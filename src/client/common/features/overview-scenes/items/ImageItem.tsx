@@ -1,8 +1,7 @@
 // An image item (FR-OVW-22, -23): the `display` file drawn whole in its `w × h`, never cropped. A
-// failed load: the asset error tile, as props (OVW §7). A later record re-arms it (FR-ASSET-16).
-import { useEffect } from "react";
+// failed load: the asset error tile, as props (OVW §7).
 import { Group, Image, Line, Rect } from "react-konva";
-import { retryAssetImage, useAssetImage } from "../../assets-pipeline/useAssetImage";
+import { useAssetImage } from "../../assets-pipeline/useAssetImage";
 import { useOverviewCanvas } from "../overview-canvas-context";
 import { HIDDEN_OPACITY, HiddenMark } from "./HiddenMark";
 import type { ItemViewProps } from "./item-view";
@@ -10,9 +9,6 @@ import type { ItemViewProps } from "./item-view";
 export function ImageItem({ item, scale }: ItemViewProps) {
   const { colors } = useOverviewCanvas();
   const img = useAssetImage(item.assetId, "display");
-  useEffect(() => {
-    if (item.assetId) retryAssetImage(item.assetId, "display");
-  }, [item]);
   const w = item.w ?? 0;
   const h = item.h ?? 0;
   return (
