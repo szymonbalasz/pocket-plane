@@ -22,6 +22,7 @@ test("FR-CMP-10 FR-CMP-13 FR-CMP-15 FR-CMP-17 Creatures search + lookup via the 
   // Goblin Warrior (store); by shared tier (FR-CMP-37), the SRD Goblin first (FR-CMP-38); CR from
   // the definitions loaded on demand.
   const win = await openWindow(dm, "ent.creatures");
+  await win.getByTestId("ent-list-custom-only").click(); // on by default: show the imported rows
   await win.getByTestId("ent-list-search").fill("gob");
   const rows = win.getByTestId("ent-list-row");
   await expect(rows.getByTestId("ent-list-row-name")).toHaveText([

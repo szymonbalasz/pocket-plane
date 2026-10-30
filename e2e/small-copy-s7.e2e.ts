@@ -62,6 +62,7 @@ test("FR-CMP-58 FR-ENT-42 DM: fixture Goblin rows typed / type-less, no trailing
   await cmp.getByTestId("ui-window-close").click();
 
   const creatures = await openWindow(dm, "ent.creatures");
+  await creatures.getByTestId("ent-list-custom-only").click(); // SRD rows too: the long names
   const box = await creatures.boundingBox();
   expect(Math.round(box?.width ?? 0)).toBe(340);
   const names = creatures.getByTestId("ent-list-row-name");

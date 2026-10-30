@@ -94,6 +94,7 @@ test("FR-ENT-32 FR-PARTY-41 FR-PARTY-42 FR-ENT-39 FR-PARTY-43 New pet: owl → O
 
   // C2 part: Creatures lists it with the customs, badged "Pet of Mira".
   const creatures = await openWindow(dm, "ent.creatures");
+  await creatures.getByTestId("ent-list-custom-only").click(); // SRD rows too: a fuller list
   // FR-ENT-39 (walkthrough step 7): at the default width every row's name stays readable beside
   // its actions (Make pet… added one): the name line ≥ 96 px, the name text visible.
   await expect(creatures.getByTestId("ent-list-row").first()).toBeVisible();

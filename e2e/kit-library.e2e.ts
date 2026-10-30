@@ -121,6 +121,7 @@ test("FR-KIT-76 FR-KIT-77 FR-KIT-82 FR-KIT-83 FR-KIT-85 kit library: compendium 
   // FR-KIT-85 (K4 walkthrough): an imported NPC's sheet at the default 320 px: the name is
   // readable (never "G.."), Derive to customise is a small button.
   const creatures = await openWindow(dm, "ent.creatures");
+  await creatures.getByTestId("ent-list-custom-only").click(); // on by default: show the SRD rows
   await creatures.getByTestId("ent-list-search").fill("goblin");
   const gobRow = creatures
     .getByTestId("ent-list-row")
