@@ -104,7 +104,8 @@ function Sections({
   title: string;
   testId: string;
   sections: readonly StatBlockSection[];
-  definitionId: string;
+  /** Absent (entry-only monster, FR-CMPX-08): its text rolls nothing against a creature. */
+  definitionId?: string | undefined;
   intro?: string;
 }) {
   if (sections.length === 0 && !intro) return null;
@@ -115,7 +116,9 @@ function Sections({
       </h3>
       {intro && <MarkdownLite text={intro} context={{ kind: "plain", label: title }} />}
       {sections.map((s, i) => {
-        const context: TextContext = { kind: "monster", definitionId, label: s.name };
+        const context: TextContext = definitionId
+          ? { kind: "monster", definitionId, label: s.name }
+          : { kind: "plain", label: s.name };
         return (
           // FR-KIT-77: name + muted line rows (the kit's attack rows, read-only here).
           <StatBlockEntry
@@ -130,6 +133,76 @@ function Sections({
         );
       })}
     </section>
+  );
+}
+
+function MonsterSections({ body, definitionId }: { body: MonsterBody; definitionId?: string }) {
+  return (
+    <>
+      <Sections
+        title="Traits"
+        testId="cmp-statblock-traits"
+        sections={body.traits}
+        definitionId={definitionId}
+      />
+      <Sections
+        title="Actions"
+        testId="cmp-statblock-actions"
+        sections={body.actions}
+        definitionId={definitionId}
+      />
+      <Sections
+        title="Bonus Actions"
+        testId="cmp-statblock-bonus-actions"
+        sections={body.bonusActions}
+        definitionId={definitionId}
+      />
+      <Sections
+        title="Reactions"
+        testId="cmp-statblock-reactions"
+        sections={body.reactions}
+        definitionId={definitionId}
+      />
+      {body.legendary && (
+        <Sections
+          title="Legendary Actions"
+          testId="cmp-statblock-legendary"
+          sections={body.legendary.actions}
+          intro={body.legendary.intro}
+          definitionId={definitionId}
+        />
+      )}
+    </>
+  );
+}
+
+function MonsterFacts({
+  meta,
+  saves,
+  senses,
+  cr,
+}: {
+  meta: MonsterBody["meta"];
+  saves: string | undefined;
+  senses: string | undefined;
+  cr: string;
+}) {
+  return (
+    <>
+      {saves && <StatFact label="Saving Throws">{saves}</StatFact>}
+      {meta.skillsText && <StatFact label="Skills">{meta.skillsText}</StatFact>}
+      {meta.vulnerabilities && (
+        <StatFact label="Damage Vulnerabilities">{meta.vulnerabilities}</StatFact>
+      )}
+      {meta.resistances && <StatFact label="Damage Resistances">{meta.resistances}</StatFact>}
+      {meta.immunities && <StatFact label="Damage Immunities">{meta.immunities}</StatFact>}
+      {meta.conditionImmunities && (
+        <StatFact label="Condition Immunities">{meta.conditionImmunities}</StatFact>
+      )}
+      {senses && <StatFact label="Senses">{senses}</StatFact>}
+      {meta.languages && <StatFact label="Languages">{meta.languages}</StatFact>}
+      <StatFact label="Challenge">{crText(cr)}</StatFact>
+    </>
   );
 }
 
@@ -191,57 +264,45 @@ export function StatBlock({
         />
       )}
       <div data-testid="cmp-statblock-facts" className="space-y-0.5">
-        {saves && <StatFact label="Saving Throws">{saves}</StatFact>}
-        {meta.skillsText && <StatFact label="Skills">{meta.skillsText}</StatFact>}
-        {meta.vulnerabilities && (
-          <StatFact label="Damage Vulnerabilities">{meta.vulnerabilities}</StatFact>
-        )}
-        {meta.resistances && <StatFact label="Damage Resistances">{meta.resistances}</StatFact>}
-        {meta.immunities && <StatFact label="Damage Immunities">{meta.immunities}</StatFact>}
-        {meta.conditionImmunities && (
-          <StatFact label="Condition Immunities">{meta.conditionImmunities}</StatFact>
-        )}
-        {senses && <StatFact label="Senses">{senses}</StatFact>}
-        {meta.languages && <StatFact label="Languages">{meta.languages}</StatFact>}
-        <StatFact label="Challenge">{crText(sb.cr)}</StatFact>
+        <MonsterFacts meta={meta} saves={saves} senses={senses} cr={sb.cr} />
       </div>
-      {body && (
-        <>
-          <Sections
-            title="Traits"
-            testId="cmp-statblock-traits"
-            sections={body.traits}
-            definitionId={definition.id}
-          />
-          <Sections
-            title="Actions"
-            testId="cmp-statblock-actions"
-            sections={body.actions}
-            definitionId={definition.id}
-          />
-          <Sections
-            title="Bonus Actions"
-            testId="cmp-statblock-bonus-actions"
-            sections={body.bonusActions}
-            definitionId={definition.id}
-          />
-          <Sections
-            title="Reactions"
-            testId="cmp-statblock-reactions"
-            sections={body.reactions}
-            definitionId={definition.id}
-          />
-          {body.legendary && (
-            <Sections
-              title="Legendary Actions"
-              testId="cmp-statblock-legendary"
-              sections={body.legendary.actions}
-              intro={body.legendary.intro}
-              definitionId={definition.id}
-            />
-          )}
-        </>
-      )}
+      {body && <MonsterSections body={body} definitionId={definition.id} />}
+    </StatBlockCard>
+  );
+}
+
+/**
+ * FR-CMPX-08: a monster with no numeric HP or AC: the entry's own text, no creature core to show.
+ * Not draggable, nothing to roll against; Derive… (DM) makes it a creature.
+ */
+function EntryOnlyStatBlock({
+  name,
+  facets,
+  body,
+}: {
+  name: string;
+  facets: MonsterFacets;
+  body: MonsterBody;
+}) {
+  const { meta } = body;
+  return (
+    <StatBlockCard>
+      <header data-testid="cmp-statblock-header">
+        <h2 data-slot="statblock-name" className="text-lg font-semibold leading-tight text-primary">
+          {name}
+        </h2>
+        <StatBlockTypeLine>
+          {cap(facets.size)} {facets.type}
+          {meta.subtype ? ` (${meta.subtype})` : ""}
+          {meta.alignment ? `, ${meta.alignment}` : ""}
+        </StatBlockTypeLine>
+      </header>
+      <div data-testid="cmp-statblock-facts" className="space-y-0.5">
+        {meta.armorNote && <StatFact label="Armor Class">{meta.armorNote}</StatFact>}
+        {meta.speedText && <StatFact label="Speed">{meta.speedText}</StatFact>}
+        <MonsterFacts meta={meta} saves={meta.savesText} senses={meta.senses} cr={facets.cr} />
+      </div>
+      <MonsterSections body={body} />
     </StatBlockCard>
   );
 }
@@ -405,6 +466,14 @@ export function EntryView({
       <StatBlock
         name={e.name}
         definition={data.definition}
+        facets={e.facets as MonsterFacets}
+        body={e.body as MonsterBody}
+      />
+    );
+  } else if (e.kind === "monster") {
+    view = (
+      <EntryOnlyStatBlock
+        name={e.name}
         facets={e.facets as MonsterFacets}
         body={e.body as MonsterBody}
       />

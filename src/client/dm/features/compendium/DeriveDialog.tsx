@@ -26,10 +26,15 @@ import { useLive } from "@ui/features/combat-tracker/store";
 import { useOpenWindow } from "@ui/features/play-shell/ShellContext";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
-import { type DeriveFields, deriveStatBlock, formulaAverage, initialDerive } from "./derive-form";
+import {
+  type DeriveFields,
+  deriveStatBlock,
+  entryOnlyBase,
+  formulaAverage,
+  initialDerive,
+  type MonsterFacets,
+} from "./derive-form";
 import { deriveMonster } from "./homebrew-rest";
-
-type Definition = NonNullable<EntryResponse["definition"]>;
 
 function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
@@ -42,18 +47,14 @@ function Field({ id, label, children }: { id: string; label: string; children: R
   );
 }
 
-function DeriveForm({
-  api,
-  data,
-  definition,
-  close,
-}: {
-  api: Api;
-  data: EntryResponse;
-  definition: Definition;
-  close(): void;
-}) {
-  const [f, setF] = useState<DeriveFields>(() => initialDerive(data.entry.name, definition));
+function DeriveForm({ api, data, close }: { api: Api; data: EntryResponse; close(): void }) {
+  // FR-CMPX-08: no definition → the entry's size / type / CR, HP and AC left for the DM.
+  const definition = data.definition ?? entryOnlyBase(data.entry.facets as MonsterFacets);
+  const [f, setF] = useState<DeriveFields>(() =>
+    data.definition
+      ? initialDerive(data.entry.name, definition)
+      : { ...initialDerive(data.entry.name, definition), ac: "", hpMax: "" },
+  );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const live = useLive();
@@ -227,17 +228,14 @@ export function DeriveDialog({
   open: boolean;
   onClose(): void;
 }) {
-  const definition = data.definition;
   return (
-    <Dialog open={open && !!definition} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent
         data-testid="cmp-derive-dialog"
         className="max-w-md"
         aria-describedby={undefined}
       >
-        {open && definition && (
-          <DeriveForm api={api} data={data} definition={definition} close={onClose} />
-        )}
+        {open && <DeriveForm api={api} data={data} close={onClose} />}
       </DialogContent>
     </Dialog>
   );
