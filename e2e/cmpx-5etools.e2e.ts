@@ -1,7 +1,8 @@
 // e2e-bundle: cmpx-5etools
 // Thin 5etools flow (compendium-expansion §13 E2E): the DM imports both fixture books from the
-// panel; "goblin" → one row badged TB1; drag it onto the map; player-1 finds the TB1 spell and no
-// monsters. States, versions, crash, credits, visibility: bun test (cmpx-panel, five-etools).
+// panel; "goblin" → one row badged TB1; drag it onto the map, it shows its token art, a second reuses
+// it; player-1 finds the TB1 spell and no monsters. States, versions, crash, credits, visibility:
+// bun test (cmpx-panel, five-etools, imported-art).
 //
 // This spec runs its own server: the folder is a per-server env value (`PP_5ETOOLS_DIR`), and
 // `bun run e2e` gives every bundle the same env. It prepares the fixture folder, loads the bundle
@@ -61,6 +62,23 @@ const wholeRows = (win: Locator) =>
       return r.top >= box.top && r.bottom <= box.bottom;
     }).length;
   });
+
+/** A token's `art` attr on the canvas: `image` once it draws an image, else its glyph or initials. */
+const tokenArt = (page: Page, id: string) =>
+  page.evaluate((tokenId) => {
+    type KStage = {
+      container(): HTMLElement;
+      find(s: string): { id(): string; getAttr(k: string): unknown }[];
+    };
+    const K = (window as unknown as { Konva?: { stages: KStage[] } }).Konva;
+    const stage = K?.stages.find((s) => s.container().isConnected);
+    return (
+      stage
+        ?.find(".map-token")
+        .find((n) => n.id() === tokenId)
+        ?.getAttr("art") ?? null
+    );
+  }, id);
 
 test.beforeAll(async () => {
   test.setTimeout(START_TIMEOUT_MS + 60_000);
@@ -186,12 +204,33 @@ test("FR-CMPX-17 FR-CMPX-14 FR-CMPX-16 import both books, 'goblin' → one TB1 r
   // Drag onto the map: one more token.
   const canvas = dm.getByTestId("map-canvas");
   await expect(canvas).toHaveAttribute("data-loading", "false");
-  const before = (await konvaNodes(dm, "map-token")).length;
-  const to = await mapPoint(dm, 7, 5);
   const box = await canvas.boundingBox();
   if (!box) throw new Error("No map canvas");
-  await goblin.dragTo(canvas, { targetPosition: { x: to.x - box.x, y: to.y - box.y } });
-  await expect.poll(async () => (await konvaNodes(dm, "map-token")).length).toBe(before + 1);
+  const dropGoblin = async (col: number, row: number) => {
+    const known = (await konvaNodes(dm, "map-token")).map((n) => n.id);
+    const to = await mapPoint(dm, col, row);
+    await goblin.dragTo(canvas, { targetPosition: { x: to.x - box.x, y: to.y - box.y } });
+    await expect
+      .poll(async () => (await konvaNodes(dm, "map-token")).length)
+      .toBe(known.length + 1);
+    return (await konvaNodes(dm, "map-token")).find((n) => !known.includes(n.id))?.id as string;
+  };
+  const first = await dropGoblin(7, 5);
+
+  // FR-CMPX-24: the placed Goblin shows its token art, the file copied from the folder.
+  await expect.poll(() => tokenArt(dm, first)).toBe("image");
+
+  // A second Goblin reuses it: art at once, and the campaign's assets hold one Goblin image.
+  const second = await dropGoblin(9, 5);
+  await expect.poll(() => tokenArt(dm, second)).toBe("image");
+  const assets = await openWindow(dm, "asset.library");
+  await assets.getByTestId("asset-picker-search").fill("goblin");
+  // By exact name: the bundle's own images include a `token-goblin`.
+  const tiles = assets
+    .getByTestId("asset-picker-item")
+    .filter({ has: dm.getByText("Goblin", { exact: true }) });
+  await expect(tiles).toHaveCount(1);
+  await expect(tiles).toHaveAttribute("data-tags", /tokens/i);
 
   // Player: the TB1 spell with its badge; no Monsters tab, "goblin" finds nothing.
   const p1 = await rolePage(browser);
