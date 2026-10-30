@@ -523,14 +523,21 @@ export function Tooltip({
     });
     return () => observer.disconnect();
   }, [trigger, ctl]);
+  // Scrolling what holds the trigger closes it (Radix's rule, kept now its closes are ignored).
+  React.useEffect(() => {
+    if (!open || !trigger) return;
+    const scroll = (e: Event) => {
+      if (e.target instanceof Node && e.target.contains(trigger)) ctl.dismiss();
+    };
+    window.addEventListener("scroll", scroll, { capture: true });
+    return () => window.removeEventListener("scroll", scroll, { capture: true });
+  }, [open, trigger, ctl]);
   const root = (
-    <T.Root
-      open={open}
-      onOpenChange={(o) => {
-        // Radix's own open requests are ignored; the controller decides when to open.
-        if (!o) ctl.dismiss();
-      }}
-    >
+    // Radix's own open / close requests are ignored; the controller decides both (#387). Radix
+    // closes its content on any `tooltip.open` document event, and fires one from its own
+    // delayed-open timer (holding a pre-open `open={false}`) just after ours opened, or on a
+    // trigger's focus. One open at a time is `TooltipGroup`'s hand-over.
+    <T.Root open={open}>
       <T.Trigger
         asChild
         ref={setTrigger}
@@ -548,7 +555,7 @@ export function Tooltip({
       >
         {children}
       </T.Trigger>
-      <TooltipContent>{content}</TooltipContent>
+      <TooltipContent onDismiss={() => ctl.dismiss()}>{content}</TooltipContent>
     </T.Root>
   );
   // Outside a `TooltipProvider` (a part rendered on its own, e.g. in a unit test) Radix still
@@ -557,13 +564,22 @@ export function Tooltip({
 }
 
 /** The hint's bubble, inside `Tooltip`'s root (its own part so a theme can style it, ADR-0069). */
-export function TooltipContent({ children }: { children: React.ReactNode }) {
+export function TooltipContent({
+  children,
+  onDismiss,
+}: {
+  children: React.ReactNode;
+  /** Escape, or a press outside the bubble. */
+  onDismiss?: () => void;
+}) {
   return (
     <T.Portal>
       <T.Content
         data-slot="tooltip-content"
         data-testid="ui-tooltip"
         sideOffset={4}
+        onEscapeKeyDown={onDismiss}
+        onPointerDownOutside={onDismiss}
         className={cn(
           POPOVER_LAYER,
           "rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground",
