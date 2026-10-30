@@ -157,11 +157,9 @@ describe("FR-FOG-24 registries (fog's server lines only)", () => {
   test("FR-FOG-24 fog registers derive, hides, dragAudience, rederive and created / duplicated / deleting / activated; without them nothing changes", () => {
     // build/fog-visibility completes fog's lines (FOG §14).
     // Sprint 6 (FR-ENT-37): entities' pet-presence line follows fog's.
-    // FR-CMPX-24: compendium's imported-art line follows.
     expect(sceneVisibilityHooks.map((h) => h.name)).toEqual([
       "fog-of-war.fogged",
       "entities.pet-presence",
-      "compendium.imported-art",
     ]);
     const [line] = sceneVisibilityHooks;
     expect([!!line?.derive, !!line?.hides, !!line?.dragAudience, !!line?.rederive]).toEqual([

@@ -203,8 +203,10 @@ describe("FR-CMPX-24 first placement, then reuse", () => {
     await t.art.settled();
     expect(t.artAssets()).toHaveLength(1);
     expect(t.events.map((e) => e.event.type)).toEqual(["TokenPlaced"]);
-    const after = t.events[0]?.event.changes.at(-1)?.after as { imageAssetId: string };
-    expect(after.imageAssetId).toBe(a?.id as string);
+    const tokenChanges = t.events[0]?.event.changes.filter((c) => c.type === "token") ?? [];
+    expect(tokenChanges).toHaveLength(1);
+    expect(tokenChanges[0]?.before).toBeNull();
+    expect(tokenChanges[0]?.after).toMatchObject({ imageAssetId: a?.id as string });
   });
 
   test("FR-CMPX-24 concurrent placements: one ingest, every token gets the same asset", async () => {
@@ -305,9 +307,12 @@ describe("FR-CMPX-24 first placement, then reuse", () => {
     expect(id).toBeString();
     expect(imageOfCombatant(first)).toBe(id);
     t.run("cbt.end", { encounterId: first });
+    t.events.length = 0;
+    // With the row: in the Start command itself, no follow-up.
     const second = start();
-    await Bun.sleep(0);
     expect(imageOfCombatant(second)).toBe(id);
+    await t.art.settled();
+    expect(t.events.filter((e) => e.event.type === "TokenUpdated")).toEqual([]);
     expect(t.artAssets()).toHaveLength(1);
   });
 });
@@ -373,6 +378,56 @@ describe("FR-CMPX-25 never overrides the DM", () => {
     t.run(MAP_INTENTS.duplicateToken, { tokenId: bare });
     await t.art.settled();
     expect(t.warnings).toHaveLength(1);
+  });
+
+  test("FR-CMPX-25 duplicating a token the DM cleared: no art, though the campaign has it", async () => {
+    const t = fresh();
+    const tok = t.place();
+    await t.art.settled();
+    t.run(MAP_INTENTS.updateToken, { tokenId: tok, imageAssetId: null });
+    t.events.length = 0;
+    const dup = t.run<{ tokenId: string }>(MAP_INTENTS.duplicateToken, { tokenId: tok }).tokenId;
+    await t.art.settled();
+    expect(t.imageOf(dup)).toBeNull();
+    expect(t.imageOf(tok)).toBeNull();
+    expect(t.events.map((e) => e.event.type)).toEqual(["TokenDuplicated"]);
+  });
+
+  test("FR-CMPX-25 copying a scene with a bare token: stays bare, nothing ingested", async () => {
+    const t = fresh();
+    t.place();
+    await t.art.settled();
+    // No row, as before a first ingest: only a placement may start one.
+    t.db.delete(importedArt).run();
+    t.db.update(token).set({ imageAssetId: null }).where(eq(token.definitionId, t.goblin)).run();
+    const tokens = t.db.select().from(token).all().length;
+    const events = t.events.length;
+    t.run("map.duplicateScene", { id: t.sceneId });
+    await t.art.settled();
+    expect(t.db.select().from(token).all().length).toBeGreaterThan(tokens);
+    expect(t.rows()).toEqual([]);
+    expect(t.events.slice(events).map((e) => e.event.type)).toEqual(["SceneDuplicated"]);
+  });
+
+  test("FR-CMPX-25 explicit null on placement counts as no image: art with a row, ingest without", async () => {
+    const t = fresh();
+    const first = t.place(t.goblin, { imageAssetId: null });
+    expect(t.imageOf(first)).toBeNull();
+    await t.art.settled();
+    const id = t.artAssets()[0]?.id as string;
+    expect(id).toBeString();
+    expect(t.imageOf(first)).toBe(id);
+    const second = t.place(t.goblin, { imageAssetId: null });
+    expect(t.imageOf(second)).toBe(id);
+  });
+
+  test("FR-CMPX-25 explicit null on a token that isn't imported: stays none", async () => {
+    const t = fresh();
+    const mira = t.db.select().from(entity).where(eq(entity.name, "Mira")).get()?.id as string;
+    const tok = t.place(mira, { imageAssetId: null });
+    await t.art.settled();
+    expect(t.imageOf(tok)).toBeNull();
+    expect(t.rows()).toEqual([]);
   });
 });
 
@@ -596,13 +651,12 @@ describe("FR-CMPX-27 visibility, over real sockets", () => {
       const art = await p.next("event", 2000);
       const id = h.t.artAssets()[0]?.id as string;
       expect(art.changes[0]).toMatchObject({ op: "upsert", data: { id: tok, imageAssetId: id } });
-      // Reuse: one frame, the last change carries the image.
+      // Reuse: one frame, the token's one change carries the image.
       const second = h.t.place();
       const frame = await p.next("event", 2000);
-      expect(frame.changes.at(-1)).toMatchObject({
-        op: "upsert",
-        data: { id: second, imageAssetId: id },
-      });
+      const own = frame.changes.filter((c) => c.type === "token" && c.id === second);
+      expect(own).toHaveLength(1);
+      expect(own[0]).toMatchObject({ op: "upsert", data: { imageAssetId: id } });
     } finally {
       await h.stop();
     }

@@ -63,6 +63,7 @@ import {
 } from "../../db/schema";
 import type { Actor, RecordChange } from "../../events/types";
 import { requireAsset } from "../assets-pipeline/commands";
+import { importedArtOfDefinition } from "../compendium/imported-art-lookup";
 import { resolveDefinition } from "../entities/commands";
 import { characterIdOf } from "./character-copy";
 import { tokenMoveGuards } from "./move-guards";
@@ -546,7 +547,8 @@ export type PlaceTokenSpec = z.output<typeof PlaceTokenInput>;
  * (`invalid`) and caps (`conflict`) fail the caller's command. The caller lists `change` in its
  * own event. Runs no token-changed hooks (placement never does, FR-MAP-30).
  *
- * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = portrait or none; size =
+ * FR-MAP-13: name = definition name, numbered (FR-MAP-16); image = the one given, else portrait;
+ * none of those (a given `null` included) → the campaign's imported art (FR-CMPX-24), or none; size =
  * `statBlock.size`; shape = definition `tokenShape`, else round (FR-MAP-35); speed =
  * `statBlock.speed`, else null (FR-MAP-36); `creatureType` = the monster's `statBlock.type`, else
  * null (FR-ENT-27); owner = the character's or (FR-MAP-74, sprint 6) the pet's owner, else none;
@@ -574,9 +576,9 @@ export function placeTokenIn(
     ownerPlayerId = input.ownerPlayerId;
   }
   const imageAssetId =
-    input.imageAssetId !== undefined
+    (input.imageAssetId !== undefined
       ? assetOrNull(env, input.imageAssetId)
-      : assetOrNull(env, def.portraitAssetId);
+      : assetOrNull(env, def.portraitAssetId)) ?? importedArtOfDefinition(tx, cid, def.id);
   const after = insertToken(env, {
     campaignId: cid,
     sceneId: s.id,

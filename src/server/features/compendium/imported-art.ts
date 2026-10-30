@@ -8,8 +8,8 @@
 import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { isValidArtPath } from "@shared/compendium/schemas";
-import { TokenDuplicated, TokenPlaced, TokenUpdated } from "@shared/events/scenes-map";
-import { MAP_INTENTS, TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
+import { SceneDuplicated, TokenDuplicated, TokenUpdated } from "@shared/events/scenes-map";
+import { TOKEN_TYPE, type TokenRecord } from "@shared/scenes-map/schemas";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { defineCommand } from "../../commands/commands";
@@ -22,7 +22,7 @@ import { readToken, toTokenRecord } from "../scenes-map/rows";
 import { runTokenChangedHooks } from "../scenes-map/token-hooks";
 import { rederiveDependants } from "../scenes-map/visibility-hooks";
 import { campaignOf } from "./homebrew";
-import { type ArtSource, artSourceOf } from "./imported-art-hook";
+import { type ArtSource, artSourceOf } from "./imported-art-lookup";
 
 export const APPLY_IMPORTED_ART = "cmp.applyImportedArt";
 /** FR-CMPX-24: the tag on an ingested token image. */
@@ -106,46 +106,20 @@ export class ImportedArt {
     while (this.inFlight.size > 0) await Promise.all(this.inFlight.values());
   }
 
+  /** Any event that creates a bare token by placing it: `map.placeToken`, combat's `placeTokenIn`. */
   readonly onEvent = ({ event }: DispatchedEvent): void => {
     const cid = event.campaignId;
-    // FR-CMPX-25: a duplicate copies its source's image, as today.
+    // FR-CMPX-25: a copy takes its source's image, as today (none stays none).
     if (!this.armed || !cid || event.type === TokenDuplicated.type) return;
+    if (event.type === SceneDuplicated.type) return;
     for (const c of event.changes) {
       if (c.type !== TOKEN_TYPE || c.before !== null || c.after === null) continue;
       const placed = c.after as TokenRecord;
       if (placed.imageAssetId !== null) continue;
       const art = artSourceOf(this.s.db, placed.definitionId);
-      if (!art) continue;
-      const now = this.s.db
-        .select({ imageAssetId: token.imageAssetId })
-        .from(token)
-        .where(eq(token.id, placed.id))
-        .get();
-      if (!now) continue;
-      if (now.imageAssetId === null) this.start(cid, placed.definitionId, art);
-      else if (event.type !== TokenPlaced.type)
-        this.copyToCombatant(cid, placed.id, now.imageAssetId);
+      if (art) this.start(cid, placed.definitionId, art);
     }
   };
-
-  /**
-   * A `placeTokenIn` caller keeps the record it read before the reuse hook wrote the image, so a
-   * bound combatant copied none. `map.updateToken` runs the token-changed hooks that copy it; on a
-   * microtask because this listener may run before the broadcaster sees the placing event.
-   */
-  private copyToCombatant(cid: string, tokenId: string, imageAssetId: string): void {
-    queueMicrotask(() => {
-      try {
-        this.s.commands.run(
-          MAP_INTENTS.updateToken,
-          { tokenId, imageAssetId },
-          { actor: system(cid) },
-        );
-      } catch (err) {
-        this.s.log.warn(`imported art: token ${tokenId} not updated: ${String(err)}`);
-      }
-    });
-  }
 
   private start(cid: string, definitionId: string, art: ArtSource): void {
     const key = [cid, art.source, art.sourceKey].join("\0");

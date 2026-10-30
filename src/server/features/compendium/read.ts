@@ -11,7 +11,7 @@ import type { Db } from "../../db/client";
 import { asset, compendiumEntry, compendiumSource, entity } from "../../db/schema";
 import { toImportedRecord } from "../entities/rows";
 import { inheritedPreset } from "./entries";
-import { importedArtAsset } from "./imported-art-hook";
+import { importedArtAsset } from "./imported-art-lookup";
 import { type EntryViewer, entryVisibleTo } from "./visibility";
 
 export interface EntryRead {
