@@ -549,19 +549,16 @@ export function FogBar() {
             />
             <label htmlFor="fog-explored-toggle">Remember explored areas</label>
           </div>
-          <Tooltip content="Forget explored…">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-8"
-              aria-label="Forget explored"
-              data-testid="fog-forget-explored"
-              disabled={off}
-              onClick={() => setConfirming("forget")}
-            >
-              <EraserIcon className="size-4" />
-            </Button>
-          </Tooltip>
+          <Button
+            size="sm"
+            variant="ghost"
+            data-testid="fog-forget-explored"
+            disabled={off}
+            onClick={() => setConfirming("forget")}
+          >
+            <EraserIcon className="size-4" />
+            Forget explored…
+          </Button>
         </Group>
         <Group id="vision" sep>
           <PartyVisionSwitch disabled={off} />

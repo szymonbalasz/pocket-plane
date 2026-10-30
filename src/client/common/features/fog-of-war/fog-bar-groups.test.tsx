@@ -63,6 +63,7 @@ test("FR-FOG-58 fog bar wraps at home: six control groups in order, each kept wh
   expect(where("fog-redo")).toEqual(["history"]);
   expect(where("fog-explored-toggle")).toEqual(["explored"]);
   expect(where("fog-forget-explored")).toEqual(["explored"]);
+  expect(list.find((g) => g.id === "explored")?.html).toContain("Forget explored…");
   expect(where("fog-party-vision")).toEqual(["vision"]);
   expect(where("fog-view-as")).toEqual(["vision"]);
   // Each group is a no-wrap row of its own (`shrink-0`, no `flex-wrap`): it never splits.
