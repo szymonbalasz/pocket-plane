@@ -4372,3 +4372,53 @@ From [assets-pipeline](../specs/assets-pipeline.md#65-rename-and-delete-an-image
 - **Picker** (`AssetPicker`): `onSelect` optional (none → no Select button); `onOpen(id)` on double-click when there's no `onSelect`; `selectedExtra(asset)` under the tag row. `ImageActions` takes `noun` (`image` | `sound`).
 - **Visibility:** unchanged: `asset` and `audio-asset` reach DM connections only; `assets.uses` answers its sender only.
 - **CON-44:** 0 B snapshot growth. The Sounds tab loads `audio-asset` lazily (≤ 50 rows, ≈ 14 KB).
+
+## 190. Overview scenes core (fix/ovw-core)
+
+From [overview-scenes](../specs/overview-scenes.md) FR-OVW-01–08, -15, -17, -19, -23, -24, -26, -27, -35, -39, -40, -42–48 ([ADR-0075](../architecture/adr/0075-overview-scenes.md), #398). **Built by `fix/ovw-core`: server only.** Shapes: `@shared/overview-scenes/schemas`; events: `@shared/events/overview-scenes`; server: `src/server/features/overview-scenes/`.
+
+**Record types**
+
+| Type | Scope | `sceneOf` | DM | Player | FR |
+|---|---|---|---|---|---|
+| `overview` | scene | its `id` | Every overview of the campaign, in the snapshot | The shown one only: `{id, campaignId, active}` | FR-OVW-08, -39 |
+| `overview-item` | scene, `dmWindow: "active-scene"` | `overviewId` | The shown overview's in the snapshot; others with `sync.loadScene` | The shown overview's non-hidden items, no `locked`, `createdAt`, `updatedAt` (so a lock change reaches no player). Reveal = `upsert`, hide = `delete` | FR-OVW-08, -39, -40 |
+
+**Resolver.** In the sync layer "active scene" means the shown thing: `ActiveSceneCache` reads the active scene, else the shown overview, refreshed on `SceneActivated` and `OverviewShown` before listeners. `provideSceneCampaign` answers overview IDs. `activeSceneOf(tx, cid)` stays battle-only: null while an overview is shown (FR-OVW-07).
+
+**Intents** (WS; `roles` DM unless marked; IDs and time from `ctx`; other campaigns' rows → `not_found`)
+
+| Intent | Payload | Rule | Event | FR |
+|---|---|---|---|---|
+| `ovw.create` | `{name, folderId?}` → `{overviewId}` | Name as a scene's (1–60). ≤ 50 per campaign else `conflict` | `OverviewCreated` | FR-OVW-01 |
+| `ovw.update` | `{overviewId, name?, folderId?}` | `folderId: null` = root. No change → no event | `OverviewUpdated` | FR-OVW-02 |
+| `ovw.duplicate` | `{overviewId}` → `{overviewId}` | "‹name› (copy)" cut to 60, same folder, not shown, every item with a new ID. Caps → `conflict` | `OverviewDuplicated` | FR-OVW-03 |
+| `ovw.delete` | `{overviewId}` | Items go with it. Shown → `conflict` "Show something else first" | `OverviewDeleted` | FR-OVW-04 |
+| `ovw.show` | `{overviewId}` | One transaction: active scene off, shown overview off, target on, `sceneHooks.deactivated` for the scene that went off. Already shown → no event. Every player of the campaign resyncs | `OverviewShown` | FR-OVW-05 |
+| `ovw.placeImage` | `{overviewId, assetId, x, y, w, h, hidden?}` → `{itemId}` | `assets.require`; sides 8–16384; on top of its band | `OverviewItemsPlaced` | FR-OVW-15, -22, -23 |
+| `ovw.placeLabel` | `{overviewId, x, y, text, style, hidden?}` → `{itemId}` | Text clean, one line, 1–80; `style` strict (`LabelStyle`) | `OverviewItemsPlaced` | FR-OVW-25–27 |
+| `ovw.updateItems` | `{overviewId, items: [{itemId, x?, y?, w?, h?, hidden?, locked?, stack?, text?, style?, assetId?}]}`, 1–50, none twice | All or nothing. `stack`: `front` / `back` within the band, a group keeping its order. Locked and `x`, `y`, `w` or `h` given → `conflict` (unlock first). By kind, else `invalid`: image no `text` / `style`; label no `w`, `h`, `assetId`, its style has a `dot`; miniature square 8–4096, name 0–40, no `dot`, and a linked one's `text` / `assetId` → `conflict`. No change → no event | `OverviewItemsUpdated` | FR-OVW-19, -21, -23, -24, -26, -27 |
+| `ovw.moveItems` | `{overviewId, moves: [{itemId, x, y}]}`, 1–50, none twice. **DM, player** | All or nothing; locked → `conflict`. Player: one item, else `invalid`; hidden, not shown or unknown → `not_found`, checked first; visible but not their miniature → `forbidden` | `OverviewItemsMoved`, not logged | FR-OVW-17, -35 |
+| `ovw.duplicateItems` | `{overviewId, itemIds}`, 1–50 → `{itemIds}` | Copy +24, +24 clamped to the bounds, flags kept, on top of its band. A linked miniature's copy drops `characterId` (one per character per overview, FR-OVW-31). Caps → `conflict` | `OverviewItemsPlaced` | FR-OVW-15, -21 |
+| `ovw.deleteItems` | `{overviewId, itemIds}`, 1–50 | All or nothing | `OverviewItemsDeleted` | FR-OVW-21 |
+
+Every item ID must be on `overviewId`, else `not_found`, nothing written. **Not in this slice:** `ovw.placeMiniature`, `ovw.addParty`, the character link hook, `ovw.drag`; the `kind`, `characterId`, `ownerPlayerId` and `shape` fields are ready.
+
+**Events** (`OverviewCreated`, `OverviewUpdated`, `OverviewDuplicated`, `OverviewDeleted`: `{overviewId}`; `OverviewShown`: `{overviewId, previousSceneId, previousOverviewId}`; `OverviewItemsPlaced`, `OverviewItemsUpdated`, `OverviewItemsDeleted`, `OverviewItemsMoved`: `{overviewId, itemIds}`). None undoable; players get them only through the scene gate, `OverviewShown` by resync.
+
+**Registries and seams**
+
+| Where | Change | Rule | FR |
+|---|---|---|---|
+| `scenes-map/scene-hooks.ts` | `deactivated?` *(new, non-append member)* | `(env, scene) → RecordChange[]` in `ovw.show`, after the flips, only when a scene went off. `map.activateScene` doesn't run it (`activated` covers a switch). First line: entities re-derive `petPresent` | FR-OVW-44 |
+| `sceneHooks` | + `overviewSceneHook` | `activated`: a shown overview off, in `SceneActivated`'s transaction; the row joins its `changes`. `map.activateScene` itself is unchanged | FR-OVW-06 |
+| `map.deleteFolder` | also moves overviews to the root | Rows join `SceneFolderDeleted` | FR-OVW-02 |
+| `ASSET_USE_KINDS` | + `overview image`, after `prop` | Any item's `assetId`; name = the overview's, one per overview | FR-OVW-45 |
+
+**Signals.** `map.ping`, `map.laser`, `map.pull` carry the overview's ID as `sceneId`, unchanged. `scn.template` from a player with the overview's ID passes the audience hook (it compares IDs) and reaches clients, which draw no template on an overview; a DM's with an overview ID → `not_found` (no such scene).
+
+**Unchanged, tested with an overview shown** (ADR-0075's risk, `overview-scenes/fight.sync.test.ts`, no combat, dice or fog code touched): a running fight (Initiative, attack roll, damage card, next turn), Start on a battle scene not shown, `cbt.start` with an overview ID → `not_found`, pets, free rolls, templates, ping, reconnect, `sync.loadScene` of an overview plain and View as.
+
+**CON-44** (measured, `FR-OVW-08 CON-44`, bundle `overview-scenes` with `ovw-crowd` shown, 300 items and 50 overviews): item row label 594 B, image 436 B, widest (80-char text) 684 B; overview row 277 B (the spec's estimates: 500 B, 200 B). Snapshot DM 184,803 B, player 136,837 B, under the ceilings (DM 1.5 MiB since #256, players 512 KiB). In the DM snapshot in place of the battle scene's tokens and props.
+
+**Fixtures** (FR-OVW-46): units `ovw-sword-coast` (shown; locked `map-large`, three styled labels, one hidden; hidden scroll, `fixtures/assets/props/scroll.svg`), `ovw-phandalin`, `ovw-crowd` (200 labels + 100 images); bundle `overview-scenes` = `scenes` + those. Party miniatures join `ovw-sword-coast` and the crowd's mix with `ovw.addParty` in the miniatures slice. Tests insert miniatures through `overview-scenes/testing.ts` until then.
