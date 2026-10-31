@@ -17,6 +17,7 @@ import { DiceText } from "../dice-extras/DiceText";
 import { SheetShare } from "../log-share/SheetShare";
 import { useOpenPartyTab } from "../party-board/open-tab";
 import { Box } from "./boxes";
+import { CompendiumName } from "./compendium-links";
 import { IntField, SelectField, TextField, useBusy } from "./fields";
 import { OverspendPopover, OverspentTip } from "./overspend";
 import { AddRow, RowTools, useRowPut } from "./rows";
@@ -191,7 +192,9 @@ function FeatureView({ f, index, count }: { f: FeatureRow; index: number; count:
       ) : (
         <>
           <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-            <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">{f.name}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">
+              <CompendiumName list="features" name={f.name} rowId={f.id} />
+            </span>
             <span className="ml-auto flex min-w-0 items-center gap-1">
               {f.source && (
                 <span className="min-w-0 text-[10px] [overflow-wrap:anywhere] text-muted-foreground">
@@ -252,7 +255,9 @@ export function LimitedUsesBox() {
           className="flex flex-col gap-0.5 border-b py-1.5 last:border-b-0"
         >
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-0.5">
-            <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">{f.name}</span>
+            <span className="min-w-0 [overflow-wrap:anywhere] text-sm font-medium">
+              <CompendiumName list="features" name={f.name} rowId={f.id} />
+            </span>
             <span className="flex items-center gap-1">
               <FeatureUses f={f} />
               <SheetShare list="features" rowId={f.id} />
@@ -318,7 +323,7 @@ function ItemView({ it, index, count }: { it: ItemRow; index: number; count: num
       ) : (
         <div className="flex items-baseline justify-between gap-2 text-sm">
           <span className="min-w-0 [overflow-wrap:anywhere]">
-            {it.name}
+            <CompendiumName list="items" name={it.name} rowId={it.id} />
             {it.qty !== 1 && <span className="text-muted-foreground"> ×{it.qty}</span>}
           </span>
           <span className="flex items-center gap-1">

@@ -13,6 +13,7 @@ import {
   FT_PER_CELL,
   TEMPLATE_SIZE,
   TEMPLATE_WIDTH,
+  type TemplateClearData,
   type TemplateGeometry,
   type TemplateRecordView,
   type TemplateShape,
@@ -44,6 +45,12 @@ export interface AoeSettings {
   width: number;
   label: string;
 }
+
+/**
+ * FR-SCN-57: the shapes the AoE tool places. A cylinder covers what a sphere does; a tall one is
+ * a wide line. `cylinder` stays a valid stored shape, so templates already kept keep working.
+ */
+export const AOE_TOOL_SHAPES = ["cone", "sphere", "cube", "line"] as const;
 
 export const DEFAULT_AOE: AoeSettings = {
   shape: "sphere",
@@ -299,6 +306,21 @@ export function templateCaption(label: string, n: number): string {
 export const templateCaptionBy = (label: string, n: number, byName: string | null) =>
   byName === null ? templateCaption(label, n) : `${templateCaption(label, n)} · by ${byName}`;
 
+/** FR-SCN-60: the label's second line: the measures that apply to the shape. */
+export function templateMeasures(t: Pick<TemplateGeometry, "shape" | "size" | "width">): string {
+  switch (t.shape) {
+    case "sphere":
+    case "cylinder":
+      return `${t.size} ft radius`;
+    case "cube":
+      return `${t.size} ft sides`;
+    case "cone":
+      return `${t.size} ft long`;
+    case "line":
+      return `${t.size} ft long · ${t.width ?? TEMPLATE_WIDTH.default} ft wide`;
+  }
+}
+
 /**
  * FR-SCN-47: a drawn template's colour: its person's (`colorOf`; unknown → role accent), but a
  * hidden one keeps `visibility.hidden` styling (OQ-SCN-41 A).
@@ -405,6 +427,44 @@ export function templateAt<
   }
   return null;
 }
+
+export interface EphemeralHitOptions {
+  /** Others' ephemerals are the DM's to clear; a player clears only their own. */
+  client: "dm" | "player";
+  scale: number;
+  grid: Grid;
+  rule?: DiagonalRule;
+}
+
+/**
+ * FR-SCN-58: the ephemeral a right press at map point `p` clears under the AoE tool: this
+ * connection's own (drawn on top), then for the DM another's, topmost first; else null. Hit as a
+ * kept one (true outline, or within 6 screen px).
+ */
+export function ephemeralAt(
+  p: GridPoint,
+  own: TemplateGeometry | null,
+  others: readonly EphemeralTemplate[],
+  o: EphemeralHitOptions,
+): "own" | EphemeralTemplate | null {
+  const g = gridPoint(o.grid, p.x, p.y);
+  const tol = TEMPLATE_HIT_PX / o.scale;
+  const rule = o.rule ?? "5-10-5";
+  if (own && isUnder(own, p, g, tol, o.grid, rule)) return "own";
+  if (o.client !== "dm") return null;
+  for (let i = others.length - 1; i >= 0; i--) {
+    const e = others[i] as EphemeralTemplate;
+    if (isUnder(e.template, p, g, tol, o.grid, rule)) return e;
+  }
+  return null;
+}
+
+/** FR-SCN-58: the `scn.templateClear` frame for another connection's ephemeral. */
+export const clearFrame = (e: EphemeralTemplate): TemplateClearData => ({
+  sceneId: e.sceneId,
+  key: e.key,
+  ...(e.from.role === "player" ? { playerId: e.from.playerId } : {}),
+});
 
 /** FR-SCN-49 / -52: map point `p` (grid units `g`) inside `t`'s true outline or within `tol` map px. */
 function isUnder(
@@ -607,6 +667,8 @@ export class EphemeralSender {
 export interface EphemeralTemplate {
   /** Store key: sender + the frame's `key` (one per sender connection; senders can't clash). */
   id: string;
+  /** The frame's `key`: the DM clears it by this (FR-SCN-58). */
+  key: string;
   sceneId: string;
   /** The server-stamped sender: its colour resolves at draw time (FR-SCN-47). */
   from: SignalFrom;
@@ -656,6 +718,7 @@ export function receiveTemplate(
       ...st.byId,
       [id]: {
         id,
+        key: d.key,
         sceneId: d.sceneId,
         from,
         template,

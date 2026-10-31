@@ -2,8 +2,9 @@
 // resolves its colour at draw time from the person it already carries (a signal's `from`, a
 // token's `ownerPlayerId`, a template's `placedByPlayerId`) via CAMP's `colorOf`, so a colour change
 // redraws them all and nothing colour-shaped is stored or sent. Coloured strokes draw over an
-// opaque dark casing (FR-MAP-72); Konva attrs `color` (the drawn hex) and `by` (player id | `dm`).
+// opaque casing, dark unless the colour is dark itself (FR-MAP-72); Konva attrs `color` (the drawn hex) and `by` (player id | `dm`).
 // DOM-free (testable).
+import { contrastRatio, isHexColor } from "@shared/campaign-management/colors";
 import type { PlayerRecord } from "@shared/campaign-management/schemas";
 import type { RecordStore } from "@shared/protocol/store";
 import {
@@ -23,9 +24,17 @@ type Records = Pick<RecordStore, "you" | "records">;
 
 /** FR-MAP-72: opaque casing under every coloured mark, 2 screen px wider than its stroke. */
 export const CASING_COLOR = "#000";
+/** FR-MAP-72: the casing under a colour that black wouldn't set off. Not white (`primary`'s look). */
+export const LIGHT_CASING_COLOR = "#e7e5e4";
 export const CASING_EXTRA_PX = 2;
 /** Konva `name` of every casing node (its `id` = its mark's id). */
 export const CASING_NAME = "map-casing";
+
+/** FR-MAP-72: the casing for a mark in `color`: dark, or light under a colour nearer black. */
+export const casingOf = (color: string | null | undefined): string =>
+  isHexColor(color) && contrastRatio(color, "#000000") < contrastRatio(color, "#ffffff")
+    ? LIGHT_CASING_COLOR
+    : CASING_COLOR;
 
 /** Casing stroke width in map px for a mark stroked `strokePx` screen px at camera `scale`. */
 export const casingWidth = (strokePx: number, scale: number) =>

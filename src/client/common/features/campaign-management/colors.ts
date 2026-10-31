@@ -10,6 +10,7 @@ import {
   type PaletteKey,
   PLAYER_COLORS,
   paletteKeyOf,
+  readableColor,
 } from "@shared/campaign-management/colors";
 import type { CampaignRecord, PlayerRecord } from "@shared/campaign-management/schemas";
 import type { RecordStore } from "@shared/protocol/store";
@@ -81,6 +82,10 @@ export function colorHex(color: string, read: ReadVar = readCssVar): string {
   return normalizeColor(color) ?? color;
 }
 
+/** `colorHex` for text on a window: a colour too dark to read in its lighter shade (FR-CAMP-31). */
+export const colorText = (color: string, read: ReadVar = readCssVar): string =>
+  readableColor(colorHex(color, read));
+
 /**
  * FR-CAMP-36: the person's colour as a CSS colour string: a stored `#rrggbb` as is; an old
  * palette key → its palette hex (theme token); anything else (old client, deleted row, unknown
@@ -111,5 +116,17 @@ export function useColorOf(): (person: ColorPerson) => string | null {
     (person: ColorPerson) =>
       colorOf({ you, records: { player: player ?? {}, campaign: campaign ?? {} } }, person),
     [player, campaign, you],
+  );
+}
+
+/** `useColorOf` for text on a window: names keep 4.5 : 1 (FR-CAMP-31). */
+export function useTextColorOf(): (person: ColorPerson) => string | null {
+  const colorOf = useColorOf();
+  return useCallback(
+    (person: ColorPerson) => {
+      const color = colorOf(person);
+      return color && readableColor(color);
+    },
+    [colorOf],
   );
 }

@@ -296,6 +296,23 @@ describe("FR-FOG-10 derive per call site", () => {
     ]);
   });
 
+  test("FR-MAP-150 / FR-FOG-10 a DM-set size re-derives fog and runs the token-changed hooks", () => {
+    const t = setup();
+    const s = t.newScene();
+    registerFog();
+    fog(s.id, [10, 0]);
+    const a = t.place(s.id, t.h.goblinId, 10, 0);
+    expect(a.fogged).toBe(true);
+    const calls: string[] = [];
+    tokenHooks.register("test.spy", (_env, before, after) => {
+      calls.push(`${before.size}->${after?.size}`);
+      return [];
+    });
+    t.run(I.updateToken, { tokenId: a.id, size: "large" }); // now reaches clear cells
+    expect(t.raw(a.id)).toMatchObject({ size: "large", fogged: false });
+    expect(calls).toEqual([`${a.size}->large`]);
+  });
+
   test("FR-FOG-10 / FR-FOG-13 size refresh: re-derived; token-changed hooks only on a fog-hidden flip", () => {
     const t = setup();
     const s = t.newScene();

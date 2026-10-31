@@ -9,6 +9,7 @@ import { templateContextMenu } from "../scene-tools/aoe-store";
 import { ScnEditLayer } from "../scene-tools/layers/EditLayer";
 import { ScnPropsLayer } from "../scene-tools/layers/PropsLayer";
 import { ScnStructureLayer } from "../scene-tools/layers/StructureLayer";
+import { ScnTemplateLabelsLayer } from "../scene-tools/layers/TemplateLabelsLayer";
 import { ScnTemplatesLayer } from "../scene-tools/layers/TemplatesLayer";
 import { VFX_LAYER_SWITCH, VfxOverLayer, VfxUnderLayer, vfxContextMenu } from "../spell-fx/layers";
 import { LAYER_ORDER, type LayerDef, orderLayers } from "./layers";
@@ -51,6 +52,14 @@ export const canvasLayers: readonly LayerDef<object>[] = orderLayers<object>([
     toggle: { key: "templates", label: "Templates", layer: "objects" },
     // FR-SCN-48 / -51: right-click menu on a kept template (FR-MAP-71 step 4).
     contextMenu: templateContextMenu,
+  },
+  // FR-SCN-59: the templates' label pills, over the tokens and their labels (no toggle: the
+  // Templates switch unmounts the layer above, which removes its pills).
+  {
+    id: "scn-template-labels",
+    order: LAYER_ORDER.scnTemplateLabels,
+    layer: "top",
+    component: ScnTemplateLabelsLayer,
   },
   {
     id: "scn-edit",

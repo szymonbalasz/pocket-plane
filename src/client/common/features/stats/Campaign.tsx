@@ -20,7 +20,7 @@ import {
 } from "../../components/ui/primitives";
 import { cn } from "../../lib/utils";
 import { useSync } from "../../sync/store";
-import { type ColorPerson, useColorOf } from "../campaign-management/colors";
+import { type ColorPerson, useTextColorOf } from "../campaign-management/colors";
 import {
   awardsWonText,
   CAMPAIGN_RECORD_TITLE,
@@ -230,7 +230,7 @@ function AwardsWon({ awards }: { awards: CampaignStats["awards"] }) {
 
 /** A character's name in its player's colour (the award cards' rule). */
 function Who({ name, playerId }: { name: string; playerId: string | null }) {
-  const colorOf = useColorOf();
+  const colorOf = useTextColorOf();
   const person: ColorPerson = playerId ? { role: "player", playerId } : { role: "dm" };
   return <span style={{ color: colorOf(person) ?? undefined }}>{name}</span>;
 }

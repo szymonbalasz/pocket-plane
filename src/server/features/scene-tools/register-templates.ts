@@ -1,7 +1,7 @@
 // Templates: scn.placeTemplate / updateTemplate / deleteTemplate / clearTemplates (WS intents),
 // the `scn.template` signal (DM, players) with its audience (FR-SCN-23/24, ADR-0033) and the
 // sprint-4 boot re-derive of DM templates' fog copies (FR-SCN-46).
-import { SCN_SIGNALS, TemplateSignalData } from "@shared/scene-tools/schemas";
+import { SCN_SIGNALS, TemplateClearData, TemplateSignalData } from "@shared/scene-tools/schemas";
 import type { Registrar } from "../../services";
 import { defineSignal } from "../../ws/signals";
 import { rederiveDmTemplates } from "./template-rederive";
@@ -10,6 +10,7 @@ import {
   deleteTemplate,
   placeTemplate,
   templateAudience,
+  templateClearAudience,
   updateTemplate,
 } from "./templates";
 
@@ -24,6 +25,14 @@ export function registerTemplates(r: Registrar): void {
       schema: TemplateSignalData,
       roles: ["dm", "player"],
       audience: templateAudience,
+    }),
+  );
+  r.signal(
+    defineSignal({
+      name: SCN_SIGNALS.templateClear,
+      schema: TemplateClearData,
+      roles: ["dm"],
+      audience: templateClearAudience,
     }),
   );
   r.onStart("scene-tools.template-rederive", (s) => {

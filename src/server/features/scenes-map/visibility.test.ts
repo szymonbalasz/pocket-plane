@@ -124,6 +124,20 @@ const dm = v("dm");
 const owner = v("player", "p1");
 const other = v("player", "p2");
 
+test("FR-MAP-150 whether the DM set a token's size is on no wire; the size itself is", () => {
+  const set = {
+    ...token("t", "s1", false, "p1"),
+    size: "huge" as const,
+    sizeOverridden: true as const,
+  };
+  const r = registry("s1");
+  for (const viewer of [dm, owner, other]) {
+    const { data } = r.view("token", set, viewer);
+    expect(data).not.toHaveProperty("sizeOverridden");
+    expect(data).toHaveProperty("size", "huge");
+  }
+});
+
 test("FR-MAP-116 the list's order never reaches a player", () => {
   expect(redactScene(scene("s", true))).not.toHaveProperty("position");
 });

@@ -21,6 +21,7 @@ import {
   TEMPLATE_WIDTH,
   TEMPLATES_PER_PLAYER_MAX,
   TEMPLATES_PER_SCENE_MAX,
+  type TemplateClearData,
   type TemplateGeometry,
   TemplateIdInput,
   type TemplateShape,
@@ -325,4 +326,26 @@ export function templateAudience(
   const { seenBy } = templateCopies(read.db, s, data, null);
   if (seenBy === null) return "all";
   return seenBy.length === 0 ? "dm" : { players: seenBy };
+}
+
+/**
+ * FR-SCN-58: `scn.templateClear` routing (DM only, by the signal's `roles`). The scene must be the
+ * campaign's (else `not_found`). Reaches the DM's other tabs and the player it names; never a
+ * player for a non-active scene (SCN §13 leak list), where no player's ephemeral can be anyway.
+ */
+export function templateClearAudience(
+  data: TemplateClearData,
+  sender: SignalSender,
+  read: SignalRead,
+): SignalAudience {
+  const s = read.db
+    .select({ id: scene.id })
+    .from(scene)
+    .where(and(eq(scene.id, data.sceneId), eq(scene.campaignId, sender.campaignId)))
+    .get();
+  if (!s) throw notFound("Scene not found");
+  if (data.playerId === undefined || data.sceneId !== read.activeSceneOf(sender.campaignId)) {
+    return "dm";
+  }
+  return { players: [data.playerId] };
 }
