@@ -20,6 +20,8 @@ export const MAP_INTENTS = {
   setLocked: "map.setLocked",
   placeToken: "map.placeToken",
   moveToken: "map.moveToken",
+  /** FR-MAP-121: DM only; the move plus a smoke cue at both ends. */
+  teleportToken: "map.teleportToken",
   updateToken: "map.updateToken",
   setTokenHidden: "map.setTokenHidden",
   duplicateToken: "map.duplicateToken",
@@ -291,6 +293,10 @@ export type PlaceTokenInput = z.input<typeof PlaceTokenInput>;
 
 export const MoveTokenInput = z.strictObject({ tokenId: Id, col: CellIndex, row: CellIndex });
 export type MoveTokenInput = z.input<typeof MoveTokenInput>;
+
+/** FR-MAP-121: `map.teleportToken` (same fields as `map.moveToken`). */
+export const TeleportTokenInput = MoveTokenInput;
+export type TeleportTokenInput = MoveTokenInput;
 
 /** FR-SCN-38: `map.checkMove` (same fields as `map.moveToken`). */
 export const CheckMoveInput = MoveTokenInput;
