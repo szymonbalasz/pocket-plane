@@ -4,7 +4,7 @@
 // FR-SHELL-22) < toast stack (900) < popovers, menus, Select lists, tooltips (`POPOVER_Z` 950,
 // portalled; `components/ui/layers.ts`) < overlay layer (FR-SHELL-112 (2), -135) < dice layer.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ConnectionIndicator, ReconnectBanner } from "../live-sync/ConnectionStatus";
+import { ConnectionIndicator, ReconnectBannerSlot } from "../live-sync/ConnectionStatus";
 import { AlertFlash } from "./AlertLayer";
 import { testSoundAttr } from "./alerts";
 import { TOP_BAR_H } from "./geometry";
@@ -282,9 +282,7 @@ export function PlayFrame({ client, topLeft, topStatus, topEnd, base, toolRail }
         ) : null;
       })}
 
-      <div className="absolute inset-x-0 z-30 bg-background/90" style={{ top: TOP_BAR_H }}>
-        <ReconnectBanner />
-      </div>
+      <ReconnectBannerSlot />
 
       <AlertFlash />
 
