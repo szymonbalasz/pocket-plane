@@ -14,6 +14,7 @@ import {
   windowId,
 } from "@ui/features/play-shell/manager";
 import type { PlacementToken } from "@ui/features/play-shell/placement";
+import { TRAY_KIND } from "@ui/features/play-shell/placer";
 import { runScript } from "@ui/features/play-shell/replay";
 
 mock.module("../campaign-management/PlayersPanel", () => ({ PlayersPanel: () => null }));
@@ -84,6 +85,10 @@ test("FR-SHELL-210 sim-17 k02: Attack on the stat block keeps it open and where 
   expect(overlap(tray, stat)).toBe(false);
   expect(p.pcClear.get(windowId(DICEX_TRAY_KIND))).toBe(true);
   expect([...p.putAway.keys()]).toEqual([]);
+});
+
+test("FR-SHELL-210 the placer's tray kind is the tray's", () => {
+  expect(TRAY_KIND).toBe(DICEX_TRAY_KIND);
 });
 
 test("FR-SHELL-210 without an opener the ladder stands: the same open from the launcher puts the stat block away (FR-SHELL-78)", () => {

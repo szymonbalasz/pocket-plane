@@ -23,7 +23,6 @@
 // squeezed, displaced or pushed (its tool-bar push and on-screen nudge are render-only); zones
 // ignore it. The ladder above runs for untouched windows only.
 import { MAIN_INSTANCE, type WindowState } from "@shared/play-shell/layout";
-import { DICEX_TRAY_KIND } from "../dice-extras/window-kind";
 import {
   clampRect,
   EDGE_GAP,
@@ -431,6 +430,13 @@ export function autoMinimiseOrder(
     .sort((a, b) => isLate(a) - isLate(b) || a.z - b.z || (at.get(a) ?? 0) - (at.get(b) ?? 0));
 }
 
+/**
+ * The Dice tray's kind, for FR-SHELL-210 and FR-MAP-125: a literal, as `SQUEEZE` below. Importing
+ * `dice-extras/window-kind` here takes that code over FR-DICEX-22's initial-chunk bound. A test
+ * pins it to `DICEX_TRAY_KIND`.
+ */
+export const TRAY_KIND = "dicex.tray";
+
 /** FR-SHELL-101's squeeze order: Game log, then DM Initiative / player sheet, then player Initiative. */
 const SQUEEZE: Record<"dm" | "player", readonly string[]> = {
   dm: ["dice.log", "cbt.initiative"],
@@ -537,7 +543,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
   /** FR-SHELL-210: the window this Dice tray open came from gives way only as a last resort. */
   const inUse =
     (trigger.type === "open" || trigger.type === "reopen" || trigger.type === "settle") &&
-    trigger.kind === DICEX_TRAY_KIND
+    trigger.kind === TRAY_KIND
       ? ctx.inUse?.()
       : undefined;
   /** FR-SHELL-77, -78's candidates for `kind`, without the window in use. */
@@ -1129,7 +1135,7 @@ export function settle(ws: Windows, trigger: Trigger, ctx: ManagerContext): Plan
       if (!dry) {
         yields = true;
         // FR-MAP-125: the Dice tray is a moment's window; the others keep FR-MAP-97.
-        if (def.kind === DICEX_TRAY_KIND && "kind" in trigger) {
+        if (def.kind === TRAY_KIND && "kind" in trigger) {
           undoFor = windowId(trigger.kind, trigger.instance);
         }
       }
